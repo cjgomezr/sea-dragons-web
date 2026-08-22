@@ -226,8 +226,7 @@ whenever a skill is added or removed.
 | `write-prd`                             | planning a feature or decomposing a spec |
 | `write-ticket`                          | creating or refining issues              |
 | `bootstrap`                             | initializing a brand-new project         |
-| <!-- add project skills here, e.g.: --> |                                          |
-| <!-- `go-practices` -->                 | <!-- touching any .go file -->           |
+| `nextjs-supabase-practices`             | touching any .ts/.tsx under `src/`, any migration under `supabase/migrations/`, or any `api/v1` handler |
 
 If a task clearly falls under a skill that does NOT exist yet (a stack, a
 domain, a recurring procedure with rules worth writing down), say so in the PR
