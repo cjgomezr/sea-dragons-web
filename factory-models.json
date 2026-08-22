@@ -1,0 +1,13 @@
+{
+  "_readme": "Modelos que usa cada pieza de la fábrica. Valores válidos: haiku | sonnet | opus (o un ID completo de modelo). worker = el Claude headless que implementa tickets (process-backlog.sh y los workflows de GitHub lo leen de aquí directamente). codeReviewer / uiReviewer = los agentes revisores (su frontmatter no puede leer JSON: tras editar este archivo corre `bash scripts/apply-models.sh` y commitea). planning = recomendación para tus sesiones de PRD/plan maestro; no se aplica automáticamente: elígelo tú con /model dentro de la sesión. Recomendación general: sonnet para todo el trabajo diario; sube a opus el reviewer (o el worker) solo en epics críticos como pagos o permisos, y bájalo al terminar.",
+  "_readme_review": "review.uiReview controla cuándo corre el agente ui-reviewer (el que MIRA screenshots, lo caro en tokens; los tests de regresión visual de Playwright corren siempre y no gastan tokens). Valores: 'label' (default, recomendado) = solo en tickets que lleven el label ui-review; write-ticket lo sugiere para tickets de UI visible y tú ratificas en el gate; 'always' = en todo ticket que toque UI; 'off' = nunca (los tests visuales siguen siendo obligatorios). Cambiar aquí no requiere apply-models.sh: el worker lee este archivo directamente.",
+  "models": {
+    "worker": "sonnet",
+    "codeReviewer": "sonnet",
+    "uiReviewer": "sonnet",
+    "planning": "opus"
+  },
+  "review": {
+    "uiReview": "label"
+  }
+}

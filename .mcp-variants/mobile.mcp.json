@@ -1,0 +1,10 @@
+{
+  "_comment": "Mobile variant. Replace .mcp.json with this file when the project is a mobile app (React Native/Expo, native). Gives Claude eyes on iOS simulators / Android emulators / real devices instead of the browser. Also swap {{E2E_TEST_CMD}} to Maestro/Detox in CLAUDE.md and stop-gate.sh. iOS simulator requires macOS.",
+  "mcpServers": {
+    "mobile": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@mobilenext/mobile-mcp@latest"]
+    }
+  }
+}

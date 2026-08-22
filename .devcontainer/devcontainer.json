@@ -1,0 +1,22 @@
+{
+  "name": "claude-factory-sandbox",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:20",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "npm install -g @anthropic-ai/claude-code && npm ci && npx playwright install --with-deps chromium",
+  "remoteEnv": {
+    "PERMISSION_MODE": "bypassPermissions"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+    }
+  }
+  // Why this exists: full-bypass permissions (zero interruptions) are only
+  // safe inside a disposable container. Open the repo in this devcontainer,
+  // then run:  bash scripts/process-backlog.sh
+  // For a hardened variant with a network firewall (allowlist npm/GitHub/
+  // Anthropic only), see Anthropic's reference devcontainer:
+  // https://docs.anthropic.com/en/docs/claude-code/devcontainer
+}

@@ -1,0 +1,124 @@
+# Two triggers for the factory in the cloud:
+#  1. Label an issue `ready-for-dev` → Claude implements it right away.
+#  2. Nightly schedule → processes eligible `pending` issues.
+# Credenciales: ver el paso 'Resolver credencial del actor'.
+#   Cron nocturno → CLAUDE_CODE_OAUTH_TOKEN (o ANTHROPIC_API_KEY).
+#   Humanos       → CLAUDE_TOKEN_<SU_USUARIO> (o ANTHROPIC_API_KEY).
+# Requiere además la GitHub App de Claude instalada (github.com/apps/claude).
+name: claude-backlog
+
+on:
+  issues:
+    types: [labeled]
+  schedule:
+    - cron: "0 16 * * *" # 02:00 Australia/Sydney (UTC+10). Adjust to taste
+  workflow_dispatch: {}
+
+jobs:
+  implement:
+    # Runs when an issue gets the ready-for-dev label, or on schedule/manual.
+    if: github.event_name != 'issues' || github.event.label.name == 'ready-for-dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    concurrency:
+      group: claude-backlog-${{ github.event.issue.number || github.run_id }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci || npm install   # el template no trae lockfile hasta el primer install
+      - run: npx playwright install --with-deps chromium
+
+      - name: Read worker model from factory-models.json
+        run: echo "FACTORY_MODEL=$(jq -r '.models.worker // "sonnet"' factory-models.json 2>/dev/null || echo sonnet)" >> $GITHUB_ENV
+
+      - name: Resolver credencial del actor
+        id: cred
+        shell: bash
+        env:
+          # ── Mapa de tokens por persona: una línea por integrante del equipo.
+          #    Cada quien planta el suyo: claude setup-token → gh secret set CLAUDE_TOKEN_SU_USUARIO
+          TOK_CJGOMEZR: ${{ secrets.CLAUDE_TOKEN_CJGOMEZR }}
+          # TOK_ANA_LOPEZ: ${{ secrets.CLAUDE_TOKEN_ANA_LOPEZ }}
+          # ── CRON_OAUTH es la bolsa EXCLUSIVA del turno nocturno (schedule).
+          #    Los humanos jamás caen ahí: token personal, o API key de equipo,
+          #    o auto-onboarding en el issue.
+          CRON_OAUTH: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          DEFAULT_API: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          NUM: ${{ github.event.issue.number }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "schedule" ]; then
+            # Turno nocturno: bolsa del cron → API key de equipo → error.
+            if [ -n "$CRON_OAUTH" ]; then
+              echo "🔑 Credencial: CLAUDE_CODE_OAUTH_TOKEN (bolsa del cron)"
+              { echo "oauth=$CRON_OAUTH"; echo "api="; } >> "$GITHUB_OUTPUT"
+            elif [ -n "$DEFAULT_API" ]; then
+              echo "🔑 Credencial: ANTHROPIC_API_KEY (API key de equipo)"
+              { echo "oauth="; echo "api=$DEFAULT_API"; } >> "$GITHUB_OUTPUT"
+            else
+              echo "::error title=Sin credencial::el cron no tiene CLAUDE_CODE_OAUTH_TOKEN ni ANTHROPIC_API_KEY"
+              exit 1
+            fi
+            exit 0
+          fi
+          A="${GITHUB_ACTOR^^}"; A="${A//[^A-Z0-9]/_}"; KEY="TOK_$A"
+          TOKEN="${!KEY:-}"
+          if [ -n "$TOKEN" ]; then
+            echo "🔑 Credencial: $KEY (token personal de $GITHUB_ACTOR)"
+            { echo "oauth=$TOKEN"; echo "api="; } >> "$GITHUB_OUTPUT"
+          elif [ -n "$DEFAULT_API" ]; then
+            echo "🔑 Credencial: ANTHROPIC_API_KEY (API key de equipo)"
+            { echo "oauth="; echo "api=$DEFAULT_API"; } >> "$GITHUB_OUTPUT"
+          else
+            echo "::error title=Sin credencial::$GITHUB_ACTOR no tiene token ($KEY) y el repo no tiene fallback"
+            if [ -n "${NUM:-}" ]; then
+              BODY=$(printf '🔑 @%s: no encontré credencial tuya para correr la fábrica en la nube, y este repo no tiene token común.\n\nPlanta tu token personal:\n```\nclaude setup-token\ngh secret set CLAUDE_TOKEN_%s --repo %s\n```\n\nY pide que agreguen la línea `TOK_%s` al mapa de credenciales de los workflows (ver GUIA-DE-LA-FABRICA.md, Parte 8). Luego vuelve a poner la etiqueta ready-for-dev.' "$GITHUB_ACTOR" "$A" "$GITHUB_REPOSITORY" "$A")
+              gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body "$BODY" || true
+            fi
+            exit 1
+          fi
+
+      - name: Run Claude Code on the issue / backlog
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Credencial resuelta por el paso "Resolver credencial del actor":
+          # cron → bolsa del cron; humanos → su token personal (o API key de equipo).
+          #
+          # NOTA sobre credenciales de la APP en la nube: el runner no tiene tu
+          # .env.local. Si los tests de integración necesitan servicios reales
+          # (p. ej. Supabase), crea sus valores como secrets del repo y expórtalos
+          # agregando al step un bloque env:, por ejemplo:
+          #   env:
+          #     NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          #     NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          #     SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Sin esto, los tests de integración se saltan/fallan en la nube y los
+          # workers nocturnos entregan trabajo sin verificar contra servicios reales.
+          claude_code_oauth_token: ${{ steps.cred.outputs.oauth }}
+          anthropic_api_key: ${{ steps.cred.outputs.api }}
+          prompt: |
+            ${{ github.event_name == 'issues'
+              && format('Process GitHub issue #{0} following the issue lifecycle in CLAUDE.md: label in-progress, branch impl-{0}, TDD until the Definition of Done passes, code-reviewer (and the ui-reviewer ONLY when the UI-review policy in factory-models.json applies to this issue) until APPROVED, then draft PR with "Closes #{0}". If blocked, label needs-human with an explanatory comment.', github.event.issue.number)
+              || 'Process up to 5 eligible pending issues per CLAUDE.md, one at a time (not blocked, highest priority, lowest number first). SKIP any issue that already has an assignee. An assignee is a human''s claim and the nightly run must respect it. For each, the full issue lifecycle: in-progress label, branch impl-N, TDD until Definition of Done, reviewer subagents until APPROVED (ui-reviewer only per the UI-review policy in factory-models.json), draft PR (auto-merge per CLAUDE.md only if the issue has the auto-merge label). After finishing each issue, re-check eligibility: an auto-merged PR may have unblocked dependents. Stop when none are eligible or 5 are done.' }}
+          claude_args: "--max-turns 80 --model ${{ env.FACTORY_MODEL }}"
+
+      - name: Leave a note on the issue if the run failed
+        if: failure() && github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label needs-human || true
+          gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "🤖 **La corrida en la nube falló** antes de completar este issue (ver logs en la pestaña Actions. Causas típicas: límite de cuota/créditos, secreto no configurado, o error del entorno). Cualquier trabajo parcial quedó en la rama del PR si alcanzó a crearse. Para reintentar: resolver la causa y volver a poner el label \`ready-for-dev\` (quitándolo primero si sigue puesto)." || true

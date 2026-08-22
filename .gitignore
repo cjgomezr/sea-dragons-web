@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+coverage/
+test-results/
+playwright-report/
+.env
+.env.*
+*.log
+.DS_Store
+
+# Claude worktrees (obreros de la fábrica, nunca commitear)
+.claude/worktrees/
+.factory/

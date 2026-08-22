@@ -1,0 +1,23 @@
+# Deterministic bookkeeping: when an issue closes (merge or manual), remove
+# the factory queue labels so the board and the labels never contradict each
+# other. No Claude involved: free, instant, runs on GitHub's token.
+name: labels-cleanup
+
+on:
+  issues:
+    types: [closed]
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Remove queue labels on close
+        run: |
+          for l in in-progress pending needs-human ready-for-dev; do
+            gh issue edit ${{ github.event.issue.number }} \
+              --repo ${{ github.repository }} --remove-label "$l" 2>/dev/null || true
+          done
