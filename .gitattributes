@@ -1,0 +1,8 @@
+* text=auto
+
+# Los scripts de la fábrica los ejecuta bash: con CRLF fallan con errores de
+# `\r` en un clon hecho en Windows.
+*.sh text eol=lf
+
+# Las líneas base visuales son binarias y por plataforma; nunca se normalizan.
+*.png binary

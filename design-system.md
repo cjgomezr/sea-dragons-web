@@ -1,4 +1,4 @@
-# Design System: {{PROJECT_NAME}}
+# Design System: Victoria Seadragons
 
 This file is the visual source of truth. With a mockup, the ui-reviewer
 compares against the mockup; **without a mockup, it reviews against this
@@ -19,7 +19,7 @@ Customize the tokens below per project; the checklists rarely change.
 
 | Role                      | Value                                   | Usage                          |
 | ------------------------- | --------------------------------------- | ------------------------------ |
-| Primary                   | `{{COLOR_PRIMARY}}` (default `#2563EB`) | Primary actions, links, focus  |
+| Primary                   | `#2563EB` (por defecto, SIN diseño de referencia todavía) | Primary actions, links, focus  |
 | Primary hover             | 10% darker                              | Hover on primary               |
 | Surface                   | `#FFFFFF`                               | Cards, panels                  |
 | Background                | `#F8FAFC`                               | Page background                |
@@ -40,14 +40,14 @@ cards in a grid share identical gaps; label-to-input distance is constant).
 
 ### Typography
 
-- Font: `{{FONT_FAMILY}}` (default: system stack). Max 2 families total.
+- Font: system stack (`ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto`), por defecto. Max 2 families total.
 - Scale: 12 / 14 / 16 (body) / 18 / 24 / 32 / 40 px. Line height ≥ 1.5 for
   body, ≥ 1.2 for headings. Max ~70ch line length for reading text.
 - Hierarchy by size + weight, never by color alone.
 
 ### Shape & elevation
 
-- Border radius: {{RADIUS}} (default 8px) everywhere interactive; pick ONE
+- Border radius: 8px everywhere interactive; pick ONE
   radius and stick to it.
 - Max 2 elevation levels (e.g. card shadow + modal shadow).
 

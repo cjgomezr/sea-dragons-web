@@ -1,20 +1,39 @@
 {
-  "name": "fabrica-app",
+  "name": "sea-dragons-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Created from the fabrica-template. Replace this description.",
+  "description": "Plataforma web del club Victoria Seadragons (rugby subacuático, Melbourne).",
   "scripts": {
-    "dev": "echo 'TODO: replace with your dev server ({{DEV_SERVER_CMD}})' && exit 1",
-    "test": "echo 'TODO: replace with your test runner ({{TEST_CMD}})' && exit 1",
+    "dev": "next dev -p 3417",
+    "build": "next build",
+    "start": "next start -p 3417",
+    "test": "vitest run",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test"
   },
+  "dependencies": {
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.98.0",
+    "next": "^16.3.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.0",
     "@playwright/test": "^1.50.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^5.1.1",
     "eslint": "^9.0.0",
+    "eslint-config-next": "^16.3.2",
+    "jsdom": "^28.0.1",
     "prettier": "^3.3.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^4.0.18"
   }
 }

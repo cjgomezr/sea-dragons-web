@@ -23,7 +23,7 @@ import AxeBuilder from "@axe-core/playwright";
 
 // Filled by /bootstrap with this project's own port. Never hardcode 3000:
 // every factory on the machine would fight over it and test each other's app.
-const APP_URL = process.env.APP_URL ?? "{{APP_URL}}";
+const APP_URL = process.env.APP_URL ?? "http://localhost:3417";
 
 const viewports = [
   { name: "mobile", width: 375, height: 812 },

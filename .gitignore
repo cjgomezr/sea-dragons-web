@@ -1,4 +1,6 @@
 node_modules/
+.next/
+next-env.d.ts
 dist/
 build/
 coverage/
@@ -6,9 +8,11 @@ test-results/
 playwright-report/
 .env
 .env.*
+!.env.local.example
 *.log
 .DS_Store
 
 # Claude worktrees (obreros de la fábrica, nunca commitear)
 .claude/worktrees/
 .factory/
+*.tsbuildinfo

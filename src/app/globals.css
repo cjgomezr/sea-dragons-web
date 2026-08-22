@@ -1,0 +1,162 @@
+/*
+ * Tokens de design-system.md. Sin diseño de referencia todavía: el primario es
+ * el azul por defecto (#2563EB). Cámbialo aquí y en design-system.md a la vez
+ * cuando el club entregue su identidad.
+ */
+:root {
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-surface: #ffffff;
+  --color-background: #f8fafc;
+  --color-text: #0f172a;
+  --color-text-secondary: #64748b;
+  --color-border: #e2e8f0;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  --radius: 8px;
+  --font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+:root[data-theme="dark"] {
+  --color-primary: #60a5fa;
+  --color-primary-hover: #93c5fd;
+  --color-surface: #1e293b;
+  --color-background: #0f172a;
+  --color-text: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-border: #334155;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-background);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-brand {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.app-nav {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-nav a {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.app-nav a[aria-current="page"] {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.theme-toggle {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: auto;
+  font-size: 18px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  border-color: var(--color-primary);
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 960px;
+  padding: var(--space-8) var(--space-4);
+  margin: 0 auto;
+}
+
+.app-main h1 {
+  margin: 0 0 var(--space-2);
+  font-size: 32px;
+  line-height: 1.2;
+}
+
+.app-lead {
+  max-width: 70ch;
+  margin: 0 0 var(--space-8);
+  color: var(--color-text-secondary);
+}
+
+.card {
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.card h2 {
+  margin: 0 0 var(--space-3);
+  font-size: 18px;
+}
+
+.card p {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+.card a {
+  color: var(--color-primary);
+}
+
+.app-footer {
+  padding: var(--space-4);
+  color: var(--color-text-secondary);
+  border-top: 1px solid var(--color-border);
+}
+
+.app-footer p {
+  max-width: 960px;
+  margin: 0 auto;
+  font-size: 14px;
+}

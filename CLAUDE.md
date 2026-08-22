@@ -1,34 +1,41 @@
-# CLAUDE.md: {{PROJECT_NAME}}
-
-<!-- Reemplaza los placeholders {{...}} al copiar esta plantilla a un repo.
-     Replace the {{...}} placeholders when copying this template into a repo. -->
+# CLAUDE.md: Victoria Seadragons
 
 ## Project
 
-{{PROJECT_DESCRIPTION}}
+Plataforma web del club Victoria Seadragons (rugby subacuático, Melbourne):
+membresías, calendario y RSVP, asistencia, evaluaciones, team builder, noticias
+y cobros por Stripe. Fuente: `docs/SRD_Victoria_Seadragons_Club_Platform.md`
+(v1.3) y `docs/plan-maestro.md` (14 epics).
 
-Stack: {{STACK}} (default: Node.js + TypeScript)
+`docs/preguntas-abiertas.md` lista los bloqueadores y contradicciones que la
+auditoría del bootstrap encontró en esos dos documentos. Antes de escribir un
+ticket de un epic, comprueba si ese epic aparece ahí sin resolver.
+
+Stack: Next.js 16 (App Router) + TypeScript estricto + Supabase (Postgres,
+Auth, Storage) + Stripe (desde E12). API REST JSON versionada bajo
+`src/app/api/v1` (CON-002: Release 2 es React Native sobre los mismos
+endpoints).
 
 ## Commands
 
-- Install: `{{INSTALL_CMD}}` (default: `npm install`)
-- Dev server: `{{DEV_SERVER_CMD}}` (default: `npm run dev`, serves `{{APP_URL}}`;
+- Install: `npm install`
+- Dev server: `npm run dev` (sirve `http://localhost:3417`;
   bootstrap assigns this project its own port, never the shared 3000)
-- Tests: `{{TEST_CMD}}` (default: `npm test`)
-- E2E / visual: `{{E2E_TEST_CMD}}` (default: `npx playwright test`)
-- Lint: `{{LINT_CMD}}` (default: `npx eslint . --max-warnings 0`)
-- Types: `{{TYPECHECK_CMD}}` (default: `npx tsc --noEmit`)
+- Tests: `npm test` (Vitest)
+- E2E / visual: `npx playwright test`
+- Lint: `npm run lint`
+- Types: `npm run typecheck`
 
 ## Definition of Done
 
 A task is ONLY finished when ALL of the following are true. The Stop hook
 enforces this; you cannot end the session with failing checks.
 
-1. All tests pass (`{{TEST_CMD}}`), including new tests for the new behavior.
-2. Lint passes with zero warnings (`{{LINT_CMD}}`).
-3. Type check passes (`{{TYPECHECK_CMD}}`).
+1. All tests pass (`npm test`), including new tests for the new behavior.
+2. Lint passes with zero warnings (`npm run lint`).
+3. Type check passes (`npm run typecheck`).
 4. If UI changed: visual regression + accessibility tests pass
-   (`{{E2E_TEST_CMD}}`) whenever the project has a Playwright config. They
+   (`npx playwright test`) whenever the project has a Playwright config. They
    cost no tokens, so they are never skipped to save budget. If Playwright or
    `scripts/ui-preflight.sh` reports that something else already answers on
    the app's URL, that is a blocker, not a nuisance: a server you did not
@@ -39,7 +46,7 @@ enforces this; you cannot end the session with failing checks.
    `"always"` = every UI change; `"label"` (default) = only when this issue
    carries the `ui-review` label; `"off"` = never.
 5. The `code-reviewer` subagent has replied `APPROVED`.
-6. Budget: {{MAX_ATTEMPTS}} (default: 5) correction cycles TOTAL across all
+6. Budget: 5 correction cycles TOTAL across all
    checks (the Stop gate enforces the same number). If still failing, stop,
    label the issue `needs-human`, and comment exactly what was tried and what
    is blocking. If the gate itself gave up (`.factory/gate-gave-up` exists),
@@ -196,8 +203,7 @@ body -q .body` → edit → `gh issue edit N --body-file`). A box you cannot bac
    NOT assume it worked. Never add the `auto-merge` label yourself.
 
 8. **Blockers.** Retries are ONLY for problems you can fix yourself (failing
-   tests, lint, types, your own bugs) and the budget is {{MAX_ATTEMPTS}}
-   (default 5) correction cycles TOTAL across all checks; the Stop gate
+   tests, lint, types, your own bugs) and the budget is 5 correction cycles TOTAL across all checks; the Stop gate
    enforces the same number. If the blocker is something only a human can
    provide (missing credentials or env vars, an external service not
    configured, a permission not granted, a dependency that cannot be
@@ -266,7 +272,7 @@ agent only ever writes "In Progress" (and "Todo" at creation time).
 ## Documents & tickets
 
 Issues, PRDs and PR descriptions are written with the `write-ticket` /
-`write-prd` skills. Default language: {{DOC_LANG}} (es | en). When in doubt,
+`write-prd` skills. Default language: es. When in doubt,
 match the language of the request.
 
 ### House style (applies to everything the factory writes)
@@ -302,3 +308,13 @@ model writes.
 - The full chain must stay traceable in the repo:
   source (SRD/brief) → `docs/plan-maestro.md` → `docs/prd/<epic>.md` →
   tickets → code.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
