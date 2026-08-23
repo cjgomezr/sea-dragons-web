@@ -10,6 +10,8 @@ const config = [
       "playwright-report/**",
       "tests/**/*-snapshots/**",
       "next-env.d.ts",
+      // Handoff de Claude Design: HTML y runtime generados, no código del proyecto.
+      "docs/**",
     ],
   },
   ...coreWebVitals,

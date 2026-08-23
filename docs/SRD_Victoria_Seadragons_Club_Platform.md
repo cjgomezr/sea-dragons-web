@@ -3,11 +3,11 @@
 
 | | |
 |---|---|
-| **Version** | 1.3 (Draft) |
-| **Date** | 15 July 2026 |
+| **Version** | 1.4 (Draft) |
+| **Date** | 23 August 2026 |
 | **Author** | Sebastián V. (PacifiCode) |
 | **Source** | Claude Design handoff bundle — `Seadragons Platform.dc.html` prototype + stakeholder interview |
-| **Status** | For review — v1.1 resolved: casual prepaid packs, coach event permissions, configurable skill categories, minor-consent registration. v1.2 resolved: plan changes at next cycle, Stripe-managed one-off charges, no evaluation versioning, no dashboard export. v1.3 resolved: no pack discounts |
+| **Status** | For review — v1.1 resolved: casual prepaid packs, coach event permissions, configurable skill categories, minor-consent registration. v1.2 resolved: plan changes at next cycle, Stripe-managed one-off charges, no evaluation versioning, no dashboard export. v1.3 resolved: no pack discounts. v1.4 resolved: Family membership deferred beyond Release 1, post-OAuth registration completion (FR-083), self-service profile editing (FR-084), member deactivation (FR-085), attendance-percentage formula (FR-042), unevaluated-player handling in auto-balance (FR-086), evaluation category-set immutability (FR-053), auto-balance objective order and algorithm (FR-046), Casual excluded from recurring billing and prepaid-balance handling on plan change (FR-087), plus acceptance criteria for the eleven requirements that lacked one |
 
 ---
 
@@ -61,7 +61,8 @@
 - Multi-club / multi-tenant operation (see CON-004)
 - Match/game statistics and results tracking
 - Direct messaging or chat between members
-- Month and week calendar visualisations (agenda list view is the Release 1 requirement; see FR-034)
+- Month and week calendar visualisations (agenda list view is the Release 1 requirement; see FR-033)
+- Family membership (the $70/month plan covering up to four linked members) — deferred beyond Release 1. Release 1 offers Full, Student and Casual only; the member-linking model is not designed or built (v1.4 resolution)
 - Dashboard data export (the prototype's "Export" control is removed from scope)
 - Per-season evaluation history/versioning (each member has a single current evaluation)
 - Public-facing marketing website
@@ -112,7 +113,7 @@ Permission matrix (from the validated prototype):
 
 | ID | Requirement |
 |---|---|
-| FR-001 | The system shall allow a visitor to create an account with full name, email address, and password. |
+| FR-001 | The system shall allow a visitor to create an account with full name, email address, country of residence, and password. |
 | FR-002 | The system shall reject any password shorter than 8 characters at account creation and password reset. |
 | FR-003 | The system shall allow a registered user to sign in with email and password. |
 | FR-004 | The system shall allow a user to sign in or sign up using their Google account. |
@@ -120,11 +121,12 @@ Permission matrix (from the validated prototype):
 | FR-006 | The system shall allow a user to request a password reset link delivered to their registered email address. |
 | FR-007 | The system shall allow a signed-in user to sign out from any screen. |
 | FR-008 | The system shall assign the Player role to every newly created account. |
-| FR-009 | The system shall require the user to select a membership type (Full, Student, Family, or Casual) during sign-up. |
+| FR-009 | The system shall require the user to select a membership type (Full, Student, or Casual) during sign-up. |
 | FR-010 | The system shall allow a user to submit a role request for Coach or Committee, with an optional justification text. |
 | FR-011 | The system shall allow an Admin to approve or reject pending role requests. |
 | FR-081 | The system shall capture the registrant's date of birth during account sign-up and member creation. |
 | FR-082 | The system shall, when a registrant's date of birth indicates they are under 18, require a parent/guardian's name, email, and explicit consent during registration, and shall not activate the account until that consent is recorded. |
+| FR-083 | The system shall create every account in an `incomplete` status until the registration data required by FR-001, FR-009 and FR-081 is present and, where FR-082 applies, guardian consent is recorded; an account in `incomplete` status shall be able to reach only the registration-completion screen and sign-out, and shall become `active` as soon as nothing is missing. A user who signs up through Google (FR-004) or Apple (FR-005) shall be taken to that screen to supply membership type, date of birth, country, position, experience level and, where applicable, guardian consent. |
 
 ### 6.2 Roles & Access Control
 
@@ -143,9 +145,11 @@ Permission matrix (from the validated prototype):
 | FR-017 | The system shall allow users to search the directory by member name. |
 | FR-018 | The system shall allow users to filter the directory by role (All, Player, Coach, Committee, Admin). |
 | FR-019 | The system shall allow users to sort the directory by member name, role, position, OVR (where visible), and attendance, in ascending or descending order. |
-| FR-020 | The system shall allow an Admin to create a member record with full name, email, position (Goalkeeper, Defender, Forward), experience level (Beginner, Intermediate, Advanced), gender, AUF number, AUF expiry date, and group assignments. |
+| FR-020 | The system shall allow an Admin to create a member record with full name, email, country, position (Goalkeeper, Defender, Forward), experience level (Beginner, Intermediate, Advanced), gender, AUF number, AUF expiry date, and group assignments. |
 | FR-021 | The system shall send an email invitation to a newly created member so they can activate their account. |
 | FR-022 | The system shall display, on a member's own profile, their attendance percentage and total sessions attended. |
+| FR-084 | The system shall allow a member to edit their own profile: full name, country, position, experience level, gender and profile photo. Role, AUF number, AUF expiry date, group assignments and account status are editable only by an Admin. |
+| FR-085 | The system shall allow an Admin to set a member's status to `active` or `inactive`. An `inactive` member shall not be able to sign in, shall be excluded from the directory unless an Admin enables the "include inactive" filter, and shall not be selectable as an event or post audience; their attendance, evaluation and payment history shall be retained. |
 
 ### 6.4 Groups
 
@@ -180,7 +184,7 @@ Permission matrix (from the validated prototype):
 | FR-039 | The system shall default each member's attendance status to Present for a new session record. |
 | FR-040 | The system shall display live summary counts of Present, Late, and Absent while attendance is being recorded. |
 | FR-041 | The system shall persist a session's attendance records when the recorder saves, and confirm the save to the recorder. |
-| FR-042 | The system shall compute each member's attendance percentage from their saved attendance records and display it in the directory, member profile, and dashboard statistics. |
+| FR-042 | The system shall compute each member's attendance percentage as `(Present + Late) / eligible sessions`, where an eligible session is a Training event whose target audience included the member and whose date falls on or after the member's join date; the result is rounded to the nearest whole percent and displayed in the directory, member profile, and dashboard statistics. Where a member has zero eligible sessions the system shall display "no data" rather than 0%. |
 
 ### 6.7 Team Builder
 
@@ -189,10 +193,11 @@ Permission matrix (from the validated prototype):
 | FR-043 | The system shall allow an Admin or Coach to split an event's squad into two named teams. |
 | FR-044 | The system shall, in manual mode, allow the builder to assign each available player to either team and to remove a player back to the available pool. |
 | FR-045 | The system shall display live totals for each team (player count, combined score, average strength) and the point difference between teams while building. |
-| FR-046 | The system shall, in auto-balance mode, distribute the squad into two teams using players' overall evaluation scores such that the difference in combined score between teams is minimised, while ensuring each team has position coverage (at least one goalkeeper, defenders, and forwards where the squad allows). |
+| FR-046 | The system shall, in auto-balance mode, distribute the squad into two teams using players' overall evaluation scores, applying these objectives in strict priority order: (1) position coverage as a hard constraint wherever the squad allows it (each team receives at least one goalkeeper when the squad holds two or more, and at least one defender and one forward when the squad holds two or more of each); (2) the smallest achievable difference in combined score subject to (1); (3) team sizes differing by no more than one player. The algorithm shall be: sort by OVR descending, deal alternately (snake order) into the two teams, then repeatedly apply the single pairwise swap that most reduces the score difference without breaking (1), stopping when no swap improves it or the NFR-002 time budget is reached. For an odd squad the extra player shall go to the team with the lower combined score. |
 | FR-047 | The system shall present a suggested player swap when a swap would reduce the strength difference or improve position coverage. |
 | FR-048 | The system shall show each assigned player which team they are on and their team's full lineup for the event. |
 | FR-049 | The system shall notify a player when they are assigned to a team for an event. |
+| FR-086 | The system shall include players without a saved evaluation in auto-balance using a virtual overall score of 5.0 computed at run time, shall not create or persist an evaluation for them, and shall mark them as "not evaluated" wherever their score is displayed to an Admin or Coach. |
 
 ### 6.8 Player Evaluations
 
@@ -201,7 +206,7 @@ Permission matrix (from the validated prototype):
 | FR-050 | The system shall allow an Admin or Coach to record a player evaluation consisting of a 1–10 integer rating for each skill category in the club's configured category set (default set: Fitness, Speed, Endurance, Experience, Game awareness, Tactical, Passing, Ball control, Defense, and Teamwork). |
 | FR-051 | The system shall initialise a new evaluation with every configured category's rating set to 5. |
 | FR-052 | The system shall compute a player's overall score (OVR) as the arithmetic mean of **all** category ratings in the evaluation — every configured skill counts toward the total — displayed to one decimal place. |
-| FR-053 | The system shall allow an Admin or Coach to configure the set of skill categories used in evaluations (add, rename, deactivate); changes shall apply to evaluations created or edited after the change. |
+| FR-053 | The system shall allow an Admin or Coach to configure the set of skill categories used in evaluations (add, rename, deactivate). Changes shall apply to evaluations created after the change; a saved evaluation keeps the category set it was saved with, and editing its ratings shall not migrate it. The system shall additionally offer an explicit "update to the current category set" action on a saved evaluation, which rebuilds it against the active set (categories added by the change initialise at 5, deactivated categories are dropped) and recomputes the OVR. |
 | FR-054 | The system shall allow an Admin or Coach to edit an existing evaluation's ratings and save the changes. |
 | FR-055 | The system shall restrict all evaluation data (category ratings and OVR) to Admin and Coach users; a Player shall not be able to view any evaluation scores, including their own. |
 | FR-056 | The system shall display an explanatory "ratings are private" notice where a score would otherwise appear for users without evaluation access. |
@@ -220,10 +225,10 @@ Permission matrix (from the validated prototype):
 
 | ID | Requirement |
 |---|---|
-| FR-062 | The system shall offer four membership types priced in AUD: Full Member ($45/month), Student ($32/month), Family ($70/month, covering up to 4 family members), and Casual ($15 per session). |
-| FR-063 | The system shall charge monthly membership fees automatically on the member's billing date via Stripe. |
+| FR-062 | The system shall offer three membership types priced in AUD: Full Member ($45/month), Student ($32/month), and Casual ($15 per session, prepaid in packs). |
+| FR-063 | The system shall charge monthly membership fees automatically on the member's billing date via Stripe for the recurring plans (Full and Student). Casual membership carries no recurring charge; a Casual member pays only for prepaid session packs (FR-064). |
 | FR-064 | The system shall allow a Casual member to purchase a prepaid session pack via Stripe at $15 AUD per session, display their remaining session balance, and decrement the balance by one for each session attended (attendance saved as Present or Late). |
-| FR-065 | The system shall display to a member their current plan, its status (e.g., Active), price, next charge date, and payment method (card brand and last four digits). |
+| FR-065 | The system shall display to a member their current plan, its status (e.g., Active), price, next charge date, and payment method (card brand and last four digits). For a Casual member the plan panel shall display the remaining prepaid session balance and the label "no recurring charge" in place of a next charge date. |
 | FR-066 | The system shall allow a member to change their membership type, with the change taking effect at the start of the next billing cycle (no mid-cycle pro-rata adjustments). |
 | FR-067 | The system shall allow a member to update their payment card through Stripe without the platform storing card data. |
 | FR-068 | The system shall display a member's payment history with date, description, amount, and status. |
@@ -232,6 +237,7 @@ Permission matrix (from the validated prototype):
 | FR-071 | The system shall allow the member to retry a failed payment and shall update the membership status upon success. |
 | FR-072 | The system shall notify a member before their membership renewal charge, including the amount and payment method. |
 | FR-080 | The system shall allow an Admin or Committee member to configure the session-pack options offered to Casual members (the number of sessions per pack). |
+| FR-087 | The system shall preserve a Casual member's remaining prepaid session balance when they change to a recurring plan: the balance is frozen (neither refunded nor forfeited), is not decremented while the recurring plan is in force, and becomes spendable again if the member returns to Casual. A member moving from a recurring plan to Casual shall start with a balance of zero. |
 
 ### 6.11 Notifications
 
@@ -287,7 +293,7 @@ Permission matrix (from the validated prototype):
 ## 8. Acceptance Criteria
 
 ### Authentication & Accounts
-- **AC-001** *(FR-001, FR-008, FR-009)* — Given a visitor on the sign-up form, When they submit a valid full name, email, password, and a selected membership type, Then the system shall create the account with the Player role and the chosen membership type.
+- **AC-001** *(FR-001, FR-008, FR-009)* — Given a visitor on the sign-up form, When they submit a valid full name, email, country, password, and a selected membership type of Full, Student or Casual, Then the system shall create the account with the Player role and the chosen membership type.
 - **AC-002** *(FR-002)* — Given a user creating or resetting a password, When they submit a password of 7 or fewer characters, Then the system shall reject it and state the 8-character minimum.
 - **AC-003** *(FR-003, FR-007)* — Given a registered user, When they submit valid credentials, Then the system shall grant access; When they sign out, Then the system shall end the session and return them to the sign-in screen.
 - **AC-004** *(FR-004, FR-005)* — Given a visitor choosing Google or Apple sign-in, When the provider authenticates them successfully, Then the system shall sign them in (creating a Player account on first use).
@@ -309,11 +315,14 @@ Permission matrix (from the validated prototype):
 - **AC-014** *(FR-030, FR-031)* — Given a weekly recurring Training event on Tuesdays and Thursdays from 1 July to 31 August, When it is created, Then one event occurrence shall exist for every Tuesday and Thursday in that range.
 - **AC-015** *(FR-034, FR-035, FR-036)* — Given a targeted member viewing an event, When they select "Maybe" and later change to "Yes" before the event starts, Then the stored RSVP shall be "Yes" and the event's aggregate counts shall update accordingly.
 - **AC-016** *(FR-038, FR-039, FR-040, FR-041)* — Given a Coach opening attendance for a session, Then every rostered member shall default to Present; When the Coach marks two members Late and one Absent and saves, Then the summary shall read the correct counts, the records shall persist, and a save confirmation shall be shown.
-- **AC-017** *(FR-042)* — Given a member with 9 Present/Late records out of 10 sessions, Then their displayed attendance shall be 90%.
+- **AC-017** *(FR-042)* — Given a member who joined on 1 May and was targeted at 10 Training sessions dated on or after that day, of which 9 are recorded Present or Late, Then their displayed attendance shall be 90%; Given the club also held Training sessions in April and sessions the member was not targeted at, Then those shall not change the number.
+- **AC-017b** *(FR-042)* — Given a member targeted at zero Training sessions since joining, Then the directory, their profile and the dashboard shall show "no data" rather than 0%.
 
 ### Team Builder & Evaluations
 - **AC-018** *(FR-044, FR-045)* — Given manual mode with players in the available pool, When the builder assigns a player to Team Kelp, Then the player shall leave the pool, appear in Team Kelp, and both teams' totals and the point difference shall update immediately.
-- **AC-019** *(FR-046)* — Given a 12-player squad with evaluations, When auto-balance runs, Then each team shall receive 6 players, the combined-score difference shall be no greater than the smallest achievable by moving any single player, and each team shall include at least one goalkeeper where the squad contains two or more.
+- **AC-019** *(FR-046)* — Given a 12-player squad with evaluations containing two goalkeepers, When auto-balance runs, Then each team shall receive 6 players, each team shall include exactly one goalkeeper, and no single pairwise swap that preserves goalkeeper coverage shall reduce the combined-score difference further.
+- **AC-019b** *(FR-046)* — Given a 13-player squad, When auto-balance runs, Then team sizes shall be 7 and 6, and the extra player shall have been added to whichever team held the lower combined score.
+- **AC-019c** *(FR-046, NFR-002)* — Given a 30-player squad, When auto-balance runs, Then a result satisfying the position-coverage constraint shall be returned within 2 seconds at the 95th percentile.
 - **AC-020** *(FR-048, FR-049)* — Given a player assigned to Team Kelp for Saturday's scrimmage, Then the player shall receive a team-assignment notification and shall be able to view their team name and full lineup.
 - **AC-021** *(FR-050, FR-051, FR-052)* — Given the default ten-category configuration and a Coach starting a new evaluation, Then all ten categories shall initialise at 5; When the Coach sets ratings summing to 83 and saves, Then the player's OVR shall display as 8.3.
 - **AC-022** *(FR-050)* — Given a Coach adjusting a rating at 10 (or 1), When they attempt to increase (or decrease) it further, Then the rating shall remain within 1–10.
@@ -338,8 +347,28 @@ Permission matrix (from the validated prototype):
 ### Review resolutions (v1.1)
 - **AC-034** *(FR-064, FR-080)* — Given an Admin has configured a 10-session pack, When a Casual member purchases it, Then Stripe shall charge $150.00 AUD, the member's balance shall show 10 sessions, and after attendance for a session is saved with the member marked Present or Late, the balance shall show 9.
 - **AC-035** *(FR-053, FR-052)* — Given a Coach adds an eleventh skill category "Breath control", When a new evaluation is created, Then it shall present eleven categories initialised at 5 and compute OVR as the mean of all eleven ratings; evaluations saved before the change shall retain their original categories and OVR.
-- **AC-037** *(FR-069, INT-007)* — Given an Admin has created an active one-off product "Nationals levy — $80" in Stripe, When a member opens the payments area, Then the levy shall be listed as payable; When the member pays it, Then Stripe shall charge $80.00 AUD and the charge shall appear in the member's payment history; archived/inactive Stripe products shall not be listed.
 - **AC-036** *(FR-081, FR-082)* — Given a registrant whose date of birth makes them 16, When they attempt to complete sign-up without guardian consent, Then the account shall not be activated; When guardian name, email, and consent are recorded, Then the account shall activate.
+- **AC-037** *(FR-069, INT-007)* — Given an Admin has created an active one-off product "Nationals levy — $80" in Stripe, When a member opens the payments area, Then the levy shall be listed as payable; When the member pays it, Then Stripe shall charge $80.00 AUD and the charge shall appear in the member's payment history; archived/inactive Stripe products shall not be listed.
+
+### Review resolutions (v1.4)
+
+- **AC-038** *(FR-083, FR-004, FR-005)* — Given a visitor who authenticates with Google for the first time, Then the account shall be created in `incomplete` status and every route except the registration-completion screen and sign-out shall be denied, including direct API requests; When they submit membership type, date of birth, country, position and experience level, Then the account shall become `active`; Given the date of birth makes them 16, Then the account shall stay `incomplete` until guardian consent is recorded.
+- **AC-039** *(FR-084)* — Given a signed-in Player on their own profile, When they change their country, position, experience level, gender, full name or photo and save, Then the new values shall persist and appear in the directory; When they attempt to change their own role, AUF number, AUF expiry, groups or status, whether through the interface or a direct API request, Then the system shall deny it.
+- **AC-040** *(FR-085)* — Given an Admin setting a member's status to `inactive`, Then that member shall no longer appear in the default directory listing, shall not be offered as an event or post audience, and shall be refused sign-in; When the Admin enables "include inactive", Then the member shall be listed with an inactive marker and their attendance, evaluation and payment history intact; When the Admin sets the status back to `active`, Then sign-in shall succeed again.
+- **AC-041** *(FR-087)* — Given a Casual member with 4 prepaid sessions remaining who changes to Full, Then the balance shall still read 4, and attendance saved as Present shall not decrement it; When they later change back to Casual, Then the balance shall read 4 and shall decrement again on the next attended session; Given a Full member changing to Casual with no prior balance, Then their balance shall read 0.
+- **AC-042** *(FR-047)* — Given two teams whose combined-score difference can be reduced by exchanging two named players, Then the builder shall present that exchange as a suggested swap stating the resulting difference; When no swap improves the difference or position coverage, Then no suggestion shall be shown.
+- **AC-043** *(FR-066)* — Given a Full member on a billing cycle ending 30 June who selects Student, Then the plan panel shall show Full as current and Student as taking effect on 1 July, no charge or refund shall occur on the day of the change, and on 1 July Stripe shall charge $32.00 AUD.
+- **AC-044** *(FR-043)* — Given an Admin or Coach opening the team builder for an event, When they name the two teams and save the split, Then the event shall hold exactly one split with those two team names; Given a Player or Committee user, Then access to the team builder shall be denied.
+- **AC-045** *(FR-054)* — Given a Coach editing a saved evaluation, When they change two ratings and save, Then the stored ratings and the recomputed OVR shall reflect the change, the evaluation shall keep the category set it was saved with, and the record shall show who edited it and when.
+- **AC-046** *(FR-033)* — Given a member opening the calendar, Then their targeted events shall be listed in an agenda ordered by date ascending, each row showing date, title, type, time, location and the going/maybe counts.
+- **AC-047** *(FR-022)* — Given a member with 9 of 10 eligible sessions attended, When they open their own profile, Then it shall show 90% and a total of 9 sessions attended.
+- **AC-048** *(FR-012)* — Given the role catalogue, Then exactly four roles shall exist (Admin, Coach, Committee, Player); When any request attempts to assign a role outside that set, Then the system shall reject it.
+- **AC-049** *(FR-026)* — Given a member belonging to no group, When an Admin assigns them to "Senior Squad" and "Masters Squad", Then the member shall appear in both group member lists and both counts shall increase by one; When the Admin removes one assignment, Then that count shall decrease by one.
+- **AC-050** *(FR-027)* — Given the groups "Senior Squad" and "Junior Squad", When a Committee member creates an event or publishes a post targeted at "Senior Squad", Then only Senior Squad members shall see it, and a member belonging to neither group shall not.
+- **AC-051** *(FR-029)* — Given the event creation form, Then the available types shall be exactly Training, Competition, Meeting and Social; When a request supplies any other type, Then the system shall reject it.
+- **AC-052** *(FR-032)* — Given an event targeted at "Senior Squad", When a member outside that group requests the event directly by its identifier through the API, Then the system shall deny it rather than relying on the list view to hide it.
+- **AC-053** *(FR-086)* — Given a squad where three players have no saved evaluation, When auto-balance runs, Then those players shall be distributed using a score of 5.0, no evaluation record shall be created for them, and the builder shall mark each as "not evaluated".
+- **AC-054** *(FR-053)* — Given a saved evaluation with ten categories and a Coach who has since added an eleventh, When the Coach edits the evaluation's ratings, Then it shall still present its original ten categories; When the Coach chooses "update to the current category set", Then it shall present eleven categories with the new one at 5 and the OVR recomputed over all eleven.
 
 ---
 
@@ -349,7 +378,7 @@ Key entities and their principal attributes. Attribute lists are requirements-le
 
 | Entity | Key attributes | Relationships |
 |---|---|---|
-| **Member** | Full name, email, date of birth, role, position (Goalkeeper/Defender/Forward), experience level (Beginner/Intermediate/Advanced), gender, country, AUF number, AUF expiry date, join date, status; for members under 18: guardian name, guardian email, consent record (timestamp) | Belongs to many Groups; has one Membership; has many RSVPs, AttendanceRecords, Evaluations, Payments, Notifications |
+| **Member** | Full name, email, date of birth, role, position (Goalkeeper/Defender/Forward), experience level (Beginner/Intermediate/Advanced), gender, country, AUF number, AUF expiry date, join date, status (incomplete/active/inactive, see FR-083 and FR-085); for members under 18: guardian name, guardian email, consent record (timestamp) | Belongs to many Groups; has one Membership; has many RSVPs, AttendanceRecords, Evaluations, Payments, Notifications |
 | **Group** | Name, member count (derived) | Has many Members; targeted by Events and Posts |
 | **Event** | Title, type (Training/Competition/Meeting/Social), date, time, location, notes, audience (all/groups), recurrence (none or weekly: days, start, end), parent series (for occurrences) | Targeted at Groups; has many RSVPs; has at most one TeamSplit; has one AttendanceSheet (Training) |
 | **RSVP** | Response (Yes/Maybe/No), responded at | One per Member per Event (latest wins) |
@@ -359,12 +388,12 @@ Key entities and their principal attributes. Attribute lists are requirements-le
 | **SessionPackOption** | Sessions per pack, derived price (sessions × $15 AUD), active flag | Maintained by Admin/Committee; purchasable by Casual members |
 | **TeamSplit** | Event reference, two team names, mode (manual/auto) | Has two Teams, each with assigned Members |
 | **Post** | Category (Announcement/News/Document), title, body, author, published at, audience (all/groups) | Has many Attachments (PDF/document/image) |
-| **Membership** | Type (Full/Student/Family/Casual), status, price, billing date, payment method reference (tokenised), prepaid session balance (Casual) | One per Member (Family: covers up to 4 linked Members — [TBD]: linking model) |
+| **Membership** | Type (Full/Student/Casual), status, price, billing date (recurring plans only), payment method reference (tokenised), prepaid session balance (Casual, frozen while a recurring plan is in force, see FR-087) | One per Member |
 | **Payment** | Date, description, amount, currency (AUD), status, external (Stripe) reference | Belongs to a Member |
 | **Notification** | Type, title, body, created at, read flag | Belongs to a Member |
 | **RoleRequest** | Requested role (Coach/Committee), justification, status, decided by, decided at | Belongs to a Member |
 
-**Retention & ownership.** Member personal data is owned by the club as data controller. Attendance, evaluation, and payment history shall be retained while the member is active; retention period after departure is [TBD] (recommendation: define before go-live to satisfy APP 11). No cardholder data is stored in the platform (see NFR-006).
+**Retention & ownership.** Member personal data is owned by the club as data controller. Attendance, evaluation, and payment history shall be retained while the member is active. The retention period after departure is a committee policy decision (APP 11) and is tracked in the privacy epic together with NFR-011; it is not a blocker for any other epic. No cardholder data is stored in the platform (see NFR-006).
 
 ---
 
@@ -372,7 +401,7 @@ Key entities and their principal attributes. Attribute lists are requirements-le
 
 | ID | System | Description |
 |---|---|---|
-| INT-001 | Stripe | The system shall create and manage recurring subscriptions (Full/Student/Family) and per-session charges (Casual) through Stripe, in AUD. |
+| INT-001 | Stripe | The system shall create and manage recurring subscriptions (Full/Student) and prepaid session packs (Casual) through Stripe, in AUD. |
 | INT-002 | Stripe | The system shall receive and process payment outcome events from Stripe (success, failure) and update membership status and payment history accordingly. |
 | INT-003 | Stripe | Card capture and update shall occur through Stripe-hosted/tokenised mechanisms so that card data never transits or rests in the platform. |
 | INT-004 | Google Identity | The system shall support OAuth sign-in/sign-up with Google accounts. |
@@ -392,11 +421,11 @@ Key entities and their principal attributes. Attribute lists are requirements-le
 ## 11. Non-Functional Requirements
 
 ### Performance
-- **NFR-001** — The system shall complete 95% of user-facing API requests and page interactions within 1 second under normal operating load (up to 50 concurrent users).
+- **NFR-001** — The system shall complete 95% of user-facing API requests and page interactions within 1 second under normal operating load (up to 50 concurrent users). Verified by the load test that ships with the infrastructure epic, not by individual feature tickets.
 - **NFR-002** — The system shall complete auto-balance team generation for a squad of up to 30 players within 2 seconds at the 95th percentile.
 
 ### Availability
-- **NFR-003** — The system shall target 99.0% monthly availability on a best-effort basis, with no contractual SLA. Planned maintenance shall be scheduled outside club training hours (Tue/Thu 18:00–22:00 and Sat 08:00–13:00 AEST/AEDT) and announced via the news feed at least 48 hours in advance.
+- **NFR-003** — The system shall target 99.0% monthly availability on a best-effort basis, with no contractual SLA. Verified by the hosting provider's uptime monitoring configured in the infrastructure epic. Planned maintenance shall be scheduled outside club training hours (Tue/Thu 18:00–22:00 and Sat 08:00–13:00 AEST/AEDT) and announced via the news feed at least 48 hours in advance.
 
 ### Security
 - **NFR-004** — The system shall require authentication for all functionality except sign-up, sign-in, and password reset, and shall enforce the Section 4 permission matrix on the server for 100% of requests.
@@ -405,7 +434,7 @@ Key entities and their principal attributes. Attribute lists are requirements-le
 - **NFR-007** — The system shall invalidate a password reset link after first use or after 60 minutes, whichever comes first.
 
 ### Scalability
-- **NFR-008** — The system shall support at least 500 member records, 5,000 event occurrences, and 50,000 attendance records without exceeding the NFR-001 response target.
+- **NFR-008** — The system shall support at least 500 member records, 5,000 event occurrences, and 50,000 attendance records without exceeding the NFR-001 response target. Verified by the same load test as NFR-001, run against a seeded dataset of that size.
 - **NFR-009** — All club data shall be logically scoped to a single club identifier so that future multi-club operation (see CON-004) does not require restructuring existing records.
 
 ### Maintainability & Observability
@@ -414,7 +443,7 @@ Key entities and their principal attributes. Attribute lists are requirements-le
 
 ### Compliance
 - **NFR-011** — The system shall handle personal information in accordance with the Australian Privacy Act 1988 (Australian Privacy Principles), including a published privacy notice at sign-up and a mechanism to fulfil member data access/deletion requests within 30 days.
-- **NFR-012** — Where a registrant's or member's date of birth indicates they are under 18, the system shall capture parent/guardian name, email, and explicit consent during registration (FR-081, FR-082) and shall not process the minor's personal data in an active account until consent is recorded.
+- **NFR-012** — Where a registrant's or member's date of birth indicates they are under 18, the system shall capture parent/guardian name, email, and explicit consent during registration (FR-081, FR-082) and shall not process the minor's personal data in an active account until consent is recorded. A registration blocked for missing consent uses the same `incomplete` account status as a registration blocked for missing data (FR-083); there is no separate state.
 
 ---
 
@@ -422,7 +451,7 @@ Key entities and their principal attributes. Attribute lists are requirements-le
 
 | ID | Assumption |
 |---|---|
-| ASS-001 | All prices are in AUD and the prototyped amounts (Full $45/mo, Student $32/mo, Family $70/mo, Casual $15/session, example levy $80) are the amounts the committee intends to charge at launch. |
+| ASS-001 | All prices are in AUD and the prototyped amounts (Full $45/mo, Student $32/mo, Casual $15/session, example levy $80) are the amounts the committee intends to charge at launch. |
 | ASS-002 | The club operates as a single tenant at launch; "Victoria Seadragons" branding is fixed in Release 1. |
 | ASS-003 | AUF registration is managed externally by the federation; the platform only records each member's AUF number and expiry date (no AUF system integration). |
 | ASS-004 | Members have internet access and a modern evergreen browser; Release 1 targets responsive web on viewports from 360 px wide. |
@@ -432,6 +461,7 @@ Key entities and their principal attributes. Attribute lists are requirements-le
 | ASS-008 | *Resolved in v1.2:* no per-season evaluation history or versioning is required. Each member has a single current evaluation that Admin/Coach edit in place. |
 | ASS-009 | *Resolved in v1.2:* the dashboard "Export" control shown in the prototype is removed from scope entirely (see Section 3.2). |
 | ASS-010 | Month and week calendar views shown as toggles in the prototype are visual variants deferred beyond Release 1; the agenda list (the prototype's active view) is the Release 1 requirement. |
+| ASS-011 | *Resolved in v1.4:* Family membership is deferred beyond Release 1. The prototype's $70/month Family plan is not offered at launch and no member-linking model is built; a family of members joins as individual Full or Student memberships. |
 
 ---
 
@@ -468,16 +498,16 @@ Key entities and their principal attributes. Attribute lists are requirements-le
 
 | BR | FR | Acceptance Criteria |
 |---|---|---|
-| BR-001 | FR-001–FR-014, FR-015–FR-022, FR-023–FR-027, FR-076–FR-079 | AC-001–AC-012, AC-031–AC-033 |
-| BR-002 | FR-028–FR-037, FR-038–FR-042 | AC-013–AC-017 |
-| BR-003 | FR-043–FR-049 | AC-018–AC-020 |
-| BR-004 | FR-050–FR-054 | AC-021, AC-022, AC-035 |
-| BR-005 | FR-062–FR-072, FR-080 (with INT-001–INT-003, INT-007) | AC-025–AC-029, AC-034, AC-037 |
+| BR-001 | FR-001–FR-014, FR-015–FR-022, FR-023–FR-027, FR-076–FR-079, FR-084, FR-085 | AC-001–AC-012, AC-031–AC-033, AC-039, AC-040, AC-047, AC-049 |
+| BR-002 | FR-028–FR-037, FR-038–FR-042 | AC-013–AC-017b, AC-046, AC-050–AC-052 |
+| BR-003 | FR-043–FR-049, FR-086 | AC-018, AC-019, AC-019b, AC-019c, AC-020, AC-042, AC-044, AC-053 |
+| BR-004 | FR-050–FR-054 | AC-021, AC-022, AC-035, AC-045, AC-054 |
+| BR-005 | FR-062–FR-072, FR-080, FR-087 (with INT-001–INT-003, INT-007) | AC-025–AC-029, AC-034, AC-037, AC-041, AC-043 |
 | BR-006 | FR-037, FR-049, FR-057–FR-061, FR-073–FR-075 | AC-013, AC-020, AC-024, AC-030 |
-| BR-007 | FR-012–FR-014, FR-016, FR-055, FR-056, FR-081, FR-082 | AC-007–AC-009, AC-023, AC-036 |
+| BR-007 | FR-012–FR-014, FR-016, FR-055, FR-056, FR-081, FR-082, FR-083 | AC-007–AC-009, AC-023, AC-036, AC-038, AC-048 |
 | BR-008 | FR-020 (AUF fields) | AC-011 |
 
-**Orphan check:** every FR above maps to at least one BR and is covered by at least one AC; every NFR carries a number, unit, and condition. Open item remaining: data retention after member departure (Section 9) — a committee policy decision (APP 11), not a build blocker. Resolved in v1.1: casual billing model, coach event permissions, position-score weightings (replaced by configurable categories), minor-consent flow. Resolved in v1.2: plan changes take effect next cycle (FR-066), one-off charges are Stripe-managed and member-payable (FR-069, INT-007, AC-037), no evaluation versioning (ASS-008), dashboard export removed (ASS-009). Resolved in v1.3: pack pricing is strictly sessions × $15, no discounts (ASS-007).
+**Orphan check:** re-run in full for v1.4 rather than asserted. The v1.3 claim was wrong: FR-012, FR-022, FR-033, FR-043, FR-047, FR-054 and FR-066 had no acceptance criterion, and FR-026, FR-027, FR-029 and FR-032 were only covered inside somebody else's. All eleven now have their own (AC-042 to AC-052), as do the five requirements added in v1.4 (FR-083 to FR-087). Every FR maps to at least one BR and is covered by at least one AC; every NFR carries a number, unit, condition and the place it gets verified. Open item remaining: data retention after member departure (Section 9), a committee policy decision (APP 11), not a build blocker. Resolved in v1.1: casual billing model, coach event permissions, position-score weightings (replaced by configurable categories), minor-consent flow. Resolved in v1.2: plan changes take effect next cycle (FR-066), one-off charges are Stripe-managed and member-payable (FR-069, INT-007, AC-037), no evaluation versioning (ASS-008), dashboard export removed (ASS-009). Resolved in v1.3: pack pricing is strictly sessions × $15, no discounts (ASS-007).
 
 ---
 *End of document.*

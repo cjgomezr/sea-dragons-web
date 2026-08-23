@@ -1,220 +1,179 @@
 # Preguntas abiertas antes de escribir tickets
 
-Auditoría del `SRD_Victoria_Seadragons_Club_Platform.md` (v1.3) y de
-`plan-maestro.md`, hecha durante el bootstrap del repo (22 de agosto de 2026).
+Auditoría del `SRD_Victoria_Seadragons_Club_Platform.md` y de `plan-maestro.md`,
+hecha durante el bootstrap del repo (22 de agosto de 2026).
 
-Este archivo NO decide nada. Lista lo que hay que resolver, con las opciones
-concretas sobre la mesa y el epic al que pega cada una. Cuando una decisión se
-tome, va escrita al SRD o al plan maestro, y su fila se marca resuelta aquí.
-
-Estado: **nada resuelto todavía.**
+Estado: **todo resuelto el 23 de agosto de 2026.** Las decisiones están escritas
+en el SRD v1.4 y en el plan maestro; este archivo queda como registro de qué se
+preguntó y qué se respondió. Cada punto apunta al FR o AC que lo cierra.
 
 ---
 
 ## 1. Bloqueadores: un ticket no se puede escribir sin esto
 
-### B1 · La membresía Family no está especificada · E12
+### B1 · La membresía Family no está especificada · E12 · RESUELTO
 
-FR-062 ofrece Family a $70 AUD/mes "cubriendo hasta 4 miembros". La sección 9
-lo admite: `Family: covers up to 4 linked Members [TBD]: linking model`. No hay
-FR que describa el vínculo, ni AC que lo verifique.
+**Decisión: Family sale de Release 1.** El club lanza con tres tipos, Full $45,
+Student $32 y Casual $15 por sesión. No se diseña ni se construye modelo de
+vínculo familiar: una familia se afilia como membresías individuales.
 
-Hay que decidir:
+Escrito en FR-062, FR-009, §3.2, §9 (entidad Membership), ASS-011 e INT-001. Con
+esto desaparece la decisión más cara de la auditoría y E12 encoge.
 
-- ¿Quién crea el vínculo? ¿El titular invita por email, o un Admin los enlaza?
-- ¿Los 3 familiares tienen cuenta propia con rol Player, o son dependientes sin
-  login?
-- Si tienen cuenta: ¿aparecen en el directorio? ¿pueden hacer RSVP? ¿cuentan
-  para la asistencia y las evaluaciones?
-- ¿Qué pasa cuando el titular cancela o le falla el pago? ¿Se suspenden los 4?
-- ¿Un familiar puede salirse y pasarse a plan individual?
+Lo que queda registrado para cuando Family vuelva: quién crea el vínculo, si los
+familiares tienen cuenta propia, qué pasa al fallar el pago del titular y cómo se
+sale a plan individual. Nada de eso se decide ahora.
 
-Sin esto, E12 queda a medio construir. Es la decisión más cara de las cuatro.
+### B2 · El registro con Google y Apple no puede cumplir el propio registro · E2 · RESUELTO
 
-### B2 · El registro con Google y Apple no puede cumplir el propio registro · E2
+**Decisión: un único estado `incomplete`.** Toda cuenta nace `incomplete` hasta
+que estén los datos que exigen FR-001, FR-009 y FR-081 y, si aplica, el
+consentimiento de FR-082. Una cuenta `incomplete` solo alcanza la pantalla de
+completar registro y el cierre de sesión, incluso por API directa. Pasa a
+`active` en cuanto no falta nada.
 
-FR-009 exige elegir membresía en el sign-up. FR-081 exige fecha de nacimiento.
-FR-082 exige consentimiento de tutor si el registrante es menor. Google y Apple
-(FR-004, FR-005) no entregan nada de eso.
+No son dos estados. El bloqueo por falta de datos y el bloqueo por falta de
+consentimiento (NFR-012) son el mismo, lo que evita la máquina de estados doble
+que insinuaba el SRD v1.3.
 
-Hace falta un paso de "completar registro" post-OAuth que ningún FR describe.
-Hay que decidir:
+Escrito en FR-083, AC-038 y en la nota de NFR-012.
 
-- ¿La cuenta existe en estado incompleto hasta que se complete, o no se crea
-  hasta terminar el paso?
-- ¿Qué puede ver o hacer una cuenta incompleta? Lo natural es nada salvo esa
-  misma pantalla.
-- ¿Cómo se relaciona ese estado con el bloqueo por consentimiento de NFR-012,
-  que también impide activar la cuenta? ¿Son el mismo estado o dos distintos?
+### B3 · El jugador no puede editar su propio perfil · E5 · RESUELTO
 
-Salen de aquí 1 o 2 FRs nuevas, sus ACs y probablemente un ticket propio.
+**Decisión: el miembro edita su ficha, el Admin conserva el registro federativo.**
 
-### B3 · El jugador no puede editar su propio perfil · E5
+- Edita el propio miembro: nombre, país, posición, nivel de experiencia, género
+  y foto (FR-084, AC-039).
+- Reservado al Admin: rol, número y vencimiento AUF, grupos y estado. Un intento
+  de cambiarlos desde la propia cuenta se rechaza también por API.
+- El país se captura en el alta: FR-001 lo pide en el registro y FR-020 en el
+  alta por Admin. Era el campo que el directorio mostraba y nadie recogía.
 
-La matriz de permisos de la sección 4 le da al Player "manage own profile",
-pero ninguna de las 82 FRs lo permite. Solo el Admin crea miembros (FR-020).
+**Baja de miembro, que era el hueco relacionado: entra en Release 1.** FR-085 y
+AC-040. Un Admin mueve el estado entre `active` e `inactive`. El inactivo no
+inicia sesión, sale del directorio salvo filtro explícito, no es targeteable y
+conserva su historial.
 
-La consecuencia es concreta: el directorio muestra país, posición y nivel de
-experiencia (FR-015), el auto-registro (FR-001) no captura ninguno de los tres,
-y **el país no se captura en ningún sitio, ni siquiera en el alta por Admin**.
-Todo el que se registre solo queda con su ficha a medias y sin forma de
-arreglarla.
+### B4 · Dos números clave no tienen definición · E8, E9, E10 · RESUELTO
 
-Hay que decidir:
+**Porcentaje de asistencia.** `(Present + Late) / sesiones elegibles`, donde
+elegible es un evento de tipo Training que targeteaba al miembro y cuya fecha es
+posterior o igual a su fecha de alta. Redondeo al entero. Con cero sesiones
+elegibles se muestra "sin datos", nunca 0%. Quien entró en mayo ya no arrastra
+marzo. Escrito en FR-042, AC-017 y AC-017b.
 
-- Qué campos edita el propio miembro y cuáles quedan reservados al Admin. El
-  número y el vencimiento AUF, por ejemplo, son registro federativo.
-- Dónde se captura el país.
-- Si el auto-registro pide posición y experiencia, o se completan después.
-
-Relacionado, y también sin FR: **no existe forma de dar de baja o desactivar a
-un miembro**. La sección 9 menciona un atributo `status` y la retención tras la
-salida, pero nadie lo escribe ni lo cambia. Decidir si entra en Release 1.
-
-### B4 · Dos números clave no tienen definición · E8, E9, E10
-
-**El porcentaje de asistencia.** FR-042 dice "calcular el % desde los registros
-guardados". Solo AC-017 insinúa la fórmula `(Present + Late) / total`. Falta el
-denominador: ¿todas las sesiones del club, o solo aquellas a las que el miembro
-estaba targeteado? Quien entró en mayo no debería arrastrar marzo. El número
-sale en directorio, perfil y dashboard, así que si está mal, está mal en tres
-sitios. Decidir la fórmula exacta y escribirla como FR.
-
-**El OVR de quien no tiene evaluación.** FR-046 balancea equipos con el OVR,
-pero nada dice qué hacer con un jugador sin evaluar. FR-051 inicializa las
-categorías en 5, sin decir quién ni cuándo crea esa evaluación. Opciones:
-
-- (a) crear la evaluación con todo en 5 al crear el miembro;
-- (b) tratar al no evaluado como 5.0 solo para balancear, sin persistir nada;
-- (c) excluirlo del auto-balance y exigir que el coach lo asigne a mano.
-
-Sin elegir una, E10 no es implementable.
+**OVR del no evaluado.** Opción (b): entra al auto-balance con 5.0 calculado al
+vuelo, sin persistir ninguna evaluación, y la interfaz lo marca "sin evaluar". No
+se crean evaluaciones fantasma ni se obliga al coach a asignar a mano. Escrito en
+FR-086 y AC-053.
 
 ---
 
 ## 2. Contradicciones internas del SRD
 
-### C1 · FR-053 contra AC-035 · E9
+### C1 · FR-053 contra AC-035 · E9 · RESUELTO
 
-FR-053: los cambios de categorías aplican a evaluaciones "creadas **o
-editadas** después del cambio". AC-035: las evaluaciones guardadas antes del
-cambio "conservarán sus categorías y OVR originales". Chocan exactamente en el
-caso "evaluación vieja que un coach edita hoy".
+**Gana AC-035: el set de categorías de una evaluación guardada es inmutable.**
+Editar ratings no migra nada. Para llevar una evaluación vieja al set actual hay
+una acción explícita, "actualizar al set actual", que la reconstruye: las
+categorías nuevas entran en 5, las desactivadas se descartan y el OVR se
+recalcula. FR-053 reescrita, AC-054 nueva.
 
-Elegir una: o editar migra la evaluación al set nuevo, o el set de una
-evaluación es inmutable y solo cambia al recrearla.
+### C2 · FR-046 pide dos objetivos que se pelean · E10 · RESUELTO
 
-### C2 · FR-046 pide dos objetivos que se pelean, y su AC no lo verifica · E10
+FR-046 reescrita con prioridad explícita:
 
-- FR-046 exige minimizar la diferencia de puntaje **y** garantizar cobertura de
-  posiciones. En escuadras chicas o desbalanceadas los dos objetivos se
-  contradicen. Falta decir cuál gana.
-- FR-046 pide el mínimo global, que es un problema de partición. AC-019 solo
-  verifica un óptimo local: "que no mejore moviendo un solo jugador". El AC no
-  prueba el FR.
-- AC-019 introduce equipos de igual tamaño (6 y 6). El FR nunca lo pidió.
-- NFR-002 exige menos de 2 segundos para 30 jugadores, así que el algoritmo hay
-  que escribirlo, no dejarlo a interpretación del worker.
-- Escuadras impares: la tabla de riesgos las menciona, ningún requisito las
-  regula.
+1. Cobertura de posición como restricción dura donde la escuadra lo permita.
+2. Mínima diferencia de puntaje combinado sujeta a lo anterior.
+3. Tamaños que no difieran en más de un jugador.
 
-Salida esperada: un FR reescrito que fije el orden de prioridad de los
-objetivos, el algoritmo (o su criterio de aceptación exacto) y el trato de las
-escuadras impares.
+Y con el algoritmo escrito, no dejado a interpretación del worker: orden
+descendente por OVR, reparto en serpiente, y luego el intercambio de a un par que
+más reduzca la diferencia, repetido hasta que ninguno mejore o se agote el
+presupuesto de tiempo de NFR-002. Escuadra impar: el sobrante va al equipo de
+menor puntaje combinado.
 
-### C3 · Casual no encaja en el modelo de cobro mensual · E12, E13
+AC-019 reescrita para verificar eso mismo, AC-019b para la escuadra impar y
+AC-019c para el límite de 2 segundos con 30 jugadores.
 
-- FR-063 cobra "cuotas mensuales automáticamente en la fecha de facturación"
-  sin excluir a Casual, que es prepago por sesión (FR-064).
-- FR-065 manda mostrar "próxima fecha de cargo", que para un Casual no existe.
-  Decidir qué muestra su panel de plan.
-- FR-066 permite cambiar de plan al siguiente ciclo, pero no dice qué pasa con
-  el **saldo de sesiones prepagas** al pasar de Casual a Full, ni al revés.
-  ¿Se reembolsa, se congela, se pierde?
+### C3 · Casual no encaja en el modelo de cobro mensual · E12, E13 · RESUELTO
+
+- FR-063 excluye a Casual del cargo recurrente de forma explícita.
+- FR-065: el panel de un Casual muestra saldo de sesiones y "sin cargo
+  recurrente" en lugar de próxima fecha de cargo.
+- FR-087, nueva: al pasar de Casual a plan mensual el saldo prepago se congela.
+  Ni se reembolsa ni se pierde, no se decrementa mientras el plan mensual esté
+  vigente y vuelve a gastarse si el miembro regresa a Casual. De mensual a Casual
+  se arranca en cero. AC-041 lo verifica.
 
 ---
 
-## 3. FRs sin criterio de aceptación
+## 3. FRs sin criterio de aceptación · RESUELTO
 
-El SRD afirma en su "Orphan check" que toda FR está cubierta por al menos una
-AC. No es cierto. Estas siete no aparecen en ninguna AC de la sección 8:
+Las siete huérfanas ya tienen AC propia, y las cuatro que solo tenían cobertura
+de refilón también:
 
-| FR     | Qué es                                        | Epic |
-| ------ | --------------------------------------------- | ---- |
-| FR-047 | Swap sugerido en el team builder              | E10  |
-| FR-066 | Cambio de plan al siguiente ciclo             | E12  |
-| FR-043 | Dividir la escuadra en dos equipos con nombre | E10  |
-| FR-054 | Editar una evaluación existente               | E9   |
-| FR-033 | Vista agenda                                  | E7   |
-| FR-022 | Asistencia en el perfil propio                | E5   |
-| FR-012 | Exactamente cuatro roles                      | E3   |
+| FR     | Qué es                                        | AC nueva |
+| ------ | --------------------------------------------- | -------- |
+| FR-047 | Swap sugerido en el team builder              | AC-042   |
+| FR-066 | Cambio de plan al siguiente ciclo             | AC-043   |
+| FR-043 | Dividir la escuadra en dos equipos con nombre | AC-044   |
+| FR-054 | Editar una evaluación existente               | AC-045   |
+| FR-033 | Vista agenda                                  | AC-046   |
+| FR-022 | Asistencia en el perfil propio                | AC-047   |
+| FR-012 | Exactamente cuatro roles                      | AC-048   |
+| FR-026 | Asignar miembros a grupos                     | AC-049   |
+| FR-027 | Grupos como audiencia                         | AC-050   |
+| FR-029 | Los cuatro tipos de evento                    | AC-051   |
+| FR-032 | Filtrado por audiencia                        | AC-052   |
 
-FR-066 duele especialmente: fue una resolución de la v1.2, la escribieron como
-FR y se olvidaron del AC.
-
-Otras cuatro tienen cobertura solo indirecta, de refilón dentro de un AC ajeno:
-FR-026 (asignar miembros a grupos), FR-027 (grupos como audiencia), FR-029 (los
-cuatro tipos de evento) y FR-032 (filtrado por audiencia). Conviene darles AC
-propia.
-
-Por qué importa: el paso 6 del ciclo de la fábrica marca los checkboxes de
-aceptación "solo los que un test que pasa demuestre". Una FR sin AC llega al
-ticket con un criterio inventado por el modelo.
+El "Orphan check" de §15 dejó de afirmar que todo estaba cubierto y ahora declara
+qué faltaba y dónde se cubrió.
 
 ---
 
 ## 4. Huecos del plan maestro
 
-### P1 · El plan nunca declara el stack
+### P1 · El plan nunca declara el stack · RESUELTO
 
-Habla de `app/api/v1`, Supabase Auth, Supabase Storage y RLS, así que lo asume,
-pero "Decisiones técnicas transversales" no dice cuál es el stack. El bootstrap
-ya lo fijó y quedó escrito en `CLAUDE.md`: **Next.js 16 (App Router) +
-TypeScript estricto + Supabase + Stripe desde E12, puerto 3417**. Falta bajarlo
-al plan maestro como decisión, no como suposición.
+El stack quedó escrito en "Decisiones técnicas transversales" del plan maestro:
+Next.js 16 (App Router), TypeScript estricto, Supabase, Stripe desde E12, puerto 3417. Ya no es una suposición que hay que deducir de las rutas.
 
-### P2 · Cuatro NFRs no tienen epic
+### P2 · Cuatro NFRs no tienen epic · RESUELTO
 
-- **NFR-011 (Privacy Act 1988)** es el grave. Exige aviso de privacidad en el
-  sign-up y un mecanismo de acceso y borrado de datos en 30 días. Son pantallas
-  y endpoints reales que ningún epic contempla. Decidir: ¿epic propio, o se
-  reparte entre E2 (el aviso) y E5 (acceso y borrado)?
-- NFR-001 (rendimiento), NFR-003 (disponibilidad) y NFR-008 (escala) no
-  aparecen. Aunque sean transversales, conviene decir dónde se verifican.
+- **NFR-011 (Privacy Act 1988)** es ahora el epic **E15, Privacidad y datos
+  personales**: aviso de privacidad en el registro, exportación de datos, borrado
+  o anonimización dentro de 30 días y política de retención tras la baja.
+- NFR-001 y NFR-008 se verifican con la prueba de carga de E16, NFR-003 con el
+  monitoreo del hosting. Escrito en el propio texto de cada NFR, para que ningún
+  ticket funcional cargue con ellos.
 
-### P3 · Falta la infraestructura de trabajos programados
+### P3 · Falta la infraestructura de trabajos programados · RESUELTO
 
-FR-072 (aviso antes de la renovación) y FR-031 (generar ocurrencias de eventos
-recurrentes) necesitan un scheduler. Ningún epic lo incluye y E12 está
-dimensionado sin él. Decidir la pieza (pg_cron de Supabase, Edge Function
-programada, cron externo) y en qué epic entra.
+`pg_cron` de Supabase, dentro del epic **E16**. De ahí cuelgan la generación de
+ocurrencias recurrentes (FR-031) y el aviso previo a la renovación (FR-072).
 
-### P4 · No hay epic de despliegue
+### P4 · No hay epic de despliegue · RESUELTO
 
-E1 cubre esquema, RLS, convención de API y app shell, pero nada de entornos,
-migraciones en CI ni hosting. Decidir dónde corre la app y quién aplica las
-migraciones antes de que E2 necesite un entorno real.
+También **E16**: entornos, hosting, secretos por entorno y aplicación de
+migraciones en CI. E2 y E7 dependen de él.
 
-### P5 · Detalles menores
+### P5 · Detalles menores · RESUELTO
 
-- La columna "Issue" del plan lista `#1` a `#14`, issues que todavía no
-  existen. Se llenan cuando se creen los epics.
-- Rutas `data/SRD_...md` corregidas a `docs/` durante el bootstrap. Hecho.
-- En el SRD, AC-037 aparece antes que AC-036.
-- En el SRD, la sección 3.2 cita FR-034 para la vista agenda. La agenda es
-  FR-033; FR-034 es el RSVP.
+- La columna "Issue" del plan apunta a los issues reales creados el 23 de agosto.
+- Rutas `data/SRD_...md` corregidas a `docs/` durante el bootstrap.
+- AC-036 y AC-037 quedaron en orden.
+- §3.2 cita FR-033 para la vista agenda, que es la correcta.
 
 ---
 
-## 5. Falta el prototipo de diseño
+## 5. Falta el prototipo de diseño · RESUELTO
 
-El SRD nombra como fuente `Seadragons Platform.dc.html`, el handoff de Claude
-Design. No está en el repo.
+`Seadragons Platform.dc.html` y su runtime `support.js` ya están en `docs/`. De
+ahí salen los tokens de marca reales (acento `#1C6EA4` claro y `#33A1E0` oscuro,
+fondo `#EFF3F7` y `#0C1A26`, tipografías Archivo, Space Grotesk y Space Mono) y
+las pantallas contra las que compara el `ui-reviewer`.
 
-Con ese archivo en `docs/mockups/`, el agente `ui-reviewer` trabaja en Modo A y
-compara cada pantalla contra su mockup, bastante mejor que el modo heurístico.
-Además los tokens de marca saldrían del diseño real en vez de los valores por
-defecto que quedaron puestos.
-
-Mientras no esté, `design-system.md` usa el azul por defecto `#2563EB` y el
-stack de fuentes del sistema, ambos marcados como provisionales.
+Dos tickets de E1 lo bajan a tierra: uno aplica los tokens a `design-system.md` y
+`globals.css`, otro exporta cada pantalla del prototipo a `docs/mockups/` para que
+el revisor trabaje en modo comparación y no en modo heurístico.
