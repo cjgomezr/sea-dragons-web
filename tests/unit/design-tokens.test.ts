@@ -12,7 +12,7 @@ const globalsCss = readFileSync(
   "utf-8",
 );
 
-function token(tokens: Record<string, string>, key: string): string {
+function token<T>(tokens: Record<string, T>, key: string): T {
   const value = tokens[key];
   if (value === undefined) {
     throw new Error(`Missing token: ${key}`);
@@ -70,9 +70,43 @@ function markdownTable(
   return rows;
 }
 
+function markdownTwoValueTable(
+  markdown: string,
+  headingPattern: RegExp,
+): Record<string, { light: string; dark: string }> {
+  const headingMatch = headingPattern.exec(markdown);
+  if (!headingMatch) {
+    throw new Error(`Heading not found in design-system.md: ${headingPattern}`);
+  }
+  const afterHeading = markdown.slice(
+    headingMatch.index + headingMatch[0].length,
+  );
+  const rows: Record<string, { light: string; dark: string }> = {};
+  for (const line of afterHeading.split("\n")) {
+    if (
+      line.startsWith("####") ||
+      (line.startsWith("##") && !line.startsWith("###"))
+    ) {
+      break;
+    }
+    const rowMatch =
+      /^\|\s*([^|]+?)\s*\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|/.exec(line);
+    if (
+      rowMatch &&
+      rowMatch[1] !== undefined &&
+      rowMatch[2] !== undefined &&
+      rowMatch[3] !== undefined
+    ) {
+      rows[rowMatch[1]] = { light: rowMatch[2], dark: rowMatch[3] };
+    }
+  }
+  return rows;
+}
+
 const lightTokens = markdownTable(designSystem, /#### Light theme/);
 const darkTokens = markdownTable(designSystem, /#### Dark theme/);
 const sidebarTokens = markdownTable(designSystem, /#### Sidebar/);
+const elevationTokens = markdownTwoValueTable(designSystem, /#### Elevation/);
 
 const rootCss = cssCustomProperties(cssBlock(globalsCss, ":root"));
 const lightCss = cssCustomProperties(
@@ -129,6 +163,31 @@ describe("tokens de color: sidebar (independiente de tema)", () => {
     (role, cssVariable) => {
       expect(token(rootCss, cssVariable).toUpperCase()).toBe(
         token(sidebarTokens, role).toUpperCase(),
+      );
+    },
+  );
+});
+
+describe("tokens de elevación (sombras, por tema)", () => {
+  const elevationRoleToCssVariable: Record<string, string> = {
+    Shadow: "shadow",
+    "Shadow (sm)": "shadow-sm",
+  };
+
+  it.each(Object.entries(elevationRoleToCssVariable))(
+    "%s coincide con globals.css en tema claro",
+    (role, cssVariable) => {
+      expect(token(lightCss, cssVariable)).toBe(
+        token(elevationTokens, role).light,
+      );
+    },
+  );
+
+  it.each(Object.entries(elevationRoleToCssVariable))(
+    "%s coincide con globals.css en tema oscuro",
+    (role, cssVariable) => {
+      expect(token(darkCss, cssVariable)).toBe(
+        token(elevationTokens, role).dark,
       );
     },
   );
@@ -212,6 +271,13 @@ describe("tipografía", () => {
 
 describe("design-system.md no deja notas de provisionalidad", () => {
   it("no menciona 'provisional' en la sección de tokens", () => {
-    expect(designSystem).not.toMatch(/provisional/i);
+    const tokensStart = designSystem.indexOf("## Tokens");
+    const tokensEnd = designSystem.indexOf("\n## ", tokensStart + 1);
+    const tokensSection = designSystem.slice(
+      tokensStart,
+      tokensEnd === -1 ? undefined : tokensEnd,
+    );
+    expect(tokensSection.length).toBeGreaterThan(0);
+    expect(tokensSection).not.toMatch(/provisional/i);
   });
 });
