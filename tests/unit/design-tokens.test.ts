@@ -1,0 +1,217 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { contrastRatio } from "./helpers/wcag-contrast";
+
+const designSystem = readFileSync(
+  join(process.cwd(), "design-system.md"),
+  "utf-8",
+);
+const globalsCss = readFileSync(
+  join(process.cwd(), "src/app/globals.css"),
+  "utf-8",
+);
+
+function token(tokens: Record<string, string>, key: string): string {
+  const value = tokens[key];
+  if (value === undefined) {
+    throw new Error(`Missing token: ${key}`);
+  }
+  return value;
+}
+
+function cssBlock(css: string, selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`${escaped}\\s*\\{([^}]*)\\}`).exec(css);
+  const body = match?.[1];
+  if (body === undefined) {
+    throw new Error(`Selector not found in globals.css: ${selector}`);
+  }
+  return body;
+}
+
+function cssCustomProperties(block: string): Record<string, string> {
+  const properties: Record<string, string> = {};
+  for (const match of block.matchAll(/--([\w-]+):\s*([^;]+);/g)) {
+    const name = match[1];
+    const value = match[2];
+    if (name === undefined || value === undefined) {
+      continue;
+    }
+    properties[name] = value.replace(/\s+/g, " ").trim();
+  }
+  return properties;
+}
+
+function markdownTable(
+  markdown: string,
+  headingPattern: RegExp,
+): Record<string, string> {
+  const headingMatch = headingPattern.exec(markdown);
+  if (!headingMatch) {
+    throw new Error(`Heading not found in design-system.md: ${headingPattern}`);
+  }
+  const afterHeading = markdown.slice(
+    headingMatch.index + headingMatch[0].length,
+  );
+  const rows: Record<string, string> = {};
+  for (const line of afterHeading.split("\n")) {
+    if (
+      line.startsWith("####") ||
+      (line.startsWith("##") && !line.startsWith("###"))
+    ) {
+      break;
+    }
+    const rowMatch = /^\|\s*([^|]+?)\s*\|\s*`([^`]+)`\s*\|/.exec(line);
+    if (rowMatch && rowMatch[1] !== undefined && rowMatch[2] !== undefined) {
+      rows[rowMatch[1]] = rowMatch[2];
+    }
+  }
+  return rows;
+}
+
+const lightTokens = markdownTable(designSystem, /#### Light theme/);
+const darkTokens = markdownTable(designSystem, /#### Dark theme/);
+const sidebarTokens = markdownTable(designSystem, /#### Sidebar/);
+
+const rootCss = cssCustomProperties(cssBlock(globalsCss, ":root"));
+const lightCss = cssCustomProperties(
+  cssBlock(globalsCss, ':root[data-theme="light"]'),
+);
+const darkCss = cssCustomProperties(
+  cssBlock(globalsCss, ':root[data-theme="dark"]'),
+);
+
+const colorRoleToCssVariable: Record<string, string> = {
+  Accent: "color-accent",
+  Background: "color-background",
+  Panel: "color-panel",
+  Text: "color-text",
+  "Text secondary": "color-text-secondary",
+  Border: "color-border",
+  Success: "color-success",
+  Warning: "color-warning",
+};
+
+describe("tokens de color: tema claro", () => {
+  it.each(Object.entries(colorRoleToCssVariable))(
+    "%s coincide entre design-system.md y globals.css",
+    (role, cssVariable) => {
+      expect(token(lightCss, cssVariable).toUpperCase()).toBe(
+        token(lightTokens, role).toUpperCase(),
+      );
+    },
+  );
+});
+
+describe("tokens de color: tema oscuro", () => {
+  it.each(Object.entries(colorRoleToCssVariable))(
+    "%s coincide entre design-system.md y globals.css",
+    (role, cssVariable) => {
+      expect(token(darkCss, cssVariable).toUpperCase()).toBe(
+        token(darkTokens, role).toUpperCase(),
+      );
+    },
+  );
+});
+
+describe("tokens de color: sidebar (independiente de tema)", () => {
+  const sidebarRoleToCssVariable: Record<string, string> = {
+    "Sidebar background": "color-sidebar-background",
+    "Sidebar text": "color-sidebar-text",
+    "Sidebar text muted": "color-sidebar-text-muted",
+    "Sidebar border": "color-sidebar-border",
+    "Sidebar hover": "color-sidebar-hover",
+  };
+
+  it.each(Object.entries(sidebarRoleToCssVariable))(
+    "%s coincide entre design-system.md y globals.css",
+    (role, cssVariable) => {
+      expect(token(rootCss, cssVariable).toUpperCase()).toBe(
+        token(sidebarTokens, role).toUpperCase(),
+      );
+    },
+  );
+});
+
+describe("contraste", () => {
+  it("texto sobre fondo cumple AA en tema claro", () => {
+    expect(
+      contrastRatio(
+        token(lightCss, "color-text"),
+        token(lightCss, "color-background"),
+      ),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("texto secundario sobre panel cumple AA en tema claro", () => {
+    expect(
+      contrastRatio(
+        token(lightCss, "color-text-secondary"),
+        token(lightCss, "color-panel"),
+      ),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("texto secundario sobre fondo cumple AA en tema claro", () => {
+    expect(
+      contrastRatio(
+        token(lightCss, "color-text-secondary"),
+        token(lightCss, "color-background"),
+      ),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("texto sobre fondo cumple AA en tema oscuro", () => {
+    expect(
+      contrastRatio(
+        token(darkCss, "color-text"),
+        token(darkCss, "color-background"),
+      ),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("texto secundario sobre panel cumple AA en tema oscuro", () => {
+    expect(
+      contrastRatio(
+        token(darkCss, "color-text-secondary"),
+        token(darkCss, "color-panel"),
+      ),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("texto secundario sobre fondo cumple AA en tema oscuro", () => {
+    expect(
+      contrastRatio(
+        token(darkCss, "color-text-secondary"),
+        token(darkCss, "color-background"),
+      ),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe("tipografía", () => {
+  it("la pila de texto declara una familia de respaldo genérica", () => {
+    expect(token(rootCss, "font-family-body")).toMatch(/,\s*sans-serif\s*$/);
+  });
+
+  it("la pila de titulares declara una familia de respaldo genérica", () => {
+    expect(token(rootCss, "font-family-heading")).toMatch(/,\s*sans-serif\s*$/);
+  });
+
+  it("la pila de datos y etiquetas declara una familia de respaldo genérica", () => {
+    expect(token(rootCss, "font-family-mono")).toMatch(/,\s*monospace\s*$/);
+  });
+
+  it("cada familia de marca tiene su propia pila", () => {
+    expect(token(rootCss, "font-family-body")).toMatch(/^Archivo/);
+    expect(token(rootCss, "font-family-heading")).toMatch(/^"Space Grotesk"/);
+    expect(token(rootCss, "font-family-mono")).toMatch(/^"Space Mono"/);
+  });
+});
+
+describe("design-system.md no deja notas de provisionalidad", () => {
+  it("no menciona 'provisional' en la sección de tokens", () => {
+    expect(designSystem).not.toMatch(/provisional/i);
+  });
+});
