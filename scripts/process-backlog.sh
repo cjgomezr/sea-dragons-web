@@ -143,6 +143,9 @@ while [ "$PROCESSED" -lt "$MAX_ISSUES" ]; do
   TDD until the Definition of Done is met, run the code-reviewer (and the ui-reviewer
   only when the UI-review policy in factory-models.json applies to this issue) until
   APPROVED, then open a draft PR with 'Closes #$N'.
+  Commit as you go: every time a piece is green (tests passing, lint and types clean),
+  commit it before starting the next one. Your turn budget can run out without warning,
+  and uncommitted work is lost work.
   If blocked after the max attempts, add label needs-human with an explanatory comment and stop." \
     --permission-mode "$PERMISSION_MODE" \
     --max-turns "$MAX_TURNS" \
