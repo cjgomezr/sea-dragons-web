@@ -29,20 +29,29 @@ perfectly valid PNG. You would review a UI nobody asked about and never
 notice. `scripts/ui-preflight.sh` starts the dev server itself and refuses any
 server this factory did not start.
 
-Run it and the captures in ONE Bash call, so the server and the URL survive
-between commands:
+One command does all of it, in a single process:
 
 ```bash
-URL=$(bash scripts/ui-preflight.sh up) || exit 1
-npx playwright screenshot --viewport-size=375,812  "$URL" /tmp/ui-375.png
-npx playwright screenshot --viewport-size=768,1024 "$URL" /tmp/ui-768.png
-npx playwright screenshot --viewport-size=1440,900 "$URL" /tmp/ui-1440.png
-bash scripts/ui-preflight.sh down
+npm run ui:screenshots
 ```
 
-For a screen other than home, append the path: `"$URL/settings"`. Always end
-with `down`, including when a capture failed, so no stray dev server is left
-running.
+It boots the dev server, captures every viewport (375, 768, 1440) in BOTH
+themes, and shuts the server down, even when a capture fails. The six PNGs land
+in `.factory/ui-screenshots/`, named `ui-<viewport>-<light|dark>.png`.
+
+**Never split this into several Bash calls.** A dev server started in one call
+does not survive to the next one, and that is exactly why this command exists:
+it keeps the whole lifecycle inside one process. If you find yourself reaching
+for the Playwright MCP browser to click a theme toggle, stop: the command
+already gave you both themes.
+
+The command also refuses to hand you a false green. It fails loudly if a
+capture comes out blank, and if the light and dark captures of a viewport are
+byte-identical, because that means the theme never applied and you would be
+reviewing the same image twice.
+
+For a screen other than home, pass its path:
+`npm run ui:screenshots -- --path /settings`.
 
 **If the preflight exits non-zero, stop there.** Do not take screenshots, do
 not try another port, and never set `FABRICA_TRUST_EXISTING_SERVER` (that

@@ -12,6 +12,11 @@ const config = [
       "next-env.d.ts",
       // Handoff de Claude Design: HTML y runtime generados, no código del proyecto.
       "docs/**",
+      // Checkouts completos que la fábrica deja por cada ticket. Sin esto,
+      // `eslint .` lintea el repo tantas veces como worktrees haya, y el gate
+      // se cae por código que ya está mergeado.
+      ".claude/worktrees/**",
+      ".factory/**",
     ],
   },
   ...coreWebVitals,
