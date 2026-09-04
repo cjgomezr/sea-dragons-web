@@ -6,7 +6,10 @@ description: >
   (CLAUDE.md). Reports findings back to the main agent, not the human.
 tools: Read, Grep, Glob, Bash
 model: sonnet
-maxTurns: 3
+# 15, no 3: leer el ticket, el diff y los archivos tocados se come varios
+# turnos antes de poder opinar. Con 3, el revisor se queda sin presupuesto
+# explorando y devuelve silencio, que el coordinador lee como "no contesta".
+maxTurns: 15
 ---
 
 # Code Reviewer / Revisor de código
