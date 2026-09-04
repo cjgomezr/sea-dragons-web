@@ -37,7 +37,12 @@ for (const vp of viewports) {
 
     test("matches approved baseline", async ({ page }) => {
       await page.goto(APP_URL);
-      await page.waitForLoadState("networkidle");
+      // networkidle nunca llega mientras el dev server compila bajo carga paralela.
+      // Lo que de verdad mueve píxeles son las fuentes, y toHaveScreenshot ya
+      // reintenta hasta que la página deja de cambiar.
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+      });
       await expect(page).toHaveScreenshot(`home-${vp.name}.png`, {
         fullPage: true,
         maxDiffPixelRatio: 0.01,
