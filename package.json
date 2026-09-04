@@ -11,7 +11,8 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
-    "export:mockups": "node --experimental-strip-types scripts/export-mockups.ts"
+    "export:mockups": "node --experimental-strip-types scripts/export-mockups.ts",
+    "ui:screenshots": "node --experimental-strip-types scripts/capture-ui.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
