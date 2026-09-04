@@ -31,28 +31,37 @@ const viewports = [
   { name: "desktop", width: 1440, height: 900 },
 ] as const;
 
+const themes = ["light", "dark"] as const;
+
 for (const vp of viewports) {
   test.describe(`home @ ${vp.name}`, () => {
     test.use({ viewport: { width: vp.width, height: vp.height } });
 
-    test("matches approved baseline", async ({ page }) => {
-      await page.goto(APP_URL);
-      // networkidle nunca llega mientras el dev server compila bajo carga paralela.
-      // Lo que de verdad mueve píxeles son las fuentes, y toHaveScreenshot ya
-      // reintenta hasta que la página deja de cambiar.
-      await page.evaluate(async () => {
-        await document.fonts.ready;
+    for (const theme of themes) {
+      test(`matches approved baseline (${theme})`, async ({ page }) => {
+        await page.goto(APP_URL);
+        if (theme === "dark") {
+          await page.getByRole("button", { name: /tema oscuro/i }).click();
+        }
+        // networkidle nunca llega mientras el dev server compila bajo carga paralela.
+        // Lo que de verdad mueve píxeles son las fuentes, y toHaveScreenshot ya
+        // reintenta hasta que la página deja de cambiar.
+        await page.evaluate(async () => {
+          await document.fonts.ready;
+        });
+        await expect(page).toHaveScreenshot(`home-${vp.name}-${theme}.png`, {
+          fullPage: true,
+          maxDiffPixelRatio: 0.01,
+        });
       });
-      await expect(page).toHaveScreenshot(`home-${vp.name}.png`, {
-        fullPage: true,
-        maxDiffPixelRatio: 0.01,
-      });
-    });
+    }
 
     test("has no horizontal scroll", async ({ page }) => {
       await page.goto(APP_URL);
       const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+        () =>
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
       );
       expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
     });
@@ -66,6 +75,6 @@ test("has no accessibility violations (axe-core)", async ({ page }) => {
     .analyze();
   expect(
     results.violations,
-    JSON.stringify(results.violations, null, 2)
+    JSON.stringify(results.violations, null, 2),
   ).toEqual([]);
 });
