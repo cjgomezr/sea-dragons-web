@@ -10,7 +10,8 @@
     "test": "vitest run",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "export:mockups": "node --experimental-strip-types scripts/export-mockups.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

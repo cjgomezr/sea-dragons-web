@@ -4,12 +4,14 @@ This file is the visual source of truth. With a mockup, the ui-reviewer
 compares against the mockup; **without a mockup, it reviews against this
 file**. Keep every rule concrete and verifiable. No "should look nice".
 
-**Mockups live in `docs/mockups/`**, one image per screen, named after it
-(`home.png`, `login.png`). That is where `write-ticket` points its `Mockup:`
-field and where the ui-reviewer looks for its Mode A reference. If the project
-has designs, the tokens below should have been extracted FROM them at
-bootstrap. They are not decoration: they are what every UI ticket gets judged
-against.
+**Mockups live in `docs/mockups/`**, exported from the interactive prototype
+(`docs/Seadragons Platform.dc.html`) with `npm run export:mockups`. One PNG
+per screen and theme, named `<screen>-<light|dark>.png` for web
+(`dashboard-light.png`, `payments-dark.png`) and `mobile-<screen>-<light|dark>.png`
+for mobile (`mobile-home-light.png`, `mobile-calendar-dark.png`). That is
+where `write-ticket` points its `Mockup:` field and where the ui-reviewer
+looks for its Mode A reference. They are not decoration: they are what every
+UI ticket gets judged against.
 
 Customize the tokens below per project; the checklists rarely change.
 
@@ -17,16 +19,16 @@ Customize the tokens below per project; the checklists rarely change.
 
 ### Color
 
-| Role                      | Value                                   | Usage                          |
-| ------------------------- | --------------------------------------- | ------------------------------ |
-| Primary                   | `#2563EB` (por defecto, SIN diseño de referencia todavía) | Primary actions, links, focus  |
-| Primary hover             | 10% darker                              | Hover on primary               |
-| Surface                   | `#FFFFFF`                               | Cards, panels                  |
-| Background                | `#F8FAFC`                               | Page background                |
-| Text                      | `#0F172A`                               | Body text                      |
-| Text secondary            | `#64748B`                               | Captions, metadata             |
-| Border                    | `#E2E8F0`                               | Dividers, input borders        |
-| Success / Warning / Error | `#16A34A` / `#D97706` / `#DC2626`       | States only, never decorative |
+| Role                      | Value                                                     | Usage                         |
+| ------------------------- | --------------------------------------------------------- | ----------------------------- |
+| Primary                   | `#2563EB` (por defecto, SIN diseño de referencia todavía) | Primary actions, links, focus |
+| Primary hover             | 10% darker                                                | Hover on primary              |
+| Surface                   | `#FFFFFF`                                                 | Cards, panels                 |
+| Background                | `#F8FAFC`                                                 | Page background               |
+| Text                      | `#0F172A`                                                 | Body text                     |
+| Text secondary            | `#64748B`                                                 | Captions, metadata            |
+| Border                    | `#E2E8F0`                                                 | Dividers, input borders       |
+| Success / Warning / Error | `#16A34A` / `#D97706` / `#DC2626`                         | States only, never decorative |
 
 Rules: one accent color; success/warning/error appear only with their meaning;
 never place text on a background with contrast ratio below 4.5:1 (3:1 for
