@@ -1,16 +1,13 @@
 /*
- * Tokens de design-system.md. Sin diseño de referencia todavía: el primario es
- * el azul por defecto (#2563EB). Cámbialo aquí y en design-system.md a la vez
- * cuando el club entregue su identidad.
+ * Tokens de design-system.md, extraídos de docs/Seadragons Platform.dc.html
+ * (handoff de Claude Design). Cambia los valores en los dos archivos a la vez.
  */
 :root {
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-surface: #ffffff;
-  --color-background: #f8fafc;
-  --color-text: #0f172a;
-  --color-text-secondary: #64748b;
-  --color-border: #e2e8f0;
+  --color-sidebar-background: #163a55;
+  --color-sidebar-text: #cfdeea;
+  --color-sidebar-text-muted: #89a1b5;
+  --color-sidebar-border: #244b69;
+  --color-sidebar-hover: #1d4869;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -21,17 +18,42 @@
   --space-12: 48px;
 
   --radius: 8px;
-  --font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --font-family-body:
+    Archivo, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  --font-family-heading:
+    "Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, sans-serif;
+  --font-family-mono:
+    "Space Mono", ui-monospace, SFMono-Regular, "SF Mono", Consolas,
+    "Liberation Mono", monospace;
+}
+
+:root[data-theme="light"] {
+  --color-accent: #1c6ea4;
+  --color-background: #eff3f7;
+  --color-panel: #ffffff;
+  --color-text: #1c3245;
+  --color-text-secondary: #5a7086;
+  --color-border: #dee6ed;
+  --color-success: #2e9e86;
+  --color-warning: #c99a3e;
+  --shadow: 0 1px 2px rgba(13, 36, 54, 0.06), 0 6px 18px rgba(13, 36, 54, 0.06);
+  --shadow-sm: 0 1px 2px rgba(13, 36, 54, 0.07);
 }
 
 :root[data-theme="dark"] {
-  --color-primary: #60a5fa;
-  --color-primary-hover: #93c5fd;
-  --color-surface: #1e293b;
-  --color-background: #0f172a;
-  --color-text: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-border: #334155;
+  --color-accent: #33a1e0;
+  --color-background: #0c1a26;
+  --color-panel: #13283a;
+  --color-text: #e8f0f7;
+  --color-text-secondary: #8aa1b5;
+  --color-border: #274055;
+  --color-success: #6fd6b4;
+  --color-warning: #f2ce78;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 *,
@@ -42,15 +64,24 @@
 
 body {
   margin: 0;
-  font-family: var(--font-family);
+  font-family: var(--font-family-body);
   font-size: 16px;
   line-height: 1.5;
   color: var(--color-text);
   background: var(--color-background);
 }
 
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-family-heading);
+}
+
 :focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
@@ -65,7 +96,7 @@ body {
   align-items: center;
   gap: var(--space-6);
   padding: var(--space-4);
-  background: var(--color-surface);
+  background: var(--color-panel);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -88,7 +119,7 @@ body {
 }
 
 .app-nav a[aria-current="page"] {
-  color: var(--color-primary);
+  color: var(--color-accent);
   font-weight: 600;
 }
 
@@ -98,14 +129,14 @@ body {
   margin-left: auto;
   font-size: 18px;
   color: var(--color-text);
-  background: var(--color-surface);
+  background: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   cursor: pointer;
 }
 
 .theme-toggle:hover {
-  border-color: var(--color-primary);
+  border-color: var(--color-accent);
 }
 
 .app-main {
@@ -130,9 +161,10 @@ body {
 
 .card {
   padding: var(--space-6);
-  background: var(--color-surface);
+  background: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .card h2 {
@@ -146,7 +178,7 @@ body {
 }
 
 .card a {
-  color: var(--color-primary);
+  color: var(--color-accent);
 }
 
 .app-footer {
