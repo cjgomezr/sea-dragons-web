@@ -19,7 +19,9 @@ command -v gh >/dev/null || { echo "❌ Falta 'gh' (GitHub CLI). Instálalo y co
 command -v jq >/dev/null || { echo "❌ Falta 'jq'. Instálalo (winget install jqlang.jq / brew install jq)" >&2; exit 1; }
 
 MAX_ISSUES="${MAX_ISSUES:-10}"
-MAX_TURNS="${MAX_TURNS:-80}"
+# 200, no 80: el tope es un corte seco. Un worker que se queda sin turnos no
+# alcanza ni a commitear lo que ya tenía verde, y el ticket se pierde entero.
+MAX_TURNS="${MAX_TURNS:-200}"
 PERMISSION_MODE="${PERMISSION_MODE:-auto}"   # auto | bypassPermissions (container only!)
 WORKER_MODEL="${WORKER_MODEL:-$(jq -r '.models.worker // "sonnet"' factory-models.json 2>/dev/null || echo sonnet)}"
 ONLY_LABEL="${ONLY_LABEL:-}"   # opcional: partir el backlog por carril (ej. ONLY_LABEL=area:billing)
