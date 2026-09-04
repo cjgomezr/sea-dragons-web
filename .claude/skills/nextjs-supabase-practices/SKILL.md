@@ -29,6 +29,23 @@ Si ese test pasa sin policy, la policy falta.
 club. `clubs` es la única excepción: es la raíz del tenant. Ver el patrón
 documentado en `supabase/migrations/0001_clubs.sql`.
 
+**Toda tabla declara sus `GRANT` explícitos.** Este proyecto de Supabase no
+trae los permisos por defecto para `anon`, `authenticated` ni `service_role`:
+sin un `grant`, PostgREST responde `401 permission denied` antes de que RLS
+llegue a evaluarse. El peligro no es el 401, es el falso verde que produce. Un
+test que espera "este rol no debe ver nada" pasa igual, sin que la policy se
+haya ejecutado nunca. El patrón, junto al de `club_id`, está en
+`supabase/migrations/0001_clubs.sql`:
+
+```sql
+grant select on public.<tabla> to anon, authenticated;
+grant select, insert, update, delete on public.<tabla> to service_role;
+```
+
+Concede solo los verbos que la tabla necesita: `audit_log` es de inserción y
+lectura, así que nadie recibe `update` ni `delete`. El `GRANT` abre la puerta;
+quién ve qué filas lo sigue decidiendo RLS.
+
 **La `service_role` key nunca sale del servidor.** No se importa en un
 componente cliente, no se pone en una variable `NEXT_PUBLIC_*`, no se pasa como
 prop. Solo `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` son

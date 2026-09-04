@@ -32,3 +32,10 @@ create policy clubs_select_authenticated
 insert into public.clubs (slug, name)
 values ('victoria-seadragons', 'Victoria Seadragons')
 on conflict (slug) do nothing;
+
+-- Este proyecto de Supabase no trae los GRANT por defecto para los roles de la
+-- API: sin ellos PostgREST responde 401 antes de que RLS llegue a opinar, y el
+-- fallo se confunde con "no hay filas". Toda tabla nueva declara los suyos.
+-- RLS sigue siendo la frontera: el GRANT solo deja pasar la puerta.
+grant select on public.clubs to anon, authenticated;
+grant select, insert, update, delete on public.clubs to service_role;

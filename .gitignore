@@ -16,3 +16,6 @@ playwright-report/
 .claude/worktrees/
 .factory/
 *.tsbuildinfo
+
+# Cache del CLI de Supabase (versión, refs): nunca se commitea
+supabase/.temp/
