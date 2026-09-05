@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Files an incident so it is born visible and executable: queued (`pending`,
+# `priority:high`), linked as a native sub-issue of the epic whose code
+# broke, and on the board when there is one. Prints only the new issue
+# number to stdout so callers can chain it.
+#
+# Usage: scripts/file-incident.sh <epic-number> <title> <body-file>
+#
+# Requires: gh (with 'project' scope for the board step), jq (via
+# task-status.sh).
+
+set -euo pipefail
+
+EPIC="${1:?usage: file-incident.sh <epic-number> <title> <body-file>}"
+TITLE="${2:?usage: file-incident.sh <epic-number> <title> <body-file>}"
+BODY_FILE="${3:?usage: file-incident.sh <epic-number> <title> <body-file>}"
+
+[ -f "$BODY_FILE" ] || {
+  echo "file-incident.sh: no existe el archivo de cuerpo '$BODY_FILE'" >&2
+  exit 1
+}
+
+gh issue view "$EPIC" >/dev/null 2>&1 || {
+  echo "file-incident.sh: la épica #$EPIC no existe" >&2
+  exit 1
+}
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+
+ISSUE_URL=$(gh issue create --title "$TITLE" --body-file "$BODY_FILE" \
+  --label "pending" --label "priority:high")
+ISSUE_NUMBER="${ISSUE_URL##*/}"
+
+DB_ID=$(gh api "repos/$REPO/issues/$ISSUE_NUMBER" --jq .id)
+gh api --method POST "repos/$REPO/issues/$EPIC/sub_issues" -F "sub_issue_id=$DB_ID" >/dev/null
+
+bash "$SCRIPT_DIR/task-status.sh" "$ISSUE_NUMBER" "Todo" >/dev/null
+
+echo "$ISSUE_NUMBER"
