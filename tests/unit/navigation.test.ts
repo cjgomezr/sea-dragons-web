@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { NAV_SECTIONS, isSectionActive } from "@/lib/navigation";
+import {
+  MOBILE_OVERFLOW_SECTIONS,
+  MOBILE_PRIMARY_SECTIONS,
+  NAV_SECTIONS,
+  isSectionActive,
+} from "@/lib/navigation";
 
 describe("navegación", () => {
   it("contiene exactamente las siete secciones esperadas, cada una con su ruta", () => {
@@ -30,5 +35,36 @@ describe("navegación", () => {
     ).length;
 
     expect(activeCount).toBe(0);
+  });
+});
+
+describe("reparto de secciones para móvil", () => {
+  it("deja como pestañas fijas las cuatro secciones de uso más frecuente", () => {
+    expect(MOBILE_PRIMARY_SECTIONS.map((section) => section.label)).toEqual([
+      "Dashboard",
+      "Calendario",
+      "Equipos",
+      "Noticias",
+    ]);
+  });
+
+  it("manda al desbordamiento las tres secciones restantes", () => {
+    expect(MOBILE_OVERFLOW_SECTIONS.map((section) => section.label)).toEqual([
+      "Directorio",
+      "Evaluaciones",
+      "Pagos",
+    ]);
+  });
+
+  it("reparte todas las secciones sin perder ni duplicar ninguna", () => {
+    const repartidas = [
+      ...MOBILE_PRIMARY_SECTIONS,
+      ...MOBILE_OVERFLOW_SECTIONS,
+    ];
+
+    expect(repartidas).toHaveLength(NAV_SECTIONS.length);
+    expect(new Set(repartidas.map((section) => section.href))).toEqual(
+      new Set(NAV_SECTIONS.map((section) => section.href)),
+    );
   });
 });

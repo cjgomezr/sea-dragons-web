@@ -108,18 +108,137 @@ for (const pg of pages) {
   });
 }
 
+const DESKTOP = { width: 1440, height: 900 } as const;
+const MOBILE = { width: 375, height: 812 } as const;
+
+// The shell renders both navs and lets CSS pick one, so every assertion is
+// scoped to the nav that the viewport actually shows.
+const SIDEBAR_NAV = "Principal";
+const TAB_BAR = "Secciones";
+
 test("marks the active section in the sidebar nav", async ({ page }) => {
+  await page.setViewportSize(DESKTOP);
   await page.goto(`${APP_URL}/calendario`);
-  const current = page.locator('[aria-current="page"]');
+  const current = page
+    .getByRole("navigation", { name: SIDEBAR_NAV })
+    .locator('[aria-current="page"]');
   await expect(current).toHaveCount(1);
   await expect(current).toHaveText("Calendario");
 });
 
-test("keyboard focus is visible when tabbing through the nav", async ({
+test("marks the active section in the mobile tab bar", async ({ page }) => {
+  await page.setViewportSize(MOBILE);
+  await page.goto(`${APP_URL}/calendario`);
+  const current = page
+    .getByRole("navigation", { name: TAB_BAR })
+    .locator('[aria-current="page"]');
+  await expect(current).toHaveCount(1);
+  await expect(current).toHaveText("Calendario");
+});
+
+test("desktop shows the sidebar nav and not the tab bar", async ({ page }) => {
+  await page.setViewportSize(DESKTOP);
+  await page.goto(`${APP_URL}/dashboard`);
+  await expect(
+    page.getByRole("navigation", { name: SIDEBAR_NAV }),
+  ).toBeVisible();
+  await expect(page.getByRole("navigation", { name: TAB_BAR })).toBeHidden();
+});
+
+test("mobile pins the tab bar to the bottom edge of the viewport", async ({
   page,
 }) => {
-  await page.goto(`${APP_URL}/`);
-  const firstLink = page.getByRole("link", { name: "Dashboard" });
-  await firstLink.focus();
-  await expect(firstLink).toBeFocused();
+  await page.setViewportSize(MOBILE);
+  await page.goto(`${APP_URL}/dashboard`);
+
+  const tabBar = page.getByRole("navigation", { name: TAB_BAR });
+  await expect(tabBar).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: SIDEBAR_NAV }),
+  ).toBeHidden();
+
+  const box = await tabBar.boundingBox();
+  expect(box, "the tab bar has no layout box").not.toBeNull();
+  // Anchored to the bottom: its lower edge sits on the fold, not below it.
+  expect(box!.y + box!.height).toBeCloseTo(MOBILE.height, 0);
+});
+
+test("mobile keeps the overflow sections behind the More tab", async ({
+  page,
+}) => {
+  await page.setViewportSize(MOBILE);
+  await page.goto(`${APP_URL}/dashboard`);
+  const tabBar = page.getByRole("navigation", { name: TAB_BAR });
+
+  await expect(tabBar.getByRole("link", { name: "Pagos" })).toBeHidden();
+  await tabBar.getByRole("button", { name: "Más" }).click();
+  await expect(tabBar.getByRole("link", { name: "Pagos" })).toBeVisible();
+});
+
+test("mobile never hides content behind the fixed tab bar", async ({
+  page,
+}) => {
+  await page.setViewportSize(MOBILE);
+  await page.goto(`${APP_URL}/dashboard`);
+
+  const barBox = await page
+    .getByRole("navigation", { name: TAB_BAR })
+    .boundingBox();
+  expect(barBox, "the tab bar has no layout box").not.toBeNull();
+
+  const mainPaddingBottom = await page.evaluate(() => {
+    const main = document.querySelector("main");
+    return main ? parseFloat(getComputedStyle(main).paddingBottom) : null;
+  });
+
+  expect(mainPaddingBottom).not.toBeNull();
+  expect(
+    mainPaddingBottom!,
+    "the main area must reserve room for the fixed bar",
+  ).toBeGreaterThanOrEqual(barBox!.height);
+});
+
+test("keyboard focus follows the visual order and stays visible", async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP);
+  await page.goto(`${APP_URL}/dashboard`);
+
+  const expectedOrder = [
+    "Dashboard",
+    "Directorio",
+    "Calendario",
+    "Equipos",
+    "Evaluaciones",
+    "Noticias",
+    "Pagos",
+  ];
+
+  const reachedByTabbing: string[] = [];
+  const outlineWidths: number[] = [];
+  // One extra press covers whatever precedes the nav (the theme toggle).
+  for (let press = 0; press < expectedOrder.length + 3; press += 1) {
+    await page.keyboard.press("Tab");
+    const focused = await page.evaluate(() => {
+      const element = document.activeElement;
+      if (!(element instanceof HTMLElement)) return null;
+      const style = getComputedStyle(element);
+      return {
+        label: element.textContent?.trim() ?? "",
+        isNavLink: element.closest("nav") !== null && element.tagName === "A",
+        outlineWidth:
+          style.outlineStyle === "none" ? 0 : parseFloat(style.outlineWidth),
+      };
+    });
+    if (focused?.isNavLink && expectedOrder.includes(focused.label)) {
+      reachedByTabbing.push(focused.label);
+      outlineWidths.push(focused.outlineWidth);
+    }
+  }
+
+  expect(reachedByTabbing).toEqual(expectedOrder);
+  expect(
+    Math.min(...outlineWidths),
+    "every nav link must paint a focus outline",
+  ).toBeGreaterThan(0);
 });

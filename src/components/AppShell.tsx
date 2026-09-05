@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { MobileTabBar } from "@/components/MobileTabBar";
 import { SidebarNav } from "@/components/SidebarNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -19,6 +20,9 @@ export function AppShell({
         <SidebarNav />
       </aside>
       <main className="app-main">{children}</main>
+      {/* After main on purpose: the bar sits at the bottom of the screen, so
+          the tab order should reach it after the content, not before. */}
+      <MobileTabBar />
     </div>
   );
 }

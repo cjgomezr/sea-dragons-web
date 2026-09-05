@@ -18,6 +18,8 @@
   --space-12: 48px;
 
   --radius: 8px;
+  /* WCAG 2.5.5: minimum size for anything a thumb has to hit. */
+  --touch-target-min: 44px;
 
   --font-family-body:
     Archivo, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
@@ -113,9 +115,15 @@ h6 {
   color: var(--color-sidebar-text);
 }
 
+/* Below 768px the sections live in the bottom tab bar, so the sidebar list is
+   not rendered at all and only the brand and the theme toggle stay on top. */
+.app-nav {
+  display: none;
+}
+
 .app-nav ul {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--space-2);
   margin: 0;
   padding: 0;
@@ -125,7 +133,7 @@ h6 {
 .app-nav a {
   display: flex;
   align-items: center;
-  min-height: 44px;
+  min-height: var(--touch-target-min);
   padding: 0 var(--space-3);
   color: var(--color-sidebar-text);
   text-decoration: none;
@@ -143,9 +151,85 @@ h6 {
   box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
+.app-tabbar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  background: var(--color-sidebar-background);
+  border-top: 1px solid var(--color-sidebar-border);
+}
+
+.app-tabbar ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-tabbar-tabs {
+  display: flex;
+}
+
+.app-tabbar-tabs > li {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.app-tabbar-tabs a,
+.app-tabbar-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--touch-target-min);
+  padding: var(--space-2) var(--space-1);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--color-sidebar-text);
+  text-align: center;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.app-tabbar-tabs [aria-current] {
+  font-weight: 700;
+  box-shadow: inset 0 3px 0 var(--color-accent);
+}
+
+.app-tabbar-overflow {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--color-sidebar-border);
+}
+
+/* Author styles win over the user agent rule for [hidden], so the panel needs
+   this to close at all. */
+.app-tabbar-overflow[hidden] {
+  display: none;
+}
+
+.app-tabbar-overflow a {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+  color: var(--color-sidebar-text);
+  text-decoration: none;
+}
+
+.app-tabbar-overflow a[aria-current="page"] {
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
 .theme-toggle {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
   font-size: 18px;
   color: var(--color-sidebar-text);
   background: transparent;
@@ -162,7 +246,10 @@ h6 {
   flex: 1;
   width: 100%;
   max-width: 960px;
-  padding: var(--space-8) var(--space-4);
+  /* The bottom padding clears the fixed tab bar, so the last line of content
+     never ends up underneath it. */
+  padding: var(--space-8) var(--space-4)
+    calc(var(--space-8) + var(--touch-target-min));
   margin: 0 auto;
 }
 
@@ -172,8 +259,6 @@ h6 {
   }
 
   .app-sidebar {
-    flex-direction: column;
-    align-items: stretch;
     width: 240px;
     flex-shrink: 0;
     border-bottom: none;
@@ -185,12 +270,17 @@ h6 {
     align-items: flex-start;
   }
 
-  .app-nav ul {
-    flex-direction: column;
+  .app-nav {
+    display: block;
+  }
+
+  .app-tabbar {
+    display: none;
   }
 
   .app-main {
     max-width: none;
+    padding-bottom: var(--space-8);
     margin: 0;
   }
 }
