@@ -30,9 +30,65 @@ function runStopGate(cwd: string, env: NodeJS.ProcessEnv): Promise<RunResult> {
   });
 }
 
-function counterFilePathFor(cwd: string): string {
-  const sanitized = cwd.replace(/[^a-zA-Z0-9]/g, "-");
-  return path.join(tmpdir(), `claude-stop-gate-${sanitized}`);
+/**
+ * Le pregunta a bash cuál es el path del contador, en vez de reimplementar la
+ * sanitización en TS: `pwd | tr -c "[:alnum:]" "-"` convierte también el
+ * salto de línea final de `pwd` en un guión, así que duplicar la fórmula con
+ * un `.replace` en JS calcula un path distinto (sin ese guión final) y el
+ * test terminaría verificando un archivo que el script real nunca toca.
+ */
+function counterFilePathFor(cwd: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      "bash",
+      ["-c", 'echo "/tmp/claude-stop-gate-$(pwd | tr -c "[:alnum:]" "-")"'],
+      { cwd, stdio: ["ignore", "pipe", "ignore"] },
+    );
+    let stdout = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.on("error", reject);
+    child.on("close", () => resolve(stdout.trim()));
+  });
+}
+
+function readViaBash(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("bash", ["-c", 'cat "$1"', "_", filePath], {
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    let stdout = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.on("error", reject);
+    child.on("close", () => resolve(stdout));
+  });
+}
+
+function writeViaBash(filePath: string, content: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      "bash",
+      ["-c", 'printf "%s" "$1" > "$2"', "_", content, filePath],
+      {
+        stdio: "ignore",
+      },
+    );
+    child.on("error", reject);
+    child.on("close", () => resolve());
+  });
+}
+
+function removeViaBash(filePath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("bash", ["-c", 'rm -f "$1"', "_", filePath], {
+      stdio: "ignore",
+    });
+    child.on("error", reject);
+    child.on("close", () => resolve());
+  });
 }
 
 /** Un `npx` de mentira: no instala nada, solo reporta si eslint "falló". */
@@ -101,8 +157,8 @@ describe("stop gate", () => {
 
   it("deja intacto el archivo contador cuando está desarmado", async () => {
     workDir = await mkdtemp(path.join(tmpdir(), "seadragons-stop-gate-"));
-    const counterFile = counterFilePathFor(workDir);
-    await writeFile(counterFile, "3");
+    const counterFile = await counterFilePathFor(workDir);
+    await writeViaBash(counterFile, "3");
 
     try {
       const { code } = await runStopGate(workDir, {
@@ -111,9 +167,9 @@ describe("stop gate", () => {
       });
 
       expect(code).toBe(0);
-      expect(await readFile(counterFile, "utf8")).toBe("3");
+      expect(await readViaBash(counterFile)).toBe("3");
     } finally {
-      await rm(counterFile, { force: true });
+      await removeViaBash(counterFile);
     }
   });
 });
