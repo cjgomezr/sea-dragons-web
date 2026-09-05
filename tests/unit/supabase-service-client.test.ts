@@ -37,6 +37,7 @@ describe("createServiceRoleClient", () => {
     expect(createClient).toHaveBeenCalledWith(
       "https://club.supabase.co",
       "service-role-key",
+      { auth: { persistSession: false, autoRefreshToken: false } },
     );
     expect(client).toEqual({ marker: "service-client" });
   });

@@ -36,11 +36,14 @@ create policy audit_log_select_denied
   using (false);
 
 -- Sin policy de insert/update/delete para `authenticated` ni `anon`: RLS las
--- niega todas por defecto. El único camino de escritura es `recordAuditEvent`
--- (src/lib/audit/audit-log.ts), que usa la llave de servicio.
+-- niega todas por defecto (sin policy, `using`/`with check` es `false`). El
+-- único camino de escritura es `recordAuditEvent` (src/lib/audit/audit-log.ts),
+-- que usa la llave de servicio, la única que evita RLS.
 --
--- `anon` no recibe ningún GRANT: a diferencia de `clubs`, este dato es
--- sensible y un visitante sin sesión no tiene ninguna razón para tocarlo, ni
--- siquiera para recibir una respuesta vacía.
+-- GRANT es aditivo y este proyecto ya concede privilegios amplios por
+-- defecto a `anon`/`authenticated` en toda tabla nueva: estos GRANT
+-- documentan la intención (quién debería poder qué), no la reducen por sí
+-- solos. RLS, no el GRANT, es la frontera real; por eso cada policy de este
+-- archivo tiene su propio test de integración.
 grant select on public.audit_log to authenticated;
 grant select, insert on public.audit_log to service_role;
