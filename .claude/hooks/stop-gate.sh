@@ -9,6 +9,15 @@
 
 set -o pipefail
 
+# Kill switch: sessions that only answer questions (e.g. @claude mentions that
+# just reply in a thread) never produce code, so verifying them with lint,
+# types and tests protects nothing, it only traps them. Exit before touching
+# the retry counter file, so a worker session running in parallel keeps its
+# own count untouched.
+if [ "${FACTORY_GATE:-}" = "off" ]; then
+  exit 0
+fi
+
 # Anti-infinite-loop guard: after MAX_GATE_RUNS blocked attempts, let Claude
 # stop so it can label the issue needs-human instead of looping forever.
 COUNTER_FILE="/tmp/claude-stop-gate-$(pwd | tr -c "[:alnum:]" "-" )"

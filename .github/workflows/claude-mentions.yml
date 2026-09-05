@@ -86,6 +86,11 @@ jobs:
 
       - name: Run Claude on the mention
         uses: anthropics/claude-code-action@v1
+        env:
+          # Esta corrida solo responde en el hilo, no produce código: el Stop
+          # gate no tiene nada que verificar y este runner no instala Chromium
+          # para los tests de integración que sí lo necesitan.
+          FACTORY_GATE: "off"
         with:
           # Credencial resuelta por el paso "Resolver credencial del actor":
           # token personal del actor → API key de equipo (el token común del
