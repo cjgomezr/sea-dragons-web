@@ -118,34 +118,34 @@ main() {
   trap cleanup INT TERM
 
   while [ "$PROCESSED" -lt "$MAX_ISSUES" ]; do
-  N=$(next_issue)
-  if [ -z "${N:-}" ]; then
-    echo "✅ Backlog empty (no eligible pending issues). Processed: $PROCESSED"
-    exit 0
-  fi
-
-  echo "▶ Processing issue #$N (attempt $((PROCESSED + 1))/$MAX_ISSUES)"
-
-  # Claim-and-verify: grab the issue by assignee, re-read, and back off if
-  # someone else (a teammate, the nightly cron) won the race.
-  if [ -n "$ME" ]; then
-    gh issue edit "$N" --add-assignee "@me" 2>/dev/null || true
-    OTHERS=$(gh issue view "$N" --json assignees --jq "[.assignees[].login] | map(select(. != \"$ME\")) | length" 2>/dev/null || echo 0)
-    if [ "${OTHERS:-0}" -gt 0 ]; then
-      echo "⚔ #$N ya está reclamado por otra persona, lo salto"
-      gh issue edit "$N" --remove-assignee "@me" 2>/dev/null || true
-      SKIPPED="${SKIPPED:-} $N"
-      PROCESSED=$((PROCESSED + 1))        # cuenta como intento: nunca bucle infinito
-      sleep $((RANDOM % 8 + 3))           # jitter: rompe el ping-pong entre dos corredores
-      continue
+    N=$(next_issue)
+    if [ -z "${N:-}" ]; then
+      echo "✅ Backlog empty (no eligible pending issues). Processed: $PROCESSED"
+      exit 0
     fi
-  fi
 
-  # Deterministic bookkeeping: don't rely on the worker remembering to do it.
-  gh issue edit "$N" --add-label "in-progress" --remove-label "pending" 2>/dev/null || true
-  bash scripts/task-status.sh "$N" "In Progress" 2>/dev/null || true
+    echo "▶ Processing issue #$N (attempt $((PROCESSED + 1))/$MAX_ISSUES)"
 
-  claude -p "Process GitHub issue #$N following the issue lifecycle in CLAUDE.md:
+    # Claim-and-verify: grab the issue by assignee, re-read, and back off if
+    # someone else (a teammate, the nightly cron) won the race.
+    if [ -n "$ME" ]; then
+      gh issue edit "$N" --add-assignee "@me" 2>/dev/null || true
+      OTHERS=$(gh issue view "$N" --json assignees --jq "[.assignees[].login] | map(select(. != \"$ME\")) | length" 2>/dev/null || echo 0)
+      if [ "${OTHERS:-0}" -gt 0 ]; then
+        echo "⚔ #$N ya está reclamado por otra persona, lo salto"
+        gh issue edit "$N" --remove-assignee "@me" 2>/dev/null || true
+        SKIPPED="${SKIPPED:-} $N"
+        PROCESSED=$((PROCESSED + 1))        # cuenta como intento: nunca bucle infinito
+        sleep $((RANDOM % 8 + 3))           # jitter: rompe el ping-pong entre dos corredores
+        continue
+      fi
+    fi
+
+    # Deterministic bookkeeping: don't rely on the worker remembering to do it.
+    gh issue edit "$N" --add-label "in-progress" --remove-label "pending" 2>/dev/null || true
+    bash scripts/task-status.sh "$N" "In Progress" 2>/dev/null || true
+
+    claude -p "Process GitHub issue #$N following the issue lifecycle in CLAUDE.md:
   read the issue with 'gh issue view $N', label it in-progress, work on branch impl-$N,
   TDD until the Definition of Done is met, run the code-reviewer (and the ui-reviewer
   only when the UI-review policy in factory-models.json applies to this issue) until
@@ -154,95 +154,95 @@ main() {
   commit it before starting the next one. Your turn budget can run out without warning,
   and uncommitted work is lost work.
   If blocked after the max attempts, add label needs-human with an explanatory comment and stop." \
-    --permission-mode "$PERMISSION_MODE" \
-    --max-turns "$MAX_TURNS" \
-    --model "$WORKER_MODEL" \
-    --worktree "impl-$N" &
-  CLAUDE_PID=$!
+      --permission-mode "$PERMISSION_MODE" \
+      --max-turns "$MAX_TURNS" \
+      --model "$WORKER_MODEL" \
+      --worktree "impl-$N" &
+    CLAUDE_PID=$!
 
-  # Heartbeat: while the worker runs, print elapsed time + latest commit on its
-  # branch every 60s, so a quiet terminal never looks like a hung one.
-  START_TS=$(date +%s)
-  LAST_COMMIT=""
-  LAST_ERR=0
-  WT_DIR=".claude/worktrees/impl-$N"
-  while kill -0 "$CLAUDE_PID" 2>/dev/null; do
-    sleep 60
-    kill -0 "$CLAUDE_PID" 2>/dev/null || break
-    ELAPSED_MIN=$(( ($(date +%s) - START_TS) / 60 ))
-    if [ -d "$WT_DIR" ]; then
-      # Untracked files never travel to worktrees, so hand the worker every
-      # local env file (gitignored, stays on this machine) so integration
-      # tests and migrations can run against the real services.
-      for envf in .env .env.*; do
-        [ -f "$envf" ] || continue
-        git ls-files --error-unmatch "$envf" >/dev/null 2>&1 && continue  # tracked (e.g. .env.example) travels on its own
-        if [ ! -f "$WT_DIR/$envf" ]; then
-          cp "$envf" "$WT_DIR/$envf"
-          echo "  🔑 $envf copiado al worktree del worker"
-        fi
-      done
-      # Read the worktree by its PATH, because workers name their branches freely.
-      COMMIT=$(git -C "$WT_DIR" log --oneline -1 2>/dev/null || echo "(worktree sin commits aún)")
-    else
-      COMMIT="(worktree aún no creado)"
-      if [ "$ELAPSED_MIN" -ge 5 ]; then
-        COMMIT="$COMMIT ⚠ sin señales de arranque: posible límite de cuota o bloqueo. Considera Ctrl+C y procesar en modo interactivo"
-      fi
-    fi
-    if [ "$COMMIT" != "$LAST_COMMIT" ]; then
-      echo "  ⏱ ${ELAPSED_MIN}m · NUEVO: $COMMIT"
-      LAST_COMMIT="$COMMIT"
-    else
-      # No new commit: mine every live signal available:
-      # (a) what tool the worker is using right now (Claude Code session log)
-      # (b) the most recently touched file and how long ago
-      # (c) uncommitted work volume, and tool errors it is fighting through
-      ACT=""; ERR=0
-      # Anchor the end: without it, issue #1 matches ...impl-19 / ...impl-100.
-      SESS_DIR=$(ls -dt "$HOME/.claude/projects/"*worktrees-impl-"$N" 2>/dev/null | head -1)
-      if [ -n "$SESS_DIR" ]; then
-        SESS_FILE=$(ls -t "$SESS_DIR"/*.jsonl 2>/dev/null | head -1)
-        if [ -n "$SESS_FILE" ]; then
-          ACT=$(tail -c 200000 "$SESS_FILE" 2>/dev/null \
-            | jq -Rr 'fromjson? | select(.type=="assistant") | .message.content[]? | select(.type=="tool_use")
-                      | "🔧 " + .name + ((.input.command // .input.file_path // "") | tostring | if . == "" then "" else ": " + .[0:55] end)' 2>/dev/null \
-            | tail -1)
-          ERR=$(tail -c 200000 "$SESS_FILE" 2>/dev/null \
-            | jq -Rr 'fromjson? | select(.type=="user") | .message.content[]? | select(.type=="tool_result" and .is_error==true) | 1' 2>/dev/null \
-            | wc -l | tr -d ' ')
+    # Heartbeat: while the worker runs, print elapsed time + latest commit on its
+    # branch every 60s, so a quiet terminal never looks like a hung one.
+    START_TS=$(date +%s)
+    LAST_COMMIT=""
+    LAST_ERR=0
+    WT_DIR=".claude/worktrees/impl-$N"
+    while kill -0 "$CLAUDE_PID" 2>/dev/null; do
+      sleep 60
+      kill -0 "$CLAUDE_PID" 2>/dev/null || break
+      ELAPSED_MIN=$(( ($(date +%s) - START_TS) / 60 ))
+      if [ -d "$WT_DIR" ]; then
+        # Untracked files never travel to worktrees, so hand the worker every
+        # local env file (gitignored, stays on this machine) so integration
+        # tests and migrations can run against the real services.
+        for envf in .env .env.*; do
+          [ -f "$envf" ] || continue
+          git ls-files --error-unmatch "$envf" >/dev/null 2>&1 && continue  # tracked (e.g. .env.example) travels on its own
+          if [ ! -f "$WT_DIR/$envf" ]; then
+            cp "$envf" "$WT_DIR/$envf"
+            echo "  🔑 $envf copiado al worktree del worker"
+          fi
+        done
+        # Read the worktree by its PATH, because workers name their branches freely.
+        COMMIT=$(git -C "$WT_DIR" log --oneline -1 2>/dev/null || echo "(worktree sin commits aún)")
+      else
+        COMMIT="(worktree aún no creado)"
+        if [ "$ELAPSED_MIN" -ge 5 ]; then
+          COMMIT="$COMMIT ⚠ sin señales de arranque: posible límite de cuota o bloqueo. Considera Ctrl+C y procesar en modo interactivo"
         fi
       fi
-      AGO=""; AGOTXT=""
-      TOUCH=$(find "$WT_DIR" -type f -not -path "*/node_modules/*" -not -path "*/.git/*" -printf '%T@ %P\n' 2>/dev/null | sort -nr | head -1)
-      if [ -n "$TOUCH" ]; then
-        TSEC=${TOUCH%% *}; TFILE=${TOUCH#* }
-        AGO=$(( $(date +%s) - ${TSEC%.*} ))
-        AGOTXT="· ✍ ${TFILE:0:45} (hace ${AGO}s)"
+      if [ "$COMMIT" != "$LAST_COMMIT" ]; then
+        echo "  ⏱ ${ELAPSED_MIN}m · NUEVO: $COMMIT"
+        LAST_COMMIT="$COMMIT"
+      else
+        # No new commit: mine every live signal available:
+        # (a) what tool the worker is using right now (Claude Code session log)
+        # (b) the most recently touched file and how long ago
+        # (c) uncommitted work volume, and tool errors it is fighting through
+        ACT=""; ERR=0
+        # Anchor the end: without it, issue #1 matches ...impl-19 / ...impl-100.
+        SESS_DIR=$(ls -dt "$HOME/.claude/projects/"*worktrees-impl-"$N" 2>/dev/null | head -1)
+        if [ -n "$SESS_DIR" ]; then
+          SESS_FILE=$(ls -t "$SESS_DIR"/*.jsonl 2>/dev/null | head -1)
+          if [ -n "$SESS_FILE" ]; then
+            ACT=$(tail -c 200000 "$SESS_FILE" 2>/dev/null \
+              | jq -Rr 'fromjson? | select(.type=="assistant") | .message.content[]? | select(.type=="tool_use")
+                        | "🔧 " + .name + ((.input.command // .input.file_path // "") | tostring | if . == "" then "" else ": " + .[0:55] end)' 2>/dev/null \
+              | tail -1)
+            ERR=$(tail -c 200000 "$SESS_FILE" 2>/dev/null \
+              | jq -Rr 'fromjson? | select(.type=="user") | .message.content[]? | select(.type=="tool_result" and .is_error==true) | 1' 2>/dev/null \
+              | wc -l | tr -d ' ')
+          fi
+        fi
+        AGO=""; AGOTXT=""
+        TOUCH=$(find "$WT_DIR" -type f -not -path "*/node_modules/*" -not -path "*/.git/*" -printf '%T@ %P\n' 2>/dev/null | sort -nr | head -1)
+        if [ -n "$TOUCH" ]; then
+          TSEC=${TOUCH%% *}; TFILE=${TOUCH#* }
+          AGO=$(( $(date +%s) - ${TSEC%.*} ))
+          AGOTXT="· ✍ ${TFILE:0:45} (hace ${AGO}s)"
+        fi
+        FILES=$(git -C "$WT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+        LINES=$(git -C "$WT_DIR" diff --shortstat 2>/dev/null | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
+        LINE="  ⏱ ${ELAPSED_MIN}m · ${ACT:-trabajando} · $FILES arch, +$LINES líneas $AGOTXT"
+        if [ "${ERR:-0}" -gt "$LAST_ERR" ]; then
+          LINE="$LINE · ⚠ $((ERR - LAST_ERR)) errores nuevos de herramienta (iterando contra fallos)"
+        fi
+        LAST_ERR=${ERR:-0}
+        echo "$LINE"
+        if [ -n "${AGO:-}" ] && [ "$AGO" -gt 240 ]; then
+          echo "  ⚠ sin actividad de archivos hace $((AGO / 60))m. Si persiste otros 5m, considera Ctrl+C y procesar en modo interactivo"
+        fi
       fi
-      FILES=$(git -C "$WT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
-      LINES=$(git -C "$WT_DIR" diff --shortstat 2>/dev/null | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
-      LINE="  ⏱ ${ELAPSED_MIN}m · ${ACT:-trabajando} · $FILES arch, +$LINES líneas $AGOTXT"
-      if [ "${ERR:-0}" -gt "$LAST_ERR" ]; then
-        LINE="$LINE · ⚠ $((ERR - LAST_ERR)) errores nuevos de herramienta (iterando contra fallos)"
-      fi
-      LAST_ERR=${ERR:-0}
-      echo "$LINE"
-      if [ -n "${AGO:-}" ] && [ "$AGO" -gt 240 ]; then
-        echo "  ⚠ sin actividad de archivos hace $((AGO / 60))m. Si persiste otros 5m, considera Ctrl+C y procesar en modo interactivo"
-      fi
-    fi
-  done
+    done
 
-  if ! wait "$CLAUDE_PID"; then
-    echo "⚠ Claude exited non-zero on issue #$N: labeling needs-human + explanatory comment"
-    LAST_WORK=$(git -C "$WT_DIR" log --oneline -1 2>/dev/null || echo "sin commits")
-    # Leave a clean state: needs-human, out of the queue, and unassigned, so the
-    # board can re-queue it later (reconcile_board) without manual surgery.
-    gh issue edit "$N" --add-label "needs-human" --remove-label "in-progress" || true
-    [ -n "${ME:-}" ] && gh issue edit "$N" --remove-assignee "@me" 2>/dev/null || true
-    bash scripts/task-status.sh "$N" "Blocked" 2>/dev/null || true
-    gh issue comment "$N" --body "🤖 **El worker terminó de forma anormal** (salida ≠ 0). Causas probables: límite de cuota del plan, interrupción manual (Ctrl+C), o tope de turnos alcanzado.
+    if ! wait "$CLAUDE_PID"; then
+      echo "⚠ Claude exited non-zero on issue #$N: labeling needs-human + explanatory comment"
+      LAST_WORK=$(git -C "$WT_DIR" log --oneline -1 2>/dev/null || echo "sin commits")
+      # Leave a clean state: needs-human, out of the queue, and unassigned, so the
+      # board can re-queue it later (reconcile_board) without manual surgery.
+      gh issue edit "$N" --add-label "needs-human" --remove-label "in-progress" || true
+      [ -n "${ME:-}" ] && gh issue edit "$N" --remove-assignee "@me" 2>/dev/null || true
+      bash scripts/task-status.sh "$N" "Blocked" 2>/dev/null || true
+      gh issue comment "$N" --body "🤖 **El worker terminó de forma anormal** (salida ≠ 0). Causas probables: límite de cuota del plan, interrupción manual (Ctrl+C), o tope de turnos alcanzado.
 
 **Trabajo parcial conservado** en el worktree \`impl-$N\`, último commit: \`$LAST_WORK\`. Nada se perdió.
 
@@ -252,9 +252,9 @@ gh issue edit $N --remove-label needs-human --remove-label in-progress --add-lab
 bash scripts/process-backlog.sh
 \`\`\`
 El nuevo worker puede continuar desde la rama existente." || true
-  fi
+    fi
 
-  PROCESSED=$((PROCESSED + 1))
+    PROCESSED=$((PROCESSED + 1))
   done
 
   echo "⏸ Reached MAX_ISSUES=$MAX_ISSUES. Remaining backlog stays for the next run."

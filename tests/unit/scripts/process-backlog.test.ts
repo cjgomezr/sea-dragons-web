@@ -352,4 +352,19 @@ describe("CLAUDE.md", () => {
 
     expect(blockersStep).toMatch(/task-status\.sh N Blocked/);
   });
+
+  it("aplica el mismo Blocked a todos los needs-human de Exceptional situations, no solo a uno", async () => {
+    const claudeMd = await readFile(path.join(REPO_ROOT, "CLAUDE.md"), "utf8");
+    const exceptionalSituations = claudeMd.slice(
+      claudeMd.indexOf("## Exceptional situations"),
+      claudeMd.indexOf("Board rules:"),
+    );
+
+    expect(exceptionalSituations).toMatch(
+      /needs-human.*Blocked|Blocked.*needs-human/s,
+    );
+    expect(exceptionalSituations).toMatch(/Rebase conflict/);
+    expect(exceptionalSituations).toMatch(/Flaky test/);
+    expect(exceptionalSituations).toMatch(/Stop gate gave up/);
+  });
 });

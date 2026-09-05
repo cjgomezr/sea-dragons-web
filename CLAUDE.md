@@ -48,9 +48,10 @@ enforces this; you cannot end the session with failing checks.
 5. The `code-reviewer` subagent has replied `APPROVED`.
 6. Budget: 5 correction cycles TOTAL across all
    checks (the Stop gate enforces the same number). If still failing, stop,
-   label the issue `needs-human`, and comment exactly what was tried and what
-   is blocking. If the gate itself gave up (`.factory/gate-gave-up` exists),
-   opening or readying a PR is FORBIDDEN.
+   label the issue `needs-human`, move its board card to `Blocked`
+   (`bash scripts/task-status.sh N Blocked`), and comment exactly what was
+   tried and what is blocking. If the gate itself gave up
+   (`.factory/gate-gave-up` exists), opening or readying a PR is FORBIDDEN.
 
 ## Workflow: TDD first
 
@@ -235,6 +236,10 @@ domain, a recurring procedure with rules worth writing down), say so in the PR
 description. Proposing new skills is part of the job.
 
 ## Exceptional situations (read before improvising)
+
+Every `needs-human` below carries the same board update as step 8: move the
+card to `Blocked` (`bash scripts/task-status.sh N Blocked`, a no-op if there
+is no board) alongside the label and the comment.
 
 - **Main is broken (not by you).** If the Stop gate fails on tests you did not
   touch, check main first (`gh run list --branch main --limit 1`, or run the
