@@ -45,6 +45,7 @@ reconcile_board() {
   number=$(jq -r .projectNumber .plan/project.json)
   gh project item-list "$number" --owner "$owner" --format json --limit 500 2>/dev/null \
     | jq -r '.items[] | select(.status=="Todo") | select(.content.number != null) | .content.number' \
+    | tr -d '\r' \
     | while read -r n; do
         info=$(gh issue view "$n" --json state,labels 2>/dev/null) || continue
         echo "$info" | jq -e '.labels[] | select(.name=="epic")' >/dev/null && continue
@@ -95,8 +96,6 @@ next_issue() {  # -> first eligible pending issue number, or empty
   done
 }
 
-reconcile_board   # (must run after the function definitions above)
-
 # Leave no ghost state if the operator hits Ctrl+C mid-ticket.
 cleanup() {
   [ -n "${CLAUDE_PID:-}" ] && kill "$CLAUDE_PID" 2>/dev/null || true
@@ -105,12 +104,20 @@ cleanup() {
     echo "⏹ Interrumpido en #$N: devolviéndolo a la cola" >&2
     gh issue edit "$N" --add-label pending --remove-label in-progress 2>/dev/null || true
     [ -n "${ME:-}" ] && gh issue edit "$N" --remove-assignee "@me" 2>/dev/null || true
+    # A board that rejects the status (no Blocked option yet) must not stop
+    # the rest of the cleanup: the label/assignee bookkeeping above already
+    # returned the ticket to the queue.
+    bash scripts/task-status.sh "$N" "Blocked" 2>/dev/null || true
   fi
   exit 130
 }
-trap cleanup INT TERM
 
-while [ "$PROCESSED" -lt "$MAX_ISSUES" ]; do
+main() {
+  reconcile_board   # (must run after the function definitions above)
+
+  trap cleanup INT TERM
+
+  while [ "$PROCESSED" -lt "$MAX_ISSUES" ]; do
   N=$(next_issue)
   if [ -z "${N:-}" ]; then
     echo "✅ Backlog empty (no eligible pending issues). Processed: $PROCESSED"
@@ -234,6 +241,7 @@ while [ "$PROCESSED" -lt "$MAX_ISSUES" ]; do
     # board can re-queue it later (reconcile_board) without manual surgery.
     gh issue edit "$N" --add-label "needs-human" --remove-label "in-progress" || true
     [ -n "${ME:-}" ] && gh issue edit "$N" --remove-assignee "@me" 2>/dev/null || true
+    bash scripts/task-status.sh "$N" "Blocked" 2>/dev/null || true
     gh issue comment "$N" --body "🤖 **El worker terminó de forma anormal** (salida ≠ 0). Causas probables: límite de cuota del plan, interrupción manual (Ctrl+C), o tope de turnos alcanzado.
 
 **Trabajo parcial conservado** en el worktree \`impl-$N\`, último commit: \`$LAST_WORK\`. Nada se perdió.
@@ -247,6 +255,13 @@ El nuevo worker puede continuar desde la rama existente." || true
   fi
 
   PROCESSED=$((PROCESSED + 1))
-done
+  done
 
-echo "⏸ Reached MAX_ISSUES=$MAX_ISSUES. Remaining backlog stays for the next run."
+  echo "⏸ Reached MAX_ISSUES=$MAX_ISSUES. Remaining backlog stays for the next run."
+}
+
+# Sourced (e.g. from tests, to exercise cleanup()/reconcile_board() in
+# isolation) vs executed directly: only the latter runs the backlog loop.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi

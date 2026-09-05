@@ -208,7 +208,9 @@ body -q .body` → edit → `gh issue edit N --body-file`). A box you cannot bac
    provide (missing credentials or env vars, an external service not
    configured, a permission not granted, a dependency that cannot be
    installed), do NOT retry and do NOT work around it silently: STOP, label
-   `needs-human`, and comment EXACTLY what is missing, where the human gets it,
+   `needs-human`, move its board card to `Blocked`
+   (`bash scripts/task-status.sh N Blocked`, a no-op if there is no board),
+   and comment EXACTLY what is missing, where the human gets it,
    and where to put it (e.g. "falta SUPABASE_SERVICE_ROLE_KEY en .env.local:
    dashboard → Settings → API"). Attempt #2 against a missing key is identical
    to attempt #1. Partial work may be delivered ONLY if the PR and the issue
@@ -245,7 +247,8 @@ description. Proposing new skills is part of the job.
   **code that broke**, not the epic of the ticket that found it: if your
   ticket belongs to epic A but the breakage lives in epic B, the incident
   hangs off B. Then label your own ticket `blocked-by-<that incident>`,
-  return YOUR ticket (not the incident) to `pending`, and stop.
+  return YOUR ticket (not the incident) to `pending`, move its board card to
+  `Blocked` (`bash scripts/task-status.sh N Blocked`), and stop.
 - **Rebase conflict you cannot resolve with certainty:** never force it;
   `needs-human` + comment listing the conflicting files.
 - **Flaky test:** run it 3 times. If it fails non-deterministically, do NOT
@@ -273,7 +276,12 @@ script reconciles the board into labels before picking work; you never go read
 the board yourself looking for something to do. Never set a board status to
 "Done" manually: the
 Project's built-in workflows do it when the issue closes / the PR merges. The
-agent only ever writes "In Progress" (and "Todo" at creation time).
+agent writes "In Progress" (and "Todo" at creation time), and "Blocked"
+whenever a ticket returns to the queue via `blocked-by-N`, gets labeled
+`needs-human`, or an interrupted worker returns it to `pending`
+(`process-backlog.sh`'s `cleanup()` on Ctrl+C). A card in `Blocked` is left
+alone by `reconcile_board`: it is not `Todo`, so it is not re-queued. Moving
+it to `Todo` by hand is still the only way to say "retry".
 
 ## Documents & tickets
 
