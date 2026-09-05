@@ -91,46 +91,65 @@ h6 {
   min-height: 100vh;
 }
 
-.app-header {
+.app-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-sidebar-background);
+  border-bottom: 1px solid var(--color-sidebar-border);
+}
+
+.app-sidebar-header {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
-  padding: var(--space-4);
-  background: var(--color-panel);
-  border-bottom: 1px solid var(--color-border);
+  justify-content: space-between;
+  gap: var(--space-4);
 }
 
 .app-brand {
   font-size: 18px;
   font-weight: 700;
+  color: var(--color-sidebar-text);
 }
 
-.app-nav {
+.app-nav ul {
   display: flex;
-  gap: var(--space-4);
+  flex-wrap: wrap;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .app-nav a {
-  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  color: var(--color-sidebar-text);
   text-decoration: none;
+  border-radius: var(--radius);
+}
+
+.app-nav a:hover {
+  background: var(--color-sidebar-hover);
 }
 
 .app-nav a[aria-current="page"] {
-  color: var(--color-accent);
-  font-weight: 600;
+  background: var(--color-sidebar-hover);
+  color: var(--color-sidebar-text);
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
 .theme-toggle {
   min-width: 44px;
   min-height: 44px;
-  margin-left: auto;
   font-size: 18px;
-  color: var(--color-text);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
+  color: var(--color-sidebar-text);
+  background: transparent;
+  border: 1px solid var(--color-sidebar-border);
   border-radius: var(--radius);
   cursor: pointer;
 }
@@ -145,6 +164,35 @@ h6 {
   max-width: 960px;
   padding: var(--space-8) var(--space-4);
   margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .app-shell {
+    flex-direction: row;
+  }
+
+  .app-sidebar {
+    flex-direction: column;
+    align-items: stretch;
+    width: 240px;
+    flex-shrink: 0;
+    border-bottom: none;
+    border-right: 1px solid var(--color-sidebar-border);
+  }
+
+  .app-sidebar-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .app-nav ul {
+    flex-direction: column;
+  }
+
+  .app-main {
+    max-width: none;
+    margin: 0;
+  }
 }
 
 .app-main h1 {
@@ -179,16 +227,4 @@ h6 {
 
 .card a {
   color: var(--color-accent);
-}
-
-.app-footer {
-  padding: var(--space-4);
-  color: var(--color-text-secondary);
-  border-top: 1px solid var(--color-border);
-}
-
-.app-footer p {
-  max-width: 960px;
-  margin: 0 auto;
-  font-size: 14px;
 }
