@@ -1,6 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
-import { type DatabaseProbeResult, buildHealthReport, healthHttpStatus } from "@/lib/health";
+import { createApiModule, createApiRoute } from "@/lib/api/handler";
+import { ApiError } from "@/lib/api/response";
+import {
+  type DatabaseProbeResult,
+  type HealthReport,
+  buildHealthReport,
+} from "@/lib/health";
 import { readSupabaseConfig } from "@/lib/supabase/config";
 
 // The probe must reflect the database right now, never a cached answer.
@@ -26,7 +31,16 @@ async function probeDatabase(): Promise<DatabaseProbeResult> {
   return { kind: "reachable" };
 }
 
-export async function GET(): Promise<NextResponse> {
-  const report = buildHealthReport(await probeDatabase());
-  return NextResponse.json(report, { status: healthHttpStatus(report) });
-}
+const getHealth = createApiRoute<HealthReport>({
+  handler: async () => {
+    const report = buildHealthReport(await probeDatabase());
+    if (report.status === "degraded") {
+      throw new ApiError("service_unavailable", report.detail);
+    }
+    return { data: report };
+  },
+});
+
+export const { GET, POST, PUT, PATCH, DELETE } = createApiModule({
+  GET: getHealth,
+});
