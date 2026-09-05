@@ -27,5 +27,13 @@ test("serves the versioned health endpoint", async ({ request }) => {
 
   // 503 without Supabase credentials is the honest answer, not a failure.
   expect([200, 503]).toContain(response.status());
-  expect(body).toMatchObject({ database: expect.any(String), status: expect.any(String) });
+  if (response.status() === 200) {
+    expect(body).toMatchObject({
+      data: { database: expect.any(String), status: expect.any(String) },
+    });
+  } else {
+    expect(body).toMatchObject({
+      error: { code: expect.any(String), message: expect.any(String) },
+    });
+  }
 });
