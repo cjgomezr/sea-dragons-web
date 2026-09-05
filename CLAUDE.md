@@ -221,12 +221,12 @@ MANDATORY, not suggestions: before writing or reviewing code that falls under
 one, load it and follow it. The table below is the contract. Keep it updated
 whenever a skill is added or removed.
 
-| Skill                                   | Load it when…                            |
-| --------------------------------------- | ---------------------------------------- |
-| `write-prd`                             | planning a feature or decomposing a spec |
-| `write-ticket`                          | creating or refining issues              |
-| `bootstrap`                             | initializing a brand-new project         |
-| `nextjs-supabase-practices`             | touching any .ts/.tsx under `src/`, any migration under `supabase/migrations/`, or any `api/v1` handler |
+| Skill                       | Load it when…                                                                                           |
+| --------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `write-prd`                 | planning a feature or decomposing a spec                                                                |
+| `write-ticket`              | creating or refining issues                                                                             |
+| `bootstrap`                 | initializing a brand-new project                                                                        |
+| `nextjs-supabase-practices` | touching any .ts/.tsx under `src/`, any migration under `supabase/migrations/`, or any `api/v1` handler |
 
 If a task clearly falls under a skill that does NOT exist yet (a stack, a
 domain, a recurring procedure with rules worth writing down), say so in the PR
@@ -237,8 +237,15 @@ description. Proposing new skills is part of the job.
 - **Main is broken (not by you).** If the Stop gate fails on tests you did not
   touch, check main first (`gh run list --branch main --limit 1`, or run the
   suite on a clean checkout). If main is red: do NOT try to fix it inside your
-  ticket. Open a `priority:high` issue "main roto por #X", label your ticket
-  `blocked-by-<that issue>`, return it to `pending`, and stop.
+  ticket. File the incident with `scripts/file-incident.sh <epic> "<title>"
+<body-file>`, never `gh issue create` by hand: it is born with `pending`
+  and `priority:high`, linked as a sub-issue, and on the board, so nothing
+  depends on the worker remembering to do that itself. Write the body with
+  the `write-ticket` template. The incident's epic is the one for the
+  **code that broke**, not the epic of the ticket that found it: if your
+  ticket belongs to epic A but the breakage lives in epic B, the incident
+  hangs off B. Then label your own ticket `blocked-by-<that incident>`,
+  return YOUR ticket (not the incident) to `pending`, and stop.
 - **Rebase conflict you cannot resolve with certainty:** never force it;
   `needs-human` + comment listing the conflicting files.
 - **Flaky test:** run it 3 times. If it fails non-deterministically, do NOT
