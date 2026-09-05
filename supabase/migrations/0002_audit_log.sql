@@ -8,6 +8,10 @@
 create table if not exists public.audit_log (
   id uuid primary key default gen_random_uuid(),
   club_id uuid not null references public.clubs (id),
+  -- Sin `references auth.users (id)` a propósito: un actor no siempre es una
+  -- fila de `auth.users` (un job programado de E16, por ejemplo, audita como
+  -- un actor de sistema sin sesión). Cuando E3 traiga el modelo de roles esto
+  -- se revisa junto con la policy de lectura de abajo.
   actor_id uuid not null,
   action text not null,
   entity_type text not null,

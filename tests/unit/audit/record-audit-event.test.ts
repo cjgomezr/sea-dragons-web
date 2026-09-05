@@ -122,6 +122,19 @@ describe("recordAuditEvent", () => {
 });
 
 describe("tipos de acción", () => {
+  it("rejects an action literal outside the closed set at compile time", () => {
+    const writer = buildWriter();
+
+    // @ts-expect-error "not.a.real.action" no pertenece a AuditAction: si
+    // este directive deja de hacer falta, es que la unión dejó de ser
+    // cerrada y `tsc --noEmit` debe fallar para avisarlo.
+    const input = buildInput({ action: "not.a.real.action" });
+
+    return expect(recordAuditEvent(writer, input)).rejects.toBeInstanceOf(
+      AuditValidationError,
+    );
+  });
+
   it("rejects an action outside the closed set at runtime", async () => {
     const writer = buildWriter();
 
