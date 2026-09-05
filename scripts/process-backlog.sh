@@ -47,7 +47,14 @@ reconcile_board() {
     | jq -r '.items[] | select(.status=="Todo") | select(.content.number != null) | .content.number' \
     | tr -d '\r' \
     | while read -r n; do
-        info=$(gh issue view "$n" --json state,labels 2>/dev/null) || continue
+        local err
+        err=$(mktemp)
+        if ! info=$(gh issue view "$n" --json state,labels 2>"$err"); then
+          echo "⚠ reconcile_board: no pude leer el issue #$n con 'gh issue view' ($(cat "$err")), lo salto" >&2
+          rm -f "$err"
+          continue
+        fi
+        rm -f "$err"
         echo "$info" | jq -e '.labels[] | select(.name=="epic")' >/dev/null && continue
         state=$(echo "$info" | jq -r .state)
         if [ "$state" = "CLOSED" ]; then

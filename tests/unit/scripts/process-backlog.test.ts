@@ -74,6 +74,10 @@ if [ "$1" = "repo" ] && [ "$2" = "view" ]; then
 fi
 
 if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
+  if [ -n "\${FAIL_ISSUE_VIEW_FOR:-}" ] && [ "$3" = "$FAIL_ISSUE_VIEW_FOR" ]; then
+    echo "GraphQL: Could not resolve to an issue (issue #$3)" >&2
+    exit 1
+  fi
   if [ -n "\${ISSUE_VIEW_JSON:-}" ]; then
     echo "$ISSUE_VIEW_JSON"
   else
@@ -114,6 +118,34 @@ exit 0
 
 async function readLog(logFile: string): Promise<string> {
   return readFile(logFile, "utf8");
+}
+
+/**
+ * `jq` de mentira que reproduce el bug real: el binario de `jq` en Windows
+ * termina líneas con CRLF. Solo afecta al filtro de `reconcile_board` (el
+ * único que menciona `Todo`); todo lo demás se delega al `jq` real del PATH,
+ * para no romper el resto del script.
+ */
+async function installFakeJq(binDir: string): Promise<void> {
+  const jqPath = path.join(binDir, "jq");
+  const script = `#!/usr/bin/env bash
+stub_dir=$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+real_jq=""
+IFS=':' read -ra parts <<< "$PATH"
+for p in "\${parts[@]}"; do
+  [ "$p" = "$stub_dir" ] && continue
+  if [ -x "$p/jq" ]; then real_jq="$p/jq"; break; fi
+done
+[ -n "$real_jq" ] || { echo "fake jq: no encontré el jq real en el PATH" >&2; exit 1; }
+
+if printf '%s\\n' "$@" | grep -q 'status=="Todo"'; then
+  "$real_jq" "$@" | sed 's/$/\\r/'
+else
+  exec "$real_jq" "$@"
+fi
+`;
+  await writeFile(jqPath, script);
+  await chmod(jqPath, 0o755);
 }
 
 async function setupWorkDir(): Promise<string> {
@@ -298,6 +330,146 @@ describe("reconcile_board", () => {
     expect(log).toMatch(
       /issue edit 22 --add-label pending --remove-label needs-human --remove-label in-progress/,
     );
+  });
+
+  it("encola un issue abierto que no tiene etiqueta de cola", async () => {
+    workDir = await setupWorkDir();
+    await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+    const { binDir, logFile } = await installFakeGh(workDir);
+    const itemListJson = JSON.stringify({
+      items: [{ status: "Todo", content: { number: 31 } }],
+    });
+    const issueViewJson = JSON.stringify({ state: "OPEN", labels: [] });
+
+    await runBash(
+      "source scripts/process-backlog.sh; reconcile_board",
+      workDir,
+      {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        ITEM_LIST_JSON: itemListJson,
+        ISSUE_VIEW_JSON: issueViewJson,
+      },
+    );
+
+    const log = await readLog(logFile);
+    expect(log).toMatch(/issue edit 31 --add-label pending/);
+  });
+
+  it("reabre y encola un issue cerrado que está en Todo", async () => {
+    workDir = await setupWorkDir();
+    await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+    const { binDir, logFile } = await installFakeGh(workDir);
+    const itemListJson = JSON.stringify({
+      items: [{ status: "Todo", content: { number: 22 } }],
+    });
+    const issueViewJson = JSON.stringify({ state: "CLOSED", labels: [] });
+
+    await runBash(
+      "source scripts/process-backlog.sh; reconcile_board",
+      workDir,
+      {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        ITEM_LIST_JSON: itemListJson,
+        ISSUE_VIEW_JSON: issueViewJson,
+      },
+    );
+
+    const log = await readLog(logFile);
+    expect(log).toMatch(/issue reopen 22/);
+    expect(log).toMatch(
+      /issue edit 22 --add-label pending --remove-label in-progress --remove-label needs-human/,
+    );
+  });
+
+  it("ignora las tarjetas de epics", async () => {
+    workDir = await setupWorkDir();
+    await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+    const { binDir, logFile } = await installFakeGh(workDir);
+    const itemListJson = JSON.stringify({
+      items: [{ status: "Todo", content: { number: 7 } }],
+    });
+    const issueViewJson = JSON.stringify({
+      state: "OPEN",
+      labels: [{ name: "epic" }],
+    });
+
+    await runBash(
+      "source scripts/process-backlog.sh; reconcile_board",
+      workDir,
+      {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        ITEM_LIST_JSON: itemListJson,
+        ISSUE_VIEW_JSON: issueViewJson,
+      },
+    );
+
+    const log = await readLog(logFile);
+    expect(log).not.toMatch(/issue edit 7/);
+    expect(log).not.toMatch(/issue reopen 7/);
+  });
+
+  it("procesa todas las tarjetas cuando la entrada llega con CRLF", async () => {
+    workDir = await setupWorkDir();
+    await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+    const { binDir, logFile } = await installFakeGh(workDir);
+    await installFakeJq(binDir);
+    const itemListJson = JSON.stringify({
+      items: [
+        { status: "Todo", content: { number: 31 } },
+        { status: "Todo", content: { number: 33 } },
+      ],
+    });
+    const issueViewJson = JSON.stringify({ state: "OPEN", labels: [] });
+
+    await runBash(
+      "source scripts/process-backlog.sh; reconcile_board",
+      workDir,
+      {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        ITEM_LIST_JSON: itemListJson,
+        ISSUE_VIEW_JSON: issueViewJson,
+      },
+    );
+
+    const log = await readLog(logFile);
+    // El bug real: con \r pegado, "31\r" no matchea y la tarjeta se salta en
+    // silencio. Si las dos aparecen limpias, el CRLF no rompió el bucle.
+    expect(log).toMatch(/issue edit 31 --add-label pending/);
+    expect(log).toMatch(/issue edit 33 --add-label pending/);
+    expect(log).not.toMatch(/issue view 31\r/);
+  });
+
+  it("avisa por stderr cuando gh falla para un issue concreto", async () => {
+    workDir = await setupWorkDir();
+    await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+    const { binDir, logFile } = await installFakeGh(workDir);
+    const itemListJson = JSON.stringify({
+      items: [
+        { status: "Todo", content: { number: 40 } },
+        { status: "Todo", content: { number: 41 } },
+      ],
+    });
+    const issueViewJson = JSON.stringify({ state: "OPEN", labels: [] });
+
+    const { stderr } = await runBash(
+      "source scripts/process-backlog.sh; reconcile_board",
+      workDir,
+      {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        ITEM_LIST_JSON: itemListJson,
+        ISSUE_VIEW_JSON: issueViewJson,
+        FAIL_ISSUE_VIEW_FOR: "40",
+      },
+    );
+
+    expect(stderr).toMatch(/#40/);
+    const log = await readLog(logFile);
+    expect(log).toMatch(/issue edit 41 --add-label pending/);
   });
 });
 
