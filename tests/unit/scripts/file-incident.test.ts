@@ -257,3 +257,26 @@ describe("file-incident", () => {
     expect(log).not.toMatch(/issue create/);
   });
 });
+
+describe("CLAUDE.md", () => {
+  it("manda usar file-incident.sh y escribir el cuerpo con write-ticket", async () => {
+    const claudeMd = await readFile(path.join(REPO_ROOT, "CLAUDE.md"), "utf8");
+
+    expect(claudeMd).toMatch(/scripts\/file-incident\.sh/);
+    expect(claudeMd).toMatch(/write-ticket/);
+  });
+
+  it("aclara que la épica del incidente es la del código roto, no la del ticket que lo descubrió", async () => {
+    const claudeMd = await readFile(path.join(REPO_ROOT, "CLAUDE.md"), "utf8");
+    const exceptionalSituations = claudeMd.slice(
+      claudeMd.indexOf("## Exceptional situations"),
+    );
+    const mainIsBrokenBullet = exceptionalSituations.slice(
+      exceptionalSituations.indexOf("**Main is broken"),
+      exceptionalSituations.indexOf("**Rebase conflict"),
+    );
+
+    expect(mainIsBrokenBullet).toMatch(/code that broke/);
+    expect(mainIsBrokenBullet).not.toMatch(/return it to `pending`/);
+  });
+});
