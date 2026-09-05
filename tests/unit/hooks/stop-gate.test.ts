@@ -174,6 +174,197 @@ describe("stop gate", () => {
   });
 });
 
+interface BashScriptResult {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+}
+
+function runBashScript(cwd: string, script: string): Promise<BashScriptResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("bash", ["-c", script], {
+      cwd,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", reject);
+    child.on("close", (code) => resolve({ code, stdout, stderr }));
+  });
+}
+
+function toBashPath(nativePath: string): string {
+  return nativePath.replace(/\\/g, "/");
+}
+
+/**
+ * Repo con upstream real: el guard necesita `@{upstream}` para decidir si hay
+ * commits por delante, así que un `git init` suelto no alcanza. El commit
+ * base deja sucios (trackeados) los cuatro archivos de ruido más uno de
+ * producto, para que los tests solo tengan que decidir cuáles tocar.
+ */
+async function createFixtureRepo(): Promise<{
+  workDir: string;
+  originDir: string;
+}> {
+  const originDir = await mkdtemp(path.join(tmpdir(), "seadragons-origin-"));
+  const workDir = await mkdtemp(path.join(tmpdir(), "seadragons-work-"));
+  const script = `
+    set -e
+    git init --bare -q "${toBashPath(originDir)}"
+    git clone -q "${toBashPath(originDir)}" .
+    git config user.email test@example.com
+    git config user.name Test
+    mkdir -p src/lib
+    echo '{"include": ["**/*.ts"]}' > tsconfig.json
+    echo '{"name": "fixture", "lockfileVersion": 3}' > package-lock.json
+    echo '# CLAUDE' > CLAUDE.md
+    echo '# AGENTS' > AGENTS.md
+    echo 'module.exports = [];' > eslint.config.js
+    echo '{"name": "fixture", "scripts": {"test": "true"}}' > package.json
+    echo 'export const foo = 1;' > src/lib/foo.ts
+    git add -A
+    git commit -q -m baseline
+    git push -q -u origin HEAD:main
+  `;
+  const { code, stderr } = await runBashScript(workDir, script);
+  if (code !== 0) {
+    throw new Error(`No se pudo preparar el repo de prueba: ${stderr}`);
+  }
+  return { workDir, originDir };
+}
+
+/**
+ * `npm`/`npx` de mentira: registran que corrieron y siempre "pasan". Viven
+ * fuera de `workDir` a propósito: si el bin stub estuviera dentro del árbol
+ * git, `git status` lo vería como archivo sin seguimiento y el guard tendría
+ * razón en no aplicar, invalidando el test.
+ */
+async function installChecksRanMarkerBin(): Promise<{
+  binDir: string;
+  markerFile: string;
+}> {
+  const binDir = await mkdtemp(path.join(tmpdir(), "seadragons-stub-bin-"));
+  const markerFile = path.join(binDir, "checks-ran");
+  const marker = toBashPath(markerFile);
+  for (const name of ["npm", "npx"]) {
+    const binPath = path.join(binDir, name);
+    await writeFile(
+      binPath,
+      `#!/usr/bin/env bash\ntouch "${marker}"\nexit 0\n`,
+    );
+    await chmod(binPath, 0o755);
+  }
+  return { binDir, markerFile };
+}
+
+async function checksRan(markerFile: string): Promise<boolean> {
+  try {
+    await readFile(markerFile);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+describe("guard de árbol limpio", () => {
+  let workDir = "";
+  let originDir = "";
+  let stubBinDir = "";
+
+  afterEach(async () => {
+    if (workDir) {
+      await rm(workDir, { recursive: true, force: true });
+      workDir = "";
+    }
+    if (originDir) {
+      await rm(originDir, { recursive: true, force: true });
+      originDir = "";
+    }
+    if (stubBinDir) {
+      await rm(stubBinDir, { recursive: true, force: true });
+      stubBinDir = "";
+    }
+  });
+
+  it.each(["tsconfig.json", "package-lock.json", "CLAUDE.md", "AGENTS.md"])(
+    "pasa cuando la única suciedad es ruido generado (%s)",
+    async (noiseFile) => {
+      ({ workDir, originDir } = await createFixtureRepo());
+      await writeFile(path.join(workDir, noiseFile), "cambiado por next dev\n");
+      const { binDir, markerFile } = await installChecksRanMarkerBin();
+      stubBinDir = binDir;
+
+      const { code } = await runStopGate(workDir, {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      });
+
+      expect(code).toBe(0);
+      expect(await checksRan(markerFile)).toBe(false);
+    },
+  );
+
+  it("no pasa cuando además hay un archivo de producto", async () => {
+    ({ workDir, originDir } = await createFixtureRepo());
+    await writeFile(path.join(workDir, "tsconfig.json"), "cambiado\n");
+    await writeFile(
+      path.join(workDir, "src/lib/foo.ts"),
+      "export const foo = 2;\n",
+    );
+    const { binDir, markerFile } = await installChecksRanMarkerBin();
+    stubBinDir = binDir;
+
+    await runStopGate(workDir, {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+    });
+
+    expect(await checksRan(markerFile)).toBe(true);
+  });
+
+  it("no pasa cuando hay commits sobre upstream, aunque la suciedad sea ruido", async () => {
+    ({ workDir, originDir } = await createFixtureRepo());
+    await runBashScript(
+      workDir,
+      `git config user.email test@example.com
+       git config user.name Test
+       echo 'export const foo = 2;' > src/lib/foo.ts
+       git commit -aqm "commit sin pushear"`,
+    );
+    await writeFile(path.join(workDir, "tsconfig.json"), "cambiado\n");
+    const { binDir, markerFile } = await installChecksRanMarkerBin();
+    stubBinDir = binDir;
+
+    await runStopGate(workDir, {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+    });
+
+    expect(await checksRan(markerFile)).toBe(true);
+  });
+
+  it("no pasa ante un archivo sin seguimiento fuera de la lista", async () => {
+    ({ workDir, originDir } = await createFixtureRepo());
+    await writeFile(path.join(workDir, "src/lib/scratch.ts"), "export {};\n");
+    const { binDir, markerFile } = await installChecksRanMarkerBin();
+    stubBinDir = binDir;
+
+    await runStopGate(workDir, {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+    });
+
+    expect(await checksRan(markerFile)).toBe(true);
+  });
+});
+
 describe("workflows", () => {
   it("claude-mentions.yml define FACTORY_GATE=off y claude-backlog.yml no", async () => {
     const mentionsYml = await readFile(

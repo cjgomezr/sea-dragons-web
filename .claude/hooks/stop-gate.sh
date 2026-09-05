@@ -33,11 +33,37 @@ if grep -q '{{TEST_CMD}}' package.json 2>/dev/null; then
   exit 0
 fi
 
-# Review-only guard: if the session changed nothing (clean tree, no commits
-# beyond upstream), there is nothing to verify. Don't run the full suite
-# just to end a Q&A session. Any failure to determine "ahead" counts as
-# ahead, so worker sessions with local commits always get checked.
-if [ -z "$(git status --porcelain 2>/dev/null)" ]; then
+# Review-only guard: if the session changed nothing beyond generated noise
+# (clean tree modulo GENERATED_NOISE_FILES, no commits beyond upstream),
+# there is nothing to verify. Don't run the full suite just to end a Q&A
+# session. Any failure to determine "ahead" counts as ahead, so worker
+# sessions with local commits always get checked. `next dev` rewrites
+# tsconfig.json and the CLAUDE.md agent block on every run, and `npm install`
+# rewrites package-lock.json, so without this allowance the first gate run in
+# a session dirties the tree and the guard can never apply again.
+GENERATED_NOISE_FILES=("tsconfig.json" "package-lock.json" "CLAUDE.md" "AGENTS.md")
+
+is_generated_noise_file() {
+  local candidate="$1"
+  local noise_file
+  for noise_file in "${GENERATED_NOISE_FILES[@]}"; do
+    if [ "$candidate" = "$noise_file" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+only_generated_noise_is_dirty() {
+  local status_line
+  while IFS= read -r status_line; do
+    [ -z "$status_line" ] && continue
+    is_generated_noise_file "${status_line:3}" || return 1
+  done <<<"$(git status --porcelain 2>/dev/null)"
+  return 0
+}
+
+if only_generated_noise_is_dirty; then
   AHEAD=$(git rev-list --count '@{upstream}..HEAD' 2>/dev/null || echo "?")
   if [ "$AHEAD" = "0" ]; then
     rm -f "$COUNTER_FILE"
