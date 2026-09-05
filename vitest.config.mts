@@ -13,6 +13,10 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
     // *.test.ts(x) is Vitest; *.spec.ts is Playwright. Keeping the split on the
     // extension stops each runner from collecting the other one's suite.
-    include: ["tests/unit/**/*.test.ts", "tests/unit/**/*.test.tsx"],
+    include: [
+      "tests/unit/**/*.test.ts",
+      "tests/unit/**/*.test.tsx",
+      "tests/rls/**/*.test.ts",
+    ],
   },
 });
