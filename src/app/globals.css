@@ -18,6 +18,8 @@
   --space-12: 48px;
 
   --radius: 8px;
+  /* WCAG 2.5.5: minimum size for anything a thumb has to hit. */
+  --touch-target-min: 44px;
 
   --font-family-body:
     Archivo, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
@@ -91,46 +93,146 @@ h6 {
   min-height: 100vh;
 }
 
-.app-header {
+.app-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-sidebar-background);
+  border-bottom: 1px solid var(--color-sidebar-border);
+}
+
+.app-sidebar-header {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
-  padding: var(--space-4);
-  background: var(--color-panel);
-  border-bottom: 1px solid var(--color-border);
+  justify-content: space-between;
+  gap: var(--space-4);
 }
 
 .app-brand {
   font-size: 18px;
   font-weight: 700;
+  color: var(--color-sidebar-text);
 }
 
+/* Below 768px the sections live in the bottom tab bar, so the sidebar list is
+   not rendered at all and only the brand and the theme toggle stay on top. */
 .app-nav {
+  display: none;
+}
+
+.app-nav ul {
   display: flex;
-  gap: var(--space-4);
+  flex-direction: column;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .app-nav a {
-  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  color: var(--color-sidebar-text);
   text-decoration: none;
+  border-radius: var(--radius);
+}
+
+.app-nav a:hover {
+  background: var(--color-sidebar-hover);
 }
 
 .app-nav a[aria-current="page"] {
-  color: var(--color-accent);
-  font-weight: 600;
+  background: var(--color-sidebar-hover);
+  color: var(--color-sidebar-text);
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.app-tabbar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  background: var(--color-sidebar-background);
+  border-top: 1px solid var(--color-sidebar-border);
+}
+
+.app-tabbar ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-tabbar-tabs {
+  display: flex;
+}
+
+.app-tabbar-tabs > li {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.app-tabbar-tabs a,
+.app-tabbar-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--touch-target-min);
+  padding: var(--space-2) var(--space-1);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--color-sidebar-text);
+  text-align: center;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.app-tabbar-tabs [aria-current] {
+  font-weight: 700;
+  box-shadow: inset 0 3px 0 var(--color-accent);
+}
+
+.app-tabbar-overflow {
+  flex-direction: column;
+  border-bottom: 1px solid var(--color-sidebar-border);
+}
+
+/* Guarded on [hidden] instead of overriding it: an unconditional display would
+   beat the user agent rule and the panel would never close. */
+.app-tabbar-overflow:not([hidden]) {
+  display: flex;
+}
+
+.app-tabbar-overflow a {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+  color: var(--color-sidebar-text);
+  text-decoration: none;
+}
+
+.app-tabbar-overflow a[aria-current="page"] {
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
 .theme-toggle {
-  min-width: 44px;
-  min-height: 44px;
-  margin-left: auto;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
   font-size: 18px;
-  color: var(--color-text);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
+  color: var(--color-sidebar-text);
+  background: transparent;
+  border: 1px solid var(--color-sidebar-border);
   border-radius: var(--radius);
   cursor: pointer;
 }
@@ -143,8 +245,43 @@ h6 {
   flex: 1;
   width: 100%;
   max-width: 960px;
-  padding: var(--space-8) var(--space-4);
+  /* The bottom padding clears the fixed tab bar, so the last line of content
+     never ends up underneath it. */
+  padding: var(--space-8) var(--space-4)
+    calc(var(--space-8) + var(--touch-target-min));
   margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .app-shell {
+    flex-direction: row;
+  }
+
+  .app-sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    border-bottom: none;
+    border-right: 1px solid var(--color-sidebar-border);
+  }
+
+  .app-sidebar-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .app-nav {
+    display: block;
+  }
+
+  .app-tabbar {
+    display: none;
+  }
+
+  .app-main {
+    max-width: none;
+    padding-bottom: var(--space-8);
+    margin: 0;
+  }
 }
 
 .app-main h1 {
@@ -179,16 +316,4 @@ h6 {
 
 .card a {
   color: var(--color-accent);
-}
-
-.app-footer {
-  padding: var(--space-4);
-  color: var(--color-text-secondary);
-  border-top: 1px solid var(--color-border);
-}
-
-.app-footer p {
-  max-width: 960px;
-  margin: 0 auto;
-  font-size: 14px;
 }
