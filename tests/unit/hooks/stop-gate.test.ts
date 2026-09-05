@@ -293,6 +293,20 @@ describe("guard de árbol limpio", () => {
     }
   });
 
+  it("pasa cuando el árbol está completamente limpio", async () => {
+    ({ workDir, originDir } = await createFixtureRepo());
+    const { binDir, markerFile } = await installChecksRanMarkerBin();
+    stubBinDir = binDir;
+
+    const { code } = await runStopGate(workDir, {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+    });
+
+    expect(code).toBe(0);
+    expect(await checksRan(markerFile)).toBe(false);
+  });
+
   it.each(["tsconfig.json", "package-lock.json", "CLAUDE.md", "AGENTS.md"])(
     "pasa cuando la única suciedad es ruido generado (%s)",
     async (noiseFile) => {

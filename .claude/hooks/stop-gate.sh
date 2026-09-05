@@ -54,11 +54,15 @@ is_generated_noise_file() {
   return 1
 }
 
+# `git status --porcelain` lines are "XY path": 2 status chars + 1 space
+# before the path.
+readonly PORCELAIN_STATUS_PREFIX_LEN=3
+
 only_generated_noise_is_dirty() {
   local status_line
   while IFS= read -r status_line; do
     [ -z "$status_line" ] && continue
-    is_generated_noise_file "${status_line:3}" || return 1
+    is_generated_noise_file "${status_line:$PORCELAIN_STATUS_PREFIX_LEN}" || return 1
   done <<<"$(git status --porcelain 2>/dev/null)"
   return 0
 }
