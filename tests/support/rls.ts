@@ -8,13 +8,22 @@ import {
 } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 
+// Vitest ejecuta cada archivo de test en su propio proceso: sin esto,
+// `process.env` nunca ve las credenciales de un `.env.local` local y
+// `describeRls` saltaría siempre, incluso con Supabase configurado.
+try {
+  process.loadEnvFile(".env.local");
+} catch {
+  // Sin `.env.local` (p. ej. en la nube sin secrets configurados): seguimos
+  // con lo que ya haya en `process.env`, y `describeRls` avisa qué falta.
+}
+
 type Environment = Readonly<Record<string, string | undefined>>;
 
 // Dos tipos distintos, nunca uno intercambiable por el otro: `RlsClient`
 // queda sujeto a las policies de la base, `ServiceRoleClient` las salta. El
 // campo `kind` es lo que permite a `assertDenied` rechazar en tiempo de
-// ejecución un cliente de servicio colado con un `as` (ver el último criterio
-// de aceptación del ticket #21).
+// ejecución un cliente de servicio colado con un `as`.
 export type RlsClient = {
   readonly kind: "rls-client";
   readonly role: "anon" | "authenticated";
@@ -120,6 +129,34 @@ export function describeRls(
   describe(name, fn);
 }
 
+type CleanupResult = { readonly error: { readonly message: string } | null };
+
+/** Ejecuta `run` y siempre intenta `cleanup` después, sin dejar que un fallo
+ * de limpieza tape la razón real por la que `run` falló: si las dos fallan,
+ * la de `run` es la que se relanza y la de limpieza queda registrada aparte. */
+async function runWithCleanup<T>(
+  run: () => Promise<T>,
+  cleanup: () => PromiseLike<CleanupResult>,
+  cleanupFailureMessage: string,
+): Promise<T> {
+  let result: T;
+  try {
+    result = await run();
+  } catch (runError) {
+    const { error: cleanupError } = await cleanup();
+    if (cleanupError) {
+      console.error(`${cleanupFailureMessage}: ${cleanupError.message}`);
+    }
+    throw runError;
+  }
+
+  const { error: cleanupError } = await cleanup();
+  if (cleanupError) {
+    throw new Error(`${cleanupFailureMessage}: ${cleanupError.message}`);
+  }
+  return result;
+}
+
 export type TestUser = {
   readonly id: string;
   readonly email: string;
@@ -148,17 +185,11 @@ export async function withTestUser<T>(
   }
 
   const user: TestUser = { id: data.user.id, email, password };
-  try {
-    return await run(user);
-  } finally {
-    const { error: deleteError } =
-      await serviceClient.client.auth.admin.deleteUser(user.id);
-    if (deleteError) {
-      throw new Error(
-        `No se pudo limpiar el usuario de prueba del arnés RLS: ${deleteError.message}`,
-      );
-    }
-  }
+  return runWithCleanup(
+    () => run(user),
+    () => serviceClient.client.auth.admin.deleteUser(user.id),
+    "No se pudo limpiar el usuario de prueba del arnés RLS",
+  );
 }
 
 /** Siembra `rows` en `table` con la llave de servicio, pasa las filas
@@ -181,30 +212,43 @@ export async function withSeededRows<T>(
   }
 
   const ids = data.map((row) => row.id as string);
-  try {
-    return await run(data);
-  } finally {
-    const { error: deleteError } = await serviceClient.client
-      .from(table)
-      .delete()
-      .in("id", ids);
-    if (deleteError) {
-      throw new Error(
-        `No se pudo limpiar la tabla ${table} tras el arnés RLS: ${deleteError.message}`,
-      );
-    }
-  }
+  return runWithCleanup(
+    () => run(data),
+    () => serviceClient.client.from(table).delete().in("id", ids),
+    `No se pudo limpiar la tabla ${table} tras el arnés RLS`,
+  );
 }
+
+export type RlsQueryError = {
+  readonly code?: string;
+  readonly message: string;
+};
 
 export type RlsQueryResult = {
   readonly data: unknown;
-  readonly error: { readonly message: string } | null;
+  readonly error: RlsQueryError | null;
 };
 
+// Código Postgres de `insufficient_privilege`. Sin `GRANT`, PostgREST
+// responde con este mismo error antes de que RLS llegue a evaluarse (ver la
+// sección 1 del skill `nextjs-supabase-practices`): un error genérico no
+// relacionado con permisos (tabla renombrada, timeout de red) no cuenta como
+// negación, o `assertDenied` daría por buena una tabla que ya no existe.
+const PERMISSION_DENIED_CODE = "42501";
+const PERMISSION_DENIED_MESSAGE_PATTERN = /permission denied/i;
+
+function isPermissionDenied(error: RlsQueryError): boolean {
+  return (
+    error.code === PERMISSION_DENIED_CODE ||
+    PERMISSION_DENIED_MESSAGE_PATTERN.test(error.message)
+  );
+}
+
 /** Afirma que RLS niega `query` para `rlsClient`: pasa con una lista vacía o
- * un error de permiso, falla en cuanto ve una fila. Rechaza en tiempo de
- * ejecución un cliente que no sea `RlsClient`, para que un cliente de
- * servicio colado a la fuerza no produzca un falso verde. */
+ * un error de permiso, falla en cuanto ve una fila o un error que no es de
+ * permiso. Rechaza en tiempo de ejecución un cliente que no sea `RlsClient`,
+ * para que un cliente de servicio colado a la fuerza no produzca un falso
+ * verde. */
 export async function assertDenied(
   rlsClient: RlsClient,
   query: (client: SupabaseClient) => PromiseLike<RlsQueryResult>,
@@ -217,6 +261,11 @@ export async function assertDenied(
 
   const { data, error } = await query(rlsClient.client);
   if (error !== null) {
+    if (!isPermissionDenied(error)) {
+      throw new Error(
+        `assertDenied esperaba un error de permiso, pero recibió uno distinto: ${error.message}`,
+      );
+    }
     return;
   }
 

@@ -11,8 +11,10 @@ import {
   readSupabaseServiceRoleConfig,
 } from "@/lib/supabase/config";
 
-// Sin arnés reutilizable todavía (#21 lo construye reusando esta tabla): este
-// archivo monta y desmonta su propio usuario autenticado de prueba.
+// Este archivo monta y desmonta su propio usuario autenticado de prueba en
+// vez de reusar `tests/support/rls.ts`: migrarlo es trabajo aparte, para no
+// tocar casos ya verdes de concurrencia y de `recordAuditEvent` en este
+// ticket.
 try {
   process.loadEnvFile(".env.local");
 } catch {

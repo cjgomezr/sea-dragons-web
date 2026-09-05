@@ -134,6 +134,40 @@ describe("afirmación de negación", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("pasa cuando la consulta devuelve el código Postgres de permiso insuficiente", async () => {
+    const { assertDenied } = await import("../support/rls");
+
+    const rlsClient = {
+      kind: "rls-client" as const,
+      role: "authenticated" as const,
+      client: {} as never,
+    };
+
+    await expect(
+      assertDenied(rlsClient, async () => ({
+        data: null,
+        error: { code: "42501", message: "insufficient_privilege" },
+      })),
+    ).resolves.toBeUndefined();
+  });
+
+  it("falla cuando la consulta devuelve un error que no es de permiso", async () => {
+    const { assertDenied } = await import("../support/rls");
+
+    const rlsClient = {
+      kind: "rls-client" as const,
+      role: "authenticated" as const,
+      client: {} as never,
+    };
+
+    await expect(
+      assertDenied(rlsClient, async () => ({
+        data: null,
+        error: { message: 'relation "audit_log" does not exist' },
+      })),
+    ).rejects.toThrow(/error de permiso/);
+  });
+
   it("impide que se use un cliente de servicio en lugar de un cliente RLS", async () => {
     const { assertDenied } = await import("../support/rls");
 
