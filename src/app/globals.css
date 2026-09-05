@@ -202,15 +202,14 @@ h6 {
 }
 
 .app-tabbar-overflow {
-  display: flex;
   flex-direction: column;
   border-bottom: 1px solid var(--color-sidebar-border);
 }
 
-/* Author styles win over the user agent rule for [hidden], so the panel needs
-   this to close at all. */
-.app-tabbar-overflow[hidden] {
-  display: none;
+/* Guarded on [hidden] instead of overriding it: an unconditional display would
+   beat the user agent rule and the panel would never close. */
+.app-tabbar-overflow:not([hidden]) {
+  display: flex;
 }
 
 .app-tabbar-overflow a {
