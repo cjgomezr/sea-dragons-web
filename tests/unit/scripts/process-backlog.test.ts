@@ -359,12 +359,25 @@ describe("CLAUDE.md", () => {
       claudeMd.indexOf("## Exceptional situations"),
       claudeMd.indexOf("Board rules:"),
     );
-
-    expect(exceptionalSituations).toMatch(
-      /needs-human.*Blocked|Blocked.*needs-human/s,
+    const blanketSentenceIndex = exceptionalSituations.indexOf(
+      "carries the same board update as step 8",
     );
-    expect(exceptionalSituations).toMatch(/Rebase conflict/);
-    expect(exceptionalSituations).toMatch(/Flaky test/);
-    expect(exceptionalSituations).toMatch(/Stop gate gave up/);
+
+    expect(blanketSentenceIndex).toBeGreaterThan(-1);
+    // La frase paraguas debe preceder a las viñetas que cubre: si alguien la
+    // borra o la mueve después de "Rebase conflict", esas viñetas vuelven a
+    // quedar con needs-human sin ligar a Blocked (el hallazgo original).
+    expect(blanketSentenceIndex).toBeLessThan(
+      exceptionalSituations.indexOf("Rebase conflict"),
+    );
+    expect(blanketSentenceIndex).toBeLessThan(
+      exceptionalSituations.indexOf("Flaky test"),
+    );
+    expect(blanketSentenceIndex).toBeLessThan(
+      exceptionalSituations.indexOf("Stop gate gave up"),
+    );
+    expect(blanketSentenceIndex).toBeLessThan(
+      exceptionalSituations.indexOf("Integration tests without credentials"),
+    );
   });
 });
