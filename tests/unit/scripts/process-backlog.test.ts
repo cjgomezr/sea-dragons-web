@@ -353,6 +353,18 @@ describe("CLAUDE.md", () => {
     expect(blockersStep).toMatch(/task-status\.sh N Blocked/);
   });
 
+  it("instruye mover a Blocked el propio ticket al volver a pending por blocked-by-N", async () => {
+    const claudeMd = await readFile(path.join(REPO_ROOT, "CLAUDE.md"), "utf8");
+    const mainIsBrokenBullet = claudeMd.slice(
+      claudeMd.indexOf("**Main is broken"),
+      claudeMd.indexOf("**Rebase conflict"),
+    );
+
+    expect(mainIsBrokenBullet).toMatch(/blocked-by-<that incident>/);
+    expect(mainIsBrokenBullet).toMatch(/return.*to `pending`/s);
+    expect(mainIsBrokenBullet).toMatch(/task-status\.sh N Blocked/);
+  });
+
   it("aplica el mismo Blocked a todos los needs-human de Exceptional situations, no solo a uno", async () => {
     const claudeMd = await readFile(path.join(REPO_ROOT, "CLAUDE.md"), "utf8");
     const exceptionalSituations = claudeMd.slice(
