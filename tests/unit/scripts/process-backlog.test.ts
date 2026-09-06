@@ -19,6 +19,28 @@ const PROCESS_BACKLOG_SCRIPT = path.join(
 );
 const TASK_STATUS_SCRIPT = path.join(REPO_ROOT, "scripts/task-status.sh");
 
+/**
+ * Estos tests lanzan bash y git de verdad, no los imitan. Bajo `npm test`
+ * completo compiten por CPU con el resto de los workers de Vitest (y en CI,
+ * con antivirus/indexado de Windows), así que el timeout de 5 s pensado para
+ * tests puros no alcanza: ver issue #50.
+ */
+const REAL_PROCESS_TEST_TIMEOUT_MS = 20_000;
+
+/**
+ * En Windows, `git.exe` puede tardar en soltar el handle del directorio de
+ * trabajo después de que su proceso reporta `close`, y un `rm` inmediato
+ * falla con `EBUSY: resource busy or locked`. `maxRetries`/`retryDelay` hacen
+ * que `fs.rm` reintente en vez de tumbar el test por un problema de limpieza
+ * ajeno a lo que el test verifica.
+ */
+const REMOVE_TEMP_DIR_OPTIONS = {
+  recursive: true,
+  force: true,
+  maxRetries: 5,
+  retryDelay: 200,
+} as const;
+
 interface RunResult {
   code: number | null;
   stdout: string;
@@ -192,71 +214,92 @@ describe("cleanup de process-backlog", () => {
 
   afterEach(async () => {
     if (workDir) {
-      await rm(workDir, { recursive: true, force: true });
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
       workDir = "";
     }
   });
 
-  it("devuelve la etiqueta pending y mueve la tarjeta a Blocked", async () => {
-    workDir = await setupWorkDir();
-    await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
-    const { binDir, logFile } = await installFakeGh(workDir);
+  it(
+    "devuelve la etiqueta pending y mueve la tarjeta a Blocked",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
 
-    const { code } = await runBash(
-      "source scripts/process-backlog.sh; N=5; ME=tester; cleanup",
-      workDir,
-      { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH}` },
-    );
+      const { code } = await runBash(
+        "source scripts/process-backlog.sh; N=5; ME=tester; cleanup",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        },
+      );
 
-    expect(code).toBe(130);
-    const log = await readLog(logFile);
-    expect(log).toMatch(
-      /issue edit 5 --add-label pending --remove-label in-progress/,
-    );
-    expect(log).toMatch(/issue edit 5 --remove-assignee @me/);
-    expect(log).toMatch(/project item-edit --id ITEM123.*opt-blocked/);
-  });
+      expect(code).toBe(130);
+      const log = await readLog(logFile);
+      expect(log).toMatch(
+        /issue edit 5 --add-label pending --remove-label in-progress/,
+      );
+      expect(log).toMatch(/issue edit 5 --remove-assignee @me/);
+      expect(log).toMatch(/project item-edit --id ITEM123.*opt-blocked/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 
-  it("termina bien aunque el tablero rechace el estado", async () => {
-    workDir = await setupWorkDir();
-    // Sin la opción Blocked: task-status.sh debe fallar, pero cleanup() no.
-    await writeProjectConfig(workDir, {
-      Todo: "opt-todo",
-      "In Progress": "opt-ip",
-      Done: "opt-done",
-    });
-    const { binDir, logFile } = await installFakeGh(workDir);
+  it(
+    "termina bien aunque el tablero rechace el estado",
+    async () => {
+      workDir = await setupWorkDir();
+      // Sin la opción Blocked: task-status.sh debe fallar, pero cleanup() no.
+      await writeProjectConfig(workDir, {
+        Todo: "opt-todo",
+        "In Progress": "opt-ip",
+        Done: "opt-done",
+      });
+      const { binDir, logFile } = await installFakeGh(workDir);
 
-    const { code } = await runBash(
-      "source scripts/process-backlog.sh; N=5; ME=tester; cleanup",
-      workDir,
-      { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH}` },
-    );
+      const { code } = await runBash(
+        "source scripts/process-backlog.sh; N=5; ME=tester; cleanup",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        },
+      );
 
-    expect(code).toBe(130);
-    const log = await readLog(logFile);
-    expect(log).toMatch(
-      /issue edit 5 --add-label pending --remove-label in-progress/,
-    );
-    expect(log).toMatch(/issue edit 5 --remove-assignee @me/);
-  });
+      expect(code).toBe(130);
+      const log = await readLog(logFile);
+      expect(log).toMatch(
+        /issue edit 5 --add-label pending --remove-label in-progress/,
+      );
+      expect(log).toMatch(/issue edit 5 --remove-assignee @me/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 
-  it("no falla cuando no existe .plan/project.json", async () => {
-    workDir = await setupWorkDir();
-    const { binDir, logFile } = await installFakeGh(workDir);
+  it(
+    "no falla cuando no existe .plan/project.json",
+    async () => {
+      workDir = await setupWorkDir();
+      const { binDir, logFile } = await installFakeGh(workDir);
 
-    const { code } = await runBash(
-      "source scripts/process-backlog.sh; N=5; ME=tester; cleanup",
-      workDir,
-      { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH}` },
-    );
+      const { code } = await runBash(
+        "source scripts/process-backlog.sh; N=5; ME=tester; cleanup",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        },
+      );
 
-    expect(code).toBe(130);
-    const log = await readLog(logFile);
-    expect(log).toMatch(
-      /issue edit 5 --add-label pending --remove-label in-progress/,
-    );
-  });
+      expect(code).toBe(130);
+      const log = await readLog(logFile);
+      expect(log).toMatch(
+        /issue edit 5 --add-label pending --remove-label in-progress/,
+      );
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 });
 
 describe("reconcile_board", () => {
@@ -264,213 +307,241 @@ describe("reconcile_board", () => {
 
   afterEach(async () => {
     if (workDir) {
-      await rm(workDir, { recursive: true, force: true });
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
       workDir = "";
     }
   });
 
-  it("ignora las tarjetas en Blocked con needs-human", async () => {
-    workDir = await setupWorkDir();
-    await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
-    const { binDir, logFile } = await installFakeGh(workDir);
-    const itemListJson = JSON.stringify({
-      items: [
+  it(
+    "ignora las tarjetas en Blocked con needs-human",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+      const itemListJson = JSON.stringify({
+        items: [
+          {
+            status: "Blocked",
+            content: { number: 22 },
+          },
+        ],
+      });
+
+      await runBash(
+        "source scripts/process-backlog.sh; reconcile_board",
+        workDir,
         {
-          status: "Blocked",
-          content: { number: 22 },
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ITEM_LIST_JSON: itemListJson,
         },
-      ],
-    });
+      );
 
-    await runBash(
-      "source scripts/process-backlog.sh; reconcile_board",
-      workDir,
-      {
-        ...process.env,
-        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
-        ITEM_LIST_JSON: itemListJson,
-      },
-    );
+      const log = await readLog(logFile);
+      expect(log).not.toMatch(/issue view 22/);
+      expect(log).not.toMatch(/issue edit 22/);
+      expect(log).not.toMatch(/issue reopen 22/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 
-    const log = await readLog(logFile);
-    expect(log).not.toMatch(/issue view 22/);
-    expect(log).not.toMatch(/issue edit 22/);
-    expect(log).not.toMatch(/issue reopen 22/);
-  });
+  it(
+    "reencola una tarjeta que pasó de Blocked a Todo",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+      const itemListJson = JSON.stringify({
+        items: [
+          {
+            status: "Todo",
+            content: { number: 22 },
+          },
+        ],
+      });
+      const issueViewJson = JSON.stringify({
+        state: "OPEN",
+        labels: [{ name: "needs-human" }],
+      });
 
-  it("reencola una tarjeta que pasó de Blocked a Todo", async () => {
-    workDir = await setupWorkDir();
-    await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
-    const { binDir, logFile } = await installFakeGh(workDir);
-    const itemListJson = JSON.stringify({
-      items: [
+      await runBash(
+        "source scripts/process-backlog.sh; reconcile_board",
+        workDir,
         {
-          status: "Todo",
-          content: { number: 22 },
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ITEM_LIST_JSON: itemListJson,
+          ISSUE_VIEW_JSON: issueViewJson,
         },
-      ],
-    });
-    const issueViewJson = JSON.stringify({
-      state: "OPEN",
-      labels: [{ name: "needs-human" }],
-    });
+      );
 
-    await runBash(
-      "source scripts/process-backlog.sh; reconcile_board",
-      workDir,
-      {
-        ...process.env,
-        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
-        ITEM_LIST_JSON: itemListJson,
-        ISSUE_VIEW_JSON: issueViewJson,
-      },
-    );
+      const log = await readLog(logFile);
+      expect(log).toMatch(
+        /issue edit 22 --add-label pending --remove-label needs-human --remove-label in-progress/,
+      );
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 
-    const log = await readLog(logFile);
-    expect(log).toMatch(
-      /issue edit 22 --add-label pending --remove-label needs-human --remove-label in-progress/,
-    );
-  });
+  it(
+    "encola un issue abierto que no tiene etiqueta de cola",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+      const itemListJson = JSON.stringify({
+        items: [{ status: "Todo", content: { number: 31 } }],
+      });
+      const issueViewJson = JSON.stringify({ state: "OPEN", labels: [] });
 
-  it("encola un issue abierto que no tiene etiqueta de cola", async () => {
-    workDir = await setupWorkDir();
-    await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
-    const { binDir, logFile } = await installFakeGh(workDir);
-    const itemListJson = JSON.stringify({
-      items: [{ status: "Todo", content: { number: 31 } }],
-    });
-    const issueViewJson = JSON.stringify({ state: "OPEN", labels: [] });
+      await runBash(
+        "source scripts/process-backlog.sh; reconcile_board",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ITEM_LIST_JSON: itemListJson,
+          ISSUE_VIEW_JSON: issueViewJson,
+        },
+      );
 
-    await runBash(
-      "source scripts/process-backlog.sh; reconcile_board",
-      workDir,
-      {
-        ...process.env,
-        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
-        ITEM_LIST_JSON: itemListJson,
-        ISSUE_VIEW_JSON: issueViewJson,
-      },
-    );
+      const log = await readLog(logFile);
+      expect(log).toMatch(/issue edit 31 --add-label pending/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 
-    const log = await readLog(logFile);
-    expect(log).toMatch(/issue edit 31 --add-label pending/);
-  });
+  it(
+    "reabre y encola un issue cerrado que está en Todo",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+      const itemListJson = JSON.stringify({
+        items: [{ status: "Todo", content: { number: 22 } }],
+      });
+      const issueViewJson = JSON.stringify({ state: "CLOSED", labels: [] });
 
-  it("reabre y encola un issue cerrado que está en Todo", async () => {
-    workDir = await setupWorkDir();
-    await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
-    const { binDir, logFile } = await installFakeGh(workDir);
-    const itemListJson = JSON.stringify({
-      items: [{ status: "Todo", content: { number: 22 } }],
-    });
-    const issueViewJson = JSON.stringify({ state: "CLOSED", labels: [] });
+      await runBash(
+        "source scripts/process-backlog.sh; reconcile_board",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ITEM_LIST_JSON: itemListJson,
+          ISSUE_VIEW_JSON: issueViewJson,
+        },
+      );
 
-    await runBash(
-      "source scripts/process-backlog.sh; reconcile_board",
-      workDir,
-      {
-        ...process.env,
-        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
-        ITEM_LIST_JSON: itemListJson,
-        ISSUE_VIEW_JSON: issueViewJson,
-      },
-    );
+      const log = await readLog(logFile);
+      expect(log).toMatch(/issue reopen 22/);
+      expect(log).toMatch(
+        /issue edit 22 --add-label pending --remove-label in-progress --remove-label needs-human/,
+      );
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 
-    const log = await readLog(logFile);
-    expect(log).toMatch(/issue reopen 22/);
-    expect(log).toMatch(
-      /issue edit 22 --add-label pending --remove-label in-progress --remove-label needs-human/,
-    );
-  });
+  it(
+    "ignora las tarjetas de epics",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+      const itemListJson = JSON.stringify({
+        items: [{ status: "Todo", content: { number: 7 } }],
+      });
+      const issueViewJson = JSON.stringify({
+        state: "OPEN",
+        labels: [{ name: "epic" }],
+      });
 
-  it("ignora las tarjetas de epics", async () => {
-    workDir = await setupWorkDir();
-    await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
-    const { binDir, logFile } = await installFakeGh(workDir);
-    const itemListJson = JSON.stringify({
-      items: [{ status: "Todo", content: { number: 7 } }],
-    });
-    const issueViewJson = JSON.stringify({
-      state: "OPEN",
-      labels: [{ name: "epic" }],
-    });
+      await runBash(
+        "source scripts/process-backlog.sh; reconcile_board",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ITEM_LIST_JSON: itemListJson,
+          ISSUE_VIEW_JSON: issueViewJson,
+        },
+      );
 
-    await runBash(
-      "source scripts/process-backlog.sh; reconcile_board",
-      workDir,
-      {
-        ...process.env,
-        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
-        ITEM_LIST_JSON: itemListJson,
-        ISSUE_VIEW_JSON: issueViewJson,
-      },
-    );
+      const log = await readLog(logFile);
+      expect(log).not.toMatch(/issue edit 7/);
+      expect(log).not.toMatch(/issue reopen 7/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 
-    const log = await readLog(logFile);
-    expect(log).not.toMatch(/issue edit 7/);
-    expect(log).not.toMatch(/issue reopen 7/);
-  });
+  it(
+    "procesa todas las tarjetas cuando la entrada llega con CRLF",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+      await installFakeJq(binDir);
+      const itemListJson = JSON.stringify({
+        items: [
+          { status: "Todo", content: { number: 31 } },
+          { status: "Todo", content: { number: 33 } },
+        ],
+      });
+      const issueViewJson = JSON.stringify({ state: "OPEN", labels: [] });
 
-  it("procesa todas las tarjetas cuando la entrada llega con CRLF", async () => {
-    workDir = await setupWorkDir();
-    await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
-    const { binDir, logFile } = await installFakeGh(workDir);
-    await installFakeJq(binDir);
-    const itemListJson = JSON.stringify({
-      items: [
-        { status: "Todo", content: { number: 31 } },
-        { status: "Todo", content: { number: 33 } },
-      ],
-    });
-    const issueViewJson = JSON.stringify({ state: "OPEN", labels: [] });
+      await runBash(
+        "source scripts/process-backlog.sh; reconcile_board",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ITEM_LIST_JSON: itemListJson,
+          ISSUE_VIEW_JSON: issueViewJson,
+        },
+      );
 
-    await runBash(
-      "source scripts/process-backlog.sh; reconcile_board",
-      workDir,
-      {
-        ...process.env,
-        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
-        ITEM_LIST_JSON: itemListJson,
-        ISSUE_VIEW_JSON: issueViewJson,
-      },
-    );
+      const log = await readLog(logFile);
+      // El bug real: con \r pegado, "31\r" no matchea y la tarjeta se salta en
+      // silencio. Si las dos aparecen limpias, el CRLF no rompió el bucle.
+      expect(log).toMatch(/issue edit 31 --add-label pending/);
+      expect(log).toMatch(/issue edit 33 --add-label pending/);
+      expect(log).not.toMatch(/issue view 31\r/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 
-    const log = await readLog(logFile);
-    // El bug real: con \r pegado, "31\r" no matchea y la tarjeta se salta en
-    // silencio. Si las dos aparecen limpias, el CRLF no rompió el bucle.
-    expect(log).toMatch(/issue edit 31 --add-label pending/);
-    expect(log).toMatch(/issue edit 33 --add-label pending/);
-    expect(log).not.toMatch(/issue view 31\r/);
-  });
+  it(
+    "avisa por stderr cuando gh falla para un issue concreto",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+      const itemListJson = JSON.stringify({
+        items: [
+          { status: "Todo", content: { number: 40 } },
+          { status: "Todo", content: { number: 41 } },
+        ],
+      });
+      const issueViewJson = JSON.stringify({ state: "OPEN", labels: [] });
 
-  it("avisa por stderr cuando gh falla para un issue concreto", async () => {
-    workDir = await setupWorkDir();
-    await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
-    const { binDir, logFile } = await installFakeGh(workDir);
-    const itemListJson = JSON.stringify({
-      items: [
-        { status: "Todo", content: { number: 40 } },
-        { status: "Todo", content: { number: 41 } },
-      ],
-    });
-    const issueViewJson = JSON.stringify({ state: "OPEN", labels: [] });
+      const { stderr } = await runBash(
+        "source scripts/process-backlog.sh; reconcile_board",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ITEM_LIST_JSON: itemListJson,
+          ISSUE_VIEW_JSON: issueViewJson,
+          FAIL_ISSUE_VIEW_FOR: "40",
+        },
+      );
 
-    const { stderr } = await runBash(
-      "source scripts/process-backlog.sh; reconcile_board",
-      workDir,
-      {
-        ...process.env,
-        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
-        ITEM_LIST_JSON: itemListJson,
-        ISSUE_VIEW_JSON: issueViewJson,
-        FAIL_ISSUE_VIEW_FOR: "40",
-      },
-    );
-
-    expect(stderr).toMatch(/#40/);
-    const log = await readLog(logFile);
-    expect(log).toMatch(/issue edit 41 --add-label pending/);
-  });
+      expect(stderr).toMatch(/#40/);
+      const log = await readLog(logFile);
+      expect(log).toMatch(/issue edit 41 --add-label pending/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 });
 
 describe("task-status", () => {
@@ -478,32 +549,39 @@ describe("task-status", () => {
 
   afterEach(async () => {
     if (workDir) {
-      await rm(workDir, { recursive: true, force: true });
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
       workDir = "";
     }
   });
 
-  it("falla con las opciones conocidas cuando el estado no existe", async () => {
-    workDir = await setupWorkDir();
-    await writeProjectConfig(workDir, {
-      Todo: "opt-todo",
-      "In Progress": "opt-ip",
-      Done: "opt-done",
-    });
-    const { binDir } = await installFakeGh(workDir);
+  it(
+    "falla con las opciones conocidas cuando el estado no existe",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, {
+        Todo: "opt-todo",
+        "In Progress": "opt-ip",
+        Done: "opt-done",
+      });
+      const { binDir } = await installFakeGh(workDir);
 
-    const { code, stderr } = await runBash(
-      "bash scripts/task-status.sh 5 Blocked",
-      workDir,
-      { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH}` },
-    );
+      const { code, stderr } = await runBash(
+        "bash scripts/task-status.sh 5 Blocked",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        },
+      );
 
-    expect(code).not.toBe(0);
-    expect(stderr).toMatch(/Unknown status 'Blocked'/);
-    expect(stderr).toMatch(/Todo/);
-    expect(stderr).toMatch(/In Progress/);
-    expect(stderr).toMatch(/Done/);
-  });
+      expect(code).not.toBe(0);
+      expect(stderr).toMatch(/Unknown status 'Blocked'/);
+      expect(stderr).toMatch(/Todo/);
+      expect(stderr).toMatch(/In Progress/);
+      expect(stderr).toMatch(/Done/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 });
 
 describe("CLAUDE.md", () => {
