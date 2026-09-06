@@ -5,13 +5,14 @@
  *   Only the Linux baseline (tests/ui.spec.ts-snapshots/*-linux.png) is
  *   versioned and binding. On Linux (e.g. the factory worker), generate or
  *   update it the usual way: npx playwright test --update-snapshots, then
- *   commit the PNG like any other file. .github/workflows/visual-baselines.yml
- *   (issue #58) is the backstop for whoever can't produce a correct Linux
- *   PNG themselves (typically a human dev on Windows): it compares on every
- *   PR and, if it finds a real diff nobody committed, regenerates it and
- *   pushes the fix straight to the PR's own branch. Either way the baseline
- *   only ever comes from one place per branch, which is what stops two UI
- *   PRs in parallel from fighting over the same binary file.
+ *   commit the PNG like any other file. On every PR,
+ *   .github/workflows/visual-baselines.yml (issue #58) only COMPARES: it
+ *   never regenerates, commits or pushes, so a red check always lands on the
+ *   PR's real HEAD and the diff is left as the visual-diff artifact for a
+ *   person to look at. Accepting a new baseline is a separate, deliberate
+ *   act: a human runs that workflow by hand against the PR's branch. The
+ *   baseline still only ever comes from one place, which is what stops two
+ *   UI PRs in parallel from fighting over the same binary file.
  *
  * - On any other platform (Windows, macOS) there is no versioned baseline:
  *   *-win32.png is gitignored. The first local run creates one and every

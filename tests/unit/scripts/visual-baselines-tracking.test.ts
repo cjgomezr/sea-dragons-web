@@ -6,6 +6,10 @@ import { describe, expect, it } from "vitest";
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const SNAPSHOTS_DIR = "tests/ui.spec.ts-snapshots";
 const UI_SPEC_PATH = path.join(REPO_ROOT, "tests/ui.spec.ts");
+const SKILL_PATH = path.join(
+  REPO_ROOT,
+  ".claude/skills/nextjs-supabase-practices/SKILL.md",
+);
 
 /**
  * Sólo Linux es la línea base vinculante (issue #58): CI la regenera y la
@@ -72,5 +76,21 @@ describe("líneas base", () => {
     expect(header).not.toMatch(/gh workflow run visual-baselines/);
     expect(header).toMatch(/visual-baselines\.yml/);
     expect(header).toMatch(/informative only|informativ/i);
+  });
+
+  it("el header no promete que el PR se autocorrija, porque ya no lo hace", () => {
+    const header = readFileSync(UI_SPEC_PATH, "utf8");
+
+    expect(header).not.toMatch(/pushes the fix/i);
+    expect(header).not.toMatch(/regenerates it and/i);
+    expect(header).toMatch(/only COMPARES/);
+  });
+
+  it("la skill obligatoria no le dice a un worker que acepte la línea base él solo", () => {
+    const skill = readFileSync(SKILL_PATH, "utf8");
+
+    expect(skill).toMatch(/nextjs|Next\.js/);
+    expect(skill).not.toMatch(/ejecuta `gh workflow run visual-baselines/);
+    expect(skill).toMatch(/No ejecutes `gh workflow run visual-baselines/);
   });
 });

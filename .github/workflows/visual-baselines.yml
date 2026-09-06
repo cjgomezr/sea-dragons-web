@@ -9,9 +9,14 @@
 # saltarse: el check cae sobre el HEAD real del PR.
 #
 # Cuando la diferencia es intencionada, un humano acepta la nueva línea base
-# ejecutando este mismo workflow a mano sobre su rama:
-#   gh workflow run visual-baselines.yml --ref <rama>
-# Ese camino sí regenera y commitea, porque ahí hay alguien decidiendo.
+# ejecutando este mismo workflow a mano sobre la rama del PR:
+#   gh workflow run visual-baselines.yml --ref <rama-de-PR> #     -f reviewed_run_url=<url de la corrida fallida>
+# Se pide esa URL a propósito: aceptar sin haber abierto el artefacto
+# `visual-diff` es dar por bueno cualquier píxel que estuviera renderizando en
+# ese momento, que es justo lo que la regresión visual existe para impedir. La
+# URL queda en el resumen del run, así que la decisión deja rastro.
+#
+# Se espera `--ref` de una rama de PR, nunca `main` directamente.
 #
 # Al comparar sin escribir, el job funciona igual en PRs desde un fork, donde
 # GitHub degrada el token a sólo lectura pase lo que pase.
@@ -21,6 +26,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
+    inputs:
+      reviewed_run_url:
+        description: "URL de la corrida cuyo artefacto visual-diff ya miraste"
+        required: true
 
 permissions:
   contents: read
@@ -65,6 +74,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Deja constancia de qué diff se revisó
+        run: |
+          echo "Línea base aceptada tras revisar:" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ inputs.reviewed_run_url }}" >> "$GITHUB_STEP_SUMMARY"
       - name: Regenera la línea base
         id: update
         run: bash scripts/update-visual-baselines.sh

@@ -26,7 +26,9 @@ interface WorkflowJob {
 interface WorkflowFile {
   on: {
     pull_request?: { types?: string[] };
-    workflow_dispatch?: null;
+    workflow_dispatch?: {
+      inputs?: Record<string, { required?: boolean }>;
+    } | null;
   };
   permissions: Record<string, string>;
   jobs: Record<string, WorkflowJob>;
@@ -99,6 +101,13 @@ describe("visual-baselines.yml", () => {
     expect(accept?.permissions?.contents).toBe("write");
     expect(runLines("accept")).toMatch(/update-visual-baselines\.sh/);
     expect(runLines("accept")).toMatch(/git push/);
+  });
+
+  it("pide la corrida revisada antes de aceptar, para que no sea un botón a ciegas", () => {
+    const dispatch = parseWorkflow().on.workflow_dispatch;
+
+    expect(dispatch?.inputs?.reviewed_run_url?.required).toBe(true);
+    expect(runLines("accept")).toMatch(/reviewed_run_url/);
   });
 
   it("no necesita ignorar sus propios commits, porque no los hace en un PR", () => {
