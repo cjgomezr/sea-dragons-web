@@ -54,7 +54,12 @@ responds() {
   fi
 }
 
-# Ours = started by a previous 'up' in this repo and still alive.
+# Ours = started by a previous 'up' in this repo and still alive. PID_FILE
+# holds whoever actually ended up bound to the port (see the comment in
+# 'up' about why that is not always the launched wrapper's own PID), so a
+# plain liveness check is enough and, unlike trusting any process merely
+# occupying the port, does not risk mistaking an unrelated later server for
+# ours once the one we started is truly gone.
 is_ours() {
   [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
 }
@@ -68,14 +73,29 @@ port_of() {
   esac
 }
 
+# Git Bash keeps its own PID numbering, separate from the native Windows PID
+# that netstat/taskkill/tasklist use for the same process. ps -W is the
+# Rosetta stone between the two; on non-Windows this simply finds nothing.
+winpid_of() {
+  local pid="$1" winpid
+  winpid=$(ps -W 2>/dev/null | awk -v p="$pid" '$1 == p { print $4 }' | head -1)
+  [ -n "$winpid" ] || winpid=$(ps 2>/dev/null | awk -v p="$pid" '$1 == p { print $4 }' | head -1)
+  printf '%s' "$winpid"
+}
+
+# The reverse of winpid_of: a native Windows PID (as netstat reports it) back
+# to the MSYS pid that Git Bash's own kill/kill -0 actually understand.
+pid_for_winpid() {
+  ps -W 2>/dev/null | awk -v w="$1" '$4 == w { print $1 }' | head -1
+}
+
 # Dev servers spawn children (next, vite, nodemon), and killing only the
 # parent leaves the port taken, which is exactly what this script exists to
 # prevent. Windows and POSIX kill trees differently.
 kill_tree() {
   local pid="$1" winpid child
   if command -v taskkill >/dev/null 2>&1; then
-    winpid=$(ps -W 2>/dev/null | awk -v p="$pid" '$1 == p { print $4 }' | head -1)
-    [ -n "$winpid" ] || winpid=$(ps 2>/dev/null | awk -v p="$pid" '$1 == p { print $4 }' | head -1)
+    winpid=$(winpid_of "$pid")
     if [ -n "$winpid" ]; then
       MSYS_NO_PATHCONV=1 taskkill /T /F /PID "$winpid" >/dev/null 2>&1 || true
       return 0
@@ -87,21 +107,66 @@ kill_tree() {
   kill -9 "$pid" 2>/dev/null || true
 }
 
+# Prints the native PID(s) (one per line) currently bound to our port, or
+# nothing if it is free.
+port_owner_pid() {
+  local port
+  port=$(port_of)
+  if command -v netstat >/dev/null 2>&1 && command -v taskkill >/dev/null 2>&1; then
+    netstat -ano 2>/dev/null | grep -i listening | grep ":$port " | awk '{print $NF}' | sort -u
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -ti "tcp:$port" 2>/dev/null
+  fi
+}
+
+# Swaps the PID_FILE entry for whoever is actually bound to the port right
+# now. 'up' calls this the instant the port answers, still inside the window
+# where it alone could have claimed a port it just confirmed was free, so
+# this is the one safe place to trust port_owner_pid: everywhere else
+# (is_ours, called an unbounded time later, possibly by a different
+# invocation) it would risk mistaking a later, unrelated server for ours.
+# Fixes the wrapper-vs-listener PID mismatch at the source instead of
+# working around it: 'npm run dev' hands off to a child before that child
+# binds the port, so $! (the wrapper's PID) is never the right thing to
+# track once the server is actually up.
+#
+# port_owner_pid reports the native Windows PID (that is what netstat and
+# taskkill deal in), but is_ours signals it with Git Bash's own kill -0,
+# which only recognizes Git Bash's PID numbering. Translate it back before
+# storing it, or a perfectly alive server reads as dead on the next check.
+# A native PID is never valid in Git Bash's own numbering (they are separate
+# spaces), so if the translation can't find a match, leave PID_FILE alone
+# rather than store a value kill -0 could never confirm, or coincidentally
+# could confirm for a completely different process.
+record_real_owner() {
+  local native_pid pid attempt
+  native_pid=$(port_owner_pid | head -1)
+  [ -n "$native_pid" ] || return 0
+  if ! command -v taskkill >/dev/null 2>&1; then
+    echo "$native_pid" > "$PID_FILE"
+    return 0
+  fi
+  for attempt in 1 2 3; do
+    pid=$(pid_for_winpid "$native_pid")
+    [ -n "$pid" ] && break
+    sleep 0.2
+  done
+  [ -n "$pid" ] && echo "$pid" > "$PID_FILE"
+  return 0
+}
+
 # Last resort: whoever still holds the port after kill_tree is our own dev
 # server surviving in a stray child ('up' checked the port was free before
 # starting it, so nothing else can have claimed it since).
 kill_port_owner() {
-  local port winpid pid
-  port=$(port_of)
-  if command -v netstat >/dev/null 2>&1 && command -v taskkill >/dev/null 2>&1; then
-    for winpid in $(netstat -ano 2>/dev/null | grep -i listening | grep ":$port " | awk '{print $NF}' | sort -u); do
-      MSYS_NO_PATHCONV=1 taskkill /T /F /PID "$winpid" >/dev/null 2>&1 || true
-    done
-  elif command -v lsof >/dev/null 2>&1; then
-    for pid in $(lsof -ti "tcp:$port" 2>/dev/null); do
+  local pid
+  for pid in $(port_owner_pid); do
+    if command -v taskkill >/dev/null 2>&1; then
+      MSYS_NO_PATHCONV=1 taskkill /T /F /PID "$pid" >/dev/null 2>&1 || true
+    else
       kill -9 "$pid" 2>/dev/null || true
-    done
-  fi
+    fi
+  done
 }
 
 check() {
@@ -141,22 +206,26 @@ up() {
 
   # The server must come up on OUR url. Frameworks that silently fall back to
   # the next free port never answer here, so they fail loudly instead.
+  #
+  # There is no reliable early "it already died" check here: the wrapper
+  # process can legitimately hand off to a child and exit before that child
+  # ever binds the port (that hand-off, mistaken for death, is exactly the
+  # bug this script used to have). A wrapper that is gone and a port that
+  # is not bound yet look identical to a wrapper that is gone and a port
+  # that never will be, so the only trustworthy verdict is whether the port
+  # answers before BOOT_TIMEOUT runs out.
   local waited=0
   while [ "$waited" -lt "$BOOT_TIMEOUT" ]; do
     if responds; then
+      record_real_owner
       echo "$APP_URL"
       return 0
-    fi
-    if ! is_ours; then
-      down
-      die "the dev server died while starting. Last lines of $LOG_FILE:
-$(tail -n 20 "$LOG_FILE" 2>/dev/null)"
     fi
     sleep 1
     waited=$((waited + 1))
   done
 
-  down
+  down || true # down's own WARNING already covers a failed stop; this die is the more useful diagnostic either way.
   die "the dev server did not answer at $APP_URL after ${BOOT_TIMEOUT}s.
 If it started on a different port, pin the port in the dev command (for
 example 'vite --strictPort --port', 'next dev -p'). Last lines of $LOG_FILE:
@@ -165,17 +234,23 @@ $(tail -n 20 "$LOG_FILE" 2>/dev/null)"
 
 down() {
   [ -f "$PID_FILE" ] || { echo "ui-preflight: nothing to stop." >&2; return 0; }
-  local pid waited=0
+  local pid
   pid=$(cat "$PID_FILE")
-  kill -0 "$pid" 2>/dev/null && kill_tree "$pid"
   rm -f "$PID_FILE"
 
   # The port is the real subject here, not the pid: a survivor keeps the next
-  # review blocked, since it will look like a foreign server.
-  while [ "$waited" -lt "$STOP_TIMEOUT" ] && responds; do
-    sleep 1
-    waited=$((waited + 1))
-  done
+  # review blocked, since it will look like a foreign server. Only wait out a
+  # grace period if we actually signalled something: a pid that was already
+  # dead never got a chance to shut down on its own, so there is nothing to
+  # wait for and kill_port_owner should run right away.
+  if kill -0 "$pid" 2>/dev/null; then
+    kill_tree "$pid"
+    local waited=0
+    while [ "$waited" -lt "$STOP_TIMEOUT" ] && responds; do
+      sleep 1
+      waited=$((waited + 1))
+    done
+  fi
   if responds; then
     kill_port_owner
     sleep 1
