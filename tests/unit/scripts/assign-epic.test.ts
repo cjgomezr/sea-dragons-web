@@ -207,6 +207,49 @@ describe("reparto de épica", () => {
     expect(log).toMatch(/issue edit 102 --add-assignee alice/);
   });
 
+  it("no reporta como ajeno un sub-issue donde el usuario ya está entre varios assignees", async () => {
+    const { binDir, logFile, fixturesDir } = await setup();
+    await writeIssueFixture(fixturesDir, 7, {
+      state: "OPEN",
+      labels: [{ name: "epic" }],
+    });
+    await writeSubIssues(fixturesDir, 7, [101]);
+    await writeIssueFixture(fixturesDir, 101, {
+      state: "OPEN",
+      assignees: [{ login: "alice" }, { login: "bob" }],
+    });
+
+    const { code, stderr } = await runAssignEpic(["7", "alice"], workDir, {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+    });
+
+    expect(code).toBe(0);
+    expect(stderr).not.toMatch(/se salta/);
+    const log = await readLog(logFile);
+    expect(log).toMatch(/issue edit 101 --add-assignee alice/);
+  });
+
+  it("usa --paginate al listar sub-issues para no perder los que exceden una página", async () => {
+    const { binDir, logFile, fixturesDir } = await setup();
+    await writeIssueFixture(fixturesDir, 7, {
+      state: "OPEN",
+      labels: [{ name: "epic" }],
+    });
+    await writeSubIssues(fixturesDir, 7, [101]);
+    await writeIssueFixture(fixturesDir, 101, { state: "OPEN" });
+
+    await runAssignEpic(["7", "alice"], workDir, {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+    });
+
+    const log = await readLog(logFile);
+    expect(log).toMatch(
+      /api --paginate repos\/acme\/repo\/issues\/7\/sub_issues/,
+    );
+  });
+
   it("ignora los sub-issues cerrados", async () => {
     const { binDir, logFile, fixturesDir } = await setup();
     await writeIssueFixture(fixturesDir, 7, {

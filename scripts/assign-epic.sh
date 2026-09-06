@@ -4,14 +4,14 @@
 # reserves work by ticket, and sub-issues don't inherit the parent's
 # assignee), so this is the command that actually reserves the epic's work.
 #
-# Usage: scripts/assign-epic.sh <epic-number> <user>
+# Usage: scripts/assign-epic.sh <epic-number> <assignee>
 #
 # Requires: gh, jq.
 
 set -euo pipefail
 
-EPIC="${1:?usage: assign-epic.sh <epic-number> <user>}"
-USER="${2:?usage: assign-epic.sh <epic-number> <user>}"
+EPIC="${1:?usage: assign-epic.sh <epic-number> <assignee>}"
+ASSIGNEE="${2:?usage: assign-epic.sh <epic-number> <assignee>}"
 
 EPIC_INFO=$(gh issue view "$EPIC" --json state,labels 2>/dev/null) || {
   echo "assign-epic.sh: la épica #$EPIC no existe" >&2
@@ -24,7 +24,9 @@ echo "$EPIC_INFO" | jq -e '.labels[] | select(.name=="epic")' >/dev/null || {
 }
 
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-SUB_ISSUES=$(gh api "repos/$REPO/issues/$EPIC/sub_issues" --jq '.[].number')
+# --paginate: la API pagina de a 30 por defecto, y una épica puede tener más
+# sub-issues que eso.
+SUB_ISSUES=$(gh api --paginate "repos/$REPO/issues/$EPIC/sub_issues" --jq '.[].number')
 
 for n in $SUB_ISSUES; do
   INFO=$(gh issue view "$n" --json state,assignees)
@@ -35,12 +37,14 @@ for n in $SUB_ISSUES; do
     continue
   fi
 
-  OTHER_ASSIGNEES=$(echo "$INFO" | jq -r --arg u "$USER" '[.assignees[].login] | map(select(. != $u)) | join(", ")')
-  if [ -n "$OTHER_ASSIGNEES" ]; then
+  HAS_ASSIGNEE=$(echo "$INFO" | jq -r --arg u "$ASSIGNEE" '[.assignees[].login] | index($u) != null')
+  OTHER_ASSIGNEES=$(echo "$INFO" | jq -r --arg u "$ASSIGNEE" '[.assignees[].login] | map(select(. != $u)) | join(", ")')
+
+  if [ -n "$OTHER_ASSIGNEES" ] && [ "$HAS_ASSIGNEE" = "false" ]; then
     echo "⚠ #$n ya está asignado a $OTHER_ASSIGNEES, se salta (no se le quita el dueño)" >&2
     continue
   fi
 
-  gh issue edit "$n" --add-assignee "$USER"
-  echo "✓ #$n → $USER"
+  gh issue edit "$n" --add-assignee "$ASSIGNEE"
+  echo "✓ #$n → $ASSIGNEE"
 done
