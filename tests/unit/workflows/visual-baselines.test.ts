@@ -11,9 +11,16 @@ const WORKFLOW_PATH = path.join(
 
 interface WorkflowStep {
   name?: string;
+  uses?: string;
   run?: string;
   if?: string;
   "continue-on-error"?: boolean;
+}
+
+interface WorkflowJob {
+  if?: string;
+  permissions?: Record<string, string>;
+  steps: WorkflowStep[];
 }
 
 interface WorkflowFile {
@@ -21,17 +28,26 @@ interface WorkflowFile {
     pull_request?: { types?: string[] };
     workflow_dispatch?: null;
   };
-  permissions: { contents: string };
-  jobs: {
-    baselines: {
-      if?: string;
-      steps: WorkflowStep[];
-    };
-  };
+  permissions: Record<string, string>;
+  jobs: Record<string, WorkflowJob>;
 }
 
 function parseWorkflow(): WorkflowFile {
   return load(readFileSync(WORKFLOW_PATH, "utf8")) as WorkflowFile;
+}
+
+function stepsOf(jobName: string): WorkflowStep[] {
+  const job = parseWorkflow().jobs[jobName];
+  if (!job) {
+    throw new Error(`El workflow no declara el job "${jobName}".`);
+  }
+  return job.steps;
+}
+
+function runLines(jobName: string): string {
+  return stepsOf(jobName)
+    .map((step) => step.run ?? "")
+    .join("\n");
 }
 
 describe("visual-baselines.yml", () => {
@@ -39,53 +55,55 @@ describe("visual-baselines.yml", () => {
     expect(() => parseWorkflow()).not.toThrow();
   });
 
-  it("ya no depende sólo de workflow_dispatch: corre también por pull_request", () => {
-    const workflow = parseWorkflow();
+  it("corre en cada pull request, no sólo cuando alguien se acuerda", () => {
+    const { on } = parseWorkflow();
 
-    expect(workflow.on.pull_request?.types).toContain("synchronize");
-    expect(workflow.on.pull_request?.types).toContain("opened");
-    expect(workflow.on.workflow_dispatch).toBeDefined();
+    expect(on.pull_request?.types).toContain("opened");
+    expect(on.pull_request?.types).toContain("synchronize");
   });
 
-  it("puede escribir de vuelta en la rama del PR", () => {
-    const workflow = parseWorkflow();
-
-    expect(workflow.permissions.contents).toBe("write");
+  it("compara la línea base en los pull requests", () => {
+    expect(parseWorkflow().jobs.compare?.if).toContain("pull_request");
+    expect(runLines("compare")).toMatch(/npx playwright test/);
   });
 
-  it("no se dispara a partir de sus propios commits, para no entrar en bucle", () => {
-    const workflow = parseWorkflow();
+  it("no regenera ni reescribe la línea base durante un pull request", () => {
+    const runs = runLines("compare");
 
-    expect(workflow.jobs.baselines.if).toMatch(/github-actions\[bot\]/);
+    expect(runs).not.toMatch(/--update-snapshots/);
+    expect(runs).not.toMatch(/git commit/);
+    expect(runs).not.toMatch(/git push/);
   });
 
-  it("delega la comparación y regeneración en el script del kit", () => {
+  it("no pide permiso de escritura para comparar, que es lo que un fork no puede dar", () => {
     const workflow = parseWorkflow();
-    const steps = workflow.jobs.baselines.steps;
 
-    const updateStep = steps.find((step) =>
-      step.run?.includes("scripts/update-visual-baselines.sh"),
+    expect(workflow.permissions.contents).toBe("read");
+    expect(workflow.jobs.compare?.permissions).toBeUndefined();
+  });
+
+  it("guarda el diff cuando la comparación falla, para que quede algo que mirar", () => {
+    const artifact = stepsOf("compare").find((step) =>
+      step.uses?.startsWith("actions/upload-artifact"),
     );
-    expect(updateStep).toBeDefined();
-    expect(updateStep!["continue-on-error"]).toBe(true);
+
+    expect(artifact).toBeDefined();
+    expect(artifact?.if).toBe("failure()");
   });
 
-  it("sólo commitea y empuja cuando el script dejó algo regenerado", () => {
-    const workflow = parseWorkflow();
-    const steps = workflow.jobs.baselines.steps;
+  it("acepta una línea base nueva sólo cuando un humano lanza el workflow", () => {
+    const accept = parseWorkflow().jobs.accept;
 
-    const commitStep = steps.find((step) => step.run?.includes("git push"));
-    expect(commitStep).toBeDefined();
-    expect(commitStep!.if).toMatch(/outcome == 'failure'/);
-    expect(commitStep!.run).toMatch(/git diff --cached --quiet/);
+    expect(accept).toBeDefined();
+    expect(accept?.if).toContain("workflow_dispatch");
+    expect(accept?.permissions?.contents).toBe("write");
+    expect(runLines("accept")).toMatch(/update-visual-baselines\.sh/);
+    expect(runLines("accept")).toMatch(/git push/);
   });
 
-  it("deja el job en rojo cuando hubo una diferencia que revisar", () => {
-    const workflow = parseWorkflow();
-    const steps = workflow.jobs.baselines.steps;
+  it("no necesita ignorar sus propios commits, porque no los hace en un PR", () => {
+    const source = readFileSync(WORKFLOW_PATH, "utf8");
 
-    const failStep = steps.find((step) => step.run?.trim() === "exit 1");
-    expect(failStep).toBeDefined();
-    expect(failStep!.if).toMatch(/outcome == 'failure'/);
+    expect(source).not.toMatch(/github\.actor\s*!=/);
   });
 });

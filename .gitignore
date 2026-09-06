@@ -20,7 +20,10 @@ playwright-report/
 # Cache del CLI de Supabase (versión, refs): nunca se commitea
 supabase/.temp/
 
-# Líneas base visuales de Playwright: sólo Linux es vinculante (CI la genera
-# y la commitea). Windows se regenera localmente y es sólo informativo
-# (issue #58); versionarla reintroduce el conflicto binario entre PRs.
-tests/ui.spec.ts-snapshots/*-win32.png
+# Líneas base visuales de Playwright: sólo Linux es vinculante. El resto se
+# regenera en la máquina de cada quien y es informativo (issue #58);
+# versionarlo reintroduce el conflicto binario entre PRs. Lista blanca en vez
+# de enumerar plataformas: nadie tiene que acordarse de añadir -darwin el día
+# que alguien trabaje en un Mac.
+tests/ui.spec.ts-snapshots/*
+!tests/ui.spec.ts-snapshots/*-linux.png

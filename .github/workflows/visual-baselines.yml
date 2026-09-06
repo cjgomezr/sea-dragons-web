@@ -1,27 +1,20 @@
-# Regenera la línea base visual de Linux automáticamente sobre la propia
-# rama del PR que toca UI (issue #58): nadie tiene que acordarse de disparar
-# nada a mano después de mergear, y como sólo CI escribe estas capturas, dos
-# PR en paralelo no terminan peleándose por el mismo PNG binario.
+# La línea base visual vinculante es la de Linux, y sólo se acepta a mano.
 #
-# El job compara primero (scripts/update-visual-baselines.sh corre
-# `playwright test` sin --update-snapshots) para que una diferencia real de
-# píxeles quede visible en el log antes de tocar nada. Sólo si esa
-# comparación falla se regenera y se empuja el resultado a la rama del PR;
-# el job igual termina en rojo para forzar que alguien mire el diff antes de
-# aceptarlo (issue #58, "que la regresión visual siga detectando cambios").
+# En cada PR este workflow COMPARA y nada más. No regenera, no commitea y no
+# empuja. Esa es la diferencia que importa: si el job pudiera arreglar el
+# desajuste por su cuenta, el commit que de verdad se mergea nunca quedaría
+# validado, porque el push del bot dispararía otra corrida que habría que
+# saltar para no entrar en bucle, y el rojo terminaría colgando siempre de un
+# commit ya superado. Sin push no hay bucle que cerrar ni validación que
+# saltarse: el check cae sobre el HEAD real del PR.
 #
-# El guard sobre github.actor evita el bucle: el push que este job hace
-# vuelve a disparar `synchronize`, pero si quien empujó fue el propio bot no
-# se vuelve a correr. El check queda en rojo hasta que un humano revisa el
-# diff y empuja de nuevo.
+# Cuando la diferencia es intencionada, un humano acepta la nueva línea base
+# ejecutando este mismo workflow a mano sobre su rama:
+#   gh workflow run visual-baselines.yml --ref <rama>
+# Ese camino sí regenera y commitea, porque ahí hay alguien decidiendo.
 #
-# workflow_dispatch se mantiene como válvula de escape manual (por ejemplo,
-# para regenerar main directamente), pero ya no es el único disparador.
-#
-# Asume PR del mismo repo: GitHub ignora `permissions: contents: write` en
-# PRs de forks externos, así que ahí el push fallaría (el check quedaría en
-# rojo igual, que es el desenlace seguro, pero sin autoarreglo). Este club no
-# recibe forks hoy; si eso cambia, hace falta otro mecanismo para ese caso.
+# Al comparar sin escribir, el job funciona igual en PRs desde un fork, donde
+# GitHub degrada el token a sólo lectura pase lo que pase.
 name: Visual baselines (Linux)
 
 on:
@@ -30,37 +23,60 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  baselines:
-    if: github.actor != 'github-actions[bot]'
+  compare:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Compara contra la línea base y regenera si hace falta
+      - name: Compara contra la línea base vinculante
+        run: npx playwright test
+      - name: Guarda el diff para que alguien lo mire
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diff
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  accept:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Regenera la línea base
         id: update
         run: bash scripts/update-visual-baselines.sh
         continue-on-error: true
-      - name: Commitea la línea base regenerada en esta rama
+      - name: Commitea la línea base aceptada
         if: steps.update.outcome == 'failure'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git diff --cached --quiet; then
-            echo "Nada que commitear: el fallo no era de píxeles."
-          else
-            git commit -m "Línea base visual para Linux (regenerada en CI para este PR)"
-            git push
+            echo "El fallo no era de píxeles: no hay línea base que aceptar." >&2
+            exit 1
           fi
-      - name: Deja el check en rojo para que alguien revise el diff
-        if: steps.update.outcome == 'failure'
-        run: exit 1
+          git commit -m "Línea base visual para Linux (aceptada a mano)"
+          git push

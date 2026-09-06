@@ -54,6 +54,12 @@ describe("líneas base", () => {
     expect(isIgnored(aWindowsCapture)).toBe(true);
   });
 
+  it("ignora también las capturas de macOS, que nadie ha generado todavía", () => {
+    const aMacCapture = `${SNAPSHOTS_DIR}/home-desktop-light-chromium-darwin.png`;
+
+    expect(isIgnored(aMacCapture)).toBe(true);
+  });
+
   it("no ignora las capturas de Linux, que siguen siendo la línea base vinculante", () => {
     const aLinuxCapture = `${SNAPSHOTS_DIR}/home-desktop-light-chromium-linux.png`;
 
