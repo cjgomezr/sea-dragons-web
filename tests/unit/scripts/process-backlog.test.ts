@@ -226,6 +226,40 @@ function extractDisallowedTools(invocation: string): string[] {
   return value.split(",").filter(Boolean);
 }
 
+/**
+ * Extrae el cuerpo de un `run: |` de un step de GitHub Actions por el
+ * nombre de su `- name:`, para poder ejecutarlo de verdad en un test en vez
+ * de solo inspeccionar el YAML como texto.
+ */
+function extractWorkflowRunBlock(workflow: string, stepName: string): string {
+  const stepIndex = workflow.indexOf(`- name: ${stepName}`);
+  if (stepIndex === -1) {
+    throw new Error(`No encontré el step "${stepName}" en el workflow`);
+  }
+  const runMarker = "run: |";
+  const runIndex = workflow.indexOf(runMarker, stepIndex);
+  if (runIndex === -1) {
+    throw new Error(`El step "${stepName}" no tiene un bloque "run: |"`);
+  }
+  const lines = workflow
+    .slice(runIndex + runMarker.length)
+    .split("\n")
+    .slice(1);
+  const bodyLines: string[] = [];
+  let baseIndent: number | null = null;
+  for (const line of lines) {
+    if (line.trim().length === 0) {
+      bodyLines.push("");
+      continue;
+    }
+    const indent = line.match(/^ */)?.[0].length ?? 0;
+    if (baseIndent === null) baseIndent = indent;
+    if (indent < baseIndent) break;
+    bodyLines.push(line.slice(baseIndent));
+  }
+  return bodyLines.join("\n");
+}
+
 async function writeProjectConfig(
   workDir: string,
   statusOptions: Record<string, string>,
@@ -725,6 +759,31 @@ describe("lanzamiento del worker", () => {
       const disallowedFromScript = extractDisallowedTools(invocation).sort();
 
       expect(disallowedFromScript).toEqual([...toolsFromFile].sort());
+
+      // No basta con que el YAML mencione el archivo: hay que ejecutar su
+      // propio paso de verdad y comprobar que calcula la misma lista que
+      // process-backlog.sh, para que un typo en el step no pase inadvertido.
+      const runBlock = extractWorkflowRunBlock(
+        workflow,
+        "Read disallowed tools for the headless worker",
+      );
+      const githubEnvFile = path.join(workDir, "github_env");
+      await writeFile(githubEnvFile, "");
+      const { code: workflowStepCode } = await runBash(runBlock, workDir, {
+        ...process.env,
+        GITHUB_ENV: toBashPath(githubEnvFile),
+      });
+      expect(workflowStepCode).toBe(0);
+      const githubEnvContent = await readFile(githubEnvFile, "utf8");
+      const workflowMatch = githubEnvContent.match(
+        /WORKER_DISALLOWED_TOOLS=(.*)/,
+      );
+      const disallowedFromWorkflow = (workflowMatch?.[1] ?? "")
+        .split(",")
+        .filter(Boolean)
+        .sort();
+
+      expect(disallowedFromWorkflow).toEqual(disallowedFromScript);
     },
     REAL_PROCESS_TEST_TIMEOUT_MS,
   );
