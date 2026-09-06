@@ -225,7 +225,7 @@ up() {
     waited=$((waited + 1))
   done
 
-  down
+  down || true # down's own WARNING already covers a failed stop; this die is the more useful diagnostic either way.
   die "the dev server did not answer at $APP_URL after ${BOOT_TIMEOUT}s.
 If it started on a different port, pin the port in the dev command (for
 example 'vite --strictPort --port', 'next dev -p'). Last lines of $LOG_FILE:
