@@ -10,7 +10,8 @@
 #
 # Cuando la diferencia es intencionada, un humano acepta la nueva línea base
 # ejecutando este mismo workflow a mano sobre la rama del PR:
-#   gh workflow run visual-baselines.yml --ref <rama-de-PR> #     -f reviewed_run_url=<url de la corrida fallida>
+#   gh workflow run visual-baselines.yml --ref <rama-de-PR> \
+#     -f reviewed_run_url=<url de la corrida fallida>
 # Se pide esa URL a propósito: aceptar sin haber abierto el artefacto
 # `visual-diff` es dar por bueno cualquier píxel que estuviera renderizando en
 # ese momento, que es justo lo que la regresión visual existe para impedir. La
