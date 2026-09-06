@@ -128,6 +128,91 @@ cleanup() {
   exit 130
 }
 
+# Labels an issue needs-human, unassigns it, moves its board card to Blocked
+# and posts a comment. Shared by every path that gives up on a ticket, so the
+# bookkeeping (label + assignee + board + comment) never drifts apart between
+# them.
+flag_needs_human() {  # issue number, comment body
+  local n="$1" body="$2"
+  gh issue edit "$n" --add-label "needs-human" --remove-label "in-progress" || true
+  [ -n "${ME:-}" ] && gh issue edit "$n" --remove-assignee "@me" 2>/dev/null || true
+  bash scripts/task-status.sh "$n" "Blocked" 2>/dev/null || true
+  gh issue comment "$n" --body "$body" || true
+}
+
+# True if some PR (any state) declares "Closes #N" in its body, OR if `gh`
+# itself could not be asked (rate limit, transient network error): a worker
+# that already shipped a PR must never be flagged needs-human just because
+# the check that would have proven it failed. Deliberately not keyed on
+# branch name: `impl-N` and `worktree-impl-N` coexist (#62), so matching by
+# head produces false negatives for work that is already sitting in an open
+# PR.
+pr_declares_closes() {  # issue number
+  local n="$1" count
+  if ! count=$(gh pr list --state all --search "Closes #$n in:body" --json number --jq length 2>/dev/null); then
+    echo "⚠ no pude comprobar si #$n ya tiene PR (falla de gh); no lo marco needs-human por si acaso" >&2
+    return 0
+  fi
+  [ "${count:-0}" != "0" ]
+}
+
+# Single source of truth for where a worker's branch/worktree lives, so the
+# path template only needs to change in one place if the naming convention
+# does (see #62, which is expected to touch it).
+worktree_dir_for() {  # issue number
+  echo ".claude/worktrees/impl-$1"
+}
+
+# A worker that exits 0 without finishing the lifecycle (asks something and
+# waits, commits and stops, loses a tool mid-session...) leaves no visible
+# signal: the issue stays in-progress, assigned, with real work stranded on
+# its branch. Detect that silent case instead of trusting exit 0 as success.
+check_worker_left_no_pr() {  # issue number
+  local n="$1" info state labels wt_dir last_commit dirty_count
+  info=$(gh issue view "$n" --json state,labels 2>/dev/null) || return 0
+  state=$(echo "$info" | jq -r .state)
+  [ "$state" = "CLOSED" ] && return 0   # closed by idempotency: no PR is correct
+  labels=$(echo "$info" | jq -r '.labels[].name')
+  echo "$labels" | grep -qx "in-progress" || return 0
+  pr_declares_closes "$n" && return 0
+
+  wt_dir=$(worktree_dir_for "$n")
+  last_commit=$(git -C "$wt_dir" log --oneline -1 2>/dev/null || echo "sin commits")
+  dirty_count=$(git -C "$wt_dir" status --porcelain 2>/dev/null | wc -l | tr -d ' ') || dirty_count=0
+
+  echo "⚠ Claude salió 0 en #$n pero no dejó PR: labeling needs-human + comentario"
+  flag_needs_human "$n" "🤖 **El worker terminó (código 0) sin completar el lifecycle**: no encontré ningún PR, abierto o cerrado, que declare \`Closes #$n\` en su cuerpo.
+
+**Último commit en la rama**: \`$last_commit\`.
+**Archivos sin commitear**: $dirty_count.
+
+Revisa el worktree \`impl-$n\` antes de decidir cómo retomarlo: puede que el trabajo esté casi terminado y solo falte abrir el PR, o que se haya detenido a mitad de camino."
+}
+
+# Single decision point for what happens after the worker process ends, so a
+# crash (exit != 0) and a silent success (exit 0, no PR) share the same
+# needs-human path and never both fire for the same run.
+handle_worker_exit() {  # issue number, wait's exit status
+  local n="$1" exit_code="$2"
+  if [ "$exit_code" -ne 0 ]; then
+    echo "⚠ Claude exited non-zero on issue #$n: labeling needs-human + explanatory comment"
+    local last_work
+    last_work=$(git -C "$(worktree_dir_for "$n")" log --oneline -1 2>/dev/null || echo "sin commits")
+    flag_needs_human "$n" "🤖 **El worker terminó de forma anormal** (salida ≠ 0). Causas probables: límite de cuota del plan, interrupción manual (Ctrl+C), o tope de turnos alcanzado.
+
+**Trabajo parcial conservado** en el worktree \`impl-$n\`, último commit: \`$last_work\`. Nada se perdió.
+
+**Para retomar** (cuando la causa esté resuelta, p. ej. la cuota repuesta):
+\`\`\`
+gh issue edit $n --remove-label needs-human --remove-label in-progress --add-label pending
+bash scripts/process-backlog.sh
+\`\`\`
+El nuevo worker puede continuar desde la rama existente."
+  else
+    check_worker_left_no_pr "$n"
+  fi
+}
+
 # Launches the worker for issue $1 in the background and sets CLAUDE_PID.
 # Pulled out of main() so tests can drive it directly against a fake `claude`.
 run_worker() {
@@ -189,7 +274,7 @@ main() {
     START_TS=$(date +%s)
     LAST_COMMIT=""
     LAST_ERR=0
-    WT_DIR=".claude/worktrees/impl-$N"
+    WT_DIR=$(worktree_dir_for "$N")
     while kill -0 "$CLAUDE_PID" 2>/dev/null; do
       sleep 60
       kill -0 "$CLAUDE_PID" 2>/dev/null || break
@@ -258,25 +343,14 @@ main() {
       fi
     done
 
-    if ! wait "$CLAUDE_PID"; then
-      echo "⚠ Claude exited non-zero on issue #$N: labeling needs-human + explanatory comment"
-      LAST_WORK=$(git -C "$WT_DIR" log --oneline -1 2>/dev/null || echo "sin commits")
-      # Leave a clean state: needs-human, out of the queue, and unassigned, so the
-      # board can re-queue it later (reconcile_board) without manual surgery.
-      gh issue edit "$N" --add-label "needs-human" --remove-label "in-progress" || true
-      [ -n "${ME:-}" ] && gh issue edit "$N" --remove-assignee "@me" 2>/dev/null || true
-      bash scripts/task-status.sh "$N" "Blocked" 2>/dev/null || true
-      gh issue comment "$N" --body "🤖 **El worker terminó de forma anormal** (salida ≠ 0). Causas probables: límite de cuota del plan, interrupción manual (Ctrl+C), o tope de turnos alcanzado.
-
-**Trabajo parcial conservado** en el worktree \`impl-$N\`, último commit: \`$LAST_WORK\`. Nada se perdió.
-
-**Para retomar** (cuando la causa esté resuelta, p. ej. la cuota repuesta):
-\`\`\`
-gh issue edit $N --remove-label needs-human --remove-label in-progress --add-label pending
-bash scripts/process-backlog.sh
-\`\`\`
-El nuevo worker puede continuar desde la rama existente." || true
+    # `set -e` would otherwise abort the whole script on a non-zero wait, so
+    # the exit status is captured through the if/else instead of `!`.
+    if wait "$CLAUDE_PID"; then
+      WORKER_EXIT_CODE=0
+    else
+      WORKER_EXIT_CODE=$?
     fi
+    handle_worker_exit "$N" "$WORKER_EXIT_CODE"
 
     PROCESSED=$((PROCESSED + 1))
   done
