@@ -10,6 +10,14 @@ const REPO_ROOT = path.resolve(__dirname, "../../..");
  * bien construido que esté el workflow (#58). Ya pasó dos veces, en la skill
  * de Next y en la definición del ui-reviewer, y ninguna de las dos la atrapó
  * un test de frase literal.
+ *
+ * Esto es una red heurística contra las dos regresiones ya sufridas y sus
+ * variantes mecánicas: reescribir la frase, partirla con el envoltorio a 80
+ * columnas, o nombrar la carpeta en vez de decir "línea base". NO es una
+ * garantía semántica. Una instrucción repartida entre dos frases, o escrita
+ * con un sinónimo que no esté en la lista ("la captura de referencia"),
+ * pasa por debajo. La primera línea de defensa sigue siendo la revisión del
+ * cambio de doctrina; esta es la segunda.
  */
 const GOVERNED_DIRS = [".claude/skills", ".claude/agents", "user-level/agents"];
 const GOVERNED_FILES = ["CLAUDE.md", "GUIA-DE-LA-FABRICA.md"];
@@ -32,20 +40,55 @@ const WRITES_IT =
  * `includes` bastaría añadir "salvo que..." al final de una frase ya aprobada
  * para invertir su sentido sin que el test se enterara.
  */
-const ALLOWED_SENTENCES: readonly string[] = [
-  // Bootstrap: el commit inicial del proyecto, cuando no hay PR ni historia
-  // contra la que comparar y alguien tiene que crear la primera.
-  "Genera las líneas base visuales (`npx playwright test --update-snapshots`) y commitéalas: si no, el Stop gate del primer ticket falla por baselines faltantes.",
+const ALLOWED_SENTENCES: ReadonlyArray<{ file: string; sentence: string }> = [
+  // Bootstrap: el commit inicial, cuando no hay PR ni historia contra la que comparar.
+  {
+    file: ".claude/skills/bootstrap/SKILL.md",
+    sentence:
+      "Genera las líneas base visuales (`npx playwright test --update-snapshots`) y commitéalas: si no, el Stop gate del primer ticket falla por baselines faltantes.",
+  },
   // Bootstrap: la frase que acota lo anterior al commit inicial.
-  "De ahí en adelante ninguna línea base se guarda a mano: los cambios pasan por `visual-baselines.yml`, que compara en cada PR y deja que una persona acepte la nueva.",
+  {
+    file: ".claude/skills/bootstrap/SKILL.md",
+    sentence:
+      "De ahí en adelante ninguna línea base se guarda a mano: los cambios pasan por `visual-baselines.yml`, que compara en cada PR y deja que una persona acepte la nueva.",
+  },
   // La prohibición de la skill: nombra la aceptación para negársela al worker.
-  "**La línea base visual la acepta una persona, nunca tú.** Sólo se versiona la de Linux (`-linux`); las demás son informativas y están ignoradas.",
+  {
+    file: ".claude/skills/nextjs-supabase-practices/SKILL.md",
+    sentence:
+      "**La línea base visual la acepta una persona, nunca tú.** Sólo se versiona la de Linux (`-linux`); las demás son informativas y están ignoradas.",
+  },
   // La prohibición de la skill: explica por qué ese comando no es para él.
-  "Ese comando es el que ACEPTA la línea base nueva, y aceptarla sin haber mirado el diff es exactamente lo que la regresión visual existe para impedir: darías por bueno cualquier píxel que estuviera renderizando en ese momento.",
+  {
+    file: ".claude/skills/nextjs-supabase-practices/SKILL.md",
+    sentence:
+      "Ese comando es el que ACEPTA la línea base nueva, y aceptarla sin haber mirado el diff es exactamente lo que la regresión visual existe para impedir: darías por bueno cualquier píxel que estuviera renderizando en ese momento.",
+  },
   // ui-reviewer: niega explícitamente la autorización a escribir.
-  "It does NOT authorise anyone to write them into `tests/ui.spec.ts-snapshots/`.",
+  {
+    file: ".claude/agents/ui-reviewer.md",
+    sentence:
+      "It does NOT authorise anyone to write them into `tests/ui.spec.ts-snapshots/`.",
+  },
+  // La copia de nivel de usuario, que siembra cada proyecto nuevo.
+  {
+    file: "user-level/agents/ui-reviewer.md",
+    sentence:
+      "It does NOT authorise anyone to write them into `tests/ui.spec.ts-snapshots/`.",
+  },
   // ui-reviewer: nombra el bucle que el gate existe para romper.
-  "An agent approving its own pixels and then saving them as the baseline is the exact loop the visual gate exists to break.",
+  {
+    file: ".claude/agents/ui-reviewer.md",
+    sentence:
+      "An agent approving its own pixels and then saving them as the baseline is the exact loop the visual gate exists to break.",
+  },
+  // La copia de nivel de usuario, que siembra cada proyecto nuevo.
+  {
+    file: "user-level/agents/ui-reviewer.md",
+    sentence:
+      "An agent approving its own pixels and then saving them as the baseline is the exact loop the visual gate exists to break.",
+  },
 ];
 
 function collectDocs(): string[] {
@@ -73,13 +116,19 @@ function sentencesOf(file: string): string[] {
     .filter(Boolean);
 }
 
+function isAllowed(file: string, sentence: string): boolean {
+  return ALLOWED_SENTENCES.some(
+    (entry) => entry.file === file && entry.sentence === sentence,
+  );
+}
+
 function findUnreviewedInstructions(): string[] {
   const offenders: string[] = [];
   for (const file of collectDocs()) {
     for (const sentence of sentencesOf(file)) {
       if (!MENTIONS_BASELINE.test(sentence)) continue;
       if (!WRITES_IT.test(sentence)) continue;
-      if (ALLOWED_SENTENCES.includes(sentence)) continue;
+      if (isAllowed(file, sentence)) continue;
       offenders.push(`${file} :: ${sentence}`);
     }
   }
