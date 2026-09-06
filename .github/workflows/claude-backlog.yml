@@ -19,7 +19,10 @@ jobs:
     # Runs when an issue gets the ready-for-dev label, or on schedule/manual.
     if: github.event_name != 'issues' || github.event.label.name == 'ready-for-dev'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # 120/350 min por debajo del tope de 6h de GitHub; ver #38. El disparo por
+    # schedule procesa hasta 5 tickets en una sola sesión y necesita más
+    # colchón que el disparo por etiqueta, que procesa uno solo.
+    timeout-minutes: ${{ github.event_name == 'schedule' && 350 || 120 }}
     concurrency:
       group: claude-backlog-${{ github.event.issue.number || github.run_id }}
       cancel-in-progress: false
@@ -121,7 +124,10 @@ jobs:
             ${{ github.event_name == 'issues'
               && format('Process GitHub issue #{0} following the issue lifecycle in CLAUDE.md: label in-progress, branch impl-{0}, TDD until the Definition of Done passes, code-reviewer (and the ui-reviewer ONLY when the UI-review policy in factory-models.json applies to this issue) until APPROVED, then draft PR with "Closes #{0}". If blocked, label needs-human with an explanatory comment.', github.event.issue.number)
               || 'Process up to 5 eligible pending issues per CLAUDE.md, one at a time (not blocked, highest priority, lowest number first). SKIP any issue that already has an assignee. An assignee is a human''s claim and the nightly run must respect it. For each, the full issue lifecycle: in-progress label, branch impl-N, TDD until Definition of Done, reviewer subagents until APPROVED (ui-reviewer only per the UI-review policy in factory-models.json), draft PR (auto-merge per CLAUDE.md only if the issue has the auto-merge label). After finishing each issue, re-check eligibility: an auto-merged PR may have unblocked dependents. Stop when none are eligible or 5 are done.' }}
-          claude_args: "--max-turns 80 --model ${{ env.FACTORY_MODEL }} --disallowedTools ${{ env.WORKER_DISALLOWED_TOOLS }}"
+          # 200/1000 turnos por el mismo motivo que el timeout de arriba: un
+          # worker que se queda sin turnos a mitad de ticket no alcanza ni a
+          # commitear lo que ya tenía verde (ver #27 y #38).
+          claude_args: "--max-turns ${{ github.event_name == 'schedule' && 1000 || 200 }} --model ${{ env.FACTORY_MODEL }} --disallowedTools ${{ env.WORKER_DISALLOWED_TOOLS }}"
 
       - name: Leave a note on the issue if the run failed
         if: failure() && github.event_name == 'issues'
