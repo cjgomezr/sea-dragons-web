@@ -140,14 +140,27 @@ flag_needs_human() {  # issue number, comment body
   gh issue comment "$n" --body "$body" || true
 }
 
-# True if some PR (any state) declares "Closes #N" in its body. Deliberately
-# not keyed on branch name: `impl-N` and `worktree-impl-N` coexist (#62), so
-# matching by head produces false negatives for work that is already sitting
-# in an open PR.
+# True if some PR (any state) declares "Closes #N" in its body, OR if `gh`
+# itself could not be asked (rate limit, transient network error): a worker
+# that already shipped a PR must never be flagged needs-human just because
+# the check that would have proven it failed. Deliberately not keyed on
+# branch name: `impl-N` and `worktree-impl-N` coexist (#62), so matching by
+# head produces false negatives for work that is already sitting in an open
+# PR.
 pr_declares_closes() {  # issue number
   local n="$1" count
-  count=$(gh pr list --state all --search "Closes #$n in:body" --json number --jq length 2>/dev/null)
+  if ! count=$(gh pr list --state all --search "Closes #$n in:body" --json number --jq length 2>/dev/null); then
+    echo "⚠ no pude comprobar si #$n ya tiene PR (falla de gh); no lo marco needs-human por si acaso" >&2
+    return 0
+  fi
   [ "${count:-0}" != "0" ]
+}
+
+# Single source of truth for where a worker's branch/worktree lives, so the
+# path template only needs to change in one place if the naming convention
+# does (see #62, which is expected to touch it).
+worktree_dir_for() {  # issue number
+  echo ".claude/worktrees/impl-$1"
 }
 
 # A worker that exits 0 without finishing the lifecycle (asks something and
@@ -163,7 +176,7 @@ check_worker_left_no_pr() {  # issue number
   echo "$labels" | grep -qx "in-progress" || return 0
   pr_declares_closes "$n" && return 0
 
-  wt_dir=".claude/worktrees/impl-$n"
+  wt_dir=$(worktree_dir_for "$n")
   last_commit=$(git -C "$wt_dir" log --oneline -1 2>/dev/null || echo "sin commits")
   dirty_count=$(git -C "$wt_dir" status --porcelain 2>/dev/null | wc -l | tr -d ' ') || dirty_count=0
 
@@ -184,7 +197,7 @@ handle_worker_exit() {  # issue number, wait's exit status
   if [ "$exit_code" -ne 0 ]; then
     echo "⚠ Claude exited non-zero on issue #$n: labeling needs-human + explanatory comment"
     local last_work
-    last_work=$(git -C ".claude/worktrees/impl-$n" log --oneline -1 2>/dev/null || echo "sin commits")
+    last_work=$(git -C "$(worktree_dir_for "$n")" log --oneline -1 2>/dev/null || echo "sin commits")
     flag_needs_human "$n" "🤖 **El worker terminó de forma anormal** (salida ≠ 0). Causas probables: límite de cuota del plan, interrupción manual (Ctrl+C), o tope de turnos alcanzado.
 
 **Trabajo parcial conservado** en el worktree \`impl-$n\`, último commit: \`$last_work\`. Nada se perdió.
@@ -261,7 +274,7 @@ main() {
     START_TS=$(date +%s)
     LAST_COMMIT=""
     LAST_ERR=0
-    WT_DIR=".claude/worktrees/impl-$N"
+    WT_DIR=$(worktree_dir_for "$N")
     while kill -0 "$CLAUDE_PID" 2>/dev/null; do
       sleep 60
       kill -0 "$CLAUDE_PID" 2>/dev/null || break

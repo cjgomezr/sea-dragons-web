@@ -113,6 +113,10 @@ if [ "$1" = "issue" ]; then
 fi
 
 if [ "$1" = "pr" ] && [ "$2" = "list" ]; then
+  if [ -n "\${FAIL_PR_LIST:-}" ]; then
+    echo "gh: API rate limit exceeded" >&2
+    exit 1
+  fi
   echo "\${PR_LIST_COUNT:-0}"
   exit 0
 fi
@@ -914,6 +918,32 @@ describe("worker sin PR", () => {
         },
       );
 
+      const log = await readLog(logFile);
+      expect(log).not.toMatch(/needs-human/);
+      expect(log).not.toMatch(/issue comment 42/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no toca nada si gh falla al comprobar si hay PR (falla segura, no falso positivo)",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+
+      const { stderr } = await runBash(
+        "source scripts/process-backlog.sh; ME=tester; check_worker_left_no_pr 42",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ISSUE_VIEW_JSON: OPEN_IN_PROGRESS_ISSUE,
+          FAIL_PR_LIST: "1",
+        },
+      );
+
+      expect(stderr).toMatch(/#42/);
       const log = await readLog(logFile);
       expect(log).not.toMatch(/needs-human/);
       expect(log).not.toMatch(/issue comment 42/);
