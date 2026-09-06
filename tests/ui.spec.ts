@@ -2,11 +2,19 @@
  * Visual regression + accessibility gate.
  *
  * - toHaveScreenshot() compares pixel-by-pixel against an approved baseline.
- *   First run (or after ui-reviewer says BASELINE-READY) generate baselines:
- *     npx playwright test --update-snapshots
- *   From then on, any visual drift fails the build, and the Stop hook
- *   blocks Claude from finishing until it's fixed or the baseline is
- *   intentionally re-approved by a human.
+ *   Only the Linux baseline (tests/ui.spec.ts-snapshots/*-linux.png) is
+ *   versioned and binding: .github/workflows/visual-baselines.yml compares
+ *   it and, if it finds a real diff, regenerates it and pushes the fix
+ *   straight to the PR's own branch. Nobody runs --update-snapshots by hand
+ *   or commits a PNG themselves (issue #58); that's how two UI PRs in
+ *   parallel stop fighting over the same binary file.
+ *
+ * - On any other platform (Windows, macOS) there is no versioned baseline:
+ *   *-win32.png is gitignored. The first local run creates one and every
+ *   run after that compares against it, but it's local and nobody reviewed
+ *   it, so it's informative only, not what decides whether a PR passes. The
+ *   command says so itself (see tests/support/visual-baseline-notice.ts,
+ *   wired as globalSetup in playwright.config.ts).
  *
  * - AxeBuilder runs automated accessibility checks (contrast, labels, etc.).
  *   Requires: npm i -D @axe-core/playwright

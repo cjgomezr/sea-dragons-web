@@ -1,11 +1,27 @@
-# Las líneas base de Playwright son por plataforma: las generadas en Windows se
-# llaman `-win32` y el worker de la nube (ubuntu-latest) busca `-linux`. Sin
-# ellas, el Stop gate bloquea todo ticket que corra en CI. Este workflow las
-# genera y las commitea. Ejecútalo a mano tras cambiar la UI en un entorno que
-# no sea Linux: gh workflow run visual-baselines.yml
+# Regenera la línea base visual de Linux automáticamente sobre la propia
+# rama del PR que toca UI (issue #58): nadie tiene que acordarse de disparar
+# nada a mano después de mergear, y como sólo CI escribe estas capturas, dos
+# PR en paralelo no terminan peleándose por el mismo PNG binario.
+#
+# El job compara primero (scripts/update-visual-baselines.sh corre
+# `playwright test` sin --update-snapshots) para que una diferencia real de
+# píxeles quede visible en el log antes de tocar nada. Sólo si esa
+# comparación falla se regenera y se empuja el resultado a la rama del PR;
+# el job igual termina en rojo para forzar que alguien mire el diff antes de
+# aceptarlo (issue #58, "que la regresión visual siga detectando cambios").
+#
+# El guard sobre github.actor evita el bucle: el push que este job hace
+# vuelve a disparar `synchronize`, pero si quien empujó fue el propio bot no
+# se vuelve a correr. El check queda en rojo hasta que un humano revisa el
+# diff y empuja de nuevo.
+#
+# workflow_dispatch se mantiene como válvula de escape manual (por ejemplo,
+# para regenerar main directamente), pero ya no es el único disparador.
 name: Visual baselines (Linux)
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
@@ -13,24 +29,33 @@ permissions:
 
 jobs:
   baselines:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test --update-snapshots
-      - name: Commit baselines
+      - name: Compara contra la línea base y regenera si hace falta
+        id: update
+        run: bash scripts/update-visual-baselines.sh
+        continue-on-error: true
+      - name: Commitea la línea base regenerada en esta rama
+        if: steps.update.outcome == 'failure'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tests/
           if git diff --cached --quiet; then
-            echo "Sin cambios: las líneas base de Linux ya estaban al día."
-            exit 0
+            echo "Nada que commitear: el fallo no era de píxeles."
+          else
+            git commit -m "Línea base visual para Linux (regenerada en CI para este PR)"
+            git push
           fi
-          git commit -m "Líneas base visuales para Linux (generadas en CI)"
-          git push
+      - name: Deja el check en rojo para que alguien revise el diff
+        if: steps.update.outcome == 'failure'
+        run: exit 1
