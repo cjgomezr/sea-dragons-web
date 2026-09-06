@@ -29,11 +29,10 @@ WORKER_MODEL="${WORKER_MODEL:-$(jq -r '.models.worker // "sonnet"' factory-model
 # /loop, which a one-ticket headless worker never has. `Agent` must never
 # be added here: the lifecycle needs it to launch code-reviewer/ui-reviewer.
 WORKER_DISALLOWED_TOOLS_FILE="${WORKER_DISALLOWED_TOOLS_FILE:-scripts/worker-disallowed-tools.txt}"
-WORKER_DISALLOWED_TOOLS=""
-if [ -f "$WORKER_DISALLOWED_TOOLS_FILE" ]; then
-  WORKER_DISALLOWED_TOOLS=$(grep -v '^[[:space:]]*#' "$WORKER_DISALLOWED_TOOLS_FILE" \
-    | grep -v '^[[:space:]]*$' | tr -d ' \t' | tr '\n' ',' | sed 's/,$//') || true
-fi
+[ -f "$WORKER_DISALLOWED_TOOLS_FILE" ] || { echo "❌ Falta $WORKER_DISALLOWED_TOOLS_FILE: no se puede lanzar el worker sin saber qué herramientas negarle" >&2; exit 1; }
+WORKER_DISALLOWED_TOOLS=$(grep -v '^[[:space:]]*#' "$WORKER_DISALLOWED_TOOLS_FILE" \
+  | grep -v '^[[:space:]]*$' | tr -d ' \t' | tr '\n' ',' | sed 's/,$//' || true)
+[ -n "$WORKER_DISALLOWED_TOOLS" ] || { echo "❌ $WORKER_DISALLOWED_TOOLS_FILE no lista ninguna herramienta" >&2; exit 1; }
 ONLY_LABEL="${ONLY_LABEL:-}"   # opcional: partir el backlog por carril (ej. ONLY_LABEL=area:billing)
 ONLY_MINE="${ONLY_MINE:-}"     # opcional: ONLY_MINE=1 → SOLO tickets asignados a mí (ignora el pozo común)
 ME=$(gh api user --jq .login 2>/dev/null || echo "")

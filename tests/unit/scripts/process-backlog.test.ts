@@ -728,6 +728,63 @@ describe("lanzamiento del worker", () => {
     },
     REAL_PROCESS_TEST_TIMEOUT_MS,
   );
+
+  it(
+    "falla en vez de lanzar el worker sin restricciones cuando falta la lista de negadas",
+    async () => {
+      workDir = await setupWorkDir();
+      await rm(path.join(workDir, "scripts/worker-disallowed-tools.txt"));
+      const { binDir, logFile } = await installFakeClaude(workDir);
+
+      const { code, stderr } = await runBash(
+        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          PERMISSION_MODE: "auto",
+          MAX_TURNS: "5",
+          WORKER_MODEL: "sonnet",
+        },
+      );
+
+      expect(code).not.toBe(0);
+      expect(stderr).toMatch(/worker-disallowed-tools\.txt/);
+      const invocation = await readLog(logFile);
+      expect(invocation).toBe("");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "falla en vez de lanzar el worker sin restricciones cuando la lista de negadas queda vacía",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeFile(
+        path.join(workDir, "scripts/worker-disallowed-tools.txt"),
+        "# solo comentarios, ninguna herramienta listada\n",
+      );
+      const { binDir, logFile } = await installFakeClaude(workDir);
+
+      const { code, stderr } = await runBash(
+        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          PERMISSION_MODE: "auto",
+          MAX_TURNS: "5",
+          WORKER_MODEL: "sonnet",
+        },
+      );
+
+      expect(code).not.toBe(0);
+      expect(stderr).toMatch(/worker-disallowed-tools\.txt/);
+      const invocation = await readLog(logFile);
+      expect(invocation).toBe("");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 });
 
 describe("CLAUDE.md", () => {
