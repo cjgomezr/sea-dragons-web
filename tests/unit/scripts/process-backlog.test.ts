@@ -972,6 +972,34 @@ describe("rama del worker", () => {
     },
     REAL_PROCESS_TEST_TIMEOUT_MS,
   );
+
+  it(
+    "reutiliza una rama impl-N que quedó de una corrida anterior sin su worktree",
+    async () => {
+      workDir = await setupWorkDir();
+      const { binDir, logFile } = await installFakeClaude(workDir);
+      // Simula una rama que sobrevivió a un worktree ya borrado (p. ej. tras
+      // un cleanup manual): la rama existe, el directorio no.
+      await runBash("git branch impl-77", workDir, process.env);
+
+      const { code } = await runBash(
+        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ...WORKER_ENV,
+        },
+      );
+
+      expect(code).toBe(0);
+      const invocation = await readLog(logFile);
+      expect(invocation).not.toBe("");
+      const branches = await listBranches(workDir);
+      expect(branches.filter((b) => b.includes("77"))).toEqual(["impl-77"]);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 });
 
 describe("worker sin PR", () => {
