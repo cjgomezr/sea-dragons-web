@@ -1,9 +1,11 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const SNAPSHOTS_DIR = "tests/ui.spec.ts-snapshots";
+const UI_SPEC_PATH = path.join(REPO_ROOT, "tests/ui.spec.ts");
 
 /**
  * Sólo Linux es la línea base vinculante (issue #58): CI la regenera y la
@@ -56,5 +58,13 @@ describe("líneas base", () => {
     const aLinuxCapture = `${SNAPSHOTS_DIR}/home-desktop-light-chromium-linux.png`;
 
     expect(isIgnored(aLinuxCapture)).toBe(false);
+  });
+
+  it("el header de ui.spec.ts ya no describe el mecanismo manual que este ticket reemplaza", () => {
+    const header = readFileSync(UI_SPEC_PATH, "utf8");
+
+    expect(header).not.toMatch(/gh workflow run visual-baselines/);
+    expect(header).toMatch(/visual-baselines\.yml/);
+    expect(header).toMatch(/informative only|informativ/i);
   });
 });
