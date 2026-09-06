@@ -12,8 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+      # Declarar permisos deja en `none` todo lo que no se lista, y este job
+      # ahora hace checkout para correr scripts/clear-blockers.sh. Sin esto,
+      # clonar un repo privado falla con 403 y el job muere antes del script.
+      contents: read
     env:
       GH_TOKEN: ${{ github.token }}
+      # Explícito en vez de inferido del remoto del checkout: así el script
+      # apunta al repositorio correcto se corra desde donde se corra.
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Remove queue labels on close
         run: |
@@ -21,3 +28,6 @@ jobs:
             gh issue edit ${{ github.event.issue.number }} \
               --repo ${{ github.repository }} --remove-label "$l" 2>/dev/null || true
           done
+      - uses: actions/checkout@v4
+      - name: Remove blocked-by-N from dependents
+        run: bash scripts/clear-blockers.sh ${{ github.event.issue.number }}
