@@ -204,6 +204,14 @@ async function setupWorkDir(): Promise<string> {
     path.join(workDir, "scripts/worker-disallowed-tools.txt"),
   );
   await runBash("git init -q", workDir, process.env);
+  // `run_worker` ahora crea el worktree del ticket con `git worktree add`, y
+  // eso exige un HEAD válido: sin este commit inicial, un repo recién
+  // inicializado no tiene de dónde ramificar.
+  await runBash(
+    "git config user.email t@t.com && git config user.name t && git add -A && git commit -q -m 'estado inicial'",
+    workDir,
+    process.env,
+  );
   return workDir;
 }
 
@@ -855,6 +863,112 @@ describe("lanzamiento del worker", () => {
       expect(stderr).toMatch(/worker-disallowed-tools\.txt/);
       const invocation = await readLog(logFile);
       expect(invocation).toBe("");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+});
+
+describe("rama del worker", () => {
+  let workDir = "";
+
+  afterEach(async () => {
+    if (workDir) {
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
+      workDir = "";
+    }
+  });
+
+  const WORKER_ENV = {
+    PERMISSION_MODE: "auto",
+    MAX_TURNS: "5",
+    WORKER_MODEL: "sonnet",
+  };
+
+  async function listBranches(cwd: string): Promise<string[]> {
+    const { stdout } = await runBash("git branch --list", cwd, process.env);
+    return stdout
+      .split("\n")
+      .map((line) => line.replace(/^[*+\s]+/, "").trim())
+      .filter(Boolean);
+  }
+
+  it(
+    "la invocación produce una rama llamada impl-N para el ticket N",
+    async () => {
+      workDir = await setupWorkDir();
+      const { binDir } = await installFakeClaude(workDir);
+
+      const { code } = await runBash(
+        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ...WORKER_ENV,
+        },
+      );
+
+      expect(code).toBe(0);
+      const branches = await listBranches(workDir);
+      expect(branches).toContain("impl-77");
+      expect(branches).not.toContain("worktree-impl-77");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "relanzar el mismo ticket no crea una segunda rama con otro nombre",
+    async () => {
+      workDir = await setupWorkDir();
+      const { binDir } = await installFakeClaude(workDir);
+      const env = {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        ...WORKER_ENV,
+      };
+      const runOnce = () =>
+        runBash(
+          'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+          workDir,
+          env,
+        );
+
+      await runOnce();
+      await runOnce();
+
+      const branches = await listBranches(workDir);
+      expect(branches.filter((b) => b.includes("77"))).toEqual(["impl-77"]);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "el nombre no depende de si el worktree ya existía",
+    async () => {
+      workDir = await setupWorkDir();
+      const { binDir, logFile } = await installFakeClaude(workDir);
+      // Simula una corrida anterior que ya dejó el worktree en disco.
+      await runBash(
+        "git worktree add .claude/worktrees/impl-77 -b impl-77",
+        workDir,
+        process.env,
+      );
+
+      const { code } = await runBash(
+        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ...WORKER_ENV,
+        },
+      );
+
+      expect(code).toBe(0);
+      const invocation = await readLog(logFile);
+      expect(invocation).not.toBe("");
+      const branches = await listBranches(workDir);
+      expect(branches.filter((b) => b.includes("77"))).toEqual(["impl-77"]);
     },
     REAL_PROCESS_TEST_TIMEOUT_MS,
   );
