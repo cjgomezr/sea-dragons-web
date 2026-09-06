@@ -134,16 +134,24 @@ port_owner_pid() {
 # taskkill deal in), but is_ours signals it with Git Bash's own kill -0,
 # which only recognizes Git Bash's PID numbering. Translate it back before
 # storing it, or a perfectly alive server reads as dead on the next check.
+# A native PID is never valid in Git Bash's own numbering (they are separate
+# spaces), so if the translation can't find a match, leave PID_FILE alone
+# rather than store a value kill -0 could never confirm, or coincidentally
+# could confirm for a completely different process.
 record_real_owner() {
-  local native_pid pid
+  local native_pid pid attempt
   native_pid=$(port_owner_pid | head -1)
   [ -n "$native_pid" ] || return 0
-  pid="$native_pid"
-  if command -v taskkill >/dev/null 2>&1; then
-    pid=$(pid_for_winpid "$native_pid")
-    [ -n "$pid" ] || pid="$native_pid"
+  if ! command -v taskkill >/dev/null 2>&1; then
+    echo "$native_pid" > "$PID_FILE"
+    return 0
   fi
-  echo "$pid" > "$PID_FILE"
+  for attempt in 1 2 3; do
+    pid=$(pid_for_winpid "$native_pid")
+    [ -n "$pid" ] && break
+    sleep 0.2
+  done
+  [ -n "$pid" ] && echo "$pid" > "$PID_FILE"
 }
 
 # Last resort: whoever still holds the port after kill_tree is our own dev
