@@ -6,13 +6,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import { captureUi } from "../../../scripts/capture-ui.ts";
 import { CAPTURE_MATRIX } from "../../../scripts/ui-review/matrix.ts";
 import { decodePng } from "../../../scripts/mockups/png.ts";
+import { FILES_NEXT_DEV_REWRITES } from "../../../scripts/ui-review/tree-guard.ts";
 
 const CAPTURE_TIMEOUT_MS = 180_000;
 const APP_URL = "http://localhost:3417";
 const APP_PORT = 3417;
-// next dev reescribe estos dos al arrancar: son el árbol de trabajo que este
-// test no puede permitirse ensuciar.
-const FILES_NEXT_DEV_REWRITES = ["tsconfig.json", "CLAUDE.md"];
 
 async function readGuardedFiles(): Promise<string[]> {
   return Promise.all(

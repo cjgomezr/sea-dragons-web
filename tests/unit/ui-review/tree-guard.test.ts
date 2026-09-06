@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  SIGINT_EXIT_CODE,
   withRestoredFiles,
   type TreeGuardProcess,
 } from "../../../scripts/ui-review/tree-guard.ts";
@@ -83,7 +84,7 @@ describe("suite de integración", () => {
       resolveExited = resolve;
     });
     const fakeProcess = createFakeProcess((code) => {
-      expect(code).toBe(130);
+      expect(code).toBe(SIGINT_EXIT_CODE);
       resolveExited?.();
     });
 

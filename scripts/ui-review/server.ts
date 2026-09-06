@@ -1,13 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { withRestoredFiles } from "./tree-guard.ts";
+import { FILES_NEXT_DEV_REWRITES, withRestoredFiles } from "./tree-guard.ts";
 
 const PREFLIGHT_SCRIPT = "scripts/ui-preflight.sh";
-
-// next dev reescribe estos dos archivos versionados al arrancar (tsconfig.json
-// para sus tipos generados, el bloque de agentes de CLAUDE.md si no lo
-// encuentra al día). Sin restaurarlos, cada corrida de la suite de UI deja el
-// árbol de trabajo sucio.
-const FILES_NEXT_DEV_REWRITES = ["tsconfig.json", "CLAUDE.md"];
 
 export interface DevServerControls {
   /** Arranca el servidor y devuelve su URL. Lanza si el puerto no es utilizable. */

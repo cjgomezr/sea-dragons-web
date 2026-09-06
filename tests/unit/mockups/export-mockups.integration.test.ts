@@ -7,13 +7,12 @@ import { MOCKUP_SCREENS, THEMES } from "../../../scripts/mockups/catalog.ts";
 import { buildFileName } from "../../../scripts/mockups/filename.ts";
 import { decodePng } from "../../../scripts/mockups/png.ts";
 import { findMissingFiles } from "../../../scripts/mockups/verify.ts";
+import { FILES_NEXT_DEV_REWRITES } from "../../../scripts/ui-review/tree-guard.ts";
 
 const EXPORT_TIMEOUT_MS = 180_000;
-// tsconfig.json y CLAUDE.md son los que next dev reescribe al arrancar
-// (véase scripts/ui-review/tree-guard.ts); esta corrida no arranca ningún dev
-// server, pero lo confirma en vez de asumirlo.
-const FILES_NEXT_DEV_REWRITES = ["tsconfig.json", "CLAUDE.md"];
 
+// Esta corrida no arranca ningún dev server, así que no debería tocar los
+// archivos que next dev reescribe al arrancar; lo confirma en vez de asumirlo.
 async function readGuardedFiles(): Promise<string[]> {
   return Promise.all(
     FILES_NEXT_DEV_REWRITES.map((filePath) => readFile(filePath, "utf8")),
