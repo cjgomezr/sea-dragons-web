@@ -97,6 +97,33 @@ sleep 30
 `;
 
 /**
+ * Reproduce el curl real de mingw/Git Bash bajo `MSYS_NO_PATHCONV=1`
+ * (issue #52): al no traducirse "/dev/null" al dispositivo NUL de Windows,
+ * curl no puede escribir ahí el cuerpo de la respuesta y sale con el código
+ * 23 "Failure writing output to destination", aunque el servidor haya
+ * respondido 200 de verdad. `responds()` no puede depender de que esa
+ * traducción ocurra.
+ */
+const FAKE_CURL_SCRIPT = `#!/usr/bin/env bash
+for arg in "$@"; do
+  if [ "$arg" = "/dev/null" ]; then
+    echo "curl: (23) Failure writing output to destination" >&2
+    exit 23
+  fi
+done
+url="\${@: -1}"
+node -e '
+  const u = new URL(process.argv[1]);
+  const req = require("http").get(
+    { hostname: u.hostname, port: u.port || 80, path: "/", timeout: 3000 },
+    () => process.exit(0)
+  );
+  req.on("error", () => process.exit(1));
+  req.on("timeout", () => process.exit(1));
+' "$url"
+`;
+
+/**
  * `git.exe`/`bash.exe` pueden tardar en soltar el handle del directorio
  * temporal en Windows; un `rm` inmediato falla con `EBUSY: resource busy or
  * locked`. Mismo remedio que `tests/unit/scripts/process-backlog.test.ts`
@@ -135,6 +162,18 @@ async function aDeadPid(): Promise<number> {
   const child = spawn(process.execPath, ["-e", ""], { stdio: "ignore" });
   await new Promise((resolve) => child.on("exit", resolve));
   return child.pid!;
+}
+
+/** Instala el curl de mentira en un directorio propio y lo antepone al PATH del test. */
+async function installFakeCurlThatFailsToWriteDevNull(
+  workDir: string,
+): Promise<string> {
+  const binDir = path.join(workDir, "fake-bin");
+  await mkdir(binDir, { recursive: true });
+  const curlPath = path.join(binDir, "curl");
+  await writeFile(curlPath, FAKE_CURL_SCRIPT);
+  await chmod(curlPath, 0o755);
+  return binDir;
 }
 
 async function setupWorkDir(): Promise<string> {
@@ -208,6 +247,25 @@ describe("ui-preflight.sh", () => {
       expect(stderr).not.toMatch(/did not answer/);
       expect(code).toBe(0);
       expect(stdout.trim()).toBe(`http://localhost:${port}`);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "responds sigue reconociendo un servidor vivo aunque curl no pueda escribir en -o /dev/null",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      const fakeBinDir = await installFakeCurlThatFailsToWriteDevNull(workDir);
+      const env = baseEnv(workDir, port, { START_DELAY_MS: "500" });
+      env.PATH = `${fakeBinDir}${path.delimiter}${env.PATH}`;
+      cleanupEnv = env;
+
+      const { code, stderr } = await runPreflight(["up"], workDir, env);
+
+      expect(stderr).not.toMatch(/did not answer/);
+      expect(code).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
     TEST_TIMEOUT_MS,

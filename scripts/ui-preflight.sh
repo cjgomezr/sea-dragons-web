@@ -38,9 +38,20 @@ case "$APP_URL$DEV_SERVER_CMD" in
 esac
 
 # Does anything answer at APP_URL? Any HTTP status counts as occupied.
+#
+# The body is discarded through the shell's own ">/dev/null", not curl's
+# "-o /dev/null": that argument is a path curl (a native Windows binary
+# under Git Bash) has to open itself, and MSYS only rewrites it to the
+# Windows NUL device as part of its automatic path conversion. Disable that
+# conversion (MSYS_NO_PATHCONV=1, set by users who need a literal leading
+# slash preserved for something else entirely) and curl fails to open
+# "/dev/null" with "Failure writing output to destination", exit 23, even
+# though the request itself succeeded and the server answered 200. The
+# shell's own redirection has no such dependency, since bash resolves it
+# itself rather than handing the path to curl's argv.
 responds() {
   if command -v curl >/dev/null 2>&1; then
-    curl -sS -o /dev/null --max-time 3 "$APP_URL" >/dev/null 2>&1
+    curl -sS --max-time 3 "$APP_URL" >/dev/null 2>&1
   else
     node -e '
       const u = new URL(process.argv[1]);
