@@ -48,6 +48,18 @@ if (!hasCredentials) {
 
 const TEST_TIMEOUT_MS = 20_000;
 
+/**
+ * La marca de tiempo la pone Postgres, así que esta comprobación enfrenta el
+ * reloj del servidor de Supabase con el de esta máquina. Un segundo de margen
+ * no aguantaba la deriva normal de NTP: se midieron 1623 ms de diferencia y el
+ * test caía siempre, sin que hubiera nada roto en lo que prueba.
+ *
+ * Lo que se verifica es que la fila la escribe el servidor con SU hora, no el
+ * cliente con la suya. Cinco minutos siguen delatando una marca absurda (el
+ * epoch, o el futuro lejano) y dejan de castigar un reloj desincronizado.
+ */
+const CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000;
+
 describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
   let serviceClient: SupabaseClient;
   let asAuthenticatedUser: SupabaseClient;
@@ -235,8 +247,10 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
       expect(row.club_id).toBe(clubId);
       expect(row.actor_id).toBe(testUserId);
       const writtenAt = new Date(row.created_at as string).getTime();
-      expect(writtenAt).toBeGreaterThanOrEqual(before - 1000);
-      expect(writtenAt).toBeLessThanOrEqual(Date.now() + 1000);
+      expect(writtenAt).toBeGreaterThanOrEqual(before - CLOCK_SKEW_TOLERANCE_MS);
+      expect(writtenAt).toBeLessThanOrEqual(
+        Date.now() + CLOCK_SKEW_TOLERANCE_MS,
+      );
     },
     TEST_TIMEOUT_MS,
   );
