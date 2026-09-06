@@ -288,6 +288,13 @@ whenever a ticket returns to the queue via `blocked-by-N`, gets labeled
 alone by `reconcile_board`: it is not `Todo`, so it is not re-queued. Moving
 it to `Todo` by hand is still the only way to say "retry".
 
+La unidad de reparto es el ticket, no la épica: asignar la épica en GitHub no
+reserva nada, porque sus sub-issues no heredan el assignee del padre y
+`next_issue()` sigue viéndolos libres. Para repartir una épica entera a
+alguien, corre `bash scripts/assign-epic.sh <épica> <usuario>`: asigna a esa
+persona cada sub-issue abierto de la épica, sin tocar los que ya tienen otro
+dueño.
+
 ## Documents & tickets
 
 Issues, PRDs and PR descriptions are written with the `write-ticket` /
