@@ -17,6 +17,11 @@
 #
 # workflow_dispatch se mantiene como válvula de escape manual (por ejemplo,
 # para regenerar main directamente), pero ya no es el único disparador.
+#
+# Asume PR del mismo repo: GitHub ignora `permissions: contents: write` en
+# PRs de forks externos, así que ahí el push fallaría (el check quedaría en
+# rojo igual, que es el desenlace seguro, pero sin autoarreglo). Este club no
+# recibe forks hoy; si eso cambia, hace falta otro mecanismo para ese caso.
 name: Visual baselines (Linux)
 
 on:

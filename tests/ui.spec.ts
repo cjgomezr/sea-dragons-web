@@ -3,11 +3,15 @@
  *
  * - toHaveScreenshot() compares pixel-by-pixel against an approved baseline.
  *   Only the Linux baseline (tests/ui.spec.ts-snapshots/*-linux.png) is
- *   versioned and binding: .github/workflows/visual-baselines.yml compares
- *   it and, if it finds a real diff, regenerates it and pushes the fix
- *   straight to the PR's own branch. Nobody runs --update-snapshots by hand
- *   or commits a PNG themselves (issue #58); that's how two UI PRs in
- *   parallel stop fighting over the same binary file.
+ *   versioned and binding. On Linux (e.g. the factory worker), generate or
+ *   update it the usual way: npx playwright test --update-snapshots, then
+ *   commit the PNG like any other file. .github/workflows/visual-baselines.yml
+ *   (issue #58) is the backstop for whoever can't produce a correct Linux
+ *   PNG themselves (typically a human dev on Windows): it compares on every
+ *   PR and, if it finds a real diff nobody committed, regenerates it and
+ *   pushes the fix straight to the PR's own branch. Either way the baseline
+ *   only ever comes from one place per branch, which is what stops two UI
+ *   PRs in parallel from fighting over the same binary file.
  *
  * - On any other platform (Windows, macOS) there is no versioned baseline:
  *   *-win32.png is gitignored. The first local run creates one and every

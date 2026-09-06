@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# Reconcilia la línea base visual de Linux con el estado actual de la rama,
-# sin que ningún dev tenga que acordarse de disparar nada a mano (issue #58).
+# Reconcilia la línea base visual de Linux con el estado actual de la rama.
+# CI (.github/workflows/visual-baselines.yml) la corre en cada PR como
+# respaldo para quien no puede generar un PNG de Linux correcto en su propia
+# máquina (issue #58: típicamente un dev en Windows). Quien SÍ está en Linux
+# (por ejemplo el worker de la fábrica) puede seguir corriendo este mismo
+# script, o `npx playwright test --update-snapshots`, y commitear el
+# resultado a mano para pasar su propio DoD antes de abrir el PR: eso no es
+# el problema que este ticket resuelve, ese sigue siendo un flujo válido.
 #
 # Compara primero (sin --update-snapshots) para que una diferencia real de
 # píxeles quede visible en el log/reporte de Playwright antes de tocar nada.
@@ -15,6 +21,8 @@
 #
 # Usage: scripts/update-visual-baselines.sh
 
+SNAPSHOTS_DIR="tests/ui.spec.ts-snapshots"
+
 set -uo pipefail
 
 if npx playwright test; then
@@ -24,7 +32,7 @@ fi
 
 echo "update-visual-baselines: la comparación falló, regenerando desde esta rama." >&2
 npx playwright test --update-snapshots
-git add tests/
+git add "$SNAPSHOTS_DIR"
 
 if git diff --cached --quiet; then
   echo "update-visual-baselines: la regeneración no cambió ninguna captura; el fallo no era de píxeles." >&2
