@@ -152,6 +152,7 @@ record_real_owner() {
     sleep 0.2
   done
   [ -n "$pid" ] && echo "$pid" > "$PID_FILE"
+  return 0
 }
 
 # Last resort: whoever still holds the port after kill_tree is our own dev

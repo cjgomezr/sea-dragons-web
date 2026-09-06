@@ -15,6 +15,17 @@ const REPO_ROOT = path.resolve(__dirname, "../../..");
 const UI_PREFLIGHT_SCRIPT = path.join(REPO_ROOT, "scripts/ui-preflight.sh");
 const TEST_TIMEOUT_MS = 20_000;
 
+// Puertos reales, no simulados: dos corridas de este archivo en paralelo (una
+// sesión de agente y su propio subagente de revisión, por ejemplo) chocarían
+// si todas usaran el mismo rango fijo. Un offset aleatorio por proceso reduce
+// esa colisión sin necesitar coordinación entre corridas.
+const PORT_BASE = 40000 + Math.floor(Math.random() * 10_000);
+let nextPortOffset = 0;
+function nextPort(): number {
+  nextPortOffset += 1;
+  return PORT_BASE + nextPortOffset;
+}
+
 interface RunResult {
   code: number | null;
   stdout: string;
@@ -189,7 +200,7 @@ describe("ui-preflight.sh", () => {
     "arranca aunque el proceso lanzador termine antes de que el servidor real escuche",
     async () => {
       workDir = await setupWorkDir();
-      const port = 39181;
+      const port = nextPort();
       const env = baseEnv(workDir, port, { START_DELAY_MS: "2000" });
       cleanupEnv = env;
       const { code, stdout, stderr } = await runPreflight(["up"], workDir, env);
@@ -206,7 +217,7 @@ describe("ui-preflight.sh", () => {
     "check reconoce como propio un servidor cuyo proceso lanzador ya murió",
     async () => {
       workDir = await setupWorkDir();
-      const port = 39182;
+      const port = nextPort();
       const env = baseEnv(workDir, port, { START_DELAY_MS: "500" });
       cleanupEnv = env;
 
@@ -224,7 +235,7 @@ describe("ui-preflight.sh", () => {
     "dos arranques seguidos con servidores distintos terminan ambos con éxito",
     async () => {
       workDir = await setupWorkDir();
-      const port = 39183;
+      const port = nextPort();
       const env = baseEnv(workDir, port, { START_DELAY_MS: "500" });
       cleanupEnv = env;
 
@@ -252,7 +263,7 @@ describe("ui-preflight.sh", () => {
     "sigue abortando por timeout cuando el servidor de verdad nunca escucha",
     async () => {
       workDir = await setupWorkDir();
-      const port = 39184;
+      const port = nextPort();
       const env = baseEnv(workDir, port, {
         FABRICA_SERVER_TIMEOUT: "2",
         DEV_SERVER_CMD: `bash ${toBashPath(workDir)}/never-starts.sh`,
@@ -272,7 +283,7 @@ describe("ui-preflight.sh", () => {
     "sigue abortando cuando el proceso muere sin haber levantado nada",
     async () => {
       workDir = await setupWorkDir();
-      const port = 39185;
+      const port = nextPort();
       const dieImmediately = path.join(workDir, "dies-immediately.sh");
       await writeFile(dieImmediately, "#!/usr/bin/env bash\nexit 1\n");
       await chmod(dieImmediately, 0o755);
@@ -295,7 +306,7 @@ describe("ui-preflight.sh", () => {
     "se sigue negando a arrancar sobre un servidor que esta fábrica no inició",
     async () => {
       workDir = await setupWorkDir();
-      const port = 39186;
+      const port = nextPort();
       intruder = await startIntruder(port);
 
       const env = baseEnv(workDir, port, {});
@@ -312,7 +323,7 @@ describe("ui-preflight.sh", () => {
     "se sigue negando cuando un PID_FILE de una sesión anterior sin cerrar coincide con un servidor ajeno más nuevo",
     async () => {
       workDir = await setupWorkDir();
-      const port = 39187;
+      const port = nextPort();
       // Simula una sesión previa que llamó a 'up' y nunca llegó a 'down'
       // (por ejemplo, el worker se quedó sin turnos a mitad de camino): el
       // PID_FILE sobrevive apuntando a un proceso que ya no existe.
