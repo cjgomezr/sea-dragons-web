@@ -8,6 +8,7 @@ import {
   MOBILE_PRIMARY_SECTIONS,
   isSectionActive,
 } from "@/lib/navigation";
+import { NAV_SECTION_ICONS, OverflowIcon } from "@/components/NavIcons";
 
 const OVERFLOW_PANEL_ID = "app-tabbar-overflow";
 
@@ -43,18 +44,22 @@ export function MobileTabBar(): React.JSX.Element {
         ))}
       </ul>
       <ul className="app-tabbar-tabs">
-        {MOBILE_PRIMARY_SECTIONS.map((section) => (
-          <li key={section.href}>
-            <Link
-              href={section.href}
-              aria-current={
-                isSectionActive(section.href, pathname) ? "page" : undefined
-              }
-            >
-              {section.label}
-            </Link>
-          </li>
-        ))}
+        {MOBILE_PRIMARY_SECTIONS.map((section) => {
+          const SectionIcon = NAV_SECTION_ICONS[section.icon];
+          return (
+            <li key={section.href}>
+              <Link
+                href={section.href}
+                aria-current={
+                  isSectionActive(section.href, pathname) ? "page" : undefined
+                }
+              >
+                <SectionIcon />
+                {section.label}
+              </Link>
+            </li>
+          );
+        })}
         <li>
           <button
             type="button"
@@ -65,6 +70,7 @@ export function MobileTabBar(): React.JSX.Element {
             aria-current={hasActiveOverflowSection ? "true" : undefined}
             onClick={() => setIsOverflowOpen((isOpen) => !isOpen)}
           >
+            <OverflowIcon />
             Más
           </button>
         </li>

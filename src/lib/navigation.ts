@@ -1,16 +1,29 @@
+// Un id por sección, no el componente de icono en sí: este archivo es .ts
+// (sin JSX) y lo consume tanto la barra de pestañas móvil (con icono) como
+// SidebarNav (sin icono). NavIcons.tsx es quien traduce el id a SVG.
+export type NavIconId =
+  | "dashboard"
+  | "directorio"
+  | "calendario"
+  | "equipos"
+  | "evaluaciones"
+  | "noticias"
+  | "pagos";
+
 export type NavSection = {
   readonly label: string;
   readonly href: string;
+  readonly icon: NavIconId;
 };
 
 export const NAV_SECTIONS: readonly NavSection[] = [
-  { label: "Dashboard", href: "/dashboard" },
-  { label: "Directorio", href: "/directorio" },
-  { label: "Calendario", href: "/calendario" },
-  { label: "Equipos", href: "/equipos" },
-  { label: "Evaluaciones", href: "/evaluaciones" },
-  { label: "Noticias", href: "/noticias" },
-  { label: "Pagos", href: "/pagos" },
+  { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
+  { label: "Directorio", href: "/directorio", icon: "directorio" },
+  { label: "Calendario", href: "/calendario", icon: "calendario" },
+  { label: "Equipos", href: "/equipos", icon: "equipos" },
+  { label: "Evaluaciones", href: "/evaluaciones", icon: "evaluaciones" },
+  { label: "Noticias", href: "/noticias", icon: "noticias" },
+  { label: "Pagos", href: "/pagos", icon: "pagos" },
 ];
 
 // Una barra de pestañas deja de ser alcanzable con el pulgar pasadas las cinco
