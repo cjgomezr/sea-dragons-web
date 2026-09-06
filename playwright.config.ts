@@ -6,6 +6,10 @@ export default defineConfig({
   testDir: "./tests",
   // *.spec.ts only: tests/unit/**/*.test.ts belongs to Vitest.
   testMatch: "**/*.spec.ts",
+  // Sólo Linux tiene línea base visual versionada (issue #58): en cualquier
+  // otra plataforma esto avisa que la comparación es informativa, no la que
+  // decide si el PR pasa.
+  globalSetup: "./tests/support/visual-baseline-global-setup.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

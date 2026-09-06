@@ -288,7 +288,11 @@ arrancado. Comprueba que funciona antes de cerrar la fase:
 
 Genera las líneas base visuales (`npx playwright test --update-snapshots`) y
 commitéalas: si no, el Stop gate del primer ticket falla por baselines
-faltantes.
+faltantes. **Esto vale sólo para el commit inicial del proyecto**, cuando
+todavía no hay PR ni historia contra la que comparar. De ahí en adelante
+ninguna línea base se guarda a mano: los cambios pasan por
+`visual-baselines.yml`, que compara en cada PR y deja que una persona acepte
+la nueva.
 
 ### Si NO hay UI
 

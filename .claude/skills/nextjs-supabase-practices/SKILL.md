@@ -143,10 +143,18 @@ cambio de horario de verano. Guarda instantes en UTC (`timestamptz`), pero
 genera las ocurrencias sobre la hora local del club, o la sesión de las 19:00
 se mueve sola a las 18:00 a mitad de temporada.
 
-**Las líneas base visuales son por plataforma.** Las de Windows (`-win32`) no
-le sirven al worker de la nube (`-linux`). Si cambias la UI en local, tras
-mergear ejecuta `gh workflow run visual-baselines.yml` para regenerar las de
-Linux, o el Stop gate de CI bloqueará el siguiente ticket.
+**La línea base visual la acepta una persona, nunca tú.** Sólo se versiona la
+de Linux (`-linux`); las demás son informativas y están ignoradas. Si tocas la
+UI, el job `compare` de `visual-baselines.yml` va a fallar en rojo en tu PR.
+**Eso es correcto y no es un bloqueo que te toque resolver.** El diff queda
+como artefacto `visual-diff` en la corrida fallida, para que alguien lo mire.
+
+No ejecutes `gh workflow run visual-baselines.yml` para desatascarte. Ese
+comando es el que ACEPTA la línea base nueva, y aceptarla sin haber mirado el
+diff es exactamente lo que la regresión visual existe para impedir: darías por
+bueno cualquier píxel que estuviera renderizando en ese momento. Si tu ticket
+no puede cerrar porque la línea base espera revisión, comenta eso en el issue
+y para ahí. Es un caso de `needs-human`, no de reintentar.
 
 **El puerto es el 3417 y es estricto.** Si algo ya responde ahí, no es tu
 servidor: libéralo. Nunca apuntes los tests a otro puerto para esquivarlo.

@@ -1,18 +1,43 @@
-# Las líneas base de Playwright son por plataforma: las generadas en Windows se
-# llaman `-win32` y el worker de la nube (ubuntu-latest) busca `-linux`. Sin
-# ellas, el Stop gate bloquea todo ticket que corra en CI. Este workflow las
-# genera y las commitea. Ejecútalo a mano tras cambiar la UI en un entorno que
-# no sea Linux: gh workflow run visual-baselines.yml
+# La línea base visual vinculante es la de Linux, y sólo se acepta a mano.
+#
+# En cada PR este workflow COMPARA y nada más. No regenera, no commitea y no
+# empuja. Esa es la diferencia que importa: si el job pudiera arreglar el
+# desajuste por su cuenta, el commit que de verdad se mergea nunca quedaría
+# validado, porque el push del bot dispararía otra corrida que habría que
+# saltar para no entrar en bucle, y el rojo terminaría colgando siempre de un
+# commit ya superado. Sin push no hay bucle que cerrar ni validación que
+# saltarse: el check cae sobre el HEAD real del PR.
+#
+# Cuando la diferencia es intencionada, un humano acepta la nueva línea base
+# ejecutando este mismo workflow a mano sobre la rama del PR:
+#   gh workflow run visual-baselines.yml --ref <rama-de-PR> \
+#     -f reviewed_run_url=<url de la corrida fallida>
+# Se pide esa URL a propósito: aceptar sin haber abierto el artefacto
+# `visual-diff` es dar por bueno cualquier píxel que estuviera renderizando en
+# ese momento, que es justo lo que la regresión visual existe para impedir. La
+# URL queda en el resumen del run, así que la decisión deja rastro.
+#
+# Se espera `--ref` de una rama de PR, nunca `main` directamente.
+#
+# Al comparar sin escribir, el job funciona igual en PRs desde un fork, donde
+# GitHub degrada el token a sólo lectura pase lo que pase.
 name: Visual baselines (Linux)
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
+    inputs:
+      reviewed_run_url:
+        description: "URL de la corrida cuyo artefacto visual-diff ya miraste"
+        required: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  baselines:
+  compare:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,15 +47,50 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test --update-snapshots
-      - name: Commit baselines
+      - name: Compara contra la línea base vinculante
+        run: npx playwright test
+      - name: Guarda el diff para que alguien lo mire
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diff
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  accept:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Deja constancia de qué diff se revisó
+        run: |
+          echo "Línea base aceptada tras revisar:" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ inputs.reviewed_run_url }}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Regenera la línea base
+        id: update
+        run: bash scripts/update-visual-baselines.sh
+        continue-on-error: true
+      - name: Commitea la línea base aceptada
+        if: steps.update.outcome == 'failure'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tests/
           if git diff --cached --quiet; then
-            echo "Sin cambios: las líneas base de Linux ya estaban al día."
-            exit 0
+            echo "El fallo no era de píxeles: no hay línea base que aceptar." >&2
+            exit 1
           fi
-          git commit -m "Líneas base visuales para Linux (generadas en CI)"
+          git commit -m "Línea base visual para Linux (aceptada a mano)"
           git push

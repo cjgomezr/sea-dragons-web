@@ -116,8 +116,13 @@ mockup or checklist), `Medium` (inconsistency, weak hierarchy), `Low` (polish).
 - No Critical/High/Medium findings → reply exactly `APPROVED` (Low findings
   may follow as optional suggestions).
 - When you approve in Mode B for the first time, add the line
-  `BASELINE-READY: <list of screenshots>` so the main agent can save the
-  approved screenshots as the `toHaveScreenshot()` baseline for future
-  regression testing.
+  `BASELINE-READY: <list of screenshots>`. That line is a signal, not an
+  instruction: it says these screenshots passed heuristic visual review. It
+  does NOT authorise anyone to write them into
+  `tests/ui.spec.ts-snapshots/`. The binding Linux baseline is only ever
+  accepted by a person, who looks at the `visual-diff` artifact and runs
+  `visual-baselines.yml` by hand. An agent approving its own pixels and then
+  saving them as the baseline is the exact loop the visual gate exists to
+  break.
 - Max 3 rounds per task. On round 3 with issues remaining, list them under
   `PENDING FOR HUMAN:` so the main agent escalates with `needs-human`.
