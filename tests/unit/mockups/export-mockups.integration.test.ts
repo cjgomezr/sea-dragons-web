@@ -9,6 +9,16 @@ import { decodePng } from "../../../scripts/mockups/png.ts";
 import { findMissingFiles } from "../../../scripts/mockups/verify.ts";
 
 const EXPORT_TIMEOUT_MS = 180_000;
+// tsconfig.json y CLAUDE.md son los que next dev reescribe al arrancar
+// (véase scripts/ui-review/tree-guard.ts); esta corrida no arranca ningún dev
+// server, pero lo confirma en vez de asumirlo.
+const FILES_NEXT_DEV_REWRITES = ["tsconfig.json", "CLAUDE.md"];
+
+async function readGuardedFiles(): Promise<string[]> {
+  return Promise.all(
+    FILES_NEXT_DEV_REWRITES.map((filePath) => readFile(filePath, "utf8")),
+  );
+}
 
 describe("exportMockups contra el prototipo real", () => {
   let outputDir: string;
@@ -27,6 +37,7 @@ describe("exportMockups contra el prototipo real", () => {
         path.join(outputDir, "huerfano-de-otra-corrida.png"),
         Buffer.from([0]),
       );
+      const guardedFilesBefore = await readGuardedFiles();
 
       const written = await exportMockups({ outputDir });
       const expectedFiles = MOCKUP_SCREENS.flatMap((entry) =>
@@ -34,6 +45,7 @@ describe("exportMockups contra el prototipo real", () => {
       );
 
       expect(findMissingFiles(expectedFiles, written)).toEqual([]);
+      expect(await readGuardedFiles()).toEqual(guardedFilesBefore);
 
       const filesOnDisk = await readdir(outputDir);
       expect(new Set(filesOnDisk)).toEqual(new Set(expectedFiles));

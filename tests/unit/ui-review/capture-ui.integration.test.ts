@@ -10,6 +10,15 @@ import { decodePng } from "../../../scripts/mockups/png.ts";
 const CAPTURE_TIMEOUT_MS = 180_000;
 const APP_URL = "http://localhost:3417";
 const APP_PORT = 3417;
+// next dev reescribe estos dos al arrancar: son el árbol de trabajo que este
+// test no puede permitirse ensuciar.
+const FILES_NEXT_DEV_REWRITES = ["tsconfig.json", "CLAUDE.md"];
+
+async function readGuardedFiles(): Promise<string[]> {
+  return Promise.all(
+    FILES_NEXT_DEV_REWRITES.map((filePath) => readFile(filePath, "utf8")),
+  );
+}
 
 async function respondsAt(url: string): Promise<boolean> {
   try {
@@ -49,7 +58,11 @@ describe("captureUi contra la aplicación real", () => {
     "captura los tres viewports en ambos temas y deja el puerto libre",
     async () => {
       outputDir = await mkdtemp(path.join(tmpdir(), "seadragons-ui-"));
-      await writeFile(path.join(outputDir, "ui-huerfana-de-otra-corrida.png"), Buffer.from([0]));
+      await writeFile(
+        path.join(outputDir, "ui-huerfana-de-otra-corrida.png"),
+        Buffer.from([0]),
+      );
+      const guardedFilesBefore = await readGuardedFiles();
 
       const written = await captureUi({ outputDir });
 
@@ -57,6 +70,7 @@ describe("captureUi contra la aplicación real", () => {
         new Set(CAPTURE_MATRIX.map((capture) => capture.fileName)),
       );
       expect(new Set(await readdir(outputDir))).toEqual(new Set(written));
+      expect(await readGuardedFiles()).toEqual(guardedFilesBefore);
 
       for (const capture of CAPTURE_MATRIX) {
         const buffer = await readFile(path.join(outputDir, capture.fileName));
@@ -79,8 +93,12 @@ describe("captureUi contra la aplicación real", () => {
       await captureUi({ outputDir });
 
       for (const viewportName of ["mobile", "tablet", "desktop"]) {
-        const light = await readFile(path.join(outputDir, `ui-${viewportName}-light.png`));
-        const dark = await readFile(path.join(outputDir, `ui-${viewportName}-dark.png`));
+        const light = await readFile(
+          path.join(outputDir, `ui-${viewportName}-light.png`),
+        );
+        const dark = await readFile(
+          path.join(outputDir, `ui-${viewportName}-dark.png`),
+        );
 
         expect(
           light.equals(dark),
@@ -122,7 +140,10 @@ describe("limpieza ante fallo", () => {
     async () => {
       // Un archivo donde se espera un directorio: el fallo ocurre ya con el
       // servidor en pie, que es el escenario que importa.
-      const notADirectory = path.join(await mkdtemp(path.join(tmpdir(), "seadragons-ui-")), "archivo");
+      const notADirectory = path.join(
+        await mkdtemp(path.join(tmpdir(), "seadragons-ui-")),
+        "archivo",
+      );
       await writeFile(notADirectory, "no soy un directorio");
 
       await expect(captureUi({ outputDir: notADirectory })).rejects.toThrow();
