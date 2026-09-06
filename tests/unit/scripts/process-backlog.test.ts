@@ -170,6 +170,15 @@ fi
   await chmod(jqPath, 0o755);
 }
 
+const WORKER_DISALLOWED_TOOLS_FILE = path.join(
+  REPO_ROOT,
+  "scripts/worker-disallowed-tools.txt",
+);
+const CLAUDE_BACKLOG_WORKFLOW = path.join(
+  REPO_ROOT,
+  ".github/workflows/claude-backlog.yml",
+);
+
 async function setupWorkDir(): Promise<string> {
   const workDir = await mkdtemp(path.join(tmpdir(), "seadragons-backlog-"));
   await mkdir(path.join(workDir, "scripts"), { recursive: true });
@@ -181,8 +190,74 @@ async function setupWorkDir(): Promise<string> {
     TASK_STATUS_SCRIPT,
     path.join(workDir, "scripts/task-status.sh"),
   );
+  await copyFile(
+    WORKER_DISALLOWED_TOOLS_FILE,
+    path.join(workDir, "scripts/worker-disallowed-tools.txt"),
+  );
   await runBash("git init -q", workDir, process.env);
   return workDir;
+}
+
+/**
+ * `claude` de mentira: registra su invocación completa (prompt + flags) y
+ * termina al instante, para no lanzar un worker real desde un test.
+ */
+async function installFakeClaude(
+  cwd: string,
+): Promise<{ binDir: string; logFile: string }> {
+  const binDir = path.join(cwd, "stub-bin");
+  await mkdir(binDir, { recursive: true });
+  const claudePath = path.join(binDir, "claude");
+  const logFile = path.join(cwd, "claude-calls.log");
+  const script = `#!/usr/bin/env bash
+echo "$@" >> "${toBashPath(logFile)}"
+exit 0
+`;
+  await writeFile(claudePath, script);
+  await chmod(claudePath, 0o755);
+  await writeFile(logFile, "");
+  return { binDir, logFile };
+}
+
+function extractDisallowedTools(invocation: string): string[] {
+  const match = invocation.match(/--disallowedTools\s+(\S+)/);
+  const value = match?.[1];
+  if (!value) return [];
+  return value.split(",").filter(Boolean);
+}
+
+/**
+ * Extrae el cuerpo de un `run: |` de un step de GitHub Actions por el
+ * nombre de su `- name:`, para poder ejecutarlo de verdad en un test en vez
+ * de solo inspeccionar el YAML como texto.
+ */
+function extractWorkflowRunBlock(workflow: string, stepName: string): string {
+  const stepIndex = workflow.indexOf(`- name: ${stepName}`);
+  if (stepIndex === -1) {
+    throw new Error(`No encontré el step "${stepName}" en el workflow`);
+  }
+  const runMarker = "run: |";
+  const runIndex = workflow.indexOf(runMarker, stepIndex);
+  if (runIndex === -1) {
+    throw new Error(`El step "${stepName}" no tiene un bloque "run: |"`);
+  }
+  const lines = workflow
+    .slice(runIndex + runMarker.length)
+    .split("\n")
+    .slice(1);
+  const bodyLines: string[] = [];
+  let baseIndent: number | null = null;
+  for (const line of lines) {
+    if (line.trim().length === 0) {
+      bodyLines.push("");
+      continue;
+    }
+    const indent = line.match(/^ */)?.[0].length ?? 0;
+    if (baseIndent === null) baseIndent = indent;
+    if (indent < baseIndent) break;
+    bodyLines.push(line.slice(baseIndent));
+  }
+  return bodyLines.join("\n");
 }
 
 async function writeProjectConfig(
@@ -579,6 +654,193 @@ describe("task-status", () => {
       expect(stderr).toMatch(/Todo/);
       expect(stderr).toMatch(/In Progress/);
       expect(stderr).toMatch(/Done/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+});
+
+describe("lanzamiento del worker", () => {
+  let workDir = "";
+
+  afterEach(async () => {
+    if (workDir) {
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
+      workDir = "";
+    }
+  });
+
+  it(
+    "niega ScheduleWakeup con --disallowedTools",
+    async () => {
+      workDir = await setupWorkDir();
+      const { binDir, logFile } = await installFakeClaude(workDir);
+
+      const { code } = await runBash(
+        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          PERMISSION_MODE: "auto",
+          MAX_TURNS: "5",
+          WORKER_MODEL: "sonnet",
+        },
+      );
+
+      expect(code).toBe(0);
+      const invocation = await readLog(logFile);
+      const disallowed = extractDisallowedTools(invocation);
+      expect(disallowed).toContain("ScheduleWakeup");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no niega Agent, porque el lifecycle depende de lanzar subagentes con ella",
+    async () => {
+      workDir = await setupWorkDir();
+      const { binDir, logFile } = await installFakeClaude(workDir);
+
+      const { code } = await runBash(
+        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          PERMISSION_MODE: "auto",
+          MAX_TURNS: "5",
+          WORKER_MODEL: "sonnet",
+        },
+      );
+
+      expect(code).toBe(0);
+      const invocation = await readLog(logFile);
+      expect(invocation).toMatch(/--disallowedTools/);
+      const disallowed = extractDisallowedTools(invocation);
+      expect(disallowed.length).toBeGreaterThan(0);
+      expect(disallowed).not.toContain("Agent");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "la lista de negadas es la misma en process-backlog.sh y en claude-backlog.yml",
+    async () => {
+      const workflow = await readFile(CLAUDE_BACKLOG_WORKFLOW, "utf8");
+
+      // Ambos consumidores deben leer el mismo archivo fuente: si alguno
+      // pasa a tener su propia copia, dejan de estar garantizadamente en
+      // sincronía y este test deja de probar lo que dice probar.
+      expect(workflow).toMatch(/scripts\/worker-disallowed-tools\.txt/);
+
+      const listFile = await readFile(WORKER_DISALLOWED_TOOLS_FILE, "utf8");
+      const toolsFromFile = listFile
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !line.startsWith("#"));
+
+      expect(toolsFromFile).toContain("ScheduleWakeup");
+      expect(toolsFromFile).not.toContain("Agent");
+
+      workDir = await setupWorkDir();
+      const { binDir, logFile } = await installFakeClaude(workDir);
+      await runBash(
+        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          PERMISSION_MODE: "auto",
+          MAX_TURNS: "5",
+          WORKER_MODEL: "sonnet",
+        },
+      );
+      const invocation = await readLog(logFile);
+      const disallowedFromScript = extractDisallowedTools(invocation).sort();
+
+      expect(disallowedFromScript).toEqual([...toolsFromFile].sort());
+
+      // No basta con que el YAML mencione el archivo: hay que ejecutar su
+      // propio paso de verdad y comprobar que calcula la misma lista que
+      // process-backlog.sh, para que un typo en el step no pase inadvertido.
+      const runBlock = extractWorkflowRunBlock(
+        workflow,
+        "Read disallowed tools for the headless worker",
+      );
+      const githubEnvFile = path.join(workDir, "github_env");
+      await writeFile(githubEnvFile, "");
+      const { code: workflowStepCode } = await runBash(runBlock, workDir, {
+        ...process.env,
+        GITHUB_ENV: toBashPath(githubEnvFile),
+      });
+      expect(workflowStepCode).toBe(0);
+      const githubEnvContent = await readFile(githubEnvFile, "utf8");
+      const workflowMatch = githubEnvContent.match(
+        /WORKER_DISALLOWED_TOOLS=(.*)/,
+      );
+      const disallowedFromWorkflow = (workflowMatch?.[1] ?? "")
+        .split(",")
+        .filter(Boolean)
+        .sort();
+
+      expect(disallowedFromWorkflow).toEqual(disallowedFromScript);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "falla en vez de lanzar el worker sin restricciones cuando falta la lista de negadas",
+    async () => {
+      workDir = await setupWorkDir();
+      await rm(path.join(workDir, "scripts/worker-disallowed-tools.txt"));
+      const { binDir, logFile } = await installFakeClaude(workDir);
+
+      const { code, stderr } = await runBash(
+        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          PERMISSION_MODE: "auto",
+          MAX_TURNS: "5",
+          WORKER_MODEL: "sonnet",
+        },
+      );
+
+      expect(code).not.toBe(0);
+      expect(stderr).toMatch(/worker-disallowed-tools\.txt/);
+      const invocation = await readLog(logFile);
+      expect(invocation).toBe("");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "falla en vez de lanzar el worker sin restricciones cuando la lista de negadas queda vacía",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeFile(
+        path.join(workDir, "scripts/worker-disallowed-tools.txt"),
+        "# solo comentarios, ninguna herramienta listada\n",
+      );
+      const { binDir, logFile } = await installFakeClaude(workDir);
+
+      const { code, stderr } = await runBash(
+        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          PERMISSION_MODE: "auto",
+          MAX_TURNS: "5",
+          WORKER_MODEL: "sonnet",
+        },
+      );
+
+      expect(code).not.toBe(0);
+      expect(stderr).toMatch(/worker-disallowed-tools\.txt/);
+      const invocation = await readLog(logFile);
+      expect(invocation).toBe("");
     },
     REAL_PROCESS_TEST_TIMEOUT_MS,
   );

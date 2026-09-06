@@ -44,6 +44,14 @@ jobs:
       - name: Read worker model from factory-models.json
         run: echo "FACTORY_MODEL=$(jq -r '.models.worker // "sonnet"' factory-models.json 2>/dev/null || echo sonnet)" >> $GITHUB_ENV
 
+      # Same source file the local worker (scripts/process-backlog.sh) reads,
+      # so the cloud and local paths can never drift apart (#60).
+      - name: Read disallowed tools for the headless worker
+        run: |
+          tools=$(grep -v '^[[:space:]]*#' scripts/worker-disallowed-tools.txt \
+            | grep -v '^[[:space:]]*$' | tr -d ' \t' | tr '\n' ',' | sed 's/,$//')
+          echo "WORKER_DISALLOWED_TOOLS=$tools" >> "$GITHUB_ENV"
+
       - name: Resolver credencial del actor
         id: cred
         shell: bash
@@ -113,7 +121,7 @@ jobs:
             ${{ github.event_name == 'issues'
               && format('Process GitHub issue #{0} following the issue lifecycle in CLAUDE.md: label in-progress, branch impl-{0}, TDD until the Definition of Done passes, code-reviewer (and the ui-reviewer ONLY when the UI-review policy in factory-models.json applies to this issue) until APPROVED, then draft PR with "Closes #{0}". If blocked, label needs-human with an explanatory comment.', github.event.issue.number)
               || 'Process up to 5 eligible pending issues per CLAUDE.md, one at a time (not blocked, highest priority, lowest number first). SKIP any issue that already has an assignee. An assignee is a human''s claim and the nightly run must respect it. For each, the full issue lifecycle: in-progress label, branch impl-N, TDD until Definition of Done, reviewer subagents until APPROVED (ui-reviewer only per the UI-review policy in factory-models.json), draft PR (auto-merge per CLAUDE.md only if the issue has the auto-merge label). After finishing each issue, re-check eligibility: an auto-merged PR may have unblocked dependents. Stop when none are eligible or 5 are done.' }}
-          claude_args: "--max-turns 80 --model ${{ env.FACTORY_MODEL }}"
+          claude_args: "--max-turns 80 --model ${{ env.FACTORY_MODEL }} --disallowedTools ${{ env.WORKER_DISALLOWED_TOOLS }}"
 
       - name: Leave a note on the issue if the run failed
         if: failure() && github.event_name == 'issues'

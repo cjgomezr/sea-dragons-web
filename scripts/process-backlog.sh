@@ -24,6 +24,15 @@ MAX_ISSUES="${MAX_ISSUES:-10}"
 MAX_TURNS="${MAX_TURNS:-200}"
 PERMISSION_MODE="${PERMISSION_MODE:-auto}"   # auto | bypassPermissions (container only!)
 WORKER_MODEL="${WORKER_MODEL:-$(jq -r '.models.worker // "sonnet"' factory-models.json 2>/dev/null || echo sonnet)}"
+# Single source of truth for both this script and claude-backlog.yml (#60):
+# tools that only make sense in an interactive session or a self-pacing
+# /loop, which a one-ticket headless worker never has. `Agent` must never
+# be added here: the lifecycle needs it to launch code-reviewer/ui-reviewer.
+WORKER_DISALLOWED_TOOLS_FILE="${WORKER_DISALLOWED_TOOLS_FILE:-scripts/worker-disallowed-tools.txt}"
+[ -f "$WORKER_DISALLOWED_TOOLS_FILE" ] || { echo "❌ Falta $WORKER_DISALLOWED_TOOLS_FILE: no se puede lanzar el worker sin saber qué herramientas negarle" >&2; exit 1; }
+WORKER_DISALLOWED_TOOLS=$(grep -v '^[[:space:]]*#' "$WORKER_DISALLOWED_TOOLS_FILE" \
+  | grep -v '^[[:space:]]*$' | tr -d ' \t' | tr '\n' ',' | sed 's/,$//' || true)
+[ -n "$WORKER_DISALLOWED_TOOLS" ] || { echo "❌ $WORKER_DISALLOWED_TOOLS_FILE no lista ninguna herramienta" >&2; exit 1; }
 ONLY_LABEL="${ONLY_LABEL:-}"   # opcional: partir el backlog por carril (ej. ONLY_LABEL=area:billing)
 ONLY_MINE="${ONLY_MINE:-}"     # opcional: ONLY_MINE=1 → SOLO tickets asignados a mí (ignora el pozo común)
 ME=$(gh api user --jq .login 2>/dev/null || echo "")
@@ -119,6 +128,27 @@ cleanup() {
   exit 130
 }
 
+# Launches the worker for issue $1 in the background and sets CLAUDE_PID.
+# Pulled out of main() so tests can drive it directly against a fake `claude`.
+run_worker() {
+  local n="$1"
+  claude -p "Process GitHub issue #$n following the issue lifecycle in CLAUDE.md:
+  read the issue with 'gh issue view $n', label it in-progress, work on branch impl-$n,
+  TDD until the Definition of Done is met, run the code-reviewer (and the ui-reviewer
+  only when the UI-review policy in factory-models.json applies to this issue) until
+  APPROVED, then open a draft PR with 'Closes #$n'.
+  Commit as you go: every time a piece is green (tests passing, lint and types clean),
+  commit it before starting the next one. Your turn budget can run out without warning,
+  and uncommitted work is lost work.
+  If blocked after the max attempts, add label needs-human with an explanatory comment and stop." \
+      --permission-mode "$PERMISSION_MODE" \
+      --max-turns "$MAX_TURNS" \
+      --model "$WORKER_MODEL" \
+      --disallowedTools "$WORKER_DISALLOWED_TOOLS" \
+      --worktree "impl-$n" &
+  CLAUDE_PID=$!
+}
+
 main() {
   reconcile_board   # (must run after the function definitions above)
 
@@ -152,20 +182,7 @@ main() {
     gh issue edit "$N" --add-label "in-progress" --remove-label "pending" 2>/dev/null || true
     bash scripts/task-status.sh "$N" "In Progress" 2>/dev/null || true
 
-    claude -p "Process GitHub issue #$N following the issue lifecycle in CLAUDE.md:
-  read the issue with 'gh issue view $N', label it in-progress, work on branch impl-$N,
-  TDD until the Definition of Done is met, run the code-reviewer (and the ui-reviewer
-  only when the UI-review policy in factory-models.json applies to this issue) until
-  APPROVED, then open a draft PR with 'Closes #$N'.
-  Commit as you go: every time a piece is green (tests passing, lint and types clean),
-  commit it before starting the next one. Your turn budget can run out without warning,
-  and uncommitted work is lost work.
-  If blocked after the max attempts, add label needs-human with an explanatory comment and stop." \
-      --permission-mode "$PERMISSION_MODE" \
-      --max-turns "$MAX_TURNS" \
-      --model "$WORKER_MODEL" \
-      --worktree "impl-$N" &
-    CLAUDE_PID=$!
+    run_worker "$N"
 
     # Heartbeat: while the worker runs, print elapsed time + latest commit on its
     # branch every 60s, so a quiet terminal never looks like a hung one.

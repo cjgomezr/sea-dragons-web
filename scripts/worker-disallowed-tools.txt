@@ -1,0 +1,41 @@
+# Herramientas negadas al worker headless (scripts/process-backlog.sh y
+# .github/workflows/claude-backlog.yml leen este mismo archivo: ver #60).
+#
+# Un worker de `claude -p` procesa UN ticket, sin humano al otro lado y con
+# un presupuesto de turnos contado. Las de agenda y de sesión de aquí abajo
+# solo tienen sentido en una sesión interactiva o en un /loop que se espacia
+# a sí mismo: en una corrida de un ticket no hay nadie ni nada que las
+# aproveche, y cada minuto que se les va no vuelve.
+#
+# `Agent` NO va en esta lista aunque suene a la misma familia: el lifecycle
+# (CLAUDE.md, paso 5) obliga a lanzar code-reviewer/ui-reviewer con ella.
+# Negarla dejaría todos los tickets sin revisión.
+
+# Agenda: programan una corrida futura o espacian iteraciones de un /loop.
+# Un worker de un solo ticket no tiene loop que espaciar ni sesión futura
+# que atienda el despertar.
+ScheduleWakeup
+CronCreate
+CronDelete
+CronList
+
+# Mensajería y descubrimiento entre sesiones/agentes: el worker no tiene
+# pares con quien hablar, solo subagentes que lanza por nombre con `Agent`.
+SendMessage
+ListAgents
+
+# Tira de la atención de un humano que no está mirando una corrida headless.
+PushNotification
+
+# Administra rutinas/triggers de claude.ai en la nube: no es parte de
+# implementar un ticket.
+RemoteTrigger
+
+# Sincroniza proyectos de diseño vía el login de claude.ai del humano.
+DesignSync
+
+# El wrapper (process-backlog.sh / claude-backlog.yml) ya asigna el
+# worktree del ticket. Cambiarlo desde adentro descoordina el heartbeat y el
+# seguimiento que el wrapper hace de ese directorio.
+EnterWorktree
+ExitWorktree
