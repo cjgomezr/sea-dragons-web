@@ -163,6 +163,25 @@ worktree_dir_for() {  # issue number
   echo ".claude/worktrees/impl-$1"
 }
 
+# Creates (or reuses) the worktree for a ticket, always on branch `impl-N`.
+# `claude --worktree NAME` cannot be trusted for this: it prefixes whatever
+# name it's given with `worktree-`, which is exactly how #62 happened
+# (`impl-N` documented, `worktree-impl-N` pushed). Deciding the branch name
+# here, with plain git, means the worker never has to get it right on its
+# own. Idempotent: a worktree left over from a previous run of the same
+# ticket is reused as-is, never given a second branch.
+ensure_worker_worktree() {  # issue number
+  local n="$1" wt_dir branch
+  wt_dir=$(worktree_dir_for "$n")
+  branch="impl-$n"
+  [ -d "$wt_dir" ] && return 0
+  if git show-ref --verify --quiet "refs/heads/$branch"; then
+    git worktree add "$wt_dir" "$branch"
+  else
+    git worktree add -b "$branch" "$wt_dir"
+  fi
+}
+
 # A worker that exits 0 without finishing the lifecycle (asks something and
 # waits, commits and stops, loses a tool mid-session...) leaves no visible
 # signal: the issue stays in-progress, assigned, with real work stranded on
@@ -216,8 +235,15 @@ El nuevo worker puede continuar desde la rama existente."
 # Launches the worker for issue $1 in the background and sets CLAUDE_PID.
 # Pulled out of main() so tests can drive it directly against a fake `claude`.
 run_worker() {
-  local n="$1"
-  claude -p "Process GitHub issue #$n following the issue lifecycle in CLAUDE.md:
+  local n="$1" wt_dir
+  wt_dir=$(worktree_dir_for "$n")
+  ensure_worker_worktree "$n"
+  # Runs from inside the worktree instead of passing `--worktree` to claude,
+  # so the branch name stays the one `ensure_worker_worktree` decided. `exec`
+  # keeps $CLAUDE_PID pointing at the actual claude process, not the subshell.
+  (
+    cd "$wt_dir"
+    exec claude -p "Process GitHub issue #$n following the issue lifecycle in CLAUDE.md:
   read the issue with 'gh issue view $n', label it in-progress, work on branch impl-$n,
   TDD until the Definition of Done is met, run the code-reviewer (and the ui-reviewer
   only when the UI-review policy in factory-models.json applies to this issue) until
@@ -229,8 +255,8 @@ run_worker() {
       --permission-mode "$PERMISSION_MODE" \
       --max-turns "$MAX_TURNS" \
       --model "$WORKER_MODEL" \
-      --disallowedTools "$WORKER_DISALLOWED_TOOLS" \
-      --worktree "impl-$n" &
+      --disallowedTools "$WORKER_DISALLOWED_TOOLS"
+  ) &
   CLAUDE_PID=$!
 }
 
