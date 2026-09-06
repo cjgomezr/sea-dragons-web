@@ -18,6 +18,9 @@ jobs:
       contents: read
     env:
       GH_TOKEN: ${{ github.token }}
+      # Explícito en vez de inferido del remoto del checkout: así el script
+      # apunta al repositorio correcto se corra desde donde se corra.
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Remove queue labels on close
         run: |

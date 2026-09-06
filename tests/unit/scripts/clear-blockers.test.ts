@@ -56,9 +56,12 @@ function runClearBlockers(
 /**
  * `gh` de mentira: registra cada invocación en un log y responde según
  * ISSUE_NUMBERS (lista separada por comas de los issues que "tienen" la
- * etiqueta buscada). Emite los números con \r\n para reproducir el bug de
- * jq externo en Windows (#39): si el script no limpia el \r, los argumentos
- * de `gh issue edit` salen rotos.
+ * etiqueta buscada). Emite los números con \r\n a propósito: el --jq
+ * interno de gh usa gojq y hoy emite LF, pero pipear a un jq externo sí
+ * metía \r en Windows (#39). El script tolera ambos y este falso lo fija.
+ *
+ * FAIL_ISSUE hace que `issue edit` falle para ese número, para probar qué
+ * pasa cuando un dependiente se cae y los demás no.
  */
 async function installFakeGh(
   cwd: string,
@@ -79,6 +82,10 @@ if [ "$1" = "issue" ] && [ "$2" = "list" ]; then
 fi
 
 if [ "$1" = "issue" ] && [ "$2" = "edit" ]; then
+  if [ -n "\${FAIL_ISSUE:-}" ] && [ "$3" = "\${FAIL_ISSUE}" ]; then
+    echo "gh: fallo al editar el issue $3" >&2
+    exit 1
+  fi
   exit 0
 fi
 
@@ -181,6 +188,39 @@ describe("clear-blockers", () => {
 
     expect(stdout).toMatch(/#22/);
     expect(stdout).toMatch(/#23/);
+  });
+
+  it("limpia los dependientes que puede aunque uno de ellos falle", async () => {
+    const { binDir, logFile } = await setupWorkDir();
+
+    const { code, stderr } = await runClearBlockers(["17"], workDir, {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      ISSUE_NUMBERS: "22,23,24",
+      FAIL_ISSUE: "23",
+    });
+
+    const log = await readLog(logFile);
+    expect(log).toMatch(/issue edit 22 --remove-label blocked-by-17/);
+    expect(log).toMatch(/issue edit 24 --remove-label blocked-by-17/);
+    expect(stderr).toContain("#23");
+    expect(code).not.toBe(0);
+  });
+
+  it("pide todos los dependientes, no solo la primera página", async () => {
+    const { binDir, logFile } = await setupWorkDir();
+
+    await runClearBlockers(["17"], workDir, {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      ISSUE_NUMBERS: "22",
+    });
+
+    const log = await readLog(logFile);
+    const listLine = log
+      .split("\n")
+      .find((line) => line.startsWith("issue list"));
+    expect(listLine).toMatch(/--limit \d+/);
   });
 });
 
