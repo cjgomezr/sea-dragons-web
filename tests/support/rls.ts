@@ -13,10 +13,24 @@ import { createServiceRoleClient } from "@/lib/supabase/service-client";
 // `describeRls` saltaría siempre, incluso con Supabase configurado.
 try {
   process.loadEnvFile(".env.local");
-} catch {
-  // Sin `.env.local` (p. ej. en la nube sin secrets configurados): seguimos
-  // con lo que ya haya en `process.env`, y `describeRls` avisa qué falta.
+} catch (error) {
+  // Solo el archivo ausente es el caso esperado (p. ej. en la nube sin
+  // secrets configurados): seguimos con lo que ya haya en `process.env`, y
+  // `describeRls` avisa qué falta. Cualquier otro error (permisos, un
+  // `.env.local` con sintaxis inválida) se relanza: silenciarlo también lo
+  // haría ver como "faltan credenciales" y produciría el mismo salto por una
+  // razón completamente distinta, indistinguible de una corrida a otra.
+  if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+    throw error;
+  }
 }
+
+/** Timeout de los tests que hablan por red con el proyecto de Supabase (en
+ * Sídney): bajo `npm test` completo compiten por CPU y sockets con el resto
+ * de los workers de Vitest, y los 5 s por defecto, pensados para tests en
+ * memoria, no alcanzan. Mismo patrón que el #50 para tests que lanzan
+ * procesos reales. */
+export const RLS_NETWORK_TEST_TIMEOUT_MS = 20_000;
 
 type Environment = Readonly<Record<string, string | undefined>>;
 

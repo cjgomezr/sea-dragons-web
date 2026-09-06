@@ -17,9 +17,15 @@ import {
 // ticket.
 try {
   process.loadEnvFile(".env.local");
-} catch {
-  // Sin .env.local (p. ej. en la nube sin secrets configurados): seguimos con
-  // lo que ya haya en process.env, y el skip de abajo avisa qué falta.
+} catch (error) {
+  // Solo el archivo ausente es el caso esperado (p. ej. en la nube sin
+  // secrets configurados): seguimos con lo que ya haya en process.env, y el
+  // skip de abajo avisa qué falta. Cualquier otro error se relanza: si no,
+  // un .env.local ilegible o con sintaxis inválida se vería idéntico a "no
+  // hay credenciales" y el skip sería inconsistente entre corridas (#68).
+  if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+    throw error;
+  }
 }
 
 const supabaseConfig = readSupabaseConfig(process.env);
