@@ -85,6 +85,47 @@ const NEVER_STARTS_SCRIPT = `#!/usr/bin/env bash
 sleep 30
 `;
 
+/**
+ * `git.exe`/`bash.exe` pueden tardar en soltar el handle del directorio
+ * temporal en Windows; un `rm` inmediato falla con `EBUSY: resource busy or
+ * locked`. Mismo remedio que `tests/unit/scripts/process-backlog.test.ts`
+ * (#55): reintentar en vez de tumbar el test por una limpieza ajena a lo que
+ * se verifica.
+ */
+const REMOVE_TEMP_DIR_OPTIONS = {
+  recursive: true,
+  force: true,
+  maxRetries: 5,
+  retryDelay: 200,
+} as const;
+
+/** Arranca un servidor HTTP ajeno a ui-preflight y espera a que responda. */
+async function startIntruder(port: number): Promise<ChildProcess> {
+  const intruder = spawn(
+    process.execPath,
+    [
+      "-e",
+      `require("node:http").createServer((req,res)=>{res.writeHead(200);res.end("ok");}).listen(${port});`,
+    ],
+    { stdio: "ignore" },
+  );
+  const deadline = Date.now() + 5000;
+  while (!(await respondsAt(`http://localhost:${port}`))) {
+    if (Date.now() > deadline) {
+      throw new Error("el servidor intruso no llegó a responder");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return intruder;
+}
+
+/** Un PID que existió y ya terminó, para simular un PID_FILE de una sesión anterior que no cerró bien. */
+async function aDeadPid(): Promise<number> {
+  const child = spawn(process.execPath, ["-e", ""], { stdio: "ignore" });
+  await new Promise((resolve) => child.on("exit", resolve));
+  return child.pid!;
+}
+
 async function setupWorkDir(): Promise<string> {
   const workDir = await mkdtemp(
     path.join(tmpdir(), "seadragons-ui-preflight-"),
@@ -135,7 +176,7 @@ describe("ui-preflight.sh", () => {
       // El servidor real puede seguir vivo si un test falla a mitad de camino;
       // 'down' lo mata por puerto, no por el PID que quedó registrado.
       await runPreflight(["down"], workDir, cleanupEnv).catch(() => undefined);
-      await rm(workDir, { recursive: true, force: true, maxRetries: 5 });
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
       workDir = "";
     }
     if (intruder) {
@@ -255,30 +296,7 @@ describe("ui-preflight.sh", () => {
     async () => {
       workDir = await setupWorkDir();
       const port = 39186;
-
-      intruder = spawn(
-        process.execPath,
-        [
-          "-e",
-          `require("node:http").createServer((req,res)=>{res.writeHead(200);res.end("ok");}).listen(${port});`,
-        ],
-        { stdio: "ignore" },
-      );
-      await new Promise<void>((resolve, reject) => {
-        const deadline = Date.now() + 5000;
-        const poll = async () => {
-          if (await respondsAt(`http://localhost:${port}`)) {
-            resolve();
-            return;
-          }
-          if (Date.now() > deadline) {
-            reject(new Error("el servidor intruso no llegó a responder"));
-            return;
-          }
-          setTimeout(poll, 100);
-        };
-        void poll();
-      });
+      intruder = await startIntruder(port);
 
       const env = baseEnv(workDir, port, {});
       cleanupEnv = env;
@@ -286,6 +304,34 @@ describe("ui-preflight.sh", () => {
 
       expect(code).not.toBe(0);
       expect(stderr).toMatch(/did not start it/);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "se sigue negando cuando un PID_FILE de una sesión anterior sin cerrar coincide con un servidor ajeno más nuevo",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = 39187;
+      // Simula una sesión previa que llamó a 'up' y nunca llegó a 'down'
+      // (por ejemplo, el worker se quedó sin turnos a mitad de camino): el
+      // PID_FILE sobrevive apuntando a un proceso que ya no existe.
+      await mkdir(path.join(workDir, ".factory"), { recursive: true });
+      await writeFile(
+        path.join(workDir, ".factory/ui-server.pid"),
+        String(await aDeadPid()),
+      );
+      // Después, sin relación alguna, otro servidor (no nuestro) toma ese
+      // mismo puerto.
+      intruder = await startIntruder(port);
+
+      const env = baseEnv(workDir, port, {});
+      cleanupEnv = env;
+      const { code, stderr } = await runPreflight(["check"], workDir, env);
+
+      expect(code).not.toBe(0);
+      expect(stderr).toMatch(/did not start it/);
+      expect(stderr).not.toMatch(/served by this factory/);
     },
     TEST_TIMEOUT_MS,
   );

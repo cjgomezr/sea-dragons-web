@@ -54,17 +54,14 @@ responds() {
   fi
 }
 
-# Ours = started by a previous 'up' in this repo and still alive. The PID in
-# PID_FILE is the wrapper's, not necessarily the process that ends up
-# listening (npm-style tools hand off to a child, and on Windows an 'exec'
-# chain through a non-native binary doesn't always keep the same PID). Once
-# the wrapper is gone, fall back to whoever is bound to our port: 'up' only
-# ever claims a port it just confirmed was free, so anything holding it now
-# can only be what we started (see kill_port_owner's reasoning below).
+# Ours = started by a previous 'up' in this repo and still alive. PID_FILE
+# holds whoever actually ended up bound to the port (see the comment in
+# 'up' about why that is not always the launched wrapper's own PID), so a
+# plain liveness check is enough and, unlike trusting any process merely
+# occupying the port, does not risk mistaking an unrelated later server for
+# ours once the one we started is truly gone.
 is_ours() {
-  [ -f "$PID_FILE" ] || return 1
-  kill -0 "$(cat "$PID_FILE")" 2>/dev/null && return 0
-  [ -n "$(port_owner_pid)" ]
+  [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
 }
 
 port_of() {
@@ -76,14 +73,29 @@ port_of() {
   esac
 }
 
+# Git Bash keeps its own PID numbering, separate from the native Windows PID
+# that netstat/taskkill/tasklist use for the same process. ps -W is the
+# Rosetta stone between the two; on non-Windows this simply finds nothing.
+winpid_of() {
+  local pid="$1" winpid
+  winpid=$(ps -W 2>/dev/null | awk -v p="$pid" '$1 == p { print $4 }' | head -1)
+  [ -n "$winpid" ] || winpid=$(ps 2>/dev/null | awk -v p="$pid" '$1 == p { print $4 }' | head -1)
+  printf '%s' "$winpid"
+}
+
+# The reverse of winpid_of: a native Windows PID (as netstat reports it) back
+# to the MSYS pid that Git Bash's own kill/kill -0 actually understand.
+pid_for_winpid() {
+  ps -W 2>/dev/null | awk -v w="$1" '$4 == w { print $1 }' | head -1
+}
+
 # Dev servers spawn children (next, vite, nodemon), and killing only the
 # parent leaves the port taken, which is exactly what this script exists to
 # prevent. Windows and POSIX kill trees differently.
 kill_tree() {
   local pid="$1" winpid child
   if command -v taskkill >/dev/null 2>&1; then
-    winpid=$(ps -W 2>/dev/null | awk -v p="$pid" '$1 == p { print $4 }' | head -1)
-    [ -n "$winpid" ] || winpid=$(ps 2>/dev/null | awk -v p="$pid" '$1 == p { print $4 }' | head -1)
+    winpid=$(winpid_of "$pid")
     if [ -n "$winpid" ]; then
       MSYS_NO_PATHCONV=1 taskkill /T /F /PID "$winpid" >/dev/null 2>&1 || true
       return 0
@@ -96,8 +108,7 @@ kill_tree() {
 }
 
 # Prints the native PID(s) (one per line) currently bound to our port, or
-# nothing if it is free. This is the ground truth 'is_ours' falls back to:
-# unlike a saved wrapper PID, a port's occupant can't be stale.
+# nothing if it is free.
 port_owner_pid() {
   local port
   port=$(port_of)
@@ -106,6 +117,33 @@ port_owner_pid() {
   elif command -v lsof >/dev/null 2>&1; then
     lsof -ti "tcp:$port" 2>/dev/null
   fi
+}
+
+# Swaps the PID_FILE entry for whoever is actually bound to the port right
+# now. 'up' calls this the instant the port answers, still inside the window
+# where it alone could have claimed a port it just confirmed was free, so
+# this is the one safe place to trust port_owner_pid: everywhere else
+# (is_ours, called an unbounded time later, possibly by a different
+# invocation) it would risk mistaking a later, unrelated server for ours.
+# Fixes the wrapper-vs-listener PID mismatch at the source instead of
+# working around it: 'npm run dev' hands off to a child before that child
+# binds the port, so $! (the wrapper's PID) is never the right thing to
+# track once the server is actually up.
+#
+# port_owner_pid reports the native Windows PID (that is what netstat and
+# taskkill deal in), but is_ours signals it with Git Bash's own kill -0,
+# which only recognizes Git Bash's PID numbering. Translate it back before
+# storing it, or a perfectly alive server reads as dead on the next check.
+record_real_owner() {
+  local native_pid pid
+  native_pid=$(port_owner_pid | head -1)
+  [ -n "$native_pid" ] || return 0
+  pid="$native_pid"
+  if command -v taskkill >/dev/null 2>&1; then
+    pid=$(pid_for_winpid "$native_pid")
+    [ -n "$pid" ] || pid="$native_pid"
+  fi
+  echo "$pid" > "$PID_FILE"
 }
 
 # Last resort: whoever still holds the port after kill_tree is our own dev
@@ -128,10 +166,7 @@ check() {
     return 0
   fi
   if is_ours; then
-    local pid
-    pid=$(cat "$PID_FILE")
-    kill -0 "$pid" 2>/dev/null || pid=$(port_owner_pid | head -1)
-    echo "ui-preflight: $APP_URL is served by this factory (pid $pid)." >&2
+    echo "ui-preflight: $APP_URL is served by this factory (pid $(cat "$PID_FILE"))." >&2
     return 0
   fi
   if [ -n "${FABRICA_TRUST_EXISTING_SERVER:-}" ]; then
@@ -173,6 +208,7 @@ up() {
   local waited=0
   while [ "$waited" -lt "$BOOT_TIMEOUT" ]; do
     if responds; then
+      record_real_owner
       echo "$APP_URL"
       return 0
     fi
