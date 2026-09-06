@@ -187,3 +187,41 @@ describe("afirmación de negación", () => {
     ).rejects.toThrow(/cliente de servicio/);
   });
 });
+
+describe("carga de .env.local", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("sigue disponible sin .env.local (ENOENT)", async () => {
+    const missingFileError = Object.assign(
+      new Error("ENOENT: no such file or directory, open '.env.local'"),
+      { code: "ENOENT" },
+    );
+    vi.spyOn(process, "loadEnvFile").mockImplementation(() => {
+      throw missingFileError;
+    });
+
+    await expect(import("../support/rls")).resolves.toBeDefined();
+  });
+
+  it("relanza un error de carga que no sea el archivo ausente", async () => {
+    const permissionError = Object.assign(
+      new Error("EACCES: permission denied, open '.env.local'"),
+      { code: "EACCES" },
+    );
+    vi.spyOn(process, "loadEnvFile").mockImplementation(() => {
+      throw permissionError;
+    });
+
+    // Si esto se tragara en silencio, un `.env.local` ilegible o con
+    // sintaxis inválida se vería idéntico a "no hay credenciales" y
+    // `describeRls` saltaría los tests de RLS sin ninguna pista de por qué:
+    // exactamente el salto inconsistente que reporta el issue #68.
+    await expect(import("../support/rls")).rejects.toThrow(/permission denied/);
+  });
+});
