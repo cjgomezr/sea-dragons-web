@@ -112,6 +112,11 @@ if [ "$1" = "issue" ]; then
   exit 0
 fi
 
+if [ "$1" = "pr" ] && [ "$2" = "list" ]; then
+  echo "\${PR_LIST_COUNT:-0}"
+  exit 0
+fi
+
 if [ "$1" = "project" ] && [ "$2" = "item-list" ]; then
   if [ -n "\${ITEM_LIST_JSON:-}" ]; then
     echo "$ITEM_LIST_JSON"
@@ -283,6 +288,11 @@ const FULL_STATUS_OPTIONS = {
   Done: "opt-done",
   Blocked: "opt-blocked",
 };
+
+const OPEN_IN_PROGRESS_ISSUE = JSON.stringify({
+  state: "OPEN",
+  labels: [{ name: "in-progress" }],
+});
 
 describe("cleanup de process-backlog", () => {
   let workDir = "";
@@ -841,6 +851,172 @@ describe("lanzamiento del worker", () => {
       expect(stderr).toMatch(/worker-disallowed-tools\.txt/);
       const invocation = await readLog(logFile);
       expect(invocation).toBe("");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+});
+
+describe("worker sin PR", () => {
+  let workDir = "";
+
+  afterEach(async () => {
+    if (workDir) {
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
+      workDir = "";
+    }
+  });
+
+  it(
+    "etiqueta needs-human, quita el assignee y comenta cuando el worker salió 0 sin dejar PR",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+
+      const { code } = await runBash(
+        "source scripts/process-backlog.sh; ME=tester; check_worker_left_no_pr 42",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ISSUE_VIEW_JSON: OPEN_IN_PROGRESS_ISSUE,
+          PR_LIST_COUNT: "0",
+        },
+      );
+
+      expect(code).toBe(0);
+      const log = await readLog(logFile);
+      expect(log).toMatch(
+        /issue edit 42 --add-label needs-human --remove-label in-progress/,
+      );
+      expect(log).toMatch(/issue edit 42 --remove-assignee @me/);
+      expect(log).toMatch(/project item-edit --id ITEM123.*opt-blocked/);
+      expect(log).toMatch(/issue comment 42/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no toca nada si el worker sí dejó un PR con Closes #N",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+
+      await runBash(
+        "source scripts/process-backlog.sh; ME=tester; check_worker_left_no_pr 42",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ISSUE_VIEW_JSON: OPEN_IN_PROGRESS_ISSUE,
+          PR_LIST_COUNT: "1",
+        },
+      );
+
+      const log = await readLog(logFile);
+      expect(log).not.toMatch(/needs-human/);
+      expect(log).not.toMatch(/issue comment 42/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no toca nada si el worker cerró el issue por idempotencia",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+
+      await runBash(
+        "source scripts/process-backlog.sh; ME=tester; check_worker_left_no_pr 42",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ISSUE_VIEW_JSON: JSON.stringify({ state: "CLOSED", labels: [] }),
+          PR_LIST_COUNT: "0",
+        },
+      );
+
+      const log = await readLog(logFile);
+      expect(log).not.toMatch(/needs-human/);
+      expect(log).not.toMatch(/issue comment 42/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "el comentario nombra el último commit de la rama y cuántos archivos quedaron sin commitear",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+
+      const wtDir = path.join(workDir, ".claude/worktrees/impl-42");
+      await mkdir(wtDir, { recursive: true });
+      await runBash("git init -q", wtDir, process.env);
+      await runBash(
+        "git config user.email t@t.com && git config user.name t",
+        wtDir,
+        process.env,
+      );
+      await writeFile(path.join(wtDir, "a.txt"), "hola");
+      await runBash(
+        "git add a.txt && git commit -q -m 'trabajo parcial del ticket'",
+        wtDir,
+        process.env,
+      );
+      await writeFile(path.join(wtDir, "b.txt"), "sin commitear");
+
+      await runBash(
+        "source scripts/process-backlog.sh; ME=tester; check_worker_left_no_pr 42",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ISSUE_VIEW_JSON: OPEN_IN_PROGRESS_ISSUE,
+          PR_LIST_COUNT: "0",
+        },
+      );
+
+      const log = await readLog(logFile);
+      expect(log).toMatch(/trabajo parcial del ticket/);
+      expect(log).toMatch(/Archivos sin commitear.*: 1/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "cuando el worker sale distinto de cero, comenta needs-human una sola vez",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+
+      const { code } = await runBash(
+        `source scripts/process-backlog.sh
+ME=tester
+N=9
+bash -c 'exit 1' &
+CLAUDE_PID=$!
+if wait "$CLAUDE_PID"; then EXIT_CODE=0; else EXIT_CODE=$?; fi
+handle_worker_exit "$N" "$EXIT_CODE"`,
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ISSUE_VIEW_JSON: OPEN_IN_PROGRESS_ISSUE,
+          PR_LIST_COUNT: "0",
+        },
+      );
+
+      expect(code).toBe(0);
+      const log = await readLog(logFile);
+      const commentCalls = log
+        .split("\n")
+        .filter((line) => line.startsWith("issue comment 9 ")).length;
+      expect(commentCalls).toBe(1);
     },
     REAL_PROCESS_TEST_TIMEOUT_MS,
   );
