@@ -1,6 +1,13 @@
 import { execFileSync } from "node:child_process";
+import { withRestoredFiles } from "./tree-guard.ts";
 
 const PREFLIGHT_SCRIPT = "scripts/ui-preflight.sh";
+
+// next dev reescribe estos dos archivos versionados al arrancar (tsconfig.json
+// para sus tipos generados, el bloque de agentes de CLAUDE.md si no lo
+// encuentra al día). Sin restaurarlos, cada corrida de la suite de UI deja el
+// árbol de trabajo sucio.
+const FILES_NEXT_DEV_REWRITES = ["tsconfig.json", "CLAUDE.md"];
 
 export interface DevServerControls {
   /** Arranca el servidor y devuelve su URL. Lanza si el puerto no es utilizable. */
@@ -21,9 +28,13 @@ function describeFailure(error: unknown): string {
 export const preflightControls: DevServerControls = {
   start: () => {
     try {
-      return execFileSync("bash", [PREFLIGHT_SCRIPT, "up"], { encoding: "utf8" }).trim();
+      return execFileSync("bash", [PREFLIGHT_SCRIPT, "up"], {
+        encoding: "utf8",
+      }).trim();
     } catch (error) {
-      throw new Error(`ui-preflight no pudo arrancar el servidor:\n${describeFailure(error)}`);
+      throw new Error(
+        `ui-preflight no pudo arrancar el servidor:\n${describeFailure(error)}`,
+      );
     }
   },
   stop: () => {
@@ -40,18 +51,20 @@ export async function withDevServer<T>(
   run: (appUrl: string) => Promise<T>,
   controls: DevServerControls = preflightControls,
 ): Promise<T> {
-  const appUrl = controls.start();
+  return withRestoredFiles(FILES_NEXT_DEV_REWRITES, async () => {
+    const appUrl = controls.start();
 
-  let result: T;
-  try {
-    result = await run(appUrl);
-  } catch (error) {
-    stopAfterFailure(controls, error);
-    throw error;
-  }
+    let result: T;
+    try {
+      result = await run(appUrl);
+    } catch (error) {
+      stopAfterFailure(controls, error);
+      throw error;
+    }
 
-  controls.stop();
-  return result;
+    controls.stop();
+    return result;
+  });
 }
 
 /**
