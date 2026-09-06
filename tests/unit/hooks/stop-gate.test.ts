@@ -14,6 +14,28 @@ import { afterEach, describe, expect, it } from "vitest";
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const STOP_GATE_SCRIPT = path.join(REPO_ROOT, ".claude/hooks/stop-gate.sh");
 
+/**
+ * Estos tests lanzan bash y git de verdad, no los imitan. Bajo `npm test`
+ * completo compiten por CPU con el resto de los workers de Vitest (y en CI,
+ * con antivirus/indexado de Windows), así que el timeout de 5 s pensado para
+ * tests puros no alcanza: ver issue #50.
+ */
+const REAL_PROCESS_TEST_TIMEOUT_MS = 20_000;
+
+/**
+ * En Windows, `git.exe` puede tardar en soltar el handle del directorio de
+ * trabajo después de que su proceso reporta `close`, y un `rm` inmediato
+ * falla con `EBUSY: resource busy or locked`. `maxRetries`/`retryDelay` hacen
+ * que `fs.rm` reintente en vez de tumbar el test por un problema de limpieza
+ * ajeno a lo que el test verifica.
+ */
+const REMOVE_TEMP_DIR_OPTIONS = {
+  recursive: true,
+  force: true,
+  maxRetries: 5,
+  retryDelay: 200,
+} as const;
+
 interface RunResult {
   code: number | null;
 }
@@ -113,65 +135,77 @@ describe("stop gate", () => {
 
   afterEach(async () => {
     if (workDir) {
-      await rm(workDir, { recursive: true, force: true });
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
       workDir = "";
     }
   });
 
-  it("sale 0 y no ejecuta ningún check cuando FACTORY_GATE=off", async () => {
-    workDir = await mkdtemp(path.join(tmpdir(), "seadragons-stop-gate-"));
-    await writeFile(
-      path.join(workDir, "eslint.config.js"),
-      "module.exports = [];\n",
-    );
-    const binDir = await installFakeEslintRunner(workDir, true);
+  it(
+    "sale 0 y no ejecuta ningún check cuando FACTORY_GATE=off",
+    async () => {
+      workDir = await mkdtemp(path.join(tmpdir(), "seadragons-stop-gate-"));
+      await writeFile(
+        path.join(workDir, "eslint.config.js"),
+        "module.exports = [];\n",
+      );
+      const binDir = await installFakeEslintRunner(workDir, true);
 
-    const { code } = await runStopGate(workDir, {
-      ...process.env,
-      FACTORY_GATE: "off",
-      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
-    });
-
-    expect(code).toBe(0);
-    await expect(
-      readFile(path.join(workDir, "npx-was-called")),
-    ).rejects.toThrow();
-  });
-
-  it("bloquea con código 2 cuando la variable no está y el lint falla", async () => {
-    workDir = await mkdtemp(path.join(tmpdir(), "seadragons-stop-gate-"));
-    await writeFile(
-      path.join(workDir, "eslint.config.js"),
-      "module.exports = [];\n",
-    );
-    const binDir = await installFakeEslintRunner(workDir, true);
-
-    const { code } = await runStopGate(workDir, {
-      ...process.env,
-      FACTORY_GATE: undefined,
-      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
-    });
-
-    expect(code).toBe(2);
-  });
-
-  it("deja intacto el archivo contador cuando está desarmado", async () => {
-    workDir = await mkdtemp(path.join(tmpdir(), "seadragons-stop-gate-"));
-    const counterFile = await counterFilePathFor(workDir);
-    await writeViaBash(counterFile, "3");
-
-    try {
       const { code } = await runStopGate(workDir, {
         ...process.env,
         FACTORY_GATE: "off",
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
       });
 
       expect(code).toBe(0);
-      expect(await readViaBash(counterFile)).toBe("3");
-    } finally {
-      await removeViaBash(counterFile);
-    }
-  });
+      await expect(
+        readFile(path.join(workDir, "npx-was-called")),
+      ).rejects.toThrow();
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "bloquea con código 2 cuando la variable no está y el lint falla",
+    async () => {
+      workDir = await mkdtemp(path.join(tmpdir(), "seadragons-stop-gate-"));
+      await writeFile(
+        path.join(workDir, "eslint.config.js"),
+        "module.exports = [];\n",
+      );
+      const binDir = await installFakeEslintRunner(workDir, true);
+
+      const { code } = await runStopGate(workDir, {
+        ...process.env,
+        FACTORY_GATE: undefined,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      });
+
+      expect(code).toBe(2);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "deja intacto el archivo contador cuando está desarmado",
+    async () => {
+      workDir = await mkdtemp(path.join(tmpdir(), "seadragons-stop-gate-"));
+      const counterFile = await counterFilePathFor(workDir);
+      await writeViaBash(counterFile, "3");
+
+      try {
+        const { code } = await runStopGate(workDir, {
+          ...process.env,
+          FACTORY_GATE: "off",
+        });
+
+        expect(code).toBe(0);
+        expect(await readViaBash(counterFile)).toBe("3");
+      } finally {
+        await removeViaBash(counterFile);
+      }
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 });
 
 interface BashScriptResult {
@@ -280,32 +314,36 @@ describe("guard de árbol limpio", () => {
 
   afterEach(async () => {
     if (workDir) {
-      await rm(workDir, { recursive: true, force: true });
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
       workDir = "";
     }
     if (originDir) {
-      await rm(originDir, { recursive: true, force: true });
+      await rm(originDir, REMOVE_TEMP_DIR_OPTIONS);
       originDir = "";
     }
     if (stubBinDir) {
-      await rm(stubBinDir, { recursive: true, force: true });
+      await rm(stubBinDir, REMOVE_TEMP_DIR_OPTIONS);
       stubBinDir = "";
     }
   });
 
-  it("pasa cuando el árbol está completamente limpio", async () => {
-    ({ workDir, originDir } = await createFixtureRepo());
-    const { binDir, markerFile } = await installChecksRanMarkerBin();
-    stubBinDir = binDir;
+  it(
+    "pasa cuando el árbol está completamente limpio",
+    async () => {
+      ({ workDir, originDir } = await createFixtureRepo());
+      const { binDir, markerFile } = await installChecksRanMarkerBin();
+      stubBinDir = binDir;
 
-    const { code } = await runStopGate(workDir, {
-      ...process.env,
-      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
-    });
+      const { code } = await runStopGate(workDir, {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      });
 
-    expect(code).toBe(0);
-    expect(await checksRan(markerFile)).toBe(false);
-  });
+      expect(code).toBe(0);
+      expect(await checksRan(markerFile)).toBe(false);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 
   it.each(["tsconfig.json", "package-lock.json", "CLAUDE.md", "AGENTS.md"])(
     "pasa cuando la única suciedad es ruido generado (%s)",
@@ -323,60 +361,73 @@ describe("guard de árbol limpio", () => {
       expect(code).toBe(0);
       expect(await checksRan(markerFile)).toBe(false);
     },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
   );
 
-  it("no pasa cuando además hay un archivo de producto", async () => {
-    ({ workDir, originDir } = await createFixtureRepo());
-    await writeFile(path.join(workDir, "tsconfig.json"), "cambiado\n");
-    await writeFile(
-      path.join(workDir, "src/lib/foo.ts"),
-      "export const foo = 2;\n",
-    );
-    const { binDir, markerFile } = await installChecksRanMarkerBin();
-    stubBinDir = binDir;
+  it(
+    "no pasa cuando además hay un archivo de producto",
+    async () => {
+      ({ workDir, originDir } = await createFixtureRepo());
+      await writeFile(path.join(workDir, "tsconfig.json"), "cambiado\n");
+      await writeFile(
+        path.join(workDir, "src/lib/foo.ts"),
+        "export const foo = 2;\n",
+      );
+      const { binDir, markerFile } = await installChecksRanMarkerBin();
+      stubBinDir = binDir;
 
-    await runStopGate(workDir, {
-      ...process.env,
-      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
-    });
+      await runStopGate(workDir, {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      });
 
-    expect(await checksRan(markerFile)).toBe(true);
-  });
+      expect(await checksRan(markerFile)).toBe(true);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 
-  it("no pasa cuando hay commits sobre upstream, aunque la suciedad sea ruido", async () => {
-    ({ workDir, originDir } = await createFixtureRepo());
-    await runBashScript(
-      workDir,
-      `git config user.email test@example.com
+  it(
+    "no pasa cuando hay commits sobre upstream, aunque la suciedad sea ruido",
+    async () => {
+      ({ workDir, originDir } = await createFixtureRepo());
+      await runBashScript(
+        workDir,
+        `git config user.email test@example.com
        git config user.name Test
        echo 'export const foo = 2;' > src/lib/foo.ts
        git commit -aqm "commit sin pushear"`,
-    );
-    await writeFile(path.join(workDir, "tsconfig.json"), "cambiado\n");
-    const { binDir, markerFile } = await installChecksRanMarkerBin();
-    stubBinDir = binDir;
+      );
+      await writeFile(path.join(workDir, "tsconfig.json"), "cambiado\n");
+      const { binDir, markerFile } = await installChecksRanMarkerBin();
+      stubBinDir = binDir;
 
-    await runStopGate(workDir, {
-      ...process.env,
-      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
-    });
+      await runStopGate(workDir, {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      });
 
-    expect(await checksRan(markerFile)).toBe(true);
-  });
+      expect(await checksRan(markerFile)).toBe(true);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 
-  it("no pasa ante un archivo sin seguimiento fuera de la lista", async () => {
-    ({ workDir, originDir } = await createFixtureRepo());
-    await writeFile(path.join(workDir, "src/lib/scratch.ts"), "export {};\n");
-    const { binDir, markerFile } = await installChecksRanMarkerBin();
-    stubBinDir = binDir;
+  it(
+    "no pasa ante un archivo sin seguimiento fuera de la lista",
+    async () => {
+      ({ workDir, originDir } = await createFixtureRepo());
+      await writeFile(path.join(workDir, "src/lib/scratch.ts"), "export {};\n");
+      const { binDir, markerFile } = await installChecksRanMarkerBin();
+      stubBinDir = binDir;
 
-    await runStopGate(workDir, {
-      ...process.env,
-      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
-    });
+      await runStopGate(workDir, {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      });
 
-    expect(await checksRan(markerFile)).toBe(true);
-  });
+      expect(await checksRan(markerFile)).toBe(true);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 });
 
 describe("workflows", () => {
