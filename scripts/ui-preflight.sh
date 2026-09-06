@@ -54,9 +54,17 @@ responds() {
   fi
 }
 
-# Ours = started by a previous 'up' in this repo and still alive.
+# Ours = started by a previous 'up' in this repo and still alive. The PID in
+# PID_FILE is the wrapper's, not necessarily the process that ends up
+# listening (npm-style tools hand off to a child, and on Windows an 'exec'
+# chain through a non-native binary doesn't always keep the same PID). Once
+# the wrapper is gone, fall back to whoever is bound to our port: 'up' only
+# ever claims a port it just confirmed was free, so anything holding it now
+# can only be what we started (see kill_port_owner's reasoning below).
 is_ours() {
-  [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
+  [ -f "$PID_FILE" ] || return 1
+  kill -0 "$(cat "$PID_FILE")" 2>/dev/null && return 0
+  [ -n "$(port_owner_pid)" ]
 }
 
 port_of() {
@@ -87,21 +95,31 @@ kill_tree() {
   kill -9 "$pid" 2>/dev/null || true
 }
 
+# Prints the native PID(s) (one per line) currently bound to our port, or
+# nothing if it is free. This is the ground truth 'is_ours' falls back to:
+# unlike a saved wrapper PID, a port's occupant can't be stale.
+port_owner_pid() {
+  local port
+  port=$(port_of)
+  if command -v netstat >/dev/null 2>&1 && command -v taskkill >/dev/null 2>&1; then
+    netstat -ano 2>/dev/null | grep -i listening | grep ":$port " | awk '{print $NF}' | sort -u
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -ti "tcp:$port" 2>/dev/null
+  fi
+}
+
 # Last resort: whoever still holds the port after kill_tree is our own dev
 # server surviving in a stray child ('up' checked the port was free before
 # starting it, so nothing else can have claimed it since).
 kill_port_owner() {
-  local port winpid pid
-  port=$(port_of)
-  if command -v netstat >/dev/null 2>&1 && command -v taskkill >/dev/null 2>&1; then
-    for winpid in $(netstat -ano 2>/dev/null | grep -i listening | grep ":$port " | awk '{print $NF}' | sort -u); do
-      MSYS_NO_PATHCONV=1 taskkill /T /F /PID "$winpid" >/dev/null 2>&1 || true
-    done
-  elif command -v lsof >/dev/null 2>&1; then
-    for pid in $(lsof -ti "tcp:$port" 2>/dev/null); do
+  local pid
+  for pid in $(port_owner_pid); do
+    if command -v taskkill >/dev/null 2>&1; then
+      MSYS_NO_PATHCONV=1 taskkill /T /F /PID "$pid" >/dev/null 2>&1 || true
+    else
       kill -9 "$pid" 2>/dev/null || true
-    done
-  fi
+    fi
+  done
 }
 
 check() {
@@ -110,7 +128,10 @@ check() {
     return 0
   fi
   if is_ours; then
-    echo "ui-preflight: $APP_URL is served by this factory (pid $(cat "$PID_FILE"))." >&2
+    local pid
+    pid=$(cat "$PID_FILE")
+    kill -0 "$pid" 2>/dev/null || pid=$(port_owner_pid | head -1)
+    echo "ui-preflight: $APP_URL is served by this factory (pid $pid)." >&2
     return 0
   fi
   if [ -n "${FABRICA_TRUST_EXISTING_SERVER:-}" ]; then
@@ -141,16 +162,19 @@ up() {
 
   # The server must come up on OUR url. Frameworks that silently fall back to
   # the next free port never answer here, so they fail loudly instead.
+  #
+  # There is no reliable early "it already died" check here: the wrapper
+  # process can legitimately hand off to a child and exit before that child
+  # ever binds the port (that hand-off, mistaken for death, is exactly the
+  # bug this script used to have). A wrapper that is gone and a port that
+  # is not bound yet look identical to a wrapper that is gone and a port
+  # that never will be, so the only trustworthy verdict is whether the port
+  # answers before BOOT_TIMEOUT runs out.
   local waited=0
   while [ "$waited" -lt "$BOOT_TIMEOUT" ]; do
     if responds; then
       echo "$APP_URL"
       return 0
-    fi
-    if ! is_ours; then
-      down
-      die "the dev server died while starting. Last lines of $LOG_FILE:
-$(tail -n 20 "$LOG_FILE" 2>/dev/null)"
     fi
     sleep 1
     waited=$((waited + 1))
@@ -165,17 +189,23 @@ $(tail -n 20 "$LOG_FILE" 2>/dev/null)"
 
 down() {
   [ -f "$PID_FILE" ] || { echo "ui-preflight: nothing to stop." >&2; return 0; }
-  local pid waited=0
+  local pid
   pid=$(cat "$PID_FILE")
-  kill -0 "$pid" 2>/dev/null && kill_tree "$pid"
   rm -f "$PID_FILE"
 
   # The port is the real subject here, not the pid: a survivor keeps the next
-  # review blocked, since it will look like a foreign server.
-  while [ "$waited" -lt "$STOP_TIMEOUT" ] && responds; do
-    sleep 1
-    waited=$((waited + 1))
-  done
+  # review blocked, since it will look like a foreign server. Only wait out a
+  # grace period if we actually signalled something: a pid that was already
+  # dead never got a chance to shut down on its own, so there is nothing to
+  # wait for and kill_port_owner should run right away.
+  if kill -0 "$pid" 2>/dev/null; then
+    kill_tree "$pid"
+    local waited=0
+    while [ "$waited" -lt "$STOP_TIMEOUT" ] && responds; do
+      sleep 1
+      waited=$((waited + 1))
+    done
+  fi
   if responds; then
     kill_port_owner
     sleep 1
