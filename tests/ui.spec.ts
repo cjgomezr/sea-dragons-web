@@ -46,6 +46,39 @@ const viewports = [
 
 const themes = ["light", "dark"] as const;
 
+// #77: medido comparando esta misma rama sin cambios dos veces en CI
+// (Linux), contra la línea base ya aceptada, con tolerancia puesta a cero
+// para que cualquier diferencia real de renderizado quedara expuesta en el
+// reporte (runs 34072162451 y 34072312519). Resultado: 0 píxeles de
+// diferencia en las 22 capturas de página sin regresión real, en ambas
+// corridas. Las únicas fallas fueron las dos líneas base oscuras ya sabidas
+// como desactualizadas (home-mobile-dark: 1756px, section-mobile-dark:
+// 1849px, idénticos en ambas corridas), que no son ruido sino el defecto
+// que este ticket corrige. El margen de abajo es generoso frente al ruido
+// medido (0) y sigue quedando dos órdenes de magnitud por debajo de la
+// regresión real más pequeña observada (1756px). Es un presupuesto
+// ABSOLUTO a propósito: uno por ratio crece con el alto de la página y es
+// la causa raíz del punto ciego (#77).
+const PAGE_MAX_DIFF_PIXELS = 20;
+const COMPONENT_MAX_DIFF_PIXELS = 10;
+
+async function goToWithTheme(
+  page: import("@playwright/test").Page,
+  path: string,
+  theme: (typeof themes)[number],
+): Promise<void> {
+  await page.goto(`${APP_URL}${path}`);
+  if (theme === "dark") {
+    await page.getByRole("button", { name: /tema oscuro/i }).click();
+  }
+  // networkidle nunca llega mientras el dev server compila bajo carga paralela.
+  // Lo que de verdad mueve píxeles son las fuentes, y toHaveScreenshot ya
+  // reintenta hasta que la página deja de cambiar.
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+}
+
 // "home" is the pre-existing landing page; "section" is a destination route
 // off the sidebar menu, standing in for any of the seven (they share the
 // same shell and SectionPlaceholder).
@@ -61,21 +94,12 @@ for (const pg of pages) {
 
       for (const theme of themes) {
         test(`matches approved baseline (${theme})`, async ({ page }) => {
-          await page.goto(`${APP_URL}${pg.path}`);
-          if (theme === "dark") {
-            await page.getByRole("button", { name: /tema oscuro/i }).click();
-          }
-          // networkidle nunca llega mientras el dev server compila bajo carga paralela.
-          // Lo que de verdad mueve píxeles son las fuentes, y toHaveScreenshot ya
-          // reintenta hasta que la página deja de cambiar.
-          await page.evaluate(async () => {
-            await document.fonts.ready;
-          });
+          await goToWithTheme(page, pg.path, theme);
           await expect(page).toHaveScreenshot(
             `${pg.name}-${vp.name}-${theme}.png`,
             {
               fullPage: true,
-              maxDiffPixelRatio: 0.01,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
             },
           );
         });
@@ -131,6 +155,96 @@ const TOUCH_TARGET_MIN_PX = 44;
 // scoped to the nav that the viewport actually shows.
 const SIDEBAR_NAV = "Principal";
 const TAB_BAR = "Secciones";
+
+// The tab bar and the sidebar are thin strips next to a much larger content
+// area: a component screenshot only frames "the component, not the page"
+// if its box stays well under these fractions of the viewport it lives in.
+const MAX_TAB_BAR_HEIGHT_RATIO = 0.2;
+const MAX_SIDEBAR_WIDTH_RATIO = 0.3;
+
+// A correct tab bar inside a broken layout must still be caught: the full
+// page capture has to cover far more surface than the component capture
+// alone, or the two checks would be redundant instead of additive.
+const MIN_PAGE_TO_COMPONENT_AREA_RATIO = 5;
+
+// #77: una captura fullPage reparte el cambio de un componente pequeño
+// entre miles de píxeles de página, así que cabe holgadamente bajo
+// cualquier presupuesto pensado para la página entera. Encuadrar el propio
+// componente hace que un cambio en él ocupe la mayor parte de los píxeles
+// comparados, en vez de perderse en el conjunto. Esto se suma a las capturas
+// de página de arriba, no las sustituye.
+for (const theme of themes) {
+  test(`mobile tab bar matches approved baseline (${theme})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(MOBILE);
+    await goToWithTheme(page, "/dashboard", theme);
+    await expect(
+      page.getByRole("navigation", { name: TAB_BAR }),
+    ).toHaveScreenshot(`tabbar-mobile-${theme}.png`, {
+      maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
+    });
+  });
+
+  test(`desktop nav matches approved baseline (${theme})`, async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await goToWithTheme(page, "/dashboard", theme);
+    await expect(
+      page.getByRole("navigation", { name: SIDEBAR_NAV }),
+    ).toHaveScreenshot(`nav-desktop-${theme}.png`, {
+      maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
+    });
+  });
+}
+
+test("the mobile tab bar component screenshot frames the component, not the page", async ({
+  page,
+}) => {
+  await page.setViewportSize(MOBILE);
+  await page.goto(`${APP_URL}/dashboard`);
+
+  const box = await page
+    .getByRole("navigation", { name: TAB_BAR })
+    .boundingBox();
+
+  expect(box, "the tab bar has no layout box").not.toBeNull();
+  expect(box!.height).toBeLessThan(MOBILE.height * MAX_TAB_BAR_HEIGHT_RATIO);
+});
+
+test("the desktop nav component screenshot frames the component, not the page", async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP);
+  await page.goto(`${APP_URL}/dashboard`);
+
+  const box = await page
+    .getByRole("navigation", { name: SIDEBAR_NAV })
+    .boundingBox();
+
+  expect(box, "the sidebar nav has no layout box").not.toBeNull();
+  expect(box!.width).toBeLessThan(DESKTOP.width * MAX_SIDEBAR_WIDTH_RATIO);
+});
+
+test("the page screenshot still covers far more area than the tab bar component alone", async ({
+  page,
+}) => {
+  await page.setViewportSize(MOBILE);
+  await page.goto(`${APP_URL}/dashboard`);
+
+  const tabBarBox = await page
+    .getByRole("navigation", { name: TAB_BAR })
+    .boundingBox();
+  const pageHeight = await page.evaluate(
+    () => document.documentElement.scrollHeight,
+  );
+
+  expect(tabBarBox, "the tab bar has no layout box").not.toBeNull();
+  const pageArea = MOBILE.width * pageHeight;
+  const componentArea = tabBarBox!.width * tabBarBox!.height;
+  expect(pageArea).toBeGreaterThan(
+    componentArea * MIN_PAGE_TO_COMPONENT_AREA_RATIO,
+  );
+});
 
 test("marks the active section in the sidebar nav", async ({ page }) => {
   await page.setViewportSize(DESKTOP);
