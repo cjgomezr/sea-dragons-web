@@ -19,12 +19,14 @@ interface WorkflowStep {
 
 interface WorkflowJob {
   if?: string;
+  needs?: string | string[];
   permissions?: Record<string, string>;
   steps: WorkflowStep[];
 }
 
 interface WorkflowFile {
   on: {
+    push?: { branches?: string[] };
     pull_request?: { types?: string[] };
     workflow_dispatch?: {
       inputs?: Record<string, { required?: boolean }>;
@@ -114,5 +116,62 @@ describe("visual-baselines.yml", () => {
     const source = readFileSync(WORKFLOW_PATH, "utf8");
 
     expect(source).not.toMatch(/github\.actor\s*!=/);
+  });
+});
+
+describe("gate visual en main", () => {
+  it("compara también en cada push a main, no sólo en pull requests", () => {
+    const { on } = parseWorkflow();
+
+    expect(on.push?.branches).toContain("main");
+  });
+
+  it("la comparación corre tanto en pull_request como en push", () => {
+    const condition = parseWorkflow().jobs.compare?.if ?? "";
+
+    expect(condition).toMatch(/pull_request/);
+    expect(condition).toMatch(/push/);
+  });
+
+  it("el job que abre el incidente sólo corre en push y sólo cuando la comparación falló", () => {
+    const job = parseWorkflow().jobs["report-incident"];
+
+    expect(job).toBeDefined();
+    expect(job?.needs).toContain("compare");
+    expect(job?.if).toMatch(/push/);
+    expect(job?.if).toMatch(/needs\.compare\.result\s*==\s*'failure'/);
+    expect(job?.if).not.toMatch(/pull_request/);
+  });
+
+  it("el paso que abre el incidente invoca scripts/file-incident.sh, no gh issue create a pelo", () => {
+    const runs = runLines("report-incident");
+
+    expect(runs).toMatch(/report-visual-incident\.sh/);
+    expect(runs).not.toMatch(/gh issue create/);
+  });
+
+  it("el job del incidente puede crear issues y leer el repo para el checkout", () => {
+    const job = parseWorkflow().jobs["report-incident"];
+
+    expect(job?.permissions?.issues).toBe("write");
+    expect(job?.permissions?.contents).toBe("read");
+  });
+
+  it("el job del incidente corre aunque compare haya fallado, no sólo cuando compare tiene éxito", () => {
+    const condition = parseWorkflow().jobs["report-incident"]?.if ?? "";
+
+    expect(condition).toMatch(/always\(\)/);
+  });
+
+  it("avisa en el PR cuando accept empuja su commit", () => {
+    const runs = runLines("accept");
+
+    expect(runs).toMatch(/gh pr comment/);
+  });
+
+  it("el job accept puede comentar en el PR", () => {
+    const accept = parseWorkflow().jobs.accept;
+
+    expect(accept?.permissions?.["pull-requests"]).toBe("write");
   });
 });
