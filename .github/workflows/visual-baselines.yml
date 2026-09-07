@@ -21,11 +21,21 @@
 #
 # Al comparar sin escribir, el job funciona igual en PRs desde un fork, donde
 # GitHub degrada el token a sólo lectura pase lo que pase.
+#
+# El disparador `push` sobre `main` existe porque nada impide mergear con este
+# check en rojo: el repo es privado en plan gratuito y no admite branch
+# protection ni rulesets. No se puede evitar el desajuste, así que se lo hace
+# ruidoso: si `main` queda incoherente, el job `report-incident` abre un
+# issue en la cola (ver scripts/report-visual-incident.sh) en vez de dejarlo
+# como una corrida roja que nadie mira hasta que otro PR salga rojo por algo
+# que no era suyo.
 name: Visual baselines (Linux)
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       reviewed_run_url:
@@ -37,7 +47,7 @@ permissions:
 
 jobs:
   compare:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -60,11 +70,26 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+  report-incident:
+    needs: compare
+    if: github.event_name == 'push' && needs.compare.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Abre (o no duplica) el incidente de main desajustado
+        run: bash scripts/report-visual-incident.sh
+
   accept:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -84,6 +109,7 @@ jobs:
         run: bash scripts/update-visual-baselines.sh
         continue-on-error: true
       - name: Commitea la línea base aceptada
+        id: commit
         if: steps.update.outcome == 'failure'
         run: |
           git config user.name "github-actions[bot]"
@@ -94,3 +120,16 @@ jobs:
           fi
           git commit -m "Línea base visual para Linux (aceptada a mano)"
           git push
+      - name: Avisa en el PR que ya se puede mergear
+        if: steps.commit.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          branch="${GITHUB_REF#refs/heads/}"
+          pr_number=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$pr_number" ]; then
+            gh pr comment "$pr_number" --body "✅ Línea base visual aceptada y ya empujada a esta rama. Ahora sí se puede mergear: antes, el push del commit y el merge podían cruzarse y dejar \`main\` con el código nuevo pero la captura vieja (ver #79)."
+          else
+            echo "No encontré un PR abierto para la rama $branch; nadie a quien avisar." >&2
+          fi
