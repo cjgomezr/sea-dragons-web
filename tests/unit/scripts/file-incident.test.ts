@@ -77,6 +77,21 @@ if [ "$1" = "issue" ] && [ "$2" = "create" ]; then
   exit 0
 fi
 
+if [ "$1" = "issue" ] && [ "$2" = "close" ]; then
+  exit 0
+fi
+
+if [ "$1" = "issue" ] && [ "$2" = "reopen" ]; then
+  exit 0
+fi
+
+if [ "$1" = "api" ] && [ "$2" = "graphql" ]; then
+  [ "\${FAIL_RECONCILE:-0}" = "1" ] && exit 1
+  printf '{"data":{"repository":{"issue":{"state":"%s","subIssuesSummary":{"total":%s,"completed":%s}}}}}' \\
+    "\${EPIC_STATE:-CLOSED}" "\${EPIC_TOTAL:-1}" "\${EPIC_COMPLETED:-0}"
+  exit 0
+fi
+
 if [ "$1" = "api" ]; then
   for arg in "$@"; do
     case "$arg" in
@@ -176,6 +191,60 @@ describe("file-incident", () => {
     const log = await readLog(logFile);
     expect(log).toMatch(/repos\/acme\/repo\/issues\/12\/sub_issues/);
     expect(log).toMatch(/sub_issue_id=9001/);
+  });
+
+  it("reabre la épica si estaba cerrada al engancharle el incidente", async () => {
+    const { binDir, logFile } = await setupWorkDir(false);
+
+    await runFileIncident(["12", "main roto por #22", bodyFile], workDir, {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      EPIC_STATE: "CLOSED",
+      EPIC_TOTAL: "1",
+      EPIC_COMPLETED: "0",
+    });
+
+    const log = await readLog(logFile);
+    expect(log).toMatch(/issue reopen 12/);
+    const subIssuesIndex = log.indexOf("api --method POST");
+    const reopenIndex = log.indexOf("issue reopen 12");
+    expect(subIssuesIndex).toBeGreaterThanOrEqual(0);
+    expect(reopenIndex).toBeGreaterThan(subIssuesIndex);
+  });
+
+  it("no toca la épica si ya estaba abierta", async () => {
+    const { binDir, logFile } = await setupWorkDir(false);
+
+    await runFileIncident(["12", "main roto por #22", bodyFile], workDir, {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      EPIC_STATE: "OPEN",
+      EPIC_TOTAL: "3",
+      EPIC_COMPLETED: "1",
+    });
+
+    const log = await readLog(logFile);
+    expect(log).not.toMatch(/issue reopen/);
+    expect(log).not.toMatch(/issue close/);
+  });
+
+  it("no aborta ni pierde el incidente si falla la reconciliación de la épica", async () => {
+    const { binDir, logFile } = await setupWorkDir(false);
+
+    const { code, stdout } = await runFileIncident(
+      ["12", "main roto por #22", bodyFile],
+      workDir,
+      {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        FAIL_RECONCILE: "1",
+      },
+    );
+
+    expect(code).toBe(0);
+    expect(stdout.trim()).toBe("42");
+    const log = await readLog(logFile);
+    expect(log).toMatch(/repos\/acme\/repo\/issues\/12\/sub_issues/);
   });
 
   it("lo agrega al tablero en Todo cuando hay project.json", async () => {

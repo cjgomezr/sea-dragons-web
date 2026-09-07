@@ -1,14 +1,26 @@
 # Deterministic bookkeeping: when an issue closes (merge or manual), remove
 # the factory queue labels so the board and the labels never contradict each
 # other. No Claude involved: free, instant, runs on GitHub's token.
+#
+# Also keeps epics in sync with their sub-issues: closes an epic once none of
+# its sub-issues are open, reopens it when one comes back. The `issues`
+# events cover a sub-issue closing or reopening; they do NOT cover attaching
+# an existing sub-issue to an epic by hand from the GitHub UI, since GitHub
+# does not offer that as an Actions trigger. The daily `schedule` run is what
+# catches that path.
 name: labels-cleanup
 
 on:
   issues:
-    types: [closed]
+    types: [closed, reopened]
+  schedule:
+    # Higiene diaria, no una alarma: solo hace algo si alguien enganchó a
+    # mano un sub-issue a una épica ya cerrada desde la interfaz de GitHub.
+    - cron: "17 6 * * *"
 
 jobs:
   cleanup:
+    if: github.event_name == 'issues' && github.event.action == 'closed'
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -31,3 +43,31 @@ jobs:
       - uses: actions/checkout@v4
       - name: Remove blocked-by-N from dependents
         run: bash scripts/clear-blockers.sh ${{ github.event.issue.number }}
+
+  epic-status:
+    if: github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync parent epic status
+        run: bash scripts/sync-epic-status.sh ${{ github.event.issue.number }}
+
+  reconcile-epics:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconcile every epic against its sub-issues
+        run: bash scripts/reconcile-all-epics.sh
