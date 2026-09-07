@@ -46,14 +46,21 @@ const viewports = [
 
 const themes = ["light", "dark"] as const;
 
-// #77: medido comparando la misma rama sin cambios dos veces en CI (Linux),
-// contra la línea base ya aceptada, con tolerancia puesta a cero para que
-// cualquier diferencia real de renderizado quedara expuesta en el reporte.
-// Ver el PR de este ticket para las corridas exactas y los píxeles medidos
-// en cada caso. Es un presupuesto ABSOLUTO a propósito: uno por ratio crece
-// con el alto de la página y es la causa raíz del punto ciego (#77).
-const PAGE_MAX_DIFF_PIXELS = 120;
-const COMPONENT_MAX_DIFF_PIXELS = 40;
+// #77: medido comparando esta misma rama sin cambios dos veces en CI
+// (Linux), contra la línea base ya aceptada, con tolerancia puesta a cero
+// para que cualquier diferencia real de renderizado quedara expuesta en el
+// reporte (runs 34072162451 y 34072312519). Resultado: 0 píxeles de
+// diferencia en las 22 capturas de página sin regresión real, en ambas
+// corridas. Las únicas fallas fueron las dos líneas base oscuras ya sabidas
+// como desactualizadas (home-mobile-dark: 1756px, section-mobile-dark:
+// 1849px, idénticos en ambas corridas), que no son ruido sino el defecto
+// que este ticket corrige. El margen de abajo es generoso frente al ruido
+// medido (0) y sigue quedando dos órdenes de magnitud por debajo de la
+// regresión real más pequeña observada (1756px). Es un presupuesto
+// ABSOLUTO a propósito: uno por ratio crece con el alto de la página y es
+// la causa raíz del punto ciego (#77).
+const PAGE_MAX_DIFF_PIXELS = 20;
+const COMPONENT_MAX_DIFF_PIXELS = 10;
 
 // "home" is the pre-existing landing page; "section" is a destination route
 // off the sidebar menu, standing in for any of the seven (they share the
