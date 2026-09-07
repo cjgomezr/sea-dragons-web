@@ -10,6 +10,16 @@ function uiSpecSource(): string {
 }
 
 /**
+ * Espacios normalizados a uno solo: el formatter reenvuelve estas llamadas
+ * (una coma final, una línea que colapsa) sin cambiar lo que de verdad
+ * importa, así que la comparación no puede depender de la forma exacta en
+ * que están partidas. Mismo enfoque que baseline-doctrine.test.ts.
+ */
+function normalizedUiSpecSource(): string {
+  return uiSpecSource().replace(/\s+/g, " ");
+}
+
+/**
  * #77: una captura fullPage de 375px de alto reparte el cambio de un
  * componente pequeño (la barra de pestañas) entre miles de píxeles de
  * página, así que cabe holgadamente bajo un presupuesto por RATIO. Cuanto
@@ -27,13 +37,13 @@ describe("gate visual", () => {
   });
 
   it("existe una captura por componente para la barra de pestañas móvil y otra para la nav de escritorio", () => {
-    const source = uiSpecSource();
+    const source = normalizedUiSpecSource();
 
     expect(source).toMatch(
-      /getByRole\(\s*"navigation",\s*\{ name: TAB_BAR \},?\s*\),?\s*\)\s*\.toHaveScreenshot\(\s*`tabbar-mobile-/,
+      /getByRole\("navigation", \{ name: TAB_BAR \}\),? ?\)\.toHaveScreenshot\(`tabbar-mobile-/,
     );
     expect(source).toMatch(
-      /getByRole\(\s*"navigation",\s*\{ name: SIDEBAR_NAV \},?\s*\),?\s*\)\s*\.toHaveScreenshot\(\s*`nav-desktop-/,
+      /getByRole\("navigation", \{ name: SIDEBAR_NAV \}\),? ?\)\.toHaveScreenshot\(`nav-desktop-/,
     );
   });
 });
