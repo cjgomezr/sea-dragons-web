@@ -124,6 +124,9 @@ for (const pg of pages) {
 const DESKTOP = { width: 1440, height: 900 } as const;
 const MOBILE = { width: 375, height: 812 } as const;
 
+// Matches --touch-target-min in globals.css (WCAG 2.5.5).
+const TOUCH_TARGET_MIN_PX = 44;
+
 // The shell renders both navs and lets CSS pick one, so every assertion is
 // scoped to the nav that the viewport actually shows.
 const SIDEBAR_NAV = "Principal";
@@ -186,6 +189,23 @@ test("mobile keeps the overflow sections behind the More tab", async ({
   await expect(tabBar.getByRole("link", { name: "Pagos" })).toBeHidden();
   await tabBar.getByRole("button", { name: "Más" }).click();
   await expect(tabBar.getByRole("link", { name: "Pagos" })).toBeVisible();
+});
+
+test("mobile tabs keep the 44px touch target after adding icons", async ({
+  page,
+}) => {
+  await page.setViewportSize(MOBILE);
+  await page.goto(`${APP_URL}/dashboard`);
+  const tabBar = page.getByRole("navigation", { name: TAB_BAR });
+
+  const tabs = await tabBar.getByRole("link").all();
+  const moreButton = tabBar.getByRole("button", { name: "Más" });
+
+  for (const tab of [...tabs, moreButton]) {
+    const box = await tab.boundingBox();
+    expect(box, "tab has no layout box").not.toBeNull();
+    expect(box!.height).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
+  }
 });
 
 test("mobile never hides content behind the fixed tab bar", async ({
