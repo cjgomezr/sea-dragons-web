@@ -163,7 +163,7 @@ describe("gate visual en main", () => {
     expect(condition).toMatch(/always\(\)/);
   });
 
-  it("deja constancia en el PR de que ya se puede mergear cuando accept empuja su commit", () => {
+  it("avisa en el PR cuando accept empuja su commit", () => {
     const runs = runLines("accept");
 
     expect(runs).toMatch(/gh pr comment/);

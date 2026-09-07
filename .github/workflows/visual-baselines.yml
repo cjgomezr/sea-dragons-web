@@ -17,7 +17,15 @@
 # ese momento, que es justo lo que la regresión visual existe para impedir. La
 # URL queda en el resumen del run, así que la decisión deja rastro.
 #
-# Se espera `--ref` de una rama de PR, nunca `main` directamente.
+# Normalmente `--ref` es una rama de PR: ahí es donde la línea base nueva
+# tiene que aterrizar antes de mergear. La excepción es un `main` que ya
+# quedó desajustado (el incidente que abre scripts/report-visual-incident.sh):
+# ahí no hay rama de PR donde aceptar, y `--ref main` es lo correcto.
+#
+# Ojo con el push del job `accept`: la corrida de `compare` que dispara queda
+# en `action_required` esperando aprobación, porque la empuja
+# `github-actions[bot]`. Hasta que alguien la apruebe, el check no está
+# verde: está sin arrancar, que no es lo mismo.
 #
 # Al comparar sin escribir, el job funciona igual en PRs desde un fork, donde
 # GitHub degrada el token a sólo lectura pase lo que pase.
@@ -129,7 +137,7 @@ jobs:
           fi
           git commit -m "Línea base visual para Linux (aceptada a mano)"
           git push
-      - name: Avisa en el PR que ya se puede mergear
+      - name: Avisa en el PR de que falta confirmar el check
         if: steps.commit.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -138,7 +146,7 @@ jobs:
           branch="${GITHUB_REF#refs/heads/}"
           pr_number=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
           if [ -n "$pr_number" ]; then
-            gh pr comment "$pr_number" --body "✅ Línea base visual aceptada y ya empujada a esta rama. Ahora sí se puede mergear: antes, el push del commit y el merge podían cruzarse y dejar \`main\` con el código nuevo pero la captura vieja."
+            gh pr comment "$pr_number" --body "✅ Línea base visual aceptada y empujada a esta rama. **Todavía no mergees**: espera a que \`compare\` corra sobre este commit y salga verde. Si aparece como \`action_required\`, apruébala primero, porque la empujó un bot y GitHub no la arranca sola. Mergear antes deja \`main\` con el código nuevo y la captura vieja."
           else
             echo "No encontré un PR abierto para la rama $branch; nadie a quien avisar." >&2
           fi
