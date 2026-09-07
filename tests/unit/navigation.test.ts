@@ -17,7 +17,12 @@ describe("navegación", () => {
         mobileLabel: "Inicio",
       },
       { label: "Directorio", href: "/directorio", icon: "directorio" },
-      { label: "Calendario", href: "/calendario", icon: "calendario" },
+      {
+        label: "Calendario",
+        href: "/calendario",
+        icon: "calendario",
+        mobileLabel: "Agenda",
+      },
       { label: "Equipos", href: "/equipos", icon: "equipos" },
       { label: "Evaluaciones", href: "/evaluaciones", icon: "evaluaciones" },
       { label: "Noticias", href: "/noticias", icon: "noticias" },
@@ -87,9 +92,17 @@ describe("etiqueta corta para la barra móvil (#85)", () => {
   });
 
   it("usa label cuando la sección no define mobileLabel", () => {
+    const equipos = NAV_SECTIONS.find(
+      (section) => section.href === "/equipos",
+    )!;
+    expect(equipos.mobileLabel).toBeUndefined();
+    expect(getMobileLabel(equipos)).toBe("Equipos");
+  });
+
+  it("acorta también Calendario, que se partía a 360px", () => {
     const calendario = NAV_SECTIONS.find(
       (section) => section.href === "/calendario",
     )!;
-    expect(getMobileLabel(calendario)).toBe("Calendario");
+    expect(getMobileLabel(calendario)).toBe("Agenda");
   });
 });

@@ -29,7 +29,17 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     mobileLabel: "Inicio",
   },
   { label: "Directorio", href: "/directorio", icon: "directorio" },
-  { label: "Calendario", href: "/calendario", icon: "calendario" },
+  {
+    label: "Calendario",
+    href: "/calendario",
+    icon: "calendario",
+    // "Calendario" ocupaba el 89% de su pestaña a 360px y se partía con las
+    // fuentes de Linux. El mockup móvil usa etiquetas de una palabra corta.
+    // Ojo para E7: el prototipo llama "Agenda" a una de las vistas del
+    // calendario (Mes/Semana/Agenda). Si esa vista se implementa, conviene
+    // renombrarla para no tener una pestaña y una vista con el mismo nombre.
+    mobileLabel: "Agenda",
+  },
   { label: "Equipos", href: "/equipos", icon: "equipos" },
   { label: "Evaluaciones", href: "/evaluaciones", icon: "evaluaciones" },
   { label: "Noticias", href: "/noticias", icon: "noticias" },
