@@ -40,6 +40,14 @@ ISSUE_NUMBER="${ISSUE_URL##*/}"
 DB_ID=$(gh api "repos/$REPO/issues/$ISSUE_NUMBER" --jq .id)
 gh api --method POST "repos/$REPO/issues/$EPIC/sub_issues" -F "sub_issue_id=$DB_ID" >/dev/null
 
+# Un incidente nuevo siempre es trabajo pendiente: si la épica estaba
+# cerrada, engancharle uno la reabre en el mismo paso, no en la próxima
+# barrida periódica. No aborta el resto del script si falla: el incidente ya
+# quedó creado y enlazado, que es lo que no se puede perder.
+source "$SCRIPT_DIR/lib/reconcile-epic.sh"
+reconcile_epic "$REPO" "$EPIC" >/dev/null \
+  || echo "⚠ file-incident.sh: no pude reconciliar el estado de la épica #$EPIC" >&2
+
 bash "$SCRIPT_DIR/task-status.sh" "$ISSUE_NUMBER" "Todo" >/dev/null || \
   echo "file-incident.sh: no pude actualizar el tablero para #$ISSUE_NUMBER (¿token sin permiso 'project'?); el issue ya quedó creado y enlazado a la épica." >&2
 
