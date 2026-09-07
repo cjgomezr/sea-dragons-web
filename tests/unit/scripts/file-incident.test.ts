@@ -98,6 +98,7 @@ if [ "$1" = "project" ] && [ "$2" = "item-add" ]; then
 fi
 
 if [ "$1" = "project" ] && [ "$2" = "item-edit" ]; then
+  [ "\${PROJECT_UPDATE_FAILS:-0}" = "1" ] && exit 1
   exit 0
 fi
 
@@ -236,6 +237,24 @@ describe("file-incident", () => {
     expect(stderr).toMatch(/usage/i);
     const log = await readLog(logFile);
     expect(log).toBe("");
+  });
+
+  it("igual crea e imprime el issue si el tablero falla (token sin permiso project)", async () => {
+    const { binDir } = await setupWorkDir(true);
+
+    const { code, stdout, stderr } = await runFileIncident(
+      ["12", "main roto por #22", bodyFile],
+      workDir,
+      {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        PROJECT_UPDATE_FAILS: "1",
+      },
+    );
+
+    expect(code).toBe(0);
+    expect(stdout.trim()).toBe("42");
+    expect(stderr).toMatch(/no pude actualizar el tablero/);
   });
 
   it("sale distinto de 0 y no crea nada si la épica no existe", async () => {

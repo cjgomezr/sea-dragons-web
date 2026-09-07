@@ -18,8 +18,8 @@
 # Usage: scripts/report-visual-incident.sh
 # Requires: gh (con permiso de escritura sobre issues), scripts/file-incident.sh.
 # Usa las variables que Actions expone (GITHUB_SHA, GITHUB_SERVER_URL,
-# GITHUB_REPOSITORY, GITHUB_RUN_ID) para enlazar la corrida; en su ausencia
-# (corrida local) las omite.
+# GITHUB_REPOSITORY, GITHUB_RUN_ID) para enlazar la corrida; pensado para
+# correr dentro de Actions, donde siempre están presentes.
 
 set -uo pipefail
 

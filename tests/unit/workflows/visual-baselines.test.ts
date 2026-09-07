@@ -150,10 +150,17 @@ describe("gate visual en main", () => {
     expect(runs).not.toMatch(/gh issue create/);
   });
 
-  it("el job del incidente puede crear issues y no necesita permisos que no usa", () => {
+  it("el job del incidente puede crear issues y leer el repo para el checkout", () => {
     const job = parseWorkflow().jobs["report-incident"];
 
     expect(job?.permissions?.issues).toBe("write");
+    expect(job?.permissions?.contents).toBe("read");
+  });
+
+  it("el job del incidente corre aunque compare haya fallado, no sólo cuando compare tiene éxito", () => {
+    const condition = parseWorkflow().jobs["report-incident"]?.if ?? "";
+
+    expect(condition).toMatch(/always\(\)/);
   });
 
   it("deja constancia en el PR de que ya se puede mergear cuando accept empuja su commit", () => {

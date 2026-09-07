@@ -72,9 +72,18 @@ jobs:
 
   report-incident:
     needs: compare
-    if: github.event_name == 'push' && needs.compare.result == 'failure'
+    # `always()` es obligatorio: sin una función de estado explícita, Actions
+    # exige implícitamente que `compare` (su única dependencia) haya
+    # terminado en success(), así que este job nunca correría cuando
+    # compare falla si sólo se compara needs.compare.result.
+    if: always() && github.event_name == 'push' && needs.compare.result == 'failure'
     runs-on: ubuntu-latest
     permissions:
+      # Declarar permisos deja en `none` todo lo que no se lista. Este job
+      # hace checkout para correr scripts/report-visual-incident.sh, y
+      # clonar un repo privado sin contents: read falla con 403 (ver
+      # labels-cleanup.yml).
+      contents: read
       issues: write
     env:
       GH_TOKEN: ${{ github.token }}
@@ -129,7 +138,7 @@ jobs:
           branch="${GITHUB_REF#refs/heads/}"
           pr_number=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
           if [ -n "$pr_number" ]; then
-            gh pr comment "$pr_number" --body "✅ Línea base visual aceptada y ya empujada a esta rama. Ahora sí se puede mergear: antes, el push del commit y el merge podían cruzarse y dejar \`main\` con el código nuevo pero la captura vieja (ver #79)."
+            gh pr comment "$pr_number" --body "✅ Línea base visual aceptada y ya empujada a esta rama. Ahora sí se puede mergear: antes, el push del commit y el merge podían cruzarse y dejar \`main\` con el código nuevo pero la captura vieja."
           else
             echo "No encontré un PR abierto para la rama $branch; nadie a quien avisar." >&2
           fi
