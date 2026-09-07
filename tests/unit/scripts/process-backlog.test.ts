@@ -1285,6 +1285,28 @@ describe("resiliencia del heartbeat ante fallos de ls/find/tail (#83)", () => {
     },
     REAL_PROCESS_TEST_TIMEOUT_MS,
   );
+
+  it(
+    "worker_tool_error_count devuelve un solo 0 limpio, no duplicado, cuando el archivo de sesión no existe",
+    async () => {
+      workDir = await setupWorkDir();
+
+      const { code, stdout } = await runBash(
+        'source scripts/process-backlog.sh; result=$(worker_tool_error_count /no/existe/sesion.jsonl); echo "RESULT=[$result]"',
+        workDir,
+        process.env,
+      );
+
+      expect(code).toBe(0);
+      // Con un `tail` que falla (archivo inexistente) pero un `wc -l | tr -d
+      // ' '` que igual imprime "0" sobre entrada vacía, un `|| echo 0` mal
+      // puesto duplica la salida ("0\n0") en vez de devolver un solo "0": ver
+      // #83, donde ese exacto patrón corrompía ERR y rompía la comparación
+      // numérica del heartbeat.
+      expect(stdout).toContain("RESULT=[0]");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 });
 
 /**

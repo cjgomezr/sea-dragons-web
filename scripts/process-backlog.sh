@@ -221,11 +221,17 @@ latest_worker_activity() {  # session file path -> text or empty
 }
 
 worker_tool_error_count() {  # session file path -> integer (0 if unavailable)
-  local sess_file="$1"
+  local sess_file="$1" count
   [ -n "$sess_file" ] || { echo 0; return 0; }
-  tail -c 200000 "$sess_file" 2>/dev/null \
+  # `wc`/`tr` can legitimately succeed on empty input (printing "0") even
+  # when `tail` failed earlier in the pipe; under `pipefail` the pipeline as
+  # a whole still counts as failed, so the `|| true` fallback must not be a
+  # second `echo 0` (that would print "0\n0", not "0") but a plain default
+  # applied to whatever `count` ended up holding.
+  count=$(tail -c 200000 "$sess_file" 2>/dev/null \
     | jq -Rr 'fromjson? | select(.type=="user") | .message.content[]? | select(.type=="tool_result" and .is_error==true) | 1' 2>/dev/null \
-    | wc -l | tr -d ' ' || echo 0
+    | wc -l | tr -d ' ') || true
+  echo "${count:-0}"
 }
 
 latest_touched_file() {  # worktree dir -> "epoch path" or empty
