@@ -234,6 +234,16 @@ worker_tool_error_count() {  # session file path -> integer (0 if unavailable)
   echo "${count:-0}"
 }
 
+dirty_file_count() {  # worktree dir -> integer (0 if unavailable)
+  local wt_dir="$1" count
+  # Same shape as worker_tool_error_count above: `wc -l | tr -d ' '` can
+  # print a legitimate "0" even when `git status` itself failed (e.g. WT_DIR
+  # doesn't exist yet), so the `pipefail`-driven failure must be neutralized
+  # on the captured variable, not with a second unconditional `echo 0`.
+  count=$(git -C "$wt_dir" status --porcelain 2>/dev/null | wc -l | tr -d ' ') || true
+  echo "${count:-0}"
+}
+
 latest_touched_file() {  # worktree dir -> "epoch path" or empty
   local wt_dir="$1"
   find "$wt_dir" -type f -not -path "*/node_modules/*" -not -path "*/.git/*" \
@@ -274,7 +284,7 @@ check_worker_left_no_pr() {  # issue number
 
   wt_dir=$(worktree_dir_for "$n")
   last_commit=$(git -C "$wt_dir" log --oneline -1 2>/dev/null || echo "sin commits")
-  dirty_count=$(git -C "$wt_dir" status --porcelain 2>/dev/null | wc -l | tr -d ' ') || dirty_count=0
+  dirty_count=$(dirty_file_count "$wt_dir")
 
   echo "⚠ Claude salió 0 en #$n pero no dejó PR: labeling needs-human + comentario"
   flag_needs_human "$n" "🤖 **El worker terminó (código 0) sin completar el lifecycle**: no encontré ningún PR, abierto o cerrado, que declare \`Closes #$n\` en su cuerpo.
@@ -427,7 +437,7 @@ main() {
           AGO=$(( $(date +%s) - ${TSEC%.*} ))
           AGOTXT="· ✍ ${TFILE:0:45} (hace ${AGO}s)"
         fi
-        FILES=$(git -C "$WT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ' || echo 0)
+        FILES=$(dirty_file_count "$WT_DIR")
         LINES=$(git -C "$WT_DIR" diff --shortstat 2>/dev/null | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
         LINE="  ⏱ ${ELAPSED_MIN}m · ${ACT:-trabajando} · $FILES arch, +$LINES líneas $AGOTXT"
         if [ "${ERR:-0}" -gt "$LAST_ERR" ]; then

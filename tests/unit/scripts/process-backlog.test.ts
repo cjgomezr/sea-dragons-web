@@ -1307,6 +1307,28 @@ describe("resiliencia del heartbeat ante fallos de ls/find/tail (#83)", () => {
     },
     REAL_PROCESS_TEST_TIMEOUT_MS,
   );
+
+  it(
+    "dirty_file_count devuelve un solo 0 limpio, no duplicado, cuando el worktree no existe",
+    async () => {
+      workDir = await setupWorkDir();
+
+      const { code, stdout } = await runBash(
+        'source scripts/process-backlog.sh; result=$(dirty_file_count /no/existe/de/verdad); echo "RESULT=[$result]"',
+        workDir,
+        process.env,
+      );
+
+      expect(code).toBe(0);
+      // Mismo defecto que worker_tool_error_count, reintroducido en la
+      // línea FILES= del heartbeat por el propio fix de #83: `git status`
+      // falla (worktree inexistente) pero `wc -l | tr -d ' '` igual imprime
+      // "0" sobre entrada vacía, y un `|| echo 0` mal puesto duplicaba la
+      // salida a "0\n0" en vez de devolver un solo "0".
+      expect(stdout).toContain("RESULT=[0]");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 });
 
 /**
