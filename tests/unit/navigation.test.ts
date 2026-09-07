@@ -3,15 +3,26 @@ import {
   MOBILE_OVERFLOW_SECTIONS,
   MOBILE_PRIMARY_SECTIONS,
   NAV_SECTIONS,
+  getMobileLabel,
   isSectionActive,
 } from "@/lib/navigation";
 
 describe("navegación", () => {
   it("contiene exactamente las siete secciones esperadas, cada una con su ruta", () => {
     expect(NAV_SECTIONS).toEqual([
-      { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
+      {
+        label: "Dashboard",
+        href: "/dashboard",
+        icon: "dashboard",
+        mobileLabel: "Inicio",
+      },
       { label: "Directorio", href: "/directorio", icon: "directorio" },
-      { label: "Calendario", href: "/calendario", icon: "calendario" },
+      {
+        label: "Calendario",
+        href: "/calendario",
+        icon: "calendario",
+        mobileLabel: "Agenda",
+      },
       { label: "Equipos", href: "/equipos", icon: "equipos" },
       { label: "Evaluaciones", href: "/evaluaciones", icon: "evaluaciones" },
       { label: "Noticias", href: "/noticias", icon: "noticias" },
@@ -66,5 +77,32 @@ describe("reparto de secciones para móvil", () => {
     expect(new Set(repartidas.map((section) => section.href))).toEqual(
       new Set(NAV_SECTIONS.map((section) => section.href)),
     );
+  });
+});
+
+// #85: "Dashboard" no cabe en una línea en la barra móvil bajo las métricas
+// de fuente que resuelve Linux. La etiqueta corta solo se usa ahí; el
+// sidebar de escritorio sigue mostrando "Dashboard".
+describe("etiqueta corta para la barra móvil (#85)", () => {
+  it("usa mobileLabel cuando la sección lo define", () => {
+    const dashboard = NAV_SECTIONS.find(
+      (section) => section.href === "/dashboard",
+    )!;
+    expect(getMobileLabel(dashboard)).toBe("Inicio");
+  });
+
+  it("usa label cuando la sección no define mobileLabel", () => {
+    const equipos = NAV_SECTIONS.find(
+      (section) => section.href === "/equipos",
+    )!;
+    expect(equipos.mobileLabel).toBeUndefined();
+    expect(getMobileLabel(equipos)).toBe("Equipos");
+  });
+
+  it("acorta también Calendario, que se partía a 360px", () => {
+    const calendario = NAV_SECTIONS.find(
+      (section) => section.href === "/calendario",
+    )!;
+    expect(getMobileLabel(calendario)).toBe("Agenda");
   });
 });

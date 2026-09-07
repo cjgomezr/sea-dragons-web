@@ -13,11 +13,21 @@ describe("barra de pestañas móvil", () => {
 
     const tabs = screen.getAllByRole("link");
     expect(tabs.map((tab) => tab.textContent)).toEqual([
-      "Dashboard",
-      "Calendario",
+      "Inicio",
+      "Agenda",
       "Equipos",
       "Noticias",
     ]);
+  });
+
+  it("la pestaña Inicio sigue enlazando a /dashboard aunque su etiqueta cambie (#85)", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(<MobileTabBar />);
+
+    expect(screen.getByRole("link", { name: "Inicio" })).toHaveAttribute(
+      "href",
+      "/dashboard",
+    );
   });
 
   it("mantiene las secciones restantes fuera del alcance hasta abrir Más", () => {
@@ -59,7 +69,7 @@ describe("barra de pestañas móvil", () => {
 
     const current = screen.getAllByRole("link", { current: "page" });
     expect(current).toHaveLength(1);
-    expect(current[0]).toHaveTextContent("Calendario");
+    expect(current[0]).toHaveTextContent("Agenda");
   });
 
   it("marca el botón Más cuando la ruta activa vive en el desbordamiento", () => {
@@ -104,7 +114,7 @@ describe("barra de pestañas móvil", () => {
     usePathname.mockReturnValue("/dashboard");
     render(<MobileTabBar />);
 
-    for (const label of ["Dashboard", "Calendario", "Equipos", "Noticias"]) {
+    for (const label of ["Inicio", "Agenda", "Equipos", "Noticias"]) {
       expect(screen.getByRole("link", { name: label })).toHaveAccessibleName(
         label,
       );

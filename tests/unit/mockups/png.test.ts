@@ -10,9 +10,13 @@ beforeAll(async () => {
   page = await browser.newPage({ viewport: { width: 40, height: 40 } });
 }, 30_000);
 
+// Mismo presupuesto que el `beforeAll` de arriba: cerrar el navegador no es
+// más rápido que abrirlo, y bajo la suite completa los 10 s del hookTimeout
+// por defecto no alcanzan (el #50 y el #68 arreglaron esta misma clase de
+// fallo para `testTimeout`, que no cubre los hooks).
 afterAll(async () => {
   await browser.close();
-});
+}, 30_000);
 
 describe("decodePng", () => {
   it("lee el ancho y el alto reales del PNG capturado", async () => {

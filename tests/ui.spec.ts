@@ -147,9 +147,65 @@ for (const pg of pages) {
 
 const DESKTOP = { width: 1440, height: 900 } as const;
 const MOBILE = { width: 375, height: 812 } as const;
+// ASS-004: the narrowest viewport the shell must support.
+const MOBILE_MIN_WIDTH = { width: 360, height: 800 } as const;
 
 // Matches --touch-target-min in globals.css (WCAG 2.5.5).
 const TOUCH_TARGET_MIN_PX = 44;
+
+// A single-line label's rendered height sits within rounding distance of the
+// element's line-height; a wrapped one is close to double. #85: the platform
+// font that resolves at runtime decides this, not a screenshot a human
+// happens to look at, so this measures geometry instead of pixels.
+const SINGLE_LINE_HEIGHT_TOLERANCE = 1.5;
+
+async function getTabLabelLineMetrics(
+  page: import("@playwright/test").Page,
+): Promise<Array<{ label: string; height: number; lineHeight: number }>> {
+  return page.evaluate(() => {
+    const tabs = document.querySelectorAll<HTMLElement>(
+      ".app-tabbar-tabs a, .app-tabbar-tabs button",
+    );
+    return Array.from(tabs).map((tab) => {
+      const lineHeight = parseFloat(getComputedStyle(tab).lineHeight);
+      const labelNode = Array.from(tab.childNodes).find(
+        (node) =>
+          node.nodeType === Node.TEXT_NODE &&
+          (node.textContent ?? "").trim().length > 0,
+      );
+      if (!labelNode) {
+        return { label: "", height: 0, lineHeight };
+      }
+      const range = document.createRange();
+      range.selectNodeContents(labelNode);
+      return {
+        label: (labelNode.textContent ?? "").trim(),
+        height: range.getBoundingClientRect().height,
+        lineHeight,
+      };
+    });
+  });
+}
+
+// Naming the offending tab is the whole point: the first version of this
+// check reported only "28.39 is not <= 21.6", which says a label wrapped but
+// not which one, and the fonts that wrap it only exist on the CI machine.
+function expectEverySingleLine(
+  metrics: Array<{ label: string; height: number; lineHeight: number }>,
+): void {
+  expect(metrics.length).toBeGreaterThan(0);
+  const wrapped = metrics.filter(
+    ({ height, lineHeight }) =>
+      height > lineHeight * SINGLE_LINE_HEIGHT_TOLERANCE,
+  );
+  expect(
+    wrapped.map(
+      ({ label, height, lineHeight }) =>
+        `${label} (${height}px, línea ${lineHeight}px)`,
+    ),
+    "estas etiquetas ocupan más de una línea",
+  ).toEqual([]);
+}
 
 // The shell renders both navs and lets CSS pick one, so every assertion is
 // scoped to the nav that the viewport actually shows.
@@ -263,7 +319,9 @@ test("marks the active section in the mobile tab bar", async ({ page }) => {
     .getByRole("navigation", { name: TAB_BAR })
     .locator('[aria-current="page"]');
   await expect(current).toHaveCount(1);
-  await expect(current).toHaveText("Calendario");
+  // "Agenda" en móvil, "Calendario" en el sidebar: el test de arriba fija esa
+  // otra mitad, así que acortar la etiqueta móvil no puede colarse en ambas.
+  await expect(current).toHaveText("Agenda");
 });
 
 test("desktop shows the sidebar nav and not the tab bar", async ({ page }) => {
@@ -320,6 +378,45 @@ test("mobile tabs keep the 44px touch target after adding icons", async ({
     expect(box, "tab has no layout box").not.toBeNull();
     expect(box!.height).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
   }
+});
+
+test("mobile tabs keep the 44px touch target at 360px (ASS-004 minimum)", async ({
+  page,
+}) => {
+  await page.setViewportSize(MOBILE_MIN_WIDTH);
+  await page.goto(`${APP_URL}/dashboard`);
+  const tabBar = page.getByRole("navigation", { name: TAB_BAR });
+
+  const tabs = await tabBar.getByRole("link").all();
+  const moreButton = tabBar.getByRole("button", { name: "Más" });
+
+  for (const tab of [...tabs, moreButton]) {
+    const box = await tab.boundingBox();
+    expect(box, "tab has no layout box").not.toBeNull();
+    expect(box!.height).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
+  }
+});
+
+// #85: "Dashboard" wrapped to two lines only on the fonts Linux resolves,
+// invisible on Windows at the same 375px width. Measuring the label's own
+// rendered height against its line-height catches that regardless of which
+// platform's font happens to be installed on the machine running the test.
+test("no mobile tab label wraps to a second line at 375px", async ({
+  page,
+}) => {
+  await page.setViewportSize(MOBILE);
+  await page.goto(`${APP_URL}/dashboard`);
+
+  expectEverySingleLine(await getTabLabelLineMetrics(page));
+});
+
+test("no mobile tab label wraps to a second line at 360px (ASS-004 minimum)", async ({
+  page,
+}) => {
+  await page.setViewportSize(MOBILE_MIN_WIDTH);
+  await page.goto(`${APP_URL}/dashboard`);
+
+  expectEverySingleLine(await getTabLabelLineMetrics(page));
 });
 
 test("mobile never hides content behind the fixed tab bar", async ({
@@ -388,4 +485,61 @@ test("keyboard focus follows the visual order and stays visible", async ({
     Math.min(...outlineWidths),
     "every nav link must paint a focus outline",
   ).toBeGreaterThan(0);
+});
+
+// El test de salto de línea solo falla donde la fuente es lo bastante ancha
+// para partir la etiqueta, que en el #85 resultó ser únicamente Linux: en
+// Windows "Dashboard" cabía por un pelo y el defecto era invisible. Este mide
+// el margen que le queda a cada etiqueta dentro de su pestaña, así que una
+// etiqueta al límite falla en la máquina de quien la escribe, no tres horas
+// después en CI.
+// De dónde sale el 0.85: a 360px cada pestaña deja 64px útiles. Medido en
+// Windows, "Calendario" ocupaba 56.8px (89%) y aun así se partía en Linux, lo
+// que sitúa la brecha entre fuentes en al menos 1.13x. No hay cota superior
+// medida, así que el umbral no se puede derivar del todo: 0.85 deja fuera a
+// las etiquetas que ya rozan el límite en la máquina del autor, y el test de
+// salto de línea sigue cubriendo lo que se escape. Si CI lo hace saltar por
+// una etiqueta que NO se parte, el número está flojo y toca medir en Linux,
+// no subirlo.
+const MAX_LABEL_WIDTH_RATIO = 0.85;
+
+test("every mobile tab label keeps room to spare inside its tab at 360px", async ({
+  page,
+}) => {
+  await page.setViewportSize(MOBILE_MIN_WIDTH);
+  await page.goto(`${APP_URL}/dashboard`);
+
+  const usage = await page.evaluate(() => {
+    const tabs = document.querySelectorAll<HTMLElement>(
+      ".app-tabbar-tabs a, .app-tabbar-tabs button",
+    );
+    return Array.from(tabs).map((tab) => {
+      const style = getComputedStyle(tab);
+      const usable =
+        tab.getBoundingClientRect().width -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight);
+      const labelNode = Array.from(tab.childNodes).find(
+        (node) =>
+          node.nodeType === Node.TEXT_NODE &&
+          (node.textContent ?? "").trim().length > 0,
+      );
+      if (!labelNode) {
+        return { label: "", ratio: 0 };
+      }
+      const range = document.createRange();
+      range.selectNodeContents(labelNode);
+      return {
+        label: (labelNode.textContent ?? "").trim(),
+        ratio: range.getBoundingClientRect().width / usable,
+      };
+    });
+  });
+
+  expect(usage.length).toBeGreaterThan(0);
+  const tooWide = usage.filter(({ ratio }) => ratio > MAX_LABEL_WIDTH_RATIO);
+  expect(
+    tooWide.map(({ label, ratio }) => `${label} (${Math.round(ratio * 100)}%)`),
+    `estas etiquetas pasan del ${MAX_LABEL_WIDTH_RATIO * 100}% de su pestaña y se partirán con una fuente algo más ancha`,
+  ).toEqual([]);
 });
