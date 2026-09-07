@@ -125,6 +125,8 @@ cleanup() {
     # returned the ticket to the queue.
     bash scripts/task-status.sh "$N" "Blocked" 2>/dev/null || true
   fi
+  # Already handled above; the EXIT trap's safety_net must not also fire.
+  TICKET_OUTCOME_RECORDED=1
   exit 130
 }
 
@@ -138,6 +140,35 @@ flag_needs_human() {  # issue number, comment body
   [ -n "${ME:-}" ] && gh issue edit "$n" --remove-assignee "@me" 2>/dev/null || true
   bash scripts/task-status.sh "$n" "Blocked" 2>/dev/null || true
   gh issue comment "$n" --body "$body" || true
+}
+
+# Last-resort net (#83): every ordinary exit path already marks the ticket
+# one way or another (cleanup() on Ctrl+C, handle_worker_exit() once the
+# worker's outcome is known), but ALL of that machinery depends on the
+# script staying alive long enough to run it, and #83 is exactly a case
+# where it didn't: the script died between the heartbeat loop and its own
+# epilogue, printing nothing, leaving the ticket in-progress and assigned
+# with real work stranded on its branch. This trap fires on every exit,
+# whatever the cause (a bug here, an environment quirk, one we haven't hit
+# yet), and is a no-op once WORKER_LAUNCHED is unset (no worker running yet)
+# or TICKET_OUTCOME_RECORDED is set (some path already handled this ticket).
+safety_net() {
+  local exit_code=$?
+  if [ -n "${N:-}" ] && [ -n "${WORKER_LAUNCHED:-}" ] && [ -z "${TICKET_OUTCOME_RECORDED:-}" ]; then
+    echo "" >&2
+    echo "🚨 process-backlog.sh terminó de forma inesperada (código $exit_code) procesando #$N: red de seguridad activada" >&2
+    flag_needs_human "$N" "🤖 **El propio \`process-backlog.sh\` terminó de forma inesperada** (código de salida $exit_code) mientras procesaba este ticket, antes de poder decidir si el worker tuvo éxito.
+
+**Qué pasó:** el proceso que orquesta al worker murió por su cuenta; el worker puede haber terminado bien, mal, o seguir corriendo huérfano. Ninguna de las rutas normales de cierre llegó a ejecutarse, así que esta es la red de seguridad de último recurso.
+
+**Trabajo parcial:** revisa el worktree \`impl-$N\` antes de decidir cómo retomarlo.
+
+**Para retomar:**
+\`\`\`
+gh issue edit $N --remove-label needs-human --remove-label in-progress --add-label pending
+bash scripts/process-backlog.sh
+\`\`\`"
+  fi
 }
 
 # True if some PR (any state) declares "Closes #N" in its body, OR if `gh`
@@ -161,6 +192,46 @@ pr_declares_closes() {  # issue number
 # does (see #62, which is expected to touch it).
 worktree_dir_for() {  # issue number
   echo ".claude/worktrees/impl-$1"
+}
+
+# Best-effort heartbeat helpers (#83): every command here can legitimately
+# fail on a live run (no session started yet, a log file rotated between the
+# `ls` that found it and the `tail` that reads it, a file renamed mid-`find`
+# scan) and must never take the whole script down with it. Under `set -euo
+# pipefail`, `VAR=$(cmd1 | cmd2)` aborts the script the instant ANY stage of
+# the pipeline fails, even if the assignment is otherwise harmless and the
+# failure is expected; the `|| true` at the end of each pipeline is what
+# neutralizes that (`LINES` a few lines below already relied on the same
+# trick with `|| echo 0`, these below just didn't have it).
+latest_session_file() {  # issue number -> path or empty
+  local n="$1" sess_dir
+  # Anchor the end: without it, issue #1 matches ...impl-19 / ...impl-100.
+  sess_dir=$(ls -dt "$HOME/.claude/projects/"*worktrees-impl-"$n" 2>/dev/null | head -1 || true)
+  [ -n "$sess_dir" ] || return 0
+  ls -t "$sess_dir"/*.jsonl 2>/dev/null | head -1 || true
+}
+
+latest_worker_activity() {  # session file path -> text or empty
+  local sess_file="$1"
+  [ -n "$sess_file" ] || return 0
+  tail -c 200000 "$sess_file" 2>/dev/null \
+    | jq -Rr 'fromjson? | select(.type=="assistant") | .message.content[]? | select(.type=="tool_use")
+              | "🔧 " + .name + ((.input.command // .input.file_path // "") | tostring | if . == "" then "" else ": " + .[0:55] end)' 2>/dev/null \
+    | tail -1 || true
+}
+
+worker_tool_error_count() {  # session file path -> integer (0 if unavailable)
+  local sess_file="$1"
+  [ -n "$sess_file" ] || { echo 0; return 0; }
+  tail -c 200000 "$sess_file" 2>/dev/null \
+    | jq -Rr 'fromjson? | select(.type=="user") | .message.content[]? | select(.type=="tool_result" and .is_error==true) | 1' 2>/dev/null \
+    | wc -l | tr -d ' ' || echo 0
+}
+
+latest_touched_file() {  # worktree dir -> "epoch path" or empty
+  local wt_dir="$1"
+  find "$wt_dir" -type f -not -path "*/node_modules/*" -not -path "*/.git/*" \
+    -printf '%T@ %P\n' 2>/dev/null | sort -nr | head -1 || true
 }
 
 # Creates (or reuses) the worktree for a ticket, always on branch `impl-N`.
@@ -264,8 +335,11 @@ main() {
   reconcile_board   # (must run after the function definitions above)
 
   trap cleanup INT TERM
+  trap safety_net EXIT
 
   while [ "$PROCESSED" -lt "$MAX_ISSUES" ]; do
+    WORKER_LAUNCHED=""
+    TICKET_OUTCOME_RECORDED=""
     N=$(next_issue)
     if [ -z "${N:-}" ]; then
       echo "✅ Backlog empty (no eligible pending issues). Processed: $PROCESSED"
@@ -294,6 +368,7 @@ main() {
     bash scripts/task-status.sh "$N" "In Progress" 2>/dev/null || true
 
     run_worker "$N"
+    WORKER_LAUNCHED=1
 
     # Heartbeat: while the worker runs, print elapsed time + latest commit on its
     # branch every 60s, so a quiet terminal never looks like a hung one.
@@ -334,28 +409,19 @@ main() {
         # (b) the most recently touched file and how long ago
         # (c) uncommitted work volume, and tool errors it is fighting through
         ACT=""; ERR=0
-        # Anchor the end: without it, issue #1 matches ...impl-19 / ...impl-100.
-        SESS_DIR=$(ls -dt "$HOME/.claude/projects/"*worktrees-impl-"$N" 2>/dev/null | head -1)
-        if [ -n "$SESS_DIR" ]; then
-          SESS_FILE=$(ls -t "$SESS_DIR"/*.jsonl 2>/dev/null | head -1)
-          if [ -n "$SESS_FILE" ]; then
-            ACT=$(tail -c 200000 "$SESS_FILE" 2>/dev/null \
-              | jq -Rr 'fromjson? | select(.type=="assistant") | .message.content[]? | select(.type=="tool_use")
-                        | "🔧 " + .name + ((.input.command // .input.file_path // "") | tostring | if . == "" then "" else ": " + .[0:55] end)' 2>/dev/null \
-              | tail -1)
-            ERR=$(tail -c 200000 "$SESS_FILE" 2>/dev/null \
-              | jq -Rr 'fromjson? | select(.type=="user") | .message.content[]? | select(.type=="tool_result" and .is_error==true) | 1' 2>/dev/null \
-              | wc -l | tr -d ' ')
-          fi
+        SESS_FILE=$(latest_session_file "$N")
+        if [ -n "$SESS_FILE" ]; then
+          ACT=$(latest_worker_activity "$SESS_FILE")
+          ERR=$(worker_tool_error_count "$SESS_FILE")
         fi
         AGO=""; AGOTXT=""
-        TOUCH=$(find "$WT_DIR" -type f -not -path "*/node_modules/*" -not -path "*/.git/*" -printf '%T@ %P\n' 2>/dev/null | sort -nr | head -1)
+        TOUCH=$(latest_touched_file "$WT_DIR")
         if [ -n "$TOUCH" ]; then
           TSEC=${TOUCH%% *}; TFILE=${TOUCH#* }
           AGO=$(( $(date +%s) - ${TSEC%.*} ))
           AGOTXT="· ✍ ${TFILE:0:45} (hace ${AGO}s)"
         fi
-        FILES=$(git -C "$WT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+        FILES=$(git -C "$WT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ' || echo 0)
         LINES=$(git -C "$WT_DIR" diff --shortstat 2>/dev/null | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
         LINE="  ⏱ ${ELAPSED_MIN}m · ${ACT:-trabajando} · $FILES arch, +$LINES líneas $AGOTXT"
         if [ "${ERR:-0}" -gt "$LAST_ERR" ]; then
@@ -377,6 +443,7 @@ main() {
       WORKER_EXIT_CODE=$?
     fi
     handle_worker_exit "$N" "$WORKER_EXIT_CODE"
+    TICKET_OUTCOME_RECORDED=1
 
     PROCESSED=$((PROCESSED + 1))
   done

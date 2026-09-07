@@ -1194,6 +1194,225 @@ handle_worker_exit "$N" "$EXIT_CODE"`,
   );
 });
 
+/**
+ * #83: `process-backlog.sh` moría en silencio después de que el worker
+ * terminaba, sin epílogo ni aviso needs-human. La causa raíz encontrada: el
+ * bucle de heartbeat asigna la salida de varios pipelines (`ls`, `find`,
+ * `tail`) directamente a variables, sin protegerlas; bajo `set -euo
+ * pipefail`, si CUALQUIER etapa de esos pipelines falla (un glob sin match,
+ * un archivo de sesión que rota justo cuando se lee), la asignación entera
+ * cuenta como un comando fallido y el script aborta sin imprimir nada. La
+ * línea `LINES=...` de al lado ya tenía el guardado correcto (`|| echo 0`);
+ * estas no lo tenían. Estos tests ejercitan las funciones extraídas
+ * directamente, sin esperar los 60 s del `sleep` real del heartbeat.
+ */
+describe("resiliencia del heartbeat ante fallos de ls/find/tail (#83)", () => {
+  let workDir = "";
+
+  afterEach(async () => {
+    if (workDir) {
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
+      workDir = "";
+    }
+  });
+
+  it(
+    "latest_session_file no aborta el shell si ningún directorio de sesión matchea",
+    async () => {
+      workDir = await setupWorkDir();
+      const emptyHome = path.join(workDir, "empty-home");
+      await mkdir(emptyHome, { recursive: true });
+
+      const { code, stdout } = await runBash(
+        'source scripts/process-backlog.sh; latest_session_file 999999; echo "DESPUES:$?"',
+        workDir,
+        { ...process.env, HOME: emptyHome },
+      );
+
+      expect(code).toBe(0);
+      expect(stdout).toContain("DESPUES:0");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "latest_touched_file no aborta el shell si el worktree no existe",
+    async () => {
+      workDir = await setupWorkDir();
+
+      const { code, stdout } = await runBash(
+        'source scripts/process-backlog.sh; latest_touched_file /no/existe/de/verdad; echo "DESPUES:$?"',
+        workDir,
+        process.env,
+      );
+
+      expect(code).toBe(0);
+      expect(stdout).toContain("DESPUES:0");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "latest_worker_activity no aborta el shell si el archivo de sesión desaparece entre el ls y la lectura",
+    async () => {
+      workDir = await setupWorkDir();
+
+      const { code, stdout } = await runBash(
+        'source scripts/process-backlog.sh; latest_worker_activity /no/existe/sesion.jsonl; echo "DESPUES:$?"',
+        workDir,
+        process.env,
+      );
+
+      expect(code).toBe(0);
+      expect(stdout).toContain("DESPUES:0");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "worker_tool_error_count devuelve 0 y no aborta el shell sin sesión",
+    async () => {
+      workDir = await setupWorkDir();
+
+      const { code, stdout } = await runBash(
+        'source scripts/process-backlog.sh; worker_tool_error_count ""; echo "DESPUES:$?"',
+        workDir,
+        process.env,
+      );
+
+      expect(code).toBe(0);
+      expect(stdout).toContain("DESPUES:0");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+});
+
+/**
+ * #83: incluso arreglado el pipeline sin proteger, nada garantiza que sea
+ * el ÚNICO comando capaz de matar el script en silencio; toda la red de
+ * seguridad del #69 depende de que el script siga vivo para ejecutarla. Este
+ * trap es la red de última instancia: si el script muere por CUALQUIER
+ * razón después de lanzar un worker y antes de que su desenlace quede
+ * registrado, el ticket no debe quedar colgado en in-progress.
+ */
+describe("red de seguridad si process-backlog.sh muere tras lanzar el worker (#83)", () => {
+  let workDir = "";
+
+  afterEach(async () => {
+    if (workDir) {
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
+      workDir = "";
+    }
+  });
+
+  it(
+    "marca needs-human si el script termina sin haber registrado el desenlace del ticket",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+
+      const { code } = await runBash(
+        "source scripts/process-backlog.sh; N=42; ME=tester; WORKER_LAUNCHED=1; safety_net",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        },
+      );
+
+      expect(code).toBe(0);
+      const log = await readLog(logFile);
+      expect(log).toMatch(
+        /issue edit 42 --add-label needs-human --remove-label in-progress/,
+      );
+      expect(log).toMatch(/issue edit 42 --remove-assignee @me/);
+      expect(log).toMatch(/project item-edit --id ITEM123.*opt-blocked/);
+      expect(log).toMatch(/issue comment 42/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no hace nada si el ticket ya quedó resuelto (handle_worker_exit ya corrió)",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+
+      const { code } = await runBash(
+        "source scripts/process-backlog.sh; N=42; ME=tester; WORKER_LAUNCHED=1; TICKET_OUTCOME_RECORDED=1; safety_net",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        },
+      );
+
+      expect(code).toBe(0);
+      const log = await readLog(logFile);
+      expect(log).not.toMatch(/needs-human/);
+      expect(log).not.toMatch(/issue comment/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no hace nada si todavía no se había lanzado ningún worker",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+
+      const { code } = await runBash(
+        "source scripts/process-backlog.sh; N=42; ME=tester; safety_net",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+        },
+      );
+
+      expect(code).toBe(0);
+      const log = await readLog(logFile);
+      expect(log).not.toMatch(/needs-human/);
+      expect(log).not.toMatch(/issue comment/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "un fallo inesperado del script tras lanzar el worker activa el trap sin que nadie llame a la red de seguridad a mano",
+    async () => {
+      workDir = await setupWorkDir();
+      await writeProjectConfig(workDir, FULL_STATUS_OPTIONS);
+      const { binDir, logFile } = await installFakeGh(workDir);
+
+      const { code } = await runBash(
+        `source scripts/process-backlog.sh
+ME=tester
+N=77
+WORKER_LAUNCHED=1
+trap safety_net EXIT
+false`,
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ISSUE_VIEW_JSON: OPEN_IN_PROGRESS_ISSUE,
+          PR_LIST_COUNT: "0",
+        },
+      );
+
+      expect(code).not.toBe(0);
+      const log = await readLog(logFile);
+      expect(log).toMatch(/issue edit 77 --add-label needs-human/);
+      expect(log).toMatch(/issue comment 77/);
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+});
+
 describe("CLAUDE.md", () => {
   it("documenta que el agente también escribe el estado Blocked", async () => {
     const claudeMd = await readFile(path.join(REPO_ROOT, "CLAUDE.md"), "utf8");
