@@ -14,10 +14,20 @@ export type NavSection = {
   readonly label: string;
   readonly href: string;
   readonly icon: NavIconId;
+  // Overrides `label` only in the mobile tab bar. Its strip is narrower than
+  // the sidebar, and the fonts Linux resolves make "Dashboard" wrap to two
+  // lines there while Windows fonts let it fit (#85). Absent unless a
+  // section's full label doesn't survive that width.
+  readonly mobileLabel?: string;
 };
 
 export const NAV_SECTIONS: readonly NavSection[] = [
-  { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
+  {
+    label: "Dashboard",
+    href: "/dashboard",
+    icon: "dashboard",
+    mobileLabel: "Inicio",
+  },
   { label: "Directorio", href: "/directorio", icon: "directorio" },
   { label: "Calendario", href: "/calendario", icon: "calendario" },
   { label: "Equipos", href: "/equipos", icon: "equipos" },
@@ -53,4 +63,8 @@ export function isSectionActive(
   pathname: string,
 ): boolean {
   return sectionHref === pathname;
+}
+
+export function getMobileLabel(section: NavSection): string {
+  return section.mobileLabel ?? section.label;
 }

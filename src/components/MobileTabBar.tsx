@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   MOBILE_OVERFLOW_SECTIONS,
   MOBILE_PRIMARY_SECTIONS,
+  getMobileLabel,
   isSectionActive,
 } from "@/lib/navigation";
 import { NAV_SECTION_ICONS, OverflowIcon } from "@/components/NavIcons";
@@ -38,7 +39,7 @@ export function MobileTabBar(): React.JSX.Element {
                 isSectionActive(section.href, pathname) ? "page" : undefined
               }
             >
-              {section.label}
+              {getMobileLabel(section)}
             </Link>
           </li>
         ))}
@@ -55,7 +56,7 @@ export function MobileTabBar(): React.JSX.Element {
                 }
               >
                 <SectionIcon />
-                {section.label}
+                {getMobileLabel(section)}
               </Link>
             </li>
           );

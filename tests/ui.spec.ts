@@ -147,9 +147,41 @@ for (const pg of pages) {
 
 const DESKTOP = { width: 1440, height: 900 } as const;
 const MOBILE = { width: 375, height: 812 } as const;
+// ASS-004: the narrowest viewport the shell must support.
+const MOBILE_MIN_WIDTH = { width: 360, height: 800 } as const;
 
 // Matches --touch-target-min in globals.css (WCAG 2.5.5).
 const TOUCH_TARGET_MIN_PX = 44;
+
+// A single-line label's rendered height sits within rounding distance of the
+// element's line-height; a wrapped one is close to double. #85: the platform
+// font that resolves at runtime decides this, not a screenshot a human
+// happens to look at, so this measures geometry instead of pixels.
+const SINGLE_LINE_HEIGHT_TOLERANCE = 1.5;
+
+async function getTabLabelLineMetrics(
+  page: import("@playwright/test").Page,
+): Promise<Array<{ height: number; lineHeight: number }>> {
+  return page.evaluate(() => {
+    const tabs = document.querySelectorAll<HTMLElement>(
+      ".app-tabbar-tabs a, .app-tabbar-tabs button",
+    );
+    return Array.from(tabs).map((tab) => {
+      const lineHeight = parseFloat(getComputedStyle(tab).lineHeight);
+      const labelNode = Array.from(tab.childNodes).find(
+        (node) =>
+          node.nodeType === Node.TEXT_NODE &&
+          (node.textContent ?? "").trim().length > 0,
+      );
+      if (!labelNode) {
+        return { height: 0, lineHeight };
+      }
+      const range = document.createRange();
+      range.selectNodeContents(labelNode);
+      return { height: range.getBoundingClientRect().height, lineHeight };
+    });
+  });
+}
 
 // The shell renders both navs and lets CSS pick one, so every assertion is
 // scoped to the nav that the viewport actually shows.
@@ -319,6 +351,57 @@ test("mobile tabs keep the 44px touch target after adding icons", async ({
     const box = await tab.boundingBox();
     expect(box, "tab has no layout box").not.toBeNull();
     expect(box!.height).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
+  }
+});
+
+test("mobile tabs keep the 44px touch target at 360px (ASS-004 minimum)", async ({
+  page,
+}) => {
+  await page.setViewportSize(MOBILE_MIN_WIDTH);
+  await page.goto(`${APP_URL}/dashboard`);
+  const tabBar = page.getByRole("navigation", { name: TAB_BAR });
+
+  const tabs = await tabBar.getByRole("link").all();
+  const moreButton = tabBar.getByRole("button", { name: "Más" });
+
+  for (const tab of [...tabs, moreButton]) {
+    const box = await tab.boundingBox();
+    expect(box, "tab has no layout box").not.toBeNull();
+    expect(box!.height).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
+  }
+});
+
+// #85: "Dashboard" wrapped to two lines only on the fonts Linux resolves,
+// invisible on Windows at the same 375px width. Measuring the label's own
+// rendered height against its line-height catches that regardless of which
+// platform's font happens to be installed on the machine running the test.
+test("no mobile tab label wraps to a second line at 375px", async ({
+  page,
+}) => {
+  await page.setViewportSize(MOBILE);
+  await page.goto(`${APP_URL}/dashboard`);
+
+  const metrics = await getTabLabelLineMetrics(page);
+  expect(metrics.length).toBeGreaterThan(0);
+  for (const { height, lineHeight } of metrics) {
+    expect(height).toBeLessThanOrEqual(
+      lineHeight * SINGLE_LINE_HEIGHT_TOLERANCE,
+    );
+  }
+});
+
+test("no mobile tab label wraps to a second line at 360px (ASS-004 minimum)", async ({
+  page,
+}) => {
+  await page.setViewportSize(MOBILE_MIN_WIDTH);
+  await page.goto(`${APP_URL}/dashboard`);
+
+  const metrics = await getTabLabelLineMetrics(page);
+  expect(metrics.length).toBeGreaterThan(0);
+  for (const { height, lineHeight } of metrics) {
+    expect(height).toBeLessThanOrEqual(
+      lineHeight * SINGLE_LINE_HEIGHT_TOLERANCE,
+    );
   }
 });
 
