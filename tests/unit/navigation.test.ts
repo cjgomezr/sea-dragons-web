@@ -9,13 +9,13 @@ import {
 describe("navegación", () => {
   it("contiene exactamente las siete secciones esperadas, cada una con su ruta", () => {
     expect(NAV_SECTIONS).toEqual([
-      { label: "Dashboard", href: "/dashboard" },
-      { label: "Directorio", href: "/directorio" },
-      { label: "Calendario", href: "/calendario" },
-      { label: "Equipos", href: "/equipos" },
-      { label: "Evaluaciones", href: "/evaluaciones" },
-      { label: "Noticias", href: "/noticias" },
-      { label: "Pagos", href: "/pagos" },
+      { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
+      { label: "Directorio", href: "/directorio", icon: "directorio" },
+      { label: "Calendario", href: "/calendario", icon: "calendario" },
+      { label: "Equipos", href: "/equipos", icon: "equipos" },
+      { label: "Evaluaciones", href: "/evaluaciones", icon: "evaluaciones" },
+      { label: "Noticias", href: "/noticias", icon: "noticias" },
+      { label: "Pagos", href: "/pagos", icon: "pagos" },
     ]);
   });
 

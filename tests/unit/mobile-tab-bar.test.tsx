@@ -24,7 +24,9 @@ describe("barra de pestañas móvil", () => {
     usePathname.mockReturnValue("/dashboard");
     render(<MobileTabBar />);
 
-    expect(screen.queryByRole("link", { name: "Pagos" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Pagos" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Más" })).toHaveAttribute(
       "aria-expanded",
       "false",
@@ -38,7 +40,9 @@ describe("barra de pestañas móvil", () => {
 
     await user.click(screen.getByRole("button", { name: "Más" }));
 
-    expect(screen.getByRole("link", { name: "Directorio" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Directorio" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Evaluaciones" }),
     ).toBeInTheDocument();
@@ -66,7 +70,9 @@ describe("barra de pestañas móvil", () => {
       "aria-current",
       "true",
     );
-    expect(screen.queryByRole("link", { current: "page" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { current: "page" }),
+    ).not.toBeInTheDocument();
   });
 
   it("no marca nada cuando la ruta no pertenece al menú", () => {
@@ -76,8 +82,50 @@ describe("barra de pestañas móvil", () => {
     expect(
       screen.queryByRole("link", { current: "page" }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Más" }),
-    ).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("button", { name: "Más" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("muestra un icono decorativo además de la etiqueta en cada pestaña fija", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(<MobileTabBar />);
+
+    const tabs = screen.getAllByRole("link");
+    expect(tabs).toHaveLength(4);
+    for (const tab of tabs) {
+      const icon = tab.querySelector("svg");
+      expect(icon).not.toBeNull();
+      expect(icon).toHaveAttribute("aria-hidden", "true");
+    }
+  });
+
+  it("el nombre accesible de cada pestaña es solo su etiqueta, sin texto del icono", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(<MobileTabBar />);
+
+    for (const label of ["Dashboard", "Calendario", "Equipos", "Noticias"]) {
+      expect(screen.getByRole("link", { name: label })).toHaveAccessibleName(
+        label,
+      );
+    }
+  });
+
+  it("el botón Más tiene icono propio, distinto de los de sección, y conserva aria-expanded", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(<MobileTabBar />);
+
+    const moreButton = screen.getByRole("button", { name: "Más" });
+    const moreIcon = moreButton.querySelector("svg");
+    expect(moreIcon).not.toBeNull();
+    expect(moreIcon).toHaveAttribute("aria-hidden", "true");
+
+    const sectionIconMarkup = screen
+      .getAllByRole("link")
+      .map((tab) => tab.querySelector("svg")?.outerHTML);
+    expect(sectionIconMarkup).not.toContain(moreIcon?.outerHTML);
+
+    expect(moreButton).toHaveAccessibleName("Más");
+    expect(moreButton).toHaveAttribute("aria-expanded", "false");
   });
 });

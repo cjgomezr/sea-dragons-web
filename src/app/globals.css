@@ -179,8 +179,10 @@ h6 {
 .app-tabbar-tabs a,
 .app-tabbar-tabs button {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--space-1);
   width: 100%;
   min-height: var(--touch-target-min);
   padding: var(--space-2) var(--space-1);
@@ -194,6 +196,11 @@ h6 {
   background: transparent;
   border: 0;
   cursor: pointer;
+}
+
+/* Decorative: the accessible name comes from the label text alone. */
+.app-tabbar-tabs svg {
+  flex-shrink: 0;
 }
 
 .app-tabbar-tabs [aria-current] {
