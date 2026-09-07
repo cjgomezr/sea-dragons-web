@@ -52,8 +52,9 @@ const themes = ["light", "dark"] as const;
 // Ver el PR de este ticket para las corridas exactas y los píxeles medidos
 // en cada caso. Es un presupuesto ABSOLUTO a propósito: uno por ratio crece
 // con el alto de la página y es la causa raíz del punto ciego (#77).
-const PAGE_MAX_DIFF_PIXELS = 120;
-const COMPONENT_MAX_DIFF_PIXELS = 40;
+// TEMPORAL: en cero a propósito para esta medición. No mergear.
+const PAGE_MAX_DIFF_PIXELS = 0;
+const COMPONENT_MAX_DIFF_PIXELS = 0;
 
 // "home" is the pre-existing landing page; "section" is a destination route
 // off the sidebar menu, standing in for any of the seven (they share the
