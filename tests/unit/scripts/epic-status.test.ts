@@ -261,6 +261,24 @@ describe("cierre de épicas", () => {
     expect(log).not.toMatch(/issue reopen/);
   });
 
+  it("respuesta de gh sin subIssuesSummary numérico: no cierra ni reabre nada", async () => {
+    const { binDir, logFile } = await setupWorkDir();
+
+    const { code } = await run(SYNC_SCRIPT, ["53"], workDir, {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      PARENT_NUMBER: "1",
+      EPIC_STATE: "OPEN",
+      EPIC_TOTAL: "null",
+      EPIC_COMPLETED: "null",
+    });
+
+    expect(code).toBe(0);
+    const log = await readLog(logFile);
+    expect(log).not.toMatch(/issue close/);
+    expect(log).not.toMatch(/issue reopen/);
+  });
+
   it("reconcile-epic.sh reconcilia directamente una épica dada por número", async () => {
     const { binDir, logFile } = await setupWorkDir();
 
