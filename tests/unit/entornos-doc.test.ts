@@ -12,6 +12,10 @@ const KEY_LOOKING_PATTERNS = [
   /service_role/i,
 ];
 
+/** Refs de los dos proyectos de Supabase. Son públicos: viajan en la URL de
+ * cada petición del navegador. Lo que nunca se versiona son las claves. */
+const PROJECT_REFS = ["xcfrpcvomjjmfoztifuo", "weqhmtpvgewomslpvefu"] as const;
+
 function readEntornosDoc(): string {
   return readFileSync(ENTORNOS_DOC_PATH, "utf-8");
 }
@@ -23,6 +27,17 @@ describe("docs/entornos.md", () => {
     expect(doc).toContain("seadragons-dev");
     expect(doc).toContain("seadragons-prod");
     expect(doc).toContain("ap-southeast-2");
+  });
+
+  it("declara un ref concreto para cada proyecto, no un pendiente", () => {
+    const doc = readEntornosDoc();
+
+    // Un ref sin resolver deja el documento inservible justo cuando alguien lo
+    // consulta: al configurar un despliegue o al buscar dónde apuntar.
+    for (const ref of PROJECT_REFS) {
+      expect(doc).toContain(ref);
+    }
+    expect(doc).not.toMatch(/\*\*Ref:\*\*\s*pendiente/i);
   });
 
   it("no contiene ninguna cadena con pinta de clave", () => {
