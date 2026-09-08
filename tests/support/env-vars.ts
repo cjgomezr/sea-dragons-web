@@ -24,11 +24,11 @@ const DIRECT_ACCESS_PATTERN = /process\.env\.([A-Za-z_][A-Za-z0-9_]*)/g;
 const BRACKET_ACCESS_PATTERN =
   /process\.env\[\s*(['"])([A-Za-z_][A-Za-z0-9_]*)\1\s*\]/g;
 // Convención de este proyecto (ver src/lib/supabase/config.ts): el nombre
-// real de una variable puede vivir en una constante exportada como
-// `ALGO_ENV = "NOMBRE_REAL"`, en vez de escribirse como `process.env.NOMBRE`
-// en el sitio donde se lee, para poder inyectar un objeto de entorno de
-// prueba. Sin este patrón, escanear solo accesos directos no vería
-// SUPABASE_SERVICE_ROLE_KEY.
+// real de una variable puede vivir en una constante exportada cuyo
+// identificador termina en "_ENV" y cuyo valor es el nombre real, en vez de
+// escribirse en el sitio donde se lee como una propiedad literal de
+// process.env, para poder inyectar un objeto de entorno de prueba. Sin este
+// patrón, escanear solo accesos directos no vería SUPABASE_SERVICE_ROLE_KEY.
 const ENV_NAME_CONSTANT_PATTERN =
   /\b[A-Z][A-Z0-9_]*_ENV\s*=\s*(['"])([A-Z][A-Z0-9_]*)\1/g;
 
