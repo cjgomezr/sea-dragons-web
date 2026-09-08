@@ -162,10 +162,16 @@ describe("limpieza ante fallo", () => {
   );
 });
 
+// El runner de CI (ubuntu-latest en checks.yml) fija Node 20, que no tiene
+// --experimental-strip-types (llegó en Node 22.6): un spawn con esa flag
+// muere ahí con "bad option" (código 9) en vez del código de salida que esta
+// prueba verifica. tsx transpila el entrypoint sin depender de esa flag.
+const TSX_CLI = require.resolve("tsx/cli");
+
 function runCommand(args: readonly string[]): Promise<number | null> {
   const child = spawn(
     process.execPath,
-    ["--experimental-strip-types", "scripts/capture-ui.ts", ...args],
+    [TSX_CLI, "scripts/capture-ui.ts", ...args],
     { stdio: "ignore" },
   );
   return new Promise((resolve) => child.on("close", resolve));

@@ -11,6 +11,13 @@ const FIXTURE_PATH = path.join(HERE, "fixtures", "sigint-fixture.ts");
 const ORIGINAL_CONTENT = '{\n  "compilerOptions": {}\n}\n';
 const FIXTURE_TIMEOUT_MS = 20_000;
 
+// El runner de CI (ubuntu-latest en checks.yml) fija Node 20, que no tiene
+// --experimental-strip-types (llegó en Node 22.6): un spawn con esa flag
+// muere ahí con "bad option" antes de imprimir nada, y este test agota su
+// timeout esperando una señal de arranque que nunca llega. tsx transpila el
+// entrypoint sin depender de esa flag ni de la versión de Node que lo corre.
+const TSX_CLI = require.resolve("tsx/cli");
+
 // Node no entrega señales POSIX reales a los hijos en Windows: child.kill("SIGINT")
 // ahí solo termina el proceso a la fuerza, sin darle nunca la oportunidad de
 // correr su propio listener (comprobado a mano: un hijo con
@@ -43,7 +50,7 @@ describe.skipIf(process.platform === "win32")("suite de integración", () => {
 
       child = spawn(
         process.execPath,
-        ["--experimental-strip-types", FIXTURE_PATH, guardedFilePath],
+        [TSX_CLI, FIXTURE_PATH, guardedFilePath],
         { stdio: ["ignore", "pipe", "inherit"] },
       );
 

@@ -9,10 +9,15 @@ if (!guardedFilePath) {
   throw new Error("uso: sigint-fixture.ts <archivo-a-vigilar>");
 }
 
-await withRestoredFiles([guardedFilePath], async () => {
-  await writeFile(guardedFilePath, "reescrito por el fixture", "utf8");
-  console.log("listo-para-sigint");
-  await new Promise(() => {
-    // Nunca resuelve: el fixture solo termina cuando el test le manda SIGINT.
+// Sin await de nivel superior: tsx (ejecutor de este fixture bajo Node 20,
+// que no soporta --experimental-strip-types) transpila el entrypoint a CommonJS,
+// y un await de nivel superior no es válido ahí.
+void (async () => {
+  await withRestoredFiles([guardedFilePath], async () => {
+    await writeFile(guardedFilePath, "reescrito por el fixture", "utf8");
+    console.log("listo-para-sigint");
+    await new Promise(() => {
+      // Nunca resuelve: el fixture solo termina cuando el test le manda SIGINT.
+    });
   });
-});
+})();
