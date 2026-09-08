@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { once } from "node:events";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -47,7 +48,16 @@ describe("captureUi contra la aplicación real", () => {
       outputDir = "";
     }
     if (intruder) {
+      // Esperar a que muera de verdad, no solo pedirlo: estas pruebas
+      // comparten el 3417, así que un intruso que sobreviva al afterEach lo
+      // hereda la siguiente como "un servidor que esta fábrica no inició".
+      // Ahí falla por una razón que no es la suya, y sólo cuando el
+      // planificador del sistema le da al intruso el tiempo justo de
+      // sobrevivir, que es lo que ocurría en un runner Linux cargado y
+      // nunca en Windows (issue #102).
+      const died = once(intruder, "exit");
       intruder.kill();
+      await died;
       intruder = undefined;
     }
   });
