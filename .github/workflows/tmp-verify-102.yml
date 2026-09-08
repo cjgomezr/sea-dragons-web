@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        run: [1]
+        run: [1, 2, 3]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,5 +27,5 @@ jobs:
       - run: npm ci
       - name: Instala el navegador que necesitan los tests de captura de UI
         run: npx playwright install --with-deps chromium
-      - name: Suite de integración de capture-ui (diagnóstico, un solo caso)
-        run: npx vitest run tests/unit/ui-review/capture-ui.integration.test.ts -t "captura los tres viewports"
+      - name: Suites de integración de ui-review
+        run: npx vitest run tests/unit/ui-review/capture-ui.integration.test.ts tests/unit/ui-review/tree-guard.integration.test.ts tests/unit/scripts/ui-preflight.test.ts
