@@ -295,6 +295,57 @@ seq 99000001 ${99000000 + NOISY_OWNER_COUNT}
   return binDir;
 }
 
+/**
+ * netstat y lsof de mentira que ven DOS procesos en el puerto: el que
+ * escucha y un cliente conectado a él. El lsof de verdad hace justo eso,
+ * porque "-i tcp:PUERTO" casa cualquier socket con ese puerto en el extremo
+ * local O en el remoto, y sólo filtra por estado si se lo piden. netstat en
+ * cambio siempre etiqueta cada línea con su estado.
+ */
+async function installPidLookupToolsThatAlsoSeeTheClient(
+  workDir: string,
+  port: number,
+  listenerPid: number,
+  clientPid: number,
+): Promise<string> {
+  const binDir = path.join(workDir, "fake-bin-with-client");
+  await mkdir(binDir, { recursive: true });
+  const netstatScript = `#!/usr/bin/env bash
+echo "  TCP    0.0.0.0:${port}         0.0.0.0:0              LISTENING       ${listenerPid}"
+echo "  TCP    127.0.0.1:${port}       127.0.0.1:54321        ESTABLISHED     ${clientPid}"
+`;
+  const lsofScript = `#!/usr/bin/env bash
+echo "${listenerPid}"
+for arg in "$@"; do
+  if [ "$arg" = "-sTCP:LISTEN" ]; then
+    exit 0
+  fi
+done
+echo "${clientPid}"
+`;
+  await writeFile(path.join(binDir, "netstat"), netstatScript);
+  await chmod(path.join(binDir, "netstat"), 0o755);
+  await writeFile(path.join(binDir, "lsof"), lsofScript);
+  await chmod(path.join(binDir, "lsof"), 0o755);
+  return binDir;
+}
+
+/** Un proceso que no hace nada y se deja matar, para comprobar que nadie lo mata. */
+function startSacrificialProcess(): ChildProcess {
+  return spawn(process.execPath, ["-e", "setInterval(() => {}, 1 << 30);"], {
+    stdio: "ignore",
+  });
+}
+
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function setupWorkDir(): Promise<string> {
   const workDir = await mkdtemp(
     path.join(tmpdir(), "seadragons-ui-preflight-"),
@@ -344,6 +395,7 @@ describe("ui-preflight.sh", () => {
   let workDir = "";
   let cleanupEnv: NodeJS.ProcessEnv = process.env;
   let intruder: ChildProcess | undefined;
+  let client: ChildProcess | undefined;
 
   afterEach(async () => {
     if (workDir) {
@@ -356,6 +408,10 @@ describe("ui-preflight.sh", () => {
     if (intruder) {
       intruder.kill();
       intruder = undefined;
+    }
+    if (client) {
+      client.kill();
+      client = undefined;
     }
   });
 
@@ -589,6 +645,43 @@ describe("ui-preflight.sh", () => {
 
       expect(code).not.toBe(0);
       expect(stderr).toMatch(/did not start it/);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "down mata al servidor que escucha, no al cliente conectado a ese puerto",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      intruder = await startIntruder(port);
+      client = startSacrificialProcess();
+      const fakeBinDir = await installPidLookupToolsThatAlsoSeeTheClient(
+        workDir,
+        port,
+        intruder.pid!,
+        client.pid!,
+      );
+      // Un PID_FILE que ya no apunta a nadie: es lo que empuja a down() a su
+      // último recurso: preguntar quién ocupa el puerto y matarlo.
+      await mkdir(path.join(workDir, ".factory"), { recursive: true });
+      await writeFile(
+        path.join(workDir, ".factory/ui-server.pid"),
+        String(await aDeadPid()),
+      );
+      const env = baseEnv(workDir, port, {});
+      cleanupEnv = env;
+      const envWithFakeTools = { ...env };
+      envWithFakeTools.PATH = `${fakeBinDir}${path.delimiter}${env.PATH}`;
+
+      const down = await runPreflight(["down"], workDir, envWithFakeTools);
+
+      expect(down.code).toBe(0);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
+      // Quien hace un fetch contra el puerto (esta misma suite, o el
+      // navegador de Playwright durante una captura) aparece en esa lista
+      // tanto como el servidor. Matarlo es matar a quien pregunta.
+      expect(isAlive(client.pid!)).toBe(true);
     },
     TEST_TIMEOUT_MS,
   );

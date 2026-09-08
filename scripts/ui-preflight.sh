@@ -132,7 +132,15 @@ port_owner_pid_once() {
   if command -v netstat >/dev/null 2>&1 && command -v taskkill >/dev/null 2>&1; then
     netstat -ano 2>/dev/null | grep -i listening | grep ":$port " | awk '{print $NF}' | sort -u
   elif command -v lsof >/dev/null 2>&1; then
-    lsof -ti "tcp:$port" 2>/dev/null
+    # -sTCP:LISTEN o mataríamos a quien pregunta. "-i tcp:PUERTO" casa
+    # cualquier socket con ese puerto en el extremo local O en el remoto, así
+    # que el cliente de una conexión sale en la lista igual que el servidor:
+    # sin filtrar por estado, kill_port_owner mata también al proceso que
+    # acaba de hacerle una petición al puerto (confirmado en CI: mató al
+    # worker de Vitest que había hecho el fetch, y puede matar al navegador
+    # de Playwright a mitad de una captura). La rama de netstat ya filtra por
+    # su cuenta con "grep -i listening".
+    lsof -ti "tcp:$port" -sTCP:LISTEN 2>/dev/null
   fi
   return 0
 }
