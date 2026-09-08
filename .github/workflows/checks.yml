@@ -9,6 +9,12 @@
 #
 # No puede impedir el merge: el repositorio es privado en plan gratuito y no
 # admite branch protection. Hace ruidoso el fallo, no lo bloquea.
+#
+# `npm test` instala chromium antes de correr: no es la comparación visual
+# vinculante (esa vive en visual-baselines.yml y no se toca aquí), sino que
+# varios tests unitarios (tests/unit/ui-review/*, tests/unit/mockups/*)
+# lanzan un navegador de verdad para capturar UI, y en un runner nuevo esa
+# instalación no existe.
 name: checks
 
 on:
@@ -34,6 +40,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Instala el navegador que necesitan los tests de captura de UI
+        run: npx playwright install --with-deps chromium
       - name: Tests
         run: npm test
       - name: Lint

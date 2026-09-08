@@ -105,4 +105,15 @@ describe("workflow de checks", () => {
 
     expect(step?.with?.["node-version"]).toBe(20);
   });
+
+  it("instala chromium antes de correr los tests, que lo necesitan para las capturas de UI", () => {
+    const steps = allSteps();
+    const installIndex = steps.findIndex((step) =>
+      step.run?.includes("playwright install"),
+    );
+    const testIndex = steps.findIndex((step) => step.run === "npm test");
+
+    expect(installIndex).toBeGreaterThanOrEqual(0);
+    expect(testIndex).toBeGreaterThan(installIndex);
+  });
 });
