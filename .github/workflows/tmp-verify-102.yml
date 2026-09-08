@@ -29,3 +29,5 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Suites de integración de ui-review
         run: npx vitest run tests/unit/ui-review/capture-ui.integration.test.ts tests/unit/ui-review/tree-guard.integration.test.ts
+      - name: Tests de ui-preflight.sh (la rama de lsof sólo se ejercita en Linux)
+        run: npx vitest run tests/unit/scripts/ui-preflight.test.ts
