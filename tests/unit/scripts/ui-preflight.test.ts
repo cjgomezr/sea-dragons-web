@@ -176,6 +176,29 @@ async function installFakeCurlThatFailsToWriteDevNull(
   return binDir;
 }
 
+// netstat/lsof salen con código distinto de cero cuando no encuentran nada
+// (issue #102): reproduce a `port_owner_pid` no encontrando todavía al dueño
+// real del puerto justo cuando `responds` ya lo da por arrancado, la misma
+// carrera que en CI hacía que `set -euo pipefail` tumbara todo `up` ahí
+// mismo, silenciosamente, con el servidor real ya arriba y respondiendo.
+const FAKE_NOTHING_FOUND_SCRIPT = `#!/usr/bin/env bash
+exit 1
+`;
+
+/** Instala un netstat y un lsof de mentira que nunca encuentran nada, y los antepone al PATH del test. */
+async function installFakePidLookupToolsThatFindNothing(
+  workDir: string,
+): Promise<string> {
+  const binDir = path.join(workDir, "fake-bin-lookup");
+  await mkdir(binDir, { recursive: true });
+  for (const name of ["netstat", "lsof"]) {
+    const toolPath = path.join(binDir, name);
+    await writeFile(toolPath, FAKE_NOTHING_FOUND_SCRIPT);
+    await chmod(toolPath, 0o755);
+  }
+  return binDir;
+}
+
 async function setupWorkDir(): Promise<string> {
   const workDir = await mkdtemp(
     path.join(tmpdir(), "seadragons-ui-preflight-"),
@@ -266,6 +289,35 @@ describe("ui-preflight.sh", () => {
 
       expect(stderr).not.toMatch(/did not answer/);
       expect(code).toBe(0);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "up sigue arrancando cuando netstat/lsof no encuentran todavía al dueño real del puerto",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      const fakeBinDir =
+        await installFakePidLookupToolsThatFindNothing(workDir);
+      // Sin el wrapper que se desliga: $! ya es el proceso real, así que
+      // 'down' en el afterEach puede limpiarlo por PID aunque las
+      // herramientas de lookup (deliberadamente rotas arriba) no encuentren
+      // nada. El wrapper que sí se desliga es harina de otro costal (lo
+      // cubren los demás tests de este archivo) y no lo que este prueba.
+      const env = baseEnv(workDir, port, {
+        DEV_SERVER_CMD: `node ${toBashPath(workDir)}/dummy-server.js ${port}`,
+        START_DELAY_MS: "500",
+      });
+      env.PATH = `${fakeBinDir}${path.delimiter}${env.PATH}`;
+      cleanupEnv = env;
+
+      const { code, stdout, stderr } = await runPreflight(["up"], workDir, env);
+
+      expect(stderr).not.toMatch(/did not answer/);
+      expect(code).toBe(0);
+      expect(stdout.trim()).toBe(`http://localhost:${port}`);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
     TEST_TIMEOUT_MS,

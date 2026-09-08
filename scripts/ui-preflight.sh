@@ -119,7 +119,13 @@ kill_tree() {
 }
 
 # Prints the native PID(s) (one per line) currently bound to our port, or
-# nothing if it is free.
+# nothing if it is free. "Nothing bound yet" is a normal outcome, not a
+# failure: grep/lsof exit non-zero on no match, and under pipefail that
+# would otherwise make THIS function report failure too, and callers that
+# assign its output (`x=$(port_owner_pid | ...)`) would trip `set -e` and
+# abort the whole script on nothing more than an empty result (confirmed in
+# CI: happened right as the dev server's port started responding, because
+# lsof's view lagged curl's by long enough to still say "not found").
 port_owner_pid() {
   local port
   port=$(port_of)
@@ -128,6 +134,7 @@ port_owner_pid() {
   elif command -v lsof >/dev/null 2>&1; then
     lsof -ti "tcp:$port" 2>/dev/null
   fi
+  return 0
 }
 
 # Swaps the PID_FILE entry for whoever is actually bound to the port right
@@ -202,7 +209,6 @@ Fix it one of these ways:
 }
 
 up() {
-  set -x
   check
   mkdir -p "$STATE_DIR"
   echo "$APP_URL" > "$URL_FILE"
