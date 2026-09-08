@@ -119,15 +119,49 @@ kill_tree() {
 }
 
 # Prints the native PID(s) (one per line) currently bound to our port, or
-# nothing if it is free.
-port_owner_pid() {
+# nothing if it is free. "Nothing bound yet" is a normal outcome, not a
+# failure: grep/lsof exit non-zero on no match, and under pipefail that
+# would otherwise make THIS function report failure too, and callers that
+# assign its output (`x=$(port_owner_pid | ...)`) would trip `set -e` and
+# abort the whole script on nothing more than an empty result (confirmed in
+# CI: happened right as the dev server's port started responding, because
+# lsof's view lagged curl's by long enough to still say "not found").
+port_owner_pid_once() {
   local port
   port=$(port_of)
   if command -v netstat >/dev/null 2>&1 && command -v taskkill >/dev/null 2>&1; then
     netstat -ano 2>/dev/null | grep -i listening | grep ":$port " | awk '{print $NF}' | sort -u
   elif command -v lsof >/dev/null 2>&1; then
-    lsof -ti "tcp:$port" 2>/dev/null
+    # -sTCP:LISTEN o mataríamos a quien pregunta. "-i tcp:PUERTO" casa
+    # cualquier socket con ese puerto en el extremo local O en el remoto, así
+    # que el cliente de una conexión sale en la lista igual que el servidor:
+    # sin filtrar por estado, kill_port_owner mata también al proceso que
+    # acaba de hacerle una petición al puerto (confirmado en CI: mató al
+    # worker de Vitest que había hecho el fetch, y puede matar al navegador
+    # de Playwright a mitad de una captura). La rama de netstat ya filtra por
+    # su cuenta con "grep -i listening".
+    lsof -ti "tcp:$port" -sTCP:LISTEN 2>/dev/null
   fi
+  return 0
+}
+
+# Both callers only ever ask this while `responds` has already confirmed
+# something IS listening, so an empty result here is never "the port is
+# free": it is netstat/lsof's view lagging behind the socket actually
+# accepting connections, confirmed in CI to still be catching up 100ms in.
+# A few quick retries close that gap without the two tools ever needing to
+# agree on timing.
+port_owner_pid() {
+  local attempt result
+  for attempt in 1 2 3 4 5; do
+    result=$(port_owner_pid_once)
+    if [ -n "$result" ]; then
+      printf '%s\n' "$result"
+      return 0
+    fi
+    sleep 0.1
+  done
+  return 0
 }
 
 # Swaps the PID_FILE entry for whoever is actually bound to the port right
@@ -151,7 +185,17 @@ port_owner_pid() {
 # could confirm for a completely different process.
 record_real_owner() {
   local native_pid pid attempt
-  native_pid=$(port_owner_pid | head -1)
+  # La primera línea SIN una tubería a 'head'. Un dev server deja más de un
+  # proceso pegado al socket, así que esa lista puede no caber en el buffer
+  # de la tubería: 'head -1' cierra el lector tras la primera línea, quien
+  # escribía recibe SIGPIPE y, bajo 'set -o pipefail', ese 141 se propaga y
+  # tumba todo 'up' aquí mismo, en silencio y con el servidor ya arriba,
+  # dejando el puerto ocupado para la siguiente corrida (issue #102: el
+  # fallo intermitente que sólo salía en Linux, porque en Windows la rama de
+  # netstat lista muchísimo menos). Un here-string no tiene lector que
+  # cerrar, así que no hay tubería que romper.
+  native_pid=$(port_owner_pid)
+  read -r native_pid <<< "$native_pid" || true
   [ -n "$native_pid" ] || return 0
   if ! command -v taskkill >/dev/null 2>&1; then
     echo "$native_pid" > "$PID_FILE"

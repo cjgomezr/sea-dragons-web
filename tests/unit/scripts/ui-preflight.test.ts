@@ -97,6 +97,28 @@ sleep 30
 `;
 
 /**
+ * Como DETACHED_WRAPPER_SCRIPT, pero además deja escrito en "real-pid" el
+ * PID del hijo real, para que un netstat/lsof de mentira pueda reportarlo
+ * una vez que decida "encontrarlo".
+ *
+ * En Windows netstat reporta el PID nativo, no el numerado por Git Bash, así
+ * que "real-pid" debe guardar ESE (la misma traducción que ui-preflight.sh
+ * hace en winpid_of), o record_real_owner nunca encuentra con qué mapearlo
+ * de vuelta y descarta el resultado como si no hubiera encontrado nada. En
+ * Linux (sin `ps -W`) no hay dos espacios de PID que traducir, así que cae
+ * de vuelta al PID normal, que es justo lo que lsof -ti reportaría ahí.
+ */
+const DETACHED_WRAPPER_WRITES_PID_SCRIPT = `#!/usr/bin/env bash
+DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+node "$DIR/dummy-server.js" "$1" &
+child=$!
+winpid=$(ps -W 2>/dev/null | awk -v p="$child" '$1 == p { print $4 }' | head -1)
+echo "\${winpid:-$child}" > "$DIR/real-pid"
+disown
+exit 0
+`;
+
+/**
  * Reproduce el curl real de mingw/Git Bash bajo `MSYS_NO_PATHCONV=1`
  * (issue #52): al no traducirse "/dev/null" al dispositivo NUL de Windows,
  * curl no puede escribir ahí el cuerpo de la respuesta y sale con el código
@@ -176,6 +198,160 @@ async function installFakeCurlThatFailsToWriteDevNull(
   return binDir;
 }
 
+// netstat/lsof salen con código distinto de cero cuando no encuentran nada
+// (issue #102): reproduce a `port_owner_pid` no encontrando todavía al dueño
+// real del puerto justo cuando `responds` ya lo da por arrancado, la misma
+// carrera que en CI hacía que `set -euo pipefail` tumbara todo `up` ahí
+// mismo, silenciosamente, con el servidor real ya arriba y respondiendo.
+const FAKE_NOTHING_FOUND_SCRIPT = `#!/usr/bin/env bash
+exit 1
+`;
+
+/** Instala un netstat y un lsof de mentira que nunca encuentran nada, y los antepone al PATH del test. */
+async function installFakePidLookupToolsThatFindNothing(
+  workDir: string,
+): Promise<string> {
+  const binDir = path.join(workDir, "fake-bin-lookup");
+  await mkdir(binDir, { recursive: true });
+  for (const name of ["netstat", "lsof"]) {
+    const toolPath = path.join(binDir, name);
+    await writeFile(toolPath, FAKE_NOTHING_FOUND_SCRIPT);
+    await chmod(toolPath, 0o755);
+  }
+  return binDir;
+}
+
+/**
+ * netstat/lsof de mentira que fallan sin encontrar nada las primeras
+ * `failCount` veces (la demora real que port_owner_pid ahora reintenta) y
+ * luego reportan el PID real que dejó escrito DETACHED_WRAPPER_WRITES_PID_SCRIPT.
+ *
+ * El formato de netstat importa: `port_owner_pid_once` sólo entra a la rama
+ * de netstat (la que se ejercita en Windows, donde corre este test) cuando
+ * taskkill también existe, y de ahí filtra con `grep -i listening | grep
+ * ":$port "`, así que una salida que no imite una línea real de
+ * `netstat -ano` se descartaría aunque el PID sea el correcto. lsof en
+ * cambio sólo necesita el PID crudo, que es lo que usa la rama que se
+ * ejercita en Linux (sin taskkill).
+ */
+async function installFlakyPidLookupTools(
+  workDir: string,
+  port: number,
+  failCount: number,
+): Promise<string> {
+  const binDir = path.join(workDir, "fake-bin-flaky");
+  await mkdir(binDir, { recursive: true });
+  const counterPath = toBashPath(path.join(workDir, "lookup-attempts"));
+  const realPidPath = toBashPath(path.join(workDir, "real-pid"));
+  const attemptsPrelude = `attempts=0
+[ -f "${counterPath}" ] && attempts=$(cat "${counterPath}")
+attempts=$((attempts + 1))
+echo "$attempts" > "${counterPath}"
+if [ "$attempts" -le ${failCount} ] || [ ! -f "${realPidPath}" ]; then
+  exit 1
+fi`;
+  const netstatScript = `#!/usr/bin/env bash
+${attemptsPrelude}
+pid=$(cat "${realPidPath}")
+echo "  TCP    0.0.0.0:${port}         0.0.0.0:0              LISTENING       $pid"
+`;
+  const lsofScript = `#!/usr/bin/env bash
+${attemptsPrelude}
+cat "${realPidPath}"
+`;
+  await writeFile(path.join(binDir, "netstat"), netstatScript);
+  await chmod(path.join(binDir, "netstat"), 0o755);
+  await writeFile(path.join(binDir, "lsof"), lsofScript);
+  await chmod(path.join(binDir, "lsof"), 0o755);
+  return binDir;
+}
+
+/**
+ * netstat y lsof de mentira que listan MILES de dueños para el puerto, muy
+ * por encima de lo que cabe en el buffer de una tubería. Es lo que ocurre de
+ * verdad en cuanto el dev server tiene mas de un proceso pegado al socket, y
+ * lo que hacía caer a `up` en silencio: quien escribe en la tubería se queda
+ * a medias cuando el lector cierra, y bajo `set -o pipefail` ese SIGPIPE se
+ * propaga hasta tumbar el script entero (issue #102).
+ */
+const NOISY_OWNER_COUNT = 20_000;
+
+async function installNoisyPidLookupTools(
+  workDir: string,
+  port: number,
+): Promise<string> {
+  const binDir = path.join(workDir, "fake-bin-noisy");
+  await mkdir(binDir, { recursive: true });
+  const netstatScript = `#!/usr/bin/env bash
+seq 1 ${NOISY_OWNER_COUNT} | awk '{ printf "  TCP    0.0.0.0:${port}         0.0.0.0:0              LISTENING       %d\\n", 99000000 + $1 }'
+`;
+  const lsofScript = `#!/usr/bin/env bash
+seq 99000001 ${99000000 + NOISY_OWNER_COUNT}
+`;
+  await writeFile(path.join(binDir, "netstat"), netstatScript);
+  await chmod(path.join(binDir, "netstat"), 0o755);
+  await writeFile(path.join(binDir, "lsof"), lsofScript);
+  await chmod(path.join(binDir, "lsof"), 0o755);
+  return binDir;
+}
+
+/**
+ * netstat y lsof de mentira que ven DOS procesos en el puerto: el que
+ * escucha y un cliente conectado a él. El lsof de verdad hace justo eso,
+ * porque "-i tcp:PUERTO" casa cualquier socket con ese puerto en el extremo
+ * local O en el remoto, y sólo filtra por estado si se lo piden. netstat en
+ * cambio siempre etiqueta cada línea con su estado.
+ */
+async function installPidLookupToolsThatAlsoSeeTheClient(
+  workDir: string,
+  port: number,
+  listenerPid: number,
+  clientPid: number,
+): Promise<string> {
+  const binDir = path.join(workDir, "fake-bin-with-client");
+  await mkdir(binDir, { recursive: true });
+  const netstatScript = `#!/usr/bin/env bash
+echo "  TCP    0.0.0.0:${port}         0.0.0.0:0              LISTENING       ${listenerPid}"
+echo "  TCP    127.0.0.1:${port}       127.0.0.1:54321        ESTABLISHED     ${clientPid}"
+`;
+  const lsofScript = `#!/usr/bin/env bash
+echo "${listenerPid}"
+for arg in "$@"; do
+  if [ "$arg" = "-sTCP:LISTEN" ]; then
+    exit 0
+  fi
+done
+echo "${clientPid}"
+`;
+  await writeFile(path.join(binDir, "netstat"), netstatScript);
+  await chmod(path.join(binDir, "netstat"), 0o755);
+  await writeFile(path.join(binDir, "lsof"), lsofScript);
+  await chmod(path.join(binDir, "lsof"), 0o755);
+  return binDir;
+}
+
+// Un intervalo que no llega a dispararse nunca: no mide nada, sólo le da al
+// proceso un handle abierto para que el event loop no lo deje morir solo.
+const KEEPS_PROCESS_ALIVE_MS = 1 << 30;
+
+/** Un proceso que no hace nada y se deja matar, para comprobar que nadie lo mata. */
+function startSacrificialProcess(): ChildProcess {
+  return spawn(
+    process.execPath,
+    ["-e", `setInterval(() => {}, ${KEEPS_PROCESS_ALIVE_MS});`],
+    { stdio: "ignore" },
+  );
+}
+
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function setupWorkDir(): Promise<string> {
   const workDir = await mkdtemp(
     path.join(tmpdir(), "seadragons-ui-preflight-"),
@@ -191,6 +367,11 @@ async function setupWorkDir(): Promise<string> {
     DETACHED_WRAPPER_SCRIPT,
   );
   await chmod(path.join(workDir, "detached-dev-server.sh"), 0o755);
+  await writeFile(
+    path.join(workDir, "detached-dev-server-writes-pid.sh"),
+    DETACHED_WRAPPER_WRITES_PID_SCRIPT,
+  );
+  await chmod(path.join(workDir, "detached-dev-server-writes-pid.sh"), 0o755);
   await writeFile(path.join(workDir, "never-starts.sh"), NEVER_STARTS_SCRIPT);
   await chmod(path.join(workDir, "never-starts.sh"), 0o755);
   return workDir;
@@ -220,6 +401,7 @@ describe("ui-preflight.sh", () => {
   let workDir = "";
   let cleanupEnv: NodeJS.ProcessEnv = process.env;
   let intruder: ChildProcess | undefined;
+  let client: ChildProcess | undefined;
 
   afterEach(async () => {
     if (workDir) {
@@ -232,6 +414,10 @@ describe("ui-preflight.sh", () => {
     if (intruder) {
       intruder.kill();
       intruder = undefined;
+    }
+    if (client) {
+      client.kill();
+      client = undefined;
     }
   });
 
@@ -267,6 +453,69 @@ describe("ui-preflight.sh", () => {
       expect(stderr).not.toMatch(/did not answer/);
       expect(code).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "up sigue arrancando cuando netstat/lsof no encuentran todavía al dueño real del puerto",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      const fakeBinDir =
+        await installFakePidLookupToolsThatFindNothing(workDir);
+      // Sin el wrapper que se desliga: $! ya es el proceso real, así que
+      // 'down' en el afterEach puede limpiarlo por PID aunque las
+      // herramientas de lookup (deliberadamente rotas arriba) no encuentren
+      // nada. El wrapper que sí se desliga es harina de otro costal (lo
+      // cubren los demás tests de este archivo) y no lo que este prueba.
+      const env = baseEnv(workDir, port, {
+        DEV_SERVER_CMD: `node ${toBashPath(workDir)}/dummy-server.js ${port}`,
+        START_DELAY_MS: "500",
+      });
+      env.PATH = `${fakeBinDir}${path.delimiter}${env.PATH}`;
+      cleanupEnv = env;
+
+      const { code, stdout, stderr } = await runPreflight(["up"], workDir, env);
+
+      expect(stderr).not.toMatch(/did not answer/);
+      expect(code).toBe(0);
+      expect(stdout.trim()).toBe(`http://localhost:${port}`);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "up corrige el PID_FILE con el dueño real aunque netstat/lsof tarden unas vueltas en verlo, y down lo apaga de verdad",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      // Falla las primeras 3 veces (dentro del presupuesto de 5 reintentos
+      // de port_owner_pid) para probar que el propio reintento resuelve la
+      // demora, no una segunda llamada externa (down también llama a
+      // port_owner_pid como último recurso, lo cual taparía una regresión
+      // aquí si se agotara ese presupuesto).
+      const fakeBinDir = await installFlakyPidLookupTools(workDir, port, 3);
+      const env = baseEnv(workDir, port, {
+        DEV_SERVER_CMD: `bash ${toBashPath(workDir)}/detached-dev-server-writes-pid.sh ${port}`,
+        START_DELAY_MS: "200",
+      });
+      env.PATH = `${fakeBinDir}${path.delimiter}${env.PATH}`;
+      cleanupEnv = env;
+
+      const up = await runPreflight(["up"], workDir, env);
+      expect(up.stderr).not.toMatch(/did not answer/);
+      expect(up.code).toBe(0);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
+
+      // El bug real (#102): sin los reintentos, record_real_owner se rinde
+      // y deja el PID_FILE apuntando al wrapper ya muerto, así que down()
+      // no encuentra a quién matar y el servidor de verdad sigue arriba
+      // aunque down() reporte éxito.
+      const down = await runPreflight(["down"], workDir, env);
+      expect(down.code).toBe(0);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
     },
     TEST_TIMEOUT_MS,
   );
@@ -313,6 +562,35 @@ describe("ui-preflight.sh", () => {
       const secondDown = await runPreflight(["down"], workDir, env);
       expect(secondDown.code).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "up no se muere en silencio cuando el puerto tiene muchísimos dueños listados",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      const fakeBinDir = await installNoisyPidLookupTools(workDir, port);
+      const env = baseEnv(workDir, port, {
+        DEV_SERVER_CMD: `node ${toBashPath(workDir)}/dummy-server.js ${port}`,
+        START_DELAY_MS: "200",
+      });
+      // La limpieza va con el netstat de verdad: lo que se prueba aquí es
+      // 'up', y las herramientas de mentira no sabrían matar a nadie.
+      cleanupEnv = env;
+      const envWithFakeTools = { ...env };
+      envWithFakeTools.PATH = `${fakeBinDir}${path.delimiter}${env.PATH}`;
+
+      const up = await runPreflight(["up"], workDir, envWithFakeTools);
+
+      // El fallo real: `up` salía distinto de cero SIN escribir una sola
+      // línea que lo explicara, con el servidor ya arriba y el puerto
+      // ocupado para quien viniera detras.
+      expect(up.stderr).not.toMatch(/did not answer/);
+      expect(up.code).toBe(0);
+      expect(up.stdout.trim()).toBe(`http://localhost:${port}`);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
     TEST_TIMEOUT_MS,
   );
@@ -373,6 +651,43 @@ describe("ui-preflight.sh", () => {
 
       expect(code).not.toBe(0);
       expect(stderr).toMatch(/did not start it/);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "down mata al servidor que escucha, no al cliente conectado a ese puerto",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      intruder = await startIntruder(port);
+      client = startSacrificialProcess();
+      const fakeBinDir = await installPidLookupToolsThatAlsoSeeTheClient(
+        workDir,
+        port,
+        intruder.pid!,
+        client.pid!,
+      );
+      // Un PID_FILE que ya no apunta a nadie: es lo que empuja a down() a su
+      // último recurso: preguntar quién ocupa el puerto y matarlo.
+      await mkdir(path.join(workDir, ".factory"), { recursive: true });
+      await writeFile(
+        path.join(workDir, ".factory/ui-server.pid"),
+        String(await aDeadPid()),
+      );
+      const env = baseEnv(workDir, port, {});
+      cleanupEnv = env;
+      const envWithFakeTools = { ...env };
+      envWithFakeTools.PATH = `${fakeBinDir}${path.delimiter}${env.PATH}`;
+
+      const down = await runPreflight(["down"], workDir, envWithFakeTools);
+
+      expect(down.code).toBe(0);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
+      // Quien hace un fetch contra el puerto (esta misma suite, o el
+      // navegador de Playwright durante una captura) aparece en esa lista
+      // tanto como el servidor. Matarlo es matar a quien pregunta.
+      expect(isAlive(client.pid!)).toBe(true);
     },
     TEST_TIMEOUT_MS,
   );

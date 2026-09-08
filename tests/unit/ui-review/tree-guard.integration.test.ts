@@ -11,6 +11,20 @@ const FIXTURE_PATH = path.join(HERE, "fixtures", "sigint-fixture.ts");
 const ORIGINAL_CONTENT = '{\n  "compilerOptions": {}\n}\n';
 const FIXTURE_TIMEOUT_MS = 20_000;
 
+// El runner de CI (ubuntu-latest en checks.yml) fija Node 20, que no tiene
+// --experimental-strip-types (llegó en Node 22.6): un spawn con esa flag
+// muere ahí con "bad option" antes de imprimir nada, y este test agota su
+// timeout esperando una señal de arranque que nunca llega. `--import tsx`
+// transpila el entrypoint en el mismo proceso sin depender de esa flag.
+//
+// A propósito NO se usa el binario `tsx` (node_modules/.bin/tsx): ese CLI
+// arranca el script en un proceso HIJO propio y reenvía las señales que
+// recibe, así que el PID que ve este test dejaría de ser el que registra el
+// listener de SIGINT que se quiere probar (el mismo problema de PID que
+// ui-preflight.sh ya resuelve para "npm run dev", pero aquí no hay forma de
+// corregirlo: es el propio relay de señales de tsx).
+const TSX_IMPORT_FLAGS = ["--import", "tsx"];
+
 // Node no entrega señales POSIX reales a los hijos en Windows: child.kill("SIGINT")
 // ahí solo termina el proceso a la fuerza, sin darle nunca la oportunidad de
 // correr su propio listener (comprobado a mano: un hijo con
@@ -43,7 +57,7 @@ describe.skipIf(process.platform === "win32")("suite de integración", () => {
 
       child = spawn(
         process.execPath,
-        ["--experimental-strip-types", FIXTURE_PATH, guardedFilePath],
+        [...TSX_IMPORT_FLAGS, FIXTURE_PATH, guardedFilePath],
         { stdio: ["ignore", "pipe", "inherit"] },
       );
 

@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { once } from "node:events";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -37,6 +38,27 @@ async function waitUntilResponds(url: string): Promise<void> {
   throw new Error(`El servidor intruso no llegó a responder en ${url}`);
 }
 
+/**
+ * Mata un proceso y espera a que muera de verdad, no sólo a pedirlo.
+ *
+ * Estas pruebas comparten el 3417, así que un intruso que sobreviva a su
+ * afterEach lo hereda la siguiente como "un servidor que esta fábrica no
+ * inició": falla por una razón que no es la suya, y sólo cuando el
+ * planificador le da al intruso el tiempo justo de sobrevivir. En un runner
+ * Linux cargado ocurría; en Windows nunca (issue #102).
+ *
+ * Un proceso ya muerto no volverá a emitir "exit", así que hay que mirarlo
+ * antes de ponerse a esperarlo o la espera se cuelga hasta el timeout.
+ */
+async function killAndWait(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return;
+  }
+  const died = once(child, "exit");
+  child.kill();
+  await died;
+}
+
 describe("captureUi contra la aplicación real", () => {
   let outputDir = "";
   let intruder: ChildProcess | undefined;
@@ -47,7 +69,7 @@ describe("captureUi contra la aplicación real", () => {
       outputDir = "";
     }
     if (intruder) {
-      intruder.kill();
+      await killAndWait(intruder);
       intruder = undefined;
     }
   });
@@ -162,10 +184,17 @@ describe("limpieza ante fallo", () => {
   );
 });
 
+// El runner de CI (ubuntu-latest en checks.yml) fija Node 20, que no tiene
+// --experimental-strip-types (llegó en Node 22.6): un spawn con esa flag
+// muere ahí con "bad option" (código 9) en vez del código de salida que esta
+// prueba verifica. `--import tsx` transpila el entrypoint en el mismo
+// proceso sin depender de esa flag; el binario `tsx` (node_modules/.bin/tsx)
+// arranca en cambio un proceso hijo propio, que dejaría el código de salida
+// que ve este test en manos del relay de ese hijo en vez del de capture-ui.ts.
 function runCommand(args: readonly string[]): Promise<number | null> {
   const child = spawn(
     process.execPath,
-    ["--experimental-strip-types", "scripts/capture-ui.ts", ...args],
+    ["--import", "tsx", "scripts/capture-ui.ts", ...args],
     { stdio: "ignore" },
   );
   return new Promise((resolve) => child.on("close", resolve));
