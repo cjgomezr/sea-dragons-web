@@ -12,9 +12,18 @@ if (!guardedFilePath) {
 // Sin await de nivel superior: tsx (ejecutor de este fixture bajo Node 20,
 // que no soporta --experimental-strip-types) transpila el entrypoint a CommonJS,
 // y un await de nivel superior no es válido ahí.
+console.error(`DEBUG fixture pid=${process.pid}`);
+process.on("exit", (code) => {
+  console.error(
+    `DEBUG fixture exit code=${code} listeners=${process.listenerCount("SIGINT")}`,
+  );
+});
 void (async () => {
   await withRestoredFiles([guardedFilePath], async () => {
     await writeFile(guardedFilePath, "reescrito por el fixture", "utf8");
+    console.error(
+      `DEBUG fixture listeners-after-register=${process.listenerCount("SIGINT")}`,
+    );
     console.log("listo-para-sigint");
     await new Promise(() => {
       // Nunca resuelve: el fixture solo termina cuando el test le manda SIGINT.
