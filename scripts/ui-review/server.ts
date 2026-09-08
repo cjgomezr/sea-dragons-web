@@ -32,7 +32,17 @@ export const preflightControls: DevServerControls = {
     }
   },
   stop: () => {
-    execFileSync("bash", [PREFLIGHT_SCRIPT, "down"], { stdio: "ignore" });
+    // Sin stdio:"ignore": si down() no logra apagar el servidor de verdad,
+    // captura su stderr (el "WARNING, something still answers..." que
+    // imprime) para que describeFailure pueda incluirlo en el error, en vez
+    // de perderlo en silencio y dejar solo el mensaje genérico de Node.
+    try {
+      execFileSync("bash", [PREFLIGHT_SCRIPT, "down"], { encoding: "utf8" });
+    } catch (error) {
+      throw new Error(
+        `ui-preflight no pudo apagar el servidor:\n${describeFailure(error)}`,
+      );
+    }
   },
 };
 
