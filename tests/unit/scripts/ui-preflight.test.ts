@@ -97,6 +97,28 @@ sleep 30
 `;
 
 /**
+ * Como DETACHED_WRAPPER_SCRIPT, pero además deja escrito en "real-pid" el
+ * PID del hijo real, para que un netstat/lsof de mentira pueda reportarlo
+ * una vez que decida "encontrarlo".
+ *
+ * En Windows netstat reporta el PID nativo, no el numerado por Git Bash, así
+ * que "real-pid" debe guardar ESE (la misma traducción que ui-preflight.sh
+ * hace en winpid_of), o record_real_owner nunca encuentra con qué mapearlo
+ * de vuelta y descarta el resultado como si no hubiera encontrado nada. En
+ * Linux (sin `ps -W`) no hay dos espacios de PID que traducir, así que cae
+ * de vuelta al PID normal, que es justo lo que lsof -ti reportaría ahí.
+ */
+const DETACHED_WRAPPER_WRITES_PID_SCRIPT = `#!/usr/bin/env bash
+DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+node "$DIR/dummy-server.js" "$1" &
+child=$!
+winpid=$(ps -W 2>/dev/null | awk -v p="$child" '$1 == p { print $4 }' | head -1)
+echo "\${winpid:-$child}" > "$DIR/real-pid"
+disown
+exit 0
+`;
+
+/**
  * Reproduce el curl real de mingw/Git Bash bajo `MSYS_NO_PATHCONV=1`
  * (issue #52): al no traducirse "/dev/null" al dispositivo NUL de Windows,
  * curl no puede escribir ahí el cuerpo de la respuesta y sale con el código
@@ -199,6 +221,51 @@ async function installFakePidLookupToolsThatFindNothing(
   return binDir;
 }
 
+/**
+ * netstat/lsof de mentira que fallan sin encontrar nada las primeras
+ * `failCount` veces (la demora real que port_owner_pid ahora reintenta) y
+ * luego reportan el PID real que dejó escrito DETACHED_WRAPPER_WRITES_PID_SCRIPT.
+ *
+ * El formato de netstat importa: `port_owner_pid_once` sólo entra a la rama
+ * de netstat (la que se ejercita en Windows, donde corre este test) cuando
+ * taskkill también existe, y de ahí filtra con `grep -i listening | grep
+ * ":$port "`, así que una salida que no imite una línea real de
+ * `netstat -ano` se descartaría aunque el PID sea el correcto. lsof en
+ * cambio sólo necesita el PID crudo, que es lo que usa la rama que se
+ * ejercita en Linux (sin taskkill).
+ */
+async function installFlakyPidLookupTools(
+  workDir: string,
+  port: number,
+  failCount: number,
+): Promise<string> {
+  const binDir = path.join(workDir, "fake-bin-flaky");
+  await mkdir(binDir, { recursive: true });
+  const counterPath = toBashPath(path.join(workDir, "lookup-attempts"));
+  const realPidPath = toBashPath(path.join(workDir, "real-pid"));
+  const attemptsPrelude = `attempts=0
+[ -f "${counterPath}" ] && attempts=$(cat "${counterPath}")
+attempts=$((attempts + 1))
+echo "$attempts" > "${counterPath}"
+if [ "$attempts" -le ${failCount} ] || [ ! -f "${realPidPath}" ]; then
+  exit 1
+fi`;
+  const netstatScript = `#!/usr/bin/env bash
+${attemptsPrelude}
+pid=$(cat "${realPidPath}")
+echo "  TCP    0.0.0.0:${port}         0.0.0.0:0              LISTENING       $pid"
+`;
+  const lsofScript = `#!/usr/bin/env bash
+${attemptsPrelude}
+cat "${realPidPath}"
+`;
+  await writeFile(path.join(binDir, "netstat"), netstatScript);
+  await chmod(path.join(binDir, "netstat"), 0o755);
+  await writeFile(path.join(binDir, "lsof"), lsofScript);
+  await chmod(path.join(binDir, "lsof"), 0o755);
+  return binDir;
+}
+
 async function setupWorkDir(): Promise<string> {
   const workDir = await mkdtemp(
     path.join(tmpdir(), "seadragons-ui-preflight-"),
@@ -214,6 +281,11 @@ async function setupWorkDir(): Promise<string> {
     DETACHED_WRAPPER_SCRIPT,
   );
   await chmod(path.join(workDir, "detached-dev-server.sh"), 0o755);
+  await writeFile(
+    path.join(workDir, "detached-dev-server-writes-pid.sh"),
+    DETACHED_WRAPPER_WRITES_PID_SCRIPT,
+  );
+  await chmod(path.join(workDir, "detached-dev-server-writes-pid.sh"), 0o755);
   await writeFile(path.join(workDir, "never-starts.sh"), NEVER_STARTS_SCRIPT);
   await chmod(path.join(workDir, "never-starts.sh"), 0o755);
   return workDir;
@@ -319,6 +391,40 @@ describe("ui-preflight.sh", () => {
       expect(code).toBe(0);
       expect(stdout.trim()).toBe(`http://localhost:${port}`);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "up corrige el PID_FILE con el dueño real aunque netstat/lsof tarden unas vueltas en verlo, y down lo apaga de verdad",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      // Falla las primeras 3 veces (dentro del presupuesto de 5 reintentos
+      // de port_owner_pid) para probar que el propio reintento resuelve la
+      // demora, no una segunda llamada externa (down también llama a
+      // port_owner_pid como último recurso, lo cual taparía una regresión
+      // aquí si se agotara ese presupuesto).
+      const fakeBinDir = await installFlakyPidLookupTools(workDir, port, 3);
+      const env = baseEnv(workDir, port, {
+        DEV_SERVER_CMD: `bash ${toBashPath(workDir)}/detached-dev-server-writes-pid.sh ${port}`,
+        START_DELAY_MS: "200",
+      });
+      env.PATH = `${fakeBinDir}${path.delimiter}${env.PATH}`;
+      cleanupEnv = env;
+
+      const up = await runPreflight(["up"], workDir, env);
+      expect(up.stderr).not.toMatch(/did not answer/);
+      expect(up.code).toBe(0);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
+
+      // El bug real (#102): sin los reintentos, record_real_owner se rinde
+      // y deja el PID_FILE apuntando al wrapper ya muerto, así que down()
+      // no encuentra a quién matar y el servidor de verdad sigue arriba
+      // aunque down() reporte éxito.
+      const down = await runPreflight(["down"], workDir, env);
+      expect(down.code).toBe(0);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
     },
     TEST_TIMEOUT_MS,
   );
