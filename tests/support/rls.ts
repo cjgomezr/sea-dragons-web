@@ -8,22 +8,9 @@ import {
 } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 
-// Vitest ejecuta cada archivo de test en su propio proceso: sin esto,
-// `process.env` nunca ve las credenciales de un `.env.local` local y
-// `describeRls` saltaría siempre, incluso con Supabase configurado.
-try {
-  process.loadEnvFile(".env.local");
-} catch (error) {
-  // Solo el archivo ausente es el caso esperado (p. ej. en la nube sin
-  // secrets configurados): seguimos con lo que ya haya en `process.env`, y
-  // `describeRls` avisa qué falta. Cualquier otro error (permisos, un
-  // `.env.local` con sintaxis inválida) se relanza: silenciarlo también lo
-  // haría ver como "faltan credenciales" y produciría el mismo salto por una
-  // razón completamente distinta, indistinguible de una corrida a otra.
-  if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-    throw error;
-  }
-}
+// `.env.local` ya está cargado y verificado contra el proyecto de desarrollo
+// por `vitest.setup.ts` (que corre antes que cualquier archivo de test): no
+// se repite aquí.
 
 /** Timeout de los tests que hablan por red con el proyecto de Supabase (en
  * Sídney): bajo `npm test` completo compiten por CPU y sockets con el resto
