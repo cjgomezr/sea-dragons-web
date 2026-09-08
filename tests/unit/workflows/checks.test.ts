@@ -12,6 +12,7 @@ interface WorkflowStep {
   run?: string;
   if?: string;
   "continue-on-error"?: boolean;
+  with?: { "node-version"?: number };
 }
 
 interface WorkflowJob {
@@ -86,7 +87,9 @@ describe("workflow de checks", () => {
     const { concurrency } = parseWorkflow();
 
     expect(concurrency?.["cancel-in-progress"]).toBe(true);
-    expect(concurrency?.group).toBeTruthy();
+    // El group debe depender de la rama/PR: uno constante cancelaría corridas
+    // de ramas distintas entre sí en vez de sólo las de la misma rama.
+    expect(concurrency?.group).toMatch(/pull_request\.number|github\.ref/);
   });
 
   it("declara permissions y sólo pide contents: read", () => {
@@ -100,6 +103,6 @@ describe("workflow de checks", () => {
       s.uses?.startsWith("actions/setup-node"),
     );
 
-    expect(step).toBeDefined();
+    expect(step?.with?.["node-version"]).toBe(20);
   });
 });
