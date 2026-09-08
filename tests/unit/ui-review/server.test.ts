@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { withDevServer } from "../../../scripts/ui-review/server.ts";
+import {
+  describeFailure,
+  withDevServer,
+} from "../../../scripts/ui-review/server.ts";
 
 const APP_URL = "http://localhost:3417";
 
@@ -51,5 +54,59 @@ describe("withDevServer", () => {
     await expect(withDevServer(run, { start, stop })).rejects.toThrow(/already answers/);
     expect(run).not.toHaveBeenCalled();
     expect(stop).not.toHaveBeenCalled();
+  });
+});
+
+describe("describeFailure", () => {
+  it("dice el código de salida aunque el proceso no haya escrito nada", () => {
+    const failure = Object.assign(new Error("Command failed"), {
+      status: 141,
+      stdout: "",
+      stderr: "",
+    });
+
+    expect(describeFailure(failure)).toContain("141");
+  });
+
+  it("acompaña el stderr con el código, porque su última línea puede ser un mensaje de éxito", () => {
+    const failure = Object.assign(new Error("Command failed"), {
+      status: 1,
+      stdout: "",
+      stderr: "ui-preflight: http://localhost:3417 is free.\n",
+    });
+
+    const described = describeFailure(failure);
+
+    expect(described).toContain("is free");
+    expect(described).toContain("1");
+  });
+
+  it("incluye también el stdout, donde el script deja la URL que llegó a imprimir", () => {
+    const failure = Object.assign(new Error("Command failed"), {
+      status: 2,
+      stdout: "http://localhost:3417\n",
+      stderr: "algo salió mal\n",
+    });
+
+    const described = describeFailure(failure);
+
+    expect(described).toContain("http://localhost:3417");
+    expect(described).toContain("algo salió mal");
+  });
+
+  it("nombra la señal cuando el proceso murió por una, no un código de salida", () => {
+    const failure = Object.assign(new Error("Command failed"), {
+      status: null,
+      signal: "SIGKILL",
+      stderr: "",
+    });
+
+    expect(describeFailure(failure)).toContain("SIGKILL");
+  });
+
+  it("se conforma con el mensaje cuando el error no viene de un proceso", () => {
+    expect(describeFailure(new Error("bash no está instalado"))).toBe(
+      "bash no está instalado",
+    );
   });
 });
