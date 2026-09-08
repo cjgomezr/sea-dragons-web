@@ -266,6 +266,35 @@ cat "${realPidPath}"
   return binDir;
 }
 
+/**
+ * netstat y lsof de mentira que listan MILES de dueños para el puerto, muy
+ * por encima de lo que cabe en el buffer de una tubería. Es lo que ocurre de
+ * verdad en cuanto el dev server tiene mas de un proceso pegado al socket, y
+ * lo que hacía caer a `up` en silencio: quien escribe en la tubería se queda
+ * a medias cuando el lector cierra, y bajo `set -o pipefail` ese SIGPIPE se
+ * propaga hasta tumbar el script entero (issue #102).
+ */
+const NOISY_OWNER_COUNT = 20_000;
+
+async function installNoisyPidLookupTools(
+  workDir: string,
+  port: number,
+): Promise<string> {
+  const binDir = path.join(workDir, "fake-bin-noisy");
+  await mkdir(binDir, { recursive: true });
+  const netstatScript = `#!/usr/bin/env bash
+seq 1 ${NOISY_OWNER_COUNT} | awk '{ printf "  TCP    0.0.0.0:${port}         0.0.0.0:0              LISTENING       %d\\n", 99000000 + $1 }'
+`;
+  const lsofScript = `#!/usr/bin/env bash
+seq 99000001 ${99000000 + NOISY_OWNER_COUNT}
+`;
+  await writeFile(path.join(binDir, "netstat"), netstatScript);
+  await chmod(path.join(binDir, "netstat"), 0o755);
+  await writeFile(path.join(binDir, "lsof"), lsofScript);
+  await chmod(path.join(binDir, "lsof"), 0o755);
+  return binDir;
+}
+
 async function setupWorkDir(): Promise<string> {
   const workDir = await mkdtemp(
     path.join(tmpdir(), "seadragons-ui-preflight-"),
@@ -471,6 +500,35 @@ describe("ui-preflight.sh", () => {
       const secondDown = await runPreflight(["down"], workDir, env);
       expect(secondDown.code).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "up no se muere en silencio cuando el puerto tiene muchísimos dueños listados",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      const fakeBinDir = await installNoisyPidLookupTools(workDir, port);
+      const env = baseEnv(workDir, port, {
+        DEV_SERVER_CMD: `node ${toBashPath(workDir)}/dummy-server.js ${port}`,
+        START_DELAY_MS: "200",
+      });
+      // La limpieza va con el netstat de verdad: lo que se prueba aquí es
+      // 'up', y las herramientas de mentira no sabrían matar a nadie.
+      cleanupEnv = env;
+      const envWithFakeTools = { ...env };
+      envWithFakeTools.PATH = `${fakeBinDir}${path.delimiter}${env.PATH}`;
+
+      const up = await runPreflight(["up"], workDir, envWithFakeTools);
+
+      // El fallo real: `up` salía distinto de cero SIN escribir una sola
+      // línea que lo explicara, con el servidor ya arriba y el puerto
+      // ocupado para quien viniera detras.
+      expect(up.stderr).not.toMatch(/did not answer/);
+      expect(up.code).toBe(0);
+      expect(up.stdout.trim()).toBe(`http://localhost:${port}`);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
     TEST_TIMEOUT_MS,
   );

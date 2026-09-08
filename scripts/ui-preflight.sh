@@ -177,7 +177,17 @@ port_owner_pid() {
 # could confirm for a completely different process.
 record_real_owner() {
   local native_pid pid attempt
-  native_pid=$(port_owner_pid | head -1)
+  # La primera línea SIN una tubería a 'head'. Un dev server deja más de un
+  # proceso pegado al socket, así que esa lista puede no caber en el buffer
+  # de la tubería: 'head -1' cierra el lector tras la primera línea, quien
+  # escribía recibe SIGPIPE y, bajo 'set -o pipefail', ese 141 se propaga y
+  # tumba todo 'up' aquí mismo, en silencio y con el servidor ya arriba,
+  # dejando el puerto ocupado para la siguiente corrida (issue #102: el
+  # fallo intermitente que sólo salía en Linux, porque en Windows la rama de
+  # netstat lista muchísimo menos). Un here-string no tiene lector que
+  # cerrar, así que no hay tubería que romper.
+  native_pid=$(port_owner_pid)
+  read -r native_pid <<< "$native_pid" || true
   [ -n "$native_pid" ] || return 0
   if ! command -v taskkill >/dev/null 2>&1; then
     echo "$native_pid" > "$PID_FILE"
