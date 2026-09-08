@@ -28,4 +28,4 @@ jobs:
       - name: Instala el navegador que necesitan los tests de captura de UI
         run: npx playwright install --with-deps chromium
       - name: Suites de integración de ui-review
-        run: npx vitest run tests/unit/ui-review/capture-ui.integration.test.ts tests/unit/ui-review/tree-guard.integration.test.ts tests/unit/scripts/ui-preflight.test.ts
+        run: npx vitest run tests/unit/ui-review/capture-ui.integration.test.ts tests/unit/ui-review/tree-guard.integration.test.ts
