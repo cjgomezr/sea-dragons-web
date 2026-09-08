@@ -126,7 +126,7 @@ kill_tree() {
 # abort the whole script on nothing more than an empty result (confirmed in
 # CI: happened right as the dev server's port started responding, because
 # lsof's view lagged curl's by long enough to still say "not found").
-port_owner_pid() {
+port_owner_pid_once() {
   local port
   port=$(port_of)
   if command -v netstat >/dev/null 2>&1 && command -v taskkill >/dev/null 2>&1; then
@@ -134,6 +134,25 @@ port_owner_pid() {
   elif command -v lsof >/dev/null 2>&1; then
     lsof -ti "tcp:$port" 2>/dev/null
   fi
+  return 0
+}
+
+# Both callers only ever ask this while `responds` has already confirmed
+# something IS listening, so an empty result here is never "the port is
+# free": it is netstat/lsof's view lagging behind the socket actually
+# accepting connections, confirmed in CI to still be catching up 100ms in.
+# A few quick retries close that gap without the two tools ever needing to
+# agree on timing.
+port_owner_pid() {
+  local attempt result
+  for attempt in 1 2 3 4 5; do
+    result=$(port_owner_pid_once)
+    if [ -n "$result" ]; then
+      printf '%s\n' "$result"
+      return 0
+    fi
+    sleep 0.1
+  done
   return 0
 }
 
