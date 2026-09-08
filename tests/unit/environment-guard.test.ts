@@ -28,6 +28,26 @@ describe("guardia de entorno de tests", () => {
     expect(checkTestSupabaseEnvironment({})).toEqual({ kind: "ok" });
   });
 
+  it("falla cuando el ref de desarrollo aparece como subcadena pero no es el host", () => {
+    const env = {
+      [SUPABASE_URL_ENV]: `https://evil.example.com/${DEVELOPMENT_SUPABASE_PROJECT_REF}`,
+    };
+
+    expect(checkTestSupabaseEnvironment(env).kind).toBe("wrong-project");
+  });
+
+  it("falla con un Supabase local vía CLI: no es un flujo soportado por este guardia", () => {
+    const env = { [SUPABASE_URL_ENV]: "http://127.0.0.1:54321" };
+
+    expect(checkTestSupabaseEnvironment(env).kind).toBe("wrong-project");
+  });
+
+  it("falla cuando la URL configurada no es una URL válida", () => {
+    const env = { [SUPABASE_URL_ENV]: "no-es-una-url" };
+
+    expect(checkTestSupabaseEnvironment(env).kind).toBe("wrong-project");
+  });
+
   it("falla con un mensaje que nombra la variable culpable, sin imprimir su valor", () => {
     const productionLookingUrl =
       "https://ref-secreto-de-produccion.supabase.co";

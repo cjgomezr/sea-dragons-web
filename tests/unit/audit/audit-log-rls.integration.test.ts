@@ -14,19 +14,8 @@ import {
 // Este archivo monta y desmonta su propio usuario autenticado de prueba en
 // vez de reusar `tests/support/rls.ts`: migrarlo es trabajo aparte, para no
 // tocar casos ya verdes de concurrencia y de `recordAuditEvent` en este
-// ticket.
-try {
-  process.loadEnvFile(".env.local");
-} catch (error) {
-  // Solo el archivo ausente es el caso esperado (p. ej. en la nube sin
-  // secrets configurados): seguimos con lo que ya haya en process.env, y el
-  // skip de abajo avisa qué falta. Cualquier otro error se relanza: si no,
-  // un .env.local ilegible o con sintaxis inválida se vería idéntico a "no
-  // hay credenciales" y el skip sería inconsistente entre corridas (#68).
-  if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-    throw error;
-  }
-}
+// ticket. `.env.local` ya está cargado y verificado contra el proyecto de
+// desarrollo por `vitest.setup.ts`, que corre antes que este archivo.
 
 const supabaseConfig = readSupabaseConfig(process.env);
 const serviceRoleConfig = readSupabaseServiceRoleConfig(process.env);
@@ -247,7 +236,9 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
       expect(row.club_id).toBe(clubId);
       expect(row.actor_id).toBe(testUserId);
       const writtenAt = new Date(row.created_at as string).getTime();
-      expect(writtenAt).toBeGreaterThanOrEqual(before - CLOCK_SKEW_TOLERANCE_MS);
+      expect(writtenAt).toBeGreaterThanOrEqual(
+        before - CLOCK_SKEW_TOLERANCE_MS,
+      );
       expect(writtenAt).toBeLessThanOrEqual(
         Date.now() + CLOCK_SKEW_TOLERANCE_MS,
       );
