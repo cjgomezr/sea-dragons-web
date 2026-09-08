@@ -230,15 +230,39 @@ No aplica: este epic no cambia ninguna pantalla. No lleva `ui-review`.
    organización está en plan `free` y admite dos proyectos activos. Se crean los
    dos y RF-1 se mantiene entera. Vercel va en Hobby. La regla de fondo la puso
    el dueño: en esta fase del proyecto, si algo hay que pagarlo, no se hace.
-2. **Cuándo deja de servir el plan Hobby de Vercel.** Hobby es para uso no
-   comercial. Mientras no haya cobros ni socios reales da igual, pero E12 mete
-   Stripe y eso ya es actividad comercial. La decisión no es de hoy. Lo que sí es
-   de hoy es dejarla escrita, para que E12 no se la encuentre de golpe.
-3. **A quién llega el aviso de caída.** Hoy solo hay una persona. Cuando entren
+2. ~~**Nombre del proyecto en Vercel.**~~ **Resuelta el 8 de septiembre de
+   2026: `victoria-seadragons`.** Define la URL `victoria-seadragons.vercel.app`,
+   que es la que verán los socios en la pantalla de consentimiento de Google
+   cuando E2 traiga OAuth, y coincide con el slug del club que siembra la
+   migración `0001_clubs`. Se descartó `seadragons` a secas por genérico y
+   `seadragons-web` porque se lee como un artefacto de programador. El 8 de
+   septiembre ninguno de los cuatro candidatos respondía en `*.vercel.app`, lo
+   que indica que nadie sirve ahí, no que el nombre esté libre.
+3. **Cuándo deja de servir el plan Hobby de Vercel.** Dos límites distintos, y
+   conviene no confundirlos.
+
+   El primero es de uso: Hobby es para uso no comercial. Mientras no haya cobros
+   ni socios reales da igual, pero E12 mete Stripe y eso ya es actividad
+   comercial. La decisión no es de hoy; dejarla escrita sí, para que E12 no se la
+   encuentre de golpe.
+
+   El segundo es de propiedad, y es el que se pasa por alto: **Hobby solo existe
+   para cuentas personales.** Un Team de Vercel es de pago. Así que la cuenta del
+   club no puede ser una organización sin pagar: sería otra cuenta personal con
+   el correo del club, en Hobby. En un club de voluntarios eso es un riesgo real,
+   no burocrático: el despliegue queda a nombre de una persona, y si esa persona
+   se va, alguien tiene que tener esas credenciales. Lo mismo aplica al proyecto
+   de Supabase.
+4. **A quién llega el aviso de caída.** Hoy solo hay una persona. Cuando entren
    más, hay que decidir si avisa a todos o hay rotación.
-4. **Dominio propio.** Fuera de alcance aquí, pero cuanto antes se decida, menos
-   URLs habrá que cambiar después (callbacks de OAuth en E2, enlaces en correos
-   de E6).
+5. **Dominio propio, y tiene fecha límite: antes de E2.** No es una preferencia
+   estética, es lo que decide si migrar de cuenta duele o no. Renombrar un
+   proyecto en Vercel es un ajuste en Settings. Lo caro es que al cambiar la URL
+   hay que volver a registrarla en las consolas de Google y de Apple, y eso solo
+   pasa si E2 ya salió apuntando a `*.vercel.app`. Si el OAuth se registra
+   contra un dominio propio desde el principio, mover la cuenta de Vercel después
+   no toca ninguna consola externa: solo cambia a dónde apunta el DNS. También
+   ahorra reescribir los enlaces de los correos de E6.
 
 ## 10. Descomposición en tickets (para write-ticket)
 
