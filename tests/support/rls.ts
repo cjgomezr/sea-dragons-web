@@ -6,6 +6,7 @@ import {
   readSupabaseConfig,
   readSupabaseServiceRoleConfig,
 } from "@/lib/supabase/config";
+import { assertTestSupabaseEnvironment } from "@/lib/supabase/environment-guard";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 
 // Vitest ejecuta cada archivo de test en su propio proceso: sin esto,
@@ -24,6 +25,12 @@ try {
     throw error;
   }
 }
+
+// Justo después de cargar `.env.local`, antes de que cualquier test de este
+// archivo pueda abrir un cliente de Supabase real: si alguien apuntó su
+// entorno local a un proyecto que no es `seadragons-dev`, la corrida entera
+// falla aquí en vez de escribir por accidente en esa base.
+assertTestSupabaseEnvironment();
 
 /** Timeout de los tests que hablan por red con el proyecto de Supabase (en
  * Sídney): bajo `npm test` completo compiten por CPU y sockets con el resto
