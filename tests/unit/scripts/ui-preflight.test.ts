@@ -330,11 +330,17 @@ echo "${clientPid}"
   return binDir;
 }
 
+// Un intervalo que no llega a dispararse nunca: no mide nada, sólo le da al
+// proceso un handle abierto para que el event loop no lo deje morir solo.
+const KEEPS_PROCESS_ALIVE_MS = 1 << 30;
+
 /** Un proceso que no hace nada y se deja matar, para comprobar que nadie lo mata. */
 function startSacrificialProcess(): ChildProcess {
-  return spawn(process.execPath, ["-e", "setInterval(() => {}, 1 << 30);"], {
-    stdio: "ignore",
-  });
+  return spawn(
+    process.execPath,
+    ["-e", `setInterval(() => {}, ${KEEPS_PROCESS_ALIVE_MS});`],
+    { stdio: "ignore" },
+  );
 }
 
 function isAlive(pid: number): boolean {

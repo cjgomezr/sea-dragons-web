@@ -38,6 +38,27 @@ async function waitUntilResponds(url: string): Promise<void> {
   throw new Error(`El servidor intruso no llegó a responder en ${url}`);
 }
 
+/**
+ * Mata un proceso y espera a que muera de verdad, no sólo a pedirlo.
+ *
+ * Estas pruebas comparten el 3417, así que un intruso que sobreviva a su
+ * afterEach lo hereda la siguiente como "un servidor que esta fábrica no
+ * inició": falla por una razón que no es la suya, y sólo cuando el
+ * planificador le da al intruso el tiempo justo de sobrevivir. En un runner
+ * Linux cargado ocurría; en Windows nunca (issue #102).
+ *
+ * Un proceso ya muerto no volverá a emitir "exit", así que hay que mirarlo
+ * antes de ponerse a esperarlo o la espera se cuelga hasta el timeout.
+ */
+async function killAndWait(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return;
+  }
+  const died = once(child, "exit");
+  child.kill();
+  await died;
+}
+
 describe("captureUi contra la aplicación real", () => {
   let outputDir = "";
   let intruder: ChildProcess | undefined;
@@ -48,16 +69,7 @@ describe("captureUi contra la aplicación real", () => {
       outputDir = "";
     }
     if (intruder) {
-      // Esperar a que muera de verdad, no solo pedirlo: estas pruebas
-      // comparten el 3417, así que un intruso que sobreviva al afterEach lo
-      // hereda la siguiente como "un servidor que esta fábrica no inició".
-      // Ahí falla por una razón que no es la suya, y sólo cuando el
-      // planificador del sistema le da al intruso el tiempo justo de
-      // sobrevivir, que es lo que ocurría en un runner Linux cargado y
-      // nunca en Windows (issue #102).
-      const died = once(intruder, "exit");
-      intruder.kill();
-      await died;
+      await killAndWait(intruder);
       intruder = undefined;
     }
   });
