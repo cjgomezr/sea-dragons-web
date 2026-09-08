@@ -102,14 +102,18 @@ llave anónima de `seadragons-prod`, distinta a la de desarrollo. En CI, como
 secret del repositorio, pendiente de configurar. La pone quien desarrolla en
 local; en Vercel/CI, quien administre esos secretos.
 
-La llave de servicio de Supabase (su nombre exacto vive solo en
-`.env.example`, no se repite aquí: ver la nota de seguridad al final de esta
-sección): en local, la de `seadragons-dev`, en `.env.local`, nunca en un
-`.env` versionado. No se expone al bundle del cliente; si algún endpoint de
-servidor la necesita en preview, es también la de `seadragons-dev`. En
-producción, la llave de servicio de `seadragons-prod`, nunca la misma que
-desarrollo. En CI, como secret del repositorio, pendiente de configurar. La
-pone quien desarrolla en local; en Vercel/CI, quien administre esos secretos.
+`SUPABASE_SERVICE_ROLE_KEY`: la llave de servicio, la única que se salta
+RLS. En local, la de `seadragons-dev`, en `.env.local`, nunca en un `.env`
+versionado. Si algún endpoint de servidor la necesita en preview, es también la
+de `seadragons-dev`. En producción, la de `seadragons-prod`, nunca la misma que
+desarrollo. En CI, como secret del repositorio, pendiente de configurar. La pone
+quien desarrolla en local; en Vercel/CI, quien administre esos secretos.
+
+Esta es la variable a la que hay que tenerle respeto. Nunca lleva el prefijo
+`NEXT_PUBLIC_`: con ese prefijo Next.js la metería en el bundle del navegador y
+cualquiera podría leer y escribir toda la base saltándose RLS.
+`tests/unit/env-example.test.ts` lo verifica. Solo se usa en código de servidor,
+a través de `src/lib/supabase/service-client.ts`.
 
 `SUPABASE_ACCESS_TOKEN`: en local, un token personal de cuenta completa (no
 de proyecto). No aplica a preview ni a producción: no lo lee el runtime de la
@@ -135,10 +139,8 @@ desarrolla, a mano, cuando lo necesita.
 CI como despliegue. Solo existe dentro del fixture de
 `tests/unit/scripts/ui-preflight.test.ts`, que la pone a sí mismo.
 
-**Nota de seguridad:** este documento evita escribir el nombre exacto de la
-variable de la llave de servicio de Supabase, aunque sí nombra las demás
-variables. `tests/unit/entornos-doc.test.ts` rechaza esa cadena en cualquier
-parte de este archivo (issue #89); `.env.example` es la única fuente de su
-nombre exacto. Esa llave nunca lleva el prefijo `NEXT_PUBLIC_`: con ese
-prefijo Next.js la incluiría en el bundle del navegador
-(`tests/unit/env-example.test.ts` lo verifica).
+**Qué protege este documento y qué no.** `tests/unit/entornos-doc.test.ts`
+rechaza cualquier cadena con forma de clave de Supabase, en los dos formatos que
+Supabase entrega: el JWT clásico y el nuevo con prefijo `sb_`. Nombrar una
+variable no es filtrarla, así que el catálogo de arriba las nombra todas. Lo que
+nunca puede aparecer aquí es un valor.

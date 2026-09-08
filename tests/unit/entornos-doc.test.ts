@@ -4,28 +4,27 @@ import { readEnvExampleNames } from "../support/env-vars";
 
 const ENTORNOS_DOC_PATH = "docs/entornos.md";
 
-// Formas de credencial de Supabase: JWT clásico (`eyJ...`), la clave con
-// prefijo `sb_` del formato nuevo, y el nombre de la clave que las tablas de
-// club_id saltan por completo. Ninguna debe aparecer nunca en este documento.
-// Si una variable futura choca con alguno de estos patrones (como le pasó a
-// SUPABASE_SERVICE_ROLE_KEY), añádela a ENV_VARS_NOT_SPELLED_OUT_BY_NAME más
-// abajo en vez de aflojar el patrón.
+// Los dos formatos en los que Supabase entrega una clave: el JWT clásico
+// (`eyJ<header>.<payload>.<firma>`) y el del formato nuevo, con prefijo
+// `sb_publishable_` o `sb_secret_`. Ninguna debe aparecer nunca en este
+// documento.
+//
+// Aquí vivió un tercer patrón, `/service_role/i`, hasta el 8 de septiembre de
+// 2026. Se quitó porque no cazaba ninguna credencial: ese texto no aparece
+// dentro de una clave de ninguno de los dos formatos. Lo único que cazaba era
+// la palabra, que es un nombre de rol de Postgres y sale con toda legitimidad
+// en las migraciones y en el código. El precio de tenerlo era que
+// `docs/entornos.md` no podía nombrar `SUPABASE_SERVICE_ROLE_KEY`, la variable
+// que más importa documentar bien, y hacía falta una lista de excepciones para
+// que este archivo y el catálogo de variables pudieran convivir.
 const KEY_LOOKING_PATTERNS = [
   /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/,
   /sb_[a-z]+_/,
-  /service_role/i,
 ];
 
 /** Refs de los dos proyectos de Supabase. Son públicos: viajan en la URL de
  * cada petición del navegador. Lo que nunca se versiona son las claves. */
 const PROJECT_REFS = ["xcfrpcvomjjmfoztifuo", "weqhmtpvgewomslpvefu"] as const;
-
-// El propio KEY_LOOKING_PATTERNS de arriba (`/service_role/i`) prohíbe esta
-// cadena en cualquier parte del documento, así que no puede aparecer por su
-// nombre exacto aunque sí tenga su fila en el catálogo de variables (issue
-// #90): docs/entornos.md la describe como "la llave de servicio" y remite a
-// `.env.example` para el nombre real.
-const ENV_VARS_NOT_SPELLED_OUT_BY_NAME = new Set(["SUPABASE_SERVICE_ROLE_KEY"]);
 
 function readEntornosDoc(): string {
   return readFileSync(ENTORNOS_DOC_PATH, "utf-8");
@@ -59,14 +58,31 @@ describe("docs/entornos.md", () => {
     }
   });
 
+  // Sin esto, borrar un patrón por accidente dejaría el test de arriba pasando
+  // siempre y nadie se enteraría: un documento sin claves y un patrón que ya no
+  // busca nada se ven exactamente igual desde fuera.
+  it.each([
+    [
+      "JWT del formato clásico",
+      "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoieCJ9.ZmlybWE",
+    ],
+    ["clave secreta del formato nuevo", "sb_secret_ejemplo"],
+    ["clave publicable del formato nuevo", "sb_publishable_ejemplo"],
+  ])(
+    "reconoce una %s como cadena con pinta de clave",
+    (_nombre, credencial) => {
+      expect(
+        KEY_LOOKING_PATTERNS.some((pattern) => pattern.test(credencial)),
+      ).toBe(true);
+    },
+  );
+
   it("documenta el entorno de cada variable declarada en .env.example", () => {
     const doc = readEntornosDoc();
     const names = readEnvExampleNames();
 
     const missing = [...names].filter(
-      (name) =>
-        !ENV_VARS_NOT_SPELLED_OUT_BY_NAME.has(name) &&
-        !new RegExp(`\\b${name}\\b`).test(doc),
+      (name) => !new RegExp(`\\b${name}\\b`).test(doc),
     );
 
     expect(
