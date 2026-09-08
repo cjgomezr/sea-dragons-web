@@ -7,6 +7,9 @@ const ENTORNOS_DOC_PATH = "docs/entornos.md";
 // Formas de credencial de Supabase: JWT clásico (`eyJ...`), la clave con
 // prefijo `sb_` del formato nuevo, y el nombre de la clave que las tablas de
 // club_id saltan por completo. Ninguna debe aparecer nunca en este documento.
+// Si una variable futura choca con alguno de estos patrones (como le pasó a
+// SUPABASE_SERVICE_ROLE_KEY), añádela a ENV_VARS_NOT_SPELLED_OUT_BY_NAME más
+// abajo en vez de aflojar el patrón.
 const KEY_LOOKING_PATTERNS = [
   /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/,
   /sb_[a-z]+_/,
