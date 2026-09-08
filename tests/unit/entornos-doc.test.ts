@@ -1,15 +1,25 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { readEnvExampleNames } from "../support/env-vars";
 
 const ENTORNOS_DOC_PATH = "docs/entornos.md";
 
-// Formas de credencial de Supabase: JWT clásico (`eyJ...`), la clave con
-// prefijo `sb_` del formato nuevo, y el nombre de la clave que las tablas de
-// club_id saltan por completo. Ninguna debe aparecer nunca en este documento.
+// Los dos formatos en los que Supabase entrega una clave: el JWT clásico
+// (`eyJ<header>.<payload>.<firma>`) y el del formato nuevo, con prefijo
+// `sb_publishable_` o `sb_secret_`. Ninguna debe aparecer nunca en este
+// documento.
+//
+// Aquí vivió un tercer patrón, `/service_role/i`, hasta el 8 de septiembre de
+// 2026. Se quitó porque no cazaba ninguna credencial: ese texto no aparece
+// dentro de una clave de ninguno de los dos formatos. Lo único que cazaba era
+// la palabra, que es un nombre de rol de Postgres y sale con toda legitimidad
+// en las migraciones y en el código. El precio de tenerlo era que
+// `docs/entornos.md` no podía nombrar `SUPABASE_SERVICE_ROLE_KEY`, la variable
+// que más importa documentar bien, y hacía falta una lista de excepciones para
+// que este archivo y el catálogo de variables pudieran convivir.
 const KEY_LOOKING_PATTERNS = [
   /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/,
   /sb_[a-z]+_/,
-  /service_role/i,
 ];
 
 /** Refs de los dos proyectos de Supabase. Son públicos: viajan en la URL de
@@ -46,5 +56,38 @@ describe("docs/entornos.md", () => {
     for (const pattern of KEY_LOOKING_PATTERNS) {
       expect(doc).not.toMatch(pattern);
     }
+  });
+
+  // Sin esto, borrar un patrón por accidente dejaría el test de arriba pasando
+  // siempre y nadie se enteraría: un documento sin claves y un patrón que ya no
+  // busca nada se ven exactamente igual desde fuera.
+  it.each([
+    [
+      "JWT del formato clásico",
+      "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoieCJ9.ZmlybWE",
+    ],
+    ["clave secreta del formato nuevo", "sb_secret_ejemplo"],
+    ["clave publicable del formato nuevo", "sb_publishable_ejemplo"],
+  ])(
+    "reconoce una %s como cadena con pinta de clave",
+    (_nombre, credencial) => {
+      expect(
+        KEY_LOOKING_PATTERNS.some((pattern) => pattern.test(credencial)),
+      ).toBe(true);
+    },
+  );
+
+  it("documenta el entorno de cada variable declarada en .env.example", () => {
+    const doc = readEntornosDoc();
+    const names = readEnvExampleNames();
+
+    const missing = [...names].filter(
+      (name) => !new RegExp(`\\b${name}\\b`).test(doc),
+    );
+
+    expect(
+      missing,
+      `faltan en docs/entornos.md: ${missing.join(", ")}`,
+    ).toEqual([]);
   });
 });

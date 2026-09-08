@@ -72,3 +72,75 @@ Free pausa un proyecto tras una semana sin actividad. Producción va a estar
 vacía y sin tráfico hasta que E2 traiga autenticación, así que es probable
 encontrarla pausada y tener que restaurarla desde el dashboard. Deja de ocurrir
 cuando el monitoreo del issue #95 empiece a consultar `/api/v1/health`.
+
+## Catálogo de variables (issue #90)
+
+Para cada variable de `.env.example`, en qué entornos vive y quién la pone.
+Los cuatro entornos posibles:
+
+- **Local**: la máquina de quien desarrolla, en `.env.local` (nunca
+  commiteado).
+- **Preview**: el despliegue de Vercel que se genera por cada PR abierto.
+  Todavía no existe (lo crea el issue #91); esta tabla dice a dónde debe
+  apuntar cuando exista.
+- **Producción**: el despliegue de Vercel que sirve desde `main`. El proyecto
+  de Supabase de producción ya existe (`seadragons-prod`, ver arriba); el
+  despliegue en Vercel que lo usaría todavía no (issue #91).
+- **CI**: los workflows de GitHub Actions (`.github/workflows/`).
+
+`NEXT_PUBLIC_SUPABASE_URL`: en local, `.env.local` apunta a `seadragons-dev`.
+En preview, apunta a `seadragons-dev`, **nunca** al proyecto de producción
+(#92). En producción, apunta a `seadragons-prod`; nadie la configura todavía
+en Vercel porque el despliegue es el #91. En CI, iría como secret del
+repositorio, pendiente de configurar (ver comentario en `claude-backlog.yml`).
+La pone quien desarrolla en local; en Vercel/CI, quien administre esos
+secretos (#91, #92).
+
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`: en local, la del proyecto `seadragons-dev`.
+En preview, la misma llave anónima de `seadragons-dev`. En producción, la
+llave anónima de `seadragons-prod`, distinta a la de desarrollo. En CI, como
+secret del repositorio, pendiente de configurar. La pone quien desarrolla en
+local; en Vercel/CI, quien administre esos secretos.
+
+`SUPABASE_SERVICE_ROLE_KEY`: la llave de servicio, la única que se salta
+RLS. En local, la de `seadragons-dev`, en `.env.local`, nunca en un `.env`
+versionado. Si algún endpoint de servidor la necesita en preview, es también la
+de `seadragons-dev`. En producción, la de `seadragons-prod`, nunca la misma que
+desarrollo. En CI, como secret del repositorio, pendiente de configurar. La pone
+quien desarrolla en local; en Vercel/CI, quien administre esos secretos.
+
+Esta es la variable a la que hay que tenerle respeto. Nunca lleva el prefijo
+`NEXT_PUBLIC_`: con ese prefijo Next.js la metería en el bundle del navegador y
+cualquiera podría leer y escribir toda la base saltándose RLS.
+`tests/unit/env-example.test.ts` lo verifica. Solo se usa en código de servidor,
+a través de `src/lib/supabase/service-client.ts`.
+
+`SUPABASE_ACCESS_TOKEN`: en local, un token personal de cuenta completa (no
+de proyecto). No aplica a preview ni a producción: no lo lee el runtime de la
+aplicación, solo el CLI/MCP de quien desarrolla. Tampoco aplica hoy a CI:
+nadie corre el CLI de Supabase ahí todavía. Cada quien genera el suyo en
+Supabase Dashboard → Account → Access Tokens.
+
+`APP_URL`: opcional en local (si no se pone, usa `http://localhost:3417`).
+En preview, la URL que genera Vercel (pendiente de #91). En producción, la
+URL de producción (pendiente de #91). En CI, la fija el workflow con la URL
+del servidor que acaba de levantar. Playwright toma el valor por defecto; en
+CI/Vercel lo fija el workflow.
+
+`CI`: no se pone en local. En preview y producción la pone Vercel
+automáticamente; en CI la pone GitHub Actions automáticamente. Nunca a mano,
+nunca en `.env.local`.
+
+`FABRICA_REUSE_SERVER`: opcional en local (`1` para reusar un `npm run dev`
+ya corriendo). No aplica a preview, producción ni CI. La pone quien
+desarrolla, a mano, cuando lo necesita.
+
+`START_DELAY_MS`: no aplica al desarrollo normal ni a preview, producción o
+CI como despliegue. Solo existe dentro del fixture de
+`tests/unit/scripts/ui-preflight.test.ts`, que la pone a sí mismo.
+
+**Qué protege este documento y qué no.** `tests/unit/entornos-doc.test.ts`
+rechaza cualquier cadena con forma de clave de Supabase, en los dos formatos que
+Supabase entrega: el JWT clásico y el nuevo con prefijo `sb_`. Nombrar una
+variable no es filtrarla, así que el catálogo de arriba las nombra todas. Lo que
+nunca puede aparecer aquí es un valor.
