@@ -165,13 +165,14 @@ describe("limpieza ante fallo", () => {
 // El runner de CI (ubuntu-latest en checks.yml) fija Node 20, que no tiene
 // --experimental-strip-types (llegó en Node 22.6): un spawn con esa flag
 // muere ahí con "bad option" (código 9) en vez del código de salida que esta
-// prueba verifica. tsx transpila el entrypoint sin depender de esa flag.
-const TSX_CLI = require.resolve("tsx/cli");
-
+// prueba verifica. `--import tsx` transpila el entrypoint en el mismo
+// proceso sin depender de esa flag; el binario `tsx` (node_modules/.bin/tsx)
+// arranca en cambio un proceso hijo propio, que dejaría el código de salida
+// que ve este test en manos del relay de ese hijo en vez del de capture-ui.ts.
 function runCommand(args: readonly string[]): Promise<number | null> {
   const child = spawn(
     process.execPath,
-    [TSX_CLI, "scripts/capture-ui.ts", ...args],
+    ["--import", "tsx", "scripts/capture-ui.ts", ...args],
     { stdio: "ignore" },
   );
   return new Promise((resolve) => child.on("close", resolve));
