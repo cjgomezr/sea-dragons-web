@@ -202,6 +202,7 @@ Fix it one of these ways:
 }
 
 up() {
+  set -x
   check
   mkdir -p "$STATE_DIR"
   echo "$APP_URL" > "$URL_FILE"
@@ -274,10 +275,6 @@ Kill it by hand before the next review, or it will be refused as a foreign serve
 
   echo "ui-preflight: stopped the dev server (pid $pid)." >&2
 }
-
-echo "DEBUG invocation pid=$$ ppid=$PPID cmd=${1:-} at=$(date +%s.%N)" >&2
-echo "DEBUG ps snapshot:" >&2
-ps -ef >&2
 
 case "${1:-}" in
   up)    up ;;
