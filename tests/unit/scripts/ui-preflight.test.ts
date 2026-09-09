@@ -20,7 +20,14 @@ const TEST_TIMEOUT_MS = 20_000;
 // sesión de agente y su propio subagente de revisión, por ejemplo) chocarían
 // si todas usaran el mismo rango fijo. Un offset aleatorio por proceso reduce
 // esa colisión sin necesitar coordinación entre corridas.
-const PORT_BASE = 40000 + Math.floor(Math.random() * 10_000);
+//
+// Por debajo de 32768 a propósito: ahí empieza el rango de puertos efímeros
+// de Linux (32768-60999 por defecto), del que el sistema reparte el extremo
+// local de cada conexión saliente. Un puerto de ese rango se lo puede quedar
+// un cliente cualquiera de esta misma suite en el instante justo, y entonces
+// el dev server no logra bindear, nadie responde y `up` agota su plazo. No
+// falla siempre, que es lo peor que puede hacer un test.
+const PORT_BASE = 20_000 + Math.floor(Math.random() * 10_000);
 let nextPortOffset = 0;
 function nextPort(): number {
   nextPortOffset += 1;
