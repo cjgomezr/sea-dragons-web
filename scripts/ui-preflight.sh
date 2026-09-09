@@ -37,7 +37,7 @@ case "$APP_URL$DEV_SERVER_CMD" in
   *'{{'*) die "this repo still has {{...}} placeholders. Run /bootstrap first, or export APP_URL and DEV_SERVER_CMD." ;;
 esac
 
-# Does anything answer at APP_URL? Any HTTP status counts as occupied.
+# Qué se sabe del puerto ahora mismo. Any HTTP status counts as occupied.
 #
 # The body is discarded through the shell's own ">/dev/null", not curl's
 # "-o /dev/null": that argument is a path curl (a native Windows binary
@@ -49,10 +49,24 @@ esac
 # though the request itself succeeded and the server answered 200. The
 # shell's own redirection has no such dependency, since bash resolves it
 # itself rather than handing the path to curl's argv.
-responds() {
-  if command -v curl >/dev/null 2>&1; then
-    curl -sS --max-time 3 "$APP_URL" >/dev/null 2>&1
-  else
+#
+# Devuelve TRES respuestas, no dos, y esa es la parte que importa:
+#
+#   answered  alguien contestó
+#   silent    no hay nadie: la conexión se rechazó al instante
+#   unknown   no se sabe: se agotó el plazo
+#
+# Tratar "unknown" como "silent" es lo que hacía este script antes, y bajo
+# carga eso significa declarar libre un puerto ocupado y arrancar el dev
+# server encima. Las capturas que salgan de ahí son de otra app, que es el
+# fallo silencioso que este script existe para impedir (issue #117).
+#
+# Además de peligroso era casi siempre falso: contra un puerto libre la
+# conexión se rechaza al instante, no se agota nada. Si algo tarda, es porque
+# hay alguien al otro lado que aceptó la conexión.
+port_state() {
+  local code=0
+  if command -v node >/dev/null 2>&1; then
     node -e '
       const u = new URL(process.argv[1]);
       const req = require("http").get(
@@ -60,9 +74,46 @@ responds() {
         () => process.exit(0)
       );
       req.on("error", () => process.exit(1));
-      req.on("timeout", () => process.exit(1));
-    ' "$APP_URL" >/dev/null 2>&1
+      req.on("timeout", () => process.exit(2));
+    ' "$APP_URL" >/dev/null 2>&1 || code=$?
+    case "$code" in
+      0) printf 'answered' ;;
+      2) printf 'unknown' ;;
+      *) printf 'silent' ;;
+    esac
+    return 0
   fi
+  # Sin node no se puede distinguir, y se degrada a las dos respuestas de
+  # antes: curl devuelve 28 tanto si no pudo conectar como si conectó y no
+  # le contestaron a tiempo, así que aquí "no lo sé" se pierde. Es el peor
+  # de los dos comportamientos, pero es el único disponible.
+  #
+  # El cuerpo se descarta con el '>/dev/null' del shell y no con el
+  # '-o /dev/null' de curl: ese argumento es una ruta que curl (un binario
+  # nativo de Windows bajo Git Bash) tiene que abrir él mismo, y MSYS sólo la
+  # reescribe al dispositivo NUL como parte de su conversión automática de
+  # rutas. Con esa conversion desactivada (MSYS_NO_PATHCONV=1), curl falla al
+  # abrir "/dev/null" con el código 23 aunque el servidor haya contestado 200.
+  code=0
+  curl -sS --max-time 3 "$APP_URL" >/dev/null 2>&1 || code=$?
+  case "$code" in
+    0) printf 'answered' ;;
+    *) printf 'silent' ;;
+  esac
+}
+
+# Sólo cuenta una respuesta de verdad. La usa el bucle de arranque: dar por
+# arriba un servidor que todavía no contestó sería peor que esperar otro
+# segundo.
+responds() {
+  [ "$(port_state)" = answered ]
+}
+
+# "Aquí no hay nadie", con seguridad. Todo lo demás, incluido "no lo sé",
+# cuenta como ocupado: es el lado seguro para decidir si se puede arrancar
+# encima, o si hay que seguir matando.
+port_is_free() {
+  [ "$(port_state)" = silent ]
 }
 
 # Ours = started by a previous 'up' in this repo and still alive. PID_FILE
@@ -243,7 +294,7 @@ kill_port_owner() {
 }
 
 check() {
-  if ! responds; then
+  if port_is_free; then
     echo "ui-preflight: $APP_URL is free." >&2
     return 0
   fi
@@ -319,16 +370,16 @@ down() {
   if kill -0 "$pid" 2>/dev/null; then
     kill_tree "$pid"
     local waited=0
-    while [ "$waited" -lt "$STOP_TIMEOUT" ] && responds; do
+    while [ "$waited" -lt "$STOP_TIMEOUT" ] && ! port_is_free; do
       sleep 1
       waited=$((waited + 1))
     done
   fi
-  if responds; then
+  if ! port_is_free; then
     kill_port_owner
     sleep 1
   fi
-  if responds; then
+  if ! port_is_free; then
     echo "ui-preflight: WARNING, something still answers at $APP_URL after stopping pid $pid.
 Kill it by hand before the next review, or it will be refused as a foreign server." >&2
     return 1
