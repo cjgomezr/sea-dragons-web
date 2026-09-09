@@ -115,6 +115,11 @@ sleep 30
  * de vuelta y descarta el resultado como si no hubiera encontrado nada. En
  * Linux (sin `ps -W`) no hay dos espacios de PID que traducir, así que cae
  * de vuelta al PID normal, que es justo lo que lsof -ti reportaría ahí.
+ *
+ * El `| head -1` de aquí abajo es la forma que el script de producción ya no
+ * usa y que un test de este archivo prohíbe. Aquí es inofensiva: no hay
+ * pipefail en este fixture y sólo puede casar una línea, la del hijo que
+ * acaba de lanzar.
  */
 const DETACHED_WRAPPER_WRITES_PID_SCRIPT = `#!/usr/bin/env bash
 DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
@@ -435,13 +440,11 @@ echo "$pid 1 1 $pid"`,
 echo "  TCP    0.0.0.0:${port}         0.0.0.0:0              LISTENING       $pid"`,
     lsof: `${readsPid}
 echo "$pid"`,
-    // Prueba las dos numeraciones porque no sabe en cuál le hablan: el `kill`
-    // de Git Bash entiende la suya, taskkill.exe la nativa de Windows.
+    // Un `kill` a secas basta: las columnas 1 y 4 del ps de mentira valen lo
+    // mismo, el PID que `up` escribió con `echo $!`, o sea la numeración de
+    // Git Bash, que es la única que este `kill` necesita entender.
     taskkill: `pid="\${@: -1}"
-kill -9 "$pid" 2>/dev/null && exit 0
-if command -v taskkill.exe >/dev/null 2>&1; then
-  MSYS_NO_PATHCONV=1 taskkill.exe /T /F /PID "$pid" >/dev/null 2>&1 || true
-fi
+kill -9 "$pid" 2>/dev/null || true
 exit 0`,
   };
   for (const [name, body] of Object.entries(tools)) {
@@ -541,7 +544,7 @@ describe("ui-preflight.sh", () => {
       const { code, stdout, stderr } = await runPreflight(["up"], workDir, env);
 
       expect(stderr).not.toMatch(/did not answer/);
-      expect(code).toBe(0);
+      expect(code, stderr).toBe(0);
       expect(stdout.trim()).toBe(`http://localhost:${port}`);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
@@ -561,7 +564,7 @@ describe("ui-preflight.sh", () => {
       const { code, stderr } = await runPreflight(["up"], workDir, env);
 
       expect(stderr).not.toMatch(/did not answer/);
-      expect(code).toBe(0);
+      expect(code, stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
     TEST_TIMEOUT_MS,
@@ -589,7 +592,7 @@ describe("ui-preflight.sh", () => {
       const { code, stdout, stderr } = await runPreflight(["up"], workDir, env);
 
       expect(stderr).not.toMatch(/did not answer/);
-      expect(code).toBe(0);
+      expect(code, stderr).toBe(0);
       expect(stdout.trim()).toBe(`http://localhost:${port}`);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
@@ -642,7 +645,7 @@ describe("ui-preflight.sh", () => {
       expect(up.code, up.stderr).toBe(0);
 
       const check = await runPreflight(["check"], workDir, env);
-      expect(check.code).toBe(0);
+      expect(check.code, check.stderr).toBe(0);
       expect(check.stderr).toMatch(/served by this factory/);
     },
     TEST_TIMEOUT_MS,
@@ -657,20 +660,20 @@ describe("ui-preflight.sh", () => {
       cleanupEnv = env;
 
       const firstUp = await runPreflight(["up"], workDir, env);
-      expect(firstUp.code).toBe(0);
+      expect(firstUp.code, firstUp.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
 
       const firstDown = await runPreflight(["down"], workDir, env);
-      expect(firstDown.code).toBe(0);
+      expect(firstDown.code, firstDown.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
 
       const secondUp = await runPreflight(["up"], workDir, env);
       expect(secondUp.stderr).not.toMatch(/did not answer/);
-      expect(secondUp.code).toBe(0);
+      expect(secondUp.code, secondUp.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
 
       const secondDown = await runPreflight(["down"], workDir, env);
-      expect(secondDown.code).toBe(0);
+      expect(secondDown.code, secondDown.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
     },
     TEST_TIMEOUT_MS,
@@ -779,6 +782,47 @@ describe("ui-preflight.sh", () => {
   );
 
   it(
+    "down sigue apagando cuando ps no admite la opción -W",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      const env = baseEnv(workDir, port, {
+        DEV_SERVER_CMD: `node ${toBashPath(workDir)}/dummy-server.js ${port}`,
+        START_DELAY_MS: "200",
+      });
+      cleanupEnv = env;
+      const calmBinDir = await installWindowsPidTranslationFakes(
+        workDir,
+        port,
+        "normal",
+      );
+      const up = await runPreflight(
+        ["up"],
+        workDir,
+        withFakeBin(env, calmBinDir),
+      );
+      expect(up.code, up.stderr).toBe(0);
+      const withoutWBinDir = await installWindowsPidTranslationFakes(
+        workDir,
+        port,
+        "sin-soporte-de-W",
+      );
+
+      const down = await runPreflight(
+        ["down"],
+        workDir,
+        withFakeBin(env, withoutWBinDir),
+      );
+
+      // El apagado es la única ruta que llega a winpid_of, y su alternativa
+      // sin -W es la línea a la que un `ps -W` fallido nunca dejaba llegar.
+      expect(down.code, down.stderr).toBe(0);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
     "up sigue arrancando cuando ps no admite la opción -W",
     async () => {
       workDir = await setupWorkDir();
@@ -839,13 +883,19 @@ describe("ui-preflight.sh", () => {
     TEST_TIMEOUT_MS,
   );
 
-  it("ninguna traducción de PID toma la primera línea con head", async () => {
+  it("ui-preflight.sh no toma ninguna primera línea con head", async () => {
     const script = await readFile(UI_PREFLIGHT_SCRIPT, "utf8");
 
-    // Guarda contra la reincidencia: es la forma exacta que tumbó a `up` en
-    // silencio en el #102, y la que este ticket quita de los dos sitios donde
-    // quedaba.
-    expect(script).not.toContain("| head");
+    // Un cable trampa, no una descripción de comportamiento. Se gana el sitio
+    // porque este defecto ya reincidió (#102 y luego #104), no lo ve el lint
+    // y su fallo es invisible: mata el script sin dejar mensaje. `head` es la
+    // forma conocida, no el peligro entero: cualquier lector que cierre antes
+    // de tiempo (`sed 1q`, `grep -q`) hace lo mismo.
+    const offenders = script
+      .split("\n")
+      .filter((line) => line.includes("| head"));
+
+    expect(offenders).toEqual([]);
   });
 
   it(
