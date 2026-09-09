@@ -419,6 +419,7 @@ async function installWindowsPidTranslationFakes(
   // PIDs, así que un doble que sólo mirara ahí se quedaría mudo justo en la
   // ruta que hay que ejercitar. La caché guarda el último PID visto.
   const pidCache = toBashPath(path.join(workDir, "fake-pid-cache"));
+  const killLog = toBashPath(path.join(workDir, "taskkill-calls"));
   const readsPid = `[ -f "${pidFile}" ] && cp "${pidFile}" "${pidCache}"
 [ -f "${pidCache}" ] || exit 0
 pid=$(cat "${pidCache}")`;
@@ -443,9 +444,13 @@ echo "$pid"`,
     // Un `kill` a secas basta: las columnas 1 y 4 del ps de mentira valen lo
     // mismo, el PID que `up` escribió con `echo $!`, o sea la numeración de
     // Git Bash, que es la única que este `kill` necesita entender.
+    //
+    // Deja escrito a quién le pidieron matar: es la única forma de ver desde
+    // fuera qué PID devolvió la traducción, en vez de deducirlo de que el
+    // puerto acabara libre.
     taskkill: `pid="\${@: -1}"
-kill -9 "$pid" 2>/dev/null || true
-exit 0`,
+echo "$pid" >> "${killLog}"
+kill -9 "$pid" 2>/dev/null || true`,
   };
   for (const [name, body] of Object.entries(tools)) {
     const toolPath = path.join(binDir, name);
@@ -802,6 +807,9 @@ describe("ui-preflight.sh", () => {
         withFakeBin(env, calmBinDir),
       );
       expect(up.code, up.stderr).toBe(0);
+      const serverPid = (
+        await readFile(path.join(workDir, ".factory/ui-server.pid"), "utf8")
+      ).trim();
       const withoutWBinDir = await installWindowsPidTranslationFakes(
         workDir,
         port,
@@ -818,6 +826,16 @@ describe("ui-preflight.sh", () => {
       // sin -W es la línea a la que un `ps -W` fallido nunca dejaba llegar.
       expect(down.code, down.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
+      // Y llegó con el PID bueno, no vacío: la traducción salió del `ps` sin
+      // -W, que es el respaldo que se quería ejercitar.
+      const killed = (
+        await readFile(path.join(workDir, "taskkill-calls"), "utf8")
+      )
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      expect(killed).toContain(serverPid);
     },
     TEST_TIMEOUT_MS,
   );
