@@ -42,11 +42,37 @@ jobs:
       - run: npm ci
       - name: Instala el navegador que necesitan los tests de captura de UI
         run: npx playwright install --with-deps chromium
+      # Qué comandos tiene de verdad este repositorio. La plantilla de la que
+      # nace un proyecto llega con `test`, `lint`, `typecheck` y `build` sin
+      # rellenar, y ahí estos pasos fallarían por no existir todavía, no por
+      # trabajo mal hecho. Mismo centinela que usa el Stop gate.
+      - id: repo
+        name: Averigua qué comandos están configurados
+        run: |
+          if grep -q '{{TEST_CMD}}' package.json; then
+            echo "bootstrapped=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "bootstrapped=true" >> "$GITHUB_OUTPUT"
+          fi
+          if jq -e '.scripts["test:kit"] // empty' package.json > /dev/null; then
+            echo "has_kit=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_kit=false" >> "$GITHUB_OUTPUT"
+          fi
+      # Los tests del kit no dependen del bootstrap: vigilan las piezas de la
+      # fábrica, que son iguales en todos los proyectos.
+      - name: Tests del kit
+        if: steps.repo.outputs.has_kit == 'true'
+        run: npm run test:kit
       - name: Tests
+        if: steps.repo.outputs.bootstrapped == 'true'
         run: npm test
       - name: Lint
+        if: steps.repo.outputs.bootstrapped == 'true'
         run: npm run lint
       - name: Tipos
+        if: steps.repo.outputs.bootstrapped == 'true'
         run: npm run typecheck
       - name: Build
+        if: steps.repo.outputs.bootstrapped == 'true'
         run: npm run build
