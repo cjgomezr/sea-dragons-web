@@ -87,17 +87,40 @@ port_of() {
 # Git Bash keeps its own PID numbering, separate from the native Windows PID
 # that netstat/taskkill/tasklist use for the same process. ps -W is the
 # Rosetta stone between the two; on non-Windows this simply finds nothing.
+# Un 'ps' que nunca falla: donde no admite la opción pedida devuelve vacío
+# en vez de un código distinto de cero. Bajo 'set -e' ese código tumbaba el
+# script en la primera línea de winpid_of, sin llegar nunca a la alternativa
+# que espera justo debajo para ese mismo caso.
+ps_listing() {
+  ps "$@" 2>/dev/null || true
+}
+
+# Imprime la columna $print de la PRIMERA línea de la entrada cuya columna
+# $match valga $value, o nada si no hay ninguna.
+#
+# Sin una tubería a 'head': head cierra el lector tras la primera línea,
+# quien escribía recibe SIGPIPE y ese 141, bajo 'set -o pipefail', tumba el
+# script entero sin decir por qué. Es lo que le pasaba a record_real_owner
+# antes del #102. 'awk' consume toda su entrada, así que aquí no hay lector
+# que cierre antes de tiempo.
+column_where() {
+  local match="$1" value="$2" print="$3" found
+  found=$(awk -v m="$match" -v v="$value" -v p="$print" '$m == v { print $p }')
+  read -r found <<< "$found" || true
+  printf '%s' "$found"
+}
+
 winpid_of() {
   local pid="$1" winpid
-  winpid=$(ps -W 2>/dev/null | awk -v p="$pid" '$1 == p { print $4 }' | head -1)
-  [ -n "$winpid" ] || winpid=$(ps 2>/dev/null | awk -v p="$pid" '$1 == p { print $4 }' | head -1)
+  winpid=$(ps_listing -W | column_where 1 "$pid" 4)
+  [ -n "$winpid" ] || winpid=$(ps_listing | column_where 1 "$pid" 4)
   printf '%s' "$winpid"
 }
 
 # The reverse of winpid_of: a native Windows PID (as netstat reports it) back
 # to the MSYS pid that Git Bash's own kill/kill -0 actually understand.
 pid_for_winpid() {
-  ps -W 2>/dev/null | awk -v w="$1" '$4 == w { print $1 }' | head -1
+  ps_listing -W | column_where 4 "$1" 1
 }
 
 # Dev servers spawn children (next, vite, nodemon), and killing only the
