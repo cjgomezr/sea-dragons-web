@@ -45,6 +45,14 @@ function runLines(): string {
     .join("\n");
 }
 
+function stepNamed(name: string): WorkflowStep {
+  const step = allSteps().find((candidate) => candidate.name === name);
+  if (!step) {
+    throw new Error(`el workflow no tiene ningún paso llamado "${name}"`);
+  }
+  return step;
+}
+
 describe("workflow de checks", () => {
   it("parsea como YAML válido", () => {
     expect(() => parseWorkflow()).not.toThrow();
@@ -115,5 +123,38 @@ describe("workflow de checks", () => {
 
     expect(installIndex).toBeGreaterThanOrEqual(0);
     expect(testIndex).toBeGreaterThan(installIndex);
+  });
+
+  /**
+   * Este workflow viaja a `fabrica-template`, donde `test`, `lint`,
+   * `typecheck` y `build` llegan sin rellenar hasta que alguien corre el
+   * bootstrap. Sin guardia, cada PR de la plantilla saldría rojo por comandos
+   * que todavía no existen, que no es trabajo mal hecho sino un repositorio
+   * que aún no es un proyecto. El centinela es el mismo que usa el Stop gate.
+   */
+  it("salta los comandos de la app mientras el repositorio no haya pasado por el bootstrap", () => {
+    for (const name of ["Tests", "Lint", "Tipos", "Build"]) {
+      expect(
+        stepNamed(name).if,
+        `el paso ${name} corre aunque el proyecto no esté bootstrapeado`,
+      ).toMatch(/steps\.repo\.outputs\.bootstrapped == 'true'/);
+    }
+  });
+
+  it("no salta los tests del kit, que no dependen del bootstrap", () => {
+    // Vigilan las piezas de la fábrica, que son iguales en todos los
+    // proyectos y funcionan desde el primer clon.
+    const kit = stepNamed("Tests del kit");
+
+    expect(kit.run).toMatch(/npm run test:kit/);
+    expect(kit.if).toMatch(/has_kit == 'true'/);
+    expect(kit.if).not.toMatch(/bootstrapped/);
+  });
+
+  it("averigua ambas cosas leyendo el package.json, no adivinando", () => {
+    const probe = stepNamed("Averigua qué comandos están configurados");
+
+    expect(probe.run).toMatch(/\{\{TEST_CMD\}\}/);
+    expect(probe.run).toMatch(/test:kit/);
   });
 });
