@@ -386,10 +386,7 @@ function isAlive(pid: number): boolean {
  *   un fallo.
  */
 type FakePsFlavour =
-  | "normal"
-  | "inundacion"
-  | "sin-soporte-de-W"
-  | "no-encuentra-nada";
+  "normal" | "inundacion" | "sin-soporte-de-W" | "no-encuentra-nada";
 
 const PS_FLOOD_LINES = 20_000;
 
@@ -454,12 +451,28 @@ kill -9 "$pid" 2>/dev/null || true`,
   };
   for (const [name, body] of Object.entries(tools)) {
     const toolPath = path.join(binDir, name);
-    await writeFile(toolPath, `#!/usr/bin/env bash
+    await writeFile(
+      toolPath,
+      `#!/usr/bin/env bash
 ${body}
-`);
+`,
+    );
     await chmod(toolPath, 0o755);
   }
   return binDir;
+}
+
+/**
+ * Un servidor que acepta la conexión y no contesta nunca. Es el puerto
+ * "ocupado pero lento" de verdad: no rechaza, así que no hay forma de saber
+ * si hay alguien salvo esperando, y esperar es lo que se agota bajo carga.
+ */
+function startMuteServer(port: number): ChildProcess {
+  return spawn(
+    process.execPath,
+    ["-e", `require("node:net").createServer(() => {}).listen(${port});`],
+    { stdio: "ignore" },
+  );
 }
 
 async function setupWorkDir(): Promise<string> {
@@ -915,6 +928,44 @@ describe("ui-preflight.sh", () => {
 
     expect(offenders).toEqual([]);
   });
+
+  it(
+    "un puerto que acepta y no contesta no se lee como libre",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      client = startMuteServer(port);
+      const env = baseEnv(workDir, port, {});
+      cleanupEnv = env;
+
+      const { code, stderr } = await runPreflight(["check"], workDir, env);
+
+      // "No me dio tiempo a averiguarlo" no es "no hay nadie". Darlo por
+      // libre es lo que dejaba arrancar el dev server encima de un puerto
+      // ajeno, y entonces las capturas son de otra app (issue #117).
+      expect(stderr).not.toMatch(/is free/);
+      expect(code).not.toBe(0);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "un puerto donde de verdad no hay nadie sigue leyéndose como libre",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      const env = baseEnv(workDir, port, {});
+      cleanupEnv = env;
+
+      const { code, stderr } = await runPreflight(["check"], workDir, env);
+
+      // El arreglo no puede volver paranoico al script: donde nadie escucha,
+      // la conexión se rechaza y eso sí es una respuesta.
+      expect(stderr, stderr).toMatch(/is free/);
+      expect(code, stderr).toBe(0);
+    },
+    TEST_TIMEOUT_MS,
+  );
 
   it(
     "sigue abortando por timeout cuando el servidor de verdad nunca escucha",
