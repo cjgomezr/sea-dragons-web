@@ -10,10 +10,12 @@
 # perder un incidente a duplicarlo, igual que pr_declares_closes() en
 # scripts/process-backlog.sh.
 #
-# La épica se fija a mano en E0 (#32, "el ciclo de vida y la fábrica misma"):
-# un desajuste del propio gate visual es infraestructura de la fábrica, no del
-# código de producto que el push tocaba, y un detector automático no puede
-# deducir qué epic rompió el push.
+# La épica se fija a mano: un desajuste del propio gate visual es
+# infraestructura de la fábrica, no del código de producto que el push tocaba,
+# y un detector automático no puede deducir qué epic rompió el push. El número
+# es de cada proyecto, así que se resuelve como el puerto en ui-preflight.sh:
+# un valor por defecto que la plantilla deja como placeholder para que lo
+# rellene /bootstrap, y FACTORY_EPIC para pisarlo desde el entorno.
 #
 # Usage: scripts/report-visual-incident.sh
 # Requires: gh (con permiso de escritura sobre issues), scripts/file-incident.sh.
@@ -23,7 +25,22 @@
 
 set -uo pipefail
 
-VISUAL_INCIDENT_EPIC=32
+DEFAULT_FACTORY_EPIC=32
+
+# En una sola expansión no funciona: con un placeholder por defecto, bash
+# cierra en la primera llave de `{{...}}` y deja `}}` pegado al valor.
+VISUAL_INCIDENT_EPIC="${FACTORY_EPIC:-$DEFAULT_FACTORY_EPIC}"
+
+# Sin épica no hay de dónde colgar el incidente, y un número equivocado lo
+# cuelga del issue ajeno que tenga ese número: nadie lo encontraría y de paso
+# ensuciaría un issue que no tiene nada que ver. Mejor fallar diciéndolo que
+# acertar por casualidad.
+case "$VISUAL_INCIDENT_EPIC" in
+  *'{{'*|"")
+    echo "report-visual-incident: falta la épica de fábrica. Corre /bootstrap o exporta FACTORY_EPIC=<número del issue de la épica>." >&2
+    exit 1
+    ;;
+esac
 TITLE="main con la línea base visual desajustada"
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 

@@ -13,7 +13,14 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const SCRIPT = path.join(REPO_ROOT, "scripts/report-visual-incident.sh");
-const VISUAL_INCIDENT_EPIC = 32;
+/**
+ * La épica que este proyecto usa por defecto. Los tests que la mencionan
+ * comprueban el MECANISMO, no el número: el que decide de qué épica cuelga el
+ * incidente es `FACTORY_EPIC`, y en la plantilla ni siquiera hay un valor por
+ * defecto hasta que el bootstrap lo rellena (issue #122).
+ */
+const DEFAULT_EPIC_OF_THIS_PROJECT = 32;
+const ANOTHER_EPIC = 777;
 
 interface RunResult {
   code: number | null;
@@ -139,8 +146,43 @@ describe("report-visual-incident", () => {
     expect(log).toMatch(/issue list/);
     expect(log).toMatch(/issue create/);
     expect(log).toMatch(
-      new RegExp(`issues/${VISUAL_INCIDENT_EPIC}/sub_issues`),
+      new RegExp(`issues/${DEFAULT_EPIC_OF_THIS_PROJECT}/sub_issues`),
     );
+  });
+
+  it("cuelga el incidente de la épica que diga FACTORY_EPIC", async () => {
+    // El número no puede vivir quemado en el script: cada proyecto tiene la
+    // suya, y la plantilla no tiene ninguna hasta que el bootstrap la crea.
+    const { logFile, env } = await setup({
+      EXISTING_INCIDENT_COUNT: "0",
+      FACTORY_EPIC: String(ANOTHER_EPIC),
+    });
+
+    const { code } = await runScript(workDir, env);
+
+    expect(code).toBe(0);
+    const log = await readLog(logFile);
+    expect(log).toMatch(new RegExp(`issues/${ANOTHER_EPIC}/sub_issues`));
+    expect(log).not.toMatch(
+      new RegExp(`issues/${DEFAULT_EPIC_OF_THIS_PROJECT}/sub_issues`),
+    );
+  });
+
+  it("falla diciéndolo si nadie ha rellenado la épica", async () => {
+    // Es el caso de la plantilla recién clonada. Colgar el incidente de un
+    // issue ajeno sería peor que no abrirlo: nadie lo encontraría, y de paso
+    // ensuciaría un issue que no tiene nada que ver.
+    const { logFile, env } = await setup({
+      EXISTING_INCIDENT_COUNT: "0",
+      FACTORY_EPIC: "{{FACTORY_EPIC}}",
+    });
+
+    const { code, stderr } = await runScript(workDir, env);
+
+    expect(code).not.toBe(0);
+    expect(stderr).toMatch(/FACTORY_EPIC/);
+    const log = await readLog(logFile);
+    expect(log).not.toMatch(/issue create/);
   });
 
   it("no abre un segundo incidente cuando ya hay uno abierto para la misma causa", async () => {
