@@ -5,7 +5,7 @@ description: >
   against the original requirements and the project's clean-code standards
   (CLAUDE.md). Reports findings back to the main agent, not the human.
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: opus
 maxTurns: 3
 ---
 
