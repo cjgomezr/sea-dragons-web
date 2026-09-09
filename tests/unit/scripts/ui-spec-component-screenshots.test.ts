@@ -59,16 +59,16 @@ function navLocatorNameIn(body: string, role: string): string | null {
   return body.match(declaration)?.[1] ?? null;
 }
 
-/**
- * #77: una captura fullPage de 375px de alto reparte el cambio de un
- * componente pequeño (la barra de pestañas) entre miles de píxeles de
- * página, así que cabe holgadamente bajo un presupuesto por RATIO. Cuanto
- * más larga la página, más grande el punto ciego. maxDiffPixels (absoluto)
- * no crece con el alto de la página; maxDiffPixelRatio sí, y esa es la
- * diferencia que crea el punto ciego. Por eso ninguna captura del archivo
- * puede volver a usarlo.
- */
 describe("gate visual", () => {
+  /**
+   * #77: una captura fullPage de 375px de alto reparte el cambio de un
+   * componente pequeño (la barra de pestañas) entre miles de píxeles de
+   * página, así que cabe holgadamente bajo un presupuesto por RATIO. Cuanto
+   * más larga la página, más grande el punto ciego. maxDiffPixels (absoluto)
+   * no crece con el alto de la página; maxDiffPixelRatio sí, y esa es la
+   * diferencia que crea el punto ciego. Por eso ninguna captura del archivo
+   * puede volver a usarlo.
+   */
   it("ninguna captura fullPage lleva maxDiffPixelRatio", () => {
     const source = uiSpecSource();
 
