@@ -118,6 +118,19 @@ $TEST_OUT"
   fi
 fi
 
+# 3b. Los tests del kit, cuando el proyecto los tiene en un comando propio.
+# En ESTE repo no existe `test:kit` y el bloque no hace nada: aquí los tests
+# del kit ya los recoge `npm test`. En un proyecto creado desde la plantilla
+# sí existe, porque allí `npm test` es el runner de la app y el kit corre por
+# su cuenta, y este bloque es lo que hace que la red que vigila los scripts de
+# la fábrica se ejecute de verdad en vez de sólo estar ahí.
+if has_script "test:kit"; then
+  if ! KIT_OUT=$(npm run test:kit 2>&1); then
+    fail "❌ Kit tests failed. Fix before finishing:
+$KIT_OUT"
+  fi
+fi
+
 # 4. Visual regression + accessibility (only if playwright config exists)
 if [ -f "playwright.config.ts" ] || [ -f "playwright.config.js" ]; then
   if ! E2E_OUT=$(npx playwright test 2>&1); then
