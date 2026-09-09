@@ -307,6 +307,36 @@ async function checksRan(markerFile: string): Promise<boolean> {
   }
 }
 
+/**
+ * `npm`/`npx` de mentira que apuntan con qué argumentos los llamaron. Sirve
+ * para comprobar qué decidió ejecutar el gate, no sólo que terminara bien.
+ */
+async function installNpmArgsRecorderBin(): Promise<{
+  binDir: string;
+  logFile: string;
+}> {
+  const binDir = await mkdtemp(path.join(tmpdir(), "seadragons-npm-log-"));
+  const logFile = path.join(binDir, "npm-args");
+  const log = toBashPath(logFile);
+  for (const name of ["npm", "npx"]) {
+    const binPath = path.join(binDir, name);
+    await writeFile(
+      binPath,
+      ["#!/usr/bin/env bash", `echo "$@" >> "${log}"`, "exit 0", ""].join("\n"),
+    );
+    await chmod(binPath, 0o755);
+  }
+  return { binDir, logFile };
+}
+
+async function npmCalls(logFile: string): Promise<string> {
+  try {
+    return await readFile(logFile, "utf8");
+  } catch {
+    return "";
+  }
+}
+
 describe("guard de árbol limpio", () => {
   let workDir = "";
   let originDir = "";
@@ -444,4 +474,67 @@ describe("workflows", () => {
     expect(mentionsYml).toMatch(/FACTORY_GATE:\s*["']?off["']?/);
     expect(backlogYml).not.toMatch(/FACTORY_GATE/);
   });
+});
+
+describe("tests del kit", () => {
+  let workDir = "";
+  let originDir = "";
+  let stubBinDir = "";
+
+  afterEach(async () => {
+    if (workDir) {
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
+      workDir = "";
+    }
+    if (originDir) {
+      await rm(originDir, REMOVE_TEMP_DIR_OPTIONS);
+      originDir = "";
+    }
+    if (stubBinDir) {
+      await rm(stubBinDir, REMOVE_TEMP_DIR_OPTIONS);
+      stubBinDir = "";
+    }
+  });
+
+  async function runGateWith(scripts: string): Promise<string> {
+    ({ workDir, originDir } = await createFixtureRepo());
+    const { binDir, logFile } = await installNpmArgsRecorderBin();
+    stubBinDir = binDir;
+    // Ensuciar el árbol a propósito: con el repo limpio el gate se salta
+    // los checks, que es justo lo que aquí hay que observar.
+    await writeViaBash(
+      path.join(workDir, "package.json"),
+      `{"name": "fixture", "scripts": ${scripts}}`,
+    );
+
+    await runStopGate(workDir, {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+    });
+
+    return npmCalls(logFile);
+  }
+
+  it(
+    "corre los del kit cuando el proyecto los tiene en su propio comando",
+    async () => {
+      // Es el caso de un proyecto creado desde la plantilla: ahí `npm test` es
+      // el runner de la app y el kit corre aparte, así que sin esto la red que
+      // vigila los scripts de la fábrica estaría sin ejecutar.
+      const calls = await runGateWith('{"test": "true", "test:kit": "true"}');
+
+      expect(calls).toContain("run test:kit");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no inventa el comando cuando el proyecto no lo tiene",
+    async () => {
+      const calls = await runGateWith('{"test": "true"}');
+
+      expect(calls).not.toContain("test:kit");
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
 });

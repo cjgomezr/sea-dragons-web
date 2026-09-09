@@ -37,10 +37,11 @@ fi
 # (clean tree modulo GENERATED_NOISE_FILES, no commits beyond upstream),
 # there is nothing to verify. Don't run the full suite just to end a Q&A
 # session. Any failure to determine "ahead" counts as ahead, so worker
-# sessions with local commits always get checked. `next dev` rewrites
-# tsconfig.json and the CLAUDE.md agent block on every run, and `npm install`
-# rewrites package-lock.json, so without this allowance the first gate run in
-# a session dirties the tree and the guard can never apply again.
+# sessions with local commits always get checked. Some dev servers rewrite
+# files on every run (`next dev` does it to tsconfig.json and to the CLAUDE.md
+# agent block), and `npm install` rewrites package-lock.json, so without this
+# allowance the first gate run in a session dirties the tree and the guard can
+# never apply again.
 GENERATED_NOISE_FILES=("tsconfig.json" "package-lock.json" "CLAUDE.md" "AGENTS.md")
 
 is_generated_noise_file() {
@@ -115,6 +116,19 @@ if has_script test; then
   if ! TEST_OUT=$(npm test 2>&1); then
     fail "❌ Tests failed. Fix before finishing:
 $TEST_OUT"
+  fi
+fi
+
+# 3b. Los tests del kit, cuando el proyecto los tiene en un comando propio.
+# En ESTE repo no existe `test:kit` y el bloque no hace nada: aquí los tests
+# del kit ya los recoge `npm test`. En un proyecto creado desde la plantilla
+# sí existe, porque allí `npm test` es el runner de la app y el kit corre por
+# su cuenta, y este bloque es lo que hace que la red que vigila los scripts de
+# la fábrica se ejecute de verdad en vez de sólo estar ahí.
+if has_script "test:kit"; then
+  if ! KIT_OUT=$(npm run test:kit 2>&1); then
+    fail "❌ Kit tests failed. Fix before finishing:
+$KIT_OUT"
   fi
 fi
 
