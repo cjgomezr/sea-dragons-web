@@ -37,10 +37,11 @@ fi
 # (clean tree modulo GENERATED_NOISE_FILES, no commits beyond upstream),
 # there is nothing to verify. Don't run the full suite just to end a Q&A
 # session. Any failure to determine "ahead" counts as ahead, so worker
-# sessions with local commits always get checked. `next dev` rewrites
-# tsconfig.json and the CLAUDE.md agent block on every run, and `npm install`
-# rewrites package-lock.json, so without this allowance the first gate run in
-# a session dirties the tree and the guard can never apply again.
+# sessions with local commits always get checked. Some dev servers rewrite
+# files on every run (`next dev` does it to tsconfig.json and to the CLAUDE.md
+# agent block), and `npm install` rewrites package-lock.json, so without this
+# allowance the first gate run in a session dirties the tree and the guard can
+# never apply again.
 GENERATED_NOISE_FILES=("tsconfig.json" "package-lock.json" "CLAUDE.md" "AGENTS.md")
 
 is_generated_noise_file() {
