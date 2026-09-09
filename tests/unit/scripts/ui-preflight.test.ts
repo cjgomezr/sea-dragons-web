@@ -609,7 +609,7 @@ describe("ui-preflight.sh", () => {
 
       const up = await runPreflight(["up"], workDir, env);
       expect(up.stderr).not.toMatch(/did not answer/);
-      expect(up.code).toBe(0);
+      expect(up.code, up.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
 
       // El bug real (#102): sin los reintentos, record_real_owner se rinde
@@ -617,7 +617,7 @@ describe("ui-preflight.sh", () => {
       // no encuentra a quién matar y el servidor de verdad sigue arriba
       // aunque down() reporte éxito.
       const down = await runPreflight(["down"], workDir, env);
-      expect(down.code).toBe(0);
+      expect(down.code, down.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
     },
     TEST_TIMEOUT_MS,
@@ -632,7 +632,7 @@ describe("ui-preflight.sh", () => {
       cleanupEnv = env;
 
       const up = await runPreflight(["up"], workDir, env);
-      expect(up.code).toBe(0);
+      expect(up.code, up.stderr).toBe(0);
 
       const check = await runPreflight(["check"], workDir, env);
       expect(check.code).toBe(0);
@@ -691,7 +691,7 @@ describe("ui-preflight.sh", () => {
       // línea que lo explicara, con el servidor ya arriba y el puerto
       // ocupado para quien viniera detras.
       expect(up.stderr).not.toMatch(/did not answer/);
-      expect(up.code).toBe(0);
+      expect(up.code, up.stderr).toBe(0);
       expect(up.stdout.trim()).toBe(`http://localhost:${port}`);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
@@ -724,7 +724,7 @@ describe("ui-preflight.sh", () => {
       // cuando el puerto ya responde. Morirse ahí deja el servidor arriba y
       // el puerto ocupado, sin escribir una línea que lo explique.
       expect(up.stderr).not.toMatch(/did not answer/);
-      expect(up.code).toBe(0);
+      expect(up.code, up.stderr).toBe(0);
       expect(up.stdout.trim()).toBe(`http://localhost:${port}`);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
@@ -752,7 +752,7 @@ describe("ui-preflight.sh", () => {
         workDir,
         withFakeBin(env, calmBinDir),
       );
-      expect(up.code).toBe(0);
+      expect(up.code, up.stderr).toBe(0);
       const floodedBinDir = await installWindowsPidTranslationFakes(
         workDir,
         port,
@@ -765,7 +765,7 @@ describe("ui-preflight.sh", () => {
         withFakeBin(env, floodedBinDir),
       );
 
-      expect(down.code).toBe(0);
+      expect(down.code, down.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
     },
     TEST_TIMEOUT_MS,
@@ -796,7 +796,7 @@ describe("ui-preflight.sh", () => {
       // Bajo pipefail, un `ps -W` que sale distinto de cero basta para
       // tumbar la tubería entera. La alternativa sin -W existe justo para
       // este caso, pero no se llegaba nunca a ella.
-      expect(up.code).toBe(0);
+      expect(up.code, up.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
     TEST_TIMEOUT_MS,
@@ -826,7 +826,7 @@ describe("ui-preflight.sh", () => {
 
       // "No lo encontré" es una respuesta, no un fallo: la misma decisión
       // que ya se tomó en port_owner_pid en el #102.
-      expect(up.code).toBe(0);
+      expect(up.code, up.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
     TEST_TIMEOUT_MS,
@@ -928,7 +928,7 @@ describe("ui-preflight.sh", () => {
 
       const down = await runPreflight(["down"], workDir, envWithFakeTools);
 
-      expect(down.code).toBe(0);
+      expect(down.code, down.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
       // Quien hace un fetch contra el puerto (esta misma suite, o el
       // navegador de Playwright durante una captura) aparece en esa lista
