@@ -4,6 +4,7 @@ import {
   copyFile,
   mkdir,
   mkdtemp,
+  readFile,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -19,7 +20,14 @@ const TEST_TIMEOUT_MS = 20_000;
 // sesión de agente y su propio subagente de revisión, por ejemplo) chocarían
 // si todas usaran el mismo rango fijo. Un offset aleatorio por proceso reduce
 // esa colisión sin necesitar coordinación entre corridas.
-const PORT_BASE = 40000 + Math.floor(Math.random() * 10_000);
+//
+// Por debajo de 32768 a propósito: ahí empieza el rango de puertos efímeros
+// de Linux (32768-60999 por defecto), del que el sistema reparte el extremo
+// local de cada conexión saliente. Un puerto de ese rango se lo puede quedar
+// un cliente cualquiera de esta misma suite en el instante justo, y entonces
+// el dev server no logra bindear, nadie responde y `up` agota su plazo. No
+// falla siempre, que es lo peor que puede hacer un test.
+const PORT_BASE = 20_000 + Math.floor(Math.random() * 10_000);
 let nextPortOffset = 0;
 function nextPort(): number {
   nextPortOffset += 1;
@@ -107,6 +115,11 @@ sleep 30
  * de vuelta y descarta el resultado como si no hubiera encontrado nada. En
  * Linux (sin `ps -W`) no hay dos espacios de PID que traducir, así que cae
  * de vuelta al PID normal, que es justo lo que lsof -ti reportaría ahí.
+ *
+ * El `| head -1` de aquí abajo es la forma que el script de producción ya no
+ * usa y que un test de este archivo prohíbe. Aquí es inofensiva: no hay
+ * pipefail en este fixture y sólo puede casar una línea, la del hijo que
+ * acaba de lanzar.
  */
 const DETACHED_WRAPPER_WRITES_PID_SCRIPT = `#!/usr/bin/env bash
 DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
@@ -352,6 +365,103 @@ function isAlive(pid: number): boolean {
   }
 }
 
+/**
+ * `ps` de mentira, en cuatro sabores, para las rutas que traducen PIDs entre
+ * la numeración de Git Bash y la nativa de Windows.
+ *
+ * Imita el formato de `ps -W`: el PID de Git Bash en la columna 1 y el
+ * nativo en la 4. Aquí los dos valen lo mismo, el que `up` dejó escrito en
+ * el PID_FILE, porque lo que se prueba es que el script no se muera
+ * traduciendo, no la traducción en sí.
+ *
+ * - `normal`: una línea, el caso corriente.
+ * - `inundacion`: MILES de líneas coincidentes. `awk` las escribe todas, así
+ *   que un `head` al otro lado cierra la tubería a media escritura, y el
+ *   SIGPIPE resultante tumba el script bajo `set -o pipefail`. Es el mismo
+ *   defecto que el #102 arregló en `record_real_owner`.
+ * - `sin-soporte-de-W`: `ps -W` sale distinto de cero, como en cualquier
+ *   Linux. Bajo `pipefail` eso solo basta para tumbar la línea que lo
+ *   invoca, que es justo la que tiene una alternativa esperando debajo.
+ * - `no-encuentra-nada`: sale bien y no imprime a nadie. No encontrar no es
+ *   un fallo.
+ */
+type FakePsFlavour =
+  | "normal"
+  | "inundacion"
+  | "sin-soporte-de-W"
+  | "no-encuentra-nada";
+
+const PS_FLOOD_LINES = 20_000;
+
+/**
+ * Instala los cuatro dobles que hacen falta para ejercitar la rama de
+ * Windows: `ps`, `netstat`, `lsof` y `taskkill`.
+ *
+ * El `taskkill` es la pieza que abre esa rama en Linux, porque el script
+ * entra en ella con un simple `command -v taskkill`. Sin él, estos tests no
+ * correrían en el CI y nadie los vería fallar nunca, que es exactamente lo
+ * que le pasó al caso del SIGINT de tree-guard (issue #102). Y mata de
+ * verdad: si sólo fingiera, el servidor seguiría en pie y el test no
+ * distinguiría un `down` que funciona de uno que no.
+ *
+ * Los cuatro leen el mismo PID, así que todos hablan de un único proceso en
+ * una única numeración, y `kill` puede con él en las dos plataformas.
+ */
+async function installWindowsPidTranslationFakes(
+  workDir: string,
+  port: number,
+  psFlavour: FakePsFlavour,
+): Promise<string> {
+  const binDir = path.join(workDir, `fake-bin-win-${psFlavour}`);
+  await mkdir(binDir, { recursive: true });
+  const pidFile = toBashPath(path.join(workDir, ".factory/ui-server.pid"));
+  // `down` borra el PID_FILE nada más leerlo, antes de ponerse a traducir
+  // PIDs, así que un doble que sólo mirara ahí se quedaría mudo justo en la
+  // ruta que hay que ejercitar. La caché guarda el último PID visto.
+  const pidCache = toBashPath(path.join(workDir, "fake-pid-cache"));
+  const killLog = toBashPath(path.join(workDir, "taskkill-calls"));
+  const readsPid = `[ -f "${pidFile}" ] && cp "${pidFile}" "${pidCache}"
+[ -f "${pidCache}" ] || exit 0
+pid=$(cat "${pidCache}")`;
+  const psBodies: Record<FakePsFlavour, string> = {
+    normal: `${readsPid}
+echo "$pid 1 1 $pid"`,
+    inundacion: `${readsPid}
+seq 1 ${PS_FLOOD_LINES} | awk -v p="$pid" '{ print p, 1, 1, p }'`,
+    "sin-soporte-de-W": `for arg in "$@"; do
+  [ "$arg" = "-W" ] && exit 1
+done
+${readsPid}
+echo "$pid 1 1 $pid"`,
+    "no-encuentra-nada": "exit 0",
+  };
+  const tools: Record<string, string> = {
+    ps: psBodies[psFlavour],
+    netstat: `${readsPid}
+echo "  TCP    0.0.0.0:${port}         0.0.0.0:0              LISTENING       $pid"`,
+    lsof: `${readsPid}
+echo "$pid"`,
+    // Un `kill` a secas basta: las columnas 1 y 4 del ps de mentira valen lo
+    // mismo, el PID que `up` escribió con `echo $!`, o sea la numeración de
+    // Git Bash, que es la única que este `kill` necesita entender.
+    //
+    // Deja escrito a quién le pidieron matar: es la única forma de ver desde
+    // fuera qué PID devolvió la traducción, en vez de deducirlo de que el
+    // puerto acabara libre.
+    taskkill: `pid="\${@: -1}"
+echo "$pid" >> "${killLog}"
+kill -9 "$pid" 2>/dev/null || true`,
+  };
+  for (const [name, body] of Object.entries(tools)) {
+    const toolPath = path.join(binDir, name);
+    await writeFile(toolPath, `#!/usr/bin/env bash
+${body}
+`);
+    await chmod(toolPath, 0o755);
+  }
+  return binDir;
+}
+
 async function setupWorkDir(): Promise<string> {
   const workDir = await mkdtemp(
     path.join(tmpdir(), "seadragons-ui-preflight-"),
@@ -397,6 +507,14 @@ function toBashPath(nativePath: string): string {
   return nativePath.replace(/\\/g, "/");
 }
 
+/** El PATH del test con un directorio de dobles por delante del real. */
+function withFakeBin(
+  env: NodeJS.ProcessEnv,
+  binDir: string,
+): NodeJS.ProcessEnv {
+  return { ...env, PATH: `${binDir}${path.delimiter}${env.PATH}` };
+}
+
 describe("ui-preflight.sh", () => {
   let workDir = "";
   let cleanupEnv: NodeJS.ProcessEnv = process.env;
@@ -431,7 +549,7 @@ describe("ui-preflight.sh", () => {
       const { code, stdout, stderr } = await runPreflight(["up"], workDir, env);
 
       expect(stderr).not.toMatch(/did not answer/);
-      expect(code).toBe(0);
+      expect(code, stderr).toBe(0);
       expect(stdout.trim()).toBe(`http://localhost:${port}`);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
@@ -451,7 +569,7 @@ describe("ui-preflight.sh", () => {
       const { code, stderr } = await runPreflight(["up"], workDir, env);
 
       expect(stderr).not.toMatch(/did not answer/);
-      expect(code).toBe(0);
+      expect(code, stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
     TEST_TIMEOUT_MS,
@@ -479,7 +597,7 @@ describe("ui-preflight.sh", () => {
       const { code, stdout, stderr } = await runPreflight(["up"], workDir, env);
 
       expect(stderr).not.toMatch(/did not answer/);
-      expect(code).toBe(0);
+      expect(code, stderr).toBe(0);
       expect(stdout.trim()).toBe(`http://localhost:${port}`);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
@@ -506,7 +624,7 @@ describe("ui-preflight.sh", () => {
 
       const up = await runPreflight(["up"], workDir, env);
       expect(up.stderr).not.toMatch(/did not answer/);
-      expect(up.code).toBe(0);
+      expect(up.code, up.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
 
       // El bug real (#102): sin los reintentos, record_real_owner se rinde
@@ -514,7 +632,7 @@ describe("ui-preflight.sh", () => {
       // no encuentra a quién matar y el servidor de verdad sigue arriba
       // aunque down() reporte éxito.
       const down = await runPreflight(["down"], workDir, env);
-      expect(down.code).toBe(0);
+      expect(down.code, down.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
     },
     TEST_TIMEOUT_MS,
@@ -529,10 +647,10 @@ describe("ui-preflight.sh", () => {
       cleanupEnv = env;
 
       const up = await runPreflight(["up"], workDir, env);
-      expect(up.code).toBe(0);
+      expect(up.code, up.stderr).toBe(0);
 
       const check = await runPreflight(["check"], workDir, env);
-      expect(check.code).toBe(0);
+      expect(check.code, check.stderr).toBe(0);
       expect(check.stderr).toMatch(/served by this factory/);
     },
     TEST_TIMEOUT_MS,
@@ -547,20 +665,20 @@ describe("ui-preflight.sh", () => {
       cleanupEnv = env;
 
       const firstUp = await runPreflight(["up"], workDir, env);
-      expect(firstUp.code).toBe(0);
+      expect(firstUp.code, firstUp.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
 
       const firstDown = await runPreflight(["down"], workDir, env);
-      expect(firstDown.code).toBe(0);
+      expect(firstDown.code, firstDown.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
 
       const secondUp = await runPreflight(["up"], workDir, env);
       expect(secondUp.stderr).not.toMatch(/did not answer/);
-      expect(secondUp.code).toBe(0);
+      expect(secondUp.code, secondUp.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
 
       const secondDown = await runPreflight(["down"], workDir, env);
-      expect(secondDown.code).toBe(0);
+      expect(secondDown.code, secondDown.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
     },
     TEST_TIMEOUT_MS,
@@ -588,12 +706,215 @@ describe("ui-preflight.sh", () => {
       // línea que lo explicara, con el servidor ya arriba y el puerto
       // ocupado para quien viniera detras.
       expect(up.stderr).not.toMatch(/did not answer/);
-      expect(up.code).toBe(0);
+      expect(up.code, up.stderr).toBe(0);
       expect(up.stdout.trim()).toBe(`http://localhost:${port}`);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
     },
     TEST_TIMEOUT_MS,
   );
+
+  it(
+    "up no se muere cuando ps lista miles de líneas para el mismo proceso",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      const fakeBinDir = await installWindowsPidTranslationFakes(
+        workDir,
+        port,
+        "inundacion",
+      );
+      const env = baseEnv(workDir, port, {
+        DEV_SERVER_CMD: `node ${toBashPath(workDir)}/dummy-server.js ${port}`,
+        START_DELAY_MS: "200",
+      });
+      cleanupEnv = env;
+
+      const up = await runPreflight(
+        ["up"],
+        workDir,
+        withFakeBin(env, fakeBinDir),
+      );
+
+      // Traducir el PID nativo al de Git Bash es lo último que hace `up`
+      // cuando el puerto ya responde. Morirse ahí deja el servidor arriba y
+      // el puerto ocupado, sin escribir una línea que lo explique.
+      expect(up.stderr).not.toMatch(/did not answer/);
+      expect(up.code, up.stderr).toBe(0);
+      expect(up.stdout.trim()).toBe(`http://localhost:${port}`);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "down no se muere cuando ps lista miles de líneas, y deja el puerto libre",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      const env = baseEnv(workDir, port, {
+        DEV_SERVER_CMD: `node ${toBashPath(workDir)}/dummy-server.js ${port}`,
+        START_DELAY_MS: "200",
+      });
+      cleanupEnv = env;
+      // El arranque con un ps corriente: lo que se prueba aquí es el apagado.
+      const calmBinDir = await installWindowsPidTranslationFakes(
+        workDir,
+        port,
+        "normal",
+      );
+      const up = await runPreflight(
+        ["up"],
+        workDir,
+        withFakeBin(env, calmBinDir),
+      );
+      expect(up.code, up.stderr).toBe(0);
+      const floodedBinDir = await installWindowsPidTranslationFakes(
+        workDir,
+        port,
+        "inundacion",
+      );
+
+      const down = await runPreflight(
+        ["down"],
+        workDir,
+        withFakeBin(env, floodedBinDir),
+      );
+
+      expect(down.code, down.stderr).toBe(0);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "down sigue apagando cuando ps no admite la opción -W",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      const env = baseEnv(workDir, port, {
+        DEV_SERVER_CMD: `node ${toBashPath(workDir)}/dummy-server.js ${port}`,
+        START_DELAY_MS: "200",
+      });
+      cleanupEnv = env;
+      const calmBinDir = await installWindowsPidTranslationFakes(
+        workDir,
+        port,
+        "normal",
+      );
+      const up = await runPreflight(
+        ["up"],
+        workDir,
+        withFakeBin(env, calmBinDir),
+      );
+      expect(up.code, up.stderr).toBe(0);
+      const serverPid = (
+        await readFile(path.join(workDir, ".factory/ui-server.pid"), "utf8")
+      ).trim();
+      const withoutWBinDir = await installWindowsPidTranslationFakes(
+        workDir,
+        port,
+        "sin-soporte-de-W",
+      );
+
+      const down = await runPreflight(
+        ["down"],
+        workDir,
+        withFakeBin(env, withoutWBinDir),
+      );
+
+      // El apagado es la única ruta que llega a winpid_of, y su alternativa
+      // sin -W es la línea a la que un `ps -W` fallido nunca dejaba llegar.
+      expect(down.code, down.stderr).toBe(0);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
+      // Y llegó con el PID bueno, no vacío: la traducción salió del `ps` sin
+      // -W, que es el respaldo que se quería ejercitar.
+      const killed = (
+        await readFile(path.join(workDir, "taskkill-calls"), "utf8")
+      )
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      expect(killed).toContain(serverPid);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "up sigue arrancando cuando ps no admite la opción -W",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      const fakeBinDir = await installWindowsPidTranslationFakes(
+        workDir,
+        port,
+        "sin-soporte-de-W",
+      );
+      const env = baseEnv(workDir, port, {
+        DEV_SERVER_CMD: `node ${toBashPath(workDir)}/dummy-server.js ${port}`,
+        START_DELAY_MS: "200",
+      });
+      cleanupEnv = env;
+
+      const up = await runPreflight(
+        ["up"],
+        workDir,
+        withFakeBin(env, fakeBinDir),
+      );
+
+      // Bajo pipefail, un `ps -W` que sale distinto de cero basta para
+      // tumbar la tubería entera. La alternativa sin -W existe justo para
+      // este caso, pero no se llegaba nunca a ella.
+      expect(up.code, up.stderr).toBe(0);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "up sigue arrancando cuando ps no encuentra a nadie",
+    async () => {
+      workDir = await setupWorkDir();
+      const port = nextPort();
+      const fakeBinDir = await installWindowsPidTranslationFakes(
+        workDir,
+        port,
+        "no-encuentra-nada",
+      );
+      const env = baseEnv(workDir, port, {
+        DEV_SERVER_CMD: `node ${toBashPath(workDir)}/dummy-server.js ${port}`,
+        START_DELAY_MS: "200",
+      });
+      cleanupEnv = env;
+
+      const up = await runPreflight(
+        ["up"],
+        workDir,
+        withFakeBin(env, fakeBinDir),
+      );
+
+      // "No lo encontré" es una respuesta, no un fallo: la misma decisión
+      // que ya se tomó en port_owner_pid en el #102.
+      expect(up.code, up.stderr).toBe(0);
+      expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it("ui-preflight.sh no toma ninguna primera línea con head", async () => {
+    const script = await readFile(UI_PREFLIGHT_SCRIPT, "utf8");
+
+    // Un cable trampa, no una descripción de comportamiento. Se gana el sitio
+    // porque este defecto ya reincidió (#102 y luego #104), no lo ve el lint
+    // y su fallo es invisible: mata el script sin dejar mensaje. `head` es la
+    // forma conocida, no el peligro entero: cualquier lector que cierre antes
+    // de tiempo (`sed 1q`, `grep -q`) hace lo mismo.
+    const offenders = script
+      .split("\n")
+      .filter((line) => line.includes("| head"));
+
+    expect(offenders).toEqual([]);
+  });
 
   it(
     "sigue abortando por timeout cuando el servidor de verdad nunca escucha",
@@ -682,7 +1003,7 @@ describe("ui-preflight.sh", () => {
 
       const down = await runPreflight(["down"], workDir, envWithFakeTools);
 
-      expect(down.code).toBe(0);
+      expect(down.code, down.stderr).toBe(0);
       expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
       // Quien hace un fetch contra el puerto (esta misma suite, o el
       // navegador de Playwright durante una captura) aparece en esa lista

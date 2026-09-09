@@ -84,20 +84,43 @@ port_of() {
   esac
 }
 
+# Un 'ps' que nunca falla: donde no admite la opción pedida devuelve vacío en
+# vez de un código distinto de cero. Bajo 'set -o pipefail' ese código hunde
+# la tubería entera aunque el resto haya ido bien, y con 'set -e' se lleva por
+# delante al script, que es como se perdía la alternativa sin -W de winpid_of
+# antes de llegar a usarla.
+ps_listing_or_empty() {
+  ps "$@" 2>/dev/null || true
+}
+
+# La primera línea de la entrada, o nada si no hay ninguna.
+#
+# El 'cat' no sobra: es lo que distingue esto de una tubería a head. head cierra
+# su entrada en cuanto tiene la línea que quería, quien escribe recibe
+# SIGPIPE, y ese 141 bajo 'set -o pipefail' tumba el script entero sin decir
+# por qué (issue #102, y de nuevo el #104). Drenar el resto cuesta un proceso
+# y le ahorra a quien escribe una muerte a media frase.
+first_line() {
+  local line
+  read -r line || true
+  cat >/dev/null
+  printf '%s' "$line"
+}
+
 # Git Bash keeps its own PID numbering, separate from the native Windows PID
 # that netstat/taskkill/tasklist use for the same process. ps -W is the
 # Rosetta stone between the two; on non-Windows this simply finds nothing.
 winpid_of() {
   local pid="$1" winpid
-  winpid=$(ps -W 2>/dev/null | awk -v p="$pid" '$1 == p { print $4 }' | head -1)
-  [ -n "$winpid" ] || winpid=$(ps 2>/dev/null | awk -v p="$pid" '$1 == p { print $4 }' | head -1)
+  winpid=$(ps_listing_or_empty -W | awk -v p="$pid" '$1 == p { print $4 }' | first_line)
+  [ -n "$winpid" ] || winpid=$(ps_listing_or_empty | awk -v p="$pid" '$1 == p { print $4 }' | first_line)
   printf '%s' "$winpid"
 }
 
 # The reverse of winpid_of: a native Windows PID (as netstat reports it) back
 # to the MSYS pid that Git Bash's own kill/kill -0 actually understand.
 pid_for_winpid() {
-  ps -W 2>/dev/null | awk -v w="$1" '$4 == w { print $1 }' | head -1
+  ps_listing_or_empty -W | awk -v w="$1" '$4 == w { print $1 }' | first_line
 }
 
 # Dev servers spawn children (next, vite, nodemon), and killing only the
@@ -185,17 +208,12 @@ port_owner_pid() {
 # could confirm for a completely different process.
 record_real_owner() {
   local native_pid pid attempt
-  # La primera línea SIN una tubería a 'head'. Un dev server deja más de un
-  # proceso pegado al socket, así que esa lista puede no caber en el buffer
-  # de la tubería: 'head -1' cierra el lector tras la primera línea, quien
-  # escribía recibe SIGPIPE y, bajo 'set -o pipefail', ese 141 se propaga y
-  # tumba todo 'up' aquí mismo, en silencio y con el servidor ya arriba,
-  # dejando el puerto ocupado para la siguiente corrida (issue #102: el
-  # fallo intermitente que sólo salía en Linux, porque en Windows la rama de
-  # netstat lista muchísimo menos). Un here-string no tiene lector que
-  # cerrar, así que no hay tubería que romper.
-  native_pid=$(port_owner_pid)
-  read -r native_pid <<< "$native_pid" || true
+  # Un dev server deja más de un proceso pegado al socket, así que esa lista
+  # puede tener varias líneas y hace falta quedarse con la primera sin matar
+  # a quien la escribe (issue #102: así, con un 'head', se caía todo 'up' en
+  # silencio y sólo en Linux, porque en Windows la rama de netstat lista
+  # muchísimo menos).
+  native_pid=$(port_owner_pid | first_line)
   [ -n "$native_pid" ] || return 0
   if ! command -v taskkill >/dev/null 2>&1; then
     echo "$native_pid" > "$PID_FILE"
