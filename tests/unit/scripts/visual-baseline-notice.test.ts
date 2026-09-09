@@ -24,7 +24,9 @@ describe("visualBaselineNotice", () => {
   it("cuenta qué pasa la primera vez en un checkout limpio", () => {
     // Es la mitad que faltaba: sin esto, 16 capturas recién creadas parecen
     // 16 regresiones (issue #96).
-    expect(visualBaselineNotice("win32")).toMatch(/primera/i);
+    expect(visualBaselineNotice("win32")).toMatch(
+      /primera corrida de un checkout limpio/i,
+    );
   });
 });
 

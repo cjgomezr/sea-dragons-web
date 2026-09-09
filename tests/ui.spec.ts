@@ -41,10 +41,14 @@ import path from "node:path";
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
 import { snapshotCreatedNotice } from "./support/visual-baseline-notice";
 
-// Los mismos ajustes con los que toHaveScreenshot toma la suya. La captura
-// sembrada la compara la propia corrida un instante después, así que tiene
-// que salir del mismo sitio y con las mismas condiciones.
-const SCREENSHOT_DEFAULTS = {
+// Con qué condiciones se toma cada captura, sembrada o comparada. Hoy
+// coinciden con los valores por defecto de toHaveScreenshot, pero se pasan a
+// mano y a los dos lados a propósito: la captura sembrada la compara la
+// propia corrida un instante después, así que si un día Playwright cambiara
+// un default, la semilla y la comparación dejarían de salir de las mismas
+// condiciones y la primera corrida volvería a fallar, esta vez disfrazada de
+// regresión visual. Compartir la constante quita esa posibilidad.
+const SCREENSHOT_OPTIONS = {
   animations: "disabled",
   caret: "hide",
   scale: "css",
@@ -60,9 +64,17 @@ const SCREENSHOT_DEFAULTS = {
  * se leían como 16 regresiones visuales, y el remedio, correr Playwright dos
  * veces, no estaba escrito en ninguna parte (issue #96).
  *
- * Esto no apaga ninguna comparación. Sembrar sirve para que haya con qué
- * comparar, y `toHaveScreenshot` corre igual justo después en todos los
- * casos. Una captura que ya existe no se toca, ni aquí ni en Linux.
+ * El matcher corre igual, siempre. En la corrida que siembra compara contra la
+ * foto recién tomada, así que ahí sólo puede fallar si la página no estaba
+ * quieta; de la siguiente en adelante compara de verdad. Una captura que ya
+ * existe no se toca, ni aquí ni en Linux.
+ *
+ * De lo que depende que la semilla sea buena: `toHaveScreenshot` reintenta
+ * hasta que dos capturas seguidas coinciden, y esto toma una sola. Que valga
+ * se apoya en que las animaciones van desactivadas y en que `goToWithTheme`
+ * ya esperó a `document.fonts.ready`. Quien meta una entrada animada en la
+ * página tendrá que mirar aquí antes de preguntarse por qué la primera
+ * corrida se puso caprichosa.
  */
 async function createMissingLocalBaseline(
   name: string,
@@ -142,9 +154,10 @@ for (const pg of pages) {
           await goToWithTheme(page, pg.path, theme);
           const name = `${pg.name}-${vp.name}-${theme}.png`;
           await createMissingLocalBaseline(name, () =>
-            page.screenshot({ ...SCREENSHOT_DEFAULTS, fullPage: true }),
+            page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
           );
           await expect(page).toHaveScreenshot(name, {
+            ...SCREENSHOT_OPTIONS,
             fullPage: true,
             maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
           });
@@ -284,9 +297,10 @@ for (const theme of themes) {
     const name = `tabbar-mobile-${theme}.png`;
     const tabBar = page.getByRole("navigation", { name: TAB_BAR });
     await createMissingLocalBaseline(name, () =>
-      tabBar.screenshot(SCREENSHOT_DEFAULTS),
+      tabBar.screenshot(SCREENSHOT_OPTIONS),
     );
     await expect(tabBar).toHaveScreenshot(name, {
+      ...SCREENSHOT_OPTIONS,
       maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
     });
   });
@@ -297,9 +311,10 @@ for (const theme of themes) {
     const name = `nav-desktop-${theme}.png`;
     const sidebar = page.getByRole("navigation", { name: SIDEBAR_NAV });
     await createMissingLocalBaseline(name, () =>
-      sidebar.screenshot(SCREENSHOT_DEFAULTS),
+      sidebar.screenshot(SCREENSHOT_OPTIONS),
     );
     await expect(sidebar).toHaveScreenshot(name, {
+      ...SCREENSHOT_OPTIONS,
       maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
     });
   });
