@@ -1,0 +1,76 @@
+/** Zona del club, nunca un desfase fijo. Melbourne alterna AEST (UTC+10) y
+ * AEDT (UTC+11), así que restar diez horas a un instante de verano da una hora
+ * local equivocada y mueve el entrenamiento de las 18:00 a las 17:00. */
+export const CLUB_TIME_ZONE = "Australia/Melbourne";
+
+export type TrainingWeekday = "tuesday" | "thursday" | "saturday";
+
+/** Un entrenamiento semanal, en hora local del club. `endHour` es exclusiva:
+ * a las 22:00 el entrenamiento ya terminó. */
+export type TrainingSession = {
+  readonly weekday: TrainingWeekday;
+  readonly startHour: number;
+  readonly endHour: number;
+};
+
+/** Las horas de entrenamiento del club (NFR-003). Viven aquí, y no en la
+ * memoria de quien planifica un mantenimiento, porque la ventana de
+ * mantenimiento tiene que caer fuera de ellas. */
+export const TRAINING_SESSIONS: readonly TrainingSession[] = [
+  { weekday: "tuesday", startHour: 18, endHour: 22 },
+  { weekday: "thursday", startHour: 18, endHour: 22 },
+  { weekday: "saturday", startHour: 8, endHour: 13 },
+];
+
+const MINUTES_PER_HOUR = 60;
+
+const CLUB_TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
+  timeZone: CLUB_TIME_ZONE,
+  weekday: "long",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+type ClubLocalTime = {
+  readonly weekday: string;
+  readonly minuteOfDay: number;
+};
+
+function readPart(
+  parts: readonly Intl.DateTimeFormatPart[],
+  type: Intl.DateTimeFormatPartTypes,
+): string {
+  const part = parts.find((candidate) => candidate.type === type);
+  if (!part) {
+    throw new Error(
+      `Intl no devolvió la parte "${type}" para la zona ${CLUB_TIME_ZONE}`,
+    );
+  }
+  return part.value;
+}
+
+function readClubLocalTime(instant: Date): ClubLocalTime {
+  const parts = CLUB_TIME_FORMAT.formatToParts(instant);
+  const hour = Number(readPart(parts, "hour"));
+  const minute = Number(readPart(parts, "minute"));
+  return {
+    weekday: readPart(parts, "weekday").toLowerCase(),
+    minuteOfDay: hour * MINUTES_PER_HOUR + minute,
+  };
+}
+
+function covers(session: TrainingSession, local: ClubLocalTime): boolean {
+  return (
+    session.weekday === local.weekday &&
+    local.minuteOfDay >= session.startHour * MINUTES_PER_HOUR &&
+    local.minuteOfDay < session.endHour * MINUTES_PER_HOUR
+  );
+}
+
+/** Si ese instante cae dentro de un entrenamiento, en hora local del club. El
+ * inicio entra y el final no: el martes a las 18:00 sí, a las 22:00 no. */
+export function isDuringTrainingHours(instant: Date): boolean {
+  const local = readClubLocalTime(instant);
+  return TRAINING_SESSIONS.some((session) => covers(session, local));
+}
