@@ -76,3 +76,9 @@ jobs:
       - name: Build
         if: steps.repo.outputs.bootstrapped == 'true'
         run: npm run build
+      # Después del build a propósito: lo que hay que revisar es el artefacto
+      # que descarga el navegador, no el código fuente que se pretendía
+      # publicar. Falla nombrando el chunk y la variable.
+      - name: Bundle del navegador sin secretos
+        if: steps.repo.outputs.bootstrapped == 'true'
+        run: npm run check:client-bundle
