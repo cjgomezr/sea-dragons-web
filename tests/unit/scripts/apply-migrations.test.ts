@@ -1,0 +1,422 @@
+import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+
+const REPO_ROOT = path.resolve(__dirname, "../../..");
+const APPLY_MIGRATIONS = path.join(REPO_ROOT, "scripts/apply-migrations.sh");
+const ROLES_SQL = path.join(REPO_ROOT, "supabase/ci/roles.sql");
+const SCHEMA_SNAPSHOT_SQL = path.join(
+  REPO_ROOT,
+  "supabase/ci/schema-snapshot.sql",
+);
+
+/**
+ * Conexión de administración desde la que estos tests crean y destruyen bases
+ * desechables. Sin ella no hay Postgres contra el que probar y el bloque se
+ * salta, igual que hace `describeRls` cuando falta Supabase. En CI la pone
+ * `migrations.yml`, apuntando al Postgres efímero del runner: nunca a una base
+ * real.
+ */
+const ADMIN_URL_ENV = "MIGRATIONS_TEST_DATABASE_URL";
+const adminUrl = process.env[ADMIN_URL_ENV];
+
+interface RunResult {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+}
+
+function toBashPath(nativePath: string): string {
+  return nativePath.replace(/\\/g, "/");
+}
+
+function run(
+  command: string,
+  args: readonly string[],
+  env: NodeJS.ProcessEnv,
+): Promise<RunResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, [...args], {
+      cwd: REPO_ROOT,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", reject);
+    child.on("close", (code) => resolve({ code, stdout, stderr }));
+  });
+}
+
+function applyMigrations(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<RunResult> {
+  return run("bash", [toBashPath(APPLY_MIGRATIONS), ...args], env);
+}
+
+function listedNames(result: RunResult): string[] {
+  return result.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => path.basename(line));
+}
+
+const temporaryDirectories: string[] = [];
+
+async function migrationsDirectory(
+  files: Readonly<Record<string, string>>,
+): Promise<string> {
+  const directory = await mkdtemp(path.join(tmpdir(), "migraciones-"));
+  temporaryDirectories.push(directory);
+  for (const [name, sql] of Object.entries(files)) {
+    await writeFile(path.join(directory, name), sql, "utf8");
+  }
+  return directory;
+}
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories
+      .splice(0)
+      .map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
+
+describe("orden de migraciones", () => {
+  it("devuelve las migraciones por nombre ascendente, no por fecha de creación", async () => {
+    const directory = await migrationsDirectory({
+      "0010_diez.sql": "select 1;",
+      "0002_dos.sql": "select 1;",
+      "0001_uno.sql": "select 1;",
+    });
+
+    const result = await applyMigrations([
+      "--list",
+      "--dir",
+      toBashPath(directory),
+    ]);
+
+    expect(result.code).toBe(0);
+    expect(listedNames(result)).toEqual([
+      "0001_uno.sql",
+      "0002_dos.sql",
+      "0010_diez.sql",
+    ]);
+  });
+
+  it("ordena por lo que viene después cuando dos comparten prefijo de fecha", async () => {
+    const directory = await migrationsDirectory({
+      "20260910_beta.sql": "select 1;",
+      "20260910_alfa.sql": "select 1;",
+      "20260909_previa.sql": "select 1;",
+    });
+
+    const result = await applyMigrations([
+      "--list",
+      "--dir",
+      toBashPath(directory),
+    ]);
+
+    expect(listedNames(result)).toEqual([
+      "20260909_previa.sql",
+      "20260910_alfa.sql",
+      "20260910_beta.sql",
+    ]);
+  });
+
+  it("da el mismo orden sea cual sea el locale del runner", async () => {
+    // La colación de `sort` depende del locale: en C el guión va antes que el
+    // subrayado y en en_US.UTF-8 la puntuación se ignora. Un runner con otro
+    // locale no puede aplicar las migraciones en otro orden.
+    const files = {
+      "0003-guion.sql": "select 1;",
+      "0003_subrayado.sql": "select 1;",
+    };
+    const enC = await migrationsDirectory(files);
+    const enUsUtf8 = await migrationsDirectory(files);
+
+    const [conC, conEnUs] = await Promise.all([
+      applyMigrations(["--list", "--dir", toBashPath(enC)], {
+        ...process.env,
+        LC_ALL: "C",
+      }),
+      applyMigrations(["--list", "--dir", toBashPath(enUsUtf8)], {
+        ...process.env,
+        LC_ALL: "en_US.UTF-8",
+      }),
+    ]);
+
+    expect(listedNames(conEnUs)).toEqual(listedNames(conC));
+  });
+
+  it("ignora lo que no sea un .sql del propio directorio", async () => {
+    const directory = await migrationsDirectory({
+      "0001_uno.sql": "select 1;",
+      "README.md": "no es una migración",
+      "0002_dos.sql.bak": "tampoco",
+    });
+    await mkdir(path.join(directory, "subcarpeta"));
+    await writeFile(
+      path.join(directory, "subcarpeta", "0003_tres.sql"),
+      "select 1;",
+      "utf8",
+    );
+
+    const result = await applyMigrations([
+      "--list",
+      "--dir",
+      toBashPath(directory),
+    ]);
+
+    expect(listedNames(result)).toEqual(["0001_uno.sql"]);
+  });
+});
+
+describe("aplicador de migraciones", () => {
+  it("lista sin necesitar ninguna conexión a una base", async () => {
+    const sinBase = { ...process.env };
+    delete sinBase.DATABASE_URL;
+
+    const result = await applyMigrations(["--list"], sinBase);
+
+    expect(result.code).toBe(0);
+    expect(listedNames(result)).toContain("0001_clubs.sql");
+  });
+
+  it("falla diciendo qué variable falta cuando no hay DATABASE_URL", async () => {
+    const sinBase = { ...process.env };
+    delete sinBase.DATABASE_URL;
+
+    const result = await applyMigrations([], sinBase);
+
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toMatch(/DATABASE_URL/);
+  });
+
+  it("falla cuando el directorio de migraciones no existe", async () => {
+    const result = await applyMigrations([
+      "--list",
+      "--dir",
+      toBashPath(path.join(tmpdir(), `no-existe-${randomUUID()}`)),
+    ]);
+
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toMatch(/no existe/i);
+  });
+
+  it("falla en vez de dar un verde falso cuando el directorio no tiene migraciones", async () => {
+    const directory = await migrationsDirectory({});
+
+    const result = await applyMigrations([
+      "--list",
+      "--dir",
+      toBashPath(directory),
+    ]);
+
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toMatch(/ninguna migración/i);
+  });
+});
+
+interface TemporaryDatabase {
+  readonly url: string;
+  readonly query: (sql: string) => Promise<string>;
+  readonly snapshot: () => Promise<string>;
+}
+
+function describeConPostgres(name: string, fn: () => void): void {
+  if (!adminUrl) {
+    describe.skip(`${name} (saltado: falta ${ADMIN_URL_ENV})`, fn);
+    return;
+  }
+  describe(name, fn);
+}
+
+function psql(url: string, args: readonly string[]): Promise<RunResult> {
+  return run(
+    "psql",
+    [
+      "--no-psqlrc",
+      "--quiet",
+      "--set",
+      "ON_ERROR_STOP=1",
+      "-At",
+      "-d",
+      url,
+      ...args,
+    ],
+    process.env,
+  );
+}
+
+async function expectPsqlSuccess(
+  url: string,
+  args: readonly string[],
+): Promise<string> {
+  const result = await psql(url, args);
+  if (result.code !== 0) {
+    throw new Error(`psql ${args.join(" ")} falló: ${result.stderr}`);
+  }
+  // psql termina las líneas con CRLF en Windows: sin normalizar, cada fila
+  // menos la última llegaría con un \r pegado al valor.
+  return result.stdout.replace(/\r\n/g, "\n").trim();
+}
+
+const createdDatabases: string[] = [];
+
+async function freshDatabase(): Promise<TemporaryDatabase> {
+  if (!adminUrl) {
+    throw new Error(`falta ${ADMIN_URL_ENV}`);
+  }
+  const name = `migraciones_${randomUUID().replace(/-/g, "")}`;
+  await expectPsqlSuccess(adminUrl, ["-c", `create database ${name}`]);
+  createdDatabases.push(name);
+
+  const url = new URL(adminUrl);
+  url.pathname = `/${name}`;
+  const databaseUrl = url.toString();
+  // Un Postgres recién creado no trae los roles de la API de Supabase, a los
+  // que las migraciones hacen GRANT.
+  await expectPsqlSuccess(databaseUrl, ["-f", toBashPath(ROLES_SQL)]);
+
+  return {
+    url: databaseUrl,
+    query: (sql: string) => expectPsqlSuccess(databaseUrl, ["-c", sql]),
+    snapshot: () =>
+      expectPsqlSuccess(databaseUrl, ["-f", toBashPath(SCHEMA_SNAPSHOT_SQL)]),
+  };
+}
+
+afterEach(async () => {
+  if (!adminUrl) {
+    return;
+  }
+  for (const name of createdDatabases.splice(0)) {
+    await psql(adminUrl, [
+      "-c",
+      `drop database if exists ${name} with (force)`,
+    ]);
+  }
+});
+
+describeConPostgres(
+  "migraciones del repositorio sobre un Postgres limpio",
+  () => {
+    it("aplica el histórico completo y deja el esquema que declaran las migraciones", async () => {
+      const database = await freshDatabase();
+
+      const result = await applyMigrations([], {
+        ...process.env,
+        DATABASE_URL: database.url,
+      });
+
+      expect(result.code, result.stderr).toBe(0);
+      const tablas = await database.query(
+        "select table_name from information_schema.tables where table_schema = 'public' order by 1",
+      );
+      expect(tablas.split("\n")).toEqual(["audit_log", "clubs"]);
+      expect(await database.query("select slug from public.clubs")).toBe(
+        "victoria-seadragons",
+      );
+      expect(
+        await database.query(
+          "select count(*) from pg_policies where schemaname = 'public'",
+        ),
+      ).not.toBe("0");
+    });
+
+    it("aplicar dos veces el histórico no cambia el esquema resultante ni duplica la semilla", async () => {
+      // El caso de las dos migraciones que llegan a main el mismo día: la
+      // segunda corrida no puede asumir que la primera no corrió.
+      const database = await freshDatabase();
+      const entorno = { ...process.env, DATABASE_URL: database.url };
+
+      const primera = await applyMigrations([], entorno);
+      const despuesDeLaPrimera = await database.snapshot();
+      const segunda = await applyMigrations([], entorno);
+
+      expect(primera.code, primera.stderr).toBe(0);
+      expect(segunda.code, segunda.stderr).toBe(0);
+      // La comparación sólo vale si la descripción del esquema trae algo: dos
+      // cadenas vacías también son iguales.
+      expect(despuesDeLaPrimera).toMatch(/tabla clubs rls=t/);
+      expect(despuesDeLaPrimera).toMatch(
+        /policy clubs\.clubs_select_authenticated/,
+      );
+      expect(await database.snapshot()).toBe(despuesDeLaPrimera);
+      expect(await database.query("select count(*) from public.clubs")).toBe(
+        "1",
+      );
+    });
+
+    it("la descripción del esquema cambia cuando el esquema cambia", async () => {
+      // Sin esto, el test de arriba pasaría igual con una descripción
+      // constante que no mirara la base.
+      const database = await freshDatabase();
+      const antes = await database.snapshot();
+
+      await database.query(
+        "create table public.recien_llegada (id int primary key)",
+      );
+
+      expect(await database.snapshot()).not.toBe(antes);
+    });
+
+    it("se detiene en la primera migración rota y no aplica las siguientes", async () => {
+      // La prueba de fuego del ticket: con este código de salida distinto de
+      // cero, el paso del workflow (que no lleva continue-on-error) deja el PR
+      // en rojo.
+      const database = await freshDatabase();
+      const directory = await migrationsDirectory({
+        "0001_buena.sql": "create table public.buena (id int primary key);",
+        "0002_rota.sql": "create table public.rota (id int primary key",
+        "0003_nunca.sql": "create table public.nunca (id int primary key);",
+      });
+
+      const result = await applyMigrations(["--dir", toBashPath(directory)], {
+        ...process.env,
+        DATABASE_URL: database.url,
+      });
+
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toMatch(/0002_rota\.sql/);
+      const tablas = await database.query(
+        "select table_name from information_schema.tables where table_schema = 'public' order by 1",
+      );
+      expect(tablas.split("\n").filter(Boolean)).toEqual(["buena"]);
+    });
+
+    it("deja la migración rota sin aplicar a medias", async () => {
+      // Cada archivo va en una sola transacción: una migración que crea dos
+      // tablas y falla en la segunda no puede dejar la primera puesta.
+      const database = await freshDatabase();
+      const directory = await migrationsDirectory({
+        "0001_a_medias.sql":
+          "create table public.primera (id int primary key);\ncreate table public.segunda (id int primary key",
+      });
+
+      const result = await applyMigrations(["--dir", toBashPath(directory)], {
+        ...process.env,
+        DATABASE_URL: database.url,
+      });
+
+      expect(result.code).not.toBe(0);
+      expect(
+        await database.query(
+          "select count(*) from information_schema.tables where table_schema = 'public'",
+        ),
+      ).toBe("0");
+    });
+  },
+);
