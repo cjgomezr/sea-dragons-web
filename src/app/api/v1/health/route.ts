@@ -6,7 +6,11 @@ import {
   type HealthReport,
   buildHealthReport,
 } from "@/lib/health";
-import { readSupabaseConfig } from "@/lib/supabase/config";
+import { readDeploymentCommit } from "@/lib/deployment";
+import {
+  readSupabaseConfig,
+  readSupabaseProjectRef,
+} from "@/lib/supabase/config";
 
 // The probe must reflect the database right now, never a cached answer.
 export const dynamic = "force-dynamic";
@@ -33,7 +37,16 @@ async function probeDatabase(): Promise<DatabaseProbeResult> {
 
 const getHealth = createApiRoute<HealthReport>({
   handler: async () => {
-    const report = buildHealthReport(await probeDatabase());
+    // El ref se parsea del entorno directamente y no de la config de la
+    // sonda, porque saber a qué proyecto apunta este entorno no depende de
+    // tener la llave anónima. En una respuesta 503 no sale: el cuerpo de error
+    // de la API v1 es solo `{ error: { code, message } }` (ver
+    // `docs/entornos.md`).
+    const report = buildHealthReport({
+      probe: await probeDatabase(),
+      supabaseProjectRef: readSupabaseProjectRef(process.env),
+      commit: readDeploymentCommit(process.env),
+    });
     if (report.status === "degraded") {
       throw new ApiError("service_unavailable", report.detail);
     }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  IGNORED_ENV_VARS,
+  PLATFORM_INJECTED_ENV_VARS,
   SECRET_ENV_VARS,
   findEnvVarsReadByCode,
   findUndocumentedEnvVars,
@@ -28,6 +30,24 @@ describe(".env.example", () => {
     expect(missing, `faltan en .env.example: ${missing.join(", ")}`).toEqual(
       [],
     );
+  });
+
+  it("no exige documentar las variables que inyecta la plataforma en vez de una persona", () => {
+    const used = [...findEnvVarsReadByCode()];
+
+    for (const name of PLATFORM_INJECTED_ENV_VARS) {
+      expect(used).not.toContain(name);
+    }
+  });
+
+  // Toda exclusión resta cobertura a la comprobación de arriba, así que la
+  // lista se fija aquí entera: ampliarla obliga a tocar este test, y ese es el
+  // momento de justificar la nueva en `tests/support/env-vars.ts`.
+  it("excluye exactamente las variables declaradas, ni una más", () => {
+    expect([...IGNORED_ENV_VARS]).toEqual([
+      "PATH",
+      ...PLATFORM_INJECTED_ENV_VARS,
+    ]);
   });
 
   it("falla nombrando la variable que falta cuando se añade una lectura nueva sin documentarla", () => {

@@ -36,6 +36,55 @@ El ref y la URL son públicos: viajan en cada petición que hace el navegador.
 Lo que nunca sale de su sitio son las claves, y eso es lo que cubre la sección
 siguiente.
 
+## Vercel
+
+El despliegue vive en Vercel, proyecto `victoria-seadragons`, en la cuenta
+personal `cjgomezr`. Producción sirve desde `main`, en
+https://victoria-seadragons.vercel.app/. Cada PR abierto genera su propia URL de
+preview, visible desde el propio PR. Un build que falla no reemplaza nada: la
+versión anterior sigue sirviendo y el fallo queda en rojo en el commit o en el
+PR.
+
+- **Región de funciones:** `syd1` (Sídney), declarada en `vercel.json` y
+  verificada en la respuesta (`x-vercel-id: syd1::...`). El importador de Vercel
+  ya no pregunta la región, así que el primer despliegue salió en Estados Unidos
+  y hubo que cambiarla a mano. Está en el repositorio para que no vuelva a
+  depender de que alguien se acuerde de mirar el panel.
+- **Framework:** Next.js, también declarado en `vercel.json`.
+- **Sin la integración de Supabase que ofrece el importador.** Se descartó a
+  propósito: inyecta las credenciales de un solo proyecto en Production,
+  Preview y Development a la vez, que es justo lo que el issue #92 existe para
+  impedir.
+- **Variables de entorno:** ninguna configurada todavía. Hasta que el #92 las
+  ponga, `GET /api/v1/health` responde 503 en producción diciendo qué falta, que
+  es el comportamiento correcto y no un despliegue roto.
+
+### Qué contesta `GET /api/v1/health`
+
+Sano, responde 200 con `supabaseProjectRef` (el ref del proyecto de Supabase al
+que apunta ese entorno) y `commit` (el sha que está sirviendo, tomado de
+`VERCEL_GIT_COMMIT_SHA`). Los dos son públicos; ninguna clave sale en la
+respuesta, y `tests/unit/api/health-route.test.ts` lo comprueba.
+
+Enfermo, responde 503 con la forma de error de la API v1
+(`{ error: { code, message } }`), que **no** lleva el ref ni el sha. Es
+deliberado: el cuerpo de error es el mismo para toda la API y este endpoint no
+lo rompe por comodidad de un consumidor. Durante una caída, la versión
+desplegada se consulta en el panel de Vercel (Deployments), y el monitoreo del
+#95 solo necesita distinguir 200 de 503.
+
+### El plan es Hobby, y Hobby es de uso no comercial
+
+El proyecto está en el plan **Hobby**, que sus términos limitan a uso **no
+comercial**. Hoy la plataforma no cobra nada, así que encaja.
+
+**E12 (cobros por Stripe) obliga a revisar esta decisión antes de cobrarle a
+nadie.** En cuanto el club acepte un pago a través de la plataforma, el uso
+deja de ser plausiblemente no comercial y el proyecto tiene que pasar a un plan
+de pago, con el gasto aprobado por el dueño. No es una tarea de infraestructura
+que se pueda aplazar hasta que alguien se queje: es una condición del
+proveedor.
+
 ## Credenciales
 
 Ninguna clave de ningún proyecto vive en este documento ni en ningún otro
@@ -80,21 +129,20 @@ Los cuatro entornos posibles:
 
 - **Local**: la máquina de quien desarrolla, en `.env.local` (nunca
   commiteado).
-- **Preview**: el despliegue de Vercel que se genera por cada PR abierto.
-  Todavía no existe (lo crea el issue #91); esta tabla dice a dónde debe
-  apuntar cuando exista.
-- **Producción**: el despliegue de Vercel que sirve desde `main`. El proyecto
-  de Supabase de producción ya existe (`seadragons-prod`, ver arriba); el
-  despliegue en Vercel que lo usaría todavía no (issue #91).
+- **Preview**: el despliegue de Vercel que se genera por cada PR abierto. Ya
+  existe; sus variables todavía no (issue #92), así que esta tabla dice a dónde
+  deben apuntar cuando alguien las configure.
+- **Producción**: el despliegue de Vercel que sirve desde `main`. Existen los
+  dos lados, el proyecto de Supabase (`seadragons-prod`) y el despliegue; lo
+  que falta es conectarlos con variables de entorno (issue #92).
 - **CI**: los workflows de GitHub Actions (`.github/workflows/`).
 
 `NEXT_PUBLIC_SUPABASE_URL`: en local, `.env.local` apunta a `seadragons-dev`.
 En preview, apunta a `seadragons-dev`, **nunca** al proyecto de producción
-(#92). En producción, apunta a `seadragons-prod`; nadie la configura todavía
-en Vercel porque el despliegue es el #91. En CI, iría como secret del
-repositorio, pendiente de configurar (ver comentario en `claude-backlog.yml`).
-La pone quien desarrolla en local; en Vercel/CI, quien administre esos
-secretos (#91, #92).
+(#92). En producción, apunta a `seadragons-prod`; nadie la ha configurado
+todavía en Vercel, y eso es el #92. En CI, iría como secret del repositorio,
+pendiente de configurar (ver comentario en `claude-backlog.yml`). La pone quien
+desarrolla en local; en Vercel/CI, quien administre esos secretos (#92).
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`: en local, la del proyecto `seadragons-dev`.
 En preview, la misma llave anónima de `seadragons-dev`. En producción, la
@@ -122,10 +170,18 @@ nadie corre el CLI de Supabase ahí todavía. Cada quien genera el suyo en
 Supabase Dashboard → Account → Access Tokens.
 
 `APP_URL`: opcional en local (si no se pone, usa `http://localhost:3417`).
-En preview, la URL que genera Vercel (pendiente de #91). En producción, la
-URL de producción (pendiente de #91). En CI, la fija el workflow con la URL
+En preview, la URL que genera Vercel para ese PR. En producción,
+https://victoria-seadragons.vercel.app/. En CI, la fija el workflow con la URL
 del servidor que acaba de levantar. Playwright toma el valor por defecto; en
 CI/Vercel lo fija el workflow.
+
+`VERCEL_GIT_COMMIT_SHA`: el sha del commit que se está sirviendo. No se pone
+nunca a mano: la inyecta el build de Vercel en preview y en producción. En
+local y en CI no existe, y `GET /api/v1/health` devuelve `commit: null` en vez
+de inventarse un valor. Es la única variable que el código lee y que no está en
+`.env.example`, a propósito: escribirla en `.env.local` haría que el endpoint
+afirmara servir un commit que no es el del disco. La exclusión está declarada
+en `tests/support/env-vars.ts`, junto a su porqué.
 
 `CI`: no se pone en local. En preview y producción la pone Vercel
 automáticamente; en CI la pone GitHub Actions automáticamente. Nunca a mano,
