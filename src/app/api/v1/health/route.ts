@@ -2,9 +2,11 @@ import { createClient } from "@supabase/supabase-js";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
 import {
+  DATABASE_PROBE_TIMEOUT_MS,
   type DatabaseProbeResult,
   type HealthReport,
   buildHealthReport,
+  probeWithinTimeout,
 } from "@/lib/health";
 import { readDeploymentCommit } from "@/lib/deployment";
 import {
@@ -17,6 +19,10 @@ export const dynamic = "force-dynamic";
 
 const PROBED_TABLE = "clubs";
 
+function describeThrownProbeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 async function probeDatabase(): Promise<DatabaseProbeResult> {
   const config = readSupabaseConfig(process.env);
   if (config.kind === "missing") {
@@ -27,12 +33,19 @@ async function probeDatabase(): Promise<DatabaseProbeResult> {
   // Nada de `head: true`: PostgREST responde 404 sin cuerpo y supabase-js lo
   // traduce a `{ status: 204, error: null }`, así que una base sin la tabla se
   // reportaba como sana. La sonda pide un cuerpo para poder leer el error.
-  const { error } = await supabase.from(PROBED_TABLE).select("id").limit(1);
-
-  if (error) {
-    return { kind: "unreachable", reason: error.message };
+  //
+  // El try existe porque supabase-js devuelve `{ error }` pero la capa de red
+  // por debajo lanza (DNS, TLS, socket cortado). Dejar escapar esa excepción
+  // la convertiría en un 500 genérico, y una base inalcanzable es un 503.
+  try {
+    const { error } = await supabase.from(PROBED_TABLE).select("id").limit(1);
+    if (error) {
+      return { kind: "unreachable", reason: error.message };
+    }
+    return { kind: "reachable" };
+  } catch (error) {
+    return { kind: "unreachable", reason: describeThrownProbeError(error) };
   }
-  return { kind: "reachable" };
 }
 
 const getHealth = createApiRoute<HealthReport>({
@@ -43,7 +56,7 @@ const getHealth = createApiRoute<HealthReport>({
     // de la API v1 es solo `{ error: { code, message } }` (ver
     // `docs/entornos.md`).
     const report = buildHealthReport({
-      probe: await probeDatabase(),
+      probe: await probeWithinTimeout(probeDatabase, DATABASE_PROBE_TIMEOUT_MS),
       supabaseProjectRef: readSupabaseProjectRef(process.env),
       commit: readDeploymentCommit(process.env),
     });

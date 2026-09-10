@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { buildHealthReport } from "@/lib/health";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  DATABASE_PROBE_TIMEOUT_MS,
+  type DatabaseProbeResult,
+  buildHealthReport,
+  probeWithinTimeout,
+} from "@/lib/health";
 
 const DEPLOYMENT = {
   supabaseProjectRef: "ejemplo123",
@@ -63,5 +68,53 @@ describe("buildHealthReport", () => {
 
     expect(report.supabaseProjectRef).toBeNull();
     expect(report.commit).toBeNull();
+  });
+});
+
+describe("probeWithinTimeout", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("devuelve el resultado de la sonda cuando contesta a tiempo", async () => {
+    const result = await probeWithinTimeout(
+      async () => ({ kind: "reachable" }),
+      DATABASE_PROBE_TIMEOUT_MS,
+    );
+
+    expect(result).toEqual({ kind: "reachable" });
+  });
+
+  it("da la base por inalcanzable cuando la sonda no contesta dentro del plazo", async () => {
+    vi.useFakeTimers();
+
+    const pending = probeWithinTimeout(
+      () => new Promise<DatabaseProbeResult>(() => {}),
+      DATABASE_PROBE_TIMEOUT_MS,
+    );
+    await vi.advanceTimersByTimeAsync(DATABASE_PROBE_TIMEOUT_MS);
+
+    await expect(pending).resolves.toEqual({
+      kind: "unreachable",
+      reason: expect.stringContaining(String(DATABASE_PROBE_TIMEOUT_MS)),
+    });
+  });
+
+  // Una sonda que tarda 4,9 s sigue siendo una sonda sana. El plazo solo puede
+  // vencer cuando de verdad se agota, o el endpoint reportaría caídas falsas.
+  it("no vence el plazo si la sonda contesta un instante antes", async () => {
+    vi.useFakeTimers();
+    const ALMOST_TIMEOUT_MS = DATABASE_PROBE_TIMEOUT_MS - 1;
+
+    const pending = probeWithinTimeout(
+      () =>
+        new Promise<DatabaseProbeResult>((resolve) => {
+          setTimeout(() => resolve({ kind: "reachable" }), ALMOST_TIMEOUT_MS);
+        }),
+      DATABASE_PROBE_TIMEOUT_MS,
+    );
+    await vi.advanceTimersByTimeAsync(DATABASE_PROBE_TIMEOUT_MS);
+
+    await expect(pending).resolves.toEqual({ kind: "reachable" });
   });
 });

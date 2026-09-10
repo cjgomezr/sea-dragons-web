@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DATABASE_PROBE_TIMEOUT_MS } from "@/lib/health";
 import { SECRET_ENV_VARS } from "../../support/env-vars";
 
 const ORIGINAL_ENV = { ...process.env };
@@ -25,6 +26,32 @@ function mockDatabaseAnswering(error: { message: string } | null): void {
   }));
 }
 
+function mockDatabaseNeverAnswering(): void {
+  vi.doMock("@supabase/supabase-js", () => ({
+    createClient: () => ({
+      from: () => ({
+        select: () => ({
+          limit: () => new Promise(() => {}),
+        }),
+      }),
+    }),
+  }));
+}
+
+function mockDatabaseThrowing(thrown: Error): void {
+  vi.doMock("@supabase/supabase-js", () => ({
+    createClient: () => ({
+      from: () => ({
+        select: () => ({
+          limit: async () => {
+            throw thrown;
+          },
+        }),
+      }),
+    }),
+  }));
+}
+
 function configureSupabaseEnvironment(): void {
   process.env.NEXT_PUBLIC_SUPABASE_URL = `https://${PROJECT_REF}.supabase.co`;
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = JWT_LOOKING_ANON_KEY;
@@ -41,6 +68,23 @@ async function getHealth(
 ): Promise<Response> {
   const { GET } = await import("@/app/api/v1/health/route");
   return GET(new NextRequest(HEALTH_URL, { headers }));
+}
+
+/** El temporizador de la sonda se arma unos microtasks después de entrar al
+ * handler, así que el reloj falso se instala con el módulo ya importado y se
+ * avanza en dos tramos: el primero deja que el temporizador exista, el segundo
+ * lo vence. */
+async function getHealthLettingTheProbeTimeOut(): Promise<Response> {
+  const { GET } = await import("@/app/api/v1/health/route");
+  vi.useFakeTimers();
+  try {
+    const pending = GET(new NextRequest(HEALTH_URL));
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(DATABASE_PROBE_TIMEOUT_MS);
+    return await pending;
+  } finally {
+    vi.useRealTimers();
+  }
 }
 
 describe("health", () => {
@@ -140,6 +184,39 @@ describe("health", () => {
     };
     expect(body.error.code).toBe("service_unavailable");
     expect(body.error.message).toContain("NEXT_PUBLIC_SUPABASE_URL");
+  });
+
+  // Una base que no contesta deja la petición colgada, y un monitoreo que
+  // espera indefinidamente no ve la caída: la ve el socio que abre la web.
+  it("responde 503, no 200, cuando Supabase tarda más que el timeout de la sonda", async () => {
+    configureSupabaseEnvironment();
+    mockDatabaseNeverAnswering();
+
+    const response = await getHealthLettingTheProbeTimeOut();
+
+    expect(response.status).toBe(503);
+    const body = (await response.json()) as {
+      error: { code: string; message: string };
+    };
+    expect(body.error.code).toBe("service_unavailable");
+    expect(body.error.message).toContain(String(DATABASE_PROBE_TIMEOUT_MS));
+  });
+
+  // supabase-js devuelve `{ error }` en vez de lanzar, pero la capa de red por
+  // debajo sí lanza (DNS, TLS, socket cortado). Sin esto el endpoint responde
+  // 500, y el criterio de aceptación pide 503 cuando Supabase no responde.
+  it("responde 503, no 500, cuando la llamada a Supabase lanza", async () => {
+    configureSupabaseEnvironment();
+    mockDatabaseThrowing(new TypeError("fetch failed"));
+
+    const response = await getHealth();
+
+    expect(response.status).toBe(503);
+    const body = (await response.json()) as {
+      error: { code: string; message: string };
+    };
+    expect(body.error.code).toBe("service_unavailable");
+    expect(body.error.message).toContain("fetch failed");
   });
 
   it("responde 405 con la forma de error para un método no soportado", async () => {
