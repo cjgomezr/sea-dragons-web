@@ -81,22 +81,37 @@ const PORT_PROBE_INTERVAL_MS = 50;
 // gasta un intento del bucle.
 const PORT_CONNECT_TIMEOUT_MS = 500;
 
+// Un sondeo fallido guarda por qué falló: "la conexión fue rechazada cien
+// veces" (el auxiliar nunca arrancó) y "el handshake se agotó" (algo raro en
+// la red del runner) piden investigaciones distintas, y en CI el mensaje del
+// test es todo lo que queda.
+type PortProbe =
+  | { readonly accepted: true }
+  | { readonly accepted: false; readonly reason: string };
+
 /**
  * Abre y cierra una conexión TCP. Es la única señal que da un puerto mudo:
  * acepta, pero no contesta nada, así que un fetch no distingue "no hay nadie"
  * de "hay alguien callado".
  */
-function acceptsConnectionsAt(port: number): Promise<boolean> {
+function probePort(port: number): Promise<PortProbe> {
   return new Promise((resolve) => {
     const socket = connect({ host: "localhost", port });
-    const settle = (accepted: boolean): void => {
+    const settle = (probe: PortProbe): void => {
       socket.destroy();
-      resolve(accepted);
+      resolve(probe);
     };
     socket.setTimeout(PORT_CONNECT_TIMEOUT_MS);
-    socket.on("connect", () => settle(true));
-    socket.on("timeout", () => settle(false));
-    socket.on("error", () => settle(false));
+    socket.on("connect", () => settle({ accepted: true }));
+    socket.on("timeout", () =>
+      settle({
+        accepted: false,
+        reason: `el handshake no terminó en ${PORT_CONNECT_TIMEOUT_MS} ms`,
+      }),
+    );
+    socket.on("error", (error) =>
+      settle({ accepted: false, reason: error.message }),
+    );
   });
 }
 
@@ -105,11 +120,18 @@ async function waitUntilPortAccepts(
   port: number,
   timeoutMs: number = PORT_ACCEPT_TIMEOUT_MS,
 ): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!(await acceptsConnectionsAt(port))) {
-    if (Date.now() > deadline) {
+  const startedAt = Date.now();
+  for (;;) {
+    const probe = await probePort(port);
+    if (probe.accepted) {
+      return;
+    }
+    // El transcurrido de verdad, no el plazo pedido: el último sondeo puede
+    // haberse comido hasta PORT_CONNECT_TIMEOUT_MS de más.
+    const elapsedMs = Date.now() - startedAt;
+    if (elapsedMs > timeoutMs) {
       throw new Error(
-        `el puerto ${port} no llegó a aceptar conexiones en ${timeoutMs} ms`,
+        `el puerto ${port} no llegó a aceptar conexiones en ${elapsedMs} ms (último intento: ${probe.reason})`,
       );
     }
     await new Promise((resolve) => setTimeout(resolve, PORT_PROBE_INTERVAL_MS));
@@ -1172,14 +1194,16 @@ describe("andamiaje de los tests de ui-preflight.sh", () => {
 
     muteServer = await startMuteServer(port);
 
-    expect(await acceptsConnectionsAt(port)).toBe(true);
+    expect((await probePort(port)).accepted).toBe(true);
   });
 
-  it("esperar a un puerto que nadie ocupa falla nombrando el puerto y el plazo", async () => {
+  it("esperar a un puerto que nadie ocupa falla nombrando el puerto, lo esperado y el motivo", async () => {
     const port = nextPort();
 
     await expect(waitUntilPortAccepts(port, 300)).rejects.toThrow(
-      `el puerto ${port} no llegó a aceptar conexiones en 300 ms`,
+      new RegExp(
+        `^el puerto ${port} no llegó a aceptar conexiones en \\d+ ms \\(último intento: .+\\)$`,
+      ),
     );
   });
 });
