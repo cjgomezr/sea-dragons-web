@@ -8,6 +8,7 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
+import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -70,6 +71,91 @@ async function respondsAt(url: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+const PORT_ACCEPT_TIMEOUT_MS = 5_000;
+const PORT_PROBE_INTERVAL_MS = 50;
+// Holgado para un handshake contra localhost, corto frente al plazo total:
+// un runner cargado puede tardar más de lo obvio, y quedarse corto aquí sólo
+// gasta un intento del bucle.
+const PORT_CONNECT_TIMEOUT_MS = 500;
+
+// Un sondeo fallido guarda por qué falló: "la conexión fue rechazada cien
+// veces" (el auxiliar nunca arrancó) y "el handshake se agotó" (algo raro en
+// la red del runner) piden investigaciones distintas, y en CI el mensaje del
+// test es todo lo que queda.
+type PortProbe =
+  | { readonly accepted: true }
+  | { readonly accepted: false; readonly reason: string };
+
+/**
+ * El texto de un fallo de conexión, ya venga suelto o agrupado. Node conecta a
+ * "localhost" probando IPv6 e IPv4 a la vez, y cuando fallan las dos emite un
+ * AggregateError cuyo `message` está vacío: el motivo vive en `errors`.
+ */
+function describeConnectError(error: unknown): string {
+  if (error instanceof AggregateError && error.errors.length > 0) {
+    // `errors` viene tipado como any[] en las libs de TS: se estrecha antes
+    // de recorrerlo, o el any se cuela en el resto de la función.
+    const causes: unknown[] = error.errors;
+    return causes.map(describeConnectError).join("; ");
+  }
+  if (error instanceof Error) {
+    return error.message || error.name;
+  }
+  return String(error);
+}
+
+/**
+ * Abre y cierra una conexión TCP. Es la única señal que da un puerto mudo:
+ * acepta, pero no contesta nada, así que un fetch no distingue "no hay nadie"
+ * de "hay alguien callado".
+ */
+function probePort(port: number): Promise<PortProbe> {
+  return new Promise((resolve) => {
+    const socket = connect({ host: "localhost", port });
+    const settle = (probe: PortProbe): void => {
+      socket.destroy();
+      resolve(probe);
+    };
+    socket.setTimeout(PORT_CONNECT_TIMEOUT_MS);
+    socket.on("connect", () => settle({ accepted: true }));
+    socket.on("timeout", () =>
+      settle({
+        accepted: false,
+        reason: `el handshake no terminó en ${PORT_CONNECT_TIMEOUT_MS} ms`,
+      }),
+    );
+    socket.on("error", (error) =>
+      settle({ accepted: false, reason: describeConnectError(error) }),
+    );
+  });
+}
+
+/**
+ * Espera a que alguien escuche en el puerto, o falla diciendo cuánto esperó y
+ * por qué no llegó a conectar.
+ */
+async function waitUntilPortAccepts(
+  port: number,
+  timeoutMs: number = PORT_ACCEPT_TIMEOUT_MS,
+): Promise<void> {
+  const startedAt = Date.now();
+  for (;;) {
+    const probe = await probePort(port);
+    if (probe.accepted) {
+      return;
+    }
+    // El transcurrido de verdad, no el plazo pedido: el último sondeo puede
+    // haberse comido hasta PORT_CONNECT_TIMEOUT_MS de más.
+    const elapsedMs = Date.now() - startedAt;
+    if (elapsedMs > timeoutMs) {
+      throw new Error(
+        `el puerto ${port} no llegó a aceptar conexiones en ${elapsedMs} ms (último intento: ${probe.reason})`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, PORT_PROBE_INTERVAL_MS));
   }
 }
 
@@ -347,7 +433,13 @@ echo "${clientPid}"
 // proceso un handle abierto para que el event loop no lo deje morir solo.
 const KEEPS_PROCESS_ALIVE_MS = 1 << 30;
 
-/** Un proceso que no hace nada y se deja matar, para comprobar que nadie lo mata. */
+/**
+ * Un proceso que no hace nada y se deja matar, para comprobar que nadie lo mata.
+ *
+ * No espera a nada, y no le hace falta: lo único que se afirma de él es que su
+ * PID siga vivo, y ese PID existe desde que `spawn` vuelve. No abre puertos ni
+ * responde nada, así que no hay precondición que sondear (issue #125).
+ */
 function startSacrificialProcess(): ChildProcess {
   return spawn(
     process.execPath,
@@ -466,13 +558,24 @@ ${body}
  * Un servidor que acepta la conexión y no contesta nunca. Es el puerto
  * "ocupado pero lento" de verdad: no rechaza, así que no hay forma de saber
  * si hay alguien salvo esperando, y esperar es lo que se agota bajo carga.
+ *
+ * Vuelve sólo cuando el puerto ya acepta conexiones: quien lo llama afirma
+ * justo después que ese puerto tiene dueño, y afirmarlo antes de que node
+ * llegue a escuchar es la carrera del issue #125.
  */
-function startMuteServer(port: number): ChildProcess {
-  return spawn(
+async function startMuteServer(port: number): Promise<ChildProcess> {
+  const muteServer = spawn(
     process.execPath,
     ["-e", `require("node:net").createServer(() => {}).listen(${port});`],
     { stdio: "ignore" },
   );
+  try {
+    await waitUntilPortAccepts(port);
+  } catch (error) {
+    muteServer.kill();
+    throw error;
+  }
+  return muteServer;
 }
 
 async function setupWorkDir(): Promise<string> {
@@ -934,7 +1037,7 @@ describe("ui-preflight.sh", () => {
     async () => {
       workDir = await setupWorkDir();
       const port = nextPort();
-      client = startMuteServer(port);
+      client = await startMuteServer(port);
       const env = baseEnv(workDir, port, {});
       cleanupEnv = env;
 
@@ -1091,4 +1194,57 @@ describe("ui-preflight.sh", () => {
     },
     TEST_TIMEOUT_MS,
   );
+});
+
+// El andamiaje de este archivo arranca procesos auxiliares y sondea el puerto
+// justo después. Cuando ese sondeo se adelanta al arranque del auxiliar, el
+// test afirma una precondición que todavía no es cierta y falla al azar bajo
+// carga (issue #125). Estos tests cubren al andamiaje mismo.
+describe("andamiaje de los tests de ui-preflight.sh", () => {
+  let muteServer: ChildProcess | undefined;
+
+  afterEach(() => {
+    if (muteServer) {
+      muteServer.kill();
+      muteServer = undefined;
+    }
+  });
+
+  it("startMuteServer no vuelve hasta que el puerto acepta conexiones", async () => {
+    const port = nextPort();
+
+    muteServer = await startMuteServer(port);
+
+    expect((await probePort(port)).accepted).toBe(true);
+  });
+
+  it("el motivo sobrevive al AggregateError que agrupa los intentos por familia", () => {
+    // Lo que de verdad emite node al conectar a "localhost" cuando resuelve a
+    // ::1 y a 127.0.0.1: agrupa los dos fallos y deja su propio `message`
+    // vacío. Leerlo a secas daba un motivo en blanco en el runner de Linux, y
+    // en Windows no, porque ahí no llegaba a haber dos familias que agrupar.
+    const bothFamiliesRefused = new AggregateError([
+      new Error("connect ECONNREFUSED ::1:24063"),
+      new Error("connect ECONNREFUSED 127.0.0.1:24063"),
+    ]);
+
+    expect(describeConnectError(bothFamiliesRefused)).toBe(
+      "connect ECONNREFUSED ::1:24063; connect ECONNREFUSED 127.0.0.1:24063",
+    );
+  });
+
+  it("esperar a un puerto que nadie ocupa falla nombrando el puerto, lo esperado y el motivo", async () => {
+    const port = nextPort();
+
+    // El motivo se comprueba como "algo, no vacío", a propósito. Exigir aquí
+    // el ECONNREFUSED que da un puerto libre ataría el test al errno de una
+    // plataforma, y una máquina que descarte el paquete en vez de rechazarlo
+    // daría el motivo del handshake agotado. Eso es exactamente el tipo de
+    // fragilidad por entorno que este ticket vino a quitar.
+    await expect(waitUntilPortAccepts(port, 300)).rejects.toThrow(
+      new RegExp(
+        `^el puerto ${port} no llegó a aceptar conexiones en \\d+ ms \\(último intento: .+\\)$`,
+      ),
+    );
+  });
 });
