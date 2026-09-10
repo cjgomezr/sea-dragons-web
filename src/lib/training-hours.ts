@@ -3,12 +3,29 @@
  * local equivocada y mueve el entrenamiento de las 18:00 a las 17:00. */
 export const CLUB_TIME_ZONE = "Australia/Melbourne";
 
-export type TrainingWeekday = "tuesday" | "thursday" | "saturday";
+export type Weekday =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+
+const WEEKDAYS: readonly Weekday[] = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
 
 /** Un entrenamiento semanal, en hora local del club. `endHour` es exclusiva:
  * a las 22:00 el entrenamiento ya terminó. */
 export type TrainingSession = {
-  readonly weekday: TrainingWeekday;
+  readonly weekday: Weekday;
   readonly startHour: number;
   readonly endHour: number;
 };
@@ -33,16 +50,24 @@ const CLUB_TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
 });
 
 type ClubLocalTime = {
-  readonly weekday: TrainingWeekday | null;
+  readonly weekday: Weekday;
   readonly minuteOfDay: number;
 };
 
-const TRAINING_WEEKDAYS: readonly TrainingWeekday[] = TRAINING_SESSIONS.map(
-  (session) => session.weekday,
-);
-
-function toTrainingWeekday(weekday: string): TrainingWeekday | null {
-  return TRAINING_WEEKDAYS.find((known) => known === weekday) ?? null;
+/** Se valida contra los siete días, no contra los tres de entrenamiento. Si
+ * solo se reconocieran esos tres, un nombre que Intl devolviera en otra forma
+ * ("Tue") se confundiría con un lunes legítimo: los dos darían "no hay
+ * entrenamiento", que es la respuesta que programa un mantenimiento en mitad
+ * de una sesión. Quedarse con los días de entrenamiento es trabajo de
+ * `covers`, no de esta función. */
+function toWeekday(weekday: string): Weekday {
+  const known = WEEKDAYS.find((candidate) => candidate === weekday);
+  if (!known) {
+    throw new Error(
+      `Intl devolvió un día desconocido ("${weekday}") para la zona ${CLUB_TIME_ZONE}`,
+    );
+  }
+  return known;
 }
 
 function readPart(
@@ -77,7 +102,7 @@ function readClubMinuteOfDay(
 function readClubLocalTime(instant: Date): ClubLocalTime {
   const parts = CLUB_TIME_FORMAT.formatToParts(instant);
   return {
-    weekday: toTrainingWeekday(readPart(parts, "weekday").toLowerCase()),
+    weekday: toWeekday(readPart(parts, "weekday").toLowerCase()),
     minuteOfDay: readClubMinuteOfDay(parts),
   };
 }

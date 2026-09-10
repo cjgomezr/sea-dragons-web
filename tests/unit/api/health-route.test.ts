@@ -233,8 +233,12 @@ describe("health", () => {
     const response = await getHealth();
 
     expect(response.status).toBe(503);
-    const body = (await response.json()) as { error: { code: string } };
+    const body = (await response.json()) as {
+      error: { code: string; message: string };
+    };
     expect(body.error.code).toBe("service_unavailable");
+    // Sin esto, cualquier otra vía de fallo dejaría el test en verde.
+    expect(body.error.message).toContain("supabaseUrl");
   });
 
   it("responde 405 con la forma de error para un método no soportado", async () => {
