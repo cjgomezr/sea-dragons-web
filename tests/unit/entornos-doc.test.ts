@@ -1,11 +1,17 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  environmentsFor,
+  readEnvironmentManifest,
+  secretVariableNames,
+} from "../../scripts/lib/entornos-manifest";
+import {
   PLATFORM_INJECTED_ENV_VARS,
   readEnvExampleNames,
 } from "../support/env-vars";
 
 const ENTORNOS_DOC_PATH = "docs/entornos.md";
+const ROTATION_HEADING = "## Rotación de credenciales";
 
 // Los dos formatos en los que Supabase entrega una clave: el JWT clásico
 // (`eyJ<header>.<payload>.<firma>`) y el del formato nuevo, con prefijo
@@ -114,5 +120,77 @@ describe("docs/entornos.md", () => {
       missing,
       `faltan en docs/entornos.md: ${missing.join(", ")}`,
     ).toEqual([]);
+  });
+});
+
+type RotationRow = readonly [
+  variable: string,
+  environment: string,
+  where: string,
+];
+
+/** Filas de la tabla de rotación, sin cabecera ni separador. La tabla es la
+ * lista que alguien sigue con la credencial nueva delante, así que se compara
+ * entera contra el manifiesto: una fila de más o de menos deja media rotación
+ * sin hacer. */
+function readRotationRows(): RotationRow[] {
+  const doc = readEntornosDoc();
+  const start = doc.indexOf(ROTATION_HEADING);
+  if (start < 0) {
+    throw new Error(`${ENTORNOS_DOC_PATH} no tiene "${ROTATION_HEADING}"`);
+  }
+  const section =
+    doc.slice(start + ROTATION_HEADING.length).split(/^## /m)[0] ?? "";
+
+  return section
+    .split("\n")
+    .filter((line) => line.trimStart().startsWith("|"))
+    .map((line) =>
+      line
+        .trim()
+        .replace(/^\||\|$/g, "")
+        .split("|")
+        .map((cell) => cell.trim().replace(/^`|`$/g, "")),
+    )
+    .filter((cells) => cells[0] !== "Variable" && !/^-+$/.test(cells[0] ?? ""))
+    .map((cells) => [cells[0] ?? "", cells[1] ?? "", cells[2] ?? ""] as const);
+}
+
+function expectedRotationRows(): RotationRow[] {
+  const manifest = readEnvironmentManifest();
+
+  return secretVariableNames(manifest).flatMap((variable) =>
+    environmentsFor(manifest, variable).map(
+      (environment) =>
+        [
+          variable,
+          environment,
+          manifest.environments[environment]?.where ?? "",
+        ] as const,
+    ),
+  );
+}
+
+describe("rotación de credenciales en docs/entornos.md", () => {
+  it("enumera un sitio por cada entorno en el que vive cada variable secreta", () => {
+    expect(readRotationRows()).toEqual(expectedRotationRows());
+  });
+
+  it("nombra todas las variables secretas del manifiesto", () => {
+    const listed = new Set(readRotationRows().map(([variable]) => variable));
+
+    for (const name of secretVariableNames(readEnvironmentManifest())) {
+      expect(listed).toContain(name);
+    }
+  });
+
+  // Sin esto, una tabla vacía y una tabla completa se verían igual el día que
+  // alguien rompa el parser o borre la sección entera.
+  it("tiene al menos una fila por variable secreta", () => {
+    const rows = readRotationRows();
+
+    expect(rows.length).toBeGreaterThanOrEqual(
+      secretVariableNames(readEnvironmentManifest()).length,
+    );
   });
 });
