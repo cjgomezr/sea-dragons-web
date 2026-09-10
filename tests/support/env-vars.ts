@@ -1,6 +1,10 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import {
+  readEnvironmentManifest,
+  secretVariableNames,
+} from "../../scripts/lib/entornos-manifest";
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const SCANNED_DIRECTORIES = ["src", "scripts", "tests"] as const;
@@ -30,12 +34,14 @@ export const IGNORED_ENV_VARS = new Set<string>([
 ]);
 
 /** Variables que nunca pueden llevar el prefijo `NEXT_PUBLIC_`: exponerlas al
- * navegador filtraría una credencial de servidor. Cuando E12 añada las de
- * Stripe (`STRIPE_SECRET_KEY`), se añaden aquí. */
-export const SECRET_ENV_VARS = [
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "SUPABASE_ACCESS_TOKEN",
-] as const;
+ * navegador filtraría una credencial de servidor. Sale del manifiesto de
+ * entornos, que es donde se declara qué es secreto: duplicar la lista aquí
+ * dejaría al chequeo del bundle y a los tests mirando conjuntos distintos.
+ * Cuando E12 añada `STRIPE_SECRET_KEY`, se marca `secret` allí y aparece sola.
+ */
+export const SECRET_ENV_VARS: readonly string[] = secretVariableNames(
+  readEnvironmentManifest(),
+);
 
 const DIRECT_ACCESS_PATTERN = /process\.env\.([A-Za-z_][A-Za-z0-9_]*)/g;
 const BRACKET_ACCESS_PATTERN =

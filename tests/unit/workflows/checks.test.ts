@@ -132,8 +132,28 @@ describe("workflow de checks", () => {
    * que todavía no existen, que no es trabajo mal hecho sino un repositorio
    * que aún no es un proyecto. El centinela es el mismo que usa el Stop gate.
    */
+  // El bundle sólo existe después de construirlo, y buscar un secreto en el
+  // código fuente diría qué se pretendía, no qué se publicó. Ver
+  // `scripts/check-client-bundle.ts`.
+  it("revisa el bundle del navegador después del build, no antes", () => {
+    const steps = allSteps();
+    const buildIndex = steps.findIndex((step) => step.run === "npm run build");
+    const bundleIndex = steps.findIndex((step) =>
+      step.run?.includes("check:client-bundle"),
+    );
+
+    expect(buildIndex).toBeGreaterThanOrEqual(0);
+    expect(bundleIndex).toBeGreaterThan(buildIndex);
+  });
+
   it("salta los comandos de la app mientras el repositorio no haya pasado por el bootstrap", () => {
-    for (const name of ["Tests", "Lint", "Tipos", "Build"]) {
+    for (const name of [
+      "Tests",
+      "Lint",
+      "Tipos",
+      "Build",
+      "Bundle del navegador sin secretos",
+    ]) {
       expect(
         stepNamed(name).if,
         `el paso ${name} corre aunque el proyecto no esté bootstrapeado`,
