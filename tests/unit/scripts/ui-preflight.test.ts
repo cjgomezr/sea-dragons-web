@@ -115,7 +115,10 @@ function probePort(port: number): Promise<PortProbe> {
   });
 }
 
-/** Espera a que alguien escuche en el puerto, o falla diciendo cuánto esperó. */
+/**
+ * Espera a que alguien escuche en el puerto, o falla diciendo cuánto esperó y
+ * por qué no llegó a conectar.
+ */
 async function waitUntilPortAccepts(
   port: number,
   timeoutMs: number = PORT_ACCEPT_TIMEOUT_MS,
@@ -1200,6 +1203,11 @@ describe("andamiaje de los tests de ui-preflight.sh", () => {
   it("esperar a un puerto que nadie ocupa falla nombrando el puerto, lo esperado y el motivo", async () => {
     const port = nextPort();
 
+    // El motivo se comprueba como "algo, no vacío", a propósito. Exigir aquí
+    // el ECONNREFUSED que da un puerto libre ataría el test al errno de una
+    // plataforma, y una máquina que descarte el paquete en vez de rechazarlo
+    // daría el motivo del handshake agotado. Eso es exactamente el tipo de
+    // fragilidad por entorno que este ticket vino a quitar.
     await expect(waitUntilPortAccepts(port, 300)).rejects.toThrow(
       new RegExp(
         `^el puerto ${port} no llegó a aceptar conexiones en \\d+ ms \\(último intento: .+\\)$`,
