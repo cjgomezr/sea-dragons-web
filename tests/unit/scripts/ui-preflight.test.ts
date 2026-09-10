@@ -96,6 +96,8 @@ type PortProbe =
  */
 function describeConnectError(error: unknown): string {
   if (error instanceof AggregateError && error.errors.length > 0) {
+    // `errors` viene tipado como any[] en las libs de TS: se estrecha antes
+    // de recorrerlo, o el any se cuela en el resto de la función.
     const causes: unknown[] = error.errors;
     return causes.map(describeConnectError).join("; ");
   }
