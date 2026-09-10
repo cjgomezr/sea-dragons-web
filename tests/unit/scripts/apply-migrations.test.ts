@@ -484,7 +484,8 @@ describeConPostgres(
     it("--write regenera una descripción con la que la comparación vuelve a pasar", async () => {
       const database = await freshDatabase();
       const entorno = { ...process.env, DATABASE_URL: database.url };
-      await applyMigrations([], entorno);
+      const aplicadas = await applyMigrations([], entorno);
+      expect(aplicadas.code, aplicadas.stderr).toBe(0);
       await database.query("create table public.nueva (id int primary key)");
       const { script } = await sandboxedChecker();
 
