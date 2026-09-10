@@ -1,0 +1,74 @@
+# Comprueba en cada PR que las migraciones del repositorio aplican limpias
+# sobre un Postgres recién creado (RF-5 del PRD de E16a). Hasta hoy se
+# aplicaban a mano por MCP desde la sesión de quien trabajaba: con una persona
+# funciona, con dos el repositorio y la base se separan sin que nadie se
+# entere, y el primer aviso llega cuando una migración revienta en producción.
+#
+# Lo que se verifica es el histórico COMPLETO, no sólo lo que cambió: por eso
+# no hay filtro `paths`. Un PR que no toca supabase/migrations puede romper el
+# histórico igual (renombrando un archivo, por ejemplo) y el job tiene que
+# enterarse.
+#
+# No pide ninguna credencial: el Postgres es un contenedor de servicio del
+# propio runner, se muere con el job y nunca contiene un dato real.
+name: migraciones
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migraciones-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migraciones:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # Sin healthcheck el job arranca antes de que la base acepte
+        # conexiones y el fallo se lee como una migración rota.
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      MIGRATIONS_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      # Los tests del aplicador se saltan solos donde no hay Postgres, que es
+      # lo correcto en `npm test`. Aquí no: saltárselos sería perder la prueba
+      # de la migración rota y leer verde una corrida que no probó nada. Con
+      # esta bandera, la falta de base es un fallo.
+      REQUIRE_MIGRATIONS_POSTGRES: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Crea los roles de la API que Supabase ya trae
+        run: psql "$DATABASE_URL" --no-psqlrc --set ON_ERROR_STOP=1 --file supabase/ci/roles.sql
+      - name: Aplica todas las migraciones del repositorio en orden de nombre
+        run: bash scripts/apply-migrations.sh
+      # Que apliquen no basta: hay que comprobar que dejan el esquema que el
+      # repositorio dice tener. Una migración editada después de haberse
+      # aplicado a mano aplica limpia sobre una base vacía y deja otra cosa.
+      - name: Compara el esquema resultante contra el declarado en el repositorio
+        run: bash scripts/check-schema-snapshot.sh
+      # Y esto prueba lo demás que pide el ticket contra un Postgres de verdad:
+      # el orden, que una migración rota deja el job en rojo, y que aplicar dos
+      # veces no cambia el esquema resultante.
+      - name: Comprueba el aplicador contra ese mismo Postgres
+        run: npx vitest run tests/unit/scripts/apply-migrations.test.ts
