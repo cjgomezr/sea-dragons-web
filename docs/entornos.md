@@ -86,6 +86,77 @@ de pago, con el gasto aprobado por el dueño. No es una tarea de infraestructura
 que se pueda aplazar hasta que alguien se queje: es una condición del
 proveedor.
 
+## Disponibilidad y mantenimiento (issue #95)
+
+NFR-003 fija **99,0% de disponibilidad mensual, best-effort y sin SLA**. Un mes
+de 30 días admite unas 7 horas y 12 minutos de caída antes de incumplirlo.
+
+### Qué se vigila
+
+`GET https://victoria-seadragons.vercel.app/api/v1/health`, y solo eso. El
+endpoint responde 200 cuando la aplicación puede leer de Supabase y 503 cuando
+no, así que sirve HTML no cuenta como estar en pie: una aplicación que no
+alcanza la base está caída y el monitoreo tiene que verlo. La sonda a la base
+tiene un plazo de 5 segundos (`DATABASE_PROBE_TIMEOUT_MS` en
+`src/lib/health.ts`); vencido, el endpoint contesta 503 en vez de quedarse
+colgado.
+
+No hace falta autenticarse ni mandar cabeceras. Cualquier respuesta que no sea
+200 cuenta como caída.
+
+### El umbral, escrito
+
+- **Cada 5 minutos** se comprueba la URL.
+- **Dos comprobaciones fallidas seguidas** disparan el aviso, es decir unos
+  **10 minutos** de caída. Una sola comprobación fallida no avisa: un arranque
+  en frío o un despliegue en curso producen fallos aislados, y un canal que
+  avisa por ruido deja de leerse.
+- **La recuperación también avisa**, para que nadie se quede pendiente de una
+  caída que ya pasó.
+
+### Dónde se consulta la disponibilidad del mes
+
+En el panel del servicio de monitoreo, que es quien acumula el histórico. **Ese
+servicio todavía no existe**: darlo de alta exige una cuenta y un correo, y eso
+no lo puede hacer un worker de la fábrica. Mientras no exista, la disponibilidad
+mensual no se puede consultar en ningún sitio, y este documento lo dice en vez
+de fingir lo contrario.
+
+Lo que falta, en concreto:
+
+1. Crear una cuenta en un servicio de monitoreo de disponibilidad con plan
+   gratuito (UptimeRobot y Better Stack tienen uno; la regla del proyecto es que
+   si hay que pagar, no se hace).
+2. Dar de alta un monitor HTTP contra la URL de arriba, cada 5 minutos, con el
+   aviso a las dos fallas seguidas.
+3. Apuntar el canal de aviso al correo del dueño. Hoy hay una sola persona de
+   guardia, así que no hay rotación que decidir (pregunta abierta 4 del PRD).
+4. Provocar una caída de prueba y **comprobar que el aviso llega**. El criterio
+   de aceptación es que llegue, no que el monitor esté configurado.
+5. Escribir aquí el nombre del servicio y el enlace a su panel.
+
+### La ventana de mantenimiento
+
+El mantenimiento planificado cae **fuera de las horas de entrenamiento del
+club** y se anuncia con 48 horas (NFR-003). Las horas, en zona
+`Australia/Melbourne`:
+
+| Día    | Horario     |
+| ------ | ----------- |
+| Martes | 18:00–22:00 |
+| Jueves | 18:00–22:00 |
+| Sábado | 08:00–13:00 |
+
+Esta tabla es una copia de cortesía. La fuente es
+`src/lib/training-hours.ts`, que las declara como dato y responde si un
+instante cae dentro de un entrenamiento. Si alguna vez discrepan, manda el
+módulo: tiene tests y la tabla no.
+
+La zona importa y es la trampa de esta sección. Melbourne alterna AEST (UTC+10)
+y AEDT (UTC+11), así que un cálculo con desfase fijo mueve el entrenamiento de
+las 18:00 a las 17:00 media temporada. Por eso el módulo convierte por nombre de
+zona y nunca por aritmética de horas.
+
 ## Credenciales
 
 Ninguna clave de ningún proyecto vive en este documento ni en ningún otro
@@ -285,7 +356,8 @@ fallo, porque ahí son media cobertura de la comprobación.
 Free pausa un proyecto tras una semana sin actividad. Producción va a estar
 vacía y sin tráfico hasta que E2 traiga autenticación, así que es probable
 encontrarla pausada y tener que restaurarla desde el dashboard. Deja de ocurrir
-cuando el monitoreo del issue #95 empiece a consultar `/api/v1/health`.
+cuando el monitoreo descrito arriba empiece a consultar `/api/v1/health` cada
+cinco minutos, y esa es una segunda razón para darlo de alta.
 
 ## Catálogo de variables (issue #90)
 

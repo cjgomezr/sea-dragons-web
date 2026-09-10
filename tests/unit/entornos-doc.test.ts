@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { CLUB_TIME_ZONE, TRAINING_SESSIONS } from "@/lib/training-hours";
 import {
   environmentsFor,
   readEnvironmentManifest,
@@ -174,5 +175,48 @@ function expectedRotationRows(): RotationRow[] {
 describe("rotación de credenciales en docs/entornos.md", () => {
   it("enumera un sitio por cada entorno en el que vive cada variable secreta", () => {
     expect(readRotationRows()).toEqual(expectedRotationRows());
+  });
+});
+
+/** Módulo que fija las horas de entrenamiento. El documento tiene que mandar
+ * ahí, o dentro de un año habrá dos verdades y nadie sabrá cuál rige. */
+const TRAINING_HOURS_MODULE = "src/lib/training-hours.ts";
+
+function formatClubHour(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+describe("docs/entornos.md · disponibilidad y mantenimiento (issue #95)", () => {
+  it("dice dónde se consulta la disponibilidad mensual que exige NFR-003", () => {
+    const doc = readEntornosDoc();
+
+    expect(doc).toContain("NFR-003");
+    expect(doc).toContain("/api/v1/health");
+  });
+
+  // "Avisar cuando esté caído" no es una regla: no dice cada cuánto se mira ni
+  // cuánto se aguanta antes de despertar a alguien. Sin esos dos números el
+  // monitoreo no se puede configurar ni discutir.
+  it("fija por escrito cada cuánto se comprueba y cuánto se aguanta antes de avisar", () => {
+    const doc = readEntornosDoc();
+
+    expect(doc).toContain("cada 5 minutos");
+    expect(doc).toContain("10 minutos");
+  });
+
+  it("escribe las horas de entrenamiento que la ventana de mantenimiento debe evitar", () => {
+    const doc = readEntornosDoc();
+
+    expect(doc).toContain(CLUB_TIME_ZONE);
+    for (const session of TRAINING_SESSIONS) {
+      const range = `${formatClubHour(session.startHour)}–${formatClubHour(session.endHour)}`;
+      expect(doc, `falta el tramo ${range} en docs/entornos.md`).toContain(
+        range,
+      );
+    }
+  });
+
+  it("manda al módulo que fija esas horas, para que documento y código no diverjan", () => {
+    expect(readEntornosDoc()).toContain(TRAINING_HOURS_MODULE);
   });
 });
