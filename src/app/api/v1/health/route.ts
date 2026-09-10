@@ -37,10 +37,10 @@ async function probeDatabase(): Promise<DatabaseProbeResult> {
 
 const getHealth = createApiRoute<HealthReport>({
   handler: async () => {
-    // El ref se lee del entorno por su cuenta, no de la config que usa la
-    // sonda: con la URL puesta y la llave anónima ausente, la config es
-    // `missing` y no trae URL, pero el ref se sabe igual y decirlo es justo lo
-    // que hace falta para diagnosticar ese caso.
+    // El ref se parsea del entorno directamente y no de la config de la
+    // sonda, porque saber a qué proyecto apunta este entorno no depende de
+    // tener la llave anónima. En una respuesta 503 no sale: el cuerpo de error
+    // de la API v1 es solo `{ code, message }` (ver `docs/entornos.md`).
     const report = buildHealthReport({
       probe: await probeDatabase(),
       supabaseProjectRef: readSupabaseProjectRef(process.env),

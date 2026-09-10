@@ -13,23 +13,27 @@ const JWT_PATTERN = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/;
 const JWT_LOOKING_ANON_KEY =
   "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.ZmlybWE";
 
-function mockReachableDatabase(): void {
+function mockDatabaseAnswering(error: { message: string } | null): void {
   vi.doMock("@supabase/supabase-js", () => ({
     createClient: () => ({
       from: () => ({
         select: () => ({
-          limit: async () => ({ error: null }),
+          limit: async () => ({ error }),
         }),
       }),
     }),
   }));
 }
 
-function configureHealthyEnvironment(): void {
+function configureSupabaseEnvironment(): void {
   process.env.NEXT_PUBLIC_SUPABASE_URL = `https://${PROJECT_REF}.supabase.co`;
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = JWT_LOOKING_ANON_KEY;
   process.env.VERCEL_GIT_COMMIT_SHA = COMMIT_SHA;
-  mockReachableDatabase();
+}
+
+function configureHealthyEnvironment(): void {
+  configureSupabaseEnvironment();
+  mockDatabaseAnswering(null);
 }
 
 async function getHealth(
@@ -95,6 +99,21 @@ describe("health", () => {
     for (const value of secretValues) {
       expect(rawBody).not.toContain(value);
     }
+    expect(rawBody).not.toContain(JWT_LOOKING_ANON_KEY);
+    expect(rawBody).not.toMatch(JWT_PATTERN);
+  });
+
+  // La rama de error propaga el mensaje del driver, así que es la que podría
+  // arrastrar algo sin querer. Este test fija que el endpoint no le añade
+  // ningún valor del entorno al cuerpo de error.
+  it("tampoco filtra nada cuando la base rechaza la sonda y responde 503", async () => {
+    configureSupabaseEnvironment();
+    mockDatabaseAnswering({ message: 'relation "clubs" does not exist' });
+
+    const response = await getHealth();
+    const rawBody = await response.text();
+
+    expect(response.status).toBe(503);
     expect(rawBody).not.toContain(JWT_LOOKING_ANON_KEY);
     expect(rawBody).not.toMatch(JWT_PATTERN);
   });
