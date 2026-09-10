@@ -7,12 +7,24 @@ export type HealthReport = {
   readonly status: "ok" | "degraded";
   readonly database: "ok" | "unconfigured" | "error";
   readonly detail: string;
+  /** Ref del proyecto de Supabase configurado, público por naturaleza. */
+  readonly supabaseProjectRef: string | null;
+  /** Sha del commit desplegado, para saber qué versión está sirviendo. */
+  readonly commit: string | null;
 };
+
+type HealthReportInput = {
+  readonly probe: DatabaseProbeResult;
+  readonly supabaseProjectRef: string | null;
+  readonly commit: string | null;
+};
+
+type DatabaseHealth = Pick<HealthReport, "status" | "database" | "detail">;
 
 const DEGRADED_HTTP_STATUS = 503;
 const HEALTHY_HTTP_STATUS = 200;
 
-export function buildHealthReport(probe: DatabaseProbeResult): HealthReport {
+function describeDatabase(probe: DatabaseProbeResult): DatabaseHealth {
   switch (probe.kind) {
     case "reachable":
       return { status: "ok", database: "ok", detail: "database reachable" };
@@ -25,6 +37,14 @@ export function buildHealthReport(probe: DatabaseProbeResult): HealthReport {
     case "unreachable":
       return { status: "degraded", database: "error", detail: probe.reason };
   }
+}
+
+export function buildHealthReport(input: HealthReportInput): HealthReport {
+  return {
+    ...describeDatabase(input.probe),
+    supabaseProjectRef: input.supabaseProjectRef,
+    commit: input.commit,
+  };
 }
 
 export function healthHttpStatus(report: HealthReport): number {

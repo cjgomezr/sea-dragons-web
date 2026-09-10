@@ -6,7 +6,11 @@ import {
   type HealthReport,
   buildHealthReport,
 } from "@/lib/health";
-import { readSupabaseConfig } from "@/lib/supabase/config";
+import { readDeploymentCommit } from "@/lib/deployment";
+import {
+  readSupabaseConfig,
+  readSupabaseProjectRef,
+} from "@/lib/supabase/config";
 
 // The probe must reflect the database right now, never a cached answer.
 export const dynamic = "force-dynamic";
@@ -33,7 +37,11 @@ async function probeDatabase(): Promise<DatabaseProbeResult> {
 
 const getHealth = createApiRoute<HealthReport>({
   handler: async () => {
-    const report = buildHealthReport(await probeDatabase());
+    const report = buildHealthReport({
+      probe: await probeDatabase(),
+      supabaseProjectRef: readSupabaseProjectRef(process.env),
+      commit: readDeploymentCommit(process.env),
+    });
     if (report.status === "degraded") {
       throw new ApiError("service_unavailable", report.detail);
     }

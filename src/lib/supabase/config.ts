@@ -40,6 +40,32 @@ export function readSupabaseConfig(env: Environment): SupabaseConfig {
   return { kind: "configured", url, anonKey };
 }
 
+const SUPABASE_PROJECT_HOSTNAME_SUFFIX = ".supabase.co";
+
+function parseProjectRef(url: string): string | null {
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    return null;
+  }
+
+  if (!hostname.endsWith(SUPABASE_PROJECT_HOSTNAME_SUFFIX)) {
+    return null;
+  }
+  const ref = hostname.slice(0, -SUPABASE_PROJECT_HOSTNAME_SUFFIX.length);
+  return ref ? ref : null;
+}
+
+/** Ref del proyecto de Supabase al que apunta este entorno, o `null` si la URL
+ * no permite deducirlo. El ref es público: viaja en el host de cada petición
+ * que hace el navegador, así que puede salir en una respuesta de la API. Las
+ * claves no. */
+export function readSupabaseProjectRef(env: Environment): string | null {
+  const url = readRequired(env, SUPABASE_URL_ENV);
+  return url === null ? null : parseProjectRef(url);
+}
+
 /** Config del cliente que evita RLS. Solo se usa en el servidor, nunca en un
  * componente de cliente: ver `recordAuditEvent` en `src/lib/audit/audit-log.ts`. */
 export function readSupabaseServiceRoleConfig(

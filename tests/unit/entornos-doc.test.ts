@@ -77,6 +77,17 @@ describe("docs/entornos.md", () => {
     },
   );
 
+  it("nombra el plan Hobby de Vercel y su límite de uso no comercial", () => {
+    const doc = readEntornosDoc();
+
+    // Hobby prohíbe el uso comercial. E12 cobra cuotas por Stripe, así que
+    // quien llegue a ese epic tiene que encontrar la advertencia aquí y no en
+    // los términos de servicio de Vercel después de cobrarle a alguien.
+    expect(doc).toContain("Hobby");
+    expect(doc).toMatch(/no comercial/i);
+    expect(doc).toContain("E12");
+  });
+
   it("documenta el entorno de cada variable declarada en .env.example", () => {
     const doc = readEntornosDoc();
     const names = readEnvExampleNames();

@@ -30,6 +30,12 @@ describe(".env.example", () => {
     );
   });
 
+  it("no exige documentar las variables que inyecta la plataforma en vez de una persona", () => {
+    // Ver el porqué de cada exclusión en `tests/support/env-vars.ts`. Sin este
+    // test, ampliar la lista de exclusiones no se notaría en ninguna corrida.
+    expect([...findEnvVarsReadByCode()]).not.toContain("VERCEL_GIT_COMMIT_SHA");
+  });
+
   it("falla nombrando la variable que falta cuando se añade una lectura nueva sin documentarla", () => {
     const used = new Set(["NEXT_PUBLIC_SUPABASE_URL", "UNA_VARIABLE_NUEVA"]);
     const documented = new Set(["NEXT_PUBLIC_SUPABASE_URL"]);

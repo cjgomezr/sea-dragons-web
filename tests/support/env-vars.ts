@@ -10,7 +10,14 @@ const SOURCE_FILE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
 // subprocesos en tests: no es configuración de la aplicación. Documentarla
 // invitaría a poner un valor de PATH en .env.local, y eso rompería el shell
 // de quien lo intentara.
-const IGNORED_ENV_VARS = new Set(["PATH"]);
+//
+// VERCEL_GIT_COMMIT_SHA es el mismo caso: la inyecta el build de Vercel, no
+// una persona. Ponerla en `.env.local` haría que `/api/v1/health` afirmara en
+// local que sirve un commit que no es el que hay en el disco, que es
+// exactamente la mentira que el endpoint existe para no contar. Donde sí se
+// documenta, porque un humano necesita saber que existe y quién la pone, es en
+// `docs/entornos.md`.
+const IGNORED_ENV_VARS = new Set(["PATH", "VERCEL_GIT_COMMIT_SHA"]);
 
 /** Variables que nunca pueden llevar el prefijo `NEXT_PUBLIC_`: exponerlas al
  * navegador filtraría una credencial de servidor. Cuando E12 añada las de
