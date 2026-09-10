@@ -37,6 +37,10 @@ async function probeDatabase(): Promise<DatabaseProbeResult> {
 
 const getHealth = createApiRoute<HealthReport>({
   handler: async () => {
+    // El ref se lee del entorno por su cuenta, no de la config que usa la
+    // sonda: con la URL puesta y la llave anónima ausente, la config es
+    // `missing` y no trae URL, pero el ref se sabe igual y decirlo es justo lo
+    // que hace falta para diagnosticar ese caso.
     const report = buildHealthReport({
       probe: await probeDatabase(),
       supabaseProjectRef: readSupabaseProjectRef(process.env),

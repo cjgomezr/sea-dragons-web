@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 const VERCEL_CONFIG_PATH = "vercel.json";
 
@@ -8,13 +9,14 @@ const VERCEL_CONFIG_PATH = "vercel.json";
  * Ver `docs/prd/e16a-entornos-y-despliegue.md`, RF-2. */
 const SYDNEY_FUNCTION_REGION = "syd1";
 
-type VercelConfig = {
-  readonly regions?: readonly string[];
-  readonly framework?: string;
-};
+const vercelConfigSchema = z.object({
+  regions: z.array(z.string()),
+  framework: z.string(),
+});
 
-function readVercelConfig(): VercelConfig {
-  return JSON.parse(readFileSync(VERCEL_CONFIG_PATH, "utf-8")) as VercelConfig;
+function readVercelConfig(): z.infer<typeof vercelConfigSchema> {
+  const raw: unknown = JSON.parse(readFileSync(VERCEL_CONFIG_PATH, "utf-8"));
+  return vercelConfigSchema.parse(raw);
 }
 
 describe("configuración de despliegue", () => {

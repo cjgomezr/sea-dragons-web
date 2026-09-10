@@ -21,9 +21,6 @@ type HealthReportInput = {
 
 type DatabaseHealth = Pick<HealthReport, "status" | "database" | "detail">;
 
-const DEGRADED_HTTP_STATUS = 503;
-const HEALTHY_HTTP_STATUS = 200;
-
 function describeDatabase(probe: DatabaseProbeResult): DatabaseHealth {
   switch (probe.kind) {
     case "reachable":
@@ -45,8 +42,4 @@ export function buildHealthReport(input: HealthReportInput): HealthReport {
     supabaseProjectRef: input.supabaseProjectRef,
     commit: input.commit,
   };
-}
-
-export function healthHttpStatus(report: HealthReport): number {
-  return report.status === "ok" ? HEALTHY_HTTP_STATUS : DEGRADED_HTTP_STATUS;
 }

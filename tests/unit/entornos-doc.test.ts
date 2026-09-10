@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { readEnvExampleNames } from "../support/env-vars";
+import {
+  PLATFORM_INJECTED_ENV_VARS,
+  readEnvExampleNames,
+} from "../support/env-vars";
 
 const ENTORNOS_DOC_PATH = "docs/entornos.md";
 
@@ -86,6 +89,17 @@ describe("docs/entornos.md", () => {
     expect(doc).toContain("Hobby");
     expect(doc).toMatch(/no comercial/i);
     expect(doc).toContain("E12");
+  });
+
+  // Estas no están en `.env.example` a propósito (ver `env-vars.ts`), así que
+  // este documento es el único sitio donde un humano puede enterarse de que
+  // existen. Sin este test, borrar su párrafo dejaría la suite en verde.
+  it("documenta las variables que inyecta la plataforma y no viven en .env.example", () => {
+    const doc = readEntornosDoc();
+
+    for (const name of PLATFORM_INJECTED_ENV_VARS) {
+      expect(doc).toContain(name);
+    }
   });
 
   it("documenta el entorno de cada variable declarada en .env.example", () => {

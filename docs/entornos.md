@@ -59,6 +59,20 @@ PR.
   ponga, `GET /api/v1/health` responde 503 en producción diciendo qué falta, que
   es el comportamiento correcto y no un despliegue roto.
 
+### Qué contesta `GET /api/v1/health`
+
+Sano, responde 200 con `supabaseProjectRef` (el ref del proyecto de Supabase al
+que apunta ese entorno) y `commit` (el sha que está sirviendo, tomado de
+`VERCEL_GIT_COMMIT_SHA`). Los dos son públicos; ninguna clave sale en la
+respuesta, y `tests/unit/api/health-route.test.ts` lo comprueba.
+
+Enfermo, responde 503 con la forma de error de la API v1
+(`{ error: { code, message } }`), que **no** lleva el ref ni el sha. Es
+deliberado: el cuerpo de error es el mismo para toda la API y este endpoint no
+lo rompe por comodidad de un consumidor. Durante una caída, la versión
+desplegada se consulta en el panel de Vercel (Deployments), y el monitoreo del
+#95 solo necesita distinguir 200 de 503.
+
 ### El plan es Hobby, y Hobby es de uso no comercial
 
 El proyecto está en el plan **Hobby**, que sus términos limitan a uso **no

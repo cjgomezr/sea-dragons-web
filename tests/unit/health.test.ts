@@ -1,23 +1,10 @@
 import { describe, expect, it } from "vitest";
-import {
-  type HealthReport,
-  buildHealthReport,
-  healthHttpStatus,
-} from "@/lib/health";
+import { buildHealthReport } from "@/lib/health";
 
 const DEPLOYMENT = {
   supabaseProjectRef: "ejemplo123",
   commit: "9f1c0de",
 } as const;
-
-function reportWith(status: HealthReport["status"]): HealthReport {
-  return {
-    status,
-    database: status === "ok" ? "ok" : "unconfigured",
-    detail: "",
-    ...DEPLOYMENT,
-  };
-}
 
 describe("buildHealthReport", () => {
   it("reports ok when the database answers", () => {
@@ -76,15 +63,5 @@ describe("buildHealthReport", () => {
 
     expect(report.supabaseProjectRef).toBeNull();
     expect(report.commit).toBeNull();
-  });
-});
-
-describe("healthHttpStatus", () => {
-  it("answers 200 for a healthy report", () => {
-    expect(healthHttpStatus(reportWith("ok"))).toBe(200);
-  });
-
-  it("answers 503 for a degraded report", () => {
-    expect(healthHttpStatus(reportWith("degraded"))).toBe(503);
   });
 });

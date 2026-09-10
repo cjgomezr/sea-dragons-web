@@ -6,18 +6,28 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const SCANNED_DIRECTORIES = ["src", "scripts", "tests"] as const;
 const SOURCE_FILE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
 
+/** Variables que el código lee pero que **no** van a `.env.example`, porque no
+ * las escribe una persona: las inyecta la plataforma que despliega. Ponerlas en
+ * `.env.local` no configuraría nada, mentiría.
+ *
+ * `VERCEL_GIT_COMMIT_SHA` es el caso vivo: con un valor a mano en local,
+ * `/api/v1/health` afirmaría servir un commit que no es el que hay en el disco,
+ * que es exactamente la mentira que el endpoint existe para no contar.
+ *
+ * Salirse de `.env.example` no es salirse de la documentación:
+ * `tests/unit/entornos-doc.test.ts` exige que cada nombre de esta lista siga
+ * explicado en `docs/entornos.md`. */
+export const PLATFORM_INJECTED_ENV_VARS = ["VERCEL_GIT_COMMIT_SHA"] as const;
+
 // process.env.PATH sólo extiende el PATH heredado del proceso al lanzar
 // subprocesos en tests: no es configuración de la aplicación. Documentarla
 // invitaría a poner un valor de PATH en .env.local, y eso rompería el shell
-// de quien lo intentara.
-//
-// VERCEL_GIT_COMMIT_SHA es el mismo caso: la inyecta el build de Vercel, no
-// una persona. Ponerla en `.env.local` haría que `/api/v1/health` afirmara en
-// local que sirve un commit que no es el que hay en el disco, que es
-// exactamente la mentira que el endpoint existe para no contar. Donde sí se
-// documenta, porque un humano necesita saber que existe y quién la pone, es en
-// `docs/entornos.md`.
-const IGNORED_ENV_VARS = new Set(["PATH", "VERCEL_GIT_COMMIT_SHA"]);
+// de quien lo intentara. No entra en PLATFORM_INJECTED_ENV_VARS porque no la
+// inyecta ningún despliegue: no es de esta aplicación en absoluto.
+export const IGNORED_ENV_VARS = new Set<string>([
+  "PATH",
+  ...PLATFORM_INJECTED_ENV_VARS,
+]);
 
 /** Variables que nunca pueden llevar el prefijo `NEXT_PUBLIC_`: exponerlas al
  * navegador filtraría una credencial de servidor. Cuando E12 añada las de
