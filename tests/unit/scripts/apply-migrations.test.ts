@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -16,6 +23,7 @@ const CHECK_SCHEMA_SNAPSHOT = path.join(
   REPO_ROOT,
   "scripts/check-schema-snapshot.sh",
 );
+const EXPECTED_SCHEMA = path.join(REPO_ROOT, "supabase/ci/schema-expected.txt");
 
 /**
  * Conexión de administración desde la que estos tests crean y destruyen bases
@@ -330,6 +338,37 @@ async function expectPsqlSuccess(
   return result.stdout.replace(/\r\n/g, "\n").trim();
 }
 
+/**
+ * Copia del comprobador de esquema en un árbol de usar y tirar. `--write`
+ * sobrescribe el archivo esperado que hay junto al script, así que probarlo
+ * sobre el repositorio pondría en juego un archivo versionado: si el guardia
+ * fallara, el test dejaría el repositorio tocado además de en rojo.
+ */
+async function sandboxedChecker(): Promise<{
+  script: string;
+  expectedSchema: string;
+}> {
+  const root = await mkdtemp(path.join(tmpdir(), "comprobador-"));
+  temporaryDirectories.push(root);
+  await mkdir(path.join(root, "scripts"));
+  await mkdir(path.join(root, "supabase", "ci"), { recursive: true });
+
+  const script = path.join(root, "scripts", "check-schema-snapshot.sh");
+  const expectedSchema = path.join(
+    root,
+    "supabase",
+    "ci",
+    "schema-expected.txt",
+  );
+  await copyFile(CHECK_SCHEMA_SNAPSHOT, script);
+  await copyFile(
+    SCHEMA_SNAPSHOT_SQL,
+    path.join(root, "supabase", "ci", "schema-snapshot.sql"),
+  );
+  await copyFile(EXPECTED_SCHEMA, expectedSchema);
+  return { script, expectedSchema };
+}
+
 const createdDatabases: string[] = [];
 
 async function freshDatabase(): Promise<TemporaryDatabase> {
@@ -401,10 +440,13 @@ describeConPostgres(
       // Sin esto, la comparación de arriba pasaría igual siendo incapaz de ver
       // una diferencia.
       const database = await freshDatabase();
-      await applyMigrations([], {
+      const aplicadas = await applyMigrations([], {
         ...process.env,
         DATABASE_URL: database.url,
       });
+      // Si el histórico no se hubiera aplicado, la diferencia se notaría igual
+      // y el test pasaría sin haber probado lo que dice probar.
+      expect(aplicadas.code, aplicadas.stderr).toBe(0);
 
       await database.query("create table public.intrusa (id int primary key)");
 
@@ -437,6 +479,43 @@ describeConPostgres(
       expect(await database.query("select count(*) from public.clubs")).toBe(
         "1",
       );
+    });
+
+    it("--write regenera una descripción con la que la comparación vuelve a pasar", async () => {
+      const database = await freshDatabase();
+      const entorno = { ...process.env, DATABASE_URL: database.url };
+      await applyMigrations([], entorno);
+      await database.query("create table public.nueva (id int primary key)");
+      const { script } = await sandboxedChecker();
+
+      const escritura = await run("bash", [toBashPath(script), "--write"], {
+        ...process.env,
+        DATABASE_URL: database.url,
+      });
+
+      expect(escritura.code, escritura.stderr).toBe(0);
+      const comparacion = await run("bash", [toBashPath(script)], {
+        ...process.env,
+        DATABASE_URL: database.url,
+      });
+      expect(comparacion.code, comparacion.stderr).toBe(0);
+    });
+
+    it("--write se niega a guardar el esquema de una base sin migraciones", async () => {
+      // Guardar una descripción vacía dejaría la comparación pasando contra
+      // cualquier base vacía a partir de ese momento.
+      const database = await freshDatabase();
+      const { script, expectedSchema } = await sandboxedChecker();
+      const antes = await readFile(expectedSchema, "utf8");
+
+      const escritura = await run("bash", [toBashPath(script), "--write"], {
+        ...process.env,
+        DATABASE_URL: database.url,
+      });
+
+      expect(escritura.code).toBeGreaterThan(0);
+      expect(escritura.stderr).toMatch(/ningún objeto/i);
+      expect(await readFile(expectedSchema, "utf8")).toBe(antes);
     });
 
     it("se detiene en la primera migración rota y no aplica las siguientes", async () => {

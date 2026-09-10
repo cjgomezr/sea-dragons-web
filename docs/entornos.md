@@ -92,6 +92,15 @@ bash scripts/apply-migrations.sh
 bash scripts/check-schema-snapshot.sh
 ```
 
+Dos avisos para quien regenere el archivo desde su máquina. Hazlo contra un
+Postgres 17, la misma versión mayor que usa el job: la descripción sale del
+catálogo, pero el texto de un `CREATE INDEX` o de una restricción ha cambiado de
+formato entre versiones mayores, y regenerar con un 16 deja el check rojo sin
+que nadie haya tocado el esquema. Y conéctate con un superusuario llamado
+`postgres`: las líneas `grant ... postgres ...` llevan el nombre del rol dueño,
+así que con otro nombre (Homebrew crea el tuyo) verás siete líneas de diferencia
+que no son un cambio de esquema.
+
 `supabase/ci/roles.sql` crea los roles de la API (`anon`, `authenticated`,
 `service_role`) que Supabase trae de fábrica y un Postgres pelado no tiene; sin
 ellos las migraciones fallan por el motivo equivocado. Hoy alcanza porque

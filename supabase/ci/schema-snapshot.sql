@@ -71,4 +71,9 @@ with objetos as (
    where n.nspname = 'public'
      and not t.tgisinternal
 )
-select descripcion from objetos order by 1;
+-- `collate "C"` por el mismo motivo que el LC_ALL=C del aplicador: la colación
+-- por defecto es la del cluster, así que sin fijarla el orden de estas líneas
+-- lo decidiría el locale de quien las generó. Dos personas con locales
+-- distintos se pisarían el archivo a turnos, y el check saldría rojo por eso y
+-- no por un cambio de esquema.
+select descripcion from objetos order by descripcion collate "C";

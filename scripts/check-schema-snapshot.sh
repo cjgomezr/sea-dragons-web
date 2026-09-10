@@ -8,9 +8,11 @@
 # mano por MCP aplica limpia en una base vacía y deja otro esquema.
 #
 # La descripción se lee del catálogo con `supabase/ci/schema-snapshot.sql`, no
-# con pg_dump: pg_dump se niega a hablar con un servidor más nuevo que él y el
-# texto cambia entre versiones, así que un archivo commiteado generado con él
-# sería un check rojo permanente según quién lo regenerara.
+# con pg_dump: pg_dump se niega a hablar con un servidor más nuevo que él, y el
+# runner no trae necesariamente el cliente de la versión de la imagen. Eso no
+# hace al catálogo inmune a la versión (`pg_get_constraintdef` ha cambiado de
+# formato entre mayores), así que el archivo se regenera contra la misma mayor
+# que usa el job.
 #
 # Usage:
 #   DATABASE_URL=postgresql://... scripts/check-schema-snapshot.sh
@@ -98,6 +100,12 @@ main() {
   printf '%s\n' "$description" > "$actual_file"
 
   if [ "$write" = true ]; then
+    # Una base sin migraciones describe un esquema vacío, y guardarlo dejaría
+    # la comparación pasando contra cualquier base vacía para siempre.
+    if [ -z "$description" ]; then
+      echo "error: la base no tiene ningún objeto en public. ¿Aplicaste las migraciones?" >&2
+      return 1
+    fi
     cp "$actual_file" "$EXPECTED_SCHEMA"
     echo "==> $EXPECTED_SCHEMA regenerado" >&2
     return 0
