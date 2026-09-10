@@ -1,0 +1,144 @@
+{
+  "environments": {
+    "local": {
+      "where": ".env.local, en la máquina de quien desarrolla, fuera de git",
+      "allowsProductionSources": false,
+      "allowsWriteCredentials": true
+    },
+    "preview": {
+      "where": "Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Preview",
+      "allowsProductionSources": false,
+      "allowsWriteCredentials": false
+    },
+    "production": {
+      "where": "Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Production",
+      "allowsProductionSources": true,
+      "allowsWriteCredentials": true
+    },
+    "ci": {
+      "where": "GitHub, repositorio sea-dragons-web, Settings, Secrets and variables, Actions",
+      "allowsProductionSources": false,
+      "allowsWriteCredentials": false
+    }
+  },
+  "sources": {
+    "seadragons-dev": { "production": false },
+    "seadragons-prod": { "production": true },
+    "supabase-account": { "production": false },
+    "developer": { "production": false },
+    "platform": { "production": false },
+    "test-harness": { "production": false }
+  },
+  "variables": {
+    "NEXT_PUBLIC_SUPABASE_URL": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": "seadragons-dev",
+        "preview": "seadragons-dev",
+        "production": "seadragons-prod",
+        "ci": null
+      }
+    },
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": "seadragons-dev",
+        "preview": "seadragons-dev",
+        "production": "seadragons-prod",
+        "ci": null
+      }
+    },
+    "SUPABASE_SERVICE_ROLE_KEY": {
+      "secret": true,
+      "writeCredential": true,
+      "scopes": {
+        "local": "seadragons-dev",
+        "preview": null,
+        "production": "seadragons-prod",
+        "ci": null
+      }
+    },
+    "SUPABASE_ACCESS_TOKEN": {
+      "secret": true,
+      "writeCredential": true,
+      "scopes": {
+        "local": "supabase-account",
+        "preview": null,
+        "production": null,
+        "ci": null
+      }
+    },
+    "APP_URL": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": "developer",
+        "preview": null,
+        "production": null,
+        "ci": null
+      }
+    },
+    "VERCEL_GIT_COMMIT_SHA": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": null,
+        "preview": "platform",
+        "production": "platform",
+        "ci": null
+      }
+    },
+    "CI": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": null,
+        "preview": "platform",
+        "production": "platform",
+        "ci": "platform"
+      }
+    },
+    "FABRICA_REUSE_SERVER": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": "developer",
+        "preview": null,
+        "production": null,
+        "ci": null
+      }
+    },
+    "START_DELAY_MS": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": "test-harness",
+        "preview": null,
+        "production": null,
+        "ci": null
+      }
+    },
+    "MIGRATIONS_TEST_DATABASE_URL": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": "developer",
+        "preview": null,
+        "production": null,
+        "ci": "platform"
+      }
+    },
+    "REQUIRE_MIGRATIONS_POSTGRES": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": null,
+        "preview": null,
+        "production": null,
+        "ci": "platform"
+      }
+    }
+  }
+}
