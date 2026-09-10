@@ -70,16 +70,15 @@ async function getHealth(
   return GET(new NextRequest(HEALTH_URL, { headers }));
 }
 
-/** El temporizador de la sonda se arma unos microtasks después de entrar al
- * handler, así que el reloj falso se instala con el módulo ya importado y se
- * avanza en dos tramos: el primero deja que el temporizador exista, el segundo
- * lo vence. */
+/** El reloj falso se instala con el módulo ya importado: la importación
+ * dinámica no es un temporizador y con el reloj congelado no habría forma de
+ * empujarla. Con el módulo dentro, `advanceTimersByTimeAsync` sí recoge el
+ * temporizador que la sonda arma unos microtasks después. */
 async function getHealthLettingTheProbeTimeOut(): Promise<Response> {
   const { GET } = await import("@/app/api/v1/health/route");
   vi.useFakeTimers();
   try {
     const pending = GET(new NextRequest(HEALTH_URL));
-    await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(DATABASE_PROBE_TIMEOUT_MS);
     return await pending;
   } finally {
@@ -90,6 +89,10 @@ async function getHealthLettingTheProbeTimeOut(): Promise<Response> {
 describe("health", () => {
   beforeEach(() => {
     vi.resetModules();
+    // `vi.doMock` sobrevive al test que lo registró. Sin esto, un test que
+    // quiere el driver de verdad hereda el doble del test anterior y pasa sin
+    // haber ejercitado nada.
+    vi.doUnmock("@supabase/supabase-js");
     process.env = { ...ORIGINAL_ENV };
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -217,6 +220,21 @@ describe("health", () => {
     };
     expect(body.error.code).toBe("service_unavailable");
     expect(body.error.message).toContain("fetch failed");
+  });
+
+  // `readSupabaseConfig` solo comprueba que la variable esté puesta, no que sea
+  // una URL, y `createClient` lanza con una mal pegada. Ese es un error de
+  // configuración de producción, justo lo que este endpoint existe para
+  // delatar, así que tiene que salir por 503 y no por un 500 mudo.
+  it("responde 503, no 500, cuando la URL de Supabase está mal escrita", async () => {
+    configureSupabaseEnvironment();
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "no-es-una-url";
+
+    const response = await getHealth();
+
+    expect(response.status).toBe(503);
+    const body = (await response.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("service_unavailable");
   });
 
   it("responde 405 con la forma de error para un método no soportado", async () => {

@@ -187,11 +187,20 @@ function formatClubHour(hour: number): string {
 }
 
 describe("docs/entornos.md · disponibilidad y mantenimiento (issue #95)", () => {
+  // "NFR-003" y "/api/v1/health" ya salían en otras secciones, así que
+  // buscarlos sueltos dejaría pasar el borrado entero de esta. El test se
+  // agarra al encabezado, que es lo que responde la pregunta.
   it("dice dónde se consulta la disponibilidad mensual que exige NFR-003", () => {
     const doc = readEntornosDoc();
 
+    expect(doc).toContain("### Dónde se consulta la disponibilidad del mes");
     expect(doc).toContain("NFR-003");
-    expect(doc).toContain("/api/v1/health");
+  });
+
+  it("nombra la URL concreta que el monitoreo tiene que vigilar", () => {
+    expect(readEntornosDoc()).toContain(
+      "https://victoria-seadragons.vercel.app/api/v1/health",
+    );
   });
 
   // "Avisar cuando esté caído" no es una regla: no dice cada cuánto se mira ni

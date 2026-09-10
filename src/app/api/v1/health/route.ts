@@ -29,15 +29,17 @@ async function probeDatabase(): Promise<DatabaseProbeResult> {
     return { kind: "unconfigured", missingKeys: config.missingKeys };
   }
 
-  const supabase = createClient(config.url, config.anonKey);
-  // Nada de `head: true`: PostgREST responde 404 sin cuerpo y supabase-js lo
-  // traduce a `{ status: 204, error: null }`, así que una base sin la tabla se
-  // reportaba como sana. La sonda pide un cuerpo para poder leer el error.
-  //
-  // El try existe porque supabase-js devuelve `{ error }` pero la capa de red
-  // por debajo lanza (DNS, TLS, socket cortado). Dejar escapar esa excepción
-  // la convertiría en un 500 genérico, y una base inalcanzable es un 503.
+  // El try abarca también la construcción del cliente: `readSupabaseConfig`
+  // comprueba que la variable esté puesta, no que sea una URL, y `createClient`
+  // lanza con una mal pegada. Dentro, supabase-js devuelve `{ error }`, pero la
+  // capa de red por debajo lanza (DNS, TLS, socket cortado). Cualquiera de esas
+  // excepciones sería un 500 mudo, y lo que hay debajo es una base inalcanzable
+  // o un entorno mal configurado: eso se cuenta con un 503 que diga qué pasó.
   try {
+    const supabase = createClient(config.url, config.anonKey);
+    // Nada de `head: true`: PostgREST responde 404 sin cuerpo y supabase-js lo
+    // traduce a `{ status: 204, error: null }`, así que una base sin la tabla
+    // se reportaba como sana. La sonda pide un cuerpo para poder leer el error.
     const { error } = await supabase.from(PROBED_TABLE).select("id").limit(1);
     if (error) {
       return { kind: "unreachable", reason: error.message };

@@ -33,9 +33,17 @@ const CLUB_TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
 });
 
 type ClubLocalTime = {
-  readonly weekday: string;
+  readonly weekday: TrainingWeekday | null;
   readonly minuteOfDay: number;
 };
+
+const TRAINING_WEEKDAYS: readonly TrainingWeekday[] = TRAINING_SESSIONS.map(
+  (session) => session.weekday,
+);
+
+function toTrainingWeekday(weekday: string): TrainingWeekday | null {
+  return TRAINING_WEEKDAYS.find((known) => known === weekday) ?? null;
+}
 
 function readPart(
   parts: readonly Intl.DateTimeFormatPart[],
@@ -50,13 +58,27 @@ function readPart(
   return part.value;
 }
 
-function readClubLocalTime(instant: Date): ClubLocalTime {
-  const parts = CLUB_TIME_FORMAT.formatToParts(instant);
+function readClubMinuteOfDay(
+  parts: readonly Intl.DateTimeFormatPart[],
+): number {
   const hour = Number(readPart(parts, "hour"));
   const minute = Number(readPart(parts, "minute"));
+  // Un NaN aquí haría que toda comparación diera falso, y "falso" significa
+  // "no hay entrenamiento": el fallo se abriría hacia el lado que programa un
+  // mantenimiento en mitad de una sesión. Mejor romper ruidosamente.
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) {
+    throw new Error(
+      `Intl devolvió una hora no numérica para la zona ${CLUB_TIME_ZONE}`,
+    );
+  }
+  return hour * MINUTES_PER_HOUR + minute;
+}
+
+function readClubLocalTime(instant: Date): ClubLocalTime {
+  const parts = CLUB_TIME_FORMAT.formatToParts(instant);
   return {
-    weekday: readPart(parts, "weekday").toLowerCase(),
-    minuteOfDay: hour * MINUTES_PER_HOUR + minute,
+    weekday: toTrainingWeekday(readPart(parts, "weekday").toLowerCase()),
+    minuteOfDay: readClubMinuteOfDay(parts),
   };
 }
 
