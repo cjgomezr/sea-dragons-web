@@ -161,11 +161,21 @@ la de desarrollo para que "avance".
 
 ### La llave de servicio no sale del servidor
 
-`npm run check:client-bundle` revisa `.next/static`, que es lo que el navegador
-descarga, y falla nombrando el chunk si encuentra el nombre de una variable
+`npm run check:client-bundle` revisa los dos sitios de los que el navegador se
+lleva algo, y falla nombrando el archivo si encuentra el nombre de una variable
 secreta o una clave de servidor pegada como literal. `checks.yml` lo corre en
 cada PR, después del build: revisar el código fuente diría qué se pretendía
 publicar, no qué se publicó.
+
+Los dos sitios son `.next/static`, que es el JavaScript que el navegador
+descarga, y `.next/server/app`, donde viven el HTML prerenderizado y los
+payloads RSC. El segundo se llama `server` y aun así viaja al navegador, así
+que revisar sólo el primero dejaría fuera una clave incrustada en el HTML.
+
+El chequeo falla cerrado. Si un directorio no existe, o existe pero no tiene un
+solo archivo del tipo esperado, eso es un error y no un bundle limpio: un build
+interrumpido y un build sin secretos se ven igual desde fuera. Por eso el
+comando dice cuántos archivos revisó, no sólo que no encontró nada.
 
 Busca nombres de variable y no valores porque la llave anónima tiene la misma
 forma que la de servicio y sí viaja al navegador con todo derecho. El nombre,

@@ -142,6 +142,7 @@ describe("workflow de checks", () => {
       step.run?.includes("check:client-bundle"),
     );
 
+    expect(buildIndex).toBeGreaterThanOrEqual(0);
     expect(bundleIndex).toBeGreaterThan(buildIndex);
   });
 

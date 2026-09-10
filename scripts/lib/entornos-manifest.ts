@@ -85,30 +85,45 @@ export type ScopeViolation = {
   readonly message: string;
 };
 
+/** Un chequeo de seguridad que ante la duda dice "todo bien" no es un chequeo.
+ * Cuando al manifiesto le falta un dato, esto falla nombrándolo en vez de dar
+ * por buena la asignación que no supo evaluar. */
+function requireDeclared<T>(value: T | undefined, missing: string): T {
+  if (value === undefined) {
+    throw new Error(`el manifiesto no declara ${missing}`);
+  }
+  return value;
+}
+
 function checkScope(
   manifest: EnvironmentManifest,
   variableName: string,
   environment: EnvironmentName,
 ): ScopeViolation | null {
-  const variable = manifest.variables[variableName];
-  const source = variable?.scopes[environment];
-  if (!variable || source === null || source === undefined) {
+  const variable = requireDeclared(
+    manifest.variables[variableName],
+    `la variable ${variableName}`,
+  );
+  const source = variable.scopes[environment];
+  if (source === null || source === undefined) {
     return null;
   }
 
-  const rules = manifest.environments[environment];
-  if (rules === undefined) {
-    return null;
-  }
+  const rules = requireDeclared(
+    manifest.environments[environment],
+    `el entorno ${environment}`,
+  );
+  const sourceRules = requireDeclared(
+    manifest.sources[source],
+    `el origen ${source}, que usa ${variableName}`,
+  );
 
-  if (manifest.sources[source]?.production === true) {
-    if (!rules.allowsProductionSources) {
-      return {
-        variable: variableName,
-        environment,
-        message: `${variableName} sale de ${source} en el entorno ${environment}, que no admite credenciales de producción`,
-      };
-    }
+  if (sourceRules.production && !rules.allowsProductionSources) {
+    return {
+      variable: variableName,
+      environment,
+      message: `${variableName} sale de ${source} en el entorno ${environment}, que no admite credenciales de producción`,
+    };
   }
 
   if (variable.writeCredential && !rules.allowsWriteCredentials) {

@@ -230,6 +230,50 @@ describe("manifiesto de entornos", () => {
       "SUPABASE_ACCESS_TOKEN",
     ]);
   });
+});
+
+// Las reglas de arriba se apoyan en marcas del propio manifiesto, así que
+// apagar una marca apagaría la regla que la usa y la suite seguiría en verde
+// con la URL de producción en preview. Esto fija las decisiones, no la
+// mecánica: cambiarlas exige tocar este test, que es donde hay que discutirlas.
+describe("decisiones que el manifiesto no puede cambiar en silencio", () => {
+  it("sólo seadragons-prod cuenta como origen de producción", () => {
+    const { sources } = readEnvironmentManifest();
+
+    expect(sources[PRODUCTION_SOURCE]?.production).toBe(true);
+    expect(
+      Object.entries(sources)
+        .filter(([, rules]) => rules.production)
+        .map(([name]) => name),
+    ).toEqual([PRODUCTION_SOURCE]);
+  });
+
+  it("la llave de servicio y el token de cuenta son credenciales de escritura", () => {
+    const { variables } = readEnvironmentManifest();
+
+    expect(variables["SUPABASE_SERVICE_ROLE_KEY"]?.writeCredential).toBe(true);
+    expect(variables["SUPABASE_ACCESS_TOKEN"]?.writeCredential).toBe(true);
+  });
+
+  it("preview apunta a desarrollo y producción a producción", () => {
+    const { variables } = readEnvironmentManifest();
+
+    for (const name of [
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    ]) {
+      expect(variables[name]?.scopes.preview).toBe(DEVELOPMENT_SOURCE);
+      expect(variables[name]?.scopes.production).toBe(PRODUCTION_SOURCE);
+    }
+  });
+
+  it("la llave de servicio no existe en preview y en producción es la de producción", () => {
+    const serviceRoleKey =
+      readEnvironmentManifest().variables["SUPABASE_SERVICE_ROLE_KEY"];
+
+    expect(serviceRoleKey?.scopes.preview).toBeNull();
+    expect(serviceRoleKey?.scopes.production).toBe(PRODUCTION_SOURCE);
+  });
 
   it("no contiene ningún valor, sólo nombres de variable y de origen", () => {
     const raw = JSON.stringify(readEnvironmentManifest());
