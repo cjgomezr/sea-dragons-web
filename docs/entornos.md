@@ -75,19 +75,35 @@ ninguna base real ni recibe ningún secreto, y corre aunque el PR no traiga
 migraciones nuevas: lo que se comprueba es que el histórico completo sigue
 aplicando.
 
+Después de aplicarlas compara el esquema resultante contra
+`supabase/ci/schema-expected.txt`, que es lo que el repositorio declara tener.
+Una migración editada después de haberse aplicado a mano aplica limpia sobre una
+base vacía y deja otro esquema: esa es la diferencia que este paso caza. **Al
+añadir una migración hay que regenerar ese archivo**, y el propio fallo dice
+cómo: `bash scripts/check-schema-snapshot.sh --write` si tienes Postgres, o
+copiando del log la descripción completa que el job imprime cuando no coincide.
+
 Para reproducirlo contra un Postgres local:
 
 ```bash
+export DATABASE_URL=postgresql://postgres@127.0.0.1:5432/una_base_vacia
 psql "$DATABASE_URL" --set ON_ERROR_STOP=1 --file supabase/ci/roles.sql
-DATABASE_URL=postgresql://... bash scripts/apply-migrations.sh
+bash scripts/apply-migrations.sh
+bash scripts/check-schema-snapshot.sh
 ```
 
 `supabase/ci/roles.sql` crea los roles de la API (`anon`, `authenticated`,
 `service_role`) que Supabase trae de fábrica y un Postgres pelado no tiene; sin
-ellos las migraciones fallan por el motivo equivocado. Los tests de
-`tests/unit/scripts/apply-migrations.test.ts` que necesitan una base se saltan
-solos mientras no exista `MIGRATIONS_TEST_DATABASE_URL`, así que `npm test`
-pasa igual en una máquina sin Postgres.
+ellos las migraciones fallan por el motivo equivocado. Hoy alcanza porque
+ninguna migración toca el esquema `auth`: la primera policy que use `auth.uid()`
+va a romper este job, y lo que hay que ampliar entonces es `roles.sql`, no la
+migración.
+
+Los tests de `tests/unit/scripts/apply-migrations.test.ts` que necesitan una
+base se saltan solos mientras no exista `MIGRATIONS_TEST_DATABASE_URL`, así que
+`npm test` pasa igual en una máquina sin Postgres. En el workflow de migraciones
+no se pueden saltar: `REQUIRE_MIGRATIONS_POSTGRES=1` convierte el salto en un
+fallo, porque ahí son media cobertura de la comprobación.
 
 ## Una trampa del plan Free
 
@@ -161,6 +177,18 @@ desarrolla, a mano, cuando lo necesita.
 `START_DELAY_MS`: no aplica al desarrollo normal ni a preview, producción o
 CI como despliegue. Solo existe dentro del fixture de
 `tests/unit/scripts/ui-preflight.test.ts`, que la pone a sí mismo.
+
+`MIGRATIONS_TEST_DATABASE_URL`: opcional en local, y solo útil a quien tenga un
+Postgres a mano: los tests del aplicador de migraciones crean y destruyen bases
+desechables desde esa conexión, y se saltan solos si no está. No aplica a
+preview ni a producción. En CI la pone `migrations.yml`, apuntando al Postgres
+efímero del propio runner. **Nunca apunta a un proyecto de Supabase:** esos
+tests truncan y borran bases.
+
+`REQUIRE_MIGRATIONS_POSTGRES`: no se pone en local. No aplica a preview ni a
+producción. En CI la pone solo `migrations.yml`, a `1`, para que la falta de
+Postgres sea un fallo en vez de un salto silencioso. `checks.yml` no la pone a
+propósito: ahí `npm test` corre sin base y saltarse esos tests es lo correcto.
 
 **Qué protege este documento y qué no.** `tests/unit/entornos-doc.test.ts`
 rechaza cualquier cadena con forma de clave de Supabase, en los dos formatos que

@@ -1,0 +1,49 @@
+columna audit_log.action tipo=text null=NO default=-
+columna audit_log.actor_id tipo=uuid null=NO default=-
+columna audit_log.club_id tipo=uuid null=NO default=-
+columna audit_log.created_at tipo=timestamp with time zone null=NO default=now()
+columna audit_log.entity_id tipo=text null=NO default=-
+columna audit_log.entity_type tipo=text null=NO default=-
+columna audit_log.id tipo=uuid null=NO default=gen_random_uuid()
+columna audit_log.metadata tipo=jsonb null=YES default=-
+columna audit_log.result tipo=text null=NO default=-
+columna clubs.created_at tipo=timestamp with time zone null=NO default=now()
+columna clubs.id tipo=uuid null=NO default=gen_random_uuid()
+columna clubs.name tipo=text null=NO default=-
+columna clubs.slug tipo=text null=NO default=-
+grant audit_log authenticated SELECT
+grant audit_log postgres DELETE
+grant audit_log postgres INSERT
+grant audit_log postgres REFERENCES
+grant audit_log postgres SELECT
+grant audit_log postgres TRIGGER
+grant audit_log postgres TRUNCATE
+grant audit_log postgres UPDATE
+grant audit_log service_role INSERT
+grant audit_log service_role SELECT
+grant clubs anon SELECT
+grant clubs authenticated SELECT
+grant clubs postgres DELETE
+grant clubs postgres INSERT
+grant clubs postgres REFERENCES
+grant clubs postgres SELECT
+grant clubs postgres TRIGGER
+grant clubs postgres TRUNCATE
+grant clubs postgres UPDATE
+grant clubs service_role DELETE
+grant clubs service_role INSERT
+grant clubs service_role SELECT
+grant clubs service_role UPDATE
+indice audit_log_club_id_created_at_idx CREATE INDEX audit_log_club_id_created_at_idx ON public.audit_log USING btree (club_id, created_at DESC)
+indice audit_log_pkey CREATE UNIQUE INDEX audit_log_pkey ON public.audit_log USING btree (id)
+indice clubs_pkey CREATE UNIQUE INDEX clubs_pkey ON public.clubs USING btree (id)
+indice clubs_slug_key CREATE UNIQUE INDEX clubs_slug_key ON public.clubs USING btree (slug)
+policy audit_log.audit_log_select_denied cmd=SELECT roles={authenticated} using=false check=-
+policy clubs.clubs_select_authenticated cmd=SELECT roles={authenticated} using=true check=-
+restriccion audit_log.audit_log_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion audit_log.audit_log_pkey PRIMARY KEY (id)
+restriccion audit_log.audit_log_result_check CHECK ((result = ANY (ARRAY['success'::text, 'failure'::text])))
+restriccion clubs.clubs_pkey PRIMARY KEY (id)
+restriccion clubs.clubs_slug_key UNIQUE (slug)
+tabla audit_log rls=t
+tabla clubs rls=t

@@ -82,8 +82,8 @@ function stepIndexMatching(pattern: RegExp): number {
 }
 
 describe("workflow de migraciones en PR", () => {
-  it("parsea como YAML válido", () => {
-    expect(() => parseWorkflow()).not.toThrow();
+  it("parsea como YAML con un job y sus pasos", () => {
+    expect(theJob().steps.length).toBeGreaterThan(0);
   });
 
   it("se dispara en pull_request y en push a main", () => {
@@ -159,10 +159,28 @@ describe("workflow de migraciones en PR", () => {
     );
   });
 
+  it("compara el esquema resultante contra el declarado, después de aplicarlas", () => {
+    expect(stepIndexMatching(/check-schema-snapshot\.sh/)).toBeGreaterThan(
+      stepIndexMatching(/apply-migrations\.sh/),
+    );
+  });
+
   it("corre los tests del aplicador contra ese Postgres, después de aplicarlas", () => {
     expect(stepIndexMatching(/apply-migrations\.test\.ts/)).toBeGreaterThan(
       stepIndexMatching(/apply-migrations\.sh/),
     );
+  });
+
+  it("le pasa a esos tests la base que esperan y les prohíbe saltarse", () => {
+    // Si la variable se renombra o desaparece, el bloque que necesita Postgres
+    // se salta solo y el job queda verde habiendo perdido la prueba de fuego.
+    // La bandera convierte ese salto en un fallo.
+    const environment = theJob().env ?? {};
+
+    expect(environment.MIGRATIONS_TEST_DATABASE_URL).toMatch(
+      /@(127\.0\.0\.1|localhost):/,
+    );
+    expect(environment.REQUIRE_MIGRATIONS_POSTGRES).toBe("1");
   });
 
   it("usa setup-node con la misma versión que el resto de los workflows", () => {

@@ -6,3 +6,8 @@
 
 # Las líneas base visuales son binarias y por plataforma; nunca se normalizan.
 *.png binary
+
+# La descripción del esquema que CI compara la genera psql, que en Windows
+# termina las líneas con CRLF. Normalizada a LF, la comparación da lo mismo en
+# cualquier máquina.
+supabase/ci/schema-expected.txt text eol=lf

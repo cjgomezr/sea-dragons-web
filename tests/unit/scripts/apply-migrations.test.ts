@@ -12,6 +12,10 @@ const SCHEMA_SNAPSHOT_SQL = path.join(
   REPO_ROOT,
   "supabase/ci/schema-snapshot.sql",
 );
+const CHECK_SCHEMA_SNAPSHOT = path.join(
+  REPO_ROOT,
+  "scripts/check-schema-snapshot.sh",
+);
 
 /**
  * Conexión de administración desde la que estos tests crean y destruyen bases
@@ -21,6 +25,8 @@ const SCHEMA_SNAPSHOT_SQL = path.join(
  * real.
  */
 const ADMIN_URL_ENV = "MIGRATIONS_TEST_DATABASE_URL";
+/** Bandera que pone `migrations.yml`: ahí saltarse los tests no es aceptable. */
+const REQUIRE_POSTGRES_ENV = "REQUIRE_MIGRATIONS_POSTGRES";
 const adminUrl = process.env[ADMIN_URL_ENV];
 
 interface RunResult {
@@ -136,12 +142,13 @@ describe("orden de migraciones", () => {
   });
 
   it("da el mismo orden sea cual sea el locale del runner", async () => {
-    // La colación de `sort` depende del locale: en C el guión va antes que el
-    // subrayado y en en_US.UTF-8 la puntuación se ignora. Un runner con otro
-    // locale no puede aplicar las migraciones en otro orden.
+    // La colación de `sort` depende del locale: en C las mayúsculas van antes
+    // que las minúsculas y en en_US.UTF-8 se ordena ignorando la caja, así que
+    // este par sí distingue un orden del otro. El script fija LC_ALL=C para
+    // que el runner no decida en qué orden se aplican las migraciones.
     const files = {
-      "0003-guion.sql": "select 1;",
-      "0003_subrayado.sql": "select 1;",
+      "0003_Beta.sql": "select 1;",
+      "0003_alfa.sql": "select 1;",
     };
     const enC = await migrationsDirectory(files);
     const enUsUtf8 = await migrationsDirectory(files);
@@ -157,6 +164,7 @@ describe("orden de migraciones", () => {
       }),
     ]);
 
+    expect(listedNames(conC)).toEqual(["0003_Beta.sql", "0003_alfa.sql"]);
     expect(listedNames(conEnUs)).toEqual(listedNames(conC));
   });
 
@@ -200,7 +208,7 @@ describe("aplicador de migraciones", () => {
 
     const result = await applyMigrations([], sinBase);
 
-    expect(result.code).not.toBe(0);
+    expect(result.code).toBeGreaterThan(0);
     expect(result.stderr).toMatch(/DATABASE_URL/);
   });
 
@@ -211,7 +219,7 @@ describe("aplicador de migraciones", () => {
       toBashPath(path.join(tmpdir(), `no-existe-${randomUUID()}`)),
     ]);
 
-    expect(result.code).not.toBe(0);
+    expect(result.code).toBeGreaterThan(0);
     expect(result.stderr).toMatch(/no existe/i);
   });
 
@@ -224,7 +232,7 @@ describe("aplicador de migraciones", () => {
       toBashPath(directory),
     ]);
 
-    expect(result.code).not.toBe(0);
+    expect(result.code).toBeGreaterThan(0);
     expect(result.stderr).toMatch(/ninguna migración/i);
   });
 });
@@ -233,14 +241,63 @@ interface TemporaryDatabase {
   readonly url: string;
   readonly query: (sql: string) => Promise<string>;
   readonly snapshot: () => Promise<string>;
+  readonly checkSchema: () => Promise<RunResult>;
 }
 
+type PostgresDecision = "corre" | "exige" | "salta";
+
+/**
+ * Qué hacer con los tests que necesitan una base. Saltarlos es lo correcto en
+ * una máquina sin Postgres y en `checks.yml`, que corre `npm test` sin base
+ * ninguna. Lo que no puede pasar es que se salten en el workflow de
+ * migraciones, donde son media cobertura del ticket: ahí se perderían la
+ * prueba de la migración rota y la corrida se leería verde. Por eso
+ * `migrations.yml` pide estos tests explícitamente y la falta de base pasa a
+ * ser un fallo, no un salto.
+ */
+function decidePostgresTests(
+  env: Readonly<Record<string, string | undefined>>,
+): PostgresDecision {
+  if (env[ADMIN_URL_ENV]) {
+    return "corre";
+  }
+  return env[REQUIRE_POSTGRES_ENV] === "1" ? "exige" : "salta";
+}
+
+describe("tests que necesitan Postgres", () => {
+  it("corren cuando hay una base de administración", () => {
+    expect(decidePostgresTests({ [ADMIN_URL_ENV]: "postgresql://x" })).toBe(
+      "corre",
+    );
+  });
+
+  it("se exigen, en vez de saltarse, cuando el workflow de migraciones los pide", () => {
+    expect(decidePostgresTests({ [REQUIRE_POSTGRES_ENV]: "1" })).toBe("exige");
+  });
+
+  it("se saltan cuando nadie los pide y no hay base", () => {
+    expect(decidePostgresTests({})).toBe("salta");
+  });
+});
+
 function describeConPostgres(name: string, fn: () => void): void {
-  if (!adminUrl) {
-    describe.skip(`${name} (saltado: falta ${ADMIN_URL_ENV})`, fn);
+  const decision = decidePostgresTests(process.env);
+  if (decision === "corre") {
+    describe(name, fn);
     return;
   }
-  describe(name, fn);
+  if (decision === "exige") {
+    describe(name, () => {
+      it(`no se saltan: ${REQUIRE_POSTGRES_ENV}=1 los exige`, () => {
+        throw new Error(
+          `falta ${ADMIN_URL_ENV}: sin ella estos tests se saltarían y la ` +
+            `corrida se leería verde sin haber probado ninguna migración`,
+        );
+      });
+    });
+    return;
+  }
+  describe.skip(`${name} (saltado: falta ${ADMIN_URL_ENV})`, fn);
 }
 
 function psql(url: string, args: readonly string[]): Promise<RunResult> {
@@ -295,6 +352,11 @@ async function freshDatabase(): Promise<TemporaryDatabase> {
     query: (sql: string) => expectPsqlSuccess(databaseUrl, ["-c", sql]),
     snapshot: () =>
       expectPsqlSuccess(databaseUrl, ["-f", toBashPath(SCHEMA_SNAPSHOT_SQL)]),
+    checkSchema: () =>
+      run("bash", [toBashPath(CHECK_SCHEMA_SNAPSHOT)], {
+        ...process.env,
+        DATABASE_URL: databaseUrl,
+      }),
   };
 }
 
@@ -303,17 +365,21 @@ afterEach(async () => {
     return;
   }
   for (const name of createdDatabases.splice(0)) {
-    await psql(adminUrl, [
+    const dropped = await psql(adminUrl, [
       "-c",
       `drop database if exists ${name} with (force)`,
     ]);
+    if (dropped.code !== 0) {
+      // Que quede dicho: si no, las bases se acumulan sin que nadie lo sepa.
+      console.warn(`no se pudo borrar la base ${name}: ${dropped.stderr}`);
+    }
   }
 });
 
 describeConPostgres(
   "migraciones del repositorio sobre un Postgres limpio",
   () => {
-    it("aplica el histórico completo y deja el esquema que declaran las migraciones", async () => {
+    it("aplica el histórico completo y deja el esquema que declara el repositorio", async () => {
       const database = await freshDatabase();
 
       const result = await applyMigrations([], {
@@ -322,18 +388,31 @@ describeConPostgres(
       });
 
       expect(result.code, result.stderr).toBe(0);
-      const tablas = await database.query(
-        "select table_name from information_schema.tables where table_schema = 'public' order by 1",
-      );
-      expect(tablas.split("\n")).toEqual(["audit_log", "clubs"]);
+      // El esquema resultante se compara contra `schema-expected.txt`, que es
+      // lo que el repositorio declara tener. Cualquier diferencia es un fallo.
+      const comparacion = await database.checkSchema();
+      expect(comparacion.code, comparacion.stderr).toBe(0);
       expect(await database.query("select slug from public.clubs")).toBe(
         "victoria-seadragons",
       );
-      expect(
-        await database.query(
-          "select count(*) from pg_policies where schemaname = 'public'",
-        ),
-      ).not.toBe("0");
+    });
+
+    it("la comparación nota que el esquema de la base no es el declarado", async () => {
+      // Sin esto, la comparación de arriba pasaría igual siendo incapaz de ver
+      // una diferencia.
+      const database = await freshDatabase();
+      await applyMigrations([], {
+        ...process.env,
+        DATABASE_URL: database.url,
+      });
+
+      await database.query("create table public.intrusa (id int primary key)");
+
+      const comparacion = await database.checkSchema();
+      expect(comparacion.code).toBeGreaterThan(0);
+      expect(comparacion.stderr).toMatch(/intrusa/);
+      // Y dice cómo arreglarlo cuando la diferencia es la esperada.
+      expect(comparacion.stderr).toMatch(/--write/);
     });
 
     it("aplicar dos veces el histórico no cambia el esquema resultante ni duplica la semilla", async () => {
@@ -360,19 +439,6 @@ describeConPostgres(
       );
     });
 
-    it("la descripción del esquema cambia cuando el esquema cambia", async () => {
-      // Sin esto, el test de arriba pasaría igual con una descripción
-      // constante que no mirara la base.
-      const database = await freshDatabase();
-      const antes = await database.snapshot();
-
-      await database.query(
-        "create table public.recien_llegada (id int primary key)",
-      );
-
-      expect(await database.snapshot()).not.toBe(antes);
-    });
-
     it("se detiene en la primera migración rota y no aplica las siguientes", async () => {
       // La prueba de fuego del ticket: con este código de salida distinto de
       // cero, el paso del workflow (que no lleva continue-on-error) deja el PR
@@ -389,7 +455,7 @@ describeConPostgres(
         DATABASE_URL: database.url,
       });
 
-      expect(result.code).not.toBe(0);
+      expect(result.code).toBeGreaterThan(0);
       expect(result.stderr).toMatch(/0002_rota\.sql/);
       const tablas = await database.query(
         "select table_name from information_schema.tables where table_schema = 'public' order by 1",
@@ -411,7 +477,7 @@ describeConPostgres(
         DATABASE_URL: database.url,
       });
 
-      expect(result.code).not.toBe(0);
+      expect(result.code).toBeGreaterThan(0);
       expect(
         await database.query(
           "select count(*) from information_schema.tables where table_schema = 'public'",

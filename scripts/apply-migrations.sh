@@ -31,11 +31,11 @@ usage() {
   sed -n '/^# Usage:/,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
-# `find | sort` con LC_ALL=C: la colación por defecto ignora la puntuación en
-# algunos locales, así que sin fijarlo el orden de aplicación dependería del
-# locale del runner. -maxdepth 1 deja fuera subdirectorios, y el nombre
-# completo del archivo ordena igual que su prefijo de fecha cuando dos lo
-# comparten.
+# `find | sort` con LC_ALL=C: la colación por defecto ordena ignorando la caja
+# y la puntuación, así que sin fijarlo el orden en que se aplican las
+# migraciones lo decidiría el locale del runner. -maxdepth 1 deja fuera
+# subdirectorios, y el nombre completo del archivo ordena igual que su prefijo
+# de fecha cuando dos lo comparten.
 list_migrations() {
   local dir="$1"
   find "$dir" -maxdepth 1 -type f -name '*.sql' | LC_ALL=C sort
@@ -99,10 +99,15 @@ main() {
     return 1
   fi
 
-  local migrations=()
-  if [ -n "$listing" ]; then
-    mapfile -t migrations <<<"$listing"
-  fi
+  # Bucle en vez de `mapfile`, que no existe en bash 3.2 (el de macOS de
+  # fábrica): ahí el script moriría con un 127 que no explica nada, y este
+  # script tiene que poder correrse desde la máquina de alguien.
+  local migrations=() line
+  while IFS= read -r line; do
+    if [ -n "$line" ]; then
+      migrations+=("$line")
+    fi
+  done <<<"$listing"
 
   # Cero migraciones es casi siempre un --dir equivocado. Salir en verde sin
   # haber comprobado nada es el peor resultado posible para un check de CI.
@@ -119,6 +124,13 @@ main() {
   local database_url="${DATABASE_URL:-}"
   if [ -z "$database_url" ]; then
     echo "error: falta DATABASE_URL con la conexión a la base destino" >&2
+    return 1
+  fi
+
+  # Sin esto, un PATH sin psql se leería como "falló la migración 0001", que es
+  # el motivo equivocado.
+  if ! command -v psql > /dev/null 2>&1; then
+    echo "error: falta psql en el PATH" >&2
     return 1
   fi
 

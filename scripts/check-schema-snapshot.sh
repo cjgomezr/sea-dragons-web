@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# Compara el esquema de la base que apunte DATABASE_URL contra el que declara
+# el repositorio en `supabase/ci/schema-expected.txt`, y falla si difieren.
+#
+# Es la otra mitad de la comprobación del PR (RF-5 del PRD de E16a): que las
+# migraciones apliquen no garantiza que dejen el esquema que el repositorio
+# dice tener. Una migración que alguien editó después de haberla aplicado a
+# mano por MCP aplica limpia en una base vacía y deja otro esquema.
+#
+# La descripción se lee del catálogo con `supabase/ci/schema-snapshot.sql`, no
+# con pg_dump: pg_dump se niega a hablar con un servidor más nuevo que él y el
+# texto cambia entre versiones, así que un archivo commiteado generado con él
+# sería un check rojo permanente según quién lo regenerara.
+#
+# Usage:
+#   DATABASE_URL=postgresql://... scripts/check-schema-snapshot.sh
+#   DATABASE_URL=postgresql://... scripts/check-schema-snapshot.sh --write
+#
+# --write regenera el archivo esperado en vez de comparar. Es lo que se corre
+# al añadir una migración. Quien no tenga Postgres a mano puede copiar la
+# descripción que el fallo imprime: el job la deja completa en el log.
+#
+# Requires: psql, diff.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+SNAPSHOT_QUERY="$REPO_ROOT/supabase/ci/schema-snapshot.sql"
+EXPECTED_SCHEMA="$REPO_ROOT/supabase/ci/schema-expected.txt"
+
+describe_schema() {
+  local database_url="$1"
+  # El `tr -d '\r'` no es cosmético: psql en Windows termina las líneas con
+  # CRLF y el archivo commiteado se normaliza a LF (.gitattributes), así que
+  # sin esto la comparación fallaría según el sistema de quien la corre, no
+  # según el esquema. Con `pipefail` el fallo de psql sigue ganando.
+  psql "$database_url" \
+    --no-psqlrc \
+    --quiet \
+    --set ON_ERROR_STOP=1 \
+    --tuples-only \
+    --no-align \
+    --file "$SNAPSHOT_QUERY" | tr -d '\r'
+}
+
+report_difference() {
+  local difference="$1" actual_file="$2"
+  {
+    echo "error: el esquema de la base no es el que declara el repositorio"
+    echo "$difference"
+    echo
+    echo "Si el cambio es esperado (vienes de añadir una migración), regenera el"
+    echo "archivo con: DATABASE_URL=... bash scripts/check-schema-snapshot.sh --write"
+    # El log completo es la vía de escape de quien no tiene Postgres a mano:
+    # copiar estas líneas al archivo equivale a haber corrido --write.
+    echo "Sin Postgres a mano, copia tal cual estas líneas:"
+    cat "$actual_file"
+  } >&2
+}
+
+main() {
+  local write=false
+  if [ $# -gt 0 ]; then
+    case "$1" in
+      --write) write=true ;;
+      *)
+        echo "error: opción desconocida: $1" >&2
+        return 2
+        ;;
+    esac
+  fi
+
+  local database_url="${DATABASE_URL:-}"
+  if [ -z "$database_url" ]; then
+    echo "error: falta DATABASE_URL con la conexión a la base a describir" >&2
+    return 1
+  fi
+  if ! command -v psql > /dev/null 2>&1; then
+    echo "error: falta psql en el PATH" >&2
+    return 1
+  fi
+
+  # La descripción se guarda en un archivo en vez de en una variable para que
+  # `diff` pueda leerla sin sustituciones de proceso, que no existen en todos
+  # los shells. El fallo de psql llega al `if` porque la sustitución es el
+  # único comando de la asignación.
+  local actual_file
+  actual_file="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "rm -f '$actual_file'" EXIT
+
+  local description
+  if ! description="$(describe_schema "$database_url")"; then
+    echo "error: no se pudo describir el esquema de la base" >&2
+    return 1
+  fi
+  printf '%s\n' "$description" > "$actual_file"
+
+  if [ "$write" = true ]; then
+    cp "$actual_file" "$EXPECTED_SCHEMA"
+    echo "==> $EXPECTED_SCHEMA regenerado" >&2
+    return 0
+  fi
+
+  if [ ! -f "$EXPECTED_SCHEMA" ]; then
+    echo "error: falta $EXPECTED_SCHEMA; genéralo con --write" >&2
+    return 1
+  fi
+
+  # `diff` sale con 1 cuando difieren, así que la comparación va en el `if`:
+  # llamarlo a pelo bajo `set -e` mataría el script antes de explicar nada.
+  local difference
+  if difference="$(diff -u \
+    --label "$EXPECTED_SCHEMA" \
+    --label "esquema de la base" \
+    "$EXPECTED_SCHEMA" "$actual_file")"; then
+    echo "==> el esquema coincide con el declarado en el repositorio" >&2
+    return 0
+  fi
+
+  report_difference "$difference" "$actual_file"
+  return 1
+}
+
+main "$@"
