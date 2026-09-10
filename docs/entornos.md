@@ -66,6 +66,29 @@ Los dos proyectos tienen la misma lista de migraciones por nombre
 proyecto las sella con la fecha en que las recibió; lo que tiene que coincidir
 es el conjunto de nombres.
 
+### Comprobadas en cada PR (issue #93)
+
+`migrations.yml` levanta un Postgres limpio dentro del propio runner y aplica
+todo el histórico en orden de nombre con `scripts/apply-migrations.sh`. Si
+alguna migración no aplica limpia, el PR queda en rojo. El job no habla con
+ninguna base real ni recibe ningún secreto, y corre aunque el PR no traiga
+migraciones nuevas: lo que se comprueba es que el histórico completo sigue
+aplicando.
+
+Para reproducirlo contra un Postgres local:
+
+```bash
+psql "$DATABASE_URL" --set ON_ERROR_STOP=1 --file supabase/ci/roles.sql
+DATABASE_URL=postgresql://... bash scripts/apply-migrations.sh
+```
+
+`supabase/ci/roles.sql` crea los roles de la API (`anon`, `authenticated`,
+`service_role`) que Supabase trae de fábrica y un Postgres pelado no tiene; sin
+ellos las migraciones fallan por el motivo equivocado. Los tests de
+`tests/unit/scripts/apply-migrations.test.ts` que necesitan una base se saltan
+solos mientras no exista `MIGRATIONS_TEST_DATABASE_URL`, así que `npm test`
+pasa igual en una máquina sin Postgres.
+
 ## Una trampa del plan Free
 
 Free pausa un proyecto tras una semana sin actividad. Producción va a estar
