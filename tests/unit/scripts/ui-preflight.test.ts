@@ -90,6 +90,22 @@ type PortProbe =
   | { readonly accepted: false; readonly reason: string };
 
 /**
+ * El texto de un fallo de conexión, ya venga suelto o agrupado. Node conecta a
+ * "localhost" probando IPv6 e IPv4 a la vez, y cuando fallan las dos emite un
+ * AggregateError cuyo `message` está vacío: el motivo vive en `errors`.
+ */
+function describeConnectError(error: unknown): string {
+  if (error instanceof AggregateError && error.errors.length > 0) {
+    const causes: unknown[] = error.errors;
+    return causes.map(describeConnectError).join("; ");
+  }
+  if (error instanceof Error) {
+    return error.message || error.name;
+  }
+  return String(error);
+}
+
+/**
  * Abre y cierra una conexión TCP. Es la única señal que da un puerto mudo:
  * acepta, pero no contesta nada, así que un fetch no distingue "no hay nadie"
  * de "hay alguien callado".
@@ -110,7 +126,7 @@ function probePort(port: number): Promise<PortProbe> {
       }),
     );
     socket.on("error", (error) =>
-      settle({ accepted: false, reason: error.message }),
+      settle({ accepted: false, reason: describeConnectError(error) }),
     );
   });
 }
@@ -1198,6 +1214,21 @@ describe("andamiaje de los tests de ui-preflight.sh", () => {
     muteServer = await startMuteServer(port);
 
     expect((await probePort(port)).accepted).toBe(true);
+  });
+
+  it("el motivo sobrevive al AggregateError que agrupa los intentos por familia", () => {
+    // Lo que de verdad emite node al conectar a "localhost" cuando resuelve a
+    // ::1 y a 127.0.0.1: agrupa los dos fallos y deja su propio `message`
+    // vacío. Leerlo a secas daba un motivo en blanco en el runner de Linux, y
+    // en Windows no, porque ahí no llegaba a haber dos familias que agrupar.
+    const bothFamiliesRefused = new AggregateError([
+      new Error("connect ECONNREFUSED ::1:24063"),
+      new Error("connect ECONNREFUSED 127.0.0.1:24063"),
+    ]);
+
+    expect(describeConnectError(bothFamiliesRefused)).toBe(
+      "connect ECONNREFUSED ::1:24063; connect ECONNREFUSED 127.0.0.1:24063",
+    );
   });
 
   it("esperar a un puerto que nadie ocupa falla nombrando el puerto, lo esperado y el motivo", async () => {
