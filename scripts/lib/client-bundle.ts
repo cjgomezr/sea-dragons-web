@@ -10,11 +10,22 @@ import {
  * llame como se llame la variable de la que salió. */
 export const FORBIDDEN_KEY_PREFIX = "sb_secret_";
 
+/** Etiqueta con la que se reporta una clave de servicio del formato clásico.
+ * No es una aguja de texto como las demás: se reconoce por el contenido del
+ * JWT, no por su forma. */
+export const SERVICE_ROLE_JWT_LABEL = "clave service_role en formato JWT";
+
 export type BundleScan = {
   /** Ruta con `/`, relativa a la raíz del repositorio. */
   readonly dir: string;
   readonly extensions: readonly string[];
   readonly needles: readonly string[];
+  /** Si un directorio sin archivos es un error. `.next/static` siempre trae
+   * JavaScript después de un build, así que ahí vacío significa build roto. El
+   * HTML prerenderizado puede no existir legítimamente el día que todas las
+   * rutas sean dinámicas, y un rojo que nadie sabe arreglar es como se acaba
+   * desactivando un chequeo. */
+  readonly mustHaveFiles: boolean;
 };
 
 export type BundleLeak = {
@@ -43,9 +54,52 @@ export function forbiddenNeedles(manifest: EnvironmentManifest): string[] {
 export function clientBundleScans(manifest: EnvironmentManifest): BundleScan[] {
   const needles = forbiddenNeedles(manifest);
   return [
-    { dir: ".next/static", extensions: [".js"], needles },
-    { dir: ".next/server/app", extensions: [".html", ".rsc"], needles },
+    {
+      dir: ".next/static",
+      extensions: [".js"],
+      needles,
+      mustHaveFiles: true,
+    },
+    {
+      dir: ".next/server/app",
+      extensions: [".html", ".rsc"],
+      needles,
+      mustHaveFiles: false,
+    },
   ];
+}
+
+// Las agujas de texto no cazan una clave de servicio del formato clásico, que
+// es una cadena `eyJ...` sin ningún nombre reconocible dentro. Y por la forma
+// no se puede distinguir de la llave anónima, que viaja al navegador con todo
+// derecho: las dos son JWT del mismo proyecto. Lo que las separa es el rol que
+// llevan en el payload, así que hay que abrirlo y mirarlo.
+const JWT_PATTERN = /eyJ[A-Za-z0-9_-]+\.([A-Za-z0-9_-]+)\.[A-Za-z0-9_-]+/g;
+const SERVICE_ROLE = "service_role";
+
+function decodeJwtPayload(segment: string): unknown {
+  try {
+    return JSON.parse(Buffer.from(segment, "base64url").toString("utf8"));
+  } catch {
+    // Una cadena con pinta de JWT que no decodifica no es un JWT. No es un
+    // error que tratar: es la respuesta a la pregunta que se hizo.
+    return null;
+  }
+}
+
+function isServiceRolePayload(payload: unknown): boolean {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "role" in payload &&
+    payload.role === SERVICE_ROLE
+  );
+}
+
+function hasServiceRoleJwt(content: string): boolean {
+  return [...content.matchAll(JWT_PATTERN)].some((match) =>
+    isServiceRolePayload(decodeJwtPayload(match[1] ?? "")),
+  );
 }
 
 function listFiles(
@@ -85,7 +139,7 @@ export function scanForLeaks(scan: BundleScan): ScanResult {
   }
 
   const files = listFiles(dir, extensions);
-  if (files.length === 0) {
+  if (files.length === 0 && scan.mustHaveFiles) {
     throw new Error(
       `${dir} no tiene ningún archivo ${extensions.join(" ni ")}: el build no dejó lo que se esperaba`,
     );
@@ -93,9 +147,15 @@ export function scanForLeaks(scan: BundleScan): ScanResult {
 
   const leaks = files.flatMap((file) => {
     const content = readFileSync(path.join(dir, file), "utf8");
-    return needles
-      .filter((needle) => content.includes(needle))
-      .map((needle) => ({ file: file.split(path.sep).join("/"), needle }));
+    const name = file.split(path.sep).join("/");
+    return [
+      ...needles
+        .filter((needle) => content.includes(needle))
+        .map((needle) => ({ file: name, needle })),
+      ...(hasServiceRoleJwt(content)
+        ? [{ file: name, needle: SERVICE_ROLE_JWT_LABEL }]
+        : []),
+    ];
   });
   return { filesRead: files.length, leaks };
 }

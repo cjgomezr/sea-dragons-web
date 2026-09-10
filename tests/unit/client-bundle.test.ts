@@ -5,12 +5,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   type BundleScan,
   FORBIDDEN_KEY_PREFIX,
+  SERVICE_ROLE_JWT_LABEL,
   clientBundleScans,
   forbiddenNeedles,
   scanForLeaks,
 } from "../../scripts/lib/client-bundle";
 import { readEnvironmentManifest } from "../../scripts/lib/entornos-manifest";
-import { SECRET_ENV_VARS } from "../support/env-vars";
 
 const JAVASCRIPT = [".js"] as const;
 const createdDirectories: string[] = [];
@@ -28,7 +28,17 @@ function scanOf(files: Record<string, string>): BundleScan {
     dir,
     extensions: JAVASCRIPT,
     needles: forbiddenNeedles(readEnvironmentManifest()),
+    mustHaveFiles: true,
   };
+}
+
+/** JWT de juguete con el rol que se le pida. Los tres segmentos van en
+ * base64url, como los de verdad, pero la firma es texto: nada aquí sirve para
+ * autenticarse contra nada. */
+function jwtWithRole(role: string): string {
+  const encode = (value: object): string =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  return `${encode({ alg: "HS256" })}.${encode({ role })}.firmadementira`;
 }
 
 afterEach(() => {
@@ -104,6 +114,7 @@ describe("bundle de cliente", () => {
         dir: path.join(tmpdir(), "un-bundle-que-no-existe"),
         extensions: JAVASCRIPT,
         needles: ["lo-que-sea"],
+        mustHaveFiles: true,
       }),
     ).toThrowError(/un-bundle-que-no-existe/);
   });
@@ -117,13 +128,44 @@ describe("bundle de cliente", () => {
     expect(() => scanForLeaks(scan)).toThrowError(/no tiene ningún archivo/);
   });
 
-  it("busca toda variable de la lista de secretos del manifiesto", () => {
-    const needles = forbiddenNeedles(readEnvironmentManifest());
+  it("busca las dos variables secretas de hoy y el prefijo de clave", () => {
+    expect(forbiddenNeedles(readEnvironmentManifest())).toEqual([
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "SUPABASE_ACCESS_TOKEN",
+      FORBIDDEN_KEY_PREFIX,
+    ]);
+  });
+});
 
-    for (const name of SECRET_ENV_VARS) {
-      expect(needles).toContain(name);
-    }
-    expect(needles).toContain(FORBIDDEN_KEY_PREFIX);
+// El formato clásico de Supabase es un JWT sin ningún nombre reconocible
+// dentro, así que las agujas de texto no lo ven. Y por la forma no se
+// distingue de la llave anónima, que sí puede estar en el bundle: lo que las
+// separa es el rol del payload.
+describe("clave de servicio en formato JWT", () => {
+  it("caza un JWT cuyo payload dice service_role", () => {
+    const scan = scanOf({
+      "chunks/page.js": `const k="${jwtWithRole("service_role")}";`,
+    });
+
+    expect(scanForLeaks(scan).leaks).toEqual([
+      { file: "chunks/page.js", needle: SERVICE_ROLE_JWT_LABEL },
+    ]);
+  });
+
+  it("deja pasar la llave anónima, que viaja al navegador con todo derecho", () => {
+    const scan = scanOf({
+      "chunks/page.js": `const k="${jwtWithRole("anon")}";`,
+    });
+
+    expect(scanForLeaks(scan).leaks).toEqual([]);
+  });
+
+  it("no se atraganta con una cadena que empieza por eyJ y no es un JWT", () => {
+    const scan = scanOf({
+      "chunks/page.js": 'const s="eyJnoesto.tampoco.nada";',
+    });
+
+    expect(scanForLeaks(scan).leaks).toEqual([]);
   });
 });
 
@@ -150,9 +192,23 @@ describe("qué se revisa del build", () => {
     }
   });
 
-  it("nombra los directorios con / y no con el separador del sistema", () => {
-    for (const scan of clientBundleScans(readEnvironmentManifest())) {
-      expect(scan.dir).not.toContain("\\");
-    }
+  // Un `.next/static` sin JavaScript es un build roto. Un `.next/server/app`
+  // sin HTML es lo que deja una aplicación enteramente dinámica, y poner el
+  // check en rojo por eso sería un rojo que nadie sabe arreglar.
+  it("exige archivos en el bundle de cliente, pero no en el HTML prerenderizado", () => {
+    const [client, prerendered] = clientBundleScans(readEnvironmentManifest());
+
+    expect(client?.mustHaveFiles).toBe(true);
+    expect(prerendered?.mustHaveFiles).toBe(false);
+  });
+
+  it("no falla cuando no queda nada prerenderizado que revisar", () => {
+    const scan = {
+      ...scanOf({ "algo.txt": "ni html ni rsc" }),
+      extensions: [".html", ".rsc"],
+      mustHaveFiles: false,
+    };
+
+    expect(scanForLeaks(scan)).toEqual({ filesRead: 0, leaks: [] });
   });
 });

@@ -172,16 +172,25 @@ descarga, y `.next/server/app`, donde viven el HTML prerenderizado y los
 payloads RSC. El segundo se llama `server` y aun así viaja al navegador, así
 que revisar sólo el primero dejaría fuera una clave incrustada en el HTML.
 
-El chequeo falla cerrado. Si un directorio no existe, o existe pero no tiene un
-solo archivo del tipo esperado, eso es un error y no un bundle limpio: un build
-interrumpido y un build sin secretos se ven igual desde fuera. Por eso el
-comando dice cuántos archivos revisó, no sólo que no encontró nada.
+El chequeo falla cerrado. Un directorio que no existe es un error y no un
+bundle limpio: un build interrumpido y un build sin secretos se ven igual desde
+fuera. Un `.next/static` sin JavaScript también, porque eso no lo deja nunca un
+build sano. Lo que sí se admite vacío es el HTML prerenderizado, que puede no
+existir el día que todas las rutas sean dinámicas. Por eso el comando dice
+cuántos archivos revisó, no sólo que no encontró nada.
 
-Busca nombres de variable y no valores porque la llave anónima tiene la misma
-forma que la de servicio y sí viaja al navegador con todo derecho. El nombre,
-en cambio, sólo aparece en el bundle si llegó hasta ahí el módulo de servidor
-que lo menciona, que es exactamente el error que se quiere cazar: un componente
-de cliente importando código de servidor.
+Busca sobre todo nombres de variable y no valores. El nombre sólo aparece en el
+bundle si llegó hasta ahí el módulo de servidor que lo menciona, que es
+exactamente el error que se quiere cazar: un componente de cliente importando
+código de servidor.
+
+Con los valores hay que hilar más fino, porque la llave anónima viaja al
+navegador con todo derecho y en el formato clásico de Supabase tiene la misma
+forma que la de servicio: las dos son un JWT del mismo proyecto. Por la forma
+no se distinguen, así que el chequeo abre el payload de cada JWT que encuentra
+y falla sólo si el rol que declara es `service_role`. Del formato nuevo, en
+cambio, basta el prefijo de las claves secretas, que no se parece al de las
+publicables.
 
 Hoy el bundle no contiene ninguna de las dos cosas, y tampoco contiene ninguna
 variable de Supabase: la aplicación todavía es un esqueleto y ningún componente

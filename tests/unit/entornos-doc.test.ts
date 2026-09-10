@@ -175,22 +175,4 @@ describe("rotación de credenciales en docs/entornos.md", () => {
   it("enumera un sitio por cada entorno en el que vive cada variable secreta", () => {
     expect(readRotationRows()).toEqual(expectedRotationRows());
   });
-
-  it("nombra todas las variables secretas del manifiesto", () => {
-    const listed = new Set(readRotationRows().map(([variable]) => variable));
-
-    for (const name of secretVariableNames(readEnvironmentManifest())) {
-      expect(listed).toContain(name);
-    }
-  });
-
-  // Sin esto, una tabla vacía y una tabla completa se verían igual el día que
-  // alguien rompa el parser o borre la sección entera.
-  it("tiene al menos una fila por variable secreta", () => {
-    const rows = readRotationRows();
-
-    expect(rows.length).toBeGreaterThanOrEqual(
-      secretVariableNames(readEnvironmentManifest()).length,
-    );
-  });
 });

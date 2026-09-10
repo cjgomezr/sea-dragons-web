@@ -248,6 +248,18 @@ describe("decisiones que el manifiesto no puede cambiar en silencio", () => {
     ).toEqual([PRODUCTION_SOURCE]);
   });
 
+  // Sin fijarlo, encender `ci.allowsWriteCredentials` apagaría esa mitad de la
+  // regla sin que nada se pusiera rojo.
+  it("sólo local y producción admiten credenciales de escritura", () => {
+    const { environments } = readEnvironmentManifest();
+
+    expect(
+      ENVIRONMENT_NAMES.filter(
+        (name) => environments[name]?.allowsWriteCredentials,
+      ),
+    ).toEqual(["local", "production"]);
+  });
+
   it("la llave de servicio y el token de cuenta son credenciales de escritura", () => {
     const { variables } = readEnvironmentManifest();
 
