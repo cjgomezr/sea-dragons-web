@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import {
+  type EmailConfirmationResult,
   confirmEmailAndActivate,
   parseEmailConfirmationOtpType,
 } from "@/lib/auth/email-confirmation";
@@ -51,11 +52,25 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return redirectToRegistration(request, "error");
   }
 
-  const result = await confirmEmailAndActivate(wiring.gateways, {
-    tokenHash,
-    type,
-    now: new Date(),
-  });
+  // El canje ya consumió el token, así que un fallo del servidor aquí deja al
+  // visitante sin segundo intento con el mismo enlace. Lo mínimo es no
+  // enseñarle la página de error de Next y no llamarlo "enlace inválido", que
+  // le haría buscar el problema donde no está.
+  let result: EmailConfirmationResult;
+  try {
+    result = await confirmEmailAndActivate(wiring.gateways, {
+      tokenHash,
+      type,
+      now: new Date(),
+    });
+  } catch (error) {
+    console.error(
+      "[auth/confirmar] no se pudo resolver la confirmación",
+      error,
+    );
+    return redirectToRegistration(request, "error");
+  }
+
   if (result.kind === "rejected") {
     // El motivo se queda en el servidor: al visitante le sirve saber que el
     // enlace no vale y cómo pedir otro, no el texto de Supabase.

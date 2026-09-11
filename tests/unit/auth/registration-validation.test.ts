@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   EARLIEST_DATE_OF_BIRTH,
   MEMBERSHIP_TYPES,
+  PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   type RegistrationIssue,
   type RegistrationRequest,
@@ -85,6 +86,25 @@ describe("registro: validación", () => {
     expect(
       validateRegistration(requestWith({ password: "12345678" }), { now: NOW })
         .ok,
+    ).toBe(true);
+  });
+
+  it("rechaza una contraseña más larga de lo que acepta el servicio de autenticación", () => {
+    expect(PASSWORD_MAX_LENGTH).toBe(72);
+    const issue = issueFor(
+      requestWith({ password: "a".repeat(PASSWORD_MAX_LENGTH + 1) }),
+      "password",
+    );
+
+    expect(issue.message).toContain(String(PASSWORD_MAX_LENGTH));
+  });
+
+  it("acepta una contraseña de exactamente el máximo", () => {
+    expect(
+      validateRegistration(
+        requestWith({ password: "a".repeat(PASSWORD_MAX_LENGTH) }),
+        { now: NOW },
+      ).ok,
     ).toBe(true);
   });
 

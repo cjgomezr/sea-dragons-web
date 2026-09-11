@@ -12,6 +12,7 @@ const confirmCalls: ConfirmArgs[] = [];
 function mockDependencies(
   options: {
     readonly result?: EmailConfirmationResult;
+    readonly throws?: Error;
     readonly unconfigured?: readonly string[];
   } = {},
 ): void {
@@ -30,6 +31,9 @@ function mockDependencies(
       input: { tokenHash: string; type: string },
     ) => {
       confirmCalls.push({ tokenHash: input.tokenHash, type: input.type });
+      if (options.throws) {
+        throw options.throws;
+      }
       return options.result ?? { kind: "activated" };
     },
   }));
@@ -108,6 +112,19 @@ describe("GET /auth/confirmar", () => {
 
     expect(confirmCalls).toEqual([]);
     expect(locationOf(response)).toBe("/registro?confirmacion=invalida");
+  });
+
+  it("no deja al visitante en una página de error si el servidor falla al canjear", async () => {
+    mockDependencies({ throws: new Error("members read failed") });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await openConfirmationLink(
+      `?token_hash=${TOKEN_HASH}&type=signup`,
+    );
+
+    // El token ya se consumió, así que reintentar el mismo enlace no sirve: la
+    // pantalla tiene que decir que el fallo es del servidor, no del enlace.
+    expect(locationOf(response)).toBe("/registro?confirmacion=error");
   });
 
   it("distingue un servidor sin configurar de un enlace que no vale", async () => {

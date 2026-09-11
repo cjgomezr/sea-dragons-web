@@ -182,6 +182,18 @@ function errorIdOf(field: RegistrationField): string {
   return `registro-${field}-error`;
 }
 
+/** Los atributos que comparten los seis controles. Con la forma escrita, una
+ * clave mal tecleada o un valor del tipo equivocado no compilan al hacer el
+ * spread; con un Record suelto sí compilarían. */
+type FieldProps = {
+  readonly id: string;
+  readonly name: RegistrationField;
+  readonly value: string;
+  readonly required: true;
+  readonly "aria-invalid": boolean;
+  readonly "aria-describedby"?: string;
+};
+
 /** Las opciones de país llegan como prop, calculadas en el servidor, y no se
  * generan aquí. Los nombres salen de `Intl.DisplayNames` y su orden de
  * `localeCompare`, y las dos cosas dependen de la versión de ICU: Node ordena
@@ -201,9 +213,7 @@ export function RegistrationForm({
     return issues.find((issue) => issue.field === field);
   }
 
-  function fieldProps(
-    field: RegistrationField,
-  ): Record<string, string | boolean> {
+  function fieldProps(field: RegistrationField): FieldProps {
     const issue = issueFor(field);
     return {
       id: `registro-${field}`,

@@ -12,6 +12,12 @@ export type MembershipType = (typeof MEMBERSHIP_TYPES)[number];
  * contraseña: el PRD de E2 lo deja fuera de alcance a propósito. */
 export const PASSWORD_MIN_LENGTH = 8;
 
+/** El máximo no es una política nuestra, es el de bcrypt, que es con lo que
+ * GoTrue guarda la contraseña. Sin esta comprobación el rechazo llegaría desde
+ * el servicio de autenticación, donde ya no se sabe qué campo era, y el
+ * visitante recibiría un 500 genérico en vez de "revisa la contraseña". */
+export const PASSWORD_MAX_LENGTH = 72;
+
 /** Una fecha de nacimiento anterior a esta no es un socio, es una errata. */
 export const EARLIEST_DATE_OF_BIRTH = "1900-01-01";
 
@@ -94,8 +100,11 @@ function validateCountry(value: string): string | null {
 }
 
 function validatePassword(value: string): string | null {
-  return value.length < PASSWORD_MIN_LENGTH
-    ? `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`
+  if (value.length < PASSWORD_MIN_LENGTH) {
+    return `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`;
+  }
+  return value.length > PASSWORD_MAX_LENGTH
+    ? `La contraseña no puede pasar de ${PASSWORD_MAX_LENGTH} caracteres.`
     : null;
 }
 
