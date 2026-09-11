@@ -23,6 +23,9 @@ const CHECK_SCHEMA_SNAPSHOT = path.join(
   REPO_ROOT,
   "scripts/check-schema-snapshot.sh",
 );
+/** El comprobador la carga con `source`, así que la copia de usar y tirar la
+ * necesita al lado o muere antes de comparar nada. */
+const SCHEMA_DRIFT_LIB = path.join(REPO_ROOT, "scripts/lib/schema-drift.sh");
 const EXPECTED_SCHEMA = path.join(REPO_ROOT, "supabase/ci/schema-expected.txt");
 
 /**
@@ -350,7 +353,7 @@ async function sandboxedChecker(): Promise<{
 }> {
   const root = await mkdtemp(path.join(tmpdir(), "comprobador-"));
   temporaryDirectories.push(root);
-  await mkdir(path.join(root, "scripts"));
+  await mkdir(path.join(root, "scripts", "lib"), { recursive: true });
   await mkdir(path.join(root, "supabase", "ci"), { recursive: true });
 
   const script = path.join(root, "scripts", "check-schema-snapshot.sh");
@@ -361,6 +364,10 @@ async function sandboxedChecker(): Promise<{
     "schema-expected.txt",
   );
   await copyFile(CHECK_SCHEMA_SNAPSHOT, script);
+  await copyFile(
+    SCHEMA_DRIFT_LIB,
+    path.join(root, "scripts", "lib", "schema-drift.sh"),
+  );
   await copyFile(
     SCHEMA_SNAPSHOT_SQL,
     path.join(root, "supabase", "ci", "schema-snapshot.sql"),
@@ -431,6 +438,7 @@ describeConPostgres(
       // lo que el repositorio declara tener. Cualquier diferencia es un fallo.
       const comparacion = await database.checkSchema();
       expect(comparacion.code, comparacion.stderr).toBe(0);
+      expect(comparacion.stdout.trim()).toBe("iguales");
       expect(await database.query("select slug from public.clubs")).toBe(
         "victoria-seadragons",
       );
@@ -455,6 +463,28 @@ describeConPostgres(
       expect(comparacion.stderr).toMatch(/intrusa/);
       // Y dice cómo arreglarlo cuando la diferencia es la esperada.
       expect(comparacion.stderr).toMatch(/--write/);
+      // La base tiene algo que el repositorio no declara, que es un estado
+      // distinto de "le faltan migraciones" y pide un arreglo distinto.
+      expect(comparacion.stdout.trim()).toBe("base-por-delante");
+    });
+
+    it("distingue que el repositorio va por delante cuando a la base le falta lo declarado", async () => {
+      const database = await freshDatabase();
+      const aplicadas = await applyMigrations([], {
+        ...process.env,
+        DATABASE_URL: database.url,
+      });
+      expect(aplicadas.code, aplicadas.stderr).toBe(0);
+
+      // Una base a la que le falta una tabla declarada es lo que ve la
+      // comprobación de divergencia cuando producción se quedó atrás.
+      await database.query("drop table public.audit_log");
+
+      const comparacion = await database.checkSchema();
+
+      expect(comparacion.code).toBeGreaterThan(0);
+      expect(comparacion.stdout.trim()).toBe("repositorio-por-delante");
+      expect(comparacion.stderr).toMatch(/migraciones por aplicar/);
     });
 
     it("aplicar dos veces el histórico no cambia el esquema resultante ni duplica la semilla", async () => {

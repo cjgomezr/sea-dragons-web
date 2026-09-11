@@ -290,11 +290,12 @@ o medio sistema se queda con la vieja. Esta es la lista, una fila por sitio.
 Sale de `entornos.json` y `tests/unit/entornos-doc.test.ts` falla si la tabla y
 el manifiesto se separan.
 
-| Variable                    | Entorno    | Dónde se cambia                                                                          |
-| --------------------------- | ---------- | ---------------------------------------------------------------------------------------- |
-| `SUPABASE_SERVICE_ROLE_KEY` | local      | .env.local, en la máquina de quien desarrolla, fuera de git                              |
-| `SUPABASE_SERVICE_ROLE_KEY` | production | Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Production |
-| `SUPABASE_ACCESS_TOKEN`     | local      | .env.local, en la máquina de quien desarrolla, fuera de git                              |
+| Variable                     | Entorno       | Dónde se cambia                                                                                      |
+| ---------------------------- | ------------- | ---------------------------------------------------------------------------------------------------- |
+| `SUPABASE_SERVICE_ROLE_KEY`  | local         | .env.local, en la máquina de quien desarrolla, fuera de git                                          |
+| `SUPABASE_SERVICE_ROLE_KEY`  | production    | Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Production             |
+| `SUPABASE_ACCESS_TOKEN`      | local         | .env.local, en la máquina de quien desarrolla, fuera de git                                          |
+| `SUPABASE_PRODUCTION_DB_URL` | ci-produccion | GitHub, repositorio sea-dragons-web, Settings, Environments, entorno Production, Environment secrets |
 
 El orden importa. Primero se genera la clave nueva, después se actualiza cada
 fila de la tabla, y sólo al final se revoca la vieja: al revés deja la
@@ -308,10 +309,10 @@ significa cambiar de proyecto, y eso es una migración, no una rotación.
 ## Migraciones
 
 El esquema de producción se sembró a mano el 8 de septiembre de 2026, por MCP,
-porque no había otra vía: el workflow que las aplica es el issue #94 y todavía
-no existe. **Es un arranque, no el procedimiento.** En cuanto el #94 esté
-mergeado, ninguna migración vuelve a aplicarse desde la sesión de nadie: llegan
-a producción por el mismo camino que el código.
+porque no había otra vía. **Fue un arranque, no el procedimiento.** Desde el
+issue #94 las migraciones llegan a producción por el mismo camino que el
+código, sin pasar por la sesión de nadie, en cuanto exista el secreto de
+producción (ver más abajo).
 
 Los dos proyectos tienen la misma lista de migraciones por nombre
 (`0001_clubs`, `0002_audit_log`). Las marcas de versión difieren, porque cada
@@ -366,6 +367,77 @@ base se saltan solos mientras no exista `MIGRATIONS_TEST_DATABASE_URL`, así que
 no se pueden saltar: `REQUIRE_MIGRATIONS_POSTGRES=1` convierte el salto en un
 fallo, porque ahí son media cobertura de la comprobación.
 
+### Aplicadas al mergear a main (issue #94)
+
+`migraciones-produccion.yml` aplica el histórico a `seadragons-prod` cuando un
+merge a `main` trae cambios en `supabase/migrations/`. Es el único camino por el
+que una migración llega a producción.
+
+**Pendiente mientras nadie ponga el secreto.** El workflow está en el
+repositorio, pero `SUPABASE_PRODUCTION_DB_URL` no existe todavía en Settings,
+Environments, Production. Hasta que alguien lo cree, la primera corrida falla en
+el paso que lo comprueba y ninguna migración llega sola. Este párrafo se borra
+en el mismo commit en que se ponga el secreto.
+
+Cómo está armado y por qué:
+
+- **Sólo `push` a `main`, y sólo si cambiaron las migraciones.** Un merge que no
+  toca `supabase/migrations/` no ejecuta nada contra la base con datos reales.
+  Ojo con el caso que eso deja fuera: regenerar `supabase/ci/schema-expected.txt`
+  sin añadir una migración no vuelve a comprobar producción contra la
+  descripción nueva. Lo hará el siguiente merge que traiga una migración, y
+  mientras tanto está el comando de la sección siguiente.
+- **`concurrency` sin cancelación.** Dos merges seguidos se ponen en fila: el
+  segundo espera al primero. Cancelar al primero lo dejaría a medio aplicar, y
+  el estado de producción pasaría a depender de en qué migración lo pillara el
+  corte.
+- **Ningún paso perdona un fallo.** Sin `continue-on-error` y sin `|| true`: una
+  migración que revienta en producción deja el workflow en rojo y el log con el
+  error de psql. No hay rollback automático, a propósito. Lo arregla una
+  persona, que es quien puede decidir si el arreglo es otra migración o
+  restaurar.
+- **La credencial no está en el repositorio ni en los secretos generales.** El
+  job declara el entorno `Production` de Actions y lee
+  `SUPABASE_PRODUCTION_DB_URL` de ahí. Los secretos generales los lee cualquier
+  workflow, el de un PR incluido; los del entorno sólo el job que lo declara.
+- **Después de aplicar, compara.** El mismo `check-schema-snapshot.sh` del PR
+  corre contra producción: aplicar sin error no garantiza haber dejado el
+  esquema que el repositorio declara. La comparación vale porque los dos lados
+  son Postgres 17 (comprobado el 11 de septiembre de 2026: `seadragons-prod`
+  corre 17.6 y el contenedor del PR es `postgres:17`). El día que Supabase suba
+  de mayor, el texto de una restricción puede cambiar de formato y este paso
+  saldrá rojo sin que nadie haya tocado el esquema; lo que se regenera entonces
+  es `supabase/ci/schema-expected.txt`.
+
+Aplicar el histórico completo en cada corrida es seguro porque toda migración de
+este repositorio es idempotente (`create table if not exists`, `drop policy if
+exists` antes de crearla, `on conflict do nothing` en las semillas). Eso lo
+prueba `tests/unit/scripts/apply-migrations.test.ts` contra un Postgres de
+verdad en cada PR: aplicar dos veces no cambia el esquema ni duplica la semilla.
+Una migración nueva que no cumpla esa regla rompe el PR, no producción.
+
+### Si el repositorio y producción divergieron
+
+La pregunta tiene tres respuestas distintas y el comando las distingue:
+
+```bash
+DATABASE_URL="<conexión a seadragons-prod>" bash scripts/check-schema-snapshot.sh
+```
+
+Escribe en stdout una palabra y sale en verde sólo con la primera:
+
+| Respuesta                 | Qué pasó                                            | Quién lo arregla                                        |
+| ------------------------- | --------------------------------------------------- | ------------------------------------------------------- |
+| `iguales`                 | la base tiene lo que el repositorio declara         | nadie                                                   |
+| `repositorio-por-delante` | a la base le faltan objetos declarados              | el workflow, aplicando las migraciones pendientes       |
+| `base-por-delante`        | la base tiene objetos que el repositorio no declara | una persona: alguien la tocó por fuera de una migración |
+| `divergieron`             | cada lado tiene algo que el otro no                 | una persona, mirando el diff que el propio comando saca |
+
+Nadie tiene esa conexión guardada en su máquina, y así debe seguir: para correrlo
+a mano hay que ir al dashboard de Supabase por la cadena de conexión en ese
+momento. La vía sin credenciales es mirar la última corrida del workflow, que
+hace exactamente esta comprobación después de cada migración aplicada.
+
 ## Una trampa del plan Free
 
 Free pausa un proyecto tras una semana sin actividad. Producción iba a estar
@@ -377,11 +449,11 @@ sí se puede pausar, porque nadie lo vigila.
 
 ## Catálogo de variables (issue #90)
 
-Para cada variable de `.env.example`, en qué entornos vive y quién la pone.
-Esto es la versión en prosa: la que leen los tests es `entornos.json`, y las
-dos no pueden separarse sin que la suite se ponga en rojo.
+Para cada variable, en qué entornos vive y quién la pone. Esto es la versión en
+prosa: la que leen los tests es `entornos.json`, y las dos no pueden separarse
+sin que la suite se ponga en rojo.
 
-Los cuatro entornos posibles:
+Los cinco entornos posibles:
 
 - **Local**: la máquina de quien desarrolla, en `.env.local` (nunca
   commiteado).
@@ -391,7 +463,13 @@ Los cuatro entornos posibles:
   `seadragons-prod` desde el 11 de septiembre de 2026. Comprobado ese día
   contra los dos despliegues: cada uno devuelve el ref del proyecto que le
   toca.
-- **CI**: los workflows de GitHub Actions (`.github/workflows/`).
+- **CI**: los secretos del repositorio, que lee cualquier workflow de GitHub
+  Actions (`.github/workflows/`), incluido el que construye un PR.
+- **CI de producción** (`ci-produccion` en el manifiesto): los secretos del
+  entorno `Production` de Actions, que sólo recibe el job que declara ese
+  entorno. Es la única puerta por la que una credencial de producción entra en
+  CI, y existe para que las migraciones puedan aplicarse solas sin abrirle
+  producción a todo lo que corra en Actions.
 
 `NEXT_PUBLIC_SUPABASE_URL`: en local, `.env.local` apunta a `seadragons-dev`.
 En preview, apunta a `seadragons-dev`, **nunca** al proyecto de producción. En
@@ -463,6 +541,17 @@ tests truncan y borran bases.
 producción. En CI la pone solo `migrations.yml`, a `1`, para que la falta de
 Postgres sea un fallo en vez de un salto silencioso. `checks.yml` no la pone a
 propósito: ahí `npm test` corre sin base y saltarse esos tests es lo correcto.
+
+`SUPABASE_PRODUCTION_DB_URL`: la cadena de conexión con la que
+`migraciones-produccion.yml` aplica el esquema en `seadragons-prod`. **No está
+en `.env.example` a propósito**, y no porque se haya olvidado: enumerarla ahí
+invitaría a pegar la conexión de producción en un `.env.local`, que es justo lo
+que RF-4 prohíbe. No existe en local, ni en preview, ni en las variables de
+Vercel, ni en los secretos generales del repositorio. Vive sólo en los secretos
+del entorno `Production` de Actions, y la pone quien administre el repositorio
+con la cadena que da el dashboard de Supabase (Connect, Session pooler, que es
+la que funciona desde un runner de GitHub). Es la credencial con la que un error
+cuesta más caro: escribe en el esquema de la base con los datos reales del club.
 
 **Qué protege este documento y qué no.** `tests/unit/entornos-doc.test.ts`
 rechaza cualquier cadena con forma de clave de Supabase, en los dos formatos que
