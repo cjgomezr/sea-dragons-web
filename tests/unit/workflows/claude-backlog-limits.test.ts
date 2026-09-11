@@ -16,14 +16,34 @@ const LABEL_TRIGGER_TIMEOUT_MINUTES = 120;
 const SCHEDULE_MAX_TURNS = 1000;
 const SCHEDULE_TIMEOUT_MINUTES = 350;
 
+/** Modos en los que Bash no pide aprobación. Es la condición que importa: el
+ * ciclo de vida es casi todo Bash (`gh issue edit`, `git push`, `gh pr create`,
+ * `npm test`), así que `acceptEdits` NO entra en la lista aunque suene
+ * permisivo, porque solo auto-aprueba escrituras de archivos y dejaría al
+ * worker igual de bloqueado que el 11 de septiembre de 2026.
+ *
+ * `auto` sí trabaja, y es el que usa `scripts/process-backlog.sh` en una
+ * máquina con alguien delante. En un runner headless su pausa ante una acción
+ * que considera peligrosa equivale a una denegación silenciosa a mitad de
+ * ticket, más difícil de diagnosticar que el fallo original. */
+const PERMISSION_MODES_WITHOUT_BASH_PROMPTS = ["bypassPermissions", "auto"];
+
+/** El guardia que convierte en rojo una corrida que no tocó el issue. */
+const CLAIM_GUARD_STEP_NAME = "Comprueba que el worker dejó rastro en el issue";
+const CLAIM_GUARD_SCRIPT = "scripts/check-worker-claimed.sh";
+
+interface WorkflowStep {
+  name?: string;
+  if?: string;
+  run?: string;
+  with?: { claude_args?: string };
+}
+
 interface WorkflowFile {
   jobs: {
     implement: {
       "timeout-minutes": number | string;
-      steps: Array<{
-        name?: string;
-        with?: { claude_args?: string };
-      }>;
+      steps: WorkflowStep[];
     };
   };
 }
@@ -116,5 +136,74 @@ describe("claude-backlog.yml", () => {
 
   it("mantiene el timeout del cron por debajo del tope de 6 horas de GitHub", () => {
     expect(SCHEDULE_TIMEOUT_MINUTES).toBeLessThan(GITHUB_JOB_HARD_CAP_MINUTES);
+  });
+});
+
+// El 11 de septiembre de 2026 la primera corrida real de este workflow terminó
+// en verde sin hacer absolutamente nada: 11 denegaciones de permiso, 18 turnos,
+// 74 segundos, y el issue intacto. Le faltaba el modo de permisos que el script
+// local sí pasa. Sin él, cada escritura espera una aprobación que en un runner
+// no va a llegar nunca.
+describe("claude-backlog.yml · permisos del worker", () => {
+  it("le pasa un modo de permisos en el que Bash no pide aprobación", () => {
+    const claudeArgs = findClaudeArgs(parseWorkflow());
+
+    const mode = claudeArgs.match(/--permission-mode\s+(\S+)/)?.[1];
+
+    expect(
+      mode,
+      `claude_args no declara --permission-mode: ${claudeArgs}`,
+    ).toBeDefined();
+    expect(PERMISSION_MODES_WITHOUT_BASH_PROMPTS).toContain(mode);
+  });
+});
+
+// El segundo defecto de esa corrida, y el peor: el único aviso del workflow
+// colgaba de `failure()`, así que un worker que sale limpio sin tocar nada no
+// avisa a nadie. La cola parecía procesada. Este guardia convierte ese silencio
+// en un job rojo.
+describe("claude-backlog.yml · el silencio no puede pasar por éxito", () => {
+  function findClaimGuard(): WorkflowStep {
+    const step = parseWorkflow().jobs.implement.steps.find(
+      (candidate) => candidate.name === CLAIM_GUARD_STEP_NAME,
+    );
+    if (!step) {
+      throw new Error(
+        `el workflow no tiene el paso '${CLAIM_GUARD_STEP_NAME}'`,
+      );
+    }
+    return step;
+  }
+
+  it("comprueba, después del worker, que el issue quedó tocado", () => {
+    // La lógica vive en un script porque ahí sí se puede ejecutar contra un
+    // `gh` de mentira. Este test solo fija que el workflow la invoque.
+    expect(findClaimGuard().run).toContain(CLAIM_GUARD_SCRIPT);
+  });
+
+  it("corre también cuando el worker sale en verde", () => {
+    // `if: failure()` es justo lo que dejó pasar el fallo original: el worker
+    // salió con éxito. Vale cualquier condición que no dependa del resultado
+    // del paso anterior.
+    const condition = findClaimGuard().if ?? "";
+
+    expect(condition).toMatch(/always\(\)|!\s*cancelled\(\)/);
+    expect(condition).not.toContain("failure()");
+  });
+
+  it("solo aplica al disparo por etiqueta, que trabaja un issue concreto", () => {
+    // El turno nocturno procesa varios y puede terminar legítimamente sin
+    // tocar ninguno si no hay nada elegible.
+    expect(findClaimGuard().if ?? "").toContain("issues");
+  });
+
+  it("deja que el aviso del issue distinga cuál de los dos fracasos ocurrió", () => {
+    // Sin esto, un worker que salió limpio recibe un comentario diciendo que
+    // la corrida falló, y manda a buscar la causa donde no está.
+    const note = parseWorkflow().jobs.implement.steps.find((candidate) =>
+      candidate.if?.includes("failure()"),
+    );
+
+    expect(note?.run).toContain("CLAIM_GUARD");
   });
 });
