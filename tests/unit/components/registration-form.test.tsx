@@ -156,6 +156,50 @@ describe("formulario de registro", () => {
     );
   });
 
+  it("cambia la pista de la contraseña por el error, en vez de apilar las dos", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    renderForm();
+
+    await fillValidForm();
+    expect(screen.getByText("Al menos 8 caracteres.")).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText("Contraseña"));
+    await user.type(screen.getByLabelText("Contraseña"), "1234567");
+    await user.click(submitButton());
+
+    await screen.findByRole("alert");
+    expect(
+      screen.queryByText("Al menos 8 caracteres."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("deshabilita el botón mientras el registro está en vuelo", async () => {
+    let releaseResponse = (): void => {};
+    const held = new Promise<void>((resolve) => {
+      releaseResponse = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        await held;
+        return new Response(
+          JSON.stringify({
+            data: { outcome: "confirmation_pending", email: "n@example.test" },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }),
+    );
+    renderForm();
+
+    await fillValidForm();
+    await userEvent.setup().click(submitButton());
+
+    await waitFor(() => expect(submitButton()).toBeDisabled());
+    releaseResponse();
+  });
+
   it("tras registrarse dice que falta confirmar el correo y lo nombra", async () => {
     stubApi();
     renderForm();

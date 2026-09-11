@@ -41,6 +41,7 @@
   --color-border: #dee6ed;
   --color-success: #2e9e86;
   --color-warning: #c99a3e;
+  --color-danger: #bc3b2e;
   /* Texto sobre un relleno de acento. No es un color nuevo: es el que hace que
      un botón primario pase AA en cada tema. Blanco sobre el acento claro da
      5.1:1; blanco sobre el acento oscuro daría 2.6:1, así que ahí el texto es
@@ -59,6 +60,7 @@
   --color-border: #274055;
   --color-success: #6fd6b4;
   --color-warning: #f2ce78;
+  --color-danger: #f2887a;
   --color-on-accent: #0c1a26;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -346,12 +348,21 @@ h6 {
 }
 
 .auth-brand {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
   padding: var(--space-6) var(--space-4);
   color: var(--color-sidebar-text);
   background: var(--color-sidebar-background);
+  /* El halo de la esquina superior derecha del mockup. Va en el fondo y no en
+     un elemento, para que no exista para el lector de pantalla ni para el
+     recorrido con teclado. */
+  background-image: radial-gradient(
+    circle at 85% 8%,
+    var(--color-sidebar-hover) 0%,
+    transparent 45%
+  );
 }
 
 .auth-brand-header {
@@ -495,7 +506,7 @@ h6 {
 }
 
 .auth-field [aria-invalid="true"] {
-  border-color: var(--color-warning);
+  border-color: var(--color-danger);
 }
 
 .auth-hint {
@@ -508,7 +519,7 @@ h6 {
   margin: 0;
   font-size: 14px;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-danger);
 }
 
 .auth-submit {
@@ -542,7 +553,7 @@ h6 {
   padding: var(--space-3) var(--space-4);
   color: var(--color-text);
   background: var(--color-panel);
-  border: 1px solid var(--color-warning);
+  border: 1px solid var(--color-danger);
   border-radius: var(--radius);
 }
 
@@ -559,6 +570,14 @@ h6 {
   margin: 0;
   font-size: 14px;
   color: var(--color-text-secondary);
+}
+
+.auth-back {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: var(--touch-target-min);
+  color: var(--color-accent);
 }
 
 @media (min-width: 768px) {

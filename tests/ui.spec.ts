@@ -716,6 +716,22 @@ for (const state of ["ok", "pendiente", "invalida", "error"] as const) {
   });
 }
 
+// Los dos desenlaces que no dejan nada que hacer sustituyen al formulario, así
+// que sin un camino de vuelta son un callejón sin salida.
+for (const state of ["invalida", "error"] as const) {
+  test(`registro tras el enlace (${state}): ofrece volver al registro`, async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}/registro?confirmacion=${state}`);
+
+    await page.getByRole("link", { name: "Volver al registro" }).click();
+
+    await expect(
+      page.getByRole("heading", { name: "Crear tu cuenta" }),
+    ).toBeVisible();
+  });
+}
+
 test("el formulario de registro no manda nada al servidor con la contraseña corta", async ({
   page,
 }) => {

@@ -15,8 +15,14 @@ export const PASSWORD_MIN_LENGTH = 8;
 /** El máximo no es una política nuestra, es el de bcrypt, que es con lo que
  * GoTrue guarda la contraseña. Sin esta comprobación el rechazo llegaría desde
  * el servicio de autenticación, donde ya no se sabe qué campo era, y el
- * visitante recibiría un 500 genérico en vez de "revisa la contraseña". */
-export const PASSWORD_MAX_LENGTH = 72;
+ * visitante recibiría un 500 genérico en vez de "revisa la contraseña".
+ *
+ * Se mide en BYTES y no en caracteres porque así lo mide bcrypt: 40 letras
+ * acentuadas son 80 bytes en UTF-8 y las rechazaría igual. El mínimo sí va en
+ * caracteres, porque ese sí es una política nuestra (NFR-005). */
+export const PASSWORD_MAX_BYTES = 72;
+
+const PASSWORD_ENCODER = new TextEncoder();
 
 /** Una fecha de nacimiento anterior a esta no es un socio, es una errata. */
 export const EARLIEST_DATE_OF_BIRTH = "1900-01-01";
@@ -103,8 +109,8 @@ function validatePassword(value: string): string | null {
   if (value.length < PASSWORD_MIN_LENGTH) {
     return `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`;
   }
-  return value.length > PASSWORD_MAX_LENGTH
-    ? `La contraseña no puede pasar de ${PASSWORD_MAX_LENGTH} caracteres.`
+  return PASSWORD_ENCODER.encode(value).length > PASSWORD_MAX_BYTES
+    ? `La contraseña no puede pasar de ${PASSWORD_MAX_BYTES} caracteres (las letras acentuadas y los emojis cuentan doble).`
     : null;
 }
 

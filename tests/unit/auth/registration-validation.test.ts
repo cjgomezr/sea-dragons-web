@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   EARLIEST_DATE_OF_BIRTH,
   MEMBERSHIP_TYPES,
-  PASSWORD_MAX_LENGTH,
+  PASSWORD_MAX_BYTES,
   PASSWORD_MIN_LENGTH,
   type RegistrationIssue,
   type RegistrationRequest,
@@ -90,22 +90,34 @@ describe("registro: validación", () => {
   });
 
   it("rechaza una contraseña más larga de lo que acepta el servicio de autenticación", () => {
-    expect(PASSWORD_MAX_LENGTH).toBe(72);
+    expect(PASSWORD_MAX_BYTES).toBe(72);
     const issue = issueFor(
-      requestWith({ password: "a".repeat(PASSWORD_MAX_LENGTH + 1) }),
+      requestWith({ password: "a".repeat(PASSWORD_MAX_BYTES + 1) }),
       "password",
     );
 
-    expect(issue.message).toContain(String(PASSWORD_MAX_LENGTH));
+    expect(issue.message).toContain(String(PASSWORD_MAX_BYTES));
   });
 
   it("acepta una contraseña de exactamente el máximo", () => {
     expect(
       validateRegistration(
-        requestWith({ password: "a".repeat(PASSWORD_MAX_LENGTH) }),
+        requestWith({ password: "a".repeat(PASSWORD_MAX_BYTES) }),
         { now: NOW },
       ).ok,
     ).toBe(true);
+  });
+
+  it("mide el máximo en bytes, que es como lo mide el servicio de autenticación", () => {
+    // 40 letras acentuadas son 80 bytes en UTF-8: pasan de largo aunque
+    // parezcan cortas. Contarlas como 40 dejaría que el rechazo llegara desde
+    // Supabase, donde ya no se sabe qué campo era.
+    const acentuada = "á".repeat(40);
+    expect(acentuada.length).toBeLessThan(PASSWORD_MAX_BYTES);
+
+    expect(
+      issueFor(requestWith({ password: acentuada }), "password"),
+    ).toBeDefined();
   });
 
   it("rechaza un tipo de membresía fuera del conjunto cerrado", () => {

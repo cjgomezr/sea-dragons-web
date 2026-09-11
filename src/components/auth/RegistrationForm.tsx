@@ -178,6 +178,8 @@ function IssueSummary({
   );
 }
 
+const PASSWORD_HINT_ID = "registro-password-hint";
+
 function errorIdOf(field: RegistrationField): string {
   return `registro-${field}-error`;
 }
@@ -348,16 +350,19 @@ export function RegistrationForm({
           type="password"
           autoComplete="new-password"
           aria-describedby={
-            issueFor("password")
-              ? `${errorIdOf("password")} registro-password-hint`
-              : "registro-password-hint"
+            issueFor("password") ? errorIdOf("password") : PASSWORD_HINT_ID
           }
           onChange={(event) => update("password", event.target.value)}
         />
-        <p className="auth-hint" id="registro-password-hint">
-          Al menos {PASSWORD_MIN_LENGTH} caracteres.
-        </p>
-        {fieldError("password")}
+        {/* La pista y el error dicen lo mismo, así que se turnan: apiladas
+            eran el mismo mensaje dos veces, y tres contando el resumen. */}
+        {issueFor("password") ? (
+          fieldError("password")
+        ) : (
+          <p className="auth-hint" id={PASSWORD_HINT_ID}>
+            Al menos {PASSWORD_MIN_LENGTH} caracteres.
+          </p>
+        )}
       </div>
 
       <button
