@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DATABASE_PROBE_TIMEOUT_MS } from "@/lib/health";
 import { SECRET_ENV_VARS } from "../../support/env-vars";
 
 const ORIGINAL_ENV = { ...process.env };
@@ -25,6 +26,32 @@ function mockDatabaseAnswering(error: { message: string } | null): void {
   }));
 }
 
+function mockDatabaseNeverAnswering(): void {
+  vi.doMock("@supabase/supabase-js", () => ({
+    createClient: () => ({
+      from: () => ({
+        select: () => ({
+          limit: () => new Promise(() => {}),
+        }),
+      }),
+    }),
+  }));
+}
+
+function mockDatabaseThrowing(thrown: Error): void {
+  vi.doMock("@supabase/supabase-js", () => ({
+    createClient: () => ({
+      from: () => ({
+        select: () => ({
+          limit: async () => {
+            throw thrown;
+          },
+        }),
+      }),
+    }),
+  }));
+}
+
 function configureSupabaseEnvironment(): void {
   process.env.NEXT_PUBLIC_SUPABASE_URL = `https://${PROJECT_REF}.supabase.co`;
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = JWT_LOOKING_ANON_KEY;
@@ -43,9 +70,29 @@ async function getHealth(
   return GET(new NextRequest(HEALTH_URL, { headers }));
 }
 
+/** El reloj falso se instala con el módulo ya importado: la importación
+ * dinámica no es un temporizador y con el reloj congelado no habría forma de
+ * empujarla. Con el módulo dentro, `advanceTimersByTimeAsync` sí recoge el
+ * temporizador que la sonda arma unos microtasks después. */
+async function getHealthLettingTheProbeTimeOut(): Promise<Response> {
+  const { GET } = await import("@/app/api/v1/health/route");
+  vi.useFakeTimers();
+  try {
+    const pending = GET(new NextRequest(HEALTH_URL));
+    await vi.advanceTimersByTimeAsync(DATABASE_PROBE_TIMEOUT_MS);
+    return await pending;
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
 describe("health", () => {
   beforeEach(() => {
     vi.resetModules();
+    // `vi.doMock` sobrevive al test que lo registró. Sin esto, un test que
+    // quiere el driver de verdad hereda el doble del test anterior y pasa sin
+    // haber ejercitado nada.
+    vi.doUnmock("@supabase/supabase-js");
     process.env = { ...ORIGINAL_ENV };
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -140,6 +187,58 @@ describe("health", () => {
     };
     expect(body.error.code).toBe("service_unavailable");
     expect(body.error.message).toContain("NEXT_PUBLIC_SUPABASE_URL");
+  });
+
+  // Una base que no contesta deja la petición colgada, y un monitoreo que
+  // espera indefinidamente no ve la caída: la ve el socio que abre la web.
+  it("responde 503, no 200, cuando Supabase tarda más que el timeout de la sonda", async () => {
+    configureSupabaseEnvironment();
+    mockDatabaseNeverAnswering();
+
+    const response = await getHealthLettingTheProbeTimeOut();
+
+    expect(response.status).toBe(503);
+    const body = (await response.json()) as {
+      error: { code: string; message: string };
+    };
+    expect(body.error.code).toBe("service_unavailable");
+    expect(body.error.message).toContain(String(DATABASE_PROBE_TIMEOUT_MS));
+  });
+
+  // supabase-js devuelve `{ error }` en vez de lanzar, pero la capa de red por
+  // debajo sí lanza (DNS, TLS, socket cortado). Sin esto el endpoint responde
+  // 500, y el criterio de aceptación pide 503 cuando Supabase no responde.
+  it("responde 503, no 500, cuando la llamada a Supabase lanza", async () => {
+    configureSupabaseEnvironment();
+    mockDatabaseThrowing(new TypeError("fetch failed"));
+
+    const response = await getHealth();
+
+    expect(response.status).toBe(503);
+    const body = (await response.json()) as {
+      error: { code: string; message: string };
+    };
+    expect(body.error.code).toBe("service_unavailable");
+    expect(body.error.message).toContain("fetch failed");
+  });
+
+  // `readSupabaseConfig` solo comprueba que la variable esté puesta, no que sea
+  // una URL, y `createClient` lanza con una mal pegada. Ese es un error de
+  // configuración de producción, justo lo que este endpoint existe para
+  // delatar, así que tiene que salir por 503 y no por un 500 mudo.
+  it("responde 503, no 500, cuando la URL de Supabase está mal escrita", async () => {
+    configureSupabaseEnvironment();
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "no-es-una-url";
+
+    const response = await getHealth();
+
+    expect(response.status).toBe(503);
+    const body = (await response.json()) as {
+      error: { code: string; message: string };
+    };
+    expect(body.error.code).toBe("service_unavailable");
+    // Sin esto, cualquier otra vía de fallo dejaría el test en verde.
+    expect(body.error.message).toContain("supabaseUrl");
   });
 
   it("responde 405 con la forma de error para un método no soportado", async () => {

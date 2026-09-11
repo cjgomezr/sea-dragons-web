@@ -56,9 +56,10 @@ PR.
   Preview y Development a la vez, que es justo lo que el issue #92 existe para
   impedir.
 - **Variables de entorno:** qué va en cada ámbito está decidido y escrito en
-  `entornos.json`; ver "Secretos por entorno" más abajo. Mientras nadie las
-  haya pegado en el panel, `GET /api/v1/health` responde 503 diciendo qué
-  falta, que es el comportamiento correcto y no un despliegue roto.
+  `entornos.json`; ver "Secretos por entorno" más abajo. Pegadas en el panel el
+  11 de septiembre de 2026, en los ámbitos Preview y Production. Si alguien las
+  borra, `GET /api/v1/health` responde 503 diciendo qué falta, que es el
+  comportamiento correcto y no un despliegue roto.
 
 ### Qué contesta `GET /api/v1/health`
 
@@ -86,6 +87,91 @@ de pago, con el gasto aprobado por el dueño. No es una tarea de infraestructura
 que se pueda aplazar hasta que alguien se queje: es una condición del
 proveedor.
 
+## Disponibilidad y mantenimiento (issue #95)
+
+NFR-003 fija **99,0% de disponibilidad mensual, best-effort y sin SLA**. Un mes
+de 30 días admite unas 7 horas y 12 minutos de caída antes de incumplirlo.
+
+### Qué se vigila
+
+`GET https://victoria-seadragons.vercel.app/api/v1/health`, y solo eso. El
+endpoint responde 200 cuando la aplicación puede leer de Supabase y 503 cuando
+no, así que servir HTML no cuenta como estar en pie: una aplicación que no
+alcanza la base está caída y el monitoreo tiene que verlo. La sonda a la base
+tiene un plazo de 5 segundos (`DATABASE_PROBE_TIMEOUT_MS` en
+`src/lib/health.ts`); vencido, el endpoint contesta 503 en vez de quedarse
+colgado.
+
+No hace falta autenticarse ni mandar cabeceras. Cualquier respuesta que no sea
+200 cuenta como caída.
+
+### El umbral, escrito
+
+- La URL se comprueba **cada 5 minutos**.
+- Una comprobación fallida no avisa por sí sola: UptimeRobot hace hasta
+  **3 reintentos de confirmación**, separados entre 10 y 20 segundos, antes de
+  dar el sitio por caído. Un paquete perdido o un error suelto no despiertan a
+  nadie.
+- Confirmada la caída, **el aviso sale de inmediato**. Entre que el sitio deja
+  de responder y que sale el correo pasan, en el peor caso, los 5 minutos hasta
+  la siguiente comprobación más el minuto largo de los reintentos: algo menos
+  de 6. Ese es el número con el que se juzga si un aviso llegó tarde.
+- **La recuperación también avisa**, para que nadie se quede pendiente de una
+  caída que ya pasó.
+
+Aquí estuvo escrito, hasta el 11 de septiembre de 2026, que el aviso esperaba a
+dos comprobaciones fallidas seguidas, unos 10 minutos. Nunca fue cierto: ese
+retraso es de pago en UptimeRobot y el proyecto no paga por el monitoreo. El
+umbral de arriba es el que el servicio cumple de verdad. Si algún día hace falta
+aguantar más antes de avisar, es un cambio de plan o de servicio, no una línea
+de este documento.
+
+### Dónde se consulta la disponibilidad del mes
+
+En el panel de **UptimeRobot**, que es quien acumula el histórico:
+
+```
+https://dashboard.uptimerobot.com/monitors
+```
+
+El monitor se llama `victoria-seadragons.vercel.app` y vigila la URL de arriba.
+El panel da el porcentaje del mes, que es el número que hay que comparar contra
+el 99,0% de NFR-003, y la lista de incidentes con su duración.
+
+La cuenta va en plan gratuito y ahí se queda. Es una regla del proyecto: si hay
+que pagar, no se hace. Lo que el plan gratuito no da está dicho arriba, en el
+umbral.
+
+El aviso llega al correo del dueño del club. Hoy hay una sola persona de
+guardia, así que no hay rotación que decidir; es la pregunta abierta 4 del PRD y
+sigue abierta para cuando entre más gente.
+
+Comprobado el 11 de septiembre de 2026: se dio de alta un monitor de prueba
+contra una ruta inexistente del mismo dominio, el correo de caída llegó, y el
+monitor de prueba se borró. El aviso funciona, no solo está configurado.
+
+### La ventana de mantenimiento
+
+El mantenimiento planificado cae **fuera de las horas de entrenamiento del
+club** y se anuncia con 48 horas (NFR-003). Las horas, en zona
+`Australia/Melbourne`:
+
+| Día    | Horario     |
+| ------ | ----------- |
+| Martes | 18:00–22:00 |
+| Jueves | 18:00–22:00 |
+| Sábado | 08:00–13:00 |
+
+Esta tabla es una copia de cortesía. La fuente es
+`src/lib/training-hours.ts`, que las declara como dato y responde si un
+instante cae dentro de un entrenamiento. Si alguna vez discrepan, manda el
+módulo: tiene tests y la tabla no.
+
+La zona importa y es la trampa de esta sección. Melbourne alterna AEST (UTC+10)
+y AEDT (UTC+11), así que un cálculo con desfase fijo mueve el entrenamiento de
+las 18:00 a las 17:00 media temporada. Por eso el módulo convierte por nombre de
+zona y nunca por aritmética de horas.
+
 ## Credenciales
 
 Ninguna clave de ningún proyecto vive en este documento ni en ningún otro
@@ -95,10 +181,10 @@ archivo versionado del repositorio.
   de git. Qué variable hace falta y para qué sirve se describe en
   `.env.example`, sin valores reales (issue #90).
 - **De producción:** no viven en el portátil de nadie. Van a los secretos del
-  despliegue (Vercel) y del repositorio (GitHub Actions) cuando existan esos
-  entornos (issues #91, #92 y #94). Poner una credencial de producción en
-  `.env.local` hace fallar la suite entera por el guardia de entorno, y eso es
-  deliberado.
+  despliegue (Vercel, puestos el 11 de septiembre de 2026) y a los del
+  repositorio (GitHub Actions, cuando el #94 los necesite). Poner una credencial
+  de producción en `.env.local` hace fallar la suite entera por el guardia de
+  entorno, y eso es deliberado.
 - **Password de la base de producción:** no se fijó al crear el proyecto por
   API. Cuando el #94 lo necesite, se genera en el dashboard (Settings →
   Database → Reset database password) y se pega como secreto del repositorio.
@@ -282,10 +368,12 @@ fallo, porque ahí son media cobertura de la comprobación.
 
 ## Una trampa del plan Free
 
-Free pausa un proyecto tras una semana sin actividad. Producción va a estar
-vacía y sin tráfico hasta que E2 traiga autenticación, así que es probable
-encontrarla pausada y tener que restaurarla desde el dashboard. Deja de ocurrir
-cuando el monitoreo del issue #95 empiece a consultar `/api/v1/health`.
+Free pausa un proyecto tras una semana sin actividad. Producción iba a estar
+vacía y sin tráfico hasta que E2 traiga autenticación, así que era probable
+encontrarla pausada y tener que restaurarla desde el dashboard. Dejó de ser un
+riesgo el 11 de septiembre de 2026: el monitoreo descrito arriba consulta
+`/api/v1/health` cada cinco minutos, y esa consulta llega a la base. Desarrollo
+sí se puede pausar, porque nadie lo vigila.
 
 ## Catálogo de variables (issue #90)
 
@@ -297,12 +385,12 @@ Los cuatro entornos posibles:
 
 - **Local**: la máquina de quien desarrolla, en `.env.local` (nunca
   commiteado).
-- **Preview**: el despliegue de Vercel que se genera por cada PR abierto. Ya
-  existe; sus variables todavía no, así que esto dice a dónde deben apuntar
-  cuando alguien las configure.
-- **Producción**: el despliegue de Vercel que sirve desde `main`. Existen los
-  dos lados, el proyecto de Supabase (`seadragons-prod`) y el despliegue; lo
-  que falta es conectarlos con variables de entorno.
+- **Preview**: el despliegue de Vercel que se genera por cada PR abierto. Sus
+  variables apuntan a `seadragons-dev` desde el 11 de septiembre de 2026.
+- **Producción**: el despliegue de Vercel que sirve desde `main`, conectado a
+  `seadragons-prod` desde el 11 de septiembre de 2026. Comprobado ese día
+  contra los dos despliegues: cada uno devuelve el ref del proyecto que le
+  toca.
 - **CI**: los workflows de GitHub Actions (`.github/workflows/`).
 
 `NEXT_PUBLIC_SUPABASE_URL`: en local, `.env.local` apunta a `seadragons-dev`.
