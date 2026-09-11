@@ -33,9 +33,14 @@ insert into public.clubs (slug, name)
 values ('victoria-seadragons', 'Victoria Seadragons')
 on conflict (slug) do nothing;
 
--- Este proyecto de Supabase no trae los GRANT por defecto para los roles de la
--- API: sin ellos PostgREST responde 401 antes de que RLS llegue a opinar, y el
--- fallo se confunde con "no hay filas". Toda tabla nueva declara los suyos.
--- RLS sigue siendo la frontera: el GRANT solo deja pasar la puerta.
+-- Los GRANT que esta tabla necesita de verdad. RLS sigue siendo la frontera: el
+-- GRANT solo deja pasar la puerta.
+--
+-- Lo que decía aquí hasta el 11 de septiembre de 2026 era falso al revés: este
+-- proyecto de Supabase SÍ concede por defecto todos los privilegios a `anon` y
+-- a `authenticated` sobre cada tabla nueva del esquema `public`, así que este
+-- `grant` no añadía nada y, sobre todo, no quitaba los seis privilegios que
+-- sobraban. `0004_privilegios_clubs_audit_log.sql` los quita. Toda tabla nueva
+-- empieza por `revoke all`, como hace `0003_members.sql`.
 grant select on public.clubs to anon, authenticated;
 grant select, insert, update, delete on public.clubs to service_role;
