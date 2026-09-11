@@ -10,6 +10,7 @@ import {
   secretVariableNames,
 } from "../../scripts/lib/entornos-manifest";
 import {
+  CI_ONLY_SECRET_ENV_VARS,
   PLATFORM_INJECTED_ENV_VARS,
   readEnvExampleNames,
 } from "../support/env-vars";
@@ -44,6 +45,11 @@ function buildManifest(
         allowsProductionSources: false,
         allowsWriteCredentials: false,
       },
+      "ci-produccion": {
+        where: "los secretos del entorno Production de Actions",
+        allowsProductionSources: true,
+        allowsWriteCredentials: true,
+      },
     },
     sources: {
       [DEVELOPMENT_SOURCE]: { production: false },
@@ -61,6 +67,7 @@ function scopes(
     preview: null,
     production: null,
     ci: null,
+    "ci-produccion": null,
     ...overrides,
   };
 }
@@ -142,7 +149,7 @@ describe("manifiesto de entornos", () => {
     ).toThrowError(/un-origen-inventado/);
   });
 
-  it("obliga a declarar los cuatro entornos de cada variable, aunque sea con null", () => {
+  it("obliga a declarar todos los entornos de cada variable, aunque sea con null", () => {
     expect(() =>
       buildManifest({
         UNA_VARIABLE: {
@@ -153,6 +160,7 @@ describe("manifiesto de entornos", () => {
             local: DEVELOPMENT_SOURCE,
             preview: null,
             production: null,
+            "ci-produccion": null,
           },
         } as never,
       }),
@@ -178,11 +186,12 @@ describe("manifiesto de entornos", () => {
     );
   });
 
-  it("no declara ninguna variable que no exista ni en .env.example ni en la plataforma", () => {
+  it("no declara ninguna variable que no exista ni en .env.example, ni en la plataforma, ni en los secretos de CI", () => {
     const manifest = readEnvironmentManifest();
     const known = new Set<string>([
       ...readEnvExampleNames(),
       ...PLATFORM_INJECTED_ENV_VARS,
+      ...CI_ONLY_SECRET_ENV_VARS,
     ]);
 
     const unknown = Object.keys(manifest.variables).filter(
@@ -194,14 +203,19 @@ describe("manifiesto de entornos", () => {
     );
   });
 
-  it("sólo el entorno de producción admite credenciales del proyecto de producción", () => {
+  // `ci` son los secretos del repositorio, que cualquier workflow puede leer,
+  // incluido el que construye un PR. `ci-produccion` son los del entorno
+  // Production de Actions, que sólo recibe el job que declara ese entorno.
+  // Distinguirlos es lo que permite que las migraciones lleguen a producción
+  // (issue #94) sin abrirle producción a todo lo que corra en Actions.
+  it("sólo producción y el entorno protegido de Actions admiten credenciales del proyecto de producción", () => {
     const manifest = readEnvironmentManifest();
 
     const permissive = ENVIRONMENT_NAMES.filter(
       (name) => manifest.environments[name]?.allowsProductionSources === true,
     );
 
-    expect(permissive).toEqual(["production"]);
+    expect(permissive).toEqual(["production", "ci-produccion"]);
   });
 
   // Un preview de un fork se construye con las variables del ámbito Preview.
@@ -224,10 +238,11 @@ describe("manifiesto de entornos", () => {
     }
   });
 
-  it("marca como secreta la llave de servicio y el token de cuenta", () => {
+  it("marca como secreta la llave de servicio, el token de cuenta y la conexión a producción", () => {
     expect(secretVariableNames(readEnvironmentManifest())).toEqual([
       "SUPABASE_SERVICE_ROLE_KEY",
       "SUPABASE_ACCESS_TOKEN",
+      "SUPABASE_PRODUCTION_DB_URL",
     ]);
   });
 });
@@ -250,14 +265,48 @@ describe("decisiones que el manifiesto no puede cambiar en silencio", () => {
 
   // Sin fijarlo, encender `ci.allowsWriteCredentials` apagaría esa mitad de la
   // regla sin que nada se pusiera rojo.
-  it("sólo local y producción admiten credenciales de escritura", () => {
+  it("sólo local, producción y el entorno protegido de Actions admiten credenciales de escritura", () => {
     const { environments } = readEnvironmentManifest();
 
     expect(
       ENVIRONMENT_NAMES.filter(
         (name) => environments[name]?.allowsWriteCredentials,
       ),
-    ).toEqual(["local", "production"]);
+    ).toEqual(["local", "production", "ci-produccion"]);
+  });
+
+  // La credencial con la que el workflow del issue #94 aplica migraciones en
+  // producción. Es la más peligrosa del proyecto: escribe en el esquema de la
+  // base con datos reales. No existe en ninguna máquina ni en ningún ámbito de
+  // Vercel, y tampoco en los secretos generales del repositorio.
+  it("la conexión a producción sólo vive en el entorno protegido de Actions", () => {
+    const manifest = readEnvironmentManifest();
+
+    expect(environmentsFor(manifest, "SUPABASE_PRODUCTION_DB_URL")).toEqual([
+      "ci-produccion",
+    ]);
+    expect(
+      manifest.variables["SUPABASE_PRODUCTION_DB_URL"]?.scopes["ci-produccion"],
+    ).toBe(PRODUCTION_SOURCE);
+  });
+
+  it("los secretos generales del repositorio no llevan ninguna credencial de producción", () => {
+    // El ámbito `ci` lo lee cualquier workflow, el del PR incluido. Lo que
+    // llegue ahí deja de estar separado de preview en la práctica.
+    const manifest = readEnvironmentManifest();
+
+    const desdeProduccion = Object.entries(manifest.variables)
+      .filter(([, variable]) => {
+        const source = variable.scopes.ci;
+        return (
+          source !== null &&
+          source !== undefined &&
+          manifest.sources[source]?.production === true
+        );
+      })
+      .map(([name]) => name);
+
+    expect(desdeProduccion).toEqual([]);
   });
 
   it("la llave de servicio y el token de cuenta son credenciales de escritura", () => {

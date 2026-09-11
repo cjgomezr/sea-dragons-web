@@ -8,14 +8,21 @@ const REPO_ROOT = path.resolve(HERE, "..", "..");
 
 export const ENVIRONMENT_MANIFEST_PATH = "entornos.json";
 
-/** Los cuatro sitios donde puede vivir una variable de esta aplicación. Un
- * `null` en `scopes` significa que la variable no existe ahí, que es distinto
- * de existir vacía. */
+/** Los sitios donde puede vivir una variable de esta aplicación. Un `null` en
+ * `scopes` significa que la variable no existe ahí, que es distinto de existir
+ * vacía.
+ *
+ * `ci` y `ci-produccion` son los dos ámbitos de GitHub Actions y la diferencia
+ * importa: `ci` son los secretos del repositorio, que lee cualquier workflow
+ * (el que construye un PR incluido), y `ci-produccion` son los del entorno
+ * Production, que sólo recibe el job que lo declara. Esa segunda puerta es la
+ * única por la que una credencial de producción entra en CI. */
 export const ENVIRONMENT_NAMES = [
   "local",
   "preview",
   "production",
   "ci",
+  "ci-produccion",
 ] as const;
 
 export type EnvironmentName = (typeof ENVIRONMENT_NAMES)[number];

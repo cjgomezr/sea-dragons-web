@@ -7,6 +7,7 @@ import {
   secretVariableNames,
 } from "../../scripts/lib/entornos-manifest";
 import {
+  CI_ONLY_SECRET_ENV_VARS,
   PLATFORM_INJECTED_ENV_VARS,
   readEnvExampleNames,
 } from "../support/env-vars";
@@ -105,6 +106,18 @@ describe("docs/entornos.md", () => {
     const doc = readEntornosDoc();
 
     for (const name of PLATFORM_INJECTED_ENV_VARS) {
+      expect(doc).toContain(name);
+    }
+  });
+
+  // Mismo caso que las anteriores por el motivo contrario: no están en
+  // `.env.example` porque nadie debe poder escribirlas en un `.env`. Este
+  // documento es el único sitio donde alguien puede enterarse de que existen y
+  // de dónde se pegan.
+  it("documenta los secretos que sólo viven en un entorno de CI", () => {
+    const doc = readEntornosDoc();
+
+    for (const name of CI_ONLY_SECRET_ENV_VARS) {
       expect(doc).toContain(name);
     }
   });

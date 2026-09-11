@@ -23,6 +23,19 @@ const SOURCE_FILE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
  * explicado en `docs/entornos.md`. */
 export const PLATFORM_INJECTED_ENV_VARS = ["VERCEL_GIT_COMMIT_SHA"] as const;
 
+/** Secretos que sólo existen dentro de un workflow y que **no** van a
+ * `.env.example` por el motivo contrario a los de arriba: no es que nadie los
+ * escriba, es que nadie debe poder escribirlos en una máquina. Enumerarlos en
+ * el archivo de ejemplo invitaría a pegar la conexión de producción en un
+ * `.env.local`, que es justo lo que RF-4 prohíbe.
+ *
+ * `SUPABASE_PRODUCTION_DB_URL` es el caso vivo: la conexión con la que
+ * `migraciones-produccion.yml` aplica el esquema en la base con datos reales.
+ * Vive en los secretos del entorno Production de Actions y en ningún otro
+ * sitio. `tests/unit/entornos-doc.test.ts` exige que siga explicada en
+ * `docs/entornos.md`. */
+export const CI_ONLY_SECRET_ENV_VARS = ["SUPABASE_PRODUCTION_DB_URL"] as const;
+
 // process.env.PATH sólo extiende el PATH heredado del proceso al lanzar
 // subprocesos en tests: no es configuración de la aplicación. Documentarla
 // invitaría a poner un valor de PATH en .env.local, y eso rompería el shell
