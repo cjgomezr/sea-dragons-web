@@ -1,0 +1,71 @@
+# Aplica las migraciones del repositorio en el Supabase de producción cuando un
+# merge a `main` trae alguna (RF-5 del PRD de E16a). Es la otra mitad de
+# `migrations.yml`: aquel comprueba en cada PR que el histórico aplica limpio
+# sobre un Postgres desechable, y este lo lleva a la base de verdad. Hasta hoy
+# ese último paso lo daba una persona por MCP desde su sesión, y era la única
+# pieza del despliegue que dependía de que alguien se acordara.
+#
+# Esta es la base que llevará datos personales de los socios del club. Tres
+# decisiones que no son detalles:
+#
+#   - `concurrency` sin cancelación. Dos merges seguidos se ponen en fila. Si el
+#     segundo cancelara al primero, en qué estado queda producción dependería de
+#     en qué migración lo pillara el corte.
+#   - Ningún paso perdona un fallo. No hay rollback automático a propósito: una
+#     migración que revienta deja esto en rojo y lo arregla una persona, que es
+#     quien puede decidir si el arreglo es otra migración o restaurar.
+#   - La credencial viene del entorno `Production` de Actions, no de los
+#     secretos generales del repositorio. Los generales los lee cualquier
+#     workflow, el que construye un PR incluido; los del entorno sólo el job que
+#     lo declara.
+#
+# Aplicar el histórico completo en cada corrida es seguro porque toda migración
+# de este repositorio es idempotente, y eso lo prueba
+# `tests/unit/scripts/apply-migrations.test.ts` contra un Postgres de verdad en
+# cada PR. Una migración nueva que no lo sea rompe el PR, no producción.
+name: migraciones en producción
+
+on:
+  push:
+    branches: [main]
+    # Un merge que no toca las migraciones no tiene nada que hacer aquí. El
+    # histórico completo ya se comprobó en su PR, contra un Postgres limpio.
+    paths:
+      - "supabase/migrations/**"
+
+permissions:
+  contents: read
+
+# Grupo fijo: todas las corridas caen en el mismo y se aplican de una en una.
+concurrency:
+  group: migraciones-produccion
+  cancel-in-progress: false
+
+jobs:
+  aplicar:
+    runs-on: ubuntu-latest
+    # Lo que hace que este job (y sólo este) reciba el secreto de producción.
+    environment: Production
+    steps:
+      - uses: actions/checkout@v4
+      # Sin esto, la falta del secreto se lee como "falta DATABASE_URL", que no
+      # dice dónde se arregla. Comprueba que existe sin imprimirlo.
+      - name: Comprueba que el secreto con la conexión a producción está puesto
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_PRODUCTION_DB_URL }}
+        run: |
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "::error::falta el secreto SUPABASE_PRODUCTION_DB_URL en Settings > Environments > Production. Es la cadena de conexión de seadragons-prod (dashboard de Supabase > Connect > Session pooler)."
+            exit 1
+          fi
+      - name: Aplica todas las migraciones del repositorio en orden de nombre
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_PRODUCTION_DB_URL }}
+        run: bash scripts/apply-migrations.sh
+      # Que apliquen sin error no basta: hay que comprobar que producción quedó
+      # con el esquema que el repositorio declara. Si no, dice en qué dirección
+      # divergieron.
+      - name: Comprueba que producción no divergió del repositorio
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_PRODUCTION_DB_URL }}
+        run: bash scripts/check-schema-snapshot.sh

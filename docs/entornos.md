@@ -391,7 +391,12 @@ Cómo está armado y por qué:
   workflow, el de un PR incluido; los del entorno sólo el job que lo declara.
 - **Después de aplicar, compara.** El mismo `check-schema-snapshot.sh` del PR
   corre contra producción: aplicar sin error no garantiza haber dejado el
-  esquema que el repositorio declara.
+  esquema que el repositorio declara. La comparación vale porque los dos lados
+  son Postgres 17 (comprobado el 11 de septiembre de 2026: `seadragons-prod`
+  corre 17.6 y el contenedor del PR es `postgres:17`). El día que Supabase suba
+  de mayor, el texto de una restricción puede cambiar de formato y este paso
+  saldrá rojo sin que nadie haya tocado el esquema; lo que se regenera entonces
+  es `supabase/ci/schema-expected.txt`.
 
 Aplicar el histórico completo en cada corrida es seguro porque toda migración de
 este repositorio es idempotente (`create table if not exists`, `drop policy if

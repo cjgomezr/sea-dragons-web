@@ -128,10 +128,11 @@ describe("bundle de cliente", () => {
     expect(() => scanForLeaks(scan)).toThrowError(/no tiene ningún archivo/);
   });
 
-  it("busca las dos variables secretas de hoy y el prefijo de clave", () => {
+  it("busca las tres variables secretas de hoy y el prefijo de clave", () => {
     expect(forbiddenNeedles(readEnvironmentManifest())).toEqual([
       "SUPABASE_SERVICE_ROLE_KEY",
       "SUPABASE_ACCESS_TOKEN",
+      "SUPABASE_PRODUCTION_DB_URL",
       FORBIDDEN_KEY_PREFIX,
     ]);
   });
