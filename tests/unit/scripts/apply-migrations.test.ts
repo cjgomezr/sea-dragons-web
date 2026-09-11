@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
 import {
   copyFile,
   mkdir,
@@ -11,75 +10,21 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-
-const REPO_ROOT = path.resolve(__dirname, "../../..");
-const APPLY_MIGRATIONS = path.join(REPO_ROOT, "scripts/apply-migrations.sh");
-const ROLES_SQL = path.join(REPO_ROOT, "supabase/ci/roles.sql");
-const SCHEMA_SNAPSHOT_SQL = path.join(
-  REPO_ROOT,
-  "supabase/ci/schema-snapshot.sql",
-);
-const CHECK_SCHEMA_SNAPSHOT = path.join(
-  REPO_ROOT,
-  "scripts/check-schema-snapshot.sh",
-);
-/** El comprobador la carga con `source`, así que la copia de usar y tirar la
- * necesita al lado o muere antes de comparar nada. */
-const SCHEMA_DRIFT_LIB = path.join(REPO_ROOT, "scripts/lib/schema-drift.sh");
-const EXPECTED_SCHEMA = path.join(REPO_ROOT, "supabase/ci/schema-expected.txt");
-
-/**
- * Conexión de administración desde la que estos tests crean y destruyen bases
- * desechables. Sin ella no hay Postgres contra el que probar y el bloque se
- * salta, igual que hace `describeRls` cuando falta Supabase. En CI la pone
- * `migrations.yml`, apuntando al Postgres efímero del runner: nunca a una base
- * real.
- */
-const ADMIN_URL_ENV = "MIGRATIONS_TEST_DATABASE_URL";
-/** Bandera que pone `migrations.yml`: ahí saltarse los tests no es aceptable. */
-const REQUIRE_POSTGRES_ENV = "REQUIRE_MIGRATIONS_POSTGRES";
-const adminUrl = process.env[ADMIN_URL_ENV];
-
-interface RunResult {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-}
-
-function toBashPath(nativePath: string): string {
-  return nativePath.replace(/\\/g, "/");
-}
-
-function run(
-  command: string,
-  args: readonly string[],
-  env: NodeJS.ProcessEnv,
-): Promise<RunResult> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, [...args], {
-      cwd: REPO_ROOT,
-      env,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-    child.on("error", reject);
-    child.on("close", (code) => resolve({ code, stdout, stderr }));
-  });
-}
-
-function applyMigrations(
-  args: readonly string[],
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<RunResult> {
-  return run("bash", [toBashPath(APPLY_MIGRATIONS), ...args], env);
-}
+import {
+  ADMIN_URL_ENV,
+  CHECK_SCHEMA_SNAPSHOT,
+  EXPECTED_SCHEMA,
+  REQUIRE_POSTGRES_ENV,
+  type RunResult,
+  SCHEMA_DRIFT_LIB,
+  SCHEMA_SNAPSHOT_SQL,
+  applyMigrations,
+  decidePostgresTests,
+  describeConPostgres,
+  freshDatabase,
+  run,
+  toBashPath,
+} from "../../support/postgres";
 
 function listedNames(result: RunResult): string[] {
   return result.stdout
@@ -248,33 +193,6 @@ describe("aplicador de migraciones", () => {
   });
 });
 
-interface TemporaryDatabase {
-  readonly url: string;
-  readonly query: (sql: string) => Promise<string>;
-  readonly snapshot: () => Promise<string>;
-  readonly checkSchema: () => Promise<RunResult>;
-}
-
-type PostgresDecision = "corre" | "exige" | "salta";
-
-/**
- * Qué hacer con los tests que necesitan una base. Saltarlos es lo correcto en
- * una máquina sin Postgres y en `checks.yml`, que corre `npm test` sin base
- * ninguna. Lo que no puede pasar es que se salten en el workflow de
- * migraciones, donde son media cobertura del ticket: ahí se perderían la
- * prueba de la migración rota y la corrida se leería verde. Por eso
- * `migrations.yml` pide estos tests explícitamente y la falta de base pasa a
- * ser un fallo, no un salto.
- */
-function decidePostgresTests(
-  env: Readonly<Record<string, string | undefined>>,
-): PostgresDecision {
-  if (env[ADMIN_URL_ENV]) {
-    return "corre";
-  }
-  return env[REQUIRE_POSTGRES_ENV] === "1" ? "exige" : "salta";
-}
-
 describe("tests que necesitan Postgres", () => {
   it("corren cuando hay una base de administración", () => {
     expect(decidePostgresTests({ [ADMIN_URL_ENV]: "postgresql://x" })).toBe(
@@ -290,56 +208,6 @@ describe("tests que necesitan Postgres", () => {
     expect(decidePostgresTests({})).toBe("salta");
   });
 });
-
-function describeConPostgres(name: string, fn: () => void): void {
-  const decision = decidePostgresTests(process.env);
-  if (decision === "corre") {
-    describe(name, fn);
-    return;
-  }
-  if (decision === "exige") {
-    describe(name, () => {
-      it(`no se saltan: ${REQUIRE_POSTGRES_ENV}=1 los exige`, () => {
-        throw new Error(
-          `falta ${ADMIN_URL_ENV}: sin ella estos tests se saltarían y la ` +
-            `corrida se leería verde sin haber probado ninguna migración`,
-        );
-      });
-    });
-    return;
-  }
-  describe.skip(`${name} (saltado: falta ${ADMIN_URL_ENV})`, fn);
-}
-
-function psql(url: string, args: readonly string[]): Promise<RunResult> {
-  return run(
-    "psql",
-    [
-      "--no-psqlrc",
-      "--quiet",
-      "--set",
-      "ON_ERROR_STOP=1",
-      "-At",
-      "-d",
-      url,
-      ...args,
-    ],
-    process.env,
-  );
-}
-
-async function expectPsqlSuccess(
-  url: string,
-  args: readonly string[],
-): Promise<string> {
-  const result = await psql(url, args);
-  if (result.code !== 0) {
-    throw new Error(`psql ${args.join(" ")} falló: ${result.stderr}`);
-  }
-  // psql termina las líneas con CRLF en Windows: sin normalizar, cada fila
-  // menos la última llegaría con un \r pegado al valor.
-  return result.stdout.replace(/\r\n/g, "\n").trim();
-}
 
 /**
  * Copia del comprobador de esquema en un árbol de usar y tirar. `--write`
@@ -375,52 +243,6 @@ async function sandboxedChecker(): Promise<{
   await copyFile(EXPECTED_SCHEMA, expectedSchema);
   return { script, expectedSchema };
 }
-
-const createdDatabases: string[] = [];
-
-async function freshDatabase(): Promise<TemporaryDatabase> {
-  if (!adminUrl) {
-    throw new Error(`falta ${ADMIN_URL_ENV}`);
-  }
-  const name = `migraciones_${randomUUID().replace(/-/g, "")}`;
-  await expectPsqlSuccess(adminUrl, ["-c", `create database ${name}`]);
-  createdDatabases.push(name);
-
-  const url = new URL(adminUrl);
-  url.pathname = `/${name}`;
-  const databaseUrl = url.toString();
-  // Un Postgres recién creado no trae los roles de la API de Supabase, a los
-  // que las migraciones hacen GRANT.
-  await expectPsqlSuccess(databaseUrl, ["-f", toBashPath(ROLES_SQL)]);
-
-  return {
-    url: databaseUrl,
-    query: (sql: string) => expectPsqlSuccess(databaseUrl, ["-c", sql]),
-    snapshot: () =>
-      expectPsqlSuccess(databaseUrl, ["-f", toBashPath(SCHEMA_SNAPSHOT_SQL)]),
-    checkSchema: () =>
-      run("bash", [toBashPath(CHECK_SCHEMA_SNAPSHOT)], {
-        ...process.env,
-        DATABASE_URL: databaseUrl,
-      }),
-  };
-}
-
-afterEach(async () => {
-  if (!adminUrl) {
-    return;
-  }
-  for (const name of createdDatabases.splice(0)) {
-    const dropped = await psql(adminUrl, [
-      "-c",
-      `drop database if exists ${name} with (force)`,
-    ]);
-    if (dropped.code !== 0) {
-      // Que quede dicho: si no, las bases se acumulan sin que nadie lo sepa.
-      console.warn(`no se pudo borrar la base ${name}: ${dropped.stderr}`);
-    }
-  }
-});
 
 describeConPostgres(
   "migraciones del repositorio sobre un Postgres limpio",
