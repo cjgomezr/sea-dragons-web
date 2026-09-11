@@ -212,6 +212,9 @@ describe("docs/entornos.md · disponibilidad y mantenimiento (issue #95)", () =>
 
     expect(doc).toContain("cada 5 minutos");
     expect(doc).toContain("3 reintentos de confirmación");
+    // La línea que responde "¿cuánta caída representa este correo?". Sin ella
+    // el umbral se puede configurar pero un aviso no se puede juzgar.
+    expect(doc).toContain("el aviso sale de inmediato");
   });
 
   // El histórico no vive en el repositorio: lo acumula el panel del servicio.
@@ -221,7 +224,10 @@ describe("docs/entornos.md · disponibilidad y mantenimiento (issue #95)", () =>
     const doc = readEntornosDoc();
 
     expect(doc).toContain("UptimeRobot");
-    expect(doc).toContain("https://dashboard.uptimerobot.com/monitors");
+    // La ruta exacta del panel es del proveedor y puede cambiar sin que cambie
+    // nada de este proyecto. Lo que el documento debe garantizar es que haya un
+    // enlace al que ir, no que siga siendo el mismo path.
+    expect(doc).toMatch(/https:\/\/\S*uptimerobot\.com\S*/);
   });
 
   it("escribe las horas de entrenamiento que la ventana de mantenimiento debe evitar", () => {

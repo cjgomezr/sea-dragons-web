@@ -56,9 +56,10 @@ PR.
   Preview y Development a la vez, que es justo lo que el issue #92 existe para
   impedir.
 - **Variables de entorno:** qué va en cada ámbito está decidido y escrito en
-  `entornos.json`; ver "Secretos por entorno" más abajo. Mientras nadie las
-  haya pegado en el panel, `GET /api/v1/health` responde 503 diciendo qué
-  falta, que es el comportamiento correcto y no un despliegue roto.
+  `entornos.json`; ver "Secretos por entorno" más abajo. Pegadas en el panel el
+  11 de septiembre de 2026, en los ámbitos Preview y Production. Si alguien las
+  borra, `GET /api/v1/health` responde 503 diciendo qué falta, que es el
+  comportamiento correcto y no un despliegue roto.
 
 ### Qué contesta `GET /api/v1/health`
 
@@ -111,9 +112,10 @@ No hace falta autenticarse ni mandar cabeceras. Cualquier respuesta que no sea
   **3 reintentos de confirmación**, separados entre 10 y 20 segundos, antes de
   dar el sitio por caído. Un paquete perdido o un error suelto no despiertan a
   nadie.
-- Confirmada la caída, **el aviso sale de inmediato**. En el peor caso llega
-  unos 5 minutos después de que el sitio dejara de responder, que es lo que
-  tarda en tocar la siguiente comprobación.
+- Confirmada la caída, **el aviso sale de inmediato**. Entre que el sitio deja
+  de responder y que sale el correo pasan, en el peor caso, los 5 minutos hasta
+  la siguiente comprobación más el minuto largo de los reintentos: algo menos
+  de 6. Ese es el número con el que se juzga si un aviso llegó tarde.
 - **La recuperación también avisa**, para que nadie se quede pendiente de una
   caída que ya pasó.
 
@@ -383,12 +385,12 @@ Los cuatro entornos posibles:
 
 - **Local**: la máquina de quien desarrolla, en `.env.local` (nunca
   commiteado).
-- **Preview**: el despliegue de Vercel que se genera por cada PR abierto. Ya
-  existe; sus variables todavía no, así que esto dice a dónde deben apuntar
-  cuando alguien las configure.
-- **Producción**: el despliegue de Vercel que sirve desde `main`. Existen los
-  dos lados, el proyecto de Supabase (`seadragons-prod`) y el despliegue; lo
-  que falta es conectarlos con variables de entorno.
+- **Preview**: el despliegue de Vercel que se genera por cada PR abierto. Sus
+  variables apuntan a `seadragons-dev` desde el 11 de septiembre de 2026.
+- **Producción**: el despliegue de Vercel que sirve desde `main`, conectado a
+  `seadragons-prod` desde el 11 de septiembre de 2026. Comprobado ese día
+  contra los dos despliegues: cada uno devuelve el ref del proyecto que le
+  toca.
 - **CI**: los workflows de GitHub Actions (`.github/workflows/`).
 
 `NEXT_PUBLIC_SUPABASE_URL`: en local, `.env.local` apunta a `seadragons-dev`.
