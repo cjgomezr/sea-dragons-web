@@ -99,7 +99,7 @@ describe("estado de la cuenta", () => {
 });
 
 type ActivationDoubles = {
-  readonly store: MemberAccountStore;
+  readonly accounts: MemberAccountStore;
   readonly identities: IdentityConfirmationReader;
   readonly written: { memberId: string; status: AccountStatus }[];
 };
@@ -111,7 +111,7 @@ function activationDoubles(options: {
   const written: { memberId: string; status: AccountStatus }[] = [];
   return {
     written,
-    store: {
+    accounts: {
       async findByUserId() {
         return options.record;
       },

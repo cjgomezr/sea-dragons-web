@@ -107,13 +107,13 @@ export function resolveAccountStatus(input: {
  * de socio (FR-085) y confirmar un correo no la revive. */
 export async function activateAccountIfComplete(
   gateways: {
-    readonly store: MemberAccountStore;
+    readonly accounts: MemberAccountStore;
     readonly identities: IdentityConfirmationReader;
   },
   userId: string,
   options: { readonly now: Date },
 ): Promise<AccountActivation> {
-  const record = await gateways.store.findByUserId(userId);
+  const record = await gateways.accounts.findByUserId(userId);
   if (record === null) {
     throw new MemberNotFoundError(userId);
   }
@@ -130,6 +130,6 @@ export async function activateAccountIfComplete(
     return { kind: "unchanged", status };
   }
 
-  await gateways.store.updateAccountStatus(record.memberId, "active");
+  await gateways.accounts.updateAccountStatus(record.memberId, "active");
   return { kind: "activated" };
 }

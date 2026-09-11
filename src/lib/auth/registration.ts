@@ -76,10 +76,15 @@ function validateFullName(value: string): string | null {
     : null;
 }
 
+/** Suficiente para descartar lo que no es una dirección. Lo comparten el
+ * registro y el reenvío de la confirmación, para que las dos puertas exijan lo
+ * mismo. */
+export function looksLikeEmail(value: string): boolean {
+  return EMAIL_PATTERN.test(value.trim());
+}
+
 function validateEmail(value: string): string | null {
-  return EMAIL_PATTERN.test(value.trim())
-    ? null
-    : "El correo no tiene una forma válida.";
+  return looksLikeEmail(value) ? null : "El correo no tiene una forma válida.";
 }
 
 function validateCountry(value: string): string | null {
