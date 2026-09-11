@@ -29,22 +29,33 @@ Si ese test pasa sin policy, la policy falta.
 club. `clubs` es la única excepción: es la raíz del tenant. Ver el patrón
 documentado en `supabase/migrations/0001_clubs.sql`.
 
-**Toda tabla declara sus `GRANT` explícitos.** Este proyecto de Supabase no
-trae los permisos por defecto para `anon`, `authenticated` ni `service_role`:
-sin un `grant`, PostgREST responde `401 permission denied` antes de que RLS
-llegue a evaluarse. El peligro no es el 401, es el falso verde que produce. Un
-test que espera "este rol no debe ver nada" pasa igual, sin que la policy se
-haya ejecutado nunca. El patrón, junto al de `club_id`, está en
-`supabase/migrations/0001_clubs.sql`:
+**Toda tabla declara sus privilegios, y empieza quitando.** Este proyecto de
+Supabase concede TODOS los privilegios a `anon`, `authenticated` y
+`service_role` sobre cada tabla nueva del esquema `public`: está en su
+`pg_default_acl`, verificado contra `seadragons-dev` el 11 de septiembre de 2026. Un `grant` suelto, por tanto, no reduce nada; sólo documenta una
+intención que la base no cumple. El patrón correcto es revocar primero:
 
 ```sql
-grant select on public.<tabla> to anon, authenticated;
+revoke all on public.<tabla> from anon, authenticated;
+grant select on public.<tabla> to authenticated;
 grant select, insert, update, delete on public.<tabla> to service_role;
 ```
 
 Concede solo los verbos que la tabla necesita: `audit_log` es de inserción y
-lectura, así que nadie recibe `update` ni `delete`. El `GRANT` abre la puerta;
-quién ve qué filas lo sigue decidiendo RLS.
+lectura, así que nadie recibe `update` ni `delete`. El patrón completo está en
+`supabase/migrations/0003_members.sql`.
+
+Por qué importa además de por higiene: RLS niega lo que no tiene policy, pero
+lo niega **en silencio**. Un `update` sin policy afecta a cero filas y responde
+en verde, así que el cliente cree que guardó. Con el privilegio revocado la
+base contesta `permission denied`. Y `truncate` no lo filtra RLS en absoluto.
+
+Hasta el 11 de septiembre de 2026 esta sección decía justo lo contrario (que el
+proyecto no trae permisos por defecto y que sin `grant` PostgREST responde
+401). Era falso, y el comentario de `supabase/migrations/0002_audit_log.sql` ya
+lo decía bien. Si un test tuyo espera "este rol no debe ver nada", comprueba
+que falla cuando quitas la policy: si no, está pasando por un privilegio, no
+por RLS.
 
 **La `service_role` key nunca sale del servidor.** No se importa en un
 componente cliente, no se pone en una variable `NEXT_PUBLIC_*`, no se pasa como
