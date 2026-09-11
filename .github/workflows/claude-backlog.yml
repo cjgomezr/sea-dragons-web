@@ -103,6 +103,7 @@ jobs:
           fi
 
       - name: Run Claude Code on the issue / backlog
+        id: worker
         uses: anthropics/claude-code-action@v1
         with:
           # Credencial resuelta por el paso "Resolver credencial del actor":
@@ -127,12 +128,97 @@ jobs:
           # 200/1000 turnos por el mismo motivo que el timeout de arriba: un
           # worker que se queda sin turnos a mitad de ticket no alcanza ni a
           # commitear lo que ya tenía verde (ver #27 y #38).
-          claude_args: "--max-turns ${{ github.event_name == 'schedule' && 1000 || 200 }} --model ${{ env.FACTORY_MODEL }} --disallowedTools ${{ env.WORKER_DISALLOWED_TOOLS }}"
+          #
+          # `--permission-mode bypassPermissions` no es un descuido: sin un modo
+          # de permisos el worker no puede hacer NADA. Lo aprendimos el 11 de
+          # septiembre de 2026, en la primera corrida real de este workflow: 11
+          # denegaciones de permiso, 18 turnos, 74 segundos, el issue intacto y
+          # el job en verde.
+          #
+          # Por qué este modo y no otro. `default` y `plan` se detienen a
+          # preguntar y en un runner no hay quien apruebe. `acceptEdits` solo
+          # auto-aprueba escrituras de archivos, y el ciclo de vida es casi todo
+          # Bash (`gh issue edit`, `git push`, `gh pr create`, `npm test`), así
+          # que dejaría al worker igual de bloqueado. `auto`, el que usa
+          # `scripts/process-backlog.sh`, sí trabaja, pero se detiene ante lo que
+          # considera peligroso: sin nadie delante eso es una denegación
+          # silenciosa a mitad de ticket, más difícil de diagnosticar que el
+          # fallo que estamos arreglando.
+          #
+          # La contrapartida, dicha sin adornos. El runner lleva el token de
+          # GitHub con permiso de escritura y la credencial de Claude, y el
+          # worker lee el cuerpo del issue, que es texto que escribió alguien.
+          # Con este modo, unas instrucciones inyectadas ahí pasan de "pregunta
+          # antes" a "lo hace". Lo que sostiene la apuesta no es que la máquina
+          # sea desechable, sino que la compuerta es humana: poner
+          # `ready-for-dev` exige permiso de escritura en el repositorio.
+          claude_args: "--max-turns ${{ github.event_name == 'schedule' && 1000 || 200 }} --model ${{ env.FACTORY_MODEL }} --permission-mode bypassPermissions --disallowedTools ${{ env.WORKER_DISALLOWED_TOOLS }}"
+
+      # El otro defecto que destapó esa corrida, y el más caro: el único aviso
+      # de este workflow colgaba de `failure()`. Un worker que sale limpio sin
+      # tocar nada no lo dispara, así que la cola parecía procesada. Por la
+      # mañana verías el ticket intacto y ninguna explicación.
+      #
+      # La lógica vive en un script, no aquí, por dos motivos. Se puede probar
+      # con un `gh` de mentira (`tests/unit/scripts/check-worker-claimed.test.ts`),
+      # que es donde se ven sus falsos positivos, y así la nube y el local no se
+      # separan, el mismo argumento del #60 con las herramientas prohibidas.
+      #
+      # Solo en el disparo por etiqueta: el turno nocturno procesa varios y
+      # puede terminar sin tocar ninguno, legítimamente, si no hay elegibles.
+      #
+      # `!cancelled()` y no `always()`: una corrida que alguien cancela a mano
+      # no debe acabar con `needs-human` pegado al ticket.
+      #
+      # Y solo si el worker llegó a correr y salió bien. Si el job murió antes
+      # (un `npm ci` roto, el paso de la credencial saliendo en rojo), el issue
+      # está intacto por razones que no tienen nada que ver con el worker, y
+      # acusarlo sería repetir el error de diagnóstico que este guardia vino a
+      # eliminar. Saltándose el paso, su resultado es `skipped` y el aviso de
+      # abajo cae en la rama genérica, que ahí es la correcta.
+      - name: Comprueba que el worker dejó rastro en el issue
+        id: claim-guard
+        if: ${{ !cancelled() && github.event_name == 'issues' && steps.worker.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/check-worker-claimed.sh "${{ github.event.issue.number }}"
 
       - name: Leave a note on the issue if the run failed
         if: failure() && github.event_name == 'issues'
         env:
           GH_TOKEN: ${{ github.token }}
+          NUM: ${{ github.event.issue.number }}
+          # Los dos fracasos se ven igual desde fuera (el job en rojo) pero no
+          # son lo mismo, y un comentario que describa el que no fue manda a
+          # buscar la causa al sitio equivocado.
+          CLAIM_GUARD: ${{ steps.claim-guard.outcome }}
         run: |
-          gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label needs-human || true
-          gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "🤖 **La corrida en la nube falló** antes de completar este issue (ver logs en la pestaña Actions. Causas típicas: límite de cuota/créditos, secreto no configurado, o error del entorno). Cualquier trabajo parcial quedó en la rama del PR si alcanzó a crearse. Para reintentar: resolver la causa y volver a poner el label \`ready-for-dev\` (quitándolo primero si sigue puesto)." || true
+          if [ "$CLAIM_GUARD" = "failure" ]; then
+            BODY="🤖 **La corrida terminó sin que el worker tocara este issue.** No se reclamó, no se bloqueó y no dejó ningún PR que declare cerrarlo.
+
+          La causa típica es que el worker no pudo escribir nada: mira el resultado en la pestaña Actions y comprueba si trae \`permission_denials_count\` mayor que cero. También puede ser un límite de cuota o de créditos.
+
+          Para reintentar, deja el ticket como estaba antes y vuelve a disparar:
+
+          \`\`\`
+          gh issue edit $NUM --remove-label needs-human --remove-label in-progress --add-label pending
+          gh issue edit $NUM --remove-label ready-for-dev
+          gh issue edit $NUM --add-label ready-for-dev
+          \`\`\`
+
+          Quitar \`needs-human\` e \`in-progress\` no es cosmético: son las etiquetas que el guardia toma como rastro de trabajo, así que dejarlas puestas lo dejaría ciego en el siguiente intento. Y una etiqueta que ya está puesta no dispara nada, de ahí el quitar y volver a poner."
+          else
+            BODY="🤖 **La corrida en la nube falló** antes de completar este issue. Mira los logs en la pestaña Actions: las causas típicas son un límite de cuota o créditos, un secreto sin configurar, o un error del entorno. Cualquier trabajo parcial quedó en la rama del PR si alcanzó a crearse.
+
+          Para reintentar, resuelve la causa y deja el ticket como estaba antes de volver a disparar:
+
+          \`\`\`
+          gh issue edit $NUM --remove-label needs-human --remove-label in-progress --add-label pending
+          gh issue edit $NUM --remove-label ready-for-dev
+          gh issue edit $NUM --add-label ready-for-dev
+          \`\`\`
+
+          Si el worker alcanzó a dejar trabajo en una rama, míralo antes de borrar nada."
+          fi
+          gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" --add-label needs-human || true
+          gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body "$BODY" || true

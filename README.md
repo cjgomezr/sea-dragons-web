@@ -98,6 +98,7 @@ GUIA-DE-LA-FABRICA.md, Parte 8.
 | `scripts/process-backlog.sh`                      | Loop autónomo local sobre el backlog (prioridades + `blocked-by-N`)                               |
 | `scripts/project-setup.sh` / `task-status.sh`     | Tablero opcional (GitHub Projects v2): cachea los IDs y actualiza el estado del board             |
 | `.github/workflows/claude-backlog.yml`            | Fábrica en la nube: label `ready-for-dev` o cron nocturno                                         |
+| `scripts/check-worker-claimed.sh`                 | Pone en rojo la corrida en la nube cuando el worker terminó sin tocar el issue                    |
 | `.devcontainer/`                                  | Contenedor desechable para correr con bypass total de permisos                                    |
 | `factory-models.json` + `scripts/apply-models.sh` | Qué modelo usa cada pieza y la política de revisión visual                                        |
 | `.github/workflows/claude-mentions.yml`           | Responder a `@claude` en issues (desde el celular)                                                |
