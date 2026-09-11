@@ -96,10 +96,10 @@ report_difference() {
   local state="$1" actual_file="$2"
   {
     echo "error: el esquema de la base no es el que declara el repositorio: $state"
-    # Los dos pueden fallar, y este bloque es el informe de un fallo: dejar que
-    # `set -e` los propague cortaría el informe justo antes de las líneas que
-    # dicen cómo salir del paso. Quien decide el veredicto es el `return 1` de
-    # `main`, no estas dos.
+    # Red de seguridad de `set -e`, no un caso esperado: este bloque es el
+    # informe de un fallo, y dejar que un error aquí lo propague cortaría el
+    # informe justo antes de las líneas que dicen cómo salir del paso. Quien
+    # decide el veredicto es el `return 1` de `main`, no estas dos.
     explain_drift_state "$state" || echo "(estado inesperado: $state)"
     schema_difference "$actual_file" || echo "(no se pudo calcular el diff)"
     echo
@@ -170,7 +170,10 @@ main() {
   # La respuesta va a stdout en una palabra, para que sirva de comprobación de
   # divergencia y no sólo de check de CI: el resto del ruido vive en stderr.
   local state
-  state="$(classify_schema_drift "$EXPECTED_SCHEMA" "$actual_file")"
+  if ! state="$(classify_schema_drift "$EXPECTED_SCHEMA" "$actual_file")"; then
+    echo "error: no se pudieron comparar las dos descripciones del esquema" >&2
+    return 1
+  fi
   echo "$state"
 
   if [ "$state" = "iguales" ]; then

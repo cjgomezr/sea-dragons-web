@@ -164,6 +164,36 @@ describe("comprobación de divergencia", () => {
     expect(resultado.code, resultado.stderr).toBe(0);
   });
 
+  it("falla en vez de comparar a medias cuando no puede ordenar las descripciones", async () => {
+    // El peor resultado posible es decir "iguales" sin haber comparado nada:
+    // declararía producción en sincronía justo cuando algo salió mal. Si el
+    // orden no se puede hacer, las dos listas de diferencias salen vacías, que
+    // es exactamente la forma de "iguales".
+    //
+    // Y no basta con `set -e` en quien llame: una sustitución de comando no
+    // hereda `errexit`, y esta función se usa dentro de una.
+    const directory = await mkdtemp(path.join(tmpdir(), "divergencia-"));
+    temporaryDirectories.push(directory);
+    const expected = await writeDescription(
+      directory,
+      "repositorio.txt",
+      ESQUEMA_DEL_REPOSITORIO,
+    );
+    const actual = await writeDescription(directory, "base.txt", []);
+
+    const resultado = await run([
+      "-c",
+      'set -euo pipefail; . "$1"; sort() { echo "sort roto" >&2; return 7; }; estado="$(classify_schema_drift "$2" "$3")"; echo "$estado"',
+      "bash",
+      toBashPath(SCHEMA_DRIFT_LIB),
+      toBashPath(expected),
+      toBashPath(actual),
+    ]);
+
+    expect(resultado.code).toBeGreaterThan(0);
+    expect(resultado.stdout.trim()).toBe("");
+  });
+
   it("falla en vez de inventarse un estado cuando le falta un archivo", async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "divergencia-"));
     temporaryDirectories.push(directory);

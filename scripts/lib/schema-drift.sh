@@ -46,9 +46,19 @@ classify_schema_drift() {
     fi
   done
 
+  # Las dos comparaciones van en un `if` y no a pelo: quien llama a esta
+  # función suele hacerlo dentro de `$(...)`, y una sustitución de comando no
+  # hereda `errexit` (eso es lo que enciende `inherit_errexit`, que no se puede
+  # dar por puesto en el shell de quien la corra). Sin el `if`, una comparación
+  # fallida seguiría hasta `name_schema_drift` con dos listas vacías y la
+  # respuesta sería "iguales", en verde, sin haber comparado nada.
   local missing_in_database extra_in_database
-  missing_in_database="$(schema_lines_missing_from "$expected_file" "$actual_file")"
-  extra_in_database="$(schema_lines_missing_from "$actual_file" "$expected_file")"
+  if ! missing_in_database="$(schema_lines_missing_from "$expected_file" "$actual_file")"; then
+    return 1
+  fi
+  if ! extra_in_database="$(schema_lines_missing_from "$actual_file" "$expected_file")"; then
+    return 1
+  fi
 
   name_schema_drift "$missing_in_database" "$extra_in_database"
 }
@@ -58,10 +68,22 @@ classify_schema_drift() {
 # `comm` exige entradas ordenadas y la colación por defecto es la del sistema,
 # así que sin fijar LC_ALL la respuesta la decidiría el locale de quien corra
 # esto. Es la misma razón por la que `supabase/ci/schema-snapshot.sql` ordena
-# con `collate "C"`. Las dos entradas van por sustitución de proceso en vez de
-# por archivos temporales: aquí el intérprete es bash (lo dice el shebang de
-# los dos scripts que la cargan) y así no queda basura en /tmp cuando algo
-# falla a mitad.
+# con `collate "C"`.
+#
+# Ordenar por separado y comprobarlo, en vez de meter los dos `sort` dentro de
+# la sustitución de proceso, es lo que hace ruidoso un fallo: el estado de
+# salida de una sustitución de proceso no lo mira nadie, así que un sort que
+# muriera (un archivo ilegible, /tmp lleno) dejaría a `comm` comparando dos
+# flujos vacíos y la respuesta sería "iguales" sin haber comparado nada.
 schema_lines_missing_from() {
-  LC_ALL=C comm -23 <(LC_ALL=C sort "$1") <(LC_ALL=C sort "$2")
+  local first second
+  if ! first="$(LC_ALL=C sort "$1")"; then
+    echo "error: no se pudo ordenar la descripción $1" >&2
+    return 1
+  fi
+  if ! second="$(LC_ALL=C sort "$2")"; then
+    echo "error: no se pudo ordenar la descripción $2" >&2
+    return 1
+  fi
+  LC_ALL=C comm -23 <(printf '%s\n' "$first") <(printf '%s\n' "$second")
 }

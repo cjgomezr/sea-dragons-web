@@ -311,7 +311,8 @@ significa cambiar de proyecto, y eso es una migración, no una rotación.
 El esquema de producción se sembró a mano el 8 de septiembre de 2026, por MCP,
 porque no había otra vía. **Fue un arranque, no el procedimiento.** Desde el
 issue #94 las migraciones llegan a producción por el mismo camino que el
-código, sin pasar por la sesión de nadie.
+código, sin pasar por la sesión de nadie, en cuanto exista el secreto de
+producción (ver más abajo).
 
 Los dos proyectos tienen la misma lista de migraciones por nombre
 (`0001_clubs`, `0002_audit_log`). Las marcas de versión difieren, porque cada

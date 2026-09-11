@@ -129,9 +129,13 @@ describe("workflow de migraciones en main", () => {
 
   it("no puede quedarse colgado reteniendo la cola", () => {
     // El grupo de concurrency serializa a propósito, así que un job colgado no
-    // se queda solo: bloquea toda migración posterior hasta que GitHub lo mate
-    // a las seis horas.
-    expect(theJob()["timeout-minutes"]).toBeGreaterThan(0);
+    // se queda solo: bloquea toda migración posterior hasta que GitHub lo mate.
+    // El techo son las seis horas por defecto, así que un timeout cerca de ese
+    // número no evitaría nada: aplicar el histórico tarda segundos.
+    const timeout = theJob()["timeout-minutes"];
+
+    expect(timeout).toBeGreaterThan(0);
+    expect(timeout).toBeLessThanOrEqual(60);
   });
 
   it("referencia la credencial por nombre desde secrets", () => {
