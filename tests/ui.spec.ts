@@ -119,12 +119,21 @@ const themes = ["light", "dark"] as const;
 const PAGE_MAX_DIFF_PIXELS = 20;
 const COMPONENT_MAX_DIFF_PIXELS = 10;
 
+// El dev server dibuja su propia burbuja de errores en una esquina, dentro de
+// <nextjs-portal>, y aparece unos milisegundos después de la carga: la captura
+// que siembra una línea base local salía sin ella y la comparación de un
+// instante después, con ella. No forma parte del producto y no está en ninguna
+// línea base aprobada, así que se oculta antes de capturar. Donde no se dibuja
+// (que es donde se aprueban las líneas base) esto no cambia un solo píxel.
+const HIDE_DEV_OVERLAY_CSS = "nextjs-portal { display: none !important; }";
+
 async function goToWithTheme(
   page: import("@playwright/test").Page,
   path: string,
   theme: (typeof themes)[number],
 ): Promise<void> {
   await page.goto(`${APP_URL}${path}`);
+  await page.addStyleTag({ content: HIDE_DEV_OVERLAY_CSS });
   if (theme === "dark") {
     await page.getByRole("button", { name: /tema oscuro/i }).click();
   }
@@ -142,6 +151,9 @@ async function goToWithTheme(
 const pages = [
   { name: "home", path: "/" },
   { name: "section", path: "/calendario" },
+  // Pantalla pública de cuentas (#132). No comparte cáscara con las de
+  // arriba: vive en el grupo de rutas (auth), con panel de marca propio.
+  { name: "registro", path: "/registro" },
 ] as const;
 
 for (const pg of pages) {
@@ -609,4 +621,123 @@ test("every mobile tab label keeps room to spare inside its tab at 360px", async
     tooWide.map(({ label, ratio }) => `${label} (${Math.round(ratio * 100)}%)`),
     `estas etiquetas pasan del ${MAX_LABEL_WIDTH_RATIO * 100}% de su pestaña y se partirán con una fuente algo más ancha`,
   ).toEqual([]);
+});
+
+/* ---------------------------------------------------------------------------
+   Registro (#132): el segundo estado de la pantalla, el que dice que falta
+   confirmar el correo. No se alcanza por URL, así que hay que enviar el
+   formulario; la respuesta del endpoint se sustituye por un doble para que la
+   suite no cree cuentas de verdad en Supabase ni gaste envíos de correo.
+   --------------------------------------------------------------------------- */
+
+const REGISTRATION_ENDPOINT = "**/api/v1/auth/register";
+const CONFIRMATION_STUB_EMAIL = "nerea@example.test";
+
+async function goToConfirmationPending(
+  page: import("@playwright/test").Page,
+  theme: (typeof themes)[number],
+): Promise<void> {
+  await page.route(REGISTRATION_ENDPOINT, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          outcome: "confirmation_pending",
+          email: CONFIRMATION_STUB_EMAIL,
+        },
+      }),
+    }),
+  );
+  await goToWithTheme(page, "/registro", theme);
+
+  await page.getByLabel("Nombre completo").fill("Nerea Silva");
+  await page.getByLabel("Correo electrónico").fill(CONFIRMATION_STUB_EMAIL);
+  await page.getByLabel("País").selectOption("AU");
+  await page.getByLabel("Fecha de nacimiento").fill("1994-03-02");
+  await page.getByLabel("Tipo de membresía").selectOption("Full");
+  await page.getByLabel("Contraseña").fill("bajoelagua");
+  await page.getByRole("button", { name: "Crear cuenta" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: /confirma tu correo/i }),
+  ).toBeVisible();
+}
+
+for (const vp of viewports) {
+  test.describe(`registro-confirmacion @ ${vp.name}`, () => {
+    test.use({ viewport: { width: vp.width, height: vp.height } });
+
+    for (const theme of themes) {
+      test(`matches approved baseline (${theme})`, async ({ page }) => {
+        await goToConfirmationPending(page, theme);
+        const name = `registro-confirmacion-${vp.name}-${theme}.png`;
+        await createMissingLocalBaseline(name, () =>
+          page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+        );
+        await expect(page).toHaveScreenshot(name, {
+          ...SCREENSHOT_OPTIONS,
+          fullPage: true,
+          maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+        });
+      });
+    }
+  });
+}
+
+test("registro-confirmacion: has no accessibility violations (axe-core)", async ({
+  page,
+}) => {
+  await goToConfirmationPending(page, "light");
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  expect(
+    results.violations,
+    JSON.stringify(results.violations, null, 2),
+  ).toEqual([]);
+});
+
+// Los cuatro desenlaces del enlace del correo se alcanzan por URL, así que se
+// revisan con axe sin capturar una línea base por cada uno: comparten
+// plantilla con la pantalla de registro, que sí la tiene.
+for (const state of ["ok", "pendiente", "invalida", "error"] as const) {
+  test(`registro tras el enlace (${state}): has no accessibility violations (axe-core)`, async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}/registro?confirmacion=${state}`);
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa"])
+      .analyze();
+    expect(
+      results.violations,
+      JSON.stringify(results.violations, null, 2),
+    ).toEqual([]);
+  });
+}
+
+test("el formulario de registro no manda nada al servidor con la contraseña corta", async ({
+  page,
+}) => {
+  let calls = 0;
+  await page.route(REGISTRATION_ENDPOINT, (route) => {
+    calls += 1;
+    return route.fulfill({ status: 200, body: "{}" });
+  });
+  await page.goto(`${APP_URL}/registro`);
+
+  await page.getByLabel("Nombre completo").fill("Nerea Silva");
+  await page.getByLabel("Correo electrónico").fill(CONFIRMATION_STUB_EMAIL);
+  await page.getByLabel("País").selectOption("AU");
+  await page.getByLabel("Fecha de nacimiento").fill("1994-03-02");
+  await page.getByLabel("Tipo de membresía").selectOption("Full");
+  await page.getByLabel("Contraseña").fill("1234567");
+  await page.getByRole("button", { name: "Crear cuenta" }).click();
+
+  // Next inserta su propio elemento con role="alert" (el anunciador de ruta),
+  // vacío, así que el resumen de errores se busca por su texto.
+  await expect(
+    page.getByRole("alert").filter({ hasText: /caracteres/ }),
+  ).toContainText("8");
+  expect(calls).toBe(0);
 });

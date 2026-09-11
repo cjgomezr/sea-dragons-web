@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   MEMBERSHIP_TYPES,
   PASSWORD_MIN_LENGTH,
@@ -9,7 +9,7 @@ import {
   type RegistrationRequest,
   validateRegistration,
 } from "@/lib/auth/registration";
-import { listCountryOptions } from "@/lib/geo/countries";
+import type { CountryOption } from "@/lib/geo/countries";
 
 const REGISTER_ENDPOINT = "/api/v1/auth/register";
 const CONFIRMATION_EMAIL_ENDPOINT = "/api/v1/auth/confirmation-email";
@@ -182,11 +182,20 @@ function errorIdOf(field: RegistrationField): string {
   return `registro-${field}-error`;
 }
 
-export function RegistrationForm(): React.JSX.Element {
+/** Las opciones de país llegan como prop, calculadas en el servidor, y no se
+ * generan aquí. Los nombres salen de `Intl.DisplayNames` y su orden de
+ * `localeCompare`, y las dos cosas dependen de la versión de ICU: Node ordena
+ * "Hungría" antes que "Hong Kong" y Chromium al revés. Generarlas a los dos
+ * lados rompía la hidratación, y React descartaba el árbol entero del
+ * servidor: la página perdía hasta el atributo de tema. */
+export function RegistrationForm({
+  countries,
+}: {
+  countries: readonly CountryOption[];
+}): React.JSX.Element {
   const [draft, setDraft] = useState<RegistrationRequest>(EMPTY_DRAFT);
   const [issues, setIssues] = useState<readonly RegistrationIssue[]>([]);
   const [status, setStatus] = useState<SubmissionStatus>({ kind: "editing" });
-  const countries = useMemo(() => listCountryOptions("es"), []);
 
   function issueFor(field: RegistrationField): RegistrationIssue | undefined {
     return issues.find((issue) => issue.field === field);
@@ -204,6 +213,19 @@ export function RegistrationForm(): React.JSX.Element {
       "aria-invalid": issue !== undefined,
       ...(issue ? { "aria-describedby": errorIdOf(field) } : {}),
     };
+  }
+
+  /** El mensaje junto al campo, que es lo que apunta su aria-describedby. El
+   * resumen de arriba lo repite a propósito: es el patrón de resumen de
+   * errores, y un aria-describedby que apunta a nada es un defecto de
+   * accesibilidad, no un detalle. */
+  function fieldError(field: RegistrationField): React.JSX.Element | null {
+    const issue = issueFor(field);
+    return issue === undefined ? null : (
+      <p className="auth-field-error" id={errorIdOf(field)}>
+        {issue.message}
+      </p>
+    );
   }
 
   function update(field: RegistrationField, value: string): void {
@@ -250,6 +272,7 @@ export function RegistrationForm(): React.JSX.Element {
           autoComplete="name"
           onChange={(event) => update("fullName", event.target.value)}
         />
+        {fieldError("fullName")}
       </div>
 
       <div className="auth-field">
@@ -260,6 +283,7 @@ export function RegistrationForm(): React.JSX.Element {
           autoComplete="email"
           onChange={(event) => update("email", event.target.value)}
         />
+        {fieldError("email")}
       </div>
 
       <div className="auth-field">
@@ -275,6 +299,7 @@ export function RegistrationForm(): React.JSX.Element {
             </option>
           ))}
         </select>
+        {fieldError("country")}
       </div>
 
       <div className="auth-field">
@@ -285,6 +310,7 @@ export function RegistrationForm(): React.JSX.Element {
           autoComplete="bday"
           onChange={(event) => update("dateOfBirth", event.target.value)}
         />
+        {fieldError("dateOfBirth")}
       </div>
 
       <div className="auth-field">
@@ -302,6 +328,7 @@ export function RegistrationForm(): React.JSX.Element {
             </option>
           ))}
         </select>
+        {fieldError("membershipType")}
       </div>
 
       <div className="auth-field">
@@ -320,6 +347,7 @@ export function RegistrationForm(): React.JSX.Element {
         <p className="auth-hint" id="registro-password-hint">
           Al menos {PASSWORD_MIN_LENGTH} caracteres.
         </p>
+        {fieldError("password")}
       </div>
 
       <button

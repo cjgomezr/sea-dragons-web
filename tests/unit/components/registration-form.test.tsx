@@ -2,6 +2,15 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RegistrationForm } from "@/components/auth/RegistrationForm";
+import { listCountryOptions } from "@/lib/geo/countries";
+
+// Las mismas opciones que calcula la página en el servidor: el componente ya
+// no las genera, las recibe.
+const COUNTRIES = listCountryOptions("es");
+
+function renderForm(): void {
+  render(<RegistrationForm countries={COUNTRIES} />);
+}
 
 type FetchCall = { url: string; body: unknown };
 
@@ -57,7 +66,7 @@ describe("formulario de registro", () => {
   });
 
   it("pide los datos que exige FR-001, cada uno con su etiqueta", () => {
-    render(<RegistrationForm />);
+    renderForm();
 
     for (const label of [
       "Nombre completo",
@@ -72,7 +81,7 @@ describe("formulario de registro", () => {
   });
 
   it("ofrece exactamente los tres tipos de membresía del SRD", () => {
-    render(<RegistrationForm />);
+    renderForm();
     const options = screen
       .getAllByRole("option")
       .filter((option) =>
@@ -86,7 +95,7 @@ describe("formulario de registro", () => {
 
   it("envía el registro al endpoint de la API v1", async () => {
     stubApi();
-    render(<RegistrationForm />);
+    renderForm();
 
     await fillValidForm();
     await userEvent.setup().click(submitButton());
@@ -106,7 +115,7 @@ describe("formulario de registro", () => {
   it("rechaza una contraseña de 7 caracteres sin llamar al servidor", async () => {
     stubApi();
     const user = userEvent.setup();
-    render(<RegistrationForm />);
+    renderForm();
 
     await fillValidForm();
     await user.clear(screen.getByLabelText("Contraseña"));
@@ -120,7 +129,7 @@ describe("formulario de registro", () => {
   it("no envía el formulario sin país", async () => {
     stubApi();
     const user = userEvent.setup();
-    render(<RegistrationForm />);
+    renderForm();
 
     await fillValidForm();
     await user.selectOptions(screen.getByLabelText("País"), "");
@@ -133,7 +142,7 @@ describe("formulario de registro", () => {
   it("marca como inválido el campo que falló", async () => {
     stubApi();
     const user = userEvent.setup();
-    render(<RegistrationForm />);
+    renderForm();
 
     await fillValidForm();
     await user.clear(screen.getByLabelText("Contraseña"));
@@ -149,7 +158,7 @@ describe("formulario de registro", () => {
 
   it("tras registrarse dice que falta confirmar el correo y lo nombra", async () => {
     stubApi();
-    render(<RegistrationForm />);
+    renderForm();
 
     await fillValidForm();
     await userEvent.setup().click(submitButton());
@@ -163,7 +172,7 @@ describe("formulario de registro", () => {
   it("ofrece reenviar el correo de confirmación", async () => {
     stubApi();
     const user = userEvent.setup();
-    render(<RegistrationForm />);
+    renderForm();
 
     await fillValidForm();
     await user.click(submitButton());
@@ -188,7 +197,7 @@ describe("formulario de registro", () => {
         },
       },
     });
-    render(<RegistrationForm />);
+    renderForm();
 
     await fillValidForm();
     await userEvent.setup().click(submitButton());
@@ -205,7 +214,7 @@ describe("formulario de registro", () => {
         throw new Error("ECONNREFUSED 127.0.0.1:3417");
       }),
     );
-    render(<RegistrationForm />);
+    renderForm();
 
     await fillValidForm();
     await userEvent.setup().click(submitButton());

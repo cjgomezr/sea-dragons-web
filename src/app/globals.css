@@ -393,7 +393,10 @@ h6 {
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-sidebar-text-muted);
+  /* No usa --color-sidebar-text-muted: sobre el azul del panel da 4.43:1 y AA
+     pide 4.5:1 para texto de este tamaño. La jerarquía la marcan el tamaño y
+     el peso, que es además lo que pide design-system.md. */
+  color: var(--color-sidebar-text);
 }
 
 .auth-brand-headline {
@@ -408,13 +411,13 @@ h6 {
 .auth-brand-copy {
   max-width: 42ch;
   margin: 0;
-  color: var(--color-sidebar-text-muted);
+  color: var(--color-sidebar-text);
 }
 
 .auth-brand-footer {
   margin: 0;
   font-size: 12px;
-  color: var(--color-sidebar-text-muted);
+  color: var(--color-sidebar-text);
 }
 
 .auth-main {
@@ -501,6 +504,13 @@ h6 {
   color: var(--color-text-secondary);
 }
 
+.auth-field-error {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
 .auth-submit {
   min-height: var(--touch-target-min);
   padding: 0 var(--space-6);
@@ -549,10 +559,6 @@ h6 {
   margin: 0;
   font-size: 14px;
   color: var(--color-text-secondary);
-}
-
-.auth-note-ok {
-  color: var(--color-success);
 }
 
 @media (min-width: 768px) {
