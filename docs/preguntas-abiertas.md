@@ -38,6 +38,14 @@ que insinuaba el SRD v1.3.
 
 Escrito en FR-083, AC-038 y en la nota de NFR-012.
 
+**Apostilla del 11 de septiembre de 2026.** Google y Apple se aplazan a
+Release 2, así que en Release 1 el único camino que llega a la pantalla de
+completar registro es el de correo y contraseña. La decisión de un único estado
+sigue en pie y no cambia: FR-083 la pide igual para ese camino, y es justo la
+pieza que un proveedor externo necesitará el día que entre. El motivo del
+aplazamiento y el momento de retomarlo están en
+`docs/prd/e2-autenticacion-cuentas.md`.
+
 ### B3 · El jugador no puede editar su propio perfil · E5 · RESUELTO
 
 **Decisión: el miembro edita su ficha, el Admin conserva el registro federativo.**
