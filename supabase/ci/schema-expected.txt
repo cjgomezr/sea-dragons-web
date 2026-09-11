@@ -11,6 +11,20 @@ columna clubs.created_at tipo=timestamp with time zone null=NO default=now()
 columna clubs.id tipo=uuid null=NO default=gen_random_uuid()
 columna clubs.name tipo=text null=NO default=-
 columna clubs.slug tipo=text null=NO default=-
+columna members.account_status tipo=text null=NO default='incomplete'::text
+columna members.club_id tipo=uuid null=NO default=-
+columna members.country tipo=text null=YES default=-
+columna members.created_at tipo=timestamp with time zone null=NO default=now()
+columna members.date_of_birth tipo=date null=YES default=-
+columna members.email tipo=text null=NO default=-
+columna members.full_name tipo=text null=NO default=-
+columna members.guardian_consent_at tipo=timestamp with time zone null=YES default=-
+columna members.guardian_email tipo=text null=YES default=-
+columna members.guardian_name tipo=text null=YES default=-
+columna members.id tipo=uuid null=NO default=gen_random_uuid()
+columna members.membership_type tipo=text null=YES default=-
+columna members.role tipo=text null=NO default='Player'::text
+columna members.user_id tipo=uuid null=NO default=-
 grant audit_log authenticated SELECT
 grant audit_log postgres DELETE
 grant audit_log postgres INSERT
@@ -34,16 +48,39 @@ grant clubs service_role DELETE
 grant clubs service_role INSERT
 grant clubs service_role SELECT
 grant clubs service_role UPDATE
+grant members authenticated SELECT
+grant members postgres DELETE
+grant members postgres INSERT
+grant members postgres REFERENCES
+grant members postgres SELECT
+grant members postgres TRIGGER
+grant members postgres TRUNCATE
+grant members postgres UPDATE
+grant members service_role DELETE
+grant members service_role INSERT
+grant members service_role SELECT
+grant members service_role UPDATE
 indice audit_log_club_id_created_at_idx CREATE INDEX audit_log_club_id_created_at_idx ON public.audit_log USING btree (club_id, created_at DESC)
 indice audit_log_pkey CREATE UNIQUE INDEX audit_log_pkey ON public.audit_log USING btree (id)
 indice clubs_pkey CREATE UNIQUE INDEX clubs_pkey ON public.clubs USING btree (id)
 indice clubs_slug_key CREATE UNIQUE INDEX clubs_slug_key ON public.clubs USING btree (slug)
+indice members_pkey CREATE UNIQUE INDEX members_pkey ON public.members USING btree (id)
+indice members_user_id_key CREATE UNIQUE INDEX members_user_id_key ON public.members USING btree (user_id)
 policy audit_log.audit_log_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy clubs.clubs_select_authenticated cmd=SELECT roles={authenticated} using=true check=-
+policy members.members_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
 restriccion audit_log.audit_log_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion audit_log.audit_log_pkey PRIMARY KEY (id)
 restriccion audit_log.audit_log_result_check CHECK ((result = ANY (ARRAY['success'::text, 'failure'::text])))
 restriccion clubs.clubs_pkey PRIMARY KEY (id)
 restriccion clubs.clubs_slug_key UNIQUE (slug)
+restriccion members.members_account_status_check CHECK ((account_status = ANY (ARRAY['incomplete'::text, 'active'::text, 'inactive'::text])))
+restriccion members.members_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion members.members_membership_type_check CHECK ((membership_type = ANY (ARRAY['Full'::text, 'Student'::text, 'Casual'::text])))
+restriccion members.members_pkey PRIMARY KEY (id)
+restriccion members.members_role_check CHECK ((role = ANY (ARRAY['Admin'::text, 'Coach'::text, 'Committee'::text, 'Player'::text])))
+restriccion members.members_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+restriccion members.members_user_id_key UNIQUE (user_id)
 tabla audit_log rls=t
 tabla clubs rls=t
+tabla members rls=t

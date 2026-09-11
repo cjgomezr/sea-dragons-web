@@ -131,6 +131,16 @@ export function describeConPostgres(name: string, fn: () => void): void {
   describe.skip(`${name} (saltado: falta ${ADMIN_URL_ENV})`, fn);
 }
 
+/**
+ * El idioma de los mensajes de error lo decide el servidor, no el cliente: un
+ * Postgres instalado en español devuelve "el valor nulo en la columna ..." y el
+ * del runner devuelve "null value in column ...". Un test que afirma sobre el
+ * texto del rechazo pasaría en CI y fallaría en la máquina de quien lo
+ * escribió, sin que el esquema tenga nada que ver. Fijarlo aquí lo resuelve
+ * para todos los casos de una vez.
+ */
+const MESSAGE_LANGUAGE_OPTIONS = "-c lc_messages=C";
+
 export function psql(url: string, args: readonly string[]): Promise<RunResult> {
   return run(
     "psql",
@@ -144,7 +154,7 @@ export function psql(url: string, args: readonly string[]): Promise<RunResult> {
       url,
       ...args,
     ],
-    process.env,
+    { ...process.env, PGOPTIONS: MESSAGE_LANGUAGE_OPTIONS },
   );
 }
 

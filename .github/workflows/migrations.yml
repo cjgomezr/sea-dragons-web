@@ -67,8 +67,14 @@ jobs:
       # aplicado a mano aplica limpia sobre una base vacía y deja otra cosa.
       - name: Compara el esquema resultante contra el declarado en el repositorio
         run: bash scripts/check-schema-snapshot.sh
-      # Y esto prueba lo demás que pide el ticket contra un Postgres de verdad:
-      # el orden, que una migración rota deja el job en rojo, y que aplicar dos
-      # veces no cambia el esquema resultante.
-      - name: Comprueba el aplicador contra ese mismo Postgres
-        run: npx vitest run tests/unit/scripts/apply-migrations.test.ts
+      # Y esto prueba lo demás contra un Postgres de verdad: el orden, que una
+      # migración rota deja el job en rojo, que aplicar dos veces no cambia el
+      # esquema resultante, y lo que cada migración promete por su cuenta
+      # (restricciones, privilegios y policies). Los tests de cada migración
+      # viven en `tests/unit/supabase/`, así que el filtro los recoge todos sin
+      # que haya que ampliar esta lista con cada una.
+      #
+      # Es el único sitio donde las policies se comprueban en un PR: los tests
+      # de `tests/rls/` hablan con `seadragons-dev` y aquí no hay credenciales.
+      - name: Comprueba el aplicador y las migraciones contra ese mismo Postgres
+        run: npx vitest run tests/unit/scripts/apply-migrations.test.ts "tests/unit/supabase/"

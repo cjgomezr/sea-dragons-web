@@ -354,18 +354,34 @@ que nadie haya tocado el esquema. Y conéctate con un superusuario llamado
 así que con otro nombre (Homebrew crea el tuyo) verás siete líneas de diferencia
 que no son un cambio de esquema.
 
-`supabase/ci/roles.sql` crea los roles de la API (`anon`, `authenticated`,
-`service_role`) que Supabase trae de fábrica y un Postgres pelado no tiene; sin
-ellos las migraciones fallan por el motivo equivocado. Hoy alcanza porque
-ninguna migración toca el esquema `auth`: la primera policy que use `auth.uid()`
-va a romper este job, y lo que hay que ampliar entonces es `roles.sql`, no la
-migración.
+`supabase/ci/roles.sql` monta el sustrato que Supabase trae de fábrica y un
+Postgres pelado no tiene; sin él las migraciones fallan por el motivo
+equivocado. Son dos cosas: los roles de la API (`anon`, `authenticated`,
+`service_role`) y, desde `0003_members`, lo mínimo del esquema `auth` que el
+repositorio referencia (la tabla `auth.users` a la que apunta `members.user_id`
+y la función `auth.uid()` que llaman sus policies). No es una réplica de
+Supabase Auth y no pretende serlo: ahí no hay contraseñas ni sesiones, porque
+ninguna migración las toca. Cuando una migración necesite algo más de `auth`,
+lo que se amplía es `roles.sql`, no la migración.
 
-Los tests de `tests/unit/scripts/apply-migrations.test.ts` que necesitan una
-base se saltan solos mientras no exista `MIGRATIONS_TEST_DATABASE_URL`, así que
-`npm test` pasa igual en una máquina sin Postgres. En el workflow de migraciones
-no se pueden saltar: `REQUIRE_MIGRATIONS_POSTGRES=1` convierte el salto en un
-fallo, porque ahí son media cobertura de la comprobación.
+Los tests que necesitan una base se saltan solos mientras no exista
+`MIGRATIONS_TEST_DATABASE_URL`, así que `npm test` pasa igual en una máquina sin
+Postgres. En el workflow de migraciones no se pueden saltar:
+`REQUIRE_MIGRATIONS_POSTGRES=1` convierte el salto en un fallo, porque ahí son
+media cobertura de la comprobación. Son los de
+`tests/unit/scripts/apply-migrations.test.ts` (el aplicador) y los de
+`tests/unit/supabase/` (lo que cada migración promete: restricciones,
+privilegios y policies). Estos últimos son el único sitio donde las policies se
+comprueban en un PR, porque los de `tests/rls/` hablan con `seadragons-dev` y el
+runner no tiene credenciales.
+
+Para correr esos tests contra un Postgres local hace falta un superusuario que
+pueda crear bases, y se conectan a ellas con el sustrato ya aplicado:
+
+```bash
+export MIGRATIONS_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/postgres
+npx vitest run tests/unit/scripts/apply-migrations.test.ts "tests/unit/supabase/"
+```
 
 ### Aplicadas al mergear a main (issue #94)
 
