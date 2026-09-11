@@ -51,9 +51,9 @@ create policy audit_log_select_denied
 -- archivo tiene su propio test de integración.
 --
 -- Lo que faltaba era el `revoke`, y sin él lo de arriba se queda en intención:
--- `0004_privilegios_clubs_audit_log.sql` quita los siete privilegios que esta
--- tabla concedía a `anon` y a `authenticated`, incluido el `select` de la línea
--- siguiente. Quien venga a darle lectura al rol Admin en E3 lo concede allí,
+-- `0004_privilegios_clubs_audit_log.sql` quita los siete privilegios con los
+-- que esta tabla nació para `anon` y `authenticated`, incluido el `select` de la
+-- línea siguiente. Quien venga a darle lectura al rol Admin en E3 lo concede allí,
 -- junto con la policy que lo acompañe.
 grant select on public.audit_log to authenticated;
 grant select, insert on public.audit_log to service_role;

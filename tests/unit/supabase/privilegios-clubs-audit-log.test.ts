@@ -40,10 +40,6 @@ async function privilegesOf(
   return rows === "" ? [] : rows.split("\n");
 }
 
-/** Los tres que RLS no filtra: se controlan sólo por privilegio. `truncate` es
- * el que vacía la tabla entera. */
-const PRIVILEGIOS_QUE_RLS_NO_FILTRA = ["REFERENCES", "TRIGGER", "TRUNCATE"];
-
 /** Envuelve `sql` en el `set role` que PostgREST hace antes de cada consulta.
  * Sin claims del JWT a propósito: ninguna policy de estas dos tablas lee
  * `auth.uid()`, así que el rol es todo lo que hace falta para reproducirlas. */
@@ -86,12 +82,11 @@ describeConPostgres("privilegios de clubs", () => {
   it("no deja a authenticated truncar, disparar ni referenciar la tabla", async () => {
     const database = await migratedDatabase();
 
-    const privilegios = await privilegesOf(database, "clubs", "authenticated");
-
-    expect(privilegios).toEqual(["SELECT"]);
-    for (const privilegio of PRIVILEGIOS_QUE_RLS_NO_FILTRA) {
-      expect(privilegios).not.toContain(privilegio);
-    }
+    // `select` y nada más, así que de los tres que RLS no filtra (`truncate`,
+    // `trigger` y `references`) no queda ninguno.
+    expect(await privilegesOf(database, "clubs", "authenticated")).toEqual([
+      "SELECT",
+    ]);
   });
 });
 
@@ -166,6 +161,12 @@ describeConPostgres("privilegios", () => {
     );
 
     expect(sonda.code, sonda.stderr).toBe(0);
+    // Y ni una fila, que es la otra mitad del argumento: el `select` que conserva
+    // `anon` es inofensivo porque RLS no le da nada. Si alguien le escribe una
+    // policy de lectura a `anon`, este caso lo cuenta. La salida vacía es la
+    // lista vacía: con `--quiet` y `-At`, psql no imprime ni etiquetas de
+    // sentencia ni cabeceras.
+    expect(sonda.stdout.trim()).toBe("");
   });
 
   it("sigue dejando a una sesión autenticada leer el club sembrado", async () => {
