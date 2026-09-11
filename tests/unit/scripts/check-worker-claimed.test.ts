@@ -113,9 +113,13 @@ describe("scripts/check-worker-claimed.sh", () => {
   }
 
   it(
-    "falla cuando el issue sigue abierto, sin etiquetas de trabajo y sin PR",
+    "falla en el estado exacto que dejó la corrida del 11 de septiembre de 2026",
     async () => {
-      const result = await run({ ISSUE_VIEW_JSON: issueJson("OPEN", []) });
+      // El issue #140 quedó así: abierto, todavía en la cola y con la etiqueta
+      // que disparó el workflow. Ninguna de las dos es rastro de trabajo.
+      const result = await run({
+        ISSUE_VIEW_JSON: issueJson("OPEN", ["pending", "ready-for-dev"]),
+      });
 
       expect(result.code).toBe(1);
       expect(result.stdout).toContain("salió sin tocar el issue");

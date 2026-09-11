@@ -103,6 +103,7 @@ jobs:
           fi
 
       - name: Run Claude Code on the issue / backlog
+        id: worker
         uses: anthropics/claude-code-action@v1
         with:
           # Credencial resuelta por el paso "Resolver credencial del actor":
@@ -168,9 +169,16 @@ jobs:
       #
       # `!cancelled()` y no `always()`: una corrida que alguien cancela a mano
       # no debe acabar con `needs-human` pegado al ticket.
+      #
+      # Y solo si el worker llegó a correr y salió bien. Si el job murió antes
+      # (un `npm ci` roto, el paso de la credencial saliendo en rojo), el issue
+      # está intacto por razones que no tienen nada que ver con el worker, y
+      # acusarlo sería repetir el error de diagnóstico que este guardia vino a
+      # eliminar. Saltándose el paso, su resultado es `skipped` y el aviso de
+      # abajo cae en la rama genérica, que ahí es la correcta.
       - name: Comprueba que el worker dejó rastro en el issue
         id: claim-guard
-        if: ${{ !cancelled() && github.event_name == 'issues' }}
+        if: ${{ !cancelled() && github.event_name == 'issues' && steps.worker.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/check-worker-claimed.sh "${{ github.event.issue.number }}"
@@ -190,11 +198,27 @@ jobs:
 
           La causa típica es que el worker no pudo escribir nada: mira el resultado en la pestaña Actions y comprueba si trae \`permission_denials_count\` mayor que cero. También puede ser un límite de cuota o de créditos.
 
-          Para reintentar: quita la etiqueta \`ready-for-dev\` y vuelve a ponerla. Una etiqueta que ya está puesta no dispara nada."
+          Para reintentar, deja el ticket como estaba antes y vuelve a disparar:
+
+          \`\`\`
+          gh issue edit $NUM --remove-label needs-human --remove-label in-progress --add-label pending
+          gh issue edit $NUM --remove-label ready-for-dev
+          gh issue edit $NUM --add-label ready-for-dev
+          \`\`\`
+
+          Quitar \`needs-human\` e \`in-progress\` no es cosmético: son las etiquetas que el guardia toma como rastro de trabajo, así que dejarlas puestas lo dejaría ciego en el siguiente intento. Y una etiqueta que ya está puesta no dispara nada, de ahí el quitar y volver a poner."
           else
             BODY="🤖 **La corrida en la nube falló** antes de completar este issue. Mira los logs en la pestaña Actions: las causas típicas son un límite de cuota o créditos, un secreto sin configurar, o un error del entorno. Cualquier trabajo parcial quedó en la rama del PR si alcanzó a crearse.
 
-          Para reintentar: resuelve la causa y vuelve a poner la etiqueta \`ready-for-dev\`, quitándola primero si sigue puesta."
+          Para reintentar, resuelve la causa y deja el ticket como estaba antes de volver a disparar:
+
+          \`\`\`
+          gh issue edit $NUM --remove-label needs-human --remove-label in-progress --add-label pending
+          gh issue edit $NUM --remove-label ready-for-dev
+          gh issue edit $NUM --add-label ready-for-dev
+          \`\`\`
+
+          Si el worker alcanzó a dejar trabajo en una rama, míralo antes de borrar nada."
           fi
           gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" --add-label needs-human || true
           gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body "$BODY" || true

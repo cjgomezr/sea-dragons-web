@@ -29,6 +29,14 @@ set -uo pipefail
 NUM="${1:-}"
 [ -n "$NUM" ] || { echo "uso: $0 <número de issue>" >&2; exit 2; }
 
+# Sin `set -e`, un `jq` ausente dejaría las variables vacías, el script no se
+# enteraría y acabaría acusando al worker de algo que no hizo. Es el mismo
+# "no pude comprobar" que el resto del archivo trata con cuidado.
+command -v jq >/dev/null || {
+  echo "::warning title=Falta jq::no puedo comprobar #$NUM, así que no marco la corrida en rojo"
+  exit 0
+}
+
 repo_args=()
 [ -n "${GITHUB_REPOSITORY:-}" ] && repo_args=(--repo "$GITHUB_REPOSITORY")
 
@@ -52,6 +60,13 @@ labels=$(printf '%s' "$info" | jq -r '.labels[].name')
 # a propósito: el ciclo de vida manda devolver el ticket a `pending` con esa
 # etiqueta cuando main está roto, y añadirle `needs-human` encima contradiría el
 # estado que el worker acaba de dejar queriendo.
+#
+# Esta exención mide estado absoluto, no lo que cambió durante la corrida, así
+# que asume que quien reintenta deja el ticket como estaba: sin `needs-human` ni
+# `in-progress`. Si se reintenta con esas etiquetas puestas, este guardia sale 0
+# aunque el worker no toque nada. Por eso el comentario de reintento que deja
+# `claude-backlog.yml` da los comandos exactos en vez de decir solo "vuelve a
+# poner la etiqueta".
 while read -r label; do
   case "$label" in
     in-progress|needs-human|blocked-by-*)
@@ -64,7 +79,7 @@ done <<< "$labels"
 # Último recurso, y el más caro, por eso va al final: un PR que declare cerrarlo
 # significa que el trabajo existe aunque las etiquetas digan otra cosa. Buscar
 # por rama no serviría, porque `impl-N` y `worktree-impl-N` conviven.
-if prs=$(gh pr list --state all --search "Closes #$NUM in:body" --json number --jq length 2>/dev/null); then
+if prs=$(gh pr list "${repo_args[@]}" --state all --search "Closes #$NUM in:body" --json number --jq length 2>/dev/null); then
   if [ "${prs:-0}" != "0" ]; then
     echo "✅ #$NUM ya tiene un PR que declara cerrarlo"
     exit 0
