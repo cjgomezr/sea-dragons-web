@@ -34,7 +34,9 @@ name_schema_drift() {
 
 # Escribe en stdout el estado de las dos descripciones. Devuelve 0 en los
 # cuatro: clasificar no es juzgar, y quien la llama bajo `set -e` necesita
-# llegar vivo a la línea en la que explica la diferencia.
+# llegar vivo a la línea en la que explica la diferencia. Distinto de cero sólo
+# cuando no hay estado que dar: 2 si falta un archivo, 1 si la comparación no
+# se pudo hacer. En esos dos, stdout queda vacío.
 classify_schema_drift() {
   local expected_file="$1" actual_file="$2"
 
@@ -85,5 +87,10 @@ schema_lines_missing_from() {
     echo "error: no se pudo ordenar la descripción $2" >&2
     return 1
   fi
+  # Una descripción vacía sale del `printf` como una línea en blanco, donde el
+  # archivo no tenía ninguna. No cambia la clasificación: si el otro lado
+  # también está vacío, la línea en blanco está en los dos y `comm` no la
+  # cuenta; si no lo está, la diferencia que importa son las otras líneas y el
+  # salto final se lo come la sustitución de comando de quien llama.
   LC_ALL=C comm -23 <(printf '%s\n' "$first") <(printf '%s\n' "$second")
 }
