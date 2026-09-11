@@ -1,0 +1,44 @@
+import type { ReactNode } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
+
+/**
+ * Disposición de las pantallas públicas de cuentas, siguiendo
+ * docs/mockups/auth-light.png: panel de marca a la izquierda y formulario a la
+ * derecha. Por debajo de 768px el panel de marca se encoge a una cabecera,
+ * para que el formulario empiece sin scroll en un móvil.
+ */
+
+const CLUB_NAME = "Victoria Seadragons";
+const CLUB_INITIALS = "VS";
+
+export default function AuthLayout({
+  children,
+}: Readonly<{ children: ReactNode }>): React.JSX.Element {
+  return (
+    <div className="auth-shell">
+      <aside className="auth-brand">
+        <div className="auth-brand-header">
+          <span className="auth-brand-mark" aria-hidden="true">
+            {CLUB_INITIALS}
+          </span>
+          <span className="auth-brand-name">{CLUB_NAME}</span>
+        </div>
+        <div className="auth-brand-pitch">
+          <p className="auth-brand-eyebrow">Rugby subacuático · Melbourne</p>
+          <p className="auth-brand-headline">Tu club, bajo la superficie.</p>
+          <p className="auth-brand-copy">
+            Entrenamientos, equipos, evaluaciones y cuotas. Todo lo que los
+            Seadragons necesitan dentro y fuera del agua.
+          </p>
+        </div>
+        <p className="auth-brand-footer">© 2026 Victoria Seadragons UWR Club</p>
+      </aside>
+      <main className="auth-main">
+        <div className="auth-main-header">
+          <ThemeToggle />
+        </div>
+        {children}
+      </main>
+    </div>
+  );
+}
