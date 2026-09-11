@@ -4,7 +4,7 @@ import {
   type TemporaryDatabase,
   applyRepositoryMigrations,
   describeConPostgres,
-  freshDatabase,
+  migratedDatabase,
 } from "../../support/postgres";
 
 /**
@@ -33,15 +33,6 @@ async function seededClubId(database: TemporaryDatabase): Promise<string> {
   return database.query(
     "select id from public.clubs where slug = 'victoria-seadragons'",
   );
-}
-
-async function migratedDatabase(): Promise<TemporaryDatabase> {
-  const database = await freshDatabase();
-  const applied = await applyRepositoryMigrations(database);
-  // Sin esto, un histórico que no aplica dejaría a los casos de abajo fallando
-  // por "la tabla no existe", que se lee como otro problema.
-  expect(applied.code, applied.stderr).toBe(0);
-  return database;
 }
 
 /**

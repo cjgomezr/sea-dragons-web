@@ -49,5 +49,12 @@ create policy audit_log_select_denied
 -- documentan la intención (quién debería poder qué), no la reducen por sí
 -- solos. RLS, no el GRANT, es la frontera real; por eso cada policy de este
 -- archivo tiene su propio test de integración.
+--
+-- Lo que faltaba era el `revoke`, y sin él lo de arriba se queda en intención:
+-- `0004_privilegios_clubs_audit_log.sql` quita los siete privilegios con los
+-- que esta tabla nació para `anon` y `authenticated`, y con ellos se va también
+-- el `select` que concede la línea siguiente, que es uno de los siete. Quien
+-- venga a darle lectura al rol Admin en E3 lo concede allí, junto con la policy
+-- que lo acompañe.
 grant select on public.audit_log to authenticated;
 grant select, insert on public.audit_log to service_role;
