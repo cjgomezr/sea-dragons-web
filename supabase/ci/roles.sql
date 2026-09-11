@@ -28,16 +28,32 @@ $$;
 
 grant usage on schema public to anon, authenticated, service_role;
 
+-- Esta línea es la diferencia menos obvia entre los dos sustratos, y la que
+-- más caro sale olvidar. En un Supabase de verdad, toda tabla nueva del esquema
+-- `public` nace con TODOS los privilegios concedidos a los tres roles de la
+-- API: está en el `pg_default_acl` del proyecto, verificado contra
+-- `seadragons-dev`. Un Postgres recién creado no tiene nada de eso, así que una
+-- tabla nueva nace sin privilegio alguno para `anon` y `authenticated`.
+--
+-- Sin reproducirlo, el sustrato es más seguro que producción, y eso es lo peor
+-- que puede ser: un `revoke` que en la base real es la única cosa que impide
+-- que un miembro se cambie el rol aquí no haría nada, y el test que lo defiende
+-- pasaría por la ausencia del privilegio en vez de por la migración. Verde
+-- falso, y justo en la frontera de NFR-004.
+alter default privileges in schema public
+  grant all on tables to anon, authenticated, service_role;
+
 -- Lo mínimo del esquema `auth` de Supabase que el repositorio necesita para
 -- que sus migraciones apliquen: la tabla a la que `public.members` apunta y la
 -- función que sus policies llaman. No es una réplica de Supabase Auth y no
 -- pretende serlo; aquí no hay contraseñas, ni sesiones, ni confirmación de
 -- correo, porque ninguna migración de este repositorio las toca.
 --
--- Lo que esto NO es: una base contra la que probar policies. Sin PostgREST
--- nadie pone el JWT en la sesión, así que `auth.uid()` devuelve null y toda
--- policy niega. Los tests de RLS van contra `seadragons-dev`, que es una base
--- de verdad (`tests/rls/`).
+-- Con `auth.uid()` puesta, esta base SÍ sirve para probar policies: el test
+-- pone el `sub` con `set request.jwt.claims` y cambia de rol con `set role`,
+-- que es lo que hace PostgREST antes de cada consulta. Lo que esta base no
+-- reproduce es PostgREST en sí (ni el JWT que firma Supabase Auth), y por eso
+-- los tests de `tests/rls/` siguen existiendo contra `seadragons-dev`.
 create schema if not exists auth;
 
 create table if not exists auth.users (id uuid primary key);

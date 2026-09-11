@@ -375,6 +375,25 @@ privilegios y policies). Estos últimos son el único sitio donde las policies s
 comprueban en un PR, porque los de `tests/rls/` hablan con `seadragons-dev` y el
 runner no tiene credenciales.
 
+### Por qué el esquema declarado concede tanto a `anon`
+
+`schema-expected.txt` dice, por ejemplo, `grant clubs anon DELETE`, y eso no es
+un descuido ni una intención: es lo que la base tiene. En un Supabase de verdad
+toda tabla nueva del esquema `public` nace con TODOS los privilegios concedidos
+a los tres roles de la API, porque así está el `pg_default_acl` del proyecto. El
+sustrato de CI lo reproduce desde `0003_members` (`alter default privileges` en
+`roles.sql`), y por eso el archivo lo refleja.
+
+Quien mande sigue siendo RLS: sin policy, niega. Lo que ese privilegio de más sí
+deja pasar es `truncate`, que RLS no filtra. `0003_members` se lo quita a
+`members` con un `revoke` explícito; `clubs` y `audit_log` todavía no, y da para
+un ticket pequeño.
+
+Reproducir el `pg_default_acl` no es cosmético. Sin él el sustrato sería más
+seguro que producción, que es lo peor que puede ser: un `revoke` que en la base
+real es lo único que impide que un miembro se cambie el rol aquí no haría nada,
+y su test pasaría por la ausencia del privilegio en vez de por la migración.
+
 Para correr esos tests contra un Postgres local hace falta un superusuario que
 pueda crear bases, y se conectan a ellas con el sustrato ya aplicado:
 

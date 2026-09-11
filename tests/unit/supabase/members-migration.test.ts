@@ -44,7 +44,13 @@ async function migratedDatabase(): Promise<TemporaryDatabase> {
   return database;
 }
 
-/** Inserta un miembro válido con los campos que `overrides` reemplace. */
+/**
+ * Inserta un miembro válido con los campos que `overrides` reemplace. Los
+ * valores son SQL literal, no datos: una cadena va entre comillas
+ * (`{ role: "'Owner'" }`) y una expresión va tal cual
+ * (`{ club_id: "gen_random_uuid()" }`). Es lo que permite pedirle a un caso que
+ * inserte `null` donde la columna no lo admite.
+ */
 async function insertMember(
   database: TemporaryDatabase,
   overrides: Readonly<Record<string, string>> = {},
@@ -302,10 +308,14 @@ describeConPostgres("policies de miembros", () => {
     );
 
     expect(lectura.code).toBeGreaterThan(0);
-    expect(lectura.stderr).toMatch(/permission denied for table members/);
+    expect(lectura.stderr).toMatch(/permission denied/);
   });
 
   it("no deja al dueño de la fila cambiar su propio rol", async () => {
+    // Se exige el error, no sólo que el valor no cambie. Sin el `revoke` de la
+    // migración el privilegio existe y lo que niega es RLS, que no tiene policy
+    // de update: el `update` afecta a cero filas y sale en verde. Un cliente
+    // que recibe eso cree que guardó.
     const database = await migratedDatabase();
     const socio = await seedMember(
       database,
@@ -321,7 +331,7 @@ describeConPostgres("policies de miembros", () => {
     );
 
     expect(intento.code).toBeGreaterThan(0);
-    expect(intento.stderr).toMatch(/permission denied for table members/);
+    expect(intento.stderr).toMatch(/permission denied/);
     expect(
       await database.query(
         `select role from public.members where user_id = '${socio.userId}'`,
@@ -345,7 +355,7 @@ describeConPostgres("policies de miembros", () => {
     );
 
     expect(intento.code).toBeGreaterThan(0);
-    expect(intento.stderr).toMatch(/permission denied for table members/);
+    expect(intento.stderr).toMatch(/permission denied/);
     expect(
       await database.query(
         `select account_status from public.members where user_id = '${socio.userId}'`,

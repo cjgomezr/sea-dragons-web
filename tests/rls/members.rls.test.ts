@@ -92,6 +92,23 @@ function authenticatedClientFor(user: TestUser): Promise<RlsClient> {
   );
 }
 
+/** Los correos de todos los miembros vistos con la llave de servicio, que salta
+ * RLS: es la única forma de saber qué filas había cuando una policy devuelve
+ * menos de las que existen. */
+async function visibleEmails(
+  serviceClient: ServiceRoleClient,
+): Promise<string[]> {
+  const { data, error } = await serviceClient.client
+    .from(MEMBERS_TABLE)
+    .select("email");
+  if (error || !data) {
+    throw new Error(
+      `No se pudieron releer los miembros sembrados: ${error?.message ?? "sin datos"}`,
+    );
+  }
+  return data.map((row) => row.email as string);
+}
+
 /** Lee la fila con la llave de servicio: sirve para comprobar que un intento
  * denegado no cambió nada, que es lo que un `error` por sí solo no prueba. */
 async function storedMember(
@@ -172,9 +189,12 @@ describeRls("RLS de miembros", () => {
 
             expect(error).toBeNull();
             expect(data).toEqual([{ email: socio.email }]);
-            // Dicho aparte: sin esto el caso pasaría igual si la fila del otro
-            // club no se hubiera sembrado.
-            expect(forastero.email).not.toBe(socio.email);
+            // Con la llave de servicio las dos filas se ven: lo que la lectura
+            // de arriba devolvió es lo que la policy dejó pasar, no lo único
+            // que había.
+            expect(await visibleEmails(serviceClient)).toEqual(
+              expect.arrayContaining([socio.email, forastero.email]),
+            );
           }),
         ),
       );

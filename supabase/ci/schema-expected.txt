@@ -25,7 +25,20 @@ columna members.id tipo=uuid null=NO default=gen_random_uuid()
 columna members.membership_type tipo=text null=YES default=-
 columna members.role tipo=text null=NO default='Player'::text
 columna members.user_id tipo=uuid null=NO default=-
+grant audit_log anon DELETE
+grant audit_log anon INSERT
+grant audit_log anon REFERENCES
+grant audit_log anon SELECT
+grant audit_log anon TRIGGER
+grant audit_log anon TRUNCATE
+grant audit_log anon UPDATE
+grant audit_log authenticated DELETE
+grant audit_log authenticated INSERT
+grant audit_log authenticated REFERENCES
 grant audit_log authenticated SELECT
+grant audit_log authenticated TRIGGER
+grant audit_log authenticated TRUNCATE
+grant audit_log authenticated UPDATE
 grant audit_log postgres DELETE
 grant audit_log postgres INSERT
 grant audit_log postgres REFERENCES
@@ -33,10 +46,27 @@ grant audit_log postgres SELECT
 grant audit_log postgres TRIGGER
 grant audit_log postgres TRUNCATE
 grant audit_log postgres UPDATE
+grant audit_log service_role DELETE
 grant audit_log service_role INSERT
+grant audit_log service_role REFERENCES
 grant audit_log service_role SELECT
+grant audit_log service_role TRIGGER
+grant audit_log service_role TRUNCATE
+grant audit_log service_role UPDATE
+grant clubs anon DELETE
+grant clubs anon INSERT
+grant clubs anon REFERENCES
 grant clubs anon SELECT
+grant clubs anon TRIGGER
+grant clubs anon TRUNCATE
+grant clubs anon UPDATE
+grant clubs authenticated DELETE
+grant clubs authenticated INSERT
+grant clubs authenticated REFERENCES
 grant clubs authenticated SELECT
+grant clubs authenticated TRIGGER
+grant clubs authenticated TRUNCATE
+grant clubs authenticated UPDATE
 grant clubs postgres DELETE
 grant clubs postgres INSERT
 grant clubs postgres REFERENCES
@@ -46,7 +76,10 @@ grant clubs postgres TRUNCATE
 grant clubs postgres UPDATE
 grant clubs service_role DELETE
 grant clubs service_role INSERT
+grant clubs service_role REFERENCES
 grant clubs service_role SELECT
+grant clubs service_role TRIGGER
+grant clubs service_role TRUNCATE
 grant clubs service_role UPDATE
 grant members authenticated SELECT
 grant members postgres DELETE
@@ -58,7 +91,10 @@ grant members postgres TRUNCATE
 grant members postgres UPDATE
 grant members service_role DELETE
 grant members service_role INSERT
+grant members service_role REFERENCES
 grant members service_role SELECT
+grant members service_role TRIGGER
+grant members service_role TRUNCATE
 grant members service_role UPDATE
 indice audit_log_club_id_created_at_idx CREATE INDEX audit_log_club_id_created_at_idx ON public.audit_log USING btree (club_id, created_at DESC)
 indice audit_log_pkey CREATE UNIQUE INDEX audit_log_pkey ON public.audit_log USING btree (id)
