@@ -46,6 +46,11 @@ jobs:
     runs-on: ubuntu-latest
     # Lo que hace que este job (y sólo este) reciba el secreto de producción.
     environment: Production
+    # Aquí la cola es el motivo: una conexión colgada contra el pooler
+    # retendría el grupo de concurrency hasta el límite por defecto, seis
+    # horas, y ninguna migración posterior entraría a producción mientras
+    # tanto. Aplicar el histórico entero tarda segundos.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       # Sin esto, la falta del secreto se lee como "falta DATABASE_URL", que no

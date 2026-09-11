@@ -310,8 +310,8 @@ significa cambiar de proyecto, y eso es una migración, no una rotación.
 
 El esquema de producción se sembró a mano el 8 de septiembre de 2026, por MCP,
 porque no había otra vía. **Fue un arranque, no el procedimiento.** Desde el
-issue #94 ninguna migración vuelve a aplicarse desde la sesión de nadie: llegan
-a producción por el mismo camino que el código.
+issue #94 las migraciones llegan a producción por el mismo camino que el
+código, sin pasar por la sesión de nadie.
 
 Los dos proyectos tienen la misma lista de migraciones por nombre
 (`0001_clubs`, `0002_audit_log`). Las marcas de versión difieren, porque cada
@@ -372,10 +372,20 @@ fallo, porque ahí son media cobertura de la comprobación.
 merge a `main` trae cambios en `supabase/migrations/`. Es el único camino por el
 que una migración llega a producción.
 
+**Pendiente mientras nadie ponga el secreto.** El workflow está en el
+repositorio, pero `SUPABASE_PRODUCTION_DB_URL` no existe todavía en Settings,
+Environments, Production. Hasta que alguien lo cree, la primera corrida falla en
+el paso que lo comprueba y ninguna migración llega sola. Este párrafo se borra
+en el mismo commit en que se ponga el secreto.
+
 Cómo está armado y por qué:
 
 - **Sólo `push` a `main`, y sólo si cambiaron las migraciones.** Un merge que no
   toca `supabase/migrations/` no ejecuta nada contra la base con datos reales.
+  Ojo con el caso que eso deja fuera: regenerar `supabase/ci/schema-expected.txt`
+  sin añadir una migración no vuelve a comprobar producción contra la
+  descripción nueva. Lo hará el siguiente merge que traiga una migración, y
+  mientras tanto está el comando de la sección siguiente.
 - **`concurrency` sin cancelación.** Dos merges seguidos se ponen en fila: el
   segundo espera al primero. Cancelar al primero lo dejaría a medio aplicar, y
   el estado de producción pasaría a depender de en qué migración lo pillara el

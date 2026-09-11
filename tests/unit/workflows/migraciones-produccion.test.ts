@@ -34,6 +34,8 @@ interface WorkflowJob {
   environment?: string;
   env?: Record<string, string>;
   permissions?: Record<string, string>;
+  "continue-on-error"?: boolean;
+  "timeout-minutes"?: number;
   steps: WorkflowStep[];
 }
 
@@ -113,13 +115,23 @@ describe("workflow de migraciones en main", () => {
     expect(concurrency?.group).not.toMatch(/run_id|run_number|run_attempt|sha/);
   });
 
-  it("ningún paso lleva continue-on-error ni termina en || true", () => {
+  it("nada perdona un fallo: ni el job, ni un paso, ni un || al final de un comando", () => {
     // Una migración que revienta en producción tiene que dejar el workflow en
-    // rojo. Estas son las dos formas de que el paso falle y el job siga verde.
+    // rojo. `continue-on-error` en el job es la forma más efectiva de que un
+    // job rojo no lo ponga, y por eso se mira además de en cada paso.
+    expect(theJob()["continue-on-error"]).not.toBe(true);
     for (const step of theJob().steps) {
       expect(step["continue-on-error"]).not.toBe(true);
     }
-    expect(readWorkflowSource()).not.toMatch(/\|\|\s*true/);
+    expect(readWorkflowSource()).not.toMatch(/\|\|\s*(true|:)/);
+    expect(readWorkflowSource()).not.toMatch(/set \+e/);
+  });
+
+  it("no puede quedarse colgado reteniendo la cola", () => {
+    // El grupo de concurrency serializa a propósito, así que un job colgado no
+    // se queda solo: bloquea toda migración posterior hasta que GitHub lo mate
+    // a las seis horas.
+    expect(theJob()["timeout-minutes"]).toBeGreaterThan(0);
   });
 
   it("referencia la credencial por nombre desde secrets", () => {

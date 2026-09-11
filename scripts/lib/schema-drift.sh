@@ -46,20 +46,22 @@ classify_schema_drift() {
     fi
   done
 
-  # `comm` exige entradas ordenadas y la colación por defecto es la del
-  # sistema, así que sin fijar LC_ALL la respuesta la decidiría el locale de
-  # quien corra esto. Es la misma razón por la que
-  # `supabase/ci/schema-snapshot.sql` ordena con `collate "C"`.
-  local sorted_expected sorted_actual
-  sorted_expected="$(mktemp)"
-  sorted_actual="$(mktemp)"
-  LC_ALL=C sort "$expected_file" > "$sorted_expected"
-  LC_ALL=C sort "$actual_file" > "$sorted_actual"
-
   local missing_in_database extra_in_database
-  missing_in_database="$(LC_ALL=C comm -23 "$sorted_expected" "$sorted_actual")"
-  extra_in_database="$(LC_ALL=C comm -13 "$sorted_expected" "$sorted_actual")"
-  rm -f "$sorted_expected" "$sorted_actual"
+  missing_in_database="$(schema_lines_missing_from "$expected_file" "$actual_file")"
+  extra_in_database="$(schema_lines_missing_from "$actual_file" "$expected_file")"
 
   name_schema_drift "$missing_in_database" "$extra_in_database"
+}
+
+# Líneas del primer archivo que no están en el segundo.
+#
+# `comm` exige entradas ordenadas y la colación por defecto es la del sistema,
+# así que sin fijar LC_ALL la respuesta la decidiría el locale de quien corra
+# esto. Es la misma razón por la que `supabase/ci/schema-snapshot.sql` ordena
+# con `collate "C"`. Las dos entradas van por sustitución de proceso en vez de
+# por archivos temporales: aquí el intérprete es bash (lo dice el shebang de
+# los dos scripts que la cargan) y así no queda basura en /tmp cuando algo
+# falla a mitad.
+schema_lines_missing_from() {
+  LC_ALL=C comm -23 <(LC_ALL=C sort "$1") <(LC_ALL=C sort "$2")
 }

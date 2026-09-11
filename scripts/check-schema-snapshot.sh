@@ -96,8 +96,12 @@ report_difference() {
   local state="$1" actual_file="$2"
   {
     echo "error: el esquema de la base no es el que declara el repositorio: $state"
-    explain_drift_state "$state"
-    schema_difference "$actual_file"
+    # Los dos pueden fallar, y este bloque es el informe de un fallo: dejar que
+    # `set -e` los propague cortaría el informe justo antes de las líneas que
+    # dicen cómo salir del paso. Quien decide el veredicto es el `return 1` de
+    # `main`, no estas dos.
+    explain_drift_state "$state" || echo "(estado inesperado: $state)"
+    schema_difference "$actual_file" || echo "(no se pudo calcular el diff)"
     echo
     echo "Si el cambio es esperado (vienes de añadir una migración), regenera el"
     echo "archivo con: DATABASE_URL=... bash scripts/check-schema-snapshot.sh --write"
