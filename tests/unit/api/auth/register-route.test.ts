@@ -24,7 +24,6 @@ function validBody(overrides: Body = {}): Body {
 }
 
 const insertedRows: NewMemberRow[] = [];
-const deletedUserIds: string[] = [];
 const requestedEmails: string[] = [];
 
 type WiringOptions = {
@@ -53,9 +52,7 @@ function mockWiring(options: WiringOptions = {}): void {
                       kind: "created",
                       userId: USER_ID,
                     },
-                  deleteIdentity: async (userId: string) => {
-                    deletedUserIds.push(userId);
-                  },
+                  deleteIdentity: async () => {},
                 },
                 members: {
                   insertMember: async (row: NewMemberRow) => {
@@ -96,7 +93,6 @@ describe("POST /api/v1/auth/register", () => {
     vi.resetModules();
     vi.doUnmock("@/lib/auth/supabase-auth-gateways");
     insertedRows.length = 0;
-    deletedUserIds.length = 0;
     requestedEmails.length = 0;
   });
 
@@ -182,7 +178,8 @@ describe("POST /api/v1/auth/register", () => {
 
   it("responde 400 si al cuerpo le falta un campo entero", async () => {
     mockWiring();
-    const { country: _omitido, ...sinPais } = validBody();
+    const sinPais = validBody();
+    delete sinPais.country;
 
     const response = await postRegistration(sinPais);
 
