@@ -106,34 +106,47 @@ No hace falta autenticarse ni mandar cabeceras. Cualquier respuesta que no sea
 
 ### El umbral, escrito
 
-- **Cada 5 minutos** se comprueba la URL.
-- **Dos comprobaciones fallidas seguidas** disparan el aviso, es decir unos
-  **10 minutos** de caída. Una sola comprobación fallida no avisa: un arranque
-  en frío o un despliegue en curso producen fallos aislados, y un canal que
-  avisa por ruido deja de leerse.
+- La URL se comprueba **cada 5 minutos**.
+- Una comprobación fallida no avisa por sí sola: UptimeRobot hace hasta
+  **3 reintentos de confirmación**, separados entre 10 y 20 segundos, antes de
+  dar el sitio por caído. Un paquete perdido o un error suelto no despiertan a
+  nadie.
+- Confirmada la caída, **el aviso sale de inmediato**. En el peor caso llega
+  unos 5 minutos después de que el sitio dejara de responder, que es lo que
+  tarda en tocar la siguiente comprobación.
 - **La recuperación también avisa**, para que nadie se quede pendiente de una
   caída que ya pasó.
 
+Aquí estuvo escrito, hasta el 11 de septiembre de 2026, que el aviso esperaba a
+dos comprobaciones fallidas seguidas, unos 10 minutos. Nunca fue cierto: ese
+retraso es de pago en UptimeRobot y el proyecto no paga por el monitoreo. El
+umbral de arriba es el que el servicio cumple de verdad. Si algún día hace falta
+aguantar más antes de avisar, es un cambio de plan o de servicio, no una línea
+de este documento.
+
 ### Dónde se consulta la disponibilidad del mes
 
-En el panel del servicio de monitoreo, que es quien acumula el histórico. **Ese
-servicio todavía no existe**: darlo de alta exige una cuenta y un correo, y eso
-no lo puede hacer un worker de la fábrica. Mientras no exista, la disponibilidad
-mensual no se puede consultar en ningún sitio, y este documento lo dice en vez
-de fingir lo contrario.
+En el panel de **UptimeRobot**, que es quien acumula el histórico:
 
-Lo que falta, en concreto:
+```
+https://dashboard.uptimerobot.com/monitors
+```
 
-1. Crear una cuenta en un servicio de monitoreo de disponibilidad con plan
-   gratuito (UptimeRobot y Better Stack tienen uno; la regla del proyecto es que
-   si hay que pagar, no se hace).
-2. Dar de alta un monitor HTTP contra la URL de arriba, cada 5 minutos, con el
-   aviso a las dos fallas seguidas.
-3. Apuntar el canal de aviso al correo del dueño. Hoy hay una sola persona de
-   guardia, así que no hay rotación que decidir (pregunta abierta 4 del PRD).
-4. Provocar una caída de prueba y **comprobar que el aviso llega**. El criterio
-   de aceptación es que llegue, no que el monitor esté configurado.
-5. Escribir aquí el nombre del servicio y el enlace a su panel.
+El monitor se llama `victoria-seadragons.vercel.app` y vigila la URL de arriba.
+El panel da el porcentaje del mes, que es el número que hay que comparar contra
+el 99,0% de NFR-003, y la lista de incidentes con su duración.
+
+La cuenta va en plan gratuito y ahí se queda. Es una regla del proyecto: si hay
+que pagar, no se hace. Lo que el plan gratuito no da está dicho arriba, en el
+umbral.
+
+El aviso llega al correo del dueño del club. Hoy hay una sola persona de
+guardia, así que no hay rotación que decidir; es la pregunta abierta 4 del PRD y
+sigue abierta para cuando entre más gente.
+
+Comprobado el 11 de septiembre de 2026: se dio de alta un monitor de prueba
+contra una ruta inexistente del mismo dominio, el correo de caída llegó, y el
+monitor de prueba se borró. El aviso funciona, no solo está configurado.
 
 ### La ventana de mantenimiento
 
@@ -353,11 +366,12 @@ fallo, porque ahí son media cobertura de la comprobación.
 
 ## Una trampa del plan Free
 
-Free pausa un proyecto tras una semana sin actividad. Producción va a estar
-vacía y sin tráfico hasta que E2 traiga autenticación, así que es probable
-encontrarla pausada y tener que restaurarla desde el dashboard. Deja de ocurrir
-cuando el monitoreo descrito arriba empiece a consultar `/api/v1/health` cada
-cinco minutos, y esa es una segunda razón para darlo de alta.
+Free pausa un proyecto tras una semana sin actividad. Producción iba a estar
+vacía y sin tráfico hasta que E2 traiga autenticación, así que era probable
+encontrarla pausada y tener que restaurarla desde el dashboard. Dejó de ser un
+riesgo el 11 de septiembre de 2026: el monitoreo descrito arriba consulta
+`/api/v1/health` cada cinco minutos, y esa consulta llega a la base. Desarrollo
+sí se puede pausar, porque nadie lo vigila.
 
 ## Catálogo de variables (issue #90)
 

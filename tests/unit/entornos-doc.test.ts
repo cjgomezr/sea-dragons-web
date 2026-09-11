@@ -204,13 +204,24 @@ describe("docs/entornos.md · disponibilidad y mantenimiento (issue #95)", () =>
   });
 
   // "Avisar cuando esté caído" no es una regla: no dice cada cuánto se mira ni
-  // cuánto se aguanta antes de despertar a alguien. Sin esos dos números el
-  // monitoreo no se puede configurar ni discutir.
-  it("fija por escrito cada cuánto se comprueba y cuánto se aguanta antes de avisar", () => {
+  // qué pasa con un fallo aislado. Sin esos dos números el monitoreo no se
+  // puede configurar ni discutir, y quien reciba un aviso no sabrá cuánta
+  // caída representa.
+  it("fija por escrito cada cuánto se comprueba y qué filtra un fallo aislado", () => {
     const doc = readEntornosDoc();
 
     expect(doc).toContain("cada 5 minutos");
-    expect(doc).toContain("10 minutos");
+    expect(doc).toContain("3 reintentos de confirmación");
+  });
+
+  // El histórico no vive en el repositorio: lo acumula el panel del servicio.
+  // Sin su nombre y su enlace, "consúltalo en el panel" no lleva a ningún
+  // sitio.
+  it("nombra el servicio de monitoreo y enlaza su panel", () => {
+    const doc = readEntornosDoc();
+
+    expect(doc).toContain("UptimeRobot");
+    expect(doc).toContain("https://dashboard.uptimerobot.com/monitors");
   });
 
   it("escribe las horas de entrenamiento que la ventana de mantenimiento debe evitar", () => {
