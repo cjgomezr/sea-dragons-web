@@ -181,10 +181,10 @@ archivo versionado del repositorio.
   de git. Qué variable hace falta y para qué sirve se describe en
   `.env.example`, sin valores reales (issue #90).
 - **De producción:** no viven en el portátil de nadie. Van a los secretos del
-  despliegue (Vercel) y del repositorio (GitHub Actions) cuando existan esos
-  entornos (issues #91, #92 y #94). Poner una credencial de producción en
-  `.env.local` hace fallar la suite entera por el guardia de entorno, y eso es
-  deliberado.
+  despliegue (Vercel, puestos el 11 de septiembre de 2026) y a los del
+  repositorio (GitHub Actions, cuando el #94 los necesite). Poner una credencial
+  de producción en `.env.local` hace fallar la suite entera por el guardia de
+  entorno, y eso es deliberado.
 - **Password de la base de producción:** no se fijó al crear el proyecto por
   API. Cuando el #94 lo necesite, se genera en el dashboard (Settings →
   Database → Reset database password) y se pega como secreto del repositorio.
