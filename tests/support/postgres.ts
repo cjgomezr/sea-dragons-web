@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { describe, it, onTestFinished } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 
 /**
  * Arnés compartido de los tests que necesitan un Postgres de verdad: los del
@@ -230,4 +230,17 @@ export async function applyRepositoryMigrations(
   database: TemporaryDatabase,
 ): Promise<RunResult> {
   return applyMigrations([], { ...process.env, DATABASE_URL: database.url });
+}
+
+/**
+ * Base desechable con el histórico completo ya aplicado, que es el punto de
+ * partida de casi todos los tests de una migración. La comprobación no sobra:
+ * sin ella, un histórico que no aplica dejaría a los casos fallando por "la
+ * tabla no existe", que se lee como otro problema.
+ */
+export async function migratedDatabase(): Promise<TemporaryDatabase> {
+  const database = await freshDatabase();
+  const applied = await applyRepositoryMigrations(database);
+  expect(applied.code, applied.stderr).toBe(0);
+  return database;
 }
