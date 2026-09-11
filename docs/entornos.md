@@ -384,8 +384,9 @@ a los tres roles de la API, porque así está el `pg_default_acl` del proyecto. 
 sustrato de CI lo reproduce desde `0003_members` (`alter default privileges` en
 `roles.sql`), y por eso el archivo lo refleja.
 
-Quien mande sigue siendo RLS: sin policy, niega. Lo que ese privilegio de más sí
-deja pasar es `truncate`, que RLS no filtra. `0003_members` se lo quita a
+Quien mande sigue siendo RLS, y sin policy niega. Pero RLS sólo filtra filas:
+`truncate`, `trigger` y `references` se le escapan, y son tres de los siete
+privilegios que la ACL por defecto reparte. `0003_members` se los quita a
 `members` con un `revoke` explícito; `clubs` y `audit_log` todavía no, y da para
 un ticket pequeño.
 

@@ -308,7 +308,7 @@ describeConPostgres("policies de miembros", () => {
     );
 
     expect(lectura.code).toBeGreaterThan(0);
-    expect(lectura.stderr).toMatch(/permission denied/);
+    expect(lectura.stderr).toMatch(/permission denied for (table|column)/);
   });
 
   it("no deja al dueño de la fila cambiar su propio rol", async () => {
@@ -331,7 +331,7 @@ describeConPostgres("policies de miembros", () => {
     );
 
     expect(intento.code).toBeGreaterThan(0);
-    expect(intento.stderr).toMatch(/permission denied/);
+    expect(intento.stderr).toMatch(/permission denied for (table|column)/);
     expect(
       await database.query(
         `select role from public.members where user_id = '${socio.userId}'`,
@@ -355,7 +355,7 @@ describeConPostgres("policies de miembros", () => {
     );
 
     expect(intento.code).toBeGreaterThan(0);
-    expect(intento.stderr).toMatch(/permission denied/);
+    expect(intento.stderr).toMatch(/permission denied for (table|column)/);
     expect(
       await database.query(
         `select account_status from public.members where user_id = '${socio.userId}'`,
