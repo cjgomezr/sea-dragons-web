@@ -29,9 +29,18 @@ function isPathWithin(pathname: string, declaredPath: string): boolean {
   return pathname === declaredPath || pathname.startsWith(`${declaredPath}/`);
 }
 
+/**
+ * Una pantalla pública abre también lo que cuelga de ella, porque el registro
+ * crecerá en pasos (`/registro/tutor`). Un endpoint público NO: se compara por
+ * igualdad, para que `/api/v1/auth/session/loquesea` nazca protegido como
+ * cualquier endpoint nuevo. Una pantalla de más es una pantalla; un endpoint
+ * de más es una puerta.
+ */
 function isPublicPath(pathname: string): boolean {
-  return [...PUBLIC_PAGE_PATHS, ...PUBLIC_API_PATHS].some((publicPath) =>
-    isPathWithin(pathname, publicPath),
+  return (
+    PUBLIC_PAGE_PATHS.some((publicPage) =>
+      isPathWithin(pathname, publicPage),
+    ) || PUBLIC_API_PATHS.includes(pathname)
   );
 }
 

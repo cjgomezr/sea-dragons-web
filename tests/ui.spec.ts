@@ -800,9 +800,36 @@ test.describe("dentro de la aplicación", () => {
     ).toEqual([]);
   });
 
+  /**
+   * Una sesión recién abierta, sólo para este test.
+   *
+   * La sesión compartida la llevan a la vez todos los demás tests del bloque,
+   * así que cerrarla les quitaría la suya a mitad de corrida. Cerrar sesión
+   * alcanza sólo a la sesión que la cierra (ver SIGN_OUT_SCOPE), de modo que
+   * con una propia estos tests no molestan a nadie.
+   */
+  async function openOwnSession(
+    page: import("@playwright/test").Page,
+    context: import("@playwright/test").BrowserContext,
+  ): Promise<void> {
+    await context.clearCookies();
+    const response = await page.request.post(`${APP_URL}${SESSION_ENDPOINT}`, {
+      data:
+        E2E_SESSION.kind === "available"
+          ? { email: E2E_SESSION.email, password: E2E_SESSION.password }
+          : {},
+    });
+    expect(
+      response.ok(),
+      `no se pudo abrir una sesión propia: ${response.status()}`,
+    ).toBe(true);
+  }
+
   test("cerrar sesión desde cualquier pantalla aterriza en la entrada", async ({
     page,
+    context,
   }) => {
+    await openOwnSession(page, context);
     await page.setViewportSize(DESKTOP);
     await page.goto(`${APP_URL}/calendario`);
 
@@ -813,7 +840,9 @@ test.describe("dentro de la aplicación", () => {
 
   test("tras cerrar sesión, la aplicación vuelve a estar cerrada", async ({
     page,
+    context,
   }) => {
+    await openOwnSession(page, context);
     await page.setViewportSize(DESKTOP);
     await page.goto(`${APP_URL}/dashboard`);
     await page.getByRole("button", { name: "Cerrar sesión" }).click();
@@ -822,6 +851,29 @@ test.describe("dentro de la aplicación", () => {
     await page.goto(`${APP_URL}/dashboard`);
 
     await expect(page).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
+  });
+
+  // Las dos pestañas comparten el tarro de cookies del contexto, que es
+  // exactamente lo que comparten dos pestañas de un navegador de verdad.
+  test("cerrar sesión en una pestaña deja sin sesión a la otra", async ({
+    page,
+    context,
+  }) => {
+    await openOwnSession(page, context);
+    const primera = await context.newPage();
+    const segunda = await context.newPage();
+    await primera.goto(`${APP_URL}/dashboard`);
+    await segunda.goto(`${APP_URL}/calendario`);
+    await expect(segunda).toHaveURL(new RegExp("/calendario$"));
+
+    await primera.setViewportSize(DESKTOP);
+    await primera.getByRole("button", { name: "Cerrar sesión" }).click();
+    await expect(primera).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
+
+    // La segunda no se entera hasta que pide algo al servidor, y entonces sí.
+    await segunda.reload();
+
+    await expect(segunda).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
   });
 
   test("entrar por el formulario lleva al panel principal", async ({

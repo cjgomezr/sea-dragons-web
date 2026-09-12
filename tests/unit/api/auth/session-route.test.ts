@@ -19,6 +19,9 @@ type WiringOptions = {
   readonly authenticated?: boolean;
   readonly accountStatus?: AccountStatus | null;
   readonly unconfigured?: readonly string[];
+  /** Una consulta que revienta después de que Supabase ya haya autenticado:
+   * RLS, la red, un tiempo agotado. */
+  readonly failAccountLookup?: boolean;
 };
 
 const signOutCalls: string[] = [];
@@ -41,10 +44,14 @@ function mockWiring(options: WiringOptions = {}): void {
                 },
               },
               accounts: {
-                findAccountStatus: async () =>
-                  options.accountStatus === undefined
+                findAccountStatus: async () => {
+                  if (options.failAccountLookup) {
+                    throw new Error("la base no contestó");
+                  }
+                  return options.accountStatus === undefined
                     ? "active"
-                    : options.accountStatus,
+                    : options.accountStatus;
+                },
               },
             },
             signOut: async () => {
@@ -54,6 +61,12 @@ function mockWiring(options: WiringOptions = {}): void {
               response.headers.append(
                 "set-cookie",
                 `${SESSION_COOKIE_NAME}=abc; Path=/`,
+              );
+            },
+            expireCookies: (response: Response) => {
+              response.headers.append(
+                "set-cookie",
+                `${SESSION_COOKIE_NAME}=; Path=/; Max-Age=0`,
               );
             },
           },
@@ -122,12 +135,34 @@ describe("inicio de sesión", () => {
     });
   });
 
-  it("escribe las cookies de Supabase también cuando rechaza, para no dejar media sesión", async () => {
+  it("caduca las cookies cuando rechaza, en vez de entregar media sesión", async () => {
     mockWiring({ authenticated: false });
 
     const response = await postSession();
 
-    expect(response.headers.get("set-cookie")).toContain(SESSION_COOKIE_NAME);
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
+  });
+
+  // Supabase autentica antes de que nadie mire si esa cuenta puede operar, así
+  // que a esta altura ya hay una sesión viva. Entregarla con un 403 dejaría
+  // dentro a quien se acaba de rechazar, porque la frontera sólo pregunta si
+  // hay sesión.
+  it("caduca las cookies de la cuenta que no puede operar", async () => {
+    mockWiring({ accountStatus: "inactive" });
+
+    const response = await postSession();
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
+  });
+
+  it("caduca las cookies cuando algo falla después de autenticar", async () => {
+    mockWiring({ failAccountLookup: true });
+
+    const response = await postSession();
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
   });
 
   it("responde 403 a una cuenta que no puede operar", async () => {

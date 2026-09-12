@@ -64,6 +64,9 @@ describe("frontera de sesión: pantallas", () => {
     const response = await proxy(requestFor(SIGN_IN_PATH));
 
     expect(response.headers.get("location")).toBeNull();
+    // Una ruta pública lo es con sesión y sin ella, así que preguntar sería un
+    // viaje a Supabase por cada visita anónima.
+    expect(hasValidSession).not.toHaveBeenCalled();
   });
 });
 
@@ -90,6 +93,9 @@ describe("frontera de sesión: API", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("location")).toBeNull();
+    // El monitoreo lo pide cada 5 minutos: atarlo a la latencia de Supabase
+    // sería hacer que el endpoint que vigila el servicio dependa del servicio.
+    expect(hasValidSession).not.toHaveBeenCalled();
   });
 
   it("deja pasar un endpoint cuando hay sesión", async () => {

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  COMPLETE_REGISTRATION_PATH,
+  DASHBOARD_PATH,
   PASSWORD_RECOVERY_PATH,
   REGISTRATION_PATH,
   SESSION_API_PATH,
@@ -47,6 +49,15 @@ function readStringAt(
   return typeof current === "string" ? current : null;
 }
 
+/** Los dos únicos destinos que el servidor puede devolver. Se contrastan en
+ * vez de navegar a lo que venga: el resto de esta función está escrita
+ * asumiendo que la respuesta viene de la red y puede ser cualquier cosa, y
+ * pasarle esa cadena al router sin mirarla rompería esa misma cautela. */
+const SIGN_IN_DESTINATIONS: readonly string[] = [
+  DASHBOARD_PATH,
+  COMPLETE_REGISTRATION_PATH,
+];
+
 type SignInResult =
   | { readonly kind: "signed-in"; readonly destination: string }
   | { readonly kind: "failed"; readonly message: string };
@@ -78,9 +89,9 @@ async function submitCredentials(credentials: {
   }
 
   const destination = readStringAt(payload, ["data", "destination"]);
-  return destination === null
-    ? { kind: "failed", message: UNEXPECTED_ERROR_MESSAGE }
-    : { kind: "signed-in", destination };
+  return destination !== null && SIGN_IN_DESTINATIONS.includes(destination)
+    ? { kind: "signed-in", destination }
+    : { kind: "failed", message: UNEXPECTED_ERROR_MESSAGE };
 }
 
 const EMAIL_FIELD_ID = "entrar-email";

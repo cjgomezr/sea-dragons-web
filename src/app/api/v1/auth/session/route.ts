@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
-import { signIn } from "@/lib/auth/sign-in";
+import { type SignInOutcome, signIn } from "@/lib/auth/sign-in";
 import {
   type SessionGatewaysResult,
   createSupabaseSessionGateways,
@@ -58,13 +58,24 @@ const postSession = createApiRoute<SignInResponse, SignInBody>({
     const wiring = requireGateways(
       createSupabaseSessionGateways(process.env, readIncomingCookies(request)),
     );
-    // Se registra antes de hablar con Supabase a propósito: un rechazo sale de
-    // aquí lanzando, y las cookies que Supabase emita (incluido el borrado de
-    // la sesión que se acaba de descartar) tienen que viajar igual.
-    decorateResponse(wiring.applyCookies);
 
-    const outcome = await signIn(wiring.gateways, body);
+    // Cuándo se entregan las cookies y cuándo se caducan es la decisión con
+    // más filo de este archivo. Supabase autentica antes de que nadie haya
+    // mirado si esa cuenta puede operar, así que en cuanto `signIn` arranca ya
+    // puede haber una sesión viva en el grabador. Si lo que sale de aquí no es
+    // un "adelante", esa sesión NO puede viajar: la frontera sólo pregunta si
+    // hay sesión, así que entregarla con un 403 o con un 500 dejaría dentro a
+    // quien acaba de ser rechazado.
+    let outcome: SignInOutcome;
+    try {
+      outcome = await signIn(wiring.gateways, body);
+    } catch (error) {
+      decorateResponse(wiring.expireCookies);
+      throw error;
+    }
+
     if (outcome.kind === "rejected") {
+      decorateResponse(wiring.expireCookies);
       throw new ApiError(
         outcome.reason === "invalid_credentials"
           ? "unauthenticated"
@@ -72,6 +83,8 @@ const postSession = createApiRoute<SignInResponse, SignInBody>({
         outcome.message,
       );
     }
+
+    decorateResponse(wiring.applyCookies);
     return { data: { destination: outcome.destination } };
   },
 });

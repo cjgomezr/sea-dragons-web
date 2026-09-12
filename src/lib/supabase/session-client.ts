@@ -94,3 +94,27 @@ export function applySessionCookies(
     response.headers.set(header, value);
   }
 }
+
+/**
+ * Caduca en la respuesta toda cookie que Supabase haya emitido en esta
+ * petición, en vez de entregarla.
+ *
+ * Es lo contrario de `applySessionCookies` y existe para un caso concreto: una
+ * petición que autenticó bien y falló después. Ahí el grabador ya tiene las
+ * cookies de una sesión viva, y entregarlas con un 500 dejaría dentro a quien
+ * la aplicación acaba de decidir que no entra. Toca sólo las que se emitieron
+ * aquí: las demás cookies del navegador no son asunto de este módulo.
+ */
+export function expireSessionCookies(
+  response: NextResponse,
+  recorder: SessionCookieRecorder,
+): void {
+  for (const { name, options } of recorder.recorded().cookies) {
+    response.cookies.set({
+      name,
+      value: "",
+      path: options.path ?? "/",
+      maxAge: 0,
+    });
+  }
+}

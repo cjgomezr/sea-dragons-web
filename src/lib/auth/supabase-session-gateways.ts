@@ -1,9 +1,13 @@
 import type { NextResponse } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  isAuthSessionMissingError,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 import {
   type IncomingCookie,
   applySessionCookies,
   createSessionClient,
+  expireSessionCookies,
 } from "@/lib/supabase/session-client";
 import { parseAccountStatus } from "./account-status";
 import type {
@@ -37,12 +41,27 @@ const INVALID_CREDENTIALS_CODES: readonly string[] = [
  * hay sesión que dar hasta que se abra el enlace. */
 const EMAIL_NOT_CONFIRMED_CODE = "email_not_confirmed";
 
+/**
+ * Cerrar sesión termina ESTA sesión, no todas las de la persona.
+ *
+ * El valor por defecto de Supabase es `global`, que revoca también las demás:
+ * salir en el portátil dejaría fuera al teléfono, que es un efecto que nadie
+ * pidió y que sorprende. Los dos criterios del ticket se cumplen igual con
+ * `local`: dos pestañas del mismo navegador comparten sesión, así que cerrarla
+ * en una la cierra para las dos, y la credencial de esa sesión deja de valer
+ * porque es esa la que se revoca.
+ */
+const SIGN_OUT_SCOPE = "local" as const;
+
 export type SessionGatewaysResult =
   | {
       readonly kind: "ready";
       readonly gateways: SignInGateways;
       readonly signOut: () => Promise<void>;
       readonly applyCookies: (response: NextResponse) => void;
+      /** Para el camino en el que la sesión recién abierta no puede entregarse.
+       * Ver `expireSessionCookies`. */
+      readonly expireCookies: (response: NextResponse) => void;
     }
   | { readonly kind: "unconfigured"; readonly missingKeys: readonly string[] };
 
@@ -82,7 +101,7 @@ function createIdentityGateway(client: SupabaseClient): IdentityGateway {
     },
 
     async discardSession() {
-      const { error } = await client.auth.signOut();
+      const { error } = await client.auth.signOut({ scope: SIGN_OUT_SCOPE });
       if (error) {
         throw new Error(
           `No se pudo cerrar la sesión recién abierta: ${describeAuthFailure(error)}`,
@@ -133,13 +152,17 @@ export function createSupabaseSessionGateways(
     // Cerrar una sesión que ya no existe no es un fallo: la respuesta es la
     // misma, no hay sesión. Es lo que pasa cuando se cierra en dos pestañas.
     signOut: async () => {
-      const { error } = await session.client.auth.signOut();
-      if (error && error.name !== "AuthSessionMissingError") {
+      const { error } = await session.client.auth.signOut({
+        scope: SIGN_OUT_SCOPE,
+      });
+      if (error && !isAuthSessionMissingError(error)) {
         throw new Error(
           `No se pudo cerrar la sesión: ${describeAuthFailure(error)}`,
         );
       }
     },
     applyCookies: (response) => applySessionCookies(response, session.recorder),
+    expireCookies: (response) =>
+      expireSessionCookies(response, session.recorder),
   };
 }

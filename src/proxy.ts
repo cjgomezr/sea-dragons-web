@@ -38,6 +38,17 @@ function buildResponse(
 }
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
+  const pathname = request.nextUrl.pathname;
+
+  // Una ruta pública lo es con sesión y sin ella, así que la respuesta no
+  // depende de preguntar. Preguntar igual le costaba a cada visita anónima un
+  // viaje a Supabase, y al endpoint de salud (que el monitoreo pide cada 5
+  // minutos) lo ataba a la latencia del servicio que precisamente está
+  // vigilando.
+  if (decideSessionBoundary({ pathname, hasSession: false }).kind === "allow") {
+    return NextResponse.next();
+  }
+
   const session = createSessionClient(
     process.env,
     readIncomingCookies(request),
@@ -49,7 +60,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     session.kind === "ready" ? await hasValidSession(session.client) : false;
 
   const response = buildResponse(
-    decideSessionBoundary({ pathname: request.nextUrl.pathname, hasSession }),
+    decideSessionBoundary({ pathname, hasSession }),
     request,
   );
 
@@ -63,10 +74,10 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  // Todo menos lo que sirve el propio Next y los archivos estáticos: pedir una
-  // fuente o un PNG no es pedir una pantalla, y hacerle una comprobación de
-  // sesión a cada uno sería una ida y vuelta a Supabase por archivo.
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\.(?:png|jpg|jpeg|gif|svg|webp|ico|woff2?)$).*)",
-  ],
+  // Todo menos lo que sirve el propio Next. La lista NO excluye por extensión:
+  // un `/api/v1/adjuntos/foto.png` saldría entonces por esa puerta, sin 401 y
+  // sin redirección, y sería un agujero que no se ve al probar. El viaje a
+  // Supabase que esa exclusión ahorraba ya no existe: las rutas públicas
+  // salen antes de crear el cliente.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

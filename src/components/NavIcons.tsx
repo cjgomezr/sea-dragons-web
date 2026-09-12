@@ -27,6 +27,20 @@ function IconBase({
   );
 }
 
+/** No es un icono de sección: lo usa el control de cerrar sesión de la
+ * cabecera, que el mockup del panel dibuja también como un icono. Vive aquí
+ * para compartir trazo y tamaño con los ocho de la navegación, en vez de ser
+ * un séptimo dibujo suelto con otro grosor. */
+export function SignOutIcon(): React.JSX.Element {
+  return (
+    <IconBase>
+      <path d="M15 5.5H19a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-4" />
+      <path d="M11 15.5 14.5 12 11 8.5" />
+      <path d="M14.5 12H4" />
+    </IconBase>
+  );
+}
+
 function DashboardIcon(): React.JSX.Element {
   return (
     <IconBase>

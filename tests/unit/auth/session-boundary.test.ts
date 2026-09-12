@@ -100,6 +100,15 @@ describe("frontera de sesión", () => {
     expect(outcome).toEqual({ kind: "redirect", to: SIGN_IN_PATH });
   });
 
+  it("protege lo que cuelga de un endpoint público, que no hereda nada", () => {
+    const outcome = decideSessionBoundary({
+      pathname: "/api/v1/auth/session/loquesea",
+      ...WITHOUT_SESSION,
+    });
+
+    expect(outcome).toEqual({ kind: "unauthenticated" });
+  });
+
   it("deja pasar las rutas hijas de una pantalla pública", () => {
     const outcome = decideSessionBoundary({
       pathname: `${REGISTRATION_PATH}/tutor`,

@@ -166,6 +166,42 @@ describeRls("sesión contra Supabase", () => {
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
 
+  // "Vuelve más tarde sin haber cerrado sesión y sigue dentro": eso sólo pasa
+  // si la cookie sobrevive a cerrar el navegador, es decir, si trae fecha de
+  // caducidad propia en vez de morir con la ventana.
+  it(
+    "deja una sesión que sobrevive a cerrar el navegador",
+    async () => {
+      const { email } = await createMember("active");
+
+      const response = await signIn(email, PASSWORD);
+
+      const lifetimes = response.cookies
+        .getAll()
+        .map(({ maxAge }) => maxAge ?? 0);
+      expect(lifetimes.length).toBeGreaterThan(0);
+      expect(Math.min(...lifetimes)).toBeGreaterThan(0);
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  // Supabase autentica antes de que nadie mire si esa cuenta puede operar, así
+  // que a esta altura ya existe una sesión viva. La respuesta no puede
+  // entregarla: la frontera sólo pregunta si hay sesión, y con la cookie
+  // puesta esta cuenta entraría en la siguiente petición.
+  it(
+    "no entrega ninguna sesión a una cuenta dada de baja",
+    async () => {
+      const { email } = await createMember("inactive");
+
+      const response = await signIn(email, PASSWORD);
+
+      expect(response.status).toBe(403);
+      expect(cookiesOf(response)).toEqual([]);
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
   it(
     "lleva a completar registro a una cuenta incompleta, no al panel",
     async () => {

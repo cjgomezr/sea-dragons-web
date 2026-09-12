@@ -2,11 +2,21 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { SignOutIcon } from "@/components/NavIcons";
 import { SESSION_API_PATH, SIGN_IN_PATH } from "@/lib/auth/routes";
 
-/** Cerrar sesión desde cualquier pantalla (FR-007): vive en la cabecera de la
- * cáscara, que es lo único que se dibuja igual en las siete secciones y en
- * los tres tamaños. */
+const LABEL = "Cerrar sesión";
+
+/**
+ * Cerrar sesión desde cualquier pantalla (FR-007): vive en la cabecera de la
+ * cáscara, que es lo único que se dibuja igual en las siete secciones y en los
+ * tres tamaños.
+ *
+ * Es un icono y no un botón con texto, como en el mockup del panel. Con texto
+ * pesaba más que la propia navegación, que está justo debajo y es lo que la
+ * gente usa todos los días. El nombre accesible sigue siendo el texto
+ * completo, así que para un lector de pantalla no cambia nada.
+ */
 export function SignOutButton(): React.JSX.Element {
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -31,8 +41,10 @@ export function SignOutButton(): React.JSX.Element {
       className="app-signout"
       onClick={handleSignOut}
       disabled={isSigningOut}
+      aria-label={LABEL}
+      title={LABEL}
     >
-      Cerrar sesión
+      <SignOutIcon />
     </button>
   );
 }

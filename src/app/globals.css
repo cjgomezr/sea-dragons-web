@@ -267,16 +267,16 @@ h6 {
 }
 
 .app-signout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target-min);
   min-height: var(--touch-target-min);
-  padding: 0 var(--space-3);
-  font-family: inherit;
-  font-size: 14px;
   color: var(--color-sidebar-text);
   background: transparent;
   border: 1px solid var(--color-sidebar-border);
   border-radius: var(--radius);
   cursor: pointer;
-  white-space: nowrap;
 }
 
 .app-signout:hover:not(:disabled) {
@@ -562,11 +562,18 @@ h6 {
   opacity: 0.6;
 }
 
+/* La barra gruesa de la izquierda es lo que hace que esto se lea como un
+   error de un vistazo. Con sólo el borde de 1px que tenía, y el texto del
+   mismo tono que cualquier párrafo, el aviso pasaba por un cuadro más. El
+   color del texto se queda sobre --color-panel, que es la pareja cuyo
+   contraste comprueba tests/unit/design-tokens.test.ts. */
 .auth-error {
   padding: var(--space-3) var(--space-4);
-  color: var(--color-text);
+  font-weight: 700;
+  color: var(--color-danger);
   background: var(--color-panel);
   border: 1px solid var(--color-danger);
+  border-left: 4px solid var(--color-danger);
   border-radius: var(--radius);
 }
 
@@ -610,5 +617,16 @@ h6 {
   .auth-main {
     justify-content: center;
     padding: var(--space-8);
+  }
+}
+
+/* La proporción del mockup es al revés que la de 768px: el panel de marca se
+   lleva la mayor parte y el formulario la menor. No se aplica antes porque en
+   una tableta esa misma proporción deja la columna del formulario en menos de
+   300px, y el formulario pide 420. A partir de 1200px la columna estrecha
+   ronda los 390px, que es justo lo que mide el formulario en el mockup. */
+@media (min-width: 1200px) {
+  .auth-brand {
+    width: 62%;
   }
 }
