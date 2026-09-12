@@ -109,12 +109,16 @@ export function expireSessionCookies(
   response: NextResponse,
   recorder: SessionCookieRecorder,
 ): void {
-  for (const { name, options } of recorder.recorded().cookies) {
-    response.cookies.set({
-      name,
-      value: "",
-      path: options.path ?? "/",
-      maxAge: 0,
-    });
+  const { cookies, headers } = recorder.recorded();
+  for (const { name, options } of cookies) {
+    // Los atributos se heredan en vez de reconstruirse. Un navegador empareja
+    // el borrado con la cookie por nombre, dominio y ruta: si aquí se
+    // inventaran, el borrado no emparejaría y la cookie viva sobreviviría, que
+    // es exactamente lo que esta función existe para impedir.
+    response.cookies.set({ ...options, name, value: "", maxAge: 0 });
+  }
+  // Esta respuesta también lleva Set-Cookie, así que tampoco puede cachearse.
+  for (const [header, value] of Object.entries(headers)) {
+    response.headers.set(header, value);
   }
 }
