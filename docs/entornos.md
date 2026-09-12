@@ -180,6 +180,10 @@ archivo versionado del repositorio.
 - **En local:** solo credenciales de `seadragons-dev`, en `.env.local`, fuera
   de git. Qué variable hace falta y para qué sirve se describe en
   `.env.example`, sin valores reales (issue #90).
+- **En CI:** también sólo de `seadragons-dev`, en los secretos del repositorio
+  (Settings, Secrets and variables, Actions), con los valores que da el panel
+  de Supabase de ese proyecto en Project Settings, API. Por qué las tiene, y
+  qué lo compensa, está en "CI escribe en seadragons-dev".
 - **De producción:** no viven en el portátil de nadie. Van a los secretos del
   despliegue (Vercel, puestos el 11 de septiembre de 2026) y a los del
   repositorio (GitHub Actions, cuando el #94 los necesite). Poner una credencial
@@ -209,6 +213,41 @@ reglas y nombra la variable culpable cuando alguna se rompe:
    rojo.
 2. Preview no lleva ninguna credencial de escritura, ni siquiera la de
    desarrollo.
+
+Todo entorno que sí admita credenciales de escritura tiene que decir por qué,
+en el campo `whyWriteCredentials` del manifiesto. No es documentación de
+cortesía: `parseEnvironmentManifest` rechaza el manifiesto sin ese texto, para
+que quien encienda el interruptor se encuentre antes con el razonamiento.
+
+### CI escribe en seadragons-dev, y es una regla que se aflojó a propósito
+
+Hasta el issue #149 el entorno `ci` no llevaba ninguna credencial. La
+consecuencia no era que CI probara menos: era que probaba **menos de lo que
+parecía**. Desde el #135 casi toda pantalla vive detrás de la frontera de
+sesión, y el arranque de Playwright abre esa sesión creando un socio de
+verdad. Sin llave de servicio no podía crearlo, así que esas pruebas se
+saltaban y el check salía verde sobre capturas que nadie comparó. Pasó en el
+PR #148, sobre una pantalla nueva sin ninguna línea base de Linux. Lo mismo
+con las pruebas de integración y de RLS.
+
+Así que `ci` admite hoy credenciales de escritura, y conviene decir en voz
+alta que eso afloja una regla que se puso a propósito. Lo que la compensa:
+
+- El guardia de entorno (`src/lib/supabase/environment-guard.ts`), enganchado
+  en `vitest.setup.ts` y en el arranque de Playwright, sólo admite la URL de
+  `seadragons-dev`. Un secreto mal pegado detiene la corrida entera antes de
+  que ningún test escriba, y si apunta a producción el mensaje lo dice con ese
+  nombre.
+- La regla 1 sigue intacta: un origen de producción en `ci` deja el test del
+  manifiesto en rojo. Producción sólo entra por `ci-produccion`, el entorno
+  protegido de Actions.
+- Faltar deja de ser un salto silencioso. En CI, `decideSupabaseCredentials`
+  (`tests/support/supabase-credentials.ts`) lanza en vez de saltarse, así que
+  un secreto borrado se ve como un fallo y no como una corrida verde.
+
+Preview no cambia: sigue sin ninguna credencial de escritura. Este hueco se
+abrió para CI, que no sirve páginas a nadie y cuyos secretos no viajan a un
+despliegue de un fork.
 
 ### Qué se pega en cada ámbito de Vercel
 
@@ -294,6 +333,7 @@ el manifiesto se separan.
 | ---------------------------- | ------------- | ---------------------------------------------------------------------------------------------------- |
 | `SUPABASE_SERVICE_ROLE_KEY`  | local         | .env.local, en la máquina de quien desarrolla, fuera de git                                          |
 | `SUPABASE_SERVICE_ROLE_KEY`  | production    | Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Production             |
+| `SUPABASE_SERVICE_ROLE_KEY`  | ci            | GitHub, repositorio sea-dragons-web, Settings, Secrets and variables, Actions                        |
 | `SUPABASE_ACCESS_TOKEN`      | local         | .env.local, en la máquina de quien desarrolla, fuera de git                                          |
 | `SUPABASE_PRODUCTION_DB_URL` | ci-produccion | GitHub, repositorio sea-dragons-web, Settings, Environments, entorno Production, Environment secrets |
 
@@ -509,24 +549,28 @@ Los cinco entornos posibles:
 
 `NEXT_PUBLIC_SUPABASE_URL`: en local, `.env.local` apunta a `seadragons-dev`.
 En preview, apunta a `seadragons-dev`, **nunca** al proyecto de producción. En
-producción, apunta a `seadragons-prod`. En CI no existe, y es a propósito: sin
-ella, el guardia de entorno se salta las pruebas de RLS en vez de hablar con
-ninguna base, así que un runner no puede tocar datos de nadie. La pone quien
-desarrolla en local; en Vercel, quien administre el proyecto.
+producción, apunta a `seadragons-prod`. En CI, a `seadragons-dev` desde el
+issue #149: sin ella, las pruebas que hablan con la base se saltaban y su check
+salía verde sin haber probado nada. La pone quien desarrolla en local; en
+Vercel, quien administre el proyecto; en Actions, quien administre el
+repositorio.
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`: en local, la del proyecto `seadragons-dev`.
 En preview, la misma llave anónima de `seadragons-dev`. En producción, la
-llave anónima de `seadragons-prod`, distinta a la de desarrollo. En CI no
-existe, por el mismo motivo que la anterior. La pone quien desarrolla en local;
-en Vercel, quien administre el proyecto.
+llave anónima de `seadragons-prod`, distinta a la de desarrollo. En CI, la de
+`seadragons-dev`, por el mismo motivo que la anterior. La pone quien desarrolla
+en local; en Vercel, quien administre el proyecto; en Actions, quien administre
+el repositorio.
 
 `SUPABASE_SERVICE_ROLE_KEY`: la llave de servicio, la única que se salta
 RLS. En local, la de `seadragons-dev`, en `.env.local`, nunca en un `.env`
 versionado. **En preview no existe**, ni siquiera la de desarrollo: es lo que
 impide que el preview de un fork reciba una credencial de escritura (ver
 "Secretos por entorno"). En producción, la de `seadragons-prod`, nunca la misma
-que desarrollo. En CI tampoco existe. La pone quien desarrolla en local; en
-Vercel, quien administre el proyecto.
+que desarrollo. En CI, la de `seadragons-dev` desde el issue #149, para que el
+arranque de Playwright pueda crear el socio con el que entra a la aplicación.
+La pone quien desarrolla en local; en Vercel, quien administre el proyecto; en
+Actions, quien administre el repositorio.
 
 Esta es la variable a la que hay que tenerle respeto. Nunca lleva el prefijo
 `NEXT_PUBLIC_`: con ese prefijo Next.js la metería en el bundle del navegador y

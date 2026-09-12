@@ -57,6 +57,13 @@ jobs:
   compare:
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
+    # Van al job entero y no a un paso: además del arranque global, que crea el
+    # socio de prueba, las necesita el `npm run dev` que Playwright levanta,
+    # porque la aplicación que se fotografía está detrás de la sesión.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -104,6 +111,12 @@ jobs:
   accept:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # Regenerar la línea base es correr la misma suite: sin sesión fotografía
+    # la pantalla de entrada en vez de la pantalla que se está aceptando.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     permissions:
       contents: write
       pull-requests: write

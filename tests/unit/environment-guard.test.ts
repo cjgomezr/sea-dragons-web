@@ -6,6 +6,11 @@ import {
   checkTestSupabaseEnvironment,
 } from "@/lib/supabase/environment-guard";
 
+/** Ref de `seadragons-prod`, escrito a mano y no importado del guardia: si se
+ * importara, el test seguiría en verde con la constante equivocada. Es
+ * público, viaja en el host de cada petición del navegador. */
+const PRODUCTION_SUPABASE_PROJECT_REF = "weqhmtpvgewomslpvefu";
+
 describe("guardia de entorno de tests", () => {
   it("falla cuando la URL de Supabase configurada no es la del proyecto de desarrollo", () => {
     const env = { [SUPABASE_URL_ENV]: "https://otro-proyecto.supabase.co" };
@@ -22,6 +27,27 @@ describe("guardia de entorno de tests", () => {
 
     expect(checkTestSupabaseEnvironment(env)).toEqual({ kind: "ok" });
     expect(() => assertTestSupabaseEnvironment(env)).not.toThrow();
+  });
+
+  // Desde el issue #149 CI lleva credenciales de escritura, así que un secreto
+  // mal pegado ya no es una hipótesis: es la forma en la que la suite podría
+  // escribir en la base del club. Que el mensaje diga "producción" y no "otro
+  // proyecto" es la diferencia entre entenderlo de un vistazo y depurarlo.
+  it("nombra el proyecto de producción cuando la URL configurada apunta a él", () => {
+    const env = {
+      [SUPABASE_URL_ENV]: `https://${PRODUCTION_SUPABASE_PROJECT_REF}.supabase.co`,
+    };
+
+    const check = checkTestSupabaseEnvironment(env);
+
+    expect(check.kind).toBe("wrong-project");
+    if (check.kind === "wrong-project") {
+      expect(check.message).toContain("seadragons-prod");
+      expect(check.message).toContain(PRODUCTION_SUPABASE_PROJECT_REF);
+    }
+    expect(() => assertTestSupabaseEnvironment(env)).toThrowError(
+      /seadragons-prod/,
+    );
   });
 
   it("pasa cuando no hay ninguna URL de Supabase configurada", () => {

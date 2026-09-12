@@ -7,12 +7,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { findMissingSupabaseKeys } from "@/lib/supabase/config";
 import { assertTestSupabaseEnvironment } from "@/lib/supabase/environment-guard";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { createSessionClient } from "@/lib/supabase/session-client";
 import { loadLocalEnvFile } from "./load-local-env";
+import { decideSupabaseCredentials } from "./supabase-credentials";
 
 /**
  * Los socios de prueba con los que Playwright entra a la aplicación.
@@ -31,11 +31,13 @@ import { loadLocalEnvFile } from "./load-local-env";
  * terminar. No manda ningún correo: la identidad nace confirmada, que es lo
  * que `admin.createUser` permite.
  *
- * Cuando el entorno no tiene credenciales de Supabase (el caso de un runner
- * de CI sin secretos), el estado queda `unavailable` con las variables que
- * faltan, y los tests que necesitan sesión se saltan diciendo cuáles son. Lo
- * que no hace es inventarse una sesión: una puerta de mentira en los tests
- * vale menos que no probar la puerta.
+ * Cuando el entorno no tiene credenciales de Supabase (una máquina sin
+ * `.env.local`), el estado queda `unavailable` con las variables que faltan, y
+ * los tests que necesitan sesión se saltan diciendo cuáles son. Lo que no hace
+ * es inventarse una sesión: una puerta de mentira en los tests vale menos que
+ * no probar la puerta. En CI ese salto no se admite y el arranque falla (ver
+ * `decideSupabaseCredentials`): allí las credenciales están, y saltarse
+ * dejaría el check en verde sin haber comparado ninguna captura.
  */
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
@@ -106,9 +108,7 @@ export const PHOTOGRAPHED_MEMBERS = [
   "varios-datos",
 ] as const satisfies readonly IncompleteMemberName[];
 
-export function incompleteStorageStatePath(
-  name: IncompleteMemberName,
-): string {
+export function incompleteStorageStatePath(name: IncompleteMemberName): string {
   return path.join(REPO_ROOT, "test-results", `e2e-storage-state-${name}.json`);
 }
 
@@ -258,9 +258,7 @@ type SeededMember = {
   readonly password: string;
 };
 
-async function findClubId(
-  serviceClient: SupabaseClient,
-): Promise<string> {
+async function findClubId(serviceClient: SupabaseClient): Promise<string> {
   const { data, error } = await serviceClient
     .from(CLUBS_TABLE)
     .select("id")
@@ -325,7 +323,11 @@ async function createTestMembers(): Promise<E2eSessionState> {
   const active = await seedMember(serviceClient, clubId, {
     account_status: "active",
   });
-  await writeStorageState(active.email, active.password, E2E_STORAGE_STATE_PATH);
+  await writeStorageState(
+    active.email,
+    active.password,
+    E2E_STORAGE_STATE_PATH,
+  );
 
   const userIds = [active.userId];
   for (const name of INCOMPLETE_MEMBER_NAMES) {
@@ -356,12 +358,9 @@ export async function prepareE2eSession(): Promise<void> {
   // ningún proyecto de Supabase que no sea el de desarrollo.
   assertTestSupabaseEnvironment();
 
-  const missingKeys = findMissingSupabaseKeys(process.env);
-  if (missingKeys.length > 0) {
-    writeState({
-      kind: "unavailable",
-      reason: `faltan variables de entorno de Supabase: ${missingKeys.join(", ")}`,
-    });
+  const decision = decideSupabaseCredentials(process.env);
+  if (decision.kind === "skip") {
+    writeState({ kind: "unavailable", reason: decision.reason });
     return;
   }
   writeState(await createTestMembers());

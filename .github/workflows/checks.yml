@@ -2,10 +2,13 @@
 # corría el Stop gate del worker, en la máquina de quien lanzó la fábrica. Eso
 # no cubre un PR abierto a mano, uno que venga de un fork, ni un commit
 # empujado después de que el gate ya pasó. Este workflow los hace visibles
-# como checks del PR, sin pedir ningún secreto: un runner sin credenciales de
-# Supabase igual pasa, porque `assertTestSupabaseEnvironment` (vitest.setup.ts
-# vía tests/support/rls.ts) se salta las pruebas de RLS a propósito cuando no
-# hay `NEXT_PUBLIC_SUPABASE_URL`.
+# como checks del PR.
+#
+# Hasta el issue #149 corría sin ningún secreto, y el precio era que las
+# pruebas de integración y de RLS se saltaban enteras: el check salía verde sin
+# haberlas corrido. Ahora el paso de tests recibe las credenciales de
+# `seadragons-dev`, y faltar deja de ser un salto silencioso para ser un fallo
+# (`decideSupabaseCredentials`, en tests/support/supabase-credentials.ts).
 #
 # No puede impedir el merge: el repositorio es privado en plan gratuito y no
 # admite branch protection. Hace ruidoso el fallo, no lo bloquea.
@@ -64,9 +67,19 @@ jobs:
       - name: Tests del kit
         if: steps.repo.outputs.has_kit == 'true'
         run: npm run test:kit
+      # Las credenciales de `seadragons-dev`, y sólo en este paso: el build no
+      # las necesita y la llave de servicio no tiene nada que hacer cerca de un
+      # bundle. Sin ellas, las pruebas de integración y de RLS se saltan
+      # enteras y el check sale verde sin haberlas corrido (issue #149). Que
+      # apunten al proyecto de desarrollo lo verifica el guardia de entorno
+      # antes del primer test, no la confianza en quien pegó el secreto.
       - name: Tests
         if: steps.repo.outputs.bootstrapped == 'true'
         run: npm test
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       - name: Lint
         if: steps.repo.outputs.bootstrapped == 'true'
         run: npm run lint

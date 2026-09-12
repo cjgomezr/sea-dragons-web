@@ -2,15 +2,42 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
+import {
+  readEnvironmentManifest,
+  variablesFromSource,
+} from "../../../scripts/lib/entornos-manifest";
 
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const WORKFLOW_PATH = path.join(REPO_ROOT, ".github/workflows/checks.yml");
+
+const DEVELOPMENT_SOURCE = "seadragons-dev";
+
+/** Las credenciales que el manifiesto pone en los secretos del repositorio.
+ * Sale de ahí y no de una lista escrita a mano: declarar una cuarta en el
+ * manifiesto y olvidarla en el workflow tiene que dejar esto en rojo. */
+function developmentCredentials(): string[] {
+  return variablesFromSource(
+    readEnvironmentManifest(),
+    "ci",
+    DEVELOPMENT_SOURCE,
+  );
+}
+
+function referencedSecrets(): string[] {
+  const source = readFileSync(WORKFLOW_PATH, "utf8");
+  return [
+    ...new Set(
+      [...source.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((match) => match[1]),
+    ),
+  ].filter((name): name is string => name !== undefined);
+}
 
 interface WorkflowStep {
   name?: string;
   uses?: string;
   run?: string;
   if?: string;
+  env?: Record<string, string>;
   "continue-on-error"?: boolean;
   with?: { "node-version"?: number };
 }
@@ -85,10 +112,25 @@ describe("workflow de checks", () => {
     expect(source).not.toMatch(/\|\|\s*true/);
   });
 
-  it("no referencia ningún secreto", () => {
-    const source = readFileSync(WORKFLOW_PATH, "utf8");
+  // Hasta el issue #149 este workflow no referenciaba ningún secreto, y el
+  // precio era que las pruebas con sesión, las de integración y las de RLS se
+  // saltaban enteras: el check salía verde sin haber probado nada. Ahora sí
+  // los referencia, y lo que se vigila es de dónde salen.
+  it("da a los tests las credenciales de desarrollo que el manifiesto declara en CI", () => {
+    const env = stepNamed("Tests").env ?? {};
 
-    expect(source).not.toMatch(/secrets\./);
+    expect(Object.keys(env)).toEqual(developmentCredentials());
+    for (const [name, value] of Object.entries(env)) {
+      expect(value).toBe(`\${{ secrets.${name} }}`);
+    }
+  });
+
+  it("no referencia ningún secreto que el manifiesto no ponga en CI como de desarrollo", () => {
+    const permitted = new Set(developmentCredentials());
+
+    expect(referencedSecrets().filter((name) => !permitted.has(name))).toEqual(
+      [],
+    );
   });
 
   it("declara concurrency con cancel-in-progress para no acumular corridas viejas", () => {

@@ -8,6 +8,7 @@ import {
   parseEnvironmentManifest,
   readEnvironmentManifest,
   secretVariableNames,
+  variablesFromSource,
 } from "../../scripts/lib/entornos-manifest";
 import {
   CI_ONLY_SECRET_ENV_VARS,
@@ -18,39 +19,47 @@ import {
 const PRODUCTION_SOURCE = "seadragons-prod";
 const DEVELOPMENT_SOURCE = "seadragons-dev";
 
+/** Entornos del manifiesto sintético, con las mismas decisiones que el real:
+ * preview no escribe, CI sí desde el issue #149. */
+const ENVIRONMENTS = {
+  local: {
+    where: "un .env.local",
+    allowsProductionSources: false,
+    allowsWriteCredentials: true,
+    whyWriteCredentials: "es la máquina de quien desarrolla",
+  },
+  preview: {
+    where: "el ámbito Preview de Vercel",
+    allowsProductionSources: false,
+    allowsWriteCredentials: false,
+  },
+  production: {
+    where: "el ámbito Production de Vercel",
+    allowsProductionSources: true,
+    allowsWriteCredentials: true,
+    whyWriteCredentials: "es el despliegue que sirve a los socios",
+  },
+  ci: {
+    where: "los secretos de Actions",
+    allowsProductionSources: false,
+    allowsWriteCredentials: true,
+    whyWriteCredentials: "el guardia de entorno sólo admite desarrollo",
+  },
+  "ci-produccion": {
+    where: "los secretos del entorno Production de Actions",
+    allowsProductionSources: true,
+    allowsWriteCredentials: true,
+    whyWriteCredentials: "es por donde las migraciones llegan a producción",
+  },
+} as const;
+
 /** Manifiesto mínimo y sano, para poder alterar una sola cosa en cada test y
  * saber que el fallo viene de esa cosa. */
 function buildManifest(
   variables: EnvironmentManifest["variables"],
 ): EnvironmentManifest {
   return parseEnvironmentManifest({
-    environments: {
-      local: {
-        where: "un .env.local",
-        allowsProductionSources: false,
-        allowsWriteCredentials: true,
-      },
-      preview: {
-        where: "el ámbito Preview de Vercel",
-        allowsProductionSources: false,
-        allowsWriteCredentials: false,
-      },
-      production: {
-        where: "el ámbito Production de Vercel",
-        allowsProductionSources: true,
-        allowsWriteCredentials: true,
-      },
-      ci: {
-        where: "los secretos de Actions",
-        allowsProductionSources: false,
-        allowsWriteCredentials: false,
-      },
-      "ci-produccion": {
-        where: "los secretos del entorno Production de Actions",
-        allowsProductionSources: true,
-        allowsWriteCredentials: true,
-      },
-    },
+    environments: ENVIRONMENTS,
     sources: {
       [DEVELOPMENT_SOURCE]: { production: false },
       [PRODUCTION_SOURCE]: { production: true },
@@ -135,6 +144,68 @@ describe("manifiesto de entornos", () => {
     expect(violations).toHaveLength(1);
     expect(violations[0]?.message).toContain("SUPABASE_SERVICE_ROLE_KEY");
     expect(violations[0]?.message).toContain("escritura");
+  });
+
+  // Las tres que necesita un runner para abrir una sesión de verdad: sin
+  // ellas, las pruebas que viven detrás del login se saltan y el check sale
+  // verde sin haber probado nada (issue #149).
+  it("acepta las tres credenciales de desarrollo en CI", () => {
+    const manifest = buildManifest({
+      NEXT_PUBLIC_SUPABASE_URL: {
+        secret: false,
+        writeCredential: false,
+        scopes: scopes({ ci: DEVELOPMENT_SOURCE }),
+      },
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: {
+        secret: false,
+        writeCredential: false,
+        scopes: scopes({ ci: DEVELOPMENT_SOURCE }),
+      },
+      SUPABASE_SERVICE_ROLE_KEY: {
+        secret: true,
+        writeCredential: true,
+        scopes: scopes({ ci: DEVELOPMENT_SOURCE }),
+      },
+    });
+
+    expect(findScopeViolations(manifest)).toEqual([]);
+  });
+
+  it("falla nombrando la variable cuando un origen de producción llega a CI", () => {
+    const manifest = buildManifest({
+      SUPABASE_SERVICE_ROLE_KEY: {
+        secret: true,
+        writeCredential: true,
+        scopes: scopes({ ci: PRODUCTION_SOURCE }),
+      },
+    });
+
+    const violations = findScopeViolations(manifest);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.variable).toBe("SUPABASE_SERVICE_ROLE_KEY");
+    expect(violations[0]?.environment).toBe("ci");
+    expect(violations[0]?.message).toContain("SUPABASE_SERVICE_ROLE_KEY");
+  });
+
+  // Admitir credenciales de escritura es la decisión que más caro cuesta
+  // equivocar, así que el manifiesto no la deja tomar en silencio: quien la
+  // encienda tiene que escribir qué control la compensa.
+  it("rechaza un entorno que admite credenciales de escritura sin decir por qué", () => {
+    expect(() =>
+      parseEnvironmentManifest({
+        environments: {
+          ...ENVIRONMENTS,
+          preview: {
+            where: "el ámbito Preview de Vercel",
+            allowsProductionSources: false,
+            allowsWriteCredentials: true,
+          },
+        },
+        sources: { [DEVELOPMENT_SOURCE]: { production: false } },
+        variables: {},
+      }),
+    ).toThrowError(/preview/);
   });
 
   it("rechaza un manifiesto que usa un origen que no declara", () => {
@@ -263,16 +334,55 @@ describe("decisiones que el manifiesto no puede cambiar en silencio", () => {
     ).toEqual([PRODUCTION_SOURCE]);
   });
 
-  // Sin fijarlo, encender `ci.allowsWriteCredentials` apagaría esa mitad de la
-  // regla sin que nada se pusiera rojo.
-  it("sólo local, producción y el entorno protegido de Actions admiten credenciales de escritura", () => {
+  // Sin fijarlo, encender `preview.allowsWriteCredentials` apagaría esa mitad
+  // de la regla sin que nada se pusiera rojo. `ci` entró en la lista con el
+  // issue #149, y el control que lo compensa es el guardia de entorno.
+  it("todos los entornos menos preview admiten credenciales de escritura", () => {
     const { environments } = readEnvironmentManifest();
 
     expect(
       ENVIRONMENT_NAMES.filter(
         (name) => environments[name]?.allowsWriteCredentials,
       ),
-    ).toEqual(["local", "production", "ci-produccion"]);
+    ).toEqual(["local", "production", "ci", "ci-produccion"]);
+  });
+
+  // El criterio del issue #149: sin estas tres en el runner, las pruebas que
+  // viven detrás de la sesión se saltan y su check sale verde sin decidir
+  // nada.
+  it("CI recibe las tres credenciales de desarrollo, y sólo de desarrollo", () => {
+    const manifest = readEnvironmentManifest();
+
+    expect(variablesFromSource(manifest, "ci", DEVELOPMENT_SOURCE)).toEqual([
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+    ]);
+    expect(variablesFromSource(manifest, "ci", PRODUCTION_SOURCE)).toEqual([]);
+  });
+
+  // El porqué vive en el manifiesto y no sólo en el PR que lo cambió: la
+  // siguiente persona que quiera aflojar una regla merece encontrarse con el
+  // razonamiento antes que con el interruptor.
+  it("cada entorno que admite credenciales de escritura explica por qué", () => {
+    const { environments } = readEnvironmentManifest();
+
+    for (const name of ENVIRONMENT_NAMES) {
+      const environment = environments[name];
+      if (!environment?.allowsWriteCredentials) {
+        continue;
+      }
+      expect(
+        environment.whyWriteCredentials,
+        `el entorno ${name} admite escritura sin decir por qué`,
+      ).toBeTruthy();
+    }
+  });
+
+  it("el porqué de CI nombra el guardia de entorno, que es el control que lo compensa", () => {
+    const ci = readEnvironmentManifest().environments.ci;
+
+    expect(ci?.whyWriteCredentials).toContain("environment-guard");
   });
 
   // La credencial con la que el workflow del issue #94 aplica migraciones en
