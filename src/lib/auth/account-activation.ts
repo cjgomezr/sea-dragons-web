@@ -1,9 +1,5 @@
 import { clubCalendarDate } from "@/lib/time/club-calendar";
-
-/** Mismos valores que el `check` de `account_status` en `0003_members.sql`. */
-export const ACCOUNT_STATUSES = ["incomplete", "active", "inactive"] as const;
-
-export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
+import type { AccountStatus } from "./account-status";
 
 /** NFR-012: por debajo de esta edad hace falta el consentimiento del tutor. */
 export const ADULT_AGE = 18;
@@ -17,6 +13,24 @@ export type MemberProfile = {
   readonly membershipType: string | null;
   readonly guardianConsentAt: string | null;
 };
+
+/**
+ * Lo que puede estar pendiente en una cuenta `incomplete`.
+ *
+ * Los tres primeros son columnas de `members` que la pantalla de completar
+ * registro pide en su formulario. Los dos últimos no se rellenan escribiendo:
+ * el consentimiento lo da otra persona (FR-082) y la confirmación llega
+ * abriendo el enlace del correo.
+ */
+export const PENDING_REQUIREMENTS = [
+  "country",
+  "dateOfBirth",
+  "membershipType",
+  "guardianConsent",
+  "emailConfirmation",
+] as const;
+
+export type PendingRequirement = (typeof PENDING_REQUIREMENTS)[number];
 
 export type MemberAccountRecord = {
   readonly memberId: string;
@@ -82,24 +96,52 @@ function needsGuardianConsent(profile: MemberProfile, now: Date): boolean {
   return isMinorOn(profile.dateOfBirth, clubCalendarDate(now));
 }
 
-/** Decide si a una cuenta le falta algo (FR-083 y decisión B2): un solo estado
- * `incomplete` para "faltan datos", "falta confirmar el correo" y "falta el
- * consentimiento del tutor". */
+/**
+ * Todo lo que le falta a una cuenta para poder operar (FR-083 y decisión B2).
+ *
+ * Es LA regla, y por eso está sola: la pantalla de completar registro pregunta
+ * aquí qué pedir, y el paso a `active` pregunta aquí si ya no falta nada. Dos
+ * copias de esto acabarían discrepando, y la discrepancia sería una cuenta
+ * activa sin los datos que el club necesita.
+ *
+ * El orden es el que la pantalla muestra: primero lo que se rellena en el
+ * formulario, después lo que depende de otra persona o de otro correo.
+ */
+export function listPendingRequirements(input: {
+  readonly profile: MemberProfile;
+  readonly emailConfirmed: boolean;
+  readonly now: Date;
+}): readonly PendingRequirement[] {
+  const { profile, emailConfirmed, now } = input;
+  const pending: PendingRequirement[] = [];
+
+  if (profile.country === null) {
+    pending.push("country");
+  }
+  if (profile.dateOfBirth === null) {
+    pending.push("dateOfBirth");
+  }
+  if (profile.membershipType === null) {
+    pending.push("membershipType");
+  }
+  if (needsGuardianConsent(profile, now)) {
+    pending.push("guardianConsent");
+  }
+  if (!emailConfirmed) {
+    pending.push("emailConfirmation");
+  }
+  return pending;
+}
+
+/** Un solo estado `incomplete` para "faltan datos", "falta confirmar el
+ * correo" y "falta el consentimiento del tutor": no hay tres estados, hay una
+ * lista de pendientes y un estado que dice si está vacía. */
 export function resolveAccountStatus(input: {
   readonly profile: MemberProfile;
   readonly emailConfirmed: boolean;
   readonly now: Date;
 }): Extract<AccountStatus, "incomplete" | "active"> {
-  const { profile, emailConfirmed, now } = input;
-  const hasEveryRequiredField =
-    profile.country !== null &&
-    profile.dateOfBirth !== null &&
-    profile.membershipType !== null;
-
-  if (!emailConfirmed || !hasEveryRequiredField) {
-    return "incomplete";
-  }
-  return needsGuardianConsent(profile, now) ? "incomplete" : "active";
+  return listPendingRequirements(input).length === 0 ? "active" : "incomplete";
 }
 
 /** Recalcula el estado de una cuenta `incomplete` y la activa si ya no le

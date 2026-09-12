@@ -111,7 +111,11 @@ function createIdentityGateway(client: SupabaseClient): IdentityGateway {
   };
 }
 
-function createAccountStatusGateway(
+/** Exportado porque lo usan dos sitios: el inicio de sesión, que decide a
+ * dónde manda a quien entra, y la frontera de sesión, que decide qué alcanza
+ * en cada petición. Una segunda copia de esta consulta sería una segunda
+ * definición de qué cuenta como cuenta que puede operar. */
+export function createAccountStatusGateway(
   client: SupabaseClient,
 ): AccountStatusGateway {
   return {

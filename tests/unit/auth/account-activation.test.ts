@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import type { AccountStatus } from "@/lib/auth/account-status";
 import {
-  type AccountStatus,
   type IdentityConfirmationReader,
   type MemberAccountRecord,
   type MemberAccountStore,

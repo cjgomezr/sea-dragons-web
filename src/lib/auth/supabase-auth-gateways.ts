@@ -6,12 +6,11 @@ import {
 } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import {
-  ACCOUNT_STATUSES,
-  type AccountStatus,
   type IdentityConfirmationReader,
   type MemberAccountRecord,
   type MemberAccountStore,
 } from "./account-activation";
+import { ACCOUNT_STATUSES, type AccountStatus } from "./account-status";
 import type { EmailConfirmationGateway } from "./email-confirmation";
 import type {
   AuthIdentityGateway,
