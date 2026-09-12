@@ -30,13 +30,16 @@ function IconBase({
 /** No es un icono de sección: lo usa el control de cerrar sesión de la
  * cabecera, que el mockup del panel dibuja también como un icono. Vive aquí
  * para compartir trazo y tamaño con los ocho de la navegación, en vez de ser
- * un séptimo dibujo suelto con otro grosor. */
+ * un noveno dibujo suelto con otro grosor.
+ *
+ * El marco de la puerta va a la izquierda y la flecha sale hacia fuera. Con el
+ * marco a la derecha, el mismo dibujo se lee como "entrar". */
 export function SignOutIcon(): React.JSX.Element {
   return (
     <IconBase>
-      <path d="M15 5.5H19a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-4" />
-      <path d="M11 15.5 14.5 12 11 8.5" />
-      <path d="M14.5 12H4" />
+      <path d="M10 5.5H5.5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1H10" />
+      <path d="M16 15.5 19.5 12 16 8.5" />
+      <path d="M19.5 12H9" />
     </IconBase>
   );
 }
