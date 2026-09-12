@@ -125,6 +125,8 @@ const colorRoleToCssVariable: Record<string, string> = {
   Border: "color-border",
   Success: "color-success",
   Warning: "color-warning",
+  "Text on accent": "color-on-accent",
+  Danger: "color-danger",
 };
 
 describe("tokens de color: tema claro", () => {
@@ -244,6 +246,40 @@ describe("contraste", () => {
       contrastRatio(
         token(darkCss, "color-text-secondary"),
         token(darkCss, "color-background"),
+      ),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // El botón primario es un relleno de acento con texto encima, y el acento
+  // cambia con el tema: el mismo blanco que pasa en claro se queda en 2.6:1
+  // sobre el acento oscuro.
+  it.each(["light", "dark"] as const)(
+    "el color de error cumple AA sobre el fondo y sobre el panel en tema %s",
+    (theme) => {
+      const tokens = theme === "light" ? lightCss : darkCss;
+      expect(
+        contrastRatio(token(tokens, "color-danger"), token(tokens, "color-background")),
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrastRatio(token(tokens, "color-danger"), token(tokens, "color-panel")),
+      ).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
+  it("texto sobre relleno de acento cumple AA en tema claro", () => {
+    expect(
+      contrastRatio(
+        token(lightCss, "color-on-accent"),
+        token(lightCss, "color-accent"),
+      ),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("texto sobre relleno de acento cumple AA en tema oscuro", () => {
+    expect(
+      contrastRatio(
+        token(darkCss, "color-on-accent"),
+        token(darkCss, "color-accent"),
       ),
     ).toBeGreaterThanOrEqual(4.5);
   });

@@ -32,6 +32,8 @@ handoff), the `[data-theme="light"]` and `[data-theme="dark"]` blocks.
 | Border         | `#DEE6ED` | Dividers, input borders       |
 | Success        | `#2E9E86` | Success state only            |
 | Warning        | `#C99A3E` | Warning state only            |
+| Danger         | `#BC3B2E` | Validation errors, destructive |
+| Text on accent | `#FFFFFF` | Text/icons on an accent fill  |
 
 > **Decisión del 2026-09-04.** El texto secundario del tema claro se desvía
 > del prototipo a propósito. El valor original del prototipo, `#6B8095`, da
@@ -54,10 +56,27 @@ handoff), the `[data-theme="light"]` and `[data-theme="dark"]` blocks.
 | Border         | `#274055` | Dividers, input borders       |
 | Success        | `#6FD6B4` | Success state only            |
 | Warning        | `#F2CE78` | Warning state only            |
+| Danger         | `#F2887A` | Validation errors, destructive |
+| Text on accent | `#0C1A26` | Text/icons on an accent fill  |
 
-Rules: one accent color; success/warning appear only with their meaning;
+Rules: one accent color; success/warning/danger appear only with their meaning;
 never place text on a background with contrast ratio below 4.5:1 (3:1 for
 text ≥ 24px).
+
+> **Decisión del 2026-09-12 (issue #132).** `Danger` es un token nuevo, y
+> existe porque el primer formulario de la aplicación necesitaba pintar un
+> error de validación y lo estaba haciendo con `Warning`. Un campo que impide
+> continuar no es una advertencia, y reutilizar el color de warning para eso
+> rompe la regla de arriba. No lo sustituyas por `Warning`: el prototipo no
+> traía un rojo porque no dibujaba ningún estado de error.
+
+> **Decisión del 2026-09-12 (issue #132).** `Text on accent` no es un color
+> nuevo: es el único valor que deja pasar AA al primer botón primario relleno
+> de la aplicación, el de crear cuenta. Blanco sobre el acento claro da 5.1:1.
+> Blanco sobre el acento oscuro daría 2.6:1, así que en tema oscuro el texto
+> del botón es el fondo de página, que da 7.4:1. No inviertas los dos valores
+> creyendo que están cambiados: `tests/unit/design-tokens.test.ts` comprueba
+> el contraste de los dos.
 
 #### Sidebar (no cambia con el tema)
 
