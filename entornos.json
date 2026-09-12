@@ -3,7 +3,8 @@
     "local": {
       "where": ".env.local, en la máquina de quien desarrolla, fuera de git",
       "allowsProductionSources": false,
-      "allowsWriteCredentials": true
+      "allowsWriteCredentials": true,
+      "whyWriteCredentials": "Desarrollar contra seadragons-dev es escribir en seadragons-dev: sin llave de servicio no hay forma de sembrar ni de correr el arnés de RLS. El control que lo compensa es el guardia de entorno (src/lib/supabase/environment-guard.ts), que rechaza cualquier URL que no sea la de desarrollo."
     },
     "preview": {
       "where": "Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Preview",
@@ -13,17 +14,20 @@
     "production": {
       "where": "Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Production",
       "allowsProductionSources": true,
-      "allowsWriteCredentials": true
+      "allowsWriteCredentials": true,
+      "whyWriteCredentials": "Es la aplicación que sirve a los socios: escribe en su propia base por definición."
     },
     "ci": {
       "where": "GitHub, repositorio sea-dragons-web, Settings, Secrets and variables, Actions",
       "allowsProductionSources": false,
-      "allowsWriteCredentials": false
+      "allowsWriteCredentials": true,
+      "whyWriteCredentials": "Abierto en el issue #149, y a sabiendas de que afloja una regla que se puso a propósito. Sin llave de servicio, el arranque de Playwright no puede crear el socio con el que entrar, así que toda pantalla detrás de la frontera de sesión se salta y el check sale verde sin haber comparado ninguna captura; lo mismo con las pruebas de integración y de RLS. El control que lo compensa es el guardia de entorno (src/lib/supabase/environment-guard.ts, enganchado en vitest.setup.ts y en el arranque de Playwright): sólo admite la URL de seadragons-dev y lanza antes de que corra ningún test, así que un secreto mal pegado se detiene antes de escribir. La regla 1 sigue intacta: aquí nunca entra un origen de producción."
     },
     "ci-produccion": {
       "where": "GitHub, repositorio sea-dragons-web, Settings, Environments, entorno Production, Environment secrets",
       "allowsProductionSources": true,
-      "allowsWriteCredentials": true
+      "allowsWriteCredentials": true,
+      "whyWriteCredentials": "Es la puerta por la que las migraciones del issue #94 llegan al esquema de producción. Sólo la recibe el job que declara el entorno Production de Actions, no cualquier workflow."
     }
   },
   "sources": {
@@ -42,7 +46,7 @@
         "local": "seadragons-dev",
         "preview": "seadragons-dev",
         "production": "seadragons-prod",
-        "ci": null,
+        "ci": "seadragons-dev",
         "ci-produccion": null
       }
     },
@@ -53,7 +57,7 @@
         "local": "seadragons-dev",
         "preview": "seadragons-dev",
         "production": "seadragons-prod",
-        "ci": null,
+        "ci": "seadragons-dev",
         "ci-produccion": null
       }
     },
@@ -64,7 +68,7 @@
         "local": "seadragons-dev",
         "preview": null,
         "production": "seadragons-prod",
-        "ci": null,
+        "ci": "seadragons-dev",
         "ci-produccion": null
       }
     },

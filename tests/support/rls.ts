@@ -1,11 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { describe } from "vitest";
-import {
-  findMissingSupabaseKeys,
-  readSupabaseConfig,
-} from "@/lib/supabase/config";
+import { readSupabaseConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
+import { decideSupabaseCredentials } from "./supabase-credentials";
 
 // `.env.local` ya está cargado y verificado contra el proyecto de desarrollo
 // por `vitest.setup.ts` (que corre antes que cualquier archivo de test): no
@@ -85,38 +83,30 @@ export function createServiceRoleTestClient(
   return { kind: "service-role-client", client: createServiceRoleClient(env) };
 }
 
-export type RlsEnvironmentStatus =
-  | { readonly kind: "available" }
-  | { readonly kind: "unavailable"; readonly missingKeys: readonly string[] };
-
-/** Las pruebas de RLS necesitan la llave anónima (para actuar como usuario) y
- * la de servicio (para crear el usuario y sembrar/limpiar datos): sin
- * cualquiera de las dos no hay forma de montar el caso. */
-export function detectRlsEnvironment(env: Environment): RlsEnvironmentStatus {
-  const missingKeys = findMissingSupabaseKeys(env);
-
-  return missingKeys.length > 0
-    ? { kind: "unavailable", missingKeys }
-    : { kind: "available" };
-}
-
-/** `describe` para casos de RLS reales: se salta, en vez de fallar, cuando el
- * entorno no tiene credenciales de Supabase, y el nombre del salto nombra las
- * variables que faltan para que quien lea el resultado sepa qué falta. */
+/** `describe` para casos de RLS reales. Las pruebas necesitan la llave anónima
+ * (para actuar como usuario) y la de servicio (para crear el usuario y
+ * sembrar/limpiar datos): sin cualquiera de las dos no hay forma de montar el
+ * caso. Fuera de CI eso se salta, y el nombre del salto nombra las variables
+ * que faltan; en CI rompe, porque allí están (ver
+ * `decideSupabaseCredentials`). */
 export function describeRls(
   name: string,
   fn: () => void,
   env: Environment = process.env,
 ): void {
-  const status = detectRlsEnvironment(env);
-  if (status.kind === "unavailable") {
-    describe.skip(
-      `${name} (saltado: faltan variables de entorno de Supabase: ${status.missingKeys.join(", ")})`,
-      fn,
-    );
+  const decision = decideSupabaseCredentials(env);
+  if (decision.kind === "skip") {
+    describe.skip(skippedSuiteName(name, decision.reason), fn);
     return;
   }
   describe(name, fn);
+}
+
+/** El título con el que sale un salto. Quien lea la corrida ve ahí qué le
+ * falta a su máquina, así que se prueba aparte: el nombre es la única parte
+ * de un test saltado que alguien llega a leer. */
+export function skippedSuiteName(name: string, reason: string): string {
+  return `${name} (saltado: ${reason})`;
 }
 
 type CleanupResult = { readonly error: { readonly message: string } | null };

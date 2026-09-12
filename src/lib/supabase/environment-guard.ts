@@ -8,7 +8,15 @@ import { SUPABASE_URL_ENV } from "./config";
  * "proyecto equivocado". */
 export const DEVELOPMENT_SUPABASE_PROJECT_REF = "xcfrpcvomjjmfoztifuo";
 
+/** Ref del proyecto de producción (`seadragons-prod`). El guardia lo conoce
+ * para poder decir "esto apunta a producción" en vez de "esto apunta a otro
+ * sitio": es el error que más caro cuesta y el que antes hay que reconocer.
+ * El ref es público, viaja en el host de cada petición del navegador; lo que
+ * este mensaje nunca imprime es el valor configurado. */
+export const PRODUCTION_SUPABASE_PROJECT_REF = "weqhmtpvgewomslpvefu";
+
 const DEVELOPMENT_SUPABASE_HOSTNAME = `${DEVELOPMENT_SUPABASE_PROJECT_REF}.supabase.co`;
+const PRODUCTION_SUPABASE_HOSTNAME = `${PRODUCTION_SUPABASE_PROJECT_REF}.supabase.co`;
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -16,12 +24,33 @@ export type TestSupabaseEnvironmentCheck =
   | { readonly kind: "ok" }
   | { readonly kind: "wrong-project"; readonly message: string };
 
-function isDevelopmentProjectUrl(url: string): boolean {
+function hostnameOf(url: string): string | null {
   try {
-    return new URL(url).hostname === DEVELOPMENT_SUPABASE_HOSTNAME;
+    return new URL(url).hostname;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/** Qué se le dice a quien lea el fallo. Un secreto de CI que apunta a
+ * producción merece que el mensaje lo nombre: desde el issue #149 el runner
+ * lleva una llave de escritura, y "apunta a otro proyecto" costaría media
+ * hora de búsqueda justo en el caso más caro. Cualquier otro destino sólo
+ * necesita saber que no es el que la suite tiene permitido alcanzar. */
+function wrongProjectMessage(hostname: string | null): string {
+  if (hostname === PRODUCTION_SUPABASE_HOSTNAME) {
+    return (
+      `${SUPABASE_URL_ENV} apunta al proyecto de PRODUCCIÓN (seadragons-prod, ` +
+      `${PRODUCTION_SUPABASE_PROJECT_REF}). La suite de tests sólo puede ` +
+      `alcanzar el de desarrollo (${DEVELOPMENT_SUPABASE_PROJECT_REF}), así ` +
+      "que se detiene aquí, antes de que ningún test escriba."
+    );
+  }
+  return (
+    `${SUPABASE_URL_ENV} no apunta al proyecto de desarrollo declarado ` +
+    `(${DEVELOPMENT_SUPABASE_PROJECT_REF}). La suite de tests no puede ` +
+    "alcanzar ningún otro proyecto de Supabase, ni siquiera por accidente."
+  );
 }
 
 /** Sin URL configurada no hay forma de que un test alcance ningún proyecto de
@@ -35,14 +64,9 @@ export function checkTestSupabaseEnvironment(
     return { kind: "ok" };
   }
 
-  if (!isDevelopmentProjectUrl(url)) {
-    return {
-      kind: "wrong-project",
-      message:
-        `${SUPABASE_URL_ENV} no apunta al proyecto de desarrollo declarado ` +
-        `(${DEVELOPMENT_SUPABASE_PROJECT_REF}). La suite de tests no puede ` +
-        "alcanzar ningún otro proyecto de Supabase, ni siquiera por accidente.",
-    };
+  const hostname = hostnameOf(url);
+  if (hostname !== DEVELOPMENT_SUPABASE_HOSTNAME) {
+    return { kind: "wrong-project", message: wrongProjectMessage(hostname) };
   }
 
   return { kind: "ok" };

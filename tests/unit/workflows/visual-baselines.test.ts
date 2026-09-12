@@ -2,6 +2,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
+import {
+  readEnvironmentManifest,
+  variablesFromSource,
+} from "../../../scripts/lib/entornos-manifest";
 
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const WORKFLOW_PATH = path.join(
@@ -9,17 +13,41 @@ const WORKFLOW_PATH = path.join(
   ".github/workflows/visual-baselines.yml",
 );
 
+const DEVELOPMENT_SOURCE = "seadragons-dev";
+
+/** Las credenciales que el manifiesto pone en los secretos del repositorio.
+ * Sale de ahí y no de una lista escrita a mano: declarar una cuarta en el
+ * manifiesto y olvidarla en el workflow tiene que dejar esto en rojo. */
+function developmentCredentials(): string[] {
+  return variablesFromSource(
+    readEnvironmentManifest(),
+    "ci",
+    DEVELOPMENT_SOURCE,
+  );
+}
+
+function referencedSecrets(): string[] {
+  const source = readFileSync(WORKFLOW_PATH, "utf8");
+  return [
+    ...new Set(
+      [...source.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((match) => match[1]),
+    ),
+  ].filter((name): name is string => name !== undefined);
+}
+
 interface WorkflowStep {
   name?: string;
   uses?: string;
   run?: string;
   if?: string;
+  env?: Record<string, string>;
   "continue-on-error"?: boolean;
 }
 
 interface WorkflowJob {
   if?: string;
   needs?: string | string[];
+  env?: Record<string, string>;
   permissions?: Record<string, string>;
   steps: WorkflowStep[];
 }
@@ -46,6 +74,16 @@ function stepsOf(jobName: string): WorkflowStep[] {
     throw new Error(`El workflow no declara el job "${jobName}".`);
   }
   return job.steps;
+}
+
+function stepNamed(jobName: string, stepName: string): WorkflowStep {
+  const step = stepsOf(jobName).find(
+    (candidate) => candidate.name === stepName,
+  );
+  if (!step) {
+    throw new Error(`El job "${jobName}" no tiene el paso "${stepName}".`);
+  }
+  return step;
 }
 
 function runLines(jobName: string): string {
@@ -110,6 +148,49 @@ describe("visual-baselines.yml", () => {
 
     expect(dispatch?.inputs?.reviewed_run_url?.required).toBe(true);
     expect(runLines("accept")).toMatch(/reviewed_run_url/);
+  });
+
+  // Desde el #135 casi toda pantalla vive detrás de la frontera de sesión, y
+  // el arranque de Playwright abre esa sesión creando un socio en
+  // `seadragons-dev`. Sin estas variables, el job no falla: se salta las
+  // pruebas y sale verde sobre capturas que nadie comparó (issue #149).
+  it.each([
+    ["compare", "Compara contra la línea base vinculante"],
+    ["accept", "Regenera la línea base"],
+  ])(
+    "da al paso que corre Playwright en el job $0 las credenciales que el manifiesto declara en CI",
+    (jobName, stepName) => {
+      const env = stepNamed(jobName, stepName).env ?? {};
+
+      expect(Object.keys(env).sort()).toEqual(developmentCredentials().sort());
+      for (const [name, value] of Object.entries(env)) {
+        expect(value).toBe(`\${{ secrets.${name} }}`);
+      }
+    },
+  );
+
+  // Una llave de escritura en el entorno del job la heredarían `npm ci` y
+  // cualquier postinstall de una dependencia, que no tienen nada que hacer
+  // con ella. Playwright arranca el dev server como hijo del paso, así que
+  // acotarla al paso no le quita nada.
+  it("no deja ninguna credencial de Supabase en el entorno de un job entero", () => {
+    const credentials = new Set(developmentCredentials());
+
+    for (const [name, job] of Object.entries(parseWorkflow().jobs)) {
+      const leaked = Object.keys(job.env ?? {}).filter((key) =>
+        credentials.has(key),
+      );
+
+      expect(leaked, `el job ${name} las declara a nivel de job`).toEqual([]);
+    }
+  });
+
+  it("no referencia ningún secreto que el manifiesto no ponga en CI como de desarrollo", () => {
+    const permitted = new Set(developmentCredentials());
+
+    expect(referencedSecrets().filter((name) => !permitted.has(name))).toEqual(
+      [],
+    );
   });
 
   it("no necesita ignorar sus propios commits, porque no los hace en un PR", () => {

@@ -4,6 +4,7 @@ import {
   SUPABASE_SERVICE_ROLE_KEY_ENV,
   SUPABASE_URL_ENV,
 } from "@/lib/supabase/config";
+import { describeRls, skippedSuiteName } from "../support/rls";
 
 describe("cliente por rol", () => {
   beforeEach(() => {
@@ -58,32 +59,40 @@ describe("cliente por rol", () => {
   });
 });
 
+// Qué variables faltan y cómo se nombran vive en
+// `tests/unit/supabase-credentials.test.ts`, que es donde se decide: aquí sólo
+// se prueba qué hace `describeRls` con esa decisión.
 describe("detección de entorno", () => {
-  it("está disponible cuando las tres variables están presentes", async () => {
-    const { detectRlsEnvironment } = await import("../support/rls");
-
-    const status = detectRlsEnvironment({
-      [SUPABASE_URL_ENV]: "https://club.supabase.co",
-      [SUPABASE_ANON_KEY_ENV]: "anon-key",
-      [SUPABASE_SERVICE_ROLE_KEY_ENV]: "service-role-key",
-    });
-
-    expect(status).toEqual({ kind: "available" });
+  // Sin credenciales en una máquina de desarrollo, saltarse es lo correcto. En
+  // CI no: desde el issue #149 el runner las tiene, y un salto ahí sería una
+  // corrida verde que no probó ninguna policy.
+  it("rompe en vez de saltarse cuando a CI le faltan las credenciales", () => {
+    expect(() =>
+      describeRls("policies que nadie llegó a probar", () => {}, {
+        CI: "true",
+      }),
+    ).toThrowError(new RegExp(SUPABASE_URL_ENV));
   });
 
-  it("nombra cada variable ausente sin duplicados", async () => {
-    const { detectRlsEnvironment } = await import("../support/rls");
-
-    const status = detectRlsEnvironment({
-      [SUPABASE_URL_ENV]: "https://club.supabase.co",
-    });
-
-    expect(status).toEqual({
-      kind: "unavailable",
-      missingKeys: [SUPABASE_ANON_KEY_ENV, SUPABASE_SERVICE_ROLE_KEY_ENV],
-    });
+  it("nombra en el título del salto lo que le falta a esta máquina", () => {
+    expect(
+      skippedSuiteName("policies de members", `faltan ${SUPABASE_URL_ENV}`),
+    ).toBe(`policies de members (saltado: faltan ${SUPABASE_URL_ENV})`);
   });
 });
+
+// Fuera de CI el mismo caso se salta en vez de romper, y se comprueba desde
+// donde se usa de verdad: al cargar el módulo. El cuerpo falla si llegara a
+// correr, así que un `describeRls` que dejara de saltarse se vería.
+describeRls(
+  "suite sin credenciales en una máquina de desarrollo",
+  () => {
+    it("no llega a correr", () => {
+      expect.unreachable("describeRls dejó de saltarse sin credenciales");
+    });
+  },
+  {},
+);
 
 describe("afirmación de negación", () => {
   it("falla cuando la consulta devuelve filas", async () => {

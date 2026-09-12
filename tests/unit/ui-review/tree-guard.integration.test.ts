@@ -11,11 +11,13 @@ const FIXTURE_PATH = path.join(HERE, "fixtures", "sigint-fixture.ts");
 const ORIGINAL_CONTENT = '{\n  "compilerOptions": {}\n}\n';
 const FIXTURE_TIMEOUT_MS = 20_000;
 
-// El runner de CI (ubuntu-latest en checks.yml) fija Node 20, que no tiene
-// --experimental-strip-types (llegó en Node 22.6): un spawn con esa flag
-// muere ahí con "bad option" antes de imprimir nada, y este test agota su
-// timeout esperando una señal de arranque que nunca llega. `--import tsx`
-// transpila el entrypoint en el mismo proceso sin depender de esa flag.
+// `--import tsx` transpila el entrypoint en el mismo proceso, sin depender de
+// --experimental-strip-types. Nació cuando CI fijaba Node 20, que no trae esa
+// flag (llegó en Node 22.6): un spawn con ella moría con "bad option" antes de
+// imprimir nada, y este test agotaba su timeout esperando una señal de
+// arranque que nunca llegaba. CI ya toma Node de .nvmrc, pero seguir con tsx
+// evita que el resultado dependa del parche exacto: dentro de la línea 22 el
+// type stripping pasó de exigir la flag a venir activo por defecto.
 //
 // A propósito NO se usa el binario `tsx` (node_modules/.bin/tsx): ese CLI
 // arranca el script en un proceso HIJO propio y reenvía las señales que

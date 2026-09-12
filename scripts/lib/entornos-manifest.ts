@@ -33,6 +33,11 @@ const environmentSchema = z.object({
   where: z.string().min(1),
   allowsProductionSources: z.boolean(),
   allowsWriteCredentials: z.boolean(),
+  /** Por qué este entorno admite credenciales de escritura, y qué control lo
+   * compensa. Obligatorio cuando las admite: es la decisión que más caro
+   * cuesta equivocar, y quien quiera aflojarla en otro entorno merece
+   * encontrarse con el razonamiento antes que con el interruptor. */
+  whyWriteCredentials: z.string().min(1).optional(),
 });
 
 const sourceSchema = z.object({
@@ -67,6 +72,17 @@ function findUnknownSources(manifest: EnvironmentManifest): string[] {
   return [...new Set(used)].filter((source) => !declared.has(source));
 }
 
+function findUnexplainedWriteCredentials(
+  manifest: EnvironmentManifest,
+): string[] {
+  return Object.entries(manifest.environments)
+    .filter(
+      ([, rules]) =>
+        rules.allowsWriteCredentials && rules.whyWriteCredentials === undefined,
+    )
+    .map(([name]) => name);
+}
+
 /** Valida el manifiesto y devuelve su contenido. Falla ruidosamente: un
  * manifiesto mal formado deja sin sentido a todo lo que se apoya en él. */
 export function parseEnvironmentManifest(raw: unknown): EnvironmentManifest {
@@ -76,6 +92,14 @@ export function parseEnvironmentManifest(raw: unknown): EnvironmentManifest {
   if (unknownSources.length > 0) {
     throw new Error(
       `el manifiesto usa orígenes que no declara: ${unknownSources.join(", ")}`,
+    );
+  }
+
+  const unexplained = findUnexplainedWriteCredentials(manifest);
+  if (unexplained.length > 0) {
+    throw new Error(
+      "estos entornos admiten credenciales de escritura sin decir por qué " +
+        `en whyWriteCredentials: ${unexplained.join(", ")}`,
     );
   }
   return manifest;
@@ -173,6 +197,20 @@ export function environmentsFor(
     const source = variable.scopes[environment];
     return source !== null && source !== undefined;
   });
+}
+
+/** Variables que el manifiesto declara en `environment` con ese origen
+ * concreto, en el orden del manifiesto. Responde "qué credenciales de
+ * `seadragons-dev` lleva CI", que es lo que un workflow tiene que pasarle a
+ * sus tests. */
+export function variablesFromSource(
+  manifest: EnvironmentManifest,
+  environment: EnvironmentName,
+  source: string,
+): string[] {
+  return Object.entries(manifest.variables)
+    .filter(([, variable]) => variable.scopes[environment] === source)
+    .map(([name]) => name);
 }
 
 /** Variables sin un solo entorno asignado. Una variable así está documentada a
