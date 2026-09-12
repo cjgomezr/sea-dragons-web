@@ -6,10 +6,14 @@ export default defineConfig({
   testDir: "./tests",
   // *.spec.ts only: tests/unit/**/*.test.ts belongs to Vitest.
   testMatch: "**/*.spec.ts",
-  // Sólo Linux tiene línea base visual versionada (issue #58): en cualquier
-  // otra plataforma esto avisa que la comparación es informativa, no la que
-  // decide si el PR pasa.
-  globalSetup: "./tests/support/visual-baseline-global-setup.ts",
+  // Dos cosas antes del primer test. Sólo Linux tiene línea base visual
+  // versionada (issue #58): en cualquier otra plataforma el arranque avisa de
+  // que la comparación es informativa, no la que decide si el PR pasa. Y
+  // desde #135 la cáscara de la aplicación está detrás de la frontera de
+  // sesión, así que hace falta un socio de prueba con el que entrar.
+  globalSetup: "./tests/support/playwright-global-setup.ts",
+  // Borra ese socio de `seadragons-dev` al terminar.
+  globalTeardown: "./tests/support/playwright-global-teardown.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

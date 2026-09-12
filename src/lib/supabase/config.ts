@@ -84,3 +84,18 @@ export function readSupabaseServiceRoleConfig(
 
   return { kind: "configured", url, serviceRoleKey };
 }
+
+/** Las variables que faltan para poder actuar a la vez como usuario (llave
+ * anónima) y como servicio, que es lo que necesita cualquier arnés de pruebas
+ * contra un Supabase real. `SUPABASE_URL_ENV` falta en las dos
+ * configuraciones a la vez y sólo se nombra una. */
+export function findMissingSupabaseKeys(env: Environment): readonly string[] {
+  const anon = readSupabaseConfig(env);
+  const service = readSupabaseServiceRoleConfig(env);
+  return [
+    ...(anon.kind === "missing" ? anon.missingKeys : []),
+    ...(service.kind === "missing"
+      ? service.missingKeys.filter((key) => key !== SUPABASE_URL_ENV)
+      : []),
+  ];
+}
