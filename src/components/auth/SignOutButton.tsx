@@ -8,16 +8,29 @@ import { SESSION_API_PATH, SIGN_IN_PATH } from "@/lib/auth/routes";
 const LABEL = "Cerrar sesión";
 
 /**
- * Cerrar sesión desde cualquier pantalla (FR-007): vive en la cabecera de la
- * cáscara, que es lo único que se dibuja igual en las siete secciones y en los
- * tres tamaños.
+ * Cómo se dibuja el control, que no es cómo se comporta.
  *
- * Es un icono y no un botón con texto, como en el mockup del panel. Con texto
- * pesaba más que la propia navegación, que está justo debajo y es lo que la
- * gente usa todos los días. El nombre accesible sigue siendo el texto
- * completo, así que para un lector de pantalla no cambia nada.
+ * `icon` es el de la cabecera de la cáscara: ahí compite con la navegación,
+ * que es lo que la gente usa todos los días, y con texto pesaba más que ella.
+ * El nombre accesible sigue siendo el texto completo, así que para un lector
+ * de pantalla los dos son lo mismo.
+ *
+ * `text` es el de completar registro (#133). Esa pantalla no tiene cáscara ni
+ * navegación, y cerrar sesión es una de las dos únicas cosas que una cuenta
+ * incompleta puede hacer: esconderla detrás de un icono suelto sería esconder
+ * media pantalla.
  */
-export function SignOutButton(): React.JSX.Element {
+export type SignOutAppearance = "icon" | "text";
+
+/**
+ * Cerrar sesión desde cualquier pantalla (FR-007). El comportamiento es uno
+ * solo y vive aquí; lo único que cambia entre sitios es cómo se dibuja.
+ */
+export function SignOutButton({
+  appearance = "icon",
+}: {
+  appearance?: SignOutAppearance;
+}): React.JSX.Element {
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -35,16 +48,16 @@ export function SignOutButton(): React.JSX.Element {
     router.refresh();
   }
 
+  const isIcon = appearance === "icon";
   return (
     <button
       type="button"
-      className="app-signout"
+      className={isIcon ? "app-signout" : "auth-signout"}
       onClick={handleSignOut}
       disabled={isSigningOut}
-      aria-label={LABEL}
-      title={LABEL}
+      {...(isIcon ? { "aria-label": LABEL, title: LABEL } : {})}
     >
-      <SignOutIcon />
+      {isIcon ? <SignOutIcon /> : LABEL}
     </button>
   );
 }

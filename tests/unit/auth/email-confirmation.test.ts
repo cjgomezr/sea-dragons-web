@@ -48,8 +48,8 @@ function doubles(options: {
           },
         };
       },
-      async updateAccountStatus(memberId, status) {
-        written.push(`${memberId}:${status}`);
+      async activateMember(memberId) {
+        written.push(memberId);
       },
     },
     // El enlace de confirmación es justo lo que deja el correo confirmado, así
@@ -91,7 +91,7 @@ describe("confirmación del correo", () => {
     });
 
     expect(result).toEqual({ kind: "activated" });
-    expect(given.written).toEqual([`${MEMBER_ID}:active`]);
+    expect(given.written).toEqual([MEMBER_ID]);
   });
 
   it("deja la cuenta incompleta si además del correo le falta otro dato", async () => {

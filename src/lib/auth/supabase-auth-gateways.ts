@@ -6,12 +6,15 @@ import {
 } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import {
-  ACCOUNT_STATUSES,
-  type AccountStatus,
   type IdentityConfirmationReader,
   type MemberAccountRecord,
   type MemberAccountStore,
 } from "./account-activation";
+import { ACCOUNT_STATUSES, type AccountStatus } from "./account-status";
+import type {
+  CompletedValues,
+  MemberProfileWriter,
+} from "./complete-registration";
 import type { EmailConfirmationGateway } from "./email-confirmation";
 import type {
   AuthIdentityGateway,
@@ -40,7 +43,10 @@ export type SupabaseAuthGateways = {
   readonly registration: RegistrationGateways;
   readonly confirmations: EmailConfirmationGateway;
   readonly clubs: ClubDirectory;
-  readonly accounts: MemberAccountStore;
+  /** Leer la fila del socio y escribir lo que le faltaba son la misma pieza:
+   * las dos las usa la pantalla de completar registro, y las dos van por la
+   * llave de servicio (ver `createMemberAccountStore`). */
+  readonly accounts: MemberAccountStore & MemberProfileWriter;
   readonly identities: IdentityConfirmationReader;
   readonly confirmationEmail: ConfirmationEmailGateway;
 };
@@ -242,9 +248,32 @@ function toMemberAccountRecord(
 const MEMBER_ACCOUNT_COLUMNS =
   "id, account_status, country, date_of_birth, membership_type, guardian_consent_at";
 
+/** Las columnas de `members` que escribe completar registro, con el nombre que
+ * tienen en la base. La conversión vive aquí y no en el dominio: snake_case es
+ * de la fila, no del modelo. */
+function toMemberColumns(values: CompletedValues): Record<string, string> {
+  return {
+    ...(values.country === undefined ? {} : { country: values.country }),
+    ...(values.dateOfBirth === undefined
+      ? {}
+      : { date_of_birth: values.dateOfBirth }),
+    ...(values.membershipType === undefined
+      ? {}
+      : { membership_type: values.membershipType }),
+  };
+}
+
+/**
+ * Va por la llave de servicio, y no por el cliente con la sesión del socio, a
+ * propósito: `0003_members.sql` no le da a `authenticated` ningún privilegio
+ * de escritura sobre su propia fila, justo para que `role` y `account_status`
+ * no los pueda mover el dueño ni atacando la API directamente (AC-039). El
+ * servidor identifica a quien pide por su cookie de sesión y sólo entonces
+ * escribe, acotado al `memberId` de esa persona.
+ */
 function createMemberAccountStore(
   serviceClient: SupabaseClient,
-): MemberAccountStore {
+): MemberAccountStore & MemberProfileWriter {
   return {
     async findByUserId(userId) {
       const { data, error } = await serviceClient
@@ -260,14 +289,30 @@ function createMemberAccountStore(
       return data === null ? null : toMemberAccountRecord(data);
     },
 
-    async updateAccountStatus(memberId, status) {
+    async updateProfile(memberId, values) {
       const { error } = await serviceClient
         .from(MEMBERS_TABLE)
-        .update({ account_status: status })
+        .update(toMemberColumns(values))
         .eq("id", memberId);
       if (error) {
         throw new Error(
-          `No se pudo cambiar el estado del miembro ${memberId} a ${status}: ${error.message}`,
+          `No se pudo guardar el perfil del miembro ${memberId}: ${error.message}`,
+        );
+      }
+    },
+
+    async activateMember(memberId) {
+      const { error } = await serviceClient
+        .from(MEMBERS_TABLE)
+        .update({ account_status: "active" })
+        .eq("id", memberId)
+        // La condición sobre el estado no sobra. Entre leer la fila y escribir
+        // este `update` cabe una baja de socio (FR-085, E5), y sin ella la
+        // baja se revive sola: sólo se activa lo que todavía está a medias.
+        .eq("account_status", "incomplete");
+      if (error) {
+        throw new Error(
+          `No se pudo activar el miembro ${memberId}: ${error.message}`,
         );
       }
     },

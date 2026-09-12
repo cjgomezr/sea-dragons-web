@@ -27,9 +27,8 @@ export const REGISTRATION_PATH = "/registro";
  * que nunca va a tener sesión. */
 export const PASSWORD_RECOVERY_PATH = "/recuperar-contrasena";
 
-/** La pantalla del ticket #133. El inicio de sesión manda aquí a las cuentas
- * `incomplete`, así que la ruta tiene que existir como destino antes que la
- * pantalla. */
+/** La pantalla del ticket #133: la única que alcanza una cuenta `incomplete`,
+ * y a la que la frontera manda todo lo demás que esa cuenta pida. */
 export const COMPLETE_REGISTRATION_PATH = "/completar-registro";
 
 /** El panel principal: el destino de una cuenta activa. */
@@ -60,13 +59,20 @@ export const HEALTH_API_PATH = "/api/v1/health";
  * dejaría la aplicación sin puerta de entrada. */
 export const SESSION_API_PATH = "/api/v1/auth/session";
 
-/** Con el que se crea la cuenta (#132). Exigirle sesión deja al club sin
- * forma de dar de alta a nadie: hay que tener cuenta para poder crearse una. */
+/** El endpoint que crea la cuenta. Quien se registra no tiene sesión todavía,
+ * por definición: protegerlo dejaba la pantalla pública de registro con un
+ * formulario que sólo podía responder 401. */
 export const REGISTER_API_PATH = "/api/v1/auth/register";
 
-/** Reenvía la confirmación (#132). Lo pide quien no recibió el correo, que es
- * exactamente quien todavía no puede tener sesión. */
+/** El reenvío del correo de confirmación. Lo pide la pantalla de registro
+ * justo después de crear la cuenta, cuando todavía no hay sesión, y la de
+ * completar registro cuando la confirmación es lo que falta. */
 export const CONFIRMATION_EMAIL_API_PATH = "/api/v1/auth/confirmation-email";
+
+/** La cuenta de quien llama: qué le falta (GET) y cómo se completa (PATCH).
+ * Es el único endpoint que una cuenta `incomplete` puede usar además de los
+ * públicos, porque es con el que deja de estarlo. */
+export const ACCOUNT_API_PATH = "/api/v1/auth/account";
 
 /**
  * Los únicos endpoints de la API que no exigen sesión.

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  type AccountStatus,
   type IdentityConfirmationReader,
   type MemberAccountRecord,
   type MemberAccountStore,
@@ -101,22 +100,23 @@ describe("estado de la cuenta", () => {
 type ActivationDoubles = {
   readonly accounts: MemberAccountStore;
   readonly identities: IdentityConfirmationReader;
-  readonly written: { memberId: string; status: AccountStatus }[];
+  /** Los miembros que quedaron activados, en orden. */
+  readonly written: string[];
 };
 
 function activationDoubles(options: {
   readonly record: MemberAccountRecord | null;
   readonly emailConfirmed: boolean;
 }): ActivationDoubles {
-  const written: { memberId: string; status: AccountStatus }[] = [];
+  const written: string[] = [];
   return {
     written,
     accounts: {
       async findByUserId() {
         return options.record;
       },
-      async updateAccountStatus(memberId, status) {
-        written.push({ memberId, status });
+      async activateMember(memberId) {
+        written.push(memberId);
       },
     },
     identities: {
@@ -150,7 +150,7 @@ describe("activación de la cuenta", () => {
     });
 
     expect(result).toEqual({ kind: "activated" });
-    expect(given.written).toEqual([{ memberId: MEMBER_ID, status: "active" }]);
+    expect(given.written).toEqual([MEMBER_ID]);
   });
 
   it("no escribe nada si la cuenta sigue incompleta", async () => {

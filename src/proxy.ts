@@ -3,8 +3,9 @@ import { apiError } from "@/lib/api/response";
 import {
   type SessionBoundaryOutcome,
   decideSessionBoundary,
+  isPublicPath,
 } from "@/lib/auth/session-boundary";
-import { hasValidSession } from "@/lib/auth/session-reader";
+import { readSessionState } from "@/lib/auth/session-reader";
 import {
   applySessionCookies,
   createSessionClient,
@@ -22,6 +23,8 @@ import {
 
 const UNAUTHENTICATED_MESSAGE =
   "Necesitas iniciar sesión para usar este endpoint.";
+const INCOMPLETE_ACCOUNT_MESSAGE =
+  "Tu cuenta todavía está incompleta. Termina tu registro antes de usar este endpoint.";
 
 function buildResponse(
   outcome: SessionBoundaryOutcome,
@@ -34,6 +37,8 @@ function buildResponse(
       return NextResponse.redirect(new URL(outcome.to, request.nextUrl));
     case "unauthenticated":
       return apiError("unauthenticated", UNAUTHENTICATED_MESSAGE);
+    case "forbidden":
+      return apiError("forbidden", INCOMPLETE_ACCOUNT_MESSAGE);
   }
 }
 
@@ -45,7 +50,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // viaje a Supabase, y al endpoint de salud (que el monitoreo pide cada 5
   // minutos) lo ataba a la latencia del servicio que precisamente está
   // vigilando.
-  if (decideSessionBoundary({ pathname, hasSession: false }).kind === "allow") {
+  if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
@@ -56,11 +61,13 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // Un entorno sin Supabase no puede reconocer a nadie, así que nadie tiene
   // sesión. Se cierra en vez de abrirse: una frontera que se cae hacia el lado
   // abierto cuando falta una variable de entorno no es una frontera.
-  const hasSession =
-    session.kind === "ready" ? await hasValidSession(session.client) : false;
+  const state =
+    session.kind === "ready"
+      ? await readSessionState(session.client)
+      : "anonymous";
 
   const response = buildResponse(
-    decideSessionBoundary({ pathname, hasSession }),
+    decideSessionBoundary({ pathname, session: state }),
     request,
   );
 
