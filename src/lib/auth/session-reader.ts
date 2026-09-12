@@ -15,8 +15,10 @@ import { createAccountStatusGateway } from "./supabase-session-gateways";
  * y de que la puerta del registro a medias esté en el servidor.
  */
 
-/** La identidad de quien pide, o `null` si no hay ninguna sesión que valga. */
-async function readAuthenticatedUserId(
+/** La identidad de quien pide, o `null` si no hay ninguna sesión que valga.
+ * Lo usan la frontera, para saber a quién mirarle el estado de la cuenta, y
+ * los endpoints que actúan sobre la cuenta de quien llama. */
+export async function readAuthenticatedUserId(
   client: SupabaseClient,
 ): Promise<string | null> {
   const { data, error } = await client.auth.getUser();
