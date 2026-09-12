@@ -188,8 +188,9 @@ describe("limpieza ante fallo", () => {
 // --experimental-strip-types. Nació cuando CI fijaba Node 20, que no trae esa
 // flag (llegó en Node 22.6): un spawn con ella moría con "bad option" (código
 // 9) en vez del código de salida que esta prueba verifica. CI ya toma Node de
-// .nvmrc, pero la flag sigue siendo experimental. El binario `tsx`
-// (node_modules/.bin/tsx)
+// .nvmrc, pero seguir con tsx evita que el resultado dependa del parche
+// exacto: dentro de la línea 22 el type stripping pasó de exigir la flag a
+// venir activo por defecto. El binario `tsx` (node_modules/.bin/tsx)
 // arranca en cambio un proceso hijo propio, que dejaría el código de salida
 // que ve este test en manos del relay de ese hijo en vez del de capture-ui.ts.
 function runCommand(args: readonly string[]): Promise<number | null> {

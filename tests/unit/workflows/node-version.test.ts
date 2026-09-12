@@ -46,16 +46,33 @@ function listNodeSetupSteps(): NodeSetupStep[] {
     );
 }
 
+const DEVCONTAINER_PATH = path.join(
+  REPO_ROOT,
+  ".devcontainer/devcontainer.json",
+);
+
+function readDeclaredNodeMajor(): number {
+  const declared = readFileSync(
+    path.join(REPO_ROOT, NODE_VERSION_FILE),
+    "utf8",
+  );
+  return Number.parseInt(declared.trim(), 10);
+}
+
 describe("versión de Node", () => {
   it(`${NODE_VERSION_FILE} declara Node ${MINIMUM_NODE_MAJOR} o superior`, () => {
-    const declared = readFileSync(
-      path.join(REPO_ROOT, NODE_VERSION_FILE),
-      "utf8",
-    ).trim();
+    expect(readDeclaredNodeMajor()).toBeGreaterThanOrEqual(MINIMUM_NODE_MAJOR);
+  });
 
-    expect(Number.parseInt(declared, 10)).toBeGreaterThanOrEqual(
-      MINIMUM_NODE_MAJOR,
-    );
+  // La fábrica recomienda correr dentro de este contenedor. Si su Node no es
+  // el de CI, un worker ahí se comporta distinto que CI, que es justo lo que
+  // costó una corrida entera en el PR #150.
+  it("el devcontainer usa la misma versión mayor de Node que .nvmrc", () => {
+    const source = readFileSync(DEVCONTAINER_PATH, "utf8");
+    const imageMajor = /typescript-node:(\d+)/.exec(source)?.[1];
+
+    expect(imageMajor).toBeDefined();
+    expect(Number(imageMajor)).toBe(readDeclaredNodeMajor());
   });
 
   // Sin esto, un cambio en cómo se leen los workflows que no encontrara
