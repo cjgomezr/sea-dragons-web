@@ -14,8 +14,15 @@ const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
 const MEMBER_ID = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 const SESSION_COOKIE_NAME = "sb-seadragons-auth-token";
 
-const profileWrites: CompletedValues[] = [];
-const statusWrites: string[] = [];
+type ProfileWrite = {
+  readonly memberId: string;
+  readonly values: CompletedValues;
+};
+
+const profileWrites: ProfileWrite[] = [];
+/** Los miembros que quedaron activados. Se guarda el id, no sólo que hubo
+ * escritura: lo que hay que fijar es SOBRE QUÉ fila escribe el endpoint. */
+const activations: string[] = [];
 
 type WiringOptions = {
   readonly callerId?: string | null;
@@ -54,17 +61,14 @@ function mockWiring(options: WiringOptions = {}): void {
                 findByUserId: async () =>
                   record === null ? null : { ...record, profile },
                 updateProfile: async (
-                  _memberId: string,
+                  memberId: string,
                   values: CompletedValues,
                 ) => {
-                  profileWrites.push(values);
+                  profileWrites.push({ memberId, values });
                   Object.assign(profile, values);
                 },
-                updateAccountStatus: async (
-                  _memberId: string,
-                  status: string,
-                ) => {
-                  statusWrites.push(status);
+                activateMember: async (memberId: string) => {
+                  activations.push(memberId);
                 },
               },
               identities: {
@@ -112,7 +116,7 @@ async function patchAccount(body: unknown): Promise<Response> {
 
 beforeEach(() => {
   profileWrites.length = 0;
-  statusWrites.length = 0;
+  activations.length = 0;
   vi.resetModules();
 });
 
@@ -203,8 +207,10 @@ describe("guardar lo que falta", () => {
     await expect(response.json()).resolves.toEqual({
       data: { accountStatus: "active", pending: [] },
     });
-    expect(profileWrites).toEqual([{ membershipType: "Student" }]);
-    expect(statusWrites).toEqual(["active"]);
+    expect(profileWrites).toEqual([
+      { memberId: MEMBER_ID, values: { membershipType: "Student" } },
+    ]);
+    expect(activations).toEqual([MEMBER_ID]);
   });
 
   it("responde 422 nombrando el campo cuando el valor no vale", async () => {
@@ -251,14 +257,26 @@ describe("guardar lo que falta", () => {
     expect(profileWrites).toEqual([]);
   });
 
-  it("no se fía del id que venga en el cuerpo: escribe sobre la cuenta de quien pide", async () => {
+  // AC-039: nadie mueve la fila de otra persona, ni su propio estado de
+  // cuenta, mandándolo en el cuerpo. Lo que se fija aquí es la fila SOBRE LA
+  // QUE se escribe, no sólo los valores: con el id del cuerpo, el endpoint
+  // habría escrito igual de bien unos valores correctos en la cuenta ajena.
+  it("no se fía de ningún id del cuerpo: escribe sobre la cuenta de quien pide", async () => {
     mockWiring();
+    const OTHER_ID = "00000000-0000-4000-8000-000000000000";
 
     await patchAccount({
       membershipType: "Student",
-      userId: "00000000-0000-4000-8000-000000000000",
+      userId: OTHER_ID,
+      memberId: OTHER_ID,
+      id: OTHER_ID,
+      accountStatus: "active",
+      role: "Admin",
     });
 
-    expect(profileWrites).toEqual([{ membershipType: "Student" }]);
+    expect(profileWrites).toEqual([
+      { memberId: MEMBER_ID, values: { membershipType: "Student" } },
+    ]);
+    expect(activations).toEqual([MEMBER_ID]);
   });
 });

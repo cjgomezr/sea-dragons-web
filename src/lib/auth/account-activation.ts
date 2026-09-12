@@ -40,7 +40,13 @@ export type MemberAccountRecord = {
 
 export type MemberAccountStore = {
   findByUserId(userId: string): Promise<MemberAccountRecord | null>;
-  updateAccountStatus(memberId: string, status: AccountStatus): Promise<void>;
+  /** Pasa la cuenta a `active`. No recibe el estado como parámetro porque
+   * ninguna transición de esta épica escribe otro: `inactive` es la baja de
+   * socio (FR-085, E5) y llegará con su propio método y sus propias reglas.
+   * Con el estado abierto, el adaptador no podía exigir que la fila siguiera
+   * `incomplete`, y una baja que ocurriera a mitad de esta operación se
+   * revivía sola. */
+  activateMember(memberId: string): Promise<void>;
 };
 
 export type IdentityConfirmationReader = {
@@ -172,6 +178,6 @@ export async function activateAccountIfComplete(
     return { kind: "unchanged", status };
   }
 
-  await gateways.accounts.updateAccountStatus(record.memberId, "active");
+  await gateways.accounts.activateMember(record.memberId);
   return { kind: "activated" };
 }

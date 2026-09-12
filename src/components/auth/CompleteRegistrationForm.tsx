@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { SignOutButton } from "@/components/auth/SignOutButton";
-import type { PendingRequirement } from "@/lib/auth/account-activation";
+import {
+  PENDING_REQUIREMENTS,
+  type PendingRequirement,
+} from "@/lib/auth/account-activation";
 import {
   COMPLETION_FIELDS,
   type CompletionField,
@@ -19,6 +22,7 @@ import {
   DASHBOARD_PATH,
 } from "@/lib/auth/routes";
 import type { CountryOption } from "@/lib/geo/countries";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 /**
@@ -48,12 +52,9 @@ type Status =
   | { readonly kind: "saving" }
   | { readonly kind: "failed"; readonly message: string };
 
-/** Lee un texto en una ruta de un JSON que llega como unknown, sin confiar en
- * su forma: la respuesta viene de la red y podría ser cualquier cosa. */
-function readStringAt(
-  payload: unknown,
-  path: readonly string[],
-): string | null {
+/** Lee lo que haya en una ruta de un JSON que llega como unknown, sin confiar
+ * en su forma: la respuesta viene de la red y podría ser cualquier cosa. */
+function readValueAt(payload: unknown, path: readonly string[]): unknown {
   let current: unknown = payload;
   for (const key of path) {
     if (typeof current !== "object" || current === null || !(key in current)) {
@@ -61,28 +62,34 @@ function readStringAt(
     }
     current = (current as Record<string, unknown>)[key];
   }
-  return typeof current === "string" ? current : null;
+  return current;
 }
 
-/** La lista de pendientes que devuelve el servidor, estrechada a los valores
- * que esta pantalla sabe dibujar. Lo que no reconoce se descarta en vez de
- * romper la pantalla. */
+function readStringAt(
+  payload: unknown,
+  path: readonly string[],
+): string | null {
+  const value = readValueAt(payload, path);
+  return typeof value === "string" ? value : null;
+}
+
+/** La lista de pendientes que devuelve el servidor, estrechada contra la lista
+ * del dominio. Se compara contra `PENDING_REQUIREMENTS` y no contra una copia
+ * local: con una copia, el pendiente que se añadiera mañana (el consentimiento
+ * del tutor va a crecer) llegaría del servidor y la pantalla lo descartaría en
+ * silencio, dejando a alguien mirando una pantalla sin nada que hacer. */
 function readPending(payload: unknown): readonly PendingRequirement[] {
-  const data = (payload as { data?: { pending?: unknown } } | null)?.data;
-  if (!Array.isArray(data?.pending)) {
+  const value = readValueAt(payload, ["data", "pending"]);
+  if (!Array.isArray(value)) {
     return [];
   }
-  return data.pending.filter(
-    (item): item is PendingRequirement =>
-      typeof item === "string" && KNOWN_REQUIREMENTS.includes(item),
-  );
+  return value.flatMap((item) => {
+    const known = PENDING_REQUIREMENTS.find(
+      (requirement) => requirement === item,
+    );
+    return known === undefined ? [] : [known];
+  });
 }
-
-const KNOWN_REQUIREMENTS: readonly string[] = [
-  ...COMPLETION_FIELDS,
-  "guardianConsent",
-  "emailConfirmation",
-];
 
 type SaveResult =
   | { readonly kind: "completed" }
@@ -323,6 +330,24 @@ export function CompleteRegistrationForm({
     // Sin esto el servidor volvería a servir desde su caché de router lo que
     // renderizó cuando la cuenta todavía estaba incompleta.
     router.refresh();
+  }
+
+  // La frontera manda aquí todo lo que pida una cuenta incompleta, así que
+  // esta pantalla nunca puede quedarse sin nada que ofrecer. Sin esta rama, un
+  // `pending` vacío dejaba un título, un texto que miente y ninguna salida.
+  if (requirements.length === 0) {
+    return (
+      <section className="auth-form" aria-labelledby="completar-titulo">
+        <h1 id="completar-titulo">Ya no te falta nada</h1>
+        <p className="auth-lead">
+          Tu cuenta está completa. Entra al panel para empezar.
+        </p>
+        <Link className="auth-submit auth-submit-link" href={DASHBOARD_PATH}>
+          Ir al panel
+        </Link>
+        <SignOutButton appearance="text" />
+      </section>
+    );
   }
 
   return (

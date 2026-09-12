@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { CompleteRegistrationForm } from "@/components/auth/CompleteRegistrationForm";
-import { describeAccountCompletion } from "@/lib/auth/complete-registration";
-import { SIGN_IN_PATH } from "@/lib/auth/routes";
+import { MemberNotFoundError } from "@/lib/auth/account-activation";
+import {
+  type AccountCompletion,
+  describeAccountCompletion,
+} from "@/lib/auth/complete-registration";
+import { DASHBOARD_PATH, SIGN_IN_PATH } from "@/lib/auth/routes";
 import { readAuthenticatedCaller } from "@/lib/auth/session-reader";
 import {
   createSupabaseAuthGateways,
@@ -45,17 +49,35 @@ export default async function CompleteRegistrationPage(): Promise<React.JSX.Elem
     throw new Error(describeMissingAuthKeys(wiring.missingKeys));
   }
 
-  const { pending } = await describeAccountCompletion(
-    {
-      accounts: wiring.gateways.accounts,
-      identities: wiring.gateways.identities,
-    },
-    { userId: caller.userId, now: new Date() },
-  );
+  let completion: AccountCompletion;
+  try {
+    completion = await describeAccountCompletion(
+      {
+        accounts: wiring.gateways.accounts,
+        identities: wiring.gateways.identities,
+      },
+      { userId: caller.userId, now: new Date() },
+    );
+  } catch (error) {
+    // Una identidad sin fila de socio no es un fallo del servidor: es alguien
+    // a quien esta aplicación no puede servir, y la entrada es el sitio desde
+    // donde volver. La frontera ya lo trata igual; aquí sólo se llega en una
+    // carrera con ella.
+    if (error instanceof MemberNotFoundError) {
+      redirect(SIGN_IN_PATH);
+    }
+    throw error;
+  }
+
+  // Consultar la cuenta la reconcilia, así que puede volver ya activa. Quien
+  // no tiene nada que completar no se queda mirando esta pantalla.
+  if (completion.accountStatus !== "incomplete") {
+    redirect(DASHBOARD_PATH);
+  }
 
   return (
     <CompleteRegistrationForm
-      pending={pending}
+      pending={completion.pending}
       countries={listCountryOptions(PAGE_LOCALE)}
       email={caller.email}
     />

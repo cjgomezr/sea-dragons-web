@@ -669,6 +669,16 @@ h6 {
   opacity: 0.6;
 }
 
+/* El mismo aspecto que .auth-submit para un enlace, que es lo que "Ir al
+   panel" tiene que ser: navega, no envía nada. Un <button> que navega deja al
+   teclado y al lector de pantalla sin saber que van a cambiar de página. */
+.auth-submit-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 /* Cerrar sesión en una pantalla sin cáscara. Va en texto y discreto: es una
    salida, no lo que se espera que la persona haga aquí. */
 .auth-signout {

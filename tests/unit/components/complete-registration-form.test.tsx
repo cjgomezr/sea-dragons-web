@@ -5,6 +5,16 @@ import { CompleteRegistrationForm } from "@/components/auth/CompleteRegistration
 import type { PendingRequirement } from "@/lib/auth/account-activation";
 import { ACCOUNT_API_PATH, DASHBOARD_PATH } from "@/lib/auth/routes";
 
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    children,
+  }: {
+    href: string;
+    children: React.ReactNode;
+  }) => <a href={href}>{children}</a>,
+}));
+
 /**
  * La pantalla que ve una cuenta `incomplete`. Lo que este test vigila sobre
  * todo es que pida SÓLO lo que falta: un formulario que vuelva a pedir el
@@ -116,6 +126,17 @@ describe("completar registro: pide solo lo que falta", () => {
     ).toBeInTheDocument();
   });
 
+  // La frontera manda aquí todo lo que pida una cuenta incompleta, así que la
+  // pantalla nunca puede quedarse sin nada que ofrecer.
+  it("no deja un callejón sin salida cuando no queda nada pendiente", () => {
+    renderForm([]);
+
+    expect(
+      screen.getByRole("link", { name: "Ir al panel" }),
+    ).toHaveAttribute("href", DASHBOARD_PATH);
+    expect(saveButton).toThrow();
+  });
+
   it("ofrece cerrar sesión, que es la otra única cosa que esta cuenta puede hacer", () => {
     renderForm(["membershipType"]);
 
@@ -168,6 +189,30 @@ describe("completar registro: guardar", () => {
       expect(replace).toHaveBeenCalledWith(DASHBOARD_PATH);
     });
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("descarta un pendiente que no reconoce en vez de romper la pantalla", async () => {
+    stubApi({
+      status: 200,
+      body: {
+        data: {
+          accountStatus: "incomplete",
+          pending: ["emailConfirmation", "loQueSea"],
+        },
+      },
+    });
+    renderForm(["membershipType"]);
+    const user = userEvent.setup();
+
+    await user.selectOptions(
+      screen.getByLabelText("Tipo de membresía"),
+      "Full",
+    );
+    await user.click(saveButton());
+
+    expect(
+      await screen.findByRole("button", { name: "Reenviar el correo" }),
+    ).toBeInTheDocument();
   });
 
   it("se queda pidiendo lo que el servidor dice que sigue faltando", async () => {

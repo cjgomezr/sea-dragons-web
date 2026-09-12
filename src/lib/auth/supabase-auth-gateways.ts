@@ -301,14 +301,18 @@ function createMemberAccountStore(
       }
     },
 
-    async updateAccountStatus(memberId, status) {
+    async activateMember(memberId) {
       const { error } = await serviceClient
         .from(MEMBERS_TABLE)
-        .update({ account_status: status })
-        .eq("id", memberId);
+        .update({ account_status: "active" })
+        .eq("id", memberId)
+        // La condición sobre el estado no sobra. Entre leer la fila y escribir
+        // este `update` cabe una baja de socio (FR-085, E5), y sin ella la
+        // baja se revive sola: sólo se activa lo que todavía está a medias.
+        .eq("account_status", "incomplete");
       if (error) {
         throw new Error(
-          `No se pudo cambiar el estado del miembro ${memberId} a ${status}: ${error.message}`,
+          `No se pudo activar el miembro ${memberId}: ${error.message}`,
         );
       }
     },

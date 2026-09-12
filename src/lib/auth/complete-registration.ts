@@ -212,6 +212,42 @@ async function findIncompleteAccount(
   return record;
 }
 
+/**
+ * Recalcula los pendientes de una cuenta `incomplete` y la activa si ya no
+ * falta ninguno. Es el ÚNICO sitio de este módulo que escribe el paso a
+ * `active`: lo comparten guardar un dato y consultar la cuenta.
+ *
+ * Que también lo haga la consulta no es un capricho. Guardar son dos
+ * escrituras en dos llamadas (el perfil y el estado), así que un corte entre
+ * las dos deja el perfil completo y el estado en `incomplete`: una cuenta a la
+ * que no le falta nada, a la que la frontera sigue devolviendo a esta pantalla
+ * y que ya no tiene ningún dato que mandar para desatascarse. Reconciliar al
+ * consultar la desatasca sola la próxima vez que abra la pantalla, que es
+ * justo donde la frontera la manda. Lo mismo valdrá el día que el
+ * consentimiento del tutor (FR-082) lo registre otra persona desde fuera.
+ */
+async function settleAccount(
+  gateways: AccountCompletionGateways,
+  input: {
+    readonly userId: string;
+    readonly memberId: string;
+    readonly profile: MemberProfile;
+    readonly now: Date;
+  },
+): Promise<AccountCompletion> {
+  const pending = listPendingRequirements({
+    profile: input.profile,
+    emailConfirmed: await gateways.identities.isEmailConfirmed(input.userId),
+    now: input.now,
+  });
+  if (pending.length > 0) {
+    return { accountStatus: "incomplete", pending };
+  }
+
+  await gateways.accounts.activateMember(input.memberId);
+  return { accountStatus: "active", pending: [] };
+}
+
 /** Qué le falta a la cuenta de quien pregunta. Lo consulta la pantalla de
  * completar registro para pedir sólo eso, y no lo que ya dio. */
 export async function describeAccountCompletion(
@@ -225,14 +261,12 @@ export async function describeAccountCompletion(
   if (record.accountStatus !== "incomplete") {
     return { accountStatus: record.accountStatus, pending: [] };
   }
-  return {
-    accountStatus: "incomplete",
-    pending: listPendingRequirements({
-      profile: record.profile,
-      emailConfirmed: await gateways.identities.isEmailConfirmed(input.userId),
-      now: input.now,
-    }),
-  };
+  return settleAccount(gateways, {
+    userId: input.userId,
+    memberId: record.memberId,
+    profile: record.profile,
+    now: input.now,
+  });
 }
 
 /**
@@ -271,15 +305,10 @@ export async function completeRegistration(
 
   await gateways.accounts.updateProfile(record.memberId, validation.values);
 
-  const pending = listPendingRequirements({
+  return settleAccount(gateways, {
+    userId: input.userId,
+    memberId: record.memberId,
     profile: { ...record.profile, ...validation.values },
-    emailConfirmed: await gateways.identities.isEmailConfirmed(input.userId),
     now: input.now,
   });
-  if (pending.length > 0) {
-    return { accountStatus: "incomplete", pending };
-  }
-
-  await gateways.accounts.updateAccountStatus(record.memberId, "active");
-  return { accountStatus: "active", pending: [] };
 }

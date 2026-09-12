@@ -5,7 +5,6 @@ import {
   MemberNotFoundError,
   type MemberProfile,
 } from "@/lib/auth/account-activation";
-import type { AccountStatus } from "@/lib/auth/account-status";
 import {
   AccountAlreadyResolvedError,
   type AccountCompletionGateways,
@@ -34,7 +33,8 @@ const FULL_PROFILE: MemberProfile = {
 type Store = {
   readonly gateways: AccountCompletionGateways;
   readonly writes: CompletedValues[];
-  readonly statuses: AccountStatus[];
+  /** Los miembros que quedaron activados, en orden. */
+  readonly activations: string[];
   profile: MemberProfile;
 };
 
@@ -43,22 +43,22 @@ function storeWith(options: {
   readonly emailConfirmed?: boolean;
 }): Store {
   const writes: CompletedValues[] = [];
-  const statuses: AccountStatus[] = [];
+  const activations: string[] = [];
   const identities: IdentityConfirmationReader = {
     isEmailConfirmed: async () => options.emailConfirmed ?? true,
   };
   const store: Store = {
     profile: options.record?.profile ?? FULL_PROFILE,
     writes,
-    statuses,
+    activations,
     gateways: {
       accounts: {
         findByUserId: async () =>
           options.record === null
             ? null
             : { ...options.record, profile: store.profile },
-        updateAccountStatus: async (_memberId, status) => {
-          statuses.push(status);
+        activateMember: async (memberId) => {
+          activations.push(memberId);
         },
         updateProfile: async (_memberId, values) => {
           writes.push(values);
@@ -122,6 +122,35 @@ describe("completar registro: pide sólo lo que falta", () => {
     ).resolves.toEqual({ accountStatus: "active", pending: [] });
   });
 
+  it("no activa nada mientras siga faltando algo", async () => {
+    const store = storeWith({ record: incompleteRecord({ country: null }) });
+
+    await describeAccountCompletion(store.gateways, {
+      userId: USER_ID,
+      now: NOW,
+    });
+
+    expect(store.activations).toEqual([]);
+  });
+
+  /** El estado que deja un corte entre las dos escrituras de guardar: el
+   * perfil completo y la cuenta todavía `incomplete`. Sin reconciliar aquí, la
+   * frontera la devolvería a esta pantalla para siempre y no le quedaría
+   * ningún dato que mandar para salir. */
+  it("activa sola la cuenta a la que ya no le falta nada pero quedó incompleta", async () => {
+    const store = storeWith({ record: incompleteRecord({}) });
+
+    const completion = await describeAccountCompletion(store.gateways, {
+      userId: USER_ID,
+      now: NOW,
+    });
+
+    expect(completion).toEqual({ accountStatus: "active", pending: [] });
+    expect(store.activations).toEqual([MEMBER_ID]);
+    // Reconciliar no es escribir el perfil: sólo mira si ya está completo.
+    expect(store.writes).toEqual([]);
+  });
+
   it("falla con un error propio cuando la identidad no tiene fila de miembro", async () => {
     const store = storeWith({ record: null });
 
@@ -142,7 +171,7 @@ describe("completar registro: guardar", () => {
     });
 
     expect(store.writes).toEqual([{ country: "AU" }]);
-    expect(store.statuses).toEqual(["active"]);
+    expect(store.activations).toEqual([MEMBER_ID]);
     expect(completion).toEqual({ accountStatus: "active", pending: [] });
   });
 
@@ -157,7 +186,7 @@ describe("completar registro: guardar", () => {
       now: NOW,
     });
 
-    expect(store.statuses).toEqual([]);
+    expect(store.activations).toEqual([]);
     expect(completion).toEqual({
       accountStatus: "incomplete",
       pending: ["membershipType"],
@@ -176,7 +205,7 @@ describe("completar registro: guardar", () => {
       now: NOW,
     });
 
-    expect(store.statuses).toEqual([]);
+    expect(store.activations).toEqual([]);
     expect(completion.pending).toEqual(["emailConfirmation"]);
   });
 
@@ -191,7 +220,7 @@ describe("completar registro: guardar", () => {
       now: NOW,
     });
 
-    expect(store.statuses).toEqual([]);
+    expect(store.activations).toEqual([]);
     expect(completion.pending).toEqual(["guardianConsent"]);
   });
 
@@ -338,7 +367,7 @@ describe("completar registro: cuentas que no se completan", () => {
     }).catch(() => undefined);
 
     expect(store.writes).toEqual([]);
-    expect(store.statuses).toEqual([]);
+    expect(store.activations).toEqual([]);
   });
 
   it("no deja completar una identidad sin fila de miembro", async () => {
