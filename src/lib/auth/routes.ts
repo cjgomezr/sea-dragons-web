@@ -37,7 +37,12 @@ export const DASHBOARD_PATH = "/dashboard";
 
 /** El destino del enlace del correo de confirmación (#132). No es una
  * pantalla del PRD: canjea el token y redirige. Es público por definición,
- * porque quien abre ese enlace todavía no puede iniciar sesión. */
+ * porque quien abre ese enlace todavía no puede iniciar sesión.
+ *
+ * Va en la lista de pantallas a sabiendas de que esa lista abre también lo que
+ * cuelga de la ruta. Hoy no cuelga nada, y `/auth` a secas sigue protegida. Si
+ * alguna vez nace algo bajo este camino, nacerá público sin que nadie lo
+ * decida, y ahí toca compararlo por igualdad en vez de por prefijo. */
 export const EMAIL_CONFIRMATION_PATH = "/auth/confirmar";
 
 export const PUBLIC_PAGE_PATHS: readonly string[] = [
@@ -55,14 +60,6 @@ export const HEALTH_API_PATH = "/api/v1/health";
  * dejaría la aplicación sin puerta de entrada. */
 export const SESSION_API_PATH = "/api/v1/auth/session";
 
-/**
- * Los únicos endpoints de la API que no exigen sesión.
- *
- * La lista es explícita y no un prefijo de `/api/v1/auth/`: un endpoint nuevo
- * nace protegido, y si de verdad tiene que ser público hay que escribirlo
- * aquí. El fallo de olvidarse es un 401 que se ve en cuanto se prueba; el de
- * un prefijo abierto es un endpoint público que nadie nota.
- */
 /** Con el que se crea la cuenta (#132). Exigirle sesión deja al club sin
  * forma de dar de alta a nadie: hay que tener cuenta para poder crearse una. */
 export const REGISTER_API_PATH = "/api/v1/auth/register";
@@ -71,6 +68,14 @@ export const REGISTER_API_PATH = "/api/v1/auth/register";
  * exactamente quien todavía no puede tener sesión. */
 export const CONFIRMATION_EMAIL_API_PATH = "/api/v1/auth/confirmation-email";
 
+/**
+ * Los únicos endpoints de la API que no exigen sesión.
+ *
+ * La lista es explícita y no un prefijo de `/api/v1/auth/`: un endpoint nuevo
+ * nace protegido, y si de verdad tiene que ser público hay que escribirlo
+ * aquí. El fallo de olvidarse es un 401 que se ve en cuanto se prueba; el de
+ * un prefijo abierto es un endpoint público que nadie nota.
+ */
 export const PUBLIC_API_PATHS: readonly string[] = [
   HEALTH_API_PATH,
   SESSION_API_PATH,

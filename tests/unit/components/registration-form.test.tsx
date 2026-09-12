@@ -2,6 +2,10 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RegistrationForm } from "@/components/auth/RegistrationForm";
+import {
+  CONFIRMATION_EMAIL_API_PATH,
+  REGISTER_API_PATH,
+} from "@/lib/auth/routes";
 import { listCountryOptions } from "@/lib/geo/countries";
 
 // Las mismas opciones que calcula la página en el servidor: el componente ya
@@ -101,7 +105,7 @@ describe("formulario de registro", () => {
     await userEvent.setup().click(submitButton());
 
     await waitFor(() => expect(calls).toHaveLength(1));
-    expect(calls[0]?.url).toBe("/api/v1/auth/register");
+    expect(calls[0]?.url).toBe(REGISTER_API_PATH);
     expect(calls[0]?.body).toEqual({
       fullName: "Nerea Silva",
       email: "nerea@example.test",
@@ -226,7 +230,7 @@ describe("formulario de registro", () => {
 
     await waitFor(() => expect(calls).toHaveLength(2));
     expect(calls[1]).toEqual({
-      url: "/api/v1/auth/confirmation-email",
+      url: CONFIRMATION_EMAIL_API_PATH,
       body: { email: "nerea@example.test" },
     });
   });

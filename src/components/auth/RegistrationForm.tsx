@@ -9,10 +9,11 @@ import {
   type RegistrationRequest,
   validateRegistration,
 } from "@/lib/auth/registration";
+import {
+  CONFIRMATION_EMAIL_API_PATH,
+  REGISTER_API_PATH,
+} from "@/lib/auth/routes";
 import type { CountryOption } from "@/lib/geo/countries";
-
-const REGISTER_ENDPOINT = "/api/v1/auth/register";
-const CONFIRMATION_EMAIL_ENDPOINT = "/api/v1/auth/confirmation-email";
 
 const NETWORK_ERROR_MESSAGE =
   "No pudimos hablar con el servidor. Revisa tu conexión y vuelve a intentarlo.";
@@ -72,7 +73,7 @@ async function submitRegistration(
 ): Promise<SubmissionStatus> {
   let response: Response;
   try {
-    response = await postJson(REGISTER_ENDPOINT, request);
+    response = await postJson(REGISTER_API_PATH, request);
   } catch {
     // El detalle técnico no le sirve a nadie que esté mirando un formulario, y
     // puede nombrar hosts internos.
@@ -105,7 +106,7 @@ function ConfirmationPending({ email }: { email: string }): React.JSX.Element {
   async function handleResend(): Promise<void> {
     setResend({ kind: "sending" });
     try {
-      const response = await postJson(CONFIRMATION_EMAIL_ENDPOINT, { email });
+      const response = await postJson(CONFIRMATION_EMAIL_API_PATH, { email });
       setResend(
         response.ok
           ? { kind: "sent" }
