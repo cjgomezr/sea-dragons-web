@@ -90,6 +90,8 @@ export class AccountAlreadyResolvedError extends Error {
   }
 }
 
+const REJECTED_VALUES_MESSAGE = "Hay datos que no se pueden guardar.";
+
 const NOTHING_TO_SAVE_MESSAGE =
   "No enviaste ningún dato que guardar. Rellena al menos uno de los que faltan.";
 
@@ -107,14 +109,10 @@ type FieldOutcome<T> =
 
 function takeField<T>(
   supplied: string | undefined,
-  current: string | null,
   validate: (value: string) => FieldValidation<T>,
 ): FieldOutcome<T> {
   if (supplied === undefined) {
     return { kind: "absent" };
-  }
-  if (current !== null) {
-    return { kind: "rejected", message: ALREADY_SET_MESSAGE };
   }
   const validation = validate(supplied);
   return validation.ok
@@ -131,34 +129,30 @@ function issuesOf(
     : [];
 }
 
-type CompletionValidation =
+export type CompletionValidation =
   | { readonly ok: true; readonly values: CompletedValues }
   | { readonly ok: false; readonly issues: readonly RegistrationIssue[] };
 
 /**
- * Valida lo que llega contra los mismos criterios que el registro, porque es
- * la misma regla: un país que no es un código ISO no lo es más por llegar por
- * esta puerta. Devuelve TODOS los campos malos, no el primero.
+ * Valida y normaliza lo que llega, con los mismos criterios que el registro:
+ * un país que no es un código ISO no lo es más por llegar por esta puerta.
+ * Devuelve TODOS los campos malos, no el primero.
+ *
+ * Es pura y la usan los dos lados: el servidor antes de escribir, y el
+ * formulario antes de mandar, para no obligar a un viaje por una fecha mal
+ * escrita. Una segunda copia en el navegador acabaría siendo otra regla.
  */
-function validateCompletion(input: {
+export function validateCompletionValues(input: {
   readonly values: CompletionValues;
-  readonly profile: MemberProfile;
   readonly now: Date;
 }): CompletionValidation {
-  const { values, profile, now } = input;
-  const country = takeField(
-    values.country,
-    profile.country,
-    validateCountryField,
-  );
-  const dateOfBirth = takeField(
-    values.dateOfBirth,
-    profile.dateOfBirth,
-    (value) => validateDateOfBirthField(value, now),
+  const { values, now } = input;
+  const country = takeField(values.country, validateCountryField);
+  const dateOfBirth = takeField(values.dateOfBirth, (value) =>
+    validateDateOfBirthField(value, now),
   );
   const membershipType = takeField(
     values.membershipType,
-    profile.membershipType,
     validateMembershipTypeField,
   );
 
@@ -183,6 +177,22 @@ function validateCompletion(input: {
         : {}),
     },
   };
+}
+
+/**
+ * Los campos que llegan y la fila ya tiene. Es una comprobación del servidor y
+ * no del formato: quien pide no puede cambiar lo que ya dio por esta puerta,
+ * la tenga bien escrita o mal.
+ */
+function issuesForAlreadySetFields(
+  values: CompletionValues,
+  profile: MemberProfile,
+): readonly RegistrationIssue[] {
+  return COMPLETION_FIELDS.flatMap((field) =>
+    values[field] !== undefined && profile[field] !== null
+      ? [{ field, message: ALREADY_SET_MESSAGE }]
+      : [],
+  );
 }
 
 /** La fila de la cuenta que se va a completar, o el error de por qué no se
@@ -240,14 +250,18 @@ export async function completeRegistration(
 ): Promise<AccountCompletion> {
   const record = await findIncompleteAccount(gateways, input.userId);
 
-  const validation = validateCompletion({
+  const alreadySet = issuesForAlreadySetFields(input.values, record.profile);
+  if (alreadySet.length > 0) {
+    throw new CompletionValidationError(REJECTED_VALUES_MESSAGE, alreadySet);
+  }
+
+  const validation = validateCompletionValues({
     values: input.values,
-    profile: record.profile,
     now: input.now,
   });
   if (!validation.ok) {
     throw new CompletionValidationError(
-      "Hay datos que no se pueden guardar.",
+      REJECTED_VALUES_MESSAGE,
       validation.issues,
     );
   }

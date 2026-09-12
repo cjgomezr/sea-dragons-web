@@ -15,12 +15,23 @@ import { createAccountStatusGateway } from "./supabase-session-gateways";
  * y de que la puerta del registro a medias esté en el servidor.
  */
 
-/** La identidad de quien pide, o `null` si no hay ninguna sesión que valga.
- * Lo usan la frontera, para saber a quién mirarle el estado de la cuenta, y
- * los endpoints que actúan sobre la cuenta de quien llama. */
-export async function readAuthenticatedUserId(
+/** Quién pide, según su cookie de sesión. */
+export type AuthenticatedCaller = {
+  readonly userId: string;
+  readonly email: string;
+};
+
+/**
+ * La identidad de quien pide, o `null` si no hay ninguna sesión que valga.
+ *
+ * Una identidad sin correo también cuenta como ninguna. Toda cuenta de este
+ * proyecto nace de un registro con correo (FR-001), así que si Supabase
+ * devolviera una sin él no sería alguien a quien esta aplicación pueda servir,
+ * y se niega el paso en vez de inventarle una dirección vacía.
+ */
+export async function readAuthenticatedCaller(
   client: SupabaseClient,
-): Promise<string | null> {
+): Promise<AuthenticatedCaller | null> {
   const { data, error } = await client.auth.getUser();
   if (error) {
     // Sin cookie de sesión no hay nada que validar ni viaje que hacer: es el
@@ -33,7 +44,16 @@ export async function readAuthenticatedUserId(
     }
     return null;
   }
-  return data.user?.id ?? null;
+  const user = data.user;
+  return user?.email ? { userId: user.id, email: user.email } : null;
+}
+
+/** Sólo el id, que es lo único que necesitan la frontera y los endpoints que
+ * actúan sobre la cuenta de quien llama. */
+export async function readAuthenticatedUserId(
+  client: SupabaseClient,
+): Promise<string | null> {
+  return (await readAuthenticatedCaller(client))?.userId ?? null;
 }
 
 export async function readSessionState(
