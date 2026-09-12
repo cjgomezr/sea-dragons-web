@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SIGN_IN_PATH } from "@/lib/auth/routes";
+import { REGISTER_API_PATH, SIGN_IN_PATH } from "@/lib/auth/routes";
 
 const createSessionClient = vi.fn();
 const applySessionCookies = vi.fn();
@@ -95,6 +95,18 @@ describe("frontera de sesión: API", () => {
     expect(response.headers.get("location")).toBeNull();
     // El monitoreo lo pide cada 5 minutos: atarlo a la latencia de Supabase
     // sería hacer que el endpoint que vigila el servicio dependa del servicio.
+    expect(hasValidSession).not.toHaveBeenCalled();
+  });
+
+  it("deja público el endpoint con el que se crea la cuenta", async () => {
+    givenSupabaseConfigured(false);
+
+    const response = await proxy(requestFor(REGISTER_API_PATH));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+    // Preguntar por una sesión que por definición no existe es un viaje a
+    // Supabase por cada visita anónima al formulario.
     expect(hasValidSession).not.toHaveBeenCalled();
   });
 
