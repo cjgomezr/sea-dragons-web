@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONFIRMATION_EMAIL_API_PATH,
+  EMAIL_CONFIRMATION_PATH,
   PASSWORD_RECOVERY_PATH,
+  REGISTER_API_PATH,
   REGISTRATION_PATH,
   SIGN_IN_PATH,
 } from "@/lib/auth/routes";
@@ -78,6 +81,20 @@ describe("frontera de sesión", () => {
       pathname: "/api/v1/auth/session",
       ...WITHOUT_SESSION,
     });
+
+    expect(outcome).toEqual({ kind: "allow" });
+  });
+
+  // Los tres caminos que necesita quien todavía no tiene cuenta. Nacieron en
+  // #132, antes de que existiera esta frontera, así que la primera versión de
+  // la lista pública se olvidó de ellos y el registro respondía 401 en
+  // producción con el formulario dibujándose igual.
+  it.each([
+    [REGISTER_API_PATH, "crear la cuenta"],
+    [CONFIRMATION_EMAIL_API_PATH, "pedir otra vez el correo de confirmación"],
+    [EMAIL_CONFIRMATION_PATH, "canjear el enlace del correo"],
+  ])("deja pasar %s sin sesión, que es por donde se %s", (pathname) => {
+    const outcome = decideSessionBoundary({ pathname, ...WITHOUT_SESSION });
 
     expect(outcome).toEqual({ kind: "allow" });
   });
