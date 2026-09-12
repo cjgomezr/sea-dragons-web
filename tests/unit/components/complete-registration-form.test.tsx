@@ -116,6 +116,14 @@ describe("completar registro: pide solo lo que falta", () => {
     ).toBeInTheDocument();
   });
 
+  it("ofrece cerrar sesión, que es la otra única cosa que esta cuenta puede hacer", () => {
+    renderForm(["membershipType"]);
+
+    expect(
+      screen.getByRole("button", { name: "Cerrar sesión" }),
+    ).toBeInTheDocument();
+  });
+
   it("avisa del consentimiento del tutor sin pedírselo a la persona menor", () => {
     renderForm(["guardianConsent"]);
 

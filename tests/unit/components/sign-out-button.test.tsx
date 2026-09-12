@@ -77,4 +77,18 @@ describe("cierre de sesión", () => {
       expect(replace).toHaveBeenCalledWith(SIGN_IN_PATH);
     });
   });
+
+  it("en texto dice lo mismo que el icono, y hace lo mismo", async () => {
+    stubApi();
+    render(<SignOutButton appearance="text" />);
+
+    await userEvent.click(button());
+
+    await waitFor(() => {
+      expect(calls).toEqual([
+        { url: "/api/v1/auth/session", method: "DELETE" },
+      ]);
+    });
+    expect(replace).toHaveBeenCalledWith(SIGN_IN_PATH);
+  });
 });

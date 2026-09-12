@@ -217,6 +217,17 @@ pantalla de completar registro y el cierre de sesión hasta que no le falte nada
 - **Dado** una cuenta `active`, **cuando** entra, **entonces** llega al panel
   principal y no vuelve a ver la pantalla de completar registro.
 
+**Qué pantalla dice que falta confirmar el correo, precisado el 12 de septiembre
+de 2026 con el ticket 3.** Lo dice la de registro, no la de completar registro.
+Supabase no da sesión a una identidad sin confirmar, así que esa cuenta no llega
+a tener sesión y no puede abrir ninguna pantalla de dentro: el aviso y el botón
+de reenviar viven donde la persona está en ese momento, que es el registro
+recién enviado. La pantalla de completar registro sabe dibujar ese mismo aviso
+igualmente, porque la regla de "qué falta" es una sola y sí cuenta la
+confirmación; hoy sólo lo verá una cuenta que consiga sesión sin haber
+confirmado, que es lo que hará una cuenta creada por Google o Apple en Release
+2.
+
 ### RF-3 · Consentimiento del tutor para menores · Must
 
 Cubre FR-082 y NFR-012. Una fecha de nacimiento que indica menos de 18 años

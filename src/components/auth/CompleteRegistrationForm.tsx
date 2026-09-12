@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import type { PendingRequirement } from "@/lib/auth/account-activation";
 import {
   COMPLETION_FIELDS,
@@ -431,6 +432,11 @@ export function CompleteRegistrationForm({
       {requirements.includes("emailConfirmation") && (
         <EmailConfirmationNotice email={email} />
       )}
+
+      {/* La otra única cosa que esta cuenta puede hacer. Sin esto la pantalla
+          es un callejón sin salida: no hay cáscara ni menú desde donde salir,
+          y la frontera devuelve aquí todo lo demás que se pida. */}
+      <SignOutButton appearance="text" />
     </section>
   );
 }
