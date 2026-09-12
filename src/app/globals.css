@@ -256,6 +256,38 @@ h6 {
   border-color: var(--color-accent);
 }
 
+/* El tema y el cierre de sesión comparten la esquina de la cabecera, que es lo
+   único que se dibuja igual en las siete secciones y en los tres tamaños: es
+   el sitio desde el que "cerrar sesión desde cualquier pantalla" (FR-007) se
+   cumple sin repetir el control en cada una. */
+.app-sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app-signout {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--color-sidebar-text);
+  background: transparent;
+  border: 1px solid var(--color-sidebar-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.app-signout:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.app-signout:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .app-main {
   flex: 1;
   width: 100%;
@@ -570,6 +602,21 @@ h6 {
   margin: 0;
   font-size: 14px;
   color: var(--color-text-secondary);
+}
+
+.auth-form a {
+  color: var(--color-accent);
+}
+
+/* "¿Olvidaste tu contraseña?" va bajo el campo y alineado a su derecha, como
+   en el mockup. Con la altura mínima de toque no se convierte en un enlace que
+   hay que apuntar con el dedo. */
+.auth-inline-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-end;
+  min-height: var(--touch-target-min);
+  font-size: 14px;
 }
 
 .auth-back {

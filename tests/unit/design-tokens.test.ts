@@ -250,9 +250,6 @@ describe("contraste", () => {
     ).toBeGreaterThanOrEqual(4.5);
   });
 
-  // El botón primario es un relleno de acento con texto encima, y el acento
-  // cambia con el tema: el mismo blanco que pasa en claro se queda en 2.6:1
-  // sobre el acento oscuro.
   it.each(["light", "dark"] as const)(
     "el color de error cumple AA sobre el fondo y sobre el panel en tema %s",
     (theme) => {
@@ -266,6 +263,9 @@ describe("contraste", () => {
     },
   );
 
+  // El botón primario es un relleno de acento con texto encima, y el acento
+  // cambia con el tema: el mismo blanco que pasa en claro se queda en 2.6:1
+  // sobre el acento oscuro.
   it("texto sobre relleno de acento cumple AA en tema claro", () => {
     expect(
       contrastRatio(
