@@ -40,6 +40,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   E2E_STORAGE_STATE_PATH,
+  PHOTOGRAPHED_MEMBERS,
+  incompleteStorageStatePath,
   readE2eSessionState,
 } from "./support/e2e-session";
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
@@ -1030,4 +1032,175 @@ test("el formulario de registro no manda nada al servidor con la contraseña cor
     page.getByRole("alert").filter({ hasText: /caracteres/ }),
   ).toContainText("8");
   expect(calls).toBe(0);
+});
+
+/* ---------------------------------------------------------------------------
+   Completar registro (#133): la pantalla de una cuenta que todavía no puede
+   operar, y la puerta que la hace cumplir.
+
+   Cada estado es un socio distinto porque el estado vive en su fila: qué le
+   falta no se elige desde el navegador. Los arma el arranque global.
+   --------------------------------------------------------------------------- */
+
+const COMPLETE_REGISTRATION_PATH = "/completar-registro";
+
+for (const name of PHOTOGRAPHED_MEMBERS) {
+  test.describe(`completar-registro-${name}`, () => {
+    test.skip(
+      E2E_SESSION.kind === "unavailable",
+      E2E_SESSION.kind === "unavailable"
+        ? `sin sesión de prueba: ${E2E_SESSION.reason}`
+        : "",
+    );
+    test.use({ storageState: incompleteStorageStatePath(name) });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToWithTheme(page, COMPLETE_REGISTRATION_PATH, theme);
+            const snapshot = `completar-registro-${name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
+      const results = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa"])
+        .analyze();
+      expect(
+        results.violations,
+        JSON.stringify(results.violations, null, 2),
+      ).toEqual([]);
+    });
+
+    // ASS-004: 360px is the narrowest viewport the shell must support.
+    test("has no horizontal scroll at 360px (ASS-004 minimum)", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 360, height: 800 });
+      await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
+
+      const overflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      );
+      expect(overflow, "horizontal overflow at 360px").toBe(false);
+    });
+  });
+}
+
+test.describe("una cuenta incompleta en un navegador de verdad", () => {
+  test.skip(
+    E2E_SESSION.kind === "unavailable",
+    E2E_SESSION.kind === "unavailable"
+      ? `sin sesión de prueba: ${E2E_SESSION.reason}`
+      : "",
+  );
+  test.use({ storageState: incompleteStorageStatePath("un-dato") });
+
+  test("no llega a ninguna pantalla de la aplicación", async ({ page }) => {
+    await page.goto(`${APP_URL}/calendario`);
+
+    await expect(page).toHaveURL(
+      new RegExp(`${COMPLETE_REGISTRATION_PATH}$`),
+    );
+  });
+
+  test("responde 403 a la API directa, que es lo que la redirección esconde", async ({
+    request,
+  }) => {
+    const response = await request.get(`${APP_URL}/api/v1/evaluaciones`);
+
+    expect(response.status()).toBe(403);
+    expect(await response.json()).toMatchObject({
+      error: { code: "forbidden" },
+    });
+  });
+
+  test("pide sólo el dato que le falta, y ninguno de los que ya dio", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
+
+    await expect(page.getByLabel("Tipo de membresía")).toBeVisible();
+    await expect(page.getByLabel("País")).toHaveCount(0);
+    await expect(page.getByLabel("Fecha de nacimiento")).toHaveCount(0);
+    await expect(page.getByLabel("Nombre completo")).toHaveCount(0);
+  });
+
+});
+
+/** Los dos tests que dejan su cuenta distinta a como la encontraron. Cada uno
+ * usa un socio que no comparte con nadie: la suite corre en paralelo, y
+ * activar o cerrar la sesión de una cuenta que otro test está mirando sería un
+ * fallo intermitente sin dueño. */
+test.describe("una cuenta incompleta que cambia de estado", () => {
+  test.skip(
+    E2E_SESSION.kind === "unavailable",
+    E2E_SESSION.kind === "unavailable"
+      ? `sin sesión de prueba: ${E2E_SESSION.reason}`
+      : "",
+  );
+
+  test.describe("al guardar el último dato", () => {
+    test.use({ storageState: incompleteStorageStatePath("para-activar") });
+
+    test("entra al panel principal sin que nadie intervenga", async ({
+      page,
+    }) => {
+      await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
+
+      await page.getByLabel("Tipo de membresía").selectOption("Student");
+      await page.getByRole("button", { name: "Guardar y continuar" }).click();
+
+      await expect(page).toHaveURL(new RegExp("/dashboard$"));
+      // Y ya no vuelve a ver la pantalla, ni pidiéndola a mano.
+      await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
+      await expect(page).toHaveURL(new RegExp("/dashboard$"));
+    });
+  });
+
+  test.describe("al cerrar sesión", () => {
+    test.use({
+      storageState: incompleteStorageStatePath("para-cerrar-sesion"),
+    });
+
+    test("la frontera la deja pasar, que es su otra salida", async ({
+      request,
+    }) => {
+      const response = await request.delete(`${APP_URL}${SESSION_ENDPOINT}`);
+
+      expect(response.status()).toBe(200);
+    });
+  });
+});
+
+test.describe("una cuenta activa que pide completar registro", () => {
+  test.skip(
+    E2E_SESSION.kind === "unavailable",
+    E2E_SESSION.kind === "unavailable"
+      ? `sin sesión de prueba: ${E2E_SESSION.reason}`
+      : "",
+  );
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("aterriza en el panel principal", async ({ page }) => {
+    await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
+
+    await expect(page).toHaveURL(new RegExp("/dashboard$"));
+  });
 });

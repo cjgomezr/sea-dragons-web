@@ -9,12 +9,18 @@ import {
 import path from "node:path";
 import { findMissingSupabaseKeys } from "@/lib/supabase/config";
 import { assertTestSupabaseEnvironment } from "@/lib/supabase/environment-guard";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { createSessionClient } from "@/lib/supabase/session-client";
 import { loadLocalEnvFile } from "./load-local-env";
 
 /**
- * El socio de prueba con el que Playwright entra a la aplicación.
+ * Los socios de prueba con los que Playwright entra a la aplicación.
+ *
+ * Son varios porque lo que cada uno puede ver depende del estado de SU fila:
+ * el activo llega a la aplicación entera, y los que están a medias sólo a
+ * completar registro. Ese estado no se cambia desde el navegador, así que la
+ * suite abre una cuenta por pantalla que necesita fotografiar.
  *
  * Desde este ticket la cáscara con menú está detrás de la frontera de sesión,
  * así que un navegador sin sesión ya no la ve: aterriza en la pantalla de
@@ -53,6 +59,59 @@ export const E2E_STORAGE_STATE_PATH = path.join(
   "e2e-storage-state.json",
 );
 
+/**
+ * Los socios a medias que necesita la suite (#133). Cada uno existe para un
+ * caso concreto, y son cuentas distintas porque el estado vive en la fila: qué
+ * le falta a una cuenta no se elige desde el navegador.
+ *
+ * Los que un test MODIFICA van aparte de los que se fotografían. La suite
+ * corre en paralelo, así que un test que activa la cuenta que otro está
+ * fotografiando produciría una regresión visual que no es de nadie.
+ *
+ * Todos nacen con el correo ya confirmado. Sin confirmar no habría nada que
+ * fotografiar: Supabase no da sesión a una identidad sin confirmar, así que
+ * esa cuenta ni siquiera llega a la pantalla.
+ */
+const FALTA_LA_MEMBRESIA = {
+  country: "AU",
+  date_of_birth: "1994-03-02",
+  membership_type: null,
+} as const;
+
+export const INCOMPLETE_MEMBERS = {
+  "un-dato": FALTA_LA_MEMBRESIA,
+  "varios-datos": {
+    country: null,
+    date_of_birth: null,
+    membership_type: null,
+  },
+  /** Lo activa el test que guarda el último dato. */
+  "para-activar": FALTA_LA_MEMBRESIA,
+  /** Cierra su propia sesión, que es justo lo que lo inutiliza para todo lo
+   * demás. Por eso no lo comparte con nadie. */
+  "para-cerrar-sesion": FALTA_LA_MEMBRESIA,
+} as const;
+
+export type IncompleteMemberName = keyof typeof INCOMPLETE_MEMBERS;
+
+export const INCOMPLETE_MEMBER_NAMES = Object.keys(
+  INCOMPLETE_MEMBERS,
+) as readonly IncompleteMemberName[];
+
+/** Los estados de la pantalla que tienen línea base visual: uno con un solo
+ * dato pendiente y otro con varios. Los demás socios existen para tests que
+ * los modifican, y una foto suya sería una foto de cuándo corrió cada test. */
+export const PHOTOGRAPHED_MEMBERS = [
+  "un-dato",
+  "varios-datos",
+] as const satisfies readonly IncompleteMemberName[];
+
+export function incompleteStorageStatePath(
+  name: IncompleteMemberName,
+): string {
+  return path.join(REPO_ROOT, "test-results", `e2e-storage-state-${name}.json`);
+}
+
 const APP_URL = process.env.APP_URL ?? "http://localhost:3417";
 
 const CLUB_SLUG = "victoria-seadragons";
@@ -64,7 +123,9 @@ export type E2eSessionState =
       readonly kind: "available";
       readonly email: string;
       readonly password: string;
-      readonly userId: string;
+      /** Todas las identidades que abrió el arranque, la activa y las que
+       * están a medias. El cierre las borra sin tener que saber cuál es cuál. */
+      readonly userIds: readonly string[];
     }
   | { readonly kind: "unavailable"; readonly reason: string };
 
@@ -125,6 +186,7 @@ function toBrowserCookie(cookie: {
 async function writeStorageState(
   email: string,
   password: string,
+  statePath: string,
 ): Promise<void> {
   const session = createSessionClient(process.env, []);
   if (session.kind === "unconfigured") {
@@ -149,7 +211,7 @@ async function writeStorageState(
       "La sesión de prueba se abrió pero no dejó ninguna cookie que dar al navegador.",
     );
   }
-  writeJson(E2E_STORAGE_STATE_PATH, { cookies, origins: [] });
+  writeJson(statePath, { cookies, origins: [] });
 }
 
 function writeJson(file: string, contents: unknown): void {
@@ -163,8 +225,17 @@ function writeState(state: E2eSessionState): void {
     // Playwright carga el archivo al crear cada contexto, tenga o no sesión
     // que meter: sin él, los tests que se van a saltar fallarían antes de
     // llegar a saltarse.
-    writeJson(E2E_STORAGE_STATE_PATH, { cookies: [], origins: [] });
+    for (const statePath of everyStorageStatePath()) {
+      writeJson(statePath, { cookies: [], origins: [] });
+    }
   }
+}
+
+function everyStorageStatePath(): readonly string[] {
+  return [
+    E2E_STORAGE_STATE_PATH,
+    ...INCOMPLETE_MEMBER_NAMES.map(incompleteStorageStatePath),
+  ];
 }
 
 /** El estado que dejó `prepareE2eSession`. Sin archivo, la suite no pasó por
@@ -181,21 +252,38 @@ export function readE2eSessionState(): E2eSessionState {
   return JSON.parse(readFileSync(STATE_PATH, "utf8")) as E2eSessionState;
 }
 
-async function createTestMember(): Promise<E2eSessionState> {
-  const serviceClient = createServiceRoleClient(process.env);
-  const email = `e2e-${randomUUID()}@example.test`;
-  const password = randomUUID();
+type SeededMember = {
+  readonly userId: string;
+  readonly email: string;
+  readonly password: string;
+};
 
-  const { data: club, error: clubError } = await serviceClient
+async function findClubId(
+  serviceClient: SupabaseClient,
+): Promise<string> {
+  const { data, error } = await serviceClient
     .from(CLUBS_TABLE)
     .select("id")
     .eq("slug", CLUB_SLUG)
     .single();
-  if (clubError || !club) {
+  if (error || !data) {
     throw new Error(
-      `No se pudo leer el club sembrado: ${clubError?.message ?? "sin datos"}`,
+      `No se pudo leer el club sembrado: ${error?.message ?? "sin datos"}`,
     );
   }
+  return data.id as string;
+}
+
+/** Crea una identidad ya confirmada y su fila de socio. Las columnas que
+ * distinguen a un socio de otro llegan en `columns`: lo demás es idéntico,
+ * porque lo que cambia entre los socios de prueba es qué les falta. */
+async function seedMember(
+  serviceClient: SupabaseClient,
+  clubId: string,
+  columns: Readonly<Record<string, string | null>>,
+): Promise<SeededMember> {
+  const email = `e2e-${randomUUID()}@example.test`;
+  const password = randomUUID();
 
   const { data, error } = await serviceClient.auth.admin.createUser({
     email,
@@ -211,11 +299,11 @@ async function createTestMember(): Promise<E2eSessionState> {
   const { error: memberError } = await serviceClient
     .from(MEMBERS_TABLE)
     .insert({
-      club_id: club.id,
+      club_id: clubId,
       user_id: data.user.id,
       full_name: "Socio de prueba",
       email,
-      account_status: "active",
+      ...columns,
     });
   if (memberError) {
     await serviceClient.auth.admin.deleteUser(data.user.id);
@@ -224,7 +312,41 @@ async function createTestMember(): Promise<E2eSessionState> {
     );
   }
 
-  return { kind: "available", email, password, userId: data.user.id };
+  return { userId: data.user.id, email, password };
+}
+
+/** El socio activo y uno por cada estado de completar registro, cada uno con
+ * su archivo de cookies. Son cuentas distintas porque el estado vive en la
+ * fila: no hay forma de cambiarlo desde el navegador a mitad de una corrida. */
+async function createTestMembers(): Promise<E2eSessionState> {
+  const serviceClient = createServiceRoleClient(process.env);
+  const clubId = await findClubId(serviceClient);
+
+  const active = await seedMember(serviceClient, clubId, {
+    account_status: "active",
+  });
+  await writeStorageState(active.email, active.password, E2E_STORAGE_STATE_PATH);
+
+  const userIds = [active.userId];
+  for (const name of INCOMPLETE_MEMBER_NAMES) {
+    const member = await seedMember(serviceClient, clubId, {
+      account_status: "incomplete",
+      ...INCOMPLETE_MEMBERS[name],
+    });
+    userIds.push(member.userId);
+    await writeStorageState(
+      member.email,
+      member.password,
+      incompleteStorageStatePath(name),
+    );
+  }
+
+  return {
+    kind: "available",
+    email: active.email,
+    password: active.password,
+    userIds,
+  };
 }
 
 /** Lo llama el arranque global de Playwright, antes de cualquier test. */
@@ -242,11 +364,7 @@ export async function prepareE2eSession(): Promise<void> {
     });
     return;
   }
-  const state = await createTestMember();
-  writeState(state);
-  if (state.kind === "available") {
-    await writeStorageState(state.email, state.password);
-  }
+  writeState(await createTestMembers());
 }
 
 /** Lo llama el cierre global de Playwright. Borrar la identidad se lleva por
@@ -255,10 +373,13 @@ export async function prepareE2eSession(): Promise<void> {
 export async function discardE2eSession(): Promise<void> {
   const state = readE2eSessionState();
   if (state.kind === "available") {
-    await createServiceRoleClient(process.env).auth.admin.deleteUser(
-      state.userId,
-    );
+    const serviceClient = createServiceRoleClient(process.env);
+    for (const userId of state.userIds) {
+      await serviceClient.auth.admin.deleteUser(userId);
+    }
   }
   rmSync(STATE_PATH, { force: true });
-  rmSync(E2E_STORAGE_STATE_PATH, { force: true });
+  for (const statePath of everyStorageStatePath()) {
+    rmSync(statePath, { force: true });
+  }
 }
