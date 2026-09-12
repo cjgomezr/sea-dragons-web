@@ -27,9 +27,17 @@ type ApiHandlerResult<T> = {
   readonly data: T;
   readonly status?: ApiSuccessStatus;
 };
+/** Una modificación que la respuesta de la ruta tiene que llevar pase lo que
+ * pase, también si el handler termina lanzando. El caso que la pide es el
+ * endpoint de la sesión: las cookies que Supabase emite al cerrar sesión o al
+ * rechazar unas credenciales viajan en una respuesta de error, y sin esto se
+ * perderían justo cuando importa. */
+export type DecorateApiResponse = (response: NextResponse) => void;
+
 type ApiHandlerArgs<Body> = {
   readonly request: NextRequest;
   readonly body: Body;
+  readonly decorateResponse: (decorate: DecorateApiResponse) => void;
 };
 type ApiHandlerFn<T, Body> = (
   args: ApiHandlerArgs<Body>,
@@ -87,20 +95,34 @@ export function createApiRoute<T, Body = undefined>(
   config: ApiRouteConfig<T, Body>,
 ): ApiRouteHandler<T> {
   return async function handleRequest(request) {
+    const decorations: DecorateApiResponse[] = [];
+    function decorated<R extends NextResponse>(response: R): R {
+      for (const decorate of decorations) {
+        decorate(response);
+      }
+      return response;
+    }
+
     try {
       const parsedBody = await readValidatedBody(request, config.schema);
       if (!parsedBody.ok) {
-        return parsedBody.response;
+        return decorated(parsedBody.response);
       }
 
-      const result = await config.handler({ request, body: parsedBody.body });
-      return apiSuccess(result.data, result.status);
+      const result = await config.handler({
+        request,
+        body: parsedBody.body,
+        decorateResponse: (decorate) => {
+          decorations.push(decorate);
+        },
+      });
+      return decorated(apiSuccess(result.data, result.status));
     } catch (error) {
       if (error instanceof ApiError) {
-        return apiError(error.code, error.message);
+        return decorated(apiError(error.code, error.message));
       }
       console.error("[api/v1] unhandled error", error);
-      return apiError("internal_error", UNEXPECTED_ERROR_MESSAGE);
+      return decorated(apiError("internal_error", UNEXPECTED_ERROR_MESSAGE));
     }
   };
 }

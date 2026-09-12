@@ -2,9 +2,8 @@ import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { describe } from "vitest";
 import {
-  SUPABASE_URL_ENV,
+  findMissingSupabaseKeys,
   readSupabaseConfig,
-  readSupabaseServiceRoleConfig,
 } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 
@@ -94,17 +93,7 @@ export type RlsEnvironmentStatus =
  * la de servicio (para crear el usuario y sembrar/limpiar datos): sin
  * cualquiera de las dos no hay forma de montar el caso. */
 export function detectRlsEnvironment(env: Environment): RlsEnvironmentStatus {
-  const anonConfig = readSupabaseConfig(env);
-  const serviceConfig = readSupabaseServiceRoleConfig(env);
-
-  // `SUPABASE_URL_ENV` puede venir marcada como ausente en los dos, y solo
-  // debe nombrarse una vez.
-  const missingKeys = [
-    ...(anonConfig.kind === "missing" ? anonConfig.missingKeys : []),
-    ...(serviceConfig.kind === "missing"
-      ? serviceConfig.missingKeys.filter((key) => key !== SUPABASE_URL_ENV)
-      : []),
-  ];
+  const missingKeys = findMissingSupabaseKeys(env);
 
   return missingKeys.length > 0
     ? { kind: "unavailable", missingKeys }

@@ -38,6 +38,10 @@ import AxeBuilder from "@axe-core/playwright";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import {
+  E2E_STORAGE_STATE_PATH,
+  readE2eSessionState,
+} from "./support/e2e-session";
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
 import { snapshotCreatedNotice } from "./support/visual-baseline-notice";
 
@@ -145,18 +149,27 @@ async function goToWithTheme(
   });
 }
 
+type Screen = { readonly name: string; readonly path: string };
+
+// Las pantallas de este archivo que se alcanzan sin sesión. Las dos viven en
+// el grupo de rutas (auth), con panel de marca propio y sin la cáscara de
+// menú. La entrada es desde #135 la puerta de toda la aplicación, y el mockup
+// que la describe es docs/mockups/auth-light.png.
+const PUBLIC_PAGES: readonly Screen[] = [
+  { name: "entrar", path: "/entrar" },
+  { name: "registro", path: "/registro" },
+];
+
 // "home" is the pre-existing landing page; "section" is a destination route
 // off the sidebar menu, standing in for any of the seven (they share the
-// same shell and SectionPlaceholder).
-const pages = [
+// same shell and SectionPlaceholder). Las dos viven detrás de la frontera de
+// sesión, así que sus tests entran antes de mirarlas.
+const APP_PAGES: readonly Screen[] = [
   { name: "home", path: "/" },
   { name: "section", path: "/calendario" },
-  // Pantalla pública de cuentas (#132). No comparte cáscara con las de
-  // arriba: vive en el grupo de rutas (auth), con panel de marca propio.
-  { name: "registro", path: "/registro" },
-] as const;
+];
 
-for (const pg of pages) {
+function describeScreen(pg: Screen): void {
   for (const vp of viewports) {
     test.describe(`${pg.name} @ ${vp.name}`, () => {
       test.use({ viewport: { width: vp.width, height: vp.height } });
@@ -216,411 +229,672 @@ for (const pg of pages) {
   });
 }
 
-const DESKTOP = { width: 1440, height: 900 } as const;
-const MOBILE = { width: 375, height: 812 } as const;
-// ASS-004: the narrowest viewport the shell must support.
-const MOBILE_MIN_WIDTH = { width: 360, height: 800 } as const;
+for (const pg of PUBLIC_PAGES) {
+  describeScreen(pg);
+}
 
-// Matches --touch-target-min in globals.css (WCAG 2.5.5).
-const TOUCH_TARGET_MIN_PX = 44;
+/* ---------------------------------------------------------------------------
+   La frontera de sesión vista desde un navegador de verdad (#135), sin
+   credenciales de por medio: un visitante anónimo no las necesita.
+   --------------------------------------------------------------------------- */
 
-// A single-line label's rendered height sits within rounding distance of the
-// element's line-height; a wrapped one is close to double. #85: the platform
-// font that resolves at runtime decides this, not a screenshot a human
-// happens to look at, so this measures geometry instead of pixels.
-const SINGLE_LINE_HEIGHT_TOLERANCE = 1.5;
+const SIGN_IN_PATH = "/entrar";
+const SESSION_ENDPOINT = "/api/v1/auth/session";
 
-async function getTabLabelLineMetrics(
+test("una pantalla de la aplicación pedida sin sesión aterriza en la entrada", async ({
+  page,
+}) => {
+  await page.goto(`${APP_URL}/calendario`);
+
+  await expect(page).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
+  await expect(
+    page.getByRole("heading", { name: "Bienvenido de vuelta" }),
+  ).toBeVisible();
+});
+
+test("un endpoint de la API pedido sin sesión responde 401", async ({
+  request,
+}) => {
+  const response = await request.get(`${APP_URL}/api/v1/evaluaciones`);
+
+  expect(response.status()).toBe(401);
+  expect(await response.json()).toMatchObject({
+    error: { code: "unauthenticated" },
+  });
+});
+
+// El monitoreo lo consulta cada 5 minutos desde fuera y sin autenticarse. Su
+// código depende de si el entorno tiene base de datos, así que lo que se fija
+// es que la frontera no lo cierre.
+test("el endpoint de salud sigue siendo público", async ({ request }) => {
+  const response = await request.get(`${APP_URL}/api/v1/health`);
+
+  expect(response.status()).not.toBe(401);
+});
+
+/** La pantalla de entrada con el error de credenciales. La respuesta del
+ * endpoint se sustituye por un doble: comprobar el mensaje no necesita hablar
+ * con Supabase, y así este caso corre también donde no hay credenciales. */
+async function goToSignInWithError(
   page: import("@playwright/test").Page,
-): Promise<Array<{ label: string; height: number; lineHeight: number }>> {
-  return page.evaluate(() => {
-    const tabs = document.querySelectorAll<HTMLElement>(
-      ".app-tabbar-tabs a, .app-tabbar-tabs button",
-    );
-    return Array.from(tabs).map((tab) => {
-      const lineHeight = parseFloat(getComputedStyle(tab).lineHeight);
-      const labelNode = Array.from(tab.childNodes).find(
-        (node) =>
-          node.nodeType === Node.TEXT_NODE &&
-          (node.textContent ?? "").trim().length > 0,
-      );
-      if (!labelNode) {
-        return { label: "", height: 0, lineHeight };
-      }
-      const range = document.createRange();
-      range.selectNodeContents(labelNode);
-      return {
-        label: (labelNode.textContent ?? "").trim(),
-        height: range.getBoundingClientRect().height,
-        lineHeight,
-      };
-    });
+  theme: (typeof themes)[number],
+): Promise<void> {
+  await page.route(`**${SESSION_ENDPOINT}`, (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: {
+          code: "unauthenticated",
+          message: "El correo o la contraseña no coinciden.",
+        },
+      }),
+    }),
+  );
+  await goToWithTheme(page, SIGN_IN_PATH, theme);
+
+  await page.getByLabel("Correo electrónico").fill("nerea@example.test");
+  await page.getByLabel("Contraseña").fill("no-es-esta");
+  await page.getByRole("button", { name: "Entrar" }).click();
+
+  await expect(
+    page.getByRole("alert").filter({ hasText: /no coinciden/ }),
+  ).toBeVisible();
+}
+
+for (const vp of viewports) {
+  test.describe(`entrar-error @ ${vp.name}`, () => {
+    test.use({ viewport: { width: vp.width, height: vp.height } });
+
+    for (const theme of themes) {
+      test(`matches approved baseline (${theme})`, async ({ page }) => {
+        await goToSignInWithError(page, theme);
+        const name = `entrar-error-${vp.name}-${theme}.png`;
+        await createMissingLocalBaseline(name, () =>
+          page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+        );
+        await expect(page).toHaveScreenshot(name, {
+          ...SCREENSHOT_OPTIONS,
+          fullPage: true,
+          maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+        });
+      });
+    }
   });
 }
 
-// Naming the offending tab is the whole point: the first version of this
-// check reported only "28.39 is not <= 21.6", which says a label wrapped but
-// not which one, and the fonts that wrap it only exist on the CI machine.
-function expectEverySingleLine(
-  metrics: Array<{ label: string; height: number; lineHeight: number }>,
-): void {
-  expect(metrics.length).toBeGreaterThan(0);
-  const wrapped = metrics.filter(
-    ({ height, lineHeight }) =>
-      height > lineHeight * SINGLE_LINE_HEIGHT_TOLERANCE,
-  );
+test("entrar-error: has no accessibility violations (axe-core)", async ({
+  page,
+}) => {
+  await goToSignInWithError(page, "light");
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
   expect(
-    wrapped.map(
-      ({ label, height, lineHeight }) =>
-        `${label} (${height}px, línea ${lineHeight}px)`,
-    ),
-    "estas etiquetas ocupan más de una línea",
+    results.violations,
+    JSON.stringify(results.violations, null, 2),
   ).toEqual([]);
-}
+});
 
-// The shell renders both navs and lets CSS pick one, so every assertion is
-// scoped to the nav that the viewport actually shows.
-const SIDEBAR_NAV = "Principal";
-const TAB_BAR = "Secciones";
+test("el formulario no manda nada al servidor con los campos vacíos", async ({
+  page,
+}) => {
+  let calls = 0;
+  await page.route(`**${SESSION_ENDPOINT}`, (route) => {
+    calls += 1;
+    return route.fulfill({ status: 200, body: "{}" });
+  });
+  await page.goto(`${APP_URL}${SIGN_IN_PATH}`);
 
-// The tab bar and the sidebar are thin strips next to a much larger content
-// area: a component screenshot only frames "the component, not the page"
-// if its box stays well under these fractions of the viewport it lives in.
-const MAX_TAB_BAR_HEIGHT_RATIO = 0.2;
-const MAX_SIDEBAR_WIDTH_RATIO = 0.3;
+  await page.getByRole("button", { name: "Entrar" }).click();
 
-// A correct tab bar inside a broken layout must still be caught: the full
-// page capture has to cover far more surface than the component capture
-// alone, or the two checks would be redundant instead of additive.
-const MIN_PAGE_TO_COMPONENT_AREA_RATIO = 5;
+  // Next inserta su propio elemento con role="alert" (el anunciador de ruta),
+  // vacío, así que el aviso se busca por su texto.
+  await expect(
+    page.getByRole("alert").filter({ hasText: /Escribe tu correo/ }),
+  ).toBeVisible();
+  expect(calls).toBe(0);
+});
 
-// #77: una captura fullPage reparte el cambio de un componente pequeño
-// entre miles de píxeles de página, así que cabe holgadamente bajo
-// cualquier presupuesto pensado para la página entera. Encuadrar el propio
-// componente hace que un cambio en él ocupe la mayor parte de los píxeles
-// comparados, en vez de perderse en el conjunto. Esto se suma a las capturas
-// de página de arriba, no las sustituye.
-for (const theme of themes) {
-  test(`mobile tab bar matches approved baseline (${theme})`, async ({
+/* ---------------------------------------------------------------------------
+   Todo lo que hay de aquí abajo vive detrás de la frontera de sesión (#135):
+   sin sesión, el servidor redirige a la pantalla de entrada y no hay cáscara
+   que mirar. Cada test entra antes, con el socio que el arranque global creó
+   en `seadragons-dev`.
+
+   Sin credenciales de Supabase (un runner de CI sin secretos) no hay forma de
+   abrir una sesión de verdad, y estos tests se saltan diciendo qué falta. No
+   se sustituye por una sesión de mentira: una puerta falsa en los tests vale
+   menos que no probar la puerta.
+   --------------------------------------------------------------------------- */
+
+const E2E_SESSION = readE2eSessionState();
+
+test.describe("dentro de la aplicación", () => {
+  test.skip(
+    E2E_SESSION.kind === "unavailable",
+    E2E_SESSION.kind === "unavailable"
+      ? `sin sesión de prueba: ${E2E_SESSION.reason}`
+      : "",
+  );
+
+  // Las cookies de la única sesión que abrió el arranque global. Abrir una por
+  // test agotaba la cuarentena de intentos de Supabase Auth a mitad de la
+  // corrida, y ese límite es el que el ticket dice que no se reimplementa.
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  for (const pg of APP_PAGES) {
+    describeScreen(pg);
+  }
+
+  const DESKTOP = { width: 1440, height: 900 } as const;
+  const MOBILE = { width: 375, height: 812 } as const;
+  // ASS-004: the narrowest viewport the shell must support.
+  const MOBILE_MIN_WIDTH = { width: 360, height: 800 } as const;
+
+  // Matches --touch-target-min in globals.css (WCAG 2.5.5).
+  const TOUCH_TARGET_MIN_PX = 44;
+
+  // A single-line label's rendered height sits within rounding distance of the
+  // element's line-height; a wrapped one is close to double. #85: the platform
+  // font that resolves at runtime decides this, not a screenshot a human
+  // happens to look at, so this measures geometry instead of pixels.
+  const SINGLE_LINE_HEIGHT_TOLERANCE = 1.5;
+
+  async function getTabLabelLineMetrics(
+    page: import("@playwright/test").Page,
+  ): Promise<Array<{ label: string; height: number; lineHeight: number }>> {
+    return page.evaluate(() => {
+      const tabs = document.querySelectorAll<HTMLElement>(
+        ".app-tabbar-tabs a, .app-tabbar-tabs button",
+      );
+      return Array.from(tabs).map((tab) => {
+        const lineHeight = parseFloat(getComputedStyle(tab).lineHeight);
+        const labelNode = Array.from(tab.childNodes).find(
+          (node) =>
+            node.nodeType === Node.TEXT_NODE &&
+            (node.textContent ?? "").trim().length > 0,
+        );
+        if (!labelNode) {
+          return { label: "", height: 0, lineHeight };
+        }
+        const range = document.createRange();
+        range.selectNodeContents(labelNode);
+        return {
+          label: (labelNode.textContent ?? "").trim(),
+          height: range.getBoundingClientRect().height,
+          lineHeight,
+        };
+      });
+    });
+  }
+
+  // Naming the offending tab is the whole point: the first version of this
+  // check reported only "28.39 is not <= 21.6", which says a label wrapped but
+  // not which one, and the fonts that wrap it only exist on the CI machine.
+  function expectEverySingleLine(
+    metrics: Array<{ label: string; height: number; lineHeight: number }>,
+  ): void {
+    expect(metrics.length).toBeGreaterThan(0);
+    const wrapped = metrics.filter(
+      ({ height, lineHeight }) =>
+        height > lineHeight * SINGLE_LINE_HEIGHT_TOLERANCE,
+    );
+    expect(
+      wrapped.map(
+        ({ label, height, lineHeight }) =>
+          `${label} (${height}px, línea ${lineHeight}px)`,
+      ),
+      "estas etiquetas ocupan más de una línea",
+    ).toEqual([]);
+  }
+
+  // The shell renders both navs and lets CSS pick one, so every assertion is
+  // scoped to the nav that the viewport actually shows.
+  const SIDEBAR_NAV = "Principal";
+  const TAB_BAR = "Secciones";
+
+  // The tab bar and the sidebar are thin strips next to a much larger content
+  // area: a component screenshot only frames "the component, not the page"
+  // if its box stays well under these fractions of the viewport it lives in.
+  const MAX_TAB_BAR_HEIGHT_RATIO = 0.2;
+  const MAX_SIDEBAR_WIDTH_RATIO = 0.3;
+
+  // A correct tab bar inside a broken layout must still be caught: the full
+  // page capture has to cover far more surface than the component capture
+  // alone, or the two checks would be redundant instead of additive.
+  const MIN_PAGE_TO_COMPONENT_AREA_RATIO = 5;
+
+  // #77: una captura fullPage reparte el cambio de un componente pequeño
+  // entre miles de píxeles de página, así que cabe holgadamente bajo
+  // cualquier presupuesto pensado para la página entera. Encuadrar el propio
+  // componente hace que un cambio en él ocupe la mayor parte de los píxeles
+  // comparados, en vez de perderse en el conjunto. Esto se suma a las capturas
+  // de página de arriba, no las sustituye.
+  for (const theme of themes) {
+    test(`mobile tab bar matches approved baseline (${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(MOBILE);
+      await goToWithTheme(page, "/dashboard", theme);
+      const name = `tabbar-mobile-${theme}.png`;
+      const tabBar = page.getByRole("navigation", { name: TAB_BAR });
+      await createMissingLocalBaseline(name, () =>
+        tabBar.screenshot(SCREENSHOT_OPTIONS),
+      );
+      await expect(tabBar).toHaveScreenshot(name, {
+        ...SCREENSHOT_OPTIONS,
+        maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
+      });
+    });
+
+    test(`desktop nav matches approved baseline (${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(DESKTOP);
+      await goToWithTheme(page, "/dashboard", theme);
+      const name = `nav-desktop-${theme}.png`;
+      const sidebar = page.getByRole("navigation", { name: SIDEBAR_NAV });
+      await createMissingLocalBaseline(name, () =>
+        sidebar.screenshot(SCREENSHOT_OPTIONS),
+      );
+      await expect(sidebar).toHaveScreenshot(name, {
+        ...SCREENSHOT_OPTIONS,
+        maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
+      });
+    });
+  }
+
+  test("the mobile tab bar component screenshot frames the component, not the page", async ({
     page,
   }) => {
     await page.setViewportSize(MOBILE);
-    await goToWithTheme(page, "/dashboard", theme);
-    const name = `tabbar-mobile-${theme}.png`;
-    const tabBar = page.getByRole("navigation", { name: TAB_BAR });
-    await createMissingLocalBaseline(name, () =>
-      tabBar.screenshot(SCREENSHOT_OPTIONS),
-    );
-    await expect(tabBar).toHaveScreenshot(name, {
-      ...SCREENSHOT_OPTIONS,
-      maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
-    });
+    await page.goto(`${APP_URL}/dashboard`);
+
+    const box = await page
+      .getByRole("navigation", { name: TAB_BAR })
+      .boundingBox();
+
+    expect(box, "the tab bar has no layout box").not.toBeNull();
+    expect(box!.height).toBeLessThan(MOBILE.height * MAX_TAB_BAR_HEIGHT_RATIO);
   });
 
-  test(`desktop nav matches approved baseline (${theme})`, async ({ page }) => {
+  test("the desktop nav component screenshot frames the component, not the page", async ({
+    page,
+  }) => {
     await page.setViewportSize(DESKTOP);
-    await goToWithTheme(page, "/dashboard", theme);
-    const name = `nav-desktop-${theme}.png`;
-    const sidebar = page.getByRole("navigation", { name: SIDEBAR_NAV });
-    await createMissingLocalBaseline(name, () =>
-      sidebar.screenshot(SCREENSHOT_OPTIONS),
+    await page.goto(`${APP_URL}/dashboard`);
+
+    const box = await page
+      .getByRole("navigation", { name: SIDEBAR_NAV })
+      .boundingBox();
+
+    expect(box, "the sidebar nav has no layout box").not.toBeNull();
+    expect(box!.width).toBeLessThan(DESKTOP.width * MAX_SIDEBAR_WIDTH_RATIO);
+  });
+
+  test("the page screenshot still covers far more area than the tab bar component alone", async ({
+    page,
+  }) => {
+    await page.setViewportSize(MOBILE);
+    await page.goto(`${APP_URL}/dashboard`);
+
+    const tabBarBox = await page
+      .getByRole("navigation", { name: TAB_BAR })
+      .boundingBox();
+    const pageHeight = await page.evaluate(
+      () => document.documentElement.scrollHeight,
     );
-    await expect(sidebar).toHaveScreenshot(name, {
-      ...SCREENSHOT_OPTIONS,
-      maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
-    });
-  });
-}
 
-test("the mobile tab bar component screenshot frames the component, not the page", async ({
-  page,
-}) => {
-  await page.setViewportSize(MOBILE);
-  await page.goto(`${APP_URL}/dashboard`);
-
-  const box = await page
-    .getByRole("navigation", { name: TAB_BAR })
-    .boundingBox();
-
-  expect(box, "the tab bar has no layout box").not.toBeNull();
-  expect(box!.height).toBeLessThan(MOBILE.height * MAX_TAB_BAR_HEIGHT_RATIO);
-});
-
-test("the desktop nav component screenshot frames the component, not the page", async ({
-  page,
-}) => {
-  await page.setViewportSize(DESKTOP);
-  await page.goto(`${APP_URL}/dashboard`);
-
-  const box = await page
-    .getByRole("navigation", { name: SIDEBAR_NAV })
-    .boundingBox();
-
-  expect(box, "the sidebar nav has no layout box").not.toBeNull();
-  expect(box!.width).toBeLessThan(DESKTOP.width * MAX_SIDEBAR_WIDTH_RATIO);
-});
-
-test("the page screenshot still covers far more area than the tab bar component alone", async ({
-  page,
-}) => {
-  await page.setViewportSize(MOBILE);
-  await page.goto(`${APP_URL}/dashboard`);
-
-  const tabBarBox = await page
-    .getByRole("navigation", { name: TAB_BAR })
-    .boundingBox();
-  const pageHeight = await page.evaluate(
-    () => document.documentElement.scrollHeight,
-  );
-
-  expect(tabBarBox, "the tab bar has no layout box").not.toBeNull();
-  const pageArea = MOBILE.width * pageHeight;
-  const componentArea = tabBarBox!.width * tabBarBox!.height;
-  expect(pageArea).toBeGreaterThan(
-    componentArea * MIN_PAGE_TO_COMPONENT_AREA_RATIO,
-  );
-});
-
-test("marks the active section in the sidebar nav", async ({ page }) => {
-  await page.setViewportSize(DESKTOP);
-  await page.goto(`${APP_URL}/calendario`);
-  const current = page
-    .getByRole("navigation", { name: SIDEBAR_NAV })
-    .locator('[aria-current="page"]');
-  await expect(current).toHaveCount(1);
-  await expect(current).toHaveText("Calendario");
-});
-
-test("marks the active section in the mobile tab bar", async ({ page }) => {
-  await page.setViewportSize(MOBILE);
-  await page.goto(`${APP_URL}/calendario`);
-  const current = page
-    .getByRole("navigation", { name: TAB_BAR })
-    .locator('[aria-current="page"]');
-  await expect(current).toHaveCount(1);
-  // "Agenda" en móvil, "Calendario" en el sidebar: el test de arriba fija esa
-  // otra mitad, así que acortar la etiqueta móvil no puede colarse en ambas.
-  await expect(current).toHaveText("Agenda");
-});
-
-test("desktop shows the sidebar nav and not the tab bar", async ({ page }) => {
-  await page.setViewportSize(DESKTOP);
-  await page.goto(`${APP_URL}/dashboard`);
-  await expect(
-    page.getByRole("navigation", { name: SIDEBAR_NAV }),
-  ).toBeVisible();
-  await expect(page.getByRole("navigation", { name: TAB_BAR })).toBeHidden();
-});
-
-test("mobile pins the tab bar to the bottom edge of the viewport", async ({
-  page,
-}) => {
-  await page.setViewportSize(MOBILE);
-  await page.goto(`${APP_URL}/dashboard`);
-
-  const tabBar = page.getByRole("navigation", { name: TAB_BAR });
-  await expect(tabBar).toBeVisible();
-  await expect(
-    page.getByRole("navigation", { name: SIDEBAR_NAV }),
-  ).toBeHidden();
-
-  const box = await tabBar.boundingBox();
-  expect(box, "the tab bar has no layout box").not.toBeNull();
-  // Anchored to the bottom: its lower edge sits on the fold, not below it.
-  expect(box!.y + box!.height).toBeCloseTo(MOBILE.height, 0);
-});
-
-test("mobile keeps the overflow sections behind the More tab", async ({
-  page,
-}) => {
-  await page.setViewportSize(MOBILE);
-  await page.goto(`${APP_URL}/dashboard`);
-  const tabBar = page.getByRole("navigation", { name: TAB_BAR });
-
-  await expect(tabBar.getByRole("link", { name: "Pagos" })).toBeHidden();
-  await tabBar.getByRole("button", { name: "Más" }).click();
-  await expect(tabBar.getByRole("link", { name: "Pagos" })).toBeVisible();
-});
-
-test("mobile tabs keep the 44px touch target after adding icons", async ({
-  page,
-}) => {
-  await page.setViewportSize(MOBILE);
-  await page.goto(`${APP_URL}/dashboard`);
-  const tabBar = page.getByRole("navigation", { name: TAB_BAR });
-
-  const tabs = await tabBar.getByRole("link").all();
-  const moreButton = tabBar.getByRole("button", { name: "Más" });
-
-  for (const tab of [...tabs, moreButton]) {
-    const box = await tab.boundingBox();
-    expect(box, "tab has no layout box").not.toBeNull();
-    expect(box!.height).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
-  }
-});
-
-test("mobile tabs keep the 44px touch target at 360px (ASS-004 minimum)", async ({
-  page,
-}) => {
-  await page.setViewportSize(MOBILE_MIN_WIDTH);
-  await page.goto(`${APP_URL}/dashboard`);
-  const tabBar = page.getByRole("navigation", { name: TAB_BAR });
-
-  const tabs = await tabBar.getByRole("link").all();
-  const moreButton = tabBar.getByRole("button", { name: "Más" });
-
-  for (const tab of [...tabs, moreButton]) {
-    const box = await tab.boundingBox();
-    expect(box, "tab has no layout box").not.toBeNull();
-    expect(box!.height).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
-  }
-});
-
-// #85: "Dashboard" wrapped to two lines only on the fonts Linux resolves,
-// invisible on Windows at the same 375px width. Measuring the label's own
-// rendered height against its line-height catches that regardless of which
-// platform's font happens to be installed on the machine running the test.
-test("no mobile tab label wraps to a second line at 375px", async ({
-  page,
-}) => {
-  await page.setViewportSize(MOBILE);
-  await page.goto(`${APP_URL}/dashboard`);
-
-  expectEverySingleLine(await getTabLabelLineMetrics(page));
-});
-
-test("no mobile tab label wraps to a second line at 360px (ASS-004 minimum)", async ({
-  page,
-}) => {
-  await page.setViewportSize(MOBILE_MIN_WIDTH);
-  await page.goto(`${APP_URL}/dashboard`);
-
-  expectEverySingleLine(await getTabLabelLineMetrics(page));
-});
-
-test("mobile never hides content behind the fixed tab bar", async ({
-  page,
-}) => {
-  await page.setViewportSize(MOBILE);
-  await page.goto(`${APP_URL}/dashboard`);
-
-  const barBox = await page
-    .getByRole("navigation", { name: TAB_BAR })
-    .boundingBox();
-  expect(barBox, "the tab bar has no layout box").not.toBeNull();
-
-  const mainPaddingBottom = await page.evaluate(() => {
-    const main = document.querySelector("main");
-    return main ? parseFloat(getComputedStyle(main).paddingBottom) : null;
+    expect(tabBarBox, "the tab bar has no layout box").not.toBeNull();
+    const pageArea = MOBILE.width * pageHeight;
+    const componentArea = tabBarBox!.width * tabBarBox!.height;
+    expect(pageArea).toBeGreaterThan(
+      componentArea * MIN_PAGE_TO_COMPONENT_AREA_RATIO,
+    );
   });
 
-  expect(mainPaddingBottom).not.toBeNull();
-  expect(
-    mainPaddingBottom!,
-    "the main area must reserve room for the fixed bar",
-  ).toBeGreaterThanOrEqual(barBox!.height);
-});
+  test("marks the active section in the sidebar nav", async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await page.goto(`${APP_URL}/calendario`);
+    const current = page
+      .getByRole("navigation", { name: SIDEBAR_NAV })
+      .locator('[aria-current="page"]');
+    await expect(current).toHaveCount(1);
+    await expect(current).toHaveText("Calendario");
+  });
 
-test("keyboard focus follows the visual order and stays visible", async ({
-  page,
-}) => {
-  await page.setViewportSize(DESKTOP);
-  await page.goto(`${APP_URL}/dashboard`);
+  test("marks the active section in the mobile tab bar", async ({ page }) => {
+    await page.setViewportSize(MOBILE);
+    await page.goto(`${APP_URL}/calendario`);
+    const current = page
+      .getByRole("navigation", { name: TAB_BAR })
+      .locator('[aria-current="page"]');
+    await expect(current).toHaveCount(1);
+    // "Agenda" en móvil, "Calendario" en el sidebar: el test de arriba fija esa
+    // otra mitad, así que acortar la etiqueta móvil no puede colarse en ambas.
+    await expect(current).toHaveText("Agenda");
+  });
 
-  const expectedOrder = [
-    "Dashboard",
-    "Directorio",
-    "Calendario",
-    "Equipos",
-    "Evaluaciones",
-    "Noticias",
-    "Pagos",
-  ];
+  test("desktop shows the sidebar nav and not the tab bar", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await page.goto(`${APP_URL}/dashboard`);
+    await expect(
+      page.getByRole("navigation", { name: SIDEBAR_NAV }),
+    ).toBeVisible();
+    await expect(page.getByRole("navigation", { name: TAB_BAR })).toBeHidden();
+  });
 
-  const reachedByTabbing: string[] = [];
-  const outlineWidths: number[] = [];
-  // One extra press covers whatever precedes the nav (the theme toggle).
-  for (let press = 0; press < expectedOrder.length + 3; press += 1) {
-    await page.keyboard.press("Tab");
-    const focused = await page.evaluate(() => {
-      const element = document.activeElement;
-      if (!(element instanceof HTMLElement)) return null;
-      const style = getComputedStyle(element);
-      return {
-        label: element.textContent?.trim() ?? "",
-        isNavLink: element.closest("nav") !== null && element.tagName === "A",
-        outlineWidth:
-          style.outlineStyle === "none" ? 0 : parseFloat(style.outlineWidth),
-      };
-    });
-    if (focused?.isNavLink && expectedOrder.includes(focused.label)) {
-      reachedByTabbing.push(focused.label);
-      outlineWidths.push(focused.outlineWidth);
+  test("mobile pins the tab bar to the bottom edge of the viewport", async ({
+    page,
+  }) => {
+    await page.setViewportSize(MOBILE);
+    await page.goto(`${APP_URL}/dashboard`);
+
+    const tabBar = page.getByRole("navigation", { name: TAB_BAR });
+    await expect(tabBar).toBeVisible();
+    await expect(
+      page.getByRole("navigation", { name: SIDEBAR_NAV }),
+    ).toBeHidden();
+
+    const box = await tabBar.boundingBox();
+    expect(box, "the tab bar has no layout box").not.toBeNull();
+    // Anchored to the bottom: its lower edge sits on the fold, not below it.
+    expect(box!.y + box!.height).toBeCloseTo(MOBILE.height, 0);
+  });
+
+  test("mobile keeps the overflow sections behind the More tab", async ({
+    page,
+  }) => {
+    await page.setViewportSize(MOBILE);
+    await page.goto(`${APP_URL}/dashboard`);
+    const tabBar = page.getByRole("navigation", { name: TAB_BAR });
+
+    await expect(tabBar.getByRole("link", { name: "Pagos" })).toBeHidden();
+    await tabBar.getByRole("button", { name: "Más" }).click();
+    await expect(tabBar.getByRole("link", { name: "Pagos" })).toBeVisible();
+  });
+
+  test("mobile tabs keep the 44px touch target after adding icons", async ({
+    page,
+  }) => {
+    await page.setViewportSize(MOBILE);
+    await page.goto(`${APP_URL}/dashboard`);
+    const tabBar = page.getByRole("navigation", { name: TAB_BAR });
+
+    const tabs = await tabBar.getByRole("link").all();
+    const moreButton = tabBar.getByRole("button", { name: "Más" });
+
+    for (const tab of [...tabs, moreButton]) {
+      const box = await tab.boundingBox();
+      expect(box, "tab has no layout box").not.toBeNull();
+      expect(box!.height).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
     }
-  }
-
-  expect(reachedByTabbing).toEqual(expectedOrder);
-  expect(
-    Math.min(...outlineWidths),
-    "every nav link must paint a focus outline",
-  ).toBeGreaterThan(0);
-});
-
-// El test de salto de línea solo falla donde la fuente es lo bastante ancha
-// para partir la etiqueta, que en el #85 resultó ser únicamente Linux: en
-// Windows "Dashboard" cabía por un pelo y el defecto era invisible. Este mide
-// el margen que le queda a cada etiqueta dentro de su pestaña, así que una
-// etiqueta al límite falla en la máquina de quien la escribe, no tres horas
-// después en CI.
-// De dónde sale el 0.85: a 360px cada pestaña deja 64px útiles. Medido en
-// Windows, "Calendario" ocupaba 56.8px (89%) y aun así se partía en Linux, lo
-// que sitúa la brecha entre fuentes en al menos 1.13x. No hay cota superior
-// medida, así que el umbral no se puede derivar del todo: 0.85 deja fuera a
-// las etiquetas que ya rozan el límite en la máquina del autor, y el test de
-// salto de línea sigue cubriendo lo que se escape. Si CI lo hace saltar por
-// una etiqueta que NO se parte, el número está flojo y toca medir en Linux,
-// no subirlo.
-const MAX_LABEL_WIDTH_RATIO = 0.85;
-
-test("every mobile tab label keeps room to spare inside its tab at 360px", async ({
-  page,
-}) => {
-  await page.setViewportSize(MOBILE_MIN_WIDTH);
-  await page.goto(`${APP_URL}/dashboard`);
-
-  const usage = await page.evaluate(() => {
-    const tabs = document.querySelectorAll<HTMLElement>(
-      ".app-tabbar-tabs a, .app-tabbar-tabs button",
-    );
-    return Array.from(tabs).map((tab) => {
-      const style = getComputedStyle(tab);
-      const usable =
-        tab.getBoundingClientRect().width -
-        parseFloat(style.paddingLeft) -
-        parseFloat(style.paddingRight);
-      const labelNode = Array.from(tab.childNodes).find(
-        (node) =>
-          node.nodeType === Node.TEXT_NODE &&
-          (node.textContent ?? "").trim().length > 0,
-      );
-      if (!labelNode) {
-        return { label: "", ratio: 0 };
-      }
-      const range = document.createRange();
-      range.selectNodeContents(labelNode);
-      return {
-        label: (labelNode.textContent ?? "").trim(),
-        ratio: range.getBoundingClientRect().width / usable,
-      };
-    });
   });
 
-  expect(usage.length).toBeGreaterThan(0);
-  const tooWide = usage.filter(({ ratio }) => ratio > MAX_LABEL_WIDTH_RATIO);
-  expect(
-    tooWide.map(({ label, ratio }) => `${label} (${Math.round(ratio * 100)}%)`),
-    `estas etiquetas pasan del ${MAX_LABEL_WIDTH_RATIO * 100}% de su pestaña y se partirán con una fuente algo más ancha`,
-  ).toEqual([]);
+  test("mobile tabs keep the 44px touch target at 360px (ASS-004 minimum)", async ({
+    page,
+  }) => {
+    await page.setViewportSize(MOBILE_MIN_WIDTH);
+    await page.goto(`${APP_URL}/dashboard`);
+    const tabBar = page.getByRole("navigation", { name: TAB_BAR });
+
+    const tabs = await tabBar.getByRole("link").all();
+    const moreButton = tabBar.getByRole("button", { name: "Más" });
+
+    for (const tab of [...tabs, moreButton]) {
+      const box = await tab.boundingBox();
+      expect(box, "tab has no layout box").not.toBeNull();
+      expect(box!.height).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
+    }
+  });
+
+  // #85: "Dashboard" wrapped to two lines only on the fonts Linux resolves,
+  // invisible on Windows at the same 375px width. Measuring the label's own
+  // rendered height against its line-height catches that regardless of which
+  // platform's font happens to be installed on the machine running the test.
+  test("no mobile tab label wraps to a second line at 375px", async ({
+    page,
+  }) => {
+    await page.setViewportSize(MOBILE);
+    await page.goto(`${APP_URL}/dashboard`);
+
+    expectEverySingleLine(await getTabLabelLineMetrics(page));
+  });
+
+  test("no mobile tab label wraps to a second line at 360px (ASS-004 minimum)", async ({
+    page,
+  }) => {
+    await page.setViewportSize(MOBILE_MIN_WIDTH);
+    await page.goto(`${APP_URL}/dashboard`);
+
+    expectEverySingleLine(await getTabLabelLineMetrics(page));
+  });
+
+  test("mobile never hides content behind the fixed tab bar", async ({
+    page,
+  }) => {
+    await page.setViewportSize(MOBILE);
+    await page.goto(`${APP_URL}/dashboard`);
+
+    const barBox = await page
+      .getByRole("navigation", { name: TAB_BAR })
+      .boundingBox();
+    expect(barBox, "the tab bar has no layout box").not.toBeNull();
+
+    const mainPaddingBottom = await page.evaluate(() => {
+      const main = document.querySelector("main");
+      return main ? parseFloat(getComputedStyle(main).paddingBottom) : null;
+    });
+
+    expect(mainPaddingBottom).not.toBeNull();
+    expect(
+      mainPaddingBottom!,
+      "the main area must reserve room for the fixed bar",
+    ).toBeGreaterThanOrEqual(barBox!.height);
+  });
+
+  test("keyboard focus follows the visual order and stays visible", async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await page.goto(`${APP_URL}/dashboard`);
+
+    const expectedOrder = [
+      "Dashboard",
+      "Directorio",
+      "Calendario",
+      "Equipos",
+      "Evaluaciones",
+      "Noticias",
+      "Pagos",
+    ];
+
+    const reachedByTabbing: string[] = [];
+    const outlineWidths: number[] = [];
+    // One extra press covers whatever precedes the nav (the theme toggle).
+    for (let press = 0; press < expectedOrder.length + 3; press += 1) {
+      await page.keyboard.press("Tab");
+      const focused = await page.evaluate(() => {
+        const element = document.activeElement;
+        if (!(element instanceof HTMLElement)) return null;
+        const style = getComputedStyle(element);
+        return {
+          label: element.textContent?.trim() ?? "",
+          isNavLink: element.closest("nav") !== null && element.tagName === "A",
+          outlineWidth:
+            style.outlineStyle === "none" ? 0 : parseFloat(style.outlineWidth),
+        };
+      });
+      if (focused?.isNavLink && expectedOrder.includes(focused.label)) {
+        reachedByTabbing.push(focused.label);
+        outlineWidths.push(focused.outlineWidth);
+      }
+    }
+
+    expect(reachedByTabbing).toEqual(expectedOrder);
+    expect(
+      Math.min(...outlineWidths),
+      "every nav link must paint a focus outline",
+    ).toBeGreaterThan(0);
+  });
+
+  // El test de salto de línea solo falla donde la fuente es lo bastante ancha
+  // para partir la etiqueta, que en el #85 resultó ser únicamente Linux: en
+  // Windows "Dashboard" cabía por un pelo y el defecto era invisible. Este mide
+  // el margen que le queda a cada etiqueta dentro de su pestaña, así que una
+  // etiqueta al límite falla en la máquina de quien la escribe, no tres horas
+  // después en CI.
+  // De dónde sale el 0.85: a 360px cada pestaña deja 64px útiles. Medido en
+  // Windows, "Calendario" ocupaba 56.8px (89%) y aun así se partía en Linux, lo
+  // que sitúa la brecha entre fuentes en al menos 1.13x. No hay cota superior
+  // medida, así que el umbral no se puede derivar del todo: 0.85 deja fuera a
+  // las etiquetas que ya rozan el límite en la máquina del autor, y el test de
+  // salto de línea sigue cubriendo lo que se escape. Si CI lo hace saltar por
+  // una etiqueta que NO se parte, el número está flojo y toca medir en Linux,
+  // no subirlo.
+  const MAX_LABEL_WIDTH_RATIO = 0.85;
+
+  test("every mobile tab label keeps room to spare inside its tab at 360px", async ({
+    page,
+  }) => {
+    await page.setViewportSize(MOBILE_MIN_WIDTH);
+    await page.goto(`${APP_URL}/dashboard`);
+
+    const usage = await page.evaluate(() => {
+      const tabs = document.querySelectorAll<HTMLElement>(
+        ".app-tabbar-tabs a, .app-tabbar-tabs button",
+      );
+      return Array.from(tabs).map((tab) => {
+        const style = getComputedStyle(tab);
+        const usable =
+          tab.getBoundingClientRect().width -
+          parseFloat(style.paddingLeft) -
+          parseFloat(style.paddingRight);
+        const labelNode = Array.from(tab.childNodes).find(
+          (node) =>
+            node.nodeType === Node.TEXT_NODE &&
+            (node.textContent ?? "").trim().length > 0,
+        );
+        if (!labelNode) {
+          return { label: "", ratio: 0 };
+        }
+        const range = document.createRange();
+        range.selectNodeContents(labelNode);
+        return {
+          label: (labelNode.textContent ?? "").trim(),
+          ratio: range.getBoundingClientRect().width / usable,
+        };
+      });
+    });
+
+    expect(usage.length).toBeGreaterThan(0);
+    const tooWide = usage.filter(({ ratio }) => ratio > MAX_LABEL_WIDTH_RATIO);
+    expect(
+      tooWide.map(
+        ({ label, ratio }) => `${label} (${Math.round(ratio * 100)}%)`,
+      ),
+      `estas etiquetas pasan del ${MAX_LABEL_WIDTH_RATIO * 100}% de su pestaña y se partirán con una fuente algo más ancha`,
+    ).toEqual([]);
+  });
+
+  /**
+   * Una sesión recién abierta, sólo para este test.
+   *
+   * La sesión compartida la llevan a la vez todos los demás tests del bloque,
+   * así que cerrarla les quitaría la suya a mitad de corrida. Cerrar sesión
+   * alcanza sólo a la sesión que la cierra (ver SIGN_OUT_SCOPE), de modo que
+   * con una propia estos tests no molestan a nadie.
+   */
+  async function openOwnSession(
+    page: import("@playwright/test").Page,
+    context: import("@playwright/test").BrowserContext,
+  ): Promise<void> {
+    await context.clearCookies();
+    const response = await page.request.post(`${APP_URL}${SESSION_ENDPOINT}`, {
+      data:
+        E2E_SESSION.kind === "available"
+          ? { email: E2E_SESSION.email, password: E2E_SESSION.password }
+          : {},
+    });
+    expect(
+      response.ok(),
+      `no se pudo abrir una sesión propia: ${response.status()}`,
+    ).toBe(true);
+  }
+
+  test("cerrar sesión desde cualquier pantalla aterriza en la entrada", async ({
+    page,
+    context,
+  }) => {
+    await openOwnSession(page, context);
+    await page.setViewportSize(DESKTOP);
+    await page.goto(`${APP_URL}/calendario`);
+
+    await page.getByRole("button", { name: "Cerrar sesión" }).click();
+
+    await expect(page).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
+  });
+
+  test("tras cerrar sesión, la aplicación vuelve a estar cerrada", async ({
+    page,
+    context,
+  }) => {
+    await openOwnSession(page, context);
+    await page.setViewportSize(DESKTOP);
+    await page.goto(`${APP_URL}/dashboard`);
+    await page.getByRole("button", { name: "Cerrar sesión" }).click();
+    await expect(page).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
+
+    await page.goto(`${APP_URL}/dashboard`);
+
+    await expect(page).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
+  });
+
+  // Las dos pestañas comparten el tarro de cookies del contexto, que es
+  // exactamente lo que comparten dos pestañas de un navegador de verdad.
+  test("cerrar sesión en una pestaña deja sin sesión a la otra", async ({
+    page,
+    context,
+  }) => {
+    await openOwnSession(page, context);
+    const primera = await context.newPage();
+    const segunda = await context.newPage();
+    await primera.goto(`${APP_URL}/dashboard`);
+    await segunda.goto(`${APP_URL}/calendario`);
+    await expect(segunda).toHaveURL(new RegExp("/calendario$"));
+
+    await primera.setViewportSize(DESKTOP);
+    await primera.getByRole("button", { name: "Cerrar sesión" }).click();
+    await expect(primera).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
+
+    // La segunda no se entera hasta que pide algo al servidor, y entonces sí.
+    await segunda.reload();
+
+    await expect(segunda).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
+  });
+
+  test("entrar por el formulario lleva al panel principal", async ({
+    page,
+    context,
+  }) => {
+    // Este caso empieza sin sesión a propósito: es el único que prueba el
+    // formulario de verdad, contra Supabase y con la cuenta de prueba.
+    await context.clearCookies();
+    await page.goto(`${APP_URL}${SIGN_IN_PATH}`);
+
+    await page
+      .getByLabel("Correo electrónico")
+      .fill(E2E_SESSION.kind === "available" ? E2E_SESSION.email : "");
+    await page
+      .getByLabel("Contraseña")
+      .fill(E2E_SESSION.kind === "available" ? E2E_SESSION.password : "");
+    await page.getByRole("button", { name: "Entrar" }).click();
+
+    await expect(page).toHaveURL(new RegExp("/dashboard$"));
+  });
 });
 
 /* ---------------------------------------------------------------------------

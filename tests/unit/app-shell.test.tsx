@@ -2,8 +2,12 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "@/components/AppShell";
 
-const { usePathname } = vi.hoisted(() => ({ usePathname: vi.fn() }));
-vi.mock("next/navigation", () => ({ usePathname }));
+const { usePathname, useRouter } = vi.hoisted(() => ({
+  usePathname: vi.fn(),
+  // La cáscara lleva el control de cerrar sesión, que navega al salir.
+  useRouter: vi.fn(() => ({ replace: vi.fn(), refresh: vi.fn() })),
+}));
+vi.mock("next/navigation", () => ({ usePathname, useRouter }));
 
 describe("app shell", () => {
   it("renderiza marca, navegación, contenido y conmutador de tema", () => {
@@ -19,6 +23,21 @@ describe("app shell", () => {
       screen.getByRole("navigation", { name: "Principal" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /tema/i })).toBeInTheDocument();
+  });
+
+  // FR-007: se cierra sesión desde cualquier pantalla, y la cáscara es lo
+  // único que dibujan las siete por igual.
+  it("ofrece cerrar sesión en cualquier pantalla de la aplicación", () => {
+    usePathname.mockReturnValue("/calendario");
+    render(
+      <AppShell>
+        <p>Contenido de la sección</p>
+      </AppShell>,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Cerrar sesión" }),
+    ).toBeInTheDocument();
   });
 
   it("muestra el contenido recibido dentro del área principal", () => {

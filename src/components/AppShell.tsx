@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { SidebarNav } from "@/components/SidebarNav";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const CLUB_NAME = "Victoria Seadragons";
@@ -15,7 +16,10 @@ export function AppShell({
       <aside className="app-sidebar">
         <div className="app-sidebar-header">
           <span className="app-brand">{CLUB_NAME}</span>
-          <ThemeToggle />
+          <div className="app-sidebar-actions">
+            <ThemeToggle />
+            <SignOutButton />
+          </div>
         </div>
         <SidebarNav />
       </aside>

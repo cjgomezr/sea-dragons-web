@@ -256,6 +256,38 @@ h6 {
   border-color: var(--color-accent);
 }
 
+/* El tema y el cierre de sesión comparten la esquina de la cabecera, que es lo
+   único que se dibuja igual en las siete secciones y en los tres tamaños: es
+   el sitio desde el que "cerrar sesión desde cualquier pantalla" (FR-007) se
+   cumple sin repetir el control en cada una. */
+.app-sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app-signout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  color: var(--color-sidebar-text);
+  background: transparent;
+  border: 1px solid var(--color-sidebar-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.app-signout:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.app-signout:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .app-main {
   flex: 1;
   width: 100%;
@@ -549,11 +581,18 @@ h6 {
   opacity: 0.6;
 }
 
+/* La barra gruesa de la izquierda es lo que hace que esto se lea como un
+   error de un vistazo. Con sólo el borde de 1px que tenía, y el texto del
+   mismo tono que cualquier párrafo, el aviso pasaba por un cuadro más. El
+   color del texto se queda sobre --color-panel, que es la pareja cuyo
+   contraste comprueba tests/unit/design-tokens.test.ts. */
 .auth-error {
   padding: var(--space-3) var(--space-4);
-  color: var(--color-text);
+  font-weight: 700;
+  color: var(--color-danger);
   background: var(--color-panel);
   border: 1px solid var(--color-danger);
+  border-left: 4px solid var(--color-danger);
   border-radius: var(--radius);
 }
 
@@ -572,12 +611,29 @@ h6 {
   color: var(--color-text-secondary);
 }
 
+.auth-form a {
+  color: var(--color-accent);
+}
+
+/* "Volver al registro" (#132) abre la columna por la izquierda, que es por
+   donde se lee de vuelta hacia la pantalla anterior. */
 .auth-back {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
   min-height: var(--touch-target-min);
   color: var(--color-accent);
+}
+
+/* "¿Olvidaste tu contraseña?" va bajo el campo y alineado a su derecha, como
+   en el mockup. Con la altura mínima de toque no se convierte en un enlace que
+   hay que apuntar con el dedo. */
+.auth-inline-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-end;
+  min-height: var(--touch-target-min);
+  font-size: 14px;
 }
 
 @media (min-width: 768px) {
@@ -599,5 +655,16 @@ h6 {
   .auth-main {
     justify-content: center;
     padding: var(--space-8);
+  }
+}
+
+/* La proporción del mockup es al revés que la de 768px: el panel de marca se
+   lleva la mayor parte y el formulario la menor. No se aplica antes porque en
+   una tableta esa misma proporción deja la columna del formulario en menos de
+   300px, y el formulario pide 420. A partir de 1200px la columna estrecha
+   ronda los 390px, que es justo lo que mide el formulario en el mockup. */
+@media (min-width: 1200px) {
+  .auth-brand {
+    width: 62%;
   }
 }

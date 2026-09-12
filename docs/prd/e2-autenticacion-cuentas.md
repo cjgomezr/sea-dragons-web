@@ -380,10 +380,23 @@ Cubre NFR-010 sobre la tabla `audit_log`, que E1 ya creó.
       el monitoreo están a nombre personal del dueño. Antes de que existan socios
       reales conviene pasar todo a un correo del club. No bloquea ningún
       requerimiento de esta épica, pero es más barato ahora que después.
-- [ ] **¿Cuál es el límite de intentos de inicio de sesión?** El SRD no fija
-      número. La propuesta es apoyarse en el límite que el servicio de
-      autenticación ya trae y no escribir uno propio, declarándolo en la
-      documentación.
+- [x] **¿Cuál es el límite de intentos de inicio de sesión?** Resuelto el 12 de
+      septiembre de 2026 con el ticket 5: el que ya trae Supabase Auth, y no se
+      escribe ninguno propio. El inicio de sesión con contraseña pega en
+      `/auth/v1/token`, que Supabase limita por dirección IP con un cubo de
+      fichas de 30 peticiones de capacidad: admite una ráfaga de hasta 30 y a
+      partir de ahí hay que esperar a que el cubo se rellene. Pasado el
+      límite responde 429. No se configura desde el panel, así que no hay
+      número que este proyecto pueda mover; el ritmo de relleno vigente se lee
+      en Authentication > Rate Limits del panel del proyecto, porque la
+      documentación lo muestra con el valor de cada plan en vez de fijarlo en
+      el texto (<https://supabase.com/docs/guides/auth/rate-limits>). No es
+      teoría: la primera versión de la suite de Playwright abría sesión en cada
+      test y el límite empezó a negarlas a mitad de la corrida, así que lo que
+      se cambió fue la suite. Del lado de la aplicación queda una sola
+      obligación, y es no disfrazarlo: un 429 no se cuenta como contraseña
+      equivocada, y `src/lib/auth/supabase-session-gateways.ts` sólo trata como
+      credenciales inválidas los códigos que lo son.
 
 ## 10. Descomposición en tickets (para write-ticket)
 
