@@ -57,10 +57,18 @@ function cookieHeader(cookies: SessionCookies): string {
     .join("; ");
 }
 
+/** Lo poco que estos casos necesitan de un `RequestInit`. El de la DOM admite
+ * `signal: null` y el de NextRequest no, así que pasarlo entero no compila. */
+type RequestOptions = {
+  readonly method?: string;
+  readonly headers?: HeadersInit;
+  readonly body?: string;
+};
+
 function requestWith(
   path: string,
   cookies: SessionCookies,
-  init: RequestInit = {},
+  init: RequestOptions = {},
 ): NextRequest {
   const headers = new Headers(init.headers);
   if (cookies.length > 0) {
