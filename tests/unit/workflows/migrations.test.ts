@@ -12,7 +12,7 @@ interface WorkflowStep {
   run?: string;
   if?: string;
   "continue-on-error"?: boolean;
-  with?: { "node-version"?: number };
+  with?: { "node-version"?: number; "node-version-file"?: string };
 }
 
 interface WorkflowService {
@@ -183,12 +183,13 @@ describe("workflow de migraciones en PR", () => {
     expect(environment.REQUIRE_MIGRATIONS_POSTGRES).toBe("1");
   });
 
-  it("usa setup-node con la misma versión que el resto de los workflows", () => {
+  it("toma la versión de Node de .nvmrc, igual que el resto de los workflows", () => {
     const step = theJob().steps.find((candidate) =>
       candidate.uses?.startsWith("actions/setup-node"),
     );
 
-    expect(step?.with?.["node-version"]).toBe(20);
+    expect(step?.with?.["node-version-file"]).toBe(".nvmrc");
+    expect(step?.with?.["node-version"]).toBeUndefined();
   });
 
   it("declara concurrency con cancel-in-progress para no acumular corridas viejas", () => {

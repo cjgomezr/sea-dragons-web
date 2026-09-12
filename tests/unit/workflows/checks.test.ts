@@ -39,7 +39,7 @@ interface WorkflowStep {
   if?: string;
   env?: Record<string, string>;
   "continue-on-error"?: boolean;
-  with?: { "node-version"?: number };
+  with?: { "node-version"?: number; "node-version-file"?: string };
 }
 
 interface WorkflowJob {
@@ -148,12 +148,13 @@ describe("workflow de checks", () => {
     expect(permissions).toEqual({ contents: "read" });
   });
 
-  it("usa setup-node con la misma versión que visual-baselines.yml", () => {
+  it("toma la versión de Node de .nvmrc, igual que visual-baselines.yml", () => {
     const step = allSteps().find((s) =>
       s.uses?.startsWith("actions/setup-node"),
     );
 
-    expect(step?.with?.["node-version"]).toBe(20);
+    expect(step?.with?.["node-version-file"]).toBe(".nvmrc");
+    expect(step?.with?.["node-version"]).toBeUndefined();
   });
 
   it("instala chromium antes de correr los tests, que lo necesitan para las capturas de UI", () => {
