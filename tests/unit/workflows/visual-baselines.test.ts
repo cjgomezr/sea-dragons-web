@@ -158,7 +158,7 @@ describe("visual-baselines.yml", () => {
     ["compare", "Compara contra la línea base vinculante"],
     ["accept", "Regenera la línea base"],
   ])(
-    "da al paso de %s que corre Playwright las credenciales que el manifiesto declara en CI",
+    "da al paso que corre Playwright en el job $0 las credenciales que el manifiesto declara en CI",
     (jobName, stepName) => {
       const env = stepNamed(jobName, stepName).env ?? {};
 
