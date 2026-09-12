@@ -27,8 +27,8 @@ export const REGISTRATION_PATH = "/registro";
  * que nunca va a tener sesión. */
 export const PASSWORD_RECOVERY_PATH = "/recuperar-contrasena";
 
-/** La única pantalla que alcanza una cuenta `incomplete`, y a la que la
- * frontera manda todo lo demás que esa cuenta pida. */
+/** La pantalla del ticket #133: la única que alcanza una cuenta `incomplete`,
+ * y a la que la frontera manda todo lo demás que esa cuenta pida. */
 export const COMPLETE_REGISTRATION_PATH = "/completar-registro";
 
 /** El panel principal: el destino de una cuenta activa. */

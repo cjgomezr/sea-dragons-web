@@ -99,6 +99,7 @@ describe("frontera de sesión: API", () => {
     const response = await proxy(requestFor("/api/v1/health"));
 
     expect(response.status).toBe(200);
+    expect(redirectedTo(response)).toBeNull();
     // El monitoreo lo pide cada 5 minutos: atarlo a la latencia de Supabase
     // sería hacer que el endpoint que vigila el servicio dependa del servicio.
     expect(readSessionState).not.toHaveBeenCalled();
@@ -110,7 +111,7 @@ describe("frontera de sesión: API", () => {
     const response = await proxy(requestFor(REGISTER_API_PATH));
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("location")).toBeNull();
+    expect(redirectedTo(response)).toBeNull();
     // Preguntar por una sesión que por definición no existe es un viaje a
     // Supabase por cada visita anónima al formulario.
     expect(readSessionState).not.toHaveBeenCalled();
