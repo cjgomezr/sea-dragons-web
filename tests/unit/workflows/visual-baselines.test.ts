@@ -40,6 +40,7 @@ interface WorkflowStep {
   uses?: string;
   run?: string;
   if?: string;
+  env?: Record<string, string>;
   "continue-on-error"?: boolean;
 }
 
@@ -73,6 +74,16 @@ function stepsOf(jobName: string): WorkflowStep[] {
     throw new Error(`El workflow no declara el job "${jobName}".`);
   }
   return job.steps;
+}
+
+function stepNamed(jobName: string, stepName: string): WorkflowStep {
+  const step = stepsOf(jobName).find(
+    (candidate) => candidate.name === stepName,
+  );
+  if (!step) {
+    throw new Error(`El job "${jobName}" no tiene el paso "${stepName}".`);
+  }
+  return step;
 }
 
 function runLines(jobName: string): string {
@@ -143,17 +154,36 @@ describe("visual-baselines.yml", () => {
   // el arranque de Playwright abre esa sesión creando un socio en
   // `seadragons-dev`. Sin estas variables, el job no falla: se salta las
   // pruebas y sale verde sobre capturas que nadie comparó (issue #149).
-  it.each(["compare", "accept"])(
-    "da al job %s las credenciales de desarrollo que el manifiesto declara en CI",
-    (jobName) => {
-      const env = parseWorkflow().jobs[jobName]?.env ?? {};
+  it.each([
+    ["compare", "Compara contra la línea base vinculante"],
+    ["accept", "Regenera la línea base"],
+  ])(
+    "da al paso de %s que corre Playwright las credenciales que el manifiesto declara en CI",
+    (jobName, stepName) => {
+      const env = stepNamed(jobName, stepName).env ?? {};
 
-      expect(Object.keys(env)).toEqual(developmentCredentials());
+      expect(Object.keys(env).sort()).toEqual(developmentCredentials().sort());
       for (const [name, value] of Object.entries(env)) {
         expect(value).toBe(`\${{ secrets.${name} }}`);
       }
     },
   );
+
+  // Una llave de escritura en el entorno del job la heredarían `npm ci` y
+  // cualquier postinstall de una dependencia, que no tienen nada que hacer
+  // con ella. Playwright arranca el dev server como hijo del paso, así que
+  // acotarla al paso no le quita nada.
+  it("no deja ninguna credencial de Supabase en el entorno de un job entero", () => {
+    const credentials = new Set(developmentCredentials());
+
+    for (const [name, job] of Object.entries(parseWorkflow().jobs)) {
+      const leaked = Object.keys(job.env ?? {}).filter((key) =>
+        credentials.has(key),
+      );
+
+      expect(leaked, `el job ${name} las declara a nivel de job`).toEqual([]);
+    }
+  });
 
   it("no referencia ningún secreto que el manifiesto no ponga en CI como de desarrollo", () => {
     const permitted = new Set(developmentCredentials());

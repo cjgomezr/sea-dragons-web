@@ -249,6 +249,13 @@ Preview no cambia: sigue sin ninguna credencial de escritura. Este hueco se
 abrió para CI, que no sirve páginas a nadie y cuyos secretos no viajan a un
 despliegue de un fork.
 
+**Qué pasa con un PR desde un fork.** GitHub no le entrega secretos, así que
+`checks.yml` y el job `compare` saldrían rojos nombrando las variables que
+faltan. Se asume: este repositorio es privado y no recibe PRs desde forks. El
+día que los reciba, la salida no es saltarse la suite para que el fork salga
+verde, porque eso es el agujero que el #149 cerró; es decidir explícitamente
+qué corre sin credenciales, con la condición escrita en el workflow.
+
 ### Qué se pega en cada ámbito de Vercel
 
 | Variable                        | Preview          | Production        |

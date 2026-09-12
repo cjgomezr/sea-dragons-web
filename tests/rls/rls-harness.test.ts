@@ -4,7 +4,7 @@ import {
   SUPABASE_SERVICE_ROLE_KEY_ENV,
   SUPABASE_URL_ENV,
 } from "@/lib/supabase/config";
-import { describeRls } from "../support/rls";
+import { describeRls, skippedSuiteName } from "../support/rls";
 
 describe("cliente por rol", () => {
   beforeEach(() => {
@@ -66,14 +66,18 @@ describe("detección de entorno", () => {
   // Sin credenciales en una máquina de desarrollo, saltarse es lo correcto. En
   // CI no: desde el issue #149 el runner las tiene, y un salto ahí sería una
   // corrida verde que no probó ninguna policy.
-  it("rompe en vez de saltarse cuando a CI le faltan las credenciales", async () => {
-    const { describeRls } = await import("../support/rls");
-
+  it("rompe en vez de saltarse cuando a CI le faltan las credenciales", () => {
     expect(() =>
       describeRls("policies que nadie llegó a probar", () => {}, {
         CI: "true",
       }),
     ).toThrowError(new RegExp(SUPABASE_URL_ENV));
+  });
+
+  it("nombra en el título del salto lo que le falta a esta máquina", () => {
+    expect(
+      skippedSuiteName("policies de members", `faltan ${SUPABASE_URL_ENV}`),
+    ).toBe(`policies de members (saltado: faltan ${SUPABASE_URL_ENV})`);
   });
 });
 

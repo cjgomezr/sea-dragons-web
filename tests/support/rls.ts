@@ -96,10 +96,17 @@ export function describeRls(
 ): void {
   const decision = decideSupabaseCredentials(env);
   if (decision.kind === "skip") {
-    describe.skip(`${name} (saltado: ${decision.reason})`, fn);
+    describe.skip(skippedSuiteName(name, decision.reason), fn);
     return;
   }
   describe(name, fn);
+}
+
+/** El título con el que sale un salto. Quien lea la corrida ve ahí qué le
+ * falta a su máquina, así que se prueba aparte: el nombre es la única parte
+ * de un test saltado que alguien llega a leer. */
+export function skippedSuiteName(name: string, reason: string): string {
+  return `${name} (saltado: ${reason})`;
 }
 
 type CleanupResult = { readonly error: { readonly message: string } | null };

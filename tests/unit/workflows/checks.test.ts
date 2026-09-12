@@ -119,7 +119,7 @@ describe("workflow de checks", () => {
   it("da a los tests las credenciales de desarrollo que el manifiesto declara en CI", () => {
     const env = stepNamed("Tests").env ?? {};
 
-    expect(Object.keys(env)).toEqual(developmentCredentials());
+    expect(Object.keys(env).sort()).toEqual(developmentCredentials().sort());
     for (const [name, value] of Object.entries(env)) {
       expect(value).toBe(`\${{ secrets.${name} }}`);
     }
