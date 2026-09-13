@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ConfirmationEmailOutcome } from "@/lib/auth/register-member";
 
 const CONFIRMATION_EMAIL_URL =
   "http://localhost/api/v1/auth/confirmation-email";
@@ -9,7 +10,7 @@ const requestedEmails: string[] = [];
 function mockWiring(
   options: {
     readonly unconfigured?: readonly string[];
-    readonly failureReason?: string;
+    readonly confirmationEmail?: ConfirmationEmailOutcome;
   } = {},
 ): void {
   vi.doMock("@/lib/auth/supabase-auth-gateways", () => ({
@@ -24,9 +25,7 @@ function mockWiring(
               confirmationEmail: {
                 requestConfirmationEmail: async (email: string) => {
                   requestedEmails.push(email);
-                  return options.failureReason
-                    ? { kind: "failed", reason: options.failureReason }
-                    : { kind: "requested" };
+                  return options.confirmationEmail ?? { kind: "requested" };
                 },
               },
             },
@@ -63,21 +62,7 @@ describe("POST /api/v1/auth/confirmation-email", () => {
     expect(requestedEmails).toEqual(["nerea@example.test"]);
   });
 
-  it("responde lo mismo aunque el envío no se haya podido pedir", async () => {
-    mockWiring({ failureReason: "rate limit exceeded" });
-    vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const response = await postConfirmationEmail({
-      email: "nerea@example.test",
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      data: { outcome: "confirmation_pending", email: "nerea@example.test" },
-    });
-  });
-
-  it("no delata si esa dirección tiene cuenta: el cuerpo sólo repite el correo", async () => {
+  it("no delata si esa dirección tiene cuenta: el cuerpo sólo repite el correo y el envío", async () => {
     mockWiring();
 
     const response = await postConfirmationEmail({
@@ -88,6 +73,7 @@ describe("POST /api/v1/auth/confirmation-email", () => {
       data: {
         outcome: "confirmation_pending",
         email: "desconocida@example.test",
+        confirmationEmail: "requested",
       },
     });
   });
@@ -109,5 +95,54 @@ describe("POST /api/v1/auth/confirmation-email", () => {
     });
 
     expect(response.status).toBe(503);
+  });
+});
+
+describe("reenvío", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doUnmock("@/lib/auth/supabase-auth-gateways");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("un rechazo de Supabase no se reporta como enviado", async () => {
+    mockWiring({
+      confirmationEmail: {
+        kind: "failed",
+        reason: "400: Email address is invalid",
+      },
+    });
+
+    const response = await postConfirmationEmail({
+      email: "nerea@example.test",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        outcome: "confirmation_pending",
+        email: "nerea@example.test",
+        confirmationEmail: "failed",
+      },
+    });
+  });
+
+  it("un 429 se distingue igual que en el registro y su motivo se registra", async () => {
+    const reason = "429: email rate limit exceeded";
+    mockWiring({ confirmationEmail: { kind: "rate_limited", reason } });
+
+    const response = await postConfirmationEmail({
+      email: "nerea@example.test",
+    });
+
+    const body = (await response.json()) as {
+      data: { confirmationEmail: string };
+    };
+    expect(body.data.confirmationEmail).toBe("rate_limited");
+    expect(console.error).toHaveBeenCalledWith(expect.any(String), reason);
   });
 });

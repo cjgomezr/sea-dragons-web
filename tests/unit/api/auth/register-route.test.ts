@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  ConfirmationEmailOutcome,
   IdentityCreation,
   NewMemberRow,
 } from "@/lib/auth/register-member";
@@ -29,6 +30,7 @@ const requestedEmails: string[] = [];
 type WiringOptions = {
   readonly identityCreation?: IdentityCreation;
   readonly unconfigured?: readonly string[];
+  readonly confirmationEmail?: ConfirmationEmailOutcome;
 };
 
 /** Sustituye la raíz de composición por dobles: este test mira los códigos y
@@ -62,7 +64,7 @@ function mockWiring(options: WiringOptions = {}): void {
                 confirmationEmail: {
                   requestConfirmationEmail: async (email: string) => {
                     requestedEmails.push(email);
-                    return { kind: "requested" };
+                    return options.confirmationEmail ?? { kind: "requested" };
                   },
                 },
               },
@@ -107,7 +109,11 @@ describe("POST /api/v1/auth/register", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: { outcome: "confirmation_pending", email: "nerea@example.test" },
+      data: {
+        outcome: "confirmation_pending",
+        email: "nerea@example.test",
+        confirmationEmail: "requested",
+      },
     });
   });
 
@@ -214,7 +220,6 @@ describe("POST /api/v1/auth/register", () => {
     await postRegistration(validBody());
 
     expect(insertedRows).toEqual([]);
-    expect(requestedEmails).toEqual([]);
   });
 
   it("responde 503 nombrando las variables que faltan", async () => {
@@ -245,5 +250,92 @@ describe("POST /api/v1/auth/register", () => {
     );
 
     expect(await response.text()).not.toContain("secretodelclub");
+  });
+});
+
+const MAILER_DOWN: ConfirmationEmailOutcome = {
+  kind: "failed",
+  reason: "400: Email address is invalid",
+};
+
+describe("registro con el correo caído", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doUnmock("@/lib/auth/supabase-auth-gateways");
+    insertedRows.length = 0;
+    requestedEmails.length = 0;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("responde 200 nombrando el fallo del envío y conserva la fila del socio", async () => {
+    mockWiring({ confirmationEmail: MAILER_DOWN });
+
+    const response = await postRegistration(validBody());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        outcome: "confirmation_pending",
+        email: "nerea@example.test",
+        confirmationEmail: "failed",
+      },
+    });
+    expect(insertedRows).toHaveLength(1);
+  });
+
+  it("una dirección con cuenta previa y otra sin ella responden idéntico byte a byte", async () => {
+    mockWiring({ confirmationEmail: MAILER_DOWN });
+    const nueva = await postRegistration(validBody());
+    const textoNuevo = await nueva.text();
+
+    vi.resetModules();
+    mockWiring({
+      identityCreation: { kind: "already_registered" },
+      confirmationEmail: MAILER_DOWN,
+    });
+    const repetida = await postRegistration(validBody());
+
+    expect(repetida.status).toBe(nueva.status);
+    expect(await repetida.text()).toBe(textoNuevo);
+  });
+
+  it("el motivo de Supabase llega al registro del servidor", async () => {
+    mockWiring({ confirmationEmail: MAILER_DOWN });
+
+    await postRegistration(validBody());
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.any(String),
+      MAILER_DOWN.reason,
+    );
+  });
+});
+
+describe("límite de envíos", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doUnmock("@/lib/auth/supabase-auth-gateways");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("un 429 se responde distinto de un fallo genérico y se registra", async () => {
+    const reason = "429: email rate limit exceeded";
+    mockWiring({ confirmationEmail: { kind: "rate_limited", reason } });
+
+    const response = await postRegistration(validBody());
+
+    const body = (await response.json()) as {
+      data: { confirmationEmail: string };
+    };
+    expect(body.data.confirmationEmail).toBe("rate_limited");
+    expect(console.error).toHaveBeenCalledWith(expect.any(String), reason);
   });
 });

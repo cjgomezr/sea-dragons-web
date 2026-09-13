@@ -909,9 +909,19 @@ test.describe("dentro de la aplicación", () => {
 const REGISTRATION_ENDPOINT = "**/api/v1/auth/register";
 const CONFIRMATION_STUB_EMAIL = "nerea@example.test";
 
+/** Las dos variantes de la pantalla (#147): el correo salió, o no salió. El
+ * límite de envíos comparte maquetación con el fallo y sólo cambia el texto. */
+const CONFIRMATION_VARIANTS = [
+  { delivery: "requested", screenshotPrefix: "registro-confirmacion" },
+  { delivery: "failed", screenshotPrefix: "registro-confirmacion-fallida" },
+] as const;
+
+type ConfirmationDelivery = (typeof CONFIRMATION_VARIANTS)[number]["delivery"];
+
 async function goToConfirmationPending(
   page: import("@playwright/test").Page,
   theme: (typeof themes)[number],
+  delivery: ConfirmationDelivery,
 ): Promise<void> {
   await page.route(REGISTRATION_ENDPOINT, (route) =>
     route.fulfill({
@@ -921,6 +931,7 @@ async function goToConfirmationPending(
         data: {
           outcome: "confirmation_pending",
           email: CONFIRMATION_STUB_EMAIL,
+          confirmationEmail: delivery,
         },
       }),
     }),
@@ -940,39 +951,41 @@ async function goToConfirmationPending(
   ).toBeVisible();
 }
 
-for (const vp of viewports) {
-  test.describe(`registro-confirmacion @ ${vp.name}`, () => {
-    test.use({ viewport: { width: vp.width, height: vp.height } });
+for (const variant of CONFIRMATION_VARIANTS) {
+  for (const vp of viewports) {
+    test.describe(`${variant.screenshotPrefix} @ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
 
-    for (const theme of themes) {
-      test(`matches approved baseline (${theme})`, async ({ page }) => {
-        await goToConfirmationPending(page, theme);
-        const name = `registro-confirmacion-${vp.name}-${theme}.png`;
-        await createMissingLocalBaseline(name, () =>
-          page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
-        );
-        await expect(page).toHaveScreenshot(name, {
-          ...SCREENSHOT_OPTIONS,
-          fullPage: true,
-          maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await goToConfirmationPending(page, theme, variant.delivery);
+          const name = `${variant.screenshotPrefix}-${vp.name}-${theme}.png`;
+          await createMissingLocalBaseline(name, () =>
+            page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+          );
+          await expect(page).toHaveScreenshot(name, {
+            ...SCREENSHOT_OPTIONS,
+            fullPage: true,
+            maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+          });
         });
-      });
-    }
+      }
+    });
+  }
+
+  test(`${variant.screenshotPrefix}: has no accessibility violations (axe-core)`, async ({
+    page,
+  }) => {
+    await goToConfirmationPending(page, "light", variant.delivery);
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa"])
+      .analyze();
+    expect(
+      results.violations,
+      JSON.stringify(results.violations, null, 2),
+    ).toEqual([]);
   });
 }
-
-test("registro-confirmacion: has no accessibility violations (axe-core)", async ({
-  page,
-}) => {
-  await goToConfirmationPending(page, "light");
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
-  expect(
-    results.violations,
-    JSON.stringify(results.violations, null, 2),
-  ).toEqual([]);
-});
 
 // Los cuatro desenlaces del enlace del correo se alcanzan por URL, así que se
 // revisan con axe sin capturar una línea base por cada uno: comparten
@@ -1115,9 +1128,7 @@ test.describe("una cuenta incompleta en un navegador de verdad", () => {
   test("no llega a ninguna pantalla de la aplicación", async ({ page }) => {
     await page.goto(`${APP_URL}/calendario`);
 
-    await expect(page).toHaveURL(
-      new RegExp(`${COMPLETE_REGISTRATION_PATH}$`),
-    );
+    await expect(page).toHaveURL(new RegExp(`${COMPLETE_REGISTRATION_PATH}$`));
   });
 
   test("responde 403 a la API directa, que es lo que la redirección esconde", async ({
@@ -1141,7 +1152,6 @@ test.describe("una cuenta incompleta en un navegador de verdad", () => {
     await expect(page.getByLabel("Fecha de nacimiento")).toHaveCount(0);
     await expect(page.getByLabel("Nombre completo")).toHaveCount(0);
   });
-
 });
 
 /** Los dos tests que dejan su cuenta distinta a como la encontraron. Cada uno

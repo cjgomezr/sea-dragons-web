@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type AuthIdentityGateway,
   type ConfirmationEmailGateway,
+  type ConfirmationEmailOutcome,
   type IdentityCreation,
   IdentityCreationError,
   type MemberDirectory,
@@ -44,7 +45,7 @@ type DoubleOptions = {
   readonly createIdentityFails?: Error;
   readonly insertMemberFails?: Error;
   readonly deleteIdentityFails?: Error;
-  readonly confirmationEmailFails?: string;
+  readonly confirmationEmail?: ConfirmationEmailOutcome;
 };
 
 function doubles(options: DoubleOptions = {}): Doubles {
@@ -81,9 +82,7 @@ function doubles(options: DoubleOptions = {}): Doubles {
     confirmationEmail: {
       async requestConfirmationEmail(email) {
         confirmationEmailsRequested.push(email);
-        return options.confirmationEmailFails
-          ? { kind: "failed", reason: options.confirmationEmailFails }
-          : { kind: "requested" };
+        return options.confirmationEmail ?? { kind: "requested" };
       },
     },
   };
@@ -135,15 +134,13 @@ describe("registro", () => {
     expect(result.confirmationEmail).toEqual({ kind: "requested" });
   });
 
-  it("no tumba el registro si el correo de confirmación no se pudo pedir", async () => {
-    const given = doubles({ confirmationEmailFails: "rate limit exceeded" });
+  it("con el envío correcto el recibo dice que el correo se pidió", async () => {
+    const result = await register(doubles());
 
-    const result = await register(given);
-
-    expect(given.insertedRows).toHaveLength(1);
-    expect(result.confirmationEmail).toEqual({
-      kind: "failed",
-      reason: "rate limit exceeded",
+    expect(result.receipt).toEqual({
+      outcome: "confirmation_pending",
+      email: "nerea@example.test",
+      confirmationEmail: "requested",
     });
   });
 
@@ -174,7 +171,16 @@ describe("registro", () => {
     await register(given);
 
     expect(given.insertedRows).toEqual([]);
-    expect(given.confirmationEmailsRequested).toEqual([]);
+  });
+
+  it("con un correo ya registrado pide el correo igual que con uno nuevo", async () => {
+    const given = doubles({
+      identityCreation: { kind: "already_registered" },
+    });
+
+    await register(given);
+
+    expect(given.confirmationEmailsRequested).toEqual(["nerea@example.test"]);
   });
 
   it("si el servicio de autenticación falla, el error sube con contexto y no queda fila de miembro", async () => {
@@ -237,5 +243,57 @@ describe("registro", () => {
         { field: "password", message: expect.any(String) },
       ],
     });
+  });
+});
+
+const MAILER_DOWN: ConfirmationEmailOutcome = {
+  kind: "failed",
+  reason: "Email address is invalid",
+};
+
+describe("registro con el correo caído", () => {
+  it("el recibo nombra el fallo del envío y la cuenta creada se conserva", async () => {
+    const given = doubles({ confirmationEmail: MAILER_DOWN });
+
+    const result = await register(given);
+
+    expect(result.receipt.confirmationEmail).toBe("failed");
+    expect(given.insertedRows).toHaveLength(1);
+    expect(given.deletedUserIds).toEqual([]);
+  });
+
+  it("una dirección con cuenta previa y otra sin ella dan recibos idénticos", async () => {
+    const nueva = await register(doubles({ confirmationEmail: MAILER_DOWN }));
+    const repetida = await register(
+      doubles({
+        identityCreation: { kind: "already_registered" },
+        confirmationEmail: MAILER_DOWN,
+      }),
+    );
+
+    expect(JSON.stringify(repetida.receipt)).toBe(
+      JSON.stringify(nueva.receipt),
+    );
+  });
+
+  it("conserva el motivo del fallo para quien lo registre", async () => {
+    const result = await register(doubles({ confirmationEmail: MAILER_DOWN }));
+
+    expect(result.confirmationEmail).toEqual(MAILER_DOWN);
+  });
+});
+
+describe("límite de envíos", () => {
+  it("el recibo distingue el límite de envíos de un fallo genérico", async () => {
+    const result = await register(
+      doubles({
+        confirmationEmail: {
+          kind: "rate_limited",
+          reason: "email rate limit exceeded",
+        },
+      }),
+    );
+
+    expect(result.receipt.confirmationEmail).toBe("rate_limited");
   });
 });

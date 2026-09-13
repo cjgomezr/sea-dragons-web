@@ -150,6 +150,7 @@ describeRls("registro contra seadragons-dev", () => {
         expect(result.receipt).toEqual({
           outcome: "confirmation_pending",
           email,
+          confirmationEmail: "requested",
         });
 
         const userId = await requireUserIdByEmail(serviceClient, email);

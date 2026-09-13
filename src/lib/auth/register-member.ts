@@ -38,10 +38,17 @@ export type MemberDirectory = {
   insertMember(row: NewMemberRow): Promise<void>;
 };
 
+/** El límite de envíos va aparte del fallo genérico porque pide otra cosa a
+ * quien mira la pantalla: esperar, ya que reintentar en ese momento vuelve a
+ * fallar. El motivo es para los registros del servidor y nunca lleva la
+ * dirección. */
 export type ConfirmationEmailOutcome =
   | { readonly kind: "requested" }
   | { readonly kind: "failed"; readonly reason: string }
-  | { readonly kind: "not_requested"; readonly reason: string };
+  | { readonly kind: "rate_limited"; readonly reason: string };
+
+/** Lo que la respuesta pública dice del envío. Sólo el tipo, sin el motivo. */
+export type ConfirmationEmailDelivery = ConfirmationEmailOutcome["kind"];
 
 /** Devuelve el fallo en vez de lanzarlo: el correo de confirmación se pide
  * pero no decide si el registro salió bien. El servicio incorporado de
@@ -49,11 +56,7 @@ export type ConfirmationEmailOutcome =
  * del proyecto, así que un envío fallido es normal y la pantalla ofrece
  * reenviarlo. Quien llama decide qué hacer con el fallo; nadie lo ignora. */
 export type ConfirmationEmailGateway = {
-  requestConfirmationEmail(
-    email: string,
-  ): Promise<
-    Extract<ConfirmationEmailOutcome, { kind: "requested" | "failed" }>
-  >;
+  requestConfirmationEmail(email: string): Promise<ConfirmationEmailOutcome>;
 };
 
 export type RegistrationGateways = {
@@ -65,10 +68,12 @@ export type RegistrationGateways = {
 /** Respuesta del registro. Es deliberadamente pobre: es la MISMA exista o no
  * ya una cuenta con ese correo, porque enumerar cuentas desde el formulario de
  * registro es una fuga de datos personales. No lleva id de miembro ni de
- * identidad por lo mismo. */
+ * identidad por lo mismo. `confirmationEmail` depende sólo de si el envío
+ * salió, nunca de si la cuenta existía (#147). */
 export type RegistrationReceipt = {
   readonly outcome: "confirmation_pending";
   readonly email: string;
+  readonly confirmationEmail: ConfirmationEmailDelivery;
 };
 
 export type RegistrationResult = {
@@ -175,40 +180,38 @@ export async function registerMember(
     throw new RegistrationValidationError(validation.issues);
   }
   const details = validation.details;
-  const receipt: RegistrationReceipt = {
-    outcome: NEUTRAL_RECEIPT_OUTCOME,
-    email: details.email,
-  };
 
   const identity = await createIdentity(gateways, {
     email: details.email,
     password: details.password,
   });
-  if (identity.kind === "already_registered") {
-    return {
-      receipt,
-      confirmationEmail: {
-        kind: "not_requested",
-        reason: "El correo ya tenía cuenta.",
-      },
-    };
+  if (identity.kind === "created") {
+    await insertMemberOrUndoIdentity(gateways, {
+      club_id: input.clubId,
+      user_id: identity.userId,
+      full_name: details.fullName,
+      email: details.email,
+      country: details.country,
+      date_of_birth: details.dateOfBirth,
+      membership_type: details.membershipType,
+      role: "Player",
+      account_status: "incomplete",
+    });
   }
 
-  await insertMemberOrUndoIdentity(gateways, {
-    club_id: input.clubId,
-    user_id: identity.userId,
-    full_name: details.fullName,
-    email: details.email,
-    country: details.country,
-    date_of_birth: details.dateOfBirth,
-    membership_type: details.membershipType,
-    role: "Player",
-    account_status: "incomplete",
-  });
+  // También con una cuenta previa. Si sólo las nuevas pidieran el correo, un
+  // envío caído (y agotar el límite está al alcance de cualquiera) haría que
+  // el recibo delatara qué direcciones ya tienen cuenta. Es lo mismo que puede
+  // pedir cualquiera desde el reenvío, así que no abre nada nuevo.
+  const confirmationEmail =
+    await gateways.confirmationEmail.requestConfirmationEmail(details.email);
 
   return {
-    receipt,
-    confirmationEmail:
-      await gateways.confirmationEmail.requestConfirmationEmail(details.email),
+    receipt: {
+      outcome: NEUTRAL_RECEIPT_OUTCOME,
+      email: details.email,
+      confirmationEmail: confirmationEmail.kind,
+    },
+    confirmationEmail,
   };
 }

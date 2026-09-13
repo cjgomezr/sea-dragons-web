@@ -272,3 +272,112 @@ describe("formulario de registro", () => {
     expect(alert).not.toHaveTextContent("ECONNREFUSED");
   });
 });
+
+type Delivery = "requested" | "failed" | "rate_limited";
+
+function pendingBody(confirmationEmail: Delivery): {
+  status: number;
+  body: unknown;
+} {
+  return {
+    status: 200,
+    body: {
+      data: {
+        outcome: "confirmation_pending",
+        email: "nerea@example.test",
+        confirmationEmail,
+      },
+    },
+  };
+}
+
+/** Cada llamada a fetch responde con la siguiente entrega de la lista: la
+ * primera es el registro y las demás son reenvíos. */
+function stubDeliveries(...deliveries: readonly Delivery[]): void {
+  const pending = [...deliveries];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      const next = pendingBody(pending.shift() ?? "requested");
+      return new Response(JSON.stringify(next.body), {
+        status: next.status,
+        headers: { "content-type": "application/json" },
+      });
+    }),
+  );
+}
+
+async function registerThroughForm(): Promise<void> {
+  renderForm();
+  await fillValidForm();
+  await userEvent.setup().click(submitButton());
+  await screen.findByRole("heading", { name: /confirma tu correo/i });
+}
+
+function resendButton(): HTMLElement {
+  return screen.getByRole("button", { name: "Reenviar el correo" });
+}
+
+describe("pantalla de confirmación", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("con el envío correcto muestra el texto de siempre y ningún aviso", async () => {
+    stubDeliveries("requested");
+
+    await registerThroughForm();
+
+    expect(screen.getByText(/te mandamos un enlace/i)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("con el envío fallido avisa de que el correo no salió y ofrece reintentarlo", async () => {
+    stubDeliveries("failed");
+
+    await registerThroughForm();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/no salió/i);
+    expect(
+      screen.queryByText(/te mandamos un enlace/i),
+    ).not.toBeInTheDocument();
+    expect(resendButton()).toBeEnabled();
+  });
+
+  it("con el límite de envíos dice que hay que esperar", async () => {
+    stubDeliveries("rate_limited");
+
+    await registerThroughForm();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/espera/i);
+  });
+
+  it("un reenvío que sale quita el aviso y dice que el enlace va en camino", async () => {
+    stubDeliveries("failed", "requested");
+    await registerThroughForm();
+
+    await userEvent.setup().click(resendButton());
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/en camino/i);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("un reenvío rechazado no dice que el enlace va en camino", async () => {
+    stubDeliveries("requested", "failed");
+    await registerThroughForm();
+
+    await userEvent.setup().click(resendButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/no salió/i);
+    expect(screen.queryByText(/en camino/i)).not.toBeInTheDocument();
+  });
+
+  it("un reenvío frenado por el límite dice que hay que esperar", async () => {
+    stubDeliveries("requested", "rate_limited");
+    await registerThroughForm();
+
+    await userEvent.setup().click(resendButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/espera/i);
+  });
+});
