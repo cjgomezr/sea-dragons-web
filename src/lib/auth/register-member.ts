@@ -38,17 +38,21 @@ export type MemberDirectory = {
   insertMember(row: NewMemberRow): Promise<void>;
 };
 
-/** El límite de envíos va aparte del fallo genérico porque pide otra cosa a
- * quien mira la pantalla: esperar, ya que reintentar en ese momento vuelve a
- * fallar. El motivo es para los registros del servidor y nunca lleva la
- * dirección. */
-export type ConfirmationEmailOutcome =
+/** Lo que contestó el servicio de correo al pedirle el envío. Es sólo para los
+ * registros del servidor, y el motivo nunca lleva la dirección. El límite va
+ * aparte del fallo genérico porque es el que se agota con dos registros
+ * seguidos, y el aviso del #154 lo necesitará.
+ *
+ * Nunca llega al cliente (#147). Supabase sólo intenta enviar a una cuenta sin
+ * confirmar, así que un fallo del envío delata que esa dirección tiene cuenta:
+ * cualquier campo de la respuesta que dependa de esto es un oráculo. */
+export type RequestedConfirmationEmail =
   | { readonly kind: "requested" }
   | { readonly kind: "failed"; readonly reason: string }
   | { readonly kind: "rate_limited"; readonly reason: string };
 
-/** Lo que la respuesta pública dice del envío. Sólo el tipo, sin el motivo. */
-export type ConfirmationEmailDelivery = ConfirmationEmailOutcome["kind"];
+export type ConfirmationEmailOutcome =
+  RequestedConfirmationEmail | { readonly kind: "not_requested" };
 
 /** Devuelve el fallo en vez de lanzarlo: el correo de confirmación se pide
  * pero no decide si el registro salió bien. El servicio incorporado de
@@ -56,7 +60,7 @@ export type ConfirmationEmailDelivery = ConfirmationEmailOutcome["kind"];
  * del proyecto, así que un envío fallido es normal y la pantalla ofrece
  * reenviarlo. Quien llama decide qué hacer con el fallo; nadie lo ignora. */
 export type ConfirmationEmailGateway = {
-  requestConfirmationEmail(email: string): Promise<ConfirmationEmailOutcome>;
+  requestConfirmationEmail(email: string): Promise<RequestedConfirmationEmail>;
 };
 
 export type RegistrationGateways = {
@@ -68,12 +72,11 @@ export type RegistrationGateways = {
 /** Respuesta del registro. Es deliberadamente pobre: es la MISMA exista o no
  * ya una cuenta con ese correo, porque enumerar cuentas desde el formulario de
  * registro es una fuga de datos personales. No lleva id de miembro ni de
- * identidad por lo mismo. `confirmationEmail` depende sólo de si el envío
- * salió, nunca de si la cuenta existía (#147). */
+ * identidad por lo mismo, ni dice si el correo salió (ver
+ * `RequestedConfirmationEmail`). */
 export type RegistrationReceipt = {
   readonly outcome: "confirmation_pending";
   readonly email: string;
-  readonly confirmationEmail: ConfirmationEmailDelivery;
 };
 
 export type RegistrationResult = {
@@ -180,38 +183,36 @@ export async function registerMember(
     throw new RegistrationValidationError(validation.issues);
   }
   const details = validation.details;
+  const receipt: RegistrationReceipt = {
+    outcome: NEUTRAL_RECEIPT_OUTCOME,
+    email: details.email,
+  };
 
   const identity = await createIdentity(gateways, {
     email: details.email,
     password: details.password,
   });
-  if (identity.kind === "created") {
-    await insertMemberOrUndoIdentity(gateways, {
-      club_id: input.clubId,
-      user_id: identity.userId,
-      full_name: details.fullName,
-      email: details.email,
-      country: details.country,
-      date_of_birth: details.dateOfBirth,
-      membership_type: details.membershipType,
-      role: "Player",
-      account_status: "incomplete",
-    });
+  // Con una cuenta previa no se pide el correo: se lo mandaría a esa persona
+  // en cada intento y gastaría el cupo. El recibo es el mismo de todas formas.
+  if (identity.kind === "already_registered") {
+    return { receipt, confirmationEmail: { kind: "not_requested" } };
   }
 
-  // También con una cuenta previa. Si sólo las nuevas pidieran el correo, un
-  // envío caído (y agotar el límite está al alcance de cualquiera) haría que
-  // el recibo delatara qué direcciones ya tienen cuenta. Es lo mismo que puede
-  // pedir cualquiera desde el reenvío, así que no abre nada nuevo.
-  const confirmationEmail =
-    await gateways.confirmationEmail.requestConfirmationEmail(details.email);
+  await insertMemberOrUndoIdentity(gateways, {
+    club_id: input.clubId,
+    user_id: identity.userId,
+    full_name: details.fullName,
+    email: details.email,
+    country: details.country,
+    date_of_birth: details.dateOfBirth,
+    membership_type: details.membershipType,
+    role: "Player",
+    account_status: "incomplete",
+  });
 
   return {
-    receipt: {
-      outcome: NEUTRAL_RECEIPT_OUTCOME,
-      email: details.email,
-      confirmationEmail: confirmationEmail.kind,
-    },
-    confirmationEmail,
+    receipt,
+    confirmationEmail:
+      await gateways.confirmationEmail.requestConfirmationEmail(details.email),
   };
 }

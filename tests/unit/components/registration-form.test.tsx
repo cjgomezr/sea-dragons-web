@@ -273,36 +273,31 @@ describe("formulario de registro", () => {
   });
 });
 
-type Delivery = "requested" | "failed" | "rate_limited";
+const PENDING_RESPONSE = new Response(
+  JSON.stringify({
+    data: { outcome: "confirmation_pending", email: "nerea@example.test" },
+  }),
+  { status: 200, headers: { "content-type": "application/json" } },
+);
 
-function pendingBody(confirmationEmail: Delivery): {
-  status: number;
-  body: unknown;
-} {
-  return {
-    status: 200,
-    body: {
-      data: {
-        outcome: "confirmation_pending",
-        email: "nerea@example.test",
-        confirmationEmail,
-      },
-    },
-  };
-}
+type ResendReply = "ok" | "http_error" | "network_error";
 
-/** Cada llamada a fetch responde con la siguiente entrega de la lista: la
- * primera es el registro y las demás son reenvíos. */
-function stubDeliveries(...deliveries: readonly Delivery[]): void {
-  const pending = [...deliveries];
+/** El registro siempre sale bien; el reenvío responde lo que pida el test. */
+function stubRegistrationThenResend(resend: ResendReply): void {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () => {
-      const next = pendingBody(pending.shift() ?? "requested");
-      return new Response(JSON.stringify(next.body), {
-        status: next.status,
-        headers: { "content-type": "application/json" },
-      });
+    vi.fn(async (url: string) => {
+      if (url === REGISTER_API_PATH) {
+        return PENDING_RESPONSE.clone();
+      }
+      switch (resend) {
+        case "ok":
+          return PENDING_RESPONSE.clone();
+        case "http_error":
+          return new Response("{}", { status: 500 });
+        case "network_error":
+          throw new Error("ECONNREFUSED 127.0.0.1:3417");
+      }
     }),
   );
 }
@@ -314,8 +309,10 @@ async function registerThroughForm(): Promise<void> {
   await screen.findByRole("heading", { name: /confirma tu correo/i });
 }
 
-function resendButton(): HTMLElement {
-  return screen.getByRole("button", { name: "Reenviar el correo" });
+async function clickResend(): Promise<void> {
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Reenviar el correo" }));
 }
 
 describe("pantalla de confirmación", () => {
@@ -323,61 +320,48 @@ describe("pantalla de confirmación", () => {
     vi.unstubAllGlobals();
   });
 
-  it("con el envío correcto muestra el texto de siempre y ningún aviso", async () => {
-    stubDeliveries("requested");
+  it("dice que mandamos un enlace y que, si no llega en unos minutos, se puede reenviar desde ahí", async () => {
+    stubRegistrationThenResend("ok");
 
     await registerThroughForm();
 
     expect(screen.getByText(/te mandamos un enlace/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/si no te llega en unos minutos/i),
+    ).toHaveTextContent(/reenv/i);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("con el envío fallido avisa de que el correo no salió y ofrece reintentarlo", async () => {
-    stubDeliveries("failed");
-
+  it("un reenvío que responde bien dice que el enlace va en camino", async () => {
+    stubRegistrationThenResend("ok");
     await registerThroughForm();
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/no salió/i);
-    expect(
-      screen.queryByText(/te mandamos un enlace/i),
-    ).not.toBeInTheDocument();
-    expect(resendButton()).toBeEnabled();
-  });
-
-  it("con el límite de envíos dice que hay que esperar", async () => {
-    stubDeliveries("rate_limited");
-
-    await registerThroughForm();
-
-    expect(screen.getByRole("alert")).toHaveTextContent(/espera/i);
-  });
-
-  it("un reenvío que sale quita el aviso y dice que el enlace va en camino", async () => {
-    stubDeliveries("failed", "requested");
-    await registerThroughForm();
-
-    await userEvent.setup().click(resendButton());
+    await clickResend();
 
     expect(await screen.findByRole("status")).toHaveTextContent(/en camino/i);
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("un reenvío rechazado no dice que el enlace va en camino", async () => {
-    stubDeliveries("requested", "failed");
+  it("con un fallo de red del reenvío muestra su mensaje propio", async () => {
+    stubRegistrationThenResend("network_error");
     await registerThroughForm();
 
-    await userEvent.setup().click(resendButton());
+    await clickResend();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/no salió/i);
-    expect(screen.queryByText(/en camino/i)).not.toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/no pudimos pedir otro correo/i);
+    expect(alert).toHaveTextContent(/conexión/i);
+    expect(alert).not.toHaveTextContent(/crear tu cuenta/i);
+    expect(alert).not.toHaveTextContent("ECONNREFUSED");
   });
 
-  it("un reenvío frenado por el límite dice que hay que esperar", async () => {
-    stubDeliveries("requested", "rate_limited");
+  it("con un error HTTP del reenvío muestra su mensaje propio", async () => {
+    stubRegistrationThenResend("http_error");
     await registerThroughForm();
 
-    await userEvent.setup().click(resendButton());
+    await clickResend();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/espera/i);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/no pudimos pedir otro correo/i);
+    expect(alert).not.toHaveTextContent(/crear tu cuenta/i);
   });
 });

@@ -35,7 +35,7 @@ describe("límite de envíos", () => {
   });
 });
 
-describe("registro con el correo caído", () => {
+describe("registro del motivo", () => {
   it("el motivo no lleva la dirección, que es un dato personal", () => {
     const outcome = toConfirmationEmailOutcome(
       { status: 400, message: `Email address "${EMAIL}" is invalid` },

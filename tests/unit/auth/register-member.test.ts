@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type AuthIdentityGateway,
   type ConfirmationEmailGateway,
-  type ConfirmationEmailOutcome,
   type IdentityCreation,
   IdentityCreationError,
   type MemberDirectory,
   MemberRecordError,
   type NewMemberRow,
+  type RequestedConfirmationEmail,
   RegistrationValidationError,
   registerMember,
 } from "@/lib/auth/register-member";
@@ -45,7 +45,7 @@ type DoubleOptions = {
   readonly createIdentityFails?: Error;
   readonly insertMemberFails?: Error;
   readonly deleteIdentityFails?: Error;
-  readonly confirmationEmail?: ConfirmationEmailOutcome;
+  readonly confirmationEmail?: RequestedConfirmationEmail;
 };
 
 function doubles(options: DoubleOptions = {}): Doubles {
@@ -134,13 +134,12 @@ describe("registro", () => {
     expect(result.confirmationEmail).toEqual({ kind: "requested" });
   });
 
-  it("con el envío correcto el recibo dice que el correo se pidió", async () => {
+  it("el recibo sólo lleva el desenlace neutro y la dirección", async () => {
     const result = await register(doubles());
 
     expect(result.receipt).toEqual({
       outcome: "confirmation_pending",
       email: "nerea@example.test",
-      confirmationEmail: "requested",
     });
   });
 
@@ -163,7 +162,7 @@ describe("registro", () => {
     expect(repetido.receipt).toEqual(nuevo.receipt);
   });
 
-  it("con un correo ya registrado no crea una segunda cuenta", async () => {
+  it("con un correo ya registrado no crea una segunda cuenta ni pide el correo", async () => {
     const given = doubles({
       identityCreation: { kind: "already_registered" },
     });
@@ -171,16 +170,7 @@ describe("registro", () => {
     await register(given);
 
     expect(given.insertedRows).toEqual([]);
-  });
-
-  it("con un correo ya registrado pide el correo igual que con uno nuevo", async () => {
-    const given = doubles({
-      identityCreation: { kind: "already_registered" },
-    });
-
-    await register(given);
-
-    expect(given.confirmationEmailsRequested).toEqual(["nerea@example.test"]);
+    expect(given.confirmationEmailsRequested).toEqual([]);
   });
 
   it("si el servicio de autenticación falla, el error sube con contexto y no queda fila de miembro", async () => {
@@ -246,54 +236,42 @@ describe("registro", () => {
   });
 });
 
-const MAILER_DOWN: ConfirmationEmailOutcome = {
-  kind: "failed",
-  reason: "Email address is invalid",
+const FAILED_SENDS: Readonly<Record<string, RequestedConfirmationEmail>> = {
+  "rechazo 400": { kind: "failed", reason: "400: Email address is invalid" },
+  "rechazo 429": {
+    kind: "rate_limited",
+    reason: "429: email rate limit exceeded",
+  },
 };
 
-describe("registro con el correo caído", () => {
-  it("el recibo nombra el fallo del envío y la cuenta creada se conserva", async () => {
-    const given = doubles({ confirmationEmail: MAILER_DOWN });
+describe("cuenta tras un envío fallido", () => {
+  it.each(Object.entries(FAILED_SENDS))(
+    "con un %s la identidad y la fila del socio se conservan",
+    async (_sendResult, confirmationEmail) => {
+      const given = doubles({ confirmationEmail });
 
-    const result = await register(given);
+      await register(given);
 
-    expect(result.receipt.confirmationEmail).toBe("failed");
-    expect(given.insertedRows).toHaveLength(1);
-    expect(given.deletedUserIds).toEqual([]);
-  });
+      expect(given.insertedRows).toHaveLength(1);
+      expect(given.deletedUserIds).toEqual([]);
+    },
+  );
 
-  it("una dirección con cuenta previa y otra sin ella dan recibos idénticos", async () => {
-    const nueva = await register(doubles({ confirmationEmail: MAILER_DOWN }));
-    const repetida = await register(
-      doubles({
-        identityCreation: { kind: "already_registered" },
-        confirmationEmail: MAILER_DOWN,
-      }),
-    );
+  it.each(Object.entries(FAILED_SENDS))(
+    "con un %s el recibo es el mismo que con un envío que sale",
+    async (_sendResult, confirmationEmail) => {
+      const sent = await register(doubles());
+      const failed = await register(doubles({ confirmationEmail }));
 
-    expect(JSON.stringify(repetida.receipt)).toBe(
-      JSON.stringify(nueva.receipt),
-    );
-  });
+      expect(JSON.stringify(failed.receipt)).toBe(JSON.stringify(sent.receipt));
+    },
+  );
 
   it("conserva el motivo del fallo para quien lo registre", async () => {
-    const result = await register(doubles({ confirmationEmail: MAILER_DOWN }));
+    const confirmationEmail = FAILED_SENDS["rechazo 429"];
 
-    expect(result.confirmationEmail).toEqual(MAILER_DOWN);
-  });
-});
+    const result = await register(doubles({ confirmationEmail }));
 
-describe("límite de envíos", () => {
-  it("el recibo distingue el límite de envíos de un fallo genérico", async () => {
-    const result = await register(
-      doubles({
-        confirmationEmail: {
-          kind: "rate_limited",
-          reason: "email rate limit exceeded",
-        },
-      }),
-    );
-
-    expect(result.receipt.confirmationEmail).toBe("rate_limited");
+    expect(result.confirmationEmail).toEqual(confirmationEmail);
   });
 });

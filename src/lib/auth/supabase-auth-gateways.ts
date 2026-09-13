@@ -19,9 +19,9 @@ import type { EmailConfirmationGateway } from "./email-confirmation";
 import type {
   AuthIdentityGateway,
   ConfirmationEmailGateway,
-  ConfirmationEmailOutcome,
   MemberDirectory,
   RegistrationGateways,
+  RequestedConfirmationEmail,
 } from "./register-member";
 
 /**
@@ -151,7 +151,7 @@ function describeSendError(error: AuthSendError, email: string): string {
 export function toConfirmationEmailOutcome(
   error: AuthSendError | null,
   email: string,
-): ConfirmationEmailOutcome {
+): RequestedConfirmationEmail {
   if (error === null) {
     return { kind: "requested" };
   }

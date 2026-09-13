@@ -2,8 +2,8 @@ import { z } from "zod";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
 import type {
-  ConfirmationEmailOutcome,
   RegistrationReceipt,
+  RequestedConfirmationEmail,
 } from "@/lib/auth/register-member";
 import { looksLikeEmail } from "@/lib/auth/registration";
 import {
@@ -19,11 +19,12 @@ const confirmationEmailBodySchema = z.object({ email: z.string() });
 type ConfirmationEmailBody = z.infer<typeof confirmationEmailBodySchema>;
 
 /** La misma forma que devuelve el registro, y por el mismo motivo: reenviar la
- * confirmación tampoco puede decir si esa dirección tiene cuenta. Sí dice si el
- * envío salió, que no depende de eso. */
+ * confirmación tampoco puede decir si esa dirección tiene cuenta. Tampoco dice
+ * si el envío salió, porque Supabase sólo intenta enviar a cuentas sin
+ * confirmar y eso lo delataría igual (#147). */
 export type ConfirmationEmailResponse = RegistrationReceipt;
 
-function reportConfirmationEmail(outcome: ConfirmationEmailOutcome): void {
+function reportConfirmationEmail(outcome: RequestedConfirmationEmail): void {
   if (outcome.kind !== "requested") {
     console.error(
       "[api/v1/auth/confirmation-email] no se pudo reenviar la confirmación",
@@ -54,16 +55,10 @@ const postConfirmationEmail = createApiRoute<
       );
     }
 
-    const outcome =
-      await wiring.gateways.confirmationEmail.requestConfirmationEmail(email);
-    reportConfirmationEmail(outcome);
-    return {
-      data: {
-        outcome: "confirmation_pending",
-        email,
-        confirmationEmail: outcome.kind,
-      },
-    };
+    reportConfirmationEmail(
+      await wiring.gateways.confirmationEmail.requestConfirmationEmail(email),
+    );
+    return { data: { outcome: "confirmation_pending", email } };
   },
 });
 
