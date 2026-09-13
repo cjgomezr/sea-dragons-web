@@ -29,7 +29,9 @@ const SECOND_MS = 1_000;
 // Pausas fijas escritas en ui-preflight.sh, fuera de sus dos plazos
 // configurables: el `sleep 1` de kill_tree, el que sigue a kill_port_owner, y
 // los reintentos de record_real_owner (5 × 0.1 s en port_owner_pid y
-// 3 × 0.2 s en pid_for_winpid).
+// 3 × 0.2 s en pid_for_winpid). En Windows kill_tree sale por taskkill antes
+// de su `sleep 1`: ahí esa pausa no ocurre y queda como margen para los dos
+// `ps -W` de winpid_of.
 const KILL_TREE_PAUSE_MS = 1_000;
 const KILL_PORT_OWNER_PAUSE_MS = 1_000;
 const RECORD_REAL_OWNER_RETRIES_MS = 5 * 100 + 3 * 200;
@@ -83,8 +85,13 @@ function downWorstCaseMs({ stopTimeoutS }: ScriptTimeouts): number {
 
 /**
  * El plazo de una secuencia de llamadas al script, cada una seguida de un
- * `respondsAt` que comprueba el puerto. Es el peor caso legítimo sumado: si
- * se agota, alguna llamada tardó más de lo que el propio script permite.
+ * `respondsAt` que comprueba el puerto. Es una estimación holgada del peor
+ * caso, no una cota exacta: no cuenta un sondeo que se quede en "unknown"
+ * (hasta 3 s), ni los netstat/grep/awk/ps que lanzan record_real_owner y
+ * kill_port_owner, ni los reintentos de port_owner_pid dentro de `down`. Lo
+ * compensa con que un `up` que sale bien nunca paga su último `sleep 1`.
+ * Agotarlo apunta a una llamada anormalmente lenta, no prueba por sí solo un
+ * defecto del script.
  */
 function sequenceDeadlineMs(
   commands: readonly PreflightCommand[],
@@ -143,6 +150,34 @@ function describeStalledSequence(options: {
   return `la secuencia ${sequenceName} no terminó en ${deadlineMs} ms: seguía en el paso ${running.index + 1} (${running.name}) tras ${runningFor} ms; ${describeFinishedSteps(finished)}`;
 }
 
+interface SequenceProgress {
+  readonly finished: FinishedStep[];
+  running: RunningStep;
+  isDeadlineReached: boolean;
+}
+
+/**
+ * Corre los pasos uno tras otro, anotando en `progress` cuál corre y cuánto
+ * tardaron los ya terminados. Deja de empezar pasos en cuanto vence el plazo.
+ */
+async function runStepsInOrder(
+  steps: readonly TimedStep[],
+  progress: SequenceProgress,
+): Promise<void> {
+  for (const [index, step] of steps.entries()) {
+    if (progress.isDeadlineReached) {
+      return;
+    }
+    const startedAt = Date.now();
+    progress.running = { index, name: step.name, startedAt };
+    await step.run();
+    progress.finished.push({
+      name: step.name,
+      elapsedMs: Date.now() - startedAt,
+    });
+  }
+}
+
 /**
  * Corre los pasos en orden y, si no terminan en `deadlineMs`, falla diciendo
  * en cuál se quedó y cuánto tardaron los anteriores. Un timeout de Vitest a
@@ -152,33 +187,28 @@ async function runTimedSequence(
   steps: readonly TimedStep[],
   deadlineMs: number,
 ): Promise<void> {
-  const finished: FinishedStep[] = [];
-  let running: RunningStep = { index: 0, name: "", startedAt: Date.now() };
-  const sequence = (async (): Promise<void> => {
-    for (const [index, step] of steps.entries()) {
-      running = { index, name: step.name, startedAt: Date.now() };
-      await step.run();
-      finished.push({
-        name: step.name,
-        elapsedMs: Date.now() - running.startedAt,
-      });
-    }
-  })();
+  const progress: SequenceProgress = {
+    finished: [],
+    running: { index: 0, name: "", startedAt: Date.now() },
+    isDeadlineReached: false,
+  };
+  const sequence = runStepsInOrder(steps, progress);
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      const message = describeStalledSequence({
-        steps,
-        deadlineMs,
-        running,
-        finished,
-      });
-      reject(new Error(message));
+      progress.isDeadlineReached = true;
+      const { running, finished } = progress;
+      reject(
+        new Error(
+          describeStalledSequence({ steps, deadlineMs, running, finished }),
+        ),
+      );
     }, deadlineMs);
   });
-  // Si gana el plazo, el paso atascado puede fallar más tarde. Ese error ya no
-  // tiene a quién llegar: el del plazo es el que se reporta, y sin este
-  // manejador Vitest lo contaría como un rechazo sin atender de otro test.
+  // Si gana el plazo, el paso en vuelo no se puede cancelar (ya no empieza
+  // ninguno más) y puede fallar más tarde. Ese error ya no tiene a quién
+  // llegar: el del plazo es el que se reporta, y sin este manejador Vitest lo
+  // contaría como un rechazo sin atender de otro test.
   sequence.catch(() => undefined);
   try {
     await Promise.race([sequence, deadline]);
@@ -1532,6 +1562,26 @@ describe("diagnóstico de una secuencia lenta", () => {
     await expect(runTimedSequence(steps, 50)).rejects.toThrow(
       /seguía en el paso 1 \(up\) tras \d+ ms; no había terminado ningún paso antes$/,
     );
+  });
+
+  it("no empieza ningún paso nuevo después de agotar el plazo", async () => {
+    // Un `up` que arrancara tras el plazo dejaría un servidor huérfano: el
+    // afterEach ya habría hecho su `down` y borrado el directorio.
+    let secondStepStarts = 0;
+    const steps = [
+      { name: "down", run: () => sleep(100) },
+      {
+        name: "up",
+        run: async (): Promise<void> => {
+          secondStepStarts += 1;
+        },
+      },
+    ];
+
+    await expect(runTimedSequence(steps, 20)).rejects.toThrow(/paso 1/);
+    await sleep(200);
+
+    expect(secondStepStarts).toBe(0);
   });
 
   it("deja pasar tal cual el error de un paso, sin disfrazarlo de plazo", async () => {
