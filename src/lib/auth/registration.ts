@@ -122,13 +122,22 @@ export function validateCountryField(value: string): FieldValidation<string> {
       };
 }
 
-function validatePassword(value: string): string | null {
+/** Exportada porque la recuperación de contraseña (RF-6) exige el mismo
+ * mínimo que el registro, con el mismo mensaje. Una segunda copia de la regla
+ * sería una segunda política de contraseñas esperando a divergir. */
+export function validatePasswordField(value: string): FieldValidation<string> {
   if (value.length < PASSWORD_MIN_LENGTH) {
-    return `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`;
+    return {
+      ok: false,
+      message: `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`,
+    };
   }
   return PASSWORD_ENCODER.encode(value).length > PASSWORD_MAX_BYTES
-    ? `La contraseña no puede pasar de ${PASSWORD_MAX_BYTES} caracteres (las letras acentuadas y los emojis cuentan doble).`
-    : null;
+    ? {
+        ok: false,
+        message: `La contraseña no puede pasar de ${PASSWORD_MAX_BYTES} caracteres (las letras acentuadas y los emojis cuentan doble).`,
+      }
+    : { ok: true, value };
 }
 
 /** Buscar el valor en la tupla en vez de comprobar la pertenencia con un
@@ -196,7 +205,7 @@ export function validateRegistration(
     ["fullName", validateFullName(request.fullName)],
     ["email", validateEmail(request.email)],
     ["country", messageOf(country)],
-    ["password", validatePassword(request.password)],
+    ["password", messageOf(validatePasswordField(request.password))],
     ["membershipType", messageOf(membershipType)],
     ["dateOfBirth", messageOf(dateOfBirth)],
   ];
@@ -207,7 +216,12 @@ export function validateRegistration(
   // Los tres últimos términos no pueden ser ciertos sin el primero: si alguno
   // de esos campos no valía, `issues` ya lo recogió. Están aquí porque son los
   // que estrechan el tipo.
-  if (issues.length > 0 || !country.ok || !membershipType.ok || !dateOfBirth.ok) {
+  if (
+    issues.length > 0 ||
+    !country.ok ||
+    !membershipType.ok ||
+    !dateOfBirth.ok
+  ) {
     return { ok: false, issues };
   }
 
