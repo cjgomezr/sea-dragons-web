@@ -15,6 +15,11 @@ export const MAX_RECOVERY_REQUESTS_PER_WINDOW = 3;
 
 const MILLISECONDS_PER_MINUTE = 60_000;
 
+/** NFR-007. No lo impone este código sino Supabase Auth (`mailer_otp_exp` del
+ * proyecto, 3600 segundos, comprobado el 14 de septiembre de 2026): aquí sólo
+ * se nombra para que las pantallas le digan a la persona cuánto tiene. */
+export const RECOVERY_LINK_LIFETIME_MINUTES = 60;
+
 export type RecoveryRequestLog = {
   /** Anota la petición y devuelve cuántas hubo desde `windowStart`, contando
    * esta. Anotar antes de contar es lo que impide que una ráfaga en paralelo

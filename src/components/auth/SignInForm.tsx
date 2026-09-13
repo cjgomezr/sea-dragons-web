@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { readStringAt } from "@/lib/api/read-string-at";
 import {
   COMPLETE_REGISTRATION_PATH,
   DASHBOARD_PATH,
@@ -32,22 +33,6 @@ type Status =
   | { readonly kind: "editing" }
   | { readonly kind: "submitting" }
   | { readonly kind: "failed"; readonly message: string };
-
-/** Lee un texto en una ruta de un JSON que llega como unknown, sin confiar en
- * su forma: la respuesta viene de la red y podría ser cualquier cosa. */
-function readStringAt(
-  payload: unknown,
-  path: readonly string[],
-): string | null {
-  let current: unknown = payload;
-  for (const key of path) {
-    if (typeof current !== "object" || current === null || !(key in current)) {
-      return null;
-    }
-    current = (current as Record<string, unknown>)[key];
-  }
-  return typeof current === "string" ? current : null;
-}
 
 /** Los dos únicos destinos que el servidor puede devolver. Se contrastan en
  * vez de navegar a lo que venga: el resto de esta función está escrita
