@@ -38,10 +38,21 @@ export type MemberDirectory = {
   insertMember(row: NewMemberRow): Promise<void>;
 };
 
-export type ConfirmationEmailOutcome =
+/** Lo que contestó el servicio de correo al pedirle el envío. Es sólo para los
+ * registros del servidor, y el motivo nunca lleva la dirección. El límite va
+ * aparte del fallo genérico porque es el que se agota con dos registros
+ * seguidos, y el aviso del #154 lo necesitará.
+ *
+ * Nunca llega al cliente (#147). Supabase sólo intenta enviar a una cuenta sin
+ * confirmar, así que un fallo del envío delata que esa dirección tiene cuenta:
+ * cualquier campo de la respuesta que dependa de esto es un oráculo. */
+export type RequestedConfirmationEmail =
   | { readonly kind: "requested" }
   | { readonly kind: "failed"; readonly reason: string }
-  | { readonly kind: "not_requested"; readonly reason: string };
+  | { readonly kind: "rate_limited"; readonly reason: string };
+
+export type ConfirmationEmailOutcome =
+  RequestedConfirmationEmail | { readonly kind: "not_requested" };
 
 /** Devuelve el fallo en vez de lanzarlo: el correo de confirmación se pide
  * pero no decide si el registro salió bien. El servicio incorporado de
@@ -49,11 +60,7 @@ export type ConfirmationEmailOutcome =
  * del proyecto, así que un envío fallido es normal y la pantalla ofrece
  * reenviarlo. Quien llama decide qué hacer con el fallo; nadie lo ignora. */
 export type ConfirmationEmailGateway = {
-  requestConfirmationEmail(
-    email: string,
-  ): Promise<
-    Extract<ConfirmationEmailOutcome, { kind: "requested" | "failed" }>
-  >;
+  requestConfirmationEmail(email: string): Promise<RequestedConfirmationEmail>;
 };
 
 export type RegistrationGateways = {
@@ -65,7 +72,8 @@ export type RegistrationGateways = {
 /** Respuesta del registro. Es deliberadamente pobre: es la MISMA exista o no
  * ya una cuenta con ese correo, porque enumerar cuentas desde el formulario de
  * registro es una fuga de datos personales. No lleva id de miembro ni de
- * identidad por lo mismo. */
+ * identidad por lo mismo, ni dice si el correo salió (ver
+ * `RequestedConfirmationEmail`). */
 export type RegistrationReceipt = {
   readonly outcome: "confirmation_pending";
   readonly email: string;
@@ -184,14 +192,10 @@ export async function registerMember(
     email: details.email,
     password: details.password,
   });
+  // Con una cuenta previa no se pide el correo: se lo mandaría a esa persona
+  // en cada intento y gastaría el cupo. El recibo es el mismo de todas formas.
   if (identity.kind === "already_registered") {
-    return {
-      receipt,
-      confirmationEmail: {
-        kind: "not_requested",
-        reason: "El correo ya tenía cuenta.",
-      },
-    };
+    return { receipt, confirmationEmail: { kind: "not_requested" } };
   }
 
   await insertMemberOrUndoIdentity(gateways, {

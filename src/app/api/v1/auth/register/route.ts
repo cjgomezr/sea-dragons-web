@@ -41,10 +41,11 @@ function describeIssues(issues: readonly RegistrationIssue[]): string {
 /** El correo de confirmación se pide, pero no decide si el registro salió
  * bien: el servicio incorporado de Supabase manda 2 mensajes por hora y se
  * niega a escribir fuera del equipo del proyecto. El fallo se registra con su
- * motivo y la pantalla ofrece reenviarlo. Nunca se registra la dirección: es un
- * dato personal y los registros del servidor no son el sitio. */
+ * motivo y la respuesta no cambia (#147): la pantalla ofrece reenviarlo en
+ * cualquier caso. Nunca se registra la dirección: es un dato personal, y el
+ * adaptador ya la quita del motivo. */
 function reportConfirmationEmail(outcome: ConfirmationEmailOutcome): void {
-  if (outcome.kind === "failed") {
+  if (outcome.kind !== "requested" && outcome.kind !== "not_requested") {
     console.error(
       "[api/v1/auth/register] no se pudo pedir el correo de confirmación",
       outcome.reason,

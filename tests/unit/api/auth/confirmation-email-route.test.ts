@@ -1,15 +1,17 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { RequestedConfirmationEmail } from "@/lib/auth/register-member";
 
 const CONFIRMATION_EMAIL_URL =
   "http://localhost/api/v1/auth/confirmation-email";
+const EMAIL = "nerea@example.test";
 
 const requestedEmails: string[] = [];
 
 function mockWiring(
   options: {
     readonly unconfigured?: readonly string[];
-    readonly failureReason?: string;
+    readonly confirmationEmail?: RequestedConfirmationEmail;
   } = {},
 ): void {
   vi.doMock("@/lib/auth/supabase-auth-gateways", () => ({
@@ -24,9 +26,7 @@ function mockWiring(
               confirmationEmail: {
                 requestConfirmationEmail: async (email: string) => {
                   requestedEmails.push(email);
-                  return options.failureReason
-                    ? { kind: "failed", reason: options.failureReason }
-                    : { kind: "requested" };
+                  return options.confirmationEmail ?? { kind: "requested" };
                 },
               },
             },
@@ -60,21 +60,7 @@ describe("POST /api/v1/auth/confirmation-email", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(requestedEmails).toEqual(["nerea@example.test"]);
-  });
-
-  it("responde lo mismo aunque el envío no se haya podido pedir", async () => {
-    mockWiring({ failureReason: "rate limit exceeded" });
-    vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const response = await postConfirmationEmail({
-      email: "nerea@example.test",
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      data: { outcome: "confirmation_pending", email: "nerea@example.test" },
-    });
+    expect(requestedEmails).toEqual([EMAIL]);
   });
 
   it("no delata si esa dirección tiene cuenta: el cuerpo sólo repite el correo", async () => {
@@ -104,10 +90,91 @@ describe("POST /api/v1/auth/confirmation-email", () => {
   it("responde 503 nombrando las variables que faltan", async () => {
     mockWiring({ unconfigured: ["SUPABASE_SERVICE_ROLE_KEY"] });
 
-    const response = await postConfirmationEmail({
-      email: "nerea@example.test",
-    });
+    const response = await postConfirmationEmail({ email: EMAIL });
 
     expect(response.status).toBe(503);
+  });
+});
+
+const FAILED_SENDS = {
+  "rechazo 400": {
+    kind: "failed",
+    reason: '400: Email address "<correo>" is invalid',
+  },
+  "rechazo 429": {
+    kind: "rate_limited",
+    reason: "429: email rate limit exceeded",
+  },
+  "rechazo 429 por dirección": {
+    kind: "rate_limited",
+    reason:
+      "429: For security purposes, you can only request this after 60 seconds.",
+  },
+} as const satisfies Record<string, RequestedConfirmationEmail>;
+
+/** Lo que Supabase contesta en cada estado de la cuenta
+ * (`internal/api/resend.go`): sin cuenta o ya confirmada responde 200 sin
+ * intentar el envío, y sólo una cuenta sin confirmar puede fallar. El estado no
+ * es una entrada de la ruta, así que llega a ella sólo a través de esto. */
+const SUPABASE_ANSWERS_BY_ACCOUNT_STATE: Readonly<
+  Record<string, readonly RequestedConfirmationEmail[]>
+> = {
+  "sin cuenta": [{ kind: "requested" }],
+  confirmada: [{ kind: "requested" }],
+  "sin confirmar": [{ kind: "requested" }, ...Object.values(FAILED_SENDS)],
+};
+
+type RawResponse = { readonly status: number; readonly text: string };
+
+async function resendWith(
+  confirmationEmail: RequestedConfirmationEmail,
+): Promise<RawResponse> {
+  vi.resetModules();
+  mockWiring({ confirmationEmail });
+  const response = await postConfirmationEmail({ email: EMAIL });
+  return { status: response.status, text: await response.text() };
+}
+
+describe("envío del correo de confirmación en el reenvío", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doUnmock("@/lib/auth/supabase-auth-gateways");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("matriz de respuestas del reenvío", () => {
+    it("responde idéntico byte a byte para cualquier envío y cualquier estado de la cuenta", async () => {
+      const responses: RawResponse[] = [];
+      for (const answers of Object.values(SUPABASE_ANSWERS_BY_ACCOUNT_STATE)) {
+        for (const outcome of answers) {
+          responses.push(await resendWith(outcome));
+        }
+      }
+
+      expect(responses).toHaveLength(6);
+      expect(new Set(responses.map((response) => response.status))).toEqual(
+        new Set([200]),
+      );
+      expect(new Set(responses.map((response) => response.text)).size).toBe(1);
+    });
+  });
+
+  describe("registro del motivo en el reenvío", () => {
+    it.each(Object.entries(FAILED_SENDS))(
+      "con un %s el motivo de Supabase llega al log sin la dirección",
+      async (_sendResult, outcome) => {
+        mockWiring({ confirmationEmail: outcome });
+
+        await postConfirmationEmail({ email: EMAIL });
+
+        const logged = vi.mocked(console.error).mock.calls.flat().map(String);
+        expect(logged).toContain(outcome.reason);
+        expect(logged.join(" ")).not.toContain(EMAIL);
+      },
+    );
   });
 });

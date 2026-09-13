@@ -3,18 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   IdentityCreation,
   NewMemberRow,
+  RequestedConfirmationEmail,
 } from "@/lib/auth/register-member";
 
 const REGISTER_URL = "http://localhost/api/v1/auth/register";
 const CLUB_ID = "6f1d2c3b-4a59-4e6f-8b70-1c2d3e4f5a6b";
 const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
+const EMAIL = "nerea@example.test";
 
 type Body = Record<string, unknown>;
 
 function validBody(overrides: Body = {}): Body {
   return {
     fullName: "Nerea Silva",
-    email: "nerea@example.test",
+    email: EMAIL,
     country: "AU",
     password: "bajoelagua",
     membershipType: "Full",
@@ -24,11 +26,13 @@ function validBody(overrides: Body = {}): Body {
 }
 
 const insertedRows: NewMemberRow[] = [];
+const deletedUserIds: string[] = [];
 const requestedEmails: string[] = [];
 
 type WiringOptions = {
   readonly identityCreation?: IdentityCreation;
   readonly unconfigured?: readonly string[];
+  readonly confirmationEmail?: RequestedConfirmationEmail;
 };
 
 /** Sustituye la raíz de composición por dobles: este test mira los códigos y
@@ -52,7 +56,9 @@ function mockWiring(options: WiringOptions = {}): void {
                       kind: "created",
                       userId: USER_ID,
                     },
-                  deleteIdentity: async () => {},
+                  deleteIdentity: async (userId: string) => {
+                    deletedUserIds.push(userId);
+                  },
                 },
                 members: {
                   insertMember: async (row: NewMemberRow) => {
@@ -62,7 +68,7 @@ function mockWiring(options: WiringOptions = {}): void {
                 confirmationEmail: {
                   requestConfirmationEmail: async (email: string) => {
                     requestedEmails.push(email);
-                    return { kind: "requested" };
+                    return options.confirmationEmail ?? { kind: "requested" };
                   },
                 },
               },
@@ -88,12 +94,17 @@ async function errorBodyOf(response: Response): Promise<ErrorBody> {
   return (await response.json()) as ErrorBody;
 }
 
+function resetRecorded(): void {
+  insertedRows.length = 0;
+  deletedUserIds.length = 0;
+  requestedEmails.length = 0;
+}
+
 describe("POST /api/v1/auth/register", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.doUnmock("@/lib/auth/supabase-auth-gateways");
-    insertedRows.length = 0;
-    requestedEmails.length = 0;
+    resetRecorded();
   });
 
   afterEach(() => {
@@ -107,7 +118,7 @@ describe("POST /api/v1/auth/register", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: { outcome: "confirmation_pending", email: "nerea@example.test" },
+      data: { outcome: "confirmation_pending", email: EMAIL },
     });
   });
 
@@ -121,7 +132,7 @@ describe("POST /api/v1/auth/register", () => {
         club_id: CLUB_ID,
         user_id: USER_ID,
         full_name: "Nerea Silva",
-        email: "nerea@example.test",
+        email: EMAIL,
         country: "AU",
         date_of_birth: "1994-03-02",
         membership_type: "Casual",
@@ -195,25 +206,19 @@ describe("POST /api/v1/auth/register", () => {
     expect(response.status).toBe(400);
   });
 
-  it("responde exactamente lo mismo cuando el correo ya tiene cuenta", async () => {
-    mockWiring();
-    const nueva = await postRegistration(validBody());
-    const cuerpoNuevo = await nueva.json();
-
-    vi.resetModules();
-    mockWiring({ identityCreation: { kind: "already_registered" } });
-    const repetida = await postRegistration(validBody());
-
-    expect(repetida.status).toBe(nueva.status);
-    await expect(repetida.json()).resolves.toEqual(cuerpoNuevo);
-  });
-
   it("no crea una segunda fila de socio cuando el correo ya tiene cuenta", async () => {
     mockWiring({ identityCreation: { kind: "already_registered" } });
 
     await postRegistration(validBody());
 
     expect(insertedRows).toEqual([]);
+  });
+
+  it("no pide el correo cuando la dirección ya tiene cuenta", async () => {
+    mockWiring({ identityCreation: { kind: "already_registered" } });
+
+    await postRegistration(validBody());
+
     expect(requestedEmails).toEqual([]);
   });
 
@@ -245,5 +250,120 @@ describe("POST /api/v1/auth/register", () => {
     );
 
     expect(await response.text()).not.toContain("secretodelclub");
+  });
+});
+
+/** Lo que devuelve el adaptador de Supabase en cada caso real del 12 de
+ * septiembre de 2026. El motivo ya llega sin la dirección. */
+const FAILED_SENDS = {
+  "rechazo 400": {
+    kind: "failed",
+    reason: '400: Email address "<correo>" is invalid',
+  },
+  "rechazo 429": {
+    kind: "rate_limited",
+    reason: "429: email rate limit exceeded",
+  },
+  "rechazo 429 por dirección": {
+    kind: "rate_limited",
+    reason:
+      "429: For security purposes, you can only request this after 60 seconds.",
+  },
+} as const satisfies Record<string, RequestedConfirmationEmail>;
+
+const SEND_RESULTS: Readonly<Record<string, RequestedConfirmationEmail>> = {
+  salió: { kind: "requested" },
+  ...FAILED_SENDS,
+};
+
+const ADDRESS_STATES: Readonly<Record<string, IdentityCreation>> = {
+  nueva: { kind: "created", userId: USER_ID },
+  "ya registrada": { kind: "already_registered" },
+};
+
+type RawResponse = { readonly status: number; readonly text: string };
+
+async function registerWith(options: WiringOptions): Promise<RawResponse> {
+  vi.resetModules();
+  mockWiring(options);
+  const response = await postRegistration(validBody());
+  return { status: response.status, text: await response.text() };
+}
+
+describe("envío del correo de confirmación en el registro", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doUnmock("@/lib/auth/supabase-auth-gateways");
+    resetRecorded();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("matriz de respuestas del registro", () => {
+    it("responde idéntico byte a byte para cualquier envío y cualquier estado de la dirección", async () => {
+      const responses: RawResponse[] = [];
+      for (const confirmationEmail of Object.values(SEND_RESULTS)) {
+        for (const identityCreation of Object.values(ADDRESS_STATES)) {
+          responses.push(
+            await registerWith({ confirmationEmail, identityCreation }),
+          );
+        }
+      }
+
+      expect(responses).toHaveLength(8);
+      expect(new Set(responses.map((response) => response.status))).toEqual(
+        new Set([200]),
+      );
+      expect(new Set(responses.map((response) => response.text)).size).toBe(1);
+    });
+
+    it("ningún campo del cuerpo habla del envío", async () => {
+      const response = await registerWith({
+        confirmationEmail: FAILED_SENDS["rechazo 429"],
+      });
+
+      const body = JSON.parse(response.text) as { data: Body };
+      expect(Object.keys(body.data).sort()).toEqual(["email", "outcome"]);
+    });
+  });
+
+  describe("registro del motivo", () => {
+    it.each(Object.entries(FAILED_SENDS))(
+      "con un %s el motivo de Supabase llega al log sin la dirección",
+      async (_sendResult, outcome) => {
+        mockWiring({ confirmationEmail: outcome });
+
+        await postRegistration(validBody());
+
+        const logged = vi.mocked(console.error).mock.calls.flat().map(String);
+        expect(logged).toContain(outcome.reason);
+        expect(logged.join(" ")).not.toContain(EMAIL);
+      },
+    );
+
+    it("un envío que sale no deja nada en el log de errores", async () => {
+      mockWiring({ confirmationEmail: { kind: "requested" } });
+
+      await postRegistration(validBody());
+
+      expect(console.error).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("cuenta tras un envío fallido", () => {
+    it.each(Object.entries(FAILED_SENDS))(
+      "con un %s la identidad no se deshace y la fila del socio queda escrita",
+      async (_sendResult, confirmationEmail) => {
+        mockWiring({ confirmationEmail });
+
+        await postRegistration(validBody());
+
+        expect(insertedRows).toHaveLength(1);
+        expect(deletedUserIds).toEqual([]);
+      },
+    );
   });
 });

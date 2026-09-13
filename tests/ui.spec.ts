@@ -1066,6 +1066,8 @@ test.describe("dentro de la aplicación", () => {
 const REGISTRATION_ENDPOINT = "**/api/v1/auth/register";
 const CONFIRMATION_STUB_EMAIL = "nerea@example.test";
 
+const RESEND_ENDPOINT = "**/api/v1/auth/confirmation-email";
+
 async function goToConfirmationPending(
   page: import("@playwright/test").Page,
   theme: (typeof themes)[number],
@@ -1097,39 +1099,67 @@ async function goToConfirmationPending(
   ).toBeVisible();
 }
 
-for (const vp of viewports) {
-  test.describe(`registro-confirmacion @ ${vp.name}`, () => {
-    test.use({ viewport: { width: vp.width, height: vp.height } });
+/** Las dos caras de la pantalla (#147): recién registrada, con el texto neutro,
+ * y tras un reenvío que no llegó a nuestro servidor. La respuesta del registro
+ * no dice nada del envío, así que no hay más variantes que fotografiar. */
+const CONFIRMATION_VARIANTS = [
+  { resend: "none", screenshotPrefix: "registro-confirmacion" },
+  { resend: "network_error", screenshotPrefix: "registro-reenvio-fallido" },
+] as const;
 
-    for (const theme of themes) {
-      test(`matches approved baseline (${theme})`, async ({ page }) => {
-        await goToConfirmationPending(page, theme);
-        const name = `registro-confirmacion-${vp.name}-${theme}.png`;
-        await createMissingLocalBaseline(name, () =>
-          page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
-        );
-        await expect(page).toHaveScreenshot(name, {
-          ...SCREENSHOT_OPTIONS,
-          fullPage: true,
-          maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
-        });
-      });
-    }
-  });
+type ConfirmationVariant = (typeof CONFIRMATION_VARIANTS)[number];
+
+async function goToConfirmationVariant(
+  page: import("@playwright/test").Page,
+  theme: (typeof themes)[number],
+  variant: ConfirmationVariant,
+): Promise<void> {
+  await goToConfirmationPending(page, theme);
+  if (variant.resend === "none") {
+    return;
+  }
+  await page.route(RESEND_ENDPOINT, (route) => route.abort("failed"));
+  await page.getByRole("button", { name: "Reenviar el correo" }).click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: /otro correo/ }),
+  ).toBeVisible();
 }
 
-test("registro-confirmacion: has no accessibility violations (axe-core)", async ({
-  page,
-}) => {
-  await goToConfirmationPending(page, "light");
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
-  expect(
-    results.violations,
-    JSON.stringify(results.violations, null, 2),
-  ).toEqual([]);
-});
+for (const variant of CONFIRMATION_VARIANTS) {
+  for (const vp of viewports) {
+    test.describe(`${variant.screenshotPrefix} @ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await goToConfirmationVariant(page, theme, variant);
+          const name = `${variant.screenshotPrefix}-${vp.name}-${theme}.png`;
+          await createMissingLocalBaseline(name, () =>
+            page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+          );
+          await expect(page).toHaveScreenshot(name, {
+            ...SCREENSHOT_OPTIONS,
+            fullPage: true,
+            maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+          });
+        });
+      }
+    });
+  }
+
+  test(`${variant.screenshotPrefix}: has no accessibility violations (axe-core)`, async ({
+    page,
+  }) => {
+    await goToConfirmationVariant(page, "light", variant);
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa"])
+      .analyze();
+    expect(
+      results.violations,
+      JSON.stringify(results.violations, null, 2),
+    ).toEqual([]);
+  });
+}
 
 // Los cuatro desenlaces del enlace del correo se alcanzan por URL, así que se
 // revisan con axe sin capturar una línea base por cada uno: comparten

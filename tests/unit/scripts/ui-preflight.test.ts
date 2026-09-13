@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { readFileSync } from "node:fs";
 import {
   chmod,
   copyFile,
@@ -16,6 +17,212 @@ import { afterEach, describe, expect, it } from "vitest";
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const UI_PREFLIGHT_SCRIPT = path.join(REPO_ROOT, "scripts/ui-preflight.sh");
 const TEST_TIMEOUT_MS = 20_000;
+
+type PreflightCommand = "up" | "down";
+
+interface ScriptTimeouts {
+  readonly bootTimeoutS: number;
+  readonly stopTimeoutS: number;
+}
+
+const SECOND_MS = 1_000;
+// Pausas fijas escritas en ui-preflight.sh, fuera de sus dos plazos
+// configurables: el `sleep 1` de kill_tree, el que sigue a kill_port_owner, y
+// los reintentos de record_real_owner (5 × 0.1 s en port_owner_pid y
+// 3 × 0.2 s en pid_for_winpid). En Windows kill_tree sale por taskkill antes
+// de su `sleep 1`: ahí esa pausa no ocurre y queda como margen para los dos
+// `ps -W` de winpid_of.
+const KILL_TREE_PAUSE_MS = 1_000;
+const KILL_PORT_OWNER_PAUSE_MS = 1_000;
+const RECORD_REAL_OWNER_RETRIES_MS = 5 * 100 + 3 * 200;
+// Lo que el script no escribe en ningún sitio: cada sondeo del puerto y cada
+// taskkill lanzan un proceso, y con la suite entera lanzando los suyos en
+// paralelo eso deja de ser gratis (issue #151).
+const PROCESS_SPAWN_ALLOWANCE_MS = 500;
+const RESPONDS_AT_TIMEOUT_MS = 1_000;
+// Crear el directorio temporal y copiar los fixtures, antes de la secuencia.
+const WORK_DIR_SETUP_ALLOWANCE_MS = 5_000;
+
+/**
+ * STOP_TIMEOUT tal como lo declara el script. Se lee del texto y no se copia:
+ * si alguien lo alarga, el plazo del test crece con él en vez de volverse
+ * imposible sin que nadie lo note.
+ */
+function readStopTimeoutS(script: string): number {
+  const match = /^STOP_TIMEOUT=(\d+)$/m.exec(script);
+  if (!match) {
+    throw new Error(
+      "ui-preflight.sh ya no declara STOP_TIMEOUT=<segundos>: el plazo de sus tests no tiene de dónde salir",
+    );
+  }
+  return Number(match[1]);
+}
+
+/** Cada vuelta de espera del script: un sondeo del puerto y un `sleep 1`. */
+function waitLoopMs(iterations: number): number {
+  return iterations * (SECOND_MS + PROCESS_SPAWN_ALLOWANCE_MS);
+}
+
+function upWorstCaseMs({ bootTimeoutS }: ScriptTimeouts): number {
+  const checkProbeAndLaunch = 2 * PROCESS_SPAWN_ALLOWANCE_MS;
+  return (
+    checkProbeAndLaunch +
+    waitLoopMs(bootTimeoutS) +
+    RECORD_REAL_OWNER_RETRIES_MS
+  );
+}
+
+function downWorstCaseMs({ stopTimeoutS }: ScriptTimeouts): number {
+  // taskkill, los dos sondeos que siguen al bucle y kill_port_owner.
+  const extraProcesses = 4 * PROCESS_SPAWN_ALLOWANCE_MS;
+  return (
+    KILL_TREE_PAUSE_MS +
+    waitLoopMs(stopTimeoutS) +
+    KILL_PORT_OWNER_PAUSE_MS +
+    extraProcesses
+  );
+}
+
+/**
+ * El plazo de una secuencia de llamadas al script, cada una seguida de un
+ * `respondsAt` que comprueba el puerto. Es una estimación holgada del peor
+ * caso, no una cota exacta: no cuenta un sondeo que se quede en "unknown"
+ * (hasta 3 s), ni los netstat/grep/awk/ps que lanzan record_real_owner y
+ * kill_port_owner, ni los reintentos de port_owner_pid dentro de `down`. Lo
+ * compensa con que un `up` que sale bien nunca paga su último `sleep 1`.
+ * Agotarlo apunta a una llamada anormalmente lenta, no prueba por sí solo un
+ * defecto del script.
+ */
+function sequenceDeadlineMs(
+  commands: readonly PreflightCommand[],
+  timeouts: ScriptTimeouts,
+): number {
+  const worstCaseOf: Record<PreflightCommand, number> = {
+    up: upWorstCaseMs(timeouts),
+    down: downWorstCaseMs(timeouts),
+  };
+  return commands.reduce(
+    (total, command) => total + worstCaseOf[command] + RESPONDS_AT_TIMEOUT_MS,
+    0,
+  );
+}
+
+interface TimedStep {
+  readonly name: string;
+  readonly run: () => Promise<void>;
+}
+
+interface FinishedStep {
+  readonly name: string;
+  readonly elapsedMs: number;
+}
+
+interface RunningStep {
+  readonly index: number;
+  readonly name: string;
+  readonly startedAt: number;
+}
+
+function describeFinishedSteps(finished: readonly FinishedStep[]): string {
+  const [first, ...rest] = finished;
+  if (!first) {
+    return "no había terminado ningún paso antes";
+  }
+  const durations = [
+    `${first.name} tardó ${first.elapsedMs} ms`,
+    ...rest.map(({ name, elapsedMs }) => `${name} ${elapsedMs} ms`),
+  ];
+  if (durations.length === 1) {
+    return `antes, ${durations[0]}`;
+  }
+  return `antes, ${durations.slice(0, -1).join(", ")} y ${durations.at(-1)}`;
+}
+
+function describeStalledSequence(options: {
+  readonly steps: readonly TimedStep[];
+  readonly deadlineMs: number;
+  readonly running: RunningStep;
+  readonly finished: readonly FinishedStep[];
+}): string {
+  const { steps, deadlineMs, running, finished } = options;
+  const sequenceName = steps.map((step) => step.name).join(", ");
+  const runningFor = Date.now() - running.startedAt;
+  return `la secuencia ${sequenceName} no terminó en ${deadlineMs} ms: seguía en el paso ${running.index + 1} (${running.name}) tras ${runningFor} ms; ${describeFinishedSteps(finished)}`;
+}
+
+interface SequenceProgress {
+  readonly finished: FinishedStep[];
+  running: RunningStep;
+  isDeadlineReached: boolean;
+}
+
+/**
+ * Corre los pasos uno tras otro, anotando en `progress` cuál corre y cuánto
+ * tardaron los ya terminados. Deja de empezar pasos en cuanto vence el plazo.
+ */
+async function runStepsInOrder(
+  steps: readonly TimedStep[],
+  progress: SequenceProgress,
+): Promise<void> {
+  for (const [index, step] of steps.entries()) {
+    if (progress.isDeadlineReached) {
+      return;
+    }
+    const startedAt = Date.now();
+    progress.running = { index, name: step.name, startedAt };
+    await step.run();
+    progress.finished.push({
+      name: step.name,
+      elapsedMs: Date.now() - startedAt,
+    });
+  }
+}
+
+/**
+ * Corre los pasos en orden y, si no terminan en `deadlineMs`, falla diciendo
+ * en cuál se quedó y cuánto tardaron los anteriores. Un timeout de Vitest a
+ * secas no dice nada de eso, y tampoco trae el stderr del script (issue #151).
+ */
+async function runTimedSequence(
+  steps: readonly TimedStep[],
+  deadlineMs: number,
+): Promise<void> {
+  const progress: SequenceProgress = {
+    finished: [],
+    running: { index: 0, name: "", startedAt: Date.now() },
+    isDeadlineReached: false,
+  };
+  const sequence = runStepsInOrder(steps, progress);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      progress.isDeadlineReached = true;
+      const { running, finished } = progress;
+      reject(
+        new Error(
+          describeStalledSequence({ steps, deadlineMs, running, finished }),
+        ),
+      );
+    }, deadlineMs);
+  });
+  // Si gana el plazo, el paso en vuelo no se puede cancelar (ya no empieza
+  // ninguno más) y puede fallar más tarde. Ese error ya no tiene a quién
+  // llegar: el del plazo es el que se reporta, y sin este manejador Vitest lo
+  // contaría como un rechazo sin atender de otro test.
+  sequence.catch(() => undefined);
+  try {
+    await Promise.race([sequence, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const TEST_BOOT_TIMEOUT_S = 8;
+const TWO_BOOTS_COMMANDS = ["up", "down", "up", "down"] as const;
+const TWO_BOOTS_DEADLINE_MS = sequenceDeadlineMs(TWO_BOOTS_COMMANDS, {
+  bootTimeoutS: TEST_BOOT_TIMEOUT_S,
+  stopTimeoutS: readStopTimeoutS(readFileSync(UI_PREFLIGHT_SCRIPT, "utf8")),
+});
 
 // Puertos reales, no simulados: dos corridas de este archivo en paralelo (una
 // sesión de agente y su propio subagente de revisión, por ejemplo) chocarían
@@ -67,7 +274,7 @@ function runPreflight(
 
 async function respondsAt(url: string): Promise<boolean> {
   try {
-    await fetch(url, { signal: AbortSignal.timeout(1000) });
+    await fetch(url, { signal: AbortSignal.timeout(RESPONDS_AT_TIMEOUT_MS) });
     return true;
   } catch {
     return false;
@@ -611,7 +818,7 @@ function baseEnv(
   return {
     ...process.env,
     APP_URL: `http://localhost:${port}`,
-    FABRICA_SERVER_TIMEOUT: "8",
+    FABRICA_SERVER_TIMEOUT: String(TEST_BOOT_TIMEOUT_S),
     ...extra,
     DEV_SERVER_CMD:
       extra.DEV_SERVER_CMD ??
@@ -779,25 +986,50 @@ describe("ui-preflight.sh", () => {
       const port = nextPort();
       const env = baseEnv(workDir, port, { START_DELAY_MS: "500" });
       cleanupEnv = env;
+      const url = `http://localhost:${port}`;
 
-      const firstUp = await runPreflight(["up"], workDir, env);
-      expect(firstUp.code, firstUp.stderr).toBe(0);
-      expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
-
-      const firstDown = await runPreflight(["down"], workDir, env);
-      expect(firstDown.code, firstDown.stderr).toBe(0);
-      expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
-
-      const secondUp = await runPreflight(["up"], workDir, env);
-      expect(secondUp.stderr).not.toMatch(/did not answer/);
-      expect(secondUp.code, secondUp.stderr).toBe(0);
-      expect(await respondsAt(`http://localhost:${port}`)).toBe(true);
-
-      const secondDown = await runPreflight(["down"], workDir, env);
-      expect(secondDown.code, secondDown.stderr).toBe(0);
-      expect(await respondsAt(`http://localhost:${port}`)).toBe(false);
+      await runTimedSequence(
+        [
+          {
+            name: "up",
+            run: async () => {
+              const firstUp = await runPreflight(["up"], workDir, env);
+              expect(firstUp.code, firstUp.stderr).toBe(0);
+              expect(await respondsAt(url)).toBe(true);
+            },
+          },
+          {
+            name: "down",
+            run: async () => {
+              const firstDown = await runPreflight(["down"], workDir, env);
+              expect(firstDown.code, firstDown.stderr).toBe(0);
+              expect(await respondsAt(url)).toBe(false);
+            },
+          },
+          {
+            name: "up",
+            run: async () => {
+              const secondUp = await runPreflight(["up"], workDir, env);
+              expect(secondUp.stderr).not.toMatch(/did not answer/);
+              expect(secondUp.code, secondUp.stderr).toBe(0);
+              expect(await respondsAt(url)).toBe(true);
+            },
+          },
+          {
+            name: "down",
+            run: async () => {
+              const secondDown = await runPreflight(["down"], workDir, env);
+              expect(secondDown.code, secondDown.stderr).toBe(0);
+              expect(await respondsAt(url)).toBe(false);
+            },
+          },
+        ],
+        TWO_BOOTS_DEADLINE_MS,
+      );
     },
-    TEST_TIMEOUT_MS,
+    // El plazo propio de la secuencia salta antes que el de Vitest, que es el
+    // que no dice nada útil.
+    TWO_BOOTS_DEADLINE_MS + WORK_DIR_SETUP_ALLOWANCE_MS,
   );
 
   it(
@@ -1245,6 +1477,127 @@ describe("andamiaje de los tests de ui-preflight.sh", () => {
       new RegExp(
         `^el puerto ${port} no llegó a aceptar conexiones en \\d+ ms \\(último intento: .+\\)$`,
       ),
+    );
+  });
+});
+
+describe("plazo de las secuencias de ui-preflight", () => {
+  const FOUR_CALLS = ["up", "down", "up", "down"] as const;
+  const TODAY = { bootTimeoutS: 8, stopTimeoutS: 10 };
+
+  it("cubre al menos las esperas de up y de down que el script declara", () => {
+    // Sólo las pausas escritas en el script, sin contar lo que cuesta cada
+    // sondeo: up espera BOOT_TIMEOUT, y down hace 1 s en kill_tree, hasta
+    // STOP_TIMEOUT a que el puerto quede libre y 1 s tras kill_port_owner.
+    const sleepsOnlyMs = 2 * 8_000 + 2 * (1_000 + 10_000 + 1_000);
+
+    expect(sequenceDeadlineMs(FOUR_CALLS, TODAY)).toBeGreaterThanOrEqual(
+      sleepsOnlyMs,
+    );
+  });
+
+  it("crece cuando el script alarga STOP_TIMEOUT", () => {
+    const longerStop = { ...TODAY, stopTimeoutS: 20 };
+
+    const growthMs =
+      sequenceDeadlineMs(FOUR_CALLS, longerStop) -
+      sequenceDeadlineMs(FOUR_CALLS, TODAY);
+
+    expect(growthMs).toBeGreaterThanOrEqual(2 * 10_000);
+  });
+
+  it("crece cuando se alarga FABRICA_SERVER_TIMEOUT", () => {
+    const longerBoot = { ...TODAY, bootTimeoutS: 18 };
+
+    const growthMs =
+      sequenceDeadlineMs(FOUR_CALLS, longerBoot) -
+      sequenceDeadlineMs(FOUR_CALLS, TODAY);
+
+    expect(growthMs).toBeGreaterThanOrEqual(2 * 10_000);
+  });
+
+  it("lee STOP_TIMEOUT del texto del script", () => {
+    const script = "#!/usr/bin/env bash\nSTOP_TIMEOUT=37\n";
+
+    expect(readStopTimeoutS(script)).toBe(37);
+  });
+
+  it("falla con un mensaje claro si el script deja de declarar STOP_TIMEOUT", () => {
+    expect(() => readStopTimeoutS("#!/usr/bin/env bash\n")).toThrow(
+      /STOP_TIMEOUT/,
+    );
+  });
+});
+
+describe("diagnóstico de una secuencia lenta", () => {
+  const sleep = (ms: number): Promise<void> =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+  const never = (): Promise<void> => new Promise(() => undefined);
+
+  it("resuelve cuando todos los pasos terminan dentro del plazo", async () => {
+    const steps = [
+      { name: "up", run: () => sleep(5) },
+      { name: "down", run: () => sleep(5) },
+    ];
+
+    await expect(runTimedSequence(steps, 1_000)).resolves.toBeUndefined();
+  });
+
+  it("nombra el paso que no terminó y lo que tardaron los anteriores", async () => {
+    const steps = [
+      { name: "up", run: () => sleep(20) },
+      { name: "down", run: () => sleep(20) },
+      { name: "up", run: never },
+      { name: "down", run: never },
+    ];
+
+    await expect(runTimedSequence(steps, 300)).rejects.toThrow(
+      /^la secuencia up, down, up, down no terminó en 300 ms: seguía en el paso 3 \(up\) tras \d+ ms; antes, up tardó \d+ ms y down \d+ ms$/,
+    );
+  });
+
+  it("dice que no hubo pasos anteriores cuando se atasca el primero", async () => {
+    const steps = [{ name: "up", run: never }];
+
+    await expect(runTimedSequence(steps, 50)).rejects.toThrow(
+      /seguía en el paso 1 \(up\) tras \d+ ms; no había terminado ningún paso antes$/,
+    );
+  });
+
+  it("no empieza ningún paso nuevo después de agotar el plazo", async () => {
+    // Un `up` que arrancara tras el plazo dejaría un servidor huérfano: el
+    // afterEach ya habría hecho su `down` y borrado el directorio.
+    let secondStepStarts = 0;
+    const steps = [
+      { name: "down", run: () => sleep(100) },
+      {
+        name: "up",
+        run: async (): Promise<void> => {
+          secondStepStarts += 1;
+        },
+      },
+    ];
+
+    await expect(runTimedSequence(steps, 20)).rejects.toThrow(
+      /paso 1 \(down\)/,
+    );
+    await sleep(200);
+
+    expect(secondStepStarts).toBe(0);
+  });
+
+  it("deja pasar tal cual el error de un paso, sin disfrazarlo de plazo", async () => {
+    const steps = [
+      {
+        name: "up",
+        run: async (): Promise<void> => {
+          throw new Error("el puerto no respondió");
+        },
+      },
+    ];
+
+    await expect(runTimedSequence(steps, 1_000)).rejects.toThrow(
+      /^el puerto no respondió$/,
     );
   });
 });

@@ -7,6 +7,7 @@ import {
   type MemberDirectory,
   MemberRecordError,
   type NewMemberRow,
+  type RequestedConfirmationEmail,
   RegistrationValidationError,
   registerMember,
 } from "@/lib/auth/register-member";
@@ -44,7 +45,7 @@ type DoubleOptions = {
   readonly createIdentityFails?: Error;
   readonly insertMemberFails?: Error;
   readonly deleteIdentityFails?: Error;
-  readonly confirmationEmailFails?: string;
+  readonly confirmationEmail?: RequestedConfirmationEmail;
 };
 
 function doubles(options: DoubleOptions = {}): Doubles {
@@ -81,9 +82,7 @@ function doubles(options: DoubleOptions = {}): Doubles {
     confirmationEmail: {
       async requestConfirmationEmail(email) {
         confirmationEmailsRequested.push(email);
-        return options.confirmationEmailFails
-          ? { kind: "failed", reason: options.confirmationEmailFails }
-          : { kind: "requested" };
+        return options.confirmationEmail ?? { kind: "requested" };
       },
     },
   };
@@ -135,15 +134,12 @@ describe("registro", () => {
     expect(result.confirmationEmail).toEqual({ kind: "requested" });
   });
 
-  it("no tumba el registro si el correo de confirmación no se pudo pedir", async () => {
-    const given = doubles({ confirmationEmailFails: "rate limit exceeded" });
+  it("el recibo sólo lleva el desenlace neutro y la dirección", async () => {
+    const result = await register(doubles());
 
-    const result = await register(given);
-
-    expect(given.insertedRows).toHaveLength(1);
-    expect(result.confirmationEmail).toEqual({
-      kind: "failed",
-      reason: "rate limit exceeded",
+    expect(result.receipt).toEqual({
+      outcome: "confirmation_pending",
+      email: "nerea@example.test",
     });
   });
 
@@ -166,7 +162,7 @@ describe("registro", () => {
     expect(repetido.receipt).toEqual(nuevo.receipt);
   });
 
-  it("con un correo ya registrado no crea una segunda cuenta", async () => {
+  it("con un correo ya registrado no crea una segunda cuenta ni pide el correo", async () => {
     const given = doubles({
       identityCreation: { kind: "already_registered" },
     });
@@ -237,5 +233,45 @@ describe("registro", () => {
         { field: "password", message: expect.any(String) },
       ],
     });
+  });
+});
+
+const FAILED_SENDS: Readonly<Record<string, RequestedConfirmationEmail>> = {
+  "rechazo 400": { kind: "failed", reason: "400: Email address is invalid" },
+  "rechazo 429": {
+    kind: "rate_limited",
+    reason: "429: email rate limit exceeded",
+  },
+};
+
+describe("cuenta tras un envío fallido", () => {
+  it.each(Object.entries(FAILED_SENDS))(
+    "con un %s la identidad y la fila del socio se conservan",
+    async (_sendResult, confirmationEmail) => {
+      const given = doubles({ confirmationEmail });
+
+      await register(given);
+
+      expect(given.insertedRows).toHaveLength(1);
+      expect(given.deletedUserIds).toEqual([]);
+    },
+  );
+
+  it.each(Object.entries(FAILED_SENDS))(
+    "con un %s el recibo es el mismo que con un envío que sale",
+    async (_sendResult, confirmationEmail) => {
+      const sent = await register(doubles());
+      const failed = await register(doubles({ confirmationEmail }));
+
+      expect(JSON.stringify(failed.receipt)).toBe(JSON.stringify(sent.receipt));
+    },
+  );
+
+  it("conserva el motivo del fallo para quien lo registre", async () => {
+    const confirmationEmail = FAILED_SENDS["rechazo 429"];
+
+    const result = await register(doubles({ confirmationEmail }));
+
+    expect(result.confirmationEmail).toEqual(confirmationEmail);
   });
 });

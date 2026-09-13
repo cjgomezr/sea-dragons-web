@@ -39,6 +39,13 @@ const EMPTY_DRAFT: RegistrationRequest = {
   dateOfBirth: "",
 };
 
+// Los del reenvío son propios: la cuenta ya está creada, y decir "no pudimos
+// crear tu cuenta" haría que la persona vuelva a registrarse.
+const RESEND_NETWORK_ERROR_MESSAGE =
+  "No pudimos pedir otro correo porque no llegamos al servidor. Revisa tu conexión y vuelve a intentarlo.";
+const RESEND_UNEXPECTED_ERROR_MESSAGE =
+  "No pudimos pedir otro correo. Vuelve a intentarlo en un momento.";
+
 type SubmissionStatus =
   | { readonly kind: "editing" }
   | { readonly kind: "submitting" }
@@ -85,30 +92,39 @@ type ResendStatus =
   | { readonly kind: "sent" }
   | { readonly kind: "failed"; readonly message: string };
 
+/** Un 200 sólo dice que el servidor atendió la petición, no que el correo
+ * salió: la respuesta es la misma en los dos casos a propósito (#147). */
+async function requestResend(email: string): Promise<ResendStatus> {
+  let response: Response;
+  try {
+    response = await postJson(CONFIRMATION_EMAIL_API_PATH, { email });
+  } catch {
+    return { kind: "failed", message: RESEND_NETWORK_ERROR_MESSAGE };
+  }
+  return response.ok
+    ? { kind: "sent" }
+    : { kind: "failed", message: RESEND_UNEXPECTED_ERROR_MESSAGE };
+}
+
+/** El texto no puede prometer que el correo salió, porque el servidor no lo
+ * dice. Por eso nombra la salida que sirve en los dos casos: pedir otro. */
 function ConfirmationPending({ email }: { email: string }): React.JSX.Element {
   const [resend, setResend] = useState<ResendStatus>({ kind: "idle" });
 
   async function handleResend(): Promise<void> {
     setResend({ kind: "sending" });
-    try {
-      const response = await postJson(CONFIRMATION_EMAIL_API_PATH, { email });
-      setResend(
-        response.ok
-          ? { kind: "sent" }
-          : { kind: "failed", message: UNEXPECTED_ERROR_MESSAGE },
-      );
-    } catch {
-      setResend({ kind: "failed", message: NETWORK_ERROR_MESSAGE });
-    }
+    setResend(await requestResend(email));
   }
 
   return (
     <section className="auth-form" aria-labelledby="registro-confirma-titulo">
       <h1 id="registro-confirma-titulo">Confirma tu correo</h1>
       <p className="auth-lead">
-        Creamos tu cuenta y te mandamos un enlace a <strong>{email}</strong>.
-        Ábrelo para terminar: hasta entonces tu cuenta queda incompleta y no
-        puedes entrar.
+        Te mandamos un enlace a <strong>{email}</strong>. Ábrelo para terminar:
+        hasta entonces tu cuenta queda incompleta y no puedes entrar.
+      </p>
+      <p className="auth-note">
+        Si no te llega en unos minutos, reenvíalo desde aquí.
       </p>
       <button
         type="button"
