@@ -17,8 +17,13 @@ import { createSupabasePasswordRecoveryGateways } from "@/lib/auth/supabase-pass
 // Gasta un token y cambia una contraseña: nada aquí se puede cachear.
 export const dynamic = "force-dynamic";
 
+/** El `hashed_token` de Supabase Auth es un hash hexadecimal de unas decenas de
+ * caracteres. El tope deja margen de sobra y evita que un endpoint público
+ * reenvíe al servicio de autenticación cadenas de cualquier tamaño. */
+const MAX_TOKEN_HASH_LENGTH = 512;
+
 const passwordResetBodySchema = z.object({
-  tokenHash: z.string().min(1),
+  tokenHash: z.string().min(1).max(MAX_TOKEN_HASH_LENGTH),
   password: z.string(),
 });
 
@@ -30,6 +35,11 @@ export type PasswordResetResponse = { readonly outcome: "password_changed" };
  * pidiendo otro. El motivo técnico no sale del servidor. */
 const LINK_UNUSABLE_MESSAGE =
   "Este enlace ya no sirve: caducó o ya se usó. Pide otro enlace para cambiar tu contraseña.";
+
+/** El enlace ya se gastó al intentarlo, así que reintentar con él no lleva a
+ * ninguna parte: hay que decirlo junto con por qué no se aceptó. */
+const PASSWORD_REJECTED_MESSAGE =
+  "password: No pudimos usar esa contraseña: es igual a la anterior o demasiado débil. El enlace ya se usó al intentarlo, así que pide otro enlace y elige una distinta.";
 
 const postPasswordReset = createApiRoute<
   PasswordResetResponse,
@@ -52,6 +62,8 @@ const postPasswordReset = createApiRoute<
     switch (outcome.kind) {
       case "invalid_password":
         throw new ApiError("business_rule", `password: ${outcome.message}`);
+      case "password_rejected":
+        throw new ApiError("business_rule", PASSWORD_REJECTED_MESSAGE);
       case "link_unusable":
         throw new ApiError("gone", LINK_UNUSABLE_MESSAGE);
       case "password_changed":

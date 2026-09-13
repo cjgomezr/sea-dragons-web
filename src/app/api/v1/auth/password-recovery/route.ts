@@ -21,7 +21,14 @@ import { createSupabasePasswordRecoveryGateways } from "@/lib/auth/supabase-pass
 // Depende del estado de la base en este instante y escribe en ella.
 export const dynamic = "force-dynamic";
 
-const passwordRecoveryBodySchema = z.object({ email: z.string() });
+/** El largo máximo de una dirección de correo (RFC 3696). Por encima no hay
+ * dirección válida, y un endpoint público no tiene por qué hashear ni reenviar
+ * cadenas de cualquier tamaño. */
+const MAX_EMAIL_LENGTH = 320;
+
+const passwordRecoveryBodySchema = z.object({
+  email: z.string().max(MAX_EMAIL_LENGTH),
+});
 
 type PasswordRecoveryBody = z.infer<typeof passwordRecoveryBodySchema>;
 

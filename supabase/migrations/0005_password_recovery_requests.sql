@@ -45,5 +45,10 @@ create policy password_recovery_requests_select_denied
 -- privilegios a `anon` y `authenticated` sobre cada tabla nueva, y `truncate`
 -- no lo filtra RLS. La llave anónima es pública, así que sin esto cualquiera
 -- podría vaciar la tabla y con ella el límite.
+--
+-- El `grant` a `service_role` documenta lo que el servidor usa (anotar y
+-- contar), pero no le quita nada: el mismo ACL por defecto le concede los siete
+-- privilegios, igual que en `audit_log`, y `supabase/ci/schema-expected.txt` lo
+-- refleja. La llave de servicio no sale del servidor, así que no se revoca.
 revoke all on public.password_recovery_requests from anon, authenticated;
 grant select, insert on public.password_recovery_requests to service_role;

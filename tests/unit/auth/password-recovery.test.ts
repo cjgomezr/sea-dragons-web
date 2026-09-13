@@ -178,10 +178,7 @@ describe("recuperación de contraseña", () => {
   });
 
   it("el enlace usado una vez ya no vale", async () => {
-    const gateways = resetGateways({
-      kind: "link_unusable",
-      reason: "Email link is invalid or has expired",
-    });
+    const gateways = resetGateways({ kind: "link_unusable" });
 
     const outcome = await resetPassword(gateways, {
       tokenHash: TOKEN_HASH,
@@ -233,5 +230,17 @@ describe("recuperación de contraseña", () => {
     });
 
     expect(gateways.audit.recordPasswordChanged).toHaveBeenCalledWith(USER_ID);
+  });
+
+  it("si el servicio no acepta la contraseña nueva, lo dice y no audita ningún cambio", async () => {
+    const gateways = resetGateways({ kind: "password_rejected" });
+
+    const outcome = await resetPassword(gateways, {
+      tokenHash: TOKEN_HASH,
+      password: NEW_PASSWORD,
+    });
+
+    expect(outcome).toEqual({ kind: "password_rejected" });
+    expect(gateways.audit.recordPasswordChanged).not.toHaveBeenCalled();
   });
 });

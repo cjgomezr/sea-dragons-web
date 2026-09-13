@@ -145,6 +145,17 @@ describe("POST /api/v1/auth/password-recovery", () => {
     );
   });
 
+  it("responde 400 a un correo más largo que cualquier dirección válida, sin contarlo", async () => {
+    mockWiring();
+
+    const response = await postRecovery({
+      email: `${"a".repeat(320)}@example.test`,
+    });
+
+    expect(response.status).toBe(400);
+    expect(probe.recordedRequests).toBe(0);
+  });
+
   it("responde 422 a una dirección sin forma de correo, sin contarla ni mirar la cuenta", async () => {
     mockWiring();
 

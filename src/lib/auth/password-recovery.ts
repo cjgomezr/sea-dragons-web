@@ -123,11 +123,20 @@ export async function requestPasswordRecovery(
   return { kind: "requested" };
 }
 
-/** Un enlace caducado y uno ya usado son el mismo caso para quien lo abre: no
- * sirve y hay que pedir otro. El motivo técnico se queda en el servidor. */
+/**
+ * Lo que pasa al canjear el enlace con una contraseña nueva.
+ *
+ * - `link_unusable`: caducado o ya usado. Para quien lo abre son el mismo
+ *   caso, y los dos se arreglan pidiendo otro.
+ * - `password_rejected`: el enlace se canjeó (y con eso se gastó) pero Supabase
+ *   Auth no aceptó la contraseña: igual a la anterior, o más débil que la
+ *   política del proyecto. Existe aparte para no disfrazarlo de fallo del
+ *   servidor.
+ */
 export type RecoveryTokenRedemption =
   | { readonly kind: "password_changed"; readonly userId: string }
-  | { readonly kind: "link_unusable"; readonly reason: string };
+  | { readonly kind: "link_unusable" }
+  | { readonly kind: "password_rejected" };
 
 /** Canjea el token y fija la contraseña nueva en un solo paso. Van juntos
  * porque el canje es lo que gasta el enlace: separarlos dejaría un enlace
@@ -153,6 +162,7 @@ export type PasswordResetGateways = {
 export type PasswordResetOutcome =
   | { readonly kind: "password_changed" }
   | { readonly kind: "link_unusable" }
+  | { readonly kind: "password_rejected" }
   | { readonly kind: "invalid_password"; readonly message: string };
 
 /** Fija la contraseña nueva. La contraseña se valida antes de canjear el
@@ -170,8 +180,8 @@ export async function resetPassword(
     tokenHash: input.tokenHash,
     newPassword: password.value,
   });
-  if (redemption.kind === "link_unusable") {
-    return { kind: "link_unusable" };
+  if (redemption.kind !== "password_changed") {
+    return redemption;
   }
 
   await gateways.audit.recordPasswordChanged(redemption.userId);

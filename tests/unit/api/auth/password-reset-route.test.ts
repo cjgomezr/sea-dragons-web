@@ -89,9 +89,7 @@ describe("POST /api/v1/auth/password-reset", () => {
   });
 
   it("responde 410 al enlace ya usado o caducado, ofreciendo pedir otro", async () => {
-    mockWiring({
-      redemption: { kind: "link_unusable", reason: "otp_expired" },
-    });
+    mockWiring({ redemption: { kind: "link_unusable" } });
 
     const response = await postReset({
       tokenHash: "hash-del-enlace",
@@ -105,6 +103,31 @@ describe("POST /api/v1/auth/password-reset", () => {
     expect(body.error.code).toBe("gone");
     expect(body.error.message).toMatch(/pide otro/i);
     expect(body.error.message).not.toContain("otp_expired");
+  });
+
+  it("responde 422 si el servicio no acepta la contraseña, avisando de que el enlace ya se gastó", async () => {
+    mockWiring({ redemption: { kind: "password_rejected" } });
+
+    const response = await postReset({
+      tokenHash: "hash-del-enlace",
+      password: "bajoelagua-nueva",
+    });
+
+    expect(response.status).toBe(422);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toMatch(/pide otro enlace/i);
+    expect(audited).toEqual([]);
+  });
+
+  it("responde 400 a un token más largo que cualquier enlace real", async () => {
+    mockWiring();
+
+    const response = await postReset({
+      tokenHash: "a".repeat(2_000),
+      password: "bajoelagua-nueva",
+    });
+
+    expect(response.status).toBe(400);
   });
 
   it("responde 400 si falta el token", async () => {

@@ -38,8 +38,13 @@ const AUDITED_ENTITY_TYPE = "auth_user";
  * el único error de `generateLink` que significa "no hay a quién mandarlo"; el
  * resto es el servicio fallando y tiene que subir. */
 const USER_NOT_FOUND_CODE = "user_not_found";
-const HTTP_NOT_FOUND = 404;
+/** Los códigos con los que Supabase Auth rechaza la contraseña nueva. */
+const REJECTED_PASSWORD_CODES: readonly string[] = [
+  "same_password",
+  "weak_password",
+];
 
+const HTTP_NOT_FOUND = 404;
 const HTTP_CLIENT_ERROR_MIN = 400;
 const HTTP_TOO_MANY_REQUESTS = 429;
 const HTTP_SERVER_ERROR_MIN = 500;
@@ -54,6 +59,30 @@ function describeAuthFailure(error: AuthError): string {
  * migración 0005 para por qué no se guarda el correo. */
 export function hashRecoveryEmail(email: string): string {
   return createHash("sha256").update(email).digest("hex");
+}
+
+/** `generateLink` dice así que el correo no tiene identidad. */
+export function isUnknownIdentity(error: AuthError): boolean {
+  return error.code === USER_NOT_FOUND_CODE || error.status === HTTP_NOT_FOUND;
+}
+
+/** Un enlace que no vale (caducado, ya canjeado, inventado) llega como error
+ * 4xx del canje. Un 429 también es 4xx pero no dice nada del enlace: es el
+ * servicio pidiendo calma, y tratarlo como enlace gastado mandaría a pedir
+ * otro a quien tiene uno bueno. Sin estado HTTP no se sabe nada, así que
+ * tampoco cuenta. */
+export function isUnusableLink(error: AuthError): boolean {
+  const status = error.status;
+  return (
+    status !== undefined &&
+    status >= HTTP_CLIENT_ERROR_MIN &&
+    status < HTTP_SERVER_ERROR_MIN &&
+    status !== HTTP_TOO_MANY_REQUESTS
+  );
+}
+
+export function isRejectedNewPassword(error: AuthError): boolean {
+  return REJECTED_PASSWORD_CODES.includes(error.code ?? "");
 }
 
 function createRecoveryRequestLog(
@@ -96,10 +125,6 @@ function createRecoveryRequestLog(
   };
 }
 
-function isUnknownIdentity(error: AuthError): boolean {
-  return error.code === USER_NOT_FOUND_CODE || error.status === HTTP_NOT_FOUND;
-}
-
 function createRecoveryTokenIssuer(
   serviceClient: SupabaseClient,
 ): RecoveryTokenIssuer {
@@ -125,17 +150,65 @@ function createRecoveryTokenIssuer(
   };
 }
 
-/** Un enlace que no vale (caducado, ya canjeado, inventado) llega como error
- * 4xx del canje. Un 429 también es 4xx pero no dice nada del enlace: es el
- * servicio pidiendo calma, y tratarlo como enlace gastado mandaría a pedir
- * otro a quien tiene uno bueno. */
-function isUnusableLink(error: AuthError): boolean {
-  const status = error.status ?? HTTP_SERVER_ERROR_MIN;
-  return (
-    status >= HTTP_CLIENT_ERROR_MIN &&
-    status < HTTP_SERVER_ERROR_MIN &&
-    status !== HTTP_TOO_MANY_REQUESTS
+type TokenVerification =
+  | { readonly kind: "verified"; readonly userId: string }
+  | { readonly kind: "link_unusable" };
+
+/** Canjea el token. Esto es lo que gasta el enlace, y deja abierta en `client`
+ * la sesión con la que se cambia la contraseña. */
+async function verifyRecoveryToken(
+  client: SupabaseClient,
+  tokenHash: string,
+): Promise<TokenVerification> {
+  const { data, error } = await client.auth.verifyOtp({
+    type: RECOVERY_OTP_TYPE,
+    token_hash: tokenHash,
+  });
+  if (error) {
+    if (isUnusableLink(error)) {
+      return { kind: "link_unusable" };
+    }
+    throw new Error(
+      `Supabase Auth no pudo canjear el enlace de recuperación: ${describeAuthFailure(error)}`,
+    );
+  }
+  if (!data.user || !data.session) {
+    throw new Error(
+      "Supabase Auth canjeó el enlace de recuperación sin devolver usuario ni sesión.",
+    );
+  }
+  return { kind: "verified", userId: data.user.id };
+}
+
+async function setNewPassword(
+  client: SupabaseClient,
+  newPassword: string,
+): Promise<"changed" | "rejected"> {
+  const { error } = await client.auth.updateUser({ password: newPassword });
+  if (!error) {
+    return "changed";
+  }
+  if (isRejectedNewPassword(error)) {
+    return "rejected";
+  }
+  throw new Error(
+    `El enlace se canjeó pero la contraseña no se pudo cambiar: ${describeAuthFailure(error)}`,
   );
+}
+
+/** La sesión del canje sólo servía para cambiar la contraseña y nadie la
+ * recibe, así que se revoca. Si la revocación falla se registra con su motivo
+ * y NO se lanza: para entonces el cambio ya ocurrió, y convertirlo en un error
+ * le diría a la persona que su contraseña no cambió, además de saltarse la
+ * entrada de la bitácora que el dominio escribe después. */
+async function closeRedemptionSession(client: SupabaseClient): Promise<void> {
+  const { error } = await client.auth.signOut({ scope: "local" });
+  if (error) {
+    console.error(
+      "[auth/password-recovery] no se pudo revocar la sesión del canje",
+      describeAuthFailure(error),
+    );
+  }
 }
 
 function createRecoveryTokenRedeemer(anon: {
@@ -149,45 +222,16 @@ function createRecoveryTokenRedeemer(anon: {
       const client = createClient(anon.url, anon.anonKey, {
         auth: { persistSession: false, autoRefreshToken: false },
       });
-      const { data, error } = await client.auth.verifyOtp({
-        type: RECOVERY_OTP_TYPE,
-        token_hash: tokenHash,
-      });
-      if (error) {
-        if (isUnusableLink(error)) {
-          return { kind: "link_unusable", reason: describeAuthFailure(error) };
-        }
-        throw new Error(
-          `Supabase Auth no pudo canjear el enlace de recuperación: ${describeAuthFailure(error)}`,
-        );
-      }
-      if (!data.user || !data.session) {
-        throw new Error(
-          "Supabase Auth canjeó el enlace de recuperación sin devolver usuario ni sesión.",
-        );
+      const verification = await verifyRecoveryToken(client, tokenHash);
+      if (verification.kind === "link_unusable") {
+        return verification;
       }
 
-      const { error: updateError } = await client.auth.updateUser({
-        password: newPassword,
-      });
-      if (updateError) {
-        throw new Error(
-          `El enlace se canjeó pero la contraseña no se pudo cambiar: ${describeAuthFailure(updateError)}`,
-        );
-      }
-
-      // La sesión que abrió el canje sólo servía para cambiar la contraseña.
-      // Nadie la recibe, así que se revoca en vez de dejarla viva en el
-      // servicio hasta que caduque.
-      const { error: signOutError } = await client.auth.signOut({
-        scope: "local",
-      });
-      if (signOutError) {
-        throw new Error(
-          `La contraseña se cambió pero no se pudo cerrar la sesión del canje: ${describeAuthFailure(signOutError)}`,
-        );
-      }
-      return { kind: "password_changed", userId: data.user.id };
+      const change = await setNewPassword(client, newPassword);
+      await closeRedemptionSession(client);
+      return change === "changed"
+        ? { kind: "password_changed", userId: verification.userId }
+        : { kind: "password_rejected" };
     },
   };
 }
@@ -229,17 +273,12 @@ export async function createSupabasePasswordRecoveryGateways(
   env: Environment,
 ): Promise<PasswordRecoveryGatewaysResult> {
   const authWiring = createSupabaseAuthGateways(env);
+  if (authWiring.kind === "unconfigured") {
+    return authWiring;
+  }
   const anonConfig = readSupabaseConfig(env);
-  if (authWiring.kind === "unconfigured" || anonConfig.kind === "missing") {
-    return {
-      kind: "unconfigured",
-      missingKeys:
-        authWiring.kind === "unconfigured"
-          ? authWiring.missingKeys
-          : anonConfig.kind === "missing"
-            ? anonConfig.missingKeys
-            : [],
-    };
+  if (anonConfig.kind === "missing") {
+    return { kind: "unconfigured", missingKeys: anonConfig.missingKeys };
   }
 
   // Release 1 opera un solo club (ver DEFAULT_CLUB_SLUG). La identidad que
