@@ -360,6 +360,20 @@ test("un enlace ya usado o caducado ofrece pedir otro", async ({ page }) => {
   ).toBeVisible();
 });
 
+// El texto de un enlace con aspecto de botón tiene que distinguirse de su
+// relleno. Axe no lo marcó la vez que ".auth-form a" lo pintó del mismo color.
+test("el botón Pedir otro enlace deja leer su texto", async ({ page }) => {
+  await page.goto(`${APP_URL}${PASSWORD_RESET_PATH}`);
+  const link = page.getByRole("link", { name: "Pedir otro enlace" });
+
+  const { color, background } = await link.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { color: style.color, background: style.backgroundColor };
+  });
+
+  expect(color).not.toBe(background);
+});
+
 test("la contraseña nueva de 7 caracteres no llega al servidor", async ({
   page,
 }) => {
