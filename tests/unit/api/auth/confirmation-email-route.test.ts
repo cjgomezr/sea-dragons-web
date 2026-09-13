@@ -105,17 +105,24 @@ const FAILED_SENDS = {
     kind: "rate_limited",
     reason: "429: email rate limit exceeded",
   },
+  "rechazo 429 por dirección": {
+    kind: "rate_limited",
+    reason:
+      "429: For security purposes, you can only request this after 60 seconds.",
+  },
 } as const satisfies Record<string, RequestedConfirmationEmail>;
 
-const SEND_RESULTS: Readonly<Record<string, RequestedConfirmationEmail>> = {
-  salió: { kind: "requested" },
-  ...FAILED_SENDS,
+/** Lo que Supabase contesta en cada estado de la cuenta
+ * (`internal/api/resend.go`): sin cuenta o ya confirmada responde 200 sin
+ * intentar el envío, y sólo una cuenta sin confirmar puede fallar. El estado no
+ * es una entrada de la ruta, así que llega a ella sólo a través de esto. */
+const SUPABASE_ANSWERS_BY_ACCOUNT_STATE: Readonly<
+  Record<string, readonly RequestedConfirmationEmail[]>
+> = {
+  "sin cuenta": [{ kind: "requested" }],
+  confirmada: [{ kind: "requested" }],
+  "sin confirmar": [{ kind: "requested" }, ...Object.values(FAILED_SENDS)],
 };
-
-/** El estado de la cuenta no es una entrada de la ruta: sólo cambia lo que
- * Supabase contesta. Por eso cada estado se cruza con los tres resultados, y
- * si la ruta llegara a distinguir alguno la matriz dejaría de ser uniforme. */
-const ACCOUNT_STATES = ["sin cuenta", "confirmada", "sin confirmar"] as const;
 
 type RawResponse = { readonly status: number; readonly text: string };
 
@@ -128,7 +135,7 @@ async function resendWith(
   return { status: response.status, text: await response.text() };
 }
 
-describe("matriz de respuestas del reenvío", () => {
+describe("envío del correo de confirmación en el reenvío", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.doUnmock("@/lib/auth/supabase-auth-gateways");
@@ -139,44 +146,35 @@ describe("matriz de respuestas del reenvío", () => {
     vi.restoreAllMocks();
   });
 
-  it("responde idéntico byte a byte para cualquier envío y cualquier estado de la cuenta", async () => {
-    const responses: RawResponse[] = [];
-    for (const accountState of ACCOUNT_STATES) {
-      for (const [sendResult, outcome] of Object.entries(SEND_RESULTS)) {
-        responses.push(await resendWith(outcome));
-        expect(
-          responses.at(-1)?.status,
-          `${accountState} / ${sendResult}`,
-        ).toBe(200);
+  describe("matriz de respuestas del reenvío", () => {
+    it("responde idéntico byte a byte para cualquier envío y cualquier estado de la cuenta", async () => {
+      const responses: RawResponse[] = [];
+      for (const answers of Object.values(SUPABASE_ANSWERS_BY_ACCOUNT_STATE)) {
+        for (const outcome of answers) {
+          responses.push(await resendWith(outcome));
+        }
       }
-    }
 
-    expect(responses).toHaveLength(9);
-    expect(new Set(responses.map((response) => response.text)).size).toBe(1);
-  });
-});
-
-describe("registro del motivo en el reenvío", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.doUnmock("@/lib/auth/supabase-auth-gateways");
-    vi.spyOn(console, "error").mockImplementation(() => {});
+      expect(responses).toHaveLength(6);
+      expect(new Set(responses.map((response) => response.status))).toEqual(
+        new Set([200]),
+      );
+      expect(new Set(responses.map((response) => response.text)).size).toBe(1);
+    });
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  describe("registro del motivo en el reenvío", () => {
+    it.each(Object.entries(FAILED_SENDS))(
+      "con un %s el motivo de Supabase llega al log sin la dirección",
+      async (_sendResult, outcome) => {
+        mockWiring({ confirmationEmail: outcome });
+
+        await postConfirmationEmail({ email: EMAIL });
+
+        const logged = vi.mocked(console.error).mock.calls.flat().map(String);
+        expect(logged).toContain(outcome.reason);
+        expect(logged.join(" ")).not.toContain(EMAIL);
+      },
+    );
   });
-
-  it.each(Object.entries(FAILED_SENDS))(
-    "con un %s el motivo de Supabase llega al log sin la dirección",
-    async (_sendResult, outcome) => {
-      mockWiring({ confirmationEmail: outcome });
-
-      await postConfirmationEmail({ email: EMAIL });
-
-      const logged = vi.mocked(console.error).mock.calls.flat().map(String);
-      expect(logged).toContain(outcome.reason);
-      expect(logged.join(" ")).not.toContain(EMAIL);
-    },
-  );
 });

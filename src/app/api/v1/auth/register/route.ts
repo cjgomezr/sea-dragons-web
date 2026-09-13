@@ -45,7 +45,7 @@ function describeIssues(issues: readonly RegistrationIssue[]): string {
  * cualquier caso. Nunca se registra la dirección: es un dato personal, y el
  * adaptador ya la quita del motivo. */
 function reportConfirmationEmail(outcome: ConfirmationEmailOutcome): void {
-  if (outcome.kind === "failed" || outcome.kind === "rate_limited") {
+  if (outcome.kind !== "requested" && outcome.kind !== "not_requested") {
     console.error(
       "[api/v1/auth/register] no se pudo pedir el correo de confirmación",
       outcome.reason,

@@ -49,7 +49,7 @@ describe("registro del motivo", () => {
   });
 });
 
-describe("reenvío", () => {
+describe("clasificación del envío", () => {
   it("sin error de Supabase el correo cuenta como pedido", () => {
     expect(toConfirmationEmailOutcome(null, EMAIL)).toEqual({
       kind: "requested",

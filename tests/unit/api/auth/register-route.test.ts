@@ -264,6 +264,11 @@ const FAILED_SENDS = {
     kind: "rate_limited",
     reason: "429: email rate limit exceeded",
   },
+  "rechazo 429 por dirección": {
+    kind: "rate_limited",
+    reason:
+      "429: For security purposes, you can only request this after 60 seconds.",
+  },
 } as const satisfies Record<string, RequestedConfirmationEmail>;
 
 const SEND_RESULTS: Readonly<Record<string, RequestedConfirmationEmail>> = {
@@ -285,7 +290,7 @@ async function registerWith(options: WiringOptions): Promise<RawResponse> {
   return { status: response.status, text: await response.text() };
 }
 
-describe("matriz de respuestas del registro", () => {
+describe("envío del correo de confirmación en el registro", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.doUnmock("@/lib/auth/supabase-auth-gateways");
@@ -297,88 +302,68 @@ describe("matriz de respuestas del registro", () => {
     vi.restoreAllMocks();
   });
 
-  it("responde idéntico byte a byte para cualquier envío y cualquier estado de la dirección", async () => {
-    const responses: RawResponse[] = [];
-    for (const confirmationEmail of Object.values(SEND_RESULTS)) {
-      for (const identityCreation of Object.values(ADDRESS_STATES)) {
-        responses.push(
-          await registerWith({ confirmationEmail, identityCreation }),
-        );
+  describe("matriz de respuestas del registro", () => {
+    it("responde idéntico byte a byte para cualquier envío y cualquier estado de la dirección", async () => {
+      const responses: RawResponse[] = [];
+      for (const confirmationEmail of Object.values(SEND_RESULTS)) {
+        for (const identityCreation of Object.values(ADDRESS_STATES)) {
+          responses.push(
+            await registerWith({ confirmationEmail, identityCreation }),
+          );
+        }
       }
-    }
 
-    expect(responses).toHaveLength(6);
-    expect(new Set(responses.map((response) => response.status))).toEqual(
-      new Set([200]),
-    );
-    expect(new Set(responses.map((response) => response.text)).size).toBe(1);
-  });
-
-  it("ningún campo del cuerpo habla del envío", async () => {
-    const response = await registerWith({
-      confirmationEmail: FAILED_SENDS["rechazo 429"],
+      expect(responses).toHaveLength(8);
+      expect(new Set(responses.map((response) => response.status))).toEqual(
+        new Set([200]),
+      );
+      expect(new Set(responses.map((response) => response.text)).size).toBe(1);
     });
 
-    const body = JSON.parse(response.text) as { data: Body };
-    expect(Object.keys(body.data).sort()).toEqual(["email", "outcome"]);
-  });
-});
+    it("ningún campo del cuerpo habla del envío", async () => {
+      const response = await registerWith({
+        confirmationEmail: FAILED_SENDS["rechazo 429"],
+      });
 
-describe("registro del motivo", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.doUnmock("@/lib/auth/supabase-auth-gateways");
-    resetRecorded();
-    vi.spyOn(console, "error").mockImplementation(() => {});
+      const body = JSON.parse(response.text) as { data: Body };
+      expect(Object.keys(body.data).sort()).toEqual(["email", "outcome"]);
+    });
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
+  describe("registro del motivo", () => {
+    it.each(Object.entries(FAILED_SENDS))(
+      "con un %s el motivo de Supabase llega al log sin la dirección",
+      async (_sendResult, outcome) => {
+        mockWiring({ confirmationEmail: outcome });
 
-  it.each(Object.entries(FAILED_SENDS))(
-    "con un %s el motivo de Supabase llega al log sin la dirección",
-    async (_sendResult, outcome) => {
-      mockWiring({ confirmationEmail: outcome });
+        await postRegistration(validBody());
+
+        const logged = vi.mocked(console.error).mock.calls.flat().map(String);
+        expect(logged).toContain(outcome.reason);
+        expect(logged.join(" ")).not.toContain(EMAIL);
+      },
+    );
+
+    it("un envío que sale no deja nada en el log de errores", async () => {
+      mockWiring({ confirmationEmail: { kind: "requested" } });
 
       await postRegistration(validBody());
 
-      const logged = vi.mocked(console.error).mock.calls.flat().map(String);
-      expect(logged).toContain(outcome.reason);
-      expect(logged.join(" ")).not.toContain(EMAIL);
-    },
-  );
-
-  it("un envío que sale no deja nada en el log de errores", async () => {
-    mockWiring({ confirmationEmail: { kind: "requested" } });
-
-    await postRegistration(validBody());
-
-    expect(console.error).not.toHaveBeenCalled();
-  });
-});
-
-describe("cuenta tras un envío fallido", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.doUnmock("@/lib/auth/supabase-auth-gateways");
-    resetRecorded();
-    vi.spyOn(console, "error").mockImplementation(() => {});
+      expect(console.error).not.toHaveBeenCalled();
+    });
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  describe("cuenta tras un envío fallido", () => {
+    it.each(Object.entries(FAILED_SENDS))(
+      "con un %s la identidad no se deshace y la fila del socio queda escrita",
+      async (_sendResult, confirmationEmail) => {
+        mockWiring({ confirmationEmail });
+
+        await postRegistration(validBody());
+
+        expect(insertedRows).toHaveLength(1);
+        expect(deletedUserIds).toEqual([]);
+      },
+    );
   });
-
-  it.each(Object.entries(FAILED_SENDS))(
-    "con un %s la identidad no se deshace y la fila del socio queda escrita",
-    async (_sendResult, confirmationEmail) => {
-      mockWiring({ confirmationEmail });
-
-      await postRegistration(validBody());
-
-      expect(insertedRows).toHaveLength(1);
-      expect(deletedUserIds).toEqual([]);
-    },
-  );
 });
