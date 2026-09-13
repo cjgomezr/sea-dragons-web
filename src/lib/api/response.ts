@@ -7,6 +7,12 @@ export type ApiErrorCode =
   | "not_found"
   | "conflict"
   | "business_rule"
+  // Un recurso que existió y ya no sirve, como un enlace de un solo uso ya
+  // canjeado o caducado. No es un 404: el cliente tiene que ofrecer pedir otro.
+  | "gone"
+  // Demasiadas peticiones seguidas. Se responde pidiendo esperar, nunca en
+  // silencio (RF-6 de E2).
+  | "rate_limited"
   | "method_not_allowed"
   | "service_unavailable"
   | "internal_error";
@@ -26,6 +32,8 @@ const HTTP_STATUS_BY_ERROR_CODE: Record<ApiErrorCode, number> = {
   not_found: 404,
   conflict: 409,
   business_rule: 422,
+  gone: 410,
+  rate_limited: 429,
   method_not_allowed: 405,
   service_unavailable: 503,
   internal_error: 500,

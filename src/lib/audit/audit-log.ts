@@ -10,6 +10,9 @@ export const AUDIT_ACTIONS = [
   "auth.login_succeeded",
   "auth.login_failed",
   "auth.logout",
+  // RF-6 de E2. Nunca lleva metadata: la contraseña y el enlace no se auditan,
+  // ni en claro ni troceados.
+  "auth.password_changed",
   "role.changed",
   "payment.status_changed",
 ] as const;

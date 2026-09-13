@@ -74,6 +74,22 @@ export const CONFIRMATION_EMAIL_API_PATH = "/api/v1/auth/confirmation-email";
  * públicos, porque es con el que deja de estarlo. */
 export const ACCOUNT_API_PATH = "/api/v1/auth/account";
 
+/** El destino del enlace del correo de recuperación (#136). Cuelga de
+ * `PASSWORD_RECOVERY_PATH`, así que ya es pública por prefijo; se nombra para
+ * que el enlace que se manda y la pantalla que lo recibe no se desincronicen. */
+export const PASSWORD_RESET_PATH = `${PASSWORD_RECOVERY_PATH}/nueva`;
+
+/** El parámetro con el que el enlace lleva el token hasta esa pantalla. */
+export const RESET_TOKEN_QUERY_PARAM = "token_hash";
+
+/** Pedir el enlace de recuperación. Quien lo pide ha perdido la contraseña,
+ * así que por definición no tiene sesión. */
+export const PASSWORD_RECOVERY_API_PATH = "/api/v1/auth/password-recovery";
+
+/** Fijar la contraseña nueva con el token del enlace. El token es la
+ * credencial: exigir además una sesión lo haría imposible de usar. */
+export const PASSWORD_RESET_API_PATH = "/api/v1/auth/password-reset";
+
 /**
  * Los únicos endpoints de la API que no exigen sesión.
  *
@@ -87,6 +103,8 @@ export const PUBLIC_API_PATHS: readonly string[] = [
   SESSION_API_PATH,
   REGISTER_API_PATH,
   CONFIRMATION_EMAIL_API_PATH,
+  PASSWORD_RECOVERY_API_PATH,
+  PASSWORD_RESET_API_PATH,
 ];
 
 export const API_V1_PREFIX = "/api/v1";
