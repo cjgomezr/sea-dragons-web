@@ -105,7 +105,7 @@ describe("POST /api/v1/auth/password-reset", () => {
     expect(body.error.message).not.toContain("otp_expired");
   });
 
-  it("responde 422 si el servicio no acepta la contraseña, avisando de que el enlace ya se gastó", async () => {
+  it("responde 410 si el servicio no acepta la contraseña, porque el enlace ya se gastó al intentarlo", async () => {
     mockWiring({ redemption: { kind: "password_rejected" } });
 
     const response = await postReset({
@@ -113,9 +113,14 @@ describe("POST /api/v1/auth/password-reset", () => {
       password: "bajoelagua-nueva",
     });
 
-    expect(response.status).toBe(422);
-    const body = (await response.json()) as { error: { message: string } };
+    expect(response.status).toBe(410);
+    const body = (await response.json()) as {
+      error: { code: string; message: string };
+    };
+    expect(body.error.code).toBe("gone");
+    expect(body.error.message).toMatch(/igual a la anterior o demasiado débil/);
     expect(body.error.message).toMatch(/pide otro enlace/i);
+    expect(body.error.message).not.toContain("password:");
     expect(audited).toEqual([]);
   });
 

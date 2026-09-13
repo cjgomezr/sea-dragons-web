@@ -36,10 +36,11 @@ export type PasswordResetResponse = { readonly outcome: "password_changed" };
 const LINK_UNUSABLE_MESSAGE =
   "Este enlace ya no sirve: caducó o ya se usó. Pide otro enlace para cambiar tu contraseña.";
 
-/** El enlace ya se gastó al intentarlo, así que reintentar con él no lleva a
- * ninguna parte: hay que decirlo junto con por qué no se aceptó. */
+/** Responde como enlace gastado (410) y no como campo inválido (422), porque
+ * eso es lo que quedó: el canje ya ocurrió, y reintentar con el mismo enlace
+ * no lleva a ninguna parte. El mensaje dice además por qué no se aceptó. */
 const PASSWORD_REJECTED_MESSAGE =
-  "password: No pudimos usar esa contraseña: es igual a la anterior o demasiado débil. El enlace ya se usó al intentarlo, así que pide otro enlace y elige una distinta.";
+  "No pudimos usar esa contraseña: es igual a la anterior o demasiado débil. El enlace ya se usó al intentarlo, así que pide otro enlace y elige una distinta.";
 
 const postPasswordReset = createApiRoute<
   PasswordResetResponse,
@@ -63,7 +64,7 @@ const postPasswordReset = createApiRoute<
       case "invalid_password":
         throw new ApiError("business_rule", `password: ${outcome.message}`);
       case "password_rejected":
-        throw new ApiError("business_rule", PASSWORD_REJECTED_MESSAGE);
+        throw new ApiError("gone", PASSWORD_REJECTED_MESSAGE);
       case "link_unusable":
         throw new ApiError("gone", LINK_UNUSABLE_MESSAGE);
       case "password_changed":

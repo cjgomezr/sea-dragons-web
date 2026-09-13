@@ -227,8 +227,15 @@ function createRecoveryTokenRedeemer(anon: {
         return verification;
       }
 
-      const change = await setNewPassword(client, newPassword);
-      await closeRedemptionSession(client);
+      // `finally` porque la sesión del canje se revoca también cuando el cambio
+      // lanza (un 500 del servicio, la red): nadie la recibe, pero no tiene por
+      // qué seguir viva hasta que caduque.
+      let change: "changed" | "rejected";
+      try {
+        change = await setNewPassword(client, newPassword);
+      } finally {
+        await closeRedemptionSession(client);
+      }
       return change === "changed"
         ? { kind: "password_changed", userId: verification.userId }
         : { kind: "password_rejected" };

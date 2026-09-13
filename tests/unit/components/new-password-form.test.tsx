@@ -109,6 +109,29 @@ describe("formulario de contraseña nueva", () => {
     ).toHaveAttribute("href", PASSWORD_RECOVERY_PATH);
   });
 
+  it("si el servicio no acepta la contraseña, dice por qué y ofrece pedir otro enlace en vez de dejar el formulario", async () => {
+    const rejection =
+      "No pudimos usar esa contraseña: es igual a la anterior o demasiado débil. Pide otro enlace y elige una distinta.";
+    stubApi({
+      status: 410,
+      body: { error: { code: "gone", message: rejection } },
+    });
+    render(<NewPasswordForm tokenHash={TOKEN_HASH} />);
+
+    await submitPassword("bajoelagua-nueva");
+
+    const panel = await screen.findByRole("region", {
+      name: "Este enlace ya no sirve",
+    });
+    expect(panel).toHaveTextContent(rejection);
+    expect(
+      screen.getByRole("link", { name: "Pedir otro enlace" }),
+    ).toHaveAttribute("href", PASSWORD_RECOVERY_PATH);
+    expect(
+      screen.queryByRole("button", { name: "Guardar contraseña" }),
+    ).toBeNull();
+  });
+
   it("muestra el mensaje del servidor ante cualquier otro fallo y deja reintentar", async () => {
     stubApi({
       status: 500,

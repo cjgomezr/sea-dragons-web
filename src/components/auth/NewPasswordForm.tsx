@@ -28,7 +28,8 @@ const NETWORK_ERROR_MESSAGE =
 const UNEXPECTED_ERROR_MESSAGE =
   "No pudimos cambiar tu contraseña. Vuelve a intentarlo en un momento.";
 
-/** El código con el que la API dice que el enlace ya no sirve. */
+/** El código con el que la API dice que el enlace ya no sirve: caducó, ya se
+ * usó, o se gastó en un intento cuya contraseña el servicio no aceptó. */
 const LINK_UNUSABLE_ERROR_CODE = "gone";
 
 type Status =
@@ -37,7 +38,7 @@ type Status =
   | { readonly kind: "invalid_password"; readonly message: string }
   | { readonly kind: "failed"; readonly message: string }
   | { readonly kind: "password_changed" }
-  | { readonly kind: "link_unusable" };
+  | { readonly kind: "link_unusable"; readonly message: string | null };
 
 async function submitNewPassword(body: {
   readonly tokenHash: string;
@@ -58,25 +59,27 @@ async function submitNewPassword(body: {
     return { kind: "password_changed" };
   }
   const payload: unknown = await response.json().catch(() => null);
+  const message = readStringAt(payload, ["error", "message"]);
   if (readStringAt(payload, ["error", "code"]) === LINK_UNUSABLE_ERROR_CODE) {
-    return { kind: "link_unusable" };
+    return { kind: "link_unusable", message };
   }
-  return {
-    kind: "failed",
-    message:
-      readStringAt(payload, ["error", "message"]) ?? UNEXPECTED_ERROR_MESSAGE,
-  };
+  return { kind: "failed", message: message ?? UNEXPECTED_ERROR_MESSAGE };
 }
 
 /** También la usa la página cuando el enlace llega sin token: para quien lo
- * abre es el mismo caso, un enlace que no sirve. */
-export function RecoveryLinkUnusable(): React.JSX.Element {
+ * abre es el mismo caso, un enlace que no sirve. `reason` es el motivo que dio
+ * el servidor, cuando lo hay; sin él se explica el caso general. */
+export function RecoveryLinkUnusable({
+  reason = null,
+}: {
+  reason?: string | null;
+}): React.JSX.Element {
   return (
     <section className="auth-form" aria-labelledby="nueva-caducada-titulo">
       <h1 id="nueva-caducada-titulo">Este enlace ya no sirve</h1>
       <p className="auth-lead">
-        El enlace para cambiar tu contraseña caducó o ya se usó. Cada enlace
-        dura {RECOVERY_LINK_LIFETIME_MINUTES} minutos y sirve una sola vez.
+        {reason ??
+          `El enlace para cambiar tu contraseña caducó o ya se usó. Cada enlace dura ${RECOVERY_LINK_LIFETIME_MINUTES} minutos y sirve una sola vez.`}
       </p>
       <Link
         className="auth-submit auth-submit-link"
@@ -134,7 +137,7 @@ export function NewPasswordForm({
     return <PasswordChanged />;
   }
   if (status.kind === "link_unusable") {
-    return <RecoveryLinkUnusable />;
+    return <RecoveryLinkUnusable reason={status.message} />;
   }
 
   const isInvalid = status.kind === "invalid_password";
