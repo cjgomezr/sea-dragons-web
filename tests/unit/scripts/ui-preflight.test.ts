@@ -1578,7 +1578,9 @@ describe("diagnóstico de una secuencia lenta", () => {
       },
     ];
 
-    await expect(runTimedSequence(steps, 20)).rejects.toThrow(/paso 1/);
+    await expect(runTimedSequence(steps, 20)).rejects.toThrow(
+      /paso 1 \(down\)/,
+    );
     await sleep(200);
 
     expect(secondStepStarts).toBe(0);
