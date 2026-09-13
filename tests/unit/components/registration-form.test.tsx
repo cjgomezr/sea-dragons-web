@@ -272,3 +272,96 @@ describe("formulario de registro", () => {
     expect(alert).not.toHaveTextContent("ECONNREFUSED");
   });
 });
+
+const PENDING_RESPONSE = new Response(
+  JSON.stringify({
+    data: { outcome: "confirmation_pending", email: "nerea@example.test" },
+  }),
+  { status: 200, headers: { "content-type": "application/json" } },
+);
+
+type ResendReply = "ok" | "http_error" | "network_error";
+
+/** El registro siempre sale bien; el reenvío responde lo que pida el test. */
+function stubRegistrationThenResend(resend: ResendReply): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) => {
+      if (url === REGISTER_API_PATH) {
+        return PENDING_RESPONSE.clone();
+      }
+      switch (resend) {
+        case "ok":
+          return PENDING_RESPONSE.clone();
+        case "http_error":
+          return new Response("{}", { status: 500 });
+        case "network_error":
+          throw new Error("ECONNREFUSED 127.0.0.1:3417");
+      }
+    }),
+  );
+}
+
+async function registerThroughForm(): Promise<void> {
+  renderForm();
+  await fillValidForm();
+  await userEvent.setup().click(submitButton());
+  await screen.findByRole("heading", { name: /confirma tu correo/i });
+}
+
+async function clickResend(): Promise<void> {
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Reenviar el correo" }));
+}
+
+describe("pantalla de confirmación", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("dice que mandamos un enlace y que, si no llega en unos minutos, se puede reenviar desde ahí", async () => {
+    stubRegistrationThenResend("ok");
+
+    await registerThroughForm();
+
+    expect(screen.getByText(/te mandamos un enlace/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/si no te llega en unos minutos/i),
+    ).toHaveTextContent(/reenv/i);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("un reenvío que responde bien dice que el enlace va en camino", async () => {
+    stubRegistrationThenResend("ok");
+    await registerThroughForm();
+
+    await clickResend();
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/en camino/i);
+  });
+
+  it("con un fallo de red del reenvío muestra su mensaje propio", async () => {
+    stubRegistrationThenResend("network_error");
+    await registerThroughForm();
+
+    await clickResend();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/no pudimos pedir otro correo/i);
+    expect(alert).toHaveTextContent(/conexión/i);
+    expect(alert).not.toHaveTextContent(/crear tu cuenta/i);
+    expect(alert).not.toHaveTextContent("ECONNREFUSED");
+  });
+
+  it("con un error HTTP del reenvío muestra su mensaje propio", async () => {
+    stubRegistrationThenResend("http_error");
+    await registerThroughForm();
+
+    await clickResend();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/no pudimos pedir otro correo/i);
+    expect(alert).not.toHaveTextContent(/crear tu cuenta/i);
+  });
+});

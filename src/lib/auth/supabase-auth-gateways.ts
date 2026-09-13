@@ -21,6 +21,7 @@ import type {
   ConfirmationEmailGateway,
   MemberDirectory,
   RegistrationGateways,
+  RequestedConfirmationEmail,
 } from "./register-member";
 
 /**
@@ -127,6 +128,42 @@ function createMemberDirectory(serviceClient: SupabaseClient): MemberDirectory {
   };
 }
 
+/** Supabase Auth responde 429 cuando se agota el cupo de correos. El código se
+ * mira además del estado por si una versión futura cambia uno de los dos. */
+const RATE_LIMITED_STATUS = 429;
+const EMAIL_RATE_LIMIT_CODE = "over_email_send_rate_limit";
+
+/** Supabase cita la dirección en algunos motivos ("Email address ... is
+ * invalid"), y los registros del servidor no son sitio para datos personales. */
+const REDACTED_EMAIL = "<correo>";
+
+type AuthSendError = {
+  readonly status?: number | undefined;
+  readonly code?: string | undefined;
+  readonly message: string;
+};
+
+function describeSendError(error: AuthSendError, email: string): string {
+  const message = error.message.replaceAll(email, REDACTED_EMAIL);
+  return error.status === undefined ? message : `${error.status}: ${message}`;
+}
+
+export function toConfirmationEmailOutcome(
+  error: AuthSendError | null,
+  email: string,
+): RequestedConfirmationEmail {
+  if (error === null) {
+    return { kind: "requested" };
+  }
+  const reason = describeSendError(error, email);
+  const isRateLimited =
+    error.status === RATE_LIMITED_STATUS ||
+    error.code === EMAIL_RATE_LIMIT_CODE;
+  return isRateLimited
+    ? { kind: "rate_limited", reason }
+    : { kind: "failed", reason };
+}
+
 function createConfirmationEmailGateway(
   anonClient: SupabaseClient,
 ): ConfirmationEmailGateway {
@@ -136,9 +173,7 @@ function createConfirmationEmailGateway(
         type: "signup",
         email,
       });
-      return error
-        ? { kind: "failed", reason: error.message }
-        : { kind: "requested" };
+      return toConfirmationEmailOutcome(error, email);
     },
   };
 }
