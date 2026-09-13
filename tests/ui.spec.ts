@@ -236,6 +236,163 @@ for (const pg of PUBLIC_PAGES) {
 }
 
 /* ---------------------------------------------------------------------------
+   Recuperación de contraseña (#136). Sin mockup propio: se revisa contra el
+   lenguaje de docs/mockups/auth-light.png. Las respuestas de los endpoints se
+   sustituyen por dobles, así que la suite no emite enlaces de verdad ni gasta
+   el límite de peticiones de nadie.
+   --------------------------------------------------------------------------- */
+
+const PASSWORD_RECOVERY_PATH = "/recuperar-contrasena";
+const PASSWORD_RESET_PATH = "/recuperar-contrasena/nueva";
+const PASSWORD_RECOVERY_ENDPOINT = "**/api/v1/auth/password-recovery";
+const PASSWORD_RESET_ENDPOINT = "**/api/v1/auth/password-reset";
+const RECOVERY_STUB_EMAIL = "nerea@example.test";
+// Abrir la pantalla no canjea nada, así que un token inventado basta para
+// dibujar el formulario.
+const STUB_RESET_PATH = `${PASSWORD_RESET_PATH}?token_hash=enlace-de-prueba`;
+
+// Las tres que se alcanzan por URL. La cuarta, la confirmación del envío, sólo
+// sale enviando el formulario y va aparte.
+const PASSWORD_RECOVERY_SCREENS: readonly Screen[] = [
+  { name: "recuperar-contrasena", path: PASSWORD_RECOVERY_PATH },
+  { name: "recuperar-contrasena-nueva", path: STUB_RESET_PATH },
+  // Sin token, que para quien lo abre es lo mismo que caducado o ya usado.
+  { name: "recuperar-contrasena-enlace-no-sirve", path: PASSWORD_RESET_PATH },
+];
+
+for (const pg of PASSWORD_RECOVERY_SCREENS) {
+  describeScreen(pg);
+}
+
+async function goToRecoveryRequested(
+  page: import("@playwright/test").Page,
+  theme: (typeof themes)[number],
+): Promise<void> {
+  await page.route(PASSWORD_RECOVERY_ENDPOINT, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: { outcome: "recovery_requested", email: RECOVERY_STUB_EMAIL },
+      }),
+    }),
+  );
+  await goToWithTheme(page, PASSWORD_RECOVERY_PATH, theme);
+
+  await page.getByLabel("Correo electrónico").fill(RECOVERY_STUB_EMAIL);
+  await page.getByRole("button", { name: "Enviar enlace" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Revisa tu correo" }),
+  ).toBeVisible();
+}
+
+for (const vp of viewports) {
+  test.describe(`recuperar-contrasena-enviado @ ${vp.name}`, () => {
+    test.use({ viewport: { width: vp.width, height: vp.height } });
+
+    for (const theme of themes) {
+      test(`matches approved baseline (${theme})`, async ({ page }) => {
+        await goToRecoveryRequested(page, theme);
+        const name = `recuperar-contrasena-enviado-${vp.name}-${theme}.png`;
+        await createMissingLocalBaseline(name, () =>
+          page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+        );
+        await expect(page).toHaveScreenshot(name, {
+          ...SCREENSHOT_OPTIONS,
+          fullPage: true,
+          maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+        });
+      });
+    }
+  });
+}
+
+test("recuperar-contrasena-enviado: has no accessibility violations (axe-core)", async ({
+  page,
+}) => {
+  await goToRecoveryRequested(page, "light");
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  expect(
+    results.violations,
+    JSON.stringify(results.violations, null, 2),
+  ).toEqual([]);
+});
+
+test("el ¿Olvidaste tu contraseña? de la entrada lleva a pedir el enlace", async ({
+  page,
+}) => {
+  await page.goto(`${APP_URL}/entrar`);
+
+  await page.getByRole("link", { name: "¿Olvidaste tu contraseña?" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Recuperar tu contraseña" }),
+  ).toBeVisible();
+});
+
+test("un enlace ya usado o caducado ofrece pedir otro", async ({ page }) => {
+  await page.route(PASSWORD_RESET_ENDPOINT, (route) =>
+    route.fulfill({
+      status: 410,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: {
+          code: "gone",
+          message: "Este enlace ya no sirve: caducó o ya se usó.",
+        },
+      }),
+    }),
+  );
+  await page.goto(`${APP_URL}${STUB_RESET_PATH}`);
+
+  await page.getByLabel("Contraseña nueva").fill("bajoelagua-nueva");
+  await page.getByRole("button", { name: "Guardar contraseña" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Este enlace ya no sirve" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Pedir otro enlace" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Recuperar tu contraseña" }),
+  ).toBeVisible();
+});
+
+test("la contraseña nueva de 7 caracteres no llega al servidor", async ({
+  page,
+}) => {
+  let calls = 0;
+  await page.route(PASSWORD_RESET_ENDPOINT, (route) => {
+    calls += 1;
+    return route.fulfill({ status: 200, body: "{}" });
+  });
+  await page.goto(`${APP_URL}${STUB_RESET_PATH}`);
+
+  await page.getByLabel("Contraseña nueva").fill("1234567");
+  await page.getByRole("button", { name: "Guardar contraseña" }).click();
+
+  // Next inserta su propio elemento con role="alert" (el anunciador de ruta),
+  // vacío, así que el aviso se busca por su texto.
+  await expect(
+    page.getByRole("alert").filter({ hasText: /caracteres/ }),
+  ).toContainText("8");
+  expect(calls).toBe(0);
+});
+
+test("la pantalla de contraseña nueva no cuenta su token en el Referer", async ({
+  page,
+}) => {
+  await page.goto(`${APP_URL}${STUB_RESET_PATH}`);
+
+  await expect(page.locator('meta[name="referrer"]')).toHaveAttribute(
+    "content",
+    "no-referrer",
+  );
+});
+
+/* ---------------------------------------------------------------------------
    La frontera de sesión vista desde un navegador de verdad (#135), sin
    credenciales de por medio: un visitante anónimo no las necesita.
    --------------------------------------------------------------------------- */
@@ -1115,9 +1272,7 @@ test.describe("una cuenta incompleta en un navegador de verdad", () => {
   test("no llega a ninguna pantalla de la aplicación", async ({ page }) => {
     await page.goto(`${APP_URL}/calendario`);
 
-    await expect(page).toHaveURL(
-      new RegExp(`${COMPLETE_REGISTRATION_PATH}$`),
-    );
+    await expect(page).toHaveURL(new RegExp(`${COMPLETE_REGISTRATION_PATH}$`));
   });
 
   test("responde 403 a la API directa, que es lo que la redirección esconde", async ({
@@ -1141,7 +1296,6 @@ test.describe("una cuenta incompleta en un navegador de verdad", () => {
     await expect(page.getByLabel("Fecha de nacimiento")).toHaveCount(0);
     await expect(page.getByLabel("Nombre completo")).toHaveCount(0);
   });
-
 });
 
 /** Los dos tests que dejan su cuenta distinta a como la encontraron. Cada uno
