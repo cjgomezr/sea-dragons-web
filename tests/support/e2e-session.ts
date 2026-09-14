@@ -13,6 +13,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { createSessionClient } from "@/lib/supabase/session-client";
 import { loadLocalEnvFile } from "./load-local-env";
 import { decideSupabaseCredentials } from "./supabase-credentials";
+import { createConfirmedUser, withSupabaseRetry } from "./supabase-retry";
 
 /**
  * Los socios de prueba con los que Playwright entra a la aplicación.
@@ -217,10 +218,10 @@ async function writeStorageState(
     );
   }
 
-  const { error } = await session.client.auth.signInWithPassword({
-    email,
-    password,
-  });
+  const { error } = await withSupabaseRetry(
+    "abrir la sesión del socio de prueba",
+    () => session.client.auth.signInWithPassword({ email, password }),
+  );
   if (error) {
     throw new Error(
       `No se pudo abrir la sesión del socio de prueba: ${error.message}`,
@@ -281,11 +282,9 @@ type SeededMember = {
 };
 
 async function findClubId(serviceClient: SupabaseClient): Promise<string> {
-  const { data, error } = await serviceClient
-    .from(CLUBS_TABLE)
-    .select("id")
-    .eq("slug", CLUB_SLUG)
-    .single();
+  const { data, error } = await withSupabaseRetry("leer el club sembrado", () =>
+    serviceClient.from(CLUBS_TABLE).select("id").eq("slug", CLUB_SLUG).single(),
+  );
   if (error || !data) {
     throw new Error(
       `No se pudo leer el club sembrado: ${error?.message ?? "sin datos"}`,
@@ -305,34 +304,48 @@ async function seedMember(
   const email = `e2e-${randomUUID()}@example.test`;
   const password = randomUUID();
 
-  const { data, error } = await serviceClient.auth.admin.createUser({
+  const user = await createConfirmedUser(serviceClient.auth.admin, {
     email,
     password,
-    email_confirm: true,
+    operation: "crear el socio de prueba",
   });
-  if (error || !data.user) {
-    throw new Error(
-      `No se pudo crear el socio de prueba: ${error?.message ?? "sin datos"}`,
-    );
-  }
 
-  const { error: memberError } = await serviceClient
-    .from(MEMBERS_TABLE)
-    .insert({
-      club_id: clubId,
-      user_id: data.user.id,
-      full_name: "Socio de prueba",
-      email,
-      ...columns,
-    });
+  const { error: memberError } = await withSupabaseRetry(
+    "crear la fila de miembro de prueba",
+    () =>
+      serviceClient.from(MEMBERS_TABLE).insert({
+        club_id: clubId,
+        user_id: user.id,
+        full_name: "Socio de prueba",
+        email,
+        ...columns,
+      }),
+  );
   if (memberError) {
-    await serviceClient.auth.admin.deleteUser(data.user.id);
+    await deleteTestUser(serviceClient, user.id);
     throw new Error(
       `No se pudo crear la fila de miembro de prueba: ${memberError.message}`,
     );
   }
 
-  return { userId: data.user.id, email, password };
+  return { userId: user.id, email, password };
+}
+
+/** Borra una identidad de prueba. Un fallo aquí se registra y no se lanza:
+ * quien llama ya está saliendo por otro error, o está limpiando al final, y
+ * ese es el resultado que importa. */
+async function deleteTestUser(
+  serviceClient: SupabaseClient,
+  userId: string,
+): Promise<void> {
+  const { error } = await withSupabaseRetry("borrar el socio de prueba", () =>
+    serviceClient.auth.admin.deleteUser(userId),
+  );
+  if (error) {
+    console.error(
+      `No se pudo borrar el socio de prueba ${userId}: ${error.message}`,
+    );
+  }
 }
 
 /** El socio activo y uno por cada estado de completar registro, cada uno con
@@ -396,7 +409,7 @@ export async function discardE2eSession(): Promise<void> {
   if (state.kind === "available") {
     const serviceClient = createServiceRoleClient(process.env);
     for (const userId of state.userIds) {
-      await serviceClient.auth.admin.deleteUser(userId);
+      await deleteTestUser(serviceClient, userId);
     }
   }
   rmSync(STATE_PATH, { force: true });
