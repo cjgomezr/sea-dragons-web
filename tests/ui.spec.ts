@@ -1209,6 +1209,64 @@ for (const state of ["invalida", "error"] as const) {
   });
 }
 
+// Con el correo confirmado lo único que queda es entrar: una cuenta incompleta
+// la manda a completar registro el propio inicio de sesión.
+const CONFIRMED_STATE_SUMMARIES = {
+  ok: /cuenta ya está activa/,
+  pendiente: /falta algún dato[\s\S]*te pediremos lo que falta/,
+} as const;
+
+for (const state of ["ok", "pendiente"] as const) {
+  test(`registro tras el enlace (${state}): explica en qué estado quedó la cuenta`, async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}/registro?confirmacion=${state}`);
+
+    await expect(page.getByRole("main")).toContainText(
+      CONFIRMED_STATE_SUMMARIES[state],
+    );
+  });
+
+  // Los textos se escribieron cuando todavía no se podía entrar (#132).
+  test(`registro tras el enlace (${state}): no promete un inicio de sesión que ya existe`, async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}/registro?confirmacion=${state}`);
+
+    await expect(page.getByRole("main")).not.toContainText(
+      /esté disponible|en cuanto esa pantalla exista/,
+    );
+  });
+
+  test(`registro tras el enlace (${state}): ofrece entrar`, async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}/registro?confirmacion=${state}`);
+
+    await page.getByRole("link", { name: "Entrar", exact: true }).click();
+
+    await expect(
+      page.getByRole("heading", { name: "Bienvenido de vuelta" }),
+    ).toBeVisible();
+  });
+
+  for (const theme of themes) {
+    test(`registro tras el enlace (${state}): el botón Entrar deja leer su texto (${theme})`, async ({
+      page,
+    }) => {
+      await goToWithTheme(page, `/registro?confirmacion=${state}`, theme);
+      const link = page.getByRole("link", { name: "Entrar", exact: true });
+
+      const { color, background } = await link.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { color: style.color, background: style.backgroundColor };
+      });
+
+      expect(color).not.toBe(background);
+    });
+  }
+}
+
 test("el formulario de registro no manda nada al servidor con la contraseña corta", async ({
   page,
 }) => {
