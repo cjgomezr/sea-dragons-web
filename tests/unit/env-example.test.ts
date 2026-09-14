@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   IGNORED_ENV_VARS,
   PLATFORM_INJECTED_ENV_VARS,
+  PRODUCTION_ONLY_ENV_VARS,
   SECRET_ENV_VARS,
   findEnvVarsReadByCode,
   findUndocumentedEnvVars,
@@ -47,7 +48,16 @@ describe(".env.example", () => {
     expect([...IGNORED_ENV_VARS]).toEqual([
       "PATH",
       ...PLATFORM_INJECTED_ENV_VARS,
+      ...PRODUCTION_ONLY_ENV_VARS,
     ]);
+  });
+
+  it("no declara las variables que sólo viven en producción, para que nadie las pegue en local", () => {
+    const documented = readEnvExampleNames();
+
+    for (const name of PRODUCTION_ONLY_ENV_VARS) {
+      expect(documented.has(name), `${name} no va en .env.example`).toBe(false);
+    }
   });
 
   it("falla nombrando la variable que falta cuando se añade una lectura nueva sin documentarla", () => {

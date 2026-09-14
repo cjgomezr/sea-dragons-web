@@ -36,7 +36,8 @@
     "supabase-account": { "production": false },
     "developer": { "production": false },
     "platform": { "production": false },
-    "test-harness": { "production": false }
+    "test-harness": { "production": false },
+    "resend": { "production": true }
   },
   "variables": {
     "NEXT_PUBLIC_SUPABASE_URL": {
@@ -169,6 +170,28 @@
         "production": null,
         "ci": null,
         "ci-produccion": "seadragons-prod"
+      }
+    },
+    "RESEND_API_KEY": {
+      "secret": true,
+      "writeCredential": false,
+      "scopes": {
+        "local": null,
+        "preview": null,
+        "production": "resend",
+        "ci": null,
+        "ci-produccion": null
+      }
+    },
+    "EMAIL_FROM": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": null,
+        "preview": null,
+        "production": "resend",
+        "ci": null,
+        "ci-produccion": null
       }
     }
   }

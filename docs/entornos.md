@@ -185,8 +185,9 @@ archivo versionado del repositorio.
   de Supabase de ese proyecto en Project Settings, API. Por qué las tiene, y
   qué lo compensa, está en "CI escribe en seadragons-dev".
 - **De producción:** no viven en el portátil de nadie. Van a los secretos del
-  despliegue (Vercel, puestos el 11 de septiembre de 2026) y a los del
-  repositorio (GitHub Actions, cuando el #94 los necesite). Poner una credencial
+  despliegue (Vercel, puestos el 11 de septiembre de 2026; la clave de Resend,
+  el 14 de septiembre de 2026) y a los del repositorio (GitHub Actions, cuando
+  el #94 los necesite). Poner una credencial
   de producción en `.env.local` hace fallar la suite entera por el guardia de
   entorno, y eso es deliberado.
 - **Password de la base de producción:** no se fijó al crear el proyecto por
@@ -263,9 +264,12 @@ qué corre sin credenciales, con la condición escrita en el workflow.
 | `NEXT_PUBLIC_SUPABASE_URL`      | `seadragons-dev` | `seadragons-prod` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `seadragons-dev` | `seadragons-prod` |
 | `SUPABASE_SERVICE_ROLE_KEY`     | no se pone       | `seadragons-prod` |
+| `RESEND_API_KEY`                | no se pone       | `resend`          |
+| `EMAIL_FROM`                    | no se pone       | `resend`          |
 
 Las dos primeras salen de Supabase Dashboard → el proyecto que toque → Project
-Settings → API. La tercera, del mismo sitio, y sólo en Production.
+Settings → API. La tercera, del mismo sitio, y sólo en Production. Las dos de
+Resend se explican en "Correo transaccional".
 
 **Ojo al ámbito Development de Vercel.** Existe, y es el que la integración de
 Supabase habría rellenado sola. Se deja vacío a propósito: en este proyecto el
@@ -329,6 +333,58 @@ variable de Supabase: la aplicación todavía es un esqueleto y ningún componen
 de cliente habla con la base. El chequeo importa a partir de E2, cuando el
 navegador empiece a autenticar.
 
+## Correo transaccional (issue #137)
+
+El proveedor es **Resend**, decidido el 11 de septiembre de 2026. Su plan
+gratuito da 3.000 correos al mes con tope de 100 al día, que sobra para el
+volumen del club. Por él salen los dos correos que manda hoy la aplicación: el
+enlace de recuperación de contraseña y el de confirmación de la cuenta. El
+servicio de correo incorporado de Supabase ya no manda nada de la aplicación:
+corta a 2 mensajes por hora y se niega a escribir fuera del equipo del
+proyecto.
+
+El código vive en `src/lib/email/`: `resend-email-sender.ts` hace el envío y
+`email-templates.ts` arma cada correo en HTML y en texto plano a partir del
+mismo contenido. Supabase sólo emite los enlaces, sin mandarlos.
+
+**Dos variables, y sólo en el ámbito Production de Vercel.** Pegadas el 14 de
+septiembre de 2026.
+
+- `RESEND_API_KEY`: la clave de la API, secreta. Se crea en el panel de Resend,
+  API Keys, con permiso de envío.
+- `EMAIL_FROM`: el remitente, `Victoria Seadragons <seadragons@volleytip.com>`.
+  No es secreta, sale en la cabecera de cada correo.
+
+El remitente es un préstamo. `volleytip.com` es un dominio del dueño, ya
+verificado en su cuenta de Resend, y se usa mientras el club no tenga dominio
+propio (pregunta abierta del PRD de E2). Cuando lo tenga, se verifica en Resend
+y se cambia `EMAIL_FROM`; el código no se toca.
+
+**Por qué no existen en preview, en local ni en CI.** Un preview con la clave
+mandaría correos de verdad a direcciones de prueba y gastaría el cupo del mes.
+En `entornos.json` las dos salen del origen `resend`, marcado como de
+producción, así que la regla 1 del manifiesto deja el test en rojo si alguien
+las declara en otro entorno. Los tests usan un doble y no necesitan la clave.
+Ninguna de las dos lleva el prefijo `NEXT_PUBLIC_`: el navegador no manda
+correos, y `npm run check:client-bundle` busca `RESEND_API_KEY` en el bundle
+como a cualquier otra variable secreta.
+
+**Qué pasa sin ellas.** Nada falla al arrancar, a propósito: un preview sin
+clave es el caso normal y no puede quedarse sin servir páginas. Falla el envío,
+y dice por qué:
+
+- Pedir la recuperación de contraseña responde 503 con un mensaje que nombra
+  la variable que falta y dónde se pone.
+- El registro y el reenvío de la confirmación siguen respondiendo lo mismo,
+  porque su respuesta no puede delatar qué direcciones tienen cuenta (#147). El
+  motivo, con el nombre de la variable, queda en el registro del servidor.
+
+`writeCredential` sigue en `false` para la clave de Resend. Ese campo significa
+"puede escribir en una base de Supabase de este proyecto", y esta clave no
+puede. Mandar correo en nombre del club también es un poder que cuesta caro
+equivocar, pero lo que la separa de preview es su origen de producción, no ese
+campo.
+
 ## Rotación de credenciales
 
 Cuando una clave se rota hay que cambiarla en **todos** los sitios donde vive,
@@ -343,12 +399,17 @@ el manifiesto se separan.
 | `SUPABASE_SERVICE_ROLE_KEY`  | ci            | GitHub, repositorio sea-dragons-web, Settings, Secrets and variables, Actions                        |
 | `SUPABASE_ACCESS_TOKEN`      | local         | .env.local, en la máquina de quien desarrolla, fuera de git                                          |
 | `SUPABASE_PRODUCTION_DB_URL` | ci-produccion | GitHub, repositorio sea-dragons-web, Settings, Environments, entorno Production, Environment secrets |
+| `RESEND_API_KEY`             | production    | Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Production             |
 
 El orden importa. Primero se genera la clave nueva, después se actualiza cada
 fila de la tabla, y sólo al final se revoca la vieja: al revés deja la
 aplicación caída durante el hueco. Un despliegue de Vercel toma las variables
 al construirse, así que después de cambiarlas hay que redesplegar; editarlas no
 basta.
+
+La clave de Resend sigue el mismo orden: se crea la nueva en el panel de Resend
+(API Keys), se pega en Vercel, se redespliega, se comprueba que llega un correo
+de recuperación, y sólo entonces se borra la vieja en Resend.
 
 Las variables públicas no se rotan, se sustituyen: cambiar el ref de Supabase
 significa cambiar de proyecto, y eso es una migración, no una rotación.
@@ -639,6 +700,20 @@ del entorno `Production` de Actions, y la pone quien administre el repositorio
 con la cadena que da el dashboard de Supabase (Connect, Session pooler, que es
 la que funciona desde un runner de GitHub). Es la credencial con la que un error
 cuesta más caro: escribe en el esquema de la base con los datos reales del club.
+
+`RESEND_API_KEY`: la clave de la API de Resend, con la que la aplicación manda
+el correo transaccional. Vive sólo en producción, en el ámbito Production de
+Vercel, y la pone quien administre el proyecto con una clave creada en el panel
+de Resend (API Keys). **No está en `.env.example` a propósito:** en local, en
+preview y en CI no existe, para que nada fuera de producción mande correos de
+verdad. Ver "Correo transaccional".
+
+`EMAIL_FROM`: el remitente de esos correos, hoy
+`Victoria Seadragons <seadragons@volleytip.com>`. No es secreta. Vive donde vive
+la clave, sólo en el ámbito Production de Vercel, porque sin la clave no sirve
+de nada y porque el dominio tiene que estar verificado en esa misma cuenta de
+Resend. Tampoco está en `.env.example`. Mudar el remitente al dominio del club
+es cambiar esta variable.
 
 **Qué protege este documento y qué no.** `tests/unit/entornos-doc.test.ts`
 rechaza cualquier cadena con forma de clave de Supabase, en los dos formatos que

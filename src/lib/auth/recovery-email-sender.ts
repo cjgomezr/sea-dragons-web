@@ -1,25 +1,52 @@
-import type { RecoveryEmailSender } from "./password-recovery";
+import { renderPasswordRecoveryEmail } from "@/lib/email/email-templates";
+import { connectResendEmailSender } from "@/lib/email/resend-email-sender";
+import {
+  RECOVERY_LINK_LIFETIME_MINUTES,
+  type RecoveryEmailSender,
+} from "./password-recovery";
 
 /**
- * La frontera del envío del correo de recuperación (INT-006).
+ * La frontera del envío del correo de recuperación (INT-006). Manda por Resend
+ * con la plantilla de recuperación.
  *
- * Hoy no hay proveedor conectado, y eso es deliberado: el ticket de Resend
- * (el 7 del PRD de E2) necesita un dominio verificado y una credencial que
- * crea una persona. Hasta entonces el flujo entero se prueba contra un doble
- * y esta función dice la verdad: no hay con qué mandar.
+ * Fuera de producción no conecta, y es deliberado: la clave de Resend sólo
+ * vive en el ámbito Production de Vercel (ver `entornos.json`). Un preview o
+ * una máquina de desarrollo responden entonces que no hay con qué mandar,
+ * nombrando la variable, en vez de mandar correos de verdad.
  *
  * Quien la llama tiene que preguntar ANTES de mirar si la cuenta existe. Un
  * "no puedo mandar" que sólo saliera para cuentas reales delataría cuáles lo
  * son.
  */
 
+type Environment = Readonly<Record<string, string | undefined>>;
+
 export type RecoveryEmailSenderConnection =
   | { readonly kind: "connected"; readonly sender: RecoveryEmailSender }
   | { readonly kind: "not_connected"; readonly reason: string };
 
-export const RECOVERY_EMAIL_NOT_CONNECTED_REASON =
-  "El envío de correos todavía no está conectado, así que la recuperación de contraseña no puede mandar enlaces. Escribe al club para recuperar el acceso.";
+export function connectRecoveryEmailSender(
+  env: Environment,
+  fetchImplementation: typeof fetch = fetch,
+): RecoveryEmailSenderConnection {
+  const connection = connectResendEmailSender(env, fetchImplementation);
+  if (connection.kind === "not_connected") {
+    return connection;
+  }
 
-export function connectRecoveryEmailSender(): RecoveryEmailSenderConnection {
-  return { kind: "not_connected", reason: RECOVERY_EMAIL_NOT_CONNECTED_REASON };
+  const { sender } = connection;
+  return {
+    kind: "connected",
+    sender: {
+      async sendRecoveryEmail({ to, resetUrl }) {
+        await sender.sendEmail({
+          to,
+          ...renderPasswordRecoveryEmail({
+            resetUrl,
+            linkLifetimeMinutes: RECOVERY_LINK_LIFETIME_MINUTES,
+          }),
+        });
+      },
+    },
+  };
 }

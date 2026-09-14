@@ -39,10 +39,10 @@ function describeIssues(issues: readonly RegistrationIssue[]): string {
 }
 
 /** El correo de confirmación se pide, pero no decide si el registro salió
- * bien: el servicio incorporado de Supabase manda 2 mensajes por hora y se
- * niega a escribir fuera del equipo del proyecto. El fallo se registra con su
- * motivo y la respuesta no cambia (#147): la pantalla ofrece reenviarlo en
- * cualquier caso. Nunca se registra la dirección: es un dato personal, y el
+ * bien: sin la clave de Resend (un preview, una máquina de desarrollo) o con
+ * el proveedor fallando, la cuenta queda creada igual. El fallo se registra
+ * con su motivo y la respuesta no cambia (#147): la pantalla ofrece reenviarlo
+ * en cualquier caso. Nunca se registra la dirección: es un dato personal, y el
  * adaptador ya la quita del motivo. */
 function reportConfirmationEmail(outcome: ConfirmationEmailOutcome): void {
   if (outcome.kind !== "requested" && outcome.kind !== "not_requested") {
@@ -56,7 +56,7 @@ function reportConfirmationEmail(outcome: ConfirmationEmailOutcome): void {
 const postRegistration = createApiRoute<RegistrationResponse, RegistrationBody>(
   {
     schema: registrationBodySchema,
-    handler: async ({ body }) => {
+    handler: async ({ request, body }) => {
       const wiring = createSupabaseAuthGateways(process.env);
       if (wiring.kind === "unconfigured") {
         throw new ApiError(
@@ -73,6 +73,7 @@ const postRegistration = createApiRoute<RegistrationResponse, RegistrationBody>(
           request: body,
           clubId,
           now: new Date(),
+          appUrl: request.url,
         });
         reportConfirmationEmail(result.confirmationEmail);
         return { data: result.receipt };

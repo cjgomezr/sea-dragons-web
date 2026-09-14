@@ -16,12 +16,16 @@ import type {
   MemberProfileWriter,
 } from "./complete-registration";
 import type { EmailConfirmationGateway } from "./email-confirmation";
+import { connectResendEmailSender } from "@/lib/email/resend-email-sender";
+import {
+  type ConfirmationTokenIssuer,
+  createConfirmationEmailGateway,
+} from "./confirmation-email-sender";
 import type {
   AuthIdentityGateway,
   ConfirmationEmailGateway,
   MemberDirectory,
   RegistrationGateways,
-  RequestedConfirmationEmail,
 } from "./register-member";
 
 /**
@@ -128,52 +132,55 @@ function createMemberDirectory(serviceClient: SupabaseClient): MemberDirectory {
   };
 }
 
-/** Supabase Auth responde 429 cuando se agota el cupo de correos. El código se
- * mira además del estado por si una versión futura cambia uno de los dos. */
-const RATE_LIMITED_STATUS = 429;
-const EMAIL_RATE_LIMIT_CODE = "over_email_send_rate_limit";
+/** Con una dirección sin cuenta, el enlace de alta sin contraseña no crea la
+ * cuenta: Supabase Auth responde este código y se queja de la contraseña. */
+const SIGNUP_VALIDATION_FAILED_CODE = "validation_failed";
+const MISSING_PASSWORD_MESSAGE_PATTERN = /password/i;
 
-/** Supabase cita la dirección en algunos motivos ("Email address ... is
- * invalid"), y los registros del servidor no son sitio para datos personales. */
-const REDACTED_EMAIL = "<correo>";
+/** Ver `createConfirmationTokenIssuer`: el tipo del SDK exige el campo, y lo
+ * que se quiere es justo no mandar ninguna. */
+const NO_PASSWORD = "";
 
-type AuthSendError = {
-  readonly status?: number | undefined;
-  readonly code?: string | undefined;
+function hasNoPendingConfirmation(error: {
+  readonly code?: string;
   readonly message: string;
-};
-
-function describeSendError(error: AuthSendError, email: string): string {
-  const message = error.message.replaceAll(email, REDACTED_EMAIL);
-  return error.status === undefined ? message : `${error.status}: ${message}`;
+}): boolean {
+  return (
+    error.code === EMAIL_EXISTS_CODE ||
+    (error.code === SIGNUP_VALIDATION_FAILED_CODE &&
+      MISSING_PASSWORD_MESSAGE_PATTERN.test(error.message))
+  );
 }
 
-export function toConfirmationEmailOutcome(
-  error: AuthSendError | null,
-  email: string,
-): RequestedConfirmationEmail {
-  if (error === null) {
-    return { kind: "requested" };
-  }
-  const reason = describeSendError(error, email);
-  const isRateLimited =
-    error.status === RATE_LIMITED_STATUS ||
-    error.code === EMAIL_RATE_LIMIT_CODE;
-  return isRateLimited
-    ? { kind: "rate_limited", reason }
-    : { kind: "failed", reason };
-}
-
-function createConfirmationEmailGateway(
-  anonClient: SupabaseClient,
-): ConfirmationEmailGateway {
+/**
+ * Emite el enlace del correo de confirmación sin mandar nada: el correo lo
+ * manda Resend (#137).
+ *
+ * Pide el enlace de alta sin contraseña, y eso es seguro por cómo responde
+ * Supabase Auth, comprobado contra seadragons-dev el 14 de septiembre de 2026
+ * y fijado en `registration.integration.test.ts`. Con una cuenta sin
+ * confirmar emite el enlace y no toca la contraseña. Con una cuenta ya
+ * confirmada responde `email_exists`. Con una dirección sin cuenta responde
+ * `validation_failed` y no la crea, que es lo que importa: el reenvío es
+ * público, y con una contraseña cualquiera crearía cuentas a quien se le
+ * antojara.
+ */
+export function createConfirmationTokenIssuer(
+  serviceClient: SupabaseClient,
+): ConfirmationTokenIssuer {
   return {
-    async requestConfirmationEmail(email) {
-      const { error } = await anonClient.auth.resend({
+    async issueConfirmationToken(email) {
+      const { data, error } = await serviceClient.auth.admin.generateLink({
         type: "signup",
         email,
+        password: NO_PASSWORD,
       });
-      return toConfirmationEmailOutcome(error, email);
+      if (error) {
+        return hasNoPendingConfirmation(error)
+          ? { kind: "no_pending_confirmation" }
+          : { kind: "failed", error };
+      }
+      return { kind: "issued", tokenHash: data.properties.hashed_token };
     },
   };
 }
@@ -414,7 +421,10 @@ export function createSupabaseAuthGateways(
   const anonClient = createClient(anonConfig.url, anonConfig.anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const confirmationEmail = createConfirmationEmailGateway(anonClient);
+  const confirmationEmail = createConfirmationEmailGateway({
+    tokens: createConfirmationTokenIssuer(serviceClient),
+    emails: connectResendEmailSender(env),
+  });
 
   return {
     kind: "ready",

@@ -28,6 +28,7 @@ function validBody(overrides: Body = {}): Body {
 const insertedRows: NewMemberRow[] = [];
 const deletedUserIds: string[] = [];
 const requestedEmails: string[] = [];
+const requestedAppUrls: string[] = [];
 
 type WiringOptions = {
   readonly identityCreation?: IdentityCreation;
@@ -66,8 +67,12 @@ function mockWiring(options: WiringOptions = {}): void {
                   },
                 },
                 confirmationEmail: {
-                  requestConfirmationEmail: async (email: string) => {
+                  requestConfirmationEmail: async (
+                    email: string,
+                    appUrl: string,
+                  ) => {
                     requestedEmails.push(email);
+                    requestedAppUrls.push(appUrl);
                     return options.confirmationEmail ?? { kind: "requested" };
                   },
                 },
@@ -98,6 +103,7 @@ function resetRecorded(): void {
   insertedRows.length = 0;
   deletedUserIds.length = 0;
   requestedEmails.length = 0;
+  requestedAppUrls.length = 0;
 }
 
 describe("POST /api/v1/auth/register", () => {
@@ -120,6 +126,14 @@ describe("POST /api/v1/auth/register", () => {
     await expect(response.json()).resolves.toEqual({
       data: { outcome: "confirmation_pending", email: EMAIL },
     });
+  });
+
+  it("pide el correo de confirmación con la dirección de la petición", async () => {
+    mockWiring();
+
+    await postRegistration(validBody());
+
+    expect(requestedAppUrls).toEqual([REGISTER_URL]);
   });
 
   it("escribe la fila del socio con el rol Player y el estado incomplete", async () => {

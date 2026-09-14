@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import {
+  EMAIL_CONFIRMATION_TOKEN_HASH_PARAM,
+  EMAIL_CONFIRMATION_TYPE_PARAM,
   type EmailConfirmationResult,
   confirmEmailAndActivate,
   parseEmailConfirmationOtpType,
@@ -14,7 +16,7 @@ import {
 } from "@/lib/auth/supabase-auth-gateways";
 
 /**
- * Destino del enlace que Supabase manda en el correo de confirmación. Vive
+ * Destino del enlace del correo de confirmación. Vive
  * fuera de `api/v1` a propósito: no es un endpoint del producto que consuma
  * nadie, es una URL que un navegador abre desde un correo y que siempre
  * termina en una redirección a una pantalla. La aplicación móvil de Release 2
@@ -22,9 +24,6 @@ import {
  * devuelve datos).
  */
 export const dynamic = "force-dynamic";
-
-const TOKEN_HASH_PARAM = "token_hash";
-const TYPE_PARAM = "type";
 
 function redirectToRegistration(
   request: NextRequest,
@@ -37,8 +36,10 @@ function redirectToRegistration(
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const params = new URL(request.url).searchParams;
-  const tokenHash = params.get(TOKEN_HASH_PARAM);
-  const type = parseEmailConfirmationOtpType(params.get(TYPE_PARAM));
+  const tokenHash = params.get(EMAIL_CONFIRMATION_TOKEN_HASH_PARAM);
+  const type = parseEmailConfirmationOtpType(
+    params.get(EMAIL_CONFIRMATION_TYPE_PARAM),
+  );
   if (tokenHash === null || tokenHash.length === 0 || type === null) {
     return redirectToRegistration(request, "invalida");
   }

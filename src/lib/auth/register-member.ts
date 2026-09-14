@@ -43,7 +43,7 @@ export type MemberDirectory = {
  * aparte del fallo genérico porque es el que se agota con dos registros
  * seguidos, y el aviso del #154 lo necesitará.
  *
- * Nunca llega al cliente (#147). Supabase sólo intenta enviar a una cuenta sin
+ * Nunca llega al cliente (#147). Sólo se intenta enviar a una cuenta sin
  * confirmar, así que un fallo del envío delata que esa dirección tiene cuenta:
  * cualquier campo de la respuesta que dependa de esto es un oráculo. */
 export type RequestedConfirmationEmail =
@@ -51,16 +51,23 @@ export type RequestedConfirmationEmail =
   | { readonly kind: "failed"; readonly reason: string }
   | { readonly kind: "rate_limited"; readonly reason: string };
 
+/** `not_requested`: no había a quién mandarlo. La cuenta ya existía, ya había
+ * confirmado su correo, o la dirección no tiene cuenta. */
 export type ConfirmationEmailOutcome =
   RequestedConfirmationEmail | { readonly kind: "not_requested" };
 
 /** Devuelve el fallo en vez de lanzarlo: el correo de confirmación se pide
- * pero no decide si el registro salió bien. El servicio incorporado de
- * Supabase manda 2 mensajes por hora y se niega a escribir fuera del equipo
- * del proyecto, así que un envío fallido es normal y la pantalla ofrece
- * reenviarlo. Quien llama decide qué hacer con el fallo; nadie lo ignora. */
+ * pero no decide si el registro salió bien. Un envío fallido deja la cuenta
+ * creada y la pantalla ofrece reenviarlo. Quien llama decide qué hacer con el
+ * fallo; nadie lo ignora.
+ *
+ * `appUrl` es la dirección de la petición que lo pide: el enlace del correo
+ * vuelve a ese mismo despliegue. */
 export type ConfirmationEmailGateway = {
-  requestConfirmationEmail(email: string): Promise<RequestedConfirmationEmail>;
+  requestConfirmationEmail(
+    email: string,
+    appUrl: string,
+  ): Promise<ConfirmationEmailOutcome>;
 };
 
 export type RegistrationGateways = {
@@ -176,6 +183,7 @@ export async function registerMember(
     readonly request: RegistrationRequest;
     readonly clubId: string;
     readonly now: Date;
+    readonly appUrl: string;
   },
 ): Promise<RegistrationResult> {
   const validation = validateRegistration(input.request, { now: input.now });
@@ -213,6 +221,9 @@ export async function registerMember(
   return {
     receipt,
     confirmationEmail:
-      await gateways.confirmationEmail.requestConfirmationEmail(details.email),
+      await gateways.confirmationEmail.requestConfirmationEmail(
+        details.email,
+        input.appUrl,
+      ),
   };
 }

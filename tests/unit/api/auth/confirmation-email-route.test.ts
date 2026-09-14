@@ -1,17 +1,21 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RequestedConfirmationEmail } from "@/lib/auth/register-member";
+import type {
+  ConfirmationEmailOutcome,
+  RequestedConfirmationEmail,
+} from "@/lib/auth/register-member";
 
 const CONFIRMATION_EMAIL_URL =
   "http://localhost/api/v1/auth/confirmation-email";
 const EMAIL = "nerea@example.test";
 
 const requestedEmails: string[] = [];
+const requestedAppUrls: string[] = [];
 
 function mockWiring(
   options: {
     readonly unconfigured?: readonly string[];
-    readonly confirmationEmail?: RequestedConfirmationEmail;
+    readonly confirmationEmail?: ConfirmationEmailOutcome;
   } = {},
 ): void {
   vi.doMock("@/lib/auth/supabase-auth-gateways", () => ({
@@ -24,8 +28,12 @@ function mockWiring(
             kind: "ready",
             gateways: {
               confirmationEmail: {
-                requestConfirmationEmail: async (email: string) => {
+                requestConfirmationEmail: async (
+                  email: string,
+                  appUrl: string,
+                ) => {
                   requestedEmails.push(email);
+                  requestedAppUrls.push(appUrl);
                   return options.confirmationEmail ?? { kind: "requested" };
                 },
               },
@@ -50,6 +58,7 @@ describe("POST /api/v1/auth/confirmation-email", () => {
     vi.resetModules();
     vi.doUnmock("@/lib/auth/supabase-auth-gateways");
     requestedEmails.length = 0;
+    requestedAppUrls.length = 0;
   });
 
   it("reenvía la confirmación a la dirección normalizada", async () => {
@@ -61,6 +70,25 @@ describe("POST /api/v1/auth/confirmation-email", () => {
 
     expect(response.status).toBe(200);
     expect(requestedEmails).toEqual([EMAIL]);
+  });
+
+  it("pide el enlace con la dirección de la petición, para que vuelva a este despliegue", async () => {
+    mockWiring();
+
+    await postConfirmationEmail({ email: EMAIL });
+
+    expect(requestedAppUrls).toEqual([CONFIRMATION_EMAIL_URL]);
+  });
+
+  it("no registra nada cuando no había confirmación pendiente que mandar", async () => {
+    mockWiring({ confirmationEmail: { kind: "not_requested" } });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await postConfirmationEmail({ email: EMAIL });
+
+    expect(response.status).toBe(200);
+    expect(logged).not.toHaveBeenCalled();
+    logged.mockRestore();
   });
 
   it("no delata si esa dirección tiene cuenta: el cuerpo sólo repite el correo", async () => {

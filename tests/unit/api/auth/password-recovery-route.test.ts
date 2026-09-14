@@ -24,6 +24,7 @@ function mockWiring(
     readonly senderConnected?: boolean;
     readonly requestsInWindow?: number;
     readonly deliveryFailure?: Error;
+    readonly realSender?: boolean;
   } = {},
 ): void {
   vi.doMock("@/lib/auth/supabase-password-recovery", () => ({
@@ -48,6 +49,9 @@ function mockWiring(
             },
           },
   }));
+  if (options.realSender) {
+    return;
+  }
   vi.doMock("@/lib/auth/recovery-email-sender", () => ({
     connectRecoveryEmailSender: () =>
       options.senderConnected === false
@@ -174,6 +178,23 @@ describe("POST /api/v1/auth/password-recovery", () => {
     expect(registered.status).toBe(503);
     expect(await registered.json()).toEqual(await unknown.json());
     expect(probe.recordedRequests).toBe(0);
+  });
+
+  // Sin doble del envío: el que responde es el conector de verdad, leyendo un
+  // entorno sin la clave, que es exactamente el de un preview.
+  it("sin la clave de Resend responde 503 nombrando la variable y dónde se pone", async () => {
+    mockWiring({ realSender: true });
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("EMAIL_FROM", "Victoria Seadragons <seadragons@volleytip.com>");
+
+    const response = await postRecovery({ email: REGISTERED_EMAIL });
+
+    expect(response.status).toBe(503);
+    const message = JSON.stringify(await response.json());
+    expect(message).toContain("RESEND_API_KEY");
+    expect(message).toContain("ámbito Production");
+    expect(probe.recordedRequests).toBe(0);
+    vi.unstubAllEnvs();
   });
 
   it("responde 503 nombrando las variables de Supabase que faltan", async () => {

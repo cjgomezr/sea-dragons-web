@@ -70,7 +70,7 @@ const postPasswordRecovery = createApiRoute<
 
     // Antes de tocar nada que dependa de la cuenta: un "no puedo mandar" que
     // sólo saliera para cuentas reales delataría cuáles lo son.
-    const connection = connectRecoveryEmailSender();
+    const connection = connectRecoveryEmailSender(process.env);
     if (connection.kind === "not_connected") {
       throw new ApiError("service_unavailable", connection.reason);
     }
