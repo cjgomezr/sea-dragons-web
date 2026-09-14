@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toConfirmationEmailOutcome } from "@/lib/auth/supabase-auth-gateways";
+import { toConfirmationEmailOutcome } from "@/lib/auth/confirmation-email-sender";
 
 const EMAIL = "nerea@example.test";
 

@@ -6,11 +6,15 @@ import {
   type NewMemberRow,
   registerMember,
 } from "@/lib/auth/register-member";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   DEFAULT_CLUB_SLUG,
   type SupabaseAuthGateways,
+  createConfirmationTokenIssuer,
   createSupabaseAuthGateways,
 } from "@/lib/auth/supabase-auth-gateways";
+import { hashEmailForRequestLog } from "@/lib/auth/supabase-email-request-log";
+import { readSupabaseConfig } from "@/lib/supabase/config";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
   type ServiceRoleClient,
@@ -32,6 +36,7 @@ import {
  */
 
 const PASSWORD = "bajoelagua-de-prueba";
+const APP_URL = "http://localhost:3417/api/v1/auth/register";
 
 const silentConfirmationEmail: ConfirmationEmailGateway = {
   async requestConfirmationEmail() {
@@ -51,6 +56,20 @@ function realGateways(): SupabaseAuthGateways {
     );
   }
   return wiring.gateways;
+}
+
+/** Un cliente como el del navegador, para comprobar que la contraseña sigue
+ * abriendo sesión. */
+function anonymousClient(): SupabaseClient {
+  const config = readSupabaseConfig(process.env);
+  if (config.kind === "missing") {
+    throw new Error(
+      `Faltan variables de entorno: ${config.missingKeys.join(", ")}`,
+    );
+  }
+  return createClient(config.url, config.anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
 
 type MemberRow = {
@@ -144,6 +163,7 @@ describeRls("registro contra seadragons-dev", () => {
             },
             clubId,
             now: new Date(),
+            appUrl: APP_URL,
           },
         );
 
@@ -193,11 +213,13 @@ describeRls("registro contra seadragons-dev", () => {
           request,
           clubId,
           now: new Date(),
+          appUrl: APP_URL,
         });
         const second = await registerMember(registration, {
           request,
           clubId,
           now: new Date(),
+          appUrl: APP_URL,
         });
 
         expect(second.receipt).toEqual(first.receipt);
@@ -261,6 +283,137 @@ describeRls("registro contra seadragons-dev", () => {
         expect(result).toEqual({ kind: "activated" });
         const member = await readMemberByUserId(serviceClient, data.user.id);
         expect(member?.account_status).toBe("active");
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+});
+
+/**
+ * El emisor del enlace que va en el correo de confirmación por Resend. Pide a
+ * Supabase el enlace de alta sin contraseña, y eso sólo es seguro por cómo
+ * responde Supabase, que no está escrito en ningún tipo: con una cuenta sin
+ * confirmar emite el enlace y no toca la contraseña; con una confirmada o con
+ * una dirección desconocida no emite nada ni crea ninguna cuenta. Si una
+ * versión de Supabase cambia eso, es aquí donde tiene que ponerse rojo.
+ */
+describeRls("enlace de confirmación contra seadragons-dev", () => {
+  it(
+    "con una cuenta sin confirmar emite un enlace que la confirma y deja su contraseña intacta",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = realGateways();
+      const tokens = createConfirmationTokenIssuer(serviceClient.client);
+      const email = testEmail();
+
+      await withCleanup(serviceClient, email, async () => {
+        await gateways.registration.identities.createIdentity({
+          email,
+          password: PASSWORD,
+        });
+
+        const issue = await tokens.issueConfirmationToken(email);
+        if (issue.kind !== "issued") {
+          throw new Error(`no emitió el enlace: ${JSON.stringify(issue)}`);
+        }
+        const confirmation = await gateways.confirmations.confirmEmail({
+          tokenHash: issue.tokenHash,
+          type: "signup",
+        });
+
+        expect(confirmation.kind).toBe("confirmed");
+        const signIn = await anonymousClient().auth.signInWithPassword({
+          email,
+          password: PASSWORD,
+        });
+        expect(signIn.error).toBeNull();
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "con una cuenta ya confirmada no emite nada",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const tokens = createConfirmationTokenIssuer(serviceClient.client);
+      const email = testEmail();
+
+      await withCleanup(serviceClient, email, async () => {
+        const { error } = await serviceClient.client.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) {
+          throw new Error(`No se pudo crear la cuenta: ${error.message}`);
+        }
+
+        expect(await tokens.issueConfirmationToken(email)).toEqual({
+          kind: "no_pending_confirmation",
+        });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "el límite del reenvío anota cada petición por el hash del correo y las cuenta",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = realGateways();
+      const email = testEmail();
+      const clubId = await gateways.clubs.findClubIdBySlug(DEFAULT_CLUB_SLUG);
+      const requests = gateways.confirmationEmailRequestsForClub(clubId);
+      const now = new Date();
+      const windowStart = new Date(now.getTime() - 60_000);
+
+      try {
+        const first = await requests.recordAndCountRecent({
+          email,
+          now,
+          windowStart,
+        });
+        const second = await requests.recordAndCountRecent({
+          email,
+          now,
+          windowStart,
+        });
+
+        expect([first, second]).toEqual([1, 2]);
+        const { data, error } = await serviceClient.client
+          .from("confirmation_email_requests")
+          .select("email_hash")
+          .eq("email_hash", hashEmailForRequestLog(email));
+        if (error) {
+          throw new Error(
+            `No se pudieron leer las peticiones: ${error.message}`,
+          );
+        }
+        expect(JSON.stringify(data)).not.toContain(email);
+        expect(data).toHaveLength(2);
+      } finally {
+        await serviceClient.client
+          .from("confirmation_email_requests")
+          .delete()
+          .eq("email_hash", hashEmailForRequestLog(email));
+      }
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "con una dirección sin cuenta no emite nada ni crea la cuenta",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const tokens = createConfirmationTokenIssuer(serviceClient.client);
+      const email = testEmail();
+
+      await withCleanup(serviceClient, email, async () => {
+        expect(await tokens.issueConfirmationToken(email)).toEqual({
+          kind: "no_pending_confirmation",
+        });
+        expect(await findUserIdByEmail(serviceClient, email)).toBeNull();
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,

@@ -9,6 +9,7 @@ import {
 import {
   CI_ONLY_SECRET_ENV_VARS,
   PLATFORM_INJECTED_ENV_VARS,
+  PRODUCTION_ONLY_ENV_VARS,
   readEnvExampleNames,
 } from "../support/env-vars";
 
@@ -120,6 +121,22 @@ describe("docs/entornos.md", () => {
     for (const name of CI_ONLY_SECRET_ENV_VARS) {
       expect(doc).toContain(name);
     }
+  });
+
+  it("documenta las variables que sólo viven en producción y no están en .env.example", () => {
+    const doc = readEntornosDoc();
+
+    for (const name of PRODUCTION_ONLY_ENV_VARS) {
+      expect(doc).toMatch(new RegExp(`^\`${name}\`:`, "m"));
+    }
+  });
+
+  it("dice qué proveedor de correo se usa y cómo se rota su clave", () => {
+    const doc = readEntornosDoc();
+    const rotation = doc.slice(doc.indexOf(ROTATION_HEADING));
+
+    expect(doc).toContain("Resend");
+    expect(rotation).toContain("`RESEND_API_KEY`");
   });
 
   it("documenta el entorno de cada variable declarada en .env.example", () => {

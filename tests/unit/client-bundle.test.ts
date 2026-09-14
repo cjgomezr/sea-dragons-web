@@ -128,12 +128,23 @@ describe("bundle de cliente", () => {
     expect(() => scanForLeaks(scan)).toThrowError(/no tiene ningún archivo/);
   });
 
-  it("busca las tres variables secretas de hoy y el prefijo de clave", () => {
+  it("busca las cuatro variables secretas de hoy y el prefijo de clave", () => {
     expect(forbiddenNeedles(readEnvironmentManifest())).toEqual([
       "SUPABASE_SERVICE_ROLE_KEY",
       "SUPABASE_ACCESS_TOKEN",
       "SUPABASE_PRODUCTION_DB_URL",
+      "RESEND_API_KEY",
       FORBIDDEN_KEY_PREFIX,
+    ]);
+  });
+
+  it("caza la credencial del proveedor de correo si llega al bundle", () => {
+    const scan = scanOf({
+      "chunks/page.js": "const k=process.env.RESEND_API_KEY;",
+    });
+
+    expect(scanForLeaks(scan).leaks).toEqual([
+      { file: "chunks/page.js", needle: "RESEND_API_KEY" },
     ]);
   });
 });

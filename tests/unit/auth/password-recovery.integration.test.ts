@@ -95,13 +95,26 @@ describeRls("recuperación de contraseña contra Supabase", () => {
     return { email, userId: data.user.id };
   }
 
+  /** Ejecuta la entrega que la ruta deja para después de responder. Falla si
+   * no había entrega pendiente. */
+  async function deliverPending(
+    outcome: Awaited<ReturnType<typeof requestPasswordRecovery>>,
+  ): Promise<void> {
+    if (outcome.kind !== "accepted") {
+      throw new Error(`Se esperaba una entrega pendiente y llegó ${outcome.kind}.`);
+    }
+    await outcome.deliver();
+  }
+
   async function requestLinkFor(email: string): Promise<string> {
     sentEmails.length = 0;
-    await requestPasswordRecovery(requestGateways(), {
-      email,
-      now: new Date(),
-      buildResetUrl,
-    });
+    await deliverPending(
+      await requestPasswordRecovery(requestGateways(), {
+        email,
+        now: new Date(),
+        buildResetUrl,
+      }),
+    );
     const [sent] = sentEmails;
     if (sent === undefined) {
       throw new Error(`No salió ningún enlace para ${email}.`);
@@ -163,7 +176,7 @@ describeRls("recuperación de contraseña contra Supabase", () => {
         buildResetUrl,
       });
 
-      expect(outcome).toEqual({ kind: "requested" });
+      await deliverPending(outcome);
       expect(sentEmails.map((sent) => sent.to)).toEqual([email]);
       expect(tokenHashOf(sentEmails[0]!)).not.toBe("");
     },
@@ -181,7 +194,7 @@ describeRls("recuperación de contraseña contra Supabase", () => {
         buildResetUrl,
       });
 
-      expect(outcome).toEqual({ kind: "requested" });
+      await deliverPending(outcome);
       expect(sentEmails).toEqual([]);
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
@@ -266,8 +279,8 @@ describeRls("recuperación de contraseña contra Supabase", () => {
       }
 
       expect(outcomes.at(-1)).toMatchObject({ kind: "rate_limited" });
-      expect(outcomes.slice(0, -1)).toEqual(
-        Array(MAX_RECOVERY_REQUESTS_PER_WINDOW).fill({ kind: "requested" }),
+      expect(outcomes.slice(0, -1).map((outcome) => outcome.kind)).toEqual(
+        Array(MAX_RECOVERY_REQUESTS_PER_WINDOW).fill("accepted"),
       );
     },
     RLS_NETWORK_TEST_TIMEOUT_MS * 2,

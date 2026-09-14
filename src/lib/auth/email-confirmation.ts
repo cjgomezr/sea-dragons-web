@@ -3,6 +3,32 @@ import {
   type MemberAccountStore,
   activateAccountIfComplete,
 } from "./account-activation";
+import { EMAIL_CONFIRMATION_PATH } from "./routes";
+
+/** Los parámetros con los que el enlace del correo lleva el token hasta
+ * `EMAIL_CONFIRMATION_PATH`. Los usan quien arma el enlace y quien lo canjea,
+ * para que no se desincronicen. */
+export const EMAIL_CONFIRMATION_TOKEN_HASH_PARAM = "token_hash";
+export const EMAIL_CONFIRMATION_TYPE_PARAM = "type";
+
+/** Lo impone Supabase Auth (`mailer_otp_exp` del proyecto, 3600 segundos, el
+ * mismo ajuste que fija la vigencia del enlace de recuperación): aquí sólo se
+ * nombra para que el correo le diga a la persona cuánto tiene. */
+export const EMAIL_CONFIRMATION_LINK_LIFETIME_MINUTES = 60;
+
+const SIGNUP_OTP_TYPE = "signup";
+
+/** El enlace del correo de confirmación. Apunta al origen de `appUrl`, que es
+ * la petición que lo pidió: así un preview no manda a confirmar a producción. */
+export function buildEmailConfirmationUrl(
+  appUrl: string,
+  tokenHash: string,
+): string {
+  const url = new URL(EMAIL_CONFIRMATION_PATH, appUrl);
+  url.searchParams.set(EMAIL_CONFIRMATION_TOKEN_HASH_PARAM, tokenHash);
+  url.searchParams.set(EMAIL_CONFIRMATION_TYPE_PARAM, SIGNUP_OTP_TYPE);
+  return url.toString();
+}
 
 /** Los tipos de enlace que confirman una dirección de correo en Supabase. El
  * enlace del registro llega como signup; las plantillas que confirman un

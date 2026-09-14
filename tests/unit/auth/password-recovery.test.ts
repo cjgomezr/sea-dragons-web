@@ -3,6 +3,7 @@ import {
   MAX_RECOVERY_REQUESTS_PER_WINDOW,
   PASSWORD_RECOVERY_WINDOW_MINUTES,
   type PasswordRecoveryRequestGateways,
+  type PasswordRecoveryRequestOutcome,
   type PasswordResetGateways,
   RecoveryEmailDeliveryError,
   type RecoveryTokenRedemption,
@@ -61,6 +62,18 @@ function resetGateways(
   };
 }
 
+/** Ejecuta la entrega que la ruta deja para después de responder. Falla si no
+ * había entrega pendiente, para que ninguna prueba dé por bueno un envío que
+ * nunca se intentó. */
+async function deliverPending(
+  outcome: PasswordRecoveryRequestOutcome,
+): Promise<void> {
+  if (outcome.kind !== "accepted") {
+    throw new Error(`Se esperaba una entrega pendiente y llegó ${outcome.kind}.`);
+  }
+  await outcome.deliver();
+}
+
 describe("recuperación de contraseña", () => {
   it("con un correo registrado emite el enlace hacia ese correo y confirma el envío", async () => {
     const gateways = requestGateways();
@@ -71,11 +84,27 @@ describe("recuperación de contraseña", () => {
       buildResetUrl,
     });
 
-    expect(outcome).toEqual({ kind: "requested" });
+    await deliverPending(outcome);
     expect(gateways.emails.sendRecoveryEmail).toHaveBeenCalledWith({
       to: REGISTERED_EMAIL,
       resetUrl: buildResetUrl(TOKEN_HASH),
     });
+  });
+
+  // La respuesta no puede esperar a nada que dependa de la cuenta: mandar el
+  // correo sólo a cuentas reales las delataría por lo que tarda en responder.
+  it("dentro del límite no mira la cuenta ni manda nada hasta que se entrega", async () => {
+    const gateways = requestGateways();
+
+    const outcome = await requestPasswordRecovery(gateways, {
+      email: REGISTERED_EMAIL,
+      now: NOW,
+      buildResetUrl,
+    });
+
+    expect(outcome.kind).toBe("accepted");
+    expect(gateways.tokens.issueRecoveryToken).not.toHaveBeenCalled();
+    expect(gateways.emails.sendRecoveryEmail).not.toHaveBeenCalled();
   });
 
   it("con un correo inexistente la respuesta es idéntica y no se emite nada", async () => {
@@ -92,7 +121,8 @@ describe("recuperación de contraseña", () => {
       buildResetUrl,
     });
 
-    expect(unknown).toEqual(registered);
+    expect(unknown.kind).toBe(registered.kind);
+    await deliverPending(unknown);
     expect(gateways.emails.sendRecoveryEmail).not.toHaveBeenCalled();
   });
 
@@ -144,18 +174,19 @@ describe("recuperación de contraseña", () => {
       buildResetUrl,
     });
 
-    expect(outcome).toEqual({ kind: "requested" });
+    expect(outcome.kind).toBe("accepted");
   });
 
-  it("si el envío falla, el error sube con contexto y no se dice que el correo salió", async () => {
+  it("si el envío falla, la entrega sube el error con contexto", async () => {
     const cause = new Error("el proveedor respondió 500");
     const gateways = requestGateways({ failDelivery: cause });
-
-    const attempt = requestPasswordRecovery(gateways, {
+    const outcome = await requestPasswordRecovery(gateways, {
       email: REGISTERED_EMAIL,
       now: NOW,
       buildResetUrl,
     });
+
+    const attempt = deliverPending(outcome);
 
     await expect(attempt).rejects.toBeInstanceOf(RecoveryEmailDeliveryError);
     await expect(attempt).rejects.toThrow(/el proveedor respondió 500/);

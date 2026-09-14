@@ -14,9 +14,16 @@ const TOKEN_HASH = "hash-del-enlace";
 type Probe = {
   sent: RecoveryEmail[];
   recordedRequests: number;
+  tokenRequests: number;
+  scheduled: (() => Promise<void>)[];
 };
 
-const probe: Probe = { sent: [], recordedRequests: 0 };
+const probe: Probe = {
+  sent: [],
+  recordedRequests: 0,
+  tokenRequests: 0,
+  scheduled: [],
+};
 
 function mockWiring(
   options: {
@@ -24,8 +31,14 @@ function mockWiring(
     readonly senderConnected?: boolean;
     readonly requestsInWindow?: number;
     readonly deliveryFailure?: Error;
+    readonly realSender?: boolean;
   } = {},
 ): void {
+  vi.doMock("@/lib/api/after-response", () => ({
+    runAfterResponse: (work: () => Promise<void>) => {
+      probe.scheduled.push(work);
+    },
+  }));
   vi.doMock("@/lib/auth/supabase-password-recovery", () => ({
     createSupabasePasswordRecoveryGateways: async () =>
       options.unconfigured
@@ -40,14 +53,19 @@ function mockWiring(
                 },
               },
               tokens: {
-                issueRecoveryToken: async (email: string) =>
-                  email === REGISTERED_EMAIL
+                issueRecoveryToken: async (email: string) => {
+                  probe.tokenRequests += 1;
+                  return email === REGISTERED_EMAIL
                     ? { kind: "issued", tokenHash: TOKEN_HASH }
-                    : { kind: "no_account" },
+                    : { kind: "no_account" };
+                },
               },
             },
           },
   }));
+  if (options.realSender) {
+    return;
+  }
   vi.doMock("@/lib/auth/recovery-email-sender", () => ({
     connectRecoveryEmailSender: () =>
       options.senderConnected === false
@@ -77,13 +95,24 @@ async function postRecovery(body: unknown): Promise<Response> {
   );
 }
 
+/** Lo que la ruta dejó para después de responder. En producción lo corre
+ * `after` de Next.js; aquí se corre a mano, y sólo después de la respuesta. */
+async function runScheduledWork(): Promise<void> {
+  for (const work of probe.scheduled.splice(0)) {
+    await work();
+  }
+}
+
 describe("POST /api/v1/auth/password-recovery", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.doUnmock("@/lib/auth/supabase-password-recovery");
     vi.doUnmock("@/lib/auth/recovery-email-sender");
+    vi.doUnmock("@/lib/api/after-response");
     probe.sent = [];
     probe.recordedRequests = 0;
+    probe.tokenRequests = 0;
+    probe.scheduled = [];
   });
 
   it("con un correo registrado manda el enlace a la pantalla de contraseña nueva y confirma el envío", async () => {
@@ -95,6 +124,7 @@ describe("POST /api/v1/auth/password-recovery", () => {
     await expect(response.json()).resolves.toEqual({
       data: { outcome: "recovery_requested", email: REGISTERED_EMAIL },
     });
+    await runScheduledWork();
     expect(probe.sent).toEqual([
       {
         to: REGISTERED_EMAIL,
@@ -112,6 +142,7 @@ describe("POST /api/v1/auth/password-recovery", () => {
     await expect(response.json()).resolves.toEqual({
       data: { outcome: "recovery_requested", email: "nadie@example.test" },
     });
+    await runScheduledWork();
     expect(probe.sent).toEqual([]);
   });
 
@@ -121,6 +152,7 @@ describe("POST /api/v1/auth/password-recovery", () => {
     const response = await postRecovery({ email: REGISTERED_EMAIL });
 
     expect(response.status).toBe(429);
+    expect(probe.scheduled).toEqual([]);
     const body = (await response.json()) as {
       error: { code: string; message: string };
     };
@@ -131,18 +163,65 @@ describe("POST /api/v1/auth/password-recovery", () => {
     expect(probe.sent).toEqual([]);
   });
 
-  it("si el envío falla responde 500 y no dice que el correo salió", async () => {
+  // Antes respondía 500. Como el correo sólo sale para cuentas reales, ese 500
+  // delataba cuáles lo son en cuanto fallaba el proveedor. Ahora la respuesta
+  // ya salió cuando se intenta mandar, y el fallo queda donde lo lee quien lo
+  // arregla.
+  it("si el envío falla responde lo mismo que si saliera y deja el fallo en el registro", async () => {
     mockWiring({ deliveryFailure: new Error("el proveedor respondió 500") });
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const response = await postRecovery({ email: REGISTERED_EMAIL });
+    await runScheduledWork();
 
-    expect(response.status).toBe(500);
-    const body = JSON.stringify(await response.json());
-    expect(body).not.toContain("recovery_requested");
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: { outcome: "recovery_requested", email: REGISTERED_EMAIL },
+    });
     expect(String(logged.mock.calls.flat().join(" "))).toContain(
       "el proveedor respondió 500",
     );
+    logged.mockRestore();
+  });
+
+  // Supabase y Resend a veces citan la dirección en sus mensajes ("Email
+  // address ... is invalid"), y el registro del servidor no es sitio para un
+  // dato personal.
+  it("el fallo registrado no incluye la dirección de correo", async () => {
+    mockWiring({
+      deliveryFailure: new Error(`Email address "${REGISTERED_EMAIL}" is invalid`),
+    });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await postRecovery({ email: REGISTERED_EMAIL });
+    await runScheduledWork();
+
+    const log = logged.mock.calls.flat().map(String).join(" ");
+    expect(log).toContain("is invalid");
+    expect(log).not.toContain(REGISTERED_EMAIL);
+    logged.mockRestore();
+  });
+
+  // Lo que tarda la respuesta no puede depender de la cuenta: si esperara al
+  // envío, que sólo ocurre para cuentas reales, las delataría.
+  it("responde antes de mirar la cuenta y de mandar el correo", async () => {
+    mockWiring();
+
+    const response = await postRecovery({ email: REGISTERED_EMAIL });
+
+    expect(response.status).toBe(200);
+    expect(probe.scheduled).toHaveLength(1);
+    expect(probe.tokenRequests).toBe(0);
+    expect(probe.sent).toEqual([]);
+  });
+
+  it("deja una entrega pendiente tanto para un correo registrado como para uno inexistente", async () => {
+    mockWiring();
+
+    await postRecovery({ email: REGISTERED_EMAIL });
+    await postRecovery({ email: "nadie@example.test" });
+
+    expect(probe.scheduled).toHaveLength(2);
   });
 
   it("responde 400 a un correo más largo que cualquier dirección válida, sin contarlo", async () => {
@@ -174,6 +253,31 @@ describe("POST /api/v1/auth/password-recovery", () => {
     expect(registered.status).toBe(503);
     expect(await registered.json()).toEqual(await unknown.json());
     expect(probe.recordedRequests).toBe(0);
+  });
+
+  // Sin doble del envío: el que responde es el conector de verdad, leyendo un
+  // entorno sin la clave, que es exactamente el de un preview. El nombre de la
+  // variable y dónde se pone van al registro del servidor, que es donde lo lee
+  // quien lo arregla; a la pantalla del socio le llega un texto para personas.
+  it("sin la clave de Resend responde 503 para personas y registra la variable y dónde se pone", async () => {
+    mockWiring({ realSender: true });
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("EMAIL_FROM", "Victoria Seadragons <seadragons@volleytip.com>");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await postRecovery({ email: REGISTERED_EMAIL });
+
+    expect(response.status).toBe(503);
+    const body = JSON.stringify(await response.json());
+    expect(body).not.toContain("RESEND_API_KEY");
+    expect(body).not.toContain("Vercel");
+    expect(body).toContain("escribe al club");
+    const log = logged.mock.calls.flat().map(String).join(" ");
+    expect(log).toContain("RESEND_API_KEY");
+    expect(log).toContain("ámbito Production");
+    expect(probe.recordedRequests).toBe(0);
+    logged.mockRestore();
+    vi.unstubAllEnvs();
   });
 
   it("responde 503 nombrando las variables de Supabase que faltan", async () => {

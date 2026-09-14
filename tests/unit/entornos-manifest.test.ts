@@ -13,11 +13,13 @@ import {
 import {
   CI_ONLY_SECRET_ENV_VARS,
   PLATFORM_INJECTED_ENV_VARS,
+  PRODUCTION_ONLY_ENV_VARS,
   readEnvExampleNames,
 } from "../support/env-vars";
 
 const PRODUCTION_SOURCE = "seadragons-prod";
 const DEVELOPMENT_SOURCE = "seadragons-dev";
+const RESEND_SOURCE = "resend";
 
 /** Entornos del manifiesto sintético, con las mismas decisiones que el real:
  * preview no escribe, CI sí desde el issue #149. */
@@ -66,6 +68,17 @@ function buildManifest(
     },
     variables,
   });
+}
+
+function requireVariable(
+  manifest: EnvironmentManifest,
+  name: string,
+): EnvironmentManifest["variables"][string] {
+  const variable = manifest.variables[name];
+  if (variable === undefined) {
+    throw new Error(`el manifiesto no declara ${name}`);
+  }
+  return variable;
 }
 
 function scopes(
@@ -263,6 +276,7 @@ describe("manifiesto de entornos", () => {
       ...readEnvExampleNames(),
       ...PLATFORM_INJECTED_ENV_VARS,
       ...CI_ONLY_SECRET_ENV_VARS,
+      ...PRODUCTION_ONLY_ENV_VARS,
     ]);
 
     const unknown = Object.keys(manifest.variables).filter(
@@ -309,11 +323,12 @@ describe("manifiesto de entornos", () => {
     }
   });
 
-  it("marca como secreta la llave de servicio, el token de cuenta y la conexión a producción", () => {
+  it("marca como secreta la llave de servicio, el token de cuenta, la conexión a producción y la clave de Resend", () => {
     expect(secretVariableNames(readEnvironmentManifest())).toEqual([
       "SUPABASE_SERVICE_ROLE_KEY",
       "SUPABASE_ACCESS_TOKEN",
       "SUPABASE_PRODUCTION_DB_URL",
+      "RESEND_API_KEY",
     ]);
   });
 });
@@ -323,16 +338,64 @@ describe("manifiesto de entornos", () => {
 // con la URL de producción en preview. Esto fija las decisiones, no la
 // mecánica: cambiarlas exige tocar este test, que es donde hay que discutirlas.
 describe("decisiones que el manifiesto no puede cambiar en silencio", () => {
-  it("sólo seadragons-prod cuenta como origen de producción", () => {
+  // Resend entró en la lista con el issue #137, a propósito: marcar su origen
+  // como de producción es lo que deja a la regla 1 impedir sola que la clave
+  // llegue a un preview, que no debe mandar correos de verdad.
+  it("sólo seadragons-prod y Resend cuentan como origen de producción", () => {
     const { sources } = readEnvironmentManifest();
 
-    expect(sources[PRODUCTION_SOURCE]?.production).toBe(true);
     expect(
       Object.entries(sources)
         .filter(([, rules]) => rules.production)
         .map(([name]) => name),
-    ).toEqual([PRODUCTION_SOURCE]);
+    ).toEqual([PRODUCTION_SOURCE, RESEND_SOURCE]);
   });
+
+  it("la clave de Resend es secreta, sólo vive en producción y sale de Resend", () => {
+    const manifest = readEnvironmentManifest();
+    const resendApiKey = manifest.variables["RESEND_API_KEY"];
+
+    expect(resendApiKey?.secret).toBe(true);
+    expect(environmentsFor(manifest, "RESEND_API_KEY")).toEqual(["production"]);
+    expect(resendApiKey?.scopes.production).toBe(RESEND_SOURCE);
+  });
+
+  // La dirección del remitente sale en la cabecera de cada correo: no es un
+  // secreto. Pero sólo sirve con un dominio verificado en esa cuenta de Resend,
+  // así que vive donde vive la clave y en ningún otro sitio.
+  it("el remitente no es secreto y vive donde vive la clave de Resend", () => {
+    const manifest = readEnvironmentManifest();
+
+    expect(manifest.variables["EMAIL_FROM"]?.secret).toBe(false);
+    expect(environmentsFor(manifest, "EMAIL_FROM")).toEqual(["production"]);
+    expect(manifest.variables["EMAIL_FROM"]?.scopes.production).toBe(
+      RESEND_SOURCE,
+    );
+  });
+
+  it.each(["preview", "local", "ci"] as const)(
+    "la regla 1 deja en rojo la clave de Resend si alguien la pone en %s",
+    (environment) => {
+      const manifest = readEnvironmentManifest();
+      const resendApiKey = requireVariable(manifest, "RESEND_API_KEY");
+      const tampered: EnvironmentManifest = {
+        ...manifest,
+        variables: {
+          ...manifest.variables,
+          RESEND_API_KEY: {
+            ...resendApiKey,
+            scopes: { ...resendApiKey.scopes, [environment]: RESEND_SOURCE },
+          },
+        },
+      };
+
+      const violations = findScopeViolations(tampered);
+
+      expect(violations).toEqual([
+        expect.objectContaining({ variable: "RESEND_API_KEY", environment }),
+      ]);
+    },
+  );
 
   // Sin fijarlo, encender `preview.allowsWriteCredentials` apagaría esa mitad
   // de la regla sin que nada se pusiera rojo. `ci` entró en la lista con el

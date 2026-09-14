@@ -1,3 +1,4 @@
+import type { EmailRequestLog } from "./email-request-log";
 import { validatePasswordField } from "./registration";
 
 /**
@@ -20,16 +21,7 @@ const MILLISECONDS_PER_MINUTE = 60_000;
  * se nombra para que las pantallas le digan a la persona cuánto tiene. */
 export const RECOVERY_LINK_LIFETIME_MINUTES = 60;
 
-export type RecoveryRequestLog = {
-  /** Anota la petición y devuelve cuántas hubo desde `windowStart`, contando
-   * esta. Anotar antes de contar es lo que impide que una ráfaga en paralelo
-   * lea todas el mismo contador por debajo del tope. */
-  recordAndCountRecent(input: {
-    readonly email: string;
-    readonly now: Date;
-    readonly windowStart: Date;
-  }): Promise<number>;
-};
+export type RecoveryRequestLog = EmailRequestLog;
 
 export type RecoveryTokenIssue =
   | { readonly kind: "issued"; readonly tokenHash: string }
@@ -44,10 +36,11 @@ export type RecoveryEmail = {
   readonly resetUrl: string;
 };
 
-/** Lanza si el correo no sale. No devuelve el fallo como un resultado porque,
- * a diferencia de la confirmación del registro, aquí el correo ES la
- * funcionalidad: decir "te lo mandamos" sin haberlo mandado deja a alguien
- * esperando un enlace que nunca llega. */
+/** Lanza si el correo no sale, para que el fallo llegue con su causa a quien
+ * lo registra. La respuesta a quien pidió el enlace no puede reflejarlo: el
+ * envío sólo existe para cuentas reales, y un error visible sólo para ellas
+ * las delataría (#147). Por eso la ruta responde antes de mandar y deja el
+ * fallo en el registro del servidor. */
 export type RecoveryEmailSender = {
   sendRecoveryEmail(email: RecoveryEmail): Promise<void>;
 };
@@ -61,7 +54,12 @@ export type PasswordRecoveryRequestGateways = {
 /** No distingue si la cuenta existe: esa diferencia convertiría el formulario
  * en un buscador de quién es socio del club. */
 export type PasswordRecoveryRequestOutcome =
-  | { readonly kind: "requested" }
+  | {
+      readonly kind: "accepted";
+      /** Emite el enlace y lo manda, si la cuenta existe. Va aparte porque
+       * depende de la cuenta: quien responde no debe esperarlo. */
+      readonly deliver: () => Promise<void>;
+    }
   | { readonly kind: "rate_limited"; readonly retryAfterMinutes: number };
 
 export class RecoveryEmailDeliveryError extends Error {
@@ -89,7 +87,11 @@ async function deliverRecoveryEmail(
 
 /** Pide el enlace. El límite se aplica antes de mirar si la cuenta existe, y
  * se aplica igual a las dos: un límite que sólo contara cuentas reales
- * volvería a delatarlas por la forma de responder. */
+ * volvería a delatarlas por la forma de responder.
+ *
+ * Emitir el enlace y mandar el correo quedan en `deliver`, sin ejecutar: sólo
+ * ocurren si la cuenta existe, y si la respuesta los esperara, lo que tarda
+ * la delataría igual. Quien llama responde primero y entrega después. */
 export async function requestPasswordRecovery(
   gateways: PasswordRecoveryRequestGateways,
   input: {
@@ -113,14 +115,18 @@ export async function requestPasswordRecovery(
     };
   }
 
-  const issue = await gateways.tokens.issueRecoveryToken(input.email);
-  if (issue.kind === "issued") {
-    await deliverRecoveryEmail(gateways.emails, {
-      to: input.email,
-      resetUrl: input.buildResetUrl(issue.tokenHash),
-    });
-  }
-  return { kind: "requested" };
+  return {
+    kind: "accepted",
+    deliver: async () => {
+      const issue = await gateways.tokens.issueRecoveryToken(input.email);
+      if (issue.kind === "issued") {
+        await deliverRecoveryEmail(gateways.emails, {
+          to: input.email,
+          resetUrl: input.buildResetUrl(issue.tokenHash),
+        });
+      }
+    },
+  };
 }
 
 /**

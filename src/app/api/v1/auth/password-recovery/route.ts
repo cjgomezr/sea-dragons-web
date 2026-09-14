@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
+import { runAfterResponse } from "@/lib/api/after-response";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
 import { requestPasswordRecovery } from "@/lib/auth/password-recovery";
@@ -11,6 +12,7 @@ import {
 } from "@/lib/auth/routes";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { createSupabasePasswordRecoveryGateways } from "@/lib/auth/supabase-password-recovery";
+import { describeErrorWithoutEmail } from "@/lib/email/redact-email";
 
 /**
  * Pedir el enlace de recuperación de contraseña (RF-6). Público: quien lo pide
@@ -25,6 +27,9 @@ export const dynamic = "force-dynamic";
  * dirección válida, y un endpoint público no tiene por qué hashear ni reenviar
  * cadenas de cualquier tamaño. */
 const MAX_EMAIL_LENGTH = 320;
+
+const RECOVERY_EMAIL_UNAVAILABLE_MESSAGE =
+  "El envío de correos no está disponible ahora mismo, así que no podemos mandarte el enlace. Si necesitas entrar ya, escribe al club.";
 
 const passwordRecoveryBodySchema = z.object({
   email: z.string().max(MAX_EMAIL_LENGTH),
@@ -54,6 +59,24 @@ function resetUrlBuilder(request: NextRequest): (tokenHash: string) => string {
   };
 }
 
+/** Corre la entrega cuando la respuesta ya salió. Un fallo aquí no puede
+ * cambiar esa respuesta, y tampoco debe: diría qué cuentas existen. Queda en
+ * el registro del servidor, que es donde lo lee quien lo arregla, y sin la
+ * dirección, que los mensajes del proveedor a veces citan. */
+async function deliverRecoveryLink(
+  deliver: () => Promise<void>,
+  email: string,
+): Promise<void> {
+  try {
+    await deliver();
+  } catch (error) {
+    console.error(
+      "[api/v1/auth/password-recovery] no se pudo mandar el enlace de recuperación",
+      describeErrorWithoutEmail(error, email),
+    );
+  }
+}
+
 const postPasswordRecovery = createApiRoute<
   PasswordRecoveryResponse,
   PasswordRecoveryBody
@@ -70,9 +93,19 @@ const postPasswordRecovery = createApiRoute<
 
     // Antes de tocar nada que dependa de la cuenta: un "no puedo mandar" que
     // sólo saliera para cuentas reales delataría cuáles lo son.
-    const connection = connectRecoveryEmailSender();
+    const connection = connectRecoveryEmailSender(process.env);
     if (connection.kind === "not_connected") {
-      throw new ApiError("service_unavailable", connection.reason);
+      // El motivo nombra la variable que falta y dónde se pone: es para quien
+      // lo arregla, y lo lee en el registro del servidor. A la pantalla del
+      // socio le sirve saber qué hacer, no cómo se llama un ajuste de Vercel.
+      console.error(
+        "[api/v1/auth/password-recovery] no hay con qué mandar el correo",
+        connection.reason,
+      );
+      throw new ApiError(
+        "service_unavailable",
+        RECOVERY_EMAIL_UNAVAILABLE_MESSAGE,
+      );
     }
 
     const wiring = await createSupabasePasswordRecoveryGateways(process.env);
@@ -97,6 +130,10 @@ const postPasswordRecovery = createApiRoute<
         describeRateLimit(outcome.retryAfterMinutes),
       );
     }
+    // Lo que depende de la cuenta va después de responder, para que lo que
+    // tarda la respuesta no delate si existe.
+    const { deliver } = outcome;
+    runAfterResponse(() => deliverRecoveryLink(deliver, email));
     return { data: { outcome: "recovery_requested", email } };
   },
 });

@@ -36,6 +36,21 @@ export const PLATFORM_INJECTED_ENV_VARS = ["VERCEL_GIT_COMMIT_SHA"] as const;
  * `docs/entornos.md`. */
 export const CI_ONLY_SECRET_ENV_VARS = ["SUPABASE_PRODUCTION_DB_URL"] as const;
 
+/** Variables que el código sí lee pero que sólo existen en el ámbito
+ * Production de Vercel, y que por eso tampoco van a `.env.example`: ese archivo
+ * describe el `.env.local` de quien desarrolla, y ahí no deben estar.
+ *
+ * Son las del correo transaccional (issue #137). Un preview o una máquina con
+ * la clave de Resend mandaría correos de verdad a direcciones de prueba, así
+ * que el manifiesto les da un origen de producción y la regla 1 las mantiene
+ * fuera. Sin ellas el envío falla nombrándolas, que es lo que se quiere.
+ * `tests/unit/entornos-doc.test.ts` exige que sigan explicadas en
+ * `docs/entornos.md`. */
+export const PRODUCTION_ONLY_ENV_VARS = [
+  "RESEND_API_KEY",
+  "EMAIL_FROM",
+] as const;
+
 // process.env.PATH sólo extiende el PATH heredado del proceso al lanzar
 // subprocesos en tests: no es configuración de la aplicación. Documentarla
 // invitaría a poner un valor de PATH en .env.local, y eso rompería el shell
@@ -44,6 +59,7 @@ export const CI_ONLY_SECRET_ENV_VARS = ["SUPABASE_PRODUCTION_DB_URL"] as const;
 export const IGNORED_ENV_VARS = new Set<string>([
   "PATH",
   ...PLATFORM_INJECTED_ENV_VARS,
+  ...PRODUCTION_ONLY_ENV_VARS,
 ]);
 
 /** Variables que nunca pueden llevar el prefijo `NEXT_PUBLIC_`: exponerlas al

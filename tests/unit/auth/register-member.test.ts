@@ -16,6 +16,7 @@ import type { RegistrationRequest } from "@/lib/auth/registration";
 const NOW = new Date("2026-09-12T03:00:00.000Z");
 const CLUB_ID = "6f1d2c3b-4a59-4e6f-8b70-1c2d3e4f5a6b";
 const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
+const APP_URL = "https://victoria-seadragons.vercel.app/api/v1/auth/register";
 
 function requestWith(
   overrides: Partial<RegistrationRequest> = {},
@@ -38,6 +39,7 @@ type Doubles = {
   readonly insertedRows: NewMemberRow[];
   readonly deletedUserIds: string[];
   readonly confirmationEmailsRequested: string[];
+  readonly confirmationAppUrls: string[];
 };
 
 type DoubleOptions = {
@@ -52,11 +54,13 @@ function doubles(options: DoubleOptions = {}): Doubles {
   const insertedRows: NewMemberRow[] = [];
   const deletedUserIds: string[] = [];
   const confirmationEmailsRequested: string[] = [];
+  const confirmationAppUrls: string[] = [];
 
   return {
     insertedRows,
     deletedUserIds,
     confirmationEmailsRequested,
+    confirmationAppUrls,
     identities: {
       async createIdentity() {
         if (options.createIdentityFails) {
@@ -80,8 +84,9 @@ function doubles(options: DoubleOptions = {}): Doubles {
       },
     },
     confirmationEmail: {
-      async requestConfirmationEmail(email) {
+      async requestConfirmationEmail(email, appUrl) {
         confirmationEmailsRequested.push(email);
+        confirmationAppUrls.push(appUrl);
         return options.confirmationEmail ?? { kind: "requested" };
       },
     },
@@ -92,7 +97,12 @@ function register(
   given: Doubles,
   request: RegistrationRequest = requestWith(),
 ): ReturnType<typeof registerMember> {
-  return registerMember(given, { request, clubId: CLUB_ID, now: NOW });
+  return registerMember(given, {
+    request,
+    clubId: CLUB_ID,
+    now: NOW,
+    appUrl: APP_URL,
+  });
 }
 
 describe("registro", () => {
@@ -132,6 +142,16 @@ describe("registro", () => {
 
     expect(given.confirmationEmailsRequested).toEqual(["nerea@example.test"]);
     expect(result.confirmationEmail).toEqual({ kind: "requested" });
+  });
+
+  // El enlace del correo tiene que volver al despliegue que atendió el
+  // registro: un preview no puede mandar a producción a confirmar.
+  it("pide el correo con la dirección de la aplicación que atendió el registro", async () => {
+    const given = doubles();
+
+    await register(given);
+
+    expect(given.confirmationAppUrls).toEqual([APP_URL]);
   });
 
   it("el recibo sólo lleva el desenlace neutro y la dirección", async () => {

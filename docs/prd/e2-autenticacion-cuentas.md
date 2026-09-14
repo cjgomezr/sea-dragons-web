@@ -144,6 +144,13 @@ decisión del dueño en la sección 9. El club probablemente lo quiere igual: ho
 la plataforma vive en una dirección de Vercel, que está bien para trabajar pero
 no para mandársela a alguien que se acaba de apuntar.
 
+**Actualizado el 14 de septiembre de 2026.** Mientras el club no tenga dominio,
+el correo sale de `volleytip.com`, un dominio del dueño ya verificado en Resend
+(ver la pregunta abierta de la sección 9). Con el ticket 7 salen por Resend los
+dos correos de esta épica: el de recuperación de contraseña y el de
+confirmación de la cuenta, que hasta entonces mandaba el servicio incorporado de
+Supabase y se cortaba con dos registros seguidos.
+
 **El servicio de correo que trae Supabase no es una alternativa.** Manda 2
 correos por hora, sin garantía de entrega ni de disponibilidad, y su propia
 documentación dice que no se use en producción. Alcanza para probar a mano
@@ -225,8 +232,7 @@ de reenviar viven donde la persona está en ese momento, que es el registro
 recién enviado. La pantalla de completar registro sabe dibujar ese mismo aviso
 igualmente, porque la regla de "qué falta" es una sola y sí cuenta la
 confirmación; hoy sólo lo verá una cuenta que consiga sesión sin haber
-confirmado, que es lo que hará una cuenta creada por Google o Apple en Release
-2.
+confirmado, que es lo que hará una cuenta creada por Google o Apple en Release 2.
 
 ### RF-3 · Consentimiento del tutor para menores · Must
 
@@ -383,10 +389,16 @@ Cubre NFR-010 sobre la tabla `audit_log`, que E1 ya creó.
       con tope de 100 al día y permite verificar hasta tres dominios sin costo.
       Para un club que manda un correo por alta y alguno por contraseña
       olvidada, sobra. Ver la sección 4.
-- [ ] **¿Compra el club un dominio propio?** Es lo único que falta para que el
-      correo llegue a un socio real, y cuesta entre 10 y 15 dólares al año. Lo
-      decide el dueño. No bloquea seis de los siete tickets; sí bloquea el
-      séptimo. Ver la sección 4.
+- [ ] **¿Compra el club un dominio propio?** Sigue abierta, pero **ya no
+      bloquea el ticket 7** (#137). El 14 de septiembre de 2026 el dueño
+      decidió mandar mientras tanto desde `volleytip.com`, un dominio suyo que
+      ya estaba verificado en su cuenta de Resend, con el remitente
+      `Victoria Seadragons <seadragons@volleytip.com>`. Eso resuelve que el
+      correo llegue, no la pregunta: los correos salen de un dominio que no es
+      del club y llevan enlaces a la dirección de Vercel. El remitente vive en
+      la variable `EMAIL_FROM`, así que el día que el club compre su dominio
+      (entre 10 y 15 dólares al año, lo decide el dueño) mudarse es verificarlo
+      en Resend y cambiar esa variable, no tocar código. Ver la sección 4.
 - [ ] **¿A nombre de quién van las cuentas de servicio?** Hoy Supabase, Vercel y
       el monitoreo están a nombre personal del dueño. Antes de que existan socios
       reales conviene pasar todo a un correo del club. No bloquea ningún
