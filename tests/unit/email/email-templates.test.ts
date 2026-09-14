@@ -131,12 +131,15 @@ const WCAG_AA_NORMAL_TEXT = 4.5;
 
 /** El correo se lee en tema claro: los clientes de correo no saben del
  * `data-theme` de la aplicación. */
+const lightThemeSection = readFileSync(
+  join(process.cwd(), "design-system.md"),
+  "utf-8",
+)
+  .split("#### Light theme")[1]
+  ?.split("####")[0];
+
 function lightThemeToken(role: string): string {
-  const designSystem = readFileSync(
-    join(process.cwd(), "design-system.md"),
-    "utf-8",
-  );
-  const section = designSystem.split("#### Light theme")[1]?.split("####")[0];
+  const section = lightThemeSection;
   if (section === undefined) {
     throw new Error("Light theme section not found in design-system.md");
   }
@@ -194,6 +197,28 @@ describe("formato del correo", () => {
       const button = buttonOf(email, url);
 
       expect(flatten(button.textContent).length).toBeGreaterThan(0);
+    },
+  );
+
+  // Outlook de escritorio pinta con el motor de Word e ignora `max-width`:
+  // sólo un ancho fijo en una tabla que sólo él lee le pone el tope.
+  it.each(Object.entries(TEMPLATES))(
+    "la de %s limita el ancho a 600 píxeles también en Outlook",
+    (_name, { email }) => {
+      expect(email.html).toMatch(
+        new RegExp(
+          `<!--\\[if mso\\]><table[^>]*\\bwidth="${MAX_EMAIL_WIDTH_PX}"[^>]*>`,
+        ),
+      );
+    },
+  );
+
+  it.each(Object.entries(TEMPLATES))(
+    "el relleno del botón de la de %s va en la celda, que Outlook sí respeta",
+    (_name, { email, url }) => {
+      const cell = buttonOf(email, url).closest("td");
+
+      expect(cell?.getAttribute("style")).toMatch(/\bpadding\s*:/);
     },
   );
 

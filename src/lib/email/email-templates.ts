@@ -58,8 +58,8 @@ const SIGNATURE_STYLE = `margin: 0; font-family: ${FONT_STACK}; font-size: 14px;
 const HEADER_STYLE = `padding: 20px 32px; background-color: ${COLOR.headerBackground}; font-family: ${FONT_STACK}; font-size: 20px; font-weight: bold; color: ${COLOR.headerText};`;
 const CONTENT_STYLE = `padding: 32px; background-color: ${COLOR.panel};`;
 const FOOTER_STYLE = `padding: 16px 32px; background-color: ${COLOR.panel}; border-top: 1px solid ${COLOR.border};`;
-const BUTTON_CELL_STYLE = `border-radius: 6px; background-color: ${COLOR.accent};`;
-const BUTTON_STYLE = `display: inline-block; padding: 12px 24px; font-family: ${FONT_STACK}; font-size: 16px; font-weight: bold; line-height: 1.25; color: ${COLOR.onAccent}; text-decoration: none; border-radius: 6px;`;
+const BUTTON_CELL_STYLE = `padding: 12px 24px; border-radius: 6px; background-color: ${COLOR.accent};`;
+const BUTTON_STYLE = `display: inline-block; font-family: ${FONT_STACK}; font-size: 16px; font-weight: bold; line-height: 1.25; color: ${COLOR.onAccent}; text-decoration: none;`;
 
 /** Las tablas de maquetación no son datos: sin `role="presentation"` un
  * lector de pantalla anuncia filas y columnas que no existen. */
@@ -127,7 +127,11 @@ function renderHtml(content: EmailContent): string {
     `<body style="${BODY_STYLE}">`,
     `<table ${LAYOUT_TABLE_ATTRIBUTES} width="100%" bgcolor="${COLOR.background}" style="width: 100%; background-color: ${COLOR.background};">`,
     '<tr><td align="center" style="padding: 24px 12px;">',
+    // Outlook de escritorio pinta con el motor de Word e ignora `max-width`:
+    // esta tabla fija, que sólo él lee, le pone el mismo tope.
+    `<!--[if mso]><table ${LAYOUT_TABLE_ATTRIBUTES} width="${MAX_WIDTH_PX}" align="center"><tr><td><![endif]-->`,
     renderCard(content),
+    "<!--[if mso]></td></tr></table><![endif]-->",
     "</td></tr>",
     "</table>",
     "</body>",
