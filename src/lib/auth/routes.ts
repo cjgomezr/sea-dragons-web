@@ -74,6 +74,11 @@ export const CONFIRMATION_EMAIL_API_PATH = "/api/v1/auth/confirmation-email";
  * públicos, porque es con el que deja de estarlo. */
 export const ACCOUNT_API_PATH = "/api/v1/auth/account";
 
+/** El consentimiento del tutor de un socio menor (#134). Es otro de los
+ * pendientes de una cuenta `incomplete`, así que la frontera la deja pasar
+ * igual que al de la cuenta. */
+export const GUARDIAN_CONSENT_API_PATH = `${ACCOUNT_API_PATH}/guardian-consent`;
+
 /** El destino del enlace del correo de recuperación (#136). Cuelga de
  * `PASSWORD_RECOVERY_PATH`, así que ya es pública por prefijo; se nombra para
  * que el enlace que se manda y la pantalla que lo recibe no se desincronicen. */

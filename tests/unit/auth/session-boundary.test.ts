@@ -5,6 +5,7 @@ import {
   CONFIRMATION_EMAIL_API_PATH,
   DASHBOARD_PATH,
   EMAIL_CONFIRMATION_PATH,
+  GUARDIAN_CONSENT_API_PATH,
   PASSWORD_RECOVERY_PATH,
   REGISTER_API_PATH,
   REGISTRATION_PATH,
@@ -202,6 +203,15 @@ describe("frontera de sesión: cuenta incompleta", () => {
         ...INCOMPLETE,
       }),
     ).toEqual({ kind: "forbidden" });
+  });
+
+  it("deja pasar el endpoint del consentimiento del tutor, que es uno de sus pendientes", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: GUARDIAN_CONSENT_API_PATH,
+        ...INCOMPLETE,
+      }),
+    ).toEqual({ kind: "allow" });
   });
 
   it("deja pasar el endpoint con el que completa su registro", () => {

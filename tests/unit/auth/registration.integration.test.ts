@@ -277,7 +277,6 @@ describeRls("registro contra seadragons-dev", () => {
         const result = await confirmEmailAndActivate(gateways, {
           tokenHash: data.properties.hashed_token,
           type: "signup",
-          now: new Date(),
         });
 
         expect(result).toEqual({ kind: "activated" });

@@ -12,13 +12,13 @@ import {
  * discrepando, y la discrepancia sería una cuenta activa sin datos.
  */
 
-const NOW = new Date("2026-09-12T10:00:00+10:00");
 
 const COMPLETE_ADULT_PROFILE: MemberProfile = {
   country: "AU",
   dateOfBirth: "1994-03-08",
   membershipType: "Full",
   guardianConsentAt: null,
+  registeredAt: "2026-09-12T00:00:00.000Z",
 };
 
 function pendingFor(
@@ -28,7 +28,6 @@ function pendingFor(
   return listPendingRequirements({
     profile: { ...COMPLETE_ADULT_PROFILE, ...profile },
     emailConfirmed,
-    now: NOW,
   });
 }
 
@@ -85,7 +84,6 @@ describe("el estado de cuenta sale de la misma lista", () => {
       resolveAccountStatus({
         profile: COMPLETE_ADULT_PROFILE,
         emailConfirmed: true,
-        now: NOW,
       }),
     ).toBe("active");
   });
@@ -100,7 +98,6 @@ describe("el estado de cuenta sale de la misma lista", () => {
       resolveAccountStatus({
         profile: { ...COMPLETE_ADULT_PROFILE, ...missing },
         emailConfirmed: true,
-        now: NOW,
       }),
     ).toBe("incomplete");
   });
@@ -110,7 +107,6 @@ describe("el estado de cuenta sale de la misma lista", () => {
       resolveAccountStatus({
         profile: COMPLETE_ADULT_PROFILE,
         emailConfirmed: false,
-        now: NOW,
       }),
     ).toBe("incomplete");
   });

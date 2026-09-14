@@ -79,7 +79,6 @@ export async function confirmEmailAndActivate(
   input: {
     readonly tokenHash: string;
     readonly type: EmailConfirmationOtpType;
-    readonly now: Date;
   },
 ): Promise<EmailConfirmationResult> {
   const confirmation = await gateways.confirmations.confirmEmail({
@@ -93,9 +92,6 @@ export async function confirmEmailAndActivate(
   const activation = await activateAccountIfComplete(
     gateways,
     confirmation.userId,
-    {
-      now: input.now,
-    },
   );
   return activation.kind === "activated"
     ? { kind: "activated" }

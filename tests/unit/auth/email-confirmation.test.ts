@@ -11,7 +11,6 @@ import {
   parseEmailConfirmationOtpType,
 } from "@/lib/auth/email-confirmation";
 
-const NOW = new Date("2026-09-12T03:00:00.000Z");
 const MEMBER_ID = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
 const TOKEN_HASH = "un-token-de-confirmacion";
@@ -39,12 +38,14 @@ function doubles(options: {
       async findByUserId() {
         return {
           memberId: MEMBER_ID,
+          clubId: "5c1ab000-0000-4000-8000-000000000001",
           accountStatus: "incomplete",
           profile: {
             country: options.country === undefined ? "AU" : options.country,
             dateOfBirth: "1994-03-02",
             membershipType: "Full",
             guardianConsentAt: null,
+            registeredAt: "2026-09-12T00:00:00.000Z",
           },
         };
       },
@@ -87,7 +88,6 @@ describe("confirmación del correo", () => {
     const result = await confirmEmailAndActivate(given, {
       tokenHash: TOKEN_HASH,
       type: "signup",
-      now: NOW,
     });
 
     expect(result).toEqual({ kind: "activated" });
@@ -103,7 +103,6 @@ describe("confirmación del correo", () => {
     const result = await confirmEmailAndActivate(given, {
       tokenHash: TOKEN_HASH,
       type: "signup",
-      now: NOW,
     });
 
     expect(result).toEqual({ kind: "confirmed_still_incomplete" });
@@ -118,7 +117,6 @@ describe("confirmación del correo", () => {
     const result = await confirmEmailAndActivate(given, {
       tokenHash: TOKEN_HASH,
       type: "signup",
-      now: NOW,
     });
 
     expect(result).toEqual({ kind: "rejected", reason: "Token has expired" });

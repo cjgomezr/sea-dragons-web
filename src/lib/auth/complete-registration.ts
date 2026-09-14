@@ -27,9 +27,9 @@ import {
  * preguntar.
  */
 
-/** Los pendientes que se rellenan escribiendo. El consentimiento del tutor lo
- * da otra persona y la confirmación del correo llega por un enlace, así que
- * ninguno de los dos se manda a este endpoint. */
+/** Los pendientes que se rellenan escribiendo. El consentimiento del tutor
+ * tiene su propia puerta (`guardian-consent.ts`) y la confirmación del correo
+ * llega por un enlace, así que ninguno de los dos se manda a este endpoint. */
 export const COMPLETION_FIELDS = [
   "country",
   "dateOfBirth",
@@ -54,9 +54,15 @@ export type MemberProfileWriter = {
   updateProfile(memberId: string, values: CompletedValues): Promise<void>;
 };
 
-export type AccountCompletionGateways = {
-  readonly accounts: MemberAccountStore & MemberProfileWriter;
+/** Lo que hace falta para decidir y escribir el paso a `active`. Lo comparten
+ * completar registro y el consentimiento del tutor. */
+export type AccountSettlementGateways = {
+  readonly accounts: MemberAccountStore;
   readonly identities: IdentityConfirmationReader;
+};
+
+export type AccountCompletionGateways = AccountSettlementGateways & {
+  readonly accounts: MemberAccountStore & MemberProfileWriter;
 };
 
 /** En qué estado queda la cuenta y qué le sigue faltando. La pantalla dibuja
@@ -196,10 +202,10 @@ function issuesForAlreadySetFields(
 }
 
 /** La fila de la cuenta que se va a completar, o el error de por qué no se
- * puede. Separado del resto para que `completeRegistration` se lea de un
- * vistazo. */
-async function findIncompleteAccount(
-  gateways: AccountCompletionGateways,
+ * puede. Lo comparten completar registro y el consentimiento del tutor: las
+ * dos puertas sólo se abren a una cuenta `incomplete`. */
+export async function findIncompleteAccount(
+  gateways: { readonly accounts: MemberAccountStore },
   userId: string,
 ): Promise<MemberAccountRecord> {
   const record = await gateways.accounts.findByUserId(userId);
@@ -214,8 +220,9 @@ async function findIncompleteAccount(
 
 /**
  * Recalcula los pendientes de una cuenta `incomplete` y la activa si ya no
- * falta ninguno. Es el ÚNICO sitio de este módulo que escribe el paso a
- * `active`: lo comparten guardar un dato y consultar la cuenta.
+ * falta ninguno. Es el ÚNICO sitio que escribe el paso a `active` desde
+ * completar registro: lo comparten guardar un dato, registrar el
+ * consentimiento del tutor y consultar la cuenta.
  *
  * Que también lo haga la consulta no es un capricho. Guardar son dos
  * escrituras en dos llamadas (el perfil y el estado), así que un corte entre
@@ -223,22 +230,19 @@ async function findIncompleteAccount(
  * que no le falta nada, a la que la frontera sigue devolviendo a esta pantalla
  * y que ya no tiene ningún dato que mandar para desatascarse. Reconciliar al
  * consultar la desatasca sola la próxima vez que abra la pantalla, que es
- * justo donde la frontera la manda. Lo mismo valdrá el día que el
- * consentimiento del tutor (FR-082) lo registre otra persona desde fuera.
+ * justo donde la frontera la manda.
  */
-async function settleAccount(
-  gateways: AccountCompletionGateways,
+export async function settleAccount(
+  gateways: AccountSettlementGateways,
   input: {
     readonly userId: string;
     readonly memberId: string;
     readonly profile: MemberProfile;
-    readonly now: Date;
   },
 ): Promise<AccountCompletion> {
   const pending = listPendingRequirements({
     profile: input.profile,
     emailConfirmed: await gateways.identities.isEmailConfirmed(input.userId),
-    now: input.now,
   });
   if (pending.length > 0) {
     return { accountStatus: "incomplete", pending };
@@ -251,8 +255,8 @@ async function settleAccount(
 /** Qué le falta a la cuenta de quien pregunta. Lo consulta la pantalla de
  * completar registro para pedir sólo eso, y no lo que ya dio. */
 export async function describeAccountCompletion(
-  gateways: AccountCompletionGateways,
-  input: { readonly userId: string; readonly now: Date },
+  gateways: AccountSettlementGateways,
+  input: { readonly userId: string },
 ): Promise<AccountCompletion> {
   const record = await gateways.accounts.findByUserId(input.userId);
   if (record === null) {
@@ -265,7 +269,6 @@ export async function describeAccountCompletion(
     userId: input.userId,
     memberId: record.memberId,
     profile: record.profile,
-    now: input.now,
   });
 }
 
@@ -309,6 +312,5 @@ export async function completeRegistration(
     userId: input.userId,
     memberId: record.memberId,
     profile: { ...record.profile, ...validation.values },
-    now: input.now,
   });
 }

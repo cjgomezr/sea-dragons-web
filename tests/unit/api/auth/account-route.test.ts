@@ -34,12 +34,14 @@ type WiringOptions = {
 
 const INCOMPLETE_RECORD: MemberAccountRecord = {
   memberId: MEMBER_ID,
+  clubId: "5c1ab000-0000-4000-8000-000000000001",
   accountStatus: "incomplete",
   profile: {
     country: "AU",
     dateOfBirth: "1994-03-08",
     membershipType: null,
     guardianConsentAt: null,
+    registeredAt: "2026-09-12T00:00:00.000Z",
   },
 };
 
@@ -255,6 +257,21 @@ describe("guardar lo que falta", () => {
 
     expect(response.status).toBe(401);
     expect(profileWrites).toEqual([]);
+  });
+
+  // FR-082: el consentimiento sólo entra por su propio endpoint, con los datos
+  // del tutor. Una marca de tiempo mandada aquí no registra nada.
+  it("no registra un consentimiento de tutor que llegue en el cuerpo", async () => {
+    mockWiring();
+
+    await patchAccount({
+      membershipType: "Student",
+      guardianConsentAt: "2026-09-12T00:00:00Z",
+    });
+
+    expect(profileWrites).toEqual([
+      { memberId: MEMBER_ID, values: { membershipType: "Student" } },
+    ]);
   });
 
   // AC-039: nadie mueve la fila de otra persona, ni su propio estado de

@@ -10,7 +10,6 @@ import {
   resolveAccountStatus,
 } from "@/lib/auth/account-activation";
 
-const NOW = new Date("2026-09-12T03:00:00.000Z");
 const MEMBER_ID = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
 
@@ -20,6 +19,7 @@ function profileWith(overrides: Partial<MemberProfile> = {}): MemberProfile {
     dateOfBirth: "1994-03-02",
     membershipType: "Full",
     guardianConsentAt: null,
+    registeredAt: "2026-09-12T03:00:00.000Z",
     ...overrides,
   };
 }
@@ -44,7 +44,6 @@ describe("estado de la cuenta", () => {
       resolveAccountStatus({
         profile: profileWith(),
         emailConfirmed: false,
-        now: NOW,
       }),
     ).toBe("incomplete");
   });
@@ -54,7 +53,6 @@ describe("estado de la cuenta", () => {
       resolveAccountStatus({
         profile: profileWith(),
         emailConfirmed: true,
-        now: NOW,
       }),
     ).toBe("active");
   });
@@ -68,7 +66,6 @@ describe("estado de la cuenta", () => {
       resolveAccountStatus({
         profile: profileWith(missing),
         emailConfirmed: true,
-        now: NOW,
       }),
     ).toBe("incomplete");
   });
@@ -78,7 +75,6 @@ describe("estado de la cuenta", () => {
       resolveAccountStatus({
         profile: profileWith({ dateOfBirth: "2010-09-13" }),
         emailConfirmed: true,
-        now: NOW,
       }),
     ).toBe("incomplete");
   });
@@ -91,7 +87,6 @@ describe("estado de la cuenta", () => {
           guardianConsentAt: "2026-09-11T10:00:00.000Z",
         }),
         emailConfirmed: true,
-        now: NOW,
       }),
     ).toBe("active");
   });
@@ -132,6 +127,7 @@ function recordWith(
 ): MemberAccountRecord {
   return {
     memberId: MEMBER_ID,
+    clubId: "5c1ab000-0000-4000-8000-000000000001",
     accountStatus: "incomplete",
     profile: profileWith(),
     ...overrides,
@@ -145,9 +141,7 @@ describe("activación de la cuenta", () => {
       emailConfirmed: true,
     });
 
-    const result = await activateAccountIfComplete(given, USER_ID, {
-      now: NOW,
-    });
+    const result = await activateAccountIfComplete(given, USER_ID);
 
     expect(result).toEqual({ kind: "activated" });
     expect(given.written).toEqual([MEMBER_ID]);
@@ -159,9 +153,7 @@ describe("activación de la cuenta", () => {
       emailConfirmed: false,
     });
 
-    const result = await activateAccountIfComplete(given, USER_ID, {
-      now: NOW,
-    });
+    const result = await activateAccountIfComplete(given, USER_ID);
 
     expect(result).toEqual({ kind: "unchanged", status: "incomplete" });
     expect(given.written).toEqual([]);
@@ -173,9 +165,7 @@ describe("activación de la cuenta", () => {
       emailConfirmed: true,
     });
 
-    const result = await activateAccountIfComplete(given, USER_ID, {
-      now: NOW,
-    });
+    const result = await activateAccountIfComplete(given, USER_ID);
 
     expect(result).toEqual({ kind: "unchanged", status: "active" });
     expect(given.written).toEqual([]);
@@ -187,9 +177,7 @@ describe("activación de la cuenta", () => {
       emailConfirmed: true,
     });
 
-    const result = await activateAccountIfComplete(given, USER_ID, {
-      now: NOW,
-    });
+    const result = await activateAccountIfComplete(given, USER_ID);
 
     expect(result).toEqual({ kind: "unchanged", status: "inactive" });
     expect(given.written).toEqual([]);
@@ -199,7 +187,7 @@ describe("activación de la cuenta", () => {
     const given = activationDoubles({ record: null, emailConfirmed: true });
 
     await expect(
-      activateAccountIfComplete(given, USER_ID, { now: NOW }),
+      activateAccountIfComplete(given, USER_ID),
     ).rejects.toBeInstanceOf(MemberNotFoundError);
   });
 });

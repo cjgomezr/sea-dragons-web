@@ -80,6 +80,23 @@ const FALTA_LA_MEMBRESIA = {
   membership_type: null,
 } as const;
 
+/** Una fecha de nacimiento que da 16 años el día en que corre la suite, que es
+ * el día en que nace la fila. Una fecha fija no serviría: dentro de dos años
+ * esa persona ya no sería menor el día de su registro (#134). */
+function minorDateOfBirth(): string {
+  const date = new Date();
+  date.setUTCFullYear(date.getUTCFullYear() - 16);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Tiene todos sus datos: lo único que le falta es el consentimiento del
+ * tutor, que es el estado de cuenta bloqueada que el ticket pide mirar. */
+const FALTA_EL_TUTOR = {
+  country: "AU",
+  date_of_birth: minorDateOfBirth(),
+  membership_type: "Student",
+} as const;
+
 export const INCOMPLETE_MEMBERS = {
   "un-dato": FALTA_LA_MEMBRESIA,
   "varios-datos": {
@@ -87,8 +104,11 @@ export const INCOMPLETE_MEMBERS = {
     date_of_birth: null,
     membership_type: null,
   },
+  "menor-sin-consentimiento": FALTA_EL_TUTOR,
   /** Lo activa el test que guarda el último dato. */
   "para-activar": FALTA_LA_MEMBRESIA,
+  /** Lo activa el test que registra el consentimiento del tutor. */
+  "menor-para-consentir": FALTA_EL_TUTOR,
   /** Cierra su propia sesión, que es justo lo que lo inutiliza para todo lo
    * demás. Por eso no lo comparte con nadie. */
   "para-cerrar-sesion": FALTA_LA_MEMBRESIA,
@@ -101,11 +121,13 @@ export const INCOMPLETE_MEMBER_NAMES = Object.keys(
 ) as readonly IncompleteMemberName[];
 
 /** Los estados de la pantalla que tienen línea base visual: uno con un solo
- * dato pendiente y otro con varios. Los demás socios existen para tests que
- * los modifican, y una foto suya sería una foto de cuándo corrió cada test. */
+ * dato pendiente, otro con varios, y el menor que espera a su tutor. Los demás
+ * socios existen para tests que los modifican, y una foto suya sería una foto
+ * de cuándo corrió cada test. */
 export const PHOTOGRAPHED_MEMBERS = [
   "un-dato",
   "varios-datos",
+  "menor-sin-consentimiento",
 ] as const satisfies readonly IncompleteMemberName[];
 
 export function incompleteStorageStatePath(name: IncompleteMemberName): string {

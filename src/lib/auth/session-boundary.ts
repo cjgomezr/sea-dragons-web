@@ -3,6 +3,7 @@ import {
   API_V1_PREFIX,
   COMPLETE_REGISTRATION_PATH,
   DASHBOARD_PATH,
+  GUARDIAN_CONSENT_API_PATH,
   PUBLIC_API_PATHS,
   PUBLIC_PAGE_PATHS,
   SIGN_IN_PATH,
@@ -74,14 +75,17 @@ function denyWithoutSession(pathname: string): SessionBoundaryOutcome {
 
 /**
  * Una cuenta `incomplete` sólo alcanza lo que la deja dejar de estarlo: la
- * pantalla de completar registro (y los pasos que cuelguen de ella) y el
- * endpoint con el que guarda lo que falta. Cerrar sesión y reenviar la
- * confirmación le llegan por la lista de rutas públicas, que ya salió antes.
+ * pantalla de completar registro (y los pasos que cuelguen de ella) y los dos
+ * endpoints con los que guarda lo que falta: sus datos y el consentimiento de
+ * su tutor. Se comparan por igualdad, como los públicos. Cerrar sesión y
+ * reenviar la confirmación le llegan por la lista de rutas públicas, que ya
+ * salió antes.
  */
 function decideForIncompleteAccount(pathname: string): SessionBoundaryOutcome {
   if (
     isPathWithin(pathname, COMPLETE_REGISTRATION_PATH) ||
-    pathname === ACCOUNT_API_PATH
+    pathname === ACCOUNT_API_PATH ||
+    pathname === GUARDIAN_CONSENT_API_PATH
   ) {
     return { kind: "allow" };
   }

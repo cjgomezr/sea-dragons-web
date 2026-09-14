@@ -22,12 +22,14 @@ import {
 const NOW = new Date("2026-09-12T10:00:00+10:00");
 const MEMBER_ID = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
+const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
 
 const FULL_PROFILE: MemberProfile = {
   country: "AU",
   dateOfBirth: "1994-03-08",
   membershipType: "Full",
   guardianConsentAt: null,
+  registeredAt: "2026-09-01T00:00:00.000Z",
 };
 
 type Store = {
@@ -76,6 +78,7 @@ function incompleteRecord(
 ): MemberAccountRecord {
   return {
     memberId: MEMBER_ID,
+    clubId: CLUB_ID,
     accountStatus: "incomplete",
     profile: { ...FULL_PROFILE, ...profile },
   };
@@ -86,7 +89,7 @@ describe("completar registro: pide sólo lo que falta", () => {
     const store = storeWith({ record: incompleteRecord({ country: null }) });
 
     await expect(
-      describeAccountCompletion(store.gateways, { userId: USER_ID, now: NOW }),
+      describeAccountCompletion(store.gateways, { userId: USER_ID }),
     ).resolves.toEqual({ accountStatus: "incomplete", pending: ["country"] });
   });
 
@@ -98,7 +101,6 @@ describe("completar registro: pide sólo lo que falta", () => {
 
     const completion = await describeAccountCompletion(store.gateways, {
       userId: USER_ID,
-      now: NOW,
     });
 
     expect(completion.pending).toEqual([
@@ -112,13 +114,14 @@ describe("completar registro: pide sólo lo que falta", () => {
     const store = storeWith({
       record: {
         memberId: MEMBER_ID,
+        clubId: CLUB_ID,
         accountStatus: "active",
         profile: FULL_PROFILE,
       },
     });
 
     await expect(
-      describeAccountCompletion(store.gateways, { userId: USER_ID, now: NOW }),
+      describeAccountCompletion(store.gateways, { userId: USER_ID }),
     ).resolves.toEqual({ accountStatus: "active", pending: [] });
   });
 
@@ -127,7 +130,6 @@ describe("completar registro: pide sólo lo que falta", () => {
 
     await describeAccountCompletion(store.gateways, {
       userId: USER_ID,
-      now: NOW,
     });
 
     expect(store.activations).toEqual([]);
@@ -142,7 +144,6 @@ describe("completar registro: pide sólo lo que falta", () => {
 
     const completion = await describeAccountCompletion(store.gateways, {
       userId: USER_ID,
-      now: NOW,
     });
 
     expect(completion).toEqual({ accountStatus: "active", pending: [] });
@@ -155,7 +156,7 @@ describe("completar registro: pide sólo lo que falta", () => {
     const store = storeWith({ record: null });
 
     await expect(
-      describeAccountCompletion(store.gateways, { userId: USER_ID, now: NOW }),
+      describeAccountCompletion(store.gateways, { userId: USER_ID }),
     ).rejects.toBeInstanceOf(MemberNotFoundError);
   });
 });
@@ -343,6 +344,7 @@ describe("completar registro: cuentas que no se completan", () => {
     store = storeWith({
       record: {
         memberId: MEMBER_ID,
+        clubId: CLUB_ID,
         accountStatus: "active",
         profile: FULL_PROFILE,
       },
