@@ -4,7 +4,12 @@ import { describe } from "vitest";
 import { readSupabaseConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { decideSupabaseCredentials } from "./supabase-credentials";
-import { createConfirmedUser, withSupabaseRetry } from "./supabase-retry";
+import {
+  createConfirmedUser,
+  describeSupabaseFailure,
+  SUPABASE_RETRY_BUDGET_MS,
+  withSupabaseRetry,
+} from "./supabase-retry";
 
 // `.env.local` ya está cargado y verificado contra el proyecto de desarrollo
 // por `vitest.setup.ts` (que corre antes que cualquier archivo de test): no
@@ -14,8 +19,17 @@ import { createConfirmedUser, withSupabaseRetry } from "./supabase-retry";
  * Sídney): bajo `npm test` completo compiten por CPU y sockets con el resto
  * de los workers de Vitest, y los 5 s por defecto, pensados para tests en
  * memoria, no alcanzan. Mismo patrón que el #50 para tests que lanzan
- * procesos reales. */
-export const RLS_NETWORK_TEST_TIMEOUT_MS = 20_000;
+ * procesos reales.
+ *
+ * Encima va el presupuesto de dos reintentos completos (#165): un test crea el
+ * usuario, inicia sesión, consulta y limpia, y un corte puede pillar a más de
+ * una de esas llamadas. Sin ese margen el test caería por plazo antes de que
+ * el reintento pudiera recuperarlo. */
+const NETWORK_TEST_BASE_TIMEOUT_MS = 20_000;
+const RETRIES_COVERED_PER_TEST = 2;
+export const RLS_NETWORK_TEST_TIMEOUT_MS =
+  NETWORK_TEST_BASE_TIMEOUT_MS +
+  SUPABASE_RETRY_BUDGET_MS * RETRIES_COVERED_PER_TEST;
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -114,46 +128,31 @@ export function skippedSuiteName(name: string, reason: string): string {
   return `${name} (saltado: ${reason})`;
 }
 
-type CleanupResult = { readonly error: { readonly message: string } | null };
-
 /** Ejecuta `run` y siempre intenta `cleanup` después, sin dejar que un fallo
  * de limpieza tape la razón real por la que `run` falló: si las dos fallan,
- * la de `run` es la que se relanza y la de limpieza queda registrada aparte. */
+ * la de `run` es la que se relanza y la de limpieza queda registrada aparte.
+ * `cleanup` devuelve el mensaje de su fallo, o `null` si limpió. */
 async function runWithCleanup<T>(
   run: () => Promise<T>,
-  cleanup: () => PromiseLike<CleanupResult>,
+  cleanup: () => Promise<string | null>,
   cleanupFailureMessage: string,
 ): Promise<T> {
   let result: T;
   try {
     result = await run();
   } catch (runError) {
-    const cleanupFailure = await describeCleanupFailure(cleanup);
+    const cleanupFailure = await cleanup();
     if (cleanupFailure !== null) {
       console.error(`${cleanupFailureMessage}: ${cleanupFailure}`);
     }
     throw runError;
   }
 
-  const cleanupFailure = await describeCleanupFailure(cleanup);
+  const cleanupFailure = await cleanup();
   if (cleanupFailure !== null) {
     throw new Error(`${cleanupFailureMessage}: ${cleanupFailure}`);
   }
   return result;
-}
-
-/** La limpieza puede fallar de dos formas: devolviendo un error de Supabase o
- * lanzando, que es lo que hace el reintento cuando agota sus intentos. Las dos
- * se reducen a un mensaje para que `runWithCleanup` las trate igual. */
-async function describeCleanupFailure(
-  cleanup: () => PromiseLike<CleanupResult>,
-): Promise<string | null> {
-  try {
-    const { error } = await cleanup();
-    return error === null ? null : error.message;
-  } catch (thrown) {
-    return thrown instanceof Error ? thrown.message : String(thrown);
-  }
 }
 
 export type TestUser = {
@@ -181,7 +180,7 @@ export async function withTestUser<T>(
   return runWithCleanup(
     () => run(user),
     () =>
-      withSupabaseRetry("borrar el usuario de prueba del arnés RLS", () =>
+      describeSupabaseFailure("borrar el usuario de prueba del arnés RLS", () =>
         serviceClient.client.auth.admin.deleteUser(user.id),
       ),
     "No se pudo limpiar el usuario de prueba del arnés RLS",
@@ -211,8 +210,9 @@ export async function withSeededRows<T>(
   return runWithCleanup(
     () => run(data),
     () =>
-      withSupabaseRetry(`limpiar la tabla ${table} tras el arnés RLS`, () =>
-        serviceClient.client.from(table).delete().in("id", ids),
+      describeSupabaseFailure(
+        `limpiar la tabla ${table} tras el arnés RLS`,
+        () => serviceClient.client.from(table).delete().in("id", ids),
       ),
     `No se pudo limpiar la tabla ${table} tras el arnés RLS`,
   );

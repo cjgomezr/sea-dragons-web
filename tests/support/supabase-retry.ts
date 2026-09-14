@@ -13,6 +13,13 @@ export const SUPABASE_RETRY_DELAYS_MS: readonly number[] = [
   2_000, 5_000, 10_000,
 ];
 
+/** Lo más que puede llegar a esperar un reintento, sin contar lo que tarde
+ * cada intento. Los plazos de los tests con red tienen que dejarle sitio. */
+export const SUPABASE_RETRY_BUDGET_MS = SUPABASE_RETRY_DELAYS_MS.reduce(
+  (total, delay) => total + delay,
+  0,
+);
+
 export type Sleep = (ms: number) => Promise<void>;
 
 const waitFor: Sleep = (ms) =>
@@ -70,7 +77,17 @@ function describeTransientResult(result: SupabaseResult): string | null {
   return null;
 }
 
+/** Lo que lanza un reintento que se agotó. Su mensaje cita el último fallo, que
+ * suele ser de red, así que se distingue por la clase: si no, un reintento
+ * anidado se volvería a reintentar entero desde fuera. */
+class SupabaseRetryExhaustedError extends Error {
+  override readonly name = "SupabaseRetryExhaustedError";
+}
+
 function describeTransientThrow(thrown: unknown): string | null {
+  if (thrown instanceof SupabaseRetryExhaustedError) {
+    return null;
+  }
   return thrown instanceof Error && NETWORK_FAILURE_PATTERN.test(thrown.message)
     ? thrown.message
     : null;
@@ -116,11 +133,30 @@ export async function withSupabaseRetry<T extends SupabaseResult>(
 
     const delay = SUPABASE_RETRY_DELAYS_MS[attemptIndex];
     if (delay === undefined) {
-      throw new Error(
+      throw new SupabaseRetryExhaustedError(
         `Supabase dev no contestó a ${operation} tras ${attemptIndex + 1} intentos (último: ${transientFailure})`,
       );
     }
     await sleep(delay);
+  }
+}
+
+/**
+ * Como `withSupabaseRetry`, pero cualquier fallo vuelve como mensaje en vez de
+ * lanzar: el error que Supabase devolvió, el reintento agotado o lo que lance
+ * la operación. `null` es que contestó bien. Es para las limpiezas, que no
+ * deben tapar el resultado de quien las llama.
+ */
+export async function describeSupabaseFailure(
+  operation: string,
+  call: () => PromiseLike<SupabaseResult>,
+  sleep: Sleep = waitFor,
+): Promise<string | null> {
+  try {
+    const { error } = await withSupabaseRetry(operation, call, sleep);
+    return error === null ? null : error.message;
+  } catch (thrown) {
+    return thrown instanceof Error ? thrown.message : String(thrown);
   }
 }
 

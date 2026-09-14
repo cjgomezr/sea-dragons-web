@@ -13,7 +13,11 @@ import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { createSessionClient } from "@/lib/supabase/session-client";
 import { loadLocalEnvFile } from "./load-local-env";
 import { decideSupabaseCredentials } from "./supabase-credentials";
-import { createConfirmedUser, withSupabaseRetry } from "./supabase-retry";
+import {
+  createConfirmedUser,
+  describeSupabaseFailure,
+  withSupabaseRetry,
+} from "./supabase-retry";
 
 /**
  * Los socios de prueba con los que Playwright entra a la aplicación.
@@ -310,7 +314,9 @@ async function seedMember(
     operation: "crear el socio de prueba",
   });
 
-  const { error: memberError } = await withSupabaseRetry(
+  // Como mensaje y no como throw: si el insert agota el reintento, el usuario
+  // ya creado se borra igual y no queda huérfano en dev.
+  const memberFailure = await describeSupabaseFailure(
     "crear la fila de miembro de prueba",
     () =>
       serviceClient.from(MEMBERS_TABLE).insert({
@@ -321,10 +327,10 @@ async function seedMember(
         ...columns,
       }),
   );
-  if (memberError) {
+  if (memberFailure !== null) {
     await deleteTestUser(serviceClient, user.id);
     throw new Error(
-      `No se pudo crear la fila de miembro de prueba: ${memberError.message}`,
+      `No se pudo crear la fila de miembro de prueba: ${memberFailure}`,
     );
   }
 
@@ -338,13 +344,12 @@ async function deleteTestUser(
   serviceClient: SupabaseClient,
   userId: string,
 ): Promise<void> {
-  const { error } = await withSupabaseRetry("borrar el socio de prueba", () =>
-    serviceClient.auth.admin.deleteUser(userId),
+  const failure = await describeSupabaseFailure(
+    "borrar el socio de prueba",
+    () => serviceClient.auth.admin.deleteUser(userId),
   );
-  if (error) {
-    console.error(
-      `No se pudo borrar el socio de prueba ${userId}: ${error.message}`,
-    );
+  if (failure !== null) {
+    console.error(`No se pudo borrar el socio de prueba ${userId}: ${failure}`);
   }
 }
 
