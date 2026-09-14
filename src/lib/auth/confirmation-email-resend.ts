@@ -16,6 +16,10 @@ import type {
  * El límite se aplica antes de mirar la cuenta, y se aplica igual exista o
  * no: un límite que sólo contara cuentas reales las delataría por la forma de
  * responder.
+ *
+ * El correo no se pide aquí: queda en `deliver`, para que la ruta responda
+ * antes. Sólo hay envío para una cuenta sin confirmar, y si la respuesta lo
+ * esperara, lo que tarda delataría cuáles lo son.
  */
 
 /** La misma ventana y el mismo tope que la recuperación: tres correos en un
@@ -26,7 +30,12 @@ export const MAX_CONFIRMATION_EMAILS_PER_WINDOW = 3;
 const MILLISECONDS_PER_MINUTE = 60_000;
 
 export type ConfirmationEmailResendOutcome =
-  | { readonly kind: "attempted"; readonly delivery: ConfirmationEmailOutcome }
+  | {
+      readonly kind: "accepted";
+      /** Pide el correo y dice qué pasó. Va aparte porque sólo hay envío para
+       * una cuenta sin confirmar: quien responde no debe esperarlo. */
+      readonly deliver: () => Promise<ConfirmationEmailOutcome>;
+    }
   | { readonly kind: "rate_limited"; readonly retryAfterMinutes: number };
 
 export async function resendConfirmationEmail(
@@ -56,10 +65,11 @@ export async function resendConfirmationEmail(
   }
 
   return {
-    kind: "attempted",
-    delivery: await gateways.confirmationEmail.requestConfirmationEmail(
-      input.email,
-      input.appUrl,
-    ),
+    kind: "accepted",
+    deliver: () =>
+      gateways.confirmationEmail.requestConfirmationEmail(
+        input.email,
+        input.appUrl,
+      ),
   };
 }

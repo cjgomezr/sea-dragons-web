@@ -12,6 +12,7 @@ const EMAIL = "nerea@example.test";
 const requestedEmails: string[] = [];
 const requestedAppUrls: string[] = [];
 const recordedRequests = { count: 0 };
+const scheduledWork: (() => Promise<void>)[] = [];
 const CLUB_ID = "6f1d2c3b-4a59-4e6f-8b70-1c2d3e4f5a6b";
 
 function mockWiring(
@@ -19,8 +20,14 @@ function mockWiring(
     readonly unconfigured?: readonly string[];
     readonly confirmationEmail?: ConfirmationEmailOutcome;
     readonly requestsInWindow?: number;
+    readonly failure?: Error;
   } = {},
 ): void {
+  vi.doMock("@/lib/api/after-response", () => ({
+    runAfterResponse: (work: () => Promise<void>) => {
+      scheduledWork.push(work);
+    },
+  }));
   vi.doMock("@/lib/auth/supabase-auth-gateways", () => ({
     DEFAULT_CLUB_SLUG: "victoria-seadragons",
     describeMissingAuthKeys: (missingKeys: readonly string[]) =>
@@ -45,6 +52,9 @@ function mockWiring(
                 ) => {
                   requestedEmails.push(email);
                   requestedAppUrls.push(appUrl);
+                  if (options.failure) {
+                    throw options.failure;
+                  }
                   return options.confirmationEmail ?? { kind: "requested" };
                 },
               },
@@ -64,10 +74,20 @@ async function postConfirmationEmail(body: unknown): Promise<Response> {
   );
 }
 
+/** Lo que la ruta dejó para después de responder. En producción lo corre
+ * `after` de Next.js; aquí se corre a mano, y sólo después de la respuesta. */
+async function runScheduledWork(): Promise<void> {
+  for (const work of scheduledWork.splice(0)) {
+    await work();
+  }
+}
+
 describe("POST /api/v1/auth/confirmation-email", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.doUnmock("@/lib/auth/supabase-auth-gateways");
+    vi.doUnmock("@/lib/api/after-response");
+    scheduledWork.length = 0;
     requestedEmails.length = 0;
     requestedAppUrls.length = 0;
     recordedRequests.count = 0;
@@ -88,15 +108,43 @@ describe("POST /api/v1/auth/confirmation-email", () => {
     expect(body.error.code).toBe("rate_limited");
     expect(body.error.message).toContain("15 minutos");
     expect(requestedEmails).toEqual([]);
+    expect(scheduledWork).toEqual([]);
   });
 
   it("cuenta la petición y pide el correo", async () => {
     mockWiring();
 
     await postConfirmationEmail({ email: EMAIL });
+    await runScheduledWork();
 
     expect(recordedRequests.count).toBe(1);
     expect(requestedEmails).toEqual([EMAIL]);
+  });
+
+  // Pedir el correo depende de la cuenta. Si la respuesta lo esperara, lo que
+  // tarda delataría qué direcciones tienen una confirmación pendiente.
+  it("responde antes de pedir el correo", async () => {
+    mockWiring();
+
+    const response = await postConfirmationEmail({ email: EMAIL });
+
+    expect(response.status).toBe(200);
+    expect(scheduledWork).toHaveLength(1);
+    expect(requestedEmails).toEqual([]);
+  });
+
+  it("un error inesperado al pedir el correo queda en el registro sin tocar la respuesta ya enviada", async () => {
+    mockWiring({ failure: new Error("supabase no contestó") });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await postConfirmationEmail({ email: EMAIL });
+    await runScheduledWork();
+
+    expect(response.status).toBe(200);
+    expect(logged.mock.calls.flat().map(String).join(" ")).toContain(
+      "supabase no contestó",
+    );
+    logged.mockRestore();
   });
 
   it("no cuenta una dirección sin forma de correo", async () => {
@@ -115,6 +163,7 @@ describe("POST /api/v1/auth/confirmation-email", () => {
       email: "  Nerea@Example.Test ",
     });
 
+    await runScheduledWork();
     expect(response.status).toBe(200);
     expect(requestedEmails).toEqual([EMAIL]);
   });
@@ -123,6 +172,7 @@ describe("POST /api/v1/auth/confirmation-email", () => {
     mockWiring();
 
     await postConfirmationEmail({ email: EMAIL });
+    await runScheduledWork();
 
     expect(requestedAppUrls).toEqual([CONFIRMATION_EMAIL_URL]);
   });
@@ -132,6 +182,7 @@ describe("POST /api/v1/auth/confirmation-email", () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const response = await postConfirmationEmail({ email: EMAIL });
+    await runScheduledWork();
 
     expect(response.status).toBe(200);
     expect(logged).not.toHaveBeenCalled();
@@ -214,6 +265,8 @@ describe("envío del correo de confirmación en el reenvío", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.doUnmock("@/lib/auth/supabase-auth-gateways");
+    vi.doUnmock("@/lib/api/after-response");
+    scheduledWork.length = 0;
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -245,6 +298,7 @@ describe("envío del correo de confirmación en el reenvío", () => {
         mockWiring({ confirmationEmail: outcome });
 
         await postConfirmationEmail({ email: EMAIL });
+        await runScheduledWork();
 
         const logged = vi.mocked(console.error).mock.calls.flat().map(String);
         expect(logged).toContain(outcome.reason);

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { runAfterResponse } from "@/lib/api/after-response";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
 import type {
@@ -35,6 +36,22 @@ function reportConfirmationEmail(outcome: ConfirmationEmailOutcome): void {
     console.error(
       "[api/v1/auth/confirmation-email] no se pudo reenviar la confirmación",
       outcome.reason,
+    );
+  }
+}
+
+/** Corre la entrega cuando la respuesta ya salió. El resultado del envío y
+ * cualquier fallo inesperado van al registro del servidor: la respuesta no
+ * puede cambiar por ellos sin delatar la cuenta. */
+async function requestConfirmationAfterResponse(
+  deliver: () => Promise<ConfirmationEmailOutcome>,
+): Promise<void> {
+  try {
+    reportConfirmationEmail(await deliver());
+  } catch (error) {
+    console.error(
+      "[api/v1/auth/confirmation-email] falló el reenvío de la confirmación",
+      error,
     );
   }
 }
@@ -79,7 +96,10 @@ const postConfirmationEmail = createApiRoute<
       );
     }
 
-    reportConfirmationEmail(outcome.delivery);
+    // Pedir el correo va después de responder: sólo hay envío para una cuenta
+    // sin confirmar, y lo que tardara la respuesta la delataría.
+    const { deliver } = outcome;
+    runAfterResponse(() => requestConfirmationAfterResponse(deliver));
     return { data: { outcome: "confirmation_pending", email } };
   },
 });

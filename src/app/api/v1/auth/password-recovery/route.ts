@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
+import { runAfterResponse } from "@/lib/api/after-response";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
 import { requestPasswordRecovery } from "@/lib/auth/password-recovery";
@@ -57,6 +58,22 @@ function resetUrlBuilder(request: NextRequest): (tokenHash: string) => string {
   };
 }
 
+/** Corre la entrega cuando la respuesta ya salió. Un fallo aquí no puede
+ * cambiar esa respuesta, y tampoco debe: diría qué cuentas existen. Queda en
+ * el registro del servidor, que es donde lo lee quien lo arregla. */
+async function deliverRecoveryLink(
+  deliver: () => Promise<void>,
+): Promise<void> {
+  try {
+    await deliver();
+  } catch (error) {
+    console.error(
+      "[api/v1/auth/password-recovery] no se pudo mandar el enlace de recuperación",
+      error,
+    );
+  }
+}
+
 const postPasswordRecovery = createApiRoute<
   PasswordRecoveryResponse,
   PasswordRecoveryBody
@@ -110,6 +127,10 @@ const postPasswordRecovery = createApiRoute<
         describeRateLimit(outcome.retryAfterMinutes),
       );
     }
+    // Lo que depende de la cuenta va después de responder, para que lo que
+    // tarda la respuesta no delate si existe.
+    const { deliver } = outcome;
+    runAfterResponse(() => deliverRecoveryLink(deliver));
     return { data: { outcome: "recovery_requested", email } };
   },
 });
