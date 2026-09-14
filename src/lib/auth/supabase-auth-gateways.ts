@@ -6,10 +6,18 @@ import {
 } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import {
+  type AuditLogWriter,
+  createSupabaseAuditLogWriter,
+} from "@/lib/audit/audit-log";
+import {
   type IdentityConfirmationReader,
   type MemberAccountRecord,
   type MemberAccountStore,
 } from "./account-activation";
+import type {
+  GuardianConsent,
+  GuardianConsentWriter,
+} from "./guardian-consent";
 import { ACCOUNT_STATUSES, type AccountStatus } from "./account-status";
 import type {
   CompletedValues,
@@ -52,10 +60,15 @@ export type SupabaseAuthGateways = {
   readonly confirmations: EmailConfirmationGateway;
   readonly clubs: ClubDirectory;
   /** Leer la fila del socio y escribir lo que le faltaba son la misma pieza:
-   * las dos las usa la pantalla de completar registro, y las dos van por la
-   * llave de servicio (ver `createMemberAccountStore`). */
-  readonly accounts: MemberAccountStore & MemberProfileWriter;
+   * las usa la pantalla de completar registro, y todas van por la llave de
+   * servicio (ver `createMemberAccountStore`). */
+  readonly accounts: MemberAccountStore &
+    MemberProfileWriter &
+    GuardianConsentWriter;
   readonly identities: IdentityConfirmationReader;
+  /** La bitácora de NFR-010. Va por la llave de servicio, que es la única que
+   * `0002_audit_log.sql` deja escribir. */
+  readonly audit: AuditLogWriter;
   readonly confirmationEmail: ConfirmationEmailGateway;
   /** El límite del reenvío de la confirmación. Pide el club porque cada fila
    * lleva `club_id` (NFR-009). */
@@ -285,18 +298,20 @@ function toMemberAccountRecord(
 ): MemberAccountRecord {
   return {
     memberId: readRequiredText(row, "id", MEMBERS_TABLE),
+    clubId: readRequiredText(row, "club_id", MEMBERS_TABLE),
     accountStatus: readAccountStatus(row),
     profile: {
       country: readText(row, "country", MEMBERS_TABLE),
       dateOfBirth: readText(row, "date_of_birth", MEMBERS_TABLE),
       membershipType: readText(row, "membership_type", MEMBERS_TABLE),
       guardianConsentAt: readText(row, "guardian_consent_at", MEMBERS_TABLE),
+      registeredAt: readRequiredText(row, "created_at", MEMBERS_TABLE),
     },
   };
 }
 
 const MEMBER_ACCOUNT_COLUMNS =
-  "id, account_status, country, date_of_birth, membership_type, guardian_consent_at";
+  "id, club_id, account_status, country, date_of_birth, membership_type, guardian_consent_at, created_at";
 
 /** Las columnas de `members` que escribe completar registro, con el nombre que
  * tienen en la base. La conversión vive aquí y no en el dominio: snake_case es
@@ -323,8 +338,31 @@ function toMemberColumns(values: CompletedValues): Record<string, string> {
  */
 function createMemberAccountStore(
   serviceClient: SupabaseClient,
-): MemberAccountStore & MemberProfileWriter {
+): MemberAccountStore & MemberProfileWriter & GuardianConsentWriter {
   return {
+    async recordGuardianConsent(memberId: string, consent: GuardianConsent) {
+      const { data, error } = await serviceClient
+        .from(MEMBERS_TABLE)
+        .update({
+          guardian_name: consent.guardianName,
+          guardian_email: consent.guardianEmail,
+          guardian_consent_at: consent.consentedAt,
+        })
+        .eq("id", memberId)
+        // Las dos condiciones cierran la carrera entre leer la fila y escribir:
+        // un consentimiento ya registrado no se pisa, y una cuenta que dejó de
+        // estar a medias no recibe uno. Sin fila afectada no hubo escritura.
+        .is("guardian_consent_at", null)
+        .eq("account_status", "incomplete")
+        .select("id");
+      if (error) {
+        throw new Error(
+          `No se pudo registrar el consentimiento del tutor del miembro ${memberId}: ${error.message}`,
+        );
+      }
+      return data.length > 0 ? "recorded" : "already_recorded";
+    },
+
     async findByUserId(userId) {
       const { data, error } = await serviceClient
         .from(MEMBERS_TABLE)
@@ -446,6 +484,7 @@ export function createSupabaseAuthGateways(
       clubs: createClubDirectory(serviceClient),
       accounts: createMemberAccountStore(serviceClient),
       identities: createIdentityConfirmationReader(serviceClient),
+      audit: createSupabaseAuditLogWriter(serviceClient),
       confirmationEmail,
       confirmationEmailRequestsForClub: (clubId) =>
         createSupabaseEmailRequestLog(serviceClient, {

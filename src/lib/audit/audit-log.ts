@@ -13,6 +13,9 @@ export const AUDIT_ACTIONS = [
   // RF-6 de E2. Nunca lleva metadata: la contraseña y el enlace no se auditan,
   // ni en claro ni troceados.
   "auth.password_changed",
+  // RF-3 y RF-8 de E2. Sin metadata: el nombre y el correo del tutor son datos
+  // personales y ya están en la fila del socio.
+  "auth.guardian_consent_recorded",
   "role.changed",
   "payment.status_changed",
 ] as const;

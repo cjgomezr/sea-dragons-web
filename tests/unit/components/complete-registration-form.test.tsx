@@ -131,9 +131,10 @@ describe("completar registro: pide solo lo que falta", () => {
   it("no deja un callejón sin salida cuando no queda nada pendiente", () => {
     renderForm([]);
 
-    expect(
-      screen.getByRole("link", { name: "Ir al panel" }),
-    ).toHaveAttribute("href", DASHBOARD_PATH);
+    expect(screen.getByRole("link", { name: "Ir al panel" })).toHaveAttribute(
+      "href",
+      DASHBOARD_PATH,
+    );
     expect(saveButton).toThrow();
   });
 
@@ -145,7 +146,10 @@ describe("completar registro: pide solo lo que falta", () => {
     ).toBeInTheDocument();
   });
 
-  it("avisa del consentimiento del tutor sin pedírselo a la persona menor", () => {
+  // Desde #134 el consentimiento se recoge en esta pantalla (ver
+  // guardian-consent-form.test.tsx); lo que se vigila aquí es que no se mezcle
+  // con el formulario de los datos del socio.
+  it("no mezcla el consentimiento del tutor con el formulario de los datos", () => {
     renderForm(["guardianConsent"]);
 
     expect(

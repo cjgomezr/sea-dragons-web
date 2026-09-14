@@ -644,6 +644,36 @@ h6 {
   color: var(--color-text-secondary);
 }
 
+/* La casilla del consentimiento del tutor (#134). Su texto es lo que se
+   consiente, así que se lee como texto y no como la etiqueta en mayúsculas de
+   un campo. La etiqueta entera es pulsable: la casilla sola no llega a los
+   44px de toque. */
+.auth-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.auth-consent input {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
+.auth-consent label {
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.auth-consent [aria-invalid="true"] {
+  outline: 2px solid var(--color-danger);
+  outline-offset: 2px;
+}
+
 /* La acción que no es la principal de la pantalla: reenviar el correo no es
    terminar el registro. Va en hueco para no competir con .auth-submit. */
 .auth-secondary {

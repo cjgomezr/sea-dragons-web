@@ -2,10 +2,7 @@
 
 import { useState } from "react";
 import { SignOutButton } from "@/components/auth/SignOutButton";
-import {
-  PENDING_REQUIREMENTS,
-  type PendingRequirement,
-} from "@/lib/auth/account-activation";
+import type { PendingRequirement } from "@/lib/auth/account-activation";
 import {
   COMPLETION_FIELDS,
   type CompletionField,
@@ -24,6 +21,13 @@ import {
 import type { CountryOption } from "@/lib/geo/countries";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  type AccountRequestResult,
+  NETWORK_ERROR_MESSAGE,
+  UNEXPECTED_ERROR_MESSAGE,
+  sendAccountRequest,
+} from "./account-request";
+import { GuardianConsentForm } from "./GuardianConsentForm";
 
 /**
  * La pantalla de una cuenta `incomplete` (FR-083). Sigue el lenguaje de
@@ -35,10 +39,6 @@ import { useRouter } from "next/navigation";
  * pedirle que se registre dos veces.
  */
 
-const NETWORK_ERROR_MESSAGE =
-  "No pudimos hablar con el servidor. Revisa tu conexión y vuelve a intentarlo.";
-const UNEXPECTED_ERROR_MESSAGE =
-  "No pudimos guardar tus datos. Vuelve a intentarlo en un momento.";
 const REQUIRED_FIELD_MESSAGE = "Este dato es obligatorio.";
 
 const FIELD_LABELS: Record<CompletionField, string> = {
@@ -51,81 +51,6 @@ type Status =
   | { readonly kind: "editing" }
   | { readonly kind: "saving" }
   | { readonly kind: "failed"; readonly message: string };
-
-/** Lee lo que haya en una ruta de un JSON que llega como unknown, sin confiar
- * en su forma: la respuesta viene de la red y podría ser cualquier cosa. */
-function readValueAt(payload: unknown, path: readonly string[]): unknown {
-  let current: unknown = payload;
-  for (const key of path) {
-    if (typeof current !== "object" || current === null || !(key in current)) {
-      return null;
-    }
-    current = (current as Record<string, unknown>)[key];
-  }
-  return current;
-}
-
-function readStringAt(
-  payload: unknown,
-  path: readonly string[],
-): string | null {
-  const value = readValueAt(payload, path);
-  return typeof value === "string" ? value : null;
-}
-
-/** La lista de pendientes que devuelve el servidor, estrechada contra la lista
- * del dominio. Se compara contra `PENDING_REQUIREMENTS` y no contra una copia
- * local: con una copia, el pendiente que se añadiera mañana (el consentimiento
- * del tutor va a crecer) llegaría del servidor y la pantalla lo descartaría en
- * silencio, dejando a alguien mirando una pantalla sin nada que hacer. */
-function readPending(payload: unknown): readonly PendingRequirement[] {
-  const value = readValueAt(payload, ["data", "pending"]);
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.flatMap((item) => {
-    const known = PENDING_REQUIREMENTS.find(
-      (requirement) => requirement === item,
-    );
-    return known === undefined ? [] : [known];
-  });
-}
-
-type SaveResult =
-  | { readonly kind: "completed" }
-  | {
-      readonly kind: "pending";
-      readonly pending: readonly PendingRequirement[];
-    }
-  | { readonly kind: "failed"; readonly message: string };
-
-async function saveCompletion(values: CompletionValues): Promise<SaveResult> {
-  let response: Response;
-  try {
-    response = await fetch(ACCOUNT_API_PATH, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(values),
-    });
-  } catch {
-    // El detalle técnico no le sirve a nadie que esté mirando un formulario, y
-    // puede nombrar hosts internos.
-    return { kind: "failed", message: NETWORK_ERROR_MESSAGE };
-  }
-
-  const payload: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    return {
-      kind: "failed",
-      message:
-        readStringAt(payload, ["error", "message"]) ?? UNEXPECTED_ERROR_MESSAGE,
-    };
-  }
-
-  return readStringAt(payload, ["data", "accountStatus"]) === "active"
-    ? { kind: "completed" }
-    : { kind: "pending", pending: readPending(payload) };
-}
 
 type ResendStatus =
   | { readonly kind: "idle" }
@@ -186,19 +111,6 @@ function EmailConfirmationNotice({
           {resend.message}
         </p>
       )}
-    </section>
-  );
-}
-
-function GuardianConsentNotice(): React.JSX.Element {
-  return (
-    <section className="auth-pending">
-      <h2>Falta el consentimiento de tu tutor</h2>
-      <p>
-        Por tu fecha de nacimiento eres menor de 18, así que tu madre, padre o
-        tutor tiene que dar su consentimiento antes de que tu cuenta se active.
-        Escribe al club para que te digan cómo.
-      </p>
     </section>
   );
 }
@@ -289,6 +201,24 @@ export function CompleteRegistrationForm({
     setDraft((current) => ({ ...current, [field]: value }));
   }
 
+  /** Lo que ocurre cuando el servidor acepta algo, venga del formulario de
+   * los datos o del bloque del tutor: o la cuenta quedó activa, o la pantalla
+   * pasa a pedir lo que el servidor dice que sigue faltando. */
+  function applySaved(
+    result: Exclude<AccountRequestResult, { kind: "failed" }>,
+  ): void {
+    if (result.kind === "pending") {
+      setRequirements(result.pending);
+      return;
+    }
+    // `replace` y no `push`: esta pantalla no tiene que quedar en el historial
+    // de quien ya terminó, o el botón de atrás la devuelve a ella.
+    router.replace(DASHBOARD_PATH);
+    // Sin esto el servidor volvería a servir desde su caché de router lo que
+    // renderizó cuando la cuenta todavía estaba incompleta.
+    router.refresh();
+  }
+
   async function handleSubmit(
     event: React.FormEvent<HTMLFormElement>,
   ): Promise<void> {
@@ -312,24 +242,18 @@ export function CompleteRegistrationForm({
 
     setIssues([]);
     setStatus({ kind: "saving" });
-    const result = await saveCompletion(draft);
+    const result = await sendAccountRequest({
+      path: ACCOUNT_API_PATH,
+      method: "PATCH",
+      body: draft,
+    });
     if (result.kind === "failed") {
       setStatus(result);
       return;
     }
-    if (result.kind === "pending") {
-      setRequirements(result.pending);
-      setDraft({});
-      setStatus({ kind: "editing" });
-      return;
-    }
-
-    // `replace` y no `push`: esta pantalla no tiene que quedar en el historial
-    // de quien ya terminó, o el botón de atrás la devuelve a ella.
-    router.replace(DASHBOARD_PATH);
-    // Sin esto el servidor volvería a servir desde su caché de router lo que
-    // renderizó cuando la cuenta todavía estaba incompleta.
-    router.refresh();
+    setDraft({});
+    setStatus({ kind: "editing" });
+    applySaved(result);
   }
 
   // La frontera manda aquí todo lo que pida una cuenta incompleta, así que
@@ -453,7 +377,9 @@ export function CompleteRegistrationForm({
         </form>
       )}
 
-      {requirements.includes("guardianConsent") && <GuardianConsentNotice />}
+      {requirements.includes("guardianConsent") && (
+        <GuardianConsentForm onSaved={applySaved} />
+      )}
       {requirements.includes("emailConfirmation") && (
         <EmailConfirmationNotice email={email} />
       )}

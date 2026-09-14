@@ -118,7 +118,6 @@ describeRls("completar registro contra seadragons-dev", () => {
         async (member) => {
           const before = await describeAccountCompletion(gateways, {
             userId: member.userId,
-            now: new Date(),
           });
           expect(before).toEqual({
             accountStatus: "incomplete",

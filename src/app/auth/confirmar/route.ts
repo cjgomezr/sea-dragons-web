@@ -62,7 +62,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     result = await confirmEmailAndActivate(wiring.gateways, {
       tokenHash,
       type,
-      now: new Date(),
     });
   } catch (error) {
     console.error(

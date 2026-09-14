@@ -56,7 +56,7 @@ export default async function CompleteRegistrationPage(): Promise<React.JSX.Elem
         accounts: wiring.gateways.accounts,
         identities: wiring.gateways.identities,
       },
-      { userId: caller.userId, now: new Date() },
+      { userId: caller.userId },
     );
   } catch (error) {
     // Una identidad sin fila de socio no es un fallo del servidor: es alguien

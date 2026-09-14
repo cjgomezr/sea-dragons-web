@@ -12,6 +12,9 @@ export type MemberProfile = {
   readonly dateOfBirth: string | null;
   readonly membershipType: string | null;
   readonly guardianConsentAt: string | null;
+  /** El instante en que nació la fila (`members.created_at`). Es el que decide
+   * si hace falta el consentimiento del tutor: ver `requiresGuardianConsent`. */
+  readonly registeredAt: string;
 };
 
 /**
@@ -34,6 +37,9 @@ export type PendingRequirement = (typeof PENDING_REQUIREMENTS)[number];
 
 export type MemberAccountRecord = {
   readonly memberId: string;
+  /** El club de la fila. Lo necesita la bitácora (NFR-010), que audita por
+   * club. */
+  readonly clubId: string;
   readonly accountStatus: AccountStatus;
   readonly profile: MemberProfile;
 };
@@ -95,11 +101,26 @@ export function isMinorOn(dateOfBirth: string, day: string): boolean {
   return age < ADULT_AGE;
 }
 
-function needsGuardianConsent(profile: MemberProfile, now: Date): boolean {
-  if (profile.dateOfBirth === null || profile.guardianConsentAt !== null) {
+/**
+ * FR-082 y NFR-012: hace falta el consentimiento del tutor si quien se
+ * registró era menor de 18 EL DÍA DEL REGISTRO, contado en Melbourne.
+ *
+ * Manda la edad del registro y no la de hoy, y es una decisión (ticket #134,
+ * escrita también en el PRD de E2): con la edad de hoy, quien se registra con
+ * 17 y cumple 18 esperando al tutor vería su cuenta activarse sola, sin que
+ * nadie consintiera el tratamiento de unos datos que dio siendo menor.
+ *
+ * `0007_members_guardian_consent.sql` mide la edad de la misma forma, para que
+ * la base y la aplicación no discrepen en el borde.
+ */
+export function requiresGuardianConsent(
+  profile: Pick<MemberProfile, "dateOfBirth" | "registeredAt">,
+): boolean {
+  if (profile.dateOfBirth === null) {
     return false;
   }
-  return isMinorOn(profile.dateOfBirth, clubCalendarDate(now));
+  const registrationDay = clubCalendarDate(new Date(profile.registeredAt));
+  return isMinorOn(profile.dateOfBirth, registrationDay);
 }
 
 /**
@@ -110,15 +131,17 @@ function needsGuardianConsent(profile: MemberProfile, now: Date): boolean {
  * copias de esto acabarían discrepando, y la discrepancia sería una cuenta
  * activa sin los datos que el club necesita.
  *
+ * No depende de la hora a la que se pregunte: lo único que dependía de ella era
+ * la edad, y la edad que cuenta es la del registro.
+ *
  * El orden es el que la pantalla muestra: primero lo que se rellena en el
  * formulario, después lo que depende de otra persona o de otro correo.
  */
 export function listPendingRequirements(input: {
   readonly profile: MemberProfile;
   readonly emailConfirmed: boolean;
-  readonly now: Date;
 }): readonly PendingRequirement[] {
-  const { profile, emailConfirmed, now } = input;
+  const { profile, emailConfirmed } = input;
   const pending: PendingRequirement[] = [];
 
   if (profile.country === null) {
@@ -130,7 +153,7 @@ export function listPendingRequirements(input: {
   if (profile.membershipType === null) {
     pending.push("membershipType");
   }
-  if (needsGuardianConsent(profile, now)) {
+  if (requiresGuardianConsent(profile) && profile.guardianConsentAt === null) {
     pending.push("guardianConsent");
   }
   if (!emailConfirmed) {
@@ -145,7 +168,6 @@ export function listPendingRequirements(input: {
 export function resolveAccountStatus(input: {
   readonly profile: MemberProfile;
   readonly emailConfirmed: boolean;
-  readonly now: Date;
 }): Extract<AccountStatus, "incomplete" | "active"> {
   return listPendingRequirements(input).length === 0 ? "active" : "incomplete";
 }
@@ -159,7 +181,6 @@ export async function activateAccountIfComplete(
     readonly identities: IdentityConfirmationReader;
   },
   userId: string,
-  options: { readonly now: Date },
 ): Promise<AccountActivation> {
   const record = await gateways.accounts.findByUserId(userId);
   if (record === null) {
@@ -172,7 +193,6 @@ export async function activateAccountIfComplete(
   const status = resolveAccountStatus({
     profile: record.profile,
     emailConfirmed: await gateways.identities.isEmailConfirmed(userId),
-    now: options.now,
   });
   if (status !== "active") {
     return { kind: "unchanged", status };

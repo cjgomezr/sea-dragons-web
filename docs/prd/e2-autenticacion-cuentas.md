@@ -251,6 +251,16 @@ exige nombre del tutor, su correo y su consentimiento explícito.
 - **Dado** una cuenta de menor sin consentimiento, **cuando** se consulta la base,
   **entonces** no hay ninguna fila activa en esa condición.
 
+**Decisión (#134): manda la edad del día del registro.** Se cuenta en
+Melbourne, sobre la fecha en que nació la cuenta (`members.created_at`), y el
+borde es "menor de 18": quien cumple 18 ese mismo día no necesita
+consentimiento. Con la edad de hoy, quien se registra con 17 años y cumple 18
+esperando al tutor vería su cuenta activarse sola. Nadie habría consentido el
+tratamiento de unos datos que dio siendo menor. La aplicación
+(`requiresGuardianConsent`) y la base (`0007_members_guardian_consent.sql`)
+miden la edad igual, y la base rechaza cualquier fila activa de un menor sin
+consentimiento aunque la escritura no pase por la aplicación.
+
 ### RF-4 · Inicio de sesión · Must
 
 Cubre FR-003. Un usuario registrado entra con su correo y su contraseña.
