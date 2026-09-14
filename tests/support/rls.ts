@@ -4,6 +4,7 @@ import { describe } from "vitest";
 import { readSupabaseConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { decideSupabaseCredentials } from "./supabase-credentials";
+import { createConfirmedUser, withSupabaseRetry } from "./supabase-retry";
 
 // `.env.local` ya está cargado y verificado contra el proyecto de desarrollo
 // por `vitest.setup.ts` (que corre antes que cualquier archivo de test): no
@@ -60,10 +61,14 @@ export async function createRlsClient(
   });
 
   if (identity.role === "authenticated") {
-    const { error } = await client.auth.signInWithPassword({
-      email: identity.email,
-      password: identity.password,
-    });
+    const { error } = await withSupabaseRetry(
+      "autenticar el cliente RLS de prueba",
+      () =>
+        client.auth.signInWithPassword({
+          email: identity.email,
+          password: identity.password,
+        }),
+    );
     if (error) {
       throw new Error(
         `No se pudo autenticar el cliente RLS de prueba: ${error.message}`,
@@ -123,18 +128,32 @@ async function runWithCleanup<T>(
   try {
     result = await run();
   } catch (runError) {
-    const { error: cleanupError } = await cleanup();
-    if (cleanupError) {
-      console.error(`${cleanupFailureMessage}: ${cleanupError.message}`);
+    const cleanupFailure = await describeCleanupFailure(cleanup);
+    if (cleanupFailure !== null) {
+      console.error(`${cleanupFailureMessage}: ${cleanupFailure}`);
     }
     throw runError;
   }
 
-  const { error: cleanupError } = await cleanup();
-  if (cleanupError) {
-    throw new Error(`${cleanupFailureMessage}: ${cleanupError.message}`);
+  const cleanupFailure = await describeCleanupFailure(cleanup);
+  if (cleanupFailure !== null) {
+    throw new Error(`${cleanupFailureMessage}: ${cleanupFailure}`);
   }
   return result;
+}
+
+/** La limpieza puede fallar de dos formas: devolviendo un error de Supabase o
+ * lanzando, que es lo que hace el reintento cuando agota sus intentos. Las dos
+ * se reducen a un mensaje para que `runWithCleanup` las trate igual. */
+async function describeCleanupFailure(
+  cleanup: () => PromiseLike<CleanupResult>,
+): Promise<string | null> {
+  try {
+    const { error } = await cleanup();
+    return error === null ? null : error.message;
+  } catch (thrown) {
+    return thrown instanceof Error ? thrown.message : String(thrown);
+  }
 }
 
 export type TestUser = {
@@ -153,21 +172,18 @@ export async function withTestUser<T>(
   const email = `rls-harness-${randomUUID()}@example.test`;
   const password = randomUUID();
 
-  const { data, error } = await serviceClient.client.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  });
-  if (error || !data.user) {
-    throw new Error(
-      `No se pudo crear el usuario de prueba del arnés RLS: ${error?.message ?? "sin datos"}`,
-    );
-  }
+  const createdUser = await createConfirmedUser(
+    serviceClient.client.auth.admin,
+    { email, password, operation: "crear el usuario de prueba del arnés RLS" },
+  );
 
-  const user: TestUser = { id: data.user.id, email, password };
+  const user: TestUser = { id: createdUser.id, email, password };
   return runWithCleanup(
     () => run(user),
-    () => serviceClient.client.auth.admin.deleteUser(user.id),
+    () =>
+      withSupabaseRetry("borrar el usuario de prueba del arnés RLS", () =>
+        serviceClient.client.auth.admin.deleteUser(user.id),
+      ),
     "No se pudo limpiar el usuario de prueba del arnés RLS",
   );
 }
@@ -194,7 +210,10 @@ export async function withSeededRows<T>(
   const ids = data.map((row) => row.id as string);
   return runWithCleanup(
     () => run(data),
-    () => serviceClient.client.from(table).delete().in("id", ids),
+    () =>
+      withSupabaseRetry(`limpiar la tabla ${table} tras el arnés RLS`, () =>
+        serviceClient.client.from(table).delete().in("id", ids),
+      ),
     `No se pudo limpiar la tabla ${table} tras el arnés RLS`,
   );
 }
