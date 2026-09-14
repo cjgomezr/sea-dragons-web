@@ -37,6 +37,8 @@ describe("apiError", () => {
     not_found: 404,
     conflict: 409,
     business_rule: 422,
+    gone: 410,
+    rate_limited: 429,
     method_not_allowed: 405,
     service_unavailable: 503,
     internal_error: 500,

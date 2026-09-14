@@ -703,7 +703,9 @@ h6 {
   opacity: 0.6;
 }
 
-.auth-form a {
+/* Sin el :not, esta regla pesa más que .auth-submit y pinta el texto de un
+   .auth-submit-link del mismo color que su relleno. */
+.auth-form a:not(.auth-submit) {
   color: var(--color-accent);
 }
 
