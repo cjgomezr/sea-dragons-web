@@ -1,3 +1,4 @@
+import type { EmailRequestLog } from "./email-request-log";
 import { validatePasswordField } from "./registration";
 
 /**
@@ -20,16 +21,7 @@ const MILLISECONDS_PER_MINUTE = 60_000;
  * se nombra para que las pantallas le digan a la persona cuánto tiene. */
 export const RECOVERY_LINK_LIFETIME_MINUTES = 60;
 
-export type RecoveryRequestLog = {
-  /** Anota la petición y devuelve cuántas hubo desde `windowStart`, contando
-   * esta. Anotar antes de contar es lo que impide que una ráfaga en paralelo
-   * lea todas el mismo contador por debajo del tope. */
-  recordAndCountRecent(input: {
-    readonly email: string;
-    readonly now: Date;
-    readonly windowStart: Date;
-  }): Promise<number>;
-};
+export type RecoveryRequestLog = EmailRequestLog;
 
 export type RecoveryTokenIssue =
   | { readonly kind: "issued"; readonly tokenHash: string }

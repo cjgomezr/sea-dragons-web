@@ -379,6 +379,14 @@ y dice por qué:
   porque su respuesta no puede delatar qué direcciones tienen cuenta (#147). El
   motivo, con el nombre de la variable, queda en el registro del servidor.
 
+**El reenvío de la confirmación tiene límite.** Con el servicio incorporado de
+Supabase el tope llegaba solo; con Resend no. `POST /api/v1/auth/confirmation-email`
+es público, y sin límite un bucle llenaría un buzón ajeno y agotaría los 100
+correos del día que también usa la recuperación. Admite 3 por correo cada 15
+minutos, igual que la recuperación, y lo cuenta la tabla
+`confirmation_email_requests` (migración 0006). A la cuarta responde 429, exista
+o no la cuenta.
+
 `writeCredential` sigue en `false` para la clave de Resend. Ese campo significa
 "puede escribir en una base de Supabase de este proyecto", y esta clave no
 puede. Mandar correo en nombre del club también es un poder que cuesta caro

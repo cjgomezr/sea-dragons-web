@@ -11,14 +11,18 @@ const EMAIL = "nerea@example.test";
 
 const requestedEmails: string[] = [];
 const requestedAppUrls: string[] = [];
+const recordedRequests = { count: 0 };
+const CLUB_ID = "6f1d2c3b-4a59-4e6f-8b70-1c2d3e4f5a6b";
 
 function mockWiring(
   options: {
     readonly unconfigured?: readonly string[];
     readonly confirmationEmail?: ConfirmationEmailOutcome;
+    readonly requestsInWindow?: number;
   } = {},
 ): void {
   vi.doMock("@/lib/auth/supabase-auth-gateways", () => ({
+    DEFAULT_CLUB_SLUG: "victoria-seadragons",
     describeMissingAuthKeys: (missingKeys: readonly string[]) =>
       `El servicio de cuentas no está configurado: faltan ${missingKeys.join(", ")}.`,
     createSupabaseAuthGateways: () =>
@@ -27,6 +31,13 @@ function mockWiring(
         : {
             kind: "ready",
             gateways: {
+              clubs: { findClubIdBySlug: async () => CLUB_ID },
+              confirmationEmailRequestsForClub: () => ({
+                recordAndCountRecent: async () => {
+                  recordedRequests.count += 1;
+                  return options.requestsInWindow ?? 1;
+                },
+              }),
               confirmationEmail: {
                 requestConfirmationEmail: async (
                   email: string,
@@ -59,6 +70,41 @@ describe("POST /api/v1/auth/confirmation-email", () => {
     vi.doUnmock("@/lib/auth/supabase-auth-gateways");
     requestedEmails.length = 0;
     requestedAppUrls.length = 0;
+    recordedRequests.count = 0;
+  });
+
+  // Antes el tope lo ponía sin querer el servicio incorporado de Supabase. Con
+  // Resend, sin este límite, un bucle contra el endpoint llena un buzón ajeno
+  // y agota el cupo que comparte la recuperación de contraseña.
+  it("superado el límite responde 429 pidiendo esperar, sin pedir ningún correo", async () => {
+    mockWiring({ requestsInWindow: 4 });
+
+    const response = await postConfirmationEmail({ email: EMAIL });
+
+    expect(response.status).toBe(429);
+    const body = (await response.json()) as {
+      error: { code: string; message: string };
+    };
+    expect(body.error.code).toBe("rate_limited");
+    expect(body.error.message).toContain("15 minutos");
+    expect(requestedEmails).toEqual([]);
+  });
+
+  it("cuenta la petición antes de pedir el correo", async () => {
+    mockWiring();
+
+    await postConfirmationEmail({ email: EMAIL });
+
+    expect(recordedRequests.count).toBe(1);
+    expect(requestedEmails).toEqual([EMAIL]);
+  });
+
+  it("no cuenta una dirección sin forma de correo", async () => {
+    mockWiring();
+
+    await postConfirmationEmail({ email: "nerea" });
+
+    expect(recordedRequests.count).toBe(0);
   });
 
   it("reenvía la confirmación a la dirección normalizada", async () => {

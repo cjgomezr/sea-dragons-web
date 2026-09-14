@@ -26,6 +26,9 @@ export const dynamic = "force-dynamic";
  * cadenas de cualquier tamaño. */
 const MAX_EMAIL_LENGTH = 320;
 
+const RECOVERY_EMAIL_UNAVAILABLE_MESSAGE =
+  "El envío de correos no está disponible ahora mismo, así que no podemos mandarte el enlace. Si necesitas entrar ya, escribe al club.";
+
 const passwordRecoveryBodySchema = z.object({
   email: z.string().max(MAX_EMAIL_LENGTH),
 });
@@ -72,7 +75,17 @@ const postPasswordRecovery = createApiRoute<
     // sólo saliera para cuentas reales delataría cuáles lo son.
     const connection = connectRecoveryEmailSender(process.env);
     if (connection.kind === "not_connected") {
-      throw new ApiError("service_unavailable", connection.reason);
+      // El motivo nombra la variable que falta y dónde se pone: es para quien
+      // lo arregla, y lo lee en el registro del servidor. A la pantalla del
+      // socio le sirve saber qué hacer, no cómo se llama un ajuste de Vercel.
+      console.error(
+        "[api/v1/auth/password-recovery] no hay con qué mandar el correo",
+        connection.reason,
+      );
+      throw new ApiError(
+        "service_unavailable",
+        RECOVERY_EMAIL_UNAVAILABLE_MESSAGE,
+      );
     }
 
     const wiring = await createSupabasePasswordRecoveryGateways(process.env);

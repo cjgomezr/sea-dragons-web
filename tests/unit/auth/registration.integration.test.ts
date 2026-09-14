@@ -13,6 +13,7 @@ import {
   createConfirmationTokenIssuer,
   createSupabaseAuthGateways,
 } from "@/lib/auth/supabase-auth-gateways";
+import { hashEmailForRequestLog } from "@/lib/auth/supabase-email-request-log";
 import { readSupabaseConfig } from "@/lib/supabase/config";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
@@ -352,6 +353,51 @@ describeRls("enlace de confirmación contra seadragons-dev", () => {
           kind: "no_pending_confirmation",
         });
       });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "el límite del reenvío anota cada petición por el hash del correo y las cuenta",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = realGateways();
+      const email = testEmail();
+      const clubId = await gateways.clubs.findClubIdBySlug(DEFAULT_CLUB_SLUG);
+      const requests = gateways.confirmationEmailRequestsForClub(clubId);
+      const now = new Date();
+      const windowStart = new Date(now.getTime() - 60_000);
+
+      try {
+        const first = await requests.recordAndCountRecent({
+          email,
+          now,
+          windowStart,
+        });
+        const second = await requests.recordAndCountRecent({
+          email,
+          now,
+          windowStart,
+        });
+
+        expect([first, second]).toEqual([1, 2]);
+        const { data, error } = await serviceClient.client
+          .from("confirmation_email_requests")
+          .select("email_hash")
+          .eq("email_hash", hashEmailForRequestLog(email));
+        if (error) {
+          throw new Error(
+            `No se pudieron leer las peticiones: ${error.message}`,
+          );
+        }
+        expect(JSON.stringify(data)).not.toContain(email);
+        expect(data).toHaveLength(2);
+      } finally {
+        await serviceClient.client
+          .from("confirmation_email_requests")
+          .delete()
+          .eq("email_hash", hashEmailForRequestLog(email));
+      }
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );

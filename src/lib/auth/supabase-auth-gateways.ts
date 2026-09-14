@@ -16,6 +16,7 @@ import type {
   MemberProfileWriter,
 } from "./complete-registration";
 import type { EmailConfirmationGateway } from "./email-confirmation";
+import type { EmailRequestLog } from "./email-request-log";
 import { connectResendEmailSender } from "@/lib/email/resend-email-sender";
 import {
   type ConfirmationTokenIssuer,
@@ -27,6 +28,7 @@ import type {
   MemberDirectory,
   RegistrationGateways,
 } from "./register-member";
+import { createSupabaseEmailRequestLog } from "./supabase-email-request-log";
 
 /**
  * Adaptadores entre los puertos del registro y Supabase. Todo lo de aquí es de
@@ -35,6 +37,7 @@ import type {
 
 const MEMBERS_TABLE = "members";
 const CLUBS_TABLE = "clubs";
+const CONFIRMATION_EMAIL_REQUESTS_TABLE = "confirmation_email_requests";
 
 /** Release 1 opera un solo club (NFR-009 ya deja club_id en cada tabla para
  * cuando no sea así). Es el club que siembra la migración 0001. */
@@ -54,6 +57,11 @@ export type SupabaseAuthGateways = {
   readonly accounts: MemberAccountStore & MemberProfileWriter;
   readonly identities: IdentityConfirmationReader;
   readonly confirmationEmail: ConfirmationEmailGateway;
+  /** El límite del reenvío de la confirmación. Pide el club porque cada fila
+   * lleva `club_id` (NFR-009). */
+  readonly confirmationEmailRequestsForClub: (
+    clubId: string,
+  ) => EmailRequestLog;
 };
 
 export type SupabaseAuthGatewaysResult =
@@ -439,6 +447,11 @@ export function createSupabaseAuthGateways(
       accounts: createMemberAccountStore(serviceClient),
       identities: createIdentityConfirmationReader(serviceClient),
       confirmationEmail,
+      confirmationEmailRequestsForClub: (clubId) =>
+        createSupabaseEmailRequestLog(serviceClient, {
+          table: CONFIRMATION_EMAIL_REQUESTS_TABLE,
+          clubId,
+        }),
     },
   };
 }

@@ -11,6 +11,10 @@ columna clubs.created_at tipo=timestamp with time zone null=NO default=now()
 columna clubs.id tipo=uuid null=NO default=gen_random_uuid()
 columna clubs.name tipo=text null=NO default=-
 columna clubs.slug tipo=text null=NO default=-
+columna confirmation_email_requests.club_id tipo=uuid null=NO default=-
+columna confirmation_email_requests.email_hash tipo=text null=NO default=-
+columna confirmation_email_requests.id tipo=uuid null=NO default=gen_random_uuid()
+columna confirmation_email_requests.requested_at tipo=timestamp with time zone null=NO default=now()
 columna members.account_status tipo=text null=NO default='incomplete'::text
 columna members.club_id tipo=uuid null=NO default=-
 columna members.country tipo=text null=YES default=-
@@ -59,6 +63,20 @@ grant clubs service_role SELECT
 grant clubs service_role TRIGGER
 grant clubs service_role TRUNCATE
 grant clubs service_role UPDATE
+grant confirmation_email_requests postgres DELETE
+grant confirmation_email_requests postgres INSERT
+grant confirmation_email_requests postgres REFERENCES
+grant confirmation_email_requests postgres SELECT
+grant confirmation_email_requests postgres TRIGGER
+grant confirmation_email_requests postgres TRUNCATE
+grant confirmation_email_requests postgres UPDATE
+grant confirmation_email_requests service_role DELETE
+grant confirmation_email_requests service_role INSERT
+grant confirmation_email_requests service_role REFERENCES
+grant confirmation_email_requests service_role SELECT
+grant confirmation_email_requests service_role TRIGGER
+grant confirmation_email_requests service_role TRUNCATE
+grant confirmation_email_requests service_role UPDATE
 grant members authenticated SELECT
 grant members postgres DELETE
 grant members postgres INSERT
@@ -92,12 +110,15 @@ indice audit_log_club_id_created_at_idx CREATE INDEX audit_log_club_id_created_a
 indice audit_log_pkey CREATE UNIQUE INDEX audit_log_pkey ON public.audit_log USING btree (id)
 indice clubs_pkey CREATE UNIQUE INDEX clubs_pkey ON public.clubs USING btree (id)
 indice clubs_slug_key CREATE UNIQUE INDEX clubs_slug_key ON public.clubs USING btree (slug)
+indice confirmation_email_requests_email_hash_requested_at_idx CREATE INDEX confirmation_email_requests_email_hash_requested_at_idx ON public.confirmation_email_requests USING btree (email_hash, requested_at DESC)
+indice confirmation_email_requests_pkey CREATE UNIQUE INDEX confirmation_email_requests_pkey ON public.confirmation_email_requests USING btree (id)
 indice members_pkey CREATE UNIQUE INDEX members_pkey ON public.members USING btree (id)
 indice members_user_id_key CREATE UNIQUE INDEX members_user_id_key ON public.members USING btree (user_id)
 indice password_recovery_requests_email_hash_requested_at_idx CREATE INDEX password_recovery_requests_email_hash_requested_at_idx ON public.password_recovery_requests USING btree (email_hash, requested_at DESC)
 indice password_recovery_requests_pkey CREATE UNIQUE INDEX password_recovery_requests_pkey ON public.password_recovery_requests USING btree (id)
 policy audit_log.audit_log_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy clubs.clubs_select_authenticated cmd=SELECT roles={authenticated} using=true check=-
+policy confirmation_email_requests.confirmation_email_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy members.members_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
 policy password_recovery_requests.password_recovery_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 restriccion audit_log.audit_log_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
@@ -105,6 +126,8 @@ restriccion audit_log.audit_log_pkey PRIMARY KEY (id)
 restriccion audit_log.audit_log_result_check CHECK ((result = ANY (ARRAY['success'::text, 'failure'::text])))
 restriccion clubs.clubs_pkey PRIMARY KEY (id)
 restriccion clubs.clubs_slug_key UNIQUE (slug)
+restriccion confirmation_email_requests.confirmation_email_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion confirmation_email_requests.confirmation_email_requests_pkey PRIMARY KEY (id)
 restriccion members.members_account_status_check CHECK ((account_status = ANY (ARRAY['incomplete'::text, 'active'::text, 'inactive'::text])))
 restriccion members.members_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion members.members_membership_type_check CHECK ((membership_type = ANY (ARRAY['Full'::text, 'Student'::text, 'Casual'::text])))
@@ -116,5 +139,6 @@ restriccion password_recovery_requests.password_recovery_requests_club_id_fkey F
 restriccion password_recovery_requests.password_recovery_requests_pkey PRIMARY KEY (id)
 tabla audit_log rls=t
 tabla clubs rls=t
+tabla confirmation_email_requests rls=t
 tabla members rls=t
 tabla password_recovery_requests rls=t

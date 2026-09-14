@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   type AuthError,
   type SupabaseClient,
@@ -16,6 +15,7 @@ import type {
   RecoveryTokenIssuer,
   RecoveryTokenRedeemer,
 } from "./password-recovery";
+import { createSupabaseEmailRequestLog } from "./supabase-email-request-log";
 import {
   DEFAULT_CLUB_SLUG,
   createSupabaseAuthGateways,
@@ -55,12 +55,6 @@ function describeAuthFailure(error: AuthError): string {
   return error.code ? `${error.code}: ${error.message}` : error.message;
 }
 
-/** El hash con el que la tabla del límite reconoce un correo. Ver la
- * migración 0005 para por qué no se guarda el correo. */
-export function hashRecoveryEmail(email: string): string {
-  return createHash("sha256").update(email).digest("hex");
-}
-
 /** `generateLink` dice así que el correo no tiene identidad. */
 export function isUnknownIdentity(error: AuthError): boolean {
   return error.code === USER_NOT_FOUND_CODE || error.status === HTTP_NOT_FOUND;
@@ -83,46 +77,6 @@ export function isUnusableLink(error: AuthError): boolean {
 
 export function isRejectedNewPassword(error: AuthError): boolean {
   return REJECTED_PASSWORD_CODES.includes(error.code ?? "");
-}
-
-function createRecoveryRequestLog(
-  serviceClient: SupabaseClient,
-  clubId: string,
-): RecoveryRequestLog {
-  return {
-    async recordAndCountRecent({ email, now, windowStart }) {
-      const emailHash = hashRecoveryEmail(email);
-      const { error: insertError } = await serviceClient
-        .from(RECOVERY_REQUESTS_TABLE)
-        .insert({
-          club_id: clubId,
-          email_hash: emailHash,
-          requested_at: now.toISOString(),
-        });
-      if (insertError) {
-        throw new Error(
-          `No se pudo anotar la petición de recuperación: ${insertError.message}`,
-        );
-      }
-
-      const { count, error } = await serviceClient
-        .from(RECOVERY_REQUESTS_TABLE)
-        .select("id", { count: "exact", head: true })
-        .eq("email_hash", emailHash)
-        .gte("requested_at", windowStart.toISOString());
-      if (error) {
-        throw new Error(
-          `No se pudieron contar las peticiones de recuperación: ${error.message}`,
-        );
-      }
-      if (count === null) {
-        throw new Error(
-          "La base no devolvió el número de peticiones de recuperación.",
-        );
-      }
-      return count;
-    },
-  };
 }
 
 function createRecoveryTokenIssuer(
@@ -298,7 +252,10 @@ export async function createSupabasePasswordRecoveryGateways(
   return {
     kind: "ready",
     gateways: {
-      requests: createRecoveryRequestLog(serviceClient, clubId),
+      requests: createSupabaseEmailRequestLog(serviceClient, {
+        table: RECOVERY_REQUESTS_TABLE,
+        clubId,
+      }),
       tokens: createRecoveryTokenIssuer(serviceClient),
       redeemer: createRecoveryTokenRedeemer(anonConfig),
       audit: createPasswordChangeAudit(serviceClient, clubId),

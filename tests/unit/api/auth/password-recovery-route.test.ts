@@ -181,19 +181,27 @@ describe("POST /api/v1/auth/password-recovery", () => {
   });
 
   // Sin doble del envío: el que responde es el conector de verdad, leyendo un
-  // entorno sin la clave, que es exactamente el de un preview.
-  it("sin la clave de Resend responde 503 nombrando la variable y dónde se pone", async () => {
+  // entorno sin la clave, que es exactamente el de un preview. El nombre de la
+  // variable y dónde se pone van al registro del servidor, que es donde lo lee
+  // quien lo arregla; a la pantalla del socio le llega un texto para personas.
+  it("sin la clave de Resend responde 503 para personas y registra la variable y dónde se pone", async () => {
     mockWiring({ realSender: true });
     vi.stubEnv("RESEND_API_KEY", "");
     vi.stubEnv("EMAIL_FROM", "Victoria Seadragons <seadragons@volleytip.com>");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const response = await postRecovery({ email: REGISTERED_EMAIL });
 
     expect(response.status).toBe(503);
-    const message = JSON.stringify(await response.json());
-    expect(message).toContain("RESEND_API_KEY");
-    expect(message).toContain("ámbito Production");
+    const body = JSON.stringify(await response.json());
+    expect(body).not.toContain("RESEND_API_KEY");
+    expect(body).not.toContain("Vercel");
+    expect(body).toContain("escribe al club");
+    const log = logged.mock.calls.flat().map(String).join(" ");
+    expect(log).toContain("RESEND_API_KEY");
+    expect(log).toContain("ámbito Production");
     expect(probe.recordedRequests).toBe(0);
+    logged.mockRestore();
     vi.unstubAllEnvs();
   });
 

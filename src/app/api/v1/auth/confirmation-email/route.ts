@@ -5,8 +5,10 @@ import type {
   ConfirmationEmailOutcome,
   RegistrationReceipt,
 } from "@/lib/auth/register-member";
+import { resendConfirmationEmail } from "@/lib/auth/confirmation-email-resend";
 import { looksLikeEmail } from "@/lib/auth/registration";
 import {
+  DEFAULT_CLUB_SLUG,
   createSupabaseAuthGateways,
   describeMissingAuthKeys,
 } from "@/lib/auth/supabase-auth-gateways";
@@ -23,6 +25,10 @@ type ConfirmationEmailBody = z.infer<typeof confirmationEmailBodySchema>;
  * si el envío salió, porque sólo se intenta enviar a cuentas sin confirmar y
  * eso lo delataría igual (#147). */
 export type ConfirmationEmailResponse = RegistrationReceipt;
+
+function describeRateLimit(retryAfterMinutes: number): string {
+  return `Pediste varios correos seguidos. Espera ${retryAfterMinutes} minutos antes de pedir otro.`;
+}
 
 function reportConfirmationEmail(outcome: ConfirmationEmailOutcome): void {
   if (outcome.kind === "failed" || outcome.kind === "rate_limited") {
@@ -55,12 +61,25 @@ const postConfirmationEmail = createApiRoute<
       );
     }
 
-    reportConfirmationEmail(
-      await wiring.gateways.confirmationEmail.requestConfirmationEmail(
-        email,
-        request.url,
-      ),
+    const clubId =
+      await wiring.gateways.clubs.findClubIdBySlug(DEFAULT_CLUB_SLUG);
+    const outcome = await resendConfirmationEmail(
+      {
+        requests: wiring.gateways.confirmationEmailRequestsForClub(clubId),
+        confirmationEmail: wiring.gateways.confirmationEmail,
+      },
+      { email, now: new Date(), appUrl: request.url },
     );
+    // El límite no depende de que la cuenta exista, así que decirlo no delata
+    // a nadie.
+    if (outcome.kind === "rate_limited") {
+      throw new ApiError(
+        "rate_limited",
+        describeRateLimit(outcome.retryAfterMinutes),
+      );
+    }
+
+    reportConfirmationEmail(outcome.delivery);
     return { data: { outcome: "confirmation_pending", email } };
   },
 });
