@@ -1387,6 +1387,84 @@ test.describe("una cuenta incompleta que cambia de estado", () => {
   });
 });
 
+/* ---------------------------------------------------------------------------
+   Consentimiento del tutor (#134): el menor ve el bloque del tutor en la misma
+   pantalla, la cuenta no opera hasta que se registra, y la API no deja
+   marcarlo sin los datos del tutor.
+   --------------------------------------------------------------------------- */
+
+const GUARDIAN_CONSENT_ENDPOINT = "/api/v1/auth/account/guardian-consent";
+
+test.describe("un menor sin el consentimiento de su tutor", () => {
+  test.skip(
+    E2E_SESSION.kind === "unavailable",
+    E2E_SESSION.kind === "unavailable"
+      ? `sin sesión de prueba: ${E2E_SESSION.reason}`
+      : "",
+  );
+
+  test.describe("mientras espera", () => {
+    test.use({
+      storageState: incompleteStorageStatePath("menor-sin-consentimiento"),
+    });
+
+    test("pide el consentimiento del tutor y ningún dato que ya dio", async ({
+      page,
+    }) => {
+      await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
+
+      await expect(
+        page.getByRole("heading", { name: /consentimiento de tu tutor/i }),
+      ).toBeVisible();
+      await expect(page.getByLabel("Nombre del tutor")).toBeVisible();
+      await expect(page.getByLabel("Tipo de membresía")).toHaveCount(0);
+      await expect(page.getByLabel("Fecha de nacimiento")).toHaveCount(0);
+    });
+
+    test("no llega a ninguna pantalla de la aplicación", async ({ page }) => {
+      await page.goto(`${APP_URL}/calendario`);
+
+      await expect(page).toHaveURL(
+        new RegExp(`${COMPLETE_REGISTRATION_PATH}$`),
+      );
+    });
+
+    test("la API rechaza marcar el consentimiento sin los datos del tutor", async ({
+      request,
+    }) => {
+      const response = await request.post(
+        `${APP_URL}${GUARDIAN_CONSENT_ENDPOINT}`,
+        { data: { consent: true } },
+      );
+
+      expect(response.status()).toBe(400);
+    });
+  });
+
+  test.describe("al registrar el consentimiento", () => {
+    test.use({
+      storageState: incompleteStorageStatePath("menor-para-consentir"),
+    });
+
+    test("entra al panel principal sin que nadie intervenga", async ({
+      page,
+    }) => {
+      await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
+
+      await page.getByLabel("Nombre del tutor").fill("Marta Silva");
+      await page.getByLabel("Correo del tutor").fill("marta@example.test");
+      await page
+        .getByRole("checkbox", { name: /doy mi consentimiento/i })
+        .check();
+      await page
+        .getByRole("button", { name: "Registrar el consentimiento" })
+        .click();
+
+      await expect(page).toHaveURL(new RegExp("/dashboard$"));
+    });
+  });
+});
+
 test.describe("una cuenta activa que pide completar registro", () => {
   test.skip(
     E2E_SESSION.kind === "unavailable",
