@@ -19,6 +19,9 @@
 
 -- Un consentimiento es un hecho con fecha: quién, su correo y cuándo, los tres
 -- o ninguno. Una marca de tiempo sin tutor no se podría enseñar a nadie.
+-- El `coalesce` no sobra: `btrim(null) <> ''` da null, y un `check` que da null
+-- deja pasar la fila, así que sin él entraría un consentimiento sin nombre o
+-- sin correo.
 alter table public.members
   drop constraint if exists members_guardian_consent_complete;
 alter table public.members
@@ -27,8 +30,8 @@ alter table public.members
       and guardian_name is null
       and guardian_email is null)
     or (guardian_consent_at is not null
-      and btrim(guardian_name) <> ''
-      and btrim(guardian_email) <> '')
+      and coalesce(btrim(guardian_name), '') <> ''
+      and coalesce(btrim(guardian_email), '') <> '')
   );
 
 -- El borde es "menor de 18": quien cumple 18 el mismo día del registro es
