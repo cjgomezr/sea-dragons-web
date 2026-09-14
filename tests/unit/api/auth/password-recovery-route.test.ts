@@ -184,6 +184,24 @@ describe("POST /api/v1/auth/password-recovery", () => {
     logged.mockRestore();
   });
 
+  // Supabase y Resend a veces citan la dirección en sus mensajes ("Email
+  // address ... is invalid"), y el registro del servidor no es sitio para un
+  // dato personal.
+  it("el fallo registrado no incluye la dirección de correo", async () => {
+    mockWiring({
+      deliveryFailure: new Error(`Email address "${REGISTERED_EMAIL}" is invalid`),
+    });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await postRecovery({ email: REGISTERED_EMAIL });
+    await runScheduledWork();
+
+    const log = logged.mock.calls.flat().map(String).join(" ");
+    expect(log).toContain("is invalid");
+    expect(log).not.toContain(REGISTERED_EMAIL);
+    logged.mockRestore();
+  });
+
   // Lo que tarda la respuesta no puede depender de la cuenta: si esperara al
   // envío, que sólo ocurre para cuentas reales, las delataría.
   it("responde antes de mirar la cuenta y de mandar el correo", async () => {

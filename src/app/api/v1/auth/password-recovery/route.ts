@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth/routes";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { createSupabasePasswordRecoveryGateways } from "@/lib/auth/supabase-password-recovery";
+import { describeErrorWithoutEmail } from "@/lib/email/redact-email";
 
 /**
  * Pedir el enlace de recuperación de contraseña (RF-6). Público: quien lo pide
@@ -60,16 +61,18 @@ function resetUrlBuilder(request: NextRequest): (tokenHash: string) => string {
 
 /** Corre la entrega cuando la respuesta ya salió. Un fallo aquí no puede
  * cambiar esa respuesta, y tampoco debe: diría qué cuentas existen. Queda en
- * el registro del servidor, que es donde lo lee quien lo arregla. */
+ * el registro del servidor, que es donde lo lee quien lo arregla, y sin la
+ * dirección, que los mensajes del proveedor a veces citan. */
 async function deliverRecoveryLink(
   deliver: () => Promise<void>,
+  email: string,
 ): Promise<void> {
   try {
     await deliver();
   } catch (error) {
     console.error(
       "[api/v1/auth/password-recovery] no se pudo mandar el enlace de recuperación",
-      error,
+      describeErrorWithoutEmail(error, email),
     );
   }
 }
@@ -130,7 +133,7 @@ const postPasswordRecovery = createApiRoute<
     // Lo que depende de la cuenta va después de responder, para que lo que
     // tarda la respuesta no delate si existe.
     const { deliver } = outcome;
-    runAfterResponse(() => deliverRecoveryLink(deliver));
+    runAfterResponse(() => deliverRecoveryLink(deliver, email));
     return { data: { outcome: "recovery_requested", email } };
   },
 });

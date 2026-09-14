@@ -147,6 +147,19 @@ describe("POST /api/v1/auth/confirmation-email", () => {
     logged.mockRestore();
   });
 
+  it("el error inesperado registrado no incluye la dirección de correo", async () => {
+    mockWiring({ failure: new Error(`no se pudo con ${EMAIL}`) });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await postConfirmationEmail({ email: EMAIL });
+    await runScheduledWork();
+
+    const log = logged.mock.calls.flat().map(String).join(" ");
+    expect(log).toContain("no se pudo con");
+    expect(log).not.toContain(EMAIL);
+    logged.mockRestore();
+  });
+
   it("no cuenta una dirección sin forma de correo", async () => {
     mockWiring();
 

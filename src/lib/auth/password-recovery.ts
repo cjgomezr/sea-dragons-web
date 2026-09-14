@@ -36,10 +36,11 @@ export type RecoveryEmail = {
   readonly resetUrl: string;
 };
 
-/** Lanza si el correo no sale. No devuelve el fallo como un resultado porque,
- * a diferencia de la confirmación del registro, aquí el correo ES la
- * funcionalidad: decir "te lo mandamos" sin haberlo mandado deja a alguien
- * esperando un enlace que nunca llega. */
+/** Lanza si el correo no sale, para que el fallo llegue con su causa a quien
+ * lo registra. La respuesta a quien pidió el enlace no puede reflejarlo: el
+ * envío sólo existe para cuentas reales, y un error visible sólo para ellas
+ * las delataría (#147). Por eso la ruta responde antes de mandar y deja el
+ * fallo en el registro del servidor. */
 export type RecoveryEmailSender = {
   sendRecoveryEmail(email: RecoveryEmail): Promise<void>;
 };

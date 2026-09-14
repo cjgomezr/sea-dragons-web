@@ -1,4 +1,5 @@
 import { renderAccountConfirmationEmail } from "@/lib/email/email-templates";
+import { redactEmail } from "@/lib/email/redact-email";
 import {
   EmailDeliveryError,
   type EmailSender,
@@ -26,10 +27,6 @@ import type {
 const RATE_LIMITED_STATUS = 429;
 const EMAIL_RATE_LIMIT_CODE = "over_email_send_rate_limit";
 
-/** Los motivos a veces citan la dirección ("Email address ... is invalid"), y
- * los registros del servidor no son sitio para datos personales. */
-const REDACTED_EMAIL = "<correo>";
-
 /** Lo mínimo que tiene cualquier fallo de envío: el de Supabase Auth al emitir
  * el enlace y el del proveedor al mandarlo. */
 export type SendFailure = {
@@ -39,7 +36,7 @@ export type SendFailure = {
 };
 
 function describeSendFailure(failure: SendFailure, email: string): string {
-  const message = failure.message.replaceAll(email, REDACTED_EMAIL);
+  const message = redactEmail(failure.message, email);
   return failure.status === undefined
     ? message
     : `${failure.status}: ${message}`;

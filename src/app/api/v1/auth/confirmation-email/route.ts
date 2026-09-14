@@ -13,6 +13,7 @@ import {
   createSupabaseAuthGateways,
   describeMissingAuthKeys,
 } from "@/lib/auth/supabase-auth-gateways";
+import { describeErrorWithoutEmail } from "@/lib/email/redact-email";
 
 // Depende del estado de la cuenta en este instante.
 export const dynamic = "force-dynamic";
@@ -41,17 +42,18 @@ function reportConfirmationEmail(outcome: ConfirmationEmailOutcome): void {
 }
 
 /** Corre la entrega cuando la respuesta ya salió. El resultado del envío y
- * cualquier fallo inesperado van al registro del servidor: la respuesta no
- * puede cambiar por ellos sin delatar la cuenta. */
+ * cualquier fallo inesperado van al registro del servidor, sin la dirección:
+ * la respuesta no puede cambiar por ellos sin delatar la cuenta. */
 async function requestConfirmationAfterResponse(
   deliver: () => Promise<ConfirmationEmailOutcome>,
+  email: string,
 ): Promise<void> {
   try {
     reportConfirmationEmail(await deliver());
   } catch (error) {
     console.error(
       "[api/v1/auth/confirmation-email] falló el reenvío de la confirmación",
-      error,
+      describeErrorWithoutEmail(error, email),
     );
   }
 }
@@ -99,7 +101,7 @@ const postConfirmationEmail = createApiRoute<
     // Pedir el correo va después de responder: sólo hay envío para una cuenta
     // sin confirmar, y lo que tardara la respuesta la delataría.
     const { deliver } = outcome;
-    runAfterResponse(() => requestConfirmationAfterResponse(deliver));
+    runAfterResponse(() => requestConfirmationAfterResponse(deliver, email));
     return { data: { outcome: "confirmation_pending", email } };
   },
 });
