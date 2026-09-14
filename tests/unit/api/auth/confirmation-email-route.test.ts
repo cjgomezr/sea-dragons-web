@@ -90,7 +90,7 @@ describe("POST /api/v1/auth/confirmation-email", () => {
     expect(requestedEmails).toEqual([]);
   });
 
-  it("cuenta la petición antes de pedir el correo", async () => {
+  it("cuenta la petición y pide el correo", async () => {
     mockWiring();
 
     await postConfirmationEmail({ email: EMAIL });
@@ -102,8 +102,9 @@ describe("POST /api/v1/auth/confirmation-email", () => {
   it("no cuenta una dirección sin forma de correo", async () => {
     mockWiring();
 
-    await postConfirmationEmail({ email: "nerea" });
+    const response = await postConfirmationEmail({ email: "nerea" });
 
+    expect(response.status).toBe(422);
     expect(recordedRequests.count).toBe(0);
   });
 
