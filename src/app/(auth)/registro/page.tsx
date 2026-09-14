@@ -34,7 +34,7 @@ const CONFIRMATION_PANELS: Record<ConfirmationState, ConfirmationPanel> = {
   ok: {
     heading: "Tu correo quedó confirmado",
     body: "Tu cuenta ya está activa. Entra con este correo y tu contraseña.",
-    note: "No hace falta que hagas nada más.",
+    note: "Ya puedes usar la plataforma del club.",
     action: "sign-in",
   },
   pendiente: {

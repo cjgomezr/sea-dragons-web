@@ -1228,7 +1228,7 @@ for (const state of ["ok", "pendiente"] as const) {
   }) => {
     await page.goto(`${APP_URL}/registro?confirmacion=${state}`);
 
-    await page.getByRole("link", { name: "Entrar" }).click();
+    await page.getByRole("link", { name: "Entrar", exact: true }).click();
 
     await expect(
       page.getByRole("heading", { name: "Bienvenido de vuelta" }),
@@ -1240,7 +1240,7 @@ for (const state of ["ok", "pendiente"] as const) {
       page,
     }) => {
       await goToWithTheme(page, `/registro?confirmacion=${state}`, theme);
-      const link = page.getByRole("link", { name: "Entrar" });
+      const link = page.getByRole("link", { name: "Entrar", exact: true });
 
       const { color, background } = await link.evaluate((element) => {
         const style = getComputedStyle(element);
