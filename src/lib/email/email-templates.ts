@@ -30,7 +30,8 @@ type EmailContent = {
   readonly outro: readonly string[];
 };
 
-/** Los tokens del tema claro de `design-system.md`. El correo no tiene
+/** Los tokens del tema claro de `design-system.md`, salvo la cabecera, que usa
+ * los de la barra lateral (no cambian con el tema). El correo no tiene
  * `data-theme`, y los clientes de correo no leen variables CSS, así que van
  * copiados a mano; `email-templates.test.ts` comprueba que el botón sigue
  * coincidiendo con el documento. */

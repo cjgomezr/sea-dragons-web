@@ -139,15 +139,14 @@ const lightThemeSection = readFileSync(
   ?.split("####")[0];
 
 function lightThemeToken(role: string): string {
-  const section = lightThemeSection;
-  if (section === undefined) {
+  if (lightThemeSection === undefined) {
     throw new Error("Light theme section not found in design-system.md");
   }
   const row = new RegExp(
     `^\\|\\s*${role}\\s*\\|\\s*\`(#[0-9A-Fa-f]{6})\``,
     "m",
   );
-  const value = row.exec(section)?.[1];
+  const value = row.exec(lightThemeSection)?.[1];
   if (value === undefined) {
     throw new Error(`Missing light theme token: ${role}`);
   }
