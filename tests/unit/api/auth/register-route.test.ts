@@ -534,6 +534,7 @@ describe("fallo diferido del registro", () => {
       const fallido = await registerWith(failure.options);
 
       await expect(runScheduledWork()).resolves.toBeUndefined();
+      expect(console.error).toHaveBeenCalledOnce();
       expect(fallido).toEqual(sano);
     },
   );
@@ -546,25 +547,35 @@ describe("validación del registro", () => {
     vi.restoreAllMocks();
   });
 
-  const INVALID_FORMS: Readonly<Record<string, unknown>> = {
-    "sin un campo": { ...validBody(), country: undefined },
-    "con un correo sin forma": validBody({ email: "nerea" }),
-    "con una fecha de nacimiento futura": validBody({
-      dateOfBirth: "3026-01-01",
-    }),
-    "con un tipo de membresía que no existe": validBody({
-      membershipType: "Platinum",
-    }),
+  type InvalidForm = { readonly body: unknown; readonly status: 400 | 422 };
+
+  const INVALID_FORMS: Readonly<Record<string, InvalidForm>> = {
+    "sin un campo": {
+      body: { ...validBody(), country: undefined },
+      status: 400,
+    },
+    "con un correo sin forma": {
+      body: validBody({ email: "nerea" }),
+      status: 422,
+    },
+    "con una fecha de nacimiento futura": {
+      body: validBody({ dateOfBirth: "3026-01-01" }),
+      status: 422,
+    },
+    "con un tipo de membresía que no existe": {
+      body: validBody({ membershipType: "Platinum" }),
+      status: 422,
+    },
   };
 
   it.each(Object.entries(INVALID_FORMS))(
     "un formulario %s responde con su error y no deja trabajo diferido",
-    async (_form, body) => {
+    async (_form, form) => {
       mockWiring();
 
-      const response = await postRegistration(body);
+      const response = await postRegistration(form.body);
 
-      expect([400, 422]).toContain(response.status);
+      expect(response.status).toBe(form.status);
       expect(scheduledWork).toEqual([]);
       expect(calls).toEqual([]);
     },

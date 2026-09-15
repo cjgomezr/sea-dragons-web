@@ -2,15 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type AuthIdentityGateway,
   type ConfirmationEmailGateway,
+  type ConfirmationEmailOutcome,
   type IdentityCreation,
   IdentityCreationError,
   type MemberDirectory,
   MemberRecordError,
   type NewMemberRow,
   type RequestedConfirmationEmail,
-  RegistrationValidationError,
   type RegistrationReceipt,
-  type ConfirmationEmailOutcome,
+  RegistrationValidationError,
   prepareRegistration,
 } from "@/lib/auth/register-member";
 import type { RegistrationRequest } from "@/lib/auth/registration";
@@ -123,7 +123,10 @@ async function register(
   readonly confirmationEmail: ConfirmationEmailOutcome;
 }> {
   const pending = prepare(given, request);
-  return { receipt: pending.receipt, confirmationEmail: await pending.deliver() };
+  return {
+    receipt: pending.receipt,
+    confirmationEmail: await pending.deliver(),
+  };
 }
 
 describe("registro con entrega diferida", () => {
