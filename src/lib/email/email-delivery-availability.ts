@@ -56,7 +56,11 @@ function describeExhaustedBudget(requestsInWindow: number): string {
 
 /** Las comprobaciones van de la más barata a la más cara, y la petición sólo
  * se anota en el cupo si iba a poder salir: una caída del proveedor no debe
- * dejar el cupo gastado para cuando vuelva. */
+ * dejar el cupo gastado para cuando vuelva.
+ *
+ * Contar y anotar no son atómicos, así que una ráfaga en el borde puede pasar
+ * unas pocas peticiones del tope. Se acepta: el margen bajo el cupo de Resend
+ * lo absorbe, y un bloqueo en la base costaría más que ese exceso. */
 export function createEmailDeliveryAvailabilityCheck(dependencies: {
   readonly connection: EmailSenderConnection;
   readonly provider: EmailProviderProbe;
