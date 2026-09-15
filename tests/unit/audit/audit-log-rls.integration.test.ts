@@ -49,6 +49,10 @@ const TEST_TIMEOUT_MS = 20_000;
  */
 const CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000;
 
+/** `insufficient_privilege` de Postgres: lo que responde PostgREST cuando el
+ * rol no tiene el privilegio sobre la tabla. */
+const PERMISSION_DENIED_CODE = "42501";
+
 describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
   let serviceClient: SupabaseClient;
   let asAuthenticatedUser: SupabaseClient;
@@ -155,7 +159,14 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
         .from("audit_log")
         .select("*");
 
-      expect(error).toBeNull();
+      // `0004` le quitó a `authenticated` el `select` sobre la bitácora, así
+      // que la negación llega como error de permiso. Una base anterior a esa
+      // migración la negaba con la policy, devolviendo cero filas. Las dos
+      // formas niegan; lo único que no puede pasar es recibir filas.
+      if (error !== null) {
+        expect(error.code).toBe(PERMISSION_DENIED_CODE);
+        return;
+      }
       expect(data).toEqual([]);
     },
     TEST_TIMEOUT_MS,

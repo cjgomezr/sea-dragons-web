@@ -69,14 +69,13 @@ async function insertAuditEvent(
 }
 
 describeConPostgres("privilegios de clubs", () => {
-  it("deja a anon sólo con la lectura de la que depende la sonda de salud", async () => {
-    // `select` y nada más. La sonda de /api/v1/health lee esta tabla con la
-    // llave anónima y sin sesión (src/app/api/v1/health/route.ts), así que
-    // quitarle también la lectura dejaría la vigilancia de producción en rojo.
-    // RLS sigue sin darle ni una fila: no hay policy para `anon`.
+  it("no deja a anon ningún privilegio", async () => {
+    // Hasta `0008_sonda_salud` conservaba `select` porque la sonda de
+    // /api/v1/health leía esta tabla con la llave anónima. Ahora la sonda
+    // llama a `public.health_probe()` y la tabla no le debe nada a `anon`.
     const database = await migratedDatabase();
 
-    expect(await privilegesOf(database, "clubs", "anon")).toEqual(["SELECT"]);
+    expect(await privilegesOf(database, "clubs", "anon")).toEqual([]);
   });
 
   it("no deja a authenticated truncar, disparar ni referenciar la tabla", async () => {
@@ -151,22 +150,17 @@ describeConPostgres("privilegios", () => {
     expect(lectura.stderr).toMatch(/permission denied for table audit_log/);
   });
 
-  it("sigue dejando a la sonda de salud leer clubs con la llave anónima", async () => {
-    // El caso de "nada que funcionaba deja de funcionar": la sonda no espera
-    // filas (RLS no le da ninguna a `anon`), espera que la consulta no falle.
+  it("no deja a un cliente anónimo leer clubs", async () => {
+    // Un rechazo claro y no una lista vacía: sin el privilegio, la base no
+    // llega a preguntarle a RLS.
     const database = await migratedDatabase();
 
-    const sonda = await database.attempt(
+    const lectura = await database.attempt(
       asRole("anon", "select id from public.clubs limit 1"),
     );
 
-    expect(sonda.code, sonda.stderr).toBe(0);
-    // Y ni una fila, que es la otra mitad del argumento: el `select` que conserva
-    // `anon` es inofensivo porque RLS no le da nada. Si alguien le escribe una
-    // policy de lectura a `anon`, este caso lo cuenta. La salida vacía es la
-    // lista vacía: con `--quiet` y `-At`, psql no imprime ni etiquetas de
-    // sentencia ni cabeceras.
-    expect(sonda.stdout.trim()).toBe("");
+    expect(lectura.code).toBeGreaterThan(0);
+    expect(lectura.stderr).toMatch(/permission denied for table clubs/);
   });
 
   it("sigue dejando a una sesión autenticada leer el club sembrado", async () => {
@@ -208,8 +202,8 @@ describeConPostgres("migración 0004", () => {
     expect(segunda.code, segunda.stderr).toBe(0);
     // La comparación sólo vale si la descripción trae las líneas que importan:
     // dos cadenas vacías también son iguales.
-    expect(despuesDeLaPrimera).toMatch(/grant clubs anon SELECT/);
-    expect(despuesDeLaPrimera).not.toMatch(/grant clubs anon TRUNCATE/);
+    expect(despuesDeLaPrimera).toMatch(/grant clubs authenticated SELECT/);
+    expect(despuesDeLaPrimera).not.toMatch(/grant clubs anon /);
     expect(await database.snapshot()).toBe(despuesDeLaPrimera);
   });
 

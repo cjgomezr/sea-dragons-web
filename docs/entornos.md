@@ -97,10 +97,11 @@ de 30 días admite unas 7 horas y 12 minutos de caída antes de incumplirlo.
 `GET https://victoria-seadragons.vercel.app/api/v1/health`, y solo eso. El
 endpoint responde 200 cuando la aplicación puede leer de Supabase y 503 cuando
 no, así que servir HTML no cuenta como estar en pie: una aplicación que no
-alcanza la base está caída y el monitoreo tiene que verlo. La sonda a la base
-tiene un plazo de 5 segundos (`DATABASE_PROBE_TIMEOUT_MS` en
-`src/lib/health.ts`); vencido, el endpoint contesta 503 en vez de quedarse
-colgado.
+alcanza la base está caída y el monitoreo tiene que verlo. La sonda llama a la
+función `public.health_probe()` con la llave anónima, que responde `true` sin
+leer ninguna tabla (issue #143). Tiene un plazo de 5 segundos
+(`DATABASE_PROBE_TIMEOUT_MS` en `src/lib/health.ts`); vencido, el endpoint
+contesta 503 en vez de quedarse colgado.
 
 No hace falta autenticarse ni mandar cabeceras. Cualquier respuesta que no sea
 200 cuenta como caída.

@@ -33,6 +33,7 @@ columna password_recovery_requests.club_id tipo=uuid null=NO default=-
 columna password_recovery_requests.email_hash tipo=text null=NO default=-
 columna password_recovery_requests.id tipo=uuid null=NO default=gen_random_uuid()
 columna password_recovery_requests.requested_at tipo=timestamp with time zone null=NO default=now()
+funcion health_probe()
 grant audit_log postgres DELETE
 grant audit_log postgres INSERT
 grant audit_log postgres REFERENCES
@@ -47,7 +48,6 @@ grant audit_log service_role SELECT
 grant audit_log service_role TRIGGER
 grant audit_log service_role TRUNCATE
 grant audit_log service_role UPDATE
-grant clubs anon SELECT
 grant clubs authenticated SELECT
 grant clubs postgres DELETE
 grant clubs postgres INSERT
