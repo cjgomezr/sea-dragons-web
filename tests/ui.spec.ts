@@ -33,7 +33,7 @@
  *   without webServer every test dies with ERR_CONNECTION_REFUSED and blocks
  *   the session for a reason unrelated to the code.
  */
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -1400,6 +1400,45 @@ test.describe("una cuenta incompleta en un navegador de verdad", () => {
   });
 });
 
+const ACCOUNT_ENDPOINT = "/api/v1/auth/account";
+
+/** Supabase dev a veces tarda más que los 5 s por defecto de `expect` en
+ * guardar (#168). El guardado sí termina, así que se le da margen. */
+const ACCOUNT_CHANGE_TIMEOUT_MS = 20_000;
+/** Cabe la espera de la respuesta y la de `/dashboard`, más la navegación. */
+const ACCOUNT_CHANGE_TEST_TIMEOUT_MS = 60_000;
+
+type AccountChange = {
+  readonly method: "PATCH" | "POST";
+  readonly endpoint: string;
+  readonly submit: () => Promise<void>;
+};
+
+/** Envía un cambio de cuenta y llega al panel. Mira la respuesta antes que la
+ * URL: si el guardado falla, el test dice con qué estado, no que la URL no
+ * cambió. La espera se prepara antes de enviar para no perder la respuesta. */
+async function submitAccountChange(
+  page: Page,
+  { method, endpoint, submit }: AccountChange,
+): Promise<void> {
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === method &&
+      new URL(response.url()).pathname === endpoint,
+    { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
+  );
+  await submit();
+  const response = await saved;
+
+  expect(
+    response.ok(),
+    `${method} ${endpoint} respondió ${response.status()}`,
+  ).toBe(true);
+  await expect(page).toHaveURL(new RegExp("/dashboard$"), {
+    timeout: ACCOUNT_CHANGE_TIMEOUT_MS,
+  });
+}
+
 /** Los dos tests que dejan su cuenta distinta a como la encontraron. Cada uno
  * usa un socio que no comparte con nadie: la suite corre en paralelo, y
  * activar o cerrar la sesión de una cuenta que otro test está mirando sería un
@@ -1413,6 +1452,12 @@ test.describe("una cuenta incompleta que cambia de estado", () => {
   );
 
   test.describe("al guardar el último dato", () => {
+    // Sin reintentos: el primer intento ya activó la cuenta, y el segundo no
+    // encontraría el formulario y fallaría con un timeout que despista.
+    test.describe.configure({
+      retries: 0,
+      timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS,
+    });
     test.use({ storageState: incompleteStorageStatePath("para-activar") });
 
     test("entra al panel principal sin que nadie intervenga", async ({
@@ -1421,9 +1466,13 @@ test.describe("una cuenta incompleta que cambia de estado", () => {
       await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
 
       await page.getByLabel("Tipo de membresía").selectOption("Student");
-      await page.getByRole("button", { name: "Guardar y continuar" }).click();
+      await submitAccountChange(page, {
+        method: "PATCH",
+        endpoint: ACCOUNT_ENDPOINT,
+        submit: () =>
+          page.getByRole("button", { name: "Guardar y continuar" }).click(),
+      });
 
-      await expect(page).toHaveURL(new RegExp("/dashboard$"));
       // Y ya no vuelve a ver la pantalla, ni pidiéndola a mano.
       await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
       await expect(page).toHaveURL(new RegExp("/dashboard$"));
@@ -1500,6 +1549,13 @@ test.describe("un menor sin el consentimiento de su tutor", () => {
   });
 
   test.describe("al registrar el consentimiento", () => {
+    // Sin reintentos: el primer intento ya registró el consentimiento, y el
+    // segundo no encontraría el formulario y fallaría con un timeout que
+    // despista.
+    test.describe.configure({
+      retries: 0,
+      timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS,
+    });
     test.use({
       storageState: incompleteStorageStatePath("menor-para-consentir"),
     });
@@ -1514,11 +1570,14 @@ test.describe("un menor sin el consentimiento de su tutor", () => {
       await page
         .getByRole("checkbox", { name: /doy mi consentimiento/i })
         .check();
-      await page
-        .getByRole("button", { name: "Registrar el consentimiento" })
-        .click();
-
-      await expect(page).toHaveURL(new RegExp("/dashboard$"));
+      await submitAccountChange(page, {
+        method: "POST",
+        endpoint: GUARDIAN_CONSENT_ENDPOINT,
+        submit: () =>
+          page
+            .getByRole("button", { name: "Registrar el consentimiento" })
+            .click(),
+      });
     });
   });
 });
