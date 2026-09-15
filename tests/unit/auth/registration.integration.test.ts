@@ -4,7 +4,7 @@ import { confirmEmailAndActivate } from "@/lib/auth/email-confirmation";
 import {
   type ConfirmationEmailGateway,
   type NewMemberRow,
-  registerMember,
+  prepareRegistration,
 } from "@/lib/auth/register-member";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -147,7 +147,7 @@ describeRls("registro contra seadragons-dev", () => {
       await withCleanup(serviceClient, email, async () => {
         const clubId = await gateways.clubs.findClubIdBySlug(DEFAULT_CLUB_SLUG);
 
-        const result = await registerMember(
+        const pending = prepareRegistration(
           {
             ...gateways.registration,
             confirmationEmail: silentConfirmationEmail,
@@ -167,10 +167,11 @@ describeRls("registro contra seadragons-dev", () => {
           },
         );
 
-        expect(result.receipt).toEqual({
+        expect(pending.receipt).toEqual({
           outcome: "confirmation_pending",
           email,
         });
+        await pending.deliver();
 
         const userId = await requireUserIdByEmail(serviceClient, email);
         expect(await gateways.identities.isEmailConfirmed(userId)).toBe(false);
@@ -209,18 +210,11 @@ describeRls("registro contra seadragons-dev", () => {
           confirmationEmail: silentConfirmationEmail,
         };
 
-        const first = await registerMember(registration, {
-          request,
-          clubId,
-          now: new Date(),
-          appUrl: APP_URL,
-        });
-        const second = await registerMember(registration, {
-          request,
-          clubId,
-          now: new Date(),
-          appUrl: APP_URL,
-        });
+        const input = { request, clubId, now: new Date(), appUrl: APP_URL };
+        const first = prepareRegistration(registration, input);
+        await first.deliver();
+        const second = prepareRegistration(registration, input);
+        await second.deliver();
 
         expect(second.receipt).toEqual(first.receipt);
 
