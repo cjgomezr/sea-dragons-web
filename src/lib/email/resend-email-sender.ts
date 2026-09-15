@@ -195,23 +195,30 @@ export const RESEND_PROBE_ENDPOINT = "https://api.resend.com/domains";
  * se registra, y un proveedor que tarda tanto ya no está disponible. */
 const PROBE_TIMEOUT_MS = 3_000;
 
-const UNAUTHORIZED_STATUS = 401;
-const TOO_MANY_REQUESTS_STATUS = 429;
-/** Lo que responde Resend a una clave que sólo puede enviar cuando se le
- * pregunta otra cosa. La de producción es de ese tipo. */
-const SEND_ONLY_KEY_ERROR = "restricted_api_key";
+const SERVER_ERROR_MIN_STATUS = 500;
 
-/** Contestar con un rechazo también es estar en pie. La clave de sólo envío
- * prueba además que la clave vale, y un 429 es el límite por segundo de la
- * API, no una caída. Lo demás (5xx, una clave suspendida) deja sin envío. */
+/** Los errores de Resend que hablan de la clave, en minúsculas porque su
+ * documentación mezcla mayúsculas (`invalid_api_Key`). Son los únicos que
+ * prueban que no podemos enviar. */
+const KEY_FAILURE_ERRORS: ReadonlySet<string> = new Set([
+  "missing_api_key",
+  "invalid_api_key",
+  "suspended_api_key",
+]);
+
+/** Contestar, aunque sea con un rechazo, es estar en pie: la pregunta de la
+ * sonda es si Resend responde y si nuestra clave sirve. Por eso la regla es
+ * una lista negra y no una lista blanca. Equivocarse hacia "en pie" sólo
+ * devuelve el texto neutro del #147, que es lo que había antes de este
+ * ticket; equivocarse hacia "caído" deja a todo el mundo sin registrarse. Por
+ * ejemplo, la clave de producción sólo envía y `GET /domains` le responde un
+ * rechazo que no habla de una clave rota. */
 function isProviderAnswering(response: Response, body: unknown): boolean {
-  if (response.ok || response.status === TOO_MANY_REQUESTS_STATUS) {
-    return true;
+  if (response.status >= SERVER_ERROR_MIN_STATUS) {
+    return false;
   }
-  return (
-    response.status === UNAUTHORIZED_STATUS &&
-    readStringAt(body, ["name"]) === SEND_ONLY_KEY_ERROR
-  );
+  const errorName = readStringAt(body, ["name"])?.toLowerCase() ?? "";
+  return !KEY_FAILURE_ERRORS.has(errorName);
 }
 
 async function probeResend(
@@ -241,12 +248,26 @@ async function probeResend(
   };
 }
 
+/** Cuánto vale un "está en pie". La sonda corre antes de responder a todo el
+ * que se registra, y sin esto cada registro gasta dos de las dos peticiones
+ * por segundo que permite Resend: la sonda y el envío de verdad. Con dos
+ * registros en el mismo segundo, el envío se llevaba el 429 y ese correo se
+ * perdía. Sólo se recuerda el resultado bueno: una caída tiene que poder
+ * recuperarse en la petición siguiente. Es un dato global, igual para toda
+ * dirección, así que no reabre el oráculo del #147. */
+const REACHABLE_CACHE_MS = 10_000;
+
 export function createResendProviderProbe(
   env: Environment,
   fetchImplementation: typeof fetch = fetch,
+  now: () => number = Date.now,
 ): EmailProviderProbe {
+  let reachableUntil = 0;
   return {
     async probeProvider() {
+      if (now() < reachableUntil) {
+        return { kind: "reachable" };
+      }
       const apiKey = readVariable(env, RESEND_API_KEY_ENV);
       if (apiKey === null) {
         return {
@@ -254,7 +275,11 @@ export function createResendProviderProbe(
           reason: describeMissingVariables([RESEND_API_KEY_ENV]),
         };
       }
-      return probeResend(apiKey, fetchImplementation);
+      const status = await probeResend(apiKey, fetchImplementation);
+      if (status.kind === "reachable") {
+        reachableUntil = now() + REACHABLE_CACHE_MS;
+      }
+      return status;
     },
   };
 }
