@@ -43,6 +43,13 @@ grant usage on schema public to anon, authenticated, service_role;
 alter default privileges in schema public
   grant all on tables to anon, authenticated, service_role;
 
+-- Lo mismo para las funciones: en Supabase toda función nueva de `public` nace
+-- ejecutable por los tres roles. Sin esta línea, el `revoke` de
+-- `0008_sonda_salud` sobre `authenticated` pasaría por la ausencia del
+-- privilegio y no por la migración.
+alter default privileges in schema public
+  grant all on functions to anon, authenticated, service_role;
+
 -- Lo mínimo del esquema `auth` de Supabase que el repositorio necesita para
 -- que sus migraciones apliquen: la tabla a la que `public.members` apunta y la
 -- función que sus policies llaman. No es una réplica de Supabase Auth y no

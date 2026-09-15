@@ -17,7 +17,10 @@ import {
 // The probe must reflect the database right now, never a cached answer.
 export const dynamic = "force-dynamic";
 
-const PROBED_TABLE = "clubs";
+/** Responde `true` y nada más (`supabase/migrations/0008_sonda_salud.sql`).
+ * La sonda llama a una función y no lee una tabla para que ninguna tabla le
+ * deba un privilegio al rol anónimo. */
+const HEALTH_PROBE_FUNCTION = "health_probe";
 
 function describeThrownProbeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -38,9 +41,9 @@ async function probeDatabase(): Promise<DatabaseProbeResult> {
   try {
     const supabase = createClient(config.url, config.anonKey);
     // Nada de `head: true`: PostgREST responde 404 sin cuerpo y supabase-js lo
-    // traduce a `{ status: 204, error: null }`, así que una base sin la tabla
-    // se reportaba como sana. La sonda pide un cuerpo para poder leer el error.
-    const { error } = await supabase.from(PROBED_TABLE).select("id").limit(1);
+    // traduce a `{ status: 204, error: null }`, así que una base sin la función
+    // se leería como sana. La llamada pide un cuerpo para poder leer el error.
+    const { error } = await supabase.rpc(HEALTH_PROBE_FUNCTION);
     if (error) {
       return { kind: "unreachable", reason: error.message };
     }

@@ -14,42 +14,32 @@ const JWT_PATTERN = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/;
 const JWT_LOOKING_ANON_KEY =
   "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.ZmlybWE";
 
-function mockDatabaseAnswering(error: { message: string } | null): void {
+const HEALTH_PROBE_FUNCTION = "health_probe";
+
+type ProbeAnswer = { error: { message: string } | null };
+
+/** El doble sólo sabe hacer `rpc`. Es a propósito: si la sonda volviera a leer
+ * una tabla con `from`, lanzaría, y el caso sano dejaría de dar 200. */
+function mockDatabaseRpc(
+  rpc: (functionName: string) => Promise<ProbeAnswer>,
+): void {
   vi.doMock("@supabase/supabase-js", () => ({
-    createClient: () => ({
-      from: () => ({
-        select: () => ({
-          limit: async () => ({ error }),
-        }),
-      }),
-    }),
+    createClient: () => ({ rpc }),
   }));
+}
+
+function mockDatabaseAnswering(error: { message: string } | null): void {
+  mockDatabaseRpc(async () => ({ error }));
 }
 
 function mockDatabaseNeverAnswering(): void {
-  vi.doMock("@supabase/supabase-js", () => ({
-    createClient: () => ({
-      from: () => ({
-        select: () => ({
-          limit: () => new Promise(() => {}),
-        }),
-      }),
-    }),
-  }));
+  mockDatabaseRpc(() => new Promise(() => {}));
 }
 
 function mockDatabaseThrowing(thrown: Error): void {
-  vi.doMock("@supabase/supabase-js", () => ({
-    createClient: () => ({
-      from: () => ({
-        select: () => ({
-          limit: async () => {
-            throw thrown;
-          },
-        }),
-      }),
-    }),
-  }));
+  mockDatabaseRpc(async () => {
+    throw thrown;
+  });
 }
 
 function configureSupabaseEnvironment(): void {
@@ -118,6 +108,35 @@ describe("health", () => {
         commit: COMMIT_SHA,
       },
     });
+  });
+
+  it("le pregunta a la función de salud en vez de leer una tabla", async () => {
+    configureSupabaseEnvironment();
+    const rpc = vi.fn(async (): Promise<ProbeAnswer> => ({ error: null }));
+    mockDatabaseRpc(rpc);
+
+    const response = await getHealth();
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith(HEALTH_PROBE_FUNCTION);
+  });
+
+  // Si la migración no llegó a la base, PostgREST no encuentra la función. Eso
+  // es un despliegue a medias, y el 503 tiene que decir qué falta.
+  it("responde 503 nombrando la función cuando la base no la tiene", async () => {
+    configureSupabaseEnvironment();
+    mockDatabaseAnswering({
+      message: `Could not find the function public.${HEALTH_PROBE_FUNCTION} without parameters in the schema cache`,
+    });
+
+    const response = await getHealth();
+
+    expect(response.status).toBe(503);
+    const body = (await response.json()) as {
+      error: { code: string; message: string };
+    };
+    expect(body.error.code).toBe("service_unavailable");
+    expect(body.error.message).toContain(HEALTH_PROBE_FUNCTION);
   });
 
   it("responde 200 con el ref del proyecto y el sha del commit desplegado", async () => {
