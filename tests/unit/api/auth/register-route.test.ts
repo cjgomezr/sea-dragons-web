@@ -29,16 +29,26 @@ const insertedRows: NewMemberRow[] = [];
 const deletedUserIds: string[] = [];
 const requestedEmails: string[] = [];
 const requestedAppUrls: string[] = [];
+const calls: string[] = [];
+const scheduledWork: (() => Promise<void>)[] = [];
 
 type WiringOptions = {
   readonly identityCreation?: IdentityCreation;
   readonly unconfigured?: readonly string[];
   readonly confirmationEmail?: RequestedConfirmationEmail;
+  readonly createIdentityFails?: Error;
+  readonly confirmationEmailFails?: Error;
 };
 
-/** Sustituye la raíz de composición por dobles: este test mira los códigos y
- * los cuerpos que devuelve la ruta, no si Supabase responde. */
+/** Sustituye la raíz de composición y `after` por dobles: este test mira los
+ * códigos y los cuerpos que devuelve la ruta, y qué deja para después, no si
+ * Supabase responde. */
 function mockWiring(options: WiringOptions = {}): void {
+  vi.doMock("@/lib/api/after-response", () => ({
+    runAfterResponse: (work: () => Promise<void>) => {
+      scheduledWork.push(work);
+    },
+  }));
   vi.doMock("@/lib/auth/supabase-auth-gateways", () => ({
     DEFAULT_CLUB_SLUG: "victoria-seadragons",
     describeMissingAuthKeys: (missingKeys: readonly string[]) =>
@@ -52,17 +62,25 @@ function mockWiring(options: WiringOptions = {}): void {
               clubs: { findClubIdBySlug: async () => CLUB_ID },
               registration: {
                 identities: {
-                  createIdentity: async () =>
-                    options.identityCreation ?? {
-                      kind: "created",
-                      userId: USER_ID,
-                    },
+                  createIdentity: async () => {
+                    calls.push("createIdentity");
+                    if (options.createIdentityFails) {
+                      throw options.createIdentityFails;
+                    }
+                    return (
+                      options.identityCreation ?? {
+                        kind: "created",
+                        userId: USER_ID,
+                      }
+                    );
+                  },
                   deleteIdentity: async (userId: string) => {
                     deletedUserIds.push(userId);
                   },
                 },
                 members: {
                   insertMember: async (row: NewMemberRow) => {
+                    calls.push("insertMember");
                     insertedRows.push(row);
                   },
                 },
@@ -71,8 +89,12 @@ function mockWiring(options: WiringOptions = {}): void {
                     email: string,
                     appUrl: string,
                   ) => {
+                    calls.push("requestConfirmationEmail");
                     requestedEmails.push(email);
                     requestedAppUrls.push(appUrl);
+                    if (options.confirmationEmailFails) {
+                      throw options.confirmationEmailFails;
+                    }
                     return options.confirmationEmail ?? { kind: "requested" };
                   },
                 },
@@ -93,6 +115,22 @@ async function postRegistration(body: unknown): Promise<Response> {
   );
 }
 
+/** Lo que la ruta dejó para después de responder. En producción lo corre
+ * `after` de Next.js; aquí se corre a mano, y sólo después de la respuesta. */
+async function runScheduledWork(): Promise<void> {
+  for (const work of scheduledWork.splice(0)) {
+    await work();
+  }
+}
+
+/** Registra y corre el trabajo diferido, para los tests que miran el efecto
+ * final y no el momento. */
+async function registerAndDeliver(body: unknown): Promise<Response> {
+  const response = await postRegistration(body);
+  await runScheduledWork();
+  return response;
+}
+
 type ErrorBody = { error: { code: string; message: string } };
 
 async function errorBodyOf(response: Response): Promise<ErrorBody> {
@@ -104,14 +142,23 @@ function resetRecorded(): void {
   deletedUserIds.length = 0;
   requestedEmails.length = 0;
   requestedAppUrls.length = 0;
+  calls.length = 0;
+  scheduledWork.length = 0;
+}
+
+function loggedErrors(): string {
+  return vi.mocked(console.error).mock.calls.flat().map(String).join(" ");
+}
+
+function resetModulesAndRecorded(): void {
+  vi.resetModules();
+  vi.doUnmock("@/lib/auth/supabase-auth-gateways");
+  vi.doUnmock("@/lib/api/after-response");
+  resetRecorded();
 }
 
 describe("POST /api/v1/auth/register", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.doUnmock("@/lib/auth/supabase-auth-gateways");
-    resetRecorded();
-  });
+  beforeEach(resetModulesAndRecorded);
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -120,7 +167,7 @@ describe("POST /api/v1/auth/register", () => {
   it("crea la cuenta y responde con la envoltura data", async () => {
     mockWiring();
 
-    const response = await postRegistration(validBody());
+    const response = await registerAndDeliver(validBody());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -131,7 +178,7 @@ describe("POST /api/v1/auth/register", () => {
   it("pide el correo de confirmación con la dirección de la petición", async () => {
     mockWiring();
 
-    await postRegistration(validBody());
+    await registerAndDeliver(validBody());
 
     expect(requestedAppUrls).toEqual([REGISTER_URL]);
   });
@@ -139,7 +186,7 @@ describe("POST /api/v1/auth/register", () => {
   it("escribe la fila del socio con el rol Player y el estado incomplete", async () => {
     mockWiring();
 
-    await postRegistration(validBody({ membershipType: "Casual" }));
+    await registerAndDeliver(validBody({ membershipType: "Casual" }));
 
     expect(insertedRows).toEqual([
       {
@@ -189,7 +236,6 @@ describe("POST /api/v1/auth/register", () => {
     expect((await errorBodyOf(response)).error.message).toContain(
       "dateOfBirth",
     );
-    expect(insertedRows).toEqual([]);
   });
 
   it("rechaza el registro sin país", async () => {
@@ -223,7 +269,7 @@ describe("POST /api/v1/auth/register", () => {
   it("no crea una segunda fila de socio cuando el correo ya tiene cuenta", async () => {
     mockWiring({ identityCreation: { kind: "already_registered" } });
 
-    await postRegistration(validBody());
+    await registerAndDeliver(validBody());
 
     expect(insertedRows).toEqual([]);
   });
@@ -231,7 +277,7 @@ describe("POST /api/v1/auth/register", () => {
   it("no pide el correo cuando la dirección ya tiene cuenta", async () => {
     mockWiring({ identityCreation: { kind: "already_registered" } });
 
-    await postRegistration(validBody());
+    await registerAndDeliver(validBody());
 
     expect(requestedEmails).toEqual([]);
   });
@@ -259,11 +305,43 @@ describe("POST /api/v1/auth/register", () => {
   it("no devuelve la contraseña en ninguna respuesta", async () => {
     mockWiring();
 
-    const response = await postRegistration(
+    const response = await registerAndDeliver(
       validBody({ password: "secretodelclub" }),
     );
 
     expect(await response.text()).not.toContain("secretodelclub");
+  });
+});
+
+describe("registro con entrega diferida", () => {
+  beforeEach(resetModulesAndRecorded);
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Saber si la dirección ya tiene cuenta exige intentar crear la identidad.
+  // Si la respuesta esperara a eso, lo que tarda delataría la cuenta.
+  it("responde sin crear la identidad, ni escribir la fila, ni pedir el correo", async () => {
+    mockWiring();
+
+    const response = await postRegistration(validBody());
+
+    expect(response.status).toBe(200);
+    expect(calls).toEqual([]);
+    expect(scheduledWork).toHaveLength(1);
+  });
+
+  it("el trabajo diferido crea la identidad, escribe la fila y pide el correo, en ese orden", async () => {
+    mockWiring();
+
+    await registerAndDeliver(validBody());
+
+    expect(calls).toEqual([
+      "createIdentity",
+      "insertMember",
+      "requestConfirmationEmail",
+    ]);
   });
 });
 
@@ -295,25 +373,45 @@ const ADDRESS_STATES: Readonly<Record<string, IdentityCreation>> = {
   "ya registrada": { kind: "already_registered" },
 };
 
-type RawResponse = { readonly status: number; readonly text: string };
+type RawResponse = {
+  readonly status: number;
+  readonly text: string;
+  readonly scheduledWork: number;
+};
 
 async function registerWith(options: WiringOptions): Promise<RawResponse> {
-  vi.resetModules();
+  resetModulesAndRecorded();
   mockWiring(options);
   const response = await postRegistration(validBody());
-  return { status: response.status, text: await response.text() };
+  return {
+    status: response.status,
+    text: await response.text(),
+    scheduledWork: scheduledWork.length,
+  };
 }
 
 describe("envío del correo de confirmación en el registro", () => {
   beforeEach(() => {
-    vi.resetModules();
-    vi.doUnmock("@/lib/auth/supabase-auth-gateways");
-    resetRecorded();
+    resetModulesAndRecorded();
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe("matriz de tiempo del registro", () => {
+    it("una dirección nueva y una ya registrada dejan un trabajo diferido cada una y responden idéntico", async () => {
+      const nueva = await registerWith({
+        identityCreation: ADDRESS_STATES.nueva,
+      });
+      const registrada = await registerWith({
+        identityCreation: ADDRESS_STATES["ya registrada"],
+      });
+
+      expect(nueva.scheduledWork).toBe(1);
+      expect(registrada).toEqual(nueva);
+    });
   });
 
   describe("matriz de respuestas del registro", () => {
@@ -350,7 +448,7 @@ describe("envío del correo de confirmación en el registro", () => {
       async (_sendResult, outcome) => {
         mockWiring({ confirmationEmail: outcome });
 
-        await postRegistration(validBody());
+        await registerAndDeliver(validBody());
 
         const logged = vi.mocked(console.error).mock.calls.flat().map(String);
         expect(logged).toContain(outcome.reason);
@@ -361,7 +459,7 @@ describe("envío del correo de confirmación en el registro", () => {
     it("un envío que sale no deja nada en el log de errores", async () => {
       mockWiring({ confirmationEmail: { kind: "requested" } });
 
-      await postRegistration(validBody());
+      await registerAndDeliver(validBody());
 
       expect(console.error).not.toHaveBeenCalled();
     });
@@ -373,11 +471,102 @@ describe("envío del correo de confirmación en el registro", () => {
       async (_sendResult, confirmationEmail) => {
         mockWiring({ confirmationEmail });
 
-        await postRegistration(validBody());
+        await registerAndDeliver(validBody());
 
         expect(insertedRows).toHaveLength(1);
         expect(deletedUserIds).toEqual([]);
       },
     );
   });
+});
+
+describe("fallo diferido del registro", () => {
+  beforeEach(() => {
+    resetModulesAndRecorded();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  type DeferredFailure = {
+    readonly options: WiringOptions;
+    readonly rootCause: string;
+  };
+
+  const FAILURES: Readonly<Record<string, DeferredFailure>> = {
+    Supabase: {
+      options: {
+        createIdentityFails: new Error(`no se pudo crear ${EMAIL}`, {
+          cause: new Error("ECONNRESET en auth"),
+        }),
+      },
+      rootCause: "ECONNRESET en auth",
+    },
+    Resend: {
+      options: {
+        confirmationEmailFails: new Error(`Resend rechazó ${EMAIL}`, {
+          cause: new Error("fetch failed: ETIMEDOUT"),
+        }),
+      },
+      rootCause: "fetch failed: ETIMEDOUT",
+    },
+  };
+
+  it.each(Object.entries(FAILURES))(
+    "un error de %s llega al registro sin la dirección y con su causa",
+    async (_service, failure) => {
+      mockWiring(failure.options);
+
+      await registerAndDeliver(validBody());
+
+      const log = loggedErrors();
+      expect(log).toContain(`Causado por: Error: ${failure.rootCause}`);
+      expect(log).not.toContain(EMAIL);
+    },
+  );
+
+  it.each(Object.entries(FAILURES))(
+    "un error de %s no cambia la respuesta ya enviada",
+    async (_service, failure) => {
+      const sano = await registerWith({});
+      const fallido = await registerWith(failure.options);
+
+      await expect(runScheduledWork()).resolves.toBeUndefined();
+      expect(fallido).toEqual(sano);
+    },
+  );
+});
+
+describe("validación del registro", () => {
+  beforeEach(resetModulesAndRecorded);
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const INVALID_FORMS: Readonly<Record<string, unknown>> = {
+    "sin un campo": { ...validBody(), country: undefined },
+    "con un correo sin forma": validBody({ email: "nerea" }),
+    "con una fecha de nacimiento futura": validBody({
+      dateOfBirth: "3026-01-01",
+    }),
+    "con un tipo de membresía que no existe": validBody({
+      membershipType: "Platinum",
+    }),
+  };
+
+  it.each(Object.entries(INVALID_FORMS))(
+    "un formulario %s responde con su error y no deja trabajo diferido",
+    async (_form, body) => {
+      mockWiring();
+
+      const response = await postRegistration(body);
+
+      expect([400, 422]).toContain(response.status);
+      expect(scheduledWork).toEqual([]);
+      expect(calls).toEqual([]);
+    },
+  );
 });

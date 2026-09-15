@@ -9,7 +9,9 @@ import {
   type NewMemberRow,
   type RequestedConfirmationEmail,
   RegistrationValidationError,
-  registerMember,
+  type RegistrationReceipt,
+  type ConfirmationEmailOutcome,
+  prepareRegistration,
 } from "@/lib/auth/register-member";
 import type { RegistrationRequest } from "@/lib/auth/registration";
 
@@ -40,6 +42,7 @@ type Doubles = {
   readonly deletedUserIds: string[];
   readonly confirmationEmailsRequested: string[];
   readonly confirmationAppUrls: string[];
+  readonly calls: string[];
 };
 
 type DoubleOptions = {
@@ -55,14 +58,17 @@ function doubles(options: DoubleOptions = {}): Doubles {
   const deletedUserIds: string[] = [];
   const confirmationEmailsRequested: string[] = [];
   const confirmationAppUrls: string[] = [];
+  const calls: string[] = [];
 
   return {
+    calls,
     insertedRows,
     deletedUserIds,
     confirmationEmailsRequested,
     confirmationAppUrls,
     identities: {
       async createIdentity() {
+        calls.push("createIdentity");
         if (options.createIdentityFails) {
           throw options.createIdentityFails;
         }
@@ -77,6 +83,7 @@ function doubles(options: DoubleOptions = {}): Doubles {
     },
     members: {
       async insertMember(row) {
+        calls.push("insertMember");
         if (options.insertMemberFails) {
           throw options.insertMemberFails;
         }
@@ -85,6 +92,7 @@ function doubles(options: DoubleOptions = {}): Doubles {
     },
     confirmationEmail: {
       async requestConfirmationEmail(email, appUrl) {
+        calls.push("requestConfirmationEmail");
         confirmationEmailsRequested.push(email);
         confirmationAppUrls.push(appUrl);
         return options.confirmationEmail ?? { kind: "requested" };
@@ -93,17 +101,70 @@ function doubles(options: DoubleOptions = {}): Doubles {
   };
 }
 
-function register(
+function prepare(
   given: Doubles,
   request: RegistrationRequest = requestWith(),
-): ReturnType<typeof registerMember> {
-  return registerMember(given, {
+): ReturnType<typeof prepareRegistration> {
+  return prepareRegistration(given, {
     request,
     clubId: CLUB_ID,
     now: NOW,
     appUrl: APP_URL,
   });
 }
+
+/** Prepara el registro y corre en el acto el trabajo que la ruta deja para
+ * después de responder. */
+async function register(
+  given: Doubles,
+  request: RegistrationRequest = requestWith(),
+): Promise<{
+  readonly receipt: RegistrationReceipt;
+  readonly confirmationEmail: ConfirmationEmailOutcome;
+}> {
+  const pending = prepare(given, request);
+  return { receipt: pending.receipt, confirmationEmail: await pending.deliver() };
+}
+
+describe("registro con entrega diferida", () => {
+  it("preparar el registro no crea la identidad, ni la fila, ni pide el correo", () => {
+    const given = doubles();
+
+    prepare(given);
+
+    expect(given.calls).toEqual([]);
+  });
+
+  it("al entregar crea la identidad, escribe la fila y pide el correo, en ese orden", async () => {
+    const given = doubles();
+
+    await prepare(given).deliver();
+
+    expect(given.calls).toEqual([
+      "createIdentity",
+      "insertMember",
+      "requestConfirmationEmail",
+    ]);
+  });
+
+  it("el recibo está listo antes de entregar y es el mismo con una dirección ya registrada", () => {
+    const nuevo = prepare(doubles());
+    const repetido = prepare(
+      doubles({ identityCreation: { kind: "already_registered" } }),
+    );
+
+    expect(repetido.receipt).toEqual(nuevo.receipt);
+  });
+
+  it("una solicitud inválida falla al preparar, antes de que haya nada que entregar", () => {
+    const given = doubles();
+
+    expect(() => prepare(given, requestWith({ password: "corta" }))).toThrow(
+      RegistrationValidationError,
+    );
+    expect(given.calls).toEqual([]);
+  });
+});
 
 describe("registro", () => {
   it("crea la cuenta con el rol Player y el tipo de membresía elegido", async () => {

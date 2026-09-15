@@ -1,5 +1,6 @@
 import {
   type MembershipType,
+  type RegistrationDetails,
   type RegistrationIssue,
   type RegistrationRequest,
   validateRegistration,
@@ -86,9 +87,13 @@ export type RegistrationReceipt = {
   readonly email: string;
 };
 
-export type RegistrationResult = {
+/** Un registro válido que todavía no ha tocado ningún servicio. El recibo se
+ * responde ya; `deliver` crea la cuenta y pide el correo, y va después de
+ * responder: saber si la dirección tenía cuenta exige intentar crearla, y lo
+ * que tardara la respuesta en esperarlo la delataría (#158). */
+export type PendingRegistration = {
   readonly receipt: RegistrationReceipt;
-  readonly confirmationEmail: ConfirmationEmailOutcome;
+  readonly deliver: () => Promise<ConfirmationEmailOutcome>;
 };
 
 export class RegistrationValidationError extends Error {
@@ -174,36 +179,26 @@ async function createIdentity(
   }
 }
 
-/** RF-1 y RF-2 del PRD de E2: crea la identidad y el socio, y devuelve siempre
- * la misma respuesta neutra. La cuenta nace `incomplete` con el rol Player
- * (FR-008, FR-083). */
-export async function registerMember(
-  gateways: RegistrationGateways,
-  input: {
-    readonly request: RegistrationRequest;
-    readonly clubId: string;
-    readonly now: Date;
-    readonly appUrl: string;
-  },
-): Promise<RegistrationResult> {
-  const validation = validateRegistration(input.request, { now: input.now });
-  if (!validation.ok) {
-    throw new RegistrationValidationError(validation.issues);
-  }
-  const details = validation.details;
-  const receipt: RegistrationReceipt = {
-    outcome: NEUTRAL_RECEIPT_OUTCOME,
-    email: details.email,
-  };
+export type RegistrationInput = {
+  readonly request: RegistrationRequest;
+  readonly clubId: string;
+  readonly now: Date;
+  readonly appUrl: string;
+};
 
+async function createAccountAndRequestEmail(
+  gateways: RegistrationGateways,
+  details: RegistrationDetails,
+  input: RegistrationInput,
+): Promise<ConfirmationEmailOutcome> {
   const identity = await createIdentity(gateways, {
     email: details.email,
     password: details.password,
   });
   // Con una cuenta previa no se pide el correo: se lo mandaría a esa persona
-  // en cada intento y gastaría el cupo. El recibo es el mismo de todas formas.
+  // en cada intento y gastaría el cupo.
   if (identity.kind === "already_registered") {
-    return { receipt, confirmationEmail: { kind: "not_requested" } };
+    return { kind: "not_requested" };
   }
 
   await insertMemberOrUndoIdentity(gateways, {
@@ -218,12 +213,29 @@ export async function registerMember(
     account_status: "incomplete",
   });
 
+  return gateways.confirmationEmail.requestConfirmationEmail(
+    details.email,
+    input.appUrl,
+  );
+}
+
+/** RF-1 y RF-2 del PRD de E2: valida en el acto y deja preparada la creación
+ * de la identidad y el socio, con la misma respuesta neutra exista o no la
+ * cuenta. La cuenta nace `incomplete` con el rol Player (FR-008, FR-083).
+ * Lanza `RegistrationValidationError` sin tocar ningún servicio: la validación
+ * no depende de ninguna cuenta, así que puede responderse antes. */
+export function prepareRegistration(
+  gateways: RegistrationGateways,
+  input: RegistrationInput,
+): PendingRegistration {
+  const validation = validateRegistration(input.request, { now: input.now });
+  if (!validation.ok) {
+    throw new RegistrationValidationError(validation.issues);
+  }
+  const details = validation.details;
+
   return {
-    receipt,
-    confirmationEmail:
-      await gateways.confirmationEmail.requestConfirmationEmail(
-        details.email,
-        input.appUrl,
-      ),
+    receipt: { outcome: NEUTRAL_RECEIPT_OUTCOME, email: details.email },
+    deliver: () => createAccountAndRequestEmail(gateways, details, input),
   };
 }
