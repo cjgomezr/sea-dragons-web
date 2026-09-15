@@ -44,6 +44,13 @@ const silentConfirmationEmail: ConfirmationEmailGateway = {
   },
 };
 
+/** Estos tests miran la cuenta que queda en Supabase, no el cupo ni Resend. */
+const alwaysAvailableEmailDelivery = {
+  async checkAvailability() {
+    return { kind: "available" } as const;
+  },
+};
+
 function testEmail(): string {
   return `registro-${randomUUID()}@example.test`;
 }
@@ -147,10 +154,11 @@ describeRls("registro contra seadragons-dev", () => {
       await withCleanup(serviceClient, email, async () => {
         const clubId = await gateways.clubs.findClubIdBySlug(DEFAULT_CLUB_SLUG);
 
-        const pending = prepareRegistration(
+        const pending = await prepareRegistration(
           {
             ...gateways.registration,
             confirmationEmail: silentConfirmationEmail,
+            emailDelivery: alwaysAvailableEmailDelivery,
           },
           {
             request: {
@@ -208,12 +216,13 @@ describeRls("registro contra seadragons-dev", () => {
         const registration = {
           ...gateways.registration,
           confirmationEmail: silentConfirmationEmail,
+          emailDelivery: alwaysAvailableEmailDelivery,
         };
 
         const input = { request, clubId, now: new Date(), appUrl: APP_URL };
-        const first = prepareRegistration(registration, input);
+        const first = await prepareRegistration(registration, input);
         await first.deliver();
-        const second = prepareRegistration(registration, input);
+        const second = await prepareRegistration(registration, input);
         await second.deliver();
 
         expect(second.receipt).toEqual(first.receipt);

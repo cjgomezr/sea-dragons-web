@@ -1,3 +1,4 @@
+import type { EmailDeliveryAvailabilityCheck } from "@/lib/email/email-delivery-availability";
 import type { EmailRequestLog } from "./email-request-log";
 import type {
   ConfirmationEmailGateway,
@@ -36,12 +37,15 @@ export type ConfirmationEmailResendOutcome =
        * una cuenta sin confirmar: quien responde no debe esperarlo. */
       readonly deliver: () => Promise<ConfirmationEmailOutcome>;
     }
-  | { readonly kind: "rate_limited"; readonly retryAfterMinutes: number };
+  | { readonly kind: "rate_limited"; readonly retryAfterMinutes: number }
+  /** Ahora no se pueden mandar correos (#154). No depende de la cuenta. */
+  | { readonly kind: "email_unavailable"; readonly reason: string };
 
 export async function resendConfirmationEmail(
   gateways: {
     readonly requests: EmailRequestLog;
     readonly confirmationEmail: ConfirmationEmailGateway;
+    readonly emailDelivery: EmailDeliveryAvailabilityCheck;
   },
   input: {
     readonly email: string;
@@ -62,6 +66,15 @@ export async function resendConfirmationEmail(
       kind: "rate_limited",
       retryAfterMinutes: CONFIRMATION_EMAIL_WINDOW_MINUTES,
     };
+  }
+
+  // Después del límite por dirección: una ráfaga contra una sola dirección no
+  // debe gastar el cupo de envío que comparten todas.
+  const emailDelivery = await gateways.emailDelivery.checkAvailability(
+    input.now,
+  );
+  if (emailDelivery.kind === "unavailable") {
+    return { kind: "email_unavailable", reason: emailDelivery.reason };
   }
 
   return {

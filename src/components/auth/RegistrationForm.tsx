@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { readStringAt } from "@/lib/api/read-string-at";
+import type { ConfirmationReceiptOutcome } from "@/lib/auth/register-member";
 import {
   MEMBERSHIP_TYPES,
   PASSWORD_MIN_LENGTH,
@@ -50,7 +51,11 @@ type SubmissionStatus =
   | { readonly kind: "editing" }
   | { readonly kind: "submitting" }
   | { readonly kind: "failed"; readonly message: string }
-  | { readonly kind: "confirmation_pending"; readonly email: string };
+  | {
+      readonly kind: "confirmation_pending";
+      readonly email: string;
+      readonly outcome: ConfirmationReceiptOutcome;
+    };
 
 async function postJson(url: string, body: unknown): Promise<Response> {
   return fetch(url, {
@@ -58,6 +63,15 @@ async function postJson(url: string, body: unknown): Promise<Response> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+/** Sólo el aviso de envío no disponible cambia la pantalla. Cualquier otra
+ * cosa en una respuesta correcta se lee como el recibo neutro, que es el texto
+ * que nunca promete de más (#147). */
+function readReceiptOutcome(payload: unknown): ConfirmationReceiptOutcome {
+  return readStringAt(payload, ["data", "outcome"]) === "email_unavailable"
+    ? "email_unavailable"
+    : "confirmation_pending";
 }
 
 async function submitRegistration(
@@ -83,17 +97,20 @@ async function submitRegistration(
   return {
     kind: "confirmation_pending",
     email: readStringAt(payload, ["data", "email"]) ?? request.email,
+    outcome: readReceiptOutcome(payload),
   };
 }
 
 type ResendStatus =
   | { readonly kind: "idle" }
   | { readonly kind: "sending" }
-  | { readonly kind: "sent" }
+  | { readonly kind: "answered"; readonly outcome: ConfirmationReceiptOutcome }
   | { readonly kind: "failed"; readonly message: string };
 
-/** Un 200 sólo dice que el servidor atendió la petición, no que el correo
- * salió: la respuesta es la misma en los dos casos a propósito (#147). */
+/** Un 200 con el recibo neutro sólo dice que el servidor atendió la petición,
+ * no que el correo salió: la respuesta es la misma en los dos casos a
+ * propósito (#147). El aviso de envío no disponible sí se distingue, porque
+ * no depende de la dirección (#154). */
 async function requestResend(email: string): Promise<ResendStatus> {
   let response: Response;
   try {
@@ -101,24 +118,18 @@ async function requestResend(email: string): Promise<ResendStatus> {
   } catch {
     return { kind: "failed", message: RESEND_NETWORK_ERROR_MESSAGE };
   }
-  return response.ok
-    ? { kind: "sent" }
-    : { kind: "failed", message: RESEND_UNEXPECTED_ERROR_MESSAGE };
+  if (!response.ok) {
+    return { kind: "failed", message: RESEND_UNEXPECTED_ERROR_MESSAGE };
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  return { kind: "answered", outcome: readReceiptOutcome(payload) };
 }
 
 /** El texto no puede prometer que el correo salió, porque el servidor no lo
  * dice. Por eso nombra la salida que sirve en los dos casos: pedir otro. */
-function ConfirmationPending({ email }: { email: string }): React.JSX.Element {
-  const [resend, setResend] = useState<ResendStatus>({ kind: "idle" });
-
-  async function handleResend(): Promise<void> {
-    setResend({ kind: "sending" });
-    setResend(await requestResend(email));
-  }
-
+function EmailSentNotice({ email }: { email: string }): React.JSX.Element {
   return (
-    <section className="auth-form" aria-labelledby="registro-confirma-titulo">
-      <h1 id="registro-confirma-titulo">Confirma tu correo</h1>
+    <>
       <p className="auth-lead">
         Te mandamos un enlace a <strong>{email}</strong>. Ábrelo para terminar:
         hasta entonces tu cuenta queda incompleta y no puedes entrar.
@@ -126,25 +137,91 @@ function ConfirmationPending({ email }: { email: string }): React.JSX.Element {
       <p className="auth-note">
         Si no te llega en unos minutos, reenvíalo desde aquí.
       </p>
+    </>
+  );
+}
+
+function EmailUnavailableNotice({
+  email,
+}: {
+  email: string;
+}): React.JSX.Element {
+  return (
+    <>
+      <p className="auth-lead">
+        Para terminar tienes que abrir el enlace que mandaremos a{" "}
+        <strong>{email}</strong>. Hasta entonces tu cuenta queda incompleta y no
+        puedes entrar.
+      </p>
+      <p className="auth-error" role="alert">
+        Ahora no podemos mandar correos, así que el enlace todavía no ha salido.
+        Inténtalo de nuevo más tarde.
+      </p>
+    </>
+  );
+}
+
+function ResendFeedback({
+  resend,
+}: {
+  resend: ResendStatus;
+}): React.JSX.Element | null {
+  if (resend.kind === "failed") {
+    return (
+      <p className="auth-error" role="alert">
+        {resend.message}
+      </p>
+    );
+  }
+  if (resend.kind !== "answered") {
+    return null;
+  }
+  return (
+    <p className="auth-note" role="status">
+      {resend.outcome === "email_unavailable"
+        ? "Lo intentamos de nuevo y todavía no podemos mandar correos."
+        : "Si esa dirección tiene una cuenta sin confirmar, el enlace va en camino."}
+    </p>
+  );
+}
+
+function ConfirmationPending({
+  email,
+  initialOutcome,
+}: {
+  email: string;
+  initialOutcome: ConfirmationReceiptOutcome;
+}): React.JSX.Element {
+  const [outcome, setOutcome] = useState(initialOutcome);
+  const [resend, setResend] = useState<ResendStatus>({ kind: "idle" });
+  const isEmailUnavailable = outcome === "email_unavailable";
+
+  async function handleResend(): Promise<void> {
+    setResend({ kind: "sending" });
+    const result = await requestResend(email);
+    if (result.kind === "answered") {
+      setOutcome(result.outcome);
+    }
+    setResend(result);
+  }
+
+  return (
+    <section className="auth-form" aria-labelledby="registro-confirma-titulo">
+      <h1 id="registro-confirma-titulo">Confirma tu correo</h1>
+      {isEmailUnavailable ? (
+        <EmailUnavailableNotice email={email} />
+      ) : (
+        <EmailSentNotice email={email} />
+      )}
       <button
         type="button"
         className="auth-submit"
         onClick={handleResend}
         disabled={resend.kind === "sending"}
       >
-        Reenviar el correo
+        {isEmailUnavailable ? "Reintentar el envío" : "Reenviar el correo"}
       </button>
-      {resend.kind === "sent" && (
-        <p className="auth-note" role="status">
-          Si esa dirección tiene una cuenta sin confirmar, el enlace va en
-          camino.
-        </p>
-      )}
-      {resend.kind === "failed" && (
-        <p className="auth-error" role="alert">
-          {resend.message}
-        </p>
-      )}
+      <ResendFeedback resend={resend} />
     </section>
   );
 }
@@ -262,7 +339,12 @@ export function RegistrationForm({
   }
 
   if (status.kind === "confirmation_pending") {
-    return <ConfirmationPending email={status.email} />;
+    return (
+      <ConfirmationPending
+        email={status.email}
+        initialOutcome={status.outcome}
+      />
+    );
   }
 
   return (

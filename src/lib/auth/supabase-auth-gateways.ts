@@ -25,7 +25,15 @@ import type {
 } from "./complete-registration";
 import type { EmailConfirmationGateway } from "./email-confirmation";
 import type { EmailRequestLog } from "./email-request-log";
-import { connectResendEmailSender } from "@/lib/email/resend-email-sender";
+import {
+  type EmailDeliveryAvailabilityCheck,
+  createEmailDeliveryAvailabilityCheck,
+} from "@/lib/email/email-delivery-availability";
+import {
+  connectResendEmailSender,
+  createResendProviderProbe,
+} from "@/lib/email/resend-email-sender";
+import { createSupabaseEmailSendBudget } from "@/lib/email/supabase-email-send-budget";
 import {
   type ConfirmationTokenIssuer,
   createConfirmationEmailGateway,
@@ -56,7 +64,9 @@ export type ClubDirectory = {
 };
 
 export type SupabaseAuthGateways = {
-  readonly registration: RegistrationGateways;
+  /** Sin la disponibilidad del envío, que necesita el club: ver
+   * `emailDeliveryForClub`. */
+  readonly registration: Omit<RegistrationGateways, "emailDelivery">;
   readonly confirmations: EmailConfirmationGateway;
   readonly clubs: ClubDirectory;
   /** Leer la fila del socio y escribir lo que le faltaba son la misma pieza:
@@ -75,6 +85,11 @@ export type SupabaseAuthGateways = {
   readonly confirmationEmailRequestsForClub: (
     clubId: string,
   ) => EmailRequestLog;
+  /** Si ahora se pueden mandar correos (#154). Pide el club porque cada
+   * petición anotada en el cupo lleva `club_id` (NFR-009). */
+  readonly emailDeliveryForClub: (
+    clubId: string,
+  ) => EmailDeliveryAvailabilityCheck;
 };
 
 export type SupabaseAuthGatewaysResult =
@@ -467,9 +482,10 @@ export function createSupabaseAuthGateways(
   const anonClient = createClient(anonConfig.url, anonConfig.anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  const emails = connectResendEmailSender(env);
   const confirmationEmail = createConfirmationEmailGateway({
     tokens: createConfirmationTokenIssuer(serviceClient),
-    emails: connectResendEmailSender(env),
+    emails,
   });
 
   return {
@@ -490,6 +506,12 @@ export function createSupabaseAuthGateways(
         createSupabaseEmailRequestLog(serviceClient, {
           table: CONFIRMATION_EMAIL_REQUESTS_TABLE,
           clubId,
+        }),
+      emailDeliveryForClub: (clubId) =>
+        createEmailDeliveryAvailabilityCheck({
+          connection: emails,
+          provider: createResendProviderProbe(env),
+          budget: createSupabaseEmailSendBudget(serviceClient, clubId),
         }),
     },
   };

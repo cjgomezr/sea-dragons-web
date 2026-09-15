@@ -1,4 +1,8 @@
 import { readStringAt } from "@/lib/api/read-string-at";
+import type {
+  EmailProviderProbe,
+  EmailProviderStatus,
+} from "./email-delivery-availability";
 
 /**
  * El envío de correo transaccional por Resend (INT-006). Es de servidor: lee
@@ -121,14 +125,19 @@ async function readJsonBody(response: Response): Promise<unknown> {
   }
 }
 
-function describeRejection(status: number, body: unknown): string {
+/** El estado con el nombre y el mensaje del error de Resend, cuando los hay. */
+function describeResendAnswer(status: number, body: unknown): string {
   const name = readStringAt(body, ["name"]);
   const message = readStringAt(body, ["message"]);
   const detail = [
     name === null ? "" : ` (${name})`,
     message === null ? "" : `: ${message}`,
   ].join("");
-  return `Resend rechazó el envío con ${status}${detail}`;
+  return `${status}${detail}`;
+}
+
+function describeRejection(status: number, body: unknown): string {
+  return `Resend rechazó el envío con ${describeResendAnswer(status, body)}`;
 }
 
 async function sendThroughResend(
@@ -176,5 +185,76 @@ export function connectResendEmailSender(
   return {
     kind: "connected",
     sender: { sendEmail: (email) => sendThroughResend(connection, email) },
+  };
+}
+
+/** Una consulta de sólo lectura: la sonda no manda nada a nadie (#154). */
+export const RESEND_PROBE_ENDPOINT = "https://api.resend.com/domains";
+
+/** Más corto que el del envío: la sonda va antes de responder a todo el que
+ * se registra, y un proveedor que tarda tanto ya no está disponible. */
+const PROBE_TIMEOUT_MS = 3_000;
+
+const UNAUTHORIZED_STATUS = 401;
+const TOO_MANY_REQUESTS_STATUS = 429;
+/** Lo que responde Resend a una clave que sólo puede enviar cuando se le
+ * pregunta otra cosa. La de producción es de ese tipo. */
+const SEND_ONLY_KEY_ERROR = "restricted_api_key";
+
+/** Contestar con un rechazo también es estar en pie. La clave de sólo envío
+ * prueba además que la clave vale, y un 429 es el límite por segundo de la
+ * API, no una caída. Lo demás (5xx, una clave suspendida) deja sin envío. */
+function isProviderAnswering(response: Response, body: unknown): boolean {
+  if (response.ok || response.status === TOO_MANY_REQUESTS_STATUS) {
+    return true;
+  }
+  return (
+    response.status === UNAUTHORIZED_STATUS &&
+    readStringAt(body, ["name"]) === SEND_ONLY_KEY_ERROR
+  );
+}
+
+async function probeResend(
+  apiKey: string,
+  fetchImplementation: typeof fetch,
+): Promise<EmailProviderStatus> {
+  let response: Response;
+  try {
+    response = await fetchImplementation(RESEND_PROBE_ENDPOINT, {
+      method: "GET",
+      headers: { authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+  } catch (error) {
+    return {
+      kind: "unreachable",
+      reason: `No se pudo hablar con Resend: ${describeCause(error)}`,
+    };
+  }
+  const body = await readJsonBody(response);
+  if (isProviderAnswering(response, body)) {
+    return { kind: "reachable" };
+  }
+  return {
+    kind: "unreachable",
+    reason: `La sonda de Resend respondió ${describeResendAnswer(response.status, body)}`,
+  };
+}
+
+export function createResendProviderProbe(
+  env: Environment,
+  fetchImplementation: typeof fetch = fetch,
+): EmailProviderProbe {
+  return {
+    async probeProvider() {
+      const apiKey = readVariable(env, RESEND_API_KEY_ENV);
+      if (apiKey === null) {
+        return {
+          kind: "unreachable",
+          reason: describeMissingVariables([RESEND_API_KEY_ENV]),
+        };
+      }
+      return probeResend(apiKey, fetchImplementation);
+    },
   };
 }

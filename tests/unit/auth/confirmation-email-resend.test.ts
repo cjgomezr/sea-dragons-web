@@ -10,6 +10,10 @@ import type {
   ConfirmationEmailGateway,
   ConfirmationEmailOutcome,
 } from "@/lib/auth/register-member";
+import type {
+  EmailDeliveryAvailability,
+  EmailDeliveryAvailabilityCheck,
+} from "@/lib/email/email-delivery-availability";
 
 const EMAIL = "nerea@example.test";
 const APP_URL =
@@ -20,19 +24,32 @@ const MILLISECONDS_PER_MINUTE = 60_000;
 type Recorded = {
   readonly logged: { email: string; now: Date; windowStart: Date }[];
   readonly requested: string[];
+  readonly availabilityChecks: Date[];
 };
 
 function doublesWith(options: {
   readonly requestsInWindow: number;
   readonly delivery?: ConfirmationEmailOutcome;
+  readonly emailDelivery?: EmailDeliveryAvailability;
 }): {
   readonly recorded: Recorded;
   readonly requests: EmailRequestLog;
   readonly confirmationEmail: ConfirmationEmailGateway;
+  readonly emailDelivery: EmailDeliveryAvailabilityCheck;
 } {
-  const recorded: Recorded = { logged: [], requested: [] };
+  const recorded: Recorded = {
+    logged: [],
+    requested: [],
+    availabilityChecks: [],
+  };
   return {
     recorded,
+    emailDelivery: {
+      async checkAvailability(now) {
+        recorded.availabilityChecks.push(now);
+        return options.emailDelivery ?? { kind: "available" };
+      },
+    },
     requests: {
       async recordAndCountRecent(input) {
         recorded.logged.push({ ...input });
@@ -54,7 +71,9 @@ async function deliverPending(
   outcome: ConfirmationEmailResendOutcome,
 ): Promise<ConfirmationEmailOutcome> {
   if (outcome.kind !== "accepted") {
-    throw new Error(`Se esperaba una entrega pendiente y llegó ${outcome.kind}.`);
+    throw new Error(
+      `Se esperaba una entrega pendiente y llegó ${outcome.kind}.`,
+    );
   }
   return outcome.deliver();
 }
@@ -133,5 +152,59 @@ describe("límite del reenvío de la confirmación", () => {
       retryAfterMinutes: CONFIRMATION_EMAIL_WINDOW_MINUTES,
     });
     expect(doubles.recorded.requested).toEqual([]);
+  });
+
+  // El límite por dirección se responde antes: una ráfaga contra una sola
+  // dirección no debe gastar el cupo que comparten todas.
+  it("superado el límite no pregunta por la disponibilidad del envío", async () => {
+    const doubles = doublesWith({
+      requestsInWindow: MAX_CONFIRMATION_EMAILS_PER_WINDOW + 1,
+    });
+
+    await resendConfirmationEmail(doubles, {
+      email: EMAIL,
+      now: NOW,
+      appUrl: APP_URL,
+    });
+
+    expect(doubles.recorded.availabilityChecks).toEqual([]);
+  });
+});
+
+describe("reenvío con el envío no disponible", () => {
+  const UNAVAILABLE: EmailDeliveryAvailability = {
+    kind: "unavailable",
+    reason: "Resend respondió 503",
+  };
+
+  it("dice que no se puede mandar, con el motivo, y no deja entrega pendiente", async () => {
+    const doubles = doublesWith({
+      requestsInWindow: 1,
+      emailDelivery: UNAVAILABLE,
+    });
+
+    const outcome = await resendConfirmationEmail(doubles, {
+      email: EMAIL,
+      now: NOW,
+      appUrl: APP_URL,
+    });
+
+    expect(outcome).toEqual({
+      kind: "email_unavailable",
+      reason: "Resend respondió 503",
+    });
+    expect(doubles.recorded.requested).toEqual([]);
+  });
+
+  it("pregunta por la disponibilidad con el instante de la petición", async () => {
+    const doubles = doublesWith({ requestsInWindow: 1 });
+
+    await resendConfirmationEmail(doubles, {
+      email: EMAIL,
+      now: NOW,
+      appUrl: APP_URL,
+    });
+
+    expect(doubles.recorded.availabilityChecks).toEqual([NOW]);
   });
 });
