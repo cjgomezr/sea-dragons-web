@@ -64,6 +64,7 @@ const postConfirmationEmail = createApiRoute<
   ConfirmationEmailBody
 >({
   schema: confirmationEmailBodySchema,
+  emailField: "email",
   handler: async ({ request, body }) => {
     if (!looksLikeEmail(body.email)) {
       throw new ApiError(

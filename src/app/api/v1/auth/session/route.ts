@@ -54,6 +54,7 @@ function requireGateways(
 
 const postSession = createApiRoute<SignInResponse, SignInBody>({
   schema: signInBodySchema,
+  emailField: "email",
   handler: async ({ request, body, decorateResponse }) => {
     const wiring = requireGateways(
       createSupabaseSessionGateways(process.env, readIncomingCookies(request)),

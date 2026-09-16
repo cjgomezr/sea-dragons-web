@@ -170,6 +170,119 @@ describe("error inesperado", () => {
   });
 });
 
+describe("dirección de correo en el registro del error", () => {
+  const EMAIL = "nerea@example.test";
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function routeThatThrows(error: unknown) {
+    return createApiRoute({
+      schema: z.object({ email: z.string() }),
+      emailField: "email",
+      handler: async (): Promise<{ data: null }> => {
+        throw error;
+      },
+    });
+  }
+
+  function requestWithEmail(email: string): NextRequest {
+    return postRequest(
+      "http://localhost/api/v1/auth/password-recovery",
+      JSON.stringify({ email }),
+    );
+  }
+
+  function spyOnConsoleError() {
+    return vi.spyOn(console, "error").mockImplementation(() => {});
+  }
+
+  function loggedDetail(spy: ReturnType<typeof spyOnConsoleError>): string {
+    const [, detail] = spy.mock.calls[0] ?? [];
+    return String(detail);
+  }
+
+  it("quita del registro la dirección que llegó en el cuerpo", async () => {
+    const consoleError = spyOnConsoleError();
+    const route = routeThatThrows(
+      new Error(`Email address "${EMAIL}" is invalid`),
+    );
+
+    await route(requestWithEmail(EMAIL));
+
+    expect(loggedDetail(consoleError)).not.toContain(EMAIL);
+    expect(loggedDetail(consoleError)).toContain("is invalid");
+  });
+
+  it("conserva la pila y la cadena de causas del error registrado", async () => {
+    const consoleError = spyOnConsoleError();
+    const route = routeThatThrows(
+      new Error(`no se pudo guardar ${EMAIL}`, {
+        cause: new Error("ECONNRESET"),
+      }),
+    );
+
+    await route(requestWithEmail(EMAIL));
+
+    const detail = loggedDetail(consoleError);
+    expect(detail).toContain("handler.test");
+    expect(detail).toContain("Causado por");
+    expect(detail).toContain("ECONNRESET");
+    expect(detail).not.toContain(EMAIL);
+  });
+
+  it("quita la dirección aunque el error la cite normalizada", async () => {
+    const consoleError = spyOnConsoleError();
+    const route = routeThatThrows(new Error(`duplicate key: ${EMAIL}`));
+
+    await route(requestWithEmail(" Nerea@Example.TEST "));
+
+    expect(loggedDetail(consoleError)).not.toContain(EMAIL);
+  });
+
+  it("registra el error tal cual cuando la ruta no declara campo de correo", async () => {
+    const consoleError = spyOnConsoleError();
+    const originalError = new Error("timeout de la base");
+    const route = createApiRoute({
+      schema: z.object({ name: z.string() }),
+      handler: async (): Promise<{ data: null }> => {
+        throw originalError;
+      },
+    });
+
+    await route(
+      postRequest(
+        "http://localhost/api/v1/players",
+        JSON.stringify({ name: "Ana" }),
+      ),
+    );
+
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.any(String),
+      originalError,
+    );
+  });
+
+  it("responde al cliente el mismo mensaje genérico que una ruta sin correo", async () => {
+    spyOnConsoleError();
+    const withEmail = routeThatThrows(new Error(`falló para ${EMAIL}`));
+    const withoutEmail = createApiRoute({
+      handler: async (): Promise<{ data: null }> => {
+        throw new Error("falló");
+      },
+    });
+
+    const response = await withEmail(requestWithEmail(EMAIL));
+    const reference = await withoutEmail(
+      new NextRequest("http://localhost/api/v1/things"),
+    );
+
+    expect(response.status).toBe(reference.status);
+    await expect(response.json()).resolves.toEqual(await reference.json());
+  });
+});
+
 describe("método no permitido", () => {
   it("responde 405 con la forma de error para un método no implementado", async () => {
     const apiModule = createApiModule({
