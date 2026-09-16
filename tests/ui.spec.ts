@@ -33,7 +33,12 @@
  *   without webServer every test dies with ERR_CONNECTION_REFUSED and blocks
  *   the session for a reason unrelated to the code.
  */
-import { test, expect, type Page } from "@playwright/test";
+import {
+  test,
+  expect,
+  type Page,
+  type PageScreenshotOptions,
+} from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -234,6 +239,64 @@ function describeScreen(pg: Screen): void {
 for (const pg of PUBLIC_PAGES) {
   describeScreen(pg);
 }
+
+// Aire alrededor de los interruptores en su captura, el mismo --space-2 que
+// los separa: sin él un borde recortado por medio píxel parecería regresión.
+const TOGGLES_CORNER_PADDING_PX = 8;
+
+type Clip = NonNullable<PageScreenshotOptions["clip"]>;
+
+/**
+ * La esquina donde conviven el tema y el idioma (E17 RF-3), recortada de la
+ * página. En la cabecera de autenticación esos dos botones no tienen un
+ * contenedor propio que encuadrar, así que se recorta la caja que los cubre a
+ * ambos, y lo mismo en la cáscara para que las dos capturas se lean igual.
+ */
+async function togglesCornerClip(page: Page): Promise<Clip> {
+  const boxes = await Promise.all([
+    page.getByRole("button", { name: /tema/i }).boundingBox(),
+    page.getByRole("button", { name: /idioma|language/i }).boundingBox(),
+  ]);
+  const [theme, language] = boxes;
+  if (theme === null || language === null) {
+    throw new Error("los interruptores de tema e idioma no tienen caja");
+  }
+  const left = Math.min(theme.x, language.x) - TOGGLES_CORNER_PADDING_PX;
+  const top = Math.min(theme.y, language.y) - TOGGLES_CORNER_PADDING_PX;
+  const right =
+    Math.max(theme.x + theme.width, language.x + language.width) +
+    TOGGLES_CORNER_PADDING_PX;
+  const bottom =
+    Math.max(theme.y + theme.height, language.y + language.height) +
+    TOGGLES_CORNER_PADDING_PX;
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+function describeTogglesCorner(pg: Screen): void {
+  for (const vp of viewports) {
+    test.describe(`interruptores-${pg.name} @ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await goToWithTheme(page, pg.path, theme);
+          const clip = await togglesCornerClip(page);
+          const name = `interruptores-${pg.name}-${vp.name}-${theme}.png`;
+          await createMissingLocalBaseline(name, () =>
+            page.screenshot({ ...SCREENSHOT_OPTIONS, clip }),
+          );
+          await expect(page).toHaveScreenshot(name, {
+            ...SCREENSHOT_OPTIONS,
+            clip,
+            maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
+          });
+        });
+      }
+    });
+  }
+}
+
+describeTogglesCorner({ name: "entrar", path: "/entrar" });
 
 /* ---------------------------------------------------------------------------
    Recuperación de contraseña (#136). Sin mockup propio: se revisa contra el
@@ -559,6 +622,8 @@ test.describe("dentro de la aplicación", () => {
   for (const pg of APP_PAGES) {
     describeScreen(pg);
   }
+
+  describeTogglesCorner({ name: "panel", path: "/dashboard" });
 
   const DESKTOP = { width: 1440, height: 900 } as const;
   const MOBILE = { width: 375, height: 812 } as const;
@@ -887,8 +952,9 @@ test.describe("dentro de la aplicación", () => {
 
     const reachedByTabbing: string[] = [];
     const outlineWidths: number[] = [];
-    // One extra press covers whatever precedes the nav (the theme toggle).
-    for (let press = 0; press < expectedOrder.length + 3; press += 1) {
+    // The extra presses cover what precedes the nav: the theme toggle, the
+    // language toggle and sign out, plus one to spare.
+    for (let press = 0; press < expectedOrder.length + 4; press += 1) {
       await page.keyboard.press("Tab");
       const focused = await page.evaluate(() => {
         const element = document.activeElement;
