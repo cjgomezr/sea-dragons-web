@@ -62,6 +62,7 @@ describe("formato del repositorio", () => {
     ".next/server/app.js",
     "test-results/results.json",
     "playwright-report/index.html",
+    ".claude/worktrees/impl-1/src/lib/theme.ts",
   ])("does not look inside the generated folder of %s", async (file) => {
     const info = await prettier.getFileInfo(path.join(REPO_ROOT, file), {
       ignorePath: IGNORE_FILES,
