@@ -149,15 +149,12 @@ test.describe("interruptor de idioma dentro de la aplicación", () => {
   test("con sesión, la pantalla siguiente se pide al servidor en el idioma nuevo", async ({
     page,
   }) => {
-    const calendarRequestsInSpanish: string[] = [];
-    page.on("request", async (request) => {
+    const calendarRequestInSpanish = page.waitForRequest(async (request) => {
       if (new URL(request.url()).pathname !== CALENDAR_PATH) {
-        return;
+        return false;
       }
       const { cookie = "" } = await request.allHeaders();
-      if (cookie.includes(`${LOCALE_COOKIE_NAME}=es`)) {
-        calendarRequestsInSpanish.push(request.url());
-      }
+      return cookie.includes(`${LOCALE_COOKIE_NAME}=es`);
     });
     await page.setViewportSize(DESKTOP);
     await page.goto(`${APP_URL}/dashboard`);
@@ -172,14 +169,9 @@ test.describe("interruptor de idioma dentro de la aplicación", () => {
 
     await expect(page).toHaveURL(new RegExp(`${CALENDAR_PATH}$`));
     await expect(spanishToggle(page)).toBeVisible();
-    // Las cabeceras de cada petición se leen de forma asíncrona, así que la
-    // lista puede llenarse un instante después de que la pantalla cambie.
-    await expect
-      .poll(
-        () => calendarRequestsInSpanish.length,
-        "ninguna petición de /calendario llevó la cookie en español",
-      )
-      .toBeGreaterThan(0);
+    // Si ninguna petición de /calendario lleva la cookie en español, esto
+    // agota el tiempo del test y falla.
+    await calendarRequestInSpanish;
   });
 
   test("cumple el objetivo táctil de 44px en móvil", async ({ page }) => {
