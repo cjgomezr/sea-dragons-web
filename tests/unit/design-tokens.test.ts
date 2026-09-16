@@ -1,16 +1,18 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  cssBlock,
+  cssCustomProperties,
+  readGlobalsCss,
+} from "./helpers/css-tokens";
 import { contrastRatio } from "./helpers/wcag-contrast";
 
 const designSystem = readFileSync(
   join(process.cwd(), "design-system.md"),
   "utf-8",
 );
-const globalsCss = readFileSync(
-  join(process.cwd(), "src/app/globals.css"),
-  "utf-8",
-);
+const globalsCss = readGlobalsCss();
 
 function token<T>(tokens: Record<string, T>, key: string): T {
   const value = tokens[key];
@@ -18,29 +20,6 @@ function token<T>(tokens: Record<string, T>, key: string): T {
     throw new Error(`Missing token: ${key}`);
   }
   return value;
-}
-
-function cssBlock(css: string, selector: string): string {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = new RegExp(`${escaped}\\s*\\{([^}]*)\\}`).exec(css);
-  const body = match?.[1];
-  if (body === undefined) {
-    throw new Error(`Selector not found in globals.css: ${selector}`);
-  }
-  return body;
-}
-
-function cssCustomProperties(block: string): Record<string, string> {
-  const properties: Record<string, string> = {};
-  for (const match of block.matchAll(/--([\w-]+):\s*([^;]+);/g)) {
-    const name = match[1];
-    const value = match[2];
-    if (name === undefined || value === undefined) {
-      continue;
-    }
-    properties[name] = value.replace(/\s+/g, " ").trim();
-  }
-  return properties;
 }
 
 function markdownTable(
@@ -108,10 +87,9 @@ const darkTokens = markdownTable(designSystem, /#### Dark theme/);
 const sidebarTokens = markdownTable(designSystem, /#### Sidebar/);
 const elevationTokens = markdownTwoValueTable(designSystem, /#### Elevation/);
 
+// El tema claro es el por defecto y vive en :root a secas, para que la paleta
+// no dependa de que ThemeScript haya escrito data-theme (#174).
 const rootCss = cssCustomProperties(cssBlock(globalsCss, ":root"));
-const lightCss = cssCustomProperties(
-  cssBlock(globalsCss, ':root[data-theme="light"]'),
-);
 const darkCss = cssCustomProperties(
   cssBlock(globalsCss, ':root[data-theme="dark"]'),
 );
@@ -133,7 +111,7 @@ describe("tokens de color: tema claro", () => {
   it.each(Object.entries(colorRoleToCssVariable))(
     "%s coincide entre design-system.md y globals.css",
     (role, cssVariable) => {
-      expect(token(lightCss, cssVariable).toUpperCase()).toBe(
+      expect(token(rootCss, cssVariable).toUpperCase()).toBe(
         token(lightTokens, role).toUpperCase(),
       );
     },
@@ -179,7 +157,7 @@ describe("tokens de elevación (sombras, por tema)", () => {
   it.each(Object.entries(elevationRoleToCssVariable))(
     "%s coincide con globals.css en tema claro",
     (role, cssVariable) => {
-      expect(token(lightCss, cssVariable)).toBe(
+      expect(token(rootCss, cssVariable)).toBe(
         token(elevationTokens, role).light,
       );
     },
@@ -199,8 +177,8 @@ describe("contraste", () => {
   it("texto sobre fondo cumple AA en tema claro", () => {
     expect(
       contrastRatio(
-        token(lightCss, "color-text"),
-        token(lightCss, "color-background"),
+        token(rootCss, "color-text"),
+        token(rootCss, "color-background"),
       ),
     ).toBeGreaterThanOrEqual(4.5);
   });
@@ -208,8 +186,8 @@ describe("contraste", () => {
   it("texto secundario sobre panel cumple AA en tema claro", () => {
     expect(
       contrastRatio(
-        token(lightCss, "color-text-secondary"),
-        token(lightCss, "color-panel"),
+        token(rootCss, "color-text-secondary"),
+        token(rootCss, "color-panel"),
       ),
     ).toBeGreaterThanOrEqual(4.5);
   });
@@ -217,8 +195,8 @@ describe("contraste", () => {
   it("texto secundario sobre fondo cumple AA en tema claro", () => {
     expect(
       contrastRatio(
-        token(lightCss, "color-text-secondary"),
-        token(lightCss, "color-background"),
+        token(rootCss, "color-text-secondary"),
+        token(rootCss, "color-background"),
       ),
     ).toBeGreaterThanOrEqual(4.5);
   });
@@ -253,7 +231,7 @@ describe("contraste", () => {
   it.each(["light", "dark"] as const)(
     "el color de error cumple AA sobre el fondo y sobre el panel en tema %s",
     (theme) => {
-      const tokens = theme === "light" ? lightCss : darkCss;
+      const tokens = theme === "light" ? rootCss : darkCss;
       expect(
         contrastRatio(token(tokens, "color-danger"), token(tokens, "color-background")),
       ).toBeGreaterThanOrEqual(4.5);
@@ -269,8 +247,8 @@ describe("contraste", () => {
   it("texto sobre relleno de acento cumple AA en tema claro", () => {
     expect(
       contrastRatio(
-        token(lightCss, "color-on-accent"),
-        token(lightCss, "color-accent"),
+        token(rootCss, "color-on-accent"),
+        token(rootCss, "color-accent"),
       ),
     ).toBeGreaterThanOrEqual(4.5);
   });

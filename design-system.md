@@ -20,7 +20,14 @@ handoff), the `[data-theme="light"]` and `[data-theme="dark"]` blocks.
 
 ### Color
 
-#### Light theme (`[data-theme="light"]`)
+Cómo se aplican (#174): el tema claro es la paleta por defecto y vive en
+`:root` a secas, así que la pantalla tiene colores aunque el script del tema
+no llegue a correr. El oscuro entra por `prefers-color-scheme` mientras nadie
+haya elegido, y por `[data-theme="dark"]` en cuanto alguien elige. Cada tema
+declara además su `color-scheme`, para que los controles nativos y la barra de
+desplazamiento lo sigan.
+
+#### Light theme (paleta por defecto, en `:root`)
 
 | Role           | Value     | Usage                         |
 | -------------- | --------- | ----------------------------- |
@@ -44,7 +51,7 @@ handoff), the `[data-theme="light"]` and `[data-theme="dark"]` blocks.
 > hex del prototipo creyendo que es una errata: es una decisión de
 > accesibilidad tomada en el issue #17.
 
-#### Dark theme (`[data-theme="dark"]`)
+#### Dark theme (`[data-theme="dark"]` y `prefers-color-scheme: dark`)
 
 | Role           | Value     | Usage                         |
 | -------------- | --------- | ----------------------------- |

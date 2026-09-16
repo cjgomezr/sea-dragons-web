@@ -1,8 +1,35 @@
 /*
  * Tokens de design-system.md, extraídos de docs/Seadragons Platform.dc.html
  * (handoff de Claude Design). Cambia los valores en los dos archivos a la vez.
+ *
+ * El tema claro vive en `:root` a secas y no dentro de un selector de
+ * atributo. `data-theme` lo escribe ThemeScript, y un navegador que no ejecute
+ * ese script dejaba sin valor cada `var(--color-*)`: el navegador descarta la
+ * declaración entera, así que la página salía con el fondo blanco y sin
+ * bordes (#174). Con la paleta clara por defecto, lo peor que puede pasar es
+ * que el tema no sea el elegido.
  */
 :root {
+  color-scheme: light;
+
+  --color-accent: #1c6ea4;
+  --color-background: #eff3f7;
+  --color-panel: #ffffff;
+  --color-text: #1c3245;
+  --color-text-secondary: #5a7086;
+  --color-border: #dee6ed;
+  --color-success: #2e9e86;
+  --color-warning: #c99a3e;
+  --color-danger: #bc3b2e;
+  /* Texto sobre un relleno de acento. No es un color nuevo: es el que hace que
+     un botón primario pase AA en cada tema. Blanco sobre el acento claro da
+     5.1:1; blanco sobre el acento oscuro daría 2.6:1, así que ahí el texto es
+     el fondo oscuro, que da 7.4:1. */
+  --color-on-accent: #ffffff;
+  --shadow: 0 1px 2px rgba(13, 36, 54, 0.06), 0 6px 18px rgba(13, 36, 54, 0.06);
+  --shadow-sm: 0 1px 2px rgba(13, 36, 54, 0.07);
+
+  /* El panel del menú es azul oscuro en los dos temas. */
   --color-sidebar-background: #163a55;
   --color-sidebar-text: #cfdeea;
   --color-sidebar-text-muted: #89a1b5;
@@ -32,26 +59,41 @@
     "Liberation Mono", monospace;
 }
 
-:root[data-theme="light"] {
-  --color-accent: #1c6ea4;
-  --color-background: #eff3f7;
-  --color-panel: #ffffff;
-  --color-text: #1c3245;
-  --color-text-secondary: #5a7086;
-  --color-border: #dee6ed;
-  --color-success: #2e9e86;
-  --color-warning: #c99a3e;
-  --color-danger: #bc3b2e;
-  /* Texto sobre un relleno de acento. No es un color nuevo: es el que hace que
-     un botón primario pase AA en cada tema. Blanco sobre el acento claro da
-     5.1:1; blanco sobre el acento oscuro daría 2.6:1, así que ahí el texto es
-     el fondo oscuro, que da 7.4:1. */
-  --color-on-accent: #ffffff;
-  --shadow: 0 1px 2px rgba(13, 36, 54, 0.06), 0 6px 18px rgba(13, 36, 54, 0.06);
-  --shadow-sm: 0 1px 2px rgba(13, 36, 54, 0.07);
+/*
+ * Quien no ha elegido tema sigue al sistema. El `:not` deja fuera a quien
+ * eligió claro a mano: sin él, esta regla pesaría más que la paleta de `:root`
+ * y la elección guardada perdería contra el sistema.
+ *
+ * La paleta se repite en el bloque de abajo porque CSS no deja compartir un
+ * cuerpo de declaraciones entre una regla dentro de una media query y otra
+ * fuera. Que las dos copias sigan siendo idénticas lo comprueba
+ * tests/unit/theme-css.test.ts.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --color-accent: #33a1e0;
+    --color-background: #0c1a26;
+    --color-panel: #13283a;
+    --color-text: #e8f0f7;
+    --color-text-secondary: #8aa1b5;
+    --color-border: #274055;
+    --color-success: #6fd6b4;
+    --color-warning: #f2ce78;
+    --color-danger: #f2887a;
+    --color-on-accent: #0c1a26;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  }
 }
 
+/* La elección guardada que ThemeScript escribe en el atributo. Pesa lo mismo
+   que la regla de arriba y va después, así que gana también con el sistema en
+   claro. */
 :root[data-theme="dark"] {
+  color-scheme: dark;
+
   --color-accent: #33a1e0;
   --color-background: #0c1a26;
   --color-panel: #13283a;
