@@ -222,7 +222,7 @@ describe("recuperación de contraseña", () => {
     expect(gateways.audit.recordPasswordChanged).not.toHaveBeenCalled();
   });
 
-  it("rechaza la contraseña corta con el mismo mensaje que el registro, sin gastar el enlace", async () => {
+  it("rechaza la contraseña corta con el mismo código que el registro, sin gastar el enlace", async () => {
     const shortPassword = "1234567";
     const registration = validateRegistration(
       {
@@ -235,10 +235,9 @@ describe("recuperación de contraseña", () => {
       },
       { now: NOW },
     );
-    const registrationMessage = registration.ok
+    const registrationCode = registration.ok
       ? null
-      : registration.issues.find((issue) => issue.field === "password")
-          ?.message;
+      : registration.issues.find((issue) => issue.field === "password")?.code;
     const gateways = resetGateways();
 
     const outcome = await resetPassword(gateways, {
@@ -246,10 +245,10 @@ describe("recuperación de contraseña", () => {
       password: shortPassword,
     });
 
-    expect(registrationMessage).toMatch(/8/);
+    expect(registrationCode).toBe("password_too_short");
     expect(outcome).toEqual({
       kind: "invalid_password",
-      message: registrationMessage,
+      code: registrationCode,
     });
     expect(gateways.tokens.redeemRecoveryToken).not.toHaveBeenCalled();
   });

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { describeAuthIssue } from "@/lib/auth/issue-messages";
+import { createTranslator } from "@/lib/i18n/translator";
 import { readStringAt } from "@/lib/api/read-string-at";
 import { RECOVERY_LINK_LIFETIME_MINUTES } from "@/lib/auth/password-recovery";
 import {
@@ -22,6 +24,9 @@ import {
  * los filtros de correo abren los enlaces para inspeccionarlos, y gastarlo al
  * abrir lo dejaría inservible antes de que su dueño llegara.
  */
+
+// Provisional hasta que la pantalla reciba el idioma de la visita.
+const translate = createTranslator("es");
 
 const NETWORK_ERROR_MESSAGE =
   "No pudimos hablar con el servidor. Revisa tu conexión y vuelve a intentarlo.";
@@ -124,7 +129,10 @@ export function NewPasswordForm({
     // para decirlo.
     const validation = validatePasswordField(password);
     if (!validation.ok) {
-      setStatus({ kind: "invalid_password", message: validation.message });
+      setStatus({
+        kind: "invalid_password",
+        message: describeAuthIssue(translate, validation.code),
+      });
       return;
     }
     setStatus({ kind: "submitting" });

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { describeAuthIssue } from "@/lib/auth/issue-messages";
+import { createTranslator } from "@/lib/i18n/translator";
 import { readStringAt } from "@/lib/api/read-string-at";
 import type { ConfirmationReceiptOutcome } from "@/lib/auth/register-member";
 import {
@@ -21,6 +23,9 @@ const NETWORK_ERROR_MESSAGE =
   "No pudimos hablar con el servidor. Revisa tu conexión y vuelve a intentarlo.";
 const UNEXPECTED_ERROR_MESSAGE =
   "No pudimos crear tu cuenta. Vuelve a intentarlo en un momento.";
+
+// Provisional hasta que la pantalla reciba el idioma de la visita.
+const translate = createTranslator("es");
 
 const FIELD_LABELS: Record<RegistrationField, string> = {
   fullName: "Nombre completo",
@@ -266,7 +271,8 @@ function IssueSummary({
       <ul>
         {issues.map((issue) => (
           <li key={issue.field}>
-            {FIELD_LABELS[issue.field]}: {issue.message}
+            {FIELD_LABELS[issue.field]}:{" "}
+            {describeAuthIssue(translate, issue.code)}
           </li>
         ))}
       </ul>
@@ -331,7 +337,7 @@ export function RegistrationForm({
     const issue = issueFor(field);
     return issue === undefined ? null : (
       <p className="auth-field-error" id={errorIdOf(field)}>
-        {issue.message}
+        {describeAuthIssue(translate, issue.code)}
       </p>
     );
   }

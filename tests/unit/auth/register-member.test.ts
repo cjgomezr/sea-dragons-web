@@ -393,8 +393,8 @@ describe("registro", () => {
       register(given, requestWith({ country: "", password: "corta" })),
     ).rejects.toMatchObject({
       issues: [
-        { field: "country", message: expect.any(String) },
-        { field: "password", message: expect.any(String) },
+        { field: "country", code: "country_unknown" },
+        { field: "password", code: "password_too_short" },
       ],
     });
   });

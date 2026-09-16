@@ -31,9 +31,20 @@ export type GuardianConsentRequest = {
 
 export type GuardianConsentField = keyof GuardianConsentRequest;
 
+/** Como en el registro, el dominio dice qué falla con un código y la frase la
+ * pone quien la muestra, en su idioma. */
+export const GUARDIAN_CONSENT_ISSUE_CODES = [
+  "guardian_name_missing",
+  "guardian_email_malformed",
+  "consent_missing",
+] as const;
+
+export type GuardianConsentIssueCode =
+  (typeof GUARDIAN_CONSENT_ISSUE_CODES)[number];
+
 export type GuardianConsentIssue = {
   readonly field: GuardianConsentField;
-  readonly message: string;
+  readonly code: GuardianConsentIssueCode;
 };
 
 /** El consentimiento ya validado, con su marca de tiempo. Es lo único que
@@ -61,11 +72,6 @@ export type GuardianConsentGateways = {
   readonly identities: IdentityConfirmationReader;
   readonly audit: AuditLogWriter;
 };
-
-const MISSING_NAME_MESSAGE = "El nombre del tutor es obligatorio.";
-const INVALID_EMAIL_MESSAGE = "El correo del tutor no tiene una forma válida.";
-const MISSING_CONSENT_MESSAGE =
-  "Marca la casilla del consentimiento: sin ella la cuenta no se activa.";
 
 /** En la bitácora el socio es la entidad. Sin metadata: el nombre y el correo
  * del tutor son datos personales y la bitácora no los necesita. */
@@ -114,14 +120,16 @@ export function validateGuardianConsent(
   const guardianEmail = request.guardianEmail.trim().toLowerCase();
   const issues: GuardianConsentIssue[] = [
     ...(guardianName === ""
-      ? [{ field: "guardianName", message: MISSING_NAME_MESSAGE } as const]
+      ? [{ field: "guardianName", code: "guardian_name_missing" } as const]
       : []),
     ...(looksLikeEmail(guardianEmail)
       ? []
-      : [{ field: "guardianEmail", message: INVALID_EMAIL_MESSAGE } as const]),
+      : [
+          { field: "guardianEmail", code: "guardian_email_malformed" } as const,
+        ]),
     ...(request.consent
       ? []
-      : [{ field: "consent", message: MISSING_CONSENT_MESSAGE } as const]),
+      : [{ field: "consent", code: "consent_missing" } as const]),
   ];
   return issues.length > 0
     ? { ok: false, issues }

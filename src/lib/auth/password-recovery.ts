@@ -1,5 +1,5 @@
 import type { EmailRequestLog } from "./email-request-log";
-import { validatePasswordField } from "./registration";
+import { type FieldIssueCode, validatePasswordField } from "./registration";
 
 /**
  * La recuperación de contraseña (RF-6), contada sin Supabase ni proveedor de
@@ -169,7 +169,7 @@ export type PasswordResetOutcome =
   | { readonly kind: "password_changed" }
   | { readonly kind: "link_unusable" }
   | { readonly kind: "password_rejected" }
-  | { readonly kind: "invalid_password"; readonly message: string };
+  | { readonly kind: "invalid_password"; readonly code: FieldIssueCode };
 
 /** Fija la contraseña nueva. La contraseña se valida antes de canjear el
  * token: una demasiado corta no puede gastar el enlace. */
@@ -179,7 +179,7 @@ export async function resetPassword(
 ): Promise<PasswordResetOutcome> {
   const password = validatePasswordField(input.password);
   if (!password.ok) {
-    return { kind: "invalid_password", message: password.message };
+    return { kind: "invalid_password", code: password.code };
   }
 
   const redemption = await gateways.tokens.redeemRecoveryToken({

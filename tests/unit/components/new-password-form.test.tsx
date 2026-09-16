@@ -10,6 +10,8 @@ import {
   PASSWORD_RESET_API_PATH,
   SIGN_IN_PATH,
 } from "@/lib/auth/routes";
+import { describeAuthIssue } from "@/lib/auth/issue-messages";
+import { createTranslator } from "@/lib/i18n/translator";
 import { validatePasswordField } from "@/lib/auth/registration";
 
 const TOKEN_HASH = "hash-del-enlace";
@@ -78,7 +80,7 @@ describe("formulario de contraseña nueva", () => {
 
     expect(rule.ok).toBe(false);
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      rule.ok ? "" : rule.message,
+      rule.ok ? "" : describeAuthIssue(createTranslator("es"), rule.code),
     );
     expect(screen.getByLabelText("Contraseña nueva")).toHaveAttribute(
       "aria-invalid",

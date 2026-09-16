@@ -50,9 +50,26 @@ export type RegistrationDetails = {
 
 export type RegistrationField = keyof RegistrationRequest;
 
+/** Por qué no vale un campo, como código y no como frase: el dominio no sabe
+ * en qué idioma lo va a leer nadie. La frase la pone `describeAuthIssue`, en
+ * el idioma de la pantalla o en el de la API (E17). */
+export const FIELD_ISSUE_CODES = [
+  "full_name_missing",
+  "email_malformed",
+  "country_unknown",
+  "password_too_short",
+  "password_too_long",
+  "membership_type_unknown",
+  "date_of_birth_not_a_date",
+  "date_of_birth_in_future",
+  "date_of_birth_too_early",
+] as const;
+
+export type FieldIssueCode = (typeof FIELD_ISSUE_CODES)[number];
+
 export type RegistrationIssue = {
   readonly field: RegistrationField;
-  readonly message: string;
+  readonly code: FieldIssueCode;
 };
 
 export type RegistrationValidation =
@@ -82,10 +99,8 @@ function isRealCalendarDate(value: string): boolean {
   );
 }
 
-function validateFullName(value: string): string | null {
-  return value.trim().length === 0
-    ? "El nombre completo es obligatorio."
-    : null;
+function validateFullName(value: string): FieldIssueCode | null {
+  return value.trim().length === 0 ? "full_name_missing" : null;
 }
 
 /** Suficiente para descartar lo que no es una dirección. Lo comparten el
@@ -95,8 +110,8 @@ export function looksLikeEmail(value: string): boolean {
   return EMAIL_PATTERN.test(value.trim());
 }
 
-function validateEmail(value: string): string | null {
-  return looksLikeEmail(value) ? null : "El correo no tiene una forma válida.";
+function validateEmail(value: string): FieldIssueCode | null {
+  return looksLikeEmail(value) ? null : "email_malformed";
 }
 
 /**
@@ -110,33 +125,23 @@ function validateEmail(value: string): string | null {
  */
 export type FieldValidation<T> =
   | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly message: string };
+  | { readonly ok: false; readonly code: FieldIssueCode };
 
 export function validateCountryField(value: string): FieldValidation<string> {
   return isKnownCountryCode(value)
     ? { ok: true, value: value.trim().toUpperCase() }
-    : {
-        ok: false,
-        message:
-          "El país es obligatorio y debe ser un código ISO 3166-1 alfa-2 conocido.",
-      };
+    : { ok: false, code: "country_unknown" };
 }
 
 /** Exportada porque la recuperación de contraseña (RF-6) exige el mismo
- * mínimo que el registro, con el mismo mensaje. Una segunda copia de la regla
+ * mínimo que el registro, con el mismo código. Una segunda copia de la regla
  * sería una segunda política de contraseñas esperando a divergir. */
 export function validatePasswordField(value: string): FieldValidation<string> {
   if (value.length < PASSWORD_MIN_LENGTH) {
-    return {
-      ok: false,
-      message: `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`,
-    };
+    return { ok: false, code: "password_too_short" };
   }
   return PASSWORD_ENCODER.encode(value).length > PASSWORD_MAX_BYTES
-    ? {
-        ok: false,
-        message: `La contraseña no puede pasar de ${PASSWORD_MAX_BYTES} caracteres (las letras acentuadas y los emojis cuentan doble).`,
-      }
+    ? { ok: false, code: "password_too_long" }
     : { ok: true, value };
 }
 
@@ -149,10 +154,7 @@ export function validateMembershipTypeField(
     (candidate) => candidate === value,
   );
   return membershipType === undefined
-    ? {
-        ok: false,
-        message: `El tipo de membresía debe ser uno de ${MEMBERSHIP_TYPES.join(", ")}.`,
-      }
+    ? { ok: false, code: "membership_type_unknown" }
     : { ok: true, value: membershipType };
 }
 
@@ -161,31 +163,21 @@ export function validateDateOfBirthField(
   now: Date,
 ): FieldValidation<string> {
   if (!isRealCalendarDate(value)) {
-    return {
-      ok: false,
-      message:
-        "La fecha de nacimiento debe existir en el calendario y escribirse como AAAA-MM-DD.",
-    };
+    return { ok: false, code: "date_of_birth_not_a_date" };
   }
   if (value > clubCalendarDate(now)) {
-    return {
-      ok: false,
-      message: "La fecha de nacimiento no puede estar en el futuro.",
-    };
+    return { ok: false, code: "date_of_birth_in_future" };
   }
   if (value < EARLIEST_DATE_OF_BIRTH) {
-    return {
-      ok: false,
-      message: `La fecha de nacimiento no puede ser anterior al ${EARLIEST_DATE_OF_BIRTH}.`,
-    };
+    return { ok: false, code: "date_of_birth_too_early" };
   }
   return { ok: true, value };
 }
 
-/** El mensaje de un campo que no vale, o `null` si vale. Es la forma que pide
+/** El código de un campo que no vale, o `null` si vale. Es la forma que pide
  * la lista de comprobaciones del registro. */
-function messageOf(validation: FieldValidation<unknown>): string | null {
-  return validation.ok ? null : validation.message;
+function codeOf(validation: FieldValidation<unknown>): FieldIssueCode | null {
+  return validation.ok ? null : validation.code;
 }
 
 /** Valida y normaliza una solicitud de registro. Devuelve TODOS los campos
@@ -201,17 +193,17 @@ export function validateRegistration(
     request.dateOfBirth,
     options.now,
   );
-  const checks: readonly [RegistrationField, string | null][] = [
+  const checks: readonly [RegistrationField, FieldIssueCode | null][] = [
     ["fullName", validateFullName(request.fullName)],
     ["email", validateEmail(request.email)],
-    ["country", messageOf(country)],
-    ["password", messageOf(validatePasswordField(request.password))],
-    ["membershipType", messageOf(membershipType)],
-    ["dateOfBirth", messageOf(dateOfBirth)],
+    ["country", codeOf(country)],
+    ["password", codeOf(validatePasswordField(request.password))],
+    ["membershipType", codeOf(membershipType)],
+    ["dateOfBirth", codeOf(dateOfBirth)],
   ];
 
-  const issues = checks.flatMap(([field, message]) =>
-    message === null ? [] : [{ field, message }],
+  const issues = checks.flatMap(([field, code]) =>
+    code === null ? [] : [{ field, code }],
   );
   // Los tres últimos términos no pueden ser ciertos sin el primero: si alguno
   // de esos campos no valía, `issues` ya lo recogió. Están aquí porque son los

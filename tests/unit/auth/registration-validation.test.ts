@@ -79,7 +79,7 @@ describe("registro: validación", () => {
     const issue = issueFor(requestWith({ password: "1234567" }), "password");
 
     expect(PASSWORD_MIN_LENGTH).toBe(8);
-    expect(issue.message).toContain("8");
+    expect(issue.code).toBe("password_too_short");
   });
 
   it("acepta una contraseña de exactamente 8 caracteres", () => {
@@ -96,7 +96,7 @@ describe("registro: validación", () => {
       "password",
     );
 
-    expect(issue.message).toContain(String(PASSWORD_MAX_BYTES));
+    expect(issue.code).toBe("password_too_long");
   });
 
   it("acepta una contraseña de exactamente el máximo", () => {
@@ -126,7 +126,7 @@ describe("registro: validación", () => {
       "membershipType",
     );
 
-    expect(issue.message).toContain("Full");
+    expect(issue.code).toBe("membership_type_unknown");
   });
 
   it("rechaza una fecha de nacimiento en el futuro", () => {
@@ -135,7 +135,7 @@ describe("registro: validación", () => {
       "dateOfBirth",
     );
 
-    expect(issue.message).toContain("futuro");
+    expect(issue.code).toBe("date_of_birth_in_future");
   });
 
   it("acepta el día de hoy en Melbourne aunque en UTC todavía sea ayer", () => {

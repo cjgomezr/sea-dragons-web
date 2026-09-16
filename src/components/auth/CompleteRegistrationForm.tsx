@@ -9,10 +9,12 @@ import {
   type CompletionValues,
   validateCompletionValues,
 } from "@/lib/auth/complete-registration";
+import { MEMBERSHIP_TYPES } from "@/lib/auth/registration";
 import {
-  MEMBERSHIP_TYPES,
-  type RegistrationIssue,
-} from "@/lib/auth/registration";
+  type AuthIssueCode,
+  describeAuthIssue,
+} from "@/lib/auth/issue-messages";
+import { createTranslator } from "@/lib/i18n/translator";
 import {
   ACCOUNT_API_PATH,
   CONFIRMATION_EMAIL_API_PATH,
@@ -39,7 +41,15 @@ import { GuardianConsentForm } from "./GuardianConsentForm";
  * pedirle que se registre dos veces.
  */
 
-const REQUIRED_FIELD_MESSAGE = "Este dato es obligatorio.";
+// Provisional hasta que la pantalla reciba el idioma de la visita.
+const translate = createTranslator("es");
+
+/** Lo que se marca junto a un campo: lo que dijo la validación del dominio, o
+ * que llegó vacío. */
+type FormIssue = {
+  readonly field: CompletionField;
+  readonly code: AuthIssueCode;
+};
 
 const FIELD_LABELS: Record<CompletionField, string> = {
   country: "País",
@@ -119,7 +129,7 @@ function IssueSummary({
   issues,
   message,
 }: {
-  issues: readonly RegistrationIssue[];
+  issues: readonly FormIssue[];
   message: string | null;
 }): React.JSX.Element | null {
   if (message !== null) {
@@ -137,7 +147,10 @@ function IssueSummary({
       <p>Revisa estos campos antes de continuar:</p>
       <ul>
         {issues.map((issue) => (
-          <li key={issue.field}>{issue.message}</li>
+          <li key={issue.field}>
+            {FIELD_LABELS[issue.field]}:{" "}
+            {describeAuthIssue(translate, issue.code)}
+          </li>
         ))}
       </ul>
     </div>
@@ -153,13 +166,10 @@ function errorIdOf(field: CompletionField): string {
 function missingValueIssues(
   fields: readonly CompletionField[],
   draft: CompletionValues,
-): readonly RegistrationIssue[] {
+): readonly FormIssue[] {
   return fields
     .filter((field) => (draft[field] ?? "").trim() === "")
-    .map((field) => ({
-      field,
-      message: `${FIELD_LABELS[field]}: ${REQUIRED_FIELD_MESSAGE}`,
-    }));
+    .map((field) => ({ field, code: "required" }));
 }
 
 export function CompleteRegistrationForm({
@@ -177,14 +187,14 @@ export function CompleteRegistrationForm({
   const [requirements, setRequirements] =
     useState<readonly PendingRequirement[]>(pending);
   const [draft, setDraft] = useState<CompletionValues>({});
-  const [issues, setIssues] = useState<readonly RegistrationIssue[]>([]);
+  const [issues, setIssues] = useState<readonly FormIssue[]>([]);
   const [status, setStatus] = useState<Status>({ kind: "editing" });
 
   const fields = COMPLETION_FIELDS.filter((field) =>
     requirements.includes(field),
   );
 
-  function issueFor(field: CompletionField): RegistrationIssue | undefined {
+  function issueFor(field: CompletionField): FormIssue | undefined {
     return issues.find((issue) => issue.field === field);
   }
 
@@ -192,7 +202,7 @@ export function CompleteRegistrationForm({
     const issue = issueFor(field);
     return issue === undefined ? null : (
       <p className="auth-field-error" id={errorIdOf(field)}>
-        {issue.message}
+        {describeAuthIssue(translate, issue.code)}
       </p>
     );
   }

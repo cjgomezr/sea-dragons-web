@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { describeAuthIssue } from "@/lib/auth/issue-messages";
+import { createTranslator } from "@/lib/i18n/translator";
 import {
   type GuardianConsentField,
   type GuardianConsentIssue,
@@ -20,6 +22,9 @@ import {
  * Valida con la misma función que el servidor, pero quien decide es el
  * servidor: la marca de tiempo la pone él.
  */
+
+// Provisional hasta que la pantalla reciba el idioma de la visita.
+const translate = createTranslator("es");
 
 type Draft = {
   readonly guardianName: string;
@@ -64,7 +69,7 @@ function IssueSummary({
       <p>Revisa estos datos antes de continuar:</p>
       <ul>
         {issues.map((issue) => (
-          <li key={issue.field}>{issue.message}</li>
+          <li key={issue.field}>{describeAuthIssue(translate, issue.code)}</li>
         ))}
       </ul>
     </div>
@@ -92,7 +97,7 @@ export function GuardianConsentForm({
     const issue = issues.find((candidate) => candidate.field === field);
     return issue === undefined ? null : (
       <p className="auth-field-error" id={errorIdOf(field)}>
-        {issue.message}
+        {describeAuthIssue(translate, issue.code)}
       </p>
     );
   }
