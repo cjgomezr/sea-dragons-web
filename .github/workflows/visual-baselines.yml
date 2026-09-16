@@ -42,8 +42,58 @@ name: Visual baselines (Linux)
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    # Sólo lo que puede cambiar un píxel. Un PR de scripts, documentos o tests
+    # unitarios no puede mover la captura, y hoy gastaba cinco minutos
+    # comparándola igual (issue #193). Entran el código y sus configuraciones,
+    # la suite de Playwright con su arranque de sesión, las propias líneas base,
+    # las dependencias (una versión nueva de Next puede renderizar distinto), y
+    # este workflow con la acción que usa, para que un cambio aquí se pueda
+    # probar al hacerlo.
+    #
+    # `paths` es seguro mientras el repositorio no tenga branch protection: un
+    # check obligatorio que no arranca deja el PR esperando un estado que nunca
+    # llega. Comprobado el 16 de septiembre de 2026, el plan gratuito no la
+    # ofrece en repositorios privados. Si algún día se activa, la alternativa es
+    # dejar que el job arranque y salga temprano.
+    paths:
+      - "src/**"
+      # Las dos formas porque `*` no cruza `/`: playwright.config.ts declara
+      # testDir ./tests con testMatch **/*.spec.ts, así que un spec agrupado en
+      # una carpeta cuenta igual que los de la raíz de tests/.
+      - "tests/*.spec.ts"
+      - "tests/**/*.spec.ts"
+      - "tests/ui.spec.ts-snapshots/**"
+      - "tests/support/**"
+      - "playwright.config.ts"
+      - "next.config.ts"
+      - ".nvmrc"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/visual-baselines.yml"
+      - ".github/actions/playwright-browsers/**"
   push:
     branches: [main]
+    # Las mismas de arriba, palabra por palabra: Actions no admite anclas de
+    # YAML, así que la lista se repite. Un filtro distinto en cada disparador o
+    # gastaría de más en main, o dejaría de vigilar en main lo que el PR sí
+    # vigilaba. Hay un test que comprueba que las dos listas siguen siendo
+    # iguales.
+    paths:
+      - "src/**"
+      # Las dos formas porque `*` no cruza `/`: playwright.config.ts declara
+      # testDir ./tests con testMatch **/*.spec.ts, así que un spec agrupado en
+      # una carpeta cuenta igual que los de la raíz de tests/.
+      - "tests/*.spec.ts"
+      - "tests/**/*.spec.ts"
+      - "tests/ui.spec.ts-snapshots/**"
+      - "tests/support/**"
+      - "playwright.config.ts"
+      - "next.config.ts"
+      - ".nvmrc"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/visual-baselines.yml"
+      - ".github/actions/playwright-browsers/**"
   workflow_dispatch:
     inputs:
       reviewed_run_url:
@@ -64,7 +114,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - uses: ./.github/actions/playwright-browsers
       # Sólo en este paso: `npm ci` y sus postinstall no tienen nada que hacer
       # con una llave de escritura. El `npm run dev` que Playwright levanta sí
       # las recibe, porque lo arranca como hijo de este proceso, y las necesita:
@@ -124,7 +174,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - uses: ./.github/actions/playwright-browsers
       - name: Deja constancia de qué diff se revisó
         run: |
           echo "Línea base aceptada tras revisar:" >> "$GITHUB_STEP_SUMMARY"
