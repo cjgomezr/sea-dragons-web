@@ -7,6 +7,7 @@ import {
   REGISTER_API_PATH,
 } from "@/lib/auth/routes";
 import { listCountryOptions } from "@/lib/geo/countries";
+import { RESEND_BUTTON_LABEL } from "../helpers/confirmation-copy";
 
 // Las mismas opciones que calcula la página en el servidor: el componente ya
 // no las genera, las recibe.
@@ -222,7 +223,7 @@ describe("formulario de registro", () => {
   // membresía y la contraseña que acaba de escribir no se guardan (#179). La
   // pantalla no puede decir cuál de los dos casos es, así que lo dice como
   // condición.
-  it("avisa de que un registro anterior con esa dirección manda sobre lo que acaba de escribir", async () => {
+  it("avisa de que un registro anterior con esa dirección manda sobre lo que acaba de escribir, contraseña incluida", async () => {
     stubApi();
     renderForm();
 
@@ -230,9 +231,10 @@ describe("formulario de registro", () => {
     await userEvent.setup().click(submitButton());
 
     await screen.findByRole("heading", { name: /confirma tu correo/i });
-    expect(
-      screen.getByText(/si esta dirección ya se había registrado/i),
-    ).toBeInTheDocument();
+    const note = screen.getByText(/si esta dirección ya se había registrado/i);
+    // La contraseña se nombra porque es la que tiene consecuencia: quien crea
+    // haberla cambiado va a intentar entrar con la que acaba de escribir.
+    expect(note).toHaveTextContent(/contraseña incluida/i);
   });
 
   it("ofrece reenviar el correo de confirmación", async () => {
@@ -243,7 +245,7 @@ describe("formulario de registro", () => {
     await fillValidForm();
     await user.click(submitButton());
     await user.click(
-      await screen.findByRole("button", { name: "Reenviar el correo" }),
+      await screen.findByRole("button", { name: RESEND_BUTTON_LABEL }),
     );
 
     await waitFor(() => expect(calls).toHaveLength(2));
@@ -460,7 +462,7 @@ describe("pantalla de confirmación con el envío no disponible", () => {
 
     expect(
       screen.getByText(/si esta dirección ya se había registrado/i),
-    ).toBeInTheDocument();
+    ).toHaveTextContent(/contraseña incluida/i);
   });
 
   it("ofrece reintentar el envío", async () => {

@@ -40,7 +40,7 @@ type ConfirmationPanel = {
  * dice nada sobre si esa dirección tiene cuenta: vale igual para quien la
  * tiene y para quien no. */
 const ANOTHER_LINK_STEPS =
-  "Para conseguir otro, empieza el registro otra vez con el mismo correo: llegarás a la pantalla de confirmación, y ahí el botón «Reenviar el correo» pide uno nuevo.";
+  "Para conseguir otro, empieza el registro otra vez con el mismo correo: vuelves a la pantalla de confirmación, y ahí pides uno nuevo con el botón «Reenviar el correo».";
 
 const CONFIRMATION_PANELS: Record<ConfirmationState, ConfirmationPanel> = {
   ok: {

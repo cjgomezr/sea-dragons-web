@@ -191,7 +191,7 @@ export function renderAccountConfirmationEmail(input: {
       // tiene identidad el registro sale sin emitirlo, a propósito (#147). El
       // que sí lo emite es el botón de la pantalla de confirmación, y a esa
       // pantalla se vuelve empezando el registro de nuevo (#179).
-      "Si caduca, pide otro con el botón «Reenviar el correo» de la pantalla de confirmación. Si ya la cerraste, empieza el registro otra vez con esta dirección y volverás a ella.",
+      "Si caduca, pide otro con el botón «Reenviar el correo» de la pantalla de confirmación. Si ya la cerraste, empieza el registro otra vez con esta dirección y volverás a esa pantalla.",
     ],
     action: {
       buttonLabel: "Confirmar mi correo",

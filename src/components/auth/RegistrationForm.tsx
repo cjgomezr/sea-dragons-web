@@ -171,7 +171,8 @@ function PreviousRegistrationNote(): React.JSX.Element {
   return (
     <p className="auth-note">
       Si esta dirección ya se había registrado antes, siguen valiendo los datos
-      de aquel registro: lo que acabas de escribir no los cambia.
+      de aquel registro, contraseña incluida: lo que acabas de escribir no los
+      cambia.
     </p>
   );
 }

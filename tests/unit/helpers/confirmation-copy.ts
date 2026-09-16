@@ -9,7 +9,10 @@ import { expect } from "vitest";
  * un camino que el servidor no recorre (#179).
  */
 
-/** El botón que de verdad pide otro enlace, en la pantalla de confirmación. */
+/** El botón que de verdad pide otro enlace, en la pantalla de confirmación.
+ * Con el envío de correos caído ese mismo botón se llama "Reintentar el
+ * envío" (#154), así que quien toque cualquiera de las dos etiquetas tiene
+ * tres textos apuntando aquí. */
 export const RESEND_BUTTON_LABEL = "Reenviar el correo";
 
 /**
@@ -19,6 +22,10 @@ export const RESEND_BUTTON_LABEL = "Reenviar el correo";
  * `createAccountAndRequestEmail` sale por `already_registered` y no emite
  * ninguno, a propósito (#147). Lo único que hace ese segundo registro es
  * devolver a la pantalla de confirmación, y ahí el enlace lo pide el botón.
+ *
+ * Son trampas tendidas a la redacción vieja, no una gramática del engaño: si
+ * un día la copia se reescribe de arriba abajo, toca revisar estos patrones,
+ * nunca relajarlos para que la frase nueva pase.
  */
 export const REGISTERING_AGAIN_SENDS_A_LINK: readonly RegExp[] = [
   /vuelve a registrarte[^.]*(mandaremos|enviaremos|otro enlace|otro correo)/i,

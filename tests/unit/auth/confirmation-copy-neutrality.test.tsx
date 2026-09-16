@@ -2,14 +2,16 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, it, vi } from "vitest";
 import { RegistrationForm } from "@/components/auth/RegistrationForm";
-import RegistrationPage from "@/app/(auth)/registro/page";
 import { listCountryOptions } from "@/lib/geo/countries";
-import type { ConfirmationState } from "@/lib/auth/registration-screen";
 import { renderAccountConfirmationEmail } from "@/lib/email/email-templates";
 import {
   ACCOUNT_EXISTENCE_CLAIMS,
   expectNoneMatch,
 } from "../helpers/confirmation-copy";
+import {
+  STATES_WITHOUT_A_VALID_LINK,
+  readConfirmationPanel,
+} from "../helpers/confirmation-panels";
 
 vi.mock("next/link", () => ({
   default: ({
@@ -57,15 +59,6 @@ async function readConfirmationScreen(): Promise<string> {
   return container.textContent ?? "";
 }
 
-async function readPanel(state: ConfirmationState): Promise<string> {
-  const { container } = render(
-    await RegistrationPage({
-      searchParams: Promise.resolve({ confirmacion: state }),
-    }),
-  );
-  return container.textContent ?? "";
-}
-
 describe("la copia del enlace de confirmación no distingue direcciones", () => {
   beforeEach(() => {
     vi.stubGlobal(
@@ -94,11 +87,11 @@ describe("la copia del enlace de confirmación no distingue direcciones", () => 
     expectNoneMatch(email.text, ACCOUNT_EXISTENCE_CLAIMS, "el correo");
   });
 
-  it.each(["invalida", "error"] as const)(
+  it.each(STATES_WITHOUT_A_VALID_LINK)(
     "el panel de %s no dice si esa dirección tiene cuenta",
     async (state) => {
       expectNoneMatch(
-        await readPanel(state),
+        await readConfirmationPanel(state),
         ACCOUNT_EXISTENCE_CLAIMS,
         `el panel ${state}`,
       );
