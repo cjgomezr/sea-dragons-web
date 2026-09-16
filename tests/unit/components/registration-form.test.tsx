@@ -7,6 +7,7 @@ import {
   REGISTER_API_PATH,
 } from "@/lib/auth/routes";
 import { listCountryOptions } from "@/lib/geo/countries";
+import { RESEND_BUTTON_LABEL } from "../helpers/confirmation-copy";
 
 // Las mismas opciones que calcula la página en el servidor: el componente ya
 // no las genera, las recibe.
@@ -217,6 +218,25 @@ describe("formulario de registro", () => {
     expect(screen.getByText(/nerea@example\.test/)).toBeInTheDocument();
   });
 
+  // Un segundo registro con una dirección que ya tiene identidad sale antes de
+  // tocar la fila del socio, así que el nombre, el país, la fecha, el tipo de
+  // membresía y la contraseña que acaba de escribir no se guardan (#179). La
+  // pantalla no puede decir cuál de los dos casos es, así que lo dice como
+  // condición.
+  it("avisa de que un registro anterior con esa dirección manda sobre lo que acaba de escribir, contraseña incluida", async () => {
+    stubApi();
+    renderForm();
+
+    await fillValidForm();
+    await userEvent.setup().click(submitButton());
+
+    await screen.findByRole("heading", { name: /confirma tu correo/i });
+    const note = screen.getByText(/si esta dirección ya se había registrado/i);
+    // La contraseña se nombra porque es la que tiene consecuencia: quien crea
+    // haberla cambiado va a intentar entrar con la que acaba de escribir.
+    expect(note).toHaveTextContent(/contraseña incluida/i);
+  });
+
   it("ofrece reenviar el correo de confirmación", async () => {
     stubApi();
     const user = userEvent.setup();
@@ -225,7 +245,7 @@ describe("formulario de registro", () => {
     await fillValidForm();
     await user.click(submitButton());
     await user.click(
-      await screen.findByRole("button", { name: "Reenviar el correo" }),
+      await screen.findByRole("button", { name: RESEND_BUTTON_LABEL }),
     );
 
     await waitFor(() => expect(calls).toHaveLength(2));
@@ -431,6 +451,18 @@ describe("pantalla de confirmación con el envío no disponible", () => {
     expect(
       screen.queryByText(/te mandamos un enlace/i),
     ).not.toBeInTheDocument();
+  });
+
+  // El aviso del #179 no depende del envío: el segundo registro ignora los
+  // datos igual, salga el correo o no.
+  it("también avisa de que manda un registro anterior con esa dirección", async () => {
+    stubDelivery("email_unavailable");
+
+    await registerThroughForm();
+
+    expect(
+      screen.getByText(/si esta dirección ya se había registrado/i),
+    ).toHaveTextContent(/contraseña incluida/i);
   });
 
   it("ofrece reintentar el envío", async () => {

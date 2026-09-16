@@ -30,6 +30,18 @@ type ConfirmationPanel = {
   readonly action: ConfirmationAction;
 };
 
+/** Los pasos que de verdad acaban en un enlace nuevo, escritos una sola vez
+ * porque los dos desenlaces sin enlace válido cuentan lo mismo.
+ *
+ * Volver a registrarse NO manda ningún enlace: con una dirección que ya tiene
+ * identidad el registro sale sin emitirlo, para no escribirle a esa persona en
+ * cada intento ajeno (#147). Lo que sí hace es devolver a la pantalla de
+ * confirmación, y el enlace lo pide el botón que hay ahí (#179). El texto no
+ * dice nada sobre si esa dirección tiene cuenta: vale igual para quien la
+ * tiene y para quien no. */
+const ANOTHER_LINK_STEPS =
+  "Para conseguir otro, empieza el registro otra vez con el mismo correo: vuelves a la pantalla de confirmación, y ahí pides uno nuevo con el botón «Reenviar el correo».";
+
 const CONFIRMATION_PANELS: Record<ConfirmationState, ConfirmationPanel> = {
   ok: {
     heading: "Tu correo quedó confirmado",
@@ -46,7 +58,7 @@ const CONFIRMATION_PANELS: Record<ConfirmationState, ConfirmationPanel> = {
   },
   invalida: {
     heading: "Este enlace ya no sirve",
-    body: "El enlace de confirmación caducó o ya se usó. Vuelve a registrarte con el mismo correo y te mandaremos otro.",
+    body: `El enlace de confirmación caducó o ya se usó. ${ANOTHER_LINK_STEPS}`,
     note: "Si el problema sigue, escribe al club.",
     action: "back-to-registration",
   },
@@ -54,7 +66,7 @@ const CONFIRMATION_PANELS: Record<ConfirmationState, ConfirmationPanel> = {
     heading: "No pudimos confirmar tu correo",
     // El enlace ya se consumió al intentarlo, así que "inténtalo otra vez" con
     // el mismo enlace no lleva a ninguna parte: hay que pedir uno nuevo.
-    body: "Algo falló de nuestro lado, no en tu enlace. Ese enlace ya se gastó al intentarlo, así que vuelve a registrarte con el mismo correo y te mandaremos otro.",
+    body: `Algo falló de nuestro lado, no en tu enlace. Ese enlace ya se gastó al intentarlo. ${ANOTHER_LINK_STEPS}`,
     note: "Si el problema sigue, escribe al club.",
     action: "back-to-registration",
   },

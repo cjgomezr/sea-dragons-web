@@ -186,7 +186,12 @@ export function renderAccountConfirmationEmail(input: {
     subject: `Confirma tu correo en ${CLUB_NAME}`,
     intro: [
       `Te registraste en ${CLUB_NAME} con esta dirección.`,
-      `El enlace caduca en ${input.linkLifetimeMinutes} minutos. Si caduca, puedes pedir otro desde la pantalla de registro.`,
+      `El enlace caduca en ${input.linkLifetimeMinutes} minutos.`,
+      // Registrarse otra vez no manda ningún enlace: con una dirección que ya
+      // tiene identidad el registro sale sin emitirlo, a propósito (#147). El
+      // que sí lo emite es el botón de la pantalla de confirmación, y a esa
+      // pantalla se vuelve empezando el registro de nuevo (#179).
+      "Si caduca, pide otro con el botón «Reenviar el correo» de la pantalla de confirmación. Si ya la cerraste, empieza el registro otra vez con esta dirección y volverás a esa pantalla.",
     ],
     action: {
       buttonLabel: "Confirmar mi correo",
