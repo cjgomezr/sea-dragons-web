@@ -9,10 +9,10 @@ const WINDOWS_DRIVE_PATH = /^[A-Za-z]:[\\/]/;
 const LEADING_SLASHES = /^\/+/;
 
 /**
- * Git Bash (MSYS) reescribe los argumentos que parecen rutas absolutas antes de
- * que Node los vea, así que `--path /entrar` llega como `C:/Program Files/Git/entrar`.
- * Capturarla daría una revisión de una pantalla que nadie pidió, de modo que aquí
- * se para y se explican las dos formas de esquivarlo.
+ * Git Bash (MSYS) reescribe los argumentos que parecen rutas absolutas antes de que Node
+ * los vea, así que `--path /settings` llega como `C:/Program Files/Git/settings`. Capturarla
+ * daría una revisión de una pantalla que nadie pidió, de modo que aquí se para y se explican
+ * las dos formas de esquivarlo.
  */
 function rejectPathRewrittenByTerminal(value: string): void {
   if (!WINDOWS_DRIVE_PATH.test(value)) {
@@ -20,8 +20,8 @@ function rejectPathRewrittenByTerminal(value: string): void {
   }
   throw new Error(
     `La terminal convirtió la ruta en ${value}. Git Bash reescribe las rutas absolutas: ` +
-      `escribe MSYS_NO_PATHCONV=1 npm run ui:screenshots -- ${PATH_OPTION} /entrar, ` +
-      `o bien ${PATH_OPTION} //entrar, que pasa sin convertir.`,
+      `escribe MSYS_NO_PATHCONV=1 npm run ui:screenshots -- ${PATH_OPTION} /settings, ` +
+      `o bien ${PATH_OPTION} //settings, que pasa sin convertir.`,
   );
 }
 
@@ -46,12 +46,12 @@ export function parseCapturePath(argv: readonly string[]): string {
       `${PATH_OPTION} necesita una ruta, por ejemplo ${PATH_OPTION} /settings.`,
     );
   }
+  rejectPathRewrittenByTerminal(value);
   if (rest.length > 0) {
     throw new Error(
       `Argumentos de más tras ${PATH_OPTION} ${value}: ${rest.join(" ")}.`,
     );
   }
-  rejectPathRewrittenByTerminal(value);
 
   const absolute = value.startsWith("/") ? value : `/${value}`;
   return absolute.replace(LEADING_SLASHES, "/");

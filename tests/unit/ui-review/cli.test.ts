@@ -39,7 +39,13 @@ describe("parseCapturePath: ruta reescrita por Git Bash", () => {
   it("nombra la otra salida, escribir la ruta con doble barra", () => {
     expect(() =>
       parseCapturePath(["--path", "C:/Program Files/Git/entrar"]),
-    ).toThrow(/\/\/entrar/);
+    ).toThrow(/--path \/\/settings/);
+  });
+
+  it("explica la reescritura aunque la ruta convertida llegue partida en varios argumentos", () => {
+    expect(() =>
+      parseCapturePath(["--path", "C:/Program", "Files/Git/entrar"]),
+    ).toThrow(/MSYS_NO_PATHCONV=1/);
   });
 
   it("muestra la ruta convertida para que se reconozca el síntoma", () => {
@@ -67,6 +73,6 @@ describe("parseCapturePath: doble barra", () => {
 
 describe("parseCapturePath: valor vacío", () => {
   it("falla en vez de capturar la portada cuando --path viene con una cadena vacía", () => {
-    expect(() => parseCapturePath(["--path", ""])).toThrow(/--path/);
+    expect(() => parseCapturePath(["--path", ""])).toThrow(/necesita una ruta/);
   });
 });
