@@ -1,8 +1,9 @@
-/** Los idiomas que habla la aplicación (E17). Añadir uno obliga a darle su
- * catálogo en `message-catalogs.ts`: el compilador no deja olvidarlo. */
-export type Locale = "en" | "es";
+const SUPPORTED_LOCALES = ["en", "es"] as const;
 
-const SUPPORTED_LOCALES: readonly Locale[] = ["en", "es"];
+/** Los idiomas que habla la aplicación (E17). Añadir uno obliga a darle su
+ * catálogo en `message-catalogs.ts`: el compilador no deja olvidarlo. Sale de
+ * la lista para que `isLocale` no pueda quedarse atrás. */
+export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 /** El idioma de quien llega sin ninguna pista: la mayoría del club habla
  * inglés (PRD E17). */

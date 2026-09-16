@@ -14,7 +14,7 @@ const FULL_WEIGHT = 1;
  * idioma. */
 function parseWeight(parameters: readonly string[]): number {
   const quality = parameters
-    .map((parameter) => parameter.trim())
+    .map((parameter) => parameter.trim().toLowerCase())
     .find((parameter) => parameter.startsWith("q="));
   if (quality === undefined) {
     return FULL_WEIGHT;

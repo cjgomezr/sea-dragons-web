@@ -50,7 +50,12 @@ test.describe("idioma de la página servida", () => {
     expect(lang).toBe("en");
   });
 
-  test("no sirve una copia cacheada de otro idioma", async ({ request }) => {
+  // El servidor de desarrollo no cachea páginas, así que esto no prueba la
+  // caché de producción: eso lo garantiza que el layout lea la cookie y la
+  // cabecera, lo que vuelve dinámica cada pantalla.
+  test("dos visitas seguidas con idiomas distintos reciben cada una el suyo", async ({
+    request,
+  }) => {
     const spanish = await servedLang(request, { "accept-language": "es" });
     const english = await servedLang(request, { "accept-language": "en" });
 
