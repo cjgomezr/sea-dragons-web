@@ -1,0 +1,12 @@
+# Prettier ya lee .gitignore: node_modules, .next, test-results,
+# playwright-report y las capturas quedan fuera sin repetirlos aquí.
+
+# Next.js reescribe este archivo con su propio formato cuando le falta algo;
+# formatearlo aquí sólo produciría una pelea de diffs con `next dev`.
+tsconfig.json
+
+# Documentos fuente que llegan de fuera y se versionan tal cual: el SRD y el
+# prototipo exportado de donde salen los mockups.
+docs/SRD_Victoria_Seadragons_Club_Platform.md
+docs/Seadragons Platform.dc.html
+docs/support.js
