@@ -158,9 +158,11 @@ describe("workflow de checks", () => {
   });
 
   it("instala chromium antes de correr los tests, que lo necesitan para las capturas de UI", () => {
+    // Desde el issue #193 lo pone la acción local que cachea los navegadores,
+    // en vez de un `npx playwright install` que los bajaba en cada corrida.
     const steps = allSteps();
     const installIndex = steps.findIndex((step) =>
-      step.run?.includes("playwright install"),
+      step.uses?.includes("playwright-browsers"),
     );
     const testIndex = steps.findIndex((step) => step.run === "npm test");
 

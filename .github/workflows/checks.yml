@@ -18,11 +18,17 @@
 # No puede impedir el merge: el repositorio es privado en plan gratuito y no
 # admite branch protection. Hace ruidoso el fallo, no lo bloquea.
 #
-# `npm test` instala chromium antes de correr: no es la comparación visual
-# vinculante (esa vive en visual-baselines.yml y no se toca aquí), sino que
-# varios tests unitarios (tests/unit/ui-review/*, tests/unit/mockups/*)
-# lanzan un navegador de verdad para capturar UI, y en un runner nuevo esa
-# instalación no existe.
+# `npm test` necesita chromium: no es la comparación visual vinculante (esa
+# vive en visual-baselines.yml y no se toca aquí), sino que varios tests
+# unitarios (tests/unit/ui-review/*, tests/unit/mockups/*) lanzan un navegador
+# de verdad para capturar UI, y en un runner nuevo esa instalación no existe.
+# Lo pone la acción local que lo cachea, para no bajarlo en cada corrida.
+#
+# No lleva filtro `paths`: dentro de `npm test` hay pruebas que leen docs/
+# (tests/unit/entornos-doc.test.ts, tests/unit/prd-e2-doc.test.ts), así que un
+# PR de sólo documentación puede romperlo igual que uno de código. Lo que sí se
+# evita es repetir en `main` un árbol que el PR ya dejó en verde, que es de
+# donde sale el gasto duplicado (issue #193).
 name: checks
 
 on:
@@ -39,7 +45,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Un merge con squash deja en `main` un commit con SHA nuevo y árbol idéntico
+  # al que el PR acaba de comprobar. Este job lo averigua en segundos para que
+  # el de abajo, que cuesta ocho minutos, no repita lo ya hecho. Ante cualquier
+  # duda responde que no y los checks corren igual (issue #193).
+  arbol-ya-verificado:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    outputs:
+      ya_verificado: ${{ steps.pregunta.outputs.ya_verificado }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: pregunta
+        run: bash scripts/checks-already-green-on-pr.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+
   checks:
+    needs: [arbol-ya-verificado]
+    # `always()` es obligatorio: sin una función de estado explícita, Actions
+    # exige implícitamente que la dependencia haya terminado en success(), y en
+    # un pull request ese job ni siquiera arranca. Sin esto, los checks se
+    # saltarían en todos los PRs, que es lo contrario de lo que se busca.
+    if: always() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +83,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Instala el navegador que necesitan los tests de captura de UI
-        run: npx playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-browsers
       # Qué comandos tiene de verdad este repositorio. La plantilla de la que
       # nace un proyecto llega con `test`, `lint`, `typecheck` y `build` sin
       # rellenar, y ahí estos pasos fallarían por no existir todavía, no por

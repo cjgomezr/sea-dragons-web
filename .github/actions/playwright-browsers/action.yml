@@ -1,0 +1,48 @@
+# Los navegadores de Playwright, sin volver a descargarlos en cada corrida.
+#
+# `actions/setup-node` ya cachea el registro de npm, pero `playwright install`
+# no pasa por ahí: baja el navegador de los servidores de Microsoft y, con
+# `--with-deps`, instala además paquetes apt del runner. Eso son unos 25
+# segundos en cada uno de los tres sitios que lo necesitan (el job de `checks`,
+# y los jobs `compare` y `accept` del visual), en cada empujón.
+#
+# La clave lleva la versión que declara `package-lock.json`: subir Playwright
+# invalida la caché sola, que es lo que evita correr una suite nueva contra
+# navegadores viejos. El `runner.os` está porque la ruta y los binarios son
+# distintos en cada sistema, y una clave compartida serviría el binario
+# equivocado el día que CI corra en otro.
+name: Navegadores de Playwright
+description: Restaura los navegadores cacheados y sólo los descarga cuando cambia la versión de Playwright.
+
+runs:
+  using: composite
+  steps:
+    - id: version
+      shell: bash
+      # Del lockfile y no de node_modules: así la clave es la misma aunque el
+      # paso corra antes o después de `npm ci`.
+      run: |
+        version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
+        echo "playwright=$version" >> "$GITHUB_OUTPUT"
+
+    - id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.version.outputs.playwright }}
+
+    # `--with-deps` son paquetes del sistema, que no viven en
+    # ~/.cache/ms-playwright y por tanto no se restauran: hay que pagarlos
+    # cuando la caché falla, que es justo cuando también hay que bajar el
+    # navegador. La imagen de ubuntu-latest ya los trae, así que en un acierto
+    # de caché no hacen falta.
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npx playwright install --with-deps chromium
+
+    # Con la caché restaurada esto es una comprobación de segundos, no una
+    # descarga. Está para que una caché a medias (por ejemplo, guardada por un
+    # job que se canceló) se complete en vez de reventar al lanzar el navegador.
+    - if: steps.cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: npx playwright install chromium

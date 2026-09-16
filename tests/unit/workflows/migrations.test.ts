@@ -32,8 +32,8 @@ interface WorkflowJob {
 
 interface WorkflowFile {
   on: {
-    pull_request?: { types?: string[] };
-    push?: { branches?: string[] };
+    pull_request?: { types?: string[]; paths?: string[] };
+    push?: { branches?: string[]; paths?: string[] };
   };
   permissions: Record<string, string>;
   concurrency?: { group: string; "cancel-in-progress"?: boolean };
@@ -95,13 +95,25 @@ describe("workflow de migraciones en PR", () => {
     expect(on.push?.branches).toContain("main");
   });
 
-  it("no filtra por rutas: corre aunque el PR no traiga migraciones nuevas", () => {
-    // Lo que se verifica es que el histórico completo sigue aplicando, no sólo
-    // lo que cambió. Un `paths:` sobre supabase/migrations dejaría pasar sin
-    // comprobar el PR que rompe el histórico desde otro sitio.
-    const source = readWorkflowSource();
+  it("corre aunque el PR no traiga migraciones nuevas, mientras toque la base", () => {
+    // Lo que se verifica al arrancar sigue siendo el histórico completo, no
+    // sólo lo que cambió: un PR que edita una migración vieja, o que sólo toca
+    // el aplicador, tiene que disparar la comprobación entera. El filtro de
+    // rutas (issue #193) decide si arranca, no qué comprueba, y por eso incluye
+    // todo lo que puede romper el histórico desde fuera de supabase/.
+    const { paths } = parseWorkflow().on.pull_request ?? {};
 
-    expect(source).not.toMatch(/^\s*paths(-ignore)?:/m);
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        "supabase/**",
+        "scripts/apply-migrations*",
+        "scripts/check-schema-snapshot.sh",
+      ]),
+    );
+    // `paths-ignore` es la forma equivocada de expresarlo: cualquier ruta nueva
+    // quedaría dentro del filtro por omisión y el ahorro se iría deshaciendo
+    // solo, sin que nadie lo notara.
+    expect(readWorkflowSource()).not.toMatch(/^\s*paths-ignore:/m);
   });
 
   it("aplica las migraciones con el script del repositorio", () => {
