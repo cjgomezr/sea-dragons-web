@@ -217,6 +217,24 @@ describe("formulario de registro", () => {
     expect(screen.getByText(/nerea@example\.test/)).toBeInTheDocument();
   });
 
+  // Un segundo registro con una dirección que ya tiene identidad sale antes de
+  // tocar la fila del socio, así que el nombre, el país, la fecha, el tipo de
+  // membresía y la contraseña que acaba de escribir no se guardan (#179). La
+  // pantalla no puede decir cuál de los dos casos es, así que lo dice como
+  // condición.
+  it("avisa de que un registro anterior con esa dirección manda sobre lo que acaba de escribir", async () => {
+    stubApi();
+    renderForm();
+
+    await fillValidForm();
+    await userEvent.setup().click(submitButton());
+
+    await screen.findByRole("heading", { name: /confirma tu correo/i });
+    expect(
+      screen.getByText(/si esta dirección ya se había registrado/i),
+    ).toBeInTheDocument();
+  });
+
   it("ofrece reenviar el correo de confirmación", async () => {
     stubApi();
     const user = userEvent.setup();
@@ -431,6 +449,18 @@ describe("pantalla de confirmación con el envío no disponible", () => {
     expect(
       screen.queryByText(/te mandamos un enlace/i),
     ).not.toBeInTheDocument();
+  });
+
+  // El aviso del #179 no depende del envío: el segundo registro ignora los
+  // datos igual, salga el correo o no.
+  it("también avisa de que manda un registro anterior con esa dirección", async () => {
+    stubDelivery("email_unavailable");
+
+    await registerThroughForm();
+
+    expect(
+      screen.getByText(/si esta dirección ya se había registrado/i),
+    ).toBeInTheDocument();
   });
 
   it("ofrece reintentar el envío", async () => {

@@ -8,6 +8,11 @@ import {
   renderAccountConfirmationEmail,
   renderPasswordRecoveryEmail,
 } from "@/lib/email/email-templates";
+import {
+  REGISTERING_AGAIN_SENDS_A_LINK,
+  RESEND_BUTTON_LABEL,
+  expectNoneMatch,
+} from "../helpers/confirmation-copy";
 
 const RESET_URL =
   "https://victoria-seadragons.vercel.app/recuperar-contrasena/nueva?token_hash=abc";
@@ -75,6 +80,27 @@ describe("plantillas de correo", () => {
     expect(email.text).toContain(`${LIFETIME_MINUTES} minutos`);
     expect(readableTextOf(email.html)).toContain(CONFIRM_URL);
     expect(email.html).toContain(`${LIFETIME_MINUTES} minutos`);
+  });
+
+  // Un enlace nuevo lo emite el botón de reenvío de la pantalla de
+  // confirmación. Registrarse otra vez no emite ninguno: el servidor sale por
+  // `already_registered` a propósito (#147), así que el correo que mandaba a
+  // la pantalla de registro mandaba a ninguna parte (#179).
+  it("la de confirmación nombra el botón de reenviar para pedir otro enlace", () => {
+    const { email } = TEMPLATES.confirmación;
+
+    expect(email.text).toContain(RESEND_BUTTON_LABEL);
+    expect(readableTextOf(email.html)).toContain(RESEND_BUTTON_LABEL);
+  });
+
+  it("la de confirmación no promete que registrarse otra vez mande otro enlace", () => {
+    const { email } = TEMPLATES.confirmación;
+
+    expectNoneMatch(
+      email.text,
+      REGISTERING_AGAIN_SENDS_A_LINK,
+      "el correo de confirmación",
+    );
   });
 
   it.each(Object.entries(TEMPLATES))(

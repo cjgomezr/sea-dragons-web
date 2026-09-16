@@ -161,6 +161,21 @@ function EmailUnavailableNotice({
   );
 }
 
+/** Un segundo registro con una dirección que ya tiene identidad sale antes de
+ * escribir la fila del socio, así que el nombre, el país, la fecha, el tipo de
+ * membresía y la contraseña que acaba de escribir no se guardan (#179). La
+ * pantalla no puede decir cuál de los dos casos es sin delatar si la dirección
+ * tiene cuenta (#147), así que lo dice como condición: se lee igual la cumpla
+ * quien la lea o no. */
+function PreviousRegistrationNote(): React.JSX.Element {
+  return (
+    <p className="auth-note">
+      Si esta dirección ya se había registrado antes, siguen valiendo los datos
+      de aquel registro: lo que acabas de escribir no los cambia.
+    </p>
+  );
+}
+
 function ResendFeedback({
   resend,
 }: {
@@ -213,6 +228,7 @@ function ConfirmationPending({
       ) : (
         <EmailSentNotice email={email} />
       )}
+      <PreviousRegistrationNote />
       <button
         type="button"
         className="auth-submit"

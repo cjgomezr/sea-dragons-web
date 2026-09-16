@@ -1207,9 +1207,39 @@ for (const state of ["ok", "pendiente", "invalida", "error"] as const) {
   });
 }
 
+// Los dos desenlaces que dejan a alguien sin enlace válido: el caducado o ya
+// usado, y el fallo del servidor, que gasta el enlace al intentarlo.
+const STATES_WITHOUT_A_VALID_LINK = ["invalida", "error"] as const;
+
+// Desde el #179 son los dos que explican cómo conseguir otro enlace, así que
+// su texto ya no cabe en la línea base de la pantalla de registro: cada uno
+// tiene la suya.
+for (const state of STATES_WITHOUT_A_VALID_LINK) {
+  for (const vp of viewports) {
+    test.describe(`registro-${state} @ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await goToWithTheme(page, `/registro?confirmacion=${state}`, theme);
+          const name = `registro-${state}-${vp.name}-${theme}.png`;
+          await createMissingLocalBaseline(name, () =>
+            page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+          );
+          await expect(page).toHaveScreenshot(name, {
+            ...SCREENSHOT_OPTIONS,
+            fullPage: true,
+            maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+          });
+        });
+      }
+    });
+  }
+}
+
 // Los dos desenlaces que no dejan nada que hacer sustituyen al formulario, así
 // que sin un camino de vuelta son un callejón sin salida.
-for (const state of ["invalida", "error"] as const) {
+for (const state of STATES_WITHOUT_A_VALID_LINK) {
   test(`registro tras el enlace (${state}): ofrece volver al registro`, async ({
     page,
   }) => {
