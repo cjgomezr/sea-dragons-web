@@ -45,7 +45,7 @@ describe("formulario para pedir el enlace de recuperación", () => {
 
   it("pide el correo y lo manda al endpoint de recuperación", async () => {
     stubRequested("nerea@example.test");
-    render(<PasswordRecoveryRequestForm />);
+    render(<PasswordRecoveryRequestForm locale="es" />);
 
     await requestLinkFor("nerea@example.test");
 
@@ -62,7 +62,7 @@ describe("formulario para pedir el enlace de recuperación", () => {
 
   it("confirma el envío con el mismo texto exista o no la cuenta", async () => {
     stubRequested("nerea@example.test");
-    const registered = render(<PasswordRecoveryRequestForm />);
+    const registered = render(<PasswordRecoveryRequestForm locale="es" />);
     await requestLinkFor("nerea@example.test");
     await screen.findByRole("heading", { name: "Revisa tu correo" });
     const registeredText = registered.container.textContent;
@@ -70,7 +70,7 @@ describe("formulario para pedir el enlace de recuperación", () => {
     vi.unstubAllGlobals();
 
     stubRequested("nerea@example.test");
-    const unknown = render(<PasswordRecoveryRequestForm />);
+    const unknown = render(<PasswordRecoveryRequestForm locale="es" />);
     await requestLinkFor("nerea@example.test");
     await screen.findByRole("heading", { name: "Revisa tu correo" });
 
@@ -79,7 +79,7 @@ describe("formulario para pedir el enlace de recuperación", () => {
 
   it("dice cuánto vive el enlace y que sirve una sola vez", async () => {
     stubRequested("nerea@example.test");
-    render(<PasswordRecoveryRequestForm />);
+    render(<PasswordRecoveryRequestForm locale="es" />);
 
     await requestLinkFor("nerea@example.test");
 
@@ -95,9 +95,9 @@ describe("formulario para pedir el enlace de recuperación", () => {
       "Pediste varios enlaces seguidos. Espera 15 minutos antes de pedir otro.";
     stubApi({
       status: 429,
-      body: { error: { code: "rate_limited", message: waitMessage } },
+      body: { error: { code: "rate_limited", message: "Too many." } },
     });
-    render(<PasswordRecoveryRequestForm />);
+    render(<PasswordRecoveryRequestForm locale="es" />);
 
     await requestLinkFor("nerea@example.test");
 
@@ -112,7 +112,7 @@ describe("formulario para pedir el enlace de recuperación", () => {
       status: 500,
       body: { error: { code: "internal_error", message: "Ocurrió un error" } },
     });
-    render(<PasswordRecoveryRequestForm />);
+    render(<PasswordRecoveryRequestForm locale="es" />);
 
     await requestLinkFor("nerea@example.test");
 
@@ -124,7 +124,7 @@ describe("formulario para pedir el enlace de recuperación", () => {
 
   it("no manda nada al servidor con el correo vacío", async () => {
     stubRequested("");
-    render(<PasswordRecoveryRequestForm />);
+    render(<PasswordRecoveryRequestForm locale="es" />);
 
     await userEvent.click(
       screen.getByRole("button", { name: "Enviar enlace" }),
@@ -135,7 +135,7 @@ describe("formulario para pedir el enlace de recuperación", () => {
   });
 
   it("ofrece volver a la entrada", () => {
-    render(<PasswordRecoveryRequestForm />);
+    render(<PasswordRecoveryRequestForm locale="es" />);
 
     expect(
       screen.getByRole("link", { name: "Volver a entrar" }),

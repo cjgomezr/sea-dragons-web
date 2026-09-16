@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SignOutIcon } from "@/components/NavIcons";
 import { SESSION_API_PATH, SIGN_IN_PATH } from "@/lib/auth/routes";
-
-const LABEL = "Cerrar sesión";
+import type { Locale } from "@/lib/i18n/locale";
+import { createTranslator } from "@/lib/i18n/translator";
 
 /**
  * Cómo se dibuja el control, que no es cómo se comporta.
@@ -27,11 +27,14 @@ export type SignOutAppearance = "icon" | "text";
  * solo y vive aquí; lo único que cambia entre sitios es cómo se dibuja.
  */
 export function SignOutButton({
+  locale,
   appearance = "icon",
 }: {
+  locale: Locale;
   appearance?: SignOutAppearance;
 }): React.JSX.Element {
   const router = useRouter();
+  const label = createTranslator(locale)("signOut.label");
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   async function handleSignOut(): Promise<void> {
@@ -55,9 +58,9 @@ export function SignOutButton({
       className={isIcon ? "app-signout" : "auth-signout"}
       onClick={handleSignOut}
       disabled={isSigningOut}
-      {...(isIcon ? { "aria-label": LABEL, title: LABEL } : {})}
+      {...(isIcon ? { "aria-label": label, title: label } : {})}
     >
-      {isIcon ? <SignOutIcon /> : LABEL}
+      {isIcon ? <SignOutIcon /> : label}
     </button>
   );
 }

@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { describeAuthIssue } from "@/lib/auth/issue-messages";
-import { createTranslator } from "@/lib/i18n/translator";
 import { readStringAt } from "@/lib/api/read-string-at";
+import { describeAuthIssue } from "@/lib/auth/issue-messages";
 import type { ConfirmationReceiptOutcome } from "@/lib/auth/register-member";
 import {
   MEMBERSHIP_TYPES,
@@ -13,28 +12,17 @@ import {
   type RegistrationRequest,
   validateRegistration,
 } from "@/lib/auth/registration";
+import { REGISTRATION_WINDOW_MINUTES } from "@/lib/auth/registration-rate-limit";
 import {
   CONFIRMATION_EMAIL_API_PATH,
   REGISTER_API_PATH,
 } from "@/lib/auth/routes";
 import type { CountryOption } from "@/lib/geo/countries";
-
-const NETWORK_ERROR_MESSAGE =
-  "No pudimos hablar con el servidor. Revisa tu conexión y vuelve a intentarlo.";
-const UNEXPECTED_ERROR_MESSAGE =
-  "No pudimos crear tu cuenta. Vuelve a intentarlo en un momento.";
-
-// Provisional hasta que la pantalla reciba el idioma de la visita.
-const translate = createTranslator("es");
-
-const FIELD_LABELS: Record<RegistrationField, string> = {
-  fullName: "Nombre completo",
-  email: "Correo electrónico",
-  country: "País",
-  dateOfBirth: "Fecha de nacimiento",
-  membershipType: "Tipo de membresía",
-  password: "Contraseña",
-};
+import type { Locale } from "@/lib/i18n/locale";
+import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import { EmphasizedValue } from "./EmphasizedValue";
+import { labelOfField } from "./field-labels";
+import { type RequestFailure, readRequestFailure } from "./request-failure";
 
 const EMPTY_DRAFT: RegistrationRequest = {
   fullName: "",
@@ -45,17 +33,10 @@ const EMPTY_DRAFT: RegistrationRequest = {
   dateOfBirth: "",
 };
 
-// Los del reenvío son propios: la cuenta ya está creada, y decir "no pudimos
-// crear tu cuenta" haría que la persona vuelva a registrarse.
-const RESEND_NETWORK_ERROR_MESSAGE =
-  "No pudimos pedir otro correo porque no llegamos al servidor. Revisa tu conexión y vuelve a intentarlo.";
-const RESEND_UNEXPECTED_ERROR_MESSAGE =
-  "No pudimos pedir otro correo. Vuelve a intentarlo en un momento.";
-
 type SubmissionStatus =
   | { readonly kind: "editing" }
   | { readonly kind: "submitting" }
-  | { readonly kind: "failed"; readonly message: string }
+  | { readonly kind: "failed"; readonly failure: RequestFailure }
   | {
       readonly kind: "confirmation_pending";
       readonly email: string;
@@ -88,16 +69,12 @@ async function submitRegistration(
   } catch {
     // El detalle técnico no le sirve a nadie que esté mirando un formulario, y
     // puede nombrar hosts internos.
-    return { kind: "failed", message: NETWORK_ERROR_MESSAGE };
+    return { kind: "failed", failure: "network" };
   }
 
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    return {
-      kind: "failed",
-      message:
-        readStringAt(payload, ["error", "message"]) ?? UNEXPECTED_ERROR_MESSAGE,
-    };
+    return { kind: "failed", failure: readRequestFailure(payload) };
   }
   return {
     kind: "confirmation_pending",
@@ -106,11 +83,33 @@ async function submitRegistration(
   };
 }
 
+/** El 422 llega con datos que el formulario ya había dado por buenos, así que
+ * se pide revisarlos en vez de reintentar igual. La espera del 429 es la
+ * ventana entera del límite, la misma constante con la que cuenta el
+ * servidor. */
+function describeSubmissionFailure(
+  translate: Translator,
+  failure: RequestFailure,
+): string {
+  switch (failure) {
+    case "network":
+      return translate("auth.error.network");
+    case "business_rule":
+      return translate("auth.registration.rejected");
+    case "rate_limited":
+      return translate("auth.registration.rateLimited", {
+        count: REGISTRATION_WINDOW_MINUTES,
+      });
+    default:
+      return translate("auth.registration.unexpected");
+  }
+}
+
 type ResendStatus =
   | { readonly kind: "idle" }
   | { readonly kind: "sending" }
   | { readonly kind: "answered"; readonly outcome: ConfirmationReceiptOutcome }
-  | { readonly kind: "failed"; readonly message: string };
+  | { readonly kind: "failed"; readonly failure: "network" | "rejected" };
 
 /** Un 200 con el recibo neutro sólo dice que el servidor atendió la petición,
  * no que el correo salió: la respuesta es la misma en los dos casos a
@@ -121,10 +120,10 @@ async function requestResend(email: string): Promise<ResendStatus> {
   try {
     response = await postJson(CONFIRMATION_EMAIL_API_PATH, { email });
   } catch {
-    return { kind: "failed", message: RESEND_NETWORK_ERROR_MESSAGE };
+    return { kind: "failed", failure: "network" };
   }
   if (!response.ok) {
-    return { kind: "failed", message: RESEND_UNEXPECTED_ERROR_MESSAGE };
+    return { kind: "failed", failure: "rejected" };
   }
   const payload: unknown = await response.json().catch(() => null);
   return { kind: "answered", outcome: readReceiptOutcome(payload) };
@@ -132,65 +131,65 @@ async function requestResend(email: string): Promise<ResendStatus> {
 
 /** El texto no puede prometer que el correo salió, porque el servidor no lo
  * dice. Por eso nombra la salida que sirve en los dos casos: pedir otro. */
-function EmailSentNotice({ email }: { email: string }): React.JSX.Element {
+function EmailSentNotice({
+  translate,
+  email,
+}: {
+  translate: Translator;
+  email: string;
+}): React.JSX.Element {
   return (
     <>
       <p className="auth-lead">
-        Te mandamos un enlace a <strong>{email}</strong>. Ábrelo para terminar:
-        hasta entonces tu cuenta queda incompleta y no puedes entrar.
+        <EmphasizedValue
+          text={translate("auth.registration.emailSent", { email })}
+          value={email}
+        />
       </p>
       <p className="auth-note">
-        Si no te llega en unos minutos, reenvíalo desde aquí.
+        {translate("auth.registration.emailSentNote")}
       </p>
     </>
   );
 }
 
 function EmailUnavailableNotice({
+  translate,
   email,
 }: {
+  translate: Translator;
   email: string;
 }): React.JSX.Element {
   return (
     <>
       <p className="auth-lead">
-        Para terminar tienes que abrir el enlace que mandaremos a{" "}
-        <strong>{email}</strong>. Hasta entonces tu cuenta queda incompleta y no
-        puedes entrar.
+        <EmphasizedValue
+          text={translate("auth.registration.emailPending", { email })}
+          value={email}
+        />
       </p>
       <p className="auth-error" role="alert">
-        Ahora no podemos mandar correos, así que el enlace todavía no ha salido.
-        Inténtalo de nuevo más tarde.
+        {translate("auth.registration.emailUnavailable")}
       </p>
     </>
   );
 }
 
-/** Un segundo registro con una dirección que ya tiene identidad sale antes de
- * escribir la fila del socio, así que el nombre, el país, la fecha, el tipo de
- * membresía y la contraseña que acaba de escribir no se guardan (#179). La
- * pantalla no puede decir cuál de los dos casos es sin delatar si la dirección
- * tiene cuenta (#147), así que lo dice como condición: se lee igual la cumpla
- * quien la lea o no. */
-function PreviousRegistrationNote(): React.JSX.Element {
-  return (
-    <p className="auth-note">
-      Si esta dirección ya se había registrado antes, siguen valiendo los datos
-      de aquel registro, contraseña incluida: lo que acabas de escribir no los
-      cambia.
-    </p>
-  );
-}
-
+/** Los del reenvío son propios: la cuenta ya está creada, y decir "no pudimos
+ * crear tu cuenta" haría que la persona vuelva a registrarse. */
 function ResendFeedback({
+  translate,
   resend,
 }: {
+  translate: Translator;
   resend: ResendStatus;
 }): React.JSX.Element | null {
   if (resend.kind === "failed") {
     return (
       <p className="auth-error" role="alert">
-        {resend.message}
+        {resend.failure === "network"
+          ? translate("auth.registration.resendNetwork")
+          : translate("auth.registration.resendUnexpected")}
       </p>
     );
   }
@@ -200,16 +199,18 @@ function ResendFeedback({
   return (
     <p className="auth-note" role="status">
       {resend.outcome === "email_unavailable"
-        ? "Lo intentamos de nuevo y todavía no podemos mandar correos."
-        : "Si esa dirección tiene una cuenta sin confirmar, el enlace va en camino."}
+        ? translate("auth.registration.resendStillUnavailable")
+        : translate("auth.registration.resendRequested")}
     </p>
   );
 }
 
 function ConfirmationPending({
+  translate,
   email,
   initialOutcome,
 }: {
+  translate: Translator;
   email: string;
   initialOutcome: ConfirmationReceiptOutcome;
 }): React.JSX.Element {
@@ -228,37 +229,50 @@ function ConfirmationPending({
 
   return (
     <section className="auth-form" aria-labelledby="registro-confirma-titulo">
-      <h1 id="registro-confirma-titulo">Confirma tu correo</h1>
+      <h1 id="registro-confirma-titulo">
+        {translate("auth.registration.confirmTitle")}
+      </h1>
       {isEmailUnavailable ? (
-        <EmailUnavailableNotice email={email} />
+        <EmailUnavailableNotice translate={translate} email={email} />
       ) : (
-        <EmailSentNotice email={email} />
+        <EmailSentNotice translate={translate} email={email} />
       )}
-      <PreviousRegistrationNote />
+      {/* Un segundo registro con una dirección que ya tiene identidad sale
+          antes de escribir la fila del socio, así que lo que acaba de escribir
+          no se guarda (#179). La pantalla no puede decir cuál de los dos casos
+          es sin delatar si la dirección tiene cuenta (#147), así que lo dice
+          como condición: se lee igual la cumpla quien la lea o no. */}
+      <p className="auth-note">
+        {translate("auth.registration.previousRegistration")}
+      </p>
       <button
         type="button"
         className="auth-submit"
         onClick={handleResend}
         disabled={resend.kind === "sending"}
       >
-        {isEmailUnavailable ? "Reintentar el envío" : "Reenviar el correo"}
+        {isEmailUnavailable
+          ? translate("auth.registration.retrySend")
+          : translate("auth.registration.resend")}
       </button>
-      <ResendFeedback resend={resend} />
+      <ResendFeedback translate={translate} resend={resend} />
     </section>
   );
 }
 
 function IssueSummary({
+  translate,
   issues,
-  message,
+  failure,
 }: {
+  translate: Translator;
   issues: readonly RegistrationIssue[];
-  message: string | null;
+  failure: RequestFailure | null;
 }): React.JSX.Element | null {
-  if (message !== null) {
+  if (failure !== null) {
     return (
       <p className="auth-error" role="alert">
-        {message}
+        {describeSubmissionFailure(translate, failure)}
       </p>
     );
   }
@@ -267,11 +281,11 @@ function IssueSummary({
   }
   return (
     <div className="auth-error" role="alert">
-      <p>Revisa estos campos antes de continuar:</p>
+      <p>{translate("auth.form.fieldIssues")}</p>
       <ul>
         {issues.map((issue) => (
           <li key={issue.field}>
-            {FIELD_LABELS[issue.field]}:{" "}
+            {labelOfField(translate, issue.field)}:{" "}
             {describeAuthIssue(translate, issue.code)}
           </li>
         ))}
@@ -298,17 +312,21 @@ type FieldProps = {
   readonly "aria-describedby"?: string;
 };
 
-/** Las opciones de país llegan como prop, calculadas en el servidor, y no se
- * generan aquí. Los nombres salen de `Intl.DisplayNames` y su orden de
- * `localeCompare`, y las dos cosas dependen de la versión de ICU: Node ordena
- * "Hungría" antes que "Hong Kong" y Chromium al revés. Generarlas a los dos
- * lados rompía la hidratación, y React descartaba el árbol entero del
- * servidor: la página perdía hasta el atributo de tema. */
+/** Las opciones de país llegan como prop, calculadas en el servidor en el
+ * idioma de la visita, y no se generan aquí. Los nombres salen de
+ * `Intl.DisplayNames` y su orden de `localeCompare`, y las dos cosas dependen
+ * de la versión de ICU: Node ordena "Hungría" antes que "Hong Kong" y Chromium
+ * al revés. Generarlas a los dos lados rompía la hidratación, y React
+ * descartaba el árbol entero del servidor: la página perdía hasta el atributo
+ * de tema. */
 export function RegistrationForm({
+  locale,
   countries,
 }: {
+  locale: Locale;
   countries: readonly CountryOption[];
 }): React.JSX.Element {
+  const translate = createTranslator(locale);
   const [draft, setDraft] = useState<RegistrationRequest>(EMPTY_DRAFT);
   const [issues, setIssues] = useState<readonly RegistrationIssue[]>([]);
   const [status, setStatus] = useState<SubmissionStatus>({ kind: "editing" });
@@ -364,6 +382,7 @@ export function RegistrationForm({
   if (status.kind === "confirmation_pending") {
     return (
       <ConfirmationPending
+        translate={translate}
         email={status.email}
         initialOutcome={status.outcome}
       />
@@ -372,19 +391,19 @@ export function RegistrationForm({
 
   return (
     <form className="auth-form" onSubmit={handleSubmit} noValidate>
-      <h1>Crear tu cuenta</h1>
-      <p className="auth-lead">
-        Con estos datos el club te da de alta. Te mandaremos un enlace para
-        confirmar tu correo.
-      </p>
+      <h1>{translate("auth.registration.title")}</h1>
+      <p className="auth-lead">{translate("auth.registration.lead")}</p>
 
       <IssueSummary
+        translate={translate}
         issues={issues}
-        message={status.kind === "failed" ? status.message : null}
+        failure={status.kind === "failed" ? status.failure : null}
       />
 
       <div className="auth-field">
-        <label htmlFor="registro-fullName">{FIELD_LABELS.fullName}</label>
+        <label htmlFor="registro-fullName">
+          {labelOfField(translate, "fullName")}
+        </label>
         <input
           {...fieldProps("fullName")}
           type="text"
@@ -395,7 +414,9 @@ export function RegistrationForm({
       </div>
 
       <div className="auth-field">
-        <label htmlFor="registro-email">{FIELD_LABELS.email}</label>
+        <label htmlFor="registro-email">
+          {labelOfField(translate, "email")}
+        </label>
         <input
           {...fieldProps("email")}
           type="email"
@@ -406,12 +427,14 @@ export function RegistrationForm({
       </div>
 
       <div className="auth-field">
-        <label htmlFor="registro-country">{FIELD_LABELS.country}</label>
+        <label htmlFor="registro-country">
+          {labelOfField(translate, "country")}
+        </label>
         <select
           {...fieldProps("country")}
           onChange={(event) => update("country", event.target.value)}
         >
-          <option value="">Selecciona tu país</option>
+          <option value="">{translate("auth.field.countryPlaceholder")}</option>
           {countries.map((country) => (
             <option key={country.code} value={country.code}>
               {country.name}
@@ -422,7 +445,9 @@ export function RegistrationForm({
       </div>
 
       <div className="auth-field">
-        <label htmlFor="registro-dateOfBirth">{FIELD_LABELS.dateOfBirth}</label>
+        <label htmlFor="registro-dateOfBirth">
+          {labelOfField(translate, "dateOfBirth")}
+        </label>
         <input
           {...fieldProps("dateOfBirth")}
           type="date"
@@ -434,13 +459,15 @@ export function RegistrationForm({
 
       <div className="auth-field">
         <label htmlFor="registro-membershipType">
-          {FIELD_LABELS.membershipType}
+          {labelOfField(translate, "membershipType")}
         </label>
         <select
           {...fieldProps("membershipType")}
           onChange={(event) => update("membershipType", event.target.value)}
         >
-          <option value="">Selecciona tu membresía</option>
+          <option value="">
+            {translate("auth.field.membershipTypePlaceholder")}
+          </option>
           {MEMBERSHIP_TYPES.map((membershipType) => (
             <option key={membershipType} value={membershipType}>
               {membershipType}
@@ -451,7 +478,9 @@ export function RegistrationForm({
       </div>
 
       <div className="auth-field">
-        <label htmlFor="registro-password">{FIELD_LABELS.password}</label>
+        <label htmlFor="registro-password">
+          {labelOfField(translate, "password")}
+        </label>
         <input
           {...fieldProps("password")}
           type="password"
@@ -467,7 +496,7 @@ export function RegistrationForm({
           fieldError("password")
         ) : (
           <p className="auth-hint" id={PASSWORD_HINT_ID}>
-            Al menos {PASSWORD_MIN_LENGTH} caracteres.
+            {translate("auth.field.passwordHint", { min: PASSWORD_MIN_LENGTH })}
           </p>
         )}
       </div>
@@ -477,7 +506,7 @@ export function RegistrationForm({
         className="auth-submit"
         disabled={status.kind === "submitting"}
       >
-        Crear cuenta
+        {translate("auth.registration.submit")}
       </button>
     </form>
   );

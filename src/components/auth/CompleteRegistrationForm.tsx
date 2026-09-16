@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import type { PendingRequirement } from "@/lib/auth/account-activation";
@@ -9,27 +11,29 @@ import {
   type CompletionValues,
   validateCompletionValues,
 } from "@/lib/auth/complete-registration";
-import { MEMBERSHIP_TYPES } from "@/lib/auth/registration";
 import {
   type AuthIssueCode,
+  REQUIRED_ISSUE_CODE,
   describeAuthIssue,
 } from "@/lib/auth/issue-messages";
-import { createTranslator } from "@/lib/i18n/translator";
+import { MEMBERSHIP_TYPES } from "@/lib/auth/registration";
 import {
   ACCOUNT_API_PATH,
   CONFIRMATION_EMAIL_API_PATH,
   DASHBOARD_PATH,
 } from "@/lib/auth/routes";
 import type { CountryOption } from "@/lib/geo/countries";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import type { Locale } from "@/lib/i18n/locale";
+import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import {
   type AccountRequestResult,
-  NETWORK_ERROR_MESSAGE,
-  UNEXPECTED_ERROR_MESSAGE,
+  describeAccountFailure,
   sendAccountRequest,
 } from "./account-request";
+import { EmphasizedValue } from "./EmphasizedValue";
+import { labelOfField } from "./field-labels";
 import { GuardianConsentForm } from "./GuardianConsentForm";
+import type { RequestFailure } from "./request-failure";
 
 /**
  * La pantalla de una cuenta `incomplete` (FR-083). Sigue el lenguaje de
@@ -41,9 +45,6 @@ import { GuardianConsentForm } from "./GuardianConsentForm";
  * pedirle que se registre dos veces.
  */
 
-// Provisional hasta que la pantalla reciba el idioma de la visita.
-const translate = createTranslator("es");
-
 /** Lo que se marca junto a un campo: lo que dijo la validación del dominio, o
  * que llegó vacío. */
 type FormIssue = {
@@ -51,29 +52,25 @@ type FormIssue = {
   readonly code: AuthIssueCode;
 };
 
-const FIELD_LABELS: Record<CompletionField, string> = {
-  country: "País",
-  dateOfBirth: "Fecha de nacimiento",
-  membershipType: "Tipo de membresía",
-};
-
 type Status =
   | { readonly kind: "editing" }
   | { readonly kind: "saving" }
-  | { readonly kind: "failed"; readonly message: string };
+  | { readonly kind: "failed"; readonly failure: RequestFailure };
 
 type ResendStatus =
   | { readonly kind: "idle" }
   | { readonly kind: "sending" }
   | { readonly kind: "sent" }
-  | { readonly kind: "failed"; readonly message: string };
+  | { readonly kind: "failed"; readonly failure: RequestFailure };
 
 /** El pendiente que no se rellena escribiendo: hay que abrir el enlace. Se
  * ofrece reenviarlo porque el correo se pierde, y sin esa salida la cuenta se
  * queda encallada para siempre. */
 function EmailConfirmationNotice({
+  translate,
   email,
 }: {
+  translate: Translator;
   email: string;
 }): React.JSX.Element {
   const [resend, setResend] = useState<ResendStatus>({ kind: "idle" });
@@ -89,19 +86,21 @@ function EmailConfirmationNotice({
       setResend(
         response.ok
           ? { kind: "sent" }
-          : { kind: "failed", message: UNEXPECTED_ERROR_MESSAGE },
+          : { kind: "failed", failure: "unrecognized_response" },
       );
     } catch {
-      setResend({ kind: "failed", message: NETWORK_ERROR_MESSAGE });
+      setResend({ kind: "failed", failure: "network" });
     }
   }
 
   return (
     <section className="auth-pending">
-      <h2>Confirma tu correo</h2>
+      <h2>{translate("auth.registration.confirmTitle")}</h2>
       <p>
-        Te mandamos un enlace a <strong>{email}</strong>. Ábrelo para terminar:
-        hasta entonces tu cuenta sigue incompleta.
+        <EmphasizedValue
+          text={translate("auth.completion.confirmEmailBody", { email })}
+          value={email}
+        />
       </p>
       <button
         type="button"
@@ -109,16 +108,16 @@ function EmailConfirmationNotice({
         onClick={handleResend}
         disabled={resend.kind === "sending"}
       >
-        Reenviar el correo
+        {translate("auth.registration.resend")}
       </button>
       {resend.kind === "sent" && (
         <p className="auth-note" role="status">
-          El enlace va en camino. Revisa también la carpeta de no deseado.
+          {translate("auth.completion.resendSent")}
         </p>
       )}
       {resend.kind === "failed" && (
         <p className="auth-error" role="alert">
-          {resend.message}
+          {describeAccountFailure(translate, resend.failure)}
         </p>
       )}
     </section>
@@ -126,16 +125,18 @@ function EmailConfirmationNotice({
 }
 
 function IssueSummary({
+  translate,
   issues,
-  message,
+  failure,
 }: {
+  translate: Translator;
   issues: readonly FormIssue[];
-  message: string | null;
+  failure: RequestFailure | null;
 }): React.JSX.Element | null {
-  if (message !== null) {
+  if (failure !== null) {
     return (
       <p className="auth-error" role="alert">
-        {message}
+        {describeAccountFailure(translate, failure)}
       </p>
     );
   }
@@ -144,11 +145,11 @@ function IssueSummary({
   }
   return (
     <div className="auth-error" role="alert">
-      <p>Revisa estos campos antes de continuar:</p>
+      <p>{translate("auth.form.fieldIssues")}</p>
       <ul>
         {issues.map((issue) => (
           <li key={issue.field}>
-            {FIELD_LABELS[issue.field]}:{" "}
+            {labelOfField(translate, issue.field)}:{" "}
             {describeAuthIssue(translate, issue.code)}
           </li>
         ))}
@@ -169,21 +170,25 @@ function missingValueIssues(
 ): readonly FormIssue[] {
   return fields
     .filter((field) => (draft[field] ?? "").trim() === "")
-    .map((field) => ({ field, code: "required" }));
+    .map((field) => ({ field, code: REQUIRED_ISSUE_CODE }));
 }
 
 export function CompleteRegistrationForm({
+  locale,
   pending,
   countries,
   email,
 }: {
+  locale: Locale;
   pending: readonly PendingRequirement[];
-  /** Calculadas en el servidor, igual que en el registro: generarlas a los dos
-   * lados rompía la hidratación, porque el orden depende de la versión de ICU. */
+  /** Calculadas en el servidor en el idioma de la visita, igual que en el
+   * registro: generarlas a los dos lados rompía la hidratación, porque el
+   * orden depende de la versión de ICU. */
   countries: readonly CountryOption[];
   email: string;
 }): React.JSX.Element {
   const router = useRouter();
+  const translate = createTranslator(locale);
   const [requirements, setRequirements] =
     useState<readonly PendingRequirement[]>(pending);
   const [draft, setDraft] = useState<CompletionValues>({});
@@ -272,36 +277,38 @@ export function CompleteRegistrationForm({
   if (requirements.length === 0) {
     return (
       <section className="auth-form" aria-labelledby="completar-titulo">
-        <h1 id="completar-titulo">Ya no te falta nada</h1>
+        <h1 id="completar-titulo">
+          {translate("auth.completion.nothingLeftTitle")}
+        </h1>
         <p className="auth-lead">
-          Tu cuenta está completa. Entra al panel para empezar.
+          {translate("auth.completion.nothingLeftLead")}
         </p>
         <Link className="auth-submit auth-submit-link" href={DASHBOARD_PATH}>
-          Ir al panel
+          {translate("auth.completion.goToDashboard")}
         </Link>
-        <SignOutButton appearance="text" />
+        <SignOutButton locale={locale} appearance="text" />
       </section>
     );
   }
 
   return (
     <section className="auth-form" aria-labelledby="completar-titulo">
-      <h1 id="completar-titulo">Termina tu registro</h1>
-      <p className="auth-lead">
-        A tu cuenta le falta esto para poder entrar. No te pedimos nada que ya
-        nos hayas dado.
-      </p>
+      <h1 id="completar-titulo">{translate("auth.completion.title")}</h1>
+      <p className="auth-lead">{translate("auth.completion.lead")}</p>
 
       {fields.length > 0 && (
         <form className="auth-fields" onSubmit={handleSubmit} noValidate>
           <IssueSummary
+            translate={translate}
             issues={issues}
-            message={status.kind === "failed" ? status.message : null}
+            failure={status.kind === "failed" ? status.failure : null}
           />
 
           {fields.includes("country") && (
             <div className="auth-field">
-              <label htmlFor="completar-country">{FIELD_LABELS.country}</label>
+              <label htmlFor="completar-country">
+                {labelOfField(translate, "country")}
+              </label>
               <select
                 id="completar-country"
                 name="country"
@@ -313,7 +320,9 @@ export function CompleteRegistrationForm({
                 }
                 onChange={(event) => update("country", event.target.value)}
               >
-                <option value="">Selecciona tu país</option>
+                <option value="">
+                  {translate("auth.field.countryPlaceholder")}
+                </option>
                 {countries.map((country) => (
                   <option key={country.code} value={country.code}>
                     {country.name}
@@ -327,7 +336,7 @@ export function CompleteRegistrationForm({
           {fields.includes("dateOfBirth") && (
             <div className="auth-field">
               <label htmlFor="completar-dateOfBirth">
-                {FIELD_LABELS.dateOfBirth}
+                {labelOfField(translate, "dateOfBirth")}
               </label>
               <input
                 id="completar-dateOfBirth"
@@ -349,7 +358,7 @@ export function CompleteRegistrationForm({
           {fields.includes("membershipType") && (
             <div className="auth-field">
               <label htmlFor="completar-membershipType">
-                {FIELD_LABELS.membershipType}
+                {labelOfField(translate, "membershipType")}
               </label>
               <select
                 id="completar-membershipType"
@@ -366,7 +375,9 @@ export function CompleteRegistrationForm({
                   update("membershipType", event.target.value)
                 }
               >
-                <option value="">Selecciona tu membresía</option>
+                <option value="">
+                  {translate("auth.field.membershipTypePlaceholder")}
+                </option>
                 {MEMBERSHIP_TYPES.map((membershipType) => (
                   <option key={membershipType} value={membershipType}>
                     {membershipType}
@@ -382,22 +393,22 @@ export function CompleteRegistrationForm({
             className="auth-submit"
             disabled={status.kind === "saving"}
           >
-            Guardar y continuar
+            {translate("auth.completion.submit")}
           </button>
         </form>
       )}
 
       {requirements.includes("guardianConsent") && (
-        <GuardianConsentForm onSaved={applySaved} />
+        <GuardianConsentForm translate={translate} onSaved={applySaved} />
       )}
       {requirements.includes("emailConfirmation") && (
-        <EmailConfirmationNotice email={email} />
+        <EmailConfirmationNotice translate={translate} email={email} />
       )}
 
       {/* La otra única cosa que esta cuenta puede hacer. Sin esto la pantalla
           es un callejón sin salida: no hay cáscara ni menú desde donde salir,
           y la frontera devuelve aquí todo lo demás que se pida. */}
-      <SignOutButton appearance="text" />
+      <SignOutButton locale={locale} appearance="text" />
     </section>
   );
 }

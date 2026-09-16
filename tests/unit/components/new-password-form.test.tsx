@@ -50,7 +50,7 @@ describe("formulario de contraseña nueva", () => {
 
   it("manda la contraseña con el token del enlace y confirma el cambio", async () => {
     stubApi({ status: 200, body: { data: { outcome: "password_changed" } } });
-    render(<NewPasswordForm tokenHash={TOKEN_HASH} />);
+    render(<NewPasswordForm locale="es" tokenHash={TOKEN_HASH} />);
 
     await submitPassword("bajoelagua-nueva");
 
@@ -74,7 +74,7 @@ describe("formulario de contraseña nueva", () => {
   it("rechaza la contraseña de 7 caracteres con el mensaje del registro, sin llamar al servidor", async () => {
     stubApi({ status: 200, body: { data: { outcome: "password_changed" } } });
     const rule = validatePasswordField("1234567");
-    render(<NewPasswordForm tokenHash={TOKEN_HASH} />);
+    render(<NewPasswordForm locale="es" tokenHash={TOKEN_HASH} />);
 
     await submitPassword("1234567");
 
@@ -95,11 +95,12 @@ describe("formulario de contraseña nueva", () => {
       body: {
         error: {
           code: "gone",
+          reason: "link_unusable",
           message: "Este enlace ya no sirve: caducó o ya se usó.",
         },
       },
     });
-    render(<NewPasswordForm tokenHash={TOKEN_HASH} />);
+    render(<NewPasswordForm locale="es" tokenHash={TOKEN_HASH} />);
 
     await submitPassword("bajoelagua-nueva");
 
@@ -113,12 +114,18 @@ describe("formulario de contraseña nueva", () => {
 
   it("si el servicio no acepta la contraseña, dice por qué y ofrece pedir otro enlace en vez de dejar el formulario", async () => {
     const rejection =
-      "No pudimos usar esa contraseña: es igual a la anterior o demasiado débil. Pide otro enlace y elige una distinta.";
+      "No pudimos usar esa contraseña: es igual a la anterior o demasiado débil. El enlace ya se usó al intentarlo, así que pide otro enlace y elige una distinta.";
     stubApi({
       status: 410,
-      body: { error: { code: "gone", message: rejection } },
+      body: {
+        error: {
+          code: "gone",
+          reason: "password_rejected",
+          message: "Frase del servidor que la pantalla no lee.",
+        },
+      },
     });
-    render(<NewPasswordForm tokenHash={TOKEN_HASH} />);
+    render(<NewPasswordForm locale="es" tokenHash={TOKEN_HASH} />);
 
     await submitPassword("bajoelagua-nueva");
 
@@ -134,7 +141,7 @@ describe("formulario de contraseña nueva", () => {
     ).toBeNull();
   });
 
-  it("muestra el mensaje del servidor ante cualquier otro fallo y deja reintentar", async () => {
+  it("ante cualquier otro fallo dice el suyo, no la frase del servidor, y deja reintentar", async () => {
     stubApi({
       status: 500,
       body: {
@@ -144,20 +151,22 @@ describe("formulario de contraseña nueva", () => {
         },
       },
     });
-    render(<NewPasswordForm tokenHash={TOKEN_HASH} />);
+    render(<NewPasswordForm locale="es" tokenHash={TOKEN_HASH} />);
 
     await submitPassword("bajoelagua-nueva");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Ocurrió un error inesperado.",
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "No pudimos cambiar tu contraseña. Vuelve a intentarlo en un momento.",
     );
+    expect(alert).not.toHaveTextContent("Ocurrió un error inesperado.");
     expect(
       screen.getByRole("button", { name: "Guardar contraseña" }),
     ).toBeEnabled();
   });
 
   it("anuncia el mínimo de caracteres junto al campo", () => {
-    render(<NewPasswordForm tokenHash={TOKEN_HASH} />);
+    render(<NewPasswordForm locale="es" tokenHash={TOKEN_HASH} />);
 
     expect(
       screen.getByLabelText("Contraseña nueva"),
@@ -167,7 +176,7 @@ describe("formulario de contraseña nueva", () => {
 
 describe("enlace de recuperación que no sirve", () => {
   it("dice que el enlace caducó o ya se usó y ofrece pedir otro", () => {
-    render(<RecoveryLinkUnusable />);
+    render(<RecoveryLinkUnusable locale="es" />);
 
     expect(
       screen.getByRole("region", { name: "Este enlace ya no sirve" }),

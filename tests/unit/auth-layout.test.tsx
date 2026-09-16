@@ -53,4 +53,26 @@ describe("disposición de las pantallas de autenticación", () => {
     const languageToggle = screen.getByRole("button", { name: /español/i });
     expect(themeToggle.nextElementSibling).toBe(languageToggle);
   });
+
+  it("cuenta el club en inglés a quien la ve en inglés", async () => {
+    await renderAuthLayout();
+
+    expect(
+      screen.getByText("Your club, beneath the surface."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Tu club, bajo la superficie.")).toBeNull();
+  });
+
+  it("cuenta el club en español a quien eligió español", async () => {
+    incoming.cookies.set(LOCALE_COOKIE_NAME, "es");
+
+    await renderAuthLayout();
+
+    expect(
+      screen.getByText("Tu club, bajo la superficie."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Rugby subacuático · Melbourne"),
+    ).toBeInTheDocument();
+  });
 });

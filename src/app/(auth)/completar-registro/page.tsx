@@ -13,6 +13,8 @@ import {
   describeMissingAuthKeys,
 } from "@/lib/auth/supabase-auth-gateways";
 import { listCountryOptions } from "@/lib/geo/countries";
+import { readRequestLocale } from "@/lib/i18n/request-locale";
+import { createTranslator } from "@/lib/i18n/translator";
 import { readServerCookies } from "@/lib/supabase/server-cookies";
 import { createSessionClient } from "@/lib/supabase/session-client";
 
@@ -25,13 +27,13 @@ import { createSessionClient } from "@/lib/supabase/session-client";
  * y lo pregunta a la misma función que decide el paso a `active`.
  */
 
-export const metadata: Metadata = {
-  title: "Termina tu registro · Victoria Seadragons",
-  description:
-    "Completa los datos que le faltan a tu cuenta del club Victoria Seadragons.",
-};
-
-const PAGE_LOCALE = "es";
+export async function generateMetadata(): Promise<Metadata> {
+  const translate = createTranslator(await readRequestLocale());
+  return {
+    title: translate("auth.completion.metaTitle"),
+    description: translate("auth.completion.metaDescription"),
+  };
+}
 
 export default async function CompleteRegistrationPage(): Promise<React.JSX.Element> {
   const session = createSessionClient(process.env, await readServerCookies());
@@ -75,10 +77,12 @@ export default async function CompleteRegistrationPage(): Promise<React.JSX.Elem
     redirect(DASHBOARD_PATH);
   }
 
+  const locale = await readRequestLocale();
   return (
     <CompleteRegistrationForm
+      locale={locale}
       pending={completion.pending}
-      countries={listCountryOptions(PAGE_LOCALE)}
+      countries={listCountryOptions(locale)}
       email={caller.email}
     />
   );

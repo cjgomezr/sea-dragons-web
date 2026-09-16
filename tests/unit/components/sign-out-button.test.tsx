@@ -45,7 +45,7 @@ describe("cierre de sesión", () => {
 
   it("tira la sesión contra el endpoint de la API", async () => {
     stubApi();
-    render(<SignOutButton />);
+    render(<SignOutButton locale="es" />);
 
     await userEvent.click(button());
 
@@ -58,7 +58,7 @@ describe("cierre de sesión", () => {
 
   it("aterriza en la pantalla de entrada", async () => {
     stubApi();
-    render(<SignOutButton />);
+    render(<SignOutButton locale="es" />);
 
     await userEvent.click(button());
 
@@ -69,7 +69,7 @@ describe("cierre de sesión", () => {
 
   it("lleva igualmente a la entrada si el servidor no contesta bien, porque quedarse dentro sería peor", async () => {
     stubApi(500);
-    render(<SignOutButton />);
+    render(<SignOutButton locale="es" />);
 
     await userEvent.click(button());
 
@@ -80,7 +80,7 @@ describe("cierre de sesión", () => {
 
   it("en texto dice lo mismo que el icono, y hace lo mismo", async () => {
     stubApi();
-    render(<SignOutButton appearance="text" />);
+    render(<SignOutButton locale="es" appearance="text" />);
 
     await userEvent.click(button());
 
