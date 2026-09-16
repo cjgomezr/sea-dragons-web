@@ -17,6 +17,24 @@ describe("redactEmail", () => {
   it("deja el texto intacto con una dirección vacía, en vez de sembrarlo de marcas", () => {
     expect(redactEmail("sin dirección", "")).toBe("sin dirección");
   });
+
+  it("la reconoce aunque el texto la escriba con otra caja", () => {
+    const text = redactEmail(`Email address "Nerea@Example.TEST" is invalid`, EMAIL);
+
+    expect(text).toBe(`Email address "${REDACTED_EMAIL}" is invalid`);
+  });
+
+  it("ignora los espacios con los que llegó la dirección", () => {
+    expect(redactEmail(`falló ${EMAIL}`, `  ${EMAIL} `)).toBe(
+      `falló ${REDACTED_EMAIL}`,
+    );
+  });
+
+  it("trata los signos de la dirección como literales, no como un patrón", () => {
+    const text = redactEmail("nadie@example.test", "n.die@example.test");
+
+    expect(text).toBe("nadie@example.test");
+  });
 });
 
 describe("describeErrorWithoutEmail", () => {

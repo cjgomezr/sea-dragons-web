@@ -82,6 +82,7 @@ const postPasswordRecovery = createApiRoute<
   PasswordRecoveryBody
 >({
   schema: passwordRecoveryBodySchema,
+  emailField: "email",
   handler: async ({ request, body }) => {
     if (!looksLikeEmail(body.email)) {
       throw new ApiError(

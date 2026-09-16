@@ -63,6 +63,7 @@ const postGuardianConsent = createApiRoute<
   ConsentBody
 >({
   schema: consentBodySchema,
+  emailField: "guardianEmail",
   handler: async ({ request, body, decorateResponse }) => {
     const userId = await identifyAccountCaller({ request, decorateResponse });
     try {

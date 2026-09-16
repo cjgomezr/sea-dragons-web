@@ -1,5 +1,6 @@
 import type { NextRequest, NextResponse } from "next/server";
 import type { ZodType } from "zod";
+import { describeErrorWithoutEmail } from "@/lib/email/redact-email";
 import {
   ApiError,
   type ApiErrorBody,
@@ -45,6 +46,11 @@ type ApiHandlerFn<T, Body> = (
 
 type ApiRouteConfig<T, Body> = {
   readonly schema?: ZodType<Body>;
+  /** Qué campo del cuerpo trae una dirección de correo, cuando la ruta recibe
+   * una. El envoltorio la quita de lo que registra si el handler lanza: se la
+   * pasa a Supabase y a Resend antes de responder, y los mensajes de esos
+   * proveedores a veces la citan. */
+  readonly emailField?: keyof Body & string;
   readonly handler: ApiHandlerFn<T, Body>;
 };
 
@@ -88,6 +94,29 @@ async function readValidatedBody<Body>(
   return { ok: true, body: result.data };
 }
 
+/** La dirección que llegó en el cuerpo, si la ruta declaró cuál es su campo.
+ * Sin campo declarado no hay nada que quitar del registro. */
+function readEmailField<Body>(
+  body: Body,
+  emailField: (keyof Body & string) | undefined,
+): string | undefined {
+  if (emailField === undefined || typeof body !== "object" || body === null) {
+    return undefined;
+  }
+  const value = body[emailField];
+  return typeof value === "string" ? value : undefined;
+}
+
+/** El error listo para el registro del servidor: sin la dirección cuando la
+ * petición trajo una, y tal cual cuando no hay ninguna que quitar, para que el
+ * registro conserve el objeto con su pila. */
+function describeUnhandledError(
+  error: unknown,
+  email: string | undefined,
+): unknown {
+  return email === undefined ? error : describeErrorWithoutEmail(error, email);
+}
+
 /** Envoltorio único de los handlers de la API v1: valida entrada, envuelve la
  * respuesta en `{ data }` o `{ error }` y nunca deja escapar una excepción ni
  * un mensaje de la base de datos hacia el cliente. */
@@ -103,11 +132,16 @@ export function createApiRoute<T, Body = undefined>(
       return response;
     }
 
+    // Fuera del try porque el catch la necesita, y el cuerpo se lee una sola
+    // vez: la petición no se puede volver a leer para averiguarla después.
+    let requestEmail: string | undefined;
+
     try {
       const parsedBody = await readValidatedBody(request, config.schema);
       if (!parsedBody.ok) {
         return decorated(parsedBody.response);
       }
+      requestEmail = readEmailField(parsedBody.body, config.emailField);
 
       const result = await config.handler({
         request,
@@ -121,7 +155,10 @@ export function createApiRoute<T, Body = undefined>(
       if (error instanceof ApiError) {
         return decorated(apiError(error.code, error.message));
       }
-      console.error("[api/v1] unhandled error", error);
+      console.error(
+        "[api/v1] unhandled error",
+        describeUnhandledError(error, requestEmail),
+      );
       return decorated(apiError("internal_error", UNEXPECTED_ERROR_MESSAGE));
     }
   };

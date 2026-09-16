@@ -120,6 +120,7 @@ async function prepareOrReject(
 const postRegistration = createApiRoute<RegistrationResponse, RegistrationBody>(
   {
     schema: registrationBodySchema,
+    emailField: "email",
     handler: async ({ request, body }) => {
       const wiring = createSupabaseAuthGateways(process.env);
       if (wiring.kind === "unconfigured") {

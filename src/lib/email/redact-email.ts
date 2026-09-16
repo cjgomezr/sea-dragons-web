@@ -3,12 +3,28 @@
  * del servidor no son sitio para un dato personal. */
 export const REDACTED_EMAIL = "<correo>";
 
+const REGEXP_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
+
+/** La dirección como texto literal: un punto o un `+` son corrientes en un
+ * correo, y dentro de un patrón significarían otra cosa. */
+function escapeForPattern(text: string): string {
+  return text.replace(REGEXP_SPECIAL_CHARACTERS, "\\$&");
+}
+
+/** Quita del texto la dirección, la escriba como la escriba. Las direcciones
+ * no distinguen mayúsculas y las rutas las normalizan antes de dárselas a
+ * Supabase, así que el mensaje del proveedor puede citarla con otra caja que
+ * la que llegó en el cuerpo. */
 export function redactEmail(text: string, email: string): string {
+  const address = email.trim();
   // Reemplazar la cadena vacía sembraría la marca entre cada carácter.
-  if (email === "") {
+  if (address === "") {
     return text;
   }
-  return text.replaceAll(email, REDACTED_EMAIL);
+  return text.replace(
+    new RegExp(escapeForPattern(address), "gi"),
+    REDACTED_EMAIL,
+  );
 }
 
 /** Cuántas causas se siguen. Una cadena real rara vez pasa de tres niveles, y
