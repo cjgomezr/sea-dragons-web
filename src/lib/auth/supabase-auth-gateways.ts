@@ -25,6 +25,7 @@ import type {
 } from "./complete-registration";
 import type { EmailConfirmationGateway } from "./email-confirmation";
 import type { EmailRequestLog } from "./email-request-log";
+import type { RegistrationRequestLog } from "./registration-rate-limit";
 import {
   type EmailDeliveryAvailabilityCheck,
   createEmailDeliveryAvailabilityCheck,
@@ -45,6 +46,7 @@ import type {
   RegistrationGateways,
 } from "./register-member";
 import { createSupabaseEmailRequestLog } from "./supabase-email-request-log";
+import { createSupabaseRegistrationRequestLog } from "./supabase-registration-request-log";
 
 /**
  * Adaptadores entre los puertos del registro y Supabase. Todo lo de aquí es de
@@ -64,9 +66,12 @@ export type ClubDirectory = {
 };
 
 export type SupabaseAuthGateways = {
-  /** Sin la disponibilidad del envío, que necesita el club: ver
-   * `emailDeliveryForClub`. */
-  readonly registration: Omit<RegistrationGateways, "emailDelivery">;
+  /** Sin lo que necesita el club: la disponibilidad del envío y el límite del
+   * registro. Ver `emailDeliveryForClub` y `registrationRequestsForClub`. */
+  readonly registration: Omit<
+    RegistrationGateways,
+    "emailDelivery" | "registrationRequests"
+  >;
   readonly confirmations: EmailConfirmationGateway;
   readonly clubs: ClubDirectory;
   /** Leer la fila del socio y escribir lo que le faltaba son la misma pieza:
@@ -90,6 +95,11 @@ export type SupabaseAuthGateways = {
   readonly emailDeliveryForClub: (
     clubId: string,
   ) => EmailDeliveryAvailabilityCheck;
+  /** El límite de peticiones del registro (#173). Pide el club porque cada
+   * fila anotada lleva `club_id` (NFR-009). */
+  readonly registrationRequestsForClub: (
+    clubId: string,
+  ) => RegistrationRequestLog;
 };
 
 export type SupabaseAuthGatewaysResult =
@@ -473,8 +483,13 @@ export function createSupabaseAuthGateways(
   env: Environment,
 ): SupabaseAuthGatewaysResult {
   const anonConfig = readSupabaseConfig(env);
+  const serviceConfig = readSupabaseServiceRoleConfig(env);
   const missingKeys = missingAuthKeys(env);
-  if (missingKeys.length > 0 || anonConfig.kind === "missing") {
+  if (
+    missingKeys.length > 0 ||
+    anonConfig.kind === "missing" ||
+    serviceConfig.kind === "missing"
+  ) {
     return { kind: "unconfigured", missingKeys };
   }
 
@@ -506,6 +521,15 @@ export function createSupabaseAuthGateways(
         createSupabaseEmailRequestLog(serviceClient, {
           table: CONFIRMATION_EMAIL_REQUESTS_TABLE,
           clubId,
+        }),
+      registrationRequestsForClub: (clubId) =>
+        createSupabaseRegistrationRequestLog(serviceClient, {
+          clubId,
+          // La llave de servicio hace de clave del hash de los sujetos. Es un
+          // secreto que este código ya necesita y que nunca sale del servidor,
+          // así que no hace falta una variable nueva que alguien tenga que
+          // acordarse de poner en cada entorno. Ver `hashRegistrationSubject`.
+          hashSecret: serviceConfig.serviceRoleKey,
         }),
       emailDeliveryForClub: (clubId) =>
         createEmailDeliveryAvailabilityCheck({

@@ -13,6 +13,7 @@ import {
   createConfirmationTokenIssuer,
   createSupabaseAuthGateways,
 } from "@/lib/auth/supabase-auth-gateways";
+import type { RegistrationRequestLog } from "@/lib/auth/registration-rate-limit";
 import { hashEmailForRequestLog } from "@/lib/auth/supabase-email-request-log";
 import { readSupabaseConfig } from "@/lib/supabase/config";
 import {
@@ -48,6 +49,14 @@ const silentConfirmationEmail: ConfirmationEmailGateway = {
 const alwaysAvailableEmailDelivery = {
   async checkAvailability() {
     return { kind: "available" } as const;
+  },
+};
+
+/** Tampoco miran el límite del registro (#173), que tiene sus propios tests:
+ * este doble deja pasar todo y no escribe nada en `seadragons-dev`. */
+const unlimitedRegistrationRequests: RegistrationRequestLog = {
+  async recordAndCountRecent() {
+    return 1;
   },
 };
 
@@ -159,6 +168,7 @@ describeRls("registro contra seadragons-dev", () => {
             ...gateways.registration,
             confirmationEmail: silentConfirmationEmail,
             emailDelivery: alwaysAvailableEmailDelivery,
+            registrationRequests: unlimitedRegistrationRequests,
           },
           {
             request: {
@@ -172,6 +182,7 @@ describeRls("registro contra seadragons-dev", () => {
             clubId,
             now: new Date(),
             appUrl: APP_URL,
+            clientBucket: "203.0.113.7",
           },
         );
 
@@ -217,9 +228,16 @@ describeRls("registro contra seadragons-dev", () => {
           ...gateways.registration,
           confirmationEmail: silentConfirmationEmail,
           emailDelivery: alwaysAvailableEmailDelivery,
+          registrationRequests: unlimitedRegistrationRequests,
         };
 
-        const input = { request, clubId, now: new Date(), appUrl: APP_URL };
+        const input = {
+          request,
+          clubId,
+          now: new Date(),
+          appUrl: APP_URL,
+          clientBucket: "203.0.113.7",
+        };
         const first = await prepareRegistration(registration, input);
         await first.deliver();
         const second = await prepareRegistration(registration, input);

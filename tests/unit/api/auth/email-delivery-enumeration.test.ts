@@ -100,6 +100,11 @@ function mockWiring(options: {
         confirmationEmailRequestsForClub: () => ({
           recordAndCountRecent: async () => 1,
         }),
+        /** El límite del registro (#173) no mira la cuenta, así que no
+         * cambia esta matriz: deja pasar siempre. */
+        registrationRequestsForClub: () => ({
+          recordAndCountRecent: async () => 1,
+        }),
         emailDeliveryForClub: () => ({
           checkAvailability: async (...args: unknown[]) => {
             availabilityArguments.push(args);

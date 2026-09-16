@@ -3,6 +3,10 @@ import type {
   EmailDeliveryAvailabilityCheck,
 } from "@/lib/email/email-delivery-availability";
 import {
+  type RegistrationRequestLog,
+  enforceRegistrationRateLimit,
+} from "./registration-rate-limit";
+import {
   type MembershipType,
   type RegistrationDetails,
   type RegistrationIssue,
@@ -80,6 +84,8 @@ export type RegistrationGateways = {
   readonly members: MemberDirectory;
   readonly confirmationEmail: ConfirmationEmailGateway;
   readonly emailDelivery: EmailDeliveryAvailabilityCheck;
+  /** El límite de peticiones del registro (#173). */
+  readonly registrationRequests: RegistrationRequestLog;
 };
 
 /** `email_unavailable`: ahora no se pueden mandar correos (#154). Se decide
@@ -203,6 +209,9 @@ export type RegistrationInput = {
   readonly clubId: string;
   readonly now: Date;
   readonly appUrl: string;
+  /** De dónde viene la petición, ya reducido a un cubo por `client-ip.ts`.
+   * El dominio no lee cabeceras: sólo cuenta contra lo que le den. */
+  readonly clientBucket: string;
 };
 
 type AccountDelivery = {
@@ -254,7 +263,8 @@ async function createAccountAndRequestEmail(
  * de la identidad y el socio, con la misma respuesta exista o no la cuenta.
  * La cuenta nace `incomplete` con el rol Player (FR-008, FR-083).
  * Lanza `RegistrationValidationError` sin tocar ningún servicio: la validación
- * no depende de ninguna cuenta, así que puede responderse antes. */
+ * no depende de ninguna cuenta, así que puede responderse antes. Lanza
+ * `RegistrationRateLimitedError` si la petición se pasa del límite (#173). */
 export async function prepareRegistration(
   gateways: RegistrationGateways,
   input: RegistrationInput,
@@ -264,7 +274,15 @@ export async function prepareRegistration(
     throw new RegistrationValidationError(validation.issues);
   }
   const details = validation.details;
-  // Después de validar, para que una solicitud inválida no gaste cupo.
+  // El orden es el mismo que usa el reenvío, y no es casual: validar primero
+  // para que una solicitud inválida no cuente, y contar antes de mirar el cupo
+  // para que una ráfaga no lo agote (#173). El límite no depende de que la
+  // cuenta exista, así que no delata ninguna.
+  await enforceRegistrationRateLimit(gateways.registrationRequests, {
+    clientBucket: input.clientBucket,
+    email: details.email,
+    now: input.now,
+  });
   const emailDelivery = await gateways.emailDelivery.checkAvailability(
     input.now,
   );
