@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_LOCALE,
-  LOCALE_COOKIE_NAME,
-  isLocale,
-} from "@/lib/i18n/locale";
+import { LOCALE_COOKIE_NAME, isLocale } from "@/lib/i18n/locale";
 import {
   localeFromAcceptLanguage,
   resolveLocale,
@@ -32,10 +28,6 @@ describe("elegir idioma", () => {
     const locale = resolveLocale({ cookie: undefined, acceptLanguage: null });
 
     expect(locale).toBe("en");
-  });
-
-  it("tiene el inglés como idioma de respaldo", () => {
-    expect(DEFAULT_LOCALE).toBe("en");
   });
 
   it("guarda la elección en una cookie con nombre propio del proyecto", () => {
@@ -88,6 +80,10 @@ describe("cabecera del navegador", () => {
 
   it("ordena por peso aunque la lista no venga ordenada", () => {
     expect(localeFromAcceptLanguage("en;q=0.5, es;q=0.9")).toBe("es");
+  });
+
+  it("lee el peso aunque el navegador escriba Q en mayúscula", () => {
+    expect(localeFromAcceptLanguage("es;Q=0.1,en;Q=0.9")).toBe("en");
   });
 
   it("descarta un idioma con peso cero", () => {
