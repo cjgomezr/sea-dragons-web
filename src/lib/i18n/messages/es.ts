@@ -8,4 +8,6 @@ export const spanishMessages: MessageCatalog = {
     one: "Podrás pedir otro enlace dentro de {count} minuto.",
     other: "Podrás pedir otro enlace dentro de {count} minutos.",
   },
+  "languageToggle.label": "Idioma: español. Cambiar a English",
+  "languageToggle.target": "EN",
 };

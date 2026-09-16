@@ -283,7 +283,10 @@ h6 {
   box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
-.theme-toggle {
+/* El idioma se dibuja igual que el tema porque vive a su lado: dos
+   preferencias de la misma esquina, con el mismo objetivo táctil (E17). */
+.theme-toggle,
+.language-toggle {
   min-width: var(--touch-target-min);
   min-height: var(--touch-target-min);
   font-size: 18px;
@@ -294,11 +297,18 @@ h6 {
   cursor: pointer;
 }
 
-.theme-toggle:hover {
+/* Dos letras a 18px no caben con aire en 44px; el icono del tema sí. */
+.language-toggle {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.theme-toggle:hover,
+.language-toggle:hover {
   border-color: var(--color-accent);
 }
 
-/* El tema y el cierre de sesión comparten la esquina de la cabecera, que es lo
+/* El tema, el idioma y el cierre de sesión comparten la esquina de la cabecera, que es lo
    único que se dibuja igual en las siete secciones y en los tres tamaños: es
    el sitio desde el que "cerrar sesión desde cualquier pantalla" (FR-007) se
    cumple sin repetir el control en cada una. */
@@ -517,11 +527,14 @@ h6 {
 .auth-main-header {
   display: flex;
   justify-content: flex-end;
+  gap: var(--space-2);
 }
 
-/* El botón de tema vive aquí sobre el fondo de la página, no sobre el panel
-   oscuro del menú, así que toma los colores del tema y no los del sidebar. */
-.auth-main-header .theme-toggle {
+/* Los botones de tema e idioma viven aquí sobre el fondo de la página, no
+   sobre el panel oscuro del menú, así que toman los colores del tema y no los
+   del sidebar. */
+.auth-main-header .theme-toggle,
+.auth-main-header .language-toggle {
   color: var(--color-text);
   border-color: var(--color-border);
 }

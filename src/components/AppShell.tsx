@@ -1,14 +1,18 @@
 import type { ReactNode } from "react";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { SidebarNav } from "@/components/SidebarNav";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import type { Locale } from "@/lib/i18n/locale";
 
 const CLUB_NAME = "Victoria Seadragons";
 
 export function AppShell({
+  locale,
   children,
 }: {
+  locale: Locale;
   children: ReactNode;
 }): React.JSX.Element {
   return (
@@ -18,6 +22,7 @@ export function AppShell({
           <span className="app-brand">{CLUB_NAME}</span>
           <div className="app-sidebar-actions">
             <ThemeToggle />
+            <LanguageToggle locale={locale} />
             <SignOutButton />
           </div>
         </div>

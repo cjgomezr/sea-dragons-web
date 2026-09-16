@@ -17,3 +17,15 @@ export const LOCALE_COOKIE_NAME = "seadragons-locale";
 export function isLocale(value: unknown): value is Locale {
   return SUPPORTED_LOCALES.some((locale) => locale === value);
 }
+
+/** El idioma al que lleva el interruptor. Son dos a propósito: un selector con
+ * más idiomas queda fuera de E17, y el día que llegue un tercero esto deja de
+ * compilar en vez de saltárselo. */
+export function otherLocale(locale: Locale): Locale {
+  switch (locale) {
+    case "en":
+      return "es";
+    case "es":
+      return "en";
+  }
+}

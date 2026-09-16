@@ -10,4 +10,8 @@ export const englishMessages = {
     one: "{count} minute to go before you can ask for another link.",
     other: "{count} minutes to go before you can ask for another link.",
   },
+  // El destino va con su propio nombre ("Español", no "Spanish"): quien no
+  // entiende el idioma de la pantalla tiene que reconocer el suyo.
+  "languageToggle.label": "Language: English. Switch to Español",
+  "languageToggle.target": "ES",
 } as const satisfies Readonly<Record<string, Message>>;

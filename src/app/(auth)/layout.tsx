@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { readRequestLocale } from "@/lib/i18n/request-locale";
 
 /**
  * Disposición de las pantallas públicas de cuentas, siguiendo
@@ -11,9 +13,11 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 const CLUB_NAME = "Victoria Seadragons";
 const CLUB_INITIALS = "VS";
 
-export default function AuthLayout({
+export default async function AuthLayout({
   children,
-}: Readonly<{ children: ReactNode }>): React.JSX.Element {
+}: Readonly<{ children: ReactNode }>): Promise<React.JSX.Element> {
+  const locale = await readRequestLocale();
+
   return (
     <div className="auth-shell">
       <aside className="auth-brand">
@@ -36,6 +40,7 @@ export default function AuthLayout({
       <main className="auth-main">
         <div className="auth-main-header">
           <ThemeToggle />
+          <LanguageToggle locale={locale} />
         </div>
         {children}
       </main>

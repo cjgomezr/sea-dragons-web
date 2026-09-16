@@ -13,7 +13,7 @@ describe("app shell", () => {
   it("renderiza marca, navegación, contenido y conmutador de tema", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell>
+      <AppShell locale="en">
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -30,7 +30,7 @@ describe("app shell", () => {
   it("ofrece cerrar sesión en cualquier pantalla de la aplicación", () => {
     usePathname.mockReturnValue("/calendario");
     render(
-      <AppShell>
+      <AppShell locale="en">
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -40,10 +40,37 @@ describe("app shell", () => {
     ).toBeInTheDocument();
   });
 
+  // E17 RF-3: un socio con sesión cambia de idioma sin salir de la aplicación.
+  it("ofrece cambiar de idioma en cualquier pantalla de la aplicación", () => {
+    usePathname.mockReturnValue("/equipos");
+    render(
+      <AppShell locale="es">
+        <p>Contenido de la sección</p>
+      </AppShell>,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /cambiar a english/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("pone el interruptor de idioma junto al del tema", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(
+      <AppShell locale="en">
+        <p>Contenido de la sección</p>
+      </AppShell>,
+    );
+
+    const themeToggle = screen.getByRole("button", { name: /tema/i });
+    const languageToggle = screen.getByRole("button", { name: /español/i });
+    expect(themeToggle.nextElementSibling).toBe(languageToggle);
+  });
+
   it("muestra el contenido recibido dentro del área principal", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell>
+      <AppShell locale="en">
         <p>Contenido de la sección</p>
       </AppShell>,
     );
