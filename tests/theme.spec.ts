@@ -31,6 +31,10 @@ const THEME_SCRIPT_PATTERN = new RegExp(
  * Sirve la pantalla sin el script del tema, que es lo que reportaron en
  * producción con una extensión que bloquea scripts en línea.
  *
+ * Simula el efecto, no el mecanismo: una extensión deja el tag en el HTML y le
+ * impide ejecutarse, y esto lo quita. Para lo que se mide (la cascada cuando
+ * `data-theme` no llega a escribirse) da igual.
+ *
  * No hace falta comprobar aquí que el reemplazo encontró algo: cada test
  * empieza exigiendo que `data-theme` no exista, y ese atributo sólo puede
  * faltar si el script no corrió.
