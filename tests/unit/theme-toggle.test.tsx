@@ -42,10 +42,14 @@ describe("ThemeToggle", () => {
   it("updates its accessible name to describe the next action", async () => {
     const user = userEvent.setup();
     render(<ThemeToggle />);
-    expect(screen.getByRole("button", { name: /tema oscuro/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /tema oscuro/i }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button"));
 
-    expect(screen.getByRole("button", { name: /tema claro/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /tema claro/i }),
+    ).toBeInTheDocument();
   });
 });

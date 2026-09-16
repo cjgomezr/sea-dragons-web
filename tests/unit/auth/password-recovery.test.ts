@@ -69,7 +69,9 @@ async function deliverPending(
   outcome: PasswordRecoveryRequestOutcome,
 ): Promise<void> {
   if (outcome.kind !== "accepted") {
-    throw new Error(`Se esperaba una entrega pendiente y llegó ${outcome.kind}.`);
+    throw new Error(
+      `Se esperaba una entrega pendiente y llegó ${outcome.kind}.`,
+    );
   }
   await outcome.deliver();
 }

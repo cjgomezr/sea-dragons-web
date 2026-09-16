@@ -28,7 +28,7 @@ fábrica: solo sus tickets lo son.
 | **E15** — Privacidad y datos personales | Aviso de privacidad en el registro, exportación de los datos del miembro, borrado o anonimización dentro de 30 días, política de retención tras la baja. NFR-011 · CON-006                                                                                     | M (4)         | E2, E5            | #15       |
 | **E16a** — Entornos y despliegue        | Proyecto de Supabase de producción separado del de desarrollo, despliegue en Vercel desde `main` con preview por PR, secretos por entorno, migraciones aplicadas por CI, monitoreo de disponibilidad. NFR-003 · NFR-011                                        | M (7)         | —                 | #16       |
 | **E16b** — Scheduler y prueba de carga  | `pg_cron` como scheduler con los jobs de ocurrencias recurrentes (FR-031) y aviso de renovación (FR-072), más la prueba de carga sobre un dataset sembrado de 500 miembros, 5.000 ocurrencias y 50.000 asistencias. NFR-001/008                                | M (4-5)       | E16a, E7, E8, E12 | por crear |
-| **E17** — Bilingüe (inglés y español)   | Catálogo de mensajes por idioma, idioma por cookie con el navegador como respaldo, interruptor junto al del tema, pantallas y correos en inglés y español, y un test que impide que se cuele texto sin traducir. Añadido después del plan. | M (8)         | ninguna           | #181      |
+| **E17** — Bilingüe (inglés y español)   | Catálogo de mensajes por idioma, idioma por cookie con el navegador como respaldo, interruptor junto al del tema, pantallas y correos en inglés y español, y un test que impide que se cuele texto sin traducir. Añadido después del plan.                     | M (8)         | ninguna           | #181      |
 
 E15 y E16 se añadieron el 23 de agosto de 2026, después del plan original, al
 resolver los huecos P2, P3 y P4 de `docs/preguntas-abiertas.md`.
@@ -40,7 +40,6 @@ epic y nadie depende de ella, pero **se trabaja antes de E3**: con la
 infraestructura de traducción puesta, cada pantalla que venga después nace en
 los dos idiomas en vez de tener que revisarse más tarde. PRD en
 `docs/prd/e17-bilingue.md`.
-
 
 El 7 de septiembre de 2026, al escribir su PRD, **E16 se partió en E16a y
 E16b**. El motivo es de secuencia, no de tamaño: sus jobs de `pg_cron` necesitan

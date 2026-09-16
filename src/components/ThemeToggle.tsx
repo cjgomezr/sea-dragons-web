@@ -1,7 +1,12 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { THEME_STORAGE_KEY, type Theme, nextTheme, resolveInitialTheme } from "@/lib/theme";
+import {
+  THEME_STORAGE_KEY,
+  type Theme,
+  nextTheme,
+  resolveInitialTheme,
+} from "@/lib/theme";
 
 // Same-tab writes do not fire `storage`, so the toggle announces its own change.
 const THEME_CHANGE_EVENT = "seadragons:themechange";
@@ -33,7 +38,11 @@ function readServerTheme(): Theme {
 }
 
 export function ThemeToggle(): React.JSX.Element {
-  const theme = useSyncExternalStore(subscribe, readStoredTheme, readServerTheme);
+  const theme = useSyncExternalStore(
+    subscribe,
+    readStoredTheme,
+    readServerTheme,
+  );
   const isDark = theme === "dark";
 
   function handleToggle(): void {

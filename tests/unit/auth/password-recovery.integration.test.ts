@@ -101,7 +101,9 @@ describeRls("recuperación de contraseña contra Supabase", () => {
     outcome: Awaited<ReturnType<typeof requestPasswordRecovery>>,
   ): Promise<void> {
     if (outcome.kind !== "accepted") {
-      throw new Error(`Se esperaba una entrega pendiente y llegó ${outcome.kind}.`);
+      throw new Error(
+        `Se esperaba una entrega pendiente y llegó ${outcome.kind}.`,
+      );
     }
     await outcome.deliver();
   }

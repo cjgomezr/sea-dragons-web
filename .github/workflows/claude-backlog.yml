@@ -41,7 +41,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      - run: npm ci || npm install   # el template no trae lockfile hasta el primer install
+      - run: npm ci || npm install # el template no trae lockfile hasta el primer install
       - run: npx playwright install --with-deps chromium
 
       - name: Read worker model from factory-models.json

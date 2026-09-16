@@ -12,7 +12,9 @@ describe("matriz de capturas", () => {
   });
 
   it("usa los tres viewports de la casa", () => {
-    expect(VIEWPORTS.map((viewport) => viewport.width)).toEqual([375, 768, 1440]);
+    expect(VIEWPORTS.map((viewport) => viewport.width)).toEqual([
+      375, 768, 1440,
+    ]);
   });
 
   it("no repite ningún nombre de archivo", () => {

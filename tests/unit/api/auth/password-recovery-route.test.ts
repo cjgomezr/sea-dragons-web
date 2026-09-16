@@ -189,7 +189,9 @@ describe("POST /api/v1/auth/password-recovery", () => {
   // dato personal.
   it("el fallo registrado no incluye la dirección de correo", async () => {
     mockWiring({
-      deliveryFailure: new Error(`Email address "${REGISTERED_EMAIL}" is invalid`),
+      deliveryFailure: new Error(
+        `Email address "${REGISTERED_EMAIL}" is invalid`,
+      ),
     });
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
 

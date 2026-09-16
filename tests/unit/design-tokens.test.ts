@@ -233,10 +233,16 @@ describe("contraste", () => {
     (theme) => {
       const tokens = theme === "light" ? rootCss : darkCss;
       expect(
-        contrastRatio(token(tokens, "color-danger"), token(tokens, "color-background")),
+        contrastRatio(
+          token(tokens, "color-danger"),
+          token(tokens, "color-background"),
+        ),
       ).toBeGreaterThanOrEqual(4.5);
       expect(
-        contrastRatio(token(tokens, "color-danger"), token(tokens, "color-panel")),
+        contrastRatio(
+          token(tokens, "color-danger"),
+          token(tokens, "color-panel"),
+        ),
       ).toBeGreaterThanOrEqual(4.5);
     },
   );

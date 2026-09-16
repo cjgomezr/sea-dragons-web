@@ -46,7 +46,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      - run: npm ci || npm install   # el template no trae lockfile hasta el primer install
+      - run: npm ci || npm install # el template no trae lockfile hasta el primer install
 
       - name: Read worker model from factory-models.json
         run: echo "FACTORY_MODEL=$(jq -r '.models.worker // "sonnet"' factory-models.json 2>/dev/null || echo sonnet)" >> $GITHUB_ENV

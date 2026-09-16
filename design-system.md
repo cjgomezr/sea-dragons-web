@@ -29,18 +29,18 @@ desplazamiento lo sigan.
 
 #### Light theme (paleta por defecto, en `:root`)
 
-| Role           | Value     | Usage                         |
-| -------------- | --------- | ----------------------------- |
-| Accent         | `#1C6EA4` | Primary actions, links, focus |
-| Background     | `#EFF3F7` | Page background               |
-| Panel          | `#FFFFFF` | Cards, panels                 |
-| Text           | `#1C3245` | Body text                     |
-| Text secondary | `#5A7086` | Captions, metadata            |
-| Border         | `#DEE6ED` | Dividers, input borders       |
-| Success        | `#2E9E86` | Success state only            |
-| Warning        | `#C99A3E` | Warning state only            |
+| Role           | Value     | Usage                          |
+| -------------- | --------- | ------------------------------ |
+| Accent         | `#1C6EA4` | Primary actions, links, focus  |
+| Background     | `#EFF3F7` | Page background                |
+| Panel          | `#FFFFFF` | Cards, panels                  |
+| Text           | `#1C3245` | Body text                      |
+| Text secondary | `#5A7086` | Captions, metadata             |
+| Border         | `#DEE6ED` | Dividers, input borders        |
+| Success        | `#2E9E86` | Success state only             |
+| Warning        | `#C99A3E` | Warning state only             |
 | Danger         | `#BC3B2E` | Validation errors, destructive |
-| Text on accent | `#FFFFFF` | Text/icons on an accent fill  |
+| Text on accent | `#FFFFFF` | Text/icons on an accent fill   |
 
 > **Decisión del 2026-09-04.** El texto secundario del tema claro se desvía
 > del prototipo a propósito. El valor original del prototipo, `#6B8095`, da
@@ -53,18 +53,18 @@ desplazamiento lo sigan.
 
 #### Dark theme (`[data-theme="dark"]` y `prefers-color-scheme: dark`)
 
-| Role           | Value     | Usage                         |
-| -------------- | --------- | ----------------------------- |
-| Accent         | `#33A1E0` | Primary actions, links, focus |
-| Background     | `#0C1A26` | Page background               |
-| Panel          | `#13283A` | Cards, panels                 |
-| Text           | `#E8F0F7` | Body text                     |
-| Text secondary | `#8AA1B5` | Captions, metadata            |
-| Border         | `#274055` | Dividers, input borders       |
-| Success        | `#6FD6B4` | Success state only            |
-| Warning        | `#F2CE78` | Warning state only            |
+| Role           | Value     | Usage                          |
+| -------------- | --------- | ------------------------------ |
+| Accent         | `#33A1E0` | Primary actions, links, focus  |
+| Background     | `#0C1A26` | Page background                |
+| Panel          | `#13283A` | Cards, panels                  |
+| Text           | `#E8F0F7` | Body text                      |
+| Text secondary | `#8AA1B5` | Captions, metadata             |
+| Border         | `#274055` | Dividers, input borders        |
+| Success        | `#6FD6B4` | Success state only             |
+| Warning        | `#F2CE78` | Warning state only             |
 | Danger         | `#F2887A` | Validation errors, destructive |
-| Text on accent | `#0C1A26` | Text/icons on an accent fill  |
+| Text on accent | `#0C1A26` | Text/icons on an accent fill   |
 
 Rules: one accent color; success/warning/danger appear only with their meaning;
 never place text on a background with contrast ratio below 4.5:1 (3:1 for

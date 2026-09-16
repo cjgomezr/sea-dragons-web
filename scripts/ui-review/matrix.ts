@@ -22,14 +22,18 @@ export const VIEWPORTS: readonly Viewport[] = [
 
 export const THEMES: readonly Theme[] = ["light", "dark"];
 
-export function buildCaptureName(viewport: Pick<Viewport, "name">, theme: Theme): string {
+export function buildCaptureName(
+  viewport: Pick<Viewport, "name">,
+  theme: Theme,
+): string {
   return `ui-${viewport.name}-${theme}.png`;
 }
 
-export const CAPTURE_MATRIX: readonly Capture[] = VIEWPORTS.flatMap((viewport) =>
-  THEMES.map((theme) => ({
-    viewport,
-    theme,
-    fileName: buildCaptureName(viewport, theme),
-  })),
+export const CAPTURE_MATRIX: readonly Capture[] = VIEWPORTS.flatMap(
+  (viewport) =>
+    THEMES.map((theme) => ({
+      viewport,
+      theme,
+      fileName: buildCaptureName(viewport, theme),
+    })),
 );
