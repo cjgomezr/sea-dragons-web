@@ -99,6 +99,11 @@ function mockWiring(options: WiringOptions = {}): void {
                   },
                 },
               },
+              /** El límite del registro (#173) tiene su propio test: aquí
+               * deja pasar, para que estos casos hablen de la ruta. */
+              registrationRequestsForClub: () => ({
+                recordAndCountRecent: async () => 1,
+              }),
               emailDeliveryForClub: () => ({
                 checkAvailability: async () => ({ kind: "available" }),
               }),

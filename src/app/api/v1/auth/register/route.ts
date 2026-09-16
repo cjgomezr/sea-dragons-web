@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { runAfterResponse } from "@/lib/api/after-response";
+import { readClientBucket } from "@/lib/api/client-ip";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
 import {
@@ -12,6 +13,7 @@ import {
   prepareRegistration,
 } from "@/lib/auth/register-member";
 import type { RegistrationIssue } from "@/lib/auth/registration";
+import { RegistrationRateLimitedError } from "@/lib/auth/registration-rate-limit";
 import {
   DEFAULT_CLUB_SLUG,
   createSupabaseAuthGateways,
@@ -42,6 +44,12 @@ export type RegistrationResponse = RegistrationReceipt;
 
 function describeIssues(issues: readonly RegistrationIssue[]): string {
   return issues.map((issue) => `${issue.field}: ${issue.message}`).join(" ");
+}
+
+/** El mismo texto para quien tiene cuenta y para quien no: el límite se aplica
+ * antes de mirar ninguna, así que decirlo no delata ninguna (#173). */
+function describeRateLimit(retryAfterMinutes: number): string {
+  return `Se hicieron varios registros seguidos. Espera ${retryAfterMinutes} minutos antes de intentarlo otra vez.`;
 }
 
 /** El correo de confirmación se pide, pero no decide si el registro salió
@@ -99,6 +107,12 @@ async function prepareOrReject(
     if (error instanceof RegistrationValidationError) {
       throw new ApiError("business_rule", describeIssues(error.issues));
     }
+    if (error instanceof RegistrationRateLimitedError) {
+      throw new ApiError(
+        "rate_limited",
+        describeRateLimit(error.retryAfterMinutes),
+      );
+    }
     throw error;
   }
 }
@@ -122,8 +136,16 @@ const postRegistration = createApiRoute<RegistrationResponse, RegistrationBody>(
         {
           ...wiring.gateways.registration,
           emailDelivery: wiring.gateways.emailDeliveryForClub(clubId),
+          registrationRequests:
+            wiring.gateways.registrationRequestsForClub(clubId),
         },
-        { request: body, clubId, now: new Date(), appUrl: request.url },
+        {
+          request: body,
+          clubId,
+          now: new Date(),
+          appUrl: request.url,
+          clientBucket: readClientBucket(request.headers),
+        },
       );
       reportEmailDelivery(emailDelivery);
       // Crear la cuenta va después de responder: sólo ahí se sabe si la

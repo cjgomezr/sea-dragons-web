@@ -14,6 +14,7 @@ import {
   prepareRegistration,
 } from "@/lib/auth/register-member";
 import type { RegistrationRequest } from "@/lib/auth/registration";
+import type { RegistrationRequestLog } from "@/lib/auth/registration-rate-limit";
 import type {
   EmailDeliveryAvailability,
   EmailDeliveryAvailabilityCheck,
@@ -23,6 +24,7 @@ const NOW = new Date("2026-09-12T03:00:00.000Z");
 const CLUB_ID = "6f1d2c3b-4a59-4e6f-8b70-1c2d3e4f5a6b";
 const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
 const APP_URL = "https://victoria-seadragons.vercel.app/api/v1/auth/register";
+const CLIENT_BUCKET = "203.0.113.7";
 
 function requestWith(
   overrides: Partial<RegistrationRequest> = {},
@@ -43,6 +45,7 @@ type Doubles = {
   readonly members: MemberDirectory;
   readonly confirmationEmail: ConfirmationEmailGateway;
   readonly emailDelivery: EmailDeliveryAvailabilityCheck;
+  readonly registrationRequests: RegistrationRequestLog;
   readonly insertedRows: NewMemberRow[];
   readonly deletedUserIds: string[];
   readonly confirmationEmailsRequested: string[];
@@ -110,13 +113,24 @@ function doubles(options: DoubleOptions = {}): Doubles {
         return options.emailDelivery ?? { kind: "available" };
       },
     },
+    /** El límite tiene sus propios tests (#173): aquí sólo deja pasar, para
+     * que estos casos hablen de la cuenta y no del cupo de intentos. */
+    registrationRequests: {
+      async recordAndCountRecent() {
+        calls.push("recordAndCountRecent");
+        return 1;
+      },
+    },
   };
 }
 
-/** Las llamadas que dependen de la cuenta. Preguntar por la disponibilidad
- * no es una de ellas: se hace antes de responder y es igual para todos. */
+/** Las llamadas que dependen de la cuenta. Preguntar por la disponibilidad y
+ * contar para el límite no son de ellas: se hacen antes de responder y son
+ * iguales para todos. */
+const CALLS_BEFORE_RESPONDING = ["checkAvailability", "recordAndCountRecent"];
+
 function accountCalls(given: Doubles): string[] {
-  return given.calls.filter((call) => call !== "checkAvailability");
+  return given.calls.filter((call) => !CALLS_BEFORE_RESPONDING.includes(call));
 }
 
 function prepare(
@@ -128,6 +142,7 @@ function prepare(
     clubId: CLUB_ID,
     now: NOW,
     appUrl: APP_URL,
+    clientBucket: CLIENT_BUCKET,
   });
 }
 
