@@ -56,6 +56,12 @@ reviewing the same image twice.
 For a screen other than home, pass its path:
 `npm run ui:screenshots -- --path /settings`.
 
+**On Windows, Git Bash rewrites that path before Node sees it**, so `/settings`
+arrives as `C:/Program Files/Git/settings`. Write
+`MSYS_NO_PATHCONV=1 npm run ui:screenshots -- --path /settings`, or double the
+first slash (`--path //settings`), which MSYS leaves alone. The command refuses
+a rewritten path instead of photographing a screen nobody asked for.
+
 **If the preflight exits non-zero, stop there.** Do not take screenshots, do
 not try another port, and never set `FABRICA_TRUST_EXISTING_SERVER` (that
 switch belongs to the human). Reply `BLOCKED: <the exact message it printed>`
