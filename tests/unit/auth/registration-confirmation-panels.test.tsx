@@ -43,5 +43,4 @@ describe("paneles del desenlace del enlace de confirmación", () => {
       expect(text).toMatch(/pantalla de confirmación/i);
     },
   );
-
 });
