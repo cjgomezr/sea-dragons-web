@@ -75,6 +75,14 @@ describe("interruptor de idioma", () => {
     ).toBeInTheDocument();
   });
 
+  it("repite en su nombre accesible el código que se ve, para el control por voz", () => {
+    render(<LanguageToggle locale="es" />);
+
+    const toggle = screen.getByRole("button");
+    expect(toggle).toHaveTextContent("EN");
+    expect(toggle).toHaveAccessibleName(/\bEN\b/);
+  });
+
   it("muestra a la vista el idioma al que lleva", () => {
     render(<LanguageToggle locale="en" />);
 

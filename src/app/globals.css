@@ -166,7 +166,8 @@ h6 {
 }
 
 /* Below 768px the sections live in the bottom tab bar, so the sidebar list is
-   not rendered at all and only the brand and the theme toggle stay on top. */
+   not rendered at all and only the brand and the header actions (theme,
+   language, sign out) stay on top. */
 .app-nav {
   display: none;
 }
@@ -308,10 +309,10 @@ h6 {
   border-color: var(--color-accent);
 }
 
-/* El tema, el idioma y el cierre de sesión comparten la esquina de la cabecera, que es lo
-   único que se dibuja igual en las siete secciones y en los tres tamaños: es
-   el sitio desde el que "cerrar sesión desde cualquier pantalla" (FR-007) se
-   cumple sin repetir el control en cada una. */
+/* El tema, el idioma y el cierre de sesión comparten la esquina de la
+   cabecera, que es lo único que se dibuja igual en las siete secciones y en
+   los tres tamaños: es el sitio desde el que "cerrar sesión desde cualquier
+   pantalla" (FR-007) se cumple sin repetir el control en cada una. */
 .app-sidebar-actions {
   display: flex;
   align-items: center;

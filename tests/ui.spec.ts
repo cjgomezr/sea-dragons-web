@@ -33,7 +33,12 @@
  *   without webServer every test dies with ERR_CONNECTION_REFUSED and blocks
  *   the session for a reason unrelated to the code.
  */
-import { test, expect, type Page } from "@playwright/test";
+import {
+  test,
+  expect,
+  type Page,
+  type PageScreenshotOptions,
+} from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -239,12 +244,7 @@ for (const pg of PUBLIC_PAGES) {
 // los separa: sin él un borde recortado por medio píxel parecería regresión.
 const TOGGLES_CORNER_PADDING_PX = 8;
 
-type Clip = {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-};
+type Clip = NonNullable<PageScreenshotOptions["clip"]>;
 
 /**
  * La esquina donde conviven el tema y el idioma (E17 RF-3), recortada de la

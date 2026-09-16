@@ -14,9 +14,11 @@ import {
   E2E_STORAGE_STATE_PATH,
   readE2eSessionState,
 } from "./support/e2e-session";
+import { LOCALE_COOKIE_NAME } from "@/lib/i18n/locale";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3417";
 const SIGN_IN_PATH = "/entrar";
+const CALENDAR_PATH = "/calendario";
 
 // Matches --touch-target-min in globals.css (WCAG 2.5.5).
 const TOUCH_TARGET_MIN_PX = 44;
@@ -135,9 +137,28 @@ test.describe("interruptor de idioma dentro de la aplicación", () => {
 
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
-  test("con sesión, la pantalla siguiente también sale en el idioma nuevo", async ({
+  /**
+   * Ir de /dashboard a /calendario es una navegación del router: el `lang` y
+   * el interruptor viven en layouts que las dos comparten y no se vuelven a
+   * pedir, así que verlos en español después de navegar no prueba nada por sí
+   * solo. Lo que sí lo prueba es que el servidor armó /calendario con la
+   * cookie nueva. Si el router hubiera reutilizado lo que guardó antes del
+   * cambio, esa petición no existiría. Mientras #185 y #186 no traduzcan el
+   * contenido de las pantallas, no hay texto visible que pueda delatarlo.
+   */
+  test("con sesión, la pantalla siguiente se pide al servidor en el idioma nuevo", async ({
     page,
   }) => {
+    const calendarRequestsInSpanish: string[] = [];
+    page.on("request", async (request) => {
+      if (new URL(request.url()).pathname !== CALENDAR_PATH) {
+        return;
+      }
+      const { cookie = "" } = await request.allHeaders();
+      if (cookie.includes(`${LOCALE_COOKIE_NAME}=es`)) {
+        calendarRequestsInSpanish.push(request.url());
+      }
+    });
     await page.setViewportSize(DESKTOP);
     await page.goto(`${APP_URL}/dashboard`);
     await expectDocumentLanguage(page, "en");
@@ -149,9 +170,16 @@ test.describe("interruptor de idioma dentro de la aplicación", () => {
       .getByRole("link", { name: "Calendario" })
       .click();
 
-    await expect(page).toHaveURL(/\/calendario$/);
-    await expectDocumentLanguage(page, "es");
+    await expect(page).toHaveURL(new RegExp(`${CALENDAR_PATH}$`));
     await expect(spanishToggle(page)).toBeVisible();
+    // Las cabeceras de cada petición se leen de forma asíncrona, así que la
+    // lista puede llenarse un instante después de que la pantalla cambie.
+    await expect
+      .poll(
+        () => calendarRequestsInSpanish.length,
+        "ninguna petición de /calendario llevó la cookie en español",
+      )
+      .toBeGreaterThan(0);
   });
 
   test("cumple el objetivo táctil de 44px en móvil", async ({ page }) => {
