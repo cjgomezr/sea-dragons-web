@@ -17,6 +17,7 @@ import {
   createSupabaseAuthGateways,
   describeMissingAuthKeys,
 } from "@/lib/auth/supabase-auth-gateways";
+import type { EmailDeliveryAvailability } from "@/lib/email/email-delivery-availability";
 import { describeErrorWithoutEmail } from "@/lib/email/redact-email";
 
 // Crea cuentas: la respuesta depende del estado de la base en este instante y
@@ -76,12 +77,24 @@ async function registerAfterResponse(
   }
 }
 
-function prepareOrReject(
+/** Que ahora no se puedan mandar correos se dice en la respuesta, igual a
+ * cualquiera (#154). El motivo es para quien lo arregla, y va al registro del
+ * servidor: puede nombrar variables de entorno o el estado del proveedor. */
+function reportEmailDelivery(emailDelivery: EmailDeliveryAvailability): void {
+  if (emailDelivery.kind === "unavailable") {
+    console.error(
+      "[api/v1/auth/register] el envío de correos no está disponible",
+      emailDelivery.reason,
+    );
+  }
+}
+
+async function prepareOrReject(
   gateways: RegistrationGateways,
   input: RegistrationInput,
-): PendingRegistration {
+): Promise<PendingRegistration> {
   try {
-    return prepareRegistration(gateways, input);
+    return await prepareRegistration(gateways, input);
   } catch (error) {
     if (error instanceof RegistrationValidationError) {
       throw new ApiError("business_rule", describeIssues(error.issues));
@@ -105,10 +118,14 @@ const postRegistration = createApiRoute<RegistrationResponse, RegistrationBody>(
       const clubId =
         await wiring.gateways.clubs.findClubIdBySlug(DEFAULT_CLUB_SLUG);
 
-      const { receipt, deliver } = prepareOrReject(
-        wiring.gateways.registration,
+      const { receipt, emailDelivery, deliver } = await prepareOrReject(
+        {
+          ...wiring.gateways.registration,
+          emailDelivery: wiring.gateways.emailDeliveryForClub(clubId),
+        },
         { request: body, clubId, now: new Date(), appUrl: request.url },
       );
+      reportEmailDelivery(emailDelivery);
       // Crear la cuenta va después de responder: sólo ahí se sabe si la
       // dirección ya tenía una, y lo que tardara la respuesta la delataría.
       runAfterResponse(() => registerAfterResponse(deliver, receipt.email));

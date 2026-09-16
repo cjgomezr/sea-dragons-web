@@ -25,7 +25,8 @@ type ConfirmationEmailBody = z.infer<typeof confirmationEmailBodySchema>;
 /** La misma forma que devuelve el registro, y por el mismo motivo: reenviar la
  * confirmación tampoco puede decir si esa dirección tiene cuenta. Tampoco dice
  * si el envío salió, porque sólo se intenta enviar a cuentas sin confirmar y
- * eso lo delataría igual (#147). */
+ * eso lo delataría igual (#147). Sí dice si ahora no se pueden mandar correos,
+ * que se decide antes de mirar la cuenta (#154). */
 export type ConfirmationEmailResponse = RegistrationReceipt;
 
 function describeRateLimit(retryAfterMinutes: number): string {
@@ -86,6 +87,7 @@ const postConfirmationEmail = createApiRoute<
       {
         requests: wiring.gateways.confirmationEmailRequestsForClub(clubId),
         confirmationEmail: wiring.gateways.confirmationEmail,
+        emailDelivery: wiring.gateways.emailDeliveryForClub(clubId),
       },
       { email, now: new Date(), appUrl: request.url },
     );
@@ -96,6 +98,15 @@ const postConfirmationEmail = createApiRoute<
         "rate_limited",
         describeRateLimit(outcome.retryAfterMinutes),
       );
+    }
+    // Tampoco depende de la cuenta que ahora no se puedan mandar correos. El
+    // motivo es para quien lo arregla, y va al registro del servidor.
+    if (outcome.kind === "email_unavailable") {
+      console.error(
+        "[api/v1/auth/confirmation-email] el envío de correos no está disponible",
+        outcome.reason,
+      );
+      return { data: { outcome: "email_unavailable", email } };
     }
 
     // Pedir el correo va después de responder: sólo hay envío para una cuenta

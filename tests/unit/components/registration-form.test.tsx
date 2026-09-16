@@ -365,3 +365,142 @@ describe("pantalla de confirmación", () => {
     expect(alert).not.toHaveTextContent(/crear tu cuenta/i);
   });
 });
+
+type ReceiptOutcome = "confirmation_pending" | "email_unavailable";
+
+function receiptResponse(outcome: ReceiptOutcome): Response {
+  return new Response(
+    JSON.stringify({ data: { outcome, email: "nerea@example.test" } }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+}
+
+/** El registro responde `registration`; cada reenvío, el siguiente de
+ * `resends`. Apunta a qué endpoint fue cada petición. */
+function stubDelivery(
+  registration: ReceiptOutcome,
+  resends: readonly ReceiptOutcome[] = [],
+): void {
+  const pendingResends = [...resends];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init: RequestInit) => {
+      calls.push({ url, body: JSON.parse(String(init.body)) as unknown });
+      if (url === REGISTER_API_PATH) {
+        return receiptResponse(registration);
+      }
+      const next = pendingResends.shift();
+      if (next === undefined) {
+        throw new Error("el test no preparó respuesta para otro reenvío");
+      }
+      return receiptResponse(next);
+    }),
+  );
+}
+
+async function clickRetry(): Promise<void> {
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Reintentar el envío" }));
+}
+
+describe("pantalla de confirmación con el envío no disponible", () => {
+  beforeEach(() => {
+    calls.length = 0;
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("avisa que ahora no se pueden mandar correos y que lo intente más tarde", async () => {
+    stubDelivery("email_unavailable");
+
+    await registerThroughForm();
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(/ahora no podemos mandar correos/i);
+    expect(alert).toHaveTextContent(/más tarde/i);
+  });
+
+  it("no dice que el enlace ya salió", async () => {
+    stubDelivery("email_unavailable");
+
+    await registerThroughForm();
+
+    expect(
+      screen.queryByText(/te mandamos un enlace/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ofrece reintentar el envío", async () => {
+    stubDelivery("email_unavailable");
+
+    await registerThroughForm();
+
+    expect(
+      screen.getByRole("button", { name: "Reintentar el envío" }),
+    ).toBeEnabled();
+  });
+
+  it("con el envío disponible muestra el texto neutro del #147, sin aviso ni reintento", async () => {
+    stubDelivery("confirmation_pending");
+
+    await registerThroughForm();
+
+    expect(screen.getByText(/te mandamos un enlace/i)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Reintentar el envío" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("reintentar pide el envío al endpoint del reenvío con la dirección", async () => {
+    stubDelivery("email_unavailable", ["email_unavailable"]);
+    await registerThroughForm();
+
+    await clickRetry();
+
+    await waitFor(() => expect(calls).toHaveLength(2));
+    expect(calls[1]).toEqual({
+      url: CONFIRMATION_EMAIL_API_PATH,
+      body: { email: "nerea@example.test" },
+    });
+  });
+
+  it("si al reintentar ya se puede mandar, quita el aviso y dice que el enlace va en camino", async () => {
+    stubDelivery("email_unavailable", ["confirmation_pending"]);
+    await registerThroughForm();
+
+    await clickRetry();
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/en camino/i);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("si al reintentar sigue sin poder mandar, mantiene el aviso y dice que lo intentó", async () => {
+    stubDelivery("email_unavailable", ["email_unavailable"]);
+    await registerThroughForm();
+
+    await clickRetry();
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/todavía no/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /ahora no podemos mandar correos/i,
+    );
+  });
+
+  it("un reenvío que responde que no se puede mandar cambia la pantalla al aviso", async () => {
+    stubDelivery("confirmation_pending", ["email_unavailable"]);
+    await registerThroughForm();
+
+    await clickResend();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /ahora no podemos mandar correos/i,
+    );
+    expect(
+      screen.getByRole("button", { name: "Reintentar el envío" }),
+    ).toBeInTheDocument();
+  });
+});

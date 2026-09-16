@@ -1,3 +1,7 @@
+import type {
+  EmailDeliveryAvailability,
+  EmailDeliveryAvailabilityCheck,
+} from "@/lib/email/email-delivery-availability";
 import {
   type MembershipType,
   type RegistrationDetails,
@@ -42,7 +46,7 @@ export type MemberDirectory = {
 /** Lo que contestó el servicio de correo al pedirle el envío. Es sólo para los
  * registros del servidor, y el motivo nunca lleva la dirección. El límite va
  * aparte del fallo genérico porque es el que se agota con dos registros
- * seguidos, y el aviso del #154 lo necesitará.
+ * seguidos.
  *
  * Nunca llega al cliente (#147). Sólo se intenta enviar a una cuenta sin
  * confirmar, así que un fallo del envío delata que esa dirección tiene cuenta:
@@ -52,8 +56,8 @@ export type RequestedConfirmationEmail =
   | { readonly kind: "failed"; readonly reason: string }
   | { readonly kind: "rate_limited"; readonly reason: string };
 
-/** `not_requested`: no había a quién mandarlo. La cuenta ya existía, ya había
- * confirmado su correo, o la dirección no tiene cuenta. */
+/** `not_requested`: no se pidió. La cuenta ya existía, ya había confirmado su
+ * correo, la dirección no tiene cuenta, o el envío no estaba disponible. */
 export type ConfirmationEmailOutcome =
   RequestedConfirmationEmail | { readonly kind: "not_requested" };
 
@@ -75,24 +79,41 @@ export type RegistrationGateways = {
   readonly identities: AuthIdentityGateway;
   readonly members: MemberDirectory;
   readonly confirmationEmail: ConfirmationEmailGateway;
+  readonly emailDelivery: EmailDeliveryAvailabilityCheck;
 };
 
-/** Respuesta del registro. Es deliberadamente pobre: es la MISMA exista o no
- * ya una cuenta con ese correo, porque enumerar cuentas desde el formulario de
- * registro es una fuga de datos personales. No lleva id de miembro ni de
- * identidad por lo mismo, ni dice si el correo salió (ver
- * `RequestedConfirmationEmail`). */
+/** `email_unavailable`: ahora no se pueden mandar correos (#154). Se decide
+ * antes de mirar la cuenta, así que sale igual para cualquier dirección. */
+export type ConfirmationReceiptOutcome =
+  "confirmation_pending" | "email_unavailable";
+
+/** Respuesta del registro y del reenvío. Es deliberadamente pobre: es la MISMA
+ * exista o no ya una cuenta con ese correo, porque enumerar cuentas desde el
+ * formulario de registro es una fuga de datos personales. No lleva id de
+ * miembro ni de identidad por lo mismo, ni dice si el correo a esa dirección
+ * salió (ver `RequestedConfirmationEmail`). */
 export type RegistrationReceipt = {
-  readonly outcome: "confirmation_pending";
+  readonly outcome: ConfirmationReceiptOutcome;
   readonly email: string;
 };
 
-/** Un registro válido que todavía no ha tocado ningún servicio. El recibo se
+export function receiptOutcomeFor(
+  emailDelivery: EmailDeliveryAvailability,
+): ConfirmationReceiptOutcome {
+  return emailDelivery.kind === "available"
+    ? "confirmation_pending"
+    : "email_unavailable";
+}
+
+/** Un registro válido que todavía no ha tocado ninguna cuenta. El recibo se
  * responde ya; `deliver` crea la cuenta y pide el correo, y va después de
  * responder: saber si la dirección tenía cuenta exige intentar crearla, y lo
- * que tardara la respuesta en esperarlo la delataría (#158). */
+ * que tardara la respuesta en esperarlo la delataría (#158).
+ * `emailDelivery` lleva el motivo de un envío no disponible, para el registro
+ * del servidor. */
 export type PendingRegistration = {
   readonly receipt: RegistrationReceipt;
+  readonly emailDelivery: EmailDeliveryAvailability;
   readonly deliver: () => Promise<ConfirmationEmailOutcome>;
 };
 
@@ -144,8 +165,6 @@ function describeCause(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
 
-const NEUTRAL_RECEIPT_OUTCOME = "confirmation_pending" as const;
-
 /** Crear la identidad y crear la fila de miembro son dos escrituras en dos
  * sistemas distintos, así que no hay transacción que las cubra. La garantía es
  * el orden más una compensación: primero la identidad (si falla, no hay nada
@@ -186,10 +205,15 @@ export type RegistrationInput = {
   readonly appUrl: string;
 };
 
+type AccountDelivery = {
+  readonly details: RegistrationDetails;
+  readonly input: RegistrationInput;
+  readonly emailDelivery: EmailDeliveryAvailability;
+};
+
 async function createAccountAndRequestEmail(
   gateways: RegistrationGateways,
-  details: RegistrationDetails,
-  input: RegistrationInput,
+  { details, input, emailDelivery }: AccountDelivery,
 ): Promise<ConfirmationEmailOutcome> {
   const identity = await createIdentity(gateways, {
     email: details.email,
@@ -213,6 +237,13 @@ async function createAccountAndRequestEmail(
     account_status: "incomplete",
   });
 
+  // La cuenta no depende del correo y se crea igual. El enlace no se emite:
+  // uno nuevo invalida el anterior, y emitirlo sin poder mandarlo le rompería
+  // a la persona el que ya tuviera.
+  if (emailDelivery.kind === "unavailable") {
+    return { kind: "not_requested" };
+  }
+
   return gateways.confirmationEmail.requestConfirmationEmail(
     details.email,
     input.appUrl,
@@ -220,22 +251,31 @@ async function createAccountAndRequestEmail(
 }
 
 /** RF-1 y RF-2 del PRD de E2: valida en el acto y deja preparada la creación
- * de la identidad y el socio, con la misma respuesta neutra exista o no la
- * cuenta. La cuenta nace `incomplete` con el rol Player (FR-008, FR-083).
+ * de la identidad y el socio, con la misma respuesta exista o no la cuenta.
+ * La cuenta nace `incomplete` con el rol Player (FR-008, FR-083).
  * Lanza `RegistrationValidationError` sin tocar ningún servicio: la validación
  * no depende de ninguna cuenta, así que puede responderse antes. */
-export function prepareRegistration(
+export async function prepareRegistration(
   gateways: RegistrationGateways,
   input: RegistrationInput,
-): PendingRegistration {
+): Promise<PendingRegistration> {
   const validation = validateRegistration(input.request, { now: input.now });
   if (!validation.ok) {
     throw new RegistrationValidationError(validation.issues);
   }
   const details = validation.details;
+  // Después de validar, para que una solicitud inválida no gaste cupo.
+  const emailDelivery = await gateways.emailDelivery.checkAvailability(
+    input.now,
+  );
 
   return {
-    receipt: { outcome: NEUTRAL_RECEIPT_OUTCOME, email: details.email },
-    deliver: () => createAccountAndRequestEmail(gateways, details, input),
+    receipt: {
+      outcome: receiptOutcomeFor(emailDelivery),
+      email: details.email,
+    },
+    emailDelivery,
+    deliver: () =>
+      createAccountAndRequestEmail(gateways, { details, input, emailDelivery }),
   };
 }

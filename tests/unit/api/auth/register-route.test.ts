@@ -99,6 +99,9 @@ function mockWiring(options: WiringOptions = {}): void {
                   },
                 },
               },
+              emailDeliveryForClub: () => ({
+                checkAvailability: async () => ({ kind: "available" }),
+              }),
             },
           },
   }));

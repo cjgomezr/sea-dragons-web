@@ -14,6 +14,10 @@ import {
   prepareRegistration,
 } from "@/lib/auth/register-member";
 import type { RegistrationRequest } from "@/lib/auth/registration";
+import type {
+  EmailDeliveryAvailability,
+  EmailDeliveryAvailabilityCheck,
+} from "@/lib/email/email-delivery-availability";
 
 const NOW = new Date("2026-09-12T03:00:00.000Z");
 const CLUB_ID = "6f1d2c3b-4a59-4e6f-8b70-1c2d3e4f5a6b";
@@ -38,6 +42,7 @@ type Doubles = {
   readonly identities: AuthIdentityGateway;
   readonly members: MemberDirectory;
   readonly confirmationEmail: ConfirmationEmailGateway;
+  readonly emailDelivery: EmailDeliveryAvailabilityCheck;
   readonly insertedRows: NewMemberRow[];
   readonly deletedUserIds: string[];
   readonly confirmationEmailsRequested: string[];
@@ -51,6 +56,7 @@ type DoubleOptions = {
   readonly insertMemberFails?: Error;
   readonly deleteIdentityFails?: Error;
   readonly confirmationEmail?: RequestedConfirmationEmail;
+  readonly emailDelivery?: EmailDeliveryAvailability;
 };
 
 function doubles(options: DoubleOptions = {}): Doubles {
@@ -98,7 +104,19 @@ function doubles(options: DoubleOptions = {}): Doubles {
         return options.confirmationEmail ?? { kind: "requested" };
       },
     },
+    emailDelivery: {
+      async checkAvailability() {
+        calls.push("checkAvailability");
+        return options.emailDelivery ?? { kind: "available" };
+      },
+    },
   };
+}
+
+/** Las llamadas que dependen de la cuenta. Preguntar por la disponibilidad
+ * no es una de ellas: se hace antes de responder y es igual para todos. */
+function accountCalls(given: Doubles): string[] {
+  return given.calls.filter((call) => call !== "checkAvailability");
 }
 
 function prepare(
@@ -122,7 +140,7 @@ async function register(
   readonly receipt: RegistrationReceipt;
   readonly confirmationEmail: ConfirmationEmailOutcome;
 }> {
-  const pending = prepare(given, request);
+  const pending = await prepare(given, request);
   return {
     receipt: pending.receipt,
     confirmationEmail: await pending.deliver(),
@@ -130,42 +148,89 @@ async function register(
 }
 
 describe("registro con entrega diferida", () => {
-  it("preparar el registro no crea la identidad, ni la fila, ni pide el correo", () => {
+  it("preparar el registro no crea la identidad, ni la fila, ni pide el correo", async () => {
     const given = doubles();
 
-    prepare(given);
+    await prepare(given);
 
-    expect(given.calls).toEqual([]);
+    expect(accountCalls(given)).toEqual([]);
   });
 
   it("al entregar crea la identidad, escribe la fila y pide el correo, en ese orden", async () => {
     const given = doubles();
 
-    await prepare(given).deliver();
+    await (await prepare(given)).deliver();
 
-    expect(given.calls).toEqual([
+    expect(accountCalls(given)).toEqual([
       "createIdentity",
       "insertMember",
       "requestConfirmationEmail",
     ]);
   });
 
-  it("el recibo está listo antes de entregar y es el mismo con una dirección ya registrada", () => {
-    const nuevo = prepare(doubles());
-    const repetido = prepare(
+  it("el recibo está listo antes de entregar y es el mismo con una dirección ya registrada", async () => {
+    const nuevo = await prepare(doubles());
+    const repetido = await prepare(
       doubles({ identityCreation: { kind: "already_registered" } }),
     );
 
     expect(repetido.receipt).toEqual(nuevo.receipt);
   });
 
-  it("una solicitud inválida falla al preparar, antes de que haya nada que entregar", () => {
+  // Una solicitud inválida no llega a gastar cupo de envío.
+  it("una solicitud inválida falla al preparar, antes de mirar la disponibilidad del envío", async () => {
     const given = doubles();
 
-    expect(() => prepare(given, requestWith({ password: "corta" }))).toThrow(
-      RegistrationValidationError,
-    );
+    await expect(
+      prepare(given, requestWith({ password: "corta" })),
+    ).rejects.toBeInstanceOf(RegistrationValidationError);
     expect(given.calls).toEqual([]);
+  });
+});
+
+describe("registro con el envío no disponible", () => {
+  const UNAVAILABLE: EmailDeliveryAvailability = {
+    kind: "unavailable",
+    reason: "Resend respondió 503",
+  };
+
+  it("el recibo dice que ahora no se pueden mandar correos", async () => {
+    const pending = await prepare(doubles({ emailDelivery: UNAVAILABLE }));
+
+    expect(pending.receipt).toEqual({
+      outcome: "email_unavailable",
+      email: "nerea@example.test",
+    });
+  });
+
+  it("deja a mano el motivo para el registro del servidor", async () => {
+    const pending = await prepare(doubles({ emailDelivery: UNAVAILABLE }));
+
+    expect(pending.emailDelivery).toEqual(UNAVAILABLE);
+  });
+
+  it("el recibo es el mismo con una dirección nueva y una ya registrada", async () => {
+    const nuevo = await prepare(doubles({ emailDelivery: UNAVAILABLE }));
+    const repetido = await prepare(
+      doubles({
+        emailDelivery: UNAVAILABLE,
+        identityCreation: { kind: "already_registered" },
+      }),
+    );
+
+    expect(repetido.receipt).toEqual(nuevo.receipt);
+  });
+
+  // La cuenta no depende del correo: se crea igual, y la persona pide el
+  // enlace desde la pantalla cuando el envío vuelva.
+  it("al entregar crea la cuenta pero no pide el correo", async () => {
+    const given = doubles({ emailDelivery: UNAVAILABLE });
+
+    const result = await register(given);
+
+    expect(given.insertedRows).toHaveLength(1);
+    expect(given.confirmationEmailsRequested).toEqual([]);
+    expect(result.confirmationEmail).toEqual({ kind: "not_requested" });
   });
 });
 

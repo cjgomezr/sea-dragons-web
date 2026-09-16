@@ -1082,19 +1082,19 @@ const CONFIRMATION_STUB_EMAIL = "nerea@example.test";
 
 const RESEND_ENDPOINT = "**/api/v1/auth/confirmation-email";
 
+type RegistrationOutcome = "confirmation_pending" | "email_unavailable";
+
 async function goToConfirmationPending(
   page: import("@playwright/test").Page,
   theme: (typeof themes)[number],
+  outcome: RegistrationOutcome = "confirmation_pending",
 ): Promise<void> {
   await page.route(REGISTRATION_ENDPOINT, (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        data: {
-          outcome: "confirmation_pending",
-          email: CONFIRMATION_STUB_EMAIL,
-        },
+        data: { outcome, email: CONFIRMATION_STUB_EMAIL },
       }),
     }),
   );
@@ -1113,12 +1113,26 @@ async function goToConfirmationPending(
   ).toBeVisible();
 }
 
-/** Las dos caras de la pantalla (#147): recién registrada, con el texto neutro,
- * y tras un reenvío que no llegó a nuestro servidor. La respuesta del registro
- * no dice nada del envío, así que no hay más variantes que fotografiar. */
+/** Las caras de la pantalla: recién registrada con el texto neutro (#147), tras
+ * un reenvío que no llegó a nuestro servidor, y con el envío de correos no
+ * disponible (#154). La respuesta no dice nada del envío a una dirección
+ * concreta, así que no hay más variantes que fotografiar. */
 const CONFIRMATION_VARIANTS = [
-  { resend: "none", screenshotPrefix: "registro-confirmacion" },
-  { resend: "network_error", screenshotPrefix: "registro-reenvio-fallido" },
+  {
+    registration: "confirmation_pending",
+    resend: "none",
+    screenshotPrefix: "registro-confirmacion",
+  },
+  {
+    registration: "confirmation_pending",
+    resend: "network_error",
+    screenshotPrefix: "registro-reenvio-fallido",
+  },
+  {
+    registration: "email_unavailable",
+    resend: "none",
+    screenshotPrefix: "registro-envio-no-disponible",
+  },
 ] as const;
 
 type ConfirmationVariant = (typeof CONFIRMATION_VARIANTS)[number];
@@ -1128,7 +1142,7 @@ async function goToConfirmationVariant(
   theme: (typeof themes)[number],
   variant: ConfirmationVariant,
 ): Promise<void> {
-  await goToConfirmationPending(page, theme);
+  await goToConfirmationPending(page, theme, variant.registration);
   if (variant.resend === "none") {
     return;
   }

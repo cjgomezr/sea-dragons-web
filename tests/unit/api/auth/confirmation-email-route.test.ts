@@ -58,6 +58,9 @@ function mockWiring(
                   return options.confirmationEmail ?? { kind: "requested" };
                 },
               },
+              emailDeliveryForClub: () => ({
+                checkAvailability: async () => ({ kind: "available" }),
+              }),
             },
           },
   }));
