@@ -67,7 +67,7 @@ function styleOf(target: Locator, property: string): Promise<string> {
 }
 
 function emailField(page: Page): Locator {
-  return page.getByLabel(/correo electrónico/i);
+  return page.getByLabel("Email", { exact: true });
 }
 
 test("keeps the chosen theme after a reload", async ({ page }) => {
