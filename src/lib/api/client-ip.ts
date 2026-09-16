@@ -10,6 +10,12 @@
  *
  * El valor que devuelve no se guarda en claro en ninguna parte: quien lo anota
  * guarda un hash con clave (ver `supabase-registration-request-log.ts`).
+ *
+ * Da por hecho que la cabecera trae la dirección desnuda, que es lo que pone
+ * Vercel. Un proxy que escribiera el puerto (`1.2.3.4:54321`,
+ * `[2001:db8::1]:54321`) dejaría a cada petición en su propio cubo, porque el
+ * puerto cambia en cada una. Si algún día hay un proxy así delante, lo que
+ * hace falta es quitar el puerto aquí, no otro límite.
  */
 
 const FORWARDED_FOR_HEADER = "x-forwarded-for";
