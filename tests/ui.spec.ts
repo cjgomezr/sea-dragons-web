@@ -159,6 +159,33 @@ async function goToWithTheme(
 
 type Screen = { readonly name: string; readonly path: string };
 
+/** La visita elige español con la cookie, igual que tras usar el interruptor.
+ * El navegador de la suite pide inglés (playwright.config.ts). */
+async function chooseSpanish(page: Page): Promise<void> {
+  await page
+    .context()
+    .addCookies([{ name: LOCALE_COOKIE_NAME, value: "es", url: APP_URL }]);
+}
+
+/** E17: axe pasa también por cada pantalla de cuentas en español. Los textos
+ * cambian de largo y el documento cambia de `lang`, y ninguna de las dos cosas
+ * la ve la pasada en inglés. */
+async function expectNoAxeViolationsInSpanish(
+  page: Page,
+  screenPath: string,
+): Promise<void> {
+  await chooseSpanish(page);
+  await page.goto(`${APP_URL}${screenPath}`);
+  await expect(page.locator("html")).toHaveAttribute("lang", "es");
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  expect(
+    results.violations,
+    JSON.stringify(results.violations, null, 2),
+  ).toEqual([]);
+}
+
 // Las pantallas de este archivo que se alcanzan sin sesión. Las dos viven en
 // el grupo de rutas (auth), con panel de marca propio y sin la cáscara de
 // menú. La entrada es desde #135 la puerta de toda la aplicación, y el mockup
@@ -326,6 +353,20 @@ const PASSWORD_RECOVERY_SCREENS: readonly Screen[] = [
 
 for (const pg of PASSWORD_RECOVERY_SCREENS) {
   describeScreen(pg);
+}
+
+// Las pantallas de cuentas que se alcanzan sin sesión, más el desenlace del
+// enlace de confirmación, que es el panel con más texto.
+for (const pg of [
+  ...PUBLIC_PAGES,
+  ...PASSWORD_RECOVERY_SCREENS,
+  { name: "registro-enlace-invalido", path: "/registro?confirmacion=invalida" },
+]) {
+  test(`${pg.name} en español: has no accessibility violations (axe-core)`, async ({
+    page,
+  }) => {
+    await expectNoAxeViolationsInSpanish(page, pg.path);
+  });
 }
 
 async function goToRecoveryRequested(
@@ -1343,9 +1384,7 @@ for (const state of ["ok", "pendiente"] as const) {
   test(`registro tras el enlace (${state}): no promete un inicio de sesión que ya existe`, async ({
     page,
   }) => {
-    await page
-      .context()
-      .addCookies([{ name: LOCALE_COOKIE_NAME, value: "es", url: APP_URL }]);
+    await chooseSpanish(page);
     await page.goto(`${APP_URL}/registro?confirmacion=${state}`);
 
     await expect(page.getByRole("main")).not.toContainText(
@@ -1458,6 +1497,12 @@ for (const name of PHOTOGRAPHED_MEMBERS) {
         results.violations,
         JSON.stringify(results.violations, null, 2),
       ).toEqual([]);
+    });
+
+    test("en español: has no accessibility violations (axe-core)", async ({
+      page,
+    }) => {
+      await expectNoAxeViolationsInSpanish(page, COMPLETE_REGISTRATION_PATH);
     });
 
     // ASS-004: 360px is the narrowest viewport the shell must support.
