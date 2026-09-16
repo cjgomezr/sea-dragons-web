@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { createTranslator } from "@/lib/i18n/translator";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import { createTranslator, type EntryParams } from "@/lib/i18n/translator";
 
 describe("leer un mensaje", () => {
   it("devuelve el texto en inglés cuando se pide en inglés", () => {
@@ -55,7 +55,7 @@ describe("mensajes con datos dentro", () => {
     );
   });
 
-  it("con un valor vacío deja la frase entera y sin marcas sin rellenar", () => {
+  it("con un valor vacío no lanza ni deja la marca sin rellenar, aunque quede el hueco", () => {
     const translate = createTranslator("es");
 
     expect(translate("auth.passwordRecovery.linkSent", { email: "" })).toBe(
@@ -97,5 +97,21 @@ describe("mensajes con datos dentro", () => {
       // @ts-expect-error `count` elige entre singular y plural: tiene que ser un número.
       translate("auth.emailRequest.retryAfter", { count: "5" }),
     ).toThrow();
+  });
+
+  it("con una categoría que el idioma no escribe usa la forma general", () => {
+    // Para un millón `Intl.PluralRules("es")` devuelve `many`, que el
+    // catálogo no trae.
+    expect(
+      createTranslator("es")("auth.emailRequest.retryAfter", {
+        count: 1_000_000,
+      }),
+    ).toBe("Podrás pedir otro enlace dentro de 1.000.000 minutos.");
+  });
+
+  it("exige la cantidad a un plural aunque ninguna forma la escriba", () => {
+    expectTypeOf<
+      EntryParams<{ one: "One minute left"; other: "A few minutes left" }>
+    >().toEqualTypeOf<{ readonly count: number }>();
   });
 });

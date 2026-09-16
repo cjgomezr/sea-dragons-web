@@ -13,7 +13,7 @@ function keysMissingFrom(
   return Object.keys(reference).filter((key) => !Object.hasOwn(candidate, key));
 }
 
-const PLACEHOLDER = /\{(\w+)\}/g;
+const PLACEHOLDER = /\{([^}]*)\}/g;
 
 function placeholdersOf(message: Message): string[] {
   const templates =

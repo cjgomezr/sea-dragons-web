@@ -12,16 +12,27 @@ type PlaceholderNames<Template> =
 
 type TemplatesOf<Entry> = Entry extends string ? Entry : Entry[keyof Entry];
 
-/** Los datos que pide una clave, deducidos de sus llaves en el catálogo
- * inglés. `count` elige la forma plural, así que tiene que ser un número. */
-export type MessageParams<Key extends MessageKey> = {
-  readonly [
-    Name in PlaceholderNames<TemplatesOf<EnglishMessage<Key>>>
-  ]: Name extends "count" ? number : string | number;
+/** Un plural pide `count` aunque ninguna de sus formas lo escriba
+ * ("One minute left"): sin él no hay forma que elegir. */
+type ParamNames<Entry> =
+  | PlaceholderNames<TemplatesOf<Entry>>
+  | (Entry extends string ? never : "count");
+
+/** Los datos que pide un mensaje, deducidos de sus llaves. `count` elige la
+ * forma plural, así que tiene que ser un número. */
+export type EntryParams<Entry extends Message> = {
+  readonly [Name in ParamNames<Entry>]: Name extends "count"
+    ? number
+    : string | number;
 };
 
+/** Los datos de una clave salen del catálogo inglés, que define las claves. */
+export type MessageParams<Key extends MessageKey> = EntryParams<
+  EnglishMessage<Key>
+>;
+
 type ParamsArgument<Key extends MessageKey> = [
-  PlaceholderNames<TemplatesOf<EnglishMessage<Key>>>,
+  ParamNames<EnglishMessage<Key>>,
 ] extends [never]
   ? []
   : [params: MessageParams<Key>];
@@ -33,10 +44,13 @@ export type Translator = <Key extends MessageKey>(
 
 type ParamValues = Readonly<Record<string, string | number | undefined>>;
 
-const PLACEHOLDER = /\{(\w+)\}/g;
+// Lo mismo que acepta `PlaceholderNames`: todo lo que haya hasta la primera
+// llave de cierre. Si los dos leyeran distinto, un dato podría compilar y
+// quedarse sin rellenar en pantalla.
+const PLACEHOLDER = /\{([^}]*)\}/g;
 
 function selectTemplate(
-  locale: Locale,
+  plurals: Intl.PluralRules,
   message: Message,
   params: ParamValues,
 ): string {
@@ -50,11 +64,11 @@ function selectTemplate(
     );
   }
   // La categoría que el idioma no escribe cae en `other`, que siempre está.
-  return message[new Intl.PluralRules(locale).select(count)] ?? message.other;
+  return message[plurals.select(count)] ?? message.other;
 }
 
 function insertParams(
-  locale: Locale,
+  numbers: Intl.NumberFormat,
   template: string,
   params: ParamValues,
 ): string {
@@ -63,9 +77,7 @@ function insertParams(
     if (value === undefined) {
       throw new TypeError(`Falta el dato {${name}} para el mensaje.`);
     }
-    return typeof value === "number"
-      ? new Intl.NumberFormat(locale).format(value)
-      : value;
+    return typeof value === "number" ? numbers.format(value) : value;
   });
 }
 
@@ -75,6 +87,8 @@ function insertParams(
  * pasar del servidor al navegador. */
 export function createTranslator(locale: Locale): Translator {
   const catalog: Readonly<Record<string, Message>> = messageCatalogs[locale];
+  const plurals = new Intl.PluralRules(locale);
+  const numbers = new Intl.NumberFormat(locale);
 
   return (key, ...[params]) => {
     const message = catalog[key];
@@ -85,8 +99,8 @@ export function createTranslator(locale: Locale): Translator {
     }
     const values: ParamValues = params ?? {};
     return insertParams(
-      locale,
-      selectTemplate(locale, message, values),
+      numbers,
+      selectTemplate(plurals, message, values),
       values,
     );
   };
