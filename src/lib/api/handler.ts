@@ -44,13 +44,21 @@ type ApiHandlerFn<T, Body> = (
   args: ApiHandlerArgs<Body>,
 ) => Promise<ApiHandlerResult<T>>;
 
+/** Los campos del cuerpo que son texto. Sólo esos pueden declararse como el
+ * del correo: si se pudiera señalar un booleano, no habría nada que redactar y
+ * la protección se apagaría sin que nadie se enterara. */
+type StringFieldOf<Body> = {
+  [K in keyof Body]-?: Body[K] extends string ? K : never;
+}[keyof Body] &
+  string;
+
 type ApiRouteConfig<T, Body> = {
   readonly schema?: ZodType<Body>;
   /** Qué campo del cuerpo trae una dirección de correo, cuando la ruta recibe
    * una. El envoltorio la quita de lo que registra si el handler lanza: se la
    * pasa a Supabase y a Resend antes de responder, y los mensajes de esos
    * proveedores a veces la citan. */
-  readonly emailField?: keyof Body & string;
+  readonly emailField?: StringFieldOf<Body>;
   readonly handler: ApiHandlerFn<T, Body>;
 };
 
@@ -98,7 +106,7 @@ async function readValidatedBody<Body>(
  * Sin campo declarado no hay nada que quitar del registro. */
 function readEmailField<Body>(
   body: Body,
-  emailField: (keyof Body & string) | undefined,
+  emailField: StringFieldOf<Body> | undefined,
 ): string | undefined {
   if (emailField === undefined || typeof body !== "object" || body === null) {
     return undefined;

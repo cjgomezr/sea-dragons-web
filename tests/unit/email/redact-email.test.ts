@@ -19,7 +19,10 @@ describe("redactEmail", () => {
   });
 
   it("la reconoce aunque el texto la escriba con otra caja", () => {
-    const text = redactEmail(`Email address "Nerea@Example.TEST" is invalid`, EMAIL);
+    const text = redactEmail(
+      `Email address "Nerea@Example.TEST" is invalid`,
+      EMAIL,
+    );
 
     expect(text).toBe(`Email address "${REDACTED_EMAIL}" is invalid`);
   });
