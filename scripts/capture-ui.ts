@@ -26,7 +26,9 @@ export interface CaptureUiOptions {
  * Captura la matriz completa de viewports por temas en una sola invocación,
  * con el dev server arrancado y apagado dentro de este mismo proceso.
  */
-export async function captureUi(options: CaptureUiOptions = {}): Promise<string[]> {
+export async function captureUi(
+  options: CaptureUiOptions = {},
+): Promise<string[]> {
   const outputDir = options.outputDir ?? DEFAULT_OUTPUT_DIR;
   const capturePath = options.capturePath ?? "/";
 
@@ -37,7 +39,11 @@ export async function captureUi(options: CaptureUiOptions = {}): Promise<string[
     try {
       const written: string[] = [];
       for (const viewport of VIEWPORTS) {
-        const byTheme = await captureThemes(browser, new URL(capturePath, appUrl).href, viewport);
+        const byTheme = await captureThemes(
+          browser,
+          new URL(capturePath, appUrl).href,
+          viewport,
+        );
         assertThemesDiffer(viewport, byTheme);
 
         for (const [theme, buffer] of byTheme) {
@@ -97,7 +103,9 @@ async function removeOrphanCaptures(
 
   await Promise.all(
     existing
-      .filter((fileName) => fileName.endsWith(".png") && !expected.has(fileName))
+      .filter(
+        (fileName) => fileName.endsWith(".png") && !expected.has(fileName),
+      )
       .map((fileName) => rm(path.join(outputDir, fileName))),
   );
 }
@@ -112,7 +120,10 @@ function assertNotBlank(buffer: Buffer, fileName: string): void {
 
 // Dos capturas idénticas significan que el tema no llegó a aplicarse, y un
 // revisor que compare la misma imagen dos veces aprueba lo que nunca vio.
-function assertThemesDiffer(viewport: Viewport, byTheme: Map<Theme, Buffer>): void {
+function assertThemesDiffer(
+  viewport: Viewport,
+  byTheme: Map<Theme, Buffer>,
+): void {
   const [light, dark] = [byTheme.get("light"), byTheme.get("dark")];
   if (light && dark && light.equals(dark)) {
     throw new Error(
@@ -122,15 +133,20 @@ function assertThemesDiffer(viewport: Viewport, byTheme: Map<Theme, Buffer>): vo
 }
 
 async function main(): Promise<void> {
-  const files = await captureUi({ capturePath: parseCapturePath(process.argv.slice(2)) });
-  console.log(`${files.length} capturas en ${path.relative(process.cwd(), DEFAULT_OUTPUT_DIR)}:`);
+  const files = await captureUi({
+    capturePath: parseCapturePath(process.argv.slice(2)),
+  });
+  console.log(
+    `${files.length} capturas en ${path.relative(process.cwd(), DEFAULT_OUTPUT_DIR)}:`,
+  );
   for (const file of files) {
     console.log(`  ${file}`);
   }
 }
 
 const isMain =
-  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
+  process.argv[1] !== undefined &&
+  fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
   main().catch((error: unknown) => {
     // Un argumento mal escrito no merece un stack trace: merece la frase que

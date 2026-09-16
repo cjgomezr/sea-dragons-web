@@ -11,7 +11,10 @@ describe("withDevServer", () => {
     const stop = vi.fn();
     const start = vi.fn().mockReturnValue(APP_URL);
 
-    const result = await withDevServer(async (url) => `visitado ${url}`, { start, stop });
+    const result = await withDevServer(async (url) => `visitado ${url}`, {
+      start,
+      stop,
+    });
 
     expect(result).toBe(`visitado ${APP_URL}`);
     expect(stop).toHaveBeenCalledOnce();
@@ -22,7 +25,10 @@ describe("withDevServer", () => {
     const start = vi.fn().mockReturnValue(APP_URL);
 
     await expect(
-      withDevServer(() => Promise.reject(new Error("la captura falló")), { start, stop }),
+      withDevServer(() => Promise.reject(new Error("la captura falló")), {
+        start,
+        stop,
+      }),
     ).rejects.toThrow("la captura falló");
     expect(stop).toHaveBeenCalledOnce();
   });
@@ -51,7 +57,9 @@ describe("withDevServer", () => {
     });
     const run = vi.fn();
 
-    await expect(withDevServer(run, { start, stop })).rejects.toThrow(/already answers/);
+    await expect(withDevServer(run, { start, stop })).rejects.toThrow(
+      /already answers/,
+    );
     expect(run).not.toHaveBeenCalled();
     expect(stop).not.toHaveBeenCalled();
   });

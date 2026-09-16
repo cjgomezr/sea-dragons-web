@@ -253,6 +253,7 @@ No aplica: este epic no cambia ninguna pantalla. No lleva `ui-review`.
    no burocrático: el despliegue queda a nombre de una persona, y si esa persona
    se va, alguien tiene que tener esas credenciales. Lo mismo aplica al proyecto
    de Supabase.
+
 4. **A quién llega el aviso de caída.** Hoy solo hay una persona. Cuando entren
    más, hay que decidir si avisa a todos o hay rotación.
 5. **Dominio propio, y tiene fecha límite: antes de E2.** No es una preferencia
@@ -266,15 +267,15 @@ No aplica: este epic no cambia ninguna pantalla. No lleva `ui-review`.
 
 ## 10. Descomposición en tickets (para write-ticket)
 
-| Issue | Título propuesto                                                                    | Tamaño | Depende de | Auto-merge sugerido                                           |
-| --- | ----------------------------------------------------------------------------------- | ------ | ---------- | ------------------------------------------------------------- |
-| #89 | Crear el proyecto de Supabase de producción y aplicarle el esquema                  | M      | ninguna    | No: crea la base que llevará datos personales reales          |
-| #90 | Documentar las variables de entorno en `.env.example` y dónde vive cada una         | S      | ninguna    | No: su test decide si un PR pasa, no es un `.md` inerte       |
-| #91 | Desplegar en Vercel desde `main` con preview por PR                                 | M      | #89, #90   | No: es lo que pone la aplicación delante de usuarios reales   |
-| #92 | Separar los secretos por entorno y probar que un preview no ve producción           | M      | #89, #91   | No: frontera de seguridad, y el fallo es silencioso           |
-| #93 | Verificar en cada PR que la migración aplica sobre un esquema como el de producción | M      | #89        | No: puerta que decide si una migración entra                  |
-| #94 | Aplicar las migraciones a producción al mergear                                     | M      | #92, #93   | No: escribe en la base de producción                          |
-| #95 | Monitorear la disponibilidad y avisar de las caídas                                 | S      | #91        | No: hay que comprobar que el aviso llega de verdad            |
+| Issue | Título propuesto                                                                    | Tamaño | Depende de | Auto-merge sugerido                                         |
+| ----- | ----------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------- |
+| #89   | Crear el proyecto de Supabase de producción y aplicarle el esquema                  | M      | ninguna    | No: crea la base que llevará datos personales reales        |
+| #90   | Documentar las variables de entorno en `.env.example` y dónde vive cada una         | S      | ninguna    | No: su test decide si un PR pasa, no es un `.md` inerte     |
+| #91   | Desplegar en Vercel desde `main` con preview por PR                                 | M      | #89, #90   | No: es lo que pone la aplicación delante de usuarios reales |
+| #92   | Separar los secretos por entorno y probar que un preview no ve producción           | M      | #89, #91   | No: frontera de seguridad, y el fallo es silencioso         |
+| #93   | Verificar en cada PR que la migración aplica sobre un esquema como el de producción | M      | #89        | No: puerta que decide si una migración entra                |
+| #94   | Aplicar las migraciones a producción al mergear                                     | M      | #92, #93   | No: escribe en la base de producción                        |
+| #95   | Monitorear la disponibilidad y avisar de las caídas                                 | S      | #91        | No: hay que comprobar que el aviso llega de verdad          |
 
 Ninguno lleva `ui-review`: este epic no toca pantallas.
 

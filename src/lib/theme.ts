@@ -14,7 +14,10 @@ export function nextTheme(current: Theme): Theme {
  * FR-079: the persisted choice always wins. The operating system preference is
  * only the starting point for a visitor who has never picked one.
  */
-export function resolveInitialTheme(stored: string | null, prefersDark: boolean): Theme {
+export function resolveInitialTheme(
+  stored: string | null,
+  prefersDark: boolean,
+): Theme {
   if (isTheme(stored)) {
     return stored;
   }

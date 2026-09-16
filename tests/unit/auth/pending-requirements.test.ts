@@ -12,7 +12,6 @@ import {
  * discrepando, y la discrepancia sería una cuenta activa sin datos.
  */
 
-
 const COMPLETE_ADULT_PROFILE: MemberProfile = {
   country: "AU",
   dateOfBirth: "1994-03-08",
@@ -73,8 +72,16 @@ describe("qué le falta a una cuenta", () => {
 
   it("devuelve todos los pendientes a la vez, no el primero", () => {
     expect(
-      pendingFor({ country: null, membershipType: null, dateOfBirth: null }, false),
-    ).toEqual(["country", "dateOfBirth", "membershipType", "emailConfirmation"]);
+      pendingFor(
+        { country: null, membershipType: null, dateOfBirth: null },
+        false,
+      ),
+    ).toEqual([
+      "country",
+      "dateOfBirth",
+      "membershipType",
+      "emailConfirmation",
+    ]);
   });
 });
 
