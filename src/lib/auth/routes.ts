@@ -1,3 +1,5 @@
+import type { Capability } from "./roles";
+
 /**
  * Las rutas que la frontera de sesión necesita nombrar, en un solo sitio.
  *
@@ -31,8 +33,16 @@ export const PASSWORD_RECOVERY_PATH = "/recuperar-contrasena";
  * y a la que la frontera manda todo lo demás que esa cuenta pida. */
 export const COMPLETE_REGISTRATION_PATH = "/completar-registro";
 
-/** El panel principal: el destino de una cuenta activa. */
+/** El panel principal: el destino de una cuenta activa, y el de quien pide una
+ * pantalla que su rol no alcanza. Por eso no puede restringirse nunca: sería
+ * una redirección sin fin. */
 export const DASHBOARD_PATH = "/dashboard";
+
+/** El team builder (FR-043). */
+export const TEAMS_PATH = "/equipos";
+
+/** Las evaluaciones. Un Player no las ve, ni las propias (FR-055). */
+export const EVALUATIONS_PATH = "/evaluaciones";
 
 /** El destino del enlace del correo de confirmación (#132). No es una
  * pantalla del PRD: canjea el token y redirige. Es público por definición,
@@ -113,3 +123,30 @@ export const PUBLIC_API_PATHS: readonly string[] = [
 ];
 
 export const API_V1_PREFIX = "/api/v1";
+
+/** Una ruta que sólo alcanza el rol que tiene la capacidad de la matriz. */
+export type RestrictedRoute = {
+  readonly path: string;
+  readonly capability: Capability;
+};
+
+/**
+ * Qué capacidad exige cada ruta restringida, pantallas y endpoints juntos
+ * (FR-013, NFR-004). Una ruta restringe también todo lo que cuelga de ella,
+ * y si una petición cae bajo varias, tiene que cumplirlas todas.
+ *
+ * Los endpoints se declaran aquí y no en `createApiRoute` por dos motivos. El
+ * primero es que el proxy ya leyó el rol en la misma consulta que el estado
+ * de la cuenta: comprobarlo otra vez en el handler sería una segunda lectura
+ * de `members` por petición. El segundo es que así un endpoint restringido no
+ * depende de que su handler se acuerde de pedirlo, y la frontera entera se lee
+ * en este archivo.
+ *
+ * Lo que no esté aquí lo alcanza cualquier cuenta activa. Olvidar una ruta la
+ * deja abierta, así que al crear una pantalla o un endpoint que la matriz
+ * limita, se declara en el mismo cambio.
+ */
+export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
+  { path: TEAMS_PATH, capability: "buildTeamsAndTrackAttendance" },
+  { path: EVALUATIONS_PATH, capability: "viewEvaluations" },
+];

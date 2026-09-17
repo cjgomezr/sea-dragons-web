@@ -16,7 +16,9 @@ describe("frontera de sesión: recuperación de contraseña", () => {
     PASSWORD_RECOVERY_API_PATH,
     PASSWORD_RESET_API_PATH,
   ])("deja pasar %s sin sesión", (pathname) => {
-    expect(decideSessionBoundary({ pathname, session: "anonymous" })).toEqual({
+    expect(
+      decideSessionBoundary({ pathname, session: { kind: "anonymous" } }),
+    ).toEqual({
       kind: "allow",
     });
   });

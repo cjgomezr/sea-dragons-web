@@ -5,17 +5,29 @@ import {
   CONFIRMATION_EMAIL_API_PATH,
   DASHBOARD_PATH,
   EMAIL_CONFIRMATION_PATH,
+  EVALUATIONS_PATH,
   GUARDIAN_CONSENT_API_PATH,
   PASSWORD_RECOVERY_PATH,
   REGISTER_API_PATH,
   REGISTRATION_PATH,
   SIGN_IN_PATH,
+  TEAMS_PATH,
 } from "@/lib/auth/routes";
-import { decideSessionBoundary } from "@/lib/auth/session-boundary";
+import { ROLES, type Role } from "@/lib/auth/roles";
+import {
+  type SessionBoundaryOutcome,
+  decideSessionBoundary,
+} from "@/lib/auth/session-boundary";
 
-const ANONYMOUS = { session: "anonymous" } as const;
-const INCOMPLETE = { session: "incomplete" } as const;
-const ACTIVE = { session: "active" } as const;
+const ANONYMOUS = { session: { kind: "anonymous" } } as const;
+const INCOMPLETE = { session: { kind: "incomplete" } } as const;
+const ACTIVE = { session: { kind: "active", role: "Player" } } as const;
+
+function activeAs(role: Role): {
+  readonly session: { readonly kind: "active"; readonly role: Role };
+} {
+  return { session: { kind: "active", role } };
+}
 
 describe("frontera de sesión: sin sesión", () => {
   it.each([SIGN_IN_PATH, REGISTRATION_PATH, PASSWORD_RECOVERY_PATH])(
@@ -245,5 +257,84 @@ describe("frontera de sesión: cuenta incompleta", () => {
         ...INCOMPLETE,
       }),
     ).toEqual({ kind: "forbidden" });
+  });
+});
+
+/** Las cinco pantallas que la matriz abre a todos (la fila de funciones de
+ * socio) más el panel, que es el destino de toda redirección por rol. */
+const PAGES_OPEN_TO_EVERY_ROLE = [
+  DASHBOARD_PATH,
+  "/calendario",
+  "/directorio",
+  "/noticias",
+  "/pagos",
+] as const;
+
+const TO_DASHBOARD: SessionBoundaryOutcome = {
+  kind: "redirect",
+  to: DASHBOARD_PATH,
+};
+const ALLOW: SessionBoundaryOutcome = { kind: "allow" };
+
+describe("frontera por rol en páginas", () => {
+  const roleByPage: readonly (readonly [
+    Role,
+    string,
+    SessionBoundaryOutcome,
+  ])[] = [
+    ["Player", TEAMS_PATH, TO_DASHBOARD],
+    ["Player", EVALUATIONS_PATH, TO_DASHBOARD],
+    ["Committee", TEAMS_PATH, TO_DASHBOARD],
+    ["Committee", EVALUATIONS_PATH, TO_DASHBOARD],
+    ["Coach", TEAMS_PATH, ALLOW],
+    ["Coach", EVALUATIONS_PATH, ALLOW],
+    ["Admin", TEAMS_PATH, ALLOW],
+    ["Admin", EVALUATIONS_PATH, ALLOW],
+    ...ROLES.flatMap((role) =>
+      PAGES_OPEN_TO_EVERY_ROLE.map(
+        (pathname) => [role, pathname, ALLOW] as const,
+      ),
+    ),
+  ];
+
+  it.each(roleByPage)(
+    "un %s que pide %s recibe %o",
+    (role, pathname, outcome) => {
+      expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
+        outcome,
+      );
+    },
+  );
+
+  it("niega también lo que cuelga de una pantalla restringida", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: `${EVALUATIONS_PATH}/nueva`,
+        ...activeAs("Player"),
+      }),
+    ).toEqual(TO_DASHBOARD);
+  });
+
+  it("no confunde una pantalla que solo empieza igual que una restringida", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: `${TEAMS_PATH}x`,
+        ...activeAs("Player"),
+      }),
+    ).toEqual(ALLOW);
+  });
+});
+
+describe("orden de las fronteras en páginas", () => {
+  it("manda a la entrada, no al panel, una pantalla restringida pedida sin sesión", () => {
+    expect(
+      decideSessionBoundary({ pathname: EVALUATIONS_PATH, ...ANONYMOUS }),
+    ).toEqual({ kind: "redirect", to: SIGN_IN_PATH });
+  });
+
+  it("manda a completar registro, no al panel, una pantalla restringida pedida con la cuenta incompleta", () => {
+    expect(
+      decideSessionBoundary({ pathname: TEAMS_PATH, ...INCOMPLETE }),
+    ).toEqual({ kind: "redirect", to: COMPLETE_REGISTRATION_PATH });
   });
 });

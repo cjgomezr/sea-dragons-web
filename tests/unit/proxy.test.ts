@@ -25,6 +25,10 @@ vi.mock("@/lib/auth/session-reader", () => ({
 
 const { proxy } = await import("@/proxy");
 
+const ANONYMOUS: SessionState = { kind: "anonymous" };
+const INCOMPLETE: SessionState = { kind: "incomplete" };
+const ACTIVE_PLAYER: SessionState = { kind: "active", role: "Player" };
+
 const ORIGIN = "http://localhost:3417";
 const TEMPORARY_REDIRECT = 307;
 
@@ -52,7 +56,7 @@ beforeEach(() => {
 
 describe("frontera de sesión: pantallas", () => {
   it("redirige a la entrada una pantalla pedida sin sesión", async () => {
-    givenSupabaseConfigured("anonymous");
+    givenSupabaseConfigured(ANONYMOUS);
 
     const response = await proxy(requestFor("/calendario"));
 
@@ -61,7 +65,7 @@ describe("frontera de sesión: pantallas", () => {
   });
 
   it("deja pasar una pantalla cuando la cuenta está activa", async () => {
-    givenSupabaseConfigured("active");
+    givenSupabaseConfigured(ACTIVE_PLAYER);
 
     const response = await proxy(requestFor("/calendario"));
 
@@ -70,7 +74,7 @@ describe("frontera de sesión: pantallas", () => {
   });
 
   it("deja pasar la pantalla de entrada sin preguntar por la sesión", async () => {
-    givenSupabaseConfigured("anonymous");
+    givenSupabaseConfigured(ANONYMOUS);
 
     const response = await proxy(requestFor(SIGN_IN_PATH));
 
@@ -83,7 +87,7 @@ describe("frontera de sesión: pantallas", () => {
 
 describe("frontera de sesión: API", () => {
   it("responde 401 con el cuerpo de la convención a un endpoint sin sesión", async () => {
-    givenSupabaseConfigured("anonymous");
+    givenSupabaseConfigured(ANONYMOUS);
 
     const response = await proxy(requestFor("/api/v1/evaluaciones"));
 
@@ -94,7 +98,7 @@ describe("frontera de sesión: API", () => {
   });
 
   it("deja público el endpoint de salud, que consulta el monitoreo", async () => {
-    givenSupabaseConfigured("anonymous");
+    givenSupabaseConfigured(ANONYMOUS);
 
     const response = await proxy(requestFor("/api/v1/health"));
 
@@ -106,7 +110,7 @@ describe("frontera de sesión: API", () => {
   });
 
   it("deja público el registro, que nadie puede pedir con sesión", async () => {
-    givenSupabaseConfigured("anonymous");
+    givenSupabaseConfigured(ANONYMOUS);
 
     const response = await proxy(requestFor(REGISTER_API_PATH));
 
@@ -118,7 +122,7 @@ describe("frontera de sesión: API", () => {
   });
 
   it("deja pasar un endpoint cuando la cuenta está activa", async () => {
-    givenSupabaseConfigured("active");
+    givenSupabaseConfigured(ACTIVE_PLAYER);
 
     const response = await proxy(requestFor("/api/v1/evaluaciones"));
 
@@ -128,7 +132,7 @@ describe("frontera de sesión: API", () => {
 
 describe("cuenta incompleta", () => {
   it("redirige a completar registro cualquier pantalla de la aplicación", async () => {
-    givenSupabaseConfigured("incomplete");
+    givenSupabaseConfigured(INCOMPLETE);
 
     const response = await proxy(requestFor("/calendario"));
 
@@ -137,7 +141,7 @@ describe("cuenta incompleta", () => {
   });
 
   it("responde 403 con el cuerpo de la convención a la API directa", async () => {
-    givenSupabaseConfigured("incomplete");
+    givenSupabaseConfigured(INCOMPLETE);
 
     const response = await proxy(requestFor("/api/v1/evaluaciones"));
 
@@ -148,7 +152,7 @@ describe("cuenta incompleta", () => {
   });
 
   it("deja llegar a la pantalla de completar registro", async () => {
-    givenSupabaseConfigured("incomplete");
+    givenSupabaseConfigured(INCOMPLETE);
 
     const response = await proxy(requestFor(COMPLETE_REGISTRATION_PATH));
 
@@ -157,7 +161,7 @@ describe("cuenta incompleta", () => {
   });
 
   it("deja llegar al endpoint con el que completa su registro", async () => {
-    givenSupabaseConfigured("incomplete");
+    givenSupabaseConfigured(INCOMPLETE);
 
     const response = await proxy(requestFor(ACCOUNT_API_PATH));
 
@@ -165,7 +169,7 @@ describe("cuenta incompleta", () => {
   });
 
   it("deja llegar a cerrar sesión", async () => {
-    givenSupabaseConfigured("incomplete");
+    givenSupabaseConfigured(INCOMPLETE);
 
     const response = await proxy(requestFor("/api/v1/auth/session"));
 
@@ -175,7 +179,7 @@ describe("cuenta incompleta", () => {
 
 describe("cuenta activa que pide completar registro", () => {
   it("aterriza en el panel principal", async () => {
-    givenSupabaseConfigured("active");
+    givenSupabaseConfigured(ACTIVE_PLAYER);
 
     const response = await proxy(requestFor(COMPLETE_REGISTRATION_PATH));
 
@@ -202,7 +206,7 @@ describe("frontera de sesión sin Supabase configurado", () => {
 
 describe("cookies del refresco de token", () => {
   it("las copia a la respuesta que sale, o el refresco se perdería", async () => {
-    givenSupabaseConfigured("active");
+    givenSupabaseConfigured(ACTIVE_PLAYER);
 
     const response = await proxy(requestFor("/calendario"));
 
