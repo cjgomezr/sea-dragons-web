@@ -41,6 +41,7 @@ const WORKER_STEP_ID = "worker";
 const TRANSCRIPT_FILENAME = "claude-execution-output.json";
 const TRANSCRIPT_UPLOAD_ACTION = "actions/upload-artifact";
 const TRANSCRIPT_ARTIFACT_NAME = "claude-transcript";
+const TRANSCRIPT_REDACT_SCRIPT = "scripts/redact-transcript.ts";
 
 /** Siete días: cubren de sobra una corrida nocturna que alguien mira el lunes.
  * No más, porque este repositorio es público y el artefacto lo puede
@@ -272,6 +273,23 @@ describe("claude-backlog.yml · la transcripción sobrevive al job", () => {
 
     expect(condition).toMatch(/always\(\)|!\s*cancelled\(\)/);
     expect(condition).not.toContain("success()");
+    // `!cancelled() && steps.worker.outcome == 'success'` pasaba las dos
+    // aserciones de arriba y perdía la transcripción en el único caso que
+    // importa, así que la comparación por resultado también queda cerrada.
+    expect(condition).not.toMatch(/(outcome|conclusion)\s*==\s*'success'/);
+  });
+
+  it("enmascara las credenciales antes de subir el artefacto", () => {
+    // El artefacto de un repositorio público lo descarga cualquiera, y la
+    // acción escribe la transcripción sin tocar los secretos que el workflow
+    // le inyectó al worker.
+    const steps = parseWorkflow().jobs.implement.steps;
+    const redactIndex = steps.findIndex((candidate) =>
+      candidate.run?.includes(TRANSCRIPT_REDACT_SCRIPT),
+    );
+
+    expect(redactIndex).toBeGreaterThanOrEqual(0);
+    expect(redactIndex).toBeLessThan(findTranscriptUpload().index);
   });
 
   it("el aviso que queda en el issue dice dónde buscar la transcripción", () => {
@@ -282,6 +300,16 @@ describe("claude-backlog.yml · la transcripción sobrevive al job", () => {
     );
 
     expect(note?.run).toContain(TRANSCRIPT_ARTIFACT_NAME);
+  });
+
+  it("no promete el artefacto cuando no llegó a haber sesión", () => {
+    // Si el job murió antes del worker, no se subió ninguna transcripción.
+    // Mandar a buscarla es el mismo defecto que el aviso vino a corregir.
+    const note = parseWorkflow().jobs.implement.steps.find((candidate) =>
+      candidate.if?.includes("failure()"),
+    );
+
+    expect(note?.run).toMatch(/if \[ "\$WORKER_OUTCOME" != "skipped" \]/);
   });
 
   it("va después del paso del worker, que es quien escribe el archivo", () => {

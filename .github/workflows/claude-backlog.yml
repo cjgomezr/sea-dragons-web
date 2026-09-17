@@ -156,32 +156,52 @@ jobs:
 
       # Las dos corridas nocturnas que murieron con el código 143 (11 y 12 de
       # septiembre de 2026) no dejaron nada que leer. Con
-      # `show_full_output: false` el log solo trae los mensajes `init` y
-      # `result` de la sesión, y la transcripción completa se queda dentro del
-      # runner, que GitHub destruye al cerrar el job. Subirla es lo único que
-      # convierte el próximo fallo en algo diagnosticable en vez de una
+      # `show_full_output: false` el log del job solo trae los mensajes `init`
+      # y `result` de la sesión, y la transcripción completa se queda dentro
+      # del runner, que GitHub destruye al cerrar el job. Subirla es lo único
+      # que convierte el próximo fallo en algo diagnosticable en vez de una
       # conjetura.
       #
-      # `!cancelled()` en lugar de dejar el paso sin condición: el caso que
-      # importa es precisamente el del paso anterior en rojo, y un paso sin
-      # condición no corre cuando el que va antes falló. El `!= 'skipped'`
-      # evita el aviso de "no encontré el archivo" cuando el job murió antes
-      # del worker (un `npm ci` roto, la credencial sin resolver): ahí no hubo
-      # sesión y no hay transcripción que subir.
+      # Pero antes hay que enmascararla. La acción escribe ese archivo tal
+      # cual: su propia redacción de secretos alcanza al resumen del job y a
+      # los comentarios, nunca al archivo en disco. Y el enmascarado de
+      # GitHub cubre el log, no los artefactos, que en un repositorio público
+      # descarga cualquiera. Basta un `git remote -v` del worker, que lleva el
+      # token en la URL, para publicar una credencial en texto plano.
       #
-      # La ruta sale de `execution_file`, la salida que declara la acción,
-      # porque es su contrato y no una ruta adivinada. El respaldo existe
-      # porque al fallar la acción solo rellena esa salida si alcanza a
-      # rescatarla, y la ruta del respaldo es la que las dos corridas
-      # imprimieron antes de morir ("Log saved to
+      # La lógica vive en un script por el mismo motivo que la del guardia de
+      # más abajo: un fallo del enmascarado es silencioso, y ahí sí se puede
+      # probar contra transcripciones de mentira.
+      - name: Enmascara las credenciales de la transcripción
+        if: ${{ always() && steps.worker.outcome != 'skipped' }}
+        env:
+          CLAUDE_OAUTH: ${{ steps.cred.outputs.oauth }}
+          CLAUDE_API_KEY: ${{ steps.cred.outputs.api }}
+          WORKFLOW_TOKEN: ${{ github.token }}
+          WORKER_APP_TOKEN: ${{ steps.worker.outputs.github_token }}
+        run: |
+          TRANSCRIPT="${{ steps.worker.outputs.execution_file || format('{0}/claude-execution-output.json', runner.temp) }}"
+          node --experimental-strip-types scripts/redact-transcript.ts \
+            "$TRANSCRIPT" \
+            CLAUDE_OAUTH CLAUDE_API_KEY WORKFLOW_TOKEN WORKER_APP_TOKEN
+
+      # `always()` y no `!cancelled()`: un job cancelado, o uno que agota sus
+      # 350 minutos, es precisamente cuando más falta hace saber qué estaba
+      # haciendo el worker. El `!= 'skipped'` deja fuera el caso en que el job
+      # murió antes de que hubiera sesión (un `npm ci` roto, la credencial sin
+      # resolver). Si esa condición no acertara, el único coste es un aviso de
+      # "no encontré el archivo".
+      #
+      # La ruta sale de `execution_file`, la salida que declara la acción. El
+      # respaldo existe porque, al fallar, la acción solo rellena esa salida si
+      # el archivo ya está escrito, y es la ruta que las dos corridas muertas
+      # imprimieron ("Log saved to
       # /home/runner/work/_temp/claude-execution-output.json").
       #
-      # Y un aviso que no se puede omitir: este repositorio es público, así que
-      # el artefacto lo descarga cualquiera, y la transcripción incluye la
-      # salida de cada comando que corrió el worker. De ahí que la retención
-      # sea corta.
+      # La retención corta acota la ventana, no el acceso. Lo que protege la
+      # transcripción es el enmascarado de arriba.
       - name: Guarda la transcripción de la sesión
-        if: ${{ !cancelled() && steps.worker.outcome != 'skipped' }}
+        if: ${{ always() && steps.worker.outcome != 'skipped' }}
         uses: actions/upload-artifact@v4
         with:
           name: claude-transcript
@@ -227,6 +247,9 @@ jobs:
           # son lo mismo, y un comentario que describa el que no fue manda a
           # buscar la causa al sitio equivocado.
           CLAIM_GUARD: ${{ steps.claim-guard.outcome }}
+          # Si el job murió antes del worker no hubo sesión, así que tampoco
+          # hay artefacto al que mandar a nadie.
+          WORKER_OUTCOME: ${{ steps.worker.outcome }}
         run: |
           if [ "$CLAIM_GUARD" = "failure" ]; then
             BODY="🤖 **La corrida terminó sin que el worker tocara este issue.** No se reclamó, no se bloqueó y no dejó ningún PR que declare cerrarlo.
@@ -255,8 +278,10 @@ jobs:
 
           Si el worker alcanzó a dejar trabajo en una rama, míralo antes de borrar nada."
           fi
-          BODY="$BODY
+          if [ "$WORKER_OUTCOME" != "skipped" ]; then
+            BODY="$BODY
 
           La sesión completa quedó como artefacto \`claude-transcript\` de esa corrida, en la pestaña Actions. Ahí está lo que el worker hizo de verdad: el log del job solo muestra el arranque y el cierre."
+          fi
           gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" --add-label needs-human || true
           gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body "$BODY" || true
