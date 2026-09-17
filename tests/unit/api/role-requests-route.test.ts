@@ -211,6 +211,18 @@ describe("POST /api/v1/role-requests", () => {
     expect(inserts).toEqual([]);
   });
 
+  it("responde 400 a una justificación desmesurada, sin tocar la base", async () => {
+    mockWiring();
+
+    const response = await postRoleRequest({
+      requestedRole: "Coach",
+      justification: "a".repeat(JUSTIFICATION_MAX_LENGTH * 10),
+    });
+
+    expect(response.status).toBe(400);
+    expect(databaseReads).toEqual([]);
+  });
+
   it("responde 401 sin sesión", async () => {
     mockWiring({ callerId: null });
 

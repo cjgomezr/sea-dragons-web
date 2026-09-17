@@ -313,6 +313,34 @@ describe("envío del formulario", () => {
     },
   );
 
+  it("quita el aviso del servidor en cuanto se corrige la justificación", async () => {
+    const user = userEvent.setup();
+    stubError(422, "business_rule", "role_already_held");
+    render(<RoleRequestPanel locale="en" role="Coach" latestRequest={null} />);
+    await user.click(screen.getByRole("button", { name: "Send request" }));
+    await screen.findByRole("alert");
+
+    await user.type(
+      screen.getByLabelText("Why do you want this role? (optional)"),
+      "x",
+    );
+
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("quita el aviso del servidor en cuanto se cambia de rol", async () => {
+    const user = userEvent.setup();
+    stubError(409, "conflict");
+    render(<RoleRequestPanel locale="en" role="Player" latestRequest={null} />);
+    await user.click(screen.getByRole("radio", { name: "Coach" }));
+    await user.click(screen.getByRole("button", { name: "Send request" }));
+    await screen.findByRole("alert");
+
+    await user.click(screen.getByRole("radio", { name: "Committee" }));
+
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("en español, el error sale en español", async () => {
     const user = userEvent.setup();
     stubError(409, "conflict");

@@ -2078,7 +2078,13 @@ test.describe("Mi cuenta con una solicitud pendiente", () => {
 test.describe("un socio que pide un rol desde Mi cuenta", () => {
   skipWithoutSession();
   test.use({ storageState: roleRequestStorageStatePath("para-pedir-rol") });
-  test.describe.configure({ timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS });
+  // Sin reintentos: el primer intento deja la solicitud guardada, así que un
+  // segundo encontraría la pendiente en vez del formulario y taparía por qué
+  // falló el primero.
+  test.describe.configure({
+    retries: 0,
+    timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS,
+  });
 
   test("envía la solicitud, ve la pendiente sin recargar y sigue ahí al volver", async ({
     page,

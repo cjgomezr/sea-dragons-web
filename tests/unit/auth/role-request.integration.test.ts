@@ -29,9 +29,11 @@ const ROLE_REQUESTS_TABLE = "role_requests";
  * aunque la red serialice alguna pareja. */
 const SIMULTANEOUS_SUBMISSIONS = 4;
 
+type SeededMember = { readonly userId: string; readonly clubId: string };
+
 async function withActiveMember<T>(
   serviceClient: ServiceRoleClient,
-  run: (userId: string) => Promise<T>,
+  run: (member: SeededMember) => Promise<T>,
 ): Promise<T> {
   const { data: club, error: clubError } = await serviceClient.client
     .from("clubs")
@@ -57,7 +59,7 @@ async function withActiveMember<T>(
     }
     // La fila y sus solicitudes se van con la identidad por las cascadas de
     // 0003 y 0012.
-    return run(user.id);
+    return run({ userId: user.id, clubId: club.id as string });
   });
 }
 
@@ -85,7 +87,7 @@ describeRls("solicitudes de rol contra seadragons-dev", () => {
       const serviceClient = createServiceRoleTestClient(process.env);
       const gateways = createRoleRequestGateways(serviceClient.client);
 
-      await withActiveMember(serviceClient, async (userId) => {
+      await withActiveMember(serviceClient, async ({ userId }) => {
         const created = await requestRole(gateways, {
           userId,
           requestedRole: "Coach",
@@ -108,13 +110,39 @@ describeRls("solicitudes de rol contra seadragons-dev", () => {
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
 
+  // Determinista, a diferencia del de envíos simultáneos: si la red los
+  // serializa, todos se rechazan en la comprobación previa y el choque con el
+  // índice no llega a ocurrir.
+  it(
+    "convierte el choque con el índice único en pending_exists",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = createRoleRequestGateways(serviceClient.client);
+
+      await withActiveMember(serviceClient, async ({ userId, clubId }) => {
+        const request = {
+          clubId,
+          userId,
+          requestedRole: "Coach",
+          justification: null,
+        } as const;
+        await gateways.requests.insertPendingRequest(request);
+
+        await expect(
+          gateways.requests.insertPendingRequest(request),
+        ).resolves.toEqual({ kind: "pending_exists" });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
   it(
     "deja una sola pendiente cuando llegan varios envíos a la vez",
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);
       const gateways = createRoleRequestGateways(serviceClient.client);
 
-      await withActiveMember(serviceClient, async (userId) => {
+      await withActiveMember(serviceClient, async ({ userId }) => {
         const outcomes = await Promise.allSettled(
           Array.from({ length: SIMULTANEOUS_SUBMISSIONS }, () =>
             requestRole(gateways, {

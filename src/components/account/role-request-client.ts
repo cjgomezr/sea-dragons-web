@@ -1,5 +1,6 @@
 import { readStringAt } from "@/lib/api/read-string-at";
 import {
+  JUSTIFICATION_MAX_LENGTH,
   ROLE_REQUEST_STATUSES,
   type RequestableRole,
   type RoleRequest,
@@ -88,7 +89,6 @@ export function describeRoleRequestFailure(
   translate: Translator,
   failure: RequestFailure,
   reason: string | null,
-  maxJustificationLength: number,
 ): string {
   switch (failure) {
     case "network":
@@ -101,7 +101,7 @@ export function describeRoleRequestFailure(
         : translate("account.error.roleAlreadyHeld");
     case "validation_error":
       return translate("account.request.justificationTooLong", {
-        max: maxJustificationLength,
+        max: JUSTIFICATION_MAX_LENGTH,
       });
     case "unauthenticated":
       return translate("account.error.signInRequired");

@@ -6,6 +6,7 @@ import {
   identifyAccountCaller,
 } from "@/lib/auth/account-api";
 import {
+  JUSTIFICATION_MAX_LENGTH,
   JustificationTooLongError,
   PendingRoleRequestError,
   REQUESTABLE_ROLES,
@@ -28,12 +29,22 @@ import { createSupabaseRoleRequestGateways } from "@/lib/auth/supabase-role-requ
 // Depende de la sesión de quien llama y de sus solicitudes en este instante.
 export const dynamic = "force-dynamic";
 
+/** Un tope holgado sólo para no arrastrar un cuerpo de megas hasta el dominio.
+ * El límite de verdad, contado como `char_length`, lo aplica `requestRole`:
+ * un emoji ocupa dos unidades aquí y un carácter allí, y cuatro veces el
+ * límite deja pasar cualquier texto que la base aceptaría. */
+const JUSTIFICATION_BODY_MAX_LENGTH = JUSTIFICATION_MAX_LENGTH * 4;
+
 /** Sólo Coach y Committee pasan la forma: pedir Admin, Player o un rol que no
  * existe es una petición mal hecha (400) y no llega a la base. Que el socio ya
  * tenga el rol es una regla del dominio (422). */
 const roleRequestBodySchema = z.object({
   requestedRole: z.enum(REQUESTABLE_ROLES),
-  justification: z.string().nullable().optional(),
+  justification: z
+    .string()
+    .max(JUSTIFICATION_BODY_MAX_LENGTH)
+    .nullable()
+    .optional(),
 });
 
 type RoleRequestBody = z.infer<typeof roleRequestBodySchema>;

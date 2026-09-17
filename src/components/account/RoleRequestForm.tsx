@@ -49,12 +49,7 @@ function FormAlert({
   if (status.kind === "failed") {
     return (
       <p className="auth-error" role="alert">
-        {describeRoleRequestFailure(
-          translate,
-          status.failure,
-          status.reason,
-          JUSTIFICATION_MAX_LENGTH,
-        )}
+        {describeRoleRequestFailure(translate, status.failure, status.reason)}
       </p>
     );
   }
@@ -175,9 +170,24 @@ export function RoleRequestForm({
   // llega antes. La referencia cambia en el acto.
   const isSendingRef = useRef(false);
 
+  // Un aviso del servidor habla del envío anterior: en cuanto se corrige
+  // algo deja de describir lo que hay en pantalla. Mientras se envía no se
+  // toca, o el botón volvería a activarse.
+  function dismissFailure(): void {
+    setStatus((current) =>
+      current.kind === "failed" ? { kind: "editing" } : current,
+    );
+  }
+
   function selectRole(role: RequestableRole): void {
     setRequestedRole(role);
     setIsRoleMissing(false);
+    dismissFailure();
+  }
+
+  function editJustification(value: string): void {
+    setJustification(value);
+    dismissFailure();
   }
 
   async function handleSubmit(
@@ -225,7 +235,7 @@ export function RoleRequestForm({
         <JustificationField
           translate={translate}
           value={justification}
-          onChange={setJustification}
+          onChange={editJustification}
         />
         <button type="submit" className="auth-submit" disabled={isSending}>
           {translate(
