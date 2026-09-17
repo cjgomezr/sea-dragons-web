@@ -3,9 +3,13 @@
 Auditoría del `SRD_Victoria_Seadragons_Club_Platform.md` y de `plan-maestro.md`,
 hecha durante el bootstrap del repo (22 de agosto de 2026).
 
-Estado: **todo resuelto el 23 de agosto de 2026.** Las decisiones están escritas
-en el SRD v1.4 y en el plan maestro; este archivo queda como registro de qué se
-preguntó y qué se respondió. Cada punto apunta al FR o AC que lo cierra.
+Estado: **todo lo auditado entonces quedó resuelto el 23 de agosto de 2026.**
+Las decisiones están escritas en el SRD v1.4 y en el plan maestro; este archivo
+queda como registro de qué se preguntó y qué se respondió. Cada punto apunta al
+FR o AC que lo cierra.
+
+**Abierto después:** B5, el 16 de septiembre de 2026, que bloquea los tickets de
+E12.
 
 ---
 
@@ -74,6 +78,42 @@ marzo. Escrito en FR-042, AC-017 y AC-017b.
 vuelo, sin persistir ninguna evaluación, y la interfaz lo marca "sin evaluar". No
 se crean evaluaciones fantasma ni se obliga al coach a asignar a mano. Escrito en
 FR-086 y AC-053.
+
+### B5 · Qué significa elegir membresía antes de pagarla · E12 · SIN RESOLVER
+
+**Qué se observó.** Al probar el registro en producción (16 de septiembre de
+2026), quien se registra elige su tipo de membresía y, en cuanto confirma el
+correo y completa los datos, su cuenta queda `active` y usa toda la aplicación
+sin haber pagado nada.
+
+**Por qué no es un error.** FR-009 pide elegir la membresía durante el alta, y la
+historia de usuario de unirse al club "en menos de un minuto" lo pide en un solo
+paso. `active` es el estado de la **cuenta** (FR-083 y la decisión B2): significa
+que puede operar, no que haya pagado. El PRD de E2 lo dejó escrito: el tipo de
+membresía "se captura y se guarda, pero no se cobra nada"
+(`docs/prd/e2-autenticacion-cuentas.md`). Hoy no existe nada de cobro: es E12.
+
+**Qué ya prevé el SRD.** La entidad `Membership` (§9) tiene su propio `status`,
+distinto del `status` de la entidad `Member`, y lo actualizan los webhooks de
+Stripe (INT-002, FR-071). O sea, el SRD sí separa "cuenta activa" de "membresía
+al día". Lo que no hace es definir la segunda.
+
+**Lo que hay que decidir antes de escribir los tickets de E12:**
+
+1. **Qué estados tiene una membresía.** El SRD solo usa "Active" como ejemplo
+   (FR-065, AC-025, AC-027). Falta la lista completa (por ejemplo: pendiente de
+   primer pago, activa, con pago fallido, vencida) y qué evento de Stripe mueve
+   de uno a otro.
+2. **Qué puede hacer un socio cuya membresía no está al día.** El SRD solo prevé
+   la alerta y el reintento (FR-070, FR-071). No dice si conserva el calendario,
+   el RSVP y el directorio, o si solo ve el aviso de pago.
+3. **Qué pasa entre el registro y el primer cobro.** Si se paga durante el alta,
+   al entrar por primera vez, o hay un plazo. Y cómo encaja Casual, que no tiene
+   cobro recurrente sino packs prepagados (FR-063, FR-064).
+
+**Qué no se toca mientras tanto.** El registro sigue pidiendo la membresía y
+activando la cuenta como hoy. Decidirlo ahora sería adelantar trabajo: no hay
+nada que cobrar hasta E12.
 
 ---
 
