@@ -24,6 +24,7 @@ columna members.country tipo=text null=YES default=-
 columna members.created_at tipo=timestamp with time zone null=NO default=now()
 columna members.date_of_birth tipo=date null=YES default=-
 columna members.email tipo=text null=NO default=-
+columna members.email_locale tipo=text null=NO default='es'::text
 columna members.full_name tipo=text null=NO default=-
 columna members.guardian_consent_at tipo=timestamp with time zone null=YES default=-
 columna members.guardian_email tipo=text null=YES default=-
@@ -175,6 +176,7 @@ restriccion email_send_requests.email_send_requests_pkey PRIMARY KEY (id)
 restriccion members.members_account_status_check CHECK ((account_status = ANY (ARRAY['incomplete'::text, 'active'::text, 'inactive'::text])))
 restriccion members.members_active_minor_requires_guardian_consent CHECK (((account_status <> 'active'::text) OR (guardian_consent_at IS NOT NULL) OR (date_of_birth IS NULL) OR (date_of_birth <= ((((created_at AT TIME ZONE 'Australia/Melbourne'::text))::date - '18 years'::interval))::date)))
 restriccion members.members_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion members.members_email_locale_check CHECK ((email_locale = ANY (ARRAY['en'::text, 'es'::text])))
 restriccion members.members_guardian_consent_complete CHECK ((((guardian_consent_at IS NULL) AND (guardian_name IS NULL) AND (guardian_email IS NULL)) OR ((guardian_consent_at IS NOT NULL) AND (COALESCE(btrim(guardian_name), ''::text) <> ''::text) AND (COALESCE(btrim(guardian_email), ''::text) <> ''::text))))
 restriccion members.members_membership_type_check CHECK ((membership_type = ANY (ARRAY['Full'::text, 'Student'::text, 'Casual'::text])))
 restriccion members.members_pkey PRIMARY KEY (id)

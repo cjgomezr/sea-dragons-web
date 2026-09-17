@@ -1,3 +1,7 @@
+import {
+  type EmailLocaleDirectory,
+  readEmailLocale,
+} from "@/lib/email/email-locale";
 import { renderAccountConfirmationEmail } from "@/lib/email/email-templates";
 import { redactEmail } from "@/lib/email/redact-email";
 import {
@@ -5,6 +9,7 @@ import {
   type EmailSender,
   type EmailSenderConnection,
 } from "@/lib/email/resend-email-sender";
+import type { Locale } from "@/lib/i18n/locale";
 import {
   EMAIL_CONFIRMATION_LINK_LIFETIME_MINUTES,
   buildEmailConfirmationUrl,
@@ -62,7 +67,12 @@ export function toConfirmationEmailOutcome(
  * ya confirmó su correo, o la dirección no tiene cuenta. En los dos no hay a
  * quién mandar nada, y el reenvío no debe distinguirlos. */
 export type ConfirmationTokenIssue =
-  | { readonly kind: "issued"; readonly tokenHash: string }
+  | {
+      readonly kind: "issued";
+      readonly tokenHash: string;
+      /** La identidad dueña del enlace: de su fila sale el idioma. */
+      readonly userId: string;
+    }
   | { readonly kind: "no_pending_confirmation" }
   | { readonly kind: "failed"; readonly error: SendFailure };
 
@@ -74,15 +84,19 @@ export type ConfirmationTokenIssuer = {
  * este código, y convertirlo en "no salió el correo" lo escondería. */
 async function deliverConfirmationEmail(
   sender: EmailSender,
-  email: string,
-  confirmUrl: string,
+  email: {
+    readonly to: string;
+    readonly confirmUrl: string;
+    readonly locale: Locale;
+  },
 ): Promise<ConfirmationEmailOutcome> {
   try {
     await sender.sendEmail({
-      to: email,
+      to: email.to,
       ...renderAccountConfirmationEmail({
-        confirmUrl,
+        confirmUrl: email.confirmUrl,
         linkLifetimeMinutes: EMAIL_CONFIRMATION_LINK_LIFETIME_MINUTES,
+        locale: email.locale,
       }),
     });
     return { kind: "requested" };
@@ -90,15 +104,16 @@ async function deliverConfirmationEmail(
     if (!(error instanceof EmailDeliveryError)) {
       throw error;
     }
-    return toConfirmationEmailOutcome(error, email);
+    return toConfirmationEmailOutcome(error, email.to);
   }
 }
 
 export function createConfirmationEmailGateway(dependencies: {
   readonly tokens: ConfirmationTokenIssuer;
   readonly emails: EmailSenderConnection;
+  readonly emailLocales: EmailLocaleDirectory;
 }): ConfirmationEmailGateway {
-  const { tokens, emails } = dependencies;
+  const { tokens, emails, emailLocales } = dependencies;
   return {
     async requestConfirmationEmail(email, appUrl) {
       // Antes de emitir: un enlace nuevo invalida el anterior, y emitirlo sin
@@ -114,11 +129,11 @@ export function createConfirmationEmailGateway(dependencies: {
       if (issue.kind === "failed") {
         return toConfirmationEmailOutcome(issue.error, email);
       }
-      return deliverConfirmationEmail(
-        emails.sender,
-        email,
-        buildEmailConfirmationUrl(appUrl, issue.tokenHash),
-      );
+      return deliverConfirmationEmail(emails.sender, {
+        to: email,
+        confirmUrl: buildEmailConfirmationUrl(appUrl, issue.tokenHash),
+        locale: await readEmailLocale(emailLocales, issue.userId),
+      });
     },
   };
 }

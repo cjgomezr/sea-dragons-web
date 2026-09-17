@@ -14,6 +14,7 @@ import {
   prepareRegistration,
 } from "@/lib/auth/register-member";
 import type { RegistrationRequest } from "@/lib/auth/registration";
+import type { Locale } from "@/lib/i18n/locale";
 import type { RegistrationRequestLog } from "@/lib/auth/registration-rate-limit";
 import type {
   EmailDeliveryAvailability,
@@ -136,6 +137,7 @@ function accountCalls(given: Doubles): string[] {
 function prepare(
   given: Doubles,
   request: RegistrationRequest = requestWith(),
+  locale: Locale = "en",
 ): ReturnType<typeof prepareRegistration> {
   return prepareRegistration(given, {
     request,
@@ -143,6 +145,7 @@ function prepare(
     now: NOW,
     appUrl: APP_URL,
     clientBucket: CLIENT_BUCKET,
+    locale,
   });
 }
 
@@ -161,6 +164,20 @@ async function register(
     confirmationEmail: await pending.deliver(),
   };
 }
+
+describe("idioma del socio", () => {
+  it.each(["en", "es"] as const)(
+    "al registrarse con la aplicación en %s, la fila guarda ese idioma para sus correos",
+    async (locale) => {
+      const given = doubles();
+
+      await (await prepare(given, requestWith(), locale)).deliver();
+
+      expect(given.insertedRows).toHaveLength(1);
+      expect(given.insertedRows[0]?.email_locale).toBe(locale);
+    },
+  );
+});
 
 describe("registro con entrega diferida", () => {
   it("preparar el registro no crea la identidad, ni la fila, ni pide el correo", async () => {
@@ -266,6 +283,7 @@ describe("registro", () => {
         membership_type: "Student",
         role: "Player",
         account_status: "incomplete",
+        email_locale: "en",
       },
     ]);
   });

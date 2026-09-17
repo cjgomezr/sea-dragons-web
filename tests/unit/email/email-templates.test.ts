@@ -51,6 +51,7 @@ const TEMPLATES = {
     email: renderPasswordRecoveryEmail({
       resetUrl: RESET_URL,
       linkLifetimeMinutes: LIFETIME_MINUTES,
+      locale: "es",
     }),
     url: RESET_URL,
   },
@@ -58,10 +59,34 @@ const TEMPLATES = {
     email: renderAccountConfirmationEmail({
       confirmUrl: CONFIRM_URL,
       linkLifetimeMinutes: LIFETIME_MINUTES,
+      locale: "es",
     }),
     url: CONFIRM_URL,
   },
 } as const;
+
+const ENGLISH_TEMPLATES = {
+  recovery: {
+    email: renderPasswordRecoveryEmail({
+      resetUrl: RESET_URL,
+      linkLifetimeMinutes: LIFETIME_MINUTES,
+      locale: "en",
+    }),
+    url: RESET_URL,
+  },
+  confirmation: {
+    email: renderAccountConfirmationEmail({
+      confirmUrl: CONFIRM_URL,
+      linkLifetimeMinutes: LIFETIME_MINUTES,
+      locale: "en",
+    }),
+    url: CONFIRM_URL,
+  },
+} as const;
+
+/** El formato no puede depender del idioma: cada caso de forma corre sobre
+ * las cuatro plantillas. */
+const ALL_TEMPLATES = { ...TEMPLATES, ...ENGLISH_TEMPLATES } as const;
 
 describe("plantillas de correo", () => {
   it("la de recuperación lleva el enlace y la vigencia", () => {
@@ -103,7 +128,7 @@ describe("plantillas de correo", () => {
     );
   });
 
-  it.each(Object.entries(TEMPLATES))(
+  it.each(Object.entries(ALL_TEMPLATES))(
     "la de %s dice quién la manda, en el asunto y en el cuerpo",
     (_name, { email }) => {
       expect(email.subject).toContain(CLUB_NAME);
@@ -112,7 +137,7 @@ describe("plantillas de correo", () => {
     },
   );
 
-  it.each(Object.entries(TEMPLATES))(
+  it.each(Object.entries(ALL_TEMPLATES))(
     "la de %s tiene versión en texto plano, sin una sola etiqueta",
     (_name, { email }) => {
       expect(email.text.length).toBeGreaterThan(0);
@@ -122,7 +147,7 @@ describe("plantillas de correo", () => {
 
   // "Se lee igual" no es que el texto exista: es que no le falte nada a quien
   // sólo ve el texto, ni al revés.
-  it.each(Object.entries(TEMPLATES))(
+  it.each(Object.entries(ALL_TEMPLATES))(
     "la de %s dice lo mismo en texto plano que en HTML",
     (_name, { email }) => {
       const htmlText = readableTextOf(email.html);
@@ -145,11 +170,80 @@ describe("plantillas de correo", () => {
     const email = renderPasswordRecoveryEmail({
       resetUrl: 'https://example.test/?x="><script>',
       linkLifetimeMinutes: LIFETIME_MINUTES,
+      locale: "es",
     });
 
     expect(email.html).not.toContain("<script>");
     expect(email.html).toContain("&quot;&gt;&lt;script&gt;");
   });
+});
+
+describe("plantillas en dos idiomas", () => {
+  it("la de recuperación sale en inglés, asunto incluido", () => {
+    const { email } = ENGLISH_TEMPLATES.recovery;
+
+    expect(email.subject).toBe("Reset your Victoria Seadragons password");
+    expect(email.text).toContain(`${LIFETIME_MINUTES} minutes`);
+    expect(email.html).toContain("Choose a new password");
+    expect(email.text).not.toContain("contraseña");
+  });
+
+  it("la de confirmación sale en inglés, asunto incluido", () => {
+    const { email } = ENGLISH_TEMPLATES.confirmation;
+
+    expect(email.subject).toBe("Confirm your email for Victoria Seadragons");
+    expect(email.text).toContain(`${LIFETIME_MINUTES} minutes`);
+    expect(email.html).toContain("Confirm my email");
+    expect(email.text).not.toContain("correo");
+  });
+
+  it("las de español conservan el asunto de siempre", () => {
+    expect(TEMPLATES.recuperación.email.subject).toBe(
+      "Recupera tu contraseña de Victoria Seadragons",
+    );
+    expect(TEMPLATES.confirmación.email.subject).toBe(
+      "Confirma tu correo en Victoria Seadragons",
+    );
+  });
+
+  it.each(Object.entries(ENGLISH_TEMPLATES))(
+    "la de %s en inglés lleva el enlace intacto, en el botón y escrito",
+    (_name, { email, url }) => {
+      expect(email.text).toContain(url);
+      expect(linksTo(parseHtml(email.html), url)).toHaveLength(2);
+    },
+  );
+
+  it("la de confirmación en inglés nombra el botón de reenviar con su nombre en inglés", () => {
+    const { email } = ENGLISH_TEMPLATES.confirmation;
+
+    expect(email.text).toContain(RESEND_BUTTON_LABEL.en);
+    expect(readableTextOf(email.html)).toContain(RESEND_BUTTON_LABEL.en);
+    expectNoneMatch(
+      email.text,
+      REGISTERING_AGAIN_SENDS_A_LINK,
+      "el correo de confirmación en inglés",
+    );
+  });
+
+  it("la firma del club sale en el idioma del correo", () => {
+    expect(ENGLISH_TEMPLATES.recovery.email.text).toContain(
+      "Victoria Seadragons, underwater rugby club in Melbourne.",
+    );
+    expect(TEMPLATES.recuperación.email.text).toContain(
+      "Victoria Seadragons, club de rugby subacuático de Melbourne.",
+    );
+  });
+
+  it.each([
+    ["es", TEMPLATES.recuperación.email],
+    ["en", ENGLISH_TEMPLATES.recovery.email],
+  ] as const)(
+    "el documento declara el idioma en que está escrito (%s)",
+    (locale, email) => {
+      expect(parseHtml(email.html).documentElement.lang).toBe(locale);
+    },
+  );
 });
 
 const MAX_EMAIL_WIDTH_PX = 600;
@@ -209,14 +303,14 @@ function inlineColor(element: Element, property: string): string | undefined {
 }
 
 describe("formato del correo", () => {
-  it.each(Object.entries(TEMPLATES))(
+  it.each(Object.entries(ALL_TEMPLATES))(
     "la de %s abre con una cabecera que lleva el nombre del club",
     (_name, { email }) => {
       expect(readableTextOf(email.html).startsWith(CLUB_NAME)).toBe(true);
     },
   );
 
-  it.each(Object.entries(TEMPLATES))(
+  it.each(Object.entries(ALL_TEMPLATES))(
     "la de %s lleva un botón con la acción que apunta al enlace",
     (_name, { email, url }) => {
       const button = buttonOf(email, url);
@@ -227,7 +321,7 @@ describe("formato del correo", () => {
 
   // Outlook de escritorio pinta con el motor de Word e ignora `max-width`:
   // sólo un ancho fijo en una tabla que sólo él lee le pone el tope.
-  it.each(Object.entries(TEMPLATES))(
+  it.each(Object.entries(ALL_TEMPLATES))(
     "la de %s limita el ancho a 600 píxeles también en Outlook",
     (_name, { email }) => {
       expect(email.html).toMatch(
@@ -238,7 +332,7 @@ describe("formato del correo", () => {
     },
   );
 
-  it.each(Object.entries(TEMPLATES))(
+  it.each(Object.entries(ALL_TEMPLATES))(
     "el relleno del botón de la de %s va en la celda, que Outlook sí respeta",
     (_name, { email, url }) => {
       const cell = buttonOf(email, url).closest("td");
@@ -247,7 +341,7 @@ describe("formato del correo", () => {
     },
   );
 
-  it.each(Object.entries(TEMPLATES))(
+  it.each(Object.entries(ALL_TEMPLATES))(
     "la de %s deja debajo del botón el enlace escrito entero",
     (_name, { email, url }) => {
       const document = parseHtml(email.html);
@@ -264,7 +358,7 @@ describe("formato del correo", () => {
     },
   );
 
-  it.each(Object.entries(TEMPLATES))(
+  it.each(Object.entries(ALL_TEMPLATES))(
     "la de %s se maqueta con tablas y estilos en línea, a 600 píxeles como mucho",
     (_name, { email }) => {
       const document = parseHtml(email.html);
@@ -283,7 +377,7 @@ describe("formato del correo", () => {
     },
   );
 
-  it.each(Object.entries(TEMPLATES))(
+  it.each(Object.entries(ALL_TEMPLATES))(
     "la de %s no carga nada de fuera",
     (_name, { email }) => {
       expect(email.html).not.toMatch(/<link\b/i);
@@ -295,7 +389,7 @@ describe("formato del correo", () => {
     },
   );
 
-  it.each(Object.entries(TEMPLATES))(
+  it.each(Object.entries(ALL_TEMPLATES))(
     "el botón de la de %s usa el acento y el texto sobre acento del sistema de diseño",
     (_name, { email, url }) => {
       const button = buttonOf(email, url);
@@ -336,6 +430,7 @@ describe("formato del correo", () => {
     const email = renderPasswordRecoveryEmail({
       resetUrl: 'https://example.test/?x="><script>',
       linkLifetimeMinutes: LIFETIME_MINUTES,
+      locale: "es",
     });
 
     expect(

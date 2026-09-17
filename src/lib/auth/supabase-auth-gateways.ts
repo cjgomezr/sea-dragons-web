@@ -35,6 +35,7 @@ import {
   createResendProviderProbe,
 } from "@/lib/email/resend-email-sender";
 import { createSupabaseEmailSendBudget } from "@/lib/email/supabase-email-send-budget";
+import type { EmailLocaleDirectory } from "@/lib/email/email-locale";
 import {
   type ConfirmationTokenIssuer,
   createConfirmationEmailGateway,
@@ -85,6 +86,8 @@ export type SupabaseAuthGateways = {
    * `0002_audit_log.sql` deja escribir. */
   readonly audit: AuditLogWriter;
   readonly confirmationEmail: ConfirmationEmailGateway;
+  /** El idioma de los correos de cada socio, guardado en su fila. */
+  readonly emailLocales: EmailLocaleDirectory;
   /** El límite del reenvío de la confirmación. Pide el club porque cada fila
    * lleva `club_id` (NFR-009). */
   readonly confirmationEmailRequestsForClub: (
@@ -226,7 +229,11 @@ export function createConfirmationTokenIssuer(
           ? { kind: "no_pending_confirmation" }
           : { kind: "failed", error };
       }
-      return { kind: "issued", tokenHash: data.properties.hashed_token };
+      return {
+        kind: "issued",
+        tokenHash: data.properties.hashed_token,
+        userId: data.user.id,
+      };
     },
   };
 }
@@ -432,6 +439,28 @@ function createMemberAccountStore(
   };
 }
 
+export function createEmailLocaleDirectory(
+  serviceClient: SupabaseClient,
+): EmailLocaleDirectory {
+  return {
+    async findStoredEmailLocale(userId) {
+      const { data, error } = await serviceClient
+        .from(MEMBERS_TABLE)
+        .select("email_locale")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (error) {
+        throw new Error(
+          `No se pudo leer el idioma de los correos de la identidad ${userId}: ${error.message}`,
+        );
+      }
+      return data === null
+        ? null
+        : readText(data, "email_locale", MEMBERS_TABLE);
+    },
+  };
+}
+
 function createIdentityConfirmationReader(
   serviceClient: SupabaseClient,
 ): IdentityConfirmationReader {
@@ -498,9 +527,11 @@ export function createSupabaseAuthGateways(
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const emails = connectResendEmailSender(env);
+  const emailLocales = createEmailLocaleDirectory(serviceClient);
   const confirmationEmail = createConfirmationEmailGateway({
     tokens: createConfirmationTokenIssuer(serviceClient),
     emails,
+    emailLocales,
   });
 
   return {
@@ -517,6 +548,7 @@ export function createSupabaseAuthGateways(
       identities: createIdentityConfirmationReader(serviceClient),
       audit: createSupabaseAuditLogWriter(serviceClient),
       confirmationEmail,
+      emailLocales,
       confirmationEmailRequestsForClub: (clubId) =>
         createSupabaseEmailRequestLog(serviceClient, {
           table: CONFIRMATION_EMAIL_REQUESTS_TABLE,

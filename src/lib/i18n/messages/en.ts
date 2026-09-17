@@ -239,4 +239,32 @@ export const englishMessages = {
   // con la voz pueda decir "ES" (WCAG 2.5.3).
   "languageToggle.label": "Language: English. Switch to Español (ES)",
   "languageToggle.target": "ES",
+
+  // Los dos correos del club (RF-6). Salen en el idioma guardado en la fila
+  // del socio, no en el de la visita: se mandan después de responder.
+  "email.signature": "{clubName}, underwater rugby club in Melbourne.",
+  "email.recovery.subject": "Reset your {clubName} password",
+  "email.recovery.requested":
+    "Someone asked to change the password for your {clubName} account.",
+  "email.recovery.linkLifetime": {
+    one: "The link works only once and expires in {count} minute.",
+    other: "The link works only once and expires in {count} minutes.",
+  },
+  "email.recovery.button": "Choose a new password",
+  "email.recovery.linkLabel": "To choose a new password, open this link",
+  "email.recovery.notYou":
+    "If you didn't ask for this, ignore this email: your password stays the same.",
+  "email.confirmation.subject": "Confirm your email for {clubName}",
+  "email.confirmation.registered":
+    "You signed up to {clubName} with this address.",
+  "email.confirmation.linkLifetime": {
+    one: "The link expires in {count} minute.",
+    other: "The link expires in {count} minutes.",
+  },
+  "email.confirmation.ifExpired":
+    "If it expires, ask for another one with the “{resendButton}” button on the confirmation screen. If you already closed it, start signing up again with this address and you'll return to that screen.",
+  "email.confirmation.button": "Confirm my email",
+  "email.confirmation.linkLabel": "To confirm your email, open this link",
+  "email.confirmation.notYou":
+    "If you didn't sign up, ignore this email: the account won't activate until it's confirmed.",
 } as const satisfies Readonly<Record<string, Message>>;

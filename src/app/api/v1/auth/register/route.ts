@@ -21,6 +21,7 @@ import {
 } from "@/lib/auth/supabase-auth-gateways";
 import type { EmailDeliveryAvailability } from "@/lib/email/email-delivery-availability";
 import { describeErrorWithoutEmail } from "@/lib/email/redact-email";
+import { readApiRequestLocale } from "@/lib/i18n/request-locale";
 
 // Crea cuentas: la respuesta depende del estado de la base en este instante y
 // no puede servirse desde una caché.
@@ -142,6 +143,7 @@ const postRegistration = createApiRoute<RegistrationResponse, RegistrationBody>(
           now: new Date(),
           appUrl: request.url,
           clientBucket: readClientBucket(request.headers),
+          locale: readApiRequestLocale(request),
         },
       );
       reportEmailDelivery(emailDelivery);

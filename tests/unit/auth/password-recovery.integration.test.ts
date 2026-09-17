@@ -62,6 +62,7 @@ describeRls("recuperación de contraseña contra Supabase", () => {
     return {
       requests: gateways.requests,
       tokens: gateways.tokens,
+      emailLocales: gateways.emailLocales,
       emails: {
         sendRecoveryEmail: async (email) => {
           sentEmails.push(email);

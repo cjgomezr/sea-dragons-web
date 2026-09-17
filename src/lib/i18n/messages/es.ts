@@ -232,4 +232,31 @@ export const spanishMessages: MessageCatalog = {
   "themeToggle.switchToDark": "Cambiar a tema oscuro",
   "languageToggle.label": "Idioma: español. Cambiar a English (EN)",
   "languageToggle.target": "EN",
+
+  "email.signature": "{clubName}, club de rugby subacuático de Melbourne.",
+  "email.recovery.subject": "Recupera tu contraseña de {clubName}",
+  "email.recovery.requested":
+    "Alguien pidió cambiar la contraseña de tu cuenta de {clubName}.",
+  "email.recovery.linkLifetime": {
+    one: "El enlace sirve una sola vez y caduca en {count} minuto.",
+    other: "El enlace sirve una sola vez y caduca en {count} minutos.",
+  },
+  "email.recovery.button": "Elegir contraseña nueva",
+  "email.recovery.linkLabel":
+    "Para elegir una contraseña nueva, abre este enlace",
+  "email.recovery.notYou":
+    "Si no lo pediste tú, ignora este correo: tu contraseña no cambia.",
+  "email.confirmation.subject": "Confirma tu correo en {clubName}",
+  "email.confirmation.registered":
+    "Te registraste en {clubName} con esta dirección.",
+  "email.confirmation.linkLifetime": {
+    one: "El enlace caduca en {count} minuto.",
+    other: "El enlace caduca en {count} minutos.",
+  },
+  "email.confirmation.ifExpired":
+    "Si caduca, pide otro con el botón «{resendButton}» de la pantalla de confirmación. Si ya la cerraste, empieza el registro otra vez con esta dirección y volverás a esa pantalla.",
+  "email.confirmation.button": "Confirmar mi correo",
+  "email.confirmation.linkLabel": "Para confirmar tu correo, abre este enlace",
+  "email.confirmation.notYou":
+    "Si no te registraste tú, ignora este correo: sin confirmar, la cuenta no se activa.",
 };

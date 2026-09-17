@@ -27,6 +27,7 @@ function requestGateways(
   options: {
     readonly requestsInWindow?: number;
     readonly failDelivery?: Error;
+    readonly storedLocale?: string | null;
   } = {},
 ): PasswordRecoveryRequestGateways {
   return {
@@ -38,9 +39,16 @@ function requestGateways(
     tokens: {
       issueRecoveryToken: vi.fn(async (email: string) =>
         email === REGISTERED_EMAIL
-          ? { kind: "issued" as const, tokenHash: TOKEN_HASH }
+          ? { kind: "issued" as const, tokenHash: TOKEN_HASH, userId: USER_ID }
           : { kind: "no_account" as const },
       ),
+    },
+    emailLocales: {
+      findStoredEmailLocale: vi
+        .fn()
+        .mockResolvedValue(
+          options.storedLocale === undefined ? "es" : options.storedLocale,
+        ),
     },
     emails: {
       sendRecoveryEmail: options.failDelivery
@@ -90,7 +98,75 @@ describe("recuperación de contraseña", () => {
     expect(gateways.emails.sendRecoveryEmail).toHaveBeenCalledWith({
       to: REGISTERED_EMAIL,
       resetUrl: buildResetUrl(TOKEN_HASH),
+      locale: "es",
     });
+  });
+
+  it("manda el correo en el idioma guardado en la fila del socio", async () => {
+    const gateways = requestGateways({ storedLocale: "en" });
+
+    const outcome = await requestPasswordRecovery(gateways, {
+      email: REGISTERED_EMAIL,
+      now: NOW,
+      buildResetUrl,
+    });
+
+    await deliverPending(outcome);
+    expect(gateways.emailLocales.findStoredEmailLocale).toHaveBeenCalledWith(
+      USER_ID,
+    );
+    expect(gateways.emails.sendRecoveryEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ locale: "en" }),
+    );
+  });
+
+  it("sin idioma guardado, el correo sale en español", async () => {
+    const gateways = requestGateways({ storedLocale: null });
+
+    const outcome = await requestPasswordRecovery(gateways, {
+      email: REGISTERED_EMAIL,
+      now: NOW,
+      buildResetUrl,
+    });
+
+    await deliverPending(outcome);
+    expect(gateways.emails.sendRecoveryEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ locale: "es" }),
+    );
+  });
+
+  // El idioma sale de la fila del socio, así que mirarlo es mirar la cuenta:
+  // si la respuesta lo esperara, lo que tarda delataría cuáles existen.
+  it.each([REGISTERED_EMAIL, UNKNOWN_EMAIL])(
+    "no lee el idioma de nadie antes de responder (%s)",
+    async (email) => {
+      const gateways = requestGateways({ storedLocale: "en" });
+
+      const outcome = await requestPasswordRecovery(gateways, {
+        email,
+        now: NOW,
+        buildResetUrl,
+      });
+
+      expect(outcome.kind).toBe("accepted");
+      expect(
+        gateways.emailLocales.findStoredEmailLocale,
+      ).not.toHaveBeenCalled();
+    },
+  );
+
+  it("con un correo inexistente no lee ningún idioma ni al entregar", async () => {
+    const gateways = requestGateways({ storedLocale: "en" });
+
+    const outcome = await requestPasswordRecovery(gateways, {
+      email: UNKNOWN_EMAIL,
+      now: NOW,
+      buildResetUrl,
+    });
+
+    await deliverPending(outcome);
+    expect(gateways.emailLocales.findStoredEmailLocale).not.toHaveBeenCalled();
+    expect(gateways.emails.sendRecoveryEmail).not.toHaveBeenCalled();
   });
 
   // La respuesta no puede esperar a nada que dependa de la cuenta: mandar el

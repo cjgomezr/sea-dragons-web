@@ -7,6 +7,7 @@ import {
   createSupabaseAuditLogWriter,
   recordAuditEvent,
 } from "@/lib/audit/audit-log";
+import type { EmailLocaleDirectory } from "@/lib/email/email-locale";
 import { readSupabaseConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type {
@@ -99,7 +100,11 @@ function createRecoveryTokenIssuer(
           `Supabase Auth no pudo emitir el enlace de recuperación: ${describeAuthFailure(error)}`,
         );
       }
-      return { kind: "issued", tokenHash: data.properties.hashed_token };
+      return {
+        kind: "issued",
+        tokenHash: data.properties.hashed_token,
+        userId: data.user.id,
+      };
     },
   };
 }
@@ -221,6 +226,7 @@ export type PasswordRecoveryGateways = {
   readonly tokens: RecoveryTokenIssuer;
   readonly redeemer: RecoveryTokenRedeemer;
   readonly audit: PasswordChangeAudit;
+  readonly emailLocales: EmailLocaleDirectory;
 };
 
 export type PasswordRecoveryGatewaysResult =
@@ -259,6 +265,7 @@ export async function createSupabasePasswordRecoveryGateways(
       tokens: createRecoveryTokenIssuer(serviceClient),
       redeemer: createRecoveryTokenRedeemer(anonConfig),
       audit: createPasswordChangeAudit(serviceClient, clubId),
+      emailLocales: authWiring.gateways.emailLocales,
     },
   };
 }

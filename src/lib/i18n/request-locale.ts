@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import type { NextRequest } from "next/server";
 import { LOCALE_COOKIE_NAME, type Locale } from "./locale";
 import { resolveLocale } from "./resolve-locale";
 
@@ -10,5 +11,15 @@ export async function readRequestLocale(): Promise<Locale> {
   return resolveLocale({
     cookie: cookieStore.get(LOCALE_COOKIE_NAME)?.value,
     acceptLanguage: headerList.get("accept-language"),
+  });
+}
+
+/** El idioma de una petición a la API, con las mismas pistas que una
+ * pantalla. La web lo manda en su cookie; una app nativa (CON-002), en
+ * `accept-language`. */
+export function readApiRequestLocale(request: NextRequest): Locale {
+  return resolveLocale({
+    cookie: request.cookies.get(LOCALE_COOKIE_NAME)?.value,
+    acceptLanguage: request.headers.get("accept-language"),
   });
 }

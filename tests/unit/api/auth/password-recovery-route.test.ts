@@ -10,11 +10,15 @@ const ORIGIN = "http://localhost:3417";
 const PASSWORD_RECOVERY_URL = `${ORIGIN}/api/v1/auth/password-recovery`;
 const REGISTERED_EMAIL = "nerea@example.test";
 const TOKEN_HASH = "hash-del-enlace";
+const REGISTERED_USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
+/** El socio registrado se registró con la aplicación en inglés. */
+const REGISTERED_EMAIL_LOCALE = "en";
 
 type Probe = {
   sent: RecoveryEmail[];
   recordedRequests: number;
   tokenRequests: number;
+  localeReads: number;
   scheduled: (() => Promise<void>)[];
 };
 
@@ -22,6 +26,7 @@ const probe: Probe = {
   sent: [],
   recordedRequests: 0,
   tokenRequests: 0,
+  localeReads: 0,
   scheduled: [],
 };
 
@@ -56,8 +61,20 @@ function mockWiring(
                 issueRecoveryToken: async (email: string) => {
                   probe.tokenRequests += 1;
                   return email === REGISTERED_EMAIL
-                    ? { kind: "issued", tokenHash: TOKEN_HASH }
+                    ? {
+                        kind: "issued",
+                        tokenHash: TOKEN_HASH,
+                        userId: REGISTERED_USER_ID,
+                      }
                     : { kind: "no_account" };
+                },
+              },
+              emailLocales: {
+                findStoredEmailLocale: async (userId: string) => {
+                  probe.localeReads += 1;
+                  return userId === REGISTERED_USER_ID
+                    ? REGISTERED_EMAIL_LOCALE
+                    : null;
                 },
               },
             },
@@ -84,12 +101,15 @@ function mockWiring(
   }));
 }
 
-async function postRecovery(body: unknown): Promise<Response> {
+async function postRecovery(
+  body: unknown,
+  headers: Readonly<Record<string, string>> = {},
+): Promise<Response> {
   const { POST } = await import("@/app/api/v1/auth/password-recovery/route");
   return POST(
     new NextRequest(PASSWORD_RECOVERY_URL, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...headers },
       body: JSON.stringify(body),
     }),
   );
@@ -112,6 +132,7 @@ describe("POST /api/v1/auth/password-recovery", () => {
     probe.sent = [];
     probe.recordedRequests = 0;
     probe.tokenRequests = 0;
+    probe.localeReads = 0;
     probe.scheduled = [];
   });
 
@@ -129,9 +150,46 @@ describe("POST /api/v1/auth/password-recovery", () => {
       {
         to: REGISTERED_EMAIL,
         resetUrl: `${ORIGIN}/recuperar-contrasena/nueva?token_hash=${TOKEN_HASH}`,
+        locale: REGISTERED_EMAIL_LOCALE,
       },
     ]);
   });
+
+  // Quien pide el enlace puede no ser el socio: el correo sale en el idioma
+  // de la fila, no en el de la visita que lo pidió.
+  it("manda el correo en el idioma guardado del socio, no en el de quien lo pide", async () => {
+    mockWiring();
+
+    await postRecovery(
+      { email: REGISTERED_EMAIL },
+      { cookie: "seadragons-locale=es", "accept-language": "es" },
+    );
+    await runScheduledWork();
+
+    expect(probe.sent.map((email) => email.locale)).toEqual([
+      REGISTERED_EMAIL_LOCALE,
+    ]);
+  });
+
+  it.each([REGISTERED_EMAIL, "nadie@example.test"])(
+    "responde igual pida el enlace en el idioma que lo pida, y sin leer el idioma de nadie (%s)",
+    async (email) => {
+      mockWiring();
+
+      const inSpanish = await postRecovery(
+        { email },
+        { cookie: "seadragons-locale=es" },
+      );
+      const inEnglish = await postRecovery(
+        { email },
+        { cookie: "seadragons-locale=en" },
+      );
+
+      expect(inSpanish.status).toBe(inEnglish.status);
+      expect(await inSpanish.json()).toEqual(await inEnglish.json());
+      expect(probe.localeReads).toBe(0);
+    },
+  );
 
   it("con un correo inexistente responde exactamente lo mismo y no manda nada", async () => {
     mockWiring();

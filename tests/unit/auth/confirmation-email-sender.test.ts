@@ -13,9 +13,11 @@ import {
 const EMAIL = "nerea@example.test";
 const APP_URL = "https://victoria-seadragons.vercel.app/api/v1/auth/register";
 const TOKEN_HASH = "hash-del-enlace";
+const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
 
 type Doubles = {
   readonly issuedFor: string[];
+  readonly localesAskedFor: string[];
   readonly sent: OutgoingEmail[];
 };
 
@@ -23,15 +25,29 @@ function gatewayWith(options: {
   readonly issue?: ConfirmationTokenIssue;
   readonly emails?: EmailSenderConnection;
   readonly deliveryFailure?: Error;
+  /** El idioma guardado en la fila del socio. `null`: sin fila. */
+  readonly storedLocale?: string | null;
 }): { readonly doubles: Doubles } & ReturnType<
   typeof createConfirmationEmailGateway
 > {
-  const doubles: Doubles = { issuedFor: [], sent: [] };
+  const doubles: Doubles = { issuedFor: [], localesAskedFor: [], sent: [] };
   const gateway = createConfirmationEmailGateway({
     tokens: {
       async issueConfirmationToken(email) {
         doubles.issuedFor.push(email);
-        return options.issue ?? { kind: "issued", tokenHash: TOKEN_HASH };
+        return (
+          options.issue ?? {
+            kind: "issued",
+            tokenHash: TOKEN_HASH,
+            userId: USER_ID,
+          }
+        );
+      },
+    },
+    emailLocales: {
+      async findStoredEmailLocale(userId) {
+        doubles.localesAskedFor.push(userId);
+        return options.storedLocale === undefined ? "es" : options.storedLocale;
       },
     },
     emails: options.emails ?? {
@@ -68,6 +84,40 @@ describe("correo de confirmación de cuenta", () => {
     );
   });
 
+  it("sale en el idioma guardado en la fila del socio, asunto incluido", async () => {
+    const gateway = gatewayWith({ storedLocale: "en" });
+
+    await gateway.requestConfirmationEmail(EMAIL, APP_URL);
+
+    const [sent] = gateway.doubles.sent;
+    expect(sent?.subject).toBe("Confirm your email for Victoria Seadragons");
+    expect(sent?.text).toContain(
+      `${EMAIL_CONFIRMATION_LINK_LIFETIME_MINUTES} minutes`,
+    );
+    expect(gateway.doubles.localesAskedFor).toEqual([USER_ID]);
+  });
+
+  it("sin idioma guardado sale en español", async () => {
+    const gateway = gatewayWith({ storedLocale: null });
+
+    await gateway.requestConfirmationEmail(EMAIL, APP_URL);
+
+    expect(gateway.doubles.sent[0]?.subject).toBe(
+      "Confirma tu correo en Victoria Seadragons",
+    );
+  });
+
+  it("con un idioma inesperado en la fila sale igual, en español", async () => {
+    const gateway = gatewayWith({ storedLocale: "fr" });
+
+    const outcome = await gateway.requestConfirmationEmail(EMAIL, APP_URL);
+
+    expect(outcome).toEqual({ kind: "requested" });
+    expect(gateway.doubles.sent[0]?.subject).toBe(
+      "Confirma tu correo en Victoria Seadragons",
+    );
+  });
+
   // Emitir un enlace nuevo invalida el anterior. Si no hay con qué mandarlo,
   // emitirlo sólo le rompería a la persona el enlace que ya tenía.
   it("sin proveedor conectado no emite ningún enlace, y el motivo nombra lo que falta", async () => {
@@ -94,6 +144,7 @@ describe("correo de confirmación de cuenta", () => {
 
     expect(outcome).toEqual({ kind: "not_requested" });
     expect(gateway.doubles.sent).toEqual([]);
+    expect(gateway.doubles.localesAskedFor).toEqual([]);
   });
 
   it("un fallo al emitir el enlace se devuelve clasificado y sin la dirección", async () => {
