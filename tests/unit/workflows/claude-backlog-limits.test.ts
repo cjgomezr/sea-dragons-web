@@ -32,11 +32,33 @@ const PERMISSION_MODES_WITHOUT_BASH_PROMPTS = ["bypassPermissions", "auto"];
 const CLAIM_GUARD_STEP_NAME = "Comprueba que el worker dejó rastro en el issue";
 const CLAIM_GUARD_SCRIPT = "scripts/check-worker-claimed.sh";
 
+/** El paso que lanza al worker: el que escribe la transcripción, y el que
+ * murió con el código 143 en las dos corridas nocturnas. */
+const WORKER_STEP_ID = "worker";
+
+/** La transcripción de la sesión, con el nombre que le pone la acción dentro
+ * del runner. */
+const TRANSCRIPT_FILENAME = "claude-execution-output.json";
+const TRANSCRIPT_UPLOAD_ACTION = "actions/upload-artifact";
+const TRANSCRIPT_ARTIFACT_NAME = "claude-transcript";
+
+/** Siete días: cubren de sobra una corrida nocturna que alguien mira el lunes.
+ * No más, porque este repositorio es público y el artefacto lo puede
+ * descargar cualquiera. */
+const TRANSCRIPT_RETENTION_DAYS = 7;
+
 interface WorkflowStep {
+  id?: string;
   name?: string;
   if?: string;
   run?: string;
-  with?: { claude_args?: string };
+  uses?: string;
+  with?: {
+    claude_args?: string;
+    name?: string;
+    path?: string;
+    "retention-days"?: number;
+  };
 }
 
 interface WorkflowFile {
@@ -205,5 +227,60 @@ describe("claude-backlog.yml · el silencio no puede pasar por éxito", () => {
     );
 
     expect(note?.run).toContain("CLAIM_GUARD");
+  });
+});
+
+// Las dos corridas nocturnas que murieron con el código 143 (11 y 12 de
+// septiembre de 2026) imprimieron en el log la línea "Log saved to
+// /home/runner/work/_temp/claude-execution-output.json" justo antes del error,
+// y el job se llevó el archivo consigo. Con `show_full_output: false` el log
+// solo trae los mensajes `init` y `result` de la sesión, así que sin ese
+// archivo no queda ni un rastro de lo que el worker hizo en sus últimos
+// noventa segundos.
+describe("claude-backlog.yml · la transcripción sobrevive al job", () => {
+  function findTranscriptUpload(): { step: WorkflowStep; index: number } {
+    const steps = parseWorkflow().jobs.implement.steps;
+    const index = steps.findIndex((candidate) =>
+      candidate.uses?.startsWith(TRANSCRIPT_UPLOAD_ACTION),
+    );
+    if (index === -1) {
+      throw new Error(
+        `el workflow no sube la transcripción con ${TRANSCRIPT_UPLOAD_ACTION}`,
+      );
+    }
+    return { step: steps[index]!, index };
+  }
+
+  it("la sube con un nombre y una retención fijos", () => {
+    const { step } = findTranscriptUpload();
+
+    expect(step.with?.name).toBe(TRANSCRIPT_ARTIFACT_NAME);
+    expect(step.with?.["retention-days"]).toBe(TRANSCRIPT_RETENTION_DAYS);
+  });
+
+  it("apunta al archivo donde la acción escribe la transcripción", () => {
+    const { step } = findTranscriptUpload();
+
+    expect(step.with?.path).toContain(TRANSCRIPT_FILENAME);
+  });
+
+  it("corre también cuando el paso del worker falla", () => {
+    // `if: success()` o un paso sin condición son justo lo que dejó perderse
+    // las dos transcripciones: el paso del worker salió en rojo y el job se
+    // detuvo antes de subir nada.
+    const condition = findTranscriptUpload().step.if ?? "";
+
+    expect(condition).toMatch(/always\(\)|!\s*cancelled\(\)/);
+    expect(condition).not.toContain("success()");
+  });
+
+  it("va después del paso del worker, que es quien escribe el archivo", () => {
+    const steps = parseWorkflow().jobs.implement.steps;
+    const workerIndex = steps.findIndex(
+      (candidate) => candidate.id === WORKER_STEP_ID,
+    );
+
+    expect(workerIndex).toBeGreaterThanOrEqual(0);
+    expect(findTranscriptUpload().index).toBeGreaterThan(workerIndex);
   });
 });

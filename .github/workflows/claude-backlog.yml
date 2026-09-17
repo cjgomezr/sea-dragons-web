@@ -154,6 +154,41 @@ jobs:
           # `ready-for-dev` exige permiso de escritura en el repositorio.
           claude_args: "--max-turns ${{ github.event_name == 'schedule' && 1000 || 200 }} --model ${{ env.FACTORY_MODEL }} --permission-mode bypassPermissions --disallowedTools ${{ env.WORKER_DISALLOWED_TOOLS }}"
 
+      # Las dos corridas nocturnas que murieron con el código 143 (11 y 12 de
+      # septiembre de 2026) no dejaron nada que leer. Con
+      # `show_full_output: false` el log solo trae los mensajes `init` y
+      # `result` de la sesión, y la transcripción completa se queda dentro del
+      # runner, que GitHub destruye al cerrar el job. Subirla es lo único que
+      # convierte el próximo fallo en algo diagnosticable en vez de una
+      # conjetura.
+      #
+      # `!cancelled()` en lugar de dejar el paso sin condición: el caso que
+      # importa es precisamente el del paso anterior en rojo, y un paso sin
+      # condición no corre cuando el que va antes falló. El `!= 'skipped'`
+      # evita el aviso de "no encontré el archivo" cuando el job murió antes
+      # del worker (un `npm ci` roto, la credencial sin resolver): ahí no hubo
+      # sesión y no hay transcripción que subir.
+      #
+      # La ruta sale de `execution_file`, la salida que declara la acción,
+      # porque es su contrato y no una ruta adivinada. El respaldo existe
+      # porque al fallar la acción solo rellena esa salida si alcanza a
+      # rescatarla, y la ruta del respaldo es la que las dos corridas
+      # imprimieron antes de morir ("Log saved to
+      # /home/runner/work/_temp/claude-execution-output.json").
+      #
+      # Y un aviso que no se puede omitir: este repositorio es público, así que
+      # el artefacto lo descarga cualquiera, y la transcripción incluye la
+      # salida de cada comando que corrió el worker. De ahí que la retención
+      # sea corta.
+      - name: Guarda la transcripción de la sesión
+        if: ${{ !cancelled() && steps.worker.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-transcript
+          path: ${{ steps.worker.outputs.execution_file || format('{0}/claude-execution-output.json', runner.temp) }}
+          retention-days: 7
+          if-no-files-found: warn
+
       # El otro defecto que destapó esa corrida, y el más caro: el único aviso
       # de este workflow colgaba de `failure()`. Un worker que sale limpio sin
       # tocar nada no lo dispara, así que la cola parecía procesada. Por la
