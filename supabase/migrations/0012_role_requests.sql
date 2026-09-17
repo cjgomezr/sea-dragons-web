@@ -41,9 +41,9 @@ create table if not exists public.role_requests (
 
 -- La regla de una sola pendiente, como índice único parcial. Una comprobación
 -- previa en la aplicación no basta: dos peticiones simultáneas la pasarían las
--- dos. El índice hace que la segunda espere a la primera y falle al confirmar.
--- Tras aprobar o rechazar, la fila sale del índice y el socio puede volver a
--- pedir.
+-- dos. Con el índice, la segunda espera a la primera y falla en cuanto esta
+-- confirma. Tras aprobar o rechazar, la fila sale del índice y el socio puede
+-- volver a pedir.
 create unique index if not exists role_requests_one_pending_per_member
   on public.role_requests (user_id)
   where status = 'pending';
@@ -52,6 +52,10 @@ create unique index if not exists role_requests_one_pending_per_member
 -- la cascada al borrar un socio.
 create index if not exists role_requests_user_id_created_at_idx
   on public.role_requests (user_id, created_at desc);
+
+-- La que recorre el `set null` al borrar a quien decidió.
+create index if not exists role_requests_decided_by_idx
+  on public.role_requests (decided_by);
 
 alter table public.role_requests enable row level security;
 

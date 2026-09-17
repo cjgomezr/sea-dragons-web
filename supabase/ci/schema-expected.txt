@@ -181,6 +181,7 @@ indice password_recovery_requests_email_hash_requested_at_idx CREATE INDEX passw
 indice password_recovery_requests_pkey CREATE UNIQUE INDEX password_recovery_requests_pkey ON public.password_recovery_requests USING btree (id)
 indice registration_requests_pkey CREATE UNIQUE INDEX registration_requests_pkey ON public.registration_requests USING btree (id)
 indice registration_requests_subject_requested_at_idx CREATE INDEX registration_requests_subject_requested_at_idx ON public.registration_requests USING btree (subject_kind, subject_hash, requested_at DESC)
+indice role_requests_decided_by_idx CREATE INDEX role_requests_decided_by_idx ON public.role_requests USING btree (decided_by)
 indice role_requests_one_pending_per_member CREATE UNIQUE INDEX role_requests_one_pending_per_member ON public.role_requests USING btree (user_id) WHERE (status = 'pending'::text)
 indice role_requests_pkey CREATE UNIQUE INDEX role_requests_pkey ON public.role_requests USING btree (id)
 indice role_requests_user_id_created_at_idx CREATE INDEX role_requests_user_id_created_at_idx ON public.role_requests USING btree (user_id, created_at DESC)

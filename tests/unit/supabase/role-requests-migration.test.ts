@@ -20,7 +20,12 @@ const JUSTIFICATION_MAX_LENGTH = 500;
 
 /** Cuánto retiene la primera transacción su fila sin confirmar, para que la
  * segunda inserción llegue seguro mientras la primera sigue abierta. */
-const CONCURRENT_INSERT_HOLD_SECONDS = 1;
+const CONCURRENT_INSERT_HOLD_SECONDS = 2;
+
+/** Lo mínimo que tiene que tardar la inserción rechazada para que conste que
+ * esperó a la otra. Si hubieran corrido una detrás de otra, el rechazo sería
+ * inmediato. La mitad del tiempo retenido deja margen al arranque de psql. */
+const MIN_BLOCKED_MILLISECONDS = (CONCURRENT_INSERT_HOLD_SECONDS * 1000) / 2;
 
 /** Etiquetas que psql imprime entre las filas que sí interesan. */
 const COMMAND_TAGS: ReadonlySet<string> = new Set(["SET", "BEGIN", "COMMIT"]);
@@ -95,6 +100,20 @@ function asApiIdentity(identity: ApiIdentity, sql: string): string {
       ? ""
       : `set request.jwt.claims = '{"sub":"${identity.subject}"}'; `;
   return `set role ${identity.role}; ${claims}${sql}`;
+}
+
+interface TimedResult {
+  readonly result: RunResult;
+  readonly elapsedMilliseconds: number;
+}
+
+async function timedAttempt(
+  database: TemporaryDatabase,
+  sql: string,
+): Promise<TimedResult> {
+  const startedAt = performance.now();
+  const result = await database.attempt(sql);
+  return { result, elapsedMilliseconds: performance.now() - startedAt };
 }
 
 function rowsOf(result: RunResult): string[] {
@@ -231,14 +250,19 @@ describeConPostgres("una sola solicitud pendiente por socio", () => {
     const concurrentInsert = `begin; ${insertSql};
       select pg_sleep(${CONCURRENT_INSERT_HOLD_SECONDS}); commit;`;
 
-    const results = await Promise.all([
-      database.attempt(concurrentInsert),
-      database.attempt(concurrentInsert),
+    const attempts = await Promise.all([
+      timedAttempt(database, concurrentInsert),
+      timedAttempt(database, concurrentInsert),
     ]);
 
-    const failures = results.filter((result) => result.code !== 0);
+    const failures = attempts.filter(({ result }) => result.code !== 0);
     expect(failures).toHaveLength(1);
-    expect(failures[0]?.stderr).toMatch(/role_requests_one_pending_per_member/);
+    expect(failures[0]?.result.stderr).toMatch(
+      /role_requests_one_pending_per_member/,
+    );
+    expect(failures[0]?.elapsedMilliseconds).toBeGreaterThanOrEqual(
+      MIN_BLOCKED_MILLISECONDS,
+    );
     expect(await countRequests(database)).toBe("1");
   });
 
