@@ -257,6 +257,32 @@ describe("metadatos", () => {
     ]);
   });
 
+  it("marca las partes de un título escrito como objeto", () => {
+    const source = `export const metadata: Metadata = {
+      title: { default: "Inicio", template: "%s · Club de rugby", absolute: "Panel" },
+    };`;
+
+    expect(scanRoute(source).map(({ text }) => text)).toEqual([
+      "Inicio",
+      "%s · Club de rugby",
+      "Panel",
+    ]);
+  });
+
+  it("marca una propiedad escrita entre comillas", () => {
+    const source = `export const metadata = { "description": "Tu club" };`;
+
+    expect(scanRoute(source).map(({ text }) => text)).toEqual(["Tu club"]);
+  });
+
+  it("no marca la plantilla de título que solo pone el nombre del club", () => {
+    const source = `export const metadata: Metadata = {
+      title: { template: "%s · Victoria Seadragons", default: "Victoria Seadragons" },
+    };`;
+
+    expect(scanRoute(source)).toEqual([]);
+  });
+
   it("no marca los metadatos que vienen del catálogo", () => {
     const source = `export async function generateMetadata(): Promise<Metadata> {
       const translate = createTranslator(await readRequestLocale());

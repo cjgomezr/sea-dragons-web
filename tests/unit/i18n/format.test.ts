@@ -85,8 +85,8 @@ describe("números", () => {
 
   it("el traductor escribe los números del mensaje con el separador del idioma", () => {
     expect(
-      createTranslator("en")("auth.field.passwordHint", { min: 1234.5 }),
-    ).toBe("At least 1,234.5 characters.");
+      createTranslator("en")("auth.field.passwordHint", { min: 12345.5 }),
+    ).toBe("At least 12,345.5 characters.");
     expect(
       createTranslator("es")("auth.field.passwordHint", { min: 12345.5 }),
     ).toBe("Al menos 12.345,5 caracteres.");

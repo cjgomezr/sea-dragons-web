@@ -161,11 +161,38 @@ function isMetadataDeclaration(node: ts.Node): boolean {
   );
 }
 
-function metadataPropertyTexts(property: ts.PropertyAssignment): string[] {
+// Next también acepta el título como objeto: `{ default, template, absolute }`.
+const TITLE_OBJECT_PROPERTIES: ReadonlySet<string> = new Set([
+  "default",
+  "template",
+  "absolute",
+]);
+
+function propertyNameOf(property: ts.PropertyAssignment): string | undefined {
   const { name } = property;
-  const isVisibleProperty =
-    ts.isIdentifier(name) && VISIBLE_METADATA_PROPERTIES.has(name.text);
-  if (!isVisibleProperty) {
+  return ts.isIdentifier(name) || ts.isStringLiteral(name)
+    ? name.text
+    : undefined;
+}
+
+function isVisibleMetadataProperty(property: ts.PropertyAssignment): boolean {
+  const name = propertyNameOf(property);
+  if (name === undefined) {
+    return false;
+  }
+  if (VISIBLE_METADATA_PROPERTIES.has(name)) {
+    return true;
+  }
+  const owner = property.parent.parent;
+  return (
+    TITLE_OBJECT_PROPERTIES.has(name) &&
+    ts.isPropertyAssignment(owner) &&
+    propertyNameOf(owner) === "title"
+  );
+}
+
+function metadataPropertyTexts(property: ts.PropertyAssignment): string[] {
+  if (!isVisibleMetadataProperty(property)) {
     return [];
   }
   return ts.findAncestor(property, isMetadataDeclaration) === undefined
