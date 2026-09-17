@@ -1,4 +1,5 @@
 import { expect } from "vitest";
+import type { Locale } from "@/lib/i18n/locale";
 
 /**
  * Lo que la copia del enlace de confirmación puede y no puede decir.
@@ -13,7 +14,17 @@ import { expect } from "vitest";
  * Con el envío de correos caído ese mismo botón se llama "Reintentar el
  * envío" (#154), así que quien toque cualquiera de las dos etiquetas tiene
  * tres textos apuntando aquí. */
-export const RESEND_BUTTON_LABEL = "Reenviar el correo";
+export const RESEND_BUTTON_LABEL: Readonly<Record<Locale, string>> = {
+  en: "Resend the email",
+  es: "Reenviar el correo",
+};
+
+/** Cómo se llama en cada idioma la pantalla a la que devuelve registrarse
+ * otra vez, que es donde está ese botón. */
+export const CONFIRMATION_SCREEN_NAME: Readonly<Record<Locale, RegExp>> = {
+  en: /confirmation screen/i,
+  es: /pantalla de confirmación/i,
+};
 
 /**
  * Prometer que registrarse otra vez manda otro enlace.
@@ -25,12 +36,15 @@ export const RESEND_BUTTON_LABEL = "Reenviar el correo";
  *
  * Son trampas tendidas a la redacción vieja, no una gramática del engaño: si
  * un día la copia se reescribe de arriba abajo, toca revisar estos patrones,
- * nunca relajarlos para que la frase nueva pase.
+ * nunca relajarlos para que la frase nueva pase. Los ingleses tienden las
+ * mismas trampas a la traducción (E17).
  */
 export const REGISTERING_AGAIN_SENDS_A_LINK: readonly RegExp[] = [
   /vuelve a registrarte[^.]*(mandaremos|enviaremos|otro enlace|otro correo)/i,
   /(regístrate|registrarte) (otra vez|de nuevo)[^.]*(mandaremos|enviaremos|otro enlace|otro correo)/i,
   /pedir otro desde la pantalla de registro/i,
+  /sign(ing)? up again[^.]*(we('ll| will) send|another link|another email)/i,
+  /ask for another (one|link) from the sign-up screen/i,
 ];
 
 /**
@@ -50,6 +64,12 @@ export const ACCOUNT_EXISTENCE_CLAIMS: readonly RegExp[] = [
   /\b(esta|esa) (dirección|cuenta) (ya )?(está|estaba|existe|existía)\b/i,
   /\b(correo|dirección) (ya )?registrad[oa]\b/i,
   /\bcuenta (nueva|existente)\b/i,
+  /\byou (already )?(have|had) an account\b/i,
+  /\byou (don't|do not|didn't|did not) have an account\b/i,
+  /\b(no account exists|there is no account)\b/i,
+  /\b(this|that) (address|account) (already )?(exists|existed|is registered)\b/i,
+  /\b(email|address) (is )?already registered\b/i,
+  /\b(new|existing) account\b/i,
 ];
 
 /** Ninguno de los patrones aparece en el texto. El mensaje dice cuál coincidió

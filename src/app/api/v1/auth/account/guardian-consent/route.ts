@@ -13,6 +13,7 @@ import {
   GuardianConsentValidationError,
   recordGuardianConsent,
 } from "@/lib/auth/guardian-consent";
+import { describeIssuesForApi } from "@/lib/auth/issue-messages";
 
 /**
  * Registrar el consentimiento del tutor de quien llama (FR-082, NFR-012).
@@ -37,17 +38,9 @@ type ConsentBody = z.infer<typeof consentBodySchema>;
 /** Igual que el endpoint de la cuenta: el estado y lo que sigue faltando. */
 export type GuardianConsentResponse = AccountCompletion;
 
-function describeValidationFailure(
-  error: GuardianConsentValidationError,
-): string {
-  return error.issues
-    .map((issue) => `${issue.field}: ${issue.message}`)
-    .join(" ");
-}
-
 function asApiError(error: unknown): never {
   if (error instanceof GuardianConsentValidationError) {
-    throw new ApiError("business_rule", describeValidationFailure(error));
+    throw new ApiError("business_rule", describeIssuesForApi(error.issues));
   }
   if (
     error instanceof GuardianConsentNotRequiredError ||

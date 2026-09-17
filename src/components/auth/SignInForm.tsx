@@ -11,6 +11,9 @@ import {
   REGISTRATION_PATH,
   SESSION_API_PATH,
 } from "@/lib/auth/routes";
+import type { Locale } from "@/lib/i18n/locale";
+import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import { type RequestFailure, readRequestFailure } from "./request-failure";
 
 /**
  * La pantalla de entrada de `docs/mockups/auth-light.png`.
@@ -20,19 +23,14 @@ import {
  * dos caminos están aplazados a Release 2.
  */
 
-const NETWORK_ERROR_MESSAGE =
-  "No pudimos hablar con el servidor. Revisa tu conexión y vuelve a intentarlo.";
-const UNEXPECTED_ERROR_MESSAGE =
-  "No pudimos entrar. Vuelve a intentarlo en un momento.";
 /** Lo dice el formulario sin preguntar al servidor: no es una credencial
  * equivocada, es que todavía no hay ninguna que comprobar. */
-const EMPTY_CREDENTIALS_MESSAGE =
-  "Escribe tu correo y tu contraseña para entrar.";
+type SignInFailure = RequestFailure | "empty_credentials";
 
 type Status =
   | { readonly kind: "editing" }
   | { readonly kind: "submitting" }
-  | { readonly kind: "failed"; readonly message: string };
+  | { readonly kind: "failed"; readonly failure: SignInFailure };
 
 /** Los dos únicos destinos que el servidor puede devolver. Se contrastan en
  * vez de navegar a lo que venga: el resto de esta función está escrita
@@ -45,7 +43,7 @@ const SIGN_IN_DESTINATIONS: readonly string[] = [
 
 type SignInResult =
   | { readonly kind: "signed-in"; readonly destination: string }
-  | { readonly kind: "failed"; readonly message: string };
+  | { readonly kind: "failed"; readonly failure: SignInFailure };
 
 async function submitCredentials(credentials: {
   readonly email: string;
@@ -61,29 +59,47 @@ async function submitCredentials(credentials: {
   } catch {
     // El detalle técnico no le sirve a nadie que esté mirando un formulario, y
     // puede nombrar hosts internos.
-    return { kind: "failed", message: NETWORK_ERROR_MESSAGE };
+    return { kind: "failed", failure: "network" };
   }
 
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    return {
-      kind: "failed",
-      message:
-        readStringAt(payload, ["error", "message"]) ?? UNEXPECTED_ERROR_MESSAGE,
-    };
+    return { kind: "failed", failure: readRequestFailure(payload) };
   }
 
   const destination = readStringAt(payload, ["data", "destination"]);
   return destination !== null && SIGN_IN_DESTINATIONS.includes(destination)
     ? { kind: "signed-in", destination }
-    : { kind: "failed", message: UNEXPECTED_ERROR_MESSAGE };
+    : { kind: "failed", failure: "unrecognized_response" };
+}
+
+/** La sesión responde 401 a unas credenciales que no valen y 403 a una cuenta
+ * que existe pero no puede entrar. Cualquier otra cosa no le dice a quien
+ * mira nada que pueda arreglar desde aquí. */
+function describeFailure(
+  translate: Translator,
+  failure: SignInFailure,
+): string {
+  switch (failure) {
+    case "empty_credentials":
+      return translate("auth.signIn.emptyCredentials");
+    case "network":
+      return translate("auth.error.network");
+    case "unauthenticated":
+      return translate("auth.signIn.invalidCredentials");
+    case "forbidden":
+      return translate("auth.signIn.accountUnavailable");
+    default:
+      return translate("auth.signIn.unexpected");
+  }
 }
 
 const EMAIL_FIELD_ID = "entrar-email";
 const PASSWORD_FIELD_ID = "entrar-password";
 
-export function SignInForm(): React.JSX.Element {
+export function SignInForm({ locale }: { locale: Locale }): React.JSX.Element {
   const router = useRouter();
+  const translate = createTranslator(locale);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "editing" });
@@ -93,7 +109,7 @@ export function SignInForm(): React.JSX.Element {
   ): Promise<void> {
     event.preventDefault();
     if (email.trim() === "" || password === "") {
-      setStatus({ kind: "failed", message: EMPTY_CREDENTIALS_MESSAGE });
+      setStatus({ kind: "failed", failure: "empty_credentials" });
       return;
     }
 
@@ -114,17 +130,17 @@ export function SignInForm(): React.JSX.Element {
 
   return (
     <form className="auth-form" onSubmit={handleSubmit} noValidate>
-      <h1>Bienvenido de vuelta</h1>
-      <p className="auth-lead">Entra a tu cuenta de los Seadragons.</p>
+      <h1>{translate("auth.signIn.title")}</h1>
+      <p className="auth-lead">{translate("auth.signIn.lead")}</p>
 
       {status.kind === "failed" && (
         <p className="auth-error" role="alert">
-          {status.message}
+          {describeFailure(translate, status.failure)}
         </p>
       )}
 
       <div className="auth-field">
-        <label htmlFor={EMAIL_FIELD_ID}>Correo electrónico</label>
+        <label htmlFor={EMAIL_FIELD_ID}>{translate("auth.field.email")}</label>
         <input
           id={EMAIL_FIELD_ID}
           name="email"
@@ -137,7 +153,9 @@ export function SignInForm(): React.JSX.Element {
       </div>
 
       <div className="auth-field">
-        <label htmlFor={PASSWORD_FIELD_ID}>Contraseña</label>
+        <label htmlFor={PASSWORD_FIELD_ID}>
+          {translate("auth.field.password")}
+        </label>
         <input
           id={PASSWORD_FIELD_ID}
           name="password"
@@ -150,7 +168,7 @@ export function SignInForm(): React.JSX.Element {
       </div>
 
       <Link className="auth-inline-link" href={PASSWORD_RECOVERY_PATH}>
-        ¿Olvidaste tu contraseña?
+        {translate("auth.signIn.forgotPassword")}
       </Link>
 
       <button
@@ -158,12 +176,14 @@ export function SignInForm(): React.JSX.Element {
         className="auth-submit"
         disabled={status.kind === "submitting"}
       >
-        Entrar
+        {translate("auth.signIn.submit")}
       </button>
 
       <p className="auth-note">
-        ¿Primera vez en el club?{" "}
-        <Link href={REGISTRATION_PATH}>Crear una cuenta</Link>
+        {translate("auth.signIn.firstTime")}{" "}
+        <Link href={REGISTRATION_PATH}>
+          {translate("auth.signIn.createAccount")}
+        </Link>
       </p>
     </form>
   );

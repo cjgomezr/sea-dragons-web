@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RecoveryTokenRedemption } from "@/lib/auth/password-recovery";
+import { describeAuthIssue } from "@/lib/auth/issue-messages";
 import { validatePasswordField } from "@/lib/auth/registration";
+import { createTranslator } from "@/lib/i18n/translator";
 
 const PASSWORD_RESET_URL = "http://localhost:3417/api/v1/auth/password-reset";
 const USER_ID = "5f1a1d6e-7f2b-4f0d-9a4c-1b2c3d4e5f60";
@@ -74,6 +76,7 @@ describe("POST /api/v1/auth/password-reset", () => {
   it("rechaza con 422 la contraseña de 7 caracteres con el mensaje del registro", async () => {
     mockWiring();
     const registrationRule = validatePasswordField("1234567");
+    const spanish = createTranslator("es");
 
     const response = await postReset({
       tokenHash: "hash-del-enlace",
@@ -84,7 +87,9 @@ describe("POST /api/v1/auth/password-reset", () => {
     const body = (await response.json()) as { error: { message: string } };
     expect(registrationRule.ok).toBe(false);
     expect(body.error.message).toContain(
-      registrationRule.ok ? "" : registrationRule.message,
+      registrationRule.ok
+        ? ""
+        : describeAuthIssue(spanish, registrationRule.code),
     );
   });
 
@@ -98,9 +103,10 @@ describe("POST /api/v1/auth/password-reset", () => {
 
     expect(response.status).toBe(410);
     const body = (await response.json()) as {
-      error: { code: string; message: string };
+      error: { code: string; reason: string; message: string };
     };
     expect(body.error.code).toBe("gone");
+    expect(body.error.reason).toBe("link_unusable");
     expect(body.error.message).toMatch(/pide otro/i);
     expect(body.error.message).not.toContain("otp_expired");
   });
@@ -115,9 +121,10 @@ describe("POST /api/v1/auth/password-reset", () => {
 
     expect(response.status).toBe(410);
     const body = (await response.json()) as {
-      error: { code: string; message: string };
+      error: { code: string; reason: string; message: string };
     };
     expect(body.error.code).toBe("gone");
+    expect(body.error.reason).toBe("password_rejected");
     expect(body.error.message).toMatch(/igual a la anterior o demasiado débil/);
     expect(body.error.message).toMatch(/pide otro enlace/i);
     expect(body.error.message).not.toContain("password:");

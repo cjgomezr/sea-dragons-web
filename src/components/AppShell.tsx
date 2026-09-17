@@ -23,7 +23,7 @@ export function AppShell({
           <div className="app-sidebar-actions">
             <ThemeToggle />
             <LanguageToggle locale={locale} />
-            <SignOutButton />
+            <SignOutButton locale={locale} />
           </div>
         </div>
         <SidebarNav />

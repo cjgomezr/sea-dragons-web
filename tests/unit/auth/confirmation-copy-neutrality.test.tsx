@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, it, vi } from "vitest";
 import { RegistrationForm } from "@/components/auth/RegistrationForm";
 import { listCountryOptions } from "@/lib/geo/countries";
 import { renderAccountConfirmationEmail } from "@/lib/email/email-templates";
+import type { Locale } from "@/lib/i18n/locale";
 import {
   ACCOUNT_EXISTENCE_CLAIMS,
   expectNoneMatch,
@@ -41,20 +42,65 @@ const CONFIRMATION_PENDING_RESPONSE = {
   data: { outcome: "confirmation_pending", email: EMAIL },
 };
 
-async function readConfirmationScreen(): Promise<string> {
+const LOCALES: readonly Locale[] = ["en", "es"];
+
+/** Las etiquetas del registro en cada idioma, sólo las que este recorrido
+ * necesita para llegar a la pantalla de confirmación. */
+const REGISTRATION_LABELS: Readonly<
+  Record<
+    Locale,
+    {
+      readonly fullName: string;
+      readonly email: string;
+      readonly country: string;
+      readonly membershipType: string;
+      readonly dateOfBirth: string;
+      readonly password: string;
+      readonly submit: string;
+      readonly confirmTitle: RegExp;
+    }
+  >
+> = {
+  en: {
+    fullName: "Full name",
+    email: "Email",
+    country: "Country",
+    membershipType: "Membership type",
+    dateOfBirth: "Date of birth",
+    password: "Password",
+    submit: "Create account",
+    confirmTitle: /confirm your email/i,
+  },
+  es: {
+    fullName: "Nombre completo",
+    email: "Correo electrónico",
+    country: "País",
+    membershipType: "Tipo de membresía",
+    dateOfBirth: "Fecha de nacimiento",
+    password: "Contraseña",
+    submit: "Crear cuenta",
+    confirmTitle: /confirma tu correo/i,
+  },
+};
+
+async function readConfirmationScreen(locale: Locale): Promise<string> {
+  const labels = REGISTRATION_LABELS[locale];
   const user = userEvent.setup();
   const { container } = render(
-    <RegistrationForm countries={listCountryOptions("es")} />,
+    <RegistrationForm locale={locale} countries={listCountryOptions(locale)} />,
   );
 
-  await user.type(screen.getByLabelText("Nombre completo"), "Nerea Silva");
-  await user.type(screen.getByLabelText("Correo electrónico"), EMAIL);
-  await user.selectOptions(screen.getByLabelText("País"), "AU");
-  await user.selectOptions(screen.getByLabelText("Tipo de membresía"), "Full");
-  await user.type(screen.getByLabelText("Fecha de nacimiento"), "1994-03-02");
-  await user.type(screen.getByLabelText("Contraseña"), "bajoelagua");
-  await user.click(screen.getByRole("button", { name: "Crear cuenta" }));
-  await screen.findByRole("heading", { name: /confirma tu correo/i });
+  await user.type(screen.getByLabelText(labels.fullName), "Nerea Silva");
+  await user.type(screen.getByLabelText(labels.email), EMAIL);
+  await user.selectOptions(screen.getByLabelText(labels.country), "AU");
+  await user.selectOptions(
+    screen.getByLabelText(labels.membershipType),
+    "Full",
+  );
+  await user.type(screen.getByLabelText(labels.dateOfBirth), "1994-03-02");
+  await user.type(screen.getByLabelText(labels.password), "bajoelagua");
+  await user.click(screen.getByRole("button", { name: labels.submit }));
+  await screen.findByRole("heading", { name: labels.confirmTitle });
 
   return container.textContent ?? "";
 }
@@ -87,22 +133,29 @@ describe("la copia del enlace de confirmación no distingue direcciones", () => 
     expectNoneMatch(email.text, ACCOUNT_EXISTENCE_CLAIMS, "el correo");
   });
 
-  it.each(STATES_WITHOUT_A_VALID_LINK)(
-    "el panel de %s no dice si esa dirección tiene cuenta",
-    async (state) => {
+  it.each(
+    LOCALES.flatMap((locale) =>
+      STATES_WITHOUT_A_VALID_LINK.map((state) => ({ state, locale })),
+    ),
+  )(
+    "el panel de $state en $locale no dice si esa dirección tiene cuenta",
+    ({ state, locale }) => {
       expectNoneMatch(
-        await readConfirmationPanel(state),
+        readConfirmationPanel(state, locale),
         ACCOUNT_EXISTENCE_CLAIMS,
         `el panel ${state}`,
       );
     },
   );
 
-  it("la pantalla de confirmación no dice si esa dirección tiene cuenta", async () => {
-    expectNoneMatch(
-      await readConfirmationScreen(),
-      ACCOUNT_EXISTENCE_CLAIMS,
-      "la pantalla de confirmación",
-    );
-  });
+  it.each(LOCALES)(
+    "la pantalla de confirmación en %s no dice si esa dirección tiene cuenta",
+    async (locale) => {
+      expectNoneMatch(
+        await readConfirmationScreen(locale),
+        ACCOUNT_EXISTENCE_CLAIMS,
+        "la pantalla de confirmación",
+      );
+    },
+  );
 });

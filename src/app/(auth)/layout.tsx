@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
+import { createTranslator } from "@/lib/i18n/translator";
 
 /**
  * Disposición de las pantallas públicas de cuentas, siguiendo
@@ -17,6 +18,7 @@ export default async function AuthLayout({
   children,
 }: Readonly<{ children: ReactNode }>): Promise<React.JSX.Element> {
   const locale = await readRequestLocale();
+  const translate = createTranslator(locale);
 
   return (
     <div className="auth-shell">
@@ -28,12 +30,13 @@ export default async function AuthLayout({
           <span className="auth-brand-name">{CLUB_NAME}</span>
         </div>
         <div className="auth-brand-pitch">
-          <p className="auth-brand-eyebrow">Rugby subacuático · Melbourne</p>
-          <p className="auth-brand-headline">Tu club, bajo la superficie.</p>
-          <p className="auth-brand-copy">
-            Entrenamientos, equipos, evaluaciones y cuotas. Todo lo que los
-            Seadragons necesitan dentro y fuera del agua.
+          <p className="auth-brand-eyebrow">
+            {translate("auth.brand.eyebrow")}
           </p>
+          <p className="auth-brand-headline">
+            {translate("auth.brand.headline")}
+          </p>
+          <p className="auth-brand-copy">{translate("auth.brand.copy")}</p>
         </div>
         <p className="auth-brand-footer">© 2026 Victoria Seadragons UWR Club</p>
       </aside>

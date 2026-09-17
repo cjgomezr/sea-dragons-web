@@ -161,7 +161,7 @@ export function createApiRoute<T, Body = undefined>(
       return decorated(apiSuccess(result.data, result.status));
     } catch (error) {
       if (error instanceof ApiError) {
-        return decorated(apiError(error.code, error.message));
+        return decorated(apiError(error.code, error.message, error.reason));
       }
       console.error(
         "[api/v1] unhandled error",

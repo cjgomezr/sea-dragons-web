@@ -14,7 +14,7 @@ import { RESEND_BUTTON_LABEL } from "../helpers/confirmation-copy";
 const COUNTRIES = listCountryOptions("es");
 
 function renderForm(): void {
-  render(<RegistrationForm countries={COUNTRIES} />);
+  render(<RegistrationForm locale="es" countries={COUNTRIES} />);
 }
 
 type FetchCall = { url: string; body: unknown };
@@ -245,7 +245,7 @@ describe("formulario de registro", () => {
     await fillValidForm();
     await user.click(submitButton());
     await user.click(
-      await screen.findByRole("button", { name: RESEND_BUTTON_LABEL }),
+      await screen.findByRole("button", { name: RESEND_BUTTON_LABEL.es }),
     );
 
     await waitFor(() => expect(calls).toHaveLength(2));
@@ -255,7 +255,7 @@ describe("formulario de registro", () => {
     });
   });
 
-  it("muestra el mensaje del servidor cuando rechaza el registro", async () => {
+  it("traduce el rechazo del registro a partir de su código, no de su frase", async () => {
     stubApi({
       status: 422,
       body: {
@@ -270,9 +270,11 @@ describe("formulario de registro", () => {
     await fillValidForm();
     await userEvent.setup().click(submitButton());
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "membershipType",
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "No pudimos crear tu cuenta con estos datos. Revísalos y vuelve a intentarlo.",
     );
+    expect(alert).not.toHaveTextContent("membershipType");
   });
 
   it("avisa sin filtrar detalles técnicos si la red falla", async () => {

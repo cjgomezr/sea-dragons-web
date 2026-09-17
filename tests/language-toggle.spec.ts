@@ -64,13 +64,15 @@ test.describe("interruptor de idioma fuera de la aplicación", () => {
     page,
   }) => {
     await page.goto(`${APP_URL}${SIGN_IN_PATH}`);
-    const email = page.getByLabel(/correo electrónico/i);
-    await email.fill("nerea@example.test");
+    await page.getByLabel("Email", { exact: true }).fill("nerea@example.test");
 
     await englishToggle(page).click();
     await expect(spanishToggle(page)).toBeVisible();
 
-    await expect(email).toHaveValue("nerea@example.test");
+    // La etiqueta ya cambió de idioma: es el mismo campo, pintado de nuevo.
+    await expect(
+      page.getByLabel("Correo electrónico", { exact: true }),
+    ).toHaveValue("nerea@example.test");
   });
 
   test("sigue en el idioma elegido al volver más tarde", async ({ page }) => {

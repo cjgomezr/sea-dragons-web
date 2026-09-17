@@ -1,28 +1,21 @@
 import { NextResponse } from "next/server";
+import type { ApiErrorCode } from "./error-codes";
 
-export type ApiErrorCode =
-  | "validation_error"
-  | "unauthenticated"
-  | "forbidden"
-  | "not_found"
-  | "conflict"
-  | "business_rule"
-  // Un recurso que existió y ya no sirve, como un enlace de un solo uso ya
-  // canjeado o caducado. No es un 404: el cliente tiene que ofrecer pedir otro.
-  | "gone"
-  // Demasiadas peticiones seguidas. Se responde pidiendo esperar, nunca en
-  // silencio (RF-6 de E2).
-  | "rate_limited"
-  | "method_not_allowed"
-  | "service_unavailable"
-  | "internal_error";
+export type { ApiErrorCode };
 
 export type ApiSuccessStatus = 200 | 201;
 
 export type ApiSuccessBody<T> = { readonly data: T };
 
+/** `reason` sólo aparece cuando un mismo código cubre casos que quien llama
+ * tiene que explicar distinto, y es tan estable como el código: la pantalla
+ * lo traduce, igual que traduce el código. */
 export type ApiErrorBody = {
-  readonly error: { readonly code: ApiErrorCode; readonly message: string };
+  readonly error: {
+    readonly code: ApiErrorCode;
+    readonly message: string;
+    readonly reason?: string;
+  };
 };
 
 const HTTP_STATUS_BY_ERROR_CODE: Record<ApiErrorCode, number> = {
@@ -43,11 +36,13 @@ const DEFAULT_SUCCESS_STATUS: ApiSuccessStatus = 200;
 
 export class ApiError extends Error {
   readonly code: ApiErrorCode;
+  readonly reason: string | undefined;
 
-  constructor(code: ApiErrorCode, message: string) {
+  constructor(code: ApiErrorCode, message: string, reason?: string) {
     super(message);
     this.name = "ApiError";
     this.code = code;
+    this.reason = reason;
   }
 }
 
@@ -61,9 +56,10 @@ export function apiSuccess<T>(
 export function apiError(
   code: ApiErrorCode,
   message: string,
+  reason?: string,
 ): NextResponse<ApiErrorBody> {
   return NextResponse.json(
-    { error: { code, message } },
+    { error: { code, message, ...(reason === undefined ? {} : { reason }) } },
     { status: HTTP_STATUS_BY_ERROR_CODE[code] },
   );
 }

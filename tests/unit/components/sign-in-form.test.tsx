@@ -63,7 +63,7 @@ describe("formulario de inicio de sesión", () => {
   });
 
   it("pide correo y contraseña, cada uno con su etiqueta", () => {
-    render(<SignInForm />);
+    render(<SignInForm locale="es" />);
 
     expect(screen.getByLabelText("Correo electrónico")).toBeInTheDocument();
     expect(screen.getByLabelText("Contraseña")).toBeInTheDocument();
@@ -71,7 +71,7 @@ describe("formulario de inicio de sesión", () => {
 
   it("lleva al destino que decide el servidor", async () => {
     stubApi({ status: 200, body: { data: { destination: "/dashboard" } } });
-    render(<SignInForm />);
+    render(<SignInForm locale="es" />);
     await fillCredentials();
 
     await userEvent.click(submitButton());
@@ -89,7 +89,7 @@ describe("formulario de inicio de sesión", () => {
 
   it("refresca para que el servidor vuelva a renderizar ya con la sesión", async () => {
     stubApi();
-    render(<SignInForm />);
+    render(<SignInForm locale="es" />);
     await fillCredentials();
 
     await userEvent.click(submitButton());
@@ -99,17 +99,17 @@ describe("formulario de inicio de sesión", () => {
     });
   });
 
-  it("muestra el mensaje del servidor cuando las credenciales no valen", async () => {
+  it("dice que las credenciales no valen a partir del código del servidor", async () => {
     stubApi({
       status: 401,
       body: {
         error: {
           code: "unauthenticated",
-          message: INVALID_CREDENTIALS_MESSAGE,
+          message: "Frase del servidor que la pantalla no lee.",
         },
       },
     });
-    render(<SignInForm />);
+    render(<SignInForm locale="es" />);
     await fillCredentials("otracosa");
 
     await userEvent.click(submitButton());
@@ -122,7 +122,7 @@ describe("formulario de inicio de sesión", () => {
 
   it("no manda nada al servidor con los campos vacíos", async () => {
     stubApi();
-    render(<SignInForm />);
+    render(<SignInForm locale="es" />);
 
     await userEvent.click(submitButton());
 
@@ -131,7 +131,7 @@ describe("formulario de inicio de sesión", () => {
   });
 
   it("ofrece el camino a recuperar la contraseña y al registro", () => {
-    render(<SignInForm />);
+    render(<SignInForm locale="es" />);
 
     expect(
       screen.getByRole("link", { name: /olvidaste tu contraseña/i }),
@@ -142,7 +142,7 @@ describe("formulario de inicio de sesión", () => {
   });
 
   it("no dibuja los caminos de Google y Apple, aplazados a Release 2", () => {
-    render(<SignInForm />);
+    render(<SignInForm locale="es" />);
 
     expect(screen.queryByRole("button", { name: /google/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /apple/i })).toBeNull();

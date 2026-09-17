@@ -3,8 +3,16 @@
 import Link from "next/link";
 import { useState } from "react";
 import { readStringAt } from "@/lib/api/read-string-at";
-import { RECOVERY_LINK_LIFETIME_MINUTES } from "@/lib/auth/password-recovery";
+import { describeAuthIssue } from "@/lib/auth/issue-messages";
+import {
+  PASSWORD_RECOVERY_WINDOW_MINUTES,
+  RECOVERY_LINK_LIFETIME_MINUTES,
+} from "@/lib/auth/password-recovery";
 import { PASSWORD_RECOVERY_API_PATH, SIGN_IN_PATH } from "@/lib/auth/routes";
+import type { Locale } from "@/lib/i18n/locale";
+import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import { EmphasizedValue } from "./EmphasizedValue";
+import { type RequestFailure, readRequestFailure } from "./request-failure";
 
 /**
  * Pedir el enlace de recuperación (RF-6). No tiene mockup propio: sigue el
@@ -15,17 +23,12 @@ import { PASSWORD_RECOVERY_API_PATH, SIGN_IN_PATH } from "@/lib/auth/routes";
  * usar esta pantalla para averiguar quién es socio del club.
  */
 
-const NETWORK_ERROR_MESSAGE =
-  "No pudimos hablar con el servidor. Revisa tu conexión y vuelve a intentarlo.";
-const UNEXPECTED_ERROR_MESSAGE =
-  "No pudimos pedir el enlace. Vuelve a intentarlo en un momento.";
-const EMPTY_EMAIL_MESSAGE =
-  "Escribe el correo de tu cuenta para pedir el enlace.";
+type RecoveryFailure = RequestFailure | "empty_email";
 
 type Status =
   | { readonly kind: "editing" }
   | { readonly kind: "submitting" }
-  | { readonly kind: "failed"; readonly message: string }
+  | { readonly kind: "failed"; readonly failure: RecoveryFailure }
   | { readonly kind: "requested"; readonly email: string };
 
 async function submitRecoveryRequest(email: string): Promise<Status> {
@@ -37,16 +40,12 @@ async function submitRecoveryRequest(email: string): Promise<Status> {
       body: JSON.stringify({ email }),
     });
   } catch {
-    return { kind: "failed", message: NETWORK_ERROR_MESSAGE };
+    return { kind: "failed", failure: "network" };
   }
 
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    return {
-      kind: "failed",
-      message:
-        readStringAt(payload, ["error", "message"]) ?? UNEXPECTED_ERROR_MESSAGE,
-    };
+    return { kind: "failed", failure: readRequestFailure(payload) };
   }
   return {
     kind: "requested",
@@ -54,20 +53,57 @@ async function submitRecoveryRequest(email: string): Promise<Status> {
   };
 }
 
-function RecoveryRequested({ email }: { email: string }): React.JSX.Element {
+/** El límite de peticiones no viaja en la respuesta: la espera es la ventana
+ * entera, la misma constante con la que el servidor cuenta. El 503 es que
+ * ahora no se pueden mandar correos, y el 422 es un correo mal escrito, que
+ * el servidor rechaza con la misma regla que el registro. */
+function describeFailure(
+  translate: Translator,
+  failure: RecoveryFailure,
+): string {
+  switch (failure) {
+    case "empty_email":
+      return translate("auth.passwordRecovery.emptyEmail");
+    case "network":
+      return translate("auth.error.network");
+    case "rate_limited":
+      return translate("auth.passwordRecovery.rateLimited", {
+        count: PASSWORD_RECOVERY_WINDOW_MINUTES,
+      });
+    case "service_unavailable":
+      return translate("auth.passwordRecovery.emailUnavailable");
+    case "business_rule":
+      return describeAuthIssue(translate, "email_malformed");
+    default:
+      return translate("auth.passwordRecovery.unexpected");
+  }
+}
+
+function RecoveryRequested({
+  translate,
+  email,
+}: {
+  translate: Translator;
+  email: string;
+}): React.JSX.Element {
   return (
     <section className="auth-form" aria-labelledby="recuperar-enviado-titulo">
-      <h1 id="recuperar-enviado-titulo">Revisa tu correo</h1>
+      <h1 id="recuperar-enviado-titulo">
+        {translate("auth.passwordRecovery.checkEmailTitle")}
+      </h1>
       <p className="auth-lead">
-        Si <strong>{email}</strong> tiene una cuenta en el club, te mandamos un
-        enlace para elegir una contraseña nueva.
+        <EmphasizedValue
+          text={translate("auth.passwordRecovery.linkSent", { email })}
+          value={email}
+        />
       </p>
       <p className="auth-note">
-        El enlace caduca a los {RECOVERY_LINK_LIFETIME_MINUTES} minutos y sirve
-        una sola vez. Si no llega, revisa la carpeta de spam o vuelve a pedirlo.
+        {translate("auth.passwordRecovery.linkNote", {
+          minutes: RECOVERY_LINK_LIFETIME_MINUTES,
+        })}
       </p>
       <Link className="auth-back" href={SIGN_IN_PATH}>
-        Volver a entrar
+        {translate("auth.passwordRecovery.backToSignIn")}
       </Link>
     </section>
   );
@@ -75,7 +111,12 @@ function RecoveryRequested({ email }: { email: string }): React.JSX.Element {
 
 const EMAIL_FIELD_ID = "recuperar-email";
 
-export function PasswordRecoveryRequestForm(): React.JSX.Element {
+export function PasswordRecoveryRequestForm({
+  locale,
+}: {
+  locale: Locale;
+}): React.JSX.Element {
+  const translate = createTranslator(locale);
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "editing" });
 
@@ -84,7 +125,7 @@ export function PasswordRecoveryRequestForm(): React.JSX.Element {
   ): Promise<void> {
     event.preventDefault();
     if (email.trim() === "") {
-      setStatus({ kind: "failed", message: EMPTY_EMAIL_MESSAGE });
+      setStatus({ kind: "failed", failure: "empty_email" });
       return;
     }
     setStatus({ kind: "submitting" });
@@ -92,25 +133,22 @@ export function PasswordRecoveryRequestForm(): React.JSX.Element {
   }
 
   if (status.kind === "requested") {
-    return <RecoveryRequested email={status.email} />;
+    return <RecoveryRequested translate={translate} email={status.email} />;
   }
 
   return (
     <form className="auth-form" onSubmit={handleSubmit} noValidate>
-      <h1>Recuperar tu contraseña</h1>
-      <p className="auth-lead">
-        Escribe el correo de tu cuenta y te mandaremos un enlace para elegir una
-        contraseña nueva.
-      </p>
+      <h1>{translate("auth.passwordRecovery.title")}</h1>
+      <p className="auth-lead">{translate("auth.passwordRecovery.lead")}</p>
 
       {status.kind === "failed" && (
         <p className="auth-error" role="alert">
-          {status.message}
+          {describeFailure(translate, status.failure)}
         </p>
       )}
 
       <div className="auth-field">
-        <label htmlFor={EMAIL_FIELD_ID}>Correo electrónico</label>
+        <label htmlFor={EMAIL_FIELD_ID}>{translate("auth.field.email")}</label>
         <input
           id={EMAIL_FIELD_ID}
           name="email"
@@ -127,11 +165,11 @@ export function PasswordRecoveryRequestForm(): React.JSX.Element {
         className="auth-submit"
         disabled={status.kind === "submitting"}
       >
-        Enviar enlace
+        {translate("auth.passwordRecovery.submit")}
       </button>
 
       <Link className="auth-back" href={SIGN_IN_PATH}>
-        Volver a entrar
+        {translate("auth.passwordRecovery.backToSignIn")}
       </Link>
     </form>
   );

@@ -12,7 +12,7 @@ import {
   RegistrationValidationError,
   prepareRegistration,
 } from "@/lib/auth/register-member";
-import type { RegistrationIssue } from "@/lib/auth/registration";
+import { describeIssuesForApi } from "@/lib/auth/issue-messages";
 import { RegistrationRateLimitedError } from "@/lib/auth/registration-rate-limit";
 import {
   DEFAULT_CLUB_SLUG,
@@ -41,10 +41,6 @@ const registrationBodySchema = z.object({
 type RegistrationBody = z.infer<typeof registrationBodySchema>;
 
 export type RegistrationResponse = RegistrationReceipt;
-
-function describeIssues(issues: readonly RegistrationIssue[]): string {
-  return issues.map((issue) => `${issue.field}: ${issue.message}`).join(" ");
-}
 
 /** El mismo texto para quien tiene cuenta y para quien no: el límite se aplica
  * antes de mirar ninguna, así que decirlo no delata ninguna (#173). */
@@ -105,7 +101,7 @@ async function prepareOrReject(
     return await prepareRegistration(gateways, input);
   } catch (error) {
     if (error instanceof RegistrationValidationError) {
-      throw new ApiError("business_rule", describeIssues(error.issues));
+      throw new ApiError("business_rule", describeIssuesForApi(error.issues));
     }
     if (error instanceof RegistrationRateLimitedError) {
       throw new ApiError(

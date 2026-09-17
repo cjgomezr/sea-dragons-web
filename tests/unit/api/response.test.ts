@@ -57,7 +57,27 @@ describe("apiError", () => {
   );
 });
 
+describe("apiError con motivo", () => {
+  it("añade el motivo cuando un mismo código cubre casos que el cliente explica distinto", async () => {
+    const response = apiError("gone", "ya no sirve", "password_rejected");
+
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "gone",
+        message: "ya no sirve",
+        reason: "password_rejected",
+      },
+    });
+  });
+});
+
 describe("ApiError", () => {
+  it("carries the reason when it has one", () => {
+    const error = new ApiError("gone", "ya no sirve", "link_unusable");
+
+    expect(error.reason).toBe("link_unusable");
+  });
+
   it("carries the code and message it was created with", () => {
     const error = new ApiError("conflict", "el recurso ya existe");
 

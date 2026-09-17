@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import { PasswordRecoveryRequestForm } from "@/components/auth/PasswordRecoveryRequestForm";
+import { readRequestLocale } from "@/lib/i18n/request-locale";
+import { createTranslator } from "@/lib/i18n/translator";
 
-export const metadata: Metadata = {
-  title: "Recuperar tu contraseña · Victoria Seadragons",
-  description:
-    "Pide un enlace para elegir una contraseña nueva en la plataforma del club Victoria Seadragons.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const translate = createTranslator(await readRequestLocale());
+  return {
+    title: translate("auth.passwordRecovery.metaTitle"),
+    description: translate("auth.passwordRecovery.metaDescription"),
+  };
+}
 
-export default function PasswordRecoveryPage(): React.JSX.Element {
-  return <PasswordRecoveryRequestForm />;
+export default async function PasswordRecoveryPage(): Promise<React.JSX.Element> {
+  return <PasswordRecoveryRequestForm locale={await readRequestLocale()} />;
 }

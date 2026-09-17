@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
+import { describeIssuesForApi } from "@/lib/auth/issue-messages";
 import { resetPassword } from "@/lib/auth/password-recovery";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { createSupabasePasswordRecoveryGateways } from "@/lib/auth/supabase-password-recovery";
@@ -62,11 +63,17 @@ const postPasswordReset = createApiRoute<
     );
     switch (outcome.kind) {
       case "invalid_password":
-        throw new ApiError("business_rule", `password: ${outcome.message}`);
+        throw new ApiError(
+          "business_rule",
+          describeIssuesForApi([{ field: "password", code: outcome.code }]),
+        );
+      // Los dos son el mismo 410, pero la pantalla los explica distinto: tras
+      // una contraseña rechazada hay que elegir otra, no sólo pedir otro
+      // enlace. El motivo viaja aparte para que no tenga que leer la frase.
       case "password_rejected":
-        throw new ApiError("gone", PASSWORD_REJECTED_MESSAGE);
+        throw new ApiError("gone", PASSWORD_REJECTED_MESSAGE, outcome.kind);
       case "link_unusable":
-        throw new ApiError("gone", LINK_UNUSABLE_MESSAGE);
+        throw new ApiError("gone", LINK_UNUSABLE_MESSAGE, outcome.kind);
       case "password_changed":
         return { data: { outcome: "password_changed" } };
     }

@@ -12,6 +12,7 @@ import {
   completeRegistration,
   describeAccountCompletion,
 } from "@/lib/auth/complete-registration";
+import { describeIssuesForApi } from "@/lib/auth/issue-messages";
 
 /**
  * La cuenta de quien llama: qué le falta (GET) y cómo se completa (PATCH).
@@ -45,7 +46,7 @@ export type AccountResponse = AccountCompletion;
 function describeCompletionFailure(error: CompletionValidationError): string {
   return error.issues.length === 0
     ? error.message
-    : error.issues.map((issue) => `${issue.field}: ${issue.message}`).join(" ");
+    : describeIssuesForApi(error.issues);
 }
 
 function asApiError(error: unknown): never {

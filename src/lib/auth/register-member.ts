@@ -129,7 +129,7 @@ export class RegistrationValidationError extends Error {
   constructor(issues: readonly RegistrationIssue[]) {
     super(
       `La solicitud de registro no es válida: ${issues
-        .map((issue) => `${issue.field}: ${issue.message}`)
+        .map((issue) => `${issue.field}: ${issue.code}`)
         .join(" ")}`,
     );
     this.name = "RegistrationValidationError";

@@ -36,6 +36,19 @@ describe("app shell", () => {
     );
 
     expect(
+      screen.getByRole("button", { name: "Sign out" }),
+    ).toBeInTheDocument();
+  });
+
+  it("nombra el botón de cerrar sesión en el idioma de la visita", () => {
+    usePathname.mockReturnValue("/calendario");
+    render(
+      <AppShell locale="es">
+        <p>Contenido de la sección</p>
+      </AppShell>,
+    );
+
+    expect(
       screen.getByRole("button", { name: "Cerrar sesión" }),
     ).toBeInTheDocument();
   });

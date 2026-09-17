@@ -52,6 +52,7 @@ function stubApi(
 function renderForm(pending: readonly PendingRequirement[]): void {
   render(
     <CompleteRegistrationForm
+      locale="es"
       pending={pending}
       countries={[{ code: "AU", name: "Australia" }]}
       email="nerea@example.test"
@@ -183,7 +184,7 @@ describe("bloque del tutor", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/correo/i);
   });
 
-  it("enseña el mensaje del servidor cuando rechaza", async () => {
+  it("traduce el rechazo del servidor a partir de su código, no de su frase", async () => {
     stubApi({
       status: 409,
       body: { error: { code: "conflict", message: "Ya estaba registrado." } },
@@ -196,9 +197,9 @@ describe("bloque del tutor", () => {
       consent: true,
     });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Ya estaba registrado.",
-    );
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/recarga la página/i);
+    expect(alert).not.toHaveTextContent("Ya estaba registrado.");
     expect(replace).not.toHaveBeenCalled();
   });
 

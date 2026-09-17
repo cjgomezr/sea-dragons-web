@@ -1,5 +1,5 @@
 import type { EmailRequestLog } from "./email-request-log";
-import { validatePasswordField } from "./registration";
+import { type FieldIssueCode, validatePasswordField } from "./registration";
 
 /**
  * La recuperación de contraseña (RF-6), contada sin Supabase ni proveedor de
@@ -141,8 +141,7 @@ export async function requestPasswordRecovery(
  */
 export type RecoveryTokenRedemption =
   | { readonly kind: "password_changed"; readonly userId: string }
-  | { readonly kind: "link_unusable" }
-  | { readonly kind: "password_rejected" };
+  | { readonly kind: PasswordResetGoneReason };
 
 /** Canjea el token y fija la contraseña nueva en un solo paso. Van juntos
  * porque el canje es lo que gasta el enlace: separarlos dejaría un enlace
@@ -165,11 +164,15 @@ export type PasswordResetGateways = {
   readonly audit: PasswordChangeAudit;
 };
 
+/** Los dos desenlaces que gastan el enlace sin cambiar la contraseña. La API
+ * los responde con el mismo 410 y los nombra en su motivo, para que quien la
+ * llama pueda explicarlos distinto. */
+export type PasswordResetGoneReason = "link_unusable" | "password_rejected";
+
 export type PasswordResetOutcome =
   | { readonly kind: "password_changed" }
-  | { readonly kind: "link_unusable" }
-  | { readonly kind: "password_rejected" }
-  | { readonly kind: "invalid_password"; readonly message: string };
+  | { readonly kind: PasswordResetGoneReason }
+  | { readonly kind: "invalid_password"; readonly code: FieldIssueCode };
 
 /** Fija la contraseña nueva. La contraseña se valida antes de canjear el
  * token: una demasiado corta no puede gastar el enlace. */
@@ -179,7 +182,7 @@ export async function resetPassword(
 ): Promise<PasswordResetOutcome> {
   const password = validatePasswordField(input.password);
   if (!password.ok) {
-    return { kind: "invalid_password", message: password.message };
+    return { kind: "invalid_password", code: password.code };
   }
 
   const redemption = await gateways.tokens.redeemRecoveryToken({

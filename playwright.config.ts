@@ -20,6 +20,10 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL: APP_URL,
+    // Las pantallas salen en el idioma que pide el navegador (E17), y sin
+    // esto Playwright pide el de la máquina: las capturas y los textos que
+    // buscan los tests cambiarían según quién corra la suite.
+    locale: "en-AU",
     trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

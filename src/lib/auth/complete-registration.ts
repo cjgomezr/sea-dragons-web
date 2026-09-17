@@ -9,9 +9,9 @@ import {
 } from "./account-activation";
 import type { AccountStatus } from "./account-status";
 import {
+  type FieldIssueCode,
   type FieldValidation,
   type MembershipType,
-  type RegistrationIssue,
   validateCountryField,
   validateDateOfBirthField,
   validateMembershipTypeField,
@@ -37,6 +37,19 @@ export const COMPLETION_FIELDS = [
 ] as const;
 
 export type CompletionField = (typeof COMPLETION_FIELDS)[number];
+
+/** El campo ya está en la fila. Cambiarlo es editar el perfil (FR-084), que es
+ * E5 y tiene su propia pantalla: esta puerta sólo rellena huecos, y dejarla
+ * escribir encima la convertiría en un editor de perfil sin sus reglas. */
+export const ALREADY_SET_ISSUE_CODE = "already_set";
+
+export type CompletionIssueCode =
+  FieldIssueCode | typeof ALREADY_SET_ISSUE_CODE;
+
+export type CompletionIssue = {
+  readonly field: CompletionField;
+  readonly code: CompletionIssueCode;
+};
 
 /** Lo que llega del formulario o de la API: un subconjunto de los campos, sin
  * validar. Es parcial a propósito, porque a una cuenta casi nunca le faltan
@@ -73,9 +86,9 @@ export type AccountCompletion = {
 };
 
 export class CompletionValidationError extends Error {
-  readonly issues: readonly RegistrationIssue[];
+  readonly issues: readonly CompletionIssue[];
 
-  constructor(message: string, issues: readonly RegistrationIssue[] = []) {
+  constructor(message: string, issues: readonly CompletionIssue[] = []) {
     super(message);
     this.name = "CompletionValidationError";
     this.issues = issues;
@@ -101,17 +114,11 @@ const REJECTED_VALUES_MESSAGE = "Hay datos que no se pueden guardar.";
 const NOTHING_TO_SAVE_MESSAGE =
   "No enviaste ningún dato que guardar. Rellena al menos uno de los que faltan.";
 
-/** El campo ya está en la fila. Cambiarlo es editar el perfil (FR-084), que es
- * E5 y tiene su propia pantalla: esta puerta sólo rellena huecos, y dejarla
- * escribir encima la convertiría en un editor de perfil sin sus reglas. */
-const ALREADY_SET_MESSAGE =
-  "Este dato ya está registrado y no se cambia desde aquí.";
-
 /** Qué pasó con un campo: no venía, se acepta ya normalizado, o se rechaza. */
 type FieldOutcome<T> =
   | { readonly kind: "absent" }
   | { readonly kind: "accepted"; readonly value: T }
-  | { readonly kind: "rejected"; readonly message: string };
+  | { readonly kind: "rejected"; readonly code: FieldIssueCode };
 
 function takeField<T>(
   supplied: string | undefined,
@@ -123,21 +130,19 @@ function takeField<T>(
   const validation = validate(supplied);
   return validation.ok
     ? { kind: "accepted", value: validation.value }
-    : { kind: "rejected", message: validation.message };
+    : { kind: "rejected", code: validation.code };
 }
 
 function issuesOf(
   field: CompletionField,
   outcome: FieldOutcome<unknown>,
-): readonly RegistrationIssue[] {
-  return outcome.kind === "rejected"
-    ? [{ field, message: outcome.message }]
-    : [];
+): readonly CompletionIssue[] {
+  return outcome.kind === "rejected" ? [{ field, code: outcome.code }] : [];
 }
 
 export type CompletionValidation =
   | { readonly ok: true; readonly values: CompletedValues }
-  | { readonly ok: false; readonly issues: readonly RegistrationIssue[] };
+  | { readonly ok: false; readonly issues: readonly CompletionIssue[] };
 
 /**
  * Valida y normaliza lo que llega, con los mismos criterios que el registro:
@@ -193,10 +198,10 @@ export function validateCompletionValues(input: {
 function issuesForAlreadySetFields(
   values: CompletionValues,
   profile: MemberProfile,
-): readonly RegistrationIssue[] {
+): readonly CompletionIssue[] {
   return COMPLETION_FIELDS.flatMap((field) =>
     values[field] !== undefined && profile[field] !== null
-      ? [{ field, message: ALREADY_SET_MESSAGE }]
+      ? [{ field, code: ALREADY_SET_ISSUE_CODE }]
       : [],
   );
 }

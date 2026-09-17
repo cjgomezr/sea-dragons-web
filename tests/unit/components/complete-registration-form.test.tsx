@@ -60,6 +60,7 @@ function stubApi(
 function renderForm(pending: readonly PendingRequirement[]): void {
   render(
     <CompleteRegistrationForm
+      locale="es"
       pending={pending}
       countries={COUNTRIES}
       email={EMAIL}
@@ -265,7 +266,7 @@ describe("completar registro: guardar", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/futuro/i);
   });
 
-  it("enseña el mensaje que devuelve el servidor cuando rechaza", async () => {
+  it("traduce el rechazo del servidor a partir de su código, no de su frase", async () => {
     stubApi({
       status: 422,
       body: {
@@ -281,7 +282,9 @@ describe("completar registro: guardar", () => {
     );
     await user.click(saveButton());
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("no vale");
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Hay datos que no se pueden guardar.");
+    expect(alert).not.toHaveTextContent("no vale");
     expect(replace).not.toHaveBeenCalled();
   });
 });

@@ -62,6 +62,22 @@ describe("respuesta de error", () => {
       error: { code: "conflict", message: "el recurso ya existe" },
     });
   });
+
+  it("conserva el motivo del ApiError en la respuesta", async () => {
+    const route = createApiRoute({
+      handler: async () => {
+        throw new ApiError("gone", "ya no sirve", "link_unusable");
+      },
+    });
+
+    const response = await route(
+      new NextRequest("http://localhost/api/v1/things"),
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      error: { code: "gone", message: "ya no sirve", reason: "link_unusable" },
+    });
+  });
 });
 
 describe("validación", () => {

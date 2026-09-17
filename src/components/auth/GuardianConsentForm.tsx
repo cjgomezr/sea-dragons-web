@@ -6,11 +6,15 @@ import {
   type GuardianConsentIssue,
   validateGuardianConsent,
 } from "@/lib/auth/guardian-consent";
+import { describeAuthIssue } from "@/lib/auth/issue-messages";
 import { GUARDIAN_CONSENT_API_PATH } from "@/lib/auth/routes";
+import type { Translator } from "@/lib/i18n/translator";
 import {
   type AccountRequestResult,
+  describeAccountFailure,
   sendAccountRequest,
 } from "./account-request";
+import type { RequestFailure } from "./request-failure";
 
 /**
  * El bloque del tutor dentro de completar registro (FR-082). El consentimiento
@@ -36,23 +40,25 @@ const EMPTY_DRAFT: Draft = {
 type Status =
   | { readonly kind: "editing" }
   | { readonly kind: "saving" }
-  | { readonly kind: "failed"; readonly message: string };
+  | { readonly kind: "failed"; readonly failure: RequestFailure };
 
 function errorIdOf(field: GuardianConsentField): string {
   return `tutor-${field}-error`;
 }
 
 function IssueSummary({
+  translate,
   issues,
   status,
 }: {
+  translate: Translator;
   issues: readonly GuardianConsentIssue[];
   status: Status;
 }): React.JSX.Element | null {
   if (status.kind === "failed") {
     return (
       <p className="auth-error" role="alert">
-        {status.message}
+        {describeAccountFailure(translate, status.failure)}
       </p>
     );
   }
@@ -61,19 +67,23 @@ function IssueSummary({
   }
   return (
     <div className="auth-error" role="alert">
-      <p>Revisa estos datos antes de continuar:</p>
+      <p>{translate("auth.guardian.detailIssues")}</p>
       <ul>
         {issues.map((issue) => (
-          <li key={issue.field}>{issue.message}</li>
+          <li key={issue.field}>{describeAuthIssue(translate, issue.code)}</li>
         ))}
       </ul>
     </div>
   );
 }
 
+/** Recibe el traductor de la pantalla que lo contiene, y no el idioma: vive
+ * siempre dentro de completar registro, que ya lo creó. */
 export function GuardianConsentForm({
+  translate,
   onSaved,
 }: {
+  translate: Translator;
   /** Lo que hacer cuando el servidor acepta: la pantalla decide si lleva al
    * panel o sigue pidiendo lo que falte. */
   onSaved: (result: Exclude<AccountRequestResult, { kind: "failed" }>) => void;
@@ -92,7 +102,7 @@ export function GuardianConsentForm({
     const issue = issues.find((candidate) => candidate.field === field);
     return issue === undefined ? null : (
       <p className="auth-field-error" id={errorIdOf(field)}>
-        {issue.message}
+        {describeAuthIssue(translate, issue.code)}
       </p>
     );
   }
@@ -125,17 +135,16 @@ export function GuardianConsentForm({
 
   return (
     <section className="auth-pending" aria-labelledby="tutor-titulo">
-      <h2 id="tutor-titulo">Falta el consentimiento de tu tutor</h2>
-      <p>
-        Eras menor de 18 el día que te registraste. Tu cuenta no se activa hasta
-        que tu madre, padre o tutor dé su consentimiento. Rellenad esto juntos.
-      </p>
+      <h2 id="tutor-titulo">{translate("auth.guardian.title")}</h2>
+      <p>{translate("auth.guardian.body")}</p>
 
       <form className="auth-fields" onSubmit={handleSubmit} noValidate>
-        <IssueSummary issues={issues} status={status} />
+        <IssueSummary translate={translate} issues={issues} status={status} />
 
         <div className="auth-field">
-          <label htmlFor="tutor-guardianName">Nombre del tutor</label>
+          <label htmlFor="tutor-guardianName">
+            {translate("auth.guardian.name")}
+          </label>
           <input
             id="tutor-guardianName"
             name="guardianName"
@@ -153,7 +162,9 @@ export function GuardianConsentForm({
         </div>
 
         <div className="auth-field">
-          <label htmlFor="tutor-guardianEmail">Correo del tutor</label>
+          <label htmlFor="tutor-guardianEmail">
+            {translate("auth.guardian.email")}
+          </label>
           <input
             id="tutor-guardianEmail"
             name="guardianEmail"
@@ -184,8 +195,7 @@ export function GuardianConsentForm({
             }
           />
           <label htmlFor="tutor-consent">
-            Soy su madre, padre o tutor legal y doy mi consentimiento para que
-            el club Victoria Seadragons trate los datos de esta cuenta.
+            {translate("auth.guardian.consent")}
           </label>
         </div>
         {fieldError("consent")}
@@ -195,7 +205,7 @@ export function GuardianConsentForm({
           className="auth-submit"
           disabled={status.kind === "saving"}
         >
-          Registrar el consentimiento
+          {translate("auth.guardian.submit")}
         </button>
       </form>
     </section>

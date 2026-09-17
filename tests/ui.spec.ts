@@ -51,6 +51,7 @@ import {
 } from "./support/e2e-session";
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
 import { snapshotCreatedNotice } from "./support/visual-baseline-notice";
+import { LOCALE_COOKIE_NAME } from "@/lib/i18n/locale";
 
 // Con qué condiciones se toma cada captura, sembrada o comparada. Hoy
 // coinciden con los valores por defecto de toHaveScreenshot, pero se pasan a
@@ -157,6 +158,33 @@ async function goToWithTheme(
 }
 
 type Screen = { readonly name: string; readonly path: string };
+
+/** La visita elige español con la cookie, igual que tras usar el interruptor.
+ * El navegador de la suite pide inglés (playwright.config.ts). */
+async function chooseSpanish(page: Page): Promise<void> {
+  await page
+    .context()
+    .addCookies([{ name: LOCALE_COOKIE_NAME, value: "es", url: APP_URL }]);
+}
+
+/** E17: axe pasa también por cada pantalla de cuentas en español. Los textos
+ * cambian de largo y el documento cambia de `lang`, y ninguna de las dos cosas
+ * la ve la pasada en inglés. */
+async function expectNoAxeViolationsInSpanish(
+  page: Page,
+  screenPath: string,
+): Promise<void> {
+  await chooseSpanish(page);
+  await page.goto(`${APP_URL}${screenPath}`);
+  await expect(page.locator("html")).toHaveAttribute("lang", "es");
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  expect(
+    results.violations,
+    JSON.stringify(results.violations, null, 2),
+  ).toEqual([]);
+}
 
 // Las pantallas de este archivo que se alcanzan sin sesión. Las dos viven en
 // el grupo de rutas (auth), con panel de marca propio y sin la cáscara de
@@ -327,6 +355,20 @@ for (const pg of PASSWORD_RECOVERY_SCREENS) {
   describeScreen(pg);
 }
 
+// Las pantallas de cuentas que se alcanzan sin sesión, más el desenlace del
+// enlace de confirmación, que es el panel con más texto.
+for (const pg of [
+  ...PUBLIC_PAGES,
+  ...PASSWORD_RECOVERY_SCREENS,
+  { name: "registro-enlace-invalido", path: "/registro?confirmacion=invalida" },
+]) {
+  test(`${pg.name} en español: has no accessibility violations (axe-core)`, async ({
+    page,
+  }) => {
+    await expectNoAxeViolationsInSpanish(page, pg.path);
+  });
+}
+
 async function goToRecoveryRequested(
   page: import("@playwright/test").Page,
   theme: (typeof themes)[number],
@@ -342,11 +384,11 @@ async function goToRecoveryRequested(
   );
   await goToWithTheme(page, PASSWORD_RECOVERY_PATH, theme);
 
-  await page.getByLabel("Correo electrónico").fill(RECOVERY_STUB_EMAIL);
-  await page.getByRole("button", { name: "Enviar enlace" }).click();
+  await page.getByLabel("Email").fill(RECOVERY_STUB_EMAIL);
+  await page.getByRole("button", { name: "Send link" }).click();
 
   await expect(
-    page.getByRole("heading", { name: "Revisa tu correo" }),
+    page.getByRole("heading", { name: "Check your email" }),
   ).toBeVisible();
 }
 
@@ -389,10 +431,10 @@ test("el ¿Olvidaste tu contraseña? de la entrada lleva a pedir el enlace", asy
 }) => {
   await page.goto(`${APP_URL}/entrar`);
 
-  await page.getByRole("link", { name: "¿Olvidaste tu contraseña?" }).click();
+  await page.getByRole("link", { name: "Forgot your password?" }).click();
 
   await expect(
-    page.getByRole("heading", { name: "Recuperar tu contraseña" }),
+    page.getByRole("heading", { name: "Reset your password" }),
   ).toBeVisible();
 });
 
@@ -411,15 +453,15 @@ test("un enlace ya usado o caducado ofrece pedir otro", async ({ page }) => {
   );
   await page.goto(`${APP_URL}${STUB_RESET_PATH}`);
 
-  await page.getByLabel("Contraseña nueva").fill("bajoelagua-nueva");
-  await page.getByRole("button", { name: "Guardar contraseña" }).click();
+  await page.getByLabel("New password").fill("bajoelagua-nueva");
+  await page.getByRole("button", { name: "Save password" }).click();
   await expect(
-    page.getByRole("heading", { name: "Este enlace ya no sirve" }),
+    page.getByRole("heading", { name: "This link no longer works" }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Pedir otro enlace" }).click();
+  await page.getByRole("link", { name: "Ask for another link" }).click();
 
   await expect(
-    page.getByRole("heading", { name: "Recuperar tu contraseña" }),
+    page.getByRole("heading", { name: "Reset your password" }),
   ).toBeVisible();
 });
 
@@ -427,7 +469,7 @@ test("un enlace ya usado o caducado ofrece pedir otro", async ({ page }) => {
 // relleno. Axe no lo marcó la vez que ".auth-form a" lo pintó del mismo color.
 test("el botón Pedir otro enlace deja leer su texto", async ({ page }) => {
   await page.goto(`${APP_URL}${PASSWORD_RESET_PATH}`);
-  const link = page.getByRole("link", { name: "Pedir otro enlace" });
+  const link = page.getByRole("link", { name: "Ask for another link" });
 
   const { color, background } = await link.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -447,13 +489,13 @@ test("la contraseña nueva de 7 caracteres no llega al servidor", async ({
   });
   await page.goto(`${APP_URL}${STUB_RESET_PATH}`);
 
-  await page.getByLabel("Contraseña nueva").fill("1234567");
-  await page.getByRole("button", { name: "Guardar contraseña" }).click();
+  await page.getByLabel("New password").fill("1234567");
+  await page.getByRole("button", { name: "Save password" }).click();
 
   // Next inserta su propio elemento con role="alert" (el anunciador de ruta),
   // vacío, así que el aviso se busca por su texto.
   await expect(
-    page.getByRole("alert").filter({ hasText: /caracteres/ }),
+    page.getByRole("alert").filter({ hasText: /characters/ }),
   ).toContainText("8");
   expect(calls).toBe(0);
 });
@@ -484,7 +526,7 @@ test("una pantalla de la aplicación pedida sin sesión aterriza en la entrada",
 
   await expect(page).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
   await expect(
-    page.getByRole("heading", { name: "Bienvenido de vuelta" }),
+    page.getByRole("heading", { name: "Welcome back" }),
   ).toBeVisible();
 });
 
@@ -529,12 +571,12 @@ async function goToSignInWithError(
   );
   await goToWithTheme(page, SIGN_IN_PATH, theme);
 
-  await page.getByLabel("Correo electrónico").fill("nerea@example.test");
-  await page.getByLabel("Contraseña").fill("no-es-esta");
-  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.getByLabel("Email").fill("nerea@example.test");
+  await page.getByLabel("Password").fill("no-es-esta");
+  await page.getByRole("button", { name: "Sign in" }).click();
 
   await expect(
-    page.getByRole("alert").filter({ hasText: /no coinciden/ }),
+    page.getByRole("alert").filter({ hasText: /incorrect/ }),
   ).toBeVisible();
 }
 
@@ -582,12 +624,12 @@ test("el formulario no manda nada al servidor con los campos vacíos", async ({
   });
   await page.goto(`${APP_URL}${SIGN_IN_PATH}`);
 
-  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
 
   // Next inserta su propio elemento con role="alert" (el anunciador de ruta),
   // vacío, así que el aviso se busca por su texto.
   await expect(
-    page.getByRole("alert").filter({ hasText: /Escribe tu correo/ }),
+    page.getByRole("alert").filter({ hasText: /Enter your email/ }),
   ).toBeVisible();
   expect(calls).toBe(0);
 });
@@ -1072,7 +1114,7 @@ test.describe("dentro de la aplicación", () => {
     await page.setViewportSize(DESKTOP);
     await page.goto(`${APP_URL}/calendario`);
 
-    await page.getByRole("button", { name: "Cerrar sesión" }).click();
+    await page.getByRole("button", { name: "Sign out" }).click();
 
     await expect(page).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
   });
@@ -1084,7 +1126,7 @@ test.describe("dentro de la aplicación", () => {
     await openOwnSession(page, context);
     await page.setViewportSize(DESKTOP);
     await page.goto(`${APP_URL}/dashboard`);
-    await page.getByRole("button", { name: "Cerrar sesión" }).click();
+    await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
 
     await page.goto(`${APP_URL}/dashboard`);
@@ -1106,7 +1148,7 @@ test.describe("dentro de la aplicación", () => {
     await expect(segunda).toHaveURL(new RegExp("/calendario$"));
 
     await primera.setViewportSize(DESKTOP);
-    await primera.getByRole("button", { name: "Cerrar sesión" }).click();
+    await primera.getByRole("button", { name: "Sign out" }).click();
     await expect(primera).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
 
     // La segunda no se entera hasta que pide algo al servidor, y entonces sí.
@@ -1125,12 +1167,12 @@ test.describe("dentro de la aplicación", () => {
     await page.goto(`${APP_URL}${SIGN_IN_PATH}`);
 
     await page
-      .getByLabel("Correo electrónico")
+      .getByLabel("Email")
       .fill(E2E_SESSION.kind === "available" ? E2E_SESSION.email : "");
     await page
-      .getByLabel("Contraseña")
+      .getByLabel("Password")
       .fill(E2E_SESSION.kind === "available" ? E2E_SESSION.password : "");
-    await page.getByRole("button", { name: "Entrar" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL(new RegExp("/dashboard$"));
   });
@@ -1166,16 +1208,16 @@ async function goToConfirmationPending(
   );
   await goToWithTheme(page, "/registro", theme);
 
-  await page.getByLabel("Nombre completo").fill("Nerea Silva");
-  await page.getByLabel("Correo electrónico").fill(CONFIRMATION_STUB_EMAIL);
-  await page.getByLabel("País").selectOption("AU");
-  await page.getByLabel("Fecha de nacimiento").fill("1994-03-02");
-  await page.getByLabel("Tipo de membresía").selectOption("Full");
-  await page.getByLabel("Contraseña").fill("bajoelagua");
-  await page.getByRole("button", { name: "Crear cuenta" }).click();
+  await page.getByLabel("Full name").fill("Nerea Silva");
+  await page.getByLabel("Email").fill(CONFIRMATION_STUB_EMAIL);
+  await page.getByLabel("Country").selectOption("AU");
+  await page.getByLabel("Date of birth").fill("1994-03-02");
+  await page.getByLabel("Membership type").selectOption("Full");
+  await page.getByLabel("Password").fill("bajoelagua");
+  await page.getByRole("button", { name: "Create account" }).click();
 
   await expect(
-    page.getByRole("heading", { name: /confirma tu correo/i }),
+    page.getByRole("heading", { name: /confirm your email/i }),
   ).toBeVisible();
 }
 
@@ -1213,9 +1255,9 @@ async function goToConfirmationVariant(
     return;
   }
   await page.route(RESEND_ENDPOINT, (route) => route.abort("failed"));
-  await page.getByRole("button", { name: "Reenviar el correo" }).click();
+  await page.getByRole("button", { name: "Resend the email" }).click();
   await expect(
-    page.getByRole("alert").filter({ hasText: /otro correo/ }),
+    page.getByRole("alert").filter({ hasText: /another email/ }),
   ).toBeVisible();
 }
 
@@ -1311,10 +1353,10 @@ for (const state of STATES_WITHOUT_A_VALID_LINK) {
   }) => {
     await page.goto(`${APP_URL}/registro?confirmacion=${state}`);
 
-    await page.getByRole("link", { name: "Volver al registro" }).click();
+    await page.getByRole("link", { name: "Back to sign-up" }).click();
 
     await expect(
-      page.getByRole("heading", { name: "Crear tu cuenta" }),
+      page.getByRole("heading", { name: "Create your account" }),
     ).toBeVisible();
   });
 }
@@ -1322,8 +1364,8 @@ for (const state of STATES_WITHOUT_A_VALID_LINK) {
 // Con el correo confirmado lo único que queda es entrar: una cuenta incompleta
 // la manda a completar registro el propio inicio de sesión.
 const CONFIRMED_STATE_SUMMARIES = {
-  ok: /cuenta ya está activa/,
-  pendiente: /falta algún dato[\s\S]*te pediremos lo que falta/,
+  ok: /account is now active/,
+  pendiente: /still needs some details[\s\S]*we'll ask you for what's missing/,
 } as const;
 
 for (const state of ["ok", "pendiente"] as const) {
@@ -1337,10 +1379,12 @@ for (const state of ["ok", "pendiente"] as const) {
     );
   });
 
-  // Los textos se escribieron cuando todavía no se podía entrar (#132).
+  // Los textos se escribieron cuando todavía no se podía entrar (#132). Las
+  // frases viejas eran españolas, así que se buscan en la pantalla en español.
   test(`registro tras el enlace (${state}): no promete un inicio de sesión que ya existe`, async ({
     page,
   }) => {
+    await chooseSpanish(page);
     await page.goto(`${APP_URL}/registro?confirmacion=${state}`);
 
     await expect(page.getByRole("main")).not.toContainText(
@@ -1353,10 +1397,10 @@ for (const state of ["ok", "pendiente"] as const) {
   }) => {
     await page.goto(`${APP_URL}/registro?confirmacion=${state}`);
 
-    await page.getByRole("link", { name: "Entrar", exact: true }).click();
+    await page.getByRole("link", { name: "Sign in", exact: true }).click();
 
     await expect(
-      page.getByRole("heading", { name: "Bienvenido de vuelta" }),
+      page.getByRole("heading", { name: "Welcome back" }),
     ).toBeVisible();
   });
 
@@ -1365,7 +1409,7 @@ for (const state of ["ok", "pendiente"] as const) {
       page,
     }) => {
       await goToWithTheme(page, `/registro?confirmacion=${state}`, theme);
-      const link = page.getByRole("link", { name: "Entrar", exact: true });
+      const link = page.getByRole("link", { name: "Sign in", exact: true });
 
       const { color, background } = await link.evaluate((element) => {
         const style = getComputedStyle(element);
@@ -1387,18 +1431,18 @@ test("el formulario de registro no manda nada al servidor con la contraseña cor
   });
   await page.goto(`${APP_URL}/registro`);
 
-  await page.getByLabel("Nombre completo").fill("Nerea Silva");
-  await page.getByLabel("Correo electrónico").fill(CONFIRMATION_STUB_EMAIL);
-  await page.getByLabel("País").selectOption("AU");
-  await page.getByLabel("Fecha de nacimiento").fill("1994-03-02");
-  await page.getByLabel("Tipo de membresía").selectOption("Full");
-  await page.getByLabel("Contraseña").fill("1234567");
-  await page.getByRole("button", { name: "Crear cuenta" }).click();
+  await page.getByLabel("Full name").fill("Nerea Silva");
+  await page.getByLabel("Email").fill(CONFIRMATION_STUB_EMAIL);
+  await page.getByLabel("Country").selectOption("AU");
+  await page.getByLabel("Date of birth").fill("1994-03-02");
+  await page.getByLabel("Membership type").selectOption("Full");
+  await page.getByLabel("Password").fill("1234567");
+  await page.getByRole("button", { name: "Create account" }).click();
 
   // Next inserta su propio elemento con role="alert" (el anunciador de ruta),
   // vacío, así que el resumen de errores se busca por su texto.
   await expect(
-    page.getByRole("alert").filter({ hasText: /caracteres/ }),
+    page.getByRole("alert").filter({ hasText: /characters/ }),
   ).toContainText("8");
   expect(calls).toBe(0);
 });
@@ -1455,6 +1499,12 @@ for (const name of PHOTOGRAPHED_MEMBERS) {
       ).toEqual([]);
     });
 
+    test("en español: has no accessibility violations (axe-core)", async ({
+      page,
+    }) => {
+      await expectNoAxeViolationsInSpanish(page, COMPLETE_REGISTRATION_PATH);
+    });
+
     // ASS-004: 360px is the narrowest viewport the shell must support.
     test("has no horizontal scroll at 360px (ASS-004 minimum)", async ({
       page,
@@ -1503,10 +1553,10 @@ test.describe("una cuenta incompleta en un navegador de verdad", () => {
   }) => {
     await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
 
-    await expect(page.getByLabel("Tipo de membresía")).toBeVisible();
-    await expect(page.getByLabel("País")).toHaveCount(0);
-    await expect(page.getByLabel("Fecha de nacimiento")).toHaveCount(0);
-    await expect(page.getByLabel("Nombre completo")).toHaveCount(0);
+    await expect(page.getByLabel("Membership type")).toBeVisible();
+    await expect(page.getByLabel("Country")).toHaveCount(0);
+    await expect(page.getByLabel("Date of birth")).toHaveCount(0);
+    await expect(page.getByLabel("Full name")).toHaveCount(0);
   });
 });
 
@@ -1575,12 +1625,12 @@ test.describe("una cuenta incompleta que cambia de estado", () => {
     }) => {
       await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
 
-      await page.getByLabel("Tipo de membresía").selectOption("Student");
+      await page.getByLabel("Membership type").selectOption("Student");
       await submitAccountChange(page, {
         method: "PATCH",
         endpoint: ACCOUNT_ENDPOINT,
         submit: () =>
-          page.getByRole("button", { name: "Guardar y continuar" }).click(),
+          page.getByRole("button", { name: "Save and continue" }).click(),
       });
 
       // Y ya no vuelve a ver la pantalla, ni pidiéndola a mano.
@@ -1631,11 +1681,11 @@ test.describe("un menor sin el consentimiento de su tutor", () => {
       await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
 
       await expect(
-        page.getByRole("heading", { name: /consentimiento de tu tutor/i }),
+        page.getByRole("heading", { name: /your guardian's consent/i }),
       ).toBeVisible();
-      await expect(page.getByLabel("Nombre del tutor")).toBeVisible();
-      await expect(page.getByLabel("Tipo de membresía")).toHaveCount(0);
-      await expect(page.getByLabel("Fecha de nacimiento")).toHaveCount(0);
+      await expect(page.getByLabel("Guardian's name")).toBeVisible();
+      await expect(page.getByLabel("Membership type")).toHaveCount(0);
+      await expect(page.getByLabel("Date of birth")).toHaveCount(0);
     });
 
     test("no llega a ninguna pantalla de la aplicación", async ({ page }) => {
@@ -1675,18 +1725,14 @@ test.describe("un menor sin el consentimiento de su tutor", () => {
     }) => {
       await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
 
-      await page.getByLabel("Nombre del tutor").fill("Marta Silva");
-      await page.getByLabel("Correo del tutor").fill("marta@example.test");
-      await page
-        .getByRole("checkbox", { name: /doy mi consentimiento/i })
-        .check();
+      await page.getByLabel("Guardian's name").fill("Marta Silva");
+      await page.getByLabel("Guardian's email").fill("marta@example.test");
+      await page.getByRole("checkbox", { name: /I consent/i }).check();
       await submitAccountChange(page, {
         method: "POST",
         endpoint: GUARDIAN_CONSENT_ENDPOINT,
         submit: () =>
-          page
-            .getByRole("button", { name: "Registrar el consentimiento" })
-            .click(),
+          page.getByRole("button", { name: "Record consent" }).click(),
       });
     });
   });

@@ -89,8 +89,8 @@ describe("plantillas de correo", () => {
   it("la de confirmación nombra el botón de reenviar para pedir otro enlace", () => {
     const { email } = TEMPLATES.confirmación;
 
-    expect(email.text).toContain(RESEND_BUTTON_LABEL);
-    expect(readableTextOf(email.html)).toContain(RESEND_BUTTON_LABEL);
+    expect(email.text).toContain(RESEND_BUTTON_LABEL.es);
+    expect(readableTextOf(email.html)).toContain(RESEND_BUTTON_LABEL.es);
   });
 
   it("la de confirmación no promete que registrarse otra vez mande otro enlace", () => {

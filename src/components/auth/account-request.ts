@@ -2,17 +2,14 @@ import {
   PENDING_REQUIREMENTS,
   type PendingRequirement,
 } from "@/lib/auth/account-activation";
+import type { Translator } from "@/lib/i18n/translator";
+import { type RequestFailure, readRequestFailure } from "./request-failure";
 
 /**
  * Lo que comparten los dos formularios de completar registro al hablar con la
  * API de la cuenta: mandar, leer la respuesta sin fiarse de su forma, y
  * reducirla a lo que la pantalla necesita saber.
  */
-
-export const NETWORK_ERROR_MESSAGE =
-  "No pudimos hablar con el servidor. Revisa tu conexión y vuelve a intentarlo.";
-export const UNEXPECTED_ERROR_MESSAGE =
-  "No pudimos guardar tus datos. Vuelve a intentarlo en un momento.";
 
 /** Lee lo que haya en una ruta de un JSON que llega como unknown, sin confiar
  * en su forma: la respuesta viene de la red y podría ser cualquier cosa. */
@@ -25,14 +22,6 @@ function readValueAt(payload: unknown, path: readonly string[]): unknown {
     current = (current as Record<string, unknown>)[key];
   }
   return current;
-}
-
-function readStringAt(
-  payload: unknown,
-  path: readonly string[],
-): string | null {
-  const value = readValueAt(payload, path);
-  return typeof value === "string" ? value : null;
 }
 
 /** La lista de pendientes que devuelve el servidor, estrechada contra la lista
@@ -59,7 +48,32 @@ export type AccountRequestResult =
       readonly kind: "pending";
       readonly pending: readonly PendingRequirement[];
     }
-  | { readonly kind: "failed"; readonly message: string };
+  | { readonly kind: "failed"; readonly failure: RequestFailure };
+
+/** Lo que los dos endpoints de la cuenta responden cuando no aceptan: sin
+ * sesión (401), una sesión sin socio (403), una cuenta que ya no necesita lo
+ * que se manda (409) o datos que el dominio rechaza (422). Los dos formularios
+ * validan antes con la misma regla que el servidor, así que el 422 sólo llega
+ * si los dos lados discrepan, y no hay campo concreto que señalar. */
+export function describeAccountFailure(
+  translate: Translator,
+  failure: RequestFailure,
+): string {
+  switch (failure) {
+    case "network":
+      return translate("auth.error.network");
+    case "unauthenticated":
+      return translate("auth.completion.signInRequired");
+    case "forbidden":
+      return translate("auth.completion.notAMember");
+    case "conflict":
+      return translate("auth.completion.noLongerNeeded");
+    case "business_rule":
+      return translate("auth.completion.rejected");
+    default:
+      return translate("auth.completion.unexpected");
+  }
+}
 
 export async function sendAccountRequest(request: {
   readonly path: string;
@@ -76,19 +90,15 @@ export async function sendAccountRequest(request: {
   } catch {
     // El detalle técnico no le sirve a nadie que esté mirando un formulario, y
     // puede nombrar hosts internos.
-    return { kind: "failed", message: NETWORK_ERROR_MESSAGE };
+    return { kind: "failed", failure: "network" };
   }
 
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    return {
-      kind: "failed",
-      message:
-        readStringAt(payload, ["error", "message"]) ?? UNEXPECTED_ERROR_MESSAGE,
-    };
+    return { kind: "failed", failure: readRequestFailure(payload) };
   }
 
-  return readStringAt(payload, ["data", "accountStatus"]) === "active"
+  return readValueAt(payload, ["data", "accountStatus"]) === "active"
     ? { kind: "completed" }
     : { kind: "pending", pending: readPending(payload) };
 }
