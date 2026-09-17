@@ -2,6 +2,7 @@ import { z } from "zod";
 import { runAfterResponse } from "@/lib/api/after-response";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
+import { describeIssuesForApi } from "@/lib/auth/issue-messages";
 import type {
   ConfirmationEmailOutcome,
   RegistrationReceipt,
@@ -69,7 +70,7 @@ const postConfirmationEmail = createApiRoute<
     if (!looksLikeEmail(body.email)) {
       throw new ApiError(
         "business_rule",
-        "email: El correo no tiene una forma válida.",
+        describeIssuesForApi([{ field: "email", code: "email_malformed" }]),
       );
     }
     const email = body.email.trim().toLowerCase();

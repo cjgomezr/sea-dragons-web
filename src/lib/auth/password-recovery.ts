@@ -141,8 +141,7 @@ export async function requestPasswordRecovery(
  */
 export type RecoveryTokenRedemption =
   | { readonly kind: "password_changed"; readonly userId: string }
-  | { readonly kind: "link_unusable" }
-  | { readonly kind: "password_rejected" };
+  | { readonly kind: PasswordResetGoneReason };
 
 /** Canjea el token y fija la contraseña nueva en un solo paso. Van juntos
  * porque el canje es lo que gasta el enlace: separarlos dejaría un enlace
@@ -165,10 +164,14 @@ export type PasswordResetGateways = {
   readonly audit: PasswordChangeAudit;
 };
 
+/** Los dos desenlaces que gastan el enlace sin cambiar la contraseña. La API
+ * los responde con el mismo 410 y los nombra en su motivo, para que quien la
+ * llama pueda explicarlos distinto. */
+export type PasswordResetGoneReason = "link_unusable" | "password_rejected";
+
 export type PasswordResetOutcome =
   | { readonly kind: "password_changed" }
-  | { readonly kind: "link_unusable" }
-  | { readonly kind: "password_rejected" }
+  | { readonly kind: PasswordResetGoneReason }
   | { readonly kind: "invalid_password"; readonly code: FieldIssueCode };
 
 /** Fija la contraseña nueva. La contraseña se valida antes de canjear el

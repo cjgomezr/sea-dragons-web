@@ -33,7 +33,7 @@ import {
 import { EmphasizedValue } from "./EmphasizedValue";
 import { labelOfField } from "./field-labels";
 import { GuardianConsentForm } from "./GuardianConsentForm";
-import type { RequestFailure } from "./request-failure";
+import { type RequestFailure, readRequestFailure } from "./request-failure";
 
 /**
  * La pantalla de una cuenta `incomplete` (FR-083). Sigue el lenguaje de
@@ -86,7 +86,12 @@ function EmailConfirmationNotice({
       setResend(
         response.ok
           ? { kind: "sent" }
-          : { kind: "failed", failure: "unrecognized_response" },
+          : {
+              kind: "failed",
+              failure: readRequestFailure(
+                await response.json().catch(() => null),
+              ),
+            },
       );
     } catch {
       setResend({ kind: "failed", failure: "network" });

@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { readStringAt } from "@/lib/api/read-string-at";
 import { describeAuthIssue } from "@/lib/auth/issue-messages";
-import { RECOVERY_LINK_LIFETIME_MINUTES } from "@/lib/auth/password-recovery";
+import {
+  type PasswordResetGoneReason,
+  RECOVERY_LINK_LIFETIME_MINUTES,
+} from "@/lib/auth/password-recovery";
 import {
   type FieldIssueCode,
   PASSWORD_MIN_LENGTH,
@@ -30,12 +33,9 @@ import { type RequestFailure, readRequestFailure } from "./request-failure";
 
 /** Por qué el enlace ya no sirve. Caducado y ya usado se explican igual; una
  * contraseña que el servicio no aceptó gastó el enlace al intentarlo, y quien
- * la escribió tiene que saber que la próxima vez elija otra. */
-export type LinkUnusableReason = "expired_or_used" | "password_rejected";
-
-/** El motivo con el que la API distingue, dentro del mismo 410, la contraseña
- * rechazada del enlace caducado o ya usado. */
-const PASSWORD_REJECTED_REASON = "password_rejected";
+ * la escribió tiene que saber que la próxima vez elija otra. Son los mismos
+ * motivos con los que la API distingue los dos casos dentro del mismo 410. */
+const PASSWORD_REJECTED_REASON: PasswordResetGoneReason = "password_rejected";
 
 type Status =
   | { readonly kind: "editing" }
@@ -43,7 +43,10 @@ type Status =
   | { readonly kind: "invalid_password"; readonly code: FieldIssueCode }
   | { readonly kind: "failed"; readonly failure: RequestFailure }
   | { readonly kind: "password_changed" }
-  | { readonly kind: "link_unusable"; readonly reason: LinkUnusableReason };
+  | {
+      readonly kind: "link_unusable";
+      readonly reason: PasswordResetGoneReason;
+    };
 
 async function submitNewPassword(body: {
   readonly tokenHash: string;
@@ -70,10 +73,12 @@ async function submitNewPassword(body: {
   }
   return {
     kind: "link_unusable",
+    // Sin motivo reconocible se explica el caso general, que es el que pide
+    // lo mismo en cualquier caso: otro enlace.
     reason:
       readStringAt(payload, ["error", "reason"]) === PASSWORD_REJECTED_REASON
         ? "password_rejected"
-        : "expired_or_used",
+        : "link_unusable",
   };
 }
 
@@ -92,10 +97,10 @@ function describeFailure(
  * abre es el mismo caso, un enlace que no sirve. */
 export function RecoveryLinkUnusable({
   locale,
-  reason = "expired_or_used",
+  reason = "link_unusable",
 }: {
   locale: Locale;
-  reason?: LinkUnusableReason;
+  reason?: PasswordResetGoneReason;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   return (

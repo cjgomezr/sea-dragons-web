@@ -446,6 +446,25 @@ describe("errores del servidor", () => {
     expect(panel).not.toHaveTextContent(SERVER_PHRASE);
   });
 
+  it("un aviso a la vista cambia de idioma con la pantalla, sin volver a preguntar al servidor", async () => {
+    const { rerender } = render(<SignInForm locale="es" />);
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByLabelText("Correo electrónico"),
+      "nerea@example.test",
+    );
+    await user.type(screen.getByLabelText("Contraseña"), "otracosa");
+    await user.click(screen.getByRole("button", { name: "Entrar" }));
+    await screen.findByRole("alert");
+
+    rerender(<SignInForm locale="en" />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The email or password is incorrect.",
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("una respuesta que no es de la API da el error genérico de la pantalla", async () => {
     vi.stubGlobal(
       "fetch",
