@@ -16,15 +16,21 @@ import {
  * La frontera de sesión (NFR-004), en el servidor y para el 100% de las
  * peticiones. En Next 16 esto se llama `proxy`; era `middleware` hasta la 15.
  *
- * Aquí no se decide QUÉ puede hacer quien entra, sólo SI hay alguien. La
- * matriz de permisos por rol es E3 y vivirá en las policies de la base y en
- * los propios endpoints, no en este archivo.
+ * Decide, en este orden, si hay alguien, si su cuenta puede operar y si su
+ * rol alcanza la ruta (FR-013). La matriz por rol se aplica aquí a propósito:
+ * redirigir desde el proxy es lo único que cubre también a quien escribe la
+ * dirección de una pantalla a mano, y un endpoint restringido responde 403
+ * sin que su handler tenga que acordarse de comprobarlo. Qué exige cada ruta
+ * se declara en `RESTRICTED_ROUTES`, no en este archivo. Las policies de la
+ * base siguen siendo la otra mitad: protegen los datos aunque se llegue a
+ * ellos por otro camino.
  */
 
 const UNAUTHENTICATED_MESSAGE =
   "Necesitas iniciar sesión para usar este endpoint.";
 const INCOMPLETE_ACCOUNT_MESSAGE =
   "Tu cuenta todavía está incompleta. Termina tu registro antes de usar este endpoint.";
+const MISSING_CAPABILITY_MESSAGE = "Tu rol no te permite usar este endpoint.";
 
 function buildResponse(
   outcome: SessionBoundaryOutcome,
@@ -39,6 +45,8 @@ function buildResponse(
       return apiError("unauthenticated", UNAUTHENTICATED_MESSAGE);
     case "forbidden":
       return apiError("forbidden", INCOMPLETE_ACCOUNT_MESSAGE);
+    case "missingCapability":
+      return apiError("forbidden", MISSING_CAPABILITY_MESSAGE);
   }
 }
 
@@ -64,7 +72,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const state =
     session.kind === "ready"
       ? await readSessionState(session.client)
-      : "anonymous";
+      : { kind: "anonymous" as const };
 
   const response = buildResponse(
     decideSessionBoundary({ pathname, session: state }),

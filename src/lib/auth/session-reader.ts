@@ -1,7 +1,10 @@
 import { isAuthSessionMissingError } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SessionState } from "./session-boundary";
-import { createAccountStatusGateway } from "./supabase-session-gateways";
+import {
+  type MemberAccess,
+  findMemberAccess,
+} from "./supabase-session-gateways";
 
 /**
  * Quién está pidiendo algo, en los términos que la frontera entiende.
@@ -11,9 +14,16 @@ import { createAccountStatusGateway } from "./supabase-session-gateways";
  * el token en local: una sesión recién cerrada deja un token que todavía no ha
  * caducado, y verificarlo en local lo daría por bueno. La segunda lee la fila
  * de miembro, porque una cuenta `incomplete` tiene sesión válida y aun así no
- * puede operar (FR-083). Ese es el precio de que cerrar sesión signifique algo
- * y de que la puerta del registro a medias esté en el servidor.
+ * puede operar (FR-083), y trae en la misma consulta el rol que decide qué
+ * alcanza. Ese es el precio de que cerrar sesión signifique algo y de que la
+ * puerta del registro a medias esté en el servidor.
+ *
+ * El rol se lee de la base en cada petición y no del token: un rol que un
+ * Admin acaba de cambiar vale desde la siguiente petición, sin esperar a que
+ * el token caduque ni obligar a cerrar sesión.
  */
+
+const ANONYMOUS: SessionState = { kind: "anonymous" };
 
 /** Quién pide, según su cookie de sesión. */
 export type AuthenticatedCaller = {
@@ -56,22 +66,43 @@ export async function readAuthenticatedUserId(
   return (await readAuthenticatedCaller(client))?.userId ?? null;
 }
 
+/** `inactive` (una baja de socio) y la identidad sin fila de miembro no abren
+ * ninguna puerta, así que son lo mismo que no tener sesión. Un rol que el
+ * catálogo no reconoce tampoco: adivinar qué permisos quiso darle la base es
+ * justo como un valor raro acaba abriendo algo. */
+function toSessionState(
+  userId: string,
+  access: MemberAccess | null,
+): SessionState {
+  if (access === null) {
+    return ANONYMOUS;
+  }
+  if (access.role === null) {
+    console.error(
+      `[sesión] la fila de miembro de ${userId} tiene un rol que el catálogo no reconoce`,
+    );
+    return ANONYMOUS;
+  }
+  switch (access.accountStatus) {
+    case "active":
+      return { kind: "active", role: access.role };
+    case "incomplete":
+      return { kind: "incomplete" };
+    default:
+      return ANONYMOUS;
+  }
+}
+
 export async function readSessionState(
   client: SupabaseClient,
 ): Promise<SessionState> {
   const userId = await readAuthenticatedUserId(client);
   if (userId === null) {
-    return "anonymous";
+    return ANONYMOUS;
   }
 
   try {
-    const status =
-      await createAccountStatusGateway(client).findAccountStatus(userId);
-    // `inactive` (una baja de socio) y la identidad sin fila de miembro no
-    // abren ninguna puerta, así que son lo mismo que no tener sesión.
-    return status === "active" || status === "incomplete"
-      ? status
-      : "anonymous";
+    return toSessionState(userId, await findMemberAccess(client, userId));
   } catch (error) {
     // Una frontera que se cae hacia el lado abierto cuando la base no contesta
     // no es una frontera. Se niega el paso y se deja escrito por qué.
@@ -79,6 +110,6 @@ export async function readSessionState(
       "[sesión] no se pudo leer el estado de la cuenta:",
       error instanceof Error ? error.message : String(error),
     );
-    return "anonymous";
+    return ANONYMOUS;
   }
 }

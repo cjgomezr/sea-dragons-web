@@ -9,7 +9,8 @@ import {
   createSessionClient,
   expireSessionCookies,
 } from "@/lib/supabase/session-client";
-import { parseAccountStatus } from "./account-status";
+import { type AccountStatus, parseAccountStatus } from "./account-status";
+import { type Role, parseRole } from "./roles";
 import type {
   AccountStatusGateway,
   IdentityGateway,
@@ -27,6 +28,7 @@ import type {
 
 const MEMBERS_TABLE = "members";
 const ACCOUNT_STATUS_COLUMN = "account_status";
+const ROLE_COLUMN = "role";
 
 /** Los códigos con los que Supabase Auth dice "esas credenciales no valen".
  * Cualquier otro error es un problema del servicio, y confundirlos sería
@@ -111,28 +113,51 @@ function createIdentityGateway(client: SupabaseClient): IdentityGateway {
   };
 }
 
-/** Exportado porque lo usan dos sitios: el inicio de sesión, que decide a
- * dónde manda a quien entra, y la frontera de sesión, que decide qué alcanza
- * en cada petición. Una segunda copia de esta consulta sería una segunda
- * definición de qué cuenta como cuenta que puede operar. */
+/** Lo que la fila de miembro dice de quién puede qué. Cada campo es `null`
+ * cuando la base guarda un valor que el catálogo no reconoce: qué hacer con
+ * eso lo decide quien llama, no la consulta. */
+export type MemberAccess = {
+  readonly accountStatus: AccountStatus | null;
+  readonly role: Role | null;
+};
+
+/**
+ * El estado de la cuenta y el rol, en una sola consulta: la frontera los
+ * necesita los dos en cada petición, y dos viajes a la base por petición serían
+ * el doble de latencia para la misma fila.
+ *
+ * Lo usan dos sitios: el inicio de sesión, que decide a dónde manda a quien
+ * entra, y la frontera de sesión, que decide qué alcanza en cada petición.
+ * Una segunda copia de esta consulta sería una segunda definición de qué
+ * cuenta como cuenta que puede operar.
+ */
+export async function findMemberAccess(
+  client: SupabaseClient,
+  userId: string,
+): Promise<MemberAccess | null> {
+  const { data, error } = await client
+    .from(MEMBERS_TABLE)
+    .select(`${ACCOUNT_STATUS_COLUMN}, ${ROLE_COLUMN}`)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    throw new Error(`No se pudo leer el estado de la cuenta: ${error.message}`);
+  }
+  return data === null
+    ? null
+    : {
+        accountStatus: parseAccountStatus(data[ACCOUNT_STATUS_COLUMN]),
+        role: parseRole(data[ROLE_COLUMN]),
+      };
+}
+
 export function createAccountStatusGateway(
   client: SupabaseClient,
 ): AccountStatusGateway {
   return {
     async findAccountStatus(userId) {
-      const { data, error } = await client
-        .from(MEMBERS_TABLE)
-        .select(ACCOUNT_STATUS_COLUMN)
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (error) {
-        throw new Error(
-          `No se pudo leer el estado de la cuenta: ${error.message}`,
-        );
-      }
-      return data === null
-        ? null
-        : parseAccountStatus(data[ACCOUNT_STATUS_COLUMN]);
+      const access = await findMemberAccess(client, userId);
+      return access === null ? null : access.accountStatus;
     },
   };
 }
