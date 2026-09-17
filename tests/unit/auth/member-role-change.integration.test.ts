@@ -241,15 +241,20 @@ describeRls("cambiar el rol de un socio contra seadragons-dev", () => {
             serviceClient,
             { clubId, role: "Admin" },
             async (second) => {
+              // Cada uno se degrada a sí mismo, y no el uno al otro: así
+              // quien pierde la carrera sigue siendo Admin cuando el dominio
+              // lo comprueba, y el rechazo lo da siempre la base. Cruzadas, la
+              // segunda podría llegar tarde a esa lectura y salir con 403; ese
+              // caso lo prueba el test de la migración contra Postgres.
               const outcomes = await Promise.allSettled([
                 changeMemberRole(gateways, {
                   actorId: first.id,
-                  targetUserId: second.id,
+                  targetUserId: first.id,
                   newRole: "Player",
                 }),
                 changeMemberRole(gateways, {
                   actorId: second.id,
-                  targetUserId: first.id,
+                  targetUserId: second.id,
                   newRole: "Player",
                 }),
               ]);
