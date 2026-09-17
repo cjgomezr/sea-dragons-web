@@ -147,7 +147,7 @@ async function goToWithTheme(
   await page.goto(`${APP_URL}${path}`);
   await page.addStyleTag({ content: HIDE_DEV_OVERLAY_CSS });
   if (theme === "dark") {
-    await page.getByRole("button", { name: /tema oscuro/i }).click();
+    await page.getByRole("button", { name: /tema oscuro|dark theme/i }).click();
   }
   // networkidle nunca llega mientras el dev server compila bajo carga paralela.
   // Lo que de verdad mueve píxeles son las fuentes, y toHaveScreenshot ya
@@ -282,7 +282,7 @@ type Clip = NonNullable<PageScreenshotOptions["clip"]>;
  */
 async function togglesCornerClip(page: Page): Promise<Clip> {
   const boxes = await Promise.all([
-    page.getByRole("button", { name: /tema/i }).boundingBox(),
+    page.getByRole("button", { name: /tema|theme/i }).boundingBox(),
     page.getByRole("button", { name: /idioma|language/i }).boundingBox(),
   ]);
   const [theme, language] = boxes;

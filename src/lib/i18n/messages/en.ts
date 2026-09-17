@@ -229,6 +229,8 @@ export const englishMessages = {
   "home.status.body":
     "The versioned API answers on the health endpoint, which queries the database.",
   "signOut.label": "Sign out",
+  "themeToggle.switchToLight": "Switch to light theme",
+  "themeToggle.switchToDark": "Switch to dark theme",
   // El destino va con su propio nombre ("Español", no "Spanish"): quien no
   // entiende el idioma de la pantalla tiene que reconocer el suyo. Y el
   // nombre repite el código que se ve en el botón, para que quien lo maneja

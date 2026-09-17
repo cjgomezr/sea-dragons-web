@@ -22,7 +22,7 @@ describe("app shell", () => {
     expect(
       screen.getByRole("navigation", { name: "Main" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /tema/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /theme/i })).toBeInTheDocument();
   });
 
   // FR-007: se cierra sesión desde cualquier pantalla, y la cáscara es lo
@@ -75,7 +75,7 @@ describe("app shell", () => {
       </AppShell>,
     );
 
-    const themeToggle = screen.getByRole("button", { name: /tema/i });
+    const themeToggle = screen.getByRole("button", { name: /theme/i });
     const languageToggle = screen.getByRole("button", { name: /español/i });
     expect(themeToggle.nextElementSibling).toBe(languageToggle);
   });
