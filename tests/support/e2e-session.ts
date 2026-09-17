@@ -139,11 +139,45 @@ export function incompleteStorageStatePath(name: IncompleteMemberName): string {
   return path.join(REPO_ROOT, "test-results", `e2e-storage-state-${name}.json`);
 }
 
+/**
+ * Los socios activos que necesitan una solicitud de rol propia (#209). El
+ * socio activo compartido no sirve: una solicitud suya cambiaría lo que
+ * fotografían los demás tests de Mi cuenta.
+ *
+ * La pendiente nace con una fecha fija, para que la captura no cambie con el
+ * día en que corre la suite.
+ */
+export const ROLE_REQUEST_MEMBERS = {
+  "con-solicitud-pendiente": { pendingRequest: "Coach" },
+  /** Lo usa el test que envía una solicitud desde el formulario. */
+  "para-pedir-rol": { pendingRequest: null },
+} as const;
+
+export type RoleRequestMemberName = keyof typeof ROLE_REQUEST_MEMBERS;
+
+const ROLE_REQUEST_MEMBER_NAMES = Object.keys(
+  ROLE_REQUEST_MEMBERS,
+) as readonly RoleRequestMemberName[];
+
+/** 17 de septiembre de 2026 a las 18:30 en Melbourne. */
+export const SEEDED_REQUEST_CREATED_AT = "2026-09-17T08:30:00.000Z";
+
+export function roleRequestStorageStatePath(
+  name: RoleRequestMemberName,
+): string {
+  return path.join(
+    REPO_ROOT,
+    "test-results",
+    `e2e-storage-state-rol-${name}.json`,
+  );
+}
+
 const APP_URL = process.env.APP_URL ?? "http://localhost:3417";
 
 const CLUB_SLUG = "victoria-seadragons";
 const MEMBERS_TABLE = "members";
 const CLUBS_TABLE = "clubs";
+const ROLE_REQUESTS_TABLE = "role_requests";
 
 export type E2eSessionState =
   | {
@@ -262,6 +296,7 @@ function everyStorageStatePath(): readonly string[] {
   return [
     E2E_STORAGE_STATE_PATH,
     ...INCOMPLETE_MEMBER_NAMES.map(incompleteStorageStatePath),
+    ...ROLE_REQUEST_MEMBER_NAMES.map(roleRequestStorageStatePath),
   ];
 }
 
@@ -353,6 +388,37 @@ async function deleteTestUser(
   }
 }
 
+/** La solicitud pendiente con la que nace un socio de Mi cuenta, si lleva
+ * una. Se borra con la identidad por las cascadas de 0003 y 0012. */
+async function seedPendingRequest(
+  serviceClient: SupabaseClient,
+  seed: {
+    readonly clubId: string;
+    readonly userId: string;
+    readonly requestedRole: string | null;
+  },
+): Promise<void> {
+  if (seed.requestedRole === null) {
+    return;
+  }
+  const failure = await describeSupabaseFailure(
+    "crear la solicitud de rol de prueba",
+    () =>
+      serviceClient.from(ROLE_REQUESTS_TABLE).insert({
+        club_id: seed.clubId,
+        user_id: seed.userId,
+        requested_role: seed.requestedRole,
+        created_at: SEEDED_REQUEST_CREATED_AT,
+      }),
+  );
+  if (failure !== null) {
+    await deleteTestUser(serviceClient, seed.userId);
+    throw new Error(
+      `No se pudo crear la solicitud de rol de prueba: ${failure}`,
+    );
+  }
+}
+
 /** El socio activo y uno por cada estado de completar registro, cada uno con
  * su archivo de cookies. Son cuentas distintas porque el estado vive en la
  * fila: no hay forma de cambiarlo desde el navegador a mitad de una corrida. */
@@ -380,6 +446,23 @@ async function createTestMembers(): Promise<E2eSessionState> {
       member.email,
       member.password,
       incompleteStorageStatePath(name),
+    );
+  }
+
+  for (const name of ROLE_REQUEST_MEMBER_NAMES) {
+    const member = await seedMember(serviceClient, clubId, {
+      account_status: "active",
+    });
+    userIds.push(member.userId);
+    await seedPendingRequest(serviceClient, {
+      clubId,
+      userId: member.userId,
+      requestedRole: ROLE_REQUEST_MEMBERS[name].pendingRequest,
+    });
+    await writeStorageState(
+      member.email,
+      member.password,
+      roleRequestStorageStatePath(name),
     );
   }
 

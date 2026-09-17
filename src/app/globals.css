@@ -707,6 +707,13 @@ h6 {
   color: var(--color-text-secondary);
 }
 
+/* Un aviso dentro del panel sigue siendo un aviso: sin esto, la regla de
+   arriba lo pinta del gris de un párrafo cualquiera (#209). */
+.auth-pending .auth-error,
+.auth-pending .auth-field-error {
+  color: var(--color-danger);
+}
+
 /* La casilla del consentimiento del tutor (#134). Su texto es lo que se
    consiente, así que se lee como texto y no como la etiqueta en mayúsculas de
    un campo. La etiqueta entera es pulsable: la casilla sola no llega a los
