@@ -80,6 +80,7 @@ describeConPostgres("migración de miembros", () => {
       "created_at timestamp with time zone null=NO",
       "date_of_birth date null=YES",
       "email text null=NO",
+      "email_locale text null=NO",
       "full_name text null=NO",
       "guardian_consent_at timestamp with time zone null=YES",
       "guardian_email text null=YES",
