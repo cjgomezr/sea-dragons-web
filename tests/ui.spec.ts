@@ -1828,3 +1828,26 @@ test.describe("una cuenta activa que pide completar registro", () => {
     await expect(page).toHaveURL(new RegExp("/dashboard$"));
   });
 });
+
+// AC-007 en un servidor de verdad. El socio de prueba nace Player, como toda
+// cuenta (FR-008), y la frontera lee ese rol de `members` en cada petición: los
+// unitarios prueban la decisión, esto prueba que la consulta real lo trae.
+test.describe("un Player que pide una pantalla que su rol no alcanza", () => {
+  test.skip(
+    E2E_SESSION.kind === "unavailable",
+    E2E_SESSION.kind === "unavailable"
+      ? `sin sesión de prueba: ${E2E_SESSION.reason}`
+      : "",
+  );
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  for (const restrictedPath of ["/equipos", "/evaluaciones"]) {
+    test(`aterriza en el panel al pedir ${restrictedPath}`, async ({
+      page,
+    }) => {
+      await page.goto(`${APP_URL}${restrictedPath}`);
+
+      await expect(page).toHaveURL(new RegExp("/dashboard$"));
+    });
+  }
+});
