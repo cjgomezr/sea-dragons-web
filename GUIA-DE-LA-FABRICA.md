@@ -391,7 +391,20 @@ seguir". Si no la agregas, funcionará a veces; si la agregas, siempre.
 | **task-status.sh**          | El mensajero del tablero: mueve las tarjetas del board ("In Progress"). Done lo pone GitHub solo al mergear.                                                                                                               | `scripts/`                   |
 | **claude-backlog.yml**      | La fábrica nocturna: el turno de noche en los servidores de GitHub (por horario, o al etiquetar `ready-for-dev`). Hasta 5 tareas por corrida.                                                                              | `.github/workflows/`         |
 | **check-worker-claimed.sh** | El detector de corridas mudas: si el worker de la nube termina sin tocar el issue (ni reclamarlo, ni bloquearlo, ni dejar PR), pone el job en rojo. Sin él, una corrida que no hizo nada se ve igual que una que funcionó. | `scripts/`                   |
+| **redact-transcript.ts**    | El censor del registro: borra las credenciales de la transcripción de la sesión antes de que se suba como artefacto. Los artefactos de un repositorio público los descarga cualquiera.                                     | `scripts/`                   |
 | **claude-mentions.yml**     | El oído de la fábrica: responde a `@claude` en issues y comentarios: tu línea directa desde el celular.                                                                                                                    | `.github/workflows/`         |
+
+**Cuando una corrida de la nube falla**, lo que hace falta leer no está en el
+log del job: ahí solo salen el arranque y el cierre de la sesión. La sesión
+entera queda como artefacto `claude-transcript` de esa corrida.
+
+```
+gh run list --workflow claude-backlog.yml
+gh run download <id-de-la-corrida> --name claude-transcript
+```
+
+Va sin credenciales, pero lleva todo lo que el worker leyó y ejecutó, y en un
+repositorio público lo descarga cualquiera. Se borra a los 7 días.
 
 ---
 
