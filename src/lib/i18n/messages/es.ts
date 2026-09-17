@@ -226,6 +226,8 @@ export const spanishMessages: MessageCatalog = {
   "home.status.body":
     "La API versionada responde en el endpoint de salud, que consulta la base de datos.",
   "signOut.label": "Cerrar sesión",
+  "themeToggle.switchToLight": "Cambiar a tema claro",
+  "themeToggle.switchToDark": "Cambiar a tema oscuro",
   "languageToggle.label": "Idioma: español. Cambiar a English (EN)",
   "languageToggle.target": "EN",
 };

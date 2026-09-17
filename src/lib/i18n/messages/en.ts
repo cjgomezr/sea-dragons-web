@@ -233,6 +233,8 @@ export const englishMessages = {
   // entiende el idioma de la pantalla tiene que reconocer el suyo. Y el
   // nombre repite el código que se ve en el botón, para que quien lo maneja
   // con la voz pueda decir "ES" (WCAG 2.5.3).
+  "themeToggle.switchToLight": "Switch to light theme",
+  "themeToggle.switchToDark": "Switch to dark theme",
   "languageToggle.label": "Language: English. Switch to Español (ES)",
   "languageToggle.target": "ES",
 } as const satisfies Readonly<Record<string, Message>>;

@@ -21,7 +21,7 @@ export function AppShell({
         <div className="app-sidebar-header">
           <span className="app-brand">{CLUB_NAME}</span>
           <div className="app-sidebar-actions">
-            <ThemeToggle />
+            <ThemeToggle locale={locale} />
             <LanguageToggle locale={locale} />
             <SignOutButton locale={locale} />
           </div>

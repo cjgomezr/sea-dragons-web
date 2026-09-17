@@ -42,7 +42,7 @@ export default async function AuthLayout({
       </aside>
       <main className="auth-main">
         <div className="auth-main-header">
-          <ThemeToggle />
+          <ThemeToggle locale={locale} />
           <LanguageToggle locale={locale} />
         </div>
         {children}

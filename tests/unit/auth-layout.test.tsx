@@ -49,7 +49,7 @@ describe("disposición de las pantallas de autenticación", () => {
   it("pone el interruptor de idioma junto al del tema", async () => {
     await renderAuthLayout();
 
-    const themeToggle = screen.getByRole("button", { name: /tema/i });
+    const themeToggle = screen.getByRole("button", { name: /theme/i });
     const languageToggle = screen.getByRole("button", { name: /español/i });
     expect(themeToggle.nextElementSibling).toBe(languageToggle);
   });

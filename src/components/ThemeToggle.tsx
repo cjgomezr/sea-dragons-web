@@ -1,6 +1,8 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import type { Locale } from "@/lib/i18n/locale";
+import { createTranslator } from "@/lib/i18n/translator";
 import {
   THEME_STORAGE_KEY,
   type Theme,
@@ -37,7 +39,8 @@ function readServerTheme(): Theme {
   return "light";
 }
 
-export function ThemeToggle(): React.JSX.Element {
+export function ThemeToggle({ locale }: { locale: Locale }): React.JSX.Element {
+  const translate = createTranslator(locale);
   const theme = useSyncExternalStore(
     subscribe,
     readStoredTheme,
@@ -58,7 +61,9 @@ export function ThemeToggle(): React.JSX.Element {
       className="theme-toggle"
       onClick={handleToggle}
       aria-pressed={isDark}
-      aria-label={isDark ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
+      aria-label={translate(
+        isDark ? "themeToggle.switchToLight" : "themeToggle.switchToDark",
+      )}
     >
       <span aria-hidden="true">{isDark ? "☀" : "☾"}</span>
     </button>

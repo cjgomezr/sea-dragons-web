@@ -75,13 +75,15 @@ test("keeps the chosen theme after a reload", async ({ page }) => {
   const html = page.locator("html");
   await expect(html).toHaveAttribute("data-theme", "light");
 
-  await page.getByRole("button", { name: /tema oscuro/i }).click();
+  await page.getByRole("button", { name: /tema oscuro|dark theme/i }).click();
   await expect(html).toHaveAttribute("data-theme", "dark");
 
   await page.reload();
 
   await expect(html).toHaveAttribute("data-theme", "dark");
-  await expect(page.getByRole("button", { name: /tema claro/i })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /tema claro|light theme/i }),
+  ).toBeVisible();
 });
 
 test.describe("sin el script del tema", () => {

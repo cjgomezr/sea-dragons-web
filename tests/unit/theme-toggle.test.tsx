@@ -16,14 +16,14 @@ describe("ThemeToggle", () => {
   it("reflects the stored theme in its pressed state", () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, "dark");
 
-    render(<ThemeToggle />);
+    render(<ThemeToggle locale="en" />);
 
     expect(screen.getByRole("button", { pressed: true })).toBeInTheDocument();
   });
 
   it("applies the chosen theme to the document when activated", async () => {
     const user = userEvent.setup();
-    render(<ThemeToggle />);
+    render(<ThemeToggle locale="en" />);
 
     await user.click(screen.getByRole("button"));
 
@@ -32,7 +32,7 @@ describe("ThemeToggle", () => {
 
   it("persists the chosen theme so it survives a reload", async () => {
     const user = userEvent.setup();
-    render(<ThemeToggle />);
+    render(<ThemeToggle locale="en" />);
 
     await user.click(screen.getByRole("button"));
 
@@ -41,15 +41,31 @@ describe("ThemeToggle", () => {
 
   it("updates its accessible name to describe the next action", async () => {
     const user = userEvent.setup();
-    render(<ThemeToggle />);
+    render(<ThemeToggle locale="en" />);
     expect(
-      screen.getByRole("button", { name: /tema oscuro/i }),
+      screen.getByRole("button", { name: "Switch to dark theme" }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button"));
 
     expect(
-      screen.getByRole("button", { name: /tema claro/i }),
+      screen.getByRole("button", { name: "Switch to light theme" }),
+    ).toBeInTheDocument();
+  });
+
+  // E17: el nombre accesible es texto que alguien escucha, así que sale del
+  // catálogo como el resto de la interfaz.
+  it("describes the next action in Spanish when the locale is Spanish", async () => {
+    const user = userEvent.setup();
+    render(<ThemeToggle locale="es" />);
+    expect(
+      screen.getByRole("button", { name: "Cambiar a tema oscuro" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button"));
+
+    expect(
+      screen.getByRole("button", { name: "Cambiar a tema claro" }),
     ).toBeInTheDocument();
   });
 });
