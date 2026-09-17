@@ -199,8 +199,12 @@ export function renderAccountConfirmationEmail(
       t("email.confirmation.linkLifetime", {
         count: input.linkLifetimeMinutes,
       }),
-      // El botón se nombra desde su propia clave: si la pantalla lo
-      // renombra, el correo no puede quedarse mandando a uno que no existe.
+      // Registrarse otra vez no manda ningún enlace: con una dirección que ya
+      // tiene identidad el registro sale sin emitirlo, a propósito (#147). El
+      // que sí lo emite es el botón de la pantalla de confirmación, y a esa
+      // pantalla se vuelve empezando el registro de nuevo (#179). El botón se
+      // nombra desde su propia clave: si la pantalla lo renombra, el correo no
+      // puede quedarse mandando a uno que no existe.
       t("email.confirmation.ifExpired", {
         resendButton: t("auth.registration.resend"),
       }),

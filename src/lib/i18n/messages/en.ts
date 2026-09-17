@@ -261,10 +261,6 @@ export const englishMessages = {
     one: "The link expires in {count} minute.",
     other: "The link expires in {count} minutes.",
   },
-  // Registrarse otra vez no manda ningún enlace: con una dirección que ya
-  // tiene identidad el registro sale sin emitirlo, a propósito (#147). El
-  // que sí lo emite es el botón de la pantalla de confirmación, y a esa
-  // pantalla se vuelve empezando el registro de nuevo (#179).
   "email.confirmation.ifExpired":
     "If it expires, ask for another one with the “{resendButton}” button on the confirmation screen. If you already closed it, start signing up again with this address and you'll return to that screen.",
   "email.confirmation.button": "Confirm my email",
