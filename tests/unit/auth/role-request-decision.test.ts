@@ -59,6 +59,8 @@ type FakeOptions = {
   readonly decider?: RoleRequestMember | null;
   readonly write?: RoleRequestDecisionWrite;
   readonly auditFailure?: string;
+  /** Sólo falla la entrada de esta acción; sin ella, fallan todas. */
+  readonly failingAuditAction?: string;
 };
 
 type Fake = {
@@ -80,7 +82,10 @@ function fakeGateways(options: FakeOptions = {}): Fake {
       : options.decider;
   const audit: AuditLogWriter = {
     async insertAuditLogRow(row) {
-      if (options.auditFailure !== undefined) {
+      const isFailingAction =
+        options.failingAuditAction === undefined ||
+        options.failingAuditAction === row.action;
+      if (options.auditFailure !== undefined && isFailingAction) {
         return { error: { message: options.auditFailure } };
       }
       auditRows.push(row);
@@ -272,6 +277,21 @@ describe("bitácora de decisiones", () => {
     const written = JSON.stringify(fake.auditRows);
     expect(written).not.toContain("Ana Admin");
     expect(written).not.toMatch(/@|justification|email|name/i);
+  });
+
+  it("tampoco se traga el fallo de la entrada del cambio de rol", async () => {
+    const fake = fakeGateways({
+      write: APPROVED_COACH,
+      auditFailure: "connection reset",
+      failingAuditAction: "role.changed",
+    });
+
+    await expect(decide(fake, "approved")).rejects.toBeInstanceOf(
+      DecisionNotAuditedError,
+    );
+    expect(fake.auditRows.map((row) => row.action)).toEqual([
+      "role_request.decided",
+    ]);
   });
 
   it("no se traga el fallo de la bitácora: lo lanza con la solicitud ya decidida", async () => {
