@@ -123,15 +123,19 @@ describe("la copia del enlace de confirmación no distingue direcciones", () => 
     vi.unstubAllGlobals();
   });
 
-  it("el correo de confirmación no dice si esa dirección tiene cuenta", () => {
-    const email = renderAccountConfirmationEmail({
-      confirmUrl: "https://example.test/auth/confirmar?token_hash=abc",
-      linkLifetimeMinutes: LIFETIME_MINUTES,
-    });
+  it.each(LOCALES)(
+    "el correo de confirmación no dice si esa dirección tiene cuenta (%s)",
+    (locale) => {
+      const email = renderAccountConfirmationEmail({
+        confirmUrl: "https://example.test/auth/confirmar?token_hash=abc",
+        linkLifetimeMinutes: LIFETIME_MINUTES,
+        locale,
+      });
 
-    expectNoneMatch(email.subject, ACCOUNT_EXISTENCE_CLAIMS, "el asunto");
-    expectNoneMatch(email.text, ACCOUNT_EXISTENCE_CLAIMS, "el correo");
-  });
+      expectNoneMatch(email.subject, ACCOUNT_EXISTENCE_CLAIMS, "el asunto");
+      expectNoneMatch(email.text, ACCOUNT_EXISTENCE_CLAIMS, "el correo");
+    },
+  );
 
   it.each(
     LOCALES.flatMap((locale) =>

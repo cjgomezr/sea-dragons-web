@@ -2,6 +2,7 @@ import type {
   EmailDeliveryAvailability,
   EmailDeliveryAvailabilityCheck,
 } from "@/lib/email/email-delivery-availability";
+import type { Locale } from "@/lib/i18n/locale";
 import {
   type RegistrationRequestLog,
   enforceRegistrationRateLimit,
@@ -41,6 +42,7 @@ export type NewMemberRow = {
   readonly membership_type: MembershipType;
   readonly role: "Player";
   readonly account_status: "incomplete";
+  readonly email_locale: Locale;
 };
 
 export type MemberDirectory = {
@@ -212,6 +214,9 @@ export type RegistrationInput = {
   /** De dónde viene la petición, ya reducido a un cubo por `client-ip.ts`.
    * El dominio no lee cabeceras: sólo cuenta contra lo que le den. */
   readonly clientBucket: string;
+  /** El idioma de la aplicación al registrarse. Se guarda en la fila porque
+   * los correos salen después y no ven la petición (E17, RF-6). */
+  readonly locale: Locale;
 };
 
 type AccountDelivery = {
@@ -244,6 +249,7 @@ async function createAccountAndRequestEmail(
     membership_type: details.membershipType,
     role: "Player",
     account_status: "incomplete",
+    email_locale: input.locale,
   });
 
   // La cuenta no depende del correo y se crea igual. El enlace no se emite:

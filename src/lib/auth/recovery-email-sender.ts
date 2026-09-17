@@ -38,12 +38,13 @@ export function connectRecoveryEmailSender(
   return {
     kind: "connected",
     sender: {
-      async sendRecoveryEmail({ to, resetUrl }) {
+      async sendRecoveryEmail({ to, resetUrl, locale }) {
         await sender.sendEmail({
           to,
           ...renderPasswordRecoveryEmail({
             resetUrl,
             linkLifetimeMinutes: RECOVERY_LINK_LIFETIME_MINUTES,
+            locale,
           }),
         });
       },

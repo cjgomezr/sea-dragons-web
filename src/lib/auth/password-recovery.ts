@@ -1,3 +1,8 @@
+import {
+  type EmailLocaleDirectory,
+  readEmailLocale,
+} from "@/lib/email/email-locale";
+import type { Locale } from "@/lib/i18n/locale";
 import type { EmailRequestLog } from "./email-request-log";
 import { type FieldIssueCode, validatePasswordField } from "./registration";
 
@@ -24,7 +29,12 @@ export const RECOVERY_LINK_LIFETIME_MINUTES = 60;
 export type RecoveryRequestLog = EmailRequestLog;
 
 export type RecoveryTokenIssue =
-  | { readonly kind: "issued"; readonly tokenHash: string }
+  | {
+      readonly kind: "issued";
+      readonly tokenHash: string;
+      /** La identidad dueña del enlace: de su fila sale el idioma. */
+      readonly userId: string;
+    }
   | { readonly kind: "no_account" };
 
 export type RecoveryTokenIssuer = {
@@ -34,6 +44,7 @@ export type RecoveryTokenIssuer = {
 export type RecoveryEmail = {
   readonly to: string;
   readonly resetUrl: string;
+  readonly locale: Locale;
 };
 
 /** Lanza si el correo no sale, para que el fallo llegue con su causa a quien
@@ -49,6 +60,7 @@ export type PasswordRecoveryRequestGateways = {
   readonly requests: RecoveryRequestLog;
   readonly tokens: RecoveryTokenIssuer;
   readonly emails: RecoveryEmailSender;
+  readonly emailLocales: EmailLocaleDirectory;
 };
 
 /** No distingue si la cuenta existe: esa diferencia convertiría el formulario
@@ -120,9 +132,12 @@ export async function requestPasswordRecovery(
     deliver: async () => {
       const issue = await gateways.tokens.issueRecoveryToken(input.email);
       if (issue.kind === "issued") {
+        // El idioma también es de la cuenta: se lee aquí, después de
+        // responder, igual que el resto de lo que depende de ella.
         await deliverRecoveryEmail(gateways.emails, {
           to: input.email,
           resetUrl: input.buildResetUrl(issue.tokenHash),
+          locale: await readEmailLocale(gateways.emailLocales, issue.userId),
         });
       }
     },

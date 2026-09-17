@@ -44,6 +44,7 @@ describe("correo de recuperación", () => {
     await connection.sender.sendRecoveryEmail({
       to: "nerea@example.test",
       resetUrl: RESET_URL,
+      locale: "es",
     });
 
     expect(fake.sent.map((request) => request.url)).toEqual([
@@ -61,6 +62,27 @@ describe("correo de recuperación", () => {
     });
   });
 
+  it("sale en el idioma que recibe, asunto incluido", async () => {
+    const fake = recordingFetch(200, { id: "id-del-envio" });
+    const connection = connectRecoveryEmailSender(CONFIGURED_ENV, fake.fetch);
+    if (connection.kind !== "connected") {
+      throw new Error(`no conectó: ${connection.reason}`);
+    }
+
+    await connection.sender.sendRecoveryEmail({
+      to: "nerea@example.test",
+      resetUrl: RESET_URL,
+      locale: "en",
+    });
+
+    expect(fake.sent[0]?.body).toMatchObject({
+      subject: "Reset your Victoria Seadragons password",
+      text: expect.stringContaining(
+        `${RECOVERY_LINK_LIFETIME_MINUTES} minutes`,
+      ),
+    });
+  });
+
   it("si el proveedor responde con error, el envío falla en vez de darse por hecho", async () => {
     const fake = recordingFetch(500, { name: "internal_server_error" });
     const connection = connectRecoveryEmailSender(CONFIGURED_ENV, fake.fetch);
@@ -72,6 +94,7 @@ describe("correo de recuperación", () => {
       connection.sender.sendRecoveryEmail({
         to: "nerea@example.test",
         resetUrl: RESET_URL,
+        locale: "es",
       }),
     ).rejects.toThrow(/Resend.*500/);
   });

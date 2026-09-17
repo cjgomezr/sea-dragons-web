@@ -94,6 +94,7 @@ type MemberRow = {
   readonly account_status: string;
   readonly membership_type: string | null;
   readonly club_id: string;
+  readonly email_locale: string;
 };
 
 async function readMemberByUserId(
@@ -102,7 +103,7 @@ async function readMemberByUserId(
 ): Promise<MemberRow | null> {
   const { data, error } = await serviceClient.client
     .from("members")
-    .select("id, role, account_status, membership_type, club_id")
+    .select("id, role, account_status, membership_type, club_id, email_locale")
     .eq("user_id", userId)
     .maybeSingle();
   if (error) {
@@ -183,6 +184,7 @@ describeRls("registro contra seadragons-dev", () => {
             now: new Date(),
             appUrl: APP_URL,
             clientBucket: "203.0.113.7",
+            locale: "en",
           },
         );
 
@@ -201,7 +203,11 @@ describeRls("registro contra seadragons-dev", () => {
           account_status: "incomplete",
           membership_type: "Student",
           club_id: clubId,
+          email_locale: "en",
         });
+        expect(await gateways.emailLocales.findStoredEmailLocale(userId)).toBe(
+          "en",
+        );
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
@@ -237,6 +243,7 @@ describeRls("registro contra seadragons-dev", () => {
           now: new Date(),
           appUrl: APP_URL,
           clientBucket: "203.0.113.7",
+          locale: "es" as const,
         };
         const first = await prepareRegistration(registration, input);
         await first.deliver();
@@ -292,6 +299,7 @@ describeRls("registro contra seadragons-dev", () => {
           membership_type: "Full",
           role: "Player",
           account_status: "incomplete",
+          email_locale: "es",
         };
         await gateways.registration.members.insertMember(row);
 

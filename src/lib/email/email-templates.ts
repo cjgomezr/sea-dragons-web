@@ -1,3 +1,6 @@
+import type { Locale } from "@/lib/i18n/locale";
+import { type Translator, createTranslator } from "@/lib/i18n/translator";
+
 /**
  * Las plantillas del correo transaccional (INT-006). Son funciones puras: dan
  * el asunto, el HTML y el texto plano, y no saben nada de quién los manda.
@@ -8,8 +11,6 @@
  */
 
 export const CLUB_NAME = "Victoria Seadragons";
-
-const CLUB_SIGNATURE = `${CLUB_NAME}, club de rugby subacuático de Melbourne.`;
 
 export type RenderedEmail = {
   readonly subject: string;
@@ -75,6 +76,10 @@ const HTML_ESCAPES: Readonly<Record<string, string>> = {
   "'": "&#39;",
 };
 
+function signatureIn(t: Translator): string {
+  return t("email.signature", { clubName: CLUB_NAME });
+}
+
 function escapeHtml(value: string): string {
   return value.replace(
     /[&<>"']/g,
@@ -105,7 +110,7 @@ function renderWrittenLink(action: EmailContent["action"]): string {
   return `<p style="${PARAGRAPH_STYLE}">${escapeHtml(action.label)}: <a href="${url}" style="${WRITTEN_LINK_STYLE}">${url}</a></p>`;
 }
 
-function renderCard(content: EmailContent): string {
+function renderCard(t: Translator, content: EmailContent): string {
   return [
     `<table ${LAYOUT_TABLE_ATTRIBUTES} width="100%" style="width: 100%; max-width: ${MAX_WIDTH_PX}px;">`,
     `<tr><td style="${HEADER_STYLE}">${escapeHtml(CLUB_NAME)}</td></tr>`,
@@ -115,15 +120,15 @@ function renderCard(content: EmailContent): string {
     renderWrittenLink(content.action),
     ...content.outro.map(renderParagraph),
     "</td></tr>",
-    `<tr><td style="${FOOTER_STYLE}"><p style="${SIGNATURE_STYLE}">${escapeHtml(CLUB_SIGNATURE)}</p></td></tr>`,
+    `<tr><td style="${FOOTER_STYLE}"><p style="${SIGNATURE_STYLE}">${escapeHtml(signatureIn(t))}</p></td></tr>`,
     "</table>",
   ].join("\n");
 }
 
-function renderHtml(content: EmailContent): string {
+function renderHtml(t: Translator, content: EmailContent): string {
   return [
     "<!doctype html>",
-    '<html lang="es">',
+    `<html lang="${t.locale}">`,
     '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>',
     `<body style="${BODY_STYLE}">`,
     `<table ${LAYOUT_TABLE_ATTRIBUTES} width="100%" bgcolor="${COLOR.background}" style="width: 100%; background-color: ${COLOR.background};">`,
@@ -131,7 +136,7 @@ function renderHtml(content: EmailContent): string {
     // Outlook de escritorio pinta con el motor de Word e ignora `max-width`:
     // esta tabla fija, que sólo él lee, le pone el mismo tope.
     `<!--[if mso]><table ${LAYOUT_TABLE_ATTRIBUTES} width="${MAX_WIDTH_PX}" align="center"><tr><td><![endif]-->`,
-    renderCard(content),
+    renderCard(t, content),
     "<!--[if mso]></td></tr></table><![endif]-->",
     "</td></tr>",
     "</table>",
@@ -140,66 +145,71 @@ function renderHtml(content: EmailContent): string {
   ].join("\n");
 }
 
-function renderText(content: EmailContent): string {
+function renderText(t: Translator, content: EmailContent): string {
   return `${[
     ...content.intro,
     `${content.action.label}: ${content.action.url}`,
     ...content.outro,
-    CLUB_SIGNATURE,
+    signatureIn(t),
   ].join("\n\n")}\n`;
 }
 
-function renderEmail(content: EmailContent): RenderedEmail {
+function renderEmail(t: Translator, content: EmailContent): RenderedEmail {
   return {
     subject: content.subject,
-    html: renderHtml(content),
-    text: renderText(content),
+    html: renderHtml(t, content),
+    text: renderText(t, content),
   };
 }
 
-export function renderPasswordRecoveryEmail(input: {
-  readonly resetUrl: string;
+type EmailLinkInput = {
   readonly linkLifetimeMinutes: number;
-}): RenderedEmail {
-  return renderEmail({
-    subject: `Recupera tu contraseña de ${CLUB_NAME}`,
+  /** El idioma guardado en la fila del socio, no el de quien navega: el
+   * correo sale después de responder (E17, RF-6). */
+  readonly locale: Locale;
+};
+
+export function renderPasswordRecoveryEmail(
+  input: EmailLinkInput & { readonly resetUrl: string },
+): RenderedEmail {
+  const t = createTranslator(input.locale);
+  return renderEmail(t, {
+    subject: t("email.recovery.subject", { clubName: CLUB_NAME }),
     intro: [
-      `Alguien pidió cambiar la contraseña de tu cuenta de ${CLUB_NAME}.`,
-      `El enlace sirve una sola vez y caduca en ${input.linkLifetimeMinutes} minutos.`,
+      t("email.recovery.requested", { clubName: CLUB_NAME }),
+      t("email.recovery.linkLifetime", { count: input.linkLifetimeMinutes }),
     ],
     action: {
-      buttonLabel: "Elegir contraseña nueva",
-      label: "Para elegir una contraseña nueva, abre este enlace",
+      buttonLabel: t("email.recovery.button"),
+      label: t("email.recovery.linkLabel"),
       url: input.resetUrl,
     },
-    outro: [
-      "Si no lo pediste tú, ignora este correo: tu contraseña no cambia.",
-    ],
+    outro: [t("email.recovery.notYou")],
   });
 }
 
-export function renderAccountConfirmationEmail(input: {
-  readonly confirmUrl: string;
-  readonly linkLifetimeMinutes: number;
-}): RenderedEmail {
-  return renderEmail({
-    subject: `Confirma tu correo en ${CLUB_NAME}`,
+export function renderAccountConfirmationEmail(
+  input: EmailLinkInput & { readonly confirmUrl: string },
+): RenderedEmail {
+  const t = createTranslator(input.locale);
+  return renderEmail(t, {
+    subject: t("email.confirmation.subject", { clubName: CLUB_NAME }),
     intro: [
-      `Te registraste en ${CLUB_NAME} con esta dirección.`,
-      `El enlace caduca en ${input.linkLifetimeMinutes} minutos.`,
-      // Registrarse otra vez no manda ningún enlace: con una dirección que ya
-      // tiene identidad el registro sale sin emitirlo, a propósito (#147). El
-      // que sí lo emite es el botón de la pantalla de confirmación, y a esa
-      // pantalla se vuelve empezando el registro de nuevo (#179).
-      "Si caduca, pide otro con el botón «Reenviar el correo» de la pantalla de confirmación. Si ya la cerraste, empieza el registro otra vez con esta dirección y volverás a esa pantalla.",
+      t("email.confirmation.registered", { clubName: CLUB_NAME }),
+      t("email.confirmation.linkLifetime", {
+        count: input.linkLifetimeMinutes,
+      }),
+      // El botón se nombra desde su propia clave: si la pantalla lo
+      // renombra, el correo no puede quedarse mandando a uno que no existe.
+      t("email.confirmation.ifExpired", {
+        resendButton: t("auth.registration.resend"),
+      }),
     ],
     action: {
-      buttonLabel: "Confirmar mi correo",
-      label: "Para confirmar tu correo, abre este enlace",
+      buttonLabel: t("email.confirmation.button"),
+      label: t("email.confirmation.linkLabel"),
       url: input.confirmUrl,
     },
-    outro: [
-      "Si no te registraste tú, ignora este correo: sin confirmar, la cuenta no se activa.",
-    ],
+    outro: [t("email.confirmation.notYou")],
   });
 }

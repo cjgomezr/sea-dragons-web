@@ -123,6 +123,7 @@ const postPasswordRecovery = createApiRoute<
         requests: wiring.gateways.requests,
         tokens: wiring.gateways.tokens,
         emails: connection.sender,
+        emailLocales: wiring.gateways.emailLocales,
       },
       { email, now: new Date(), buildResetUrl: resetUrlBuilder(request) },
     );

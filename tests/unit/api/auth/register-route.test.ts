@@ -112,12 +112,15 @@ function mockWiring(options: WiringOptions = {}): void {
   }));
 }
 
-async function postRegistration(body: unknown): Promise<Response> {
+async function postRegistration(
+  body: unknown,
+  headers: Readonly<Record<string, string>> = {},
+): Promise<Response> {
   const { POST } = await import("@/app/api/v1/auth/register/route");
   return POST(
     new NextRequest(REGISTER_URL, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...headers },
       body: typeof body === "string" ? body : JSON.stringify(body),
     }),
   );
@@ -207,8 +210,45 @@ describe("POST /api/v1/auth/register", () => {
         membership_type: "Casual",
         role: "Player",
         account_status: "incomplete",
+        email_locale: "en",
       },
     ]);
+  });
+
+  describe("idioma del socio", () => {
+    it.each([
+      [
+        "la cookie de idioma en español",
+        { cookie: "seadragons-locale=es" },
+        "es",
+      ],
+      [
+        "la cookie de idioma en inglés",
+        { cookie: "seadragons-locale=en" },
+        "en",
+      ],
+      [
+        "el navegador pidiendo español",
+        { "accept-language": "es-AR,es;q=0.9" },
+        "es",
+      ],
+      [
+        "la cookie por encima del navegador",
+        { cookie: "seadragons-locale=en", "accept-language": "es" },
+        "en",
+      ],
+      ["ninguna pista, en inglés de respaldo", {}, "en"],
+    ] as const)(
+      "guarda en la fila el idioma de la aplicación: %s",
+      async (_case, headers, expected) => {
+        mockWiring();
+
+        await postRegistration(validBody(), headers);
+        await runScheduledWork();
+
+        expect(insertedRows.map((row) => row.email_locale)).toEqual([expected]);
+      },
+    );
   });
 
   it("responde 422 nombrando el campo cuando el tipo de membresía no existe", async () => {
