@@ -173,6 +173,7 @@ describe("lo que no se traduce", () => {
     const source = `const Contact = () => (
       <p>
         <a href="mailto:hola@seadragons.club">hola@seadragons.club</a>.
+        <span>hola@seadragons.club.</span>
         (https://seadragons.club),
       </p>
     );`;
