@@ -54,6 +54,10 @@ export const ROLE_REQUESTS_API_PATH = "/api/v1/role-requests";
  * roles, aunque cuelgue de un endpoint abierto a los cuatro. */
 export const ROLE_REQUEST_DECISION_API_PATH = `${ROLE_REQUESTS_API_PATH}/[id]/decision`;
 
+/** Cambiar el rol de un socio (#211, FR-014). `[id]` es el `user_id` del
+ * socio. Sólo lo alcanza quien gestiona usuarios y roles. */
+export const MEMBER_ROLE_API_PATH = "/api/v1/members/[id]/role";
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 
@@ -167,4 +171,5 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: TEAMS_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: EVALUATIONS_PATH, capability: "viewEvaluations" },
   { path: ROLE_REQUEST_DECISION_API_PATH, capability: "manageUsersAndRoles" },
+  { path: MEMBER_ROLE_API_PATH, capability: "manageUsersAndRoles" },
 ];
