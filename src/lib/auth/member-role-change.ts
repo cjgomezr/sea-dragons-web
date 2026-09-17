@@ -157,27 +157,23 @@ async function auditAppliedChange(
   }
 }
 
-/** Aplica el cambio de un Admin y lo deja en la bitácora. La bitácora va
- * después de la escritura: auditar primero dejaría una entrada de éxito para
- * un cambio que la base no aplicó. Un rol que ya se tenía no es un cambio y
- * no deja entrada. */
-export async function changeMemberRole(
-  gateways: MemberRoleChangeGateways,
-  input: {
-    readonly actorId: string;
-    readonly targetUserId: string;
-    readonly newRole: Role;
+type MemberRoleChangeInput = {
+  readonly actorId: string;
+  readonly targetUserId: string;
+  readonly newRole: Role;
+};
+
+/** Traduce la respuesta de la base a un resultado o a un error, y deja en la
+ * bitácora lo que corresponde a cada caso. */
+async function settleRoleChangeWrite(
+  audit: AuditLogWriter,
+  settlement: {
+    readonly actor: AuditActor;
+    readonly input: MemberRoleChangeInput;
+    readonly write: MemberRoleChangeWrite;
   },
 ): Promise<MemberRoleChange> {
-  const actor = await findActor(gateways, input.actorId);
-  const auditActor: AuditActor = { id: input.actorId, clubId: actor.clubId };
-  const write = await gateways.roles.applyRoleChange({
-    targetUserId: input.targetUserId,
-    clubId: actor.clubId,
-    actorId: input.actorId,
-    newRole: input.newRole,
-  });
-
+  const { actor, input, write } = settlement;
   switch (write.kind) {
     case "changed": {
       const change: MemberRoleChange = {
@@ -185,7 +181,7 @@ export async function changeMemberRole(
         previousRole: write.previousRole,
         role: write.newRole,
       };
-      await auditAppliedChange(gateways.audit, auditActor, change);
+      await auditAppliedChange(audit, actor, change);
       return change;
     }
     case "unchanged":
@@ -195,11 +191,33 @@ export async function changeMemberRole(
         role: write.role,
       };
     case "last_admin":
-      await auditLastAdminRefusal(gateways.audit, auditActor, input);
+      await auditLastAdminRefusal(audit, actor, input);
       throw new LastAdminError();
     case "actor_not_admin":
       throw new MemberRoleChangeForbiddenError();
     case "not_found":
       throw new MemberToChangeNotFoundError(input.targetUserId);
   }
+}
+
+/** Aplica el cambio de un Admin y lo deja en la bitácora. La bitácora va
+ * después de la escritura: auditar primero dejaría una entrada de éxito para
+ * un cambio que la base no aplicó. Un rol que ya se tenía no es un cambio y
+ * no deja entrada. */
+export async function changeMemberRole(
+  gateways: MemberRoleChangeGateways,
+  input: MemberRoleChangeInput,
+): Promise<MemberRoleChange> {
+  const actor = await findActor(gateways, input.actorId);
+  const write = await gateways.roles.applyRoleChange({
+    targetUserId: input.targetUserId,
+    clubId: actor.clubId,
+    actorId: input.actorId,
+    newRole: input.newRole,
+  });
+  return settleRoleChangeWrite(gateways.audit, {
+    actor: { id: input.actorId, clubId: actor.clubId },
+    input,
+    write,
+  });
 }
