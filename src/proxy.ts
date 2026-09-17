@@ -24,6 +24,9 @@ import {
  * se declara en `RESTRICTED_ROUTES`, no en este archivo. Las policies de la
  * base siguen siendo la otra mitad: protegen los datos aunque se llegue a
  * ellos por otro camino.
+ *
+ * Una Server Action no pasa por ese mapa: se invoca con un POST a cualquier
+ * página, así que una restringida comprueba la capacidad por sí misma.
  */
 
 const UNAUTHENTICATED_MESSAGE =

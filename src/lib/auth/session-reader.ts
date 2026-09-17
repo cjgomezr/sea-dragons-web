@@ -68,8 +68,10 @@ export async function readAuthenticatedUserId(
 
 /** `inactive` (una baja de socio) y la identidad sin fila de miembro no abren
  * ninguna puerta, así que son lo mismo que no tener sesión. Un rol que el
- * catálogo no reconoce tampoco: adivinar qué permisos quiso darle la base es
- * justo como un valor raro acaba abriendo algo. */
+ * catálogo no reconoce tampoco, sea cual sea el estado de la cuenta: una fila
+ * así está corrupta (el `check` de `members.role` no la deja existir), y
+ * adivinar qué permisos quiso darle la base es justo como un valor raro acaba
+ * abriendo algo. */
 function toSessionState(
   userId: string,
   access: MemberAccess | null,

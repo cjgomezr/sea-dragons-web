@@ -22,7 +22,7 @@ import type { SessionState } from "@/lib/auth/session-boundary";
 const { RESTRICTED_TEST_API_PATH, RESTRICTED_TEST_CAPABILITY } = vi.hoisted(
   () => ({
     RESTRICTED_TEST_API_PATH: "/api/v1/prueba-restringida",
-    RESTRICTED_TEST_CAPABILITY: "viewEvaluations" as Capability,
+    RESTRICTED_TEST_CAPABILITY: "viewEvaluations" satisfies Capability,
   }),
 );
 
