@@ -255,5 +255,8 @@ jobs:
 
           Si el worker alcanzó a dejar trabajo en una rama, míralo antes de borrar nada."
           fi
+          BODY="$BODY
+
+          La sesión completa quedó como artefacto \`claude-transcript\` de esa corrida, en la pestaña Actions. Ahí está lo que el worker hizo de verdad: el log del job solo muestra el arranque y el cierre."
           gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" --add-label needs-human || true
           gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body "$BODY" || true

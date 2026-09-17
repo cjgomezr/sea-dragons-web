@@ -274,6 +274,16 @@ describe("claude-backlog.yml · la transcripción sobrevive al job", () => {
     expect(condition).not.toContain("success()");
   });
 
+  it("el aviso que queda en el issue dice dónde buscar la transcripción", () => {
+    // Sin esto el aviso sigue mandando a "los logs de la pestaña Actions",
+    // que es justo donde no está lo que hace falta leer.
+    const note = parseWorkflow().jobs.implement.steps.find((candidate) =>
+      candidate.if?.includes("failure()"),
+    );
+
+    expect(note?.run).toContain(TRANSCRIPT_ARTIFACT_NAME);
+  });
+
   it("va después del paso del worker, que es quien escribe el archivo", () => {
     const steps = parseWorkflow().jobs.implement.steps;
     const workerIndex = steps.findIndex(
