@@ -40,6 +40,36 @@ describe("app shell", () => {
     ).toBeInTheDocument();
   });
 
+  // #209: Mi cuenta se alcanza desde la cabecera, junto a cerrar sesión.
+  it("enlaza Mi cuenta justo antes de cerrar sesión", () => {
+    usePathname.mockReturnValue("/calendario");
+    render(
+      <AppShell locale="en">
+        <p>Contenido de la sección</p>
+      </AppShell>,
+    );
+
+    const accountLink = screen.getByRole("link", { name: "My account" });
+    expect(accountLink).toHaveAttribute("href", "/cuenta");
+    expect(accountLink.nextElementSibling).toBe(
+      screen.getByRole("button", { name: "Sign out" }),
+    );
+  });
+
+  it("nombra el enlace a Mi cuenta en el idioma de la visita", () => {
+    usePathname.mockReturnValue("/calendario");
+    render(
+      <AppShell locale="es">
+        <p>Contenido de la sección</p>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole("link", { name: "Mi cuenta" })).toHaveAttribute(
+      "href",
+      "/cuenta",
+    );
+  });
+
   it("nombra el botón de cerrar sesión en el idioma de la visita", () => {
     usePathname.mockReturnValue("/calendario");
     render(

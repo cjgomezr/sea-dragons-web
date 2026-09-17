@@ -258,7 +258,7 @@ function readText(
   return value;
 }
 
-function readRequiredText(
+export function readRequiredText(
   row: Record<string, unknown>,
   column: string,
   table: string,

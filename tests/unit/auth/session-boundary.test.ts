@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ACCOUNT_API_PATH,
+  ACCOUNT_PAGE_PATH,
   COMPLETE_REGISTRATION_PATH,
   CONFIRMATION_EMAIL_API_PATH,
   DASHBOARD_PATH,
@@ -268,6 +269,8 @@ const PAGES_OPEN_TO_EVERY_ROLE = [
   "/directorio",
   "/noticias",
   "/pagos",
+  // Mi cuenta (#209): pedir un rol no es una fila de la matriz.
+  ACCOUNT_PAGE_PATH,
 ] as const;
 
 const TO_DASHBOARD: SessionBoundaryOutcome = {
@@ -322,6 +325,20 @@ describe("frontera por rol en páginas", () => {
         ...activeAs("Player"),
       }),
     ).toEqual(ALLOW);
+  });
+});
+
+describe("Mi cuenta con la cuenta incompleta o sin sesión", () => {
+  it("manda a completar registro a una cuenta incompleta", () => {
+    expect(
+      decideSessionBoundary({ pathname: ACCOUNT_PAGE_PATH, ...INCOMPLETE }),
+    ).toEqual({ kind: "redirect", to: COMPLETE_REGISTRATION_PATH });
+  });
+
+  it("manda a la entrada a quien no tiene sesión", () => {
+    expect(
+      decideSessionBoundary({ pathname: ACCOUNT_PAGE_PATH, ...ANONYMOUS }),
+    ).toEqual({ kind: "redirect", to: SIGN_IN_PATH });
   });
 });
 

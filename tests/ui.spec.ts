@@ -48,6 +48,7 @@ import {
   PHOTOGRAPHED_MEMBERS,
   incompleteStorageStatePath,
   readE2eSessionState,
+  roleRequestStorageStatePath,
 } from "./support/e2e-session";
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
 import { snapshotCreatedNotice } from "./support/visual-baseline-notice";
@@ -1850,4 +1851,265 @@ test.describe("un Player que pide una pantalla que su rol no alcanza", () => {
       await expect(page).toHaveURL(new RegExp("/dashboard$"));
     });
   }
+});
+
+/* ---------------------------------------------------------------------------
+   Mi cuenta (#209). La cabecera se revisa contra
+   docs/mockups/mobile-profile-light.png; el resto, contra design-system.md.
+   El socio activo compartido es Player y no tiene solicitudes, así que es el
+   del formulario. La pendiente y el envío tienen su propio socio, sembrado
+   por el arranque global.
+   --------------------------------------------------------------------------- */
+
+const ACCOUNT_PATH = "/cuenta";
+const ROLE_REQUESTS_ENDPOINT = "/api/v1/role-requests";
+/** El mismo límite que `JUSTIFICATION_MAX_LENGTH`, más uno. */
+const TOO_LONG_JUSTIFICATION = "a".repeat(501);
+
+type AccountState = {
+  readonly name: string;
+  readonly storageState: string;
+  readonly prepare?: (page: Page) => Promise<void>;
+};
+
+async function writeTooLongJustification(page: Page): Promise<void> {
+  await page
+    .getByLabel("Why do you want this role? (optional)")
+    .fill(TOO_LONG_JUSTIFICATION);
+  await expect(page.getByText(/can be at most 500 characters/)).toBeVisible();
+}
+
+const ACCOUNT_STATES: readonly AccountState[] = [
+  { name: "cuenta-formulario", storageState: E2E_STORAGE_STATE_PATH },
+  {
+    name: "cuenta-pendiente",
+    storageState: roleRequestStorageStatePath("con-solicitud-pendiente"),
+  },
+  {
+    name: "cuenta-justificacion-larga",
+    storageState: E2E_STORAGE_STATE_PATH,
+    prepare: writeTooLongJustification,
+  },
+];
+
+async function expectNoAxeViolations(page: Page): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  expect(
+    results.violations,
+    JSON.stringify(results.violations, null, 2),
+  ).toEqual([]);
+}
+
+function skipWithoutSession(): void {
+  test.skip(
+    E2E_SESSION.kind === "unavailable",
+    E2E_SESSION.kind === "unavailable"
+      ? `sin sesión de prueba: ${E2E_SESSION.reason}`
+      : "",
+  );
+}
+
+for (const state of ACCOUNT_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    test.use({ storageState: state.storageState });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToWithTheme(page, ACCOUNT_PATH, theme);
+            await state.prepare?.(page);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+          await state.prepare?.(page);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+      await state.prepare?.(page);
+      await expectNoAxeViolations(page);
+    });
+
+    test("en español: has no accessibility violations (axe-core)", async ({
+      page,
+    }) => {
+      await expectNoAxeViolationsInSpanish(page, ACCOUNT_PATH);
+    });
+  });
+}
+
+test.describe("Mi cuenta de un Player sin solicitudes", () => {
+  skipWithoutSession();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("ve su rol y el formulario con Coach y Committee", async ({ page }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+
+    await expect(page.getByText("Role: Player")).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Coach" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Committee" })).toBeVisible();
+  });
+
+  test("en español, la pantalla sale en español", async ({ page }) => {
+    await chooseSpanish(page);
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+
+    await expect(page.getByText("Rol: Jugador")).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Comité" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Enviar solicitud" }),
+    ).toBeVisible();
+  });
+
+  test("llega desde el enlace de la cabecera", async ({ page }) => {
+    await page.goto(`${APP_URL}/calendario`);
+
+    await page.getByRole("link", { name: "My account" }).click();
+
+    await expect(page).toHaveURL(new RegExp(`${ACCOUNT_PATH}$`));
+  });
+
+  test("el endpoint rechaza con 400 una petición de Admin", async ({
+    request,
+  }) => {
+    const response = await request.post(`${APP_URL}${ROLE_REQUESTS_ENDPOINT}`, {
+      data: { requestedRole: "Admin" },
+    });
+
+    expect(response.status()).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: { code: "validation_error" },
+    });
+  });
+
+  // El nombre del club y los cuatro controles viven en la misma fila del
+  // móvil. A 360 y 375 tienen que caber sin partirla ni tapar el nombre.
+  for (const width of [360, 375]) {
+    test(`la cabecera cabe en una fila a ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+
+      const brand = await page.locator(".app-brand").boundingBox();
+      const controlBoxes = await Promise.all(
+        [
+          page.getByRole("button", { name: /theme/i }),
+          page.getByRole("button", { name: /español/i }),
+          page.getByRole("link", { name: "My account" }),
+          page.getByRole("button", { name: "Sign out" }),
+        ].map((control) => control.boundingBox()),
+      );
+      const boxes = controlBoxes.flatMap((box) => (box === null ? [] : [box]));
+      if (brand === null || boxes.length !== controlBoxes.length) {
+        throw new Error("la cabecera no dibujó el nombre o algún control");
+      }
+
+      const tops = new Set(boxes.map((box) => Math.round(box.y)));
+      expect(tops.size, "los cuatro controles no están en una fila").toBe(1);
+      const firstControlLeft = Math.min(...boxes.map((box) => box.x));
+      expect(
+        brand.x + brand.width,
+        "el nombre del club queda tapado por los controles",
+      ).toBeLessThanOrEqual(firstControlLeft);
+    });
+  }
+});
+
+test.describe("Mi cuenta con una solicitud pendiente", () => {
+  skipWithoutSession();
+  test.use({
+    storageState: roleRequestStorageStatePath("con-solicitud-pendiente"),
+  });
+
+  test("ve el rol pedido, la fecha y el estado, sin formulario", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+
+    await expect(
+      page.getByRole("heading", { name: "Request pending" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        "You asked to be Coach on 17 September 2026 at 6:30 pm. An Admin hasn't answered yet.",
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Send request" }),
+    ).toHaveCount(0);
+  });
+
+  test("otra petición directa recibe 409", async ({ request }) => {
+    const response = await request.post(`${APP_URL}${ROLE_REQUESTS_ENDPOINT}`, {
+      data: { requestedRole: "Committee" },
+    });
+
+    expect(response.status()).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: { code: "conflict" },
+    });
+  });
+});
+
+test.describe("un socio que pide un rol desde Mi cuenta", () => {
+  skipWithoutSession();
+  test.use({ storageState: roleRequestStorageStatePath("para-pedir-rol") });
+  // Sin reintentos: el primer intento deja la solicitud guardada, así que un
+  // segundo encontraría la pendiente en vez del formulario y taparía por qué
+  // falló el primero.
+  test.describe.configure({
+    retries: 0,
+    timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS,
+  });
+
+  test("envía la solicitud, ve la pendiente sin recargar y sigue ahí al volver", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+    await page.getByRole("radio", { name: "Coach" }).check();
+    await page
+      .getByLabel("Why do you want this role? (optional)")
+      .fill("I coach the juniors on Thursdays.");
+
+    const created = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(ROLE_REQUESTS_ENDPOINT) &&
+        response.request().method() === "POST",
+      { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
+    );
+    await page.getByRole("button", { name: "Send request" }).click();
+    expect((await created).status()).toBe(201);
+    await expect(
+      page.getByRole("heading", { name: "Request pending" }),
+    ).toBeVisible();
+
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { name: "Request pending" }),
+    ).toBeVisible();
+  });
 });
