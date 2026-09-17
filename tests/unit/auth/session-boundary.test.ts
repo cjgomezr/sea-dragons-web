@@ -8,6 +8,7 @@ import {
   EMAIL_CONFIRMATION_PATH,
   EVALUATIONS_PATH,
   GUARDIAN_CONSENT_API_PATH,
+  MEMBER_ROLE_API_PATH,
   PASSWORD_RECOVERY_PATH,
   REGISTER_API_PATH,
   REGISTRATION_PATH,
@@ -395,6 +396,35 @@ describe("frontera por rol en la decisión de una solicitud (#210)", () => {
       decideSessionBoundary({
         pathname: DECISION_PATH.replace("/decision", "/decisiones"),
         ...activeAs("Player"),
+      }),
+    ).toEqual(ALLOW);
+  });
+});
+
+/** El `user_id` de un socio cualquiera, en el segmento dinámico. */
+const MEMBER_ROLE_PATH = MEMBER_ROLE_API_PATH.replace(
+  "[id]",
+  "b1b1b1b1-0000-4000-8000-00000000000b",
+);
+
+describe("frontera por rol en el cambio de rol de un socio (#211)", () => {
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "niega a un %s cambiar un rol",
+    (role) => {
+      expect(
+        decideSessionBoundary({
+          pathname: MEMBER_ROLE_PATH,
+          ...activeAs(role),
+        }),
+      ).toEqual({ kind: "missingCapability" });
+    },
+  );
+
+  it("deja pasar a un Admin", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: MEMBER_ROLE_PATH,
+        ...activeAs("Admin"),
       }),
     ).toEqual(ALLOW);
   });
