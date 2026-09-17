@@ -57,9 +57,14 @@ const ABSOLUTE_PATH = /^\/\S*$/;
 // "GET", "UWR": las siglas se leen igual en los dos idiomas.
 const ACRONYM = /^\p{Lu}{2,}$/u;
 
+// La puntuación pegada a una dirección ("hola@seadragons.club.") no la hace
+// traducible.
+const SURROUNDING_PUNCTUATION = /^[("'¿¡]+|[)"'.,;:!?]+$/g;
+
 function isUntranslatableToken(token: string): boolean {
+  const bare = token.replace(SURROUNDING_PUNCTUATION, "");
   return [EMAIL, URL_WITH_SCHEME, ABSOLUTE_PATH, ACRONYM].some((pattern) =>
-    pattern.test(token),
+    pattern.test(bare),
   );
 }
 
@@ -75,7 +80,10 @@ function isTranslatableText(raw: string): boolean {
 }
 
 /** Los literales de una expresión que acaban pintados. En `a ? "Sí" : "No"`
- * se pintan las dos ramas; en `a === "primary" && <Icon />`, ninguno. */
+ * se pintan las dos ramas; en `a === "primary" && <Icon />`, ninguno.
+ *
+ * Una plantilla con datos (`Hola ${name}`) se deja pasar a propósito: separar
+ * su texto de sus datos es donde empiezan los falsos positivos. */
 function renderedLiterals(expression: ts.Expression): string[] {
   if (ts.isStringLiteralLike(expression)) {
     return [expression.text];

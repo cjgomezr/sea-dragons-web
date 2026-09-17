@@ -71,6 +71,28 @@ describe("textos sueltos", () => {
     expect(scanComponent(source)).toEqual(["Abierto", "Cerrado"]);
   });
 
+  it("marca el texto que se pinta tras un &&", () => {
+    const source = `const Badge = ({ open }: Props) => <p>{open && "Abierto"}</p>;`;
+
+    expect(scanComponent(source)).toEqual(["Abierto"]);
+  });
+
+  it("marca los dos lados de un ?? o un ||", () => {
+    const source = `const Name = ({ name, nick }: Props) => (
+      <p>
+        {name ?? "Sin nombre"} {nick || "Sin apodo"}
+      </p>
+    );`;
+
+    expect(scanComponent(source)).toEqual(["Sin nombre", "Sin apodo"]);
+  });
+
+  it("marca la etiqueta que recibe un componente propio", () => {
+    const source = `const Form = () => <Field label="Nombre" />;`;
+
+    expect(scanComponent(source)).toEqual(["Nombre"]);
+  });
+
   it("marca los atributos que se leen o se escuchan", () => {
     const source = `const Close = () => (
       <button aria-label="Cerrar menú" title={"Cerrar"}>
@@ -143,6 +165,23 @@ describe("lo que no se traduce", () => {
         <a href="https://seadragons.club">https://seadragons.club</a>
       </p>
     );`;
+
+    expect(scanComponent(source)).toEqual([]);
+  });
+
+  it("no marca una dirección seguida de puntuación", () => {
+    const source = `const Contact = () => (
+      <p>
+        <a href="mailto:hola@seadragons.club">hola@seadragons.club</a>.
+        (https://seadragons.club),
+      </p>
+    );`;
+
+    expect(scanComponent(source)).toEqual([]);
+  });
+
+  it("no marca las entidades de HTML", () => {
+    const source = `const Spacer = () => <p>&nbsp;&copy;&#8212;</p>;`;
 
     expect(scanComponent(source)).toEqual([]);
   });
