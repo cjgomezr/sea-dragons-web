@@ -17,6 +17,10 @@ export const AUDIT_ACTIONS = [
   // personales y ya están en la fila del socio.
   "auth.guardian_consent_recorded",
   "role.changed",
+  // RF-5 de E3: un Admin aprueba o rechaza una solicitud de rol. La metadata
+  // sólo lleva la decisión; el cambio de rol que trae una aprobación va en su
+  // propia entrada `role.changed`. Ni nombre, ni correo, ni justificación.
+  "role_request.decided",
   "payment.status_changed",
 ] as const;
 

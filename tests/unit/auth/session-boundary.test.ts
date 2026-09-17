@@ -11,6 +11,8 @@ import {
   PASSWORD_RECOVERY_PATH,
   REGISTER_API_PATH,
   REGISTRATION_PATH,
+  ROLE_REQUESTS_API_PATH,
+  ROLE_REQUEST_DECISION_API_PATH,
   SIGN_IN_PATH,
   TEAMS_PATH,
 } from "@/lib/auth/routes";
@@ -353,5 +355,47 @@ describe("orden de las fronteras en páginas", () => {
     expect(
       decideSessionBoundary({ pathname: TEAMS_PATH, ...INCOMPLETE }),
     ).toEqual({ kind: "redirect", to: COMPLETE_REGISTRATION_PATH });
+  });
+});
+
+/** Una solicitud cualquiera: la frontera no mira qué id trae, sólo que ocupa
+ * el segmento dinámico de la ruta declarada. */
+const DECISION_PATH = ROLE_REQUEST_DECISION_API_PATH.replace(
+  "[id]",
+  "0f0e0d0c-0b0a-4908-8706-050403020100",
+);
+
+describe("frontera por rol en la decisión de una solicitud (#210)", () => {
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "niega a un %s decidir una solicitud",
+    (role) => {
+      expect(
+        decideSessionBoundary({ pathname: DECISION_PATH, ...activeAs(role) }),
+      ).toEqual({ kind: "missingCapability" });
+    },
+  );
+
+  it("deja pasar a un Admin", () => {
+    expect(
+      decideSessionBoundary({ pathname: DECISION_PATH, ...activeAs("Admin") }),
+    ).toEqual(ALLOW);
+  });
+
+  it("sigue dejando a cualquier rol pedir un rol, aunque la decisión cuelgue del mismo endpoint", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: ROLE_REQUESTS_API_PATH,
+        ...activeAs("Player"),
+      }),
+    ).toEqual(ALLOW);
+  });
+
+  it("no confunde con la decisión otra ruta que cuelgue de una solicitud", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: DECISION_PATH.replace("/decision", "/decisiones"),
+        ...activeAs("Player"),
+      }),
+    ).toEqual(ALLOW);
   });
 });

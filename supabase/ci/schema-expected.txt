@@ -51,6 +51,7 @@ columna role_requests.justification tipo=text null=YES default=-
 columna role_requests.requested_role tipo=text null=NO default=-
 columna role_requests.status tipo=text null=NO default='pending'::text
 columna role_requests.user_id tipo=uuid null=NO default=-
+funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
 funcion health_probe()
 grant audit_log postgres DELETE
 grant audit_log postgres INSERT

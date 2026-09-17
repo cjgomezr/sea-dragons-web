@@ -55,10 +55,28 @@ export type SessionBoundaryRequest = {
   readonly session: SessionState;
 };
 
-/** Compara la ruta con la declarada, sin que `/registros` cuele por parecerse
- * a `/registro`: o es la misma, o cuelga de ella. */
+/** Un segmento declarado entre corchetes, como la carpeta `[id]` de una ruta
+ * de Next. */
+const DYNAMIC_SEGMENT = /^\[[^\]/]+\]$/;
+
+function matchesSegment(segment: string, declaredSegment: string): boolean {
+  return DYNAMIC_SEGMENT.test(declaredSegment)
+    ? segment.length > 0
+    : segment === declaredSegment;
+}
+
+/** Compara la ruta con la declarada segmento a segmento, sin que `/registros`
+ * cuele por parecerse a `/registro`: o es la misma, o cuelga de ella. Un
+ * segmento dinámico de la declarada casa con cualquiera que no esté vacío. */
 function isPathWithin(pathname: string, declaredPath: string): boolean {
-  return pathname === declaredPath || pathname.startsWith(`${declaredPath}/`);
+  const segments = pathname.split("/");
+  const declaredSegments = declaredPath.split("/");
+  return (
+    segments.length >= declaredSegments.length &&
+    declaredSegments.every((declaredSegment, index) =>
+      matchesSegment(segments[index] ?? "", declaredSegment),
+    )
+  );
 }
 
 function isApiPath(pathname: string): boolean {
