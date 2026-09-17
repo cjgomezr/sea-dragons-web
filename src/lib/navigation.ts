@@ -25,8 +25,9 @@ export type NavSection = {
   // Overrides `labelKey` only in the mobile tab bar. Its strip is narrower
   // than the sidebar, and the fonts Linux resolves make "Dashboard" wrap to
   // two lines there while Windows fonts let it fit (#85). Absent unless a
-  // section's full label doesn't survive that width in some language; the
-  // languages where it does fit repeat the full label in the short key.
+  // section's full label doesn't survive that width in some language. Each
+  // catalog fills the short key to its own measure, so a language where the
+  // full label fits may simply repeat it.
   readonly mobileLabelKey?: NavLabelKey;
 };
 

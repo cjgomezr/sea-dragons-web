@@ -135,10 +135,10 @@ describe("etiqueta corta para la barra móvil (#85)", () => {
     expect(getMobileLabel(equipos, english)).toBe("Teams");
   });
 
-  it("acorta Calendario, que se partía a 360px, y deja Calendar entero", () => {
+  it("acorta Calendario, que se partía a 360px, y Calendar, que rozaba el margen", () => {
     const calendario = sectionAt("/calendario");
 
     expect(getMobileLabel(calendario, spanish)).toBe("Agenda");
-    expect(getMobileLabel(calendario, english)).toBe("Calendar");
+    expect(getMobileLabel(calendario, english)).toBe("Events");
   });
 });

@@ -150,7 +150,7 @@ describe("navegación traducida en la barra móvil", () => {
     const tabs = screen.getAllByRole("link");
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       "Home",
-      "Calendar",
+      "Events",
       "Teams",
       "News",
     ]);
@@ -187,7 +187,7 @@ describe("navegación traducida en la barra móvil", () => {
   );
 
   it.each([
-    ["en", "Calendar"],
+    ["en", "Events"],
     ["es", "Agenda"],
   ] as const)(
     "marca la pestaña de la ruta activa igual en los dos idiomas (%s)",

@@ -216,11 +216,12 @@ export const englishMessages = {
   "nav.label.evaluations": "Evaluations",
   "nav.label.news": "News",
   "nav.label.payments": "Payments",
-  // Las etiquetas cortas de la barra móvil, como en
-  // docs/mockups/mobile-home-light.png. "Calendar" cabe entero: sólo el
-  // español necesita acortarlo.
+  // Las etiquetas cortas de la barra móvil. "Home" es la del mockup
+  // (docs/mockups/mobile-home-light.png); "Calendar", la otra, no se parte a
+  // 360px pero con DejaVu Sans, la fuente que resuelve Linux, ocupa el 84% de
+  // su pestaña y roza el margen que exige la suite. "Events" ocupa el 64%.
   "nav.label.dashboardShort": "Home",
-  "nav.label.calendarShort": "Calendar",
+  "nav.label.calendarShort": "Events",
   "section.underConstruction": "This section is under construction.",
   "home.lead":
     "The underwater rugby club platform. This is the initial shell: the rest of the features arrive epic by epic, each with its own tickets and review.",
