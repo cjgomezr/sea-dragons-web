@@ -20,14 +20,32 @@ const NUMBER_FORMATTERS = formattersByLocale(
   (displayLocale) => new Intl.NumberFormat(displayLocale),
 );
 
-const CLUB_MOMENT_FORMATTERS = formattersByLocale(
+// Fecha y hora se formatean por separado y las une la aplicación. Pedirlas
+// juntas deja la unión en manos de los datos de idioma de cada Node y cada
+// navegador, que no coinciden: unos escriben "15 de septiembre de 2026, 18:00"
+// y otros "… a las 18:00". El servidor y el navegador de un socio escribirían
+// la misma fecha distinta (#188).
+const CLUB_DAY_FORMATTERS = formattersByLocale(
   (displayLocale) =>
     new Intl.DateTimeFormat(displayLocale, {
       dateStyle: "long",
+      timeZone: CLUB_TIME_ZONE,
+    }),
+);
+
+const CLUB_TIME_FORMATTERS = formattersByLocale(
+  (displayLocale) =>
+    new Intl.DateTimeFormat(displayLocale, {
       timeStyle: "short",
       timeZone: CLUB_TIME_ZONE,
     }),
 );
+
+// En español, una coma y no "a las": "a las" falla con la una ("a las 1:00").
+const DATE_TIME_JOINERS: Readonly<Record<Locale, string>> = {
+  en: " at ",
+  es: ", ",
+};
 
 // Un día sin hora no pertenece a ninguna zona. Se formatea en UTC sobre la
 // medianoche UTC de ese día, así ninguna zona lo arrastra al día de al lado.
@@ -64,7 +82,9 @@ export function formatNumber(locale: Locale, value: number): string {
 /** Un instante del club (un entrenamiento, una solicitud), con fecha y hora de
  * Melbourne sea cual sea el idioma o la zona de quien lo mira. */
 export function formatClubMoment(locale: Locale, instant: Date): string {
-  return CLUB_MOMENT_FORMATTERS[locale].format(instant);
+  const day = CLUB_DAY_FORMATTERS[locale].format(instant);
+  const time = CLUB_TIME_FORMATTERS[locale].format(instant);
+  return `${day}${DATE_TIME_JOINERS[locale]}${time}`;
 }
 
 /** Un día de calendario sin hora (YYYY-MM-DD, como una columna `date`). */

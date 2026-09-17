@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { describeAuthIssue } from "@/lib/auth/issue-messages";
 import {
   EARLIEST_DATE_OF_BIRTH,
@@ -27,6 +27,42 @@ describe("fechas por idioma", () => {
     expect(formatClubMoment("es", instant)).toBe(
       "15 de septiembre de 2026, 18:00",
     );
+  });
+
+  // Cómo se unen fecha y hora lo decide la versión de datos de idioma que trae
+  // cada Node y cada navegador: con unas sale "15 de septiembre de 2026, 18:00"
+  // y con otras "… a las 18:00". Si el texto dependiera de eso, el servidor y
+  // el navegador de un socio podrían escribir la misma fecha distinta (#188).
+  it("une fecha y hora igual aunque la versión de datos de idioma cambie su separador", async () => {
+    const RealDateTimeFormat = Intl.DateTimeFormat;
+    const intlWithOtherJoiner = Object.create(Intl) as typeof Intl;
+    intlWithOtherJoiner.DateTimeFormat = function (
+      locales?: string | string[],
+      options?: Intl.DateTimeFormatOptions,
+    ) {
+      const real = new RealDateTimeFormat(locales, options);
+      if (options?.dateStyle !== undefined && options.timeStyle !== undefined) {
+        return {
+          format: (date?: Date | number) =>
+            real.format(date).replace(", ", " a las "),
+        };
+      }
+      return real;
+    } as unknown as typeof Intl.DateTimeFormat;
+    vi.stubGlobal("Intl", intlWithOtherJoiner);
+    vi.resetModules();
+
+    try {
+      const { formatClubMoment: formatWithOtherData } =
+        await import("@/lib/i18n/format");
+
+      expect(formatWithOtherData("es", instant)).toBe(
+        "15 de septiembre de 2026, 18:00",
+      );
+    } finally {
+      vi.unstubAllGlobals();
+      vi.resetModules();
+    }
   });
 
   it("escribe un día sin hora en el formato de cada idioma", () => {
