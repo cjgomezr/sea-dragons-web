@@ -309,16 +309,20 @@ h6 {
   border-color: var(--color-accent);
 }
 
-/* El tema, el idioma y el cierre de sesión comparten la esquina de la
+/* El tema, el idioma, Mi cuenta y el cierre de sesión comparten la esquina de la
    cabecera, que es lo único que se dibuja igual en las siete secciones y en
    los tres tamaños: es el sitio desde el que "cerrar sesión desde cualquier
    pantalla" (FR-007) se cumple sin repetir el control en cada una. */
 .app-sidebar-actions {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--space-2);
 }
 
+/* El enlace a Mi cuenta (#209) se dibuja como el botón de cerrar sesión que
+   tiene al lado: son los dos iconos de la misma esquina. */
+.app-header-icon,
 .app-signout {
   display: flex;
   align-items: center;
@@ -332,6 +336,7 @@ h6 {
   cursor: pointer;
 }
 
+.app-header-icon:hover,
 .app-signout:hover:not(:disabled) {
   border-color: var(--color-accent);
 }
@@ -577,7 +582,8 @@ h6 {
 }
 
 .auth-field input,
-.auth-field select {
+.auth-field select,
+.auth-field textarea {
   min-height: var(--touch-target-min);
   padding: 0 var(--space-3);
   font-family: inherit;
@@ -589,7 +595,8 @@ h6 {
 }
 
 .auth-field input:hover,
-.auth-field select:hover {
+.auth-field select:hover,
+.auth-field textarea:hover {
   border-color: var(--color-accent);
 }
 
@@ -847,4 +854,116 @@ h6 {
   .auth-brand {
     width: 62%;
   }
+}
+
+/* Mi cuenta (#209). La cabecera es la de docs/mockups/mobile-profile-light.png:
+   iniciales, nombre y rol, centrados en el móvil. Desde 768px se alinea a la
+   izquierda con el resto del contenido de la pantalla. */
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 560px;
+}
+
+.account-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.account-avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  font-family: var(--font-family-heading);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+}
+
+.app-main .account-identity h1 {
+  margin: 0;
+  font-size: 24px;
+  overflow-wrap: anywhere;
+}
+
+.account-role {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+@media (min-width: 768px) {
+  .account-header {
+    flex-direction: row;
+    text-align: left;
+  }
+}
+
+/* La textarea de la justificación hereda el campo de .auth-field y sólo
+   cambia lo que una caja de varias líneas necesita. */
+.auth-field textarea {
+  padding: var(--space-3);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.account-character-count {
+  align-self: flex-end;
+  font-family: var(--font-family-mono);
+}
+
+.account-role-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.account-role-options legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* Toda la fila es pulsable y llega a los 44px de toque, como la casilla del
+   consentimiento del tutor. */
+.account-role-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target-min);
+}
+
+.account-role-option input {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
+.account-role-option label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  align-self: stretch;
+  font-size: 16px;
+  color: var(--color-text);
+  cursor: pointer;
 }

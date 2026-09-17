@@ -228,6 +228,39 @@ export const spanishMessages: MessageCatalog = {
   "home.status.body":
     "La API versionada responde en el endpoint de salud, que consulta la base de datos.",
   "signOut.label": "Cerrar sesión",
+  "account.link": "Mi cuenta",
+  "account.metaTitle": "Mi cuenta · Victoria Seadragons",
+  "account.metaDescription":
+    "Tu rol en el club, y la solicitud para ser Coach o entrar al Comité.",
+  "account.roleLine": "Rol: {role}",
+  "role.Admin": "Admin",
+  "role.Coach": "Coach",
+  "role.Committee": "Comité",
+  "role.Player": "Jugador",
+  "account.request.title": "Pedir un rol",
+  "account.request.body":
+    "Un Admin revisa cada solicitud. Conservas tu rol actual hasta que la apruebe.",
+  "account.request.roleLegend": "Rol que pides",
+  "account.request.justification": "¿Por qué quieres este rol? (opcional)",
+  "account.request.characterCount": "{used}/{max}",
+  "account.request.justificationTooLong":
+    "La nota puede tener como mucho {max} caracteres. Acórtala para enviar la solicitud.",
+  "account.request.roleMissing": "Elige el rol que quieres pedir.",
+  "account.request.submit": "Enviar solicitud",
+  "account.request.sending": "Enviando…",
+  "account.pending.title": "Solicitud pendiente",
+  "account.pending.body":
+    "Pediste ser {role} el {date}. Todavía no hay respuesta de un Admin.",
+  "account.adminNote":
+    "Como Admin ya tienes todas las capacidades, así que no hay ningún rol que pedir.",
+  "account.error.pending":
+    "Ya tienes una solicitud esperando respuesta. Recarga la página para verla.",
+  "account.error.roleAlreadyHeld": "Ya tienes ese rol.",
+  "account.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para enviar la solicitud.",
+  "account.error.forbidden": "Tu cuenta no puede pedir un rol ahora mismo.",
+  "account.error.unexpected":
+    "No pudimos enviar la solicitud. Vuelve a intentarlo en un momento.",
   "themeToggle.switchToLight": "Cambiar a tema claro",
   "themeToggle.switchToDark": "Cambiar a tema oscuro",
   "languageToggle.label": "Idioma: español. Cambiar a English (EN)",

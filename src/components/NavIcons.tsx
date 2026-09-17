@@ -44,6 +44,17 @@ export function SignOutIcon(): React.JSX.Element {
   );
 }
 
+/** Tampoco es de sección: es el enlace a Mi cuenta de la cabecera (#209),
+ * junto a cerrar sesión, y comparte trazo con él por la misma razón. */
+export function AccountIcon(): React.JSX.Element {
+  return (
+    <IconBase>
+      <circle cx="12" cy="8.5" r="3.5" />
+      <path d="M5 19.5a7 7 0 0 1 14 0" />
+    </IconBase>
+  );
+}
+
 function DashboardIcon(): React.JSX.Element {
   return (
     <IconBase>

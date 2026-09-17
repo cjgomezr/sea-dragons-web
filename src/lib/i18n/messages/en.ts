@@ -231,6 +231,40 @@ export const englishMessages = {
   "home.status.body":
     "The versioned API answers on the health endpoint, which queries the database.",
   "signOut.label": "Sign out",
+  // Mi cuenta (#209). Los roles se escriben como en el SRD en inglés.
+  "account.link": "My account",
+  "account.metaTitle": "My account · Victoria Seadragons",
+  "account.metaDescription":
+    "Your role in the club, and a request to become a Coach or join the Committee.",
+  "account.roleLine": "Role: {role}",
+  "role.Admin": "Admin",
+  "role.Coach": "Coach",
+  "role.Committee": "Committee",
+  "role.Player": "Player",
+  "account.request.title": "Request a role",
+  "account.request.body":
+    "An Admin reviews every request. You'll keep your current role until they approve it.",
+  "account.request.roleLegend": "Role to request",
+  "account.request.justification": "Why do you want this role? (optional)",
+  "account.request.characterCount": "{used}/{max}",
+  "account.request.justificationTooLong":
+    "The note can be at most {max} characters. Shorten it to send the request.",
+  "account.request.roleMissing": "Choose the role you want to request.",
+  "account.request.submit": "Send request",
+  "account.request.sending": "Sending…",
+  "account.pending.title": "Request pending",
+  "account.pending.body":
+    "You asked to be {role} on {date}. An Admin hasn't answered yet.",
+  "account.adminNote":
+    "As an Admin you already have every capability, so there is no role to request.",
+  "account.error.pending":
+    "You already have a request waiting for an answer. Reload the page to see it.",
+  "account.error.roleAlreadyHeld": "You already have that role.",
+  "account.error.signInRequired":
+    "Your session has ended. Sign in again to send the request.",
+  "account.error.forbidden": "Your account can't request a role right now.",
+  "account.error.unexpected":
+    "We couldn't send the request. Try again in a moment.",
   "themeToggle.switchToLight": "Switch to light theme",
   "themeToggle.switchToDark": "Switch to dark theme",
   // El destino va con su propio nombre ("Español", no "Spanish"): quien no

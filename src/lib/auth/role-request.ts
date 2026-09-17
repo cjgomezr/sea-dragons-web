@@ -113,10 +113,12 @@ export function parseRequestableRole(value: unknown): RequestableRole | null {
   return REQUESTABLE_ROLES.find((role) => role === value) ?? null;
 }
 
-/** Cuenta caracteres como `char_length` en la base, no unidades UTF-16: un
- * emoji es uno. Con `length`, el formulario rechazaría lo que la base acepta. */
-function countCharacters(text: string): number {
-  return [...text].length;
+/** Los caracteres de la justificación que se guardarían: sin los espacios de
+ * los extremos, y contados como `char_length` en la base, no en unidades
+ * UTF-16. Un emoji es uno; con `length`, el formulario rechazaría lo que la
+ * base acepta. */
+export function countJustificationCharacters(text: string): number {
+  return [...text.trim()].length;
 }
 
 /** Lo que se guarda de la justificación: sin espacios en los extremos, y nada
@@ -129,7 +131,7 @@ function normalizeJustification(text: string | null): string | null {
 /** La usan el formulario, para avisar antes de enviar, y el dominio, para
  * rechazar lo que llegue sin pasar por el formulario. */
 export function isJustificationTooLong(text: string): boolean {
-  return countCharacters(text.trim()) > JUSTIFICATION_MAX_LENGTH;
+  return countJustificationCharacters(text) > JUSTIFICATION_MAX_LENGTH;
 }
 
 /** Qué puede hacer un socio en Mi cuenta: nada, esperar la respuesta a su
