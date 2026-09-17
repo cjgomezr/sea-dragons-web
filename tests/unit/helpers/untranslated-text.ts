@@ -137,6 +137,69 @@ function visibleAttributeTexts(
     : [];
 }
 
+/** Lo que enseñan la pestaña, los buscadores y las vistas previas de un
+ * enlace. Solo cuenta dentro de los metadatos de Next: fuera de ellos, un
+ * `title` puede ser cualquier dato. */
+const VISIBLE_METADATA_PROPERTIES: ReadonlySet<string> = new Set([
+  "title",
+  "description",
+]);
+
+const METADATA_DECLARATIONS: ReadonlySet<string> = new Set([
+  "metadata",
+  "generateMetadata",
+]);
+
+function isMetadataDeclaration(node: ts.Node): boolean {
+  const isNamedDeclaration =
+    ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node);
+  return (
+    isNamedDeclaration &&
+    node.name !== undefined &&
+    ts.isIdentifier(node.name) &&
+    METADATA_DECLARATIONS.has(node.name.text)
+  );
+}
+
+// Next también acepta el título como objeto: `{ default, template, absolute }`.
+const TITLE_OBJECT_PROPERTIES: ReadonlySet<string> = new Set([
+  "default",
+  "template",
+  "absolute",
+]);
+
+function propertyNameOf(property: ts.PropertyAssignment): string | undefined {
+  const { name } = property;
+  return ts.isIdentifier(name) || ts.isStringLiteral(name)
+    ? name.text
+    : undefined;
+}
+
+function isVisibleMetadataProperty(property: ts.PropertyAssignment): boolean {
+  const name = propertyNameOf(property);
+  if (name === undefined) {
+    return false;
+  }
+  if (VISIBLE_METADATA_PROPERTIES.has(name)) {
+    return true;
+  }
+  const owner = property.parent.parent;
+  return (
+    TITLE_OBJECT_PROPERTIES.has(name) &&
+    ts.isPropertyAssignment(owner) &&
+    propertyNameOf(owner) === "title"
+  );
+}
+
+function metadataPropertyTexts(property: ts.PropertyAssignment): string[] {
+  if (!isVisibleMetadataProperty(property)) {
+    return [];
+  }
+  return ts.findAncestor(property, isMetadataDeclaration) === undefined
+    ? []
+    : renderedLiterals(property.initializer);
+}
+
 function isJsxChild(node: ts.JsxExpression): boolean {
   return ts.isJsxElement(node.parent) || ts.isJsxFragment(node.parent);
 }
@@ -153,12 +216,15 @@ function textsAt(node: ts.Node, sourceFile: ts.SourceFile): string[] {
   if (ts.isJsxAttribute(node)) {
     return visibleAttributeTexts(node, sourceFile);
   }
+  if (ts.isPropertyAssignment(node)) {
+    return metadataPropertyTexts(node);
+  }
   return [];
 }
 
-/** Los textos visibles escritos a mano dentro del JSX de un componente. La
- * heurística es conservadora a propósito (PRD E17, RF-8): prefiere dejar pasar
- * un texto antes que marcar uno que no hay que traducir. */
+/** Los textos visibles escritos a mano dentro del JSX de un componente o de
+ * sus metadatos. La heurística es conservadora a propósito (PRD E17, RF-8):
+ * prefiere dejar pasar un texto antes que marcar uno que no hay que traducir. */
 export function findUntranslatedTexts({
   file,
   source,

@@ -1,3 +1,4 @@
+import { formatNumber } from "./format";
 import type { Locale } from "./locale";
 import type { Message, MessageKey } from "./message";
 import { messageCatalogs } from "./message-catalogs";
@@ -37,10 +38,12 @@ type ParamsArgument<Key extends MessageKey> = [
   ? []
   : [params: MessageParams<Key>];
 
-export type Translator = <Key extends MessageKey>(
-  key: Key,
-  ...params: ParamsArgument<Key>
-) => string;
+/** Lleva su idioma consigo para que quien arma los datos de un mensaje (una
+ * fecha, por ejemplo) los escriba en el mismo idioma que la frase. */
+export type Translator = {
+  <Key extends MessageKey>(key: Key, ...params: ParamsArgument<Key>): string;
+  readonly locale: Locale;
+};
 
 type ParamValues = Readonly<Record<string, string | number | undefined>>;
 
@@ -68,7 +71,7 @@ function selectTemplate(
 }
 
 function insertParams(
-  numbers: Intl.NumberFormat,
+  locale: Locale,
   template: string,
   params: ParamValues,
 ): string {
@@ -77,7 +80,7 @@ function insertParams(
     if (value === undefined) {
       throw new TypeError(`Falta el dato {${name}} para el mensaje.`);
     }
-    return typeof value === "number" ? numbers.format(value) : value;
+    return typeof value === "number" ? formatNumber(locale, value) : value;
   });
 }
 
@@ -88,9 +91,11 @@ function insertParams(
 export function createTranslator(locale: Locale): Translator {
   const catalog: Readonly<Record<string, Message>> = messageCatalogs[locale];
   const plurals = new Intl.PluralRules(locale);
-  const numbers = new Intl.NumberFormat(locale);
 
-  return (key, ...[params]) => {
+  const translate = <Key extends MessageKey>(
+    key: Key,
+    ...[params]: ParamsArgument<Key>
+  ): string => {
     const message = catalog[key];
     if (message === undefined) {
       throw new RangeError(
@@ -99,9 +104,10 @@ export function createTranslator(locale: Locale): Translator {
     }
     const values: ParamValues = params ?? {};
     return insertParams(
-      numbers,
+      locale,
       selectTemplate(plurals, message, values),
       values,
     );
   };
+  return Object.assign(translate, { locale });
 }

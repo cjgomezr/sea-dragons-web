@@ -219,6 +219,8 @@ export const spanishMessages: MessageCatalog = {
   // conviene renombrarla para no tener una pestaña y una vista con el mismo
   // nombre.
   "nav.label.calendarShort": "Agenda",
+  "app.metaDescription":
+    "Plataforma del club de rugby subacuático Victoria Seadragons (Melbourne).",
   "section.underConstruction": "Esta sección está en construcción.",
   "home.lead":
     "Plataforma del club de rugby subacuático. Esta es la cáscara inicial: el resto de las funcionalidades llega epic por epic, cada una con sus tickets y su revisión.",

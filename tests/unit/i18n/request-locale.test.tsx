@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LOCALE_COOKIE_NAME } from "@/lib/i18n/locale";
+import { createTranslator } from "@/lib/i18n/translator";
 
 const incoming = {
   cookies: new Map<string, string>(),
@@ -18,7 +19,7 @@ vi.mock("next/headers", () => ({
 }));
 
 const { readRequestLocale } = await import("@/lib/i18n/request-locale");
-const { default: RootLayout } = await import("@/app/layout");
+const { default: RootLayout, generateMetadata } = await import("@/app/layout");
 
 async function servedHtmlTag(): Promise<string> {
   const markup = renderToStaticMarkup(await RootLayout({ children: <main /> }));
@@ -64,5 +65,35 @@ describe("documento servido", () => {
     incoming.headers.set("accept-language", "en-AU");
 
     expect(await servedHtmlTag()).toContain('lang="en"');
+  });
+});
+
+describe("metadatos por idioma", () => {
+  it("describe la aplicación en inglés cuando la visita es en inglés", async () => {
+    incoming.headers.set("accept-language", "en-AU");
+
+    const metadata = await generateMetadata();
+
+    expect(metadata.description).toBe(
+      createTranslator("en")("app.metaDescription"),
+    );
+    expect(metadata.description).toMatch(/underwater rugby/i);
+  });
+
+  it("describe la aplicación en español cuando la visita es en español", async () => {
+    incoming.cookies.set(LOCALE_COOKIE_NAME, "es");
+
+    const metadata = await generateMetadata();
+
+    expect(metadata.description).toBe(
+      createTranslator("es")("app.metaDescription"),
+    );
+    expect(metadata.description).toMatch(/rugby subacuático/i);
+  });
+
+  it("titula el documento con el nombre del club en los dos idiomas", async () => {
+    incoming.cookies.set(LOCALE_COOKIE_NAME, "es");
+
+    expect((await generateMetadata()).title).toBe("Victoria Seadragons");
   });
 });

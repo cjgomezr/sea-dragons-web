@@ -222,6 +222,8 @@ export const englishMessages = {
   // su pestaña y roza el margen que exige la suite. "Events" ocupa el 64%.
   "nav.label.dashboardShort": "Home",
   "nav.label.calendarShort": "Events",
+  "app.metaDescription":
+    "The platform of the Victoria Seadragons underwater rugby club (Melbourne).",
   "section.underConstruction": "This section is under construction.",
   "home.lead":
     "The underwater rugby club platform. This is the initial shell: the rest of the features arrive epic by epic, each with its own tickets and review.",

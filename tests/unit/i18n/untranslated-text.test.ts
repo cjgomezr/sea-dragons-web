@@ -219,3 +219,93 @@ describe("lo que no se traduce", () => {
     expect(scanComponent(source)).toEqual([]);
   });
 });
+
+describe("metadatos", () => {
+  function scanRoute(source: string): { file: string; text: string }[] {
+    return findUntranslatedTexts({ file: "src/app/example/page.tsx", source });
+  }
+
+  it("marca una descripción incrustada en un metadata fijo, nombrando el archivo", () => {
+    const source = `export const metadata: Metadata = {
+      title: "Victoria Seadragons",
+      description: "Plataforma del club de rugby subacuático",
+    };`;
+
+    expect(scanRoute(source)).toEqual([
+      {
+        file: "src/app/example/page.tsx",
+        text: "Plataforma del club de rugby subacuático",
+      },
+    ]);
+  });
+
+  it("marca un título incrustado en lo que devuelve generateMetadata", () => {
+    const source = `export async function generateMetadata(): Promise<Metadata> {
+      return { title: "Entrar", description: translate("auth.signIn.metaDescription") };
+    }`;
+
+    expect(scanRoute(source).map(({ text }) => text)).toEqual(["Entrar"]);
+  });
+
+  it("marca los textos de un generateMetadata escrito como función flecha", () => {
+    const source = `export const generateMetadata = async (): Promise<Metadata> => ({
+      openGraph: { description: "Tu club, bajo la superficie" },
+    });`;
+
+    expect(scanRoute(source).map(({ text }) => text)).toEqual([
+      "Tu club, bajo la superficie",
+    ]);
+  });
+
+  it("marca las partes de un título escrito como objeto", () => {
+    const source = `export const metadata: Metadata = {
+      title: { default: "Inicio", template: "%s · Club de rugby", absolute: "Panel" },
+    };`;
+
+    expect(scanRoute(source).map(({ text }) => text)).toEqual([
+      "Inicio",
+      "%s · Club de rugby",
+      "Panel",
+    ]);
+  });
+
+  it("marca una propiedad escrita entre comillas", () => {
+    const source = `export const metadata = { "description": "Tu club" };`;
+
+    expect(scanRoute(source).map(({ text }) => text)).toEqual(["Tu club"]);
+  });
+
+  it("no marca la plantilla de título que solo pone el nombre del club", () => {
+    const source = `export const metadata: Metadata = {
+      title: { template: "%s · Victoria Seadragons", default: "Victoria Seadragons" },
+    };`;
+
+    expect(scanRoute(source)).toEqual([]);
+  });
+
+  it("no marca los metadatos que vienen del catálogo", () => {
+    const source = `export async function generateMetadata(): Promise<Metadata> {
+      const translate = createTranslator(await readRequestLocale());
+      return {
+        title: translate("auth.signIn.metaTitle"),
+        description: translate("auth.signIn.metaDescription"),
+      };
+    }`;
+
+    expect(scanRoute(source)).toEqual([]);
+  });
+
+  it("no marca el nombre del club como título", () => {
+    const source = `export const metadata: Metadata = {
+      title: "Victoria Seadragons",
+    };`;
+
+    expect(scanRoute(source)).toEqual([]);
+  });
+
+  it("no marca un title o description que no son metadatos", () => {
+    const source = `const card = { title: "Próximo entrenamiento", description: "Martes" };`;
+
+    expect(scanRoute(source)).toEqual([]);
+  });
+});
