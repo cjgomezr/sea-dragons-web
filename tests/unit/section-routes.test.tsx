@@ -1,29 +1,101 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import CalendarioPage from "@/app/(app)/calendario/page";
-import DashboardPage from "@/app/(app)/dashboard/page";
-import DirectorioPage from "@/app/(app)/directorio/page";
-import EquiposPage from "@/app/(app)/equipos/page";
-import EvaluacionesPage from "@/app/(app)/evaluaciones/page";
-import NoticiasPage from "@/app/(app)/noticias/page";
-import PagosPage from "@/app/(app)/pagos/page";
+import { describe, expect, it, vi } from "vitest";
+import type { Locale } from "@/lib/i18n/locale";
 
-describe("rutas de destino", () => {
-  it.each([
-    ["Dashboard", DashboardPage],
-    ["Directorio", DirectorioPage],
-    ["Calendario", CalendarioPage],
-    ["Equipos", EquiposPage],
-    ["Evaluaciones", EvaluacionesPage],
-    ["Noticias", NoticiasPage],
-    ["Pagos", PagosPage],
-  ])(
-    "la ruta de %s nombra su sección en un marcador de en construcción",
-    (label, Page) => {
-      render(<Page />);
+const requestLocale = { current: "en" as Locale };
 
-      expect(screen.getByRole("heading", { name: label })).toBeInTheDocument();
-      expect(screen.getByText(/en construcción/i)).toBeInTheDocument();
+vi.mock("@/lib/i18n/request-locale", () => ({
+  readRequestLocale: async () => requestLocale.current,
+}));
+
+const { default: CalendarioPage } = await import("@/app/(app)/calendario/page");
+const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");
+const { default: DirectorioPage } = await import("@/app/(app)/directorio/page");
+const { default: EquiposPage } = await import("@/app/(app)/equipos/page");
+const { default: EvaluacionesPage } =
+  await import("@/app/(app)/evaluaciones/page");
+const { default: NoticiasPage } = await import("@/app/(app)/noticias/page");
+const { default: PagosPage } = await import("@/app/(app)/pagos/page");
+const { default: HomePage } = await import("@/app/(app)/page");
+
+type ServerPage = () => Promise<React.JSX.Element>;
+
+async function renderIn(locale: Locale, Page: ServerPage): Promise<void> {
+  requestLocale.current = locale;
+  render(await Page());
+}
+
+const SECTIONS: ReadonlyArray<
+  readonly [english: string, spanish: string, Page: ServerPage]
+> = [
+  ["Dashboard", "Dashboard", DashboardPage],
+  ["Directory", "Directorio", DirectorioPage],
+  ["Calendar", "Calendario", CalendarioPage],
+  ["Teams", "Equipos", EquiposPage],
+  ["Evaluations", "Evaluaciones", EvaluacionesPage],
+  ["News", "Noticias", NoticiasPage],
+  ["Payments", "Pagos", PagosPage],
+];
+
+describe("secciones", () => {
+  it.each(SECTIONS)(
+    "la ruta de %s se titula y avisa en inglés que está en construcción",
+    async (english, _spanish, Page) => {
+      await renderIn("en", Page);
+
+      expect(
+        screen.getByRole("heading", { level: 1, name: english }),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/under construction/i)).toBeInTheDocument();
     },
   );
+
+  it.each(SECTIONS)(
+    "la ruta de %s dice en español lo mismo que antes de traducirla",
+    async (_english, spanish, Page) => {
+      await renderIn("es", Page);
+
+      expect(
+        screen.getByRole("heading", { level: 1, name: spanish }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Esta sección está en construcción."),
+      ).toBeInTheDocument();
+    },
+  );
+});
+
+describe("panel principal", () => {
+  it("explica en inglés qué es la plataforma y dónde mirar su estado", async () => {
+    await renderIn("en", HomePage);
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Victoria Seadragons" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/underwater rugby club/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Service status" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "GET /api/v1/health" }),
+    ).toHaveAttribute("href", "/api/v1/health");
+  });
+
+  it("dice en español lo mismo que antes de traducirlo", async () => {
+    await renderIn("es", HomePage);
+
+    expect(
+      screen.getByText(
+        "Plataforma del club de rugby subacuático. Esta es la cáscara inicial: el resto de las funcionalidades llega epic por epic, cada una con sus tickets y su revisión.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Estado del servicio" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "La API versionada responde en el endpoint de salud, que consulta la base de datos.",
+      ),
+    ).toBeInTheDocument();
+  });
 });

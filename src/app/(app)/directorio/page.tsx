@@ -1,5 +1,11 @@
 import { SectionPlaceholder } from "@/components/SectionPlaceholder";
+import { readRequestLocale } from "@/lib/i18n/request-locale";
 
-export default function DirectorioPage(): React.JSX.Element {
-  return <SectionPlaceholder title="Directorio" />;
+export default async function DirectorioPage(): Promise<React.JSX.Element> {
+  return (
+    <SectionPlaceholder
+      locale={await readRequestLocale()}
+      titleKey="nav.label.directory"
+    />
+  );
 }

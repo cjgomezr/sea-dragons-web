@@ -1,5 +1,11 @@
 import { SectionPlaceholder } from "@/components/SectionPlaceholder";
+import { readRequestLocale } from "@/lib/i18n/request-locale";
 
-export default function CalendarioPage(): React.JSX.Element {
-  return <SectionPlaceholder title="Calendario" />;
+export default async function CalendarioPage(): Promise<React.JSX.Element> {
+  return (
+    <SectionPlaceholder
+      locale={await readRequestLocale()}
+      titleKey="nav.label.calendar"
+    />
+  );
 }

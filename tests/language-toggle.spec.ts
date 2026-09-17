@@ -145,8 +145,9 @@ test.describe("interruptor de idioma dentro de la aplicación", () => {
    * pedir, así que verlos en español después de navegar no prueba nada por sí
    * solo. Lo que sí lo prueba es que el servidor armó /calendario con la
    * cookie nueva. Si el router hubiera reutilizado lo que guardó antes del
-   * cambio, esa petición no existiría. Mientras #185 y #186 no traduzcan el
-   * contenido de las pantallas, no hay texto visible que pueda delatarlo.
+   * cambio, esa petición no existiría. Desde #186 el título de la sección
+   * también lo dice, pero sólo la petición distingue una pantalla armada con la
+   * cookie nueva de una que el router hubiera guardado.
    */
   test("con sesión, la pantalla siguiente se pide al servidor en el idioma nuevo", async ({
     page,
@@ -171,6 +172,9 @@ test.describe("interruptor de idioma dentro de la aplicación", () => {
 
     await expect(page).toHaveURL(new RegExp(`${CALENDAR_PATH}$`));
     await expect(spanishToggle(page)).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Calendario" }),
+    ).toBeVisible();
     // Si ninguna petición de /calendario lleva la cookie en español, esto
     // agota el tiempo del test y falla.
     await calendarRequestInSpanish;

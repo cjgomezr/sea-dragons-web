@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
+import type { Locale } from "@/lib/i18n/locale";
+import { createTranslator } from "@/lib/i18n/translator";
 import {
   MOBILE_OVERFLOW_SECTIONS,
   MOBILE_PRIMARY_SECTIONS,
@@ -16,8 +18,13 @@ const OVERFLOW_PANEL_ID = "app-tabbar-overflow";
 // Same reason as SidebarNav: usePathname() only exists on the client, and the
 // overflow panel needs open/closed state. Both stay in this leaf so AppShell
 // remains a Server Component.
-export function MobileTabBar(): React.JSX.Element {
+export function MobileTabBar({
+  locale,
+}: {
+  locale: Locale;
+}): React.JSX.Element {
   const pathname = usePathname();
+  const translate = createTranslator(locale);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
 
   const hasActiveOverflowSection = MOBILE_OVERFLOW_SECTIONS.some((section) =>
@@ -25,7 +32,7 @@ export function MobileTabBar(): React.JSX.Element {
   );
 
   return (
-    <nav aria-label="Secciones" className="app-tabbar">
+    <nav aria-label={translate("nav.tabBarLabel")} className="app-tabbar">
       <ul
         className="app-tabbar-overflow"
         id={OVERFLOW_PANEL_ID}
@@ -39,7 +46,7 @@ export function MobileTabBar(): React.JSX.Element {
                 isSectionActive(section.href, pathname) ? "page" : undefined
               }
             >
-              {getMobileLabel(section)}
+              {getMobileLabel(section, translate)}
             </Link>
           </li>
         ))}
@@ -56,7 +63,7 @@ export function MobileTabBar(): React.JSX.Element {
                 }
               >
                 <SectionIcon />
-                {getMobileLabel(section)}
+                {getMobileLabel(section, translate)}
               </Link>
             </li>
           );
@@ -72,7 +79,7 @@ export function MobileTabBar(): React.JSX.Element {
             onClick={() => setIsOverflowOpen((isOpen) => !isOpen)}
           >
             <OverflowIcon />
-            Más
+            {translate("nav.more")}
           </button>
         </li>
       </ul>

@@ -1,18 +1,17 @@
-export default function HomePage(): React.JSX.Element {
+import { readRequestLocale } from "@/lib/i18n/request-locale";
+import { createTranslator } from "@/lib/i18n/translator";
+
+const CLUB_NAME = "Victoria Seadragons";
+
+export default async function HomePage(): Promise<React.JSX.Element> {
+  const translate = createTranslator(await readRequestLocale());
   return (
     <>
-      <h1>Victoria Seadragons</h1>
-      <p className="app-lead">
-        Plataforma del club de rugby subacuático. Esta es la cáscara inicial: el
-        resto de las funcionalidades llega epic por epic, cada una con sus
-        tickets y su revisión.
-      </p>
+      <h1>{CLUB_NAME}</h1>
+      <p className="app-lead">{translate("home.lead")}</p>
       <section className="card" aria-labelledby="estado-titulo">
-        <h2 id="estado-titulo">Estado del servicio</h2>
-        <p>
-          La API versionada responde en el endpoint de salud, que consulta la
-          base de datos.
-        </p>
+        <h2 id="estado-titulo">{translate("home.status.title")}</h2>
+        <p>{translate("home.status.body")}</p>
         <a href="/api/v1/health" target="_blank" rel="noopener noreferrer">
           GET /api/v1/health
         </a>

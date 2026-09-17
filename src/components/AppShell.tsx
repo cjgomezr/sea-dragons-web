@@ -26,12 +26,12 @@ export function AppShell({
             <SignOutButton locale={locale} />
           </div>
         </div>
-        <SidebarNav />
+        <SidebarNav locale={locale} />
       </aside>
       <main className="app-main">{children}</main>
       {/* After main on purpose: the bar sits at the bottom of the screen, so
           the tab order should reach it after the content, not before. */}
-      <MobileTabBar />
+      <MobileTabBar locale={locale} />
     </div>
   );
 }

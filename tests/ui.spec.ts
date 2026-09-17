@@ -51,7 +51,7 @@ import {
 } from "./support/e2e-session";
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
 import { snapshotCreatedNotice } from "./support/visual-baseline-notice";
-import { LOCALE_COOKIE_NAME } from "@/lib/i18n/locale";
+import { LOCALE_COOKIE_NAME, type Locale } from "@/lib/i18n/locale";
 
 // Con qué condiciones se toma cada captura, sembrada o comparada. Hoy
 // coinciden con los valores por defecto de toHaveScreenshot, pero se pasan a
@@ -665,6 +665,16 @@ test.describe("dentro de la aplicación", () => {
     describeScreen(pg);
   }
 
+  // E17 RF-5: el panel y las secciones cambian de largo y de `lang` en
+  // español, y eso no lo ve la pasada de axe en inglés.
+  for (const pg of APP_PAGES) {
+    test(`${pg.name} en español: has no accessibility violations (axe-core)`, async ({
+      page,
+    }) => {
+      await expectNoAxeViolationsInSpanish(page, pg.path);
+    });
+  }
+
   describeTogglesCorner({ name: "panel", path: "/dashboard" });
 
   const DESKTOP = { width: 1440, height: 900 } as const;
@@ -730,9 +740,63 @@ test.describe("dentro de la aplicación", () => {
   }
 
   // The shell renders both navs and lets CSS pick one, so every assertion is
-  // scoped to the nav that the viewport actually shows.
-  const SIDEBAR_NAV = "Principal";
-  const TAB_BAR = "Secciones";
+  // scoped to the nav that the viewport actually shows. E17 RF-5: each nav is
+  // named in the visit's language, and the checks that a translation can break
+  // (a label that wraps, a lost touch target, the active mark) run in both.
+  type ShellLanguage = {
+    readonly locale: Locale;
+    readonly sidebarNav: string;
+    readonly tabBar: string;
+    readonly more: string;
+    readonly overflowSection: string;
+    readonly calendarInSidebar: string;
+    readonly calendarInTabBar: string;
+  };
+
+  const ENGLISH_SHELL: ShellLanguage = {
+    locale: "en",
+    sidebarNav: "Main",
+    tabBar: "Sections",
+    more: "More",
+    overflowSection: "Payments",
+    calendarInSidebar: "Calendar",
+    calendarInTabBar: "Events",
+  };
+
+  const SHELL_LANGUAGES: readonly ShellLanguage[] = [
+    ENGLISH_SHELL,
+    {
+      locale: "es",
+      sidebarNav: "Principal",
+      tabBar: "Secciones",
+      more: "Más",
+      overflowSection: "Pagos",
+      calendarInSidebar: "Calendario",
+      // "Agenda" en móvil, "Calendario" en el sidebar: el test del sidebar fija
+      // esa otra mitad, así que acortar la etiqueta móvil no puede colarse en
+      // ambas.
+      calendarInTabBar: "Agenda",
+    },
+  ];
+
+  const SIDEBAR_NAV = ENGLISH_SHELL.sidebarNav;
+  const TAB_BAR = ENGLISH_SHELL.tabBar;
+
+  /** Abre la pantalla con el idioma puesto en la cookie, como tras usar el
+   * interruptor, en vez de fiarse de lo que pide el navegador de la suite. */
+  async function goToIn(
+    page: Page,
+    language: ShellLanguage,
+    screenPath: string,
+  ): Promise<void> {
+    await page
+      .context()
+      .addCookies([
+        { name: LOCALE_COOKIE_NAME, value: language.locale, url: APP_URL },
+      ]);
+    await page.goto(`${APP_URL}${screenPath}`);
+    await expect(page.locator("html")).toHaveAttribute("lang", language.locale);
+  }
 
   // The tab bar and the sidebar are thin strips next to a much larger content
   // area: a component screenshot only frames "the component, not the page"
@@ -834,28 +898,6 @@ test.describe("dentro de la aplicación", () => {
     );
   });
 
-  test("marks the active section in the sidebar nav", async ({ page }) => {
-    await page.setViewportSize(DESKTOP);
-    await page.goto(`${APP_URL}/calendario`);
-    const current = page
-      .getByRole("navigation", { name: SIDEBAR_NAV })
-      .locator('[aria-current="page"]');
-    await expect(current).toHaveCount(1);
-    await expect(current).toHaveText("Calendario");
-  });
-
-  test("marks the active section in the mobile tab bar", async ({ page }) => {
-    await page.setViewportSize(MOBILE);
-    await page.goto(`${APP_URL}/calendario`);
-    const current = page
-      .getByRole("navigation", { name: TAB_BAR })
-      .locator('[aria-current="page"]');
-    await expect(current).toHaveCount(1);
-    // "Agenda" en móvil, "Calendario" en el sidebar: el test de arriba fija esa
-    // otra mitad, así que acortar la etiqueta móvil no puede colarse en ambas.
-    await expect(current).toHaveText("Agenda");
-  });
-
   test("desktop shows the sidebar nav and not the tab bar", async ({
     page,
   }) => {
@@ -885,18 +927,6 @@ test.describe("dentro de la aplicación", () => {
     expect(box!.y + box!.height).toBeCloseTo(MOBILE.height, 0);
   });
 
-  test("mobile keeps the overflow sections behind the More tab", async ({
-    page,
-  }) => {
-    await page.setViewportSize(MOBILE);
-    await page.goto(`${APP_URL}/dashboard`);
-    const tabBar = page.getByRole("navigation", { name: TAB_BAR });
-
-    await expect(tabBar.getByRole("link", { name: "Pagos" })).toBeHidden();
-    await tabBar.getByRole("button", { name: "Más" }).click();
-    await expect(tabBar.getByRole("link", { name: "Pagos" })).toBeVisible();
-  });
-
   test("mobile tabs keep the 44px touch target after adding icons", async ({
     page,
   }) => {
@@ -905,24 +935,7 @@ test.describe("dentro de la aplicación", () => {
     const tabBar = page.getByRole("navigation", { name: TAB_BAR });
 
     const tabs = await tabBar.getByRole("link").all();
-    const moreButton = tabBar.getByRole("button", { name: "Más" });
-
-    for (const tab of [...tabs, moreButton]) {
-      const box = await tab.boundingBox();
-      expect(box, "tab has no layout box").not.toBeNull();
-      expect(box!.height).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
-    }
-  });
-
-  test("mobile tabs keep the 44px touch target at 360px (ASS-004 minimum)", async ({
-    page,
-  }) => {
-    await page.setViewportSize(MOBILE_MIN_WIDTH);
-    await page.goto(`${APP_URL}/dashboard`);
-    const tabBar = page.getByRole("navigation", { name: TAB_BAR });
-
-    const tabs = await tabBar.getByRole("link").all();
-    const moreButton = tabBar.getByRole("button", { name: "Más" });
+    const moreButton = tabBar.getByRole("button", { name: ENGLISH_SHELL.more });
 
     for (const tab of [...tabs, moreButton]) {
       const box = await tab.boundingBox();
@@ -935,23 +948,81 @@ test.describe("dentro de la aplicación", () => {
   // invisible on Windows at the same 375px width. Measuring the label's own
   // rendered height against its line-height catches that regardless of which
   // platform's font happens to be installed on the machine running the test.
-  test("no mobile tab label wraps to a second line at 375px", async ({
-    page,
-  }) => {
-    await page.setViewportSize(MOBILE);
-    await page.goto(`${APP_URL}/dashboard`);
+  for (const language of SHELL_LANGUAGES) {
+    test(`marks the active section in the sidebar nav (${language.locale})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(DESKTOP);
+      await goToIn(page, language, "/calendario");
+      const current = page
+        .getByRole("navigation", { name: language.sidebarNav })
+        .locator('[aria-current="page"]');
+      await expect(current).toHaveCount(1);
+      await expect(current).toHaveText(language.calendarInSidebar);
+    });
 
-    expectEverySingleLine(await getTabLabelLineMetrics(page));
-  });
+    test(`marks the active section in the mobile tab bar (${language.locale})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(MOBILE);
+      await goToIn(page, language, "/calendario");
+      const current = page
+        .getByRole("navigation", { name: language.tabBar })
+        .locator('[aria-current="page"]');
+      await expect(current).toHaveCount(1);
+      await expect(current).toHaveText(language.calendarInTabBar);
+    });
 
-  test("no mobile tab label wraps to a second line at 360px (ASS-004 minimum)", async ({
-    page,
-  }) => {
-    await page.setViewportSize(MOBILE_MIN_WIDTH);
-    await page.goto(`${APP_URL}/dashboard`);
+    test(`mobile keeps the overflow sections behind the More tab (${language.locale})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(MOBILE);
+      await goToIn(page, language, "/dashboard");
+      const tabBar = page.getByRole("navigation", { name: language.tabBar });
+      const overflowLink = tabBar.getByRole("link", {
+        name: language.overflowSection,
+      });
 
-    expectEverySingleLine(await getTabLabelLineMetrics(page));
-  });
+      await expect(overflowLink).toBeHidden();
+      await tabBar.getByRole("button", { name: language.more }).click();
+      await expect(overflowLink).toBeVisible();
+    });
+
+    test(`mobile tabs keep the 44px touch target at 360px (ASS-004 minimum, ${language.locale})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(MOBILE_MIN_WIDTH);
+      await goToIn(page, language, "/dashboard");
+      const tabBar = page.getByRole("navigation", { name: language.tabBar });
+
+      const tabs = await tabBar.getByRole("link").all();
+      const moreButton = tabBar.getByRole("button", { name: language.more });
+
+      for (const tab of [...tabs, moreButton]) {
+        const box = await tab.boundingBox();
+        expect(box, "tab has no layout box").not.toBeNull();
+        expect(box!.height).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_PX);
+      }
+    });
+
+    test(`no mobile tab label wraps to a second line at 375px (${language.locale})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(MOBILE);
+      await goToIn(page, language, "/dashboard");
+
+      expectEverySingleLine(await getTabLabelLineMetrics(page));
+    });
+
+    test(`no mobile tab label wraps to a second line at 360px (ASS-004 minimum, ${language.locale})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(MOBILE_MIN_WIDTH);
+      await goToIn(page, language, "/dashboard");
+
+      expectEverySingleLine(await getTabLabelLineMetrics(page));
+    });
+  }
 
   test("mobile never hides content behind the fixed tab bar", async ({
     page,
@@ -984,12 +1055,12 @@ test.describe("dentro de la aplicación", () => {
 
     const expectedOrder = [
       "Dashboard",
-      "Directorio",
-      "Calendario",
-      "Equipos",
-      "Evaluaciones",
-      "Noticias",
-      "Pagos",
+      "Directory",
+      "Calendar",
+      "Teams",
+      "Evaluations",
+      "News",
+      "Payments",
     ];
 
     const reachedByTabbing: string[] = [];
@@ -1038,48 +1109,52 @@ test.describe("dentro de la aplicación", () => {
   // no subirlo.
   const MAX_LABEL_WIDTH_RATIO = 0.85;
 
-  test("every mobile tab label keeps room to spare inside its tab at 360px", async ({
-    page,
-  }) => {
-    await page.setViewportSize(MOBILE_MIN_WIDTH);
-    await page.goto(`${APP_URL}/dashboard`);
+  for (const language of SHELL_LANGUAGES) {
+    test(`every mobile tab label keeps room to spare inside its tab at 360px (${language.locale})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(MOBILE_MIN_WIDTH);
+      await goToIn(page, language, "/dashboard");
 
-    const usage = await page.evaluate(() => {
-      const tabs = document.querySelectorAll<HTMLElement>(
-        ".app-tabbar-tabs a, .app-tabbar-tabs button",
-      );
-      return Array.from(tabs).map((tab) => {
-        const style = getComputedStyle(tab);
-        const usable =
-          tab.getBoundingClientRect().width -
-          parseFloat(style.paddingLeft) -
-          parseFloat(style.paddingRight);
-        const labelNode = Array.from(tab.childNodes).find(
-          (node) =>
-            node.nodeType === Node.TEXT_NODE &&
-            (node.textContent ?? "").trim().length > 0,
+      const usage = await page.evaluate(() => {
+        const tabs = document.querySelectorAll<HTMLElement>(
+          ".app-tabbar-tabs a, .app-tabbar-tabs button",
         );
-        if (!labelNode) {
-          return { label: "", ratio: 0 };
-        }
-        const range = document.createRange();
-        range.selectNodeContents(labelNode);
-        return {
-          label: (labelNode.textContent ?? "").trim(),
-          ratio: range.getBoundingClientRect().width / usable,
-        };
+        return Array.from(tabs).map((tab) => {
+          const style = getComputedStyle(tab);
+          const usable =
+            tab.getBoundingClientRect().width -
+            parseFloat(style.paddingLeft) -
+            parseFloat(style.paddingRight);
+          const labelNode = Array.from(tab.childNodes).find(
+            (node) =>
+              node.nodeType === Node.TEXT_NODE &&
+              (node.textContent ?? "").trim().length > 0,
+          );
+          if (!labelNode) {
+            return { label: "", ratio: 0 };
+          }
+          const range = document.createRange();
+          range.selectNodeContents(labelNode);
+          return {
+            label: (labelNode.textContent ?? "").trim(),
+            ratio: range.getBoundingClientRect().width / usable,
+          };
+        });
       });
-    });
 
-    expect(usage.length).toBeGreaterThan(0);
-    const tooWide = usage.filter(({ ratio }) => ratio > MAX_LABEL_WIDTH_RATIO);
-    expect(
-      tooWide.map(
-        ({ label, ratio }) => `${label} (${Math.round(ratio * 100)}%)`,
-      ),
-      `estas etiquetas pasan del ${MAX_LABEL_WIDTH_RATIO * 100}% de su pestaña y se partirán con una fuente algo más ancha`,
-    ).toEqual([]);
-  });
+      expect(usage.length).toBeGreaterThan(0);
+      const tooWide = usage.filter(
+        ({ ratio }) => ratio > MAX_LABEL_WIDTH_RATIO,
+      );
+      expect(
+        tooWide.map(
+          ({ label, ratio }) => `${label} (${Math.round(ratio * 100)}%)`,
+        ),
+        `estas etiquetas pasan del ${MAX_LABEL_WIDTH_RATIO * 100}% de su pestaña y se partirán con una fuente algo más ancha`,
+      ).toEqual([]);
+    });
+  }
 
   /**
    * Una sesión recién abierta, sólo para este test.
