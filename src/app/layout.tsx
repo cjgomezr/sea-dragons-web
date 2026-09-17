@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
 import { ThemeScript } from "@/components/ThemeScript";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
+import { createTranslator } from "@/lib/i18n/translator";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "Victoria Seadragons",
-  description:
-    "Plataforma del club de rugby subacuático Victoria Seadragons (Melbourne).",
-};
+// Es lo que enseñan los buscadores y las vistas previas de un enlace, así que
+// sale del idioma de la visita y no de un `metadata` fijo.
+export async function generateMetadata(): Promise<Metadata> {
+  const translate = createTranslator(await readRequestLocale());
+  return {
+    title: "Victoria Seadragons",
+    description: translate("app.metaDescription"),
+  };
+}
 
 export default async function RootLayout({
   children,

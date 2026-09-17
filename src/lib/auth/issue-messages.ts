@@ -1,3 +1,4 @@
+import { formatCalendarDay } from "@/lib/i18n/format";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import {
   ALREADY_SET_ISSUE_CODE,
@@ -67,7 +68,7 @@ export function describeAuthIssue(
       return translate("auth.issue.dateOfBirthInFuture");
     case "date_of_birth_too_early":
       return translate("auth.issue.dateOfBirthTooEarly", {
-        earliest: EARLIEST_DATE_OF_BIRTH,
+        earliest: formatCalendarDay(translate.locale, EARLIEST_DATE_OF_BIRTH),
       });
     case "already_set":
       return translate("auth.issue.alreadySet");
