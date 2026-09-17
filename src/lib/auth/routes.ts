@@ -48,6 +48,12 @@ export const ACCOUNT_PAGE_PATH = "/cuenta";
  * que Mi cuenta: el propio dominio responde a quien no tiene nada que pedir. */
 export const ROLE_REQUESTS_API_PATH = "/api/v1/role-requests";
 
+/** Aprobar o rechazar una solicitud (#210, FR-011). `[id]` es un segmento
+ * dinámico, escrito como en la carpeta de la ruta: la frontera lo casa con
+ * cualquier segmento no vacío. Sólo lo alcanza quien gestiona usuarios y
+ * roles, aunque cuelgue de un endpoint abierto a los cuatro. */
+export const ROLE_REQUEST_DECISION_API_PATH = `${ROLE_REQUESTS_API_PATH}/[id]/decision`;
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 
@@ -143,7 +149,8 @@ export type RestrictedRoute = {
 /**
  * Qué capacidad exige cada ruta restringida, pantallas y endpoints juntos
  * (FR-013, NFR-004). Una ruta restringe también todo lo que cuelga de ella,
- * y si una petición cae bajo varias, tiene que cumplirlas todas.
+ * y si una petición cae bajo varias, tiene que cumplirlas todas. Un segmento
+ * entre corchetes (`[id]`) casa con cualquier segmento no vacío.
  *
  * Los endpoints se declaran aquí y no en `createApiRoute` por dos motivos. El
  * primero es que el proxy ya leyó el rol en la misma consulta que el estado
@@ -159,4 +166,5 @@ export type RestrictedRoute = {
 export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: TEAMS_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: EVALUATIONS_PATH, capability: "viewEvaluations" },
+  { path: ROLE_REQUEST_DECISION_API_PATH, capability: "manageUsersAndRoles" },
 ];
