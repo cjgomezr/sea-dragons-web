@@ -38,6 +38,16 @@ export const COMPLETE_REGISTRATION_PATH = "/completar-registro";
  * una redirección sin fin. */
 export const DASHBOARD_PATH = "/dashboard";
 
+/** Mi cuenta (#209): el rol de quien la abre y la solicitud de Coach o
+ * Committee (FR-010). Pedir un rol no es una fila de la matriz, así que la
+ * alcanza cualquier cuenta activa, sea cual sea su rol, y por eso no aparece
+ * en `RESTRICTED_ROUTES`. E5 la convierte después en el perfil. */
+export const ACCOUNT_PAGE_PATH = "/cuenta";
+
+/** El endpoint de las solicitudes de rol. Abierto a los cuatro roles, igual
+ * que Mi cuenta: el propio dominio responde a quien no tiene nada que pedir. */
+export const ROLE_REQUESTS_API_PATH = "/api/v1/role-requests";
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 
