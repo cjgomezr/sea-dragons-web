@@ -141,7 +141,8 @@ describe("barra de pestañas móvil", () => {
 });
 
 // E17 RF-5: las pestañas en inglés siguen el mockup móvil
-// (docs/mockups/mobile-home-light.png).
+// (docs/mockups/mobile-home-light.png), salvo Calendar, que se acorta a Events
+// por ancho (ver messages/en.ts).
 describe("navegación traducida en la barra móvil", () => {
   it("nombra las pestañas fijas en inglés", () => {
     usePathname.mockReturnValue("/dashboard");

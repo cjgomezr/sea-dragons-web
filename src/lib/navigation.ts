@@ -16,7 +16,13 @@ export type NavIconId =
 /** Las etiquetas de la navegación viven en el catálogo bajo `nav.label.`.
  * Ninguna lleva datos que rellenar, y acotar el tipo a ese prefijo es lo que
  * deja traducirlas sin pasar parámetros. */
-export type NavLabelKey = Extract<MessageKey, `nav.label.${string}`>;
+type AnyNavLabelKey = Extract<MessageKey, `nav.label.${string}`>;
+
+/** Las cortas sólo caben en la barra móvil. Separarlas por tipo impide que
+ * una acabe titulando una pantalla ("Events" en vez de "Calendar"). */
+export type NavShortLabelKey = Extract<AnyNavLabelKey, `${string}Short`>;
+
+export type NavLabelKey = Exclude<AnyNavLabelKey, NavShortLabelKey>;
 
 export type NavSection = {
   readonly labelKey: NavLabelKey;
@@ -28,7 +34,7 @@ export type NavSection = {
   // section's full label doesn't survive that width in some language. Each
   // catalog fills the short key to its own measure, so a language where the
   // full label fits may simply repeat it.
-  readonly mobileLabelKey?: NavLabelKey;
+  readonly mobileLabelKey?: NavShortLabelKey;
 };
 
 export const NAV_SECTIONS: readonly NavSection[] = [
