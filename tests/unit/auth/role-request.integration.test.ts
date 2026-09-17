@@ -126,7 +126,9 @@ describeRls("solicitudes de rol contra seadragons-dev", () => {
           requestedRole: "Coach",
           justification: null,
         } as const;
-        await gateways.requests.insertPendingRequest(request);
+        await expect(
+          gateways.requests.insertPendingRequest(request),
+        ).resolves.toMatchObject({ kind: "created" });
 
         await expect(
           gateways.requests.insertPendingRequest(request),

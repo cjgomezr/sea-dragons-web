@@ -220,6 +220,9 @@ describe("POST /api/v1/role-requests", () => {
     });
 
     expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "validation_error" },
+    });
     expect(databaseReads).toEqual([]);
   });
 
