@@ -42,6 +42,15 @@ columna registration_requests.id tipo=uuid null=NO default=gen_random_uuid()
 columna registration_requests.requested_at tipo=timestamp with time zone null=NO default=now()
 columna registration_requests.subject_hash tipo=text null=NO default=-
 columna registration_requests.subject_kind tipo=text null=NO default=-
+columna role_requests.club_id tipo=uuid null=NO default=-
+columna role_requests.created_at tipo=timestamp with time zone null=NO default=now()
+columna role_requests.decided_at tipo=timestamp with time zone null=YES default=-
+columna role_requests.decided_by tipo=uuid null=YES default=-
+columna role_requests.id tipo=uuid null=NO default=gen_random_uuid()
+columna role_requests.justification tipo=text null=YES default=-
+columna role_requests.requested_role tipo=text null=NO default=-
+columna role_requests.status tipo=text null=NO default='pending'::text
+columna role_requests.user_id tipo=uuid null=NO default=-
 funcion health_probe()
 grant audit_log postgres DELETE
 grant audit_log postgres INSERT
@@ -143,6 +152,21 @@ grant registration_requests service_role SELECT
 grant registration_requests service_role TRIGGER
 grant registration_requests service_role TRUNCATE
 grant registration_requests service_role UPDATE
+grant role_requests authenticated SELECT
+grant role_requests postgres DELETE
+grant role_requests postgres INSERT
+grant role_requests postgres REFERENCES
+grant role_requests postgres SELECT
+grant role_requests postgres TRIGGER
+grant role_requests postgres TRUNCATE
+grant role_requests postgres UPDATE
+grant role_requests service_role DELETE
+grant role_requests service_role INSERT
+grant role_requests service_role REFERENCES
+grant role_requests service_role SELECT
+grant role_requests service_role TRIGGER
+grant role_requests service_role TRUNCATE
+grant role_requests service_role UPDATE
 indice audit_log_club_id_created_at_idx CREATE INDEX audit_log_club_id_created_at_idx ON public.audit_log USING btree (club_id, created_at DESC)
 indice audit_log_pkey CREATE UNIQUE INDEX audit_log_pkey ON public.audit_log USING btree (id)
 indice clubs_pkey CREATE UNIQUE INDEX clubs_pkey ON public.clubs USING btree (id)
@@ -157,6 +181,10 @@ indice password_recovery_requests_email_hash_requested_at_idx CREATE INDEX passw
 indice password_recovery_requests_pkey CREATE UNIQUE INDEX password_recovery_requests_pkey ON public.password_recovery_requests USING btree (id)
 indice registration_requests_pkey CREATE UNIQUE INDEX registration_requests_pkey ON public.registration_requests USING btree (id)
 indice registration_requests_subject_requested_at_idx CREATE INDEX registration_requests_subject_requested_at_idx ON public.registration_requests USING btree (subject_kind, subject_hash, requested_at DESC)
+indice role_requests_decided_by_idx CREATE INDEX role_requests_decided_by_idx ON public.role_requests USING btree (decided_by)
+indice role_requests_one_pending_per_member CREATE UNIQUE INDEX role_requests_one_pending_per_member ON public.role_requests USING btree (user_id) WHERE (status = 'pending'::text)
+indice role_requests_pkey CREATE UNIQUE INDEX role_requests_pkey ON public.role_requests USING btree (id)
+indice role_requests_user_id_created_at_idx CREATE INDEX role_requests_user_id_created_at_idx ON public.role_requests USING btree (user_id, created_at DESC)
 policy audit_log.audit_log_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy clubs.clubs_select_authenticated cmd=SELECT roles={authenticated} using=true check=-
 policy confirmation_email_requests.confirmation_email_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
@@ -164,6 +192,7 @@ policy email_send_requests.email_send_requests_select_denied cmd=SELECT roles={a
 policy members.members_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
 policy password_recovery_requests.password_recovery_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy registration_requests.registration_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
+policy role_requests.role_requests_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
 restriccion audit_log.audit_log_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion audit_log.audit_log_pkey PRIMARY KEY (id)
 restriccion audit_log.audit_log_result_check CHECK ((result = ANY (ARRAY['success'::text, 'failure'::text])))
@@ -188,6 +217,14 @@ restriccion password_recovery_requests.password_recovery_requests_pkey PRIMARY K
 restriccion registration_requests.registration_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion registration_requests.registration_requests_pkey PRIMARY KEY (id)
 restriccion registration_requests.registration_requests_subject_kind_check CHECK ((subject_kind = ANY (ARRAY['ip'::text, 'email'::text])))
+restriccion role_requests.role_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion role_requests.role_requests_decided_by_fkey FOREIGN KEY (decided_by) REFERENCES members(user_id) ON DELETE SET NULL
+restriccion role_requests.role_requests_decision_matches_status CHECK ((((status = 'pending'::text) AND (decided_by IS NULL) AND (decided_at IS NULL)) OR ((status <> 'pending'::text) AND (decided_at IS NOT NULL))))
+restriccion role_requests.role_requests_justification_check CHECK ((char_length(justification) <= 500))
+restriccion role_requests.role_requests_pkey PRIMARY KEY (id)
+restriccion role_requests.role_requests_requested_role_check CHECK ((requested_role = ANY (ARRAY['Coach'::text, 'Committee'::text])))
+restriccion role_requests.role_requests_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))
+restriccion role_requests.role_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES members(user_id) ON DELETE CASCADE
 tabla audit_log rls=t
 tabla clubs rls=t
 tabla confirmation_email_requests rls=t
@@ -195,3 +232,4 @@ tabla email_send_requests rls=t
 tabla members rls=t
 tabla password_recovery_requests rls=t
 tabla registration_requests rls=t
+tabla role_requests rls=t
