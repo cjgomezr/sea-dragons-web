@@ -97,6 +97,7 @@ Un socio pide Coach o Committee, con una justificación opcional, desde una pág
 - **Dado** el formulario, **cuando** se está enviando, **entonces** el botón queda desactivado, para que un doble clic no mande dos.
 - **Dado** un socio al que le rechazaron una solicitud, **cuando** vuelve a Mi cuenta, **entonces** el formulario está de nuevo disponible y la nueva solicitud se acepta.
 - **Dado** una solicitud de un rol que esa persona ya tiene, o de Admin, **cuando** se envía, **entonces** se rechaza.
+- **Dado** un Admin, **cuando** abre Mi cuenta, **entonces** ve su rol y no ve el formulario: ya tiene todas las capacidades, y así aprobar una solicitud nunca degrada a un Admin.
 - **Dado** una cuenta que todavía está incompleta, **cuando** intenta solicitar, **entonces** se le niega, porque esa cuenta aún no opera.
 
 ### RF-5 · Aprobar o rechazar una solicitud · Must
@@ -170,7 +171,7 @@ Un Admin puede poner cualquiera de los cuatro roles a cualquier socio. FR-014 lo
 - Seguridad: la matriz se aplica en el servidor para el 100% de las peticiones (NFR-004). La interfaz solo esconde; no protege.
 - Auditoría: todo cambio de rol y toda decisión quedan registrados (NFR-010), sin datos personales que no hagan falta: identificadores, no nombres ni correos ni la justificación.
 - Rendimiento: leer el rol no puede costar una consulta extra por cada comprobación dentro de la misma petición.
-- Idiomas: todo texto nuevo sale del catálogo (`src/lib/i18n/messages/en.ts` y `es.ts`), incluidos los mensajes de error de los endpoints que ve una persona. El test de textos sin traducir lo vigila.
+- Idiomas: todo texto nuevo sale del catálogo (`src/lib/i18n/messages/en.ts` y `es.ts`). Los errores que ve una persona se traducen en pantalla a partir del código de error de la API, como en E17. El test de textos sin traducir lo vigila.
 - Accesibilidad: sin violaciones de axe en las pantallas nuevas, en los dos idiomas.
 - Privacidad: la bandeja no expone datos del socio más allá de lo que el Admin ya puede ver.
 
