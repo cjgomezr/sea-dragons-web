@@ -8,7 +8,7 @@ vi.mock("next/navigation", () => ({ usePathname }));
 describe("navegación", () => {
   it("contiene exactamente las siete secciones esperadas, cada una con su ruta", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<SidebarNav />);
+    render(<SidebarNav locale="es" />);
 
     const links = screen.getAllByRole("link");
     expect(links).toHaveLength(7);
@@ -27,21 +27,62 @@ describe("navegación", () => {
     );
   });
 
-  it("marca como actual la sección que corresponde a la ruta activa, y solo esa", () => {
-    usePathname.mockReturnValue("/calendario");
-    render(<SidebarNav />);
-
-    const current = screen.getByRole("link", { current: "page" });
-    expect(current).toHaveTextContent("Calendario");
-    expect(screen.getAllByRole("link", { current: "page" })).toHaveLength(1);
-  });
-
   it("no marca ninguna sección como actual fuera del menú", () => {
     usePathname.mockReturnValue("/");
-    render(<SidebarNav />);
+    render(<SidebarNav locale="es" />);
 
     expect(
       screen.queryByRole("link", { current: "page" }),
     ).not.toBeInTheDocument();
   });
+});
+
+describe("navegación traducida", () => {
+  it("nombra las secciones en inglés sin cambiar a dónde llevan", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(<SidebarNav locale="en" />);
+
+    const links = screen.getAllByRole("link");
+    expect(links.map((link) => link.textContent)).toEqual([
+      "Dashboard",
+      "Directory",
+      "Calendar",
+      "Teams",
+      "Evaluations",
+      "News",
+      "Payments",
+    ]);
+    expect(screen.getByRole("link", { name: "Calendar" })).toHaveAttribute(
+      "href",
+      "/calendario",
+    );
+  });
+
+  it.each([
+    ["en", "Main"],
+    ["es", "Principal"],
+  ] as const)(
+    "nombra el menú en el idioma de la visita (%s)",
+    (locale, name) => {
+      usePathname.mockReturnValue("/dashboard");
+      render(<SidebarNav locale={locale} />);
+
+      expect(screen.getByRole("navigation", { name })).toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    ["en", "Calendar"],
+    ["es", "Calendario"],
+  ] as const)(
+    "marca como actual la sección de la ruta activa, y solo esa (%s)",
+    (locale, label) => {
+      usePathname.mockReturnValue("/calendario");
+      render(<SidebarNav locale={locale} />);
+
+      const current = screen.getAllByRole("link", { current: "page" });
+      expect(current).toHaveLength(1);
+      expect(current[0]).toHaveTextContent(label);
+    },
+  );
 });

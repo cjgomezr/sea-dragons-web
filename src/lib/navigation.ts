@@ -1,3 +1,6 @@
+import type { MessageKey } from "@/lib/i18n/message";
+import type { Translator } from "@/lib/i18n/translator";
+
 // Un id por sección, no el componente de icono en sí: este archivo es .ts
 // (sin JSX) y lo consume tanto la barra de pestañas móvil (con icono) como
 // SidebarNav (sin icono). NavIcons.tsx es quien traduce el id a SVG.
@@ -10,40 +13,45 @@ export type NavIconId =
   | "noticias"
   | "pagos";
 
+/** Las etiquetas de la navegación viven en el catálogo bajo `nav.label.`.
+ * Ninguna lleva datos que rellenar, y acotar el tipo a ese prefijo es lo que
+ * deja traducirlas sin pasar parámetros. */
+export type NavLabelKey = Extract<MessageKey, `nav.label.${string}`>;
+
 export type NavSection = {
-  readonly label: string;
+  readonly labelKey: NavLabelKey;
   readonly href: string;
   readonly icon: NavIconId;
-  // Overrides `label` only in the mobile tab bar. Its strip is narrower than
-  // the sidebar, and the fonts Linux resolves make "Dashboard" wrap to two
-  // lines there while Windows fonts let it fit (#85). Absent unless a
-  // section's full label doesn't survive that width.
-  readonly mobileLabel?: string;
+  // Overrides `labelKey` only in the mobile tab bar. Its strip is narrower
+  // than the sidebar, and the fonts Linux resolves make "Dashboard" wrap to
+  // two lines there while Windows fonts let it fit (#85). Absent unless a
+  // section's full label doesn't survive that width in some language; the
+  // languages where it does fit repeat the full label in the short key.
+  readonly mobileLabelKey?: NavLabelKey;
 };
 
 export const NAV_SECTIONS: readonly NavSection[] = [
   {
-    label: "Dashboard",
+    labelKey: "nav.label.dashboard",
     href: "/dashboard",
     icon: "dashboard",
-    mobileLabel: "Inicio",
+    mobileLabelKey: "nav.label.dashboardShort",
   },
-  { label: "Directorio", href: "/directorio", icon: "directorio" },
+  { labelKey: "nav.label.directory", href: "/directorio", icon: "directorio" },
   {
-    label: "Calendario",
+    labelKey: "nav.label.calendar",
     href: "/calendario",
     icon: "calendario",
-    // "Calendario" ocupaba el 89% de su pestaña a 360px y se partía con las
-    // fuentes de Linux. El mockup móvil usa etiquetas de una palabra corta.
-    // Ojo para E7: el prototipo llama "Agenda" a una de las vistas del
-    // calendario (Mes/Semana/Agenda). Si esa vista se implementa, conviene
-    // renombrarla para no tener una pestaña y una vista con el mismo nombre.
-    mobileLabel: "Agenda",
+    mobileLabelKey: "nav.label.calendarShort",
   },
-  { label: "Equipos", href: "/equipos", icon: "equipos" },
-  { label: "Evaluaciones", href: "/evaluaciones", icon: "evaluaciones" },
-  { label: "Noticias", href: "/noticias", icon: "noticias" },
-  { label: "Pagos", href: "/pagos", icon: "pagos" },
+  { labelKey: "nav.label.teams", href: "/equipos", icon: "equipos" },
+  {
+    labelKey: "nav.label.evaluations",
+    href: "/evaluaciones",
+    icon: "evaluaciones",
+  },
+  { labelKey: "nav.label.news", href: "/noticias", icon: "noticias" },
+  { labelKey: "nav.label.payments", href: "/pagos", icon: "pagos" },
 ];
 
 // Una barra de pestañas deja de ser alcanzable con el pulgar pasadas las cinco
@@ -75,6 +83,16 @@ export function isSectionActive(
   return sectionHref === pathname;
 }
 
-export function getMobileLabel(section: NavSection): string {
-  return section.mobileLabel ?? section.label;
+export function getSectionLabel(
+  section: NavSection,
+  translate: Translator,
+): string {
+  return translate(section.labelKey);
+}
+
+export function getMobileLabel(
+  section: NavSection,
+  translate: Translator,
+): string {
+  return translate(section.mobileLabelKey ?? section.labelKey);
 }

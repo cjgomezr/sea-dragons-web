@@ -1,5 +1,11 @@
 import { SectionPlaceholder } from "@/components/SectionPlaceholder";
+import { readRequestLocale } from "@/lib/i18n/request-locale";
 
-export default function EquiposPage(): React.JSX.Element {
-  return <SectionPlaceholder title="Equipos" />;
+export default async function EquiposPage(): Promise<React.JSX.Element> {
+  return (
+    <SectionPlaceholder
+      locale={await readRequestLocale()}
+      titleKey="nav.label.teams"
+    />
+  );
 }

@@ -20,7 +20,7 @@ describe("app shell", () => {
 
     expect(screen.getByText("Victoria Seadragons")).toBeInTheDocument();
     expect(
-      screen.getByRole("navigation", { name: "Principal" }),
+      screen.getByRole("navigation", { name: "Main" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /tema/i })).toBeInTheDocument();
   });
@@ -78,6 +78,24 @@ describe("app shell", () => {
     const themeToggle = screen.getByRole("button", { name: /tema/i });
     const languageToggle = screen.getByRole("button", { name: /español/i });
     expect(themeToggle.nextElementSibling).toBe(languageToggle);
+  });
+
+  // E17 RF-5: la cáscara pasa el idioma a las dos navegaciones, que son hojas
+  // de cliente y no pueden leer la cookie por su cuenta.
+  it("nombra las dos navegaciones en el idioma de la visita", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(
+      <AppShell locale="es">
+        <p>Contenido de la sección</p>
+      </AppShell>,
+    );
+
+    expect(
+      screen.getByRole("navigation", { name: "Principal" }),
+    ).toHaveTextContent("Directorio");
+    expect(
+      screen.getByRole("navigation", { name: "Secciones" }),
+    ).toHaveTextContent("Inicio");
   });
 
   it("muestra el contenido recibido dentro del área principal", () => {

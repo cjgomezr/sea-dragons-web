@@ -1,5 +1,11 @@
 import { SectionPlaceholder } from "@/components/SectionPlaceholder";
+import { readRequestLocale } from "@/lib/i18n/request-locale";
 
-export default function EvaluacionesPage(): React.JSX.Element {
-  return <SectionPlaceholder title="Evaluaciones" />;
+export default async function EvaluacionesPage(): Promise<React.JSX.Element> {
+  return (
+    <SectionPlaceholder
+      locale={await readRequestLocale()}
+      titleKey="nav.label.evaluations"
+    />
+  );
 }

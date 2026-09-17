@@ -202,6 +202,29 @@ export const spanishMessages: MessageCatalog = {
   "auth.issue.consentMissing":
     "Marca la casilla del consentimiento: sin ella la cuenta no se activa.",
   "auth.issue.required": "Este dato es obligatorio.",
+  "nav.sidebarLabel": "Principal",
+  "nav.tabBarLabel": "Secciones",
+  "nav.more": "Más",
+  "nav.label.dashboard": "Dashboard",
+  "nav.label.directory": "Directorio",
+  "nav.label.calendar": "Calendario",
+  "nav.label.teams": "Equipos",
+  "nav.label.evaluations": "Evaluaciones",
+  "nav.label.news": "Noticias",
+  "nav.label.payments": "Pagos",
+  "nav.label.dashboardShort": "Inicio",
+  // "Calendario" ocupaba el 89% de su pestaña a 360px y se partía con las
+  // fuentes de Linux. Ojo para E7: el prototipo llama "Agenda" a una de las
+  // vistas del calendario (Mes/Semana/Agenda). Si esa vista se implementa,
+  // conviene renombrarla para no tener una pestaña y una vista con el mismo
+  // nombre.
+  "nav.label.calendarShort": "Agenda",
+  "section.underConstruction": "Esta sección está en construcción.",
+  "home.lead":
+    "Plataforma del club de rugby subacuático. Esta es la cáscara inicial: el resto de las funcionalidades llega epic por epic, cada una con sus tickets y su revisión.",
+  "home.status.title": "Estado del servicio",
+  "home.status.body":
+    "La API versionada responde en el endpoint de salud, que consulta la base de datos.",
   "signOut.label": "Cerrar sesión",
   "languageToggle.label": "Idioma: español. Cambiar a English (EN)",
   "languageToggle.target": "EN",

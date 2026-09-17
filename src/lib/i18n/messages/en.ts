@@ -205,6 +205,28 @@ export const englishMessages = {
   "auth.issue.consentMissing":
     "Tick the consent box: without it the account is not activated.",
   "auth.issue.required": "This detail is required.",
+  "nav.sidebarLabel": "Main",
+  "nav.tabBarLabel": "Sections",
+  "nav.more": "More",
+  // Los nombres de escritorio son los de docs/mockups/dashboard-light.png.
+  "nav.label.dashboard": "Dashboard",
+  "nav.label.directory": "Directory",
+  "nav.label.calendar": "Calendar",
+  "nav.label.teams": "Teams",
+  "nav.label.evaluations": "Evaluations",
+  "nav.label.news": "News",
+  "nav.label.payments": "Payments",
+  // Las etiquetas cortas de la barra móvil, como en
+  // docs/mockups/mobile-home-light.png. "Calendar" cabe entero: sólo el
+  // español necesita acortarlo.
+  "nav.label.dashboardShort": "Home",
+  "nav.label.calendarShort": "Calendar",
+  "section.underConstruction": "This section is under construction.",
+  "home.lead":
+    "The underwater rugby club platform. This is the initial shell: the rest of the features arrive epic by epic, each with its own tickets and review.",
+  "home.status.title": "Service status",
+  "home.status.body":
+    "The versioned API answers on the health endpoint, which queries the database.",
   "signOut.label": "Sign out",
   // El destino va con su propio nombre ("Español", no "Spanish"): quien no
   // entiende el idioma de la pantalla tiene que reconocer el suyo. Y el
