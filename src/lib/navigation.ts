@@ -31,7 +31,8 @@ export type NavSection = {
   readonly labelKey: NavLabelKey;
   readonly href: string;
   readonly icon: NavIconId;
-  // Overrides `labelKey` only in the mobile tab bar. Its strip is narrower
+  // Overrides `labelKey` only on a fixed tab of the mobile tab bar; the
+  // overflow panel spans the full width and keeps the full label. Its strip is narrower
   // than the sidebar, and the fonts Linux resolves make "Dashboard" wrap to
   // two lines there while Windows fonts let it fit (#85). Absent unless a
   // section's full label doesn't survive that width in some language. Each
@@ -47,7 +48,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     icon: "dashboard",
     mobileLabelKey: "nav.label.dashboardShort",
   },
-  { labelKey: "nav.label.directory", href: "/directorio", icon: "directorio" },
+  {
+    labelKey: "nav.label.directory",
+    href: "/directorio",
+    icon: "directorio",
+    mobileLabelKey: "nav.label.directoryShort",
+  },
   {
     labelKey: "nav.label.calendar",
     href: "/calendario",

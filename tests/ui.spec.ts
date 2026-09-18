@@ -1056,12 +1056,12 @@ test.describe("dentro de la aplicación", () => {
     await page.setViewportSize(DESKTOP);
     await page.goto(`${APP_URL}/dashboard`);
 
+    // El socio compartido es Player: su menú no lleva Equipos, Evaluaciones
+    // ni Administración (#213).
     const expectedOrder = [
       "Dashboard",
       "Directory",
       "Calendar",
-      "Teams",
-      "Evaluations",
       "News",
       "Payments",
     ];
@@ -1158,6 +1158,213 @@ test.describe("dentro de la aplicación", () => {
       ).toEqual([]);
     });
   }
+
+  /* -------------------------------------------------------------------------
+     La navegación por rol (#213). El socio compartido es Player, que es
+     también con quien se toman las capturas de arriba; el Admin es el que
+     siembra el arranque para la pantalla de administración. Committee ve lo
+     mismo que Player y Coach lo mismo que Admin sin Administración: los
+     unitarios cubren los cuatro, aquí se fotografían los dos extremos.
+     ------------------------------------------------------------------------- */
+  test.describe("navegación por rol", () => {
+    const ROLE_SESSIONS = [
+      { name: "player", storageState: E2E_STORAGE_STATE_PATH },
+      {
+        name: "admin",
+        storageState: roleRequestStorageStatePath("admin-de-administracion"),
+      },
+    ] as const;
+
+    const TAB_BAR_WIDTHS = [MOBILE_MIN_WIDTH, MOBILE] as const;
+
+    async function goToDashboardIn(
+      page: Page,
+      language: ShellLanguage,
+      theme: (typeof themes)[number],
+    ): Promise<void> {
+      await page
+        .context()
+        .addCookies([
+          { name: LOCALE_COOKIE_NAME, value: language.locale, url: APP_URL },
+        ]);
+      await goToWithTheme(page, "/dashboard", theme);
+      await expect(page.locator("html")).toHaveAttribute(
+        "lang",
+        language.locale,
+      );
+    }
+
+    async function openMore(
+      page: Page,
+      language: ShellLanguage,
+    ): Promise<void> {
+      await page
+        .getByRole("navigation", { name: language.tabBar })
+        .getByRole("button", { name: language.more })
+        .click();
+    }
+
+    for (const session of ROLE_SESSIONS) {
+      test.describe(session.name, () => {
+        test.use({ storageState: session.storageState });
+
+        for (const language of SHELL_LANGUAGES) {
+          for (const theme of themes) {
+            test(`sidebar nav matches approved baseline (${language.locale}, ${theme})`, async ({
+              page,
+            }) => {
+              await page.setViewportSize(DESKTOP);
+              await goToDashboardIn(page, language, theme);
+              const name = `nav-${session.name}-desktop-${language.locale}-${theme}.png`;
+              const sidebar = page.getByRole("navigation", {
+                name: language.sidebarNav,
+              });
+              await createMissingLocalBaseline(name, () =>
+                sidebar.screenshot(SCREENSHOT_OPTIONS),
+              );
+              await expect(sidebar).toHaveScreenshot(name, {
+                ...SCREENSHOT_OPTIONS,
+                maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
+              });
+            });
+
+            for (const viewport of TAB_BAR_WIDTHS) {
+              test(`tab bar with More open matches approved baseline (${viewport.width}px, ${language.locale}, ${theme})`, async ({
+                page,
+              }) => {
+                await page.setViewportSize(viewport);
+                await goToDashboardIn(page, language, theme);
+                await openMore(page, language);
+                const name = `tabbar-${session.name}-mas-${viewport.width}-${language.locale}-${theme}.png`;
+                const tabBar = page.getByRole("navigation", {
+                  name: language.tabBar,
+                });
+                await createMissingLocalBaseline(name, () =>
+                  tabBar.screenshot(SCREENSHOT_OPTIONS),
+                );
+                await expect(tabBar).toHaveScreenshot(name, {
+                  ...SCREENSHOT_OPTIONS,
+                  maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
+                });
+              });
+            }
+          }
+
+          test(`no tab label wraps to a second line at 360px (${language.locale})`, async ({
+            page,
+          }) => {
+            await page.setViewportSize(MOBILE_MIN_WIDTH);
+            await goToIn(page, language, "/dashboard");
+
+            expectEverySingleLine(await getTabLabelLineMetrics(page));
+          });
+
+          test(`with More open has no accessibility violations (${language.locale})`, async ({
+            page,
+          }) => {
+            await page.setViewportSize(MOBILE);
+            await goToIn(page, language, "/dashboard");
+            await openMore(page, language);
+
+            const results = await new AxeBuilder({ page })
+              .withTags(["wcag2a", "wcag2aa"])
+              .analyze();
+            expect(
+              results.violations,
+              JSON.stringify(results.violations, null, 2),
+            ).toEqual([]);
+          });
+        }
+      });
+    }
+
+    test.describe("player", () => {
+      test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+      test("the sidebar offers only what a Player can open", async ({
+        page,
+      }) => {
+        await page.setViewportSize(DESKTOP);
+        await page.goto(`${APP_URL}/dashboard`);
+
+        const links = page
+          .getByRole("navigation", { name: SIDEBAR_NAV })
+          .getByRole("link");
+        await expect(links).toHaveText([
+          "Dashboard",
+          "Directory",
+          "Calendar",
+          "News",
+          "Payments",
+        ]);
+      });
+
+      test("the tab bar keeps Directory in the Teams slot and Payments behind More", async ({
+        page,
+      }) => {
+        await page.setViewportSize(MOBILE);
+        await page.goto(`${APP_URL}/dashboard`);
+        const tabBar = page.getByRole("navigation", { name: TAB_BAR });
+
+        await expect(
+          tabBar.locator(".app-tabbar-tabs").getByRole("link"),
+        ).toHaveText(["Home", "Events", "People", "News"]);
+        await openMore(page, ENGLISH_SHELL);
+        await expect(
+          tabBar.locator(".app-tabbar-overflow").getByRole("link"),
+        ).toHaveText(["Payments"]);
+      });
+    });
+
+    test.describe("admin", () => {
+      test.use({
+        storageState: roleRequestStorageStatePath("admin-de-administracion"),
+      });
+
+      test("the sidebar offers every section and Administration", async ({
+        page,
+      }) => {
+        await page.setViewportSize(DESKTOP);
+        await page.goto(`${APP_URL}/dashboard`);
+
+        const sidebar = page.getByRole("navigation", { name: SIDEBAR_NAV });
+        await expect(sidebar.getByRole("link")).toHaveText([
+          "Dashboard",
+          "Directory",
+          "Calendar",
+          "Teams",
+          "Evaluations",
+          "News",
+          "Payments",
+          "Administration",
+        ]);
+        await expect(
+          sidebar.getByRole("link", { name: "Administration" }),
+        ).toHaveAttribute("href", "/administracion");
+      });
+
+      test("the tab bar keeps the Coach tabs and adds Administration behind More", async ({
+        page,
+      }) => {
+        await page.setViewportSize(MOBILE);
+        await page.goto(`${APP_URL}/dashboard`);
+        const tabBar = page.getByRole("navigation", { name: TAB_BAR });
+
+        await expect(
+          tabBar.locator(".app-tabbar-tabs").getByRole("link"),
+        ).toHaveText(["Home", "Events", "Teams", "News"]);
+        await openMore(page, ENGLISH_SHELL);
+        await expect(
+          tabBar.locator(".app-tabbar-overflow").getByRole("link"),
+        ).toHaveText([
+          "Directory",
+          "Evaluations",
+          "Payments",
+          "Administration",
+        ]);
+      });
+    });
+  });
 
   /**
    * Una sesión recién abierta, sólo para este test.
@@ -1844,7 +2051,13 @@ test.describe("un Player que pide una pantalla que su rol no alcanza", () => {
   );
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
-  for (const restrictedPath of ["/equipos", "/evaluaciones"]) {
+  // #213: la navegación ya no las ofrece, pero esconder es comodidad. Quien
+  // escribe la dirección a mano se topa igual con la frontera.
+  for (const restrictedPath of [
+    "/equipos",
+    "/evaluaciones",
+    "/administracion",
+  ]) {
     test(`aterriza en el panel al pedir ${restrictedPath}`, async ({
       page,
     }) => {

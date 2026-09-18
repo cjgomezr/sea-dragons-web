@@ -243,6 +243,13 @@ describe("etiqueta corta para la barra móvil (#85)", () => {
     expect(getMobileLabel(equipos, english)).toBe("Teams");
   });
 
+  it("acorta Directorio y Directory, que pasan del margen como pestaña fija (#213)", () => {
+    const directorio = sectionAt("/directorio");
+
+    expect(getMobileLabel(directorio, spanish)).toBe("Socios");
+    expect(getMobileLabel(directorio, english)).toBe("People");
+  });
+
   it("acorta Calendario, que se partía a 360px, y Calendar, que rozaba el margen", () => {
     const calendario = sectionAt("/calendario");
 

@@ -24,7 +24,7 @@ async function openMoreAndListIt(): Promise<(string | null)[]> {
 // puede abrir, y Directorio ocupa el hueco de Equipos.
 describe("barra móvil por rol", () => {
   it.each(["Player", "Committee"] as const)(
-    "un %s tiene fijas Inicio, Agenda, Directorio y Noticias, y Pagos en Más",
+    "un %s tiene fijas Inicio, Agenda, Socios y Noticias, y Pagos en Más",
     async (role) => {
       usePathname.mockReturnValue("/dashboard");
       render(<MobileTabBar locale="es" role={role} />);
@@ -32,7 +32,7 @@ describe("barra móvil por rol", () => {
       expect(fixedTabLabels()).toEqual([
         "Inicio",
         "Agenda",
-        "Directorio",
+        "Socios",
         "Noticias",
       ]);
       expect(await openMoreAndListIt()).toEqual(["Pagos"]);
@@ -67,6 +67,15 @@ describe("barra móvil por rol", () => {
       "Payments",
       "Administration",
     ]);
+  });
+
+  // La etiqueta corta es sólo para la pestaña: el panel de Más ocupa todo el
+  // ancho y nombra la sección como la barra lateral.
+  it("nombra Directorio completo en Más aunque su pestaña use la corta", async () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(<MobileTabBar locale="en" role="Coach" />);
+
+    expect(await openMoreAndListIt()).toContain("Directory");
   });
 
   it("marca Más cuando un Admin está en Administración", () => {

@@ -9,6 +9,7 @@ import { createTranslator } from "@/lib/i18n/translator";
 import {
   getMobileLabel,
   getMobileSections,
+  getSectionLabel,
   isSectionActive,
 } from "@/lib/navigation";
 import { NAV_SECTION_ICONS, OverflowIcon } from "@/components/NavIcons";
@@ -49,7 +50,7 @@ export function MobileTabBar({
                 isSectionActive(section.href, pathname) ? "page" : undefined
               }
             >
-              {getMobileLabel(section, translate)}
+              {getSectionLabel(section, translate)}
             </Link>
           </li>
         ))}
