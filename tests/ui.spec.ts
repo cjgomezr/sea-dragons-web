@@ -47,6 +47,8 @@ import {
   ADMINISTRATION_ADMIN_NAME,
   DECIDABLE_MEMBER_NAME,
   E2E_STORAGE_STATE_PATH,
+  GROUPED_MEMBER_GROUP_NAMES,
+  GROUPED_MEMBER_STORAGE_STATE_PATH,
   PHOTOGRAPHED_MEMBERS,
   incompleteStorageStatePath,
   readE2eSessionState,
@@ -2078,12 +2080,15 @@ test.describe("un Player que pide una pantalla que su rol no alcanza", () => {
 
 const ACCOUNT_PATH = "/cuenta";
 const ROLE_REQUESTS_ENDPOINT = "/api/v1/role-requests";
+const ACCOUNT_GROUPS_ENDPOINT = "/api/v1/account/groups";
 /** El mismo límite que `JUSTIFICATION_MAX_LENGTH`, más uno. */
 const TOO_LONG_JUSTIFICATION = "a".repeat(501);
 
 type AccountState = {
   readonly name: string;
   readonly storageState: string;
+  /** Qué hacer antes de abrir la pantalla, como elegir el idioma. */
+  readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
 };
 
@@ -2104,6 +2109,22 @@ const ACCOUNT_STATES: readonly AccountState[] = [
     name: "cuenta-justificacion-larga",
     storageState: E2E_STORAGE_STATE_PATH,
     prepare: writeTooLongJustification,
+  },
+  // Mis grupos (#229). El socio compartido no tiene grupos, así que
+  // `cuenta-formulario` es ya la captura "sin grupos" en inglés.
+  {
+    name: "cuenta-con-grupos",
+    storageState: GROUPED_MEMBER_STORAGE_STATE_PATH,
+  },
+  {
+    name: "cuenta-con-grupos-es",
+    storageState: GROUPED_MEMBER_STORAGE_STATE_PATH,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "cuenta-sin-grupos-es",
+    storageState: E2E_STORAGE_STATE_PATH,
+    beforeVisit: chooseSpanish,
   },
 ];
 
@@ -2137,6 +2158,7 @@ for (const state of ACCOUNT_STATES) {
 
         for (const theme of themes) {
           test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await state.beforeVisit?.(page);
             await goToWithTheme(page, ACCOUNT_PATH, theme);
             await state.prepare?.(page);
             const snapshot = `${state.name}-${vp.name}-${theme}.png`;
@@ -2152,6 +2174,7 @@ for (const state of ACCOUNT_STATES) {
         }
 
         test("has no horizontal scroll", async ({ page }) => {
+          await state.beforeVisit?.(page);
           await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
           await state.prepare?.(page);
           const overflow = await page.evaluate(
@@ -2165,6 +2188,7 @@ for (const state of ACCOUNT_STATES) {
     }
 
     test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await state.beforeVisit?.(page);
       await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
       await state.prepare?.(page);
       await expectNoAxeViolations(page);
@@ -2252,6 +2276,68 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
       ).toBeLessThanOrEqual(firstControlLeft);
     });
   }
+});
+
+test.describe("Mi cuenta con grupos", () => {
+  skipWithoutSession();
+  test.use({ storageState: GROUPED_MEMBER_STORAGE_STATE_PATH });
+
+  test("ve sus grupos en orden alfabético", async ({ page }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+
+    const section = page.getByRole("region", { name: "My groups" });
+    await expect(section.getByRole("listitem")).toHaveText(
+      [...GROUPED_MEMBER_GROUP_NAMES].sort(),
+    );
+  });
+
+  test("en español, la sección sale en español", async ({ page }) => {
+    await chooseSpanish(page);
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+
+    await expect(
+      page.getByRole("region", { name: "Mis grupos" }),
+    ).toBeVisible();
+  });
+
+  test("el endpoint devuelve sólo sus grupos, con id y nombre", async ({
+    request,
+  }) => {
+    const response = await request.get(`${APP_URL}${ACCOUNT_GROUPS_ENDPOINT}`);
+
+    expect(response.status()).toBe(200);
+    const { data } = (await response.json()) as {
+      data: { groups: { id: string; name: string }[] };
+    };
+    expect(data.groups.map((group) => group.name)).toEqual(
+      [...GROUPED_MEMBER_GROUP_NAMES].sort(),
+    );
+    for (const group of data.groups) {
+      expect(Object.keys(group).sort()).toEqual(["id", "name"]);
+    }
+  });
+});
+
+test.describe("Mi cuenta sin grupos", () => {
+  skipWithoutSession();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("dice que no pertenece a ninguno", async ({ page }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+
+    const section = page.getByRole("region", { name: "My groups" });
+    await expect(
+      section.getByText("You don't belong to any group yet."),
+    ).toBeVisible();
+    await expect(section.getByRole("listitem")).toHaveCount(0);
+  });
+
+  test("el endpoint devuelve una lista vacía", async ({ request }) => {
+    const response = await request.get(`${APP_URL}${ACCOUNT_GROUPS_ENDPOINT}`);
+
+    expect(response.status()).toBe(200);
+    expect(await response.json()).toEqual({ data: { groups: [] } });
+  });
 });
 
 test.describe("Mi cuenta con una solicitud pendiente", () => {
