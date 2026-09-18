@@ -19,6 +19,8 @@ import { hasCapability } from "@/lib/auth/roles";
  * pantalla lo usará para su formulario. */
 export const GROUP_NAME_MAX_LENGTH = 60;
 
+const CONTROL_CHARACTER = /\p{Cc}/u;
+
 /** Un grupo con cuántos socios cuenta. Los dados de baja (`inactive`) siguen
  * asignados, pero no cuentan (RF-3). */
 export type Group = {
@@ -92,11 +94,19 @@ export class GroupNotFoundError extends Error {
 /** El nombre tal como se guarda: recortado de todo espacio en blanco, no sólo
  * de los espacios que quita el `btrim` de la base, para que un tabulador o un
  * salto de línea alrededor no cree un grupo que parece repetido. El largo se
- * cuenta en caracteres, como `char_length`, y no en unidades de UTF-16. */
+ * cuenta en caracteres, como `char_length`, y no en unidades de UTF-16.
+ *
+ * Dentro del nombre no cabe ningún carácter de control: Postgres rechaza el
+ * nulo en un `text`, y un tabulador en medio es un nombre que nadie escribió
+ * a propósito. */
 export function normalizeGroupName(rawName: string): string {
   const name = rawName.trim();
   const length = [...name].length;
-  if (length === 0 || length > GROUP_NAME_MAX_LENGTH) {
+  if (
+    length === 0 ||
+    length > GROUP_NAME_MAX_LENGTH ||
+    CONTROL_CHARACTER.test(name)
+  ) {
     throw new InvalidGroupNameError();
   }
   return name;
@@ -132,8 +142,8 @@ export async function createGroup(
   gateways: GroupsGateways,
   request: { readonly callerId: string; readonly name: string },
 ): Promise<Group> {
-  const name = normalizeGroupName(request.name);
   const caller = await findGroupManager(gateways, request.callerId);
+  const name = normalizeGroupName(request.name);
   const result = await gateways.groups.insertGroup({
     clubId: caller.clubId,
     name,
@@ -152,8 +162,8 @@ export async function renameGroup(
     readonly name: string;
   },
 ): Promise<Group> {
-  const name = normalizeGroupName(request.name);
   const caller = await findGroupManager(gateways, request.callerId);
+  const name = normalizeGroupName(request.name);
   const result = await gateways.groups.renameGroup({
     clubId: caller.clubId,
     groupId: request.groupId,

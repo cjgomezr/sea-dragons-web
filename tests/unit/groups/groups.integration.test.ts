@@ -150,6 +150,12 @@ describeRls("los grupos contra seadragons-dev", () => {
                     clubId,
                     name: "Junior Squad",
                   });
+                  // En minúscula: el orden alfabético no puede depender de
+                  // las mayúsculas ni del collation de la base.
+                  const { id: alevinesId } = await createOrFail(gateways, {
+                    clubId,
+                    name: "alevines",
+                  });
                   await assignMembers(serviceClient, {
                     clubId,
                     groupId: seniorId,
@@ -165,6 +171,7 @@ describeRls("los grupos contra seadragons-dev", () => {
                   await expect(
                     gateways.groups.findClubGroups(clubId),
                   ).resolves.toEqual([
+                    { id: alevinesId, name: "alevines", memberCount: 0 },
                     { id: juniorId, name: "Junior Squad", memberCount: 0 },
                     { id: seniorId, name: "Senior Squad", memberCount: 1 },
                   ]);
@@ -210,6 +217,7 @@ describeRls("los grupos contra seadragons-dev", () => {
                   await expect(
                     gateways.groups.findClubGroups(clubId),
                   ).resolves.toEqual([
+                    { id: alevinesId, name: "alevines", memberCount: 0 },
                     { id: juniorId, name: "Junior Squad", memberCount: 0 },
                   ]);
                   const { count, error } = await serviceClient.client

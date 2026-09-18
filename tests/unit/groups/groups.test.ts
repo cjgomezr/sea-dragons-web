@@ -146,6 +146,8 @@ describe("grupos: crear", () => {
     ["vacío", ""],
     ["de solo espacios", "   \t "],
     ["de más de 60 caracteres", "x".repeat(GROUP_NAME_MAX_LENGTH + 1)],
+    ["con un carácter nulo dentro", "Senior\u0000Squad"],
+    ["con un tabulador dentro", "Senior\tSquad"],
   ])("rechaza un nombre %s sin escribir", async (_case, name) => {
     await expect(
       createGroup(gateways(), { callerId: CALLER_ID, name }),
@@ -281,6 +283,25 @@ describe("grupos: quién puede", () => {
       );
       expect(clubsRead).toEqual([]);
       expect(writes).toEqual([]);
+    },
+  );
+
+  it.each([
+    [
+      "crear",
+      (g: GroupsGateways) => createGroup(g, { callerId: CALLER_ID, name: "" }),
+    ],
+    [
+      "renombrar",
+      (g: GroupsGateways) =>
+        renameGroup(g, { callerId: CALLER_ID, groupId: GROUP_ID, name: "" }),
+    ],
+  ] as const)(
+    "niega a un Player %s aunque el nombre tampoco valga",
+    async (_operation, run) => {
+      await expect(run(gateways({ role: "Player" }))).rejects.toBeInstanceOf(
+        GroupsForbiddenError,
+      );
     },
   );
 

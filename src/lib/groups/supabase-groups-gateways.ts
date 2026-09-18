@@ -26,6 +26,11 @@ const INACTIVE_STATUS = "inactive";
 const UNIQUE_VIOLATION_CODE = "23505";
 const GROUP_NAME_INDEX = "groups_club_id_name_key";
 
+/** El orden alfabético de la lista, sin distinguir mayúsculas. Se ordena aquí
+ * y no con `order by`, que seguiría el collation de la base: con `C`, "alevines"
+ * saldría detrás de "Senior Squad", y dev y producción podrían no coincidir. */
+const GROUP_NAME_ORDER = new Intl.Collator("en", { sensitivity: "base" });
+
 type Environment = Readonly<Record<string, string | undefined>>;
 
 type Row = Record<string, unknown>;
@@ -124,8 +129,7 @@ export function createGroupsGateways(
           serviceClient
             .from(GROUPS_TABLE)
             .select(GROUP_COLUMNS)
-            .eq("club_id", clubId)
-            .order("name"),
+            .eq("club_id", clubId),
           readActiveMemberCounts(serviceClient, clubId),
         ]);
         if (groups.error) {
@@ -133,10 +137,12 @@ export function createGroupsGateways(
             `No se pudieron leer los grupos del club ${clubId}: ${groups.error.message}`,
           );
         }
-        return groups.data.map((row: Row) => {
-          const group = toGroupRow(row);
-          return { ...group, memberCount: counts.get(group.id) ?? 0 };
-        });
+        return groups.data
+          .map((row: Row) => {
+            const group = toGroupRow(row);
+            return { ...group, memberCount: counts.get(group.id) ?? 0 };
+          })
+          .sort((a, b) => GROUP_NAME_ORDER.compare(a.name, b.name));
       },
 
       async insertGroup({ clubId, name }) {
