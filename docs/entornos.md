@@ -634,11 +634,10 @@ where email = 'admin@example.com'
 returning id, full_name, email, role;
 ```
 
-El `returning` muestra la fila cambiada: debe ser una sola y la misma del paso
-
-1. `'Admin'` va con esa grafía exacta; la restricción de `members.role`
-   (`0003_members.sql`) rechaza cualquier otra. El rol se lee del servidor en cada
-   petición, así que la persona no necesita cerrar sesión.
+El `returning` muestra la fila cambiada. Debe ser una sola, la misma que viste
+en el primer paso. `'Admin'` va con esa grafía exacta: la restricción de
+`members.role` (`0003_members.sql`) rechaza cualquier otra. El rol se lee del
+servidor en cada petición, así que la persona no necesita cerrar sesión.
 
 **Después del primero**, los demás Admin se nombran desde la aplicación, en la
 pantalla de Administración (`/administracion`), aprobando una solicitud de rol
