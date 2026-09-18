@@ -31,6 +31,16 @@ const GROUP_NAME_INDEX = "groups_club_id_name_key";
  * saldría detrás de "Senior Squad", y dev y producción podrían no coincidir. */
 const GROUP_NAME_ORDER = new Intl.Collator("en", { sensitivity: "base" });
 
+/** "Élite" y "Elite" empatan para el collator y los dos caben en la base; el
+ * desempate por código hace que su orden no dependa de cómo lleguen las filas. */
+function compareGroupNames(a: GroupRow, b: GroupRow): number {
+  const byName = GROUP_NAME_ORDER.compare(a.name, b.name);
+  if (byName !== 0) {
+    return byName;
+  }
+  return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+}
+
 type Environment = Readonly<Record<string, string | undefined>>;
 
 type Row = Record<string, unknown>;
@@ -142,7 +152,7 @@ export function createGroupsGateways(
             const group = toGroupRow(row);
             return { ...group, memberCount: counts.get(group.id) ?? 0 };
           })
-          .sort((a, b) => GROUP_NAME_ORDER.compare(a.name, b.name));
+          .sort(compareGroupNames);
       },
 
       async insertGroup({ clubId, name }) {

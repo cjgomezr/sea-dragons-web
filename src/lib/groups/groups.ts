@@ -71,7 +71,7 @@ export class GroupsForbiddenError extends Error {
 export class InvalidGroupNameError extends Error {
   constructor() {
     super(
-      `El nombre del grupo no puede quedar vacío ni pasar de ${GROUP_NAME_MAX_LENGTH} caracteres.`,
+      `El nombre del grupo tiene que tener entre 1 y ${GROUP_NAME_MAX_LENGTH} caracteres, sin caracteres de control.`,
     );
     this.name = "InvalidGroupNameError";
   }
