@@ -9,6 +9,7 @@ import {
   DASHBOARD_PATH,
   EMAIL_CONFIRMATION_PATH,
   EVALUATIONS_PATH,
+  GROUPS_API_PATH,
   GUARDIAN_CONSENT_API_PATH,
   MEMBERS_API_PATH,
   MEMBER_ROLE_API_PATH,
@@ -474,6 +475,41 @@ describe("frontera por rol en la administración del club (#212)", () => {
         ...activeAs("Admin"),
       }),
     ).toEqual(ALLOW);
+  });
+});
+
+/** Un grupo cualquiera, en el segmento dinámico de renombrar y borrar. */
+const GROUP_PATH = `${GROUPS_API_PATH}/9a9a9a9a-0000-4000-8000-000000000009`;
+
+describe("frontera de grupos", () => {
+  it.each([GROUPS_API_PATH, GROUP_PATH])("niega a un Player %s", (pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs("Player") })).toEqual({
+      kind: "missingCapability",
+    });
+  });
+
+  it.each(
+    (["Admin", "Coach", "Committee"] as const).flatMap((role) =>
+      [GROUPS_API_PATH, GROUP_PATH].map(
+        (pathname) => [role, pathname] as const,
+      ),
+    ),
+  )("deja pasar a un %s a %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
+      ALLOW,
+    );
+  });
+
+  it("responde 401 sin sesión", () => {
+    expect(
+      decideSessionBoundary({ pathname: GROUPS_API_PATH, ...ANONYMOUS }),
+    ).toEqual({ kind: "unauthenticated" });
+  });
+
+  it("responde 403 a una cuenta incompleta", () => {
+    expect(
+      decideSessionBoundary({ pathname: GROUP_PATH, ...INCOMPLETE }),
+    ).toEqual({ kind: "forbidden" });
   });
 });
 

@@ -43,6 +43,19 @@ describe("respuesta correcta", () => {
 
     expect(response.status).toBe(201);
   });
+
+  it("responde 204 sin cuerpo cuando el handler no tiene nada que devolver", async () => {
+    const route = createApiRoute({
+      handler: async () => ({ status: 204 as const }),
+    });
+
+    const response = await route(
+      new NextRequest("http://localhost/api/v1/things/1", { method: "DELETE" }),
+    );
+
+    expect(response.status).toBe(204);
+    await expect(response.text()).resolves.toBe("");
+  });
 });
 
 describe("respuesta de error", () => {
