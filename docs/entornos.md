@@ -591,6 +591,62 @@ a mano hay que ir al dashboard de Supabase por la cadena de conexión en ese
 momento. La vía sin credenciales es mirar la última corrida del workflow, que
 hace exactamente esta comprobación después de cada migración aplicada.
 
+## El primer Admin del club
+
+Toda cuenta nace Player (FR-008) y solo un Admin puede cambiar roles (E3,
+`docs/prd/e3-roles-rbac.md`). Un club recién desplegado no tiene ningún Admin,
+así que el primero se crea a mano con una sentencia SQL (RF-10). Es un acto
+manual y se hace una sola vez por proyecto: una vez en `seadragons-prod` para el
+club de verdad y, si hace falta, una vez en `seadragons-dev` para probar. Si ya
+existe algún Admin, no se usa esta vía.
+
+Dónde se ejecuta: dashboard de Supabase, el proyecto que toque
+(`seadragons-dev` o `seadragons-prod`), **SQL Editor**. Mira el nombre del
+proyecto arriba a la izquierda antes de pulsar Run; es la misma sentencia en los
+dos y nada la detiene si te equivocas de pestaña.
+
+La persona tiene que haberse registrado y completado su cuenta antes. Una
+cuenta `incomplete` no puede administrar (la frontera de cuentas incompletas se
+aplica antes que la de roles), y por eso la sentencia exige `active`.
+
+**1. Comprueba el correo.** Sustituye `admin@example.com` por el correo con el
+que la persona se registró, en minúsculas: Supabase Auth guarda los correos así
+y `members.email` es copia de ese valor.
+
+```sql
+select id, full_name, email, role, account_status
+from public.members
+where email = 'admin@example.com';
+```
+
+Tiene que salir exactamente una fila, con `account_status = 'active'`. Si no
+sale ninguna, el correo está mal escrito o la persona no se ha registrado. Si
+sale `incomplete`, falta que termine el registro. En cualquiera de esos casos
+no sigas.
+
+**2. Nómbrala Admin.**
+
+```sql
+update public.members
+set role = 'Admin'
+where email = 'admin@example.com'
+  and account_status = 'active'
+returning id, full_name, email, role;
+```
+
+El `returning` muestra la fila cambiada: debe ser una sola y la misma del paso
+
+1. `'Admin'` va con esa grafía exacta; la restricción de `members.role`
+   (`0003_members.sql`) rechaza cualquier otra. El rol se lee del servidor en cada
+   petición, así que la persona no necesita cerrar sesión.
+
+**Después del primero**, los demás Admin se nombran desde la aplicación, en la
+pantalla de Administración (`/administracion`), aprobando una solicitud de rol
+o cambiando el rol de un socio. Esa vía sí deja rastro. El cambio a mano de esta
+sección no queda en la bitácora (`public.audit_log`): la entrada `role.changed` la
+escribe la aplicación, no la base, y la sentencia no pasa por la aplicación.
+Si hace falta constancia, anótala fuera (quién, qué correo, qué día).
+
 ## Una trampa del plan Free
 
 Free pausa un proyecto tras una semana sin actividad. Producción iba a estar
