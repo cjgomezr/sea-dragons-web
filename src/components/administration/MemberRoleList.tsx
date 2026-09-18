@@ -38,14 +38,18 @@ function MemberRow({
   translate,
   member,
   draftRole,
-  isBusy,
+  isSaving,
+  isLocked,
   onSelect,
   onSave,
 }: {
   translate: Translator;
   member: ClubMember;
   draftRole: Role;
-  isBusy: boolean;
+  /** Este socio es el que se está guardando. */
+  isSaving: boolean;
+  /** Hay un guardado en curso, de este socio o de otro: el clic no saldría. */
+  isLocked: boolean;
   /** Recibe `null` sólo si el navegador devolviera algo que no es de las
    * opciones de abajo, que es lo mismo que decir nunca. */
   onSelect: (role: Role | null) => void;
@@ -66,7 +70,7 @@ function MemberRow({
           name: member.fullName,
         })}
         value={draftRole}
-        disabled={isBusy}
+        disabled={isLocked}
         onChange={(event) => onSelect(parseRole(event.target.value))}
       >
         {ROLES.map((role) => (
@@ -81,10 +85,10 @@ function MemberRow({
         aria-label={translate("admin.members.saveLabel", {
           name: member.fullName,
         })}
-        disabled={isBusy || draftRole === member.role}
+        disabled={isLocked || draftRole === member.role}
         onClick={onSave}
       >
-        {translate(isBusy ? "admin.members.saving" : "admin.members.save")}
+        {translate(isSaving ? "admin.members.saving" : "admin.members.save")}
       </button>
     </li>
   );
@@ -151,7 +155,8 @@ export function MemberRoleList({
                 translate={translate}
                 member={member}
                 draftRole={draftRole}
-                isBusy={savingUserId === member.userId}
+                isSaving={savingUserId === member.userId}
+                isLocked={savingUserId !== null}
                 onSelect={(role) => selectRole(member.userId, role)}
                 onSave={() => void save(member, draftRole)}
               />

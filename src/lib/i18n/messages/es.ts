@@ -296,6 +296,7 @@ export const spanishMessages: MessageCatalog = {
   "admin.error.roleAlreadyGranted":
     "Ese socio ya tiene ese rol o uno mayor. Rechaza la solicitud.",
   "admin.error.gone": "Esa solicitud ya no está en el club.",
+  "admin.error.memberGone": "Ese socio ya no está en el club.",
   "admin.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para seguir.",
   "admin.error.forbidden": "Tu rol no puede gestionar socios ni roles.",

@@ -472,6 +472,78 @@ describe("lista de socios", () => {
     await waitFor(() => expect(memberRole()).toHaveValue("Committee"));
     expect(calls.filter((call) => call.method === "PATCH")).toHaveLength(1);
   });
+
+  it("con un socio que ya no está en el club lo dice del socio, no de una solicitud", async () => {
+    const user = userEvent.setup();
+    stubApi({
+      requests: [],
+      roleChange: async () => errorResponse(404, "not_found"),
+    });
+    await renderScreen();
+
+    await user.selectOptions(memberRole(), "Coach");
+    await user.click(
+      screen.getByRole("button", { name: "Save the role for Nerea Ruiz" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That member is no longer in the club.",
+    );
+  });
+
+  it("con una regla de negocio que no conoce da el aviso genérico", async () => {
+    const user = userEvent.setup();
+    stubApi({
+      requests: [],
+      roleChange: async () =>
+        errorResponse(422, "business_rule", "regla_desconocida"),
+    });
+    await renderScreen();
+
+    await user.selectOptions(memberRole(), "Coach");
+    await user.click(
+      screen.getByRole("button", { name: "Save the role for Nerea Ruiz" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't finish that. Try again in a moment.",
+    );
+    expect(memberRole()).toHaveValue("Player");
+  });
+
+  it("desactiva el botón de los demás socios mientras un cambio está en curso", async () => {
+    const user = userEvent.setup();
+    let answer: (response: Response) => void = () => undefined;
+    stubApi({
+      members: [NEREA, ANA],
+      requests: [],
+      roleChange: () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve;
+        }),
+    });
+    await renderScreen();
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Role for Ana Admin" }),
+      "Committee",
+    );
+
+    await user.selectOptions(memberRole(), "Coach");
+    await user.click(
+      screen.getByRole("button", { name: "Save the role for Nerea Ruiz" }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Save the role for Ana Admin" }),
+    ).toBeDisabled();
+    await act(async () => {
+      answer(
+        jsonResponse(200, {
+          data: { userId: NEREA_ID, previousRole: "Player", role: "Coach" },
+        }),
+      );
+    });
+  });
 });
 
 describe("carga de la pantalla", () => {

@@ -17,6 +17,7 @@ import {
   ROLE_REQUESTS_API_PATH,
   ROLE_REQUEST_DECISION_API_PATH,
 } from "@/lib/auth/routes";
+import type { MessageKey } from "@/lib/i18n/message";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
@@ -198,9 +199,33 @@ export function isChangeRefused(failure: RequestFailure): boolean {
   );
 }
 
+/** Lo que la pantalla intentaba cuando el servidor dijo que no. Un mismo
+ * código no significa lo mismo en las dos acciones: un 404 al decidir es una
+ * solicitud que ya no está, y al cambiar un rol es un socio que ya no está. */
+export type AdministrationAction = "decision" | "roleChange";
+
+const NOT_FOUND_MESSAGES: Readonly<Record<AdministrationAction, MessageKey>> = {
+  decision: "admin.error.gone",
+  roleChange: "admin.error.memberGone",
+};
+
+/** Las reglas que los endpoints de escritura nombran en `reason`. Una que no
+ * esté aquí no se adivina: sale el aviso genérico. */
+function businessRuleMessage(reason: string | null): MessageKey {
+  switch (reason) {
+    case "last_admin":
+      return "admin.error.lastAdmin";
+    case "role_already_granted":
+      return "admin.error.roleAlreadyGranted";
+    default:
+      return "admin.error.unexpected";
+  }
+}
+
 /** Lo que el servidor puede responder que no, en el idioma de la pantalla. */
 export function describeAdministrationFailure(
   translate: Translator,
+  action: AdministrationAction,
   { failure, reason }: AdministrationFailure,
 ): string {
   switch (failure) {
@@ -209,11 +234,9 @@ export function describeAdministrationFailure(
     case "conflict":
       return translate("admin.error.alreadyDecided");
     case "business_rule":
-      return reason === "last_admin"
-        ? translate("admin.error.lastAdmin")
-        : translate("admin.error.roleAlreadyGranted");
+      return translate(businessRuleMessage(reason));
     case "not_found":
-      return translate("admin.error.gone");
+      return translate(NOT_FOUND_MESSAGES[action]);
     case "unauthenticated":
       return translate("admin.error.signInRequired");
     case "forbidden":

@@ -14,6 +14,7 @@ import { type MemberRoleSaveResult, MemberRoleList } from "./MemberRoleList";
 import { PendingRequestsTray } from "./PendingRequestsTray";
 import {
   type AdministrationData,
+  type AdministrationAction,
   type AdministrationFailure,
   type AdministrationLoad,
   describeAdministrationFailure,
@@ -117,11 +118,12 @@ export function AdministrationScreen({
   }
 
   function noticeFor(
+    action: AdministrationAction,
     failure: AdministrationFailure,
   ): AdministrationNoticeState {
     return {
       kind: "error",
-      message: describeAdministrationFailure(translate, failure),
+      message: describeAdministrationFailure(translate, action, failure),
     };
   }
 
@@ -153,7 +155,7 @@ export function AdministrationScreen({
   ): Promise<void> {
     const outcome = await submitRoleRequestDecision(request.id, decision);
     if (outcome.kind === "failed") {
-      setNotices({ tray: noticeFor(outcome), members: null });
+      setNotices({ tray: noticeFor("decision", outcome), members: null });
       // Una que el servidor da por resuelta no sigue esperando respuesta.
       if (isRequestSettled(outcome.failure)) {
         settleRequest(request, null);
@@ -182,7 +184,7 @@ export function AdministrationScreen({
   ): Promise<MemberRoleSaveResult> {
     const outcome = await submitMemberRole(member.userId, role);
     if (outcome.kind === "failed") {
-      setNotices({ tray: null, members: noticeFor(outcome) });
+      setNotices({ tray: null, members: noticeFor("roleChange", outcome) });
       return isChangeRefused(outcome.failure) ? "settled" : "retryable";
     }
     setState((current) =>

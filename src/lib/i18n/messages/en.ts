@@ -301,6 +301,7 @@ export const englishMessages = {
   "admin.error.roleAlreadyGranted":
     "That member already has that role or a higher one. Reject the request instead.",
   "admin.error.gone": "That request is no longer in the club.",
+  "admin.error.memberGone": "That member is no longer in the club.",
   "admin.error.signInRequired":
     "Your session has ended. Sign in again to keep going.",
   "admin.error.forbidden": "Your role can't manage members and roles.",
