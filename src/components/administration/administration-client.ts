@@ -204,14 +204,19 @@ export function isChangeRefused(failure: RequestFailure): boolean {
  * solicitud que ya no está, y al cambiar un rol es un socio que ya no está. */
 export type AdministrationAction = "decision" | "roleChange";
 
-const NOT_FOUND_MESSAGES: Readonly<Record<AdministrationAction, MessageKey>> = {
+const NOT_FOUND_MESSAGES = {
   decision: "admin.error.gone",
   roleChange: "admin.error.memberGone",
-};
+} as const satisfies Readonly<Record<AdministrationAction, MessageKey>>;
+
+type BusinessRuleMessageKey =
+  | "admin.error.lastAdmin"
+  | "admin.error.roleAlreadyGranted"
+  | "admin.error.unexpected";
 
 /** Las reglas que los endpoints de escritura nombran en `reason`. Una que no
  * esté aquí no se adivina: sale el aviso genérico. */
-function businessRuleMessage(reason: string | null): MessageKey {
+function businessRuleMessage(reason: string | null): BusinessRuleMessageKey {
   switch (reason) {
     case "last_admin":
       return "admin.error.lastAdmin";
