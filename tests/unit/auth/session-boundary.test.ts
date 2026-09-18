@@ -481,16 +481,29 @@ describe("frontera por rol en la administración del club (#212)", () => {
 /** Un grupo cualquiera, en el segmento dinámico de renombrar y borrar. */
 const GROUP_PATH = `${GROUPS_API_PATH}/9a9a9a9a-0000-4000-8000-000000000009`;
 
+/** Los caminos de los socios de un grupo (#227), que cuelgan del mismo
+ * prefijo y no se declaran aparte. */
+const GROUP_MEMBERSHIP_PATHS = [
+  `${GROUP_PATH}/members`,
+  `${GROUP_PATH}/candidates`,
+  `${GROUP_PATH}/members/b1b1b1b1-0000-4000-8000-00000000000b`,
+];
+
 describe("frontera de grupos", () => {
-  it.each([GROUPS_API_PATH, GROUP_PATH])("niega a un Player %s", (pathname) => {
-    expect(decideSessionBoundary({ pathname, ...activeAs("Player") })).toEqual({
-      kind: "missingCapability",
-    });
-  });
+  it.each([GROUPS_API_PATH, GROUP_PATH, ...GROUP_MEMBERSHIP_PATHS])(
+    "niega a un Player %s",
+    (pathname) => {
+      expect(
+        decideSessionBoundary({ pathname, ...activeAs("Player") }),
+      ).toEqual({
+        kind: "missingCapability",
+      });
+    },
+  );
 
   it.each(
     (["Admin", "Coach", "Committee"] as const).flatMap((role) =>
-      [GROUPS_API_PATH, GROUP_PATH].map(
+      [GROUPS_API_PATH, GROUP_PATH, ...GROUP_MEMBERSHIP_PATHS].map(
         (pathname) => [role, pathname] as const,
       ),
     ),
