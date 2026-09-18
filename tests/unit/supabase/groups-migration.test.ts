@@ -595,4 +595,24 @@ describeConPostgres("la función de pertenencia a grupos", () => {
     expect(llamada.code, llamada.stderr).toBe(0);
     expect(rowsOf(llamada)).toEqual(["t"]);
   });
+
+  it("no deja a un socio sondear los grupos de otro", async () => {
+    // Con `security invoker` la policy de pertenencias filtra la consulta de
+    // la función: preguntar por otro socio siempre responde falso.
+    const database = await migratedDatabase();
+    const socio = await seedMember(database, { accountStatus: "active" });
+    const otro = await seedMember(database, { accountStatus: "active" });
+    const groupId = await seedGroup(database, "Senior Squad");
+    await insertMembership(database, { groupId, userId: otro });
+
+    const llamada = await database.attempt(
+      asApiIdentity(
+        { role: "authenticated", subject: socio },
+        callIsMemberInGroups(otro, [groupId]),
+      ),
+    );
+
+    expect(llamada.code, llamada.stderr).toBe(0);
+    expect(rowsOf(llamada)).toEqual(["f"]);
+  });
 });
