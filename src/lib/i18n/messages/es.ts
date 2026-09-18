@@ -261,6 +261,46 @@ export const spanishMessages: MessageCatalog = {
   "account.error.forbidden": "Tu cuenta no puede pedir un rol ahora mismo.",
   "account.error.unexpected":
     "No pudimos enviar la solicitud. Vuelve a intentarlo en un momento.",
+
+  "admin.metaTitle": "Administración · Victoria Seadragons",
+  "admin.metaDescription":
+    "Las solicitudes de rol pendientes y los socios del club, para un Admin.",
+  "admin.title": "Administración",
+  "admin.lead":
+    "Responde las solicitudes de rol que te esperan y decide el rol de cada socio.",
+  "admin.loading": "Cargando las solicitudes y los socios del club…",
+  "admin.loadFailed":
+    "No pudimos cargar las solicitudes y los socios del club.",
+  "admin.retry": "Volver a intentar",
+  "admin.requests.title": "Solicitudes pendientes",
+  "admin.requests.empty": "No hay solicitudes esperando respuesta.",
+  "admin.requests.asked": "{name} pidió ser {role}",
+  "admin.requests.askedOn": "La pidió el {date}",
+  "admin.requests.noJustification": "No escribió ninguna nota.",
+  "admin.requests.approve": "Aprobar",
+  "admin.requests.reject": "Rechazar",
+  "admin.requests.approveLabel": "Aprobar la solicitud de {name}",
+  "admin.requests.rejectLabel": "Rechazar la solicitud de {name}",
+  "admin.requests.approved": "{name} ya es {role}.",
+  "admin.requests.rejected": "La solicitud de {name} quedó rechazada.",
+  "admin.members.title": "Socios del club",
+  "admin.members.empty": "El club todavía no tiene socios.",
+  "admin.members.roleLabel": "Rol de {name}",
+  "admin.members.save": "Guardar",
+  "admin.members.saveLabel": "Guardar el rol de {name}",
+  "admin.members.saving": "Guardando…",
+  "admin.members.saved": "{name} ya es {role}.",
+  "admin.error.alreadyDecided": "Otro Admin ya respondió esta solicitud.",
+  "admin.error.lastAdmin":
+    "Es el último Admin del club. Nombra a otro Admin antes de cambiar este rol.",
+  "admin.error.roleAlreadyGranted":
+    "Ese socio ya tiene ese rol o uno mayor. Rechaza la solicitud.",
+  "admin.error.gone": "Esa solicitud ya no está en el club.",
+  "admin.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para seguir.",
+  "admin.error.forbidden": "Tu rol no puede gestionar socios ni roles.",
+  "admin.error.unexpected":
+    "No pudimos completar la acción. Vuelve a intentarlo en un momento.",
   "themeToggle.switchToLight": "Cambiar a tema claro",
   "themeToggle.switchToDark": "Cambiar a tema oscuro",
   "languageToggle.label": "Idioma: español. Cambiar a English (EN)",

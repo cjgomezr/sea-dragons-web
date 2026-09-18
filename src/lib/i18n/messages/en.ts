@@ -265,6 +265,46 @@ export const englishMessages = {
   "account.error.forbidden": "Your account can't request a role right now.",
   "account.error.unexpected":
     "We couldn't send the request. Try again in a moment.",
+
+  // La pantalla de administración (#212). Los nombres de rol salen de las
+  // claves `role.*` de arriba, que ya las usa Mi cuenta.
+  "admin.metaTitle": "Administration · Victoria Seadragons",
+  "admin.metaDescription":
+    "Pending role requests and the club's members, for an Admin.",
+  "admin.title": "Administration",
+  "admin.lead":
+    "Answer the role requests waiting for you, and set each member's role.",
+  "admin.loading": "Loading the club's requests and members…",
+  "admin.loadFailed": "We couldn't load the club's requests and members.",
+  "admin.retry": "Try again",
+  "admin.requests.title": "Pending requests",
+  "admin.requests.empty": "No requests are waiting for an answer.",
+  "admin.requests.asked": "{name} asked to be {role}",
+  "admin.requests.askedOn": "Asked on {date}",
+  "admin.requests.noJustification": "They didn't write a note.",
+  "admin.requests.approve": "Approve",
+  "admin.requests.reject": "Reject",
+  "admin.requests.approveLabel": "Approve the request from {name}",
+  "admin.requests.rejectLabel": "Reject the request from {name}",
+  "admin.requests.approved": "{name} is now {role}.",
+  "admin.requests.rejected": "The request from {name} was rejected.",
+  "admin.members.title": "Club members",
+  "admin.members.empty": "The club has no members yet.",
+  "admin.members.roleLabel": "Role for {name}",
+  "admin.members.save": "Save",
+  "admin.members.saveLabel": "Save the role for {name}",
+  "admin.members.saving": "Saving…",
+  "admin.members.saved": "{name} is now {role}.",
+  "admin.error.alreadyDecided": "Another Admin already answered this request.",
+  "admin.error.lastAdmin":
+    "This is the club's last Admin. Name another Admin before changing this role.",
+  "admin.error.roleAlreadyGranted":
+    "That member already has that role or a higher one. Reject the request instead.",
+  "admin.error.gone": "That request is no longer in the club.",
+  "admin.error.signInRequired":
+    "Your session has ended. Sign in again to keep going.",
+  "admin.error.forbidden": "Your role can't manage members and roles.",
+  "admin.error.unexpected": "We couldn't finish that. Try again in a moment.",
   "themeToggle.switchToLight": "Switch to light theme",
   "themeToggle.switchToDark": "Switch to dark theme",
   // El destino va con su propio nombre ("Español", no "Spanish"): quien no
