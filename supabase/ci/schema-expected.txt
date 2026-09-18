@@ -18,6 +18,14 @@ columna confirmation_email_requests.requested_at tipo=timestamp with time zone n
 columna email_send_requests.club_id tipo=uuid null=NO default=-
 columna email_send_requests.id tipo=uuid null=NO default=gen_random_uuid()
 columna email_send_requests.requested_at tipo=timestamp with time zone null=NO default=now()
+columna group_memberships.assigned_at tipo=timestamp with time zone null=NO default=now()
+columna group_memberships.club_id tipo=uuid null=NO default=-
+columna group_memberships.group_id tipo=uuid null=NO default=-
+columna group_memberships.user_id tipo=uuid null=NO default=-
+columna groups.club_id tipo=uuid null=NO default=-
+columna groups.created_at tipo=timestamp with time zone null=NO default=now()
+columna groups.id tipo=uuid null=NO default=gen_random_uuid()
+columna groups.name tipo=text null=NO default=-
 columna members.account_status tipo=text null=NO default='incomplete'::text
 columna members.club_id tipo=uuid null=NO default=-
 columna members.country tipo=text null=YES default=-
@@ -54,6 +62,7 @@ columna role_requests.user_id tipo=uuid null=NO default=-
 funcion change_member_role(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_role text)
 funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
 funcion health_probe()
+funcion is_member_in_groups(target_user_id uuid, group_ids uuid[])
 grant audit_log postgres DELETE
 grant audit_log postgres INSERT
 grant audit_log postgres REFERENCES
@@ -111,6 +120,36 @@ grant email_send_requests service_role SELECT
 grant email_send_requests service_role TRIGGER
 grant email_send_requests service_role TRUNCATE
 grant email_send_requests service_role UPDATE
+grant group_memberships authenticated SELECT
+grant group_memberships postgres DELETE
+grant group_memberships postgres INSERT
+grant group_memberships postgres REFERENCES
+grant group_memberships postgres SELECT
+grant group_memberships postgres TRIGGER
+grant group_memberships postgres TRUNCATE
+grant group_memberships postgres UPDATE
+grant group_memberships service_role DELETE
+grant group_memberships service_role INSERT
+grant group_memberships service_role REFERENCES
+grant group_memberships service_role SELECT
+grant group_memberships service_role TRIGGER
+grant group_memberships service_role TRUNCATE
+grant group_memberships service_role UPDATE
+grant groups authenticated SELECT
+grant groups postgres DELETE
+grant groups postgres INSERT
+grant groups postgres REFERENCES
+grant groups postgres SELECT
+grant groups postgres TRIGGER
+grant groups postgres TRUNCATE
+grant groups postgres UPDATE
+grant groups service_role DELETE
+grant groups service_role INSERT
+grant groups service_role REFERENCES
+grant groups service_role SELECT
+grant groups service_role TRIGGER
+grant groups service_role TRUNCATE
+grant groups service_role UPDATE
 grant members authenticated SELECT
 grant members postgres DELETE
 grant members postgres INSERT
@@ -177,7 +216,13 @@ indice confirmation_email_requests_email_hash_requested_at_idx CREATE INDEX conf
 indice confirmation_email_requests_pkey CREATE UNIQUE INDEX confirmation_email_requests_pkey ON public.confirmation_email_requests USING btree (id)
 indice email_send_requests_pkey CREATE UNIQUE INDEX email_send_requests_pkey ON public.email_send_requests USING btree (id)
 indice email_send_requests_requested_at_idx CREATE INDEX email_send_requests_requested_at_idx ON public.email_send_requests USING btree (requested_at DESC)
+indice group_memberships_pkey CREATE UNIQUE INDEX group_memberships_pkey ON public.group_memberships USING btree (group_id, user_id)
+indice group_memberships_user_id_club_id_idx CREATE INDEX group_memberships_user_id_club_id_idx ON public.group_memberships USING btree (user_id, club_id)
+indice groups_club_id_name_key CREATE UNIQUE INDEX groups_club_id_name_key ON public.groups USING btree (club_id, lower(btrim(name)))
+indice groups_id_club_id_key CREATE UNIQUE INDEX groups_id_club_id_key ON public.groups USING btree (id, club_id)
+indice groups_pkey CREATE UNIQUE INDEX groups_pkey ON public.groups USING btree (id)
 indice members_pkey CREATE UNIQUE INDEX members_pkey ON public.members USING btree (id)
+indice members_user_id_club_id_key CREATE UNIQUE INDEX members_user_id_club_id_key ON public.members USING btree (user_id, club_id)
 indice members_user_id_key CREATE UNIQUE INDEX members_user_id_key ON public.members USING btree (user_id)
 indice password_recovery_requests_email_hash_requested_at_idx CREATE INDEX password_recovery_requests_email_hash_requested_at_idx ON public.password_recovery_requests USING btree (email_hash, requested_at DESC)
 indice password_recovery_requests_pkey CREATE UNIQUE INDEX password_recovery_requests_pkey ON public.password_recovery_requests USING btree (id)
@@ -191,6 +236,10 @@ policy audit_log.audit_log_select_denied cmd=SELECT roles={authenticated} using=
 policy clubs.clubs_select_authenticated cmd=SELECT roles={authenticated} using=true check=-
 policy confirmation_email_requests.confirmation_email_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy email_send_requests.email_send_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
+policy group_memberships.group_memberships_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
+policy groups.groups_select_own cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
+   FROM group_memberships gm
+  WHERE ((gm.group_id = groups.id) AND (gm.user_id = ( SELECT auth.uid() AS uid))))) check=-
 policy members.members_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
 policy password_recovery_requests.password_recovery_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy registration_requests.registration_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
@@ -204,6 +253,14 @@ restriccion confirmation_email_requests.confirmation_email_requests_club_id_fkey
 restriccion confirmation_email_requests.confirmation_email_requests_pkey PRIMARY KEY (id)
 restriccion email_send_requests.email_send_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion email_send_requests.email_send_requests_pkey PRIMARY KEY (id)
+restriccion group_memberships.group_memberships_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion group_memberships.group_memberships_group_same_club_fkey FOREIGN KEY (group_id, club_id) REFERENCES groups(id, club_id) ON DELETE CASCADE
+restriccion group_memberships.group_memberships_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
+restriccion group_memberships.group_memberships_pkey PRIMARY KEY (group_id, user_id)
+restriccion groups.groups_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion groups.groups_id_club_id_key UNIQUE (id, club_id)
+restriccion groups.groups_name_length CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 60)))
+restriccion groups.groups_pkey PRIMARY KEY (id)
 restriccion members.members_account_status_check CHECK ((account_status = ANY (ARRAY['incomplete'::text, 'active'::text, 'inactive'::text])))
 restriccion members.members_active_minor_requires_guardian_consent CHECK (((account_status <> 'active'::text) OR (guardian_consent_at IS NOT NULL) OR (date_of_birth IS NULL) OR (date_of_birth <= ((((created_at AT TIME ZONE 'Australia/Melbourne'::text))::date - '18 years'::interval))::date)))
 restriccion members.members_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
@@ -212,6 +269,7 @@ restriccion members.members_guardian_consent_complete CHECK ((((guardian_consent
 restriccion members.members_membership_type_check CHECK ((membership_type = ANY (ARRAY['Full'::text, 'Student'::text, 'Casual'::text])))
 restriccion members.members_pkey PRIMARY KEY (id)
 restriccion members.members_role_check CHECK ((role = ANY (ARRAY['Admin'::text, 'Coach'::text, 'Committee'::text, 'Player'::text])))
+restriccion members.members_user_id_club_id_key UNIQUE (user_id, club_id)
 restriccion members.members_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 restriccion members.members_user_id_key UNIQUE (user_id)
 restriccion password_recovery_requests.password_recovery_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
@@ -231,6 +289,8 @@ tabla audit_log rls=t
 tabla clubs rls=t
 tabla confirmation_email_requests rls=t
 tabla email_send_requests rls=t
+tabla group_memberships rls=t
+tabla groups rls=t
 tabla members rls=t
 tabla password_recovery_requests rls=t
 tabla registration_requests rls=t
