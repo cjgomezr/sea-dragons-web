@@ -1,3 +1,5 @@
+import type { Role } from "@/lib/auth/roles";
+import { isAllowedForRole } from "@/lib/auth/session-boundary";
 import type { MessageKey } from "@/lib/i18n/message";
 import type { Translator } from "@/lib/i18n/translator";
 
@@ -11,7 +13,8 @@ export type NavIconId =
   | "equipos"
   | "evaluaciones"
   | "noticias"
-  | "pagos";
+  | "pagos"
+  | "administracion";
 
 /** Las etiquetas de la navegación viven en el catálogo bajo `nav.label.`.
  * Ninguna lleva datos que rellenar, y acotar el tipo a ese prefijo es lo que
@@ -59,29 +62,60 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   },
   { labelKey: "nav.label.news", href: "/noticias", icon: "noticias" },
   { labelKey: "nav.label.payments", href: "/pagos", icon: "pagos" },
+  // Sólo en "Más" y en la barra lateral, donde cabe entera: no necesita
+  // etiqueta corta.
+  {
+    labelKey: "nav.label.admin",
+    href: "/administracion",
+    icon: "administracion",
+  },
 ];
+
+/** Las secciones que el rol puede abrir, en el orden de `NAV_SECTIONS`.
+ * Esconder el resto es comodidad: quien escriba la dirección a mano se topa
+ * igual con la frontera, que es la que decide. */
+export function getVisibleSections(role: Role): readonly NavSection[] {
+  return NAV_SECTIONS.filter((section) => isAllowedForRole(section.href, role));
+}
+
+export type MobileSections = {
+  readonly primary: readonly NavSection[];
+  readonly overflow: readonly NavSection[];
+};
 
 // Una barra de pestañas deja de ser alcanzable con el pulgar pasadas las cinco
 // ranuras, y la quinta se gasta en el acceso al resto. El mockup móvil define
 // cinco, así que cuatro secciones quedan fijas y las demás viven detrás de
-// "Más". Cuáles van fijas es una decisión de producto, no de layout: estas son
-// las de uso diario (#22).
-const MOBILE_PRIMARY_HREFS: readonly string[] = [
-  "/dashboard",
-  "/calendario",
-  "/equipos",
-  "/noticias",
+// "Más". Cuáles van fijas es una decisión de producto, no de layout: las de uso
+// diario (#22) que el rol puede abrir (#213). Cada ranura lista sus candidatas
+// por preferencia y se queda con la primera que el rol alcance: quien no ve
+// Equipos tiene Directorio en ese mismo hueco.
+const MOBILE_PRIMARY_SLOTS: readonly (readonly string[])[] = [
+  ["/dashboard"],
+  ["/calendario"],
+  ["/equipos", "/directorio"],
+  ["/noticias"],
 ];
 
-function isPrimaryOnMobile(section: NavSection): boolean {
-  return MOBILE_PRIMARY_HREFS.includes(section.href);
+function pickSlotSection(
+  candidates: readonly string[],
+  visible: readonly NavSection[],
+): NavSection | undefined {
+  return candidates
+    .map((href) => visible.find((section) => section.href === href))
+    .find((section) => section !== undefined);
 }
 
-export const MOBILE_PRIMARY_SECTIONS: readonly NavSection[] =
-  NAV_SECTIONS.filter(isPrimaryOnMobile);
-
-export const MOBILE_OVERFLOW_SECTIONS: readonly NavSection[] =
-  NAV_SECTIONS.filter((section) => !isPrimaryOnMobile(section));
+export function getMobileSections(role: Role): MobileSections {
+  const visible = getVisibleSections(role);
+  const primary = MOBILE_PRIMARY_SLOTS.map((candidates) =>
+    pickSlotSection(candidates, visible),
+  ).filter((section) => section !== undefined);
+  return {
+    primary,
+    overflow: visible.filter((section) => !primary.includes(section)),
+  };
+}
 
 export function isSectionActive(
   sectionHref: string,

@@ -6,6 +6,7 @@ import { MobileTabBar } from "@/components/MobileTabBar";
 import { SidebarNav } from "@/components/SidebarNav";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import type { Role } from "@/lib/auth/roles";
 import { ACCOUNT_PAGE_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
@@ -14,9 +15,12 @@ const CLUB_NAME = "Victoria Seadragons";
 
 export function AppShell({
   locale,
+  role,
   children,
 }: {
   locale: Locale;
+  /** El que leyó el servidor: decide qué secciones ofrece la navegación. */
+  role: Role;
   children: ReactNode;
 }): React.JSX.Element {
   const accountLabel = createTranslator(locale)("account.link");
@@ -41,12 +45,12 @@ export function AppShell({
             <SignOutButton locale={locale} />
           </div>
         </div>
-        <SidebarNav locale={locale} />
+        <SidebarNav locale={locale} role={role} />
       </aside>
       <main className="app-main">{children}</main>
       {/* After main on purpose: the bar sits at the bottom of the screen, so
           the tab order should reach it after the content, not before. */}
-      <MobileTabBar locale={locale} />
+      <MobileTabBar locale={locale} role={role} />
     </div>
   );
 }

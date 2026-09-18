@@ -126,8 +126,11 @@ function decideForIncompleteAccount(pathname: string): SessionBoundaryOutcome {
 }
 
 /** Si el rol cumple cada capacidad que exigen las rutas restringidas bajo las
- * que cae la petición. Sin ninguna, la ruta es de cualquier cuenta activa. */
-function isAllowedForRole(pathname: string, role: Role): boolean {
+ * que cae la petición. Sin ninguna, la ruta es de cualquier cuenta activa.
+ *
+ * La navegación (#213) pregunta aquí qué ofrecer, para que esconder y cerrar
+ * salgan de la misma matriz y no de dos listas que puedan desincronizarse. */
+export function isAllowedForRole(pathname: string, role: Role): boolean {
   return RESTRICTED_ROUTES.filter((route) =>
     isPathWithin(pathname, route.path),
   ).every((route) => hasCapability(role, route.capability));

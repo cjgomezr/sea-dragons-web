@@ -216,6 +216,7 @@ export const englishMessages = {
   "nav.label.evaluations": "Evaluations",
   "nav.label.news": "News",
   "nav.label.payments": "Payments",
+  "nav.label.admin": "Administration",
   // Las etiquetas cortas de la barra móvil. "Home" es la del mockup
   // (docs/mockups/mobile-home-light.png); "Calendar", la otra, no se parte a
   // 360px pero con DejaVu Sans, la fuente que resuelve Linux, ocupa el 84% de

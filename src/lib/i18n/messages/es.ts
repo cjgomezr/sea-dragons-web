@@ -212,6 +212,7 @@ export const spanishMessages: MessageCatalog = {
   "nav.label.evaluations": "Evaluaciones",
   "nav.label.news": "Noticias",
   "nav.label.payments": "Pagos",
+  "nav.label.admin": "Administración",
   "nav.label.dashboardShort": "Inicio",
   // "Calendario" ocupaba el 89% de su pestaña a 360px y se partía con las
   // fuentes de Linux. Ojo para E7: el prototipo llama "Agenda" a una de las
