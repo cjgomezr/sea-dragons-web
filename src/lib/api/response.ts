@@ -34,6 +34,8 @@ const HTTP_STATUS_BY_ERROR_CODE: Record<ApiErrorCode, number> = {
 
 const DEFAULT_SUCCESS_STATUS: ApiSuccessStatus = 200;
 
+export const NO_CONTENT_STATUS = 204;
+
 export class ApiError extends Error {
   readonly code: ApiErrorCode;
   readonly reason: string | undefined;
@@ -51,6 +53,12 @@ export function apiSuccess<T>(
   status: ApiSuccessStatus = DEFAULT_SUCCESS_STATUS,
 ): NextResponse<ApiSuccessBody<T>> {
   return NextResponse.json({ data }, { status });
+}
+
+/** Lo que responde una operación que salió bien y no tiene nada que devolver,
+ * como un borrado. Un 204 no lleva cuerpo, ni siquiera `{ data }`. */
+export function apiNoContent(): NextResponse<null> {
+  return new NextResponse(null, { status: NO_CONTENT_STATUS });
 }
 
 export function apiError(
