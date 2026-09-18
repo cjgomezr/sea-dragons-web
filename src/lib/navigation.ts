@@ -32,8 +32,8 @@ export type NavSection = {
   readonly href: string;
   readonly icon: NavIconId;
   // Overrides `labelKey` only on a fixed tab of the mobile tab bar; the
-  // overflow panel spans the full width and keeps the full label. Its strip is narrower
-  // than the sidebar, and the fonts Linux resolves make "Dashboard" wrap to
+  // overflow panel spans the full width and keeps the full label. A tab is
+  // much narrower than the sidebar, and the fonts Linux resolves make "Dashboard" wrap to
   // two lines there while Windows fonts let it fit (#85). Absent unless a
   // section's full label doesn't survive that width in some language. Each
   // catalog fills the short key to its own measure, so a language where the
