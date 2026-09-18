@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ACCOUNT_API_PATH,
+  ACCOUNT_GROUPS_API_PATH,
   ACCOUNT_PAGE_PATH,
   ADMINISTRATION_PATH,
   COMPLETE_REGISTRATION_PATH,
@@ -473,5 +474,34 @@ describe("frontera por rol en la administración del club (#212)", () => {
         ...activeAs("Admin"),
       }),
     ).toEqual(ALLOW);
+  });
+});
+
+describe("frontera de Mis grupos (#229)", () => {
+  it.each(ROLES)("deja a un %s leer sus propios grupos", (role) => {
+    expect(
+      decideSessionBoundary({
+        pathname: ACCOUNT_GROUPS_API_PATH,
+        ...activeAs(role),
+      }),
+    ).toEqual(ALLOW);
+  });
+
+  it("responde sin sesión como a cualquier otro endpoint", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: ACCOUNT_GROUPS_API_PATH,
+        ...ANONYMOUS,
+      }),
+    ).toEqual({ kind: "unauthenticated" });
+  });
+
+  it("no se lo abre a una cuenta incompleta, aunque cuelgue de la cuenta", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: ACCOUNT_GROUPS_API_PATH,
+        ...INCOMPLETE,
+      }),
+    ).toEqual({ kind: "forbidden" });
   });
 });

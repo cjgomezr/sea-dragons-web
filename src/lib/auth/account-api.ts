@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NextRequest } from "next/server";
 import type { DecorateApiResponse } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
@@ -30,13 +31,24 @@ const NO_SESSION_MESSAGE =
 const NO_MEMBER_MESSAGE =
   "Tu sesión no corresponde a ningún socio del club. Escribe al club para que la revisen.";
 
-/** Quién está pidiendo, según su cookie de sesión. Las cookies que Supabase
- * emita al validarla se apuntan en la respuesta: perderlas es el fallo clásico
- * de este patrón. */
-export async function identifyAccountCaller(args: {
+type AccountCallerArgs = {
   readonly request: NextRequest;
   readonly decorateResponse: (decorate: DecorateApiResponse) => void;
-}): Promise<string> {
+};
+
+/** Quién llama y el cliente de su sesión, para los endpoints que leen con la
+ * RLS de quien llama en vez de con la llave de servicio. */
+export type AccountSession = {
+  readonly userId: string;
+  readonly client: SupabaseClient;
+};
+
+/** Quién está pidiendo, según su cookie de sesión, junto al cliente que la
+ * lleva. Las cookies que Supabase emita al validarla se apuntan en la
+ * respuesta: perderlas es el fallo clásico de este patrón. */
+export async function openAccountSession(
+  args: AccountCallerArgs,
+): Promise<AccountSession> {
   const session = createSessionClient(
     process.env,
     readIncomingCookies(args.request),
@@ -55,7 +67,15 @@ export async function identifyAccountCaller(args: {
   if (userId === null) {
     throw new ApiError("unauthenticated", NO_SESSION_MESSAGE);
   }
-  return userId;
+  return { userId, client: session.client };
+}
+
+/** Sólo el id de quien pide, para los endpoints que después leen o escriben
+ * con la llave de servicio, acotados a ese id. */
+export async function identifyAccountCaller(
+  args: AccountCallerArgs,
+): Promise<string> {
+  return (await openAccountSession(args)).userId;
 }
 
 export function requireAuthGateways(): SupabaseAuthGateways {

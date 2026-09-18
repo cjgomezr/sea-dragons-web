@@ -257,6 +257,9 @@ export const spanishMessages: MessageCatalog = {
     "Pediste ser {role} el {date}. Todavía no hay respuesta de un Admin.",
   "account.adminNote":
     "Como Admin ya tienes todas las capacidades, así que no hay ningún rol que pedir.",
+  // Mis grupos (#229). Sólo los grupos propios, sin sus demás miembros.
+  "account.groups.title": "Mis grupos",
+  "account.groups.empty": "Todavía no perteneces a ningún grupo.",
   "account.error.pending":
     "Ya tienes una solicitud esperando respuesta. Recarga la página para verla.",
   "account.error.roleAlreadyHeld": "Ya tienes ese rol.",

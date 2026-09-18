@@ -74,6 +74,12 @@ export const MEMBERS_API_PATH = "/api/v1/members";
  * socio. Sólo lo alcanza quien gestiona usuarios y roles. */
 export const MEMBER_ROLE_API_PATH = `${MEMBERS_API_PATH}/[id]/role`;
 
+/** Los grupos de quien llama (#229, RF-8 del PRD de E4). Va fuera de
+ * `/api/v1/groups`, que es de quien gestiona grupos, porque lo alcanza
+ * cualquier cuenta activa: por eso no aparece en `RESTRICTED_ROUTES`. Una
+ * cuenta incompleta no lo alcanza, aunque cuelgue de la cuenta. */
+export const ACCOUNT_GROUPS_API_PATH = "/api/v1/account/groups";
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 

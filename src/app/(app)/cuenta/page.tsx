@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { AccountHeader } from "@/components/account/AccountHeader";
+import { MyGroups } from "@/components/account/MyGroups";
 import { RoleRequestPanel } from "@/components/account/RoleRequestPanel";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import {
@@ -11,14 +13,17 @@ import { SIGN_IN_PATH } from "@/lib/auth/routes";
 import { readAuthenticatedUserId } from "@/lib/auth/session-reader";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { createSupabaseRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
+import { type MemberGroup, listMemberGroups } from "@/lib/groups/member-groups";
+import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-groups-gateway";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 import { createTranslator } from "@/lib/i18n/translator";
 import { readServerCookies } from "@/lib/supabase/server-cookies";
 import { createSessionClient } from "@/lib/supabase/session-client";
 
 /**
- * Mi cuenta (#209): el rol de quien la abre y, si le toca, el formulario para
- * pedir Coach o Committee (FR-010). E5 la convertirá en el perfil.
+ * Mi cuenta (#209): el rol de quien la abre, los grupos a los que pertenece
+ * (#229) y, si le toca, el formulario para pedir Coach o Committee (FR-010).
+ * E5 la convertirá en el perfil.
  *
  * Quién llega lo decide la frontera: cualquier cuenta activa, de cualquier
  * rol. Una incompleta acaba en completar registro y una sin sesión en la
@@ -33,7 +38,12 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-async function readCallerId(): Promise<string> {
+type CallerSession = {
+  readonly userId: string;
+  readonly client: SupabaseClient;
+};
+
+async function readCallerSession(): Promise<CallerSession> {
   const session = createSessionClient(process.env, await readServerCookies());
   if (session.kind === "unconfigured") {
     throw new Error(describeMissingAuthKeys(session.missingKeys));
@@ -42,7 +52,16 @@ async function readCallerId(): Promise<string> {
   if (userId === null) {
     redirect(SIGN_IN_PATH);
   }
-  return userId;
+  return { userId, client: session.client };
+}
+
+/** Con la sesión del socio y no con la llave de servicio: la RLS de
+ * `0015_groups.sql` ya le deja ver sólo sus grupos. */
+function readGroups({
+  userId,
+  client,
+}: CallerSession): Promise<readonly MemberGroup[]> {
+  return listMemberGroups(createSupabaseMemberGroupsGateway(client), userId);
 }
 
 async function readAccount(userId: string): Promise<RoleRequestAccount> {
@@ -63,9 +82,13 @@ async function readAccount(userId: string): Promise<RoleRequestAccount> {
 }
 
 export default async function AccountPage(): Promise<React.JSX.Element> {
-  const [locale, account] = await Promise.all([
+  const [locale, caller] = await Promise.all([
     readRequestLocale(),
-    readCallerId().then(readAccount),
+    readCallerSession(),
+  ]);
+  const [account, groups] = await Promise.all([
+    readAccount(caller.userId),
+    readGroups(caller),
   ]);
   return (
     <div className="account">
@@ -74,6 +97,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
         fullName={account.fullName}
         role={account.role}
       />
+      <MyGroups locale={locale} groups={groups} />
       <RoleRequestPanel
         locale={locale}
         role={account.role}
