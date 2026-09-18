@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { ROLES, type Role } from "@/lib/auth/roles";
+import { decideSessionBoundary } from "@/lib/auth/session-boundary";
 import { createTranslator } from "@/lib/i18n/translator";
 import {
-  MOBILE_OVERFLOW_SECTIONS,
-  MOBILE_PRIMARY_SECTIONS,
   NAV_SECTIONS,
   getMobileLabel,
+  getMobileSections,
   getSectionLabel,
+  getVisibleSections,
   isSectionActive,
 } from "@/lib/navigation";
 
@@ -21,7 +23,7 @@ function sectionAt(href: string): (typeof NAV_SECTIONS)[number] {
 }
 
 describe("navegación", () => {
-  it("contiene exactamente las siete secciones esperadas, cada una con su ruta", () => {
+  it("contiene las siete secciones y Administración al final, cada una con su ruta", () => {
     expect(NAV_SECTIONS.map((section) => [section.href, section.icon])).toEqual(
       [
         ["/dashboard", "dashboard"],
@@ -31,6 +33,7 @@ describe("navegación", () => {
         ["/evaluaciones", "evaluaciones"],
         ["/noticias", "noticias"],
         ["/pagos", "pagos"],
+        ["/administracion", "administracion"],
       ],
     );
   });
@@ -57,7 +60,7 @@ describe("navegación", () => {
 // E17 RF-5: los nombres en inglés son los del mockup de escritorio
 // (docs/mockups/dashboard-light.png).
 describe("navegación traducida", () => {
-  it("nombra las siete secciones en inglés", () => {
+  it("nombra las ocho secciones en inglés", () => {
     expect(
       NAV_SECTIONS.map((section) => getSectionLabel(section, english)),
     ).toEqual([
@@ -68,10 +71,11 @@ describe("navegación traducida", () => {
       "Evaluations",
       "News",
       "Payments",
+      "Administration",
     ]);
   });
 
-  it("nombra las siete secciones en español igual que antes de traducirlas", () => {
+  it("nombra las ocho secciones en español igual que antes de traducirlas", () => {
     expect(
       NAV_SECTIONS.map((section) => getSectionLabel(section, spanish)),
     ).toEqual([
@@ -82,39 +86,143 @@ describe("navegación traducida", () => {
       "Evaluaciones",
       "Noticias",
       "Pagos",
+      "Administración",
     ]);
   });
 });
 
-describe("reparto de secciones para móvil", () => {
-  it("deja como pestañas fijas las cuatro secciones de uso más frecuente", () => {
-    expect(MOBILE_PRIMARY_SECTIONS.map((section) => section.href)).toEqual([
+function hrefsOf(sections: readonly { readonly href: string }[]): string[] {
+  return sections.map((section) => section.href);
+}
+
+const MEMBER_SECTIONS = [
+  "/dashboard",
+  "/directorio",
+  "/calendario",
+  "/noticias",
+  "/pagos",
+];
+
+// FR-013 (#213): la navegación ofrece sólo lo que la frontera deja abrir.
+describe("secciones por rol", () => {
+  it("un Player ve Panel, Directorio, Calendario, Noticias y Pagos", () => {
+    expect(hrefsOf(getVisibleSections("Player"))).toEqual(MEMBER_SECTIONS);
+  });
+
+  it("un Committee ve lo mismo que un Player", () => {
+    expect(hrefsOf(getVisibleSections("Committee"))).toEqual(MEMBER_SECTIONS);
+  });
+
+  it("un Coach ve además Equipos y Evaluaciones, y no Administración", () => {
+    expect(hrefsOf(getVisibleSections("Coach"))).toEqual([
+      "/dashboard",
+      "/directorio",
+      "/calendario",
+      "/equipos",
+      "/evaluaciones",
+      "/noticias",
+      "/pagos",
+    ]);
+  });
+
+  it("un Admin ve todas las secciones y Administración", () => {
+    expect(hrefsOf(getVisibleSections("Admin"))).toEqual(hrefsOf(NAV_SECTIONS));
+  });
+});
+
+describe("barra móvil por rol", () => {
+  it.each(["Player", "Committee"] as const)(
+    "un %s tiene fijas Inicio, Eventos, Directorio y Noticias, y Pagos en Más",
+    (role) => {
+      const { primary, overflow } = getMobileSections(role);
+
+      expect(hrefsOf(primary)).toEqual([
+        "/dashboard",
+        "/calendario",
+        "/directorio",
+        "/noticias",
+      ]);
+      expect(hrefsOf(overflow)).toEqual(["/pagos"]);
+    },
+  );
+
+  it("un Coach tiene fijas Inicio, Eventos, Equipos y Noticias, y en Más Directorio, Evaluaciones y Pagos", () => {
+    const { primary, overflow } = getMobileSections("Coach");
+
+    expect(hrefsOf(primary)).toEqual([
       "/dashboard",
       "/calendario",
       "/equipos",
       "/noticias",
     ]);
-  });
-
-  it("manda al desbordamiento las tres secciones restantes", () => {
-    expect(MOBILE_OVERFLOW_SECTIONS.map((section) => section.href)).toEqual([
+    expect(hrefsOf(overflow)).toEqual([
       "/directorio",
       "/evaluaciones",
       "/pagos",
     ]);
   });
 
-  it("reparte todas las secciones sin perder ni duplicar ninguna", () => {
-    const repartidas = [
-      ...MOBILE_PRIMARY_SECTIONS,
-      ...MOBILE_OVERFLOW_SECTIONS,
-    ];
+  it("un Admin tiene las fijas del Coach, y en Más además Administración", () => {
+    const { primary, overflow } = getMobileSections("Admin");
 
-    expect(repartidas).toHaveLength(NAV_SECTIONS.length);
-    expect(new Set(repartidas.map((section) => section.href))).toEqual(
-      new Set(NAV_SECTIONS.map((section) => section.href)),
+    expect(hrefsOf(primary)).toEqual(
+      hrefsOf(getMobileSections("Coach").primary),
     );
+    expect(hrefsOf(overflow)).toEqual([
+      "/directorio",
+      "/evaluaciones",
+      "/pagos",
+      "/administracion",
+    ]);
   });
+
+  it.each(ROLES)(
+    "reparte las secciones visibles de un %s sin perder ni duplicar ninguna",
+    (role) => {
+      const { primary, overflow } = getMobileSections(role);
+      const repartidas = hrefsOf([...primary, ...overflow]);
+
+      expect(repartidas).toHaveLength(getVisibleSections(role).length);
+      expect(new Set(repartidas)).toEqual(
+        new Set(hrefsOf(getVisibleSections(role))),
+      );
+    },
+  );
+});
+
+function isOpenedByBoundary(href: string, role: Role): boolean {
+  return (
+    decideSessionBoundary({
+      pathname: href,
+      session: { kind: "active", role },
+    }).kind === "allow"
+  );
+}
+
+// El criterio de "misma matriz": se recorren todas las secciones contra la
+// decisión real de la frontera, no contra una lista escrita a mano aquí.
+describe("navegación y matriz", () => {
+  it.each(ROLES)(
+    "muestra a un %s exactamente las secciones que la frontera le deja abrir",
+    (role) => {
+      const opened = NAV_SECTIONS.filter((section) =>
+        isOpenedByBoundary(section.href, role),
+      );
+
+      expect(hrefsOf(getVisibleSections(role))).toEqual(hrefsOf(opened));
+    },
+  );
+
+  it.each(ROLES)(
+    "no pone en la barra móvil de un %s nada que la frontera le cierre",
+    (role) => {
+      const { primary, overflow } = getMobileSections(role);
+
+      for (const section of [...primary, ...overflow]) {
+        expect(isOpenedByBoundary(section.href, role)).toBe(true);
+      }
+    },
+  );
 });
 
 // #85: "Dashboard" no cabe en una línea en la barra móvil bajo las métricas
@@ -133,6 +241,13 @@ describe("etiqueta corta para la barra móvil (#85)", () => {
 
     expect(getMobileLabel(equipos, spanish)).toBe("Equipos");
     expect(getMobileLabel(equipos, english)).toBe("Teams");
+  });
+
+  it("acorta Directorio y Directory, que pasan del margen como pestaña fija (#213)", () => {
+    const directorio = sectionAt("/directorio");
+
+    expect(getMobileLabel(directorio, spanish)).toBe("Socios");
+    expect(getMobileLabel(directorio, english)).toBe("People");
   });
 
   it("acorta Calendario, que se partía a 360px, y Calendar, que rozaba el margen", () => {

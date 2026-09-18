@@ -13,7 +13,7 @@ describe("app shell", () => {
   it("renderiza marca, navegación, contenido y conmutador de tema", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="en">
+      <AppShell locale="en" role="Player">
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -30,7 +30,7 @@ describe("app shell", () => {
   it("ofrece cerrar sesión en cualquier pantalla de la aplicación", () => {
     usePathname.mockReturnValue("/calendario");
     render(
-      <AppShell locale="en">
+      <AppShell locale="en" role="Player">
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -44,7 +44,7 @@ describe("app shell", () => {
   it("enlaza Mi cuenta justo antes de cerrar sesión", () => {
     usePathname.mockReturnValue("/calendario");
     render(
-      <AppShell locale="en">
+      <AppShell locale="en" role="Player">
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -59,7 +59,7 @@ describe("app shell", () => {
   it("nombra el enlace a Mi cuenta en el idioma de la visita", () => {
     usePathname.mockReturnValue("/calendario");
     render(
-      <AppShell locale="es">
+      <AppShell locale="es" role="Player">
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -73,7 +73,7 @@ describe("app shell", () => {
   it("nombra el botón de cerrar sesión en el idioma de la visita", () => {
     usePathname.mockReturnValue("/calendario");
     render(
-      <AppShell locale="es">
+      <AppShell locale="es" role="Player">
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -87,7 +87,7 @@ describe("app shell", () => {
   it("ofrece cambiar de idioma en cualquier pantalla de la aplicación", () => {
     usePathname.mockReturnValue("/equipos");
     render(
-      <AppShell locale="es">
+      <AppShell locale="es" role="Player">
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -100,7 +100,7 @@ describe("app shell", () => {
   it("pone el interruptor de idioma junto al del tema", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="en">
+      <AppShell locale="en" role="Player">
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -115,7 +115,7 @@ describe("app shell", () => {
   it("nombra las dos navegaciones en el idioma de la visita", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="es">
+      <AppShell locale="es" role="Player">
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -128,10 +128,44 @@ describe("app shell", () => {
     ).toHaveTextContent("Inicio");
   });
 
+  // #213: la cáscara reparte el rol que leyó el servidor a las dos
+  // navegaciones, que esconden lo que ese rol no puede abrir.
+  it("ofrece a cada navegación sólo lo que el rol recibido puede abrir", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(
+      <AppShell locale="en" role="Player">
+        <p>Contenido de la sección</p>
+      </AppShell>,
+    );
+
+    const sidebar = screen.getByRole("navigation", { name: "Main" });
+    expect(sidebar).not.toHaveTextContent("Teams");
+    expect(sidebar).not.toHaveTextContent("Evaluations");
+    expect(
+      screen.getByRole("navigation", { name: "Sections" }),
+    ).not.toHaveTextContent("Teams");
+  });
+
+  it("enseña Administración en las dos navegaciones a un Admin", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(
+      <AppShell locale="en" role="Admin">
+        <p>Contenido de la sección</p>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole("navigation", { name: "Main" })).toHaveTextContent(
+      "Administration",
+    );
+    expect(
+      screen.getByRole("navigation", { name: "Sections" }),
+    ).toHaveTextContent("Administration");
+  });
+
   it("muestra el contenido recibido dentro del área principal", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="en">
+      <AppShell locale="en" role="Player">
         <p>Contenido de la sección</p>
       </AppShell>,
     );

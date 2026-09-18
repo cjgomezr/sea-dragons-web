@@ -1,7 +1,7 @@
 import type { NavIconId } from "@/lib/navigation";
 
-// Ocho SVG inline, sin librería: el repo no traía ninguna y instalar una para
-// ocho glifos habría sido peso de bundle sin uso real (#53). Todos comparten
+// Nueve SVG inline, sin librería: el repo no traía ninguna y instalar una para
+// nueve glifos habría sido peso de bundle sin uso real (#53). Todos comparten
 // trazo para leerse como un mismo set.
 const STROKE_WIDTH = 1.8;
 
@@ -29,7 +29,7 @@ function IconBase({
 
 /** No es un icono de sección: lo usa el control de cerrar sesión de la
  * cabecera, que el mockup del panel dibuja también como un icono. Vive aquí
- * para compartir trazo y tamaño con los ocho de la navegación, en vez de ser
+ * para compartir trazo y tamaño con los nueve de la navegación, en vez de ser
  * un noveno dibujo suelto con otro grosor.
  *
  * El marco de la puerta va a la izquierda y la flecha sale hacia fuera. Con el
@@ -125,6 +125,18 @@ function PagosIcon(): React.JSX.Element {
   );
 }
 
+/** Un escudo con una marca: la gestión del club (#213). Sólo sale en "Más",
+ * pero lleva icono como las demás para que añadirla a las pestañas fijas no
+ * pida un dibujo nuevo. */
+function AdministracionIcon(): React.JSX.Element {
+  return (
+    <IconBase>
+      <path d="M12 3.5 5 6v5.5c0 4.2 2.9 7.6 7 9 4.1-1.4 7-4.8 7-9V6z" />
+      <path d="M9 12l2 2 4-4.5" />
+    </IconBase>
+  );
+}
+
 export function OverflowIcon(): React.JSX.Element {
   return (
     <IconBase>
@@ -143,4 +155,5 @@ export const NAV_SECTION_ICONS: Record<NavIconId, () => React.JSX.Element> = {
   evaluaciones: EvaluacionesIcon,
   noticias: NoticiasIcon,
   pagos: PagosIcon,
+  administracion: AdministracionIcon,
 };

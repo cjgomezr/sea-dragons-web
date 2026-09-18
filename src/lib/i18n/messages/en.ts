@@ -216,12 +216,17 @@ export const englishMessages = {
   "nav.label.evaluations": "Evaluations",
   "nav.label.news": "News",
   "nav.label.payments": "Payments",
+  "nav.label.admin": "Administration",
   // Las etiquetas cortas de la barra móvil. "Home" es la del mockup
   // (docs/mockups/mobile-home-light.png); "Calendar", la otra, no se parte a
   // 360px pero con DejaVu Sans, la fuente que resuelve Linux, ocupa el 84% de
   // su pestaña y roza el margen que exige la suite. "Events" ocupa el 64%.
   "nav.label.dashboardShort": "Home",
   "nav.label.calendarShort": "Events",
+  // Directory only becomes a fixed tab for the roles that don't see Teams
+  // (#213). Measured against "Calendar", "Directory" would take about 89% of
+  // its tab with DejaVu Sans, over the suite's margin; "Members" is as wide.
+  "nav.label.directoryShort": "People",
   "app.metaDescription":
     "The platform of the Victoria Seadragons underwater rugby club (Melbourne).",
   "section.underConstruction": "This section is under construction.",

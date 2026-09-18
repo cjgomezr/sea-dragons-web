@@ -14,8 +14,8 @@ import { createTranslator } from "@/lib/i18n/translator";
  * no esta página: son los mismos endpoints que usará la aplicación nativa de
  * Release 2 (CON-002).
  *
- * A la pantalla se llega hoy escribiendo la dirección: la entrada en el menú
- * es de su propio ticket.
+ * Se llega desde la navegación, que sólo la ofrece a quien la frontera deja
+ * pasar (#213).
  */
 
 export async function generateMetadata(): Promise<Metadata> {

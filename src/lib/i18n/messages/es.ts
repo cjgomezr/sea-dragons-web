@@ -212,6 +212,7 @@ export const spanishMessages: MessageCatalog = {
   "nav.label.evaluations": "Evaluaciones",
   "nav.label.news": "Noticias",
   "nav.label.payments": "Pagos",
+  "nav.label.admin": "Administración",
   "nav.label.dashboardShort": "Inicio",
   // "Calendario" ocupaba el 89% de su pestaña a 360px y se partía con las
   // fuentes de Linux. Ojo para E7: el prototipo llama "Agenda" a una de las
@@ -219,6 +220,9 @@ export const spanishMessages: MessageCatalog = {
   // conviene renombrarla para no tener una pestaña y una vista con el mismo
   // nombre.
   "nav.label.calendarShort": "Agenda",
+  // Directorio sólo es pestaña fija para los roles que no ven Equipos (#213).
+  // Mide casi lo que "Calendario", que se partía, así que tampoco cabe.
+  "nav.label.directoryShort": "Socios",
   "app.metaDescription":
     "Plataforma del club de rugby subacuático Victoria Seadragons (Melbourne).",
   "section.underConstruction": "Esta sección está en construcción.",

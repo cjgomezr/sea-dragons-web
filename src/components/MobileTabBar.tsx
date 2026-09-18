@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
+import type { Role } from "@/lib/auth/roles";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
 import {
-  MOBILE_OVERFLOW_SECTIONS,
-  MOBILE_PRIMARY_SECTIONS,
   getMobileLabel,
+  getMobileSections,
+  getSectionLabel,
   isSectionActive,
 } from "@/lib/navigation";
 import { NAV_SECTION_ICONS, OverflowIcon } from "@/components/NavIcons";
@@ -20,14 +21,17 @@ const OVERFLOW_PANEL_ID = "app-tabbar-overflow";
 // remains a Server Component.
 export function MobileTabBar({
   locale,
+  role,
 }: {
   locale: Locale;
+  role: Role;
 }): React.JSX.Element {
   const pathname = usePathname();
   const translate = createTranslator(locale);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
+  const { primary, overflow } = getMobileSections(role);
 
-  const hasActiveOverflowSection = MOBILE_OVERFLOW_SECTIONS.some((section) =>
+  const hasActiveOverflowSection = overflow.some((section) =>
     isSectionActive(section.href, pathname),
   );
 
@@ -38,7 +42,7 @@ export function MobileTabBar({
         id={OVERFLOW_PANEL_ID}
         hidden={!isOverflowOpen}
       >
-        {MOBILE_OVERFLOW_SECTIONS.map((section) => (
+        {overflow.map((section) => (
           <li key={section.href}>
             <Link
               href={section.href}
@@ -46,13 +50,13 @@ export function MobileTabBar({
                 isSectionActive(section.href, pathname) ? "page" : undefined
               }
             >
-              {getMobileLabel(section, translate)}
+              {getSectionLabel(section, translate)}
             </Link>
           </li>
         ))}
       </ul>
       <ul className="app-tabbar-tabs">
-        {MOBILE_PRIMARY_SECTIONS.map((section) => {
+        {primary.map((section) => {
           const SectionIcon = NAV_SECTION_ICONS[section.icon];
           return (
             <li key={section.href}>
