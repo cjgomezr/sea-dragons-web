@@ -4,6 +4,7 @@ import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gate
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type { Group, GroupsGateways } from "./groups";
+import { compareNames } from "./name-order";
 
 /**
  * Adaptadores entre los grupos y Supabase.
@@ -26,19 +27,8 @@ const INACTIVE_STATUS = "inactive";
 const UNIQUE_VIOLATION_CODE = "23505";
 const GROUP_NAME_INDEX = "groups_club_id_name_key";
 
-/** El orden alfabético de la lista, sin distinguir mayúsculas. Se ordena aquí
- * y no con `order by`, que seguiría el collation de la base: con `C`, "alevines"
- * saldría detrás de "Senior Squad", y dev y producción podrían no coincidir. */
-const GROUP_NAME_ORDER = new Intl.Collator("en", { sensitivity: "base" });
-
-/** "Élite" y "Elite" empatan para el collator y los dos caben en la base; el
- * desempate por código hace que su orden no dependa de cómo lleguen las filas. */
 function compareGroupNames(a: GroupRow, b: GroupRow): number {
-  const byName = GROUP_NAME_ORDER.compare(a.name, b.name);
-  if (byName !== 0) {
-    return byName;
-  }
-  return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+  return compareNames(a.name, b.name);
 }
 
 type Environment = Readonly<Record<string, string | undefined>>;
