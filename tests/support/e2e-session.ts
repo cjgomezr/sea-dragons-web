@@ -139,18 +139,36 @@ export function incompleteStorageStatePath(name: IncompleteMemberName): string {
   return path.join(REPO_ROOT, "test-results", `e2e-storage-state-${name}.json`);
 }
 
+/** El Admin de la pantalla de administración (#212) y el socio cuya solicitud
+ * decide. Sus nombres son únicos dentro del club de prueba: la bandeja y la
+ * lista enseñan a todo el club, así que un test que quiera señalar una fila
+ * concreta tiene que poder nombrarla. */
+export const ADMINISTRATION_ADMIN_NAME = "Admin de administración";
+export const DECIDABLE_MEMBER_NAME = "Socio para decidir";
+
 /**
- * Los socios activos que necesitan una solicitud de rol propia (#209). El
- * socio activo compartido no sirve: una solicitud suya cambiaría lo que
- * fotografían los demás tests de Mi cuenta.
+ * Los socios activos que necesitan una fila propia más allá del socio
+ * compartido (#209, #212). El compartido no sirve para esto: una solicitud o
+ * un rol suyos cambiarían lo que fotografían los demás tests de Mi cuenta.
  *
  * La pendiente nace con una fecha fija, para que la captura no cambie con el
  * día en que corre la suite.
  */
 export const ROLE_REQUEST_MEMBERS = {
-  "con-solicitud-pendiente": { pendingRequest: "Coach" },
+  "con-solicitud-pendiente": { pendingRequest: "Coach", columns: {} },
   /** Lo usa el test que envía una solicitud desde el formulario. */
-  "para-pedir-rol": { pendingRequest: null },
+  "para-pedir-rol": { pendingRequest: null, columns: {} },
+  /** El único Admin que abre `/administracion` (#212). */
+  "admin-de-administracion": {
+    pendingRequest: null,
+    columns: { role: "Admin", full_name: ADMINISTRATION_ADMIN_NAME },
+  },
+  /** Su solicitud es la que un Admin aprueba desde la bandeja. Lleva nombre
+   * propio para que el test la señale entre las demás del club. */
+  "socio-para-decidir": {
+    pendingRequest: "Committee",
+    columns: { full_name: DECIDABLE_MEMBER_NAME },
+  },
 } as const;
 
 export type RoleRequestMemberName = keyof typeof ROLE_REQUEST_MEMBERS;
@@ -452,6 +470,7 @@ async function createTestMembers(): Promise<E2eSessionState> {
   for (const name of ROLE_REQUEST_MEMBER_NAMES) {
     const member = await seedMember(serviceClient, clubId, {
       account_status: "active",
+      ...ROLE_REQUEST_MEMBERS[name].columns,
     });
     userIds.push(member.userId);
     await seedPendingRequest(serviceClient, {

@@ -241,7 +241,7 @@ export function createConfirmationTokenIssuer(
 /** Lee una columna de texto de una fila que llega como unknown. supabase-js no
  * conoce el esquema de este proyecto, así que estrechar es la alternativa a
  * reescribir a mano la forma de la tabla o a colar un cast. */
-function readText(
+export function readText(
   row: Record<string, unknown>,
   column: string,
   table: string,

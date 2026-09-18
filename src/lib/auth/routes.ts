@@ -44,8 +44,17 @@ export const DASHBOARD_PATH = "/dashboard";
  * en `RESTRICTED_ROUTES`. E5 la convierte después en el perfil. */
 export const ACCOUNT_PAGE_PATH = "/cuenta";
 
-/** El endpoint de las solicitudes de rol. Abierto a los cuatro roles, igual
- * que Mi cuenta: el propio dominio responde a quien no tiene nada que pedir. */
+/** La pantalla mínima de administración (#212, RF-8): la bandeja de
+ * solicitudes pendientes y la lista de socios con su rol. Sólo la alcanza
+ * quien gestiona usuarios y roles. E5 la absorbe en el directorio completo. */
+export const ADMINISTRATION_PATH = "/administracion";
+
+/** El endpoint de las solicitudes de rol. Su POST está abierto a los cuatro
+ * roles, igual que Mi cuenta: el propio dominio responde a quien no tiene nada
+ * que pedir. Por eso la ruta NO aparece en `RESTRICTED_ROUTES`, y la bandeja
+ * que sirve su GET comprueba la capacidad en el handler: la frontera decide
+ * por camino, no por método, y aquí los dos métodos no coinciden en quién
+ * puede usarlos. */
 export const ROLE_REQUESTS_API_PATH = "/api/v1/role-requests";
 
 /** Aprobar o rechazar una solicitud (#210, FR-011). `[id]` es un segmento
@@ -54,9 +63,16 @@ export const ROLE_REQUESTS_API_PATH = "/api/v1/role-requests";
  * roles, aunque cuelgue de un endpoint abierto a los cuatro. */
 export const ROLE_REQUEST_DECISION_API_PATH = `${ROLE_REQUESTS_API_PATH}/[id]/decision`;
 
+/** Los socios del club (#212, RF-8). Todo lo que cuelga de este camino es de
+ * quien gestiona usuarios y roles: el listado de la pantalla de administración
+ * y el cambio de rol de abajo. El directorio que E5 abrirá a cualquier socio
+ * (FR-015) tendrá que decidir entonces qué abre, y por eso el cambio de rol se
+ * declara además por su cuenta. */
+export const MEMBERS_API_PATH = "/api/v1/members";
+
 /** Cambiar el rol de un socio (#211, FR-014). `[id]` es el `user_id` del
  * socio. Sólo lo alcanza quien gestiona usuarios y roles. */
-export const MEMBER_ROLE_API_PATH = "/api/v1/members/[id]/role";
+export const MEMBER_ROLE_API_PATH = `${MEMBERS_API_PATH}/[id]/role`;
 
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
@@ -170,6 +186,12 @@ export type RestrictedRoute = {
 export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: TEAMS_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: EVALUATIONS_PATH, capability: "viewEvaluations" },
+  { path: ADMINISTRATION_PATH, capability: "manageUsersAndRoles" },
   { path: ROLE_REQUEST_DECISION_API_PATH, capability: "manageUsersAndRoles" },
+  { path: MEMBERS_API_PATH, capability: "manageUsersAndRoles" },
+  // Cuelga del anterior, así que hoy no añade nada. Se declara igual porque es
+  // el de arriba el que E5 va a abrir al directorio, y el día que lo haga el
+  // cambio de rol tiene que seguir siendo sólo de un Admin sin que nadie se
+  // acuerde de escribir esta línea.
   { path: MEMBER_ROLE_API_PATH, capability: "manageUsersAndRoles" },
 ];

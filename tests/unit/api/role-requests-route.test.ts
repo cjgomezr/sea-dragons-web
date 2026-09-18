@@ -235,12 +235,16 @@ describe("POST /api/v1/role-requests", () => {
     expect(inserts).toEqual([]);
   });
 
-  it("no acepta otro método", async () => {
+  // El GET dejó de ser "otro método" en #212: es la bandeja del Admin, y sus
+  // casos viven en tests/unit/api/administration-reads-route.test.ts.
+  it("no acepta un método que el endpoint no implementa", async () => {
     mockWiring();
-    const { GET } = await import("@/app/api/v1/role-requests/route");
+    const { PUT } = await import("@/app/api/v1/role-requests/route");
 
-    const response = await GET(
-      new NextRequest(new URL(ROLE_REQUESTS_API_PATH, ORIGIN)),
+    const response = await PUT(
+      new NextRequest(new URL(ROLE_REQUESTS_API_PATH, ORIGIN), {
+        method: "PUT",
+      }),
     );
 
     expect(response.status).toBe(405);

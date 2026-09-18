@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   ACCOUNT_API_PATH,
   ACCOUNT_PAGE_PATH,
+  ADMINISTRATION_PATH,
   COMPLETE_REGISTRATION_PATH,
   CONFIRMATION_EMAIL_API_PATH,
   DASHBOARD_PATH,
   EMAIL_CONFIRMATION_PATH,
   EVALUATIONS_PATH,
   GUARDIAN_CONSENT_API_PATH,
+  MEMBERS_API_PATH,
   MEMBER_ROLE_API_PATH,
   PASSWORD_RECOVERY_PATH,
   REGISTER_API_PATH,
@@ -424,6 +426,50 @@ describe("frontera por rol en el cambio de rol de un socio (#211)", () => {
     expect(
       decideSessionBoundary({
         pathname: MEMBER_ROLE_PATH,
+        ...activeAs("Admin"),
+      }),
+    ).toEqual(ALLOW);
+  });
+});
+
+describe("frontera por rol en la administración del club (#212)", () => {
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "manda al panel a un %s que pide la pantalla de administración",
+    (role) => {
+      expect(
+        decideSessionBoundary({
+          pathname: ADMINISTRATION_PATH,
+          ...activeAs(role),
+        }),
+      ).toEqual(TO_DASHBOARD);
+    },
+  );
+
+  it("deja entrar a un Admin en la pantalla de administración", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: ADMINISTRATION_PATH,
+        ...activeAs("Admin"),
+      }),
+    ).toEqual(ALLOW);
+  });
+
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "niega a un %s leer la lista de socios",
+    (role) => {
+      expect(
+        decideSessionBoundary({
+          pathname: MEMBERS_API_PATH,
+          ...activeAs(role),
+        }),
+      ).toEqual({ kind: "missingCapability" });
+    },
+  );
+
+  it("deja pasar a un Admin a la lista de socios", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: MEMBERS_API_PATH,
         ...activeAs("Admin"),
       }),
     ).toEqual(ALLOW);
