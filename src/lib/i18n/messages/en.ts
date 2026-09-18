@@ -262,6 +262,9 @@ export const englishMessages = {
     "You asked to be {role} on {date}. An Admin hasn't answered yet.",
   "account.adminNote":
     "As an Admin you already have every capability, so there is no role to request.",
+  // Mis grupos (#229). Sólo los grupos propios, sin sus demás miembros.
+  "account.groups.title": "My groups",
+  "account.groups.empty": "You don't belong to any group yet.",
   "account.error.pending":
     "You already have a request waiting for an answer. Reload the page to see it.",
   "account.error.roleAlreadyHeld": "You already have that role.",

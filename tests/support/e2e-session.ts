@@ -190,12 +190,37 @@ export function roleRequestStorageStatePath(
   );
 }
 
+/**
+ * El socio de Mi cuenta con grupos (#229), con nombre de grupo del ejemplo del
+ * ticket. El compartido sigue sin ninguno, que es la captura "sin grupos".
+ *
+ * Los nombres son fijos para que la captura no cambie entre corridas, y el
+ * nombre es único por club: si el grupo ya existe (otra corrida a la vez, o
+ * alguien lo creó en dev) se reutiliza. El cierre sólo borra los que creó esta
+ * corrida, y sólo si ya no queda nadie dentro.
+ */
+export const GROUPED_MEMBER_GROUP_NAMES = [
+  "Senior Squad",
+  "Masters Squad",
+] as const;
+
+export const GROUPED_MEMBER_STORAGE_STATE_PATH = path.join(
+  REPO_ROOT,
+  "test-results",
+  "e2e-storage-state-con-grupos.json",
+);
+
 const APP_URL = process.env.APP_URL ?? "http://localhost:3417";
 
 const CLUB_SLUG = "victoria-seadragons";
 const MEMBERS_TABLE = "members";
 const CLUBS_TABLE = "clubs";
 const ROLE_REQUESTS_TABLE = "role_requests";
+const GROUPS_TABLE = "groups";
+const GROUP_MEMBERSHIPS_TABLE = "group_memberships";
+/** El código de Postgres de una violación de unicidad: otra corrida creó el
+ * mismo grupo entre la búsqueda y el alta. */
+const UNIQUE_VIOLATION_CODE = "23505";
 
 export type E2eSessionState =
   | {
@@ -205,6 +230,10 @@ export type E2eSessionState =
       /** Todas las identidades que abrió el arranque, la activa y las que
        * están a medias. El cierre las borra sin tener que saber cuál es cuál. */
       readonly userIds: readonly string[];
+      /** Los grupos que creó el arranque para el socio con grupos. Sobreviven
+       * a sus socios, así que el cierre los borra aparte cuando nadie más los
+       * usa. Uno que ya existía no es de la suite y no se toca. */
+      readonly createdGroupIds: readonly string[];
     }
   | { readonly kind: "unavailable"; readonly reason: string };
 
@@ -315,6 +344,7 @@ function everyStorageStatePath(): readonly string[] {
     E2E_STORAGE_STATE_PATH,
     ...INCOMPLETE_MEMBER_NAMES.map(incompleteStorageStatePath),
     ...ROLE_REQUEST_MEMBER_NAMES.map(roleRequestStorageStatePath),
+    GROUPED_MEMBER_STORAGE_STATE_PATH,
   ];
 }
 
@@ -437,6 +467,124 @@ async function seedPendingRequest(
   }
 }
 
+async function findGroupId(
+  serviceClient: SupabaseClient,
+  clubId: string,
+  name: string,
+): Promise<string | null> {
+  const { data, error } = await withSupabaseRetry(
+    "buscar el grupo de prueba",
+    () =>
+      serviceClient
+        .from(GROUPS_TABLE)
+        .select("id")
+        .eq("club_id", clubId)
+        // Sin distinguir mayúsculas, como el índice único: si dev ya tiene un
+        // "senior squad", insertar el nuestro chocaría con él.
+        .ilike("name", name)
+        .maybeSingle(),
+  );
+  if (error) {
+    throw new Error(`No se pudo buscar el grupo ${name}: ${error.message}`);
+  }
+  return data === null ? null : (data.id as string);
+}
+
+type SeededGroup = { readonly id: string; readonly wasCreated: boolean };
+
+/** El grupo con ese nombre, creado si no existe. Si otra corrida lo crea
+ * entre la búsqueda y el alta, el choque con el índice único lo resuelve
+ * volviendo a buscar. */
+async function findOrCreateGroup(
+  serviceClient: SupabaseClient,
+  clubId: string,
+  name: string,
+): Promise<SeededGroup> {
+  const existingId = await findGroupId(serviceClient, clubId, name);
+  if (existingId !== null) {
+    return { id: existingId, wasCreated: false };
+  }
+  const { data, error } = await withSupabaseRetry(
+    "crear el grupo de prueba",
+    () =>
+      serviceClient
+        .from(GROUPS_TABLE)
+        .insert({ club_id: clubId, name })
+        .select("id")
+        .single(),
+  );
+  if (error?.code === UNIQUE_VIOLATION_CODE) {
+    const racedId = await findGroupId(serviceClient, clubId, name);
+    if (racedId !== null) {
+      return { id: racedId, wasCreated: false };
+    }
+  }
+  if (error || !data) {
+    throw new Error(
+      `No se pudo crear el grupo ${name}: ${error?.message ?? "sin datos"}`,
+    );
+  }
+  return { id: data.id as string, wasCreated: true };
+}
+
+/** Mete al socio en los grupos del ejemplo del ticket y devuelve los ids de
+ * los que tuvo que crear. La pertenencia se va con la identidad por las
+ * cascadas de 0003 y 0015. */
+async function seedGroupMemberships(
+  serviceClient: SupabaseClient,
+  seed: { readonly clubId: string; readonly userId: string },
+): Promise<readonly string[]> {
+  const groups: SeededGroup[] = [];
+  for (const name of GROUPED_MEMBER_GROUP_NAMES) {
+    groups.push(await findOrCreateGroup(serviceClient, seed.clubId, name));
+  }
+  const failure = await describeSupabaseFailure(
+    "meter al socio de prueba en sus grupos",
+    () =>
+      serviceClient.from(GROUP_MEMBERSHIPS_TABLE).insert(
+        groups.map((group) => ({
+          club_id: seed.clubId,
+          group_id: group.id,
+          user_id: seed.userId,
+        })),
+      ),
+  );
+  if (failure !== null) {
+    throw new Error(`No se pudo meter al socio en sus grupos: ${failure}`);
+  }
+  return groups.filter((group) => group.wasCreated).map((group) => group.id);
+}
+
+/** Borra los grupos de prueba que ya no tienen a nadie dentro. Uno con socios
+ * es de otra corrida que sigue en marcha, o de alguien que lo usa en dev. */
+async function deleteEmptyGroups(
+  serviceClient: SupabaseClient,
+  groupIds: readonly string[],
+): Promise<void> {
+  for (const groupId of groupIds) {
+    const { count, error } = await serviceClient
+      .from(GROUP_MEMBERSHIPS_TABLE)
+      .select("group_id", { count: "exact", head: true })
+      .eq("group_id", groupId);
+    if (error || count === null) {
+      console.error(
+        `No se pudo contar quién queda en el grupo ${groupId}: ${error?.message ?? "sin cuenta"}`,
+      );
+      continue;
+    }
+    if (count > 0) {
+      continue;
+    }
+    const failure = await describeSupabaseFailure(
+      "borrar el grupo de prueba",
+      () => serviceClient.from(GROUPS_TABLE).delete().eq("id", groupId),
+    );
+    if (failure !== null) {
+      console.error(`No se pudo borrar el grupo ${groupId}: ${failure}`);
+    }
+  }
+}
+
 /** El socio activo y uno por cada estado de completar registro, cada uno con
  * su archivo de cookies. Son cuentas distintas porque el estado vive en la
  * fila: no hay forma de cambiarlo desde el navegador a mitad de una corrida. */
@@ -485,11 +633,26 @@ async function createTestMembers(): Promise<E2eSessionState> {
     );
   }
 
+  const grouped = await seedMember(serviceClient, clubId, {
+    account_status: "active",
+  });
+  userIds.push(grouped.userId);
+  const createdGroupIds = await seedGroupMemberships(serviceClient, {
+    clubId,
+    userId: grouped.userId,
+  });
+  await writeStorageState(
+    grouped.email,
+    grouped.password,
+    GROUPED_MEMBER_STORAGE_STATE_PATH,
+  );
+
   return {
     kind: "available",
     email: active.email,
     password: active.password,
     userIds,
+    createdGroupIds,
   };
 }
 
@@ -518,6 +681,9 @@ export async function discardE2eSession(): Promise<void> {
     for (const userId of state.userIds) {
       await deleteTestUser(serviceClient, userId);
     }
+    // Después de los socios: sus pertenencias se van con ellos, y sólo
+    // entonces se sabe qué grupo quedó vacío.
+    await deleteEmptyGroups(serviceClient, state.createdGroupIds);
   }
   rmSync(STATE_PATH, { force: true });
   for (const statePath of everyStorageStatePath()) {
