@@ -44,6 +44,8 @@ import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  ADMINISTRATION_ADMIN_NAME,
+  DECIDABLE_MEMBER_NAME,
   E2E_STORAGE_STATE_PATH,
   PHOTOGRAPHED_MEMBERS,
   incompleteStorageStatePath,
@@ -2111,5 +2113,317 @@ test.describe("un socio que pide un rol desde Mi cuenta", () => {
     await expect(
       page.getByRole("heading", { name: "Request pending" }),
     ).toBeVisible();
+  });
+});
+/* ---------------------------------------------------------------------------
+   La pantalla de administración (#212). La fila de socio se revisa contra
+   docs/mockups/directory-light.png; la bandeja, contra design-system.md.
+
+   Las capturas leen datos fijos, servidos por `page.route`: la bandeja y la
+   lista enseñan TODO el club, así que en el club compartido de la suite una
+   captura cambiaría con cada socio que cualquier otro test creara. Lo que los
+   endpoints de verdad responden se prueba aparte, en esta misma sección, con
+   la sesión del Admin sembrado.
+   --------------------------------------------------------------------------- */
+
+const ADMINISTRATION_PATH = "/administracion";
+const MEMBERS_ENDPOINT = "/api/v1/members";
+const PENDING_REQUESTS_ENDPOINT = "/api/v1/role-requests";
+const ADMIN_STORAGE_STATE = roleRequestStorageStatePath(
+  "admin-de-administracion",
+);
+
+/** Tres veces el largo de una nota normal, para el caso de contenido largo de
+ * design-system.md y el criterio de los 375px del ticket. */
+const LONG_JUSTIFICATION =
+  "Llevo tres temporadas entrenando al grupo de juveniles los jueves y también los sábados por la mañana cuando hay torneo, y me gustaría poder cargar las alineaciones y las asistencias sin pedírselo cada vez a alguien del comité.";
+
+const STUBBED_MEMBERS = [
+  {
+    userId: "aaaaaaaa-0000-4000-8000-00000000000a",
+    fullName: "Ana Admin",
+    email: "ana.admin@example.test",
+    role: "Admin",
+  },
+  {
+    userId: "bbbbbbbb-0000-4000-8000-00000000000b",
+    fullName: "Nerea Ruiz",
+    email: "nerea.ruiz@example.test",
+    role: "Player",
+  },
+  {
+    userId: "cccccccc-0000-4000-8000-00000000000c",
+    fullName: "Tomás Errekondo Aranburu",
+    email: "tomas.errekondo.aranburu@example.test",
+    role: "Coach",
+  },
+];
+
+const STUBBED_REQUESTS = [
+  {
+    id: "11111111-0000-4000-8000-000000000001",
+    userId: STUBBED_MEMBERS[1]?.userId,
+    fullName: "Nerea Ruiz",
+    requestedRole: "Coach",
+    justification: LONG_JUSTIFICATION,
+    createdAt: "2026-09-17T08:30:00.000Z",
+  },
+  {
+    id: "22222222-0000-4000-8000-000000000002",
+    userId: STUBBED_MEMBERS[2]?.userId,
+    fullName: "Tomás Errekondo Aranburu",
+    requestedRole: "Committee",
+    justification: null,
+    createdAt: "2026-09-18T02:00:00.000Z",
+  },
+];
+
+/** Las dos lecturas, con datos fijos. Registradas antes de navegar, para que
+ * la pantalla no llegue a ver las de verdad. */
+async function stubAdministrationReads(
+  page: Page,
+  options: { readonly withRequests: boolean },
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === MEMBERS_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { members: STUBBED_MEMBERS } }),
+      }),
+  );
+  await page.route(
+    (url) => url.pathname === PENDING_REQUESTS_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: { requests: options.withRequests ? STUBBED_REQUESTS : [] },
+        }),
+      }),
+  );
+}
+
+/** Lo que responde la base cuando alguien intenta degradar al último Admin del
+ * club (#211). Aquí se finge porque cuántos Admin tiene el club de pruebas
+ * depende de qué otros tests estén corriendo. */
+async function stubLastAdminRefusal(page: Page): Promise<void> {
+  await page.route(
+    (url) => /^\/api\/v1\/members\/[^/]+\/role$/.test(url.pathname),
+    (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: {
+            code: "business_rule",
+            message: "Es el último Admin del club.",
+            reason: "last_admin",
+          },
+        }),
+      }),
+  );
+}
+
+/** La pantalla pide sus dos listas al montarse, así que hasta que llegan sólo
+ * enseña que está cargando. Sin esperarlas, una captura sale del estado de
+ * carga y la comparación de un instante después, de la pantalla ya llena. */
+async function waitForAdministration(
+  page: Page,
+  heading: string,
+): Promise<void> {
+  await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+}
+
+/** Intenta degradar al Admin de la lista y espera a que la pantalla explique
+ * que no se puede. El aviso se busca por su texto: el anunciador de rutas del
+ * dev server de Next también lleva `role="alert"`. */
+async function refuseLastAdminChange(page: Page): Promise<void> {
+  await stubLastAdminRefusal(page);
+  await page
+    .getByRole("combobox", { name: "Role for Ana Admin" })
+    .selectOption("Player");
+  await page
+    .getByRole("button", { name: "Save the role for Ana Admin" })
+    .click();
+  await expect(page.getByText(/last Admin/)).toBeVisible();
+}
+
+type AdministrationState = {
+  readonly name: string;
+  readonly withRequests: boolean;
+  readonly prepare?: (page: Page) => Promise<void>;
+};
+
+const ADMINISTRATION_STATES: readonly AdministrationState[] = [
+  { name: "administracion-con-solicitudes", withRequests: true },
+  { name: "administracion-sin-solicitudes", withRequests: false },
+  {
+    name: "administracion-ultimo-admin",
+    withRequests: false,
+    prepare: refuseLastAdminChange,
+  },
+];
+
+for (const state of ADMINISTRATION_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await stubAdministrationReads(page, state);
+            await goToWithTheme(page, ADMINISTRATION_PATH, theme);
+            await waitForAdministration(page, "Club members");
+            await state.prepare?.(page);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await stubAdministrationReads(page, state);
+          await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
+          await waitForAdministration(page, "Club members");
+          await state.prepare?.(page);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await stubAdministrationReads(page, state);
+      await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
+      await waitForAdministration(page, "Club members");
+      await state.prepare?.(page);
+      await expectNoAxeViolations(page);
+    });
+
+    // Como `expectNoAxeViolationsInSpanish`, pero esperando a que las listas
+    // lleguen: en la pantalla de carga no hay casi nada que axe pueda revisar.
+    test("en español: has no accessibility violations (axe-core)", async ({
+      page,
+    }) => {
+      await stubAdministrationReads(page, state);
+      await chooseSpanish(page);
+      await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
+      await expect(page.locator("html")).toHaveAttribute("lang", "es");
+      await waitForAdministration(page, "Socios del club");
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("la pantalla de administración con los datos de verdad", () => {
+  skipWithoutSession();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("un Admin ve la bandeja y a los socios de su club", async ({ page }) => {
+    await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
+
+    await expect(
+      page.getByRole("heading", { name: "Pending requests" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("combobox", {
+        name: `Role for ${ADMINISTRATION_ADMIN_NAME}`,
+      }),
+    ).toHaveValue("Admin");
+  });
+
+  test("en español, la pantalla sale en español", async ({ page }) => {
+    await chooseSpanish(page);
+    await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
+
+    await expect(
+      page.getByRole("heading", { name: "Solicitudes pendientes" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Socios del club" }),
+    ).toBeVisible();
+  });
+
+  test("las dos lecturas responden 200 a un Admin", async ({ request }) => {
+    const members = await request.get(`${APP_URL}${MEMBERS_ENDPOINT}`);
+    const pending = await request.get(
+      `${APP_URL}${PENDING_REQUESTS_ENDPOINT}?status=pending`,
+    );
+
+    expect(members.status()).toBe(200);
+    expect(pending.status()).toBe(200);
+  });
+});
+
+test.describe("un Player frente a la pantalla de administración", () => {
+  skipWithoutSession();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("aterriza en el panel al pedirla", async ({ page }) => {
+    await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
+
+    await expect(page).toHaveURL(new RegExp("/dashboard$"));
+  });
+
+  test("las dos lecturas le responden 403", async ({ request }) => {
+    const members = await request.get(`${APP_URL}${MEMBERS_ENDPOINT}`);
+    const pending = await request.get(
+      `${APP_URL}${PENDING_REQUESTS_ENDPOINT}?status=pending`,
+    );
+
+    expect(members.status()).toBe(403);
+    expect(pending.status()).toBe(403);
+  });
+});
+
+test.describe("un Admin que decide una solicitud desde la bandeja", () => {
+  skipWithoutSession();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+  // Sin reintentos: el primer intento ya aprueba la solicitud, y el segundo
+  // encontraría la bandeja sin ella y taparía por qué falló el primero.
+  test.describe.configure({
+    retries: 0,
+    timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS,
+  });
+
+  test("aprobar la saca de la bandeja y deja al socio con su rol nuevo", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
+    const approve = page.getByRole("button", {
+      name: `Approve the request from ${DECIDABLE_MEMBER_NAME}`,
+    });
+    await expect(approve).toBeVisible();
+
+    const decided = page.waitForResponse(
+      (response) =>
+        response.url().includes(PENDING_REQUESTS_ENDPOINT) &&
+        response.request().method() === "POST",
+      { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
+    );
+    await approve.click();
+    expect((await decided).status()).toBe(200);
+
+    await expect(approve).toHaveCount(0);
+    await expect(
+      page.getByRole("combobox", { name: `Role for ${DECIDABLE_MEMBER_NAME}` }),
+    ).toHaveValue("Committee");
   });
 });

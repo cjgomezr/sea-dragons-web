@@ -986,6 +986,12 @@ h6 {
   max-width: 720px;
 }
 
+/* La entradilla ya tiene el aire de `gap` debajo: su propio margen inferior
+   la separaría del doble que separa a las dos secciones entre sí. */
+.admin > .app-lead {
+  margin-bottom: 0;
+}
+
 .admin-section {
   display: flex;
   flex-direction: column;

@@ -77,7 +77,7 @@ function MemberRow({
       </select>
       <button
         type="button"
-        className="auth-submit"
+        className="admin-secondary"
         aria-label={translate("admin.members.saveLabel", {
           name: member.fullName,
         })}
