@@ -74,6 +74,11 @@ export const MEMBERS_API_PATH = "/api/v1/members";
  * socio. Sólo lo alcanza quien gestiona usuarios y roles. */
 export const MEMBER_ROLE_API_PATH = `${MEMBERS_API_PATH}/[id]/role`;
 
+/** Los grupos del club (#226, E4). Todo lo que cuelga de este camino es de
+ * quien gestiona grupos: crear, listar, renombrar y borrar, y también asignar
+ * y quitar socios cuando llegue su ticket. */
+export const GROUPS_API_PATH = "/api/v1/groups";
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 
@@ -194,4 +199,5 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   // cambio de rol tiene que seguir siendo sólo de un Admin sin que nadie se
   // acuerde de escribir esta línea.
   { path: MEMBER_ROLE_API_PATH, capability: "manageUsersAndRoles" },
+  { path: GROUPS_API_PATH, capability: "manageGroups" },
 ];

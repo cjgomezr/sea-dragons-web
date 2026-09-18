@@ -6,7 +6,9 @@ import {
   type ApiErrorBody,
   type ApiSuccessBody,
   type ApiSuccessStatus,
+  NO_CONTENT_STATUS,
   apiError,
+  apiNoContent,
   apiSuccess,
 } from "./response";
 
@@ -22,12 +24,13 @@ const INVALID_JSON_MESSAGE = "El cuerpo de la petición no es JSON válido.";
 export type ApiResponseBody<T> = ApiSuccessBody<T> | ApiErrorBody;
 export type ApiRouteHandler<T> = (
   request: NextRequest,
-) => Promise<NextResponse<ApiResponseBody<T>>>;
+) => Promise<NextResponse<ApiResponseBody<T> | null>>;
 
-type ApiHandlerResult<T> = {
-  readonly data: T;
-  readonly status?: ApiSuccessStatus;
-};
+/** Lo que devuelve un handler: un valor que va en `{ data }`, o nada, que sale
+ * como 204 sin cuerpo. */
+type ApiHandlerResult<T> =
+  | { readonly data: T; readonly status?: ApiSuccessStatus }
+  | { readonly status: typeof NO_CONTENT_STATUS };
 /** Una modificación que la respuesta de la ruta tiene que llevar pase lo que
  * pase, también si el handler termina lanzando. El caso que la pide es el
  * endpoint de la sesión: las cookies que Supabase emite al cerrar sesión o al
@@ -158,6 +161,9 @@ export function createApiRoute<T, Body = undefined>(
           decorations.push(decorate);
         },
       });
+      if (!("data" in result)) {
+        return decorated(apiNoContent());
+      }
       return decorated(apiSuccess(result.data, result.status));
     } catch (error) {
       if (error instanceof ApiError) {
