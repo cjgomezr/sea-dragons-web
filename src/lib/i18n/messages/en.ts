@@ -216,6 +216,7 @@ export const englishMessages = {
   "nav.label.evaluations": "Evaluations",
   "nav.label.news": "News",
   "nav.label.payments": "Payments",
+  "nav.label.groups": "Groups",
   "nav.label.admin": "Administration",
   // Las etiquetas cortas de la barra móvil. "Home" es la del mockup
   // (docs/mockups/mobile-home-light.png); "Calendar", la otra, no se parte a
@@ -314,6 +315,65 @@ export const englishMessages = {
     "Your session has ended. Sign in again to keep going.",
   "admin.error.forbidden": "Your role can't manage members and roles.",
   "admin.error.unexpected": "We couldn't finish that. Try again in a moment.",
+  // La sección Grupos (#228, RF-2 a RF-7 del PRD de E4). Los errores se
+  // traducen por su código, no por la frase que manda el servidor.
+  "groups.metaTitle": "Groups · Victoria Seadragons",
+  "groups.metaDescription":
+    "Create the club's groups and choose which members belong to each one.",
+  "groups.title": "Groups",
+  "groups.lead":
+    "Groups gather members so a session, an event or a post can be aimed at them.",
+  "groups.loading": "Loading the club's groups…",
+  "groups.loadFailed": "We couldn't load the club's groups.",
+  "groups.retry": "Try again",
+  "groups.list.title": "Club groups",
+  "groups.list.empty":
+    "This club has no groups yet. Create the first one to start gathering members.",
+  "groups.memberCount": {
+    one: "{count} member",
+    other: "{count} members",
+  },
+  "groups.create.label": "Name of the new group",
+  "groups.create.submit": "Create group",
+  "groups.create.saving": "Creating…",
+  "groups.rename": "Rename",
+  "groups.renameLabel": "Rename {name}",
+  "groups.renameField": "New name for {name}",
+  "groups.renameSubmit": "Save the new name",
+  "groups.renameSaving": "Saving…",
+  "groups.cancel": "Cancel",
+  "groups.delete": "Delete",
+  "groups.deleteLabel": "Delete {name}",
+  "groups.deleteQuestion": {
+    one: "Delete “{name}”? It has {count} member. They stay in the club.",
+    other: "Delete “{name}”? It has {count} members. They stay in the club.",
+  },
+  "groups.deleteSubmit": "Delete group",
+  "groups.deleting": "Deleting…",
+  "groups.members.title": "Members of {name}",
+  "groups.members.loading": "Loading this group's members…",
+  "groups.members.loadFailed": "We couldn't load this group's members.",
+  "groups.members.empty":
+    "This group has no members yet. Add the first one from the list.",
+  "groups.members.close": "Close the group",
+  "groups.members.remove": "Remove",
+  "groups.members.removeLabel": "Remove {name} from the group",
+  "groups.members.removing": "Removing…",
+  "groups.members.addLabel": "Member to add",
+  "groups.members.add": "Add to the group",
+  "groups.members.adding": "Adding…",
+  "groups.members.noCandidates":
+    "Every member of the club is already in this group.",
+  "groups.error.nameTaken": "The club already has a group with that name.",
+  "groups.error.invalidName":
+    "The name must have between 1 and {max} characters.",
+  "groups.error.groupGone": "That group is no longer in the club.",
+  "groups.error.memberInactive":
+    "That member already left the club, so they can't be added.",
+  "groups.error.signInRequired":
+    "Your session has ended. Sign in again to keep going.",
+  "groups.error.forbidden": "Your role can't manage the club's groups.",
+  "groups.error.unexpected": "We couldn't finish that. Try again in a moment.",
   "themeToggle.switchToLight": "Switch to light theme",
   "themeToggle.switchToDark": "Switch to dark theme",
   // El destino va con su propio nombre ("Español", no "Spanish"): quien no

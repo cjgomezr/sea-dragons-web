@@ -49,6 +49,11 @@ export const ACCOUNT_PAGE_PATH = "/cuenta";
  * quien gestiona usuarios y roles. E5 la absorbe en el directorio completo. */
 export const ADMINISTRATION_PATH = "/administracion";
 
+/** La sección Grupos (#228, RF-2 a RF-7 del PRD de E4): la lista de grupos
+ * del club, con quién está en cada uno. Sólo la alcanza quien gestiona
+ * grupos, que son tres de los cuatro roles. */
+export const GROUPS_PATH = "/grupos";
+
 /** El endpoint de las solicitudes de rol. Su POST está abierto a los cuatro
  * roles, igual que Mi cuenta: el propio dominio responde a quien no tiene nada
  * que pedir. Por eso la ruta NO aparece en `RESTRICTED_ROUTES`, y la bandeja
@@ -206,4 +211,5 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   // acuerde de escribir esta línea.
   { path: MEMBER_ROLE_API_PATH, capability: "manageUsersAndRoles" },
   { path: GROUPS_API_PATH, capability: "manageGroups" },
+  { path: GROUPS_PATH, capability: "manageGroups" },
 ];

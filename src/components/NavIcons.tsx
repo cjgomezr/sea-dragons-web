@@ -1,8 +1,8 @@
 import type { NavIconId } from "@/lib/navigation";
 
-// Nueve SVG inline, sin librería: el repo no traía ninguna y instalar una para
-// nueve glifos habría sido peso de bundle sin uso real (#53). Todos comparten
-// trazo para leerse como un mismo set.
+// Diez SVG inline, sin librería: el repo no traía ninguna y instalar una para
+// tan pocos glifos habría sido peso de bundle sin uso real (#53). Todos
+// comparten trazo para leerse como un mismo set.
 const STROKE_WIDTH = 1.8;
 
 function IconBase({
@@ -29,8 +29,8 @@ function IconBase({
 
 /** No es un icono de sección: lo usa el control de cerrar sesión de la
  * cabecera, que el mockup del panel dibuja también como un icono. Vive aquí
- * para compartir trazo y tamaño con los nueve de la navegación, en vez de ser
- * un noveno dibujo suelto con otro grosor.
+ * para compartir trazo y tamaño con los de la navegación, en vez de ser un
+ * dibujo suelto con otro grosor.
  *
  * El marco de la puerta va a la izquierda y la flecha sale hacia fuera. Con el
  * marco a la derecha, el mismo dibujo se lee como "entrar". */
@@ -125,6 +125,20 @@ function PagosIcon(): React.JSX.Element {
   );
 }
 
+/** Dos siluetas, una detrás de otra: un grupo de socios (#228). Se distingue
+ * de Directorio, que dibuja una sola ficha, en que aquí hay más de una
+ * persona y ninguna tarjeta alrededor. */
+function GruposIcon(): React.JSX.Element {
+  return (
+    <IconBase>
+      <circle cx="9.5" cy="8.5" r="3" />
+      <path d="M3.5 19.5c0-3 2.7-5 6-5s6 2 6 5" />
+      <path d="M16 5.6a3 3 0 0 1 0 5.8" />
+      <path d="M17.5 14.9c1.9.6 3 2.3 3 4.6" />
+    </IconBase>
+  );
+}
+
 /** Un escudo con una marca: la gestión del club (#213). Sólo sale en "Más",
  * pero lleva icono como las demás para que añadirla a las pestañas fijas no
  * pida un dibujo nuevo. */
@@ -155,5 +169,6 @@ export const NAV_SECTION_ICONS: Record<NavIconId, () => React.JSX.Element> = {
   evaluaciones: EvaluacionesIcon,
   noticias: NoticiasIcon,
   pagos: PagosIcon,
+  grupos: GruposIcon,
   administracion: AdministracionIcon,
 };

@@ -23,7 +23,7 @@ function sectionAt(href: string): (typeof NAV_SECTIONS)[number] {
 }
 
 describe("navegación", () => {
-  it("contiene las siete secciones y Administración al final, cada una con su ruta", () => {
+  it("contiene las siete secciones de socio, Grupos y Administración al final, cada una con su ruta", () => {
     expect(NAV_SECTIONS.map((section) => [section.href, section.icon])).toEqual(
       [
         ["/dashboard", "dashboard"],
@@ -33,6 +33,7 @@ describe("navegación", () => {
         ["/evaluaciones", "evaluaciones"],
         ["/noticias", "noticias"],
         ["/pagos", "pagos"],
+        ["/grupos", "grupos"],
         ["/administracion", "administracion"],
       ],
     );
@@ -60,7 +61,7 @@ describe("navegación", () => {
 // E17 RF-5: los nombres en inglés son los del mockup de escritorio
 // (docs/mockups/dashboard-light.png).
 describe("navegación traducida", () => {
-  it("nombra las ocho secciones en inglés", () => {
+  it("nombra las nueve secciones en inglés", () => {
     expect(
       NAV_SECTIONS.map((section) => getSectionLabel(section, english)),
     ).toEqual([
@@ -71,11 +72,12 @@ describe("navegación traducida", () => {
       "Evaluations",
       "News",
       "Payments",
+      "Groups",
       "Administration",
     ]);
   });
 
-  it("nombra las ocho secciones en español igual que antes de traducirlas", () => {
+  it("nombra las nueve secciones en español igual que antes de traducirlas", () => {
     expect(
       NAV_SECTIONS.map((section) => getSectionLabel(section, spanish)),
     ).toEqual([
@@ -86,6 +88,7 @@ describe("navegación traducida", () => {
       "Evaluaciones",
       "Noticias",
       "Pagos",
+      "Grupos",
       "Administración",
     ]);
   });
@@ -109,11 +112,18 @@ describe("secciones por rol", () => {
     expect(hrefsOf(getVisibleSections("Player"))).toEqual(MEMBER_SECTIONS);
   });
 
-  it("un Committee ve lo mismo que un Player", () => {
-    expect(hrefsOf(getVisibleSections("Committee"))).toEqual(MEMBER_SECTIONS);
+  it("un Player no ve Grupos, que su rol no gestiona", () => {
+    expect(hrefsOf(getVisibleSections("Player"))).not.toContain("/grupos");
   });
 
-  it("un Coach ve además Equipos y Evaluaciones, y no Administración", () => {
+  it("un Committee ve lo mismo que un Player, y además Grupos", () => {
+    expect(hrefsOf(getVisibleSections("Committee"))).toEqual([
+      ...MEMBER_SECTIONS,
+      "/grupos",
+    ]);
+  });
+
+  it("un Coach ve además Equipos, Evaluaciones y Grupos, y no Administración", () => {
     expect(hrefsOf(getVisibleSections("Coach"))).toEqual([
       "/dashboard",
       "/directorio",
@@ -122,6 +132,7 @@ describe("secciones por rol", () => {
       "/evaluaciones",
       "/noticias",
       "/pagos",
+      "/grupos",
     ]);
   });
 
@@ -131,9 +142,12 @@ describe("secciones por rol", () => {
 });
 
 describe("barra móvil por rol", () => {
-  it.each(["Player", "Committee"] as const)(
-    "un %s tiene fijas Inicio, Eventos, Directorio y Noticias, y Pagos en Más",
-    (role) => {
+  it.each([
+    ["Player", ["/pagos"]],
+    ["Committee", ["/pagos", "/grupos"]],
+  ] as const)(
+    "un %s tiene fijas Inicio, Eventos, Directorio y Noticias, y el resto en Más",
+    (role, overflowHrefs) => {
       const { primary, overflow } = getMobileSections(role);
 
       expect(hrefsOf(primary)).toEqual([
@@ -142,11 +156,11 @@ describe("barra móvil por rol", () => {
         "/directorio",
         "/noticias",
       ]);
-      expect(hrefsOf(overflow)).toEqual(["/pagos"]);
+      expect(hrefsOf(overflow)).toEqual(overflowHrefs);
     },
   );
 
-  it("un Coach tiene fijas Inicio, Eventos, Equipos y Noticias, y en Más Directorio, Evaluaciones y Pagos", () => {
+  it("un Coach tiene fijas Inicio, Eventos, Equipos y Noticias, y en Más Directorio, Evaluaciones, Pagos y Grupos", () => {
     const { primary, overflow } = getMobileSections("Coach");
 
     expect(hrefsOf(primary)).toEqual([
@@ -159,6 +173,7 @@ describe("barra móvil por rol", () => {
       "/directorio",
       "/evaluaciones",
       "/pagos",
+      "/grupos",
     ]);
   });
 
@@ -172,6 +187,7 @@ describe("barra móvil por rol", () => {
       "/directorio",
       "/evaluaciones",
       "/pagos",
+      "/grupos",
       "/administracion",
     ]);
   });

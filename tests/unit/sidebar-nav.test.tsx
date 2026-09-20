@@ -18,20 +18,30 @@ const MEMBER_LABELS = [
 ];
 
 describe("secciones por rol", () => {
-  it.each(["Player", "Committee"] as const)(
-    "un %s ve Panel, Directorio, Calendario, Noticias y Pagos",
-    (role) => {
-      usePathname.mockReturnValue("/dashboard");
-      render(<SidebarNav locale="es" role={role} />);
+  it("un Player ve Panel, Directorio, Calendario, Noticias y Pagos, sin Grupos", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(<SidebarNav locale="es" role="Player" />);
 
-      expect(renderedLabels()).toEqual(MEMBER_LABELS);
-      expect(
-        screen.queryByRole("link", { name: "Administración" }),
-      ).not.toBeInTheDocument();
-    },
-  );
+    expect(renderedLabels()).toEqual(MEMBER_LABELS);
+    expect(
+      screen.queryByRole("link", { name: "Administración" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Grupos" }),
+    ).not.toBeInTheDocument();
+  });
 
-  it("un Coach ve además Equipos y Evaluaciones, y no Administración", () => {
+  it("un Committee ve lo del Player y además Grupos, y no Administración", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(<SidebarNav locale="es" role="Committee" />);
+
+    expect(renderedLabels()).toEqual([...MEMBER_LABELS, "Grupos"]);
+    expect(
+      screen.queryByRole("link", { name: "Administración" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("un Coach ve además Equipos, Evaluaciones y Grupos, y no Administración", () => {
     usePathname.mockReturnValue("/dashboard");
     render(<SidebarNav locale="es" role="Coach" />);
 
@@ -43,10 +53,11 @@ describe("secciones por rol", () => {
       "Evaluaciones",
       "Noticias",
       "Pagos",
+      "Grupos",
     ]);
   });
 
-  it("un Admin ve todas las secciones y Administración", () => {
+  it("un Admin ve todas las secciones, Grupos y Administración", () => {
     usePathname.mockReturnValue("/dashboard");
     render(<SidebarNav locale="es" role="Admin" />);
 
@@ -58,11 +69,16 @@ describe("secciones por rol", () => {
       "Evaluaciones",
       "Noticias",
       "Pagos",
+      "Grupos",
       "Administración",
     ]);
     expect(
       screen.getByRole("link", { name: "Administración" }),
     ).toHaveAttribute("href", "/administracion");
+    expect(screen.getByRole("link", { name: "Grupos" })).toHaveAttribute(
+      "href",
+      "/grupos",
+    );
   });
 });
 
@@ -101,6 +117,7 @@ describe("navegación traducida", () => {
       "Evaluations",
       "News",
       "Payments",
+      "Groups",
       "Administration",
     ]);
     expect(screen.getByRole("link", { name: "Calendar" })).toHaveAttribute(

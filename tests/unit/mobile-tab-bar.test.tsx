@@ -23,9 +23,12 @@ async function openMoreAndListIt(): Promise<(string | null)[]> {
 // FR-013 (#213): las cuatro fijas son las primeras de uso diario que el rol
 // puede abrir, y Directorio ocupa el hueco de Equipos.
 describe("barra móvil por rol", () => {
-  it.each(["Player", "Committee"] as const)(
-    "un %s tiene fijas Inicio, Agenda, Socios y Noticias, y Pagos en Más",
-    async (role) => {
+  it.each([
+    ["Player", ["Pagos"]],
+    ["Committee", ["Pagos", "Grupos"]],
+  ] as const)(
+    "un %s tiene fijas Inicio, Agenda, Socios y Noticias, y el resto en Más",
+    async (role, overflowLabels) => {
       usePathname.mockReturnValue("/dashboard");
       render(<MobileTabBar locale="es" role={role} />);
 
@@ -35,11 +38,11 @@ describe("barra móvil por rol", () => {
         "Socios",
         "Noticias",
       ]);
-      expect(await openMoreAndListIt()).toEqual(["Pagos"]);
+      expect(await openMoreAndListIt()).toEqual([...overflowLabels]);
     },
   );
 
-  it("un Coach tiene fijas Inicio, Agenda, Equipos y Noticias, y en Más Directorio, Evaluaciones y Pagos", async () => {
+  it("un Coach tiene fijas Inicio, Agenda, Equipos y Noticias, y en Más Directorio, Evaluaciones, Pagos y Grupos", async () => {
     usePathname.mockReturnValue("/dashboard");
     render(<MobileTabBar locale="es" role="Coach" />);
 
@@ -53,10 +56,11 @@ describe("barra móvil por rol", () => {
       "Directorio",
       "Evaluaciones",
       "Pagos",
+      "Grupos",
     ]);
   });
 
-  it("un Admin tiene las fijas del Coach, y en Más además Administración", async () => {
+  it("un Admin tiene las fijas del Coach, y en Más además Grupos y Administración", async () => {
     usePathname.mockReturnValue("/dashboard");
     render(<MobileTabBar locale="en" role="Admin" />);
 
@@ -65,6 +69,7 @@ describe("barra móvil por rol", () => {
       "Directory",
       "Evaluations",
       "Payments",
+      "Groups",
       "Administration",
     ]);
   });
@@ -126,7 +131,7 @@ describe("barra de pestañas móvil", () => {
     );
   });
 
-  it("revela las tres secciones restantes al pulsar Más", async () => {
+  it("revela las secciones restantes al pulsar Más", async () => {
     const user = userEvent.setup();
     usePathname.mockReturnValue("/dashboard");
     render(<MobileTabBar locale="es" role="Coach" />);
@@ -140,6 +145,7 @@ describe("barra de pestañas móvil", () => {
       screen.getByRole("link", { name: "Evaluaciones" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Pagos" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Grupos" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Más" })).toHaveAttribute(
       "aria-expanded",
       "true",
@@ -244,14 +250,14 @@ describe("navegación traducida en la barra móvil", () => {
     );
   });
 
-  it("revela en inglés las tres secciones restantes al pulsar More", async () => {
+  it("revela en inglés las secciones restantes al pulsar More", async () => {
     const user = userEvent.setup();
     usePathname.mockReturnValue("/dashboard");
     render(<MobileTabBar locale="en" role="Coach" />);
 
     await user.click(screen.getByRole("button", { name: "More" }));
 
-    const overflow = ["Directory", "Evaluations", "Payments"];
+    const overflow = ["Directory", "Evaluations", "Payments", "Groups"];
     for (const label of overflow) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }

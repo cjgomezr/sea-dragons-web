@@ -10,6 +10,7 @@ import {
   EMAIL_CONFIRMATION_PATH,
   EVALUATIONS_PATH,
   GROUPS_API_PATH,
+  GROUPS_PATH,
   GUARDIAN_CONSENT_API_PATH,
   MEMBERS_API_PATH,
   MEMBER_ROLE_API_PATH,
@@ -488,6 +489,29 @@ const GROUP_MEMBERSHIP_PATHS = [
   `${GROUP_PATH}/candidates`,
   `${GROUP_PATH}/members/b1b1b1b1-0000-4000-8000-00000000000b`,
 ];
+
+describe("frontera de la pantalla Grupos (#228)", () => {
+  it("manda al panel a un Player que la pide a mano", () => {
+    expect(
+      decideSessionBoundary({ pathname: GROUPS_PATH, ...activeAs("Player") }),
+    ).toEqual(TO_DASHBOARD);
+  });
+
+  it.each(["Admin", "Coach", "Committee"] as const)(
+    "deja entrar a un %s",
+    (role) => {
+      expect(
+        decideSessionBoundary({ pathname: GROUPS_PATH, ...activeAs(role) }),
+      ).toEqual(ALLOW);
+    },
+  );
+
+  it("manda a la entrada a quien la pide sin sesión", () => {
+    expect(
+      decideSessionBoundary({ pathname: GROUPS_PATH, ...ANONYMOUS }),
+    ).toEqual({ kind: "redirect", to: SIGN_IN_PATH });
+  });
+});
 
 describe("frontera de grupos", () => {
   it.each([GROUPS_API_PATH, GROUP_PATH, ...GROUP_MEMBERSHIP_PATHS])(
