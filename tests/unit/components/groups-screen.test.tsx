@@ -461,6 +461,25 @@ describe("pantalla de grupos", () => {
     expect(calls.filter((call) => call.method === "POST")).toHaveLength(1);
   });
 
+  it("traduce el error del servidor por su código, no por la frase que manda", async () => {
+    stubApi({
+      groups: [SENIOR],
+      createGroup: () => errorResponse(409, "conflict"),
+    });
+    await renderScreen("es");
+
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByLabelText("Nombre del grupo nuevo"),
+      "Senior Squad",
+    );
+    await user.click(screen.getByRole("button", { name: "Crear grupo" }));
+
+    expect(
+      await screen.findByText("El club ya tiene un grupo con ese nombre."),
+    ).toBeVisible();
+  });
+
   it("en español, la pantalla sale en español", async () => {
     stubApi({ groups: [SENIOR] });
 

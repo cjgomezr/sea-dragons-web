@@ -222,6 +222,8 @@ export function describeGroupsFailure(
       return translate("groups.error.invalidName", {
         max: GROUP_NAME_MAX_LENGTH,
       });
+    // La única regla que estos endpoints nombran: un socio dado de baja no se
+    // asigna (RF-6). Crear, renombrar y borrar no responden 422 nunca.
     case "business_rule":
       return translate("groups.error.memberInactive");
     case "not_found":

@@ -1338,11 +1338,15 @@ test.describe("dentro de la aplicación", () => {
           "Evaluations",
           "News",
           "Payments",
+          "Groups",
           "Administration",
         ]);
         await expect(
           sidebar.getByRole("link", { name: "Administration" }),
         ).toHaveAttribute("href", "/administracion");
+        await expect(
+          sidebar.getByRole("link", { name: "Groups" }),
+        ).toHaveAttribute("href", "/grupos");
       });
 
       test("the tab bar keeps the Coach tabs and adds Administration behind More", async ({
@@ -1362,6 +1366,7 @@ test.describe("dentro de la aplicación", () => {
           "Directory",
           "Evaluations",
           "Payments",
+          "Groups",
           "Administration",
         ]);
       });
@@ -2059,6 +2064,7 @@ test.describe("un Player que pide una pantalla que su rol no alcanza", () => {
     "/equipos",
     "/evaluaciones",
     "/administracion",
+    "/grupos",
   ]) {
     test(`aterriza en el panel al pedir ${restrictedPath}`, async ({
       page,
@@ -2724,5 +2730,304 @@ test.describe("un Admin que decide una solicitud desde la bandeja", () => {
     await expect(
       page.getByRole("combobox", { name: `Role for ${DECIDABLE_MEMBER_NAME}` }),
     ).toHaveValue("Committee");
+  });
+});
+
+/* ---------------------------------------------------------------------------
+   La sección Grupos (#228). Sin mockup propio: se revisa contra
+   design-system.md, y la fila de socio del panel contra
+   docs/mockups/directory-light.png, como la pantalla de administración.
+
+   Las capturas leen datos fijos, servidos por `page.route`: la lista enseña
+   TODOS los grupos del club, así que en el club compartido de la suite una
+   captura cambiaría con cada grupo que cualquier otro test creara. Lo que los
+   endpoints de verdad responden se prueba aparte, con la sesión del Admin
+   sembrado.
+   --------------------------------------------------------------------------- */
+
+const GROUPS_SCREEN_PATH = "/grupos";
+const GROUPS_ENDPOINT = "/api/v1/groups";
+
+/** Justo el tope de `GROUP_NAME_MAX_LENGTH`, para el criterio de los 60
+ * caracteres a 375px y el caso de contenido largo de design-system.md. */
+const LONG_GROUP_NAME =
+  "Juveniles que entrenan los jueves por la tarde en la piscina";
+
+const STUBBED_GROUPS = [
+  {
+    id: "11111111-0000-4000-8000-000000000001",
+    name: "Senior Squad",
+    memberCount: 3,
+  },
+  {
+    id: "22222222-0000-4000-8000-000000000002",
+    name: LONG_GROUP_NAME,
+    memberCount: 0,
+  },
+];
+
+const STUBBED_GROUP_MEMBERS = [
+  { id: "aaaaaaaa-0000-4000-8000-00000000000a", fullName: "Ana Admin" },
+  { id: "bbbbbbbb-0000-4000-8000-00000000000b", fullName: "Nerea Ruiz" },
+  {
+    id: "cccccccc-0000-4000-8000-00000000000c",
+    fullName: "Tomás Errekondo Aranburu",
+  },
+];
+
+const STUBBED_GROUP_CANDIDATES = [
+  { id: "dddddddd-0000-4000-8000-00000000000d", fullName: "Bea Nadal" },
+  { id: "eeeeeeee-0000-4000-8000-00000000000e", fullName: "Iker Lasa" },
+];
+
+const OPENED_GROUP = STUBBED_GROUPS[0];
+
+/** Las tres lecturas de la sección, con datos fijos. Registradas antes de
+ * navegar, para que la pantalla no llegue a ver las de verdad. */
+async function stubGroupsReads(
+  page: Page,
+  options: { readonly withGroups: boolean },
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === GROUPS_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: { groups: options.withGroups ? STUBBED_GROUPS : [] },
+        }),
+      }),
+  );
+  await page.route(
+    (url) => /^\/api\/v1\/groups\/[^/]+\/members$/.test(url.pathname),
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { members: STUBBED_GROUP_MEMBERS } }),
+      }),
+  );
+  await page.route(
+    (url) => /^\/api\/v1\/groups\/[^/]+\/candidates$/.test(url.pathname),
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: { candidates: STUBBED_GROUP_CANDIDATES },
+        }),
+      }),
+  );
+}
+
+/** La pantalla pide su lista al montarse, así que hasta que llega sólo enseña
+ * que está cargando. Sin esperarla, una captura sale del estado de carga y la
+ * comparación de un instante después, de la pantalla ya llena. */
+async function waitForGroups(page: Page, heading: string): Promise<void> {
+  await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+}
+
+/** Abre la confirmación de borrado del grupo con socios, que es la que dice
+ * cuántos tiene. */
+async function askToDeleteGroup(page: Page): Promise<void> {
+  await page
+    .getByRole("button", { name: `Delete ${OPENED_GROUP?.name ?? ""}` })
+    .click();
+  await expect(page.getByText(/They stay in the club/)).toBeVisible();
+}
+
+function openGroupIn(memberHeading: string) {
+  return async (page: Page): Promise<void> => {
+    await page
+      .getByRole("button", { name: OPENED_GROUP?.name ?? "", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: memberHeading }),
+    ).toBeVisible();
+  };
+}
+
+type GroupsState = {
+  readonly name: string;
+  readonly withGroups: boolean;
+  /** El encabezado por el que se sabe que la lista llegó. */
+  readonly listHeading: string;
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+  readonly prepare?: (page: Page) => Promise<void>;
+};
+
+const ENGLISH_GROUPS_HEADING = "Club groups";
+const SPANISH_GROUPS_HEADING = "Grupos del club";
+
+const GROUPS_STATES: readonly GroupsState[] = [
+  {
+    name: "grupos-con-grupos",
+    withGroups: true,
+    listHeading: ENGLISH_GROUPS_HEADING,
+  },
+  {
+    name: "grupos-con-grupos-es",
+    withGroups: true,
+    listHeading: SPANISH_GROUPS_HEADING,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "grupos-sin-grupos",
+    withGroups: false,
+    listHeading: ENGLISH_GROUPS_HEADING,
+  },
+  {
+    name: "grupos-sin-grupos-es",
+    withGroups: false,
+    listHeading: SPANISH_GROUPS_HEADING,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "grupos-borrar",
+    withGroups: true,
+    listHeading: ENGLISH_GROUPS_HEADING,
+    prepare: askToDeleteGroup,
+  },
+  {
+    name: "grupos-abierto",
+    withGroups: true,
+    listHeading: ENGLISH_GROUPS_HEADING,
+    prepare: openGroupIn(`Members of ${OPENED_GROUP?.name ?? ""}`),
+  },
+  {
+    name: "grupos-abierto-es",
+    withGroups: true,
+    listHeading: SPANISH_GROUPS_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: openGroupIn(`Socios de ${OPENED_GROUP?.name ?? ""}`),
+  },
+];
+
+async function goToGroups(
+  page: Page,
+  state: GroupsState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await stubGroupsReads(page, state);
+  await state.beforeVisit?.(page);
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${GROUPS_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, GROUPS_SCREEN_PATH, theme);
+  }
+  await waitForGroups(page, state.listHeading);
+  await state.prepare?.(page);
+}
+
+for (const state of GROUPS_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToGroups(page, state, theme);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToGroups(page, state);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToGroups(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("la sección Grupos con los datos de verdad", () => {
+  skipWithoutSession();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("un Admin abre la sección desde la barra lateral", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${APP_URL}/dashboard`);
+
+    await page
+      .getByRole("navigation", { name: "Main" })
+      .getByRole("link", { name: "Groups" })
+      .click();
+
+    await expect(page).toHaveURL(new RegExp(`${GROUPS_SCREEN_PATH}$`));
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Groups" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: ENGLISH_GROUPS_HEADING }),
+    ).toBeVisible();
+  });
+
+  test("en español, la sección sale en español", async ({ page }) => {
+    await chooseSpanish(page);
+    await page.goto(`${APP_URL}${GROUPS_SCREEN_PATH}`);
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Grupos" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: SPANISH_GROUPS_HEADING }),
+    ).toBeVisible();
+  });
+
+  test("la lista responde 200 a un Admin", async ({ request }) => {
+    const groups = await request.get(`${APP_URL}${GROUPS_ENDPOINT}`);
+
+    expect(groups.status()).toBe(200);
+  });
+});
+
+test.describe("un Player frente a la sección Grupos", () => {
+  skipWithoutSession();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("no la ve en la barra lateral", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${APP_URL}/dashboard`);
+
+    await expect(
+      page
+        .getByRole("navigation", { name: "Main" })
+        .getByRole("link", { name: "Groups" }),
+    ).toHaveCount(0);
+  });
+
+  test("aterriza en el panel al pedirla", async ({ page }) => {
+    await page.goto(`${APP_URL}${GROUPS_SCREEN_PATH}`);
+
+    await expect(page).toHaveURL(new RegExp("/dashboard$"));
+  });
+
+  test("la lista de grupos le responde 403", async ({ request }) => {
+    const groups = await request.get(`${APP_URL}${GROUPS_ENDPOINT}`);
+
+    expect(groups.status()).toBe(403);
   });
 });
