@@ -1,9 +1,11 @@
 import { z } from "zod";
+import type { RequestFailure } from "@/components/auth/request-failure";
 import {
-  type RequestFailure,
-  readRequestFailure,
-} from "@/components/auth/request-failure";
-import { readStringAt } from "@/lib/api/read-string-at";
+  type ApiRequestFailure,
+  JSON_REQUEST_HEADERS,
+  UNRECOGNIZED_RESPONSE,
+  requestApi,
+} from "@/lib/api/request-api";
 import type {
   ClubMember,
   PendingRoleRequest,
@@ -31,7 +33,6 @@ import type { Translator } from "@/lib/i18n/translator";
  */
 
 const PENDING_REQUESTS_PATH = `${ROLE_REQUESTS_API_PATH}?status=pending`;
-const JSON_HEADERS = { "content-type": "application/json" };
 
 const clubMembersSchema = z.object({
   data: z.object({
@@ -63,13 +64,8 @@ const pendingRequestsSchema = z.object({
 
 const memberRoleSchema = z.object({ data: z.object({ role: z.enum(ROLES) }) });
 
-/** Por qué no salió una petición de esta pantalla. `reason` es el del cuerpo
- * de un error de la convención, que distingue qué regla se incumplió. */
-export type AdministrationFailure = {
-  readonly kind: "failed";
-  readonly failure: RequestFailure;
-  readonly reason: string | null;
-};
+/** Por qué no salió una petición de esta pantalla. */
+export type AdministrationFailure = ApiRequestFailure;
 
 export type AdministrationData = {
   readonly requests: readonly PendingRoleRequest[];
@@ -86,41 +82,6 @@ export type DecisionOutcome =
 export type RoleChangeOutcome =
   { readonly kind: "changed"; readonly role: Role } | AdministrationFailure;
 
-type FetchedPayload = { readonly kind: "ok"; readonly payload: unknown };
-
-type FetchOutcome = FetchedPayload | AdministrationFailure;
-
-/** Una petición a la API v1 reducida a "el cuerpo que respondió" o "por qué
- * no". El detalle técnico de un fallo de red no le sirve a quien mira la
- * pantalla, así que no sale de aquí. */
-async function requestApi(
-  path: string,
-  init?: RequestInit,
-): Promise<FetchOutcome> {
-  let response: Response;
-  try {
-    response = await fetch(path, init);
-  } catch {
-    return { kind: "failed", failure: "network", reason: null };
-  }
-
-  const payload: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    return {
-      kind: "failed",
-      failure: readRequestFailure(payload),
-      reason: readStringAt(payload, ["error", "reason"]),
-    };
-  }
-  return { kind: "ok", payload };
-}
-
-const UNRECOGNIZED: AdministrationFailure = {
-  kind: "failed",
-  failure: "unrecognized_response",
-  reason: null,
-};
-
 export async function loadAdministration(): Promise<AdministrationLoad> {
   const [pending, members] = await Promise.all([
     requestApi(PENDING_REQUESTS_PATH),
@@ -136,7 +97,7 @@ export async function loadAdministration(): Promise<AdministrationLoad> {
   const parsedRequests = pendingRequestsSchema.safeParse(pending.payload);
   const parsedMembers = clubMembersSchema.safeParse(members.payload);
   if (!parsedRequests.success || !parsedMembers.success) {
-    return UNRECOGNIZED;
+    return UNRECOGNIZED_RESPONSE;
   }
   return {
     kind: "loaded",
@@ -155,7 +116,7 @@ export async function submitRoleRequestDecision(
     ROLE_REQUEST_DECISION_API_PATH.replace("[id]", requestId),
     {
       method: "POST",
-      headers: JSON_HEADERS,
+      headers: JSON_REQUEST_HEADERS,
       body: JSON.stringify({ decision }),
     },
   );
@@ -170,7 +131,7 @@ export async function submitMemberRole(
     MEMBER_ROLE_API_PATH.replace("[id]", userId),
     {
       method: "PATCH",
-      headers: JSON_HEADERS,
+      headers: JSON_REQUEST_HEADERS,
       body: JSON.stringify({ role }),
     },
   );
@@ -180,7 +141,7 @@ export async function submitMemberRole(
   const parsed = memberRoleSchema.safeParse(outcome.payload);
   return parsed.success
     ? { kind: "changed", role: parsed.data.data.role }
-    : UNRECOGNIZED;
+    : UNRECOGNIZED_RESPONSE;
 }
 
 /** Una solicitud que el servidor dice que ya no está pendiente no vuelve a la

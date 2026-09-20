@@ -212,6 +212,7 @@ export const spanishMessages: MessageCatalog = {
   "nav.label.evaluations": "Evaluaciones",
   "nav.label.news": "Noticias",
   "nav.label.payments": "Pagos",
+  "nav.label.groups": "Grupos",
   "nav.label.admin": "Administración",
   "nav.label.dashboardShort": "Inicio",
   // "Calendario" ocupaba el 89% de su pestaña a 360px y se partía con las
@@ -308,6 +309,65 @@ export const spanishMessages: MessageCatalog = {
     "Tu sesión terminó. Vuelve a entrar para seguir.",
   "admin.error.forbidden": "Tu rol no puede gestionar socios ni roles.",
   "admin.error.unexpected":
+    "No pudimos completar la acción. Vuelve a intentarlo en un momento.",
+  // La sección Grupos (#228, RF-2 a RF-7 del PRD de E4).
+  "groups.metaTitle": "Grupos · Victoria Seadragons",
+  "groups.metaDescription":
+    "Crea los grupos del club y elige qué socios pertenecen a cada uno.",
+  "groups.title": "Grupos",
+  "groups.lead":
+    "Los grupos juntan socios para poder dirigirles un entrenamiento, un evento o una noticia.",
+  "groups.loading": "Cargando los grupos del club…",
+  "groups.loadFailed": "No pudimos cargar los grupos del club.",
+  "groups.retry": "Volver a intentarlo",
+  "groups.list.title": "Grupos del club",
+  "groups.list.empty":
+    "Este club todavía no tiene grupos. Crea el primero para empezar a juntar socios.",
+  "groups.memberCount": {
+    one: "{count} socio",
+    other: "{count} socios",
+  },
+  "groups.create.label": "Nombre del grupo nuevo",
+  "groups.create.submit": "Crear grupo",
+  "groups.create.saving": "Creando…",
+  "groups.rename": "Renombrar",
+  "groups.renameLabel": "Renombrar {name}",
+  "groups.renameField": "Nombre nuevo de {name}",
+  "groups.renameSubmit": "Guardar el nombre nuevo",
+  "groups.renameSaving": "Guardando…",
+  "groups.cancel": "Cancelar",
+  "groups.delete": "Borrar",
+  "groups.deleteLabel": "Borrar {name}",
+  "groups.deleteQuestion": {
+    one: "¿Borrar «{name}»? Tiene {count} socio, que sigue en el club.",
+    other: "¿Borrar «{name}»? Tiene {count} socios, que siguen en el club.",
+  },
+  "groups.deleteSubmit": "Borrar el grupo",
+  "groups.deleting": "Borrando…",
+  "groups.members.title": "Socios de {name}",
+  "groups.members.loading": "Cargando los socios del grupo…",
+  "groups.members.loadFailed": "No pudimos cargar los socios de este grupo.",
+  "groups.members.empty":
+    "Este grupo todavía no tiene socios. Agrega el primero desde la lista.",
+  "groups.members.close": "Cerrar el grupo",
+  "groups.members.remove": "Quitar",
+  "groups.members.removeLabel": "Quitar a {name} del grupo",
+  "groups.members.removing": "Quitando…",
+  "groups.members.addLabel": "Socio para agregar",
+  "groups.members.add": "Agregar al grupo",
+  "groups.members.adding": "Agregando…",
+  "groups.members.noCandidates":
+    "Todos los socios del club ya están en este grupo.",
+  "groups.error.nameTaken": "El club ya tiene un grupo con ese nombre.",
+  "groups.error.invalidName":
+    "El nombre tiene que tener entre 1 y {max} caracteres.",
+  "groups.error.groupGone": "Ese grupo ya no está en el club.",
+  "groups.error.memberInactive":
+    "Ese socio ya dejó el club, así que no se puede agregar.",
+  "groups.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para seguir.",
+  "groups.error.forbidden": "Tu rol no puede gestionar los grupos del club.",
+  "groups.error.unexpected":
     "No pudimos completar la acción. Vuelve a intentarlo en un momento.",
   "themeToggle.switchToLight": "Cambiar a tema claro",
   "themeToggle.switchToDark": "Cambiar a tema oscuro",

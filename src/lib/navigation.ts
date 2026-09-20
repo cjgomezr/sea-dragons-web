@@ -14,6 +14,7 @@ export type NavIconId =
   | "evaluaciones"
   | "noticias"
   | "pagos"
+  | "grupos"
   | "administracion";
 
 /** Las etiquetas de la navegación viven en el catálogo bajo `nav.label.`.
@@ -68,6 +69,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   },
   { labelKey: "nav.label.news", href: "/noticias", icon: "noticias" },
   { labelKey: "nav.label.payments", href: "/pagos", icon: "pagos" },
+  // Grupos y Administración cierran la lista porque las dos son de gestión, y
+  // ninguna de las dos la abre un Player. Como Administración, Grupos sólo
+  // sale en "Más" y en la barra lateral, donde su etiqueta cabe entera.
+  { labelKey: "nav.label.groups", href: "/grupos", icon: "grupos" },
   // Sólo en "Más" y en la barra lateral, donde cabe entera: no necesita
   // etiqueta corta.
   {

@@ -1223,3 +1223,172 @@ h6 {
     min-width: 160px;
   }
 }
+
+/* La sección Grupos (#228). Sin mockup propio: se revisa contra
+   design-system.md, y la fila de socio del panel reutiliza la de la pantalla
+   de administración (docs/mockups/directory-light.png) sin el correo, que a
+   quien gestiona grupos no se le enseña. */
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  max-width: 720px;
+}
+
+.groups > .app-lead {
+  margin-bottom: 0;
+}
+
+/* El formulario de un nombre: el de crear y el de renombrar son el mismo. El
+   campo y el botón se apilan en móvil y comparten línea en cuanto cabe. */
+.groups-name-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.groups-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.groups-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.groups-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.groups-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* El nombre es el control que abre el grupo, así que se lee como texto y se
+   comporta como botón: un nombre de 60 caracteres parte por donde haga falta
+   antes que sacar una barra horizontal a 375px. */
+.groups-open {
+  flex: 1 1 160px;
+  min-width: 0;
+  min-height: var(--touch-target-min);
+  padding: 0;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--color-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.groups-open:hover:not(:disabled) {
+  color: var(--color-accent);
+}
+
+.groups-open:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.groups-count {
+  flex: none;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.groups-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.groups-question {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* La única acción destructiva de la pantalla. Lleva el color de peligro para
+   no parecer la principal, y el borde la distingue también sin color. */
+.groups-danger {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-6);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-danger);
+  background: var(--color-panel);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.groups-danger:hover:not(:disabled) {
+  background: var(--color-background);
+}
+
+.groups-danger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.groups-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.groups-detail-head h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.groups-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* El campo y el botón comparten línea en cuanto caben. `flex-basis` sólo se
+   declara aquí a propósito: en la columna del móvil el eje principal es el
+   vertical, así que esos 220px serían un ALTO mínimo del campo y abrirían un
+   hueco enorme entre el campo y su botón. */
+@media (min-width: 768px) {
+  .groups-name-form,
+  .groups-add {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .groups-name-form .auth-field,
+  .groups-add .auth-field {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+
+  .groups-name-form .groups-actions,
+  .groups-add > button {
+    flex: none;
+  }
+}
