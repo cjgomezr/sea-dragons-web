@@ -223,7 +223,8 @@ export const spanishMessages: MessageCatalog = {
   "nav.label.calendarShort": "Agenda",
   // Directorio sólo es pestaña fija para los roles que no ven Equipos (#213).
   // Mide casi lo que "Calendario", que se partía, así que tampoco cabe.
-  // "Miembros" (#246) mide lo mismo que "Noticias", que sí cabe a 360px.
+  // "Miembros" (#246) cabe a 360px como pestaña fija; lo miden los tests
+  // de geometría de Playwright, no el número de letras.
   "nav.label.directoryShort": "Miembros",
   "app.metaDescription":
     "Plataforma del club de rugby subacuático Victoria Seadragons (Melbourne).",

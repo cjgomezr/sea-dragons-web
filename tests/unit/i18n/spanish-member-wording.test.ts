@@ -6,7 +6,7 @@ import { createTranslator } from "@/lib/i18n/translator";
 // #246: en un club quien pertenece es un miembro, no un socio. El inglés ya
 // decía "member", así que la palabra nueva además alinea los dos catálogos.
 // Que las claves sigan emparejadas lo vigila `untranslated-text.test.ts`.
-const SOCIO = /\bsocios?\b/i;
+const SOCIO = /\bsoci[oa]s?\b/i;
 
 function textsOf(message: Message): string[] {
   if (typeof message === "string") {
@@ -44,5 +44,11 @@ describe("plurales", () => {
     expect(
       translate("groups.deleteQuestion", { name: "Senior", count: 1 }),
     ).toBe("¿Borrar «Senior»? Tiene 1 miembro, que sigue en el club.");
+  });
+
+  it("pregunta por el grupo que borra nombrando a sus miembros", () => {
+    expect(
+      translate("groups.deleteQuestion", { name: "Senior", count: 2 }),
+    ).toBe("¿Borrar «Senior»? Tiene 2 miembros, que siguen en el club.");
   });
 });
