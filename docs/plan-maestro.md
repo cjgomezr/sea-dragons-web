@@ -34,7 +34,7 @@ E15 y E16 se añadieron el 23 de agosto de 2026, después del plan original, al
 resolver los huecos P2, P3 y P4 de `docs/preguntas-abiertas.md`.
 
 E17 se añadió el 16 de septiembre de 2026, también después del plan original, a
-petición del dueño: el club está en Melbourne y la mayoría de sus socios habla
+petición del dueño: el club está en Melbourne y la mayoría de sus miembros habla
 inglés, pero la plataforma se escribió entera en español. No depende de ningún
 epic y nadie depende de ella, pero **se trabaja antes de E3**: con la
 infraestructura de traducción puesta, cada pantalla que venga después nace en
@@ -184,11 +184,11 @@ de casi todos los epics anteriores.
   100 al día y hasta tres dominios verificados, que sobra para el volumen del
   club. Sustituye al servicio incorporado de Supabase, que manda 2 correos por
   hora y su propia documentación desaconseja para producción. Lo usan la
-  recuperación de contraseña (E2), las invitaciones de socios (E5) y los avisos
+  recuperación de contraseña (E2), las invitaciones de miembros (E5) y los avisos
   de cobro (E12). **Depende de que el club tenga dominio propio**: sin un
   remitente verificado, Resend solo escribe al correo de la propia cuenta. Esa
   compra sigue sin decidirse y es lo único que separa al correo de funcionar
-  con socios reales.
+  con miembros reales.
 - **Un solo estado de cuenta incompleta (FR-083).** Falta de datos de registro
   y falta de consentimiento de tutor comparten el estado `incomplete`, en vez
   de dos máquinas de estado paralelas.

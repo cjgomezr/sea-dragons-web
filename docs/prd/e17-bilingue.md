@@ -6,16 +6,16 @@ Fuente: petición del dueño del 16 de septiembre de 2026. Es una épica llegada
 
 ## 1. Problema
 
-El club está en Melbourne y la mayoría de sus socios habla inglés. La plataforma está escrita entera en español, con los textos incrustados en cada pantalla y en los dos correos que salen hoy. Un socio australiano se encuentra con un formulario de registro que no entiende, y el club vuelve a WhatsApp, que es lo que la plataforma existe para reemplazar.
+El club está en Melbourne y la mayoría de sus miembros habla inglés. La plataforma está escrita entera en español, con los textos incrustados en cada pantalla y en los dos correos que salen hoy. Un miembro australiano se encuentra con un formulario de registro que no entiende, y el club vuelve a WhatsApp, que es lo que la plataforma existe para reemplazar.
 
 Esto se resuelve ahora o se paga caro después. Hoy hay unas diez pantallas y dos correos. Después de calendario, noticias, pagos y evaluaciones habrá el triple, y cada pantalla que nazca en un solo idioma es una pantalla que alguien tendrá que revisar de nuevo. Con la infraestructura puesta, cada pantalla nueva nace en los dos idiomas y el costo por pantalla es casi cero.
 
 ## 2. Usuarios y contexto
 
-- **Socio australiano:** habla inglés, su navegador está en inglés, y hoy no entiende la aplicación. Es la mayoría del club.
-- **Socio hispanohablante:** parte del club viene de Latinoamérica y prefiere español. Es quien usa la plataforma hoy.
-- **Administrador del club:** escribe avisos y gestiona socios. Necesita ver la interfaz en su idioma sin que eso cambie lo que ven los demás.
-- **Hoy lo resuelven así:** el socio que no entiende pregunta por WhatsApp, o traduce la página con el navegador y ve una traducción automática que rompe el diseño.
+- **Miembro australiano:** habla inglés, su navegador está en inglés, y hoy no entiende la aplicación. Es la mayoría del club.
+- **Miembro hispanohablante:** parte del club viene de Latinoamérica y prefiere español. Es quien usa la plataforma hoy.
+- **Administrador del club:** escribe avisos y gestiona miembros. Necesita ver la interfaz en su idioma sin que eso cambie lo que ven los demás.
+- **Hoy lo resuelven así:** el miembro que no entiende pregunta por WhatsApp, o traduce la página con el navegador y ve una traducción automática que rompe el diseño.
 
 ## 3. Objetivo y métricas de éxito
 
@@ -35,7 +35,7 @@ Esto se resuelve ahora o se paga caro después. Hoy hay unas diez pantallas y do
 - El interruptor de idioma, junto al del tema, que recuerda la elección.
 - Las pantallas de autenticación traducidas: entrar, registro, completar registro, consentimiento del tutor, recuperar contraseña y contraseña nueva.
 - La cáscara traducida: navegación de escritorio y móvil, panel principal y las siete secciones.
-- Los dos correos (confirmación y recuperación) en el idioma del socio, con su idioma guardado en la fila del socio al registrarse.
+- Los dos correos (confirmación y recuperación) en el idioma del miembro, con su idioma guardado en la fila del miembro al registrarse.
 - Fechas, horas y números en el formato de cada idioma, respetando la zona horaria del club.
 - El atributo de idioma del documento, que hoy es siempre `es`, siguiendo al idioma activo.
 - Un test que impida que se cuele un texto sin traducir.
@@ -43,11 +43,11 @@ Esto se resuelve ahora o se paga caro después. Hoy hay unas diez pantallas y do
 **Explícitamente fuera (por ahora):**
 
 - Un tercer idioma. La infraestructura no debe estorbarlo, pero no se añade ninguno.
-- Traducir lo que escriben los socios: nombres, justificaciones, noticias o notas de eventos se guardan tal cual.
+- Traducir lo que escriben los miembros: nombres, justificaciones, noticias o notas de eventos se guardan tal cual.
 - Direcciones distintas por idioma (`/en/...`, `/es/...`). La cookie decide, y la dirección no cambia.
 - Traducir los correos que manda Supabase Auth por su cuenta, si alguno queda fuera de las plantillas del repositorio.
 - Cambiar el idioma en el que se escriben los documentos del repositorio, los tickets o los comentarios del código, que siguen en español.
-- Que el idioma viaje con la cuenta entre dispositivos para la interfaz. La cookie es por equipo; en la fila del socio solo se guarda para los correos.
+- Que el idioma viaje con la cuenta entre dispositivos para la interfaz. La cookie es por equipo; en la fila del miembro solo se guarda para los correos.
 
 ## 5. Requerimientos funcionales
 
@@ -73,7 +73,7 @@ Todo texto visible sale de un catálogo por idioma, no del componente que lo pin
 - **Dado** una persona viendo la aplicación en inglés, **cuando** usa el interruptor de idioma, **entonces** la pantalla pasa a español sin perder dónde estaba.
 - **Dado** ese cambio, **cuando** vuelve más tarde, **entonces** sigue en el idioma que eligió.
 - **Dado** el interruptor, **cuando** se mira, **entonces** está junto al del tema y dice a qué idioma lleva.
-- **Dado** un socio con la sesión abierta, **cuando** está en cualquier pantalla de dentro de la aplicación, **entonces** tiene el interruptor a mano sin cerrar sesión ni volver al registro. Vive en los dos sitios donde ya vive el del tema: el encabezado de las pantallas de autenticación (`src/app/(auth)/layout.tsx`) y la cáscara de la aplicación (`src/components/AppShell.tsx`).
+- **Dado** un miembro con la sesión abierta, **cuando** está en cualquier pantalla de dentro de la aplicación, **entonces** tiene el interruptor a mano sin cerrar sesión ni volver al registro. Vive en los dos sitios donde ya vive el del tema: el encabezado de las pantallas de autenticación (`src/app/(auth)/layout.tsx`) y la cáscara de la aplicación (`src/components/AppShell.tsx`).
 - **Dado** ese cambio hecho desde dentro, **cuando** la persona sigue navegando, **entonces** todas las pantallas siguientes salen en el idioma nuevo, incluidos los textos que arma el servidor.
 - **Dado** alguien que navega con el teclado, **cuando** llega al interruptor, **entonces** lo puede usar y sabe en qué idioma está.
 
@@ -89,11 +89,11 @@ Todo texto visible sale de un catálogo por idioma, no del componente que lo pin
 - **Dado** la barra móvil a 360 píxeles, **cuando** se pinta en cualquiera de los dos idiomas, **entonces** ninguna etiqueta se parte en dos líneas y cada pestaña conserva su objetivo táctil de 44 píxeles.
 - **Dado** las siete secciones y el panel principal, **cuando** se piden en un idioma, **entonces** sus títulos y textos de marcador de posición están en ese idioma.
 
-### RF-6 · Los correos en el idioma del socio · Must
+### RF-6 · Los correos en el idioma del miembro · Must
 
 - **Dado** alguien que se registra con la aplicación en inglés, **cuando** recibe el correo de confirmación, **entonces** llega en inglés, asunto incluido.
-- **Dado** ese mismo socio, **cuando** pide recuperar su contraseña, **entonces** ese correo también llega en inglés.
-- **Dado** un socio registrado antes de esta épica, **cuando** recibe un correo, **entonces** llega en español, que es el idioma con el que se registró.
+- **Dado** ese mismo miembro, **cuando** pide recuperar su contraseña, **entonces** ese correo también llega en inglés.
+- **Dado** un miembro registrado antes de esta épica, **cuando** recibe un correo, **entonces** llega en español, que es el idioma con el que se registró.
 - **Dado** el idioma guardado, **cuando** se mira en la base, **entonces** es uno de los dos que la aplicación habla, y la base rechaza cualquier otro.
 
 ### RF-7 · Fechas, horas y números · Should
@@ -113,7 +113,7 @@ Todo texto visible sale de un catálogo por idioma, no del componente que lo pin
 - **Navegador que pide varios idiomas:** se toma el primero que la aplicación hable; si no habla ninguno, inglés.
 - **Traducción más larga que el espacio:** las etiquetas de la barra móvil tienen test de ancho a 360 píxeles en los dos idiomas. Si una no cabe, se acorta la etiqueta, no se achica la letra.
 - **Cambio de idioma a mitad de un formulario:** lo escrito no se pierde.
-- **Correo de un socio sin idioma guardado:** sale en español, que es lo que había.
+- **Correo de un miembro sin idioma guardado:** sale en español, que es lo que había.
 - **Textos que vienen del servidor:** los mensajes de error de la API se traducen en la pantalla a partir de su código, no traduciendo la frase que llega.
 - **Capturas y tests actuales:** hoy buscan textos en español. Cambian al idioma por defecto dentro de los tickets que traducen cada pantalla, y las líneas base visuales se aceptan de nuevo.
 - **Contenido que escriben las personas:** no se traduce nunca, ni con la interfaz en el otro idioma.
@@ -134,7 +134,7 @@ Todo texto visible sale de un catálogo por idioma, no del componente que lo pin
 
 ## 9. Preguntas abiertas
 
-Ninguna. Las tres decisiones que faltaban las tomó el dueño el 16 de septiembre de 2026: la épica entra antes de E3, el idioma por defecto sale del navegador con inglés de respaldo, y la preferencia se guarda en el equipo (por cookie, porque el servidor necesita leerla) mientras que en la fila del socio solo se guarda el idioma de sus correos.
+Ninguna. Las tres decisiones que faltaban las tomó el dueño el 16 de septiembre de 2026: la épica entra antes de E3, el idioma por defecto sale del navegador con inglés de respaldo, y la preferencia se guarda en el equipo (por cookie, porque el servidor necesita leerla) mientras que en la fila del miembro solo se guarda el idioma de sus correos.
 
 ## 10. Descomposición en tickets (para write-ticket)
 
@@ -145,6 +145,6 @@ Ninguna. Las tres decisiones que faltaban las tomó el dueño el 16 de septiembr
 | 3   | Pon un interruptor de idioma junto al del tema, que recuerde la elección         | S      | 2          | No: pantalla nueva, lleva revisión visual                            |
 | 4   | Traduce las pantallas de autenticación, con sus mensajes de validación           | M      | 1          | No: cambia lo que lee quien se registra                              |
 | 5   | Traduce la cáscara y las siete secciones, sin que las pestañas se partan a 360px | M      | 1          | No: cambia la interfaz de toda la aplicación                         |
-| 6   | Guarda el idioma del socio y manda los correos del club en ese idioma            | M      | 2          | No: migración y correos reales                                       |
+| 6   | Guarda el idioma del miembro y manda los correos del club en ese idioma          | M      | 2          | No: migración y correos reales                                       |
 | 7   | Muestra fechas, horas y números en el formato de cada idioma                     | S      | 1          | No: cambia datos visibles en varias pantallas                        |
 | 8   | Impide que se cuele un texto sin traducir, con un test que lo vigile             | S      | 4, 5       | Sí: solo tests, y su valor es fallar cuando alguien olvide una clave |

@@ -20,7 +20,7 @@ así que ninguna de esas épicas puede empezar.
 Es el cuello de botella del plan. Seis épicas dependen de esta, directa o
 indirectamente, y el tronco común completo (roles, grupos, directorio,
 notificaciones) sale de aquí. Mientras tanto el club sigue llevando la lista de
-socios en una hoja de cálculo y coordinando por WhatsApp, que es exactamente lo
+miembros en una hoja de cálculo y coordinando por WhatsApp, que es exactamente lo
 que la plataforma existe para reemplazar.
 
 ## 2. Usuarios y contexto
@@ -29,7 +29,7 @@ que la plataforma existe para reemplazar.
   pasó por WhatsApp, casi siempre desde el móvil, de pie y con poca paciencia.
   No conoce la plataforma. Si el registro le pide algo que no tiene a mano,
   abandona y vuelve a preguntar por WhatsApp.
-- **Socio que ya está registrado:** vuelve cada semana a mirar el calendario o
+- **Miembro que ya está registrado:** vuelve cada semana a mirar el calendario o
   a confirmar entrenamiento. Quiere entrar rápido y no volver a escribir la
   contraseña cada vez.
 - **Menor de 18 con su tutor:** el club tiene jugadores juveniles. El menor hace
@@ -76,9 +76,9 @@ Métricas:
 - **Inicio de sesión con Google y con Apple.** Aplazados. Ver abajo.
 - La matriz de permisos por rol y las solicitudes de cambio de rol. Son E3. Aquí
   toda cuenta nace Player y nadie puede cambiarlo todavía.
-- El directorio, la edición del propio perfil y el alta de un socio por parte de
+- El directorio, la edición del propio perfil y el alta de un miembro por parte de
   un Admin. Son E5.
-- La baja de un socio. Es E5. Aquí el estado `inactive` existe en el modelo pero
+- La baja de un miembro. Es E5. Aquí el estado `inactive` existe en el modelo pero
   nada lo escribe.
 - El cobro de la membresía. Es E12. Aquí el tipo de membresía se captura y se
   guarda, pero no se cobra nada.
@@ -128,7 +128,7 @@ defecto**, así que el ticket de la pantalla de entrada lo dice en su cuerpo.
 ### El correo transaccional y el dominio
 
 INT-006 pide correo transaccional y esta épica lo necesita para una sola cosa:
-el enlace de recuperación de contraseña. Las invitaciones de socios llegan en
+el enlace de recuperación de contraseña. Las invitaciones de miembros llegan en
 E5 y los avisos de cobro en E12, sobre esta misma pieza.
 
 **Proveedor elegido el 11 de septiembre de 2026: Resend.** Su plan gratuito da
@@ -138,7 +138,7 @@ por contraseña olvidada, así que no se acerca al límite.
 
 **Lo que falta no es el proveedor, es el dominio.** Sin un dominio verificado,
 Resend solo envía desde su dirección de pruebas y solo al correo de la propia
-cuenta. Sirve para desarrollar y no sirve para socios. Un dominio cuesta entre
+cuenta. Sirve para desarrollar y no sirve para miembros. Un dominio cuesta entre
 10 y 15 dólares al año, así que choca con la regla de no pagar, y queda como
 decisión del dueño en la sección 9. El club probablemente lo quiere igual: hoy
 la plataforma vive en una dirección de Vercel, que está bien para trabajar pero
@@ -181,7 +181,7 @@ desarrollan y se prueban contra dobles, sin hablar con ningún proveedor, así
 que ninguno depende del dominio. El ticket 7 es el único que necesita la cuenta
 de Resend, el dominio verificado y la credencial. Si el dominio tarda, ese
 ticket espera y los otros seis se entregan igual, con el aviso escrito de que
-la recuperación de contraseña todavía no llega a un socio real.
+la recuperación de contraseña todavía no llega a un miembro real.
 
 ## 5. Requerimientos funcionales
 
@@ -310,7 +310,7 @@ Cubre NFR-004. La comprobación vive en el servidor, no en el navegador.
 - **Dado** cualquier endpoint de `api/v1` que no sea de salud, **cuando** se pide
   sin sesión, **entonces** responde 401 con el cuerpo de error de la convención.
 - **Dado** una fila de otro club en la base, **cuando** se consulta con la sesión
-  de un socio, **entonces** no aparece. Lo garantizan las políticas de la base y
+  de un miembro, **entonces** no aparece. Lo garantizan las políticas de la base y
   no el código de la aplicación.
 
 ### RF-8 · Auditoría de los eventos de cuenta · Should
@@ -410,7 +410,7 @@ Cubre NFR-010 sobre la tabla `audit_log`, que E1 ya creó.
       (entre 10 y 15 dólares al año, lo decide el dueño) mudarse es verificarlo
       en Resend y cambiar esa variable, no tocar código. Ver la sección 4.
 - [ ] **¿A nombre de quién van las cuentas de servicio?** Hoy Supabase, Vercel y
-      el monitoreo están a nombre personal del dueño. Antes de que existan socios
+      el monitoreo están a nombre personal del dueño. Antes de que existan miembros
       reales conviene pasar todo a un correo del club. No bloquea ningún
       requerimiento de esta épica, pero es más barato ahora que después.
 - [x] **¿Cuál es el límite de intentos de inicio de sesión?** Resuelto el 12 de

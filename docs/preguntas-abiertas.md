@@ -104,7 +104,7 @@ al día". Lo que no hace es definir la segunda.
    (FR-065, AC-025, AC-027). Falta la lista completa (por ejemplo: pendiente de
    primer pago, activa, con pago fallido, vencida) y qué evento de Stripe mueve
    de uno a otro.
-2. **Qué puede hacer un socio cuya membresía no está al día.** El SRD solo prevé
+2. **Qué puede hacer un miembro cuya membresía no está al día.** El SRD solo prevé
    la alerta y el reintento (FR-070, FR-071). No dice si conserva el calendario,
    el RSVP y el directorio, o si solo ve el aviso de pago.
 3. **Qué pasa entre el registro y el primer cobro.** Si se paga durante el alta,
