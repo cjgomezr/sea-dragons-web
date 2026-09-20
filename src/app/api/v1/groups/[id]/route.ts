@@ -1,16 +1,11 @@
 import type { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
-import { ApiError } from "@/lib/api/response";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
-import {
-  type Group,
-  GroupNotFoundError,
-  deleteGroup,
-  renameGroup,
-} from "@/lib/groups/groups";
+import { type Group, deleteGroup, renameGroup } from "@/lib/groups/groups";
 import {
   asGroupsApiError,
+  readGroupId,
   requireGroupsGateways,
 } from "@/lib/groups/groups-api";
 
@@ -20,7 +15,7 @@ import {
  *
  * Quién puede llamarlo lo decide la frontera, igual que la lista. El `[id]` es
  * el del grupo, y sólo alcanza a los del club de quien llama: el de otro club
- * responde 404, como uno que no existe.
+ * responde 404, como uno que no existe. Un `[id]` que no es un uuid, también.
  */
 
 // Depende de la sesión de quien llama y del grupo ahora.
@@ -37,14 +32,9 @@ type GroupRouteContext = {
   readonly params: Promise<{ readonly id: string }>;
 };
 
-/** Un id que no es un uuid no puede nombrar a ningún grupo: se responde como
- * uno que no existe, sin mandarle a Postgres un valor que rechazaría. */
-async function readGroupId(context: GroupRouteContext): Promise<string> {
+async function readRouteGroupId(context: GroupRouteContext): Promise<string> {
   const { id } = await context.params;
-  if (!z.uuid().safeParse(id).success) {
-    throw new ApiError("not_found", new GroupNotFoundError().message);
-  }
-  return id;
+  return readGroupId(id);
 }
 
 export function PATCH(
@@ -58,7 +48,7 @@ export function PATCH(
         request: apiRequest,
         decorateResponse,
       });
-      const groupId = await readGroupId(context);
+      const groupId = await readRouteGroupId(context);
       try {
         return {
           data: await renameGroup(requireGroupsGateways(), {
@@ -85,7 +75,7 @@ export function DELETE(
         request: apiRequest,
         decorateResponse,
       });
-      const groupId = await readGroupId(context);
+      const groupId = await readRouteGroupId(context);
       try {
         await deleteGroup(requireGroupsGateways(), { callerId, groupId });
         return { status: 204 };

@@ -115,8 +115,8 @@ export function normalizeGroupName(rawName: string): string {
 /** Quien llama, con su club. La frontera ya niega estas rutas a quien no
  * gestiona grupos; esto es el cerrojo del dominio, para que no dependa de que
  * nadie olvide la línea de `RESTRICTED_ROUTES`. */
-async function findGroupManager(
-  gateways: GroupsGateways,
+export async function findGroupManager(
+  gateways: Pick<GroupsGateways, "members">,
   callerId: string,
 ): Promise<RoleRequestMember> {
   const caller = await gateways.members.findRoleRequestMember(callerId);
