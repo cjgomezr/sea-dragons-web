@@ -1247,11 +1247,6 @@ h6 {
   gap: var(--space-3);
 }
 
-.groups-name-form .auth-field {
-  flex: 1 1 220px;
-  min-width: 0;
-}
-
 .groups-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1375,16 +1370,21 @@ h6 {
   gap: var(--space-3);
 }
 
-.groups-add .auth-field {
-  flex: 1 1 220px;
-  min-width: 0;
-}
-
+/* El campo y el botón comparten línea en cuanto caben. `flex-basis` sólo se
+   declara aquí a propósito: en la columna del móvil el eje principal es el
+   vertical, así que esos 220px serían un ALTO mínimo del campo y abrirían un
+   hueco enorme entre el campo y su botón. */
 @media (min-width: 768px) {
   .groups-name-form,
   .groups-add {
     flex-direction: row;
     align-items: flex-end;
+  }
+
+  .groups-name-form .auth-field,
+  .groups-add .auth-field {
+    flex: 1 1 220px;
+    min-width: 0;
   }
 
   .groups-name-form .groups-actions,
