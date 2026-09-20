@@ -15,7 +15,7 @@ También es un riesgo declarado del SRD: BR-007 pide que el acceso a datos sensi
 ## 2. Usuarios y contexto
 
 - **Administrador del club:** una o dos personas de la junta. Necesitan dar permisos a los entrenadores y a la gente de la junta sin depender de nadie de fuera. Trabajan desde el móvil tanto como desde el escritorio.
-- **Socio que quiere ser Coach o Committee:** hoy lo pide por WhatsApp y alguien se acuerda o no. Quiere pedirlo dentro de la aplicación y que quede registrado.
+- **Miembro que quiere ser Coach o Committee:** hoy lo pide por WhatsApp y alguien se acuerda o no. Quiere pedirlo dentro de la aplicación y que quede registrado.
 - **Jugador:** no debería ver evaluaciones, ni administración, ni publicar nada. Hoy no las ve porque esas pantallas están vacías, no porque algo se lo impida.
 - **Hoy lo resuelven así:** no hay roles. Quién puede qué vive en la cabeza de la junta y se coordina por WhatsApp.
 
@@ -24,7 +24,7 @@ También es un riesgo declarado del SRD: BR-007 pide que el acceso a datos sensi
 - Objetivo: que cada persona vea y pueda hacer exactamente lo que su rol permite, decidido en el servidor.
 - Métricas:
   - El 100% de las peticiones a capacidades restringidas se resuelve por rol en el servidor, con un test por cada celda de la matriz.
-  - Un Admin cambia el rol de un socio en menos de un minuto, sin salir de la aplicación.
+  - Un Admin cambia el rol de un miembro en menos de un minuto, sin salir de la aplicación.
   - Toda decisión sobre una solicitud y todo cambio de rol queda en la bitácora con actor, momento y resultado (NFR-010).
 
 ## 4. Alcance
@@ -39,7 +39,7 @@ También es un riesgo declarado del SRD: BR-007 pide que el acceso a datos sensi
 - Cambio de rol directo por un Admin.
 - Protección del último Admin del club.
 - Auditoría de los cambios de rol y de las decisiones sobre solicitudes.
-- Una pantalla mínima de administración, solo para Admin: lista de socios con su rol y bandeja de solicitudes pendientes.
+- Una pantalla mínima de administración, solo para Admin: lista de miembros con su rol y bandeja de solicitudes pendientes.
 - La navegación, también la barra móvil, deja de ofrecer lo que el rol no permite.
 - El primer Admin se crea a mano con una sentencia SQL documentada.
 
@@ -53,7 +53,7 @@ También es un riesgo declarado del SRD: BR-007 pide que el acceso a datos sensi
 - Una vista de auditoría para el Admin. El SRD la deja como recomendación para una release posterior.
 - Construir las funciones que la matriz protege. Las capacidades cuyas pantallas todavía no existen se protegen igual, pero no se implementan aquí.
 
-**Ya hecho antes de esta épica:** la base no deja que un socio cambie su propio rol. `0003_members.sql` quita todo privilegio a `authenticated` salvo la lectura, y `tests/unit/supabase/members-migration.test.ts` lo prueba ("no deja al dueño de la fila cambiar su propio rol"). La restricción de cuatro roles de esa misma tabla es la segunda barrera de RF-1.
+**Ya hecho antes de esta épica:** la base no deja que un miembro cambie su propio rol. `0003_members.sql` quita todo privilegio a `authenticated` salvo la lectura, y `tests/unit/supabase/members-migration.test.ts` lo prueba ("no deja al dueño de la fila cambiar su propio rol"). La restricción de cuatro roles de esa misma tabla es la segunda barrera de RF-1.
 
 ## 5. Requerimientos funcionales
 
@@ -80,22 +80,22 @@ Cada página y cada endpoint restringido declara qué capacidad exige, y la fron
 
 Aunque alguien se saltara la aplicación, la base no deja duplicar solicitudes ni leer las ajenas.
 
-- **Dado** un socio con una solicitud pendiente, **cuando** se intenta guardar otra suya, aunque sea al mismo tiempo, **entonces** la base la rechaza.
-- **Dado** un socio con una solicitud ya aprobada o rechazada, **cuando** se guarda una nueva, **entonces** la base la acepta.
-- **Dado** la tabla de solicitudes, **cuando** un socio la consulta, **entonces** ve las suyas y ninguna más.
+- **Dado** un miembro con una solicitud pendiente, **cuando** se intenta guardar otra suya, aunque sea al mismo tiempo, **entonces** la base la rechaza.
+- **Dado** un miembro con una solicitud ya aprobada o rechazada, **cuando** se guarda una nueva, **entonces** la base la acepta.
+- **Dado** la tabla de solicitudes, **cuando** un miembro la consulta, **entonces** ve las suyas y ninguna más.
 - **Dado** esa misma tabla, **cuando** la consulta alguien sin sesión, **entonces** no ve nada.
 - **Dado** una solicitud, **cuando** se guarda, **entonces** su rol solo puede ser Coach o Committee y su estado solo pendiente, aprobada o rechazada.
 
 ### RF-4 · Solicitar un rol desde Mi cuenta · Must
 
-Un socio pide Coach o Committee, con una justificación opcional, desde una página Mi cuenta enlazada en la cabecera junto a cerrar sesión. No puede inundar la aplicación con la misma solicitud.
+Un miembro pide Coach o Committee, con una justificación opcional, desde una página Mi cuenta enlazada en la cabecera junto a cerrar sesión. No puede inundar la aplicación con la misma solicitud.
 
-- **Dado** un socio con la cuenta activa, **cuando** abre Mi cuenta, **entonces** ve su rol actual y el formulario de solicitud.
-- **Dado** ese socio, **cuando** envía una solicitud de Coach con su justificación, **entonces** queda registrada como pendiente (FR-010).
-- **Dado** un socio con una solicitud pendiente, **cuando** abre Mi cuenta, **entonces** no ve el formulario: ve qué rol pidió, cuándo, y que está pendiente de respuesta.
-- **Dado** un socio con una solicitud pendiente, **cuando** envía otra por petición directa, **entonces** recibe 409 y el mensaje de que ya tiene una en curso.
+- **Dado** un miembro con la cuenta activa, **cuando** abre Mi cuenta, **entonces** ve su rol actual y el formulario de solicitud.
+- **Dado** ese miembro, **cuando** envía una solicitud de Coach con su justificación, **entonces** queda registrada como pendiente (FR-010).
+- **Dado** un miembro con una solicitud pendiente, **cuando** abre Mi cuenta, **entonces** no ve el formulario: ve qué rol pidió, cuándo, y que está pendiente de respuesta.
+- **Dado** un miembro con una solicitud pendiente, **cuando** envía otra por petición directa, **entonces** recibe 409 y el mensaje de que ya tiene una en curso.
 - **Dado** el formulario, **cuando** se está enviando, **entonces** el botón queda desactivado, para que un doble clic no mande dos.
-- **Dado** un socio al que le rechazaron una solicitud, **cuando** vuelve a Mi cuenta, **entonces** el formulario está de nuevo disponible y la nueva solicitud se acepta.
+- **Dado** un miembro al que le rechazaron una solicitud, **cuando** vuelve a Mi cuenta, **entonces** el formulario está de nuevo disponible y la nueva solicitud se acepta.
 - **Dado** una solicitud de un rol que esa persona ya tiene, o de Admin, **cuando** se envía, **entonces** se rechaza.
 - **Dado** un Admin, **cuando** abre Mi cuenta, **entonces** ve su rol y no ve el formulario: ya tiene todas las capacidades, y así aprobar una solicitud nunca degrada a un Admin.
 - **Dado** una cuenta que todavía está incompleta, **cuando** intenta solicitar, **entonces** se le niega, porque esa cuenta aún no opera.
@@ -110,11 +110,11 @@ Solo un Admin decide, y aprobar cambia el rol.
 - **Dado** dos Admin que deciden la misma solicitud a la vez, **cuando** llega la segunda decisión, **entonces** no pisa a la primera y se le dice que ya estaba resuelta.
 - **Dado** una decisión, **cuando** se toma, **entonces** queda en la bitácora con quién decidió, sobre qué solicitud, cuándo y el resultado (NFR-010).
 
-### RF-6 · Cambiar el rol de un socio · Must
+### RF-6 · Cambiar el rol de un miembro · Must
 
-Un Admin puede poner cualquiera de los cuatro roles a cualquier socio. FR-014 lo sitúa en el perfil del socio; hasta que E5 construya ese perfil, vive en la pantalla de administración.
+Un Admin puede poner cualquiera de los cuatro roles a cualquier miembro. FR-014 lo sitúa en el perfil del miembro; hasta que E5 construya ese perfil, vive en la pantalla de administración.
 
-- **Dado** un Admin, **cuando** cambia el rol de un socio a Committee, **entonces** sus permisos pasan a ser los de Committee en su siguiente petición (FR-014, AC-008).
+- **Dado** un Admin, **cuando** cambia el rol de un miembro a Committee, **entonces** sus permisos pasan a ser los de Committee en su siguiente petición (FR-014, AC-008).
 - **Dado** quien no es Admin, **cuando** intenta cambiar un rol, **entonces** recibe 403.
 - **Dado** un rol que no existe, **cuando** se envía, **entonces** se rechaza.
 - **Dado** un cambio de rol, **cuando** ocurre, **entonces** la bitácora guarda quién lo hizo, sobre quién, cuándo, el rol anterior, el nuevo y el resultado (NFR-010).
@@ -127,7 +127,7 @@ Un Admin puede poner cualquiera de los cuatro roles a cualquier socio. FR-014 lo
 
 ### RF-8 · Pantalla mínima de administración · Must
 
-- **Dado** un Admin, **cuando** abre administración, **entonces** ve la lista de socios con nombre, correo y rol, y la bandeja de solicitudes pendientes con el rol pedido, la fecha y la justificación.
+- **Dado** un Admin, **cuando** abre administración, **entonces** ve la lista de miembros con nombre, correo y rol, y la bandeja de solicitudes pendientes con el rol pedido, la fecha y la justificación.
 - **Dado** esa pantalla, **cuando** aprueba, rechaza o cambia un rol, **entonces** la lista y la bandeja reflejan el resultado sin recargar a mano.
 - **Dado** una bandeja sin solicitudes, **cuando** se abre, **entonces** lo dice con una frase, no con una tabla vacía.
 - **Dado** el último Admin, **cuando** alguien intenta degradarlo, **entonces** la pantalla muestra el motivo del rechazo.
@@ -162,8 +162,8 @@ Un Admin puede poner cualquiera de los cuatro roles a cualquier socio. FR-014 lo
 - Mockups: sin mockup. Revisión heurística contra `design-system.md`.
 - Pantallas:
   - **Mi cuenta (todos):** rol actual; si no hay solicitud pendiente, el formulario con el rol pedido y la justificación; si la hay, su estado en lugar del formulario.
-  - **Administración (solo Admin):** lista de socios con nombre, correo, rol y el control para cambiarlo, y bandeja de solicitudes pendientes con los botones de aprobar y rechazar.
-- Flujo principal: el socio solicita desde Mi cuenta, el Admin ve la solicitud en su bandeja y decide, y el socio ve su rol nuevo en su siguiente petición.
+  - **Administración (solo Admin):** lista de miembros con nombre, correo, rol y el control para cambiarlo, y bandeja de solicitudes pendientes con los botones de aprobar y rechazar.
+- Flujo principal: el miembro solicita desde Mi cuenta, el Admin ve la solicitud en su bandeja y decide, y el miembro ve su rol nuevo en su siguiente petición.
 - Viewports: 375 / 768 / 1440 (y 360 para la barra móvil), en tema claro y oscuro, en inglés y en español.
 
 ## 8. Requerimientos no funcionales
@@ -173,7 +173,7 @@ Un Admin puede poner cualquiera de los cuatro roles a cualquier socio. FR-014 lo
 - Rendimiento: leer el rol no puede costar una consulta extra por cada comprobación dentro de la misma petición.
 - Idiomas: todo texto nuevo sale del catálogo (`src/lib/i18n/messages/en.ts` y `es.ts`). Los errores que ve una persona se traducen en pantalla a partir del código de error de la API, como en E17. El test de textos sin traducir lo vigila.
 - Accesibilidad: sin violaciones de axe en las pantallas nuevas, en los dos idiomas.
-- Privacidad: la bandeja no expone datos del socio más allá de lo que el Admin ya puede ver.
+- Privacidad: la bandeja no expone datos del miembro más allá de lo que el Admin ya puede ver.
 
 ## 9. Preguntas abiertas
 
@@ -184,14 +184,14 @@ Ninguna. El dueño tomó estas decisiones:
 
 ## 10. Descomposición en tickets (para write-ticket)
 
-| #   | Título propuesto                                                                | Tamaño | Depende de | Auto-merge sugerido                 |
-| --- | ------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------- |
-| 1   | Escribe en código el catálogo de roles y la matriz de capacidades del SRD       | S      | ninguna    | No: fuente de verdad de permisos    |
-| 2   | Haz que la frontera niegue por rol, en pantallas y en endpoints                 | M      | 1          | No: frontera de seguridad           |
-| 3   | Guarda las solicitudes de rol, con una sola pendiente por persona en la base    | S      | 1          | No: tabla nueva con datos de socios |
-| 4   | Deja que un socio pida Coach o Committee desde una página Mi cuenta             | M      | 2, 3       | No: lógica nueva y pantalla         |
-| 5   | Deja que un Admin apruebe o rechace una solicitud, con su rastro en la bitácora | M      | 4          | No: cambia permisos                 |
-| 6   | Deja que un Admin cambie el rol de un socio, sin degradar al último Admin       | M      | 2          | No: cambia permisos                 |
-| 7   | Da al Admin una pantalla con los socios y las solicitudes pendientes            | M      | 5, 6       | No: pantalla nueva                  |
-| 8   | Muestra en la navegación solo lo que el rol permite, también en la barra móvil  | S      | 2, 7       | No: cambia todas las pantallas      |
-| 9   | Documenta cómo se crea el primer Admin del club                                 | S      | 1          | Sí: solo documentación              |
+| #   | Título propuesto                                                                | Tamaño | Depende de | Auto-merge sugerido                   |
+| --- | ------------------------------------------------------------------------------- | ------ | ---------- | ------------------------------------- |
+| 1   | Escribe en código el catálogo de roles y la matriz de capacidades del SRD       | S      | ninguna    | No: fuente de verdad de permisos      |
+| 2   | Haz que la frontera niegue por rol, en pantallas y en endpoints                 | M      | 1          | No: frontera de seguridad             |
+| 3   | Guarda las solicitudes de rol, con una sola pendiente por persona en la base    | S      | 1          | No: tabla nueva con datos de miembros |
+| 4   | Deja que un miembro pida Coach o Committee desde una página Mi cuenta           | M      | 2, 3       | No: lógica nueva y pantalla           |
+| 5   | Deja que un Admin apruebe o rechace una solicitud, con su rastro en la bitácora | M      | 4          | No: cambia permisos                   |
+| 6   | Deja que un Admin cambie el rol de un miembro, sin degradar al último Admin     | M      | 2          | No: cambia permisos                   |
+| 7   | Da al Admin una pantalla con los miembros y las solicitudes pendientes          | M      | 5, 6       | No: pantalla nueva                    |
+| 8   | Muestra en la navegación solo lo que el rol permite, también en la barra móvil  | S      | 2, 7       | No: cambia todas las pantallas        |
+| 9   | Documenta cómo se crea el primer Admin del club                                 | S      | 1          | Sí: solo documentación                |

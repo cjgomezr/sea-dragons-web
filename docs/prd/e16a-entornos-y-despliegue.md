@@ -31,11 +31,11 @@ separan sin que nadie se entere.
 
 ## 2. Usuarios y contexto
 
-El usuario de este epic no es el socio del club: es **quien trabaja en la
+El usuario de este epic no es el miembro del club: es **quien trabaja en la
 plataforma**, hoy una persona y pronto más de una, más los workers headless de
 la fábrica.
 
-Para el socio, el efecto es indirecto pero real: hasta que exista producción, la
+Para el miembro, el efecto es indirecto pero real: hasta que exista producción, la
 plataforma no existe. NFR-003 fija 99,0% de disponibilidad mensual best-effort,
 sin SLA contractual, y exige que el mantenimiento planificado quede fuera de las
 horas de entrenamiento (martes y jueves 18:00–22:00, sábados 08:00–13:00
@@ -232,7 +232,7 @@ No aplica: este epic no cambia ninguna pantalla. No lleva `ui-review`.
    el dueño: en esta fase del proyecto, si algo hay que pagarlo, no se hace.
 2. ~~**Nombre del proyecto en Vercel.**~~ **Resuelta el 8 de septiembre de
    2026: `victoria-seadragons`.** Define la URL `victoria-seadragons.vercel.app`,
-   que es la que verán los socios en la pantalla de consentimiento de Google
+   que es la que verán los miembros en la pantalla de consentimiento de Google
    cuando E2 traiga OAuth, y coincide con el slug del club que siembra la
    migración `0001_clubs`. Se descartó `seadragons` a secas por genérico y
    `seadragons-web` porque se lee como un artefacto de programador. El 8 de
@@ -242,7 +242,7 @@ No aplica: este epic no cambia ninguna pantalla. No lleva `ui-review`.
    conviene no confundirlos.
 
    El primero es de uso: Hobby es para uso no comercial. Mientras no haya cobros
-   ni socios reales da igual, pero E12 mete Stripe y eso ya es actividad
+   ni miembros reales da igual, pero E12 mete Stripe y eso ya es actividad
    comercial. La decisión no es de hoy; dejarla escrita sí, para que E12 no se la
    encuentre de golpe.
 

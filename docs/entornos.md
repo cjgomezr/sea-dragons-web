@@ -14,7 +14,7 @@ organización está en plan `free` y el segundo proyecto cuesta 0 al mes.
 - **Región:** `ap-southeast-2` (Sídney)
 - **Para qué sirve:** desarrollo y tests. Es la base que los tests de RLS
   truncan y resiembran en cada corrida. Nunca debe recibir datos reales de un
-  socio: quedarían mezclados con datos de prueba.
+  miembro: quedarían mezclados con datos de prueba.
 
 ## seadragons-prod
 
@@ -26,7 +26,7 @@ organización está en plan `free` y el segundo proyecto cuesta 0 al mes.
   (`0001_clubs`, `0002_audit_log`). La única fila que existe es el club
   `victoria-seadragons`, que la propia migración siembra porque Release 1 opera
   un único club (CON-004). No hay datos de prueba.
-- **Para qué sirve:** datos reales de los socios del club. Ningún test debe
+- **Para qué sirve:** datos reales de los miembros del club. Ningún test debe
   poder alcanzarlo, ni siquiera por accidente: el guardia de entorno de la
   suite (`src/lib/supabase/environment-guard.ts`, enganchado en
   `vitest.setup.ts`, que corre antes que cualquier archivo de test) falla de
@@ -226,7 +226,7 @@ que quien encienda el interruptor se encuentre antes con el razonamiento.
 Hasta el issue #149 el entorno `ci` no llevaba ninguna credencial. La
 consecuencia no era que CI probara menos: era que probaba **menos de lo que
 parecía**. Desde el #135 casi toda pantalla vive detrás de la frontera de
-sesión, y el arranque de Playwright abre esa sesión creando un socio de
+sesión, y el arranque de Playwright abre esa sesión creando un miembro de
 verdad. Sin llave de servicio no podía crearlo, así que esas pruebas se
 saltaban y el check salía verde sobre capturas que nadie comparó. Pasó en el
 PR #148, sobre una pantalla nueva sin ninguna línea base de Linux. Lo mismo
@@ -641,7 +641,7 @@ servidor en cada petición, así que la persona no necesita cerrar sesión.
 
 **Después del primero**, los demás Admin se nombran desde la aplicación, en la
 pantalla de Administración (`/administracion`), aprobando una solicitud de rol
-o cambiando el rol de un socio. Esa vía sí deja rastro. El cambio a mano de esta
+o cambiando el rol de un miembro. Esa vía sí deja rastro. El cambio a mano de esta
 sección no queda en la bitácora (`public.audit_log`): la entrada `role.changed` la
 escribe la aplicación, no la base, y la sentencia no pasa por la aplicación.
 Si hace falta constancia, anótala fuera (quién, qué correo, qué día).
@@ -700,7 +700,7 @@ versionado. **En preview no existe**, ni siquiera la de desarrollo: es lo que
 impide que el preview de un fork reciba una credencial de escritura (ver
 "Secretos por entorno"). En producción, la de `seadragons-prod`, nunca la misma
 que desarrollo. En CI, la de `seadragons-dev` desde el issue #149, para que el
-arranque de Playwright pueda crear el socio con el que entra a la aplicación.
+arranque de Playwright pueda crear el miembro con el que entra a la aplicación.
 La pone quien desarrolla en local; en Vercel, quien administre el proyecto; en
 Actions, quien administre el repositorio.
 

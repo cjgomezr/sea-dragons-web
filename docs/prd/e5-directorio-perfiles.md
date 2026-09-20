@@ -6,9 +6,9 @@ Fuente: `docs/SRD_Victoria_Seadragons_Club_Platform.md` (v1.4), epic E5 de `docs
 
 ## 1. Problema
 
-El club no tiene una lista de sus socios dentro de la plataforma. Quién juega, en qué posición, con qué nivel y con qué registro federativo vive en una hoja de cálculo y en la memoria de la junta. Cuando llega alguien nuevo, la junta lo anota a mano y le escribe por WhatsApp para que se registre.
+El club no tiene una lista de sus miembros dentro de la plataforma. Quién juega, en qué posición, con qué nivel y con qué registro federativo vive en una hoja de cálculo y en la memoria de la junta. Cuando llega alguien nuevo, la junta lo anota a mano y le escribe por WhatsApp para que se registre.
 
-Además, la persona no puede corregir sus propios datos: hoy solo existen el nombre y el correo del registro, y ni siquiera hay dónde cambiarlos. Y el club no tiene forma de dar de baja a un socio que se va, así que su cuenta sigue viva.
+Además, la persona no puede corregir sus propios datos: hoy solo existen el nombre y el correo del registro, y ni siquiera hay dónde cambiarlos. Y el club no tiene forma de dar de baja a un miembro que se va, así que su cuenta sigue viva.
 
 BR-008 lo hace urgente por un lado concreto: el número de la federación (AUF) y su vencimiento tienen que estar al día y visibles para el Admin, y hoy no se guardan en ninguna parte.
 
@@ -16,28 +16,28 @@ BR-008 lo hace urgente por un lado concreto: el número de la federación (AUF) 
 
 - **Admin:** mantiene el registro del club. Da de alta a quien llega, anota su número de AUF, lo pone en sus grupos, y da de baja a quien se va. Necesita ver de un golpe quién tiene el registro federativo vencido.
 - **Coach:** busca a una persona para saber su posición y su nivel antes de armar un entrenamiento.
-- **Socio:** quiere corregir su país, su posición, su nivel o su foto sin pedírselo a nadie.
+- **Miembro:** quiere corregir su país, su posición, su nivel o su foto sin pedírselo a nadie.
 - **Hoy lo resuelven así:** una hoja de cálculo que solo tiene una persona, y WhatsApp para todo lo demás.
 
 ## 3. Objetivo y métricas de éxito
 
-- Objetivo: que el club tenga en la plataforma la lista completa y al día de sus socios, y que cada persona mantenga sus propios datos.
+- Objetivo: que el club tenga en la plataforma la lista completa y al día de sus miembros, y que cada persona mantenga sus propios datos.
 - Métricas:
-  - Encontrar a un socio por nombre en el directorio toma menos de cinco segundos.
-  - Dar de alta a un socio con sus datos federativos y su invitación toma menos de dos minutos.
-  - El 100% de los intentos de un socio de cambiarse el rol, el AUF, sus grupos o su estado se rechaza en el servidor.
+  - Encontrar a un miembro por nombre en el directorio toma menos de cinco segundos.
+  - Dar de alta a un miembro con sus datos federativos y su invitación toma menos de dos minutos.
+  - El 100% de los intentos de un miembro de cambiarse el rol, el AUF, sus grupos o su estado se rechaza en el servidor.
 
 ## 4. Alcance
 
 **Incluido (v1):**
 
-- Los campos que faltan en la ficha del socio: posición, nivel de experiencia, género, número y vencimiento de AUF, y fecha de ingreso.
+- Los campos que faltan en la ficha del miembro: posición, nivel de experiencia, género, número y vencimiento de AUF, y fecha de ingreso.
 - El directorio con nombre, país, nivel, rol, posición y estado, con búsqueda por nombre, filtro por rol y orden ascendente o descendente.
 - El filtro "incluir inactivos", solo para el Admin.
 - El perfil propio editable: nombre, país, posición, nivel, género y foto. Mi cuenta se convierte en esa pantalla.
 - La ficha reservada al Admin: rol, AUF y su vencimiento, grupos y estado.
-- El alta de un socio por el Admin, con su invitación por correo.
-- La baja y la reactivación de un socio.
+- El alta de un miembro por el Admin, con su invitación por correo.
+- La baja y la reactivación de un miembro.
 - La foto de perfil, guardada en el almacenamiento de Supabase.
 - La mudanza de la bandeja de solicitudes y del cambio de rol al directorio, y el retiro de la pantalla de administración.
 
@@ -45,99 +45,99 @@ BR-008 lo hace urgente por un lado concreto: el número de la federación (AUF) 
 
 - La columna de asistencia y su orden (E8), y la de la nota general OVR (E9). El SRD las pide en el directorio (FR-015, FR-016, FR-019); las agrega cada épica cuando ese dato exista, porque hoy no hay nada que mostrar. FR-022 (asistencia en el perfil propio) queda igual, en E8.
 - Ver el perfil completo de otra persona. Cualquiera ve su ficha en el directorio; la pantalla de perfil es la propia, y el Admin abre la de cualquiera para editar lo suyo.
-- Borrar a un socio. La baja es un estado, y el borrado de datos personales es E15.
+- Borrar a un miembro. La baja es un estado, y el borrado de datos personales es E15.
 - Exportar el directorio.
-- Editar a varios socios a la vez.
+- Editar a varios miembros a la vez.
 
 ## 5. Requerimientos funcionales
 
-### RF-1 · La ficha del socio guarda los datos del club · Must
+### RF-1 · La ficha del miembro guarda los datos del club · Must
 
-- **Dado** la ficha de un socio, **cuando** se mira en la base, **entonces** tiene posición (Goalkeeper, Defender, Forward), nivel de experiencia (Beginner, Intermediate, Advanced), género, número de AUF, vencimiento de AUF y fecha de ingreso, además de lo que ya tenía (FR-020).
+- **Dado** la ficha de un miembro, **cuando** se mira en la base, **entonces** tiene posición (Goalkeeper, Defender, Forward), nivel de experiencia (Beginner, Intermediate, Advanced), género, número de AUF, vencimiento de AUF y fecha de ingreso, además de lo que ya tenía (FR-020).
 - **Dado** un valor fuera de esos conjuntos para la posición o el nivel, **cuando** se guarda, **entonces** la base lo rechaza.
-- **Dado** un socio que ya existía, **cuando** se aplica el cambio, **entonces** conserva sus datos y los campos nuevos quedan vacíos, salvo la fecha de ingreso, que toma la de creación de su cuenta.
-- **Dado** un socio, **cuando** un usuario autenticado consulta la base directamente, **entonces** sigue viendo solo su propia fila, como hasta ahora.
+- **Dado** un miembro que ya existía, **cuando** se aplica el cambio, **entonces** conserva sus datos y los campos nuevos quedan vacíos, salvo la fecha de ingreso, que toma la de creación de su cuenta.
+- **Dado** un miembro, **cuando** un usuario autenticado consulta la base directamente, **entonces** sigue viendo solo su propia fila, como hasta ahora.
 
 ### RF-2 · El directorio · Must
 
-- **Dado** cualquier socio con la cuenta activa, **cuando** abre el directorio, **entonces** ve a los socios del club con nombre, país, nivel, rol y posición (FR-015).
+- **Dado** cualquier miembro con la cuenta activa, **cuando** abre el directorio, **entonces** ve a los miembros del club con nombre, país, nivel, rol y posición (FR-015).
 - **Dado** el directorio, **cuando** se escribe parte de un nombre, **entonces** la lista muestra solo a quienes lo llevan, sin distinguir mayúsculas ni acentos (FR-017).
 - **Dado** el directorio, **cuando** se filtra por rol (todos, Player, Coach, Committee, Admin), **entonces** solo aparecen los de ese rol (FR-018).
 - **Dado** el directorio, **cuando** se ordena por nombre, rol o posición, **entonces** la lista se ordena en el sentido pedido, ascendente o descendente (FR-019).
-- **Dado** un socio dado de baja, **cuando** se mira el directorio, **entonces** no aparece (FR-085).
+- **Dado** un miembro dado de baja, **cuando** se mira el directorio, **entonces** no aparece (FR-085).
 - **Dado** un Admin, **cuando** activa "incluir inactivos", **entonces** los ve con una marca de baja (AC-040).
 - **Dado** quien no es Admin, **cuando** pide ese filtro por API, **entonces** se le niega.
 - **Dado** una búsqueda sin resultados, **cuando** termina, **entonces** una frase lo dice y ofrece limpiar los filtros.
-- **Dado** un Admin, **cuando** mira a un socio con el registro de AUF vencido, **entonces** la ficha lo señala (BR-008). Nadie más ve el dato de AUF.
+- **Dado** un Admin, **cuando** mira a un miembro con el registro de AUF vencido, **entonces** la ficha lo señala (BR-008). Nadie más ve el dato de AUF.
 
 ### RF-3 · El perfil propio · Must
 
-- **Dado** un socio, **cuando** abre su perfil, **entonces** ve sus datos y puede cambiar nombre, país, posición, nivel de experiencia y género (FR-084).
+- **Dado** un miembro, **cuando** abre su perfil, **entonces** ve sus datos y puede cambiar nombre, país, posición, nivel de experiencia y género (FR-084).
 - **Dado** ese cambio, **cuando** se guarda, **entonces** el directorio lo muestra (AC-039).
-- **Dado** ese mismo socio, **cuando** intenta cambiar su rol, su AUF, su vencimiento, sus grupos o su estado, por pantalla o por API directa, **entonces** se le niega (AC-039).
+- **Dado** ese mismo miembro, **cuando** intenta cambiar su rol, su AUF, su vencimiento, sus grupos o su estado, por pantalla o por API directa, **entonces** se le niega (AC-039).
 - **Dado** un nombre vacío o de largo desmedido, **cuando** se guarda, **entonces** se rechaza con un mensaje que lo explica.
 - **Dado** el perfil propio, **cuando** se abre, **entonces** sigue mostrando lo que Mi cuenta ya mostraba: el rol actual, la solicitud de rol y los grupos propios.
 
 ### RF-4 · La ficha reservada al Admin · Must
 
-- **Dado** un Admin en el directorio, **cuando** abre a un socio, **entonces** puede cambiar su número de AUF, su vencimiento y sus grupos (FR-020, FR-084).
+- **Dado** un Admin en el directorio, **cuando** abre a un miembro, **entonces** puede cambiar su número de AUF, su vencimiento y sus grupos (FR-020, FR-084).
 - **Dado** un Coach, un Committee o un Player, **cuando** intenta lo mismo, **entonces** recibe 403.
 - **Dado** un vencimiento con formato inválido o anterior a la fecha de ingreso, **cuando** se guarda, **entonces** se rechaza.
 - **Dado** un cambio de grupos desde ahí, **cuando** se guarda, **entonces** vale lo mismo que hacerlo desde la sección Grupos, y los conteos cuadran.
 
-### RF-5 · Alta de un socio por el Admin · Must
+### RF-5 · Alta de un miembro por el Admin · Must
 
-- **Dado** un Admin, **cuando** crea un socio con nombre, correo, país, posición, nivel, género, número y vencimiento de AUF y grupos, **entonces** queda creado con el rol Player, sus grupos asignados y la cuenta pendiente de activar (FR-020, AC-011).
-- **Dado** ese alta, **cuando** termina, **entonces** sale una invitación por correo al socio, en su idioma, con un enlace para activar su cuenta (FR-021, AC-011).
+- **Dado** un Admin, **cuando** crea un miembro con nombre, correo, país, posición, nivel, género, número y vencimiento de AUF y grupos, **entonces** queda creado con el rol Player, sus grupos asignados y la cuenta pendiente de activar (FR-020, AC-011).
+- **Dado** ese alta, **cuando** termina, **entonces** sale una invitación por correo al miembro, en su idioma, con un enlace para activar su cuenta (FR-021, AC-011).
 - **Dado** un correo que ya tiene cuenta en el club, **cuando** se intenta dar de alta, **entonces** se rechaza diciendo que ya existe, sin crear nada ni mandar correo.
-- **Dado** el socio invitado, **cuando** abre el enlace, **entonces** termina su registro con la pantalla que ya existe y su cuenta pasa a activa.
-- **Dado** que el envío del correo falla, **cuando** ocurre, **entonces** el socio queda creado, la pantalla lo dice y ofrece reenviar la invitación.
+- **Dado** el miembro invitado, **cuando** abre el enlace, **entonces** termina su registro con la pantalla que ya existe y su cuenta pasa a activa.
+- **Dado** que el envío del correo falla, **cuando** ocurre, **entonces** el miembro queda creado, la pantalla lo dice y ofrece reenviar la invitación.
 
 ### RF-6 · Baja y reactivación · Must
 
-- **Dado** un Admin, **cuando** da de baja a un socio, **entonces** su estado pasa a `inactive` (FR-085).
-- **Dado** un socio dado de baja, **cuando** intenta entrar, **entonces** no puede (AC-040).
-- **Dado** un socio dado de baja, **cuando** se mira el directorio, los grupos o cualquier audiencia, **entonces** no aparece ni se puede elegir.
-- **Dado** un socio dado de baja, **cuando** se mira su historial, **entonces** sigue completo.
+- **Dado** un Admin, **cuando** da de baja a un miembro, **entonces** su estado pasa a `inactive` (FR-085).
+- **Dado** un miembro dado de baja, **cuando** intenta entrar, **entonces** no puede (AC-040).
+- **Dado** un miembro dado de baja, **cuando** se mira el directorio, los grupos o cualquier audiencia, **entonces** no aparece ni se puede elegir.
+- **Dado** un miembro dado de baja, **cuando** se mira su historial, **entonces** sigue completo.
 - **Dado** un Admin, **cuando** lo reactiva, **entonces** vuelve a entrar y a aparecer.
 - **Dado** el último Admin del club, **cuando** se intenta dar de baja, **entonces** se rechaza, igual que al degradarlo.
 - **Dado** un Admin, **cuando** intenta darse de baja a sí mismo, **entonces** se rechaza, porque quien se va lo hace desde otra cuenta de Admin.
 
 ### RF-7 · La foto de perfil · Should
 
-- **Dado** un socio, **cuando** sube una foto, **entonces** aparece en su perfil y en su ficha del directorio (FR-084).
+- **Dado** un miembro, **cuando** sube una foto, **entonces** aparece en su perfil y en su ficha del directorio (FR-084).
 - **Dado** un archivo que no es imagen, o que pesa más de lo permitido, **cuando** se sube, **entonces** se rechaza con un mensaje que dice el límite.
-- **Dado** un socio, **cuando** borra su foto, **entonces** vuelven sus iniciales.
+- **Dado** un miembro, **cuando** borra su foto, **entonces** vuelven sus iniciales.
 - **Dado** la foto de otra persona, **cuando** alguien intenta reemplazarla o borrarla, **entonces** el almacenamiento lo niega.
-- **Dado** una foto subida, **cuando** se mira su dirección, **entonces** no expone datos del socio más allá de lo que el directorio ya muestra.
+- **Dado** una foto subida, **cuando** se mira su dirección, **entonces** no expone datos del miembro más allá de lo que el directorio ya muestra.
 
 ### RF-8 · El directorio absorbe la pantalla de administración · Must
 
-- **Dado** un Admin, **cuando** abre el directorio, **entonces** encuentra ahí la bandeja de solicitudes de rol y el cambio de rol de cada socio.
+- **Dado** un Admin, **cuando** abre el directorio, **entonces** encuentra ahí la bandeja de solicitudes de rol y el cambio de rol de cada miembro.
 - **Dado** esa mudanza, **cuando** termina, **entonces** `/administracion` ya no existe y su entrada sale de la navegación.
 - **Dado** lo que E3 dejó probado (decidir solicitudes, cambiar rol, último Admin protegido), **cuando** se usa desde el directorio, **entonces** se comporta igual.
 
 ## 6. Casos borde y estados de error
 
-- **Club con un solo socio, o directorio recién estrenado:** la lista se ve bien con una fila.
+- **Club con un solo miembro, o directorio recién estrenado:** la lista se ve bien con una fila.
 - **Búsqueda con acentos o mayúsculas distintas:** encuentra igual.
 - **Nombre muy largo o de una sola letra:** la fila no se rompe a 375.
-- **Socio sin posición, sin nivel o sin país:** la ficha muestra un guion, no un hueco.
-- **Dos Admin editando al mismo socio:** gana la última escritura, y cada campo se guarda completo.
+- **Miembro sin posición, sin nivel o sin país:** la ficha muestra un guion, no un hueco.
+- **Dos Admin editando al mismo miembro:** gana la última escritura, y cada campo se guarda completo.
 - **Invitación a un correo con cuenta en otro club:** se rechaza.
 - **Reenvío de invitación repetido:** limitado como el reenvío del correo de confirmación que ya existe.
 - **Baja de alguien con solicitud de rol pendiente:** la solicitud queda sin efecto y no aparece en la bandeja.
 - **Foto enorme o con formato raro:** se rechaza antes de subirla.
 - **Subir foto con la conexión caída:** la pantalla lo dice y deja reintentar, sin dejar una foto a medias.
-- **Un socio que pide el perfil de otro por API:** se le niega.
+- **Un miembro que pide el perfil de otro por API:** se le niega.
 
 ## 7. UX / UI
 
 - Mockups: `docs/mockups/directory-light.png` y `directory-dark.png` para el directorio (búsqueda, filtros por rol, filas con iniciales, nombre, país, nivel y rol; las columnas de OVR y asistencia quedan fuera hasta E8 y E9). `docs/mockups/mobile-profile-light.png` y `mobile-profile-dark.png` para el perfil, sin las métricas ni las notas.
 - Pantallas:
-  - **Directorio:** búsqueda, filtro por rol, orden, filas de socio, y para el Admin la bandeja de solicitudes, el cambio de rol, el alta y la baja.
+  - **Directorio:** búsqueda, filtro por rol, orden, filas de miembro, y para el Admin la bandeja de solicitudes, el cambio de rol, el alta y la baja.
   - **Perfil propio:** datos editables, foto, rol actual, solicitud de rol y grupos propios.
-  - **Ficha de socio para el Admin:** AUF, vencimiento, grupos, rol y estado.
+  - **Ficha de miembro para el Admin:** AUF, vencimiento, grupos, rol y estado.
 - Viewports: 375 / 768 / 1440, tema claro y oscuro, en inglés y en español.
 
 ## 8. Requerimientos no funcionales
@@ -145,7 +145,7 @@ BR-008 lo hace urgente por un lado concreto: el número de la federación (AUF) 
 - Seguridad: lo reservado al Admin se aplica en el servidor para el 100% de las peticiones (NFR-004), con la capacidad `manageUsersAndRoles` declarada en `RESTRICTED_ROUTES`. La interfaz solo esconde.
 - Privacidad: el directorio muestra los datos del club, no los personales. La fecha de nacimiento, el correo del tutor y el consentimiento no se muestran nunca. El número de AUF solo lo ve el Admin.
 - Auditoría: el cambio de estado de una cuenta queda registrado con actor, momento y resultado, como los cambios de rol (NFR-010).
-- Idiomas: todo texto nuevo sale del catálogo, y los correos salen en el idioma del socio.
+- Idiomas: todo texto nuevo sale del catálogo, y los correos salen en el idioma del miembro.
 - Accesibilidad: sin violaciones de axe en las pantallas nuevas, en los dos idiomas.
 - API: todo pasa por la API v1 (CON-002).
 
@@ -156,18 +156,18 @@ Ninguna. El dueño tomó estas decisiones el 20 de septiembre de 2026:
 - Las columnas de asistencia y de nota general no entran aquí: las agregan E8 y E9 cuando esos datos existan.
 - La foto de perfil entra en E5, con su propio ticket, y monta el almacenamiento que E11 reutilizará para los adjuntos.
 - El directorio absorbe la pantalla de administración, y Mi cuenta se convierte en el perfil.
-- Un socio ve la ficha de otro en el directorio, pero la pantalla de perfil es la propia. El Admin abre la de cualquiera para editar lo suyo.
+- Un miembro ve la ficha de otro en el directorio, pero la pantalla de perfil es la propia. El Admin abre la de cualquiera para editar lo suyo.
 
 ## 10. Descomposición en tickets (para write-ticket)
 
 | #   | Título propuesto                                                                  | Tamaño | Depende de | Auto-merge sugerido                     |
 | --- | --------------------------------------------------------------------------------- | ------ | ---------- | --------------------------------------- |
-| 1   | Agrega a la ficha del socio posición, nivel, género, AUF y fecha de ingreso       | S      | ninguna    | No: datos personales en la base         |
-| 2   | Sirve el directorio por API, con búsqueda, filtro por rol y orden                 | M      | 1          | No: expone datos de todos los socios    |
+| 1   | Agrega a la ficha del miembro posición, nivel, género, AUF y fecha de ingreso     | S      | ninguna    | No: datos personales en la base         |
+| 2   | Sirve el directorio por API, con búsqueda, filtro por rol y orden                 | M      | 1          | No: expone datos de todos los miembros  |
 | 3   | Da al club la pantalla del directorio                                             | M      | 2          | No: pantalla nueva                      |
 | 4   | Muda al directorio la bandeja de solicitudes y el cambio de rol, y retira la otra | M      | 3          | No: mueve permisos de sitio             |
-| 5   | Deja que un socio edite su perfil, con Mi cuenta convertida en perfil             | M      | 1          | No: escribe datos personales            |
-| 6   | Deja que un Admin edite lo reservado de un socio: AUF y grupos                    | M      | 3          | No: campos reservados al Admin          |
-| 7   | Deja que un Admin cree un socio y lo invite por correo                            | M      | 6          | No: crea cuentas y manda correos        |
-| 8   | Deja que un Admin dé de baja y reactive a un socio                                | M      | 3          | No: cierra el acceso de una persona     |
+| 5   | Deja que un miembro edite su perfil, con Mi cuenta convertida en perfil           | M      | 1          | No: escribe datos personales            |
+| 6   | Deja que un Admin edite lo reservado de un miembro: AUF y grupos                  | M      | 3          | No: campos reservados al Admin          |
+| 7   | Deja que un Admin cree un miembro y lo invite por correo                          | M      | 6          | No: crea cuentas y manda correos        |
+| 8   | Deja que un Admin dé de baja y reactive a un miembro                              | M      | 3          | No: cierra el acceso de una persona     |
 | 9   | Guarda la foto de perfil en el almacenamiento de Supabase                         | M      | 5          | No: almacenamiento nuevo con sus reglas |
