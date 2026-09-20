@@ -206,6 +206,30 @@ de casi todos los epics anteriores.
   pantallas salen de `docs/Seadragons Platform.dc.html`, el handoff de Claude
   Design, no de valores por defecto.
 
+### Política de avisos (decidida el 21 de septiembre de 2026)
+
+Quién se entera de qué, y por dónde. Sin esta regla, cada epic con avisos
+(E6, E7, E11) la decide por su cuenta, y el propio SRD advierte del riesgo:
+si todo notifica, nadie lee las notificaciones.
+
+- **Dentro de la aplicación (E6) se avisa todo lo que la persona puede ver
+  estando dentro.** Que su rol cambió, sea por decisión directa de un Admin
+  (#211) o por la aprobación de su solicitud (#210); que su solicitud de rol
+  fue rechazada, que hoy no se avisa en ninguna parte; y lo que el plan ya
+  trae: un evento dirigido a su audiencia (E7) y una noticia publicada (E11).
+- **Por correo sólo va lo que no puede ver dentro, o lo que exige actuar
+  fuera.** Confirmar la cuenta y recuperar la contraseña, que ya existen; la
+  invitación a un miembro nuevo (#243); la baja de la cuenta, porque quien
+  queda `inactive` no puede entrar y un aviso interno no lo vería nunca; y
+  los avisos de cobro que define el SRD (E12, E13).
+- **Un cambio de rol no pide nada a la persona**, así que no lleva correo: se
+  entera al entrar, y el aviso interno le explica por qué cambió su menú.
+
+Queda anotado un caso sin resolver: ser nombrado Admin es el único cambio que
+entrega responsabilidad sobre los datos de los demás. La política lo deja en
+el aviso interno, y el club puede pedir un correo ahí cuando se escriba el
+PRD de E6.
+
 ## Trazabilidad
 
 `docs/SRD_Victoria_Seadragons_Club_Platform.md` → este documento →
