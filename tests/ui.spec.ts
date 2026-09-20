@@ -2631,7 +2631,7 @@ for (const state of ADMINISTRATION_STATES) {
       await chooseSpanish(page);
       await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
       await expect(page.locator("html")).toHaveAttribute("lang", "es");
-      await waitForAdministration(page, "Socios del club");
+      await waitForAdministration(page, "Miembros del club");
       await expectNoAxeViolations(page);
     });
   });
@@ -2662,7 +2662,7 @@ test.describe("la pantalla de administración con los datos de verdad", () => {
       page.getByRole("heading", { name: "Solicitudes pendientes" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Socios del club" }),
+      page.getByRole("heading", { name: "Miembros del club" }),
     ).toBeVisible();
   });
 
@@ -2900,7 +2900,7 @@ const GROUPS_STATES: readonly GroupsState[] = [
     withGroups: true,
     listHeading: SPANISH_GROUPS_HEADING,
     beforeVisit: chooseSpanish,
-    prepare: openGroupIn(`Socios de ${OPENED_GROUP?.name ?? ""}`),
+    prepare: openGroupIn(`Miembros de ${OPENED_GROUP?.name ?? ""}`),
   },
 ];
 

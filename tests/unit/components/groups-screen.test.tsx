@@ -504,7 +504,7 @@ describe("pantalla de grupos", () => {
       screen.getByRole("heading", { level: 1, name: "Grupos" }),
     ).toBeVisible();
     expect(
-      within(groupRow("Senior Squad")).getByText("2 socios"),
+      within(groupRow("Senior Squad")).getByText("2 miembros"),
     ).toBeVisible();
   });
 });
