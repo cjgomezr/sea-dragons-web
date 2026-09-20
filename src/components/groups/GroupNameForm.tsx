@@ -44,7 +44,9 @@ export function GroupNameForm({
 
   async function submit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
-    if ((await onSubmit(name)) === "done") {
+    // Se manda recortado, que es como se valida aquí y como lo guarda el
+    // servidor: si no, un fallo dejaría el campo con espacios que no cuentan.
+    if ((await onSubmit(name.trim())) === "done") {
       setName(initialName);
     }
   }

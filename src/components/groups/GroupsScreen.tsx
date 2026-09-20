@@ -15,6 +15,7 @@ import {
   createGroup,
   deleteGroup,
   describeGroupsFailure,
+  hasActionableCause,
   isGroupGone,
   loadGroups,
   renameGroup,
@@ -34,7 +35,7 @@ import {
 
 type ScreenState =
   | { readonly kind: "loading" }
-  | { readonly kind: "failed" }
+  | { readonly kind: "failed"; readonly failure: GroupsFailure }
   | { readonly kind: "ready"; readonly groups: readonly Group[] };
 
 /** La lista se ordena aquí y no sólo en el servidor porque cambia sin volver a
@@ -75,17 +76,23 @@ function withMemberCount(
     : state;
 }
 
+/** Una causa que se arregla de otra forma se dice tal cual: quien perdió la
+ * sesión tiene que volver a entrar, y reintentar no le sirve de nada. */
 function LoadFailure({
   translate,
+  failure,
   onRetry,
 }: {
   translate: Translator;
+  failure: GroupsFailure;
   onRetry: () => void;
 }): React.JSX.Element {
   return (
     <div className="admin-load-failure">
       <p className="auth-error" role="alert">
-        {translate("groups.loadFailed")}
+        {hasActionableCause(failure)
+          ? describeGroupsFailure(translate, failure)
+          : translate("groups.loadFailed")}
       </p>
       <button type="button" className="auth-submit" onClick={onRetry}>
         {translate("groups.retry")}
@@ -116,7 +123,7 @@ export function GroupsScreen({
       setState(
         outcome.kind === "loaded"
           ? { kind: "ready", groups: byName(outcome.groups) }
-          : { kind: "failed" },
+          : { kind: "failed", failure: outcome },
       );
     });
   }, [reloads]);
@@ -198,7 +205,11 @@ export function GroupsScreen({
         <p className="admin-empty">{translate("groups.loading")}</p>
       ) : null}
       {state.kind === "failed" ? (
-        <LoadFailure translate={translate} onRetry={retryLoad} />
+        <LoadFailure
+          translate={translate}
+          failure={state.failure}
+          onRetry={retryLoad}
+        />
       ) : null}
       {state.kind === "ready" ? (
         <GroupList

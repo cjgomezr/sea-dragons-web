@@ -21,8 +21,10 @@ import type { Translator } from "@/lib/i18n/translator";
  * interruptor (E17).
  */
 
+/** El id es el uuid de la fila, y de ahí sale el camino de la petición
+ * siguiente: uno con una barra compondría una URL distinta de la pretendida. */
 const groupSchema = z.object({
-  id: z.string(),
+  id: z.uuid(),
   name: z.string(),
   memberCount: z.number(),
 });
@@ -33,7 +35,7 @@ const groupsSchema = z.object({
 
 const singleGroupSchema = z.object({ data: groupSchema });
 
-const memberSchema = z.object({ id: z.string(), fullName: z.string() });
+const memberSchema = z.object({ id: z.uuid(), fullName: z.string() });
 
 const membersSchema = z.object({
   data: z.object({ members: z.array(memberSchema) }),
@@ -207,6 +209,17 @@ export const GROUP_GONE: GroupsFailure = {
   failure: "not_found",
   reason: null,
 };
+
+/** Si el fallo dice algo que quien mira puede hacer distinto: reconectar,
+ * volver a entrar o pedir el permiso. Un 500 no: ahí sólo queda reintentar, y
+ * el aviso de la pantalla ya lo ofrece. */
+export function hasActionableCause({ failure }: GroupsFailure): boolean {
+  return (
+    failure === "network" ||
+    failure === "unauthenticated" ||
+    failure === "forbidden"
+  );
+}
 
 /** Lo que el servidor puede responder que no, en el idioma de la pantalla. */
 export function describeGroupsFailure(

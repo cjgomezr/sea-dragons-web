@@ -388,17 +388,16 @@ describe("pantalla de grupos", () => {
     await waitFor(() => expect(listedGroupNames()).toEqual(["Masters Squad"]));
   });
 
-  it("un error de red al cargar deja volver a intentarlo", async () => {
+  it("un error al cargar deja volver a intentarlo", async () => {
     const user = userEvent.setup();
     let attempts = 0;
     stubApi({
       groups: [SENIOR],
       loadGroups: () => {
         attempts += 1;
-        if (attempts === 1) {
-          throw new TypeError("Failed to fetch");
-        }
-        return jsonResponse(200, { data: { groups: [SENIOR] } });
+        return attempts === 1
+          ? errorResponse(500, "internal_error")
+          : jsonResponse(200, { data: { groups: [SENIOR] } });
       },
     });
     render(<GroupsScreen locale="en" />);
@@ -411,6 +410,22 @@ describe("pantalla de grupos", () => {
     expect(
       await screen.findByRole("listitem", { name: "Senior Squad" }),
     ).toBeVisible();
+  });
+
+  it("dice la causa cuando quien mira puede arreglarla de otra forma", async () => {
+    stubApi({
+      loadGroups: () => {
+        throw new TypeError("Failed to fetch");
+      },
+    });
+    render(<GroupsScreen locale="en" />);
+
+    expect(
+      await screen.findByText(
+        "We couldn't reach the server. Check your connection and try again.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
   });
 
   it("un error de red al crear no da el grupo por creado", async () => {

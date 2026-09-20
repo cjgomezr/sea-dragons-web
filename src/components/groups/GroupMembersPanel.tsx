@@ -189,7 +189,11 @@ export function GroupMembersPanel({
   }
 
   /** Un fallo que deja el grupo fuera de uso cierra el panel; el resto sólo se
-   * cuenta, y lo que se intentaba no se da por hecho. */
+   * cuenta, y lo que se intentaba no se da por hecho.
+   *
+   * Aquí sí se avisa al padre en el acto, sin pasar por el estado `gone`: esto
+   * sale de un clic y no de la carga, así que el panel ya está pintado y
+   * desmontarlo no interrumpe ningún efecto a medias. */
   function reportFailure(outcome: GroupsFailure): void {
     if (isGroupGone(outcome)) {
       onGroupGone();
