@@ -87,13 +87,8 @@ export async function loadAdministration(): Promise<AdministrationLoad> {
     requestApi(PENDING_REQUESTS_PATH),
     requestApi(MEMBERS_API_PATH),
   ]);
-  if (pending.kind === "failed") {
-    return pending;
-  }
-  if (members.kind === "failed") {
-    return members;
-  }
-
+  // `readApiPayload` devuelve tal cual el fallo de red o de HTTP que traiga
+  // cada mitad, así que no hace falta mirarlo antes por separado.
   const readRequests = readApiPayload(pending, pendingRequestsSchema);
   if (readRequests.kind === "failed") {
     return readRequests;

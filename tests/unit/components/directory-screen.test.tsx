@@ -93,7 +93,9 @@ type ApiStub = {
   /** Quién mira: sólo un Admin recibe `admin`, y con él el control de los
    * dados de baja y la marca del AUF. */
   readonly kind?: "member" | "admin";
-  readonly respond?: () => Response | Promise<Response>;
+  /** Recibe el camino pedido, para poder contestar distinto según lo que se
+   * preguntó (un 403 sólo a quien pide los dados de baja, por ejemplo). */
+  readonly respond?: (url: string) => Response | Promise<Response>;
 };
 
 const requestedUrls: string[] = [];
@@ -165,7 +167,7 @@ function stubApi(stub: ApiStub = {}): void {
       if (!url.startsWith(DIRECTORY_PATH)) {
         throw new Error(`Petición inesperada: ${url}`);
       }
-      return stub.respond?.() ?? listingFor(stub, url);
+      return stub.respond?.(url) ?? listingFor(stub, url);
     }),
   );
 }
@@ -534,6 +536,32 @@ describe("incluir inactivos", () => {
     expect(
       within(memberRow("Ana Admin")).queryByText("Former member"),
     ).toBeNull();
+  });
+
+  it("reintentar tras un 403 vuelve a pedir la lista sin los dados de baja", async () => {
+    const asAdmin: ApiStub = { kind: "admin", members: [VENCIDA, ZOE] };
+    stubApi({
+      ...asAdmin,
+      // A quien deja de ser Admin con la pantalla abierta, el servidor le
+      // niega justo lo que la casilla pide.
+      respond: (url) =>
+        new URL(url, "http://localhost").searchParams.get("includeInactive") ===
+        "true"
+          ? errorResponse(403, "forbidden")
+          : listingFor(asAdmin, url),
+    });
+    await renderScreen();
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Include former members" }),
+    );
+    await user.click(await screen.findByRole("button", { name: "Try again" }));
+
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["Ana Admin"]);
+    });
+    expect(lastRequest().get("includeInactive")).toBeNull();
   });
 
   it("señala a un Admin la fila con el registro de AUF vencido", async () => {
