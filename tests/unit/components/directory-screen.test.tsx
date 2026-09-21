@@ -513,6 +513,14 @@ describe("pantalla del directorio", () => {
 });
 
 describe("incluir inactivos", () => {
+  it("no ofrece dar de alta a quien no es Admin", async () => {
+    stubApi({ kind: "member", members: [MARIA] });
+
+    await renderScreen();
+
+    expect(screen.queryByRole("link", { name: "Add member" })).toBeNull();
+  });
+
   it("no ofrece el control a quien no es Admin", async () => {
     stubApi({ kind: "member", members: [MARIA] });
 

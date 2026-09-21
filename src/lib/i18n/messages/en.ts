@@ -478,6 +478,60 @@ export const englishMessages = {
   "directory.aufSummary": "AUF {number} · expires {date}",
   "directory.aufWithoutExpiry": "AUF {number} · no expiry date",
   "directory.aufMissing": "No AUF",
+  // El alta de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta
+  // desde la cabecera del directorio.
+  "directory.addMember": "Add member",
+  "newMember.metaTitle": "Add a member · Victoria Seadragons",
+  "newMember.metaDescription":
+    "Add a member to the club and send them an invitation to activate their account.",
+  "newMember.title": "Add a member",
+  "newMember.lead":
+    "They join as a Player and get an email to activate their account. Their role can be changed from the directory.",
+  "newMember.loading": "Loading the club's groups…",
+  "newMember.loadFailed": "We couldn't load the club's groups. Try again.",
+  "newMember.details.title": "Member details",
+  "newMember.fullName": "Full name",
+  "newMember.email": "Email",
+  "newMember.country": "Country",
+  "newMember.position": "Position",
+  "newMember.experienceLevel": "Experience level",
+  "newMember.gender": "Gender",
+  "newMember.choose": "Choose one",
+  "newMember.auf.title": "AUF registration",
+  "newMember.auf.number": "AUF number",
+  "newMember.auf.expiry": "AUF expiry date",
+  "newMember.submit": "Add member",
+  "newMember.sending": "Adding…",
+  "newMember.created.sent":
+    "{name} was added. We sent the invitation to {email}.",
+  "newMember.created.notSent":
+    "{name} was added, but the invitation could not be sent.",
+  "newMember.resend": "Resend invitation",
+  "newMember.resending": "Resending…",
+  "newMember.resent": "We sent a new invitation to {email}.",
+  "newMember.addAnother": "Add another member",
+  "newMember.issue.fullNameMissing": "Write the member's name.",
+  "newMember.issue.emailMalformed": "Write a valid email address.",
+  "newMember.issue.countryUnknown": "Choose a country.",
+  "newMember.issue.positionUnknown": "Choose a position.",
+  "newMember.issue.experienceLevelUnknown": "Choose an experience level.",
+  "newMember.issue.genderUnknown": "Choose an option.",
+  "newMember.issue.aufNumberMissing": "Write the AUF number.",
+  "newMember.issue.aufNumberTooLong":
+    "The AUF number can have at most {max} characters.",
+  "newMember.issue.aufExpiryNotADate": "Write the AUF expiry date.",
+  "newMember.issue.aufExpiryInThePast":
+    "The AUF has already expired. Check the date.",
+  "newMember.error.emailTaken":
+    "That email already has an account in the club.",
+  "newMember.error.groupNotFound":
+    "One of those groups is no longer in the club. Reload the page.",
+  "newMember.error.invitationNotSent":
+    "The invitation could not be sent. Try again later.",
+  "newMember.error.rateLimited":
+    "Several invitations were sent in a row. Wait a few minutes before asking for another.",
+  "newMember.error.forbidden": "Only an Admin can add members.",
+  "newMember.error.unexpected": "We couldn't add the member. Try again.",
   "themeToggle.switchToLight": "Switch to light theme",
   "themeToggle.switchToDark": "Switch to dark theme",
   // El destino va con su propio nombre ("Español", no "Spanish"): quien no

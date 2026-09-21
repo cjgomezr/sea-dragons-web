@@ -92,6 +92,12 @@ export type NewMemberIssue = {
   readonly code: NewMemberIssueCode;
 };
 
+/** Los `reason` con los que la API distingue cada rechazo del alta y del
+ * reenvío. La pantalla los lee para decir cuál. */
+export const EMAIL_TAKEN_REASON = "email_taken";
+export const INVITATION_NOT_PENDING_REASON = "invitation_not_pending";
+export const INVITATION_NOT_SENT_REASON = "invitation_not_sent";
+
 /** Columnas de `public.members` que escribe el alta, en snake_case porque es
  * la fila que va a la base. `joined_on` no va: su defecto es el día del club,
  * que es cuando ingresa quien se da de alta. */
@@ -246,33 +252,55 @@ function checkAufNumber(aufNumber: string): NewMemberIssueCode | null {
 }
 
 /** Todos los campos que no valen, no el primero: el formulario los marca de
- * una vez. No lee nada, así que una petición mal hecha no toca la base. */
+ * una vez, y lo usa también para avisar antes de enviar. No lee nada, así que
+ * una petición mal hecha no toca la base. */
+export function listNewMemberIssues(
+  submission: NewMemberSubmission,
+  todayInClub: string,
+): readonly NewMemberIssue[] {
+  const checks: readonly FieldCheck[] = [
+    [
+      "fullName",
+      submission.fullName.trim() === "" ? "full_name_missing" : null,
+    ],
+    ["email", looksLikeEmail(submission.email) ? null : "email_malformed"],
+    [
+      "country",
+      validateCountryField(submission.country).ok ? null : "country_unknown",
+    ],
+    [
+      "position",
+      parsePosition(submission.position) === null ? "position_unknown" : null,
+    ],
+    [
+      "experienceLevel",
+      parseExperienceLevel(submission.experienceLevel) === null
+        ? "experience_level_unknown"
+        : null,
+    ],
+    [
+      "gender",
+      parseGender(submission.gender) === null ? "gender_unknown" : null,
+    ],
+    ["aufNumber", checkAufNumber(submission.aufNumber.trim())],
+    ["aufExpiry", checkAufExpiry(submission.aufExpiry, todayInClub)],
+  ];
+  return checks.flatMap(([field, code]) =>
+    code === null ? [] : [{ field, code }],
+  );
+}
+
 function validateNewMember(
   submission: NewMemberSubmission,
   todayInClub: string,
 ): ValidNewMember {
-  const fullName = submission.fullName.trim();
-  const aufNumber = submission.aufNumber.trim();
+  const issues = listNewMemberIssues(submission, todayInClub);
   const country = validateCountryField(submission.country);
   const position = parsePosition(submission.position);
   const experienceLevel = parseExperienceLevel(submission.experienceLevel);
   const gender = parseGender(submission.gender);
-  const checks: readonly FieldCheck[] = [
-    ["fullName", fullName === "" ? "full_name_missing" : null],
-    ["email", looksLikeEmail(submission.email) ? null : "email_malformed"],
-    ["country", country.ok ? null : "country_unknown"],
-    ["position", position === null ? "position_unknown" : null],
-    [
-      "experienceLevel",
-      experienceLevel === null ? "experience_level_unknown" : null,
-    ],
-    ["gender", gender === null ? "gender_unknown" : null],
-    ["aufNumber", checkAufNumber(aufNumber)],
-    ["aufExpiry", checkAufExpiry(submission.aufExpiry, todayInClub)],
-  ];
-  const issues = checks.flatMap(([field, code]) =>
-    code === null ? [] : [{ field, code }],
-  );
+  // Los cuatro últimos términos no pueden ser ciertos sin el primero; están
+  // aquí porque son los que estrechan el tipo.
   if (
     issues.length > 0 ||
     !country.ok ||
@@ -283,13 +311,13 @@ function validateNewMember(
     throw new NewMemberValidationError(issues);
   }
   return {
-    full_name: fullName,
+    full_name: submission.fullName.trim(),
     email: submission.email.trim().toLowerCase(),
     country: country.value,
     position,
     experience_level: experienceLevel,
     gender,
-    auf_number: aufNumber,
+    auf_number: submission.aufNumber.trim(),
     auf_expiry: submission.aufExpiry,
   };
 }

@@ -96,6 +96,11 @@ export const MEMBER_INVITATION_API_PATH = `${MEMBERS_API_PATH}/[id]/invitation`;
  * Admin: quien no lo es y la pide a mano vuelve al panel, como con Equipos. */
 export const MEMBER_RECORD_PATH = `${DIRECTORY_PATH}/[id]`;
 
+/** El alta de un miembro por un Admin (#243, FR-020), abierta desde la
+ * cabecera del directorio. Casa también con `MEMBER_RECORD_PATH`, que ya la
+ * reserva al Admin; se declara igual para que siga siéndolo si esa cambia. */
+export const NEW_MEMBER_PATH = `${DIRECTORY_PATH}/nuevo`;
+
 /** Los grupos del club (#226, E4). Todo lo que cuelga de este camino es de
  * quien gestiona grupos: crear, listar, renombrar y borrar, y también asignar
  * y quitar socios cuando llegue su ticket. */
@@ -244,6 +249,7 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: MEMBER_RECORD_API_PATH, capability: "manageUsersAndRoles" },
   { path: MEMBER_INVITATION_API_PATH, capability: "manageUsersAndRoles" },
   { path: MEMBER_RECORD_PATH, capability: "manageUsersAndRoles" },
+  { path: NEW_MEMBER_PATH, capability: "manageUsersAndRoles" },
   { path: GROUPS_API_PATH, capability: "manageGroups" },
   { path: GROUPS_PATH, capability: "manageGroups" },
 ];

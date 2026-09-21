@@ -3,6 +3,9 @@ import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { GroupNotFoundError } from "@/lib/groups/groups";
 import { asGroupsApiError } from "@/lib/groups/groups-api";
 import {
+  EMAIL_TAKEN_REASON,
+  INVITATION_NOT_PENDING_REASON,
+  INVITATION_NOT_SENT_REASON,
   InvitationNotPendingError,
   InvitationNotSentError,
   InvitationRateLimitedError,
@@ -23,11 +26,6 @@ import { createSupabaseMemberInvitationGateways } from "./supabase-member-invita
  * invitación (#243): de dónde salen los adaptadores y cómo se responde cada
  * error del dominio.
  */
-
-/** Los `reason` con los que la pantalla distingue cada rechazo. */
-export const EMAIL_TAKEN_REASON = "email_taken";
-export const INVITATION_NOT_PENDING_REASON = "invitation_not_pending";
-export const INVITATION_NOT_SENT_REASON = "invitation_not_sent";
 
 export function requireMemberInvitationGateways(): MemberInvitationGateways {
   const wiring = createSupabaseMemberInvitationGateways(process.env);

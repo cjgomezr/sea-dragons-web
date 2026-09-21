@@ -475,6 +475,60 @@ export const spanishMessages: MessageCatalog = {
   "directory.aufSummary": "AUF {number} · vence el {date}",
   "directory.aufWithoutExpiry": "AUF {number} · sin vencimiento",
   "directory.aufMissing": "Sin AUF",
+  // El alta de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta
+  // desde la cabecera del directorio.
+  "directory.addMember": "Dar de alta",
+  "newMember.metaTitle": "Dar de alta a un miembro · Victoria Seadragons",
+  "newMember.metaDescription":
+    "Da de alta a un miembro del club y mándale la invitación para activar su cuenta.",
+  "newMember.title": "Dar de alta a un miembro",
+  "newMember.lead":
+    "Entra como Player y recibe un correo para activar su cuenta. Su rol se cambia desde el directorio.",
+  "newMember.loading": "Cargando los grupos del club…",
+  "newMember.loadFailed":
+    "No pudimos cargar los grupos del club. Inténtalo de nuevo.",
+  "newMember.details.title": "Datos del miembro",
+  "newMember.fullName": "Nombre completo",
+  "newMember.email": "Correo",
+  "newMember.country": "País",
+  "newMember.position": "Posición",
+  "newMember.experienceLevel": "Nivel de experiencia",
+  "newMember.gender": "Género",
+  "newMember.choose": "Elige una opción",
+  "newMember.auf.title": "Registro AUF",
+  "newMember.auf.number": "Número de AUF",
+  "newMember.auf.expiry": "Vencimiento del AUF",
+  "newMember.submit": "Dar de alta",
+  "newMember.sending": "Dando de alta…",
+  "newMember.created.sent":
+    "Dimos de alta a {name}. Le mandamos la invitación a {email}.",
+  "newMember.created.notSent":
+    "Dimos de alta a {name}, pero la invitación no se pudo mandar.",
+  "newMember.resend": "Reenviar la invitación",
+  "newMember.resending": "Reenviando…",
+  "newMember.resent": "Le mandamos una invitación nueva a {email}.",
+  "newMember.addAnother": "Dar de alta a otro miembro",
+  "newMember.issue.fullNameMissing": "Escribe el nombre del miembro.",
+  "newMember.issue.emailMalformed": "Escribe una dirección de correo válida.",
+  "newMember.issue.countryUnknown": "Elige un país.",
+  "newMember.issue.positionUnknown": "Elige una posición.",
+  "newMember.issue.experienceLevelUnknown": "Elige un nivel de experiencia.",
+  "newMember.issue.genderUnknown": "Elige una opción.",
+  "newMember.issue.aufNumberMissing": "Escribe el número de AUF.",
+  "newMember.issue.aufNumberTooLong":
+    "El número de AUF no puede pasar de {max} caracteres.",
+  "newMember.issue.aufExpiryNotADate": "Escribe el vencimiento del AUF.",
+  "newMember.issue.aufExpiryInThePast": "Ese AUF ya venció. Revisa la fecha.",
+  "newMember.error.emailTaken": "Ese correo ya tiene una cuenta en el club.",
+  "newMember.error.groupNotFound":
+    "Uno de esos grupos ya no está en el club. Recarga la página.",
+  "newMember.error.invitationNotSent":
+    "La invitación no se pudo mandar. Inténtalo más tarde.",
+  "newMember.error.rateLimited":
+    "Se mandaron varias invitaciones seguidas. Espera unos minutos antes de pedir otra.",
+  "newMember.error.forbidden": "Sólo un Admin puede dar de alta a miembros.",
+  "newMember.error.unexpected":
+    "No pudimos dar de alta al miembro. Inténtalo de nuevo.",
   "themeToggle.switchToLight": "Cambiar a tema claro",
   "themeToggle.switchToDark": "Cambiar a tema oscuro",
   "languageToggle.label": "Idioma: español. Cambiar a English (EN)",
