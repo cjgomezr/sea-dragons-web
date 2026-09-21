@@ -371,6 +371,47 @@ export const spanishMessages: MessageCatalog = {
   "groups.error.forbidden": "Tu rol no puede gestionar los grupos del club.",
   "groups.error.unexpected":
     "No pudimos completar la acción. Vuelve a intentarlo en un momento.",
+
+  // El directorio del club (#239). Las posiciones van en femenino de lugar
+  // ("Portería", "Ataque") y no de persona ("Portero"): nombran el puesto, y
+  // así la fila no le asigna un género a nadie.
+  "directory.metaTitle": "Directorio · Victoria Seadragons",
+  "directory.metaDescription":
+    "Todo el club, con su país, su nivel, su rol y su posición.",
+  "directory.title": "Directorio",
+  "directory.lead":
+    "Todo el club. Busca por nombre, filtra por rol y ordena la lista.",
+  "directory.loading": "Cargando el directorio del club…",
+  "directory.retry": "Volver a intentarlo",
+  "directory.list.title": "Miembros del club",
+  "directory.memberCount": {
+    one: "{count} miembro",
+    other: "{count} miembros",
+  },
+  "directory.search.label": "Buscar por nombre",
+  "directory.search.placeholder": "Busca a alguien del club…",
+  "directory.role.legend": "Filtrar por rol",
+  "directory.role.all": "Todos",
+  "directory.includeInactive": "Incluir a quienes están de baja",
+  "directory.empty": "Nadie del club coincide con lo que buscas.",
+  "directory.clearFilters": "Limpiar los filtros",
+  "directory.column.member": "Miembro",
+  "directory.column.role": "Rol",
+  "directory.column.position": "Posición",
+  "directory.mark.inactive": "De baja",
+  "directory.mark.aufExpired": "AUF vencido",
+  "directory.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para ver el directorio.",
+  "directory.error.forbidden": "Tu cuenta no puede ver el directorio del club.",
+  "directory.error.unexpected":
+    "No pudimos cargar el directorio del club. Vuelve a intentarlo.",
+  "position.Goalkeeper": "Portería",
+  "position.Defender": "Defensa",
+  "position.Forward": "Ataque",
+  "level.Beginner": "Principiante",
+  "level.Intermediate": "Intermedio",
+  "level.Advanced": "Avanzado",
+
   "themeToggle.switchToLight": "Cambiar a tema claro",
   "themeToggle.switchToDark": "Cambiar a tema oscuro",
   "languageToggle.label": "Idioma: español. Cambiar a English (EN)",

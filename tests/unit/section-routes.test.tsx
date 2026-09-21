@@ -10,7 +10,6 @@ vi.mock("@/lib/i18n/request-locale", () => ({
 
 const { default: CalendarioPage } = await import("@/app/(app)/calendario/page");
 const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");
-const { default: DirectorioPage } = await import("@/app/(app)/directorio/page");
 const { default: EquiposPage } = await import("@/app/(app)/equipos/page");
 const { default: EvaluacionesPage } =
   await import("@/app/(app)/evaluaciones/page");
@@ -25,11 +24,13 @@ async function renderIn(locale: Locale, Page: ServerPage): Promise<void> {
   render(await Page());
 }
 
+/** Las secciones que siguen siendo un marcador de posición. El directorio
+ * salió de aquí en #239, que le dio su pantalla: lo que enseña se prueba en
+ * `tests/unit/components/directory-screen.test.tsx`. */
 const SECTIONS: ReadonlyArray<
   readonly [english: string, spanish: string, Page: ServerPage]
 > = [
   ["Dashboard", "Dashboard", DashboardPage],
-  ["Directory", "Directorio", DirectorioPage],
   ["Calendar", "Calendario", CalendarioPage],
   ["Teams", "Equipos", EquiposPage],
   ["Evaluations", "Evaluaciones", EvaluacionesPage],

@@ -1155,22 +1155,6 @@ h6 {
   border-radius: var(--radius);
 }
 
-.admin-member-avatar {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  font-family: var(--font-family-mono);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--color-text);
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 50%;
-}
-
 /* `min-width: 0` para que un correo largo se parta dentro de la columna en vez
    de empujar el resto de la fila fuera de la pantalla. */
 .admin-member-identity {
@@ -1390,5 +1374,277 @@ h6 {
   .groups-name-form .groups-actions,
   .groups-add > button {
     flex: none;
+  }
+}
+
+/* El directorio del club (#239). Sigue docs/mockups/directory-light.png: la
+   búsqueda, los filtros por rol y la fila con iniciales, nombre, país, nivel,
+   rol y posición. Las columnas de OVR y asistencia del mockup no están: son de
+   E9 y E8, y hoy no hay dato que enseñar. */
+.directory {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  max-width: 960px;
+}
+
+.directory > .app-lead {
+  margin-bottom: 0;
+}
+
+.directory-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.directory-search {
+  margin: 0;
+}
+
+/* El `fieldset` sólo está por su `legend`, que es el nombre del grupo de
+   opciones: sin recuadro propio, que competiría con el de cada pastilla. */
+.directory-roles {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.directory-roles legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.directory-role-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* El radio no se ve, pero sigue ahí: recibe el foco y el teclado lo recorre
+   con las flechas. Lo que se pinta es la pastilla, que muestra el foco y la
+   elección por ella. */
+.directory-role {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+  font-size: 14px;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.directory-role input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.directory-role:hover {
+  border-color: var(--color-accent);
+}
+
+.directory-role:has(input:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.directory-role:has(input:checked) {
+  font-weight: 700;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.directory-inactive {
+  align-items: center;
+}
+
+.directory-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.directory-card {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* `table-layout: fixed` es lo que impide que un nombre largo ensanche la tabla
+   más allá de la pantalla a 375px: las columnas miden lo que dice el reparto
+   de abajo, y el texto se parte dentro. */
+.directory-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.directory-count {
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.directory-table th,
+.directory-table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.directory-table thead th {
+  padding: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.directory-table tbody tr + tr th,
+.directory-table tbody tr + tr td {
+  border-top: 1px solid var(--color-border);
+}
+
+.directory-table th:nth-child(2),
+.directory-table th:nth-child(3) {
+  width: 27%;
+}
+
+.directory-sort {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: var(--touch-target-min);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.directory-sort:hover {
+  color: var(--color-accent);
+}
+
+/* Ancho fijo para que la flecha aparezca sin mover el título de la columna. */
+.directory-arrow {
+  display: inline-block;
+  width: 1em;
+}
+
+.directory-member {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-weight: 400;
+}
+
+/* La misma pieza que la fila de la pantalla de administración, que sale de
+   este mismo mockup. Comparten regla en vez de copiarla: cuando #240 traiga
+   aquí esa pantalla, quedará una sola. */
+.admin-member-avatar,
+.directory-avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+}
+
+/* `min-width: 0` para que un nombre largo se parta dentro de su columna en vez
+   de empujar el resto de la fila fuera de la pantalla. */
+.directory-identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.directory-name {
+  font-weight: 700;
+}
+
+.directory-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.directory-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.directory-mark {
+  padding: 0 var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  border: 1px solid;
+  border-radius: var(--radius);
+}
+
+.directory-mark-neutral {
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+}
+
+/* El AUF vencido es lo único de la fila que pide hacer algo, así que es lo
+   único que lleva el color de advertencia. La palabra va igual: el color no
+   es lo que lo dice. */
+.directory-mark-warning {
+  color: var(--color-warning);
+  border-color: var(--color-warning);
+}
+
+.directory-position {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-background);
+  border-radius: var(--radius);
+}
+
+@media (min-width: 768px) {
+  .directory-filters {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+
+  .directory-search {
+    flex: 1 1 260px;
+    min-width: 0;
+  }
+
+  .directory-table {
+    font-size: 16px;
   }
 }

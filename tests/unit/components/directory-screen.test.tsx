@@ -1,0 +1,455 @@
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DirectoryScreen } from "@/components/directory/DirectoryScreen";
+import type {
+  AdminDirectoryMember,
+  DirectoryMember,
+} from "@/lib/directory/directory";
+
+/**
+ * La pantalla del directorio (#239, RF-2 del PRD de E5). Buscar, filtrar y
+ * ordenar los resuelve el servidor desde #238, así que lo que se prueba aquí
+ * es que la pantalla le pide lo que quien mira pidió y enseña lo que
+ * respondió: ni filtra por su cuenta ni recuerda una lista vieja.
+ */
+
+const MARIA: DirectoryMember = {
+  userId: "aaaaaaaa-0000-4000-8000-00000000000a",
+  fullName: "María Ñíguez",
+  country: "AU",
+  experienceLevel: "Advanced",
+  role: "Coach",
+  position: "Forward",
+  status: "active",
+};
+
+/** Sin país, sin nivel y sin posición: los tres huecos del criterio del
+ * guion, y el nombre más largo de la lista para el caso de contenido largo. */
+const TOMAS: DirectoryMember = {
+  userId: "bbbbbbbb-0000-4000-8000-00000000000b",
+  fullName: "Tomás Errekondo Aranburu",
+  country: null,
+  experienceLevel: null,
+  role: "Player",
+  position: null,
+  status: "active",
+};
+
+const NEREA: DirectoryMember = {
+  userId: "cccccccc-0000-4000-8000-00000000000c",
+  fullName: "Nerea Ruiz",
+  country: "ES",
+  experienceLevel: "Beginner",
+  role: "Player",
+  position: "Goalkeeper",
+  status: "active",
+};
+
+const ZOE: AdminDirectoryMember = {
+  userId: "dddddddd-0000-4000-8000-00000000000d",
+  fullName: "Zoe Zapata",
+  country: "AU",
+  experienceLevel: "Intermediate",
+  role: "Committee",
+  position: "Defender",
+  status: "inactive",
+  aufNumber: null,
+  aufExpiry: null,
+  isAufExpired: false,
+};
+
+const VENCIDA: AdminDirectoryMember = {
+  userId: "eeeeeeee-0000-4000-8000-00000000000e",
+  fullName: "Ana Admin",
+  country: "AU",
+  experienceLevel: "Advanced",
+  role: "Admin",
+  position: "Defender",
+  status: "active",
+  aufNumber: "AUF-7",
+  aufExpiry: "2020-01-31",
+  isAufExpired: true,
+};
+
+/** La misma socia, tal como la ve un Admin: con su registro federativo al día,
+ * que es lo que distingue a la fila señalada de las demás. */
+const MARIA_PARA_ADMIN: AdminDirectoryMember = {
+  ...MARIA,
+  aufNumber: "AUF-1",
+  aufExpiry: "2030-06-30",
+  isAufExpired: false,
+};
+
+/** El guion que ocupa el sitio de un dato que el socio no tiene. */
+const MISSING = "–";
+
+const DIRECTORY_PATH = "/api/v1/directory";
+
+type AnyMember = DirectoryMember | AdminDirectoryMember;
+
+type ApiStub = {
+  readonly members?: readonly AnyMember[];
+  /** Quién mira: sólo un Admin recibe `admin`, y con él el control de los
+   * dados de baja y la marca del AUF. */
+  readonly kind?: "member" | "admin";
+  readonly respond?: () => Response | Promise<Response>;
+};
+
+const requestedUrls: string[] = [];
+
+function jsonResponse(status: number, payload: unknown): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function errorResponse(status: number, code: string): Response {
+  return jsonResponse(status, { error: { code, message: "x" } });
+}
+
+function normalize(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
+/** Lo que el endpoint de #238 hace con la consulta, reducido a lo que estos
+ * tests necesitan distinguir. El orden lo decide el servidor, así que aquí
+ * responde en el orden de la lista: lo que la pantalla tiene que probar es
+ * que pidió el orden, no que sepa ordenar. */
+function listingFor(stub: ApiStub, url: string): Response {
+  const params = new URL(url, "http://localhost").searchParams;
+  const search = params.get("q");
+  const role = params.get("role");
+  const includeInactive = params.get("includeInactive") === "true";
+  const members = (stub.members ?? [MARIA]).filter(
+    (member) =>
+      (role === null || member.role === role) &&
+      (includeInactive || member.status !== "inactive") &&
+      (search === null ||
+        normalize(member.fullName).includes(normalize(search))),
+  );
+  return jsonResponse(200, { data: { kind: stub.kind ?? "member", members } });
+}
+
+function stubApi(stub: ApiStub = {}): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) => {
+      requestedUrls.push(url);
+      if (!url.startsWith(DIRECTORY_PATH)) {
+        throw new Error(`Petición inesperada: ${url}`);
+      }
+      return stub.respond?.() ?? listingFor(stub, url);
+    }),
+  );
+}
+
+function lastRequest(): URLSearchParams {
+  const url = requestedUrls[requestedUrls.length - 1] ?? "";
+  return new URL(url, "http://localhost").searchParams;
+}
+
+async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
+  render(<DirectoryScreen locale={locale} />);
+  await screen.findByRole("region", {
+    name: locale === "en" ? "Club members" : "Miembros del club",
+  });
+}
+
+function memberRow(name: string): HTMLElement {
+  return screen.getByRole("row", { name });
+}
+
+function listedNames(): readonly string[] {
+  return screen
+    .getAllByRole("row")
+    .map((row) => row.getAttribute("aria-label"))
+    .filter((label): label is string => label !== null);
+}
+
+function columnHeader(name: string): HTMLElement {
+  return screen.getByRole("columnheader", { name });
+}
+
+async function sortBy(column: string): Promise<void> {
+  await userEvent
+    .setup()
+    .click(within(columnHeader(column)).getByRole("button"));
+}
+
+beforeEach(() => {
+  requestedUrls.length = 0;
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("pantalla del directorio", () => {
+  it("lista a los socios del club con sus iniciales, nombre, país, nivel, rol y posición", async () => {
+    stubApi({ members: [MARIA, NEREA] });
+
+    await renderScreen();
+
+    expect(listedNames()).toEqual(["María Ñíguez", "Nerea Ruiz"]);
+    const row = memberRow("María Ñíguez");
+    expect(within(row).getByText("MÑ")).toBeVisible();
+    expect(within(row).getByText(/Australia/)).toBeVisible();
+    expect(within(row).getByText(/Advanced/)).toBeVisible();
+    expect(within(row).getByRole("cell", { name: "Coach" })).toBeVisible();
+    expect(within(row).getByRole("cell", { name: "Forward" })).toBeVisible();
+  });
+
+  it("dice cuántos socios enseña", async () => {
+    stubApi({ members: [MARIA, NEREA] });
+
+    await renderScreen();
+
+    expect(screen.getByText("2 members")).toBeVisible();
+  });
+
+  it("pone un guion donde el socio no tiene país, nivel ni posición", async () => {
+    stubApi({ members: [TOMAS] });
+
+    await renderScreen();
+
+    const row = memberRow("Tomás Errekondo Aranburu");
+    expect(within(row).getByText(`${MISSING} · ${MISSING}`)).toBeVisible();
+    expect(within(row).getByRole("cell", { name: MISSING })).toBeVisible();
+  });
+
+  it("filtra por nombre sin perder el filtro de rol", async () => {
+    stubApi({ members: [MARIA, NEREA, TOMAS] });
+    await renderScreen();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("radio", { name: "Player" }));
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["Nerea Ruiz", "Tomás Errekondo Aranburu"]);
+    });
+    await userEvent
+      .setup()
+      .type(screen.getByLabelText("Search by name"), "nerea");
+
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["Nerea Ruiz"]);
+    });
+    expect(lastRequest().get("role")).toBe("Player");
+    expect(lastRequest().get("q")).toBe("nerea");
+  });
+
+  it("espera a que quien escribe termine antes de preguntar por el nombre", async () => {
+    stubApi({ members: [MARIA] });
+    await renderScreen();
+    const requestsBeforeTyping = requestedUrls.length;
+
+    await userEvent
+      .setup()
+      .type(screen.getByLabelText("Search by name"), "mar");
+
+    await waitFor(() => {
+      expect(lastRequest().get("q")).toBe("mar");
+    });
+    expect(requestedUrls.length - requestsBeforeTyping).toBe(1);
+  });
+
+  it("muestra sólo el rol elegido y vuelve al club entero con Todos", async () => {
+    stubApi({ members: [MARIA, NEREA] });
+    await renderScreen();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("radio", { name: "Coach" }));
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["María Ñíguez"]);
+    });
+    expect(lastRequest().get("role")).toBe("Coach");
+
+    await user.click(screen.getByRole("radio", { name: "All" }));
+
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["María Ñíguez", "Nerea Ruiz"]);
+    });
+    expect(lastRequest().get("role")).toBeNull();
+  });
+
+  it("arranca ordenado por nombre ascendente", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(lastRequest().get("sort")).toBe("name");
+    expect(lastRequest().get("direction")).toBe("asc");
+    expect(columnHeader("Member")).toHaveAttribute("aria-sort", "ascending");
+  });
+
+  it.each([
+    ["Role", "role"],
+    ["Position", "position"],
+  ])("ordena por %s al pulsar su cabecera", async (column, sort) => {
+    stubApi();
+    await renderScreen();
+
+    await sortBy(column);
+
+    await waitFor(() => {
+      expect(lastRequest().get("sort")).toBe(sort);
+    });
+    expect(lastRequest().get("direction")).toBe("asc");
+    expect(columnHeader(column)).toHaveAttribute("aria-sort", "ascending");
+  });
+
+  it("invierte el nombre al pulsar la cabecera por la que ya venía ordenado", async () => {
+    stubApi();
+    await renderScreen();
+
+    await sortBy("Member");
+
+    await waitFor(() => {
+      expect(lastRequest().get("direction")).toBe("desc");
+    });
+    expect(lastRequest().get("sort")).toBe("name");
+    expect(columnHeader("Member")).toHaveAttribute("aria-sort", "descending");
+  });
+
+  it("invierte el sentido al volver a pulsar la misma cabecera", async () => {
+    stubApi();
+    await renderScreen();
+
+    await sortBy("Role");
+    await waitFor(() => {
+      expect(lastRequest().get("sort")).toBe("role");
+    });
+    await sortBy("Role");
+
+    await waitFor(() => {
+      expect(lastRequest().get("direction")).toBe("desc");
+    });
+    expect(columnHeader("Role")).toHaveAttribute("aria-sort", "descending");
+    expect(columnHeader("Member")).toHaveAttribute("aria-sort", "none");
+  });
+
+  it("dice que no encontró a nadie y ofrece limpiar los filtros", async () => {
+    stubApi({ members: [MARIA] });
+    await renderScreen();
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText("Search by name"), "zzz");
+    await waitFor(() => {
+      expect(
+        screen.getByText("No member matches what you're looking for."),
+      ).toBeVisible();
+    });
+    expect(screen.queryByRole("table")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Clear the filters" }));
+
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["María Ñíguez"]);
+    });
+    expect(screen.getByLabelText("Search by name")).toHaveValue("");
+  });
+
+  it("dice que la carga falló y deja reintentar", async () => {
+    let attempts = 0;
+    stubApi({
+      respond: () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new TypeError("sin red");
+        }
+        return jsonResponse(200, {
+          data: { kind: "member", members: [MARIA] },
+        });
+      },
+    });
+    render(<DirectoryScreen locale="en" />);
+
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    expect(
+      screen.getByText(
+        "We couldn't reach the server. Check your connection and try again.",
+      ),
+    ).toBeVisible();
+
+    await userEvent.setup().click(retry);
+
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["María Ñíguez"]);
+    });
+  });
+
+  it("dice que la sesión terminó cuando el servidor no reconoce a quien pregunta", async () => {
+    stubApi({ respond: () => errorResponse(401, "unauthenticated") });
+
+    render(<DirectoryScreen locale="en" />);
+
+    expect(
+      await screen.findByText(
+        "Your session ended. Sign in again to see the directory.",
+      ),
+    ).toBeVisible();
+  });
+
+  it("escribe en español los roles, las posiciones y los niveles", async () => {
+    stubApi({ members: [NEREA] });
+
+    await renderScreen("es");
+
+    const row = memberRow("Nerea Ruiz");
+    expect(within(row).getByRole("cell", { name: "Jugador" })).toBeVisible();
+    expect(within(row).getByRole("cell", { name: "Portería" })).toBeVisible();
+    expect(within(row).getByText(/España · Principiante/)).toBeVisible();
+    expect(screen.getByRole("radio", { name: "Comité" })).toBeVisible();
+  });
+});
+
+describe("incluir inactivos", () => {
+  it("no ofrece el control a quien no es Admin", async () => {
+    stubApi({ kind: "member", members: [MARIA] });
+
+    await renderScreen();
+
+    expect(
+      screen.queryByRole("checkbox", { name: "Include former members" }),
+    ).toBeNull();
+  });
+
+  it("enseña a los dados de baja con una marca cuando un Admin lo activa", async () => {
+    stubApi({ kind: "admin", members: [VENCIDA, ZOE] });
+    await renderScreen();
+    expect(listedNames()).toEqual(["Ana Admin"]);
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("checkbox", { name: "Include former members" }));
+
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["Ana Admin", "Zoe Zapata"]);
+    });
+    expect(lastRequest().get("includeInactive")).toBe("true");
+    expect(
+      within(memberRow("Zoe Zapata")).getByText("Former member"),
+    ).toBeVisible();
+    expect(
+      within(memberRow("Ana Admin")).queryByText("Former member"),
+    ).toBeNull();
+  });
+
+  it("señala a un Admin la fila con el registro de AUF vencido", async () => {
+    stubApi({ kind: "admin", members: [VENCIDA, MARIA_PARA_ADMIN] });
+
+    await renderScreen();
+
+    expect(
+      within(memberRow("Ana Admin")).getByText("AUF expired"),
+    ).toBeVisible();
+    expect(
+      within(memberRow("María Ñíguez")).queryByText("AUF expired"),
+    ).toBeNull();
+  });
+});

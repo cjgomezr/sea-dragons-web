@@ -37,6 +37,20 @@ export function isKnownCountryCode(value: string): boolean {
   return KNOWN_CODES.has(value.trim().toUpperCase());
 }
 
+/** El nombre visible de un país en el idioma pedido, para enseñar un código
+ * que ya está guardado (el directorio, #239). Un código que no está en el
+ * catálogo devuelve `null`: quien llama decide qué pone en su lugar, en vez de
+ * recibir de vuelta un código que nadie reconoce. */
+export function countryName(locale: string, code: string): string | null {
+  const normalized = code.trim().toUpperCase();
+  if (!KNOWN_CODES.has(normalized)) {
+    return null;
+  }
+  return (
+    new Intl.DisplayNames([locale], { type: "region" }).of(normalized) ?? null
+  );
+}
+
 export type CountryOption = {
   readonly code: CountryCode;
   readonly name: string;

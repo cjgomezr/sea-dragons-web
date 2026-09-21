@@ -374,6 +374,47 @@ export const englishMessages = {
     "Your session has ended. Sign in again to keep going.",
   "groups.error.forbidden": "Your role can't manage the club's groups.",
   "groups.error.unexpected": "We couldn't finish that. Try again in a moment.",
+
+  // El directorio del club (#239, RF-2 del PRD de E5). Los catálogos que la
+  // base guarda en inglés (el rol, la posición y el nivel) se traducen por
+  // clave: `role.*` ya existía para Mi cuenta.
+  "directory.metaTitle": "Directory · Victoria Seadragons",
+  "directory.metaDescription":
+    "Everyone in the club, with their country, level, role and position.",
+  "directory.title": "Directory",
+  "directory.lead":
+    "Everyone in the club. Search by name, filter by role and sort the list.",
+  "directory.loading": "Loading the club's directory…",
+  "directory.retry": "Try again",
+  "directory.list.title": "Club members",
+  "directory.memberCount": {
+    one: "{count} member",
+    other: "{count} members",
+  },
+  "directory.search.label": "Search by name",
+  "directory.search.placeholder": "Search members…",
+  "directory.role.legend": "Filter by role",
+  "directory.role.all": "All",
+  "directory.includeInactive": "Include former members",
+  "directory.empty": "No member matches what you're looking for.",
+  "directory.clearFilters": "Clear the filters",
+  "directory.column.member": "Member",
+  "directory.column.role": "Role",
+  "directory.column.position": "Position",
+  "directory.mark.inactive": "Former member",
+  "directory.mark.aufExpired": "AUF expired",
+  "directory.error.signInRequired":
+    "Your session ended. Sign in again to see the directory.",
+  "directory.error.forbidden": "Your account can't see the club's directory.",
+  "directory.error.unexpected":
+    "We couldn't load the club's directory. Try again.",
+  "position.Goalkeeper": "Goalkeeper",
+  "position.Defender": "Defender",
+  "position.Forward": "Forward",
+  "level.Beginner": "Beginner",
+  "level.Intermediate": "Intermediate",
+  "level.Advanced": "Advanced",
+
   "themeToggle.switchToLight": "Switch to light theme",
   "themeToggle.switchToDark": "Switch to dark theme",
   // El destino va con su propio nombre ("Español", no "Spanish"): quien no
