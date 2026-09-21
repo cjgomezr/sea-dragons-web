@@ -76,6 +76,9 @@ export const MEMBERS_API_PATH = "/api/v1/members";
  * socio. Sólo lo alcanza quien gestiona usuarios y roles. */
 export const MEMBER_ROLE_API_PATH = `${MEMBERS_API_PATH}/[id]/role`;
 
+/** El directorio del club (#239). Lo alcanza cualquier cuenta activa. */
+export const DIRECTORY_PATH = "/directorio";
+
 /** La ficha reservada al Admin de un socio (#242, RF-4 del PRD de E5): su
  * AUF y sus grupos. `[id]` es el `user_id` del socio. Cuelga de
  * `MEMBERS_API_PATH`, y se declara igual por el mismo motivo que el cambio de
@@ -85,7 +88,7 @@ export const MEMBER_RECORD_API_PATH = `${MEMBERS_API_PATH}/[id]/record`;
 /** La pantalla de esa ficha, abierta desde el directorio. El directorio lo
  * alcanza cualquier cuenta activa, pero lo que cuelga de él con un id es del
  * Admin: quien no lo es y la pide a mano vuelve al panel, como con Equipos. */
-export const MEMBER_RECORD_PATH = "/directorio/[id]";
+export const MEMBER_RECORD_PATH = `${DIRECTORY_PATH}/[id]`;
 
 /** Los grupos del club (#226, E4). Todo lo que cuelga de este camino es de
  * quien gestiona grupos: crear, listar, renombrar y borrar, y también asignar

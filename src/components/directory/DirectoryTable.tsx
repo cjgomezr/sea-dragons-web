@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { memberInitials } from "@/lib/auth/member-initials";
 import type {
   DirectoryDirection,
@@ -7,6 +8,9 @@ import type {
   DirectoryMember,
   DirectorySort,
 } from "@/lib/directory/directory";
+import { MEMBER_RECORD_PATH } from "@/lib/auth/routes";
+import { formatCalendarDay } from "@/lib/i18n/format";
+import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
 import {
   MemberRoleControl,
@@ -36,26 +40,48 @@ import {
  * cambio de rol lo comprueba igual por su cuenta.
  */
 
+/** El registro federativo de una fila, que sólo recibe un Admin (BR-008). */
+type AufView = {
+  readonly aufNumber: string | null;
+  readonly aufExpiry: string | null;
+  readonly isAufExpired: boolean;
+};
+
 /** Lo que una fila necesita saber, con lo que sólo un Admin recibe ya
- * resuelto: así la fila no tiene que volver a preguntarse quién la mira. */
+ * resuelto: así la fila no tiene que volver a preguntarse quién la mira. Con
+ * `auf` la fila es de Admin: enseña el registro, enlaza la ficha (#242) y
+ * deja cambiar el rol (#240). */
 type DirectoryRow = {
   readonly member: DirectoryMember;
-  readonly isAufExpired: boolean;
-  readonly canEditRole: boolean;
+  readonly auf: AufView | null;
 };
 
 function rowsOf(listing: DirectoryListing): readonly DirectoryRow[] {
   return listing.kind === "admin"
-    ? listing.members.map((member) => ({
-        member,
-        isAufExpired: member.isAufExpired,
-        canEditRole: true,
-      }))
-    : listing.members.map((member) => ({
-        member,
-        isAufExpired: false,
-        canEditRole: false,
-      }));
+    ? listing.members.map((member) => ({ member, auf: member }))
+    : listing.members.map((member) => ({ member, auf: null }));
+}
+
+/** La línea del AUF, con el vencimiento escrito en el idioma de la pantalla.
+ * Quien no tiene número no tiene registro: se dice, no se deja en blanco. */
+function describeAuf(
+  translate: Translator,
+  locale: Locale,
+  auf: AufView,
+): string {
+  if (auf.aufNumber === null) {
+    return translate("directory.aufMissing");
+  }
+  return auf.aufExpiry === null
+    ? translate("directory.aufWithoutExpiry", { number: auf.aufNumber })
+    : translate("directory.aufSummary", {
+        number: auf.aufNumber,
+        date: formatCalendarDay(locale, auf.aufExpiry),
+      });
+}
+
+function memberRecordHref(userId: string): string {
+  return MEMBER_RECORD_PATH.replace("[id]", userId);
 }
 
 const ARIA_SORT: Readonly<
@@ -122,7 +148,7 @@ function marksOf(translate: Translator, row: DirectoryRow): readonly RowMark[] {
           },
         ]
       : []),
-    ...(row.isAufExpired
+    ...(row.auf?.isAufExpired === true
       ? [
           {
             text: translate("directory.mark.aufExpired"),
@@ -155,12 +181,40 @@ function RowMarks({
   );
 }
 
+/** A un Admin el nombre le abre la ficha del miembro (#242). El nombre
+ * accesible dice a dónde lleva y contiene el nombre visible (WCAG 2.5.3). */
+function MemberName({
+  translate,
+  row,
+}: {
+  translate: Translator;
+  row: DirectoryRow;
+}): React.JSX.Element {
+  const { member } = row;
+  if (row.auf === null) {
+    return <span className="directory-name">{member.fullName}</span>;
+  }
+  return (
+    <Link
+      href={memberRecordHref(member.userId)}
+      className="directory-name directory-record-link"
+      aria-label={translate("memberRecord.openLabel", {
+        name: member.fullName,
+      })}
+    >
+      {member.fullName}
+    </Link>
+  );
+}
+
 function MemberRow({
   translate,
+  locale,
   row,
   roleDrafts,
 }: {
   translate: Translator;
+  locale: Locale;
   row: DirectoryRow;
   roleDrafts: RoleDraftsControl;
 }): React.JSX.Element {
@@ -180,16 +234,21 @@ function MemberRow({
             {memberInitials(member.fullName)}
           </span>
           <span className="directory-identity">
-            <span className="directory-name">{member.fullName}</span>
+            <MemberName translate={translate} row={row} />
             <span className="directory-meta">
               {`${describeCountry(translate, member.country)} · ${describeExperienceLevel(translate, member.experienceLevel)}`}
             </span>
+            {row.auf === null ? null : (
+              <span className="directory-meta">
+                {describeAuf(translate, locale, row.auf)}
+              </span>
+            )}
             <RowMarks marks={marksOf(translate, row)} />
           </span>
         </span>
       </th>
       <td className="directory-role-cell">
-        {row.canEditRole ? (
+        {row.auf !== null ? (
           <MemberRoleControl
             translate={translate}
             member={member}
@@ -210,6 +269,7 @@ function MemberRow({
 
 export function DirectoryTable({
   translate,
+  locale,
   listing,
   sort,
   direction,
@@ -217,6 +277,7 @@ export function DirectoryTable({
   onSaveRole,
 }: {
   translate: Translator;
+  locale: Locale;
   listing: DirectoryListing;
   sort: DirectorySort;
   direction: DirectoryDirection;
@@ -271,6 +332,7 @@ export function DirectoryTable({
             <MemberRow
               key={row.member.userId}
               translate={translate}
+              locale={locale}
               row={row}
               roleDrafts={roleDrafts}
             />

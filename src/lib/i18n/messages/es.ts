@@ -432,6 +432,47 @@ export const spanishMessages: MessageCatalog = {
   "directory.error.forbidden": "Tu cuenta no puede ver el directorio del club.",
   "directory.error.unexpected":
     "No pudimos cargar el directorio del club. Vuelve a intentarlo.",
+
+  // La ficha reservada al Admin (#242, RF-4 del PRD de E5).
+  "memberRecord.metaTitle": "Ficha del miembro · Victoria Seadragons",
+  "memberRecord.metaDescription":
+    "El registro AUF y los grupos de un miembro, que sólo edita un Admin.",
+  "memberRecord.back": "← Volver al directorio",
+  "memberRecord.openLabel": "Abrir la ficha de {name}",
+  "memberRecord.loading": "Cargando la ficha del miembro…",
+  "memberRecord.lead":
+    "Lo que sólo edita un Admin: el registro AUF y los grupos.",
+  "memberRecord.joinedOn": "Miembro desde el {date}",
+  "memberRecord.auf.title": "Registro AUF",
+  "memberRecord.auf.number": "Número de AUF",
+  "memberRecord.auf.expiry": "Vencimiento",
+  "memberRecord.auf.hint":
+    "Si borras el número, se borra también su vencimiento.",
+  "memberRecord.groups.legend": "Grupos",
+  "memberRecord.groups.empty": "El club todavía no tiene grupos.",
+  "memberRecord.save": "Guardar la ficha",
+  "memberRecord.saving": "Guardando…",
+  "memberRecord.saved": "Ficha guardada.",
+  "memberRecord.issue.aufNumberTooLong":
+    "El número de AUF no puede pasar de {max} caracteres.",
+  "memberRecord.issue.aufExpiryNotADate":
+    "Ese vencimiento no es una fecha válida.",
+  "memberRecord.issue.aufExpiryBeforeJoined":
+    "El vencimiento no puede ser anterior a su fecha de ingreso ({date}).",
+  "memberRecord.error.memberNotFound": "Ese miembro no está en el club.",
+  "memberRecord.error.groupNotFound":
+    "Uno de esos grupos ya no está en el club. Vuelve a cargar la ficha.",
+  "memberRecord.error.memberInactive":
+    "A un miembro dado de baja no se le pueden agregar grupos.",
+  "memberRecord.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para seguir.",
+  "memberRecord.error.forbidden":
+    "Sólo un Admin puede ver y editar esta ficha.",
+  "memberRecord.error.unexpected":
+    "No pudimos guardar la ficha. Vuelve a intentarlo.",
+  "directory.aufSummary": "AUF {number} · vence el {date}",
+  "directory.aufWithoutExpiry": "AUF {number} · sin vencimiento",
+  "directory.aufMissing": "Sin AUF",
   "themeToggle.switchToLight": "Cambiar a tema claro",
   "themeToggle.switchToDark": "Cambiar a tema oscuro",
   "languageToggle.label": "Idioma: español. Cambiar a English (EN)",

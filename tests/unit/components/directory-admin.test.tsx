@@ -557,6 +557,91 @@ describe("directorio para Admin: lecturas", () => {
   });
 });
 
+const VENCIDA: AdminDirectoryMember = {
+  ...NEREA,
+  userId: "c2c2c2c2-0000-4000-8000-00000000000c",
+  fullName: "Vera Vencida",
+  aufNumber: "AUF-7",
+  aufExpiry: "2020-01-31",
+  isAufExpired: true,
+};
+
+function memberRow(name: string): HTMLElement {
+  return screen.getByRole("row", { name });
+}
+
+describe("directorio para Admin: ficha reservada (#242)", () => {
+  it("enlaza cada miembro con su ficha", async () => {
+    stubApi({ members: [NEREA, ANA], requests: [] });
+
+    await renderAdminDirectory();
+
+    expect(
+      screen.getByRole("link", { name: "Open Nerea Ruiz's record" }),
+    ).toHaveAttribute("href", `/directorio/${NEREA_ID}`);
+    expect(
+      screen.getByRole("link", { name: "Open Ana Admin's record" }),
+    ).toHaveAttribute("href", `/directorio/${ADMIN_ID}`);
+  });
+
+  it("enseña el número de AUF y su vencimiento", async () => {
+    stubApi({ members: [ANA], requests: [] });
+
+    await renderAdminDirectory();
+
+    expect(
+      within(memberRow("Ana Admin")).getByText(
+        "AUF AUF-1 · expires 30 June 2030",
+      ),
+    ).toBeVisible();
+  });
+
+  it("dice que no tiene AUF quien no lo tiene", async () => {
+    stubApi({ members: [NEREA], requests: [] });
+
+    await renderAdminDirectory();
+
+    expect(within(memberRow("Nerea Ruiz")).getByText("No AUF")).toBeVisible();
+  });
+
+  it("dice que un AUF no tiene vencimiento cuando no lo tiene", async () => {
+    stubApi({ members: [{ ...ANA, aufExpiry: null }], requests: [] });
+
+    await renderAdminDirectory();
+
+    expect(
+      within(memberRow("Ana Admin")).getByText("AUF AUF-1 · no expiry date"),
+    ).toBeVisible();
+  });
+
+  it("marca el vencimiento pasado junto al número", async () => {
+    stubApi({ members: [VENCIDA], requests: [] });
+
+    await renderAdminDirectory();
+
+    const row = memberRow("Vera Vencida");
+    expect(
+      within(row).getByText("AUF AUF-7 · expires 31 January 2020"),
+    ).toBeVisible();
+    expect(within(row).getByText("AUF expired")).toBeVisible();
+  });
+
+  it("escribe el enlace y el AUF en español", async () => {
+    stubApi({ members: [ANA], requests: [] });
+
+    await renderAdminDirectory("es");
+
+    expect(
+      screen.getByRole("link", { name: "Abrir la ficha de Ana Admin" }),
+    ).toBeVisible();
+    expect(
+      within(memberRow("Ana Admin")).getByText(
+        "AUF AUF-1 · vence el 30 de junio de 2030",
+      ),
+    ).toBeVisible();
+  });
+});
+
 describe("directorio para quien no es Admin", () => {
   it.each(["Coach", "Committee", "Player"] as const)(
     "a un %s no le enseña la bandeja ni el control de rol",
@@ -570,6 +655,8 @@ describe("directorio para quien no es Admin", () => {
         screen.queryByRole("region", { name: "Pending requests" }),
       ).toBeNull();
       expect(screen.queryByRole("combobox")).toBeNull();
+      expect(screen.queryByRole("link", { name: /record/ })).toBeNull();
+      expect(screen.queryByText(/AUF/)).toBeNull();
       expect(
         within(screen.getByRole("row", { name: "Nerea Ruiz" })).getByRole(
           "cell",
