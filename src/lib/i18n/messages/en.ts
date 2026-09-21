@@ -305,9 +305,9 @@ export const englishMessages = {
   "position.Goalkeeper": "Goalkeeper",
   "position.Defender": "Defender",
   "position.Forward": "Forward",
-  "experienceLevel.Beginner": "Beginner",
-  "experienceLevel.Intermediate": "Intermediate",
-  "experienceLevel.Advanced": "Advanced",
+  "level.Beginner": "Beginner",
+  "level.Intermediate": "Intermediate",
+  "level.Advanced": "Advanced",
   "gender.female": "Female",
   "gender.male": "Male",
   "gender.non_binary": "Non-binary",
@@ -446,13 +446,6 @@ export const englishMessages = {
   "directory.error.forbidden": "Your account can't see the club's directory.",
   "directory.error.unexpected":
     "We couldn't load the club's directory. Try again.",
-  "position.Goalkeeper": "Goalkeeper",
-  "position.Defender": "Defender",
-  "position.Forward": "Forward",
-  "level.Beginner": "Beginner",
-  "level.Intermediate": "Intermediate",
-  "level.Advanced": "Advanced",
-
   "themeToggle.switchToLight": "Switch to light theme",
   "themeToggle.switchToDark": "Switch to dark theme",
   // El destino va con su propio nombre ("Español", no "Spanish"): quien no

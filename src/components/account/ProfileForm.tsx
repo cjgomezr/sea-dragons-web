@@ -193,7 +193,7 @@ function catalogOptions(translate: Translator): {
     })),
     experienceLevels: EXPERIENCE_LEVELS.map((value) => ({
       value,
-      label: translate(`experienceLevel.${value}`),
+      label: translate(`level.${value}`),
     })),
     genders: GENDERS.map((value) => ({
       value,
