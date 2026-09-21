@@ -3186,9 +3186,7 @@ function searchFor(term: string, emptyText: RegExp | null) {
       await expect(
         page.getByRole("row", { name: "Mateo Restrepo" }),
       ).toBeVisible();
-      await expect(page.getByRole("row", { name: "Nerea Ruiz" })).toHaveCount(
-        0,
-      );
+      await expect(page.getByRole("row", { name: "Ana Admin" })).toHaveCount(0);
     } else {
       await expect(page.getByText(emptyText)).toBeVisible();
     }

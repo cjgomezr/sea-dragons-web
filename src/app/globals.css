@@ -1410,11 +1410,16 @@ h6 {
   border: none;
 }
 
+/* La misma etiqueta que la del campo de búsqueda de al lado: los dos nombran
+   un control, y leerse distinto sólo los desalinearía. */
 .directory-roles legend {
   padding: 0;
   margin-bottom: var(--space-2);
-  font-size: 14px;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--color-text-secondary);
 }
 
@@ -1471,6 +1476,7 @@ h6 {
 .directory-empty {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-4);
 }
 
@@ -1500,9 +1506,12 @@ h6 {
   border-bottom: 1px solid var(--color-border);
 }
 
+/* El aire de la celda es el mínimo de la escala en el móvil: a 375px las tres
+   columnas se reparten poco más de 340px, y con el padding de escritorio no
+   cabría "Committee" sin partirse por la mitad. */
 .directory-table th,
 .directory-table td {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2);
   text-align: left;
   vertical-align: middle;
   overflow-wrap: anywhere;
@@ -1520,7 +1529,7 @@ h6 {
 
 .directory-table th:nth-child(2),
 .directory-table th:nth-child(3) {
-  width: 27%;
+  width: 28%;
 }
 
 .directory-sort {
@@ -1529,9 +1538,9 @@ h6 {
   gap: var(--space-1);
   width: 100%;
   min-height: var(--touch-target-min);
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2);
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--color-text-secondary);
   text-align: left;
@@ -1554,6 +1563,10 @@ h6 {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  font-weight: 400;
+}
+
+.directory-table tbody th {
   font-weight: 400;
 }
 
@@ -1615,21 +1628,23 @@ h6 {
 }
 
 /* El AUF vencido es lo único de la fila que pide hacer algo, así que es lo
-   único que lleva el color de advertencia. La palabra va igual: el color no
-   es lo que lo dice. */
+   único que lleva el color de advertencia, y lo lleva en el borde. En el
+   texto no cabe: el amarillo del tema claro da 2.56:1 sobre el panel blanco,
+   muy por debajo del mínimo AA que este proyecto se exige, y axe lo cazó. La
+   palabra dice igual lo que pasa: el color no es lo que lo cuenta. */
 .directory-mark-warning {
-  color: var(--color-warning);
+  font-weight: 700;
+  color: var(--color-text);
   border-color: var(--color-warning);
 }
 
+/* En el móvil la posición es texto a secas: la pastilla del mockup necesita
+   un ancho que a 375px sólo se consigue partiendo la palabra. Desde 768px
+   recupera su forma. */
 .directory-position {
   display: inline-block;
-  padding: 0 var(--space-2);
-  font-family: var(--font-family-mono);
   font-size: 12px;
   color: var(--color-text-secondary);
-  background: var(--color-background);
-  border-radius: var(--radius);
 }
 
 @media (min-width: 768px) {
@@ -1646,5 +1661,27 @@ h6 {
 
   .directory-table {
     font-size: 16px;
+  }
+
+  .directory-table th,
+  .directory-table td {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .directory-table th:nth-child(2),
+  .directory-table th:nth-child(3) {
+    width: 27%;
+  }
+
+  .directory-sort {
+    padding: var(--space-2) var(--space-4);
+    font-size: 12px;
+  }
+
+  .directory-position {
+    padding: 0 var(--space-2);
+    font-family: var(--font-family-mono);
+    background: var(--color-background);
+    border-radius: var(--radius);
   }
 }

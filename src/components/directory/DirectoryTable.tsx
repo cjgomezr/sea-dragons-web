@@ -149,16 +149,21 @@ function MemberRow({
   const { member } = row;
   return (
     <tr aria-label={member.fullName}>
-      <th scope="row" className="directory-member">
-        <span className="directory-avatar" aria-hidden="true">
-          {memberInitials(member.fullName)}
-        </span>
-        <span className="directory-identity">
-          <span className="directory-name">{member.fullName}</span>
-          <span className="directory-meta">
-            {`${describeCountry(translate, member.country)} · ${describeExperienceLevel(translate, member.experienceLevel)}`}
+      <th scope="row">
+        {/* La caja flexible va dentro y no en la celda: un `th` que deja de
+            ser `table-cell` no estira con su fila, y el contenido de la más
+            alta se sale por debajo del borde. */}
+        <span className="directory-member">
+          <span className="directory-avatar" aria-hidden="true">
+            {memberInitials(member.fullName)}
           </span>
-          <RowMarks marks={marksOf(translate, row)} />
+          <span className="directory-identity">
+            <span className="directory-name">{member.fullName}</span>
+            <span className="directory-meta">
+              {`${describeCountry(translate, member.country)} · ${describeExperienceLevel(translate, member.experienceLevel)}`}
+            </span>
+            <RowMarks marks={marksOf(translate, row)} />
+          </span>
         </span>
       </th>
       <td className="directory-role-cell">

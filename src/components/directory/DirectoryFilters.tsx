@@ -1,6 +1,6 @@
 "use client";
 
-import { ROLES, type Role } from "@/lib/auth/roles";
+import type { Role } from "@/lib/auth/roles";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
@@ -20,8 +20,17 @@ export type DirectoryFilterState = {
   readonly includeInactive: boolean;
 };
 
-/** "Todos" primero, que es el estado en el que llega quien abre la pantalla. */
-const ROLE_OPTIONS: readonly (Role | null)[] = [null, ...ROLES];
+/** El orden del mockup y del ticket: "Todos" primero, que es el estado en el
+ * que llega quien abre la pantalla, y después del rol más común al menos. No
+ * es el de `ROLES`, que es el de la matriz de permisos del SRD y el que el
+ * servidor usa para ordenar la columna: aquí manda a quién se busca más. */
+const ROLE_OPTIONS: readonly (Role | null)[] = [
+  null,
+  "Player",
+  "Coach",
+  "Committee",
+  "Admin",
+];
 
 const SEARCH_FIELD_ID = "directorio-buscar";
 const INACTIVE_FIELD_ID = "directorio-inactivos";
