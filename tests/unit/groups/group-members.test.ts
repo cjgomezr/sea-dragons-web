@@ -23,7 +23,11 @@ const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
 const GROUP_ID = "9a9a9a9a-0000-4000-8000-000000000009";
 const MEMBER_ID = "b1b1b1b1-0000-4000-8000-00000000000b";
 
-const PAULA: GroupMember = { id: MEMBER_ID, fullName: "Paula Player" };
+const PAULA: GroupMember = {
+  id: MEMBER_ID,
+  fullName: "Paula Player",
+  isPendingActivation: false,
+};
 
 type GatewayOptions = {
   readonly role?: Role;
@@ -109,13 +113,13 @@ describe("socios de un grupo: asignar", () => {
     },
   );
 
-  it("permite asignar a un socio con la cuenta incompleta", async () => {
+  it("permite asignar a un socio con la cuenta incompleta y lo marca pendiente de activar", async () => {
     const member = await assignGroupMember(
       gateways({ memberStatus: "incomplete" }),
       REQUEST,
     );
 
-    expect(member).toEqual(PAULA);
+    expect(member).toEqual({ ...PAULA, isPendingActivation: true });
     expect(writes).toEqual([{ kind: "insert", ...MEMBERSHIP }]);
   });
 

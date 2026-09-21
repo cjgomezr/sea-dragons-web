@@ -380,6 +380,7 @@ export const spanishMessages: MessageCatalog = {
     "Este grupo todavía no tiene miembros. Agrega el primero desde la lista.",
   "groups.members.close": "Cerrar el grupo",
   "groups.members.remove": "Quitar",
+  "groups.members.pendingActivation": "Pendiente de activar",
   "groups.members.removeLabel": "Quitar a {name} del grupo",
   "groups.members.removing": "Quitando…",
   "groups.members.addLabel": "Miembro para agregar",
@@ -427,6 +428,7 @@ export const spanishMessages: MessageCatalog = {
   "directory.column.position": "Posición",
   "directory.mark.inactive": "De baja",
   "directory.mark.aufExpired": "AUF vencido",
+  "directory.mark.pendingActivation": "Pendiente de activar",
   "directory.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para ver el directorio.",
   "directory.error.forbidden": "Tu cuenta no puede ver el directorio del club.",

@@ -16,11 +16,26 @@ import { GroupNotFoundError, findGroupManager } from "./groups";
 export type GroupMember = {
   readonly id: string;
   readonly fullName: string;
+  /** La cuenta todavía no está activa: el alta de un Admin (#243) o un
+   * registro a medias. Pertenece al grupo, pero no cuenta como miembro activo
+   * en su conteo. */
+  readonly isPendingActivation: boolean;
 };
 
-export type ClubMember = GroupMember & {
+export type ClubMember = {
+  readonly id: string;
+  readonly fullName: string;
   readonly accountStatus: AccountStatus;
 };
+
+/** Lo que se enseña de un socio del club a quien gestiona grupos. */
+export function toGroupMember(member: ClubMember): GroupMember {
+  return {
+    id: member.id,
+    fullName: member.fullName,
+    isPendingActivation: member.accountStatus === "incomplete",
+  };
+}
 
 export type GroupScope = { readonly clubId: string; readonly groupId: string };
 export type Membership = GroupScope & { readonly userId: string };
@@ -147,7 +162,7 @@ export async function assignGroupMember(
   const result = await gateways.groupMembers.insertMembership(membership);
   switch (result.kind) {
     case "assigned":
-      return { id: member.id, fullName: member.fullName };
+      return toGroupMember(member);
     case "group_not_found":
       throw new GroupNotFoundError();
     case "member_not_found":

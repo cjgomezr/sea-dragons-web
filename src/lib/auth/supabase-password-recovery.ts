@@ -80,7 +80,7 @@ export function isRejectedNewPassword(error: AuthError): boolean {
   return REJECTED_PASSWORD_CODES.includes(error.code ?? "");
 }
 
-function createRecoveryTokenIssuer(
+export function createRecoveryTokenIssuer(
   serviceClient: SupabaseClient,
 ): RecoveryTokenIssuer {
   return {
@@ -170,7 +170,7 @@ async function closeRedemptionSession(client: SupabaseClient): Promise<void> {
   }
 }
 
-function createRecoveryTokenRedeemer(anon: {
+export function createRecoveryTokenRedeemer(anon: {
   readonly url: string;
   readonly anonKey: string;
 }): RecoveryTokenRedeemer {

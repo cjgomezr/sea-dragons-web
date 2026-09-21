@@ -1157,6 +1157,11 @@ h6 {
   overflow-wrap: anywhere;
 }
 
+.admin-member-status {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
 .admin-member-role {
   flex: 1 1 auto;
   min-height: var(--touch-target-min);

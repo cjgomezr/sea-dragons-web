@@ -20,7 +20,7 @@ const GROUPS_TABLE = "groups";
 const MEMBERSHIPS_TABLE = "group_memberships";
 const MEMBERS_TABLE = "members";
 const GROUP_COLUMNS = "id, name";
-const INACTIVE_STATUS = "inactive";
+const ACTIVE_STATUS = "active";
 
 /** El código de Postgres de una violación de unicidad, y el índice del nombre
  * por club. Se mira el nombre para no confundir este choque con otro. */
@@ -54,7 +54,7 @@ function isGroupNameViolation(error: {
   );
 }
 
-async function readInactiveMemberIds(
+async function readActiveMemberIds(
   serviceClient: SupabaseClient,
   clubId: string,
 ): Promise<ReadonlySet<string>> {
@@ -62,10 +62,10 @@ async function readInactiveMemberIds(
     .from(MEMBERS_TABLE)
     .select("user_id")
     .eq("club_id", clubId)
-    .eq("account_status", INACTIVE_STATUS);
+    .eq("account_status", ACTIVE_STATUS);
   if (error) {
     throw new Error(
-      `No se pudieron leer los socios dados de baja del club ${clubId}: ${error.message}`,
+      `No se pudieron leer los socios activos del club ${clubId}: ${error.message}`,
     );
   }
   return new Set(
@@ -74,7 +74,9 @@ async function readInactiveMemberIds(
 }
 
 /**
- * Cuántos socios que no están dados de baja tiene cada grupo del club.
+ * Cuántos socios activos tiene cada grupo del club. No cuentan los dados de
+ * baja (RF-3 de E4) ni los que todavía no activaron su cuenta, como el
+ * miembro recién dado de alta por un Admin (#243).
  *
  * Son dos consultas fijas y no una que incruste `members` en las pertenencias:
  * esa relación va por una clave foránea compuesta contra una restricción única,
@@ -86,12 +88,12 @@ async function readActiveMemberCounts(
   serviceClient: SupabaseClient,
   clubId: string,
 ): Promise<ReadonlyMap<string, number>> {
-  const [memberships, inactiveIds] = await Promise.all([
+  const [memberships, activeIds] = await Promise.all([
     serviceClient
       .from(MEMBERSHIPS_TABLE)
       .select("group_id, user_id")
       .eq("club_id", clubId),
-    readInactiveMemberIds(serviceClient, clubId),
+    readActiveMemberIds(serviceClient, clubId),
   ]);
   if (memberships.error) {
     throw new Error(
@@ -100,7 +102,7 @@ async function readActiveMemberCounts(
   }
   const counts = new Map<string, number>();
   for (const row of memberships.data as Row[]) {
-    if (inactiveIds.has(readRequiredText(row, "user_id", MEMBERSHIPS_TABLE))) {
+    if (!activeIds.has(readRequiredText(row, "user_id", MEMBERSHIPS_TABLE))) {
       continue;
     }
     const groupId = readRequiredText(row, "group_id", MEMBERSHIPS_TABLE);

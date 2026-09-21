@@ -21,8 +21,9 @@ export const GROUP_NAME_MAX_LENGTH = 60;
 
 const CONTROL_CHARACTER = /\p{Cc}/u;
 
-/** Un grupo con cuántos socios cuenta. Los dados de baja (`inactive`) siguen
- * asignados, pero no cuentan (RF-3). */
+/** Un grupo con cuántos socios activos cuenta. Los dados de baja (`inactive`,
+ * RF-3) y los pendientes de activar (`incomplete`, #243) siguen asignados,
+ * pero no cuentan. */
 export type Group = {
   readonly id: string;
   readonly name: string;

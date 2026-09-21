@@ -570,6 +570,22 @@ describe("incluir inactivos", () => {
     expect(lastRequest().get("includeInactive")).toBeNull();
   });
 
+  it("marca como pendiente de activar a quien todavía no entró", async () => {
+    stubApi({
+      kind: "member",
+      members: [MARIA, { ...NEREA, status: "incomplete" }],
+    });
+
+    await renderScreen();
+
+    expect(
+      within(memberRow("Nerea Ruiz")).getByText("Pending activation"),
+    ).toBeVisible();
+    expect(
+      within(memberRow("María Ñíguez")).queryByText("Pending activation"),
+    ).toBeNull();
+  });
+
   it("señala a un Admin la fila con el registro de AUF vencido", async () => {
     stubApi({ kind: "admin", members: [VENCIDA, MARIA_PARA_ADMIN] });
 

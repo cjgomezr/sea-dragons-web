@@ -79,6 +79,11 @@ function MemberRow({
       </span>
       <div className="admin-member-identity">
         <span className="admin-member-name">{member.fullName}</span>
+        {member.isPendingActivation ? (
+          <span className="admin-member-status">
+            {translate("groups.members.pendingActivation")}
+          </span>
+        ) : null}
       </div>
       <button
         type="button"
@@ -205,7 +210,11 @@ export function GroupMembersPanel({
   function applyRoster(roster: GroupRoster): void {
     setState({ kind: "ready", ...roster });
     setFailure(null);
-    onMemberCountChange(roster.members.length);
+    // El mismo conteo que el servidor: quien no activó su cuenta está en el
+    // grupo, pero no cuenta.
+    onMemberCountChange(
+      roster.members.filter((member) => !member.isPendingActivation).length,
+    );
   }
 
   function add(roster: GroupRoster, candidate: GroupMember): void {

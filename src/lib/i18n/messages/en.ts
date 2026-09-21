@@ -387,6 +387,7 @@ export const englishMessages = {
     "This group has no members yet. Add the first one from the list.",
   "groups.members.close": "Close the group",
   "groups.members.remove": "Remove",
+  "groups.members.pendingActivation": "Pending activation",
   "groups.members.removeLabel": "Remove {name} from the group",
   "groups.members.removing": "Removing…",
   "groups.members.addLabel": "Member to add",
@@ -433,6 +434,7 @@ export const englishMessages = {
   "directory.column.position": "Position",
   "directory.mark.inactive": "Former member",
   "directory.mark.aufExpired": "AUF expired",
+  "directory.mark.pendingActivation": "Pending activation",
   "directory.error.signInRequired":
     "Your session ended. Sign in again to see the directory.",
   "directory.error.forbidden": "Your account can't see the club's directory.",

@@ -21,8 +21,13 @@ const MEMBER_ID = "b1b1b1b1-0000-4000-8000-00000000000b";
 const ANA: GroupMember = {
   id: "c2c2c2c2-0000-4000-8000-00000000000c",
   fullName: "Ana Active",
+  isPendingActivation: false,
 };
-const PAULA: GroupMember = { id: MEMBER_ID, fullName: "Paula Player" };
+const PAULA: GroupMember = {
+  id: MEMBER_ID,
+  fullName: "Paula Player",
+  isPendingActivation: false,
+};
 
 type WiringOptions = {
   readonly callerRole?: Role;
