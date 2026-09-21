@@ -3735,9 +3735,12 @@ test.describe("un Admin frente a la ficha con los datos de verdad", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
     await openOwnRecordLink(page).click();
+    // Es la primera petición de la corrida a los endpoints reales de la ficha
+    // y de los grupos (las capturas los fingen): el dev server los compila
+    // aquí, y bajo carga paralela pasa de los 5 s por defecto.
     await expect(
       page.getByRole("heading", { level: 1, name: ADMINISTRATION_ADMIN_NAME }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: ACCOUNT_CHANGE_TIMEOUT_MS });
 
     const aufNumber = `AUF-E2E-${Date.now()}`;
     await page.getByLabel("AUF number").fill(aufNumber);
