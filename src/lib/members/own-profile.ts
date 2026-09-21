@@ -87,11 +87,13 @@ export type OwnProfileGateways = {
 };
 
 /** Los caracteres del nombre que se guardaría, contados como `char_length`:
- * un emoji es uno. El formulario lo usa para avisar antes de enviar. */
-export function countFullNameCharacters(fullName: string): number {
+ * un emoji es uno. */
+function countFullNameCharacters(fullName: string): number {
   return [...fullName.trim()].length;
 }
 
+/** La usan el formulario, para avisar antes de enviar, y el dominio, para
+ * rechazar lo que llegue sin pasar por él. */
 export function validateFullName(fullName: string): ProfileIssueCode | null {
   const length = countFullNameCharacters(fullName);
   if (length === 0) {
