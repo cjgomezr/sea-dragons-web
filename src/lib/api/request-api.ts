@@ -1,3 +1,4 @@
+import type { z } from "zod";
 import {
   type RequestFailure,
   readRequestFailure,
@@ -56,4 +57,23 @@ export async function requestApi(
     };
   }
   return { kind: "ok", payload };
+}
+
+/** El cuerpo de una respuesta, estrechado contra lo que la pantalla sabe
+ * pintar. Un cuerpo que no cuadra no se adivina: vale tanto como un fallo.
+ *
+ * Vive aquí y no en cada cliente de pantalla porque ya iba por la tercera
+ * copia (grupos, administración y el directorio de #239), que es donde
+ * CLAUDE.md pide extraer. */
+export function readApiPayload<Value>(
+  outcome: ApiRequestOutcome,
+  schema: z.ZodType<Value>,
+): { readonly kind: "ok"; readonly value: Value } | ApiRequestFailure {
+  if (outcome.kind === "failed") {
+    return outcome;
+  }
+  const parsed = schema.safeParse(outcome.payload);
+  return parsed.success
+    ? { kind: "ok", value: parsed.data }
+    : UNRECOGNIZED_RESPONSE;
 }

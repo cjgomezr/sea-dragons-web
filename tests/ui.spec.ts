@@ -3178,3 +3178,364 @@ test.describe("un Player frente a la sección Grupos", () => {
     expect(groups.status()).toBe(403);
   });
 });
+/* ---------------------------------------------------------------------------
+   El directorio del club (#239). Mockup: docs/mockups/directory-light.png y
+   directory-dark.png, del que quedan fuera las columnas de OVR y asistencia
+   (son de E9 y E8) y el botón de alta, que llega en su propio ticket.
+
+   Las capturas leen datos fijos, servidos por `page.route`: el directorio
+   enseña a TODO el club, así que una captura cambiaría con cada socio que
+   cualquier otro test sembrara. Lo que el endpoint de verdad responde se
+   prueba aparte, con las sesiones sembradas.
+   --------------------------------------------------------------------------- */
+
+const DIRECTORY_SCREEN_PATH = "/directorio";
+const DIRECTORY_ENDPOINT = "/api/v1/directory";
+
+/** Un nombre de los que rompen una fila estrecha, para el criterio de los
+ * 375px y el caso de contenido largo de design-system.md. */
+const LONG_MEMBER_NAME = "Tomás Errekondo Aranburu de la Hoz";
+
+/** Sin país, sin nivel y sin posición: los tres huecos que la fila rellena
+ * con un guion. */
+const MEMBER_WITHOUT_DATA = {
+  userId: "44444444-0000-4000-8000-000000000004",
+  fullName: LONG_MEMBER_NAME,
+  country: null,
+  experienceLevel: null,
+  role: "Player",
+  position: null,
+  status: "active",
+} as const;
+
+const STUBBED_DIRECTORY_MEMBERS = [
+  {
+    userId: "11111111-0000-4000-8000-000000000001",
+    fullName: "Ana Admin",
+    country: "AU",
+    experienceLevel: "Advanced",
+    role: "Admin",
+    position: "Defender",
+    status: "active",
+  },
+  {
+    userId: "22222222-0000-4000-8000-000000000002",
+    fullName: "Mateo Restrepo",
+    country: "CO",
+    experienceLevel: "Advanced",
+    role: "Coach",
+    position: "Forward",
+    status: "active",
+  },
+  {
+    userId: "33333333-0000-4000-8000-000000000003",
+    fullName: "Nerea Ruiz",
+    country: "ES",
+    experienceLevel: "Beginner",
+    role: "Player",
+    position: "Goalkeeper",
+    status: "active",
+  },
+  MEMBER_WITHOUT_DATA,
+  {
+    userId: "55555555-0000-4000-8000-000000000005",
+    fullName: "Zoe Zapata",
+    country: "AU",
+    experienceLevel: "Intermediate",
+    role: "Committee",
+    position: "Defender",
+    status: "inactive",
+  },
+] as const;
+
+/** La única fila con el registro federativo vencido, que es la que la captura
+ * del Admin tiene que enseñar señalada (BR-008). */
+const EXPIRED_AUF_MEMBER_ID = "11111111-0000-4000-8000-000000000001";
+
+function asAdminMember(
+  member: (typeof STUBBED_DIRECTORY_MEMBERS)[number],
+): Record<string, unknown> {
+  const isAufExpired = member.userId === EXPIRED_AUF_MEMBER_ID;
+  return {
+    ...member,
+    aufNumber: `AUF-${member.userId.slice(0, 2)}`,
+    aufExpiry: isAufExpired ? "2020-01-31" : "2030-06-30",
+    isAufExpired,
+  };
+}
+
+function normalizeName(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
+/** Lo que el endpoint de #238 hace con la consulta, reducido a lo que estas
+ * capturas necesitan distinguir. El orden lo decide el servidor, así que la
+ * lista sale en el orden en que está escrita, que ya es el alfabético. */
+function stubbedListing(
+  searchParams: URLSearchParams,
+  asAdmin: boolean,
+): Record<string, unknown> {
+  const search = searchParams.get("q");
+  const role = searchParams.get("role");
+  const includeInactive = searchParams.get("includeInactive") === "true";
+  const members = STUBBED_DIRECTORY_MEMBERS.filter(
+    (member) =>
+      (role === null || member.role === role) &&
+      (includeInactive || member.status !== "inactive") &&
+      (search === null ||
+        normalizeName(member.fullName).includes(normalizeName(search))),
+  );
+  return {
+    kind: asAdmin ? "admin" : "member",
+    members: asAdmin ? members.map(asAdminMember) : members,
+  };
+}
+
+async function stubDirectoryReads(
+  page: Page,
+  options: { readonly asAdmin: boolean },
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === DIRECTORY_ENDPOINT,
+    (route, request) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: stubbedListing(
+            new URL(request.url()).searchParams,
+            options.asAdmin,
+          ),
+        }),
+      }),
+  );
+}
+
+const ENGLISH_DIRECTORY_HEADING = "Club members";
+const SPANISH_DIRECTORY_HEADING = "Miembros del club";
+
+/** La pantalla pide su lista al montarse, así que hasta que llega sólo dice
+ * que está cargando. Sin esperarla, la captura sale de ese estado. */
+async function waitForDirectory(page: Page, heading: string): Promise<void> {
+  await expect(page.getByRole("region", { name: heading })).toBeVisible();
+  await expect(page.getByRole("table")).toBeVisible();
+}
+
+/** Escribe en la búsqueda y espera al desenlace: la tabla recortada, o la
+ * frase de que nadie coincide. */
+function searchFor(term: string, emptyText: RegExp | null) {
+  return async (page: Page): Promise<void> => {
+    await page.getByRole("searchbox").fill(term);
+    if (emptyText === null) {
+      await expect(
+        page.getByRole("row", { name: "Mateo Restrepo" }),
+      ).toBeVisible();
+      await expect(page.getByRole("row", { name: "Ana Admin" })).toHaveCount(0);
+    } else {
+      await expect(page.getByText(emptyText)).toBeVisible();
+    }
+  };
+}
+
+function includeFormerMembers(label: string) {
+  return async (page: Page): Promise<void> => {
+    await page.getByRole("checkbox", { name: label }).check();
+    await expect(page.getByRole("row", { name: "Zoe Zapata" })).toBeVisible();
+  };
+}
+
+type DirectoryState = {
+  readonly name: string;
+  /** Un Admin recibe la lista marcada como suya, y con ella el control de los
+   * dados de baja y la marca del AUF vencido. */
+  readonly asAdmin: boolean;
+  readonly listHeading: string;
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+  readonly prepare?: (page: Page) => Promise<void>;
+};
+
+const DIRECTORY_STATES: readonly DirectoryState[] = [
+  {
+    name: "directorio-con-miembros",
+    asAdmin: false,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+  },
+  {
+    name: "directorio-con-miembros-es",
+    asAdmin: false,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "directorio-filtrado",
+    asAdmin: false,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: searchFor("re", null),
+  },
+  {
+    name: "directorio-sin-resultados",
+    asAdmin: false,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: searchFor("zzz", /No member matches/),
+  },
+  {
+    name: "directorio-sin-resultados-es",
+    asAdmin: false,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: searchFor("zzz", /Nadie del club coincide/),
+  },
+  {
+    name: "directorio-con-inactivos",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: includeFormerMembers("Include former members"),
+  },
+  {
+    name: "directorio-con-inactivos-es",
+    asAdmin: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: includeFormerMembers("Incluir a quienes están de baja"),
+  },
+];
+
+async function goToDirectory(
+  page: Page,
+  state: DirectoryState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await stubDirectoryReads(page, state);
+  await state.beforeVisit?.(page);
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, DIRECTORY_SCREEN_PATH, theme);
+  }
+  await waitForDirectory(page, state.listHeading);
+  await state.prepare?.(page);
+}
+
+for (const state of DIRECTORY_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToDirectory(page, state, theme);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToDirectory(page, state);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToDirectory(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("el directorio con los datos de verdad", () => {
+  skipWithoutSession();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("un Admin lo abre desde la barra lateral", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${APP_URL}/dashboard`);
+
+    await page
+      .getByRole("navigation", { name: "Main" })
+      .getByRole("link", { name: "Directory" })
+      .click();
+
+    await expect(page).toHaveURL(new RegExp(`${DIRECTORY_SCREEN_PATH}$`));
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Directory" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: ENGLISH_DIRECTORY_HEADING }),
+    ).toBeVisible();
+  });
+
+  test("en español, la pantalla sale en español", async ({ page }) => {
+    await chooseSpanish(page);
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Directorio" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: SPANISH_DIRECTORY_HEADING }),
+    ).toBeVisible();
+  });
+
+  test("un Admin encuentra el control de los dados de baja", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+
+    await expect(
+      page.getByRole("checkbox", { name: "Include former members" }),
+    ).toBeVisible();
+  });
+});
+
+test.describe("un Player frente al directorio", () => {
+  skipWithoutSession();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("lo alcanza, porque el club puede verse a sí mismo", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+
+    await expect(page).toHaveURL(new RegExp(`${DIRECTORY_SCREEN_PATH}$`));
+    await expect(
+      page.getByRole("heading", { name: ENGLISH_DIRECTORY_HEADING }),
+    ).toBeVisible();
+  });
+
+  test("no le ofrece el control de los dados de baja", async ({ page }) => {
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+    await expect(
+      page.getByRole("heading", { name: ENGLISH_DIRECTORY_HEADING }),
+    ).toBeVisible();
+
+    await expect(
+      page.getByRole("checkbox", { name: "Include former members" }),
+    ).toHaveCount(0);
+  });
+
+  test("la lista le responde 200", async ({ request }) => {
+    const directory = await request.get(`${APP_URL}${DIRECTORY_ENDPOINT}`);
+
+    expect(directory.status()).toBe(200);
+  });
+});
