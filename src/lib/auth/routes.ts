@@ -84,6 +84,15 @@ export const MEMBER_ROLE_API_PATH = `${MEMBERS_API_PATH}/[id]/role`;
  * y quitar socios cuando llegue su ticket. */
 export const GROUPS_API_PATH = "/api/v1/groups";
 
+/** El directorio del club (#238, FR-015 a FR-019). Lo alcanza cualquier
+ * cuenta activa, de cualquier rol, así que no aparece en `RESTRICTED_ROUTES`:
+ * un club que no puede verse a sí mismo no es un club. Va fuera de
+ * `/api/v1/members`, que sigue reservado a quien gestiona usuarios y roles.
+ * Lo que dentro del directorio es de un Admin (el número de AUF y los socios
+ * dados de baja) lo decide el handler leyendo el rol de quien llama, porque
+ * la frontera decide por camino y aquí los dos casos comparten el mismo. */
+export const DIRECTORY_API_PATH = "/api/v1/directory";
+
 /** Los grupos de quien llama (#229, RF-8 del PRD de E4). Va fuera de
  * `/api/v1/groups`, que es de quien gestiona grupos, porque lo alcanza
  * cualquier cuenta activa: por eso no aparece en `RESTRICTED_ROUTES`. Una
