@@ -262,7 +262,7 @@ describe("etiqueta corta para la barra móvil (#85)", () => {
   it("acorta Directorio y Directory, que pasan del margen como pestaña fija (#213)", () => {
     const directorio = sectionAt("/directorio");
 
-    expect(getMobileLabel(directorio, spanish)).toBe("Miembros");
+    expect(getMobileLabel(directorio, spanish)).toBe("Gente");
     expect(getMobileLabel(directorio, english)).toBe("People");
   });
 

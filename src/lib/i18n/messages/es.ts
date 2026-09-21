@@ -222,10 +222,10 @@ export const spanishMessages: MessageCatalog = {
   // nombre.
   "nav.label.calendarShort": "Agenda",
   // Directorio sólo es pestaña fija para los roles que no ven Equipos (#213).
-  // Mide casi lo que "Calendario", que se partía, así que tampoco cabe.
-  // "Miembros" (#246) cabe a 360px como pestaña fija; lo miden los tests
-  // de geometría de Playwright, no el número de letras.
-  "nav.label.directoryShort": "Miembros",
+  // Ni "Directorio" ni "Miembros" caben a 360px: el segundo llegó al 92% de
+  // su pestaña con las fuentes de Linux y el guardián de geometría corta en
+  // el 85% (#246). "Gente" es lo que dice el inglés ("People") y deja sitio.
+  "nav.label.directoryShort": "Gente",
   "app.metaDescription":
     "Plataforma del club de rugby subacuático Victoria Seadragons (Melbourne).",
   "section.underConstruction": "Esta sección está en construcción.",
