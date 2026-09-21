@@ -3,7 +3,7 @@ import type { RequestFailure } from "@/components/auth/request-failure";
 import {
   type ApiRequestFailure,
   JSON_REQUEST_HEADERS,
-  UNRECOGNIZED_RESPONSE,
+  readApiPayload,
   requestApi,
 } from "@/lib/api/request-api";
 import type {
@@ -87,23 +87,21 @@ export async function loadAdministration(): Promise<AdministrationLoad> {
     requestApi(PENDING_REQUESTS_PATH),
     requestApi(MEMBERS_API_PATH),
   ]);
-  if (pending.kind === "failed") {
-    return pending;
+  // `readApiPayload` devuelve tal cual el fallo de red o de HTTP que traiga
+  // cada mitad, así que no hace falta mirarlo antes por separado.
+  const readRequests = readApiPayload(pending, pendingRequestsSchema);
+  if (readRequests.kind === "failed") {
+    return readRequests;
   }
-  if (members.kind === "failed") {
-    return members;
-  }
-
-  const parsedRequests = pendingRequestsSchema.safeParse(pending.payload);
-  const parsedMembers = clubMembersSchema.safeParse(members.payload);
-  if (!parsedRequests.success || !parsedMembers.success) {
-    return UNRECOGNIZED_RESPONSE;
+  const readMembers = readApiPayload(members, clubMembersSchema);
+  if (readMembers.kind === "failed") {
+    return readMembers;
   }
   return {
     kind: "loaded",
     data: {
-      requests: parsedRequests.data.data.requests,
-      members: parsedMembers.data.data.members,
+      requests: readRequests.value.data.requests,
+      members: readMembers.value.data.members,
     },
   };
 }
@@ -138,10 +136,10 @@ export async function submitMemberRole(
   if (outcome.kind === "failed") {
     return outcome;
   }
-  const parsed = memberRoleSchema.safeParse(outcome.payload);
-  return parsed.success
-    ? { kind: "changed", role: parsed.data.data.role }
-    : UNRECOGNIZED_RESPONSE;
+  const read = readApiPayload(outcome, memberRoleSchema);
+  return read.kind === "failed"
+    ? read
+    : { kind: "changed", role: read.value.data.role };
 }
 
 /** Una solicitud que el servidor dice que ya no está pendiente no vuelve a la

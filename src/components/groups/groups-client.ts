@@ -3,7 +3,7 @@ import {
   type ApiRequestFailure,
   type ApiRequestOutcome,
   JSON_REQUEST_HEADERS,
-  UNRECOGNIZED_RESPONSE,
+  readApiPayload,
   requestApi,
 } from "@/lib/api/request-api";
 import { GROUPS_API_PATH } from "@/lib/auth/routes";
@@ -79,21 +79,6 @@ function membershipPath(groupId: string, userId: string): string {
   return `${groupPath(groupId)}/members/${userId}`;
 }
 
-/** El cuerpo de una respuesta, estrechado contra lo que la pantalla sabe
- * pintar. Un cuerpo que no cuadra no se adivina: vale tanto como un fallo. */
-function readPayload<Value>(
-  outcome: ApiRequestOutcome,
-  schema: z.ZodType<Value>,
-): { readonly kind: "ok"; readonly value: Value } | GroupsFailure {
-  if (outcome.kind === "failed") {
-    return outcome;
-  }
-  const parsed = schema.safeParse(outcome.payload);
-  return parsed.success
-    ? { kind: "ok", value: parsed.data }
-    : UNRECOGNIZED_RESPONSE;
-}
-
 function writeName(
   path: string,
   method: "POST" | "PATCH",
@@ -111,7 +96,7 @@ async function saveGroup(
   method: "POST" | "PATCH",
   name: string,
 ): Promise<GroupSaved> {
-  const read = readPayload(
+  const read = readApiPayload(
     await writeName(path, method, name),
     singleGroupSchema,
   );
@@ -121,7 +106,7 @@ async function saveGroup(
 }
 
 export async function loadGroups(): Promise<GroupsLoad> {
-  const read = readPayload(await requestApi(GROUPS_API_PATH), groupsSchema);
+  const read = readApiPayload(await requestApi(GROUPS_API_PATH), groupsSchema);
   return read.kind === "failed"
     ? read
     : { kind: "loaded", groups: read.value.data.groups };
@@ -152,11 +137,11 @@ export async function loadGroupRoster(
     requestApi(`${groupPath(groupId)}/members`),
     requestApi(`${groupPath(groupId)}/candidates`),
   ]);
-  const readMembers = readPayload(members, membersSchema);
+  const readMembers = readApiPayload(members, membersSchema);
   if (readMembers.kind === "failed") {
     return readMembers;
   }
-  const readCandidates = readPayload(candidates, candidatesSchema);
+  const readCandidates = readApiPayload(candidates, candidatesSchema);
   if (readCandidates.kind === "failed") {
     return readCandidates;
   }
@@ -171,7 +156,7 @@ export async function assignMember(
   groupId: string,
   userId: string,
 ): Promise<MemberAssigned> {
-  const read = readPayload(
+  const read = readApiPayload(
     await requestApi(membershipPath(groupId, userId), { method: "PUT" }),
     singleMemberSchema,
   );
