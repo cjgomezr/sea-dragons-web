@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from "react";
 import { memberInitials } from "@/lib/auth/member-initials";
 import type { GroupMember } from "@/lib/groups/group-members";
 import type { Group } from "@/lib/groups/groups";
-import { compareNames } from "@/lib/groups/name-order";
+import { compareNames } from "@/lib/text/name-order";
 import type { Translator } from "@/lib/i18n/translator";
 import {
   type GroupRoster,

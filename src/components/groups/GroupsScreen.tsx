@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Group } from "@/lib/groups/groups";
-import { compareNames } from "@/lib/groups/name-order";
+import { compareNames } from "@/lib/text/name-order";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import { GroupList } from "./GroupList";

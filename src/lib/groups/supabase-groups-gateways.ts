@@ -3,8 +3,8 @@ import { readRequiredText } from "@/lib/auth/supabase-auth-gateways";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
+import { compareNames } from "@/lib/text/name-order";
 import type { Group, GroupsGateways } from "./groups";
-import { compareNames } from "./name-order";
 
 /**
  * Adaptadores entre los grupos y Supabase.
