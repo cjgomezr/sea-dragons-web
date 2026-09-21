@@ -306,35 +306,39 @@ export function MemberRecordForm({
         onSubmit={handleSubmit}
         noValidate
       >
-        <section className="auth-fields" aria-labelledby="ficha-auf">
-          <h2 id="ficha-auf">{translate("memberRecord.auf.title")}</h2>
-          <TextField
-            id={AUF_NUMBER_ID}
-            label={translate("memberRecord.auf.number")}
-            type="text"
-            value={draft.aufNumber}
-            issueText={issueTextFor("aufNumber")}
-            hintId={AUF_HINT_ID}
-            onChange={(aufNumber) => update({ aufNumber })}
+        {/* Mientras se guarda no se edita: lo que se escribiera ahora lo
+            pisaría la ficha que devuelva el servidor. */}
+        <fieldset className="member-record-fields" disabled={isSending}>
+          <section className="auth-fields" aria-labelledby="ficha-auf">
+            <h2 id="ficha-auf">{translate("memberRecord.auf.title")}</h2>
+            <TextField
+              id={AUF_NUMBER_ID}
+              label={translate("memberRecord.auf.number")}
+              type="text"
+              value={draft.aufNumber}
+              issueText={issueTextFor("aufNumber")}
+              hintId={AUF_HINT_ID}
+              onChange={(aufNumber) => update({ aufNumber })}
+            />
+            <TextField
+              id={AUF_EXPIRY_ID}
+              label={translate("memberRecord.auf.expiry")}
+              type="date"
+              value={draft.aufExpiry}
+              issueText={issueTextFor("aufExpiry")}
+              onChange={(aufExpiry) => update({ aufExpiry })}
+            />
+            <p className="auth-hint" id={AUF_HINT_ID}>
+              {translate("memberRecord.auf.hint")}
+            </p>
+          </section>
+          <GroupsField
+            translate={translate}
+            clubGroups={clubGroups}
+            chosen={draft.groupIds}
+            onToggle={toggleGroup}
           />
-          <TextField
-            id={AUF_EXPIRY_ID}
-            label={translate("memberRecord.auf.expiry")}
-            type="date"
-            value={draft.aufExpiry}
-            issueText={issueTextFor("aufExpiry")}
-            onChange={(aufExpiry) => update({ aufExpiry })}
-          />
-          <p className="auth-hint" id={AUF_HINT_ID}>
-            {translate("memberRecord.auf.hint")}
-          </p>
-        </section>
-        <GroupsField
-          translate={translate}
-          clubGroups={clubGroups}
-          chosen={draft.groupIds}
-          onToggle={toggleGroup}
-        />
+        </fieldset>
         <SaveOutcome translate={translate} status={status} />
         <button type="submit" className="auth-submit" disabled={isSending}>
           {translate(isSending ? "memberRecord.saving" : "memberRecord.save")}

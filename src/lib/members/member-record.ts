@@ -312,6 +312,10 @@ export async function updateMemberRecord(
   const groupIds = new Set(request.submission.groupIds);
   await assertClubGroups(gateways, caller.clubId, groupIds);
 
+  // Los grupos van antes que el AUF porque son lo único que una regla puede
+  // rechazar a estas alturas. Si el socio desapareciera justo en medio, el
+  // 404 del AUF llega con sus pertenencias ya cambiadas, pero las de una fila
+  // borrada se van con ella por la cascada.
   await applyGroupChanges(
     gateways,
     { callerId: request.callerId, scope },

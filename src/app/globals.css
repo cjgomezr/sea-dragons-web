@@ -1785,3 +1785,14 @@ h6 {
 .member-record-form .auth-submit {
   align-self: flex-start;
 }
+
+/* Sólo agrupa los campos para desactivarlos juntos mientras se guarda. */
+.member-record-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}

@@ -293,9 +293,14 @@ describe("ficha en pantalla: guardado", () => {
 
     expect(saveButton()).toBeDisabled();
     expect(saveButton()).toHaveTextContent("Saving…");
+    expect(screen.getByLabelText("AUF number")).toBeDisabled();
+    expect(
+      screen.getByRole("checkbox", { name: "Masters Squad" }),
+    ).toBeDisabled();
     answer(jsonResponse(200, { data: RECORD }));
     expect(await screen.findByRole("status")).toBeInTheDocument();
     expect(saveButton()).toBeEnabled();
+    expect(screen.getByLabelText("AUF number")).toBeEnabled();
   });
 
   it("no manda un segundo guardado con un doble clic", async () => {

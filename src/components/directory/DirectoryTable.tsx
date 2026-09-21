@@ -80,6 +80,14 @@ function describeAuf(
       });
 }
 
+/** Sólo la lista de un Admin trae el AUF, y es la misma marca que le da el
+ * enlace a la ficha y el cambio de rol. */
+function isAdminRow(row: DirectoryRow): row is DirectoryRow & {
+  readonly auf: AufView;
+} {
+  return row.auf !== null;
+}
+
 function memberRecordHref(userId: string): string {
   return MEMBER_RECORD_PATH.replace("[id]", userId);
 }
@@ -191,7 +199,7 @@ function MemberName({
   row: DirectoryRow;
 }): React.JSX.Element {
   const { member } = row;
-  if (row.auf === null) {
+  if (!isAdminRow(row)) {
     return <span className="directory-name">{member.fullName}</span>;
   }
   return (
@@ -238,17 +246,17 @@ function MemberRow({
             <span className="directory-meta">
               {`${describeCountry(translate, member.country)} · ${describeExperienceLevel(translate, member.experienceLevel)}`}
             </span>
-            {row.auf === null ? null : (
+            {isAdminRow(row) ? (
               <span className="directory-meta">
                 {describeAuf(translate, locale, row.auf)}
               </span>
-            )}
+            ) : null}
             <RowMarks marks={marksOf(translate, row)} />
           </span>
         </span>
       </th>
       <td className="directory-role-cell">
-        {row.auf !== null ? (
+        {isAdminRow(row) ? (
           <MemberRoleControl
             translate={translate}
             member={member}
