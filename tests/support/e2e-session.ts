@@ -148,8 +148,9 @@ export const DECIDABLE_MEMBER_NAME = "Socio para decidir";
 
 /**
  * Los socios activos que necesitan una fila propia más allá del socio
- * compartido (#209, #212). El compartido no sirve para esto: una solicitud o
- * un rol suyos cambiarían lo que fotografían los demás tests de Mi cuenta.
+ * compartido (#209, #212, #241). El compartido no sirve para esto: una
+ * solicitud, un rol o una ficha suyos cambiarían lo que fotografían los demás
+ * tests de Mi cuenta.
  *
  * La pendiente nace con una fecha fija, para que la captura no cambie con el
  * día en que corre la suite.
@@ -168,6 +169,24 @@ export const ROLE_REQUEST_MEMBERS = {
   "socio-para-decidir": {
     pendingRequest: "Committee",
     columns: { full_name: DECIDABLE_MEMBER_NAME },
+  },
+  /** El perfil con la ficha entera (#241). Sus capturas guardan sin cambiar
+   * nada, así que varias a la vez escriben lo mismo que ya había. */
+  "perfil-completo": {
+    pendingRequest: null,
+    columns: {
+      full_name: "Nerea Ruiz",
+      country: "AU",
+      position: "Defender",
+      experience_level: "Intermediate",
+      gender: "female",
+    },
+  },
+  /** Lo usa el test que cambia la ficha y la busca después en el directorio.
+   * El país va puesto porque el compartido no lo tiene y sin él no se guarda. */
+  "perfil-para-editar": {
+    pendingRequest: null,
+    columns: { country: "AU" },
   },
 } as const;
 

@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { AccountHeader } from "@/components/account/AccountHeader";
-import { MyGroups } from "@/components/account/MyGroups";
-import { RoleRequestPanel } from "@/components/account/RoleRequestPanel";
+import { ProfileScreen } from "@/components/account/ProfileScreen";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import {
   type RoleRequestAccount,
@@ -13,17 +11,21 @@ import { SIGN_IN_PATH } from "@/lib/auth/routes";
 import { readAuthenticatedUserId } from "@/lib/auth/session-reader";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { createSupabaseRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
+import { listCountryOptions } from "@/lib/geo/countries";
 import { type MemberGroup, listMemberGroups } from "@/lib/groups/member-groups";
 import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-groups-gateway";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 import { createTranslator } from "@/lib/i18n/translator";
+import { type OwnProfile, readOwnProfile } from "@/lib/members/own-profile";
+import { createOwnProfileGateways } from "@/lib/members/supabase-own-profile-gateways";
 import { readServerCookies } from "@/lib/supabase/server-cookies";
 import { createSessionClient } from "@/lib/supabase/session-client";
 
 /**
- * Mi cuenta (#209): el rol de quien la abre, los grupos a los que pertenece
- * (#229) y, si le toca, el formulario para pedir Coach o Committee (FR-010).
- * E5 la convertirá en el perfil.
+ * El perfil propio (#241), que antes era Mi cuenta (#209): la ficha que el
+ * miembro edita (FR-084), el rol de quien la abre, los grupos a los que
+ * pertenece (#229) y, si le toca, el formulario para pedir Coach o Committee
+ * (FR-010). La dirección sigue siendo `/cuenta`, la del enlace de la cabecera.
  *
  * Quién llega lo decide la frontera: cualquier cuenta activa, de cualquier
  * rol. Una incompleta acaba en completar registro y una sin sesión en la
@@ -64,6 +66,23 @@ function readGroups({
   return listMemberGroups(createSupabaseMemberGroupsGateway(client), userId);
 }
 
+/** También con la sesión: `members_select_own` le deja leer su propia fila,
+ * y la llave de servicio sólo hace falta para escribirla. */
+async function readProfile({
+  userId,
+  client,
+}: CallerSession): Promise<OwnProfile> {
+  try {
+    return await readOwnProfile(createOwnProfileGateways(client), userId);
+  } catch (error) {
+    // La misma carrera con la frontera que en `readAccount`.
+    if (error instanceof MemberNotFoundError) {
+      redirect(SIGN_IN_PATH);
+    }
+    throw error;
+  }
+}
+
 async function readAccount(userId: string): Promise<RoleRequestAccount> {
   const wiring = createSupabaseRoleRequestGateways(process.env);
   if (wiring.kind === "unconfigured") {
@@ -86,23 +105,18 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
     readRequestLocale(),
     readCallerSession(),
   ]);
-  const [account, groups] = await Promise.all([
+  const [account, profile, groups] = await Promise.all([
     readAccount(caller.userId),
+    readProfile(caller),
     readGroups(caller),
   ]);
   return (
-    <div className="account">
-      <AccountHeader
-        locale={locale}
-        fullName={account.fullName}
-        role={account.role}
-      />
-      <MyGroups locale={locale} groups={groups} />
-      <RoleRequestPanel
-        locale={locale}
-        role={account.role}
-        latestRequest={account.latestRequest}
-      />
-    </div>
+    <ProfileScreen
+      locale={locale}
+      account={account}
+      profile={profile}
+      groups={groups}
+      countries={listCountryOptions(locale)}
+    />
   );
 }
