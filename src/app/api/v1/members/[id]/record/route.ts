@@ -4,9 +4,14 @@ import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
+import { InactiveMemberError } from "@/lib/groups/group-members";
+import { GroupNotFoundError } from "@/lib/groups/groups";
 import { asGroupsApiError } from "@/lib/groups/groups-api";
 import {
   AUF_NUMBER_MAX_LENGTH,
+  GROUP_NOT_FOUND_REASON,
+  MEMBER_INACTIVE_REASON,
+  MEMBER_NOT_FOUND_REASON,
   type MemberRecord,
   MemberRecordForbiddenError,
   type MemberRecordGateways,
@@ -76,14 +81,16 @@ async function readMemberId(
 ): Promise<string> {
   const { id } = await context.params;
   if (!z.uuid().safeParse(id).success) {
-    throw new ApiError("not_found", new MemberRecordNotFoundError().message);
+    throw new ApiError(
+      "not_found",
+      new MemberRecordNotFoundError().message,
+      MEMBER_NOT_FOUND_REASON,
+    );
   }
   return id;
 }
 
-/** El primer campo que no vale va como `reason`, que la pantalla traduce.
- * Los errores de los grupos (uno que no es del club, un socio dado de baja)
- * responden igual que en la sección Grupos. */
+/** El primer campo que no vale va como `reason`, que la pantalla traduce. */
 function asApiError(error: unknown): never {
   if (error instanceof MemberRecordValidationError) {
     throw new ApiError(
@@ -96,7 +103,13 @@ function asApiError(error: unknown): never {
     throw new ApiError("forbidden", error.message);
   }
   if (error instanceof MemberRecordNotFoundError) {
-    throw new ApiError("not_found", error.message);
+    throw new ApiError("not_found", error.message, MEMBER_NOT_FOUND_REASON);
+  }
+  if (error instanceof GroupNotFoundError) {
+    throw new ApiError("not_found", error.message, GROUP_NOT_FOUND_REASON);
+  }
+  if (error instanceof InactiveMemberError) {
+    throw new ApiError("business_rule", error.message, MEMBER_INACTIVE_REASON);
   }
   return asGroupsApiError(error);
 }

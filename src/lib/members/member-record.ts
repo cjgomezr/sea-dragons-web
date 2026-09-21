@@ -76,6 +76,13 @@ export type MemberRecordIssue = {
   readonly code: MemberRecordIssueCode;
 };
 
+/** Los `reason` con los que la API distingue qué no se encontró o qué regla
+ * de Grupos se incumplió: un 404 puede ser del socio o de un grupo. La
+ * pantalla los lee para decir cuál. */
+export const MEMBER_NOT_FOUND_REASON = "member_not_found";
+export const GROUP_NOT_FOUND_REASON = "group_not_found";
+export const MEMBER_INACTIVE_REASON = "member_inactive";
+
 export type MemberScope = { readonly clubId: string; readonly userId: string };
 
 export type AufUpdateResult =

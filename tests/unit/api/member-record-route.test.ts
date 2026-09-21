@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AccountStatus } from "@/lib/auth/account-status";
 import type { Role } from "@/lib/auth/roles";
 import { MEMBER_RECORD_API_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
@@ -34,6 +35,7 @@ const VALID_BODY = {
 const readSessionState = vi.fn();
 const writes: string[] = [];
 let callerRole: Role = "Admin";
+let memberStatus: AccountStatus = "active";
 
 function memberRecordGateways(): MemberRecordGateways {
   let auf: { aufNumber: string | null; aufExpiry: string | null } = {
@@ -80,7 +82,7 @@ function memberRecordGateways(): MemberRecordGateways {
       findClubMember: async ({ userId }) => ({
         id: userId,
         fullName: "Paula Player",
-        accountStatus: "active",
+        accountStatus: memberStatus,
       }),
       insertMembership: async ({ groupId }) => {
         writes.push(`assign ${groupId}`);
@@ -173,6 +175,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   writes.length = 0;
   gateways = memberRecordGateways();
+  memberStatus = "active";
   givenRole("Admin");
 });
 
@@ -264,6 +267,7 @@ describe("PATCH /api/v1/members/{id}/record", () => {
     const response = await patchRecord(VALID_BODY, UNKNOWN_MEMBER_ID);
 
     expect(response.status).toBe(404);
+    await expect(reasonOf(response)).resolves.toBe("member_not_found");
     expect(writes).toEqual([]);
   });
 
@@ -280,6 +284,17 @@ describe("PATCH /api/v1/members/{id}/record", () => {
     });
 
     expect(response.status).toBe(404);
+    await expect(reasonOf(response)).resolves.toBe("group_not_found");
+    expect(writes).toEqual([]);
+  });
+
+  it("responde 422 al agregar grupos a un miembro dado de baja", async () => {
+    memberStatus = "inactive";
+
+    const response = await patchRecord(VALID_BODY);
+
+    expect(response.status).toBe(422);
+    await expect(reasonOf(response)).resolves.toBe("member_inactive");
     expect(writes).toEqual([]);
   });
 
@@ -319,5 +334,6 @@ describe("GET /api/v1/members/{id}/record", () => {
     const response = await getRecord(UNKNOWN_MEMBER_ID);
 
     expect(response.status).toBe(404);
+    await expect(reasonOf(response)).resolves.toBe("member_not_found");
   });
 });
