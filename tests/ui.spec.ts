@@ -3461,3 +3461,319 @@ test.describe("un Player frente al directorio", () => {
     expect(pending.status()).toBe(403);
   });
 });
+/* ---------------------------------------------------------------------------
+   La ficha reservada al Admin (#242, RF-4 del PRD de E5): el AUF y los grupos
+   de un miembro, abierta desde su fila del directorio. Sin mockup: se revisa
+   contra design-system.md, con el aspecto del directorio (directory-light.png).
+
+   Las capturas leen datos fijos, servidos por `page.route`, por lo mismo que
+   las del directorio: los grupos y el AUF de verdad cambian con cada test que
+   siembre. Lo que la frontera y el endpoint de verdad responden se prueba
+   aparte, con las sesiones sembradas.
+   --------------------------------------------------------------------------- */
+
+const RECORD_MEMBER_ID = MEMBER_WITHOUT_DATA.userId;
+const MEMBER_RECORD_SCREEN_PATH = `${DIRECTORY_SCREEN_PATH}/${RECORD_MEMBER_ID}`;
+const MEMBER_RECORD_ENDPOINT = `/api/v1/members/${RECORD_MEMBER_ID}/record`;
+const CLUB_GROUPS_ENDPOINT = "/api/v1/groups";
+
+const STUBBED_CLUB_GROUPS = [
+  {
+    id: "aaaaaaaa-0000-4000-8000-000000000001",
+    name: "Juveniles de los jueves y sábados por la mañana",
+    memberCount: 12,
+  },
+  {
+    id: "aaaaaaaa-0000-4000-8000-000000000002",
+    name: "Masters Squad",
+    memberCount: 8,
+  },
+  {
+    id: "aaaaaaaa-0000-4000-8000-000000000003",
+    name: "Senior Squad",
+    memberCount: 21,
+  },
+] as const;
+
+type StubbedMemberRecord = {
+  readonly userId: string;
+  readonly fullName: string;
+  readonly joinedOn: string;
+  readonly aufNumber: string;
+  readonly aufExpiry: string;
+  readonly isAufExpired: boolean;
+  readonly groups: readonly { readonly id: string; readonly name: string }[];
+};
+
+/** El nombre más largo de la lista, para el caso de contenido largo. */
+const CURRENT_RECORD: StubbedMemberRecord = {
+  userId: RECORD_MEMBER_ID,
+  fullName: LONG_MEMBER_NAME,
+  joinedOn: "2024-03-06",
+  aufNumber: "AUF-2026-0042",
+  aufExpiry: "2030-06-30",
+  isAufExpired: false,
+  groups: [STUBBED_CLUB_GROUPS[0], STUBBED_CLUB_GROUPS[2]].map(
+    ({ id, name }) => ({ id, name }),
+  ),
+};
+
+const EXPIRED_RECORD: StubbedMemberRecord = {
+  ...CURRENT_RECORD,
+  aufExpiry: "2025-01-31",
+  isAufExpired: true,
+};
+
+const EXPIRY_BEFORE_JOINING_ERROR = {
+  error: {
+    code: "validation_error",
+    message: "El vencimiento es anterior al ingreso.",
+    reason: "auf_expiry_before_joined",
+  },
+};
+
+async function stubMemberRecordReads(
+  page: Page,
+  record: StubbedMemberRecord,
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === CLUB_GROUPS_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { groups: STUBBED_CLUB_GROUPS } }),
+      }),
+  );
+  // Guardar sólo se prueba en la captura del aviso, así que el PATCH fingido
+  // siempre lo rechaza.
+  await page.route(
+    (url) => url.pathname === MEMBER_RECORD_ENDPOINT,
+    (route, request) =>
+      request.method() === "PATCH"
+        ? route.fulfill({
+            status: 400,
+            contentType: "application/json",
+            body: JSON.stringify(EXPIRY_BEFORE_JOINING_ERROR),
+          })
+        : route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ data: record }),
+          }),
+  );
+}
+
+/** Pone un vencimiento anterior al ingreso y guarda: el servidor fingido lo
+ * rechaza, y el aviso sale junto al campo. */
+function submitExpiryBeforeJoining(saveLabel: string, issueText: RegExp) {
+  return async (page: Page): Promise<void> => {
+    await page.locator("#ficha-auf-vencimiento").fill("2024-01-15");
+    await page.getByRole("button", { name: saveLabel }).click();
+    await expect(page.getByText(issueText)).toBeVisible();
+  };
+}
+
+type MemberRecordState = {
+  readonly name: string;
+  readonly record: StubbedMemberRecord;
+  readonly saveLabel: string;
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+  readonly prepare?: (page: Page) => Promise<void>;
+};
+
+const ENGLISH_SAVE_RECORD = "Save the record";
+const SPANISH_SAVE_RECORD = "Guardar la ficha";
+
+const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
+  {
+    name: "ficha-auf-vigente",
+    record: CURRENT_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+  },
+  {
+    name: "ficha-auf-vigente-es",
+    record: CURRENT_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "ficha-auf-vencido",
+    record: EXPIRED_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+  },
+  {
+    name: "ficha-auf-vencido-es",
+    record: EXPIRED_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "ficha-aviso-validacion",
+    record: CURRENT_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+    prepare: submitExpiryBeforeJoining(
+      ENGLISH_SAVE_RECORD,
+      /can't be before the date they joined/,
+    ),
+  },
+  {
+    name: "ficha-aviso-validacion-es",
+    record: CURRENT_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    beforeVisit: chooseSpanish,
+    prepare: submitExpiryBeforeJoining(
+      SPANISH_SAVE_RECORD,
+      /no puede ser anterior a su fecha de ingreso/,
+    ),
+  },
+];
+
+async function goToMemberRecord(
+  page: Page,
+  state: MemberRecordState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await stubMemberRecordReads(page, state.record);
+  await state.beforeVisit?.(page);
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${MEMBER_RECORD_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, MEMBER_RECORD_SCREEN_PATH, theme);
+  }
+  await expect(
+    page.getByRole("heading", { level: 1, name: LONG_MEMBER_NAME }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: state.saveLabel }),
+  ).toBeVisible();
+  await state.prepare?.(page);
+}
+
+for (const state of MEMBER_RECORD_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToMemberRecord(page, state, theme);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToMemberRecord(page, state);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToMemberRecord(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+function openOwnRecordLink(page: Page) {
+  return page.getByRole("link", {
+    name: `Open ${ADMINISTRATION_ADMIN_NAME}'s record`,
+  });
+}
+
+test.describe("un Admin frente a la ficha con los datos de verdad", () => {
+  skipWithoutSession();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+  // Sin reintentos: el primer intento ya guarda, y el segundo partiría de lo
+  // que dejó el primero y taparía por qué falló.
+  test.describe.configure({
+    retries: 0,
+    timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS,
+  });
+
+  test("la abre desde el directorio, guarda el AUF y el directorio lo enseña", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+    await openOwnRecordLink(page).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: ADMINISTRATION_ADMIN_NAME }),
+    ).toBeVisible();
+
+    const aufNumber = `AUF-E2E-${Date.now()}`;
+    await page.getByLabel("AUF number").fill(aufNumber);
+    await page.getByLabel("Expiry date").fill("2099-12-31");
+    const saved = page.waitForResponse(
+      (response) =>
+        response.url().includes("/record") &&
+        response.request().method() === "PATCH",
+      { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
+    );
+    await page.getByRole("button", { name: ENGLISH_SAVE_RECORD }).click();
+    expect((await saved).status()).toBe(200);
+    await expect(page.getByText("Record saved.")).toBeVisible();
+
+    await page.getByRole("link", { name: /Back to the directory/ }).click();
+    await expect(
+      page
+        .getByRole("row", { name: ADMINISTRATION_ADMIN_NAME })
+        .getByText(`AUF ${aufNumber} · expires 31 December 2099`),
+    ).toBeVisible();
+
+    // Deja la fila como estaba: sin número, que borra también el vencimiento.
+    await openOwnRecordLink(page).click();
+    await page.getByLabel("AUF number").fill("");
+    await page.getByRole("button", { name: ENGLISH_SAVE_RECORD }).click();
+    await expect(page.getByText("Record saved.")).toBeVisible();
+    await expect(page.getByLabel("Expiry date")).toHaveValue("");
+  });
+});
+
+test.describe("un Player frente a la ficha reservada al Admin", () => {
+  skipWithoutSession();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("abrirla a mano lo manda al panel", async ({ page }) => {
+    await page.goto(`${APP_URL}${MEMBER_RECORD_SCREEN_PATH}`);
+
+    await expect(page).toHaveURL(/\/dashboard$/);
+  });
+
+  test("el endpoint le responde 403, para leer y para guardar", async ({
+    request,
+  }) => {
+    const read = await request.get(`${APP_URL}${MEMBER_RECORD_ENDPOINT}`);
+    const write = await request.patch(`${APP_URL}${MEMBER_RECORD_ENDPOINT}`, {
+      data: { aufNumber: "AUF-1", aufExpiry: null, groupIds: [] },
+    });
+
+    expect(read.status()).toBe(403);
+    expect(write.status()).toBe(403);
+  });
+
+  test("su directorio no enlaza ninguna ficha", async ({ page }) => {
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+    await expect(page.getByRole("table")).toBeVisible();
+
+    await expect(page.getByRole("link", { name: /record$/ })).toHaveCount(0);
+  });
+});

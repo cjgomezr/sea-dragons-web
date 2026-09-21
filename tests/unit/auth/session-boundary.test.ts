@@ -12,6 +12,8 @@ import {
   GROUPS_PATH,
   GUARDIAN_CONSENT_API_PATH,
   MEMBERS_API_PATH,
+  MEMBER_RECORD_API_PATH,
+  MEMBER_RECORD_PATH,
   MEMBER_ROLE_API_PATH,
   PASSWORD_RECOVERY_PATH,
   REGISTER_API_PATH,
@@ -558,4 +560,53 @@ describe("frontera de Mis grupos (#229)", () => {
       }),
     ).toEqual({ kind: "forbidden" });
   });
+});
+
+/** La ficha reservada al Admin de un socio cualquiera (#242). */
+const MEMBER_ID = "b1b1b1b1-0000-4000-8000-00000000000b";
+const MEMBER_RECORD_API = MEMBER_RECORD_API_PATH.replace("[id]", MEMBER_ID);
+const MEMBER_RECORD_PAGE = MEMBER_RECORD_PATH.replace("[id]", MEMBER_ID);
+
+describe("frontera de la ficha reservada al Admin (#242)", () => {
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "niega a un %s el endpoint de la ficha",
+    (role) => {
+      expect(
+        decideSessionBoundary({
+          pathname: MEMBER_RECORD_API,
+          ...activeAs(role),
+        }),
+      ).toEqual({ kind: "missingCapability" });
+    },
+  );
+
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "manda al panel a un %s que abre la ficha a mano",
+    (role) => {
+      expect(
+        decideSessionBoundary({
+          pathname: MEMBER_RECORD_PAGE,
+          ...activeAs(role),
+        }),
+      ).toEqual(TO_DASHBOARD);
+    },
+  );
+
+  it.each([MEMBER_RECORD_API, MEMBER_RECORD_PAGE])(
+    "deja pasar a un Admin a %s",
+    (pathname) => {
+      expect(decideSessionBoundary({ pathname, ...activeAs("Admin") })).toEqual(
+        ALLOW,
+      );
+    },
+  );
+
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "sigue dejando a un %s ver el directorio",
+    (role) => {
+      expect(
+        decideSessionBoundary({ pathname: "/directorio", ...activeAs(role) }),
+      ).toEqual(ALLOW);
+    },
+  );
 });

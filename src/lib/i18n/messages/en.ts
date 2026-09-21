@@ -438,6 +438,44 @@ export const englishMessages = {
   "directory.error.forbidden": "Your account can't see the club's directory.",
   "directory.error.unexpected":
     "We couldn't load the club's directory. Try again.",
+
+  // La ficha reservada al Admin (#242, RF-4 del PRD de E5): el AUF y los
+  // grupos de un miembro, abierta desde su fila del directorio.
+  "memberRecord.metaTitle": "Member record · Victoria Seadragons",
+  "memberRecord.metaDescription":
+    "A member's AUF registration and groups, which only an Admin edits.",
+  "memberRecord.back": "← Back to the directory",
+  "memberRecord.openLabel": "Open {name}'s record",
+  "memberRecord.loading": "Loading the member's record…",
+  "memberRecord.lead":
+    "What only an Admin edits: the AUF registration and the groups.",
+  "memberRecord.joinedOn": "Member since {date}",
+  "memberRecord.auf.title": "AUF registration",
+  "memberRecord.auf.number": "AUF number",
+  "memberRecord.auf.expiry": "Expiry date",
+  "memberRecord.auf.hint": "Clearing the number also clears its expiry date.",
+  "memberRecord.groups.legend": "Groups",
+  "memberRecord.groups.empty": "The club has no groups yet.",
+  "memberRecord.save": "Save the record",
+  "memberRecord.saving": "Saving…",
+  "memberRecord.saved": "Record saved.",
+  "memberRecord.issue.aufNumberTooLong":
+    "The AUF number can have at most {max} characters.",
+  "memberRecord.issue.aufExpiryNotADate": "That expiry isn't a valid date.",
+  "memberRecord.issue.aufExpiryBeforeJoined":
+    "The expiry can't be before the date they joined ({date}).",
+  "memberRecord.error.memberNotFound": "That member isn't in the club.",
+  "memberRecord.error.groupNotFound":
+    "One of those groups is no longer in the club. Reload the record.",
+  "memberRecord.error.memberInactive":
+    "A former member can't be added to groups.",
+  "memberRecord.error.signInRequired":
+    "Your session ended. Sign in again to keep going.",
+  "memberRecord.error.forbidden": "Only an Admin can see and edit this record.",
+  "memberRecord.error.unexpected": "We couldn't save the record. Try again.",
+  "directory.aufSummary": "AUF {number} · expires {date}",
+  "directory.aufWithoutExpiry": "AUF {number} · no expiry date",
+  "directory.aufMissing": "No AUF",
   "themeToggle.switchToLight": "Switch to light theme",
   "themeToggle.switchToDark": "Switch to dark theme",
   // El destino va con su propio nombre ("Español", no "Spanish"): quien no

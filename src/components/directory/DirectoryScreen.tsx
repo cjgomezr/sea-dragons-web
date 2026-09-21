@@ -254,6 +254,7 @@ export function DirectoryScreen({
           ) : (
             <DirectoryTable
               translate={translate}
+              locale={locale}
               listing={state.listing}
               sort={order.sort}
               direction={order.direction}
