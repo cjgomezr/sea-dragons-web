@@ -504,4 +504,19 @@ export const spanishMessages: MessageCatalog = {
   "email.confirmation.linkLabel": "Para confirmar tu correo, abre este enlace",
   "email.confirmation.notYou":
     "Si no te registraste tú, ignora este correo: sin confirmar, la cuenta no se activa.",
+  "email.invitation.subject": "Te invitaron a {clubName}",
+  "email.invitation.invited":
+    "El club te dio de alta en {clubName} con esta dirección.",
+  "email.invitation.nextSteps":
+    "Para activar tu cuenta, abre el enlace, elige una contraseña y entra con ella. Después completa tu registro con los datos que falten.",
+  "email.invitation.linkLifetime": {
+    one: "El enlace sirve una sola vez y caduca en {count} minuto.",
+    other: "El enlace sirve una sola vez y caduca en {count} minutos.",
+  },
+  "email.invitation.button": "Activar mi cuenta",
+  "email.invitation.linkLabel": "Para activar tu cuenta, abre este enlace",
+  "email.invitation.ifExpired":
+    "Si caduca, pide al club que te reenvíe la invitación.",
+  "email.invitation.notYou":
+    "Si no esperabas esta invitación, ignora este correo: sin activarla, la cuenta no se usa.",
 };

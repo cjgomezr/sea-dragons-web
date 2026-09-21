@@ -256,9 +256,12 @@ export async function readMemberRecord(
 }
 
 /** Un id que no es de un grupo del club se rechaza antes de escribir nada:
- * de lo contrario la mitad de los grupos quedaría cambiada. */
-async function assertClubGroups(
-  gateways: MemberRecordGateways,
+ * de lo contrario la mitad de los grupos quedaría cambiada. La usa también el
+ * alta de un miembro (#243). */
+export async function assertClubGroups(
+  gateways: {
+    readonly groups: Pick<GroupsGateways["groups"], "findClubGroups">;
+  },
   clubId: string,
   groupIds: ReadonlySet<string>,
 ): Promise<void> {

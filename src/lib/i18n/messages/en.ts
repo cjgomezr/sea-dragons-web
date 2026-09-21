@@ -512,4 +512,19 @@ export const englishMessages = {
   "email.confirmation.linkLabel": "To confirm your email, open this link",
   "email.confirmation.notYou":
     "If you didn't sign up, ignore this email: the account won't activate until it's confirmed.",
+  "email.invitation.subject": "You're invited to {clubName}",
+  "email.invitation.invited":
+    "The club has added you to {clubName} with this address.",
+  "email.invitation.nextSteps":
+    "To activate your account, open the link, choose a password and sign in with it. Then complete your registration with any missing details.",
+  "email.invitation.linkLifetime": {
+    one: "The link works once and expires in {count} minute.",
+    other: "The link works once and expires in {count} minutes.",
+  },
+  "email.invitation.button": "Activate my account",
+  "email.invitation.linkLabel": "To activate your account, open this link",
+  "email.invitation.ifExpired":
+    "If it expires, ask the club to resend your invitation.",
+  "email.invitation.notYou":
+    "If you weren't expecting this invitation, ignore this email: the account stays unused until it is activated.",
 } as const satisfies Readonly<Record<string, Message>>;
