@@ -29,7 +29,7 @@ fábrica: solo sus tickets lo son.
 | **E16a** — Entornos y despliegue        | Proyecto de Supabase de producción separado del de desarrollo, despliegue en Vercel desde `main` con preview por PR, secretos por entorno, migraciones aplicadas por CI, monitoreo de disponibilidad. NFR-003 · NFR-011                                        | M (7)         | —                 | #16       |
 | **E16b** — Scheduler y prueba de carga  | `pg_cron` como scheduler con los jobs de ocurrencias recurrentes (FR-031) y aviso de renovación (FR-072), más la prueba de carga sobre un dataset sembrado de 500 miembros, 5.000 ocurrencias y 50.000 asistencias. NFR-001/008                                | M (4-5)       | E16a, E7, E8, E12 | por crear |
 | **E17** — Bilingüe (inglés y español)   | Catálogo de mensajes por idioma, idioma por cookie con el navegador como respaldo, interruptor junto al del tema, pantallas y correos en inglés y español, y un test que impide que se cuele texto sin traducir. Añadido después del plan.                     | M (8)         | ninguna           | #181      |
-| **E18** · Marca configurable por club   | Nombre, logo, colores base y textos del inicio de sesión configurables por el Admin; la marca sale del código; un club por instalación (relaja ASS-002). Añadido después del plan.                                                                             | M (5-7)       | E3, E5            | #258      |
+| **E18** · Marca configurable por club   | Nombre, logo, colores base y textos del inicio de sesión configurables por el Admin; la marca sale del código; alta de un club nuevo y publicación de versiones a cada instalación; un club por instalación (relaja ASS-002). Añadido después del plan.        | L (7-9)       | E3, E5            | #258      |
 
 E15 y E16 se añadieron el 23 de agosto de 2026, después del plan original, al
 resolver los huecos P2, P3 y P4 de `docs/preguntas-abiertas.md`.
@@ -55,6 +55,25 @@ Admin) y de E5 (el almacenamiento que monta la foto de perfil), y **se trabaja
 después de E5**. Con una advertencia: sacar la marca del código conviene
 hacerlo antes de E7 y E11, porque cada pantalla nueva nace con el nombre escrito
 a mano y habría que volver a revisarla.
+
+Un club por instalación solo funciona si instalar y actualizar no se hace a
+mano, así que E18 incluye también **cómo se opera ese modelo**:
+
+- **El alta de un club nuevo**, con un procedimiento escrito y, en lo posible,
+  un script: crear el proyecto de Supabase, aplicar las migraciones, sembrar la
+  fila del club con su marca, cargar las variables de entorno, el dominio de la
+  aplicación y el del correo en Resend.
+- **La publicación a todas las instalaciones**: llevar la misma versión a cada
+  club, con las migraciones antes que el código, y un registro de qué versión
+  tiene cada uno para que ninguno se quede atrás sin que se note.
+
+Queda una decisión de negocio abierta, que el dueño toma antes de escribir el
+PRD: **de quién son las cuentas** de Supabase, Vercel, Resend y Stripe. Si son
+del club, el club paga su infraestructura directamente, pero tiene acceso a todo
+y es más difícil controlar la licencia y las versiones. Si son del dueño, la
+infraestructura va dentro de la cuota y las versiones se controlan desde un solo
+sitio, pero la factura y el riesgo son suyos. Esa respuesta cambia el script de
+alta y el de publicación.
 
 El 7 de septiembre de 2026, al escribir su PRD, **E16 se partió en E16a y
 E16b**. El motivo es de secuencia, no de tamaño: sus jobs de `pg_cron` necesitan

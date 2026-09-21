@@ -9,7 +9,7 @@ queda como registro de qué se preguntó y qué se respondió. Cada punto apunta
 FR o AC que lo cierra.
 
 **Abierto después:** B5, el 16 de septiembre de 2026, que bloquea los tickets de
-E12.
+E12, y B6, el 22 de septiembre de 2026, que bloquea los de E18.
 
 ---
 
@@ -114,6 +114,31 @@ al día". Lo que no hace es definir la segunda.
 **Qué no se toca mientras tanto.** El registro sigue pidiendo la membresía y
 activando la cuenta como hoy. Decidirlo ahora sería adelantar trabajo: no hay
 nada que cobrar hasta E12.
+
+### B6 · De quién son las cuentas de cada instalación · E18 · SIN RESOLVER
+
+**De dónde sale.** El 22 de septiembre de 2026 el dueño decidió vender la
+licencia a otros clubes con un modelo de **un club por instalación** (E18): cada
+club tiene su propio despliegue y su propia base, en vez de compartir una
+aplicación multi-cliente. Ese modelo necesita un procedimiento de alta de clubes
+y otro de publicación de versiones, y los dos dependen de una decisión de
+negocio que nadie ha tomado.
+
+**La pregunta.** Las cuentas de Supabase, Vercel, Resend y Stripe de cada
+instalación, ¿son del club o del dueño?
+
+- **Del club:** el club paga su infraestructura directamente (hoy, unos 45
+  dólares al mes entre Vercel Pro y Supabase Pro) y cobra a sus miembros con su
+  propio Stripe. A cambio tiene acceso a todo, y es más difícil controlar la
+  licencia y que actualice cuando sale una versión.
+- **Del dueño:** la infraestructura va dentro de la cuota de la licencia y las
+  versiones se publican desde un solo sitio. A cambio la factura, el soporte de
+  la infraestructura y el riesgo son del dueño. Stripe es aparte en este caso:
+  el dinero de las cuotas de los miembros tiene que llegar al club, no al dueño.
+
+**Por qué bloquea.** Cambia qué hace el script de alta (crear cuentas o pedir
+acceso a las del club) y el de publicación (desplegar desde una cuenta o desde
+varias). Se decide antes de escribir los tickets de E18.
 
 ---
 
