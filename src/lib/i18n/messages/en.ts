@@ -532,6 +532,12 @@ export const englishMessages = {
     "Several invitations were sent in a row. Wait a few minutes before asking for another.",
   "newMember.error.forbidden": "Only an Admin can add members.",
   "newMember.error.unexpected": "We couldn't add the member. Try again.",
+  "newMember.error.invitationNotPending":
+    "This member has already activated their account.",
+  "memberRecord.invitation.title": "Invitation",
+  "memberRecord.invitation.lead":
+    "{name} hasn't activated their account yet. The invitation link expires after an hour, so you can send a new one.",
+  "memberRecord.invitation.resent": "We sent {name} a new invitation.",
   "themeToggle.switchToLight": "Switch to light theme",
   "themeToggle.switchToDark": "Switch to dark theme",
   // El destino va con su propio nombre ("Español", no "Spanish"): quien no

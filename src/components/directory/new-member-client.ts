@@ -12,6 +12,7 @@ import {
 import type { Translator } from "@/lib/i18n/translator";
 import {
   EMAIL_TAKEN_REASON,
+  INVITATION_NOT_PENDING_REASON,
   INVITATION_NOT_SENT_REASON,
   NEW_MEMBER_ISSUE_CODES,
   type NewMemberIssueCode,
@@ -139,6 +140,9 @@ export function describeNewMemberFailure(
   }
   if (reason === GROUP_NOT_FOUND_REASON) {
     return translate("newMember.error.groupNotFound");
+  }
+  if (reason === INVITATION_NOT_PENDING_REASON) {
+    return translate("newMember.error.invitationNotPending");
   }
   if (reason === INVITATION_NOT_SENT_REASON) {
     return translate("newMember.error.invitationNotSent");

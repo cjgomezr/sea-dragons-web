@@ -8,12 +8,8 @@ import type { Group } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import { loadGroups } from "@/components/groups/groups-client";
-import {
-  type CreatedMemberView,
-  type InvitationResend,
-  describeNewMemberFailure,
-  resendMemberInvitation,
-} from "./new-member-client";
+import { InvitationResend } from "./InvitationResend";
+import type { CreatedMemberView } from "./new-member-client";
 import { NewMemberForm } from "./NewMemberForm";
 
 /**
@@ -32,35 +28,6 @@ type GroupsState =
   | { readonly kind: "failed" }
   | { readonly kind: "ready"; readonly groups: readonly Group[] };
 
-type ResendState =
-  { readonly kind: "idle" } | { readonly kind: "sending" } | InvitationResend;
-
-function ResendOutcome({
-  translate,
-  state,
-  email,
-}: {
-  translate: Translator;
-  state: ResendState;
-  email: string;
-}): React.JSX.Element | null {
-  if (state.kind === "sent") {
-    return (
-      <p className="auth-note" role="status">
-        {translate("newMember.resent", { email })}
-      </p>
-    );
-  }
-  if (state.kind === "failed") {
-    return (
-      <p className="auth-error" role="alert">
-        {describeNewMemberFailure(translate, state)}
-      </p>
-    );
-  }
-  return null;
-}
-
 function CreatedNotice({
   translate,
   created,
@@ -70,16 +37,8 @@ function CreatedNotice({
   created: CreatedMemberView;
   onAddAnother: () => void;
 }): React.JSX.Element {
-  const [resend, setResend] = useState<ResendState>({ kind: "idle" });
   const { fullName: name, email, userId } = created.member;
   const wasSent = created.invitation === "sent";
-  const canResend = !wasSent && resend.kind !== "sent";
-
-  async function resendInvitation(): Promise<void> {
-    setResend({ kind: "sending" });
-    setResend(await resendMemberInvitation(userId));
-  }
-
   return (
     <section className="admin-section new-member-created">
       <p
@@ -91,22 +50,15 @@ function CreatedNotice({
           { name, email },
         )}
       </p>
-      <ResendOutcome translate={translate} state={resend} email={email} />
       <div className="new-member-actions">
-        {canResend ? (
-          <button
-            type="button"
-            className="auth-submit"
-            disabled={resend.kind === "sending"}
-            onClick={() => void resendInvitation()}
-          >
-            {translate(
-              resend.kind === "sending"
-                ? "newMember.resending"
-                : "newMember.resend",
-            )}
-          </button>
-        ) : null}
+        {wasSent ? null : (
+          <InvitationResend
+            translate={translate}
+            userId={userId}
+            isPrimary
+            sentText={translate("newMember.resent", { email })}
+          />
+        )}
         <button
           type="button"
           className="admin-secondary"

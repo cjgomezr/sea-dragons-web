@@ -17,6 +17,7 @@ import {
 import type { RoleRequestMember } from "@/lib/auth/role-request";
 import { hasCapability } from "@/lib/auth/roles";
 import type { EmailDeliveryAvailabilityCheck } from "@/lib/email/email-delivery-availability";
+import { describeErrorWithoutEmail } from "@/lib/email/redact-email";
 import {
   type GroupMembersGateways,
   assignGroupMember,
@@ -393,6 +394,24 @@ async function sendInvitation(
   return describeOutcome(outcome);
 }
 
+/** Cuando esto corre el miembro ya existe, así que ningún fallo puede subir
+ * como error: la respuesta sería un 500, y reintentar daría un 409 con el
+ * miembro creado y sin invitación. Se registra como invitación no enviada, con
+ * su causa, y la pantalla ofrece reenviarla. */
+async function sendInvitationAfterCreation(
+  gateways: MemberInvitationGateways,
+  request: InvitationRequest,
+): Promise<InvitationDelivery> {
+  try {
+    return await sendInvitation(gateways, request);
+  } catch (error) {
+    return {
+      kind: "not_sent",
+      reason: describeErrorWithoutEmail(error, request.email),
+    };
+  }
+}
+
 function describeOutcome(
   outcome: Awaited<
     ReturnType<ConfirmationEmailGateway["requestConfirmationEmail"]>
@@ -462,7 +481,7 @@ export async function createInvitedMember(
       fullName: member.full_name,
       email: member.email,
     },
-    invitation: await sendInvitation(gateways, {
+    invitation: await sendInvitationAfterCreation(gateways, {
       clubId: caller.clubId,
       email: member.email,
       now: request.now,

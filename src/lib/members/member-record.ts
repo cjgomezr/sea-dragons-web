@@ -1,4 +1,5 @@
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
+import type { AccountStatus } from "@/lib/auth/account-status";
 import { isRealCalendarDate } from "@/lib/auth/registration";
 import type { RoleRequestMember } from "@/lib/auth/role-request";
 import { hasCapability } from "@/lib/auth/roles";
@@ -44,6 +45,9 @@ export type StoredMemberRecord = {
   readonly fullName: string;
   /** YYYY-MM-DD, el día del club en que ingresó (#237). */
   readonly joinedOn: string;
+  /** `incomplete` es quien todavía no activó su cuenta: la pantalla le ofrece
+   * al Admin reenviarle la invitación (#243). */
+  readonly accountStatus: AccountStatus;
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
 };

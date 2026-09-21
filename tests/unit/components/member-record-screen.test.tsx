@@ -15,12 +15,14 @@ const MEMBER_ID = "b1b1b1b1-0000-4000-8000-00000000000b";
 const SENIOR_ID = "9a9a9a9a-0000-4000-8000-000000000001";
 const MASTERS_ID = "9a9a9a9a-0000-4000-8000-000000000002";
 const RECORD_PATH = `/api/v1/members/${MEMBER_ID}/record`;
+const INVITATION_PATH = `/api/v1/members/${MEMBER_ID}/invitation`;
 const GROUPS_PATH = "/api/v1/groups";
 
 const RECORD: MemberRecord = {
   userId: MEMBER_ID,
   fullName: "Paula Player",
   joinedOn: "2024-03-06",
+  accountStatus: "active",
   aufNumber: "AUF-1",
   aufExpiry: "2027-03-31",
   isAufExpired: false,
@@ -40,7 +42,10 @@ type Stub = {
   readonly record?: MemberRecord;
   readonly load?: () => Response | Promise<Response>;
   readonly save?: (body: unknown) => Response | Promise<Response>;
+  readonly resend?: () => Response;
 };
+
+const resends: string[] = [];
 
 function jsonResponse(status: number, payload: unknown): Response {
   return new Response(JSON.stringify(payload), {
@@ -81,6 +86,12 @@ function stubApi(stub: Stub = {}): void {
       if (url === GROUPS_PATH) {
         return jsonResponse(200, { data: { groups: CLUB_GROUPS } });
       }
+      if (url === INVITATION_PATH && init?.method === "POST") {
+        resends.push(url);
+        return (
+          stub.resend?.() ?? jsonResponse(200, { data: { invitation: "sent" } })
+        );
+      }
       if (url !== RECORD_PATH) {
         throw new Error(`Petición inesperada: ${url}`);
       }
@@ -109,6 +120,7 @@ function saveButton(): HTMLElement {
 
 beforeEach(() => {
   patches.length = 0;
+  resends.length = 0;
 });
 
 afterEach(() => {
@@ -397,5 +409,51 @@ describe("ficha en pantalla: errores", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(text);
     expect(saveButton()).toBeEnabled();
+  });
+});
+
+describe("ficha en pantalla: invitación (#243)", () => {
+  const PENDING = { ...RECORD, accountStatus: "incomplete" as const };
+
+  it("no ofrece reenviar la invitación a quien ya activó su cuenta", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(
+      screen.queryByRole("button", { name: "Resend invitation" }),
+    ).toBeNull();
+  });
+
+  it("reenvía la invitación a quien todavía no activó su cuenta", async () => {
+    stubApi({ record: PENDING });
+    await renderScreen();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Resend invitation" }));
+
+    expect(
+      await screen.findByText("We sent Paula Player a new invitation."),
+    ).toBeVisible();
+    expect(resends).toEqual([INVITATION_PATH]);
+  });
+
+  it("dice que ya entró cuando el servidor responde que no hay invitación pendiente", async () => {
+    stubApi({
+      record: PENDING,
+      resend: () => errorResponse(409, "conflict", "invitation_not_pending"),
+    });
+    await renderScreen();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Resend invitation" }));
+
+    expect(
+      await screen.findByText(
+        "This member has already activated their account.",
+      ),
+    ).toBeVisible();
   });
 });

@@ -10,6 +10,7 @@ import {
   describeMemberRecordFailure,
   loadMemberRecord,
 } from "./member-record-client";
+import { InvitationResend } from "./InvitationResend";
 import { MemberRecordForm } from "./MemberRecordForm";
 
 /**
@@ -78,6 +79,27 @@ export function MemberRecordScreen({
           record={state.record}
           clubGroups={state.clubGroups}
         />
+      ) : null}
+      {state.kind === "loaded" &&
+      state.record.accountStatus === "incomplete" ? (
+        <section className="admin-section" aria-labelledby="ficha-invitacion">
+          <h2 id="ficha-invitacion">
+            {translate("memberRecord.invitation.title")}
+          </h2>
+          <p className="app-lead">
+            {translate("memberRecord.invitation.lead", {
+              name: state.record.fullName,
+            })}
+          </p>
+          <InvitationResend
+            translate={translate}
+            userId={userId}
+            isPrimary={false}
+            sentText={translate("memberRecord.invitation.resent", {
+              name: state.record.fullName,
+            })}
+          />
+        </section>
       ) : null}
     </div>
   );

@@ -529,6 +529,12 @@ export const spanishMessages: MessageCatalog = {
   "newMember.error.forbidden": "Sólo un Admin puede dar de alta a miembros.",
   "newMember.error.unexpected":
     "No pudimos dar de alta al miembro. Inténtalo de nuevo.",
+  "newMember.error.invitationNotPending": "Este miembro ya activó su cuenta.",
+  "memberRecord.invitation.title": "Invitación",
+  "memberRecord.invitation.lead":
+    "{name} todavía no activó su cuenta. El enlace de la invitación caduca a la hora, así que puedes mandarle uno nuevo.",
+  "memberRecord.invitation.resent":
+    "Le mandamos una invitación nueva a {name}.",
   "themeToggle.switchToLight": "Cambiar a tema claro",
   "themeToggle.switchToDark": "Cambiar a tema oscuro",
   "languageToggle.label": "Idioma: español. Cambiar a English (EN)",

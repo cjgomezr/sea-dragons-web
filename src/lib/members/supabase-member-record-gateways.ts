@@ -1,4 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  type AccountStatus,
+  parseAccountStatus,
+} from "@/lib/auth/account-status";
 import { readRequiredText, readText } from "@/lib/auth/supabase-auth-gateways";
 import { createGroupMembersGateways } from "@/lib/groups/supabase-group-members-gateways";
 import { createGroupsGateways } from "@/lib/groups/supabase-groups-gateways";
@@ -24,11 +28,21 @@ import type {
  */
 
 const MEMBERS_TABLE = "members";
-const RECORD_COLUMNS = "user_id, full_name, joined_on, auf_number, auf_expiry";
+const RECORD_COLUMNS =
+  "user_id, full_name, joined_on, account_status, auf_number, auf_expiry";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
 type Row = Record<string, unknown>;
+
+function readAccountStatus(row: Row): AccountStatus {
+  const value = readRequiredText(row, "account_status", MEMBERS_TABLE);
+  const status = parseAccountStatus(value);
+  if (status === null) {
+    throw new Error(`${value} no es un estado de cuenta que se reconozca.`);
+  }
+  return status;
+}
 
 function toStoredMemberRecord(row: Row): StoredMemberRecord {
   return {
@@ -37,6 +51,7 @@ function toStoredMemberRecord(row: Row): StoredMemberRecord {
     // Las columnas `date` llegan como YYYY-MM-DD, el formato con el que el
     // dominio las compara.
     joinedOn: readRequiredText(row, "joined_on", MEMBERS_TABLE),
+    accountStatus: readAccountStatus(row),
     aufNumber: readText(row, "auf_number", MEMBERS_TABLE),
     aufExpiry: readText(row, "auf_expiry", MEMBERS_TABLE),
   };

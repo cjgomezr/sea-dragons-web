@@ -3499,6 +3499,7 @@ type StubbedMemberRecord = {
   readonly userId: string;
   readonly fullName: string;
   readonly joinedOn: string;
+  readonly accountStatus: "incomplete" | "active";
   readonly aufNumber: string;
   readonly aufExpiry: string;
   readonly isAufExpired: boolean;
@@ -3510,12 +3511,20 @@ const CURRENT_RECORD: StubbedMemberRecord = {
   userId: RECORD_MEMBER_ID,
   fullName: LONG_MEMBER_NAME,
   joinedOn: "2024-03-06",
+  accountStatus: "active",
   aufNumber: "AUF-2026-0042",
   aufExpiry: "2030-06-30",
   isAufExpired: false,
   groups: [STUBBED_CLUB_GROUPS[0], STUBBED_CLUB_GROUPS[2]].map(
     ({ id, name }) => ({ id, name }),
   ),
+};
+
+/** Quien todavía no activó su cuenta: la ficha ofrece reenviar la
+ * invitación (#243). */
+const PENDING_RECORD: StubbedMemberRecord = {
+  ...CURRENT_RECORD,
+  accountStatus: "incomplete",
 };
 
 const EXPIRED_RECORD: StubbedMemberRecord = {
@@ -3605,6 +3614,17 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
   {
     name: "ficha-auf-vencido-es",
     record: EXPIRED_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "ficha-invitacion-pendiente",
+    record: PENDING_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+  },
+  {
+    name: "ficha-invitacion-pendiente-es",
+    record: PENDING_RECORD,
     saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
   },

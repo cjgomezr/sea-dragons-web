@@ -57,6 +57,7 @@ type FakeOptions = {
   readonly emailTaken?: boolean;
   readonly insertFails?: boolean;
   readonly emailDelivery?: EmailDeliveryAvailability;
+  readonly deliveryCheckFails?: boolean;
   readonly emailOutcome?: ConfirmationEmailOutcome;
   readonly invitee?: {
     readonly accountStatus: AccountStatus;
@@ -145,8 +146,12 @@ function fake(options: FakeOptions = {}): Fake {
       },
     },
     emailDeliveryForClub: () => ({
-      checkAvailability: async () =>
-        options.emailDelivery ?? { kind: "available" },
+      checkAvailability: async () => {
+        if (options.deliveryCheckFails) {
+          throw new Error("no se pudo leer el cupo");
+        }
+        return options.emailDelivery ?? { kind: "available" };
+      },
     }),
     invitationRequestsForClub: () => ({
       recordAndCountRecent: async () => {
@@ -391,6 +396,18 @@ describe("alta de un miembro", () => {
     expect(created.invitation).toEqual({
       kind: "not_sent",
       reason: "cupo agotado",
+    });
+  });
+
+  it("keeps the member and reports the invitation not sent when the delivery check throws", async () => {
+    const { gateways, insertedRows } = fake({ deliveryCheckFails: true });
+
+    const created = await create(gateways);
+
+    expect(insertedRows).toHaveLength(1);
+    expect(created.invitation).toEqual({
+      kind: "not_sent",
+      reason: expect.stringContaining("no se pudo leer el cupo"),
     });
   });
 
