@@ -1,12 +1,12 @@
 /**
  * Los catálogos de la ficha del socio que `0016_member_profile_fields.sql`
- * (#237) dejó cerrados con un `check` en la base: la posición y el nivel de
- * experiencia. Esto es la misma lista del lado de TypeScript, para estrechar
- * lo que llega de una consulta, igual que `ACCOUNT_STATUSES` hace con el
- * estado de la cuenta.
+ * (#237) dejó cerrados con un `check` en la base: la posición, el nivel de
+ * experiencia y el género. Esto es la misma lista del lado de TypeScript, para
+ * estrechar lo que llega de una consulta o de una petición, igual que
+ * `ACCOUNT_STATUSES` hace con el estado de la cuenta.
  *
- * El género vive sólo en la base por ahora: el directorio no lo muestra
- * (NFR-010) y el perfil propio llega en su propio ticket.
+ * El directorio no muestra el género (NFR-010): sólo lo lee y lo escribe el
+ * perfil propio (#241).
  */
 
 /** En el orden del SRD, que no es el alfabético: es el que usa el directorio
@@ -33,4 +33,14 @@ export function parsePosition(value: unknown): Position | null {
 
 export function parseExperienceLevel(value: unknown): ExperienceLevel | null {
   return EXPERIENCE_LEVELS.find((level) => level === value) ?? null;
+}
+
+/** Códigos y no texto libre: "prefiero no decirlo" (`undisclosed`) es un
+ * valor de verdad, distinto de no haber contestado (null). */
+export const GENDERS = ["female", "male", "non_binary", "undisclosed"] as const;
+
+export type Gender = (typeof GENDERS)[number];
+
+export function parseGender(value: unknown): Gender | null {
+  return GENDERS.find((gender) => gender === value) ?? null;
 }
