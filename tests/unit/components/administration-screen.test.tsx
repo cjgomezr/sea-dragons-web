@@ -121,7 +121,7 @@ function stubApi(stub: ApiStub = {}): void {
 async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
   render(<AdministrationScreen locale={locale} />);
   await screen.findByRole("heading", {
-    name: locale === "en" ? "Club members" : "Socios del club",
+    name: locale === "en" ? "Club members" : "Miembros del club",
   });
 }
 

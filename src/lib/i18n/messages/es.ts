@@ -118,7 +118,7 @@ export const spanishMessages: MessageCatalog = {
   "auth.completion.signInRequired":
     "Necesitas iniciar sesión para consultar o completar tu cuenta.",
   "auth.completion.notAMember":
-    "Tu sesión no corresponde a ningún socio del club. Escribe al club para que la revisen.",
+    "Tu sesión no corresponde a ningún miembro del club. Escribe al club para que la revisen.",
   "auth.completion.noLongerNeeded":
     "Tu cuenta ya no necesita esto. Recarga la página para ver lo que sigue faltando.",
   "auth.completion.rejected": "Hay datos que no se pueden guardar.",
@@ -222,8 +222,10 @@ export const spanishMessages: MessageCatalog = {
   // nombre.
   "nav.label.calendarShort": "Agenda",
   // Directorio sólo es pestaña fija para los roles que no ven Equipos (#213).
-  // Mide casi lo que "Calendario", que se partía, así que tampoco cabe.
-  "nav.label.directoryShort": "Socios",
+  // Ni "Directorio" ni "Miembros" caben a 360px: el segundo llegó al 92% de
+  // su pestaña con las fuentes de Linux y el guardián de geometría corta en
+  // el 85% (#246). "Gente" es lo que dice el inglés ("People") y deja sitio.
+  "nav.label.directoryShort": "Gente",
   "app.metaDescription":
     "Plataforma del club de rugby subacuático Victoria Seadragons (Melbourne).",
   "section.underConstruction": "Esta sección está en construcción.",
@@ -272,13 +274,13 @@ export const spanishMessages: MessageCatalog = {
 
   "admin.metaTitle": "Administración · Victoria Seadragons",
   "admin.metaDescription":
-    "Las solicitudes de rol pendientes y los socios del club, para un Admin.",
+    "Las solicitudes de rol pendientes y los miembros del club, para un Admin.",
   "admin.title": "Administración",
   "admin.lead":
-    "Responde las solicitudes de rol que te esperan y decide el rol de cada socio.",
-  "admin.loading": "Cargando las solicitudes y los socios del club…",
+    "Responde las solicitudes de rol que te esperan y decide el rol de cada miembro.",
+  "admin.loading": "Cargando las solicitudes y los miembros del club…",
   "admin.loadFailed":
-    "No pudimos cargar las solicitudes y los socios del club.",
+    "No pudimos cargar las solicitudes y los miembros del club.",
   "admin.retry": "Volver a intentar",
   "admin.requests.title": "Solicitudes pendientes",
   "admin.requests.empty": "No hay solicitudes esperando respuesta.",
@@ -291,8 +293,8 @@ export const spanishMessages: MessageCatalog = {
   "admin.requests.rejectLabel": "Rechazar la solicitud de {name}",
   "admin.requests.approved": "{name} ya es {role}.",
   "admin.requests.rejected": "La solicitud de {name} quedó rechazada.",
-  "admin.members.title": "Socios del club",
-  "admin.members.empty": "El club todavía no tiene socios.",
+  "admin.members.title": "Miembros del club",
+  "admin.members.empty": "El club todavía no tiene miembros.",
   "admin.members.roleLabel": "Rol de {name}",
   "admin.members.save": "Guardar",
   "admin.members.saveLabel": "Guardar el rol de {name}",
@@ -302,30 +304,30 @@ export const spanishMessages: MessageCatalog = {
   "admin.error.lastAdmin":
     "Es el último Admin del club. Nombra a otro Admin antes de cambiar este rol.",
   "admin.error.roleAlreadyGranted":
-    "Ese socio ya tiene ese rol o uno mayor. Rechaza la solicitud.",
+    "Ese miembro ya tiene ese rol o uno mayor. Rechaza la solicitud.",
   "admin.error.gone": "Esa solicitud ya no está en el club.",
-  "admin.error.memberGone": "Ese socio ya no está en el club.",
+  "admin.error.memberGone": "Ese miembro ya no está en el club.",
   "admin.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para seguir.",
-  "admin.error.forbidden": "Tu rol no puede gestionar socios ni roles.",
+  "admin.error.forbidden": "Tu rol no puede gestionar miembros ni roles.",
   "admin.error.unexpected":
     "No pudimos completar la acción. Vuelve a intentarlo en un momento.",
   // La sección Grupos (#228, RF-2 a RF-7 del PRD de E4).
   "groups.metaTitle": "Grupos · Victoria Seadragons",
   "groups.metaDescription":
-    "Crea los grupos del club y elige qué socios pertenecen a cada uno.",
+    "Crea los grupos del club y elige qué miembros pertenecen a cada uno.",
   "groups.title": "Grupos",
   "groups.lead":
-    "Los grupos juntan socios para poder dirigirles un entrenamiento, un evento o una noticia.",
+    "Los grupos juntan miembros para poder dirigirles un entrenamiento, un evento o una noticia.",
   "groups.loading": "Cargando los grupos del club…",
   "groups.loadFailed": "No pudimos cargar los grupos del club.",
   "groups.retry": "Volver a intentarlo",
   "groups.list.title": "Grupos del club",
   "groups.list.empty":
-    "Este club todavía no tiene grupos. Crea el primero para empezar a juntar socios.",
+    "Este club todavía no tiene grupos. Crea el primero para empezar a juntar miembros.",
   "groups.memberCount": {
-    one: "{count} socio",
-    other: "{count} socios",
+    one: "{count} miembro",
+    other: "{count} miembros",
   },
   "groups.create.label": "Nombre del grupo nuevo",
   "groups.create.submit": "Crear grupo",
@@ -339,31 +341,31 @@ export const spanishMessages: MessageCatalog = {
   "groups.delete": "Borrar",
   "groups.deleteLabel": "Borrar {name}",
   "groups.deleteQuestion": {
-    one: "¿Borrar «{name}»? Tiene {count} socio, que sigue en el club.",
-    other: "¿Borrar «{name}»? Tiene {count} socios, que siguen en el club.",
+    one: "¿Borrar «{name}»? Tiene {count} miembro, que sigue en el club.",
+    other: "¿Borrar «{name}»? Tiene {count} miembros, que siguen en el club.",
   },
   "groups.deleteSubmit": "Borrar el grupo",
   "groups.deleting": "Borrando…",
-  "groups.members.title": "Socios de {name}",
-  "groups.members.loading": "Cargando los socios del grupo…",
-  "groups.members.loadFailed": "No pudimos cargar los socios de este grupo.",
+  "groups.members.title": "Miembros de {name}",
+  "groups.members.loading": "Cargando los miembros del grupo…",
+  "groups.members.loadFailed": "No pudimos cargar los miembros de este grupo.",
   "groups.members.empty":
-    "Este grupo todavía no tiene socios. Agrega el primero desde la lista.",
+    "Este grupo todavía no tiene miembros. Agrega el primero desde la lista.",
   "groups.members.close": "Cerrar el grupo",
   "groups.members.remove": "Quitar",
   "groups.members.removeLabel": "Quitar a {name} del grupo",
   "groups.members.removing": "Quitando…",
-  "groups.members.addLabel": "Socio para agregar",
+  "groups.members.addLabel": "Miembro para agregar",
   "groups.members.add": "Agregar al grupo",
   "groups.members.adding": "Agregando…",
   "groups.members.noCandidates":
-    "Todos los socios del club ya están en este grupo.",
+    "Todos los miembros del club ya están en este grupo.",
   "groups.error.nameTaken": "El club ya tiene un grupo con ese nombre.",
   "groups.error.invalidName":
     "El nombre tiene que tener entre 1 y {max} caracteres.",
   "groups.error.groupGone": "Ese grupo ya no está en el club.",
   "groups.error.memberInactive":
-    "Ese socio ya dejó el club, así que no se puede agregar.",
+    "Ese miembro ya dejó el club, así que no se puede agregar.",
   "groups.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para seguir.",
   "groups.error.forbidden": "Tu rol no puede gestionar los grupos del club.",

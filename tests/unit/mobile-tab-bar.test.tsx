@@ -27,7 +27,7 @@ describe("barra móvil por rol", () => {
     ["Player", ["Pagos"]],
     ["Committee", ["Pagos", "Grupos"]],
   ] as const)(
-    "un %s tiene fijas Inicio, Agenda, Socios y Noticias, y el resto en Más",
+    "un %s tiene fijas Inicio, Agenda, Gente y Noticias, y el resto en Más",
     async (role, overflowLabels) => {
       usePathname.mockReturnValue("/dashboard");
       render(<MobileTabBar locale="es" role={role} />);
@@ -35,7 +35,7 @@ describe("barra móvil por rol", () => {
       expect(fixedTabLabels()).toEqual([
         "Inicio",
         "Agenda",
-        "Socios",
+        "Gente",
         "Noticias",
       ]);
       expect(await openMoreAndListIt()).toEqual([...overflowLabels]);
