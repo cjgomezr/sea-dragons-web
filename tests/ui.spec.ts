@@ -2105,6 +2105,32 @@ async function writeTooLongJustification(page: Page): Promise<void> {
   await expect(page.getByText(/can be at most 500 characters/)).toBeVisible();
 }
 
+const ACCOUNT_PROFILE_ENDPOINT = "/api/v1/account/profile";
+const FULL_PROFILE_STORAGE_STATE =
+  roleRequestStorageStatePath("perfil-completo");
+/** El botón de guardar en los dos idiomas: las capturas en español preparan
+ * la pantalla con la misma función. */
+const SAVE_PROFILE_BUTTON = /^(Save changes|Guardar cambios)$/;
+const PROFILE_SAVED_MESSAGE = /^(Changes saved\.|Cambios guardados\.)$/;
+
+/** Guarda la ficha tal como está. Escribe lo que ya había, así que las
+ * capturas de varios tamaños pueden hacerlo a la vez sobre el mismo socio. */
+async function saveProfileUnchanged(page: Page): Promise<void> {
+  await page.getByRole("button", { name: SAVE_PROFILE_BUTTON }).click();
+  await expect(page.getByRole("status")).toHaveText(PROFILE_SAVED_MESSAGE, {
+    timeout: ACCOUNT_CHANGE_TIMEOUT_MS,
+  });
+}
+
+async function failProfileSaveOnNetwork(page: Page): Promise<void> {
+  await page.route(`**${ACCOUNT_PROFILE_ENDPOINT}`, (route) =>
+    route.abort("internetdisconnected"),
+  );
+  await page.getByRole("button", { name: SAVE_PROFILE_BUTTON }).click();
+  // Con texto: el anunciador de rutas de Next también es un `alert`, vacío.
+  await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toBeVisible();
+}
+
 const ACCOUNT_STATES: readonly AccountState[] = [
   { name: "cuenta-formulario", storageState: E2E_STORAGE_STATE_PATH },
   {
@@ -2131,6 +2157,38 @@ const ACCOUNT_STATES: readonly AccountState[] = [
     name: "cuenta-sin-grupos-es",
     storageState: E2E_STORAGE_STATE_PATH,
     beforeVisit: chooseSpanish,
+  },
+  // El perfil (#241). El socio compartido ya es la ficha con los campos
+  // vacíos, en inglés (`cuenta-formulario`) y en español
+  // (`cuenta-sin-grupos-es`). Estos son la ficha completa, el aviso de
+  // guardado y el de un error de red.
+  { name: "perfil-completo", storageState: FULL_PROFILE_STORAGE_STATE },
+  {
+    name: "perfil-completo-es",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "perfil-guardado",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    prepare: saveProfileUnchanged,
+  },
+  {
+    name: "perfil-guardado-es",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    beforeVisit: chooseSpanish,
+    prepare: saveProfileUnchanged,
+  },
+  {
+    name: "perfil-error-de-red",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    prepare: failProfileSaveOnNetwork,
+  },
+  {
+    name: "perfil-error-de-red-es",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    beforeVisit: chooseSpanish,
+    prepare: failProfileSaveOnNetwork,
   },
 ];
 
@@ -2343,6 +2401,95 @@ test.describe("Mi cuenta sin grupos", () => {
 
     expect(response.status()).toBe(200);
     expect(await response.json()).toEqual({ data: { groups: [] } });
+  });
+});
+
+test.describe("un socio que edita su perfil", () => {
+  skipWithoutSession();
+  test.use({ storageState: roleRequestStorageStatePath("perfil-para-editar") });
+  // Sin reintentos: el primer intento ya dejó la ficha cambiada, y un segundo
+  // taparía por qué falló.
+  test.describe.configure({
+    retries: 0,
+    timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS,
+  });
+
+  test("guarda la ficha, la cabecera y el directorio enseñan lo nuevo, y un campo vaciado queda sin valor", async ({
+    page,
+  }) => {
+    const newName = `Perfil Editado ${Date.now()}`;
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+    await page.getByLabel("Full name").fill(newName);
+    await page.getByLabel("Position").selectOption("Forward");
+    await page.getByLabel("Experience level").selectOption("Advanced");
+    await page.getByLabel("Gender").selectOption("non_binary");
+
+    const saved = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(ACCOUNT_PROFILE_ENDPOINT) &&
+        response.request().method() === "PATCH",
+      { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
+    );
+    await page.getByRole("button", { name: "Save changes" }).click();
+    expect((await saved).status()).toBe(200);
+    await expect(page.getByRole("status")).toHaveText("Changes saved.");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(newName);
+
+    await page.reload();
+    await expect(page.getByLabel("Full name")).toHaveValue(newName);
+    await expect(page.getByLabel("Position")).toHaveValue("Forward");
+
+    const directory = await page.request.get(
+      `${APP_URL}/api/v1/directory?q=${encodeURIComponent(newName)}`,
+    );
+    expect(directory.status()).toBe(200);
+    expect(await directory.json()).toMatchObject({
+      data: {
+        members: [
+          {
+            fullName: newName,
+            position: "Forward",
+            experienceLevel: "Advanced",
+          },
+        ],
+      },
+    });
+
+    await page.getByLabel("Position").selectOption("");
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.getByRole("status")).toHaveText("Changes saved.");
+    const afterClearing = await page.request.get(
+      `${APP_URL}/api/v1/directory?q=${encodeURIComponent(newName)}`,
+    );
+    expect(await afterClearing.json()).toMatchObject({
+      data: { members: [{ fullName: newName, position: null }] },
+    });
+  });
+
+  test("el endpoint le niega cambiar su rol, su AUF, sus grupos o su estado", async ({
+    request,
+  }) => {
+    const response = await request.patch(
+      `${APP_URL}${ACCOUNT_PROFILE_ENDPOINT}`,
+      {
+        data: {
+          fullName: "Intento de Admin",
+          country: "AU",
+          position: null,
+          experienceLevel: null,
+          gender: null,
+          role: "Admin",
+          aufNumber: "AUF-1",
+          groups: [],
+          status: "active",
+        },
+      },
+    );
+
+    expect(response.status()).toBe(403);
+    expect(await response.json()).toMatchObject({
+      error: { code: "forbidden", reason: "reserved_fields" },
+    });
   });
 });
 
