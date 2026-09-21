@@ -3,7 +3,6 @@ import {
   ACCOUNT_API_PATH,
   ACCOUNT_GROUPS_API_PATH,
   ACCOUNT_PAGE_PATH,
-  ADMINISTRATION_PATH,
   COMPLETE_REGISTRATION_PATH,
   CONFIRMATION_EMAIL_API_PATH,
   DASHBOARD_PATH,
@@ -435,28 +434,10 @@ describe("frontera por rol en el cambio de rol de un socio (#211)", () => {
   });
 });
 
+// La pantalla de administración se mudó al directorio (#240): lo que queda de
+// ella en la frontera, y la ruta retirada, se prueban en
+// `tests/unit/administration-retirement.test.ts`.
 describe("frontera por rol en la administración del club (#212)", () => {
-  it.each(["Coach", "Committee", "Player"] as const)(
-    "manda al panel a un %s que pide la pantalla de administración",
-    (role) => {
-      expect(
-        decideSessionBoundary({
-          pathname: ADMINISTRATION_PATH,
-          ...activeAs(role),
-        }),
-      ).toEqual(TO_DASHBOARD);
-    },
-  );
-
-  it("deja entrar a un Admin en la pantalla de administración", () => {
-    expect(
-      decideSessionBoundary({
-        pathname: ADMINISTRATION_PATH,
-        ...activeAs("Admin"),
-      }),
-    ).toEqual(ALLOW);
-  });
-
   it.each(["Coach", "Committee", "Player"] as const)(
     "niega a un %s leer la lista de socios",
     (role) => {

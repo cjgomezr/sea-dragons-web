@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { Role } from "@/lib/auth/roles";
 import {
   DEFAULT_DIRECTORY_QUERY,
   type DirectoryDirection,
   type DirectoryListing,
   type DirectoryQuery,
   type DirectorySort,
+  withMemberRole,
 } from "@/lib/directory/directory";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import { AdministrationNotice } from "./AdministrationNotice";
 import {
   type DirectoryFailure,
   describeDirectoryFailure,
@@ -20,7 +23,9 @@ import {
   DirectoryFilters,
 } from "./DirectoryFilters";
 import { DirectoryTable } from "./DirectoryTable";
+import { RoleRequestsPanel } from "./RoleRequestsPanel";
 import { useDebouncedValue } from "./use-debounced-value";
+import { useMemberRoleChange } from "./use-member-role-change";
 
 /**
  * La pantalla del directorio (#239, RF-2 del PRD de E5): quién está en el
@@ -30,6 +35,9 @@ import { useDebouncedValue } from "./use-debounced-value";
  * que comprobar aquí: quien no tiene sesión no llega, y lo que es del Admin lo
  * decide el servidor. Que quien mira sea Admin se sabe por la respuesta, que
  * viene marcada, y no por un rol que la pantalla haya leído por su cuenta.
+ * Con esa marca, un Admin encuentra además la bandeja de solicitudes de rol y
+ * el cambio de rol de cada fila (#240), que antes vivían en su propia pantalla
+ * de administración.
  *
  * Es de cliente porque su razón de ser es cambiar sin recargar: buscar,
  * filtrar y ordenar rehacen la lectura. Lee por la API v1 y nunca contra la
@@ -186,6 +194,21 @@ export function DirectoryScreen({
     }));
   }
 
+  /** Lo que el servidor ya confirmó llega a la fila sin volver a leer la
+   * lista: la aprobación de una solicitud o un cambio de rol. */
+  function applyRole(userId: string, role: Role): void {
+    setState((current) =>
+      current.kind === "ready"
+        ? {
+            kind: "ready",
+            listing: withMemberRole(current.listing, userId, role),
+          }
+        : current,
+    );
+  }
+
+  const roleChange = useMemberRoleChange(translate, applyRole);
+
   const hasNarrowingFilters =
     asSearchQuery(filters.search) !== null || filters.role !== null;
 
@@ -203,9 +226,13 @@ export function DirectoryScreen({
           onRetry={retryLoad}
         />
       ) : null}
+      {state.kind === "ready" && state.listing.kind === "admin" ? (
+        <RoleRequestsPanel translate={translate} onRoleGranted={applyRole} />
+      ) : null}
       {state.kind === "ready" ? (
         <section className="admin-section" aria-labelledby="miembros-del-club">
           <h2 id="miembros-del-club">{translate("directory.list.title")}</h2>
+          <AdministrationNotice notice={roleChange.notice} />
           <DirectoryFilters
             translate={translate}
             filters={filters}
@@ -231,6 +258,7 @@ export function DirectoryScreen({
               sort={order.sort}
               direction={order.direction}
               onSort={sortBy}
+              onSaveRole={roleChange.saveRole}
             />
           )}
         </section>

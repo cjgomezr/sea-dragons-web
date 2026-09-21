@@ -11,7 +11,11 @@ import {
 } from "./AdministrationNotice";
 
 /**
- * La bandeja de solicitudes pendientes del club (RF-8 del PRD de E3).
+ * La bandeja de solicitudes pendientes del club (RF-8 del PRD de E3), que
+ * desde #240 vive en el directorio y sólo se dibuja para un Admin.
+ *
+ * Pinta sólo lo que va debajo del título: la sección, con su título y su
+ * estado de carga, la pone `RoleRequestsPanel`.
  *
  * Quién decide de verdad es el servidor: aquí sólo se manda la decisión y se
  * espera. Mientras una está en vuelo, ninguna otra sale, así que un doble clic
@@ -131,8 +135,7 @@ export function PendingRequestsTray({
   }
 
   return (
-    <section className="admin-section" aria-labelledby="solicitudes-pendientes">
-      <h2 id="solicitudes-pendientes">{translate("admin.requests.title")}</h2>
+    <>
       <AdministrationNotice notice={notice} />
       {requests.length === 0 ? (
         <p className="admin-empty">{translate("admin.requests.empty")}</p>
@@ -149,6 +152,6 @@ export function PendingRequestsTray({
           ))}
         </ul>
       )}
-    </section>
+    </>
   );
 }

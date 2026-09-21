@@ -1,6 +1,6 @@
 /**
- * El resultado de la última acción de una sección de la pantalla de
- * administración. Un error se anuncia como `alert` porque interrumpe lo que
+ * El resultado de la última acción de un Admin en el directorio: la bandeja
+ * de solicitudes o el cambio de rol. Un error se anuncia como `alert` porque interrumpe lo que
  * se estaba haciendo; un éxito, como `status`, que no interrumpe a quien usa
  * un lector de pantalla.
  */

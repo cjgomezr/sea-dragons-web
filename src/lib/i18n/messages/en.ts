@@ -217,7 +217,6 @@ export const englishMessages = {
   "nav.label.news": "News",
   "nav.label.payments": "Payments",
   "nav.label.groups": "Groups",
-  "nav.label.admin": "Administration",
   // Las etiquetas cortas de la barra móvil. "Home" es la del mockup
   // (docs/mockups/mobile-home-light.png); "Calendar", la otra, no se parte a
   // 360px pero con DejaVu Sans, la fuente que resuelve Linux, ocupa el 84% de
@@ -313,16 +312,11 @@ export const englishMessages = {
   "gender.non_binary": "Non-binary",
   "gender.undisclosed": "Prefer not to say",
 
-  // La pantalla de administración (#212). Los nombres de rol salen de las
+  // La bandeja de solicitudes y el cambio de rol (#212), que viven en el
+  // directorio desde #240. Los nombres de rol salen de las
   // claves `role.*` de arriba, que ya las usa Mi cuenta.
-  "admin.metaTitle": "Administration · Victoria Seadragons",
-  "admin.metaDescription":
-    "Pending role requests and the club's members, for an Admin.",
-  "admin.title": "Administration",
-  "admin.lead":
-    "Answer the role requests waiting for you, and set each member's role.",
-  "admin.loading": "Loading the club's requests and members…",
-  "admin.loadFailed": "We couldn't load the club's requests and members.",
+  "admin.loading": "Loading the pending requests…",
+  "admin.loadFailed": "We couldn't load the pending requests.",
   "admin.retry": "Try again",
   "admin.requests.title": "Pending requests",
   "admin.requests.empty": "No requests are waiting for an answer.",
@@ -335,8 +329,6 @@ export const englishMessages = {
   "admin.requests.rejectLabel": "Reject the request from {name}",
   "admin.requests.approved": "{name} is now {role}.",
   "admin.requests.rejected": "The request from {name} was rejected.",
-  "admin.members.title": "Club members",
-  "admin.members.empty": "The club has no members yet.",
   "admin.members.roleLabel": "Role for {name}",
   "admin.members.save": "Save",
   "admin.members.saveLabel": "Save the role for {name}",

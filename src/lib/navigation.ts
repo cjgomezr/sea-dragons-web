@@ -14,8 +14,7 @@ export type NavIconId =
   | "evaluaciones"
   | "noticias"
   | "pagos"
-  | "grupos"
-  | "administracion";
+  | "grupos";
 
 /** Las etiquetas de la navegación viven en el catálogo bajo `nav.label.`.
  * Ninguna lleva datos que rellenar, y acotar el tipo a ese prefijo es lo que
@@ -69,17 +68,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   },
   { labelKey: "nav.label.news", href: "/noticias", icon: "noticias" },
   { labelKey: "nav.label.payments", href: "/pagos", icon: "pagos" },
-  // Grupos y Administración cierran la lista porque las dos son de gestión, y
-  // ninguna de las dos la abre un Player. Como Administración, Grupos sólo
-  // sale en "Más" y en la barra lateral, donde su etiqueta cabe entera.
+  // Grupos cierra la lista porque es de gestión y no la abre un Player. Sólo
+  // sale en "Más" y en la barra lateral, donde su etiqueta cabe entera. La
+  // administración que la seguía vive ahora dentro del directorio (#240).
   { labelKey: "nav.label.groups", href: "/grupos", icon: "grupos" },
-  // Sólo en "Más" y en la barra lateral, donde cabe entera: no necesita
-  // etiqueta corta.
-  {
-    labelKey: "nav.label.admin",
-    href: "/administracion",
-    icon: "administracion",
-  },
 ];
 
 /** Las secciones que el rol puede abrir, en el orden de `NAV_SECTIONS`.

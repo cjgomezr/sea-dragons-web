@@ -6,15 +6,11 @@ import {
   readApiPayload,
   requestApi,
 } from "@/lib/api/request-api";
-import type {
-  ClubMember,
-  PendingRoleRequest,
-} from "@/lib/auth/club-administration";
+import type { PendingRoleRequest } from "@/lib/auth/club-administration";
 import { REQUESTABLE_ROLES } from "@/lib/auth/role-request";
 import type { RoleRequestDecision } from "@/lib/auth/role-request-decision";
 import { ROLES, type Role } from "@/lib/auth/roles";
 import {
-  MEMBERS_API_PATH,
   MEMBER_ROLE_API_PATH,
   ROLE_REQUESTS_API_PATH,
   ROLE_REQUEST_DECISION_API_PATH,
@@ -23,8 +19,9 @@ import type { MessageKey } from "@/lib/i18n/message";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
- * Lo que la pantalla de administración le pide a la API v1 y cómo reduce cada
- * respuesta a algo que pintar.
+ * Lo que el directorio le pide a la API v1 para la bandeja de solicitudes y el
+ * cambio de rol de un Admin (#240, mudado desde la pantalla de administración
+ * de #212), y cómo reduce cada respuesta a algo que pintar.
  *
  * Todo pasa por los endpoints y nada por la base: la aplicación nativa de
  * Release 2 va a usar exactamente estos mismos caminos (CON-002). Como en los
@@ -33,19 +30,6 @@ import type { Translator } from "@/lib/i18n/translator";
  */
 
 const PENDING_REQUESTS_PATH = `${ROLE_REQUESTS_API_PATH}?status=pending`;
-
-const clubMembersSchema = z.object({
-  data: z.object({
-    members: z.array(
-      z.object({
-        userId: z.string(),
-        fullName: z.string(),
-        email: z.string(),
-        role: z.enum(ROLES),
-      }),
-    ),
-  }),
-});
 
 const pendingRequestsSchema = z.object({
   data: z.object({
@@ -64,16 +48,14 @@ const pendingRequestsSchema = z.object({
 
 const memberRoleSchema = z.object({ data: z.object({ role: z.enum(ROLES) }) });
 
-/** Por qué no salió una petición de esta pantalla. */
+/** Por qué no salió una petición de la bandeja o del cambio de rol. */
 export type AdministrationFailure = ApiRequestFailure;
 
-export type AdministrationData = {
-  readonly requests: readonly PendingRoleRequest[];
-  readonly members: readonly ClubMember[];
-};
-
-export type AdministrationLoad =
-  | { readonly kind: "loaded"; readonly data: AdministrationData }
+export type PendingRequestsLoad =
+  | {
+      readonly kind: "loaded";
+      readonly requests: readonly PendingRoleRequest[];
+    }
   | AdministrationFailure;
 
 export type DecisionOutcome =
@@ -82,28 +64,16 @@ export type DecisionOutcome =
 export type RoleChangeOutcome =
   { readonly kind: "changed"; readonly role: Role } | AdministrationFailure;
 
-export async function loadAdministration(): Promise<AdministrationLoad> {
-  const [pending, members] = await Promise.all([
-    requestApi(PENDING_REQUESTS_PATH),
-    requestApi(MEMBERS_API_PATH),
-  ]);
-  // `readApiPayload` devuelve tal cual el fallo de red o de HTTP que traiga
-  // cada mitad, así que no hace falta mirarlo antes por separado.
-  const readRequests = readApiPayload(pending, pendingRequestsSchema);
-  if (readRequests.kind === "failed") {
-    return readRequests;
-  }
-  const readMembers = readApiPayload(members, clubMembersSchema);
-  if (readMembers.kind === "failed") {
-    return readMembers;
-  }
-  return {
-    kind: "loaded",
-    data: {
-      requests: readRequests.value.data.requests,
-      members: readMembers.value.data.members,
-    },
-  };
+/** Nunca rechaza: `readApiPayload` devuelve tal cual el fallo de red o de
+ * HTTP, y un cuerpo que no cuadra sale como fallo, no como excepción. */
+export async function loadPendingRequests(): Promise<PendingRequestsLoad> {
+  const read = readApiPayload(
+    await requestApi(PENDING_REQUESTS_PATH),
+    pendingRequestsSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "loaded", requests: read.value.data.requests };
 }
 
 export async function submitRoleRequestDecision(
@@ -158,7 +128,7 @@ export function isChangeRefused(failure: RequestFailure): boolean {
   );
 }
 
-/** Lo que la pantalla intentaba cuando el servidor dijo que no. Un mismo
+/** Lo que el Admin intentaba cuando el servidor dijo que no. Un mismo
  * código no significa lo mismo en las dos acciones: un 404 al decidir es una
  * solicitud que ya no está, y al cambiar un rol es un socio que ya no está. */
 export type AdministrationAction = "decision" | "roleChange";
