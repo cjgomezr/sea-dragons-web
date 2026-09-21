@@ -99,6 +99,12 @@ export const DIRECTORY_API_PATH = "/api/v1/directory";
  * cuenta incompleta no lo alcanza, aunque cuelgue de la cuenta. */
 export const ACCOUNT_GROUPS_API_PATH = "/api/v1/account/groups";
 
+/** El perfil propio de quien llama (#241, FR-084). Lo alcanza cualquier
+ * cuenta activa, de cualquier rol, así que no aparece en
+ * `RESTRICTED_ROUTES`. Lo que el miembro no puede cambiar (rol, AUF, grupos y
+ * estado) lo rechaza el handler campo a campo. */
+export const ACCOUNT_PROFILE_API_PATH = "/api/v1/account/profile";
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 
