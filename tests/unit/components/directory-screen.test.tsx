@@ -85,6 +85,7 @@ const MARIA_PARA_ADMIN: AdminDirectoryMember = {
 const MISSING = "–";
 
 const DIRECTORY_PATH = "/api/v1/directory";
+const PENDING_REQUESTS_PATH = "/api/v1/role-requests?status=pending";
 
 type AnyMember = DirectoryMember | AdminDirectoryMember;
 
@@ -163,6 +164,11 @@ function stubApi(stub: ApiStub = {}): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
+      // La bandeja de solicitudes que el directorio le carga a un Admin
+      // (#240) se prueba en `directory-admin.test.tsx`: aquí llega vacía.
+      if (url === PENDING_REQUESTS_PATH) {
+        return jsonResponse(200, { data: { requests: [] } });
+      }
       requestedUrls.push(url);
       if (!url.startsWith(DIRECTORY_PATH)) {
         throw new Error(`Petición inesperada: ${url}`);

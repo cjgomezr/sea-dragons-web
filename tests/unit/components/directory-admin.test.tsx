@@ -1,36 +1,52 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AdministrationScreen } from "@/components/administration/AdministrationScreen";
+import { DirectoryScreen } from "@/components/directory/DirectoryScreen";
+import type { PendingRoleRequest } from "@/lib/auth/club-administration";
 import type {
-  ClubMember,
-  PendingRoleRequest,
-} from "@/lib/auth/club-administration";
+  AdminDirectoryMember,
+  DirectoryMember,
+} from "@/lib/directory/directory";
 
 /**
- * La pantalla de administración (#212, RF-8 del PRD de E3): la bandeja de
- * solicitudes pendientes y la lista de socios con su rol. Las escrituras ya
- * existían (#210 y #211); lo que se prueba aquí es que la pantalla refleja su
- * resultado sin recargar y que no da por hecho ningún cambio que el servidor
- * no confirmó.
+ * Lo que el directorio le enseña a un Admin además de la lista (#240, RF-8 del
+ * PRD de E5): la bandeja de solicitudes de rol y el cambio de rol de cada
+ * miembro, mudados tal cual desde la pantalla de administración de E3 (#212).
+ *
+ * Las escrituras ya existían (#210 y #211). Lo que se prueba aquí es que el
+ * directorio refleja su resultado sin recargar, que no da por hecho ningún
+ * cambio que el servidor no confirmó, y que nada de esto le sale a quien no
+ * es Admin.
  */
 
 const NEREA_ID = "b1b1b1b1-0000-4000-8000-00000000000b";
 const ADMIN_ID = "a0a0a0a0-0000-4000-8000-00000000000a";
 const REQUEST_ID = "0f0e0d0c-0b0a-4908-8706-050403020100";
 
-const NEREA: ClubMember = {
+const NEREA: AdminDirectoryMember = {
   userId: NEREA_ID,
   fullName: "Nerea Ruiz",
-  email: "nerea@example.test",
+  country: "ES",
+  experienceLevel: "Beginner",
   role: "Player",
+  position: "Goalkeeper",
+  status: "active",
+  aufNumber: null,
+  aufExpiry: null,
+  isAufExpired: false,
 };
 
-const ANA: ClubMember = {
+const ANA: AdminDirectoryMember = {
   userId: ADMIN_ID,
   fullName: "Ana Admin",
-  email: "ana@example.test",
+  country: "AU",
+  experienceLevel: "Advanced",
   role: "Admin",
+  position: "Defender",
+  status: "active",
+  aufNumber: "AUF-1",
+  aufExpiry: "2030-06-30",
+  isAufExpired: false,
 };
 
 const COACH_REQUEST: PendingRoleRequest = {
@@ -43,6 +59,9 @@ const COACH_REQUEST: PendingRoleRequest = {
   createdAt: "2026-09-17T08:30:00.000Z",
 };
 
+const DIRECTORY_PATH = "/api/v1/directory";
+const PENDING_REQUESTS_PATH = "/api/v1/role-requests?status=pending";
+
 type ApiCall = {
   readonly url: string;
   readonly method: string;
@@ -52,11 +71,13 @@ type ApiCall = {
 type Respond = () => Promise<Response>;
 
 type ApiStub = {
-  readonly members?: readonly ClubMember[];
+  /** Quién mira: sólo a un Admin le llega la lista marcada `admin`. */
+  readonly kind?: "admin" | "member";
+  readonly members?: readonly (AdminDirectoryMember | DirectoryMember)[];
   readonly requests?: readonly PendingRoleRequest[];
+  readonly loadRequests?: Respond;
   readonly decision?: Respond;
   readonly roleChange?: Respond;
-  readonly load?: Respond;
 };
 
 const calls: ApiCall[] = [];
@@ -76,6 +97,36 @@ function errorResponse(
   return jsonResponse(status, { error: { code, message: "x", reason } });
 }
 
+function readResponse(stub: ApiStub, url: string): Promise<Response> {
+  if (url.startsWith(DIRECTORY_PATH)) {
+    return Promise.resolve(
+      jsonResponse(200, {
+        data: { kind: stub.kind ?? "admin", members: stub.members ?? [NEREA] },
+      }),
+    );
+  }
+  if (url === PENDING_REQUESTS_PATH) {
+    return (
+      stub.loadRequests?.() ??
+      Promise.resolve(
+        jsonResponse(200, {
+          data: { requests: stub.requests ?? [COACH_REQUEST] },
+        }),
+      )
+    );
+  }
+  throw new Error(`Petición inesperada: ${url}`);
+}
+
+const APPROVED_DECISION = {
+  data: {
+    id: REQUEST_ID,
+    status: "approved",
+    decidedBy: ADMIN_ID,
+    decidedAt: "2026-09-18T01:00:00.000Z",
+  },
+};
+
 function stubApi(stub: ApiStub = {}): void {
   vi.stubGlobal(
     "fetch",
@@ -84,28 +135,11 @@ function stubApi(stub: ApiStub = {}): void {
       const body =
         init?.body === undefined ? null : JSON.parse(String(init.body));
       calls.push({ url, method, body });
-      if (method === "GET" && stub.load !== undefined) {
-        return stub.load();
-      }
       if (method === "GET") {
-        return url.startsWith("/api/v1/members")
-          ? jsonResponse(200, { data: { members: stub.members ?? [NEREA] } })
-          : jsonResponse(200, {
-              data: { requests: stub.requests ?? [COACH_REQUEST] },
-            });
+        return readResponse(stub, url);
       }
       if (method === "POST") {
-        return (
-          stub.decision?.() ??
-          jsonResponse(200, {
-            data: {
-              id: REQUEST_ID,
-              status: "approved",
-              decidedBy: ADMIN_ID,
-              decidedAt: "2026-09-18T01:00:00.000Z",
-            },
-          })
-        );
+        return stub.decision?.() ?? jsonResponse(200, APPROVED_DECISION);
       }
       return (
         stub.roleChange?.() ??
@@ -117,12 +151,23 @@ function stubApi(stub: ApiStub = {}): void {
   );
 }
 
-/** Espera a que las dos lecturas hayan pintado la pantalla. */
-async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
-  render(<AdministrationScreen locale={locale} />);
-  await screen.findByRole("heading", {
+const TRAY_LOADING = {
+  en: "Loading the pending requests…",
+  es: "Cargando las solicitudes pendientes…",
+} as const;
+
+/** Espera a que el directorio y la bandeja hayan pintado lo que leyeron. */
+async function renderAdminDirectory(locale: "en" | "es" = "en"): Promise<void> {
+  render(<DirectoryScreen locale={locale} />);
+  await screen.findByRole("region", {
     name: locale === "en" ? "Club members" : "Miembros del club",
   });
+  await screen.findByRole("region", {
+    name: locale === "en" ? "Pending requests" : "Solicitudes pendientes",
+  });
+  await waitFor(() =>
+    expect(screen.queryByText(TRAY_LOADING[locale])).toBeNull(),
+  );
 }
 
 function trayItem(): HTMLElement {
@@ -133,6 +178,20 @@ function memberRole(): HTMLSelectElement {
   return screen.getByRole("combobox", { name: "Role for Nerea Ruiz" });
 }
 
+function approveButton(): HTMLElement {
+  return screen.getByRole("button", {
+    name: "Approve the request from Nerea Ruiz",
+  });
+}
+
+function saveButton(name = "Nerea Ruiz"): HTMLElement {
+  return screen.getByRole("button", { name: `Save the role for ${name}` });
+}
+
+function emptyTray(): HTMLElement {
+  return screen.getByText("No requests are waiting for an answer.");
+}
+
 beforeEach(() => {
   calls.length = 0;
 });
@@ -141,11 +200,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("bandeja de solicitudes", () => {
-  it("lista cada solicitud con el socio, el rol pedido, la fecha y la justificación", async () => {
+describe("directorio para Admin: bandeja de solicitudes", () => {
+  it("lista cada solicitud con el miembro, el rol pedido, la fecha y la justificación", async () => {
     stubApi();
 
-    await renderScreen();
+    await renderAdminDirectory();
 
     const item = trayItem();
     expect(
@@ -159,33 +218,23 @@ describe("bandeja de solicitudes", () => {
     ).toBeVisible();
   });
 
-  it("dice con una frase que no hay ninguna, en vez de una tabla vacía", async () => {
+  it("dice con una frase que no hay ninguna, en vez de una lista vacía", async () => {
     stubApi({ requests: [] });
 
-    await renderScreen();
+    await renderAdminDirectory();
 
-    expect(
-      screen.getByText("No requests are waiting for an answer."),
-    ).toBeVisible();
+    expect(emptyTray()).toBeVisible();
     expect(screen.queryByRole("listitem", { name: /Nerea Ruiz/ })).toBeNull();
   });
 
-  it("al aprobar, la solicitud sale de la bandeja y el socio cambia de rol", async () => {
+  it("al aprobar, la solicitud sale de la bandeja y la lista enseña el rol nuevo", async () => {
     const user = userEvent.setup();
     stubApi();
-    await renderScreen();
+    await renderAdminDirectory();
 
-    await user.click(
-      screen.getByRole("button", {
-        name: "Approve the request from Nerea Ruiz",
-      }),
-    );
+    await user.click(approveButton());
 
-    await waitFor(() =>
-      expect(
-        screen.getByText("No requests are waiting for an answer."),
-      ).toBeVisible(),
-    );
+    await waitFor(() => expect(emptyTray()).toBeVisible());
     expect(memberRole()).toHaveValue("Coach");
     expect(calls.filter((call) => call.method === "POST")).toEqual([
       {
@@ -201,15 +250,10 @@ describe("bandeja de solicitudes", () => {
     stubApi({
       decision: async () =>
         jsonResponse(200, {
-          data: {
-            id: REQUEST_ID,
-            status: "rejected",
-            decidedBy: ADMIN_ID,
-            decidedAt: "2026-09-18T01:00:00.000Z",
-          },
+          data: { ...APPROVED_DECISION.data, status: "rejected" },
         }),
     });
-    await renderScreen();
+    await renderAdminDirectory();
 
     await user.click(
       screen.getByRole("button", {
@@ -217,11 +261,7 @@ describe("bandeja de solicitudes", () => {
       }),
     );
 
-    await waitFor(() =>
-      expect(
-        screen.getByText("No requests are waiting for an answer."),
-      ).toBeVisible(),
-    );
+    await waitFor(() => expect(emptyTray()).toBeVisible());
     expect(memberRole()).toHaveValue("Player");
     expect(calls.at(-1)?.body).toEqual({ decision: "rejected" });
   });
@@ -229,13 +269,9 @@ describe("bandeja de solicitudes", () => {
   it("una solicitud que otro Admin ya resolvió lo dice y sale de la bandeja", async () => {
     const user = userEvent.setup();
     stubApi({ decision: async () => errorResponse(409, "conflict") });
-    await renderScreen();
+    await renderAdminDirectory();
 
-    await user.click(
-      screen.getByRole("button", {
-        name: "Approve the request from Nerea Ruiz",
-      }),
-    );
+    await user.click(approveButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Another Admin already answered this request.",
@@ -251,13 +287,9 @@ describe("bandeja de solicitudes", () => {
         throw new TypeError("Failed to fetch");
       },
     });
-    await renderScreen();
+    await renderAdminDirectory();
 
-    await user.click(
-      screen.getByRole("button", {
-        name: "Approve the request from Nerea Ruiz",
-      }),
-    );
+    await user.click(approveButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't reach the server",
@@ -265,16 +297,8 @@ describe("bandeja de solicitudes", () => {
     expect(trayItem()).toBeVisible();
 
     stubApi();
-    await user.click(
-      screen.getByRole("button", {
-        name: "Approve the request from Nerea Ruiz",
-      }),
-    );
-    await waitFor(() =>
-      expect(
-        screen.getByText("No requests are waiting for an answer."),
-      ).toBeVisible(),
-    );
+    await user.click(approveButton());
+    await waitFor(() => expect(emptyTray()).toBeVisible());
   });
 
   it("desactiva aprobar y rechazar mientras la decisión está en curso", async () => {
@@ -286,67 +310,63 @@ describe("bandeja de solicitudes", () => {
           answer = resolve;
         }),
     });
-    await renderScreen();
+    await renderAdminDirectory();
 
-    await user.click(
-      screen.getByRole("button", {
-        name: "Approve the request from Nerea Ruiz",
-      }),
-    );
+    await user.click(approveButton());
 
-    expect(
-      screen.getByRole("button", {
-        name: "Approve the request from Nerea Ruiz",
-      }),
-    ).toBeDisabled();
+    expect(approveButton()).toBeDisabled();
     expect(
       screen.getByRole("button", {
         name: "Reject the request from Nerea Ruiz",
       }),
     ).toBeDisabled();
     await act(async () => {
-      answer(
-        jsonResponse(200, {
-          data: {
-            id: REQUEST_ID,
-            status: "approved",
-            decidedBy: ADMIN_ID,
-            decidedAt: "2026-09-18T01:00:00.000Z",
-          },
-        }),
-      );
+      answer(jsonResponse(200, APPROVED_DECISION));
     });
   });
 
   it("un doble clic manda una sola decisión", async () => {
     const user = userEvent.setup();
     stubApi();
-    await renderScreen();
+    await renderAdminDirectory();
 
-    await user.dblClick(
-      screen.getByRole("button", {
-        name: "Approve the request from Nerea Ruiz",
-      }),
-    );
+    await user.dblClick(approveButton());
 
-    await waitFor(() =>
-      expect(
-        screen.getByText("No requests are waiting for an answer."),
-      ).toBeVisible(),
-    );
+    await waitFor(() => expect(emptyTray()).toBeVisible());
     expect(calls.filter((call) => call.method === "POST")).toHaveLength(1);
+  });
+
+  it("si la bandeja no carga, lo dice y deja volver a intentar sin perder la lista", async () => {
+    const user = userEvent.setup();
+    stubApi({ loadRequests: async () => errorResponse(500, "internal_error") });
+    render(<DirectoryScreen locale="en" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't load the pending requests.",
+    );
+    expect(memberRole()).toHaveValue("Player");
+
+    stubApi();
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByRole("listitem", { name: /Nerea Ruiz/ })).toBe(
+      trayItem(),
+    );
   });
 });
 
-describe("lista de socios", () => {
-  it("muestra el nombre, el correo y el rol de cada socio", async () => {
+describe("directorio para Admin: cambio de rol", () => {
+  it("pone en la fila de cada miembro un control con su rol", async () => {
     stubApi({ members: [NEREA, ANA], requests: [] });
 
-    await renderScreen();
+    await renderAdminDirectory();
 
-    expect(screen.getByText("Nerea Ruiz")).toBeVisible();
-    expect(screen.getByText("nerea@example.test")).toBeVisible();
-    expect(memberRole()).toHaveValue("Player");
+    expect(
+      within(screen.getByRole("row", { name: "Nerea Ruiz" })).getByRole(
+        "combobox",
+        { name: "Role for Nerea Ruiz" },
+      ),
+    ).toHaveValue("Player");
     expect(
       screen.getByRole("combobox", { name: "Role for Ana Admin" }),
     ).toHaveValue("Admin");
@@ -355,12 +375,10 @@ describe("lista de socios", () => {
   it("al confirmar otro rol, la lista muestra el rol nuevo", async () => {
     const user = userEvent.setup();
     stubApi({ requests: [] });
-    await renderScreen();
+    await renderAdminDirectory();
 
     await user.selectOptions(memberRole(), "Committee");
-    await user.click(
-      screen.getByRole("button", { name: "Save the role for Nerea Ruiz" }),
-    );
+    await user.click(saveButton());
 
     await waitFor(() =>
       expect(screen.getByRole("status")).toHaveTextContent(
@@ -384,13 +402,11 @@ describe("lista de socios", () => {
       requests: [],
       roleChange: async () => errorResponse(422, "business_rule", "last_admin"),
     });
-    await renderScreen();
+    await renderAdminDirectory();
     const role = screen.getByRole("combobox", { name: "Role for Ana Admin" });
 
     await user.selectOptions(role, "Player");
-    await user.click(
-      screen.getByRole("button", { name: "Save the role for Ana Admin" }),
-    );
+    await user.click(saveButton("Ana Admin"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "This is the club's last Admin.",
@@ -406,12 +422,10 @@ describe("lista de socios", () => {
         throw new TypeError("Failed to fetch");
       },
     });
-    await renderScreen();
+    await renderAdminDirectory();
 
     await user.selectOptions(memberRole(), "Coach");
-    await user.click(
-      screen.getByRole("button", { name: "Save the role for Nerea Ruiz" }),
-    );
+    await user.click(saveButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't reach the server",
@@ -424,13 +438,11 @@ describe("lista de socios", () => {
           data: { userId: NEREA_ID, previousRole: "Player", role: "Coach" },
         }),
     });
-    await user.click(
-      screen.getByRole("button", { name: "Save the role for Nerea Ruiz" }),
-    );
+    await user.click(saveButton());
     await waitFor(() => expect(memberRole()).toHaveValue("Coach"));
   });
 
-  it("desactiva el botón del socio mientras el cambio está en curso", async () => {
+  it("desactiva el botón del miembro mientras el cambio está en curso", async () => {
     const user = userEvent.setup();
     let answer: (response: Response) => void = () => undefined;
     stubApi({
@@ -440,16 +452,12 @@ describe("lista de socios", () => {
           answer = resolve;
         }),
     });
-    await renderScreen();
+    await renderAdminDirectory();
 
     await user.selectOptions(memberRole(), "Coach");
-    await user.click(
-      screen.getByRole("button", { name: "Save the role for Nerea Ruiz" }),
-    );
+    await user.click(saveButton());
 
-    expect(
-      screen.getByRole("button", { name: "Save the role for Nerea Ruiz" }),
-    ).toBeDisabled();
+    expect(saveButton()).toBeDisabled();
     await act(async () => {
       answer(
         jsonResponse(200, {
@@ -462,29 +470,25 @@ describe("lista de socios", () => {
   it("un doble clic manda un solo cambio", async () => {
     const user = userEvent.setup();
     stubApi({ requests: [] });
-    await renderScreen();
+    await renderAdminDirectory();
 
     await user.selectOptions(memberRole(), "Committee");
-    await user.dblClick(
-      screen.getByRole("button", { name: "Save the role for Nerea Ruiz" }),
-    );
+    await user.dblClick(saveButton());
 
     await waitFor(() => expect(memberRole()).toHaveValue("Committee"));
     expect(calls.filter((call) => call.method === "PATCH")).toHaveLength(1);
   });
 
-  it("con un socio que ya no está en el club lo dice del socio, no de una solicitud", async () => {
+  it("con un miembro que ya no está en el club lo dice del miembro, no de una solicitud", async () => {
     const user = userEvent.setup();
     stubApi({
       requests: [],
       roleChange: async () => errorResponse(404, "not_found"),
     });
-    await renderScreen();
+    await renderAdminDirectory();
 
     await user.selectOptions(memberRole(), "Coach");
-    await user.click(
-      screen.getByRole("button", { name: "Save the role for Nerea Ruiz" }),
-    );
+    await user.click(saveButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "That member is no longer in the club.",
@@ -498,12 +502,10 @@ describe("lista de socios", () => {
       roleChange: async () =>
         errorResponse(422, "business_rule", "regla_desconocida"),
     });
-    await renderScreen();
+    await renderAdminDirectory();
 
     await user.selectOptions(memberRole(), "Coach");
-    await user.click(
-      screen.getByRole("button", { name: "Save the role for Nerea Ruiz" }),
-    );
+    await user.click(saveButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't finish that. Try again in a moment.",
@@ -511,7 +513,7 @@ describe("lista de socios", () => {
     expect(memberRole()).toHaveValue("Player");
   });
 
-  it("desactiva el botón de los demás socios mientras un cambio está en curso", async () => {
+  it("desactiva el botón de los demás miembros mientras un cambio está en curso", async () => {
     const user = userEvent.setup();
     let answer: (response: Response) => void = () => undefined;
     stubApi({
@@ -522,20 +524,16 @@ describe("lista de socios", () => {
           answer = resolve;
         }),
     });
-    await renderScreen();
+    await renderAdminDirectory();
     await user.selectOptions(
       screen.getByRole("combobox", { name: "Role for Ana Admin" }),
       "Committee",
     );
 
     await user.selectOptions(memberRole(), "Coach");
-    await user.click(
-      screen.getByRole("button", { name: "Save the role for Nerea Ruiz" }),
-    );
+    await user.click(saveButton());
 
-    expect(
-      screen.getByRole("button", { name: "Save the role for Ana Admin" }),
-    ).toBeDisabled();
+    expect(saveButton("Ana Admin")).toBeDisabled();
     await act(async () => {
       answer(
         jsonResponse(200, {
@@ -546,41 +544,50 @@ describe("lista de socios", () => {
   });
 });
 
-describe("carga de la pantalla", () => {
-  it("si una lectura falla, lo dice y deja volver a intentar", async () => {
-    const user = userEvent.setup();
-    stubApi({ load: async () => errorResponse(500, "internal_error") });
-    render(<AdministrationScreen locale="en" />);
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "We couldn't load the club's requests and members.",
-    );
-
-    stubApi();
-    await user.click(screen.getByRole("button", { name: "Try again" }));
-
-    expect(
-      await screen.findByRole("heading", { name: "Club members" }),
-    ).toBeVisible();
-  });
-
-  it("pide las dos lecturas a la API v1, no a la base", async () => {
+describe("directorio para Admin: lecturas", () => {
+  it("pide la lista y la bandeja a la API v1, no a la base", async () => {
     stubApi();
 
-    await renderScreen();
+    await renderAdminDirectory();
 
-    expect(calls.map((call) => call.url).sort()).toEqual([
-      "/api/v1/members",
-      "/api/v1/role-requests?status=pending",
-    ]);
+    const urls = calls.map((call) => call.url);
+    expect(urls.some((url) => url.startsWith(DIRECTORY_PATH))).toBe(true);
+    expect(urls).toContain(PENDING_REQUESTS_PATH);
+    expect(urls).not.toContain("/api/v1/members");
   });
 });
 
-describe("la pantalla en español", () => {
-  it("escribe títulos, roles, fechas y estados vacíos en español", async () => {
+describe("directorio para quien no es Admin", () => {
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "a un %s no le enseña la bandeja ni el control de rol",
+    async (role) => {
+      stubApi({ kind: "member", members: [{ ...NEREA, role }] });
+
+      render(<DirectoryScreen locale="en" />);
+      await screen.findByRole("region", { name: "Club members" });
+
+      expect(
+        screen.queryByRole("region", { name: "Pending requests" }),
+      ).toBeNull();
+      expect(screen.queryByRole("combobox")).toBeNull();
+      expect(
+        within(screen.getByRole("row", { name: "Nerea Ruiz" })).getByRole(
+          "cell",
+          { name: role },
+        ),
+      ).toBeVisible();
+      expect(calls.map((call) => call.url)).not.toContain(
+        PENDING_REQUESTS_PATH,
+      );
+    },
+  );
+});
+
+describe("directorio para Admin en español", () => {
+  it("escribe títulos, roles y estados vacíos en español", async () => {
     stubApi({ requests: [] });
 
-    await renderScreen("es");
+    await renderAdminDirectory("es");
 
     expect(
       screen.getByRole("heading", { name: "Solicitudes pendientes" }),
@@ -601,7 +608,7 @@ describe("la pantalla en español", () => {
   it("escribe en español la fecha y el rol pedido de una solicitud", async () => {
     stubApi();
 
-    await renderScreen("es");
+    await renderAdminDirectory("es");
 
     const item = screen.getByRole("listitem", { name: /Nerea Ruiz/ });
     expect(within(item).getByText(/Nerea Ruiz pidió ser Coach/)).toBeVisible();
@@ -611,7 +618,7 @@ describe("la pantalla en español", () => {
   it("traduce al español el aviso de un error del servidor", async () => {
     const user = userEvent.setup();
     stubApi({ decision: async () => errorResponse(409, "conflict") });
-    await renderScreen("es");
+    await renderAdminDirectory("es");
 
     await user.click(
       screen.getByRole("button", {
@@ -621,6 +628,16 @@ describe("la pantalla en español", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Otro Admin ya respondió esta solicitud.",
+    );
+  });
+
+  it("traduce al español que la bandeja no cargó", async () => {
+    stubApi({ loadRequests: async () => errorResponse(500, "internal_error") });
+
+    render(<DirectoryScreen locale="es" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "No pudimos cargar las solicitudes pendientes.",
     );
   });
 });

@@ -44,11 +44,6 @@ export const DASHBOARD_PATH = "/dashboard";
  * en `RESTRICTED_ROUTES`. E5 la convierte después en el perfil. */
 export const ACCOUNT_PAGE_PATH = "/cuenta";
 
-/** La pantalla mínima de administración (#212, RF-8): la bandeja de
- * solicitudes pendientes y la lista de socios con su rol. Sólo la alcanza
- * quien gestiona usuarios y roles. E5 la absorbe en el directorio completo. */
-export const ADMINISTRATION_PATH = "/administracion";
-
 /** La sección Grupos (#228, RF-2 a RF-7 del PRD de E4): la lista de grupos
  * del club, con quién está en cada uno. Sólo la alcanza quien gestiona
  * grupos, que son tres de los cuatro roles. */
@@ -69,10 +64,12 @@ export const ROLE_REQUESTS_API_PATH = "/api/v1/role-requests";
 export const ROLE_REQUEST_DECISION_API_PATH = `${ROLE_REQUESTS_API_PATH}/[id]/decision`;
 
 /** Los socios del club (#212, RF-8). Todo lo que cuelga de este camino es de
- * quien gestiona usuarios y roles: el listado de la pantalla de administración
- * y el cambio de rol de abajo. El directorio que E5 abrirá a cualquier socio
- * (FR-015) tendrá que decidir entonces qué abre, y por eso el cambio de rol se
- * declara además por su cuenta. */
+ * quien gestiona usuarios y roles: el listado que leía la pantalla de
+ * administración y el cambio de rol de abajo. Esa pantalla se mudó al
+ * directorio (#240), que lee de `DIRECTORY_API_PATH`; el listado se queda
+ * porque es API de producto (CON-002), no un detalle de aquella pantalla. El
+ * cambio de rol se declara además por su cuenta: si este camino se abre algún
+ * día, él tiene que seguir siendo sólo de un Admin. */
 export const MEMBERS_API_PATH = "/api/v1/members";
 
 /** Cambiar el rol de un socio (#211, FR-014). `[id]` es el `user_id` del
@@ -217,7 +214,6 @@ export type RestrictedRoute = {
 export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: TEAMS_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: EVALUATIONS_PATH, capability: "viewEvaluations" },
-  { path: ADMINISTRATION_PATH, capability: "manageUsersAndRoles" },
   { path: ROLE_REQUEST_DECISION_API_PATH, capability: "manageUsersAndRoles" },
   { path: MEMBERS_API_PATH, capability: "manageUsersAndRoles" },
   // Cuelga del anterior, así que hoy no añade nada. Se declara igual porque es

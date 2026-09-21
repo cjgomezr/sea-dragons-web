@@ -57,7 +57,7 @@ describe("secciones por rol", () => {
     ]);
   });
 
-  it("un Admin ve todas las secciones, Grupos y Administración", () => {
+  it("un Admin ve todas las secciones y Grupos, y ninguna Administración", () => {
     usePathname.mockReturnValue("/dashboard");
     render(<SidebarNav locale="es" role="Admin" />);
 
@@ -70,11 +70,10 @@ describe("secciones por rol", () => {
       "Noticias",
       "Pagos",
       "Grupos",
-      "Administración",
     ]);
     expect(
-      screen.getByRole("link", { name: "Administración" }),
-    ).toHaveAttribute("href", "/administracion");
+      screen.queryByRole("link", { name: "Administración" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Grupos" })).toHaveAttribute(
       "href",
       "/grupos",
@@ -118,7 +117,6 @@ describe("navegación traducida", () => {
       "News",
       "Payments",
       "Groups",
-      "Administration",
     ]);
     expect(screen.getByRole("link", { name: "Calendar" })).toHaveAttribute(
       "href",

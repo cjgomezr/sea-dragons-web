@@ -273,3 +273,19 @@ export async function listDirectory(
       }
     : { kind: "member", members: listed.map(toDirectoryMember) };
 }
+
+/** La misma lista con el rol nuevo de un miembro, sin tocar a nadie más. Es
+ * lo que la pantalla aplica cuando el servidor confirma un cambio de rol o la
+ * aprobación de una solicitud (#240), para no volver a leer el club entero. */
+export function withMemberRole(
+  listing: DirectoryListing,
+  userId: string,
+  role: Role,
+): DirectoryListing {
+  function update<Member extends DirectoryMember>(member: Member): Member {
+    return member.userId === userId ? { ...member, role } : member;
+  }
+  return listing.kind === "admin"
+    ? { kind: "admin", members: listing.members.map(update) }
+    : { kind: "member", members: listing.members.map(update) };
+}

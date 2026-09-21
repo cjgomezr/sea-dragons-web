@@ -1017,23 +1017,10 @@ h6 {
   cursor: pointer;
 }
 
-/* La pantalla de administración (#212). La fila de socio es la de
-   docs/mockups/directory-light.png reducida a lo que el ticket cubre:
-   iniciales, nombre, correo y el rol. La bandeja no tiene mockup y se apoya en
-   el panel de .auth-pending, que es el que ya usa Mi cuenta. */
-.admin {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-  max-width: 720px;
-}
-
-/* La entradilla ya tiene el aire de `gap` debajo: su propio margen inferior
-   la separaría del doble que separa a las dos secciones entre sí. */
-.admin > .app-lead {
-  margin-bottom: 0;
-}
-
+/* Las piezas de administración (#212): la bandeja de solicitudes y el control
+   de rol, que desde #240 viven en el directorio, y la fila de socio que
+   reutiliza Grupos. La bandeja no tiene mockup y se apoya en el panel de
+   .auth-pending, que es el que ya usa Mi cuenta. */
 .admin-section {
   display: flex;
   flex-direction: column;
@@ -1167,12 +1154,6 @@ h6 {
 
 .admin-member-name {
   font-weight: 700;
-  overflow-wrap: anywhere;
-}
-
-.admin-member-email {
-  font-size: 14px;
-  color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }
 
@@ -1570,9 +1551,8 @@ h6 {
   font-weight: 400;
 }
 
-/* La misma pieza que la fila de la pantalla de administración, que sale de
-   este mismo mockup. Comparten regla en vez de copiarla: cuando #240 traiga
-   aquí esa pantalla, quedará una sola. */
+/* La misma pieza que la fila de socio de Grupos, que sale de este mismo
+   mockup. Comparten regla en vez de copiarla. */
 .admin-member-avatar,
 .directory-avatar {
   display: flex;
@@ -1638,6 +1618,36 @@ h6 {
   border-color: var(--color-warning);
 }
 
+/* A un Admin la columna del rol le cede sitio a la de posición: en ella van
+   el selector y su botón (#240), y a 375px no caben en el 28% de la lista de
+   quien sólo mira. */
+.directory-table-admin th:nth-child(2) {
+  width: 36%;
+}
+
+.directory-table-admin th:nth-child(3) {
+  width: 24%;
+}
+
+/* El selector y su botón se ponen uno al lado del otro cuando caben y uno
+   debajo del otro cuando no, sin un punto de corte fijo: el ancho de la celda
+   depende de la barra lateral y del idioma. */
+.directory-role-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.directory-role-control .admin-member-role {
+  flex: 1 1 7rem;
+  min-width: 0;
+}
+
+.directory-role-control .admin-secondary {
+  flex: 1 0 auto;
+  padding: 0 var(--space-3);
+}
+
 /* En el móvil la posición es texto a secas: la pastilla del mockup necesita
    un ancho que a 375px sólo se consigue partiendo la palabra. Desde 768px
    recupera su forma. */
@@ -1670,6 +1680,17 @@ h6 {
 
   .directory-table th:nth-child(2),
   .directory-table th:nth-child(3) {
+    width: 27%;
+  }
+
+  /* La posición recupera aquí su pastilla, y "Goalkeeper" necesita el mismo
+     ancho que en la lista de quien sólo mira: el rol cede lo que haga falta,
+     y su botón baja debajo del selector si no le cabe al lado. */
+  .directory-table-admin th:nth-child(2) {
+    width: 30%;
+  }
+
+  .directory-table-admin th:nth-child(3) {
     width: 27%;
   }
 

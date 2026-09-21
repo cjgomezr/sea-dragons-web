@@ -1164,9 +1164,10 @@ test.describe("dentro de la aplicación", () => {
   /* -------------------------------------------------------------------------
      La navegación por rol (#213). El socio compartido es Player, que es
      también con quien se toman las capturas de arriba; el Admin es el que
-     siembra el arranque para la pantalla de administración. Committee ve lo
-     mismo que Player y Coach lo mismo que Admin sin Administración: los
-     unitarios cubren los cuatro, aquí se fotografían los dos extremos.
+     siembra el arranque para la bandeja del directorio. Committee ve lo
+     mismo que Player y Coach lo mismo que Admin: los unitarios cubren los
+     cuatro, aquí se fotografían los dos extremos. Desde #240 ninguno ve
+     Administración, que vive dentro del directorio.
      ------------------------------------------------------------------------- */
   test.describe("navegación por rol", () => {
     const ROLE_SESSIONS = [
@@ -1323,7 +1324,7 @@ test.describe("dentro de la aplicación", () => {
         storageState: roleRequestStorageStatePath("admin-de-administracion"),
       });
 
-      test("the sidebar offers every section and Administration", async ({
+      test("the sidebar offers every section and no Administration", async ({
         page,
       }) => {
         await page.setViewportSize(DESKTOP);
@@ -1339,17 +1340,13 @@ test.describe("dentro de la aplicación", () => {
           "News",
           "Payments",
           "Groups",
-          "Administration",
         ]);
-        await expect(
-          sidebar.getByRole("link", { name: "Administration" }),
-        ).toHaveAttribute("href", "/administracion");
         await expect(
           sidebar.getByRole("link", { name: "Groups" }),
         ).toHaveAttribute("href", "/grupos");
       });
 
-      test("the tab bar keeps the Coach tabs and adds Administration behind More", async ({
+      test("the tab bar keeps the Coach tabs and the Coach More", async ({
         page,
       }) => {
         await page.setViewportSize(MOBILE);
@@ -1362,13 +1359,7 @@ test.describe("dentro de la aplicación", () => {
         await openMore(page, ENGLISH_SHELL);
         await expect(
           tabBar.locator(".app-tabbar-overflow").getByRole("link"),
-        ).toHaveText([
-          "Directory",
-          "Evaluations",
-          "Payments",
-          "Groups",
-          "Administration",
-        ]);
+        ).toHaveText(["Directory", "Evaluations", "Payments", "Groups"]);
       });
     });
   });
@@ -2060,12 +2051,7 @@ test.describe("un Player que pide una pantalla que su rol no alcanza", () => {
 
   // #213: la navegación ya no las ofrece, pero esconder es comodidad. Quien
   // escribe la dirección a mano se topa igual con la frontera.
-  for (const restrictedPath of [
-    "/equipos",
-    "/evaluaciones",
-    "/administracion",
-    "/grupos",
-  ]) {
+  for (const restrictedPath of ["/equipos", "/evaluaciones", "/grupos"]) {
     test(`aterriza en el panel al pedir ${restrictedPath}`, async ({
       page,
     }) => {
@@ -2568,322 +2554,19 @@ test.describe("un socio que pide un rol desde Mi cuenta", () => {
   });
 });
 /* ---------------------------------------------------------------------------
-   La pantalla de administración (#212). La fila de socio se revisa contra
-   docs/mockups/directory-light.png; la bandeja, contra design-system.md.
-
-   Las capturas leen datos fijos, servidos por `page.route`: la bandeja y la
-   lista enseñan TODO el club, así que en el club compartido de la suite una
-   captura cambiaría con cada socio que cualquier otro test creara. Lo que los
-   endpoints de verdad responden se prueba aparte, en esta misma sección, con
-   la sesión del Admin sembrado.
+   La sesión del Admin sembrado, que usan Grupos y el directorio. La pantalla
+   de administración que la estrenó (#212) se mudó al directorio en #240, y
+   sus pruebas con ella: están en la sección del directorio, más abajo.
    --------------------------------------------------------------------------- */
 
-const ADMINISTRATION_PATH = "/administracion";
-const MEMBERS_ENDPOINT = "/api/v1/members";
-const PENDING_REQUESTS_ENDPOINT = "/api/v1/role-requests";
 const ADMIN_STORAGE_STATE = roleRequestStorageStatePath(
   "admin-de-administracion",
 );
 
-/** Tres veces el largo de una nota normal, para el caso de contenido largo de
- * design-system.md y el criterio de los 375px del ticket. */
-const LONG_JUSTIFICATION =
-  "Llevo tres temporadas entrenando al grupo de juveniles los jueves y también los sábados por la mañana cuando hay torneo, y me gustaría poder cargar las alineaciones y las asistencias sin pedírselo cada vez a alguien del comité.";
-
-const STUBBED_MEMBERS = [
-  {
-    userId: "aaaaaaaa-0000-4000-8000-00000000000a",
-    fullName: "Ana Admin",
-    email: "ana.admin@example.test",
-    role: "Admin",
-  },
-  {
-    userId: "bbbbbbbb-0000-4000-8000-00000000000b",
-    fullName: "Nerea Ruiz",
-    email: "nerea.ruiz@example.test",
-    role: "Player",
-  },
-  {
-    userId: "cccccccc-0000-4000-8000-00000000000c",
-    fullName: "Tomás Errekondo Aranburu",
-    email: "tomas.errekondo.aranburu@example.test",
-    role: "Coach",
-  },
-];
-
-const STUBBED_REQUESTS = [
-  {
-    id: "11111111-0000-4000-8000-000000000001",
-    userId: STUBBED_MEMBERS[1]?.userId,
-    fullName: "Nerea Ruiz",
-    requestedRole: "Coach",
-    justification: LONG_JUSTIFICATION,
-    createdAt: "2026-09-17T08:30:00.000Z",
-  },
-  {
-    id: "22222222-0000-4000-8000-000000000002",
-    userId: STUBBED_MEMBERS[2]?.userId,
-    fullName: "Tomás Errekondo Aranburu",
-    requestedRole: "Committee",
-    justification: null,
-    createdAt: "2026-09-18T02:00:00.000Z",
-  },
-];
-
-/** Las dos lecturas, con datos fijos. Registradas antes de navegar, para que
- * la pantalla no llegue a ver las de verdad. */
-async function stubAdministrationReads(
-  page: Page,
-  options: { readonly withRequests: boolean },
-): Promise<void> {
-  await page.route(
-    (url) => url.pathname === MEMBERS_ENDPOINT,
-    (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ data: { members: STUBBED_MEMBERS } }),
-      }),
-  );
-  await page.route(
-    (url) => url.pathname === PENDING_REQUESTS_ENDPOINT,
-    (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          data: { requests: options.withRequests ? STUBBED_REQUESTS : [] },
-        }),
-      }),
-  );
-}
-
-/** Lo que responde la base cuando alguien intenta degradar al último Admin del
- * club (#211). Aquí se finge porque cuántos Admin tiene el club de pruebas
- * depende de qué otros tests estén corriendo. */
-async function stubLastAdminRefusal(page: Page): Promise<void> {
-  await page.route(
-    (url) => /^\/api\/v1\/members\/[^/]+\/role$/.test(url.pathname),
-    (route) =>
-      route.fulfill({
-        status: 422,
-        contentType: "application/json",
-        body: JSON.stringify({
-          error: {
-            code: "business_rule",
-            message: "Es el último Admin del club.",
-            reason: "last_admin",
-          },
-        }),
-      }),
-  );
-}
-
-/** La pantalla pide sus dos listas al montarse, así que hasta que llegan sólo
- * enseña que está cargando. Sin esperarlas, una captura sale del estado de
- * carga y la comparación de un instante después, de la pantalla ya llena. */
-async function waitForAdministration(
-  page: Page,
-  heading: string,
-): Promise<void> {
-  await expect(page.getByRole("heading", { name: heading })).toBeVisible();
-}
-
-/** Intenta degradar al Admin de la lista y espera a que la pantalla explique
- * que no se puede. El aviso se busca por su texto: el anunciador de rutas del
- * dev server de Next también lleva `role="alert"`. */
-async function refuseLastAdminChange(page: Page): Promise<void> {
-  await stubLastAdminRefusal(page);
-  await page
-    .getByRole("combobox", { name: "Role for Ana Admin" })
-    .selectOption("Player");
-  await page
-    .getByRole("button", { name: "Save the role for Ana Admin" })
-    .click();
-  await expect(page.getByText(/last Admin/)).toBeVisible();
-}
-
-type AdministrationState = {
-  readonly name: string;
-  readonly withRequests: boolean;
-  readonly prepare?: (page: Page) => Promise<void>;
-};
-
-const ADMINISTRATION_STATES: readonly AdministrationState[] = [
-  { name: "administracion-con-solicitudes", withRequests: true },
-  { name: "administracion-sin-solicitudes", withRequests: false },
-  {
-    name: "administracion-ultimo-admin",
-    withRequests: false,
-    prepare: refuseLastAdminChange,
-  },
-];
-
-for (const state of ADMINISTRATION_STATES) {
-  test.describe(state.name, () => {
-    skipWithoutSession();
-    test.use({ storageState: ADMIN_STORAGE_STATE });
-
-    for (const vp of viewports) {
-      test.describe(`@ ${vp.name}`, () => {
-        test.use({ viewport: { width: vp.width, height: vp.height } });
-
-        for (const theme of themes) {
-          test(`matches approved baseline (${theme})`, async ({ page }) => {
-            await stubAdministrationReads(page, state);
-            await goToWithTheme(page, ADMINISTRATION_PATH, theme);
-            await waitForAdministration(page, "Club members");
-            await state.prepare?.(page);
-            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
-            await createMissingLocalBaseline(snapshot, () =>
-              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
-            );
-            await expect(page).toHaveScreenshot(snapshot, {
-              ...SCREENSHOT_OPTIONS,
-              fullPage: true,
-              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
-            });
-          });
-        }
-
-        test("has no horizontal scroll", async ({ page }) => {
-          await stubAdministrationReads(page, state);
-          await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
-          await waitForAdministration(page, "Club members");
-          await state.prepare?.(page);
-          const overflow = await page.evaluate(
-            () =>
-              document.documentElement.scrollWidth >
-              document.documentElement.clientWidth,
-          );
-          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
-        });
-      });
-    }
-
-    test("has no accessibility violations (axe-core)", async ({ page }) => {
-      await stubAdministrationReads(page, state);
-      await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
-      await waitForAdministration(page, "Club members");
-      await state.prepare?.(page);
-      await expectNoAxeViolations(page);
-    });
-
-    // Como `expectNoAxeViolationsInSpanish`, pero esperando a que las listas
-    // lleguen: en la pantalla de carga no hay casi nada que axe pueda revisar.
-    test("en español: has no accessibility violations (axe-core)", async ({
-      page,
-    }) => {
-      await stubAdministrationReads(page, state);
-      await chooseSpanish(page);
-      await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
-      await expect(page.locator("html")).toHaveAttribute("lang", "es");
-      await waitForAdministration(page, "Miembros del club");
-      await expectNoAxeViolations(page);
-    });
-  });
-}
-
-test.describe("la pantalla de administración con los datos de verdad", () => {
-  skipWithoutSession();
-  test.use({ storageState: ADMIN_STORAGE_STATE });
-
-  test("un Admin ve la bandeja y a los socios de su club", async ({ page }) => {
-    await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
-
-    await expect(
-      page.getByRole("heading", { name: "Pending requests" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("combobox", {
-        name: `Role for ${ADMINISTRATION_ADMIN_NAME}`,
-      }),
-    ).toHaveValue("Admin");
-  });
-
-  test("en español, la pantalla sale en español", async ({ page }) => {
-    await chooseSpanish(page);
-    await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
-
-    await expect(
-      page.getByRole("heading", { name: "Solicitudes pendientes" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Miembros del club" }),
-    ).toBeVisible();
-  });
-
-  test("las dos lecturas responden 200 a un Admin", async ({ request }) => {
-    const members = await request.get(`${APP_URL}${MEMBERS_ENDPOINT}`);
-    const pending = await request.get(
-      `${APP_URL}${PENDING_REQUESTS_ENDPOINT}?status=pending`,
-    );
-
-    expect(members.status()).toBe(200);
-    expect(pending.status()).toBe(200);
-  });
-});
-
-test.describe("un Player frente a la pantalla de administración", () => {
-  skipWithoutSession();
-  test.use({ storageState: E2E_STORAGE_STATE_PATH });
-
-  test("aterriza en el panel al pedirla", async ({ page }) => {
-    await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
-
-    await expect(page).toHaveURL(new RegExp("/dashboard$"));
-  });
-
-  test("las dos lecturas le responden 403", async ({ request }) => {
-    const members = await request.get(`${APP_URL}${MEMBERS_ENDPOINT}`);
-    const pending = await request.get(
-      `${APP_URL}${PENDING_REQUESTS_ENDPOINT}?status=pending`,
-    );
-
-    expect(members.status()).toBe(403);
-    expect(pending.status()).toBe(403);
-  });
-});
-
-test.describe("un Admin que decide una solicitud desde la bandeja", () => {
-  skipWithoutSession();
-  test.use({ storageState: ADMIN_STORAGE_STATE });
-  // Sin reintentos: el primer intento ya aprueba la solicitud, y el segundo
-  // encontraría la bandeja sin ella y taparía por qué falló el primero.
-  test.describe.configure({
-    retries: 0,
-    timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS,
-  });
-
-  test("aprobar la saca de la bandeja y deja al socio con su rol nuevo", async ({
-    page,
-  }) => {
-    await page.goto(`${APP_URL}${ADMINISTRATION_PATH}`);
-    const approve = page.getByRole("button", {
-      name: `Approve the request from ${DECIDABLE_MEMBER_NAME}`,
-    });
-    await expect(approve).toBeVisible();
-
-    const decided = page.waitForResponse(
-      (response) =>
-        response.url().includes(PENDING_REQUESTS_ENDPOINT) &&
-        response.request().method() === "POST",
-      { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
-    );
-    await approve.click();
-    expect((await decided).status()).toBe(200);
-
-    await expect(approve).toHaveCount(0);
-    await expect(
-      page.getByRole("combobox", { name: `Role for ${DECIDABLE_MEMBER_NAME}` }),
-    ).toHaveValue("Committee");
-  });
-});
-
 /* ---------------------------------------------------------------------------
    La sección Grupos (#228). Sin mockup propio: se revisa contra
    design-system.md, y la fila de socio del panel contra
-   docs/mockups/directory-light.png, como la pantalla de administración.
+   docs/mockups/directory-light.png, como el directorio.
 
    Las capturas leen datos fijos, servidos por `page.route`: la lista enseña
    TODOS los grupos del club, así que en el club compartido de la suite una
@@ -3183,6 +2866,11 @@ test.describe("un Player frente a la sección Grupos", () => {
    directory-dark.png, del que quedan fuera las columnas de OVR y asistencia
    (son de E9 y E8) y el botón de alta, que llega en su propio ticket.
 
+   A un Admin el directorio le enseña además la bandeja de solicitudes de rol
+   y el control de rol de cada fila (#240), mudados desde la pantalla de
+   administración de #212. La bandeja no sale en el mockup: se revisa contra
+   design-system.md, con el aspecto que ya tenía en Administración.
+
    Las capturas leen datos fijos, servidos por `page.route`: el directorio
    enseña a TODO el club, así que una captura cambiaría con cada socio que
    cualquier otro test sembrara. Lo que el endpoint de verdad responde se
@@ -3294,10 +2982,61 @@ function stubbedListing(
   };
 }
 
+const MEMBERS_ENDPOINT = "/api/v1/members";
+const PENDING_REQUESTS_ENDPOINT = "/api/v1/role-requests";
+
+/** Tres veces el largo de una nota normal, para el caso de contenido largo de
+ * design-system.md y el criterio de los 375px. */
+const LONG_JUSTIFICATION =
+  "Llevo tres temporadas entrenando al grupo de juveniles los jueves y también los sábados por la mañana cuando hay torneo, y me gustaría poder cargar las alineaciones y las asistencias sin pedírselo cada vez a alguien del comité.";
+
+/** Dos solicitudes de miembros de la lista: una con la nota más larga y otra
+ * sin nota y con el nombre más largo. */
+const STUBBED_REQUESTS = [
+  {
+    id: "11111111-0000-4000-8000-0000000000aa",
+    userId: "33333333-0000-4000-8000-000000000003",
+    fullName: "Nerea Ruiz",
+    requestedRole: "Coach",
+    justification: LONG_JUSTIFICATION,
+    createdAt: "2026-09-17T08:30:00.000Z",
+  },
+  {
+    id: "22222222-0000-4000-8000-0000000000bb",
+    userId: MEMBER_WITHOUT_DATA.userId,
+    fullName: LONG_MEMBER_NAME,
+    requestedRole: "Committee",
+    justification: null,
+    createdAt: "2026-09-18T02:00:00.000Z",
+  },
+] as const;
+
+/** La bandeja con datos fijos: en el club compartido de la suite cambiaría
+ * con cada solicitud que otro test sembrara. */
+async function stubPendingRequests(
+  page: Page,
+  withRequests: boolean,
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === PENDING_REQUESTS_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: { requests: withRequests ? STUBBED_REQUESTS : [] },
+        }),
+      }),
+  );
+}
+
 async function stubDirectoryReads(
   page: Page,
-  options: { readonly asAdmin: boolean },
+  options: { readonly asAdmin: boolean; readonly withRequests?: boolean },
 ): Promise<void> {
+  if (options.asAdmin) {
+    await stubPendingRequests(page, options.withRequests ?? false);
+  }
   await page.route(
     (url) => url.pathname === DIRECTORY_ENDPOINT,
     (route, request) =>
@@ -3317,11 +3056,60 @@ async function stubDirectoryReads(
 const ENGLISH_DIRECTORY_HEADING = "Club members";
 const SPANISH_DIRECTORY_HEADING = "Miembros del club";
 
-/** La pantalla pide su lista al montarse, así que hasta que llega sólo dice
- * que está cargando. Sin esperarla, la captura sale de ese estado. */
-async function waitForDirectory(page: Page, heading: string): Promise<void> {
+/** El título de la bandeja en el idioma de cada lista. */
+const TRAY_HEADINGS: Readonly<Record<string, string>> = {
+  [ENGLISH_DIRECTORY_HEADING]: "Pending requests",
+  [SPANISH_DIRECTORY_HEADING]: "Solicitudes pendientes",
+};
+
+const TRAY_LOADING = /Loading the pending requests|Cargando las solicitudes/;
+
+/** La pantalla pide su lista al montarse, y la de un Admin después su
+ * bandeja, así que hasta que llegan sólo dicen que están cargando. Sin
+ * esperarlas, la captura sale de ese estado. */
+async function waitForDirectory(
+  page: Page,
+  heading: string,
+  asAdmin = false,
+): Promise<void> {
   await expect(page.getByRole("region", { name: heading })).toBeVisible();
   await expect(page.getByRole("table")).toBeVisible();
+  if (asAdmin) {
+    await expect(
+      page.getByRole("region", { name: TRAY_HEADINGS[heading] }),
+    ).toBeVisible();
+    await expect(page.getByText(TRAY_LOADING)).toHaveCount(0);
+  }
+}
+
+/** Intenta degradar a la Admin de la lista y espera a que la pantalla explique
+ * que no se puede. Lo que responde la base se finge, porque cuántos Admin
+ * tiene el club de pruebas depende de qué otros tests estén corriendo. El
+ * aviso se busca por su texto: el anunciador de rutas del dev server de Next
+ * también lleva `role="alert"`. */
+async function refuseLastAdminChange(page: Page): Promise<void> {
+  await page.route(
+    (url) => /^\/api\/v1\/members\/[^/]+\/role$/.test(url.pathname),
+    (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: {
+            code: "business_rule",
+            message: "Es el último Admin del club.",
+            reason: "last_admin",
+          },
+        }),
+      }),
+  );
+  await page
+    .getByRole("combobox", { name: "Role for Ana Admin" })
+    .selectOption("Player");
+  await page
+    .getByRole("button", { name: "Save the role for Ana Admin" })
+    .click();
+  await expect(page.getByText(/last Admin/)).toBeVisible();
 }
 
 /** Escribe en la búsqueda y espera al desenlace: la tabla recortada, o la
@@ -3352,6 +3140,8 @@ type DirectoryState = {
   /** Un Admin recibe la lista marcada como suya, y con ella el control de los
    * dados de baja y la marca del AUF vencido. */
   readonly asAdmin: boolean;
+  /** Sólo cuenta para un Admin, que es a quien se le carga la bandeja. */
+  readonly withRequests?: boolean;
   readonly listHeading: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
@@ -3401,6 +3191,30 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     beforeVisit: chooseSpanish,
     prepare: includeFormerMembers("Incluir a quienes están de baja"),
   },
+  {
+    name: "directorio-admin-con-solicitudes",
+    asAdmin: true,
+    withRequests: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+  },
+  {
+    name: "directorio-admin-con-solicitudes-es",
+    asAdmin: true,
+    withRequests: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "directorio-admin-sin-solicitudes",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+  },
+  {
+    name: "directorio-admin-ultimo-admin",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: refuseLastAdminChange,
+  },
 ];
 
 async function goToDirectory(
@@ -3415,7 +3229,7 @@ async function goToDirectory(
   } else {
     await goToWithTheme(page, DIRECTORY_SCREEN_PATH, theme);
   }
-  await waitForDirectory(page, state.listHeading);
+  await waitForDirectory(page, state.listHeading, state.asAdmin);
   await state.prepare?.(page);
 }
 
@@ -3505,6 +3319,86 @@ test.describe("el directorio con los datos de verdad", () => {
       page.getByRole("checkbox", { name: "Include former members" }),
     ).toBeVisible();
   });
+
+  test("un Admin ve la bandeja y el control de su propio rol", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+
+    await expect(
+      page.getByRole("heading", { name: "Pending requests" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("combobox", {
+        name: `Role for ${ADMINISTRATION_ADMIN_NAME}`,
+      }),
+    ).toHaveValue("Admin");
+  });
+
+  test("en español, la bandeja sale en español", async ({ page }) => {
+    await chooseSpanish(page);
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+
+    await expect(
+      page.getByRole("heading", { name: "Solicitudes pendientes" }),
+    ).toBeVisible();
+  });
+
+  test("la ruta vieja de administración lo lleva al directorio", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}/administracion`);
+
+    await expect(page).toHaveURL(new RegExp(`${DIRECTORY_SCREEN_PATH}$`));
+    await expect(
+      page.getByRole("heading", { name: "Pending requests" }),
+    ).toBeVisible();
+  });
+
+  test("las lecturas de E3 le siguen respondiendo 200", async ({ request }) => {
+    const members = await request.get(`${APP_URL}${MEMBERS_ENDPOINT}`);
+    const pending = await request.get(
+      `${APP_URL}${PENDING_REQUESTS_ENDPOINT}?status=pending`,
+    );
+
+    expect(members.status()).toBe(200);
+    expect(pending.status()).toBe(200);
+  });
+});
+
+test.describe("un Admin que decide una solicitud desde el directorio", () => {
+  skipWithoutSession();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+  // Sin reintentos: el primer intento ya aprueba la solicitud, y el segundo
+  // encontraría la bandeja sin ella y taparía por qué falló el primero.
+  test.describe.configure({
+    retries: 0,
+    timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS,
+  });
+
+  test("aprobar la saca de la bandeja y deja al miembro con su rol nuevo", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+    const approve = page.getByRole("button", {
+      name: `Approve the request from ${DECIDABLE_MEMBER_NAME}`,
+    });
+    await expect(approve).toBeVisible();
+
+    const decided = page.waitForResponse(
+      (response) =>
+        response.url().includes(PENDING_REQUESTS_ENDPOINT) &&
+        response.request().method() === "POST",
+      { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
+    );
+    await approve.click();
+    expect((await decided).status()).toBe(200);
+
+    await expect(approve).toHaveCount(0);
+    await expect(
+      page.getByRole("combobox", { name: `Role for ${DECIDABLE_MEMBER_NAME}` }),
+    ).toHaveValue("Committee");
+  });
 });
 
 test.describe("un Player frente al directorio", () => {
@@ -3537,5 +3431,33 @@ test.describe("un Player frente al directorio", () => {
     const directory = await request.get(`${APP_URL}${DIRECTORY_ENDPOINT}`);
 
     expect(directory.status()).toBe(200);
+  });
+
+  test("no le enseña la bandeja ni el control de rol", async ({ page }) => {
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+    await expect(page.getByRole("table")).toBeVisible();
+
+    await expect(
+      page.getByRole("heading", { name: "Pending requests" }),
+    ).toHaveCount(0);
+    await expect(page.getByRole("combobox")).toHaveCount(0);
+  });
+
+  test("la ruta vieja de administración lo lleva al directorio", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}/administracion`);
+
+    await expect(page).toHaveURL(new RegExp(`${DIRECTORY_SCREEN_PATH}$`));
+  });
+
+  test("las lecturas de E3 le siguen respondiendo 403", async ({ request }) => {
+    const members = await request.get(`${APP_URL}${MEMBERS_ENDPOINT}`);
+    const pending = await request.get(
+      `${APP_URL}${PENDING_REQUESTS_ENDPOINT}?status=pending`,
+    );
+
+    expect(members.status()).toBe(403);
+    expect(pending.status()).toBe(403);
   });
 });

@@ -60,7 +60,7 @@ describe("barra móvil por rol", () => {
     ]);
   });
 
-  it("un Admin tiene las fijas del Coach, y en Más además Grupos y Administración", async () => {
+  it("un Admin tiene las fijas del Coach, y en Más Grupos pero ninguna Administración", async () => {
     usePathname.mockReturnValue("/dashboard");
     render(<MobileTabBar locale="en" role="Admin" />);
 
@@ -70,7 +70,6 @@ describe("barra móvil por rol", () => {
       "Evaluations",
       "Payments",
       "Groups",
-      "Administration",
     ]);
   });
 
@@ -83,8 +82,8 @@ describe("barra móvil por rol", () => {
     expect(await openMoreAndListIt()).toContain("Directory");
   });
 
-  it("marca Más cuando un Admin está en Administración", () => {
-    usePathname.mockReturnValue("/administracion");
+  it("marca Más cuando un Admin está en Grupos", () => {
+    usePathname.mockReturnValue("/grupos");
     render(<MobileTabBar locale="es" role="Admin" />);
 
     expect(screen.getByRole("button", { name: "Más" })).toHaveAttribute(

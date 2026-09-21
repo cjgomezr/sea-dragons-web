@@ -139,18 +139,6 @@ function GruposIcon(): React.JSX.Element {
   );
 }
 
-/** Un escudo con una marca: la gestión del club (#213). Sólo sale en "Más",
- * pero lleva icono como las demás para que añadirla a las pestañas fijas no
- * pida un dibujo nuevo. */
-function AdministracionIcon(): React.JSX.Element {
-  return (
-    <IconBase>
-      <path d="M12 3.5 5 6v5.5c0 4.2 2.9 7.6 7 9 4.1-1.4 7-4.8 7-9V6z" />
-      <path d="M9 12l2 2 4-4.5" />
-    </IconBase>
-  );
-}
-
 export function OverflowIcon(): React.JSX.Element {
   return (
     <IconBase>
@@ -170,5 +158,4 @@ export const NAV_SECTION_ICONS: Record<NavIconId, () => React.JSX.Element> = {
   noticias: NoticiasIcon,
   pagos: PagosIcon,
   grupos: GruposIcon,
-  administracion: AdministracionIcon,
 };

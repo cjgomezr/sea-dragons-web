@@ -146,7 +146,9 @@ describe("app shell", () => {
     ).not.toHaveTextContent("Teams");
   });
 
-  it("enseña Administración en las dos navegaciones a un Admin", () => {
+  // La administración vive dentro del directorio desde #240: ninguna de las
+  // dos navegaciones la ofrece, ni siquiera a un Admin.
+  it("no enseña Administración en ninguna de las dos navegaciones a un Admin", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
       <AppShell locale="en" role="Admin">
@@ -154,12 +156,12 @@ describe("app shell", () => {
       </AppShell>,
     );
 
-    expect(screen.getByRole("navigation", { name: "Main" })).toHaveTextContent(
-      "Administration",
-    );
+    expect(
+      screen.getByRole("navigation", { name: "Main" }),
+    ).not.toHaveTextContent("Administration");
     expect(
       screen.getByRole("navigation", { name: "Sections" }),
-    ).toHaveTextContent("Administration");
+    ).not.toHaveTextContent("Administration");
   });
 
   it("muestra el contenido recibido dentro del área principal", () => {

@@ -7,7 +7,9 @@ import {
   DirectoryForbiddenError,
   type DirectoryMemberRecord,
   type DirectoryQuery,
+  type DirectoryListing,
   listDirectory,
+  withMemberRole,
 } from "@/lib/directory/directory";
 
 /**
@@ -328,4 +330,48 @@ describe("el AUF en el directorio", () => {
       }
     },
   );
+});
+
+describe("el rol nuevo en la lista (#240)", () => {
+  const NEREA = {
+    userId: "bbbbbbbb-0000-4000-8000-00000000000b",
+    fullName: "Nerea Ruiz",
+    country: "ES",
+    experienceLevel: "Beginner",
+    role: "Player",
+    position: "Goalkeeper",
+    status: "active",
+  } as const;
+  const TOMAS = {
+    ...NEREA,
+    userId: "cccccccc-0000-4000-8000-00000000000c",
+    fullName: "Tomás Errekondo",
+  } as const;
+
+  it("cambia sólo el rol del miembro nombrado", () => {
+    const listing: DirectoryListing = {
+      kind: "member",
+      members: [NEREA, TOMAS],
+    };
+
+    expect(withMemberRole(listing, NEREA.userId, "Coach")).toEqual({
+      kind: "member",
+      members: [{ ...NEREA, role: "Coach" }, TOMAS],
+    });
+  });
+
+  it("conserva lo que sólo ve un Admin", () => {
+    const admin = {
+      ...NEREA,
+      aufNumber: "AUF-9",
+      aufExpiry: "2020-01-31",
+      isAufExpired: true,
+    };
+    const listing: DirectoryListing = { kind: "admin", members: [admin] };
+
+    expect(withMemberRole(listing, NEREA.userId, "Committee")).toEqual({
+      kind: "admin",
+      members: [{ ...admin, role: "Committee" }],
+    });
+  });
 });

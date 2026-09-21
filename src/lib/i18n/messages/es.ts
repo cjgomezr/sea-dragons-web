@@ -213,7 +213,6 @@ export const spanishMessages: MessageCatalog = {
   "nav.label.news": "Noticias",
   "nav.label.payments": "Pagos",
   "nav.label.groups": "Grupos",
-  "nav.label.admin": "Administración",
   "nav.label.dashboardShort": "Inicio",
   // "Calendario" ocupaba el 89% de su pestaña a 360px y se partía con las
   // fuentes de Linux. Ojo para E7: el prototipo llama "Agenda" a una de las
@@ -309,15 +308,8 @@ export const spanishMessages: MessageCatalog = {
   "gender.non_binary": "No binario",
   "gender.undisclosed": "Prefiero no decirlo",
 
-  "admin.metaTitle": "Administración · Victoria Seadragons",
-  "admin.metaDescription":
-    "Las solicitudes de rol pendientes y los miembros del club, para un Admin.",
-  "admin.title": "Administración",
-  "admin.lead":
-    "Responde las solicitudes de rol que te esperan y decide el rol de cada miembro.",
-  "admin.loading": "Cargando las solicitudes y los miembros del club…",
-  "admin.loadFailed":
-    "No pudimos cargar las solicitudes y los miembros del club.",
+  "admin.loading": "Cargando las solicitudes pendientes…",
+  "admin.loadFailed": "No pudimos cargar las solicitudes pendientes.",
   "admin.retry": "Volver a intentar",
   "admin.requests.title": "Solicitudes pendientes",
   "admin.requests.empty": "No hay solicitudes esperando respuesta.",
@@ -330,8 +322,6 @@ export const spanishMessages: MessageCatalog = {
   "admin.requests.rejectLabel": "Rechazar la solicitud de {name}",
   "admin.requests.approved": "{name} ya es {role}.",
   "admin.requests.rejected": "La solicitud de {name} quedó rechazada.",
-  "admin.members.title": "Miembros del club",
-  "admin.members.empty": "El club todavía no tiene miembros.",
   "admin.members.roleLabel": "Rol de {name}",
   "admin.members.save": "Guardar",
   "admin.members.saveLabel": "Guardar el rol de {name}",

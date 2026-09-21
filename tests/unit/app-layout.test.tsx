@@ -66,14 +66,14 @@ describe("disposición de la aplicación", () => {
     expect(sidebar).not.toHaveTextContent("Administration");
   });
 
-  it("dibuja la navegación de un Admin con Administración", async () => {
+  it("dibuja la navegación de un Admin sin Administración, que vive en el directorio", async () => {
     givenSession({ kind: "active", role: "Admin" });
 
     await renderAppLayout();
 
-    expect(
-      screen.getByRole("link", { name: "Administration" }),
-    ).toHaveAttribute("href", "/administracion");
+    const sidebar = screen.getByRole("navigation", { name: "Main" });
+    expect(sidebar).toHaveTextContent("Groups");
+    expect(sidebar).not.toHaveTextContent("Administration");
   });
 
   it("manda a la entrada a quien ya no tiene sesión", async () => {

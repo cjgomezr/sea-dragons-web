@@ -23,7 +23,7 @@ function sectionAt(href: string): (typeof NAV_SECTIONS)[number] {
 }
 
 describe("navegación", () => {
-  it("contiene las siete secciones de socio, Grupos y Administración al final, cada una con su ruta", () => {
+  it("contiene las siete secciones de socio y Grupos al final, cada una con su ruta", () => {
     expect(NAV_SECTIONS.map((section) => [section.href, section.icon])).toEqual(
       [
         ["/dashboard", "dashboard"],
@@ -34,7 +34,6 @@ describe("navegación", () => {
         ["/noticias", "noticias"],
         ["/pagos", "pagos"],
         ["/grupos", "grupos"],
-        ["/administracion", "administracion"],
       ],
     );
   });
@@ -61,7 +60,7 @@ describe("navegación", () => {
 // E17 RF-5: los nombres en inglés son los del mockup de escritorio
 // (docs/mockups/dashboard-light.png).
 describe("navegación traducida", () => {
-  it("nombra las nueve secciones en inglés", () => {
+  it("nombra las ocho secciones en inglés", () => {
     expect(
       NAV_SECTIONS.map((section) => getSectionLabel(section, english)),
     ).toEqual([
@@ -73,11 +72,10 @@ describe("navegación traducida", () => {
       "News",
       "Payments",
       "Groups",
-      "Administration",
     ]);
   });
 
-  it("nombra las nueve secciones en español igual que antes de traducirlas", () => {
+  it("nombra las ocho secciones en español igual que antes de traducirlas", () => {
     expect(
       NAV_SECTIONS.map((section) => getSectionLabel(section, spanish)),
     ).toEqual([
@@ -89,7 +87,6 @@ describe("navegación traducida", () => {
       "Noticias",
       "Pagos",
       "Grupos",
-      "Administración",
     ]);
   });
 });
@@ -105,6 +102,23 @@ const MEMBER_SECTIONS = [
   "/noticias",
   "/pagos",
 ];
+
+// La pantalla de administración se mudó al directorio (#240): la bandeja y el
+// cambio de rol viven ahí, y la navegación ya no tiene a dónde llevar.
+describe("navegación", () => {
+  it.each(ROLES)("no ofrece ninguna sección Administración a un %s", (role) => {
+    const labels = getVisibleSections(role).map((section) =>
+      getSectionLabel(section, english),
+    );
+
+    expect(labels).not.toContain("Administration");
+    expect(hrefsOf(getVisibleSections(role))).not.toContain("/administracion");
+  });
+
+  it("no guarda la sección en ninguna lista, ni para quien la pudiera abrir", () => {
+    expect(hrefsOf(NAV_SECTIONS)).not.toContain("/administracion");
+  });
+});
 
 // FR-013 (#213): la navegación ofrece sólo lo que la frontera deja abrir.
 describe("secciones por rol", () => {
@@ -123,7 +137,7 @@ describe("secciones por rol", () => {
     ]);
   });
 
-  it("un Coach ve además Equipos, Evaluaciones y Grupos, y no Administración", () => {
+  it("un Coach ve además Equipos, Evaluaciones y Grupos", () => {
     expect(hrefsOf(getVisibleSections("Coach"))).toEqual([
       "/dashboard",
       "/directorio",
@@ -136,7 +150,7 @@ describe("secciones por rol", () => {
     ]);
   });
 
-  it("un Admin ve todas las secciones y Administración", () => {
+  it("un Admin ve todas las secciones", () => {
     expect(hrefsOf(getVisibleSections("Admin"))).toEqual(hrefsOf(NAV_SECTIONS));
   });
 });
@@ -177,7 +191,7 @@ describe("barra móvil por rol", () => {
     ]);
   });
 
-  it("un Admin tiene las fijas del Coach, y en Más además Administración", () => {
+  it("un Admin tiene las mismas fijas y el mismo Más que un Coach", () => {
     const { primary, overflow } = getMobileSections("Admin");
 
     expect(hrefsOf(primary)).toEqual(
@@ -188,7 +202,6 @@ describe("barra móvil por rol", () => {
       "/evaluaciones",
       "/pagos",
       "/grupos",
-      "/administracion",
     ]);
   });
 

@@ -9,6 +9,12 @@ import type {
 } from "@/lib/directory/directory";
 import type { Translator } from "@/lib/i18n/translator";
 import {
+  MemberRoleControl,
+  type RoleDraftsControl,
+  type SaveMemberRole,
+  useRoleDrafts,
+} from "./MemberRoleControl";
+import {
   describeCountry,
   describeExperienceLevel,
   describePosition,
@@ -24,6 +30,10 @@ import {
  *
  * Ordenar es cosa del servidor, así que pulsar una cabecera no reordena nada
  * aquí: dice por dónde, y la pantalla vuelve a preguntar.
+ *
+ * A un Admin la celda del rol le da además el control para cambiarlo (#240).
+ * Lo decide la marca de la lista, no un rol leído aparte: el endpoint del
+ * cambio de rol lo comprueba igual por su cuenta.
  */
 
 /** Lo que una fila necesita saber, con lo que sólo un Admin recibe ya
@@ -31,6 +41,7 @@ import {
 type DirectoryRow = {
   readonly member: DirectoryMember;
   readonly isAufExpired: boolean;
+  readonly canEditRole: boolean;
 };
 
 function rowsOf(listing: DirectoryListing): readonly DirectoryRow[] {
@@ -38,8 +49,13 @@ function rowsOf(listing: DirectoryListing): readonly DirectoryRow[] {
     ? listing.members.map((member) => ({
         member,
         isAufExpired: member.isAufExpired,
+        canEditRole: true,
       }))
-    : listing.members.map((member) => ({ member, isAufExpired: false }));
+    : listing.members.map((member) => ({
+        member,
+        isAufExpired: false,
+        canEditRole: false,
+      }));
 }
 
 const ARIA_SORT: Readonly<
@@ -142,9 +158,11 @@ function RowMarks({
 function MemberRow({
   translate,
   row,
+  roleDrafts,
 }: {
   translate: Translator;
   row: DirectoryRow;
+  roleDrafts: RoleDraftsControl;
 }): React.JSX.Element {
   const { member } = row;
   return (
@@ -171,7 +189,15 @@ function MemberRow({
         </span>
       </th>
       <td className="directory-role-cell">
-        {translate(`role.${member.role}`)}
+        {row.canEditRole ? (
+          <MemberRoleControl
+            translate={translate}
+            member={member}
+            drafts={roleDrafts}
+          />
+        ) : (
+          translate(`role.${member.role}`)
+        )}
       </td>
       <td>
         <span className="directory-position">
@@ -188,19 +214,30 @@ export function DirectoryTable({
   sort,
   direction,
   onSort,
+  onSaveRole,
 }: {
   translate: Translator;
   listing: DirectoryListing;
   sort: DirectorySort;
   direction: DirectoryDirection;
   onSort: (column: DirectorySort) => void;
+  /** Sólo se llama desde una lista de Admin, que es la única que dibuja el
+   * control del rol. */
+  onSaveRole: SaveMemberRole;
 }): React.JSX.Element {
   const rows = rowsOf(listing);
+  const roleDrafts = useRoleDrafts(onSaveRole);
   return (
     // La tarjeta es el div y no la tabla: un `border-radius` sobre una tabla
     // no recorta las esquinas de su primera y su última fila.
     <div className="directory-card">
-      <table className="directory-table">
+      <table
+        className={
+          listing.kind === "admin"
+            ? "directory-table directory-table-admin"
+            : "directory-table"
+        }
+      >
         <caption className="directory-count">
           {translate("directory.memberCount", { count: rows.length })}
         </caption>
@@ -235,6 +272,7 @@ export function DirectoryTable({
               key={row.member.userId}
               translate={translate}
               row={row}
+              roleDrafts={roleDrafts}
             />
           ))}
         </tbody>
