@@ -82,8 +82,9 @@ const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** `true` solo si `value` es una fecha del calendario de verdad: `new Date`
- * acepta 2026-02-30 y la corre al 2 de marzo sin avisar. */
-function isRealCalendarDate(value: string): boolean {
+ * acepta 2026-02-30 y la corre al 2 de marzo sin avisar. Exportada porque
+ * el vencimiento del AUF (#242) se valida con la misma regla. */
+export function isRealCalendarDate(value: string): boolean {
   const match = ISO_DATE_PATTERN.exec(value);
   if (!match) {
     return false;

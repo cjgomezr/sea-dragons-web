@@ -7,6 +7,7 @@ import {
   type ExperienceLevel,
   type Position,
 } from "@/lib/members/profile-fields";
+import { isAufExpired } from "@/lib/members/member-record";
 import { compareNames } from "@/lib/text/name-order";
 
 /**
@@ -220,10 +221,7 @@ function toDirectoryMember(record: DirectoryMemberRecord): DirectoryMember {
   };
 }
 
-/** Vencido es haber caducado antes de hoy: el registro vale todo el día de su
- * vencimiento. `todayInClub` y la columna son los dos días de calendario del
- * club en formato YYYY-MM-DD, que se comparan como texto. Quien no tiene
- * registro no lo tiene vencido: no tiene ninguno. */
+/** Cuándo está vencido lo decide la misma regla que la ficha del Admin. */
 function toAdminDirectoryMember(
   record: DirectoryMemberRecord,
   todayInClub: string,
@@ -232,7 +230,7 @@ function toAdminDirectoryMember(
     ...toDirectoryMember(record),
     aufNumber: record.aufNumber,
     aufExpiry: record.aufExpiry,
-    isAufExpired: record.aufExpiry !== null && record.aufExpiry < todayInClub,
+    isAufExpired: isAufExpired(record.aufExpiry, todayInClub),
   };
 }
 
