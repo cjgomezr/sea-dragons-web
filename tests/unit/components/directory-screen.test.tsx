@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DirectoryScreen } from "@/components/directory/DirectoryScreen";
@@ -133,6 +133,28 @@ function listingFor(stub: ApiStub, url: string): Response {
         normalize(member.fullName).includes(normalize(search))),
   );
   return jsonResponse(200, { data: { kind: stub.kind ?? "member", members } });
+}
+
+/** Una respuesta que resuelve cuando el test quiera, para poder contestar dos
+ * consultas en el orden contrario al que se pidieron. */
+type PendingResponse = (response: Response) => void;
+
+function deferredResponses(): {
+  readonly pending: PendingResponse[];
+  readonly respond: () => Promise<Response>;
+} {
+  const pending: PendingResponse[] = [];
+  return {
+    pending,
+    respond: () =>
+      new Promise<Response>((resolve) => {
+        pending.push(resolve);
+      }),
+  };
+}
+
+function listingResponse(members: readonly AnyMember[]): Response {
+  return jsonResponse(200, { data: { kind: "member", members } });
 }
 
 function stubApi(stub: ApiStub = {}): void {
@@ -391,6 +413,80 @@ describe("pantalla del directorio", () => {
     expect(
       await screen.findByText(
         "Your session ended. Sign in again to see the directory.",
+      ),
+    ).toBeVisible();
+  });
+
+  it("descarta la respuesta de una consulta que ya nadie pidió", async () => {
+    const { pending, respond } = deferredResponses();
+    stubApi({ respond });
+    render(<DirectoryScreen locale="en" />);
+    await waitFor(() => {
+      expect(pending).toHaveLength(1);
+    });
+    await act(async () => {
+      pending[0]?.(listingResponse([MARIA, NEREA]));
+    });
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText("Search by name"), "ma");
+    await waitFor(() => {
+      expect(pending).toHaveLength(2);
+    });
+    await user.type(screen.getByLabelText("Search by name"), "r");
+    await waitFor(() => {
+      expect(pending).toHaveLength(3);
+    });
+
+    // La consulta viva ("mar") contesta primero, y la vieja ("ma") después.
+    await act(async () => {
+      pending[2]?.(listingResponse([MARIA]));
+    });
+    await act(async () => {
+      pending[1]?.(listingResponse([NEREA]));
+    });
+
+    expect(listedNames()).toEqual(["María Ñíguez"]);
+  });
+
+  it("deja la lista anterior a la vista mientras llega la nueva", async () => {
+    const { pending, respond } = deferredResponses();
+    stubApi({ respond });
+    render(<DirectoryScreen locale="en" />);
+    await waitFor(() => {
+      expect(pending).toHaveLength(1);
+    });
+    await act(async () => {
+      pending[0]?.(listingResponse([MARIA, NEREA]));
+    });
+
+    await userEvent.setup().click(screen.getByRole("radio", { name: "Coach" }));
+    await waitFor(() => {
+      expect(pending).toHaveLength(2);
+    });
+
+    expect(screen.getByRole("table")).toBeVisible();
+    expect(listedNames()).toEqual(["María Ñíguez", "Nerea Ruiz"]);
+  });
+
+  it("dice que la cuenta no puede ver el directorio cuando el servidor lo niega", async () => {
+    stubApi({ respond: () => errorResponse(403, "forbidden") });
+
+    render(<DirectoryScreen locale="en" />);
+
+    expect(
+      await screen.findByText("Your account can't see the club's directory."),
+    ).toBeVisible();
+  });
+
+  it("trata un cuerpo que no sabe leer como un fallo, no como una lista vacía", async () => {
+    stubApi({ respond: () => jsonResponse(200, { data: { kind: "member" } }) });
+
+    render(<DirectoryScreen locale="en" />);
+
+    expect(
+      await screen.findByText(
+        "We couldn't load the club's directory. Try again.",
       ),
     ).toBeVisible();
   });

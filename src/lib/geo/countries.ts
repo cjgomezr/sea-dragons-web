@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n/locale";
+
 /** Códigos ISO 3166-1 alfa-2. FR-001 pide el país en el registro, y guardarlo
  * como código en vez de como texto libre es lo que permite validarlo en el
  * servidor y traducirlo después sin migrar datos. El nombre visible lo pone
@@ -41,7 +43,7 @@ export function isKnownCountryCode(value: string): boolean {
  * que ya está guardado (el directorio, #239). Un código que no está en el
  * catálogo devuelve `null`: quien llama decide qué pone en su lugar, en vez de
  * recibir de vuelta un código que nadie reconoce. */
-export function countryName(locale: string, code: string): string | null {
+export function countryName(locale: Locale, code: string): string | null {
   const normalized = code.trim().toUpperCase();
   if (!KNOWN_CODES.has(normalized)) {
     return null;

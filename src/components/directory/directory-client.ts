@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   type ApiRequestFailure,
-  UNRECOGNIZED_RESPONSE,
+  readApiPayload,
   requestApi,
 } from "@/lib/api/request-api";
 import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
@@ -82,17 +82,19 @@ export function directoryPath(query: DirectoryQuery): string {
   return `${DIRECTORY_API_PATH}?${params.toString()}`;
 }
 
+/** Nunca rechaza: `requestApi` atrapa el fallo de red y un cuerpo que no
+ * cuadra sale como fallo, no como excepción. Quien la llama puede leer el
+ * resultado sin envolverlo en un `catch`. */
 export async function loadDirectory(
   query: DirectoryQuery,
 ): Promise<DirectoryLoad> {
-  const outcome = await requestApi(directoryPath(query));
-  if (outcome.kind === "failed") {
-    return outcome;
-  }
-  const parsed = responseSchema.safeParse(outcome.payload);
-  return parsed.success
-    ? { kind: "loaded", listing: parsed.data.data }
-    : UNRECOGNIZED_RESPONSE;
+  const read = readApiPayload(
+    await requestApi(directoryPath(query)),
+    responseSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "loaded", listing: read.value.data };
 }
 
 /** Por qué no se pudo leer el directorio, en el idioma de la pantalla. Sólo

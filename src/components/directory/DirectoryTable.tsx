@@ -148,6 +148,10 @@ function MemberRow({
 }): React.JSX.Element {
   const { member } = row;
   return (
+    // El nombre accesible de la fila se declara en vez de dejarlo calcular:
+    // el nombre calculado saldría del contenido de las celdas, y ahí van el
+    // país, el nivel, las marcas y el rol. Quien recorre la tabla con un
+    // lector de pantalla quiere saber de quién es la fila en la que entra.
     <tr aria-label={member.fullName}>
       <th scope="row">
         {/* La caja flexible va dentro y no en la celda: un `th` que deja de

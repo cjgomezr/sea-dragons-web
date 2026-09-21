@@ -163,7 +163,14 @@ export function DirectoryScreen({
     };
   }, [query, reloads]);
 
+  /** Reintentar tras un 403 quita lo único que este endpoint puede negar: los
+   * dados de baja, que sólo un Admin pide. Sin esto, a quien deja de ser Admin
+   * con la pantalla abierta le queda un botón que repite el mismo 403 para
+   * siempre, porque la casilla que lo causa ya no se dibuja. */
   function retryLoad(): void {
+    if (state.kind === "failed" && state.failure.failure === "forbidden") {
+      setFilters((current) => ({ ...current, includeInactive: false }));
+    }
     setState({ kind: "loading" });
     setReloads((count) => count + 1);
   }
