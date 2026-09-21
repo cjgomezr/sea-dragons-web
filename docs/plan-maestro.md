@@ -29,6 +29,7 @@ fábrica: solo sus tickets lo son.
 | **E16a** — Entornos y despliegue        | Proyecto de Supabase de producción separado del de desarrollo, despliegue en Vercel desde `main` con preview por PR, secretos por entorno, migraciones aplicadas por CI, monitoreo de disponibilidad. NFR-003 · NFR-011                                        | M (7)         | —                 | #16       |
 | **E16b** — Scheduler y prueba de carga  | `pg_cron` como scheduler con los jobs de ocurrencias recurrentes (FR-031) y aviso de renovación (FR-072), más la prueba de carga sobre un dataset sembrado de 500 miembros, 5.000 ocurrencias y 50.000 asistencias. NFR-001/008                                | M (4-5)       | E16a, E7, E8, E12 | por crear |
 | **E17** — Bilingüe (inglés y español)   | Catálogo de mensajes por idioma, idioma por cookie con el navegador como respaldo, interruptor junto al del tema, pantallas y correos en inglés y español, y un test que impide que se cuele texto sin traducir. Añadido después del plan.                     | M (8)         | ninguna           | #181      |
+| **E18** · Marca configurable por club   | Nombre, logo, colores base y textos del inicio de sesión configurables por el Admin; la marca sale del código; un club por instalación (relaja ASS-002). Añadido después del plan.                                                                             | M (5-7)       | E3, E5            | #258      |
 
 E15 y E16 se añadieron el 23 de agosto de 2026, después del plan original, al
 resolver los huecos P2, P3 y P4 de `docs/preguntas-abiertas.md`.
@@ -40,6 +41,20 @@ epic y nadie depende de ella, pero **se trabaja antes de E3**: con la
 infraestructura de traducción puesta, cada pantalla que venga después nace en
 los dos idiomas en vez de tener que revisarse más tarde. PRD en
 `docs/prd/e17-bilingue.md`.
+
+E18 se añadió el 22 de septiembre de 2026, a petición del dueño: quiere vender la
+licencia de uso a otros clubes, no necesariamente de rugby subacuático, y cada
+uno tiene que poder poner su logo, su nombre, sus colores y los textos del
+inicio de sesión sin tocar el código. El alcance es **un club por instalación**:
+cada cliente sigue con su propio despliegue y su propia base, así que esto
+relaja ASS-002 ("la marca es fija en la Release 1") sin construir el
+multi-cliente real. Varios clubes en una instalación, direcciones por club, alta
+de clubes y cobrarle al club quedan fuera; `club_id` y RLS en toda tabla
+(NFR-009) siguen siendo la base para cuando se decida. Depende de E3 (el rol
+Admin) y de E5 (el almacenamiento que monta la foto de perfil), y **se trabaja
+después de E5**. Con una advertencia: sacar la marca del código conviene
+hacerlo antes de E7 y E11, porque cada pantalla nueva nace con el nombre escrito
+a mano y habría que volver a revisarla.
 
 El 7 de septiembre de 2026, al escribir su PRD, **E16 se partió en E16a y
 E16b**. El motivo es de secuencia, no de tamaño: sus jobs de `pg_cron` necesitan
@@ -113,6 +128,8 @@ graph LR
   E8 --> E13
   E2 --> E15
   E5 --> E15
+  E3 --> E18
+  E5 --> E18
   E7 --> E14
   E8 --> E14
   E11 --> E14
