@@ -133,12 +133,13 @@ describe("GET /api/v1/members", () => {
     },
   );
 
+  // El POST es el alta de un miembro (#243); los demás siguen sin existir.
   it("no acepta otro método", async () => {
     mockWiring();
-    const { POST } = await import("@/app/api/v1/members/route");
+    const { DELETE } = await import("@/app/api/v1/members/route");
 
-    const response = await POST(
-      new NextRequest(new URL(MEMBERS_API_PATH, ORIGIN), { method: "POST" }),
+    const response = await DELETE(
+      new NextRequest(new URL(MEMBERS_API_PATH, ORIGIN), { method: "DELETE" }),
     );
 
     expect(response.status).toBe(405);

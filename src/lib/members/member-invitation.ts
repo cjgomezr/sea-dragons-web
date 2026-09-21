@@ -207,10 +207,15 @@ export class InvitationRateLimitedError extends Error {
   }
 }
 
+/** El motivo es del proveedor o del cupo, y va al registro del servidor; el
+ * mensaje, que es lo que llega a quien llama, no lo repite. */
 export class InvitationNotSentError extends Error {
+  readonly reason: string;
+
   constructor(reason: string) {
-    super(`No se pudo mandar la invitación: ${reason}`);
+    super("No se pudo mandar la invitación. Inténtalo de nuevo más tarde.");
     this.name = "InvitationNotSentError";
+    this.reason = reason;
   }
 }
 
