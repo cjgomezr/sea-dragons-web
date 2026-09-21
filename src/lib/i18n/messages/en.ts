@@ -239,9 +239,9 @@ export const englishMessages = {
   "signOut.label": "Sign out",
   // Mi cuenta (#209). Los roles se escriben como en el SRD en inglés.
   "account.link": "My account",
-  "account.metaTitle": "My account · Victoria Seadragons",
+  "account.metaTitle": "Profile · Victoria Seadragons",
   "account.metaDescription":
-    "Your role in the club, and a request to become a Coach or join the Committee.",
+    "Your details, your role in the club and your groups, plus a request to become a Coach or join the Committee.",
   "account.roleLine": "Role: {role}",
   "role.Admin": "Admin",
   "role.Coach": "Coach",
@@ -274,6 +274,44 @@ export const englishMessages = {
   "account.error.forbidden": "Your account can't request a role right now.",
   "account.error.unexpected":
     "We couldn't send the request. Try again in a moment.",
+  // El perfil propio (#241). Posición y nivel se guardan con la grafía del
+  // SRD; género, como código.
+  "account.profile.title": "Your details",
+  "account.profile.fullName": "Full name",
+  "account.profile.country": "Country",
+  "account.profile.position": "Position",
+  "account.profile.experienceLevel": "Experience level",
+  "account.profile.gender": "Gender",
+  "account.profile.notSet": "Not set",
+  "account.profile.save": "Save changes",
+  "account.profile.saving": "Saving…",
+  "account.profile.saved": "Changes saved.",
+  "account.profile.issue.fullNameMissing": "Write your name.",
+  "account.profile.issue.fullNameTooLong":
+    "Your name can be at most {max} characters.",
+  "account.profile.issue.countryUnknown": "Choose your country from the list.",
+  "account.profile.issue.positionUnknown": "Choose a position from the list.",
+  "account.profile.issue.experienceLevelUnknown":
+    "Choose an experience level from the list.",
+  "account.profile.issue.genderUnknown": "Choose a gender from the list.",
+  "account.profile.error.network":
+    "We couldn't save your changes. Check your connection and try again.",
+  "account.profile.error.signInRequired":
+    "Your session has ended. Sign in again to save your changes.",
+  "account.profile.error.forbidden":
+    "Your account can't change these details right now.",
+  "account.profile.error.unexpected":
+    "We couldn't save your changes. Try again in a moment.",
+  "position.Goalkeeper": "Goalkeeper",
+  "position.Defender": "Defender",
+  "position.Forward": "Forward",
+  "experienceLevel.Beginner": "Beginner",
+  "experienceLevel.Intermediate": "Intermediate",
+  "experienceLevel.Advanced": "Advanced",
+  "gender.female": "Female",
+  "gender.male": "Male",
+  "gender.non_binary": "Non-binary",
+  "gender.undisclosed": "Prefer not to say",
 
   // La pantalla de administración (#212). Los nombres de rol salen de las
   // claves `role.*` de arriba, que ya las usa Mi cuenta.

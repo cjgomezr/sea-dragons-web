@@ -236,9 +236,9 @@ export const spanishMessages: MessageCatalog = {
     "La API versionada responde en el endpoint de salud, que consulta la base de datos.",
   "signOut.label": "Cerrar sesión",
   "account.link": "Mi cuenta",
-  "account.metaTitle": "Mi cuenta · Victoria Seadragons",
+  "account.metaTitle": "Perfil · Victoria Seadragons",
   "account.metaDescription":
-    "Tu rol en el club, y la solicitud para ser Coach o entrar al Comité.",
+    "Tus datos, tu rol en el club y tus grupos, y la solicitud para ser Coach o entrar al Comité.",
   "account.roleLine": "Rol: {role}",
   "role.Admin": "Admin",
   "role.Coach": "Coach",
@@ -271,6 +271,43 @@ export const spanishMessages: MessageCatalog = {
   "account.error.forbidden": "Tu cuenta no puede pedir un rol ahora mismo.",
   "account.error.unexpected":
     "No pudimos enviar la solicitud. Vuelve a intentarlo en un momento.",
+  // El perfil propio (#241).
+  "account.profile.title": "Tus datos",
+  "account.profile.fullName": "Nombre completo",
+  "account.profile.country": "País",
+  "account.profile.position": "Posición",
+  "account.profile.experienceLevel": "Nivel de experiencia",
+  "account.profile.gender": "Género",
+  "account.profile.notSet": "Sin indicar",
+  "account.profile.save": "Guardar cambios",
+  "account.profile.saving": "Guardando…",
+  "account.profile.saved": "Cambios guardados.",
+  "account.profile.issue.fullNameMissing": "Escribe tu nombre.",
+  "account.profile.issue.fullNameTooLong":
+    "El nombre puede tener como mucho {max} caracteres.",
+  "account.profile.issue.countryUnknown": "Elige tu país de la lista.",
+  "account.profile.issue.positionUnknown": "Elige una posición de la lista.",
+  "account.profile.issue.experienceLevelUnknown":
+    "Elige un nivel de experiencia de la lista.",
+  "account.profile.issue.genderUnknown": "Elige un género de la lista.",
+  "account.profile.error.network":
+    "No pudimos guardar tus cambios. Revisa tu conexión y vuelve a intentarlo.",
+  "account.profile.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para guardar tus cambios.",
+  "account.profile.error.forbidden":
+    "Tu cuenta no puede cambiar estos datos ahora mismo.",
+  "account.profile.error.unexpected":
+    "No pudimos guardar tus cambios. Vuelve a intentarlo en un momento.",
+  "position.Goalkeeper": "Portero",
+  "position.Defender": "Defensa",
+  "position.Forward": "Delantero",
+  "experienceLevel.Beginner": "Principiante",
+  "experienceLevel.Intermediate": "Intermedio",
+  "experienceLevel.Advanced": "Avanzado",
+  "gender.female": "Mujer",
+  "gender.male": "Hombre",
+  "gender.non_binary": "No binario",
+  "gender.undisclosed": "Prefiero no decirlo",
 
   "admin.metaTitle": "Administración · Victoria Seadragons",
   "admin.metaDescription":
