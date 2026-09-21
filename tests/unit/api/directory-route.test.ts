@@ -204,6 +204,9 @@ describe("GET /api/v1/directory", () => {
     ["un rol que no existe", "?role=Trainer"],
     ["un orden que no existe", "?sort=country"],
     ["una dirección que no existe", "?direction=descending"],
+    // Pedir las bajas es cosa de un Admin: la bandera se escribe entera y no
+    // se adivina desde un "1" ni desde la mera presencia del parámetro.
+    ["un incluir inactivos que no es booleano", "?includeInactive=1"],
   ])("responde 400 a %s sin tocar la base", async (_case, search) => {
     mockWiring();
 
