@@ -1683,12 +1683,15 @@ h6 {
     width: 27%;
   }
 
+  /* La posición recupera aquí su pastilla, y "Goalkeeper" necesita el mismo
+     ancho que en la lista de quien sólo mira: el rol cede lo que haga falta,
+     y su botón baja debajo del selector si no le cabe al lado. */
   .directory-table-admin th:nth-child(2) {
-    width: 34%;
+    width: 30%;
   }
 
   .directory-table-admin th:nth-child(3) {
-    width: 22%;
+    width: 27%;
   }
 
   .directory-sort {
