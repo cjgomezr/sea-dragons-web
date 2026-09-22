@@ -15,12 +15,15 @@ export function ProfileScreen({
   locale,
   account,
   profile,
+  photoUrl,
   groups,
   countries,
 }: {
   locale: Locale;
   account: RoleRequestAccount;
   profile: OwnProfile;
+  /** La dirección firmada de la foto (#245), o null sin foto. */
+  photoUrl: string | null;
   groups: readonly MemberGroup[];
   countries: readonly CountryOption[];
 }): React.JSX.Element {
@@ -30,6 +33,7 @@ export function ProfileScreen({
         locale={locale}
         fullName={account.fullName}
         role={account.role}
+        photoUrl={photoUrl}
       />
       <ProfileForm locale={locale} profile={profile} countries={countries} />
       <MyGroups locale={locale} groups={groups} />

@@ -301,6 +301,31 @@ export const englishMessages = {
     "Your account can't change these details right now.",
   "account.profile.error.unexpected":
     "We couldn't save your changes. Try again in a moment.",
+  // La foto de perfil (#245): el círculo de la cabecera y sus controles.
+  "account.photo.alt": "Your profile photo",
+  "account.photo.add": "Add photo",
+  "account.photo.change": "Change photo",
+  "account.photo.remove": "Remove photo",
+  "account.photo.choose": "Choose a photo",
+  "account.photo.hint": "JPEG, PNG or WebP, up to {max} MB.",
+  "account.photo.uploading": "Uploading…",
+  "account.photo.removing": "Removing…",
+  "account.photo.saved": "Photo updated.",
+  "account.photo.removed": "Photo removed.",
+  "account.photo.retry": "Try again",
+  "account.photo.issue.photoTooLarge":
+    "This photo is larger than {max} MB. Choose a smaller one.",
+  "account.photo.issue.photoTypeUnsupported":
+    "Only JPEG, PNG or WebP photos are accepted.",
+  "account.photo.issue.photoEmpty": "This file is empty. Choose another photo.",
+  "account.photo.error.network":
+    "We couldn't reach the server. Your photo hasn't changed. Check your connection and try again.",
+  "account.photo.error.signInRequired":
+    "Your session has ended. Sign in again to change your photo.",
+  "account.photo.error.forbidden":
+    "Your account can't change its photo right now.",
+  "account.photo.error.unexpected":
+    "Something went wrong and your photo hasn't changed. Try again in a moment.",
   "position.Goalkeeper": "Goalkeeper",
   "position.Defender": "Defender",
   "position.Forward": "Forward",

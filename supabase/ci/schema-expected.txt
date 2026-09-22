@@ -44,6 +44,7 @@ columna members.guardian_name tipo=text null=YES default=-
 columna members.id tipo=uuid null=NO default=gen_random_uuid()
 columna members.joined_on tipo=date null=NO default=((now() AT TIME ZONE 'Australia/Melbourne'::text))::date
 columna members.membership_type tipo=text null=YES default=-
+columna members.photo_path tipo=text null=YES default=-
 columna members.position tipo=text null=YES default=-
 columna members.role tipo=text null=NO default='Player'::text
 columna members.user_id tipo=uuid null=NO default=-
@@ -277,6 +278,7 @@ restriccion members.members_experience_level_check CHECK ((experience_level = AN
 restriccion members.members_gender_check CHECK ((gender = ANY (ARRAY['female'::text, 'male'::text, 'non_binary'::text, 'undisclosed'::text])))
 restriccion members.members_guardian_consent_complete CHECK ((((guardian_consent_at IS NULL) AND (guardian_name IS NULL) AND (guardian_email IS NULL)) OR ((guardian_consent_at IS NOT NULL) AND (COALESCE(btrim(guardian_name), ''::text) <> ''::text) AND (COALESCE(btrim(guardian_email), ''::text) <> ''::text))))
 restriccion members.members_membership_type_check CHECK ((membership_type = ANY (ARRAY['Full'::text, 'Student'::text, 'Casual'::text])))
+restriccion members.members_photo_path_in_own_folder CHECK (starts_with(photo_path, ((user_id)::text || '/'::text)))
 restriccion members.members_pkey PRIMARY KEY (id)
 restriccion members.members_position_check CHECK (("position" = ANY (ARRAY['Goalkeeper'::text, 'Defender'::text, 'Forward'::text])))
 restriccion members.members_role_check CHECK ((role = ANY (ARRAY['Admin'::text, 'Coach'::text, 'Committee'::text, 'Player'::text])))

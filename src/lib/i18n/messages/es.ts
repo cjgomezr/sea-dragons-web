@@ -297,6 +297,31 @@ export const spanishMessages: MessageCatalog = {
     "Tu cuenta no puede cambiar estos datos ahora mismo.",
   "account.profile.error.unexpected":
     "No pudimos guardar tus cambios. Vuelve a intentarlo en un momento.",
+  // La foto de perfil (#245): el círculo de la cabecera y sus controles.
+  "account.photo.alt": "Tu foto de perfil",
+  "account.photo.add": "Añadir foto",
+  "account.photo.change": "Cambiar foto",
+  "account.photo.remove": "Quitar foto",
+  "account.photo.choose": "Elegir una foto",
+  "account.photo.hint": "JPEG, PNG o WebP, hasta {max} MB.",
+  "account.photo.uploading": "Subiendo…",
+  "account.photo.removing": "Quitando…",
+  "account.photo.saved": "Foto actualizada.",
+  "account.photo.removed": "Foto quitada.",
+  "account.photo.retry": "Reintentar",
+  "account.photo.issue.photoTooLarge":
+    "Esta foto pesa más de {max} MB. Elige una más pequeña.",
+  "account.photo.issue.photoTypeUnsupported":
+    "Sólo valen fotos JPEG, PNG o WebP.",
+  "account.photo.issue.photoEmpty": "Este archivo está vacío. Elige otra foto.",
+  "account.photo.error.network":
+    "No pudimos conectar con el servidor. Tu foto no ha cambiado. Revisa la conexión y vuelve a intentarlo.",
+  "account.photo.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para cambiar tu foto.",
+  "account.photo.error.forbidden":
+    "Tu cuenta no puede cambiar su foto ahora mismo.",
+  "account.photo.error.unexpected":
+    "Algo falló y tu foto no ha cambiado. Vuelve a intentarlo en un momento.",
   "position.Goalkeeper": "Portería",
   "position.Defender": "Defensa",
   "position.Forward": "Ataque",

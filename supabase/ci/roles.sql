@@ -80,3 +80,47 @@ as $$
 $$;
 
 grant usage on schema auth to anon, authenticated, service_role;
+
+-- Lo mínimo del esquema `storage` de Supabase para que `0018_member_photos`
+-- aplique y sus policies se puedan probar: la tabla de buckets, la de objetos
+-- con RLS activo (en Supabase ya viene así, y la migración no puede activarlo
+-- porque la tabla es de `supabase_storage_admin`) y `storage.foldername`, que
+-- las policies usan para leer la carpeta de un objeto. No es Supabase Storage:
+-- no hay ficheros, sólo las filas que el servicio escribe por cada uno.
+create schema if not exists storage;
+
+create table if not exists storage.buckets (
+  id text primary key,
+  name text not null,
+  public boolean default false,
+  file_size_limit bigint,
+  allowed_mime_types text[]
+);
+
+create table if not exists storage.objects (
+  id uuid primary key default gen_random_uuid(),
+  bucket_id text references storage.buckets (id),
+  name text,
+  owner uuid
+);
+
+alter table storage.objects enable row level security;
+
+-- Copia de la definición de Supabase: todos los segmentos de la ruta menos el
+-- último, que es el nombre del fichero.
+create or replace function storage.foldername(name text) returns text[]
+  language plpgsql
+  immutable
+as $$
+declare
+  _parts text[];
+begin
+  select string_to_array(name, '/') into _parts;
+  return _parts[1:array_length(_parts, 1) - 1];
+end
+$$;
+
+-- Supabase concede la tabla entera a los tres roles y deja que decida RLS.
+grant usage on schema storage to anon, authenticated, service_role;
+grant all on storage.objects to anon, authenticated, service_role;
+grant all on storage.buckets to anon, authenticated, service_role;

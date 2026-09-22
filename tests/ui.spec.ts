@@ -40,7 +40,7 @@ import {
   type PageScreenshotOptions,
 } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -50,6 +50,7 @@ import {
   GROUPED_MEMBER_GROUP_NAMES,
   GROUPED_MEMBER_STORAGE_STATE_PATH,
   PHOTOGRAPHED_MEMBERS,
+  PROFILE_PHOTO_FIXTURE_PATH,
   incompleteStorageStatePath,
   readE2eSessionState,
   roleRequestStorageStatePath,
@@ -2108,6 +2109,33 @@ async function saveProfileUnchanged(page: Page): Promise<void> {
   });
 }
 
+const PHOTO_PROFILE_STORAGE_STATE =
+  roleRequestStorageStatePath("perfil-con-foto");
+const PROFILE_PHOTO_ALT = /^(Your profile photo|Tu foto de perfil)$/;
+const CHOOSE_PHOTO_LABEL = /^(Choose a photo|Elegir una foto)$/;
+/** Un byte más de lo que admite la foto de perfil (#245). */
+const TOO_LARGE_PHOTO_BYTES = 2 * 1024 * 1024 + 1;
+
+/** La foto llega de Storage por una dirección firmada: sin esperar a que
+ * termine de cargar, la captura sale con el círculo vacío. */
+async function waitForProfilePhoto(page: Page): Promise<void> {
+  await expect(
+    page.getByRole("img", { name: PROFILE_PHOTO_ALT }),
+  ).toHaveJSProperty("complete", true);
+}
+
+/** Elige una foto de más de 2 MB: la pantalla la rechaza sin subirla. */
+async function chooseTooLargePhoto(page: Page): Promise<void> {
+  await page.getByLabel(CHOOSE_PHOTO_LABEL).setInputFiles({
+    name: "foto-enorme.jpg",
+    mimeType: "image/jpeg",
+    buffer: Buffer.alloc(TOO_LARGE_PHOTO_BYTES),
+  });
+  await expect(
+    page.getByRole("alert").filter({ hasText: /2 MB/ }),
+  ).toBeVisible();
+}
+
 async function failProfileSaveOnNetwork(page: Page): Promise<void> {
   await page.route(`**${ACCOUNT_PROFILE_ENDPOINT}`, (route) =>
     route.abort("internetdisconnected"),
@@ -2175,6 +2203,30 @@ const ACCOUNT_STATES: readonly AccountState[] = [
     storageState: FULL_PROFILE_STORAGE_STATE,
     beforeVisit: chooseSpanish,
     prepare: failProfileSaveOnNetwork,
+  },
+  // La foto de perfil (#245). Sin foto son las capturas de arriba; éstas son
+  // la cabecera con foto y el aviso de una foto demasiado grande.
+  {
+    name: "perfil-con-foto",
+    storageState: PHOTO_PROFILE_STORAGE_STATE,
+    prepare: waitForProfilePhoto,
+  },
+  {
+    name: "perfil-con-foto-es",
+    storageState: PHOTO_PROFILE_STORAGE_STATE,
+    beforeVisit: chooseSpanish,
+    prepare: waitForProfilePhoto,
+  },
+  {
+    name: "perfil-foto-demasiado-grande",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    prepare: chooseTooLargePhoto,
+  },
+  {
+    name: "perfil-foto-demasiado-grande-es",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    beforeVisit: chooseSpanish,
+    prepare: chooseTooLargePhoto,
   },
 ];
 
@@ -2475,6 +2527,81 @@ test.describe("un socio que edita su perfil", () => {
     expect(response.status()).toBe(403);
     expect(await response.json()).toMatchObject({
       error: { code: "forbidden", reason: "reserved_fields" },
+    });
+  });
+});
+
+const ACCOUNT_PROFILE_PHOTO_ENDPOINT = "/api/v1/account/profile/photo";
+const PHOTO_MEMBER_NAME = "Socia que sube su foto";
+
+test.describe("una socia que sube su foto de perfil", () => {
+  skipWithoutSession();
+  test.use({ storageState: roleRequestStorageStatePath("perfil-para-foto") });
+  // Sin reintentos: el primer intento ya dejó la foto cambiada, y un segundo
+  // taparía por qué falló.
+  test.describe.configure({
+    retries: 0,
+    timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS,
+  });
+
+  test("la ve en su perfil y en su fila del directorio, y al quitarla vuelven sus iniciales", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+    const uploaded = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(ACCOUNT_PROFILE_PHOTO_ENDPOINT) &&
+        response.request().method() === "PUT",
+      { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
+    );
+    await page
+      .getByLabel("Choose a photo")
+      .setInputFiles(PROFILE_PHOTO_FIXTURE_PATH);
+    expect((await uploaded).status()).toBe(200);
+    await expect(page.getByRole("status")).toHaveText("Photo updated.");
+    await waitForProfilePhoto(page);
+
+    await page.reload();
+    await waitForProfilePhoto(page);
+
+    const directory = await page.request.get(
+      `${APP_URL}/api/v1/directory?q=${encodeURIComponent(PHOTO_MEMBER_NAME)}`,
+    );
+    const listing = await directory.json();
+    const photoUrl: unknown = listing.data.members[0]?.photoUrl;
+    expect(typeof photoUrl).toBe("string");
+    // La dirección no dice nada de la socia: ni su correo ni su nombre.
+    expect(String(photoUrl)).not.toMatch(/example\.test|Socia/);
+    const served = await page.request.get(String(photoUrl));
+    expect(served.status()).toBe(200);
+
+    await page.getByRole("button", { name: "Remove photo" }).click();
+    await expect(page.getByRole("status")).toHaveText("Photo removed.");
+    await expect(
+      page.getByRole("img", { name: PROFILE_PHOTO_ALT }),
+    ).toHaveCount(0);
+    const afterRemoval = await page.request.get(
+      `${APP_URL}/api/v1/directory?q=${encodeURIComponent(PHOTO_MEMBER_NAME)}`,
+    );
+    expect(await afterRemoval.json()).toMatchObject({
+      data: { members: [{ fullName: PHOTO_MEMBER_NAME, photoUrl: null }] },
+    });
+  });
+
+  test("el endpoint rechaza un formato que no es imagen y dice cuáles valen", async ({
+    request,
+  }) => {
+    const response = await request.put(
+      `${APP_URL}${ACCOUNT_PROFILE_PHOTO_ENDPOINT}`,
+      {
+        headers: { "content-type": "image/png" },
+        data: Buffer.from("esto no es una imagen"),
+      },
+    );
+
+    expect(response.status()).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: { reason: "photo_type_unsupported" },
     });
   });
 });
@@ -2894,7 +3021,14 @@ const MEMBER_WITHOUT_DATA = {
   role: "Player",
   position: null,
   status: "active",
+  photoUrl: null,
 } as const;
+
+/** Una dirección que no existe: la captura la sirve con la foto fija, igual
+ * que Storage serviría una dirección firmada. */
+const STUBBED_PHOTO_URL = "https://fotos.test/member-photos/mateo.png";
+/** La fila que sale con foto en las capturas que la piden (#245). */
+const MEMBER_WITH_PHOTO_ID = "22222222-0000-4000-8000-000000000002";
 
 const STUBBED_DIRECTORY_MEMBERS = [
   {
@@ -2905,6 +3039,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     role: "Admin",
     position: "Defender",
     status: "active",
+    photoUrl: null,
   },
   {
     userId: "22222222-0000-4000-8000-000000000002",
@@ -2914,6 +3049,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     role: "Coach",
     position: "Forward",
     status: "active",
+    photoUrl: null,
   },
   {
     userId: "33333333-0000-4000-8000-000000000003",
@@ -2923,6 +3059,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     role: "Player",
     position: "Goalkeeper",
     status: "active",
+    photoUrl: null,
   },
   MEMBER_WITHOUT_DATA,
   {
@@ -2933,6 +3070,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     role: "Committee",
     position: "Defender",
     status: "inactive",
+    photoUrl: null,
   },
 ] as const;
 
@@ -2940,9 +3078,9 @@ const STUBBED_DIRECTORY_MEMBERS = [
  * del Admin tiene que enseñar señalada (BR-008). */
 const EXPIRED_AUF_MEMBER_ID = "11111111-0000-4000-8000-000000000001";
 
-function asAdminMember(
-  member: (typeof STUBBED_DIRECTORY_MEMBERS)[number],
-): Record<string, unknown> {
+function asAdminMember(member: {
+  readonly userId: string;
+}): Record<string, unknown> {
   const isAufExpired = member.userId === EXPIRED_AUF_MEMBER_ID;
   return {
     ...member,
@@ -2964,8 +3102,9 @@ function normalizeName(text: string): string {
  * lista sale en el orden en que está escrita, que ya es el alfabético. */
 function stubbedListing(
   searchParams: URLSearchParams,
-  asAdmin: boolean,
+  options: { readonly asAdmin: boolean; readonly withPhoto: boolean },
 ): Record<string, unknown> {
+  const { asAdmin } = options;
   const search = searchParams.get("q");
   const role = searchParams.get("role");
   const includeInactive = searchParams.get("includeInactive") === "true";
@@ -2976,9 +3115,14 @@ function stubbedListing(
       (search === null ||
         normalizeName(member.fullName).includes(normalizeName(search))),
   );
+  const listed = members.map((member) =>
+    options.withPhoto && member.userId === MEMBER_WITH_PHOTO_ID
+      ? { ...member, photoUrl: STUBBED_PHOTO_URL }
+      : member,
+  );
   return {
     kind: asAdmin ? "admin" : "member",
-    members: asAdmin ? members.map(asAdminMember) : members,
+    members: asAdmin ? listed.map(asAdminMember) : listed,
   };
 }
 
@@ -3030,12 +3174,31 @@ async function stubPendingRequests(
   );
 }
 
+/** La foto de la fila que la lleva, servida con la foto fija. */
+async function stubDirectoryPhoto(page: Page): Promise<void> {
+  await page.route(STUBBED_PHOTO_URL, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: readFileSync(PROFILE_PHOTO_FIXTURE_PATH),
+    }),
+  );
+}
+
 async function stubDirectoryReads(
   page: Page,
-  options: { readonly asAdmin: boolean; readonly withRequests?: boolean },
+  options: {
+    readonly asAdmin: boolean;
+    readonly withRequests?: boolean;
+    readonly withPhoto?: boolean;
+  },
 ): Promise<void> {
   if (options.asAdmin) {
     await stubPendingRequests(page, options.withRequests ?? false);
+  }
+  const withPhoto = options.withPhoto ?? false;
+  if (withPhoto) {
+    await stubDirectoryPhoto(page);
   }
   await page.route(
     (url) => url.pathname === DIRECTORY_ENDPOINT,
@@ -3044,10 +3207,10 @@ async function stubDirectoryReads(
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          data: stubbedListing(
-            new URL(request.url()).searchParams,
-            options.asAdmin,
-          ),
+          data: stubbedListing(new URL(request.url()).searchParams, {
+            asAdmin: options.asAdmin,
+            withPhoto,
+          }),
         }),
       }),
   );
@@ -3135,6 +3298,14 @@ function includeFormerMembers(label: string) {
   };
 }
 
+/** La foto de la fila es decorativa (el nombre va al lado), así que se busca
+ * por su dirección y no por su nombre accesible. */
+async function waitForDirectoryPhoto(page: Page): Promise<void> {
+  await expect(
+    page.locator(`img[src="${STUBBED_PHOTO_URL}"]`),
+  ).toHaveJSProperty("complete", true);
+}
+
 type DirectoryState = {
   readonly name: string;
   /** Un Admin recibe la lista marcada como suya, y con ella el control de los
@@ -3142,6 +3313,8 @@ type DirectoryState = {
   readonly asAdmin: boolean;
   /** Sólo cuenta para un Admin, que es a quien se le carga la bandeja. */
   readonly withRequests?: boolean;
+  /** Una de las filas sale con foto en vez de iniciales (#245). */
+  readonly withPhoto?: boolean;
   readonly listHeading: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
@@ -3152,6 +3325,21 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     name: "directorio-con-miembros",
     asAdmin: false,
     listHeading: ENGLISH_DIRECTORY_HEADING,
+  },
+  {
+    name: "directorio-con-foto",
+    asAdmin: false,
+    withPhoto: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: waitForDirectoryPhoto,
+  },
+  {
+    name: "directorio-con-foto-es",
+    asAdmin: false,
+    withPhoto: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: waitForDirectoryPhoto,
   },
   {
     name: "directorio-con-miembros-es",

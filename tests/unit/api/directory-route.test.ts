@@ -26,6 +26,7 @@ const MARIA: DirectoryMemberRecord = {
   status: "active",
   aufNumber: "AUF-7",
   aufExpiry: "2020-01-31",
+  photoPath: null,
 };
 
 const BAJA: DirectoryMemberRecord = {
@@ -38,6 +39,7 @@ const BAJA: DirectoryMemberRecord = {
   status: "inactive",
   aufNumber: null,
   aufExpiry: null,
+  photoPath: null,
 };
 
 const databaseCalls: string[] = [];
@@ -72,6 +74,7 @@ function mockWiring(callerRole: Role = "Player"): void {
             return [MARIA, BAJA];
           },
         },
+        photos: { signPhotoUrls: async () => new Map() },
       },
     }),
   }));
@@ -136,6 +139,7 @@ describe("GET /api/v1/directory", () => {
             role: "Player",
             position: "Defender",
             status: "active",
+            photoUrl: null,
           },
         ],
       },

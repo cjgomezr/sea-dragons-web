@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { memberInitials } from "@/lib/auth/member-initials";
+import { MemberAvatar } from "@/components/MemberAvatar";
 import type {
   DirectoryDirection,
   DirectoryListing,
@@ -25,8 +25,8 @@ import {
 } from "./member-labels";
 
 /**
- * La tabla del directorio (FR-015, FR-019): una fila por socio con sus
- * iniciales, su nombre, su país, su nivel, su rol y su posición, y cabeceras
+ * La tabla del directorio (FR-015, FR-019): una fila por socio con su foto o
+ * sus iniciales (#245), su nombre, su país, su nivel, su rol y su posición, y cabeceras
  * que piden el orden.
  *
  * Las columnas de OVR y asistencia del mockup no están: son de E9 y E8, y hoy
@@ -39,6 +39,9 @@ import {
  * Lo decide la marca de la lista, no un rol leído aparte: el endpoint del
  * cambio de rol lo comprueba igual por su cuenta.
  */
+
+/** El círculo de cada fila, en píxeles; `.directory-avatar` dice lo mismo. */
+const DIRECTORY_AVATAR_SIZE = 40;
 
 /** El registro federativo de una fila, que sólo recibe un Admin (BR-008). */
 type AufView = {
@@ -247,9 +250,12 @@ function MemberRow({
             ser `table-cell` no estira con su fila, y el contenido de la más
             alta se sale por debajo del borde. */}
         <span className="directory-member">
-          <span className="directory-avatar" aria-hidden="true">
-            {memberInitials(member.fullName)}
-          </span>
+          <MemberAvatar
+            className="directory-avatar"
+            fullName={member.fullName}
+            photoUrl={member.photoUrl}
+            size={DIRECTORY_AVATAR_SIZE}
+          />
           <span className="directory-identity">
             <MemberName translate={translate} row={row} />
             <span className="directory-meta">

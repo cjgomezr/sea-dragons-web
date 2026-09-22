@@ -22,6 +22,7 @@ const MARIA: DirectoryMember = {
   role: "Coach",
   position: "Forward",
   status: "active",
+  photoUrl: null,
 };
 
 /** Sin país, sin nivel y sin posición: los tres huecos del criterio del
@@ -34,6 +35,7 @@ const TOMAS: DirectoryMember = {
   role: "Player",
   position: null,
   status: "active",
+  photoUrl: null,
 };
 
 const NEREA: DirectoryMember = {
@@ -44,6 +46,7 @@ const NEREA: DirectoryMember = {
   role: "Player",
   position: "Goalkeeper",
   status: "active",
+  photoUrl: null,
 };
 
 const ZOE: AdminDirectoryMember = {
@@ -54,6 +57,7 @@ const ZOE: AdminDirectoryMember = {
   role: "Committee",
   position: "Defender",
   status: "inactive",
+  photoUrl: null,
   aufNumber: null,
   aufExpiry: null,
   isAufExpired: false,
@@ -67,6 +71,7 @@ const VENCIDA: AdminDirectoryMember = {
   role: "Admin",
   position: "Defender",
   status: "active",
+  photoUrl: null,
   aufNumber: "AUF-7",
   aufExpiry: "2020-01-31",
   isAufExpired: true,
@@ -232,6 +237,34 @@ describe("pantalla del directorio", () => {
     expect(within(row).getByText(/Advanced/)).toBeVisible();
     expect(within(row).getByRole("cell", { name: "Coach" })).toBeVisible();
     expect(within(row).getByRole("cell", { name: "Forward" })).toBeVisible();
+  });
+
+  it("enseña la foto de quien tiene una, en lugar de sus iniciales", async () => {
+    const photoUrl = "https://storage.test/member-photos/nerea.webp?token=t";
+    stubApi({ members: [MARIA, { ...NEREA, photoUrl }] });
+
+    await renderScreen();
+
+    const withPhoto = memberRow("Nerea Ruiz");
+    expect(within(withPhoto).getByRole("presentation")).toHaveAttribute(
+      "src",
+      photoUrl,
+    );
+    expect(within(withPhoto).queryByText("NR")).not.toBeInTheDocument();
+    expect(
+      within(memberRow("María Ñíguez")).queryByRole("presentation"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("no enseña una foto que no llega por una dirección web", async () => {
+    stubApi({
+      members: [{ ...NEREA, photoUrl: "javascript:alert(1)" }],
+    });
+
+    render(<DirectoryScreen locale="en" />);
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByRole("presentation")).not.toBeInTheDocument();
   });
 
   it("dice cuántos socios enseña", async () => {

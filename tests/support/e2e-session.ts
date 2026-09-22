@@ -188,9 +188,32 @@ export const ROLE_REQUEST_MEMBERS = {
     pendingRequest: null,
     columns: { country: "AU" },
   },
+  /** El perfil con foto (#245): nace con la foto fija de
+   * `tests/support/fixtures`, y sus capturas no la cambian. */
+  "perfil-con-foto": {
+    pendingRequest: null,
+    columns: { full_name: "Lía Fotógrafa", country: "AU" },
+  },
+  /** Lo usa el test que sube una foto, la busca en el directorio y la quita. */
+  "perfil-para-foto": {
+    pendingRequest: null,
+    columns: { full_name: "Socia que sube su foto", country: "AU" },
+  },
 } as const;
 
 export type RoleRequestMemberName = keyof typeof ROLE_REQUEST_MEMBERS;
+
+/** Los socios que nacen con foto de perfil (#245). */
+const MEMBERS_WITH_PHOTO: readonly RoleRequestMemberName[] = [
+  "perfil-con-foto",
+];
+
+/** La foto fija de las capturas: siempre la misma, para que no cambien. */
+export const PROFILE_PHOTO_FIXTURE_PATH = path.join(
+  __dirname,
+  "fixtures",
+  "foto-de-perfil.png",
+);
 
 const ROLE_REQUEST_MEMBER_NAMES = Object.keys(
   ROLE_REQUEST_MEMBERS,
@@ -237,6 +260,7 @@ const CLUBS_TABLE = "clubs";
 const ROLE_REQUESTS_TABLE = "role_requests";
 const GROUPS_TABLE = "groups";
 const GROUP_MEMBERSHIPS_TABLE = "group_memberships";
+const PHOTOS_BUCKET = "member-photos";
 /** El código de Postgres de una violación de unicidad: otra corrida creó el
  * mismo grupo entre la búsqueda y el alta. */
 const UNIQUE_VIOLATION_CODE = "23505";
@@ -455,6 +479,61 @@ async function deleteTestUser(
   }
 }
 
+/** Sube la foto fija a la carpeta del socio y la apunta en su ficha, como
+ * lo haría el endpoint, pero con la llave de servicio. */
+async function seedProfilePhoto(
+  serviceClient: SupabaseClient,
+  userId: string,
+): Promise<void> {
+  const photoPath = `${userId}/${randomUUID()}.png`;
+  const { error: uploadError } = await serviceClient.storage
+    .from(PHOTOS_BUCKET)
+    .upload(photoPath, readFileSync(PROFILE_PHOTO_FIXTURE_PATH), {
+      contentType: "image/png",
+    });
+  if (uploadError) {
+    throw new Error(
+      `No se pudo subir la foto de prueba: ${uploadError.message}`,
+    );
+  }
+  const failure = await describeSupabaseFailure(
+    "apuntar la foto de prueba en la ficha",
+    () =>
+      serviceClient
+        .from(MEMBERS_TABLE)
+        .update({ photo_path: photoPath })
+        .eq("user_id", userId),
+  );
+  if (failure !== null) {
+    throw new Error(`No se pudo apuntar la foto de prueba: ${failure}`);
+  }
+}
+
+/** Vacía la carpeta de fotos de un socio de prueba. La cascada de `members`
+ * no llega a Storage, así que sin esto las fotos se quedarían en dev. */
+async function deleteTestPhotos(
+  serviceClient: SupabaseClient,
+  userId: string,
+): Promise<void> {
+  const bucket = serviceClient.storage.from(PHOTOS_BUCKET);
+  const { data, error } = await bucket.list(userId);
+  if (error) {
+    console.error(`No se pudo listar las fotos de ${userId}: ${error.message}`);
+    return;
+  }
+  if (data.length === 0) {
+    return;
+  }
+  const { error: removeError } = await bucket.remove(
+    data.map((file) => `${userId}/${file.name}`),
+  );
+  if (removeError) {
+    console.error(
+      `No se pudo borrar las fotos de ${userId}: ${removeError.message}`,
+    );
+  }
+}
+
 /** La solicitud pendiente con la que nace un socio de Mi cuenta, si lleva
  * una. Se borra con la identidad por las cascadas de 0003 y 0012. */
 async function seedPendingRequest(
@@ -645,6 +724,9 @@ async function createTestMembers(): Promise<E2eSessionState> {
       userId: member.userId,
       requestedRole: ROLE_REQUEST_MEMBERS[name].pendingRequest,
     });
+    if (MEMBERS_WITH_PHOTO.includes(name)) {
+      await seedProfilePhoto(serviceClient, member.userId);
+    }
     await writeStorageState(
       member.email,
       member.password,
@@ -698,6 +780,7 @@ export async function discardE2eSession(): Promise<void> {
   if (state.kind === "available") {
     const serviceClient = createServiceRoleClient(process.env);
     for (const userId of state.userIds) {
+      await deleteTestPhotos(serviceClient, userId);
       await deleteTestUser(serviceClient, userId);
     }
     // Después de los socios: sus pertenencias se van con ellos, y sólo
