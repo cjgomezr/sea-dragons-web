@@ -235,6 +235,7 @@ describeConPostgres("el destinatario de un aviso", () => {
     const otro = await seedMember(database);
     await insertNotification(database, { userId });
     await insertNotification(database, { userId: otro });
+    expect(await countNotifications(database)).toBe("2");
 
     await database.query(`delete from auth.users where id = '${userId}'`);
 
