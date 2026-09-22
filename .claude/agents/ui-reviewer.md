@@ -6,7 +6,7 @@ description: >
   mockup when one exists, or reviews against the project's design-system.md
   heuristic checklist when there is no mockup. Reports back to the main agent.
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: claude-fable-5-1
 # 20, no 3: además de leer, este captura la pantalla y mira seis imágenes.
 # Es el agente más caro en turnos de la fábrica, y quedarse corto aquí
 # significa aprobar sin haber mirado.
