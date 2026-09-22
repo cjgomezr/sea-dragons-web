@@ -142,9 +142,12 @@ describe("bandeja de solicitudes pendientes", () => {
       fullName: "Iván de baja",
       requesterStatus: "inactive",
     };
-    const fromIncomplete: PendingRoleRequestRecord = {
+    const visibleIncomplete: PendingRoleRequest = {
       ...pending!,
       id: "2f0e0d0c-0b0a-4908-8706-050403020102",
+    };
+    const fromIncomplete: PendingRoleRequestRecord = {
+      ...visibleIncomplete,
       requesterStatus: "incomplete",
     };
 
@@ -155,7 +158,6 @@ describe("bandeja de solicitudes pendientes", () => {
       ADMIN_ID,
     );
 
-    const { requesterStatus: _status, ...visibleIncomplete } = fromIncomplete;
     expect(requests).toEqual([...PENDING, visibleIncomplete]);
   });
 

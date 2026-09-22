@@ -105,5 +105,19 @@ export async function listPendingRoleRequests(
   );
   return records
     .filter((record) => record.requesterStatus !== "inactive")
-    .map(({ requesterStatus: _requesterStatus, ...request }) => request);
+    .map(toPendingRoleRequest);
+}
+
+/** El estado de quien la pidió ya decidió si entra: no sale a la bandeja. */
+function toPendingRoleRequest(
+  record: PendingRoleRequestRecord,
+): PendingRoleRequest {
+  return {
+    id: record.id,
+    userId: record.userId,
+    fullName: record.fullName,
+    requestedRole: record.requestedRole,
+    justification: record.justification,
+    createdAt: record.createdAt,
+  };
 }
