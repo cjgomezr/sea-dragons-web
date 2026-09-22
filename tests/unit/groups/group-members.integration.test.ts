@@ -171,7 +171,13 @@ describeRls("los socios de un grupo contra seadragons-dev", () => {
 
                 const paulaInList = {
                   kind: "found",
-                  members: [{ id: paulaId, fullName: "paula Player" }],
+                  members: [
+                    {
+                      id: paulaId,
+                      fullName: "paula Player",
+                      isPendingActivation: false,
+                    },
+                  ],
                 };
                 for (const groupId of [seniorId, mastersId]) {
                   await expect(
@@ -254,8 +260,16 @@ describeRls("los socios de un grupo contra seadragons-dev", () => {
                 ).resolves.toEqual({
                   kind: "found",
                   members: [
-                    { id: active!.id, fullName: "Ana Active" },
-                    { id: incomplete!.id, fullName: "ivan Incomplete" },
+                    {
+                      id: active!.id,
+                      fullName: "Ana Active",
+                      isPendingActivation: false,
+                    },
+                    {
+                      id: incomplete!.id,
+                      fullName: "ivan Incomplete",
+                      isPendingActivation: true,
+                    },
                   ],
                 });
                 // El inactive sigue asignado, pero no cuenta ni se lista.
@@ -266,7 +280,13 @@ describeRls("los socios de un grupo contra seadragons-dev", () => {
                   }),
                 ).resolves.toEqual({
                   kind: "found",
-                  members: [{ id: assigned!.id, fullName: "Zoe Assigned" }],
+                  members: [
+                    {
+                      id: assigned!.id,
+                      fullName: "Zoe Assigned",
+                      isPendingActivation: false,
+                    },
+                  ],
                 });
               },
             ),

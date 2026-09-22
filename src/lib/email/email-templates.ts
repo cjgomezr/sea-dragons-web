@@ -217,3 +217,26 @@ export function renderAccountConfirmationEmail(
     outro: [t("email.confirmation.notYou")],
   });
 }
+
+/** La invitación del alta por un Admin (#243, FR-021). El enlace es el de
+ * elegir contraseña: canjearlo confirma el correo, y con esa contraseña el
+ * miembro entra y termina su registro en la pantalla que ya existe. */
+export function renderMemberInvitationEmail(
+  input: EmailLinkInput & { readonly acceptUrl: string },
+): RenderedEmail {
+  const t = createTranslator(input.locale);
+  return renderEmail(t, {
+    subject: t("email.invitation.subject", { clubName: CLUB_NAME }),
+    intro: [
+      t("email.invitation.invited", { clubName: CLUB_NAME }),
+      t("email.invitation.nextSteps"),
+      t("email.invitation.linkLifetime", { count: input.linkLifetimeMinutes }),
+    ],
+    action: {
+      buttonLabel: t("email.invitation.button"),
+      label: t("email.invitation.linkLabel"),
+      url: input.acceptUrl,
+    },
+    outro: [t("email.invitation.ifExpired"), t("email.invitation.notYou")],
+  });
+}

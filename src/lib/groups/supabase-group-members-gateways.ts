@@ -13,6 +13,7 @@ import type {
   GroupScope,
   MembershipInsertResult,
 } from "./group-members";
+import { toGroupMember } from "./group-members";
 
 /**
  * Adaptadores entre los socios de un grupo y Supabase.
@@ -57,10 +58,6 @@ function toClubMember(row: Row): ClubMember {
     fullName: readRequiredText(row, "full_name", MEMBERS_TABLE),
     accountStatus,
   };
-}
-
-function toGroupMember(member: ClubMember): GroupMember {
-  return { id: member.id, fullName: member.fullName };
 }
 
 function compareMemberNames(a: GroupMember, b: GroupMember): number {

@@ -55,7 +55,13 @@ function memberRecordGateways(): MemberRecordGateways {
     records: {
       findMemberRecord: async ({ userId }) =>
         isKnown(userId)
-          ? { userId, fullName: "Paula Player", joinedOn: JOINED_ON, ...auf }
+          ? {
+              userId,
+              fullName: "Paula Player",
+              joinedOn: JOINED_ON,
+              accountStatus: "active",
+              ...auf,
+            }
           : null,
       findMemberGroups: async () =>
         [...memberships].map((id) => ({ id, name: "Senior Squad" })),
@@ -189,6 +195,7 @@ describe("PATCH /api/v1/members/{id}/record", () => {
         userId: MEMBER_ID,
         fullName: "Paula Player",
         joinedOn: JOINED_ON,
+        accountStatus: "active",
         aufNumber: "AUF-2026-0042",
         aufExpiry: "2027-03-31",
         isAufExpired: false,

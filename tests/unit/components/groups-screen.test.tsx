@@ -28,21 +28,25 @@ const MASTERS: Group = {
 const NEREA: GroupMember = {
   id: "aaaaaaaa-0000-4000-8000-00000000000a",
   fullName: "Nerea Ruiz",
+  isPendingActivation: false,
 };
 
 const TOMAS: GroupMember = {
   id: "bbbbbbbb-0000-4000-8000-00000000000b",
   fullName: "Tomás Errekondo",
+  isPendingActivation: false,
 };
 
 const ANA: GroupMember = {
   id: "cccccccc-0000-4000-8000-00000000000c",
   fullName: "Ana Admin",
+  isPendingActivation: false,
 };
 
 const BEA: GroupMember = {
   id: "dddddddd-0000-4000-8000-00000000000d",
   fullName: "Bea Nadal",
+  isPendingActivation: false,
 };
 
 type ApiCall = {
@@ -572,6 +576,28 @@ describe("socios de un grupo en pantalla", () => {
         body: null,
       },
     ]);
+  });
+
+  it("marca a quien no activó su cuenta y no lo suma al conteo", async () => {
+    const user = userEvent.setup();
+    const pendingAna = { ...ANA, isPendingActivation: true };
+    stubApi({
+      groups: [SENIOR],
+      members: [NEREA, TOMAS],
+      candidates: [pendingAna, BEA],
+    });
+    await renderScreen();
+    await openGroup("Senior Squad");
+
+    await user.click(screen.getByRole("button", { name: "Add to the group" }));
+
+    const panel = membersPanel("Senior Squad");
+    await waitFor(() =>
+      expect(within(panel).getByText("Pending activation")).toBeVisible(),
+    );
+    expect(
+      within(groupRow("Senior Squad")).getByText("2 members"),
+    ).toBeVisible();
   });
 
   it("quitar un socio lo saca de la lista, lo devuelve al selector y baja el conteo", async () => {

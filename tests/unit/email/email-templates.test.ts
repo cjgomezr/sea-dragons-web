@@ -6,6 +6,7 @@ import {
   CLUB_NAME,
   type RenderedEmail,
   renderAccountConfirmationEmail,
+  renderMemberInvitationEmail,
   renderPasswordRecoveryEmail,
 } from "@/lib/email/email-templates";
 import {
@@ -18,6 +19,8 @@ const RESET_URL =
   "https://victoria-seadragons.vercel.app/recuperar-contrasena/nueva?token_hash=abc";
 const CONFIRM_URL =
   "https://victoria-seadragons.vercel.app/auth/confirmar?token_hash=abc&type=signup";
+const INVITATION_URL =
+  "https://victoria-seadragons.vercel.app/recuperar-contrasena/nueva?token_hash=inv";
 const LIFETIME_MINUTES = 60;
 
 /** Lo que ve alguien cuyo cliente no pinta HTML, sacado del propio HTML: sin
@@ -63,6 +66,14 @@ const TEMPLATES = {
     }),
     url: CONFIRM_URL,
   },
+  invitación: {
+    email: renderMemberInvitationEmail({
+      acceptUrl: INVITATION_URL,
+      linkLifetimeMinutes: LIFETIME_MINUTES,
+      locale: "es",
+    }),
+    url: INVITATION_URL,
+  },
 } as const;
 
 const ENGLISH_TEMPLATES = {
@@ -81,6 +92,14 @@ const ENGLISH_TEMPLATES = {
       locale: "en",
     }),
     url: CONFIRM_URL,
+  },
+  invitation: {
+    email: renderMemberInvitationEmail({
+      acceptUrl: INVITATION_URL,
+      linkLifetimeMinutes: LIFETIME_MINUTES,
+      locale: "en",
+    }),
+    url: INVITATION_URL,
   },
 } as const;
 
@@ -175,6 +194,44 @@ describe("plantillas de correo", () => {
 
     expect(email.html).not.toContain("<script>");
     expect(email.html).toContain("&quot;&gt;&lt;script&gt;");
+  });
+});
+
+describe("invitación", () => {
+  it("sale en español con su asunto, el enlace y la vigencia", () => {
+    const { email } = TEMPLATES.invitación;
+
+    expect(email.subject).toBe("Te invitaron a Victoria Seadragons");
+    expect(email.text).toContain(INVITATION_URL);
+    expect(email.text).toContain(`${LIFETIME_MINUTES} minutos`);
+    expect(email.html).toContain(`href="${INVITATION_URL}"`);
+    expect(email.html).toContain("Activar mi cuenta");
+  });
+
+  it("sale en inglés con su asunto, el enlace y la vigencia", () => {
+    const { email } = ENGLISH_TEMPLATES.invitation;
+
+    expect(email.subject).toBe("You're invited to Victoria Seadragons");
+    expect(email.text).toContain(INVITATION_URL);
+    expect(email.text).toContain(`${LIFETIME_MINUTES} minutes`);
+    expect(email.html).toContain("Activate my account");
+    expect(email.text).not.toContain("contraseña");
+  });
+
+  it("explica que el enlace lleva a elegir contraseña y a completar el registro", () => {
+    const { email } = TEMPLATES.invitación;
+
+    expect(email.text).toMatch(/elige una contraseña/i);
+    expect(email.text).toMatch(/completa tu registro/i);
+  });
+
+  it("dice a quién pedir otro enlace si caduca", () => {
+    expect(TEMPLATES.invitación.email.text).toMatch(
+      /pide al club que te reenvíe la invitación/i,
+    );
+    expect(ENGLISH_TEMPLATES.invitation.email.text).toMatch(
+      /ask the club to resend your invitation/i,
+    );
   });
 });
 

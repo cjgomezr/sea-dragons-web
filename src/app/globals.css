@@ -1157,6 +1157,11 @@ h6 {
   overflow-wrap: anywhere;
 }
 
+.admin-member-status {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
 .admin-member-role {
   flex: 1 1 auto;
   min-height: var(--touch-target-min);
@@ -1369,8 +1374,35 @@ h6 {
   max-width: 960px;
 }
 
-.directory > .app-lead {
+.directory-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.directory-header .app-lead {
   margin-bottom: 0;
+}
+
+/* Un enlace con forma de botón primario. */
+.directory-add {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.new-member-created {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.new-member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
 }
 
 .directory-filters {

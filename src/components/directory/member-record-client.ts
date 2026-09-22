@@ -5,6 +5,7 @@ import {
   readApiPayload,
   requestApi,
 } from "@/lib/api/request-api";
+import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
 import { MEMBER_RECORD_API_PATH } from "@/lib/auth/routes";
 import type { Group } from "@/lib/groups/groups";
 import { formatCalendarDay } from "@/lib/i18n/format";
@@ -37,6 +38,7 @@ const recordSchema = z.object({
   userId: z.uuid(),
   fullName: z.string(),
   joinedOn: z.string(),
+  accountStatus: z.enum(ACCOUNT_STATUSES),
   aufNumber: z.string().nullable(),
   aufExpiry: z.string().nullable(),
   isAufExpired: z.boolean(),

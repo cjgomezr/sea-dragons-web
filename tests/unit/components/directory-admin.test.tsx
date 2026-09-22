@@ -570,6 +570,19 @@ function memberRow(name: string): HTMLElement {
   return screen.getByRole("row", { name });
 }
 
+describe("directorio para Admin: alta de un miembro (#243)", () => {
+  it("ofrece dar de alta a un miembro desde la cabecera", async () => {
+    stubApi({ members: [NEREA, ANA], requests: [] });
+
+    await renderAdminDirectory();
+
+    expect(screen.getByRole("link", { name: "Add member" })).toHaveAttribute(
+      "href",
+      "/directorio/nuevo",
+    );
+  });
+});
+
 describe("directorio para Admin: ficha reservada (#242)", () => {
   it("enlaza cada miembro con su ficha", async () => {
     stubApi({ members: [NEREA, ANA], requests: [] });

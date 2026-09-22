@@ -89,6 +89,7 @@ function fake(options: FakeOptions = {}): Fake {
               userId,
               fullName: "Paula Player",
               joinedOn: JOINED_ON,
+              accountStatus: options.memberStatus ?? "active",
               ...auf,
             }
           : null;
@@ -202,6 +203,7 @@ describe("ficha reservada al Admin: lectura", () => {
       userId: MEMBER_ID,
       fullName: "Paula Player",
       joinedOn: JOINED_ON,
+      accountStatus: "active",
       aufNumber: "AUF-1",
       aufExpiry: "2027-01-01",
       isAufExpired: false,

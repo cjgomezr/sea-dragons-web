@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { NEW_MEMBER_PATH } from "@/lib/auth/routes";
 import type { Role } from "@/lib/auth/roles";
 import {
   DEFAULT_DIRECTORY_QUERY,
@@ -214,8 +216,18 @@ export function DirectoryScreen({
 
   return (
     <div className="directory">
-      <h1>{translate("directory.title")}</h1>
-      <p className="app-lead">{translate("directory.lead")}</p>
+      <header className="directory-header">
+        <div>
+          <h1>{translate("directory.title")}</h1>
+          <p className="app-lead">{translate("directory.lead")}</p>
+        </div>
+        {/* Sólo quien recibe la lista de Admin puede dar de alta (#243). */}
+        {state.kind === "ready" && state.listing.kind === "admin" ? (
+          <Link href={NEW_MEMBER_PATH} className="auth-submit directory-add">
+            {translate("directory.addMember")}
+          </Link>
+        ) : null}
+      </header>
       {state.kind === "loading" ? (
         <p className="admin-empty">{translate("directory.loading")}</p>
       ) : null}

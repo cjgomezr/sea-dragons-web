@@ -118,7 +118,7 @@ type Environment = Readonly<Record<string, string | undefined>>;
 const EMAIL_EXISTS_CODE = "email_exists";
 const EMAIL_EXISTS_MESSAGE_PATTERN = /already\b.*\bregistered/i;
 
-function isAlreadyRegistered(error: {
+export function isAlreadyRegistered(error: {
   readonly code?: string;
   readonly message: string;
 }): boolean {

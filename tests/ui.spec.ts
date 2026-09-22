@@ -3499,6 +3499,7 @@ type StubbedMemberRecord = {
   readonly userId: string;
   readonly fullName: string;
   readonly joinedOn: string;
+  readonly accountStatus: "incomplete" | "active";
   readonly aufNumber: string;
   readonly aufExpiry: string;
   readonly isAufExpired: boolean;
@@ -3510,12 +3511,20 @@ const CURRENT_RECORD: StubbedMemberRecord = {
   userId: RECORD_MEMBER_ID,
   fullName: LONG_MEMBER_NAME,
   joinedOn: "2024-03-06",
+  accountStatus: "active",
   aufNumber: "AUF-2026-0042",
   aufExpiry: "2030-06-30",
   isAufExpired: false,
   groups: [STUBBED_CLUB_GROUPS[0], STUBBED_CLUB_GROUPS[2]].map(
     ({ id, name }) => ({ id, name }),
   ),
+};
+
+/** Quien todavía no activó su cuenta: la ficha ofrece reenviar la
+ * invitación (#243). */
+const PENDING_RECORD: StubbedMemberRecord = {
+  ...CURRENT_RECORD,
+  accountStatus: "incomplete",
 };
 
 const EXPIRED_RECORD: StubbedMemberRecord = {
@@ -3605,6 +3614,17 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
   {
     name: "ficha-auf-vencido-es",
     record: EXPIRED_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "ficha-invitacion-pendiente",
+    record: PENDING_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+  },
+  {
+    name: "ficha-invitacion-pendiente-es",
+    record: PENDING_RECORD,
     saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
   },
@@ -3715,9 +3735,12 @@ test.describe("un Admin frente a la ficha con los datos de verdad", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
     await openOwnRecordLink(page).click();
+    // Es la primera petición de la corrida a los endpoints reales de la ficha
+    // y de los grupos (las capturas los fingen): el dev server los compila
+    // aquí, y bajo carga paralela pasa de los 5 s por defecto.
     await expect(
       page.getByRole("heading", { level: 1, name: ADMINISTRATION_ADMIN_NAME }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: ACCOUNT_CHANGE_TIMEOUT_MS });
 
     const aufNumber = `AUF-E2E-${Date.now()}`;
     await page.getByLabel("AUF number").fill(aufNumber);
@@ -3775,5 +3798,360 @@ test.describe("un Player frente a la ficha reservada al Admin", () => {
     await expect(page.getByRole("table")).toBeVisible();
 
     await expect(page.getByRole("link", { name: /record$/ })).toHaveCount(0);
+  });
+});
+/* ---------------------------------------------------------------------------
+   El alta de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta desde
+   la cabecera del directorio. El botón está en el mockup del directorio; el
+   formulario no, así que se revisa contra design-system.md.
+
+   Las capturas leen datos fijos, servidos por `page.route`: los grupos de
+   verdad cambian con cada test que siembre, y un alta de verdad mandaría una
+   invitación. Lo que la frontera y el endpoint de verdad responden se prueba
+   aparte, con un correo que ya tiene cuenta, que no crea nada ni manda nada.
+   --------------------------------------------------------------------------- */
+
+const NEW_MEMBER_SCREEN_PATH = `${DIRECTORY_SCREEN_PATH}/nuevo`;
+const NEW_MEMBER_ID = "cccccccc-0000-4000-8000-000000000243";
+
+const EMAIL_TAKEN_ERROR = {
+  error: {
+    code: "conflict",
+    message: "Ese correo ya tiene una cuenta.",
+    reason: "email_taken",
+  },
+};
+
+type NewMemberCopy = {
+  readonly title: string;
+  readonly submit: string;
+  readonly fullName: string;
+  readonly email: string;
+  readonly country: string;
+  readonly position: string;
+  readonly experienceLevel: string;
+  readonly gender: string;
+  readonly aufNumber: string;
+  readonly aufExpiry: string;
+  readonly emailTaken: string;
+  readonly invitationSent: RegExp;
+};
+
+const ENGLISH_NEW_MEMBER: NewMemberCopy = {
+  title: "Add a member",
+  submit: "Add member",
+  fullName: "Full name",
+  email: "Email",
+  country: "Country",
+  position: "Position",
+  experienceLevel: "Experience level",
+  gender: "Gender",
+  aufNumber: "AUF number",
+  aufExpiry: "AUF expiry date",
+  emailTaken: "That email already has an account in the club.",
+  invitationSent: /We sent the invitation to/,
+};
+
+const SPANISH_NEW_MEMBER: NewMemberCopy = {
+  title: "Dar de alta a un miembro",
+  submit: "Dar de alta",
+  fullName: "Nombre completo",
+  email: "Correo",
+  country: "País",
+  position: "Posición",
+  experienceLevel: "Nivel de experiencia",
+  gender: "Género",
+  aufNumber: "Número de AUF",
+  aufExpiry: "Vencimiento del AUF",
+  emailTaken: "Ese correo ya tiene una cuenta en el club.",
+  invitationSent: /Le mandamos la invitación a/,
+};
+
+type NewMemberAnswer = "sent" | "email_taken";
+
+async function stubNewMemberApi(
+  page: Page,
+  answer: NewMemberAnswer,
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === CLUB_GROUPS_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { groups: STUBBED_CLUB_GROUPS } }),
+      }),
+  );
+  await page.route(
+    (url) => url.pathname === MEMBERS_ENDPOINT,
+    (route, request) => {
+      if (request.method() !== "POST") {
+        return route.fallback();
+      }
+      return answer === "email_taken"
+        ? route.fulfill({
+            status: 409,
+            contentType: "application/json",
+            body: JSON.stringify(EMAIL_TAKEN_ERROR),
+          })
+        : route.fulfill({
+            status: 201,
+            contentType: "application/json",
+            body: JSON.stringify({
+              data: {
+                member: {
+                  userId: NEW_MEMBER_ID,
+                  fullName: LONG_MEMBER_NAME,
+                  email: "nerea.silva@example.com",
+                },
+                invitation: "sent",
+              },
+            }),
+          });
+    },
+  );
+}
+
+type NewMemberEntry = {
+  readonly fullName: string;
+  readonly email: string;
+  /** Los grupos de verdad cambian con cada test que siembre: el caso real no
+   * elige ninguno. */
+  readonly groupName: string | null;
+};
+
+const STUBBED_ENTRY: NewMemberEntry = {
+  fullName: LONG_MEMBER_NAME,
+  email: "nerea.silva@example.com",
+  groupName: STUBBED_CLUB_GROUPS[2].name,
+};
+
+async function fillNewMemberForm(
+  page: Page,
+  copy: NewMemberCopy,
+  entry: NewMemberEntry,
+): Promise<void> {
+  await page.getByLabel(copy.fullName).fill(entry.fullName);
+  await page.getByLabel(copy.email).fill(entry.email);
+  await page.getByLabel(copy.country).selectOption("AU");
+  await page.getByLabel(copy.position).selectOption("Forward");
+  await page.getByLabel(copy.experienceLevel).selectOption("Intermediate");
+  await page.getByLabel(copy.gender).selectOption("female");
+  await page.getByLabel(copy.aufNumber).fill("AUF-2026-0243");
+  await page.getByLabel(copy.aufExpiry).fill("2099-06-30");
+  if (entry.groupName !== null) {
+    await page.getByRole("checkbox", { name: entry.groupName }).check();
+  }
+}
+
+function fillNewMember(copy: NewMemberCopy) {
+  return (page: Page): Promise<void> =>
+    fillNewMemberForm(page, copy, STUBBED_ENTRY);
+}
+
+function submitNewMember(copy: NewMemberCopy, expected: string | RegExp) {
+  return async (page: Page): Promise<void> => {
+    await fillNewMemberForm(page, copy, STUBBED_ENTRY);
+    await page.getByRole("button", { name: copy.submit }).click();
+    await expect(page.getByText(expected)).toBeVisible();
+  };
+}
+
+type NewMemberState = {
+  readonly name: string;
+  readonly copy: NewMemberCopy;
+  readonly answer: NewMemberAnswer;
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+  readonly prepare?: (page: Page) => Promise<void>;
+};
+
+const NEW_MEMBER_STATES: readonly NewMemberState[] = [
+  { name: "alta-vacia", copy: ENGLISH_NEW_MEMBER, answer: "sent" },
+  {
+    name: "alta-vacia-es",
+    copy: SPANISH_NEW_MEMBER,
+    answer: "sent",
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "alta-con-datos",
+    copy: ENGLISH_NEW_MEMBER,
+    answer: "sent",
+    prepare: fillNewMember(ENGLISH_NEW_MEMBER),
+  },
+  {
+    name: "alta-correo-repetido",
+    copy: ENGLISH_NEW_MEMBER,
+    answer: "email_taken",
+    prepare: submitNewMember(ENGLISH_NEW_MEMBER, ENGLISH_NEW_MEMBER.emailTaken),
+  },
+  {
+    name: "alta-correo-repetido-es",
+    copy: SPANISH_NEW_MEMBER,
+    answer: "email_taken",
+    beforeVisit: chooseSpanish,
+    prepare: submitNewMember(SPANISH_NEW_MEMBER, SPANISH_NEW_MEMBER.emailTaken),
+  },
+  {
+    name: "alta-invitacion-enviada",
+    copy: ENGLISH_NEW_MEMBER,
+    answer: "sent",
+    prepare: submitNewMember(
+      ENGLISH_NEW_MEMBER,
+      ENGLISH_NEW_MEMBER.invitationSent,
+    ),
+  },
+  {
+    name: "alta-invitacion-enviada-es",
+    copy: SPANISH_NEW_MEMBER,
+    answer: "sent",
+    beforeVisit: chooseSpanish,
+    prepare: submitNewMember(
+      SPANISH_NEW_MEMBER,
+      SPANISH_NEW_MEMBER.invitationSent,
+    ),
+  },
+];
+
+async function goToNewMember(
+  page: Page,
+  state: NewMemberState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await stubNewMemberApi(page, state.answer);
+  await state.beforeVisit?.(page);
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${NEW_MEMBER_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, NEW_MEMBER_SCREEN_PATH, theme);
+  }
+  await expect(
+    page.getByRole("heading", { level: 1, name: state.copy.title }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("checkbox", { name: STUBBED_CLUB_GROUPS[2].name }),
+  ).toBeVisible();
+  await state.prepare?.(page);
+}
+
+for (const state of NEW_MEMBER_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToNewMember(page, state, theme);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToNewMember(page, state);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToNewMember(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("un Admin frente al alta con los datos de verdad", () => {
+  skipWithoutSession();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("la abre desde el directorio y un correo con cuenta se rechaza junto a su campo", async ({
+    page,
+    request,
+  }) => {
+    // Un correo que ya tiene cuenta en el club: el del propio Admin. Así el
+    // alta de verdad responde 409 sin crear nada ni mandar ningún correo.
+    const members = await request.get(`${APP_URL}${MEMBERS_ENDPOINT}`);
+    expect(members.status()).toBe(200);
+    const { data } = (await members.json()) as {
+      data: { members: { fullName: string; email: string }[] };
+    };
+    const adminEmail = data.members.find(
+      (member) => member.fullName === ADMINISTRATION_ADMIN_NAME,
+    )?.email;
+    if (adminEmail === undefined) {
+      throw new Error("El Admin sembrado no aparece en la lista de socios.");
+    }
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+    await page.getByRole("link", { name: "Add member" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: ENGLISH_NEW_MEMBER.title }),
+    ).toBeVisible();
+
+    await fillNewMemberForm(page, ENGLISH_NEW_MEMBER, {
+      fullName: "Alta repetida",
+      email: adminEmail,
+      groupName: null,
+    });
+    const answered = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === MEMBERS_ENDPOINT &&
+        response.request().method() === "POST",
+      { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
+    );
+    await page.getByRole("button", { name: ENGLISH_NEW_MEMBER.submit }).click();
+
+    expect((await answered).status()).toBe(409);
+    await expect(
+      page.getByLabel(ENGLISH_NEW_MEMBER.email),
+    ).toHaveAccessibleDescription(ENGLISH_NEW_MEMBER.emailTaken);
+  });
+});
+
+test.describe("un Player frente al alta de un miembro", () => {
+  skipWithoutSession();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("abrirla a mano lo manda al panel", async ({ page }) => {
+    await page.goto(`${APP_URL}${NEW_MEMBER_SCREEN_PATH}`);
+
+    await expect(page).toHaveURL(/\/dashboard$/);
+  });
+
+  test("el alta y el reenvío le responden 403", async ({ request }) => {
+    const created = await request.post(`${APP_URL}${MEMBERS_ENDPOINT}`, {
+      data: {},
+    });
+    const resent = await request.post(
+      `${APP_URL}${MEMBERS_ENDPOINT}/${NEW_MEMBER_ID}/invitation`,
+    );
+
+    expect(created.status()).toBe(403);
+    expect(resent.status()).toBe(403);
+  });
+
+  test("su directorio no ofrece dar de alta", async ({ page }) => {
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+    await expect(page.getByRole("table")).toBeVisible();
+
+    await expect(page.getByRole("link", { name: "Add member" })).toHaveCount(0);
   });
 });

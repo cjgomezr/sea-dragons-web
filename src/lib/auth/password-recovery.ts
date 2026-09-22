@@ -5,6 +5,7 @@ import {
 import type { Locale } from "@/lib/i18n/locale";
 import type { EmailRequestLog } from "./email-request-log";
 import { type FieldIssueCode, validatePasswordField } from "./registration";
+import { PASSWORD_RESET_PATH, RESET_TOKEN_QUERY_PARAM } from "./routes";
 
 /**
  * La recuperación de contraseña (RF-6), contada sin Supabase ni proveedor de
@@ -27,6 +28,20 @@ const MILLISECONDS_PER_MINUTE = 60_000;
 export const RECOVERY_LINK_LIFETIME_MINUTES = 60;
 
 export type RecoveryRequestLog = EmailRequestLog;
+
+/** El enlace de elegir contraseña nueva. Apunta al origen de `appUrl`, que es
+ * la petición que lo pidió: en Vercel sólo llegan a un despliegue las
+ * peticiones dirigidas a sus propios dominios, así que un `Host` inventado no
+ * alcanza este código para envenenar el enlace. Lo usan la recuperación y la
+ * invitación de un miembro dado de alta por un Admin (#243). */
+export function buildPasswordResetUrl(
+  appUrl: string,
+  tokenHash: string,
+): string {
+  const url = new URL(PASSWORD_RESET_PATH, appUrl);
+  url.searchParams.set(RESET_TOKEN_QUERY_PARAM, tokenHash);
+  return url.toString();
+}
 
 export type RecoveryTokenIssue =
   | {

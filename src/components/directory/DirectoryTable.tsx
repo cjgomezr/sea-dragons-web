@@ -144,10 +144,19 @@ type RowMark = {
   readonly tone: "neutral" | "warning";
 };
 
-/** Lo que distingue a esta fila de las demás: de baja (AC-040) y el registro
- * federativo vencido (BR-008), que sólo un Admin recibe. */
+/** Lo que distingue a esta fila de las demás: pendiente de activar (#243), de
+ * baja (AC-040) y el registro federativo vencido (BR-008), que sólo un Admin
+ * recibe. */
 function marksOf(translate: Translator, row: DirectoryRow): readonly RowMark[] {
   return [
+    ...(row.member.status === "incomplete"
+      ? [
+          {
+            text: translate("directory.mark.pendingActivation"),
+            tone: "neutral" as const,
+          },
+        ]
+      : []),
     ...(row.member.status === "inactive"
       ? [
           {

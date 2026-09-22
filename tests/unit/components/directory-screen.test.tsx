@@ -513,6 +513,14 @@ describe("pantalla del directorio", () => {
 });
 
 describe("incluir inactivos", () => {
+  it("no ofrece dar de alta a quien no es Admin", async () => {
+    stubApi({ kind: "member", members: [MARIA] });
+
+    await renderScreen();
+
+    expect(screen.queryByRole("link", { name: "Add member" })).toBeNull();
+  });
+
   it("no ofrece el control a quien no es Admin", async () => {
     stubApi({ kind: "member", members: [MARIA] });
 
@@ -568,6 +576,22 @@ describe("incluir inactivos", () => {
       expect(listedNames()).toEqual(["Ana Admin"]);
     });
     expect(lastRequest().get("includeInactive")).toBeNull();
+  });
+
+  it("marca como pendiente de activar a quien todavía no entró", async () => {
+    stubApi({
+      kind: "member",
+      members: [MARIA, { ...NEREA, status: "incomplete" }],
+    });
+
+    await renderScreen();
+
+    expect(
+      within(memberRow("Nerea Ruiz")).getByText("Pending activation"),
+    ).toBeVisible();
+    expect(
+      within(memberRow("María Ñíguez")).queryByText("Pending activation"),
+    ).toBeNull();
   });
 
   it("señala a un Admin la fila con el registro de AUF vencido", async () => {

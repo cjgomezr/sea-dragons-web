@@ -213,6 +213,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
 
         expect(saved).toMatchObject({
           joinedOn: JOINED_ON,
+          accountStatus: "active",
           aufNumber: longestNumber,
           aufExpiry: "2025-12-31",
           isAufExpired: true,

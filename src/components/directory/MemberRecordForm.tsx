@@ -11,6 +11,7 @@ import {
   type MemberRecordSubmission,
   isAufNumberTooLong,
 } from "@/lib/members/member-record";
+import { GroupsField, TextField } from "./record-fields";
 import {
   type MemberRecordFailure,
   describeMemberRecordFailure,
@@ -108,85 +109,6 @@ function SaveOutcome({
     );
   }
   return null;
-}
-
-function TextField({
-  id,
-  label,
-  type,
-  value,
-  issueText,
-  hintId,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  type: "text" | "date";
-  value: string;
-  /** El aviso de este campo, o null si no tiene ninguno. */
-  issueText: string | null;
-  hintId?: string;
-  onChange: (value: string) => void;
-}): React.JSX.Element {
-  const issueId = `${id}-aviso`;
-  const describedBy = [issueText === null ? null : issueId, hintId ?? null]
-    .filter((part) => part !== null)
-    .join(" ");
-  return (
-    <div className="auth-field">
-      <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        autoComplete="off"
-        aria-invalid={issueText !== null}
-        aria-describedby={describedBy === "" ? undefined : describedBy}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {issueText === null ? null : (
-        <p className="auth-field-error" id={issueId}>
-          {issueText}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function GroupsField({
-  translate,
-  clubGroups,
-  chosen,
-  onToggle,
-}: {
-  translate: Translator;
-  clubGroups: readonly Group[];
-  chosen: ReadonlySet<string>;
-  onToggle: (groupId: string, isChosen: boolean) => void;
-}): React.JSX.Element {
-  return (
-    <fieldset className="member-record-groups">
-      <legend>{translate("memberRecord.groups.legend")}</legend>
-      {clubGroups.length === 0 ? (
-        <p className="admin-empty">{translate("memberRecord.groups.empty")}</p>
-      ) : (
-        clubGroups.map((group) => {
-          const inputId = `ficha-grupo-${group.id}`;
-          return (
-            <div className="auth-consent" key={group.id}>
-              <input
-                id={inputId}
-                type="checkbox"
-                checked={chosen.has(group.id)}
-                onChange={(event) => onToggle(group.id, event.target.checked)}
-              />
-              <label htmlFor={inputId}>{group.name}</label>
-            </div>
-          );
-        })
-      )}
-    </fieldset>
-  );
 }
 
 function RecordHeader({

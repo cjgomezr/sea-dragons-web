@@ -35,7 +35,11 @@ const groupsSchema = z.object({
 
 const singleGroupSchema = z.object({ data: groupSchema });
 
-const memberSchema = z.object({ id: z.uuid(), fullName: z.string() });
+const memberSchema = z.object({
+  id: z.uuid(),
+  fullName: z.string(),
+  isPendingActivation: z.boolean(),
+});
 
 const membersSchema = z.object({
   data: z.object({ members: z.array(memberSchema) }),

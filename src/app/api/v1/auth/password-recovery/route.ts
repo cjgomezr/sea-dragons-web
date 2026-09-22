@@ -1,16 +1,14 @@
-import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { runAfterResponse } from "@/lib/api/after-response";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
 import { describeIssuesForApi } from "@/lib/auth/issue-messages";
-import { requestPasswordRecovery } from "@/lib/auth/password-recovery";
+import {
+  buildPasswordResetUrl,
+  requestPasswordRecovery,
+} from "@/lib/auth/password-recovery";
 import { connectRecoveryEmailSender } from "@/lib/auth/recovery-email-sender";
 import { looksLikeEmail } from "@/lib/auth/registration";
-import {
-  PASSWORD_RESET_PATH,
-  RESET_TOKEN_QUERY_PARAM,
-} from "@/lib/auth/routes";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { createSupabasePasswordRecoveryGateways } from "@/lib/auth/supabase-password-recovery";
 import { describeErrorWithoutEmail } from "@/lib/email/redact-email";
@@ -46,18 +44,6 @@ export type PasswordRecoveryResponse = {
 
 function describeRateLimit(retryAfterMinutes: number): string {
   return `Pediste varios enlaces seguidos. Espera ${retryAfterMinutes} minutos antes de pedir otro.`;
-}
-
-/** El enlace apunta al origen que recibió la petición. No es un campo que
- * decida quien llama: en Vercel sólo llegan a este despliegue las peticiones
- * dirigidas a sus propios dominios, así que un `Host` inventado no alcanza
- * este código para envenenar el enlace. */
-function resetUrlBuilder(request: NextRequest): (tokenHash: string) => string {
-  return (tokenHash) => {
-    const url = new URL(PASSWORD_RESET_PATH, request.url);
-    url.searchParams.set(RESET_TOKEN_QUERY_PARAM, tokenHash);
-    return url.toString();
-  };
 }
 
 /** Corre la entrega cuando la respuesta ya salió. Un fallo aquí no puede
@@ -125,7 +111,12 @@ const postPasswordRecovery = createApiRoute<
         emails: connection.sender,
         emailLocales: wiring.gateways.emailLocales,
       },
-      { email, now: new Date(), buildResetUrl: resetUrlBuilder(request) },
+      {
+        email,
+        now: new Date(),
+        buildResetUrl: (tokenHash) =>
+          buildPasswordResetUrl(request.url, tokenHash),
+      },
     );
     if (outcome.kind === "rate_limited") {
       throw new ApiError(
