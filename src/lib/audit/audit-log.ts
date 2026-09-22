@@ -21,6 +21,10 @@ export const AUDIT_ACTIONS = [
   // sólo lleva la decisión; el cambio de rol que trae una aprobación va en su
   // propia entrada `role.changed`. Ni nombre, ni correo, ni justificación.
   "role_request.decided",
+  // RF-6 de E5: un Admin da de baja o reactiva a un miembro. La metadata lleva
+  // el estado anterior y el nuevo, y en el rechazo del último Admin el motivo.
+  // Ni nombre ni correo: la entidad es el `user_id` del miembro.
+  "member.status_changed",
   "payment.status_changed",
 ] as const;
 
