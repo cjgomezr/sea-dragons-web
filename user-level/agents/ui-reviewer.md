@@ -6,7 +6,7 @@ description: >
   mockup when one exists, or reviews against the project's design-system.md
   heuristic checklist when there is no mockup. Reports back to the main agent.
 tools: Read, Grep, Glob, Bash
-model: claude-fable-5-1
+model: sonnet
 maxTurns: 3
 ---
 
