@@ -32,12 +32,18 @@ const GIF_BYTES = Uint8Array.from(Buffer.from("GIF89a......"));
 
 type Owner = { status: AccountStatus; photoPath: string | null } | null;
 
+/** Lo que devuelve el reductor de mentira: bytes que no se parecen a ninguno
+ * de los que se suben, para ver cuáles llegan al almacenamiento. */
+const SHRUNK_BYTES = Uint8Array.from([0x52, 0x45, 0x44, 0x55, 0x43, 0x49]);
+
 type FakeState = {
   owner: Owner;
   readonly stored: Set<string>;
+  readonly uploads: { bytes: Uint8Array; type: string }[];
   readonly savedPaths: (string | null)[];
   failUpload: boolean;
   failSave: boolean;
+  isUndecodable: boolean;
 };
 
 function fakeGateways(owner: Owner): {
@@ -47,9 +53,11 @@ function fakeGateways(owner: Owner): {
   const state: FakeState = {
     owner,
     stored: new Set(owner?.photoPath ? [owner.photoPath] : []),
+    uploads: [],
     savedPaths: [],
     failUpload: false,
     failSave: false,
+    isUndecodable: false,
   };
   const gateways: ProfilePhotoGateways = {
     members: {
@@ -64,11 +72,12 @@ function fakeGateways(owner: Owner): {
       },
     },
     storage: {
-      async upload(path) {
+      async upload(path, bytes, type) {
         if (state.failUpload) {
           throw new Error("conexión caída");
         }
         state.stored.add(path);
+        state.uploads.push({ bytes, type });
       },
       async remove(path) {
         state.stored.delete(path);
@@ -77,6 +86,13 @@ function fakeGateways(owner: Owner): {
     signing: {
       async signPhotoUrl(path) {
         return `https://storage.test/signed/${path}?token=t`;
+      },
+    },
+    images: {
+      async shrinkPhoto() {
+        return state.isUndecodable
+          ? { kind: "undecodable" }
+          : { kind: "shrunk", bytes: SHRUNK_BYTES, type: "image/webp" };
       },
     },
     newFileId: () => NEW_FILE_ID,
@@ -161,7 +177,7 @@ describe("foto de perfil", () => {
         bytes: PNG_BYTES,
       });
 
-      const expectedPath = `${USER_ID}/${NEW_FILE_ID}.png`;
+      const expectedPath = `${USER_ID}/${NEW_FILE_ID}.webp`;
       expect([...state.stored]).toEqual([expectedPath]);
       expect(state.savedPaths).toEqual([expectedPath]);
       expect(photo.photoUrl).toBe(
@@ -169,7 +185,7 @@ describe("foto de perfil", () => {
       );
     });
 
-    it("usa la extensión del tipo que dicen los bytes", async () => {
+    it("guarda la versión reducida y no la que se subió", async () => {
       const { gateways, state } = fakeGateways(ACTIVE_WITHOUT_PHOTO);
 
       await replaceProfilePhoto(gateways, {
@@ -177,7 +193,37 @@ describe("foto de perfil", () => {
         bytes: JPEG_BYTES,
       });
 
-      expect(state.savedPaths).toEqual([`${USER_ID}/${NEW_FILE_ID}.jpg`]);
+      expect(state.uploads).toEqual([
+        { bytes: SHRUNK_BYTES, type: "image/webp" },
+      ]);
+    });
+
+    it("apunta en la ficha la ruta con la extensión de la reducida", async () => {
+      const { gateways, state } = fakeGateways(ACTIVE_WITHOUT_PHOTO);
+
+      await replaceProfilePhoto(gateways, {
+        userId: USER_ID,
+        bytes: JPEG_BYTES,
+      });
+
+      expect(state.savedPaths).toEqual([`${USER_ID}/${NEW_FILE_ID}.webp`]);
+    });
+
+    it("rechaza como formato no admitido lo que no se puede decodificar, sin subir nada", async () => {
+      const { gateways, state } = fakeGateways(ACTIVE_WITHOUT_PHOTO);
+      state.isUndecodable = true;
+
+      const upload = replaceProfilePhoto(gateways, {
+        userId: USER_ID,
+        bytes: PNG_BYTES,
+      });
+
+      await expect(upload).rejects.toMatchObject({
+        name: ProfilePhotoValidationError.name,
+        code: "photo_type_unsupported",
+      });
+      expect(state.stored.size).toBe(0);
+      expect(state.savedPaths).toEqual([]);
     });
 
     it("rechaza un formato no admitido sin subir nada", async () => {
@@ -230,7 +276,7 @@ describe("foto de perfil", () => {
         bytes: PNG_BYTES,
       });
 
-      expect([...state.stored]).toEqual([`${USER_ID}/${NEW_FILE_ID}.png`]);
+      expect([...state.stored]).toEqual([`${USER_ID}/${NEW_FILE_ID}.webp`]);
     });
 
     it("conserva la foto anterior si la subida falla a mitad", async () => {
@@ -283,8 +329,8 @@ describe("foto de perfil", () => {
         bytes: PNG_BYTES,
       });
 
-      expect(photo.photoUrl).toContain(`${USER_ID}/${NEW_FILE_ID}.png`);
-      expect(state.savedPaths).toEqual([`${USER_ID}/${NEW_FILE_ID}.png`]);
+      expect(photo.photoUrl).toContain(`${USER_ID}/${NEW_FILE_ID}.webp`);
+      expect(state.savedPaths).toEqual([`${USER_ID}/${NEW_FILE_ID}.webp`]);
       expect(errors).toHaveBeenCalledWith(
         expect.stringContaining(OLD_PATH),
         expect.any(Error),

@@ -5,6 +5,7 @@ import { readText } from "@/lib/auth/supabase-auth-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type { PhotoOwner, ProfilePhotoGateways } from "./profile-photo";
+import { shrinkProfilePhoto } from "./shrink-profile-photo";
 
 /**
  * Adaptador entre la foto de perfil (#245) y Supabase.
@@ -152,6 +153,7 @@ export function createProfilePhotoGateways(clients: {
       signPhotoUrl: (photoPath) =>
         signProfilePhotoUrl(serviceClient, photoPath),
     },
+    images: { shrinkPhoto: shrinkProfilePhoto },
     newFileId: randomUUID,
   };
 }
