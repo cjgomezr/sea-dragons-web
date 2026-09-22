@@ -559,6 +559,22 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
     );
   });
 
+  it("dice que el cambio quedó sin bitácora en vez de pedir reintentar", async () => {
+    stubApi({
+      changeStatus: () =>
+        errorResponse(500, "internal_error", "audit_not_recorded"),
+    });
+    await renderScreen();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Deactivate member" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The membership changed, but it couldn't be logged.",
+    );
+  });
+
   it("no manda una segunda baja con un doble clic", async () => {
     let release: (() => void) | null = null;
     stubApi({

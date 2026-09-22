@@ -553,6 +553,8 @@ export const englishMessages = {
     "This is the club's last Admin and can't be deactivated. Name another Admin first.",
   "memberStatus.error.selfDeactivation":
     "You can't deactivate yourself. Another Admin has to do it.",
+  "memberStatus.error.notAudited":
+    "The membership changed, but it couldn't be logged. Reload the record and tell whoever maintains the platform.",
   "memberStatus.error.unexpected":
     "We couldn't change their membership. Try again.",
   "themeToggle.switchToLight": "Switch to light theme",

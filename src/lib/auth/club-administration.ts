@@ -41,8 +41,9 @@ export type PendingRoleRequest = {
   readonly createdAt: string;
 };
 
-/** Una solicitud tal como la lee la base, con el estado de cuenta de quien
- * la pidió. No sale de aquí: decide si entra en la bandeja. */
+/** Una solicitud tal como la devuelve el adaptador, con el estado de cuenta
+ * de quien la pidió. Ese estado decide si entra en la bandeja; la bandeja
+ * publica `PendingRoleRequest`, sin él. */
 export type PendingRoleRequestRecord = PendingRoleRequest & {
   readonly requesterStatus: AccountStatus;
 };

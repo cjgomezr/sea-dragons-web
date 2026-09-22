@@ -28,6 +28,23 @@ type ControlState =
 
 const DEACTIVATED_STATUS = "inactive" satisfies RequestableMemberStatus;
 
+/** El botón dice lo contrario de lo que el miembro es, salvo mientras se
+ * guarda. */
+type ButtonLabelKey =
+  "memberStatus.saving" | "memberStatus.reactivate" | "memberStatus.deactivate";
+
+function buttonLabelKey(control: {
+  readonly isSaving: boolean;
+  readonly isDeactivated: boolean;
+}): ButtonLabelKey {
+  if (control.isSaving) {
+    return "memberStatus.saving";
+  }
+  return control.isDeactivated
+    ? "memberStatus.reactivate"
+    : "memberStatus.deactivate";
+}
+
 function requestedStatusFor(
   currentStatus: AccountStatus,
 ): RequestableMemberStatus {
@@ -123,13 +140,7 @@ export function MemberStatusControl({
           disabled={isSaving}
           onClick={() => void changeStatus()}
         >
-          {translate(
-            isSaving
-              ? "memberStatus.saving"
-              : isDeactivated
-                ? "memberStatus.reactivate"
-                : "memberStatus.deactivate",
-          )}
+          {translate(buttonLabelKey({ isSaving, isDeactivated }))}
         </button>
       </div>
     </section>

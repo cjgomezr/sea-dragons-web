@@ -549,6 +549,8 @@ export const spanishMessages: MessageCatalog = {
     "Es el último Admin del club y no se le puede dar de baja. Nombra antes a otro Admin.",
   "memberStatus.error.selfDeactivation":
     "No puedes darte de baja a ti mismo: la baja de un Admin la hace otro Admin.",
+  "memberStatus.error.notAudited":
+    "La membresía cambió, pero no quedó en la bitácora. Recarga la ficha y avisa a quien mantiene la plataforma.",
   "memberStatus.error.unexpected":
     "No pudimos cambiar la membresía. Vuelve a intentarlo.",
   "themeToggle.switchToLight": "Cambiar a tema claro",

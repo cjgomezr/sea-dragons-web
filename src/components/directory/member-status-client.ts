@@ -27,6 +27,10 @@ const memberStatusSchema = z.object({
 /** Las reglas que el endpoint nombra en `reason` cuando dice que no. */
 const LAST_ADMIN_REASON = "last_admin";
 const SELF_DEACTIVATION_REASON = "self_deactivation";
+/** El estado sí cambió, pero su rastro no llegó a la bitácora: no es un
+ * "vuelve a intentarlo", porque el segundo intento no encontraría nada que
+ * cambiar. */
+const AUDIT_NOT_RECORDED_REASON = "audit_not_recorded";
 
 export type MemberStatusFailure = ApiRequestFailure;
 
@@ -65,6 +69,9 @@ export function describeMemberStatusFailure(
   }
   if (reason === SELF_DEACTIVATION_REASON) {
     return translate("memberStatus.error.selfDeactivation");
+  }
+  if (reason === AUDIT_NOT_RECORDED_REASON) {
+    return translate("memberStatus.error.notAudited");
   }
   switch (failure) {
     case "network":
