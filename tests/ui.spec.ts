@@ -44,8 +44,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
-  ADMINISTRATION_ADMIN_NAME,
-  DECIDABLE_MEMBER_NAME,
   E2E_STORAGE_STATE_PATH,
   GROUPED_MEMBER_GROUP_NAMES,
   GROUPED_MEMBER_STORAGE_STATE_PATH,
@@ -54,6 +52,7 @@ import {
   incompleteStorageStatePath,
   readE2eSessionState,
   roleRequestStorageStatePath,
+  seededMemberName,
 } from "./support/e2e-session";
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
 import { snapshotCreatedNotice } from "./support/visual-baseline-notice";
@@ -653,6 +652,17 @@ test("el formulario no manda nada al servidor con los campos vacíos", async ({
    --------------------------------------------------------------------------- */
 
 const E2E_SESSION = readE2eSessionState();
+
+// Con el sufijo de esta corrida (#254): otra suite a la vez siembra los
+// mismos papeles, y un nombre fijo encontraría también sus filas.
+const ADMINISTRATION_ADMIN_NAME = seededMemberName(
+  E2E_SESSION,
+  "admin-de-administracion",
+);
+const DECIDABLE_MEMBER_NAME = seededMemberName(
+  E2E_SESSION,
+  "socio-para-decidir",
+);
 
 test.describe("dentro de la aplicación", () => {
   test.skip(
@@ -2532,7 +2542,7 @@ test.describe("un socio que edita su perfil", () => {
 });
 
 const ACCOUNT_PROFILE_PHOTO_ENDPOINT = "/api/v1/account/profile/photo";
-const PHOTO_MEMBER_NAME = "Socia que sube su foto";
+const PHOTO_MEMBER_NAME = seededMemberName(E2E_SESSION, "perfil-para-foto");
 
 test.describe("una socia que sube su foto de perfil", () => {
   skipWithoutSession();
