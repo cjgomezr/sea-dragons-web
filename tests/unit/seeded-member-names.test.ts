@@ -128,8 +128,8 @@ type FakeServiceClient = {
   readonly deletedUserIds: string[];
 };
 
-/** Un proyecto de dev con los socios de dos corridas. Sólo registra qué
- * identidades se borran; sus carpetas de fotos están vacías. */
+/** Un proyecto de dev que sólo registra qué identidades se borran; las
+ * carpetas de fotos están vacías. */
 function fakeServiceClient(): FakeServiceClient {
   const deletedUserIds: string[] = [];
   const client = {
@@ -155,11 +155,9 @@ describe("el cierre de la corrida", () => {
   it("borra sus propios miembros y no toca los de otra corrida", async () => {
     const fake = fakeServiceClient();
     const mine = availableState("aaaa1111", ["mine-1", "mine-2"]);
-    const theirs = availableState("bbbb2222", ["theirs-1"]);
 
     await deleteSeededMembers(fake.client, mine);
 
     expect(fake.deletedUserIds).toEqual(["mine-1", "mine-2"]);
-    expect(fake.deletedUserIds).not.toContain(theirs.userIds[0]);
   });
 });

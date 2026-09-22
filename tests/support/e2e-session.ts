@@ -190,7 +190,7 @@ export const ROLE_REQUEST_MEMBERS = {
   "con-solicitud-pendiente": { pendingRequest: "Coach", columns: {} },
   /** Lo usa el test que envía una solicitud desde el formulario. */
   "para-pedir-rol": { pendingRequest: null, columns: {} },
-  /** El único Admin sembrado: abre la bandeja del directorio (#212, #240). */
+  /** El único Admin que siembra esta corrida: abre la bandeja del directorio (#212, #240). */
   "admin-de-administracion": {
     pendingRequest: null,
     columns: { role: "Admin" },
