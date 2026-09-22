@@ -1083,9 +1083,14 @@ test.describe("dentro de la aplicación", () => {
 
     const reachedByTabbing: string[] = [];
     const outlineWidths: number[] = [];
-    // The extra presses cover what precedes the nav: the theme toggle, the
-    // language toggle and sign out, plus one to spare.
-    for (let press = 0; press < expectedOrder.length + 4; press += 1) {
+    // The extra presses cover what precedes the nav: the theme and language
+    // toggles, the notification bell (#266), My account and sign out.
+    const headerControlCount = 5;
+    for (
+      let press = 0;
+      press < expectedOrder.length + headerControlCount;
+      press += 1
+    ) {
       await page.keyboard.press("Tab");
       const focused = await page.evaluate(() => {
         const element = document.activeElement;
