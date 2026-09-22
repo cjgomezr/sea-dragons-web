@@ -582,6 +582,32 @@ export const englishMessages = {
     "The membership changed, but it couldn't be logged. Reload the record and tell whoever maintains the platform.",
   "memberStatus.error.unexpected":
     "We couldn't change their membership. Try again.",
+  // La campana y su lista (#266). Cada tipo de aviso tiene su título y su
+  // cuerpo; los datos del aviso entran como parámetros.
+  "notifications.bell.label": {
+    one: "Notifications, {count} unread",
+    other: "Notifications, {count} unread",
+  },
+  "notifications.bell.labelNoneUnread": "Notifications, none unread",
+  "notifications.panel.title": "Notifications",
+  "notifications.panel.markAllRead": "Mark all read",
+  "notifications.panel.back": "Back",
+  "notifications.panel.loading": "Loading your notifications…",
+  "notifications.panel.empty": "You don't have any notifications yet.",
+  "notifications.panel.unread": "New",
+  "notifications.panel.error.load": "We couldn't load your notifications.",
+  "notifications.panel.error.markRead":
+    "We couldn't mark your notifications as read.",
+  "notifications.panel.retry": "Try again",
+  "notifications.role_changed.title": "Your role changed",
+  "notifications.role_changed.body": "You are now {role}.",
+  "notifications.role_request_rejected.title": "Role request declined",
+  "notifications.role_request_rejected.body":
+    "An Admin declined your request to be {role}.",
+  "notifications.role_request_received.title": "New role request",
+  "notifications.role_request_received.body": "{name} asked to be {role}.",
+  "notifications.generic.title": "New notification",
+  "notifications.generic.body": "Something changed in your account.",
   "themeToggle.switchToLight": "Switch to light theme",
   "themeToggle.switchToDark": "Switch to dark theme",
   // El destino va con su propio nombre ("Español", no "Spanish"): quien no

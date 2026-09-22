@@ -55,6 +55,17 @@ export function AccountIcon(): React.JSX.Element {
   );
 }
 
+/** La campana de avisos de la cabecera (#266), con el mismo trazo que los
+ * otros iconos de esa esquina. */
+export function BellIcon(): React.JSX.Element {
+  return (
+    <IconBase>
+      <path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z" />
+      <path d="M10 20.5a2 2 0 0 0 4 0" />
+    </IconBase>
+  );
+}
+
 function DashboardIcon(): React.JSX.Element {
   return (
     <IconBase>

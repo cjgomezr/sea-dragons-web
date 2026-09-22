@@ -36,6 +36,7 @@
 import {
   test,
   expect,
+  type Locator,
   type Page,
   type PageScreenshotOptions,
 } from "@playwright/test";
@@ -1082,9 +1083,14 @@ test.describe("dentro de la aplicación", () => {
 
     const reachedByTabbing: string[] = [];
     const outlineWidths: number[] = [];
-    // The extra presses cover what precedes the nav: the theme toggle, the
-    // language toggle and sign out, plus one to spare.
-    for (let press = 0; press < expectedOrder.length + 4; press += 1) {
+    // The extra presses cover what precedes the nav: the theme and language
+    // toggles, the notification bell (#266), My account and sign out.
+    const headerControlCount = 5;
+    for (
+      let press = 0;
+      press < expectedOrder.length + headerControlCount;
+      press += 1
+    ) {
       await page.keyboard.press("Tab");
       const focused = await page.evaluate(() => {
         const element = document.activeElement;
@@ -2361,10 +2367,14 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
     });
   });
 
-  // El nombre del club y los cuatro controles viven en la misma fila del
-  // móvil. A 360 y 375 tienen que caber sin partirla ni tapar el nombre.
+  // Los cinco controles de la cabecera (la campana desde #266). Hasta #209
+  // cabían en la fila del nombre del club; con cinco ya no, así que en un
+  // móvil estrecho bajan juntos a su propia fila. A 360 y 375 esa fila no se
+  // parte, no tapa el nombre y no se sale de la pantalla.
   for (const width of [360, 375]) {
-    test(`la cabecera cabe en una fila a ${width}px`, async ({ page }) => {
+    test(`los controles de la cabecera caben en su fila sin tapar el nombre a ${width}px`, async ({
+      page,
+    }) => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
 
@@ -2373,6 +2383,7 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
         [
           page.getByRole("button", { name: /theme/i }),
           page.getByRole("button", { name: /español/i }),
+          page.getByRole("button", { name: /^Notifications/ }),
           page.getByRole("link", { name: "My account" }),
           page.getByRole("button", { name: "Sign out" }),
         ].map((control) => control.boundingBox()),
@@ -2383,12 +2394,25 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
       }
 
       const tops = new Set(boxes.map((box) => Math.round(box.y)));
-      expect(tops.size, "los cuatro controles no están en una fila").toBe(1);
+      expect(tops.size, "los controles no están en una fila").toBe(1);
+      // Desde #266 los controles pueden bajar a su propia fila, bajo el
+      // nombre: lo que no pueden es pisarlo, ni salirse de la pantalla.
+      const controlsTop = Math.min(...boxes.map((box) => box.y));
       const firstControlLeft = Math.min(...boxes.map((box) => box.x));
+      const isBrandClear =
+        brand.y + brand.height <= controlsTop ||
+        brand.x + brand.width <= firstControlLeft;
       expect(
-        brand.x + brand.width,
+        isBrandClear,
         "el nombre del club queda tapado por los controles",
-      ).toBeLessThanOrEqual(firstControlLeft);
+      ).toBe(true);
+      const lastControlRight = Math.max(
+        ...boxes.map((box) => box.x + box.width),
+      );
+      expect(
+        lastControlRight,
+        "un control se sale de la pantalla",
+      ).toBeLessThanOrEqual(width);
     });
   }
 });
@@ -4373,5 +4397,385 @@ test.describe("un Player frente al alta de un miembro", () => {
     await expect(page.getByRole("table")).toBeVisible();
 
     await expect(page.getByRole("link", { name: "Add member" })).toHaveCount(0);
+  });
+});
+/* ---------------------------------------------------------------------------
+   La campana de avisos (#266). Sin captura en docs/mockups/: se sigue el
+   prototipo y se revisa contra design-system.md. Las capturas responden a la
+   campana con una API de mentira (`page.route`), porque el número y la lista
+   tienen que ser los mismos en cada corrida; una prueba aparte habla con la
+   API de verdad.
+   --------------------------------------------------------------------------- */
+
+const NOTIFICATIONS_ENDPOINT = "/api/v1/notifications";
+const UNREAD_COUNT_ENDPOINT = `${NOTIFICATIONS_ENDPOINT}/unread-count`;
+const READ_ALL_ENDPOINT = `${NOTIFICATIONS_ENDPOINT}/read-all`;
+const NOTIFICATIONS_SCREEN_PATH = "/dashboard";
+const HOUR_MS = 60 * 60 * 1000;
+const BELL_NAME = /^(Notifications|Avisos)/;
+const NOTIFICATIONS_REGION_NAME = /^(Notifications|Avisos)$/;
+
+type FakeNotification = {
+  readonly id: string;
+  readonly type: string;
+  readonly data: Readonly<Record<string, unknown>>;
+  readonly createdAt: string;
+  readonly isRead: boolean;
+};
+
+/** A media hora de un cambio de unidad: el tiempo relativo que sale en la
+ * captura no se mueve aunque la corrida tarde. */
+function hoursAgo(hours: number): string {
+  return new Date(Date.now() - (hours + 0.5) * HOUR_MS).toISOString();
+}
+
+function fakeNotificationId(index: number): string {
+  return `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
+}
+
+const SAMPLE_NOTIFICATIONS: readonly FakeNotification[] = [
+  {
+    id: fakeNotificationId(1),
+    type: "role_request_received",
+    data: { requesterName: "Nerea Ruiz", requestedRole: "Coach" },
+    createdAt: hoursAgo(2),
+    isRead: false,
+  },
+  {
+    id: fakeNotificationId(2),
+    type: "role_changed",
+    data: { newRole: "Committee" },
+    createdAt: hoursAgo(5),
+    isRead: false,
+  },
+  {
+    id: fakeNotificationId(3),
+    type: "role_request_rejected",
+    data: { requestedRole: "Coach" },
+    createdAt: hoursAgo(26),
+    isRead: false,
+  },
+  {
+    id: fakeNotificationId(4),
+    type: "role_changed",
+    data: { newRole: "Player" },
+    createdAt: hoursAgo(24 * 9),
+    isRead: true,
+  },
+];
+
+function unreadOnly(count: number): readonly FakeNotification[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: fakeNotificationId(index + 1),
+    type: "role_changed",
+    data: { newRole: "Coach" },
+    createdAt: hoursAgo(index + 1),
+    isRead: false,
+  }));
+}
+
+/** La API de avisos de mentira, con el mismo contrato que la de #265. */
+async function serveNotifications(
+  page: Page,
+  notifications: readonly FakeNotification[],
+): Promise<void> {
+  let stored = [...notifications];
+  await page.route(`**${UNREAD_COUNT_ENDPOINT}`, (route) =>
+    route.fulfill({
+      json: {
+        data: { unreadCount: stored.filter((n) => !n.isRead).length },
+      },
+    }),
+  );
+  await page.route(`**${NOTIFICATIONS_ENDPOINT}`, (route) =>
+    route.fulfill({ json: { data: { notifications: stored } } }),
+  );
+  await page.route(`**${READ_ALL_ENDPOINT}`, (route) => {
+    stored = stored.map((n) => ({ ...n, isRead: true }));
+    return route.fulfill({ status: 204 });
+  });
+}
+
+function notificationsRegion(page: Page): Locator {
+  return page.getByRole("region", { name: NOTIFICATIONS_REGION_NAME });
+}
+
+async function openNotifications(page: Page): Promise<void> {
+  await page.getByRole("button", { name: BELL_NAME }).click();
+  await expect(notificationsRegion(page)).toBeVisible();
+  await expect(notificationsRegion(page).getByRole("status")).toHaveCount(0);
+}
+
+type BellState = {
+  readonly name: string;
+  readonly notifications: readonly FakeNotification[];
+  /** El texto del número, o null si la campana va sin él. */
+  readonly badge: string | null;
+};
+
+const BELL_STATES: readonly BellState[] = [
+  { name: "campana-con-numero", notifications: unreadOnly(3), badge: "3" },
+  { name: "campana-9-mas", notifications: unreadOnly(12), badge: "9+" },
+  { name: "campana-sin-numero", notifications: [], badge: null },
+];
+
+for (const state of BELL_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+    for (const vp of viewports) {
+      for (const theme of themes) {
+        test(`@ ${vp.name}: matches approved baseline (${theme})`, async ({
+          page,
+        }) => {
+          await page.setViewportSize({ width: vp.width, height: vp.height });
+          await serveNotifications(page, state.notifications);
+          await goToWithTheme(page, NOTIFICATIONS_SCREEN_PATH, theme);
+          const bell = page.getByRole("button", { name: BELL_NAME });
+          if (state.badge === null) {
+            await expect(bell).toHaveAccessibleName(
+              "Notifications, none unread",
+            );
+          } else {
+            await expect(bell).toHaveText(state.badge);
+          }
+          const header = page.locator(".app-sidebar-header");
+          const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+          await createMissingLocalBaseline(snapshot, () =>
+            header.screenshot(SCREENSHOT_OPTIONS),
+          );
+          await expect(header).toHaveScreenshot(snapshot, {
+            ...SCREENSHOT_OPTIONS,
+            maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
+          });
+        });
+      }
+    }
+  });
+}
+
+type NotificationListCapture = {
+  readonly name: string;
+  readonly notifications: readonly FakeNotification[];
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+};
+
+// El español conserva su captura con avisos: "Marcar todo como leído" es
+// bastante más largo que "Mark all read" y es el que puede partir la fila.
+const NOTIFICATION_LIST_CAPTURES: readonly NotificationListCapture[] = [
+  { name: "avisos-con-avisos", notifications: SAMPLE_NOTIFICATIONS },
+  {
+    name: "avisos-con-avisos-es",
+    notifications: SAMPLE_NOTIFICATIONS,
+    beforeVisit: chooseSpanish,
+  },
+  { name: "avisos-vacia", notifications: [] },
+];
+
+for (const capture of NOTIFICATION_LIST_CAPTURES) {
+  test.describe(capture.name, () => {
+    skipWithoutSession();
+    test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await capture.beforeVisit?.(page);
+            await serveNotifications(page, capture.notifications);
+            await goToWithTheme(page, NOTIFICATIONS_SCREEN_PATH, theme);
+            await openNotifications(page);
+            // El ratón se queda donde estaba la campana, que en el móvil es
+            // encima de "Mark all read": la captura saldría con su hover.
+            await page.mouse.move(0, 0);
+            // Sin fullPage: en el móvil la lista es una pantalla fija encima
+            // de la página, y lo que hay debajo no forma parte de la captura.
+            const snapshot = `${capture.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot(SCREENSHOT_OPTIONS),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+
+        test("has no horizontal scroll with the list open", async ({
+          page,
+        }) => {
+          await capture.beforeVisit?.(page);
+          await serveNotifications(page, capture.notifications);
+          await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
+          await openNotifications(page);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+
+        test("has no accessibility violations with the list open (axe-core)", async ({
+          page,
+        }) => {
+          await capture.beforeVisit?.(page);
+          await serveNotifications(page, capture.notifications);
+          await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
+          await openNotifications(page);
+          await expectNoAxeViolations(page);
+        });
+      });
+    }
+  });
+}
+
+test.describe("la campana de avisos", () => {
+  skipWithoutSession();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("en escritorio abre un panel bajo la campana y Escape lo cierra", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await serveNotifications(page, SAMPLE_NOTIFICATIONS);
+    await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
+
+    await openNotifications(page);
+    const panel = await notificationsRegion(page).boundingBox();
+    expect(panel?.width, "el panel ocupa toda la pantalla").toBeLessThan(1440);
+    await expect(page.getByRole("button", { name: "Back" })).toBeHidden();
+    await page.keyboard.press("Escape");
+
+    await expect(notificationsRegion(page)).toHaveCount(0);
+  });
+
+  // La barra lateral mide 240px: los cinco controles no caben en una fila y
+  // se parten en sus dos grupos, sin salirse de ella.
+  for (const width of [768, 1440]) {
+    test(`los controles de la cabecera no se salen de la barra lateral a ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
+
+      const sidebar = await page.locator(".app-sidebar").boundingBox();
+      const signOut = await page
+        .getByRole("button", { name: "Sign out" })
+        .boundingBox();
+      if (sidebar === null || signOut === null) {
+        throw new Error("la barra lateral no dibujó sus controles");
+      }
+
+      expect(signOut.x + signOut.width).toBeLessThanOrEqual(
+        sidebar.x + sidebar.width,
+      );
+    });
+  }
+
+  test("en escritorio se cierra al pulsar fuera del panel", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await serveNotifications(page, SAMPLE_NOTIFICATIONS);
+    await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
+    await openNotifications(page);
+
+    await page.getByRole("main").click({ position: { x: 900, y: 600 } });
+
+    await expect(notificationsRegion(page)).toHaveCount(0);
+  });
+
+  for (const width of [360, 375]) {
+    test(`en el móvil la lista ocupa la pantalla y se vuelve con la flecha a ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await serveNotifications(page, SAMPLE_NOTIFICATIONS);
+      await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
+
+      await openNotifications(page);
+      const panel = await notificationsRegion(page).boundingBox();
+      expect(panel).toEqual({ x: 0, y: 0, width, height: 800 });
+      await page.getByRole("button", { name: "Back" }).click();
+
+      await expect(notificationsRegion(page)).toHaveCount(0);
+    });
+  }
+
+  test("en el móvil el teclado no se pasea por la pantalla tapada", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await serveNotifications(page, SAMPLE_NOTIFICATIONS);
+    await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
+    await openNotifications(page);
+    const controlsInList = await notificationsRegion(page)
+      .getByRole("button")
+      .count();
+
+    for (let press = 0; press <= controlsInList; press += 1) {
+      await page.keyboard.press("Tab");
+    }
+
+    const isFocusInsideList = await page.evaluate(
+      () => document.activeElement?.closest(".notification-panel") !== null,
+    );
+    const isListOpen = (await notificationsRegion(page).count()) > 0;
+    expect(
+      isListOpen && !isFocusInsideList,
+      "el foco salió de la lista y la lista sigue tapando la pantalla",
+    ).toBe(false);
+  });
+
+  test("marcar todo deja la campana sin número", async ({ page }) => {
+    await serveNotifications(page, SAMPLE_NOTIFICATIONS);
+    await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
+    await expect(page.getByRole("button", { name: BELL_NAME })).toHaveText("3");
+    await openNotifications(page);
+
+    await page.getByRole("button", { name: "Mark all read" }).click();
+
+    await expect(
+      page.getByRole("button", { name: "Notifications, none unread" }),
+    ).toHaveText("");
+  });
+
+  test("dice que no pudo cargar la lista cuando falla la red", async ({
+    page,
+  }) => {
+    await serveNotifications(page, SAMPLE_NOTIFICATIONS);
+    await page.route(`**${NOTIFICATIONS_ENDPOINT}`, (route) =>
+      route.abort("internetdisconnected"),
+    );
+    await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
+
+    await page.getByRole("button", { name: BELL_NAME }).click();
+
+    await expect(
+      page.getByText("We couldn't load your notifications."),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  });
+
+  // Sin API de mentira: la campana lee por los endpoints de #265.
+  test("lee la lista de la API de verdad", async ({ page }) => {
+    await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
+    const listed = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === NOTIFICATIONS_ENDPOINT &&
+        response.request().method() === "GET",
+    );
+
+    await page.getByRole("button", { name: BELL_NAME }).click();
+
+    expect((await listed).status()).toBe(200);
+    await expect(notificationsRegion(page)).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toHaveCount(
+      0,
+    );
   });
 });

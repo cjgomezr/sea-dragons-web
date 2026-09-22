@@ -8,7 +8,8 @@ const SPANISH_STATE_SUFFIX = "-es";
  * que su captura casi nunca defiende algo que la inglesa no defienda ya. Lo
  * que sí cambia con el idioma es el largo de un aviso de varias líneas: el
  * español es más largo, parte en otro sitio y puede empujar el diseño. Estos
- * son los estados cuyo aviso es de ese tipo.
+ * son los estados cuyo texto es de ese tipo: un aviso de varias líneas, o la
+ * lista de avisos de la campana, donde cada cuerpo parte donde le toca.
  *
  * El estado sigue existiendo aunque no se fotografíe: sus pruebas de scroll
  * horizontal y de accesibilidad corren igual en los dos idiomas. La barra de
@@ -17,6 +18,7 @@ const SPANISH_STATE_SUFFIX = "-es";
  */
 export const SPANISH_STATES_WITH_OWN_CAPTURE: readonly string[] = [
   "alta-invitacion-enviada-es",
+  "avisos-con-avisos-es",
   "ficha-aviso-validacion-es",
   "ficha-invitacion-pendiente-es",
   "perfil-error-de-red-es",

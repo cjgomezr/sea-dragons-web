@@ -91,3 +91,56 @@ export function formatClubMoment(locale: Locale, instant: Date): string {
 export function formatCalendarDay(locale: Locale, isoDate: string): string {
   return CALENDAR_DAY_FORMATTERS[locale].format(parseCalendarDay(isoDate));
 }
+
+const RELATIVE_TIME_FORMATTERS = formattersByLocale(
+  (displayLocale) =>
+    new Intl.RelativeTimeFormat(displayLocale, { numeric: "auto" }),
+);
+
+const SECONDS_PER_MINUTE = 60;
+const SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
+const SECONDS_PER_DAY = 24 * SECONDS_PER_HOUR;
+const SECONDS_PER_WEEK = 7 * SECONDS_PER_DAY;
+// Un mes y un año "de calendario" no miden siempre lo mismo. Para decir hace
+// cuánto llegó un aviso basta con la aproximación.
+const SECONDS_PER_MONTH = 30 * SECONDS_PER_DAY;
+const SECONDS_PER_YEAR = 365 * SECONDS_PER_DAY;
+
+/** De la más grande a la más pequeña: se usa la primera que cabe entera en
+ * lo que pasó. */
+const RELATIVE_TIME_UNITS: readonly {
+  readonly unit: Intl.RelativeTimeFormatUnit;
+  readonly seconds: number;
+}[] = [
+  { unit: "year", seconds: SECONDS_PER_YEAR },
+  { unit: "month", seconds: SECONDS_PER_MONTH },
+  { unit: "week", seconds: SECONDS_PER_WEEK },
+  { unit: "day", seconds: SECONDS_PER_DAY },
+  { unit: "hour", seconds: SECONDS_PER_HOUR },
+  { unit: "minute", seconds: SECONDS_PER_MINUTE },
+];
+
+/** Hace cuánto pasó algo ("5 minutes ago", "hace 5 minutos"). Lo de menos de
+ * un minuto es "ahora", y también lo que parece futuro: eso sólo pasa cuando
+ * el reloj del navegador va por detrás del de la base. */
+export function formatRelativeTime(
+  locale: Locale,
+  instant: Date,
+  now: Date,
+): string {
+  const elapsedSeconds = Math.max(
+    0,
+    (now.getTime() - instant.getTime()) / 1000,
+  );
+  const formatter = RELATIVE_TIME_FORMATTERS[locale];
+  const largestUnit = RELATIVE_TIME_UNITS.find(
+    ({ seconds }) => elapsedSeconds >= seconds,
+  );
+  if (largestUnit === undefined) {
+    return formatter.format(0, "second");
+  }
+  return formatter.format(
+    -Math.floor(elapsedSeconds / largestUnit.seconds),
+    largestUnit.unit,
+  );
+}

@@ -56,6 +56,21 @@ describe("app shell", () => {
     );
   });
 
+  // #266: la campana de avisos va en la misma fila, justo antes de Mi cuenta.
+  it("pone la campana de avisos junto a Mi cuenta", () => {
+    usePathname.mockReturnValue("/calendario");
+    render(
+      <AppShell locale="en" role="Player">
+        <p>Contenido de la sección</p>
+      </AppShell>,
+    );
+
+    const bell = screen.getByRole("button", { name: /^Notifications/ });
+    expect(bell.parentElement?.nextElementSibling).toBe(
+      screen.getByRole("link", { name: "My account" }),
+    );
+  });
+
   it("nombra el enlace a Mi cuenta en el idioma de la visita", () => {
     usePathname.mockReturnValue("/calendario");
     render(
