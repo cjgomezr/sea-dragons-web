@@ -1,4 +1,5 @@
 import { MemberNotFoundError } from "./account-activation";
+import type { AccountStatus } from "./account-status";
 import type {
   RequestableRole,
   RoleRequestGateways,
@@ -40,12 +41,20 @@ export type PendingRoleRequest = {
   readonly createdAt: string;
 };
 
+/** Una solicitud tal como la lee la base, con el estado de cuenta de quien
+ * la pidió. No sale de aquí: decide si entra en la bandeja. */
+export type PendingRoleRequestRecord = PendingRoleRequest & {
+  readonly requesterStatus: AccountStatus;
+};
+
 export type ClubAdministrationGateways = {
   readonly members: RoleRequestGateways["members"] & {
     findClubMembers(clubId: string): Promise<readonly ClubMember[]>;
   };
   readonly requests: {
-    findPendingRequests(clubId: string): Promise<readonly PendingRoleRequest[]>;
+    findPendingRequests(
+      clubId: string,
+    ): Promise<readonly PendingRoleRequestRecord[]>;
   };
 };
 
@@ -83,10 +92,18 @@ export async function listClubMembers(
   return gateways.members.findClubMembers(administrator.clubId);
 }
 
+/** La solicitud de quien está de baja (FR-085) no entra en la bandeja, pero
+ * sigue pendiente en la base: si se le reactiva, vuelve a aparecer. La baja no
+ * borra el historial. */
 export async function listPendingRoleRequests(
   gateways: ClubAdministrationGateways,
   administratorId: string,
 ): Promise<readonly PendingRoleRequest[]> {
   const administrator = await findAdministrator(gateways, administratorId);
-  return gateways.requests.findPendingRequests(administrator.clubId);
+  const records = await gateways.requests.findPendingRequests(
+    administrator.clubId,
+  );
+  return records
+    .filter((record) => record.requesterStatus !== "inactive")
+    .map(({ requesterStatus: _requesterStatus, ...request }) => request);
 }

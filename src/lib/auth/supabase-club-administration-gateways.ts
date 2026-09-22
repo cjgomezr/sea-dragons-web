@@ -1,10 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
+import { parseAccountStatus } from "./account-status";
 import type {
   ClubAdministrationGateways,
   ClubMember,
-  PendingRoleRequest,
+  PendingRoleRequestRecord,
 } from "./club-administration";
 import { parseRequestableRole } from "./role-request";
 import { parseRole } from "./roles";
@@ -48,7 +49,28 @@ function toClubMember(row: Row): ClubMember {
   };
 }
 
-function toPendingRequest(row: Row, fullName: string): PendingRoleRequest {
+/** Quien pidió, con lo que la bandeja necesita saber de su fila. */
+type Requester = {
+  readonly fullName: string;
+  readonly accountStatus: PendingRoleRequestRecord["requesterStatus"];
+};
+
+function toRequester(row: Row): Requester {
+  const value = readRequiredText(row, "account_status", MEMBERS_TABLE);
+  const accountStatus = parseAccountStatus(value);
+  if (accountStatus === null) {
+    throw new Error(`${value} no es un estado de cuenta que se reconozca.`);
+  }
+  return {
+    fullName: readRequiredText(row, "full_name", MEMBERS_TABLE),
+    accountStatus,
+  };
+}
+
+function toPendingRequest(
+  row: Row,
+  requester: Requester,
+): PendingRoleRequestRecord {
   const value = readRequiredText(row, "requested_role", ROLE_REQUESTS_TABLE);
   const requestedRole = parseRequestableRole(value);
   if (requestedRole === null) {
@@ -57,7 +79,7 @@ function toPendingRequest(row: Row, fullName: string): PendingRoleRequest {
   return {
     id: readRequiredText(row, "id", ROLE_REQUESTS_TABLE),
     userId: readRequiredText(row, "user_id", ROLE_REQUESTS_TABLE),
-    fullName,
+    fullName: requester.fullName,
     requestedRole,
     justification: readText(row, "justification", ROLE_REQUESTS_TABLE),
     // Postgres devuelve `timestamptz` con su propio formato; se normaliza a
@@ -65,11 +87,13 @@ function toPendingRequest(row: Row, fullName: string): PendingRoleRequest {
     createdAt: new Date(
       readRequiredText(row, "created_at", ROLE_REQUESTS_TABLE),
     ).toISOString(),
+    requesterStatus: requester.accountStatus,
   };
 }
 
 /**
- * Los nombres de quienes pidieron, en una sola consulta más.
+ * Los nombres y el estado de cuenta de quienes pidieron, en una sola
+ * consulta más.
  *
  * Se leen aparte en vez de pedirle a PostgREST que incruste `members` en la
  * misma consulta: la clave foránea de `role_requests.user_id` apunta a una
@@ -77,14 +101,14 @@ function toPendingRequest(row: Row, fullName: string): PendingRoleRequest {
  * PostgREST deduzca esa relación es una lectura que se rompe sin que nadie
  * toque este archivo. Son dos consultas fijas, no una por solicitud.
  */
-async function readRequesterNames(
+async function readRequesters(
   serviceClient: SupabaseClient,
   clubId: string,
   userIds: readonly string[],
-): Promise<ReadonlyMap<string, string>> {
+): Promise<ReadonlyMap<string, Requester>> {
   const { data, error } = await serviceClient
     .from(MEMBERS_TABLE)
-    .select("user_id, full_name")
+    .select("user_id, full_name, account_status")
     .eq("club_id", clubId)
     .in("user_id", userIds);
   if (error) {
@@ -95,7 +119,7 @@ async function readRequesterNames(
   return new Map(
     data.map((row: Row) => [
       readRequiredText(row, "user_id", MEMBERS_TABLE),
-      readRequiredText(row, "full_name", MEMBERS_TABLE),
+      toRequester(row),
     ]),
   );
 }
@@ -142,16 +166,16 @@ export function createClubAdministrationGateways(
         const userIds = data.map((row: Row) =>
           readRequiredText(row, "user_id", ROLE_REQUESTS_TABLE),
         );
-        const names = await readRequesterNames(serviceClient, clubId, userIds);
+        const requesters = await readRequesters(serviceClient, clubId, userIds);
         return data.map((row: Row) => {
           const userId = readRequiredText(row, "user_id", ROLE_REQUESTS_TABLE);
-          const fullName = names.get(userId);
-          if (fullName === undefined) {
+          const requester = requesters.get(userId);
+          if (requester === undefined) {
             throw new Error(
               `La solicitud de rol de ${userId} no tiene socio en el club ${clubId}.`,
             );
           }
-          return toPendingRequest(row, fullName);
+          return toPendingRequest(row, requester);
         });
       },
     },
