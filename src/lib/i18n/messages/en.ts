@@ -538,6 +538,23 @@ export const englishMessages = {
   "memberRecord.invitation.lead":
     "{name} hasn't activated their account yet. The invitation link expires after an hour, so you can send a new one.",
   "memberRecord.invitation.resent": "We sent {name} a new invitation.",
+  // La baja y la reactivación desde la ficha (#244, RF-6 del PRD de E5).
+  "memberStatus.title": "Membership",
+  "memberStatus.lead.active":
+    "{name} is a member of the club. Deactivating keeps their history, but they can no longer sign in or appear in the directory.",
+  "memberStatus.lead.inactive":
+    "{name} is no longer a member. Their history is kept, and reactivating lets them sign in and appear in the directory again.",
+  "memberStatus.deactivate": "Deactivate member",
+  "memberStatus.reactivate": "Reactivate member",
+  "memberStatus.saving": "Saving…",
+  "memberStatus.deactivated": "{name} is no longer a member.",
+  "memberStatus.reactivated": "{name} is back in the club.",
+  "memberStatus.error.lastAdmin":
+    "This is the club's last Admin and can't be deactivated. Name another Admin first.",
+  "memberStatus.error.selfDeactivation":
+    "You can't deactivate yourself. Another Admin has to do it.",
+  "memberStatus.error.unexpected":
+    "We couldn't change their membership. Try again.",
   "themeToggle.switchToLight": "Switch to light theme",
   "themeToggle.switchToDark": "Switch to dark theme",
   // El destino va con su propio nombre ("Español", no "Spanish"): quien no

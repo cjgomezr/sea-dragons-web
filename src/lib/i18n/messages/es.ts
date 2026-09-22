@@ -535,6 +535,22 @@ export const spanishMessages: MessageCatalog = {
     "{name} todavía no activó su cuenta. El enlace de la invitación caduca a la hora, así que puedes mandarle uno nuevo.",
   "memberRecord.invitation.resent":
     "Le mandamos una invitación nueva a {name}.",
+  "memberStatus.title": "Membresía",
+  "memberStatus.lead.active":
+    "{name} es miembro del club. Darle de baja conserva su historial, pero deja de entrar y de aparecer en el directorio.",
+  "memberStatus.lead.inactive":
+    "{name} está de baja. Su historial se conserva, y al reactivarle vuelve a entrar y a aparecer en el directorio.",
+  "memberStatus.deactivate": "Dar de baja",
+  "memberStatus.reactivate": "Reactivar",
+  "memberStatus.saving": "Guardando…",
+  "memberStatus.deactivated": "{name} quedó de baja.",
+  "memberStatus.reactivated": "{name} vuelve a estar en el club.",
+  "memberStatus.error.lastAdmin":
+    "Es el último Admin del club y no se le puede dar de baja. Nombra antes a otro Admin.",
+  "memberStatus.error.selfDeactivation":
+    "No puedes darte de baja a ti mismo: la baja de un Admin la hace otro Admin.",
+  "memberStatus.error.unexpected":
+    "No pudimos cambiar la membresía. Vuelve a intentarlo.",
   "themeToggle.switchToLight": "Cambiar a tema claro",
   "themeToggle.switchToDark": "Cambiar a tema oscuro",
   "languageToggle.label": "Idioma: español. Cambiar a English (EN)",

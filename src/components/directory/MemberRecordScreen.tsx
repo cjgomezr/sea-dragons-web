@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import type { AccountStatus } from "@/lib/auth/account-status";
 import { DIRECTORY_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
@@ -12,6 +13,7 @@ import {
 } from "./member-record-client";
 import { InvitationResend } from "./InvitationResend";
 import { MemberRecordForm } from "./MemberRecordForm";
+import { MemberStatusControl } from "./MemberStatusControl";
 
 /**
  * La ficha reservada al Admin de un miembro (#242, RF-4 del PRD de E5), que se
@@ -53,6 +55,16 @@ export function MemberRecordScreen({
   function retryLoad(): void {
     setState({ kind: "loading" });
     setReloads((count) => count + 1);
+  }
+
+  /** La baja o la reactivación (#244) cambia sólo el estado: el resto de la
+   * ficha sigue siendo la misma y no hace falta volver a pedirla. */
+  function applyStatus(accountStatus: AccountStatus): void {
+    setState((current) =>
+      current.kind === "loaded"
+        ? { ...current, record: { ...current.record, accountStatus } }
+        : current,
+    );
   }
 
   return (
@@ -100,6 +112,13 @@ export function MemberRecordScreen({
             })}
           />
         </section>
+      ) : null}
+      {state.kind === "loaded" ? (
+        <MemberStatusControl
+          translate={translate}
+          member={state.record}
+          onStatusChanged={applyStatus}
+        />
       ) : null}
     </div>
   );
