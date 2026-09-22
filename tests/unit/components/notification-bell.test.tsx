@@ -33,6 +33,8 @@ type FakeApi = {
   /** Las rutas que responden como si no hubiera red. */
   offline: Set<string>;
   calls: { readonly url: string; readonly method: string }[];
+  /** Mientras no se resuelva, ninguna escritura responde. */
+  writesHeldUntil: Promise<void> | null;
 };
 
 let api: FakeApi;
@@ -71,7 +73,7 @@ function respond(url: string, method: string): Response {
 }
 
 function installFakeApi(notifications: StoredNotification[]): void {
-  api = { notifications, offline: new Set(), calls: [] };
+  api = { notifications, offline: new Set(), calls: [], writesHeldUntil: null };
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
@@ -79,6 +81,9 @@ function installFakeApi(notifications: StoredNotification[]): void {
       api.calls.push({ url, method });
       if (api.offline.has(url)) {
         throw new TypeError("Failed to fetch");
+      }
+      if (method === "POST" && api.writesHeldUntil !== null) {
+        await api.writesHeldUntil;
       }
       return respond(url, method);
     }),
@@ -303,6 +308,28 @@ describe("lista de avisos", () => {
 
     expect(screen.queryByRole("region", { name: "Notifications" })).toBeNull();
     expect(bell()).toHaveFocus();
+  });
+
+  // En el móvil la lista tapa la pantalla entera: el foco no puede seguir
+  // por lo que hay debajo, que no se ve.
+  it("la cierra cuando el foco sale de ella", async () => {
+    installFakeApi([]);
+    render(
+      <>
+        <NotificationBell locale="en" />
+        <button type="button">Control de debajo</button>
+      </>,
+    );
+    const list = await openList();
+    await within(list).findByText("You don't have any notifications yet.");
+
+    screen.getByRole("button", { name: "Control de debajo" }).focus();
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("region", { name: "Notifications" }),
+      ).toBeNull(),
+    );
   });
 
   it("vuelve a cerrarla al pulsar otra vez la campana", async () => {
@@ -530,6 +557,34 @@ describe("marcar como leídos", () => {
         "POST",
       ),
     ).toBe(1);
+  });
+
+  it("dos toques seguidos sobre el mismo aviso bajan el número una sola vez", async () => {
+    installFakeApi(unreadNotifications(2));
+    renderBell();
+    const list = await openList();
+    await within(bell()).findByText("2");
+    const [first] = await within(list).findAllByRole("button", {
+      name: /You are now Coach\./,
+    });
+    if (first === undefined) {
+      throw new Error("la lista no dibujó ningún aviso sin leer");
+    }
+
+    let releaseWrites = (): void => {};
+    api.writesHeldUntil = new Promise((resolve) => {
+      releaseWrites = resolve;
+    });
+
+    await userEvent.dblClick(first);
+    releaseWrites();
+
+    await waitFor(() =>
+      expect(within(list).getAllByRole("listitem")[0]).not.toHaveTextContent(
+        "New",
+      ),
+    );
+    expect(bell()).toHaveAccessibleName("Notifications, 1 unread");
   });
 
   it("un aviso ya leído no se ofrece para abrir", async () => {

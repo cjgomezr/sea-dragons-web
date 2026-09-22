@@ -2367,11 +2367,14 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
     });
   });
 
-  // El nombre del club y los cinco controles (la campana desde #266) viven en
-  // la misma fila del móvil. A 360 y 375 tienen que caber sin partirla ni
-  // tapar el nombre.
+  // Los cinco controles de la cabecera (la campana desde #266). Hasta #209
+  // cabían en la fila del nombre del club; con cinco ya no, así que en un
+  // móvil estrecho bajan juntos a su propia fila. A 360 y 375 esa fila no se
+  // parte, no tapa el nombre y no se sale de la pantalla.
   for (const width of [360, 375]) {
-    test(`la cabecera cabe en una fila a ${width}px`, async ({ page }) => {
+    test(`los controles de la cabecera caben en su fila sin tapar el nombre a ${width}px`, async ({
+      page,
+    }) => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
 
@@ -4702,6 +4705,31 @@ test.describe("la campana de avisos", () => {
       await expect(notificationsRegion(page)).toHaveCount(0);
     });
   }
+
+  test("en el móvil el teclado no se pasea por la pantalla tapada", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await serveNotifications(page, SAMPLE_NOTIFICATIONS);
+    await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
+    await openNotifications(page);
+    const controlsInList = await notificationsRegion(page)
+      .getByRole("button")
+      .count();
+
+    for (let press = 0; press <= controlsInList; press += 1) {
+      await page.keyboard.press("Tab");
+    }
+
+    const isFocusInsideList = await page.evaluate(
+      () => document.activeElement?.closest(".notification-panel") !== null,
+    );
+    const isListOpen = (await notificationsRegion(page).count()) > 0;
+    expect(
+      isListOpen && !isFocusInsideList,
+      "el foco salió de la lista y la lista sigue tapando la pantalla",
+    ).toBe(false);
+  });
 
   test("marcar todo deja la campana sin número", async ({ page }) => {
     await serveNotifications(page, SAMPLE_NOTIFICATIONS);

@@ -5,17 +5,12 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { BellIcon } from "@/components/NavIcons";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator, type Translator } from "@/lib/i18n/translator";
+import { NotificationPanel } from "./NotificationPanel";
+import { fetchUnreadCount } from "./notifications-client";
 import {
-  type NotificationListState,
-  NotificationPanel,
-  type MarkReadFailure,
-} from "./NotificationPanel";
-import {
-  fetchNotifications,
-  fetchUnreadCount,
-  markAllNotificationsRead,
-  markNotificationRead,
-} from "./notifications-client";
+  type UnreadChange,
+  useNotificationList,
+} from "./use-notification-list";
 
 /**
  * La campana de la cabecera (#266, RF-4 del PRD de E6): el número de avisos
@@ -78,53 +73,58 @@ function useUnreadCount(): readonly [
   return [unreadCount, setUnreadCount] as const;
 }
 
-/** Cerrar con Escape o pulsando fuera, mientras está abierto. */
+/** El número tras marcar: todos leídos lo deja en cero, uno lo baja en uno. */
+function countAfter(
+  change: UnreadChange,
+  current: number | null,
+): number | null {
+  if (change === "all_read") {
+    return 0;
+  }
+  return current === null ? null : Math.max(0, current - 1);
+}
+
+/** Cerrar con Escape, pulsando fuera o cuando el foco sale del panel. Lo
+ * último importa en el móvil: la lista tapa la pantalla, y el foco no puede
+ * seguir por lo que hay debajo, que no se ve. */
 function useDismissal(options: {
   readonly isOpen: boolean;
   readonly containerRef: React.RefObject<HTMLDivElement | null>;
   readonly onEscape: () => void;
-  readonly onOutsideClick: () => void;
+  readonly onLeave: () => void;
 }): void {
-  const { isOpen, containerRef, onEscape, onOutsideClick } = options;
+  const { isOpen, containerRef, onEscape, onLeave } = options;
   useEffect(() => {
     if (!isOpen) {
       return;
+    }
+    function isOutside(target: EventTarget | null): boolean {
+      const container = containerRef.current;
+      return (
+        container !== null &&
+        target instanceof Node &&
+        !container.contains(target)
+      );
     }
     function handleKeyDown(event: KeyboardEvent): void {
       if (event.key === "Escape") {
         onEscape();
       }
     }
-    function handlePointerDown(event: PointerEvent): void {
-      const container = containerRef.current;
-      if (container !== null && !container.contains(event.target as Node)) {
-        onOutsideClick();
+    function handleLeave(event: Event): void {
+      if (isOutside(event.target)) {
+        onLeave();
       }
     }
     document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("pointerdown", handleLeave);
+    document.addEventListener("focusin", handleLeave);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("pointerdown", handleLeave);
+      document.removeEventListener("focusin", handleLeave);
     };
-  }, [isOpen, containerRef, onEscape, onOutsideClick]);
-}
-
-function markAsRead(
-  list: NotificationListState,
-  isTarget: (notificationId: string) => boolean,
-): NotificationListState {
-  if (list.status !== "loaded") {
-    return list;
-  }
-  return {
-    status: "loaded",
-    notifications: list.notifications.map((notification) =>
-      isTarget(notification.id)
-        ? { ...notification, isRead: true }
-        : notification,
-    ),
-  };
+  }, [isOpen, containerRef, onEscape, onLeave]);
 }
 
 export function NotificationBell({
@@ -139,15 +139,15 @@ export function NotificationBell({
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [unreadCount, setUnreadCount] = useUnreadCount();
   const [isOpen, setIsOpen] = useState(false);
-  const [list, setList] = useState<NotificationListState>({
-    status: "loading",
-  });
-  const [markFailure, setMarkFailure] = useState<MarkReadFailure | null>(null);
+  const notifications = useNotificationList((change) =>
+    setUnreadCount((current) => countAfter(change, current)),
+  );
+  const { clearMarkFailure } = notifications;
 
   const close = useCallback(() => {
     setIsOpen(false);
-    setMarkFailure(null);
-  }, []);
+    clearMarkFailure();
+  }, [clearMarkFailure]);
   const closeAndReturnFocus = useCallback(() => {
     close();
     bellRef.current?.focus();
@@ -156,7 +156,7 @@ export function NotificationBell({
     isOpen,
     containerRef,
     onEscape: closeAndReturnFocus,
-    onOutsideClick: close,
+    onLeave: close,
   });
 
   useEffect(() => {
@@ -165,56 +165,13 @@ export function NotificationBell({
     }
   }, [isOpen]);
 
-  async function loadList(): Promise<void> {
-    setList({ status: "loading" });
-    const result = await fetchNotifications();
-    setList(
-      result.kind === "ok"
-        ? { status: "loaded", notifications: result.notifications }
-        : { status: "failed" },
-    );
-  }
-
   function toggle(): void {
     if (isOpen) {
       close();
       return;
     }
     setIsOpen(true);
-    void loadList();
-  }
-
-  async function markAll(): Promise<void> {
-    const result = await markAllNotificationsRead();
-    if (result.kind === "failed") {
-      setMarkFailure({ target: "all" });
-      return;
-    }
-    setMarkFailure(null);
-    setUnreadCount(() => 0);
-    setList((current) => markAsRead(current, () => true));
-  }
-
-  async function markOne(notificationId: string): Promise<void> {
-    const result = await markNotificationRead(notificationId);
-    if (result.kind === "failed") {
-      setMarkFailure({ target: "one", notificationId });
-      return;
-    }
-    setMarkFailure(null);
-    setUnreadCount((current) =>
-      current === null ? null : Math.max(0, current - 1),
-    );
-    setList((current) => markAsRead(current, (id) => id === notificationId));
-  }
-
-  function retryMark(): void {
-    if (markFailure === null) {
-      return;
-    }
-    void (markFailure.target === "all"
-      ? markAll()
-      : markOne(markFailure.notificationId));
+    void notifications.loadList();
   }
 
   const badge = badgeText(unreadCount);
@@ -242,14 +199,16 @@ export function NotificationBell({
         <NotificationPanel
           id={panelId}
           translate={translate}
-          list={list}
-          markFailure={markFailure}
+          list={notifications.list}
+          markFailure={notifications.markFailure}
           headingRef={headingRef}
           onBack={closeAndReturnFocus}
-          onRetryLoad={() => void loadList()}
-          onMarkAll={() => void markAll()}
-          onMarkOne={(notificationId) => void markOne(notificationId)}
-          onRetryMark={retryMark}
+          onRetryLoad={() => void notifications.loadList()}
+          onMarkAll={() => void notifications.markAll()}
+          onMarkOne={(notificationId) =>
+            void notifications.markOne(notificationId)
+          }
+          onRetryMark={notifications.retryMark}
         />
       ) : null}
     </div>
