@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type AuditLogInsertRow,
   type AuditLogWriter,
@@ -18,6 +18,10 @@ import {
 } from "@/lib/auth/member-role-change";
 import type { RoleRequestMember } from "@/lib/auth/role-request";
 import type { Role } from "@/lib/auth/roles";
+import type {
+  NotificationInsert,
+  NotificationWriter,
+} from "@/lib/notifications/notify-member";
 
 /**
  * Cambiar el rol de un socio (FR-014, AC-008, RF-6 y RF-7 del PRD de E3),
@@ -40,17 +44,35 @@ type FakeOptions = {
   readonly actor?: RoleRequestMember | null;
   readonly write?: MemberRoleChangeWrite;
   readonly auditFailure?: string;
+  readonly notificationFailure?: string;
 };
 
 type Fake = {
   readonly gateways: MemberRoleChangeGateways;
   readonly writes: MemberRoleChangeWriteInput[];
   readonly auditRows: AuditLogInsertRow[];
+  readonly notifications: NotificationInsert[];
 };
+
+function fakeNotificationWriter(
+  inserted: NotificationInsert[],
+  failure: string | undefined,
+): NotificationWriter {
+  return {
+    findRecipient: async () => ({ clubId: CLUB_ID, accountStatus: "active" }),
+    async insertNotification(row) {
+      if (failure !== undefined) {
+        throw new Error(failure);
+      }
+      inserted.push(row);
+    },
+  };
+}
 
 function fakeGateways(options: FakeOptions = {}): Fake {
   const writes: MemberRoleChangeWriteInput[] = [];
   const auditRows: AuditLogInsertRow[] = [];
+  const notifications: NotificationInsert[] = [];
   const actor: RoleRequestMember | null =
     options.actor === undefined
       ? {
@@ -72,6 +94,7 @@ function fakeGateways(options: FakeOptions = {}): Fake {
   return {
     writes,
     auditRows,
+    notifications,
     gateways: {
       members: { findRoleRequestMember: async () => actor },
       roles: {
@@ -81,6 +104,10 @@ function fakeGateways(options: FakeOptions = {}): Fake {
         },
       },
       audit,
+      notifications: fakeNotificationWriter(
+        notifications,
+        options.notificationFailure,
+      ),
     },
   };
 }
@@ -293,5 +320,77 @@ describe("bitácora de cambios de rol", () => {
     });
 
     await expect(change(fake, "Coach")).rejects.toBeInstanceOf(AuditWriteError);
+  });
+});
+
+describe("aviso de cambio de rol", () => {
+  it("un cambio directo avisa al socio con su rol nuevo", async () => {
+    const fake = fakeGateways({ write: changed("Player", "Committee") });
+
+    await change(fake, "Committee");
+
+    expect(fake.notifications).toEqual([
+      {
+        clubId: CLUB_ID,
+        userId: MEMBER_ID,
+        type: "role_changed",
+        data: { newRole: "Committee" },
+      },
+    ]);
+  });
+
+  it("poner el rol que ya tenía no avisa a nadie", async () => {
+    const fake = fakeGateways({ write: { kind: "unchanged", role: "Coach" } });
+
+    await change(fake, "Coach");
+
+    expect(fake.notifications).toEqual([]);
+  });
+
+  it.each([
+    { kind: "last_admin" },
+    { kind: "not_found" },
+    { kind: "actor_not_admin" },
+  ] as const)("un intento rechazado (%o) no avisa a nadie", async (write) => {
+    const fake = fakeGateways({ write });
+
+    await expect(change(fake, "Coach")).rejects.toThrow();
+    expect(fake.notifications).toEqual([]);
+  });
+
+  it("un permiso que no alcanza no avisa a nadie", async () => {
+    const fake = fakeGateways({ actorRole: "Committee" });
+
+    await expect(change(fake, "Admin")).rejects.toBeInstanceOf(
+      MemberRoleChangeForbiddenError,
+    );
+    expect(fake.notifications).toEqual([]);
+  });
+});
+
+describe("aviso que falla", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("el cambio se aplica y responde igual, con el fallo registrado", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fake = fakeGateways({
+      write: changed("Player", "Coach"),
+      notificationFailure: "timeout",
+    });
+
+    const result = await change(fake, "Coach");
+
+    expect(result).toEqual({
+      userId: MEMBER_ID,
+      previousRole: "Player",
+      role: "Coach",
+    });
+    expect(fake.auditRows).toHaveLength(1);
+    expect(errorLog).toHaveBeenCalledWith(
+      "[notifications] aviso sin guardar",
+      expect.objectContaining({ recipientUserId: MEMBER_ID }),
+    );
   });
 });

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
+import { createSupabaseNotificationWriter } from "@/lib/notifications/supabase-notification-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type {
@@ -84,6 +85,7 @@ export function createMemberRoleGateways(
       },
     },
     audit: createSupabaseAuditLogWriter(serviceClient),
+    notifications: createSupabaseNotificationWriter(serviceClient),
   };
 }
 

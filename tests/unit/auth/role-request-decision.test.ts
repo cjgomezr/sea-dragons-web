@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AuditLogInsertRow, AuditLogWriter } from "@/lib/audit/audit-log";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type { RoleRequestMember } from "@/lib/auth/role-request";
@@ -15,6 +15,10 @@ import {
   decideRoleRequest,
 } from "@/lib/auth/role-request-decision";
 import type { Role } from "@/lib/auth/roles";
+import type {
+  NotificationInsert,
+  NotificationWriter,
+} from "@/lib/notifications/notify-member";
 
 /**
  * Decidir una solicitud de rol (FR-011, AC-006, RF-5 del PRD de E3), contado
@@ -52,6 +56,7 @@ const APPROVED_COACH: RoleRequestDecisionWrite = {
 const REJECTED: RoleRequestDecisionWrite = {
   kind: "rejected",
   request: decided("rejected"),
+  requester: { memberUserId: MEMBER_ID, requestedRole: "Committee" },
 };
 
 type FakeOptions = {
@@ -61,17 +66,35 @@ type FakeOptions = {
   readonly auditFailure?: string;
   /** Sólo falla la entrada de esta acción; sin ella, fallan todas. */
   readonly failingAuditAction?: string;
+  readonly notificationFailure?: string;
 };
 
 type Fake = {
   readonly gateways: RoleRequestDecisionGateways;
   readonly writes: RoleRequestDecisionWriteInput[];
   readonly auditRows: AuditLogInsertRow[];
+  readonly notifications: NotificationInsert[];
 };
+
+function fakeNotificationWriter(
+  inserted: NotificationInsert[],
+  failure: string | undefined,
+): NotificationWriter {
+  return {
+    findRecipient: async () => ({ clubId: CLUB_ID, accountStatus: "active" }),
+    async insertNotification(row) {
+      if (failure !== undefined) {
+        throw new Error(failure);
+      }
+      inserted.push(row);
+    },
+  };
+}
 
 function fakeGateways(options: FakeOptions = {}): Fake {
   const writes: RoleRequestDecisionWriteInput[] = [];
   const auditRows: AuditLogInsertRow[] = [];
+  const notifications: NotificationInsert[] = [];
   const decider: RoleRequestMember | null =
     options.decider === undefined
       ? {
@@ -96,6 +119,7 @@ function fakeGateways(options: FakeOptions = {}): Fake {
   return {
     writes,
     auditRows,
+    notifications,
     gateways: {
       members: { findRoleRequestMember: async () => decider },
       decisions: {
@@ -105,6 +129,10 @@ function fakeGateways(options: FakeOptions = {}): Fake {
         },
       },
       audit,
+      notifications: fakeNotificationWriter(
+        notifications,
+        options.notificationFailure,
+      ),
     },
   };
 }
@@ -310,4 +338,84 @@ describe("bitácora de decisiones", () => {
       }),
     });
   });
+});
+
+describe("aviso de cambio de rol", () => {
+  it("al aprobar avisa al socio con su rol nuevo", async () => {
+    const fake = fakeGateways({ write: APPROVED_COACH });
+
+    await decide(fake, "approved");
+
+    expect(fake.notifications).toEqual([
+      {
+        clubId: CLUB_ID,
+        userId: MEMBER_ID,
+        type: "role_changed",
+        data: { newRole: "Coach" },
+      },
+    ]);
+  });
+
+  it.each([
+    { kind: "already_decided", status: "approved" },
+    { kind: "role_already_granted" },
+    { kind: "not_found" },
+  ] as const)("no avisa a nadie si la escritura es %o", async (write) => {
+    const fake = fakeGateways({ write });
+
+    await expect(decide(fake, "approved")).rejects.toThrow();
+    expect(fake.notifications).toEqual([]);
+  });
+
+  it("no avisa a nadie si quien decide no es Admin", async () => {
+    const fake = fakeGateways({ deciderRole: "Coach" });
+
+    await expect(decide(fake, "approved")).rejects.toBeInstanceOf(
+      RoleRequestDecisionForbiddenError,
+    );
+    expect(fake.notifications).toEqual([]);
+  });
+});
+
+describe("aviso de solicitud rechazada", () => {
+  it("al rechazar avisa al socio con el rol que había pedido", async () => {
+    const fake = fakeGateways({ write: REJECTED });
+
+    await decide(fake, "rejected");
+
+    expect(fake.notifications).toEqual([
+      {
+        clubId: CLUB_ID,
+        userId: MEMBER_ID,
+        type: "role_request_rejected",
+        data: { requestedRole: "Committee" },
+      },
+    ]);
+  });
+});
+
+describe("aviso que falla", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ["aprobada", APPROVED_COACH, "approved"],
+    ["rechazada", REJECTED, "rejected"],
+  ] as const)(
+    "la solicitud queda %s y responde igual, con el fallo registrado",
+    async (_label, write, decision) => {
+      const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+      const fake = fakeGateways({ write, notificationFailure: "timeout" });
+
+      const result = await decide(fake, decision);
+
+      expect(result).toEqual(decided(decision));
+      expect(fake.auditRows.length).toBeGreaterThan(0);
+      expect(errorLog).toHaveBeenCalledWith(
+        "[notifications] aviso sin guardar",
+        expect.objectContaining({ recipientUserId: MEMBER_ID }),
+      );
+    },
+  );
 });

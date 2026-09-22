@@ -33,6 +33,7 @@ type WiringOptions = {
   readonly deciderRole?: Role;
   readonly write?: RoleRequestDecisionWrite;
   readonly auditFailure?: string;
+  readonly notificationFailure?: string;
 };
 
 const writes: RoleRequestDecisionWriteInput[] = [];
@@ -73,6 +74,17 @@ function mockWiring(options: WiringOptions = {}): void {
             }
             auditRows.push(row);
             return { error: null };
+          },
+        },
+        notifications: {
+          findRecipient: async () => ({
+            clubId: CLUB_ID,
+            accountStatus: "active",
+          }),
+          insertNotification: async () => {
+            if (options.notificationFailure !== undefined) {
+              throw new Error(options.notificationFailure);
+            }
           },
         },
       },
@@ -151,7 +163,16 @@ describe("POST /api/v1/role-requests/{id}/decision", () => {
 
   it("responde 200 con la solicitud rechazada", async () => {
     const rejected: DecidedRoleRequest = { ...APPROVED, status: "rejected" };
-    mockWiring({ write: { kind: "rejected", request: rejected } });
+    mockWiring({
+      write: {
+        kind: "rejected",
+        request: rejected,
+        requester: {
+          memberUserId: "b1b1b1b1-0000-4000-8000-00000000000b",
+          requestedRole: "Coach",
+        },
+      },
+    });
 
     const response = await postDecision({ decision: "rejected" });
 
@@ -240,6 +261,20 @@ describe("POST /api/v1/role-requests/{id}/decision", () => {
       error: { code: "internal_error", reason: "audit_not_recorded" },
     });
     expect(JSON.stringify(serverLog.mock.calls)).toContain("connection reset");
+  });
+
+  it("responde igual si el aviso al socio falla, y deja el error en el servidor", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockWiring({ notificationFailure: "timeout" });
+
+    const response = await postDecision({ decision: "approved" });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ data: APPROVED });
+    expect(errorLog).toHaveBeenCalledWith(
+      "[notifications] aviso sin guardar",
+      expect.anything(),
+    );
   });
 
   it("no acepta otro método", async () => {

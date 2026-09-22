@@ -3,6 +3,11 @@ import {
   type AuditLogWriter,
   recordAuditEvent,
 } from "@/lib/audit/audit-log";
+import {
+  type NewNotification,
+  type NotificationWriter,
+  notifyMember,
+} from "@/lib/notifications/notify-member";
 import { MemberNotFoundError } from "./account-activation";
 import type {
   RequestableRole,
@@ -18,7 +23,8 @@ import { type Role, hasCapability } from "./roles";
  * Las dos reglas que no pueden depender de la aplicación viven en la base, en
  * `decide_role_request` de `0013_decide_role_request.sql`: solicitud y rol
  * cambian juntos o no cambia ninguno, y de dos decisiones simultáneas sólo se
- * aplica una. Aquí se decide quién puede pedirla y qué queda en la bitácora.
+ * aplica una. Aquí se decide quién puede pedirla, qué queda en la bitácora y
+ * a quién se avisa (RF-6 del PRD de E6).
  */
 
 export const ROLE_REQUEST_DECISIONS = ["approved", "rejected"] as const;
@@ -39,6 +45,12 @@ export type RoleChange = {
   readonly newRole: RequestableRole;
 };
 
+/** Quién pidió el rol que se rechazó, para avisarle. */
+export type RoleRequester = {
+  readonly memberUserId: string;
+  readonly requestedRole: RequestableRole;
+};
+
 export type RoleRequestDecisionWriteInput = {
   readonly requestId: string;
   readonly clubId: string;
@@ -54,7 +66,11 @@ export type RoleRequestDecisionWrite =
       readonly request: DecidedRoleRequest;
       readonly roleChange: RoleChange;
     }
-  | { readonly kind: "rejected"; readonly request: DecidedRoleRequest }
+  | {
+      readonly kind: "rejected";
+      readonly request: DecidedRoleRequest;
+      readonly requester: RoleRequester;
+    }
   | { readonly kind: "already_decided"; readonly status: RoleRequestDecision }
   | { readonly kind: "role_already_granted" }
   | { readonly kind: "not_found" };
@@ -67,6 +83,7 @@ export type RoleRequestDecisionGateways = {
     ): Promise<RoleRequestDecisionWrite>;
   };
   readonly audit: AuditLogWriter;
+  readonly notifications: NotificationWriter;
 };
 
 /** Qué entidad nombra cada entrada de la bitácora. */
@@ -196,6 +213,23 @@ async function auditDecision(
   }
 }
 
+/** Sólo el rol, nuevo o pedido: ni nombre, ni correo, ni justificación
+ * (privacidad del PRD de E6). */
+function decisionNotification(applied: AppliedDecision): NewNotification {
+  if (applied.kind === "approved") {
+    return {
+      recipientUserId: applied.roleChange.memberUserId,
+      type: "role_changed",
+      data: { newRole: applied.roleChange.newRole },
+    };
+  }
+  return {
+    recipientUserId: applied.requester.memberUserId,
+    type: "role_request_rejected",
+    data: { requestedRole: applied.requester.requestedRole },
+  };
+}
+
 /** Aplica la decisión de un Admin y la deja en la bitácora. La bitácora va
  * después de la escritura, como en `recordGuardianConsent`: auditar primero
  * dejaría una entrada de éxito para una decisión que la base no aplicó. */
@@ -215,6 +249,10 @@ export async function decideRoleRequest(
     decision: input.decision,
   });
   const applied = assertApplied(write, input.requestId);
+  // `notifyMember` no lanza: un aviso perdido queda registrado y la decisión
+  // responde igual. Va antes de la bitácora para que el socio se entere
+  // también si ella falla, porque la decisión ya está aplicada.
+  await notifyMember(gateways.notifications, decisionNotification(applied));
 
   try {
     await auditDecision(

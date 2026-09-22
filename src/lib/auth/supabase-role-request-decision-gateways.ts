@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
+import { createSupabaseNotificationWriter } from "@/lib/notifications/supabase-notification-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { REQUESTABLE_ROLES } from "./role-request";
@@ -39,7 +40,12 @@ const decisionResultSchema = z.discriminatedUnion("outcome", [
     previous_role: z.enum(ROLES),
     new_role: z.enum(REQUESTABLE_ROLES),
   }),
-  z.object({ outcome: z.literal("rejected"), ...decidedFields }),
+  z.object({
+    outcome: z.literal("rejected"),
+    ...decidedFields,
+    user_id: z.string(),
+    requested_role: z.enum(REQUESTABLE_ROLES),
+  }),
   z.object({
     outcome: z.literal("already_decided"),
     status: z.enum(ROLE_REQUEST_DECISIONS),
@@ -76,7 +82,14 @@ function toDecisionWrite(result: DecisionResult): RoleRequestDecisionWrite {
         },
       };
     case "rejected":
-      return { kind: "rejected", request: toDecidedRequest(result) };
+      return {
+        kind: "rejected",
+        request: toDecidedRequest(result),
+        requester: {
+          memberUserId: result.user_id,
+          requestedRole: result.requested_role,
+        },
+      };
     case "already_decided":
       return { kind: "already_decided", status: result.status };
     case "role_already_granted":
@@ -117,6 +130,7 @@ export function createRoleRequestDecisionGateways(
       },
     },
     audit: createSupabaseAuditLogWriter(serviceClient),
+    notifications: createSupabaseNotificationWriter(serviceClient),
   };
 }
 
