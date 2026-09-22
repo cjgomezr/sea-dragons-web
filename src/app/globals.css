@@ -152,8 +152,12 @@ h6 {
   border-bottom: 1px solid var(--color-sidebar-border);
 }
 
+/* En el móvil el nombre y los controles comparten fila mientras quepan; en un
+   teléfono estrecho los controles bajan a la suya entera en vez de apretar el
+   nombre (#266). */
 .app-sidebar-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
@@ -313,11 +317,16 @@ h6 {
    cabecera, que es lo único que se dibuja igual en las siete secciones y en
    los tres tamaños: es el sitio desde el que "cerrar sesión desde cualquier
    pantalla" (FR-007) se cumple sin repetir el control en cada una. */
-.app-sidebar-actions {
+.app-sidebar-actions,
+.app-header-group {
   display: flex;
-  flex-shrink: 0;
   align-items: center;
   gap: var(--space-2);
+}
+
+.app-sidebar-actions {
+  flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 /* El enlace a Mi cuenta (#209) se dibuja como el botón de cerrar sesión que
