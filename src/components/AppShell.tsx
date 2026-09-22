@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AccountIcon } from "@/components/NavIcons";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { MobileTabBar } from "@/components/MobileTabBar";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SidebarNav } from "@/components/SidebarNav";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -32,8 +33,9 @@ export function AppShell({
           <div className="app-sidebar-actions">
             <ThemeToggle locale={locale} />
             <LanguageToggle locale={locale} />
-            {/* Un icono, como cerrar sesión: con texto, los cuatro controles
-                no caben junto al nombre del club a 360px. */}
+            <NotificationBell locale={locale} />
+            {/* Un icono, como cerrar sesión: con texto, los controles no
+                caben junto al nombre del club a 360px. */}
             <Link
               href={ACCOUNT_PAGE_PATH}
               className="app-header-icon"
