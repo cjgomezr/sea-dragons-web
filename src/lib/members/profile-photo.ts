@@ -169,6 +169,24 @@ async function findOperatingOwner(
   return owner;
 }
 
+/** La foto que enseña el perfil propio. Leerla no pide que la cuenta opere:
+ * a quien no opera la frontera ya no le deja abrir la pantalla. */
+export async function readProfilePhoto(
+  gateways: ProfilePhotoGateways,
+  userId: string,
+): Promise<ProfilePhoto> {
+  const owner = await gateways.members.findPhotoOwner(userId);
+  if (owner === null) {
+    throw new MemberNotFoundError(userId);
+  }
+  return {
+    photoUrl:
+      owner.photoPath === null
+        ? null
+        : await gateways.signing.signPhotoUrl(owner.photoPath),
+  };
+}
+
 /** Sube la foto nueva, la apunta en la ficha y sólo entonces borra la
  * anterior. Si la subida falla, la ficha sigue con la de antes; si falla
  * apuntarla, se borra la nueva para que no quede huérfana. */

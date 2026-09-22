@@ -915,6 +915,48 @@ h6 {
   }
 }
 
+/* La foto de perfil (#245). La imagen ocupa el mismo círculo que las
+   iniciales y se recorta a él sin deformarse. */
+.member-photo {
+  padding: 0;
+  object-fit: cover;
+}
+
+.account-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+
+.account-photo-hint {
+  margin-top: var(--space-2);
+}
+
+.account-photo-error {
+  margin-top: var(--space-3);
+  text-align: left;
+}
+
+/* El selector de ficheros no se ve: lo abre el botón, que sí tiene el foco y
+   el aspecto de los demás. Se oculta así y no con `display: none` para que el
+   navegador lo siga dejando abrir. */
+.account-photo-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .account-photo-actions {
+    justify-content: flex-start;
+  }
+}
+
 /* Mis grupos (#229): la tarjeta de "Skill ratings" del mismo mockup, con la
    etiqueta en mayúsculas y una fila por grupo. */
 .account-groups {

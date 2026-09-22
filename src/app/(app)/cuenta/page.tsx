@@ -17,7 +17,12 @@ import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 import { createTranslator } from "@/lib/i18n/translator";
 import { type OwnProfile, readOwnProfile } from "@/lib/members/own-profile";
+import {
+  type ProfilePhoto,
+  readProfilePhoto,
+} from "@/lib/members/profile-photo";
 import { createOwnProfileGateways } from "@/lib/members/supabase-own-profile-gateways";
+import { createSupabaseProfilePhotoGateways } from "@/lib/members/supabase-profile-photo-gateways";
 import { readServerCookies } from "@/lib/supabase/server-cookies";
 import { createSessionClient } from "@/lib/supabase/session-client";
 
@@ -25,7 +30,8 @@ import { createSessionClient } from "@/lib/supabase/session-client";
  * El perfil propio (#241), que antes era Mi cuenta (#209): la ficha que el
  * miembro edita (FR-084), el rol de quien la abre, los grupos a los que
  * pertenece (#229) y, si le toca, el formulario para pedir Coach o Committee
- * (FR-010). La dirección sigue siendo `/cuenta`, la del enlace de la cabecera.
+ * (FR-010), y la foto de perfil (#245). La dirección sigue siendo `/cuenta`,
+ * la del enlace de la cabecera.
  *
  * Quién llega lo decide la frontera: cualquier cuenta activa, de cualquier
  * rol. Una incompleta acaba en completar registro y una sin sesión en la
@@ -83,6 +89,26 @@ async function readProfile({
   }
 }
 
+/** La foto se firma con la llave de servicio: el bucket es privado (#245). */
+async function readPhoto({
+  userId,
+  client,
+}: CallerSession): Promise<ProfilePhoto> {
+  const wiring = createSupabaseProfilePhotoGateways(process.env, client);
+  if (wiring.kind === "unconfigured") {
+    throw new Error(describeMissingAuthKeys(wiring.missingKeys));
+  }
+  try {
+    return await readProfilePhoto(wiring.gateways, userId);
+  } catch (error) {
+    // La misma carrera con la frontera que en `readAccount`.
+    if (error instanceof MemberNotFoundError) {
+      redirect(SIGN_IN_PATH);
+    }
+    throw error;
+  }
+}
+
 async function readAccount(userId: string): Promise<RoleRequestAccount> {
   const wiring = createSupabaseRoleRequestGateways(process.env);
   if (wiring.kind === "unconfigured") {
@@ -105,9 +131,10 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
     readRequestLocale(),
     readCallerSession(),
   ]);
-  const [account, profile, groups] = await Promise.all([
+  const [account, profile, photo, groups] = await Promise.all([
     readAccount(caller.userId),
     readProfile(caller),
+    readPhoto(caller),
     readGroups(caller),
   ]);
   return (
@@ -115,6 +142,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
       locale={locale}
       account={account}
       profile={profile}
+      photoUrl={photo.photoUrl}
       groups={groups}
       countries={listCountryOptions(locale)}
     />

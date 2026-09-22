@@ -64,7 +64,14 @@ afterEach(() => {
 
 describe("página Mi cuenta", () => {
   it("muestra el nombre, sus iniciales y el rol actual", () => {
-    render(<AccountHeader locale="en" fullName="Nerea Ruiz" role="Coach" />);
+    render(
+      <AccountHeader
+        locale="en"
+        fullName="Nerea Ruiz"
+        role="Coach"
+        photoUrl={null}
+      />,
+    );
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Nerea Ruiz" }),
@@ -74,7 +81,14 @@ describe("página Mi cuenta", () => {
   });
 
   it("nombra el rol en el idioma de la visita", () => {
-    render(<AccountHeader locale="es" fullName="Nerea Ruiz" role="Player" />);
+    render(
+      <AccountHeader
+        locale="es"
+        fullName="Nerea Ruiz"
+        role="Player"
+        photoUrl={null}
+      />,
+    );
 
     expect(screen.getByText("Rol: Jugador")).toBeInTheDocument();
   });

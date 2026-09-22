@@ -7,6 +7,7 @@ import {
   type ProfilePhotoGateways,
   ProfilePhotoValidationError,
   detectProfilePhotoType,
+  readProfilePhoto,
   removeProfilePhoto,
   replaceProfilePhoto,
   validateProfilePhotoFile,
@@ -272,6 +273,32 @@ describe("foto de perfil", () => {
       await removeProfilePhoto(gateways, USER_ID);
 
       expect(state.savedPaths).toEqual([]);
+    });
+  });
+
+  describe("lectura", () => {
+    it("sirve la foto firmada de quien tiene una", async () => {
+      const { gateways } = fakeGateways(ACTIVE_WITH_PHOTO);
+
+      await expect(readProfilePhoto(gateways, USER_ID)).resolves.toEqual({
+        photoUrl: `https://storage.test/signed/${OLD_PATH}?token=t`,
+      });
+    });
+
+    it("sirve null a quien no tiene foto, para que salgan sus iniciales", async () => {
+      const { gateways } = fakeGateways(ACTIVE_WITHOUT_PHOTO);
+
+      await expect(readProfilePhoto(gateways, USER_ID)).resolves.toEqual({
+        photoUrl: null,
+      });
+    });
+
+    it("rechaza a una identidad sin fila de miembro", async () => {
+      const { gateways } = fakeGateways(null);
+
+      await expect(readProfilePhoto(gateways, USER_ID)).rejects.toBeInstanceOf(
+        MemberNotFoundError,
+      );
     });
   });
 

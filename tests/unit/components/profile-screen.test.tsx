@@ -68,6 +68,7 @@ function renderScreen(
       locale={locale}
       account={{ fullName: "Nerea Ruiz", role: "Player", latestRequest: null }}
       profile={options.profile ?? PROFILE}
+      photoUrl={null}
       groups={[{ id: "g1", name: "Senior Squad" }]}
       countries={listCountryOptions(locale)}
     />,
