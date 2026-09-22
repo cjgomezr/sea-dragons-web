@@ -48,6 +48,13 @@ columna members.photo_path tipo=text null=YES default=-
 columna members.position tipo=text null=YES default=-
 columna members.role tipo=text null=NO default='Player'::text
 columna members.user_id tipo=uuid null=NO default=-
+columna notifications.club_id tipo=uuid null=NO default=-
+columna notifications.created_at tipo=timestamp with time zone null=NO default=now()
+columna notifications.data tipo=jsonb null=NO default='{}'::jsonb
+columna notifications.id tipo=uuid null=NO default=gen_random_uuid()
+columna notifications.read_at tipo=timestamp with time zone null=YES default=-
+columna notifications.type tipo=text null=NO default=-
+columna notifications.user_id tipo=uuid null=NO default=-
 columna password_recovery_requests.club_id tipo=uuid null=NO default=-
 columna password_recovery_requests.email_hash tipo=text null=NO default=-
 columna password_recovery_requests.id tipo=uuid null=NO default=gen_random_uuid()
@@ -173,6 +180,21 @@ grant members service_role SELECT
 grant members service_role TRIGGER
 grant members service_role TRUNCATE
 grant members service_role UPDATE
+grant notifications authenticated SELECT
+grant notifications postgres DELETE
+grant notifications postgres INSERT
+grant notifications postgres REFERENCES
+grant notifications postgres SELECT
+grant notifications postgres TRIGGER
+grant notifications postgres TRUNCATE
+grant notifications postgres UPDATE
+grant notifications service_role DELETE
+grant notifications service_role INSERT
+grant notifications service_role REFERENCES
+grant notifications service_role SELECT
+grant notifications service_role TRIGGER
+grant notifications service_role TRUNCATE
+grant notifications service_role UPDATE
 grant password_recovery_requests postgres DELETE
 grant password_recovery_requests postgres INSERT
 grant password_recovery_requests postgres REFERENCES
@@ -232,6 +254,9 @@ indice groups_pkey CREATE UNIQUE INDEX groups_pkey ON public.groups USING btree 
 indice members_pkey CREATE UNIQUE INDEX members_pkey ON public.members USING btree (id)
 indice members_user_id_club_id_key CREATE UNIQUE INDEX members_user_id_club_id_key ON public.members USING btree (user_id, club_id)
 indice members_user_id_key CREATE UNIQUE INDEX members_user_id_key ON public.members USING btree (user_id)
+indice notifications_pkey CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)
+indice notifications_unread_user_id_idx CREATE INDEX notifications_unread_user_id_idx ON public.notifications USING btree (user_id) WHERE (read_at IS NULL)
+indice notifications_user_id_created_at_idx CREATE INDEX notifications_user_id_created_at_idx ON public.notifications USING btree (user_id, created_at DESC)
 indice password_recovery_requests_email_hash_requested_at_idx CREATE INDEX password_recovery_requests_email_hash_requested_at_idx ON public.password_recovery_requests USING btree (email_hash, requested_at DESC)
 indice password_recovery_requests_pkey CREATE UNIQUE INDEX password_recovery_requests_pkey ON public.password_recovery_requests USING btree (id)
 indice registration_requests_pkey CREATE UNIQUE INDEX registration_requests_pkey ON public.registration_requests USING btree (id)
@@ -249,6 +274,7 @@ policy groups.groups_select_own cmd=SELECT roles={authenticated} using=(EXISTS (
    FROM group_memberships gm
   WHERE ((gm.group_id = groups.id) AND (gm.user_id = ( SELECT auth.uid() AS uid))))) check=-
 policy members.members_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
+policy notifications.notifications_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
 policy password_recovery_requests.password_recovery_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy registration_requests.registration_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy role_requests.role_requests_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
@@ -285,6 +311,11 @@ restriccion members.members_role_check CHECK ((role = ANY (ARRAY['Admin'::text, 
 restriccion members.members_user_id_club_id_key UNIQUE (user_id, club_id)
 restriccion members.members_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 restriccion members.members_user_id_key UNIQUE (user_id)
+restriccion notifications.notifications_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion notifications.notifications_data_is_object CHECK ((jsonb_typeof(data) = 'object'::text))
+restriccion notifications.notifications_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
+restriccion notifications.notifications_pkey PRIMARY KEY (id)
+restriccion notifications.notifications_type_check CHECK ((type = ANY (ARRAY['role_changed'::text, 'role_request_rejected'::text, 'role_request_received'::text])))
 restriccion password_recovery_requests.password_recovery_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion password_recovery_requests.password_recovery_requests_pkey PRIMARY KEY (id)
 restriccion registration_requests.registration_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
@@ -305,6 +336,7 @@ tabla email_send_requests rls=t
 tabla group_memberships rls=t
 tabla groups rls=t
 tabla members rls=t
+tabla notifications rls=t
 tabla password_recovery_requests rls=t
 tabla registration_requests rls=t
 tabla role_requests rls=t
