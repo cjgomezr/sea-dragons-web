@@ -104,7 +104,84 @@ permissions:
   contents: read
 
 jobs:
+  # La suite se reparte en varias máquinas (#255): en una sola, comparar
+  # tardaba más de 8 minutos y aceptar entre 13 y 16. Cada parte siembra sus
+  # propios miembros de prueba en `seadragons-dev` con un nombre único por
+  # corrida (#254), así que las partes no chocan entre sí. Más partes también
+  # son más sesiones abiertas a la vez contra el límite de peticiones de
+  # Supabase Auth; si ese límite empieza a hundir corridas, la salida es
+  # bajar el número de partes.
+  #
+  # `regenerate` se reparte exactamente igual; scripts/check-shard-coverage.ts
+  # lo comprueba en el job `reparto`.
   compare:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      # Que una parte falle no cancela las demás: el diff de cada una es lo
+      # que alguien tiene que mirar, y una parte cancelada no deja ninguno.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: ./.github/actions/playwright-browsers
+      # Playwright sirve en CI la aplicación compilada (`npm run start`, ver
+      # tests/support/web-server-command.ts). Sin credenciales, igual que en
+      # checks.yml: el build no las necesita.
+      - name: Compila la aplicación
+        run: npm run build
+      # Sólo en este paso: `npm ci` y sus postinstall no tienen nada que hacer
+      # con una llave de escritura. El `npm run start` que Playwright levanta
+      # sí las recibe, porque lo arranca como hijo de este proceso, y las
+      # necesita: la aplicación que se fotografía vive detrás de la frontera de
+      # sesión.
+      - name: Compara contra la línea base vinculante
+        run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # Un nombre por parte: dos subidas con el mismo nombre chocan. El job
+      # `visual-diff` las junta después en el artefacto que la gente conoce.
+      - name: Guarda el diff para que alguien lo mire
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diff-${{ matrix.shard }}
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # Quien acepta una línea base busca un solo artefacto `visual-diff`, con el
+  # diff de todas las partes que fallaron, cada una en su carpeta.
+  visual-diff:
+    needs: compare
+    # `always()` por lo mismo que en `report-incident`: sin él, este job sólo
+    # correría cuando `compare` salió bien, que es cuando no hay diff.
+    if: always() && needs.compare.result == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Junta el diff de las partes que fallaron
+        uses: actions/upload-artifact/merge@v4
+        with:
+          name: visual-diff
+          pattern: visual-diff-*
+          separate-directories: true
+          retention-days: 14
+          delete-merged: true
+
+  # Las partes tienen que sumar la suite entera: una prueba que no cae en
+  # ninguna nunca se compara, y el check saldría verde sin haberla visto.
+  # Sólo lista las pruebas, sin correrlas, así que no necesita credenciales.
+  reparto:
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
@@ -114,27 +191,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - uses: ./.github/actions/playwright-browsers
-      # Sólo en este paso: `npm ci` y sus postinstall no tienen nada que hacer
-      # con una llave de escritura. El `npm run dev` que Playwright levanta sí
-      # las recibe, porque lo arranca como hijo de este proceso, y las necesita:
-      # la aplicación que se fotografía vive detrás de la frontera de sesión.
-      - name: Compara contra la línea base vinculante
-        run: npx playwright test
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      - name: Guarda el diff para que alguien lo mire
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: visual-diff
-          path: |
-            test-results/
-            playwright-report/
-          retention-days: 14
-          if-no-files-found: ignore
+      - name: Comprueba que las partes suman la suite entera
+        run: npm run check:shards
 
   report-incident:
     needs: compare
@@ -159,12 +217,21 @@ jobs:
       - name: Abre (o no duplica) el incidente de main desajustado
         run: bash scripts/report-visual-incident.sh
 
-  accept:
+  # Aceptar son dos jobs: `regenerate` rehace las capturas repartido en
+  # partes, con las credenciales y sin permiso de escritura; `accept` junta lo
+  # que produjo cada parte y lo empuja, con permiso de escritura y sin
+  # credenciales.
+  regenerate:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
+    strategy:
+      # Una parte que falla no cancela las demás: `accept` no commitea nada si
+      # alguna falló, pero su log dice cuáles, no sólo la primera.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -175,34 +242,86 @@ jobs:
           cache: npm
       - run: npm ci
       - uses: ./.github/actions/playwright-browsers
-      - name: Deja constancia de qué diff se revisó
-        run: |
-          echo "Línea base aceptada tras revisar:" >> "$GITHUB_STEP_SUMMARY"
-          echo "${{ inputs.reviewed_run_url }}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Compila la aplicación
+        run: npm run build
       # Regenerar es correr la misma suite: sin sesión fotografiaría la
       # pantalla de entrada en vez de la que se está aceptando.
       - name: Regenera la línea base
         id: update
-        run: bash scripts/update-visual-baselines.sh
+        run: bash scripts/update-visual-baselines.sh --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         continue-on-error: true
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      - name: Commitea la línea base aceptada
-        id: commit
+      # Sólo las capturas que esta parte regeneró. Subir la carpeta entera
+      # haría que la copia vieja de otra parte pisara, al juntarlas, la
+      # captura nueva de ésta.
+      - name: Separa las capturas regeneradas
+        id: collect
         if: steps.update.outcome == 'failure'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --cached --quiet; then
+          mkdir -p baseline-changes
+          git diff --cached --name-only --diff-filter=AM -- tests/ui.spec.ts-snapshots \
+            | xargs -r cp -t baseline-changes
+          if [ -z "$(ls -A baseline-changes)" ]; then
             echo "El fallo no era de píxeles: no hay línea base que aceptar." >&2
             exit 1
           fi
+      - name: Sube las capturas de esta parte
+        if: steps.collect.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-${{ matrix.shard }}
+          path: baseline-changes/
+          retention-days: 1
+          if-no-files-found: error
+
+  accept:
+    needs: regenerate
+    # Sin `always()` a propósito: si una parte falló por algo que no eran
+    # píxeles, no se acepta nada. La línea base no se acepta a medias.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - name: Deja constancia de qué diff se revisó
+        run: |
+          echo "Línea base aceptada tras revisar:" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ inputs.reviewed_run_url }}" >> "$GITHUB_STEP_SUMMARY"
+      # Cada parte en su carpeta, para poder decir en el resumen cuántas
+      # capturas trajo cada una antes de juntarlas.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: baseline-*
+          path: baseline-parts
+      - name: Junta las capturas de todas las partes
+        run: |
+          shopt -s nullglob
+          for part in baseline-parts/*/; do
+            echo "- $(basename "$part"): $(ls "$part" | wc -l) capturas" >> "$GITHUB_STEP_SUMMARY"
+            cp "$part"* tests/ui.spec.ts-snapshots/
+          done
+      - name: Commitea la línea base aceptada
+        id: commit
+        run: |
+          git add tests/ui.spec.ts-snapshots
+          if git diff --cached --quiet; then
+            echo "La línea base ya estaba al día: no hay nada que aceptar." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Línea base visual para Linux (aceptada a mano)"
           git push
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
       - name: Avisa en el PR de que falta confirmar el check
-        if: steps.commit.outcome == 'success'
+        if: steps.commit.outputs.pushed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
