@@ -66,6 +66,9 @@ export type DirectoryMemberRecord = {
   readonly status: AccountStatus;
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
+  /** Dónde está la foto en el almacenamiento (#245). No sale nunca tal cual:
+   * se sirve una dirección firmada de vida corta. */
+  readonly photoPath: string | null;
 };
 
 /** Lo que el directorio enseña de un socio a cualquiera del club (FR-015). Ni
@@ -79,6 +82,8 @@ export type DirectoryMember = {
   readonly role: Role;
   readonly position: Position | null;
   readonly status: AccountStatus;
+  /** Null sin foto: la fila enseña entonces las iniciales. */
+  readonly photoUrl: string | null;
 };
 
 /** Lo mismo, más el registro federativo, que sólo ve un Admin (BR-008). */
@@ -104,6 +109,12 @@ export type DirectoryGateways = {
     findDirectoryMembers(
       clubId: string,
     ): Promise<readonly DirectoryMemberRecord[]>;
+  };
+  readonly photos: {
+    /** Las direcciones firmadas, por ruta. */
+    signPhotoUrls(
+      photoPaths: readonly string[],
+    ): Promise<ReadonlyMap<string, string>>;
   };
 };
 
@@ -209,7 +220,39 @@ function compareForQuery(
     : primary;
 }
 
-function toDirectoryMember(record: DirectoryMemberRecord): DirectoryMember {
+type SignedPhotos = ReadonlyMap<string, string>;
+
+function photoUrlOf(
+  record: DirectoryMemberRecord,
+  signedPhotos: SignedPhotos,
+): string | null {
+  if (record.photoPath === null) {
+    return null;
+  }
+  const url = signedPhotos.get(record.photoPath);
+  if (url === undefined) {
+    throw new Error(`Falta la dirección firmada de ${record.photoPath}.`);
+  }
+  return url;
+}
+
+/** Sólo se firman las fotos de quien sale en la lista: una baja que un
+ * Player no ve tampoco le deja una dirección de su foto. */
+function signListedPhotos(
+  gateways: DirectoryGateways,
+  listed: readonly DirectoryMemberRecord[],
+): Promise<SignedPhotos> {
+  return gateways.photos.signPhotoUrls(
+    listed.flatMap((record) =>
+      record.photoPath === null ? [] : [record.photoPath],
+    ),
+  );
+}
+
+function toDirectoryMember(
+  record: DirectoryMemberRecord,
+  signedPhotos: SignedPhotos,
+): DirectoryMember {
   return {
     userId: record.userId,
     fullName: record.fullName,
@@ -218,6 +261,7 @@ function toDirectoryMember(record: DirectoryMemberRecord): DirectoryMember {
     role: record.role,
     position: record.position,
     status: record.status,
+    photoUrl: photoUrlOf(record, signedPhotos),
   };
 }
 
@@ -225,9 +269,10 @@ function toDirectoryMember(record: DirectoryMemberRecord): DirectoryMember {
 function toAdminDirectoryMember(
   record: DirectoryMemberRecord,
   todayInClub: string,
+  signedPhotos: SignedPhotos,
 ): AdminDirectoryMember {
   return {
-    ...toDirectoryMember(record),
+    ...toDirectoryMember(record, signedPhotos),
     aufNumber: record.aufNumber,
     aufExpiry: record.aufExpiry,
     isAufExpired: isAufExpired(record.aufExpiry, todayInClub),
@@ -261,15 +306,21 @@ export async function listDirectory(
   const listed = records
     .filter((record) => isVisible(record, request.query))
     .sort((first, second) => compareForQuery(first, second, request.query));
+  const signedPhotos = await signListedPhotos(gateways, listed);
 
   return isAdmin
     ? {
         kind: "admin",
         members: listed.map((record) =>
-          toAdminDirectoryMember(record, request.todayInClub),
+          toAdminDirectoryMember(record, request.todayInClub, signedPhotos),
         ),
       }
-    : { kind: "member", members: listed.map(toDirectoryMember) };
+    : {
+        kind: "member",
+        members: listed.map((record) =>
+          toDirectoryMember(record, signedPhotos),
+        ),
+      };
 }
 
 /** La misma lista con el rol nuevo de un miembro, sin tocar a nadie más. Es

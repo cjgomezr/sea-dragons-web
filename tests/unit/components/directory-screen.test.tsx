@@ -22,6 +22,7 @@ const MARIA: DirectoryMember = {
   role: "Coach",
   position: "Forward",
   status: "active",
+  photoUrl: null,
 };
 
 /** Sin país, sin nivel y sin posición: los tres huecos del criterio del
@@ -34,6 +35,7 @@ const TOMAS: DirectoryMember = {
   role: "Player",
   position: null,
   status: "active",
+  photoUrl: null,
 };
 
 const NEREA: DirectoryMember = {
@@ -44,6 +46,7 @@ const NEREA: DirectoryMember = {
   role: "Player",
   position: "Goalkeeper",
   status: "active",
+  photoUrl: null,
 };
 
 const ZOE: AdminDirectoryMember = {
@@ -54,6 +57,7 @@ const ZOE: AdminDirectoryMember = {
   role: "Committee",
   position: "Defender",
   status: "inactive",
+  photoUrl: null,
   aufNumber: null,
   aufExpiry: null,
   isAufExpired: false,
@@ -67,6 +71,7 @@ const VENCIDA: AdminDirectoryMember = {
   role: "Admin",
   position: "Defender",
   status: "active",
+  photoUrl: null,
   aufNumber: "AUF-7",
   aufExpiry: "2020-01-31",
   isAufExpired: true,

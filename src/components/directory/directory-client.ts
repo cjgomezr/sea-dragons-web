@@ -40,6 +40,8 @@ const memberSchema = z.object({
   role: z.enum(ROLES),
   position: z.enum(POSITIONS).nullable(),
   status: z.enum(ACCOUNT_STATUSES),
+  // Sólo una dirección web: la pantalla la pone tal cual en una imagen.
+  photoUrl: z.url({ protocol: /^https?$/ }).nullable(),
 });
 
 const adminMemberSchema = memberSchema.extend({

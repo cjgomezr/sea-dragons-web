@@ -132,6 +132,11 @@ export const ACCOUNT_GROUPS_API_PATH = "/api/v1/account/groups";
  * estado) lo rechaza el handler campo a campo. */
 export const ACCOUNT_PROFILE_API_PATH = "/api/v1/account/profile";
 
+/** La foto de perfil de quien llama (#245): PUT la sube o la reemplaza,
+ * DELETE la quita. Cuelga del perfil y lo alcanza igual cualquier cuenta
+ * activa, así que tampoco aparece en `RESTRICTED_ROUTES`. */
+export const ACCOUNT_PROFILE_PHOTO_API_PATH = `${ACCOUNT_PROFILE_API_PATH}/photo`;
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 

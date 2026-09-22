@@ -35,6 +35,7 @@ const ANA: DirectoryMemberRecord = {
   status: "active",
   aufNumber: "AUF-1",
   aufExpiry: "2027-01-31",
+  photoPath: "aaaaaaaa-0000-4000-8000-00000000000a/foto.webp",
 };
 
 const BRUNO: DirectoryMemberRecord = {
@@ -47,6 +48,7 @@ const BRUNO: DirectoryMemberRecord = {
   status: "active",
   aufNumber: "AUF-2",
   aufExpiry: "2026-09-20",
+  photoPath: null,
 };
 
 const MARIA: DirectoryMemberRecord = {
@@ -59,6 +61,7 @@ const MARIA: DirectoryMemberRecord = {
   status: "active",
   aufNumber: null,
   aufExpiry: null,
+  photoPath: null,
 };
 
 const ZOE: DirectoryMemberRecord = {
@@ -71,16 +74,23 @@ const ZOE: DirectoryMemberRecord = {
   status: "inactive",
   aufNumber: "AUF-4",
   aufExpiry: TODAY,
+  photoPath: "dddddddd-0000-4000-8000-00000000000d/foto.png",
 };
 
 const CLUB: readonly DirectoryMemberRecord[] = [ZOE, MARIA, ANA, BRUNO];
 
 const clubsRead: string[] = [];
+const photosSigned: string[] = [];
+
+function signedUrlOf(photoPath: string): string {
+  return `https://storage.test/${photoPath}?token=t`;
+}
 
 function gateways(
   options: { readonly callerRole?: Role; readonly member?: null } = {},
 ): DirectoryGateways {
   clubsRead.length = 0;
+  photosSigned.length = 0;
   return {
     members: {
       findRoleRequestMember: async () =>
@@ -96,6 +106,12 @@ function gateways(
       findDirectoryMembers: async (clubId) => {
         clubsRead.push(clubId);
         return CLUB;
+      },
+    },
+    photos: {
+      signPhotoUrls: async (photoPaths) => {
+        photosSigned.push(...photoPaths);
+        return new Map(photoPaths.map((path) => [path, signedUrlOf(path)]));
       },
     },
   };
@@ -114,6 +130,44 @@ async function listNames(
 }
 
 describe("directorio", () => {
+  it("sirve firmada la foto de quien tiene una, y null a quien no", async () => {
+    const listing = await listDirectory(gateways(), {
+      callerId: CALLER_ID,
+      query: DEFAULT_DIRECTORY_QUERY,
+      todayInClub: TODAY,
+    });
+
+    expect(
+      listing.members.map((member) => [member.fullName, member.photoUrl]),
+    ).toEqual([
+      ["Ana Admin", signedUrlOf(ANA.photoPath ?? "")],
+      ["Bruno Beltrán", null],
+      ["María Ñíguez", null],
+    ]);
+  });
+
+  it("no firma la foto de quien no sale en la lista", async () => {
+    await listDirectory(gateways(), {
+      callerId: CALLER_ID,
+      query: DEFAULT_DIRECTORY_QUERY,
+      todayInClub: TODAY,
+    });
+
+    expect(photosSigned).toEqual([ANA.photoPath]);
+  });
+
+  it("no cuenta la ruta de la foto, sólo su dirección firmada", async () => {
+    const listing = await listDirectory(gateways(), {
+      callerId: CALLER_ID,
+      query: DEFAULT_DIRECTORY_QUERY,
+      todayInClub: TODAY,
+    });
+
+    for (const member of listing.members) {
+      expect(Object.keys(member)).not.toContain("photoPath");
+    }
+  });
+
   it("trae a los socios del club de quien pregunta, por nombre ascendente", async () => {
     const listing = await listDirectory(gateways(), {
       callerId: CALLER_ID,
@@ -145,6 +199,7 @@ describe("directorio", () => {
         role: "Player",
         position: "Defender",
         status: "active",
+        photoUrl: null,
       },
     ]);
   });
@@ -341,6 +396,7 @@ describe("el rol nuevo en la lista (#240)", () => {
     role: "Player",
     position: "Goalkeeper",
     status: "active",
+    photoUrl: null,
   } as const;
   const TOMAS = {
     ...NEREA,
