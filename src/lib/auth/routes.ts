@@ -91,6 +91,11 @@ export const MEMBER_RECORD_API_PATH = `${MEMBERS_API_PATH}/[id]/record`;
  * es el POST de `MEMBERS_API_PATH`. */
 export const MEMBER_INVITATION_API_PATH = `${MEMBERS_API_PATH}/[id]/invitation`;
 
+/** Dar de baja o reactivar a un miembro (#244, FR-085, AC-040). `[id]` es el
+ * `user_id` del miembro. Cuelga de `MEMBERS_API_PATH`, y se declara igual por
+ * el mismo motivo que el cambio de rol. */
+export const MEMBER_STATUS_API_PATH = `${MEMBERS_API_PATH}/[id]/status`;
+
 /** La pantalla de esa ficha, abierta desde el directorio. El directorio lo
  * alcanza cualquier cuenta activa, pero lo que cuelga de él con un id es del
  * Admin: quien no lo es y la pide a mano vuelve al panel, como con Equipos. */
@@ -248,6 +253,7 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: MEMBER_ROLE_API_PATH, capability: "manageUsersAndRoles" },
   { path: MEMBER_RECORD_API_PATH, capability: "manageUsersAndRoles" },
   { path: MEMBER_INVITATION_API_PATH, capability: "manageUsersAndRoles" },
+  { path: MEMBER_STATUS_API_PATH, capability: "manageUsersAndRoles" },
   { path: MEMBER_RECORD_PATH, capability: "manageUsersAndRoles" },
   { path: NEW_MEMBER_PATH, capability: "manageUsersAndRoles" },
   { path: GROUPS_API_PATH, capability: "manageGroups" },
