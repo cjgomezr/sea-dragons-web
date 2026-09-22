@@ -25,6 +25,7 @@ type WiringOptions = {
   readonly actorRole?: Role;
   readonly write?: MemberRoleChangeWrite;
   readonly auditFailure?: string;
+  readonly notificationFailure?: string;
 };
 
 const writes: MemberRoleChangeWriteInput[] = [];
@@ -73,6 +74,17 @@ function mockWiring(options: WiringOptions = {}): void {
             }
             auditRows.push(row);
             return { error: null };
+          },
+        },
+        notifications: {
+          findRecipient: async () => ({
+            clubId: CLUB_ID,
+            accountStatus: "active",
+          }),
+          insertNotification: async () => {
+            if (options.notificationFailure !== undefined) {
+              throw new Error(options.notificationFailure);
+            }
           },
         },
       },
@@ -238,6 +250,22 @@ describe("PATCH /api/v1/members/{id}/role", () => {
       error: { code: "internal_error", reason: "audit_not_recorded" },
     });
     expect(JSON.stringify(serverLog.mock.calls)).toContain("connection reset");
+  });
+
+  it("responde igual si el aviso al socio falla, y deja el error en el servidor", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockWiring({ notificationFailure: "timeout" });
+
+    const response = await patchRole({ role: "Committee" });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: { userId: MEMBER_ID, previousRole: "Player", role: "Committee" },
+    });
+    expect(errorLog).toHaveBeenCalledWith(
+      "[notifications] aviso sin guardar",
+      expect.anything(),
+    );
   });
 
   it("no acepta otro método", async () => {

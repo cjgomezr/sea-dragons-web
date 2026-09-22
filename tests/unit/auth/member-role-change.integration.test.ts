@@ -37,6 +37,7 @@ import {
 const MEMBERS_TABLE = "members";
 const AUDIT_LOG_TABLE = "audit_log";
 const CLUBS_TABLE = "clubs";
+const NOTIFICATIONS_TABLE = "notifications";
 
 type SeededMember = TestUser & { readonly fullName: string };
 
@@ -127,6 +128,20 @@ async function readAuditEntries(
   return data;
 }
 
+async function readNotifications(
+  serviceClient: ServiceRoleClient,
+  userId: string,
+): Promise<readonly Record<string, unknown>[]> {
+  const { data, error } = await serviceClient.client
+    .from(NOTIFICATIONS_TABLE)
+    .select("club_id, type, data")
+    .eq("user_id", userId);
+  if (error) {
+    throw new Error(`No se pudieron leer los avisos: ${error.message}`);
+  }
+  return data;
+}
+
 /** El rol con el que la frontera ve la siguiente petición del socio, leído
  * con su propia sesión como lo lee el proxy. */
 async function sessionRoleOf(member: SeededMember): Promise<SessionState> {
@@ -184,6 +199,41 @@ describeRls("cambiar el rol de un socio contra seadragons-dev", () => {
               const written = JSON.stringify(entries);
               expect(written).not.toContain(player.fullName);
               expect(written).not.toContain(player.email);
+            },
+          ),
+        ),
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "el socio al que le cambian el rol recibe un aviso con su rol nuevo (#267)",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = createMemberRoleGateways(serviceClient.client);
+
+      await withTemporaryClub(serviceClient, (clubId) =>
+        withActiveMember(serviceClient, { clubId, role: "Admin" }, (admin) =>
+          withActiveMember(
+            serviceClient,
+            { clubId, role: "Player" },
+            async (player) => {
+              await changeMemberRole(gateways, {
+                actorId: admin.id,
+                targetUserId: player.id,
+                newRole: "Coach",
+              });
+
+              await expect(
+                readNotifications(serviceClient, player.id),
+              ).resolves.toEqual([
+                {
+                  club_id: clubId,
+                  type: "role_changed",
+                  data: { newRole: "Coach" },
+                },
+              ]);
             },
           ),
         ),

@@ -183,6 +183,18 @@ describeConPostgres("decidir una solicitud de rol en la base", () => {
     expect(await memberRole(database, target.memberId)).toBe("Player");
   });
 
+  it("al rechazar dice a quién avisar y qué rol había pedido (#267)", async () => {
+    const database = await migratedDatabase();
+    const target = await scenario(database);
+
+    const outcome = await decide(database, target, "rejected");
+
+    expect(outcome).toMatchObject({
+      user_id: target.memberId,
+      requested_role: "Coach",
+    });
+  });
+
   it("no pisa una decisión ya tomada y dice cuál fue", async () => {
     const database = await migratedDatabase();
     const target = await scenario(database);

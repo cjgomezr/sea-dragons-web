@@ -3,6 +3,10 @@ import {
   type AuditLogWriter,
   recordAuditEvent,
 } from "@/lib/audit/audit-log";
+import {
+  type NotificationWriter,
+  notifyMember,
+} from "@/lib/notifications/notify-member";
 import { MemberNotFoundError } from "./account-activation";
 import type { RoleRequestGateways, RoleRequestMember } from "./role-request";
 import { type Role, hasCapability } from "./roles";
@@ -14,7 +18,8 @@ import { type Role, hasCapability } from "./roles";
  * La regla que no puede depender de la aplicación vive en la base, en
  * `change_member_role` de `0014_change_member_role.sql`: el club nunca se
  * queda sin Admin, tampoco con dos degradaciones simultáneas. Aquí se decide
- * quién puede pedirlo y qué queda en la bitácora.
+ * quién puede pedirlo, qué queda en la bitácora y a quién se avisa (RF-6 del
+ * PRD de E6).
  *
  * El socio se nombra por su `user_id`, el mismo id con el que la bitácora
  * nombra al socio en `role.changed` desde #210.
@@ -55,6 +60,7 @@ export type MemberRoleChangeGateways = {
     ): Promise<MemberRoleChangeWrite>;
   };
   readonly audit: AuditLogWriter;
+  readonly notifications: NotificationWriter;
 };
 
 const MEMBER_ENTITY_TYPE = "member";
@@ -166,7 +172,7 @@ type MemberRoleChangeInput = {
 /** Traduce la respuesta de la base a un resultado o a un error, y deja en la
  * bitácora lo que corresponde a cada caso. */
 async function settleRoleChangeWrite(
-  audit: AuditLogWriter,
+  gateways: Pick<MemberRoleChangeGateways, "audit" | "notifications">,
   settlement: {
     readonly actor: AuditActor;
     readonly input: MemberRoleChangeInput;
@@ -181,7 +187,15 @@ async function settleRoleChangeWrite(
         previousRole: write.previousRole,
         role: write.newRole,
       };
-      await auditAppliedChange(audit, actor, change);
+      // `notifyMember` no lanza: un aviso perdido queda registrado y el
+      // cambio responde igual. Va antes de la bitácora para que el socio se
+      // entere también si ella falla, porque el rol ya cambió.
+      await notifyMember(gateways.notifications, {
+        recipientUserId: change.userId,
+        type: "role_changed",
+        data: { newRole: change.role },
+      });
+      await auditAppliedChange(gateways.audit, actor, change);
       return change;
     }
     case "unchanged":
@@ -191,7 +205,7 @@ async function settleRoleChangeWrite(
         role: write.role,
       };
     case "last_admin":
-      await auditLastAdminRefusal(audit, actor, input);
+      await auditLastAdminRefusal(gateways.audit, actor, input);
       throw new LastAdminError();
     case "actor_not_admin":
       throw new MemberRoleChangeForbiddenError();
@@ -215,7 +229,7 @@ export async function changeMemberRole(
     actorId: input.actorId,
     newRole: input.newRole,
   });
-  return settleRoleChangeWrite(gateways.audit, {
+  return settleRoleChangeWrite(gateways, {
     actor: { id: input.actorId, clubId: actor.clubId },
     input,
     write,
