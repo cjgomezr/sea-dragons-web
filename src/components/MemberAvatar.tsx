@@ -10,8 +10,9 @@ import { memberInitials } from "@/lib/auth/member-initials";
  * corta, y el optimizador de Next la pediría sin esa firma o guardaría en su
  * caché una copia que la firma ya no protege.
  *
- * Sin `alt` la foto es decorativa, igual que las iniciales: donde va, el
- * nombre ya está escrito al lado.
+ * Por defecto la foto es decorativa, igual que las iniciales, porque donde va
+ * el nombre ya está escrito al lado. Con `alt` se anuncia, como en la
+ * cabecera del perfil, donde es la foto propia la que se cambia.
  */
 export function MemberAvatar({
   fullName,

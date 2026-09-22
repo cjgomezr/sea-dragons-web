@@ -22,11 +22,13 @@ const BYTES_PER_MEGABYTE = 1024 * 1024;
 const MAX_MEGABYTES = PROFILE_PHOTO_MAX_BYTES / BYTES_PER_MEGABYTE;
 
 const photoResponseSchema = z.object({
-  data: z.object({ photoUrl: z.url({ protocol: /^https?$/ }) }),
+  // Null si la foto se guardó pero Storage no la firmó: salen las iniciales.
+  data: z.object({ photoUrl: z.url({ protocol: /^https?$/ }).nullable() }),
 });
 
 export type PhotoUploadResult =
-  { readonly kind: "saved"; readonly photoUrl: string } | ApiRequestFailure;
+  | { readonly kind: "saved"; readonly photoUrl: string | null }
+  | ApiRequestFailure;
 
 export type PhotoRemovalResult =
   { readonly kind: "removed" } | ApiRequestFailure;

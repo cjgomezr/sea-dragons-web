@@ -83,7 +83,9 @@ export type ProfilePhotoGateways = {
     remove(photoPath: string): Promise<void>;
   };
   readonly signing: {
-    signPhotoUrl(photoPath: string): Promise<string>;
+    /** Null cuando Storage no la pudo firmar (el fichero ya no está): quien
+     * la enseña pone entonces las iniciales en vez de fallar. */
+    signPhotoUrl(photoPath: string): Promise<string | null>;
   };
   /** El nombre aleatorio del fichero nuevo. Se inyecta para que los tests
    * sepan qué ruta esperar. */
@@ -206,9 +208,27 @@ export async function replaceProfilePhoto(
     throw error;
   }
   if (owner.photoPath !== null) {
-    await gateways.storage.remove(owner.photoPath);
+    await removeReplacedPhoto(gateways, owner.photoPath);
   }
   return { photoUrl: await gateways.signing.signPhotoUrl(photoPath) };
+}
+
+/** La foto nueva ya está guardada, así que no poder borrar la anterior no
+ * deshace el reemplazo: responder error haría que quien sube reintente, y el
+ * reintento borraría la recién guardada en vez de ésta. Queda registrada con
+ * su ruta para limpiarla a mano. */
+async function removeReplacedPhoto(
+  gateways: ProfilePhotoGateways,
+  photoPath: string,
+): Promise<void> {
+  try {
+    await gateways.storage.remove(photoPath);
+  } catch (error) {
+    console.error(
+      `[profile-photo] quedó sin borrar la foto reemplazada ${photoPath}`,
+      error,
+    );
+  }
 }
 
 /** Deja la ficha sin foto y después borra el fichero. En ese orden, un fallo

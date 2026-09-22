@@ -41,7 +41,12 @@ function toPhotoOwner(row: Row): PhotoOwner {
 }
 
 /** Las direcciones firmadas de varias fotos en una sola llamada, por ruta.
- * La usa también el directorio, que enseña decenas a la vez. */
+ * La usa también el directorio, que enseña decenas a la vez.
+ *
+ * Una ruta que Storage no firma (el fichero ya no existe, por ejemplo porque
+ * alguien lo borró desde el dashboard) no tumba la lista de todo el club: se
+ * registra con su motivo y se deja fuera, y quien la enseña pone las
+ * iniciales. Un fallo de la llamada entera sí se lanza. */
 export async function signProfilePhotoUrls(
   serviceClient: SupabaseClient,
   photoPaths: readonly string[],
@@ -56,32 +61,30 @@ export async function signProfilePhotoUrls(
     throw new Error(`No se pudieron firmar las fotos: ${error.message}`);
   }
   return new Map(
-    data.map((signed): [string, string] => {
+    data.flatMap((signed): [string, string][] => {
       if (
         signed.error !== null ||
         signed.path === null ||
         signed.signedUrl === null
       ) {
-        throw new Error(
-          `No se pudo firmar la foto ${signed.path ?? "(sin ruta)"}: ${signed.error ?? "sin detalle"}`,
+        console.error(
+          `[profile-photo] no se pudo firmar la foto ${signed.path ?? "(sin ruta)"}: ${signed.error ?? "sin detalle"}`,
         );
+        return [];
       }
-      return [signed.path, signed.signedUrl];
+      return [[signed.path, signed.signedUrl]];
     }),
   );
 }
 
-/** Una sola dirección firmada, para quien enseña una sola foto. */
+/** Una sola dirección firmada, para quien enseña una sola foto. Null si
+ * Storage no la firmó, con el motivo ya registrado. */
 export async function signProfilePhotoUrl(
   serviceClient: SupabaseClient,
   photoPath: string,
-): Promise<string> {
+): Promise<string | null> {
   const signed = await signProfilePhotoUrls(serviceClient, [photoPath]);
-  const url = signed.get(photoPath);
-  if (url === undefined) {
-    throw new Error(`Storage no devolvió la firma de ${photoPath}.`);
-  }
-  return url;
+  return signed.get(photoPath) ?? null;
 }
 
 export function createProfilePhotoGateways(clients: {

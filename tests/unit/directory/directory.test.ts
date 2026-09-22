@@ -146,6 +146,26 @@ describe("directorio", () => {
     ]);
   });
 
+  it("enseña las iniciales de quien tiene una foto que no se pudo firmar, y el resto de la lista sigue", async () => {
+    const unsigned = gateways();
+    const listing = await listDirectory(
+      { ...unsigned, photos: { signPhotoUrls: async () => new Map() } },
+      {
+        callerId: CALLER_ID,
+        query: DEFAULT_DIRECTORY_QUERY,
+        todayInClub: TODAY,
+      },
+    );
+
+    expect(
+      listing.members.map((member) => [member.fullName, member.photoUrl]),
+    ).toEqual([
+      ["Ana Admin", null],
+      ["Bruno Beltrán", null],
+      ["María Ñíguez", null],
+    ]);
+  });
+
   it("no firma la foto de quien no sale en la lista", async () => {
     await listDirectory(gateways(), {
       callerId: CALLER_ID,

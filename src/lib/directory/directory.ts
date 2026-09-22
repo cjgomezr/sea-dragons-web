@@ -111,7 +111,8 @@ export type DirectoryGateways = {
     ): Promise<readonly DirectoryMemberRecord[]>;
   };
   readonly photos: {
-    /** Las direcciones firmadas, por ruta. */
+    /** Las direcciones firmadas, por ruta. Una ruta que no se pudo firmar
+     * falta en el mapa. */
     signPhotoUrls(
       photoPaths: readonly string[],
     ): Promise<ReadonlyMap<string, string>>;
@@ -229,11 +230,9 @@ function photoUrlOf(
   if (record.photoPath === null) {
     return null;
   }
-  const url = signedPhotos.get(record.photoPath);
-  if (url === undefined) {
-    throw new Error(`Falta la dirección firmada de ${record.photoPath}.`);
-  }
-  return url;
+  // Sin firma, las iniciales: una foto rota no tumba la lista del club, y el
+  // adaptador ya registró por qué no se firmó.
+  return signedPhotos.get(record.photoPath) ?? null;
 }
 
 /** Sólo se firman las fotos de quien sale en la lista: una baja que un

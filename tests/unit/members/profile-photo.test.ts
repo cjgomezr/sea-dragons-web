@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import {
@@ -254,6 +254,52 @@ describe("foto de perfil", () => {
 
       await expect(upload).rejects.toThrow("la base no respondió");
       expect([...state.stored]).toEqual([OLD_PATH]);
+    });
+  });
+
+  describe("limpieza de la foto anterior", () => {
+    it("da el reemplazo por hecho aunque la foto anterior no se pueda borrar", async () => {
+      const { gateways, state } = fakeGateways(ACTIVE_WITH_PHOTO);
+      const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+      const failingRemove: ProfilePhotoGateways = {
+        ...gateways,
+        storage: {
+          ...gateways.storage,
+          remove: async (path) => {
+            if (path === OLD_PATH) {
+              throw new Error("Storage no respondió");
+            }
+            await gateways.storage.remove(path);
+          },
+        },
+      };
+
+      const photo = await replaceProfilePhoto(failingRemove, {
+        userId: USER_ID,
+        bytes: PNG_BYTES,
+      });
+
+      expect(photo.photoUrl).toContain(`${USER_ID}/${NEW_FILE_ID}.png`);
+      expect(state.savedPaths).toEqual([`${USER_ID}/${NEW_FILE_ID}.png`]);
+      expect(errors).toHaveBeenCalledWith(
+        expect.stringContaining(OLD_PATH),
+        expect.any(Error),
+      );
+      errors.mockRestore();
+    });
+  });
+
+  describe("una foto que no se puede firmar", () => {
+    it("se lee como sin foto, para que salgan las iniciales", async () => {
+      const { gateways } = fakeGateways(ACTIVE_WITH_PHOTO);
+      const unsigned: ProfilePhotoGateways = {
+        ...gateways,
+        signing: { signPhotoUrl: async () => null },
+      };
+
+      await expect(readProfilePhoto(unsigned, USER_ID)).resolves.toEqual({
+        photoUrl: null,
+      });
     });
   });
 
