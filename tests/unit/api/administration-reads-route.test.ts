@@ -71,7 +71,10 @@ function mockWiring(callerRole: Role = "Admin"): void {
         requests: {
           findPendingRequests: async (clubId: string) => {
             clubsRead.push(clubId);
-            return PENDING;
+            return PENDING.map((request) => ({
+              ...request,
+              requesterStatus: "active",
+            }));
           },
         },
       },

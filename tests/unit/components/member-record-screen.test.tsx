@@ -16,6 +16,7 @@ const SENIOR_ID = "9a9a9a9a-0000-4000-8000-000000000001";
 const MASTERS_ID = "9a9a9a9a-0000-4000-8000-000000000002";
 const RECORD_PATH = `/api/v1/members/${MEMBER_ID}/record`;
 const INVITATION_PATH = `/api/v1/members/${MEMBER_ID}/invitation`;
+const STATUS_PATH = `/api/v1/members/${MEMBER_ID}/status`;
 const GROUPS_PATH = "/api/v1/groups";
 
 const RECORD: MemberRecord = {
@@ -43,9 +44,11 @@ type Stub = {
   readonly load?: () => Response | Promise<Response>;
   readonly save?: (body: unknown) => Response | Promise<Response>;
   readonly resend?: () => Response;
+  readonly changeStatus?: (body: unknown) => Response | Promise<Response>;
 };
 
 const resends: string[] = [];
+const statusChanges: unknown[] = [];
 
 function jsonResponse(status: number, payload: unknown): Response {
   return new Response(JSON.stringify(payload), {
@@ -79,6 +82,14 @@ function savedRecord(body: unknown): MemberRecord {
   };
 }
 
+/** Lo que el servidor respondería a un cambio de estado que aplicó. */
+function changedStatus(body: unknown): Response {
+  const { status } = body as { status: string };
+  return jsonResponse(200, {
+    data: { userId: MEMBER_ID, previousStatus: "active", status },
+  });
+}
+
 function stubApi(stub: Stub = {}): void {
   vi.stubGlobal(
     "fetch",
@@ -91,6 +102,11 @@ function stubApi(stub: Stub = {}): void {
         return (
           stub.resend?.() ?? jsonResponse(200, { data: { invitation: "sent" } })
         );
+      }
+      if (url === STATUS_PATH && init?.method === "PATCH") {
+        const body: unknown = JSON.parse(String(init.body));
+        statusChanges.push(body);
+        return stub.changeStatus?.(body) ?? changedStatus(body);
       }
       if (url !== RECORD_PATH) {
         throw new Error(`Petición inesperada: ${url}`);
@@ -121,6 +137,7 @@ function saveButton(): HTMLElement {
 beforeEach(() => {
   patches.length = 0;
   resends.length = 0;
+  statusChanges.length = 0;
 });
 
 afterEach(() => {
@@ -455,5 +472,147 @@ describe("ficha en pantalla: invitación (#243)", () => {
         "This member has already activated their account.",
       ),
     ).toBeVisible();
+  });
+});
+
+describe("ficha en pantalla: baja y reactivación (#244)", () => {
+  const INACTIVE = { ...RECORD, accountStatus: "inactive" as const };
+
+  it("da de baja a quien está activo y pasa a ofrecer reactivarle", async () => {
+    stubApi();
+    await renderScreen();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Deactivate member" }));
+
+    expect(
+      await screen.findByText("Paula Player is no longer a member."),
+    ).toBeVisible();
+    expect(statusChanges).toEqual([{ status: "inactive" }]);
+    expect(
+      screen.getByRole("button", { name: "Reactivate member" }),
+    ).toBeInTheDocument();
+  });
+
+  it("reactiva a quien está de baja y vuelve a ofrecer la baja", async () => {
+    stubApi({ record: INACTIVE });
+    await renderScreen();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Reactivate member" }));
+
+    expect(
+      await screen.findByText("Paula Player is back in the club."),
+    ).toBeVisible();
+    expect(statusChanges).toEqual([{ status: "active" }]);
+    expect(
+      screen.getByRole("button", { name: "Deactivate member" }),
+    ).toBeInTheDocument();
+  });
+
+  it("explica que es el último Admin y deja la ficha como estaba", async () => {
+    stubApi({
+      changeStatus: () => errorResponse(422, "business_rule", "last_admin"),
+    });
+    await renderScreen();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Deactivate member" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This is the club's last Admin and can't be deactivated. Name another Admin first.",
+    );
+    expect(
+      screen.getByRole("button", { name: "Deactivate member" }),
+    ).toBeEnabled();
+  });
+
+  it("explica que un Admin no se da de baja a sí mismo", async () => {
+    stubApi({
+      changeStatus: () =>
+        errorResponse(422, "business_rule", "self_deactivation"),
+    });
+    await renderScreen();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Deactivate member" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "You can't deactivate yourself. Another Admin has to do it.",
+    );
+  });
+
+  it("dice que el miembro ya no está cuando el servidor responde 404", async () => {
+    stubApi({ changeStatus: () => errorResponse(404, "not_found") });
+    await renderScreen();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Deactivate member" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That member isn't in the club.",
+    );
+  });
+
+  it("dice que el cambio quedó sin bitácora en vez de pedir reintentar", async () => {
+    stubApi({
+      changeStatus: () =>
+        errorResponse(500, "internal_error", "audit_not_recorded"),
+    });
+    await renderScreen();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Deactivate member" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The membership changed, but it couldn't be logged.",
+    );
+  });
+
+  it("no manda una segunda baja con un doble clic", async () => {
+    let release: (() => void) | null = null;
+    stubApi({
+      changeStatus: (body) =>
+        new Promise<Response>((resolve) => {
+          release = () => resolve(changedStatus(body));
+        }),
+    });
+    await renderScreen();
+    const user = userEvent.setup();
+    const button = screen.getByRole("button", { name: "Deactivate member" });
+
+    await user.dblClick(button);
+
+    expect(statusChanges).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
+    release!();
+    expect(
+      await screen.findByText("Paula Player is no longer a member."),
+    ).toBeVisible();
+  });
+
+  it("sale en español", async () => {
+    stubApi();
+    await renderScreen("es");
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Membresía" }),
+    ).toBeInTheDocument();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Dar de baja" }));
+
+    expect(
+      await screen.findByText("Paula Player quedó de baja."),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Reactivar" }),
+    ).toBeInTheDocument();
   });
 });

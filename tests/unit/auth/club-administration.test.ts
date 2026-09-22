@@ -5,6 +5,7 @@ import {
   ClubAdministrationForbiddenError,
   type ClubMember,
   type PendingRoleRequest,
+  type PendingRoleRequestRecord,
   listClubMembers,
   listPendingRoleRequests,
 } from "@/lib/auth/club-administration";
@@ -49,7 +50,17 @@ const PENDING: readonly PendingRoleRequest[] = [
 type GatewayOptions = {
   readonly role?: Role;
   readonly member?: null;
+  readonly pending?: readonly PendingRoleRequestRecord[];
 };
+
+function asActiveRecords(
+  requests: readonly PendingRoleRequest[],
+): readonly PendingRoleRequestRecord[] {
+  return requests.map((request) => ({
+    ...request,
+    requesterStatus: "active",
+  }));
+}
 
 const clubsRead: string[] = [];
 
@@ -73,7 +84,7 @@ function gateways(options: GatewayOptions = {}): ClubAdministrationGateways {
     requests: {
       findPendingRequests: async (clubId: string) => {
         clubsRead.push(clubId);
-        return PENDING;
+        return options.pending ?? asActiveRecords(PENDING);
       },
     },
   };
@@ -121,6 +132,34 @@ describe("bandeja de solicitudes pendientes", () => {
       expect(clubsRead).toEqual([]);
     },
   );
+
+  it("deja fuera la solicitud de quien está de baja, y conserva las demás", async () => {
+    const [pending] = PENDING;
+    const fromInactive: PendingRoleRequestRecord = {
+      ...pending!,
+      id: "1f0e0d0c-0b0a-4908-8706-050403020101",
+      userId: "c2c2c2c2-0000-4000-8000-00000000000c",
+      fullName: "Iván de baja",
+      requesterStatus: "inactive",
+    };
+    const visibleIncomplete: PendingRoleRequest = {
+      ...pending!,
+      id: "2f0e0d0c-0b0a-4908-8706-050403020102",
+    };
+    const fromIncomplete: PendingRoleRequestRecord = {
+      ...visibleIncomplete,
+      requesterStatus: "incomplete",
+    };
+
+    const requests = await listPendingRoleRequests(
+      gateways({
+        pending: [...asActiveRecords(PENDING), fromInactive, fromIncomplete],
+      }),
+      ADMIN_ID,
+    );
+
+    expect(requests).toEqual([...PENDING, visibleIncomplete]);
+  });
 
   it("rechaza a una identidad que no es socia de ningún club", async () => {
     await expect(
