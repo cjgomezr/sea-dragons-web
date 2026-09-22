@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import {
@@ -87,6 +87,10 @@ function fakeGateways(owner: Owner): {
 const ACTIVE_WITHOUT_PHOTO: Owner = { status: "active", photoPath: null };
 const OLD_PATH = `${USER_ID}/viejo.png`;
 const ACTIVE_WITH_PHOTO: Owner = { status: "active", photoPath: OLD_PATH };
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("foto de perfil", () => {
   describe("formato admitido", () => {
@@ -285,7 +289,6 @@ describe("foto de perfil", () => {
         expect.stringContaining(OLD_PATH),
         expect.any(Error),
       );
-      errors.mockRestore();
     });
   });
 

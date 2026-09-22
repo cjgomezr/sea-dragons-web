@@ -199,7 +199,7 @@ function PhotoStatus({
       );
     case "rejected":
       return (
-        <p role="alert" className="auth-error">
+        <p role="alert" className="auth-error account-photo-error">
           {describePhotoIssue(translate, status.issue)}
         </p>
       );
