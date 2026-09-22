@@ -578,6 +578,32 @@ export const spanishMessages: MessageCatalog = {
     "La membresía cambió, pero no quedó en la bitácora. Recarga la ficha y avisa a quien mantiene la plataforma.",
   "memberStatus.error.unexpected":
     "No pudimos cambiar la membresía. Vuelve a intentarlo.",
+  // La campana y su lista (#266). Cada tipo de aviso tiene su título y su
+  // cuerpo; los datos del aviso entran como parámetros.
+  "notifications.bell.label": {
+    one: "Avisos, {count} sin leer",
+    other: "Avisos, {count} sin leer",
+  },
+  "notifications.bell.labelNoneUnread": "Avisos, ninguno sin leer",
+  "notifications.panel.title": "Avisos",
+  "notifications.panel.markAllRead": "Marcar todo como leído",
+  "notifications.panel.back": "Volver",
+  "notifications.panel.loading": "Cargando tus avisos…",
+  "notifications.panel.empty": "Todavía no tienes avisos.",
+  "notifications.panel.unread": "Nuevo",
+  "notifications.panel.error.load": "No pudimos cargar tus avisos.",
+  "notifications.panel.error.markRead":
+    "No pudimos marcar tus avisos como leídos.",
+  "notifications.panel.retry": "Reintentar",
+  "notifications.role_changed.title": "Tu rol cambió",
+  "notifications.role_changed.body": "Ahora eres {role}.",
+  "notifications.role_request_rejected.title": "Solicitud de rol rechazada",
+  "notifications.role_request_rejected.body":
+    "Un Admin rechazó tu solicitud para ser {role}.",
+  "notifications.role_request_received.title": "Nueva solicitud de rol",
+  "notifications.role_request_received.body": "{name} pidió ser {role}.",
+  "notifications.generic.title": "Aviso nuevo",
+  "notifications.generic.body": "Algo cambió en tu cuenta.",
   "themeToggle.switchToLight": "Cambiar a tema claro",
   "themeToggle.switchToDark": "Cambiar a tema oscuro",
   "languageToggle.label": "Idioma: español. Cambiar a English (EN)",
