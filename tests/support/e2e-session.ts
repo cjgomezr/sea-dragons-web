@@ -139,12 +139,43 @@ export function incompleteStorageStatePath(name: IncompleteMemberName): string {
   return path.join(REPO_ROOT, "test-results", `e2e-storage-state-${name}.json`);
 }
 
-/** El Admin de la pantalla de administración (#212) y el socio cuya solicitud
- * decide. Sus nombres son únicos dentro del club de prueba: la bandeja y la
- * lista enseñan a todo el club, así que un test que quiera señalar una fila
- * concreta tiene que poder nombrarla. */
-export const ADMINISTRATION_ADMIN_NAME = "Admin de administración";
-export const DECIDABLE_MEMBER_NAME = "Socio para decidir";
+/**
+ * Los socios que un test busca por nombre entre todo el club: el Admin de la
+ * pantalla de administración (#212), el socio cuya solicitud decide, y la
+ * socia que se busca en el directorio después de subir su foto (#245).
+ *
+ * Su nombre lleva el sufijo de la corrida (#254). Dos suites a la vez contra
+ * `seadragons-dev` sembraban el mismo nombre, y `getByRole` encontraba dos
+ * filas. El sufijo sólo va en estos: los socios fotografiados conservan un
+ * nombre fijo, porque su pantalla lo dibuja y un sufijo cambiaría la captura
+ * en cada corrida. A ellos nadie los busca entre el club, así que un
+ * homónimo de otra corrida no les estorba.
+ */
+export const RUN_NAMED_MEMBERS = {
+  "admin-de-administracion": "Admin de administración",
+  "socio-para-decidir": "Socio para decidir",
+  "perfil-para-foto": "Socia que sube su foto",
+} as const;
+
+export type RunNamedMember = keyof typeof RUN_NAMED_MEMBERS;
+
+/** Ocho caracteres de un UUID: de sobra para que dos corridas no coincidan, y
+ * cortos para que el nombre siga cabiendo en su fila. */
+const RUN_ID_LENGTH = 8;
+
+/** El identificador de una corrida. Lo calcula el arranque global una vez y
+ * viaja a los tests dentro del estado de la sesión. */
+export function createRunId(): string {
+  return randomUUID().slice(0, RUN_ID_LENGTH);
+}
+
+function runMemberName(member: RunNamedMember, runId: string): string {
+  return `${RUN_NAMED_MEMBERS[member]} ${runId}`;
+}
+
+function isRunNamedMember(name: string): name is RunNamedMember {
+  return Object.hasOwn(RUN_NAMED_MEMBERS, name);
+}
 
 /**
  * Los socios activos que necesitan una fila propia más allá del socio
@@ -159,16 +190,16 @@ export const ROLE_REQUEST_MEMBERS = {
   "con-solicitud-pendiente": { pendingRequest: "Coach", columns: {} },
   /** Lo usa el test que envía una solicitud desde el formulario. */
   "para-pedir-rol": { pendingRequest: null, columns: {} },
-  /** El único Admin sembrado: abre la bandeja del directorio (#212, #240). */
+  /** El único Admin que siembra esta corrida: abre la bandeja del directorio (#212, #240). */
   "admin-de-administracion": {
     pendingRequest: null,
-    columns: { role: "Admin", full_name: ADMINISTRATION_ADMIN_NAME },
+    columns: { role: "Admin" },
   },
   /** Su solicitud es la que un Admin aprueba desde la bandeja. Lleva nombre
    * propio para que el test la señale entre las demás del club. */
   "socio-para-decidir": {
     pendingRequest: "Committee",
-    columns: { full_name: DECIDABLE_MEMBER_NAME },
+    columns: {},
   },
   /** El perfil con la ficha entera (#241). Sus capturas guardan sin cambiar
    * nada, así que varias a la vez escriben lo mismo que ya había. */
@@ -197,11 +228,30 @@ export const ROLE_REQUEST_MEMBERS = {
   /** Lo usa el test que sube una foto, la busca en el directorio y la quita. */
   "perfil-para-foto": {
     pendingRequest: null,
-    columns: { full_name: "Socia que sube su foto", country: "AU" },
+    columns: { country: "AU" },
   },
 } as const;
 
 export type RoleRequestMemberName = keyof typeof ROLE_REQUEST_MEMBERS;
+
+/** Los socios de este grupo cuyas pantallas tienen línea base visual. */
+export const PHOTOGRAPHED_ROLE_REQUEST_MEMBERS = [
+  "perfil-completo",
+  "perfil-con-foto",
+] as const satisfies readonly RoleRequestMemberName[];
+
+/** Las columnas con las que nace uno de estos socios en la corrida `runId`:
+ * las suyas, más el nombre de corrida si un test lo busca por nombre. */
+export function seededRoleRequestColumns(
+  name: RoleRequestMemberName,
+  runId: string,
+): Readonly<Record<string, string | null>> {
+  const { columns } = ROLE_REQUEST_MEMBERS[name];
+  if (!isRunNamedMember(name)) {
+    return columns;
+  }
+  return { ...columns, full_name: runMemberName(name, runId) };
+}
 
 /** Los socios que nacen con foto de perfil (#245). */
 const MEMBERS_WITH_PHOTO: readonly RoleRequestMemberName[] = [
@@ -270,6 +320,8 @@ export type E2eSessionState =
       readonly kind: "available";
       readonly email: string;
       readonly password: string;
+      /** El sufijo de los nombres que siembra esta corrida. */
+      readonly runId: string;
       /** Todas las identidades que abrió el arranque, la activa y las que
        * están a medias. El cierre las borra sin tener que saber cuál es cuál. */
       readonly userIds: readonly string[];
@@ -403,6 +455,19 @@ export function readE2eSessionState(): E2eSessionState {
     };
   }
   return JSON.parse(readFileSync(STATE_PATH, "utf8")) as E2eSessionState;
+}
+
+/** El nombre con el que esta corrida sembró a un socio que se busca por
+ * nombre. Sin sesión no hay corrida: el nombre base basta, porque los tests
+ * que lo usarían se saltan. */
+export function seededMemberName(
+  state: E2eSessionState,
+  member: RunNamedMember,
+): string {
+  if (state.kind === "unavailable") {
+    return RUN_NAMED_MEMBERS[member];
+  }
+  return runMemberName(member, state.runId);
 }
 
 type SeededMember = {
@@ -689,6 +754,7 @@ async function deleteEmptyGroups(
 async function createTestMembers(): Promise<E2eSessionState> {
   const serviceClient = createServiceRoleClient(process.env);
   const clubId = await findClubId(serviceClient);
+  const runId = createRunId();
 
   const active = await seedMember(serviceClient, clubId, {
     account_status: "active",
@@ -716,7 +782,7 @@ async function createTestMembers(): Promise<E2eSessionState> {
   for (const name of ROLE_REQUEST_MEMBER_NAMES) {
     const member = await seedMember(serviceClient, clubId, {
       account_status: "active",
-      ...ROLE_REQUEST_MEMBERS[name].columns,
+      ...seededRoleRequestColumns(name, runId),
     });
     userIds.push(member.userId);
     await seedPendingRequest(serviceClient, {
@@ -752,6 +818,7 @@ async function createTestMembers(): Promise<E2eSessionState> {
     kind: "available",
     email: active.email,
     password: active.password,
+    runId,
     userIds,
     createdGroupIds,
   };
@@ -772,20 +839,29 @@ export async function prepareE2eSession(): Promise<void> {
   writeState(await createTestMembers());
 }
 
+/** Borra lo que sembró esta corrida, y sólo eso: va por los `userId` que
+ * guardó el arranque, así que los socios de otra corrida a la vez siguen en
+ * pie aunque se llamen igual. */
+export async function deleteSeededMembers(
+  serviceClient: SupabaseClient,
+  state: Extract<E2eSessionState, { kind: "available" }>,
+): Promise<void> {
+  for (const userId of state.userIds) {
+    await deleteTestPhotos(serviceClient, userId);
+    await deleteTestUser(serviceClient, userId);
+  }
+  // Después de los socios: sus pertenencias se van con ellos, y sólo
+  // entonces se sabe qué grupo quedó vacío.
+  await deleteEmptyGroups(serviceClient, state.createdGroupIds);
+}
+
 /** Lo llama el cierre global de Playwright. Borrar la identidad se lleva por
  * delante su fila de miembro (`on delete cascade`), así que no queda residuo
  * en el proyecto de desarrollo. */
 export async function discardE2eSession(): Promise<void> {
   const state = readE2eSessionState();
   if (state.kind === "available") {
-    const serviceClient = createServiceRoleClient(process.env);
-    for (const userId of state.userIds) {
-      await deleteTestPhotos(serviceClient, userId);
-      await deleteTestUser(serviceClient, userId);
-    }
-    // Después de los socios: sus pertenencias se van con ellos, y sólo
-    // entonces se sabe qué grupo quedó vacío.
-    await deleteEmptyGroups(serviceClient, state.createdGroupIds);
+    await deleteSeededMembers(createServiceRoleClient(process.env), state);
   }
   rmSync(STATE_PATH, { force: true });
   for (const statePath of everyStorageStatePath()) {

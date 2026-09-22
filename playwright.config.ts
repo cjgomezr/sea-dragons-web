@@ -17,6 +17,12 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
+  // En CI la suite corre contra `next dev`, que compila cada pantalla la
+  // primera vez que alguien la pide, con cientos de pruebas en paralelo. Con
+  // los 5 s por defecto fallaba cada vez un test distinto, siempre por tiempo
+  // y sin nada roto (#254). 15 s no debilita ninguna comprobación: lo que está
+  // roto falla igual, solo deja de fallar lo que era lento.
+  expect: { timeout: process.env.CI ? 15_000 : 5_000 },
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL: APP_URL,
