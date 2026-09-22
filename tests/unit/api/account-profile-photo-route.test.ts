@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { NextRequest } from "next/server";
+import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import { ACCOUNT_PROFILE_PHOTO_API_PATH } from "@/lib/auth/routes";
@@ -7,6 +10,10 @@ import {
   PROFILE_PHOTO_MAX_BYTES,
   type ProfilePhotoGateways,
 } from "@/lib/members/profile-photo";
+import {
+  PROFILE_PHOTO_MAX_SIDE_PX,
+  shrinkProfilePhoto,
+} from "@/lib/members/shrink-profile-photo";
 
 /**
  * La foto de perfil por la API (#245, FR-084). Actúa siempre sobre quien
@@ -20,9 +27,15 @@ const FILE_ID = "5e6f7a8b-0000-4000-8000-0000000000ff";
 const ORIGIN = "http://localhost:3417";
 const CONTINUE_HEADER = "x-middleware-next";
 
-const PNG_BYTES = Uint8Array.from([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01,
-]);
+const FIXTURES_DIR = path.resolve(__dirname, "../../support/fixtures");
+
+function fixture(name: string): Uint8Array {
+  return new Uint8Array(readFileSync(path.join(FIXTURES_DIR, name)));
+}
+
+const PNG_BYTES = fixture("foto-de-perfil.png");
+const LARGE_PHOTO_BYTES = fixture("foto-apaisada-3000x2000.jpg");
+const CORRUPT_PNG_BYTES = fixture("foto-corrupta.png");
 const GIF_BYTES = Uint8Array.from(Buffer.from("GIF89a......"));
 
 const readSessionState = vi.fn();
@@ -33,6 +46,7 @@ type Store = {
   photoPath: string | null;
   readonly uploadedBy: string[];
   readonly files: Set<string>;
+  readonly uploadedBytes: Uint8Array[];
 };
 
 let store: Store;
@@ -49,8 +63,9 @@ function fakeGateways(): ProfilePhotoGateways {
       },
     },
     storage: {
-      async upload(photoPath) {
+      async upload(photoPath, bytes) {
         store.files.add(photoPath);
+        store.uploadedBytes.push(bytes);
       },
       async remove(photoPath) {
         store.files.delete(photoPath);
@@ -61,6 +76,7 @@ function fakeGateways(): ProfilePhotoGateways {
         return `https://storage.test/${photoPath}?token=t`;
       },
     },
+    images: { shrinkPhoto: shrinkProfilePhoto },
     newFileId: () => FILE_ID,
   };
 }
@@ -127,6 +143,7 @@ beforeEach(() => {
     photoPath: null,
     uploadedBy: [],
     files: new Set(),
+    uploadedBytes: [],
   };
 });
 
@@ -138,7 +155,7 @@ describe("endpoints de la foto", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         data: {
-          photoUrl: `https://storage.test/${USER_ID}/${FILE_ID}.png?token=t`,
+          photoUrl: `https://storage.test/${USER_ID}/${FILE_ID}.webp?token=t`,
         },
       });
     });
@@ -147,7 +164,7 @@ describe("endpoints de la foto", () => {
       await throughBoundary("PUT", { body: PNG_BYTES });
 
       expect(store.uploadedBy).toEqual([USER_ID]);
-      expect([...store.files]).toEqual([`${USER_ID}/${FILE_ID}.png`]);
+      expect([...store.files]).toEqual([`${USER_ID}/${FILE_ID}.webp`]);
     });
 
     it("reemplaza la anterior sin dejarla en el almacenamiento", async () => {
@@ -158,7 +175,35 @@ describe("endpoints de la foto", () => {
       const response = await throughBoundary("PUT", { body: PNG_BYTES });
 
       expect(response.status).toBe(200);
-      expect([...store.files]).toEqual([`${USER_ID}/${FILE_ID}.png`]);
+      expect([...store.files]).toEqual([`${USER_ID}/${FILE_ID}.webp`]);
+    });
+
+    it("sube al almacenamiento la foto reducida, no la original", async () => {
+      const response = await throughBoundary("PUT", {
+        body: LARGE_PHOTO_BYTES,
+      });
+
+      expect(response.status).toBe(200);
+      expect(store.uploadedBytes).toHaveLength(1);
+      const [uploaded = new Uint8Array()] = store.uploadedBytes;
+      expect(uploaded.length).toBeLessThan(LARGE_PHOTO_BYTES.length);
+      const { format, width } = await sharp(uploaded).metadata();
+      expect({ format, width }).toEqual({
+        format: "webp",
+        width: PROFILE_PHOTO_MAX_SIDE_PX,
+      });
+    });
+
+    it("rechaza con el mismo 400 de formato un fichero que no se puede decodificar", async () => {
+      const response = await throughBoundary("PUT", {
+        body: CORRUPT_PNG_BYTES,
+      });
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error.reason).toBe("photo_type_unsupported");
+      expect(body.error.message).toMatch(/JPEG, PNG o WebP/);
+      expect(store.files.size).toBe(0);
     });
 
     it("rechaza con 400 un formato no admitido y dice cuáles valen", async () => {

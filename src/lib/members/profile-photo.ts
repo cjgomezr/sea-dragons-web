@@ -10,6 +10,9 @@ import type { AccountStatus } from "@/lib/auth/account-status";
  * de su `user_id` con un nombre aleatorio por subida, así que la ruta no dice
  * ni el correo ni el nombre de nadie, y la foto nueva no pisa la anterior
  * hasta que ya quedó apuntada en la ficha.
+ *
+ * Lo que se guarda no es lo que se sube, sino una versión reducida (#271):
+ * así el directorio no gasta el tráfico de salida del plan de Supabase.
  */
 
 /** 2 MB: una foto de móvil recién sacada cabe si es JPEG o WebP, y el
@@ -63,6 +66,16 @@ export class AccountNotOperatingError extends Error {
   }
 }
 
+/** La foto reducida que se guarda, o la señal de que los bytes empiezan como
+ * una imagen admitida pero no se pueden decodificar. */
+export type ShrunkPhoto =
+  | {
+      readonly kind: "shrunk";
+      readonly bytes: Uint8Array;
+      readonly type: ProfilePhotoType;
+    }
+  | { readonly kind: "undecodable" };
+
 /** Lo que el dominio necesita saber de la ficha de quien pide. */
 export type PhotoOwner = {
   readonly status: AccountStatus;
@@ -86,6 +99,9 @@ export type ProfilePhotoGateways = {
     /** Null cuando Storage no la pudo firmar (el fichero ya no está): quien
      * la enseña pone entonces las iniciales en vez de fallar. */
     signPhotoUrl(photoPath: string): Promise<string | null>;
+  };
+  readonly images: {
+    shrinkPhoto(bytes: Uint8Array): Promise<ShrunkPhoto>;
   };
   /** El nombre aleatorio del fichero nuevo. Se inyecta para que los tests
    * sepan qué ruta esperar. */
@@ -143,18 +159,30 @@ export function detectProfilePhotoType(
   return isWebp ? "image/webp" : null;
 }
 
-function validatePhotoBytes(bytes: Uint8Array): ProfilePhotoType {
+function validatePhotoBytes(bytes: Uint8Array): void {
   if (bytes.length === 0) {
     throw new ProfilePhotoValidationError("photo_empty");
   }
   if (bytes.length > PROFILE_PHOTO_MAX_BYTES) {
     throw new ProfilePhotoValidationError("photo_too_large");
   }
-  const type = detectProfilePhotoType(bytes);
-  if (type === null) {
+  if (detectProfilePhotoType(bytes) === null) {
     throw new ProfilePhotoValidationError("photo_type_unsupported");
   }
-  return type;
+}
+
+/** Para quien sube, un fichero que no se decodifica es un formato que no
+ * vale: recibe el mismo mensaje que un GIF. */
+async function shrinkValidPhoto(
+  gateways: ProfilePhotoGateways,
+  bytes: Uint8Array,
+): Promise<{ readonly bytes: Uint8Array; readonly type: ProfilePhotoType }> {
+  validatePhotoBytes(bytes);
+  const shrunk = await gateways.images.shrinkPhoto(bytes);
+  if (shrunk.kind === "undecodable") {
+    throw new ProfilePhotoValidationError("photo_type_unsupported");
+  }
+  return shrunk;
 }
 
 async function findOperatingOwner(
@@ -197,10 +225,10 @@ export async function replaceProfilePhoto(
   request: { readonly userId: string; readonly bytes: Uint8Array },
 ): Promise<ProfilePhoto> {
   const owner = await findOperatingOwner(gateways, request.userId);
-  const type = validatePhotoBytes(request.bytes);
-  const photoPath = `${request.userId}/${gateways.newFileId()}.${FILE_EXTENSIONS[type]}`;
+  const photo = await shrinkValidPhoto(gateways, request.bytes);
+  const photoPath = `${request.userId}/${gateways.newFileId()}.${FILE_EXTENSIONS[photo.type]}`;
 
-  await gateways.storage.upload(photoPath, request.bytes, type);
+  await gateways.storage.upload(photoPath, photo.bytes, photo.type);
   try {
     await gateways.members.savePhotoPath(request.userId, photoPath);
   } catch (error) {

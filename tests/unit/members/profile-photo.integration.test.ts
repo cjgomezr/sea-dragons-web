@@ -1,9 +1,13 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import sharp from "sharp";
 import { expect, it } from "vitest";
 import { DEFAULT_CLUB_SLUG } from "@/lib/auth/supabase-auth-gateways";
 import {
   removeProfilePhoto,
   replaceProfilePhoto,
 } from "@/lib/members/profile-photo";
+import { PROFILE_PHOTO_MAX_SIDE_PX } from "@/lib/members/shrink-profile-photo";
 import {
   PROFILE_PHOTO_BUCKET,
   createProfilePhotoGateways,
@@ -30,13 +34,18 @@ import {
  * cascada de `members` no alcanza a Storage.
  */
 
-/** Un PNG de 1x1 de verdad, para que la foto servida se pueda comparar. */
-const PNG_BYTES = Uint8Array.from(
-  Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/eL9GtQAAAABJRU5ErkJggg==",
-    "base64",
-  ),
-);
+const FIXTURES_DIR = path.resolve(__dirname, "../../support/fixtures");
+
+function fixture(name: string): Uint8Array {
+  return new Uint8Array(readFileSync(path.join(FIXTURES_DIR, name)));
+}
+
+/** Un PNG de 128 × 128 de verdad: desde #271 el servidor lo decodifica para
+ * reducirlo, así que no vale cualquier cabecera. */
+const PNG_BYTES = fixture("foto-de-perfil.png");
+const PNG_SIDE_PX = 128;
+const LARGE_PHOTO_BYTES = fixture("foto-apaisada-3000x2000.jpg");
+const MAX_STORED_BYTES = 100 * 1024;
 
 async function seedActiveMember(
   serviceClient: ServiceRoleClient,
@@ -133,7 +142,13 @@ describeRls("foto de perfil contra seadragons-dev", () => {
         expect(first.photoUrl).not.toContain(user.email);
         const served = await fetch(first.photoUrl ?? "");
         expect(served.status).toBe(200);
-        expect(new Uint8Array(await served.arrayBuffer())).toEqual(PNG_BYTES);
+        const servedPhoto = await sharp(
+          new Uint8Array(await served.arrayBuffer()),
+        ).metadata();
+        expect(servedPhoto).toMatchObject({
+          format: "webp",
+          width: PNG_SIDE_PX,
+        });
 
         await replaceProfilePhoto(gateways, {
           userId: user.id,
@@ -150,6 +165,41 @@ describeRls("foto de perfil contra seadragons-dev", () => {
 
         await removeProfilePhoto(gateways, user.id);
         await expect(listFolder(serviceClient, user.id)).resolves.toEqual([]);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "una foto grande queda en el bucket reducida, en WebP y por debajo de 100 KB",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withPhotoOwner(serviceClient, async ({ user, sessionClient }) => {
+        const gateways = createProfilePhotoGateways({
+          sessionClient: sessionClient.client,
+          serviceClient: serviceClient.client,
+        });
+
+        await replaceProfilePhoto(gateways, {
+          userId: user.id,
+          bytes: LARGE_PHOTO_BYTES,
+        });
+
+        const [storedPath = ""] = await listFolder(serviceClient, user.id);
+        expect(storedPath).toMatch(/\.webp$/);
+        const { data, error } = await serviceClient.client.storage
+          .from(PROFILE_PHOTO_BUCKET)
+          .download(storedPath);
+        if (error) {
+          throw new Error(`No se pudo bajar la foto: ${error.message}`);
+        }
+        const stored = new Uint8Array(await data.arrayBuffer());
+        expect(stored.length).toBeLessThan(MAX_STORED_BYTES);
+        await expect(sharp(stored).metadata()).resolves.toMatchObject({
+          format: "webp",
+          width: PROFILE_PHOTO_MAX_SIDE_PX,
+        });
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
