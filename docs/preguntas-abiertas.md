@@ -61,6 +61,12 @@ aplazamiento y el momento de retomarlo están en
 - El país se captura en el alta: FR-001 lo pide en el registro y FR-020 en el
   alta por Admin. Era el campo que el directorio mostraba y nadie recogía.
 
+**Ajustado el 22 de septiembre de 2026:** el miembro puede escribir su propio
+número de AUF y su vencimiento, pero quedan **sin verificar** hasta que un
+Admin los confirme, y una vez verificados solo el Admin los corrige. El resto
+de lo reservado (rol, grupos y estado) sigue igual. Está en el PRD de E5 como
+RF-12.
+
 **Baja de miembro, que era el hueco relacionado: entra en Release 1.** FR-085 y
 AC-040. Un Admin mueve el estado entre `active` e `inactive`. El inactivo no
 inicia sesión, sale del directorio salvo filtro explícito, no es targeteable y

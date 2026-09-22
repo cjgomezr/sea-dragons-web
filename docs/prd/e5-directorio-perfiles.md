@@ -117,6 +117,49 @@ BR-008 lo hace urgente por un lado concreto: el número de la federación (AUF) 
 - **Dado** esa mudanza, **cuando** termina, **entonces** `/administracion` ya no existe y su entrada sale de la navegación.
 - **Dado** lo que E3 dejó probado (decidir solicitudes, cambiar rol, último Admin protegido), **cuando** se usa desde el directorio, **entonces** se comporta igual.
 
+### Mejoras añadidas el 22 de septiembre de 2026
+
+Al probar E5 terminada, el dueño encontró cuatro cosas que ajustar. Van como requerimientos nuevos de la misma épica.
+
+### RF-9 · La foto se achica al subirla · Must
+
+Hoy la foto se guarda tal como la sube el miembro, hasta 2 MB. Un directorio de 30 miembros con fotos grandes descarga decenas de megas cada vez que alguien lo abre, y el plan gratuito de Supabase tiene un tope mensual de tráfico de salida que eso agota pronto.
+
+- **Dado** un miembro que sube una foto, **cuando** el servidor la recibe, **entonces** la guarda reducida a un tamaño de ficha (unos 400 px por lado, en un formato comprimido) y no el original.
+- **Dado** una foto reducida, **cuando** se mira su peso, **entonces** queda muy por debajo del límite de subida, del orden de decenas de KB.
+- **Dado** una foto vertical, apaisada o con giro guardado en sus metadatos, **cuando** se reduce, **entonces** conserva su orientación y su proporción, sin deformarse.
+- **Dado** los metadatos de la foto original (ubicación GPS, cámara), **cuando** se guarda la reducida, **entonces** no los conserva.
+- **Dado** una foto ya pequeña, **cuando** se sube, **entonces** no se agranda.
+
+### RF-10 · El Admin corrige la fecha de nacimiento · Must
+
+El miembro no edita su fecha de nacimiento a propósito: de ella depende si es menor y necesita el consentimiento de su tutor (NFR-012), y editarla le dejaría saltárselo. Pero hoy nadie puede corregir un error del registro.
+
+- **Dado** un Admin en la ficha de un miembro, **cuando** corrige su fecha de nacimiento, **entonces** queda guardada.
+- **Dado** esa corrección, **cuando** ocurre, **entonces** la bitácora guarda quién la hizo, sobre quién y cuándo, sin guardar la fecha en sí.
+- **Dado** una corrección que deja al miembro como menor y sin consentimiento de tutor, **cuando** se guarda, **entonces** su cuenta pasa a `incomplete` y, al entrar, se le pide el consentimiento, como en el registro (FR-081, FR-082).
+- **Dado** una fecha futura o imposible, **cuando** se guarda, **entonces** se rechaza.
+- **Dado** el miembro, **cuando** mira su perfil, **entonces** sigue sin poder editar su fecha.
+
+### RF-11 · Los textos dicen invitar y desactivar · Should
+
+"Dar de alta" y "dar de baja" suenan a trámite. El dueño prefiere palabras de club.
+
+- **Dado** la aplicación en español, **cuando** se mira el directorio y la ficha, **entonces** dice "Invitar miembro" donde decía dar de alta, y "Desactivar cuenta" y "Reactivar cuenta" donde decía dar de baja y reactivar.
+- **Dado** la aplicación en inglés, **cuando** se mira lo mismo, **entonces** dice "Invite member", "Deactivate account" y "Reactivate account".
+- **Dado** la marca y el filtro de los miembros desactivados, **cuando** se miran, **entonces** usan la misma palabra ("desactivada", "inactive"), sin que quede "de baja" en ningún texto que vea una persona.
+
+### RF-12 · El miembro propone su número de AUF · Could
+
+Hasta ahora el AUF lo escribía solo el Admin (decisión B3). El dueño decidió que el miembro pueda escribirlo para ahorrarle trabajo al Admin, sin perder la confianza en el dato: queda **sin verificar** hasta que un Admin lo confirme.
+
+- **Dado** un miembro en su perfil, **cuando** escribe su número de AUF y su vencimiento, **entonces** se guardan marcados como sin verificar.
+- **Dado** un AUF sin verificar, **cuando** un Admin mira el directorio o la ficha, **entonces** lo ve marcado como tal, distinto de uno verificado y de uno vencido.
+- **Dado** un AUF sin verificar, **cuando** el Admin lo confirma, **entonces** queda verificado, y la bitácora guarda quién lo verificó y cuándo.
+- **Dado** un AUF verificado, **cuando** el miembro intenta cambiarlo, **entonces** se le niega: una vez verificado, solo el Admin lo corrige.
+- **Dado** un AUF que el Admin escribe o corrige él mismo, **cuando** se guarda, **entonces** queda verificado directamente.
+- **Dado** el miembro, **cuando** intenta cambiar su rol, grupos o estado, **entonces** se le sigue negando como hasta ahora.
+
 ## 6. Casos borde y estados de error
 
 - **Club con un solo miembro, o directorio recién estrenado:** la lista se ve bien con una fila.
@@ -130,6 +173,11 @@ BR-008 lo hace urgente por un lado concreto: el número de la federación (AUF) 
 - **Foto enorme o con formato raro:** se rechaza antes de subirla.
 - **Subir foto con la conexión caída:** la pantalla lo dice y deja reintentar, sin dejar una foto a medias.
 - **Un miembro que pide el perfil de otro por API:** se le niega.
+- **Una foto que el servidor no puede decodificar** aunque diga ser JPEG, PNG o WebP: se rechaza con el mismo mensaje de formato no admitido.
+- **Las fotos que ya se subieron antes de achicarlas:** se quedan como están; se reemplazan la próxima vez que el miembro suba otra.
+- **Dos Admin corrigiendo la fecha de nacimiento a la vez:** gana la última, y la bitácora guarda las dos.
+- **Un miembro que cambia su AUF sin verificar varias veces:** cada cambio lo deja sin verificar, sin límite.
+- **Un AUF verificado que se vence:** sigue verificado, y además se marca vencido, como ya pasa hoy.
 
 ## 7. UX / UI
 
@@ -158,16 +206,28 @@ Ninguna. El dueño tomó estas decisiones el 20 de septiembre de 2026:
 - El directorio absorbe la pantalla de administración, y Mi cuenta se convierte en el perfil.
 - Un miembro ve la ficha de otro en el directorio, pero la pantalla de perfil es la propia. El Admin abre la de cualquiera para editar lo suyo.
 
+Y estas, el 22 de septiembre de 2026, al probar la épica terminada:
+
+- La foto se achica en el servidor al subirla (RF-9), con una librería de imágenes nueva justificada en su PR.
+- El Admin corrige la fecha de nacimiento (RF-10); el miembro sigue sin poder hacerlo, por el consentimiento de tutor.
+- Los textos dicen "Invitar miembro", "Desactivar cuenta" y "Reactivar cuenta" (RF-11).
+- El miembro propone su número de AUF y un Admin lo verifica (RF-12). Esto cambia la decisión B3 de `docs/preguntas-abiertas.md`.
+- Las posiciones configurables por club no entran aquí: van a E18, que es la épica pensada para clubes de otros deportes.
+
 ## 10. Descomposición en tickets (para write-ticket)
 
-| #   | Título propuesto                                                                  | Tamaño | Depende de | Auto-merge sugerido                     |
-| --- | --------------------------------------------------------------------------------- | ------ | ---------- | --------------------------------------- |
-| 1   | Agrega a la ficha del miembro posición, nivel, género, AUF y fecha de ingreso     | S      | ninguna    | No: datos personales en la base         |
-| 2   | Sirve el directorio por API, con búsqueda, filtro por rol y orden                 | M      | 1          | No: expone datos de todos los miembros  |
-| 3   | Da al club la pantalla del directorio                                             | M      | 2          | No: pantalla nueva                      |
-| 4   | Muda al directorio la bandeja de solicitudes y el cambio de rol, y retira la otra | M      | 3          | No: mueve permisos de sitio             |
-| 5   | Deja que un miembro edite su perfil, con Mi cuenta convertida en perfil           | M      | 1          | No: escribe datos personales            |
-| 6   | Deja que un Admin edite lo reservado de un miembro: AUF y grupos                  | M      | 3          | No: campos reservados al Admin          |
-| 7   | Deja que un Admin cree un miembro y lo invite por correo                          | M      | 6          | No: crea cuentas y manda correos        |
-| 8   | Deja que un Admin dé de baja y reactive a un miembro                              | M      | 3          | No: cierra el acceso de una persona     |
-| 9   | Guarda la foto de perfil en el almacenamiento de Supabase                         | M      | 5          | No: almacenamiento nuevo con sus reglas |
+| #   | Título propuesto                                                                  | Tamaño | Depende de | Auto-merge sugerido                       |
+| --- | --------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------- |
+| 1   | Agrega a la ficha del miembro posición, nivel, género, AUF y fecha de ingreso     | S      | ninguna    | No: datos personales en la base           |
+| 2   | Sirve el directorio por API, con búsqueda, filtro por rol y orden                 | M      | 1          | No: expone datos de todos los miembros    |
+| 3   | Da al club la pantalla del directorio                                             | M      | 2          | No: pantalla nueva                        |
+| 4   | Muda al directorio la bandeja de solicitudes y el cambio de rol, y retira la otra | M      | 3          | No: mueve permisos de sitio               |
+| 5   | Deja que un miembro edite su perfil, con Mi cuenta convertida en perfil           | M      | 1          | No: escribe datos personales              |
+| 6   | Deja que un Admin edite lo reservado de un miembro: AUF y grupos                  | M      | 3          | No: campos reservados al Admin            |
+| 7   | Deja que un Admin cree un miembro y lo invite por correo                          | M      | 6          | No: crea cuentas y manda correos          |
+| 8   | Deja que un Admin dé de baja y reactive a un miembro                              | M      | 3          | No: cierra el acceso de una persona       |
+| 9   | Guarda la foto de perfil en el almacenamiento de Supabase                         | M      | 5          | No: almacenamiento nuevo con sus reglas   |
+| 10  | Reduce la foto de perfil al subirla, para que el directorio no gaste el tráfico   | M      | 9          | No: dependencia nueva de imágenes         |
+| 11  | Deja que un Admin corrija la fecha de nacimiento de un miembro                    | M      | 6          | No: toca el consentimiento de tutor       |
+| 12  | Llama "Invitar miembro" y "Desactivar cuenta" a lo que hoy dice alta y baja       | S      | 7, 8       | No: cambia textos y capturas              |
+| 13  | Deja que un miembro escriba su AUF, pendiente de que un Admin lo verifique        | M      | 6          | No: cambia quién escribe un dato del club |
