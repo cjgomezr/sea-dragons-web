@@ -3577,11 +3577,22 @@ test.describe("un Admin que decide una solicitud desde el directorio", () => {
   test("aprobar la saca de la bandeja y deja al miembro con su rol nuevo", async ({
     page,
   }) => {
+    // La bandeja se pide aparte, después de la lista. Con la suite entera en
+    // paralelo en CI esa respuesta pasaba a veces de los 5 s por defecto de
+    // `expect`, y el test fallaba sin que hubiera nada roto: se espera a que
+    // llegue antes de buscar el botón.
+    const trayLoaded = page.waitForResponse(
+      (response) =>
+        response.url().includes(PENDING_REQUESTS_ENDPOINT) &&
+        response.request().method() === "GET",
+      { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
+    );
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+    expect((await trayLoaded).status()).toBe(200);
     const approve = page.getByRole("button", {
       name: `Approve the request from ${DECIDABLE_MEMBER_NAME}`,
     });
-    await expect(approve).toBeVisible();
+    await expect(approve).toBeVisible({ timeout: ACCOUNT_CHANGE_TIMEOUT_MS });
 
     const decided = page.waitForResponse(
       (response) =>
