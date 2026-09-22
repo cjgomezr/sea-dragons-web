@@ -262,7 +262,9 @@ describe("gate visual en main", () => {
 
     expect(accept?.permissions?.["pull-requests"]).toBe("write");
   });
-}); /** Los jobs que corren Playwright, repartidos en partes (#255). */
+});
+
+/** Los jobs que corren Playwright, repartidos en partes (#255). */
 const SHARDED_JOBS = ["compare", "regenerate"] as const;
 
 /** El paso de cada uno de esos jobs que lanza la suite. */
@@ -363,6 +365,25 @@ describe("aceptación repartida (#255)", () => {
 
     expect(download.with?.pattern).toBe("baseline-*");
     expect(runLines("accept")).toMatch(/tests\/ui\.spec\.ts-snapshots/);
+  });
+
+  // Las partes y el commit tienen que salir del mismo commit de la rama. Si
+  // alguien empuja mientras se acepta, el push tiene que rechazarse en vez de
+  // dejar capturas de un commit encima de otro.
+  it.each(["regenerate", "accept"])(
+    "el job %s parte del commit que se lanzó, no de la punta de la rama",
+    (jobName) => {
+      const checkout = stepUsing(jobName, "actions/checkout");
+
+      expect(checkout.with?.ref).toBe("${{ github.sha }}");
+    },
+  );
+
+  it("empuja a la rama lanzada sin forzar, para que un push ajeno lo rechace", () => {
+    const runs = runLines("accept");
+
+    expect(runs).toContain('git push origin "HEAD:${GITHUB_REF}"');
+    expect(runs).not.toMatch(/--force/);
   });
 
   it("el job que regenera no puede escribir en el repositorio", () => {

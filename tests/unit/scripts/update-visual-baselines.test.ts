@@ -210,7 +210,7 @@ describe("scripts/update-visual-baselines.sh", () => {
     expect(await stagedFiles(workDir)).toBe("");
   });
 
-  // #255: `accept` corre el script en cada parte del reparto, y cada una
+  // #255: `regenerate` corre el script en cada parte del reparto, y cada una
   // tiene que comparar y regenerar sólo lo suyo.
   it("pasa sus argumentos a las dos corridas de Playwright", async () => {
     workDir = await mkdtemp(path.join(tmpdir(), "update-baselines-"));

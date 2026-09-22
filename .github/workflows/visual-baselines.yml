@@ -165,7 +165,10 @@ jobs:
   visual-diff:
     needs: compare
     # `always()` por lo mismo que en `report-incident`: sin él, este job sólo
-    # correría cuando `compare` salió bien, que es cuando no hay diff.
+    # correría cuando `compare` salió bien, que es cuando no hay diff. Si
+    # `compare` cayó antes de Playwright (en `npm ci` o en el build), ninguna
+    # parte subió diff y este job también sale rojo, por no encontrar nada que
+    # juntar. No esconde nada: el fallo de verdad está en `compare`.
     if: always() && needs.compare.result == 'failure'
     runs-on: ubuntu-latest
     steps:
@@ -221,6 +224,12 @@ jobs:
   # partes, con las credenciales y sin permiso de escritura; `accept` junta lo
   # que produjo cada parte y lo empuja, con permiso de escritura y sin
   # credenciales.
+  #
+  # Los dos parten de `github.sha`, el commit que era la punta de la rama al
+  # lanzar el workflow, y no de la punta en el momento en que arranca cada
+  # job. Si alguien empuja a la rama mientras se acepta, las partes siguen
+  # saliendo del mismo commit, y el push de `accept` se rechaza por no ser
+  # fast-forward en vez de dejar capturas viejas encima del código nuevo.
   regenerate:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -235,7 +244,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -289,7 +298,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
       - name: Deja constancia de qué diff se revisó
         run: |
           echo "Línea base aceptada tras revisar:" >> "$GITHUB_STEP_SUMMARY"
@@ -318,7 +327,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Línea base visual para Linux (aceptada a mano)"
-          git push
+          git push origin "HEAD:${GITHUB_REF}"
           echo "pushed=true" >> "$GITHUB_OUTPUT"
       - name: Avisa en el PR de que falta confirmar el check
         if: steps.commit.outputs.pushed == 'true'
