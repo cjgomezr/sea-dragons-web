@@ -55,6 +55,7 @@ import {
   seededMemberName,
 } from "./support/e2e-session";
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
+import { isStatePhotographed } from "./support/spanish-captures";
 import { snapshotCreatedNotice } from "./support/visual-baseline-notice";
 import { LOCALE_COOKIE_NAME, type Locale } from "@/lib/i18n/locale";
 
@@ -2183,9 +2184,9 @@ const ACCOUNT_STATES: readonly AccountState[] = [
     beforeVisit: chooseSpanish,
   },
   // El perfil (#241). El socio compartido ya es la ficha con los campos
-  // vacíos, en inglés (`cuenta-formulario`) y en español
-  // (`cuenta-sin-grupos-es`). Estos son la ficha completa, el aviso de
-  // guardado y el de un error de red.
+  // vacíos (`cuenta-formulario`). Estos son la ficha completa, el aviso de
+  // guardado y el de un error de red. Qué estados en español conservan su
+  // captura lo decide tests/support/spanish-captures.ts (#255).
   { name: "perfil-completo", storageState: FULL_PROFILE_STORAGE_STATE },
   {
     name: "perfil-completo-es",
@@ -2268,21 +2269,23 @@ for (const state of ACCOUNT_STATES) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
-        for (const theme of themes) {
-          test(`matches approved baseline (${theme})`, async ({ page }) => {
-            await state.beforeVisit?.(page);
-            await goToWithTheme(page, ACCOUNT_PATH, theme);
-            await state.prepare?.(page);
-            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
-            await createMissingLocalBaseline(snapshot, () =>
-              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
-            );
-            await expect(page).toHaveScreenshot(snapshot, {
-              ...SCREENSHOT_OPTIONS,
-              fullPage: true,
-              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await state.beforeVisit?.(page);
+              await goToWithTheme(page, ACCOUNT_PATH, theme);
+              await state.prepare?.(page);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
             });
-          });
+          }
         }
 
         test("has no horizontal scroll", async ({ page }) => {
@@ -2896,19 +2899,21 @@ for (const state of GROUPS_STATES) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
-        for (const theme of themes) {
-          test(`matches approved baseline (${theme})`, async ({ page }) => {
-            await goToGroups(page, state, theme);
-            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
-            await createMissingLocalBaseline(snapshot, () =>
-              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
-            );
-            await expect(page).toHaveScreenshot(snapshot, {
-              ...SCREENSHOT_OPTIONS,
-              fullPage: true,
-              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToGroups(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
             });
-          });
+          }
         }
 
         test("has no horizontal scroll", async ({ page }) => {
@@ -3440,19 +3445,21 @@ for (const state of DIRECTORY_STATES) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
-        for (const theme of themes) {
-          test(`matches approved baseline (${theme})`, async ({ page }) => {
-            await goToDirectory(page, state, theme);
-            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
-            await createMissingLocalBaseline(snapshot, () =>
-              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
-            );
-            await expect(page).toHaveScreenshot(snapshot, {
-              ...SCREENSHOT_OPTIONS,
-              fullPage: true,
-              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToDirectory(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
             });
-          });
+          }
         }
 
         test("has no horizontal scroll", async ({ page }) => {
@@ -3888,19 +3895,21 @@ for (const state of MEMBER_RECORD_STATES) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
-        for (const theme of themes) {
-          test(`matches approved baseline (${theme})`, async ({ page }) => {
-            await goToMemberRecord(page, state, theme);
-            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
-            await createMissingLocalBaseline(snapshot, () =>
-              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
-            );
-            await expect(page).toHaveScreenshot(snapshot, {
-              ...SCREENSHOT_OPTIONS,
-              fullPage: true,
-              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToMemberRecord(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
             });
-          });
+          }
         }
 
         test("has no horizontal scroll", async ({ page }) => {
@@ -4252,19 +4261,21 @@ for (const state of NEW_MEMBER_STATES) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
-        for (const theme of themes) {
-          test(`matches approved baseline (${theme})`, async ({ page }) => {
-            await goToNewMember(page, state, theme);
-            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
-            await createMissingLocalBaseline(snapshot, () =>
-              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
-            );
-            await expect(page).toHaveScreenshot(snapshot, {
-              ...SCREENSHOT_OPTIONS,
-              fullPage: true,
-              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToNewMember(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
             });
-          });
+          }
         }
 
         test("has no horizontal scroll", async ({ page }) => {

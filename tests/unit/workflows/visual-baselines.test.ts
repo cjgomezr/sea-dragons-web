@@ -37,9 +37,11 @@ function referencedSecrets(): string[] {
 
 interface WorkflowStep {
   name?: string;
+  id?: string;
   uses?: string;
   run?: string;
   if?: string;
+  with?: Record<string, string | boolean>;
   env?: Record<string, string>;
   "continue-on-error"?: boolean;
 }
@@ -49,6 +51,10 @@ interface WorkflowJob {
   needs?: string | string[];
   env?: Record<string, string>;
   permissions?: Record<string, string>;
+  strategy?: {
+    "fail-fast"?: boolean;
+    matrix?: { shard?: number[] };
+  };
   steps: WorkflowStep[];
 }
 
@@ -134,12 +140,13 @@ describe("visual-baselines.yml", () => {
   });
 
   it("acepta una línea base nueva sólo cuando un humano lanza el workflow", () => {
-    const accept = parseWorkflow().jobs.accept;
+    const { accept, regenerate } = parseWorkflow().jobs;
 
     expect(accept).toBeDefined();
     expect(accept?.if).toContain("workflow_dispatch");
+    expect(regenerate?.if).toContain("workflow_dispatch");
     expect(accept?.permissions?.contents).toBe("write");
-    expect(runLines("accept")).toMatch(/update-visual-baselines\.sh/);
+    expect(runLines("regenerate")).toMatch(/update-visual-baselines\.sh/);
     expect(runLines("accept")).toMatch(/git push/);
   });
 
@@ -156,7 +163,7 @@ describe("visual-baselines.yml", () => {
   // pruebas y sale verde sobre capturas que nadie comparó (issue #149).
   it.each([
     ["compare", "Compara contra la línea base vinculante"],
-    ["accept", "Regenera la línea base"],
+    ["regenerate", "Regenera la línea base"],
   ])(
     "da al paso que corre Playwright en el job $0 las credenciales que el manifiesto declara en CI",
     (jobName, stepName) => {
@@ -255,4 +262,158 @@ describe("gate visual en main", () => {
 
     expect(accept?.permissions?.["pull-requests"]).toBe("write");
   });
+});
+
+/** Los jobs que corren Playwright, repartidos en partes (#255). */
+const SHARDED_JOBS = ["compare", "regenerate"] as const;
+
+/** El paso de cada uno de esos jobs que lanza la suite. */
+const PLAYWRIGHT_STEP: Record<(typeof SHARDED_JOBS)[number], string> = {
+  compare: "Compara contra la línea base vinculante",
+  regenerate: "Regenera la línea base",
+};
+
+const SHARD_ARGUMENT = "--shard=${{ matrix.shard }}/${{ strategy.job-total }}";
+
+function stepUsing(jobName: string, action: string): WorkflowStep {
+  const step = stepsOf(jobName).find(
+    (candidate) => candidate.uses?.split("@")[0] === action,
+  );
+  if (!step) {
+    throw new Error(`El job "${jobName}" no usa "${action}".`);
+  }
+  return step;
+}
+
+describe("reparto de la suite (#255)", () => {
+  it.each(SHARDED_JOBS)(
+    "el job %s reparte la suite en varias máquinas",
+    (jobName) => {
+      const shards = parseWorkflow().jobs[jobName]?.strategy?.matrix?.shard;
+
+      expect(shards?.length).toBeGreaterThan(1);
+    },
+  );
+
+  it.each(SHARDED_JOBS)(
+    "el job %s deja terminar a todas las partes aunque una falle",
+    (jobName) => {
+      const strategy = parseWorkflow().jobs[jobName]?.strategy;
+
+      expect(strategy?.["fail-fast"]).toBe(false);
+    },
+  );
+
+  it.each(SHARDED_JOBS)(
+    "cada parte del job %s corre sólo su tramo de la suite",
+    (jobName) => {
+      const step = stepNamed(jobName, PLAYWRIGHT_STEP[jobName]);
+
+      expect(step.run).toContain(SHARD_ARGUMENT);
+    },
+  );
+
+  it("cada parte guarda su diff con un nombre propio, que no pisa el de otra", () => {
+    const artifact = stepUsing("compare", "actions/upload-artifact");
+
+    expect(artifact.with?.name).toBe("visual-diff-${{ matrix.shard }}");
+  });
+
+  it("junta los diffs de las partes que fallaron en un solo artefacto visual-diff", () => {
+    const job = parseWorkflow().jobs["visual-diff"];
+    const merge = stepUsing("visual-diff", "actions/upload-artifact/merge");
+
+    expect(job?.needs).toContain("compare");
+    expect(job?.if).toMatch(/always\(\)/);
+    expect(job?.if).toMatch(/needs\.compare\.result\s*==\s*'failure'/);
+    expect(merge.with?.name).toBe("visual-diff");
+    expect(merge.with?.pattern).toBe("visual-diff-*");
+  });
+
+  it("comprueba en cada PR que las partes suman la suite entera", () => {
+    const job = parseWorkflow().jobs.reparto;
+
+    expect(job?.if).toMatch(/pull_request/);
+    expect(runLines("reparto")).toMatch(/npm run check:shards/);
+  });
+});
+
+describe("aceptación repartida (#255)", () => {
+  it("cada parte sube las capturas que regeneró", () => {
+    const artifact = stepUsing("regenerate", "actions/upload-artifact");
+
+    expect(artifact.with?.name).toBe("baseline-${{ matrix.shard }}");
+    expect(artifact.with?.["if-no-files-found"]).toBe("error");
+  });
+
+  it("una parte que falló sin capturas que aceptar hunde la aceptación", () => {
+    const runs = runLines("regenerate");
+
+    expect(runs).toMatch(/no era de píxeles/);
+    expect(runs).toMatch(/exit 1/);
+  });
+
+  it("commitea sólo cuando todas las partes terminaron bien", () => {
+    const accept = parseWorkflow().jobs.accept;
+
+    expect(accept?.needs).toContain("regenerate");
+    expect(accept?.if).not.toMatch(/always\(\)/);
+  });
+
+  it("baja las capturas de todas las partes antes de commitear", () => {
+    const download = stepUsing("accept", "actions/download-artifact");
+
+    expect(download.with?.pattern).toBe("baseline-*");
+    expect(runLines("accept")).toMatch(/tests\/ui\.spec\.ts-snapshots/);
+  });
+
+  // Las partes y el commit tienen que salir del mismo commit de la rama. Si
+  // alguien empuja mientras se acepta, el push tiene que rechazarse en vez de
+  // dejar capturas de un commit encima de otro.
+  it.each(["regenerate", "accept"])(
+    "el job %s parte del commit que se lanzó, no de la punta de la rama",
+    (jobName) => {
+      const checkout = stepUsing(jobName, "actions/checkout");
+
+      expect(checkout.with?.ref).toBe("${{ github.sha }}");
+    },
+  );
+
+  it("empuja a la rama lanzada sin forzar, para que un push ajeno lo rechace", () => {
+    const runs = runLines("accept");
+
+    expect(runs).toContain('git push origin "HEAD:${GITHUB_REF}"');
+    expect(runs).not.toMatch(/--force/);
+  });
+
+  it("el job que regenera no puede escribir en el repositorio", () => {
+    const regenerate = parseWorkflow().jobs.regenerate;
+
+    expect(regenerate?.permissions?.contents).toBe("read");
+    expect(runLines("regenerate")).not.toMatch(/git push/);
+  });
+
+  it("el job que empuja no recibe ninguna credencial de Supabase", () => {
+    const credentials = new Set(developmentCredentials());
+    const leaked = stepsOf("accept").flatMap((step) =>
+      Object.keys(step.env ?? {}).filter((key) => credentials.has(key)),
+    );
+
+    expect(leaked).toEqual([]);
+  });
+});
+
+describe("aplicación compilada en CI (#255)", () => {
+  it.each(SHARDED_JOBS)(
+    "el job %s compila la aplicación antes de correr Playwright",
+    (jobName) => {
+      const names = stepsOf(jobName).map((step) => step.name);
+      const build = stepNamed(jobName, "Compila la aplicación");
+
+      expect(build.run).toBe("npm run build");
+      expect(names.indexOf("Compila la aplicación")).toBeLessThan(
+        names.indexOf(PLAYWRIGHT_STEP[jobName]),
+      );
+    },
+  );
 });

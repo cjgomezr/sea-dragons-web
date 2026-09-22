@@ -4,7 +4,7 @@
 # no pasa por ahí: baja el navegador de los servidores de Microsoft y, con
 # `--with-deps`, instala además paquetes apt del runner. Eso son unos 25
 # segundos en cada uno de los tres sitios que lo necesitan (el job de `checks`,
-# y los jobs `compare` y `accept` del visual), en cada empujón.
+# y los jobs `compare` y `regenerate` del visual), en cada empujón.
 #
 # La clave lleva la versión que declara `package-lock.json`: subir Playwright
 # invalida la caché sola, que es lo que evita correr una suite nueva contra

@@ -241,12 +241,13 @@ describe("filtros de ruta", () => {
 
 describe("caché de navegadores", () => {
   /** Los tres sitios que necesitan un chromium: el job de `checks` (varios
-   * tests unitarios capturan UI de verdad) y los jobs `compare` y `accept`
-   * del visual. */
+   * tests unitarios capturan UI de verdad) y los jobs `compare` y
+   * `regenerate` del visual. `accept` ya no corre Playwright (#255): sólo
+   * junta y empuja lo que regeneraron las partes. */
   const INSTALLERS: ReadonlyArray<[string, string]> = [
     [CHECKS, "checks"],
     [VISUAL, "compare"],
-    [VISUAL, "accept"],
+    [VISUAL, "regenerate"],
   ];
 
   it.each(INSTALLERS)(

@@ -19,19 +19,23 @@
 # con 1: la comparación "sigue fallando" a propósito, para forzar que alguien
 # mire el diff antes de darlo por bueno.
 #
-# Usage: scripts/update-visual-baselines.sh
+# Los argumentos pasan tal cual a las dos corridas de Playwright. El job
+# `regenerate` de visual-baselines.yml los usa para que cada parte del reparto
+# (#255) compare y regenere sólo su tramo: `--shard=2/4`.
+#
+# Usage: scripts/update-visual-baselines.sh [argumentos de playwright test]
 
 SNAPSHOTS_DIR="tests/ui.spec.ts-snapshots"
 
 set -uo pipefail
 
-if npx playwright test; then
+if npx playwright test "$@"; then
   echo "update-visual-baselines: sin cambios, la línea base ya estaba al día."
   exit 0
 fi
 
 echo "update-visual-baselines: la comparación falló, regenerando desde esta rama." >&2
-npx playwright test --update-snapshots
+npx playwright test --update-snapshots "$@"
 git add "$SNAPSHOTS_DIR"
 
 if git diff --cached --quiet; then

@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { webServerCommand } from "./tests/support/web-server-command";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3417";
 
@@ -17,11 +18,13 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  // En CI la suite corre contra `next dev`, que compila cada pantalla la
-  // primera vez que alguien la pide, con cientos de pruebas en paralelo. Con
-  // los 5 s por defecto fallaba cada vez un test distinto, siempre por tiempo
-  // y sin nada roto (#254). 15 s no debilita ninguna comprobación: lo que está
-  // roto falla igual, solo deja de fallar lo que era lento.
+  // Hasta el #255 la suite corría en CI contra `next dev`, que compila cada
+  // pantalla la primera vez que alguien la pide, y con los 5 s por defecto
+  // fallaba cada vez un test distinto, siempre por tiempo y sin nada roto
+  // (#254). Ahora CI sirve la aplicación compilada, que quita esa causa, pero
+  // cada máquina sigue corriendo su parte de la suite en paralelo contra
+  // Supabase. 15 s no debilita ninguna comprobación: lo que está roto falla
+  // igual, solo deja de fallar lo que era lento.
   expect: { timeout: process.env.CI ? 15_000 : 5_000 },
   reporter: process.env.CI ? "github" : "list",
   use: {
@@ -34,7 +37,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "npm run dev",
+    command: webServerCommand(process.env),
     url: APP_URL,
     // Off a propósito: si algo ya responde en esa URL, Playwright falla en vez
     // de adoptarlo. Un servidor ajeno en el puerto haría que la suite compare

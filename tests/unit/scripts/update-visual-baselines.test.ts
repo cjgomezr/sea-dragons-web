@@ -27,9 +27,13 @@ interface RunResult {
   stderr: string;
 }
 
-function runScript(cwd: string, env: NodeJS.ProcessEnv): Promise<RunResult> {
+function runScript(
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+  args: readonly string[] = [],
+): Promise<RunResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn("bash", [toBashPath(SCRIPT)], {
+    const child = spawn("bash", [toBashPath(SCRIPT), ...args], {
       cwd,
       env,
       stdio: ["ignore", "pipe", "pipe"],
@@ -204,5 +208,28 @@ describe("scripts/update-visual-baselines.sh", () => {
 
     expect(code).toBe(1);
     expect(await stagedFiles(workDir)).toBe("");
+  });
+
+  // #255: `regenerate` corre el script en cada parte del reparto, y cada una
+  // tiene que comparar y regenerar sólo lo suyo.
+  it("pasa sus argumentos a las dos corridas de Playwright", async () => {
+    workDir = await mkdtemp(path.join(tmpdir(), "update-baselines-"));
+    await initGitRepoWithCommittedSnapshot(workDir);
+    const { binDir, logFile } = await installFakeNpx(workDir, {
+      firstCompareExit: 1,
+      regenerateChangesFile: true,
+    });
+    const env = {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+    };
+
+    await runScript(workDir, env, ["--shard=2/4"]);
+
+    const invocations = (await readFile(logFile, "utf8")).trim().split("\n");
+    expect(invocations).toEqual([
+      "playwright test --shard=2/4",
+      "playwright test --update-snapshots --shard=2/4",
+    ]);
   });
 });
