@@ -137,6 +137,11 @@ export const ACCOUNT_PROFILE_API_PATH = "/api/v1/account/profile";
  * activa, así que tampoco aparece en `RESTRICTED_ROUTES`. */
 export const ACCOUNT_PROFILE_PHOTO_API_PATH = `${ACCOUNT_PROFILE_API_PATH}/photo`;
 
+/** Los avisos de quien llama (#265, E6): listarlos, contar los no leídos y
+ * marcarlos. Los alcanza cualquier cuenta activa, de cualquier rol, y siempre
+ * sobre los suyos, así que no aparecen en `RESTRICTED_ROUTES`. */
+export const NOTIFICATIONS_API_PATH = "/api/v1/notifications";
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 
