@@ -911,6 +911,9 @@ h6 {
 @media (min-width: 768px) {
   .account-header {
     flex-direction: row;
+    /* Arriba y no al centro: bajo el nombre van los controles de la foto
+       (#245), y centrado el círculo quedaba a media altura de todo eso. */
+    align-items: flex-start;
     text-align: left;
   }
 }
