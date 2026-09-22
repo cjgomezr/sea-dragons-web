@@ -61,6 +61,8 @@ export function createSupabaseNotificationReader(
         .select(NOTIFICATION_COLUMNS)
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
+        // Dos avisos del mismo instante no se turnan entre peticiones.
+        .order("id", { ascending: false })
         .limit(limit);
       if (error) {
         throw new Error(`No se pudieron leer los avisos: ${error.message}`);
