@@ -284,7 +284,12 @@ describe("pantalla del directorio", () => {
     await renderScreen();
 
     const row = memberRow("Tomás Errekondo Aranburu");
-    expect(within(row).getByText(`${MISSING} · ${MISSING}`)).toBeVisible();
+    // Un guion por dato que falta: el país, el nivel y la posición. Desde #283
+    // el país y el nivel son un elemento cada uno, para que la tarjeta del
+    // móvil pueda etiquetarlos por separado.
+    const dashes = within(row).getAllByText(MISSING);
+    expect(dashes).toHaveLength(3);
+    dashes.forEach((dash) => expect(dash).toBeVisible());
     expect(within(row).getByRole("cell", { name: MISSING })).toBeVisible();
   });
 
@@ -543,8 +548,123 @@ describe("pantalla del directorio", () => {
     const row = memberRow("Nerea Ruiz");
     expect(within(row).getByRole("cell", { name: "Jugador" })).toBeVisible();
     expect(within(row).getByRole("cell", { name: "Portería" })).toBeVisible();
-    expect(within(row).getByText(/España · Principiante/)).toBeVisible();
+    expect(within(row).getByText("España")).toBeVisible();
+    expect(within(row).getByText("Principiante")).toBeVisible();
+    expect(within(row).getByRole("rowheader")).toHaveTextContent(
+      /España · Principiante/,
+    );
     expect(screen.getByRole("radio", { name: "Comité" })).toBeVisible();
+  });
+});
+
+/** El control de orden de la lista de tarjetas (#283). En el navegador sólo se
+ * ve por debajo de 768px, donde la tabla pierde sus cabeceras; aquí no hay
+ * hoja de estilos, así que convive con ellas, y eso es justo lo que deja
+ * probar que los dos leen y escriben el mismo orden. */
+function sortGroup(name = "Sort by"): HTMLElement {
+  return screen.getByRole("group", { name });
+}
+
+function directionGroup(name = "Order"): HTMLElement {
+  return screen.getByRole("group", { name });
+}
+
+describe("orden desde el control de la lista estrecha", () => {
+  it("ofrece los mismos campos que las cabeceras y los dos sentidos", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(
+      within(sortGroup())
+        .getAllByRole("radio")
+        .map((radio) => radio.closest("label")?.textContent),
+    ).toEqual(["Member", "Role", "Position"]);
+    expect(
+      within(directionGroup())
+        .getAllByRole("radio")
+        .map((radio) => radio.closest("label")?.textContent),
+    ).toEqual(["Ascending", "Descending"]);
+  });
+
+  it("arranca con el orden por defecto elegido", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(
+      within(sortGroup()).getByRole("radio", { name: "Member" }),
+    ).toBeChecked();
+    expect(
+      within(directionGroup()).getByRole("radio", { name: "Ascending" }),
+    ).toBeChecked();
+  });
+
+  it("pide el campo que se elige y lo refleja en la cabecera de la tabla", async () => {
+    stubApi();
+    await renderScreen();
+
+    await userEvent
+      .setup()
+      .click(within(sortGroup()).getByRole("radio", { name: "Role" }));
+
+    await waitFor(() => {
+      expect(lastRequest().get("sort")).toBe("role");
+    });
+    expect(lastRequest().get("direction")).toBe("asc");
+    expect(columnHeader("Role")).toHaveAttribute("aria-sort", "ascending");
+    expect(columnHeader("Member")).toHaveAttribute("aria-sort", "none");
+  });
+
+  it("pide el sentido que se elige sin cambiar de campo", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+    await user.click(
+      within(sortGroup()).getByRole("radio", { name: "Position" }),
+    );
+
+    await user.click(
+      within(directionGroup()).getByRole("radio", { name: "Descending" }),
+    );
+
+    await waitFor(() => {
+      expect(lastRequest().get("direction")).toBe("desc");
+    });
+    expect(lastRequest().get("sort")).toBe("position");
+    expect(columnHeader("Position")).toHaveAttribute("aria-sort", "descending");
+  });
+
+  it("enseña el orden que se eligió desde una cabecera", async () => {
+    stubApi();
+    await renderScreen();
+
+    await sortBy("Member");
+
+    await waitFor(() => {
+      expect(lastRequest().get("direction")).toBe("desc");
+    });
+    expect(
+      within(sortGroup()).getByRole("radio", { name: "Member" }),
+    ).toBeChecked();
+    expect(
+      within(directionGroup()).getByRole("radio", { name: "Descending" }),
+    ).toBeChecked();
+  });
+
+  it("se escribe en español", async () => {
+    stubApi();
+
+    await renderScreen("es");
+
+    expect(
+      within(sortGroup("Ordenar por")).getByRole("radio", { name: "Miembro" }),
+    ).toBeChecked();
+    expect(
+      within(directionGroup("Sentido")).getByRole("radio", {
+        name: "Ascendente",
+      }),
+    ).toBeChecked();
   });
 });
 

@@ -2095,6 +2095,14 @@ button.notification-item-content:hover {
   padding: 0 var(--space-3);
 }
 
+/* El orden de la lista de tarjetas (#283): campo y sentido, con las mismas
+   pastillas que el filtro por rol. Desde 768px lo sustituyen las cabeceras. */
+.directory-sort-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
 /* En el móvil la posición es texto a secas: la pastilla del mockup necesita
    un ancho que a 375px sólo se consigue partiendo la palabra. Desde 768px
    recupera su forma. */
@@ -2151,6 +2159,135 @@ button.notification-item-content:hover {
     font-family: var(--font-family-mono);
     background: var(--color-background);
     border-radius: var(--radius);
+  }
+
+  /* Con cabeceras, el orden se pide desde ellas. */
+  .directory-sort-control {
+    display: none;
+  }
+}
+
+/* Por debajo de 768px el directorio es una lista de tarjetas (#283): tres
+   columnas no caben en 375px sin partir palabras por la mitad. Es el mismo
+   marcado que la tabla, así que un lector de pantalla sigue recorriendo filas;
+   lo que cambia es que cada dato lleva su etiqueta, escrita desde su
+   `data-label`, porque las cabeceras se esconden. El texto generado entra en
+   el nombre accesible de la celda, así que la etiqueta también se oye.
+
+   La tarjeta es una rejilla de tres columnas: la del avatar y dos de datos.
+   El país y el nivel viven dentro del nombre, a la derecha del avatar, y usan
+   el mismo hueco, así que quedan alineados con el rol y la posición. */
+@media (width < 768px) {
+  .directory-card {
+    overflow: visible;
+    background: none;
+    border: none;
+    border-radius: 0;
+  }
+
+  .directory-table,
+  .directory-table caption,
+  .directory-table tbody,
+  .directory-table th,
+  .directory-table td {
+    display: block;
+  }
+
+  .directory-table thead {
+    display: none;
+  }
+
+  .directory-count {
+    padding: 0 0 var(--space-3);
+    border-bottom: none;
+  }
+
+  .directory-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .directory-table tbody tr {
+    display: grid;
+    grid-template-columns: 40px 1fr 1fr;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--color-panel);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+  }
+
+  /* Sin `anywhere`: una palabra sólo se parte si no cabe entera en una línea,
+     que en una tarjeta de 375px no pasa con ningún dato de verdad. */
+  .directory-table th,
+  .directory-table td,
+  .directory-table tbody tr + tr th,
+  .directory-table tbody tr + tr td {
+    min-width: 0;
+    padding: 0;
+    overflow-wrap: break-word;
+    border-top: none;
+  }
+
+  .directory-table tbody th {
+    grid-column: 1 / -1;
+  }
+
+  /* El rol abre la fila de datos debajo del nombre; la posición le sigue. */
+  .directory-role-cell {
+    grid-column: 2;
+  }
+
+  /* El selector del rol y su botón no caben en media tarjeta: el rol de un
+     Admin ocupa las dos columnas de datos, y la posición baja debajo. */
+  .directory-table-admin .directory-role-cell,
+  .directory-table-admin .directory-role-cell + td {
+    grid-column: 2 / -1;
+  }
+
+  .directory-member {
+    align-items: flex-start;
+  }
+
+  /* A lo ancho de la tarjeta, para que el nivel caiga en la misma columna que
+     la posición y no donde acabe el nombre de cada uno. */
+  .directory-identity {
+    flex: 1;
+  }
+
+  .directory-facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+
+  .directory-fact-separator {
+    display: none;
+  }
+
+  .directory-fact,
+  .directory-position {
+    font-size: 14px;
+    color: var(--color-text);
+  }
+
+  .directory-table td::before,
+  .directory-fact::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: var(--space-1);
+    font-family: var(--font-family-mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+  }
+
+  /* Una marca se lee entera: si no cabe al lado de la otra, baja entera. */
+  .directory-mark {
+    white-space: nowrap;
   }
 }
 

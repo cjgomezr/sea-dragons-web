@@ -476,6 +476,12 @@ export const spanishMessages: MessageCatalog = {
   "directory.column.member": "Miembro",
   "directory.column.role": "Rol",
   "directory.column.position": "Posición",
+  "directory.field.country": "País",
+  "directory.field.level": "Nivel",
+  "directory.sort.label": "Ordenar por",
+  "directory.sort.directionLabel": "Sentido",
+  "directory.sort.direction.asc": "Ascendente",
+  "directory.sort.direction.desc": "Descendente",
   "directory.mark.inactive": "Desactivada",
   "directory.mark.aufExpired": "AUF vencido",
   // #274: el AUF que escribió el miembro, hasta que un Admin lo verifica.

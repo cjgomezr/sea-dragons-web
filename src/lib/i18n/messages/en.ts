@@ -482,6 +482,14 @@ export const englishMessages = {
   "directory.column.member": "Member",
   "directory.column.role": "Role",
   "directory.column.position": "Position",
+  // #283: por debajo de 768px la tabla es una lista de tarjetas, sin
+  // cabeceras. Cada dato lleva su etiqueta y el orden tiene su propio control.
+  "directory.field.country": "Country",
+  "directory.field.level": "Level",
+  "directory.sort.label": "Sort by",
+  "directory.sort.directionLabel": "Order",
+  "directory.sort.direction.asc": "Ascending",
+  "directory.sort.direction.desc": "Descending",
   "directory.mark.inactive": "Deactivated",
   "directory.mark.aufExpired": "AUF expired",
   // #274: el AUF que escribió el miembro, hasta que un Admin lo verifica.

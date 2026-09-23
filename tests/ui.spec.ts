@@ -3294,18 +3294,29 @@ function normalizeName(text: string): string {
     .toLowerCase();
 }
 
+/** Un socio de la lista fija, con el nombre y el id abiertos para que un
+ * describe pueda añadir los suyos. */
+type StubbedMember = Omit<
+  (typeof STUBBED_DIRECTORY_MEMBERS)[number],
+  "userId" | "fullName"
+> & { readonly userId: string; readonly fullName: string };
+
 /** Lo que el endpoint de #238 hace con la consulta, reducido a lo que estas
  * capturas necesitan distinguir. El orden lo decide el servidor, así que la
  * lista sale en el orden en que está escrita, que ya es el alfabético. */
 function stubbedListing(
   searchParams: URLSearchParams,
-  options: { readonly asAdmin: boolean; readonly withPhoto: boolean },
+  options: {
+    readonly asAdmin: boolean;
+    readonly withPhoto: boolean;
+    readonly members: readonly StubbedMember[];
+  },
 ): Record<string, unknown> {
   const { asAdmin } = options;
   const search = searchParams.get("q");
   const role = searchParams.get("role");
   const includeInactive = searchParams.get("includeInactive") === "true";
-  const members = STUBBED_DIRECTORY_MEMBERS.filter(
+  const members = options.members.filter(
     (member) =>
       (role === null || member.role === role) &&
       (includeInactive || member.status !== "inactive") &&
@@ -3388,6 +3399,7 @@ async function stubDirectoryReads(
     readonly asAdmin: boolean;
     readonly withRequests?: boolean;
     readonly withPhoto?: boolean;
+    readonly members?: readonly StubbedMember[];
   },
 ): Promise<void> {
   if (options.asAdmin) {
@@ -3407,6 +3419,7 @@ async function stubDirectoryReads(
           data: stubbedListing(new URL(request.url()).searchParams, {
             asAdmin: options.asAdmin,
             withPhoto,
+            members: options.members ?? STUBBED_DIRECTORY_MEMBERS,
           }),
         }),
       }),
@@ -3663,6 +3676,264 @@ for (const state of DIRECTORY_STATES) {
     });
   });
 }
+
+/* ---------------------------------------------------------------------------
+   El directorio como lista de tarjetas (#283). Por debajo de 768px la tabla
+   pierde sus cabeceras y cada socio es una tarjeta con sus datos etiquetados.
+   Todo esto vive en la hoja de estilos, así que sólo un navegador lo puede
+   probar: el nombre accesible de cada dato con su etiqueta, que ninguna
+   palabra se parta, y que el orden sobreviva al cambio de ancho.
+   --------------------------------------------------------------------------- */
+
+/** Más de 40 caracteres, el caso de nombre larguísimo del criterio. */
+const VERY_LONG_MEMBER_NAME =
+  "María de los Ángeles Errekondo Aranburu de la Hoz";
+
+const NARROW_DIRECTORY_MEMBERS: readonly StubbedMember[] = [
+  ...STUBBED_DIRECTORY_MEMBERS,
+  {
+    ...MEMBER_WITHOUT_DATA,
+    userId: "66666666-0000-4000-8000-000000000006",
+    fullName: VERY_LONG_MEMBER_NAME,
+  },
+];
+
+const NARROW_VIEWPORT = { width: 375, height: 812 } as const;
+const TABLE_VIEWPORT = { width: 768, height: 1024 } as const;
+
+/** Lo que mide una línea de nombre en la tarjeta: más alto, se partió. */
+const SINGLE_LINE_NAME_HEIGHT = 24;
+
+async function goToNarrowDirectory(
+  page: Page,
+  options: { readonly asAdmin: boolean },
+): Promise<void> {
+  await stubDirectoryReads(page, {
+    asAdmin: options.asAdmin,
+    members: NARROW_DIRECTORY_MEMBERS,
+  });
+  await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+  await waitForDirectory(page, ENGLISH_DIRECTORY_HEADING, options.asAdmin);
+}
+
+/** Las palabras de la lista que el navegador pintó en más de una línea. Una
+ * palabra entera ocupa una sola línea, así que sus rectángulos comparten la
+ * misma altura; una partida tiene rectángulos en dos. */
+async function wordsSplitAcrossLines(page: Page): Promise<readonly string[]> {
+  return page.evaluate(() => {
+    const body = document.querySelector("tbody");
+    if (body === null) {
+      throw new Error("No hay lista de socios en la pantalla.");
+    }
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+    const split: string[] = [];
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const text = node.textContent ?? "";
+      for (const word of text.matchAll(/\S+/g)) {
+        const range = document.createRange();
+        range.setStart(node, word.index);
+        range.setEnd(node, word.index + word[0].length);
+        const lines = new Set(
+          Array.from(range.getClientRects())
+            .filter((rect) => rect.width > 0)
+            .map((rect) => Math.round(rect.top)),
+        );
+        if (lines.size > 1) {
+          split.push(word[0]);
+        }
+      }
+    }
+    return split;
+  });
+}
+
+async function hasHorizontalScroll(page: Page): Promise<boolean> {
+  return page.evaluate(
+    () =>
+      document.documentElement.scrollWidth >
+      document.documentElement.clientWidth,
+  );
+}
+
+function sortOption(page: Page, group: string, option: string): Locator {
+  return page
+    .getByRole("group", { name: group })
+    .locator("label", { hasText: option });
+}
+
+function sortRadio(page: Page, group: string, option: string): Locator {
+  return page
+    .getByRole("group", { name: group })
+    .getByRole("radio", { name: option });
+}
+
+test.describe("el directorio en pantalla estrecha (#283)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE, viewport: NARROW_VIEWPORT });
+
+  test("cada socio es una tarjeta con sus datos etiquetados y sin cabeceras", async ({
+    page,
+  }) => {
+    await goToNarrowDirectory(page, { asAdmin: false });
+
+    const card = page.getByRole("row", { name: "Mateo Restrepo" });
+    await expect(page.getByRole("columnheader")).toHaveCount(0);
+    await expect(card.getByText("MR")).toBeVisible();
+    await expect(card.getByRole("rowheader")).toHaveAccessibleName(
+      /Mateo Restrepo\s*Country\s*Colombia\s*Level\s*Advanced/,
+    );
+    await expect(card.getByRole("cell", { name: "Role Coach" })).toBeVisible();
+    await expect(
+      card.getByRole("cell", { name: "Position Forward" }),
+    ).toBeVisible();
+  });
+
+  test("un dato que falta sale con su etiqueta y su guion", async ({
+    page,
+  }) => {
+    await goToNarrowDirectory(page, { asAdmin: false });
+
+    const card = page.getByRole("row", { name: LONG_MEMBER_NAME });
+    await expect(card.getByRole("rowheader")).toHaveAccessibleName(
+      /Country\s*–\s*Level\s*–/,
+    );
+    await expect(card.getByRole("cell", { name: "Position –" })).toBeVisible();
+  });
+
+  test("ninguna palabra queda partida, tampoco las marcas", async ({
+    page,
+  }) => {
+    await goToNarrowDirectory(page, { asAdmin: true });
+    await includeFormerMembers("Include deactivated accounts")(page);
+    await expect(page.getByText("Deactivated", { exact: true })).toBeVisible();
+    await expect(page.getByText("AUF expired")).toBeVisible();
+    await expect(page.getByText("AUF not verified")).toBeVisible();
+
+    expect(await wordsSplitAcrossLines(page)).toEqual([]);
+  });
+
+  test("un nombre larguísimo se parte entre palabras sin desbordar la tarjeta", async ({
+    page,
+  }) => {
+    await goToNarrowDirectory(page, { asAdmin: false });
+
+    const card = page.getByRole("row", { name: VERY_LONG_MEMBER_NAME });
+    const cardBox = await card.boundingBox();
+    const nameBox = await card.getByText(VERY_LONG_MEMBER_NAME).boundingBox();
+    if (cardBox === null || nameBox === null) {
+      throw new Error("La tarjeta del nombre larguísimo no se pintó.");
+    }
+    expect(nameBox.height).toBeGreaterThan(SINGLE_LINE_NAME_HEIGHT);
+    expect(nameBox.x + nameBox.width).toBeLessThanOrEqual(
+      cardBox.x + cardBox.width,
+    );
+    expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(
+      NARROW_VIEWPORT.width,
+    );
+    expect(await wordsSplitAcrossLines(page)).toEqual([]);
+  });
+
+  test("se ordena con un control que se ve y se toca", async ({ page }) => {
+    await goToNarrowDirectory(page, { asAdmin: false });
+    const roleOption = sortOption(page, "Sort by", "Role");
+    const box = await roleOption.boundingBox();
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+
+    const requested = page.waitForRequest(
+      (request) =>
+        new URL(request.url()).pathname === DIRECTORY_ENDPOINT &&
+        new URL(request.url()).searchParams.get("sort") === "role",
+    );
+    await roleOption.click();
+    await requested;
+    await sortOption(page, "Order", "Descending").click();
+
+    await expect(sortRadio(page, "Sort by", "Role")).toBeChecked();
+    await expect(sortRadio(page, "Order", "Descending")).toBeChecked();
+  });
+
+  test("el orden elegido se conserva al cambiar de ancho, en los dos sentidos", async ({
+    page,
+  }) => {
+    await goToNarrowDirectory(page, { asAdmin: false });
+    await sortOption(page, "Sort by", "Position").click();
+    await sortOption(page, "Order", "Descending").click();
+
+    await page.setViewportSize(TABLE_VIEWPORT);
+
+    await expect(page.getByRole("group", { name: "Sort by" })).toBeHidden();
+    await expect(
+      page.getByRole("columnheader", { name: "Position" }),
+    ).toHaveAttribute("aria-sort", "descending");
+
+    await page
+      .getByRole("columnheader", { name: "Role" })
+      .getByRole("button")
+      .click();
+    await expect(
+      page.getByRole("columnheader", { name: "Role" }),
+    ).toHaveAttribute("aria-sort", "ascending");
+    await page.setViewportSize(NARROW_VIEWPORT);
+
+    await expect(sortRadio(page, "Sort by", "Role")).toBeChecked();
+    await expect(sortRadio(page, "Order", "Ascending")).toBeChecked();
+  });
+
+  test("un Admin cambia el rol desde la tarjeta con el mismo resultado que en la tabla", async ({
+    page,
+  }) => {
+    await goToNarrowDirectory(page, { asAdmin: true });
+    await expect(
+      page
+        .getByRole("row", { name: "Ana Admin" })
+        .getByRole("combobox", { name: "Role for Ana Admin" }),
+    ).toBeVisible();
+
+    await refuseLastAdminChange(page);
+  });
+
+  test("a 768px sigue siendo la tabla, con sus cabeceras y sin etiquetas", async ({
+    page,
+  }) => {
+    await page.setViewportSize(TABLE_VIEWPORT);
+    await goToNarrowDirectory(page, { asAdmin: false });
+
+    await expect(page.getByRole("columnheader")).toHaveCount(3);
+    await expect(page.getByRole("group", { name: "Sort by" })).toBeHidden();
+    await expect(
+      page
+        .getByRole("row", { name: "Mateo Restrepo" })
+        .getByRole("cell", { name: "Coach", exact: true }),
+    ).toBeVisible();
+  });
+
+  for (const width of [320, 375, 768]) {
+    for (const asAdmin of [false, true]) {
+      test(`no hay scroll horizontal a ${width}px (${asAdmin ? "Admin" : "socio"})`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: NARROW_VIEWPORT.height });
+        await goToNarrowDirectory(page, { asAdmin });
+
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+  }
+
+  for (const viewport of viewports) {
+    for (const asAdmin of [false, true]) {
+      test(`axe no encuentra violaciones a ${viewport.width}px (${asAdmin ? "Admin" : "socio"})`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(viewport);
+        await goToNarrowDirectory(page, { asAdmin });
+
+        await expectNoAxeViolations(page);
+      });
+    }
+  }
+});
 
 test.describe("el directorio con los datos de verdad", () => {
   skipWithoutSession();

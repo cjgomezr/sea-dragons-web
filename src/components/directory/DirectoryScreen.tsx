@@ -24,6 +24,7 @@ import {
   type DirectoryFilterState,
   DirectoryFilters,
 } from "./DirectoryFilters";
+import type { DirectoryOrder } from "./DirectorySortControl";
 import { DirectoryTable } from "./DirectoryTable";
 import { RoleRequestsPanel } from "./RoleRequestsPanel";
 import { useDebouncedValue } from "./use-debounced-value";
@@ -58,18 +59,13 @@ type ScreenState =
   | { readonly kind: "failed"; readonly failure: DirectoryFailure }
   | { readonly kind: "ready"; readonly listing: DirectoryListing };
 
-type SortState = {
-  readonly sort: DirectorySort;
-  readonly direction: DirectoryDirection;
-};
-
 const INITIAL_FILTERS: DirectoryFilterState = {
   search: "",
   role: DEFAULT_DIRECTORY_QUERY.role,
   includeInactive: DEFAULT_DIRECTORY_QUERY.includeInactive,
 };
 
-const INITIAL_SORT: SortState = {
+const INITIAL_SORT: DirectoryOrder = {
   sort: DEFAULT_DIRECTORY_QUERY.sort,
   direction: DEFAULT_DIRECTORY_QUERY.direction,
 };
@@ -135,7 +131,7 @@ export function DirectoryScreen({
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [filters, setFilters] = useState<DirectoryFilterState>(INITIAL_FILTERS);
-  const [order, setOrder] = useState<SortState>(INITIAL_SORT);
+  const [order, setOrder] = useState<DirectoryOrder>(INITIAL_SORT);
   const [state, setState] = useState<ScreenState>({ kind: "loading" });
   // Volver a intentarlo cuenta como una lectura más, aunque la consulta sea la
   // misma de antes: así el pedido vive sólo en el efecto.
@@ -268,9 +264,9 @@ export function DirectoryScreen({
               translate={translate}
               locale={locale}
               listing={state.listing}
-              sort={order.sort}
-              direction={order.direction}
+              order={order}
               onSort={sortBy}
+              onOrderChange={setOrder}
               onSaveRole={roleChange.saveRole}
             />
           )}
