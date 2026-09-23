@@ -205,20 +205,20 @@ Queda anotada una decisión tomada en la sesión: quien crea, cambia o cancela u
 
 ## 10. Descomposición en tickets (para write-ticket)
 
-| #   | Título propuesto                                                                     | Tamaño | Depende de | Auto-merge sugerido                      |
-| --- | ------------------------------------------------------------------------------------ | ------ | ---------- | ---------------------------------------- |
-| 1   | Guarda los eventos, sus series y su audiencia en la base, visibles solo a quien toca | M      | ninguna    | No: tablas nuevas con RLS por audiencia  |
-| 2   | Crea eventos puntuales y series semanales por API, con todas sus ocurrencias         | M      | 1          | No: lógica nueva con permisos            |
-| 3   | Guarda el RSVP de un miembro y déjalo cambiar hasta que empiece el evento            | M      | 2          | No: lógica nueva con permisos            |
-| 4   | Sirve la agenda y el detalle de un evento por API, con conteos y quién va            | M      | 3          | No: frontera de visibilidad (AC-052)     |
-| 5   | Avisa a la audiencia cuando se crea un evento o una serie                            | M      | 2, #293    | No: fan-out nuevo de avisos              |
-| 6   | Convierte Calendario en la agenda del mockup, con el RSVP en cada fila               | M      | 4, #293    | No: pantalla nueva                       |
-| 7   | Despliega cada evento con sus notas y quién va, y deja ver los pasados               | M      | 6          | No: pantalla nueva                       |
-| 8   | Da a Admin y Committee el diálogo para crear eventos puntuales y semanales           | M      | 6          | No: pantalla nueva con permisos          |
-| 9   | Deja editar y cancelar un evento suelto o una ocurrencia, por API                    | M      | 4          | No: lógica nueva con permisos            |
-| 10  | Deja editar y cancelar una serie de hoy en adelante, por API                         | M      | 9          | No: cambios masivos sobre datos con RSVP |
-| 11  | Edita y cancela eventos y series desde el calendario                                 | M      | 7, 8, 10   | No: pantalla nueva con permisos          |
-| 12  | Avisa a la audiencia cuando un evento cambia de hora o lugar, o se cancela           | S      | 5, 10      | No: amplía el catálogo de avisos         |
+| #   | Issue | Título propuesto                                                                     | Tamaño | Depende de | Auto-merge sugerido                      |
+| --- | ----- | ------------------------------------------------------------------------------------ | ------ | ---------- | ---------------------------------------- |
+| 1   | #306  | Guarda los eventos, sus series y su audiencia en la base, visibles solo a quien toca | M      | ninguna    | No: tablas nuevas con RLS por audiencia  |
+| 2   | #307  | Crea eventos puntuales y series semanales por API, con todas sus ocurrencias         | M      | 1          | No: lógica nueva con permisos            |
+| 3   | #308  | Guarda el RSVP de un miembro y déjalo cambiar hasta que empiece el evento            | M      | 2          | No: lógica nueva con permisos            |
+| 4   | #309  | Sirve la agenda y el detalle de un evento por API, con conteos y quién va            | M      | 3          | No: frontera de visibilidad (AC-052)     |
+| 5   | #310  | Avisa a la audiencia cuando se crea un evento o una serie                            | M      | 2, #293    | No: fan-out nuevo de avisos              |
+| 6   | #311  | Convierte Calendario en la agenda del mockup, con el RSVP en cada fila               | M      | 4, #293    | No: pantalla nueva                       |
+| 7   | #312  | Despliega cada evento con sus notas y quién va, y deja ver los pasados               | M      | 6          | No: pantalla nueva                       |
+| 8   | #313  | Da a Admin y Committee el diálogo para crear eventos puntuales y semanales           | M      | 6          | No: pantalla nueva con permisos          |
+| 9   | #314  | Deja editar y cancelar un evento suelto o una ocurrencia, por API                    | M      | 4          | No: lógica nueva con permisos            |
+| 10  | #315  | Deja editar y cancelar una serie de hoy en adelante, por API                         | M      | 9          | No: cambios masivos sobre datos con RSVP |
+| 11  | #316  | Edita y cancela eventos y series desde el calendario                                 | M      | 7, 8, 10   | No: pantalla nueva con permisos          |
+| 12  | #317  | Avisa a la audiencia cuando un evento cambia de hora o lugar, o se cancela           | S      | 5, 10      | No: amplía el catálogo de avisos         |
 
 Traen migración el 1, el 2 (la función que crea todo o nada), el 3, el 5, el 9, el 10 y el 12. La cadena 1, 2, 3 ordena las primeras; si al rebasar otro ticket ya tomó el número, se renumera.
 
