@@ -550,6 +550,9 @@ describe("pantalla del directorio", () => {
     expect(within(row).getByRole("cell", { name: "Portería" })).toBeVisible();
     expect(within(row).getByText("España")).toBeVisible();
     expect(within(row).getByText("Principiante")).toBeVisible();
+    expect(within(row).getByRole("rowheader")).toHaveTextContent(
+      /España · Principiante/,
+    );
     expect(screen.getByRole("radio", { name: "Comité" })).toBeVisible();
   });
 });

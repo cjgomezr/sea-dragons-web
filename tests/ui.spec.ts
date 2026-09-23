@@ -3294,9 +3294,6 @@ function normalizeName(text: string): string {
     .toLowerCase();
 }
 
-/** Lo que el endpoint de #238 hace con la consulta, reducido a lo que estas
- * capturas necesitan distinguir. El orden lo decide el servidor, así que la
- * lista sale en el orden en que está escrita, que ya es el alfabético. */
 /** Un socio de la lista fija, con el nombre y el id abiertos para que un
  * describe pueda añadir los suyos. */
 type StubbedMember = Omit<
@@ -3304,6 +3301,9 @@ type StubbedMember = Omit<
   "userId" | "fullName"
 > & { readonly userId: string; readonly fullName: string };
 
+/** Lo que el endpoint de #238 hace con la consulta, reducido a lo que estas
+ * capturas necesitan distinguir. El orden lo decide el servidor, así que la
+ * lista sale en el orden en que está escrita, que ya es el alfabético. */
 function stubbedListing(
   searchParams: URLSearchParams,
   options: {
