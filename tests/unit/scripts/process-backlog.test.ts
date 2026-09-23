@@ -121,6 +121,11 @@ if [ "$1" = "pr" ] && [ "$2" = "list" ]; then
   exit 0
 fi
 
+if [ "$1" = "api" ] && [ "$2" = "graphql" ] && [[ "$*" == *projectItems* ]]; then
+  echo '{"data":{"repository":{"issue":{"url":"https://github.com/acme/repo/issues/5","projectItems":{"nodes":[]}}}}}'
+  exit 0
+fi
+
 if [ "$1" = "project" ] && [ "$2" = "item-list" ]; then
   if [ -n "\${ITEM_LIST_JSON:-}" ]; then
     echo "$ITEM_LIST_JSON"
