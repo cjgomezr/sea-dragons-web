@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type ClubBrandRow,
   DEFAULT_CLUB_BRAND,
@@ -11,6 +11,7 @@ import {
 
 const STORED_ROW: ClubBrandRow = { name: "Hobart Orcas", initials: "HO" };
 const TIME_TO_LIVE_MS = 60_000;
+const READ_TIMEOUT_MS = 3_000;
 
 type ReaderSetup = {
   readonly fetchRow: () => Promise<ClubBrandRow>;
@@ -26,6 +27,7 @@ function createReader({ fetchRow, reportFailure = vi.fn() }: ReaderSetup): {
     fetchRow,
     reportFailure,
     timeToLiveMs: TIME_TO_LIVE_MS,
+    readTimeoutMs: READ_TIMEOUT_MS,
     now: () => nowMs,
   });
   return {
@@ -123,6 +125,46 @@ describe("lectura de la marca", () => {
 
     expect(await reader.read()).toEqual(DEFAULT_CLUB_BRAND);
     expect(reportFailure).toHaveBeenCalledWith(failure);
+  });
+
+  describe("con la base colgada", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    // Una base que no contesta no devuelve un error: deja la consulta colgada,
+    // y con ella cada pantalla que espera la marca.
+    it("pasado el plazo devuelve los valores por defecto y registra el fallo", async () => {
+      vi.useFakeTimers();
+      const reportFailure = vi.fn();
+      const { reader } = createReader({
+        fetchRow: () => new Promise<ClubBrandRow>(() => {}),
+        reportFailure,
+      });
+
+      const brand = reader.read();
+      await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS);
+
+      expect(await brand).toEqual(DEFAULT_CLUB_BRAND);
+      expect(reportFailure).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/3000ms/) }),
+      );
+    });
+
+    it("la visita siguiente al plazo vuelve a consultar la base", async () => {
+      vi.useFakeTimers();
+      const fetchRow = vi
+        .fn<() => Promise<ClubBrandRow>>()
+        .mockReturnValueOnce(new Promise<ClubBrandRow>(() => {}))
+        .mockResolvedValueOnce(STORED_ROW);
+      const { reader } = createReader({ fetchRow });
+
+      const firstBrand = reader.read();
+      await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS);
+      await firstBrand;
+
+      expect((await reader.read()).name).toBe("Hobart Orcas");
+    });
   });
 
   it("no guarda en la caché un fallo: la visita siguiente vuelve a intentarlo", async () => {

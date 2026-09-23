@@ -16,6 +16,11 @@ const BRAND_COLUMNS = "name, initials";
  * cualquier otra instancia del servidor, que no se entera de la invalidación. */
 const CLUB_BRAND_TIME_TO_LIVE_MS = 5 * 60 * 1000;
 
+/** Por debajo del corte de 10 s de una función de Vercel en plan Hobby, como
+ * `DATABASE_PROBE_TIMEOUT_MS`: si vence antes la plataforma, la pantalla se cae
+ * en vez de pintarse con el respaldo. */
+const CLUB_BRAND_READ_TIMEOUT_MS = 3_000;
+
 /**
  * Lee la marca del club de esta instalación. Va con la llave de servicio, como
  * `findClubIdBySlug`, porque el club se encuentra por su `slug` y
@@ -47,6 +52,7 @@ const clubBrandReader = createCachedClubBrandReader({
     );
   },
   timeToLiveMs: CLUB_BRAND_TIME_TO_LIVE_MS,
+  readTimeoutMs: CLUB_BRAND_READ_TIMEOUT_MS,
   now: Date.now,
 });
 

@@ -51,6 +51,9 @@ export type CachedClubBrandReaderOptions = {
   readonly fetchRow: () => Promise<ClubBrandRow>;
   readonly reportFailure: (error: unknown) => void;
   readonly timeToLiveMs: number;
+  /** Una base que no contesta no devuelve un error: deja la consulta colgada,
+   * y con ella cada pantalla. Pasado este plazo se pinta con el respaldo. */
+  readonly readTimeoutMs: number;
   readonly now: () => number;
 };
 
@@ -58,6 +61,25 @@ type CacheEntry = {
   readonly brand: Promise<ClubBrand>;
   readonly expiresAtMs: number;
 };
+
+async function fetchWithinTimeout(
+  fetchRow: () => Promise<ClubBrandRow>,
+  timeoutMs: number,
+): Promise<ClubBrandRow> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expiry = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`la base no contestó en ${timeoutMs}ms`)),
+      timeoutMs,
+    );
+  });
+
+  try {
+    return await Promise.race([fetchRow(), expiry]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * Una consulta por caducidad, no por visita. Se guarda la promesa y no el
@@ -69,6 +91,7 @@ export function createCachedClubBrandReader({
   fetchRow,
   reportFailure,
   timeToLiveMs,
+  readTimeoutMs,
   now,
 }: CachedClubBrandReaderOptions): ClubBrandReader {
   let cached: CacheEntry | null = null;
@@ -76,7 +99,7 @@ export function createCachedClubBrandReader({
   function startFetch(): CacheEntry {
     const entry: CacheEntry = {
       brand: Promise.resolve()
-        .then(fetchRow)
+        .then(() => fetchWithinTimeout(fetchRow, readTimeoutMs))
         .then(toClubBrand, (error: unknown) => {
           // Sólo si nadie la sustituyó entre medias: una invalidación
           // posterior ya dejó en la caché una consulta más nueva.

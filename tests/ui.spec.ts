@@ -2525,8 +2525,9 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
   // #292: el nombre sale de la base y admite hasta 60 caracteres. Se pone en
   // la página y no en la base compartida de desarrollo: cambiarlo allí lo
   // vería cualquier otra corrida a la vez. Lo que se prueba es que el CSS lo
-  // aguanta: una sola fila, sin tapar los controles ni salirse, y entero para
-  // un lector de pantalla aunque se vea recortado.
+  // aguanta: una sola fila, sin tapar los controles ni salirse, y el texto
+  // entero en el árbol aunque se vea recortado. El `title` que pone la cáscara
+  // lo prueba `tests/unit/app-shell.test.tsx`.
   const LONGEST_CLUB_NAME =
     "Asociación Deportiva de Rugby Subacuático del Sur · Tasmania";
   for (const width of [360, 375]) {
@@ -2541,7 +2542,6 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
       );
       await brandLocator.evaluate((element, name) => {
         element.textContent = name;
-        element.setAttribute("title", name);
       }, LONGEST_CLUB_NAME);
 
       const brand = await brandLocator.boundingBox();
@@ -2581,7 +2581,6 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
       );
       expect(hasHorizontalScroll, "aparece scroll horizontal").toBe(false);
       await expect(brandLocator).toHaveText(LONGEST_CLUB_NAME);
-      await expect(brandLocator).toHaveAttribute("title", LONGEST_CLUB_NAME);
     });
   }
 });
