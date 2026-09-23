@@ -224,27 +224,49 @@ const UNCHANGED_AUF = {
   isAufVerified: true,
 } as const;
 
+/** La ficha como la escribe el formulario cuando el AUF se editó. */
+type EditedSubmission = {
+  readonly aufNumber: string | null;
+  readonly aufExpiry: string | null;
+  readonly groupIds: readonly string[];
+  readonly dateOfBirth: string | null;
+};
+
 function submission(
-  overrides: Partial<MemberRecordSubmission> = {},
+  overrides: Partial<EditedSubmission> = {},
 ): MemberRecordSubmission {
-  return {
+  const { aufNumber, aufExpiry, ...rest }: EditedSubmission = {
     aufNumber: "AUF-2026-0042",
     aufExpiry: "2027-03-31",
     groupIds: [],
     dateOfBirth: ADULT_BIRTH,
     ...overrides,
   };
+  return { ...rest, auf: { aufNumber, aufExpiry } };
 }
 
 async function save(
   { gateways }: Fake,
-  overrides: Partial<MemberRecordSubmission> = {},
+  overrides: Partial<EditedSubmission> = {},
   callerId: string = ADMIN_ID,
 ): ReturnType<typeof updateMemberRecord> {
   return updateMemberRecord(gateways, {
     callerId,
     userId: MEMBER_ID,
     submission: submission(overrides),
+    todayInClub: TODAY_IN_CLUB,
+  });
+}
+
+/** Guarda la ficha con el AUF sin tocar: el formulario no lo manda. */
+async function saveKeepingAuf(
+  { gateways }: Fake,
+  groupIds: readonly string[],
+): ReturnType<typeof updateMemberRecord> {
+  return updateMemberRecord(gateways, {
+    callerId: ADMIN_ID,
+    userId: MEMBER_ID,
+    submission: { ...submission({ groupIds }), auf: null },
     todayInClub: TODAY_IN_CLUB,
   });
 }
@@ -822,6 +844,21 @@ describe("el AUF que escribe el Admin nace verificado", () => {
       aufNumber: "AUF-2026-0042",
       isAufVerified: true,
     });
+  });
+
+  it("no toca el AUF que el miembro propuso mientras el Admin tenía la ficha abierta", async () => {
+    // El Admin abrió la ficha con otro AUF; el miembro propuso éste después.
+    const store = fake({ aufNumber: "AUF-NUEVO", aufExpiry: "2028-01-31" });
+
+    const record = await saveKeepingAuf(store, [SENIOR_ID]);
+
+    expect(record).toMatchObject({
+      aufNumber: "AUF-NUEVO",
+      aufExpiry: "2028-01-31",
+      isAufVerified: false,
+    });
+    expect(store.writes.some((write) => write.startsWith("auf"))).toBe(false);
+    expect(store.auditRows).toEqual([]);
   });
 
   it("no toca un AUF pendiente si guarda la ficha sin cambiarlo", async () => {

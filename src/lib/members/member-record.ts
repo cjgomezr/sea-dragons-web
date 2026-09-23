@@ -90,12 +90,19 @@ export type MemberRecord = StoredMemberRecord & {
   readonly groups: readonly MemberGroup[];
 };
 
-/** Lo que llega a guardarse, sin validar todavía. Un número vacío o en null
- * es borrar el registro, y con él su vencimiento. `groupIds` es la lista
- * entera de grupos con la que el miembro tiene que quedar. */
-export type MemberRecordSubmission = {
+/** El AUF que el Admin escribió en la ficha. Un número vacío o en null es
+ * borrar el registro, y con él su vencimiento. */
+export type AufSubmission = {
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
+};
+
+/** Lo que llega a guardarse, sin validar todavía. `auf` en null es que el
+ * Admin no lo tocó: el AUF guardado se queda como esté, aunque el miembro lo
+ * haya cambiado desde que se abrió la ficha (#274). `groupIds` es la lista
+ * entera de grupos con la que el miembro tiene que quedar. */
+export type MemberRecordSubmission = {
+  readonly auf: AufSubmission | null;
   readonly groupIds: readonly string[];
   /** Null sólo vale para quien todavía no tiene fecha: la corrección no
    * borra la que ya hay. */
@@ -273,19 +280,16 @@ export function correctionRequiresGuardianConsent(
   );
 }
 
-function aufIssuesOf(submission: MemberRecordSubmission): MemberRecordIssue[] {
-  const number = submission.aufNumber?.trim() ?? "";
-  if (number === "") {
+function aufIssuesOf(auf: AufSubmission | null): MemberRecordIssue[] {
+  const number = auf?.aufNumber?.trim() ?? "";
+  if (auf === null || number === "") {
     return [];
   }
   const issues: MemberRecordIssue[] = [];
   if (isAufNumberTooLong(number)) {
     issues.push({ field: "aufNumber", code: "auf_number_too_long" });
   }
-  if (
-    submission.aufExpiry !== null &&
-    !isRealCalendarDate(submission.aufExpiry)
-  ) {
+  if (auf.aufExpiry !== null && !isRealCalendarDate(auf.aufExpiry)) {
     issues.push({ field: "aufExpiry", code: "auf_expiry_not_a_date" });
   }
   return issues;
@@ -309,7 +313,7 @@ function assertSubmissionShape(
   todayInClub: string,
 ): void {
   const issues = [
-    ...aufIssuesOf(submission),
+    ...aufIssuesOf(submission.auf),
     ...dateOfBirthIssuesOf(submission.dateOfBirth, todayInClub),
   ];
   if (issues.length > 0) {
@@ -318,13 +322,11 @@ function assertSubmissionShape(
 }
 
 /** Ya validado: un número vacío es no tener registro. */
-function toAufRegistration(
-  submission: MemberRecordSubmission,
-): AufRegistration {
-  const number = submission.aufNumber?.trim() ?? "";
+function toAufRegistration(auf: AufSubmission): AufRegistration {
+  const number = auf.aufNumber?.trim() ?? "";
   return number === ""
     ? { kind: "none" }
-    : { kind: "registered", number, expiry: submission.aufExpiry };
+    : { kind: "registered", number, expiry: auf.aufExpiry };
 }
 
 /** Una fecha que ya estaba no se borra: sin ella la cuenta no sabría si es
@@ -343,11 +345,11 @@ function assertDateOfBirthKept(
 /** El vencimiento se compara con el ingreso (#237): un registro no puede
  * caducar antes de que la persona fuera del club. */
 function assertExpiryAfterJoining(
-  registration: AufRegistration,
+  registration: AufRegistration | null,
   record: StoredMemberRecord,
 ): void {
   if (
-    registration.kind === "registered" &&
+    registration?.kind === "registered" &&
     registration.expiry !== null &&
     registration.expiry < record.joinedOn
   ) {
@@ -542,7 +544,7 @@ function recordAufVerified(
 /**
  * Escribe el AUF sólo si el Admin lo cambió, y entonces queda verificado: lo
  * escribió él. Sin cambio no se escribe, o guardar los grupos verificaría un
- * AUF pendiente que nadie ha mirado.
+ * AUF pendiente que nadie ha mirado. Null es que el Admin no lo tocó.
  */
 async function applyAufChange(
   gateways: MemberRecordGateways,
@@ -551,10 +553,10 @@ async function applyAufChange(
     readonly scope: MemberScope;
     readonly record: StoredMemberRecord;
   },
-  registration: AufRegistration,
+  registration: AufRegistration | null,
 ): Promise<void> {
   const { actor, scope, record } = request;
-  if (isSameAuf(registration, record)) {
+  if (registration === null || isSameAuf(registration, record)) {
     return;
   }
   const result = await gateways.records.updateAufRegistration(
@@ -577,7 +579,8 @@ export async function updateMemberRecord(
 ): Promise<MemberRecord> {
   const { submission } = request;
   assertSubmissionShape(submission, request.todayInClub);
-  const registration = toAufRegistration(submission);
+  const registration =
+    submission.auf === null ? null : toAufRegistration(submission.auf);
   const caller = await findAdministrator(gateways, request.callerId);
   const scope = { clubId: caller.clubId, userId: request.userId };
   const record = await findStoredRecord(gateways, scope);

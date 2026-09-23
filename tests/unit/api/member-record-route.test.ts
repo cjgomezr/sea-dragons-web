@@ -253,6 +253,36 @@ describe("PATCH /api/v1/members/{id}/record", () => {
     });
   });
 
+  it("sin AUF en el cuerpo no toca el que hay (#274)", async () => {
+    gateways = memberRecordGateways({
+      aufNumber: "AUF-9",
+      aufExpiry: "2027-06-30",
+      isAufVerified: false,
+    });
+
+    const response = await patchRecord({
+      groupIds: [SENIOR_ID],
+      dateOfBirth: ADULT_BIRTH,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { aufNumber: "AUF-9", isAufVerified: false },
+    });
+    expect(writes.some((write) => write.startsWith("auf"))).toBe(false);
+  });
+
+  it("responde 400 a un vencimiento que llega sin número", async () => {
+    const response = await patchRecord({
+      aufExpiry: "2027-06-30",
+      groupIds: [],
+      dateOfBirth: ADULT_BIRTH,
+    });
+
+    expect(response.status).toBe(400);
+    expect(writes).toEqual([]);
+  });
+
   it("deja sin valor el número y el vencimiento cuando el número llega vacío", async () => {
     const response = await patchRecord({ ...VALID_BODY, aufNumber: null });
 

@@ -79,14 +79,19 @@ function errorResponse(
   return jsonResponse(status, { error: { code, message: "x", reason } });
 }
 
-/** Lo que el servidor respondería al guardar: la ficha con lo pedido. */
+/** Lo que el servidor respondería al guardar: la ficha con lo pedido. Sin
+ * AUF en la petición, el guardado se queda como estaba. */
 function savedRecord(body: unknown): MemberRecord {
-  const { aufNumber, aufExpiry, groupIds, dateOfBirth } = body as {
-    aufNumber: string | null;
-    aufExpiry: string | null;
+  const { groupIds, dateOfBirth, ...auf } = body as {
+    aufNumber?: string | null;
+    aufExpiry?: string | null;
     groupIds: string[];
     dateOfBirth: string | null;
   };
+  const aufNumber =
+    auf.aufNumber === undefined ? RECORD.aufNumber : auf.aufNumber;
+  const aufExpiry =
+    auf.aufExpiry === undefined ? RECORD.aufExpiry : auf.aufExpiry;
   return {
     ...RECORD,
     dateOfBirth,
@@ -291,6 +296,19 @@ describe("ficha en pantalla: guardado", () => {
     expect(
       screen.getByRole("checkbox", { name: "Masters Squad" }),
     ).toBeChecked();
+  });
+
+  it("no manda el AUF si no lo tocó: el miembro puede haberlo cambiado entretanto (#274)", async () => {
+    stubApi({ record: PENDING_RECORD });
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(screen.getByRole("checkbox", { name: "Masters Squad" }));
+    await user.click(saveButton());
+
+    await screen.findByRole("status");
+    expect(patches[0]?.body).not.toHaveProperty("aufNumber");
+    expect(patches[0]?.body).not.toHaveProperty("aufExpiry");
   });
 
   it("manda el número y el vencimiento vacíos como null", async () => {

@@ -83,10 +83,27 @@ function orNull(value: string): string | null {
   return value.trim() === "" ? null : value;
 }
 
-function toSubmission(draft: Draft): MemberRecordSubmission {
+/** Si los controles siguen enseñando el AUF guardado. */
+function isAufUntouched(record: MemberRecord, draft: Draft): boolean {
+  return (
+    draft.aufNumber === (record.aufNumber ?? "") &&
+    draft.aufExpiry === (record.aufExpiry ?? "")
+  );
+}
+
+/** Un AUF sin tocar no se manda: el miembro puede haberlo cambiado desde
+ * que se abrió la ficha, y mandar el de entonces lo pisaría verificado. */
+function toSubmission(
+  draft: Draft,
+  record: MemberRecord,
+): MemberRecordSubmission {
   return {
-    aufNumber: orNull(draft.aufNumber),
-    aufExpiry: orNull(draft.aufExpiry),
+    auf: isAufUntouched(record, draft)
+      ? null
+      : {
+          aufNumber: orNull(draft.aufNumber),
+          aufExpiry: orNull(draft.aufExpiry),
+        },
     groupIds: [...draft.groupIds],
     dateOfBirth: orNull(draft.dateOfBirth),
   };
@@ -146,6 +163,7 @@ function RecordHeader({
   locale: Locale;
   record: MemberRecord;
 }): React.JSX.Element {
+  const marks = aufMarksOf(translate, record);
   return (
     <header className="member-record-header">
       <h1>{record.fullName}</h1>
@@ -155,16 +173,18 @@ function RecordHeader({
           date: formatCalendarDay(locale, record.joinedOn),
         })}
       </p>
-      <span className="directory-marks">
-        {aufMarksOf(translate, record).map((mark) => (
-          <span
-            key={mark.text}
-            className={`directory-mark directory-mark-${mark.tone}`}
-          >
-            {mark.text}
-          </span>
-        ))}
-      </span>
+      {marks.length === 0 ? null : (
+        <span className="directory-marks">
+          {marks.map((mark) => (
+            <span
+              key={mark.text}
+              className={`directory-mark directory-mark-${mark.tone}`}
+            >
+              {mark.text}
+            </span>
+          ))}
+        </span>
+      )}
     </header>
   );
 }
@@ -230,14 +250,6 @@ function DateOfBirthSection({
 
 function isAufPending(record: MemberRecord): boolean {
   return record.aufNumber !== null && !record.isAufVerified;
-}
-
-/** Si los controles siguen enseñando el AUF guardado. */
-function isAufUntouched(record: MemberRecord, draft: Draft): boolean {
-  return (
-    draft.aufNumber === (record.aufNumber ?? "") &&
-    draft.aufExpiry === (record.aufExpiry ?? "")
-  );
 }
 
 function AufVerification({
@@ -334,7 +346,7 @@ export function MemberRecordForm({
       return;
     }
     await send("sending", () =>
-      saveMemberRecord(record.userId, toSubmission(draft)),
+      saveMemberRecord(record.userId, toSubmission(draft, record)),
     );
   }
 

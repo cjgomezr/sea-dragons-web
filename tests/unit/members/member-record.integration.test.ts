@@ -195,8 +195,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
             callerId: adminId,
             userId: paulaId!,
             submission: {
-              aufNumber: null,
-              aufExpiry: null,
+              auf: { aufNumber: null, aufExpiry: null },
               groupIds: groups,
               dateOfBirth: null,
             },
@@ -242,8 +241,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
           callerId: adminId,
           userId: paulaId,
           submission: {
-            aufNumber: longestNumber,
-            aufExpiry: "2025-12-31",
+            auf: { aufNumber: longestNumber, aufExpiry: "2025-12-31" },
             groupIds: [],
             dateOfBirth: null,
           },
@@ -288,8 +286,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
           callerId: adminId,
           userId: paulaId,
           submission: {
-            aufNumber,
-            aufExpiry: "2027-06-30",
+            auf: { aufNumber, aufExpiry: "2027-06-30" },
             groupIds: [],
             dateOfBirth: null,
           },
@@ -322,8 +319,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
             callerId: adminId,
             userId: players[0]!,
             submission: {
-              aufNumber: "AUF-1",
-              aufExpiry: "2024-03-05",
+              auf: { aufNumber: "AUF-1", aufExpiry: "2024-03-05" },
               groupIds: [],
               dateOfBirth: null,
             },
@@ -348,8 +344,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
             callerId: adminId,
             userId: paula.id,
             submission: {
-              aufNumber: null,
-              aufExpiry: null,
+              auf: { aufNumber: null, aufExpiry: null },
               groupIds: [],
               dateOfBirth: MINOR_BIRTH,
             },
@@ -538,8 +533,7 @@ describeRls("verificar el AUF contra seadragons-dev", () => {
           callerId: adminId,
           userId: players[0]!,
           submission: {
-            aufNumber: "AUF-DEL-ADMIN",
-            aufExpiry: "2030-06-30",
+            auf: { aufNumber: "AUF-DEL-ADMIN", aufExpiry: "2030-06-30" },
             groupIds: [],
             dateOfBirth: null,
           },

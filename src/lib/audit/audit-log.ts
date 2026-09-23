@@ -30,9 +30,10 @@ export const AUDIT_ACTIONS = [
   // Quién, sobre quién y cuándo ya están en la entrada.
   "member.date_of_birth_corrected",
   // RF-12 de E5 (#274): un Admin verifica el AUF de un miembro, confirmando
-  // el que propuso el miembro o escribiendo él mismo otro. Sin metadata: ni
-  // el número ni el vencimiento. Quién, sobre quién y cuándo ya están en la
-  // entrada.
+  // el que propuso el miembro o escribiendo él mismo otro en la ficha. Sin
+  // metadata: ni el número ni el vencimiento. Quién, sobre quién y cuándo ya
+  // están en la entrada. El alta de un miembro (#243) también deja su AUF
+  // verificado, pero no escribe esta entrada: ahí el AUF nace con la fila.
   "member.auf_verified",
   "payment.status_changed",
 ] as const;

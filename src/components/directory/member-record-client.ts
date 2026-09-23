@@ -25,6 +25,7 @@ import {
   MEMBER_STATUS_CHANGED_REASON,
   type MemberRecord,
   type MemberRecordIssueCode,
+  type AufSubmission,
   type MemberRecordSubmission,
 } from "@/lib/members/member-record";
 import { loadGroups } from "@/components/groups/groups-client";
@@ -95,6 +96,16 @@ export async function loadMemberRecord(
   return { kind: "loaded", record: read.value.data, clubGroups: groups.groups };
 }
 
+/** El cuerpo que espera la API: el AUF en dos campos planos, y sin él no va
+ * ninguno, que es no tocarlo. */
+function toRequestBody({
+  auf,
+  ...rest
+}: MemberRecordSubmission): Omit<MemberRecordSubmission, "auf"> &
+  Partial<AufSubmission> {
+  return auf === null ? rest : { ...auf, ...rest };
+}
+
 export async function saveMemberRecord(
   userId: string,
   submission: MemberRecordSubmission,
@@ -103,7 +114,7 @@ export async function saveMemberRecord(
     await requestApi(recordPath(userId), {
       method: "PATCH",
       headers: JSON_REQUEST_HEADERS,
-      body: JSON.stringify(submission),
+      body: JSON.stringify(toRequestBody(submission)),
     }),
     responseSchema,
   );

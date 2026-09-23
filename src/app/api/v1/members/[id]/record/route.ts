@@ -5,6 +5,7 @@ import { identifyAccountCaller } from "@/lib/auth/account-api";
 import {
   AUF_NUMBER_MAX_LENGTH,
   type MemberRecord,
+  type MemberRecordSubmission,
   readMemberRecord,
   updateMemberRecord,
 } from "@/lib/members/member-record";
@@ -41,17 +42,39 @@ const AUF_NUMBER_BODY_MAX_LENGTH = AUF_NUMBER_MAX_LENGTH * 4;
 
 /** Sólo la forma. Que el número quepa y la fecha sea un día de verdad lo
  * decide el dominio, que dice además cuál falló. `strict` responde 400 a
- * cualquier campo que no sea de esta ficha, como el rol o el nombre. */
+ * cualquier campo que no sea de esta ficha, como el rol o el nombre.
+ *
+ * El AUF va entero o no va (#274): sin él no se toca el guardado, que el
+ * miembro puede haber cambiado desde que el Admin abrió la ficha. */
 const recordBodySchema = z
   .object({
-    aufNumber: z.string().max(AUF_NUMBER_BODY_MAX_LENGTH).nullable(),
-    aufExpiry: z.string().nullable(),
+    aufNumber: z.string().max(AUF_NUMBER_BODY_MAX_LENGTH).nullable().optional(),
+    aufExpiry: z.string().nullable().optional(),
     groupIds: z.array(z.uuid()),
     dateOfBirth: z.string().nullable(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (body) => (body.aufNumber === undefined) === (body.aufExpiry === undefined),
+    {
+      message: "aufNumber y aufExpiry van juntos, o no va ninguno.",
+      path: ["aufNumber"],
+    },
+  );
 
 type RecordBody = z.infer<typeof recordBodySchema>;
+
+function toSubmission(body: RecordBody): MemberRecordSubmission {
+  const { aufNumber, aufExpiry, groupIds, dateOfBirth } = body;
+  return {
+    auf:
+      aufNumber === undefined || aufExpiry === undefined
+        ? null
+        : { aufNumber, aufExpiry },
+    groupIds,
+    dateOfBirth,
+  };
+}
 
 /** La ficha tal como está en la base después de la petición. */
 export type MemberRecordResponse = MemberRecord;
@@ -101,7 +124,7 @@ export function PATCH(
           data: await updateMemberRecord(requireMemberRecordGateways(), {
             callerId,
             userId,
-            submission: body,
+            submission: toSubmission(body),
             todayInClub: clubCalendarDate(new Date()),
           }),
         };
