@@ -2266,9 +2266,27 @@ function skipWithoutSession(): void {
   );
 }
 
+/**
+ * Sirve la campana vacía en la pantalla que se va a fotografiar.
+ *
+ * La campana está en la cabecera de todas las pantallas (#266) y su número
+ * depende de los avisos que el socio de prueba haya acumulado durante la
+ * corrida: cambiar un rol le crea uno (#267, #268). Sin esto, cualquier
+ * captura cambia sola de una corrida a otra por esos píxeles.
+ *
+ * Las pruebas de la propia campana sirven la suya dentro del test, y esa gana:
+ * Playwright atiende primero la ruta registrada más tarde.
+ */
+function quietNotificationBell(): void {
+  test.beforeEach(async ({ page }) => {
+    await serveNotifications(page, []);
+  });
+}
+
 for (const state of ACCOUNT_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
+    quietNotificationBell();
     test.use({ storageState: state.storageState });
 
     for (const vp of viewports) {
@@ -2325,6 +2343,7 @@ for (const state of ACCOUNT_STATES) {
 
 test.describe("Mi cuenta de un Player sin solicitudes", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   test("ve su rol y el formulario con Coach y Committee", async ({ page }) => {
@@ -2419,6 +2438,7 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
 
 test.describe("Mi cuenta con grupos", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: GROUPED_MEMBER_STORAGE_STATE_PATH });
 
   test("ve sus grupos en orden alfabético", async ({ page }) => {
@@ -2459,6 +2479,7 @@ test.describe("Mi cuenta con grupos", () => {
 
 test.describe("Mi cuenta sin grupos", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   test("dice que no pertenece a ninguno", async ({ page }) => {
@@ -2481,6 +2502,7 @@ test.describe("Mi cuenta sin grupos", () => {
 
 test.describe("un socio que edita su perfil", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: roleRequestStorageStatePath("perfil-para-editar") });
   // Sin reintentos: el primer intento ya dejó la ficha cambiada, y un segundo
   // taparía por qué falló.
@@ -2573,6 +2595,7 @@ const PHOTO_MEMBER_NAME = seededMemberName(E2E_SESSION, "perfil-para-foto");
 
 test.describe("una socia que sube su foto de perfil", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: roleRequestStorageStatePath("perfil-para-foto") });
   // Sin reintentos: el primer intento ya dejó la foto cambiada, y un segundo
   // taparía por qué falló.
@@ -2645,6 +2668,7 @@ test.describe("una socia que sube su foto de perfil", () => {
 
 test.describe("Mi cuenta con una solicitud pendiente", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({
     storageState: roleRequestStorageStatePath("con-solicitud-pendiente"),
   });
@@ -2681,6 +2705,7 @@ test.describe("Mi cuenta con una solicitud pendiente", () => {
 
 test.describe("un socio que pide un rol desde Mi cuenta", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: roleRequestStorageStatePath("para-pedir-rol") });
   // Sin reintentos: el primer intento deja la solicitud guardada, así que un
   // segundo encontraría la pendiente en vez del formulario y taparía por qué
@@ -2917,6 +2942,7 @@ async function goToGroups(
 for (const state of GROUPS_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
+    quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
     for (const vp of viewports) {
@@ -2961,6 +2987,7 @@ for (const state of GROUPS_STATES) {
 
 test.describe("la sección Grupos con los datos de verdad", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
   test("un Admin abre la sección desde la barra lateral", async ({ page }) => {
@@ -3002,6 +3029,7 @@ test.describe("la sección Grupos con los datos de verdad", () => {
 
 test.describe("un Player frente a la sección Grupos", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   test("no la ve en la barra lateral", async ({ page }) => {
@@ -3463,6 +3491,7 @@ async function goToDirectory(
 for (const state of DIRECTORY_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
+    quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
     for (const vp of viewports) {
@@ -3507,6 +3536,7 @@ for (const state of DIRECTORY_STATES) {
 
 test.describe("el directorio con los datos de verdad", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
   test("un Admin lo abre desde la barra lateral", async ({ page }) => {
@@ -3597,6 +3627,7 @@ test.describe("el directorio con los datos de verdad", () => {
 
 test.describe("un Admin que decide una solicitud desde el directorio", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
   // Sin reintentos: el primer intento ya aprueba la solicitud, y el segundo
   // encontraría la bandeja sin ella y taparía por qué falló el primero.
@@ -3643,6 +3674,7 @@ test.describe("un Admin que decide una solicitud desde el directorio", () => {
 
 test.describe("un Player frente al directorio", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   test("lo alcanza, porque el club puede verse a sí mismo", async ({
@@ -4011,6 +4043,7 @@ async function goToMemberRecord(
 for (const state of MEMBER_RECORD_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
+    quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
     for (const vp of viewports) {
@@ -4061,6 +4094,7 @@ function openOwnRecordLink(page: Page) {
 
 test.describe("un Admin frente a la ficha con los datos de verdad", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
   // Sin reintentos: el primer intento ya guarda, y el segundo partiría de lo
   // que dejó el primero y taparía por qué falló.
@@ -4113,6 +4147,7 @@ test.describe("un Admin frente a la ficha con los datos de verdad", () => {
 
 test.describe("un Player frente a la ficha reservada al Admin", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   test("abrirla a mano lo manda al panel", async ({ page }) => {
@@ -4377,6 +4412,7 @@ async function goToNewMember(
 for (const state of NEW_MEMBER_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
+    quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
     for (const vp of viewports) {
@@ -4421,6 +4457,7 @@ for (const state of NEW_MEMBER_STATES) {
 
 test.describe("un Admin frente al alta con los datos de verdad", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
   test("la abre desde el directorio y un correo con cuenta se rechaza junto a su campo", async ({
@@ -4470,6 +4507,7 @@ test.describe("un Admin frente al alta con los datos de verdad", () => {
 
 test.describe("un Player frente al alta de un miembro", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   test("abrirla a mano lo manda al panel", async ({ page }) => {
