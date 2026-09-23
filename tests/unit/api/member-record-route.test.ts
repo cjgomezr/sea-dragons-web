@@ -25,11 +25,16 @@ const UNKNOWN_MEMBER_ID = "b1b1b1b1-0000-4000-8000-0000000000ff";
 const SENIOR_ID = "9a9a9a9a-0000-4000-8000-000000000001";
 const UNKNOWN_GROUP_ID = "9a9a9a9a-0000-4000-8000-0000000000ff";
 const JOINED_ON = "2024-03-06";
+const REGISTERED_AT = "2024-03-06T01:00:00.000Z";
+const ADULT_BIRTH = "1990-05-10";
+/** 14 años el día del registro. */
+const MINOR_BIRTH = "2010-01-01";
 
 const VALID_BODY = {
   aufNumber: "AUF-2026-0042",
   aufExpiry: "2027-03-31",
   groupIds: [SENIOR_ID],
+  dateOfBirth: ADULT_BIRTH,
 } as const;
 
 const readSessionState = vi.fn();
@@ -43,6 +48,8 @@ function memberRecordGateways(): MemberRecordGateways {
     aufExpiry: null,
   };
   const memberships = new Set<string>();
+  let dateOfBirth: string = ADULT_BIRTH;
+  let accountStatus: AccountStatus = "active";
   const isKnown = (userId: string): boolean => userId === MEMBER_ID;
   return {
     members: {
@@ -59,8 +66,11 @@ function memberRecordGateways(): MemberRecordGateways {
               userId,
               fullName: "Paula Player",
               joinedOn: JOINED_ON,
-              accountStatus: "active",
+              accountStatus,
               ...auf,
+              dateOfBirth,
+              registeredAt: REGISTERED_AT,
+              hasGuardianConsent: false,
             }
           : null,
       findMemberGroups: async () =>
@@ -75,6 +85,18 @@ function memberRecordGateways(): MemberRecordGateways {
                 aufExpiry: registration.expiry,
               };
         return { kind: "updated" };
+      },
+      correctDateOfBirth: async (_scope, correction) => {
+        writes.push(`birth ${correction.toStatus}`);
+        dateOfBirth = correction.dateOfBirth;
+        accountStatus = correction.toStatus;
+        return { kind: "corrected" };
+      },
+    },
+    audit: {
+      insertAuditLogRow: async (row) => {
+        writes.push(`audit ${row.action}`);
+        return { error: null };
       },
     },
     groups: {
@@ -198,6 +220,9 @@ describe("PATCH /api/v1/members/{id}/record", () => {
         accountStatus: "active",
         aufNumber: "AUF-2026-0042",
         aufExpiry: "2027-03-31",
+        dateOfBirth: ADULT_BIRTH,
+        registeredAt: REGISTERED_AT,
+        hasGuardianConsent: false,
         isAufExpired: false,
         groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
       },
@@ -263,6 +288,8 @@ describe("PATCH /api/v1/members/{id}/record", () => {
     ["un grupo que no es un uuid", { ...VALID_BODY, groupIds: ["senior"] }],
     ["sin la lista de grupos", { aufNumber: "A", aufExpiry: null }],
     ["un número que no es texto", { ...VALID_BODY, aufNumber: 42 }],
+    ["sin la fecha de nacimiento", { ...VALID_BODY, dateOfBirth: undefined }],
+    ["una fecha que no es texto", { ...VALID_BODY, dateOfBirth: 20100101 }],
   ])("responde 400 a %s", async (_case, body) => {
     const response = await patchRecord(body);
 
@@ -342,5 +369,82 @@ describe("GET /api/v1/members/{id}/record", () => {
 
     expect(response.status).toBe(404);
     await expect(reasonOf(response)).resolves.toBe("member_not_found");
+  });
+});
+
+describe("endpoint de la ficha: fecha de nacimiento", () => {
+  it("guarda la fecha corregida, lo deja en la bitácora y responde el estado nuevo", async () => {
+    const response = await patchRecord({
+      ...VALID_BODY,
+      dateOfBirth: MINOR_BIRTH,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { dateOfBirth: MINOR_BIRTH, accountStatus: "incomplete" },
+    });
+    expect(writes).toEqual(
+      expect.arrayContaining([
+        "birth incomplete",
+        "audit member.date_of_birth_corrected",
+      ]),
+    );
+  });
+
+  it.each([
+    ["2999-01-01", "date_of_birth_in_future"],
+    ["1899-12-31", "date_of_birth_too_early"],
+    ["2010-02-30", "date_of_birth_not_a_date"],
+    ["10/05/1990", "date_of_birth_not_a_date"],
+  ])(
+    "responde 400 a la fecha %j con el motivo %s, sin tocar la base",
+    async (dateOfBirth, reason) => {
+      const response = await patchRecord({ ...VALID_BODY, dateOfBirth });
+
+      expect(response.status).toBe(400);
+      await expect(reasonOf(response)).resolves.toBe(reason);
+      expect(writes).toEqual([]);
+    },
+  );
+
+  it("responde 400 si intenta borrar una fecha que ya estaba", async () => {
+    const response = await patchRecord({ ...VALID_BODY, dateOfBirth: null });
+
+    expect(response.status).toBe(400);
+    await expect(reasonOf(response)).resolves.toBe("date_of_birth_required");
+    expect(writes).toEqual([]);
+  });
+
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "responde 403 a un %s que intenta corregir la fecha",
+    async (role) => {
+      givenRole(role);
+
+      const response = await patchRecord({
+        ...VALID_BODY,
+        dateOfBirth: MINOR_BIRTH,
+      });
+
+      expect(response.status).toBe(403);
+      expect(writes).toEqual([]);
+    },
+  );
+
+  it("responde 409 si el estado de la cuenta cambió mientras se guardaba", async () => {
+    gateways = {
+      ...gateways,
+      records: {
+        ...gateways.records,
+        correctDateOfBirth: async () => ({ kind: "status_changed" }),
+      },
+    };
+
+    const response = await patchRecord({
+      ...VALID_BODY,
+      dateOfBirth: MINOR_BIRTH,
+    });
+
+    expect(response.status).toBe(409);
+    await expect(reasonOf(response)).resolves.toBe("member_status_changed");
   });
 });

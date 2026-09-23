@@ -2266,9 +2266,27 @@ function skipWithoutSession(): void {
   );
 }
 
+/**
+ * Sirve la campana vacía en la pantalla que se va a fotografiar.
+ *
+ * La campana está en la cabecera de todas las pantallas (#266) y su número
+ * depende de los avisos que el socio de prueba haya acumulado durante la
+ * corrida: cambiar un rol le crea uno (#267, #268). Sin esto, cualquier
+ * captura cambia sola de una corrida a otra por esos píxeles.
+ *
+ * Las pruebas de la propia campana sirven la suya dentro del test, y esa gana:
+ * Playwright atiende primero la ruta registrada más tarde.
+ */
+function quietNotificationBell(): void {
+  test.beforeEach(async ({ page }) => {
+    await serveNotifications(page, []);
+  });
+}
+
 for (const state of ACCOUNT_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
+    quietNotificationBell();
     test.use({ storageState: state.storageState });
 
     for (const vp of viewports) {
@@ -2325,6 +2343,7 @@ for (const state of ACCOUNT_STATES) {
 
 test.describe("Mi cuenta de un Player sin solicitudes", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   test("ve su rol y el formulario con Coach y Committee", async ({ page }) => {
@@ -2419,6 +2438,7 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
 
 test.describe("Mi cuenta con grupos", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: GROUPED_MEMBER_STORAGE_STATE_PATH });
 
   test("ve sus grupos en orden alfabético", async ({ page }) => {
@@ -2459,6 +2479,7 @@ test.describe("Mi cuenta con grupos", () => {
 
 test.describe("Mi cuenta sin grupos", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   test("dice que no pertenece a ninguno", async ({ page }) => {
@@ -2481,6 +2502,7 @@ test.describe("Mi cuenta sin grupos", () => {
 
 test.describe("un socio que edita su perfil", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: roleRequestStorageStatePath("perfil-para-editar") });
   // Sin reintentos: el primer intento ya dejó la ficha cambiada, y un segundo
   // taparía por qué falló.
@@ -2573,6 +2595,7 @@ const PHOTO_MEMBER_NAME = seededMemberName(E2E_SESSION, "perfil-para-foto");
 
 test.describe("una socia que sube su foto de perfil", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: roleRequestStorageStatePath("perfil-para-foto") });
   // Sin reintentos: el primer intento ya dejó la foto cambiada, y un segundo
   // taparía por qué falló.
@@ -2645,6 +2668,7 @@ test.describe("una socia que sube su foto de perfil", () => {
 
 test.describe("Mi cuenta con una solicitud pendiente", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({
     storageState: roleRequestStorageStatePath("con-solicitud-pendiente"),
   });
@@ -2681,6 +2705,7 @@ test.describe("Mi cuenta con una solicitud pendiente", () => {
 
 test.describe("un socio que pide un rol desde Mi cuenta", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: roleRequestStorageStatePath("para-pedir-rol") });
   // Sin reintentos: el primer intento deja la solicitud guardada, así que un
   // segundo encontraría la pendiente en vez del formulario y taparía por qué
@@ -2917,6 +2942,7 @@ async function goToGroups(
 for (const state of GROUPS_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
+    quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
     for (const vp of viewports) {
@@ -2961,6 +2987,7 @@ for (const state of GROUPS_STATES) {
 
 test.describe("la sección Grupos con los datos de verdad", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
   test("un Admin abre la sección desde la barra lateral", async ({ page }) => {
@@ -3002,6 +3029,7 @@ test.describe("la sección Grupos con los datos de verdad", () => {
 
 test.describe("un Player frente a la sección Grupos", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   test("no la ve en la barra lateral", async ({ page }) => {
@@ -3463,6 +3491,7 @@ async function goToDirectory(
 for (const state of DIRECTORY_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
+    quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
     for (const vp of viewports) {
@@ -3507,6 +3536,7 @@ for (const state of DIRECTORY_STATES) {
 
 test.describe("el directorio con los datos de verdad", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
   test("un Admin lo abre desde la barra lateral", async ({ page }) => {
@@ -3597,6 +3627,7 @@ test.describe("el directorio con los datos de verdad", () => {
 
 test.describe("un Admin que decide una solicitud desde el directorio", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
   // Sin reintentos: el primer intento ya aprueba la solicitud, y el segundo
   // encontraría la bandeja sin ella y taparía por qué falló el primero.
@@ -3643,6 +3674,7 @@ test.describe("un Admin que decide una solicitud desde el directorio", () => {
 
 test.describe("un Player frente al directorio", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   test("lo alcanza, porque el club puede verse a sí mismo", async ({
@@ -3742,6 +3774,9 @@ type StubbedMemberRecord = {
   readonly accountStatus: "incomplete" | "active" | "inactive";
   readonly aufNumber: string;
   readonly aufExpiry: string;
+  readonly dateOfBirth: string;
+  readonly registeredAt: string;
+  readonly hasGuardianConsent: boolean;
   readonly isAufExpired: boolean;
   readonly groups: readonly { readonly id: string; readonly name: string }[];
 };
@@ -3754,6 +3789,9 @@ const CURRENT_RECORD: StubbedMemberRecord = {
   accountStatus: "active",
   aufNumber: "AUF-2026-0042",
   aufExpiry: "2030-06-30",
+  dateOfBirth: "1990-05-10",
+  registeredAt: "2024-03-06T01:00:00.000Z",
+  hasGuardianConsent: false,
   isAufExpired: false,
   groups: [STUBBED_CLUB_GROUPS[0], STUBBED_CLUB_GROUPS[2]].map(
     ({ id, name }) => ({ id, name }),
@@ -3779,7 +3817,15 @@ const EXPIRED_RECORD: StubbedMemberRecord = {
   isAufExpired: true,
 };
 
-const EXPIRY_BEFORE_JOINING_ERROR = {
+type StubbedSaveRejection = {
+  readonly error: {
+    readonly code: string;
+    readonly message: string;
+    readonly reason: string;
+  };
+};
+
+const EXPIRY_BEFORE_JOINING_ERROR: StubbedSaveRejection = {
   error: {
     code: "validation_error",
     message: "El vencimiento es anterior al ingreso.",
@@ -3787,9 +3833,22 @@ const EXPIRY_BEFORE_JOINING_ERROR = {
   },
 };
 
+const BIRTH_IN_FUTURE_ERROR: StubbedSaveRejection = {
+  error: {
+    code: "validation_error",
+    message: "La fecha de nacimiento es futura.",
+    reason: "date_of_birth_in_future",
+  },
+};
+
+/** 9 años el día del registro del miembro: guardarla le pediría el
+ * consentimiento de su tutor (#272). */
+const MINOR_BIRTH = "2015-01-01";
+
 async function stubMemberRecordReads(
   page: Page,
   record: StubbedMemberRecord,
+  saveRejection: StubbedSaveRejection = EXPIRY_BEFORE_JOINING_ERROR,
 ): Promise<void> {
   await page.route(
     (url) => url.pathname === CLUB_GROUPS_ENDPOINT,
@@ -3809,7 +3868,7 @@ async function stubMemberRecordReads(
         ? route.fulfill({
             status: 400,
             contentType: "application/json",
-            body: JSON.stringify(EXPIRY_BEFORE_JOINING_ERROR),
+            body: JSON.stringify(saveRejection),
           })
         : route.fulfill({
             status: 200,
@@ -3829,10 +3888,30 @@ function submitExpiryBeforeJoining(saveLabel: string, issueText: RegExp) {
   };
 }
 
+/** Pone una fecha de nacimiento futura y guarda: el servidor fingido la
+ * rechaza, y el aviso sale junto al campo. */
+function submitBirthInFuture(saveLabel: string, issueText: RegExp) {
+  return async (page: Page): Promise<void> => {
+    await page.locator("#ficha-nacimiento").fill("2999-01-01");
+    await page.getByRole("button", { name: saveLabel }).click();
+    await expect(page.getByText(issueText)).toBeVisible();
+  };
+}
+
+/** Pone la fecha de un menor sin guardar: la ficha avisa de que el miembro
+ * tendrá que dar el consentimiento de su tutor. */
+function typeMinorBirth(noticeText: RegExp) {
+  return async (page: Page): Promise<void> => {
+    await page.locator("#ficha-nacimiento").fill(MINOR_BIRTH);
+    await expect(page.getByText(noticeText)).toBeVisible();
+  };
+}
+
 type MemberRecordState = {
   readonly name: string;
   readonly record: StubbedMemberRecord;
   readonly saveLabel: string;
+  readonly saveRejection?: StubbedSaveRejection;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
 };
@@ -3904,6 +3983,40 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
       /no puede ser anterior a su fecha de ingreso/,
     ),
   },
+  {
+    name: "ficha-nacimiento-aviso-validacion",
+    record: CURRENT_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+    saveRejection: BIRTH_IN_FUTURE_ERROR,
+    prepare: submitBirthInFuture(
+      ENGLISH_SAVE_RECORD,
+      /Date of birth can't be in the future/,
+    ),
+  },
+  {
+    name: "ficha-nacimiento-aviso-validacion-es",
+    record: CURRENT_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    saveRejection: BIRTH_IN_FUTURE_ERROR,
+    beforeVisit: chooseSpanish,
+    prepare: submitBirthInFuture(
+      SPANISH_SAVE_RECORD,
+      /La fecha de nacimiento no puede estar en el futuro/,
+    ),
+  },
+  {
+    name: "ficha-nacimiento-aviso-tutor",
+    record: CURRENT_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+    prepare: typeMinorBirth(/will have to give a guardian's details/),
+  },
+  {
+    name: "ficha-nacimiento-aviso-tutor-es",
+    record: CURRENT_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    beforeVisit: chooseSpanish,
+    prepare: typeMinorBirth(/tendrá que dar los datos y el consentimiento/),
+  },
 ];
 
 async function goToMemberRecord(
@@ -3911,7 +4024,7 @@ async function goToMemberRecord(
   state: MemberRecordState,
   theme?: (typeof themes)[number],
 ): Promise<void> {
-  await stubMemberRecordReads(page, state.record);
+  await stubMemberRecordReads(page, state.record, state.saveRejection);
   await state.beforeVisit?.(page);
   if (theme === undefined) {
     await page.goto(`${APP_URL}${MEMBER_RECORD_SCREEN_PATH}`);
@@ -3930,6 +4043,7 @@ async function goToMemberRecord(
 for (const state of MEMBER_RECORD_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
+    quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
     for (const vp of viewports) {
@@ -3980,6 +4094,7 @@ function openOwnRecordLink(page: Page) {
 
 test.describe("un Admin frente a la ficha con los datos de verdad", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
   // Sin reintentos: el primer intento ya guarda, y el segundo partiría de lo
   // que dejó el primero y taparía por qué falló.
@@ -4032,6 +4147,7 @@ test.describe("un Admin frente a la ficha con los datos de verdad", () => {
 
 test.describe("un Player frente a la ficha reservada al Admin", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   test("abrirla a mano lo manda al panel", async ({ page }) => {
@@ -4296,6 +4412,7 @@ async function goToNewMember(
 for (const state of NEW_MEMBER_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
+    quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
     for (const vp of viewports) {
@@ -4340,6 +4457,7 @@ for (const state of NEW_MEMBER_STATES) {
 
 test.describe("un Admin frente al alta con los datos de verdad", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
   test("la abre desde el directorio y un correo con cuenta se rechaza junto a su campo", async ({
@@ -4389,6 +4507,7 @@ test.describe("un Admin frente al alta con los datos de verdad", () => {
 
 test.describe("un Player frente al alta de un miembro", () => {
   skipWithoutSession();
+  quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
   test("abrirla a mano lo manda al panel", async ({ page }) => {

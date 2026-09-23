@@ -9,6 +9,7 @@ import {
   type MemberRecord,
   type MemberRecordIssueCode,
   type MemberRecordSubmission,
+  correctionRequiresGuardianConsent,
   isAufNumberTooLong,
 } from "@/lib/members/member-record";
 import { GroupsField, TextField } from "./record-fields";
@@ -22,8 +23,8 @@ import {
 
 /**
  * El formulario de la ficha reservada al Admin (#242): número de AUF,
- * vencimiento y grupos, guardados juntos en una sola petición para que dos
- * Admin a la vez no dejen la fila a medias.
+ * vencimiento, grupos y fecha de nacimiento (#272), guardados juntos en una
+ * sola petición para que dos Admin a la vez no dejen la fila a medias.
  *
  * Da un cambio por hecho sólo cuando el servidor lo confirma, y entonces
  * enseña lo que el servidor guardó, no lo que se escribió: si el número se
@@ -42,23 +43,28 @@ type Draft = {
   readonly aufNumber: string;
   readonly aufExpiry: string;
   readonly groupIds: ReadonlySet<string>;
+  readonly dateOfBirth: string;
 };
 
 /** Un aviso que va junto a su campo y no en el aviso general. */
 type FieldIssue = {
-  readonly field: "aufNumber" | "aufExpiry";
+  readonly field: "aufNumber" | "aufExpiry" | "dateOfBirth";
   readonly code: MemberRecordIssueCode;
 };
 
 const AUF_NUMBER_ID = "ficha-auf-numero";
 const AUF_EXPIRY_ID = "ficha-auf-vencimiento";
 const AUF_HINT_ID = "ficha-auf-ayuda";
+const BIRTH_ID = "ficha-nacimiento";
+const BIRTH_HINT_ID = "ficha-nacimiento-ayuda";
+const GUARDIAN_NOTICE_ID = "ficha-nacimiento-tutor";
 
 function toDraft(record: MemberRecord): Draft {
   return {
     aufNumber: record.aufNumber ?? "",
     aufExpiry: record.aufExpiry ?? "",
     groupIds: new Set(record.groups.map((group) => group.id)),
+    dateOfBirth: record.dateOfBirth ?? "",
   };
 }
 
@@ -71,6 +77,7 @@ function toSubmission(draft: Draft): MemberRecordSubmission {
     aufNumber: orNull(draft.aufNumber),
     aufExpiry: orNull(draft.aufExpiry),
     groupIds: [...draft.groupIds],
+    dateOfBirth: orNull(draft.dateOfBirth),
   };
 }
 
@@ -80,6 +87,10 @@ const FIELD_OF_ISSUE: Readonly<
   auf_number_too_long: "aufNumber",
   auf_expiry_not_a_date: "aufExpiry",
   auf_expiry_before_joined: "aufExpiry",
+  date_of_birth_not_a_date: "dateOfBirth",
+  date_of_birth_in_future: "dateOfBirth",
+  date_of_birth_too_early: "dateOfBirth",
+  date_of_birth_required: "dateOfBirth",
 };
 
 function toFieldIssue(code: MemberRecordIssueCode): FieldIssue {
@@ -135,6 +146,65 @@ function RecordHeader({
         </span>
       ) : null}
     </header>
+  );
+}
+
+/** Si guardar la fecha que hay en el control dejaría al miembro pidiendo el
+ * consentimiento de su tutor. Se avisa antes de guardar para que no sea una
+ * sorpresa para nadie. Una fecha a medio escribir no avisa: el control de
+ * fecha la entrega vacía hasta que está completa. */
+function isGuardianNoticeDue(
+  record: MemberRecord,
+  dateOfBirth: string,
+): boolean {
+  return (
+    dateOfBirth !== "" &&
+    dateOfBirth !== record.dateOfBirth &&
+    correctionRequiresGuardianConsent(record, dateOfBirth)
+  );
+}
+
+function DateOfBirthSection({
+  translate,
+  record,
+  value,
+  issueText,
+  onChange,
+}: {
+  translate: Translator;
+  record: MemberRecord;
+  value: string;
+  issueText: string | null;
+  onChange: (dateOfBirth: string) => void;
+}): React.JSX.Element {
+  const isNoticeDue = isGuardianNoticeDue(record, value);
+  return (
+    <section className="auth-fields" aria-labelledby="ficha-nacimiento-titulo">
+      <h2 id="ficha-nacimiento-titulo">
+        {translate("memberRecord.birth.title")}
+      </h2>
+      <TextField
+        id={BIRTH_ID}
+        label={translate("memberRecord.birth.label")}
+        type="date"
+        value={value}
+        issueText={issueText}
+        hintIds={
+          isNoticeDue ? [GUARDIAN_NOTICE_ID, BIRTH_HINT_ID] : [BIRTH_HINT_ID]
+        }
+        onChange={onChange}
+      />
+      {isNoticeDue ? (
+        <p className="member-record-warning" id={GUARDIAN_NOTICE_ID}>
+          {translate("memberRecord.birth.guardianNotice", {
+            name: record.fullName,
+          })}
+        </p>
+      ) : null}
+      <p className="auth-hint" id={BIRTH_HINT_ID}>
+        {translate("memberRecord.birth.hint")}
+      </p>
+    </section>
   );
 }
 
@@ -239,7 +309,7 @@ export function MemberRecordForm({
               type="text"
               value={draft.aufNumber}
               issueText={issueTextFor("aufNumber")}
-              hintId={AUF_HINT_ID}
+              hintIds={[AUF_HINT_ID]}
               onChange={(aufNumber) => update({ aufNumber })}
             />
             <TextField
@@ -254,6 +324,13 @@ export function MemberRecordForm({
               {translate("memberRecord.auf.hint")}
             </p>
           </section>
+          <DateOfBirthSection
+            translate={translate}
+            record={record}
+            value={draft.dateOfBirth}
+            issueText={issueTextFor("dateOfBirth")}
+            onChange={(dateOfBirth) => update({ dateOfBirth })}
+          />
           <GroupsField
             translate={translate}
             clubGroups={clubGroups}

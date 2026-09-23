@@ -190,6 +190,7 @@ describe("PATCH /api/v1/account/profile", () => {
     ["aufExpiry", "2030-01-01"],
     ["groups", ["Senior Squad"]],
     ["status", "active"],
+    ["dateOfBirth", "2010-01-01"],
   ])(
     "responde 403 y nombra el campo cuando intenta cambiar %s",
     async (field, value) => {

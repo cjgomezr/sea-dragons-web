@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
+import { listPendingRequirements } from "@/lib/auth/account-activation";
 import type { Role } from "@/lib/auth/roles";
+import { readSessionState } from "@/lib/auth/session-reader";
+import { createSupabaseAuthGateways } from "@/lib/auth/supabase-auth-gateways";
 import {
   DEFAULT_DIRECTORY_QUERY,
   listDirectory,
@@ -22,6 +25,7 @@ import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
   type ServiceRoleClient,
   type TestUser,
+  createRlsClient,
   createServiceRoleTestClient,
   describeRls,
   withSeededRows,
@@ -35,10 +39,15 @@ import {
  * grupos desde la ficha deja los mismos conteos que hacerlo desde Grupos.
  *
  * Orden de limpieza: los grupos primero (y con ellos sus pertenencias), luego
- * los socios y al final el club.
+ * los socios, la bitácora del club y al final el club.
  */
 
 const MEMBERS_TABLE = "members";
+const AUDIT_LOG_TABLE = "audit_log";
+/** Mayor de edad hoy y el día en que se sembró la fila. */
+const ADULT_BIRTH = "1990-05-10";
+/** Menor el día en que se sembró la fila, que es hoy. */
+const MINOR_BIRTH = "2015-01-01";
 const GROUPS_TABLE = "groups";
 const TODAY_IN_CLUB = "2026-09-21";
 const JOINED_ON = "2024-03-06";
@@ -53,7 +62,21 @@ async function withClub<T>(
     serviceClient,
     "clubs",
     [{ slug: `ficha-admin-${randomUUID()}`, name: "Club de la ficha" }],
-    ([club]) => run(club!.id as string),
+    async ([club]) => {
+      const clubId = club!.id as string;
+      try {
+        return await run(clubId);
+      } finally {
+        // La bitácora nombra al club y no dejaría borrarlo.
+        const { error } = await serviceClient.client
+          .from(AUDIT_LOG_TABLE)
+          .delete()
+          .eq("club_id", clubId);
+        if (error) {
+          throw new Error(`No se pudo limpiar la bitácora: ${error.message}`);
+        }
+      }
+    },
   );
 }
 
@@ -119,6 +142,8 @@ type Scenario = {
   readonly clubId: string;
   readonly adminId: string;
   readonly players: readonly string[];
+  /** Paula con su contraseña, para entrar como ella. */
+  readonly paula: TestUser;
   readonly groupIds: readonly [string, string];
 };
 
@@ -140,6 +165,7 @@ async function withScenario(run: (scenario: Scenario) => Promise<void>) {
             clubId,
             adminId: admin!.id,
             players: [paula!.id, pedro!.id],
+            paula: paula!,
             groupIds,
           }),
         ),
@@ -161,7 +187,12 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
           updateMemberRecord(recordGateways, {
             callerId: adminId,
             userId: paulaId!,
-            submission: { aufNumber: null, aufExpiry: null, groupIds: groups },
+            submission: {
+              aufNumber: null,
+              aufExpiry: null,
+              groupIds: groups,
+              dateOfBirth: null,
+            },
             todayInClub: TODAY_IN_CLUB,
           });
         const viaGroups = (groupId: string) => ({
@@ -207,6 +238,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
             aufNumber: longestNumber,
             aufExpiry: "2025-12-31",
             groupIds: [],
+            dateOfBirth: null,
           },
           todayInClub: TODAY_IN_CLUB,
         });
@@ -248,7 +280,12 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
         const request = (aufNumber: string | null) => ({
           callerId: adminId,
           userId: paulaId,
-          submission: { aufNumber, aufExpiry: "2027-06-30", groupIds: [] },
+          submission: {
+            aufNumber,
+            aufExpiry: "2027-06-30",
+            groupIds: [],
+            dateOfBirth: null,
+          },
           todayInClub: TODAY_IN_CLUB,
         });
         await updateMemberRecord(gateways, request("AUF-1"));
@@ -281,6 +318,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
               aufNumber: "AUF-1",
               aufExpiry: "2024-03-05",
               groupIds: [],
+              dateOfBirth: null,
             },
             todayInClub: TODAY_IN_CLUB,
           }),
@@ -289,4 +327,106 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
+
+  it(
+    "la corrección que deja menor sin consentimiento manda a completar el registro, y la bitácora no guarda las fechas",
+    async () => {
+      await withScenario(async (scenario) => {
+        const { serviceClient, clubId, adminId, paula } = scenario;
+        await setDateOfBirth(serviceClient, paula.id, ADULT_BIRTH);
+
+        const saved = await updateMemberRecord(
+          createMemberRecordGateways(serviceClient.client),
+          {
+            callerId: adminId,
+            userId: paula.id,
+            submission: {
+              aufNumber: null,
+              aufExpiry: null,
+              groupIds: [],
+              dateOfBirth: MINOR_BIRTH,
+            },
+            todayInClub: TODAY_IN_CLUB,
+          },
+        );
+
+        expect(saved).toMatchObject({
+          dateOfBirth: MINOR_BIRTH,
+          accountStatus: "incomplete",
+          hasGuardianConsent: false,
+        });
+        await expect(pendingOf(paula.id)).resolves.toContain("guardianConsent");
+        await expect(sessionKindOf(paula)).resolves.toBe("incomplete");
+        const auditRows = await readAuditRows(serviceClient, clubId);
+        expect(auditRows).toEqual([
+          {
+            actor_id: adminId,
+            action: "member.date_of_birth_corrected",
+            entity_type: "member",
+            entity_id: paula.id,
+            result: "success",
+            metadata: null,
+          },
+        ]);
+        expect(JSON.stringify(auditRows)).not.toContain(MINOR_BIRTH);
+        expect(JSON.stringify(auditRows)).not.toContain(ADULT_BIRTH);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
 });
+
+async function setDateOfBirth(
+  serviceClient: ServiceRoleClient,
+  userId: string,
+  dateOfBirth: string,
+): Promise<void> {
+  const { error } = await serviceClient.client
+    .from(MEMBERS_TABLE)
+    .update({ date_of_birth: dateOfBirth })
+    .eq("user_id", userId);
+  if (error) {
+    throw new Error(`No se pudo sembrar la fecha: ${error.message}`);
+  }
+}
+
+/** Lo que la pantalla de completar registro le pediría, leído con la misma
+ * regla y el mismo adaptador que ella. */
+async function pendingOf(userId: string): Promise<readonly string[]> {
+  const wiring = createSupabaseAuthGateways(process.env);
+  if (wiring.kind === "unconfigured") {
+    throw new Error(`Faltan variables: ${wiring.missingKeys.join(", ")}`);
+  }
+  const account = await wiring.gateways.accounts.findByUserId(userId);
+  if (account === null) {
+    throw new Error(`No existe la cuenta ${userId}.`);
+  }
+  return listPendingRequirements({
+    profile: account.profile,
+    emailConfirmed: true,
+  });
+}
+
+/** Lo que la frontera ve en la siguiente petición del socio, leído con su
+ * propia sesión como lo lee el proxy. */
+async function sessionKindOf(member: TestUser): Promise<string> {
+  const { client } = await createRlsClient(
+    { role: "authenticated", email: member.email, password: member.password },
+    process.env,
+  );
+  return (await readSessionState(client)).kind;
+}
+
+async function readAuditRows(
+  serviceClient: ServiceRoleClient,
+  clubId: string,
+): Promise<readonly unknown[]> {
+  const { data, error } = await serviceClient.client
+    .from(AUDIT_LOG_TABLE)
+    .select("actor_id, action, entity_type, entity_id, result, metadata")
+    .eq("club_id", clubId);
+  if (error) {
+    throw new Error(`No se pudo leer la bitácora: ${error.message}`);
+  }
+  return data;
+}

@@ -25,6 +25,10 @@ export const AUDIT_ACTIONS = [
   // el estado anterior y el nuevo, y en el rechazo del último Admin el motivo.
   // Ni nombre ni correo: la entidad es el `user_id` del miembro.
   "member.status_changed",
+  // RF-10 de E5 (#272): un Admin corrige la fecha de nacimiento de un miembro.
+  // Sin metadata: ni la fecha nueva ni la anterior, que son datos personales.
+  // Quién, sobre quién y cuándo ya están en la entrada.
+  "member.date_of_birth_corrected",
   "payment.status_changed",
 ] as const;
 

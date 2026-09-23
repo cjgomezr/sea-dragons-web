@@ -468,13 +468,19 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.openLabel": "Abrir la ficha de {name}",
   "memberRecord.loading": "Cargando la ficha del miembro…",
   "memberRecord.lead":
-    "Lo que sólo edita un Admin: el registro AUF y los grupos.",
+    "Lo que sólo edita un Admin: el registro AUF, la fecha de nacimiento y los grupos.",
   "memberRecord.joinedOn": "Miembro desde el {date}",
   "memberRecord.auf.title": "Registro AUF",
   "memberRecord.auf.number": "Número de AUF",
   "memberRecord.auf.expiry": "Vencimiento",
   "memberRecord.auf.hint":
     "Si borras el número, se borra también su vencimiento.",
+  "memberRecord.birth.title": "Datos personales",
+  "memberRecord.birth.label": "Fecha de nacimiento",
+  "memberRecord.birth.hint":
+    "El miembro no puede cambiarla: de ella depende si necesita el consentimiento de un tutor.",
+  "memberRecord.birth.guardianNotice":
+    "Al guardar, {name} tendrá que dar los datos y el consentimiento de su tutor la próxima vez que entre.",
   "memberRecord.groups.legend": "Grupos",
   "memberRecord.groups.empty": "El club todavía no tiene grupos.",
   "memberRecord.save": "Guardar la ficha",
@@ -486,11 +492,15 @@ export const spanishMessages: MessageCatalog = {
     "Ese vencimiento no es una fecha válida.",
   "memberRecord.issue.aufExpiryBeforeJoined":
     "El vencimiento no puede ser anterior a su fecha de ingreso ({date}).",
+  "memberRecord.issue.dateOfBirthRequired":
+    "Una fecha de nacimiento ya registrada no se puede borrar.",
   "memberRecord.error.memberNotFound": "Ese miembro no está en el club.",
   "memberRecord.error.groupNotFound":
     "Uno de esos grupos ya no está en el club. Vuelve a cargar la ficha.",
   "memberRecord.error.memberInactive":
     "A un miembro con la cuenta desactivada no se le pueden agregar grupos.",
+  "memberRecord.error.memberStatusChanged":
+    "La cuenta del miembro cambió mientras se guardaba. Vuelve a cargar la ficha e inténtalo de nuevo.",
   "memberRecord.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para seguir.",
   "memberRecord.error.forbidden":

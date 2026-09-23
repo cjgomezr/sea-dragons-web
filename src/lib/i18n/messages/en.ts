@@ -475,12 +475,18 @@ export const englishMessages = {
   "memberRecord.openLabel": "Open {name}'s record",
   "memberRecord.loading": "Loading the member's record…",
   "memberRecord.lead":
-    "What only an Admin edits: the AUF registration and the groups.",
+    "What only an Admin edits: the AUF registration, the date of birth and the groups.",
   "memberRecord.joinedOn": "Member since {date}",
   "memberRecord.auf.title": "AUF registration",
   "memberRecord.auf.number": "AUF number",
   "memberRecord.auf.expiry": "Expiry date",
   "memberRecord.auf.hint": "Clearing the number also clears its expiry date.",
+  "memberRecord.birth.title": "Personal details",
+  "memberRecord.birth.label": "Date of birth",
+  "memberRecord.birth.hint":
+    "The member can't change it: it decides whether they need a guardian's consent.",
+  "memberRecord.birth.guardianNotice":
+    "When you save, {name} will have to give a guardian's details and consent the next time they sign in.",
   "memberRecord.groups.legend": "Groups",
   "memberRecord.groups.empty": "The club has no groups yet.",
   "memberRecord.save": "Save the record",
@@ -491,11 +497,15 @@ export const englishMessages = {
   "memberRecord.issue.aufExpiryNotADate": "That expiry isn't a valid date.",
   "memberRecord.issue.aufExpiryBeforeJoined":
     "The expiry can't be before the date they joined ({date}).",
+  "memberRecord.issue.dateOfBirthRequired":
+    "A date of birth that's already recorded can't be cleared.",
   "memberRecord.error.memberNotFound": "That member isn't in the club.",
   "memberRecord.error.groupNotFound":
     "One of those groups is no longer in the club. Reload the record.",
   "memberRecord.error.memberInactive":
     "A member with a deactivated account can't be added to groups.",
+  "memberRecord.error.memberStatusChanged":
+    "The member's account changed while saving. Reload the record and try again.",
   "memberRecord.error.signInRequired":
     "Your session ended. Sign in again to keep going.",
   "memberRecord.error.forbidden": "Only an Admin can see and edit this record.",

@@ -1,6 +1,17 @@
-import { MemberNotFoundError } from "@/lib/auth/account-activation";
+import {
+  type AuditActor,
+  type AuditLogWriter,
+  recordAuditEvent,
+} from "@/lib/audit/audit-log";
+import {
+  MemberNotFoundError,
+  requiresGuardianConsent,
+} from "@/lib/auth/account-activation";
 import type { AccountStatus } from "@/lib/auth/account-status";
-import { isRealCalendarDate } from "@/lib/auth/registration";
+import {
+  isRealCalendarDate,
+  validateDateOfBirthOn,
+} from "@/lib/auth/registration";
 import type { RoleRequestMember } from "@/lib/auth/role-request";
 import { hasCapability } from "@/lib/auth/roles";
 import {
@@ -13,8 +24,13 @@ import { type MemberGroup, listMemberGroups } from "@/lib/groups/member-groups";
 
 /**
  * La ficha reservada al Admin (#242, RF-4 del PRD de E5): lo que de un miembro
- * sólo edita un Admin, que es su registro federativo (AUF, BR-008) y sus
- * grupos. Contado sin Supabase delante.
+ * sólo edita un Admin, que es su registro federativo (AUF, BR-008), sus
+ * grupos y la corrección de su fecha de nacimiento (#272, RF-10). Contado sin
+ * Supabase delante.
+ *
+ * La fecha de nacimiento no la edita el propio miembro a propósito: de ella
+ * depende si necesita el consentimiento de su tutor (NFR-012, FR-082), y
+ * poder cambiarla le dejaría saltárselo.
  *
  * El resto de la ficha es de cada miembro (#241) y aquí no entra: este módulo
  * arma lo que se escribe campo a campo, así que nada más llega a la base.
@@ -50,6 +66,14 @@ export type StoredMemberRecord = {
   readonly accountStatus: AccountStatus;
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
+  /** YYYY-MM-DD, o null en quien todavía no completó el registro. */
+  readonly dateOfBirth: string | null;
+  /** `members.created_at`: la edad que decide el consentimiento del tutor es
+   * la de ese día (#134). */
+  readonly registeredAt: string;
+  /** Sólo si hay uno registrado: quién lo dio es un dato personal del tutor
+   * que la ficha no necesita. */
+  readonly hasGuardianConsent: boolean;
 };
 
 /** La ficha tal como la sirve la API. */
@@ -65,18 +89,25 @@ export type MemberRecordSubmission = {
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
   readonly groupIds: readonly string[];
+  /** Null sólo vale para quien todavía no tiene fecha: la corrección no
+   * borra la que ya hay. */
+  readonly dateOfBirth: string | null;
 };
 
 export const MEMBER_RECORD_ISSUE_CODES = [
   "auf_number_too_long",
   "auf_expiry_not_a_date",
   "auf_expiry_before_joined",
+  "date_of_birth_not_a_date",
+  "date_of_birth_in_future",
+  "date_of_birth_too_early",
+  "date_of_birth_required",
 ] as const;
 
 export type MemberRecordIssueCode = (typeof MEMBER_RECORD_ISSUE_CODES)[number];
 
 export type MemberRecordIssue = {
-  readonly field: "aufNumber" | "aufExpiry";
+  readonly field: "aufNumber" | "aufExpiry" | "dateOfBirth";
   readonly code: MemberRecordIssueCode;
 };
 
@@ -86,11 +117,29 @@ export type MemberRecordIssue = {
 export const MEMBER_NOT_FOUND_REASON = "member_not_found";
 export const GROUP_NOT_FOUND_REASON = "group_not_found";
 export const MEMBER_INACTIVE_REASON = "member_inactive";
+export const MEMBER_STATUS_CHANGED_REASON = "member_status_changed";
+
+/** En la bitácora el socio es la entidad, como en su consentimiento. */
+const AUDITED_ENTITY_TYPE = "member";
 
 export type MemberScope = { readonly clubId: string; readonly userId: string };
 
 export type AufUpdateResult =
   { readonly kind: "updated" } | { readonly kind: "member_not_found" };
+
+/** La fecha y el estado con el que la cuenta queda, en una sola escritura.
+ * `fromStatus` es el que se leyó: si otra petición lo cambió entretanto, la
+ * corrección no se escribe, o una baja recién hecha volvería a `incomplete`. */
+export type DateOfBirthCorrection = {
+  readonly dateOfBirth: string;
+  readonly fromStatus: AccountStatus;
+  readonly toStatus: AccountStatus;
+};
+
+export type DateOfBirthCorrectionResult =
+  | { readonly kind: "corrected" }
+  | { readonly kind: "member_not_found" }
+  | { readonly kind: "status_changed" };
 
 export type MemberRecordGateways = Pick<
   GroupMembersGateways,
@@ -105,8 +154,13 @@ export type MemberRecordGateways = Pick<
       scope: MemberScope,
       registration: AufRegistration,
     ): Promise<AufUpdateResult>;
+    correctDateOfBirth(
+      scope: MemberScope,
+      correction: DateOfBirthCorrection,
+    ): Promise<DateOfBirthCorrectionResult>;
   };
   readonly groups: Pick<GroupsGateways["groups"], "findClubGroups">;
+  readonly audit: AuditLogWriter;
 };
 
 export class MemberRecordForbiddenError extends Error {
@@ -120,6 +174,17 @@ export class MemberRecordNotFoundError extends Error {
   constructor() {
     super("No existe ese socio en tu club.");
     this.name = "MemberRecordNotFoundError";
+  }
+}
+
+/** El estado de la cuenta cambió entre la lectura y la corrección de la
+ * fecha. Volver a guardar la aplica sobre el estado nuevo. */
+export class MemberRecordConflictError extends Error {
+  constructor() {
+    super(
+      "El estado de la cuenta cambió mientras se guardaba: vuelve a abrir la ficha.",
+    );
+    this.name = "MemberRecordConflictError";
   }
 }
 
@@ -152,14 +217,31 @@ export function isAufNumberTooLong(aufNumber: string): boolean {
   return [...aufNumber.trim()].length > AUF_NUMBER_MAX_LENGTH;
 }
 
-/** Lo que se puede decidir sin leer la base: la forma del número y de la
- * fecha. Así una petición mal hecha no toca nada. */
-function toAufRegistration(
-  submission: MemberRecordSubmission,
-): AufRegistration {
+/**
+ * Si guardar esta fecha deja la cuenta pidiendo el consentimiento del tutor.
+ * Es la regla del registro (`requiresGuardianConsent`): menor el día en que
+ * se registró. Sólo cambia una cuenta `active`: una `incomplete` ya pasa por
+ * completar el registro, que le pedirá el consentimiento, y una `inactive` lo
+ * hará al reactivarse. La usan el dominio y el aviso del formulario.
+ */
+export function correctionRequiresGuardianConsent(
+  record: Pick<
+    StoredMemberRecord,
+    "accountStatus" | "registeredAt" | "hasGuardianConsent"
+  >,
+  dateOfBirth: string,
+): boolean {
+  return (
+    record.accountStatus === "active" &&
+    !record.hasGuardianConsent &&
+    requiresGuardianConsent({ dateOfBirth, registeredAt: record.registeredAt })
+  );
+}
+
+function aufIssuesOf(submission: MemberRecordSubmission): MemberRecordIssue[] {
   const number = submission.aufNumber?.trim() ?? "";
   if (number === "") {
-    return { kind: "none" };
+    return [];
   }
   const issues: MemberRecordIssue[] = [];
   if (isAufNumberTooLong(number)) {
@@ -171,10 +253,56 @@ function toAufRegistration(
   ) {
     issues.push({ field: "aufExpiry", code: "auf_expiry_not_a_date" });
   }
+  return issues;
+}
+
+function dateOfBirthIssuesOf(
+  dateOfBirth: string | null,
+  todayInClub: string,
+): MemberRecordIssue[] {
+  if (dateOfBirth === null) {
+    return [];
+  }
+  const validation = validateDateOfBirthOn(dateOfBirth, todayInClub);
+  return validation.ok ? [] : [{ field: "dateOfBirth", code: validation.code }];
+}
+
+/** Lo que se puede decidir sin leer la base: la forma del número y de las
+ * fechas. Así una petición mal hecha no toca nada. */
+function assertSubmissionShape(
+  submission: MemberRecordSubmission,
+  todayInClub: string,
+): void {
+  const issues = [
+    ...aufIssuesOf(submission),
+    ...dateOfBirthIssuesOf(submission.dateOfBirth, todayInClub),
+  ];
   if (issues.length > 0) {
     throw new MemberRecordValidationError(issues);
   }
-  return { kind: "registered", number, expiry: submission.aufExpiry };
+}
+
+/** Ya validado: un número vacío es no tener registro. */
+function toAufRegistration(
+  submission: MemberRecordSubmission,
+): AufRegistration {
+  const number = submission.aufNumber?.trim() ?? "";
+  return number === ""
+    ? { kind: "none" }
+    : { kind: "registered", number, expiry: submission.aufExpiry };
+}
+
+/** Una fecha que ya estaba no se borra: sin ella la cuenta no sabría si es
+ * de un menor. */
+function assertDateOfBirthKept(
+  dateOfBirth: string | null,
+  record: StoredMemberRecord,
+): void {
+  if (dateOfBirth === null && record.dateOfBirth !== null) {
+    throw new MemberRecordValidationError([
+      { field: "dateOfBirth", code: "date_of_birth_required" },
+    ]);
+  }
 }
 
 /** El vencimiento se compara con el ingreso (#237): un registro no puede
@@ -303,30 +431,87 @@ async function applyGroupChanges(
   }
 }
 
+/**
+ * Corrige la fecha si cambió, y con ella el estado: quien queda menor sin
+ * consentimiento pasa a `incomplete`, y la frontera lo manda a completar el
+ * registro, que le pide los datos del tutor. El consentimiento que ya hubiera
+ * no se toca.
+ *
+ * La bitácora va después de la escritura, como en el consentimiento: auditar
+ * primero dejaría rastro de una corrección que no se guardó. Sin metadata:
+ * ni la fecha nueva ni la anterior, que son datos personales.
+ */
+async function applyDateOfBirthCorrection(
+  gateways: MemberRecordGateways,
+  request: {
+    readonly actor: AuditActor;
+    readonly scope: MemberScope;
+    readonly record: StoredMemberRecord;
+  },
+  dateOfBirth: string | null,
+): Promise<void> {
+  const { actor, scope, record } = request;
+  if (dateOfBirth === null || dateOfBirth === record.dateOfBirth) {
+    return;
+  }
+  const result = await gateways.records.correctDateOfBirth(scope, {
+    dateOfBirth,
+    fromStatus: record.accountStatus,
+    toStatus: correctionRequiresGuardianConsent(record, dateOfBirth)
+      ? "incomplete"
+      : record.accountStatus,
+  });
+  if (result.kind === "member_not_found") {
+    throw new MemberRecordNotFoundError();
+  }
+  if (result.kind === "status_changed") {
+    throw new MemberRecordConflictError();
+  }
+  await recordAuditEvent(gateways.audit, {
+    actor,
+    clubId: actor.clubId,
+    action: "member.date_of_birth_corrected",
+    entityType: AUDITED_ENTITY_TYPE,
+    entityId: scope.userId,
+    result: "success",
+  });
+}
+
 export async function updateMemberRecord(
   gateways: MemberRecordGateways,
   request: MemberRecordRequest & {
     readonly submission: MemberRecordSubmission;
   },
 ): Promise<MemberRecord> {
-  const registration = toAufRegistration(request.submission);
+  const { submission } = request;
+  assertSubmissionShape(submission, request.todayInClub);
+  const registration = toAufRegistration(submission);
   const caller = await findAdministrator(gateways, request.callerId);
   const scope = { clubId: caller.clubId, userId: request.userId };
-  assertExpiryAfterJoining(
-    registration,
-    await findStoredRecord(gateways, scope),
-  );
-  const groupIds = new Set(request.submission.groupIds);
+  const record = await findStoredRecord(gateways, scope);
+  assertExpiryAfterJoining(registration, record);
+  assertDateOfBirthKept(submission.dateOfBirth, record);
+  const groupIds = new Set(submission.groupIds);
   await assertClubGroups(gateways, caller.clubId, groupIds);
 
-  // Los grupos van antes que el AUF porque son lo único que una regla puede
-  // rechazar a estas alturas. Si el socio desapareciera justo en medio, el
-  // 404 del AUF llega con sus pertenencias ya cambiadas, pero las de una fila
-  // borrada se van con ella por la cascada.
+  // Los grupos van primero porque son lo que una regla puede rechazar a estas
+  // alturas. Si el socio desapareciera justo en medio, el 404 llega con sus
+  // pertenencias ya cambiadas, pero las de una fila borrada se van con ella
+  // por la cascada. Igual con el 409 de la fecha: los grupos ya quedaron
+  // guardados, y volver a guardar la ficha no los repite.
   await applyGroupChanges(
     gateways,
     { callerId: request.callerId, scope },
     groupIds,
+  );
+  await applyDateOfBirthCorrection(
+    gateways,
+    {
+      actor: { id: request.callerId, clubId: caller.clubId },
+      scope,
+      record,
+    },
+    submission.dateOfBirth,
   );
   const result = await gateways.records.updateAufRegistration(
     scope,
