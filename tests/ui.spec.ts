@@ -3742,6 +3742,9 @@ type StubbedMemberRecord = {
   readonly accountStatus: "incomplete" | "active" | "inactive";
   readonly aufNumber: string;
   readonly aufExpiry: string;
+  readonly dateOfBirth: string;
+  readonly registeredAt: string;
+  readonly hasGuardianConsent: boolean;
   readonly isAufExpired: boolean;
   readonly groups: readonly { readonly id: string; readonly name: string }[];
 };
@@ -3754,6 +3757,9 @@ const CURRENT_RECORD: StubbedMemberRecord = {
   accountStatus: "active",
   aufNumber: "AUF-2026-0042",
   aufExpiry: "2030-06-30",
+  dateOfBirth: "1990-05-10",
+  registeredAt: "2024-03-06T01:00:00.000Z",
+  hasGuardianConsent: false,
   isAufExpired: false,
   groups: [STUBBED_CLUB_GROUPS[0], STUBBED_CLUB_GROUPS[2]].map(
     ({ id, name }) => ({ id, name }),
@@ -3779,7 +3785,15 @@ const EXPIRED_RECORD: StubbedMemberRecord = {
   isAufExpired: true,
 };
 
-const EXPIRY_BEFORE_JOINING_ERROR = {
+type StubbedSaveRejection = {
+  readonly error: {
+    readonly code: string;
+    readonly message: string;
+    readonly reason: string;
+  };
+};
+
+const EXPIRY_BEFORE_JOINING_ERROR: StubbedSaveRejection = {
   error: {
     code: "validation_error",
     message: "El vencimiento es anterior al ingreso.",
@@ -3787,9 +3801,22 @@ const EXPIRY_BEFORE_JOINING_ERROR = {
   },
 };
 
+const BIRTH_IN_FUTURE_ERROR: StubbedSaveRejection = {
+  error: {
+    code: "validation_error",
+    message: "La fecha de nacimiento es futura.",
+    reason: "date_of_birth_in_future",
+  },
+};
+
+/** 9 años el día del registro del miembro: guardarla le pediría el
+ * consentimiento de su tutor (#272). */
+const MINOR_BIRTH = "2015-01-01";
+
 async function stubMemberRecordReads(
   page: Page,
   record: StubbedMemberRecord,
+  saveRejection: StubbedSaveRejection = EXPIRY_BEFORE_JOINING_ERROR,
 ): Promise<void> {
   await page.route(
     (url) => url.pathname === CLUB_GROUPS_ENDPOINT,
@@ -3809,7 +3836,7 @@ async function stubMemberRecordReads(
         ? route.fulfill({
             status: 400,
             contentType: "application/json",
-            body: JSON.stringify(EXPIRY_BEFORE_JOINING_ERROR),
+            body: JSON.stringify(saveRejection),
           })
         : route.fulfill({
             status: 200,
@@ -3829,10 +3856,30 @@ function submitExpiryBeforeJoining(saveLabel: string, issueText: RegExp) {
   };
 }
 
+/** Pone una fecha de nacimiento futura y guarda: el servidor fingido la
+ * rechaza, y el aviso sale junto al campo. */
+function submitBirthInFuture(saveLabel: string, issueText: RegExp) {
+  return async (page: Page): Promise<void> => {
+    await page.locator("#ficha-nacimiento").fill("2999-01-01");
+    await page.getByRole("button", { name: saveLabel }).click();
+    await expect(page.getByText(issueText)).toBeVisible();
+  };
+}
+
+/** Pone la fecha de un menor sin guardar: la ficha avisa de que el miembro
+ * tendrá que dar el consentimiento de su tutor. */
+function typeMinorBirth(noticeText: RegExp) {
+  return async (page: Page): Promise<void> => {
+    await page.locator("#ficha-nacimiento").fill(MINOR_BIRTH);
+    await expect(page.getByText(noticeText)).toBeVisible();
+  };
+}
+
 type MemberRecordState = {
   readonly name: string;
   readonly record: StubbedMemberRecord;
   readonly saveLabel: string;
+  readonly saveRejection?: StubbedSaveRejection;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
 };
@@ -3904,6 +3951,40 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
       /no puede ser anterior a su fecha de ingreso/,
     ),
   },
+  {
+    name: "ficha-nacimiento-aviso-validacion",
+    record: CURRENT_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+    saveRejection: BIRTH_IN_FUTURE_ERROR,
+    prepare: submitBirthInFuture(
+      ENGLISH_SAVE_RECORD,
+      /Date of birth can't be in the future/,
+    ),
+  },
+  {
+    name: "ficha-nacimiento-aviso-validacion-es",
+    record: CURRENT_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    saveRejection: BIRTH_IN_FUTURE_ERROR,
+    beforeVisit: chooseSpanish,
+    prepare: submitBirthInFuture(
+      SPANISH_SAVE_RECORD,
+      /La fecha de nacimiento no puede estar en el futuro/,
+    ),
+  },
+  {
+    name: "ficha-nacimiento-aviso-tutor",
+    record: CURRENT_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+    prepare: typeMinorBirth(/will have to give a guardian's details/),
+  },
+  {
+    name: "ficha-nacimiento-aviso-tutor-es",
+    record: CURRENT_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    beforeVisit: chooseSpanish,
+    prepare: typeMinorBirth(/tendrá que dar los datos y el consentimiento/),
+  },
 ];
 
 async function goToMemberRecord(
@@ -3911,7 +3992,7 @@ async function goToMemberRecord(
   state: MemberRecordState,
   theme?: (typeof themes)[number],
 ): Promise<void> {
-  await stubMemberRecordReads(page, state.record);
+  await stubMemberRecordReads(page, state.record, state.saveRejection);
   await state.beforeVisit?.(page);
   if (theme === undefined) {
     await page.goto(`${APP_URL}${MEMBER_RECORD_SCREEN_PATH}`);
