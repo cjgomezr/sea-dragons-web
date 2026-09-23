@@ -2250,6 +2250,12 @@ button.notification-item-content:hover {
     align-items: flex-start;
   }
 
+  /* A lo ancho de la tarjeta, para que el nivel caiga en la misma columna que
+     la posición y no donde acabe el nombre de cada uno. */
+  .directory-identity {
+    flex: 1;
+  }
+
   .directory-facts {
     display: grid;
     grid-template-columns: 1fr 1fr;
