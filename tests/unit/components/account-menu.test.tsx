@@ -2,7 +2,11 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountMenu } from "@/components/AccountMenu";
-import { ACCOUNT_PAGE_PATH, SIGN_IN_PATH } from "@/lib/auth/routes";
+import {
+  ACCOUNT_PAGE_PATH,
+  CLUB_SETTINGS_PATH,
+  SIGN_IN_PATH,
+} from "@/lib/auth/routes";
 import { LOCALE_COOKIE_NAME, type Locale } from "@/lib/i18n/locale";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
 
@@ -20,8 +24,13 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace, refresh }),
 }));
 
-function renderMenu(locale: Locale = "en"): ReturnType<typeof render> {
-  return render(<AccountMenu locale={locale} />);
+function renderMenu(
+  locale: Locale = "en",
+  canConfigureClub = false,
+): ReturnType<typeof render> {
+  return render(
+    <AccountMenu locale={locale} canConfigureClub={canConfigureClub} />,
+  );
 }
 
 function accountButton(name = "My account"): HTMLElement {
@@ -78,6 +87,38 @@ describe("menú de la cuenta", () => {
     expect(entries[3]).toHaveTextContent("Sign out");
   });
 
+  it("ofrece la configuración del club justo después de Mi perfil a quien puede cambiarla (#296)", async () => {
+    renderMenu("en", true);
+
+    const menu = await openMenu();
+    const entries = within(menu).getAllByRole("listitem");
+
+    expect(entries).toHaveLength(5);
+    const settings = within(menu).getByRole("link", { name: "Club settings" });
+    expect(settings).toHaveAttribute("href", CLUB_SETTINGS_PATH);
+    expect(entries[1]).toContainElement(settings);
+  });
+
+  it("no ofrece la configuración del club a quien no puede cambiarla", async () => {
+    renderMenu();
+
+    const menu = await openMenu();
+
+    expect(
+      within(menu).queryByRole("link", { name: "Club settings" }),
+    ).toBeNull();
+  });
+
+  it("nombra la configuración del club en español", async () => {
+    renderMenu("es", true);
+
+    const menu = await openMenu("Mi cuenta");
+
+    expect(
+      within(menu).getByRole("link", { name: "Configuración del club" }),
+    ).toBeInTheDocument();
+  });
+
   it("cada entrada lleva su control", async () => {
     renderMenu();
 
@@ -122,7 +163,7 @@ describe("menú de la cuenta", () => {
     render(
       <>
         <p>Contenido de la pantalla</p>
-        <AccountMenu locale="en" />
+        <AccountMenu locale="en" canConfigureClub={false} />
       </>,
     );
     await openMenu();
@@ -137,7 +178,7 @@ describe("menú de la cuenta", () => {
     render(
       <>
         <input aria-label="Buscar" />
-        <AccountMenu locale="en" />
+        <AccountMenu locale="en" canConfigureClub={false} />
       </>,
     );
     await openMenu();
@@ -162,7 +203,7 @@ describe("menú de la cuenta", () => {
   it("se cierra cuando el foco sale de él y el foco vuelve al botón de la cuenta", async () => {
     render(
       <>
-        <AccountMenu locale="en" />
+        <AccountMenu locale="en" canConfigureClub={false} />
         <button type="button">Control de debajo</button>
       </>,
     );
@@ -273,7 +314,7 @@ describe("preferencias dentro del menú", () => {
     const { rerender } = renderMenu("en");
     await openMenu();
 
-    rerender(<AccountMenu locale="es" />);
+    rerender(<AccountMenu locale="es" canConfigureClub={false} />);
 
     const menu = screen.getByRole("region", { name: "Mi cuenta" });
     expect(

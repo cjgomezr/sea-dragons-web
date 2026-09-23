@@ -4,6 +4,8 @@ import { MobileTabBar } from "@/components/MobileTabBar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SidebarNav } from "@/components/SidebarNav";
 import type { Role } from "@/lib/auth/roles";
+import { CLUB_SETTINGS_PATH } from "@/lib/auth/routes";
+import { isAllowedForRole } from "@/lib/auth/session-boundary";
 import type { ClubBrand } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
 
@@ -34,7 +36,12 @@ export function AppShell({
               de avisos sin leer, y dentro de un menú no avisaría de nada. */}
           <div className="app-sidebar-actions">
             <NotificationBell locale={locale} />
-            <AccountMenu locale={locale} />
+            {/* Con la misma regla que la frontera, como la navegación: el
+                menú no ofrece lo que la frontera no dejaría abrir. */}
+            <AccountMenu
+              locale={locale}
+              canConfigureClub={isAllowedForRole(CLUB_SETTINGS_PATH, role)}
+            />
           </div>
         </div>
         <SidebarNav locale={locale} role={role} />
