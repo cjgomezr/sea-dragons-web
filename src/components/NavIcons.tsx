@@ -27,8 +27,8 @@ function IconBase({
   );
 }
 
-/** No es un icono de sección: lo usa el control de cerrar sesión de la
- * cabecera, que el mockup del panel dibuja también como un icono. Vive aquí
+/** No es un icono de sección: lo usa la entrada de cerrar sesión del menú de
+ * la cuenta (#287), que el mockup del panel dibuja también como un icono. Vive aquí
  * para compartir trazo y tamaño con los de la navegación, en vez de ser un
  * dibujo suelto con otro grosor.
  *
@@ -44,8 +44,9 @@ export function SignOutIcon(): React.JSX.Element {
   );
 }
 
-/** Tampoco es de sección: es el enlace a Mi cuenta de la cabecera (#209),
- * junto a cerrar sesión, y comparte trazo con él por la misma razón. */
+/** Tampoco es de sección: es el botón que abre el menú de la cuenta en la
+ * cabecera (#287) y su entrada Mi perfil, y comparte trazo con los demás por
+ * la misma razón. */
 export function AccountIcon(): React.JSX.Element {
   return (
     <IconBase>
