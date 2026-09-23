@@ -186,6 +186,9 @@ function isRunNamedMember(name: string): name is RunNamedMember {
  * La pendiente nace con una fecha fija, para que la captura no cambie con el
  * día en que corre la suite.
  */
+/** 17 de septiembre de 2026 a las 18:30 en Melbourne. */
+const SEEDED_AUF_VERIFIED_AT = "2026-09-17T08:30:00.000Z";
+
 export const ROLE_REQUEST_MEMBERS = {
   "con-solicitud-pendiente": { pendingRequest: "Coach", columns: {} },
   /** Lo usa el test que envía una solicitud desde el formulario. */
@@ -230,6 +233,29 @@ export const ROLE_REQUEST_MEMBERS = {
     pendingRequest: null,
     columns: { country: "AU" },
   },
+  /** El AUF que escribió la socia y ningún Admin ha verificado (#274). */
+  "perfil-auf-pendiente": {
+    pendingRequest: null,
+    columns: {
+      full_name: "Irene Pendiente",
+      country: "AU",
+      auf_number: "AUF-2026-0274",
+      auf_expiry: "2030-06-30",
+    },
+  },
+  /** El AUF ya verificado: la pantalla lo enseña sin dejar cambiarlo, y la
+   * API rechaza cambiarlo (#274). La fecha es fija para que no dependa del
+   * día de la corrida. */
+  "perfil-auf-verificado": {
+    pendingRequest: null,
+    columns: {
+      full_name: "Vera Verificada",
+      country: "AU",
+      auf_number: "AUF-2026-0275",
+      auf_expiry: "2030-06-30",
+      auf_verified_at: SEEDED_AUF_VERIFIED_AT,
+    },
+  },
 } as const;
 
 export type RoleRequestMemberName = keyof typeof ROLE_REQUEST_MEMBERS;
@@ -238,6 +264,8 @@ export type RoleRequestMemberName = keyof typeof ROLE_REQUEST_MEMBERS;
 export const PHOTOGRAPHED_ROLE_REQUEST_MEMBERS = [
   "perfil-completo",
   "perfil-con-foto",
+  "perfil-auf-pendiente",
+  "perfil-auf-verificado",
 ] as const satisfies readonly RoleRequestMemberName[];
 
 /** Las columnas con las que nace uno de estos socios en la corrida `runId`:
