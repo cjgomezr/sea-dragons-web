@@ -273,6 +273,19 @@ entrega responsabilidad sobre los datos de los demás. La política lo deja en
 el aviso interno, y el club puede pedir un correo ahí cuando se escriba el
 PRD de E6.
 
+## El rol da permisos, no participación
+
+Decidido el 23 de septiembre de 2026 (B7 en `docs/preguntas-abiertas.md`), al
+salir el caso del Coach que también juega. Cada persona tiene **un** rol, el que
+le da sus permisos, y se mantienen los cuatro de FR-012.
+
+De ahí sale una regla que E7, E8 y E10 heredan: **quién participa en una sesión
+sale del RSVP y de los grupos, nunca del rol.** Los equipos se arman con quienes
+confirmaron asistencia, y la asistencia se registra a quien fue, sea Coach o
+Player. Un filtro por rol `Player` en el team builder dejaría fuera al Coach que
+juega. Si hace falta distinguir quién entrena de quién dirige, es un grupo de
+E4, no un rol.
+
 ## Trazabilidad
 
 `docs/SRD_Victoria_Seadragons_Club_Platform.md` → este documento →
