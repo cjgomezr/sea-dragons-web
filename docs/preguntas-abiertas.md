@@ -9,7 +9,7 @@ queda como registro de qué se preguntó y qué se respondió. Cada punto apunta
 FR o AC que lo cierra.
 
 **Abierto después:** B5, el 16 de septiembre de 2026, que bloquea los tickets de
-E12, y B6, el 22 de septiembre de 2026, que bloquea los de E18.
+E12, y B6, el 22 de septiembre de 2026, que bloquea los de E18b.
 
 ---
 
@@ -121,7 +121,7 @@ al día". Lo que no hace es definir la segunda.
 activando la cuenta como hoy. Decidirlo ahora sería adelantar trabajo: no hay
 nada que cobrar hasta E12.
 
-### B6 · De quién son las cuentas de cada instalación · E18 · SIN RESOLVER
+### B6 · De quién son las cuentas de cada instalación · E18b · SIN RESOLVER
 
 **De dónde sale.** El 22 de septiembre de 2026 el dueño decidió vender la
 licencia a otros clubes con un modelo de **un club por instalación** (E18): cada
@@ -144,7 +144,15 @@ instalación, ¿son del club o del dueño?
 
 **Por qué bloquea.** Cambia qué hace el script de alta (crear cuentas o pedir
 acceso a las del club) y el de publicación (desplegar desde una cuenta o desde
-varias). Se decide antes de escribir los tickets de E18.
+varias). Se decide antes de escribir los tickets de E18b.
+
+**Acotado el 23 de septiembre de 2026.** El dueño prefiere decidirlo más
+adelante, así que E18 se partió (ver `docs/plan-maestro.md`): B6 bloquea sólo a
+E18b, el alta de clubes y la publicación de versiones. E18a, que saca la marca
+del código y hace configurables las posiciones de juego, no depende de esta
+respuesta y se trabaja ya. Lo que sigue en pie: sin E18b no se puede operar de
+verdad el modelo de un club por instalación, así que esta decisión es condición
+para el primer cliente.
 
 ### B7 · Un Coach que también juega · E7, E8, E9, E10 · RESUELTO
 
