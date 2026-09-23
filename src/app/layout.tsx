@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ThemeScript } from "@/components/ThemeScript";
+import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 import { createTranslator } from "@/lib/i18n/translator";
 import "./globals.css";
@@ -7,9 +8,13 @@ import "./globals.css";
 // Es lo que enseñan los buscadores y las vistas previas de un enlace, así que
 // sale del idioma de la visita y no de un `metadata` fijo.
 export async function generateMetadata(): Promise<Metadata> {
-  const translate = createTranslator(await readRequestLocale());
+  const [locale, brand] = await Promise.all([
+    readRequestLocale(),
+    readClubBrand(),
+  ]);
+  const translate = createTranslator(locale);
   return {
-    title: "Victoria Seadragons",
+    title: brand.name,
     description: translate("app.metaDescription"),
   };
 }

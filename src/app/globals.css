@@ -161,10 +161,18 @@ h6 {
   gap: var(--space-4);
 }
 
+/* El nombre sale de la base y admite hasta 60 caracteres (#292): en una sola
+   línea, recortado con puntos suspensivos, para que no parta la cabecera en dos
+   filas ni empuje los controles fuera de la pantalla a 360px. */
 .app-brand {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   font-size: 18px;
   font-weight: 700;
   color: var(--color-sidebar-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Below 768px the sections live in the bottom tab bar, so the sidebar list is
@@ -825,6 +833,8 @@ button.notification-item-content:hover {
 
 .auth-brand-mark {
   display: flex;
+  /* Un nombre largo se reparte en líneas; el recuadro no cede su ancho. */
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   width: var(--space-8);

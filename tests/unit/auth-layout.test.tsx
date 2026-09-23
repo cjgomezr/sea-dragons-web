@@ -1,8 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ClubBrand } from "@/lib/club/club-brand";
 import { LOCALE_COOKIE_NAME } from "@/lib/i18n/locale";
 
 const incoming = { cookies: new Map<string, string>() };
+const storedBrand: { current: ClubBrand } = {
+  current: { name: "Hobart Orcas", initials: "HO" },
+};
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({
@@ -14,6 +18,9 @@ vi.mock("next/headers", () => ({
   headers: async () => new Headers(),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("@/lib/club/supabase-club-brand", () => ({
+  readClubBrand: async () => storedBrand.current,
+}));
 
 const { default: AuthLayout } = await import("@/app/(auth)/layout");
 
@@ -23,6 +30,25 @@ async function renderAuthLayout(): Promise<void> {
 
 beforeEach(() => {
   incoming.cookies.clear();
+  storedBrand.current = { name: "Hobart Orcas", initials: "HO" };
+});
+
+// #292: la marca de la pantalla de entrar sale de la base, no del código.
+describe("la marca en la pantalla de entrar", () => {
+  it("enseña el nombre guardado del club", async () => {
+    await renderAuthLayout();
+
+    expect(screen.getByText("Hobart Orcas")).toBeInTheDocument();
+    expect(screen.queryByText(/Victoria Seadragons/)).toBeNull();
+  });
+
+  it("enseña las iniciales guardadas en el recuadro de la marca", async () => {
+    storedBrand.current = { name: "Hobart Orcas", initials: "HOC" };
+
+    await renderAuthLayout();
+
+    expect(screen.getByText("HOC")).toBeInTheDocument();
+  });
 });
 
 // E17 RF-3: quien todavía no entró también tiene que poder cambiar de idioma,

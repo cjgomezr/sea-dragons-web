@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "@/components/AppShell";
+import type { ClubBrand } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
 
 const { usePathname, useRouter } = vi.hoisted(() => ({
@@ -11,9 +12,15 @@ const { usePathname, useRouter } = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({ usePathname, useRouter }));
 
-function renderShell(locale: Locale = "en"): void {
+const BRAND: ClubBrand = { name: "Hobart Orcas", initials: "HO" };
+
+/** El máximo que admite `clubs_name_length` en `0022_club_brand.sql`. */
+const LONGEST_CLUB_NAME =
+  "Asociación Deportiva de Rugby Subacuático del Sur · Tasmania";
+
+function renderShell(locale: Locale = "en", brand: ClubBrand = BRAND): void {
   render(
-    <AppShell locale={locale} role="Player">
+    <AppShell locale={locale} role="Player" brand={brand}>
       <p>Contenido de la sección</p>
     </AppShell>,
   );
@@ -24,12 +31,36 @@ async function openAccountMenu(name = "My account"): Promise<HTMLElement> {
   return screen.getByRole("region", { name });
 }
 
+describe("la marca en la cabecera", () => {
+  it("enseña el nombre que recibe de la base, no uno escrito en el código", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell();
+
+    const sidebar = screen.getByRole("complementary");
+    expect(within(sidebar).getByText("Hobart Orcas")).toBeInTheDocument();
+    expect(screen.queryByText(/Victoria Seadragons/)).toBeNull();
+  });
+
+  // A 360px un nombre de 60 caracteres se recorta con puntos suspensivos; el
+  // título deja leerlo entero a quien pasa el ratón y el texto sigue completo
+  // en el árbol, que es lo que oye un lector de pantalla.
+  it("un nombre largo se lee entero aunque se vea recortado", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell("en", { name: LONGEST_CLUB_NAME, initials: "AD" });
+
+    const brand = screen.getByText(LONGEST_CLUB_NAME);
+    expect(LONGEST_CLUB_NAME).toHaveLength(60);
+    expect(brand).toHaveTextContent(LONGEST_CLUB_NAME);
+    expect(brand).toHaveAttribute("title", LONGEST_CLUB_NAME);
+  });
+});
+
 describe("app shell", () => {
   it("renderiza marca, navegación y contenido", () => {
     usePathname.mockReturnValue("/dashboard");
     renderShell();
 
-    expect(screen.getByText("Victoria Seadragons")).toBeInTheDocument();
+    expect(screen.getByText("Hobart Orcas")).toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "Main" }),
     ).toBeInTheDocument();
@@ -143,7 +174,7 @@ describe("app shell", () => {
   it("nombra las dos navegaciones en el idioma de la visita", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="es" role="Player">
+      <AppShell locale="es" role="Player" brand={BRAND}>
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -161,7 +192,7 @@ describe("app shell", () => {
   it("ofrece a cada navegación sólo lo que el rol recibido puede abrir", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="en" role="Player">
+      <AppShell locale="en" role="Player" brand={BRAND}>
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -179,7 +210,7 @@ describe("app shell", () => {
   it("no enseña Administración en ninguna de las dos navegaciones a un Admin", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="en" role="Admin">
+      <AppShell locale="en" role="Admin" brand={BRAND}>
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -195,7 +226,7 @@ describe("app shell", () => {
   it("muestra el contenido recibido dentro del área principal", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="en" role="Player">
+      <AppShell locale="en" role="Player" brand={BRAND}>
         <p>Contenido de la sección</p>
       </AppShell>,
     );

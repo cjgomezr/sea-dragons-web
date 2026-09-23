@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import type { Role } from "@/lib/auth/roles";
+import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import { COMPLETE_REGISTRATION_PATH, SIGN_IN_PATH } from "@/lib/auth/routes";
 import { readSessionState } from "@/lib/auth/session-reader";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
@@ -41,12 +42,13 @@ async function readCallerRole(): Promise<Role> {
 export default async function AppLayout({
   children,
 }: Readonly<{ children: ReactNode }>): Promise<React.JSX.Element> {
-  const [locale, role] = await Promise.all([
+  const [locale, role, brand] = await Promise.all([
     readRequestLocale(),
     readCallerRole(),
+    readClubBrand(),
   ]);
   return (
-    <AppShell locale={locale} role={role}>
+    <AppShell locale={locale} role={role} brand={brand}>
       {children}
     </AppShell>
   );

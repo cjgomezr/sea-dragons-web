@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 import { createTranslator } from "@/lib/i18n/translator";
 
@@ -11,13 +12,13 @@ import { createTranslator } from "@/lib/i18n/translator";
  * para que el formulario empiece sin scroll en un móvil.
  */
 
-const CLUB_NAME = "Victoria Seadragons";
-const CLUB_INITIALS = "VS";
-
 export default async function AuthLayout({
   children,
 }: Readonly<{ children: ReactNode }>): Promise<React.JSX.Element> {
-  const locale = await readRequestLocale();
+  const [locale, brand] = await Promise.all([
+    readRequestLocale(),
+    readClubBrand(),
+  ]);
   const translate = createTranslator(locale);
 
   return (
@@ -25,9 +26,9 @@ export default async function AuthLayout({
       <aside className="auth-brand">
         <div className="auth-brand-header">
           <span className="auth-brand-mark" aria-hidden="true">
-            {CLUB_INITIALS}
+            {brand.initials}
           </span>
-          <span className="auth-brand-name">{CLUB_NAME}</span>
+          <span className="auth-brand-name">{brand.name}</span>
         </div>
         <div className="auth-brand-pitch">
           <p className="auth-brand-eyebrow">
@@ -38,7 +39,7 @@ export default async function AuthLayout({
           </p>
           <p className="auth-brand-copy">{translate("auth.brand.copy")}</p>
         </div>
-        <p className="auth-brand-footer">© 2026 Victoria Seadragons UWR Club</p>
+        <p className="auth-brand-footer">© 2026 {brand.name}</p>
       </aside>
       <main className="auth-main">
         <div className="auth-main-header">

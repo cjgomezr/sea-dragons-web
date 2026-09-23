@@ -1,3 +1,4 @@
+import { DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 
@@ -10,7 +11,10 @@ import { type Translator, createTranslator } from "@/lib/i18n/translator";
  * mismo, y no hay dos versiones que se puedan separar con el tiempo.
  */
 
-export const CLUB_NAME = "Victoria Seadragons";
+/** Los correos todavía no leen la marca de la base: es el ticket T7 de E18a.
+ * Hasta entonces llevan el respaldo, que es el único sitio donde el nombre
+ * sigue escrito. */
+export const CLUB_NAME = DEFAULT_CLUB_BRAND.name;
 
 export type RenderedEmail = {
   readonly subject: string;

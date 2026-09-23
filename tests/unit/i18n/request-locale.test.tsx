@@ -17,6 +17,11 @@ vi.mock("next/headers", () => ({
   }),
   headers: async () => incoming.headers,
 }));
+// La marca sale de la base (#292): la del test es otra que la de Victoria,
+// así que un nombre escrito a mano en la pantalla no pasaría.
+vi.mock("@/lib/club/supabase-club-brand", () => ({
+  readClubBrand: async () => ({ name: "Hobart Orcas", initials: "HO" }),
+}));
 
 const { readRequestLocale } = await import("@/lib/i18n/request-locale");
 const { default: RootLayout, generateMetadata } = await import("@/app/layout");
@@ -94,6 +99,6 @@ describe("metadatos por idioma", () => {
   it("titula el documento con el nombre del club en los dos idiomas", async () => {
     incoming.cookies.set(LOCALE_COOKIE_NAME, "es");
 
-    expect((await generateMetadata()).title).toBe("Victoria Seadragons");
+    expect((await generateMetadata()).title).toBe("Hobart Orcas");
   });
 });
