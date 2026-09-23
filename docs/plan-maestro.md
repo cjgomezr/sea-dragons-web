@@ -21,7 +21,7 @@ fábrica: solo sus tickets lo son.
 | **E8** — Asistencia                     | Registro Present/Late/Absent por sesión, contadores en vivo, % de asistencia sobre sesiones elegibles para directorio/perfil/dashboard. FR-038–042                                                                                                             | M (4)         | E7                | #8        |
 | **E9** — Evaluaciones                   | Ratings 1–10 por categoría configurable, OVR a 1 decimal, set de categorías inmutable por evaluación, visibilidad estricta Admin/Coach garantizada por RLS. FR-050–056                                                                                         | M (5)         | E3, E5            | #9        |
 | **E10** — Team builder                  | Modo manual + auto-balance determinista server-side (< 2s para 30 jugadores, NFR-002), no evaluados a 5.0 virtual, swap sugerido, vista del jugador asignado. FR-043–049, FR-086 · NFR-002                                                                     | L (6)         | E7, E8, E9        | #10       |
-| **E11** — Noticias y documentos         | Posts con adjuntos (PDF/doc/imagen) vía Supabase Storage, targeting a grupos, feed cronológico inverso, notificaciones. FR-057–061                                                                                                                             | M (4-5)       | E4, E6            | #11       |
+| **E11** — Noticias y documentos         | Posts con adjuntos (PDF/doc/imagen) vía Supabase Storage, targeting a grupos, feed cronológico inverso, notificaciones; editar y retirar una publicación. FR-057–061                                                                                           | L (7)         | E4, E6            | #11       |
 | **E12** — Stripe base                   | 3 membresías en AUD (Full, Student, Casual), cargo mensual recurrente para los planes recurrentes, panel de plan, cambio de plan al siguiente ciclo, tarjeta tokenizada (NFR-006), historial, webhooks. FR-062/063/065–068 · INT-001/002/003 · NFR-006         | L (6-7)       | E2, E6            | #12       |
 | **E13** — Stripe avanzado               | Packs prepagos Casual con decremento por asistencia y saldo congelado al cambiar de plan, levies one-off gestionados en Stripe, recuperación de pago fallido, aviso pre-renovación. FR-064/069–072/080/087 · INT-007                                           | L (5-6)       | E12, E8           | #13       |
 | **E14** — Dashboard y búsqueda global   | Dashboard con 4 tiles + próximos eventos + últimas noticias; búsqueda global agrupada por tipo (miembros/eventos/noticias). FR-076–078                                                                                                                         | M (4)         | E7, E8, E11       | #14       |
@@ -118,6 +118,14 @@ esto la única salida era dejar el error publicado. Cancelar marca el evento en
 vez de borrarlo, para que E8 no pierda el historial. Sus pantallas esperan a
 #293, que saca el nombre del club de los catálogos, como ya pedía el orden de
 E18a. PRD en `docs/prd/e7-calendario-eventos-rsvp.md`.
+
+El 24 de septiembre de 2026, al escribir su PRD, **E11 creció de 4-5 tickets a
+7**, por el mismo motivo que E7: el dueño decidió que se pueda editar y retirar
+una publicación. Retirar la oculta, no la borra. Lo demás que engorda la épica
+son los adjuntos, que el SRD despachaba en una línea (FR-058) y que traen sus
+límites, su bucket privado y sus direcciones firmadas. Se avisa al publicar y
+nunca al editar, que es lo que mantiene creíble la campana de E6. PRD en
+`docs/prd/e11-noticias-documentos.md`.
 
 El 7 de septiembre de 2026, al escribir su PRD, **E16 se partió en E16a y
 E16b**. El motivo es de secuencia, no de tamaño: sus jobs de `pg_cron` necesitan
