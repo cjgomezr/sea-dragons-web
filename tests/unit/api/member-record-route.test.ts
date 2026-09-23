@@ -2,7 +2,10 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { Role } from "@/lib/auth/roles";
-import { MEMBER_RECORD_API_PATH } from "@/lib/auth/routes";
+import {
+  MEMBER_AUF_VERIFICATION_API_PATH,
+  MEMBER_RECORD_API_PATH,
+} from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
 import type {
   AufRegistration,
@@ -13,7 +16,8 @@ import type {
  * La ficha reservada al Admin por la API (#242, RF-4 del PRD de E5). La
  * petición entra por el proxy y sólo llega al handler si la frontera la deja
  * seguir, como en producción: así el 403 de los otros tres roles es el de
- * verdad y no uno que el test se inventa.
+ * verdad y no uno que el test se inventa. Desde #274 cuelga de ella la
+ * verificación del AUF que propuso el miembro.
  */
 
 const ORIGIN = "http://localhost:3417";
@@ -42,11 +46,22 @@ const writes: string[] = [];
 let callerRole: Role = "Admin";
 let memberStatus: AccountStatus = "active";
 
-function memberRecordGateways(): MemberRecordGateways {
-  let auf: { aufNumber: string | null; aufExpiry: string | null } = {
-    aufNumber: null,
-    aufExpiry: null,
-  };
+type StoredAuf = {
+  readonly aufNumber: string | null;
+  readonly aufExpiry: string | null;
+  readonly isAufVerified: boolean;
+};
+
+const NO_AUF: StoredAuf = {
+  aufNumber: null,
+  aufExpiry: null,
+  isAufVerified: false,
+};
+
+function memberRecordGateways(
+  initialAuf: StoredAuf = NO_AUF,
+): MemberRecordGateways {
+  let auf = initialAuf;
   const memberships = new Set<string>();
   let dateOfBirth: string = ADULT_BIRTH;
   let accountStatus: AccountStatus = "active";
@@ -79,12 +94,18 @@ function memberRecordGateways(): MemberRecordGateways {
         writes.push(`auf ${registration.kind}`);
         auf =
           registration.kind === "none"
-            ? { aufNumber: null, aufExpiry: null }
+            ? NO_AUF
             : {
                 aufNumber: registration.number,
                 aufExpiry: registration.expiry,
+                isAufVerified: true,
               };
         return { kind: "updated" };
+      },
+      verifyAufRegistration: async (_scope, registration) => {
+        writes.push(`verify ${registration.number}`);
+        auf = { ...auf, isAufVerified: true };
+        return { kind: "verified" };
       },
       correctDateOfBirth: async (_scope, correction) => {
         writes.push(`birth ${correction.toStatus}`);
@@ -150,6 +171,8 @@ vi.mock("@/lib/members/supabase-member-record-gateways", () => ({
 const { proxy } = await import("@/proxy");
 const { GET, PATCH, POST } =
   await import("@/app/api/v1/members/[id]/record/route");
+const verification =
+  await import("@/app/api/v1/members/[id]/record/auf-verification/route");
 
 function givenRole(role: Role): void {
   callerRole = role;
@@ -220,6 +243,7 @@ describe("PATCH /api/v1/members/{id}/record", () => {
         accountStatus: "active",
         aufNumber: "AUF-2026-0042",
         aufExpiry: "2027-03-31",
+        isAufVerified: true,
         dateOfBirth: ADULT_BIRTH,
         registeredAt: REGISTERED_AT,
         hasGuardianConsent: false,
@@ -227,6 +251,36 @@ describe("PATCH /api/v1/members/{id}/record", () => {
         groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
       },
     });
+  });
+
+  it("sin AUF en el cuerpo no toca el que hay (#274)", async () => {
+    gateways = memberRecordGateways({
+      aufNumber: "AUF-9",
+      aufExpiry: "2027-06-30",
+      isAufVerified: false,
+    });
+
+    const response = await patchRecord({
+      groupIds: [SENIOR_ID],
+      dateOfBirth: ADULT_BIRTH,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { aufNumber: "AUF-9", isAufVerified: false },
+    });
+    expect(writes.some((write) => write.startsWith("auf"))).toBe(false);
+  });
+
+  it("responde 400 a un vencimiento que llega sin número", async () => {
+    const response = await patchRecord({
+      aufExpiry: "2027-06-30",
+      groupIds: [],
+      dateOfBirth: ADULT_BIRTH,
+    });
+
+    expect(response.status).toBe(400);
+    expect(writes).toEqual([]);
   });
 
   it("deja sin valor el número y el vencimiento cuando el número llega vacío", async () => {
@@ -446,5 +500,87 @@ describe("endpoint de la ficha: fecha de nacimiento", () => {
 
     expect(response.status).toBe(409);
     await expect(reasonOf(response)).resolves.toBe("member_status_changed");
+  });
+});
+
+const PENDING_AUF: StoredAuf = {
+  aufNumber: "AUF-9",
+  aufExpiry: "2027-06-30",
+  isAufVerified: false,
+};
+
+async function postVerification(
+  body: unknown,
+  memberId: string = MEMBER_ID,
+): Promise<Response> {
+  const path = MEMBER_AUF_VERIFICATION_API_PATH.replace("[id]", memberId);
+  const request = new NextRequest(new URL(path, ORIGIN), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return throughBoundary(request, (incoming) =>
+    verification.POST(incoming, { params: Promise.resolve({ id: memberId }) }),
+  );
+}
+
+describe("POST /api/v1/members/{id}/record/auf-verification", () => {
+  beforeEach(() => {
+    gateways = memberRecordGateways(PENDING_AUF);
+  });
+
+  it("verifica el AUF que el Admin vio y responde la ficha", async () => {
+    const response = await postVerification({
+      aufNumber: "AUF-9",
+      aufExpiry: "2027-06-30",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { aufNumber: "AUF-9", isAufVerified: true },
+    });
+    expect(writes).toEqual(["verify AUF-9", "audit member.auf_verified"]);
+  });
+
+  it("responde 409 si el AUF ya no es el que el Admin vio", async () => {
+    const response = await postVerification({
+      aufNumber: "AUF-OTRO",
+      aufExpiry: "2027-06-30",
+    });
+
+    expect(response.status).toBe(409);
+    await expect(reasonOf(response)).resolves.toBe("auf_changed");
+    expect(writes).toEqual([]);
+  });
+
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "responde 403 a un %s sin escribir nada",
+    async (role) => {
+      givenRole(role);
+
+      const response = await postVerification({
+        aufNumber: "AUF-9",
+        aufExpiry: "2027-06-30",
+      });
+
+      expect(response.status).toBe(403);
+      expect(writes).toEqual([]);
+    },
+  );
+
+  it("responde 404 a un miembro que no es del club", async () => {
+    const response = await postVerification(
+      { aufNumber: "AUF-9", aufExpiry: "2027-06-30" },
+      UNKNOWN_MEMBER_ID,
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("responde 400 a un cuerpo sin número", async () => {
+    const response = await postVerification({ aufExpiry: "2027-06-30" });
+
+    expect(response.status).toBe(400);
+    expect(writes).toEqual([]);
   });
 });

@@ -1,17 +1,11 @@
-import { copyFile, mkdtemp, readdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
-import { expect, it, onTestFinished } from "vitest";
+import { expect, it } from "vitest";
 import {
-  REPO_ROOT,
   type RunResult,
   type TemporaryDatabase,
-  applyMigrations,
   applyRepositoryMigrations,
+  databaseBeforeMigration,
   describeConPostgres,
-  freshDatabase,
   migratedDatabase,
-  toBashPath,
 } from "../../support/postgres";
 
 /**
@@ -62,34 +56,9 @@ async function insertMember(
   );
 }
 
-/**
- * Base con el histórico aplicado HASTA la migración anterior a la de este
- * ticket. Es el único punto de partida desde el que se puede comprobar qué le
- * pasa a un socio que ya existía: sobre el histórico completo la columna ya
- * está puesta y el relleno ya ocurrió.
- */
-async function databaseBeforeThisTicket(): Promise<TemporaryDatabase> {
-  const database = await freshDatabase();
-  const source = path.join(REPO_ROOT, "supabase", "migrations");
-  const directory = await mkdtemp(path.join(tmpdir(), "migraciones-previas-"));
-  onTestFinished(() => rm(directory, { recursive: true, force: true }));
-  const earlier = (await readdir(source))
-    .filter((name) => name < THIS_TICKETS_MIGRATION)
-    .sort();
-  // Sin esto, un renombrado del histórico dejaría el directorio vacío y el
-  // aplicador fallaría por "no hay ninguna migración", que se lee como otro
-  // problema.
-  expect(earlier.length).toBeGreaterThan(0);
-  for (const name of earlier) {
-    await copyFile(path.join(source, name), path.join(directory, name));
-  }
-
-  const applied = await applyMigrations(["--dir", toBashPath(directory)], {
-    ...process.env,
-    DATABASE_URL: database.url,
-  });
-  expect(applied.code, applied.stderr).toBe(0);
-  return database;
+/** Parte de la base de ayer: la de antes de esta migración. */
+function databaseBeforeThisTicket(): Promise<TemporaryDatabase> {
+  return databaseBeforeMigration(THIS_TICKETS_MIGRATION);
 }
 
 describeConPostgres("campos de la ficha del socio", () => {

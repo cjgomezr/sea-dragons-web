@@ -13,15 +13,18 @@ import {
   MemberRecordNotFoundError,
   MemberRecordValidationError,
   type MemberRecordSubmission,
+  MemberAufChangedError,
   readMemberRecord,
   updateMemberRecord,
+  verifyMemberAuf,
 } from "@/lib/members/member-record";
 
 /**
  * La ficha reservada al Admin (#242, RF-4 del PRD de E5): el número de AUF,
  * su vencimiento y los grupos de otro miembro. Todo sale del club de quien
  * llama, y los grupos se escriben con las mismas funciones que la sección
- * Grupos.
+ * Grupos. Desde #274 el Admin además verifica el AUF que propuso el miembro,
+ * y el que escribe él mismo nace verificado.
  */
 
 const ADMIN_ID = "a0a0a0a0-0000-4000-8000-00000000000a";
@@ -52,6 +55,9 @@ type FakeOptions = {
   readonly memberStatus?: AccountStatus;
   readonly aufNumber?: string | null;
   readonly aufExpiry?: string | null;
+  readonly isAufVerified?: boolean;
+  /** El miembro cambió su AUF entre la lectura y la verificación. */
+  readonly aufChangesMidway?: boolean;
   readonly groupIds?: readonly string[];
   readonly dateOfBirth?: string | null;
   readonly hasGuardianConsent?: boolean;
@@ -77,6 +83,7 @@ function fake(options: FakeOptions = {}): Fake {
   let auf = {
     aufNumber: options.aufNumber ?? null,
     aufExpiry: options.aufExpiry ?? null,
+    isAufVerified: options.isAufVerified ?? false,
   };
   const memberships = new Set(options.groupIds ?? []);
   let dateOfBirth =
@@ -129,12 +136,27 @@ function fake(options: FakeOptions = {}): Fake {
         }
         auf =
           registration.kind === "none"
-            ? { aufNumber: null, aufExpiry: null }
+            ? { aufNumber: null, aufExpiry: null, isAufVerified: false }
             : {
                 aufNumber: registration.number,
                 aufExpiry: registration.expiry,
+                isAufVerified: true,
               };
         return { kind: "updated" };
+      },
+      verifyAufRegistration: async ({ clubId, userId }, registration) => {
+        writes.push(`verify ${JSON.stringify(registration)}`);
+        const isStillTheSame =
+          isClubMember(clubId, userId) &&
+          options.aufChangesMidway !== true &&
+          auf.aufNumber === registration.number &&
+          auf.aufExpiry === registration.expiry &&
+          !auf.isAufVerified;
+        if (!isStillTheSame) {
+          return { kind: "changed" };
+        }
+        auf = { ...auf, isAufVerified: true };
+        return { kind: "verified" };
       },
       correctDateOfBirth: async ({ clubId, userId }, correction) => {
         writes.push(
@@ -194,27 +216,57 @@ function fake(options: FakeOptions = {}): Fake {
   return { gateways, writes, reads, auditRows };
 }
 
+/** El AUF que manda `submission()`, ya guardado y verificado: guardar la
+ * ficha no lo cambia. */
+const UNCHANGED_AUF = {
+  aufNumber: "AUF-2026-0042",
+  aufExpiry: "2027-03-31",
+  isAufVerified: true,
+} as const;
+
+/** La ficha como la escribe el formulario cuando el AUF se editó. */
+type EditedSubmission = {
+  readonly aufNumber: string | null;
+  readonly aufExpiry: string | null;
+  readonly groupIds: readonly string[];
+  readonly dateOfBirth: string | null;
+};
+
 function submission(
-  overrides: Partial<MemberRecordSubmission> = {},
+  overrides: Partial<EditedSubmission> = {},
 ): MemberRecordSubmission {
-  return {
+  const { aufNumber, aufExpiry, ...rest }: EditedSubmission = {
     aufNumber: "AUF-2026-0042",
     aufExpiry: "2027-03-31",
     groupIds: [],
     dateOfBirth: ADULT_BIRTH,
     ...overrides,
   };
+  return { ...rest, auf: { aufNumber, aufExpiry } };
 }
 
 async function save(
   { gateways }: Fake,
-  overrides: Partial<MemberRecordSubmission> = {},
+  overrides: Partial<EditedSubmission> = {},
   callerId: string = ADMIN_ID,
 ): ReturnType<typeof updateMemberRecord> {
   return updateMemberRecord(gateways, {
     callerId,
     userId: MEMBER_ID,
     submission: submission(overrides),
+    todayInClub: TODAY_IN_CLUB,
+  });
+}
+
+/** Guarda la ficha con el AUF sin tocar: el formulario no lo manda. */
+async function saveKeepingAuf(
+  { gateways }: Fake,
+  groupIds: readonly string[],
+): ReturnType<typeof updateMemberRecord> {
+  return updateMemberRecord(gateways, {
+    callerId: ADMIN_ID,
+    userId: MEMBER_ID,
+    submission: { ...submission({ groupIds }), auf: null },
     todayInClub: TODAY_IN_CLUB,
   });
 }
@@ -249,6 +301,7 @@ describe("ficha reservada al Admin: lectura", () => {
       accountStatus: "active",
       aufNumber: "AUF-1",
       aufExpiry: "2027-01-01",
+      isAufVerified: false,
       dateOfBirth: ADULT_BIRTH,
       registeredAt: REGISTERED_AT,
       hasGuardianConsent: false,
@@ -623,7 +676,7 @@ describe("corregir la fecha de nacimiento", () => {
   );
 
   it("no escribe la fecha si no cambió", async () => {
-    const store = fake();
+    const store = fake(UNCHANGED_AUF);
 
     await save(store, { dateOfBirth: ADULT_BIRTH });
 
@@ -712,7 +765,7 @@ describe("corregir la fecha de nacimiento", () => {
 
 describe("bitácora de la corrección de la fecha de nacimiento", () => {
   it("guarda quién la hizo, sobre quién y el resultado", async () => {
-    const store = fake();
+    const store = fake(UNCHANGED_AUF);
 
     await save(store, { dateOfBirth: MINOR_BIRTH });
 
@@ -767,5 +820,209 @@ describe("aviso del consentimiento del tutor", () => {
     ],
   ] as const)("no avisa %s", (_case, record, dateOfBirth) => {
     expect(correctionRequiresGuardianConsent(record, dateOfBirth)).toBe(false);
+  });
+});
+
+describe("el AUF que escribe el Admin nace verificado", () => {
+  it("queda verificado al escribirlo en la ficha", async () => {
+    const store = fake();
+
+    const record = await save(store);
+
+    expect(record).toMatchObject({
+      aufNumber: "AUF-2026-0042",
+      isAufVerified: true,
+    });
+  });
+
+  it("queda verificado al corregir uno que el miembro propuso", async () => {
+    const store = fake({ aufNumber: "AUF-MAL", aufExpiry: "2027-03-31" });
+
+    const record = await save(store);
+
+    expect(record).toMatchObject({
+      aufNumber: "AUF-2026-0042",
+      isAufVerified: true,
+    });
+  });
+
+  it("no toca el AUF que el miembro propuso mientras el Admin tenía la ficha abierta", async () => {
+    // El Admin abrió la ficha con otro AUF; el miembro propuso éste después.
+    const store = fake({
+      aufNumber: "AUF-NUEVO",
+      aufExpiry: "2028-01-31",
+      isAufVerified: false,
+    });
+
+    const record = await saveKeepingAuf(store, [SENIOR_ID]);
+
+    expect(record).toMatchObject({
+      aufNumber: "AUF-NUEVO",
+      aufExpiry: "2028-01-31",
+      isAufVerified: false,
+    });
+    expect(store.writes.some((write) => write.startsWith("auf"))).toBe(false);
+    expect(store.auditRows).toEqual([]);
+  });
+
+  it("no toca un AUF pendiente si guarda la ficha sin cambiarlo", async () => {
+    const store = fake({ ...UNCHANGED_AUF, isAufVerified: false });
+
+    const record = await save(store, { groupIds: [SENIOR_ID] });
+
+    expect(record.isAufVerified).toBe(false);
+    expect(store.writes.some((write) => write.startsWith("auf"))).toBe(false);
+  });
+
+  it("guarda en la bitácora quién lo verificó al escribirlo", async () => {
+    const store = fake();
+
+    await save(store);
+
+    expect(store.auditRows).toEqual([
+      {
+        club_id: CLUB_ID,
+        actor_id: ADMIN_ID,
+        action: "member.auf_verified",
+        entity_type: "member",
+        entity_id: MEMBER_ID,
+        result: "success",
+        metadata: null,
+      },
+    ]);
+  });
+
+  it("no deja rastro de verificación al borrar el AUF", async () => {
+    const store = fake(UNCHANGED_AUF);
+
+    await save(store, { aufNumber: null, aufExpiry: null });
+
+    expect(store.auditRows).toEqual([]);
+  });
+});
+
+async function verify(
+  store: Fake,
+  expected: { readonly aufNumber: string; readonly aufExpiry: string | null },
+  callerId: string = ADMIN_ID,
+): ReturnType<typeof verifyMemberAuf> {
+  return verifyMemberAuf(store.gateways, {
+    callerId,
+    userId: MEMBER_ID,
+    expected,
+    todayInClub: TODAY_IN_CLUB,
+  });
+}
+
+const PENDING = { aufNumber: "AUF-9", aufExpiry: "2027-06-30" } as const;
+
+describe("verificar el AUF", () => {
+  it("el Admin confirma un AUF pendiente y queda verificado", async () => {
+    const store = fake(PENDING);
+
+    const record = await verify(store, PENDING);
+
+    expect(record).toMatchObject({ ...PENDING, isAufVerified: true });
+  });
+
+  it("guarda en la bitácora quién lo verificó, sobre quién y sin el número", async () => {
+    const store = fake(PENDING);
+
+    await verify(store, PENDING);
+
+    expect(store.auditRows).toEqual([
+      {
+        club_id: CLUB_ID,
+        actor_id: ADMIN_ID,
+        action: "member.auf_verified",
+        entity_type: "member",
+        entity_id: MEMBER_ID,
+        result: "success",
+        metadata: null,
+      },
+    ]);
+    expect(JSON.stringify(store.auditRows)).not.toContain("AUF-9");
+  });
+
+  it("verifica también uno sin vencimiento", async () => {
+    const store = fake({ aufNumber: "AUF-9", aufExpiry: null });
+
+    const record = await verify(store, { aufNumber: "AUF-9", aufExpiry: null });
+
+    expect(record.isAufVerified).toBe(true);
+  });
+
+  it("no repite la verificación ni la bitácora de uno ya verificado", async () => {
+    const store = fake({ ...PENDING, isAufVerified: true });
+
+    const record = await verify(store, PENDING);
+
+    expect(record.isAufVerified).toBe(true);
+    expect(store.writes).toEqual([]);
+    expect(store.auditRows).toEqual([]);
+  });
+
+  it("responde con un conflicto si el AUF no es el que el Admin vio", async () => {
+    const store = fake(PENDING);
+
+    await expect(
+      verify(store, { aufNumber: "AUF-9", aufExpiry: "2028-01-01" }),
+    ).rejects.toBeInstanceOf(MemberAufChangedError);
+    expect(store.writes).toEqual([]);
+    expect(store.auditRows).toEqual([]);
+  });
+
+  it("responde con un conflicto si el miembro ya no tiene AUF", async () => {
+    const store = fake();
+
+    await expect(verify(store, PENDING)).rejects.toBeInstanceOf(
+      MemberAufChangedError,
+    );
+  });
+
+  it("responde con un conflicto si el miembro lo cambió mientras se verificaba", async () => {
+    const store = fake({ ...PENDING, aufChangesMidway: true });
+
+    await expect(verify(store, PENDING)).rejects.toBeInstanceOf(
+      MemberAufChangedError,
+    );
+    expect(store.auditRows).toEqual([]);
+  });
+
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "rechaza a un %s sin escribir nada",
+    async (callerRole) => {
+      const store = fake({ ...PENDING, callerRole });
+
+      await expect(verify(store, PENDING)).rejects.toBeInstanceOf(
+        MemberRecordForbiddenError,
+      );
+      expect(store.writes).toEqual([]);
+      expect(store.auditRows).toEqual([]);
+    },
+  );
+
+  it("responde que no existe un miembro de otro club", async () => {
+    const store = fake({ ...PENDING, memberClubId: OTHER_CLUB_ID });
+
+    await expect(verify(store, PENDING)).rejects.toBeInstanceOf(
+      MemberRecordNotFoundError,
+    );
+  });
+
+  it("un AUF verificado que vence sigue verificado y se marca vencido", async () => {
+    const store = fake({
+      aufNumber: "AUF-9",
+      aufExpiry: "2026-09-20",
+      isAufVerified: true,
+    });
+
+    const record = await readMemberRecord(store.gateways, {
+      callerId: ADMIN_ID,
+      userId: MEMBER_ID,
+      todayInClub: TODAY_IN_CLUB,
+    });
+
+    expect(record).toMatchObject({ isAufVerified: true, isAufExpired: true });
   });
 });

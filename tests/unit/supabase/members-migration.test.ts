@@ -77,6 +77,7 @@ describeConPostgres("migración de miembros", () => {
       "account_status text null=NO",
       "auf_expiry date null=YES",
       "auf_number text null=YES",
+      "auf_verified_at timestamp with time zone null=YES",
       "club_id uuid null=NO",
       "country text null=YES",
       "created_at timestamp with time zone null=NO",

@@ -306,6 +306,26 @@ export const englishMessages = {
     "Your account can't change these details right now.",
   "account.profile.error.unexpected":
     "We couldn't save your changes. Try again in a moment.",
+  // El AUF del perfil propio (#274): lo escribe el miembro y queda pendiente
+  // hasta que un Admin lo verifica.
+  "account.profile.auf.title": "AUF registration",
+  "account.profile.auf.number": "AUF number",
+  "account.profile.auf.expiry": "AUF expiry",
+  "account.profile.auf.hint":
+    "An Admin checks it before it counts as verified.",
+  "account.profile.auf.pending": "Pending verification by an Admin.",
+  "account.profile.auf.verified":
+    "Verified by an Admin. Only an Admin can change it.",
+  "account.profile.auf.summary": "AUF {number} · expires {date}",
+  "account.profile.auf.withoutExpiry": "AUF {number} · no expiry",
+  "account.profile.issue.aufNumberMissing": "Write your AUF number.",
+  "account.profile.issue.aufNumberTooLong":
+    "Your AUF number can be at most {max} characters.",
+  "account.profile.issue.aufExpiryNotADate": "Write a valid expiry date.",
+  "account.profile.issue.aufExpiryBeforeJoined":
+    "The expiry can't be before the day you joined the club.",
+  "account.profile.error.aufVerified":
+    "Your AUF is already verified. Only an Admin can change it.",
   // La foto de perfil (#245): el círculo de la cabecera y sus controles.
   "account.photo.alt": "Your profile photo",
   "account.photo.add": "Add photo",
@@ -464,6 +484,9 @@ export const englishMessages = {
   "directory.column.position": "Position",
   "directory.mark.inactive": "Deactivated",
   "directory.mark.aufExpired": "AUF expired",
+  // #274: el AUF que escribió el miembro, hasta que un Admin lo verifica.
+  "directory.mark.aufNotVerified": "AUF not verified",
+  "directory.mark.aufVerified": "AUF verified",
   "directory.mark.pendingActivation": "Pending activation",
   "directory.error.signInRequired":
     "Your session ended. Sign in again to see the directory.",
@@ -486,6 +509,11 @@ export const englishMessages = {
   "memberRecord.auf.number": "AUF number",
   "memberRecord.auf.expiry": "Expiry date",
   "memberRecord.auf.hint": "Clearing the number also clears its expiry date.",
+  "memberRecord.auf.pending":
+    "The member wrote this AUF. Check it and verify it, or correct it and save: what you write is verified.",
+  "memberRecord.auf.verify": "Verify AUF",
+  "memberRecord.auf.verifying": "Verifying…",
+  "memberRecord.auf.verified": "AUF verified.",
   "memberRecord.birth.title": "Personal details",
   "memberRecord.birth.label": "Date of birth",
   "memberRecord.birth.hint":
@@ -511,6 +539,8 @@ export const englishMessages = {
     "A member with a deactivated account can't be added to groups.",
   "memberRecord.error.memberStatusChanged":
     "The member's account changed while saving. Reload the record and try again.",
+  "memberRecord.error.aufChanged":
+    "The member changed the AUF after you opened the record. Reload it before verifying.",
   "memberRecord.error.signInRequired":
     "Your session ended. Sign in again to keep going.",
   "memberRecord.error.forbidden": "Only an Admin can see and edit this record.",

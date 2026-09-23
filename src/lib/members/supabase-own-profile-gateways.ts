@@ -2,7 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { readRequiredText, readText } from "@/lib/auth/supabase-auth-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
-import type { OwnProfile, OwnProfileGateways } from "./own-profile";
+import type {
+  OwnAuf,
+  OwnAufChange,
+  OwnProfileFields,
+  OwnProfileGateways,
+  OwnProfileUpdateResult,
+  StoredOwnProfile,
+} from "./own-profile";
 import {
   parseExperienceLevel,
   parseGender,
@@ -16,14 +23,15 @@ import {
  * `0003_members.sql` ya deja a cada miembro ver su fila, así que la pantalla
  * lee con la sesión de quien la abre. Escribir va por la llave de servicio a
  * propósito: `authenticated` no tiene `update` sobre `members`, y así el rol,
- * el AUF o el estado no se pueden cambiar atacando la base directamente. El
- * servidor identifica a quien pide por su cookie y escribe sólo su fila, y
- * sólo las cinco columnas del perfil.
+ * la verificación del AUF o el estado no se pueden cambiar atacando la base
+ * directamente. El servidor identifica a quien pide por su cookie y escribe
+ * sólo su fila, y sólo las cinco columnas del perfil y el AUF propuesto
+ * (#274), que siempre se escribe sin verificar.
  */
 
 const MEMBERS_TABLE = "members";
 const PROFILE_COLUMNS =
-  "full_name, country, position, experience_level, gender";
+  "full_name, country, position, experience_level, gender, auf_number, auf_expiry, auf_verified_at, joined_on";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -49,18 +57,108 @@ function readOptionalCatalogValue<T>(
   return parsed;
 }
 
-function toOwnProfile(row: Row): OwnProfile {
+/** El `check` `members_auf_verified_requires_number` de `0021` garantiza
+ * que no haya verificación sin número. */
+function toOwnAuf(row: Row): OwnAuf {
+  const number = readText(row, "auf_number", MEMBERS_TABLE);
+  if (number === null) {
+    return { status: "none" };
+  }
   return {
-    fullName: readRequiredText(row, "full_name", MEMBERS_TABLE),
-    country: readText(row, "country", MEMBERS_TABLE),
-    position: readOptionalCatalogValue(row, "position", parsePosition),
-    experienceLevel: readOptionalCatalogValue(
-      row,
-      "experience_level",
-      parseExperienceLevel,
-    ),
-    gender: readOptionalCatalogValue(row, "gender", parseGender),
+    status:
+      readText(row, "auf_verified_at", MEMBERS_TABLE) === null
+        ? "pending"
+        : "verified",
+    number,
+    // Las columnas `date` llegan como YYYY-MM-DD.
+    expiry: readText(row, "auf_expiry", MEMBERS_TABLE),
   };
+}
+
+function toStoredOwnProfile(row: Row): StoredOwnProfile {
+  return {
+    profile: {
+      fullName: readRequiredText(row, "full_name", MEMBERS_TABLE),
+      country: readText(row, "country", MEMBERS_TABLE),
+      position: readOptionalCatalogValue(row, "position", parsePosition),
+      experienceLevel: readOptionalCatalogValue(
+        row,
+        "experience_level",
+        parseExperienceLevel,
+      ),
+      gender: readOptionalCatalogValue(row, "gender", parseGender),
+      auf: toOwnAuf(row),
+    },
+    joinedOn: readRequiredText(row, "joined_on", MEMBERS_TABLE),
+  };
+}
+
+function toProfileColumns(
+  fields: OwnProfileFields,
+  auf: OwnAufChange,
+): Record<string, string | null> {
+  const profileColumns = {
+    full_name: fields.fullName,
+    country: fields.country,
+    position: fields.position,
+    experience_level: fields.experienceLevel,
+    gender: fields.gender,
+  };
+  return auf.kind === "keep"
+    ? profileColumns
+    : {
+        ...profileColumns,
+        auf_number: auf.number,
+        auf_expiry: auf.expiry,
+        auf_verified_at: null,
+      };
+}
+
+async function findOwnProfile(
+  client: SupabaseClient,
+  userId: string,
+): Promise<StoredOwnProfile | null> {
+  const { data, error } = await client
+    .from(MEMBERS_TABLE)
+    .select(PROFILE_COLUMNS)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    throw new Error(`No se pudo leer el perfil de ${userId}: ${error.message}`);
+  }
+  return data === null ? null : toStoredOwnProfile(data);
+}
+
+/** Una propuesta lleva la condición de que el AUF siga sin verificar en el
+ * mismo `update`: si un Admin lo verificó entre la lectura y la escritura, no
+ * toca ninguna fila, y una segunda lectura dice si fue eso o si la fila ya no
+ * está. */
+async function updateOwnProfile(
+  client: SupabaseClient,
+  userId: string,
+  change: { readonly fields: OwnProfileFields; readonly auf: OwnAufChange },
+): Promise<OwnProfileUpdateResult> {
+  const update = client
+    .from(MEMBERS_TABLE)
+    .update(toProfileColumns(change.fields, change.auf))
+    .eq("user_id", userId);
+  const { data, error } = await (
+    change.auf.kind === "propose" ? update.is("auf_verified_at", null) : update
+  )
+    .select(PROFILE_COLUMNS)
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `No se pudo guardar el perfil de ${userId}: ${error.message}`,
+    );
+  }
+  if (data !== null) {
+    return { kind: "updated", profile: toStoredOwnProfile(data).profile };
+  }
+  return change.auf.kind === "propose" &&
+    (await findOwnProfile(client, userId)) !== null
+    ? { kind: "auf_verified" }
+    : { kind: "member_not_found" };
 }
 
 export function createOwnProfileGateways(
@@ -68,40 +166,9 @@ export function createOwnProfileGateways(
 ): OwnProfileGateways {
   return {
     profiles: {
-      async findOwnProfile(userId) {
-        const { data, error } = await client
-          .from(MEMBERS_TABLE)
-          .select(PROFILE_COLUMNS)
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (error) {
-          throw new Error(
-            `No se pudo leer el perfil de ${userId}: ${error.message}`,
-          );
-        }
-        return data === null ? null : toOwnProfile(data);
-      },
-
-      async updateOwnProfile(userId, profile) {
-        const { data, error } = await client
-          .from(MEMBERS_TABLE)
-          .update({
-            full_name: profile.fullName,
-            country: profile.country,
-            position: profile.position,
-            experience_level: profile.experienceLevel,
-            gender: profile.gender,
-          })
-          .eq("user_id", userId)
-          .select(PROFILE_COLUMNS)
-          .maybeSingle();
-        if (error) {
-          throw new Error(
-            `No se pudo guardar el perfil de ${userId}: ${error.message}`,
-          );
-        }
-        return data === null ? null : toOwnProfile(data);
-      },
+      findOwnProfile: (userId) => findOwnProfile(client, userId),
+      updateOwnProfile: (userId, fields, auf) =>
+        updateOwnProfile(client, userId, { fields, auf }),
     },
   };
 }

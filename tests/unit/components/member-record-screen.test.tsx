@@ -8,7 +8,8 @@ import type { MemberRecord } from "@/lib/members/member-record";
 /**
  * La ficha reservada al Admin en pantalla (#242, RF-4 del PRD de E5): carga la
  * ficha y los grupos del club por la API v1, guarda todo en una sola
- * petición y enseña lo que el servidor respondió.
+ * petición y enseña lo que el servidor respondió. Desde #274 marca el AUF sin
+ * verificar y deja al Admin verificarlo.
  */
 
 const MEMBER_ID = "b1b1b1b1-0000-4000-8000-00000000000b";
@@ -17,6 +18,7 @@ const MASTERS_ID = "9a9a9a9a-0000-4000-8000-000000000002";
 const RECORD_PATH = `/api/v1/members/${MEMBER_ID}/record`;
 const INVITATION_PATH = `/api/v1/members/${MEMBER_ID}/invitation`;
 const STATUS_PATH = `/api/v1/members/${MEMBER_ID}/status`;
+const VERIFICATION_PATH = `${RECORD_PATH}/auf-verification`;
 const GROUPS_PATH = "/api/v1/groups";
 
 const RECORD: MemberRecord = {
@@ -26,12 +28,16 @@ const RECORD: MemberRecord = {
   accountStatus: "active",
   aufNumber: "AUF-1",
   aufExpiry: "2027-03-31",
+  isAufVerified: true,
   dateOfBirth: "1990-05-10",
   registeredAt: "2024-03-06T01:00:00.000Z",
   hasGuardianConsent: false,
   isAufExpired: false,
   groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
 };
+
+/** Un AUF que escribió el miembro y ningún Admin ha mirado. */
+const PENDING_RECORD: MemberRecord = { ...RECORD, isAufVerified: false };
 
 /** 14 años el día del registro. */
 const MINOR_BIRTH = "2010-01-01";
@@ -51,10 +57,12 @@ type Stub = {
   readonly save?: (body: unknown) => Response | Promise<Response>;
   readonly resend?: () => Response;
   readonly changeStatus?: (body: unknown) => Response | Promise<Response>;
+  readonly verify?: (body: unknown) => Response | Promise<Response>;
 };
 
 const resends: string[] = [];
 const statusChanges: unknown[] = [];
+const verifications: unknown[] = [];
 
 function jsonResponse(status: number, payload: unknown): Response {
   return new Response(JSON.stringify(payload), {
@@ -71,19 +79,26 @@ function errorResponse(
   return jsonResponse(status, { error: { code, message: "x", reason } });
 }
 
-/** Lo que el servidor respondería al guardar: la ficha con lo pedido. */
+/** Lo que el servidor respondería al guardar: la ficha con lo pedido. Sin
+ * AUF en la petición, el guardado se queda como estaba. */
 function savedRecord(body: unknown): MemberRecord {
-  const { aufNumber, aufExpiry, groupIds, dateOfBirth } = body as {
-    aufNumber: string | null;
-    aufExpiry: string | null;
+  const { groupIds, dateOfBirth, ...auf } = body as {
+    aufNumber?: string | null;
+    aufExpiry?: string | null;
     groupIds: string[];
     dateOfBirth: string | null;
   };
+  const aufNumber =
+    auf.aufNumber === undefined ? RECORD.aufNumber : auf.aufNumber;
+  const aufExpiry =
+    auf.aufExpiry === undefined ? RECORD.aufExpiry : auf.aufExpiry;
   return {
     ...RECORD,
     dateOfBirth,
     aufNumber,
     aufExpiry: aufNumber === null ? null : aufExpiry,
+    // Lo que escribe un Admin nace verificado.
+    isAufVerified: aufNumber !== null,
     groups: CLUB_GROUPS.filter((group) => groupIds.includes(group.id)).map(
       ({ id, name }) => ({ id, name }),
     ),
@@ -109,6 +124,14 @@ function stubApi(stub: Stub = {}): void {
         resends.push(url);
         return (
           stub.resend?.() ?? jsonResponse(200, { data: { invitation: "sent" } })
+        );
+      }
+      if (url === VERIFICATION_PATH && init?.method === "POST") {
+        const body: unknown = JSON.parse(String(init.body));
+        verifications.push(body);
+        return (
+          stub.verify?.(body) ??
+          jsonResponse(200, { data: { ...RECORD, isAufVerified: true } })
         );
       }
       if (url === STATUS_PATH && init?.method === "PATCH") {
@@ -146,6 +169,7 @@ beforeEach(() => {
   patches.length = 0;
   resends.length = 0;
   statusChanges.length = 0;
+  verifications.length = 0;
 });
 
 afterEach(() => {
@@ -272,6 +296,19 @@ describe("ficha en pantalla: guardado", () => {
     expect(
       screen.getByRole("checkbox", { name: "Masters Squad" }),
     ).toBeChecked();
+  });
+
+  it("no manda el AUF si no lo tocó: el miembro puede haberlo cambiado entretanto (#274)", async () => {
+    stubApi({ record: PENDING_RECORD });
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(screen.getByRole("checkbox", { name: "Masters Squad" }));
+    await user.click(saveButton());
+
+    await screen.findByRole("status");
+    expect(patches[0]?.body).not.toHaveProperty("aufNumber");
+    expect(patches[0]?.body).not.toHaveProperty("aufExpiry");
   });
 
   it("manda el número y el vencimiento vacíos como null", async () => {
@@ -744,5 +781,133 @@ describe("ficha en pantalla: fecha de nacimiento", () => {
     ).toHaveAccessibleDescription(
       /Paula Player tendrá que dar los datos y el consentimiento de su tutor/,
     );
+  });
+});
+
+function verifyButton(): HTMLElement {
+  return screen.getByRole("button", { name: /verify aUF|verifying/i });
+}
+
+describe("ficha en pantalla: verificar el AUF (#274)", () => {
+  it("marca sin verificar el AUF que escribió el miembro", async () => {
+    stubApi({ record: PENDING_RECORD });
+
+    await renderScreen();
+
+    expect(screen.getByText("AUF not verified")).toBeInTheDocument();
+    expect(screen.queryByText("AUF verified")).not.toBeInTheDocument();
+  });
+
+  it("marca verificado un AUF verificado, sin ofrecer verificarlo", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(screen.getByText("AUF verified")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /verify AUF/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("marca a la vez verificado y vencido un AUF verificado que venció", async () => {
+    stubApi({
+      record: { ...RECORD, aufExpiry: "2025-01-31", isAufExpired: true },
+    });
+
+    await renderScreen();
+
+    expect(screen.getByText("AUF verified")).toBeInTheDocument();
+    expect(screen.getByText("AUF expired")).toBeInTheDocument();
+  });
+
+  it("no marca nada sin AUF", async () => {
+    stubApi({
+      record: {
+        ...RECORD,
+        aufNumber: null,
+        aufExpiry: null,
+        isAufVerified: false,
+      },
+    });
+
+    await renderScreen();
+
+    expect(screen.queryByText(/AUF (not )?verified/)).not.toBeInTheDocument();
+  });
+
+  it("verifica el AUF que el Admin tiene delante y lo marca verificado", async () => {
+    stubApi({ record: PENDING_RECORD });
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(verifyButton());
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "AUF verified.",
+    );
+    expect(verifications).toEqual([
+      { aufNumber: "AUF-1", aufExpiry: "2027-03-31" },
+    ]);
+    expect(screen.getByText("AUF verified")).toBeInTheDocument();
+    expect(screen.queryByText("AUF not verified")).not.toBeInTheDocument();
+  });
+
+  it("no ofrece verificar mientras el número está editado: guardar ya lo verifica", async () => {
+    stubApi({ record: PENDING_RECORD });
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.type(screen.getByLabelText("AUF number"), "0");
+
+    expect(
+      screen.queryByRole("button", { name: /verify AUF/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("dice que el miembro cambió el AUF cuando el servidor responde 409", async () => {
+    stubApi({
+      record: PENDING_RECORD,
+      verify: () => errorResponse(409, "conflict", "auf_changed"),
+    });
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(verifyButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The member changed the AUF after you opened the record. Reload it before verifying.",
+    );
+    expect(screen.getByText("AUF not verified")).toBeInTheDocument();
+  });
+
+  it("no manda una segunda verificación con un doble clic", async () => {
+    let answer: (response: Response) => void = () => undefined;
+    stubApi({
+      record: PENDING_RECORD,
+      verify: () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve;
+        }),
+    });
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.dblClick(verifyButton());
+
+    expect(verifications).toHaveLength(1);
+    expect(verifyButton()).toBeDisabled();
+    answer(jsonResponse(200, { data: RECORD }));
+    await screen.findByRole("status");
+  });
+
+  it("sale en español", async () => {
+    stubApi({ record: PENDING_RECORD });
+
+    await renderScreen("es");
+
+    expect(screen.getByText("AUF sin verificar")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Verificar AUF" }),
+    ).toBeInTheDocument();
   });
 });

@@ -35,6 +35,7 @@ const ANA: DirectoryMemberRecord = {
   status: "active",
   aufNumber: "AUF-1",
   aufExpiry: "2027-01-31",
+  isAufVerified: true,
   photoPath: "aaaaaaaa-0000-4000-8000-00000000000a/foto.webp",
 };
 
@@ -48,6 +49,7 @@ const BRUNO: DirectoryMemberRecord = {
   status: "active",
   aufNumber: "AUF-2",
   aufExpiry: "2026-09-20",
+  isAufVerified: true,
   photoPath: null,
 };
 
@@ -61,6 +63,7 @@ const MARIA: DirectoryMemberRecord = {
   status: "active",
   aufNumber: null,
   aufExpiry: null,
+  isAufVerified: false,
   photoPath: null,
 };
 
@@ -74,6 +77,8 @@ const ZOE: DirectoryMemberRecord = {
   status: "inactive",
   aufNumber: "AUF-4",
   aufExpiry: TODAY,
+  // Lo escribió la socia y ningún Admin lo ha verificado todavía (#274).
+  isAufVerified: false,
   photoPath: "dddddddd-0000-4000-8000-00000000000d/foto.png",
 };
 
@@ -405,8 +410,32 @@ describe("el AUF en el directorio", () => {
     });
   });
 
+  it("marca sin verificar el AUF que escribió el socio", async () => {
+    const members = await listForAdmin();
+
+    expect(members.get("Zoe Zapata")).toMatchObject({
+      aufNumber: "AUF-4",
+      isAufVerified: false,
+    });
+  });
+
+  it("marca verificado el AUF que confirmó un Admin", async () => {
+    const members = await listForAdmin();
+
+    expect(members.get("Ana Admin")).toMatchObject({ isAufVerified: true });
+  });
+
+  it("un AUF verificado que venció sigue verificado y además vencido", async () => {
+    const members = await listForAdmin();
+
+    expect(members.get("Bruno Beltrán")).toMatchObject({
+      isAufVerified: true,
+      isAufExpired: true,
+    });
+  });
+
   it.each(["Coach", "Committee", "Player"] as const)(
-    "no le cuenta el AUF a un %s",
+    "no le cuenta el AUF ni su verificación a un %s",
     async (callerRole) => {
       const listing = await listDirectory(gateways({ callerRole }), {
         callerId: CALLER_ID,
@@ -417,6 +446,7 @@ describe("el AUF en el directorio", () => {
       expect(listing.kind).toBe("member");
       for (const member of listing.members) {
         expect(Object.keys(member)).not.toContain("aufNumber");
+        expect(Object.keys(member)).not.toContain("isAufVerified");
       }
     },
   );
@@ -456,6 +486,7 @@ describe("el rol nuevo en la lista (#240)", () => {
       ...NEREA,
       aufNumber: "AUF-9",
       aufExpiry: "2020-01-31",
+      isAufVerified: true,
       isAufExpired: true,
     };
     const listing: DirectoryListing = { kind: "admin", members: [admin] };

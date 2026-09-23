@@ -73,6 +73,7 @@ function renderScreen(
         position: null,
         experienceLevel: null,
         gender: null,
+        auf: { status: "none" },
       }}
       photoUrl={options.photoUrl === undefined ? OLD_URL : options.photoUrl}
       groups={[]}

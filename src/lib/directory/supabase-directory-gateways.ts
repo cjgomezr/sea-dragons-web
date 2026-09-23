@@ -29,7 +29,7 @@ import type { DirectoryGateways, DirectoryMemberRecord } from "./directory";
 
 const MEMBERS_TABLE = "members";
 const DIRECTORY_COLUMNS =
-  "user_id, full_name, country, experience_level, role, position, account_status, auf_number, auf_expiry, photo_path";
+  "user_id, full_name, country, experience_level, role, position, account_status, auf_number, auf_expiry, auf_verified_at, photo_path";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -80,6 +80,7 @@ function toDirectoryMemberRecord(row: Row): DirectoryMemberRecord {
     // Una columna `date` llega como YYYY-MM-DD, que es el formato con el que
     // el dominio compara el vencimiento contra el día del club.
     aufExpiry: readText(row, "auf_expiry", MEMBERS_TABLE),
+    isAufVerified: readText(row, "auf_verified_at", MEMBERS_TABLE) !== null,
     photoPath: readText(row, "photo_path", MEMBERS_TABLE),
   };
 }

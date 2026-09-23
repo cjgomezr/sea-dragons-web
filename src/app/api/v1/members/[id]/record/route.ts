@@ -1,28 +1,20 @@
 import type { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
-import { ApiError } from "@/lib/api/response";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
-import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
-import { InactiveMemberError } from "@/lib/groups/group-members";
-import { GroupNotFoundError } from "@/lib/groups/groups";
-import { asGroupsApiError } from "@/lib/groups/groups-api";
 import {
   AUF_NUMBER_MAX_LENGTH,
-  GROUP_NOT_FOUND_REASON,
-  MEMBER_INACTIVE_REASON,
-  MEMBER_NOT_FOUND_REASON,
-  MEMBER_STATUS_CHANGED_REASON,
   type MemberRecord,
-  MemberRecordConflictError,
-  MemberRecordForbiddenError,
-  type MemberRecordGateways,
-  MemberRecordNotFoundError,
-  MemberRecordValidationError,
+  type MemberRecordSubmission,
   readMemberRecord,
   updateMemberRecord,
 } from "@/lib/members/member-record";
-import { createSupabaseMemberRecordGateways } from "@/lib/members/supabase-member-record-gateways";
+import {
+  type MemberRecordRouteContext,
+  asMemberRecordApiError,
+  readMemberId,
+  requireMemberRecordGateways,
+} from "@/lib/members/member-record-api";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
 
 /**
@@ -36,7 +28,9 @@ import { clubCalendarDate } from "@/lib/time/club-calendar";
  * club.
  *
  * El PATCH lleva la ficha entera en una sola petición: dos Admin que guardan a
- * la vez no dejan el número de uno con el vencimiento del otro.
+ * la vez no dejan el número de uno con el vencimiento del otro. Un AUF que el
+ * Admin cambia aquí queda verificado (#274); confirmar el que propuso el
+ * miembro sin cambiarlo es `auf-verification`, que cuelga de esta ruta.
  */
 
 // Depende de la sesión de quien llama y de la fila del socio ahora.
@@ -48,78 +42,42 @@ const AUF_NUMBER_BODY_MAX_LENGTH = AUF_NUMBER_MAX_LENGTH * 4;
 
 /** Sólo la forma. Que el número quepa y la fecha sea un día de verdad lo
  * decide el dominio, que dice además cuál falló. `strict` responde 400 a
- * cualquier campo que no sea de esta ficha, como el rol o el nombre. */
+ * cualquier campo que no sea de esta ficha, como el rol o el nombre.
+ *
+ * El AUF va entero o no va (#274): sin él no se toca el guardado, que el
+ * miembro puede haber cambiado desde que el Admin abrió la ficha. */
 const recordBodySchema = z
   .object({
-    aufNumber: z.string().max(AUF_NUMBER_BODY_MAX_LENGTH).nullable(),
-    aufExpiry: z.string().nullable(),
+    aufNumber: z.string().max(AUF_NUMBER_BODY_MAX_LENGTH).nullable().optional(),
+    aufExpiry: z.string().nullable().optional(),
     groupIds: z.array(z.uuid()),
     dateOfBirth: z.string().nullable(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (body) => (body.aufNumber === undefined) === (body.aufExpiry === undefined),
+    {
+      message: "aufNumber y aufExpiry van juntos, o no va ninguno.",
+      path: ["aufNumber"],
+    },
+  );
 
 type RecordBody = z.infer<typeof recordBodySchema>;
 
+function toSubmission(body: RecordBody): MemberRecordSubmission {
+  const { aufNumber, aufExpiry, groupIds, dateOfBirth } = body;
+  return {
+    auf:
+      aufNumber === undefined || aufExpiry === undefined
+        ? null
+        : { aufNumber, aufExpiry },
+    groupIds,
+    dateOfBirth,
+  };
+}
+
 /** La ficha tal como está en la base después de la petición. */
 export type MemberRecordResponse = MemberRecord;
-
-type MemberRecordRouteContext = {
-  readonly params: Promise<{ readonly id: string }>;
-};
-
-function requireMemberRecordGateways(): MemberRecordGateways {
-  const wiring = createSupabaseMemberRecordGateways(process.env);
-  if (wiring.kind === "unconfigured") {
-    throw new ApiError(
-      "service_unavailable",
-      describeMissingAuthKeys(wiring.missingKeys),
-    );
-  }
-  return wiring.gateways;
-}
-
-/** Un id que no es un uuid no puede nombrar a ningún socio: se responde como
- * uno que no existe, sin mandarle a Postgres un valor que rechazaría. */
-async function readMemberId(
-  context: MemberRecordRouteContext,
-): Promise<string> {
-  const { id } = await context.params;
-  if (!z.uuid().safeParse(id).success) {
-    throw new ApiError(
-      "not_found",
-      new MemberRecordNotFoundError().message,
-      MEMBER_NOT_FOUND_REASON,
-    );
-  }
-  return id;
-}
-
-/** El primer campo que no vale va como `reason`, que la pantalla traduce. */
-function asApiError(error: unknown): never {
-  if (error instanceof MemberRecordValidationError) {
-    throw new ApiError(
-      "validation_error",
-      error.message,
-      error.issues[0]?.code,
-    );
-  }
-  if (error instanceof MemberRecordForbiddenError) {
-    throw new ApiError("forbidden", error.message);
-  }
-  if (error instanceof MemberRecordNotFoundError) {
-    throw new ApiError("not_found", error.message, MEMBER_NOT_FOUND_REASON);
-  }
-  if (error instanceof GroupNotFoundError) {
-    throw new ApiError("not_found", error.message, GROUP_NOT_FOUND_REASON);
-  }
-  if (error instanceof MemberRecordConflictError) {
-    throw new ApiError("conflict", error.message, MEMBER_STATUS_CHANGED_REASON);
-  }
-  if (error instanceof InactiveMemberError) {
-    throw new ApiError("business_rule", error.message, MEMBER_INACTIVE_REASON);
-  }
-  return asGroupsApiError(error);
-}
 
 export function GET(
   request: NextRequest,
@@ -142,7 +100,7 @@ export function GET(
           }),
         };
       } catch (error) {
-        asApiError(error);
+        asMemberRecordApiError(error);
       }
     },
   });
@@ -166,12 +124,12 @@ export function PATCH(
           data: await updateMemberRecord(requireMemberRecordGateways(), {
             callerId,
             userId,
-            submission: body,
+            submission: toSubmission(body),
             todayInClub: clubCalendarDate(new Date()),
           }),
         };
       } catch (error) {
-        asApiError(error);
+        asMemberRecordApiError(error);
       }
     },
   });

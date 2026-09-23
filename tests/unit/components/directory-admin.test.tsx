@@ -34,6 +34,7 @@ const NEREA: AdminDirectoryMember = {
   photoUrl: null,
   aufNumber: null,
   aufExpiry: null,
+  isAufVerified: false,
   isAufExpired: false,
 };
 
@@ -48,6 +49,7 @@ const ANA: AdminDirectoryMember = {
   photoUrl: null,
   aufNumber: "AUF-1",
   aufExpiry: "2030-06-30",
+  isAufVerified: true,
   isAufExpired: false,
 };
 
@@ -565,6 +567,7 @@ const VENCIDA: AdminDirectoryMember = {
   fullName: "Vera Vencida",
   aufNumber: "AUF-7",
   aufExpiry: "2020-01-31",
+  isAufVerified: true,
   isAufExpired: true,
 };
 
@@ -639,6 +642,56 @@ describe("directorio para Admin: ficha reservada (#242)", () => {
       within(row).getByText("AUF AUF-7 · expires 31 January 2020"),
     ).toBeVisible();
     expect(within(row).getByText("AUF expired")).toBeVisible();
+  });
+
+  it("marca sin verificar el AUF que escribió el miembro (#274)", async () => {
+    stubApi({ members: [{ ...ANA, isAufVerified: false }], requests: [] });
+
+    await renderAdminDirectory();
+
+    const row = memberRow("Ana Admin");
+    expect(within(row).getByText("AUF not verified")).toBeVisible();
+    expect(within(row).queryByText("AUF verified")).toBeNull();
+  });
+
+  it("marca verificado el AUF que confirmó un Admin (#274)", async () => {
+    stubApi({ members: [ANA], requests: [] });
+
+    await renderAdminDirectory();
+
+    const row = memberRow("Ana Admin");
+    expect(within(row).getByText("AUF verified")).toBeVisible();
+    expect(within(row).queryByText("AUF not verified")).toBeNull();
+  });
+
+  it("marca verificado y vencido a la vez un AUF verificado que venció", async () => {
+    stubApi({ members: [VENCIDA], requests: [] });
+
+    await renderAdminDirectory();
+
+    const row = memberRow("Vera Vencida");
+    expect(within(row).getByText("AUF verified")).toBeVisible();
+    expect(within(row).getByText("AUF expired")).toBeVisible();
+  });
+
+  it("no marca la verificación de quien no tiene AUF", async () => {
+    stubApi({ members: [NEREA], requests: [] });
+
+    await renderAdminDirectory();
+
+    expect(
+      within(memberRow("Nerea Ruiz")).queryByText(/AUF (not )?verified/),
+    ).toBeNull();
+  });
+
+  it("escribe en español la marca del AUF sin verificar", async () => {
+    stubApi({ members: [{ ...ANA, isAufVerified: false }], requests: [] });
+
+    await renderAdminDirectory("es");
+
+    expect(
+      within(memberRow("Ana Admin")).getByText("AUF sin verificar"),
+    ).toBeVisible();
   });
 
   it("escribe el enlace y el AUF en español", async () => {

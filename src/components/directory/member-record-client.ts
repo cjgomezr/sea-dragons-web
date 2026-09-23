@@ -7,12 +7,16 @@ import {
 } from "@/lib/api/request-api";
 import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
 import { describeAuthIssue } from "@/lib/auth/issue-messages";
-import { MEMBER_RECORD_API_PATH } from "@/lib/auth/routes";
+import {
+  MEMBER_AUF_VERIFICATION_API_PATH,
+  MEMBER_RECORD_API_PATH,
+} from "@/lib/auth/routes";
 import type { Group } from "@/lib/groups/groups";
 import { formatCalendarDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
 import {
+  AUF_CHANGED_REASON,
   AUF_NUMBER_MAX_LENGTH,
   GROUP_NOT_FOUND_REASON,
   MEMBER_INACTIVE_REASON,
@@ -21,6 +25,7 @@ import {
   MEMBER_STATUS_CHANGED_REASON,
   type MemberRecord,
   type MemberRecordIssueCode,
+  type AufSubmission,
   type MemberRecordSubmission,
 } from "@/lib/members/member-record";
 import { loadGroups } from "@/components/groups/groups-client";
@@ -43,6 +48,7 @@ const recordSchema = z.object({
   accountStatus: z.enum(ACCOUNT_STATUSES),
   aufNumber: z.string().nullable(),
   aufExpiry: z.string().nullable(),
+  isAufVerified: z.boolean(),
   dateOfBirth: z.string().nullable(),
   registeredAt: z.string(),
   hasGuardianConsent: z.boolean(),
@@ -90,6 +96,16 @@ export async function loadMemberRecord(
   return { kind: "loaded", record: read.value.data, clubGroups: groups.groups };
 }
 
+/** El cuerpo que espera la API: el AUF en dos campos planos, y sin él no va
+ * ninguno, que es no tocarlo. */
+function toRequestBody({
+  auf,
+  ...rest
+}: MemberRecordSubmission): Omit<MemberRecordSubmission, "auf"> &
+  Partial<AufSubmission> {
+  return auf === null ? rest : { ...auf, ...rest };
+}
+
 export async function saveMemberRecord(
   userId: string,
   submission: MemberRecordSubmission,
@@ -98,7 +114,26 @@ export async function saveMemberRecord(
     await requestApi(recordPath(userId), {
       method: "PATCH",
       headers: JSON_REQUEST_HEADERS,
-      body: JSON.stringify(submission),
+      body: JSON.stringify(toRequestBody(submission)),
+    }),
+    responseSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "saved", record: read.value.data };
+}
+
+/** Verifica el AUF que el Admin tiene delante (#274). Si el miembro lo
+ * cambió entretanto, el servidor responde 409 y no verifica nada. */
+export async function verifyMemberRecordAuf(
+  userId: string,
+  shown: { readonly aufNumber: string; readonly aufExpiry: string | null },
+): Promise<MemberRecordSave> {
+  const read = readApiPayload(
+    await requestApi(MEMBER_AUF_VERIFICATION_API_PATH.replace("[id]", userId), {
+      method: "POST",
+      headers: JSON_REQUEST_HEADERS,
+      body: JSON.stringify(shown),
     }),
     responseSchema,
   );
@@ -170,6 +205,9 @@ export function describeMemberRecordFailure(
   }
   if (reason === MEMBER_STATUS_CHANGED_REASON) {
     return translate("memberRecord.error.memberStatusChanged");
+  }
+  if (reason === AUF_CHANGED_REASON) {
+    return translate("memberRecord.error.aufChanged");
   }
   switch (failure) {
     case "network":

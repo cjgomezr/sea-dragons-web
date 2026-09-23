@@ -60,6 +60,7 @@ const ZOE: AdminDirectoryMember = {
   photoUrl: null,
   aufNumber: null,
   aufExpiry: null,
+  isAufVerified: false,
   isAufExpired: false,
 };
 
@@ -74,6 +75,7 @@ const VENCIDA: AdminDirectoryMember = {
   photoUrl: null,
   aufNumber: "AUF-7",
   aufExpiry: "2020-01-31",
+  isAufVerified: true,
   isAufExpired: true,
 };
 
@@ -83,6 +85,7 @@ const MARIA_PARA_ADMIN: AdminDirectoryMember = {
   ...MARIA,
   aufNumber: "AUF-1",
   aufExpiry: "2030-06-30",
+  isAufVerified: true,
   isAufExpired: false,
 };
 

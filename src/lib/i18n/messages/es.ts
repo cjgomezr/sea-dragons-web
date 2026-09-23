@@ -301,6 +301,27 @@ export const spanishMessages: MessageCatalog = {
     "Tu cuenta no puede cambiar estos datos ahora mismo.",
   "account.profile.error.unexpected":
     "No pudimos guardar tus cambios. Vuelve a intentarlo en un momento.",
+  // El AUF del perfil propio (#274): lo escribe el miembro y queda pendiente
+  // hasta que un Admin lo verifica.
+  "account.profile.auf.title": "Registro AUF",
+  "account.profile.auf.number": "Número de AUF",
+  "account.profile.auf.expiry": "Vencimiento del AUF",
+  "account.profile.auf.hint":
+    "Un Admin lo revisa antes de darlo por verificado.",
+  "account.profile.auf.pending": "Pendiente de que un Admin lo verifique.",
+  "account.profile.auf.verified":
+    "Verificado por un Admin. Sólo un Admin puede cambiarlo.",
+  "account.profile.auf.summary": "AUF {number} · vence el {date}",
+  "account.profile.auf.withoutExpiry": "AUF {number} · sin vencimiento",
+  "account.profile.issue.aufNumberMissing": "Escribe tu número de AUF.",
+  "account.profile.issue.aufNumberTooLong":
+    "Tu número de AUF no puede pasar de {max} caracteres.",
+  "account.profile.issue.aufExpiryNotADate":
+    "Escribe una fecha de vencimiento válida.",
+  "account.profile.issue.aufExpiryBeforeJoined":
+    "El vencimiento no puede ser anterior al día en que ingresaste al club.",
+  "account.profile.error.aufVerified":
+    "Tu AUF ya está verificado. Sólo un Admin puede cambiarlo.",
   // La foto de perfil (#245): el círculo de la cabecera y sus controles.
   "account.photo.alt": "Tu foto de perfil",
   "account.photo.add": "Añadir foto",
@@ -457,6 +478,9 @@ export const spanishMessages: MessageCatalog = {
   "directory.column.position": "Posición",
   "directory.mark.inactive": "Desactivada",
   "directory.mark.aufExpired": "AUF vencido",
+  // #274: el AUF que escribió el miembro, hasta que un Admin lo verifica.
+  "directory.mark.aufNotVerified": "AUF sin verificar",
+  "directory.mark.aufVerified": "AUF verificado",
   "directory.mark.pendingActivation": "Pendiente de activar",
   "directory.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para ver el directorio.",
@@ -479,6 +503,11 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.auf.expiry": "Vencimiento",
   "memberRecord.auf.hint":
     "Si borras el número, se borra también su vencimiento.",
+  "memberRecord.auf.pending":
+    "Este AUF lo escribió el miembro. Revísalo y verifícalo, o corrígelo y guarda: lo que escribes tú queda verificado.",
+  "memberRecord.auf.verify": "Verificar AUF",
+  "memberRecord.auf.verifying": "Verificando…",
+  "memberRecord.auf.verified": "AUF verificado.",
   "memberRecord.birth.title": "Datos personales",
   "memberRecord.birth.label": "Fecha de nacimiento",
   "memberRecord.birth.hint":
@@ -505,6 +534,8 @@ export const spanishMessages: MessageCatalog = {
     "A un miembro con la cuenta desactivada no se le pueden agregar grupos.",
   "memberRecord.error.memberStatusChanged":
     "La cuenta del miembro cambió mientras se guardaba. Vuelve a cargar la ficha e inténtalo de nuevo.",
+  "memberRecord.error.aufChanged":
+    "El miembro cambió el AUF después de que abrieras la ficha. Recárgala antes de verificarlo.",
   "memberRecord.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para seguir.",
   "memberRecord.error.forbidden":

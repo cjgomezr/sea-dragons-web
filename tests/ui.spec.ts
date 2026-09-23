@@ -2306,6 +2306,26 @@ const ACCOUNT_STATES: readonly AccountState[] = [
     beforeVisit: chooseSpanish,
     prepare: chooseTooLargePhoto,
   },
+  // El AUF del miembro (#274). Sin AUF es `perfil-completo`; éstos son el
+  // pendiente de verificar y el verificado, que ya no se edita.
+  {
+    name: "perfil-auf-pendiente",
+    storageState: roleRequestStorageStatePath("perfil-auf-pendiente"),
+  },
+  {
+    name: "perfil-auf-pendiente-es",
+    storageState: roleRequestStorageStatePath("perfil-auf-pendiente"),
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "perfil-auf-verificado",
+    storageState: roleRequestStorageStatePath("perfil-auf-verificado"),
+  },
+  {
+    name: "perfil-auf-verificado-es",
+    storageState: roleRequestStorageStatePath("perfil-auf-verificado"),
+    beforeVisit: chooseSpanish,
+  },
 ];
 
 async function expectNoAxeViolations(page: Page): Promise<void> {
@@ -2630,7 +2650,9 @@ test.describe("un socio que edita su perfil", () => {
     });
   });
 
-  test("el endpoint le niega cambiar su rol, su AUF, sus grupos o su estado", async ({
+  // El AUF ya no es reservado (#274): lo prueba el bloque de la socia con el
+  // AUF verificado, que es el único caso en que se niega.
+  test("el endpoint le niega cambiar su rol, sus grupos o su estado", async ({
     request,
   }) => {
     const response = await request.patch(
@@ -2643,7 +2665,6 @@ test.describe("un socio que edita su perfil", () => {
           experienceLevel: null,
           gender: null,
           role: "Admin",
-          aufNumber: "AUF-1",
           groups: [],
           status: "active",
         },
@@ -2653,6 +2674,43 @@ test.describe("un socio que edita su perfil", () => {
     expect(response.status()).toBe(403);
     expect(await response.json()).toMatchObject({
       error: { code: "forbidden", reason: "reserved_fields" },
+    });
+  });
+});
+
+test.describe("una socia con el AUF verificado", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: roleRequestStorageStatePath("perfil-auf-verificado"),
+  });
+
+  test("la pantalla no le ofrece cambiarlo", async ({ page }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+
+    await expect(page.getByText("AUF AUF-2026-0275 · expires")).toBeVisible();
+    await expect(page.getByLabel("AUF number")).toHaveCount(0);
+  });
+
+  test("el endpoint le niega cambiarlo", async ({ request }) => {
+    const response = await request.patch(
+      `${APP_URL}${ACCOUNT_PROFILE_ENDPOINT}`,
+      {
+        data: {
+          fullName: "Vera Verificada",
+          country: "AU",
+          position: null,
+          experienceLevel: null,
+          gender: null,
+          aufNumber: "AUF-OTRO",
+          aufExpiry: "2030-06-30",
+        },
+      },
+    );
+
+    expect(response.status()).toBe(403);
+    expect(await response.json()).toMatchObject({
+      error: { code: "forbidden", reason: "auf_verified" },
     });
   });
 });
@@ -3209,8 +3267,12 @@ const STUBBED_DIRECTORY_MEMBERS = [
 ] as const;
 
 /** La única fila con el registro federativo vencido, que es la que la captura
- * del Admin tiene que enseñar señalada (BR-008). */
+ * del Admin tiene que enseñar señalada (BR-008). Está verificado: vencido y
+ * verificado se marcan a la vez (#274). */
 const EXPIRED_AUF_MEMBER_ID = "11111111-0000-4000-8000-000000000001";
+/** La única fila con un AUF que escribió el socio y nadie ha verificado
+ * (#274): así la captura del Admin enseña las tres marcas. */
+const UNVERIFIED_AUF_MEMBER_ID = "33333333-0000-4000-8000-000000000003";
 
 function asAdminMember(member: {
   readonly userId: string;
@@ -3220,6 +3282,7 @@ function asAdminMember(member: {
     ...member,
     aufNumber: `AUF-${member.userId.slice(0, 2)}`,
     aufExpiry: isAufExpired ? "2020-01-31" : "2030-06-30",
+    isAufVerified: member.userId !== UNVERIFIED_AUF_MEMBER_ID,
     isAufExpired,
   };
 }
@@ -3841,6 +3904,7 @@ type StubbedMemberRecord = {
   readonly accountStatus: "incomplete" | "active" | "inactive";
   readonly aufNumber: string;
   readonly aufExpiry: string;
+  readonly isAufVerified: boolean;
   readonly dateOfBirth: string;
   readonly registeredAt: string;
   readonly hasGuardianConsent: boolean;
@@ -3856,6 +3920,7 @@ const CURRENT_RECORD: StubbedMemberRecord = {
   accountStatus: "active",
   aufNumber: "AUF-2026-0042",
   aufExpiry: "2030-06-30",
+  isAufVerified: true,
   dateOfBirth: "1990-05-10",
   registeredAt: "2024-03-06T01:00:00.000Z",
   hasGuardianConsent: false,
@@ -3882,6 +3947,13 @@ const EXPIRED_RECORD: StubbedMemberRecord = {
   ...CURRENT_RECORD,
   aufExpiry: "2025-01-31",
   isAufExpired: true,
+};
+
+/** El AUF que escribió el miembro: la ficha lo marca y ofrece verificarlo
+ * (#274). */
+const UNVERIFIED_AUF_RECORD: StubbedMemberRecord = {
+  ...CURRENT_RECORD,
+  isAufVerified: false,
 };
 
 type StubbedSaveRejection = {
@@ -4006,6 +4078,17 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
   {
     name: "ficha-auf-vencido-es",
     record: EXPIRED_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "ficha-auf-sin-verificar",
+    record: UNVERIFIED_AUF_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+  },
+  {
+    name: "ficha-auf-sin-verificar-es",
+    record: UNVERIFIED_AUF_RECORD,
     saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
   },

@@ -17,9 +17,14 @@ import { createGroupMembersGateways } from "@/lib/groups/supabase-group-members-
 import { createGroupsGateways } from "@/lib/groups/supabase-groups-gateways";
 import {
   AUF_NUMBER_MAX_LENGTH,
+  MemberAufChangedError,
   MemberRecordValidationError,
+  readMemberRecord,
   updateMemberRecord,
+  verifyMemberAuf,
 } from "@/lib/members/member-record";
+import { updateOwnProfile } from "@/lib/members/own-profile";
+import { createOwnProfileGateways } from "@/lib/members/supabase-own-profile-gateways";
 import { createMemberRecordGateways } from "@/lib/members/supabase-member-record-gateways";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
@@ -37,6 +42,8 @@ import {
  * doble puede afirmar: que el `check` del AUF de `0016` acepta lo que el
  * dominio deja pasar, que el directorio lee lo guardado, y que cambiar los
  * grupos desde la ficha deja los mismos conteos que hacerlo desde Grupos.
+ * Desde #274, también que la verificación del AUF que propuso el miembro sólo
+ * se pone sobre el AUF que el Admin vio.
  *
  * Orden de limpieza: los grupos primero (y con ellos sus pertenencias), luego
  * los socios, la bitácora del club y al final el club.
@@ -188,8 +195,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
             callerId: adminId,
             userId: paulaId!,
             submission: {
-              aufNumber: null,
-              aufExpiry: null,
+              auf: { aufNumber: null, aufExpiry: null },
               groupIds: groups,
               dateOfBirth: null,
             },
@@ -235,8 +241,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
           callerId: adminId,
           userId: paulaId,
           submission: {
-            aufNumber: longestNumber,
-            aufExpiry: "2025-12-31",
+            auf: { aufNumber: longestNumber, aufExpiry: "2025-12-31" },
             groupIds: [],
             dateOfBirth: null,
           },
@@ -281,8 +286,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
           callerId: adminId,
           userId: paulaId,
           submission: {
-            aufNumber,
-            aufExpiry: "2027-06-30",
+            auf: { aufNumber, aufExpiry: "2027-06-30" },
             groupIds: [],
             dateOfBirth: null,
           },
@@ -315,8 +319,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
             callerId: adminId,
             userId: players[0]!,
             submission: {
-              aufNumber: "AUF-1",
-              aufExpiry: "2024-03-05",
+              auf: { aufNumber: "AUF-1", aufExpiry: "2024-03-05" },
               groupIds: [],
               dateOfBirth: null,
             },
@@ -341,8 +344,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
             callerId: adminId,
             userId: paula.id,
             submission: {
-              aufNumber: null,
-              aufExpiry: null,
+              auf: { aufNumber: null, aufExpiry: null },
               groupIds: [],
               dateOfBirth: MINOR_BIRTH,
             },
@@ -430,3 +432,117 @@ async function readAuditRows(
   }
   return data;
 }
+
+/** Paula propone su AUF desde su perfil, como lo haría la pantalla. */
+async function proposeAuf(
+  serviceClient: ServiceRoleClient,
+  userId: string,
+  expiry: string | null,
+): Promise<void> {
+  await updateOwnProfile(createOwnProfileGateways(serviceClient.client), {
+    userId,
+    submission: {
+      fullName: "Paula Ficha",
+      country: "AU",
+      position: null,
+      experienceLevel: null,
+      gender: null,
+      auf: { number: "AUF-PROPUESTO", expiry },
+    },
+  });
+}
+
+describeRls("verificar el AUF contra seadragons-dev", () => {
+  it.each([["2030-06-30"], [null]])(
+    "el Admin verifica el AUF que propuso el miembro (vencimiento %s)",
+    async (expiry) => {
+      await withScenario(
+        async ({ serviceClient, clubId, adminId, players }) => {
+          const paulaId = players[0]!;
+          const gateways = createMemberRecordGateways(serviceClient.client);
+          await proposeAuf(serviceClient, paulaId, expiry);
+          const request = {
+            callerId: adminId,
+            userId: paulaId,
+            todayInClub: TODAY_IN_CLUB,
+          };
+          await expect(
+            readMemberRecord(gateways, request),
+          ).resolves.toMatchObject({ isAufVerified: false });
+
+          const verified = await verifyMemberAuf(gateways, {
+            ...request,
+            expected: { aufNumber: "AUF-PROPUESTO", aufExpiry: expiry },
+          });
+
+          expect(verified).toMatchObject({
+            aufNumber: "AUF-PROPUESTO",
+            aufExpiry: expiry,
+            isAufVerified: true,
+          });
+          await expect(readAuditRows(serviceClient, clubId)).resolves.toEqual([
+            {
+              actor_id: adminId,
+              action: "member.auf_verified",
+              entity_type: "member",
+              entity_id: paulaId,
+              result: "success",
+              metadata: null,
+            },
+          ]);
+        },
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "no verifica un AUF distinto del que el Admin vio",
+    async () => {
+      await withScenario(async ({ serviceClient, adminId, players }) => {
+        const paulaId = players[0]!;
+        const gateways = createMemberRecordGateways(serviceClient.client);
+        await proposeAuf(serviceClient, paulaId, "2030-06-30");
+        const request = {
+          callerId: adminId,
+          userId: paulaId,
+          todayInClub: TODAY_IN_CLUB,
+        };
+
+        await expect(
+          verifyMemberAuf(gateways, {
+            ...request,
+            expected: { aufNumber: "AUF-PROPUESTO", aufExpiry: "2031-01-01" },
+          }),
+        ).rejects.toBeInstanceOf(MemberAufChangedError);
+        await expect(
+          readMemberRecord(gateways, request),
+        ).resolves.toMatchObject({ isAufVerified: false });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "el AUF que escribe el Admin en la ficha nace verificado",
+    async () => {
+      await withScenario(async ({ serviceClient, adminId, players }) => {
+        const gateways = createMemberRecordGateways(serviceClient.client);
+
+        const saved = await updateMemberRecord(gateways, {
+          callerId: adminId,
+          userId: players[0]!,
+          submission: {
+            auf: { aufNumber: "AUF-DEL-ADMIN", aufExpiry: "2030-06-30" },
+            groupIds: [],
+            dateOfBirth: null,
+          },
+          todayInClub: TODAY_IN_CLUB,
+        });
+
+        expect(saved.isAufVerified).toBe(true);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+});

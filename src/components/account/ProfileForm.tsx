@@ -7,9 +7,12 @@ import type { CountryOption } from "@/lib/geo/countries";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import {
+  type AufProposal,
+  type OwnAuf,
   type OwnProfile,
   type OwnProfileSubmission,
   type ProfileIssueCode,
+  validateAufNumber,
   validateFullName,
 } from "@/lib/members/own-profile";
 import {
@@ -17,6 +20,7 @@ import {
   GENDERS,
   POSITIONS,
 } from "@/lib/members/profile-fields";
+import { type AufDraft, OwnAufSection } from "./OwnAufSection";
 import {
   describeProfileFailure,
   describeProfileIssue,
@@ -25,8 +29,9 @@ import {
 
 /**
  * La ficha editable del perfil propio (#241, FR-084): nombre, país,
- * posición, nivel y género. Nada de lo que la decisión B3 reserva al Admin
- * aparece aquí, ni siquiera desactivado.
+ * posición, nivel y género, y el AUF que el miembro propone (#274). Nada más
+ * de lo que la decisión B3 reserva al Admin aparece aquí, ni siquiera
+ * desactivado.
  *
  * Es de cliente por el estado del envío. Da un cambio por hecho sólo cuando el
  * servidor lo confirma, y entonces refresca la página para que la cabecera
@@ -45,15 +50,13 @@ type Status =
 
 /** Lo que hay en los controles. Una cadena vacía en un desplegable es "sin
  * indicar", y se manda como null. */
-type Draft = {
+type Draft = AufDraft & {
   readonly fullName: string;
   readonly country: string;
   readonly position: string;
   readonly experienceLevel: string;
   readonly gender: string;
 };
-
-type DraftField = keyof Draft;
 
 const FULL_NAME_ID = "perfil-nombre";
 const FULL_NAME_ERROR_ID = "perfil-nombre-error";
@@ -65,6 +68,8 @@ function toDraft(profile: OwnProfile): Draft {
     position: profile.position ?? "",
     experienceLevel: profile.experienceLevel ?? "",
     gender: profile.gender ?? "",
+    aufNumber: profile.auf.status === "none" ? "" : profile.auf.number,
+    aufExpiry: profile.auf.status === "none" ? "" : (profile.auf.expiry ?? ""),
   };
 }
 
@@ -72,13 +77,41 @@ function orNull(value: string): string | null {
   return value === "" ? null : value;
 }
 
-function toSubmission(draft: Draft): OwnProfileSubmission {
+/** Un AUF verificado no se manda: sólo lo cambia un Admin. Tampoco unos
+ * campos que siguen vacíos sin haber AUF, que no proponen nada. */
+function toAufProposal(draft: Draft, auf: OwnAuf): AufProposal | null {
+  const isUntouchedEmpty =
+    auf.status === "none" && draft.aufNumber === "" && draft.aufExpiry === "";
+  if (auf.status === "verified" || isUntouchedEmpty) {
+    return null;
+  }
+  return { number: draft.aufNumber, expiry: orNull(draft.aufExpiry) };
+}
+
+function toSubmission(draft: Draft, auf: OwnAuf): OwnProfileSubmission {
   return {
     fullName: draft.fullName,
     country: draft.country,
     position: orNull(draft.position),
     experienceLevel: orNull(draft.experienceLevel),
     gender: orNull(draft.gender),
+    auf: toAufProposal(draft, auf),
+  };
+}
+
+/** Lo que se puede avisar antes de enviar, campo a campo. */
+type LocalIssues = {
+  readonly fullName: ProfileIssueCode | null;
+  readonly aufNumber: ProfileIssueCode | null;
+};
+
+const NO_LOCAL_ISSUES: LocalIssues = { fullName: null, aufNumber: null };
+
+function localIssuesOf(submission: OwnProfileSubmission): LocalIssues {
+  return {
+    fullName: validateFullName(submission.fullName),
+    aufNumber:
+      submission.auf === null ? null : validateAufNumber(submission.auf.number),
   };
 }
 
@@ -214,17 +247,19 @@ export function ProfileForm({
   const translate = createTranslator(locale);
   const router = useRouter();
   const [draft, setDraft] = useState<Draft>(() => toDraft(profile));
-  const [nameIssue, setNameIssue] = useState<ProfileIssueCode | null>(null);
+  const [auf, setAuf] = useState<OwnAuf>(profile.auf);
+  const [issues, setIssues] = useState<LocalIssues>(NO_LOCAL_ISSUES);
   const [status, setStatus] = useState<Status>({ kind: "editing" });
   // El estado desactiva el botón en el siguiente pintado, pero un doble clic
   // llega antes. La referencia cambia en el acto.
   const isSendingRef = useRef(false);
 
-  function update(field: DraftField, value: string): void {
-    setDraft((current) => ({ ...current, [field]: value }));
-    if (field === "fullName") {
-      setNameIssue(null);
-    }
+  function update(change: Partial<Draft>): void {
+    setDraft((current) => ({ ...current, ...change }));
+    setIssues((current) => ({
+      fullName: "fullName" in change ? null : current.fullName,
+      aufNumber: "aufNumber" in change ? null : current.aufNumber,
+    }));
     // Un aviso habla del envío anterior. Mientras se envía no se toca, o el
     // botón volvería a activarse.
     setStatus((current) =>
@@ -239,21 +274,23 @@ export function ProfileForm({
     if (isSendingRef.current) {
       return;
     }
-    const issue = validateFullName(draft.fullName);
-    if (issue !== null) {
-      setNameIssue(issue);
+    const submission = toSubmission(draft, auf);
+    const localIssues = localIssuesOf(submission);
+    if (localIssues.fullName !== null || localIssues.aufNumber !== null) {
+      setIssues(localIssues);
       return;
     }
 
     isSendingRef.current = true;
     setStatus({ kind: "sending" });
-    const result = await saveOwnProfile(toSubmission(draft));
+    const result = await saveOwnProfile(submission);
     isSendingRef.current = false;
     if (result.kind === "failed") {
       setStatus(result);
       return;
     }
     setDraft(toDraft(result.profile));
+    setAuf(result.profile.auf);
     setStatus({ kind: "saved" });
     router.refresh();
   }
@@ -267,8 +304,8 @@ export function ProfileForm({
         <FullNameField
           translate={translate}
           value={draft.fullName}
-          issue={nameIssue}
-          onChange={(value) => update("fullName", value)}
+          issue={issues.fullName}
+          onChange={(fullName) => update({ fullName })}
         />
         <SelectField
           id="perfil-pais"
@@ -285,7 +322,7 @@ export function ProfileForm({
               ? translate("auth.field.countryPlaceholder")
               : null
           }
-          onChange={(value) => update("country", value)}
+          onChange={(country) => update({ country })}
         />
         <SelectField
           id="perfil-posicion"
@@ -293,7 +330,7 @@ export function ProfileForm({
           value={draft.position}
           options={options.positions}
           emptyLabel={translate("account.profile.notSet")}
-          onChange={(value) => update("position", value)}
+          onChange={(position) => update({ position })}
         />
         <SelectField
           id="perfil-nivel"
@@ -301,7 +338,7 @@ export function ProfileForm({
           value={draft.experienceLevel}
           options={options.experienceLevels}
           emptyLabel={translate("account.profile.notSet")}
-          onChange={(value) => update("experienceLevel", value)}
+          onChange={(experienceLevel) => update({ experienceLevel })}
         />
         <SelectField
           id="perfil-genero"
@@ -309,7 +346,19 @@ export function ProfileForm({
           value={draft.gender}
           options={options.genders}
           emptyLabel={translate("account.profile.notSet")}
-          onChange={(value) => update("gender", value)}
+          onChange={(gender) => update({ gender })}
+        />
+        <OwnAufSection
+          translate={translate}
+          locale={locale}
+          auf={auf}
+          draft={draft}
+          numberIssueText={
+            issues.aufNumber === null
+              ? null
+              : describeProfileIssue(translate, issues.aufNumber)
+          }
+          onChange={update}
         />
         <SaveOutcome translate={translate} status={status} />
         <button type="submit" className="auth-submit" disabled={isSending}>

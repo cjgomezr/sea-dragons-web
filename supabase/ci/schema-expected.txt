@@ -29,6 +29,7 @@ columna groups.name tipo=text null=NO default=-
 columna members.account_status tipo=text null=NO default='incomplete'::text
 columna members.auf_expiry tipo=date null=YES default=-
 columna members.auf_number tipo=text null=YES default=-
+columna members.auf_verified_at tipo=timestamp with time zone null=YES default=-
 columna members.club_id tipo=uuid null=NO default=-
 columna members.country tipo=text null=YES default=-
 columna members.created_at tipo=timestamp with time zone null=NO default=now()
@@ -298,6 +299,7 @@ restriccion groups.groups_pkey PRIMARY KEY (id)
 restriccion members.members_account_status_check CHECK ((account_status = ANY (ARRAY['incomplete'::text, 'active'::text, 'inactive'::text])))
 restriccion members.members_active_minor_requires_guardian_consent CHECK (((account_status <> 'active'::text) OR (guardian_consent_at IS NOT NULL) OR (date_of_birth IS NULL) OR (date_of_birth <= ((((created_at AT TIME ZONE 'Australia/Melbourne'::text))::date - '18 years'::interval))::date)))
 restriccion members.members_auf_number_length CHECK (((char_length(btrim(auf_number)) >= 1) AND (char_length(btrim(auf_number)) <= 40)))
+restriccion members.members_auf_verified_requires_number CHECK (((auf_verified_at IS NULL) OR (auf_number IS NOT NULL)))
 restriccion members.members_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion members.members_email_locale_check CHECK ((email_locale = ANY (ARRAY['en'::text, 'es'::text])))
 restriccion members.members_experience_level_check CHECK ((experience_level = ANY (ARRAY['Beginner'::text, 'Intermediate'::text, 'Advanced'::text])))

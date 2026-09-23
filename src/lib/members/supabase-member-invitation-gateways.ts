@@ -85,7 +85,10 @@ export function createInvitedMemberStore(serviceClient: SupabaseClient): Pick<
     },
     invitees: {
       async insertInvitedMember(row) {
-        const { error } = await serviceClient.from(MEMBERS_TABLE).insert(row);
+        // El AUF del alta lo escribe un Admin: nace verificado (#274).
+        const { error } = await serviceClient
+          .from(MEMBERS_TABLE)
+          .insert({ ...row, auf_verified_at: new Date().toISOString() });
         if (error) {
           throw new Error(
             `No se pudo crear la fila del miembro dado de alta: ${error.message}`,

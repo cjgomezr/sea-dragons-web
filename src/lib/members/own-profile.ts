@@ -1,5 +1,7 @@
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
+import { isRealCalendarDate } from "@/lib/auth/registration";
 import { isKnownCountryCode } from "@/lib/geo/countries";
+import { isAufNumberTooLong } from "./member-record";
 import {
   type ExperienceLevel,
   type Gender,
@@ -14,18 +16,22 @@ import {
  * de su ficha (FR-084), contado sin Supabase delante.
  *
  * La decisión B3 de docs/preguntas-abiertas.md parte la ficha en dos. El
- * miembro edita su nombre, país, posición, nivel y género; el rol, el AUF, los
- * grupos y el estado son del Admin. Este módulo sólo sabe de los cinco
- * primeros: arma lo que se escribe campo a campo, así que nada más puede
- * colarse hasta la base aunque llegue en la petición.
+ * miembro edita su nombre, país, posición, nivel y género; el rol, los grupos
+ * y el estado son del Admin. Este módulo sólo sabe de esos cinco y del AUF:
+ * arma lo que se escribe campo a campo, así que nada más puede colarse hasta
+ * la base aunque llegue en la petición.
+ *
+ * El AUF lo escribía sólo el Admin hasta #274. Ahora lo propone también el
+ * miembro, y lo que propone queda sin verificar hasta que un Admin lo
+ * confirme (BR-008). Una vez verificado, sólo el Admin lo corrige.
  */
 
 /** Largo máximo del nombre, en caracteres y no en unidades UTF-16. */
 export const FULL_NAME_MAX_LENGTH = 120;
 
-/** La ficha tal como la ve y la edita su dueño. El país puede faltar en una
- * fila vieja; al guardar se exige. */
-export type OwnProfile = {
+/** Los cinco campos que el miembro edita libremente. El país puede faltar
+ * en una fila vieja; al guardar se exige. */
+export type OwnProfileFields = {
   readonly fullName: string;
   readonly country: string | null;
   readonly position: Position | null;
@@ -33,17 +39,49 @@ export type OwnProfile = {
   readonly gender: Gender | null;
 };
 
+/** El registro federativo tal como lo ve su dueño: si lo tiene, y si un
+ * Admin ya lo confirmó. */
+export type OwnAuf =
+  | { readonly status: "none" }
+  | {
+      readonly status: "pending" | "verified";
+      readonly number: string;
+      /** YYYY-MM-DD, o null si el registro no tiene vencimiento conocido. */
+      readonly expiry: string | null;
+    };
+
+/** La ficha tal como la ve y la edita su dueño. */
+export type OwnProfile = OwnProfileFields & { readonly auf: OwnAuf };
+
+/** El AUF que el miembro manda, sin validar todavía. */
+export type AufProposal = {
+  readonly number: string;
+  readonly expiry: string | null;
+};
+
 /** Lo que llega a guardarse, sin validar todavía. Null en los tres catálogos
- * es vaciarlos a propósito. */
+ * es vaciarlos a propósito. `auf` en null es no tocar el registro: el miembro
+ * no puede borrarlo, sólo proponer otro. */
 export type OwnProfileSubmission = {
   readonly fullName: string;
   readonly country: string;
   readonly position: string | null;
   readonly experienceLevel: string | null;
   readonly gender: string | null;
+  readonly auf: AufProposal | null;
 };
 
-export type ProfileField = keyof OwnProfileSubmission;
+/** Lo que el guardado hace con el AUF: dejarlo como está, o escribir la
+ * propuesta sin verificar. */
+export type OwnAufChange =
+  | { readonly kind: "keep" }
+  | {
+      readonly kind: "propose";
+      readonly number: string;
+      readonly expiry: string | null;
+    };
+
+export type ProfileField = keyof OwnProfileFields | "aufNumber" | "aufExpiry";
 
 export const PROFILE_ISSUE_CODES = [
   "full_name_missing",
@@ -52,6 +90,10 @@ export const PROFILE_ISSUE_CODES = [
   "position_unknown",
   "experience_level_unknown",
   "gender_unknown",
+  "auf_number_missing",
+  "auf_number_too_long",
+  "auf_expiry_not_a_date",
+  "auf_expiry_before_joined",
 ] as const;
 
 export type ProfileIssueCode = (typeof PROFILE_ISSUE_CODES)[number];
@@ -75,14 +117,42 @@ export class ProfileValidationError extends Error {
   }
 }
 
+/** El `reason` con el que la API rechaza cambiar un AUF verificado. La
+ * pantalla lo lee para decirlo. */
+export const AUF_VERIFIED_REASON = "auf_verified";
+
+/** El AUF ya está verificado: sólo un Admin lo corrige. */
+export class OwnAufVerifiedError extends Error {
+  constructor() {
+    super("Tu AUF ya está verificado: sólo un Admin puede cambiarlo.");
+    this.name = "OwnAufVerifiedError";
+  }
+}
+
+/** La ficha con lo que hace falta para validar el AUF y que no se sirve. */
+export type StoredOwnProfile = {
+  readonly profile: OwnProfile;
+  /** YYYY-MM-DD, el día del club en que ingresó (#237). */
+  readonly joinedOn: string;
+};
+
+export type OwnProfileUpdateResult =
+  | { readonly kind: "updated"; readonly profile: OwnProfile }
+  | { readonly kind: "member_not_found" }
+  /** Un Admin lo verificó entre la lectura y la escritura. */
+  | { readonly kind: "auf_verified" };
+
 export type OwnProfileGateways = {
   readonly profiles: {
-    findOwnProfile(userId: string): Promise<OwnProfile | null>;
     /** Null cuando la identidad no tiene fila de miembro. */
+    findOwnProfile(userId: string): Promise<StoredOwnProfile | null>;
+    /** Los campos y el AUF en una sola escritura. Una propuesta sólo se
+     * escribe si el AUF sigue sin verificar. */
     updateOwnProfile(
       userId: string,
-      profile: OwnProfile,
-    ): Promise<OwnProfile | null>;
+      fields: OwnProfileFields,
+      auf: OwnAufChange,
+    ): Promise<OwnProfileUpdateResult>;
   };
 };
 
@@ -110,7 +180,7 @@ function isInCatalogOrEmpty(
   return value === null || parse(value) !== null;
 }
 
-function collectIssues(
+function fieldIssuesOf(
   submission: OwnProfileSubmission,
 ): readonly ProfileIssue[] {
   const fullNameIssue = validateFullName(submission.fullName);
@@ -144,11 +214,39 @@ function collectIssues(
   );
 }
 
-/** Valida todos los campos a la vez y devuelve la ficha normalizada, o lanza
- * con cada campo que no vale: quien llama a la API no descubre los errores de
- * uno en uno. */
-function toValidProfile(submission: OwnProfileSubmission): OwnProfile {
-  const issues = collectIssues(submission);
+/** El número lo exige: a diferencia del Admin, el miembro no puede borrar
+ * su registro dejándolo vacío. El resto son las reglas de la ficha del
+ * Admin. La usan el formulario, para avisar antes de enviar, y el dominio. */
+export function validateAufNumber(number: string): ProfileIssueCode | null {
+  if (number.trim() === "") {
+    return "auf_number_missing";
+  }
+  return isAufNumberTooLong(number) ? "auf_number_too_long" : null;
+}
+
+function aufIssuesOf(auf: AufProposal | null): readonly ProfileIssue[] {
+  if (auf === null) {
+    return [];
+  }
+  const checks: readonly [ProfileField, ProfileIssueCode | null][] = [
+    ["aufNumber", validateAufNumber(auf.number)],
+    [
+      "aufExpiry",
+      auf.expiry === null || isRealCalendarDate(auf.expiry)
+        ? null
+        : "auf_expiry_not_a_date",
+    ],
+  ];
+  return checks.flatMap(([field, code]) =>
+    code === null ? [] : [{ field, code }],
+  );
+}
+
+/** Valida todos los campos a la vez y devuelve los cinco normalizados, o
+ * lanza con cada campo que no vale: quien llama a la API no descubre los
+ * errores de uno en uno. */
+function toValidFields(submission: OwnProfileSubmission): OwnProfileFields {
+  const issues = [...fieldIssuesOf(submission), ...aufIssuesOf(submission.auf)];
   if (issues.length > 0) {
     throw new ProfileValidationError(issues);
   }
@@ -161,15 +259,56 @@ function toValidProfile(submission: OwnProfileSubmission): OwnProfile {
   };
 }
 
+function isSameAuf(stored: OwnAuf, proposal: AufProposal): boolean {
+  return (
+    stored.status !== "none" &&
+    stored.number === proposal.number &&
+    stored.expiry === proposal.expiry
+  );
+}
+
+/**
+ * Qué hacer con el AUF que llega. Llegar igual que el guardado no es
+ * cambiarlo: así el formulario puede mandar siempre lo que enseña, y un AUF
+ * verificado no impide guardar el nombre. El vencimiento se compara con el
+ * ingreso (#237), como en la ficha del Admin.
+ */
+async function planAufChange(
+  gateways: OwnProfileGateways,
+  userId: string,
+  auf: AufProposal | null,
+): Promise<OwnAufChange> {
+  if (auf === null) {
+    return { kind: "keep" };
+  }
+  const stored = await gateways.profiles.findOwnProfile(userId);
+  if (stored === null) {
+    throw new MemberNotFoundError(userId);
+  }
+  const proposal = { number: auf.number.trim(), expiry: auf.expiry };
+  if (isSameAuf(stored.profile.auf, proposal)) {
+    return { kind: "keep" };
+  }
+  if (stored.profile.auf.status === "verified") {
+    throw new OwnAufVerifiedError();
+  }
+  if (proposal.expiry !== null && proposal.expiry < stored.joinedOn) {
+    throw new ProfileValidationError([
+      { field: "aufExpiry", code: "auf_expiry_before_joined" },
+    ]);
+  }
+  return { kind: "propose", ...proposal };
+}
+
 export async function readOwnProfile(
   gateways: OwnProfileGateways,
   userId: string,
 ): Promise<OwnProfile> {
-  const profile = await gateways.profiles.findOwnProfile(userId);
-  if (profile === null) {
+  const stored = await gateways.profiles.findOwnProfile(userId);
+  if (stored === null) {
     throw new MemberNotFoundError(userId);
   }
-  return profile;
+  return stored.profile;
 }
 
 export async function updateOwnProfile(
@@ -179,13 +318,23 @@ export async function updateOwnProfile(
     readonly submission: OwnProfileSubmission;
   },
 ): Promise<OwnProfile> {
-  const profile = toValidProfile(request.submission);
-  const saved = await gateways.profiles.updateOwnProfile(
+  const fields = toValidFields(request.submission);
+  const auf = await planAufChange(
+    gateways,
     request.userId,
-    profile,
+    request.submission.auf,
   );
-  if (saved === null) {
-    throw new MemberNotFoundError(request.userId);
+  const result = await gateways.profiles.updateOwnProfile(
+    request.userId,
+    fields,
+    auf,
+  );
+  switch (result.kind) {
+    case "member_not_found":
+      throw new MemberNotFoundError(request.userId);
+    case "auf_verified":
+      throw new OwnAufVerifiedError();
+    case "updated":
+      return result.profile;
   }
-  return saved;
 }
