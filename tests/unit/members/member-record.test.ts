@@ -848,7 +848,11 @@ describe("el AUF que escribe el Admin nace verificado", () => {
 
   it("no toca el AUF que el miembro propuso mientras el Admin tenía la ficha abierta", async () => {
     // El Admin abrió la ficha con otro AUF; el miembro propuso éste después.
-    const store = fake({ aufNumber: "AUF-NUEVO", aufExpiry: "2028-01-31" });
+    const store = fake({
+      aufNumber: "AUF-NUEVO",
+      aufExpiry: "2028-01-31",
+      isAufVerified: false,
+    });
 
     const record = await saveKeepingAuf(store, [SENIOR_ID]);
 
