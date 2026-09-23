@@ -2,11 +2,17 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCOUNT_PROFILE_API_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
-import type { OwnProfile } from "@/lib/members/own-profile";
+import type {
+  OwnAuf,
+  OwnAufChange,
+  OwnProfileFields,
+  StoredOwnProfile,
+} from "@/lib/members/own-profile";
 
 /**
  * El perfil propio por la API (#241, FR-084, AC-039). Cualquier cuenta activa
- * edita su propia ficha, siempre la que identifica la cookie. La petición
+ * edita su propia ficha, siempre la que identifica la cookie, y desde #274
+ * propone su AUF, que queda sin verificar. La petición
  * entra por el proxy y sólo llega al handler si la frontera la deja seguir,
  * como en producción.
  */
@@ -25,7 +31,16 @@ const VALID_BODY = {
   gender: "undisclosed",
 } as const;
 
+const NO_AUF: OwnAuf = { status: "none" };
+
+const VERIFIED_AUF: OwnAuf = {
+  status: "verified",
+  number: "AUF-100",
+  expiry: "2027-06-30",
+};
+
 const readSessionState = vi.fn();
+const findOwnProfile = vi.fn();
 const readAuthenticatedUserId = vi.fn();
 const updateOwnProfile = vi.fn();
 
@@ -50,7 +65,7 @@ vi.mock("@/lib/members/supabase-own-profile-gateways", () => ({
     kind: "ready",
     gateways: {
       profiles: {
-        findOwnProfile: async () => null,
+        findOwnProfile: (...args: unknown[]) => findOwnProfile(...args),
         updateOwnProfile: (...args: unknown[]) => updateOwnProfile(...args),
       },
     },
@@ -80,10 +95,28 @@ beforeEach(() => {
   vi.clearAllMocks();
   givenSession({ kind: "active", role: "Player" });
   readAuthenticatedUserId.mockResolvedValue(USER_ID);
+  givenStoredAuf(NO_AUF);
   updateOwnProfile.mockImplementation(
-    async (_userId: string, profile: OwnProfile) => profile,
+    async (_userId: string, fields: OwnProfileFields, auf: OwnAufChange) => ({
+      kind: "updated",
+      profile: {
+        ...fields,
+        auf:
+          auf.kind === "keep"
+            ? NO_AUF
+            : { status: "pending", number: auf.number, expiry: auf.expiry },
+      },
+    }),
   );
 });
+
+function givenStoredAuf(auf: OwnAuf): void {
+  const stored: StoredOwnProfile = {
+    profile: { ...VALID_BODY, auf },
+    joinedOn: "2024-03-06",
+  };
+  findOwnProfile.mockResolvedValue(stored);
+}
 
 describe("PATCH /api/v1/account/profile", () => {
   it.each(["Admin", "Coach", "Committee", "Player"] as const)(
@@ -94,14 +127,18 @@ describe("PATCH /api/v1/account/profile", () => {
       const response = await patchThroughBoundary(VALID_BODY);
 
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ data: VALID_BODY });
+      await expect(response.json()).resolves.toEqual({
+        data: { ...VALID_BODY, auf: NO_AUF },
+      });
     },
   );
 
   it("escribe sobre quien identifica la cookie", async () => {
     await patchThroughBoundary(VALID_BODY);
 
-    expect(updateOwnProfile).toHaveBeenCalledWith(USER_ID, VALID_BODY);
+    expect(updateOwnProfile).toHaveBeenCalledWith(USER_ID, VALID_BODY, {
+      kind: "keep",
+    });
   });
 
   it("acepta posición, nivel y género vaciados a propósito", async () => {
@@ -115,7 +152,9 @@ describe("PATCH /api/v1/account/profile", () => {
     const response = await patchThroughBoundary(body);
 
     expect(response.status).toBe(200);
-    expect(updateOwnProfile).toHaveBeenCalledWith(USER_ID, body);
+    expect(updateOwnProfile).toHaveBeenCalledWith(USER_ID, body, {
+      kind: "keep",
+    });
   });
 
   it("responde 400 con el motivo a un nombre vacío", async () => {
@@ -186,8 +225,6 @@ describe("PATCH /api/v1/account/profile", () => {
 
   it.each([
     ["role", "Admin"],
-    ["aufNumber", "AUF-123"],
-    ["aufExpiry", "2030-01-01"],
     ["groups", ["Senior Squad"]],
     ["status", "active"],
     ["dateOfBirth", "2010-01-01"],
@@ -231,11 +268,100 @@ describe("PATCH /api/v1/account/profile", () => {
   });
 
   it("responde 403 cuando la sesión no corresponde a ningún miembro", async () => {
-    updateOwnProfile.mockResolvedValue(null);
+    updateOwnProfile.mockResolvedValue({ kind: "member_not_found" });
 
     const response = await patchThroughBoundary(VALID_BODY);
 
     expect(response.status).toBe(403);
+  });
+
+  it("acepta el AUF del miembro y lo devuelve sin verificar", async () => {
+    const response = await patchThroughBoundary({
+      ...VALID_BODY,
+      aufNumber: "AUF-123",
+      aufExpiry: "2030-01-01",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        auf: { status: "pending", number: "AUF-123", expiry: "2030-01-01" },
+      },
+    });
+    expect(updateOwnProfile).toHaveBeenCalledWith(USER_ID, VALID_BODY, {
+      kind: "propose",
+      number: "AUF-123",
+      expiry: "2030-01-01",
+    });
+  });
+
+  it("acepta un AUF sin vencimiento", async () => {
+    const response = await patchThroughBoundary({
+      ...VALID_BODY,
+      aufNumber: "AUF-123",
+      aufExpiry: null,
+    });
+
+    expect(response.status).toBe(200);
+  });
+
+  it("responde 403 y no escribe nada cuando el AUF ya está verificado", async () => {
+    givenStoredAuf(VERIFIED_AUF);
+
+    const response = await patchThroughBoundary({
+      ...VALID_BODY,
+      aufNumber: "AUF-999",
+      aufExpiry: "2030-01-01",
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "forbidden", reason: "auf_verified" },
+    });
+    expect(updateOwnProfile).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["", "auf_number_missing"],
+    ["A".repeat(41), "auf_number_too_long"],
+  ])(
+    "responde 400 con el motivo a un número de AUF que no vale (%j)",
+    async (aufNumber, reason) => {
+      const response = await patchThroughBoundary({
+        ...VALID_BODY,
+        aufNumber,
+        aufExpiry: null,
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "validation_error", reason },
+      });
+      expect(updateOwnProfile).not.toHaveBeenCalled();
+    },
+  );
+
+  it("responde 400 a un vencimiento anterior a su ingreso", async () => {
+    const response = await patchThroughBoundary({
+      ...VALID_BODY,
+      aufNumber: "AUF-123",
+      aufExpiry: "2024-03-05",
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "validation_error", reason: "auf_expiry_before_joined" },
+    });
+  });
+
+  it("responde 400 a un vencimiento que llega sin número", async () => {
+    const response = await patchThroughBoundary({
+      ...VALID_BODY,
+      aufExpiry: "2030-01-01",
+    });
+
+    expect(response.status).toBe(400);
+    expect(updateOwnProfile).not.toHaveBeenCalled();
   });
 
   it("no atiende otros métodos", async () => {

@@ -6,8 +6,12 @@ import {
   identifyAccountCaller,
 } from "@/lib/auth/account-api";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
+import { AUF_NUMBER_MAX_LENGTH } from "@/lib/members/member-record";
 import {
+  AUF_VERIFIED_REASON,
+  type AufProposal,
   FULL_NAME_MAX_LENGTH,
+  OwnAufVerifiedError,
   type OwnProfile,
   type OwnProfileGateways,
   ProfileValidationError,
@@ -22,7 +26,10 @@ import { createSupabaseOwnProfileGateways } from "@/lib/members/supabase-own-pro
  * incompleta recibe 403 de la frontera antes de llegar aquí.
  *
  * Se mandan los cinco campos siempre: la ficha editable es pequeña, y así no
- * hay que distinguir "no lo toco" de "lo vacío".
+ * hay que distinguir "no lo toco" de "lo vacío". El AUF (#274) es la
+ * excepción: sin `aufNumber` no se toca, porque el miembro no puede borrarlo,
+ * sólo proponer otro. Lo que propone queda sin verificar; si ya está
+ * verificado, cambiarlo responde 403 con `reason: auf_verified`.
  */
 
 // Depende de la sesión de quien llama y escribe su fila.
@@ -31,11 +38,9 @@ export const dynamic = "force-dynamic";
 /** Lo que la decisión B3 reserva al Admin. No se ignoran en silencio: quien
  * los mande recibe 403 con su nombre, para que el intento quede claro
  * (AC-039). Se nombran con la grafía con la que la API los sirve en el
- * directorio. */
+ * directorio. El AUF salió de esta lista con #274. */
 const RESERVED_PROFILE_FIELDS = [
   "role",
-  "aufNumber",
-  "aufExpiry",
   "groups",
   "status",
   // De ella depende si hace falta el consentimiento del tutor (NFR-012): sólo
@@ -43,16 +48,18 @@ const RESERVED_PROFILE_FIELDS = [
   "dateOfBirth",
 ] as const;
 
-/** Un tope holgado sólo para no arrastrar un cuerpo de megas hasta el
- * dominio, que cuenta el nombre en caracteres y no en unidades UTF-16. */
+/** Topes holgados sólo para no arrastrar un cuerpo de megas hasta el
+ * dominio, que cuenta en caracteres y no en unidades UTF-16. */
 const FULL_NAME_BODY_MAX_LENGTH = FULL_NAME_MAX_LENGTH * 4;
+const AUF_NUMBER_BODY_MAX_LENGTH = AUF_NUMBER_MAX_LENGTH * 4;
 
 /** Se aceptan en la forma sólo para poder rechazarlos por su nombre. */
 const reservedField = z.unknown().optional();
 
-/** Sólo la forma. Que el país, la posición, el nivel y el género existan lo
- * decide el dominio, que dice además cuál falló. `strict` responde 400 a
- * cualquier campo que no sea del perfil, como un `userId`. */
+/** Sólo la forma. Que el país, la posición, el nivel, el género y el AUF
+ * valgan lo decide el dominio, que dice además cuál falló. `strict` responde
+ * 400 a cualquier campo que no sea del perfil, como un `userId`, y un
+ * vencimiento sin número también: no hay registro al que pertenezca. */
 const profileBodySchema = z
   .object({
     fullName: z.string().max(FULL_NAME_BODY_MAX_LENGTH),
@@ -60,14 +67,18 @@ const profileBodySchema = z
     position: z.string().nullable(),
     experienceLevel: z.string().nullable(),
     gender: z.string().nullable(),
+    aufNumber: z.string().max(AUF_NUMBER_BODY_MAX_LENGTH).optional(),
+    aufExpiry: z.string().nullable().optional(),
     role: reservedField,
-    aufNumber: reservedField,
-    aufExpiry: reservedField,
     groups: reservedField,
     status: reservedField,
     dateOfBirth: reservedField,
   })
-  .strict();
+  .strict()
+  .refine(
+    (body) => body.aufNumber !== undefined || body.aufExpiry === undefined,
+    { message: "aufExpiry llega sin aufNumber.", path: ["aufExpiry"] },
+  );
 
 type ProfileBody = z.infer<typeof profileBodySchema>;
 
@@ -85,6 +96,13 @@ function rejectReservedFields(body: ProfileBody): void {
       "reserved_fields",
     );
   }
+}
+
+/** Sin número no hay propuesta. Un vencimiento omitido es no conocerlo. */
+function toAufProposal(body: ProfileBody): AufProposal | null {
+  return body.aufNumber === undefined
+    ? null
+    : { number: body.aufNumber, expiry: body.aufExpiry ?? null };
 }
 
 function requireOwnProfileGateways(): OwnProfileGateways {
@@ -108,6 +126,9 @@ function asApiError(error: unknown): never {
       error.issues[0]?.code,
     );
   }
+  if (error instanceof OwnAufVerifiedError) {
+    throw new ApiError("forbidden", error.message, AUF_VERIFIED_REASON);
+  }
   return asAccountApiError(error);
 }
 
@@ -126,6 +147,7 @@ const patchProfile = createApiRoute<AccountProfileResponse, ProfileBody>({
             position: body.position,
             experienceLevel: body.experienceLevel,
             gender: body.gender,
+            auf: toAufProposal(body),
           },
         }),
       };

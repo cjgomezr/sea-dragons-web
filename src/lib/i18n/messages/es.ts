@@ -297,6 +297,27 @@ export const spanishMessages: MessageCatalog = {
     "Tu cuenta no puede cambiar estos datos ahora mismo.",
   "account.profile.error.unexpected":
     "No pudimos guardar tus cambios. Vuelve a intentarlo en un momento.",
+  // El AUF del perfil propio (#274): lo escribe el miembro y queda pendiente
+  // hasta que un Admin lo verifica.
+  "account.profile.auf.title": "Registro AUF",
+  "account.profile.auf.number": "Número de AUF",
+  "account.profile.auf.expiry": "Vencimiento del AUF",
+  "account.profile.auf.hint":
+    "Un Admin lo revisa antes de darlo por verificado.",
+  "account.profile.auf.pending": "Pendiente de que un Admin lo verifique.",
+  "account.profile.auf.verified":
+    "Verificado por un Admin. Sólo un Admin puede cambiarlo.",
+  "account.profile.auf.summary": "AUF {number} · vence el {date}",
+  "account.profile.auf.withoutExpiry": "AUF {number} · sin vencimiento",
+  "account.profile.issue.aufNumberMissing": "Escribe tu número de AUF.",
+  "account.profile.issue.aufNumberTooLong":
+    "Tu número de AUF no puede pasar de {max} caracteres.",
+  "account.profile.issue.aufExpiryNotADate":
+    "Escribe una fecha de vencimiento válida.",
+  "account.profile.issue.aufExpiryBeforeJoined":
+    "El vencimiento no puede ser anterior al día en que ingresaste al club.",
+  "account.profile.error.aufVerified":
+    "Tu AUF ya está verificado. Sólo un Admin puede cambiarlo.",
   // La foto de perfil (#245): el círculo de la cabecera y sus controles.
   "account.photo.alt": "Tu foto de perfil",
   "account.photo.add": "Añadir foto",

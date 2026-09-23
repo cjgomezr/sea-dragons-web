@@ -301,6 +301,26 @@ export const englishMessages = {
     "Your account can't change these details right now.",
   "account.profile.error.unexpected":
     "We couldn't save your changes. Try again in a moment.",
+  // El AUF del perfil propio (#274): lo escribe el miembro y queda pendiente
+  // hasta que un Admin lo verifica.
+  "account.profile.auf.title": "AUF registration",
+  "account.profile.auf.number": "AUF number",
+  "account.profile.auf.expiry": "AUF expiry",
+  "account.profile.auf.hint":
+    "An Admin checks it before it counts as verified.",
+  "account.profile.auf.pending": "Pending verification by an Admin.",
+  "account.profile.auf.verified":
+    "Verified by an Admin. Only an Admin can change it.",
+  "account.profile.auf.summary": "AUF {number} · expires {date}",
+  "account.profile.auf.withoutExpiry": "AUF {number} · no expiry",
+  "account.profile.issue.aufNumberMissing": "Write your AUF number.",
+  "account.profile.issue.aufNumberTooLong":
+    "Your AUF number can be at most {max} characters.",
+  "account.profile.issue.aufExpiryNotADate": "Write a valid expiry date.",
+  "account.profile.issue.aufExpiryBeforeJoined":
+    "The expiry can't be before the day you joined the club.",
+  "account.profile.error.aufVerified":
+    "Your AUF is already verified. Only an Admin can change it.",
   // La foto de perfil (#245): el círculo de la cabecera y sus controles.
   "account.photo.alt": "Your profile photo",
   "account.photo.add": "Add photo",

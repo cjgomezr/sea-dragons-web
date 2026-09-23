@@ -5,7 +5,11 @@ import {
 } from "@/lib/directory/directory";
 import { createDirectoryGateways } from "@/lib/directory/supabase-directory-gateways";
 import { DEFAULT_CLUB_SLUG } from "@/lib/auth/supabase-auth-gateways";
-import { readOwnProfile, updateOwnProfile } from "@/lib/members/own-profile";
+import {
+  OwnAufVerifiedError,
+  readOwnProfile,
+  updateOwnProfile,
+} from "@/lib/members/own-profile";
 import { createOwnProfileGateways } from "@/lib/members/supabase-own-profile-gateways";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
@@ -20,11 +24,21 @@ import {
  * (#241). Lo que ningún doble puede decir: que las columnas y los `check` de
  * `0016_member_profile_fields.sql` aceptan lo que el dominio deja pasar, que
  * se guarda sólo la fila de quien llama, y que el directorio lee lo nuevo
- * (AC-039).
+ * (AC-039). Desde #274, también que el AUF propuesto queda sin verificar y
+ * que uno verificado no se deja cambiar.
  */
 
 const MEMBERS_TABLE = "members";
 const TODAY_IN_CLUB = "2026-09-21";
+
+/** Los cinco campos como los siembra `withActiveMember`. */
+const UNCHANGED_FIELDS = {
+  fullName: "Socia que edita su perfil",
+  country: "AU",
+  position: "Defender",
+  experienceLevel: "Beginner",
+  gender: "female",
+} as const;
 
 type SeededMember = { readonly userId: string };
 
@@ -79,6 +93,7 @@ describeRls("perfil propio contra seadragons-dev", () => {
             position: "Forward",
             experienceLevel: "Advanced",
             gender: "undisclosed",
+            auf: null,
           },
         });
 
@@ -88,6 +103,7 @@ describeRls("perfil propio contra seadragons-dev", () => {
           position: "Forward",
           experienceLevel: "Advanced",
           gender: "undisclosed",
+          auf: { status: "none" },
         };
         expect(saved).toEqual(expected);
         await expect(readOwnProfile(gateways, userId)).resolves.toEqual(
@@ -131,6 +147,7 @@ describeRls("perfil propio contra seadragons-dev", () => {
             position: null,
             experienceLevel: null,
             gender: null,
+            auf: null,
           },
         });
 
@@ -169,6 +186,7 @@ describeRls("perfil propio contra seadragons-dev", () => {
             position: "Goalkeeper",
             experienceLevel: "Intermediate",
             gender: "female",
+            auf: null,
           },
         });
 
@@ -183,6 +201,72 @@ describeRls("perfil propio contra seadragons-dev", () => {
           account_status: "active",
           auf_number: null,
           auf_expiry: null,
+        });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "guarda el AUF propuesto sin verificar",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = createOwnProfileGateways(serviceClient.client);
+
+      await withActiveMember(serviceClient, async ({ userId }) => {
+        const saved = await updateOwnProfile(gateways, {
+          userId,
+          submission: {
+            ...UNCHANGED_FIELDS,
+            auf: { number: "AUF-PROPUESTO-1", expiry: "2030-06-30" },
+          },
+        });
+
+        expect(saved.auf).toEqual({
+          status: "pending",
+          number: "AUF-PROPUESTO-1",
+          expiry: "2030-06-30",
+        });
+        const { data, error } = await serviceClient.client
+          .from(MEMBERS_TABLE)
+          .select("auf_verified_at")
+          .eq("user_id", userId)
+          .single();
+        expect(error).toBeNull();
+        expect(data).toEqual({ auf_verified_at: null });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "niega cambiar un AUF verificado y lo deja como estaba",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = createOwnProfileGateways(serviceClient.client);
+
+      await withActiveMember(serviceClient, async ({ userId }) => {
+        const { error: seedError } = await serviceClient.client
+          .from(MEMBERS_TABLE)
+          .update({
+            auf_number: "AUF-VERIFICADO",
+            auf_expiry: "2030-06-30",
+            auf_verified_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId);
+        expect(seedError).toBeNull();
+
+        await expect(
+          updateOwnProfile(gateways, {
+            userId,
+            submission: {
+              ...UNCHANGED_FIELDS,
+              auf: { number: "AUF-OTRO", expiry: "2030-06-30" },
+            },
+          }),
+        ).rejects.toBeInstanceOf(OwnAufVerifiedError);
+        await expect(readOwnProfile(gateways, userId)).resolves.toMatchObject({
+          auf: { status: "verified", number: "AUF-VERIFICADO" },
         });
       });
     },

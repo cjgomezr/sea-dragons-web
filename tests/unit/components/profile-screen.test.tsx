@@ -5,13 +5,14 @@ import { ProfileScreen } from "@/components/account/ProfileScreen";
 import { ACCOUNT_PROFILE_API_PATH } from "@/lib/auth/routes";
 import { listCountryOptions } from "@/lib/geo/countries";
 import type { Locale } from "@/lib/i18n/locale";
-import type { OwnProfile } from "@/lib/members/own-profile";
+import type { OwnAuf, OwnProfile } from "@/lib/members/own-profile";
 
 /**
  * La pantalla de perfil (#241): Mi cuenta convertida en perfil. Enseña lo
  * que ya enseñaba (rol, solicitud de rol y grupos) y suma el formulario de la
  * ficha editable. Lo que se prueba es que sólo da un cambio por hecho cuando
- * el servidor lo confirmó.
+ * el servidor lo confirmó. Desde #274 la ficha lleva también el AUF, que el
+ * miembro escribe y queda pendiente hasta que un Admin lo verifique.
  */
 
 const refresh = vi.fn();
@@ -23,6 +24,7 @@ const PROFILE: OwnProfile = {
   position: "Defender",
   experienceLevel: "Intermediate",
   gender: "female",
+  auf: { status: "none" },
 };
 
 const EMPTY_PROFILE: OwnProfile = {
@@ -31,6 +33,19 @@ const EMPTY_PROFILE: OwnProfile = {
   position: null,
   experienceLevel: null,
   gender: null,
+  auf: { status: "none" },
+};
+
+const PENDING_AUF: OwnAuf = {
+  status: "pending",
+  number: "AUF-100",
+  expiry: "2027-06-30",
+};
+
+const VERIFIED_AUF: OwnAuf = {
+  status: "verified",
+  number: "AUF-100",
+  expiry: "2027-06-30",
 };
 
 type ApiCall = { readonly url: string; readonly body: unknown };
@@ -55,8 +70,21 @@ function stubFetch(respond: (body: unknown) => Response | Promise<Response>) {
   );
 }
 
-function echoSavedProfile(): void {
-  stubFetch((body) => jsonResponse(200, { data: body }));
+/** Lo que el servidor guardaría: el AUF que llega queda pendiente, y sin
+ * AUF en la petición se queda el que había. */
+function savedProfileOf(body: unknown, previousAuf: OwnAuf): unknown {
+  const { aufNumber, aufExpiry, ...fields } = body as Record<string, unknown>;
+  const auf =
+    typeof aufNumber === "string"
+      ? { status: "pending", number: aufNumber, expiry: aufExpiry }
+      : previousAuf;
+  return { ...fields, auf };
+}
+
+function echoSavedProfile(previousAuf: OwnAuf = { status: "none" }): void {
+  stubFetch((body) =>
+    jsonResponse(200, { data: savedProfileOf(body, previousAuf) }),
+  );
 }
 
 function renderScreen(
@@ -307,5 +335,176 @@ describe("pantalla de perfil", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "No pudimos guardar tus cambios. Revisa tu conexión y vuelve a intentarlo.",
     );
+  });
+});
+
+function withAuf(auf: OwnAuf): OwnProfile {
+  return { ...PROFILE, auf };
+}
+
+describe("el AUF en el perfil propio", () => {
+  it("sin AUF, ofrece escribirlo y dice que un Admin lo revisará", () => {
+    renderScreen();
+
+    expect(screen.getByLabelText("AUF number")).toHaveValue("");
+    expect(screen.getByLabelText("AUF expiry")).toHaveValue("");
+    expect(
+      screen.getByText("An Admin checks it before it counts as verified."),
+    ).toBeInTheDocument();
+  });
+
+  it("guardar sin tocar el AUF vacío no lo manda", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(saveButton());
+
+    await screen.findByRole("status");
+    expect(calls[0]?.body).not.toHaveProperty("aufNumber");
+    expect(calls[0]?.body).not.toHaveProperty("aufExpiry");
+  });
+
+  it("manda el AUF escrito y después lo enseña pendiente", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.type(screen.getByLabelText("AUF number"), "AUF-200");
+    await user.type(screen.getByLabelText("AUF expiry"), "2028-01-31");
+    await user.click(saveButton());
+
+    await screen.findByRole("status");
+    expect(calls[0]?.body).toMatchObject({
+      aufNumber: "AUF-200",
+      aufExpiry: "2028-01-31",
+    });
+    expect(
+      screen.getByText("Pending verification by an Admin."),
+    ).toBeInTheDocument();
+  });
+
+  it("manda null por un vencimiento que no se conoce", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.type(screen.getByLabelText("AUF number"), "AUF-200");
+    await user.click(saveButton());
+
+    await screen.findByRole("status");
+    expect(calls[0]?.body).toMatchObject({
+      aufNumber: "AUF-200",
+      aufExpiry: null,
+    });
+  });
+
+  it("un AUF pendiente se enseña en sus campos y como pendiente", () => {
+    renderScreen({ profile: withAuf(PENDING_AUF) });
+
+    expect(screen.getByLabelText("AUF number")).toHaveValue("AUF-100");
+    expect(screen.getByLabelText("AUF expiry")).toHaveValue("2027-06-30");
+    expect(
+      screen.getByText("Pending verification by an Admin."),
+    ).toBeInTheDocument();
+  });
+
+  it("no envía un AUF pendiente vaciado y dice por qué", async () => {
+    echoSavedProfile(PENDING_AUF);
+    const user = userEvent.setup();
+    renderScreen({ profile: withAuf(PENDING_AUF) });
+
+    await user.clear(screen.getByLabelText("AUF number"));
+    await user.click(saveButton());
+
+    expect(screen.getByLabelText("AUF number")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(screen.getByText("Write your AUF number.")).toBeInTheDocument();
+    expect(calls).toEqual([]);
+  });
+
+  it("no envía un número de más de 40 caracteres y dice el límite", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(screen.getByLabelText("AUF number"));
+    await user.paste("A".repeat(41));
+    await user.click(saveButton());
+
+    expect(
+      screen.getByText("Your AUF number can be at most 40 characters."),
+    ).toBeInTheDocument();
+    expect(calls).toEqual([]);
+  });
+
+  it("un AUF verificado se lee pero no se edita, y no se manda", async () => {
+    echoSavedProfile(VERIFIED_AUF);
+    const user = userEvent.setup();
+    renderScreen({ profile: withAuf(VERIFIED_AUF) });
+
+    expect(screen.queryByLabelText("AUF number")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("AUF AUF-100 · expires 30 June 2027"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Verified by an Admin. Only an Admin can change it."),
+    ).toBeInTheDocument();
+
+    await user.click(saveButton());
+
+    await screen.findByRole("status");
+    expect(calls[0]?.body).not.toHaveProperty("aufNumber");
+  });
+
+  it("traduce el rechazo de un AUF que un Admin verificó entretanto", async () => {
+    stubFetch(() =>
+      jsonResponse(403, {
+        error: { code: "forbidden", message: "x", reason: "auf_verified" },
+      }),
+    );
+    const user = userEvent.setup();
+    renderScreen({ profile: withAuf(PENDING_AUF) });
+
+    await user.clear(screen.getByLabelText("AUF number"));
+    await user.type(screen.getByLabelText("AUF number"), "AUF-300");
+    await user.click(saveButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Your AUF is already verified. Only an Admin can change it.",
+    );
+  });
+
+  it("traduce un vencimiento anterior a su ingreso", async () => {
+    stubFetch(() =>
+      jsonResponse(400, {
+        error: {
+          code: "validation_error",
+          message: "x",
+          reason: "auf_expiry_before_joined",
+        },
+      }),
+    );
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.type(screen.getByLabelText("AUF number"), "AUF-200");
+    await user.type(screen.getByLabelText("AUF expiry"), "2001-01-01");
+    await user.click(saveButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The expiry can't be before the day you joined the club.",
+    );
+  });
+
+  it("en español, el AUF y su estado salen en español", () => {
+    renderScreen({ locale: "es", profile: withAuf(PENDING_AUF) });
+
+    expect(screen.getByLabelText("Número de AUF")).toHaveValue("AUF-100");
+    expect(
+      screen.getByText("Pendiente de que un Admin lo verifique."),
+    ).toBeInTheDocument();
   });
 });

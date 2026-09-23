@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { copyFile, mkdtemp, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it, onTestFinished } from "vitest";
 
@@ -241,6 +243,38 @@ export async function applyRepositoryMigrations(
 export async function migratedDatabase(): Promise<TemporaryDatabase> {
   const database = await freshDatabase();
   const applied = await applyRepositoryMigrations(database);
+  expect(applied.code, applied.stderr).toBe(0);
+  return database;
+}
+
+/**
+ * Base con el histórico aplicado HASTA la migración anterior a
+ * `migrationPrefix`. Es el único punto de partida desde el que se puede
+ * comprobar qué le pasa a una fila que ya existía: sobre el histórico completo
+ * la columna ya está puesta y el relleno ya ocurrió.
+ */
+export async function databaseBeforeMigration(
+  migrationPrefix: string,
+): Promise<TemporaryDatabase> {
+  const database = await freshDatabase();
+  const source = path.join(REPO_ROOT, "supabase", "migrations");
+  const directory = await mkdtemp(path.join(tmpdir(), "migraciones-previas-"));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  const earlier = (await readdir(source))
+    .filter((name) => name < migrationPrefix)
+    .sort();
+  // Sin esto, un renombrado del histórico dejaría el directorio vacío y el
+  // aplicador fallaría por "no hay ninguna migración", que se lee como otro
+  // problema.
+  expect(earlier.length).toBeGreaterThan(0);
+  for (const name of earlier) {
+    await copyFile(path.join(source, name), path.join(directory, name));
+  }
+
+  const applied = await applyMigrations(["--dir", toBashPath(directory)], {
+    ...process.env,
+    DATABASE_URL: database.url,
+  });
   expect(applied.code, applied.stderr).toBe(0);
   return database;
 }
