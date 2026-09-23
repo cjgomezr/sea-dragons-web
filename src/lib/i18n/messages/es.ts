@@ -418,7 +418,7 @@ export const spanishMessages: MessageCatalog = {
     "El nombre tiene que tener entre 1 y {max} caracteres.",
   "groups.error.groupGone": "Ese grupo ya no está en el club.",
   "groups.error.memberInactive":
-    "Ese miembro ya dejó el club, así que no se puede agregar.",
+    "Ese miembro tiene la cuenta desactivada, así que no se puede agregar.",
   "groups.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para seguir.",
   "groups.error.forbidden": "Tu rol no puede gestionar los grupos del club.",
@@ -562,9 +562,9 @@ export const spanishMessages: MessageCatalog = {
     "Le mandamos una invitación nueva a {name}.",
   "memberStatus.title": "Membresía",
   "memberStatus.lead.active":
-    "{name} es miembro del club. Si desactivas su cuenta, su historial se conserva, pero deja de entrar y de aparecer en el directorio.",
+    "{name} es miembro del club. Si desactivas su cuenta, su historial se conserva, pero {name} deja de entrar y de aparecer en el directorio.",
   "memberStatus.lead.inactive":
-    "La cuenta de {name} está desactivada. Su historial se conserva, y si la reactivas vuelve a entrar y a aparecer en el directorio.",
+    "La cuenta de {name} está desactivada. Su historial se conserva, y si la reactivas, {name} vuelve a entrar y a aparecer en el directorio.",
   "memberStatus.deactivate": "Desactivar cuenta",
   "memberStatus.reactivate": "Reactivar cuenta",
   "memberStatus.saving": "Guardando…",
@@ -637,7 +637,7 @@ export const spanishMessages: MessageCatalog = {
     "Si no te registraste tú, ignora este correo: sin confirmar, la cuenta no se activa.",
   "email.invitation.subject": "Te invitaron a {clubName}",
   "email.invitation.invited":
-    "El club te dio de alta en {clubName} con esta dirección.",
+    "El club te invitó a {clubName} con esta dirección.",
   "email.invitation.nextSteps":
     "Para activar tu cuenta, abre el enlace, elige una contraseña y entra con ella. Después completa tu registro con los datos que falten.",
   "email.invitation.linkLifetime": {

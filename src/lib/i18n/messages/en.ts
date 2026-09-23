@@ -425,7 +425,7 @@ export const englishMessages = {
     "The name must have between 1 and {max} characters.",
   "groups.error.groupGone": "That group is no longer in the club.",
   "groups.error.memberInactive":
-    "That member already left the club, so they can't be added.",
+    "That member's account is deactivated, so they can't be added.",
   "groups.error.signInRequired":
     "Your session has ended. Sign in again to keep going.",
   "groups.error.forbidden": "Your role can't manage the club's groups.",
@@ -646,7 +646,7 @@ export const englishMessages = {
     "If you didn't sign up, ignore this email: the account won't activate until it's confirmed.",
   "email.invitation.subject": "You're invited to {clubName}",
   "email.invitation.invited":
-    "The club has added you to {clubName} with this address.",
+    "The club has invited you to {clubName} with this address.",
   "email.invitation.nextSteps":
     "To activate your account, open the link, choose a password and sign in with it. Then complete your registration with any missing details.",
   "email.invitation.linkLifetime": {
