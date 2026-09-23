@@ -237,11 +237,13 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
             const { data: row } = await serviceClient.client
               .from(MEMBERS_TABLE)
               .select(
-                "role, account_status, email_locale, position, experience_level, gender, auf_number, auf_expiry, country, joined_on",
+                "role, account_status, email_locale, position, experience_level, gender, auf_number, auf_expiry, country, joined_on, auf_verified_at",
               )
               .eq("user_id", created.member.userId)
               .single();
-            expect(row).toEqual({
+            // El AUF del alta lo escribe un Admin: nace verificado (#274).
+            expect(row?.auf_verified_at).not.toBeNull();
+            expect({ ...row, auf_verified_at: undefined }).toEqual({
               role: "Player",
               account_status: "incomplete",
               email_locale: "en",

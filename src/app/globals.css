@@ -2055,10 +2055,10 @@ button.notification-item-content:hover {
 
 /* El AUF vencido y el AUF sin verificar (#274) son lo único de la fila que
    pide hacer algo, así que son lo único que lleva el color de advertencia, y
-   lo llevan en el borde. En el
-   texto no cabe: el amarillo del tema claro da 2.56:1 sobre el panel blanco,
-   muy por debajo del mínimo AA que este proyecto se exige, y axe lo cazó. La
-   palabra dice igual lo que pasa: el color no es lo que lo cuenta. */
+   lo llevan en el borde. En el texto no cabe: el amarillo del tema claro da
+   2.56:1 sobre el panel blanco, muy por debajo del mínimo AA que este
+   proyecto se exige, y axe lo cazó. La palabra dice igual lo que pasa: el
+   color no es lo que lo cuenta. */
 .directory-mark-warning {
   font-weight: 700;
   color: var(--color-text);
