@@ -238,6 +238,11 @@ export const englishMessages = {
   "signOut.label": "Sign out",
   // Mi cuenta (#209). Los roles se escriben como en el SRD en inglés.
   "account.link": "My account",
+  // El menú de la cuenta (#287), que abre el botón de la cuenta.
+  "accountMenu.profile": "My profile",
+  "accountMenu.appearance": "Appearance",
+  "accountMenu.language": "Language",
+  "accountMenu.back": "Back",
   "account.metaTitle": "Profile · Victoria Seadragons",
   "account.metaDescription":
     "Your details, your role in the club and your groups, plus a request to become a Coach or join the Committee.",

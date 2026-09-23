@@ -10,17 +10,15 @@ import { createTranslator } from "@/lib/i18n/translator";
 /**
  * Cómo se dibuja el control, que no es cómo se comporta.
  *
- * `icon` es el de la cabecera de la cáscara: ahí compite con la navegación,
- * que es lo que la gente usa todos los días, y con texto pesaba más que ella.
- * El nombre accesible sigue siendo el texto completo, así que para un lector
- * de pantalla los dos son lo mismo.
+ * `menu` es el del menú de la cuenta (#287): una entrada más de la lista, con
+ * su icono y su texto, porque ahí ya no compite por el ancho de la cabecera.
  *
  * `text` es el de completar registro (#133). Esa pantalla no tiene cáscara ni
  * navegación, y cerrar sesión es una de las dos únicas cosas que una cuenta
  * incompleta puede hacer: esconderla detrás de un icono suelto sería esconder
  * media pantalla.
  */
-export type SignOutAppearance = "icon" | "text";
+export type SignOutAppearance = "menu" | "text";
 
 /**
  * Cerrar sesión desde cualquier pantalla (FR-007). El comportamiento es uno
@@ -28,7 +26,7 @@ export type SignOutAppearance = "icon" | "text";
  */
 export function SignOutButton({
   locale,
-  appearance = "icon",
+  appearance = "menu",
 }: {
   locale: Locale;
   appearance?: SignOutAppearance;
@@ -51,16 +49,16 @@ export function SignOutButton({
     router.refresh();
   }
 
-  const isIcon = appearance === "icon";
+  const isMenuItem = appearance === "menu";
   return (
     <button
       type="button"
-      className={isIcon ? "app-signout" : "auth-signout"}
+      className={isMenuItem ? "account-menu-item" : "auth-signout"}
       onClick={handleSignOut}
       disabled={isSigningOut}
-      {...(isIcon ? { "aria-label": label, title: label } : {})}
     >
-      {isIcon ? <SignOutIcon /> : label}
+      {isMenuItem ? <SignOutIcon /> : null}
+      {label}
     </button>
   );
 }

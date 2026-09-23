@@ -42,6 +42,12 @@ function spanishToggle(page: Page): Locator {
   return page.getByRole("button", { name: /cambiar a english/i });
 }
 
+/** Dentro de la aplicación el interruptor vive en el menú de la cuenta
+ * (#287), así que primero se abre. */
+async function openAccountMenu(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /^(My account|Mi cuenta)$/ }).click();
+}
+
 async function expectDocumentLanguage(page: Page, lang: string): Promise<void> {
   await expect(page.locator("html")).toHaveAttribute("lang", lang);
 }
@@ -163,14 +169,18 @@ test.describe("interruptor de idioma dentro de la aplicación", () => {
     await page.goto(`${APP_URL}/dashboard`);
     await expectDocumentLanguage(page, "en");
 
+    await openAccountMenu(page);
     await englishToggle(page).click();
     await expectDocumentLanguage(page, "es");
+    // El desplegable abierto tapa la navegación de la barra lateral.
+    await page.keyboard.press("Escape");
     await page
       .getByRole("navigation", { name: "Principal" })
       .getByRole("link", { name: "Calendario" })
       .click();
 
     await expect(page).toHaveURL(new RegExp(`${CALENDAR_PATH}$`));
+    await openAccountMenu(page);
     await expect(spanishToggle(page)).toBeVisible();
     await expect(
       page.getByRole("heading", { level: 1, name: "Calendario" }),
@@ -183,6 +193,7 @@ test.describe("interruptor de idioma dentro de la aplicación", () => {
   test("cumple el objetivo táctil de 44px en móvil", async ({ page }) => {
     await page.setViewportSize(MOBILE);
     await page.goto(`${APP_URL}/dashboard`);
+    await openAccountMenu(page);
 
     const box = await englishToggle(page).boundingBox();
 
