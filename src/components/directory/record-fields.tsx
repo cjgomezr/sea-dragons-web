@@ -61,7 +61,7 @@ export function TextField({
   type,
   value,
   issueText,
-  hintId,
+  hintIds = [],
   onChange,
 }: {
   id: string;
@@ -70,13 +70,16 @@ export function TextField({
   value: string;
   /** El aviso de este campo, o null si no tiene ninguno. */
   issueText: string | null;
-  hintId?: string;
+  /** Los textos que lo describen además del aviso, en el orden en que se
+   * leen. */
+  hintIds?: readonly string[];
   onChange: (value: string) => void;
 }): React.JSX.Element {
   const issueId = `${id}-aviso`;
-  const describedBy = [issueText === null ? null : issueId, hintId ?? null]
-    .filter((part) => part !== null)
-    .join(" ");
+  const describedBy = [
+    ...(issueText === null ? [] : [issueId]),
+    ...hintIds,
+  ].join(" ");
   return (
     <div className="auth-field">
       <label htmlFor={id}>{label}</label>

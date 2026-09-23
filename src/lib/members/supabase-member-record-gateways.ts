@@ -7,11 +7,15 @@ import { readRequiredText, readText } from "@/lib/auth/supabase-auth-gateways";
 import { createGroupMembersGateways } from "@/lib/groups/supabase-group-members-gateways";
 import { createGroupsGateways } from "@/lib/groups/supabase-groups-gateways";
 import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-groups-gateway";
+import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type {
   AufRegistration,
+  DateOfBirthCorrection,
+  DateOfBirthCorrectionResult,
   MemberRecordGateways,
+  MemberScope,
   StoredMemberRecord,
 } from "./member-record";
 
@@ -25,11 +29,14 @@ import type {
  *
  * Los grupos se leen y se escriben con los adaptadores de E4, los mismos que
  * usa la sección Grupos.
+ *
+ * Del consentimiento del tutor sólo se lee si existe: su nombre y su correo
+ * no salen de la fila.
  */
 
 const MEMBERS_TABLE = "members";
 const RECORD_COLUMNS =
-  "user_id, full_name, joined_on, account_status, auf_number, auf_expiry";
+  "user_id, full_name, joined_on, account_status, auf_number, auf_expiry, date_of_birth, created_at, guardian_consent_at";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -54,6 +61,10 @@ function toStoredMemberRecord(row: Row): StoredMemberRecord {
     accountStatus: readAccountStatus(row),
     aufNumber: readText(row, "auf_number", MEMBERS_TABLE),
     aufExpiry: readText(row, "auf_expiry", MEMBERS_TABLE),
+    dateOfBirth: readText(row, "date_of_birth", MEMBERS_TABLE),
+    registeredAt: readRequiredText(row, "created_at", MEMBERS_TABLE),
+    hasGuardianConsent:
+      readText(row, "guardian_consent_at", MEMBERS_TABLE) !== null,
   };
 }
 
@@ -64,6 +75,58 @@ function toAufColumns(registration: AufRegistration): {
   return registration.kind === "none"
     ? { auf_number: null, auf_expiry: null }
     : { auf_number: registration.number, auf_expiry: registration.expiry };
+}
+
+async function memberExists(
+  serviceClient: SupabaseClient,
+  { clubId, userId }: MemberScope,
+): Promise<boolean> {
+  const { data, error } = await serviceClient
+    .from(MEMBERS_TABLE)
+    .select("user_id")
+    .eq("user_id", userId)
+    .eq("club_id", clubId)
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `No se pudo comprobar si existe el socio ${userId}: ${error.message}`,
+    );
+  }
+  return data !== null;
+}
+
+/** La fecha y el estado en un solo `update`, y sólo si el estado sigue siendo
+ * el que se leyó. Si no toca ninguna fila, una segunda lectura dice si el
+ * socio ya no está o si cambió su estado. El `check`
+ * `members_active_minor_requires_guardian_consent` de `0007` es la red: una
+ * cuenta activa de un menor sin consentimiento no llega a escribirse. */
+async function correctDateOfBirth(
+  serviceClient: SupabaseClient,
+  scope: MemberScope,
+  correction: DateOfBirthCorrection,
+): Promise<DateOfBirthCorrectionResult> {
+  const { data, error } = await serviceClient
+    .from(MEMBERS_TABLE)
+    .update({
+      date_of_birth: correction.dateOfBirth,
+      account_status: correction.toStatus,
+    })
+    .eq("user_id", scope.userId)
+    .eq("club_id", scope.clubId)
+    .eq("account_status", correction.fromStatus)
+    .select("user_id")
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `No se pudo corregir la fecha de nacimiento del socio ${scope.userId}: ${error.message}`,
+    );
+  }
+  if (data !== null) {
+    return { kind: "corrected" };
+  }
+  return (await memberExists(serviceClient, scope))
+    ? { kind: "status_changed" }
+    : { kind: "member_not_found" };
 }
 
 export function createMemberRecordGateways(
@@ -77,6 +140,7 @@ export function createMemberRecordGateways(
     members: groupMembersGateways.members,
     groupMembers: groupMembersGateways.groupMembers,
     groups: createGroupsGateways(serviceClient).groups,
+    audit: createSupabaseAuditLogWriter(serviceClient),
     records: {
       async findMemberRecord({ clubId, userId }) {
         const { data, error } = await serviceClient
@@ -114,6 +178,9 @@ export function createMemberRecordGateways(
           ? { kind: "member_not_found" }
           : { kind: "updated" };
       },
+
+      correctDateOfBirth: (scope, correction) =>
+        correctDateOfBirth(serviceClient, scope, correction),
     },
   };
 }

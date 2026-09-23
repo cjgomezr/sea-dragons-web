@@ -12,7 +12,9 @@ import {
   GROUP_NOT_FOUND_REASON,
   MEMBER_INACTIVE_REASON,
   MEMBER_NOT_FOUND_REASON,
+  MEMBER_STATUS_CHANGED_REASON,
   type MemberRecord,
+  MemberRecordConflictError,
   MemberRecordForbiddenError,
   type MemberRecordGateways,
   MemberRecordNotFoundError,
@@ -25,7 +27,8 @@ import { clubCalendarDate } from "@/lib/time/club-calendar";
 
 /**
  * La ficha reservada al Admin de un socio (#242, RF-4 del PRD de E5): su
- * número de AUF, su vencimiento y sus grupos (FR-020, BR-008).
+ * número de AUF, su vencimiento y sus grupos (FR-020, BR-008), y la
+ * corrección de su fecha de nacimiento (#272, RF-10).
  *
  * Quién puede llamarlo lo decide la frontera: `RESTRICTED_ROUTES` lo reserva a
  * quien gestiona usuarios y roles, que sólo es Admin, y el dominio lo vuelve a
@@ -51,6 +54,7 @@ const recordBodySchema = z
     aufNumber: z.string().max(AUF_NUMBER_BODY_MAX_LENGTH).nullable(),
     aufExpiry: z.string().nullable(),
     groupIds: z.array(z.uuid()),
+    dateOfBirth: z.string().nullable(),
   })
   .strict();
 
@@ -107,6 +111,9 @@ function asApiError(error: unknown): never {
   }
   if (error instanceof GroupNotFoundError) {
     throw new ApiError("not_found", error.message, GROUP_NOT_FOUND_REASON);
+  }
+  if (error instanceof MemberRecordConflictError) {
+    throw new ApiError("conflict", error.message, MEMBER_STATUS_CHANGED_REASON);
   }
   if (error instanceof InactiveMemberError) {
     throw new ApiError("business_rule", error.message, MEMBER_INACTIVE_REASON);

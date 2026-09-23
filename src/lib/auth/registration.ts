@@ -124,9 +124,17 @@ function validateEmail(value: string): FieldIssueCode | null {
  * falten. Devolver el valor normalizado junto al veredicto es lo que impide
  * que el segundo sitio se escriba su propia copia del `trim`.
  */
-export type FieldValidation<T> =
+export type FieldValidation<T, Code extends FieldIssueCode = FieldIssueCode> =
   | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly code: FieldIssueCode };
+  | { readonly ok: false; readonly code: Code };
+
+/** Por qué no vale una fecha de nacimiento. */
+export type DateOfBirthIssueCode = Extract<
+  FieldIssueCode,
+  | "date_of_birth_not_a_date"
+  | "date_of_birth_in_future"
+  | "date_of_birth_too_early"
+>;
 
 export function validateCountryField(value: string): FieldValidation<string> {
   return isKnownCountryCode(value)
@@ -163,10 +171,19 @@ export function validateDateOfBirthField(
   value: string,
   now: Date,
 ): FieldValidation<string> {
+  return validateDateOfBirthOn(value, clubCalendarDate(now));
+}
+
+/** La misma regla, contra un día del club (YYYY-MM-DD) que ya trae quien
+ * llama. La usa también la corrección del Admin en la ficha (#272). */
+export function validateDateOfBirthOn(
+  value: string,
+  todayInClub: string,
+): FieldValidation<string, DateOfBirthIssueCode> {
   if (!isRealCalendarDate(value)) {
     return { ok: false, code: "date_of_birth_not_a_date" };
   }
-  if (value > clubCalendarDate(now)) {
+  if (value > todayInClub) {
     return { ok: false, code: "date_of_birth_in_future" };
   }
   if (value < EARLIEST_DATE_OF_BIRTH) {

@@ -6,6 +6,7 @@ import {
   requestApi,
 } from "@/lib/api/request-api";
 import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
+import { describeAuthIssue } from "@/lib/auth/issue-messages";
 import { MEMBER_RECORD_API_PATH } from "@/lib/auth/routes";
 import type { Group } from "@/lib/groups/groups";
 import { formatCalendarDay } from "@/lib/i18n/format";
@@ -17,6 +18,7 @@ import {
   MEMBER_INACTIVE_REASON,
   MEMBER_NOT_FOUND_REASON,
   MEMBER_RECORD_ISSUE_CODES,
+  MEMBER_STATUS_CHANGED_REASON,
   type MemberRecord,
   type MemberRecordIssueCode,
   type MemberRecordSubmission,
@@ -41,6 +43,9 @@ const recordSchema = z.object({
   accountStatus: z.enum(ACCOUNT_STATUSES),
   aufNumber: z.string().nullable(),
   aufExpiry: z.string().nullable(),
+  dateOfBirth: z.string().nullable(),
+  registeredAt: z.string(),
+  hasGuardianConsent: z.boolean(),
   isAufExpired: z.boolean(),
   groups: z.array(z.object({ id: z.uuid(), name: z.string() })),
 });
@@ -137,6 +142,14 @@ export function describeMemberRecordIssue(
       return translate("memberRecord.issue.aufExpiryBeforeJoined", {
         date: formatCalendarDay(locale, joinedOn),
       });
+    // Las mismas frases que el registro, que valida la fecha con la misma
+    // regla.
+    case "date_of_birth_not_a_date":
+    case "date_of_birth_in_future":
+    case "date_of_birth_too_early":
+      return describeAuthIssue(translate, code);
+    case "date_of_birth_required":
+      return translate("memberRecord.issue.dateOfBirthRequired");
   }
 }
 
@@ -154,6 +167,9 @@ export function describeMemberRecordFailure(
   }
   if (reason === MEMBER_INACTIVE_REASON) {
     return translate("memberRecord.error.memberInactive");
+  }
+  if (reason === MEMBER_STATUS_CHANGED_REASON) {
+    return translate("memberRecord.error.memberStatusChanged");
   }
   switch (failure) {
     case "network":

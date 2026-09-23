@@ -26,9 +26,15 @@ const RECORD: MemberRecord = {
   accountStatus: "active",
   aufNumber: "AUF-1",
   aufExpiry: "2027-03-31",
+  dateOfBirth: "1990-05-10",
+  registeredAt: "2024-03-06T01:00:00.000Z",
+  hasGuardianConsent: false,
   isAufExpired: false,
   groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
 };
+
+/** 14 años el día del registro. */
+const MINOR_BIRTH = "2010-01-01";
 
 const CLUB_GROUPS: readonly Group[] = [
   { id: MASTERS_ID, name: "Masters Squad", memberCount: 3 },
@@ -67,13 +73,15 @@ function errorResponse(
 
 /** Lo que el servidor respondería al guardar: la ficha con lo pedido. */
 function savedRecord(body: unknown): MemberRecord {
-  const { aufNumber, aufExpiry, groupIds } = body as {
+  const { aufNumber, aufExpiry, groupIds, dateOfBirth } = body as {
     aufNumber: string | null;
     aufExpiry: string | null;
     groupIds: string[];
+    dateOfBirth: string | null;
   };
   return {
     ...RECORD,
+    dateOfBirth,
     aufNumber,
     aufExpiry: aufNumber === null ? null : aufExpiry,
     groups: CLUB_GROUPS.filter((group) => groupIds.includes(group.id)).map(
@@ -254,6 +262,7 @@ describe("ficha en pantalla: guardado", () => {
           aufNumber: "AUF-99",
           aufExpiry: "2027-03-31",
           groupIds: [MASTERS_ID],
+          dateOfBirth: "1990-05-10",
         },
       },
     ]);
@@ -401,6 +410,11 @@ describe("ficha en pantalla: errores", () => {
       "un miembro dado de baja",
       () => errorResponse(422, "business_rule", "member_inactive"),
       "A member with a deactivated account can't be added to groups.",
+    ],
+    [
+      "un estado de cuenta que cambió a medias",
+      () => errorResponse(409, "conflict", "member_status_changed"),
+      "The member's account changed while saving. Reload the record and try again.",
     ],
     [
       "un grupo que ya no existe",
@@ -614,5 +628,121 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
     expect(
       screen.getByRole("button", { name: "Reactivar cuenta" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("ficha en pantalla: fecha de nacimiento", () => {
+  it("enseña la fecha de nacimiento del miembro", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(screen.getByLabelText("Date of birth")).toHaveValue("1990-05-10");
+  });
+
+  it("manda la fecha corregida y enseña la guardada", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.clear(screen.getByLabelText("Date of birth"));
+    await user.type(screen.getByLabelText("Date of birth"), "1988-11-02");
+    await user.click(saveButton());
+
+    expect(patches[0]?.body).toMatchObject({ dateOfBirth: "1988-11-02" });
+    await screen.findByRole("status");
+    expect(screen.getByLabelText("Date of birth")).toHaveValue("1988-11-02");
+  });
+
+  it("manda null si el miembro todavía no tiene fecha y no se da ninguna", async () => {
+    stubApi({ record: { ...RECORD, dateOfBirth: null } });
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(saveButton());
+
+    expect(patches[0]?.body).toMatchObject({ dateOfBirth: null });
+  });
+
+  it("avisa antes de guardar que el miembro tendrá que dar el consentimiento de su tutor", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.clear(screen.getByLabelText("Date of birth"));
+    await user.type(screen.getByLabelText("Date of birth"), MINOR_BIRTH);
+
+    expect(screen.getByLabelText("Date of birth")).toHaveAccessibleDescription(
+      /Paula Player will have to give a guardian's details and consent/,
+    );
+  });
+
+  it.each([
+    ["con la fecha de un mayor", RECORD, "1988-11-02"],
+    [
+      "si ya tiene consentimiento",
+      { ...RECORD, hasGuardianConsent: true },
+      MINOR_BIRTH,
+    ],
+    [
+      "si la cuenta todavía no está activa",
+      { ...RECORD, accountStatus: "incomplete" },
+      MINOR_BIRTH,
+    ],
+  ] as const)("no avisa del tutor %s", async (_case, record, dateOfBirth) => {
+    stubApi({ record });
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.clear(screen.getByLabelText("Date of birth"));
+    await user.type(screen.getByLabelText("Date of birth"), dateOfBirth);
+
+    expect(
+      screen.queryByText(/will have to give a guardian's details/),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["date_of_birth_in_future", "Date of birth can't be in the future."],
+    [
+      "date_of_birth_too_early",
+      "Date of birth can't be before 1 January 1900.",
+    ],
+    [
+      "date_of_birth_required",
+      "A date of birth that's already recorded can't be cleared.",
+    ],
+  ])(
+    "explica junto a la fecha el rechazo %s del servidor",
+    async (reason, text) => {
+      stubApi({ save: () => errorResponse(400, "validation_error", reason) });
+      const user = userEvent.setup();
+      await renderScreen();
+
+      await user.click(saveButton());
+
+      const dateOfBirth = screen.getByLabelText("Date of birth");
+      await vi.waitFor(() =>
+        expect(dateOfBirth).toHaveAccessibleDescription(
+          expect.stringContaining(text),
+        ),
+      );
+      expect(dateOfBirth).toHaveAttribute("aria-invalid", "true");
+    },
+  );
+
+  it("sale en español", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen("es");
+
+    await user.clear(screen.getByLabelText("Fecha de nacimiento"));
+    await user.type(screen.getByLabelText("Fecha de nacimiento"), MINOR_BIRTH);
+
+    expect(
+      screen.getByLabelText("Fecha de nacimiento"),
+    ).toHaveAccessibleDescription(
+      /Paula Player tendrá que dar los datos y el consentimiento de su tutor/,
+    );
   });
 });

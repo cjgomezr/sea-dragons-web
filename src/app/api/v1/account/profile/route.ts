@@ -38,6 +38,9 @@ const RESERVED_PROFILE_FIELDS = [
   "aufExpiry",
   "groups",
   "status",
+  // De ella depende si hace falta el consentimiento del tutor (NFR-012): sólo
+  // la corrige un Admin, desde la ficha (#272).
+  "dateOfBirth",
 ] as const;
 
 /** Un tope holgado sólo para no arrastrar un cuerpo de megas hasta el
@@ -62,6 +65,7 @@ const profileBodySchema = z
     aufExpiry: reservedField,
     groups: reservedField,
     status: reservedField,
+    dateOfBirth: reservedField,
   })
   .strict();
 

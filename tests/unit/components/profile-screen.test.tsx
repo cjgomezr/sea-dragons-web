@@ -111,6 +111,12 @@ describe("pantalla de perfil", () => {
     ).toBeInTheDocument();
   });
 
+  it("no ofrece cambiar la fecha de nacimiento, que sólo corrige un Admin", () => {
+    renderScreen();
+
+    expect(screen.queryByLabelText(/date of birth/i)).not.toBeInTheDocument();
+  });
+
   it("sigue mostrando el rol, la solicitud de rol y los grupos propios", () => {
     renderScreen();
 

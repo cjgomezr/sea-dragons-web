@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
+import type { AuditLogInsertRow } from "@/lib/audit/audit-log";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { Role } from "@/lib/auth/roles";
 import { InactiveMemberError } from "@/lib/groups/group-members";
 import { GroupNotFoundError } from "@/lib/groups/groups";
 import {
   type AufRegistration,
+  MemberRecordConflictError,
+  correctionRequiresGuardianConsent,
   MemberRecordForbiddenError,
   type MemberRecordGateways,
   MemberRecordNotFoundError,
@@ -30,6 +33,12 @@ const MASTERS_ID = "9a9a9a9a-0000-4000-8000-000000000002";
 const JUNIORS_ID = "9a9a9a9a-0000-4000-8000-000000000003";
 const TODAY_IN_CLUB = "2026-09-21";
 const JOINED_ON = "2024-03-06";
+/** El registro de la fila: la edad que decide el consentimiento es la de ese
+ * día en Melbourne (#134). */
+const REGISTERED_AT = "2024-03-06T01:00:00.000Z";
+const ADULT_BIRTH = "1990-05-10";
+/** 14 años el día del registro. */
+const MINOR_BIRTH = "2010-01-01";
 
 const CLUB_GROUPS = [
   { id: MASTERS_ID, name: "Masters Squad" },
@@ -44,6 +53,11 @@ type FakeOptions = {
   readonly aufNumber?: string | null;
   readonly aufExpiry?: string | null;
   readonly groupIds?: readonly string[];
+  readonly dateOfBirth?: string | null;
+  readonly hasGuardianConsent?: boolean;
+  /** Otra petición cambió el estado de la cuenta entre la lectura y la
+   * escritura. */
+  readonly statusChangesMidway?: boolean;
 };
 
 type Fake = {
@@ -52,17 +66,22 @@ type Fake = {
   readonly writes: string[];
   /** Cuántas lecturas se hicieron: validar no debe tocar la base. */
   readonly reads: string[];
+  readonly auditRows: AuditLogInsertRow[];
 };
 
 function fake(options: FakeOptions = {}): Fake {
   const writes: string[] = [];
   const reads: string[] = [];
+  const auditRows: AuditLogInsertRow[] = [];
   const memberClubId = options.memberClubId ?? CLUB_ID;
   let auf = {
     aufNumber: options.aufNumber ?? null,
     aufExpiry: options.aufExpiry ?? null,
   };
   const memberships = new Set(options.groupIds ?? []);
+  let dateOfBirth =
+    options.dateOfBirth === undefined ? ADULT_BIRTH : options.dateOfBirth;
+  let accountStatus = options.memberStatus ?? "active";
   const isClubMember = (clubId: string, userId: string): boolean =>
     clubId === memberClubId && userId === MEMBER_ID;
   const groupName = (groupId: string): string =>
@@ -89,8 +108,11 @@ function fake(options: FakeOptions = {}): Fake {
               userId,
               fullName: "Paula Player",
               joinedOn: JOINED_ON,
-              accountStatus: options.memberStatus ?? "active",
+              accountStatus,
               ...auf,
+              dateOfBirth,
+              registeredAt: REGISTERED_AT,
+              hasGuardianConsent: options.hasGuardianConsent ?? false,
             }
           : null;
       },
@@ -113,6 +135,26 @@ function fake(options: FakeOptions = {}): Fake {
                 aufExpiry: registration.expiry,
               };
         return { kind: "updated" };
+      },
+      correctDateOfBirth: async ({ clubId, userId }, correction) => {
+        writes.push(
+          `birth ${correction.dateOfBirth} ${correction.fromStatus}->${correction.toStatus}`,
+        );
+        if (!isClubMember(clubId, userId)) {
+          return { kind: "member_not_found" };
+        }
+        if (options.statusChangesMidway === true) {
+          return { kind: "status_changed" };
+        }
+        dateOfBirth = correction.dateOfBirth;
+        accountStatus = correction.toStatus;
+        return { kind: "corrected" };
+      },
+    },
+    audit: {
+      insertAuditLogRow: async (row) => {
+        auditRows.push(row);
+        return { error: null };
       },
     },
     groups: {
@@ -149,7 +191,7 @@ function fake(options: FakeOptions = {}): Fake {
       },
     },
   };
-  return { gateways, writes, reads };
+  return { gateways, writes, reads, auditRows };
 }
 
 function submission(
@@ -159,6 +201,7 @@ function submission(
     aufNumber: "AUF-2026-0042",
     aufExpiry: "2027-03-31",
     groupIds: [],
+    dateOfBirth: ADULT_BIRTH,
     ...overrides,
   };
 }
@@ -206,6 +249,9 @@ describe("ficha reservada al Admin: lectura", () => {
       accountStatus: "active",
       aufNumber: "AUF-1",
       aufExpiry: "2027-01-01",
+      dateOfBirth: ADULT_BIRTH,
+      registeredAt: REGISTERED_AT,
+      hasGuardianConsent: false,
       isAufExpired: false,
       groups: [
         { id: MASTERS_ID, name: "Masters Squad" },
@@ -502,5 +548,224 @@ describe("ficha reservada al Admin: quién y a quién", () => {
     await save(store);
 
     expect(store.reads).toContain(`record ${CLUB_ID} ${MEMBER_ID}`);
+  });
+});
+
+describe("corregir la fecha de nacimiento", () => {
+  it("guarda la fecha corregida de un mayor que sigue siendo mayor", async () => {
+    const store = fake();
+
+    const record = await save(store, { dateOfBirth: "1988-11-02" });
+
+    expect(record).toMatchObject({
+      dateOfBirth: "1988-11-02",
+      accountStatus: "active",
+    });
+    expect(store.writes).toContain("birth 1988-11-02 active->active");
+  });
+
+  it("pasa a incomplete a quien queda menor sin consentimiento de tutor", async () => {
+    const store = fake();
+
+    const record = await save(store, { dateOfBirth: MINOR_BIRTH });
+
+    expect(record).toMatchObject({
+      dateOfBirth: MINOR_BIRTH,
+      accountStatus: "incomplete",
+      hasGuardianConsent: false,
+    });
+    expect(store.writes).toContain(`birth ${MINOR_BIRTH} active->incomplete`);
+  });
+
+  it("mide la edad el día del registro, no hoy", async () => {
+    const store = fake();
+    // 18 años se cumplen el 2024-03-07: el día del registro todavía tenía 17,
+    // aunque hoy ya es mayor.
+    const seventeenOnRegistration = "2006-03-07";
+
+    const record = await save(store, { dateOfBirth: seventeenOnRegistration });
+
+    expect(record.accountStatus).toBe("incomplete");
+  });
+
+  it("no cambia el estado de quien queda menor y ya tiene consentimiento", async () => {
+    const store = fake({ hasGuardianConsent: true });
+
+    const record = await save(store, { dateOfBirth: MINOR_BIRTH });
+
+    expect(record).toMatchObject({
+      dateOfBirth: MINOR_BIRTH,
+      accountStatus: "active",
+    });
+  });
+
+  it("no cambia el estado de quien era menor y queda mayor, y conserva su consentimiento", async () => {
+    const store = fake({ dateOfBirth: MINOR_BIRTH, hasGuardianConsent: true });
+
+    const record = await save(store, { dateOfBirth: ADULT_BIRTH });
+
+    expect(record).toMatchObject({
+      dateOfBirth: ADULT_BIRTH,
+      accountStatus: "active",
+      hasGuardianConsent: true,
+    });
+  });
+
+  it.each(["incomplete", "inactive"] as const)(
+    "deja %s una cuenta que ya no estaba activa",
+    async (memberStatus) => {
+      const store = fake({ memberStatus });
+
+      const record = await save(store, { dateOfBirth: MINOR_BIRTH });
+
+      expect(record.accountStatus).toBe(memberStatus);
+    },
+  );
+
+  it("no escribe la fecha si no cambió", async () => {
+    const store = fake();
+
+    await save(store, { dateOfBirth: ADULT_BIRTH });
+
+    expect(store.writes.some((write) => write.startsWith("birth"))).toBe(false);
+    expect(store.auditRows).toEqual([]);
+  });
+
+  it("deja sin fecha a quien todavía no la tenía si no se da ninguna", async () => {
+    const store = fake({ dateOfBirth: null, memberStatus: "incomplete" });
+
+    const record = await save(store, { dateOfBirth: null });
+
+    expect(record.dateOfBirth).toBeNull();
+    expect(store.writes.some((write) => write.startsWith("birth"))).toBe(false);
+  });
+
+  it("da la primera fecha a quien todavía no la tenía", async () => {
+    const store = fake({ dateOfBirth: null, memberStatus: "incomplete" });
+
+    const record = await save(store, { dateOfBirth: ADULT_BIRTH });
+
+    expect(record.dateOfBirth).toBe(ADULT_BIRTH);
+  });
+
+  it("no deja borrar una fecha que ya estaba, sin escribir nada", async () => {
+    const store = fake();
+
+    const issues = await issuesOf(save(store, { dateOfBirth: null }));
+
+    expect(issues).toEqual([
+      { field: "dateOfBirth", code: "date_of_birth_required" },
+    ]);
+    expect(store.writes).toEqual([]);
+  });
+
+  it.each([
+    ["2026-09-22", "date_of_birth_in_future"],
+    ["1899-12-31", "date_of_birth_too_early"],
+    ["2010-02-30", "date_of_birth_not_a_date"],
+    ["01/01/2010", "date_of_birth_not_a_date"],
+    ["", "date_of_birth_not_a_date"],
+  ])(
+    "rechaza la fecha %j (%s) sin leer ni escribir nada",
+    async (dateOfBirth, code) => {
+      const store = fake();
+
+      const issues = await issuesOf(save(store, { dateOfBirth }));
+
+      expect(issues).toEqual([{ field: "dateOfBirth", code }]);
+      expect(store.reads).toEqual([]);
+      expect(store.writes).toEqual([]);
+    },
+  );
+
+  it("acepta la fecha de hoy y el 1 de enero de 1900", async () => {
+    await expect(
+      save(fake(), { dateOfBirth: TODAY_IN_CLUB }),
+    ).resolves.toMatchObject({ dateOfBirth: TODAY_IN_CLUB });
+    await expect(
+      save(fake(), { dateOfBirth: "1900-01-01" }),
+    ).resolves.toMatchObject({ dateOfBirth: "1900-01-01" });
+  });
+
+  it("responde con un conflicto si el estado de la cuenta cambió a medias", async () => {
+    const store = fake({ statusChangesMidway: true });
+
+    await expect(
+      save(store, { dateOfBirth: MINOR_BIRTH }),
+    ).rejects.toBeInstanceOf(MemberRecordConflictError);
+    expect(store.auditRows).toEqual([]);
+  });
+
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "rechaza la corrección de un %s sin escribir nada",
+    async (callerRole) => {
+      const store = fake({ callerRole });
+
+      await expect(
+        save(store, { dateOfBirth: MINOR_BIRTH }),
+      ).rejects.toBeInstanceOf(MemberRecordForbiddenError);
+      expect(store.writes).toEqual([]);
+      expect(store.auditRows).toEqual([]);
+    },
+  );
+});
+
+describe("bitácora de la corrección de la fecha de nacimiento", () => {
+  it("guarda quién la hizo, sobre quién y el resultado", async () => {
+    const store = fake();
+
+    await save(store, { dateOfBirth: MINOR_BIRTH });
+
+    expect(store.auditRows).toEqual([
+      {
+        club_id: CLUB_ID,
+        actor_id: ADMIN_ID,
+        action: "member.date_of_birth_corrected",
+        entity_type: "member",
+        entity_id: MEMBER_ID,
+        result: "success",
+        metadata: null,
+      },
+    ]);
+  });
+
+  it("no guarda la fecha nueva ni la anterior", async () => {
+    const store = fake();
+
+    await save(store, { dateOfBirth: MINOR_BIRTH });
+
+    const logged = JSON.stringify(store.auditRows);
+    expect(logged).not.toContain(MINOR_BIRTH);
+    expect(logged).not.toContain(ADULT_BIRTH);
+  });
+});
+
+describe("aviso del consentimiento del tutor", () => {
+  const activeWithoutConsent = {
+    accountStatus: "active",
+    registeredAt: REGISTERED_AT,
+    hasGuardianConsent: false,
+  } as const;
+
+  it("avisa cuando la fecha deja menor a una cuenta activa sin consentimiento", () => {
+    expect(
+      correctionRequiresGuardianConsent(activeWithoutConsent, MINOR_BIRTH),
+    ).toBe(true);
+  });
+
+  it.each([
+    ["con la fecha de un mayor", activeWithoutConsent, ADULT_BIRTH],
+    [
+      "con consentimiento ya dado",
+      { ...activeWithoutConsent, hasGuardianConsent: true },
+      MINOR_BIRTH,
+    ],
+    [
+      "con la cuenta sin activar",
+      { ...activeWithoutConsent, accountStatus: "incomplete" },
+      MINOR_BIRTH,
+    ],
+  ] as const)("no avisa %s", (_case, record, dateOfBirth) => {
+    expect(correctionRequiresGuardianConsent(record, dateOfBirth)).toBe(false);
   });
 });

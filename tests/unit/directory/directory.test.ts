@@ -224,6 +224,21 @@ describe("directorio", () => {
     ]);
   });
 
+  it.each(["Player", "Admin"] as const)(
+    "no enseña la fecha de nacimiento ni a un %s",
+    async (callerRole) => {
+      const listing = await listDirectory(gateways({ callerRole }), {
+        callerId: CALLER_ID,
+        query: DEFAULT_DIRECTORY_QUERY,
+        todayInClub: TODAY,
+      });
+
+      for (const member of listing.members) {
+        expect(Object.keys(member)).not.toContain("dateOfBirth");
+      }
+    },
+  );
+
   it("encuentra un nombre sin distinguir acentos ni mayúsculas", async () => {
     await expect(listNames({ search: "maria niguez" })).resolves.toEqual([
       "María Ñíguez",
