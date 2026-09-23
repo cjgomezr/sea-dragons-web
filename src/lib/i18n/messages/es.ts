@@ -736,5 +736,5 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.error.forbidden":
     "Sólo un Admin puede cambiar la configuración del club.",
   "clubSettings.error.unexpected":
-    "No pudimos guardar la configuración del club. Vuelve a intentarlo.",
+    "Algo falló con la configuración del club. Vuelve a intentarlo.",
 };

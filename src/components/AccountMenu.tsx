@@ -12,8 +12,9 @@ import { createTranslator, type Translator } from "@/lib/i18n/translator";
 
 /**
  * El menú de la cuenta (#287): Mi perfil, Apariencia, Idioma y Cerrar sesión
- * detrás de un solo botón, y la configuración del club para el Admin (#296), para que la cabecera quepa en una fila junto al
- * nombre del club. Se abre como la lista de avisos (#266): desplegable en
+ * detrás de un solo botón, para que la cabecera quepa en una fila junto al
+ * nombre del club. Al Admin le ofrece además la configuración del club
+ * (#296). Se abre como la lista de avisos (#266): desplegable en
  * escritorio y pantalla entera con su flecha de volver en el móvil.
  *
  * Es de cliente porque abre y cierra. Cambiar de idioma rehace la cabecera en

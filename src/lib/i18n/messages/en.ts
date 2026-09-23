@@ -745,5 +745,5 @@ export const englishMessages = {
     "Your session ended. Sign in again to keep going.",
   "clubSettings.error.forbidden": "Only an Admin can change the club settings.",
   "clubSettings.error.unexpected":
-    "We couldn't save the club settings. Try again.",
+    "Something went wrong with the club settings. Try again.",
 } as const satisfies Readonly<Record<string, Message>>;

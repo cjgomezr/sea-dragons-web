@@ -156,6 +156,18 @@ describe("pantalla de configuración: carga", () => {
     );
   });
 
+  it("no habla de guardar cuando lo que falló fue la carga", async () => {
+    stubApi({ load: () => errorResponse(500, "internal_error") });
+
+    render(<ClubSettingsScreen locale="en" />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "Something went wrong with the club settings. Try again.",
+    );
+    expect(alert).not.toHaveTextContent(/save/i);
+  });
+
   it("sale entera en español", async () => {
     stubApi();
 
@@ -363,7 +375,7 @@ describe("pantalla de configuración: errores", () => {
     [
       "un 500",
       () => errorResponse(500, "internal_error"),
-      "We couldn't save the club settings. Try again.",
+      "Something went wrong with the club settings. Try again.",
     ],
   ])("avisa de %s", async (_case, save, text) => {
     stubApi({ save });
