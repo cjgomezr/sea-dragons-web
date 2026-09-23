@@ -147,6 +147,15 @@ export const ACCOUNT_PROFILE_PHOTO_API_PATH = `${ACCOUNT_PROFILE_API_PATH}/photo
  * sobre los suyos, así que no aparecen en `RESTRICTED_ROUTES`. */
 export const NOTIFICATIONS_API_PATH = "/api/v1/notifications";
 
+/** La configuración del club (#296, RF-6 del PRD de E18a): nombre,
+ * iniciales, acento y logo. Es sólo del Admin, y se abre desde el menú de la
+ * cuenta. */
+export const CLUB_SETTINGS_PATH = "/club";
+
+/** El endpoint de esa pantalla. Sólo del Admin, como ella; el handler lo
+ * vuelve a comprobar. */
+export const CLUB_SETTINGS_API_PATH = "/api/v1/club/settings";
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 
@@ -277,4 +286,8 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: NEW_MEMBER_PATH, capability: "manageUsersAndRoles" },
   { path: GROUPS_API_PATH, capability: "manageGroups" },
   { path: GROUPS_PATH, capability: "manageGroups" },
+  // La matriz del SRD no tiene fila para configurar el club: la única que es
+  // sólo del Admin es la de usuarios y roles.
+  { path: CLUB_SETTINGS_PATH, capability: "manageUsersAndRoles" },
+  { path: CLUB_SETTINGS_API_PATH, capability: "manageUsersAndRoles" },
 ];
