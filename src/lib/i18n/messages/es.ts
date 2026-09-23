@@ -235,6 +235,10 @@ export const spanishMessages: MessageCatalog = {
     "La API versionada responde en el endpoint de salud, que consulta la base de datos.",
   "signOut.label": "Cerrar sesión",
   "account.link": "Mi cuenta",
+  "accountMenu.profile": "Mi perfil",
+  "accountMenu.appearance": "Apariencia",
+  "accountMenu.language": "Idioma",
+  "accountMenu.back": "Volver",
   "account.metaTitle": "Perfil · Victoria Seadragons",
   "account.metaDescription":
     "Tus datos, tu rol en el club y tus grupos, y la solicitud para ser Coach o entrar al Comité.",
