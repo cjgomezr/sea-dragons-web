@@ -38,6 +38,10 @@ const requestLocale = { current: "en" as Locale };
 vi.mock("@/lib/i18n/request-locale", () => ({
   readRequestLocale: async () => requestLocale.current,
 }));
+// El nombre del club sale de la base (#293), no del catálogo.
+vi.mock("@/lib/club/supabase-club-brand", () => ({
+  readClubBrand: async () => ({ name: "Hobart Orcas", initials: "HO" }),
+}));
 
 const COUNTRIES_EN = listCountryOptions("en");
 const COUNTRIES_ES = listCountryOptions("es");
@@ -94,6 +98,7 @@ const SCREENS: readonly ScreenCase[] = [
           pending={["country", "emailConfirmation"]}
           countries={locale === "en" ? COUNTRIES_EN : COUNTRIES_ES}
           email="nerea@example.test"
+          clubName="Hobart Orcas"
         />,
       ),
     english: "Finish signing up",
@@ -108,6 +113,7 @@ const SCREENS: readonly ScreenCase[] = [
           pending={["guardianConsent"]}
           countries={COUNTRIES_EN}
           email="nerea@example.test"
+          clubName="Hobart Orcas"
         />,
       ),
     english: "Your guardian's consent is missing",
@@ -211,6 +217,7 @@ describe("pantallas de autenticación en los dos idiomas", () => {
         pending={["guardianConsent"]}
         countries={COUNTRIES_EN}
         email="nerea@example.test"
+        clubName="Hobart Orcas"
       />,
     );
 
@@ -231,6 +238,7 @@ describe("pantallas de autenticación en los dos idiomas", () => {
         pending={["emailConfirmation"]}
         countries={COUNTRIES_EN}
         email="nerea@example.test"
+        clubName="Hobart Orcas"
       />,
     );
 
@@ -322,6 +330,7 @@ describe("validación traducida", () => {
           pending={["guardianConsent"]}
           countries={COUNTRIES_EN}
           email="nerea@example.test"
+          clubName="Hobart Orcas"
         />,
       );
       const user = userEvent.setup();
@@ -340,6 +349,7 @@ describe("validación traducida", () => {
         pending={["country"]}
         countries={COUNTRIES_EN}
         email="nerea@example.test"
+        clubName="Hobart Orcas"
       />,
     );
 
@@ -527,8 +537,8 @@ describe("países", () => {
 
 describe("títulos de las pantallas", () => {
   it.each([
-    { locale: "en" as const, title: "Sign in · Victoria Seadragons" },
-    { locale: "es" as const, title: "Entrar · Victoria Seadragons" },
+    { locale: "en" as const, title: "Sign in · Hobart Orcas" },
+    { locale: "es" as const, title: "Entrar · Hobart Orcas" },
   ])("la entrada se titula en $locale", async ({ locale, title }) => {
     requestLocale.current = locale;
     const { generateMetadata } = await import("@/app/(auth)/entrar/page");

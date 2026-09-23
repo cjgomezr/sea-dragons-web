@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { PasswordRecoveryRequestForm } from "@/components/auth/PasswordRecoveryRequestForm";
+import { readMetadataContext } from "@/lib/club/metadata-context";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
-import { createTranslator } from "@/lib/i18n/translator";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const translate = createTranslator(await readRequestLocale());
+  const { translate, club } = await readMetadataContext();
   return {
-    title: translate("auth.passwordRecovery.metaTitle"),
-    description: translate("auth.passwordRecovery.metaDescription"),
+    title: translate("auth.passwordRecovery.metaTitle", { club }),
+    description: translate("auth.passwordRecovery.metaDescription", { club }),
   };
 }
 

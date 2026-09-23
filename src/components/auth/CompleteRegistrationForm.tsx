@@ -183,6 +183,7 @@ export function CompleteRegistrationForm({
   pending,
   countries,
   email,
+  clubName,
 }: {
   locale: Locale;
   pending: readonly PendingRequirement[];
@@ -191,6 +192,8 @@ export function CompleteRegistrationForm({
    * orden depende de la versión de ICU. */
   countries: readonly CountryOption[];
   email: string;
+  /** Lo nombra el consentimiento del tutor: el club es quien trata los datos. */
+  clubName: string;
 }): React.JSX.Element {
   const router = useRouter();
   const translate = createTranslator(locale);
@@ -404,7 +407,11 @@ export function CompleteRegistrationForm({
       )}
 
       {requirements.includes("guardianConsent") && (
-        <GuardianConsentForm translate={translate} onSaved={applySaved} />
+        <GuardianConsentForm
+          translate={translate}
+          clubName={clubName}
+          onSaved={applySaved}
+        />
       )}
       {requirements.includes("emailConfirmation") && (
         <EmailConfirmationNotice translate={translate} email={email} />

@@ -56,6 +56,7 @@ function renderForm(pending: readonly PendingRequirement[]): void {
       pending={pending}
       countries={[{ code: "AU", name: "Australia" }]}
       email="nerea@example.test"
+      clubName="Hobart Orcas"
     />,
   );
 }
@@ -104,6 +105,16 @@ describe("bloque del tutor", () => {
     expect(
       screen.getByRole("checkbox", { name: /doy mi consentimiento/i }),
     ).not.toBeChecked();
+  });
+
+  it("el consentimiento nombra al club guardado en la base", () => {
+    renderForm(["guardianConsent"]);
+
+    expect(
+      screen.getByRole("checkbox", {
+        name: /para que el club Hobart Orcas trate los datos/,
+      }),
+    ).toBeInTheDocument();
   });
 
   it("dice que la cuenta no se activa hasta tener el consentimiento", () => {

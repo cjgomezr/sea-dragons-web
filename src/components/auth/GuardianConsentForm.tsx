@@ -81,9 +81,11 @@ function IssueSummary({
  * siempre dentro de completar registro, que ya lo creó. */
 export function GuardianConsentForm({
   translate,
+  clubName,
   onSaved,
 }: {
   translate: Translator;
+  clubName: string;
   /** Lo que hacer cuando el servidor acepta: la pantalla decide si lleva al
    * panel o sigue pidiendo lo que falte. */
   onSaved: (result: Exclude<AccountRequestResult, { kind: "failed" }>) => void;
@@ -195,7 +197,7 @@ export function GuardianConsentForm({
             }
           />
           <label htmlFor="tutor-consent">
-            {translate("auth.guardian.consent")}
+            {translate("auth.guardian.consent", { club: clubName })}
           </label>
         </div>
         {fieldError("consent")}

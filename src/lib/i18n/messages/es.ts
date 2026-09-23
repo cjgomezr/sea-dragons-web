@@ -26,9 +26,9 @@ export const spanishMessages: MessageCatalog = {
   "auth.error.network":
     "No pudimos hablar con el servidor. Revisa tu conexión y vuelve a intentarlo.",
 
-  "auth.signIn.metaTitle": "Entrar · Victoria Seadragons",
+  "auth.signIn.metaTitle": "Entrar · {club}",
   "auth.signIn.metaDescription":
-    "Entra a la plataforma del club Victoria Seadragons de rugby subacuático.",
+    "Entra a la plataforma del club {club} de rugby subacuático.",
   "auth.signIn.title": "Bienvenido de vuelta",
   "auth.signIn.lead": "Entra a tu cuenta de los Seadragons.",
   "auth.signIn.forgotPassword": "¿Olvidaste tu contraseña?",
@@ -43,9 +43,9 @@ export const spanishMessages: MessageCatalog = {
   "auth.signIn.unexpected":
     "No pudimos entrar. Vuelve a intentarlo en un momento.",
 
-  "auth.registration.metaTitle": "Crear tu cuenta · Victoria Seadragons",
+  "auth.registration.metaTitle": "Crear tu cuenta · {club}",
   "auth.registration.metaDescription":
-    "Regístrate en la plataforma del club Victoria Seadragons de rugby subacuático.",
+    "Regístrate en la plataforma del club {club} de rugby subacuático.",
   "auth.registration.title": "Crear tu cuenta",
   "auth.registration.lead":
     "Con estos datos el club te da de alta. Te mandaremos un enlace para confirmar tu correo.",
@@ -100,9 +100,9 @@ export const spanishMessages: MessageCatalog = {
   "auth.confirmation.contactClub": "Si el problema sigue, escribe al club.",
   "auth.confirmation.backToRegistration": "Volver al registro",
 
-  "auth.completion.metaTitle": "Termina tu registro · Victoria Seadragons",
+  "auth.completion.metaTitle": "Termina tu registro · {club}",
   "auth.completion.metaDescription":
-    "Completa los datos que le faltan a tu cuenta del club Victoria Seadragons.",
+    "Completa los datos que le faltan a tu cuenta del club {club}.",
   "auth.completion.title": "Termina tu registro",
   "auth.completion.lead":
     "A tu cuenta le falta esto para poder entrar. No te pedimos nada que ya nos hayas dado.",
@@ -132,13 +132,13 @@ export const spanishMessages: MessageCatalog = {
   "auth.guardian.name": "Nombre del tutor",
   "auth.guardian.email": "Correo del tutor",
   "auth.guardian.consent":
-    "Soy su madre, padre o tutor legal y doy mi consentimiento para que el club Victoria Seadragons trate los datos de esta cuenta.",
+    "Soy su madre, padre o tutor legal y doy mi consentimiento para que el club {club} trate los datos de esta cuenta.",
   "auth.guardian.submit": "Registrar el consentimiento",
 
   "auth.passwordRecovery.metaTitle":
-    "Recuperar tu contraseña · Victoria Seadragons",
+    "Recuperar tu contraseña · {club}",
   "auth.passwordRecovery.metaDescription":
-    "Pide un enlace para elegir una contraseña nueva en la plataforma del club Victoria Seadragons.",
+    "Pide un enlace para elegir una contraseña nueva en la plataforma del club {club}.",
   "auth.passwordRecovery.title": "Recuperar tu contraseña",
   "auth.passwordRecovery.lead":
     "Escribe el correo de tu cuenta y te mandaremos un enlace para elegir una contraseña nueva.",
@@ -159,9 +159,9 @@ export const spanishMessages: MessageCatalog = {
     "No pudimos pedir el enlace. Vuelve a intentarlo en un momento.",
 
   "auth.newPassword.metaTitle":
-    "Elige tu contraseña nueva · Victoria Seadragons",
+    "Elige tu contraseña nueva · {club}",
   "auth.newPassword.metaDescription":
-    "Elige una contraseña nueva para tu cuenta del club Victoria Seadragons.",
+    "Elige una contraseña nueva para tu cuenta del club {club}.",
   "auth.newPassword.title": "Elige tu contraseña nueva",
   "auth.newPassword.lead":
     "Es la que usarás a partir de ahora para entrar al club.",
@@ -226,7 +226,7 @@ export const spanishMessages: MessageCatalog = {
   // el 85% (#246). "Gente" es lo que dice el inglés ("People") y deja sitio.
   "nav.label.directoryShort": "Gente",
   "app.metaDescription":
-    "Plataforma del club de rugby subacuático Victoria Seadragons (Melbourne).",
+    "Plataforma del club de rugby subacuático {club} (Melbourne).",
   "section.underConstruction": "Esta sección está en construcción.",
   "home.lead":
     "Plataforma del club de rugby subacuático. Esta es la cáscara inicial: el resto de las funcionalidades llega epic por epic, cada una con sus tickets y su revisión.",
@@ -239,7 +239,7 @@ export const spanishMessages: MessageCatalog = {
   "accountMenu.appearance": "Apariencia",
   "accountMenu.language": "Idioma",
   "accountMenu.back": "Volver",
-  "account.metaTitle": "Perfil · Victoria Seadragons",
+  "account.metaTitle": "Perfil · {club}",
   "account.metaDescription":
     "Tus datos, tu rol en el club y tus grupos, y la solicitud para ser Coach o entrar al Comité.",
   "account.roleLine": "Rol: {role}",
@@ -390,7 +390,7 @@ export const spanishMessages: MessageCatalog = {
   "admin.error.unexpected":
     "No pudimos completar la acción. Vuelve a intentarlo en un momento.",
   // La sección Grupos (#228, RF-2 a RF-7 del PRD de E4).
-  "groups.metaTitle": "Grupos · Victoria Seadragons",
+  "groups.metaTitle": "Grupos · {club}",
   "groups.metaDescription":
     "Crea los grupos del club y elige qué miembros pertenecen a cada uno.",
   "groups.title": "Grupos",
@@ -453,7 +453,7 @@ export const spanishMessages: MessageCatalog = {
   // El directorio del club (#239). Las posiciones van en femenino de lugar
   // ("Portería", "Ataque") y no de persona ("Portero"): nombran el puesto, y
   // así la fila no le asigna un género a nadie.
-  "directory.metaTitle": "Directorio · Victoria Seadragons",
+  "directory.metaTitle": "Directorio · {club}",
   "directory.metaDescription":
     "Todo el club, con su país, su nivel, su rol y su posición.",
   "directory.title": "Directorio",
@@ -495,7 +495,7 @@ export const spanishMessages: MessageCatalog = {
     "No pudimos cargar el directorio del club. Vuelve a intentarlo.",
 
   // La ficha reservada al Admin (#242, RF-4 del PRD de E5).
-  "memberRecord.metaTitle": "Ficha del miembro · Victoria Seadragons",
+  "memberRecord.metaTitle": "Ficha del miembro · {club}",
   "memberRecord.metaDescription":
     "El registro AUF y los grupos de un miembro, que sólo edita un Admin.",
   "memberRecord.back": "← Volver al directorio",
@@ -554,7 +554,7 @@ export const spanishMessages: MessageCatalog = {
   // La invitación de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta
   // desde la cabecera del directorio.
   "directory.addMember": "Invitar miembro",
-  "newMember.metaTitle": "Invitar miembro · Victoria Seadragons",
+  "newMember.metaTitle": "Invitar miembro · {club}",
   "newMember.metaDescription":
     "Invita a un miembro al club y mándale el correo para activar su cuenta.",
   "newMember.title": "Invitar miembro",

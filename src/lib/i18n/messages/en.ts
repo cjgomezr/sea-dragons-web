@@ -29,9 +29,9 @@ export const englishMessages = {
   "auth.error.network":
     "We couldn't reach the server. Check your connection and try again.",
 
-  "auth.signIn.metaTitle": "Sign in · Victoria Seadragons",
+  "auth.signIn.metaTitle": "Sign in · {club}",
   "auth.signIn.metaDescription":
-    "Sign in to the Victoria Seadragons underwater rugby club platform.",
+    "Sign in to the {club} underwater rugby club platform.",
   "auth.signIn.title": "Welcome back",
   "auth.signIn.lead": "Sign in to your Seadragons account.",
   "auth.signIn.forgotPassword": "Forgot your password?",
@@ -46,9 +46,9 @@ export const englishMessages = {
     "Your account can't sign in right now. Contact the club so they can look into it.",
   "auth.signIn.unexpected": "We couldn't sign you in. Try again in a moment.",
 
-  "auth.registration.metaTitle": "Create your account · Victoria Seadragons",
+  "auth.registration.metaTitle": "Create your account · {club}",
   "auth.registration.metaDescription":
-    "Sign up to the Victoria Seadragons underwater rugby club platform.",
+    "Sign up to the {club} underwater rugby club platform.",
   "auth.registration.title": "Create your account",
   "auth.registration.lead":
     "The club signs you up with these details. We'll send you a link to confirm your email.",
@@ -108,9 +108,9 @@ export const englishMessages = {
     "If the problem continues, contact the club.",
   "auth.confirmation.backToRegistration": "Back to sign-up",
 
-  "auth.completion.metaTitle": "Finish signing up · Victoria Seadragons",
+  "auth.completion.metaTitle": "Finish signing up · {club}",
   "auth.completion.metaDescription":
-    "Fill in the details your Victoria Seadragons club account is missing.",
+    "Fill in the details your {club} club account is missing.",
   "auth.completion.title": "Finish signing up",
   "auth.completion.lead":
     "Your account needs this before you can get in. We won't ask for anything you've already given us.",
@@ -140,13 +140,13 @@ export const englishMessages = {
   "auth.guardian.name": "Guardian's name",
   "auth.guardian.email": "Guardian's email",
   "auth.guardian.consent":
-    "I am their parent or legal guardian and I consent to the Victoria Seadragons club processing the data in this account.",
+    "I am their parent or legal guardian and I consent to the {club} club processing the data in this account.",
   "auth.guardian.submit": "Record consent",
 
   "auth.passwordRecovery.metaTitle":
-    "Reset your password · Victoria Seadragons",
+    "Reset your password · {club}",
   "auth.passwordRecovery.metaDescription":
-    "Ask for a link to choose a new password on the Victoria Seadragons club platform.",
+    "Ask for a link to choose a new password on the {club} club platform.",
   "auth.passwordRecovery.title": "Reset your password",
   "auth.passwordRecovery.lead":
     "Enter your account email and we'll send you a link to choose a new password.",
@@ -167,9 +167,9 @@ export const englishMessages = {
     "We couldn't request the link. Try again in a moment.",
 
   "auth.newPassword.metaTitle":
-    "Choose your new password · Victoria Seadragons",
+    "Choose your new password · {club}",
   "auth.newPassword.metaDescription":
-    "Choose a new password for your Victoria Seadragons club account.",
+    "Choose a new password for your {club} club account.",
   "auth.newPassword.title": "Choose your new password",
   "auth.newPassword.lead":
     "It's the one you'll use from now on to sign in to the club.",
@@ -228,7 +228,7 @@ export const englishMessages = {
   // its tab with DejaVu Sans, over the suite's margin; "Members" is as wide.
   "nav.label.directoryShort": "People",
   "app.metaDescription":
-    "The platform of the Victoria Seadragons underwater rugby club (Melbourne).",
+    "The platform of the {club} underwater rugby club (Melbourne).",
   "section.underConstruction": "This section is under construction.",
   "home.lead":
     "The underwater rugby club platform. This is the initial shell: the rest of the features arrive epic by epic, each with its own tickets and review.",
@@ -243,7 +243,7 @@ export const englishMessages = {
   "accountMenu.appearance": "Appearance",
   "accountMenu.language": "Language",
   "accountMenu.back": "Back",
-  "account.metaTitle": "Profile · Victoria Seadragons",
+  "account.metaTitle": "Profile · {club}",
   "account.metaDescription":
     "Your details, your role in the club and your groups, plus a request to become a Coach or join the Committee.",
   "account.roleLine": "Role: {role}",
@@ -397,7 +397,7 @@ export const englishMessages = {
   "admin.error.unexpected": "We couldn't finish that. Try again in a moment.",
   // La sección Grupos (#228, RF-2 a RF-7 del PRD de E4). Los errores se
   // traducen por su código, no por la frase que manda el servidor.
-  "groups.metaTitle": "Groups · Victoria Seadragons",
+  "groups.metaTitle": "Groups · {club}",
   "groups.metaDescription":
     "Create the club's groups and choose which members belong to each one.",
   "groups.title": "Groups",
@@ -459,7 +459,7 @@ export const englishMessages = {
   // El directorio del club (#239, RF-2 del PRD de E5). Los catálogos que la
   // base guarda en inglés (el rol, la posición y el nivel) se traducen por
   // clave: `role.*` ya existía para Mi cuenta.
-  "directory.metaTitle": "Directory · Victoria Seadragons",
+  "directory.metaTitle": "Directory · {club}",
   "directory.metaDescription":
     "Everyone in the club, with their country, level, role and position.",
   "directory.title": "Directory",
@@ -504,7 +504,7 @@ export const englishMessages = {
 
   // La ficha reservada al Admin (#242, RF-4 del PRD de E5): el AUF y los
   // grupos de un miembro, abierta desde su fila del directorio.
-  "memberRecord.metaTitle": "Member record · Victoria Seadragons",
+  "memberRecord.metaTitle": "Member record · {club}",
   "memberRecord.metaDescription":
     "A member's AUF registration and groups, which only an Admin edits.",
   "memberRecord.back": "← Back to the directory",
@@ -559,7 +559,7 @@ export const englishMessages = {
   // La invitación de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta
   // desde la cabecera del directorio.
   "directory.addMember": "Invite member",
-  "newMember.metaTitle": "Invite member · Victoria Seadragons",
+  "newMember.metaTitle": "Invite member · {club}",
   "newMember.metaDescription":
     "Invite a member to the club and send them an email to activate their account.",
   "newMember.title": "Invite member",

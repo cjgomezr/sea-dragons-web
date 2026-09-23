@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { MemberRecordScreen } from "@/components/directory/MemberRecordScreen";
+import { readMetadataContext } from "@/lib/club/metadata-context";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
-import { createTranslator } from "@/lib/i18n/translator";
 
 /**
  * La ficha reservada al Admin de un miembro (#242, RF-4 del PRD de E5), que
@@ -17,9 +17,9 @@ type MemberRecordPageProps = {
 };
 
 export async function generateMetadata(): Promise<Metadata> {
-  const translate = createTranslator(await readRequestLocale());
+  const { translate, club } = await readMetadataContext();
   return {
-    title: translate("memberRecord.metaTitle"),
+    title: translate("memberRecord.metaTitle", { club }),
     description: translate("memberRecord.metaDescription"),
   };
 }

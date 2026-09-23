@@ -52,8 +52,8 @@ describe("textos de invitar y desactivar", () => {
     ["newMember.title", "Invitar miembro", "Invite member"],
     [
       "newMember.metaTitle",
-      "Invitar miembro · Victoria Seadragons",
-      "Invite member · Victoria Seadragons",
+      "Invitar miembro · {club}",
+      "Invite member · {club}",
     ],
     ["newMember.submit", "Invitar miembro", "Invite member"],
     ["newMember.addAnother", "Invitar a otro miembro", "Invite another member"],
