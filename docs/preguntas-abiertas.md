@@ -146,6 +146,44 @@ instalación, ¿son del club o del dueño?
 acceso a las del club) y el de publicación (desplegar desde una cuenta o desde
 varias). Se decide antes de escribir los tickets de E18.
 
+### B7 · Un Coach que también juega · E7, E8, E9, E10 · RESUELTO
+
+**De dónde sale.** El 23 de septiembre de 2026, preparando la reunión con el
+equipo, salió la pregunta: en el club hay gente que entrena a otros y además
+juega. ¿Necesitan dos roles?
+
+**Decisión: un rol por persona, el que le da los permisos.** El rol responde a
+"qué puede hacer en la aplicación", no a "qué es en el club". Quien entrena y
+además juega es Coach, porque jugar no da ningún permiso extra: confirmar
+asistencia a un evento, ver el calendario y pagar la membresía los alcanza
+cualquier miembro. Se mantienen los cuatro roles de FR-012 y AC-048, y E3 no se
+toca.
+
+**La regla que se deriva, y es lo que de verdad importa:**
+
+> **La participación sale del RSVP y de los grupos, nunca del rol.**
+
+Los tickets de E7, E8 y E10 nacen con esto:
+
+- **E7 y E8:** quién juega una sesión sale de quién confirmó asistencia. Un
+  Coach que confirma cuenta como cualquier otro, y su porcentaje de asistencia
+  se calcula igual.
+- **E10:** los equipos se arman con quienes confirmaron asistencia a ese evento.
+  Filtrar por rol `Player` dejaría fuera al Coach que juega, y eso sí sería un
+  fallo.
+- **E4:** si algún día hace falta distinguir quién entrena de quién dirige, es
+  un grupo ("Coaching staff"), no un rol. Una persona está en varios grupos; de
+  rol solo tiene uno.
+
+**Consecuencia asumida, que el club conoce.** Las evaluaciones solo las ven
+Admin y Coach, ni siquiera el jugador ve la suya (FR-055, AC-023). Un Coach que
+juega verá su propia evaluación. Se acepta: es personal de entrenamiento.
+
+**Por qué se descartó multi-rol.** Obliga a definir qué pasa cuando los permisos
+se cruzan, a rehacer las reglas de la base de datos de E3, las solicitudes de
+rol y su auditoría, y la pantalla de administración. Todo eso para expresar algo
+que en permisos ya está resuelto.
+
 ---
 
 ## 2. Contradicciones internas del SRD
