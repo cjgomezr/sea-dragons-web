@@ -85,6 +85,11 @@ if [ "$1" = "issue" ] && [ "$2" = "reopen" ]; then
   exit 0
 fi
 
+if [ "$1" = "api" ] && [ "$2" = "graphql" ] && [[ "$*" == *projectItems* ]]; then
+  echo '{"data":{"repository":{"issue":{"url":"https://github.com/acme/repo/issues/5","projectItems":{"nodes":[]}}}}}'
+  exit 0
+fi
+
 if [ "$1" = "api" ] && [ "$2" = "graphql" ]; then
   [ "\${FAIL_RECONCILE:-0}" = "1" ] && exit 1
   printf '{"data":{"repository":{"issue":{"state":"%s","subIssuesSummary":{"total":%s,"completed":%s}}}}}' \\
