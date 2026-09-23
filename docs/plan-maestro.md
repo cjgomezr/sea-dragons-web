@@ -9,27 +9,28 @@ fábrica: solo sus tickets lo son.
 
 ## Epics
 
-| Epic                                    | Alcance / FRs                                                                                                                                                                                                                                                                                       | Tamaño        | Depende de        | Issue     |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ----------------- | --------- |
-| **E1** — Fundación técnica              | Esquema base con `club_id` + RLS, convención API v1, tabla `audit_log`, app shell + tema claro/oscuro, tokens de marca y mockups del prototipo. FR-079 · NFR-009, NFR-010 · CON-002, CON-004                                                                                                        | S (6 tickets) | —                 | #1        |
-| **E2** — Autenticación y cuentas        | Signup/login email+password; estado `incomplete` y completar registro; menores con consentimiento de tutor; reset de password; sign-out. Google y Apple aplazados a Release 2 (ver nota abajo). FR-001–003, FR-006–009, FR-081–083 · INT-006 · NFR-005/007/012                                      | L (7)         | E1, E16a          | #2        |
-| **E3** — Roles y RBAC                   | 4 roles con permission matrix aplicado en servidor (RLS + handlers, NFR-004); solicitudes de rol; cambio de rol; auditoría. FR-010–014 · NFR-004                                                                                                                                                    | M (9)         | E2                | #3        |
-| **E4** — Grupos                         | CRUD de grupos, asignación de miembros, base de targeting para eventos y noticias. FR-023–027                                                                                                                                                                                                       | M (5)         | E3                | #4        |
-| **E5** — Directorio y perfiles          | Directorio con búsqueda/filtro/orden, alta por Admin con AUF (BR-008) e invitación por email, perfil propio editable, baja de miembro. FR-015–022, FR-084, FR-085 · BR-008                                                                                                                          | L (9)         | E3, E4            | #5        |
-| **E6** — Notificaciones (core)          | Centro de notificaciones in-app, badge de no-leídas, marcar todo leído. FR-073–075                                                                                                                                                                                                                  | M (5)         | E2                | #6        |
-| **E7** — Calendario y eventos + RSVP    | Eventos puntuales y recurrentes (semanal), 4 tipos, targeting por audiencia, agenda, RSVP con agregados, notificación al crear. FR-028–037                                                                                                                                                          | L (6-8)       | E4, E6            | #7        |
-| **E8** — Asistencia                     | Registro Present/Late/Absent por sesión, contadores en vivo, % de asistencia sobre sesiones elegibles para directorio/perfil/dashboard. FR-038–042                                                                                                                                                  | M (4)         | E7                | #8        |
-| **E9** — Evaluaciones                   | Ratings 1–10 por categoría configurable, OVR a 1 decimal, set de categorías inmutable por evaluación, visibilidad estricta Admin/Coach garantizada por RLS. FR-050–056                                                                                                                              | M (5)         | E3, E5            | #9        |
-| **E10** — Team builder                  | Modo manual + auto-balance determinista server-side (< 2s para 30 jugadores, NFR-002), no evaluados a 5.0 virtual, swap sugerido, vista del jugador asignado. FR-043–049, FR-086 · NFR-002                                                                                                          | L (6)         | E7, E8, E9        | #10       |
-| **E11** — Noticias y documentos         | Posts con adjuntos (PDF/doc/imagen) vía Supabase Storage, targeting a grupos, feed cronológico inverso, notificaciones. FR-057–061                                                                                                                                                                  | M (4-5)       | E4, E6            | #11       |
-| **E12** — Stripe base                   | 3 membresías en AUD (Full, Student, Casual), cargo mensual recurrente para los planes recurrentes, panel de plan, cambio de plan al siguiente ciclo, tarjeta tokenizada (NFR-006), historial, webhooks. FR-062/063/065–068 · INT-001/002/003 · NFR-006                                              | L (6-7)       | E2, E6            | #12       |
-| **E13** — Stripe avanzado               | Packs prepagos Casual con decremento por asistencia y saldo congelado al cambiar de plan, levies one-off gestionados en Stripe, recuperación de pago fallido, aviso pre-renovación. FR-064/069–072/080/087 · INT-007                                                                                | L (5-6)       | E12, E8           | #13       |
-| **E14** — Dashboard y búsqueda global   | Dashboard con 4 tiles + próximos eventos + últimas noticias; búsqueda global agrupada por tipo (miembros/eventos/noticias). FR-076–078                                                                                                                                                              | M (4)         | E7, E8, E11       | #14       |
-| **E15** — Privacidad y datos personales | Aviso de privacidad en el registro, exportación de los datos del miembro, borrado o anonimización dentro de 30 días, política de retención tras la baja. NFR-011 · CON-006                                                                                                                          | M (4)         | E2, E5            | #15       |
-| **E16a** — Entornos y despliegue        | Proyecto de Supabase de producción separado del de desarrollo, despliegue en Vercel desde `main` con preview por PR, secretos por entorno, migraciones aplicadas por CI, monitoreo de disponibilidad. NFR-003 · NFR-011                                                                             | M (7)         | —                 | #16       |
-| **E16b** — Scheduler y prueba de carga  | `pg_cron` como scheduler con los jobs de ocurrencias recurrentes (FR-031) y aviso de renovación (FR-072), más la prueba de carga sobre un dataset sembrado de 500 miembros, 5.000 ocurrencias y 50.000 asistencias. NFR-001/008                                                                     | M (4-5)       | E16a, E7, E8, E12 | por crear |
-| **E17** — Bilingüe (inglés y español)   | Catálogo de mensajes por idioma, idioma por cookie con el navegador como respaldo, interruptor junto al del tema, pantallas y correos en inglés y español, y un test que impide que se cuele texto sin traducir. Añadido después del plan.                                                          | M (8)         | ninguna           | #181      |
-| **E18** · Marca configurable por club   | Nombre, logo, colores base y textos del inicio de sesión configurables por el Admin; la marca sale del código; alta de un club nuevo y publicación de versiones a cada instalación; posiciones de juego configurables por club; un club por instalación (relaja ASS-002). Añadido después del plan. | L (7-9)       | E3, E5            | #258      |
+| Epic                                    | Alcance / FRs                                                                                                                                                                                                                                                  | Tamaño        | Depende de        | Issue     |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ----------------- | --------- |
+| **E1** — Fundación técnica              | Esquema base con `club_id` + RLS, convención API v1, tabla `audit_log`, app shell + tema claro/oscuro, tokens de marca y mockups del prototipo. FR-079 · NFR-009, NFR-010 · CON-002, CON-004                                                                   | S (6 tickets) | —                 | #1        |
+| **E2** — Autenticación y cuentas        | Signup/login email+password; estado `incomplete` y completar registro; menores con consentimiento de tutor; reset de password; sign-out. Google y Apple aplazados a Release 2 (ver nota abajo). FR-001–003, FR-006–009, FR-081–083 · INT-006 · NFR-005/007/012 | L (7)         | E1, E16a          | #2        |
+| **E3** — Roles y RBAC                   | 4 roles con permission matrix aplicado en servidor (RLS + handlers, NFR-004); solicitudes de rol; cambio de rol; auditoría. FR-010–014 · NFR-004                                                                                                               | M (9)         | E2                | #3        |
+| **E4** — Grupos                         | CRUD de grupos, asignación de miembros, base de targeting para eventos y noticias. FR-023–027                                                                                                                                                                  | M (5)         | E3                | #4        |
+| **E5** — Directorio y perfiles          | Directorio con búsqueda/filtro/orden, alta por Admin con AUF (BR-008) e invitación por email, perfil propio editable, baja de miembro. FR-015–022, FR-084, FR-085 · BR-008                                                                                     | L (9)         | E3, E4            | #5        |
+| **E6** — Notificaciones (core)          | Centro de notificaciones in-app, badge de no-leídas, marcar todo leído. FR-073–075                                                                                                                                                                             | M (5)         | E2                | #6        |
+| **E7** — Calendario y eventos + RSVP    | Eventos puntuales y recurrentes (semanal), 4 tipos, targeting por audiencia, agenda, RSVP con agregados, notificación al crear. FR-028–037                                                                                                                     | L (6-8)       | E4, E6            | #7        |
+| **E8** — Asistencia                     | Registro Present/Late/Absent por sesión, contadores en vivo, % de asistencia sobre sesiones elegibles para directorio/perfil/dashboard. FR-038–042                                                                                                             | M (4)         | E7                | #8        |
+| **E9** — Evaluaciones                   | Ratings 1–10 por categoría configurable, OVR a 1 decimal, set de categorías inmutable por evaluación, visibilidad estricta Admin/Coach garantizada por RLS. FR-050–056                                                                                         | M (5)         | E3, E5            | #9        |
+| **E10** — Team builder                  | Modo manual + auto-balance determinista server-side (< 2s para 30 jugadores, NFR-002), no evaluados a 5.0 virtual, swap sugerido, vista del jugador asignado. FR-043–049, FR-086 · NFR-002                                                                     | L (6)         | E7, E8, E9        | #10       |
+| **E11** — Noticias y documentos         | Posts con adjuntos (PDF/doc/imagen) vía Supabase Storage, targeting a grupos, feed cronológico inverso, notificaciones. FR-057–061                                                                                                                             | M (4-5)       | E4, E6            | #11       |
+| **E12** — Stripe base                   | 3 membresías en AUD (Full, Student, Casual), cargo mensual recurrente para los planes recurrentes, panel de plan, cambio de plan al siguiente ciclo, tarjeta tokenizada (NFR-006), historial, webhooks. FR-062/063/065–068 · INT-001/002/003 · NFR-006         | L (6-7)       | E2, E6            | #12       |
+| **E13** — Stripe avanzado               | Packs prepagos Casual con decremento por asistencia y saldo congelado al cambiar de plan, levies one-off gestionados en Stripe, recuperación de pago fallido, aviso pre-renovación. FR-064/069–072/080/087 · INT-007                                           | L (5-6)       | E12, E8           | #13       |
+| **E14** — Dashboard y búsqueda global   | Dashboard con 4 tiles + próximos eventos + últimas noticias; búsqueda global agrupada por tipo (miembros/eventos/noticias). FR-076–078                                                                                                                         | M (4)         | E7, E8, E11       | #14       |
+| **E15** — Privacidad y datos personales | Aviso de privacidad en el registro, exportación de los datos del miembro, borrado o anonimización dentro de 30 días, política de retención tras la baja. NFR-011 · CON-006                                                                                     | M (4)         | E2, E5            | #15       |
+| **E16a** — Entornos y despliegue        | Proyecto de Supabase de producción separado del de desarrollo, despliegue en Vercel desde `main` con preview por PR, secretos por entorno, migraciones aplicadas por CI, monitoreo de disponibilidad. NFR-003 · NFR-011                                        | M (7)         | —                 | #16       |
+| **E16b** — Scheduler y prueba de carga  | `pg_cron` como scheduler con los jobs de ocurrencias recurrentes (FR-031) y aviso de renovación (FR-072), más la prueba de carga sobre un dataset sembrado de 500 miembros, 5.000 ocurrencias y 50.000 asistencias. NFR-001/008                                | M (4-5)       | E16a, E7, E8, E12 | por crear |
+| **E17** — Bilingüe (inglés y español)   | Catálogo de mensajes por idioma, idioma por cookie con el navegador como respaldo, interruptor junto al del tema, pantallas y correos en inglés y español, y un test que impide que se cuele texto sin traducir. Añadido después del plan.                     | M (8)         | ninguna           | #181      |
+| **E18a** · Marca configurable por club  | Nombre, iniciales, logo, colores base y textos del inicio de sesión configurables por el Admin; la marca sale del código; posiciones de juego configurables por club; un club por instalación (relaja ASS-002). Añadido después del plan.                      | L (9-11)      | E3, E5            | #258      |
+| **E18b** · Alta de clubes y publicación | Alta de un club nuevo (proyecto, migraciones, siembra, variables, dominios) y publicación de la misma versión a cada instalación, con el registro de qué versión tiene cada una. Bloqueada por B6. Añadido después del plan.                                   | M (4-5)       | E18a, B6          | por crear |
 
 E15 y E16 se añadieron el 23 de agosto de 2026, después del plan original, al
 resolver los huecos P2, P3 y P4 de `docs/preguntas-abiertas.md`.
@@ -57,7 +58,7 @@ hacerlo antes de E7 y E11, porque cada pantalla nueva nace con el nombre escrito
 a mano y habría que volver a revisarla.
 
 Un club por instalación solo funciona si instalar y actualizar no se hace a
-mano, así que E18 incluye también **cómo se opera ese modelo**:
+mano, así que el alcance original incluía también **cómo se opera ese modelo**:
 
 - **El alta de un club nuevo**, con un procedimiento escrito y, en lo posible,
   un script: crear el proyecto de Supabase, aplicar las migraciones, sembrar la
@@ -74,13 +75,40 @@ podrá renombrarlas, agregar o quitar, decidiendo qué pasa con los miembros que
 tenían una posición que se quita. Conviene resolverlo **antes de E10**, porque
 el auto-balance del team builder reparte por posición.
 
+### La partición en E18a y E18b
+
+El 23 de septiembre de 2026, antes de escribir su PRD, **E18 se partió en E18a y
+E18b**. El criterio es el mismo con el que se partió E16, y es de bloqueo, no de
+tamaño: las dos piezas que operan el modelo (el alta de un club y la publicación
+de versiones) dependen de B6, la decisión de a quién pertenecen las cuentas de
+cada instalación, y esa decisión no tiene fecha. Las otras dos, sacar la marca
+del código y hacer configurables las posiciones, no dependen de nada y son justo
+lo que conviene hacer antes de E7 y E11.
+
+- **E18a** conserva el issue #258, renombrado: marca fuera del código y
+  posiciones configurables. Sus tickets van en dos tandas, la marca antes de E7
+  y E11, las posiciones antes de E10.
+- **E18b** se crea cuando B6 esté resuelta: el alta de clubes y la publicación
+  de versiones.
+
+Mantenerlas juntas habría dejado la épica abierta indefinidamente con su barra
+de progreso congelada, que es lo que ya pasó con E16. El riesgo de partirlas hay
+que decirlo en voz alta: **mientras E18b no se escriba, el modelo de un club por
+instalación no se puede operar de verdad.** Vender una licencia exige que exista
+el alta, así que E18b es condición para el primer cliente, no un extra.
+
+Una consecuencia de esquema: E18a decide dónde vive la marca (tabla propia o
+columnas en `clubs`) y siembra la fila del club, así que E18b se apoya en eso en
+vez de reabrirlo.
+
 Queda una decisión de negocio abierta, que el dueño toma antes de escribir el
 PRD: **de quién son las cuentas** de Supabase, Vercel, Resend y Stripe. Si son
 del club, el club paga su infraestructura directamente, pero tiene acceso a todo
 y es más difícil controlar la licencia y las versiones. Si son del dueño, la
 infraestructura va dentro de la cuota y las versiones se controlan desde un solo
 sitio, pero la factura y el riesgo son suyos. Esa respuesta cambia el script de
-alta y el de publicación.
+alta y el de publicación, así que **bloquea a E18b y solo a E18b**: E18a se
+puede escribir y trabajar sin ella.
 
 El 7 de septiembre de 2026, al escribir su PRD, **E16 se partió en E16a y
 E16b**. El motivo es de secuencia, no de tamaño: sus jobs de `pg_cron` necesitan
@@ -154,8 +182,9 @@ graph LR
   E8 --> E13
   E2 --> E15
   E5 --> E15
-  E3 --> E18
-  E5 --> E18
+  E3 --> E18a
+  E5 --> E18a
+  E18a --> E18b
   E7 --> E14
   E8 --> E14
   E11 --> E14
@@ -179,6 +208,12 @@ E15 (privacidad) puede entrar en cualquier momento tras E5, y conviene cerrarlo
 antes de go-live porque CON-006 lo hace condición para procesar datos de
 miembros. E14 (dashboard y búsqueda global) cierra Release 1 porque agrega datos
 de casi todos los epics anteriores.
+
+E18a se cuela entre E5 y esos carriles, y no por dependencia sino por coste de
+retrabajo: **su tanda de la marca va antes de abrir E7 y E11**, porque cada
+pantalla nueva nace con el nombre del club escrito a mano y habría que volver a
+revisarla entera. Su tanda de las posiciones va **antes de E10**, que reparte
+los equipos por posición.
 
 ## Racional del orden
 
