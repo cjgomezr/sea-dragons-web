@@ -27,10 +27,10 @@ function IconBase({
   );
 }
 
-/** No es un icono de sección: lo usa la entrada de cerrar sesión del menú de
- * la cuenta (#287), que el mockup del panel dibuja también como un icono. Vive aquí
- * para compartir trazo y tamaño con los de la navegación, en vez de ser un
- * dibujo suelto con otro grosor.
+/** No es un icono de sección: acompaña al texto de la entrada de cerrar
+ * sesión del menú de la cuenta (#287). Vive aquí para compartir trazo y
+ * tamaño con los de la navegación, en vez de ser un dibujo suelto con otro
+ * grosor.
  *
  * El marco de la puerta va a la izquierda y la flecha sale hacia fuera. Con el
  * marco a la derecha, el mismo dibujo se lee como "entrar". */

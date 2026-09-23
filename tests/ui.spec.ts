@@ -4991,6 +4991,7 @@ test.describe("la campana de avisos", () => {
     );
   });
 });
+
 /* ---------------------------------------------------------------------------
    El menú de la cuenta (#287). Sin mockup: se revisa contra design-system.md,
    con la lista de avisos (#266) como referencia de cómo se abre. La campana va

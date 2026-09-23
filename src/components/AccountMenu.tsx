@@ -21,9 +21,9 @@ import { createTranslator, type Translator } from "@/lib/i18n/translator";
  * sale en el idioma nuevo.
  */
 
-/** Lo que se queda con el foco al pulsarlo. Un clic fuera del menú sobre uno de
- * estos le cede el foco; sobre cualquier otra cosa el navegador lo dejaría en
- * el `body`, y ahí se pierde quien navega con teclado. */
+/** Lo que se queda con el foco al pulsarlo. Un clic fuera del menú sobre uno
+ * de estos le cede el foco; sobre cualquier otra cosa el navegador lo dejaría
+ * en el `body`, y ahí se pierde quien navega con teclado. */
 const FOCUSABLE_SELECTOR =
   "a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]";
 
