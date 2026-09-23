@@ -299,6 +299,8 @@ describe("aviso de solicitud nueva", () => {
     expect(fake.notifications).toEqual(ADMIN_IDS.map(receivedNotification));
   });
 
+  // El falso devuelve también al Admin inactivo: así se prueba la defensa de
+  // `notifyMember`. El filtro de la consulta lo prueba la integración.
   it("no avisa a un Admin dado de baja", async () => {
     const fake = fakeGateways({
       adminIds: ADMIN_IDS,
