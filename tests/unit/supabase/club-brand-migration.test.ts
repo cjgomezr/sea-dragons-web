@@ -46,6 +46,7 @@ function updateSeededClub(
   );
 }
 
+/** Espera que la base rechace `assignment` citando la restricción `constraint`. */
 async function expectRejected(
   database: TemporaryDatabase,
   assignment: string,
@@ -286,7 +287,8 @@ describeConPostgres("el club que ya existía cuando llegó la marca", () => {
 
   it("no pisa la marca que alguien cambió después al repetirse", async () => {
     const database = await migratedDatabase();
-    await updateSeededClub(database, "initials = 'XY'");
+    const change = await updateSeededClub(database, "initials = 'XY'");
+    expect(change.code, change.stderr).toBe(0);
 
     const second = await applyRepositoryMigrations(database);
 
