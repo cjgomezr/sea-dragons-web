@@ -143,8 +143,7 @@ export const englishMessages = {
     "I am their parent or legal guardian and I consent to the {club} club processing the data in this account.",
   "auth.guardian.submit": "Record consent",
 
-  "auth.passwordRecovery.metaTitle":
-    "Reset your password · {club}",
+  "auth.passwordRecovery.metaTitle": "Reset your password · {club}",
   "auth.passwordRecovery.metaDescription":
     "Ask for a link to choose a new password on the {club} club platform.",
   "auth.passwordRecovery.title": "Reset your password",
@@ -166,8 +165,7 @@ export const englishMessages = {
   "auth.passwordRecovery.unexpected":
     "We couldn't request the link. Try again in a moment.",
 
-  "auth.newPassword.metaTitle":
-    "Choose your new password · {club}",
+  "auth.newPassword.metaTitle": "Choose your new password · {club}",
   "auth.newPassword.metaDescription":
     "Choose a new password for your {club} club account.",
   "auth.newPassword.title": "Choose your new password",

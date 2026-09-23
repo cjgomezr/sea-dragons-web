@@ -135,8 +135,7 @@ export const spanishMessages: MessageCatalog = {
     "Soy su madre, padre o tutor legal y doy mi consentimiento para que el club {club} trate los datos de esta cuenta.",
   "auth.guardian.submit": "Registrar el consentimiento",
 
-  "auth.passwordRecovery.metaTitle":
-    "Recuperar tu contraseña · {club}",
+  "auth.passwordRecovery.metaTitle": "Recuperar tu contraseña · {club}",
   "auth.passwordRecovery.metaDescription":
     "Pide un enlace para elegir una contraseña nueva en la plataforma del club {club}.",
   "auth.passwordRecovery.title": "Recuperar tu contraseña",
@@ -158,8 +157,7 @@ export const spanishMessages: MessageCatalog = {
   "auth.passwordRecovery.unexpected":
     "No pudimos pedir el enlace. Vuelve a intentarlo en un momento.",
 
-  "auth.newPassword.metaTitle":
-    "Elige tu contraseña nueva · {club}",
+  "auth.newPassword.metaTitle": "Elige tu contraseña nueva · {club}",
   "auth.newPassword.metaDescription":
     "Elige una contraseña nueva para tu cuenta del club {club}.",
   "auth.newPassword.title": "Elige tu contraseña nueva",
