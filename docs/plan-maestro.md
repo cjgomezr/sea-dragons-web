@@ -17,7 +17,7 @@ fábrica: solo sus tickets lo son.
 | **E4** — Grupos                         | CRUD de grupos, asignación de miembros, base de targeting para eventos y noticias. FR-023–027                                                                                                                                                                  | M (5)         | E3                | #4        |
 | **E5** — Directorio y perfiles          | Directorio con búsqueda/filtro/orden, alta por Admin con AUF (BR-008) e invitación por email, perfil propio editable, baja de miembro. FR-015–022, FR-084, FR-085 · BR-008                                                                                     | L (9)         | E3, E4            | #5        |
 | **E6** — Notificaciones (core)          | Centro de notificaciones in-app, badge de no-leídas, marcar todo leído. FR-073–075                                                                                                                                                                             | M (5)         | E2                | #6        |
-| **E7** — Calendario y eventos + RSVP    | Eventos puntuales y recurrentes (semanal), 4 tipos, targeting por audiencia, agenda, RSVP con agregados, notificación al crear. FR-028–037                                                                                                                     | L (6-8)       | E4, E6            | #7        |
+| **E7** — Calendario y eventos + RSVP    | Eventos puntuales y recurrentes (semanal), 4 tipos, targeting por audiencia, agenda, RSVP con agregados, notificación al crear; editar y cancelar eventos y series. FR-028–037                                                                                 | L (12)        | E4, E6            | #7        |
 | **E8** — Asistencia                     | Registro Present/Late/Absent por sesión, contadores en vivo, % de asistencia sobre sesiones elegibles para directorio/perfil/dashboard. FR-038–042                                                                                                             | M (4)         | E7                | #8        |
 | **E9** — Evaluaciones                   | Ratings 1–10 por categoría configurable, OVR a 1 decimal, set de categorías inmutable por evaluación, visibilidad estricta Admin/Coach garantizada por RLS. FR-050–056                                                                                         | M (5)         | E3, E5            | #9        |
 | **E10** — Team builder                  | Modo manual + auto-balance determinista server-side (< 2s para 30 jugadores, NFR-002), no evaluados a 5.0 virtual, swap sugerido, vista del jugador asignado. FR-043–049, FR-086 · NFR-002                                                                     | L (6)         | E7, E8, E9        | #10       |
@@ -109,6 +109,15 @@ infraestructura va dentro de la cuota y las versiones se controlan desde un solo
 sitio, pero la factura y el riesgo son suyos. Esa respuesta cambia el script de
 alta y el de publicación, así que **bloquea a E18b y solo a E18b**: E18a se
 puede escribir y trabajar sin ella.
+
+El 23 de septiembre de 2026, al escribir su PRD, **E7 creció de 6-8 tickets a
+12**: el dueño decidió que editar y cancelar eventos entra en la épica, para un
+evento suelto, una ocurrencia y una serie entera. El SRD no lo pedía, pero un
+club que publica la temporada de una vez se equivoca en alguna fecha, y sin
+esto la única salida era dejar el error publicado. Cancelar marca el evento en
+vez de borrarlo, para que E8 no pierda el historial. Sus pantallas esperan a
+#293, que saca el nombre del club de los catálogos, como ya pedía el orden de
+E18a. PRD en `docs/prd/e7-calendario-eventos-rsvp.md`.
 
 El 7 de septiembre de 2026, al escribir su PRD, **E16 se partió en E16a y
 E16b**. El motivo es de secuencia, no de tamaño: sus jobs de `pg_cron` necesitan
