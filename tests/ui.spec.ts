@@ -146,6 +146,53 @@ const COMPONENT_MAX_DIFF_PIXELS = 10;
 // (que es donde se aprueban las líneas base) esto no cambia un solo píxel.
 const HIDE_DEV_OVERLAY_CSS = "nextjs-portal { display: none !important; }";
 
+/* El menú de la cuenta (#287): dentro de la aplicación el tema, el idioma, Mi
+   perfil y cerrar sesión viven ahí, detrás del botón de la cuenta. */
+const ACCOUNT_BUTTON_NAME = /^(My account|Mi cuenta)$/;
+const BACK_BUTTON_NAME = /^(Back|Volver)$/;
+
+function accountMenu(page: Page): Locator {
+  return page.getByRole("region", { name: ACCOUNT_BUTTON_NAME });
+}
+
+async function openAccountMenu(page: Page): Promise<Locator> {
+  await page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }).click();
+  await expect(accountMenu(page)).toBeVisible();
+  return accountMenu(page);
+}
+
+/** Cierra con el ratón, como quien lo usa: en el móvil con la flecha, que es
+ * lo único que se ve, y en escritorio con el propio botón de la cuenta. Con
+ * Escape el foco volvería pintando su anillo en todas las capturas. */
+async function closeAccountMenu(page: Page): Promise<void> {
+  const back = accountMenu(page).getByRole("button", {
+    name: BACK_BUTTON_NAME,
+  });
+  const closer = (await back.isVisible())
+    ? back
+    : page.getByRole("button", { name: ACCOUNT_BUTTON_NAME });
+  await closer.click();
+  await expect(accountMenu(page)).toHaveCount(0);
+  await page.mouse.move(0, 0);
+}
+
+/** Fuera de la aplicación el interruptor está a la vista; dentro, en el menú
+ * de la cuenta, que se cierra después para que la captura no lo lleve. */
+async function chooseDarkTheme(page: Page): Promise<void> {
+  const darkThemeToggle = page.getByRole("button", {
+    name: /tema oscuro|dark theme/i,
+  });
+  const isInsideApp =
+    (await page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }).count()) > 0;
+  if (!isInsideApp) {
+    await darkThemeToggle.click();
+    return;
+  }
+  await openAccountMenu(page);
+  await darkThemeToggle.click();
+  await closeAccountMenu(page);
+}
+
 async function goToWithTheme(
   page: import("@playwright/test").Page,
   path: string,
@@ -154,7 +201,7 @@ async function goToWithTheme(
   await page.goto(`${APP_URL}${path}`);
   await page.addStyleTag({ content: HIDE_DEV_OVERLAY_CSS });
   if (theme === "dark") {
-    await page.getByRole("button", { name: /tema oscuro|dark theme/i }).click();
+    await chooseDarkTheme(page);
   }
   // networkidle nunca llega mientras el dev server compila bajo carga paralela.
   // Lo que de verdad mueve píxeles son las fuentes, y toHaveScreenshot ya
@@ -307,7 +354,12 @@ async function togglesCornerClip(page: Page): Promise<Clip> {
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
-function describeTogglesCorner(pg: Screen): void {
+/** `revealToggles` los pone a la vista donde no lo están: dentro de la
+ * aplicación viven en el menú de la cuenta (#287). */
+function describeTogglesCorner(
+  pg: Screen,
+  revealToggles?: (page: Page) => Promise<void>,
+): void {
   for (const vp of viewports) {
     test.describe(`interruptores-${pg.name} @ ${vp.name}`, () => {
       test.use({ viewport: { width: vp.width, height: vp.height } });
@@ -315,6 +367,7 @@ function describeTogglesCorner(pg: Screen): void {
       for (const theme of themes) {
         test(`matches approved baseline (${theme})`, async ({ page }) => {
           await goToWithTheme(page, pg.path, theme);
+          await revealToggles?.(page);
           const clip = await togglesCornerClip(page);
           const name = `interruptores-${pg.name}-${vp.name}-${theme}.png`;
           await createMissingLocalBaseline(name, () =>
@@ -693,7 +746,10 @@ test.describe("dentro de la aplicación", () => {
     });
   }
 
-  describeTogglesCorner({ name: "panel", path: "/dashboard" });
+  describeTogglesCorner({ name: "panel", path: "/dashboard" }, async (page) => {
+    await openAccountMenu(page);
+    await page.mouse.move(0, 0);
+  });
 
   const DESKTOP = { width: 1440, height: 900 } as const;
   const MOBILE = { width: 375, height: 812 } as const;
@@ -1083,9 +1139,9 @@ test.describe("dentro de la aplicación", () => {
 
     const reachedByTabbing: string[] = [];
     const outlineWidths: number[] = [];
-    // The extra presses cover what precedes the nav: the theme and language
-    // toggles, the notification bell (#266), My account and sign out.
-    const headerControlCount = 5;
+    // The extra presses cover what precedes the nav: the notification bell
+    // (#266) and the account button (#287). The rest lives in its menu.
+    const headerControlCount = 2;
     for (
       let press = 0;
       press < expectedOrder.length + headerControlCount;
@@ -1407,6 +1463,11 @@ test.describe("dentro de la aplicación", () => {
     ).toBe(true);
   }
 
+  async function signOutFromAccountMenu(page: Page): Promise<void> {
+    const menu = await openAccountMenu(page);
+    await menu.getByRole("button", { name: "Sign out" }).click();
+  }
+
   test("cerrar sesión desde cualquier pantalla aterriza en la entrada", async ({
     page,
     context,
@@ -1415,7 +1476,7 @@ test.describe("dentro de la aplicación", () => {
     await page.setViewportSize(DESKTOP);
     await page.goto(`${APP_URL}/calendario`);
 
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await signOutFromAccountMenu(page);
 
     await expect(page).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
   });
@@ -1427,7 +1488,7 @@ test.describe("dentro de la aplicación", () => {
     await openOwnSession(page, context);
     await page.setViewportSize(DESKTOP);
     await page.goto(`${APP_URL}/dashboard`);
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await signOutFromAccountMenu(page);
     await expect(page).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
 
     await page.goto(`${APP_URL}/dashboard`);
@@ -1449,7 +1510,7 @@ test.describe("dentro de la aplicación", () => {
     await expect(segunda).toHaveURL(new RegExp("/calendario$"));
 
     await primera.setViewportSize(DESKTOP);
-    await primera.getByRole("button", { name: "Sign out" }).click();
+    await signOutFromAccountMenu(primera);
     await expect(primera).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
 
     // La segunda no se entera hasta que pide algo al servidor, y entonces sí.
@@ -2365,12 +2426,16 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
     ).toBeVisible();
   });
 
-  test("llega desde el enlace de la cabecera", async ({ page }) => {
+  test("llega desde Mi perfil, en el menú de la cuenta, y el menú se cierra", async ({
+    page,
+  }) => {
     await page.goto(`${APP_URL}/calendario`);
+    const menu = await openAccountMenu(page);
 
-    await page.getByRole("link", { name: "My account" }).click();
+    await menu.getByRole("link", { name: "My profile" }).click();
 
     await expect(page).toHaveURL(new RegExp(`${ACCOUNT_PATH}$`));
+    await expect(accountMenu(page)).toHaveCount(0);
   });
 
   test("el endpoint rechaza con 400 una petición de Admin", async ({
@@ -2386,25 +2451,22 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
     });
   });
 
-  // Los cinco controles de la cabecera (la campana desde #266). Hasta #209
-  // cabían en la fila del nombre del club; con cinco ya no, así que en un
-  // móvil estrecho bajan juntos a su propia fila. A 360 y 375 esa fila no se
-  // parte, no tapa el nombre y no se sale de la pantalla.
+  // La cabecera del móvil (#209, #266, #287). Con la campana y el botón de
+  // la cuenta como únicos controles, todo vuelve a caber en una sola fila:
+  // a 360 y 375 el nombre se lee entero, nada lo tapa y nada se sale.
   for (const width of [360, 375]) {
-    test(`los controles de la cabecera caben en su fila sin tapar el nombre a ${width}px`, async ({
+    test(`la cabecera cae en una sola fila sin tapar el nombre a ${width}px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
 
-      const brand = await page.locator(".app-brand").boundingBox();
+      const brandLocator = page.locator(".app-brand");
+      const brand = await brandLocator.boundingBox();
       const controlBoxes = await Promise.all(
         [
-          page.getByRole("button", { name: /theme/i }),
-          page.getByRole("button", { name: /español/i }),
           page.getByRole("button", { name: /^Notifications/ }),
-          page.getByRole("link", { name: "My account" }),
-          page.getByRole("button", { name: "Sign out" }),
+          page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }),
         ].map((control) => control.boundingBox()),
       );
       const boxes = controlBoxes.flatMap((box) => (box === null ? [] : [box]));
@@ -2412,19 +2474,24 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
         throw new Error("la cabecera no dibujó el nombre o algún control");
       }
 
-      const tops = new Set(boxes.map((box) => Math.round(box.y)));
-      expect(tops.size, "los controles no están en una fila").toBe(1);
-      // Desde #266 los controles pueden bajar a su propia fila, bajo el
-      // nombre: lo que no pueden es pisarlo, ni salirse de la pantalla.
-      const controlsTop = Math.min(...boxes.map((box) => box.y));
+      const brandMiddle = brand.y + brand.height / 2;
+      for (const box of boxes) {
+        expect(
+          brandMiddle > box.y && brandMiddle < box.y + box.height,
+          "un control no está en la fila del nombre",
+        ).toBe(true);
+      }
       const firstControlLeft = Math.min(...boxes.map((box) => box.x));
-      const isBrandClear =
-        brand.y + brand.height <= controlsTop ||
-        brand.x + brand.width <= firstControlLeft;
       expect(
-        isBrandClear,
+        brand.x + brand.width,
         "el nombre del club queda tapado por los controles",
-      ).toBe(true);
+      ).toBeLessThanOrEqual(firstControlLeft);
+      const isBrandTruncated = await brandLocator.evaluate(
+        (element) => element.scrollWidth > element.clientWidth,
+      );
+      expect(isBrandTruncated, "el nombre del club no se lee entero").toBe(
+        false,
+      );
       const lastControlRight = Math.max(
         ...boxes.map((box) => box.x + box.width),
       );
@@ -4791,24 +4858,31 @@ test.describe("la campana de avisos", () => {
     await expect(notificationsRegion(page)).toHaveCount(0);
   });
 
-  // La barra lateral mide 240px: los cinco controles no caben en una fila y
-  // se parten en sus dos grupos, sin salirse de ella.
+  // La barra lateral mide 240px: la campana y el botón de la cuenta (#287)
+  // caben en ella en una sola fila, sin salirse.
   for (const width of [768, 1440]) {
-    test(`los controles de la cabecera no se salen de la barra lateral a ${width}px`, async ({
+    test(`los controles de la cabecera caben en una fila de la barra lateral a ${width}px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
 
       const sidebar = await page.locator(".app-sidebar").boundingBox();
-      const signOut = await page
-        .getByRole("button", { name: "Sign out" })
+      const bell = await page
+        .getByRole("button", { name: BELL_NAME })
         .boundingBox();
-      if (sidebar === null || signOut === null) {
+      const account = await page
+        .getByRole("button", { name: ACCOUNT_BUTTON_NAME })
+        .boundingBox();
+      if (sidebar === null || bell === null || account === null) {
         throw new Error("la barra lateral no dibujó sus controles");
       }
 
-      expect(signOut.x + signOut.width).toBeLessThanOrEqual(
+      expect(
+        Math.round(account.y),
+        "los controles se parten en dos filas",
+      ).toBe(Math.round(bell.y));
+      expect(account.x + account.width).toBeLessThanOrEqual(
         sidebar.x + sidebar.width,
       );
     });
@@ -4915,5 +4989,286 @@ test.describe("la campana de avisos", () => {
     await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toHaveCount(
       0,
     );
+  });
+});
+/* ---------------------------------------------------------------------------
+   El menú de la cuenta (#287). Sin mockup: se revisa contra design-system.md,
+   con la lista de avisos (#266) como referencia de cómo se abre. La campana va
+   vacía en todas las pruebas para que su número no mueva las capturas.
+   --------------------------------------------------------------------------- */
+
+const ACCOUNT_MENU_SCREENS: readonly Screen[] = [
+  { name: "panel", path: "/dashboard" },
+  { name: "directorio", path: DIRECTORY_SCREEN_PATH },
+];
+
+type MenuLanguage = {
+  readonly suffix: string;
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+};
+
+const MENU_LANGUAGES: readonly MenuLanguage[] = [
+  { suffix: "en" },
+  { suffix: "es", beforeVisit: chooseSpanish },
+];
+
+test.describe("menú de la cuenta", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  for (const language of MENU_LANGUAGES) {
+    for (const vp of viewports) {
+      test.describe(`${language.suffix} @ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`abierto: matches approved baseline (${theme})`, async ({
+            page,
+          }) => {
+            await language.beforeVisit?.(page);
+            await goToWithTheme(page, "/dashboard", theme);
+            await openAccountMenu(page);
+            // El ratón se queda sobre el botón de la cuenta, que en el móvil
+            // es una fila del menú: la captura saldría con su hover.
+            await page.mouse.move(0, 0);
+            // Sin fullPage: en el móvil el menú es una pantalla fija encima
+            // de la página, y lo que hay debajo no forma parte de la captura.
+            const snapshot = `menu-cuenta-${language.suffix}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot(SCREENSHOT_OPTIONS),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+      });
+    }
+  }
+
+  for (const menuScreen of ACCOUNT_MENU_SCREENS) {
+    for (const vp of viewports) {
+      test(`${menuScreen.name} @ ${vp.name}: no accessibility violations with the menu open (axe-core)`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: vp.width, height: vp.height });
+        await page.goto(`${APP_URL}${menuScreen.path}`);
+        await openAccountMenu(page);
+
+        await expectNoAxeViolations(page);
+      });
+
+      test(`${menuScreen.name} @ ${vp.name}: has no horizontal scroll with the menu open`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: vp.width, height: vp.height });
+        await page.goto(`${APP_URL}${menuScreen.path}`);
+        await openAccountMenu(page);
+
+        const overflow = await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth >
+            document.documentElement.clientWidth,
+        );
+        expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+      });
+    }
+  }
+
+  test("el menú en español: has no accessibility violations (axe-core)", async ({
+    page,
+  }) => {
+    await chooseSpanish(page);
+    await page.goto(`${APP_URL}/dashboard`);
+    await openAccountMenu(page);
+
+    await expectNoAxeViolations(page);
+  });
+
+  test("el botón de la cuenta dice si el menú está abierto o cerrado", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}/dashboard`);
+    const button = page.getByRole("button", { name: ACCOUNT_BUTTON_NAME });
+    await expect(button).toHaveAttribute("aria-expanded", "false");
+
+    await openAccountMenu(page);
+
+    await expect(button).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("ofrece Mi perfil, Apariencia, Idioma y Cerrar sesión, en ese orden", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}/dashboard`);
+
+    const menu = await openAccountMenu(page);
+
+    await expect(menu.getByRole("listitem")).toHaveText([
+      /My profile/,
+      /Appearance/,
+      /Language/,
+      /Sign out/,
+    ]);
+  });
+
+  test("en escritorio es un desplegable que se cierra con Escape y devuelve el foco", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${APP_URL}/dashboard`);
+
+    const menu = await openAccountMenu(page);
+    const box = await menu.boundingBox();
+    expect(box?.width, "el menú ocupa toda la pantalla").toBeLessThan(1440);
+    await expect(
+      menu.getByRole("button", { name: BACK_BUTTON_NAME }),
+    ).toBeHidden();
+    await page.keyboard.press("Escape");
+
+    await expect(accountMenu(page)).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }),
+    ).toBeFocused();
+  });
+
+  test("en escritorio se cierra al pulsar fuera y devuelve el foco", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${APP_URL}/dashboard`);
+    await openAccountMenu(page);
+
+    await page.getByRole("main").click({ position: { x: 900, y: 600 } });
+
+    await expect(accountMenu(page)).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }),
+    ).toBeFocused();
+  });
+
+  for (const width of [360, 375]) {
+    test(`en el móvil ocupa la pantalla y se vuelve con la flecha a ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`${APP_URL}/dashboard`);
+
+      const menu = await openAccountMenu(page);
+      expect(await menu.boundingBox()).toEqual({
+        x: 0,
+        y: 0,
+        width,
+        height: 800,
+      });
+      await menu.getByRole("button", { name: BACK_BUTTON_NAME }).click();
+
+      await expect(accountMenu(page)).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }),
+      ).toBeFocused();
+    });
+  }
+
+  test("el teclado recorre la cabecera en orden: campana y luego cuenta", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${APP_URL}/dashboard`);
+    const bell = page.getByRole("button", { name: BELL_NAME });
+
+    await bell.focus();
+    await page.keyboard.press("Tab");
+
+    await expect(
+      page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }),
+    ).toBeFocused();
+    const isBrandBeforeBell = await page
+      .locator(".app-brand")
+      .evaluate(
+        (brand, bellElement) =>
+          bellElement !== null &&
+          (brand.compareDocumentPosition(bellElement) &
+            Node.DOCUMENT_POSITION_FOLLOWING) !==
+            0,
+        await bell.elementHandle(),
+      );
+    expect(isBrandBeforeBell, "el nombre va antes que la campana").toBe(true);
+  });
+
+  test("con el menú abierto el teclado no se pasea por lo que queda detrás", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto(`${APP_URL}/dashboard`);
+    const menu = await openAccountMenu(page);
+    const controlsInMenu =
+      (await menu.getByRole("button").count()) +
+      (await menu.getByRole("link").count());
+
+    // Una pulsación más que controles tiene el menú: la última lo recorre
+    // entero y sale. En ningún momento puede quedar el menú abierto con el
+    // foco en lo que tapa; al salir, el foco vuelve al botón de la cuenta.
+    for (let press = 0; press <= controlsInMenu; press += 1) {
+      await page.keyboard.press("Tab");
+      const isFocusInsideMenu = await page.evaluate(
+        () => document.activeElement?.closest(".account-menu") !== null,
+      );
+      const isMenuOpen = (await accountMenu(page).count()) > 0;
+      expect(
+        isMenuOpen && !isFocusInsideMenu,
+        "el foco salió a lo que queda detrás y el menú sigue tapándolo",
+      ).toBe(false);
+      if (!isMenuOpen) {
+        await expect(
+          page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }),
+        ).toBeFocused();
+        return;
+      }
+    }
+    throw new Error("el foco no llegó a salir del menú");
+  });
+
+  test("el tema cambia al momento, el menú sigue abierto y se conserva al recargar", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}/dashboard`);
+    const html = page.locator("html");
+    await expect(html).toHaveAttribute("data-theme", "light");
+    const menu = await openAccountMenu(page);
+
+    await menu.getByRole("button", { name: /dark theme/i }).click();
+
+    await expect(html).toHaveAttribute("data-theme", "dark");
+    await expect(accountMenu(page)).toBeVisible();
+    await page.reload();
+    await expect(html).toHaveAttribute("data-theme", "dark");
+    const reopened = await openAccountMenu(page);
+    await expect(
+      reopened.getByRole("button", { name: /light theme/i }),
+    ).toBeVisible();
+  });
+
+  test("el idioma cambia toda la aplicación, el propio menú incluido, y se conserva al recargar", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}/dashboard`);
+    const menu = await openAccountMenu(page);
+
+    await menu.getByRole("button", { name: /switch to español/i }).click();
+
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+    await expect(accountMenu(page)).toBeVisible();
+    await expect(
+      accountMenu(page).getByRole("link", { name: "Mi perfil" }),
+    ).toBeVisible();
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+    const reopened = await openAccountMenu(page);
+    await expect(
+      reopened.getByRole("button", { name: /cambiar a english/i }),
+    ).toBeVisible();
   });
 });
