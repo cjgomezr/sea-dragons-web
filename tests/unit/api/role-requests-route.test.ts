@@ -62,6 +62,11 @@ function mockWiring(options: WiringOptions = {}): void {
             );
           },
         },
+        admins: { listActiveAdminUserIds: async () => [] },
+        notifications: {
+          findRecipient: async () => null,
+          insertNotification: async () => undefined,
+        },
       },
     }),
   }));

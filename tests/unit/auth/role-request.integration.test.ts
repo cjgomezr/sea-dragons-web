@@ -1,16 +1,21 @@
+import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
+import type { AccountStatus } from "@/lib/auth/account-status";
 import {
   PendingRoleRequestError,
   describeRoleRequestAccount,
   requestRole,
 } from "@/lib/auth/role-request";
+import type { Role } from "@/lib/auth/roles";
 import { DEFAULT_CLUB_SLUG } from "@/lib/auth/supabase-auth-gateways";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
+import { createNotificationMarker } from "@/lib/notifications/supabase-notification-gateways";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
   type ServiceRoleClient,
   createServiceRoleTestClient,
   describeRls,
+  withSeededRows,
   withTestUser,
 } from "../../support/rls";
 
@@ -23,6 +28,9 @@ import {
 
 const MEMBERS_TABLE = "members";
 const ROLE_REQUESTS_TABLE = "role_requests";
+const CLUBS_TABLE = "clubs";
+const NOTIFICATIONS_TABLE = "notifications";
+const REQUESTER_NAME = "Socia que pide rol";
 
 /** Cuántos envíos simultáneos del mismo socio se lanzan. Con dos basta para
  * que los dos pasen la comprobación previa; alguno más hace el choque seguro
@@ -46,21 +54,64 @@ async function withActiveMember<T>(
     );
   }
 
+  return withClubMember(serviceClient, { clubId: club.id as string }, run);
+}
+
+type MemberSeed = {
+  readonly clubId: string;
+  readonly role?: Role;
+  readonly accountStatus?: AccountStatus;
+};
+
+async function withClubMember<T>(
+  serviceClient: ServiceRoleClient,
+  seed: MemberSeed,
+  run: (member: SeededMember) => Promise<T>,
+): Promise<T> {
   return withTestUser(serviceClient, async (user) => {
     const { error } = await serviceClient.client.from(MEMBERS_TABLE).insert({
-      club_id: club.id,
+      club_id: seed.clubId,
       user_id: user.id,
-      full_name: "Socia que pide rol",
+      full_name: REQUESTER_NAME,
       email: user.email,
-      account_status: "active",
+      account_status: seed.accountStatus ?? "active",
+      role: seed.role ?? "Player",
     });
     if (error) {
       throw new Error(`No se pudo sembrar la socia: ${error.message}`);
     }
-    // La fila y sus solicitudes se van con la identidad por las cascadas de
-    // 0003 y 0012.
-    return run({ userId: user.id, clubId: club.id as string });
+    // La fila, sus solicitudes y sus avisos se van con la identidad por las
+    // cascadas de 0003, 0012 y 0019.
+    return run({ userId: user.id, clubId: seed.clubId });
   });
+}
+
+/** Un club de usar y tirar: en el sembrado habría otros Admin a los que el
+ * test llenaría de avisos. */
+async function withTemporaryClub<T>(
+  serviceClient: ServiceRoleClient,
+  run: (clubId: string) => Promise<T>,
+): Promise<T> {
+  return withSeededRows(
+    serviceClient,
+    CLUBS_TABLE,
+    [{ slug: `aviso-de-solicitud-${randomUUID()}`, name: "Club del aviso" }],
+    ([club]) => run(club!.id as string),
+  );
+}
+
+async function readNotifications(
+  serviceClient: ServiceRoleClient,
+  userId: string,
+): Promise<readonly Record<string, unknown>[]> {
+  const { data, error } = await serviceClient.client
+    .from(NOTIFICATIONS_TABLE)
+    .select("id, club_id, type, data, read_at")
+    .eq("user_id", userId);
+  if (error) {
+    throw new Error(`No se pudieron leer los avisos: ${error.message}`);
+  }
+  return data;
 }
 
 async function countPending(
@@ -106,6 +157,67 @@ describeRls("solicitudes de rol contra seadragons-dev", () => {
           latestRequest: created,
         });
       });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "deja un aviso propio a cada Admin activo del club y ninguno al dado de baja (#268)",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = createRoleRequestGateways(serviceClient.client);
+      const marker = createNotificationMarker(serviceClient.client);
+      const admin = { role: "Admin" } as const;
+
+      await withTemporaryClub(serviceClient, (clubId) =>
+        withClubMember(serviceClient, { clubId, ...admin }, (first) =>
+          withClubMember(serviceClient, { clubId, ...admin }, (second) =>
+            withClubMember(
+              serviceClient,
+              { clubId, ...admin, accountStatus: "inactive" },
+              (inactive) =>
+                withClubMember(serviceClient, { clubId }, async (player) => {
+                  await requestRole(gateways, {
+                    userId: player.userId,
+                    requestedRole: "Committee",
+                    justification: "Llevo la tesorería.",
+                  });
+
+                  const expected = {
+                    club_id: clubId,
+                    type: "role_request_received",
+                    data: {
+                      requesterName: REQUESTER_NAME,
+                      requestedRole: "Committee",
+                    },
+                    read_at: null,
+                  };
+                  const [firstNotice] = await readNotifications(
+                    serviceClient,
+                    first.userId,
+                  );
+                  expect(firstNotice).toMatchObject(expected);
+                  await expect(
+                    readNotifications(serviceClient, second.userId),
+                  ).resolves.toEqual([expect.objectContaining(expected)]);
+                  await expect(
+                    readNotifications(serviceClient, inactive.userId),
+                  ).resolves.toEqual([]);
+
+                  await marker.markRead({
+                    userId: first.userId,
+                    notificationId: firstNotice!.id as string,
+                  });
+                  await expect(
+                    readNotifications(serviceClient, second.userId),
+                  ).resolves.toEqual([
+                    expect.objectContaining({ read_at: null }),
+                  ]);
+                }),
+            ),
+          ),
+        ),
+      );
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
