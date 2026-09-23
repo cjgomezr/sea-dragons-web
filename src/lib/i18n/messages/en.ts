@@ -479,6 +479,9 @@ export const englishMessages = {
   "directory.column.position": "Position",
   "directory.mark.inactive": "Deactivated",
   "directory.mark.aufExpired": "AUF expired",
+  // #274: el AUF que escribió el miembro, hasta que un Admin lo verifica.
+  "directory.mark.aufNotVerified": "AUF not verified",
+  "directory.mark.aufVerified": "AUF verified",
   "directory.mark.pendingActivation": "Pending activation",
   "directory.error.signInRequired":
     "Your session ended. Sign in again to see the directory.",
@@ -501,6 +504,11 @@ export const englishMessages = {
   "memberRecord.auf.number": "AUF number",
   "memberRecord.auf.expiry": "Expiry date",
   "memberRecord.auf.hint": "Clearing the number also clears its expiry date.",
+  "memberRecord.auf.pending":
+    "The member wrote this AUF. Check it and verify it, or correct it and save: what you write is verified.",
+  "memberRecord.auf.verify": "Verify AUF",
+  "memberRecord.auf.verifying": "Verifying…",
+  "memberRecord.auf.verified": "AUF verified.",
   "memberRecord.birth.title": "Personal details",
   "memberRecord.birth.label": "Date of birth",
   "memberRecord.birth.hint":
@@ -526,6 +534,8 @@ export const englishMessages = {
     "A member with a deactivated account can't be added to groups.",
   "memberRecord.error.memberStatusChanged":
     "The member's account changed while saving. Reload the record and try again.",
+  "memberRecord.error.aufChanged":
+    "The member changed the AUF after you opened the record. Reload it before verifying.",
   "memberRecord.error.signInRequired":
     "Your session ended. Sign in again to keep going.",
   "memberRecord.error.forbidden": "Only an Admin can see and edit this record.",

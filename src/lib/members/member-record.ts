@@ -35,6 +35,12 @@ import { type MemberGroup, listMemberGroups } from "@/lib/groups/member-groups";
  * El resto de la ficha es de cada miembro (#241) y aquí no entra: este módulo
  * arma lo que se escribe campo a campo, así que nada más llega a la base.
  *
+ * Desde #274 el miembro también propone su AUF, que queda sin verificar. El
+ * Admin lo verifica aquí de dos maneras: con `verifyMemberAuf`, que confirma
+ * el que propuso el miembro sin cambiarlo, o escribiendo él mismo otro al
+ * guardar la ficha, que nace verificado. Guardar la ficha sin tocar el AUF no
+ * lo verifica: un Admin que sólo cambia los grupos no ha mirado el registro.
+ *
  * Los grupos no se escriben aquí. Se agregan y se quitan con las funciones de
  * la sección Grupos (#227), para que valgan sus mismas reglas y los conteos
  * no puedan divergir según desde dónde se cambió.
@@ -66,6 +72,8 @@ export type StoredMemberRecord = {
   readonly accountStatus: AccountStatus;
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
+  /** Si un Admin lo confirmó. Sin número, siempre false. */
+  readonly isAufVerified: boolean;
   /** YYYY-MM-DD, o null en quien todavía no completó el registro. */
   readonly dateOfBirth: string | null;
   /** `members.created_at`: la edad que decide el consentimiento del tutor es
@@ -118,6 +126,7 @@ export const MEMBER_NOT_FOUND_REASON = "member_not_found";
 export const GROUP_NOT_FOUND_REASON = "group_not_found";
 export const MEMBER_INACTIVE_REASON = "member_inactive";
 export const MEMBER_STATUS_CHANGED_REASON = "member_status_changed";
+export const AUF_CHANGED_REASON = "auf_changed";
 
 /** En la bitácora el socio es la entidad, como en su consentimiento. */
 const AUDITED_ENTITY_TYPE = "member";
@@ -126,6 +135,14 @@ export type MemberScope = { readonly clubId: string; readonly userId: string };
 
 export type AufUpdateResult =
   { readonly kind: "updated" } | { readonly kind: "member_not_found" };
+
+/** Un registro con número, que es lo único que se puede verificar. */
+export type RegisteredAuf = Extract<AufRegistration, { kind: "registered" }>;
+
+/** `changed` es que el AUF ya no es el que se leyó, o que ya estaba
+ * verificado: la marca no se puso. */
+export type AufVerificationResult =
+  { readonly kind: "verified" } | { readonly kind: "changed" };
 
 /** La fecha y el estado con el que la cuenta queda, en una sola escritura.
  * `fromStatus` es el que se leyó: si otra petición lo cambió entretanto, la
@@ -148,12 +165,19 @@ export type MemberRecordGateways = Pick<
   readonly records: {
     findMemberRecord(scope: MemberScope): Promise<StoredMemberRecord | null>;
     findMemberGroups(scope: MemberScope): Promise<readonly MemberGroup[]>;
-    /** Número y vencimiento en una sola escritura: dos Admin que guardan a la
-     * vez no pueden dejar el número de uno con el vencimiento del otro. */
+    /** Número, vencimiento y verificación en una sola escritura: dos Admin
+     * que guardan a la vez no pueden dejar el número de uno con el
+     * vencimiento del otro. Lo que escribe un Admin queda verificado. */
     updateAufRegistration(
       scope: MemberScope,
       registration: AufRegistration,
     ): Promise<AufUpdateResult>;
+    /** Pone la marca sólo si el AUF sigue siendo `registration` y sigue sin
+     * verificar, en la misma escritura. */
+    verifyAufRegistration(
+      scope: MemberScope,
+      registration: RegisteredAuf,
+    ): Promise<AufVerificationResult>;
     correctDateOfBirth(
       scope: MemberScope,
       correction: DateOfBirthCorrection,
@@ -185,6 +209,17 @@ export class MemberRecordConflictError extends Error {
       "El estado de la cuenta cambió mientras se guardaba: vuelve a abrir la ficha.",
     );
     this.name = "MemberRecordConflictError";
+  }
+}
+
+/** El AUF que el Admin quería verificar ya no es el que hay: el miembro lo
+ * cambió o lo quitó. Volver a abrir la ficha enseña el de ahora. */
+export class MemberAufChangedError extends Error {
+  constructor() {
+    super(
+      "El AUF cambió desde que abriste la ficha: vuelve a abrirla antes de verificarlo.",
+    );
+    this.name = "MemberAufChangedError";
   }
 }
 
@@ -477,6 +512,63 @@ async function applyDateOfBirthCorrection(
   });
 }
 
+function isSameAuf(
+  registration: AufRegistration,
+  record: StoredMemberRecord,
+): boolean {
+  return registration.kind === "none"
+    ? record.aufNumber === null
+    : registration.number === record.aufNumber &&
+        registration.expiry === record.aufExpiry;
+}
+
+/** La verificación va a la bitácora sin el número ni el vencimiento: quién,
+ * sobre quién y cuándo ya están en la entrada. */
+function recordAufVerified(
+  gateways: MemberRecordGateways,
+  actor: AuditActor,
+  userId: string,
+): Promise<void> {
+  return recordAuditEvent(gateways.audit, {
+    actor,
+    clubId: actor.clubId,
+    action: "member.auf_verified",
+    entityType: AUDITED_ENTITY_TYPE,
+    entityId: userId,
+    result: "success",
+  });
+}
+
+/**
+ * Escribe el AUF sólo si el Admin lo cambió, y entonces queda verificado: lo
+ * escribió él. Sin cambio no se escribe, o guardar los grupos verificaría un
+ * AUF pendiente que nadie ha mirado.
+ */
+async function applyAufChange(
+  gateways: MemberRecordGateways,
+  request: {
+    readonly actor: AuditActor;
+    readonly scope: MemberScope;
+    readonly record: StoredMemberRecord;
+  },
+  registration: AufRegistration,
+): Promise<void> {
+  const { actor, scope, record } = request;
+  if (isSameAuf(registration, record)) {
+    return;
+  }
+  const result = await gateways.records.updateAufRegistration(
+    scope,
+    registration,
+  );
+  if (result.kind === "member_not_found") {
+    throw new MemberRecordNotFoundError();
+  }
+  if (registration.kind === "registered") {
+    await recordAufVerified(gateways, actor, scope.userId);
+  }
+}
+
 export async function updateMemberRecord(
   gateways: MemberRecordGateways,
   request: MemberRecordRequest & {
@@ -504,21 +596,59 @@ export async function updateMemberRecord(
     { callerId: request.callerId, scope },
     groupIds,
   );
+  const changeRequest = {
+    actor: { id: request.callerId, clubId: caller.clubId },
+    scope,
+    record,
+  };
   await applyDateOfBirthCorrection(
     gateways,
-    {
-      actor: { id: request.callerId, clubId: caller.clubId },
-      scope,
-      record,
-    },
+    changeRequest,
     submission.dateOfBirth,
   );
-  const result = await gateways.records.updateAufRegistration(
-    scope,
-    registration,
-  );
-  if (result.kind === "member_not_found") {
-    throw new MemberRecordNotFoundError();
+  await applyAufChange(gateways, changeRequest, registration);
+  return composeRecord(gateways, scope, request.todayInClub);
+}
+
+/**
+ * Un Admin confirma el AUF que propuso el miembro (#274). `expected` es el
+ * que el Admin tenía delante: si el miembro lo cambió entretanto, no se
+ * verifica uno que nadie ha mirado. Verificar uno ya verificado no escribe
+ * nada, así que un doble clic no deja dos entradas en la bitácora.
+ */
+export async function verifyMemberAuf(
+  gateways: MemberRecordGateways,
+  request: MemberRecordRequest & {
+    readonly expected: {
+      readonly aufNumber: string;
+      readonly aufExpiry: string | null;
+    };
+  },
+): Promise<MemberRecord> {
+  const caller = await findAdministrator(gateways, request.callerId);
+  const scope = { clubId: caller.clubId, userId: request.userId };
+  const record = await findStoredRecord(gateways, scope);
+  const expected: RegisteredAuf = {
+    kind: "registered",
+    number: request.expected.aufNumber,
+    expiry: request.expected.aufExpiry,
+  };
+  if (!isSameAuf(expected, record)) {
+    throw new MemberAufChangedError();
+  }
+  if (!record.isAufVerified) {
+    const result = await gateways.records.verifyAufRegistration(
+      scope,
+      expected,
+    );
+    if (result.kind === "changed") {
+      throw new MemberAufChangedError();
+    }
+    await recordAufVerified(
+      gateways,
+      { id: request.callerId, clubId: caller.clubId },
+      scope.userId,
+    );
   }
   return composeRecord(gateways, scope, request.todayInClub);
 }

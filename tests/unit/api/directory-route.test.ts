@@ -26,6 +26,7 @@ const MARIA: DirectoryMemberRecord = {
   status: "active",
   aufNumber: "AUF-7",
   aufExpiry: "2020-01-31",
+  isAufVerified: true,
   photoPath: null,
 };
 
@@ -39,6 +40,7 @@ const BAJA: DirectoryMemberRecord = {
   status: "inactive",
   aufNumber: null,
   aufExpiry: null,
+  isAufVerified: false,
   photoPath: null,
 };
 
@@ -172,6 +174,7 @@ describe("GET /api/v1/directory", () => {
             fullName: "María Ñíguez",
             aufNumber: "AUF-7",
             aufExpiry: "2020-01-31",
+            isAufVerified: true,
             isAufExpired: true,
           },
         ],

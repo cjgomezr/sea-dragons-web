@@ -47,6 +47,7 @@ const memberSchema = z.object({
 const adminMemberSchema = memberSchema.extend({
   aufNumber: z.string().nullable(),
   aufExpiry: z.string().nullable(),
+  isAufVerified: z.boolean(),
   isAufExpired: z.boolean(),
 });
 

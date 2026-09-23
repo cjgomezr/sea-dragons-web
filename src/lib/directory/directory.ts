@@ -66,6 +66,8 @@ export type DirectoryMemberRecord = {
   readonly status: AccountStatus;
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
+  /** Si un Admin lo confirmó (#274). Sin número, siempre false. */
+  readonly isAufVerified: boolean;
   /** Dónde está la foto en el almacenamiento (#245). No sale nunca tal cual:
    * se sirve una dirección firmada de vida corta. */
   readonly photoPath: string | null;
@@ -90,6 +92,7 @@ export type DirectoryMember = {
 export type AdminDirectoryMember = DirectoryMember & {
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
+  readonly isAufVerified: boolean;
   readonly isAufExpired: boolean;
 };
 
@@ -274,6 +277,7 @@ function toAdminDirectoryMember(
     ...toDirectoryMember(record, signedPhotos),
     aufNumber: record.aufNumber,
     aufExpiry: record.aufExpiry,
+    isAufVerified: record.isAufVerified,
     isAufExpired: isAufExpired(record.aufExpiry, todayInClub),
   };
 }

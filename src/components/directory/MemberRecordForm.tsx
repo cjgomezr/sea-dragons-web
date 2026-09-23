@@ -12,13 +12,16 @@ import {
   correctionRequiresGuardianConsent,
   isAufNumberTooLong,
 } from "@/lib/members/member-record";
+import { aufMarksOf } from "./auf-marks";
 import { GroupsField, TextField } from "./record-fields";
 import {
   type MemberRecordFailure,
+  type MemberRecordSave,
   describeMemberRecordFailure,
   describeMemberRecordIssue,
   readIssueCode,
   saveMemberRecord,
+  verifyMemberRecordAuf,
 } from "./member-record-client";
 
 /**
@@ -29,12 +32,19 @@ import {
  * Da un cambio por hecho sólo cuando el servidor lo confirma, y entonces
  * enseña lo que el servidor guardó, no lo que se escribió: si el número se
  * borró, el vencimiento también desaparece.
+ *
+ * Un AUF que escribió el miembro llega sin verificar (#274). El Admin lo
+ * verifica con su botón, que manda el AUF guardado y no el de los controles;
+ * por eso el botón desaparece en cuanto el número o el vencimiento se editan:
+ * entonces guardar ya lo deja verificado.
  */
 
 type Status =
   | { readonly kind: "editing" }
   | { readonly kind: "sending" }
+  | { readonly kind: "verifying" }
   | { readonly kind: "saved" }
+  | { readonly kind: "aufVerified" }
   | MemberRecordFailure;
 
 /** Lo que hay en los controles. Una cadena vacía es "sin valor", y se manda
@@ -55,6 +65,7 @@ type FieldIssue = {
 const AUF_NUMBER_ID = "ficha-auf-numero";
 const AUF_EXPIRY_ID = "ficha-auf-vencimiento";
 const AUF_HINT_ID = "ficha-auf-ayuda";
+const AUF_PENDING_ID = "ficha-auf-pendiente";
 const BIRTH_ID = "ficha-nacimiento";
 const BIRTH_HINT_ID = "ficha-nacimiento-ayuda";
 const GUARDIAN_NOTICE_ID = "ficha-nacimiento-tutor";
@@ -104,10 +115,14 @@ function SaveOutcome({
   translate: Translator;
   status: Status;
 }): React.JSX.Element | null {
-  if (status.kind === "saved") {
+  if (status.kind === "saved" || status.kind === "aufVerified") {
     return (
       <p className="auth-note" role="status">
-        {translate("memberRecord.saved")}
+        {translate(
+          status.kind === "saved"
+            ? "memberRecord.saved"
+            : "memberRecord.auf.verified",
+        )}
       </p>
     );
   }
@@ -140,11 +155,16 @@ function RecordHeader({
           date: formatCalendarDay(locale, record.joinedOn),
         })}
       </p>
-      {record.isAufExpired ? (
-        <span className="directory-mark directory-mark-warning">
-          {translate("directory.mark.aufExpired")}
-        </span>
-      ) : null}
+      <span className="directory-marks">
+        {aufMarksOf(translate, record).map((mark) => (
+          <span
+            key={mark.text}
+            className={`directory-mark directory-mark-${mark.tone}`}
+          >
+            {mark.text}
+          </span>
+        ))}
+      </span>
     </header>
   );
 }
@@ -208,6 +228,53 @@ function DateOfBirthSection({
   );
 }
 
+function isAufPending(record: MemberRecord): boolean {
+  return record.aufNumber !== null && !record.isAufVerified;
+}
+
+/** Si los controles siguen enseñando el AUF guardado. */
+function isAufUntouched(record: MemberRecord, draft: Draft): boolean {
+  return (
+    draft.aufNumber === (record.aufNumber ?? "") &&
+    draft.aufExpiry === (record.aufExpiry ?? "")
+  );
+}
+
+function AufVerification({
+  translate,
+  isVerifying,
+  canVerify,
+  onVerify,
+}: {
+  translate: Translator;
+  isVerifying: boolean;
+  /** Sólo el AUF guardado se verifica: con los controles editados, no. */
+  canVerify: boolean;
+  onVerify: () => void;
+}): React.JSX.Element {
+  return (
+    <>
+      <p className="member-record-warning" id={AUF_PENDING_ID}>
+        {translate("memberRecord.auf.pending")}
+      </p>
+      {canVerify ? (
+        <button
+          type="button"
+          className="auth-secondary"
+          aria-describedby={AUF_PENDING_ID}
+          onClick={onVerify}
+        >
+          {translate(
+            isVerifying
+              ? "memberRecord.auf.verifying"
+              : "memberRecord.auf.verify",
+          )}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
 /** El aviso de campo que trajo el último envío, si el servidor rechazó uno. */
 function serverIssueOf(status: Status): FieldIssue | null {
   if (status.kind !== "failed") {
@@ -266,9 +333,20 @@ export function MemberRecordForm({
       setLocalIssue(toFieldIssue("auf_number_too_long"));
       return;
     }
+    await send("sending", () =>
+      saveMemberRecord(record.userId, toSubmission(draft)),
+    );
+  }
+
+  /** Guardar y verificar comparten el candado y el desenlace: los dos
+   * devuelven la ficha tal como quedó. */
+  async function send(
+    kind: "sending" | "verifying",
+    request: () => Promise<MemberRecordSave>,
+  ): Promise<void> {
     isSendingRef.current = true;
-    setStatus({ kind: "sending" });
-    const result = await saveMemberRecord(record.userId, toSubmission(draft));
+    setStatus({ kind });
+    const result = await request();
     isSendingRef.current = false;
     if (result.kind === "failed") {
       setStatus(result);
@@ -276,7 +354,15 @@ export function MemberRecordForm({
     }
     setRecord(result.record);
     setDraft(toDraft(result.record));
-    setStatus({ kind: "saved" });
+    setStatus({ kind: kind === "sending" ? "saved" : "aufVerified" });
+  }
+
+  async function handleVerify(): Promise<void> {
+    if (isSendingRef.current || record.aufNumber === null) {
+      return;
+    }
+    const shown = { aufNumber: record.aufNumber, aufExpiry: record.aufExpiry };
+    await send("verifying", () => verifyMemberRecordAuf(record.userId, shown));
   }
 
   const issue = localIssue ?? serverIssueOf(status);
@@ -288,7 +374,7 @@ export function MemberRecordForm({
           joinedOn: record.joinedOn,
         })
       : null;
-  const isSending = status.kind === "sending";
+  const isSending = status.kind === "sending" || status.kind === "verifying";
 
   return (
     <>
@@ -323,6 +409,14 @@ export function MemberRecordForm({
             <p className="auth-hint" id={AUF_HINT_ID}>
               {translate("memberRecord.auf.hint")}
             </p>
+            {isAufPending(record) ? (
+              <AufVerification
+                translate={translate}
+                isVerifying={status.kind === "verifying"}
+                canVerify={isAufUntouched(record, draft)}
+                onVerify={handleVerify}
+              />
+            ) : null}
           </section>
           <DateOfBirthSection
             translate={translate}
@@ -340,7 +434,11 @@ export function MemberRecordForm({
         </fieldset>
         <SaveOutcome translate={translate} status={status} />
         <button type="submit" className="auth-submit" disabled={isSending}>
-          {translate(isSending ? "memberRecord.saving" : "memberRecord.save")}
+          {translate(
+            status.kind === "sending"
+              ? "memberRecord.saving"
+              : "memberRecord.save",
+          )}
         </button>
       </form>
     </>

@@ -12,10 +12,12 @@ import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type {
   AufRegistration,
+  AufVerificationResult,
   DateOfBirthCorrection,
   DateOfBirthCorrectionResult,
   MemberRecordGateways,
   MemberScope,
+  RegisteredAuf,
   StoredMemberRecord,
 } from "./member-record";
 
@@ -31,12 +33,13 @@ import type {
  * usa la sección Grupos.
  *
  * Del consentimiento del tutor sólo se lee si existe: su nombre y su correo
- * no salen de la fila.
+ * no salen de la fila. De la verificación del AUF (#274), igual: sólo si
+ * existe. Quién la hizo está en la bitácora.
  */
 
 const MEMBERS_TABLE = "members";
 const RECORD_COLUMNS =
-  "user_id, full_name, joined_on, account_status, auf_number, auf_expiry, date_of_birth, created_at, guardian_consent_at";
+  "user_id, full_name, joined_on, account_status, auf_number, auf_expiry, auf_verified_at, date_of_birth, created_at, guardian_consent_at";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -61,6 +64,7 @@ function toStoredMemberRecord(row: Row): StoredMemberRecord {
     accountStatus: readAccountStatus(row),
     aufNumber: readText(row, "auf_number", MEMBERS_TABLE),
     aufExpiry: readText(row, "auf_expiry", MEMBERS_TABLE),
+    isAufVerified: readText(row, "auf_verified_at", MEMBERS_TABLE) !== null,
     dateOfBirth: readText(row, "date_of_birth", MEMBERS_TABLE),
     registeredAt: readRequiredText(row, "created_at", MEMBERS_TABLE),
     hasGuardianConsent:
@@ -68,13 +72,50 @@ function toStoredMemberRecord(row: Row): StoredMemberRecord {
   };
 }
 
+/** Lo que escribe un Admin queda verificado desde ahora. Sin número no hay
+ * nada que verificar, y el `check` de `0021` no dejaría la marca suelta. */
 function toAufColumns(registration: AufRegistration): {
   readonly auf_number: string | null;
   readonly auf_expiry: string | null;
+  readonly auf_verified_at: string | null;
 } {
   return registration.kind === "none"
-    ? { auf_number: null, auf_expiry: null }
-    : { auf_number: registration.number, auf_expiry: registration.expiry };
+    ? { auf_number: null, auf_expiry: null, auf_verified_at: null }
+    : {
+        auf_number: registration.number,
+        auf_expiry: registration.expiry,
+        auf_verified_at: new Date().toISOString(),
+      };
+}
+
+/** La marca en un solo `update` condicionado a que el AUF siga siendo el que
+ * el Admin vio y siga sin verificar: si el miembro lo cambió entretanto, no
+ * toca ninguna fila. */
+async function verifyAufRegistration(
+  serviceClient: SupabaseClient,
+  { clubId, userId }: MemberScope,
+  registration: RegisteredAuf,
+): Promise<AufVerificationResult> {
+  const update = serviceClient
+    .from(MEMBERS_TABLE)
+    .update({ auf_verified_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .eq("club_id", clubId)
+    .eq("auf_number", registration.number)
+    .is("auf_verified_at", null);
+  const { data, error } = await (
+    registration.expiry === null
+      ? update.is("auf_expiry", null)
+      : update.eq("auf_expiry", registration.expiry)
+  )
+    .select("user_id")
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `No se pudo verificar el AUF del socio ${userId}: ${error.message}`,
+    );
+  }
+  return data === null ? { kind: "changed" } : { kind: "verified" };
 }
 
 async function memberExists(
@@ -178,6 +219,9 @@ export function createMemberRecordGateways(
           ? { kind: "member_not_found" }
           : { kind: "updated" };
       },
+
+      verifyAufRegistration: (scope, registration) =>
+        verifyAufRegistration(serviceClient, scope, registration),
 
       correctDateOfBirth: (scope, correction) =>
         correctDateOfBirth(serviceClient, scope, correction),

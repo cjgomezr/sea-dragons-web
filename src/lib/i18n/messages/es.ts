@@ -474,6 +474,9 @@ export const spanishMessages: MessageCatalog = {
   "directory.column.position": "Posición",
   "directory.mark.inactive": "Desactivada",
   "directory.mark.aufExpired": "AUF vencido",
+  // #274: el AUF que escribió el miembro, hasta que un Admin lo verifica.
+  "directory.mark.aufNotVerified": "AUF sin verificar",
+  "directory.mark.aufVerified": "AUF verificado",
   "directory.mark.pendingActivation": "Pendiente de activar",
   "directory.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para ver el directorio.",
@@ -496,6 +499,11 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.auf.expiry": "Vencimiento",
   "memberRecord.auf.hint":
     "Si borras el número, se borra también su vencimiento.",
+  "memberRecord.auf.pending":
+    "Este AUF lo escribió el miembro. Revísalo y verifícalo, o corrígelo y guarda: lo que escribes tú queda verificado.",
+  "memberRecord.auf.verify": "Verificar AUF",
+  "memberRecord.auf.verifying": "Verificando…",
+  "memberRecord.auf.verified": "AUF verificado.",
   "memberRecord.birth.title": "Datos personales",
   "memberRecord.birth.label": "Fecha de nacimiento",
   "memberRecord.birth.hint":
@@ -522,6 +530,8 @@ export const spanishMessages: MessageCatalog = {
     "A un miembro con la cuenta desactivada no se le pueden agregar grupos.",
   "memberRecord.error.memberStatusChanged":
     "La cuenta del miembro cambió mientras se guardaba. Vuelve a cargar la ficha e inténtalo de nuevo.",
+  "memberRecord.error.aufChanged":
+    "El miembro cambió el AUF después de que abrieras la ficha. Recárgala antes de verificarlo.",
   "memberRecord.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para seguir.",
   "memberRecord.error.forbidden":

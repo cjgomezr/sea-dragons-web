@@ -85,6 +85,11 @@ export const DIRECTORY_PATH = "/directorio";
  * rol. */
 export const MEMBER_RECORD_API_PATH = `${MEMBERS_API_PATH}/[id]/record`;
 
+/** Verificar el AUF que propuso un miembro (#274, RF-12 del PRD de E5).
+ * Cuelga de la ficha, y se declara igual por el mismo motivo que el cambio de
+ * rol. */
+export const MEMBER_AUF_VERIFICATION_API_PATH = `${MEMBER_RECORD_API_PATH}/auf-verification`;
+
 /** Reenviar la invitación de un miembro dado de alta por un Admin (#243,
  * FR-021). `[id]` es el `user_id` del miembro. Cuelga de `MEMBERS_API_PATH`,
  * y se declara igual por el mismo motivo que el cambio de rol. El alta en sí
@@ -262,6 +267,10 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   // acuerde de escribir esta línea.
   { path: MEMBER_ROLE_API_PATH, capability: "manageUsersAndRoles" },
   { path: MEMBER_RECORD_API_PATH, capability: "manageUsersAndRoles" },
+  {
+    path: MEMBER_AUF_VERIFICATION_API_PATH,
+    capability: "manageUsersAndRoles",
+  },
   { path: MEMBER_INVITATION_API_PATH, capability: "manageUsersAndRoles" },
   { path: MEMBER_STATUS_API_PATH, capability: "manageUsersAndRoles" },
   { path: MEMBER_RECORD_PATH, capability: "manageUsersAndRoles" },

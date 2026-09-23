@@ -12,6 +12,7 @@ import { MEMBER_RECORD_PATH } from "@/lib/auth/routes";
 import { formatCalendarDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
+import { type AufState, type RowMark, aufMarksOf } from "./auf-marks";
 import {
   MemberRoleControl,
   type RoleDraftsControl,
@@ -44,11 +45,7 @@ import {
 const DIRECTORY_AVATAR_SIZE = 40;
 
 /** El registro federativo de una fila, que sólo recibe un Admin (BR-008). */
-type AufView = {
-  readonly aufNumber: string | null;
-  readonly aufExpiry: string | null;
-  readonly isAufExpired: boolean;
-};
+type AufView = AufState & { readonly aufExpiry: string | null };
 
 /** Lo que una fila necesita saber, con lo que sólo un Admin recibe ya
  * resuelto: así la fila no tiene que volver a preguntarse quién la mira. Con
@@ -139,17 +136,9 @@ function SortableHeader({
   );
 }
 
-/** Una marca dice algo de la fila con palabras, nunca sólo con color. El tono
- * separa lo que sólo informa (está de baja) de lo que pide hacer algo: un
- * registro federativo vencido es una advertencia, y se pinta como tal. */
-type RowMark = {
-  readonly text: string;
-  readonly tone: "neutral" | "warning";
-};
-
 /** Lo que distingue a esta fila de las demás: pendiente de activar (#243), de
- * baja (AC-040) y el registro federativo vencido (BR-008), que sólo un Admin
- * recibe. */
+ * baja (AC-040) y el estado del registro federativo (BR-008, #274), que sólo
+ * un Admin recibe. */
 function marksOf(translate: Translator, row: DirectoryRow): readonly RowMark[] {
   return [
     ...(row.member.status === "incomplete"
@@ -168,14 +157,7 @@ function marksOf(translate: Translator, row: DirectoryRow): readonly RowMark[] {
           },
         ]
       : []),
-    ...(row.auf?.isAufExpired === true
-      ? [
-          {
-            text: translate("directory.mark.aufExpired"),
-            tone: "warning" as const,
-          },
-        ]
-      : []),
+    ...(row.auf === null ? [] : aufMarksOf(translate, row.auf)),
   ];
 }
 

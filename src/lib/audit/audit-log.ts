@@ -29,6 +29,11 @@ export const AUDIT_ACTIONS = [
   // Sin metadata: ni la fecha nueva ni la anterior, que son datos personales.
   // Quién, sobre quién y cuándo ya están en la entrada.
   "member.date_of_birth_corrected",
+  // RF-12 de E5 (#274): un Admin verifica el AUF de un miembro, confirmando
+  // el que propuso el miembro o escribiendo él mismo otro. Sin metadata: ni
+  // el número ni el vencimiento. Quién, sobre quién y cuándo ya están en la
+  // entrada.
+  "member.auf_verified",
   "payment.status_changed",
 ] as const;
 
