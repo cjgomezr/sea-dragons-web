@@ -14,6 +14,11 @@ import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
 import { type AufState, type RowMark, aufMarksOf } from "./auf-marks";
 import {
+  type DirectoryOrder,
+  DirectorySortControl,
+  SORT_COLUMN_LABELS,
+} from "./DirectorySortControl";
+import {
   MemberRoleControl,
   type RoleDraftsControl,
   type SaveMemberRole,
@@ -35,6 +40,13 @@ import {
  *
  * Ordenar es cosa del servidor, así que pulsar una cabecera no reordena nada
  * aquí: dice por dónde, y la pantalla vuelve a preguntar.
+ *
+ * Por debajo de 768px la misma tabla se pinta como una lista de tarjetas
+ * (#283), sin cabeceras: cada dato lleva entonces su etiqueta, escrita por la
+ * hoja de estilos desde su `data-label`, y el orden se elige con
+ * `DirectorySortControl`. Es el mismo marcado en los dos anchos para que el
+ * servidor no tenga que adivinar cuál pintar, y para que las filas sigan
+ * siendo filas para un lector de pantalla.
  *
  * A un Admin la celda del rol le da además el control para cambiarlo (#240).
  * Lo decide la marca de la lista, no un rol leído aparte: el endpoint del
@@ -107,29 +119,27 @@ const SORT_ARROWS: Readonly<Record<DirectoryDirection, string>> = {
 };
 
 function SortableHeader({
-  label,
+  translate,
   column,
-  sort,
-  direction,
+  order,
   onSort,
 }: {
-  label: string;
+  translate: Translator;
   column: DirectorySort;
-  sort: DirectorySort;
-  direction: DirectoryDirection;
+  order: DirectoryOrder;
   onSort: (column: DirectorySort) => void;
 }): React.JSX.Element {
-  const isSorted = sort === column;
+  const isSorted = order.sort === column;
   return (
-    <th scope="col" aria-sort={isSorted ? ARIA_SORT[direction] : "none"}>
+    <th scope="col" aria-sort={isSorted ? ARIA_SORT[order.direction] : "none"}>
       <button
         type="button"
         className="directory-sort"
         onClick={() => onSort(column)}
       >
-        {label}
+        {translate(SORT_COLUMN_LABELS[column])}
         <span className="directory-arrow" aria-hidden="true">
-          {isSorted ? SORT_ARROWS[direction] : ""}
+          {isSorted ? SORT_ARROWS[order.direction] : ""}
         </span>
       </button>
     </th>
@@ -209,6 +219,36 @@ function MemberName({
   );
 }
 
+/** El país y el nivel, que en la tabla se leen juntos bajo el nombre y en la
+ * tarjeta cada uno con su etiqueta. El punto que los separa en la tabla sobra
+ * en la tarjeta, y la hoja de estilos lo quita. Un dato que falta sigue ahí
+ * con su guion: la etiqueta nunca queda sola. */
+function MemberFacts({
+  translate,
+  member,
+}: {
+  translate: Translator;
+  member: DirectoryMember;
+}): React.JSX.Element {
+  return (
+    <span className="directory-meta directory-facts">
+      <span
+        className="directory-fact"
+        data-label={translate("directory.field.country")}
+      >
+        {describeCountry(translate, member.country)}
+      </span>
+      <span className="directory-fact-separator"> · </span>
+      <span
+        className="directory-fact"
+        data-label={translate("directory.field.level")}
+      >
+        {describeExperienceLevel(translate, member.experienceLevel)}
+      </span>
+    </span>
+  );
+}
+
 function MemberRow({
   translate,
   locale,
@@ -240,9 +280,7 @@ function MemberRow({
           />
           <span className="directory-identity">
             <MemberName translate={translate} row={row} />
-            <span className="directory-meta">
-              {`${describeCountry(translate, member.country)} · ${describeExperienceLevel(translate, member.experienceLevel)}`}
-            </span>
+            <MemberFacts translate={translate} member={member} />
             {isAdminRow(row) ? (
               <span className="directory-meta">
                 {describeAuf(translate, locale, row.auf)}
@@ -252,7 +290,10 @@ function MemberRow({
           </span>
         </span>
       </th>
-      <td className="directory-role-cell">
+      <td
+        className="directory-role-cell"
+        data-label={translate("directory.column.role")}
+      >
         {isAdminRow(row) ? (
           <MemberRoleControl
             translate={translate}
@@ -263,7 +304,7 @@ function MemberRow({
           translate(`role.${member.role}`)
         )}
       </td>
-      <td>
+      <td data-label={translate("directory.column.position")}>
         <span className="directory-position">
           {describePosition(translate, member.position)}
         </span>
@@ -276,17 +317,19 @@ export function DirectoryTable({
   translate,
   locale,
   listing,
-  sort,
-  direction,
+  order,
   onSort,
+  onOrderChange,
   onSaveRole,
 }: {
   translate: Translator;
   locale: Locale;
   listing: DirectoryListing;
-  sort: DirectorySort;
-  direction: DirectoryDirection;
+  order: DirectoryOrder;
+  /** Lo que pide una cabecera de la tabla: sólo el campo. */
   onSort: (column: DirectorySort) => void;
+  /** Lo que pide el selector de la lista de tarjetas: campo y sentido. */
+  onOrderChange: (order: DirectoryOrder) => void;
   /** Sólo se llama desde una lista de Admin, que es la única que dibuja el
    * control del rol. */
   onSaveRole: SaveMemberRole;
@@ -294,56 +337,60 @@ export function DirectoryTable({
   const rows = rowsOf(listing);
   const roleDrafts = useRoleDrafts(onSaveRole);
   return (
-    // La tarjeta es el div y no la tabla: un `border-radius` sobre una tabla
-    // no recorta las esquinas de su primera y su última fila.
-    <div className="directory-card">
-      <table
-        className={
-          listing.kind === "admin"
-            ? "directory-table directory-table-admin"
-            : "directory-table"
-        }
-      >
-        <caption className="directory-count">
-          {translate("directory.memberCount", { count: rows.length })}
-        </caption>
-        <thead>
-          <tr>
-            <SortableHeader
-              label={translate("directory.column.member")}
-              column="name"
-              sort={sort}
-              direction={direction}
-              onSort={onSort}
-            />
-            <SortableHeader
-              label={translate("directory.column.role")}
-              column="role"
-              sort={sort}
-              direction={direction}
-              onSort={onSort}
-            />
-            <SortableHeader
-              label={translate("directory.column.position")}
-              column="position"
-              sort={sort}
-              direction={direction}
-              onSort={onSort}
-            />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <MemberRow
-              key={row.member.userId}
-              translate={translate}
-              locale={locale}
-              row={row}
-              roleDrafts={roleDrafts}
-            />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <DirectorySortControl
+        translate={translate}
+        order={order}
+        onChange={onOrderChange}
+      />
+      {/* La tarjeta es el div y no la tabla: un `border-radius` sobre una
+          tabla no recorta las esquinas de su primera y su última fila. */}
+      <div className="directory-card">
+        <table
+          className={
+            listing.kind === "admin"
+              ? "directory-table directory-table-admin"
+              : "directory-table"
+          }
+        >
+          <caption className="directory-count">
+            {translate("directory.memberCount", { count: rows.length })}
+          </caption>
+          <thead>
+            <tr>
+              <SortableHeader
+                translate={translate}
+                column="name"
+                order={order}
+                onSort={onSort}
+              />
+              <SortableHeader
+                translate={translate}
+                column="role"
+                order={order}
+                onSort={onSort}
+              />
+              <SortableHeader
+                translate={translate}
+                column="position"
+                order={order}
+                onSort={onSort}
+              />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <MemberRow
+                key={row.member.userId}
+                translate={translate}
+                locale={locale}
+                row={row}
+                roleDrafts={roleDrafts}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
