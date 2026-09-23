@@ -1,3 +1,7 @@
+import {
+  type NotificationWriter,
+  notifyMember,
+} from "@/lib/notifications/notify-member";
 import { MemberNotFoundError } from "./account-activation";
 import type { Role } from "./roles";
 
@@ -68,6 +72,11 @@ export type RoleRequestGateways = {
     findLatestRequest(userId: string): Promise<RoleRequest | null>;
     insertPendingRequest(request: NewRoleRequest): Promise<RoleRequestInsert>;
   };
+  readonly admins: {
+    /** Los `user_id` de los Admin con la cuenta activa en el club. */
+    listActiveAdminUserIds(clubId: string): Promise<readonly string[]>;
+  };
+  readonly notifications: NotificationWriter;
 };
 
 /** Por qué no se puede pedir un rol aunque la petición esté bien formada. Es
@@ -181,6 +190,37 @@ async function findMember(
   return member;
 }
 
+/** Avisa a cada Admin activo del club de la solicitud nueva (RF-6 del PRD de
+ * E6). No lanza: la solicitud ya está guardada y un aviso perdido no la
+ * deshace. `notifyMember` registra el fallo de cada aviso; aquí se registra
+ * el de la lectura de los Admin. Los datos llevan sólo el nombre y el rol,
+ * lo mismo que el Admin ya ve en la bandeja: ni correo ni justificación. */
+async function notifyAdminsOfRequest(
+  gateways: RoleRequestGateways,
+  requester: RoleRequestMember,
+  requestedRole: RequestableRole,
+): Promise<void> {
+  let adminIds: readonly string[];
+  try {
+    adminIds = await gateways.admins.listActiveAdminUserIds(requester.clubId);
+  } catch (error) {
+    console.error("[notifications] Admin sin avisar de la solicitud", {
+      clubId: requester.clubId,
+      error,
+    });
+    return;
+  }
+  await Promise.all(
+    adminIds.map((adminId) =>
+      notifyMember(gateways.notifications, {
+        recipientUserId: adminId,
+        type: "role_request_received",
+        data: { requesterName: requester.fullName, requestedRole },
+      }),
+    ),
+  );
+}
+
 /** Guarda una solicitud pendiente de quien llama. Lo barato va primero: la
  * justificación no necesita la base, y el rol se decide con la fila del socio
  * antes de buscar solicitudes. */
@@ -216,6 +256,7 @@ export async function requestRole(
   if (insert.kind === "pending_exists") {
     throw new PendingRoleRequestError();
   }
+  await notifyAdminsOfRequest(gateways, member, insert.request.requestedRole);
   return insert.request;
 }
 

@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createSupabaseNotificationWriter } from "@/lib/notifications/supabase-notification-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
+import type { AccountStatus } from "./account-status";
 import {
   ROLE_REQUEST_STATUSES,
   type RoleRequest,
@@ -8,7 +10,7 @@ import {
   type RoleRequestMember,
   parseRequestableRole,
 } from "./role-request";
-import { parseRole } from "./roles";
+import { type Role, parseRole } from "./roles";
 import { readRequiredText } from "./supabase-auth-gateways";
 
 /**
@@ -23,6 +25,8 @@ import { readRequiredText } from "./supabase-auth-gateways";
 const MEMBERS_TABLE = "members";
 const ROLE_REQUESTS_TABLE = "role_requests";
 const ROLE_REQUEST_COLUMNS = "id, requested_role, status, created_at";
+const ADMIN_ROLE: Role = "Admin";
+const ACTIVE_ACCOUNT_STATUS: AccountStatus = "active";
 
 /** El código de Postgres de una violación de unicidad, y el índice que la
  * convierte en "ya hay una pendiente". Se mira el nombre para no confundir
@@ -147,6 +151,25 @@ export function createRoleRequestGateways(
         return { kind: "created", request: toRoleRequest(data) };
       },
     },
+    admins: {
+      async listActiveAdminUserIds(clubId) {
+        const { data, error } = await serviceClient
+          .from(MEMBERS_TABLE)
+          .select("user_id")
+          .eq("club_id", clubId)
+          .eq("role", ADMIN_ROLE)
+          .eq("account_status", ACTIVE_ACCOUNT_STATUS);
+        if (error) {
+          throw new Error(
+            `No se pudieron leer los Admin del club ${clubId}: ${error.message}`,
+          );
+        }
+        return data.map((row) =>
+          readRequiredText(row, "user_id", MEMBERS_TABLE),
+        );
+      },
+    },
+    notifications: createSupabaseNotificationWriter(serviceClient),
   };
 }
 

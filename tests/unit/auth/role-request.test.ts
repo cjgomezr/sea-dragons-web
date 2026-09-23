@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AccountStatus } from "@/lib/auth/account-status";
 import type { Role } from "@/lib/auth/roles";
 import {
   JUSTIFICATION_MAX_LENGTH,
@@ -16,6 +17,7 @@ import {
   roleRequestAvailability,
 } from "@/lib/auth/role-request";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
+import type { NotificationInsert } from "@/lib/notifications/notify-member";
 
 /**
  * Pedir Coach o Committee (FR-010, RF-4 del PRD de E3), sin Supabase delante.
@@ -26,6 +28,11 @@ import { MemberNotFoundError } from "@/lib/auth/account-activation";
 
 const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
 const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
+
+const ADMIN_IDS = [
+  "a0000000-0000-4000-8000-000000000001",
+  "a0000000-0000-4000-8000-000000000002",
+] as const;
 
 const PENDING_COACH: RoleRequest = {
   id: "0f0e0d0c-0b0a-4908-8706-050403020100",
@@ -39,17 +46,27 @@ type FakeOptions = {
   readonly memberExists?: boolean;
   readonly latestRequest?: RoleRequest | null;
   readonly insertResult?: RoleRequestInsert;
+  readonly adminIds?: readonly string[];
+  readonly adminLookupFails?: boolean;
+  readonly inactiveRecipients?: readonly string[];
+  readonly failingRecipients?: readonly string[];
 };
 
 type Fake = {
   readonly gateways: RoleRequestGateways;
   readonly inserts: NewRoleRequest[];
   readonly lookups: string[];
+  readonly notifications: NotificationInsert[];
 };
+
+function recipientStatus(options: FakeOptions, userId: string): AccountStatus {
+  return options.inactiveRecipients?.includes(userId) ? "inactive" : "active";
+}
 
 function fakeGateways(options: FakeOptions = {}): Fake {
   const inserts: NewRoleRequest[] = [];
   const lookups: string[] = [];
+  const notifications: NotificationInsert[] = [];
   const gateways: RoleRequestGateways = {
     members: {
       async findRoleRequestMember(userId) {
@@ -77,8 +94,39 @@ function fakeGateways(options: FakeOptions = {}): Fake {
         );
       },
     },
+    admins: {
+      async listActiveAdminUserIds(clubId) {
+        if (options.adminLookupFails === true) {
+          throw new Error("La base no responde.");
+        }
+        return clubId === CLUB_ID ? (options.adminIds ?? [ADMIN_IDS[0]]) : [];
+      },
+    },
+    notifications: {
+      async findRecipient(userId) {
+        return {
+          clubId: CLUB_ID,
+          accountStatus: recipientStatus(options, userId),
+        };
+      },
+      async insertNotification(row) {
+        if (options.failingRecipients?.includes(row.userId)) {
+          throw new Error("No se pudo guardar el aviso.");
+        }
+        notifications.push(row);
+      },
+    },
   };
-  return { gateways, inserts, lookups };
+  return { gateways, inserts, lookups, notifications };
+}
+
+function receivedNotification(userId: string): NotificationInsert {
+  return {
+    clubId: CLUB_ID,
+    userId,
+    type: "role_request_received",
+    data: { requesterName: "Nerea Ruiz", requestedRole: "Coach" },
+  };
 }
 
 describe("solicitar un rol", () => {
@@ -223,6 +271,130 @@ describe("solicitar un rol", () => {
     });
 
     await expect(attempt).rejects.toBeInstanceOf(MemberNotFoundError);
+  });
+});
+
+describe("aviso de solicitud nueva", () => {
+  it("avisa al Admin del club con quién pidió y qué rol", async () => {
+    const fake = fakeGateways();
+
+    await requestRole(fake.gateways, {
+      userId: USER_ID,
+      requestedRole: "Coach",
+      justification: null,
+    });
+
+    expect(fake.notifications).toEqual([receivedNotification(ADMIN_IDS[0])]);
+  });
+
+  it("da a cada Admin del club su propio aviso", async () => {
+    const fake = fakeGateways({ adminIds: ADMIN_IDS });
+
+    await requestRole(fake.gateways, {
+      userId: USER_ID,
+      requestedRole: "Coach",
+      justification: null,
+    });
+
+    expect(fake.notifications).toEqual(ADMIN_IDS.map(receivedNotification));
+  });
+
+  // El falso devuelve también al Admin inactivo: así se prueba la defensa de
+  // `notifyMember`. El filtro de la consulta lo prueba la integración.
+  it("no avisa a un Admin dado de baja", async () => {
+    const fake = fakeGateways({
+      adminIds: ADMIN_IDS,
+      inactiveRecipients: [ADMIN_IDS[1]],
+    });
+
+    await requestRole(fake.gateways, {
+      userId: USER_ID,
+      requestedRole: "Coach",
+      justification: null,
+    });
+
+    expect(fake.notifications).toEqual([receivedNotification(ADMIN_IDS[0])]);
+  });
+
+  it("no lleva ni la justificación ni el correo en los datos", async () => {
+    const fake = fakeGateways();
+
+    await requestRole(fake.gateways, {
+      userId: USER_ID,
+      requestedRole: "Coach",
+      justification: "Entreno a los juveniles los jueves.",
+    });
+
+    expect(fake.notifications[0]?.data).toEqual({
+      requesterName: "Nerea Ruiz",
+      requestedRole: "Coach",
+    });
+  });
+
+  it.each([
+    ["ya había una pendiente", { latestRequest: PENDING_COACH }, "Committee"],
+    [
+      "la pendiente chocó con el índice",
+      { insertResult: { kind: "pending_exists" } },
+      "Coach",
+    ],
+    ["pide el rol que ya tiene", { role: "Coach" }, "Coach"],
+    ["un Admin pide", { role: "Admin" }, "Committee"],
+  ] as const)(
+    "no avisa a nadie cuando la solicitud se rechaza porque %s",
+    async (_case, options, requestedRole) => {
+      const fake = fakeGateways({ ...options, adminIds: ADMIN_IDS });
+
+      await expect(
+        requestRole(fake.gateways, {
+          userId: USER_ID,
+          requestedRole,
+          justification: null,
+        }),
+      ).rejects.toThrow();
+
+      expect(fake.notifications).toEqual([]);
+    },
+  );
+});
+
+describe("aviso que falla", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("un aviso que falla no impide el de los demás Admin ni la solicitud", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fake = fakeGateways({
+      adminIds: ADMIN_IDS,
+      failingRecipients: [ADMIN_IDS[0]],
+    });
+
+    const created = await requestRole(fake.gateways, {
+      userId: USER_ID,
+      requestedRole: "Coach",
+      justification: null,
+    });
+
+    expect(created).toEqual(PENDING_COACH);
+    expect(fake.notifications).toEqual([receivedNotification(ADMIN_IDS[1])]);
+    expect(logged).toHaveBeenCalled();
+  });
+
+  it("si no se pueden leer los Admin, la solicitud queda y el error se registra", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fake = fakeGateways({ adminLookupFails: true });
+
+    const created = await requestRole(fake.gateways, {
+      userId: USER_ID,
+      requestedRole: "Coach",
+      justification: null,
+    });
+
+    expect(created).toEqual(PENDING_COACH);
+    expect(fake.inserts).toHaveLength(1);
+    expect(fake.notifications).toEqual([]);
+    expect(logged).toHaveBeenCalled();
   });
 });
 
