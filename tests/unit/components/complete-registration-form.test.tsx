@@ -64,6 +64,7 @@ function renderForm(pending: readonly PendingRequirement[]): void {
       pending={pending}
       countries={COUNTRIES}
       email={EMAIL}
+      clubName="Hobart Orcas"
     />,
   );
 }

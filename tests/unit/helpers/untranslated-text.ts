@@ -39,14 +39,6 @@ const VISIBLE_ATTRIBUTES: ReadonlySet<string> = new Set([
   "title",
 ]);
 
-/** Nombres propios que se escriben igual en todos los idiomas. El largo va
- * primero para que no lo parta el corto. */
-const UNTRANSLATABLE_NAMES = [
-  "Victoria Seadragons UWR Club",
-  "Victoria Seadragons",
-  "Seadragons",
-];
-
 // Una palabra son al menos dos letras seguidas: así no cuentan los signos
 // sueltos, los números ni una "x" de cerrar.
 const WORD = /\p{L}{2,}/u;
@@ -69,11 +61,10 @@ function isUntranslatableToken(token: string): boolean {
 }
 
 function isTranslatableText(raw: string): boolean {
-  const withoutNames = UNTRANSLATABLE_NAMES.reduce(
-    (remaining, name) => remaining.replaceAll(name, " "),
-    raw.replace(HTML_ENTITY, " "),
-  );
-  return withoutNames
+  // El nombre del club no es una excepción: sale de la base (#293), así que
+  // escrito a mano en la interfaz es un texto incrustado más.
+  return raw
+    .replace(HTML_ENTITY, " ")
     .split(/\s+/)
     .filter((token) => !isUntranslatableToken(token))
     .some((token) => WORD.test(token));

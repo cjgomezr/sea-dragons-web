@@ -6,14 +6,14 @@ import {
   parseConfirmationState,
 } from "@/lib/auth/registration-screen";
 import { listCountryOptions } from "@/lib/geo/countries";
+import { readMetadataContext } from "@/lib/club/metadata-context";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
-import { createTranslator } from "@/lib/i18n/translator";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const translate = createTranslator(await readRequestLocale());
+  const { translate, club } = await readMetadataContext();
   return {
-    title: translate("auth.registration.metaTitle"),
-    description: translate("auth.registration.metaDescription"),
+    title: translate("auth.registration.metaTitle", { club }),
+    description: translate("auth.registration.metaDescription", { club }),
   };
 }
 

@@ -136,18 +136,22 @@ describe("textos sueltos", () => {
   });
 });
 
-describe("lo que no se traduce", () => {
-  it("no marca el nombre del club", () => {
+describe("el nombre del club", () => {
+  it("lo marca escrito a mano, porque ya sale de la base", () => {
     const source = `const Brand = () => (
       <a href="/" aria-label="Victoria Seadragons">
-        <strong>Victoria Seadragons</strong> <span>Seadragons</span>
-        <small>© 2026 Victoria Seadragons UWR Club</small>
+        <strong>Victoria Seadragons</strong>
       </a>
     );`;
 
-    expect(scanComponent(source)).toEqual([]);
+    expect(scanComponent(source)).toEqual([
+      "Victoria Seadragons",
+      "Victoria Seadragons",
+    ]);
   });
+});
 
+describe("lo que no se traduce", () => {
   it("no marca las clases de CSS ni otros atributos que no se ven", () => {
     const source = `const Box = () => (
       <div className="app-card app-card--wide" id="main-content" role="region">
@@ -227,7 +231,7 @@ describe("metadatos", () => {
 
   it("marca una descripción incrustada en un metadata fijo, nombrando el archivo", () => {
     const source = `export const metadata: Metadata = {
-      title: "Victoria Seadragons",
+      title: brand.name,
       description: "Plataforma del club de rugby subacuático",
     };`;
 
@@ -275,14 +279,6 @@ describe("metadatos", () => {
     expect(scanRoute(source).map(({ text }) => text)).toEqual(["Tu club"]);
   });
 
-  it("no marca la plantilla de título que solo pone el nombre del club", () => {
-    const source = `export const metadata: Metadata = {
-      title: { template: "%s · Victoria Seadragons", default: "Victoria Seadragons" },
-    };`;
-
-    expect(scanRoute(source)).toEqual([]);
-  });
-
   it("no marca los metadatos que vienen del catálogo", () => {
     const source = `export async function generateMetadata(): Promise<Metadata> {
       const translate = createTranslator(await readRequestLocale());
@@ -295,12 +291,14 @@ describe("metadatos", () => {
     expect(scanRoute(source)).toEqual([]);
   });
 
-  it("no marca el nombre del club como título", () => {
+  it("marca el nombre del club escrito a mano como título", () => {
     const source = `export const metadata: Metadata = {
       title: "Victoria Seadragons",
     };`;
 
-    expect(scanRoute(source)).toEqual([]);
+    expect(scanRoute(source).map(({ text }) => text)).toEqual([
+      "Victoria Seadragons",
+    ]);
   });
 
   it("no marca un title o description que no son metadatos", () => {

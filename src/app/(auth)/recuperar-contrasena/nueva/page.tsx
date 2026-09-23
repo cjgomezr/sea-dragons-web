@@ -4,14 +4,14 @@ import {
   RecoveryLinkUnusable,
 } from "@/components/auth/NewPasswordForm";
 import { RESET_TOKEN_QUERY_PARAM } from "@/lib/auth/routes";
+import { readMetadataContext } from "@/lib/club/metadata-context";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
-import { createTranslator } from "@/lib/i18n/translator";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const translate = createTranslator(await readRequestLocale());
+  const { translate, club } = await readMetadataContext();
   return {
-    title: translate("auth.newPassword.metaTitle"),
-    description: translate("auth.newPassword.metaDescription"),
+    title: translate("auth.newPassword.metaTitle", { club }),
+    description: translate("auth.newPassword.metaDescription", { club }),
     // La URL de esta pantalla lleva el token del enlace. Sin esto, cualquier
     // navegación que saliera de aquí se lo contaría al siguiente sitio en la
     // cabecera Referer.

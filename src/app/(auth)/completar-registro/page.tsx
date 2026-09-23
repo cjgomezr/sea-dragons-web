@@ -13,8 +13,9 @@ import {
   describeMissingAuthKeys,
 } from "@/lib/auth/supabase-auth-gateways";
 import { listCountryOptions } from "@/lib/geo/countries";
+import { readMetadataContext } from "@/lib/club/metadata-context";
+import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
-import { createTranslator } from "@/lib/i18n/translator";
 import { readServerCookies } from "@/lib/supabase/server-cookies";
 import { createSessionClient } from "@/lib/supabase/session-client";
 
@@ -28,10 +29,10 @@ import { createSessionClient } from "@/lib/supabase/session-client";
  */
 
 export async function generateMetadata(): Promise<Metadata> {
-  const translate = createTranslator(await readRequestLocale());
+  const { translate, club } = await readMetadataContext();
   return {
-    title: translate("auth.completion.metaTitle"),
-    description: translate("auth.completion.metaDescription"),
+    title: translate("auth.completion.metaTitle", { club }),
+    description: translate("auth.completion.metaDescription", { club }),
   };
 }
 
@@ -77,13 +78,17 @@ export default async function CompleteRegistrationPage(): Promise<React.JSX.Elem
     redirect(DASHBOARD_PATH);
   }
 
-  const locale = await readRequestLocale();
+  const [locale, brand] = await Promise.all([
+    readRequestLocale(),
+    readClubBrand(),
+  ]);
   return (
     <CompleteRegistrationForm
       locale={locale}
       pending={completion.pending}
       countries={listCountryOptions(locale)}
       email={caller.email}
+      clubName={brand.name}
     />
   );
 }

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { NewMemberScreen } from "@/components/directory/NewMemberScreen";
 import { listCountryOptions } from "@/lib/geo/countries";
+import { readMetadataContext } from "@/lib/club/metadata-context";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
-import { createTranslator } from "@/lib/i18n/translator";
 
 /**
  * El alta de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta desde
@@ -14,9 +14,9 @@ import { createTranslator } from "@/lib/i18n/translator";
  */
 
 export async function generateMetadata(): Promise<Metadata> {
-  const translate = createTranslator(await readRequestLocale());
+  const { translate, club } = await readMetadataContext();
   return {
-    title: translate("newMember.metaTitle"),
+    title: translate("newMember.metaTitle", { club }),
     description: translate("newMember.metaDescription"),
   };
 }

@@ -14,8 +14,8 @@ import { createSupabaseRoleRequestGateways } from "@/lib/auth/supabase-role-requ
 import { listCountryOptions } from "@/lib/geo/countries";
 import { type MemberGroup, listMemberGroups } from "@/lib/groups/member-groups";
 import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-groups-gateway";
+import { readMetadataContext } from "@/lib/club/metadata-context";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
-import { createTranslator } from "@/lib/i18n/translator";
 import { type OwnProfile, readOwnProfile } from "@/lib/members/own-profile";
 import {
   type ProfilePhoto,
@@ -39,9 +39,9 @@ import { createSessionClient } from "@/lib/supabase/session-client";
  */
 
 export async function generateMetadata(): Promise<Metadata> {
-  const translate = createTranslator(await readRequestLocale());
+  const { translate, club } = await readMetadataContext();
   return {
-    title: translate("account.metaTitle"),
+    title: translate("account.metaTitle", { club }),
     description: translate("account.metaDescription"),
   };
 }

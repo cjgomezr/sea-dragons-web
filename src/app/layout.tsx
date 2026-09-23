@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const translate = createTranslator(locale);
   return {
     title: brand.name,
-    description: translate("app.metaDescription"),
+    description: translate("app.metaDescription", { club: brand.name }),
   };
 }
 

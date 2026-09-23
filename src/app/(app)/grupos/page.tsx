@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { GroupsScreen } from "@/components/groups/GroupsScreen";
+import { readMetadataContext } from "@/lib/club/metadata-context";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
-import { createTranslator } from "@/lib/i18n/translator";
 
 /**
  * La sección Grupos (#228, RF-2 a RF-7 del PRD de E4): los grupos del club con
@@ -17,9 +17,9 @@ import { createTranslator } from "@/lib/i18n/translator";
  */
 
 export async function generateMetadata(): Promise<Metadata> {
-  const translate = createTranslator(await readRequestLocale());
+  const { translate, club } = await readMetadataContext();
   return {
-    title: translate("groups.metaTitle"),
+    title: translate("groups.metaTitle", { club }),
     description: translate("groups.metaDescription"),
   };
 }

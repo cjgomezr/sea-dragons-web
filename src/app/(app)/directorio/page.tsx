@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { DirectoryScreen } from "@/components/directory/DirectoryScreen";
+import { readMetadataContext } from "@/lib/club/metadata-context";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
-import { createTranslator } from "@/lib/i18n/translator";
 
 /**
  * El directorio del club (#239, RF-2 del PRD de E5): quién está en el club,
@@ -15,9 +15,9 @@ import { createTranslator } from "@/lib/i18n/translator";
  */
 
 export async function generateMetadata(): Promise<Metadata> {
-  const translate = createTranslator(await readRequestLocale());
+  const { translate, club } = await readMetadataContext();
   return {
-    title: translate("directory.metaTitle"),
+    title: translate("directory.metaTitle", { club }),
     description: translate("directory.metaDescription"),
   };
 }

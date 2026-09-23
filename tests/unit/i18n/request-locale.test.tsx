@@ -80,7 +80,7 @@ describe("metadatos por idioma", () => {
     const metadata = await generateMetadata();
 
     expect(metadata.description).toBe(
-      createTranslator("en")("app.metaDescription"),
+      createTranslator("en")("app.metaDescription", { club: "Hobart Orcas" }),
     );
     expect(metadata.description).toMatch(/underwater rugby/i);
   });
@@ -91,7 +91,7 @@ describe("metadatos por idioma", () => {
     const metadata = await generateMetadata();
 
     expect(metadata.description).toBe(
-      createTranslator("es")("app.metaDescription"),
+      createTranslator("es")("app.metaDescription", { club: "Hobart Orcas" }),
     );
     expect(metadata.description).toMatch(/rugby subacuático/i);
   });
