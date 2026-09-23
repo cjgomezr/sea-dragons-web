@@ -1927,8 +1927,15 @@ button.notification-item-content:hover {
   gap: var(--space-1);
 }
 
+/* A 375px la columna del nombre es más estrecha que "Deactivated" o
+   "Desactivada": sin guion, el navegador parte la palabra donde caiga. Con
+   `hyphens` la parte por sílabas según el `lang` de la página (#273). Safari
+   aún pide el prefijo. El Chromium sin interfaz de las capturas no trae
+   diccionarios de guiones, así que allí se sigue viendo el corte seco. */
 .directory-mark {
   padding: 0 var(--space-2);
+  -webkit-hyphens: auto;
+  hyphens: auto;
   font-family: var(--font-family-mono);
   font-size: 12px;
   border: 1px solid;
