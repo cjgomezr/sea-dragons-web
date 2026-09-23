@@ -69,10 +69,12 @@ async function insertAuditEvent(
 }
 
 describeConPostgres("privilegios de clubs", () => {
-  it("no deja a anon ningún privilegio", async () => {
+  it("no deja a anon ningún privilegio sobre la tabla entera", async () => {
     // Hasta `0008_sonda_salud` conservaba `select` porque la sonda de
     // /api/v1/health leía esta tabla con la llave anónima. Ahora la sonda
-    // llama a `public.health_probe()` y la tabla no le debe nada a `anon`.
+    // llama a `public.health_probe()`. Desde `0022_club_brand` `anon` lee las
+    // columnas de la marca, y sólo esas: lo comprueba
+    // `club-brand-migration.test.ts`.
     const database = await migratedDatabase();
 
     expect(await privilegesOf(database, "clubs", "anon")).toEqual([]);

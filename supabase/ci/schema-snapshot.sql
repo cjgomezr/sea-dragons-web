@@ -53,6 +53,20 @@ with objetos as (
     from information_schema.role_table_grants
    where table_schema = 'public'
   union all
+  -- Los GRANT de columna sueltos, leídos de `attacl` y no de
+  -- `information_schema.column_privileges`: esa vista repite por cada columna
+  -- los GRANT de tabla de arriba, y la descripción se llenaría de duplicados.
+  select format(
+           'grant-columna %s.%s %s %s',
+           c.relname, a.attname, acl.grantee::regrole, acl.privilege_type
+         )
+    from pg_attribute a
+    join pg_class c on c.oid = a.attrelid
+    join pg_namespace n on n.oid = c.relnamespace
+   cross join lateral aclexplode(a.attacl) acl
+   where n.nspname = 'public'
+     and a.attacl is not null
+  union all
   select format(
            'funcion %s(%s)', p.proname, pg_get_function_identity_arguments(p.oid)
          )

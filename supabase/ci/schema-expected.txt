@@ -7,8 +7,11 @@ columna audit_log.entity_type tipo=text null=NO default=-
 columna audit_log.id tipo=uuid null=NO default=gen_random_uuid()
 columna audit_log.metadata tipo=jsonb null=YES default=-
 columna audit_log.result tipo=text null=NO default=-
+columna clubs.accent_color tipo=text null=NO default='#1c6ea4'::text
 columna clubs.created_at tipo=timestamp with time zone null=NO default=now()
 columna clubs.id tipo=uuid null=NO default=gen_random_uuid()
+columna clubs.initials tipo=text null=YES default=-
+columna clubs.logo_path tipo=text null=YES default=-
 columna clubs.name tipo=text null=NO default=-
 columna clubs.slug tipo=text null=NO default=-
 columna confirmation_email_requests.club_id tipo=uuid null=NO default=-
@@ -239,6 +242,10 @@ grant role_requests service_role SELECT
 grant role_requests service_role TRIGGER
 grant role_requests service_role TRUNCATE
 grant role_requests service_role UPDATE
+grant-columna clubs.accent_color anon SELECT
+grant-columna clubs.initials anon SELECT
+grant-columna clubs.logo_path anon SELECT
+grant-columna clubs.name anon SELECT
 indice audit_log_club_id_created_at_idx CREATE INDEX audit_log_club_id_created_at_idx ON public.audit_log USING btree (club_id, created_at DESC)
 indice audit_log_pkey CREATE UNIQUE INDEX audit_log_pkey ON public.audit_log USING btree (id)
 indice clubs_pkey CREATE UNIQUE INDEX clubs_pkey ON public.clubs USING btree (id)
@@ -267,6 +274,7 @@ indice role_requests_one_pending_per_member CREATE UNIQUE INDEX role_requests_on
 indice role_requests_pkey CREATE UNIQUE INDEX role_requests_pkey ON public.role_requests USING btree (id)
 indice role_requests_user_id_created_at_idx CREATE INDEX role_requests_user_id_created_at_idx ON public.role_requests USING btree (user_id, created_at DESC)
 policy audit_log.audit_log_select_denied cmd=SELECT roles={authenticated} using=false check=-
+policy clubs.clubs_select_anon cmd=SELECT roles={anon} using=true check=-
 policy clubs.clubs_select_authenticated cmd=SELECT roles={authenticated} using=true check=-
 policy confirmation_email_requests.confirmation_email_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy email_send_requests.email_send_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
@@ -282,6 +290,9 @@ policy role_requests.role_requests_select_own cmd=SELECT roles={authenticated} u
 restriccion audit_log.audit_log_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion audit_log.audit_log_pkey PRIMARY KEY (id)
 restriccion audit_log.audit_log_result_check CHECK ((result = ANY (ARRAY['success'::text, 'failure'::text])))
+restriccion clubs.clubs_accent_color_hex CHECK ((accent_color ~ '^#[0-9A-Fa-f]{6}$'::text))
+restriccion clubs.clubs_initials_length CHECK (((char_length(initials) >= 1) AND (char_length(initials) <= 3)))
+restriccion clubs.clubs_name_length CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 60)))
 restriccion clubs.clubs_pkey PRIMARY KEY (id)
 restriccion clubs.clubs_slug_key UNIQUE (slug)
 restriccion confirmation_email_requests.confirmation_email_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
