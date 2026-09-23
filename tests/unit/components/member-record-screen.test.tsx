@@ -400,7 +400,7 @@ describe("ficha en pantalla: errores", () => {
     [
       "un miembro dado de baja",
       () => errorResponse(422, "business_rule", "member_inactive"),
-      "A former member can't be added to groups.",
+      "A member with a deactivated account can't be added to groups.",
     ],
     [
       "un grupo que ya no existe",
@@ -484,14 +484,14 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
 
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "Deactivate member" }));
+      .click(screen.getByRole("button", { name: "Deactivate account" }));
 
     expect(
-      await screen.findByText("Paula Player is no longer a member."),
+      await screen.findByText("Paula Player's account was deactivated."),
     ).toBeVisible();
     expect(statusChanges).toEqual([{ status: "inactive" }]);
     expect(
-      screen.getByRole("button", { name: "Reactivate member" }),
+      screen.getByRole("button", { name: "Reactivate account" }),
     ).toBeInTheDocument();
   });
 
@@ -501,14 +501,14 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
 
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "Reactivate member" }));
+      .click(screen.getByRole("button", { name: "Reactivate account" }));
 
     expect(
-      await screen.findByText("Paula Player is back in the club."),
+      await screen.findByText("Paula Player's account was reactivated."),
     ).toBeVisible();
     expect(statusChanges).toEqual([{ status: "active" }]);
     expect(
-      screen.getByRole("button", { name: "Deactivate member" }),
+      screen.getByRole("button", { name: "Deactivate account" }),
     ).toBeInTheDocument();
   });
 
@@ -520,13 +520,13 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
 
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "Deactivate member" }));
+      .click(screen.getByRole("button", { name: "Deactivate account" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "This is the club's last Admin and can't be deactivated. Name another Admin first.",
+      "This is the club's last Admin, so their account can't be deactivated. Name another Admin first.",
     );
     expect(
-      screen.getByRole("button", { name: "Deactivate member" }),
+      screen.getByRole("button", { name: "Deactivate account" }),
     ).toBeEnabled();
   });
 
@@ -539,10 +539,10 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
 
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "Deactivate member" }));
+      .click(screen.getByRole("button", { name: "Deactivate account" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "You can't deactivate yourself. Another Admin has to do it.",
+      "You can't deactivate your own account. Another Admin has to do it.",
     );
   });
 
@@ -552,7 +552,7 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
 
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "Deactivate member" }));
+      .click(screen.getByRole("button", { name: "Deactivate account" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "That member isn't in the club.",
@@ -568,7 +568,7 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
 
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "Deactivate member" }));
+      .click(screen.getByRole("button", { name: "Deactivate account" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "The membership changed, but it couldn't be logged.",
@@ -585,7 +585,7 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
     });
     await renderScreen();
     const user = userEvent.setup();
-    const button = screen.getByRole("button", { name: "Deactivate member" });
+    const button = screen.getByRole("button", { name: "Deactivate account" });
 
     await user.dblClick(button);
 
@@ -593,7 +593,7 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
     expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
     release!();
     expect(
-      await screen.findByText("Paula Player is no longer a member."),
+      await screen.findByText("Paula Player's account was deactivated."),
     ).toBeVisible();
   });
 
@@ -606,13 +606,13 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
     ).toBeInTheDocument();
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "Dar de baja" }));
+      .click(screen.getByRole("button", { name: "Desactivar cuenta" }));
 
     expect(
-      await screen.findByText("Paula Player quedó de baja."),
+      await screen.findByText("La cuenta de Paula Player quedó desactivada."),
     ).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "Reactivar" }),
+      screen.getByRole("button", { name: "Reactivar cuenta" }),
     ).toBeInTheDocument();
   });
 });

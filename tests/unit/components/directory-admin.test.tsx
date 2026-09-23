@@ -578,7 +578,7 @@ describe("directorio para Admin: alta de un miembro (#243)", () => {
 
     await renderAdminDirectory();
 
-    expect(screen.getByRole("link", { name: "Add member" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Invite member" })).toHaveAttribute(
       "href",
       "/directorio/nuevo",
     );

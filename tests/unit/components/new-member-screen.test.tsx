@@ -107,7 +107,7 @@ async function fillValidForm(): Promise<void> {
 }
 
 function submitButton(): HTMLElement {
-  return screen.getByRole("button", { name: /^add member|adding/i });
+  return screen.getByRole("button", { name: /^invite member|inviting/i });
 }
 
 beforeEach(() => {
@@ -163,7 +163,7 @@ describe("formulario de alta", () => {
 
     expect(
       await screen.findByText(
-        "Nerea Silva was added. We sent the invitation to nerea@example.com.",
+        "Nerea Silva was invited. We sent the invitation to nerea@example.com.",
       ),
     ).toBeVisible();
     expect(calls).toEqual([
@@ -210,7 +210,7 @@ describe("formulario de alta", () => {
     await user.click(submitButton());
     expect(
       await screen.findByText(
-        "Nerea Silva was added, but the invitation could not be sent.",
+        "We created Nerea Silva's account, but the invitation could not be sent.",
       ),
     ).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Resend invitation" }));
@@ -253,7 +253,7 @@ describe("formulario de alta", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: "Dar de alta a un miembro",
+        name: "Invitar miembro",
       }),
     ).toBeVisible();
     expect(screen.getByLabelText("Nombre completo")).toBeInTheDocument();
