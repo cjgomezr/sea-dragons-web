@@ -35,6 +35,10 @@ export const AUDIT_ACTIONS = [
   // están en la entrada. El alta de un miembro (#243) también deja su AUF
   // verificado, pero no escribe esta entrada: ahí el AUF nace con la fila.
   "member.auf_verified",
+  // RF-6 de E18a (#296): un Admin cambia la configuración del club. La
+  // metadata sólo nombra los campos que cambiaron (`{ fields: ["name"] }`),
+  // nunca sus valores ni los anteriores. La entidad es el id del club.
+  "club.settings_changed",
   "payment.status_changed",
 ] as const;
 
