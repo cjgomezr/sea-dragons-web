@@ -2441,9 +2441,15 @@ button.notification-item-content:hover {
   gap: var(--space-2);
 }
 
+/* Con el aspecto de las etiquetas de los campos de arriba: son los mismos
+   datos del club, sólo que todavía no se editan aquí. */
 .club-settings-brand-row dt {
-  font-size: 14px;
-  font-weight: 600;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
 }
 
 .club-settings-brand-row dd {

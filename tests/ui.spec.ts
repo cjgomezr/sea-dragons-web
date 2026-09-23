@@ -5689,3 +5689,311 @@ test.describe("menú de la cuenta", () => {
     ).toBeVisible();
   });
 });
+/* ---------------------------------------------------------------------------
+   La configuración del club (#296, RF-6 del PRD de E18a), abierta desde el
+   menú de la cuenta del Admin. Sin mockup: se revisa contra design-system.md,
+   con la ficha del miembro como referencia de formulario.
+
+   Las capturas leen datos fijos, servidos por `page.route`: guardar de verdad
+   cambiaría el nombre que sale en la cabecera de todas las demás capturas de
+   la corrida. Lo que la frontera y el endpoint de verdad responden se prueba
+   aparte, con un guardado que no cambia nada.
+   --------------------------------------------------------------------------- */
+
+const CLUB_SETTINGS_SCREEN_PATH = "/club";
+const CLUB_SETTINGS_ENDPOINT = "/api/v1/club/settings";
+
+/** El máximo que admite `clubs_name_length`, para el caso de contenido
+ * largo. */
+const STUBBED_CLUB_SETTINGS = {
+  name: "Asociación Deportiva de Rugby Subacuático del Sur · Tasmania",
+  initials: "AD",
+  accentColor: "#1c6ea4",
+  logoPath: null,
+} as const;
+
+const ENGLISH_SAVE_SETTINGS = "Save settings";
+const SPANISH_SAVE_SETTINGS = "Guardar la configuración";
+
+type ClubSettingsSave = "rejects_as_conflict" | "hangs" | "drops_connection";
+
+async function stubClubSettings(
+  page: Page,
+  save: ClubSettingsSave = "hangs",
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === CLUB_SETTINGS_ENDPOINT,
+    async (route, request) => {
+      if (request.method() !== "PATCH") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ data: STUBBED_CLUB_SETTINGS }),
+        });
+        return;
+      }
+      if (save === "drops_connection") {
+        await route.abort("internetdisconnected");
+        return;
+      }
+      if (save === "rejects_as_conflict") {
+        await route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: {
+              code: "conflict",
+              message: "Otro Admin cambió la configuración.",
+              reason: "club_settings_changed",
+            },
+          }),
+        });
+      }
+      // "hangs": sin respuesta, la pantalla se queda guardando.
+    },
+  );
+}
+
+function clubNameField(page: Page): Locator {
+  return page.getByLabel(/^(Club name|Nombre del club)$/);
+}
+
+/** Borra el nombre y guarda: la pantalla lo rechaza junto al campo sin
+ * mandar nada. */
+function submitEmptyName(saveLabel: string, issueText: RegExp) {
+  return async (page: Page): Promise<void> => {
+    await clubNameField(page).fill("");
+    await page.getByRole("button", { name: saveLabel }).click();
+    await expect(page.getByText(issueText)).toBeVisible();
+  };
+}
+
+/** Guarda y espera a lo que conteste el servidor fingido. */
+function submitAndExpect(saveLabel: string, outcome: RegExp) {
+  return async (page: Page): Promise<void> => {
+    await page.getByRole("button", { name: saveLabel }).click();
+    await expect(page.getByText(outcome)).toBeVisible();
+  };
+}
+
+type ClubSettingsState = {
+  readonly name: string;
+  readonly save?: ClubSettingsSave;
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+  readonly prepare?: (page: Page) => Promise<void>;
+};
+
+const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
+  { name: "club-cargada" },
+  { name: "club-cargada-es", beforeVisit: chooseSpanish },
+  {
+    name: "club-aviso-validacion",
+    prepare: submitEmptyName(ENGLISH_SAVE_SETTINGS, /The club needs a name/),
+  },
+  {
+    name: "club-aviso-validacion-es",
+    beforeVisit: chooseSpanish,
+    prepare: submitEmptyName(
+      SPANISH_SAVE_SETTINGS,
+      /El club necesita un nombre/,
+    ),
+  },
+  {
+    name: "club-guardando",
+    save: "hangs",
+    prepare: submitAndExpect(ENGLISH_SAVE_SETTINGS, /^Saving…$/),
+  },
+  {
+    name: "club-error-de-red",
+    save: "drops_connection",
+    prepare: submitAndExpect(ENGLISH_SAVE_SETTINGS, /reach the server/),
+  },
+  {
+    name: "club-error-de-red-es",
+    save: "drops_connection",
+    beforeVisit: chooseSpanish,
+    prepare: submitAndExpect(
+      SPANISH_SAVE_SETTINGS,
+      /No pudimos hablar con el servidor/,
+    ),
+  },
+  {
+    name: "club-conflicto",
+    save: "rejects_as_conflict",
+    prepare: submitAndExpect(
+      ENGLISH_SAVE_SETTINGS,
+      /Another Admin changed the settings/,
+    ),
+  },
+];
+
+async function goToClubSettings(
+  page: Page,
+  state: ClubSettingsState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await stubClubSettings(page, state.save);
+  await state.beforeVisit?.(page);
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${CLUB_SETTINGS_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, CLUB_SETTINGS_SCREEN_PATH, theme);
+  }
+  await expect(clubNameField(page)).toHaveValue(STUBBED_CLUB_SETTINGS.name);
+  await state.prepare?.(page);
+  // El puntero se queda sobre el botón pulsado: la captura saldría con su
+  // hover.
+  await page.mouse.move(0, 0);
+}
+
+for (const state of CLUB_SETTINGS_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToClubSettings(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToClubSettings(page, state);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToClubSettings(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("un Admin frente a la configuración de verdad", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+  test.describe.configure({ timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS });
+
+  test("la abre desde el menú de la cuenta", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${APP_URL}/dashboard`);
+    const menu = await openAccountMenu(page);
+
+    await menu.getByRole("link", { name: "Club settings" }).click();
+
+    await expect(page).toHaveURL(new RegExp(`${CLUB_SETTINGS_SCREEN_PATH}$`));
+    // Es la primera petición de la corrida al endpoint real: el dev server
+    // lo compila aquí.
+    await expect(clubNameField(page)).not.toHaveValue("", {
+      timeout: ACCOUNT_CHANGE_TIMEOUT_MS,
+    });
+  });
+
+  test("su menú abierto no tiene violaciones (axe-core)", async ({ page }) => {
+    await page.goto(`${APP_URL}/dashboard`);
+    await openAccountMenu(page);
+
+    await expectNoAxeViolations(page);
+  });
+
+  test("guardar sin cambiar nada responde 200 con lo que hay", async ({
+    request,
+  }) => {
+    const read = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
+    expect(read.status()).toBe(200);
+    const { data } = (await read.json()) as {
+      data: { name: string; initials: string | null };
+    };
+    const identity = { name: data.name, initials: data.initials };
+
+    const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
+      data: { ...identity, expected: identity },
+    });
+
+    expect(write.status()).toBe(200);
+    await expect(write.json()).resolves.toMatchObject({ data: identity });
+  });
+
+  test("el endpoint rechaza un nombre vacío con 400", async ({ request }) => {
+    const empty = { name: "", initials: null };
+
+    const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
+      data: { ...empty, expected: empty },
+    });
+
+    expect(write.status()).toBe(400);
+  });
+});
+
+test.describe("un Player frente a la configuración del club", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("abrirla a mano lo manda al panel", async ({ page }) => {
+    await page.goto(`${APP_URL}${CLUB_SETTINGS_SCREEN_PATH}`);
+
+    await expect(page).toHaveURL(/\/dashboard$/);
+  });
+
+  test("su menú de la cuenta no la ofrece", async ({ page }) => {
+    await page.goto(`${APP_URL}/dashboard`);
+    const menu = await openAccountMenu(page);
+
+    await expect(menu.getByRole("link", { name: "Club settings" })).toHaveCount(
+      0,
+    );
+  });
+
+  test("el endpoint le responde 403, para leer y para guardar", async ({
+    request,
+  }) => {
+    const identity = { name: "Otro club", initials: null };
+
+    const read = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
+    const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
+      data: { ...identity, expected: identity },
+    });
+
+    expect(read.status()).toBe(403);
+    expect(write.status()).toBe(403);
+  });
+});
+
+test.describe("sin sesión frente a la configuración del club", () => {
+  test("el endpoint responde 401", async ({ request }) => {
+    const read = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
+
+    expect(read.status()).toBe(401);
+  });
+
+  test("la pantalla manda a iniciar sesión", async ({ page }) => {
+    await page.goto(`${APP_URL}${CLUB_SETTINGS_SCREEN_PATH}`);
+
+    await expect(page).toHaveURL(/\/entrar/);
+  });
+});
