@@ -21,6 +21,7 @@ export const SPANISH_STATES_WITH_OWN_CAPTURE: readonly string[] = [
   "avisos-con-avisos-es",
   "ficha-aviso-validacion-es",
   "ficha-invitacion-pendiente-es",
+  "menu-cuenta-es",
   "perfil-error-de-red-es",
 ];
 
