@@ -7,6 +7,11 @@ const requestLocale = { current: "en" as Locale };
 vi.mock("@/lib/i18n/request-locale", () => ({
   readRequestLocale: async () => requestLocale.current,
 }));
+// La marca sale de la base (#292): la del test es otra que la de Victoria,
+// así que un nombre escrito a mano en la pantalla no pasaría.
+vi.mock("@/lib/club/supabase-club-brand", () => ({
+  readClubBrand: async () => ({ name: "Hobart Orcas", initials: "HO" }),
+}));
 
 const { default: CalendarioPage } = await import("@/app/(app)/calendario/page");
 const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");
@@ -71,7 +76,7 @@ describe("panel principal", () => {
     await renderIn("en", HomePage);
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Victoria Seadragons" }),
+      screen.getByRole("heading", { level: 1, name: "Hobart Orcas" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/underwater rugby club/i)).toBeInTheDocument();
     expect(

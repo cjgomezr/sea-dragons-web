@@ -4,25 +4,32 @@ import { MobileTabBar } from "@/components/MobileTabBar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SidebarNav } from "@/components/SidebarNav";
 import type { Role } from "@/lib/auth/roles";
+import type { ClubBrand } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
-
-const CLUB_NAME = "Victoria Seadragons";
 
 export function AppShell({
   locale,
   role,
+  brand,
   children,
 }: {
   locale: Locale;
   /** El que leyó el servidor: decide qué secciones ofrece la navegación. */
   role: Role;
+  /** La que leyó el servidor de la base (#292). */
+  brand: ClubBrand;
   children: ReactNode;
 }): React.JSX.Element {
   return (
     <div className="app-shell">
       <aside className="app-sidebar">
         <div className="app-sidebar-header">
-          <span className="app-brand">{CLUB_NAME}</span>
+          {/* Un nombre largo se recorta con puntos suspensivos: el título lo
+              deja leer entero, y el texto sigue completo para un lector de
+              pantalla. */}
+          <span className="app-brand" title={brand.name}>
+            {brand.name}
+          </span>
           {/* La campana va fuera del menú de la cuenta (#287): lleva el número
               de avisos sin leer, y dentro de un menú no avisaría de nada. */}
           <div className="app-sidebar-actions">

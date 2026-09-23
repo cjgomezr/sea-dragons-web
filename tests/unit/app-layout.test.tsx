@@ -37,6 +37,9 @@ vi.mock("@/lib/supabase/session-client", () => ({
 vi.mock("@/lib/auth/session-reader", () => ({
   readSessionState: (...args: unknown[]) => readSessionState(...args),
 }));
+vi.mock("@/lib/club/supabase-club-brand", () => ({
+  readClubBrand: async () => ({ name: "Hobart Orcas", initials: "HO" }),
+}));
 
 const { default: AppLayout } = await import("@/app/(app)/layout");
 
@@ -54,6 +57,15 @@ beforeEach(() => {
 });
 
 describe("disposición de la aplicación", () => {
+  // #292: la cabecera enseña la marca que guarda la base.
+  it("pone en la cabecera el nombre guardado del club", async () => {
+    givenSession({ kind: "active", role: "Player" });
+
+    await renderAppLayout();
+
+    expect(screen.getByText("Hobart Orcas")).toBeInTheDocument();
+  });
+
   it("dibuja la navegación de un Player sin Equipos, Evaluaciones ni Administración", async () => {
     givenSession({ kind: "active", role: "Player" });
 

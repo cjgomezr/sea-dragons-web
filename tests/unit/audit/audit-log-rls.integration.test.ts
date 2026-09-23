@@ -6,6 +6,7 @@ import {
   createSupabaseAuditLogWriter,
   recordAuditEvent,
 } from "@/lib/audit/audit-log";
+import { DEFAULT_CLUB_SLUG } from "@/lib/auth/supabase-auth-gateways";
 import {
   readSupabaseConfig,
   readSupabaseServiceRoleConfig,
@@ -77,14 +78,18 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
 
+    // Por `slug`, no "el primer club que salga": `seadragons-dev` acumula
+    // clubes efímeros que otras suites crean y borran, y si a esta le tocaba
+    // uno de ésos mientras su dueña lo borraba, las escrituras de abajo caían
+    // por clave foránea (23503). El club de la instalación no lo borra nadie.
     const { data: club, error: clubError } = await serviceClient
       .from("clubs")
       .select("id")
-      .limit(1)
+      .eq("slug", DEFAULT_CLUB_SLUG)
       .single();
     if (clubError || !club) {
       throw new Error(
-        `No se pudo leer un club de prueba: ${clubError?.message ?? "sin filas"}`,
+        `No se pudo leer el club ${DEFAULT_CLUB_SLUG}: ${clubError?.message ?? "sin filas"}`,
       );
     }
     clubId = club.id as string;
