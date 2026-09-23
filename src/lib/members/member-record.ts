@@ -497,7 +497,8 @@ export async function updateMemberRecord(
   // Los grupos van primero porque son lo que una regla puede rechazar a estas
   // alturas. Si el socio desapareciera justo en medio, el 404 llega con sus
   // pertenencias ya cambiadas, pero las de una fila borrada se van con ella
-  // por la cascada.
+  // por la cascada. Igual con el 409 de la fecha: los grupos ya quedaron
+  // guardados, y volver a guardar la ficha no los repite.
   await applyGroupChanges(
     gateways,
     { callerId: request.callerId, scope },
