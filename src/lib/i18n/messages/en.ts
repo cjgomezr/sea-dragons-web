@@ -425,7 +425,7 @@ export const englishMessages = {
     "The name must have between 1 and {max} characters.",
   "groups.error.groupGone": "That group is no longer in the club.",
   "groups.error.memberInactive":
-    "That member already left the club, so they can't be added.",
+    "That member's account is deactivated, so they can't be added.",
   "groups.error.signInRequired":
     "Your session has ended. Sign in again to keep going.",
   "groups.error.forbidden": "Your role can't manage the club's groups.",
@@ -451,13 +451,13 @@ export const englishMessages = {
   "directory.search.placeholder": "Search members…",
   "directory.role.legend": "Filter by role",
   "directory.role.all": "All",
-  "directory.includeInactive": "Include former members",
+  "directory.includeInactive": "Include deactivated accounts",
   "directory.empty": "No member matches what you're looking for.",
   "directory.clearFilters": "Clear the filters",
   "directory.column.member": "Member",
   "directory.column.role": "Role",
   "directory.column.position": "Position",
-  "directory.mark.inactive": "Former member",
+  "directory.mark.inactive": "Deactivated",
   "directory.mark.aufExpired": "AUF expired",
   "directory.mark.pendingActivation": "Pending activation",
   "directory.error.signInRequired":
@@ -495,7 +495,7 @@ export const englishMessages = {
   "memberRecord.error.groupNotFound":
     "One of those groups is no longer in the club. Reload the record.",
   "memberRecord.error.memberInactive":
-    "A former member can't be added to groups.",
+    "A member with a deactivated account can't be added to groups.",
   "memberRecord.error.signInRequired":
     "Your session ended. Sign in again to keep going.",
   "memberRecord.error.forbidden": "Only an Admin can see and edit this record.",
@@ -503,13 +503,13 @@ export const englishMessages = {
   "directory.aufSummary": "AUF {number} · expires {date}",
   "directory.aufWithoutExpiry": "AUF {number} · no expiry date",
   "directory.aufMissing": "No AUF",
-  // El alta de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta
+  // La invitación de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta
   // desde la cabecera del directorio.
-  "directory.addMember": "Add member",
-  "newMember.metaTitle": "Add a member · Victoria Seadragons",
+  "directory.addMember": "Invite member",
+  "newMember.metaTitle": "Invite member · Victoria Seadragons",
   "newMember.metaDescription":
-    "Add a member to the club and send them an invitation to activate their account.",
-  "newMember.title": "Add a member",
+    "Invite a member to the club and send them an email to activate their account.",
+  "newMember.title": "Invite member",
   "newMember.lead":
     "They join as a Player and get an email to activate their account. Their role can be changed from the directory.",
   "newMember.loading": "Loading the club's groups…",
@@ -525,16 +525,16 @@ export const englishMessages = {
   "newMember.auf.title": "AUF registration",
   "newMember.auf.number": "AUF number",
   "newMember.auf.expiry": "AUF expiry date",
-  "newMember.submit": "Add member",
-  "newMember.sending": "Adding…",
+  "newMember.submit": "Invite member",
+  "newMember.sending": "Inviting…",
   "newMember.created.sent":
-    "{name} was added. We sent the invitation to {email}.",
+    "{name} was invited. We sent the invitation to {email}.",
   "newMember.created.notSent":
-    "{name} was added, but the invitation could not be sent.",
+    "We created {name}'s account, but the invitation could not be sent.",
   "newMember.resend": "Resend invitation",
   "newMember.resending": "Resending…",
   "newMember.resent": "We sent a new invitation to {email}.",
-  "newMember.addAnother": "Add another member",
+  "newMember.addAnother": "Invite another member",
   "newMember.issue.fullNameMissing": "Write the member's name.",
   "newMember.issue.emailMalformed": "Write a valid email address.",
   "newMember.issue.countryUnknown": "Choose a country.",
@@ -555,29 +555,29 @@ export const englishMessages = {
     "The invitation could not be sent. Try again later.",
   "newMember.error.rateLimited":
     "Several invitations were sent in a row. Wait a few minutes before asking for another.",
-  "newMember.error.forbidden": "Only an Admin can add members.",
-  "newMember.error.unexpected": "We couldn't add the member. Try again.",
+  "newMember.error.forbidden": "Only an Admin can invite members.",
+  "newMember.error.unexpected": "We couldn't invite the member. Try again.",
   "newMember.error.invitationNotPending":
     "This member has already activated their account.",
   "memberRecord.invitation.title": "Invitation",
   "memberRecord.invitation.lead":
     "{name} hasn't activated their account yet. The invitation link expires after an hour, so you can send a new one.",
   "memberRecord.invitation.resent": "We sent {name} a new invitation.",
-  // La baja y la reactivación desde la ficha (#244, RF-6 del PRD de E5).
+  // Desactivar y reactivar la cuenta desde la ficha (#244, RF-6 del PRD de E5).
   "memberStatus.title": "Membership",
   "memberStatus.lead.active":
-    "{name} is a member of the club. Deactivating keeps their history, but they can no longer sign in or appear in the directory.",
+    "{name} is a member of the club. Deactivating their account keeps their history, but they can no longer sign in or appear in the directory.",
   "memberStatus.lead.inactive":
-    "{name} is no longer a member. Their history is kept, and reactivating lets them sign in and appear in the directory again.",
-  "memberStatus.deactivate": "Deactivate member",
-  "memberStatus.reactivate": "Reactivate member",
+    "{name}'s account is deactivated. Their history is kept, and reactivating it lets them sign in and appear in the directory again.",
+  "memberStatus.deactivate": "Deactivate account",
+  "memberStatus.reactivate": "Reactivate account",
   "memberStatus.saving": "Saving…",
-  "memberStatus.deactivated": "{name} is no longer a member.",
-  "memberStatus.reactivated": "{name} is back in the club.",
+  "memberStatus.deactivated": "{name}'s account was deactivated.",
+  "memberStatus.reactivated": "{name}'s account was reactivated.",
   "memberStatus.error.lastAdmin":
-    "This is the club's last Admin and can't be deactivated. Name another Admin first.",
+    "This is the club's last Admin, so their account can't be deactivated. Name another Admin first.",
   "memberStatus.error.selfDeactivation":
-    "You can't deactivate yourself. Another Admin has to do it.",
+    "You can't deactivate your own account. Another Admin has to do it.",
   "memberStatus.error.notAudited":
     "The membership changed, but it couldn't be logged. Reload the record and tell whoever maintains the platform.",
   "memberStatus.error.unexpected":
@@ -646,7 +646,7 @@ export const englishMessages = {
     "If you didn't sign up, ignore this email: the account won't activate until it's confirmed.",
   "email.invitation.subject": "You're invited to {clubName}",
   "email.invitation.invited":
-    "The club has added you to {clubName} with this address.",
+    "The club has invited you to {clubName} with this address.",
   "email.invitation.nextSteps":
     "To activate your account, open the link, choose a password and sign in with it. Then complete your registration with any missing details.",
   "email.invitation.linkLifetime": {

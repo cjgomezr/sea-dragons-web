@@ -418,7 +418,7 @@ export const spanishMessages: MessageCatalog = {
     "El nombre tiene que tener entre 1 y {max} caracteres.",
   "groups.error.groupGone": "Ese grupo ya no está en el club.",
   "groups.error.memberInactive":
-    "Ese miembro ya dejó el club, así que no se puede agregar.",
+    "Ese miembro tiene la cuenta desactivada, así que no se puede agregar.",
   "groups.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para seguir.",
   "groups.error.forbidden": "Tu rol no puede gestionar los grupos del club.",
@@ -445,13 +445,13 @@ export const spanishMessages: MessageCatalog = {
   "directory.search.placeholder": "Busca a alguien del club…",
   "directory.role.legend": "Filtrar por rol",
   "directory.role.all": "Todos",
-  "directory.includeInactive": "Incluir a quienes están de baja",
+  "directory.includeInactive": "Incluir las cuentas desactivadas",
   "directory.empty": "Nadie del club coincide con lo que buscas.",
   "directory.clearFilters": "Limpiar los filtros",
   "directory.column.member": "Miembro",
   "directory.column.role": "Rol",
   "directory.column.position": "Posición",
-  "directory.mark.inactive": "De baja",
+  "directory.mark.inactive": "Desactivada",
   "directory.mark.aufExpired": "AUF vencido",
   "directory.mark.pendingActivation": "Pendiente de activar",
   "directory.error.signInRequired":
@@ -490,7 +490,7 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.error.groupNotFound":
     "Uno de esos grupos ya no está en el club. Vuelve a cargar la ficha.",
   "memberRecord.error.memberInactive":
-    "A un miembro dado de baja no se le pueden agregar grupos.",
+    "A un miembro con la cuenta desactivada no se le pueden agregar grupos.",
   "memberRecord.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para seguir.",
   "memberRecord.error.forbidden":
@@ -500,13 +500,13 @@ export const spanishMessages: MessageCatalog = {
   "directory.aufSummary": "AUF {number} · vence el {date}",
   "directory.aufWithoutExpiry": "AUF {number} · sin vencimiento",
   "directory.aufMissing": "Sin AUF",
-  // El alta de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta
+  // La invitación de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta
   // desde la cabecera del directorio.
-  "directory.addMember": "Dar de alta",
-  "newMember.metaTitle": "Dar de alta a un miembro · Victoria Seadragons",
+  "directory.addMember": "Invitar miembro",
+  "newMember.metaTitle": "Invitar miembro · Victoria Seadragons",
   "newMember.metaDescription":
-    "Da de alta a un miembro del club y mándale la invitación para activar su cuenta.",
-  "newMember.title": "Dar de alta a un miembro",
+    "Invita a un miembro al club y mándale el correo para activar su cuenta.",
+  "newMember.title": "Invitar miembro",
   "newMember.lead":
     "Entra como Player y recibe un correo para activar su cuenta. Su rol se cambia desde el directorio.",
   "newMember.loading": "Cargando los grupos del club…",
@@ -523,16 +523,16 @@ export const spanishMessages: MessageCatalog = {
   "newMember.auf.title": "Registro AUF",
   "newMember.auf.number": "Número de AUF",
   "newMember.auf.expiry": "Vencimiento del AUF",
-  "newMember.submit": "Dar de alta",
-  "newMember.sending": "Dando de alta…",
+  "newMember.submit": "Invitar miembro",
+  "newMember.sending": "Invitando…",
   "newMember.created.sent":
-    "Dimos de alta a {name}. Le mandamos la invitación a {email}.",
+    "Invitamos a {name}. Le mandamos la invitación a {email}.",
   "newMember.created.notSent":
-    "Dimos de alta a {name}, pero la invitación no se pudo mandar.",
+    "Creamos la cuenta de {name}, pero la invitación no se pudo mandar.",
   "newMember.resend": "Reenviar la invitación",
   "newMember.resending": "Reenviando…",
   "newMember.resent": "Le mandamos una invitación nueva a {email}.",
-  "newMember.addAnother": "Dar de alta a otro miembro",
+  "newMember.addAnother": "Invitar a otro miembro",
   "newMember.issue.fullNameMissing": "Escribe el nombre del miembro.",
   "newMember.issue.emailMalformed": "Escribe una dirección de correo válida.",
   "newMember.issue.countryUnknown": "Elige un país.",
@@ -551,9 +551,9 @@ export const spanishMessages: MessageCatalog = {
     "La invitación no se pudo mandar. Inténtalo más tarde.",
   "newMember.error.rateLimited":
     "Se mandaron varias invitaciones seguidas. Espera unos minutos antes de pedir otra.",
-  "newMember.error.forbidden": "Sólo un Admin puede dar de alta a miembros.",
+  "newMember.error.forbidden": "Sólo un Admin puede invitar a miembros.",
   "newMember.error.unexpected":
-    "No pudimos dar de alta al miembro. Inténtalo de nuevo.",
+    "No pudimos invitar al miembro. Inténtalo de nuevo.",
   "newMember.error.invitationNotPending": "Este miembro ya activó su cuenta.",
   "memberRecord.invitation.title": "Invitación",
   "memberRecord.invitation.lead":
@@ -562,18 +562,18 @@ export const spanishMessages: MessageCatalog = {
     "Le mandamos una invitación nueva a {name}.",
   "memberStatus.title": "Membresía",
   "memberStatus.lead.active":
-    "{name} es miembro del club. Darle de baja conserva su historial, pero deja de entrar y de aparecer en el directorio.",
+    "{name} es miembro del club. Si desactivas su cuenta, su historial se conserva, pero {name} deja de entrar y de aparecer en el directorio.",
   "memberStatus.lead.inactive":
-    "{name} está de baja. Su historial se conserva, y al reactivarle vuelve a entrar y a aparecer en el directorio.",
-  "memberStatus.deactivate": "Dar de baja",
-  "memberStatus.reactivate": "Reactivar",
+    "La cuenta de {name} está desactivada. Su historial se conserva, y si la reactivas, {name} vuelve a entrar y a aparecer en el directorio.",
+  "memberStatus.deactivate": "Desactivar cuenta",
+  "memberStatus.reactivate": "Reactivar cuenta",
   "memberStatus.saving": "Guardando…",
-  "memberStatus.deactivated": "{name} quedó de baja.",
-  "memberStatus.reactivated": "{name} vuelve a estar en el club.",
+  "memberStatus.deactivated": "La cuenta de {name} quedó desactivada.",
+  "memberStatus.reactivated": "La cuenta de {name} quedó reactivada.",
   "memberStatus.error.lastAdmin":
-    "Es el último Admin del club y no se le puede dar de baja. Nombra antes a otro Admin.",
+    "Es el último Admin del club y su cuenta no se puede desactivar. Nombra antes a otro Admin.",
   "memberStatus.error.selfDeactivation":
-    "No puedes darte de baja a ti mismo: la baja de un Admin la hace otro Admin.",
+    "No puedes desactivar tu propia cuenta: la de un Admin la desactiva otro Admin.",
   "memberStatus.error.notAudited":
     "La membresía cambió, pero no quedó en la bitácora. Recarga la ficha y avisa a quien mantiene la plataforma.",
   "memberStatus.error.unexpected":
@@ -637,7 +637,7 @@ export const spanishMessages: MessageCatalog = {
     "Si no te registraste tú, ignora este correo: sin confirmar, la cuenta no se activa.",
   "email.invitation.subject": "Te invitaron a {clubName}",
   "email.invitation.invited":
-    "El club te dio de alta en {clubName} con esta dirección.",
+    "El club te invitó a {clubName} con esta dirección.",
   "email.invitation.nextSteps":
     "Para activar tu cuenta, abre el enlace, elige una contraseña y entra con ella. Después completa tu registro con los datos que falten.",
   "email.invitation.linkLifetime": {

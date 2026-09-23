@@ -3409,14 +3409,14 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     name: "directorio-con-inactivos",
     asAdmin: true,
     listHeading: ENGLISH_DIRECTORY_HEADING,
-    prepare: includeFormerMembers("Include former members"),
+    prepare: includeFormerMembers("Include deactivated accounts"),
   },
   {
     name: "directorio-con-inactivos-es",
     asAdmin: true,
     listHeading: SPANISH_DIRECTORY_HEADING,
     beforeVisit: chooseSpanish,
-    prepare: includeFormerMembers("Incluir a quienes están de baja"),
+    prepare: includeFormerMembers("Incluir las cuentas desactivadas"),
   },
   {
     name: "directorio-admin-con-solicitudes",
@@ -3545,7 +3545,7 @@ test.describe("el directorio con los datos de verdad", () => {
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
 
     await expect(
-      page.getByRole("checkbox", { name: "Include former members" }),
+      page.getByRole("checkbox", { name: "Include deactivated accounts" }),
     ).toBeVisible();
   });
 
@@ -3663,7 +3663,7 @@ test.describe("un Player frente al directorio", () => {
     ).toBeVisible();
 
     await expect(
-      page.getByRole("checkbox", { name: "Include former members" }),
+      page.getByRole("checkbox", { name: "Include deactivated accounts" }),
     ).toHaveCount(0);
   });
 
@@ -3739,7 +3739,7 @@ type StubbedMemberRecord = {
   readonly userId: string;
   readonly fullName: string;
   readonly joinedOn: string;
-  readonly accountStatus: "incomplete" | "active";
+  readonly accountStatus: "incomplete" | "active" | "inactive";
   readonly aufNumber: string;
   readonly aufExpiry: string;
   readonly isAufExpired: boolean;
@@ -3765,6 +3765,12 @@ const CURRENT_RECORD: StubbedMemberRecord = {
 const PENDING_RECORD: StubbedMemberRecord = {
   ...CURRENT_RECORD,
   accountStatus: "incomplete",
+};
+
+/** Quien tiene la cuenta desactivada: la ficha ofrece reactivarla (#273). */
+const DEACTIVATED_RECORD: StubbedMemberRecord = {
+  ...CURRENT_RECORD,
+  accountStatus: "inactive",
 };
 
 const EXPIRED_RECORD: StubbedMemberRecord = {
@@ -3865,6 +3871,17 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
   {
     name: "ficha-invitacion-pendiente-es",
     record: PENDING_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "ficha-cuenta-desactivada",
+    record: DEACTIVATED_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+  },
+  {
+    name: "ficha-cuenta-desactivada-es",
+    record: DEACTIVATED_RECORD,
     saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
   },
@@ -4080,8 +4097,8 @@ type NewMemberCopy = {
 };
 
 const ENGLISH_NEW_MEMBER: NewMemberCopy = {
-  title: "Add a member",
-  submit: "Add member",
+  title: "Invite member",
+  submit: "Invite member",
   fullName: "Full name",
   email: "Email",
   country: "Country",
@@ -4095,8 +4112,8 @@ const ENGLISH_NEW_MEMBER: NewMemberCopy = {
 };
 
 const SPANISH_NEW_MEMBER: NewMemberCopy = {
-  title: "Dar de alta a un miembro",
-  submit: "Dar de alta",
+  title: "Invitar miembro",
+  submit: "Invitar miembro",
   fullName: "Nombre completo",
   email: "Correo",
   country: "País",
@@ -4345,7 +4362,7 @@ test.describe("un Admin frente al alta con los datos de verdad", () => {
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
-    await page.getByRole("link", { name: "Add member" }).click();
+    await page.getByRole("link", { name: "Invite member" }).click();
     await expect(
       page.getByRole("heading", { level: 1, name: ENGLISH_NEW_MEMBER.title }),
     ).toBeVisible();
@@ -4396,7 +4413,9 @@ test.describe("un Player frente al alta de un miembro", () => {
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
     await expect(page.getByRole("table")).toBeVisible();
 
-    await expect(page.getByRole("link", { name: "Add member" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Invite member" })).toHaveCount(
+      0,
+    );
   });
 });
 /* ---------------------------------------------------------------------------

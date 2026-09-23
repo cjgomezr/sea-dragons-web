@@ -686,7 +686,7 @@ describe("socios de un grupo en pantalla", () => {
 
     expect(
       await screen.findByText(
-        "That member already left the club, so they can't be added.",
+        "That member's account is deactivated, so they can't be added.",
       ),
     ).toBeVisible();
     expect(

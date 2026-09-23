@@ -551,7 +551,7 @@ describe("incluir inactivos", () => {
 
     await renderScreen();
 
-    expect(screen.queryByRole("link", { name: "Add member" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Invite member" })).toBeNull();
   });
 
   it("no ofrece el control a quien no es Admin", async () => {
@@ -560,7 +560,7 @@ describe("incluir inactivos", () => {
     await renderScreen();
 
     expect(
-      screen.queryByRole("checkbox", { name: "Include former members" }),
+      screen.queryByRole("checkbox", { name: "Include deactivated accounts" }),
     ).toBeNull();
   });
 
@@ -571,17 +571,19 @@ describe("incluir inactivos", () => {
 
     await userEvent
       .setup()
-      .click(screen.getByRole("checkbox", { name: "Include former members" }));
+      .click(
+        screen.getByRole("checkbox", { name: "Include deactivated accounts" }),
+      );
 
     await waitFor(() => {
       expect(listedNames()).toEqual(["Ana Admin", "Zoe Zapata"]);
     });
     expect(lastRequest().get("includeInactive")).toBe("true");
     expect(
-      within(memberRow("Zoe Zapata")).getByText("Former member"),
+      within(memberRow("Zoe Zapata")).getByText("Deactivated"),
     ).toBeVisible();
     expect(
-      within(memberRow("Ana Admin")).queryByText("Former member"),
+      within(memberRow("Ana Admin")).queryByText("Deactivated"),
     ).toBeNull();
   });
 
@@ -601,7 +603,7 @@ describe("incluir inactivos", () => {
     const user = userEvent.setup();
 
     await user.click(
-      screen.getByRole("checkbox", { name: "Include former members" }),
+      screen.getByRole("checkbox", { name: "Include deactivated accounts" }),
     );
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 
