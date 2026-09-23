@@ -2521,6 +2521,69 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
       ).toBeLessThanOrEqual(width);
     });
   }
+
+  // #292: el nombre sale de la base y admite hasta 60 caracteres. Se pone en
+  // la página y no en la base compartida de desarrollo: cambiarlo allí lo
+  // vería cualquier otra corrida a la vez. Lo que se prueba es que el CSS lo
+  // aguanta: una sola fila, sin tapar los controles ni salirse, y entero para
+  // un lector de pantalla aunque se vea recortado.
+  const LONGEST_CLUB_NAME =
+    "Asociación Deportiva de Rugby Subacuático del Sur · Tasmania";
+  for (const width of [360, 375]) {
+    test(`un nombre de 60 caracteres se recorta en una sola fila a ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+      const brandLocator = page.locator(".app-brand");
+      const singleLineHeight = await brandLocator.evaluate(
+        (element) => element.getBoundingClientRect().height,
+      );
+      await brandLocator.evaluate((element, name) => {
+        element.textContent = name;
+        element.setAttribute("title", name);
+      }, LONGEST_CLUB_NAME);
+
+      const brand = await brandLocator.boundingBox();
+      const controls = await Promise.all(
+        [
+          page.getByRole("button", { name: /^Notifications/ }),
+          page.getByRole("button", { name: ACCOUNT_BUTTON_NAME }),
+        ].map((control) => control.boundingBox()),
+      );
+      const boxes = controls.flatMap((box) => (box === null ? [] : [box]));
+      if (brand === null || boxes.length !== controls.length) {
+        throw new Error("la cabecera no dibujó el nombre o algún control");
+      }
+
+      expect(brand.height, "el nombre se parte en dos filas").toBe(
+        singleLineHeight,
+      );
+      const brandMiddle = brand.y + brand.height / 2;
+      for (const box of boxes) {
+        expect(
+          brandMiddle > box.y && brandMiddle < box.y + box.height,
+          "un control no está en la fila del nombre",
+        ).toBe(true);
+      }
+      expect(
+        brand.x + brand.width,
+        "el nombre del club tapa los controles",
+      ).toBeLessThanOrEqual(Math.min(...boxes.map((box) => box.x)));
+      expect(
+        Math.max(...boxes.map((box) => box.x + box.width)),
+        "un control se sale de la pantalla",
+      ).toBeLessThanOrEqual(width);
+      const hasHorizontalScroll = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      );
+      expect(hasHorizontalScroll, "aparece scroll horizontal").toBe(false);
+      await expect(brandLocator).toHaveText(LONGEST_CLUB_NAME);
+      await expect(brandLocator).toHaveAttribute("title", LONGEST_CLUB_NAME);
+    });
+  }
 });
 
 test.describe("Mi cuenta con grupos", () => {
