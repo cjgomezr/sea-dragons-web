@@ -3285,6 +3285,23 @@ const STUBBED_PHOTO_URL = "https://fotos.test/member-photos/mateo.png";
 /** La fila que sale con foto en las capturas que la piden (#245). */
 const MEMBER_WITH_PHOTO_ID = "22222222-0000-4000-8000-000000000002";
 
+/** Las posiciones como las sirve el directorio desde #299: con sus nombres
+ * del club, y la pantalla elige el del idioma en que se lee. */
+const STUBBED_POSITIONS = {
+  Goalkeeper: {
+    id: "90000000-0000-4000-8000-000000000001",
+    names: { en: "Goalkeeper", es: "Portería" },
+  },
+  Defender: {
+    id: "90000000-0000-4000-8000-000000000002",
+    names: { en: "Defender", es: "Defensa" },
+  },
+  Forward: {
+    id: "90000000-0000-4000-8000-000000000003",
+    names: { en: "Forward", es: "Ataque" },
+  },
+} as const;
+
 const STUBBED_DIRECTORY_MEMBERS = [
   {
     userId: "11111111-0000-4000-8000-000000000001",
@@ -3292,7 +3309,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     country: "AU",
     experienceLevel: "Advanced",
     role: "Admin",
-    position: "Defender",
+    position: STUBBED_POSITIONS.Defender,
     status: "active",
     photoUrl: null,
   },
@@ -3302,7 +3319,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     country: "CO",
     experienceLevel: "Advanced",
     role: "Coach",
-    position: "Forward",
+    position: STUBBED_POSITIONS.Forward,
     status: "active",
     photoUrl: null,
   },
@@ -3312,7 +3329,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     country: "ES",
     experienceLevel: "Beginner",
     role: "Player",
-    position: "Goalkeeper",
+    position: STUBBED_POSITIONS.Goalkeeper,
     status: "active",
     photoUrl: null,
   },
@@ -3323,7 +3340,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     country: "AU",
     experienceLevel: "Intermediate",
     role: "Committee",
-    position: "Defender",
+    position: STUBBED_POSITIONS.Defender,
     status: "inactive",
     photoUrl: null,
   },

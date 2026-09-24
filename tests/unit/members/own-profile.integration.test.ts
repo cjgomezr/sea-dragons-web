@@ -4,6 +4,7 @@ import {
   listDirectory,
 } from "@/lib/directory/directory";
 import { createDirectoryGateways } from "@/lib/directory/supabase-directory-gateways";
+import { createClubPositionsGateway } from "@/lib/club/supabase-club-positions";
 import { DEFAULT_CLUB_SLUG } from "@/lib/auth/supabase-auth-gateways";
 import {
   OwnAufVerifiedError,
@@ -111,7 +112,10 @@ describeRls("perfil propio contra seadragons-dev", () => {
         );
 
         const listing = await listDirectory(
-          createDirectoryGateways(serviceClient.client),
+          createDirectoryGateways(
+  serviceClient.client,
+  createClubPositionsGateway(serviceClient.client),
+),
           {
             callerId: userId,
             query: { ...DEFAULT_DIRECTORY_QUERY, search: "Socia Renombrada" },
@@ -152,7 +156,10 @@ describeRls("perfil propio contra seadragons-dev", () => {
         });
 
         const listing = await listDirectory(
-          createDirectoryGateways(serviceClient.client),
+          createDirectoryGateways(
+  serviceClient.client,
+  createClubPositionsGateway(serviceClient.client),
+),
           {
             callerId: userId,
             query: { ...DEFAULT_DIRECTORY_QUERY, search: "Socia Sin Posición" },

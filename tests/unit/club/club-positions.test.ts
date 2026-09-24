@@ -3,6 +3,7 @@ import {
   type ClubPosition,
   type ClubPositions,
   createCachedClubPositionsReader,
+  findClubPosition,
   isAcceptablePosition,
   offeredPositions,
   positionName,
@@ -171,6 +172,18 @@ function createReader(
     },
   };
 }
+
+describe("buscar una posición del club", () => {
+  it("devuelve la del id pedido", () => {
+    expect(findClubPosition(CLUB_POSITIONS, UTILITY.id)).toBe(UTILITY);
+  });
+
+  it("falla con una posición que el club no tiene", () => {
+    expect(() =>
+      findClubPosition(CLUB_POSITIONS, OTHER_CLUBS_POSITION_ID),
+    ).toThrow(OTHER_CLUBS_POSITION_ID);
+  });
+});
 
 describe("la caché de las posiciones", () => {
   it("lee la base una sola vez mientras no caduca", async () => {

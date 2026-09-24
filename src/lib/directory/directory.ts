@@ -3,10 +3,13 @@ import type { AccountStatus } from "@/lib/auth/account-status";
 import type { RoleRequestGateways } from "@/lib/auth/role-request";
 import { ROLES, type Role, hasCapability } from "@/lib/auth/roles";
 import {
-  POSITIONS,
-  type ExperienceLevel,
-  type Position,
-} from "@/lib/members/profile-fields";
+  type ClubPosition,
+  type ClubPositions,
+  type ClubPositionsGateway,
+  findClubPosition,
+  positionRank,
+} from "@/lib/club/club-positions";
+import type { ExperienceLevel } from "@/lib/members/profile-fields";
 import { isAufExpired } from "@/lib/members/member-record";
 import { compareNames } from "@/lib/text/name-order";
 
@@ -62,7 +65,8 @@ export type DirectoryMemberRecord = {
   readonly country: string | null;
   readonly experienceLevel: ExperienceLevel | null;
   readonly role: Role;
-  readonly position: Position | null;
+  /** Una posición del catálogo del club (#299), o null sin posición. */
+  readonly positionId: string | null;
   readonly status: AccountStatus;
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
@@ -73,6 +77,10 @@ export type DirectoryMemberRecord = {
   readonly photoPath: string | null;
 };
 
+/** La posición tal como la pinta el directorio: sus nombres, y la pantalla
+ * elige el del idioma en que se lee (#299). */
+export type DirectoryPosition = Pick<ClubPosition, "id" | "names">;
+
 /** Lo que el directorio enseña de un socio a cualquiera del club (FR-015). Ni
  * fecha de nacimiento, ni datos del tutor, ni tipo de membresía, ni correo: el
  * directorio muestra los datos del club, no los personales (NFR-010). */
@@ -82,7 +90,7 @@ export type DirectoryMember = {
   readonly country: string | null;
   readonly experienceLevel: ExperienceLevel | null;
   readonly role: Role;
-  readonly position: Position | null;
+  readonly position: DirectoryPosition | null;
   readonly status: AccountStatus;
   /** Null sin foto: la fila enseña entonces las iniciales. */
   readonly photoUrl: string | null;
@@ -113,6 +121,7 @@ export type DirectoryGateways = {
       clubId: string,
     ): Promise<readonly DirectoryMemberRecord[]>;
   };
+  readonly positions: ClubPositionsGateway;
   readonly photos: {
     /** Las direcciones firmadas, por ruta. Una ruta que no se pudo firmar
      * falta en el mapa. */
@@ -173,19 +182,20 @@ function withDirection(
   return direction === "asc" ? comparison : -comparison;
 }
 
-/** El orden del catálogo de posiciones es el del SRD (Goalkeeper, Defender,
- * Forward), no el alfabético. Quien no tiene posición va al final en los dos
- * sentidos: es un dato que falta, no uno que vaya antes ni después. */
+/** El orden de las posiciones es el que decidió el club (#299), no el
+ * alfabético. Quien no tiene posición va al final en los dos sentidos: es un
+ * dato que falta, no uno que vaya antes ni después. */
 function comparePositions(
-  first: Position | null,
-  second: Position | null,
+  positions: ClubPositions,
+  pair: readonly [string | null, string | null],
   direction: DirectoryDirection,
 ): number {
+  const [first, second] = pair;
   if (first === null || second === null) {
     return first === second ? 0 : first === null ? 1 : -1;
   }
   return withDirection(
-    POSITIONS.indexOf(first) - POSITIONS.indexOf(second),
+    positionRank(positions, first) - positionRank(positions, second),
     direction,
   );
 }
@@ -193,9 +203,9 @@ function comparePositions(
 /** El criterio pedido primero y el nombre después, para que dos socios que
  * empatan salgan siempre en el mismo orden. */
 function comparePrimary(
-  first: DirectoryMemberRecord,
-  second: DirectoryMemberRecord,
+  [first, second]: readonly [DirectoryMemberRecord, DirectoryMemberRecord],
   query: DirectoryQuery,
+  positions: ClubPositions,
 ): number {
   switch (query.sort) {
     case "name":
@@ -209,16 +219,21 @@ function comparePrimary(
         query.direction,
       );
     case "position":
-      return comparePositions(first.position, second.position, query.direction);
+      return comparePositions(
+        positions,
+        [first.positionId, second.positionId],
+        query.direction,
+      );
   }
 }
 
 function compareForQuery(
-  first: DirectoryMemberRecord,
-  second: DirectoryMemberRecord,
+  pair: readonly [DirectoryMemberRecord, DirectoryMemberRecord],
   query: DirectoryQuery,
+  positions: ClubPositions,
 ): number {
-  const primary = comparePrimary(first, second, query);
+  const primary = comparePrimary(pair, query, positions);
+  const [first, second] = pair;
   return primary === 0
     ? compareNames(first.fullName, second.fullName)
     : primary;
@@ -251,9 +266,26 @@ function signListedPhotos(
   );
 }
 
+function directoryPositionOf(
+  positions: ClubPositions,
+  positionId: string | null,
+): DirectoryPosition | null {
+  if (positionId === null) {
+    return null;
+  }
+  const { id, names } = findClubPosition(positions, positionId);
+  return { id, names };
+}
+
+/** Lo que se lee para armar cada fila, aparte de la fila misma. */
+type ListingContext = {
+  readonly positions: ClubPositions;
+  readonly signedPhotos: SignedPhotos;
+};
+
 function toDirectoryMember(
   record: DirectoryMemberRecord,
-  signedPhotos: SignedPhotos,
+  { positions, signedPhotos }: ListingContext,
 ): DirectoryMember {
   return {
     userId: record.userId,
@@ -261,7 +293,7 @@ function toDirectoryMember(
     country: record.country,
     experienceLevel: record.experienceLevel,
     role: record.role,
-    position: record.position,
+    position: directoryPositionOf(positions, record.positionId),
     status: record.status,
     photoUrl: photoUrlOf(record, signedPhotos),
   };
@@ -271,10 +303,10 @@ function toDirectoryMember(
 function toAdminDirectoryMember(
   record: DirectoryMemberRecord,
   todayInClub: string,
-  signedPhotos: SignedPhotos,
+  context: ListingContext,
 ): AdminDirectoryMember {
   return {
-    ...toDirectoryMember(record, signedPhotos),
+    ...toDirectoryMember(record, context),
     aufNumber: record.aufNumber,
     aufExpiry: record.aufExpiry,
     isAufVerified: record.isAufVerified,
@@ -305,23 +337,31 @@ export async function listDirectory(
     throw new DirectoryForbiddenError();
   }
 
-  const records = await gateways.directory.findDirectoryMembers(caller.clubId);
+  const [records, positions] = await Promise.all([
+    gateways.directory.findDirectoryMembers(caller.clubId),
+    gateways.positions.findClubPositions(caller.clubId),
+  ]);
   const listed = records
     .filter((record) => isVisible(record, request.query))
-    .sort((first, second) => compareForQuery(first, second, request.query));
-  const signedPhotos = await signListedPhotos(gateways, listed);
+    .sort((first, second) =>
+      compareForQuery([first, second], request.query, positions),
+    );
+  const context = {
+    positions,
+    signedPhotos: await signListedPhotos(gateways, listed),
+  };
 
   return isAdmin
     ? {
         kind: "admin",
         members: listed.map((record) =>
-          toAdminDirectoryMember(record, request.todayInClub, signedPhotos),
+          toAdminDirectoryMember(record, request.todayInClub, context),
         ),
       }
     : {
         kind: "member",
         members: listed.map((record) =>
-          toDirectoryMember(record, signedPhotos),
+          toDirectoryMember(record, context),
         ),
       };
 }

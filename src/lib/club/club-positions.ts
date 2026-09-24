@@ -77,6 +77,18 @@ export function positionRank(positions: ClubPositions, id: string): number {
   return rank;
 }
 
+/** La posición por su id, con la misma garantía que `positionRank`. */
+export function findClubPosition(
+  positions: ClubPositions,
+  id: string,
+): ClubPosition {
+  const position = positions.find((candidate) => candidate.id === id);
+  if (position === undefined) {
+    throw new Error(`El club no tiene la posición ${id}.`);
+  }
+  return position;
+}
+
 export type CachedClubPositionsReaderOptions = {
   readonly fetchPositions: (clubId: string) => Promise<ClubPositions>;
   readonly timeToLiveMs: number;

@@ -6,6 +6,7 @@ import {
   listDirectory,
 } from "@/lib/directory/directory";
 import { createDirectoryGateways } from "@/lib/directory/supabase-directory-gateways";
+import { createClubPositionsGateway } from "@/lib/club/supabase-club-positions";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
   type ServiceRoleClient,
@@ -83,6 +84,31 @@ async function insertMember(
   }
 }
 
+/** El club pone Forward delante de las otras dos (#299): ordenado por
+ * posición, el directorio tiene que seguir al club y no al SRD. */
+async function moveForwardFirst(
+  serviceClient: ServiceRoleClient,
+  clubId: string,
+): Promise<void> {
+  const { data: names, error: nameError } = await serviceClient.client
+    .from("club_position_names")
+    .select("position_id")
+    .eq("club_id", clubId)
+    .eq("locale", "en")
+    .eq("name", "Forward")
+    .single();
+  if (nameError) {
+    throw new Error(`No se pudo leer Forward: ${nameError.message}`);
+  }
+  const { error } = await serviceClient.client
+    .from("club_positions")
+    .update({ sort_order: 0 })
+    .eq("id", names.position_id);
+  if (error) {
+    throw new Error(`No se pudo mover Forward: ${error.message}`);
+  }
+}
+
 /** Crea un usuario real por socio, anidando las limpiezas: al terminar, cada
  * usuario se borra y su fila de `members` se va con él (la cascada de
  * `0003_members.sql`), que es lo que deja borrar después los clubes. */
@@ -111,9 +137,13 @@ describeRls("el directorio contra seadragons-dev", () => {
     "sirve sólo el club de quien pregunta, filtrado, ordenado y con el AUF sólo para el Admin",
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);
-      const gateways = createDirectoryGateways(serviceClient.client);
+      const gateways = createDirectoryGateways(
+  serviceClient.client,
+  createClubPositionsGateway(serviceClient.client),
+);
 
       await withTwoClubs(serviceClient, async ([clubId, otherClubId]) => {
+        await moveForwardFirst(serviceClient, clubId);
         const seeds: readonly MemberSeed[] = [
           {
             clubId,
@@ -182,7 +212,7 @@ describeRls("el directorio contra seadragons-dev", () => {
           expect(listed.members[1]).toMatchObject({
             country: null,
             experienceLevel: "Intermediate",
-            position: "Defender",
+            position: { names: { en: "Defender", es: "Defensa" } },
             role: "Player",
             status: "active",
             aufNumber: "AUF-MARIA",
@@ -208,8 +238,8 @@ describeRls("el directorio contra seadragons-dev", () => {
               member.status,
             ]),
           ).toEqual([
-            ["María Ñíguez", "active"],
             ["Zoe Zapata", "inactive"],
+            ["María Ñíguez", "active"],
             ["Ana Admin", "active"],
           ]);
 

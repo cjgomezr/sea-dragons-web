@@ -18,7 +18,7 @@ import {
   SEARCH_QUERY_PARAM,
   SORT_QUERY_PARAM,
 } from "@/lib/directory/directory-query";
-import { EXPERIENCE_LEVELS, POSITIONS } from "@/lib/members/profile-fields";
+import { EXPERIENCE_LEVELS } from "@/lib/members/profile-fields";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
@@ -32,13 +32,21 @@ import type { Translator } from "@/lib/i18n/translator";
  * para que el aviso cambie de idioma con el interruptor (E17).
  */
 
+/** Un nombre por idioma, y al menos uno: sin ninguno no hay qué pintar. */
+const positionSchema = z.object({
+  id: z.uuid(),
+  names: z
+    .object({ en: z.string().nullable(), es: z.string().nullable() })
+    .refine((names) => names.en !== null || names.es !== null),
+});
+
 const memberSchema = z.object({
   userId: z.uuid(),
   fullName: z.string(),
   country: z.string().nullable(),
   experienceLevel: z.enum(EXPERIENCE_LEVELS).nullable(),
   role: z.enum(ROLES),
-  position: z.enum(POSITIONS).nullable(),
+  position: positionSchema.nullable(),
   status: z.enum(ACCOUNT_STATUSES),
   // Sólo una dirección web: la pantalla la pone tal cual en una imagen.
   photoUrl: z.url({ protocol: /^https?$/ }).nullable(),

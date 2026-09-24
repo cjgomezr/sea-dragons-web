@@ -11,6 +11,7 @@ import {
   listDirectory,
   withMemberRole,
 } from "@/lib/directory/directory";
+import type { ClubPosition } from "@/lib/club/club-positions";
 
 /**
  * El directorio del club (#238, RF-2 del PRD de E5, FR-015 a FR-019),
@@ -25,13 +26,34 @@ const CALLER_ID = "a0a0a0a0-0000-4000-8000-00000000000a";
 const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
 const TODAY = "2026-09-21";
 
+/** En el orden que decidió el club, que no es el del SRD ni el alfabético:
+ * así el orden por posición sólo sale bien si sigue al club (#299). */
+const FORWARD: ClubPosition = {
+  id: "f0f0f0f0-0000-4000-8000-000000000003",
+  names: { en: "Forward", es: "Ataque" },
+  isArchived: false,
+};
+const GOALKEEPER: ClubPosition = {
+  id: "f0f0f0f0-0000-4000-8000-000000000001",
+  names: { en: "Goalkeeper", es: "Portería" },
+  isArchived: false,
+};
+const DEFENDER: ClubPosition = {
+  id: "f0f0f0f0-0000-4000-8000-000000000002",
+  names: { en: "Defender", es: null },
+  // Archivada: quien la tenía la conserva, y el directorio la sigue enseñando.
+  isArchived: true,
+};
+const CLUB_POSITIONS = [FORWARD, GOALKEEPER, DEFENDER] as const;
+const clubsWhosePositionsWereRead: string[] = [];
+
 const ANA: DirectoryMemberRecord = {
   userId: "aaaaaaaa-0000-4000-8000-00000000000a",
   fullName: "Ana Admin",
   country: "AU",
   experienceLevel: "Advanced",
   role: "Admin",
-  position: null,
+  positionId: null,
   status: "active",
   aufNumber: "AUF-1",
   aufExpiry: "2027-01-31",
@@ -45,7 +67,7 @@ const BRUNO: DirectoryMemberRecord = {
   country: "CO",
   experienceLevel: "Beginner",
   role: "Coach",
-  position: "Goalkeeper",
+  positionId: GOALKEEPER.id,
   status: "active",
   aufNumber: "AUF-2",
   aufExpiry: "2026-09-20",
@@ -59,7 +81,7 @@ const MARIA: DirectoryMemberRecord = {
   country: null,
   experienceLevel: "Intermediate",
   role: "Player",
-  position: "Defender",
+  positionId: DEFENDER.id,
   status: "active",
   aufNumber: null,
   aufExpiry: null,
@@ -73,7 +95,7 @@ const ZOE: DirectoryMemberRecord = {
   country: "AU",
   experienceLevel: null,
   role: "Committee",
-  position: "Forward",
+  positionId: FORWARD.id,
   status: "inactive",
   aufNumber: "AUF-4",
   aufExpiry: TODAY,
@@ -96,6 +118,7 @@ function gateways(
 ): DirectoryGateways {
   clubsRead.length = 0;
   photosSigned.length = 0;
+  clubsWhosePositionsWereRead.length = 0;
   return {
     members: {
       findRoleRequestMember: async () =>
@@ -111,6 +134,12 @@ function gateways(
       findDirectoryMembers: async (clubId) => {
         clubsRead.push(clubId);
         return CLUB;
+      },
+    },
+    positions: {
+      findClubPositions: async (clubId) => {
+        clubsWhosePositionsWereRead.push(clubId);
+        return CLUB_POSITIONS;
       },
     },
     photos: {
@@ -222,11 +251,17 @@ describe("directorio", () => {
         country: null,
         experienceLevel: "Intermediate",
         role: "Player",
-        position: "Defender",
+        position: { id: DEFENDER.id, names: DEFENDER.names },
         status: "active",
         photoUrl: null,
       },
     ]);
+  });
+
+  it("lee las posiciones del club de quien pregunta", async () => {
+    await listNames();
+
+    expect(clubsWhosePositionsWereRead).toEqual([CLUB_ID]);
   });
 
   it.each(["Player", "Admin"] as const)(
@@ -339,16 +374,17 @@ describe("el orden del directorio", () => {
       "desc",
       ["María Ñíguez", "Zoe Zapata", "Bruno Beltrán", "Ana Admin"],
     ],
-    // El orden del SRD: Goalkeeper, Defender, Forward. Sin posición, al final.
+    // El orden del club (#299): Forward, Goalkeeper, Defender. Sin posición,
+    // al final en los dos sentidos.
     [
       "position",
       "asc",
-      ["Bruno Beltrán", "María Ñíguez", "Zoe Zapata", "Ana Admin"],
+      ["Zoe Zapata", "Bruno Beltrán", "María Ñíguez", "Ana Admin"],
     ],
     [
       "position",
       "desc",
-      ["Zoe Zapata", "María Ñíguez", "Bruno Beltrán", "Ana Admin"],
+      ["María Ñíguez", "Bruno Beltrán", "Zoe Zapata", "Ana Admin"],
     ],
   ] as const)("ordena por %s %s", async (sort, direction, expected) => {
     await expect(orderedBy(sort, direction)).resolves.toEqual(expected);
@@ -459,7 +495,7 @@ describe("el rol nuevo en la lista (#240)", () => {
     country: "ES",
     experienceLevel: "Beginner",
     role: "Player",
-    position: "Goalkeeper",
+    position: { id: GOALKEEPER.id, names: GOALKEEPER.names },
     status: "active",
     photoUrl: null,
   } as const;

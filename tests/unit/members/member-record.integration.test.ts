@@ -9,6 +9,7 @@ import {
   listDirectory,
 } from "@/lib/directory/directory";
 import { createDirectoryGateways } from "@/lib/directory/supabase-directory-gateways";
+import { createClubPositionsGateway } from "@/lib/club/supabase-club-positions";
 import {
   assignGroupMember,
   removeGroupMember,
@@ -256,7 +257,10 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
           isAufExpired: true,
         });
         const listing = await listDirectory(
-          createDirectoryGateways(serviceClient.client),
+          createDirectoryGateways(
+  serviceClient.client,
+  createClubPositionsGateway(serviceClient.client),
+),
           {
             callerId: adminId,
             query: { ...DEFAULT_DIRECTORY_QUERY, search: "Paula Ficha" },

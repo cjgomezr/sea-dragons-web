@@ -13,6 +13,7 @@ import {
 } from "@/lib/directory/directory";
 import { DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
 import { createDirectoryGateways } from "@/lib/directory/supabase-directory-gateways";
+import { createClubPositionsGateway } from "@/lib/club/supabase-club-positions";
 import type { OutgoingEmail } from "@/lib/email/resend-email-sender";
 import { createGroupsGateways } from "@/lib/groups/supabase-groups-gateways";
 import { createInvitationEmailGateway } from "@/lib/members/invitation-email-sender";
@@ -259,7 +260,10 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
             });
 
             const listing = await listDirectory(
-              createDirectoryGateways(serviceClient.client),
+              createDirectoryGateways(
+  serviceClient.client,
+  createClubPositionsGateway(serviceClient.client),
+),
               {
                 callerId: adminId,
                 query: DEFAULT_DIRECTORY_QUERY,

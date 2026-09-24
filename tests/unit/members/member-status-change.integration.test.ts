@@ -7,6 +7,7 @@ import {
   listDirectory,
 } from "@/lib/directory/directory";
 import { createDirectoryGateways } from "@/lib/directory/supabase-directory-gateways";
+import { createClubPositionsGateway } from "@/lib/club/supabase-club-positions";
 import {
   InactiveMemberError,
   assignGroupMember,
@@ -199,7 +200,10 @@ describeRls("la baja y la reactivación contra seadragons-dev", () => {
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);
       const gateways = requireGateways(serviceClient);
-      const directory = createDirectoryGateways(serviceClient.client);
+      const directory = createDirectoryGateways(
+  serviceClient.client,
+  createClubPositionsGateway(serviceClient.client),
+);
       const groups = createGroupsGateways(serviceClient.client);
       const groupMembers = createGroupMembersGateways(serviceClient.client);
 
