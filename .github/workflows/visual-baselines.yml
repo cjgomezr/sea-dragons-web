@@ -135,7 +135,16 @@ jobs:
       # tests/support/web-server-command.ts). Sin credenciales, igual que en
       # checks.yml: el build no las necesita.
       - name: Compila la aplicación
+        # Con los secretos: al compilar, Next prerenderiza las pantallas y eso
+        # ejecuta la lectura de la marca del club (#292). Sin ellos cae al
+        # respaldo, y hoy no se nota sólo porque el respaldo coincide con lo
+        # sembrado. En cuanto un club se renombre, las capturas saldrían con el
+        # nombre viejo y la comparación fallaría sin decir por qué.
         run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       # Sólo en este paso: `npm ci` y sus postinstall no tienen nada que hacer
       # con una llave de escritura. El `npm run start` que Playwright levanta
       # sí las recibe, porque lo arranca como hijo de este proceso, y las
@@ -252,7 +261,16 @@ jobs:
       - run: npm ci
       - uses: ./.github/actions/playwright-browsers
       - name: Compila la aplicación
+        # Con los secretos: al compilar, Next prerenderiza las pantallas y eso
+        # ejecuta la lectura de la marca del club (#292). Sin ellos cae al
+        # respaldo, y hoy no se nota sólo porque el respaldo coincide con lo
+        # sembrado. En cuanto un club se renombre, las capturas saldrían con el
+        # nombre viejo y la comparación fallaría sin decir por qué.
         run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       # Regenerar es correr la misma suite: sin sesión fotografiaría la
       # pantalla de entrada en vez de la que se está aceptando.
       - name: Regenera la línea base
