@@ -95,6 +95,7 @@ describeConPostgres("migración de miembros", () => {
       "membership_type text null=YES",
       "photo_path text null=YES",
       "position text null=YES",
+      "position_id uuid null=YES",
       "role text null=NO",
       "user_id uuid null=NO",
     ]);
