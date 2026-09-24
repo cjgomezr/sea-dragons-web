@@ -85,6 +85,15 @@ text ≥ 24px).
 > creyendo que están cambiados: `tests/unit/design-tokens.test.ts` comprueba
 > el contraste de los dos.
 
+> **Decisión del 2026-09-24 (issue #294).** Cada club puede tener su propio
+> `Accent`; los valores de las tablas son los del club sembrado. El club elige
+> un solo color y `src/lib/club/accent-color.ts` deriva el resto. El texto
+> encima es, de los dos `Text on accent` de arriba, el que mejor contrasta. En
+> tema oscuro el acento se aclara hacia el blanco hasta llegar a 4.5:1 sobre el
+> panel y el fondo oscuros. Se rechaza un acento con el que ningún texto llegue
+> a AA, o que como enlace no llegue a 4.5:1 sobre el panel y el fondo claros.
+> Nada más de la paleta cambia con el club.
+
 #### Sidebar (no cambia con el tema)
 
 El prototipo fija estos valores en `:root`, iguales en claro y oscuro. Los va
