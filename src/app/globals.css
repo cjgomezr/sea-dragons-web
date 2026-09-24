@@ -162,11 +162,14 @@ h6 {
   gap: var(--space-4);
 }
 
-/* El logo va delante del nombre (#295). Sin logo el contenedor sólo lleva el
-   nombre, y se comporta como él: puede encogerse para que recorte. */
+/* El logo va encima del nombre (#295): al lado, uno apaisado dejaba el nombre
+   en unas pocas letras, tanto en la barra lateral de 240px como junto a la
+   campana y el menú a 375px. Sin logo el contenedor sólo lleva el nombre, y se
+   comporta como él: puede encogerse para que recorte. */
 .app-brand-lockup {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-2);
   min-width: 0;
   max-width: 100%;
@@ -767,13 +770,6 @@ button.notification-item-content:hover {
   }
 
   .app-sidebar-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  /* En la barra lateral, de 240px, un logo apaisado al lado dejaría el nombre
-     en unas pocas letras: va encima de él (#295). */
-  .app-brand-lockup {
     flex-direction: column;
     align-items: flex-start;
   }
