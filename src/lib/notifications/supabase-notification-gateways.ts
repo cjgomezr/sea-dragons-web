@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { runAfterResponse } from "@/lib/api/after-response";
 import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
@@ -8,7 +9,11 @@ import type {
   NotificationMarker,
   NotificationReader,
 } from "./member-notifications";
-import { NOTIFICATION_TYPES, type NotificationWriter } from "./notify-member";
+import {
+  NOTIFICATION_TYPES,
+  type NotificationCleanup,
+  type NotificationWriter,
+} from "./notify-member";
 
 /**
  * Los avisos contra Supabase (#265).
@@ -24,6 +29,7 @@ import { NOTIFICATION_TYPES, type NotificationWriter } from "./notify-member";
 const NOTIFICATIONS_TABLE = "notifications";
 const MEMBERS_TABLE = "members";
 const NOTIFICATION_COLUMNS = "id, type, data, created_at, read_at";
+const PRUNE_FUNCTION = "prune_member_notifications";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -39,6 +45,13 @@ const recipientRowSchema = z.object({
   club_id: z.string(),
   account_status: z.enum(ACCOUNT_STATUSES),
 });
+
+const cleanupRowsSchema = z.array(
+  z.object({
+    deleted_count: z.number().int(),
+    kept_count: z.number().int(),
+  }),
+);
 
 function toMemberNotification(row: unknown): MemberNotification {
   const parsed = notificationRowSchema.parse(row);
@@ -90,8 +103,14 @@ export function createSupabaseNotificationReader(
   };
 }
 
+/** Un socio sin ningún aviso no sale en lo que devuelve la limpieza. */
+const EMPTY_CLEANUP: NotificationCleanup = { deletedCount: 0, keptCount: 0 };
+
+/** `runLater` es `after` de Next.js salvo en los tests de integración, que
+ * corren fuera de una petición y quieren ver la limpieza terminada. */
 export function createSupabaseNotificationWriter(
   serviceClient: SupabaseClient,
+  runLater: NotificationWriter["runAfterResponse"] = runAfterResponse,
 ): NotificationWriter {
   return {
     async findRecipient(userId) {
@@ -125,6 +144,23 @@ export function createSupabaseNotificationWriter(
         throw new Error(`No se pudo guardar el aviso: ${error.message}`);
       }
     },
+    async pruneNotifications(userId) {
+      const { data, error } = await serviceClient.rpc(PRUNE_FUNCTION, {
+        recipient_user_ids: [userId],
+      });
+      if (error) {
+        throw new Error(`No se pudieron limpiar los avisos: ${error.message}`);
+      }
+      const [cleanup] = cleanupRowsSchema.parse(data);
+      if (cleanup === undefined) {
+        return EMPTY_CLEANUP;
+      }
+      return {
+        deletedCount: cleanup.deleted_count,
+        keptCount: cleanup.kept_count,
+      };
+    },
+    runAfterResponse: runLater,
   };
 }
 

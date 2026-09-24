@@ -5,7 +5,10 @@ import {
   type NotificationReader,
   RECENT_NOTIFICATIONS_LIMIT,
 } from "@/lib/notifications/member-notifications";
-import { notifyMember } from "@/lib/notifications/notify-member";
+import {
+  type NotificationWriter,
+  notifyMember,
+} from "@/lib/notifications/notify-member";
 import {
   createNotificationMarker,
   createSupabaseNotificationReader,
@@ -96,15 +99,97 @@ function markerFor(serviceClient: ServiceRoleClient): NotificationMarker {
   return createNotificationMarker(serviceClient.client);
 }
 
+type WriterWithDeferredWork = {
+  readonly writer: NotificationWriter;
+  /** Corre lo que `after` habría dejado para después de responder. */
+  readonly runDeferredWork: () => Promise<void>;
+};
+
+/** Fuera de una petición de Next.js no hay `after`: el trabajo se guarda y el
+ * test lo corre cuando quiere verlo terminado. */
+function writerWithDeferredWork(
+  serviceClient: ServiceRoleClient,
+): WriterWithDeferredWork {
+  const deferred: (() => Promise<void>)[] = [];
+  return {
+    writer: createSupabaseNotificationWriter(serviceClient.client, (work) => {
+      deferred.push(work);
+    }),
+    async runDeferredWork() {
+      for (const work of deferred.splice(0)) {
+        await work();
+      }
+    },
+  };
+}
+
 async function notifyRoleChanged(
   serviceClient: ServiceRoleClient,
   recipientUserId: string,
 ): Promise<void> {
-  const outcome = await notifyMember(
-    createSupabaseNotificationWriter(serviceClient.client),
-    { recipientUserId, type: "role_changed", data: { newRole: "Coach" } },
-  );
+  const { writer, runDeferredWork } = writerWithDeferredWork(serviceClient);
+  const outcome = await notifyMember(writer, {
+    recipientUserId,
+    type: "role_changed",
+    data: { newRole: "Coach" },
+  });
   expect(outcome).toEqual({ kind: "saved" });
+  await runDeferredWork();
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Pasado el plazo de 90 días de `0023_prune_notifications.sql`. */
+const EXPIRED_AGE_DAYS = 100;
+const RECENT_AGE_DAYS = 1;
+
+type SeededNotification = {
+  readonly clubId: string;
+  readonly userId: string;
+  readonly ageDays: number;
+  readonly isRead: boolean;
+};
+
+async function seedNotifications(
+  serviceClient: ServiceRoleClient,
+  notifications: readonly SeededNotification[],
+): Promise<void> {
+  const now = Date.now();
+  const rows = notifications.map((notification) => {
+    const createdAt = new Date(now - notification.ageDays * DAY_MS);
+    return {
+      club_id: notification.clubId,
+      user_id: notification.userId,
+      type: "role_changed",
+      data: { newRole: "Coach", ageDays: notification.ageDays },
+      created_at: createdAt.toISOString(),
+      read_at: notification.isRead ? createdAt.toISOString() : null,
+    };
+  });
+  const { error } = await serviceClient.client
+    .from("notifications")
+    .insert(rows);
+  if (error) {
+    throw new Error(`No se pudieron sembrar avisos: ${error.message}`);
+  }
+}
+
+async function readAgesOf(
+  serviceClient: ServiceRoleClient,
+  userId: string,
+): Promise<string[]> {
+  const { data, error } = await serviceClient.client
+    .from("notifications")
+    .select("read_at, data")
+    .eq("user_id", userId)
+    .order("created_at");
+  if (error) {
+    throw new Error(`No se pudieron leer los avisos: ${error.message}`);
+  }
+  return data.map((row) => {
+    const age = (row.data as { ageDays?: number }).ageDays;
+    const state = row.read_at === null ? "sin leer" : "leído";
+    return age === undefined ? `nuevo ${state}` : `${age}d ${state}`;
+  });
 }
 
 async function readReadAt(
@@ -253,6 +338,53 @@ describeRls("avisos contra seadragons-dev", () => {
             expect(count).toBe(0);
           },
         ),
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "al crear un aviso borra los leídos caducados de ese socio y de nadie más",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withTwoMembers(
+        serviceClient,
+        async ({ member, otherMember, clubId }) => {
+          await seedNotifications(serviceClient, [
+            { clubId, userId: member.id, ageDays: 110, isRead: true },
+            { clubId, userId: member.id, ageDays: 105, isRead: false },
+            {
+              clubId,
+              userId: member.id,
+              ageDays: EXPIRED_AGE_DAYS,
+              isRead: true,
+            },
+            {
+              clubId,
+              userId: member.id,
+              ageDays: RECENT_AGE_DAYS,
+              isRead: true,
+            },
+            {
+              clubId,
+              userId: otherMember.id,
+              ageDays: EXPIRED_AGE_DAYS,
+              isRead: true,
+            },
+          ]);
+
+          await notifyRoleChanged(serviceClient, member.id);
+
+          expect(await readAgesOf(serviceClient, member.id)).toEqual([
+            "105d sin leer",
+            "1d leído",
+            "nuevo sin leer",
+          ]);
+          expect(await readAgesOf(serviceClient, otherMember.id)).toEqual([
+            "100d leído",
+          ]);
+        },
       );
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
