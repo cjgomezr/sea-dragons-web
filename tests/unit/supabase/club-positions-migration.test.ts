@@ -513,4 +513,19 @@ describeConPostgres("la migración de las posiciones repetida", () => {
     ).toBe("1");
     expect(await memberPositionName(database, userId)).toBe("Defender");
   });
+
+  it("no falla con un miembro en una posición que el club añadió", async () => {
+    // El `check` fijo de `0016` no puede volver al repetirse el histórico: una
+    // posición fuera de las tres de siempre lo violaría y tumbaría el
+    // despliegue de migraciones.
+    const database = await migratedDatabase();
+    const clubId = await clubIdOf(database, SEEDED_CLUB);
+    await createPosition(database, clubId, "Utility");
+    const userId = await insertMember(database, "'Utility'");
+
+    const second = await applyRepositoryMigrations(database);
+
+    expect(second.code, second.stderr).toBe(0);
+    expect(await memberPositionName(database, userId)).toBe("Utility");
+  });
 });

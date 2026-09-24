@@ -106,6 +106,8 @@ alter table public.members
 create index if not exists members_position_id_club_id_idx
   on public.members (position_id, club_id);
 
+-- `0016` ya no lo repone si esta tabla existe: al repetirse el histórico, el
+-- `check` fijo rechazaría las posiciones que el club haya añadido.
 alter table public.members
   drop constraint if exists members_position_check;
 
