@@ -2455,8 +2455,15 @@ button.notification-item-content:hover {
 
 .club-settings-brand-row dd {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
+  margin: 0;
+}
+
+/* El aviso de un acento que ya no vale va debajo de la muestra, a lo ancho. */
+.club-settings-brand-row dd .auth-field-error {
+  flex-basis: 100%;
   margin: 0;
 }
 

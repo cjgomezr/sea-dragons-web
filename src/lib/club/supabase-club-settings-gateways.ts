@@ -65,9 +65,14 @@ async function updateClubIdentity(
   const { expected, identity } = write;
   const matchingName = serviceClient
     .from(CLUBS_TABLE)
-    .update({ name: identity.name, initials: identity.initials })
+    .update({
+      name: identity.name,
+      initials: identity.initials,
+      accent_color: identity.accentColor,
+    })
     .eq("id", clubId)
-    .eq("name", expected.name);
+    .eq("name", expected.name)
+    .eq("accent_color", expected.accentColor);
   const matchingRow =
     expected.initials === null
       ? matchingName.is("initials", null)

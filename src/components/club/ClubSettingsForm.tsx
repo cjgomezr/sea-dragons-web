@@ -55,16 +55,21 @@ const FIELD_OF_ISSUE: Readonly<
   name_required: "name",
   name_too_long: "name",
   initials_too_long: "initials",
+  accent_color_invalid: "accentColor",
+  accent_color_no_readable_text: "accentColor",
+  accent_color_unreadable_on_background: "accentColor",
 };
 
 function toDraft(settings: ClubSettings): Draft {
   return { name: settings.name, initials: settings.initials ?? "" };
 }
 
-function toIdentity(draft: Draft): ClubIdentity {
+/** Esta pantalla no cambia el acento: manda el guardado tal cual. */
+function toIdentity(draft: Draft, accentColor: string): ClubIdentity {
   return {
     name: draft.name,
     initials: draft.initials.trim() === "" ? null : draft.initials,
+    accentColor,
   };
 }
 
@@ -118,14 +123,18 @@ function SaveOutcome({
   );
 }
 
-/** El acento y el logo se enseñan aquí; cambiarlos llega con sus propios
- * tickets (RF-3 y RF-4 del PRD de E18a). */
+/** El acento y el logo se enseñan aquí; elegirlos llega con sus propios
+ * tickets (RF-3 y RF-4 del PRD de E18a). Un acento guardado que el servidor
+ * ya no acepta se explica junto a él: si no, el guardado fallaría sin decir
+ * por qué. */
 function BrandSummary({
   translate,
   settings,
+  accentIssueText,
 }: {
   translate: Translator;
   settings: ClubSettings;
+  accentIssueText: string | null;
 }): React.JSX.Element {
   const accent = settings.accentColor.toUpperCase();
   const initials = settings.initials ?? deriveInitials(settings.name);
@@ -142,6 +151,12 @@ function BrandSummary({
               aria-hidden="true"
             />
             <span>{accent}</span>
+            {/* Dentro del dd: un dl sólo admite dt y dd en cada grupo. */}
+            {accentIssueText === null ? null : (
+              <p className="auth-field-error" role="alert">
+                {accentIssueText}
+              </p>
+            )}
           </dd>
         </div>
         <div className="club-settings-brand-row">
@@ -201,7 +216,7 @@ export function ClubSettingsForm({
     if (isSendingRef.current) {
       return;
     }
-    const identity = toIdentity(draft);
+    const identity = toIdentity(draft, settings.accentColor);
     const issues = findClubSettingsIssues(identity);
     if (issues.length > 0) {
       setLocalIssues(issues);
@@ -211,7 +226,11 @@ export function ClubSettingsForm({
     setStatus({ kind: "sending" });
     const result = await saveClubSettings({
       identity,
-      expected: { name: settings.name, initials: settings.initials },
+      expected: {
+        name: settings.name,
+        initials: settings.initials,
+        accentColor: settings.accentColor,
+      },
     });
     isSendingRef.current = false;
     if (result.kind === "failed") {
@@ -274,7 +293,11 @@ export function ClubSettingsForm({
           </p>
         </section>
       </fieldset>
-      <BrandSummary translate={translate} settings={settings} />
+      <BrandSummary
+        translate={translate}
+        settings={settings}
+        accentIssueText={issueTextFor("accentColor")}
+      />
       <SaveOutcome
         translate={translate}
         status={status}
