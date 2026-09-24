@@ -197,7 +197,13 @@ describe("pantalla de configuración: guardar", () => {
       {
         name: "Bay Barracudas",
         initials: "HH",
-        expected: { name: "Harbour Hammerheads", initials: "HH" },
+        // #294: el acento guardado viaja tal cual; esta pantalla no lo cambia.
+        accentColor: "#1c6ea4",
+        expected: {
+          name: "Harbour Hammerheads",
+          initials: "HH",
+          accentColor: "#1c6ea4",
+        },
       },
     ]);
   });
@@ -297,6 +303,21 @@ describe("pantalla de configuración: errores", () => {
       /^Initials can have at most 3 characters\./,
     );
     expect(patches).toEqual([]);
+  });
+
+  it("explica junto al color un acento guardado que el servidor rechaza", async () => {
+    stubApi({
+      save: () =>
+        errorResponse(400, "validation_error", "accent_color_no_readable_text"),
+    });
+    await renderScreen();
+
+    await typeName("Bay Barracudas");
+    await userEvent.click(saveButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /No text colour reaches the minimum contrast/,
+    );
   });
 
   it("enseña junto al campo el rechazo que decide el servidor", async () => {

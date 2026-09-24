@@ -36,7 +36,12 @@ const STORED: ClubSettings = {
 const VALID_BODY = {
   name: "Bay Barracudas",
   initials: "BB",
-  expected: { name: STORED.name, initials: STORED.initials },
+  accentColor: STORED.accentColor,
+  expected: {
+    name: STORED.name,
+    initials: STORED.initials,
+    accentColor: STORED.accentColor,
+  },
 } as const;
 
 const readSessionState = vi.fn();
@@ -204,6 +209,19 @@ describe("endpoint de la configuración: PATCH", () => {
     expect(invalidateClubBrand).toHaveBeenCalledOnce();
   });
 
+  it("guarda un acento nuevo e invalida la caché de la marca", async () => {
+    const response = await patchSettings({
+      ...VALID_BODY,
+      accentColor: "#7b3fa0",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { accentColor: "#7b3fa0" },
+    });
+    expect(invalidateClubBrand).toHaveBeenCalledTimes(1);
+  });
+
   it("acepta quitar las iniciales con null", async () => {
     const response = await patchSettings({ ...VALID_BODY, initials: null });
 
@@ -241,6 +259,23 @@ describe("endpoint de la configuración: PATCH", () => {
     ["un nombre vacío", { name: "" }, "name_required"],
     ["un nombre de 61 caracteres", { name: "a".repeat(61) }, "name_too_long"],
     ["unas iniciales de 4", { initials: "ABCD" }, "initials_too_long"],
+    // #294 (RF-3)
+    ["un acento sin #", { accentColor: "7b3fa0" }, "accent_color_invalid"],
+    [
+      "un acento de tres cifras",
+      { accentColor: "#7b3" },
+      "accent_color_invalid",
+    ],
+    [
+      "un acento con el que ningún texto llega a AA",
+      { accentColor: "#7a7a7a" },
+      "accent_color_no_readable_text",
+    ],
+    [
+      "un acento ilegible sobre el fondo",
+      { accentColor: "#ffd700" },
+      "accent_color_unreadable_on_background",
+    ],
   ])(
     "responde 400 a %s, con el campo en el motivo",
     async (_case, change, reason) => {
@@ -259,6 +294,8 @@ describe("endpoint de la configuración: PATCH", () => {
     ["sin el estado esperado", { name: "X", initials: null }],
     ["con un campo que no es de esta pantalla", { ...VALID_BODY, slug: "x" }],
     ["con el nombre como número", { ...VALID_BODY, name: 7 }],
+    ["con el acento como número", { ...VALID_BODY, accentColor: 0x7b3fa0 }],
+    ["sin el acento", { ...VALID_BODY, accentColor: undefined }],
   ])("responde 400 a un cuerpo %s", async (_case, body) => {
     const response = await patchSettings(body);
 

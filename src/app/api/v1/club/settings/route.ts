@@ -24,7 +24,7 @@ import { createSupabaseClubSettingsGateways } from "@/lib/club/supabase-club-set
 
 /**
  * La configuración del club (#296, RF-6 del PRD de E18a): GET la lee y PATCH
- * cambia el nombre y las iniciales.
+ * cambia el nombre, las iniciales y el acento (#294, RF-3).
  *
  * Quién puede llamarlo lo decide la frontera: `RESTRICTED_ROUTES` lo reserva
  * al Admin, y el dominio lo vuelve a comprobar. El PATCH lleva lo que el
@@ -39,10 +39,13 @@ export const dynamic = "force-dynamic";
  * dominio, que cuenta en caracteres y dice qué campo falló. */
 const NAME_BODY_MAX_LENGTH = CLUB_NAME_MAX_LENGTH * 4;
 const INITIALS_BODY_MAX_LENGTH = CLUB_INITIALS_MAX_LENGTH * 4;
+/** `#rrggbb` son siete; que sea un color lo dice el dominio. */
+const ACCENT_BODY_MAX_LENGTH = 32;
 
 const identityShape = {
   name: z.string().max(NAME_BODY_MAX_LENGTH),
   initials: z.string().max(INITIALS_BODY_MAX_LENGTH).nullable(),
+  accentColor: z.string().max(ACCENT_BODY_MAX_LENGTH),
 };
 
 /** Sólo la forma. `strict` responde 400 a cualquier campo que no sea de esta

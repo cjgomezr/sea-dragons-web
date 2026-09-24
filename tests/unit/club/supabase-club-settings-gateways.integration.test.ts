@@ -18,6 +18,9 @@ import {
 
 type SeededClub = { readonly id: string };
 
+/** El acento que `0022_club_brand.sql` pone por defecto. */
+const SEEDED_ACCENT = "#1c6ea4";
+
 async function withThrowawayClub(
   initials: string | null,
   run: (club: SeededClub) => Promise<void>,
@@ -39,12 +42,20 @@ function settingsGateway() {
 
 describeRls("configuración del club en Supabase", () => {
   it(
-    "guarda el nombre y las iniciales cuando la fila sigue como se leyó",
+    "guarda el nombre, las iniciales y el acento cuando la fila sigue como se leyó",
     async () => {
       await withThrowawayClub("HH", async (club) => {
         const result = await settingsGateway().updateClubIdentity(club.id, {
-          expected: { name: "Harbour Hammerheads", initials: "HH" },
-          identity: { name: "Bay Barracudas", initials: null },
+          expected: {
+            name: "Harbour Hammerheads",
+            initials: "HH",
+            accentColor: SEEDED_ACCENT,
+          },
+          identity: {
+            name: "Bay Barracudas",
+            initials: null,
+            accentColor: "#7b3fa0",
+          },
         });
 
         expect(result).toEqual({
@@ -52,7 +63,7 @@ describeRls("configuración del club en Supabase", () => {
           settings: {
             name: "Bay Barracudas",
             initials: null,
-            accentColor: "#1c6ea4",
+            accentColor: "#7b3fa0",
             logoPath: null,
           },
         });
@@ -66,8 +77,16 @@ describeRls("configuración del club en Supabase", () => {
     async () => {
       await withThrowawayClub(null, async (club) => {
         const result = await settingsGateway().updateClubIdentity(club.id, {
-          expected: { name: "Harbour Hammerheads", initials: null },
-          identity: { name: "Harbour Hammerheads", initials: "HQ" },
+          expected: {
+            name: "Harbour Hammerheads",
+            initials: null,
+            accentColor: SEEDED_ACCENT,
+          },
+          identity: {
+            name: "Harbour Hammerheads",
+            initials: "HQ",
+            accentColor: SEEDED_ACCENT,
+          },
         });
 
         expect(result).toMatchObject({
@@ -79,21 +98,29 @@ describeRls("configuración del club en Supabase", () => {
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
 
-  it(
-    "no pisa nada si otro Admin cambió la fila entretanto",
-    async () => {
+  it.each([
+    ["las iniciales", { initials: "XX", accentColor: SEEDED_ACCENT }],
+    ["el acento", { initials: "HH", accentColor: "#7b3fa0" }],
+  ])(
+    "no pisa nada si otro Admin cambió %s entretanto",
+    async (_field, changed) => {
       await withThrowawayClub("HH", async (club) => {
         const gateway = settingsGateway();
 
         const result = await gateway.updateClubIdentity(club.id, {
-          expected: { name: "Harbour Hammerheads", initials: "XX" },
-          identity: { name: "Bay Barracudas", initials: "BB" },
+          expected: { name: "Harbour Hammerheads", ...changed },
+          identity: {
+            name: "Bay Barracudas",
+            initials: "BB",
+            accentColor: "#2e7d32",
+          },
         });
 
         expect(result).toEqual({ kind: "changed_meanwhile" });
         await expect(gateway.findClubSettings(club.id)).resolves.toMatchObject({
           name: "Harbour Hammerheads",
           initials: "HH",
+          accentColor: SEEDED_ACCENT,
         });
       });
     },

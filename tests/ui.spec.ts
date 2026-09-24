@@ -58,6 +58,7 @@ import {
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
 import { isStatePhotographed } from "./support/spanish-captures";
 import { snapshotCreatedNotice } from "./support/visual-baseline-notice";
+import { buildAccentStylesheet } from "@/lib/club/accent-stylesheet";
 import { LOCALE_COOKIE_NAME, type Locale } from "@/lib/i18n/locale";
 
 // Con qué condiciones se toma cada captura, sembrada o comparada. Hoy
@@ -5926,9 +5927,13 @@ test.describe("un Admin frente a la configuración de verdad", () => {
     const read = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
     expect(read.status()).toBe(200);
     const { data } = (await read.json()) as {
-      data: { name: string; initials: string | null };
+      data: { name: string; initials: string | null; accentColor: string };
     };
-    const identity = { name: data.name, initials: data.initials };
+    const identity = {
+      name: data.name,
+      initials: data.initials,
+      accentColor: data.accentColor,
+    };
 
     const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
       data: { ...identity, expected: identity },
@@ -5939,13 +5944,39 @@ test.describe("un Admin frente a la configuración de verdad", () => {
   });
 
   test("el endpoint rechaza un nombre vacío con 400", async ({ request }) => {
-    const empty = { name: "", initials: null };
+    const empty = { name: "", initials: null, accentColor: "#1c6ea4" };
 
     const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
       data: { ...empty, expected: empty },
     });
 
     expect(write.status()).toBe(400);
+  });
+
+  // #294 (RF-3): un color que no es hexadecimal no llega a la base.
+  test("el endpoint rechaza un acento que no es hexadecimal con 400, sin tocar la base", async ({
+    request,
+  }) => {
+    const before = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
+    const { data } = (await before.json()) as {
+      data: { name: string; initials: string | null; accentColor: string };
+    };
+    const expected = {
+      name: data.name,
+      initials: data.initials,
+      accentColor: data.accentColor,
+    };
+
+    const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
+      data: { ...expected, accentColor: "purple", expected },
+    });
+
+    expect(write.status()).toBe(400);
+    await expect(write.json()).resolves.toMatchObject({
+      error: { code: "validation_error", reason: "accent_color_invalid" },
+    });
+    const after = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
+    await expect(after.json()).resolves.toMatchObject({ data: expected });
   });
 });
 
@@ -5972,7 +6003,11 @@ test.describe("un Player frente a la configuración del club", () => {
   test("el endpoint le responde 403, para leer y para guardar", async ({
     request,
   }) => {
-    const identity = { name: "Otro club", initials: null };
+    const identity = {
+      name: "Otro club",
+      initials: null,
+      accentColor: "#7b3fa0",
+    };
 
     const read = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
     const write = await request.patch(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`, {
@@ -5995,5 +6030,179 @@ test.describe("sin sesión frente a la configuración del club", () => {
     await page.goto(`${APP_URL}${CLUB_SETTINGS_SCREEN_PATH}`);
 
     await expect(page).toHaveURL(/\/entrar/);
+  });
+});
+/* ---------------------------------------------------------------------------
+   El acento del club (#294, RF-3 del PRD de E18a). Sin mockup: se revisa
+   contra design-system.md con un acento lejos del azul de hoy.
+
+   El servidor mete la hoja del acento en el <head> cuando la base guarda un
+   color propio. Cambiar el acento del club en la base compartida movería las
+   capturas de todas las demás pruebas que corren a la vez, así que aquí se
+   aplica la misma hoja, construida por el mismo `buildAccentStylesheet`, sobre
+   la página servida. Que el servidor la sirva sin JavaScript lo prueba
+   tests/unit/club/accent-injection.test.tsx.
+   --------------------------------------------------------------------------- */
+
+/** Morado: botones, enlaces y estados activos se distinguen a simple vista
+ * de los de hoy. */
+const CLUB_ACCENT = "#7b3fa0";
+const CLUB_ACCENT_RGB = "rgb(123, 63, 160)";
+const DEFAULT_LIGHT_ACCENT_RGB = "rgb(28, 110, 164)";
+const DEFAULT_DARK_ACCENT_RGB = "rgb(51, 161, 224)";
+
+function clubAccentStylesheet(): string {
+  const stylesheet = buildAccentStylesheet(CLUB_ACCENT);
+  if (stylesheet === null) {
+    throw new Error(`${CLUB_ACCENT} no produjo hoja de acento`);
+  }
+  return stylesheet;
+}
+
+async function applyClubAccent(page: Page): Promise<void> {
+  await page.addStyleTag({ content: clubAccentStylesheet() });
+}
+
+type AccentScreen = {
+  readonly name: string;
+  readonly storageState?: string;
+  readonly visit: (page: Page, theme: (typeof themes)[number]) => Promise<void>;
+};
+
+const DIRECTORY_WITH_REQUESTS = DIRECTORY_STATES.find(
+  (state) => state.name === "directorio-admin-con-solicitudes",
+);
+
+const ACCENT_SCREENS: readonly AccentScreen[] = [
+  {
+    name: "acento-entrar",
+    visit: (page, theme) => goToWithTheme(page, SIGN_IN_PATH, theme),
+  },
+  {
+    name: "acento-panel",
+    storageState: E2E_STORAGE_STATE_PATH,
+    visit: (page, theme) => goToWithTheme(page, "/dashboard", theme),
+  },
+  {
+    name: "acento-directorio",
+    storageState: ADMIN_STORAGE_STATE,
+    visit: async (page, theme) => {
+      if (DIRECTORY_WITH_REQUESTS === undefined) {
+        throw new Error("falta el estado directorio-admin-con-solicitudes");
+      }
+      await goToDirectory(page, DIRECTORY_WITH_REQUESTS, theme);
+    },
+  },
+];
+
+async function goToWithClubAccent(
+  page: Page,
+  accentScreen: AccentScreen,
+  theme: (typeof themes)[number],
+): Promise<void> {
+  await accentScreen.visit(page, theme);
+  await applyClubAccent(page);
+  await page.mouse.move(0, 0);
+}
+
+for (const accentScreen of ACCENT_SCREENS) {
+  test.describe(accentScreen.name, () => {
+    if (accentScreen.storageState !== undefined) {
+      skipWithoutSession();
+      quietNotificationBell();
+      test.use({ storageState: accentScreen.storageState });
+    }
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToWithClubAccent(page, accentScreen, theme);
+            const snapshot = `${accentScreen.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+      });
+    }
+
+    for (const theme of themes) {
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await goToWithClubAccent(page, accentScreen, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
+  });
+}
+
+test.describe("el acento del club sobre la aplicación", () => {
+  async function signInButtonColor(page: Page): Promise<string> {
+    return page
+      .getByRole("button", { name: "Sign in" })
+      .evaluate((button) => getComputedStyle(button).backgroundColor);
+  }
+
+  test("el botón principal usa el color del club en el tema claro", async ({
+    page,
+  }) => {
+    await goToWithTheme(page, SIGN_IN_PATH, "light");
+    await applyClubAccent(page);
+
+    expect(await signInButtonColor(page)).toBe(CLUB_ACCENT_RGB);
+  });
+
+  test("en el tema oscuro usa el color del club aclarado, no el azul de hoy", async ({
+    page,
+  }) => {
+    await goToWithTheme(page, SIGN_IN_PATH, "dark");
+    await applyClubAccent(page);
+
+    const color = await signInButtonColor(page);
+    expect(color).not.toBe(DEFAULT_DARK_ACCENT_RGB);
+    expect(color).not.toBe(CLUB_ACCENT_RGB);
+  });
+
+  test("en el tema oscuro el resto de la paleta no cambia", async ({
+    page,
+  }) => {
+    await goToWithTheme(page, SIGN_IN_PATH, "dark");
+    const readPalette = (): Promise<string[]> =>
+      page.evaluate(() => {
+        const style = getComputedStyle(document.documentElement);
+        return [
+          "--color-background",
+          "--color-panel",
+          "--color-text",
+          "--color-text-secondary",
+          "--color-border",
+        ].map((name) => style.getPropertyValue(name).trim());
+      });
+    const before = await readPalette();
+
+    await applyClubAccent(page);
+
+    expect(await readPalette()).toEqual(before);
+  });
+
+  test("sin JavaScript, la página del club sembrado sale con el acento de hoy", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+
+    await page.goto(`${APP_URL}${SIGN_IN_PATH}`);
+
+    expect(await signInButtonColor(page)).toBe(DEFAULT_LIGHT_ACCENT_RGB);
+    await context.close();
   });
 });

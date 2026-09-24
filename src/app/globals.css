@@ -24,7 +24,8 @@
   /* Texto sobre un relleno de acento. No es un color nuevo: es el que hace que
      un botón primario pase AA en cada tema. Blanco sobre el acento claro da
      5.1:1; blanco sobre el acento oscuro daría 2.6:1, así que ahí el texto es
-     el fondo oscuro, que da 7.4:1. */
+     el fondo oscuro, que da 7.4:1. Con el acento propio de un club (#294) el
+     layout raíz sobrescribe los dos con los que calcula `accent-color.ts`. */
   --color-on-accent: #ffffff;
   --shadow: 0 1px 2px rgba(13, 36, 54, 0.06), 0 6px 18px rgba(13, 36, 54, 0.06);
   --shadow-sm: 0 1px 2px rgba(13, 36, 54, 0.07);
@@ -2454,8 +2455,15 @@ button.notification-item-content:hover {
 
 .club-settings-brand-row dd {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
+  margin: 0;
+}
+
+/* El aviso de un acento que ya no vale va debajo de la muestra, a lo ancho. */
+.club-settings-brand-row dd .auth-field-error {
+  flex-basis: 100%;
   margin: 0;
 }
 

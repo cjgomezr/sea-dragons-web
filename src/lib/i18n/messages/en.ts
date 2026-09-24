@@ -739,6 +739,12 @@ export const englishMessages = {
     "The name can have at most {max} characters.",
   "clubSettings.issue.initialsTooLong":
     "Initials can have at most {max} characters.",
+  "clubSettings.issue.accentInvalid":
+    "The accent colour must be a hex code such as #1C6EA4.",
+  "clubSettings.issue.accentNoReadableText":
+    "No text colour reaches the minimum contrast (4.5:1) on this accent. Pick a lighter or darker one.",
+  "clubSettings.issue.accentUnreadableOnBackground":
+    "This accent can't be read as a link on the light background (it needs 4.5:1). Pick a darker one.",
   "clubSettings.error.changed":
     "Another Admin changed the settings while you were editing. Load the latest settings and make your change again.",
   "clubSettings.error.signInRequired":

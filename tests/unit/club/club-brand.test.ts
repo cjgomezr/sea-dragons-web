@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_ACCENT_COLOR } from "@/lib/club/accent-color";
 import {
   type ClubBrandRow,
   DEFAULT_CLUB_BRAND,
@@ -9,7 +10,11 @@ import {
 /** La marca de E18a (#292, RF-1 y RF-2): se lee de la base una vez, se sirve de
  * la caché, y si la base no contesta la pantalla se pinta con el respaldo. */
 
-const STORED_ROW: ClubBrandRow = { name: "Hobart Orcas", initials: "HO" };
+const STORED_ROW: ClubBrandRow = {
+  name: "Hobart Orcas",
+  initials: "HO",
+  accentColor: "#7b3fa0",
+};
 const TIME_TO_LIVE_MS = 60_000;
 const READ_TIMEOUT_MS = 3_000;
 
@@ -52,6 +57,13 @@ describe("derivar las iniciales", () => {
   });
 });
 
+describe("marca por defecto", () => {
+  // #294: sin marca legible, el acento de hoy.
+  it("lleva el acento de hoy", () => {
+    expect(DEFAULT_CLUB_BRAND.accentColor).toBe(DEFAULT_ACCENT_COLOR);
+  });
+});
+
 describe("lectura de la marca", () => {
   it("devuelve el nombre y las iniciales guardados", async () => {
     const { reader } = createReader({ fetchRow: async () => STORED_ROW });
@@ -59,12 +71,17 @@ describe("lectura de la marca", () => {
     expect(await reader.read()).toEqual({
       name: "Hobart Orcas",
       initials: "HO",
+      accentColor: "#7b3fa0",
     });
   });
 
   it("deriva las iniciales del nombre cuando no hay guardadas", async () => {
     const { reader } = createReader({
-      fetchRow: async () => ({ name: "Geelong Stingrays", initials: null }),
+      fetchRow: async () => ({
+        ...STORED_ROW,
+        name: "Geelong Stingrays",
+        initials: null,
+      }),
     });
 
     expect((await reader.read()).initials).toBe("GS");
@@ -104,7 +121,7 @@ describe("lectura de la marca", () => {
     const fetchRow = vi
       .fn<() => Promise<ClubBrandRow>>()
       .mockResolvedValueOnce(STORED_ROW)
-      .mockResolvedValueOnce({ name: "Hobart Sharks", initials: "HS" });
+      .mockResolvedValueOnce({ ...STORED_ROW, name: "Hobart Sharks" });
     const { reader } = createReader({ fetchRow });
 
     await reader.read();

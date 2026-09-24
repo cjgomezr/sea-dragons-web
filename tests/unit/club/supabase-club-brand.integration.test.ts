@@ -22,7 +22,11 @@ describe.skipIf(!hasCredentials)("lectura de la marca en Supabase", () => {
     async () => {
       const row = await fetchClubBrandRow(process.env);
 
-      expect(row).toEqual({ name: "Victoria Seadragons", initials: "VS" });
+      expect(row).toEqual({
+        name: "Victoria Seadragons",
+        initials: "VS",
+        accentColor: "#1c6ea4",
+      });
     },
     TEST_TIMEOUT_MS,
   );
