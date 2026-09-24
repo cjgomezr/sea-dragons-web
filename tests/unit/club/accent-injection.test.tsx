@@ -103,7 +103,9 @@ describe("inyección del color", () => {
     );
   });
 
-  it("sin marca legible trae el color por defecto", async () => {
+  // La marca que no se puede leer se sirve como DEFAULT_CLUB_BRAND: eso lo
+  // prueba el lector en caché de club-brand.test.ts.
+  it("con la marca por defecto no inyecta hoja y manda globals.css", async () => {
     servedBrand.current = DEFAULT_CLUB_BRAND;
 
     const head = await servedHead();

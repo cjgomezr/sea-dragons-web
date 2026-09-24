@@ -217,7 +217,12 @@ export function ClubSettingsForm({
       return;
     }
     const identity = toIdentity(draft, settings.accentColor);
-    const issues = findClubSettingsIssues(identity);
+    const expected: ClubIdentity = {
+      name: settings.name,
+      initials: settings.initials,
+      accentColor: settings.accentColor,
+    };
+    const issues = findClubSettingsIssues({ identity, expected });
     if (issues.length > 0) {
       setLocalIssues(issues);
       return;
@@ -226,11 +231,7 @@ export function ClubSettingsForm({
     setStatus({ kind: "sending" });
     const result = await saveClubSettings({
       identity,
-      expected: {
-        name: settings.name,
-        initials: settings.initials,
-        accentColor: settings.accentColor,
-      },
+      expected,
     });
     isSendingRef.current = false;
     if (result.kind === "failed") {

@@ -265,6 +265,45 @@ describe("configuración del club: acento", () => {
     expect(auditRows[0]?.metadata).toEqual({ fields: ["accentColor"] });
   });
 
+  it("un acento guardado que ya no llega a AA no impide cambiar el nombre", async () => {
+    const { gateways, writes } = fake();
+    const stored = { ...LOADED, accentColor: "#7a7a7a" };
+
+    await updateClubSettings(gateways, {
+      callerId: ADMIN_ID,
+      submission: submit({ ...stored, name: "Bay Barracudas" }, stored),
+    });
+
+    expect(writes).toHaveLength(1);
+  });
+
+  it("un acento que no es hexadecimal se rechaza aunque sea el guardado", async () => {
+    const { gateways, writes } = fake();
+    const stored = { ...LOADED, accentColor: "purple" };
+
+    const attempt = updateClubSettings(gateways, {
+      callerId: ADMIN_ID,
+      submission: submit({ ...stored, name: "Bay Barracudas" }, stored),
+    });
+
+    await expect(attempt).rejects.toMatchObject({
+      issues: [{ field: "accentColor", code: "accent_color_invalid" }],
+    });
+    expect(writes).toEqual([]);
+  });
+
+  it("un acento guardado en mayúsculas no cuenta como un cambio al guardar el nombre", async () => {
+    const { gateways, auditRows } = fake();
+    const stored = { ...LOADED, accentColor: "#1C6EA4" };
+
+    await updateClubSettings(gateways, {
+      callerId: ADMIN_ID,
+      submission: submit({ ...stored, name: "Bay Barracudas" }, stored),
+    });
+
+    expect(auditRows[0]?.metadata).toEqual({ fields: ["name"] });
+  });
+
   it("el mismo acento en mayúsculas no cuenta como un cambio", async () => {
     const { gateways, writes } = fake();
 

@@ -9,7 +9,11 @@ import type {
   RoleRequestMember,
 } from "@/lib/auth/role-request";
 import { hasCapability } from "@/lib/auth/roles";
-import { type AccentRejection, evaluateAccentColor } from "./accent-color";
+import {
+  type AccentRejection,
+  evaluateAccentColor,
+  isHexColor,
+} from "./accent-color";
 
 /**
  * La configuración del club (#296, RF-6 del PRD de E18a), contada sin
@@ -149,7 +153,19 @@ function normalizeIdentity(identity: ClubIdentity): ClubIdentity {
   };
 }
 
-function findAccentIssue(accentColor: string): ClubSettingsIssue | null {
+/**
+ * El contraste sólo se exige a un acento que cambia. Uno ya guardado que no
+ * llegue a AA (escrito a mano en la base, o de antes de un cambio de paleta)
+ * no puede impedir que el Admin guarde el nombre: la pantalla todavía no deja
+ * elegir otro. El formato sí se exige siempre, porque es el de la base.
+ */
+function findAccentIssue(
+  accentColor: string,
+  expectedAccentColor: string,
+): ClubSettingsIssue | null {
+  if (isHexColor(accentColor) && accentColor === expectedAccentColor) {
+    return null;
+  }
   const evaluation = evaluateAccentColor(accentColor);
   return evaluation.kind === "accepted"
     ? null
@@ -159,9 +175,10 @@ function findAccentIssue(accentColor: string): ClubSettingsIssue | null {
       };
 }
 
-export function findClubSettingsIssues(
-  identity: ClubIdentity,
-): readonly ClubSettingsIssue[] {
+export function findClubSettingsIssues({
+  identity,
+  expected,
+}: ClubSettingsSubmission): readonly ClubSettingsIssue[] {
   const { name, initials, accentColor } = normalizeIdentity(identity);
   const issues: ClubSettingsIssue[] = [];
   if (name === "") {
@@ -175,7 +192,10 @@ export function findClubSettingsIssues(
   ) {
     issues.push({ field: "initials", code: "initials_too_long" });
   }
-  const accentIssue = findAccentIssue(accentColor);
+  const accentIssue = findAccentIssue(
+    accentColor,
+    expected.accentColor.toLowerCase(),
+  );
   if (accentIssue !== null) {
     issues.push(accentIssue);
   }
@@ -246,14 +266,19 @@ export async function updateClubSettings(
     readonly submission: ClubSettingsSubmission;
   },
 ): Promise<ClubSettings> {
-  const issues = findClubSettingsIssues(request.submission.identity);
+  const issues = findClubSettingsIssues(request.submission);
   if (issues.length > 0) {
     throw new ClubSettingsValidationError(issues);
   }
   const caller = await findAdministrator(gateways, request.callerId);
   const identity = normalizeIdentity(request.submission.identity);
   const { expected } = request.submission;
-  const fields = changedFields(identity, expected);
+  // La base admite un acento en mayúsculas, y no por eso cambió. Al gateway
+  // va lo esperado tal cual, para que case con la fila.
+  const fields = changedFields(identity, {
+    ...expected,
+    accentColor: expected.accentColor.toLowerCase(),
+  });
   if (fields.length === 0) {
     return gateways.settings.findClubSettings(caller.clubId);
   }
