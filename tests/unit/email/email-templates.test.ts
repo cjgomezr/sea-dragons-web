@@ -676,7 +676,7 @@ describe("la marca en los correos", () => {
       expect(inlineColor(cell, "background-color")).toBe(
         DEFAULT_CLUB_BRAND.accentColor.toUpperCase(),
       );
-      expect(email.html).not.toContain(accentColor);
+      expect(email.html.toLowerCase()).not.toContain(accentColor.toLowerCase());
     },
   );
 });
