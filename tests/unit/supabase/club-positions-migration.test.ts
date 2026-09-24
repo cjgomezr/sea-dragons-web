@@ -179,9 +179,13 @@ describeConPostgres("las posiciones sembradas", () => {
     const database = await migratedDatabase();
     const otherClub = await createOtherClub(database);
 
+    const userId = await database.query(
+      "insert into auth.users (id) values (gen_random_uuid()) returning id",
+    );
     const saved = await database.query(
-      `insert into public.members (user_id, club_id, full_name, position)
-       values (gen_random_uuid(), '${otherClub}', 'Nueva Socia', 'Goalkeeper')
+      `insert into public.members (user_id, club_id, full_name, email, position)
+       values ('${userId}', '${otherClub}', 'Nueva Socia',
+               '${userId}@example.test', 'Goalkeeper')
        returning position`,
     );
 
@@ -269,15 +273,19 @@ describeConPostgres("las restricciones de las posiciones", () => {
 
   it("acepta el mismo nombre en otro club", async () => {
     const database = await migratedDatabase();
+    const clubId = await clubIdOf(database, SEEDED_CLUB);
     const otherClubId = await createOtherClub(database);
+    // Un nombre que ningún club trae sembrado: las tres por defecto ya
+    // demuestran de por sí que dos clubes pueden compartir nombre.
+    await createPosition(database, clubId, "Utility");
 
     const other = await database.attempt(
       `with p as (
          insert into public.club_positions (club_id, sort_order)
-         values ('${otherClubId}', 1) returning id
+         values ('${otherClubId}', 99) returning id
        )
        insert into public.club_position_names (position_id, club_id, locale, name)
-       select id, '${otherClubId}', 'en', 'Forward' from p`,
+       select id, '${otherClubId}', 'en', 'Utility' from p`,
     );
 
     expect(other.code, other.stderr).toBe(0);
