@@ -7,6 +7,15 @@ columna audit_log.entity_type tipo=text null=NO default=-
 columna audit_log.id tipo=uuid null=NO default=gen_random_uuid()
 columna audit_log.metadata tipo=jsonb null=YES default=-
 columna audit_log.result tipo=text null=NO default=-
+columna club_position_names.club_id tipo=uuid null=NO default=-
+columna club_position_names.locale tipo=text null=NO default=-
+columna club_position_names.name tipo=text null=NO default=-
+columna club_position_names.position_id tipo=uuid null=NO default=-
+columna club_positions.archived_at tipo=timestamp with time zone null=YES default=-
+columna club_positions.club_id tipo=uuid null=NO default=-
+columna club_positions.created_at tipo=timestamp with time zone null=NO default=now()
+columna club_positions.id tipo=uuid null=NO default=gen_random_uuid()
+columna club_positions.sort_order tipo=integer null=NO default=-
 columna clubs.accent_color tipo=text null=NO default='#1c6ea4'::text
 columna clubs.created_at tipo=timestamp with time zone null=NO default=now()
 columna clubs.id tipo=uuid null=NO default=gen_random_uuid()
@@ -50,6 +59,7 @@ columna members.joined_on tipo=date null=NO default=((now() AT TIME ZONE 'Austra
 columna members.membership_type tipo=text null=YES default=-
 columna members.photo_path tipo=text null=YES default=-
 columna members.position tipo=text null=YES default=-
+columna members.position_id tipo=uuid null=YES default=-
 columna members.role tipo=text null=NO default='Player'::text
 columna members.user_id tipo=uuid null=NO default=-
 columna notifications.club_id tipo=uuid null=NO default=-
@@ -79,8 +89,10 @@ columna role_requests.status tipo=text null=NO default='pending'::text
 columna role_requests.user_id tipo=uuid null=NO default=-
 funcion change_member_role(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_role text)
 funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
+funcion clubs_seed_default_positions()
 funcion health_probe()
 funcion is_member_in_groups(target_user_id uuid, group_ids uuid[])
+funcion members_sync_position_id()
 funcion prune_member_notifications(recipient_user_ids uuid[])
 funcion set_member_status(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_status text)
 grant audit_log postgres DELETE
@@ -97,6 +109,36 @@ grant audit_log service_role SELECT
 grant audit_log service_role TRIGGER
 grant audit_log service_role TRUNCATE
 grant audit_log service_role UPDATE
+grant club_position_names authenticated SELECT
+grant club_position_names postgres DELETE
+grant club_position_names postgres INSERT
+grant club_position_names postgres REFERENCES
+grant club_position_names postgres SELECT
+grant club_position_names postgres TRIGGER
+grant club_position_names postgres TRUNCATE
+grant club_position_names postgres UPDATE
+grant club_position_names service_role DELETE
+grant club_position_names service_role INSERT
+grant club_position_names service_role REFERENCES
+grant club_position_names service_role SELECT
+grant club_position_names service_role TRIGGER
+grant club_position_names service_role TRUNCATE
+grant club_position_names service_role UPDATE
+grant club_positions authenticated SELECT
+grant club_positions postgres DELETE
+grant club_positions postgres INSERT
+grant club_positions postgres REFERENCES
+grant club_positions postgres SELECT
+grant club_positions postgres TRIGGER
+grant club_positions postgres TRUNCATE
+grant club_positions postgres UPDATE
+grant club_positions service_role DELETE
+grant club_positions service_role INSERT
+grant club_positions service_role REFERENCES
+grant club_positions service_role SELECT
+grant club_positions service_role TRIGGER
+grant club_positions service_role TRUNCATE
+grant club_positions service_role UPDATE
 grant clubs authenticated SELECT
 grant clubs postgres DELETE
 grant clubs postgres INSERT
@@ -249,6 +291,11 @@ grant-columna clubs.logo_path anon SELECT
 grant-columna clubs.name anon SELECT
 indice audit_log_club_id_created_at_idx CREATE INDEX audit_log_club_id_created_at_idx ON public.audit_log USING btree (club_id, created_at DESC)
 indice audit_log_pkey CREATE UNIQUE INDEX audit_log_pkey ON public.audit_log USING btree (id)
+indice club_position_names_club_id_locale_name_key CREATE UNIQUE INDEX club_position_names_club_id_locale_name_key ON public.club_position_names USING btree (club_id, locale, lower(btrim(name)))
+indice club_position_names_pkey CREATE UNIQUE INDEX club_position_names_pkey ON public.club_position_names USING btree (position_id, locale)
+indice club_positions_club_id_sort_order_idx CREATE INDEX club_positions_club_id_sort_order_idx ON public.club_positions USING btree (club_id, sort_order)
+indice club_positions_id_club_id_key CREATE UNIQUE INDEX club_positions_id_club_id_key ON public.club_positions USING btree (id, club_id)
+indice club_positions_pkey CREATE UNIQUE INDEX club_positions_pkey ON public.club_positions USING btree (id)
 indice clubs_pkey CREATE UNIQUE INDEX clubs_pkey ON public.clubs USING btree (id)
 indice clubs_slug_key CREATE UNIQUE INDEX clubs_slug_key ON public.clubs USING btree (slug)
 indice confirmation_email_requests_email_hash_requested_at_idx CREATE INDEX confirmation_email_requests_email_hash_requested_at_idx ON public.confirmation_email_requests USING btree (email_hash, requested_at DESC)
@@ -261,6 +308,7 @@ indice groups_club_id_name_key CREATE UNIQUE INDEX groups_club_id_name_key ON pu
 indice groups_id_club_id_key CREATE UNIQUE INDEX groups_id_club_id_key ON public.groups USING btree (id, club_id)
 indice groups_pkey CREATE UNIQUE INDEX groups_pkey ON public.groups USING btree (id)
 indice members_pkey CREATE UNIQUE INDEX members_pkey ON public.members USING btree (id)
+indice members_position_id_club_id_idx CREATE INDEX members_position_id_club_id_idx ON public.members USING btree (position_id, club_id)
 indice members_user_id_club_id_key CREATE UNIQUE INDEX members_user_id_club_id_key ON public.members USING btree (user_id, club_id)
 indice members_user_id_key CREATE UNIQUE INDEX members_user_id_key ON public.members USING btree (user_id)
 indice notifications_pkey CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)
@@ -275,6 +323,12 @@ indice role_requests_one_pending_per_member CREATE UNIQUE INDEX role_requests_on
 indice role_requests_pkey CREATE UNIQUE INDEX role_requests_pkey ON public.role_requests USING btree (id)
 indice role_requests_user_id_created_at_idx CREATE INDEX role_requests_user_id_created_at_idx ON public.role_requests USING btree (user_id, created_at DESC)
 policy audit_log.audit_log_select_denied cmd=SELECT roles={authenticated} using=false check=-
+policy club_position_names.club_position_names_select_own_club cmd=SELECT roles={authenticated} using=(club_id IN ( SELECT m.club_id
+   FROM members m
+  WHERE (m.user_id = ( SELECT auth.uid() AS uid)))) check=-
+policy club_positions.club_positions_select_own_club cmd=SELECT roles={authenticated} using=(club_id IN ( SELECT m.club_id
+   FROM members m
+  WHERE (m.user_id = ( SELECT auth.uid() AS uid)))) check=-
 policy clubs.clubs_select_anon cmd=SELECT roles={anon} using=true check=-
 policy clubs.clubs_select_authenticated cmd=SELECT roles={authenticated} using=true check=-
 policy confirmation_email_requests.confirmation_email_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
@@ -291,6 +345,14 @@ policy role_requests.role_requests_select_own cmd=SELECT roles={authenticated} u
 restriccion audit_log.audit_log_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion audit_log.audit_log_pkey PRIMARY KEY (id)
 restriccion audit_log.audit_log_result_check CHECK ((result = ANY (ARRAY['success'::text, 'failure'::text])))
+restriccion club_position_names.club_position_names_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
+restriccion club_position_names.club_position_names_locale_check CHECK ((locale = ANY (ARRAY['en'::text, 'es'::text])))
+restriccion club_position_names.club_position_names_name_length CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 40)))
+restriccion club_position_names.club_position_names_pkey PRIMARY KEY (position_id, locale)
+restriccion club_position_names.club_position_names_position_same_club_fkey FOREIGN KEY (position_id, club_id) REFERENCES club_positions(id, club_id) ON DELETE CASCADE
+restriccion club_positions.club_positions_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
+restriccion club_positions.club_positions_id_club_id_key UNIQUE (id, club_id)
+restriccion club_positions.club_positions_pkey PRIMARY KEY (id)
 restriccion clubs.clubs_accent_color_hex CHECK ((accent_color ~ '^#[0-9A-Fa-f]{6}$'::text))
 restriccion clubs.clubs_initials_length CHECK (((char_length(initials) >= 1) AND (char_length(initials) <= 3)))
 restriccion clubs.clubs_name_length CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 60)))
@@ -320,7 +382,7 @@ restriccion members.members_guardian_consent_complete CHECK ((((guardian_consent
 restriccion members.members_membership_type_check CHECK ((membership_type = ANY (ARRAY['Full'::text, 'Student'::text, 'Casual'::text])))
 restriccion members.members_photo_path_in_own_folder CHECK (starts_with(photo_path, ((user_id)::text || '/'::text)))
 restriccion members.members_pkey PRIMARY KEY (id)
-restriccion members.members_position_check CHECK (("position" = ANY (ARRAY['Goalkeeper'::text, 'Defender'::text, 'Forward'::text])))
+restriccion members.members_position_same_club_fkey FOREIGN KEY (position_id, club_id) REFERENCES club_positions(id, club_id)
 restriccion members.members_role_check CHECK ((role = ANY (ARRAY['Admin'::text, 'Coach'::text, 'Committee'::text, 'Player'::text])))
 restriccion members.members_user_id_club_id_key UNIQUE (user_id, club_id)
 restriccion members.members_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
@@ -344,6 +406,8 @@ restriccion role_requests.role_requests_requested_role_check CHECK ((requested_r
 restriccion role_requests.role_requests_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))
 restriccion role_requests.role_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES members(user_id) ON DELETE CASCADE
 tabla audit_log rls=t
+tabla club_position_names rls=t
+tabla club_positions rls=t
 tabla clubs rls=t
 tabla confirmation_email_requests rls=t
 tabla email_send_requests rls=t
@@ -354,3 +418,5 @@ tabla notifications rls=t
 tabla password_recovery_requests rls=t
 tabla registration_requests rls=t
 tabla role_requests rls=t
+trigger clubs_seed_default_positions CREATE TRIGGER clubs_seed_default_positions AFTER INSERT ON public.clubs FOR EACH ROW EXECUTE FUNCTION clubs_seed_default_positions()
+trigger members_sync_position_id CREATE TRIGGER members_sync_position_id BEFORE INSERT OR UPDATE OF "position" ON public.members FOR EACH ROW EXECUTE FUNCTION members_sync_position_id()
