@@ -1,11 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ClubBrand } from "@/lib/club/club-brand";
+import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
 import { LOCALE_COOKIE_NAME } from "@/lib/i18n/locale";
 
 const incoming = { cookies: new Map<string, string>() };
 const storedBrand: { current: ClubBrand } = {
-  current: { name: "Hobart Orcas", initials: "HO" },
+  current: { ...DEFAULT_CLUB_BRAND, name: "Hobart Orcas", initials: "HO" },
 };
 
 vi.mock("next/headers", () => ({
@@ -30,7 +30,11 @@ async function renderAuthLayout(): Promise<void> {
 
 beforeEach(() => {
   incoming.cookies.clear();
-  storedBrand.current = { name: "Hobart Orcas", initials: "HO" };
+  storedBrand.current = {
+    ...DEFAULT_CLUB_BRAND,
+    name: "Hobart Orcas",
+    initials: "HO",
+  };
 });
 
 // #292: la marca de la pantalla de entrar sale de la base, no del código.
@@ -43,7 +47,11 @@ describe("la marca en la pantalla de entrar", () => {
   });
 
   it("enseña las iniciales guardadas en el recuadro de la marca", async () => {
-    storedBrand.current = { name: "Hobart Orcas", initials: "HOC" };
+    storedBrand.current = {
+      ...DEFAULT_CLUB_BRAND,
+      name: "Hobart Orcas",
+      initials: "HOC",
+    };
 
     await renderAuthLayout();
 

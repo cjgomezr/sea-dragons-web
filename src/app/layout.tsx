@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AccentStyle } from "@/components/AccentStyle";
 import { ThemeScript } from "@/components/ThemeScript";
 import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
@@ -24,12 +25,16 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>): Promise<React.JSX.Element> {
   // El lector de pantalla pronuncia según este atributo, así que sale del
   // idioma de la visita y se decide aquí, antes de pintar.
-  const locale = await readRequestLocale();
+  const [locale, brand] = await Promise.all([
+    readRequestLocale(),
+    readClubBrand(),
+  ]);
 
   return (
     <html lang={locale} suppressHydrationWarning>
       <head>
         <ThemeScript />
+        <AccentStyle accentColor={brand.accentColor} />
       </head>
       <body>{children}</body>
     </html>

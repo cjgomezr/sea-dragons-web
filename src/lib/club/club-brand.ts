@@ -1,5 +1,7 @@
+import { DEFAULT_ACCENT_COLOR } from "./accent-color";
+
 /**
- * La marca del club (E18a, RF-1 y RF-2): nombre e iniciales, leídos de
+ * La marca del club (E18a, RF-1, RF-2 y RF-3): nombre, iniciales y acento, leídos de
  * `public.clubs` en vez de escritos en el código. Aquí vive la parte pura: el
  * respaldo, las iniciales derivadas y la caché. Hablar con Supabase es cosa de
  * `supabase-club-brand.ts`.
@@ -8,6 +10,9 @@
 export type ClubBrand = {
   readonly name: string;
   readonly initials: string;
+  /** Tal cual lo guarda la base. Si se puede pintar lo decide
+   * `accent-stylesheet.ts`. */
+  readonly accentColor: string;
 };
 
 /** Lo que guarda la base. Sin iniciales es `null`, nunca la cadena vacía
@@ -15,6 +20,7 @@ export type ClubBrand = {
 export type ClubBrandRow = {
   readonly name: string;
   readonly initials: string | null;
+  readonly accentColor: string;
 };
 
 /** La red si la base no contesta: la marca sale en todas las pantallas, y una
@@ -22,6 +28,7 @@ export type ClubBrandRow = {
 export const DEFAULT_CLUB_BRAND: ClubBrand = {
   name: "Victoria Seadragons",
   initials: "VS",
+  accentColor: DEFAULT_ACCENT_COLOR,
 };
 
 const DERIVED_INITIALS_WORD_COUNT = 2;
@@ -37,7 +44,11 @@ export function deriveInitials(name: string): string {
 }
 
 function toClubBrand(row: ClubBrandRow): ClubBrand {
-  return { name: row.name, initials: row.initials ?? deriveInitials(row.name) };
+  return {
+    name: row.name,
+    initials: row.initials ?? deriveInitials(row.name),
+    accentColor: row.accentColor,
+  };
 }
 
 export type ClubBrandReader = {

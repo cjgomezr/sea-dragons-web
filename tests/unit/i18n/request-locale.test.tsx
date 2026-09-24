@@ -20,7 +20,11 @@ vi.mock("next/headers", () => ({
 // La marca sale de la base (#292): la del test es otra que la de Victoria,
 // así que un nombre escrito a mano en la pantalla no pasaría.
 vi.mock("@/lib/club/supabase-club-brand", () => ({
-  readClubBrand: async () => ({ name: "Hobart Orcas", initials: "HO" }),
+  readClubBrand: async () => ({
+    name: "Hobart Orcas",
+    initials: "HO",
+    accentColor: "#1c6ea4",
+  }),
 }));
 
 const { readRequestLocale } = await import("@/lib/i18n/request-locale");

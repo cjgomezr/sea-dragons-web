@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "@/components/AppShell";
 import type { Role } from "@/lib/auth/roles";
-import type { ClubBrand } from "@/lib/club/club-brand";
+import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
 
 const { usePathname, useRouter } = vi.hoisted(() => ({
@@ -13,7 +13,11 @@ const { usePathname, useRouter } = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({ usePathname, useRouter }));
 
-const BRAND: ClubBrand = { name: "Hobart Orcas", initials: "HO" };
+const BRAND: ClubBrand = {
+  ...DEFAULT_CLUB_BRAND,
+  name: "Hobart Orcas",
+  initials: "HO",
+};
 
 /** El máximo que admite `clubs_name_length` en `0022_club_brand.sql`. */
 const LONGEST_CLUB_NAME =
@@ -51,7 +55,11 @@ describe("la marca en la cabecera", () => {
   // en el árbol, que es lo que oye un lector de pantalla.
   it("un nombre largo se lee entero aunque se vea recortado", () => {
     usePathname.mockReturnValue("/dashboard");
-    renderShell("en", { name: LONGEST_CLUB_NAME, initials: "AD" });
+    renderShell("en", {
+      ...DEFAULT_CLUB_BRAND,
+      name: LONGEST_CLUB_NAME,
+      initials: "AD",
+    });
 
     const brand = screen.getByText(LONGEST_CLUB_NAME);
     expect(LONGEST_CLUB_NAME).toHaveLength(60);
