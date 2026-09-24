@@ -771,6 +771,13 @@ button.notification-item-content:hover {
     align-items: flex-start;
   }
 
+  /* En la barra lateral, de 240px, un logo apaisado al lado dejaría el nombre
+     en unas pocas letras: va encima de él (#295). */
+  .app-brand-lockup {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .app-nav {
     display: block;
   }

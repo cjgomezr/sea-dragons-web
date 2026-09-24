@@ -6080,6 +6080,425 @@ test.describe("sin sesión frente a la configuración del club", () => {
   });
 });
 /* ---------------------------------------------------------------------------
+   El logo del club (#295, RF-4 del PRD de E18a). Sin mockup: se revisa contra
+   design-system.md, con el recuadro de iniciales marcando el tamaño y el
+   sitio.
+
+   Subir un logo de verdad cambiaría la marca de la base compartida, y con
+   ella la cabecera de todas las demás capturas que corren a la vez, también
+   en las otras máquinas de CI. Así que, como con el acento, en la cabecera y
+   en la pantalla de entrar se pone sobre la página servida la misma imagen
+   que pinta `ClubBrandMark`, con su clase. Que el servidor la pinte a partir
+   de la marca lo prueban tests/unit/auth-layout.test.tsx y
+   tests/unit/app-shell.test.tsx. La pantalla de configuración sí la pinta
+   React, con la configuración servida por `page.route`.
+   --------------------------------------------------------------------------- */
+
+const LOGO_HOST = "https://logos.example.test";
+const CLUB_LOGO_ENDPOINT = `${CLUB_SETTINGS_ENDPOINT}/logo`;
+const FIXTURES_DIR = path.join(__dirname, "support", "fixtures");
+/** El alto del recuadro de iniciales (`--space-8`), y el tope de ancho que
+ * `.club-logo` le da a un logo apaisado. */
+const LOGO_BOX_HEIGHT_PX = 32;
+const LOGO_BOX_MAX_WIDTH_PX = LOGO_BOX_HEIGHT_PX * 4;
+/** Cuánto puede apartarse la proporción pintada de la del fichero por el
+ * redondeo a píxeles enteros. */
+const LOGO_RATIO_TOLERANCE = 0.05;
+/** Medio píxel de margen por el redondeo de las cajas. */
+const SUBPIXEL_TOLERANCE_PX = 0.5;
+
+const CLUB_LOGOS = [
+  { name: "cuadrado", file: "logo-cuadrado.png" },
+  { name: "apaisado", file: "logo-apaisado.png" },
+] as const;
+
+type ClubLogoFixture = (typeof CLUB_LOGOS)[number];
+
+/** El logo que se fotografía: el apaisado es el que más empuja al nombre. */
+const PHOTOGRAPHED_LOGO: ClubLogoFixture = CLUB_LOGOS[1];
+
+function logoUrlOf(logo: ClubLogoFixture): string {
+  return `${LOGO_HOST}/${logo.file}`;
+}
+
+function readLogoFixture(file: string): Buffer {
+  return readFileSync(path.join(FIXTURES_DIR, file));
+}
+
+/** Sirve los ficheros de prueba en `LOGO_HOST`; cualquier otro, 404. */
+async function serveClubLogos(page: Page): Promise<void> {
+  await page.route(`${LOGO_HOST}/**`, async (route, request) => {
+    const logo = CLUB_LOGOS.find((candidate) =>
+      request.url().endsWith(`/${candidate.file}`),
+    );
+    if (logo === undefined) {
+      await route.fulfill({ status: 404, body: "" });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: readLogoFixture(logo.file),
+    });
+  });
+}
+
+async function expectLogoLoaded(page: Page): Promise<void> {
+  await expect
+    .poll(() =>
+      page
+        .locator("img.club-logo")
+        .evaluate((image: HTMLImageElement) =>
+          image.complete ? image.naturalWidth : 0,
+        ),
+    )
+    .toBeGreaterThan(0);
+}
+
+/** Lo que pinta `ClubBrandMark` con logo: en la pantalla de entrar sustituye
+ * al recuadro de iniciales, y en la cabecera va delante del nombre. */
+async function showLogoOnServedPage(
+  page: Page,
+  logo: ClubLogoFixture,
+): Promise<void> {
+  // Antes de que React hidrate, la imagen puesta a mano no casa con lo que
+  // pintó el servidor, y React la cambia por el recuadro de iniciales.
+  await page.waitForFunction(() => {
+    const brand = document.querySelector(".auth-brand-mark, .app-brand");
+    return (
+      brand !== null &&
+      Object.keys(brand).some((key) => key.startsWith("__reactFiber"))
+    );
+  });
+  await page.evaluate(
+    ({ url, alt }) => {
+      const image = document.createElement("img");
+      image.className = "club-logo";
+      image.src = url;
+      image.alt = alt;
+      const initials = document.querySelector(".auth-brand-mark");
+      if (initials === null) {
+        document.querySelector(".app-brand-lockup")?.prepend(image);
+      } else {
+        initials.replaceWith(image);
+      }
+    },
+    { url: logoUrlOf(logo), alt: "Victoria Seadragons logo" },
+  );
+  await expectLogoLoaded(page);
+}
+
+/** El logo dentro de su caja: del alto del recuadro, sin pasar del tope de
+ * ancho, con la proporción del fichero y sin salirse de su contenedor. */
+async function expectLogoFitsItsBox(page: Page): Promise<void> {
+  const fit = await page
+    .locator("img.club-logo")
+    .evaluate((image: HTMLImageElement) => {
+      const box = image.getBoundingClientRect();
+      const parent = image.parentElement?.getBoundingClientRect();
+      return {
+        width: box.width,
+        height: box.height,
+        right: box.right,
+        parentRight: parent?.right ?? 0,
+        naturalRatio: image.naturalWidth / image.naturalHeight,
+        objectFit: getComputedStyle(image).objectFit,
+      };
+    });
+  expect(fit.height).toBe(LOGO_BOX_HEIGHT_PX);
+  expect(fit.width).toBeLessThanOrEqual(LOGO_BOX_MAX_WIDTH_PX);
+  expect(fit.objectFit).toBe("contain");
+  expect(Math.abs(fit.width / fit.height - fit.naturalRatio)).toBeLessThan(
+    LOGO_RATIO_TOLERANCE,
+  );
+  expect(fit.right).toBeLessThanOrEqual(
+    fit.parentRight + SUBPIXEL_TOLERANCE_PX,
+  );
+}
+
+async function expectNoHorizontalScroll(page: Page): Promise<void> {
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth >
+      document.documentElement.clientWidth,
+  );
+  expect(overflow).toBe(false);
+}
+
+type BrandScreen = {
+  readonly name: string;
+  readonly path: string;
+  readonly needsSession: boolean;
+  /** Lo que se fotografía: la página entera, o sólo la cabecera. */
+  readonly capture: (page: Page) => Locator | null;
+};
+
+const BRAND_SCREENS: readonly BrandScreen[] = [
+  {
+    name: "logo-entrar",
+    path: "/entrar",
+    needsSession: false,
+    capture: () => null,
+  },
+  {
+    name: "logo-cabecera",
+    path: "/dashboard",
+    needsSession: true,
+    capture: (page) => page.locator(".app-sidebar-header"),
+  },
+];
+
+async function goToBrandWithLogo(
+  page: Page,
+  screenPath: string,
+  logo: ClubLogoFixture,
+  theme: (typeof themes)[number] = "light",
+): Promise<void> {
+  await serveClubLogos(page);
+  await goToWithTheme(page, screenPath, theme);
+  await showLogoOnServedPage(page, logo);
+}
+
+async function expectMatchesBrandBaseline(
+  page: Page,
+  screen: BrandScreen,
+  snapshot: string,
+): Promise<void> {
+  const element = screen.capture(page);
+  if (element === null) {
+    await createMissingLocalBaseline(snapshot, () =>
+      page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+    );
+    await expect(page).toHaveScreenshot(snapshot, {
+      ...SCREENSHOT_OPTIONS,
+      fullPage: true,
+      maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+    });
+    return;
+  }
+  await createMissingLocalBaseline(snapshot, () =>
+    element.screenshot(SCREENSHOT_OPTIONS),
+  );
+  await expect(element).toHaveScreenshot(snapshot, {
+    ...SCREENSHOT_OPTIONS,
+    maxDiffPixels: COMPONENT_MAX_DIFF_PIXELS,
+  });
+}
+
+for (const screen of BRAND_SCREENS) {
+  test.describe(`${screen.name}: la marca con logo`, () => {
+    if (screen.needsSession) {
+      skipWithoutSession();
+      quietNotificationBell();
+      test.use({ storageState: E2E_STORAGE_STATE_PATH });
+    }
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const logo of CLUB_LOGOS) {
+          test(`el logo ${logo.name} encaja sin deformarse ni desbordar`, async ({
+            page,
+          }) => {
+            await goToBrandWithLogo(page, screen.path, logo);
+
+            await expectLogoFitsItsBox(page);
+            await expectNoHorizontalScroll(page);
+          });
+        }
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToBrandWithLogo(
+              page,
+              screen.path,
+              PHOTOGRAPHED_LOGO,
+              theme,
+            );
+
+            await expectMatchesBrandBaseline(
+              page,
+              screen,
+              `${screen.name}-${vp.name}-${theme}.png`,
+            );
+          });
+        }
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToBrandWithLogo(page, screen.path, PHOTOGRAPHED_LOGO);
+
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+/** La configuración servida con un logo: uno de los de prueba, o una
+ * dirección que responde 404, como un fichero borrado del almacenamiento. */
+async function goToClubSettingsWithLogo(
+  page: Page,
+  logoUrl: string,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await serveClubLogos(page);
+  await stubClubSettings(page);
+  // Registrada después, gana a la de `stubClubSettings`.
+  await page.route(
+    (url) => url.pathname === CLUB_SETTINGS_ENDPOINT,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { ...STUBBED_CLUB_SETTINGS, logoUrl } }),
+      });
+    },
+  );
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${CLUB_SETTINGS_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, CLUB_SETTINGS_SCREEN_PATH, theme);
+  }
+  await expect(clubNameField(page)).toHaveValue(STUBBED_CLUB_SETTINGS.name);
+}
+
+test.describe("club-con-logo", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  for (const vp of viewports) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await goToClubSettingsWithLogo(
+            page,
+            logoUrlOf(PHOTOGRAPHED_LOGO),
+            theme,
+          );
+          await expectLogoLoaded(page);
+          const snapshot = `club-con-logo-${vp.name}-${theme}.png`;
+          await createMissingLocalBaseline(snapshot, () =>
+            page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+          );
+          await expect(page).toHaveScreenshot(snapshot, {
+            ...SCREENSHOT_OPTIONS,
+            fullPage: true,
+            maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+          });
+        });
+      }
+
+      for (const logo of CLUB_LOGOS) {
+        test(`el logo ${logo.name} encaja sin deformarse ni desbordar`, async ({
+          page,
+        }) => {
+          await goToClubSettingsWithLogo(page, logoUrlOf(logo));
+          await expectLogoLoaded(page);
+
+          await expectLogoFitsItsBox(page);
+          await expectNoHorizontalScroll(page);
+        });
+      }
+    });
+  }
+
+  test("has no accessibility violations (axe-core)", async ({ page }) => {
+    await goToClubSettingsWithLogo(page, logoUrlOf(PHOTOGRAPHED_LOGO));
+    await expectLogoLoaded(page);
+
+    await expectNoAxeViolations(page);
+  });
+
+  test("un logo que ya no está en el almacenamiento deja las iniciales", async ({
+    page,
+  }) => {
+    await goToClubSettingsWithLogo(page, `${LOGO_HOST}/borrado.png`);
+
+    await expect(
+      page.locator(".club-logo-preview .auth-brand-mark"),
+    ).toHaveText(STUBBED_CLUB_SETTINGS.initials);
+    await expect(page.locator("img.club-logo")).toHaveCount(0);
+  });
+});
+
+/** Las subidas que el endpoint de verdad rechaza. Ninguna llega a guardar
+ * nada, así que no cambian la marca que ven las demás pruebas. */
+const REJECTED_LOGO_UPLOADS = [
+  {
+    name: "un fichero que no es PNG ni WebP",
+    body: (): Buffer => Buffer.from("esto no es una imagen"),
+    reason: "logo_type_unsupported",
+  },
+  {
+    name: "un logo de más de 512 KB",
+    body: (): Buffer =>
+      Buffer.concat([
+        readLogoFixture("logo-cuadrado.png"),
+        Buffer.alloc(512 * 1024),
+      ]),
+    reason: "logo_too_large",
+  },
+  {
+    name: "un PNG que no se puede decodificar",
+    body: (): Buffer => readLogoFixture("foto-corrupta.png"),
+    reason: "logo_undecodable",
+  },
+] as const;
+
+test.describe("un Admin frente al endpoint del logo de verdad", () => {
+  skipWithoutSession();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+  test.describe.configure({ timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS });
+
+  for (const upload of REJECTED_LOGO_UPLOADS) {
+    test(`rechaza ${upload.name} con 400 y su motivo, sin tocar la marca`, async ({
+      request,
+    }) => {
+      const before = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
+
+      const response = await request.put(`${APP_URL}${CLUB_LOGO_ENDPOINT}`, {
+        headers: { "content-type": "image/png" },
+        data: upload.body(),
+      });
+
+      expect(response.status()).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "validation_error", reason: upload.reason },
+      });
+      const after = await request.get(`${APP_URL}${CLUB_SETTINGS_ENDPOINT}`);
+      expect(await after.json()).toEqual(await before.json());
+    });
+  }
+});
+
+test.describe("un Player frente al endpoint del logo", () => {
+  skipWithoutSession();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("le responde 403, para subir y para quitar", async ({ request }) => {
+    const upload = await request.put(`${APP_URL}${CLUB_LOGO_ENDPOINT}`, {
+      headers: { "content-type": "image/png" },
+      data: readLogoFixture("logo-cuadrado.png"),
+    });
+    const removal = await request.delete(`${APP_URL}${CLUB_LOGO_ENDPOINT}`);
+
+    expect(upload.status()).toBe(403);
+    expect(removal.status()).toBe(403);
+  });
+});
+
+test.describe("sin sesión frente al endpoint del logo", () => {
+  test("responde 401", async ({ request }) => {
+    const removal = await request.delete(`${APP_URL}${CLUB_LOGO_ENDPOINT}`);
+
+    expect(removal.status()).toBe(401);
+  });
+});
+/* ---------------------------------------------------------------------------
    El acento del club (#294, RF-3 del PRD de E18a). Sin mockup: se revisa
    contra design-system.md con un acento lejos del azul de hoy.
 
