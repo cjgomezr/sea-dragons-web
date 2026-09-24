@@ -84,6 +84,12 @@ function NotificationContent({
   );
 }
 
+/** Con una tecla modificadora el enlace se abre en otra pestaña o ventana, y
+ * esta pantalla no se mueve: el panel sigue abierto para abrir más. */
+function opensElsewhere(event: React.MouseEvent): boolean {
+  return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+}
+
 type OpenHandlers = Pick<NotificationPanelProps, "onMarkOne" | "onNavigate">;
 
 /** Abrir un aviso lleva a su pantalla (#338) y, si estaba sin leer, lo marca.
@@ -113,11 +119,13 @@ function NotificationItem({
       <Link
         href={destination}
         className="notification-item-content"
-        onClick={() => {
+        onClick={(event) => {
           if (!notification.isRead) {
             onMarkOne(notification.id);
           }
-          onNavigate();
+          if (!opensElsewhere(event)) {
+            onNavigate();
+          }
         }}
       >
         {content}

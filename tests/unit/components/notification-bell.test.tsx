@@ -690,6 +690,47 @@ describe("abrir un aviso", () => {
     expect(countMarkCalls()).toBe(0);
   });
 
+  // Navegar vuelve a pedir el número a la vez que se marca: restar en local
+  // además de esa lectura bajaría el número dos veces.
+  it("tras abrir un aviso el número es el que da el servidor", async () => {
+    installFakeApi([
+      aNotification({ minutesAgo: 1, data: { newRole: "Coach" } }),
+      aNotification({ minutesAgo: 2, data: { newRole: "Admin" } }),
+    ]);
+    renderBell();
+    const list = await openList();
+    await within(bell()).findByText("2");
+    api.notifications = [
+      ...api.notifications,
+      aNotification({ data: { newRole: "Player" } }),
+    ];
+
+    await userEvent.click(
+      await findNotificationLink(list, /You are now Coach\./),
+    );
+
+    await waitFor(() =>
+      expect(bell()).toHaveAccessibleName("Notifications, 2 unread"),
+    );
+  });
+
+  it("abrirlo en otra pestaña lo marca pero deja el panel abierto", async () => {
+    installFakeApi([aNotification({ data: { newRole: "Coach" } })]);
+    renderBell();
+    const list = await openList();
+    const link = await findNotificationLink(list, /You are now Coach\./);
+
+    const user = userEvent.setup();
+    await user.keyboard("{Control>}");
+    await user.click(link);
+    await user.keyboard("{/Control}");
+
+    await waitFor(() =>
+      expect(bell()).toHaveAccessibleName("Notifications, none unread"),
+    );
+    expect(queryList()).toBeInTheDocument();
+  });
+
   it("el panel se cierra al navegar", async () => {
     installFakeApi([aNotification({ data: { newRole: "Coach" } })]);
     renderBell();

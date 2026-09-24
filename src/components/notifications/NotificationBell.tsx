@@ -44,44 +44,53 @@ function bellLabel(translate: Translator, unreadCount: number | null): string {
     : translate("notifications.bell.label", { count: unreadCount });
 }
 
+type UnreadCount = {
+  readonly unreadCount: number | null;
+  /** Vuelve a pedir el número al servidor. */
+  readonly refresh: () => Promise<void>;
+  readonly clear: () => void;
+};
+
 /** El número de la campana, al día al montar, al navegar y cada minuto. */
-function useUnreadCount(): readonly [
-  number | null,
-  (update: (current: number | null) => number | null) => void,
-] {
+function useUnreadCount(): UnreadCount {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
+  // Navegar desde un aviso pide el número a la vez que se marca: sólo cuenta
+  // la última lectura, aunque otra anterior conteste después.
+  const latestRequest = useRef(0);
+  const isMounted = useRef(true);
+
+  const refresh = useCallback(async (): Promise<void> => {
+    latestRequest.current += 1;
+    const thisRequest = latestRequest.current;
+    const result = await fetchUnreadCount();
+    // Si no se pudo contar se queda el último número: la cabecera no es
+    // sitio para un error, y la próxima vuelta lo vuelve a intentar.
+    if (
+      isMounted.current &&
+      thisRequest === latestRequest.current &&
+      result.kind === "ok"
+    ) {
+      setUnreadCount(result.unreadCount);
+    }
+  }, []);
+
+  const clear = useCallback(() => {
+    latestRequest.current += 1;
+    setUnreadCount(0);
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
-    async function refresh(): Promise<void> {
-      const result = await fetchUnreadCount();
-      // Si no se pudo contar se queda el último número: la cabecera no es
-      // sitio para un error, y la próxima vuelta lo vuelve a intentar.
-      if (isMounted && result.kind === "ok") {
-        setUnreadCount(result.unreadCount);
-      }
-    }
+    isMounted.current = true;
     void refresh();
     const timer = setInterval(() => void refresh(), REFRESH_INTERVAL_MS);
     return () => {
-      isMounted = false;
+      isMounted.current = false;
       clearInterval(timer);
     };
-  }, [pathname]);
+  }, [pathname, refresh]);
 
-  return [unreadCount, setUnreadCount] as const;
-}
-
-/** El número tras marcar: todos leídos lo deja en cero, uno lo baja en uno. */
-function countAfter(
-  change: UnreadChange,
-  current: number | null,
-): number | null {
-  if (change === "all_read") {
-    return 0;
-  }
-  return current === null ? null : Math.max(0, current - 1);
+  return { unreadCount, refresh, clear };
 }
 
 /** Cerrar con Escape, pulsando fuera o cuando el foco sale del panel. Lo
@@ -137,10 +146,11 @@ export function NotificationBell({
   const containerRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLButtonElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const [unreadCount, setUnreadCount] = useUnreadCount();
+  const { unreadCount, refresh, clear } = useUnreadCount();
   const [isOpen, setIsOpen] = useState(false);
-  const notifications = useNotificationList((change) =>
-    setUnreadCount((current) => countAfter(change, current)),
+  // Marcar uno no resta en local: se pide el número, que ya lo descuenta.
+  const notifications = useNotificationList((change: UnreadChange) =>
+    change === "all_read" ? clear() : void refresh(),
   );
   const { clearMarkFailure } = notifications;
 
