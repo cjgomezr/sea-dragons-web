@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { RECOVERY_LINK_LIFETIME_MINUTES } from "@/lib/auth/password-recovery";
 import { connectRecoveryEmailSender } from "@/lib/auth/recovery-email-sender";
+import { DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
 import {
   EMAIL_FROM_ENV,
   RESEND_API_KEY_ENV,
@@ -36,7 +37,10 @@ const CONFIGURED_ENV = {
 describe("correo de recuperación", () => {
   it("con la configuración de producción, sale por Resend con la plantilla de recuperación", async () => {
     const fake = recordingFetch(200, { id: "id-del-envio" });
-    const connection = connectRecoveryEmailSender(CONFIGURED_ENV, fake.fetch);
+    const connection = connectRecoveryEmailSender(CONFIGURED_ENV, {
+      fetchImplementation: fake.fetch,
+      readClubBrand: async () => DEFAULT_CLUB_BRAND,
+    });
     if (connection.kind !== "connected") {
       throw new Error(`no conectó: ${connection.reason}`);
     }
@@ -64,7 +68,10 @@ describe("correo de recuperación", () => {
 
   it("sale en el idioma que recibe, asunto incluido", async () => {
     const fake = recordingFetch(200, { id: "id-del-envio" });
-    const connection = connectRecoveryEmailSender(CONFIGURED_ENV, fake.fetch);
+    const connection = connectRecoveryEmailSender(CONFIGURED_ENV, {
+      fetchImplementation: fake.fetch,
+      readClubBrand: async () => DEFAULT_CLUB_BRAND,
+    });
     if (connection.kind !== "connected") {
       throw new Error(`no conectó: ${connection.reason}`);
     }
@@ -85,7 +92,10 @@ describe("correo de recuperación", () => {
 
   it("si el proveedor responde con error, el envío falla en vez de darse por hecho", async () => {
     const fake = recordingFetch(500, { name: "internal_server_error" });
-    const connection = connectRecoveryEmailSender(CONFIGURED_ENV, fake.fetch);
+    const connection = connectRecoveryEmailSender(CONFIGURED_ENV, {
+      fetchImplementation: fake.fetch,
+      readClubBrand: async () => DEFAULT_CLUB_BRAND,
+    });
     if (connection.kind !== "connected") {
       throw new Error(`no conectó: ${connection.reason}`);
     }
@@ -100,11 +110,38 @@ describe("correo de recuperación", () => {
   });
 
   it("sin la credencial no conecta, y el motivo nombra la variable y dónde se pone", () => {
-    const connection = connectRecoveryEmailSender({ [EMAIL_FROM_ENV]: FROM });
+    const connection = connectRecoveryEmailSender(
+      { [EMAIL_FROM_ENV]: FROM },
+      { readClubBrand: async () => DEFAULT_CLUB_BRAND },
+    );
 
     expect(connection.kind).toBe("not_connected");
     if (connection.kind !== "not_connected") return;
     expect(connection.reason).toContain(RESEND_API_KEY_ENV);
     expect(connection.reason).toContain("Vercel");
+  });
+
+  it("lleva la marca del club que devuelve la marca", async () => {
+    const fake = recordingFetch(200, { id: "id-del-envio" });
+    const connection = connectRecoveryEmailSender(CONFIGURED_ENV, {
+      fetchImplementation: fake.fetch,
+      readClubBrand: async () => ({
+        ...DEFAULT_CLUB_BRAND,
+        name: "Hobart Orcas",
+      }),
+    });
+    if (connection.kind !== "connected") {
+      throw new Error(`no conectó: ${connection.reason}`);
+    }
+
+    await connection.sender.sendRecoveryEmail({
+      to: "nerea@example.test",
+      resetUrl: RESET_URL,
+      locale: "es",
+    });
+
+    expect(fake.sent[0]?.body).toMatchObject({
+      subject: "Recupera tu contraseña de Hobart Orcas",
+    });
   });
 });

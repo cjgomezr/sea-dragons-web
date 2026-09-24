@@ -1,3 +1,4 @@
+import type { ClubBrand } from "@/lib/club/club-brand";
 import {
   type EmailLocaleDirectory,
   readEmailLocale,
@@ -88,6 +89,7 @@ async function deliverConfirmationEmail(
     readonly to: string;
     readonly confirmUrl: string;
     readonly locale: Locale;
+    readonly brand: ClubBrand;
   },
 ): Promise<ConfirmationEmailOutcome> {
   try {
@@ -97,6 +99,7 @@ async function deliverConfirmationEmail(
         confirmUrl: email.confirmUrl,
         linkLifetimeMinutes: EMAIL_CONFIRMATION_LINK_LIFETIME_MINUTES,
         locale: email.locale,
+        brand: email.brand,
       }),
     });
     return { kind: "requested" };
@@ -112,8 +115,10 @@ export function createConfirmationEmailGateway(dependencies: {
   readonly tokens: ConfirmationTokenIssuer;
   readonly emails: EmailSenderConnection;
   readonly emailLocales: EmailLocaleDirectory;
+  /** Nunca lanza: si la base no contesta, da la marca de respaldo. */
+  readonly readClubBrand: () => Promise<ClubBrand>;
 }): ConfirmationEmailGateway {
-  const { tokens, emails, emailLocales } = dependencies;
+  const { tokens, emails, emailLocales, readClubBrand } = dependencies;
   return {
     async requestConfirmationEmail(email, appUrl) {
       // Antes de emitir: un enlace nuevo invalida el anterior, y emitirlo sin
@@ -133,6 +138,7 @@ export function createConfirmationEmailGateway(dependencies: {
         to: email,
         confirmUrl: buildEmailConfirmationUrl(appUrl, issue.tokenHash),
         locale: await readEmailLocale(emailLocales, issue.userId),
+        brand: await readClubBrand(),
       });
     },
   };
