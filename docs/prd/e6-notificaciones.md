@@ -137,3 +137,30 @@ Ninguna. El dueño tomó estas decisiones el 22 de septiembre de 2026:
 | 3   | Pon la campana en la cabecera, con su panel y su pantalla en el móvil                            | M      | 2          | No: pantalla nueva                    |
 | 4   | Avisa a un miembro cuando su rol cambia o su solicitud se rechaza                                | S      | 2          | No: toca el flujo de roles            |
 | 5   | Avisa a los Admin cuando llega una solicitud de rol nueva                                        | S      | 2          | No: toca el flujo de roles            |
+
+## Apéndice A · Limpieza de avisos viejos (#339)
+
+Añadido después del plan. Hasta el #339 no se borraba ningún aviso. La lista
+enseña los 50 más recientes y el resto crecía en la base para siempre, con
+nombres de personas dentro.
+
+La política:
+
+- Un aviso **leído** caduca a los **90 días** de creado.
+- Nadie guarda más de **200 avisos**. Pasado el tope se borran los leídos,
+  empezando por el más viejo, hasta dejar 200.
+- Un aviso **sin leer no se borra nunca**, ni por viejo ni por exceso. Si un
+  socio pasa de 200 con todo sin leer, no se borra nada y queda un aviso en el
+  log del servidor.
+
+Dónde corre: la función `public.prune_member_notifications` de
+`supabase/migrations/0023_prune_notifications.sql`, en una sola sentencia para
+todos los destinatarios que reciba. Todavía no hay programador (`pg_cron` es de
+E16b), así que `notifyMember` la llama después de responder, acotada al
+destinatario de cada aviso. Un fallo de la limpieza se registra y no toca el
+aviso ya guardado ni la acción que lo originó. Cuando llegue E16b, el trabajo
+programado llamará a la misma función con todos los socios.
+
+Los dos números viven en la función de la base. El tope está repetido como
+`MAX_NOTIFICATIONS_PER_MEMBER` en `src/lib/notifications/notify-member.ts`,
+que lo usa sólo para decidir cuándo dejar constancia: cambian juntos.

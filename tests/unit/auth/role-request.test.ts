@@ -18,6 +18,7 @@ import {
 } from "@/lib/auth/role-request";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type { NotificationInsert } from "@/lib/notifications/notify-member";
+import { NO_NOTIFICATION_CLEANUP } from "../helpers/notification-cleanup";
 
 /**
  * Pedir Coach o Committee (FR-010, RF-4 del PRD de E3), sin Supabase delante.
@@ -115,6 +116,7 @@ function fakeGateways(options: FakeOptions = {}): Fake {
         }
         notifications.push(row);
       },
+      ...NO_NOTIFICATION_CLEANUP,
     },
   };
   return { gateways, inserts, lookups, notifications };

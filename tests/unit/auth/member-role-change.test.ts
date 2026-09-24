@@ -22,6 +22,7 @@ import type {
   NotificationInsert,
   NotificationWriter,
 } from "@/lib/notifications/notify-member";
+import { NO_NOTIFICATION_CLEANUP } from "../helpers/notification-cleanup";
 
 /**
  * Cambiar el rol de un socio (FR-014, AC-008, RF-6 y RF-7 del PRD de E3),
@@ -66,6 +67,7 @@ function fakeNotificationWriter(
       }
       inserted.push(row);
     },
+    ...NO_NOTIFICATION_CLEANUP,
   };
 }
 

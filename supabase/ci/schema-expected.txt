@@ -81,6 +81,7 @@ funcion change_member_role(target_user_id uuid, acting_club_id uuid, acting_user
 funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
 funcion health_probe()
 funcion is_member_in_groups(target_user_id uuid, group_ids uuid[])
+funcion prune_member_notifications(recipient_user_ids uuid[])
 funcion set_member_status(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_status text)
 grant audit_log postgres DELETE
 grant audit_log postgres INSERT

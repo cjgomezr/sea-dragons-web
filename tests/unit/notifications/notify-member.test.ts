@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  MAX_NOTIFICATIONS_PER_MEMBER,
   type NewNotification,
+  type NotificationCleanup,
   type NotificationInsert,
   type NotificationRecipient,
   type NotificationWriter,
@@ -21,19 +23,44 @@ const ROLE_CHANGED: NewNotification = {
   data: { newRole: "Coach" },
 };
 
+const NOTHING_TO_CLEAN: NotificationCleanup = { deletedCount: 0, keptCount: 1 };
+
 type FakeWriter = NotificationWriter & {
   readonly inserted: NotificationInsert[];
+  /** Lo que se dejó para después de responder, sin correr todavía. */
+  readonly deferred: (() => Promise<void>)[];
 };
 
-function writerFor(recipient: NotificationRecipient | null): FakeWriter {
+function writerFor(
+  recipient: NotificationRecipient | null,
+  prune: NotificationWriter["pruneNotifications"] = async () =>
+    NOTHING_TO_CLEAN,
+): FakeWriter {
   const inserted: NotificationInsert[] = [];
+  const deferred: (() => Promise<void>)[] = [];
   return {
     inserted,
+    deferred,
     findRecipient: vi.fn(async () => recipient),
     insertNotification: vi.fn(async (row: NotificationInsert) => {
       inserted.push(row);
     }),
+    pruneNotifications: vi.fn(prune),
+    runAfterResponse: (work) => {
+      deferred.push(work);
+    },
   };
+}
+
+const ACTIVE_RECIPIENT: NotificationRecipient = {
+  clubId: CLUB_ID,
+  accountStatus: "active",
+};
+
+async function runDeferredWork(writer: FakeWriter): Promise<void> {
+  for (const work of writer.deferred) {
+    await work();
+  }
 }
 
 afterEach(() => {
@@ -91,6 +118,8 @@ describe("crear un aviso", () => {
       insertNotification: async () => {
         throw failure;
       },
+      pruneNotifications: vi.fn(),
+      runAfterResponse: vi.fn(),
     };
     const logError = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -114,6 +143,8 @@ describe("crear un aviso", () => {
         throw failure;
       },
       insertNotification: vi.fn(),
+      pruneNotifications: vi.fn(),
+      runAfterResponse: vi.fn(),
     };
     vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -129,6 +160,8 @@ describe("crear un aviso", () => {
       insertNotification: async () => {
         throw new Error("fallo");
       },
+      pruneNotifications: vi.fn(),
+      runAfterResponse: vi.fn(),
     };
     const logError = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -139,5 +172,106 @@ describe("crear un aviso", () => {
     });
 
     expect(JSON.stringify(logError.mock.calls)).not.toContain("Ana Buceadora");
+  });
+});
+
+describe("crear un aviso y limpiar después", () => {
+  it("deja la limpieza del destinatario para después de responder", async () => {
+    const writer = writerFor(ACTIVE_RECIPIENT);
+
+    await notifyMember(writer, ROLE_CHANGED);
+
+    expect(writer.pruneNotifications).not.toHaveBeenCalled();
+    expect(writer.deferred).toHaveLength(1);
+  });
+
+  it("limpia sólo los avisos del destinatario", async () => {
+    const writer = writerFor(ACTIVE_RECIPIENT);
+    await notifyMember(writer, ROLE_CHANGED);
+
+    await runDeferredWork(writer);
+
+    expect(writer.pruneNotifications).toHaveBeenCalledWith(RECIPIENT_ID);
+  });
+
+  it("no limpia nada si el aviso no se guardó", async () => {
+    const writer = writerFor({ clubId: CLUB_ID, accountStatus: "inactive" });
+
+    await notifyMember(writer, ROLE_CHANGED);
+
+    expect(writer.deferred).toEqual([]);
+  });
+
+  it("deja el aviso guardado y registra el fallo cuando la limpieza falla", async () => {
+    const failure = new Error("la limpieza se cayó");
+    const writer = writerFor(ACTIVE_RECIPIENT, async () => {
+      throw failure;
+    });
+    const logError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const outcome = await notifyMember(writer, ROLE_CHANGED);
+    await runDeferredWork(writer);
+
+    expect(outcome).toEqual({ kind: "saved" });
+    expect(writer.inserted).toHaveLength(1);
+    expect(logError).toHaveBeenCalledWith(
+      expect.stringContaining("limpieza"),
+      expect.objectContaining({
+        recipientUserId: RECIPIENT_ID,
+        error: failure,
+      }),
+    );
+  });
+
+  it("responde guardado aunque no se pueda dejar la limpieza para después", async () => {
+    const failure = new Error("fuera de una petición");
+    const writer: NotificationWriter = {
+      ...writerFor(ACTIVE_RECIPIENT),
+      runAfterResponse: () => {
+        throw failure;
+      },
+    };
+    const logError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const outcome = await notifyMember(writer, ROLE_CHANGED);
+
+    expect(outcome).toEqual({ kind: "saved" });
+    expect(logError).toHaveBeenCalledWith(
+      expect.stringContaining("limpieza"),
+      expect.objectContaining({
+        recipientUserId: RECIPIENT_ID,
+        error: failure,
+      }),
+    );
+  });
+
+  it("deja constancia cuando el socio sigue por encima del tope", async () => {
+    const keptCount = MAX_NOTIFICATIONS_PER_MEMBER + 5;
+    const writer = writerFor(ACTIVE_RECIPIENT, async () => ({
+      deletedCount: 0,
+      keptCount,
+    }));
+    const logWarning = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await notifyMember(writer, ROLE_CHANGED);
+    await runDeferredWork(writer);
+
+    expect(logWarning).toHaveBeenCalledWith(expect.stringContaining("tope"), {
+      recipientUserId: RECIPIENT_ID,
+      keptCount,
+    });
+  });
+
+  it("no deja constancia de nada cuando el socio queda dentro del tope", async () => {
+    const writer = writerFor(ACTIVE_RECIPIENT, async () => ({
+      deletedCount: 3,
+      keptCount: MAX_NOTIFICATIONS_PER_MEMBER,
+    }));
+    const logWarning = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await notifyMember(writer, ROLE_CHANGED);
+    await runDeferredWork(writer);
+
+    expect(logWarning).not.toHaveBeenCalled();
   });
 });

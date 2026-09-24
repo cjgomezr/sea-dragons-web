@@ -9,6 +9,12 @@ import type { Role } from "@/lib/auth/roles";
  * No lanza nunca: devuelve un resultado. El PRD pide que un aviso perdido no
  * tumbe la acción que lo originó (un cambio de rol se aplica aunque su aviso
  * no se guarde), así que el fallo se registra aquí y quien avisa sigue.
+ *
+ * Después de guardar, deja para cuando ya se respondió la limpieza de los
+ * avisos del destinatario (#339, `0023_prune_notifications.sql`). Va aquí
+ * porque todavía no hay programador: cuando llegue `pg_cron` (E16b), el
+ * trabajo programado llamará a la misma función de la base con todos los
+ * socios, y esto podrá quitarse.
  */
 
 /** El catálogo cerrado de `notifications.type` en
@@ -61,10 +67,24 @@ export type NotificationInsert = NotificationContent & {
   readonly userId: string;
 };
 
+/** El tope de avisos por socio. La base lo aplica en
+ * `0023_prune_notifications.sql`; aquí sirve para dejar constancia de quien
+ * sigue por encima porque todo lo suyo está sin leer. Cambian juntos. */
+export const MAX_NOTIFICATIONS_PER_MEMBER = 200;
+
+export type NotificationCleanup = {
+  readonly deletedCount: number;
+  /** Los avisos que le quedan al socio después de limpiar. */
+  readonly keptCount: number;
+};
+
 export type NotificationWriter = {
   /** `null` cuando la identidad no es socia de ningún club. */
   findRecipient(userId: string): Promise<NotificationRecipient | null>;
   insertNotification(row: NotificationInsert): Promise<void>;
+  pruneNotifications(userId: string): Promise<NotificationCleanup>;
+  /** Deja trabajo para después de responder a quien disparó el aviso. */
+  runAfterResponse(work: () => Promise<void>): void;
 };
 
 export type NotifyOutcome =
@@ -93,7 +113,6 @@ export async function notifyMember(
       clubId: recipient.clubId,
       userId: recipientUserId,
     });
-    return { kind: "saved" };
   } catch (error) {
     // Sin los datos: pueden llevar el nombre de alguien.
     console.error("[notifications] aviso sin guardar", {
@@ -103,4 +122,45 @@ export async function notifyMember(
     });
     return { kind: "failed", error };
   }
+  scheduleCleanup(writer, recipientUserId);
+  return { kind: "saved" };
+}
+
+/** Limpiar nunca puede tumbar la acción que originó el aviso: ni cuando no se
+ * puede dejar para después ni cuando falla ya corriendo. */
+function scheduleCleanup(
+  writer: NotificationWriter,
+  recipientUserId: string,
+): void {
+  try {
+    writer.runAfterResponse(() => pruneRecipient(writer, recipientUserId));
+  } catch (error) {
+    logCleanupFailure(recipientUserId, error);
+  }
+}
+
+async function pruneRecipient(
+  writer: NotificationWriter,
+  recipientUserId: string,
+): Promise<void> {
+  try {
+    const { keptCount } = await writer.pruneNotifications(recipientUserId);
+    if (keptCount > MAX_NOTIFICATIONS_PER_MEMBER) {
+      // Sólo puede pasar si todo lo que sobra está sin leer, y eso no se
+      // borra nunca.
+      console.warn("[notifications] socio por encima del tope de avisos", {
+        recipientUserId,
+        keptCount,
+      });
+    }
+  } catch (error) {
+    logCleanupFailure(recipientUserId, error);
+  }
+}
+
+function logCleanupFailure(recipientUserId: string, error: unknown): void {
+  console.error("[notifications] limpieza de avisos sin hacer", {
+    recipientUserId,
+    error,
+  });
 }

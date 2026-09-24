@@ -19,6 +19,7 @@ import type {
   NotificationInsert,
   NotificationWriter,
 } from "@/lib/notifications/notify-member";
+import { NO_NOTIFICATION_CLEANUP } from "../helpers/notification-cleanup";
 
 /**
  * Decidir una solicitud de rol (FR-011, AC-006, RF-5 del PRD de E3), contado
@@ -88,6 +89,7 @@ function fakeNotificationWriter(
       }
       inserted.push(row);
     },
+    ...NO_NOTIFICATION_CLEANUP,
   };
 }
 
