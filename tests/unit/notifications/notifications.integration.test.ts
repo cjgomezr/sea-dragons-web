@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { z } from "zod";
 import { DEFAULT_CLUB_SLUG } from "@/lib/auth/supabase-auth-gateways";
 import {
   type NotificationMarker,
@@ -173,6 +174,9 @@ async function seedNotifications(
   }
 }
 
+/** Los avisos sembrados llevan su edad en los datos; el nuevo, no. */
+const seededDataSchema = z.object({ ageDays: z.number().optional() });
+
 async function readAgesOf(
   serviceClient: ServiceRoleClient,
   userId: string,
@@ -186,7 +190,7 @@ async function readAgesOf(
     throw new Error(`No se pudieron leer los avisos: ${error.message}`);
   }
   return data.map((row) => {
-    const age = (row.data as { ageDays?: number }).ageDays;
+    const age = seededDataSchema.parse(row.data).ageDays;
     const state = row.read_at === null ? "sin leer" : "leído";
     return age === undefined ? `nuevo ${state}` : `${age}d ${state}`;
   });
