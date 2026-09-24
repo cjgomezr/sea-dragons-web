@@ -78,6 +78,12 @@ function hexFromHsl([hue, saturation, lightness]: Hsl): string {
     .join("")}`;
 }
 
+function cssCustomPropertyReferences(block: string): string[] {
+  return [...block.matchAll(/var\(--([\w-]+)\)/g)].map(
+    (match) => match[1] ?? "",
+  );
+}
+
 function acceptedPalette(value: string): AccentPalette {
   const evaluation = evaluateAccentColor(value);
   if (evaluation.kind !== "accepted") {
@@ -354,6 +360,17 @@ describe("color de acento", () => {
       expect(
         declarations.match(/^\s*(color|outline):[^;]*var\(--color-accent\)/gm),
       ).toBeNull();
+    });
+
+    // El punto de no leído es la única señal en escritorio: WCAG 1.4.11 le
+    // pide 3:1 sobre el panel, y el relleno de un acento claro no lo da.
+    it("el punto de no leído usa el acento como texto, no el de relleno", () => {
+      expect(
+        cssCustomPropertyReferences(cssBlock(css, ".notification-unread-dot")),
+      ).toContain("color-accent-text");
+      expect(cssBlock(css, ".notification-unread-dot")).not.toMatch(
+        /var\(--color-accent\)/,
+      );
     });
 
     it("los textos candidatos son los dos textos sobre acento de hoy", () => {
