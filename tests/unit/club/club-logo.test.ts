@@ -282,6 +282,21 @@ describe("logo del club", () => {
       ]);
     });
 
+    it("no deshace la retirada si el fichero no se pudo borrar", async () => {
+      const report = vi.spyOn(console, "error").mockImplementation(() => {});
+      const state = fake({ logoPath: OLD_PATH, failsRemovingOld: true });
+
+      const logo = await removeClubLogo(state.gateways, { callerId: ADMIN_ID });
+
+      expect(logo).toEqual({ logoUrl: null });
+      expect(state.savedPaths).toEqual([null]);
+      expect(report).toHaveBeenCalledWith(
+        expect.stringContaining(OLD_PATH),
+        expect.any(Error),
+      );
+      report.mockRestore();
+    });
+
     it("sin logo no escribe ni anota nada", async () => {
       const state = fake();
 

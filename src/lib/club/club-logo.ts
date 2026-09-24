@@ -139,9 +139,10 @@ function recordLogoChanged(
   });
 }
 
-/** El logo nuevo ya está guardado, así que no poder borrar el anterior no
- * deshace el cambio: queda en el registro con su ruta para borrarlo a mano. */
-async function removeReplacedLogo(
+/** Un fichero que ya nadie enseña. La marca ya quedó como debía, así que no
+ * poder borrarlo no deshace nada ni tapa otro error: queda en el registro con
+ * su ruta para borrarlo a mano. */
+async function removeUnusedLogo(
   gateways: ClubLogoGateways,
   path: string,
 ): Promise<void> {
@@ -149,7 +150,7 @@ async function removeReplacedLogo(
     await gateways.storage.remove(path);
   } catch (error) {
     console.error(
-      `[club-logo] quedó sin borrar el logo reemplazado ${path}`,
+      `[club-logo] quedó sin borrar el logo ${path}, que ya nadie enseña`,
       error,
     );
   }
@@ -184,12 +185,12 @@ export async function replaceClubLogo(
       path,
     });
   } catch (error) {
-    await gateways.storage.remove(path);
+    await removeUnusedLogo(gateways, path);
     throw error;
   }
   await recordLogoChanged(gateways, { id: request.callerId, ...caller });
   if (previousPath !== null) {
-    await removeReplacedLogo(gateways, previousPath);
+    await removeUnusedLogo(gateways, previousPath);
   }
   return { logoUrl: gateways.storage.publicUrl(path) };
 }
@@ -211,6 +212,6 @@ export async function removeClubLogo(
     path: null,
   });
   await recordLogoChanged(gateways, { id: request.callerId, ...caller });
-  await gateways.storage.remove(previousPath);
+  await removeUnusedLogo(gateways, previousPath);
   return { logoUrl: null };
 }

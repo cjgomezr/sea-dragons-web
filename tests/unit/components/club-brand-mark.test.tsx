@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClubBrandMark } from "@/components/ClubBrandMark";
 
 /**
@@ -20,6 +20,10 @@ function renderMark(logoUrl: string | null): void {
     />,
   );
 }
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("la marca con y sin logo", () => {
   it("con logo pinta la imagen con su texto alternativo", () => {
@@ -63,5 +67,21 @@ describe("la marca con y sin logo", () => {
     );
 
     expect(screen.getByRole("img", { name: LOGO_ALT })).toBeInTheDocument();
+  });
+
+  // En la cabecera y en la pantalla de entrar la imagen la pinta el servidor:
+  // si falla antes de que React hidrate, `onError` ya no llega.
+  it("vuelve a las iniciales si la imagen ya estaba rota al montar", () => {
+    vi.spyOn(HTMLImageElement.prototype, "complete", "get").mockReturnValue(
+      true,
+    );
+    vi.spyOn(HTMLImageElement.prototype, "naturalWidth", "get").mockReturnValue(
+      0,
+    );
+
+    renderMark(LOGO_URL);
+
+    expect(screen.getByText("HH")).toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 });

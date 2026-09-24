@@ -6107,6 +6107,9 @@ const LOGO_RATIO_TOLERANCE = 0.05;
 /** Medio píxel de margen por el redondeo de las cajas. */
 const SUBPIXEL_TOLERANCE_PX = 0.5;
 
+/** 256 × 256 y 600 × 160. El apaisado (3,75:1) cabe por debajo del tope de
+ * cuatro veces el alto: lo que aquí se prueba es que conserva su proporción,
+ * y no el recorte de `object-fit` de uno más ancho que el tope. */
 const CLUB_LOGOS = [
   { name: "cuadrado", file: "logo-cuadrado.png" },
   { name: "apaisado", file: "logo-apaisado.png" },
