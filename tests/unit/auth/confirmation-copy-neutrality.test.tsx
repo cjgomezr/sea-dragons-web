@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, it, vi } from "vitest";
 import { RegistrationForm } from "@/components/auth/RegistrationForm";
 import { listCountryOptions } from "@/lib/geo/countries";
 import { renderAccountConfirmationEmail } from "@/lib/email/email-templates";
+import { DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
 import {
   ACCOUNT_EXISTENCE_CLAIMS,
@@ -130,6 +131,7 @@ describe("la copia del enlace de confirmación no distingue direcciones", () => 
         confirmUrl: "https://example.test/auth/confirmar?token_hash=abc",
         linkLifetimeMinutes: LIFETIME_MINUTES,
         locale,
+        brand: DEFAULT_CLUB_BRAND,
       });
 
       expectNoneMatch(email.subject, ACCOUNT_EXISTENCE_CLAIMS, "el asunto");

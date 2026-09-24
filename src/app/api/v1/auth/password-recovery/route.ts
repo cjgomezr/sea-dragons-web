@@ -8,6 +8,7 @@ import {
   requestPasswordRecovery,
 } from "@/lib/auth/password-recovery";
 import { connectRecoveryEmailSender } from "@/lib/auth/recovery-email-sender";
+import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import { looksLikeEmail } from "@/lib/auth/registration";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { createSupabasePasswordRecoveryGateways } from "@/lib/auth/supabase-password-recovery";
@@ -81,7 +82,9 @@ const postPasswordRecovery = createApiRoute<
 
     // Antes de tocar nada que dependa de la cuenta: un "no puedo mandar" que
     // sólo saliera para cuentas reales delataría cuáles lo son.
-    const connection = connectRecoveryEmailSender(process.env);
+    const connection = connectRecoveryEmailSender(process.env, {
+      readClubBrand,
+    });
     if (connection.kind === "not_connected") {
       // El motivo nombra la variable que falta y dónde se pone: es para quien
       // lo arregla, y lo lee en el registro del servidor. A la pantalla del

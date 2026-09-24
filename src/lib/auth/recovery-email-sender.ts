@@ -1,3 +1,4 @@
+import type { ClubBrand } from "@/lib/club/club-brand";
 import { renderPasswordRecoveryEmail } from "@/lib/email/email-templates";
 import { connectResendEmailSender } from "@/lib/email/resend-email-sender";
 import {
@@ -25,9 +26,17 @@ export type RecoveryEmailSenderConnection =
   | { readonly kind: "connected"; readonly sender: RecoveryEmailSender }
   | { readonly kind: "not_connected"; readonly reason: string };
 
+export type RecoveryEmailSenderDependencies = {
+  readonly readClubBrand: () => Promise<ClubBrand>;
+  readonly fetchImplementation?: typeof fetch;
+};
+
 export function connectRecoveryEmailSender(
   env: Environment,
-  fetchImplementation: typeof fetch = fetch,
+  {
+    readClubBrand,
+    fetchImplementation = fetch,
+  }: RecoveryEmailSenderDependencies,
 ): RecoveryEmailSenderConnection {
   const connection = connectResendEmailSender(env, fetchImplementation);
   if (connection.kind === "not_connected") {
@@ -45,6 +54,7 @@ export function connectRecoveryEmailSender(
             resetUrl,
             linkLifetimeMinutes: RECOVERY_LINK_LIFETIME_MINUTES,
             locale,
+            brand: await readClubBrand(),
           }),
         });
       },

@@ -3,6 +3,7 @@ import type {
   RecoveryTokenIssue,
   RecoveryTokenIssuer,
 } from "@/lib/auth/password-recovery";
+import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
 import {
   EmailDeliveryError,
   type EmailSenderConnection,
@@ -30,6 +31,7 @@ function harness(options: {
   readonly connection?: "connected" | "not_connected";
   readonly sendError?: EmailDeliveryError;
   readonly storedLocale?: string | null;
+  readonly brand?: ClubBrand;
 }): Harness & {
   readonly gateway: ReturnType<typeof createInvitationEmailGateway>;
 } {
@@ -62,6 +64,7 @@ function harness(options: {
     sent,
     issued,
     gateway: createInvitationEmailGateway({
+      readClubBrand: async () => options.brand ?? DEFAULT_CLUB_BRAND,
       tokens,
       emails,
       emailLocales: {
@@ -135,5 +138,22 @@ describe("invitación", () => {
     const outcome = await gateway.requestConfirmationEmail(EMAIL, APP_URL);
 
     expect(outcome).toEqual({ kind: "rate_limited", reason: "429: too many" });
+  });
+});
+
+describe("la marca en la invitación", () => {
+  it("lleva el nombre y el acento del club que devuelve la marca", async () => {
+    const { gateway, sent } = harness({
+      brand: {
+        ...DEFAULT_CLUB_BRAND,
+        name: "Hobart Orcas",
+        accentColor: "#7a2e8c",
+      },
+    });
+
+    await gateway.requestConfirmationEmail(EMAIL, APP_URL);
+
+    expect(sent[0]?.subject).toContain("Hobart Orcas");
+    expect(sent[0]?.html).toContain("#7a2e8c");
   });
 });

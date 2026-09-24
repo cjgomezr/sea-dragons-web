@@ -9,6 +9,7 @@ import type {
   ConfirmationEmailGateway,
   ConfirmationEmailOutcome,
 } from "@/lib/auth/register-member";
+import type { ClubBrand } from "@/lib/club/club-brand";
 import {
   type EmailLocaleDirectory,
   readEmailLocale,
@@ -35,6 +36,7 @@ type InvitationEmail = {
   readonly to: string;
   readonly acceptUrl: string;
   readonly userId: string;
+  readonly brand: ClubBrand;
 };
 
 /** El alta ya creó al miembro cuando esto corre, así que un fallo al emitir el
@@ -70,6 +72,7 @@ async function deliverInvitation(
         acceptUrl: invitation.acceptUrl,
         linkLifetimeMinutes: RECOVERY_LINK_LIFETIME_MINUTES,
         locale,
+        brand: invitation.brand,
       }),
     });
     return { kind: "requested" };
@@ -85,8 +88,10 @@ export function createInvitationEmailGateway(dependencies: {
   readonly tokens: RecoveryTokenIssuer;
   readonly emails: EmailSenderConnection;
   readonly emailLocales: EmailLocaleDirectory;
+  /** Nunca lanza: si la base no contesta, da la marca de respaldo. */
+  readonly readClubBrand: () => Promise<ClubBrand>;
 }): ConfirmationEmailGateway {
-  const { tokens, emails, emailLocales } = dependencies;
+  const { tokens, emails, emailLocales, readClubBrand } = dependencies;
   return {
     async requestConfirmationEmail(email, appUrl) {
       // Antes de emitir: un enlace nuevo invalida el anterior, y emitirlo sin
@@ -105,6 +110,7 @@ export function createInvitationEmailGateway(dependencies: {
         to: email,
         acceptUrl: buildPasswordResetUrl(appUrl, issue.tokenHash),
         userId: issue.userId,
+        brand: await readClubBrand(),
       });
     },
   };

@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
+import type { Locale } from "@/lib/i18n/locale";
 import { contrastRatio } from "../helpers/wcag-contrast";
 import {
-  CLUB_NAME,
   type RenderedEmail,
   renderAccountConfirmationEmail,
   renderMemberInvitationEmail,
@@ -55,6 +56,7 @@ const TEMPLATES = {
       resetUrl: RESET_URL,
       linkLifetimeMinutes: LIFETIME_MINUTES,
       locale: "es",
+      brand: DEFAULT_CLUB_BRAND,
     }),
     url: RESET_URL,
   },
@@ -63,6 +65,7 @@ const TEMPLATES = {
       confirmUrl: CONFIRM_URL,
       linkLifetimeMinutes: LIFETIME_MINUTES,
       locale: "es",
+      brand: DEFAULT_CLUB_BRAND,
     }),
     url: CONFIRM_URL,
   },
@@ -71,6 +74,7 @@ const TEMPLATES = {
       acceptUrl: INVITATION_URL,
       linkLifetimeMinutes: LIFETIME_MINUTES,
       locale: "es",
+      brand: DEFAULT_CLUB_BRAND,
     }),
     url: INVITATION_URL,
   },
@@ -82,6 +86,7 @@ const ENGLISH_TEMPLATES = {
       resetUrl: RESET_URL,
       linkLifetimeMinutes: LIFETIME_MINUTES,
       locale: "en",
+      brand: DEFAULT_CLUB_BRAND,
     }),
     url: RESET_URL,
   },
@@ -90,6 +95,7 @@ const ENGLISH_TEMPLATES = {
       confirmUrl: CONFIRM_URL,
       linkLifetimeMinutes: LIFETIME_MINUTES,
       locale: "en",
+      brand: DEFAULT_CLUB_BRAND,
     }),
     url: CONFIRM_URL,
   },
@@ -98,6 +104,7 @@ const ENGLISH_TEMPLATES = {
       acceptUrl: INVITATION_URL,
       linkLifetimeMinutes: LIFETIME_MINUTES,
       locale: "en",
+      brand: DEFAULT_CLUB_BRAND,
     }),
     url: INVITATION_URL,
   },
@@ -150,9 +157,9 @@ describe("plantillas de correo", () => {
   it.each(Object.entries(ALL_TEMPLATES))(
     "la de %s dice quién la manda, en el asunto y en el cuerpo",
     (_name, { email }) => {
-      expect(email.subject).toContain(CLUB_NAME);
-      expect(email.text).toContain(CLUB_NAME);
-      expect(email.html).toContain(CLUB_NAME);
+      expect(email.subject).toContain(DEFAULT_CLUB_BRAND.name);
+      expect(email.text).toContain(DEFAULT_CLUB_BRAND.name);
+      expect(email.html).toContain(DEFAULT_CLUB_BRAND.name);
     },
   );
 
@@ -190,6 +197,7 @@ describe("plantillas de correo", () => {
       resetUrl: 'https://example.test/?x="><script>',
       linkLifetimeMinutes: LIFETIME_MINUTES,
       locale: "es",
+      brand: DEFAULT_CLUB_BRAND,
     });
 
     expect(email.html).not.toContain("<script>");
@@ -363,7 +371,9 @@ describe("formato del correo", () => {
   it.each(Object.entries(ALL_TEMPLATES))(
     "la de %s abre con una cabecera que lleva el nombre del club",
     (_name, { email }) => {
-      expect(readableTextOf(email.html).startsWith(CLUB_NAME)).toBe(true);
+      expect(
+        readableTextOf(email.html).startsWith(DEFAULT_CLUB_BRAND.name),
+      ).toBe(true);
     },
   );
 
@@ -435,7 +445,7 @@ describe("formato del correo", () => {
   );
 
   it.each(Object.entries(ALL_TEMPLATES))(
-    "la de %s no carga nada de fuera",
+    "sin logo, la de %s no carga nada de fuera",
     (_name, { email }) => {
       expect(email.html).not.toMatch(/<link\b/i);
       expect(email.html).not.toMatch(/@import/i);
@@ -488,6 +498,7 @@ describe("formato del correo", () => {
       resetUrl: 'https://example.test/?x="><script>',
       linkLifetimeMinutes: LIFETIME_MINUTES,
       locale: "es",
+      brand: DEFAULT_CLUB_BRAND,
     });
 
     expect(
@@ -495,4 +506,177 @@ describe("formato del correo", () => {
     ).toBeGreaterThanOrEqual(3);
     expect(parseHtml(email.html).querySelector("script")).toBeNull();
   });
+});
+
+const STORED_BRAND: ClubBrand = {
+  name: "Hobart Orcas",
+  initials: "HO",
+  accentColor: "#7A2E8C",
+  logoUrl: null,
+};
+const PUBLIC_LOGO_URL =
+  "https://abc.supabase.co/storage/v1/object/public/club-logos/club/logo.png";
+const ACCENT_ON_WHITE = "#FFFFFF";
+
+type BrandedRender = (brand: ClubBrand, locale: Locale) => RenderedEmail;
+
+const BRANDED_RENDERS: Readonly<Record<string, BrandedRender>> = {
+  recuperación: (brand, locale) =>
+    renderPasswordRecoveryEmail({
+      resetUrl: RESET_URL,
+      linkLifetimeMinutes: LIFETIME_MINUTES,
+      locale,
+      brand,
+    }),
+  confirmación: (brand, locale) =>
+    renderAccountConfirmationEmail({
+      confirmUrl: CONFIRM_URL,
+      linkLifetimeMinutes: LIFETIME_MINUTES,
+      locale,
+      brand,
+    }),
+  invitación: (brand, locale) =>
+    renderMemberInvitationEmail({
+      acceptUrl: INVITATION_URL,
+      linkLifetimeMinutes: LIFETIME_MINUTES,
+      locale,
+      brand,
+    }),
+};
+
+const BRANDED_CASES = Object.entries(BRANDED_RENDERS).flatMap(
+  ([name, render]) =>
+    (["es", "en"] as const).map((locale) => [name, locale, render] as const),
+);
+
+function headerOf(email: RenderedEmail): HTMLTableCellElement {
+  const header = parseHtml(email.html).querySelector("td");
+  if (header === null) {
+    throw new Error("El correo no tiene cabecera");
+  }
+  // La primera celda es la del fondo; la cabecera es la primera de la tarjeta.
+  const card = header.querySelector("table td");
+  if (card === null) {
+    throw new Error("El correo no tiene tarjeta");
+  }
+  return card as HTMLTableCellElement;
+}
+
+function buttonCellOf(email: RenderedEmail): Element {
+  const cell = buttonOf(email, CONFIRM_URL).closest("td");
+  if (cell === null) {
+    throw new Error("El botón no va en una celda");
+  }
+  return cell;
+}
+
+describe("la marca en los correos", () => {
+  it.each(BRANDED_CASES)(
+    "la de %s en %s lleva el nombre guardado en el asunto, la cabecera y la firma",
+    (_name, locale, render) => {
+      const email = render(STORED_BRAND, locale);
+
+      expect(email.subject).toContain(STORED_BRAND.name);
+      expect(flatten(headerOf(email).textContent)).toBe(STORED_BRAND.name);
+      expect(textLines(email).at(-1)).toContain(STORED_BRAND.name);
+      expect(email.html).not.toContain(DEFAULT_CLUB_BRAND.name);
+      expect(email.text).not.toContain(DEFAULT_CLUB_BRAND.name);
+    },
+  );
+
+  it("la cabecera y el botón usan el acento del club", () => {
+    const email = BRANDED_RENDERS.confirmación?.(STORED_BRAND, "es");
+    if (email === undefined) {
+      throw new Error("Falta la plantilla de confirmación");
+    }
+    const cell = buttonCellOf(email);
+
+    expect(headerOf(email).getAttribute("style")).toContain(
+      STORED_BRAND.accentColor.toLowerCase(),
+    );
+    expect(inlineColor(cell, "background-color")).toBe(
+      STORED_BRAND.accentColor,
+    );
+    expect(cell.getAttribute("bgcolor")?.toUpperCase()).toBe(
+      STORED_BRAND.accentColor,
+    );
+    expect(inlineColor(buttonOf(email, CONFIRM_URL), "color")).toBe(
+      ACCENT_ON_WHITE,
+    );
+  });
+
+  it.each(BRANDED_CASES)(
+    "con logo, la cabecera de la de %s en %s lo enseña con el nombre como texto alternativo",
+    (_name, locale, render) => {
+      const email = render(
+        { ...STORED_BRAND, logoUrl: PUBLIC_LOGO_URL },
+        locale,
+      );
+      const logo = headerOf(email).querySelector("img");
+
+      expect(logo?.getAttribute("src")).toBe(PUBLIC_LOGO_URL);
+      expect(logo?.getAttribute("alt")).toBe(STORED_BRAND.name);
+    },
+  );
+
+  it("con logo, lo único que se carga de fuera es el logo", () => {
+    const email = renderPasswordRecoveryEmail({
+      resetUrl: RESET_URL,
+      linkLifetimeMinutes: LIFETIME_MINUTES,
+      locale: "es",
+      brand: { ...STORED_BRAND, logoUrl: PUBLIC_LOGO_URL },
+    });
+    const sources = [...parseHtml(email.html).querySelectorAll("img")].map(
+      (image) => image.getAttribute("src"),
+    );
+
+    expect(sources).toEqual([PUBLIC_LOGO_URL]);
+    expect(email.html).not.toMatch(/<link\b/i);
+    expect(email.html).not.toMatch(/url\s*\(/i);
+  });
+
+  it("sin logo, la cabecera enseña el nombre y ninguna imagen", () => {
+    const email = BRANDED_RENDERS.invitación?.(STORED_BRAND, "en");
+    if (email === undefined) {
+      throw new Error("Falta la plantilla de invitación");
+    }
+
+    expect(headerOf(email).querySelector("img")).toBeNull();
+    expect(readableTextOf(email.html).startsWith(STORED_BRAND.name)).toBe(true);
+  });
+
+  // Un cliente de correo no resuelve una ruta relativa ni inicia sesión, y
+  // `http:` lo bloquean casi todos: sin dirección pública se pinta el nombre.
+  it.each(["/storage/club/logo.png", "http://abc.supabase.co/logo.png"])(
+    "con un logo que no es una dirección https absoluta (%s), la cabecera enseña el nombre",
+    (logoUrl) => {
+      const email = renderPasswordRecoveryEmail({
+        resetUrl: RESET_URL,
+        linkLifetimeMinutes: LIFETIME_MINUTES,
+        locale: "es",
+        brand: { ...STORED_BRAND, logoUrl },
+      });
+
+      expect(headerOf(email).querySelector("img")).toBeNull();
+      expect(flatten(headerOf(email).textContent)).toBe(STORED_BRAND.name);
+    },
+  );
+
+  it.each(["no-es-un-color", "#FFFF00"])(
+    "con un acento que no se puede pintar (%s), usa el acento por defecto",
+    (accentColor) => {
+      const email = renderAccountConfirmationEmail({
+        confirmUrl: CONFIRM_URL,
+        linkLifetimeMinutes: LIFETIME_MINUTES,
+        locale: "es",
+        brand: { ...STORED_BRAND, accentColor },
+      });
+      const cell = buttonCellOf(email);
+
+      expect(inlineColor(cell, "background-color")).toBe(
+        DEFAULT_CLUB_BRAND.accentColor.toUpperCase(),
+      );
+      expect(email.html.toLowerCase()).not.toContain(accentColor.toLowerCase());
+    },
+  );
 });

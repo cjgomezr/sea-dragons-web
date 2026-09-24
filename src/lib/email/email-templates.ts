@@ -1,4 +1,9 @@
-import { DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
+import {
+  type AccentPair,
+  DEFAULT_ACCENT_COLOR,
+  evaluateAccentColor,
+} from "@/lib/club/accent-color";
+import type { ClubBrand } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 
@@ -10,11 +15,6 @@ import { type Translator, createTranslator } from "@/lib/i18n/translator";
  * salen los dos de ahí. Así un cliente que no pinta HTML lee exactamente lo
  * mismo, y no hay dos versiones que se puedan separar con el tiempo.
  */
-
-/** Los correos todavía no leen la marca de la base: es el ticket T7 de E18a.
- * Hasta entonces llevan el respaldo, que es el único sitio donde el nombre
- * sigue escrito. */
-export const CLUB_NAME = DEFAULT_CLUB_BRAND.name;
 
 export type RenderedEmail = {
   readonly subject: string;
@@ -38,16 +38,14 @@ type EmailContent = {
 /** Los tokens del tema claro de `design-system.md`, salvo la cabecera, que usa
  * los de la barra lateral (no cambian con el tema). El correo no tiene
  * `data-theme`, y los clientes de correo no leen variables CSS, así que van
- * copiados a mano; `email-templates.test.ts` comprueba que el botón sigue
- * coincidiendo con el documento. */
+ * copiados a mano. El acento no está aquí: es el del club, y llega con la
+ * marca (E18a, RF-8). */
 const COLOR = {
   background: "#EFF3F7",
   panel: "#FFFFFF",
   text: "#1C3245",
   textSecondary: "#5A7086",
   border: "#DEE6ED",
-  accent: "#1C6EA4",
-  onAccent: "#FFFFFF",
   headerBackground: "#163A55",
   headerText: "#CFDEEA",
 } as const;
@@ -56,16 +54,67 @@ const COLOR = {
  * fuera, porque los clientes las bloquean. */
 const FONT_STACK = "Arial, Helvetica, sans-serif";
 const MAX_WIDTH_PX = 600;
+const LOGO_HEIGHT_PX = 40;
+const HEADER_ACCENT_BORDER_PX = 4;
 
 const BODY_STYLE = `margin: 0; padding: 0; background-color: ${COLOR.background};`;
 const PARAGRAPH_STYLE = `margin: 0 0 16px; font-family: ${FONT_STACK}; font-size: 16px; line-height: 1.5; color: ${COLOR.text};`;
-const WRITTEN_LINK_STYLE = `color: ${COLOR.accent}; word-break: break-all;`;
 const SIGNATURE_STYLE = `margin: 0; font-family: ${FONT_STACK}; font-size: 14px; line-height: 1.5; color: ${COLOR.textSecondary};`;
-const HEADER_STYLE = `padding: 20px 32px; background-color: ${COLOR.headerBackground}; font-family: ${FONT_STACK}; font-size: 20px; font-weight: bold; color: ${COLOR.headerText};`;
+const HEADER_TEXT_STYLE = `font-family: ${FONT_STACK}; font-size: 20px; font-weight: bold; color: ${COLOR.headerText};`;
 const CONTENT_STYLE = `padding: 32px; background-color: ${COLOR.panel};`;
 const FOOTER_STYLE = `padding: 16px 32px; background-color: ${COLOR.panel}; border-top: 1px solid ${COLOR.border};`;
-const BUTTON_CELL_STYLE = `padding: 12px 24px; border-radius: 6px; background-color: ${COLOR.accent};`;
-const BUTTON_STYLE = `display: inline-block; font-family: ${FONT_STACK}; font-size: 16px; font-weight: bold; line-height: 1.25; color: ${COLOR.onAccent}; text-decoration: none;`;
+const BUTTON_TEXT_STYLE = `display: inline-block; font-family: ${FONT_STACK}; font-size: 16px; font-weight: bold; line-height: 1.25; text-decoration: none;`;
+
+function headerStyle(accent: AccentPair): string {
+  return `padding: 20px 32px; background-color: ${COLOR.headerBackground}; border-bottom: ${HEADER_ACCENT_BORDER_PX}px solid ${accent.accent}; ${HEADER_TEXT_STYLE}`;
+}
+
+function buttonCellStyle(accent: AccentPair): string {
+  return `padding: 12px 24px; border-radius: 6px; background-color: ${accent.accent};`;
+}
+
+function buttonStyle(accent: AccentPair): string {
+  return `${BUTTON_TEXT_STYLE} color: ${accent.onAccent};`;
+}
+
+function writtenLinkStyle(accent: AccentPair): string {
+  return `color: ${accent.accent}; word-break: break-all;`;
+}
+
+/** Lo que la plantilla pinta de la marca, ya comprobado. Un acento guardado
+ * que no llegue a AA no debería existir, pero si llega no puede dejar el
+ * botón ilegible: se pinta el de siempre. */
+type EmailBrand = {
+  readonly name: string;
+  readonly accent: AccentPair;
+  readonly logoUrl: string | null;
+};
+
+const HTTPS_URL_PATTERN = /^https:\/\//i;
+
+function accentPairFor(accentColor: string): AccentPair {
+  const evaluation = evaluateAccentColor(accentColor);
+  if (evaluation.kind === "accepted") {
+    return evaluation.palette.light;
+  }
+  const fallback = evaluateAccentColor(DEFAULT_ACCENT_COLOR);
+  if (fallback.kind === "rejected") {
+    throw new Error(`El acento por defecto no se lee: ${DEFAULT_ACCENT_COLOR}`);
+  }
+  return fallback.palette.light;
+}
+
+/** Un cliente de correo no resuelve una ruta relativa ni inicia sesión, y
+ * casi todos bloquean `http:`: sin una dirección https se pinta el nombre. */
+function toEmailBrand(brand: ClubBrand): EmailBrand {
+  const hasPublicLogo =
+    brand.logoUrl !== null && HTTPS_URL_PATTERN.test(brand.logoUrl);
+  return {
+    name: brand.name,
+    accent: accentPairFor(brand.accentColor),
+    logoUrl: hasPublicLogo ? brand.logoUrl : null,
+  };
+}
 
 /** Las tablas de maquetación no son datos: sin `role="presentation"` un
  * lector de pantalla anuncia filas y columnas que no existen. */
@@ -80,8 +129,8 @@ const HTML_ESCAPES: Readonly<Record<string, string>> = {
   "'": "&#39;",
 };
 
-function signatureIn(t: Translator): string {
-  return t("email.signature", { clubName: CLUB_NAME });
+function signatureIn(t: Translator, brand: EmailBrand): string {
+  return t("email.signature", { clubName: brand.name });
 }
 
 function escapeHtml(value: string): string {
@@ -97,11 +146,14 @@ function renderParagraph(text: string): string {
 
 /** El color va en la celda y no sólo en el enlace: Outlook y Gmail respetan
  * el fondo de una `td`, y un `<a>` con `display: block` lo pierden. */
-function renderButton(action: EmailContent["action"]): string {
+function renderButton(
+  action: EmailContent["action"],
+  accent: AccentPair,
+): string {
   return [
     `<table ${LAYOUT_TABLE_ATTRIBUTES} style="margin: 0 0 16px;">`,
-    `<tr><td bgcolor="${COLOR.accent}" style="${BUTTON_CELL_STYLE}">`,
-    `<a href="${escapeHtml(action.url)}" style="${BUTTON_STYLE}">${escapeHtml(action.buttonLabel)}</a>`,
+    `<tr><td bgcolor="${accent.accent}" style="${buttonCellStyle(accent)}">`,
+    `<a href="${escapeHtml(action.url)}" style="${buttonStyle(accent)}">${escapeHtml(action.buttonLabel)}</a>`,
     "</td></tr>",
     "</table>",
   ].join("\n");
@@ -109,27 +161,48 @@ function renderButton(action: EmailContent["action"]): string {
 
 /** El botón no sustituye al enlace escrito entero: hay clientes que bloquean
  * los enlaces, y quien lo lee en texto plano tiene que poder copiarlo igual. */
-function renderWrittenLink(action: EmailContent["action"]): string {
+function renderWrittenLink(
+  action: EmailContent["action"],
+  accent: AccentPair,
+): string {
   const url = escapeHtml(action.url);
-  return `<p style="${PARAGRAPH_STYLE}">${escapeHtml(action.label)}: <a href="${url}" style="${WRITTEN_LINK_STYLE}">${url}</a></p>`;
+  return `<p style="${PARAGRAPH_STYLE}">${escapeHtml(action.label)}: <a href="${url}" style="${writtenLinkStyle(accent)}">${url}</a></p>`;
 }
 
-function renderCard(t: Translator, content: EmailContent): string {
+/** Con las imágenes bloqueadas, el cliente enseña el texto alternativo en su
+ * lugar: por eso es el nombre del club y lleva el estilo del de la cabecera. */
+function renderHeaderContent(brand: EmailBrand): string {
+  const name = escapeHtml(brand.name);
+  if (brand.logoUrl === null) {
+    return name;
+  }
+  return `<img src="${escapeHtml(brand.logoUrl)}" alt="${name}" height="${LOGO_HEIGHT_PX}" style="display: block; height: ${LOGO_HEIGHT_PX}px; width: auto; border: 0; ${HEADER_TEXT_STYLE}">`;
+}
+
+function renderCard(
+  t: Translator,
+  brand: EmailBrand,
+  content: EmailContent,
+): string {
   return [
     `<table ${LAYOUT_TABLE_ATTRIBUTES} width="100%" style="width: 100%; max-width: ${MAX_WIDTH_PX}px;">`,
-    `<tr><td style="${HEADER_STYLE}">${escapeHtml(CLUB_NAME)}</td></tr>`,
+    `<tr><td style="${headerStyle(brand.accent)}">${renderHeaderContent(brand)}</td></tr>`,
     `<tr><td style="${CONTENT_STYLE}">`,
     ...content.intro.map(renderParagraph),
-    renderButton(content.action),
-    renderWrittenLink(content.action),
+    renderButton(content.action, brand.accent),
+    renderWrittenLink(content.action, brand.accent),
     ...content.outro.map(renderParagraph),
     "</td></tr>",
-    `<tr><td style="${FOOTER_STYLE}"><p style="${SIGNATURE_STYLE}">${escapeHtml(signatureIn(t))}</p></td></tr>`,
+    `<tr><td style="${FOOTER_STYLE}"><p style="${SIGNATURE_STYLE}">${escapeHtml(signatureIn(t, brand))}</p></td></tr>`,
     "</table>",
   ].join("\n");
 }
 
-function renderHtml(t: Translator, content: EmailContent): string {
+function renderHtml(
+  t: Translator,
+  brand: EmailBrand,
+  content: EmailContent,
+): string {
   return [
     "<!doctype html>",
     `<html lang="${t.locale}">`,
@@ -140,7 +213,7 @@ function renderHtml(t: Translator, content: EmailContent): string {
     // Outlook de escritorio pinta con el motor de Word e ignora `max-width`:
     // esta tabla fija, que sólo él lee, le pone el mismo tope.
     `<!--[if mso]><table ${LAYOUT_TABLE_ATTRIBUTES} width="${MAX_WIDTH_PX}" align="center"><tr><td><![endif]-->`,
-    renderCard(t, content),
+    renderCard(t, brand, content),
     "<!--[if mso]></td></tr></table><![endif]-->",
     "</td></tr>",
     "</table>",
@@ -149,20 +222,29 @@ function renderHtml(t: Translator, content: EmailContent): string {
   ].join("\n");
 }
 
-function renderText(t: Translator, content: EmailContent): string {
+function renderText(
+  t: Translator,
+  brand: EmailBrand,
+  content: EmailContent,
+): string {
   return `${[
     ...content.intro,
     `${content.action.label}: ${content.action.url}`,
     ...content.outro,
-    signatureIn(t),
+    signatureIn(t, brand),
   ].join("\n\n")}\n`;
 }
 
-function renderEmail(t: Translator, content: EmailContent): RenderedEmail {
+function renderEmail(
+  t: Translator,
+  clubBrand: ClubBrand,
+  content: EmailContent,
+): RenderedEmail {
+  const brand = toEmailBrand(clubBrand);
   return {
     subject: content.subject,
-    html: renderHtml(t, content),
-    text: renderText(t, content),
+    html: renderHtml(t, brand, content),
+    text: renderText(t, brand, content),
   };
 }
 
@@ -171,16 +253,19 @@ type EmailLinkInput = {
   /** El idioma guardado en la fila del socio, no el de quien navega: el
    * correo sale después de responder (E17, RF-6). */
   readonly locale: Locale;
+  /** La lee quien manda el correo: así la plantilla sigue siendo pura. */
+  readonly brand: ClubBrand;
 };
 
 export function renderPasswordRecoveryEmail(
   input: EmailLinkInput & { readonly resetUrl: string },
 ): RenderedEmail {
   const t = createTranslator(input.locale);
-  return renderEmail(t, {
-    subject: t("email.recovery.subject", { clubName: CLUB_NAME }),
+  const clubName = input.brand.name;
+  return renderEmail(t, input.brand, {
+    subject: t("email.recovery.subject", { clubName }),
     intro: [
-      t("email.recovery.requested", { clubName: CLUB_NAME }),
+      t("email.recovery.requested", { clubName }),
       t("email.recovery.linkLifetime", { count: input.linkLifetimeMinutes }),
     ],
     action: {
@@ -196,10 +281,11 @@ export function renderAccountConfirmationEmail(
   input: EmailLinkInput & { readonly confirmUrl: string },
 ): RenderedEmail {
   const t = createTranslator(input.locale);
-  return renderEmail(t, {
-    subject: t("email.confirmation.subject", { clubName: CLUB_NAME }),
+  const clubName = input.brand.name;
+  return renderEmail(t, input.brand, {
+    subject: t("email.confirmation.subject", { clubName }),
     intro: [
-      t("email.confirmation.registered", { clubName: CLUB_NAME }),
+      t("email.confirmation.registered", { clubName }),
       t("email.confirmation.linkLifetime", {
         count: input.linkLifetimeMinutes,
       }),
@@ -229,10 +315,11 @@ export function renderMemberInvitationEmail(
   input: EmailLinkInput & { readonly acceptUrl: string },
 ): RenderedEmail {
   const t = createTranslator(input.locale);
-  return renderEmail(t, {
-    subject: t("email.invitation.subject", { clubName: CLUB_NAME }),
+  const clubName = input.brand.name;
+  return renderEmail(t, input.brand, {
+    subject: t("email.invitation.subject", { clubName }),
     intro: [
-      t("email.invitation.invited", { clubName: CLUB_NAME }),
+      t("email.invitation.invited", { clubName }),
       t("email.invitation.nextSteps"),
       t("email.invitation.linkLifetime", { count: input.linkLifetimeMinutes }),
     ],

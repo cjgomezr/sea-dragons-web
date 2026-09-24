@@ -6,6 +6,7 @@ import {
   readRequiredText,
 } from "@/lib/auth/supabase-auth-gateways";
 import { createRecoveryTokenIssuer } from "@/lib/auth/supabase-password-recovery";
+import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import { connectResendEmailSender } from "@/lib/email/resend-email-sender";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { createInvitationEmailGateway } from "./invitation-email-sender";
@@ -143,6 +144,7 @@ export function createSupabaseMemberInvitationGateways(
         tokens: createRecoveryTokenIssuer(serviceClient),
         emails: connectResendEmailSender(env),
         emailLocales: auth.emailLocales,
+        readClubBrand,
       }),
       emailDeliveryForClub: auth.emailDeliveryForClub,
       invitationRequestsForClub: auth.confirmationEmailRequestsForClub,

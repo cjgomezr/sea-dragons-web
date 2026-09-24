@@ -36,6 +36,7 @@ import {
 } from "@/lib/email/resend-email-sender";
 import { createSupabaseEmailSendBudget } from "@/lib/email/supabase-email-send-budget";
 import type { EmailLocaleDirectory } from "@/lib/email/email-locale";
+import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import {
   type ConfirmationTokenIssuer,
   createConfirmationEmailGateway,
@@ -532,6 +533,7 @@ export function createSupabaseAuthGateways(
     tokens: createConfirmationTokenIssuer(serviceClient),
     emails,
     emailLocales,
+    readClubBrand,
   });
 
   return {

@@ -5,6 +5,11 @@ import {
 } from "@/lib/auth/confirmation-email-sender";
 import { EMAIL_CONFIRMATION_LINK_LIFETIME_MINUTES } from "@/lib/auth/email-confirmation";
 import {
+  type ClubBrand,
+  DEFAULT_CLUB_BRAND,
+  createCachedClubBrandReader,
+} from "@/lib/club/club-brand";
+import {
   EmailDeliveryError,
   type EmailSenderConnection,
   type OutgoingEmail,
@@ -27,11 +32,13 @@ function gatewayWith(options: {
   readonly deliveryFailure?: Error;
   /** El idioma guardado en la fila del socio. `null`: sin fila. */
   readonly storedLocale?: string | null;
+  readonly readClubBrand?: () => Promise<ClubBrand>;
 }): { readonly doubles: Doubles } & ReturnType<
   typeof createConfirmationEmailGateway
 > {
   const doubles: Doubles = { issuedFor: [], localesAskedFor: [], sent: [] };
   const gateway = createConfirmationEmailGateway({
+    readClubBrand: options.readClubBrand ?? (async () => DEFAULT_CLUB_BRAND),
     tokens: {
       async issueConfirmationToken(email) {
         doubles.issuedFor.push(email);
@@ -200,5 +207,38 @@ describe("correo de confirmación de cuenta", () => {
     await expect(gateway.requestConfirmationEmail(EMAIL, APP_URL)).rejects.toBe(
       bug,
     );
+  });
+});
+
+describe("la marca en el correo de confirmación", () => {
+  it("lleva el nombre del club que devuelve la marca", async () => {
+    const gateway = gatewayWith({
+      readClubBrand: async () => ({
+        ...DEFAULT_CLUB_BRAND,
+        name: "Hobart Orcas",
+      }),
+    });
+
+    await gateway.requestConfirmationEmail(EMAIL, APP_URL);
+
+    const [sent] = gateway.doubles.sent;
+    expect(sent?.subject).toContain("Hobart Orcas");
+    expect(sent?.text).toContain("Hobart Orcas");
+  });
+
+  it("si la marca no se puede leer, sale igual con la de respaldo", async () => {
+    const reader = createCachedClubBrandReader({
+      fetchRow: () => Promise.reject(new Error("la base no contesta")),
+      reportFailure: () => undefined,
+      timeToLiveMs: 60_000,
+      readTimeoutMs: 1_000,
+      now: () => 0,
+    });
+    const gateway = gatewayWith({ readClubBrand: () => reader.read() });
+
+    const outcome = await gateway.requestConfirmationEmail(EMAIL, APP_URL);
+
+    expect(outcome).toEqual({ kind: "requested" });
+    expect(gateway.doubles.sent[0]?.subject).toContain(DEFAULT_CLUB_BRAND.name);
   });
 });

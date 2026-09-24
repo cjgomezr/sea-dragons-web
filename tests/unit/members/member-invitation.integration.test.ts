@@ -11,6 +11,7 @@ import {
   DEFAULT_DIRECTORY_QUERY,
   listDirectory,
 } from "@/lib/directory/directory";
+import { DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
 import { createDirectoryGateways } from "@/lib/directory/supabase-directory-gateways";
 import type { OutgoingEmail } from "@/lib/email/resend-email-sender";
 import { createGroupsGateways } from "@/lib/groups/supabase-groups-gateways";
@@ -155,6 +156,7 @@ function capturingInvitationEmail(
         },
       },
       emailLocales: auth.gateways.emailLocales,
+      readClubBrand: async () => DEFAULT_CLUB_BRAND,
     }),
   };
 }
