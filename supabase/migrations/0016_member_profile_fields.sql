@@ -30,12 +30,22 @@ alter table public.members
   add column if not exists auf_number text,
   add column if not exists auf_expiry date;
 
-alter table public.members
-  drop constraint if exists members_position_check;
-alter table public.members
-  add constraint members_position_check check (
-    position in ('Goalkeeper', 'Defender', 'Forward')
-  );
+-- `0025_club_positions.sql` sustituyó este `check` por el catálogo de
+-- posiciones del club. Al repetirse el histórico no puede volver: rechazaría
+-- a quien tenga una posición que el club añadió, y la migración caería en
+-- rojo. Por eso sólo se pone mientras el catálogo no existe.
+do $$
+begin
+  if to_regclass('public.club_positions') is null then
+    alter table public.members
+      drop constraint if exists members_position_check;
+    alter table public.members
+      add constraint members_position_check check (
+        position in ('Goalkeeper', 'Defender', 'Forward')
+      );
+  end if;
+end
+$$;
 
 alter table public.members
   drop constraint if exists members_experience_level_check;
