@@ -810,7 +810,9 @@ async function findArchivedE2ePosition(
     .eq("name", ARCHIVED_E2E_POSITION.en)
     .maybeSingle();
   if (error) {
-    throw new Error(`No se pudo buscar la posición archivada: ${error.message}`);
+    throw new Error(
+      `No se pudo buscar la posición archivada: ${error.message}`,
+    );
   }
   return data === null ? null : (data.position_id as string);
 }
