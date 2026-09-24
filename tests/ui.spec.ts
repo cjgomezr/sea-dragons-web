@@ -5757,7 +5757,7 @@ const STUBBED_CLUB_SETTINGS = {
   name: "Asociación Deportiva de Rugby Subacuático del Sur · Tasmania",
   initials: "AD",
   accentColor: "#1c6ea4",
-  logoPath: null,
+  logoUrl: null,
 } as const;
 
 const ENGLISH_SAVE_SETTINGS = "Save settings";

@@ -720,6 +720,23 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.logo.none":
     "Todavía no hay logo: en su lugar salen las iniciales.",
   "clubSettings.logo.present": "El club tiene logo.",
+  "clubSettings.logo.add": "Subir logo",
+  "clubSettings.logo.change": "Cambiar logo",
+  "clubSettings.logo.remove": "Quitar logo",
+  "clubSettings.logo.choose": "Elegir un logo",
+  "clubSettings.logo.hint": "PNG o WebP, hasta {max} KB.",
+  "clubSettings.logo.uploading": "Subiendo…",
+  "clubSettings.logo.removing": "Quitando…",
+  "clubSettings.logo.saved": "Logo actualizado.",
+  "clubSettings.logo.removed": "Logo quitado: vuelven las iniciales.",
+  "clubSettings.logo.issue.logoEmpty":
+    "Este archivo está vacío. Elige otro logo.",
+  "clubSettings.logo.issue.logoTooLarge":
+    "Este logo pesa más de {max} KB. Elige uno más pequeño.",
+  "clubSettings.logo.issue.logoTypeUnsupported": "Sólo valen logos PNG o WebP.",
+  "clubSettings.logo.issue.logoUndecodable":
+    "Este archivo no se puede leer como imagen. Elige otro logo.",
+  "club.logoAlt": "Logo de {club}",
   "clubSettings.save": "Guardar la configuración",
   "clubSettings.saving": "Guardando…",
   "clubSettings.saved": "Configuración guardada.",

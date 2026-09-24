@@ -24,6 +24,7 @@ vi.mock("@/lib/club/supabase-club-brand", () => ({
     name: "Hobart Orcas",
     initials: "HO",
     accentColor: "#1c6ea4",
+    logoUrl: null,
   }),
 }));
 

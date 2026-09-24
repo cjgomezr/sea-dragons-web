@@ -10,6 +10,7 @@ import type {
   ClubSettings,
   ClubSettingsGateways,
 } from "./club-settings";
+import { readClubLogoUrl } from "./supabase-club-logo-gateways";
 
 /**
  * Adaptador entre la configuración del club (#296) y Supabase.
@@ -26,12 +27,15 @@ type Environment = Readonly<Record<string, string | undefined>>;
 
 type Row = Record<string, unknown>;
 
-function toClubSettings(row: Row): ClubSettings {
+function toClubSettings(serviceClient: SupabaseClient, row: Row): ClubSettings {
   return {
     name: readRequiredText(row, "name", CLUBS_TABLE),
     initials: readText(row, "initials", CLUBS_TABLE),
     accentColor: readRequiredText(row, "accent_color", CLUBS_TABLE),
-    logoPath: readText(row, "logo_path", CLUBS_TABLE),
+    logoUrl: readClubLogoUrl(
+      serviceClient,
+      readText(row, "logo_path", CLUBS_TABLE),
+    ),
   };
 }
 
@@ -49,7 +53,7 @@ async function findClubSettings(
       `No se pudo leer la configuración del club ${clubId}: ${error.message}`,
     );
   }
-  return toClubSettings(data);
+  return toClubSettings(serviceClient, data);
 }
 
 /**
@@ -87,7 +91,7 @@ async function updateClubIdentity(
   }
   return data === null
     ? { kind: "changed_meanwhile" }
-    : { kind: "updated", settings: toClubSettings(data) };
+    : { kind: "updated", settings: toClubSettings(serviceClient, data) };
 }
 
 export function createClubSettingsGateways(

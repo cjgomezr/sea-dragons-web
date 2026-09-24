@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ClubBrandMark } from "@/components/ClubBrandMark";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { readClubBrand } from "@/lib/club/supabase-club-brand";
@@ -25,9 +26,15 @@ export default async function AuthLayout({
     <div className="auth-shell">
       <aside className="auth-brand">
         <div className="auth-brand-header">
-          <span className="auth-brand-mark" aria-hidden="true">
-            {brand.initials}
-          </span>
+          <ClubBrandMark
+            logoUrl={brand.logoUrl}
+            logoAlt={translate("club.logoAlt", { club: brand.name })}
+            fallback={
+              <span className="auth-brand-mark" aria-hidden="true">
+                {brand.initials}
+              </span>
+            }
+          />
           <span className="auth-brand-name">{brand.name}</span>
         </div>
         <div className="auth-brand-pitch">

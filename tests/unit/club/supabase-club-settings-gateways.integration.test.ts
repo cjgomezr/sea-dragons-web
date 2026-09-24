@@ -64,7 +64,7 @@ describeRls("configuración del club en Supabase", () => {
             name: "Bay Barracudas",
             initials: null,
             accentColor: "#7b3fa0",
-            logoPath: null,
+            logoUrl: null,
           },
         });
       });

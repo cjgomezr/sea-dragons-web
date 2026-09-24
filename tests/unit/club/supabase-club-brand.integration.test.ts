@@ -26,6 +26,7 @@ describe.skipIf(!hasCredentials)("lectura de la marca en Supabase", () => {
         name: "Victoria Seadragons",
         initials: "VS",
         accentColor: "#1c6ea4",
+        logoUrl: null,
       });
     },
     TEST_TIMEOUT_MS,

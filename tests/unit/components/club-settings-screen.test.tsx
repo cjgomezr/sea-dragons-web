@@ -16,7 +16,7 @@ const STORED: ClubSettings = {
   name: "Harbour Hammerheads",
   initials: "HH",
   accentColor: "#1c6ea4",
-  logoPath: null,
+  logoUrl: null,
 };
 
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
@@ -119,7 +119,12 @@ describe("pantalla de configuración: carga", () => {
   });
 
   it("dice que hay un logo cuando el club lo tiene", async () => {
-    stubApi({ settings: { ...STORED, logoPath: "club/logo.png" } });
+    stubApi({
+      settings: {
+        ...STORED,
+        logoUrl: "https://storage.example.test/club-logos/club/logo.png",
+      },
+    });
 
     await renderScreen();
 

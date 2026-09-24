@@ -57,6 +57,26 @@ describe("la marca en la pantalla de entrar", () => {
 
     expect(screen.getByText("HOC")).toBeInTheDocument();
   });
+
+  // #295: el logo sustituye al recuadro de iniciales.
+  it("con logo enseña el logo en vez de las iniciales", async () => {
+    storedBrand.current = {
+      ...DEFAULT_CLUB_BRAND,
+      name: "Hobart Orcas",
+      initials: "HO",
+      logoUrl: "https://storage.example.test/club-logos/club/logo.png",
+    };
+
+    await renderAuthLayout();
+
+    expect(
+      screen.getByRole("img", { name: "Hobart Orcas logo" }),
+    ).toHaveAttribute(
+      "src",
+      "https://storage.example.test/club-logos/club/logo.png",
+    );
+    expect(screen.queryByText("HO")).toBeNull();
+  });
 });
 
 // E17 RF-3: quien todavía no entró también tiene que poder cambiar de idioma,

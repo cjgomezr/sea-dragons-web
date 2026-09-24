@@ -730,6 +730,24 @@ export const englishMessages = {
   "clubSettings.logo.label": "Logo",
   "clubSettings.logo.none": "No logo yet: the initials are shown instead.",
   "clubSettings.logo.present": "The club has a logo.",
+  "clubSettings.logo.add": "Upload logo",
+  "clubSettings.logo.change": "Change logo",
+  "clubSettings.logo.remove": "Remove logo",
+  "clubSettings.logo.choose": "Choose a logo",
+  "clubSettings.logo.hint": "PNG or WebP, up to {max} KB.",
+  "clubSettings.logo.uploading": "Uploading…",
+  "clubSettings.logo.removing": "Removing…",
+  "clubSettings.logo.saved": "Logo updated.",
+  "clubSettings.logo.removed": "Logo removed: the initials are back.",
+  "clubSettings.logo.issue.logoEmpty":
+    "This file is empty. Choose another logo.",
+  "clubSettings.logo.issue.logoTooLarge":
+    "This logo is larger than {max} KB. Choose a smaller one.",
+  "clubSettings.logo.issue.logoTypeUnsupported":
+    "Only PNG or WebP logos can be used.",
+  "clubSettings.logo.issue.logoUndecodable":
+    "This file cannot be read as an image. Choose another logo.",
+  "club.logoAlt": "{club} logo",
   "clubSettings.save": "Save settings",
   "clubSettings.saving": "Saving…",
   "clubSettings.saved": "Settings saved.",

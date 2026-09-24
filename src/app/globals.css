@@ -162,6 +162,27 @@ h6 {
   gap: var(--space-4);
 }
 
+/* El logo va delante del nombre (#295). Sin logo el contenedor sólo lleva el
+   nombre, y se comporta como él: puede encogerse para que recorte. */
+.app-brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* El logo ocupa el alto del recuadro de iniciales. Uno apaisado se ensancha
+   hasta cuatro veces ese alto y no más; `contain` lo encaja sin deformarlo si
+   llega al tope (#295). */
+.club-logo {
+  flex-shrink: 0;
+  width: auto;
+  max-width: calc(var(--space-8) * 4);
+  height: var(--space-8);
+  object-fit: contain;
+}
+
 /* El nombre sale de la base y admite hasta 60 caracteres (#292): en una sola
    línea, recortado con puntos suspensivos, para que no parta la cabecera en dos
    filas ni empuje los controles fuera de la pantalla a 360px. */
@@ -2485,4 +2506,29 @@ button.notification-item-content:hover {
 
 .club-settings-brand-row .auth-brand-mark {
   flex-shrink: 0;
+}
+
+/* El logo en la configuración (#295): la marca con su estado, los botones
+   debajo y la ayuda y los avisos al final, todo alineado a la izquierda. */
+.club-logo-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.club-logo-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.club-logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.club-logo-field p {
+  margin: 0;
 }

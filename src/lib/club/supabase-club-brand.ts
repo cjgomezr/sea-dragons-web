@@ -5,12 +5,19 @@ import {
   type ClubBrandRow,
   createCachedClubBrandReader,
 } from "./club-brand";
+import { readClubLogoUrl } from "./supabase-club-logo-gateways";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
 const CLUBS_TABLE = "clubs";
-// El alias deja la fila con la forma de `ClubBrandRow`.
-const BRAND_COLUMNS = "name, initials, accentColor:accent_color";
+// Los alias dejan la fila casi con la forma de `ClubBrandRow`: falta pasar la
+// ruta del logo a su dirección pública.
+const BRAND_COLUMNS =
+  "name, initials, accentColor:accent_color, logoPath:logo_path";
+
+type BrandColumns = Omit<ClubBrandRow, "logoUrl"> & {
+  readonly logoPath: string | null;
+};
 
 /** Cuánto vive la marca en la memoria del servidor. Guardar un cambio la
  * invalida en el proceso que lo guarda; este plazo acota lo que tarda en verlo
@@ -25,8 +32,8 @@ const CLUB_BRAND_READ_TIMEOUT_MS = 3_000;
 /**
  * Lee la marca del club de esta instalación. Va con la llave de servicio, como
  * `findClubIdBySlug`, porque el club se encuentra por su `slug` y
- * `0022_club_brand.sql` no deja a `anon` leer esa columna. Sólo pide el nombre,
- * las iniciales y el acento, y corre en el servidor. Lanza si Supabase no
+ * `0022_club_brand.sql` no deja a `anon` leer esa columna. Sólo pide la marca,
+ * y corre en el servidor. Lanza si Supabase no
  * contesta o no está configurado; decidir qué se pinta entonces es cosa de la
  * caché.
  */
@@ -38,11 +45,12 @@ export async function fetchClubBrandRow(
     .from(CLUBS_TABLE)
     .select(BRAND_COLUMNS)
     .eq("slug", DEFAULT_CLUB_SLUG)
-    .single<ClubBrandRow>();
+    .single<BrandColumns>();
   if (error) {
     throw new Error(`No se pudo leer la marca del club: ${error.message}`);
   }
-  return data;
+  const { logoPath, ...brand } = data;
+  return { ...brand, logoUrl: readClubLogoUrl(client, logoPath) };
 }
 
 const clubBrandReader = createCachedClubBrandReader({
