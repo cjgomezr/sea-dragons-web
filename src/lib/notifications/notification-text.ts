@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { REQUESTABLE_ROLES } from "@/lib/auth/role-request";
+import { ACCOUNT_PAGE_PATH, DIRECTORY_PATH } from "@/lib/auth/routes";
 import { ROLES } from "@/lib/auth/roles";
 import type { Translator } from "@/lib/i18n/translator";
 import type { NotificationType } from "./notify-member";
@@ -84,6 +85,21 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
 
 function isKnownType(type: string): type is NotificationType {
   return Object.hasOwn(DESCRIBE_BY_TYPE, type);
+}
+
+/** La pantalla donde se actúa sobre cada tipo (#338). Un `Record` sobre el
+ * catálogo, como los textos: un tipo nuevo no compila sin decir a dónde lleva. */
+const DESTINATION_BY_TYPE: Readonly<Record<NotificationType, string>> = {
+  role_changed: ACCOUNT_PAGE_PATH,
+  role_request_rejected: ACCOUNT_PAGE_PATH,
+  // La bandeja de solicitudes, para aprobarla o rechazarla, está en el
+  // directorio.
+  role_request_received: DIRECTORY_PATH,
+};
+
+/** `null` para un tipo que esta pantalla no reconoce: se marca, no se sigue. */
+export function notificationDestination(type: string): string | null {
+  return isKnownType(type) ? DESTINATION_BY_TYPE[type] : null;
 }
 
 export function describeNotification(

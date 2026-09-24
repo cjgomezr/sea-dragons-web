@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { formatRelativeTime } from "@/lib/i18n/format";
 import { createTranslator } from "@/lib/i18n/translator";
-import { describeNotification } from "@/lib/notifications/notification-text";
+import { ACCOUNT_PAGE_PATH, DIRECTORY_PATH } from "@/lib/auth/routes";
+import {
+  describeNotification,
+  notificationDestination,
+} from "@/lib/notifications/notification-text";
 import { NOTIFICATION_TYPES } from "@/lib/notifications/notify-member";
 
 // #266: la pantalla arma el texto de cada aviso con su tipo y sus datos, en
@@ -99,6 +103,36 @@ describe("textos de los avisos", () => {
 
     expect(text.title).toBe("New notification");
   });
+});
+
+// #338: abrir un aviso lleva a la pantalla donde se actúa sobre él.
+describe("destino de cada aviso", () => {
+  it("lleva una solicitud de rol recibida al directorio, donde se decide", () => {
+    expect(notificationDestination("role_request_received")).toBe(
+      DIRECTORY_PATH,
+    );
+  });
+
+  it("lleva un cambio de rol a Mi cuenta", () => {
+    expect(notificationDestination("role_changed")).toBe(ACCOUNT_PAGE_PATH);
+  });
+
+  it("lleva una solicitud de rol rechazada a Mi cuenta", () => {
+    expect(notificationDestination("role_request_rejected")).toBe(
+      ACCOUNT_PAGE_PATH,
+    );
+  });
+
+  it("no lleva a ninguna parte un tipo que la pantalla no reconoce", () => {
+    expect(notificationDestination("event_created")).toBeNull();
+  });
+
+  // Cuando E7 o E11 añadan tipos, este test pide decir a dónde llevan.
+  for (const type of NOTIFICATION_TYPES) {
+    it(`el tipo ${type} del catálogo declara su destino`, () => {
+      expect(notificationDestination(type)).toMatch(/^\//);
+    });
+  }
 });
 
 describe("tiempo relativo", () => {

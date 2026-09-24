@@ -5116,6 +5116,11 @@ async function serveNotifications(
     stored = stored.map((n) => ({ ...n, isRead: true }));
     return route.fulfill({ status: 204 });
   });
+  await page.route(`**${NOTIFICATIONS_ENDPOINT}/*/read`, (route) => {
+    const readId = new URL(route.request().url()).pathname.split("/").at(-2);
+    stored = stored.map((n) => (n.id === readId ? { ...n, isRead: true } : n));
+    return route.fulfill({ status: 204 });
+  });
 }
 
 function notificationsRegion(page: Page): Locator {
@@ -5342,9 +5347,10 @@ test.describe("la campana de avisos", () => {
     await serveNotifications(page, SAMPLE_NOTIFICATIONS);
     await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
     await openNotifications(page);
-    const controlsInList = await notificationsRegion(page)
-      .getByRole("button")
-      .count();
+    const region = notificationsRegion(page);
+    const controlsInList =
+      (await region.getByRole("button").count()) +
+      (await region.getByRole("link").count());
 
     for (let press = 0; press <= controlsInList; press += 1) {
       await page.keyboard.press("Tab");
@@ -5388,6 +5394,47 @@ test.describe("la campana de avisos", () => {
       page.getByText("We couldn't load your notifications."),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  });
+
+  // #338: cada aviso es un enlace a la pantalla donde se actúa sobre él.
+  test("en escritorio abrir un aviso lleva a su pantalla y cierra el panel", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await serveNotifications(page, SAMPLE_NOTIFICATIONS);
+    await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
+    await expect(page.getByRole("button", { name: BELL_NAME })).toHaveText("3");
+    await openNotifications(page);
+    await expect(
+      notificationsRegion(page).getByRole("link", { name: /Nerea Ruiz/ }),
+    ).toHaveAttribute("href", DIRECTORY_SCREEN_PATH);
+
+    await notificationsRegion(page)
+      .getByRole("link", { name: /Committee/ })
+      .first()
+      .click();
+
+    await expect(page).toHaveURL(new RegExp(`${ACCOUNT_PATH}$`));
+    await expect(notificationsRegion(page)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: BELL_NAME })).toHaveText("2");
+  });
+
+  test("en el móvil abrir un aviso navega y volver regresa a donde se abrió", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 800 });
+    await serveNotifications(page, SAMPLE_NOTIFICATIONS);
+    await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
+    await openNotifications(page);
+
+    await notificationsRegion(page)
+      .getByRole("link", { name: /Committee/ })
+      .first()
+      .click();
+    await expect(page).toHaveURL(new RegExp(`${ACCOUNT_PATH}$`));
+    await page.goBack();
+
+    await expect(page).toHaveURL(new RegExp(`${NOTIFICATIONS_SCREEN_PATH}$`));
   });
 
   // Sin API de mentira: la campana lee por los endpoints de #265.

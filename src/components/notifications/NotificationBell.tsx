@@ -171,6 +171,10 @@ export function NotificationBell({
       return;
     }
     setIsOpen(true);
+    // Un aviso que se abrió para navegar pudo fallar al marcarse con el panel
+    // ya cerrado: ese error no es de esta apertura, y la lista nueva ya dice
+    // qué quedó sin leer.
+    clearMarkFailure();
     void notifications.loadList();
   }
 
@@ -208,6 +212,7 @@ export function NotificationBell({
           onMarkOne={(notificationId) =>
             void notifications.markOne(notificationId)
           }
+          onNavigate={close}
           onRetryMark={notifications.retryMark}
         />
       ) : null}
