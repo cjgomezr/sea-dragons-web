@@ -2,7 +2,11 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { NOTIFICATIONS_API_PATH } from "@/lib/auth/routes";
+import {
+  ACCOUNT_PAGE_PATH,
+  DIRECTORY_PATH,
+  NOTIFICATIONS_API_PATH,
+} from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
 
 /**
@@ -534,23 +538,31 @@ describe("marcar como leídos", () => {
     );
   });
 
-  it("abrir un aviso sin leer lo marca leído y el número baja en uno", async () => {
+  // Un tipo sin destino no navega: el panel sigue abierto, así que un doble
+  // toque llega a pulsarlo dos veces.
+  it("dos toques seguidos sobre el mismo aviso bajan el número una sola vez", async () => {
     installFakeApi([
-      aNotification({ minutesAgo: 1, data: { newRole: "Coach" } }),
-      aNotification({ minutesAgo: 2, data: { newRole: "Admin" } }),
+      aNotification({ minutesAgo: 1, type: "event_created", data: {} }),
+      aNotification({ minutesAgo: 2 }),
     ]);
     renderBell();
     const list = await openList();
     await within(bell()).findByText("2");
+    const unknown = await within(list).findByRole("button", {
+      name: /New notification/,
+    });
 
-    await userEvent.click(
-      within(list).getByRole("button", { name: /You are now Coach\./ }),
+    let releaseWrites = (): void => {};
+    api.writesHeldUntil = new Promise((resolve) => {
+      releaseWrites = resolve;
+    });
+
+    await userEvent.dblClick(unknown);
+    releaseWrites();
+
+    await waitFor(() =>
+      expect(bell()).toHaveAccessibleName("Notifications, 1 unread"),
     );
-
-    expect(await within(bell()).findByText("1")).toBeInTheDocument();
-    const [opened, untouched] = within(list).getAllByRole("listitem");
-    expect(opened).not.toHaveTextContent("New");
-    expect(untouched).toHaveTextContent("New");
     expect(
       countCalls(
         `${NOTIFICATIONS_API_PATH}/${api.notifications[0]?.id}/read`,
@@ -559,55 +571,16 @@ describe("marcar como leídos", () => {
     ).toBe(1);
   });
 
-  it("dos toques seguidos sobre el mismo aviso bajan el número una sola vez", async () => {
-    installFakeApi(unreadNotifications(2));
-    renderBell();
-    const list = await openList();
-    await within(bell()).findByText("2");
-    const [first] = await within(list).findAllByRole("button", {
-      name: /You are now Coach\./,
-    });
-    if (first === undefined) {
-      throw new Error("la lista no dibujó ningún aviso sin leer");
-    }
-
-    let releaseWrites = (): void => {};
-    api.writesHeldUntil = new Promise((resolve) => {
-      releaseWrites = resolve;
-    });
-
-    await userEvent.dblClick(first);
-    releaseWrites();
-
-    await waitFor(() =>
-      expect(within(list).getAllByRole("listitem")[0]).not.toHaveTextContent(
-        "New",
-      ),
-    );
-    expect(bell()).toHaveAccessibleName("Notifications, 1 unread");
-  });
-
-  it("un aviso ya leído no se ofrece para abrir", async () => {
-    installFakeApi([aNotification({ isRead: true })]);
-    renderBell();
-
-    const list = await openList();
-
-    await within(list).findByRole("listitem");
-    expect(
-      within(list).queryByRole("button", { name: /You are now/ }),
-    ).toBeNull();
-  });
-
+  // Sólo se ve con un aviso sin destino: los demás cierran el panel al abrirse.
   it("dice que no pudo marcar un aviso y lo deja como nuevo", async () => {
-    installFakeApi([aNotification({ data: { newRole: "Coach" } })]);
+    installFakeApi([aNotification({ type: "event_created", data: {} })]);
     const target = `${NOTIFICATIONS_API_PATH}/${api.notifications[0]?.id}/read`;
     api.offline.add(target);
     renderBell();
     const list = await openList();
 
     await userEvent.click(
-      await within(list).findByRole("button", { name: /You are now Coach\./ }),
+      await within(list).findByRole("button", { name: /New notification/ }),
     );
 
     expect(
@@ -617,5 +590,210 @@ describe("marcar como leídos", () => {
     ).toBeInTheDocument();
     expect(within(list).getByRole("listitem")).toHaveTextContent("New");
     expect(within(bell()).getByText("1")).toBeInTheDocument();
+  });
+});
+
+/** jsdom no navega: lo que importa es a dónde apunta el enlace y lo que pasa
+ * al pulsarlo. */
+function holdNavigation(link: HTMLElement): void {
+  link.addEventListener("click", (event) => event.preventDefault());
+}
+
+async function findNotificationLink(
+  list: HTMLElement,
+  name: RegExp,
+): Promise<HTMLElement> {
+  const link = await within(list).findByRole("link", { name });
+  holdNavigation(link);
+  return link;
+}
+
+function queryList(): HTMLElement | null {
+  return screen.queryByRole("region", { name: "Notifications" });
+}
+
+function countMarkCalls(): number {
+  return api.calls.filter((call) => call.method === "POST").length;
+}
+
+describe("abrir un aviso", () => {
+  it("anuncia cada aviso con destino como un enlace a su pantalla", async () => {
+    installFakeApi([
+      aNotification({
+        minutesAgo: 1,
+        type: "role_request_received",
+        data: { requesterName: "Ana Ruiz", requestedRole: "Coach" },
+      }),
+      aNotification({ minutesAgo: 2, data: { newRole: "Coach" } }),
+      aNotification({
+        minutesAgo: 3,
+        type: "role_request_rejected",
+        data: { requestedRole: "Committee" },
+      }),
+    ]);
+    renderBell();
+
+    const list = await openList();
+
+    expect(
+      await within(list).findByRole("link", { name: /Ana Ruiz asked/ }),
+    ).toHaveAttribute("href", DIRECTORY_PATH);
+    expect(
+      within(list).getByRole("link", { name: /You are now Coach\./ }),
+    ).toHaveAttribute("href", ACCOUNT_PAGE_PATH);
+    expect(
+      within(list).getByRole("link", { name: /Committee/ }),
+    ).toHaveAttribute("href", ACCOUNT_PAGE_PATH);
+  });
+
+  it("un aviso sin leer navega, queda leído y el número baja en uno", async () => {
+    installFakeApi([
+      aNotification({ minutesAgo: 1, data: { newRole: "Coach" } }),
+      aNotification({ minutesAgo: 2, data: { newRole: "Admin" } }),
+    ]);
+    renderBell();
+    const list = await openList();
+    await within(bell()).findByText("2");
+
+    await userEvent.click(
+      await findNotificationLink(list, /You are now Coach\./),
+    );
+
+    expect(await within(bell()).findByText("1")).toBeInTheDocument();
+    expect(
+      countCalls(
+        `${NOTIFICATIONS_API_PATH}/${api.notifications[0]?.id}/read`,
+        "POST",
+      ),
+    ).toBe(1);
+  });
+
+  it("un aviso ya leído también lleva a su pantalla y el número no cambia", async () => {
+    installFakeApi([
+      aNotification({ minutesAgo: 1, isRead: true }),
+      aNotification({ minutesAgo: 2 }),
+    ]);
+    renderBell();
+    const list = await openList();
+    await within(bell()).findByText("1");
+    const [readLink] = await within(list).findAllByRole("link");
+    if (readLink === undefined) {
+      throw new Error("la lista no dibujó el aviso leído como enlace");
+    }
+    holdNavigation(readLink);
+
+    await userEvent.click(readLink);
+
+    expect(readLink).toHaveAttribute("href", ACCOUNT_PAGE_PATH);
+    expect(queryList()).toBeNull();
+    expect(within(bell()).getByText("1")).toBeInTheDocument();
+    expect(countMarkCalls()).toBe(0);
+  });
+
+  // Navegar vuelve a pedir el número a la vez que se marca: restar en local
+  // además de esa lectura bajaría el número dos veces.
+  it("tras abrir un aviso el número es el que da el servidor", async () => {
+    installFakeApi([
+      aNotification({ minutesAgo: 1, data: { newRole: "Coach" } }),
+      aNotification({ minutesAgo: 2, data: { newRole: "Admin" } }),
+    ]);
+    renderBell();
+    const list = await openList();
+    await within(bell()).findByText("2");
+    api.notifications = [
+      ...api.notifications,
+      aNotification({ data: { newRole: "Player" } }),
+    ];
+
+    await userEvent.click(
+      await findNotificationLink(list, /You are now Coach\./),
+    );
+
+    await waitFor(() =>
+      expect(bell()).toHaveAccessibleName("Notifications, 2 unread"),
+    );
+  });
+
+  it("abrirlo en otra pestaña lo marca pero deja el panel abierto", async () => {
+    installFakeApi([aNotification({ data: { newRole: "Coach" } })]);
+    renderBell();
+    const list = await openList();
+    const link = await findNotificationLink(list, /You are now Coach\./);
+
+    const user = userEvent.setup();
+    await user.keyboard("{Control>}");
+    await user.click(link);
+    await user.keyboard("{/Control}");
+
+    await waitFor(() =>
+      expect(bell()).toHaveAccessibleName("Notifications, none unread"),
+    );
+    expect(queryList()).toBeInTheDocument();
+  });
+
+  it("el panel se cierra al navegar", async () => {
+    installFakeApi([aNotification({ data: { newRole: "Coach" } })]);
+    renderBell();
+    const list = await openList();
+
+    await userEvent.click(
+      await findNotificationLink(list, /You are now Coach\./),
+    );
+
+    expect(queryList()).toBeNull();
+    expect(bell()).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("navega igual aunque no se pueda marcar, sin dejar el error para la próxima vez", async () => {
+    installFakeApi([aNotification({ data: { newRole: "Coach" } })]);
+    api.offline.add(
+      `${NOTIFICATIONS_API_PATH}/${api.notifications[0]?.id}/read`,
+    );
+    renderBell();
+    const list = await openList();
+
+    await userEvent.click(
+      await findNotificationLink(list, /You are now Coach\./),
+    );
+    await waitFor(() => expect(countMarkCalls()).toBe(1));
+
+    expect(queryList()).toBeNull();
+    const reopened = await openList();
+    await within(reopened).findByRole("listitem");
+    expect(within(reopened).queryByRole("alert")).toBeNull();
+  });
+
+  it("un aviso de un tipo desconocido se marca leído y no navega", async () => {
+    installFakeApi([aNotification({ type: "event_created", data: {} })]);
+    renderBell();
+    const list = await openList();
+    await within(bell()).findByText("1");
+
+    await userEvent.click(
+      await within(list).findByRole("button", { name: /New notification/ }),
+    );
+
+    await waitFor(() =>
+      expect(bell()).toHaveAccessibleName("Notifications, none unread"),
+    );
+    expect(within(list).queryByRole("link")).toBeNull();
+    expect(queryList()).toBeInTheDocument();
+  });
+
+  it("se alcanza con el teclado y se abre con Enter", async () => {
+    installFakeApi([aNotification({ data: { newRole: "Coach" } })]);
+    renderBell();
+    const list = await openList();
+    const link = await findNotificationLink(list, /You are now Coach\./);
+
+    await userEvent.tab();
+    await userEvent.tab();
+    expect(link).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+
+    expect(queryList()).toBeNull();
+    await waitFor(() =>
+      expect(bell()).toHaveAccessibleName("Notifications, none unread"),
+    );
   });
 });

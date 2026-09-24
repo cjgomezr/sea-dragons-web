@@ -1,7 +1,11 @@
+import Link from "next/link";
 import type { Ref } from "react";
 import { formatRelativeTime } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
-import { describeNotification } from "@/lib/notifications/notification-text";
+import {
+  describeNotification,
+  notificationDestination,
+} from "@/lib/notifications/notification-text";
 import type { ListedNotification } from "./notifications-client";
 
 /**
@@ -34,6 +38,8 @@ export type NotificationPanelProps = {
   readonly onRetryLoad: () => void;
   readonly onMarkAll: () => void;
   readonly onMarkOne: (notificationId: string) => void;
+  /** Se abrió un aviso que lleva a otra pantalla: el panel se cierra. */
+  readonly onNavigate: () => void;
   readonly onRetryMark: () => void;
 };
 
@@ -78,14 +84,76 @@ function NotificationContent({
   );
 }
 
+/** Con una tecla modificadora el enlace se abre en otra pestaña o ventana, y
+ * esta pantalla no se mueve: el panel sigue abierto para abrir más. */
+function opensElsewhere(event: React.MouseEvent): boolean {
+  return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+}
+
+type OpenHandlers = Pick<NotificationPanelProps, "onMarkOne" | "onNavigate">;
+
+/** Abrir un aviso lleva a su pantalla (#338) y, si estaba sin leer, lo marca.
+ * Marcar va por su lado: si falla, se navega igual. Un tipo sin destino sólo
+ * se marca, y uno así ya leído no tiene nada que abrir. */
+function NotificationItem({
+  translate,
+  notification,
+  now,
+  onMarkOne,
+  onNavigate,
+}: OpenHandlers & {
+  readonly translate: Translator;
+  readonly notification: ListedNotification;
+  readonly now: Date;
+}): React.JSX.Element {
+  const content = (
+    <NotificationContent
+      translate={translate}
+      notification={notification}
+      now={now}
+    />
+  );
+  const destination = notificationDestination(notification.type);
+  if (destination !== null) {
+    return (
+      <Link
+        href={destination}
+        className="notification-item-content"
+        onClick={(event) => {
+          if (!notification.isRead) {
+            onMarkOne(notification.id);
+          }
+          if (!opensElsewhere(event)) {
+            onNavigate();
+          }
+        }}
+      >
+        {content}
+      </Link>
+    );
+  }
+  if (notification.isRead) {
+    return <div className="notification-item-content">{content}</div>;
+  }
+  return (
+    <button
+      type="button"
+      className="notification-item-content"
+      onClick={() => onMarkOne(notification.id)}
+    >
+      {content}
+    </button>
+  );
+}
+
 function NotificationItems({
   translate,
   notifications,
   onMarkOne,
-}: {
+  onNavigate,
+}: OpenHandlers & {
   readonly translate: Translator;
   readonly notifications: readonly ListedNotification[];
-  readonly onMarkOne: (notificationId: string) => void;
 }): React.JSX.Element {
   if (notifications.length === 0) {
     return (
@@ -106,29 +174,13 @@ function NotificationItems({
               : "notification-item notification-item-unread"
           }
         >
-          {/* Sólo se abre el que está sin leer: abrirlo, por ahora, no hace
-              más que marcarlo (fuera de alcance de #266 llevar a su pantalla). */}
-          {notification.isRead ? (
-            <div className="notification-item-content">
-              <NotificationContent
-                translate={translate}
-                notification={notification}
-                now={now}
-              />
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="notification-item-content"
-              onClick={() => onMarkOne(notification.id)}
-            >
-              <NotificationContent
-                translate={translate}
-                notification={notification}
-                now={now}
-              />
-            </button>
-          )}
+          <NotificationItem
+            translate={translate}
+            notification={notification}
+            now={now}
+            onMarkOne={onMarkOne}
+            onNavigate={onNavigate}
+          />
         </li>
       ))}
     </ul>
@@ -140,9 +192,10 @@ function ListBody({
   list,
   onRetryLoad,
   onMarkOne,
+  onNavigate,
 }: Pick<
   NotificationPanelProps,
-  "translate" | "list" | "onRetryLoad" | "onMarkOne"
+  "translate" | "list" | "onRetryLoad" | "onMarkOne" | "onNavigate"
 >): React.JSX.Element {
   switch (list.status) {
     case "loading":
@@ -170,6 +223,7 @@ function ListBody({
           translate={translate}
           notifications={list.notifications}
           onMarkOne={onMarkOne}
+          onNavigate={onNavigate}
         />
       );
   }
@@ -223,6 +277,7 @@ export function NotificationPanel(
         list={list}
         onRetryLoad={props.onRetryLoad}
         onMarkOne={props.onMarkOne}
+        onNavigate={props.onNavigate}
       />
     </section>
   );
