@@ -156,6 +156,38 @@ describeConPostgres("las posiciones sembradas", () => {
     expect(positions.split("\n")).toEqual([...TODAYS_POSITIONS]);
   });
 
+  it("un club creado después de la migración nace con las tres", async () => {
+    const database = await migratedDatabase();
+
+    const otherClub = await createOtherClub(database);
+    const positions = await database.query(
+      `select n.name from public.club_positions p
+         join public.club_position_names n
+           on n.position_id = p.id and n.locale = 'en'
+        where p.club_id = '${otherClub}'
+        order by p.sort_order`,
+    );
+
+    expect(positions.split("\n")).toEqual([
+      "Goalkeeper",
+      "Defender",
+      "Forward",
+    ]);
+  });
+
+  it("dejan insertar un miembro con posición en un club nuevo", async () => {
+    const database = await migratedDatabase();
+    const otherClub = await createOtherClub(database);
+
+    const saved = await database.query(
+      `insert into public.members (user_id, club_id, full_name, position)
+       values (gen_random_uuid(), '${otherClub}', 'Nueva Socia', 'Goalkeeper')
+       returning position`,
+    );
+
+    expect(saved).toBe("Goalkeeper");
+  });
+
   it("nacen activas, con la fecha de archivo nula", async () => {
     const database = await migratedDatabase();
 

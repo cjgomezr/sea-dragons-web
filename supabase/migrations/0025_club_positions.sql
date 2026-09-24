@@ -21,7 +21,10 @@
 
 create table if not exists public.club_positions (
   id uuid primary key default gen_random_uuid(),
-  club_id uuid not null references public.clubs (id),
+  -- En cascada: borrar un club se lleva sus posiciones. Sin esto, la limpieza
+  -- de los clubes desechables de las pruebas de integración falla con una
+  -- violación de clave foránea (#348).
+  club_id uuid not null references public.clubs (id) on delete cascade,
   -- El orden lo decide el club, no el alfabeto. Sin `unique`: reordenar sería
   -- una carrera de intercambios, y un empate sólo deja dos posiciones en el
   -- orden en que se crearon.
@@ -40,7 +43,7 @@ create table if not exists public.club_position_names (
   position_id uuid not null,
   -- Redundante a propósito: es lo que deja al índice único de abajo comparar
   -- nombres dentro de un club sin un trigger.
-  club_id uuid not null references public.clubs (id),
+  club_id uuid not null references public.clubs (id) on delete cascade,
   locale text not null
     constraint club_position_names_locale_check check (locale in ('en', 'es')),
   -- El largo cabe en el desplegable del perfil y en la columna del
@@ -52,7 +55,7 @@ create table if not exists public.club_position_names (
   constraint club_position_names_pkey primary key (position_id, locale),
   constraint club_position_names_position_same_club_fkey
     foreign key (position_id, club_id)
-    references public.club_positions (id, club_id)
+    references public.club_positions (id, club_id) on delete cascade
 );
 
 -- Dos posiciones no pueden llamarse igual en el mismo club y el mismo idioma,
@@ -202,4 +205,53 @@ grant select, insert, update, delete on public.club_position_names
 
 -- El trigger no se llama a mano.
 revoke all on function public.members_sync_position_id()
+  from public, anon, authenticated;
+
+-- Un club creado después de esta migración nace sin posiciones, y entonces el
+-- trigger de arriba rechaza a cualquier miembro con posición: así se rompieron
+-- las pruebas de directorio y de alta contra `seadragons-dev` el 24 de
+-- septiembre de 2026 (#348). La siembra de arriba sólo alcanza a los clubes que
+-- ya existían, así que los nuevos la reciben aquí.
+create or replace function public.clubs_seed_default_positions()
+  returns trigger
+  language plpgsql
+  security definer
+  set search_path = public, pg_temp
+as $$
+declare
+  seeded record;
+begin
+  for seeded in
+    with seed (sort_order, name_en, name_es) as (
+      values
+        (1, 'Goalkeeper', 'Portería'),
+        (2, 'Defender', 'Defensa'),
+        (3, 'Forward', 'Ataque')
+    ),
+    inserted as (
+      insert into public.club_positions (club_id, sort_order)
+      select new.id, s.sort_order from seed s
+      returning id, sort_order
+    )
+    select i.id, s.name_en, s.name_es
+      from inserted i
+      join seed s on s.sort_order = i.sort_order
+  loop
+    insert into public.club_position_names (position_id, club_id, locale, name)
+    values
+      (seeded.id, new.id, 'en', seeded.name_en),
+      (seeded.id, new.id, 'es', seeded.name_es);
+  end loop;
+  return new;
+end;
+$$;
+
+drop trigger if exists clubs_seed_default_positions on public.clubs;
+create trigger clubs_seed_default_positions
+  after insert on public.clubs
+  for each row
+  execute function public.clubs_seed_default_positions();
+
+-- El trigger no se llama a mano.
+revoke all on function public.clubs_seed_default_positions()
   from public, anon, authenticated;
