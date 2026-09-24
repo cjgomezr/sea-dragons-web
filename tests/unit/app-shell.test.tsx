@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "@/components/AppShell";
+import type { Role } from "@/lib/auth/roles";
 import type { ClubBrand } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
 
@@ -18,9 +19,13 @@ const BRAND: ClubBrand = { name: "Hobart Orcas", initials: "HO" };
 const LONGEST_CLUB_NAME =
   "Asociación Deportiva de Rugby Subacuático del Sur · Tasmania";
 
-function renderShell(locale: Locale = "en", brand: ClubBrand = BRAND): void {
+function renderShell(
+  locale: Locale = "en",
+  brand: ClubBrand = BRAND,
+  role: Role = "Player",
+): void {
   render(
-    <AppShell locale={locale} role="Player" brand={brand}>
+    <AppShell locale={locale} role={role} brand={brand}>
       <p>Contenido de la sección</p>
     </AppShell>,
   );
@@ -126,6 +131,33 @@ describe("app shell", () => {
       within(menu).getByRole("link", { name: "My profile" }),
     ).toHaveAttribute("href", "/cuenta");
   });
+
+  // #296: la configuración del club se alcanza desde el menú de la cuenta,
+  // y sólo la ve quien la frontera deja entrar.
+  it("enlaza la configuración del club en el menú de un Admin", async () => {
+    usePathname.mockReturnValue("/calendario");
+    renderShell("en", BRAND, "Admin");
+
+    const menu = await openAccountMenu();
+
+    expect(
+      within(menu).getByRole("link", { name: "Club settings" }),
+    ).toHaveAttribute("href", "/club");
+  });
+
+  it.each<Role>(["Coach", "Committee", "Player"])(
+    "no enlaza la configuración del club en el menú de un %s",
+    async (role) => {
+      usePathname.mockReturnValue("/calendario");
+      renderShell("en", BRAND, role);
+
+      const menu = await openAccountMenu();
+
+      expect(
+        within(menu).queryByRole("link", { name: "Club settings" }),
+      ).toBeNull();
+    },
+  );
 
   it("nombra Mi perfil y cerrar sesión en el idioma de la visita", async () => {
     usePathname.mockReturnValue("/calendario");

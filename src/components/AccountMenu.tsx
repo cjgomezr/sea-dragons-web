@@ -4,16 +4,17 @@ import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { LanguageToggle } from "@/components/LanguageToggle";
-import { AccountIcon } from "@/components/NavIcons";
+import { AccountIcon, SettingsIcon } from "@/components/NavIcons";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { ACCOUNT_PAGE_PATH } from "@/lib/auth/routes";
+import { ACCOUNT_PAGE_PATH, CLUB_SETTINGS_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator, type Translator } from "@/lib/i18n/translator";
 
 /**
  * El menú de la cuenta (#287): Mi perfil, Apariencia, Idioma y Cerrar sesión
  * detrás de un solo botón, para que la cabecera quepa en una fila junto al
- * nombre del club. Se abre como la lista de avisos (#266): desplegable en
+ * nombre del club. Al Admin le ofrece además la configuración del club
+ * (#296). Se abre como la lista de avisos (#266): desplegable en
  * escritorio y pantalla entera con su flecha de volver en el móvil.
  *
  * Es de cliente porque abre y cierra. Cambiar de idioma rehace la cabecera en
@@ -93,12 +94,14 @@ function AccountMenuPanel({
   id,
   locale,
   translate,
+  canConfigureClub,
   headingRef,
   onBack,
   onNavigate,
 }: {
   readonly id: string;
   readonly locale: Locale;
+  readonly canConfigureClub: boolean;
   readonly translate: Translator;
   readonly headingRef: React.Ref<HTMLHeadingElement>;
   readonly onBack: () => void;
@@ -129,6 +132,18 @@ function AccountMenuPanel({
             {translate("accountMenu.profile")}
           </Link>
         </li>
+        {canConfigureClub ? (
+          <li>
+            <Link
+              href={CLUB_SETTINGS_PATH}
+              className="account-menu-item"
+              onClick={onNavigate}
+            >
+              <SettingsIcon />
+              {translate("accountMenu.clubSettings")}
+            </Link>
+          </li>
+        ) : null}
         <li className="account-menu-setting">
           <span>{translate("accountMenu.appearance")}</span>
           <ThemeToggle locale={locale} />
@@ -145,7 +160,15 @@ function AccountMenuPanel({
   );
 }
 
-export function AccountMenu({ locale }: { locale: Locale }): React.JSX.Element {
+export function AccountMenu({
+  locale,
+  canConfigureClub,
+}: {
+  locale: Locale;
+  /** Si quien lo abre es Admin: sólo entonces ofrece la configuración del
+   * club. Lo decide el servidor con la regla de la frontera. */
+  canConfigureClub: boolean;
+}): React.JSX.Element {
   const translate = createTranslator(locale);
   const menuId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -191,6 +214,7 @@ export function AccountMenu({ locale }: { locale: Locale }): React.JSX.Element {
           id={menuId}
           locale={locale}
           translate={translate}
+          canConfigureClub={canConfigureClub}
           headingRef={headingRef}
           onBack={closeAndReturnFocus}
           onNavigate={close}

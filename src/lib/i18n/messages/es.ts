@@ -237,6 +237,7 @@ export const spanishMessages: MessageCatalog = {
   "accountMenu.appearance": "Apariencia",
   "accountMenu.language": "Idioma",
   "accountMenu.back": "Volver",
+  "accountMenu.clubSettings": "Configuración del club",
   "account.metaTitle": "Perfil · {club}",
   "account.metaDescription":
     "Tus datos, tu rol en el club y tus grupos, y la solicitud para ser Coach o entrar al Comité.",
@@ -699,4 +700,41 @@ export const spanishMessages: MessageCatalog = {
     "Si caduca, pide al club que te reenvíe la invitación.",
   "email.invitation.notYou":
     "Si no esperabas esta invitación, ignora este correo: sin activarla, la cuenta no se usa.",
+  // La configuración del club (#296, RF-6 del PRD de E18a), sólo del Admin.
+  "clubSettings.metaTitle": "Configuración del club · {club}",
+  "clubSettings.metaDescription":
+    "El nombre, las iniciales, el color de acento y el logo del club, tal como los ven los miembros en cada pantalla.",
+  "clubSettings.title": "Configuración del club",
+  "clubSettings.lead":
+    "Cómo ven el club sus miembros: en la cabecera, al iniciar sesión y en cada correo.",
+  "clubSettings.loading": "Cargando la configuración del club…",
+  "clubSettings.identity.title": "Nombre e iniciales",
+  "clubSettings.name.label": "Nombre del club",
+  "clubSettings.name.hint": "Hasta {max} caracteres.",
+  "clubSettings.initials.label": "Iniciales",
+  "clubSettings.initials.hint":
+    "Hasta {max} caracteres. Déjalas vacías para usar las primeras letras del nombre.",
+  "clubSettings.brand.title": "Color y logo",
+  "clubSettings.accent.label": "Color de acento",
+  "clubSettings.logo.label": "Logo",
+  "clubSettings.logo.none":
+    "Todavía no hay logo: en su lugar salen las iniciales.",
+  "clubSettings.logo.present": "El club tiene logo.",
+  "clubSettings.save": "Guardar la configuración",
+  "clubSettings.saving": "Guardando…",
+  "clubSettings.saved": "Configuración guardada.",
+  "clubSettings.reloadLatest": "Cargar la configuración más reciente",
+  "clubSettings.issue.nameRequired": "El club necesita un nombre.",
+  "clubSettings.issue.nameTooLong":
+    "El nombre puede tener como mucho {max} caracteres.",
+  "clubSettings.issue.initialsTooLong":
+    "Las iniciales pueden tener como mucho {max} caracteres.",
+  "clubSettings.error.changed":
+    "Otro Admin cambió la configuración mientras la editabas. Carga la más reciente y vuelve a hacer tu cambio.",
+  "clubSettings.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para seguir.",
+  "clubSettings.error.forbidden":
+    "Sólo un Admin puede cambiar la configuración del club.",
+  "clubSettings.error.unexpected":
+    "Algo falló con la configuración del club. Vuelve a intentarlo.",
 };

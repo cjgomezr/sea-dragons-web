@@ -56,6 +56,19 @@ export function AccountIcon(): React.JSX.Element {
   );
 }
 
+/** Acompaña a la entrada de la configuración del club en el menú de la cuenta
+ * (#296): dos controles deslizantes, el glifo de "ajustes" que no se
+ * confunde con el engranaje del sistema operativo. */
+export function SettingsIcon(): React.JSX.Element {
+  return (
+    <IconBase>
+      <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="10" cy="17" r="2" />
+    </IconBase>
+  );
+}
+
 /** La campana de avisos de la cabecera (#266), con el mismo trazo que los
  * otros iconos de esa esquina. */
 export function BellIcon(): React.JSX.Element {

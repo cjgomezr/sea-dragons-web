@@ -2403,3 +2403,73 @@ button.notification-item-content:hover {
   padding: 0;
   border: none;
 }
+
+/* La configuración del club (#296). Sin mockup: sigue a la ficha del
+   miembro, con el formulario en el mismo panel. */
+.club-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 640px;
+}
+
+.club-settings-form {
+  gap: var(--space-6);
+}
+
+.club-settings-form .auth-submit {
+  align-self: flex-start;
+}
+
+.club-settings-failure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.club-settings-brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.club-settings-brand-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Con el aspecto de las etiquetas de los campos de arriba: son los mismos
+   datos del club, sólo que todavía no se editan aquí. */
+.club-settings-brand-row dt {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.club-settings-brand-row dd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+/* La muestra del acento lleva borde: un acento claro sobre el panel blanco
+   se perdería sin él. El valor en texto va al lado, así que el color no es
+   la única forma de saberlo. */
+.club-settings-swatch {
+  flex-shrink: 0;
+  width: var(--space-8);
+  height: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.club-settings-brand-row .auth-brand-mark {
+  flex-shrink: 0;
+}

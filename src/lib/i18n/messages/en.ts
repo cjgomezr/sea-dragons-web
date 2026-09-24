@@ -241,6 +241,7 @@ export const englishMessages = {
   "accountMenu.appearance": "Appearance",
   "accountMenu.language": "Language",
   "accountMenu.back": "Back",
+  "accountMenu.clubSettings": "Club settings",
   "account.metaTitle": "Profile · {club}",
   "account.metaDescription":
     "Your details, your role in the club and your groups, plus a request to become a Coach or join the Committee.",
@@ -710,4 +711,39 @@ export const englishMessages = {
     "If it expires, ask the club to resend your invitation.",
   "email.invitation.notYou":
     "If you weren't expecting this invitation, ignore this email: the account stays unused until it is activated.",
+  // La configuración del club (#296, RF-6 del PRD de E18a), sólo del Admin.
+  "clubSettings.metaTitle": "Club settings · {club}",
+  "clubSettings.metaDescription":
+    "The club's name, initials, accent colour and logo, as members see them on every screen.",
+  "clubSettings.title": "Club settings",
+  "clubSettings.lead":
+    "How the club appears to its members: in the header, on the sign-in screen and in every email.",
+  "clubSettings.loading": "Loading the club settings…",
+  "clubSettings.identity.title": "Name and initials",
+  "clubSettings.name.label": "Club name",
+  "clubSettings.name.hint": "Up to {max} characters.",
+  "clubSettings.initials.label": "Initials",
+  "clubSettings.initials.hint":
+    "Up to {max} characters. Leave it empty to use the first letters of the name.",
+  "clubSettings.brand.title": "Colour and logo",
+  "clubSettings.accent.label": "Accent colour",
+  "clubSettings.logo.label": "Logo",
+  "clubSettings.logo.none": "No logo yet: the initials are shown instead.",
+  "clubSettings.logo.present": "The club has a logo.",
+  "clubSettings.save": "Save settings",
+  "clubSettings.saving": "Saving…",
+  "clubSettings.saved": "Settings saved.",
+  "clubSettings.reloadLatest": "Load the latest settings",
+  "clubSettings.issue.nameRequired": "The club needs a name.",
+  "clubSettings.issue.nameTooLong":
+    "The name can have at most {max} characters.",
+  "clubSettings.issue.initialsTooLong":
+    "Initials can have at most {max} characters.",
+  "clubSettings.error.changed":
+    "Another Admin changed the settings while you were editing. Load the latest settings and make your change again.",
+  "clubSettings.error.signInRequired":
+    "Your session ended. Sign in again to keep going.",
+  "clubSettings.error.forbidden": "Only an Admin can change the club settings.",
+  "clubSettings.error.unexpected":
+    "Something went wrong with the club settings. Try again.",
 } as const satisfies Readonly<Record<string, Message>>;
