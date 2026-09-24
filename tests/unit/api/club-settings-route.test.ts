@@ -30,7 +30,7 @@ const STORED: ClubSettings = {
   name: "Harbour Hammerheads",
   initials: "HH",
   accentColor: "#1c6ea4",
-  logoPath: null,
+  logoUrl: null,
 };
 
 const VALID_BODY = {

@@ -23,6 +23,7 @@ import {
   readIssueCode,
   saveClubSettings,
 } from "./club-settings-client";
+import { ClubLogoField } from "./ClubLogoField";
 
 /**
  * El formulario de la configuración del club (#296). Sigue a la ficha del
@@ -123,18 +124,20 @@ function SaveOutcome({
   );
 }
 
-/** El acento y el logo se enseñan aquí; elegirlos llega con sus propios
- * tickets (RF-3 y RF-4 del PRD de E18a). Un acento guardado que el servidor
- * ya no acepta se explica junto a él: si no, el guardado fallaría sin decir
- * por qué. */
+/** El acento se enseña aquí; elegirlo llega con su propio ticket (RF-3 del
+ * PRD de E18a). Un acento guardado que el servidor ya no acepta se explica
+ * junto a él: si no, el guardado fallaría sin decir por qué. El logo se
+ * cambia aquí mismo (#295). */
 function BrandSummary({
   translate,
   settings,
   accentIssueText,
+  onLogoChanged,
 }: {
   translate: Translator;
   settings: ClubSettings;
   accentIssueText: string | null;
+  onLogoChanged: (logoUrl: string | null) => void;
 }): React.JSX.Element {
   const accent = settings.accentColor.toUpperCase();
   const initials = settings.initials ?? deriveInitials(settings.name);
@@ -162,18 +165,13 @@ function BrandSummary({
         <div className="club-settings-brand-row">
           <dt>{translate("clubSettings.logo.label")}</dt>
           <dd>
-            {settings.logoPath === null ? (
-              <span className="auth-brand-mark" aria-hidden="true">
-                {initials}
-              </span>
-            ) : null}
-            <span>
-              {translate(
-                settings.logoPath === null
-                  ? "clubSettings.logo.none"
-                  : "clubSettings.logo.present",
-              )}
-            </span>
+            <ClubLogoField
+              translate={translate}
+              clubName={settings.name}
+              initials={initials}
+              logoUrl={settings.logoUrl}
+              onLogoChanged={onLogoChanged}
+            />
           </dd>
         </div>
       </dl>
@@ -298,6 +296,11 @@ export function ClubSettingsForm({
         translate={translate}
         settings={settings}
         accentIssueText={issueTextFor("accentColor")}
+        onLogoChanged={(logoUrl) => {
+          setSettings((current) => ({ ...current, logoUrl }));
+          // Como al guardar: redibuja la cabecera con el logo nuevo.
+          router.refresh();
+        }}
       />
       <SaveOutcome
         translate={translate}

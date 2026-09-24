@@ -156,6 +156,10 @@ export const CLUB_SETTINGS_PATH = "/club";
  * vuelve a comprobar. */
 export const CLUB_SETTINGS_API_PATH = "/api/v1/club/settings";
 
+/** Subir o quitar el logo (#295). Cuelga de la configuración, así que la
+ * regla de esa ruta en `RESTRICTED_ROUTES` también lo reserva al Admin. */
+export const CLUB_LOGO_API_PATH = `${CLUB_SETTINGS_API_PATH}/logo`;
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 

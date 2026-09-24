@@ -30,7 +30,7 @@ const settingsSchema = z.object({
   name: z.string(),
   initials: z.string().nullable(),
   accentColor: z.string(),
-  logoPath: z.string().nullable(),
+  logoUrl: z.url({ protocol: /^https?$/ }).nullable(),
 });
 
 const responseSchema = z.object({ data: settingsSchema });

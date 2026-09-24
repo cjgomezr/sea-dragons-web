@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AccountMenu } from "@/components/AccountMenu";
+import { ClubBrandMark } from "@/components/ClubBrandMark";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SidebarNav } from "@/components/SidebarNav";
@@ -8,6 +9,7 @@ import { CLUB_SETTINGS_PATH } from "@/lib/auth/routes";
 import { isAllowedForRole } from "@/lib/auth/session-boundary";
 import type { ClubBrand } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
+import { createTranslator } from "@/lib/i18n/translator";
 
 export function AppShell({
   locale,
@@ -29,9 +31,19 @@ export function AppShell({
           {/* Un nombre largo se recorta con puntos suspensivos: el título lo
               deja leer entero, y el texto sigue completo para un lector de
               pantalla. */}
-          <span className="app-brand" title={brand.name}>
-            {brand.name}
-          </span>
+          <div className="app-brand-lockup">
+            {/* Sin logo, la cabecera sigue siendo sólo el nombre (#295). */}
+            <ClubBrandMark
+              logoUrl={brand.logoUrl}
+              logoAlt={createTranslator(locale)("club.logoAlt", {
+                club: brand.name,
+              })}
+              fallback={null}
+            />
+            <span className="app-brand" title={brand.name}>
+              {brand.name}
+            </span>
+          </div>
           {/* La campana va fuera del menú de la cuenta (#287): lleva el número
               de avisos sin leer, y dentro de un menú no avisaría de nada. */}
           <div className="app-sidebar-actions">

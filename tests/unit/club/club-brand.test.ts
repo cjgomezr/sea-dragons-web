@@ -14,7 +14,9 @@ const STORED_ROW: ClubBrandRow = {
   name: "Hobart Orcas",
   initials: "HO",
   accentColor: "#7b3fa0",
+  logoUrl: null,
 };
+const LOGO_URL = "https://storage.example.test/club-logos/club/logo.png";
 const TIME_TO_LIVE_MS = 60_000;
 const READ_TIMEOUT_MS = 3_000;
 
@@ -62,6 +64,11 @@ describe("marca por defecto", () => {
   it("lleva el acento de hoy", () => {
     expect(DEFAULT_CLUB_BRAND.accentColor).toBe(DEFAULT_ACCENT_COLOR);
   });
+
+  // #295: si la base no contesta, las iniciales y no un logo que no se sabe.
+  it("no lleva logo", () => {
+    expect(DEFAULT_CLUB_BRAND.logoUrl).toBeNull();
+  });
 });
 
 describe("lectura de la marca", () => {
@@ -72,7 +79,16 @@ describe("lectura de la marca", () => {
       name: "Hobart Orcas",
       initials: "HO",
       accentColor: "#7b3fa0",
+      logoUrl: null,
     });
+  });
+
+  it("devuelve la dirección del logo cuando el club lo tiene", async () => {
+    const { reader } = createReader({
+      fetchRow: async () => ({ ...STORED_ROW, logoUrl: LOGO_URL }),
+    });
+
+    expect((await reader.read()).logoUrl).toBe(LOGO_URL);
   });
 
   it("deriva las iniciales del nombre cuando no hay guardadas", async () => {

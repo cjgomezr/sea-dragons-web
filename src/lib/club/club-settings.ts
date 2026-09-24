@@ -18,8 +18,8 @@ import {
 /**
  * La configuración del club (#296, RF-6 del PRD de E18a), contada sin
  * Supabase delante. El Admin lee la marca entera y cambia el nombre, las
- * iniciales y el acento (#294); el logo se enseña aquí y se cambia con su
- * propio ticket.
+ * iniciales y el acento (#294); el logo se enseña aquí y se cambia con
+ * `club-logo.ts` (#295).
  *
  * Guardar sigue el patrón de la corrección de la fecha en la ficha del
  * miembro (`member_status_changed`): la escritura lleva lo que el Admin tenía
@@ -40,7 +40,8 @@ export type ClubSettings = {
   /** Sin iniciales guardadas es `null`, y la marca las deriva del nombre. */
   readonly initials: string | null;
   readonly accentColor: string;
-  readonly logoPath: string | null;
+  /** La dirección pública del logo; se cambia con `club-logo.ts` (#295). */
+  readonly logoUrl: string | null;
 };
 
 /** La parte de la configuración que esta pantalla escribe. */
@@ -204,7 +205,7 @@ export function findClubSettingsIssues({
 
 /** Quien llama, con su club, si es Admin. La frontera ya lo comprobó por la
  * ruta; esto es el cerrojo del propio dominio. */
-async function findAdministrator(
+export async function findAdministrator(
   gateways: Pick<ClubSettingsGateways, "members">,
   callerId: string,
 ): Promise<RoleRequestMember> {

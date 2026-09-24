@@ -66,6 +66,31 @@ describe("la marca en la cabecera", () => {
     expect(brand).toHaveTextContent(LONGEST_CLUB_NAME);
     expect(brand).toHaveAttribute("title", LONGEST_CLUB_NAME);
   });
+
+  // #295: el logo va delante del nombre, que se sigue leyendo.
+  it("con logo lo enseña delante del nombre", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell("en", {
+      ...BRAND,
+      logoUrl: "https://storage.example.test/club-logos/club/logo.png",
+    });
+
+    const sidebar = screen.getByRole("complementary");
+    expect(
+      within(sidebar).getByRole("img", { name: "Hobart Orcas logo" }),
+    ).toBeInTheDocument();
+    expect(within(sidebar).getByText("Hobart Orcas")).toBeInTheDocument();
+  });
+
+  it("sin logo no pinta ninguna imagen de marca", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell();
+
+    const sidebar = screen.getByRole("complementary");
+    expect(
+      within(sidebar).queryByRole("img", { name: /logo/ }),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe("app shell", () => {
