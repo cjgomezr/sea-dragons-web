@@ -89,6 +89,7 @@ columna role_requests.status tipo=text null=NO default='pending'::text
 columna role_requests.user_id tipo=uuid null=NO default=-
 funcion change_member_role(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_role text)
 funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
+funcion clubs_seed_default_positions()
 funcion health_probe()
 funcion is_member_in_groups(target_user_id uuid, group_ids uuid[])
 funcion members_sync_position_id()
@@ -344,12 +345,12 @@ policy role_requests.role_requests_select_own cmd=SELECT roles={authenticated} u
 restriccion audit_log.audit_log_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion audit_log.audit_log_pkey PRIMARY KEY (id)
 restriccion audit_log.audit_log_result_check CHECK ((result = ANY (ARRAY['success'::text, 'failure'::text])))
-restriccion club_position_names.club_position_names_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion club_position_names.club_position_names_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
 restriccion club_position_names.club_position_names_locale_check CHECK ((locale = ANY (ARRAY['en'::text, 'es'::text])))
 restriccion club_position_names.club_position_names_name_length CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 40)))
 restriccion club_position_names.club_position_names_pkey PRIMARY KEY (position_id, locale)
-restriccion club_position_names.club_position_names_position_same_club_fkey FOREIGN KEY (position_id, club_id) REFERENCES club_positions(id, club_id)
-restriccion club_positions.club_positions_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion club_position_names.club_position_names_position_same_club_fkey FOREIGN KEY (position_id, club_id) REFERENCES club_positions(id, club_id) ON DELETE CASCADE
+restriccion club_positions.club_positions_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
 restriccion club_positions.club_positions_id_club_id_key UNIQUE (id, club_id)
 restriccion club_positions.club_positions_pkey PRIMARY KEY (id)
 restriccion clubs.clubs_accent_color_hex CHECK ((accent_color ~ '^#[0-9A-Fa-f]{6}$'::text))
@@ -417,4 +418,5 @@ tabla notifications rls=t
 tabla password_recovery_requests rls=t
 tabla registration_requests rls=t
 tabla role_requests rls=t
+trigger clubs_seed_default_positions CREATE TRIGGER clubs_seed_default_positions AFTER INSERT ON public.clubs FOR EACH ROW EXECUTE FUNCTION clubs_seed_default_positions()
 trigger members_sync_position_id CREATE TRIGGER members_sync_position_id BEFORE INSERT OR UPDATE OF "position" ON public.members FOR EACH ROW EXECUTE FUNCTION members_sync_position_id()
