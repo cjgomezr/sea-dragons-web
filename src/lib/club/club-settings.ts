@@ -274,7 +274,8 @@ export async function updateClubSettings(
   const identity = normalizeIdentity(request.submission.identity);
   const { expected } = request.submission;
   // La base admite un acento en mayúsculas, y no por eso cambió. Al gateway
-  // va lo esperado tal cual, para que case con la fila.
+  // va lo esperado tal cual, para que case con la fila; la escritura lo deja
+  // en minúsculas sin contarlo como cambio.
   const fields = changedFields(identity, {
     ...expected,
     accentColor: expected.accentColor.toLowerCase(),
