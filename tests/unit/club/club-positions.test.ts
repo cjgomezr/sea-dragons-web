@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import {
   type ClubPosition,
   type ClubPositions,
   createCachedClubPositionsReader,
   findClubPosition,
   isAcceptablePosition,
+  listPositionChoices,
   offeredPositions,
   positionName,
   positionRank,
@@ -230,5 +232,53 @@ describe("la caché de las posiciones", () => {
     await expect(reader.findClubPositions(CLUB_ID)).rejects.toThrow("sin base");
 
     expect(await reader.findClubPositions(CLUB_ID)).toEqual(CLUB_POSITIONS);
+  });
+});
+
+describe("las posiciones que se pueden elegir", () => {
+  const CALLER_ID = "c0c0c0c0-0000-4000-8000-00000000000c";
+
+  function choicesGateways(member: { clubId: string } | null): {
+    gateways: Parameters<typeof listPositionChoices>[0];
+    clubsRead: string[];
+  } {
+    const clubsRead: string[] = [];
+    return {
+      clubsRead,
+      gateways: {
+        members: {
+          findRoleRequestMember: async () =>
+            member === null
+              ? null
+              : { clubId: member.clubId, fullName: "Ana", role: "Admin" },
+        },
+        positions: {
+          findClubPositions: async (clubId) => {
+            clubsRead.push(clubId);
+            return CLUB_POSITIONS;
+          },
+        },
+      },
+    };
+  }
+
+  it("son las activas del club de quien pregunta, en su orden y sin la marca de archivo", async () => {
+    const { gateways, clubsRead } = choicesGateways({ clubId: CLUB_ID });
+
+    const choices = await listPositionChoices(gateways, CALLER_ID);
+
+    expect(choices).toEqual([
+      { id: GOALKEEPER.id, names: GOALKEEPER.names },
+      { id: FORWARD.id, names: FORWARD.names },
+    ]);
+    expect(clubsRead).toEqual([CLUB_ID]);
+  });
+
+  it("falla con quien no tiene fila de miembro", async () => {
+    const { gateways } = choicesGateways(null);
+
+    await expect(
+      listPositionChoices(gateways, CALLER_ID),
+    ).rejects.toBeInstanceOf(MemberNotFoundError);
   });
 });

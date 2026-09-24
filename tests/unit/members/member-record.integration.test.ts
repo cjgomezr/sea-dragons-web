@@ -258,9 +258,9 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
         });
         const listing = await listDirectory(
           createDirectoryGateways(
-  serviceClient.client,
-  createClubPositionsGateway(serviceClient.client),
-),
+            serviceClient.client,
+            createClubPositionsGateway(serviceClient.client),
+          ),
           {
             callerId: adminId,
             query: { ...DEFAULT_DIRECTORY_QUERY, search: "Paula Ficha" },
@@ -443,17 +443,23 @@ async function proposeAuf(
   userId: string,
   expiry: string | null,
 ): Promise<void> {
-  await updateOwnProfile(createOwnProfileGateways(serviceClient.client), {
-    userId,
-    submission: {
-      fullName: "Paula Ficha",
-      country: "AU",
-      position: null,
-      experienceLevel: null,
-      gender: null,
-      auf: { number: "AUF-PROPUESTO", expiry },
+  await updateOwnProfile(
+    createOwnProfileGateways(
+      serviceClient.client,
+      createClubPositionsGateway(serviceClient.client),
+    ),
+    {
+      userId,
+      submission: {
+        fullName: "Paula Ficha",
+        country: "AU",
+        positionId: null,
+        experienceLevel: null,
+        gender: null,
+        auf: { number: "AUF-PROPUESTO", expiry },
+      },
     },
-  });
+  );
 }
 
 describeRls("verificar el AUF contra seadragons-dev", () => {

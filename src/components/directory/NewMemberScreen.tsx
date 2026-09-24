@@ -8,6 +8,8 @@ import type { Group } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import { loadGroups } from "@/components/groups/groups-client";
+import { loadPositionChoices } from "@/components/club/positions-client";
+import type { NamedPosition } from "@/lib/club/club-positions";
 import { InvitationResend } from "./InvitationResend";
 import type { CreatedMemberView } from "./new-member-client";
 import { NewMemberForm } from "./NewMemberForm";
@@ -23,10 +25,26 @@ import { NewMemberForm } from "./NewMemberForm";
  * cruza del servidor al navegador.
  */
 
-type GroupsState =
+/** Los grupos y las posiciones del club (#299): el formulario necesita las
+ * dos listas, así que se espera a ambas. */
+type CatalogsState =
   | { readonly kind: "loading" }
   | { readonly kind: "failed" }
-  | { readonly kind: "ready"; readonly groups: readonly Group[] };
+  | {
+      readonly kind: "ready";
+      readonly groups: readonly Group[];
+      readonly positions: readonly NamedPosition[];
+    };
+
+async function loadCatalogs(): Promise<CatalogsState> {
+  const [groups, positions] = await Promise.all([
+    loadGroups(),
+    loadPositionChoices(),
+  ]);
+  return groups.kind === "loaded" && positions.kind === "loaded"
+    ? { kind: "ready", groups: groups.groups, positions: positions.positions }
+    : { kind: "failed" };
+}
 
 function CreatedNotice({
   translate,
@@ -79,19 +97,17 @@ export function NewMemberScreen({
   countries: readonly CountryOption[];
 }): React.JSX.Element {
   const translate = createTranslator(locale);
-  const [groups, setGroups] = useState<GroupsState>({ kind: "loading" });
+  const [catalogs, setCatalogs] = useState<CatalogsState>({
+    kind: "loading",
+  });
   const [created, setCreated] = useState<CreatedMemberView | null>(null);
   const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     let isCurrent = true;
-    void loadGroups().then((outcome) => {
+    void loadCatalogs().then((loaded) => {
       if (isCurrent) {
-        setGroups(
-          outcome.kind === "loaded"
-            ? { kind: "ready", groups: outcome.groups }
-            : { kind: "failed" },
-        );
+        setCatalogs(loaded);
       }
     });
     return () => {
@@ -100,7 +116,7 @@ export function NewMemberScreen({
   }, [reloads]);
 
   function retryLoad(): void {
-    setGroups({ kind: "loading" });
+    setCatalogs({ kind: "loading" });
     setReloads((count) => count + 1);
   }
 
@@ -113,10 +129,10 @@ export function NewMemberScreen({
         <h1>{translate("newMember.title")}</h1>
         <p className="app-lead">{translate("newMember.lead")}</p>
       </header>
-      {groups.kind === "loading" ? (
+      {catalogs.kind === "loading" ? (
         <p className="admin-empty">{translate("newMember.loading")}</p>
       ) : null}
-      {groups.kind === "failed" ? (
+      {catalogs.kind === "failed" ? (
         <div className="admin-load-failure">
           <p className="auth-error" role="alert">
             {translate("newMember.loadFailed")}
@@ -126,18 +142,19 @@ export function NewMemberScreen({
           </button>
         </div>
       ) : null}
-      {groups.kind === "ready" && created !== null ? (
+      {catalogs.kind === "ready" && created !== null ? (
         <CreatedNotice
           translate={translate}
           created={created}
           onAddAnother={() => setCreated(null)}
         />
       ) : null}
-      {groups.kind === "ready" && created === null ? (
+      {catalogs.kind === "ready" && created === null ? (
         <NewMemberForm
           locale={locale}
           countries={countries}
-          clubGroups={groups.groups}
+          clubGroups={catalogs.groups}
+          positions={catalogs.positions}
           onCreated={setCreated}
         />
       ) : null}

@@ -201,9 +201,9 @@ describeRls("la baja y la reactivación contra seadragons-dev", () => {
       const serviceClient = createServiceRoleTestClient(process.env);
       const gateways = requireGateways(serviceClient);
       const directory = createDirectoryGateways(
-  serviceClient.client,
-  createClubPositionsGateway(serviceClient.client),
-);
+        serviceClient.client,
+        createClubPositionsGateway(serviceClient.client),
+      );
       const groups = createGroupsGateways(serviceClient.client);
       const groupMembers = createGroupMembersGateways(serviceClient.client);
 

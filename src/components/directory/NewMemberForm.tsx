@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { type NamedPosition, positionName } from "@/lib/club/club-positions";
 import type { CountryOption } from "@/lib/geo/countries";
 import type { Group } from "@/lib/groups/groups";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
@@ -12,11 +13,7 @@ import {
   type NewMemberSubmission,
   listNewMemberIssues,
 } from "@/lib/members/member-invitation";
-import {
-  EXPERIENCE_LEVELS,
-  GENDERS,
-  POSITIONS,
-} from "@/lib/members/profile-fields";
+import { EXPERIENCE_LEVELS, GENDERS } from "@/lib/members/profile-fields";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
 import {
   type CreatedMemberView,
@@ -58,7 +55,7 @@ const EMPTY_DRAFT: Draft = {
   fullName: "",
   email: "",
   country: "",
-  position: "",
+  positionId: "",
   experienceLevel: "",
   gender: "",
   aufNumber: "",
@@ -71,7 +68,7 @@ const FIELD_IDS: Readonly<Record<NewMemberField, string>> = {
   fullName: "alta-nombre",
   email: "alta-correo",
   country: "alta-pais",
-  position: "alta-posicion",
+  positionId: "alta-posicion",
   experienceLevel: "alta-nivel",
   gender: "alta-genero",
   aufNumber: "alta-auf-numero",
@@ -84,7 +81,7 @@ const FIELD_OF_ISSUE: Readonly<Record<NewMemberIssueCode, NewMemberField>> = {
   full_name_missing: "fullName",
   email_malformed: "email",
   country_unknown: "country",
-  position_unknown: "position",
+  position_unknown: "positionId",
   experience_level_unknown: "experienceLevel",
   gender_unknown: "gender",
   auf_number_missing: "aufNumber",
@@ -100,15 +97,10 @@ function toSubmission(draft: Draft): NewMemberSubmission {
 /** Las claves se arman con el valor del catálogo, así que el compilador
  * comprueba que cada mensaje exista en los dos idiomas. */
 function catalogOptions(translate: Translator): {
-  readonly positions: readonly SelectOption[];
   readonly experienceLevels: readonly SelectOption[];
   readonly genders: readonly SelectOption[];
 } {
   return {
-    positions: POSITIONS.map((value) => ({
-      value,
-      label: translate(`position.${value}`),
-    })),
     experienceLevels: EXPERIENCE_LEVELS.map((value) => ({
       value,
       label: translate(`level.${value}`),
@@ -165,23 +157,34 @@ type FieldProps = {
   readonly onChange: (field: TextDraftField, value: string) => void;
 };
 
+/** La etiqueta de cada desplegable. La posición se manda por su id (#299),
+ * pero se sigue llamando "posición". */
+const SELECT_LABEL_KEYS = {
+  country: "newMember.country",
+  positionId: "newMember.position",
+  experienceLevel: "newMember.experienceLevel",
+  gender: "newMember.gender",
+} as const;
+
 function DetailsFields({
   translate,
   draft,
   issueTextFor,
   onChange,
   countries,
+  positions,
 }: FieldProps & {
   readonly countries: readonly CountryOption[];
+  readonly positions: readonly NamedPosition[];
 }): React.JSX.Element {
   const options = catalogOptions(translate);
   const select = (
-    field: "country" | "position" | "experienceLevel" | "gender",
+    field: keyof typeof SELECT_LABEL_KEYS,
     fieldOptions: readonly SelectOption[],
   ): React.JSX.Element => (
     <SelectField
       id={FIELD_IDS[field]}
-      label={translate(`newMember.${field}`)}
+      label={translate(SELECT_LABEL_KEYS[field])}
       value={draft[field]}
       options={fieldOptions}
       placeholder={translate("newMember.choose")}
@@ -212,7 +215,16 @@ function DetailsFields({
         "country",
         countries.map(({ code, name }) => ({ value: code, label: name })),
       )}
-      {select("position", options.positions)}
+      {/* Si el club no ofrece ninguna, no hay qué elegir: nace sin posición. */}
+      {positions.length === 0
+        ? null
+        : select(
+            "positionId",
+            positions.map(({ id, names }) => ({
+              value: id,
+              label: positionName(names, translate.locale),
+            })),
+          )}
       {select("experienceLevel", options.experienceLevels)}
       {select("gender", options.genders)}
     </section>
@@ -252,11 +264,14 @@ export function NewMemberForm({
   locale,
   countries,
   clubGroups,
+  positions,
   onCreated,
 }: {
   locale: Locale;
   countries: readonly CountryOption[];
   clubGroups: readonly Group[];
+  /** Las activas del club, en su orden (#299). */
+  positions: readonly NamedPosition[];
   onCreated: (created: CreatedMemberView) => void;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
@@ -295,10 +310,10 @@ export function NewMemberForm({
       return;
     }
     const submission = toSubmission(draft);
-    const issues = listNewMemberIssues(
-      submission,
-      clubCalendarDate(new Date()),
-    );
+    const issues = listNewMemberIssues(submission, {
+      todayInClub: clubCalendarDate(new Date()),
+      positionChoices: positions,
+    });
     if (issues.length > 0) {
       setLocalIssues(issues);
       return;
@@ -339,7 +354,11 @@ export function NewMemberForm({
       noValidate
     >
       <fieldset className="member-record-fields" disabled={isSending}>
-        <DetailsFields {...fieldProps} countries={countries} />
+        <DetailsFields
+          {...fieldProps}
+          countries={countries}
+          positions={positions}
+        />
         <AufFields {...fieldProps} />
         <GroupsField
           translate={translate}

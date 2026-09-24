@@ -15,6 +15,11 @@ import {
   validateCountryField,
 } from "@/lib/auth/registration";
 import type { RoleRequestMember } from "@/lib/auth/role-request";
+import {
+  type ClubPositionsGateway,
+  type NamedPosition,
+  offeredPositions,
+} from "@/lib/club/club-positions";
 import { hasCapability } from "@/lib/auth/roles";
 import type { EmailDeliveryAvailabilityCheck } from "@/lib/email/email-delivery-availability";
 import { describeErrorWithoutEmail } from "@/lib/email/redact-email";
@@ -33,10 +38,8 @@ import {
 import {
   type ExperienceLevel,
   type Gender,
-  type Position,
   parseExperienceLevel,
   parseGender,
-  parsePosition,
 } from "./profile-fields";
 
 /**
@@ -56,13 +59,18 @@ import {
  * difiere para que lo que tarda la respuesta no delate qué direcciones tienen
  * cuenta; aquí quien llama es un Admin que ya sabe si el alta salió, y la
  * pantalla tiene que decirle si la invitación no salió para ofrecer reenviarla.
+ *
+ * La posición es una activa del club del Admin (#299). Si el club las archivó
+ * todas no hay qué elegir, y el miembro nace sin posición.
  */
 
 export type NewMemberSubmission = {
   readonly fullName: string;
   readonly email: string;
   readonly country: string;
-  readonly position: string;
+  /** El id de una posición del club; vacío sólo si el club no ofrece
+   * ninguna. */
+  readonly positionId: string;
   readonly experienceLevel: string;
   readonly gender: string;
   readonly aufNumber: string;
@@ -108,7 +116,7 @@ export type InvitedMemberRow = {
   readonly full_name: string;
   readonly email: string;
   readonly country: string;
-  readonly position: Position;
+  readonly position_id: string | null;
   readonly experience_level: ExperienceLevel;
   readonly gender: Gender;
   readonly auf_number: string;
@@ -145,6 +153,7 @@ export type MemberInvitationGateways = Pick<
   "members" | "groupMembers"
 > & {
   readonly groups: Pick<GroupsGateways["groups"], "findClubGroups">;
+  readonly positions: ClubPositionsGateway;
   readonly identities: IdentityConfirmationReader & {
     /** Sin contraseña y sin confirmar: la elige el miembro con el enlace. */
     createInvitedIdentity(email: string): Promise<IdentityCreation>;
@@ -252,12 +261,33 @@ function checkAufNumber(aufNumber: string): NewMemberIssueCode | null {
   return isAufNumberTooLong(aufNumber) ? "auf_number_too_long" : null;
 }
 
+/** Contra qué se valida el alta: el día del club, que es el de ingreso, y
+ * las posiciones que el club del Admin da a alguien nuevo, que son sus
+ * activas (#299). */
+export type NewMemberContext = {
+  readonly todayInClub: string;
+  readonly positionChoices: readonly NamedPosition[];
+};
+
+/** Obligatoria mientras el club ofrezca alguna, y siempre una de ellas: una
+ * archivada o de otro club no está entre las que se ofrecen. */
+function checkPosition(
+  positionId: string,
+  positionChoices: readonly NamedPosition[],
+): NewMemberIssueCode | null {
+  const isOffered =
+    positionId === ""
+      ? positionChoices.length === 0
+      : positionChoices.some((position) => position.id === positionId);
+  return isOffered ? null : "position_unknown";
+}
+
 /** Todos los campos que no valen, no el primero: el formulario los marca de
- * una vez, y lo usa también para avisar antes de enviar. No lee nada, así que
- * una petición mal hecha no toca la base. */
+ * una vez, y lo usa también para avisar antes de enviar. No lee nada: las
+ * posiciones las trae quien llama. */
 export function listNewMemberIssues(
   submission: NewMemberSubmission,
-  todayInClub: string,
+  { todayInClub, positionChoices }: NewMemberContext,
 ): readonly NewMemberIssue[] {
   const checks: readonly FieldCheck[] = [
     [
@@ -269,10 +299,7 @@ export function listNewMemberIssues(
       "country",
       validateCountryField(submission.country).ok ? null : "country_unknown",
     ],
-    [
-      "position",
-      parsePosition(submission.position) === null ? "position_unknown" : null,
-    ],
+    ["positionId", checkPosition(submission.positionId, positionChoices)],
     [
       "experienceLevel",
       parseExperienceLevel(submission.experienceLevel) === null
@@ -293,19 +320,17 @@ export function listNewMemberIssues(
 
 function validateNewMember(
   submission: NewMemberSubmission,
-  todayInClub: string,
+  context: NewMemberContext,
 ): ValidNewMember {
-  const issues = listNewMemberIssues(submission, todayInClub);
+  const issues = listNewMemberIssues(submission, context);
   const country = validateCountryField(submission.country);
-  const position = parsePosition(submission.position);
   const experienceLevel = parseExperienceLevel(submission.experienceLevel);
   const gender = parseGender(submission.gender);
-  // Los cuatro últimos términos no pueden ser ciertos sin el primero; están
+  // Los tres últimos términos no pueden ser ciertos sin el primero; están
   // aquí porque son los que estrechan el tipo.
   if (
     issues.length > 0 ||
     !country.ok ||
-    position === null ||
     experienceLevel === null ||
     gender === null
   ) {
@@ -315,7 +340,7 @@ function validateNewMember(
     full_name: submission.fullName.trim(),
     email: submission.email.trim().toLowerCase(),
     country: country.value,
-    position,
+    position_id: submission.positionId === "" ? null : submission.positionId,
     experience_level: experienceLevel,
     gender,
     auf_number: submission.aufNumber.trim(),
@@ -448,8 +473,13 @@ export async function createInvitedMember(
   gateways: MemberInvitationGateways,
   request: NewMemberRequest,
 ): Promise<CreatedMember> {
-  const member = validateNewMember(request.submission, request.todayInClub);
+  // Primero quién llama: las posiciones que valen son las de su club.
   const caller = await findAdministrator(gateways, request.callerId);
+  const positions = await gateways.positions.findClubPositions(caller.clubId);
+  const member = validateNewMember(request.submission, {
+    todayInClub: request.todayInClub,
+    positionChoices: offeredPositions(positions, null),
+  });
   const groupIds = new Set(request.submission.groupIds);
   // Antes de crear la identidad: un grupo que no es del club no deja nada a
   // medias.

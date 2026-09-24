@@ -14,6 +14,7 @@ import type {
   InvitedMemberRow,
   MemberInvitationGateways,
 } from "@/lib/members/member-invitation";
+import { FORWARD, SEEDED_POSITIONS } from "../helpers/seeded-positions";
 
 /**
  * El alta de un miembro y el reenvío de su invitación por la API (#243, RF-5
@@ -33,7 +34,7 @@ const VALID_BODY = {
   fullName: "Nerea Silva",
   email: "nerea.silva@example.com",
   country: "AU",
-  position: "Forward",
+  positionId: FORWARD.id,
   experienceLevel: "Intermediate",
   gender: "female",
   aufNumber: "AUF-2210",
@@ -59,6 +60,7 @@ function invitationGateways(): MemberInvitationGateways {
         role: callerRole,
       }),
     },
+    positions: { findClubPositions: async () => SEEDED_POSITIONS },
     groups: {
       findClubGroups: async () => [
         { id: SENIOR_ID, name: "Senior Squad", memberCount: 0 },

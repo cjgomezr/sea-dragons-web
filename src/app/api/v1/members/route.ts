@@ -82,7 +82,9 @@ const newMemberBodySchema = z
     fullName: z.string().max(FULL_NAME_BODY_MAX_LENGTH),
     email: z.string().max(EMAIL_BODY_MAX_LENGTH),
     country: z.string().max(CATALOG_BODY_MAX_LENGTH),
-    position: z.string().max(CATALOG_BODY_MAX_LENGTH),
+    // El id de una posición del club (#299): vacío si el club no ofrece
+    // ninguna, y por eso no `z.uuid()`.
+    positionId: z.string().max(CATALOG_BODY_MAX_LENGTH),
     experienceLevel: z.string().max(CATALOG_BODY_MAX_LENGTH),
     gender: z.string().max(CATALOG_BODY_MAX_LENGTH),
     aufNumber: z.string().max(AUF_NUMBER_BODY_MAX_LENGTH),

@@ -1,3 +1,5 @@
+import { MemberNotFoundError } from "@/lib/auth/account-activation";
+import type { RoleRequestGateways } from "@/lib/auth/role-request";
 import { type Locale, otherLocale } from "@/lib/i18n/locale";
 
 /**
@@ -20,6 +22,10 @@ export type ClubPosition = {
   readonly names: PositionNames;
   readonly isArchived: boolean;
 };
+
+/** Una posición tal como la pinta quien no decide si está archivada: el
+ * directorio y los desplegables que sólo ofrecen activas. */
+export type NamedPosition = Pick<ClubPosition, "id" | "names">;
 
 /** Todas las del club, archivadas incluidas, en el orden que decidió. */
 export type ClubPositions = readonly ClubPosition[];
@@ -138,4 +144,27 @@ export function createCachedClubPositionsReader({
       return entry.positions;
     },
   };
+}
+
+export type PositionChoicesGateways = {
+  readonly members: RoleRequestGateways["members"];
+  readonly positions: ClubPositionsGateway;
+};
+
+/** Las que se pueden dar a quien todavía no tiene ninguna, en el club de
+ * quien pregunta: las activas, en su orden. Es el desplegable del alta de un
+ * miembro. */
+export async function listPositionChoices(
+  gateways: PositionChoicesGateways,
+  callerId: string,
+): Promise<readonly NamedPosition[]> {
+  const caller = await gateways.members.findRoleRequestMember(callerId);
+  if (caller === null) {
+    throw new MemberNotFoundError(callerId);
+  }
+  const positions = await gateways.positions.findClubPositions(caller.clubId);
+  return offeredPositions(positions, null).map(({ id, names }) => ({
+    id,
+    names,
+  }));
 }

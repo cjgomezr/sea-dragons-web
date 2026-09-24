@@ -1,10 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isLocale } from "@/lib/i18n/locale";
+import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
+import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import {
   type ClubPosition,
   type ClubPositions,
   type ClubPositionsGateway,
+  type PositionChoicesGateways,
   type PositionNames,
   createCachedClubPositionsReader,
 } from "./club-positions";
@@ -101,3 +104,27 @@ export const cachedClubPositions: ClubPositionsGateway =
     timeToLiveMs: CLUB_POSITIONS_TIME_TO_LIVE_MS,
     now: Date.now,
   });
+
+type Environment = Readonly<Record<string, string | undefined>>;
+
+export type PositionChoicesGatewaysResult =
+  | { readonly kind: "ready"; readonly gateways: PositionChoicesGateways }
+  | { readonly kind: "unconfigured"; readonly missingKeys: readonly string[] };
+
+/** Raíz de composición de `GET /api/v1/club/positions`. Con la llave de
+ * servicio, como el directorio: la fila de quien llama dice su club. */
+export function createSupabasePositionChoicesGateways(
+  env: Environment,
+): PositionChoicesGatewaysResult {
+  const config = readSupabaseServiceRoleConfig(env);
+  if (config.kind === "missing") {
+    return { kind: "unconfigured", missingKeys: config.missingKeys };
+  }
+  return {
+    kind: "ready",
+    gateways: {
+      members: createRoleRequestGateways(createServiceRoleClient(env)).members,
+      positions: cachedClubPositions,
+    },
+  };
+}

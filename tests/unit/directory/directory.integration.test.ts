@@ -138,9 +138,9 @@ describeRls("el directorio contra seadragons-dev", () => {
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);
       const gateways = createDirectoryGateways(
-  serviceClient.client,
-  createClubPositionsGateway(serviceClient.client),
-);
+        serviceClient.client,
+        createClubPositionsGateway(serviceClient.client),
+      );
 
       await withTwoClubs(serviceClient, async ([clubId, otherClubId]) => {
         await moveForwardFirst(serviceClient, clubId);

@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth/supabase-auth-gateways";
 import { createRecoveryTokenIssuer } from "@/lib/auth/supabase-password-recovery";
 import { readClubBrand } from "@/lib/club/supabase-club-brand";
+import { cachedClubPositions } from "@/lib/club/supabase-club-positions";
 import { connectResendEmailSender } from "@/lib/email/resend-email-sender";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { createInvitationEmailGateway } from "./invitation-email-sender";
@@ -138,6 +139,7 @@ export function createSupabaseMemberInvitationGateways(
       members: record.members,
       groupMembers: record.groupMembers,
       groups: record.groups,
+      positions: cachedClubPositions,
       identities: { ...store.identities, ...auth.identities },
       invitees: store.invitees,
       invitationEmail: createInvitationEmailGateway({

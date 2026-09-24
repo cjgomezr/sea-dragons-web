@@ -176,6 +176,7 @@ function realGateways(
     members: record.members,
     groupMembers: record.groupMembers,
     groups: record.groups,
+    positions: createClubPositionsGateway(serviceClient.client),
     identities: { ...store.identities, ...auth.gateways.identities },
     invitees: store.invitees,
     invitationEmail,
@@ -189,12 +190,34 @@ function realGateways(
   };
 }
 
-function submissionFor(email: string, groupId: string): NewMemberSubmission {
+/** La posición Forward que el club nuevo trae sembrada (#299). */
+async function forwardPositionId(
+  serviceClient: ServiceRoleClient,
+  clubId: string,
+): Promise<string> {
+  const { data, error } = await serviceClient.client
+    .from("club_position_names")
+    .select("position_id")
+    .eq("club_id", clubId)
+    .eq("locale", "en")
+    .eq("name", "Forward")
+    .single();
+  if (error) {
+    throw new Error(`No se pudo leer Forward: ${error.message}`);
+  }
+  return data.position_id;
+}
+
+function submissionFor(
+  email: string,
+  groupId: string,
+  positionId: string,
+): NewMemberSubmission {
   return {
     fullName: "Nerea Invitada",
     email,
     country: "AU",
-    position: "Forward",
+    positionId,
     experienceLevel: "Beginner",
     gender: "undisclosed",
     aufNumber: "AUF-243",
@@ -225,7 +248,11 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
               realGateways(serviceClient, gateway),
               {
                 callerId: adminId,
-                submission: submissionFor(email, groupId),
+                submission: submissionFor(
+                  email,
+                  groupId,
+                  await forwardPositionId(serviceClient, clubId),
+                ),
                 todayInClub: today,
                 now: new Date(),
                 locale: "en",
@@ -240,7 +267,7 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
             const { data: row } = await serviceClient.client
               .from(MEMBERS_TABLE)
               .select(
-                "role, account_status, email_locale, position, experience_level, gender, auf_number, auf_expiry, country, joined_on, auf_verified_at",
+                "role, account_status, email_locale, position_id, experience_level, gender, auf_number, auf_expiry, country, joined_on, auf_verified_at",
               )
               .eq("user_id", created.member.userId)
               .single();
@@ -250,7 +277,8 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
               role: "Player",
               account_status: "incomplete",
               email_locale: "en",
-              position: "Forward",
+              // Sin texto de posición: `0026` no puede borrar la referencia.
+              position_id: await forwardPositionId(serviceClient, clubId),
               experience_level: "Beginner",
               gender: "undisclosed",
               auf_number: "AUF-243",
@@ -261,9 +289,9 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
 
             const listing = await listDirectory(
               createDirectoryGateways(
-  serviceClient.client,
-  createClubPositionsGateway(serviceClient.client),
-),
+                serviceClient.client,
+                createClubPositionsGateway(serviceClient.client),
+              ),
               {
                 callerId: adminId,
                 query: DEFAULT_DIRECTORY_QUERY,
@@ -291,37 +319,43 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
   it(
     "rechaza un correo que ya tiene cuenta sin crear otra fila ni mandar nada",
     async () => {
-      await withScenario(async ({ serviceClient, adminId, groupId }) => {
-        await withInvitedEmail(serviceClient, async (email) => {
-          const { gateway, sent } = capturingInvitationEmail(serviceClient);
-          const gateways = realGateways(serviceClient, gateway);
-          const request = {
-            callerId: adminId,
-            submission: submissionFor(email, groupId),
-            todayInClub: clubCalendarDate(new Date()),
-            now: new Date(),
-            locale: "es" as const,
-            appUrl: APP_URL,
-          };
-          await createInvitedMember(gateways, request);
+      await withScenario(
+        async ({ serviceClient, clubId, adminId, groupId }) => {
+          await withInvitedEmail(serviceClient, async (email) => {
+            const { gateway, sent } = capturingInvitationEmail(serviceClient);
+            const gateways = realGateways(serviceClient, gateway);
+            const request = {
+              callerId: adminId,
+              submission: submissionFor(
+                email,
+                groupId,
+                await forwardPositionId(serviceClient, clubId),
+              ),
+              todayInClub: clubCalendarDate(new Date()),
+              now: new Date(),
+              locale: "es" as const,
+              appUrl: APP_URL,
+            };
+            await createInvitedMember(gateways, request);
 
-          await expect(
-            createInvitedMember(gateways, {
-              ...request,
-              submission: {
-                ...request.submission,
-                email: email.toUpperCase(),
-              },
-            }),
-          ).rejects.toBeInstanceOf(MemberEmailTakenError);
-          const { count } = await serviceClient.client
-            .from(MEMBERS_TABLE)
-            .select("user_id", { count: "exact", head: true })
-            .eq("email", email);
-          expect(count).toBe(1);
-          expect(sent).toHaveLength(1);
-        });
-      });
+            await expect(
+              createInvitedMember(gateways, {
+                ...request,
+                submission: {
+                  ...request.submission,
+                  email: email.toUpperCase(),
+                },
+              }),
+            ).rejects.toBeInstanceOf(MemberEmailTakenError);
+            const { count } = await serviceClient.client
+              .from(MEMBERS_TABLE)
+              .select("user_id", { count: "exact", head: true })
+              .eq("email", email);
+            expect(count).toBe(1);
+            expect(sent).toHaveLength(1);
+          });
+        },
+      );
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
@@ -329,59 +363,65 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
   it(
     "el enlace de la invitación deja elegir contraseña, y al completar el registro la cuenta queda activa",
     async () => {
-      await withScenario(async ({ serviceClient, adminId, groupId }) => {
-        await withInvitedEmail(serviceClient, async (email) => {
-          const { gateway, sent } = capturingInvitationEmail(serviceClient);
-          const gateways = realGateways(serviceClient, gateway);
-          const created = await createInvitedMember(gateways, {
-            callerId: adminId,
-            submission: submissionFor(email, groupId),
-            todayInClub: clubCalendarDate(new Date()),
-            now: new Date(),
-            locale: "es",
-            appUrl: APP_URL,
-          });
-          expect(sent[0]?.subject).toBe("Te invitaron a Victoria Seadragons");
-
-          const anon = readSupabaseConfig(process.env);
-          if (anon.kind === "missing") {
-            throw new Error("Falta la llave anónima.");
-          }
-          await expect(
-            createRecoveryTokenRedeemer(anon).redeemRecoveryToken({
-              tokenHash: tokenHashFrom(sent[0]!),
-              newPassword: PASSWORD,
-            }),
-          ).resolves.toEqual({
-            kind: "password_changed",
-            userId: created.member.userId,
-          });
-          await expect(
-            resendInvitation(gateways, {
+      await withScenario(
+        async ({ serviceClient, clubId, adminId, groupId }) => {
+          await withInvitedEmail(serviceClient, async (email) => {
+            const { gateway, sent } = capturingInvitationEmail(serviceClient);
+            const gateways = realGateways(serviceClient, gateway);
+            const created = await createInvitedMember(gateways, {
               callerId: adminId,
-              userId: created.member.userId,
+              submission: submissionFor(
+                email,
+                groupId,
+                await forwardPositionId(serviceClient, clubId),
+              ),
+              todayInClub: clubCalendarDate(new Date()),
               now: new Date(),
+              locale: "es",
               appUrl: APP_URL,
-            }),
-          ).rejects.toBeInstanceOf(InvitationNotPendingError);
+            });
+            expect(sent[0]?.subject).toBe("Te invitaron a Victoria Seadragons");
 
-          // Lo que pide la pantalla de completar registro que ya existe.
-          const auth = createSupabaseAuthGateways(process.env);
-          if (auth.kind === "unconfigured") {
-            throw new Error("Faltan las variables de Supabase.");
-          }
-          const account = await auth.gateways.accounts.findByUserId(
-            created.member.userId,
-          );
-          await auth.gateways.accounts.updateProfile(account!.memberId, {
-            dateOfBirth: "1990-05-04",
-            membershipType: "Full",
+            const anon = readSupabaseConfig(process.env);
+            if (anon.kind === "missing") {
+              throw new Error("Falta la llave anónima.");
+            }
+            await expect(
+              createRecoveryTokenRedeemer(anon).redeemRecoveryToken({
+                tokenHash: tokenHashFrom(sent[0]!),
+                newPassword: PASSWORD,
+              }),
+            ).resolves.toEqual({
+              kind: "password_changed",
+              userId: created.member.userId,
+            });
+            await expect(
+              resendInvitation(gateways, {
+                callerId: adminId,
+                userId: created.member.userId,
+                now: new Date(),
+                appUrl: APP_URL,
+              }),
+            ).rejects.toBeInstanceOf(InvitationNotPendingError);
+
+            // Lo que pide la pantalla de completar registro que ya existe.
+            const auth = createSupabaseAuthGateways(process.env);
+            if (auth.kind === "unconfigured") {
+              throw new Error("Faltan las variables de Supabase.");
+            }
+            const account = await auth.gateways.accounts.findByUserId(
+              created.member.userId,
+            );
+            await auth.gateways.accounts.updateProfile(account!.memberId, {
+              dateOfBirth: "1990-05-04",
+              membershipType: "Full",
+            });
+            await expect(
+              activateAccountIfComplete(auth.gateways, created.member.userId),
+            ).resolves.toEqual({ kind: "activated" });
           });
-          await expect(
-            activateAccountIfComplete(auth.gateways, created.member.userId),
-          ).resolves.toEqual({ kind: "activated" });
-        });
-      });
+        },
+      );
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );

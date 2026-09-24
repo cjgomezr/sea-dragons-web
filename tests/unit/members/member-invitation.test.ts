@@ -19,6 +19,8 @@ import {
   resendInvitation,
 } from "@/lib/members/member-invitation";
 import { MemberRecordNotFoundError } from "@/lib/members/member-record";
+import type { ClubPosition, ClubPositions } from "@/lib/club/club-positions";
+import { FORWARD, SEEDED_POSITIONS } from "../helpers/seeded-positions";
 
 /**
  * El alta de un miembro por un Admin y su invitación (#243, RF-5 del PRD de
@@ -40,11 +42,19 @@ const CLUB_GROUPS = [
   { id: MASTERS_ID, name: "Masters Squad", memberCount: 2 },
 ] as const;
 
+/** Una posición que el club archivó (#299): ya no se le da a nadie nuevo. */
+const ARCHIVED_POSITION: ClubPosition = {
+  id: "90000000-0000-4000-8000-000000000004",
+  names: { en: "Utility", es: "Comodín" },
+  isArchived: true,
+};
+const OTHER_CLUBS_POSITION_ID = "90000000-0000-4000-8000-000000000099";
+
 const VALID_SUBMISSION: NewMemberSubmission = {
   fullName: "  Nerea Silva ",
   email: " Nerea.Silva@Example.com ",
   country: "au",
-  position: "Forward",
+  positionId: FORWARD.id,
   experienceLevel: "Intermediate",
   gender: "female",
   aufNumber: " AUF-2210 ",
@@ -64,10 +74,13 @@ type FakeOptions = {
     readonly emailConfirmed: boolean;
   } | null;
   readonly previousRequests?: number;
+  readonly positions?: ClubPositions;
 };
 
 type Fake = {
   readonly gateways: MemberInvitationGateways;
+  /** Los clubes de los que se leyeron las posiciones. */
+  readonly positionsRead: string[];
   readonly insertedRows: InvitedMemberRow[];
   readonly assignedGroups: string[];
   readonly createdIdentities: string[];
@@ -81,6 +94,7 @@ function fake(options: FakeOptions = {}): Fake {
   const createdIdentities: string[] = [];
   const deletedIdentities: string[] = [];
   const sentEmails: { email: string; appUrl: string }[] = [];
+  const positionsRead: string[] = [];
   let requestsInWindow = options.previousRequests ?? 0;
   const invitee =
     options.invitee === undefined
@@ -97,6 +111,12 @@ function fake(options: FakeOptions = {}): Fake {
     },
     groups: {
       findClubGroups: async () => CLUB_GROUPS,
+    },
+    positions: {
+      findClubPositions: async (clubId) => {
+        positionsRead.push(clubId);
+        return options.positions ?? [...SEEDED_POSITIONS, ARCHIVED_POSITION];
+      },
     },
     groupMembers: {
       findGroupMembers: async () => ({ kind: "found", members: [] }),
@@ -163,6 +183,7 @@ function fake(options: FakeOptions = {}): Fake {
 
   return {
     gateways,
+    positionsRead,
     insertedRows,
     assignedGroups,
     createdIdentities,
@@ -221,7 +242,7 @@ describe("alta de un miembro", () => {
         full_name: "Nerea Silva",
         email: "nerea.silva@example.com",
         country: "AU",
-        position: "Forward",
+        position_id: FORWARD.id,
         experience_level: "Intermediate",
         gender: "female",
         auf_number: "AUF-2210",
@@ -286,7 +307,7 @@ describe("alta de un miembro", () => {
       ...VALID_SUBMISSION,
       email: "nerea-at-example",
       country: "Atlantis",
-      position: "Striker",
+      positionId: "Striker",
       experienceLevel: "Expert",
       gender: "other",
       aufExpiry: "2027-02-30",
@@ -295,11 +316,46 @@ describe("alta de un miembro", () => {
     expect(codes).toEqual([
       "email:email_malformed",
       "country:country_unknown",
-      "position:position_unknown",
+      "positionId:position_unknown",
       "experienceLevel:experience_level_unknown",
       "gender:gender_unknown",
       "aufExpiry:auf_expiry_not_a_date",
     ]);
+  });
+
+  it("reads the positions of the Admin's club", async () => {
+    const { gateways, positionsRead } = fake();
+
+    await create(gateways);
+
+    expect(positionsRead).toEqual([CLUB_ID]);
+  });
+
+  it.each([
+    ["an archived position", ARCHIVED_POSITION.id],
+    ["another club's position", OTHER_CLUBS_POSITION_ID],
+    ["no position while the club offers some", ""],
+  ])("rejects %s before creating anything", async (_kind, positionId) => {
+    const { gateways, createdIdentities } = fake();
+
+    const error = await create(gateways, {
+      ...VALID_SUBMISSION,
+      positionId,
+    }).catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(NewMemberValidationError);
+    expect((error as NewMemberValidationError).issues).toEqual([
+      { field: "positionId", code: "position_unknown" },
+    ]);
+    expect(createdIdentities).toEqual([]);
+  });
+
+  it("creates the member without a position when the club archived them all", async () => {
+    const { gateways, insertedRows } = fake({ positions: [ARCHIVED_POSITION] });
+
+    await create(gateways, { ...VALID_SUBMISSION, positionId: "" });
+
+    expect(insertedRows[0]?.position_id).toBeNull();
   });
 
   it("rejects empty required fields", async () => {

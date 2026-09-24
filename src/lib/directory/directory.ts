@@ -3,9 +3,9 @@ import type { AccountStatus } from "@/lib/auth/account-status";
 import type { RoleRequestGateways } from "@/lib/auth/role-request";
 import { ROLES, type Role, hasCapability } from "@/lib/auth/roles";
 import {
-  type ClubPosition,
   type ClubPositions,
   type ClubPositionsGateway,
+  type NamedPosition,
   findClubPosition,
   positionRank,
 } from "@/lib/club/club-positions";
@@ -79,7 +79,7 @@ export type DirectoryMemberRecord = {
 
 /** La posición tal como la pinta el directorio: sus nombres, y la pantalla
  * elige el del idioma en que se lee (#299). */
-export type DirectoryPosition = Pick<ClubPosition, "id" | "names">;
+export type DirectoryPosition = NamedPosition;
 
 /** Lo que el directorio enseña de un socio a cualquiera del club (FR-015). Ni
  * fecha de nacimiento, ni datos del tutor, ni tipo de membresía, ni correo: el
@@ -360,9 +360,7 @@ export async function listDirectory(
       }
     : {
         kind: "member",
-        members: listed.map((record) =>
-          toDirectoryMember(record, context),
-        ),
+        members: listed.map((record) => toDirectoryMember(record, context)),
       };
 }
 
