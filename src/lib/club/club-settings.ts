@@ -64,7 +64,6 @@ export const CLUB_SETTINGS_ISSUE_CODES = [
   "initials_too_long",
   "accent_color_invalid",
   "accent_color_no_readable_text",
-  "accent_color_unreadable_on_background",
 ] as const;
 
 export type ClubSettingsIssueCode = (typeof CLUB_SETTINGS_ISSUE_CODES)[number];
@@ -140,7 +139,6 @@ const ACCENT_ISSUE_OF_REJECTION: Readonly<
 > = {
   not_hex: "accent_color_invalid",
   no_readable_text: "accent_color_no_readable_text",
-  unreadable_on_background: "accent_color_unreadable_on_background",
 };
 
 /** El nombre sin los espacios de los extremos, unas iniciales vacías como

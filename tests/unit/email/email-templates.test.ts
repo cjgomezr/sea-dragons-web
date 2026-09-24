@@ -662,7 +662,32 @@ describe("la marca en los correos", () => {
     },
   );
 
-  it.each(["no-es-un-color", "#FFFF00"])(
+  // #341: el amarillo del prototipo rellena el botón, pero sobre la tarjeta
+  // blanca el enlace escrito lleva su variante oscurecida.
+  it("con un acento claro, el botón lleva el color tal cual y el enlace escrito uno que se lee", () => {
+    const lightAccent = "#FFC94A";
+    const email = renderAccountConfirmationEmail({
+      confirmUrl: CONFIRM_URL,
+      linkLifetimeMinutes: LIFETIME_MINUTES,
+      locale: "es",
+      brand: { ...STORED_BRAND, accentColor: lightAccent },
+    });
+    const writtenLink = linksTo(parseHtml(email.html), CONFIRM_URL).find(
+      (link) => flatten(link.textContent) === CONFIRM_URL,
+    );
+    const linkColor = writtenLink && inlineColor(writtenLink, "color");
+
+    expect(inlineColor(buttonCellOf(email), "background-color")).toBe(
+      lightAccent,
+    );
+    expect(linkColor).toBeDefined();
+    expect(linkColor).not.toBe(lightAccent);
+    expect(contrastRatio(linkColor ?? "", "#FFFFFF")).toBeGreaterThanOrEqual(
+      WCAG_AA_NORMAL_TEXT,
+    );
+  });
+
+  it.each(["no-es-un-color", "#7A7A7A"])(
     "con un acento que no se puede pintar (%s), usa el acento por defecto",
     (accentColor) => {
       const email = renderAccountConfirmationEmail({

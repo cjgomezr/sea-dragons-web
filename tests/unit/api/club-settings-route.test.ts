@@ -222,6 +222,19 @@ describe("endpoint de la configuración: PATCH", () => {
     expect(invalidateClubBrand).toHaveBeenCalledTimes(1);
   });
 
+  // #341: el enlace usa una variante oscurecida, así que un acento claro vale.
+  it("guarda un acento claro como el amarillo del prototipo", async () => {
+    const response = await patchSettings({
+      ...VALID_BODY,
+      accentColor: "#FFC94A",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { accentColor: "#ffc94a" },
+    });
+  });
+
   it("acepta quitar las iniciales con null", async () => {
     const response = await patchSettings({ ...VALID_BODY, initials: null });
 
@@ -270,11 +283,6 @@ describe("endpoint de la configuración: PATCH", () => {
       "un acento con el que ningún texto llega a AA",
       { accentColor: "#7a7a7a" },
       "accent_color_no_readable_text",
-    ],
-    [
-      "un acento ilegible sobre el fondo",
-      { accentColor: "#ffd700" },
-      "accent_color_unreadable_on_background",
     ],
   ])(
     "responde 400 a %s, con el campo en el motivo",

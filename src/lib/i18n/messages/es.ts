@@ -750,8 +750,6 @@ export const spanishMessages: MessageCatalog = {
     "El color de acento tiene que ser un código hexadecimal, como #1C6EA4.",
   "clubSettings.issue.accentNoReadableText":
     "Ningún color de texto llega al contraste mínimo (4,5:1) sobre este acento. Elige uno más claro o más oscuro.",
-  "clubSettings.issue.accentUnreadableOnBackground":
-    "Este acento no se lee como enlace sobre el fondo claro (necesita 4,5:1). Elige uno más oscuro.",
   "clubSettings.error.changed":
     "Otro Admin cambió la configuración mientras la editabas. Carga la más reciente y vuelve a hacer tu cambio.",
   "clubSettings.error.signInRequired":

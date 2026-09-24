@@ -13,6 +13,10 @@
   color-scheme: light;
 
   --color-accent: #1c6ea4;
+  /* El acento cuando es texto: enlaces y contorno de foco. Con el acento de
+     hoy es el mismo color; con uno claro de un club (#341), `accent-color.ts`
+     lo oscurece hasta que se lee sobre el panel y el fondo. */
+  --color-accent-text: #1c6ea4;
   --color-background: #eff3f7;
   --color-panel: #ffffff;
   --color-text: #1c3245;
@@ -75,6 +79,7 @@
     color-scheme: dark;
 
     --color-accent: #33a1e0;
+    --color-accent-text: #33a1e0;
     --color-background: #0c1a26;
     --color-panel: #13283a;
     --color-text: #e8f0f7;
@@ -96,6 +101,7 @@
   color-scheme: dark;
 
   --color-accent: #33a1e0;
+  --color-accent-text: #33a1e0;
   --color-background: #0c1a26;
   --color-panel: #13283a;
   --color-text: #e8f0f7;
@@ -134,7 +140,7 @@ h6 {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-accent-text);
   outline-offset: 2px;
 }
 
@@ -464,7 +470,7 @@ h6 {
   font-family: inherit;
   font-size: 14px;
   font-weight: 700;
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   background: transparent;
   border: none;
   border-radius: var(--radius);
@@ -642,7 +648,7 @@ button.notification-item-content:hover {
 }
 
 .account-menu-item:hover:not(:disabled) {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .account-menu-item:disabled {
@@ -820,7 +826,7 @@ button.notification-item-content:hover {
 }
 
 .card a {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* ---------------------------------------------------------------------------
@@ -1155,9 +1161,9 @@ button.notification-item-content:hover {
   font-family: inherit;
   font-size: 16px;
   font-weight: 700;
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   background: transparent;
-  border: 1px solid var(--color-accent);
+  border: 1px solid var(--color-accent-text);
   border-radius: var(--radius);
   cursor: pointer;
 }
@@ -1208,7 +1214,7 @@ button.notification-item-content:hover {
 /* Sin el :not, esta regla pesa más que .auth-submit y pinta el texto de un
    .auth-submit-link del mismo color que su relleno. */
 .auth-form a:not(.auth-submit) {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* "Volver al registro" (#132) abre la columna por la izquierda, que es por
@@ -1218,7 +1224,7 @@ button.notification-item-content:hover {
   align-items: center;
   align-self: flex-start;
   min-height: var(--touch-target-min);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* "¿Olvidaste tu contraseña?" va bajo el campo y alineado a su derecha, como
@@ -1716,7 +1722,7 @@ button.notification-item-content:hover {
 }
 
 .groups-open:hover:not(:disabled) {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .groups-open:disabled {
@@ -1918,7 +1924,7 @@ button.notification-item-content:hover {
 }
 
 .directory-role:has(input:focus-visible) {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-accent-text);
   outline-offset: 2px;
 }
 
@@ -2010,7 +2016,7 @@ button.notification-item-content:hover {
 }
 
 .directory-sort:hover {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* Ancho fijo para que la flecha aparezca sin mover el título de la columna. */
@@ -2342,7 +2348,7 @@ button.notification-item-content:hover {
 }
 
 .directory-record-link:hover {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* La ficha reservada al Admin (#242). Sin mockup: sigue el aspecto del
@@ -2359,7 +2365,7 @@ button.notification-item-content:hover {
   align-items: center;
   align-self: flex-start;
   min-height: var(--touch-target-min);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .member-record-header {
