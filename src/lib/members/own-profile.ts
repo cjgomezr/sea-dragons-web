@@ -330,6 +330,10 @@ function planAufChange(
   return { kind: "propose", ...proposal };
 }
 
+function presentIds(ids: readonly (string | null)[]): readonly string[] {
+  return ids.filter((id) => id !== null);
+}
+
 async function findStoredProfile(
   gateways: OwnProfileGateways,
   userId: string,
@@ -346,7 +350,10 @@ export async function readOwnProfile(
   userId: string,
 ): Promise<OwnProfileScreen> {
   const { profile, clubId } = await findStoredProfile(gateways, userId);
-  const positions = await gateways.positions.findClubPositions(clubId);
+  const positions = await gateways.positions.findClubPositions(
+    clubId,
+    presentIds([profile.positionId]),
+  );
   return {
     profile,
     positionOptions: offeredPositions(positions, profile.positionId),
@@ -361,7 +368,10 @@ export async function updateOwnProfile(
   },
 ): Promise<OwnProfile> {
   const stored = await findStoredProfile(gateways, request.userId);
-  const positions = await gateways.positions.findClubPositions(stored.clubId);
+  const positions = await gateways.positions.findClubPositions(
+    stored.clubId,
+    presentIds([stored.profile.positionId, request.submission.positionId]),
+  );
   const fields = toValidFields(request.submission, {
     positions,
     currentId: stored.profile.positionId,

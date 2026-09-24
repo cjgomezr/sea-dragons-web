@@ -475,7 +475,11 @@ export async function createInvitedMember(
 ): Promise<CreatedMember> {
   // Primero quién llama: las posiciones que valen son las de su club.
   const caller = await findAdministrator(gateways, request.callerId);
-  const positions = await gateways.positions.findClubPositions(caller.clubId);
+  const { positionId } = request.submission;
+  const positions = await gateways.positions.findClubPositions(
+    caller.clubId,
+    positionId === "" ? [] : [positionId],
+  );
   const member = validateNewMember(request.submission, {
     todayInClub: request.todayInClub,
     positionChoices: offeredPositions(positions, null),

@@ -97,9 +97,8 @@ describe("GET /api/v1/club/positions", () => {
   it("responde 403 a una identidad sin fila de miembro", async () => {
     mockCaller(CALLER_ID);
     // La copia que cargará la ruta tras `resetModules`, o `instanceof` falla.
-    const { MemberNotFoundError } = await import(
-      "@/lib/auth/account-activation"
-    );
+    const { MemberNotFoundError } =
+      await import("@/lib/auth/account-activation");
     listPositionChoices.mockRejectedValue(new MemberNotFoundError(CALLER_ID));
 
     const response = await getPositions();

@@ -277,6 +277,16 @@ function directoryPositionOf(
   return { id, names };
 }
 
+/** Las posiciones que tienen los socios, sin repetir y en un orden fijo. */
+function referencedPositionIds(
+  records: readonly DirectoryMemberRecord[],
+): readonly string[] {
+  const ids = records.flatMap((record) =>
+    record.positionId === null ? [] : [record.positionId],
+  );
+  return [...new Set(ids)].sort();
+}
+
 /** Lo que se lee para armar cada fila, aparte de la fila misma. */
 type ListingContext = {
   readonly positions: ClubPositions;
@@ -337,10 +347,11 @@ export async function listDirectory(
     throw new DirectoryForbiddenError();
   }
 
-  const [records, positions] = await Promise.all([
-    gateways.directory.findDirectoryMembers(caller.clubId),
-    gateways.positions.findClubPositions(caller.clubId),
-  ]);
+  const records = await gateways.directory.findDirectoryMembers(caller.clubId);
+  const positions = await gateways.positions.findClubPositions(
+    caller.clubId,
+    referencedPositionIds(records),
+  );
   const listed = records
     .filter((record) => isVisible(record, request.query))
     .sort((first, second) =>

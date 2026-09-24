@@ -88,6 +88,7 @@ export async function fetchClubPositions(
 export function createClubPositionsGateway(
   client: SupabaseClient,
 ): ClubPositionsGateway {
+  // Sin caché no hay nada viejo: se lee siempre, y las pedidas sobran.
   return { findClubPositions: (clubId) => fetchClubPositions(client, clubId) };
 }
 

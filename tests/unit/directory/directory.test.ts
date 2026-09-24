@@ -46,6 +46,7 @@ const DEFENDER: ClubPosition = {
 };
 const CLUB_POSITIONS = [FORWARD, GOALKEEPER, DEFENDER] as const;
 const clubsWhosePositionsWereRead: string[] = [];
+const positionsReferenced: (readonly string[])[] = [];
 
 const ANA: DirectoryMemberRecord = {
   userId: "aaaaaaaa-0000-4000-8000-00000000000a",
@@ -119,6 +120,7 @@ function gateways(
   clubsRead.length = 0;
   photosSigned.length = 0;
   clubsWhosePositionsWereRead.length = 0;
+  positionsReferenced.length = 0;
   return {
     members: {
       findRoleRequestMember: async () =>
@@ -137,8 +139,9 @@ function gateways(
       },
     },
     positions: {
-      findClubPositions: async (clubId) => {
+      findClubPositions: async (clubId, referencedIds) => {
         clubsWhosePositionsWereRead.push(clubId);
+        positionsReferenced.push(referencedIds);
         return CLUB_POSITIONS;
       },
     },
@@ -262,6 +265,14 @@ describe("directorio", () => {
     await listNames();
 
     expect(clubsWhosePositionsWereRead).toEqual([CLUB_ID]);
+  });
+
+  it("pide al catálogo las posiciones de los socios que tiene que pintar", async () => {
+    await listNames();
+
+    expect(positionsReferenced).toEqual([
+      [GOALKEEPER.id, DEFENDER.id, FORWARD.id].sort(),
+    ]);
   });
 
   it.each(["Player", "Admin"] as const)(

@@ -81,6 +81,7 @@ type Fake = {
   readonly gateways: MemberInvitationGateways;
   /** Los clubes de los que se leyeron las posiciones. */
   readonly positionsRead: string[];
+  readonly positionsReferenced: (readonly string[])[];
   readonly insertedRows: InvitedMemberRow[];
   readonly assignedGroups: string[];
   readonly createdIdentities: string[];
@@ -95,6 +96,7 @@ function fake(options: FakeOptions = {}): Fake {
   const deletedIdentities: string[] = [];
   const sentEmails: { email: string; appUrl: string }[] = [];
   const positionsRead: string[] = [];
+  const positionsReferenced: (readonly string[])[] = [];
   let requestsInWindow = options.previousRequests ?? 0;
   const invitee =
     options.invitee === undefined
@@ -113,8 +115,9 @@ function fake(options: FakeOptions = {}): Fake {
       findClubGroups: async () => CLUB_GROUPS,
     },
     positions: {
-      findClubPositions: async (clubId) => {
+      findClubPositions: async (clubId, referencedIds) => {
         positionsRead.push(clubId);
+        positionsReferenced.push(referencedIds);
         return options.positions ?? [...SEEDED_POSITIONS, ARCHIVED_POSITION];
       },
     },
@@ -184,6 +187,7 @@ function fake(options: FakeOptions = {}): Fake {
   return {
     gateways,
     positionsRead,
+    positionsReferenced,
     insertedRows,
     assignedGroups,
     createdIdentities,
@@ -329,6 +333,14 @@ describe("alta de un miembro", () => {
     await create(gateways);
 
     expect(positionsRead).toEqual([CLUB_ID]);
+  });
+
+  it("asks the catalog for the chosen position", async () => {
+    const { gateways, positionsReferenced } = fake();
+
+    await create(gateways);
+
+    expect(positionsReferenced).toEqual([[FORWARD.id]]);
   });
 
   it.each([

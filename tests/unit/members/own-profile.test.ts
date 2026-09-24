@@ -80,6 +80,8 @@ type FakeProfiles = {
   readonly writes: ProfileWrite[];
   /** Los clubes de los que se leyeron las posiciones. */
   readonly positionsRead: string[];
+  /** Las posiciones que cada lectura pidió que el catálogo conociera. */
+  readonly positionsReferenced: (readonly string[])[];
 };
 
 /** El AUF que queda después de un cambio, como lo dejaría la base. */
@@ -98,13 +100,16 @@ function fakeProfiles(
 ): FakeProfiles {
   const writes: ProfileWrite[] = [];
   const positionsRead: string[] = [];
+  const positionsReferenced: (readonly string[])[] = [];
   return {
     writes,
     positionsRead,
+    positionsReferenced,
     gateways: {
       positions: {
-        findClubPositions: async (clubId) => {
+        findClubPositions: async (clubId, referencedIds) => {
           positionsRead.push(clubId);
+          positionsReferenced.push(referencedIds);
           return options.positions ?? CLUB_POSITIONS;
         },
       },
@@ -349,6 +354,22 @@ describe("perfil propio: las posiciones del club (#299)", () => {
     });
 
     expect(positionsRead).toEqual([CLUB_ID]);
+  });
+
+  it("pide al catálogo la posición que tiene y la que elige", async () => {
+    const { positionsReferenced } = await submitPosition(GOALKEEPER.id, {
+      current: DEFENDER.id,
+    });
+
+    expect(positionsReferenced).toEqual([[DEFENDER.id, GOALKEEPER.id]]);
+  });
+
+  it("al leer, pide al catálogo la posición que tiene", async () => {
+    const fake = fakeProfiles();
+
+    await readOwnProfile(fake.gateways, USER_ID);
+
+    expect(fake.positionsReferenced).toEqual([[DEFENDER.id]]);
   });
 
   it("guarda una posición activa del club", async () => {

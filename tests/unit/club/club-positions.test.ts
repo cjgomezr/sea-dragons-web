@@ -192,8 +192,8 @@ describe("la caché de las posiciones", () => {
     const fetchPositions = vi.fn(async () => CLUB_POSITIONS);
     const { reader } = createReader(fetchPositions);
 
-    await reader.findClubPositions(CLUB_ID);
-    const positions = await reader.findClubPositions(CLUB_ID);
+    await reader.findClubPositions(CLUB_ID, []);
+    const positions = await reader.findClubPositions(CLUB_ID, []);
 
     expect(positions).toEqual(CLUB_POSITIONS);
     expect(fetchPositions).toHaveBeenCalledTimes(1);
@@ -203,9 +203,9 @@ describe("la caché de las posiciones", () => {
     const fetchPositions = vi.fn(async () => CLUB_POSITIONS);
     const { reader, advanceClock } = createReader(fetchPositions);
 
-    await reader.findClubPositions(CLUB_ID);
+    await reader.findClubPositions(CLUB_ID, []);
     advanceClock(TIME_TO_LIVE_MS);
-    await reader.findClubPositions(CLUB_ID);
+    await reader.findClubPositions(CLUB_ID, []);
 
     expect(fetchPositions).toHaveBeenCalledTimes(2);
   });
@@ -216,10 +216,39 @@ describe("la caché de las posiciones", () => {
     );
     const { reader } = createReader(fetchPositions);
 
-    await reader.findClubPositions(CLUB_ID);
+    await reader.findClubPositions(CLUB_ID, []);
 
-    expect(await reader.findClubPositions(OTHER_CLUB_ID)).toEqual([FORWARD]);
+    expect(await reader.findClubPositions(OTHER_CLUB_ID, [])).toEqual([
+      FORWARD,
+    ]);
     expect(fetchPositions).toHaveBeenCalledWith(OTHER_CLUB_ID);
+  });
+
+  it("vuelve a leer la base cuando le piden una posición que no tenía", async () => {
+    // Un Admin la creó y se la dio a alguien después de que esta instancia
+    // del servidor guardara el catálogo: la caché está vieja, no la fila.
+    const created: ClubPosition = { ...FORWARD, id: "created-after-caching" };
+    const fetchPositions = vi
+      .fn<(clubId: string) => Promise<ClubPositions>>()
+      .mockResolvedValueOnce(CLUB_POSITIONS)
+      .mockResolvedValueOnce([...CLUB_POSITIONS, created]);
+    const { reader } = createReader(fetchPositions);
+    await reader.findClubPositions(CLUB_ID, []);
+
+    const positions = await reader.findClubPositions(CLUB_ID, [created.id]);
+
+    expect(positions).toContainEqual(created);
+    expect(fetchPositions).toHaveBeenCalledTimes(2);
+  });
+
+  it("no vuelve a leer la base si ya tiene las posiciones que le piden", async () => {
+    const fetchPositions = vi.fn(async () => CLUB_POSITIONS);
+    const { reader } = createReader(fetchPositions);
+    await reader.findClubPositions(CLUB_ID, []);
+
+    await reader.findClubPositions(CLUB_ID, [UTILITY.id, FORWARD.id]);
+
+    expect(fetchPositions).toHaveBeenCalledTimes(1);
   });
 
   it("propaga un fallo y no lo guarda: la siguiente lectura reintenta", async () => {
@@ -229,9 +258,11 @@ describe("la caché de las posiciones", () => {
       .mockResolvedValueOnce(CLUB_POSITIONS);
     const { reader } = createReader(fetchPositions);
 
-    await expect(reader.findClubPositions(CLUB_ID)).rejects.toThrow("sin base");
+    await expect(reader.findClubPositions(CLUB_ID, [])).rejects.toThrow(
+      "sin base",
+    );
 
-    expect(await reader.findClubPositions(CLUB_ID)).toEqual(CLUB_POSITIONS);
+    expect(await reader.findClubPositions(CLUB_ID, [])).toEqual(CLUB_POSITIONS);
   });
 });
 

@@ -31,7 +31,13 @@ export type NamedPosition = Pick<ClubPosition, "id" | "names">;
 export type ClubPositions = readonly ClubPosition[];
 
 export type ClubPositionsGateway = {
-  findClubPositions(clubId: string): Promise<ClubPositions>;
+  /** `referencedIds` son las posiciones que quien llama necesita resolver,
+   * como las que tienen los socios que va a pintar. Una caché que no las
+   * conoce está vieja y vuelve a leer. */
+  findClubPositions(
+    clubId: string,
+    referencedIds: readonly string[],
+  ): Promise<ClubPositions>;
 };
 
 /** En el idioma de la pantalla, o en el otro si falta (D2 del PRD). */
@@ -106,12 +112,25 @@ type CacheEntry = {
   readonly expiresAtMs: number;
 };
 
+function includesAll(
+  positions: ClubPositions,
+  referencedIds: readonly string[],
+): boolean {
+  return referencedIds.every((id) =>
+    positions.some((position) => position.id === id),
+  );
+}
+
 /**
  * La misma caché que la marca (`club-brand.ts`): una consulta por caducidad y
  * no por visita, guardando la promesa para que las visitas simultáneas la
  * compartan. A diferencia de la marca no hay respaldo: sin catálogo no se
  * puede validar una posición, así que el fallo sube, y no se guarda para que
  * la siguiente lectura reintente.
+ *
+ * Una posición creada en otra instancia del servidor no invalida ésta. Si la
+ * piden y no está, se vuelve a leer en vez de esperar a que caduque: si no, el
+ * directorio no sabría pintar a quien ya la tiene.
  */
 export function createCachedClubPositionsReader({
   fetchPositions,
@@ -133,15 +152,22 @@ export function createCachedClubPositionsReader({
     return entry;
   }
 
+  function refresh(clubId: string): Promise<ClubPositions> {
+    const entry = startFetch(clubId);
+    cache.set(clubId, entry);
+    return entry.positions;
+  }
+
   return {
-    findClubPositions(clubId) {
+    async findClubPositions(clubId, referencedIds) {
       const cached = cache.get(clubId);
-      if (cached !== undefined && now() < cached.expiresAtMs) {
-        return cached.positions;
+      if (cached === undefined || now() >= cached.expiresAtMs) {
+        return refresh(clubId);
       }
-      const entry = startFetch(clubId);
-      cache.set(clubId, entry);
-      return entry.positions;
+      const positions = await cached.positions;
+      return includesAll(positions, referencedIds)
+        ? positions
+        : refresh(clubId);
     },
   };
 }
@@ -162,7 +188,10 @@ export async function listPositionChoices(
   if (caller === null) {
     throw new MemberNotFoundError(callerId);
   }
-  const positions = await gateways.positions.findClubPositions(caller.clubId);
+  const positions = await gateways.positions.findClubPositions(
+    caller.clubId,
+    [],
+  );
   return offeredPositions(positions, null).map(({ id, names }) => ({
     id,
     names,
