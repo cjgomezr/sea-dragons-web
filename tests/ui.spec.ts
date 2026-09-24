@@ -2327,6 +2327,17 @@ const ACCOUNT_STATES: readonly AccountState[] = [
     storageState: roleRequestStorageStatePath("perfil-auf-verificado"),
     beforeVisit: chooseSpanish,
   },
+  // Una posición que el club archivó (#299): quien la tiene la sigue viendo,
+  // marcada como retirada.
+  {
+    name: "perfil-posicion-retirada",
+    storageState: roleRequestStorageStatePath("perfil-posicion-retirada"),
+  },
+  {
+    name: "perfil-posicion-retirada-es",
+    storageState: roleRequestStorageStatePath("perfil-posicion-retirada"),
+    beforeVisit: chooseSpanish,
+  },
 ];
 
 async function expectNoAxeViolations(page: Page): Promise<void> {
@@ -2667,7 +2678,7 @@ test.describe("un socio que edita su perfil", () => {
     const newName = `Perfil Editado ${Date.now()}`;
     await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
     await page.getByLabel("Full name").fill(newName);
-    await page.getByLabel("Position").selectOption("Forward");
+    await page.getByLabel("Position").selectOption({ label: "Forward" });
     await page.getByLabel("Experience level").selectOption("Advanced");
     await page.getByLabel("Gender").selectOption("non_binary");
 
@@ -2684,7 +2695,9 @@ test.describe("un socio que edita su perfil", () => {
 
     await page.reload();
     await expect(page.getByLabel("Full name")).toHaveValue(newName);
-    await expect(page.getByLabel("Position")).toHaveValue("Forward");
+    await expect(
+      page.getByLabel("Position").locator("option:checked"),
+    ).toHaveText("Forward");
 
     const directory = await page.request.get(
       `${APP_URL}/api/v1/directory?q=${encodeURIComponent(newName)}`,
@@ -2695,7 +2708,7 @@ test.describe("un socio que edita su perfil", () => {
         members: [
           {
             fullName: newName,
-            position: "Forward",
+            position: { names: { en: "Forward", es: "Ataque" } },
             experienceLevel: "Advanced",
           },
         ],
@@ -2724,7 +2737,7 @@ test.describe("un socio que edita su perfil", () => {
         data: {
           fullName: "Intento de Admin",
           country: "AU",
-          position: null,
+          positionId: null,
           experienceLevel: null,
           gender: null,
           role: "Admin",
@@ -2762,7 +2775,7 @@ test.describe("una socia con el AUF verificado", () => {
         data: {
           fullName: "Vera Verificada",
           country: "AU",
-          position: null,
+          positionId: null,
           experienceLevel: null,
           gender: null,
           aufNumber: "AUF-OTRO",
@@ -4705,6 +4718,9 @@ type NewMemberCopy = {
   readonly email: string;
   readonly country: string;
   readonly position: string;
+  /** El nombre de Forward en ese idioma: el desplegable lleva los del club
+   * (#299), y la opción se elige por lo que dice. */
+  readonly forward: string;
   readonly experienceLevel: string;
   readonly gender: string;
   readonly aufNumber: string;
@@ -4720,6 +4736,7 @@ const ENGLISH_NEW_MEMBER: NewMemberCopy = {
   email: "Email",
   country: "Country",
   position: "Position",
+  forward: "Forward",
   experienceLevel: "Experience level",
   gender: "Gender",
   aufNumber: "AUF number",
@@ -4735,6 +4752,7 @@ const SPANISH_NEW_MEMBER: NewMemberCopy = {
   email: "Correo",
   country: "País",
   position: "Posición",
+  forward: "Ataque",
   experienceLevel: "Nivel de experiencia",
   gender: "Género",
   aufNumber: "Número de AUF",
@@ -4810,7 +4828,7 @@ async function fillNewMemberForm(
   await page.getByLabel(copy.fullName).fill(entry.fullName);
   await page.getByLabel(copy.email).fill(entry.email);
   await page.getByLabel(copy.country).selectOption("AU");
-  await page.getByLabel(copy.position).selectOption("Forward");
+  await page.getByLabel(copy.position).selectOption({ label: copy.forward });
   await page.getByLabel(copy.experienceLevel).selectOption("Intermediate");
   await page.getByLabel(copy.gender).selectOption("female");
   await page.getByLabel(copy.aufNumber).fill("AUF-2026-0243");
