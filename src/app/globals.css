@@ -57,6 +57,9 @@
   --radius: 8px;
   /* WCAG 2.5.5: minimum size for anything a thumb has to hit. */
   --touch-target-min: 44px;
+  /* La marca en la barra lateral, con el logo junto al nombre (#352). */
+  --sidebar-logo-max-width: calc(var(--space-8) * 2.5);
+  --sidebar-brand-name-min-width: 120px;
 
   --font-family-body:
     Archivo, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
@@ -173,10 +176,11 @@ h6 {
   gap: var(--space-4);
 }
 
-/* El logo va encima del nombre (#295): al lado, uno apaisado dejaba el nombre
-   en unas pocas letras, tanto en la barra lateral de 240px como junto a la
-   campana y el menú a 375px. Sin logo el contenedor sólo lleva el nombre, y se
-   comporta como él: puede encogerse para que recorte. */
+/* En el móvil el logo va encima del nombre (#295): al lado, uno apaisado
+   dejaba el nombre en unas pocas letras junto a la campana y el menú a 375px.
+   En la barra lateral va en la misma fila (#352, más abajo). Sin logo el
+   contenedor sólo lleva el nombre, y se comporta como él: puede encogerse
+   para que recorte. */
 .app-brand-lockup {
   display: flex;
   flex-direction: column;
@@ -197,9 +201,9 @@ h6 {
   object-fit: contain;
 }
 
-/* El nombre sale de la base y admite hasta 60 caracteres (#292): en una sola
-   línea, recortado con puntos suspensivos, para que no parta la cabecera en dos
-   filas ni empuje los controles fuera de la pantalla a 360px. */
+/* El nombre sale de la base y admite hasta 60 caracteres (#292). En el móvil
+   va en una sola línea, recortado con puntos suspensivos, para que no parta la
+   cabecera en dos filas ni empuje los controles fuera de la pantalla a 360px. */
 .app-brand {
   min-width: 0;
   max-width: 100%;
@@ -785,6 +789,34 @@ button.notification-item-content:hover {
   .app-sidebar-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  /* El logo y el nombre en una fila, como en el mockup del panel (#352). */
+  .app-brand-lockup {
+    flex-direction: row;
+    align-items: center;
+    align-self: stretch;
+  }
+
+  /* El logo llega como mucho a 80px, 2,5 veces su alto, y nunca quita al
+     nombre sus 120px: la barra mide 240px pero su borde deja 207 de
+     contenido, así que el tope real es el menor de los dos. */
+  .app-brand-lockup .club-logo {
+    max-width: min(
+      var(--sidebar-logo-max-width),
+      100% - var(--space-2) - var(--sidebar-brand-name-min-width)
+    );
+  }
+
+  /* Junto al logo, una línea recortada dejaba el nombre en pocas letras: se
+     parte entre palabras hasta en dos líneas, y sólo más allá se recorta. */
+  .app-brand {
+    display: -webkit-box;
+    flex: 1 1 0;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
   }
 
   .app-nav {

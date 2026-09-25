@@ -9,7 +9,6 @@ import { CLUB_SETTINGS_PATH } from "@/lib/auth/routes";
 import { isAllowedForRole } from "@/lib/auth/session-boundary";
 import type { ClubBrand } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
-import { createTranslator } from "@/lib/i18n/translator";
 
 export function AppShell({
   locale,
@@ -28,18 +27,13 @@ export function AppShell({
     <div className="app-shell">
       <aside className="app-sidebar">
         <div className="app-sidebar-header">
-          {/* Un nombre largo se recorta con puntos suspensivos: el título lo
-              deja leer entero, y el texto sigue completo para un lector de
-              pantalla. */}
+          {/* Un nombre largo se recorta: el título lo deja leer entero, y el
+              texto sigue completo para un lector de pantalla. */}
           <div className="app-brand-lockup">
-            {/* Sin logo, la cabecera sigue siendo sólo el nombre (#295). */}
-            <ClubBrandMark
-              logoUrl={brand.logoUrl}
-              logoAlt={createTranslator(locale)("club.logoAlt", {
-                club: brand.name,
-              })}
-              fallback={null}
-            />
+            {/* Sin logo, la cabecera sigue siendo sólo el nombre (#295). El
+                logo va sin texto alternativo porque el nombre ya está al lado:
+                con él, un lector de pantalla leería el club dos veces (#352). */}
+            <ClubBrandMark logoUrl={brand.logoUrl} logoAlt="" fallback={null} />
             <span className="app-brand" title={brand.name}>
               {brand.name}
             </span>
