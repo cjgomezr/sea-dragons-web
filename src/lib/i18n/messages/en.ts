@@ -727,7 +727,8 @@ export const englishMessages = {
   "clubSettings.accent.label": "Accent colour",
   "clubSettings.accent.hint":
     "A hex code such as #1C6EA4. Paste it from your brand guide or pick it on screen.",
-  "clubSettings.accent.picker": "Pick the accent colour on screen (now {color})",
+  "clubSettings.accent.picker":
+    "Pick the accent colour on screen (now {color})",
   "clubSettings.accent.previewText": "Sample text",
   "clubSettings.accent.previewLink": "Sample link",
   "clubSettings.logo.label": "Logo",
