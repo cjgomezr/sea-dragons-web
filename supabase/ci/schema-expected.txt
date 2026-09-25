@@ -62,6 +62,27 @@ columna members.position tipo=text null=YES default=-
 columna members.position_id tipo=uuid null=YES default=-
 columna members.role tipo=text null=NO default='Player'::text
 columna members.user_id tipo=uuid null=NO default=-
+columna news_post_attachments.club_id tipo=uuid null=NO default=-
+columna news_post_attachments.content_type tipo=text null=NO default=-
+columna news_post_attachments.created_at tipo=timestamp with time zone null=NO default=now()
+columna news_post_attachments.file_name tipo=text null=NO default=-
+columna news_post_attachments.id tipo=uuid null=NO default=gen_random_uuid()
+columna news_post_attachments.post_id tipo=uuid null=NO default=-
+columna news_post_attachments.size_bytes tipo=bigint null=NO default=-
+columna news_post_attachments.storage_path tipo=text null=NO default=-
+columna news_post_groups.club_id tipo=uuid null=NO default=-
+columna news_post_groups.group_id tipo=uuid null=NO default=-
+columna news_post_groups.post_id tipo=uuid null=NO default=-
+columna news_posts.audience tipo=text null=NO default=-
+columna news_posts.author_id tipo=uuid null=NO default=-
+columna news_posts.body tipo=text null=NO default=-
+columna news_posts.category tipo=text null=NO default=-
+columna news_posts.club_id tipo=uuid null=NO default=-
+columna news_posts.edited_at tipo=timestamp with time zone null=YES default=-
+columna news_posts.id tipo=uuid null=NO default=gen_random_uuid()
+columna news_posts.published_at tipo=timestamp with time zone null=NO default=now()
+columna news_posts.status tipo=text null=NO default='published'::text
+columna news_posts.title tipo=text null=NO default=-
 columna notifications.club_id tipo=uuid null=NO default=-
 columna notifications.created_at tipo=timestamp with time zone null=NO default=now()
 columna notifications.data tipo=jsonb null=NO default='{}'::jsonb
@@ -97,6 +118,7 @@ funcion insert_club_position_names(acting_club_id uuid, target_position_id uuid,
 funcion is_member_in_groups(target_user_id uuid, group_ids uuid[])
 funcion lock_club_positions(acting_club_id uuid)
 funcion members_sync_position_id()
+funcion news_post_attachments_enforce_max()
 funcion prune_member_notifications(recipient_user_ids uuid[])
 funcion rename_club_position(acting_club_id uuid, target_position_id uuid, name_en text, name_es text)
 funcion reorder_club_positions(acting_club_id uuid, ordered_ids uuid[])
@@ -234,6 +256,51 @@ grant members service_role SELECT
 grant members service_role TRIGGER
 grant members service_role TRUNCATE
 grant members service_role UPDATE
+grant news_post_attachments authenticated SELECT
+grant news_post_attachments postgres DELETE
+grant news_post_attachments postgres INSERT
+grant news_post_attachments postgres REFERENCES
+grant news_post_attachments postgres SELECT
+grant news_post_attachments postgres TRIGGER
+grant news_post_attachments postgres TRUNCATE
+grant news_post_attachments postgres UPDATE
+grant news_post_attachments service_role DELETE
+grant news_post_attachments service_role INSERT
+grant news_post_attachments service_role REFERENCES
+grant news_post_attachments service_role SELECT
+grant news_post_attachments service_role TRIGGER
+grant news_post_attachments service_role TRUNCATE
+grant news_post_attachments service_role UPDATE
+grant news_post_groups authenticated SELECT
+grant news_post_groups postgres DELETE
+grant news_post_groups postgres INSERT
+grant news_post_groups postgres REFERENCES
+grant news_post_groups postgres SELECT
+grant news_post_groups postgres TRIGGER
+grant news_post_groups postgres TRUNCATE
+grant news_post_groups postgres UPDATE
+grant news_post_groups service_role DELETE
+grant news_post_groups service_role INSERT
+grant news_post_groups service_role REFERENCES
+grant news_post_groups service_role SELECT
+grant news_post_groups service_role TRIGGER
+grant news_post_groups service_role TRUNCATE
+grant news_post_groups service_role UPDATE
+grant news_posts authenticated SELECT
+grant news_posts postgres DELETE
+grant news_posts postgres INSERT
+grant news_posts postgres REFERENCES
+grant news_posts postgres SELECT
+grant news_posts postgres TRIGGER
+grant news_posts postgres TRUNCATE
+grant news_posts postgres UPDATE
+grant news_posts service_role DELETE
+grant news_posts service_role INSERT
+grant news_posts service_role REFERENCES
+grant news_posts service_role SELECT
+grant news_posts service_role TRIGGER
+grant news_posts service_role TRUNCATE
+grant news_posts service_role UPDATE
 grant notifications authenticated SELECT
 grant notifications postgres DELETE
 grant notifications postgres INSERT
@@ -318,6 +385,15 @@ indice members_pkey CREATE UNIQUE INDEX members_pkey ON public.members USING btr
 indice members_position_id_club_id_idx CREATE INDEX members_position_id_club_id_idx ON public.members USING btree (position_id, club_id)
 indice members_user_id_club_id_key CREATE UNIQUE INDEX members_user_id_club_id_key ON public.members USING btree (user_id, club_id)
 indice members_user_id_key CREATE UNIQUE INDEX members_user_id_key ON public.members USING btree (user_id)
+indice news_post_attachments_pkey CREATE UNIQUE INDEX news_post_attachments_pkey ON public.news_post_attachments USING btree (id)
+indice news_post_attachments_post_id_idx CREATE INDEX news_post_attachments_post_id_idx ON public.news_post_attachments USING btree (post_id)
+indice news_post_attachments_storage_path_key CREATE UNIQUE INDEX news_post_attachments_storage_path_key ON public.news_post_attachments USING btree (storage_path)
+indice news_post_groups_group_id_idx CREATE INDEX news_post_groups_group_id_idx ON public.news_post_groups USING btree (group_id)
+indice news_post_groups_pkey CREATE UNIQUE INDEX news_post_groups_pkey ON public.news_post_groups USING btree (post_id, group_id)
+indice news_posts_author_id_club_id_idx CREATE INDEX news_posts_author_id_club_id_idx ON public.news_posts USING btree (author_id, club_id)
+indice news_posts_club_id_published_at_idx CREATE INDEX news_posts_club_id_published_at_idx ON public.news_posts USING btree (club_id, published_at DESC)
+indice news_posts_id_club_id_key CREATE UNIQUE INDEX news_posts_id_club_id_key ON public.news_posts USING btree (id, club_id)
+indice news_posts_pkey CREATE UNIQUE INDEX news_posts_pkey ON public.news_posts USING btree (id)
 indice notifications_pkey CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)
 indice notifications_unread_user_id_idx CREATE INDEX notifications_unread_user_id_idx ON public.notifications USING btree (user_id) WHERE (read_at IS NULL)
 indice notifications_user_id_created_at_idx CREATE INDEX notifications_user_id_created_at_idx ON public.notifications USING btree (user_id, created_at DESC)
@@ -345,6 +421,17 @@ policy groups.groups_select_own cmd=SELECT roles={authenticated} using=(EXISTS (
    FROM group_memberships gm
   WHERE ((gm.group_id = groups.id) AND (gm.user_id = ( SELECT auth.uid() AS uid))))) check=-
 policy members.members_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
+policy news_post_attachments.news_post_attachments_select_audience cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
+   FROM news_posts p
+  WHERE (p.id = news_post_attachments.post_id))) check=-
+policy news_post_groups.news_post_groups_select_own_groups cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
+   FROM group_memberships gm
+  WHERE ((gm.group_id = news_post_groups.group_id) AND (gm.user_id = ( SELECT auth.uid() AS uid))))) check=-
+policy news_posts.news_posts_select_audience cmd=SELECT roles={authenticated} using=((status = 'published'::text) AND (EXISTS ( SELECT 1
+   FROM members m
+  WHERE ((m.user_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = news_posts.club_id) AND (m.account_status <> 'inactive'::text)))) AND ((audience = 'club'::text) OR is_member_in_groups(( SELECT auth.uid() AS uid), ARRAY( SELECT npg.group_id
+   FROM news_post_groups npg
+  WHERE (npg.post_id = news_posts.id))))) check=-
 policy notifications.notifications_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
 policy password_recovery_requests.password_recovery_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy registration_requests.registration_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
@@ -394,6 +481,24 @@ restriccion members.members_role_check CHECK ((role = ANY (ARRAY['Admin'::text, 
 restriccion members.members_user_id_club_id_key UNIQUE (user_id, club_id)
 restriccion members.members_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 restriccion members.members_user_id_key UNIQUE (user_id)
+restriccion news_post_attachments.news_post_attachments_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion news_post_attachments.news_post_attachments_pkey PRIMARY KEY (id)
+restriccion news_post_attachments.news_post_attachments_post_same_club_fkey FOREIGN KEY (post_id, club_id) REFERENCES news_posts(id, club_id) ON DELETE CASCADE
+restriccion news_post_attachments.news_post_attachments_size_bytes_check CHECK (((size_bytes >= 1) AND (size_bytes <= 10485760)))
+restriccion news_post_attachments.news_post_attachments_storage_path_key UNIQUE (storage_path)
+restriccion news_post_groups.news_post_groups_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion news_post_groups.news_post_groups_group_same_club_fkey FOREIGN KEY (group_id, club_id) REFERENCES groups(id, club_id) ON DELETE CASCADE
+restriccion news_post_groups.news_post_groups_pkey PRIMARY KEY (post_id, group_id)
+restriccion news_post_groups.news_post_groups_post_same_club_fkey FOREIGN KEY (post_id, club_id) REFERENCES news_posts(id, club_id) ON DELETE CASCADE
+restriccion news_posts.news_posts_audience_check CHECK ((audience = ANY (ARRAY['club'::text, 'groups'::text])))
+restriccion news_posts.news_posts_author_same_club_fkey FOREIGN KEY (author_id, club_id) REFERENCES members(user_id, club_id)
+restriccion news_posts.news_posts_body_not_blank CHECK ((body ~ '\S'::text))
+restriccion news_posts.news_posts_category_check CHECK ((category = ANY (ARRAY['announcement'::text, 'news'::text, 'document'::text])))
+restriccion news_posts.news_posts_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion news_posts.news_posts_id_club_id_key UNIQUE (id, club_id)
+restriccion news_posts.news_posts_pkey PRIMARY KEY (id)
+restriccion news_posts.news_posts_status_check CHECK ((status = ANY (ARRAY['published'::text, 'withdrawn'::text])))
+restriccion news_posts.news_posts_title_length CHECK (((char_length(btrim(title)) >= 1) AND (char_length(btrim(title)) <= 120)))
 restriccion notifications.notifications_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion notifications.notifications_data_is_object CHECK ((jsonb_typeof(data) = 'object'::text))
 restriccion notifications.notifications_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
@@ -421,9 +526,13 @@ tabla email_send_requests rls=t
 tabla group_memberships rls=t
 tabla groups rls=t
 tabla members rls=t
+tabla news_post_attachments rls=t
+tabla news_post_groups rls=t
+tabla news_posts rls=t
 tabla notifications rls=t
 tabla password_recovery_requests rls=t
 tabla registration_requests rls=t
 tabla role_requests rls=t
 trigger clubs_seed_default_positions CREATE TRIGGER clubs_seed_default_positions AFTER INSERT ON public.clubs FOR EACH ROW EXECUTE FUNCTION clubs_seed_default_positions()
 trigger members_sync_position_id CREATE TRIGGER members_sync_position_id BEFORE INSERT OR UPDATE OF "position" ON public.members FOR EACH ROW EXECUTE FUNCTION members_sync_position_id()
+trigger news_post_attachments_enforce_max CREATE TRIGGER news_post_attachments_enforce_max BEFORE INSERT OR UPDATE OF post_id ON public.news_post_attachments FOR EACH ROW EXECUTE FUNCTION news_post_attachments_enforce_max()
