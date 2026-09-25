@@ -32,8 +32,8 @@
      layout raíz sobrescribe los dos con los que calcula `accent-color.ts`. */
   --color-on-accent: #ffffff;
   /* El enlace de ejemplo junto al acento que el Admin elige (#346). La
-     muestra pone los de cada tema en línea; esto sólo cubre una muestra que
-     no los traiga. */
+     muestra pone los de cada tema en línea; aquí están porque toda variable
+     que la hoja lee tiene su valor en :root (tests/unit/theme-css.test.ts). */
   --club-accent-link-light: var(--color-accent-text);
   --club-accent-link-dark: var(--color-accent-text);
   --shadow: 0 1px 2px rgba(13, 36, 54, 0.06), 0 6px 18px rgba(13, 36, 54, 0.06);
