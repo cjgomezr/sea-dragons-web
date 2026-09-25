@@ -160,6 +160,20 @@ export const CLUB_SETTINGS_API_PATH = "/api/v1/club/settings";
  * regla de esa ruta en `RESTRICTED_ROUTES` también lo reserva al Admin. */
 export const CLUB_LOGO_API_PATH = `${CLUB_SETTINGS_API_PATH}/logo`;
 
+/** Las posiciones del club tal como las administra el Admin (#300): todas,
+ * archivadas incluidas. GET las lista y POST crea una. Cuelga de la
+ * configuración, así que ya es sólo del Admin; se declara igual en
+ * `RESTRICTED_ROUTES` por si esa ruta se abre algún día. No es
+ * `CLUB_POSITIONS_API_PATH`, que lee cualquier cuenta activa. */
+export const CLUB_SETTINGS_POSITIONS_API_PATH = `${CLUB_SETTINGS_API_PATH}/positions`;
+
+/** Renombrar, archivar o reactivar una posición. `[id]` es el de la
+ * posición. */
+export const CLUB_SETTINGS_POSITION_API_PATH = `${CLUB_SETTINGS_POSITIONS_API_PATH}/[id]`;
+
+/** Reordenar: PUT con la lista entera de las activas en el orden nuevo. */
+export const CLUB_SETTINGS_POSITIONS_ORDER_API_PATH = `${CLUB_SETTINGS_POSITIONS_API_PATH}/order`;
+
 /** Las posiciones que se pueden elegir en el club de quien llama (#299).
  * Las lee cualquier cuenta activa, así que no está en `RESTRICTED_ROUTES`:
  * no cuelga de la configuración del club, que es sólo del Admin. */
@@ -299,4 +313,9 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   // sólo del Admin es la de usuarios y roles.
   { path: CLUB_SETTINGS_PATH, capability: "manageUsersAndRoles" },
   { path: CLUB_SETTINGS_API_PATH, capability: "manageUsersAndRoles" },
+  // Cuelga del anterior; se declara por el mismo motivo que el cambio de rol.
+  {
+    path: CLUB_SETTINGS_POSITIONS_API_PATH,
+    capability: "manageUsersAndRoles",
+  },
 ];
