@@ -16,7 +16,11 @@ import { type MemberGroup, listMemberGroups } from "@/lib/groups/member-groups";
 import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-groups-gateway";
 import { readMetadataContext } from "@/lib/club/metadata-context";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
-import { type OwnProfile, readOwnProfile } from "@/lib/members/own-profile";
+import {
+  type OwnProfileScreen,
+  readOwnProfile,
+} from "@/lib/members/own-profile";
+import { cachedClubPositions } from "@/lib/club/supabase-club-positions";
 import {
   type ProfilePhoto,
   readProfilePhoto,
@@ -73,13 +77,17 @@ function readGroups({
 }
 
 /** También con la sesión: `members_select_own` le deja leer su propia fila,
- * y la llave de servicio sólo hace falta para escribirla. */
+ * y la llave de servicio sólo hace falta para escribirla. Las posiciones de su
+ * club salen de la caché (#299). */
 async function readProfile({
   userId,
   client,
-}: CallerSession): Promise<OwnProfile> {
+}: CallerSession): Promise<OwnProfileScreen> {
   try {
-    return await readOwnProfile(createOwnProfileGateways(client), userId);
+    return await readOwnProfile(
+      createOwnProfileGateways(client, cachedClubPositions),
+      userId,
+    );
   } catch (error) {
     // La misma carrera con la frontera que en `readAccount`.
     if (error instanceof MemberNotFoundError) {
@@ -141,7 +149,8 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
     <ProfileScreen
       locale={locale}
       account={account}
-      profile={profile}
+      profile={profile.profile}
+      positionOptions={profile.positionOptions}
       photoUrl={photo.photoUrl}
       groups={groups}
       countries={listCountryOptions(locale)}

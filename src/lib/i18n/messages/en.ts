@@ -283,6 +283,7 @@ export const englishMessages = {
   "account.profile.fullName": "Full name",
   "account.profile.country": "Country",
   "account.profile.position": "Position",
+  "account.profile.positionRetired": "{name} (retired)",
   "account.profile.experienceLevel": "Experience level",
   "account.profile.gender": "Gender",
   "account.profile.notSet": "Not set",
@@ -350,9 +351,6 @@ export const englishMessages = {
     "Your account can't change its photo right now.",
   "account.photo.error.unexpected":
     "Something went wrong and your photo hasn't changed. Try again in a moment.",
-  "position.Goalkeeper": "Goalkeeper",
-  "position.Defender": "Defender",
-  "position.Forward": "Forward",
   "level.Beginner": "Beginner",
   "level.Intermediate": "Intermediate",
   "level.Advanced": "Advanced",

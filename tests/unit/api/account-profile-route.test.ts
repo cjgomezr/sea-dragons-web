@@ -8,6 +8,8 @@ import type {
   OwnProfileFields,
   StoredOwnProfile,
 } from "@/lib/members/own-profile";
+import type { ClubPosition } from "@/lib/club/club-positions";
+import { FORWARD, SEEDED_POSITIONS } from "../helpers/seeded-positions";
 
 /**
  * El perfil propio por la API (#241, FR-084, AC-039). Cualquier cuenta activa
@@ -18,6 +20,15 @@ import type {
  */
 
 const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
+const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
+
+/** Una posición que el club archivó (#299). */
+const ARCHIVED_POSITION: ClubPosition = {
+  id: "90000000-0000-4000-8000-000000000004",
+  names: { en: "Utility", es: "Comodín" },
+  isArchived: true,
+};
+const OTHER_CLUBS_POSITION_ID = "90000000-0000-4000-8000-000000000099";
 const ORIGIN = "http://localhost:3417";
 /** Lo que hace Next con la respuesta del proxy: si es `NextResponse.next()`
  * la petición sigue hasta la ruta; si no, esa respuesta es la definitiva. */
@@ -26,7 +37,7 @@ const CONTINUE_HEADER = "x-middleware-next";
 const VALID_BODY = {
   fullName: "Nerea Ruiz Soto",
   country: "ES",
-  position: "Forward",
+  positionId: FORWARD.id,
   experienceLevel: "Advanced",
   gender: "undisclosed",
 } as const;
@@ -64,6 +75,9 @@ vi.mock("@/lib/members/supabase-own-profile-gateways", () => ({
   createSupabaseOwnProfileGateways: () => ({
     kind: "ready",
     gateways: {
+      positions: {
+        findClubPositions: async () => [...SEEDED_POSITIONS, ARCHIVED_POSITION],
+      },
       profiles: {
         findOwnProfile: (...args: unknown[]) => findOwnProfile(...args),
         updateOwnProfile: (...args: unknown[]) => updateOwnProfile(...args),
@@ -114,6 +128,7 @@ function givenStoredAuf(auf: OwnAuf): void {
   const stored: StoredOwnProfile = {
     profile: { ...VALID_BODY, auf },
     joinedOn: "2024-03-06",
+    clubId: CLUB_ID,
   };
   findOwnProfile.mockResolvedValue(stored);
 }
@@ -144,7 +159,7 @@ describe("PATCH /api/v1/account/profile", () => {
   it("acepta posición, nivel y género vaciados a propósito", async () => {
     const body = {
       ...VALID_BODY,
-      position: null,
+      positionId: null,
       experienceLevel: null,
       gender: null,
     };
@@ -184,7 +199,7 @@ describe("PATCH /api/v1/account/profile", () => {
 
   it.each([
     ["country", "XX"],
-    ["position", "Striker"],
+    ["positionId", "Striker"],
     ["experienceLevel", "expert"],
     ["gender", "other"],
   ])(
@@ -198,6 +213,25 @@ describe("PATCH /api/v1/account/profile", () => {
       expect(response.status).toBe(400);
       await expect(response.json()).resolves.toMatchObject({
         error: { code: "validation_error" },
+      });
+      expect(updateOwnProfile).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["archivada", ARCHIVED_POSITION.id],
+    ["de otro club", OTHER_CLUBS_POSITION_ID],
+  ])(
+    "responde 400 con position_unknown a una posición %s",
+    async (_kind, positionId) => {
+      const response = await patchThroughBoundary({
+        ...VALID_BODY,
+        positionId,
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "validation_error", reason: "position_unknown" },
       });
       expect(updateOwnProfile).not.toHaveBeenCalled();
     },

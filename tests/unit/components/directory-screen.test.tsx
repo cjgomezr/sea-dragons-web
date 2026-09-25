@@ -6,6 +6,12 @@ import type {
   AdminDirectoryMember,
   DirectoryMember,
 } from "@/lib/directory/directory";
+import {
+  DEFENDER,
+  FORWARD,
+  GOALKEEPER,
+  asDirectoryPosition,
+} from "../helpers/seeded-positions";
 
 /**
  * La pantalla del directorio (#239, RF-2 del PRD de E5). Buscar, filtrar y
@@ -20,7 +26,7 @@ const MARIA: DirectoryMember = {
   country: "AU",
   experienceLevel: "Advanced",
   role: "Coach",
-  position: "Forward",
+  position: asDirectoryPosition(FORWARD),
   status: "active",
   photoUrl: null,
 };
@@ -44,7 +50,7 @@ const NEREA: DirectoryMember = {
   country: "ES",
   experienceLevel: "Beginner",
   role: "Player",
-  position: "Goalkeeper",
+  position: asDirectoryPosition(GOALKEEPER),
   status: "active",
   photoUrl: null,
 };
@@ -55,7 +61,7 @@ const ZOE: AdminDirectoryMember = {
   country: "AU",
   experienceLevel: "Intermediate",
   role: "Committee",
-  position: "Defender",
+  position: asDirectoryPosition(DEFENDER),
   status: "inactive",
   photoUrl: null,
   aufNumber: null,
@@ -70,7 +76,7 @@ const VENCIDA: AdminDirectoryMember = {
   country: "AU",
   experienceLevel: "Advanced",
   role: "Admin",
-  position: "Defender",
+  position: asDirectoryPosition(DEFENDER),
   status: "active",
   photoUrl: null,
   aufNumber: "AUF-7",
@@ -554,6 +560,26 @@ describe("pantalla del directorio", () => {
       /España · Principiante/,
     );
     expect(screen.getByRole("radio", { name: "Comité" })).toBeVisible();
+  });
+
+  it("escribe en inglés la posición que no tiene nombre en español", async () => {
+    stubApi({
+      members: [
+        {
+          ...NEREA,
+          position: {
+            id: "90000000-0000-4000-8000-000000000009",
+            names: { en: "Sweeper", es: null },
+          },
+        },
+      ],
+    });
+
+    await renderScreen("es");
+
+    expect(
+      within(memberRow("Nerea Ruiz")).getByRole("cell", { name: "Sweeper" }),
+    ).toBeVisible();
   });
 });
 

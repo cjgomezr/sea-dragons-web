@@ -14,7 +14,6 @@ import {
 import {
   parseExperienceLevel,
   parseGender,
-  parsePosition,
 } from "@/lib/members/profile-fields";
 import {
   type RequestFailure,
@@ -56,26 +55,25 @@ function readSavedAuf(payload: unknown): OwnAuf | null {
 }
 
 /** La ficha que devuelve un 200, sin fiarse de su forma. Un catálogo en null
- * es un campo vacío; con un valor que no se reconoce, la respuesta no vale. */
+ * es un campo vacío; con un valor que no se reconoce, la respuesta no vale.
+ * La posición es un id del catálogo del club (#299): la valida el servidor. */
 function readSavedProfile(payload: unknown): OwnProfile | null {
   const fullName = readStringAt(payload, ["data", "fullName"]);
   const auf = readSavedAuf(payload);
   if (fullName === null || auf === null) {
     return null;
   }
-  const position = readStringAt(payload, ["data", "position"]);
   const experienceLevel = readStringAt(payload, ["data", "experienceLevel"]);
   const gender = readStringAt(payload, ["data", "gender"]);
   const profile: OwnProfile = {
     fullName,
     country: readStringAt(payload, ["data", "country"]),
-    position: parsePosition(position),
+    positionId: readStringAt(payload, ["data", "positionId"]),
     experienceLevel: parseExperienceLevel(experienceLevel),
     gender: parseGender(gender),
     auf,
   };
   const isRecognized =
-    (position === null || profile.position !== null) &&
     (experienceLevel === null || profile.experienceLevel !== null) &&
     (gender === null || profile.gender !== null);
   return isRecognized ? profile : null;

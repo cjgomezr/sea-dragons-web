@@ -256,6 +256,12 @@ export const ROLE_REQUEST_MEMBERS = {
       auf_verified_at: SEEDED_AUF_VERIFIED_AT,
     },
   },
+  /** Tiene una posición que el club archivó (#299): la sigue viendo,
+   * marcada como retirada. La posición la pone `createTestMembers`. */
+  "perfil-posicion-retirada": {
+    pendingRequest: null,
+    columns: { full_name: "Rita Retirada", country: "AU" },
+  },
 } as const;
 
 export type RoleRequestMemberName = keyof typeof ROLE_REQUEST_MEMBERS;
@@ -266,6 +272,7 @@ export const PHOTOGRAPHED_ROLE_REQUEST_MEMBERS = [
   "perfil-con-foto",
   "perfil-auf-pendiente",
   "perfil-auf-verificado",
+  "perfil-posicion-retirada",
 ] as const satisfies readonly RoleRequestMemberName[];
 
 /** Las columnas con las que nace uno de estos socios en la corrida `runId`:
@@ -280,6 +287,21 @@ export function seededRoleRequestColumns(
   }
   return { ...columns, full_name: runMemberName(name, runId) };
 }
+
+/** Los socios que nacen con la posición archivada del club (#299). */
+const MEMBERS_WITH_ARCHIVED_POSITION: readonly RoleRequestMemberName[] = [
+  "perfil-posicion-retirada",
+];
+
+/** La posición archivada del club de dev (#299). Queda ahí entre corridas:
+ * archivada no le sale a nadie que no la tenga, así que no mueve ninguna otra
+ * captura, y borrarla chocaría con otra corrida que la esté usando. */
+const ARCHIVED_E2E_POSITION = {
+  en: "Utility",
+  es: "Comodín",
+  /** Detrás de las tres sembradas, que van del 1 al 3. */
+  sortOrder: 99,
+} as const;
 
 /** Los socios que nacen con foto de perfil (#245). */
 const MEMBERS_WITH_PHOTO: readonly RoleRequestMemberName[] = [
@@ -776,6 +798,70 @@ async function deleteEmptyGroups(
   }
 }
 
+async function findArchivedE2ePosition(
+  serviceClient: SupabaseClient,
+  clubId: string,
+): Promise<string | null> {
+  const { data, error } = await serviceClient
+    .from("club_position_names")
+    .select("position_id")
+    .eq("club_id", clubId)
+    .eq("locale", "en")
+    .eq("name", ARCHIVED_E2E_POSITION.en)
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `No se pudo buscar la posición archivada: ${error.message}`,
+    );
+  }
+  return data === null ? null : (data.position_id as string);
+}
+
+/** La crea si falta. Dos corridas a la vez pueden crearla las dos: el índice
+ * único de los nombres deja pasar a una, y la otra borra la suya y usa esa. */
+async function ensureArchivedE2ePosition(
+  serviceClient: SupabaseClient,
+  clubId: string,
+): Promise<string> {
+  const existing = await findArchivedE2ePosition(serviceClient, clubId);
+  if (existing !== null) {
+    return existing;
+  }
+  const { data: position, error } = await serviceClient
+    .from("club_positions")
+    .insert({
+      club_id: clubId,
+      sort_order: ARCHIVED_E2E_POSITION.sortOrder,
+      archived_at: SEEDED_AUF_VERIFIED_AT,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    throw new Error(`No se pudo crear la posición archivada: ${error.message}`);
+  }
+  const { error: namesError } = await serviceClient
+    .from("club_position_names")
+    .insert(
+      (["en", "es"] as const).map((locale) => ({
+        position_id: position.id,
+        club_id: clubId,
+        locale,
+        name: ARCHIVED_E2E_POSITION[locale],
+      })),
+    );
+  if (namesError === null) {
+    return position.id as string;
+  }
+  await serviceClient.from("club_positions").delete().eq("id", position.id);
+  const winner = await findArchivedE2ePosition(serviceClient, clubId);
+  if (winner === null) {
+    throw new Error(
+      `No se pudo nombrar la posición archivada: ${namesError.message}`,
+    );
+  }
+  return winner;
+}
+
 /** El socio activo y uno por cada estado de completar registro, cada uno con
  * su archivo de cookies. Son cuentas distintas porque el estado vive en la
  * fila: no hay forma de cambiarlo desde el navegador a mitad de una corrida. */
@@ -807,10 +893,17 @@ async function createTestMembers(): Promise<E2eSessionState> {
     );
   }
 
+  const archivedPositionId = await ensureArchivedE2ePosition(
+    serviceClient,
+    clubId,
+  );
   for (const name of ROLE_REQUEST_MEMBER_NAMES) {
     const member = await seedMember(serviceClient, clubId, {
       account_status: "active",
       ...seededRoleRequestColumns(name, runId),
+      ...(MEMBERS_WITH_ARCHIVED_POSITION.includes(name)
+        ? { position_id: archivedPositionId }
+        : {}),
     });
     userIds.push(member.userId);
     await seedPendingRequest(serviceClient, {

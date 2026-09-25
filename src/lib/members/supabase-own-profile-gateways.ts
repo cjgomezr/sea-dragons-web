@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readRequiredText, readText } from "@/lib/auth/supabase-auth-gateways";
+import type { ClubPositionsGateway } from "@/lib/club/club-positions";
+import { cachedClubPositions } from "@/lib/club/supabase-club-positions";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type {
@@ -10,11 +12,7 @@ import type {
   OwnProfileUpdateResult,
   StoredOwnProfile,
 } from "./own-profile";
-import {
-  parseExperienceLevel,
-  parseGender,
-  parsePosition,
-} from "./profile-fields";
+import { parseExperienceLevel, parseGender } from "./profile-fields";
 
 /**
  * Adaptador entre el perfil propio (#241) y Supabase.
@@ -31,7 +29,7 @@ import {
 
 const MEMBERS_TABLE = "members";
 const PROFILE_COLUMNS =
-  "full_name, country, position, experience_level, gender, auf_number, auf_expiry, auf_verified_at, joined_on";
+  "full_name, country, position_id, experience_level, gender, auf_number, auf_expiry, auf_verified_at, joined_on, club_id";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -80,7 +78,7 @@ function toStoredOwnProfile(row: Row): StoredOwnProfile {
     profile: {
       fullName: readRequiredText(row, "full_name", MEMBERS_TABLE),
       country: readText(row, "country", MEMBERS_TABLE),
-      position: readOptionalCatalogValue(row, "position", parsePosition),
+      positionId: readText(row, "position_id", MEMBERS_TABLE),
       experienceLevel: readOptionalCatalogValue(
         row,
         "experience_level",
@@ -90,6 +88,7 @@ function toStoredOwnProfile(row: Row): StoredOwnProfile {
       auf: toOwnAuf(row),
     },
     joinedOn: readRequiredText(row, "joined_on", MEMBERS_TABLE),
+    clubId: readRequiredText(row, "club_id", MEMBERS_TABLE),
   };
 }
 
@@ -100,7 +99,9 @@ function toProfileColumns(
   const profileColumns = {
     full_name: fields.fullName,
     country: fields.country,
-    position: fields.position,
+    // La clave foránea compuesta de `0025` rechaza una posición de otro club
+    // aunque el dominio la dejara pasar.
+    position_id: fields.positionId,
     experience_level: fields.experienceLevel,
     gender: fields.gender,
   };
@@ -161,10 +162,14 @@ async function updateOwnProfile(
     : { kind: "member_not_found" };
 }
 
+/** Las posiciones van aparte: la pantalla y la API las leen de la caché, y
+ * un test de integración que acaba de archivar una las quiere al día. */
 export function createOwnProfileGateways(
   client: SupabaseClient,
+  positions: ClubPositionsGateway,
 ): OwnProfileGateways {
   return {
+    positions,
     profiles: {
       findOwnProfile: (userId) => findOwnProfile(client, userId),
       updateOwnProfile: (userId, fields, auf) =>
@@ -188,6 +193,9 @@ export function createSupabaseOwnProfileGateways(
   }
   return {
     kind: "ready",
-    gateways: createOwnProfileGateways(createServiceRoleClient(env)),
+    gateways: createOwnProfileGateways(
+      createServiceRoleClient(env),
+      cachedClubPositions,
+    ),
   };
 }

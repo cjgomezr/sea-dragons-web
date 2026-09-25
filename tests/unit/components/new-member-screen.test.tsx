@@ -4,6 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NewMemberScreen } from "@/components/directory/NewMemberScreen";
 import { listCountryOptions } from "@/lib/geo/countries";
 import type { Group } from "@/lib/groups/groups";
+import {
+  DEFENDER,
+  FORWARD,
+  GOALKEEPER,
+  asDirectoryPosition,
+} from "../helpers/seeded-positions";
 
 /**
  * La pantalla de alta de un miembro (#243, RF-5 del PRD de E5): el formulario
@@ -16,6 +22,10 @@ const SENIOR_ID = "9a9a9a9a-0000-4000-8000-000000000001";
 const MASTERS_ID = "9a9a9a9a-0000-4000-8000-000000000002";
 const MEMBERS_PATH = "/api/v1/members";
 const GROUPS_PATH = "/api/v1/groups";
+const POSITIONS_PATH = "/api/v1/club/positions";
+
+/** En el orden del club, que no es el alfabético (#299). */
+const CLUB_POSITIONS = [FORWARD, GOALKEEPER, DEFENDER].map(asDirectoryPosition);
 const INVITATION_PATH = `/api/v1/members/${NEW_USER_ID}/invitation`;
 
 const CLUB_GROUPS: readonly Group[] = [
@@ -28,6 +38,7 @@ type Call = { readonly url: string; readonly body: unknown };
 const calls: Call[] = [];
 
 type Stub = {
+  readonly positions?: readonly unknown[];
   readonly create?: () => Response;
   readonly resend?: () => Response;
 };
@@ -67,6 +78,11 @@ function stubApi(stub: Stub = {}): void {
       if (url === GROUPS_PATH) {
         return jsonResponse(200, { data: { groups: CLUB_GROUPS } });
       }
+      if (url === POSITIONS_PATH) {
+        return jsonResponse(200, {
+          data: { positions: stub.positions ?? CLUB_POSITIONS },
+        });
+      }
       const body: unknown =
         init?.body === undefined ? null : JSON.parse(String(init.body));
       calls.push({ url, body });
@@ -90,12 +106,16 @@ async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
   await screen.findByRole("checkbox", { name: "Senior Squad" });
 }
 
-async function fillValidForm(): Promise<void> {
+async function fillValidForm(
+  options: { readonly withPosition?: boolean } = {},
+): Promise<void> {
   const user = userEvent.setup();
   await user.type(screen.getByLabelText("Full name"), "Nerea Silva");
   await user.type(screen.getByLabelText("Email"), "nerea@example.com");
   await user.selectOptions(screen.getByLabelText("Country"), "AU");
-  await user.selectOptions(screen.getByLabelText("Position"), "Forward");
+  if (options.withPosition ?? true) {
+    await user.selectOptions(screen.getByLabelText("Position"), "Forward");
+  }
   await user.selectOptions(
     screen.getByLabelText("Experience level"),
     "Intermediate",
@@ -173,7 +193,7 @@ describe("formulario de alta", () => {
           fullName: "Nerea Silva",
           email: "nerea@example.com",
           country: "AU",
-          position: "Forward",
+          positionId: FORWARD.id,
           experienceLevel: "Intermediate",
           gender: "female",
           aufNumber: "AUF-2210",
@@ -257,5 +277,52 @@ describe("formulario de alta", () => {
       }),
     ).toBeVisible();
     expect(screen.getByLabelText("Nombre completo")).toBeInTheDocument();
+  });
+});
+
+describe("formulario de alta: las posiciones del club (#299)", () => {
+  it("ofrece las posiciones del club, en su orden", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(
+      within(screen.getByLabelText("Position"))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["Choose one", "Forward", "Goalkeeper", "Defender"]);
+  });
+
+  it("escribe las posiciones en español, y en inglés la que no tiene nombre en español", async () => {
+    stubApi({
+      positions: [
+        asDirectoryPosition(GOALKEEPER),
+        {
+          id: "90000000-0000-4000-8000-000000000009",
+          names: { en: "Sweeper", es: null },
+        },
+      ],
+    });
+
+    await renderScreen("es");
+
+    expect(
+      within(screen.getByLabelText("Posición"))
+        .getAllByRole("option")
+        .map((option) => option.textContent)
+        .slice(1),
+    ).toEqual(["Portería", "Sweeper"]);
+  });
+
+  it("sin posiciones que ofrecer, no pinta el campo y manda el alta sin posición", async () => {
+    stubApi({ positions: [] });
+    await renderScreen();
+
+    expect(screen.queryByLabelText("Position")).not.toBeInTheDocument();
+    await fillValidForm({ withPosition: false });
+    await userEvent.setup().click(submitButton());
+
+    await screen.findByText(/was invited/);
+    expect(calls[0]?.body).toMatchObject({ positionId: "" });
   });
 });

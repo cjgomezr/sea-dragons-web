@@ -18,8 +18,9 @@ import {
   SEARCH_QUERY_PARAM,
   SORT_QUERY_PARAM,
 } from "@/lib/directory/directory-query";
-import { EXPERIENCE_LEVELS, POSITIONS } from "@/lib/members/profile-fields";
+import { EXPERIENCE_LEVELS } from "@/lib/members/profile-fields";
 import type { Translator } from "@/lib/i18n/translator";
+import { namedPositionSchema } from "@/components/club/positions-client";
 
 /**
  * Lo que la pantalla del directorio le pide a `GET /api/v1/directory` (#238) y
@@ -38,7 +39,7 @@ const memberSchema = z.object({
   country: z.string().nullable(),
   experienceLevel: z.enum(EXPERIENCE_LEVELS).nullable(),
   role: z.enum(ROLES),
-  position: z.enum(POSITIONS).nullable(),
+  position: namedPositionSchema.nullable(),
   status: z.enum(ACCOUNT_STATUSES),
   // Sólo una dirección web: la pantalla la pone tal cual en una imagen.
   photoUrl: z.url({ protocol: /^https?$/ }).nullable(),

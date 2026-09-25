@@ -278,6 +278,7 @@ export const spanishMessages: MessageCatalog = {
   "account.profile.fullName": "Nombre completo",
   "account.profile.country": "País",
   "account.profile.position": "Posición",
+  "account.profile.positionRetired": "{name} (retirada)",
   "account.profile.experienceLevel": "Nivel de experiencia",
   "account.profile.gender": "Género",
   "account.profile.notSet": "Sin indicar",
@@ -346,9 +347,6 @@ export const spanishMessages: MessageCatalog = {
     "Tu cuenta no puede cambiar su foto ahora mismo.",
   "account.photo.error.unexpected":
     "Algo falló y tu foto no ha cambiado. Vuelve a intentarlo en un momento.",
-  "position.Goalkeeper": "Portería",
-  "position.Defender": "Defensa",
-  "position.Forward": "Ataque",
   "level.Beginner": "Principiante",
   "level.Intermediate": "Intermedio",
   "level.Advanced": "Avanzado",

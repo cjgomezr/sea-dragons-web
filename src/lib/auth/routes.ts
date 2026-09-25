@@ -160,6 +160,11 @@ export const CLUB_SETTINGS_API_PATH = "/api/v1/club/settings";
  * regla de esa ruta en `RESTRICTED_ROUTES` también lo reserva al Admin. */
 export const CLUB_LOGO_API_PATH = `${CLUB_SETTINGS_API_PATH}/logo`;
 
+/** Las posiciones que se pueden elegir en el club de quien llama (#299).
+ * Las lee cualquier cuenta activa, así que no está en `RESTRICTED_ROUTES`:
+ * no cuelga de la configuración del club, que es sólo del Admin. */
+export const CLUB_POSITIONS_API_PATH = "/api/v1/club/positions";
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 

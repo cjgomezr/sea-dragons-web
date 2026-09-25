@@ -13,6 +13,13 @@ import {
   readOwnProfile,
   updateOwnProfile,
 } from "@/lib/members/own-profile";
+import type { ClubPosition, ClubPositions } from "@/lib/club/club-positions";
+import {
+  DEFENDER,
+  FORWARD,
+  GOALKEEPER,
+  SEEDED_POSITIONS,
+} from "../helpers/seeded-positions";
 
 /**
  * El perfil propio (#241, FR-084, AC-039): lo que un miembro puede cambiar de
@@ -22,6 +29,18 @@ import {
  */
 
 const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
+const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
+
+/** Una cuarta posición que el club archivó (#299). */
+const UTILITY: ClubPosition = {
+  id: "90000000-0000-4000-8000-000000000004",
+  names: { en: "Utility", es: "Comodín" },
+  isArchived: true,
+};
+const OTHER_CLUBS_POSITION_ID = "90000000-0000-4000-8000-000000000099";
+
+/** Las del club, en su orden, con la archivada en medio. */
+const CLUB_POSITIONS: ClubPositions = [GOALKEEPER, UTILITY, DEFENDER, FORWARD];
 
 /** El día del club en que ingresó: ningún vencimiento puede ser anterior. */
 const JOINED_ON = "2024-03-06";
@@ -31,7 +50,7 @@ const NO_AUF: OwnAuf = { status: "none" };
 const STORED: OwnProfile = {
   fullName: "Nerea Ruiz",
   country: "AU",
-  position: "Defender",
+  positionId: DEFENDER.id,
   experienceLevel: "Intermediate",
   gender: "female",
   auf: NO_AUF,
@@ -40,7 +59,7 @@ const STORED: OwnProfile = {
 const VALID_FIELDS = {
   fullName: "Nerea Ruiz Soto",
   country: "ES",
-  position: "Forward",
+  positionId: FORWARD.id,
   experienceLevel: "Advanced",
   gender: "undisclosed",
 } as const satisfies OwnProfileFields;
@@ -59,6 +78,10 @@ type ProfileWrite = {
 type FakeProfiles = {
   readonly gateways: OwnProfileGateways;
   readonly writes: ProfileWrite[];
+  /** Los clubes de los que se leyeron las posiciones. */
+  readonly positionsRead: string[];
+  /** Las posiciones que cada lectura pidió que el catálogo conociera. */
+  readonly positionsReferenced: (readonly string[])[];
 };
 
 /** El AUF que queda después de un cambio, como lo dejaría la base. */
@@ -70,15 +93,31 @@ function aufAfter(change: OwnAufChange, stored: OwnAuf): OwnAuf {
 
 function fakeProfiles(
   stored: OwnProfile | null = STORED,
-  options: { readonly verifiedMeanwhile?: boolean } = {},
+  options: {
+    readonly verifiedMeanwhile?: boolean;
+    readonly positions?: ClubPositions;
+  } = {},
 ): FakeProfiles {
   const writes: ProfileWrite[] = [];
+  const positionsRead: string[] = [];
+  const positionsReferenced: (readonly string[])[] = [];
   return {
     writes,
+    positionsRead,
+    positionsReferenced,
     gateways: {
+      positions: {
+        findClubPositions: async (clubId, referencedIds) => {
+          positionsRead.push(clubId);
+          positionsReferenced.push(referencedIds);
+          return options.positions ?? CLUB_POSITIONS;
+        },
+      },
       profiles: {
         findOwnProfile: async () =>
-          stored === null ? null : { profile: stored, joinedOn: JOINED_ON },
+          stored === null
+            ? null
+            : { profile: stored, joinedOn: JOINED_ON, clubId: CLUB_ID },
         updateOwnProfile: async (userId, fields, auf) => {
           if (stored === null) {
             return { kind: "member_not_found" };
@@ -155,14 +194,14 @@ describe("editar el perfil propio", () => {
       userId: USER_ID,
       submission: {
         ...VALID_SUBMISSION,
-        position: null,
+        positionId: null,
         experienceLevel: null,
         gender: null,
       },
     });
 
     expect(writes[0]?.fields).toMatchObject({
-      position: null,
+      positionId: null,
       experienceLevel: null,
       gender: null,
     });
@@ -209,7 +248,7 @@ describe("editar el perfil propio", () => {
     const error = await captureValidationError({
       fullName: "Nerea Ruiz",
       country: "XX",
-      position: "Striker",
+      positionId: "Striker",
       experienceLevel: "expert",
       gender: "other",
       auf: null,
@@ -217,7 +256,7 @@ describe("editar el perfil propio", () => {
 
     expect(error.issues).toEqual([
       { field: "country", code: "country_unknown" },
-      { field: "position", code: "position_unknown" },
+      { field: "positionId", code: "position_unknown" },
       { field: "experienceLevel", code: "experience_level_unknown" },
       { field: "gender", code: "gender_unknown" },
     ]);
@@ -228,7 +267,7 @@ describe("editar el perfil propio", () => {
 
     await updateOwnProfile(gateways, {
       userId: USER_ID,
-      submission: { ...VALID_SUBMISSION, position: "Striker" },
+      submission: { ...VALID_SUBMISSION, positionId: "Striker" },
     }).catch(() => undefined);
 
     expect(writes).toEqual([]);
@@ -253,7 +292,7 @@ describe("editar el perfil propio", () => {
       "experienceLevel",
       "fullName",
       "gender",
-      "position",
+      "positionId",
     ]);
   });
 
@@ -270,10 +309,13 @@ describe("editar el perfil propio", () => {
 });
 
 describe("leer el perfil propio", () => {
-  it("devuelve la ficha de quien llama", async () => {
+  it("devuelve la ficha de quien llama, con las posiciones que se le ofrecen", async () => {
     const { gateways } = fakeProfiles();
 
-    await expect(readOwnProfile(gateways, USER_ID)).resolves.toEqual(STORED);
+    await expect(readOwnProfile(gateways, USER_ID)).resolves.toEqual({
+      profile: STORED,
+      positionOptions: [GOALKEEPER, DEFENDER, FORWARD],
+    });
   });
 
   it("lanza MemberNotFoundError cuando la identidad no tiene fila", async () => {
@@ -282,6 +324,116 @@ describe("leer el perfil propio", () => {
     await expect(readOwnProfile(gateways, USER_ID)).rejects.toBeInstanceOf(
       MemberNotFoundError,
     );
+  });
+});
+
+async function submitPosition(
+  positionId: string | null,
+  options: { readonly current: string | null },
+): Promise<FakeProfiles & { readonly outcome: unknown }> {
+  const fake = fakeProfiles({ ...STORED, positionId: options.current });
+  const outcome: unknown = await updateOwnProfile(fake.gateways, {
+    userId: USER_ID,
+    submission: { ...VALID_SUBMISSION, positionId },
+  }).catch((caught: unknown) => caught);
+  return { ...fake, outcome };
+}
+
+function expectPositionRejected(outcome: unknown, writes: unknown[]): void {
+  expect(outcome).toBeInstanceOf(ProfileValidationError);
+  expect((outcome as ProfileValidationError).issues).toEqual([
+    { field: "positionId", code: "position_unknown" },
+  ]);
+  expect(writes).toEqual([]);
+}
+
+describe("perfil propio: las posiciones del club (#299)", () => {
+  it("lee las posiciones del club de quien llama", async () => {
+    const { positionsRead } = await submitPosition(FORWARD.id, {
+      current: null,
+    });
+
+    expect(positionsRead).toEqual([CLUB_ID]);
+  });
+
+  it("pide al catálogo la posición que tiene y la que elige", async () => {
+    const { positionsReferenced } = await submitPosition(GOALKEEPER.id, {
+      current: DEFENDER.id,
+    });
+
+    expect(positionsReferenced).toEqual([[DEFENDER.id, GOALKEEPER.id]]);
+  });
+
+  it("al leer, pide al catálogo la posición que tiene", async () => {
+    const fake = fakeProfiles();
+
+    await readOwnProfile(fake.gateways, USER_ID);
+
+    expect(fake.positionsReferenced).toEqual([[DEFENDER.id]]);
+  });
+
+  it("guarda una posición activa del club", async () => {
+    const { writes } = await submitPosition(GOALKEEPER.id, {
+      current: DEFENDER.id,
+    });
+
+    expect(writes[0]?.fields.positionId).toBe(GOALKEEPER.id);
+  });
+
+  it("rechaza una posición archivada como valor nuevo", async () => {
+    const { outcome, writes } = await submitPosition(UTILITY.id, {
+      current: DEFENDER.id,
+    });
+
+    expectPositionRejected(outcome, writes);
+  });
+
+  it("deja guardar el perfil a quien conserva la posición archivada", async () => {
+    const { writes } = await submitPosition(UTILITY.id, {
+      current: UTILITY.id,
+    });
+
+    expect(writes[0]?.fields.positionId).toBe(UTILITY.id);
+  });
+
+  it("rechaza una posición de otro club", async () => {
+    const { outcome, writes } = await submitPosition(OTHER_CLUBS_POSITION_ID, {
+      current: null,
+    });
+
+    expectPositionRejected(outcome, writes);
+  });
+
+  it("ofrece la archivada, marcada, sólo a quien la tiene", async () => {
+    const { gateways } = fakeProfiles({ ...STORED, positionId: UTILITY.id });
+
+    const { positionOptions } = await readOwnProfile(gateways, USER_ID);
+
+    expect(positionOptions).toEqual([GOALKEEPER, UTILITY, DEFENDER, FORWARD]);
+  });
+
+  it("no ofrece la archivada a quien tiene otra", async () => {
+    const { gateways } = fakeProfiles();
+
+    const { positionOptions } = await readOwnProfile(gateways, USER_ID);
+
+    expect(positionOptions).not.toContainEqual(UTILITY);
+  });
+
+  it("no ofrece ninguna si el club archivó todas", async () => {
+    const { gateways } = fakeProfiles(
+      { ...STORED, positionId: null },
+      {
+        positions: SEEDED_POSITIONS.map((position) => ({
+          ...position,
+          isArchived: true,
+        })),
+      },
+    );
+
+    const { positionOptions } = await readOwnProfile(gateways, USER_ID);
+
+    expect(positionOptions).toEqual([]);
   });
 });
 

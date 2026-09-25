@@ -57,14 +57,16 @@ const AUF_NUMBER_BODY_MAX_LENGTH = AUF_NUMBER_MAX_LENGTH * 4;
 const reservedField = z.unknown().optional();
 
 /** Sólo la forma. Que el país, la posición, el nivel, el género y el AUF
- * valgan lo decide el dominio, que dice además cuál falló. `strict` responde
+ * valgan lo decide el dominio, que dice además cuál falló. La posición va por
+ * su id en el catálogo del club (#299): una archivada o de otro club es un
+ * 400 con `position_unknown`. `strict` responde
  * 400 a cualquier campo que no sea del perfil, como un `userId`, y un
  * vencimiento sin número también: no hay registro al que pertenezca. */
 const profileBodySchema = z
   .object({
     fullName: z.string().max(FULL_NAME_BODY_MAX_LENGTH),
     country: z.string(),
-    position: z.string().nullable(),
+    positionId: z.string().nullable(),
     experienceLevel: z.string().nullable(),
     gender: z.string().nullable(),
     aufNumber: z.string().max(AUF_NUMBER_BODY_MAX_LENGTH).optional(),
@@ -144,7 +146,7 @@ const patchProfile = createApiRoute<AccountProfileResponse, ProfileBody>({
           submission: {
             fullName: body.fullName,
             country: body.country,
-            position: body.position,
+            positionId: body.positionId,
             experienceLevel: body.experienceLevel,
             gender: body.gender,
             auf: toAufProposal(body),

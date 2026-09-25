@@ -7,6 +7,11 @@ import type {
   AdminDirectoryMember,
   DirectoryMember,
 } from "@/lib/directory/directory";
+import {
+  DEFENDER,
+  GOALKEEPER,
+  asDirectoryPosition,
+} from "../helpers/seeded-positions";
 
 /**
  * Lo que el directorio le enseña a un Admin además de la lista (#240, RF-8 del
@@ -29,7 +34,7 @@ const NEREA: AdminDirectoryMember = {
   country: "ES",
   experienceLevel: "Beginner",
   role: "Player",
-  position: "Goalkeeper",
+  position: asDirectoryPosition(GOALKEEPER),
   status: "active",
   photoUrl: null,
   aufNumber: null,
@@ -44,7 +49,7 @@ const ANA: AdminDirectoryMember = {
   country: "AU",
   experienceLevel: "Advanced",
   role: "Admin",
-  position: "Defender",
+  position: asDirectoryPosition(DEFENDER),
   status: "active",
   photoUrl: null,
   aufNumber: "AUF-1",

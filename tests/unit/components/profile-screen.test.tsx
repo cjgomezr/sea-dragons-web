@@ -6,6 +6,13 @@ import { ACCOUNT_PROFILE_API_PATH } from "@/lib/auth/routes";
 import { listCountryOptions } from "@/lib/geo/countries";
 import type { Locale } from "@/lib/i18n/locale";
 import type { OwnAuf, OwnProfile } from "@/lib/members/own-profile";
+import type { ClubPosition, ClubPositions } from "@/lib/club/club-positions";
+import {
+  DEFENDER,
+  FORWARD,
+  GOALKEEPER,
+  SEEDED_POSITIONS,
+} from "../helpers/seeded-positions";
 
 /**
  * La pantalla de perfil (#241): Mi cuenta convertida en perfil. Enseña lo
@@ -21,7 +28,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 const PROFILE: OwnProfile = {
   fullName: "Nerea Ruiz",
   country: "AU",
-  position: "Defender",
+  positionId: DEFENDER.id,
   experienceLevel: "Intermediate",
   gender: "female",
   auf: { status: "none" },
@@ -30,7 +37,7 @@ const PROFILE: OwnProfile = {
 const EMPTY_PROFILE: OwnProfile = {
   fullName: "Nerea Ruiz",
   country: "AU",
-  position: null,
+  positionId: null,
   experienceLevel: null,
   gender: null,
   auf: { status: "none" },
@@ -87,8 +94,19 @@ function echoSavedProfile(previousAuf: OwnAuf = { status: "none" }): void {
   );
 }
 
+/** Una posición que el club archivó, con nombre sólo en inglés (#299). */
+const UTILITY: ClubPosition = {
+  id: "90000000-0000-4000-8000-000000000004",
+  names: { en: "Utility", es: null },
+  isArchived: true,
+};
+
 function renderScreen(
-  options: { readonly locale?: Locale; readonly profile?: OwnProfile } = {},
+  options: {
+    readonly locale?: Locale;
+    readonly profile?: OwnProfile;
+    readonly positionOptions?: ClubPositions;
+  } = {},
 ): void {
   const locale = options.locale ?? "en";
   render(
@@ -96,6 +114,7 @@ function renderScreen(
       locale={locale}
       account={{ fullName: "Nerea Ruiz", role: "Player", latestRequest: null }}
       profile={options.profile ?? PROFILE}
+      positionOptions={options.positionOptions ?? SEEDED_POSITIONS}
       photoUrl={null}
       groups={[{ id: "g1", name: "Senior Squad" }]}
       countries={listCountryOptions(locale)}
@@ -122,7 +141,7 @@ describe("pantalla de perfil", () => {
 
     expect(screen.getByLabelText("Full name")).toHaveValue("Nerea Ruiz");
     expect(screen.getByLabelText("Country")).toHaveValue("AU");
-    expect(screen.getByLabelText("Position")).toHaveValue("Defender");
+    expect(screen.getByLabelText("Position")).toHaveDisplayValue("Defender");
     expect(screen.getByLabelText("Experience level")).toHaveValue(
       "Intermediate",
     );
@@ -176,7 +195,7 @@ describe("pantalla de perfil", () => {
         body: {
           fullName: "Nerea Ruiz Soto",
           country: "AU",
-          position: "Forward",
+          positionId: FORWARD.id,
           experienceLevel: "Intermediate",
           gender: "undisclosed",
         },
@@ -194,7 +213,7 @@ describe("pantalla de perfil", () => {
     await user.click(saveButton());
 
     await screen.findByRole("status");
-    expect(calls[0]?.body).toMatchObject({ position: null });
+    expect(calls[0]?.body).toMatchObject({ positionId: null });
   });
 
   it("no envía un nombre vacío y dice por qué", async () => {
@@ -505,6 +524,78 @@ describe("el AUF en el perfil propio", () => {
     expect(screen.getByLabelText("Número de AUF")).toHaveValue("AUF-100");
     expect(
       screen.getByText("Pendiente de que un Admin lo verifique."),
+    ).toBeInTheDocument();
+  });
+});
+
+function positionOptionNames(): readonly string[] {
+  return within(screen.getByLabelText("Position"))
+    .getAllByRole("option")
+    .map((option) => option.textContent ?? "");
+}
+
+describe("perfil propio: las posiciones del club (#299)", () => {
+  it("el desplegable ofrece las posiciones del club, en su orden", () => {
+    renderScreen({ positionOptions: [FORWARD, GOALKEEPER, DEFENDER] });
+
+    expect(positionOptionNames()).toEqual([
+      "Not set",
+      "Forward",
+      "Goalkeeper",
+      "Defender",
+    ]);
+  });
+
+  it("quien tiene una posición retirada la sigue viendo, marcada", () => {
+    renderScreen({
+      profile: { ...PROFILE, positionId: UTILITY.id },
+      positionOptions: [GOALKEEPER, UTILITY, DEFENDER, FORWARD],
+    });
+
+    expect(screen.getByLabelText("Position")).toHaveDisplayValue(
+      "Utility (retired)",
+    );
+  });
+
+  it("al cambiar de la retirada a otra y guardar, la retirada deja de ofrecerse", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen({
+      profile: { ...PROFILE, positionId: UTILITY.id },
+      positionOptions: [GOALKEEPER, UTILITY, DEFENDER, FORWARD],
+    });
+
+    await user.selectOptions(screen.getByLabelText("Position"), "Forward");
+    await user.click(saveButton());
+
+    await screen.findByRole("status");
+    expect(positionOptionNames()).not.toContain("Utility (retired)");
+  });
+
+  it("el campo no se muestra si el club no ofrece ninguna posición", () => {
+    renderScreen({
+      profile: { ...PROFILE, positionId: null },
+      positionOptions: [],
+    });
+
+    expect(screen.queryByLabelText("Position")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Experience level")).toBeInTheDocument();
+  });
+
+  it("en español, una posición sin nombre en español sale en inglés y marcada", () => {
+    renderScreen({
+      locale: "es",
+      profile: { ...PROFILE, positionId: UTILITY.id },
+      positionOptions: [GOALKEEPER, UTILITY],
+    });
+
+    expect(screen.getByLabelText("Posición")).toHaveDisplayValue(
+      "Utility (retirada)",
+    );
+    expect(
+      within(screen.getByLabelText("Posición")).getByRole("option", {
+        name: "Portería",
+      }),
     ).toBeInTheDocument();
   });
 });

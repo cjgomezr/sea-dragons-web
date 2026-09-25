@@ -3,10 +3,9 @@ import { parseAccountStatus } from "@/lib/auth/account-status";
 import { parseRole } from "@/lib/auth/roles";
 import { readRequiredText, readText } from "@/lib/auth/supabase-auth-gateways";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
-import {
-  parseExperienceLevel,
-  parsePosition,
-} from "@/lib/members/profile-fields";
+import type { ClubPositionsGateway } from "@/lib/club/club-positions";
+import { cachedClubPositions } from "@/lib/club/supabase-club-positions";
+import { parseExperienceLevel } from "@/lib/members/profile-fields";
 import { signProfilePhotoUrls } from "@/lib/members/supabase-profile-photo-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
@@ -29,7 +28,7 @@ import type { DirectoryGateways, DirectoryMemberRecord } from "./directory";
 
 const MEMBERS_TABLE = "members";
 const DIRECTORY_COLUMNS =
-  "user_id, full_name, country, experience_level, role, position, account_status, auf_number, auf_expiry, auf_verified_at, photo_path";
+  "user_id, full_name, country, experience_level, role, position_id, account_status, auf_number, auf_expiry, auf_verified_at, photo_path";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -74,7 +73,7 @@ function toDirectoryMemberRecord(row: Row): DirectoryMemberRecord {
       parseExperienceLevel,
     ),
     role: readCatalogValue(row, "role", parseRole),
-    position: readOptionalCatalogValue(row, "position", parsePosition),
+    positionId: readText(row, "position_id", MEMBERS_TABLE),
     status: readCatalogValue(row, "account_status", parseAccountStatus),
     aufNumber: readText(row, "auf_number", MEMBERS_TABLE),
     // Una columna `date` llega como YYYY-MM-DD, que es el formato con el que
@@ -85,8 +84,11 @@ function toDirectoryMemberRecord(row: Row): DirectoryMemberRecord {
   };
 }
 
+/** Las posiciones van aparte: la API las lee de la caché, y un test de
+ * integración que acaba de sembrar un club las quiere al día. */
 export function createDirectoryGateways(
   serviceClient: SupabaseClient,
+  positions: ClubPositionsGateway,
 ): DirectoryGateways {
   return {
     members: createRoleRequestGateways(serviceClient).members,
@@ -104,6 +106,7 @@ export function createDirectoryGateways(
         return data.map(toDirectoryMemberRecord);
       },
     },
+    positions,
     photos: {
       signPhotoUrls: (photoPaths) =>
         signProfilePhotoUrls(serviceClient, photoPaths),
@@ -126,6 +129,9 @@ export function createSupabaseDirectoryGateways(
   }
   return {
     kind: "ready",
-    gateways: createDirectoryGateways(createServiceRoleClient(env)),
+    gateways: createDirectoryGateways(
+      createServiceRoleClient(env),
+      cachedClubPositions,
+    ),
   };
 }

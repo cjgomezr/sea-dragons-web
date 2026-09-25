@@ -4,6 +4,12 @@ import type { DirectoryMemberRecord } from "@/lib/directory/directory";
 import type { Role } from "@/lib/auth/roles";
 import { DIRECTORY_API_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
+import {
+  DEFENDER,
+  FORWARD,
+  SEEDED_POSITIONS,
+  asDirectoryPosition,
+} from "../helpers/seeded-positions";
 
 /**
  * El directorio del club por API (#238, FR-015 a FR-019). Lo alcanza
@@ -22,7 +28,7 @@ const MARIA: DirectoryMemberRecord = {
   country: "AU",
   experienceLevel: "Intermediate",
   role: "Player",
-  position: "Defender",
+  positionId: DEFENDER.id,
   status: "active",
   aufNumber: "AUF-7",
   aufExpiry: "2020-01-31",
@@ -36,7 +42,7 @@ const BAJA: DirectoryMemberRecord = {
   country: "AU",
   experienceLevel: null,
   role: "Committee",
-  position: "Forward",
+  positionId: FORWARD.id,
   status: "inactive",
   aufNumber: null,
   aufExpiry: null,
@@ -70,6 +76,7 @@ function mockWiring(callerRole: Role = "Player"): void {
             role: callerRole,
           }),
         },
+        positions: { findClubPositions: async () => SEEDED_POSITIONS },
         directory: {
           findDirectoryMembers: async (clubId: string) => {
             databaseCalls.push(`list ${clubId}`);
@@ -139,7 +146,7 @@ describe("GET /api/v1/directory", () => {
             country: "AU",
             experienceLevel: "Intermediate",
             role: "Player",
-            position: "Defender",
+            position: asDirectoryPosition(DEFENDER),
             status: "active",
             photoUrl: null,
           },

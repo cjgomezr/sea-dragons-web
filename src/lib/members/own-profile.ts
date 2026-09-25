@@ -1,14 +1,18 @@
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
+import {
+  type ClubPositions,
+  type ClubPositionsGateway,
+  isAcceptablePosition,
+  offeredPositions,
+} from "@/lib/club/club-positions";
 import { isRealCalendarDate } from "@/lib/auth/registration";
 import { isKnownCountryCode } from "@/lib/geo/countries";
 import { isAufNumberTooLong } from "./member-record";
 import {
   type ExperienceLevel,
   type Gender,
-  type Position,
   parseExperienceLevel,
   parseGender,
-  parsePosition,
 } from "./profile-fields";
 
 /**
@@ -24,6 +28,9 @@ import {
  * El AUF lo escribía sólo el Admin hasta #274. Ahora lo propone también el
  * miembro, y lo que propone queda sin verificar hasta que un Admin lo
  * confirme (BR-008). Una vez verificado, sólo el Admin lo corrige.
+ *
+ * La posición es una del catálogo de su club (#299): una activa, o la
+ * archivada que ya tenía. Una vez que la cambia, no puede volver a ella.
  */
 
 /** Largo máximo del nombre, en caracteres y no en unidades UTF-16. */
@@ -34,7 +41,8 @@ export const FULL_NAME_MAX_LENGTH = 120;
 export type OwnProfileFields = {
   readonly fullName: string;
   readonly country: string | null;
-  readonly position: Position | null;
+  /** Una posición del catálogo del club, o null sin posición. */
+  readonly positionId: string | null;
   readonly experienceLevel: ExperienceLevel | null;
   readonly gender: Gender | null;
 };
@@ -65,7 +73,7 @@ export type AufProposal = {
 export type OwnProfileSubmission = {
   readonly fullName: string;
   readonly country: string;
-  readonly position: string | null;
+  readonly positionId: string | null;
   readonly experienceLevel: string | null;
   readonly gender: string | null;
   readonly auf: AufProposal | null;
@@ -134,6 +142,15 @@ export type StoredOwnProfile = {
   readonly profile: OwnProfile;
   /** YYYY-MM-DD, el día del club en que ingresó (#237). */
   readonly joinedOn: string;
+  /** De qué club son las posiciones que puede elegir (#299). */
+  readonly clubId: string;
+};
+
+/** La ficha y las posiciones que su desplegable ofrece, en el orden del
+ * club. Vacías si el club archivó todas y el miembro no tiene ninguna. */
+export type OwnProfileScreen = {
+  readonly profile: OwnProfile;
+  readonly positionOptions: ClubPositions;
 };
 
 export type OwnProfileUpdateResult =
@@ -143,6 +160,7 @@ export type OwnProfileUpdateResult =
   | { readonly kind: "auf_verified" };
 
 export type OwnProfileGateways = {
+  readonly positions: ClubPositionsGateway;
   readonly profiles: {
     /** Null cuando la identidad no tiene fila de miembro. */
     findOwnProfile(userId: string): Promise<StoredOwnProfile | null>;
@@ -180,8 +198,16 @@ function isInCatalogOrEmpty(
   return value === null || parse(value) !== null;
 }
 
+/** Contra qué se valida la posición: el catálogo del club y la que ya
+ * tiene, que puede estar archivada. */
+type PositionContext = {
+  readonly positions: ClubPositions;
+  readonly currentId: string | null;
+};
+
 function fieldIssuesOf(
   submission: OwnProfileSubmission,
+  { positions, currentId }: PositionContext,
 ): readonly ProfileIssue[] {
   const fullNameIssue = validateFullName(submission.fullName);
   const checks: readonly [ProfileField, ProfileIssueCode | null][] = [
@@ -191,8 +217,11 @@ function fieldIssuesOf(
       isKnownCountryCode(submission.country) ? null : "country_unknown",
     ],
     [
-      "position",
-      isInCatalogOrEmpty(submission.position, parsePosition)
+      "positionId",
+      isAcceptablePosition(positions, {
+        chosenId: submission.positionId,
+        currentId,
+      })
         ? null
         : "position_unknown",
     ],
@@ -245,15 +274,21 @@ function aufIssuesOf(auf: AufProposal | null): readonly ProfileIssue[] {
 /** Valida todos los campos a la vez y devuelve los cinco normalizados, o
  * lanza con cada campo que no vale: quien llama a la API no descubre los
  * errores de uno en uno. */
-function toValidFields(submission: OwnProfileSubmission): OwnProfileFields {
-  const issues = [...fieldIssuesOf(submission), ...aufIssuesOf(submission.auf)];
+function toValidFields(
+  submission: OwnProfileSubmission,
+  positionContext: PositionContext,
+): OwnProfileFields {
+  const issues = [
+    ...fieldIssuesOf(submission, positionContext),
+    ...aufIssuesOf(submission.auf),
+  ];
   if (issues.length > 0) {
     throw new ProfileValidationError(issues);
   }
   return {
     fullName: submission.fullName.trim(),
     country: submission.country.trim().toUpperCase(),
-    position: parsePosition(submission.position),
+    positionId: submission.positionId,
     experienceLevel: parseExperienceLevel(submission.experienceLevel),
     gender: parseGender(submission.gender),
   };
@@ -273,17 +308,12 @@ function isSameAuf(stored: OwnAuf, proposal: AufProposal): boolean {
  * verificado no impide guardar el nombre. El vencimiento se compara con el
  * ingreso (#237), como en la ficha del Admin.
  */
-async function planAufChange(
-  gateways: OwnProfileGateways,
-  userId: string,
+function planAufChange(
+  stored: StoredOwnProfile,
   auf: AufProposal | null,
-): Promise<OwnAufChange> {
+): OwnAufChange {
   if (auf === null) {
     return { kind: "keep" };
-  }
-  const stored = await gateways.profiles.findOwnProfile(userId);
-  if (stored === null) {
-    throw new MemberNotFoundError(userId);
   }
   const proposal = { number: auf.number.trim(), expiry: auf.expiry };
   if (isSameAuf(stored.profile.auf, proposal)) {
@@ -300,15 +330,34 @@ async function planAufChange(
   return { kind: "propose", ...proposal };
 }
 
-export async function readOwnProfile(
+function presentIds(ids: readonly (string | null)[]): readonly string[] {
+  return ids.filter((id) => id !== null);
+}
+
+async function findStoredProfile(
   gateways: OwnProfileGateways,
   userId: string,
-): Promise<OwnProfile> {
+): Promise<StoredOwnProfile> {
   const stored = await gateways.profiles.findOwnProfile(userId);
   if (stored === null) {
     throw new MemberNotFoundError(userId);
   }
-  return stored.profile;
+  return stored;
+}
+
+export async function readOwnProfile(
+  gateways: OwnProfileGateways,
+  userId: string,
+): Promise<OwnProfileScreen> {
+  const { profile, clubId } = await findStoredProfile(gateways, userId);
+  const positions = await gateways.positions.findClubPositions(
+    clubId,
+    presentIds([profile.positionId]),
+  );
+  return {
+    profile,
+    positionOptions: offeredPositions(positions, profile.positionId),
+  };
 }
 
 export async function updateOwnProfile(
@@ -318,12 +367,16 @@ export async function updateOwnProfile(
     readonly submission: OwnProfileSubmission;
   },
 ): Promise<OwnProfile> {
-  const fields = toValidFields(request.submission);
-  const auf = await planAufChange(
-    gateways,
-    request.userId,
-    request.submission.auf,
+  const stored = await findStoredProfile(gateways, request.userId);
+  const positions = await gateways.positions.findClubPositions(
+    stored.clubId,
+    presentIds([stored.profile.positionId, request.submission.positionId]),
   );
+  const fields = toValidFields(request.submission, {
+    positions,
+    currentId: stored.profile.positionId,
+  });
+  const auf = planAufChange(stored, request.submission.auf);
   const result = await gateways.profiles.updateOwnProfile(
     request.userId,
     fields,

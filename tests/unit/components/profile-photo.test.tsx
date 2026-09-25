@@ -70,11 +70,12 @@ function renderScreen(
       profile={{
         fullName: "Nerea Ruiz",
         country: "AU",
-        position: null,
+        positionId: null,
         experienceLevel: null,
         gender: null,
         auf: { status: "none" },
       }}
+      positionOptions={[]}
       photoUrl={options.photoUrl === undefined ? OLD_URL : options.photoUrl}
       groups={[]}
       countries={listCountryOptions(locale)}

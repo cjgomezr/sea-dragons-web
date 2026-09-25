@@ -2,6 +2,7 @@ import type { RoleRequestAccount } from "@/lib/auth/role-request";
 import type { CountryOption } from "@/lib/geo/countries";
 import type { MemberGroup } from "@/lib/groups/member-groups";
 import type { Locale } from "@/lib/i18n/locale";
+import type { ClubPositions } from "@/lib/club/club-positions";
 import type { OwnProfile } from "@/lib/members/own-profile";
 import { AccountHeader } from "./AccountHeader";
 import { MyGroups } from "./MyGroups";
@@ -15,6 +16,7 @@ export function ProfileScreen({
   locale,
   account,
   profile,
+  positionOptions,
   photoUrl,
   groups,
   countries,
@@ -22,6 +24,8 @@ export function ProfileScreen({
   locale: Locale;
   account: RoleRequestAccount;
   profile: OwnProfile;
+  /** Las posiciones del club que se le ofrecen, en su orden (#299). */
+  positionOptions: ClubPositions;
   /** La dirección firmada de la foto (#245), o null sin foto. */
   photoUrl: string | null;
   groups: readonly MemberGroup[];
@@ -35,7 +39,12 @@ export function ProfileScreen({
         role={account.role}
         photoUrl={photoUrl}
       />
-      <ProfileForm locale={locale} profile={profile} countries={countries} />
+      <ProfileForm
+        locale={locale}
+        profile={profile}
+        positionOptions={positionOptions}
+        countries={countries}
+      />
       <MyGroups locale={locale} groups={groups} />
       <RoleRequestPanel
         locale={locale}

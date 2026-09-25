@@ -9,6 +9,7 @@ import {
   listDirectory,
 } from "@/lib/directory/directory";
 import { createDirectoryGateways } from "@/lib/directory/supabase-directory-gateways";
+import { createClubPositionsGateway } from "@/lib/club/supabase-club-positions";
 import {
   assignGroupMember,
   removeGroupMember,
@@ -256,7 +257,10 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
           isAufExpired: true,
         });
         const listing = await listDirectory(
-          createDirectoryGateways(serviceClient.client),
+          createDirectoryGateways(
+            serviceClient.client,
+            createClubPositionsGateway(serviceClient.client),
+          ),
           {
             callerId: adminId,
             query: { ...DEFAULT_DIRECTORY_QUERY, search: "Paula Ficha" },
@@ -439,17 +443,23 @@ async function proposeAuf(
   userId: string,
   expiry: string | null,
 ): Promise<void> {
-  await updateOwnProfile(createOwnProfileGateways(serviceClient.client), {
-    userId,
-    submission: {
-      fullName: "Paula Ficha",
-      country: "AU",
-      position: null,
-      experienceLevel: null,
-      gender: null,
-      auf: { number: "AUF-PROPUESTO", expiry },
+  await updateOwnProfile(
+    createOwnProfileGateways(
+      serviceClient.client,
+      createClubPositionsGateway(serviceClient.client),
+    ),
+    {
+      userId,
+      submission: {
+        fullName: "Paula Ficha",
+        country: "AU",
+        positionId: null,
+        experienceLevel: null,
+        gender: null,
+        auf: { number: "AUF-PROPUESTO", expiry },
+      },
     },
-  });
+  );
 }
 
 describeRls("verificar el AUF contra seadragons-dev", () => {
