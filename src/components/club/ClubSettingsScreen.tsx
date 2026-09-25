@@ -79,9 +79,9 @@ export function ClubSettingsScreen({
             settings={state.settings}
             onReloadRequested={reload}
           />
+          <ClubSignInTextsSection translate={translate} />
           {/* Cada cambio de las posiciones se guarda en el acto (#300): no
               viaja con el botón del formulario de arriba. */}
-          <ClubSignInTextsSection translate={translate} />
           <ClubPositionsSection locale={locale} translate={translate} />
         </>
       ) : null}

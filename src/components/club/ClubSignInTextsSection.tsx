@@ -5,7 +5,8 @@ import type { ApiRequestFailure } from "@/lib/api/request-api";
 import {
   findSignInTextsIssues,
   NO_SIGN_IN_TEXTS,
-  SIGN_IN_TEXT_KINDS,
+  SIGN_IN_TEXT_FIELDS,
+  type SignInTextField,
   type SignInTextKind,
   type SignInTexts,
   signInTextMaxLength,
@@ -17,7 +18,6 @@ import {
   describeSignInTextTooLong,
   loadSignInTexts,
   readSignInTextIssueField,
-  type SignInTextField,
   saveSignInTexts,
 } from "./club-sign-in-texts-client";
 
@@ -41,8 +41,6 @@ type Status =
 type Draft = {
   readonly [L in Locale]: { readonly [K in SignInTextKind]: string };
 };
-
-const LOCALES = ["en", "es"] as const satisfies readonly Locale[];
 
 /** De qué clave del catálogo sale el texto cuando el club no escribe uno. */
 const FALLBACK_KEY_OF_KIND = {
@@ -152,21 +150,20 @@ function SaveOutcome({
   );
 }
 
-function useSignInTextsEditor(): {
+type SignInTextsEditor = {
   readonly draft: Draft;
   readonly status: Status;
   readonly localIssues: readonly SignInTextField[];
   readonly update: (field: SignInTextField, text: string) => void;
   readonly submit: () => Promise<void>;
-} {
-  const [draft, setDraft] = useState<Draft>(() => toDraft(NO_SIGN_IN_TEXTS));
-  const [status, setStatus] = useState<Status>({ kind: "loading" });
-  const [localIssues, setLocalIssues] = useState<readonly SignInTextField[]>(
-    [],
-  );
-  // Un doble clic llega antes de que el estado desactive el botón.
-  const isSendingRef = useRef(false);
+};
 
+/** Lee lo guardado una vez, al montar. Los setters de React no cambian, así
+ * que el efecto no se repite. */
+function useInitialLoad(
+  setDraft: (draft: Draft) => void,
+  setStatus: (status: Status) => void,
+): void {
   useEffect(() => {
     let isCurrent = true;
     void loadSignInTexts().then((outcome) => {
@@ -183,7 +180,18 @@ function useSignInTextsEditor(): {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [setDraft, setStatus]);
+}
+
+function useSignInTextsEditor(): SignInTextsEditor {
+  const [draft, setDraft] = useState<Draft>(() => toDraft(NO_SIGN_IN_TEXTS));
+  const [status, setStatus] = useState<Status>({ kind: "loading" });
+  const [localIssues, setLocalIssues] = useState<readonly SignInTextField[]>(
+    [],
+  );
+  // Un doble clic llega antes de que el estado desactive el botón.
+  const isSendingRef = useRef(false);
+  useInitialLoad(setDraft, setStatus);
 
   function update(field: SignInTextField, text: string): void {
     setDraft((current) => ({
@@ -221,18 +229,62 @@ function useSignInTextsEditor(): {
   return { draft, status, localIssues, update, submit };
 }
 
-export function ClubSignInTextsSection({
+function SignInTextsForm({
   translate,
+  editor: { draft, status, localIssues, update, submit },
 }: {
   translate: Translator;
+  editor: SignInTextsEditor;
 }): React.JSX.Element {
-  const { draft, status, localIssues, update, submit } = useSignInTextsEditor();
   const serverIssue =
     status.kind === "failed" ? readSignInTextIssueField(status) : null;
   const isInvalid = (field: SignInTextField): boolean =>
     localIssues.some((issue) => isSameField(issue, field)) ||
     (serverIssue !== null && isSameField(serverIssue, field));
   const isSending = status.kind === "sending";
+
+  return (
+    <form
+      className="auth-pending club-settings-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit();
+      }}
+      noValidate
+    >
+      {/* Mientras se guarda no se edita: lo que se escribiera ahora lo
+          pisaría lo que devuelva el servidor. */}
+      <fieldset className="member-record-fields" disabled={isSending}>
+        {SIGN_IN_TEXT_FIELDS.map((field) => (
+          <SignInTextInput
+            key={`${field.locale}-${field.kind}`}
+            translate={translate}
+            field={field}
+            value={draft[field.locale][field.kind]}
+            isInvalid={isInvalid(field)}
+            onChange={(text) => update(field, text)}
+          />
+        ))}
+      </fieldset>
+      <SaveOutcome translate={translate} status={status} />
+      <button type="submit" className="auth-submit" disabled={isSending}>
+        {translate(
+          isSending
+            ? "clubSettings.signInTexts.saving"
+            : "clubSettings.signInTexts.save",
+        )}
+      </button>
+    </form>
+  );
+}
+
+export function ClubSignInTextsSection({
+  translate,
+}: {
+  translate: Translator;
+}): React.JSX.Element {
+  const editor = useSignInTextsEditor();
+  const { status } = editor;
   const hasLoadFailed = status.kind === "failed" && status.phase === "load";
 
   return (
@@ -252,39 +304,7 @@ export function ClubSignInTextsSection({
         </p>
       ) : null}
       {status.kind === "loading" || hasLoadFailed ? null : (
-        <form
-          className="auth-pending club-settings-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void submit();
-          }}
-          noValidate
-        >
-          {/* Mientras se guarda no se edita: lo que se escribiera ahora lo
-              pisaría lo que devuelva el servidor. */}
-          <fieldset className="member-record-fields" disabled={isSending}>
-            {LOCALES.flatMap((locale) =>
-              SIGN_IN_TEXT_KINDS.map((kind) => (
-                <SignInTextInput
-                  key={`${locale}-${kind}`}
-                  translate={translate}
-                  field={{ locale, kind }}
-                  value={draft[locale][kind]}
-                  isInvalid={isInvalid({ locale, kind })}
-                  onChange={(text) => update({ locale, kind }, text)}
-                />
-              )),
-            )}
-          </fieldset>
-          <SaveOutcome translate={translate} status={status} />
-          <button type="submit" className="auth-submit" disabled={isSending}>
-            {translate(
-              isSending
-                ? "clubSettings.signInTexts.saving"
-                : "clubSettings.signInTexts.save",
-            )}
-          </button>
-        </form>
+        <SignInTextsForm translate={translate} editor={editor} />
       )}
     </section>
   );

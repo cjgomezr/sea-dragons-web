@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
+import { SUPPORTED_LOCALES } from "@/lib/i18n/locale";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import {
@@ -47,7 +48,7 @@ async function replaceSignInTexts(
   clubId: string,
   texts: SignInTexts,
 ): Promise<SignInTexts> {
-  const rows = (["en", "es"] as const).map((locale) => ({
+  const rows = SUPPORTED_LOCALES.map((locale) => ({
     club_id: clubId,
     locale,
     ...texts[locale],

@@ -32,7 +32,9 @@ import { createSupabaseSignInTextsGateways } from "@/lib/club/supabase-sign-in-t
 export const dynamic = "force-dynamic";
 
 /** Un tope holgado sólo para no arrastrar un cuerpo de megas hasta el
- * dominio, que cuenta en caracteres y dice qué campo se pasó. */
+ * dominio, que cuenta en caracteres y dice qué campo se pasó. Lo que pasa de
+ * aquí responde 400 sin `reason`: la pantalla valida antes, así que sólo lo
+ * ve quien llama a la API a mano. */
 const TEXT_BODY_MAX_LENGTH = SIGN_IN_WELCOME_MAX_LENGTH * 4;
 
 const textSchema = z.string().max(TEXT_BODY_MAX_LENGTH).nullable();

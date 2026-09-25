@@ -8,12 +8,12 @@ import {
 } from "@/lib/api/request-api";
 import { CLUB_SIGN_IN_TEXTS_API_PATH } from "@/lib/auth/routes";
 import {
-  SIGN_IN_TEXT_KINDS,
+  SIGN_IN_TEXT_FIELDS,
+  type SignInTextField,
   type SignInTextKind,
   type SignInTexts,
   signInTextMaxLength,
 } from "@/lib/club/sign-in-texts";
-import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
@@ -33,12 +33,6 @@ const responseSchema = z.object({
 
 export type SignInTextsRead =
   { readonly kind: "loaded"; readonly texts: SignInTexts } | ApiRequestFailure;
-
-/** El campo de un texto: su idioma y si es el lema o el párrafo. */
-export type SignInTextField = {
-  readonly locale: Locale;
-  readonly kind: SignInTextKind;
-};
 
 async function readTextsResponse(
   request: Promise<ApiRequestOutcome>,
@@ -63,10 +57,6 @@ export function saveSignInTexts(texts: SignInTexts): Promise<SignInTextsRead> {
   );
 }
 
-const TEXT_FIELDS: readonly SignInTextField[] = (["en", "es"] as const).flatMap(
-  (locale) => SIGN_IN_TEXT_KINDS.map((kind) => ({ locale, kind })),
-);
-
 /** El campo del que habla un 400 (`es.tagline_too_long`), si es uno de esta
  * sección. */
 export function readSignInTextIssueField(
@@ -76,7 +66,7 @@ export function readSignInTextIssueField(
     return null;
   }
   return (
-    TEXT_FIELDS.find(
+    SIGN_IN_TEXT_FIELDS.find(
       ({ locale, kind }) => failure.reason === `${locale}.${kind}_too_long`,
     ) ?? null
   );

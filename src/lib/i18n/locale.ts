@@ -1,4 +1,4 @@
-const SUPPORTED_LOCALES = ["en", "es"] as const;
+export const SUPPORTED_LOCALES = ["en", "es"] as const;
 
 /** Los idiomas que habla la aplicación (E17). Añadir uno obliga a darle su
  * catálogo en `message-catalogs.ts`: el compilador no deja olvidarlo. Sale de

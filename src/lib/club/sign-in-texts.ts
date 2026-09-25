@@ -3,7 +3,7 @@ import {
   type AuditLogWriter,
   recordAuditEvent,
 } from "@/lib/audit/audit-log";
-import { isLocale, type Locale } from "@/lib/i18n/locale";
+import { isLocale, type Locale, SUPPORTED_LOCALES } from "@/lib/i18n/locale";
 import { type ClubSettingsGateways, findAdministrator } from "./club-settings";
 
 /**
@@ -33,6 +33,18 @@ const MAX_LENGTH_OF_KIND: Readonly<Record<SignInTextKind, number>> = {
 export function signInTextMaxLength(kind: SignInTextKind): number {
   return MAX_LENGTH_OF_KIND[kind];
 }
+
+/** Un campo de la pantalla: su idioma y si es el lema o el párrafo. */
+export type SignInTextField = {
+  readonly locale: Locale;
+  readonly kind: SignInTextKind;
+};
+
+/** Todos los campos, idioma por idioma: el orden en que se enseñan. */
+export const SIGN_IN_TEXT_FIELDS: readonly SignInTextField[] =
+  SUPPORTED_LOCALES.flatMap((locale) =>
+    SIGN_IN_TEXT_KINDS.map((kind) => ({ locale, kind })),
+  );
 
 /** Sin texto es `null`, nunca la cadena vacía. */
 export type SignInTextsInLocale = {
@@ -79,9 +91,7 @@ export function toSignInTexts(rows: readonly SignInTextRow[]): SignInTexts {
 
 export type SignInTextsIssueCode = `${SignInTextKind}_too_long`;
 
-export type SignInTextsIssue = {
-  readonly locale: Locale;
-  readonly kind: SignInTextKind;
+export type SignInTextsIssue = SignInTextField & {
   readonly code: SignInTextsIssueCode;
 };
 
@@ -112,8 +122,6 @@ export class SignInTextsValidationError extends Error {
   }
 }
 
-const LOCALES: readonly Locale[] = ["en", "es"];
-
 /** Como `char_length` de Postgres: un emoji es un carácter, no dos. */
 function countCharacters(text: string): number {
   return [...text].length;
@@ -134,25 +142,14 @@ export function normalizeSignInTexts(texts: SignInTexts): SignInTexts {
   return { en: normalizeLocale("en"), es: normalizeLocale("es") };
 }
 
-function eachField(): readonly {
-  readonly locale: Locale;
-  readonly kind: SignInTextKind;
-}[] {
-  return LOCALES.flatMap((locale) =>
-    SIGN_IN_TEXT_KINDS.map((kind) => ({ locale, kind })),
-  );
-}
-
 export function findSignInTextsIssues(
   texts: SignInTexts,
 ): readonly SignInTextsIssue[] {
   const normalized = normalizeSignInTexts(texts);
-  return eachField()
-    .filter(({ locale, kind }) => {
-      const text = normalized[locale][kind];
-      return text !== null && countCharacters(text) > MAX_LENGTH_OF_KIND[kind];
-    })
-    .map(({ locale, kind }) => ({ locale, kind, code: `${kind}_too_long` }));
+  return SIGN_IN_TEXT_FIELDS.filter(({ locale, kind }) => {
+    const text = normalized[locale][kind];
+    return text !== null && countCharacters(text) > MAX_LENGTH_OF_KIND[kind];
+  }).map(({ locale, kind }) => ({ locale, kind, code: `${kind}_too_long` }));
 }
 
 /** `en.tagline`, `es.welcome`: lo que la bitácora nombra, sin el valor. */
@@ -160,9 +157,9 @@ function changedFields(
   texts: SignInTexts,
   stored: SignInTexts,
 ): readonly string[] {
-  return eachField()
-    .filter(({ locale, kind }) => texts[locale][kind] !== stored[locale][kind])
-    .map(({ locale, kind }) => `${locale}.${kind}`);
+  return SIGN_IN_TEXT_FIELDS.filter(
+    ({ locale, kind }) => texts[locale][kind] !== stored[locale][kind],
+  ).map(({ locale, kind }) => `${locale}.${kind}`);
 }
 
 function recordTextsChanged(
