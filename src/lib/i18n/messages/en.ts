@@ -772,4 +772,53 @@ export const englishMessages = {
   "clubSettings.error.forbidden": "Only an Admin can change the club settings.",
   "clubSettings.error.unexpected":
     "Something went wrong with the club settings. Try again.",
+  "clubSettings.positions.title": "Positions",
+  "clubSettings.positions.lead":
+    "The playing positions members choose in their profile, in the order the directory follows. Archiving a position keeps it for the members who have it, but nobody else can choose it.",
+  "clubSettings.positions.loading": "Loading the positions…",
+  "clubSettings.positions.active.title": "Active positions",
+  "clubSettings.positions.active.empty":
+    "There are no active positions. Add one below or reactivate an archived one.",
+  "clubSettings.positions.archived.title": "Archived positions",
+  "clubSettings.positions.archived.empty": "No archived positions.",
+  "clubSettings.positions.create.title": "Add a position",
+  "clubSettings.positions.create.submit": "Add position",
+  "clubSettings.positions.create.saving": "Adding…",
+  "clubSettings.positions.rename.label": "Rename {name}",
+  "clubSettings.positions.rename.submit": "Save name",
+  "clubSettings.positions.rename.saving": "Saving…",
+  "clubSettings.positions.cancel": "Cancel",
+  "clubSettings.positions.name.en": "Name in English",
+  "clubSettings.positions.name.es": "Name in Spanish",
+  "clubSettings.positions.name.hint":
+    "Up to {max} characters each. One language is enough: where a name is missing, the other one is shown.",
+  "clubSettings.positions.language.en": "English",
+  "clubSettings.positions.language.es": "Spanish",
+  "clubSettings.positions.otherName": "In {language}: {name}",
+  "clubSettings.positions.missingName":
+    "No name in {language} yet: this one is shown instead.",
+  "clubSettings.positions.move.up": "Up",
+  "clubSettings.positions.move.up.label": "Move {name} up",
+  "clubSettings.positions.move.down": "Down",
+  "clubSettings.positions.move.down.label": "Move {name} down",
+  "clubSettings.positions.rename": "Rename",
+  "clubSettings.positions.archive": "Archive",
+  "clubSettings.positions.archive.label": "Archive {name}",
+  "clubSettings.positions.reactivate": "Reactivate",
+  "clubSettings.positions.reactivate.label": "Reactivate {name}",
+  "clubSettings.positions.moved": "{name} is now number {rank} of {total}.",
+  "clubSettings.positions.created": "{name} added.",
+  "clubSettings.positions.renamed": "Name saved.",
+  "clubSettings.positions.archived":
+    "{name} archived: members who have it keep it.",
+  "clubSettings.positions.reactivated": "{name} can be chosen again.",
+  "clubSettings.positions.retry": "Try again",
+  "clubSettings.positions.reloadLatest": "Load the latest positions",
+  "clubSettings.positions.issue.nameRequired":
+    "Give the position a name in at least one language.",
+  "clubSettings.positions.issue.nameTooLong": "Up to {max} characters.",
+  "clubSettings.positions.issue.nameTaken":
+    "Another position already has this name.",
+  "clubSettings.positions.error.changed":
+    "Another Admin changed the positions while you were editing them. Load the latest and try again.",
 } as const satisfies Readonly<Record<string, Message>>;

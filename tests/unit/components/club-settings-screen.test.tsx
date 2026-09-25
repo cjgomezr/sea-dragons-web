@@ -13,6 +13,7 @@ import type { ClubSettings } from "@/lib/club/club-settings";
  */
 
 const SETTINGS_PATH = "/api/v1/club/settings";
+const POSITIONS_PATH = `${SETTINGS_PATH}/positions`;
 
 const STORED: ClubSettings = {
   name: "Harbour Hammerheads",
@@ -64,6 +65,10 @@ function stubApi(stub: Stub = {}): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
+      // La sección de posiciones (#300) carga lo suyo: aquí sin ninguna.
+      if (url === POSITIONS_PATH) {
+        return jsonResponse(200, { data: { positions: [] } });
+      }
       if (url !== SETTINGS_PATH) {
         throw new Error(`Petición inesperada: ${url}`);
       }

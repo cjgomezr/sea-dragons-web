@@ -8,6 +8,7 @@ import {
   describeClubSettingsFailure,
   loadClubSettings,
 } from "./club-settings-client";
+import { ClubPositionsSection } from "./ClubPositionsSection";
 import { ClubSettingsForm } from "./ClubSettingsForm";
 
 /**
@@ -68,14 +69,19 @@ export function ClubSettingsScreen({
         </div>
       ) : null}
       {state.kind === "loaded" ? (
-        <ClubSettingsForm
-          // Lo último que se cargó empieza de cero: sin esto, el borrador
-          // que chocó con el cambio de otro Admin seguiría a la vista.
-          key={reloads}
-          translate={translate}
-          settings={state.settings}
-          onReloadRequested={reload}
-        />
+        <>
+          <ClubSettingsForm
+            // Lo último que se cargó empieza de cero: sin esto, el borrador
+            // que chocó con el cambio de otro Admin seguiría a la vista.
+            key={reloads}
+            translate={translate}
+            settings={state.settings}
+            onReloadRequested={reload}
+          />
+          {/* Cada cambio de las posiciones se guarda en el acto (#300): no
+              viaja con el botón del formulario de arriba. */}
+          <ClubPositionsSection locale={locale} translate={translate} />
+        </>
       ) : null}
     </div>
   );
