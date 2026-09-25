@@ -115,6 +115,8 @@ export function PositionNamesForm({
     }
     if (outcome.kind === "done") {
       setDraft(toDraft(initialNames));
+      setIssueCode(null);
+      setFailure(null);
       return;
     }
     const code = readPositionIssueCode(outcome);

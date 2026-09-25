@@ -21,7 +21,9 @@
 -- bitácora no se escribe aquí: su único camino es `recordAuditEvent`
 -- (NFR-010).
 
--- El bloqueo que comparten las cuatro.
+-- El bloqueo que comparten las cuatro. Primero la fila del club: un club sin
+-- ninguna posición no tendría nada más que bloquear, y dos altas simultáneas
+-- de la primera no se esperarían.
 create or replace function public.lock_club_positions(acting_club_id uuid)
   returns void
   language plpgsql
@@ -30,6 +32,8 @@ create or replace function public.lock_club_positions(acting_club_id uuid)
   set search_path = ''
 as $$
 begin
+  perform 1 from public.clubs c where c.id = acting_club_id for update;
+
   perform 1
      from public.club_positions p
     where p.club_id = acting_club_id

@@ -417,6 +417,7 @@ describe("pantalla de posiciones", () => {
     );
 
     expect(await within(activeList()).findByText("Centre")).toBeInTheDocument();
+    expect(within(createForm()).queryByRole("alert")).toBeNull();
   });
 
   it("tras un fallo de red al archivar lo dice y reintenta con un botón", async () => {
