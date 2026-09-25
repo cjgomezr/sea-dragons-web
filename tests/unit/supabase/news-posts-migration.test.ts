@@ -188,10 +188,12 @@ function visibleTitles(
   database: TemporaryDatabase,
   subject: string,
 ): Promise<string[]> {
+  // collate "C": en_US de glibc (el Postgres de CI) ignora los espacios al
+  // ordenar y un Postgres local con C no, así que sin esto el orden cambia.
   return readAs(
     database,
     subject,
-    "select title from public.news_posts order by title",
+    'select title from public.news_posts order by title collate "C"',
   );
 }
 
@@ -414,8 +416,9 @@ describeConPostgres("las reglas de una publicación", () => {
       audience: "'groups'",
     });
 
+    // Mismo collate "C" que visibleTitles, por la misma razón.
     const audiencias = await database.query(
-      "select title || ' ' || audience from public.news_posts order by title",
+      "select title || ' ' || audience from public.news_posts order by title collate \"C\"",
     );
 
     expect(audiencias.split("\n")).toEqual([
