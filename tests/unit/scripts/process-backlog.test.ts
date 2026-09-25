@@ -322,6 +322,37 @@ describe("cleanup de process-backlog", () => {
   });
 
   it(
+    "no mata el proceso que llega en CLAUDE_PID desde el entorno",
+    async () => {
+      // Claude Code exporta CLAUDE_PID con su propio PID. Si cleanup() lo usara,
+      // correr estos tests dentro de una sesión de Claude la cerraría.
+      workDir = await setupWorkDir();
+      const { binDir } = await installFakeGh(workDir);
+      const bystander = spawn("sleep", ["30"], { stdio: "ignore" });
+      const bystanderPid = bystander.pid;
+      if (bystanderPid === undefined) throw new Error("sleep no arrancó");
+
+      try {
+        await runBash(
+          "source scripts/process-backlog.sh; N=5; ME=tester; cleanup",
+          workDir,
+          {
+            ...process.env,
+            PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+            CLAUDE_PID: String(bystanderPid),
+          },
+        );
+
+        // La señal 0 no mata: solo falla si el proceso ya no existe.
+        expect(() => process.kill(bystanderPid, 0)).not.toThrow();
+      } finally {
+        bystander.kill();
+      }
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "devuelve la etiqueta pending y mueve la tarjeta a Blocked",
     async () => {
       workDir = await setupWorkDir();
@@ -398,6 +429,43 @@ describe("cleanup de process-backlog", () => {
       const log = await readLog(logFile);
       expect(log).toMatch(
         /issue edit 5 --add-label pending --remove-label in-progress/,
+      );
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+});
+
+describe("next_issue", () => {
+  let workDir = "";
+
+  afterEach(async () => {
+    if (workDir) {
+      await rm(workDir, REMOVE_TEMP_DIR_OPTIONS);
+      workDir = "";
+    }
+  });
+
+  it(
+    "consulta los pending sin ONLY_LABEL y sin errores de variable no definida",
+    async () => {
+      // En el bash 3.2 de macOS, "${a[@]}" sobre un array vacío falla con set -u.
+      // En bash 4.4+ este test pasa siempre; solo lo atrapa en una Mac.
+      workDir = await setupWorkDir();
+      const { binDir, logFile } = await installFakeGh(workDir);
+
+      const { stderr } = await runBash(
+        "source scripts/process-backlog.sh; ME=tester; next_issue",
+        workDir,
+        {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+          ONLY_LABEL: "",
+        },
+      );
+
+      expect(stderr).not.toMatch(/unbound variable/);
+      expect(await readLog(logFile)).toMatch(
+        /issue list --limit 500 --label pending --state open/,
       );
     },
     REAL_PROCESS_TEST_TIMEOUT_MS,
@@ -703,7 +771,7 @@ describe("lanzamiento del worker", () => {
       const { binDir, logFile } = await installFakeClaude(workDir);
 
       const { code } = await runBash(
-        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        'source scripts/process-backlog.sh; run_worker 77; wait "$WORKER_PID"',
         workDir,
         {
           ...process.env,
@@ -729,7 +797,7 @@ describe("lanzamiento del worker", () => {
       const { binDir, logFile } = await installFakeClaude(workDir);
 
       const { code } = await runBash(
-        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        'source scripts/process-backlog.sh; run_worker 77; wait "$WORKER_PID"',
         workDir,
         {
           ...process.env,
@@ -772,7 +840,7 @@ describe("lanzamiento del worker", () => {
       workDir = await setupWorkDir();
       const { binDir, logFile } = await installFakeClaude(workDir);
       await runBash(
-        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        'source scripts/process-backlog.sh; run_worker 77; wait "$WORKER_PID"',
         workDir,
         {
           ...process.env,
@@ -823,7 +891,7 @@ describe("lanzamiento del worker", () => {
       const { binDir, logFile } = await installFakeClaude(workDir);
 
       const { code, stderr } = await runBash(
-        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        'source scripts/process-backlog.sh; run_worker 77; wait "$WORKER_PID"',
         workDir,
         {
           ...process.env,
@@ -853,7 +921,7 @@ describe("lanzamiento del worker", () => {
       const { binDir, logFile } = await installFakeClaude(workDir);
 
       const { code, stderr } = await runBash(
-        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        'source scripts/process-backlog.sh; run_worker 77; wait "$WORKER_PID"',
         workDir,
         {
           ...process.env,
@@ -904,7 +972,7 @@ describe("rama del worker", () => {
       const { binDir } = await installFakeClaude(workDir);
 
       const { code } = await runBash(
-        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        'source scripts/process-backlog.sh; run_worker 77; wait "$WORKER_PID"',
         workDir,
         {
           ...process.env,
@@ -933,7 +1001,7 @@ describe("rama del worker", () => {
       };
       const runOnce = () =>
         runBash(
-          'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+          'source scripts/process-backlog.sh; run_worker 77; wait "$WORKER_PID"',
           workDir,
           env,
         );
@@ -960,7 +1028,7 @@ describe("rama del worker", () => {
       );
 
       const { code } = await runBash(
-        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        'source scripts/process-backlog.sh; run_worker 77; wait "$WORKER_PID"',
         workDir,
         {
           ...process.env,
@@ -988,7 +1056,7 @@ describe("rama del worker", () => {
       await runBash("git branch impl-77", workDir, process.env);
 
       const { code } = await runBash(
-        'source scripts/process-backlog.sh; run_worker 77; wait "$CLAUDE_PID"',
+        'source scripts/process-backlog.sh; run_worker 77; wait "$WORKER_PID"',
         workDir,
         {
           ...process.env,
@@ -1176,8 +1244,8 @@ describe("worker sin PR", () => {
 ME=tester
 N=9
 bash -c 'exit 1' &
-CLAUDE_PID=$!
-if wait "$CLAUDE_PID"; then EXIT_CODE=0; else EXIT_CODE=$?; fi
+WORKER_PID=$!
+if wait "$WORKER_PID"; then EXIT_CODE=0; else EXIT_CODE=$?; fi
 handle_worker_exit "$N" "$EXIT_CODE"`,
         workDir,
         {
