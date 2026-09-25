@@ -58,6 +58,10 @@ import {
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
 import { isStatePhotographed } from "./support/spanish-captures";
 import { snapshotCreatedNotice } from "./support/visual-baseline-notice";
+import {
+  type AccentPalette,
+  evaluateAccentColor,
+} from "@/lib/club/accent-color";
 import { buildAccentStylesheet } from "@/lib/club/accent-stylesheet";
 import { LOCALE_COOKIE_NAME, type Locale } from "@/lib/i18n/locale";
 
@@ -6520,16 +6524,48 @@ const CLUB_ACCENT_RGB = "rgb(123, 63, 160)";
 const DEFAULT_LIGHT_ACCENT_RGB = "rgb(28, 110, 164)";
 const DEFAULT_DARK_ACCENT_RGB = "rgb(51, 161, 224)";
 
-function clubAccentStylesheet(): string {
-  const stylesheet = buildAccentStylesheet(CLUB_ACCENT);
+/** El amarillo del prototipo (#341): rellena el botón tal cual, pero como
+ * enlace sobre el fondo claro va oscurecido. */
+const LIGHT_CLUB_ACCENT = "#ffc94a";
+const LIGHT_CLUB_ACCENT_RGB = "rgb(255, 201, 74)";
+
+/** Las dos marcas con las que se revisan las pantallas: una oscura que ya se
+ * lee como enlace y una clara que necesita su variante. El morado conserva
+ * los nombres de captura que tenía desde el #294. */
+const CLUB_ACCENTS = [
+  { color: CLUB_ACCENT, snapshotSuffix: "" },
+  { color: LIGHT_CLUB_ACCENT, snapshotSuffix: "-amarillo" },
+] as const;
+
+function clubAccentStylesheet(accent: string): string {
+  const stylesheet = buildAccentStylesheet(accent);
   if (stylesheet === null) {
-    throw new Error(`${CLUB_ACCENT} no produjo hoja de acento`);
+    throw new Error(`${accent} no produjo hoja de acento`);
   }
   return stylesheet;
 }
 
-async function applyClubAccent(page: Page): Promise<void> {
-  await page.addStyleTag({ content: clubAccentStylesheet() });
+async function applyClubAccent(
+  page: Page,
+  accent: string = CLUB_ACCENT,
+): Promise<void> {
+  await page.addStyleTag({ content: clubAccentStylesheet(accent) });
+}
+
+function acceptedAccentPalette(accent: string): AccentPalette {
+  const evaluation = evaluateAccentColor(accent);
+  if (evaluation.kind !== "accepted") {
+    throw new Error(`${accent} fue rechazado: ${evaluation.reason}`);
+  }
+  return evaluation.palette;
+}
+
+/** `#rrggbb` como lo devuelve `getComputedStyle`. */
+function toComputedRgb(hex: string): string {
+  const [red, green, blue] = [1, 3, 5].map((start) =>
+    parseInt(hex.slice(start, start + 2), 16),
+  );
+  return `rgb(${red}, ${green}, ${blue})`;
 }
 
 type AccentScreen = {
@@ -6567,51 +6603,54 @@ const ACCENT_SCREENS: readonly AccentScreen[] = [
 async function goToWithClubAccent(
   page: Page,
   accentScreen: AccentScreen,
-  theme: (typeof themes)[number],
+  { theme, accent }: { theme: (typeof themes)[number]; accent: string },
 ): Promise<void> {
   await accentScreen.visit(page, theme);
-  await applyClubAccent(page);
+  await applyClubAccent(page, accent);
   await page.mouse.move(0, 0);
 }
 
-for (const accentScreen of ACCENT_SCREENS) {
-  test.describe(accentScreen.name, () => {
-    if (accentScreen.storageState !== undefined) {
-      skipWithoutSession();
-      quietNotificationBell();
-      test.use({ storageState: accentScreen.storageState });
-    }
+for (const { color: accent, snapshotSuffix } of CLUB_ACCENTS) {
+  for (const accentScreen of ACCENT_SCREENS) {
+    const screenName = `${accentScreen.name}${snapshotSuffix}`;
+    test.describe(screenName, () => {
+      if (accentScreen.storageState !== undefined) {
+        skipWithoutSession();
+        quietNotificationBell();
+        test.use({ storageState: accentScreen.storageState });
+      }
 
-    for (const vp of viewports) {
-      test.describe(`@ ${vp.name}`, () => {
-        test.use({ viewport: { width: vp.width, height: vp.height } });
+      for (const vp of viewports) {
+        test.describe(`@ ${vp.name}`, () => {
+          test.use({ viewport: { width: vp.width, height: vp.height } });
 
-        for (const theme of themes) {
-          test(`matches approved baseline (${theme})`, async ({ page }) => {
-            await goToWithClubAccent(page, accentScreen, theme);
-            const snapshot = `${accentScreen.name}-${vp.name}-${theme}.png`;
-            await createMissingLocalBaseline(snapshot, () =>
-              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
-            );
-            await expect(page).toHaveScreenshot(snapshot, {
-              ...SCREENSHOT_OPTIONS,
-              fullPage: true,
-              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToWithClubAccent(page, accentScreen, { theme, accent });
+              const snapshot = `${screenName}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
             });
-          });
-        }
-      });
-    }
+          }
+        });
+      }
 
-    for (const theme of themes) {
-      test(`has no accessibility violations (axe-core, ${theme})`, async ({
-        page,
-      }) => {
-        await goToWithClubAccent(page, accentScreen, theme);
-        await expectNoAxeViolations(page);
-      });
-    }
-  });
+      for (const theme of themes) {
+        test(`has no accessibility violations (axe-core, ${theme})`, async ({
+          page,
+        }) => {
+          await goToWithClubAccent(page, accentScreen, { theme, accent });
+          await expectNoAxeViolations(page);
+        });
+      }
+    });
+  }
 }
 
 test.describe("el acento del club sobre la aplicación", () => {
@@ -6639,6 +6678,46 @@ test.describe("el acento del club sobre la aplicación", () => {
     const color = await signInButtonColor(page);
     expect(color).not.toBe(DEFAULT_DARK_ACCENT_RGB);
     expect(color).not.toBe(CLUB_ACCENT_RGB);
+  });
+
+  async function signInLinkColor(page: Page): Promise<string> {
+    return page
+      .locator(".auth-inline-link")
+      .evaluate((link) => getComputedStyle(link).color);
+  }
+
+  test("con un acento claro, el botón usa el color del club tal cual y el enlace su variante oscura", async ({
+    page,
+  }) => {
+    await goToWithTheme(page, SIGN_IN_PATH, "light");
+    await applyClubAccent(page, LIGHT_CLUB_ACCENT);
+
+    expect(await signInButtonColor(page)).toBe(LIGHT_CLUB_ACCENT_RGB);
+    expect(await signInLinkColor(page)).toBe(
+      toComputedRgb(acceptedAccentPalette(LIGHT_CLUB_ACCENT).light.accentText),
+    );
+  });
+
+  test("con un acento que ya se lee, el enlace usa el color del club tal cual", async ({
+    page,
+  }) => {
+    await goToWithTheme(page, SIGN_IN_PATH, "light");
+    await applyClubAccent(page);
+
+    expect(await signInLinkColor(page)).toBe(CLUB_ACCENT_RGB);
+  });
+
+  test("con un acento claro en el tema oscuro, el enlace es el acento aclarado", async ({
+    page,
+  }) => {
+    await goToWithTheme(page, SIGN_IN_PATH, "dark");
+    await applyClubAccent(page, LIGHT_CLUB_ACCENT);
+
+    const darkAccent = toComputedRgb(
+      acceptedAccentPalette(LIGHT_CLUB_ACCENT).dark.accent,
+    );
+    expect(await signInButtonColor(page)).toBe(darkAccent);
+    expect(await signInLinkColor(page)).toBe(darkAccent);
   });
 
   test("en el tema oscuro el resto de la paleta no cambia", async ({

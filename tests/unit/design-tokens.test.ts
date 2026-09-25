@@ -96,6 +96,7 @@ const darkCss = cssCustomProperties(
 
 const colorRoleToCssVariable: Record<string, string> = {
   Accent: "color-accent",
+  "Accent text": "color-accent-text",
   Background: "color-background",
   Panel: "color-panel",
   Text: "color-text",

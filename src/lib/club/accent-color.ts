@@ -1,13 +1,14 @@
 /**
  * El color de acento del club (#294, RF-3 del PRD de E18a). El club elige un
  * solo color (decisión D1); el texto que va encima se calcula, y el acento
- * se rechaza si el par no llega a AA o si el acento no se lee como enlace
- * sobre los fondos claros.
+ * se rechaza sólo si ningún texto encima llega a AA.
  *
  * Un mismo color no puede servir de enlace sobre el panel blanco y sobre el
  * panel oscuro: el que se lee en uno se pierde en el otro. Por eso el tema
  * oscuro lleva el color del club aclarado, igual que hoy lleva un azul más
- * claro que el del tema claro.
+ * claro que el del tema claro. Y un acento claro, como un amarillo, rellena
+ * los botones tal cual pero pinta los enlaces del tema claro con una variante
+ * oscurecida (#341).
  *
  * Los colores de la paleta que se nombran aquí son copia de `globals.css`, y
  * `tests/unit/club/accent-color.test.ts` exige que sigan siéndolo.
@@ -30,8 +31,12 @@ export const DARK_ACCENT_SURFACES = ["#13283a", "#0c1a26"] as const;
 export const ON_ACCENT_CANDIDATES = ["#ffffff", "#0c1a26"] as const;
 
 export type AccentPair = {
+  /** El relleno de botones y estados activos. */
   readonly accent: string;
+  /** El texto sobre ese relleno. */
   readonly onAccent: string;
+  /** El acento usado como texto (enlaces, foco) sobre los fondos del tema. */
+  readonly accentText: string;
 };
 
 export type AccentPalette = {
@@ -39,14 +44,16 @@ export type AccentPalette = {
   readonly dark: AccentPair;
 };
 
-export type AccentRejection =
-  "not_hex" | "no_readable_text" | "unreadable_on_background";
+export type AccentRejection = "not_hex" | "no_readable_text";
 
 export type AccentEvaluation =
   | { readonly kind: "accepted"; readonly palette: AccentPalette }
   | { readonly kind: "rejected"; readonly reason: AccentRejection };
 
 type Rgb = readonly [red: number, green: number, blue: number];
+
+/** Tono en grados; saturación y claridad entre 0 y 1. */
+type Hsl = readonly [hue: number, saturation: number, lightness: number];
 
 /** El mismo formato que exige `clubs_accent_color_hex` en la base. */
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -56,6 +63,13 @@ const MAX_CHANNEL = 255;
 /** En cuántos pasos se acerca al blanco el acento del tema oscuro: de 5 en 5
  * por ciento, un cambio que a la vista apenas se nota. */
 const DARK_LIGHTENING_STEPS = 20;
+
+/** Lo mismo al revés para el enlace del tema claro: de 5 en 5 por ciento de
+ * la claridad del club hacia el negro. */
+const LIGHT_DARKENING_STEPS = 20;
+
+const DEGREES_PER_HUE_SECTOR = 60;
+const HUE_SECTORS = 6;
 
 export function isHexColor(value: string): boolean {
   return HEX_COLOR_PATTERN.test(value);
@@ -137,8 +151,64 @@ function lightenForDarkTheme(accent: string): string {
   throw new Error(`Ni el blanco se lee sobre los fondos oscuros: ${accent}`);
 }
 
-function pairFor(accent: string): AccentPair {
-  return { accent, onAccent: bestOnAccent(accent) };
+/** https://www.w3.org/TR/css-color-4/#rgb-to-hsl */
+function toHsl(rgb: Rgb): Hsl {
+  const [red, green, blue] = rgb.map((channel) => channel / MAX_CHANNEL) as [
+    number,
+    number,
+    number,
+  ];
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const lightness = (max + min) / 2;
+  const chroma = max - min;
+  if (chroma === 0) {
+    return [0, 0, lightness];
+  }
+  const saturation = chroma / (1 - Math.abs(2 * lightness - 1));
+  const sector =
+    max === red
+      ? ((green - blue) / chroma + HUE_SECTORS) % HUE_SECTORS
+      : max === green
+        ? (blue - red) / chroma + 2
+        : (red - green) / chroma + 4;
+  return [sector * DEGREES_PER_HUE_SECTOR, saturation, lightness];
+}
+
+/** https://www.w3.org/TR/css-color-4/#hsl-to-rgb */
+function fromHsl([hue, saturation, lightness]: Hsl): Rgb {
+  const amplitude = saturation * Math.min(lightness, 1 - lightness);
+  const channel = (offset: number): number => {
+    const position = (offset + hue / 30) % 12;
+    const ramp = Math.max(-1, Math.min(position - 3, 9 - position, 1));
+    return (lightness - amplitude * ramp) * MAX_CHANNEL;
+  };
+  return [channel(0), channel(8), channel(4)];
+}
+
+/**
+ * El color del club, cada vez más oscuro, hasta que se lee como enlace sobre
+ * los fondos claros. Baja la claridad en HSL y deja quietos el tono y la
+ * saturación: restar lo mismo a cada canal RGB desplazaría el tono. El negro
+ * se lee siempre, así que termina.
+ */
+function darkenForLightTheme(accent: string): string {
+  if (readsOnAll(accent, LIGHT_ACCENT_SURFACES)) {
+    return accent;
+  }
+  const [hue, saturation, lightness] = toHsl(toRgb(accent));
+  for (let step = 1; step <= LIGHT_DARKENING_STEPS; step += 1) {
+    const darkerLightness = lightness * (1 - step / LIGHT_DARKENING_STEPS);
+    const candidate = toHex(fromHsl([hue, saturation, darkerLightness]));
+    if (readsOnAll(candidate, LIGHT_ACCENT_SURFACES)) {
+      return candidate;
+    }
+  }
+  throw new Error(`Ni el negro se lee sobre los fondos claros: ${accent}`);
+}
+
+function pairFor(accent: string, accentText: string): AccentPair {
+  return { accent, onAccent: bestOnAccent(accent), accentText };
 }
 
 export function evaluateAccentColor(value: string): AccentEvaluation {
@@ -146,15 +216,13 @@ export function evaluateAccentColor(value: string): AccentEvaluation {
     return { kind: "rejected", reason: "not_hex" };
   }
   const accent = value.toLowerCase();
-  const light = pairFor(accent);
+  const light = pairFor(accent, darkenForLightTheme(accent));
   if (contrastRatio(light.accent, light.onAccent) < AA_NORMAL_TEXT_CONTRAST) {
     return { kind: "rejected", reason: "no_readable_text" };
   }
-  if (!readsOnAll(accent, LIGHT_ACCENT_SURFACES)) {
-    return { kind: "rejected", reason: "unreadable_on_background" };
-  }
+  const darkAccent = lightenForDarkTheme(accent);
   return {
     kind: "accepted",
-    palette: { light, dark: pairFor(lightenForDarkTheme(accent)) },
+    palette: { light, dark: pairFor(darkAccent, darkAccent) },
   };
 }

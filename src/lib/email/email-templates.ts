@@ -78,7 +78,7 @@ function buttonStyle(accent: AccentPair): string {
 }
 
 function writtenLinkStyle(accent: AccentPair): string {
-  return `color: ${accent.accent}; word-break: break-all;`;
+  return `color: ${accent.accentText}; word-break: break-all;`;
 }
 
 /** Lo que la plantilla pinta de la marca, ya comprobado. Un acento guardado

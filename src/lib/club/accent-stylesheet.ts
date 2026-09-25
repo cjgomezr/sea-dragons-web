@@ -20,7 +20,7 @@ const SYSTEM_DARK_SELECTOR = 'html:root:not([data-theme="light"])';
 const CHOSEN_DARK_SELECTOR = 'html:root[data-theme="dark"]';
 
 function accentRule(selector: string, pair: AccentPair): string {
-  return `${selector}{--color-accent:${pair.accent};--color-on-accent:${pair.onAccent}}`;
+  return `${selector}{--color-accent:${pair.accent};--color-on-accent:${pair.onAccent};--color-accent-text:${pair.accentText}}`;
 }
 
 /**

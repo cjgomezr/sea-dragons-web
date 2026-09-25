@@ -58,7 +58,6 @@ const FIELD_OF_ISSUE: Readonly<
   initials_too_long: "initials",
   accent_color_invalid: "accentColor",
   accent_color_no_readable_text: "accentColor",
-  accent_color_unreadable_on_background: "accentColor",
 };
 
 function toDraft(settings: ClubSettings): Draft {

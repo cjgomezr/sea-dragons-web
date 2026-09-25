@@ -104,8 +104,6 @@ export function describeClubSettingsIssue(
       return translate("clubSettings.issue.accentInvalid");
     case "accent_color_no_readable_text":
       return translate("clubSettings.issue.accentNoReadableText");
-    case "accent_color_unreadable_on_background":
-      return translate("clubSettings.issue.accentUnreadableOnBackground");
   }
 }
 

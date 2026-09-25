@@ -31,7 +31,8 @@ desplazamiento lo sigan.
 
 | Role           | Value     | Usage                          |
 | -------------- | --------- | ------------------------------ |
-| Accent         | `#1C6EA4` | Primary actions, links, focus  |
+| Accent         | `#1C6EA4` | Primary actions, active states |
+| Accent text    | `#1C6EA4` | Links, focus, accent as text   |
 | Background     | `#EFF3F7` | Page background                |
 | Panel          | `#FFFFFF` | Cards, panels                  |
 | Text           | `#1C3245` | Body text                      |
@@ -55,7 +56,8 @@ desplazamiento lo sigan.
 
 | Role           | Value     | Usage                          |
 | -------------- | --------- | ------------------------------ |
-| Accent         | `#33A1E0` | Primary actions, links, focus  |
+| Accent         | `#33A1E0` | Primary actions, active states |
+| Accent text    | `#33A1E0` | Links, focus, accent as text   |
 | Background     | `#0C1A26` | Page background                |
 | Panel          | `#13283A` | Cards, panels                  |
 | Text           | `#E8F0F7` | Body text                      |
@@ -69,6 +71,14 @@ desplazamiento lo sigan.
 Rules: one accent color; success/warning/danger appear only with their meaning;
 never place text on a background with contrast ratio below 4.5:1 (3:1 for
 text ≥ 24px).
+
+> **Decisión del 2026-09-24 (issue #341).** `Accent text` no es un segundo
+> acento: es el mismo color cuando hace de texto. Con el acento de hoy los dos
+> valen lo mismo. Con el acento claro de un club (un amarillo, por ejemplo)
+> los botones se rellenan con el color tal cual y los enlaces y el foco usan
+> una variante oscurecida que conserva su tono y llega a 4.5:1. Nada que sea
+> texto usa `Accent`; los rellenos, los bordes de hover y las marcas de
+> estado activo sí.
 
 > **Decisión del 2026-09-12 (issue #132).** `Danger` es un token nuevo, y
 > existe porque el primer formulario de la aplicación necesitaba pintar un

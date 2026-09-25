@@ -1,6 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_ACCENT_COLOR } from "@/lib/club/accent-color";
+import {
+  DEFAULT_ACCENT_COLOR,
+  evaluateAccentColor,
+} from "@/lib/club/accent-color";
 import { buildAccentStylesheet } from "@/lib/club/accent-stylesheet";
 import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
 
@@ -11,6 +14,18 @@ import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
  */
 
 const CLUB_ACCENT = "#7b3fa0";
+
+/** El amarillo del prototipo (#341): rellena bien, pero no se lee como
+ * enlace sobre el fondo claro. */
+const LIGHT_CLUB_ACCENT = "#ffc94a";
+
+function darkenedAccentText(accent: string): string {
+  const evaluation = evaluateAccentColor(accent);
+  if (evaluation.kind !== "accepted") {
+    throw new Error(`${accent} fue rechazado: ${evaluation.reason}`);
+  }
+  return evaluation.palette.light.accentText;
+}
 
 const servedBrand = vi.hoisted(() => ({
   current: null as ClubBrand | null,
@@ -74,14 +89,14 @@ describe("hoja del acento", () => {
     expect(systemDark).not.toBe(light);
   });
 
-  it("sólo toca el acento y el texto encima: el resto de la paleta no cambia", () => {
+  it("sólo toca el acento, el texto encima y el acento como texto: el resto de la paleta no cambia", () => {
     const stylesheet = buildAccentStylesheet(CLUB_ACCENT) ?? "";
 
     const properties = [...stylesheet.matchAll(/--([\w-]+):/g)].map(
       (match) => match[1],
     );
     expect(new Set(properties)).toEqual(
-      new Set(["color-accent", "color-on-accent"]),
+      new Set(["color-accent", "color-on-accent", "color-accent-text"]),
     );
   });
 
@@ -90,7 +105,38 @@ describe("hoja del acento", () => {
   });
 
   it("con un acento guardado que no llega a AA deja el de hoy", () => {
-    expect(buildAccentStylesheet("#ffd700")).toBeNull();
+    expect(buildAccentStylesheet("#7a7a7a")).toBeNull();
+  });
+
+  it("con un acento claro, el relleno es el del club y el enlace del tema claro, su variante oscura", () => {
+    const stylesheet = buildAccentStylesheet(LIGHT_CLUB_ACCENT) ?? "";
+
+    expect(customProperty(stylesheet, "color-accent")[0]).toBe(
+      LIGHT_CLUB_ACCENT,
+    );
+    expect(customProperty(stylesheet, "color-accent-text")[0]).toBe(
+      darkenedAccentText(LIGHT_CLUB_ACCENT),
+    );
+  });
+
+  it("con un acento que ya se lee, el enlace del tema claro es el mismo color", () => {
+    const stylesheet = buildAccentStylesheet(CLUB_ACCENT) ?? "";
+
+    expect(customProperty(stylesheet, "color-accent-text")[0]).toBe(
+      CLUB_ACCENT,
+    );
+  });
+
+  it("en el tema oscuro, el enlace es el acento aclarado", () => {
+    const stylesheet = buildAccentStylesheet(LIGHT_CLUB_ACCENT) ?? "";
+
+    const [, systemDark, chosenDark] = customProperty(
+      stylesheet,
+      "color-accent-text",
+    );
+    const [, darkAccent] = customProperty(stylesheet, "color-accent");
+    expect(systemDark).toBe(darkAccent);
+    expect(chosenDark).toBe(darkAccent);
   });
 });
 

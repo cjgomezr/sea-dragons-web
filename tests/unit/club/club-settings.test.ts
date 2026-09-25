@@ -265,6 +265,17 @@ describe("configuración del club: acento", () => {
     expect(auditRows[0]?.metadata).toEqual({ fields: ["accentColor"] });
   });
 
+  it("guarda un acento claro, que como enlace se pinta oscurecido (#341)", async () => {
+    const { gateways, writes } = fake();
+
+    await updateClubSettings(gateways, {
+      callerId: ADMIN_ID,
+      submission: submit({ accentColor: "#FFC94A" }),
+    });
+
+    expect(writes[0]?.identity.accentColor).toBe("#ffc94a");
+  });
+
   it("un acento guardado que ya no llega a AA no impide cambiar el nombre", async () => {
     const { gateways, writes } = fake();
     const stored = { ...LOADED, accentColor: "#7a7a7a" };
@@ -344,12 +355,6 @@ describe("configuración del club: validación", () => {
       { accentColor: "#7a7a7a" },
       "accentColor",
       "accent_color_no_readable_text",
-    ],
-    [
-      "un acento que no se lee sobre el fondo claro",
-      { accentColor: "#ffd700" },
-      "accentColor",
-      "accent_color_unreadable_on_background",
     ],
   ] as const)(
     "rechaza %s junto a su campo, sin tocar la base",
