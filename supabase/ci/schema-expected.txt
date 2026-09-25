@@ -16,6 +16,10 @@ columna club_positions.club_id tipo=uuid null=NO default=-
 columna club_positions.created_at tipo=timestamp with time zone null=NO default=now()
 columna club_positions.id tipo=uuid null=NO default=gen_random_uuid()
 columna club_positions.sort_order tipo=integer null=NO default=-
+columna club_sign_in_texts.club_id tipo=uuid null=NO default=-
+columna club_sign_in_texts.locale tipo=text null=NO default=-
+columna club_sign_in_texts.tagline tipo=text null=YES default=-
+columna club_sign_in_texts.welcome tipo=text null=YES default=-
 columna clubs.accent_color tipo=text null=NO default='#1c6ea4'::text
 columna clubs.created_at tipo=timestamp with time zone null=NO default=now()
 columna clubs.id tipo=uuid null=NO default=gen_random_uuid()
@@ -168,6 +172,22 @@ grant club_positions service_role SELECT
 grant club_positions service_role TRIGGER
 grant club_positions service_role TRUNCATE
 grant club_positions service_role UPDATE
+grant club_sign_in_texts anon SELECT
+grant club_sign_in_texts authenticated SELECT
+grant club_sign_in_texts postgres DELETE
+grant club_sign_in_texts postgres INSERT
+grant club_sign_in_texts postgres REFERENCES
+grant club_sign_in_texts postgres SELECT
+grant club_sign_in_texts postgres TRIGGER
+grant club_sign_in_texts postgres TRUNCATE
+grant club_sign_in_texts postgres UPDATE
+grant club_sign_in_texts service_role DELETE
+grant club_sign_in_texts service_role INSERT
+grant club_sign_in_texts service_role REFERENCES
+grant club_sign_in_texts service_role SELECT
+grant club_sign_in_texts service_role TRIGGER
+grant club_sign_in_texts service_role TRUNCATE
+grant club_sign_in_texts service_role UPDATE
 grant clubs authenticated SELECT
 grant clubs postgres DELETE
 grant clubs postgres INSERT
@@ -370,6 +390,7 @@ indice club_position_names_pkey CREATE UNIQUE INDEX club_position_names_pkey ON 
 indice club_positions_club_id_sort_order_idx CREATE INDEX club_positions_club_id_sort_order_idx ON public.club_positions USING btree (club_id, sort_order)
 indice club_positions_id_club_id_key CREATE UNIQUE INDEX club_positions_id_club_id_key ON public.club_positions USING btree (id, club_id)
 indice club_positions_pkey CREATE UNIQUE INDEX club_positions_pkey ON public.club_positions USING btree (id)
+indice club_sign_in_texts_pkey CREATE UNIQUE INDEX club_sign_in_texts_pkey ON public.club_sign_in_texts USING btree (club_id, locale)
 indice clubs_pkey CREATE UNIQUE INDEX clubs_pkey ON public.clubs USING btree (id)
 indice clubs_slug_key CREATE UNIQUE INDEX clubs_slug_key ON public.clubs USING btree (slug)
 indice confirmation_email_requests_email_hash_requested_at_idx CREATE INDEX confirmation_email_requests_email_hash_requested_at_idx ON public.confirmation_email_requests USING btree (email_hash, requested_at DESC)
@@ -412,6 +433,7 @@ policy club_position_names.club_position_names_select_own_club cmd=SELECT roles=
 policy club_positions.club_positions_select_own_club cmd=SELECT roles={authenticated} using=(club_id IN ( SELECT m.club_id
    FROM members m
   WHERE (m.user_id = ( SELECT auth.uid() AS uid)))) check=-
+policy club_sign_in_texts.club_sign_in_texts_select_public cmd=SELECT roles={anon,authenticated} using=true check=-
 policy clubs.clubs_select_anon cmd=SELECT roles={anon} using=true check=-
 policy clubs.clubs_select_authenticated cmd=SELECT roles={authenticated} using=true check=-
 policy confirmation_email_requests.confirmation_email_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
@@ -447,6 +469,11 @@ restriccion club_position_names.club_position_names_position_same_club_fkey FORE
 restriccion club_positions.club_positions_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
 restriccion club_positions.club_positions_id_club_id_key UNIQUE (id, club_id)
 restriccion club_positions.club_positions_pkey PRIMARY KEY (id)
+restriccion club_sign_in_texts.club_sign_in_texts_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
+restriccion club_sign_in_texts.club_sign_in_texts_locale_check CHECK ((locale = ANY (ARRAY['en'::text, 'es'::text])))
+restriccion club_sign_in_texts.club_sign_in_texts_pkey PRIMARY KEY (club_id, locale)
+restriccion club_sign_in_texts.club_sign_in_texts_tagline_length CHECK (((char_length(btrim(tagline)) >= 1) AND (char_length(btrim(tagline)) <= 140)))
+restriccion club_sign_in_texts.club_sign_in_texts_welcome_length CHECK (((char_length(btrim(welcome)) >= 1) AND (char_length(btrim(welcome)) <= 320)))
 restriccion clubs.clubs_accent_color_hex CHECK ((accent_color ~ '^#[0-9A-Fa-f]{6}$'::text))
 restriccion clubs.clubs_initials_length CHECK (((char_length(initials) >= 1) AND (char_length(initials) <= 3)))
 restriccion clubs.clubs_name_length CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 60)))
@@ -520,6 +547,7 @@ restriccion role_requests.role_requests_user_id_fkey FOREIGN KEY (user_id) REFER
 tabla audit_log rls=t
 tabla club_position_names rls=t
 tabla club_positions rls=t
+tabla club_sign_in_texts rls=t
 tabla clubs rls=t
 tabla confirmation_email_requests rls=t
 tabla email_send_requests rls=t
