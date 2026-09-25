@@ -6216,6 +6216,12 @@ const FIXTURES_DIR = path.join(__dirname, "support", "fixtures");
  * `.club-logo` le da a un logo apaisado. */
 const LOGO_BOX_HEIGHT_PX = 32;
 const LOGO_BOX_MAX_WIDTH_PX = LOGO_BOX_HEIGHT_PX * 4;
+/** En la barra lateral de escritorio el logo va junto al nombre y su tope
+ * baja a 2,5 veces el alto, para que el nombre conserve 120px (#352). */
+const SIDEBAR_LOGO_MAX_WIDTH_PX = 80;
+const SIDEBAR_NAME_MIN_WIDTH_PX = 120;
+/** Desde aquí la cabecera es la barra lateral de 240px. */
+const SIDEBAR_MIN_VIEWPORT_PX = 768;
 /** Cuánto puede apartarse la proporción pintada de la del fichero por el
  * redondeo a píxeles enteros. */
 const LOGO_RATIO_TOLERANCE = 0.05;
@@ -6306,9 +6312,13 @@ async function showLogoOnServedPage(
   await expectLogoLoaded(page);
 }
 
-/** El logo dentro de su caja: del alto del recuadro, sin pasar del tope de
- * ancho, con la proporción del fichero y sin salirse de su contenedor. */
-async function expectLogoFitsItsBox(page: Page): Promise<void> {
+/** El logo dentro de su caja: del alto del recuadro, con el ancho que le da
+ * su proporción hasta el tope, encajado sin deformarse si llega a él, y sin
+ * salirse de su contenedor. */
+async function expectLogoFitsItsBox(
+  page: Page,
+  maxWidth: number = LOGO_BOX_MAX_WIDTH_PX,
+): Promise<void> {
   const fit = await page
     .locator("img.club-logo")
     .evaluate((image: HTMLImageElement) => {
@@ -6324,9 +6334,10 @@ async function expectLogoFitsItsBox(page: Page): Promise<void> {
       };
     });
   expect(fit.height).toBe(LOGO_BOX_HEIGHT_PX);
-  expect(fit.width).toBeLessThanOrEqual(LOGO_BOX_MAX_WIDTH_PX);
+  expect(fit.width).toBeLessThanOrEqual(maxWidth);
   expect(fit.objectFit).toBe("contain");
-  expect(Math.abs(fit.width / fit.height - fit.naturalRatio)).toBeLessThan(
+  const expectedRatio = Math.min(fit.naturalRatio, maxWidth / fit.height);
+  expect(Math.abs(fit.width / fit.height - expectedRatio)).toBeLessThan(
     LOGO_RATIO_TOLERANCE,
   );
   expect(fit.right).toBeLessThanOrEqual(
@@ -6349,6 +6360,19 @@ type BrandScreen = {
   readonly needsSession: boolean;
   /** Lo que se fotografía: la página entera, o sólo la cabecera. */
   readonly capture: (page: Page) => Locator | null;
+  /** El tope de ancho del logo en esta pantalla a ese ancho de ventana. */
+  readonly logoMaxWidthAt: (viewportWidth: number) => number;
+};
+
+const SIDEBAR_BRAND_SCREEN: BrandScreen = {
+  name: "logo-cabecera",
+  path: "/dashboard",
+  needsSession: true,
+  capture: (page) => page.locator(".app-sidebar-header"),
+  logoMaxWidthAt: (viewportWidth) =>
+    viewportWidth >= SIDEBAR_MIN_VIEWPORT_PX
+      ? SIDEBAR_LOGO_MAX_WIDTH_PX
+      : LOGO_BOX_MAX_WIDTH_PX,
 };
 
 const BRAND_SCREENS: readonly BrandScreen[] = [
@@ -6357,13 +6381,9 @@ const BRAND_SCREENS: readonly BrandScreen[] = [
     path: "/entrar",
     needsSession: false,
     capture: () => null,
+    logoMaxWidthAt: () => LOGO_BOX_MAX_WIDTH_PX,
   },
-  {
-    name: "logo-cabecera",
-    path: "/dashboard",
-    needsSession: true,
-    capture: (page) => page.locator(".app-sidebar-header"),
-  },
+  SIDEBAR_BRAND_SCREEN,
 ];
 
 async function goToBrandWithLogo(
@@ -6421,7 +6441,7 @@ for (const screen of BRAND_SCREENS) {
           }) => {
             await goToBrandWithLogo(page, screen.path, logo);
 
-            await expectLogoFitsItsBox(page);
+            await expectLogoFitsItsBox(page, screen.logoMaxWidthAt(vp.width));
             await expectNoHorizontalScroll(page);
           });
         }
@@ -6452,6 +6472,164 @@ for (const screen of BRAND_SCREENS) {
     });
   });
 }
+
+type SidebarBrandGeometry = {
+  readonly logo: DOMRect | null;
+  readonly lockup: DOMRect;
+  readonly name: DOMRect;
+  readonly nameLineCount: number;
+  readonly isNameOverflowing: boolean;
+  readonly actions: DOMRect;
+  readonly sidebar: DOMRect;
+};
+
+/** Las cajas de la marca y de los controles en la barra lateral. */
+async function readSidebarBrandGeometry(
+  page: Page,
+): Promise<SidebarBrandGeometry> {
+  return page.evaluate(() => {
+    const elementOf = (selector: string): HTMLElement => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (element === null) {
+        throw new Error(`falta ${selector}`);
+      }
+      return element;
+    };
+    const boxOf = (selector: string): DOMRect =>
+      elementOf(selector).getBoundingClientRect();
+    const name = elementOf(".app-brand");
+    const lineHeight = parseFloat(getComputedStyle(name).lineHeight);
+    return {
+      logo:
+        document.querySelector("img.club-logo")?.getBoundingClientRect() ??
+        null,
+      lockup: boxOf(".app-brand-lockup"),
+      name: name.getBoundingClientRect(),
+      nameLineCount: Math.round(
+        name.getBoundingClientRect().height / lineHeight,
+      ),
+      isNameOverflowing: name.scrollWidth > name.clientWidth,
+      actions: boxOf(".app-sidebar-actions"),
+      sidebar: boxOf(".app-sidebar"),
+    };
+  });
+}
+
+function expectHorizontallyInside(inner: DOMRect, outer: DOMRect): void {
+  expect(inner.left).toBeGreaterThanOrEqual(outer.left - SUBPIXEL_TOLERANCE_PX);
+  expect(inner.right).toBeLessThanOrEqual(outer.right + SUBPIXEL_TOLERANCE_PX);
+}
+
+/** Cuánto pueden apartarse los centros del logo y del nombre. */
+const VERTICAL_CENTER_TOLERANCE_PX = 1;
+
+/** No cabe en una línea de 120px a 18px, pero sí en dos. */
+const TWO_LINE_CLUB_NAME = "Victoria Seadragons Rugby";
+
+async function renameServedClub(page: Page, name: string): Promise<void> {
+  await page.locator(".app-brand").evaluate((element, text) => {
+    element.textContent = text;
+  }, name);
+}
+
+function expectLogoBesideName(geometry: SidebarBrandGeometry): void {
+  if (geometry.logo === null) {
+    throw new Error("el logo no se pintó");
+  }
+  expect(geometry.logo.right).toBeLessThanOrEqual(geometry.name.left);
+  const logoCenter = geometry.logo.top + geometry.logo.height / 2;
+  const nameCenter = geometry.name.top + geometry.name.height / 2;
+  expect(Math.abs(logoCenter - nameCenter)).toBeLessThanOrEqual(
+    VERTICAL_CENTER_TOLERANCE_PX,
+  );
+  expect(geometry.name.width).toBeGreaterThanOrEqual(
+    SIDEBAR_NAME_MIN_WIDTH_PX - SUBPIXEL_TOLERANCE_PX,
+  );
+}
+
+function expectControlsBelowBrand(geometry: SidebarBrandGeometry): void {
+  expect(geometry.actions.top).toBeGreaterThanOrEqual(geometry.lockup.bottom);
+  expectHorizontallyInside(geometry.lockup, geometry.sidebar);
+  expectHorizontallyInside(geometry.actions, geometry.sidebar);
+}
+
+/* La barra lateral de escritorio con el logo junto al nombre (#352). */
+test.describe("logo-cabecera: el logo en la misma fila que el nombre", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  for (const vp of viewports.filter(
+    (candidate) => candidate.width >= SIDEBAR_MIN_VIEWPORT_PX,
+  )) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const logo of CLUB_LOGOS) {
+        test(`el logo ${logo.name} va a la izquierda del nombre, centrado con él`, async ({
+          page,
+        }) => {
+          await goToBrandWithLogo(page, SIDEBAR_BRAND_SCREEN.path, logo);
+
+          const geometry = await readSidebarBrandGeometry(page);
+          expectLogoBesideName(geometry);
+          expectControlsBelowBrand(geometry);
+          await expectNoHorizontalScroll(page);
+        });
+      }
+
+      test("un nombre largo se parte en dos líneas entre palabras", async ({
+        page,
+      }) => {
+        await goToBrandWithLogo(
+          page,
+          SIDEBAR_BRAND_SCREEN.path,
+          PHOTOGRAPHED_LOGO,
+        );
+        await renameServedClub(page, TWO_LINE_CLUB_NAME);
+
+        const geometry = await readSidebarBrandGeometry(page);
+        expect(geometry.nameLineCount).toBe(2);
+        expect(geometry.isNameOverflowing).toBe(false);
+        expectLogoBesideName(geometry);
+        expectControlsBelowBrand(geometry);
+        await expectNoHorizontalScroll(page);
+      });
+
+      test("sin logo la marca es sólo el nombre, sin hueco delante", async ({
+        page,
+      }) => {
+        await goToWithTheme(page, SIDEBAR_BRAND_SCREEN.path, "light");
+
+        const geometry = await readSidebarBrandGeometry(page);
+        expect(geometry.logo).toBeNull();
+        expect(geometry.name.left).toBe(geometry.lockup.left);
+        expectControlsBelowBrand(geometry);
+      });
+
+      // El apaisado lo fotografía `logo-cabecera: la marca con logo`; el
+      // cuadrado es el emblema real del club, el que motivó el ticket.
+      for (const theme of themes) {
+        test(`con el logo cuadrado coincide con la línea base (${theme})`, async ({
+          page,
+        }) => {
+          await goToBrandWithLogo(
+            page,
+            SIDEBAR_BRAND_SCREEN.path,
+            CLUB_LOGOS[0],
+            theme,
+          );
+
+          await expectMatchesBrandBaseline(
+            page,
+            SIDEBAR_BRAND_SCREEN,
+            `logo-cabecera-cuadrado-${vp.name}-${theme}.png`,
+          );
+        });
+      }
+    });
+  }
+});
 
 /** La configuración servida con un logo: uno de los de prueba, o una
  * dirección que responde 404, como un fichero borrado del almacenamiento. */

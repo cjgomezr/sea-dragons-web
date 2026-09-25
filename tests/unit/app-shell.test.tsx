@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "@/components/AppShell";
@@ -67,29 +67,76 @@ describe("la marca en la cabecera", () => {
     expect(brand).toHaveAttribute("title", LONGEST_CLUB_NAME);
   });
 
-  // #295: el logo va delante del nombre, que se sigue leyendo.
-  it("con logo lo enseña delante del nombre", () => {
-    usePathname.mockReturnValue("/dashboard");
-    renderShell("en", {
-      ...BRAND,
-      logoUrl: "https://storage.example.test/club-logos/club/logo.png",
-    });
-
-    const sidebar = screen.getByRole("complementary");
-    expect(
-      within(sidebar).getByRole("img", { name: "Hobart Orcas logo" }),
-    ).toBeInTheDocument();
-    expect(within(sidebar).getByText("Hobart Orcas")).toBeInTheDocument();
-  });
-
   it("sin logo no pinta ninguna imagen de marca", () => {
     usePathname.mockReturnValue("/dashboard");
     renderShell();
 
     const sidebar = screen.getByRole("complementary");
+    expect(sidebar.querySelector("img.club-logo")).toBeNull();
+  });
+});
+
+const LOGO_URL = "https://storage.example.test/club-logos/club/logo.png";
+
+function renderShellWithLogo(): HTMLElement {
+  usePathname.mockReturnValue("/dashboard");
+  renderShell("en", { ...BRAND, logoUrl: LOGO_URL });
+  return screen.getByRole("complementary");
+}
+
+function brandLockupOf(sidebar: HTMLElement): HTMLElement {
+  const name = within(sidebar).getByText(BRAND.name);
+  const lockup = name.parentElement;
+  if (lockup === null) {
+    throw new Error("el nombre del club no tiene contenedor");
+  }
+  return lockup;
+}
+
+// #352: el logo y el nombre en una sola fila, como en el mockup.
+describe("la marca en la barra lateral", () => {
+  it("con logo pone el logo y el nombre en el mismo contenedor de fila", () => {
+    const sidebar = renderShellWithLogo();
+
+    const lockup = brandLockupOf(sidebar);
+    const logo = lockup.querySelector("img.club-logo");
+    expect(logo).toHaveAttribute("src", LOGO_URL);
+    expect(lockup.firstElementChild).toBe(logo);
+    expect(lockup).toHaveClass("app-brand-lockup");
+  });
+
+  it("sin logo el contenedor lleva sólo el nombre", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell();
+
+    const lockup = brandLockupOf(screen.getByRole("complementary"));
+    expect(lockup.children).toHaveLength(1);
+    expect(lockup.firstElementChild).toHaveTextContent(BRAND.name);
+  });
+
+  it("con el logo roto queda sólo el nombre, sin hueco a la izquierda", () => {
+    const sidebar = renderShellWithLogo();
+    const lockup = brandLockupOf(sidebar);
+
+    const logo = lockup.querySelector("img.club-logo");
+    if (logo === null) {
+      throw new Error("el logo no se pintó");
+    }
+    fireEvent.error(logo);
+
+    expect(lockup.querySelector("img")).toBeNull();
+    expect(lockup.children).toHaveLength(1);
+    expect(lockup.firstElementChild).toHaveTextContent(BRAND.name);
+  });
+
+  it("el lector de pantalla oye el nombre del club una sola vez", () => {
+    const sidebar = renderShellWithLogo();
+
+    expect(within(sidebar).queryAllByRole("img")).toHaveLength(0);
+    expect(within(sidebar).getByText(BRAND.name)).toBeInTheDocument();
     expect(
-      within(sidebar).queryByRole("img", { name: /logo/ }),
-    ).not.toBeInTheDocument();
+      brandLockupOf(sidebar).querySelector("img.club-logo"),
+    ).toHaveAttribute("alt", "");
   });
 });
 
