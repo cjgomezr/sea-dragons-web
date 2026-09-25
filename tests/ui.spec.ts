@@ -5802,7 +5802,32 @@ const STUBBED_CLUB_SETTINGS = {
 const ENGLISH_SAVE_SETTINGS = "Save settings";
 const SPANISH_SAVE_SETTINGS = "Guardar la configuración";
 
-type ClubSettingsSave = "rejects_as_conflict" | "hangs" | "drops_connection";
+type ClubSettingsSave =
+  | "rejects_as_conflict"
+  | "rejects_accent_contrast"
+  | "hangs"
+  | "drops_connection";
+
+/** Lo que el servidor fingido responde a cada guardado que rechaza. */
+const REJECTED_CLUB_SETTINGS_SAVES = {
+  rejects_as_conflict: {
+    status: 409,
+    error: {
+      code: "conflict",
+      message: "Otro Admin cambió la configuración.",
+      reason: "club_settings_changed",
+    },
+  },
+  // #346: la pantalla ya descarta estos colores, pero el servidor decide.
+  rejects_accent_contrast: {
+    status: 400,
+    error: {
+      code: "validation_error",
+      message: "Ningún texto se lee sobre el acento.",
+      reason: "accent_color_no_readable_text",
+    },
+  },
+} as const;
 
 async function stubClubSettings(
   page: Page,
@@ -5823,17 +5848,15 @@ async function stubClubSettings(
         await route.abort("internetdisconnected");
         return;
       }
-      if (save === "rejects_as_conflict") {
+      if (
+        save === "rejects_as_conflict" ||
+        save === "rejects_accent_contrast"
+      ) {
+        const { status, error } = REJECTED_CLUB_SETTINGS_SAVES[save];
         await route.fulfill({
-          status: 409,
+          status,
           contentType: "application/json",
-          body: JSON.stringify({
-            error: {
-              code: "conflict",
-              message: "Otro Admin cambió la configuración.",
-              reason: "club_settings_changed",
-            },
-          }),
+          body: JSON.stringify({ error }),
         });
       }
       // "hangs": sin respuesta, la pantalla se queda guardando.
@@ -5852,6 +5875,36 @@ function submitEmptyName(saveLabel: string, issueText: RegExp) {
     await clubNameField(page).fill("");
     await page.getByRole("button", { name: saveLabel }).click();
     await expect(page.getByText(issueText)).toBeVisible();
+  };
+}
+
+/** Un morado que se lee con texto blanco encima: el acento que se elige en
+ * las capturas del #346. */
+const CHOSEN_CLUB_ACCENT = "#7B3FA0";
+
+function clubAccentField(page: Page): Locator {
+  return page.getByRole("textbox", {
+    name: /^(Accent colour|Color de acento)$/,
+  });
+}
+
+/** Escribe un acento sin guardarlo y espera a que la muestra lo siga. */
+function chooseAccent(sampleText: RegExp) {
+  return async (page: Page): Promise<void> => {
+    await clubAccentField(page).fill(CHOSEN_CLUB_ACCENT);
+    await expect(page.getByText(sampleText)).toHaveCSS(
+      "background-color",
+      "rgb(123, 63, 160)",
+    );
+  };
+}
+
+/** Elige un acento y lo guarda; el servidor fingido lo rechaza. */
+function chooseAccentAndSave(saveLabel: string, outcome: RegExp) {
+  return async (page: Page): Promise<void> => {
+    await clubAccentField(page).fill(CHOSEN_CLUB_ACCENT);
+    await page.getByRole("button", { name: saveLabel }).click();
+    await expect(page.getByText(outcome)).toBeVisible();
   };
 }
 
@@ -5902,6 +5955,29 @@ const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
     prepare: submitAndExpect(
       SPANISH_SAVE_SETTINGS,
       /No pudimos hablar con el servidor/,
+    ),
+  },
+  { name: "club-acento-elegido", prepare: chooseAccent(/^Sample text$/) },
+  {
+    name: "club-acento-elegido-es",
+    beforeVisit: chooseSpanish,
+    prepare: chooseAccent(/^Texto de ejemplo$/),
+  },
+  {
+    name: "club-acento-rechazado",
+    save: "rejects_accent_contrast",
+    prepare: chooseAccentAndSave(
+      ENGLISH_SAVE_SETTINGS,
+      /No text colour reaches the minimum contrast/,
+    ),
+  },
+  {
+    name: "club-acento-rechazado-es",
+    save: "rejects_accent_contrast",
+    beforeVisit: chooseSpanish,
+    prepare: chooseAccentAndSave(
+      SPANISH_SAVE_SETTINGS,
+      /Ningún color de texto llega al contraste mínimo/,
     ),
   },
   {

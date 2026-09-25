@@ -725,6 +725,12 @@ export const englishMessages = {
     "Up to {max} characters. Leave it empty to use the first letters of the name.",
   "clubSettings.brand.title": "Colour and logo",
   "clubSettings.accent.label": "Accent colour",
+  "clubSettings.accent.hint":
+    "A hex code such as #1C6EA4. Paste it from your brand guide or pick it on screen.",
+  "clubSettings.accent.picker":
+    "Pick the accent colour on screen (now {color})",
+  "clubSettings.accent.previewText": "Sample text",
+  "clubSettings.accent.previewLink": "Sample link",
   "clubSettings.logo.label": "Logo",
   "clubSettings.logo.none": "No logo yet: the initials are shown instead.",
   "clubSettings.logo.present": "The club has a logo.",

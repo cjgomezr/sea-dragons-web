@@ -714,6 +714,12 @@ export const spanishMessages: MessageCatalog = {
     "Hasta {max} caracteres. Déjalas vacías para usar las primeras letras del nombre.",
   "clubSettings.brand.title": "Color y logo",
   "clubSettings.accent.label": "Color de acento",
+  "clubSettings.accent.hint":
+    "Un código hexadecimal, como #1C6EA4. Pégalo de tu guía de marca o elígelo en pantalla.",
+  "clubSettings.accent.picker":
+    "Elegir el color de acento en pantalla (ahora {color})",
+  "clubSettings.accent.previewText": "Texto de ejemplo",
+  "clubSettings.accent.previewLink": "Enlace de ejemplo",
   "clubSettings.logo.label": "Logo",
   "clubSettings.logo.none":
     "Todavía no hay logo: en su lugar salen las iniciales.",
