@@ -2503,6 +2503,82 @@ button.notification-item-content:hover {
   gap: var(--space-3);
 }
 
+/* Las posiciones del club (#300): las activas en su orden, el alta y las
+   archivadas, cada grupo con su título. Cada posición es una tarjeta como
+   las de Grupos, con sus acciones debajo del nombre. */
+.club-positions-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.club-positions-group h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.club-positions-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* El puesto en el orden, en la fuente de los datos. Lo lee también quien no
+   ve la lista numerada, porque la lista es un `ol`. */
+.club-positions-rank {
+  flex: none;
+  min-width: var(--space-6);
+  font-family: var(--font-family-mono);
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--color-text-secondary);
+}
+
+.club-positions-names {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Un nombre de 40 caracteres parte donde haga falta antes que sacar una
+   barra horizontal a 375px. */
+.club-positions-name {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.club-positions-note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.club-positions-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.club-positions-form .auth-hint,
+.club-positions-form .auth-error {
+  margin: 0;
+}
+
+.club-positions-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
 .club-settings-brand {
   display: flex;
   flex-direction: column;

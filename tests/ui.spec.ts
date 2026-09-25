@@ -5916,9 +5916,119 @@ function submitAndExpect(saveLabel: string, outcome: RegExp) {
   };
 }
 
+/* Las posiciones del club (#300) viven en la misma pantalla. También se sirven
+   fijas: archivar o crear una de verdad cambiaría el desplegable del perfil
+   y el directorio en las capturas de los demás. */
+const CLUB_POSITIONS_ADMIN_ENDPOINT = `${CLUB_SETTINGS_ENDPOINT}/positions`;
+
+type StubbedPosition = {
+  readonly id: string;
+  readonly names: { readonly en: string | null; readonly es: string | null };
+  readonly isArchived: boolean;
+};
+
+type PositionCreate = "hangs" | "rejects_name_taken";
+
+const STUBBED_ACTIVE_POSITIONS: readonly StubbedPosition[] = [
+  {
+    id: "90000000-0000-4000-8000-000000000001",
+    names: { en: "Goalkeeper", es: "Portería" },
+    isArchived: false,
+  },
+  {
+    id: "90000000-0000-4000-8000-000000000002",
+    names: { en: "Defender", es: "Defensa" },
+    isArchived: false,
+  },
+  {
+    id: "90000000-0000-4000-8000-000000000003",
+    names: { en: "Forward", es: "Ataque" },
+    isArchived: false,
+  },
+];
+
+/** Una archivada sin nombre en español y otra con nombres cerca del máximo
+ * que admite la base (40 caracteres), para el caso de contenido largo. */
+const STUBBED_POSITIONS_WITH_ARCHIVED: readonly StubbedPosition[] = [
+  ...STUBBED_ACTIVE_POSITIONS,
+  {
+    id: "90000000-0000-4000-8000-000000000004",
+    names: { en: "Utility", es: null },
+    isArchived: true,
+  },
+  {
+    id: "90000000-0000-4000-8000-000000000005",
+    names: {
+      en: "Second-line support behind the basket",
+      es: "Apoyo de segunda línea tras la cesta",
+    },
+    isArchived: true,
+  },
+];
+
+const REJECTED_POSITION_NAME = {
+  code: "validation_error",
+  message: "Ya hay una posición con ese nombre.",
+  reason: "name_es_taken",
+} as const;
+
+async function stubClubPositions(
+  page: Page,
+  stub: {
+    readonly positions: readonly StubbedPosition[];
+    readonly create: PositionCreate;
+  },
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname.startsWith(CLUB_POSITIONS_ADMIN_ENDPOINT),
+    async (route, request) => {
+      if (request.method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ data: { positions: stub.positions } }),
+        });
+        return;
+      }
+      if (stub.create === "rejects_name_taken") {
+        await route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({ error: REJECTED_POSITION_NAME }),
+        });
+      }
+      // "hangs": sin respuesta, la sección se queda guardando.
+    },
+  );
+}
+
+function positionsSection(page: Page): Locator {
+  return page.getByRole("region", { name: /^(Positions|Posiciones)$/ });
+}
+
+/** Da de alta una posición cuyo nombre en español ya usa otra: el servidor
+ * fingido la rechaza y el aviso sale junto a ese campo. */
+function addPositionWithTakenName(labels: {
+  readonly english: string;
+  readonly spanish: string;
+  readonly submit: string;
+  readonly issue: RegExp;
+}) {
+  return async (page: Page): Promise<void> => {
+    const section = positionsSection(page);
+    await section.getByLabel(labels.english).fill("Centre");
+    await section.getByLabel(labels.spanish).fill("Defensa");
+    await section.getByRole("button", { name: labels.submit }).click();
+    await expect(section.getByText(labels.issue)).toBeVisible();
+  };
+}
+
 type ClubSettingsState = {
   readonly name: string;
   readonly save?: ClubSettingsSave;
+  /** El catálogo que sirve el endpoint fingido de las posiciones (#300). */
+  readonly positions?: readonly StubbedPosition[];
+  readonly createPosition?: PositionCreate;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
 };
@@ -5996,6 +6106,10 @@ async function goToClubSettings(
   theme?: (typeof themes)[number],
 ): Promise<void> {
   await stubClubSettings(page, state.save);
+  await stubClubPositions(page, {
+    positions: state.positions ?? STUBBED_ACTIVE_POSITIONS,
+    create: state.createPosition ?? "hangs",
+  });
   await state.beforeVisit?.(page);
   if (theme === undefined) {
     await page.goto(`${APP_URL}${CLUB_SETTINGS_SCREEN_PATH}`);
@@ -6055,6 +6169,102 @@ for (const state of CLUB_SETTINGS_STATES) {
   });
 }
 
+const CLUB_POSITIONS_STATES: readonly ClubSettingsState[] = [
+  { name: "club-posiciones" },
+  { name: "club-posiciones-es", beforeVisit: chooseSpanish },
+  {
+    name: "club-posiciones-archivadas",
+    positions: STUBBED_POSITIONS_WITH_ARCHIVED,
+  },
+  {
+    name: "club-posiciones-archivadas-es",
+    positions: STUBBED_POSITIONS_WITH_ARCHIVED,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "club-posiciones-nombre-repetido",
+    createPosition: "rejects_name_taken",
+    prepare: addPositionWithTakenName({
+      english: "Name in English",
+      spanish: "Name in Spanish",
+      submit: "Add position",
+      issue: /Another position already has this name/,
+    }),
+  },
+  {
+    name: "club-posiciones-nombre-repetido-es",
+    createPosition: "rejects_name_taken",
+    beforeVisit: chooseSpanish,
+    prepare: addPositionWithTakenName({
+      english: "Nombre en inglés",
+      spanish: "Nombre en español",
+      submit: "Añadir posición",
+      issue: /Otra posición ya se llama así/,
+    }),
+  },
+];
+
+/* La sección se fotografía sola: el resto de la pantalla ya tiene sus
+   capturas arriba, y así un cambio de las posiciones no las mueve. La barra
+   de pestañas del móvil va fija abajo y taparía parte de la sección en una
+   captura de elemento: ahí se esconde. Va en la página y no en la opción
+   `style`, que `toHaveScreenshot` no aplica. */
+const HIDDEN_TAB_BAR_STYLE = ".app-tabbar { display: none !important; }";
+
+for (const state of CLUB_POSITIONS_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToClubSettings(page, state, theme);
+              const section = positionsSection(page);
+              await expect(section.getByRole("list").first()).toBeVisible();
+              await page.addStyleTag({ content: HIDDEN_TAB_BAR_STYLE });
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                section.screenshot(SCREENSHOT_OPTIONS),
+              );
+              await expect(section).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToClubSettings(page, state);
+          await expect(
+            positionsSection(page).getByRole("list").first(),
+          ).toBeVisible();
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToClubSettings(page, state);
+      await expect(
+        positionsSection(page).getByRole("list").first(),
+      ).toBeVisible();
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
 test.describe("un Admin frente a la configuración de verdad", () => {
   skipWithoutSession();
   quietNotificationBell();
@@ -6103,6 +6313,33 @@ test.describe("un Admin frente a la configuración de verdad", () => {
 
     expect(write.status()).toBe(200);
     await expect(write.json()).resolves.toMatchObject({ data: identity });
+  });
+
+  // #300: la lista de verdad, sin tocar nada del catálogo compartido.
+  test("el endpoint de posiciones lista las del club con su marca de archivo", async ({
+    request,
+  }) => {
+    const read = await request.get(
+      `${APP_URL}${CLUB_POSITIONS_ADMIN_ENDPOINT}`,
+    );
+
+    expect(read.status()).toBe(200);
+    const { data } = (await read.json()) as {
+      data: { positions: { isArchived: boolean }[] };
+    };
+    expect(data.positions.length).toBeGreaterThan(0);
+    expect(typeof data.positions[0]?.isArchived).toBe("boolean");
+  });
+
+  test("el endpoint de posiciones rechaza una sin nombre con 400", async ({
+    request,
+  }) => {
+    const write = await request.post(
+      `${APP_URL}${CLUB_POSITIONS_ADMIN_ENDPOINT}`,
+      { data: { names: { en: " ", es: null } } },
+    );
+
+    expect(write.status()).toBe(400);
   });
 
   test("el endpoint rechaza un nombre vacío con 400", async ({ request }) => {

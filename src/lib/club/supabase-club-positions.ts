@@ -92,19 +92,28 @@ export function createClubPositionsGateway(
   return { findClubPositions: (clubId) => fetchClubPositions(client, clubId) };
 }
 
-/** Lo mismo que la marca: un cambio del Admin tarda como mucho esto en verse.
- * La pantalla que las edita (#300) añadirá la invalidación. */
+/** Lo mismo que la marca: un cambio guardado en otra instancia del servidor
+ * tarda como mucho esto en verse. En la que lo guardó se ve en el acto, porque
+ * la pantalla del Admin (#300) invalida la caché. */
 const CLUB_POSITIONS_TIME_TO_LIVE_MS = 5 * 60 * 1000;
+
+const cachedClubPositionsReader = createCachedClubPositionsReader({
+  fetchPositions: (clubId) =>
+    fetchClubPositions(createServiceRoleClient(process.env), clubId),
+  timeToLiveMs: CLUB_POSITIONS_TIME_TO_LIVE_MS,
+  now: Date.now,
+});
 
 /** El catálogo con el que trabajan las pantallas y la API, desde la caché. Va
  * con la llave de servicio porque la caché la comparten todas las visitas. */
 export const cachedClubPositions: ClubPositionsGateway =
-  createCachedClubPositionsReader({
-    fetchPositions: (clubId) =>
-      fetchClubPositions(createServiceRoleClient(process.env), clubId),
-    timeToLiveMs: CLUB_POSITIONS_TIME_TO_LIVE_MS,
-    now: Date.now,
-  });
+  cachedClubPositionsReader;
+
+/** Para quien guarda un cambio del catálogo: el perfil y el directorio lo ven
+ * en la siguiente visita, como la marca con `invalidateClubBrand`. */
+export function invalidateClubPositions(): void {
+  cachedClubPositionsReader.invalidate();
+}
 
 type Environment = Readonly<Record<string, string | undefined>>;
 

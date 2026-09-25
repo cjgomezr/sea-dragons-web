@@ -132,11 +132,17 @@ function includesAll(
  * piden y no está, se vuelve a leer en vez de esperar a que caduque: si no, el
  * directorio no sabría pintar a quien ya la tiene.
  */
+export type CachedClubPositionsReader = ClubPositionsGateway & {
+  /** Para quien guarda un cambio del catálogo (#300): la siguiente lectura
+   * va a la base sin esperar a que caduque. */
+  invalidate(): void;
+};
+
 export function createCachedClubPositionsReader({
   fetchPositions,
   timeToLiveMs,
   now,
-}: CachedClubPositionsReaderOptions): ClubPositionsGateway {
+}: CachedClubPositionsReaderOptions): CachedClubPositionsReader {
   const cache = new Map<string, CacheEntry>();
 
   function startFetch(clubId: string): CacheEntry {
@@ -168,6 +174,9 @@ export function createCachedClubPositionsReader({
       return includesAll(positions, referencedIds)
         ? positions
         : refresh(clubId);
+    },
+    invalidate() {
+      cache.clear();
     },
   };
 }

@@ -12,6 +12,7 @@ import type { ClubSettings } from "@/lib/club/club-settings";
 
 const SETTINGS_PATH = "/api/v1/club/settings";
 const LOGO_PATH = "/api/v1/club/settings/logo";
+const POSITIONS_PATH = "/api/v1/club/settings/positions";
 const LOGO_URL = "https://storage.example.test/club-logos/club/logo.png";
 const NEW_LOGO_URL = "https://storage.example.test/club-logos/club/nuevo.png";
 const LOGO_ALT = "Harbour Hammerheads logo";
@@ -46,6 +47,10 @@ function stubApi(options: {
     vi.fn(async (url: string, init?: RequestInit) => {
       if (url === SETTINGS_PATH) {
         return jsonResponse(200, { data: options.settings ?? STORED });
+      }
+      // La sección de posiciones (#300) carga lo suyo: aquí sin ninguna.
+      if (url === POSITIONS_PATH) {
+        return jsonResponse(200, { data: { positions: [] } });
       }
       if (url === LOGO_PATH) {
         const method = init?.method ?? "GET";

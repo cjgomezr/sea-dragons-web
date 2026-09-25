@@ -762,4 +762,53 @@ export const spanishMessages: MessageCatalog = {
     "Sólo un Admin puede cambiar la configuración del club.",
   "clubSettings.error.unexpected":
     "Algo falló con la configuración del club. Vuelve a intentarlo.",
+  "clubSettings.positions.title": "Posiciones",
+  "clubSettings.positions.lead":
+    "Las posiciones de juego que cada miembro elige en su perfil, en el orden que sigue el directorio. Archivar una posición la conserva para quien ya la tiene, pero nadie más puede elegirla.",
+  "clubSettings.positions.loading": "Cargando las posiciones…",
+  "clubSettings.positions.active.title": "Posiciones activas",
+  "clubSettings.positions.active.empty":
+    "No hay posiciones activas. Añade una abajo o reactiva una archivada.",
+  "clubSettings.positions.archived.title": "Posiciones archivadas",
+  "clubSettings.positions.archived.empty": "No hay posiciones archivadas.",
+  "clubSettings.positions.create.title": "Añadir una posición",
+  "clubSettings.positions.create.submit": "Añadir posición",
+  "clubSettings.positions.create.saving": "Añadiendo…",
+  "clubSettings.positions.rename.label": "Renombrar {name}",
+  "clubSettings.positions.rename.submit": "Guardar nombre",
+  "clubSettings.positions.rename.saving": "Guardando…",
+  "clubSettings.positions.cancel": "Cancelar",
+  "clubSettings.positions.name.en": "Nombre en inglés",
+  "clubSettings.positions.name.es": "Nombre en español",
+  "clubSettings.positions.name.hint":
+    "Hasta {max} caracteres cada uno. Basta con un idioma: donde falte un nombre, se muestra el otro.",
+  "clubSettings.positions.language.en": "inglés",
+  "clubSettings.positions.language.es": "español",
+  "clubSettings.positions.otherName": "En {language}: {name}",
+  "clubSettings.positions.missingName":
+    "Todavía sin nombre en {language}: se muestra este.",
+  "clubSettings.positions.move.up": "Subir",
+  "clubSettings.positions.move.up.label": "Subir {name}",
+  "clubSettings.positions.move.down": "Bajar",
+  "clubSettings.positions.move.down.label": "Bajar {name}",
+  "clubSettings.positions.rename": "Renombrar",
+  "clubSettings.positions.archive": "Archivar",
+  "clubSettings.positions.archive.label": "Archivar {name}",
+  "clubSettings.positions.reactivate": "Reactivar",
+  "clubSettings.positions.reactivate.label": "Reactivar {name}",
+  "clubSettings.positions.moved":
+    "{name} queda en el puesto {rank} de {total}.",
+  "clubSettings.positions.created": "{name} añadida.",
+  "clubSettings.positions.renamed": "Nombre guardado.",
+  "clubSettings.positions.archived":
+    "{name} archivada: quien la tiene la conserva.",
+  "clubSettings.positions.reactivated": "{name} se puede volver a elegir.",
+  "clubSettings.positions.retry": "Volver a intentarlo",
+  "clubSettings.positions.reloadLatest": "Cargar las últimas posiciones",
+  "clubSettings.positions.issue.nameRequired":
+    "Dale a la posición un nombre en al menos un idioma.",
+  "clubSettings.positions.issue.nameTooLong": "Hasta {max} caracteres.",
+  "clubSettings.positions.issue.nameTaken": "Otra posición ya se llama así.",
+  "clubSettings.positions.error.changed":
+    "Otro Admin cambió las posiciones mientras las editabas. Carga las últimas y vuelve a intentarlo.",
 };

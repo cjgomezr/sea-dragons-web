@@ -241,6 +241,25 @@ describe("la caché de las posiciones", () => {
     expect(fetchPositions).toHaveBeenCalledTimes(2);
   });
 
+  // #300: el Admin guarda un cambio y el perfil y el directorio lo ven ya.
+  it("vuelve a leer la base después de invalidarla", async () => {
+    const renamed: ClubPosition = {
+      ...FORWARD,
+      names: { en: "Striker", es: "Delantera" },
+    };
+    const fetchPositions = vi
+      .fn<(clubId: string) => Promise<ClubPositions>>()
+      .mockResolvedValueOnce(CLUB_POSITIONS)
+      .mockResolvedValueOnce([GOALKEEPER, UTILITY, renamed]);
+    const { reader } = createReader(fetchPositions);
+    await reader.findClubPositions(CLUB_ID, []);
+
+    reader.invalidate();
+    const positions = await reader.findClubPositions(CLUB_ID, []);
+
+    expect(positions).toContainEqual(renamed);
+  });
+
   it("no vuelve a leer la base si ya tiene las posiciones que le piden", async () => {
     const fetchPositions = vi.fn(async () => CLUB_POSITIONS);
     const { reader } = createReader(fetchPositions);
