@@ -103,7 +103,9 @@ next_issue() {  # -> first eligible pending issue number, or empty
     [ -n "$prio" ] && pf=(--label "$prio")
     local jqsel=".[] | select((.assignees|length)==0 or ([.assignees[].login]|index(\"$ME\"))) | .number"
     [ -n "$ONLY_MINE" ] && jqsel=".[] | select([.assignees[].login]|index(\"$ME\")) | .number"
-    for n in $(gh issue list --limit 500 --label pending "${lane[@]}" "${pf[@]}" --state open \
+    # ${a[@]+"${a[@]}"}: macOS ships bash 3.2, where "${a[@]}" on an empty
+    # array trips `set -u` inside $(...) and the loop silently sees no issues.
+    for n in $(gh issue list --limit 500 --label pending ${lane[@]+"${lane[@]}"} ${pf[@]+"${pf[@]}"} --state open \
                  --json number,assignees \
                  --jq "$jqsel" \
                | sort -n); do
@@ -114,7 +116,7 @@ next_issue() {  # -> first eligible pending issue number, or empty
 
 # Leave no ghost state if the operator hits Ctrl+C mid-ticket.
 cleanup() {
-  [ -n "${CLAUDE_PID:-}" ] && kill "$CLAUDE_PID" 2>/dev/null || true
+  [ -n "${WORKER_PID:-}" ] && kill "$WORKER_PID" 2>/dev/null || true
   if [ -n "${N:-}" ]; then
     echo "" >&2
     echo "⏹ Interrumpido en #$N: devolviéndolo a la cola" >&2
@@ -319,7 +321,7 @@ El nuevo worker puede continuar desde la rama existente."
   fi
 }
 
-# Launches the worker for issue $1 in the background and sets CLAUDE_PID.
+# Launches the worker for issue $1 in the background and sets WORKER_PID.
 # Pulled out of main() so tests can drive it directly against a fake `claude`.
 run_worker() {
   local n="$1" wt_dir
@@ -327,7 +329,7 @@ run_worker() {
   ensure_worker_worktree "$n"
   # Runs from inside the worktree instead of passing `--worktree` to claude,
   # so the branch name stays the one `ensure_worker_worktree` decided. `exec`
-  # keeps $CLAUDE_PID pointing at the actual claude process, not the subshell.
+  # keeps $WORKER_PID pointing at the actual claude process, not the subshell.
   (
     cd "$wt_dir"
     exec claude -p "Process GitHub issue #$n following the issue lifecycle in CLAUDE.md:
@@ -344,7 +346,7 @@ run_worker() {
       --model "$WORKER_MODEL" \
       --disallowedTools "$WORKER_DISALLOWED_TOOLS"
   ) &
-  CLAUDE_PID=$!
+  WORKER_PID=$!
 }
 
 main() {
@@ -392,9 +394,9 @@ main() {
     LAST_COMMIT=""
     LAST_ERR=0
     WT_DIR=$(worktree_dir_for "$N")
-    while kill -0 "$CLAUDE_PID" 2>/dev/null; do
+    while kill -0 "$WORKER_PID" 2>/dev/null; do
       sleep 60
-      kill -0 "$CLAUDE_PID" 2>/dev/null || break
+      kill -0 "$WORKER_PID" 2>/dev/null || break
       ELAPSED_MIN=$(( ($(date +%s) - START_TS) / 60 ))
       if [ -d "$WT_DIR" ]; then
         # Untracked files never travel to worktrees, so hand the worker every
@@ -453,7 +455,7 @@ main() {
 
     # `set -e` would otherwise abort the whole script on a non-zero wait, so
     # the exit status is captured through the if/else instead of `!`.
-    if wait "$CLAUDE_PID"; then
+    if wait "$WORKER_PID"; then
       WORKER_EXIT_CODE=0
     else
       WORKER_EXIT_CODE=$?

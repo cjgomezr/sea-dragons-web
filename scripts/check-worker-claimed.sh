@@ -43,7 +43,7 @@ repo_args=()
 # Un fallo de `gh` (rate limit, 502) no es culpa del worker. Marcar la corrida
 # en rojo por no haber podido preguntar acaba pegándole `needs-human` a un
 # ticket sano, y el repositorio ya decidió lo contrario en `pr_declares_closes`.
-if ! info=$(gh issue view "$NUM" "${repo_args[@]}" --json state,labels 2>/dev/null); then
+if ! info=$(gh issue view "$NUM" ${repo_args[@]+"${repo_args[@]}"} --json state,labels 2>/dev/null); then
   echo "::warning title=No pude comprobar #$NUM::gh falló al consultarlo, así que no marco la corrida en rojo por eso"
   exit 0
 fi
@@ -79,7 +79,7 @@ done <<< "$labels"
 # Último recurso, y el más caro, por eso va al final: un PR que declare cerrarlo
 # significa que el trabajo existe aunque las etiquetas digan otra cosa. Buscar
 # por rama no serviría, porque `impl-N` y `worktree-impl-N` conviven.
-if prs=$(gh pr list "${repo_args[@]}" --state all --search "Closes #$NUM in:body" --json number --jq length 2>/dev/null); then
+if prs=$(gh pr list ${repo_args[@]+"${repo_args[@]}"} --state all --search "Closes #$NUM in:body" --json number --jq length 2>/dev/null); then
   if [ "${prs:-0}" != "0" ]; then
     echo "✅ #$NUM ya tiene un PR que declara cerrarlo"
     exit 0
