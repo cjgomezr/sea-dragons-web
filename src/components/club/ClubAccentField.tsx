@@ -120,14 +120,15 @@ export function ClubAccentField({
         />
         <AccentPreview translate={translate} color={previewColor} />
       </div>
-      <p className="auth-hint" id={ACCENT_HINT_ID}>
-        {translate("clubSettings.accent.hint")}
-      </p>
+      {/* Primero el aviso y luego la ayuda, como en los campos del nombre. */}
       {issueText === null ? null : (
         <p className="auth-field-error" id={ACCENT_ISSUE_ID} role="alert">
           {issueText}
         </p>
       )}
+      <p className="auth-hint" id={ACCENT_HINT_ID}>
+        {translate("clubSettings.accent.hint")}
+      </p>
     </div>
   );
 }

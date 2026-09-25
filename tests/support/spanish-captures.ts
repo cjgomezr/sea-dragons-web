@@ -19,6 +19,7 @@ const SPANISH_STATE_SUFFIX = "-es";
 export const SPANISH_STATES_WITH_OWN_CAPTURE: readonly string[] = [
   "alta-invitacion-enviada-es",
   "avisos-con-avisos-es",
+  "club-acento-rechazado-es",
   "ficha-aviso-validacion-es",
   "ficha-invitacion-pendiente-es",
   "menu-cuenta-es",
