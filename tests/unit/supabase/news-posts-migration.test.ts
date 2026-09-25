@@ -904,4 +904,22 @@ describeConPostgres("privilegios de las publicaciones", () => {
 
     expect(insercion.code, insercion.stderr).toBe(0);
   });
+
+  it("el servidor adjunta con la llave de servicio", async () => {
+    // El trigger del límite bloquea la publicación con `for update`: tiene que
+    // poder hacerlo con el rol que de verdad sube los adjuntos.
+    const database = await migratedDatabase();
+    const authorId = await seedMember(database);
+    const postId = await seedPost(database, { authorId });
+
+    const insercion = await database.attempt(
+      `set role service_role;
+       insert into public.news_post_attachments
+         (post_id, club_id, file_name, content_type, size_bytes, storage_path)
+       select id, club_id, 'a.pdf', 'application/pdf', 10, 'ruta/a.pdf'
+         from public.news_posts where id = '${postId}'`,
+    );
+
+    expect(insercion.code, insercion.stderr).toBe(0);
+  });
 });

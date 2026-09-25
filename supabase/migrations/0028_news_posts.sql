@@ -34,7 +34,8 @@ create table if not exists public.news_posts (
   -- guarda igual y no alcanza a nadie. Así "todo el club" y "cero grupos" no
   -- se confunden nunca. Que publicar a cero grupos sea un error lo decide el
   -- servidor (RF-2): borrar un grupo puede dejar una publicación así (PRD,
-  -- sección 7) y la base no debe impedirlo.
+  -- sección 7) y la base no debe impedirlo. Tampoco impide que una `club`
+  -- tenga filas de grupos: la policy las ignora, y no dejarlas es del servidor.
   audience text not null
     constraint news_posts_audience_check
     check (audience in ('club', 'groups')),
