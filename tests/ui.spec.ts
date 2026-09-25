@@ -6006,6 +6006,103 @@ function positionsSection(page: Page): Locator {
   return page.getByRole("region", { name: /^(Positions|Posiciones)$/ });
 }
 
+/* #301: los textos de la pantalla de entrar que escribe el club. El endpoint
+   se finge, como el de las posiciones: guardarlos de verdad cambiaría la
+   pantalla de entrar que fotografían las demás pruebas. Guardar se queda
+   colgado: los estados de aquí no esperan respuesta. */
+const CLUB_SIGN_IN_TEXTS_ENDPOINT = `${CLUB_SETTINGS_ENDPOINT}/sign-in-texts`;
+
+type StubbedSignInTexts = {
+  readonly [Locale in "en" | "es"]: {
+    readonly tagline: string | null;
+    readonly welcome: string | null;
+  };
+};
+
+const NO_STUBBED_SIGN_IN_TEXTS: StubbedSignInTexts = {
+  en: { tagline: null, welcome: null },
+  es: { tagline: null, welcome: null },
+};
+
+const SHORT_SIGN_IN_TEXTS: StubbedSignInTexts = {
+  en: {
+    tagline: "Hold your breath, not your team back.",
+    welcome:
+      "Sessions every Tuesday and Thursday at the Hobart Aquatic Centre.",
+  },
+  es: {
+    tagline: "Aguanta la respiración, no al equipo.",
+    welcome: "Entrenamos martes y jueves en el Hobart Aquatic Centre.",
+  },
+};
+
+/** Repite `text` hasta `length` caracteres justos. */
+function padToLength(text: string, length: number): string {
+  return text.repeat(Math.ceil(length / text.length)).slice(0, length);
+}
+
+/** Justo en los límites de la base: 140 el lema y 320 el párrafo, con una
+ * dirección sin espacios que no puede partirse por una palabra. */
+const LONG_SIGN_IN_TEXTS: StubbedSignInTexts = {
+  en: {
+    tagline: padToLength("Underwater rugby for every body in Tasmania. ", 140),
+    welcome: padToLength(
+      "Read more at www.hobartorcasunderwaterrugbyclubtasmania.org.au before your first session. ",
+      320,
+    ),
+  },
+  es: {
+    tagline: padToLength(
+      "Rugby subacuático para todo el mundo en Tasmania. ",
+      140,
+    ),
+    welcome: padToLength(
+      "Lee más en www.hobartorcasunderwaterrugbyclubtasmania.org.au antes de tu primera sesión. ",
+      320,
+    ),
+  },
+};
+
+async function stubSignInTexts(
+  page: Page,
+  texts: StubbedSignInTexts,
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === CLUB_SIGN_IN_TEXTS_ENDPOINT,
+    async (route, request) => {
+      if (request.method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ data: texts }),
+        });
+      }
+      // PUT: sin respuesta, la sección se queda guardando.
+    },
+  );
+}
+
+function signInTextsSection(page: Page): Locator {
+  return page.getByRole("region", {
+    name: /^(Sign-in screen|Pantalla de entrar)$/,
+  });
+}
+
+/** Un lema de 141 caracteres: la pantalla lo rechaza junto al campo sin
+ * mandar nada. */
+function writeTooLongTagline(labels: {
+  readonly field: string;
+  readonly submit: string;
+  readonly issue: RegExp;
+}) {
+  return async (page: Page): Promise<void> => {
+    const section = signInTextsSection(page);
+    await section.getByLabel(labels.field).fill("a".repeat(141));
+    await section.getByRole("button", { name: labels.submit }).click();
+    await expect(section.getByText(labels.issue)).toBeVisible();
+  };
+}
+
 /** Da de alta una posición cuyo nombre en español ya usa otra: el servidor
  * fingido la rechaza y el aviso sale junto a ese campo. */
 function addPositionWithTakenName(labels: {
@@ -6026,6 +6123,8 @@ function addPositionWithTakenName(labels: {
 type ClubSettingsState = {
   readonly name: string;
   readonly save?: ClubSettingsSave;
+  /** Lo que sirve el endpoint fingido de los textos de entrada (#301). */
+  readonly signInTexts?: StubbedSignInTexts;
   /** El catálogo que sirve el endpoint fingido de las posiciones (#300). */
   readonly positions?: readonly StubbedPosition[];
   readonly createPosition?: PositionCreate;
@@ -6110,6 +6209,7 @@ async function goToClubSettings(
     positions: state.positions ?? STUBBED_ACTIVE_POSITIONS,
     create: state.createPosition ?? "hangs",
   });
+  await stubSignInTexts(page, state.signInTexts ?? NO_STUBBED_SIGN_IN_TEXTS);
   await state.beforeVisit?.(page);
   if (theme === undefined) {
     await page.goto(`${APP_URL}${CLUB_SETTINGS_SCREEN_PATH}`);
@@ -6260,6 +6360,216 @@ for (const state of CLUB_POSITIONS_STATES) {
       await expect(
         positionsSection(page).getByRole("list").first(),
       ).toBeVisible();
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+const CLUB_SIGN_IN_TEXTS_STATES: readonly ClubSettingsState[] = [
+  { name: "club-textos-entrada", signInTexts: SHORT_SIGN_IN_TEXTS },
+  {
+    name: "club-textos-entrada-es",
+    signInTexts: SHORT_SIGN_IN_TEXTS,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "club-textos-entrada-demasiado-largo",
+    prepare: writeTooLongTagline({
+      field: "Tagline in Spanish",
+      submit: "Save sign-in texts",
+      issue: /The tagline can have at most 140 characters/,
+    }),
+  },
+  {
+    name: "club-textos-entrada-demasiado-largo-es",
+    beforeVisit: chooseSpanish,
+    prepare: writeTooLongTagline({
+      field: "Lema en español",
+      submit: "Guardar los textos",
+      issue: /El lema puede tener como mucho 140 caracteres/,
+    }),
+  },
+];
+
+async function goToSignInTextsSection(
+  page: Page,
+  state: ClubSettingsState,
+  theme?: (typeof themes)[number],
+): Promise<Locator> {
+  await goToClubSettings(page, state, theme);
+  const section = signInTextsSection(page);
+  await expect(section.getByRole("textbox").first()).toBeVisible();
+  return section;
+}
+
+/* Como las posiciones, la sección se fotografía sola, sin la barra de
+   pestañas del móvil encima. */
+for (const state of CLUB_SIGN_IN_TEXTS_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              const section = await goToSignInTextsSection(page, state, theme);
+              await page.addStyleTag({ content: HIDDEN_TAB_BAR_STYLE });
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                section.screenshot(SCREENSHOT_OPTIONS),
+              );
+              await expect(section).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToSignInTextsSection(page, state);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToSignInTextsSection(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+/* #301: la pantalla de entrar con los textos del club. Se ponen sobre la
+   página ya servida, como el logo y el acento: guardarlos en la base
+   cambiaría la pantalla de entrar de las demás pruebas. Que el servidor los
+   elija por idioma lo prueban los unitarios de `auth-layout.test.tsx`; aquí
+   se mira que caben, en los dos idiomas y en los tres anchos. */
+type SignInTextsScreen = {
+  readonly name: string;
+  readonly locale: "en" | "es";
+  readonly texts: StubbedSignInTexts;
+};
+
+const SIGN_IN_TEXTS_SCREENS: readonly SignInTextsScreen[] = [
+  { name: "entrar-textos-club", locale: "en", texts: SHORT_SIGN_IN_TEXTS },
+  { name: "entrar-textos-club-es", locale: "es", texts: SHORT_SIGN_IN_TEXTS },
+  {
+    name: "entrar-textos-club-largos",
+    locale: "en",
+    texts: LONG_SIGN_IN_TEXTS,
+  },
+  {
+    name: "entrar-textos-club-largos-es",
+    locale: "es",
+    texts: LONG_SIGN_IN_TEXTS,
+  },
+];
+
+async function showSignInTextsOnServedPage(
+  page: Page,
+  texts: { readonly tagline: string; readonly welcome: string },
+): Promise<void> {
+  // Antes de que React hidrate, un texto cambiado a mano no casa con lo que
+  // pintó el servidor, y React vuelve a poner el suyo.
+  await page.waitForFunction(() => {
+    const headline = document.querySelector(".auth-brand-headline");
+    return (
+      headline !== null &&
+      Object.keys(headline).some((key) => key.startsWith("__reactFiber"))
+    );
+  });
+  await page.evaluate(({ tagline, welcome }) => {
+    const headline = document.querySelector(".auth-brand-headline");
+    const copy = document.querySelector(".auth-brand-copy");
+    if (headline === null || copy === null) {
+      throw new Error("La pantalla de entrar no tiene lema o párrafo.");
+    }
+    headline.textContent = tagline;
+    copy.textContent = welcome;
+  }, texts);
+}
+
+async function goToSignInWithClubTexts(
+  page: Page,
+  signInScreen: SignInTextsScreen,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  if (signInScreen.locale === "es") {
+    await chooseSpanish(page);
+  }
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${SIGN_IN_PATH}`);
+  } else {
+    await goToWithTheme(page, SIGN_IN_PATH, theme);
+  }
+  const { tagline, welcome } = signInScreen.texts[signInScreen.locale];
+  if (tagline === null || welcome === null) {
+    throw new Error(`${signInScreen.name} necesita lema y párrafo.`);
+  }
+  await showSignInTextsOnServedPage(page, { tagline, welcome });
+}
+
+for (const signInScreen of SIGN_IN_TEXTS_SCREENS) {
+  test.describe(signInScreen.name, () => {
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(signInScreen.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToSignInWithClubTexts(page, signInScreen, theme);
+              const snapshot = `${signInScreen.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToSignInWithClubTexts(page, signInScreen);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+
+        test("keeps the club texts inside the brand panel", async ({
+          page,
+        }) => {
+          await goToSignInWithClubTexts(page, signInScreen);
+          const overflowing = await page.evaluate(() =>
+            [".auth-brand-headline", ".auth-brand-copy"].filter((selector) => {
+              const text = document.querySelector(selector);
+              return text !== null && text.scrollWidth > text.clientWidth;
+            }),
+          );
+          expect(overflowing).toEqual([]);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToSignInWithClubTexts(page, signInScreen);
       await expectNoAxeViolations(page);
     });
   });
