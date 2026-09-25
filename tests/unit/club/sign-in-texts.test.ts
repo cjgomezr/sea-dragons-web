@@ -12,6 +12,7 @@ import {
   type SignInTexts,
   type SignInTextsGateways,
   SignInTextsValidationError,
+  toSignInTexts,
   updateSignInTexts,
 } from "@/lib/club/sign-in-texts";
 
@@ -80,6 +81,29 @@ describe("textos del inicio de sesión", () => {
 
     it("no devuelve nada en un club que no escribió ninguno", () => {
       expect(clubSignInText(NO_SIGN_IN_TEXTS, "es", "welcome")).toBeNull();
+    });
+  });
+
+  describe("las filas de la base", () => {
+    it("reparte cada fila en su idioma", () => {
+      expect(
+        toSignInTexts([
+          { locale: "es", tagline: "Bajo el agua, juntos.", welcome: null },
+        ]),
+      ).toEqual({
+        en: { tagline: null, welcome: null },
+        es: { tagline: "Bajo el agua, juntos.", welcome: null },
+      });
+    });
+
+    it("sin filas no hay textos del club", () => {
+      expect(toSignInTexts([])).toEqual(NO_SIGN_IN_TEXTS);
+    });
+
+    it("falla con un idioma que la aplicación no habla", () => {
+      expect(() =>
+        toSignInTexts([{ locale: "fr", tagline: "Plongez.", welcome: null }]),
+      ).toThrow(/fr/);
     });
   });
 

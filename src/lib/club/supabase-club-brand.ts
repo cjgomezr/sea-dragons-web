@@ -5,18 +5,21 @@ import {
   type ClubBrandRow,
   createCachedClubBrandReader,
 } from "./club-brand";
+import { type SignInTextRow, toSignInTexts } from "./sign-in-texts";
 import { readClubLogoUrl } from "./supabase-club-logo-gateways";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
 const CLUBS_TABLE = "clubs";
 // Los alias dejan la fila casi con la forma de `ClubBrandRow`: falta pasar la
-// ruta del logo a su dirección pública.
+// ruta del logo a su dirección pública y repartir los textos del inicio de
+// sesión (#301) por idioma.
 const BRAND_COLUMNS =
-  "name, initials, accentColor:accent_color, logoPath:logo_path";
+  "name, initials, accentColor:accent_color, logoPath:logo_path, signInTextRows:club_sign_in_texts(locale, tagline, welcome)";
 
-type BrandColumns = Omit<ClubBrandRow, "logoUrl"> & {
+type BrandColumns = Omit<ClubBrandRow, "logoUrl" | "signInTexts"> & {
   readonly logoPath: string | null;
+  readonly signInTextRows: readonly SignInTextRow[];
 };
 
 /** Cuánto vive la marca en la memoria del servidor. Guardar un cambio la
@@ -49,8 +52,12 @@ export async function fetchClubBrandRow(
   if (error) {
     throw new Error(`No se pudo leer la marca del club: ${error.message}`);
   }
-  const { logoPath, ...brand } = data;
-  return { ...brand, logoUrl: readClubLogoUrl(client, logoPath) };
+  const { logoPath, signInTextRows, ...brand } = data;
+  return {
+    ...brand,
+    logoUrl: readClubLogoUrl(client, logoPath),
+    signInTexts: toSignInTexts(signInTextRows),
+  };
 }
 
 const clubBrandReader = createCachedClubBrandReader({

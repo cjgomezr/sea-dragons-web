@@ -6,6 +6,7 @@ import {
   createCachedClubBrandReader,
   deriveInitials,
 } from "@/lib/club/club-brand";
+import { NO_SIGN_IN_TEXTS, type SignInTexts } from "@/lib/club/sign-in-texts";
 
 /** La marca de E18a (#292, RF-1 y RF-2): se lee de la base una vez, se sirve de
  * la caché, y si la base no contesta la pantalla se pinta con el respaldo. */
@@ -15,6 +16,7 @@ const STORED_ROW: ClubBrandRow = {
   initials: "HO",
   accentColor: "#7b3fa0",
   logoUrl: null,
+  signInTexts: NO_SIGN_IN_TEXTS,
 };
 const LOGO_URL = "https://storage.example.test/club-logos/club/logo.png";
 const TIME_TO_LIVE_MS = 60_000;
@@ -69,6 +71,10 @@ describe("marca por defecto", () => {
   it("no lleva logo", () => {
     expect(DEFAULT_CLUB_BRAND.logoUrl).toBeNull();
   });
+
+  it("no lleva textos del inicio de sesión, así que salen los de la aplicación", () => {
+    expect(DEFAULT_CLUB_BRAND.signInTexts).toEqual(NO_SIGN_IN_TEXTS);
+  });
 });
 
 describe("lectura de la marca", () => {
@@ -80,7 +86,21 @@ describe("lectura de la marca", () => {
       initials: "HO",
       accentColor: "#7b3fa0",
       logoUrl: null,
+      signInTexts: NO_SIGN_IN_TEXTS,
     });
+  });
+
+  // #301: el lema y el párrafo del inicio de sesión viajan con la marca.
+  it("devuelve los textos del inicio de sesión que escribió el club", async () => {
+    const signInTexts: SignInTexts = {
+      en: { tagline: "Dive in.", welcome: null },
+      es: { tagline: null, welcome: null },
+    };
+    const { reader } = createReader({
+      fetchRow: async () => ({ ...STORED_ROW, signInTexts }),
+    });
+
+    expect((await reader.read()).signInTexts).toEqual(signInTexts);
   });
 
   it("devuelve la dirección del logo cuando el club lo tiene", async () => {

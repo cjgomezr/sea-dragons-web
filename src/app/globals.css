@@ -954,12 +954,16 @@ button.notification-item-content:hover {
   font-size: 40px;
   font-weight: 700;
   line-height: 1.2;
+  /* El lema lo escribe el club (#301): una palabra sin espacios de 140
+     caracteres no puede empujar el panel más allá de su ancho. */
+  overflow-wrap: anywhere;
 }
 
 .auth-brand-copy {
   max-width: 42ch;
   margin: 0;
   color: var(--color-sidebar-text);
+  overflow-wrap: anywhere;
 }
 
 .auth-brand-footer {

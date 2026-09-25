@@ -3,7 +3,7 @@ import {
   type AuditLogWriter,
   recordAuditEvent,
 } from "@/lib/audit/audit-log";
-import type { Locale } from "@/lib/i18n/locale";
+import { isLocale, type Locale } from "@/lib/i18n/locale";
 import { type ClubSettingsGateways, findAdministrator } from "./club-settings";
 
 /**
@@ -54,6 +54,27 @@ export function clubSignInText(
   kind: SignInTextKind,
 ): string | null {
   return texts[locale][kind];
+}
+
+/** Una fila de `club_sign_in_texts`. */
+export type SignInTextRow = {
+  readonly locale: string;
+  readonly tagline: string | null;
+  readonly welcome: string | null;
+};
+
+/** Un idioma sin fila no tiene textos del club. Un idioma que la aplicación
+ * no habla es una fila que `club_sign_in_texts_locale_check` no dejaría
+ * existir: se falla en vez de ignorarla. */
+export function toSignInTexts(rows: readonly SignInTextRow[]): SignInTexts {
+  return rows.reduce<SignInTexts>((texts, { locale, tagline, welcome }) => {
+    if (!isLocale(locale)) {
+      throw new Error(
+        `Textos del inicio de sesión en un idioma que no hay: ${locale}.`,
+      );
+    }
+    return { ...texts, [locale]: { tagline, welcome } };
+  }, NO_SIGN_IN_TEXTS);
 }
 
 export type SignInTextsIssueCode = `${SignInTextKind}_too_long`;

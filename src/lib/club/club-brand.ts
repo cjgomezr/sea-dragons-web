@@ -1,4 +1,5 @@
 import { DEFAULT_ACCENT_COLOR } from "./accent-color";
+import { NO_SIGN_IN_TEXTS, type SignInTexts } from "./sign-in-texts";
 
 /**
  * La marca del club (E18a, RF-1 a RF-4): nombre, iniciales, acento y logo, leídos de
@@ -16,6 +17,9 @@ export type ClubBrand = {
   /** La dirección pública del logo (#295). Sin logo, la marca son las
    * iniciales. */
   readonly logoUrl: string | null;
+  /** El lema y el párrafo del inicio de sesión (#301). Un idioma sin texto
+   * del club usa el del catálogo. */
+  readonly signInTexts: SignInTexts;
 };
 
 /** Lo que guarda la base. Sin iniciales es `null`, nunca la cadena vacía
@@ -25,6 +29,7 @@ export type ClubBrandRow = {
   readonly initials: string | null;
   readonly accentColor: string;
   readonly logoUrl: string | null;
+  readonly signInTexts: SignInTexts;
 };
 
 /** La red si la base no contesta: la marca sale en todas las pantallas, y una
@@ -34,6 +39,7 @@ export const DEFAULT_CLUB_BRAND: ClubBrand = {
   initials: "VS",
   accentColor: DEFAULT_ACCENT_COLOR,
   logoUrl: null,
+  signInTexts: NO_SIGN_IN_TEXTS,
 };
 
 const DERIVED_INITIALS_WORD_COUNT = 2;
@@ -54,6 +60,7 @@ function toClubBrand(row: ClubBrandRow): ClubBrand {
     initials: row.initials ?? deriveInitials(row.name),
     accentColor: row.accentColor,
     logoUrl: row.logoUrl,
+    signInTexts: row.signInTexts,
   };
 }
 
