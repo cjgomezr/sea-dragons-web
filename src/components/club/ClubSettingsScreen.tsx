@@ -10,6 +10,7 @@ import {
 } from "./club-settings-client";
 import { ClubPositionsSection } from "./ClubPositionsSection";
 import { ClubSettingsForm } from "./ClubSettingsForm";
+import { ClubSignInTextsSection } from "./ClubSignInTextsSection";
 
 /**
  * La configuración del club (#296, RF-6 del PRD de E18a), que un Admin abre
@@ -80,6 +81,7 @@ export function ClubSettingsScreen({
           />
           {/* Cada cambio de las posiciones se guarda en el acto (#300): no
               viaja con el botón del formulario de arriba. */}
+          <ClubSignInTextsSection translate={translate} />
           <ClubPositionsSection locale={locale} translate={translate} />
         </>
       ) : null}

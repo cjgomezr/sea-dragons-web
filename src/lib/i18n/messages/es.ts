@@ -762,6 +762,22 @@ export const spanishMessages: MessageCatalog = {
     "Sólo un Admin puede cambiar la configuración del club.",
   "clubSettings.error.unexpected":
     "Algo falló con la configuración del club. Vuelve a intentarlo.",
+  "clubSettings.signInTexts.title": "Pantalla de entrar",
+  "clubSettings.signInTexts.lead":
+    "El lema y el párrafo de bienvenida que se leen antes de iniciar sesión. Deja un campo vacío para que salga el texto de la aplicación en ese idioma.",
+  "clubSettings.signInTexts.loading": "Cargando los textos de entrada…",
+  "clubSettings.signInTexts.tagline.en": "Lema en inglés",
+  "clubSettings.signInTexts.welcome.en": "Párrafo de bienvenida en inglés",
+  "clubSettings.signInTexts.tagline.es": "Lema en español",
+  "clubSettings.signInTexts.welcome.es": "Párrafo de bienvenida en español",
+  "clubSettings.signInTexts.hint": "Hasta {max} caracteres. Texto plano.",
+  "clubSettings.signInTexts.issue.taglineTooLong":
+    "El lema puede tener como mucho {max} caracteres.",
+  "clubSettings.signInTexts.issue.welcomeTooLong":
+    "El párrafo de bienvenida puede tener como mucho {max} caracteres.",
+  "clubSettings.signInTexts.save": "Guardar los textos",
+  "clubSettings.signInTexts.saving": "Guardando los textos…",
+  "clubSettings.signInTexts.saved": "Textos de entrada guardados.",
   "clubSettings.positions.title": "Posiciones",
   "clubSettings.positions.lead":
     "Las posiciones de juego que cada miembro elige en su perfil, en el orden que sigue el directorio. Archivar una posición la conserva para quien ya la tiene, pero nadie más puede elegirla.",

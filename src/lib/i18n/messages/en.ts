@@ -772,6 +772,23 @@ export const englishMessages = {
   "clubSettings.error.forbidden": "Only an Admin can change the club settings.",
   "clubSettings.error.unexpected":
     "Something went wrong with the club settings. Try again.",
+  // Los textos de la pantalla de entrar que escribe el club (#301).
+  "clubSettings.signInTexts.title": "Sign-in screen",
+  "clubSettings.signInTexts.lead":
+    "The tagline and welcome paragraph people read before they sign in. Leave a field empty to show the app's own text in that language.",
+  "clubSettings.signInTexts.loading": "Loading the sign-in texts…",
+  "clubSettings.signInTexts.tagline.en": "Tagline in English",
+  "clubSettings.signInTexts.welcome.en": "Welcome paragraph in English",
+  "clubSettings.signInTexts.tagline.es": "Tagline in Spanish",
+  "clubSettings.signInTexts.welcome.es": "Welcome paragraph in Spanish",
+  "clubSettings.signInTexts.hint": "Up to {max} characters. Plain text.",
+  "clubSettings.signInTexts.issue.taglineTooLong":
+    "The tagline can have at most {max} characters.",
+  "clubSettings.signInTexts.issue.welcomeTooLong":
+    "The welcome paragraph can have at most {max} characters.",
+  "clubSettings.signInTexts.save": "Save sign-in texts",
+  "clubSettings.signInTexts.saving": "Saving texts…",
+  "clubSettings.signInTexts.saved": "Sign-in texts saved.",
   "clubSettings.positions.title": "Positions",
   "clubSettings.positions.lead":
     "The playing positions members choose in their profile, in the order the directory follows. Archiving a position keeps it for the members who have it, but nobody else can choose it.",
