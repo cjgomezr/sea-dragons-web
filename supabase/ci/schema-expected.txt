@@ -88,12 +88,19 @@ columna role_requests.requested_role tipo=text null=NO default=-
 columna role_requests.status tipo=text null=NO default='pending'::text
 columna role_requests.user_id tipo=uuid null=NO default=-
 funcion change_member_role(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_role text)
-funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
+funcion club_position_name_taken(acting_club_id uuid, own_position_id uuid, name_en text, name_es text)
 funcion clubs_seed_default_positions()
+funcion create_club_position(acting_club_id uuid, name_en text, name_es text)
+funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
 funcion health_probe()
+funcion insert_club_position_names(acting_club_id uuid, target_position_id uuid, name_en text, name_es text)
 funcion is_member_in_groups(target_user_id uuid, group_ids uuid[])
+funcion lock_club_positions(acting_club_id uuid)
 funcion members_sync_position_id()
 funcion prune_member_notifications(recipient_user_ids uuid[])
+funcion rename_club_position(acting_club_id uuid, target_position_id uuid, name_en text, name_es text)
+funcion reorder_club_positions(acting_club_id uuid, ordered_ids uuid[])
+funcion set_club_position_archived(acting_club_id uuid, target_position_id uuid, archived boolean)
 funcion set_member_status(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_status text)
 grant audit_log postgres DELETE
 grant audit_log postgres INSERT
