@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { TextField } from "@/components/directory/record-fields";
+import { normalizeAccentInput } from "@/lib/club/accent-color";
 import { deriveInitials } from "@/lib/club/club-brand";
 import {
   CLUB_INITIALS_MAX_LENGTH,
@@ -23,6 +24,7 @@ import {
   readIssueCode,
   saveClubSettings,
 } from "./club-settings-client";
+import { ACCENT_FIELD_ID, ClubAccentField } from "./ClubAccentField";
 import { ClubLogoField } from "./ClubLogoField";
 
 /**
@@ -42,8 +44,13 @@ type Status =
   | { readonly kind: "saved" }
   | ClubSettingsFailure;
 
-/** Lo que hay en los controles. Unas iniciales vacías se mandan como null. */
-type Draft = { readonly name: string; readonly initials: string };
+/** Lo que hay en los controles. Unas iniciales vacías se mandan como null, y
+ * el acento se manda como lo guarda la base, escriba lo que escriba el Admin. */
+type Draft = {
+  readonly name: string;
+  readonly initials: string;
+  readonly accentColor: string;
+};
 
 const NAME_ID = "club-nombre";
 const NAME_HINT_ID = "club-nombre-ayuda";
@@ -61,15 +68,18 @@ const FIELD_OF_ISSUE: Readonly<
 };
 
 function toDraft(settings: ClubSettings): Draft {
-  return { name: settings.name, initials: settings.initials ?? "" };
+  return {
+    name: settings.name,
+    initials: settings.initials ?? "",
+    accentColor: settings.accentColor.toUpperCase(),
+  };
 }
 
-/** Esta pantalla no cambia el acento: manda el guardado tal cual. */
-function toIdentity(draft: Draft, accentColor: string): ClubIdentity {
+function toIdentity(draft: Draft): ClubIdentity {
   return {
     name: draft.name,
     initials: draft.initials.trim() === "" ? null : draft.initials,
-    accentColor,
+    accentColor: normalizeAccentInput(draft.accentColor),
   };
 }
 
@@ -123,42 +133,41 @@ function SaveOutcome({
   );
 }
 
-/** El acento se enseña aquí; elegirlo llega con su propio ticket (RF-3 del
- * PRD de E18a). Un acento guardado que el servidor ya no acepta se explica
- * junto a él: si no, el guardado fallaría sin decir por qué. El logo se
- * cambia aquí mismo (#295). */
+/** El acento se elige aquí (#346) y viaja con el botón del formulario; el
+ * logo se guarda en el acto con sus propios botones (#295). */
 function BrandSummary({
   translate,
   settings,
-  accentIssueText,
+  accent,
   onLogoChanged,
 }: {
   translate: Translator;
   settings: ClubSettings;
-  accentIssueText: string | null;
+  accent: {
+    readonly typedColor: string;
+    readonly issueText: string | null;
+    readonly isDisabled: boolean;
+    readonly onChange: (typedColor: string) => void;
+  };
   onLogoChanged: (logoUrl: string | null) => void;
 }): React.JSX.Element {
-  const accent = settings.accentColor.toUpperCase();
   const initials = settings.initials ?? deriveInitials(settings.name);
   return (
     <section className="auth-fields" aria-labelledby="club-marca">
       <h2 id="club-marca">{translate("clubSettings.brand.title")}</h2>
       <dl className="club-settings-brand">
         <div className="club-settings-brand-row">
-          <dt>{translate("clubSettings.accent.label")}</dt>
+          <dt>
+            <label htmlFor={ACCENT_FIELD_ID}>
+              {translate("clubSettings.accent.label")}
+            </label>
+          </dt>
           <dd>
-            <span
-              className="club-settings-swatch"
-              style={{ backgroundColor: settings.accentColor }}
-              aria-hidden="true"
+            <ClubAccentField
+              translate={translate}
+              savedColor={settings.accentColor}
+              {...accent}
             />
-            <span>{accent}</span>
-            {/* Dentro del dd: un dl sólo admite dt y dd en cada grupo. */}
-            {accentIssueText === null ? null : (
-              <p className="auth-field-error" role="alert">
-                {accentIssueText}
-              </p>
-            )}
           </dd>
         </div>
         <div className="club-settings-brand-row">
@@ -213,7 +222,7 @@ export function ClubSettingsForm({
     if (isSendingRef.current) {
       return;
     }
-    const identity = toIdentity(draft, settings.accentColor);
+    const identity = toIdentity(draft);
     const expected: ClubIdentity = {
       name: settings.name,
       initials: settings.initials,
@@ -294,7 +303,12 @@ export function ClubSettingsForm({
       <BrandSummary
         translate={translate}
         settings={settings}
-        accentIssueText={issueTextFor("accentColor")}
+        accent={{
+          typedColor: draft.accentColor,
+          issueText: issueTextFor("accentColor"),
+          isDisabled: isSending,
+          onChange: (accentColor) => update({ accentColor }),
+        }}
         onLogoChanged={(logoUrl) => {
           setSettings((current) => ({ ...current, logoUrl }));
           // Como al guardar: redibuja la cabecera con el logo nuevo.

@@ -8,6 +8,8 @@ import {
   ON_ACCENT_CANDIDATES,
   contrastRatio,
   evaluateAccentColor,
+  isHexColor,
+  normalizeAccentInput,
 } from "@/lib/club/accent-color";
 import {
   cssBlock,
@@ -379,5 +381,23 @@ describe("color de acento", () => {
         dark["color-on-accent"],
       ]);
     });
+  });
+});
+
+describe("normalizar el código que escribe el Admin (#346)", () => {
+  it.each([
+    ["sin almohadilla", "7B3FA0", "#7b3fa0"],
+    ["en mayúsculas", "#7B3FA0", "#7b3fa0"],
+    ["con espacios alrededor", "  #7b3fa0 ", "#7b3fa0"],
+  ])(
+    "acepta un código %s y lo deja como lo guarda la base",
+    (_case, typed, stored) => {
+      expect(normalizeAccentInput(typed)).toBe(stored);
+    },
+  );
+
+  it("deja tal cual lo que no es un hexadecimal, para que la validación lo rechace", () => {
+    expect(normalizeAccentInput("purple")).toBe("#purple");
+    expect(isHexColor(normalizeAccentInput("#12345"))).toBe(false);
   });
 });

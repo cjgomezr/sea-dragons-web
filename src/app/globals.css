@@ -2480,7 +2480,7 @@ button.notification-item-content:hover {
 }
 
 /* Con el aspecto de las etiquetas de los campos de arriba: son los mismos
-   datos del club, sólo que todavía no se editan aquí. */
+   datos del club, agrupados con su muestra. */
 .club-settings-brand-row dt {
   font-family: var(--font-family-mono);
   font-size: 12px;
@@ -2504,15 +2504,65 @@ button.notification-item-content:hover {
   margin: 0;
 }
 
-/* La muestra del acento lleva borde: un acento claro sobre el panel blanco
-   se perdería sin él. El valor en texto va al lado, así que el color no es
-   la única forma de saberlo. */
-.club-settings-swatch {
-  flex-shrink: 0;
-  width: var(--space-8);
-  height: var(--space-8);
+/* El acento en la configuración (#346): el selector, el código y la muestra
+   en una fila que se parte en móvil, y la ayuda y el aviso debajo. */
+.club-accent-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.club-accent-field .club-accent-picker {
+  width: var(--touch-target-min);
+  padding: var(--space-1);
+  cursor: pointer;
+}
+
+/* Cabe un código de siete caracteres con aire, sin estirarse a lo ancho. */
+.club-accent-field .club-accent-code {
+  width: 9em;
+  font-family: var(--font-family-mono);
+}
+
+.club-accent-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* La muestra lleva borde: un acento claro sobre el panel blanco se perdería
+   sin él. El código va al lado, así que el color no es la única forma de
+   saberlo. */
+.club-accent-preview-swatch {
+  display: inline-flex;
+  align-items: center;
+  min-width: var(--space-8);
+  min-height: var(--space-8);
+  padding: 0 var(--space-3);
+  font-size: 14px;
+  font-weight: 700;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+}
+
+/* Como la hoja del acento (#294): un enlace para cada tema, porque el que se
+   lee sobre el panel claro se pierde sobre el oscuro. */
+.club-accent-preview-link {
+  font-weight: 700;
+  color: var(--club-accent-link-light);
+  text-decoration: underline;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .club-accent-preview-link {
+    color: var(--club-accent-link-dark);
+  }
+}
+
+:root[data-theme="dark"] .club-accent-preview-link {
+  color: var(--club-accent-link-dark);
 }
 
 .club-settings-brand-row .auth-brand-mark {

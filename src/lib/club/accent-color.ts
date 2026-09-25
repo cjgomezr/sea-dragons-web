@@ -75,6 +75,14 @@ export function isHexColor(value: string): boolean {
   return HEX_COLOR_PATTERN.test(value);
 }
 
+/** Un código pegado de una guía de marca suele venir sin la almohadilla o en
+ * mayúsculas (#346). Lo que no es un hexadecimal sigue sin serlo: esto no
+ * valida, sólo deja el código como lo guarda la base. */
+export function normalizeAccentInput(typed: string): string {
+  const code = typed.trim().toLowerCase();
+  return code.startsWith("#") ? code : `#${code}`;
+}
+
 function toRgb(hex: string): Rgb {
   if (!isHexColor(hex)) {
     throw new Error(`No es un color hexadecimal de seis cifras: ${hex}`);

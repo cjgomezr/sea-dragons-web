@@ -155,8 +155,8 @@ function normalizeIdentity(identity: ClubIdentity): ClubIdentity {
 /**
  * El contraste sólo se exige a un acento que cambia. Uno ya guardado que no
  * llegue a AA (escrito a mano en la base, o de antes de un cambio de paleta)
- * no puede impedir que el Admin guarde el nombre: la pantalla todavía no deja
- * elegir otro. El formato sí se exige siempre, porque es el de la base.
+ * no puede impedir que el Admin guarde el nombre sin tocar el color. El
+ * formato sí se exige siempre, porque es el de la base.
  */
 function findAccentIssue(
   accentColor: string,
