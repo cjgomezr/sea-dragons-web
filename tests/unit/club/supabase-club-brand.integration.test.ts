@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
 import { fetchClubBrandRow } from "@/lib/club/supabase-club-brand";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 
@@ -27,6 +28,7 @@ describe.skipIf(!hasCredentials)("lectura de la marca en Supabase", () => {
         initials: "VS",
         accentColor: "#1c6ea4",
         logoUrl: null,
+        signInTexts: NO_SIGN_IN_TEXTS,
       });
     },
     TEST_TIMEOUT_MS,

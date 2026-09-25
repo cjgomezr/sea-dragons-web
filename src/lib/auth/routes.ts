@@ -160,6 +160,11 @@ export const CLUB_SETTINGS_API_PATH = "/api/v1/club/settings";
  * regla de esa ruta en `RESTRICTED_ROUTES` también lo reserva al Admin. */
 export const CLUB_LOGO_API_PATH = `${CLUB_SETTINGS_API_PATH}/logo`;
 
+/** El lema y el párrafo del inicio de sesión, por idioma (#301). Cuelga de
+ * la configuración, así que ya es sólo del Admin; se declara igual en
+ * `RESTRICTED_ROUTES`, como las posiciones. */
+export const CLUB_SIGN_IN_TEXTS_API_PATH = `${CLUB_SETTINGS_API_PATH}/sign-in-texts`;
+
 /** Las posiciones del club tal como las administra el Admin (#300): todas,
  * archivadas incluidas. GET las lista y POST crea una. Cuelga de la
  * configuración, así que ya es sólo del Admin; se declara igual en
@@ -318,4 +323,5 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
     path: CLUB_SETTINGS_POSITIONS_API_PATH,
     capability: "manageUsersAndRoles",
   },
+  { path: CLUB_SIGN_IN_TEXTS_API_PATH, capability: "manageUsersAndRoles" },
 ];

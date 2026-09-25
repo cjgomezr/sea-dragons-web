@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClubSettingsScreen } from "@/components/club/ClubSettingsScreen";
 import { evaluateAccentColor } from "@/lib/club/accent-color";
 import type { ClubSettings } from "@/lib/club/club-settings";
+import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
 
 /**
  * La pantalla de configuración del club (#296, RF-6 del PRD de E18a): carga
@@ -14,6 +15,7 @@ import type { ClubSettings } from "@/lib/club/club-settings";
 
 const SETTINGS_PATH = "/api/v1/club/settings";
 const POSITIONS_PATH = `${SETTINGS_PATH}/positions`;
+const SIGN_IN_TEXTS_PATH = `${SETTINGS_PATH}/sign-in-texts`;
 
 const STORED: ClubSettings = {
   name: "Harbour Hammerheads",
@@ -69,6 +71,10 @@ function stubApi(stub: Stub = {}): void {
       if (url === POSITIONS_PATH) {
         return jsonResponse(200, { data: { positions: [] } });
       }
+      // La de los textos de entrada (#301) también: aquí sin ninguno.
+      if (url === SIGN_IN_TEXTS_PATH) {
+        return jsonResponse(200, { data: NO_SIGN_IN_TEXTS });
+      }
       if (url !== SETTINGS_PATH) {
         throw new Error(`Petición inesperada: ${url}`);
       }
@@ -87,7 +93,9 @@ function stubApi(stub: Stub = {}): void {
 
 async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
   render(<ClubSettingsScreen locale={locale} />);
-  await screen.findByRole("button", { name: /save settings|guardar/i });
+  await screen.findByRole("button", {
+    name: /save settings|guardar la configuración/i,
+  });
 }
 
 function saveButton(): HTMLElement {

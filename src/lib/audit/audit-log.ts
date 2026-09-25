@@ -39,6 +39,10 @@ export const AUDIT_ACTIONS = [
   // metadata sólo nombra los campos que cambiaron (`{ fields: ["name"] }`),
   // nunca sus valores ni los anteriores. La entidad es el id del club.
   "club.settings_changed",
+  // RF-5 de E18a (#301): un Admin cambia los textos del inicio de sesión. La
+  // metadata nombra los que cambiaron (`{ fields: ["es.tagline"] }`), nunca
+  // el texto. La entidad es el id del club.
+  "club.sign_in_texts_changed",
   // RF-7 de E18a (#300): un Admin administra las posiciones del club. La
   // entidad es la posición (`club_position`), sin metadata: ni el nombre nuevo
   // ni el anterior. Reordenar toca todas, así que su entidad es el club y la

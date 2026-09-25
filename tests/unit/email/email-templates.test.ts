@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
+import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
 import type { Locale } from "@/lib/i18n/locale";
 import { contrastRatio } from "../helpers/wcag-contrast";
 import {
@@ -513,6 +514,7 @@ const STORED_BRAND: ClubBrand = {
   initials: "HO",
   accentColor: "#7A2E8C",
   logoUrl: null,
+  signInTexts: NO_SIGN_IN_TEXTS,
 };
 const PUBLIC_LOGO_URL =
   "https://abc.supabase.co/storage/v1/object/public/club-logos/club/logo.png";

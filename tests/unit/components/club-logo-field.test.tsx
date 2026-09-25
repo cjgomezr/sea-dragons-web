@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClubSettingsScreen } from "@/components/club/ClubSettingsScreen";
 import type { ClubSettings } from "@/lib/club/club-settings";
+import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
 
 /**
  * El logo en la pantalla de configuración del club (#295, RF-4 del PRD de
@@ -13,6 +14,7 @@ import type { ClubSettings } from "@/lib/club/club-settings";
 const SETTINGS_PATH = "/api/v1/club/settings";
 const LOGO_PATH = "/api/v1/club/settings/logo";
 const POSITIONS_PATH = "/api/v1/club/settings/positions";
+const SIGN_IN_TEXTS_PATH = `${SETTINGS_PATH}/sign-in-texts`;
 const LOGO_URL = "https://storage.example.test/club-logos/club/logo.png";
 const NEW_LOGO_URL = "https://storage.example.test/club-logos/club/nuevo.png";
 const LOGO_ALT = "Harbour Hammerheads logo";
@@ -51,6 +53,10 @@ function stubApi(options: {
       // La sección de posiciones (#300) carga lo suyo: aquí sin ninguna.
       if (url === POSITIONS_PATH) {
         return jsonResponse(200, { data: { positions: [] } });
+      }
+      // La de los textos de entrada (#301) también: aquí sin ninguno.
+      if (url === SIGN_IN_TEXTS_PATH) {
+        return jsonResponse(200, { data: NO_SIGN_IN_TEXTS });
       }
       if (url === LOGO_PATH) {
         const method = init?.method ?? "GET";

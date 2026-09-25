@@ -79,6 +79,97 @@ describe("la marca en la pantalla de entrar", () => {
   });
 });
 
+// #301: el lema y el párrafo los escribe el club, por idioma; si falta uno,
+// sale el de la aplicación en ese idioma, nunca el del otro.
+describe("pantalla de entrar", () => {
+  function givenSignInTexts(signInTexts: ClubBrand["signInTexts"]): void {
+    storedBrand.current = { ...storedBrand.current, signInTexts };
+  }
+
+  it("con textos del club enseña los suyos en vez de los de la aplicación", async () => {
+    givenSignInTexts({
+      en: { tagline: "Dive in with us.", welcome: "Hobart's finest." },
+      es: { tagline: "Al agua con nosotros.", welcome: "Lo mejor de Hobart." },
+    });
+
+    await renderAuthLayout();
+
+    expect(screen.getByText("Dive in with us.")).toBeInTheDocument();
+    expect(screen.getByText("Hobart's finest.")).toBeInTheDocument();
+    expect(screen.queryByText("Your club, beneath the surface.")).toBeNull();
+  });
+
+  it("con textos del club en español los enseña a quien eligió español", async () => {
+    incoming.cookies.set(LOCALE_COOKIE_NAME, "es");
+    givenSignInTexts({
+      en: { tagline: "Dive in with us.", welcome: "Hobart's finest." },
+      es: { tagline: "Al agua con nosotros.", welcome: "Lo mejor de Hobart." },
+    });
+
+    await renderAuthLayout();
+
+    expect(screen.getByText("Al agua con nosotros.")).toBeInTheDocument();
+    expect(screen.getByText("Lo mejor de Hobart.")).toBeInTheDocument();
+    expect(screen.queryByText("Dive in with us.")).toBeNull();
+  });
+
+  it("con textos sólo en español, en inglés salen los de la aplicación", async () => {
+    givenSignInTexts({
+      en: { tagline: null, welcome: null },
+      es: { tagline: "Al agua con nosotros.", welcome: "Lo mejor de Hobart." },
+    });
+
+    await renderAuthLayout();
+
+    expect(
+      screen.getByText("Your club, beneath the surface."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Al agua con nosotros.")).toBeNull();
+    expect(screen.queryByText("Lo mejor de Hobart.")).toBeNull();
+  });
+
+  it("con sólo el lema del club, el párrafo sale de la aplicación", async () => {
+    givenSignInTexts({
+      en: { tagline: "Dive in with us.", welcome: null },
+      es: { tagline: null, welcome: null },
+    });
+
+    await renderAuthLayout();
+
+    expect(screen.getByText("Dive in with us.")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Training, teams, assessments/),
+    ).toBeInTheDocument();
+  });
+
+  it("sin textos del club salen los de hoy", async () => {
+    await renderAuthLayout();
+
+    expect(
+      screen.getByText("Your club, beneath the surface."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Training, teams, assessments/),
+    ).toBeInTheDocument();
+  });
+
+  it("enseña un texto con etiquetas HTML como texto plano, sin interpretarlo", async () => {
+    const markup = '<img src=x onerror="alert(1)"><b>Hola</b>';
+    givenSignInTexts({
+      en: { tagline: markup, welcome: "<script>alert(2)</script>" },
+      es: { tagline: null, welcome: null },
+    });
+
+    const { container } = render(
+      await AuthLayout({ children: <form aria-label="Entrar" /> }),
+    );
+
+    expect(screen.getByText(markup)).toBeInTheDocument();
+    expect(screen.getByText("<script>alert(2)</script>")).toBeInTheDocument();
+    expect(container.querySelector("img[onerror], b, script")).toBeNull();
+  });
+});
+
 // E17 RF-3: quien todavía no entró también tiene que poder cambiar de idioma,
 // y el sitio es la cabecera donde ya vive el tema.
 describe("disposición de las pantallas de autenticación", () => {
