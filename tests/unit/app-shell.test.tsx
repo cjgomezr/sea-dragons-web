@@ -72,9 +72,7 @@ describe("la marca en la cabecera", () => {
     renderShell();
 
     const sidebar = screen.getByRole("complementary");
-    expect(
-      within(sidebar).queryByRole("img", { name: /logo/ }),
-    ).not.toBeInTheDocument();
+    expect(sidebar.querySelector("img.club-logo")).toBeNull();
   });
 });
 
@@ -120,7 +118,11 @@ describe("la marca en la barra lateral", () => {
     const sidebar = renderShellWithLogo();
     const lockup = brandLockupOf(sidebar);
 
-    fireEvent.error(lockup.querySelector("img.club-logo") as Element);
+    const logo = lockup.querySelector("img.club-logo");
+    if (logo === null) {
+      throw new Error("el logo no se pintó");
+    }
+    fireEvent.error(logo);
 
     expect(lockup.querySelector("img")).toBeNull();
     expect(lockup.children).toHaveLength(1);
