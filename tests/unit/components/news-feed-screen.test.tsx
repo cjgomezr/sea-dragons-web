@@ -108,7 +108,7 @@ describe("feed de noticias", () => {
   it("enseña las publicaciones en el orden en que las sirve el servidor, de la más reciente a la más antigua", async () => {
     stubSinglePage([SHORTLIST, WINTER, POLICY]);
 
-    render(<NewsFeedScreen locale="en" />);
+    render(<NewsFeedScreen locale="en" canPublish={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     const links = within(feedList()).getAllByRole("link");
@@ -122,7 +122,7 @@ describe("feed de noticias", () => {
   it("cada fila trae su categoría, hace cuánto, el autor, el título y el extracto", async () => {
     stubSinglePage([SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" />);
+    render(<NewsFeedScreen locale="en" canPublish={false} />);
 
     const link = await screen.findByRole("link", { name: SHORTLIST.title });
     const row = link.closest("li");
@@ -137,7 +137,7 @@ describe("feed de noticias", () => {
   it("la fila abre la publicación", async () => {
     stubSinglePage([SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" />);
+    render(<NewsFeedScreen locale="en" canPublish={false} />);
 
     expect(
       await screen.findByRole("link", { name: SHORTLIST.title }),
@@ -147,7 +147,7 @@ describe("feed de noticias", () => {
   it("la marca de adjuntos dice cuántos son", async () => {
     stubSinglePage([SHORTLIST, POLICY]);
 
-    render(<NewsFeedScreen locale="en" />);
+    render(<NewsFeedScreen locale="en" canPublish={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(screen.getByText("2 attachments")).toBeInTheDocument();
@@ -157,7 +157,7 @@ describe("feed de noticias", () => {
   it("una publicación sin adjuntos no lleva marca", async () => {
     stubSinglePage([WINTER]);
 
-    render(<NewsFeedScreen locale="en" />);
+    render(<NewsFeedScreen locale="en" canPublish={false} />);
 
     await screen.findByRole("link", { name: WINTER.title });
     expect(screen.queryByText(/attachment/)).not.toBeInTheDocument();
@@ -166,7 +166,7 @@ describe("feed de noticias", () => {
   it("dice en español la categoría, el tiempo y los adjuntos", async () => {
     stubSinglePage([SHORTLIST, WINTER]);
 
-    render(<NewsFeedScreen locale="es" />);
+    render(<NewsFeedScreen locale="es" canPublish={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(screen.getByText("Aviso")).toBeInTheDocument();
@@ -177,7 +177,7 @@ describe("feed de noticias", () => {
   it("explica con una frase que no hay nada publicado para quien mira", async () => {
     stubSinglePage([]);
 
-    render(<NewsFeedScreen locale="en" />);
+    render(<NewsFeedScreen locale="en" canPublish={false} />);
 
     expect(
       await screen.findByText("Nothing has been published for you yet."),
@@ -192,7 +192,7 @@ describe("feed de noticias", () => {
         : pageResponse({ posts: [POLICY], nextCursor: null }),
     );
     const user = userEvent.setup();
-    render(<NewsFeedScreen locale="en" />);
+    render(<NewsFeedScreen locale="en" canPublish={false} />);
 
     await user.click(await screen.findByRole("button", { name: "Load more" }));
 
@@ -211,7 +211,7 @@ describe("feed de noticias", () => {
         : pageResponse({ posts: [WINTER, POLICY], nextCursor: null }),
     );
     const user = userEvent.setup();
-    render(<NewsFeedScreen locale="en" />);
+    render(<NewsFeedScreen locale="en" canPublish={false} />);
 
     await user.click(await screen.findByRole("button", { name: "Load more" }));
 
@@ -222,7 +222,7 @@ describe("feed de noticias", () => {
   it("no ofrece cargar más en la última página", async () => {
     stubSinglePage([SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" />);
+    render(<NewsFeedScreen locale="en" canPublish={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(
@@ -240,7 +240,7 @@ describe("feed de noticias", () => {
       return pageResponse({ posts: [SHORTLIST], nextCursor: null });
     });
     const user = userEvent.setup();
-    render(<NewsFeedScreen locale="en" />);
+    render(<NewsFeedScreen locale="en" canPublish={false} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't reach the server.",
@@ -266,7 +266,7 @@ describe("feed de noticias", () => {
       return pageResponse({ posts: [WINTER], nextCursor: null });
     });
     const user = userEvent.setup();
-    render(<NewsFeedScreen locale="en" />);
+    render(<NewsFeedScreen locale="en" canPublish={false} />);
 
     await user.click(await screen.findByRole("button", { name: "Load more" }));
 
@@ -290,7 +290,7 @@ describe("feed de noticias", () => {
       }),
     );
 
-    render(<NewsFeedScreen locale="en" />);
+    render(<NewsFeedScreen locale="en" canPublish={false} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Your session ended. Sign in again to see the news.",

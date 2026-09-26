@@ -866,4 +866,67 @@ export const spanishMessages: MessageCatalog = {
   "news.post.notFound.lead": "Revisa la dirección o vuelve a Noticias.",
   "news.post.error.unexpected":
     "No pudimos abrir la publicación. Vuelve a intentarlo.",
+  // El formulario de publicar (#330).
+  "news.publish": "+ Publicar",
+  "news.publish.metaTitle": "Publicar · {club}",
+  "news.publish.metaDescription":
+    "Escribe una publicación para el club, elige quién la ve y adjunta documentos.",
+  "news.publish.back": "← Volver a Noticias",
+  "news.publish.title": "Nueva publicación",
+  "news.publish.lead":
+    "Escríbela, elige quién la ve y adjunta los documentos que hagan falta. Sale arriba del feed en cuanto la publicas.",
+  "news.publish.loading": "Cargando los grupos del club…",
+  "news.publish.loadFailed":
+    "No pudimos cargar los grupos del club. Vuelve a intentarlo.",
+  "news.publish.category": "Categoría",
+  "news.publish.titleLabel": "Título",
+  "news.publish.titleHint": "Hasta {max} caracteres.",
+  "news.publish.body": "Mensaje",
+  "news.publish.bodyHint": "Texto plano. Se respetan los saltos de línea.",
+  "news.publish.audience.legend": "Quién la ve",
+  "news.publish.audience.club": "Todo el club",
+  "news.publish.audience.groups": "Grupos concretos",
+  "news.publish.audience.groupsLegend": "Grupos",
+  "news.publish.audience.noGroups":
+    "El club todavía no tiene grupos, así que sólo puede ir a todo el club.",
+  "news.publish.attachments.legend": "Adjuntos",
+  "news.publish.attachments.hint":
+    "Hasta {max} archivos de {size} MB cada uno: PDF, JPEG, PNG, WebP o Word.",
+  "news.publish.attachments.choose": "Elegir archivos",
+  "news.publish.attachments.add": "Añadir archivos",
+  "news.publish.attachments.uploading": "Subiendo…",
+  "news.publish.attachments.remove": "Quitar",
+  "news.publish.attachments.removeNamed": "Quitar {name}",
+  "news.publish.attachments.notice": "{name}: {reason}",
+  "news.publish.attachments.removeFailed":
+    "No pudimos quitarlo. Vuelve a intentarlo.",
+  "news.publish.attachments.issue.empty": "El archivo está vacío.",
+  "news.publish.attachments.issue.tooLarge":
+    "Cada archivo puede pesar hasta {max} MB.",
+  "news.publish.attachments.issue.typeUnsupported":
+    "Sólo PDF, imágenes (JPEG, PNG, WebP) y documentos de Word.",
+  "news.publish.attachments.issue.typeMismatch":
+    "La extensión del archivo no corresponde con lo que tiene dentro.",
+  "news.publish.attachments.issue.nameInvalid":
+    "El nombre del archivo no vale. Cámbialo y vuelve a intentarlo.",
+  "news.publish.attachments.issue.limitReached":
+    "Una publicación puede llevar como mucho {max} adjuntos.",
+  "news.publish.attachments.issue.uploadMissing":
+    "Un adjunto ya no está subido. Quítalo y vuelve a adjuntarlo.",
+  "news.publish.issue.titleMissing": "Ponle un título.",
+  "news.publish.issue.titleTooLong":
+    "El título puede tener hasta {max} caracteres.",
+  "news.publish.issue.bodyMissing": "Escribe el mensaje.",
+  "news.publish.issue.audienceGroupsEmpty":
+    "Elige al menos un grupo, o mándala a todo el club.",
+  "news.publish.submit": "Publicar",
+  "news.publish.sending": "Publicando…",
+  "news.publish.waitForUploads": "Espera a que terminen de subir los adjuntos.",
+  "news.publish.error.network":
+    "No pudimos llegar al servidor. No se publicó nada: revisa tu conexión y vuelve a intentarlo.",
+  "news.publish.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para publicar.",
+  "news.publish.error.forbidden": "Tu rol no puede publicar noticias.",
+  "news.publish.error.unexpected":
+    "No pudimos publicarla. Vuelve a intentarlo.",
 };

@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import { NEWS_PUBLISH_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import type { NewsFeedItem } from "@/lib/news/news-feed";
@@ -100,8 +102,12 @@ function LoadMore({
 
 export function NewsFeedScreen({
   locale,
+  canPublish,
 }: {
   readonly locale: Locale;
+  /** Si quien mira puede publicar (#330). Sólo decide si se pinta el botón:
+   * la frontera es quien niega el formulario y el endpoint. */
+  readonly canPublish: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [state, setState] = useState<FeedState>({ kind: "loading" });
@@ -165,8 +171,15 @@ export function NewsFeedScreen({
   return (
     <div className="news">
       <header className="news-header">
-        <p className="news-eyebrow">{translate("news.eyebrow")}</p>
-        <h1 id={TITLE_ID}>{translate("news.title")}</h1>
+        <div>
+          <p className="news-eyebrow">{translate("news.eyebrow")}</p>
+          <h1 id={TITLE_ID}>{translate("news.title")}</h1>
+        </div>
+        {canPublish ? (
+          <Link href={NEWS_PUBLISH_PATH} className="auth-submit directory-add">
+            {translate("news.publish")}
+          </Link>
+        ) : null}
       </header>
       {state.kind === "loading" ? (
         <p className="admin-empty">{translate("news.loading")}</p>
