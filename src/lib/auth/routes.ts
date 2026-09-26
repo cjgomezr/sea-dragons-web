@@ -189,6 +189,21 @@ export const CLUB_SETTINGS_POSITIONS_ORDER_API_PATH = `${CLUB_SETTINGS_POSITIONS
  * no cuelga de la configuración del club, que es sólo del Admin. */
 export const CLUB_POSITIONS_API_PATH = "/api/v1/club/positions";
 
+/** El feed de noticias (#327, RF-4 del PRD de E11). Lo alcanza cualquier
+ * cuenta activa, de cualquier rol, así que no aparece en
+ * `RESTRICTED_ROUTES`: qué publicaciones ve cada uno lo decide el servidor
+ * con su audiencia. */
+export const NEWS_API_PATH = "/api/v1/news";
+
+/** Una publicación abierta (#327, RF-5). `[id]` es el de la publicación. Lo
+ * alcanza cualquier cuenta activa; la que no le corresponde responde 404. */
+export const NEWS_POST_API_PATH = `${NEWS_API_PATH}/[id]`;
+
+/** Publicar (#327, RF-2): sólo Admin y Committee (FR-057). Va en un camino
+ * propio y no en el POST del feed porque la frontera decide por camino, no
+ * por método, y el feed es de todos. */
+export const NEWS_PUBLISH_API_PATH = `${NEWS_API_PATH}/publish`;
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 
@@ -329,4 +344,5 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
     capability: "manageUsersAndRoles",
   },
   { path: CLUB_SIGN_IN_TEXTS_API_PATH, capability: "manageUsersAndRoles" },
+  { path: NEWS_PUBLISH_API_PATH, capability: "publishNewsAndDocuments" },
 ];
