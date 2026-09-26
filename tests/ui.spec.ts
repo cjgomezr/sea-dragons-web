@@ -64,6 +64,7 @@ import {
 } from "@/lib/club/accent-color";
 import { memberInitials } from "@/lib/auth/member-initials";
 import { buildAccentStylesheet } from "@/lib/club/accent-stylesheet";
+import { shrinkProfilePhoto } from "@/lib/members/shrink-profile-photo";
 import { LOCALE_COOKIE_NAME, type Locale } from "@/lib/i18n/locale";
 
 // Con qué condiciones se toma cada captura, sembrada o comparada. Hoy
@@ -3614,6 +3615,92 @@ async function waitForDirectoryPhoto(page: Page): Promise<void> {
   ).toHaveJSProperty("complete", true);
 }
 
+/* La foto grande (#355): pulsar la miniatura de una fila la abre en un
+   diálogo. Las dos fotos fijas pasan por la misma reducción que una subida
+   de verdad, así que el diálogo recibe lo que recibiría en producción: una
+   WebP de 1024 px por el lado mayor. */
+
+const LARGE_PHOTO_ENDPOINT = `${DIRECTORY_ENDPOINT}/${MEMBER_WITH_PHOTO_ID}/photo`;
+const STUBBED_LARGE_PHOTO_URL =
+  "https://fotos.test/member-photos/mateo-large.webp";
+const PHOTO_FIXTURES_DIRECTORY = path.dirname(PROFILE_PHOTO_FIXTURE_PATH);
+const LARGE_PHOTO_FIXTURES = {
+  landscape: path.join(PHOTO_FIXTURES_DIRECTORY, "foto-apaisada-3000x2000.jpg"),
+  portrait: path.join(PHOTO_FIXTURES_DIRECTORY, "foto-vertical-2000x3000.jpg"),
+} as const;
+type LargePhotoShape = keyof typeof LARGE_PHOTO_FIXTURES;
+const OPEN_PHOTO_BUTTON =
+  /^(Open the photo of|Abrir la foto de) Mateo Restrepo$/;
+const LARGE_PHOTO_NAME = /^(Photo of|Foto de) Mateo Restrepo$/;
+
+async function largeVersionOf(shape: LargePhotoShape): Promise<Buffer> {
+  const shrunk = await shrinkProfilePhoto(
+    readFileSync(LARGE_PHOTO_FIXTURES[shape]),
+  );
+  if (shrunk.kind !== "shrunk") {
+    throw new Error(`La foto fija ${shape} no se pudo reducir.`);
+  }
+  return Buffer.from(shrunk.large.bytes);
+}
+
+/** El endpoint de #353 y la foto que firma. Con `failed`, el endpoint cae. */
+async function stubLargePhoto(
+  page: Page,
+  shape: LargePhotoShape | "failed",
+): Promise<void> {
+  if (shape === "failed") {
+    await page.route(
+      (url) => url.pathname === LARGE_PHOTO_ENDPOINT,
+      (route) =>
+        route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: { code: "internal_error", message: "x" },
+          }),
+        }),
+    );
+    return;
+  }
+  const photo = await largeVersionOf(shape);
+  await page.route(STUBBED_LARGE_PHOTO_URL, (route) =>
+    route.fulfill({ status: 200, contentType: "image/webp", body: photo }),
+  );
+  await page.route(
+    (url) => url.pathname === LARGE_PHOTO_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { photoUrl: STUBBED_LARGE_PHOTO_URL } }),
+      }),
+  );
+}
+
+function photoDialog(page: Page): Locator {
+  return page.getByRole("dialog", { name: "Mateo Restrepo" });
+}
+
+/** Abre la foto de la fila y espera a que el diálogo termine: la grande
+ * pintada entera, o el aviso de que no cargó. */
+function openLargePhoto(shape: LargePhotoShape | "failed") {
+  return async (page: Page): Promise<void> => {
+    await waitForDirectoryPhoto(page);
+    await stubLargePhoto(page, shape);
+    await page.getByRole("button", { name: OPEN_PHOTO_BUTTON }).click();
+    const dialog = photoDialog(page);
+    await expect(dialog).toBeVisible();
+    if (shape === "failed") {
+      await expect(dialog.getByRole("alert")).toBeVisible();
+      return;
+    }
+    await expect(
+      dialog.getByRole("img", { name: LARGE_PHOTO_NAME }),
+    ).toHaveJSProperty("complete", true);
+    await expect(dialog.getByRole("status")).toHaveCount(0);
+  };
+}
+
 type DirectoryState = {
   readonly name: string;
   /** Un Admin recibe la lista marcada como suya, y con ella el control de los
@@ -3623,6 +3710,10 @@ type DirectoryState = {
   readonly withRequests?: boolean;
   /** Una de las filas sale con foto en vez de iniciales (#245). */
   readonly withPhoto?: boolean;
+  /** Termina con un diálogo modal abierto (#355). Se fotografía lo que se ve
+   * en la ventana: a página entera la capa modal, que es fija, sale partida a
+   * media altura. */
+  readonly endsInModal?: boolean;
   readonly listHeading: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   readonly prepare?: (page: Page) => Promise<void>;
@@ -3648,6 +3739,39 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     listHeading: SPANISH_DIRECTORY_HEADING,
     beforeVisit: chooseSpanish,
     prepare: waitForDirectoryPhoto,
+  },
+  {
+    name: "directorio-foto-grande-apaisada",
+    asAdmin: false,
+    withPhoto: true,
+    endsInModal: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: openLargePhoto("landscape"),
+  },
+  {
+    name: "directorio-foto-grande-vertical",
+    asAdmin: false,
+    withPhoto: true,
+    endsInModal: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: openLargePhoto("portrait"),
+  },
+  {
+    name: "directorio-foto-grande-error",
+    asAdmin: false,
+    withPhoto: true,
+    endsInModal: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: openLargePhoto("failed"),
+  },
+  {
+    name: "directorio-foto-grande-apaisada-es",
+    asAdmin: false,
+    withPhoto: true,
+    endsInModal: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: openLargePhoto("landscape"),
   },
   {
     name: "directorio-con-miembros-es",
@@ -3744,12 +3868,13 @@ for (const state of DIRECTORY_STATES) {
             test(`matches approved baseline (${theme})`, async ({ page }) => {
               await goToDirectory(page, state, theme);
               const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              const fullPage = state.endsInModal !== true;
               await createMissingLocalBaseline(snapshot, () =>
-                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage }),
               );
               await expect(page).toHaveScreenshot(snapshot, {
                 ...SCREENSHOT_OPTIONS,
-                fullPage: true,
+                fullPage,
                 maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
               });
             });
@@ -3774,6 +3899,168 @@ for (const state of DIRECTORY_STATES) {
     });
   });
 }
+
+/** Cómo queda la foto grande en la pantalla, medido en el navegador. */
+type RenderedPhoto = {
+  readonly width: number;
+  readonly height: number;
+  readonly naturalWidth: number;
+  readonly naturalHeight: number;
+  readonly centerX: number;
+  readonly centerY: number;
+};
+
+async function measureLargePhoto(page: Page): Promise<RenderedPhoto> {
+  return photoDialog(page)
+    .getByRole("img", { name: LARGE_PHOTO_NAME })
+    .evaluate((element) => {
+      const image = element as HTMLImageElement;
+      const box = image.getBoundingClientRect();
+      return {
+        width: box.width,
+        height: box.height,
+        naturalWidth: image.naturalWidth,
+        naturalHeight: image.naturalHeight,
+        centerX: box.left + box.width / 2,
+        centerY: box.top + box.height / 2,
+      };
+    });
+}
+
+/** Ancho entre alto, con la tolerancia de un píxel de redondeo. */
+function expectSameProportion(photo: RenderedPhoto): void {
+  expect(photo.width / photo.height).toBeCloseTo(
+    photo.naturalWidth / photo.naturalHeight,
+    1,
+  );
+}
+
+/** Un medio píxel de redondeo al centrar. */
+const CENTERING_TOLERANCE_PX = 1;
+
+test.describe("la foto grande en el directorio (#355)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  const photoState: DirectoryState = {
+    name: "directorio-con-foto",
+    asAdmin: false,
+    withPhoto: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+  };
+
+  for (const shape of ["landscape", "portrait"] as const) {
+    test.describe(`móvil, ${shape}`, () => {
+      test.use({ viewport: { width: 375, height: 812 } });
+
+      test("ocupa el ancho de la pantalla sin deformarse", async ({ page }) => {
+        await goToDirectory(page, {
+          ...photoState,
+          prepare: openLargePhoto(shape),
+        });
+
+        const photo = await measureLargePhoto(page);
+
+        expect(photo.width).toBeCloseTo(375, 0);
+        expectSameProportion(photo);
+        expect(photo.height).toBeLessThanOrEqual(812);
+      });
+    });
+
+    test.describe(`escritorio, ${shape}`, () => {
+      test.use({ viewport: { width: 1440, height: 900 } });
+
+      test("sale a su tamaño sin pasar de la ventana, centrada y sin deformarse", async ({
+        page,
+      }) => {
+        await goToDirectory(page, {
+          ...photoState,
+          prepare: openLargePhoto(shape),
+        });
+
+        const photo = await measureLargePhoto(page);
+
+        expectSameProportion(photo);
+        expect(photo.width).toBeLessThanOrEqual(photo.naturalWidth);
+        expect(photo.height).toBeLessThanOrEqual(900);
+        expect(Math.abs(photo.centerX - 1440 / 2)).toBeLessThanOrEqual(
+          CENTERING_TOLERANCE_PX,
+        );
+        if (shape === "landscape") {
+          // 1024 x 683 cabe entera en 1440 x 900: se ve a su tamaño.
+          expect(photo.width).toBe(photo.naturalWidth);
+        }
+      });
+    });
+  }
+
+  test.describe("con el teclado", () => {
+    test.use({ viewport: { width: 1440, height: 900 } });
+
+    test("se abre con Enter, el foco no sale del diálogo y Escape lo devuelve a la foto", async ({
+      page,
+    }) => {
+      await goToDirectory(page, photoState);
+      await waitForDirectoryPhoto(page);
+      await stubLargePhoto(page, "landscape");
+      const trigger = page.getByRole("button", { name: OPEN_PHOTO_BUTTON });
+      await trigger.focus();
+
+      await page.keyboard.press("Enter");
+      const dialog = photoDialog(page);
+      await expect(dialog).toBeVisible();
+      for (let press = 0; press < 3; press += 1) {
+        await page.keyboard.press("Tab");
+        const isFocusBehind = await dialog.evaluate(
+          (element) =>
+            document.activeElement !== null &&
+            document.activeElement !== document.body &&
+            !element.contains(document.activeElement),
+        );
+        expect(isFocusBehind, `Tab número ${press + 1}`).toBe(false);
+      }
+      await page.keyboard.press("Escape");
+
+      await expect(dialog).toBeHidden();
+      await expect(trigger).toBeFocused();
+    });
+
+    test("un clic en el fondo lo cierra y devuelve el foco a la foto", async ({
+      page,
+    }) => {
+      await goToDirectory(page, {
+        ...photoState,
+        prepare: openLargePhoto("landscape"),
+      });
+
+      await page.mouse.click(8, 8);
+
+      await expect(photoDialog(page)).toBeHidden();
+      await expect(
+        page.getByRole("button", { name: OPEN_PHOTO_BUTTON }),
+      ).toBeFocused();
+    });
+
+    test("el botón de cerrar lo cierra y devuelve el foco a la foto", async ({
+      page,
+    }) => {
+      await goToDirectory(page, {
+        ...photoState,
+        prepare: openLargePhoto("failed"),
+      });
+
+      await photoDialog(page)
+        .getByRole("button", { name: "Close the photo" })
+        .click();
+
+      await expect(photoDialog(page)).toBeHidden();
+      await expect(
+        page.getByRole("button", { name: OPEN_PHOTO_BUTTON }),
+      ).toBeFocused();
+    });
+  });
+});
 
 /* ---------------------------------------------------------------------------
    El directorio como lista de tarjetas (#283). Por debajo de 768px la tabla
