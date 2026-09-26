@@ -65,7 +65,14 @@ describe("detectFileType", () => {
   });
 
   it("no reconoce un RIFF que no es WebP", () => {
-    const wav = Uint8Array.from([...ascii("RIFF"), 0, 0, 0, 0, ...ascii("WAVE")]);
+    const wav = Uint8Array.from([
+      ...ascii("RIFF"),
+      0,
+      0,
+      0,
+      0,
+      ...ascii("WAVE"),
+    ]);
 
     expect(detectFileType(wav)).toBeNull();
   });
@@ -92,7 +99,9 @@ describe("detectFileType", () => {
   });
 
   it("no reconoce un texto que sólo se llama PDF", () => {
-    expect(detectFileType(Uint8Array.from(ascii("hola, soy un pdf")))).toBeNull();
+    expect(
+      detectFileType(Uint8Array.from(ascii("hola, soy un pdf"))),
+    ).toBeNull();
   });
 
   it("no reconoce un fichero vacío", () => {

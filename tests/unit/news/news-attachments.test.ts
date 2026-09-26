@@ -18,6 +18,7 @@ import {
   NEW_FILE_ID,
   SIGNED_URL_PREFIX,
   type StoredAttachment,
+  attachmentIdFor,
   fakeAttachmentClub,
 } from "../helpers/news-attachments-club";
 import {
@@ -35,7 +36,7 @@ import {
  */
 
 const POST_ID = "d3d3d3d3-0000-4000-8000-00000000000d";
-const ATTACHMENT_ID = "attachment-1";
+const ATTACHMENT_ID = attachmentIdFor(1);
 const STORAGE_PATH = `${CLUB_ID}/${POST_ID}/aaaa.pdf`;
 
 const PDF_BYTES = Uint8Array.from(Buffer.from("%PDF-1.7\n1 0 obj"));
@@ -47,7 +48,7 @@ const TEXT_BYTES = Uint8Array.from(Buffer.from("hola, soy un pdf"));
 
 function storedAttachment(index: number): StoredAttachment {
   return {
-    id: `attachment-${index}`,
+    id: attachmentIdFor(index),
     postId: POST_ID,
     clubId: CLUB_ID,
     fileName: `acta-${index}.pdf`,
@@ -276,7 +277,7 @@ describe("adjuntos", () => {
       attachmentId: ATTACHMENT_ID,
     });
 
-    expect(club.rows.map((row) => row.id)).toEqual(["attachment-2"]);
+    expect(club.rows.map((row) => row.id)).toEqual([attachmentIdFor(2)]);
     expect(club.files.has(storedAttachment(1).storagePath)).toBe(false);
     expect(club.files.has(storedAttachment(2).storagePath)).toBe(true);
   });

@@ -15,6 +15,11 @@ import { type FakeClubOptions, fakeClub } from "./news-club";
 export const NEW_FILE_ID = "f5f5f5f5-0000-4000-8000-00000000000f";
 export const SIGNED_URL_PREFIX = "https://storage.test/signed/";
 
+/** Un id de adjunto con forma de uuid, como los de la base. */
+export function attachmentIdFor(index: number): string {
+  return `e4e4e4e4-0000-4000-8000-${String(index).padStart(12, "0")}`;
+}
+
 export type StoredAttachment = NewNewsAttachment & { readonly id: string };
 
 export type FakeAttachmentClubOptions = FakeClubOptions & {
@@ -59,7 +64,7 @@ export function fakeAttachmentClub(
         if (onPost.length >= MAX_ROWS_PER_POST) {
           throw new NewsAttachmentValidationError("attachment_limit_reached");
         }
-        const row = { ...attachment, id: `attachment-${rows.length + 1}` };
+        const row = { ...attachment, id: attachmentIdFor(rows.length + 1) };
         rows.push(row);
         return toSummary(row);
       },
