@@ -34,6 +34,12 @@ columna confirmation_email_requests.requested_at tipo=timestamp with time zone n
 columna email_send_requests.club_id tipo=uuid null=NO default=-
 columna email_send_requests.id tipo=uuid null=NO default=gen_random_uuid()
 columna email_send_requests.requested_at tipo=timestamp with time zone null=NO default=now()
+columna evaluation_categories.club_id tipo=uuid null=NO default=-
+columna evaluation_categories.created_at tipo=timestamp with time zone null=NO default=now()
+columna evaluation_categories.deactivated_at tipo=timestamp with time zone null=YES default=-
+columna evaluation_categories.id tipo=uuid null=NO default=gen_random_uuid()
+columna evaluation_categories.name tipo=text null=NO default=-
+columna evaluation_categories.sort_order tipo=integer null=NO default=-
 columna group_memberships.assigned_at tipo=timestamp with time zone null=NO default=now()
 columna group_memberships.club_id tipo=uuid null=NO default=-
 columna group_memberships.group_id tipo=uuid null=NO default=-
@@ -42,6 +48,15 @@ columna groups.club_id tipo=uuid null=NO default=-
 columna groups.created_at tipo=timestamp with time zone null=NO default=now()
 columna groups.id tipo=uuid null=NO default=gen_random_uuid()
 columna groups.name tipo=text null=NO default=-
+columna member_evaluation_ratings.category_id tipo=uuid null=NO default=-
+columna member_evaluation_ratings.club_id tipo=uuid null=NO default=-
+columna member_evaluation_ratings.evaluation_id tipo=uuid null=NO default=-
+columna member_evaluation_ratings.rating tipo=numeric null=NO default=-
+columna member_evaluations.club_id tipo=uuid null=NO default=-
+columna member_evaluations.created_at tipo=timestamp with time zone null=NO default=now()
+columna member_evaluations.id tipo=uuid null=NO default=gen_random_uuid()
+columna member_evaluations.updated_at tipo=timestamp with time zone null=NO default=now()
+columna member_evaluations.user_id tipo=uuid null=NO default=-
 columna members.account_status tipo=text null=NO default='incomplete'::text
 columna members.auf_expiry tipo=date null=YES default=-
 columna members.auf_number tipo=text null=YES default=-
@@ -114,6 +129,7 @@ columna role_requests.status tipo=text null=NO default='pending'::text
 columna role_requests.user_id tipo=uuid null=NO default=-
 funcion change_member_role(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_role text)
 funcion club_position_name_taken(acting_club_id uuid, own_position_id uuid, name_en text, name_es text)
+funcion clubs_seed_default_evaluation_categories()
 funcion clubs_seed_default_positions()
 funcion create_club_position(acting_club_id uuid, name_en text, name_es text)
 funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
@@ -126,6 +142,7 @@ funcion news_post_attachments_enforce_max()
 funcion prune_member_notifications(recipient_user_ids uuid[])
 funcion rename_club_position(acting_club_id uuid, target_position_id uuid, name_en text, name_es text)
 funcion reorder_club_positions(acting_club_id uuid, ordered_ids uuid[])
+funcion seed_default_evaluation_categories(target_club_id uuid)
 funcion set_club_position_archived(acting_club_id uuid, target_position_id uuid, archived boolean)
 funcion set_member_status(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_status text)
 grant audit_log postgres DELETE
@@ -231,6 +248,20 @@ grant email_send_requests service_role SELECT
 grant email_send_requests service_role TRIGGER
 grant email_send_requests service_role TRUNCATE
 grant email_send_requests service_role UPDATE
+grant evaluation_categories postgres DELETE
+grant evaluation_categories postgres INSERT
+grant evaluation_categories postgres REFERENCES
+grant evaluation_categories postgres SELECT
+grant evaluation_categories postgres TRIGGER
+grant evaluation_categories postgres TRUNCATE
+grant evaluation_categories postgres UPDATE
+grant evaluation_categories service_role DELETE
+grant evaluation_categories service_role INSERT
+grant evaluation_categories service_role REFERENCES
+grant evaluation_categories service_role SELECT
+grant evaluation_categories service_role TRIGGER
+grant evaluation_categories service_role TRUNCATE
+grant evaluation_categories service_role UPDATE
 grant group_memberships authenticated SELECT
 grant group_memberships postgres DELETE
 grant group_memberships postgres INSERT
@@ -261,6 +292,34 @@ grant groups service_role SELECT
 grant groups service_role TRIGGER
 grant groups service_role TRUNCATE
 grant groups service_role UPDATE
+grant member_evaluation_ratings postgres DELETE
+grant member_evaluation_ratings postgres INSERT
+grant member_evaluation_ratings postgres REFERENCES
+grant member_evaluation_ratings postgres SELECT
+grant member_evaluation_ratings postgres TRIGGER
+grant member_evaluation_ratings postgres TRUNCATE
+grant member_evaluation_ratings postgres UPDATE
+grant member_evaluation_ratings service_role DELETE
+grant member_evaluation_ratings service_role INSERT
+grant member_evaluation_ratings service_role REFERENCES
+grant member_evaluation_ratings service_role SELECT
+grant member_evaluation_ratings service_role TRIGGER
+grant member_evaluation_ratings service_role TRUNCATE
+grant member_evaluation_ratings service_role UPDATE
+grant member_evaluations postgres DELETE
+grant member_evaluations postgres INSERT
+grant member_evaluations postgres REFERENCES
+grant member_evaluations postgres SELECT
+grant member_evaluations postgres TRIGGER
+grant member_evaluations postgres TRUNCATE
+grant member_evaluations postgres UPDATE
+grant member_evaluations service_role DELETE
+grant member_evaluations service_role INSERT
+grant member_evaluations service_role REFERENCES
+grant member_evaluations service_role SELECT
+grant member_evaluations service_role TRIGGER
+grant member_evaluations service_role TRUNCATE
+grant member_evaluations service_role UPDATE
 grant members authenticated SELECT
 grant members postgres DELETE
 grant members postgres INSERT
@@ -397,11 +456,20 @@ indice confirmation_email_requests_email_hash_requested_at_idx CREATE INDEX conf
 indice confirmation_email_requests_pkey CREATE UNIQUE INDEX confirmation_email_requests_pkey ON public.confirmation_email_requests USING btree (id)
 indice email_send_requests_pkey CREATE UNIQUE INDEX email_send_requests_pkey ON public.email_send_requests USING btree (id)
 indice email_send_requests_requested_at_idx CREATE INDEX email_send_requests_requested_at_idx ON public.email_send_requests USING btree (requested_at DESC)
+indice evaluation_categories_club_id_name_key CREATE UNIQUE INDEX evaluation_categories_club_id_name_key ON public.evaluation_categories USING btree (club_id, lower(btrim(name)))
+indice evaluation_categories_club_id_sort_order_idx CREATE INDEX evaluation_categories_club_id_sort_order_idx ON public.evaluation_categories USING btree (club_id, sort_order)
+indice evaluation_categories_id_club_id_key CREATE UNIQUE INDEX evaluation_categories_id_club_id_key ON public.evaluation_categories USING btree (id, club_id)
+indice evaluation_categories_pkey CREATE UNIQUE INDEX evaluation_categories_pkey ON public.evaluation_categories USING btree (id)
 indice group_memberships_pkey CREATE UNIQUE INDEX group_memberships_pkey ON public.group_memberships USING btree (group_id, user_id)
 indice group_memberships_user_id_club_id_idx CREATE INDEX group_memberships_user_id_club_id_idx ON public.group_memberships USING btree (user_id, club_id)
 indice groups_club_id_name_key CREATE UNIQUE INDEX groups_club_id_name_key ON public.groups USING btree (club_id, lower(btrim(name)))
 indice groups_id_club_id_key CREATE UNIQUE INDEX groups_id_club_id_key ON public.groups USING btree (id, club_id)
 indice groups_pkey CREATE UNIQUE INDEX groups_pkey ON public.groups USING btree (id)
+indice member_evaluation_ratings_category_id_club_id_idx CREATE INDEX member_evaluation_ratings_category_id_club_id_idx ON public.member_evaluation_ratings USING btree (category_id, club_id)
+indice member_evaluation_ratings_pkey CREATE UNIQUE INDEX member_evaluation_ratings_pkey ON public.member_evaluation_ratings USING btree (evaluation_id, category_id)
+indice member_evaluations_id_club_id_key CREATE UNIQUE INDEX member_evaluations_id_club_id_key ON public.member_evaluations USING btree (id, club_id)
+indice member_evaluations_pkey CREATE UNIQUE INDEX member_evaluations_pkey ON public.member_evaluations USING btree (id)
+indice member_evaluations_user_id_key CREATE UNIQUE INDEX member_evaluations_user_id_key ON public.member_evaluations USING btree (user_id)
 indice members_pkey CREATE UNIQUE INDEX members_pkey ON public.members USING btree (id)
 indice members_position_id_club_id_idx CREATE INDEX members_position_id_club_id_idx ON public.members USING btree (position_id, club_id)
 indice members_user_id_club_id_key CREATE UNIQUE INDEX members_user_id_club_id_key ON public.members USING btree (user_id, club_id)
@@ -483,6 +551,10 @@ restriccion confirmation_email_requests.confirmation_email_requests_club_id_fkey
 restriccion confirmation_email_requests.confirmation_email_requests_pkey PRIMARY KEY (id)
 restriccion email_send_requests.email_send_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion email_send_requests.email_send_requests_pkey PRIMARY KEY (id)
+restriccion evaluation_categories.evaluation_categories_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
+restriccion evaluation_categories.evaluation_categories_id_club_id_key UNIQUE (id, club_id)
+restriccion evaluation_categories.evaluation_categories_name_length CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 40)))
+restriccion evaluation_categories.evaluation_categories_pkey PRIMARY KEY (id)
 restriccion group_memberships.group_memberships_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion group_memberships.group_memberships_group_same_club_fkey FOREIGN KEY (group_id, club_id) REFERENCES groups(id, club_id) ON DELETE CASCADE
 restriccion group_memberships.group_memberships_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
@@ -491,6 +563,16 @@ restriccion groups.groups_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id
 restriccion groups.groups_id_club_id_key UNIQUE (id, club_id)
 restriccion groups.groups_name_length CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 60)))
 restriccion groups.groups_pkey PRIMARY KEY (id)
+restriccion member_evaluation_ratings.member_evaluation_ratings_category_same_club_fkey FOREIGN KEY (category_id, club_id) REFERENCES evaluation_categories(id, club_id)
+restriccion member_evaluation_ratings.member_evaluation_ratings_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion member_evaluation_ratings.member_evaluation_ratings_evaluation_same_club_fkey FOREIGN KEY (evaluation_id, club_id) REFERENCES member_evaluations(id, club_id) ON DELETE CASCADE
+restriccion member_evaluation_ratings.member_evaluation_ratings_pkey PRIMARY KEY (evaluation_id, category_id)
+restriccion member_evaluation_ratings.member_evaluation_ratings_rating_check CHECK ((((rating >= (1)::numeric) AND (rating <= (10)::numeric)) AND (rating = trunc(rating))))
+restriccion member_evaluations.member_evaluations_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion member_evaluations.member_evaluations_id_club_id_key UNIQUE (id, club_id)
+restriccion member_evaluations.member_evaluations_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
+restriccion member_evaluations.member_evaluations_pkey PRIMARY KEY (id)
+restriccion member_evaluations.member_evaluations_user_id_key UNIQUE (user_id)
 restriccion members.members_account_status_check CHECK ((account_status = ANY (ARRAY['incomplete'::text, 'active'::text, 'inactive'::text])))
 restriccion members.members_active_minor_requires_guardian_consent CHECK (((account_status <> 'active'::text) OR (guardian_consent_at IS NOT NULL) OR (date_of_birth IS NULL) OR (date_of_birth <= ((((created_at AT TIME ZONE 'Australia/Melbourne'::text))::date - '18 years'::interval))::date)))
 restriccion members.members_auf_number_length CHECK (((char_length(btrim(auf_number)) >= 1) AND (char_length(btrim(auf_number)) <= 40)))
@@ -551,8 +633,11 @@ tabla club_sign_in_texts rls=t
 tabla clubs rls=t
 tabla confirmation_email_requests rls=t
 tabla email_send_requests rls=t
+tabla evaluation_categories rls=t
 tabla group_memberships rls=t
 tabla groups rls=t
+tabla member_evaluation_ratings rls=t
+tabla member_evaluations rls=t
 tabla members rls=t
 tabla news_post_attachments rls=t
 tabla news_post_groups rls=t
@@ -561,6 +646,7 @@ tabla notifications rls=t
 tabla password_recovery_requests rls=t
 tabla registration_requests rls=t
 tabla role_requests rls=t
+trigger clubs_seed_default_evaluation_categories CREATE TRIGGER clubs_seed_default_evaluation_categories AFTER INSERT ON public.clubs FOR EACH ROW EXECUTE FUNCTION clubs_seed_default_evaluation_categories()
 trigger clubs_seed_default_positions CREATE TRIGGER clubs_seed_default_positions AFTER INSERT ON public.clubs FOR EACH ROW EXECUTE FUNCTION clubs_seed_default_positions()
 trigger members_sync_position_id CREATE TRIGGER members_sync_position_id BEFORE INSERT OR UPDATE OF "position" ON public.members FOR EACH ROW EXECUTE FUNCTION members_sync_position_id()
 trigger news_post_attachments_enforce_max CREATE TRIGGER news_post_attachments_enforce_max BEFORE INSERT OR UPDATE OF post_id ON public.news_post_attachments FOR EACH ROW EXECUTE FUNCTION news_post_attachments_enforce_max()
