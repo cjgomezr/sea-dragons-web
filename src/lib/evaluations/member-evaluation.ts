@@ -374,17 +374,18 @@ function assertSaved(save: RatingsSave): void {
   }
 }
 
-/** Valida antes de leer nada, y sólo las categorías que llegan: las demás
- * de la evaluación se quedan como estaban. */
+/** Valida después de saber quién pide y antes de escribir nada: a quien no
+ * puede ver evaluaciones no se le explica qué valoración falla. Sólo las
+ * categorías que llegan: las demás de la evaluación se quedan como estaban. */
 export async function saveEvaluationRatings(
   gateways: MemberEvaluationGateways,
   request: EvaluationRequest & RatingsSubmission,
 ): Promise<MemberEvaluation> {
+  const actor = await findEvaluatorActor(gateways, request.callerId);
   const issues = findRatingsIssues(request.ratings);
   if (issues.length > 0) {
     throw new EvaluationValidationError(issues);
   }
-  const actor = await findEvaluatorActor(gateways, request.callerId);
   const scope = { clubId: actor.clubId, userId: request.memberId };
   await findWritableMember(gateways, scope);
   assertSaved(

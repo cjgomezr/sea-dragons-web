@@ -317,6 +317,17 @@ describe("guardar valoraciones", () => {
     expect(writes).toEqual([]);
   });
 
+  it("rechaza a un Player antes de mirar sus valoraciones", async () => {
+    const { gateways } = fakeGateways({ role: "Player" });
+
+    const saving = saveEvaluationRatings(gateways, {
+      ...SAVE_REQUEST,
+      ratings: [{ categoryId: FITNESS_ID, rating: 11 }],
+    });
+
+    await expect(saving).rejects.toBeInstanceOf(EvaluationForbiddenError);
+  });
+
   it("rechaza la misma categoría dos veces", async () => {
     const { gateways, writes } = fakeGateways({ stored: TWO_CATEGORIES });
 
