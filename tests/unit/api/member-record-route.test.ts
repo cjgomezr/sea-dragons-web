@@ -45,6 +45,12 @@ const readSessionState = vi.fn();
 const writes: string[] = [];
 let callerRole: Role = "Admin";
 let memberStatus: AccountStatus = "active";
+/** La foto del socio en Storage (#354), o null si no tiene. */
+let memberPhotoPath: string | null = null;
+/** Si firmar la foto falla entera, como cuando Storage no responde. */
+let isPhotoSigningDown = false;
+const PHOTO_PATH = `${MEMBER_ID}/foto.webp`;
+const SIGNED_PHOTO_URL = `https://storage.example/member-photos/${PHOTO_PATH}?token=firma`;
 
 type StoredAuf = {
   readonly aufNumber: string | null;
@@ -86,6 +92,7 @@ function memberRecordGateways(
               dateOfBirth,
               registeredAt: REGISTERED_AT,
               hasGuardianConsent: false,
+              photoPath: memberPhotoPath,
             }
           : null,
       findMemberGroups: async () =>
@@ -112,6 +119,14 @@ function memberRecordGateways(
         dateOfBirth = correction.dateOfBirth;
         accountStatus = correction.toStatus;
         return { kind: "corrected" };
+      },
+    },
+    photos: {
+      signPhotoUrl: async () => {
+        if (isPhotoSigningDown) {
+          throw new Error("Storage no responde.");
+        }
+        return SIGNED_PHOTO_URL;
       },
     },
     audit: {
@@ -227,6 +242,8 @@ beforeEach(() => {
   writes.length = 0;
   gateways = memberRecordGateways();
   memberStatus = "active";
+  memberPhotoPath = null;
+  isPhotoSigningDown = false;
   givenRole("Admin");
 });
 
@@ -247,6 +264,7 @@ describe("PATCH /api/v1/members/{id}/record", () => {
         dateOfBirth: ADULT_BIRTH,
         registeredAt: REGISTERED_AT,
         hasGuardianConsent: false,
+        photoUrl: null,
         isAufExpired: false,
         groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
       },
@@ -424,6 +442,53 @@ describe("GET /api/v1/members/{id}/record", () => {
     expect(response.status).toBe(404);
     await expect(reasonOf(response)).resolves.toBe("member_not_found");
   });
+});
+
+describe("la foto en la ficha", () => {
+  it("responde a un Admin con la dirección firmada de la foto", async () => {
+    memberPhotoPath = PHOTO_PATH;
+
+    const response = await getRecord();
+
+    const body = (await response.json()) as { data: Record<string, unknown> };
+    expect(body.data.photoUrl).toBe(SIGNED_PHOTO_URL);
+    expect(body.data).not.toHaveProperty("photoPath");
+  });
+
+  it("responde la foto en null si el miembro no tiene", async () => {
+    const response = await getRecord();
+
+    await expect(response.json()).resolves.toMatchObject({
+      data: { photoUrl: null },
+    });
+  });
+
+  it("responde 200 con la foto en null si firmarla falla", async () => {
+    memberPhotoPath = PHOTO_PATH;
+    isPhotoSigningDown = true;
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await getRecord();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { userId: MEMBER_ID, photoUrl: null },
+    });
+    logged.mockRestore();
+  });
+
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "sigue respondiendo 403 a un %s aunque el miembro tenga foto",
+    async (role) => {
+      memberPhotoPath = PHOTO_PATH;
+      givenRole(role);
+
+      const response = await getRecord();
+
+      expect(response.status).toBe(403);
+      await expect(response.text()).resolves.not.toContain(SIGNED_PHOTO_URL);
+    },
+  );
 });
 
 describe("endpoint de la ficha: fecha de nacimiento", () => {

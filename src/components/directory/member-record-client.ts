@@ -52,6 +52,7 @@ const recordSchema = z.object({
   dateOfBirth: z.string().nullable(),
   registeredAt: z.string(),
   hasGuardianConsent: z.boolean(),
+  photoUrl: z.url().nullable(),
   isAufExpired: z.boolean(),
   groups: z.array(z.object({ id: z.uuid(), name: z.string() })),
 });

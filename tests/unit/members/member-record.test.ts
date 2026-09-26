@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AuditLogInsertRow } from "@/lib/audit/audit-log";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { Role } from "@/lib/auth/roles";
@@ -14,6 +14,7 @@ import {
   MemberRecordValidationError,
   type MemberRecordSubmission,
   MemberAufChangedError,
+  type MemberRecord,
   readMemberRecord,
   updateMemberRecord,
   verifyMemberAuf,
@@ -43,6 +44,9 @@ const ADULT_BIRTH = "1990-05-10";
 /** 14 años el día del registro. */
 const MINOR_BIRTH = "2010-01-01";
 
+const PHOTO_PATH = `${MEMBER_ID}/foto.webp`;
+const SIGNED_PHOTO_ORIGIN = "https://storage.example/member-photos";
+
 const CLUB_GROUPS = [
   { id: MASTERS_ID, name: "Masters Squad" },
   { id: SENIOR_ID, name: "Senior Squad" },
@@ -64,6 +68,11 @@ type FakeOptions = {
   /** Otra petición cambió el estado de la cuenta entre la lectura y la
    * escritura. */
   readonly statusChangesMidway?: boolean;
+  /** La ruta de la foto en Storage (#245), o null si no tiene. */
+  readonly photoPath?: string | null;
+  /** Cómo responde Storage al firmarla: `unsigned` es que no firmó esa
+   * ruta, `failed` que la llamada entera falló. */
+  readonly photoSigning?: "signed" | "unsigned" | "failed";
 };
 
 type Fake = {
@@ -120,6 +129,7 @@ function fake(options: FakeOptions = {}): Fake {
               dateOfBirth,
               registeredAt: REGISTERED_AT,
               hasGuardianConsent: options.hasGuardianConsent ?? false,
+              photoPath: options.photoPath ?? null,
             }
           : null;
       },
@@ -171,6 +181,17 @@ function fake(options: FakeOptions = {}): Fake {
         dateOfBirth = correction.dateOfBirth;
         accountStatus = correction.toStatus;
         return { kind: "corrected" };
+      },
+    },
+    photos: {
+      signPhotoUrl: async (photoPath) => {
+        reads.push(`sign ${photoPath}`);
+        if (options.photoSigning === "failed") {
+          throw new Error("Storage no responde.");
+        }
+        return options.photoSigning === "unsigned"
+          ? null
+          : `${SIGNED_PHOTO_ORIGIN}/${photoPath}?token=firma`;
       },
     },
     audit: {
@@ -305,6 +326,7 @@ describe("ficha reservada al Admin: lectura", () => {
       dateOfBirth: ADULT_BIRTH,
       registeredAt: REGISTERED_AT,
       hasGuardianConsent: false,
+      photoUrl: null,
       isAufExpired: false,
       groups: [
         { id: MASTERS_ID, name: "Masters Squad" },
@@ -363,6 +385,84 @@ describe("ficha reservada al Admin: lectura", () => {
         todayInClub: TODAY_IN_CLUB,
       }),
     ).rejects.toBeInstanceOf(MemberRecordNotFoundError);
+  });
+});
+
+describe("la foto en la ficha", () => {
+  function readRecord(gateways: MemberRecordGateways): Promise<MemberRecord> {
+    return readMemberRecord(gateways, {
+      callerId: ADMIN_ID,
+      userId: MEMBER_ID,
+      todayInClub: TODAY_IN_CLUB,
+    });
+  }
+
+  it("trae la dirección firmada de la foto del miembro", async () => {
+    const { gateways } = fake({ photoPath: PHOTO_PATH });
+
+    const record = await readRecord(gateways);
+
+    expect(record.photoUrl).toBe(
+      `${SIGNED_PHOTO_ORIGIN}/${PHOTO_PATH}?token=firma`,
+    );
+  });
+
+  it("no expone la ruta interna de la foto en Storage", async () => {
+    const { gateways } = fake({ photoPath: PHOTO_PATH });
+
+    const record = await readRecord(gateways);
+
+    expect(record).not.toHaveProperty("photoPath");
+  });
+
+  it("trae la foto en null y no firma nada si el miembro no tiene", async () => {
+    const { gateways, reads } = fake({ photoPath: null });
+
+    const record = await readRecord(gateways);
+
+    expect(record.photoUrl).toBeNull();
+    expect(reads.some((read) => read.startsWith("sign"))).toBe(false);
+  });
+
+  it("trae la foto en null si Storage no firma esa ruta", async () => {
+    const { gateways } = fake({
+      photoPath: PHOTO_PATH,
+      photoSigning: "unsigned",
+    });
+
+    const record = await readRecord(gateways);
+
+    expect(record.photoUrl).toBeNull();
+  });
+
+  it("trae la foto en null y el resto de la ficha si firmar falla", async () => {
+    const { gateways } = fake({
+      photoPath: PHOTO_PATH,
+      photoSigning: "failed",
+      aufNumber: "AUF-1",
+      groupIds: [SENIOR_ID],
+    });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const record = await readRecord(gateways);
+
+    expect(record.photoUrl).toBeNull();
+    expect(record.aufNumber).toBe("AUF-1");
+    expect(record.groups).toEqual([{ id: SENIOR_ID, name: "Senior Squad" }]);
+    expect(logged).toHaveBeenCalledWith(
+      expect.stringContaining("Storage no responde."),
+    );
+    logged.mockRestore();
+  });
+
+  it("devuelve la foto también tras guardar la ficha", async () => {
+    const record = await save(
+      fake({ photoPath: PHOTO_PATH, ...UNCHANGED_AUF }),
+    );
+
+    expect(record.photoUrl).toBe(
+      `${SIGNED_PHOTO_ORIGIN}/${PHOTO_PATH}?token=firma`,
+    );
   });
 });
 

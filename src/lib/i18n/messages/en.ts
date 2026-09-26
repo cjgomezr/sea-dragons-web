@@ -510,6 +510,7 @@ export const englishMessages = {
   "memberRecord.lead":
     "What only an Admin edits: the AUF registration, the date of birth and the groups.",
   "memberRecord.joinedOn": "Member since {date}",
+  "memberRecord.photoAlt": "Photo of {name}",
   "memberRecord.auf.title": "AUF registration",
   "memberRecord.auf.number": "AUF number",
   "memberRecord.auf.expiry": "Expiry date",

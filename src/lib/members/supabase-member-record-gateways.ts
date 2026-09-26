@@ -10,6 +10,7 @@ import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-
 import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
+import { signProfilePhotoUrl } from "./supabase-profile-photo-gateways";
 import type {
   AufRegistration,
   AufVerificationResult,
@@ -32,6 +33,8 @@ import type {
  * Los grupos se leen y se escriben con los adaptadores de E4, los mismos que
  * usa la sección Grupos.
  *
+ * La foto se firma con la misma llave (#354): el bucket es privado.
+ *
  * Del consentimiento del tutor sólo se lee si existe: su nombre y su correo
  * no salen de la fila. De la verificación del AUF (#274), igual: sólo si
  * existe. Quién la hizo está en la bitácora.
@@ -39,7 +42,7 @@ import type {
 
 const MEMBERS_TABLE = "members";
 const RECORD_COLUMNS =
-  "user_id, full_name, joined_on, account_status, auf_number, auf_expiry, auf_verified_at, date_of_birth, created_at, guardian_consent_at";
+  "user_id, full_name, joined_on, account_status, auf_number, auf_expiry, auf_verified_at, date_of_birth, created_at, guardian_consent_at, photo_path";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -69,6 +72,7 @@ function toStoredMemberRecord(row: Row): StoredMemberRecord {
     registeredAt: readRequiredText(row, "created_at", MEMBERS_TABLE),
     hasGuardianConsent:
       readText(row, "guardian_consent_at", MEMBERS_TABLE) !== null,
+    photoPath: readText(row, "photo_path", MEMBERS_TABLE),
   };
 }
 
@@ -182,6 +186,10 @@ export function createMemberRecordGateways(
     groupMembers: groupMembersGateways.groupMembers,
     groups: createGroupsGateways(serviceClient).groups,
     audit: createSupabaseAuditLogWriter(serviceClient),
+    photos: {
+      signPhotoUrl: (photoPath) =>
+        signProfilePhotoUrl(serviceClient, photoPath),
+    },
     records: {
       async findMemberRecord({ clubId, userId }) {
         const { data, error } = await serviceClient

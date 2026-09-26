@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
 import { memberInitials } from "@/lib/auth/member-initials";
 
 /**
@@ -13,6 +16,10 @@ import { memberInitials } from "@/lib/auth/member-initials";
  * Por defecto la foto es decorativa, igual que las iniciales, porque donde va
  * el nombre ya está escrito al lado. Con `alt` se anuncia, como en la
  * cabecera del perfil, donde es la foto propia la que se cambia.
+ *
+ * Una foto que no carga (la firma caducó, el fichero ya no está) cae a las
+ * iniciales en vez de dejar un icono roto (#354). Se recuerda qué dirección
+ * falló, no sólo que falló: una dirección nueva se vuelve a intentar.
  */
 export function MemberAvatar({
   fullName,
@@ -28,7 +35,8 @@ export function MemberAvatar({
   className: string;
   alt?: string;
 }): React.JSX.Element {
-  if (photoUrl === null) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (photoUrl === null || photoUrl === failedUrl) {
     return (
       <span className={className} aria-hidden="true">
         {memberInitials(fullName)}
@@ -43,6 +51,7 @@ export function MemberAvatar({
       width={size}
       height={size}
       unoptimized
+      onError={() => setFailedUrl(photoUrl)}
     />
   );
 }
