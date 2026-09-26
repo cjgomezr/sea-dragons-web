@@ -96,15 +96,16 @@ describe("dos tamaños de la foto", () => {
     });
   });
 
-  it("guarda la miniatura por debajo de 20 KB y la grande por debajo de 200 KB", async () => {
-    const result = await shrinkProfilePhoto(
-      await fixture("foto-apaisada-3000x2000.jpg"),
-    );
+  it.each(["foto-apaisada-3000x2000.jpg", "foto-vertical-2000x3000.jpg"])(
+    "guarda la miniatura de %s por debajo de 20 KB y la grande por debajo de 200 KB",
+    async (file) => {
+      const result = await shrinkProfilePhoto(await fixture(file));
 
-    if (result.kind !== "shrunk") throw new Error("no se pudo reducir");
-    expect(result.thumbnail.bytes.length).toBeLessThan(THUMBNAIL_MAX_BYTES);
-    expect(result.large.bytes.length).toBeLessThan(LARGE_MAX_BYTES);
-  });
+      if (result.kind !== "shrunk") throw new Error("no se pudo reducir");
+      expect(result.thumbnail.bytes.length).toBeLessThan(THUMBNAIL_MAX_BYTES);
+      expect(result.large.bytes.length).toBeLessThan(LARGE_MAX_BYTES);
+    },
+  );
 
   it("no agranda la versión grande de una foto que mide menos de 1024 px", async () => {
     const bytes = await shrunkBytes("foto-transparente-800x800.png", "large");
