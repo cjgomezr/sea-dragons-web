@@ -62,6 +62,7 @@ import {
   type AccentPalette,
   evaluateAccentColor,
 } from "@/lib/club/accent-color";
+import { memberInitials } from "@/lib/auth/member-initials";
 import { buildAccentStylesheet } from "@/lib/club/accent-stylesheet";
 import { LOCALE_COOKIE_NAME, type Locale } from "@/lib/i18n/locale";
 
@@ -4276,11 +4277,13 @@ type StubbedMemberRecord = {
   readonly dateOfBirth: string;
   readonly registeredAt: string;
   readonly hasGuardianConsent: boolean;
+  readonly photoUrl: string | null;
   readonly isAufExpired: boolean;
   readonly groups: readonly { readonly id: string; readonly name: string }[];
 };
 
-/** El nombre más largo de la lista, para el caso de contenido largo. */
+/** El nombre más largo de la lista, para el caso de contenido largo. Sin
+ * foto: la cabecera lleva sus iniciales (#354). */
 const CURRENT_RECORD: StubbedMemberRecord = {
   userId: RECORD_MEMBER_ID,
   fullName: LONG_MEMBER_NAME,
@@ -4292,10 +4295,18 @@ const CURRENT_RECORD: StubbedMemberRecord = {
   dateOfBirth: "1990-05-10",
   registeredAt: "2024-03-06T01:00:00.000Z",
   hasGuardianConsent: false,
+  photoUrl: null,
   isAufExpired: false,
   groups: [STUBBED_CLUB_GROUPS[0], STUBBED_CLUB_GROUPS[2]].map(
     ({ id, name }) => ({ id, name }),
   ),
+};
+
+/** Con foto, que la cabecera pone junto al nombre largo (#354). La sirve
+ * la misma foto fija que el directorio. */
+const PHOTO_RECORD: StubbedMemberRecord = {
+  ...CURRENT_RECORD,
+  photoUrl: STUBBED_PHOTO_URL,
 };
 
 /** Quien todavía no activó su cuenta: la ficha ofrece reenviar la
@@ -4357,6 +4368,9 @@ async function stubMemberRecordReads(
   record: StubbedMemberRecord,
   saveRejection: StubbedSaveRejection = EXPIRY_BEFORE_JOINING_ERROR,
 ): Promise<void> {
+  if (record.photoUrl !== null) {
+    await stubDirectoryPhoto(page);
+  }
   await page.route(
     (url) => url.pathname === CLUB_GROUPS_ENDPOINT,
     (route) =>
@@ -4435,6 +4449,17 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
   {
     name: "ficha-auf-vigente-es",
     record: CURRENT_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "ficha-con-foto",
+    record: PHOTO_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+  },
+  {
+    name: "ficha-con-foto-es",
+    record: PHOTO_RECORD,
     saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
   },
@@ -4555,6 +4580,11 @@ async function goToMemberRecord(
   await expect(
     page.getByRole("button", { name: state.saveLabel }),
   ).toBeVisible();
+  if (state.record.photoUrl !== null) {
+    await expect(
+      page.locator(`img[src="${state.record.photoUrl}"]`),
+    ).toHaveJSProperty("complete", true);
+  }
   await state.prepare?.(page);
 }
 
@@ -4603,6 +4633,30 @@ for (const state of MEMBER_RECORD_STATES) {
     });
   });
 }
+
+test.describe("la ficha con una foto que no carga", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("pone las iniciales en su lugar y la ficha sigue funcionando", async ({
+    page,
+  }) => {
+    await stubMemberRecordReads(page, PHOTO_RECORD);
+    // Registrada después: Playwright prueba primero la última ruta.
+    await page.route(STUBBED_PHOTO_URL, (route) =>
+      route.fulfill({ status: 404, body: "" }),
+    );
+    await page.goto(`${APP_URL}${MEMBER_RECORD_SCREEN_PATH}`);
+
+    const header = page.locator(".member-record-identity");
+    await expect(header.locator("img")).toHaveCount(0);
+    await expect(header.locator('[aria-hidden="true"]')).toHaveText(
+      memberInitials(LONG_MEMBER_NAME),
+    );
+    await expect(page.getByLabel("AUF number")).toHaveValue("AUF-2026-0042");
+  });
+});
 
 function openOwnRecordLink(page: Page) {
   return page.getByRole("link", {
