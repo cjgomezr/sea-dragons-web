@@ -501,6 +501,7 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.lead":
     "Lo que sólo edita un Admin: el registro AUF, la fecha de nacimiento y los grupos.",
   "memberRecord.joinedOn": "Miembro desde el {date}",
+  "memberRecord.photoAlt": "Foto de {name}",
   "memberRecord.auf.title": "Registro AUF",
   "memberRecord.auf.number": "Número de AUF",
   "memberRecord.auf.expiry": "Vencimiento",

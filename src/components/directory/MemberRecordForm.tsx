@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { MemberAvatar } from "@/components/MemberAvatar";
 import type { Group } from "@/lib/groups/groups";
 import { formatCalendarDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
@@ -69,6 +70,9 @@ const AUF_PENDING_ID = "ficha-auf-pendiente";
 const BIRTH_ID = "ficha-nacimiento";
 const BIRTH_HINT_ID = "ficha-nacimiento-ayuda";
 const GUARDIAN_NOTICE_ID = "ficha-nacimiento-tutor";
+/** El mismo círculo, y la misma clase, que la cabecera del perfil propio
+ * (#354). */
+const RECORD_AVATAR_SIZE = 64;
 
 function toDraft(record: MemberRecord): Draft {
   return {
@@ -166,7 +170,16 @@ function RecordHeader({
   const marks = aufMarksOf(translate, record);
   return (
     <header className="member-record-header">
-      <h1>{record.fullName}</h1>
+      <div className="member-record-identity">
+        <MemberAvatar
+          className="account-avatar"
+          fullName={record.fullName}
+          photoUrl={record.photoUrl}
+          size={RECORD_AVATAR_SIZE}
+          alt={translate("memberRecord.photoAlt", { name: record.fullName })}
+        />
+        <h1>{record.fullName}</h1>
+      </div>
       <p className="app-lead">{translate("memberRecord.lead")}</p>
       <p className="member-record-joined">
         {translate("memberRecord.joinedOn", {

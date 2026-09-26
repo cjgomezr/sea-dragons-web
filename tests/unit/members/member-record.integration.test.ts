@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { expect, it, vi } from "vitest";
 import { listPendingRequirements } from "@/lib/auth/account-activation";
 import type { Role } from "@/lib/auth/roles";
 import { readSessionState } from "@/lib/auth/session-reader";
@@ -27,6 +29,7 @@ import {
 import { updateOwnProfile } from "@/lib/members/own-profile";
 import { createOwnProfileGateways } from "@/lib/members/supabase-own-profile-gateways";
 import { createMemberRecordGateways } from "@/lib/members/supabase-member-record-gateways";
+import { PROFILE_PHOTO_BUCKET } from "@/lib/members/supabase-profile-photo-gateways";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
   type ServiceRoleClient,
@@ -313,6 +316,43 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
   );
 
   it(
+    "la ficha trae la foto firmada, y null si Storage no tiene el fichero (#354)",
+    async () => {
+      await withScenario(async ({ serviceClient, adminId, players }) => {
+        const paulaId = players[0]!;
+        const gateways = createMemberRecordGateways(serviceClient.client);
+        const bucket = serviceClient.client.storage.from(PROFILE_PHOTO_BUCKET);
+        const photoPath = `${paulaId}/${randomUUID()}.png`;
+        const read = async (path: string) => {
+          await pointPhotoAt(serviceClient, paulaId, path);
+          return readMemberRecord(gateways, {
+            callerId: adminId,
+            userId: paulaId,
+            todayInClub: TODAY_IN_CLUB,
+          });
+        };
+        const upload = await bucket.upload(photoPath, PHOTO_BYTES, {
+          contentType: "image/png",
+        });
+        expect(upload.error).toBeNull();
+        const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+        try {
+          const signed = await read(photoPath);
+          const missing = await read(`${paulaId}/no-existe.png`);
+
+          expect(signed.photoUrl).toContain(photoPath);
+          expect(signed.photoUrl).toContain("token=");
+          expect(missing.photoUrl).toBeNull();
+        } finally {
+          logged.mockRestore();
+          await bucket.remove([photoPath]);
+        }
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "rechaza un vencimiento anterior al ingreso guardado en la base",
     async () => {
       await withScenario(async ({ serviceClient, adminId, players }) => {
@@ -435,6 +475,28 @@ async function readAuditRows(
     throw new Error(`No se pudo leer la bitácora: ${error.message}`);
   }
   return data;
+}
+
+/** Un PNG de verdad: el bucket sólo acepta imágenes. */
+const PHOTO_BYTES = new Uint8Array(
+  readFileSync(
+    path.resolve(__dirname, "../../support/fixtures/foto-de-perfil.png"),
+  ),
+);
+
+/** Apunta la foto de la ficha a `photoPath`, exista o no el fichero. */
+async function pointPhotoAt(
+  serviceClient: ServiceRoleClient,
+  userId: string,
+  photoPath: string,
+): Promise<void> {
+  const { error } = await serviceClient.client
+    .from(MEMBERS_TABLE)
+    .update({ photo_path: photoPath })
+    .eq("user_id", userId);
+  if (error) {
+    throw new Error(`No se pudo apuntar la foto: ${error.message}`);
+  }
 }
 
 /** Paula propone su AUF desde su perfil, como lo haría la pantalla. */

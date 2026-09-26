@@ -2423,6 +2423,21 @@ button.notification-item-content:hover {
   margin: 0;
 }
 
+/* La foto junto al nombre (#354). `min-width: 0` deja que un nombre largo
+   se parta entre palabras en vez de empujar la foto fuera de la pantalla. */
+.member-record-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.member-record-identity h1 {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
 .member-record-joined {
   margin: 0;
   font-size: 14px;

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemberRecordScreen } from "@/components/directory/MemberRecordScreen";
@@ -32,9 +32,12 @@ const RECORD: MemberRecord = {
   dateOfBirth: "1990-05-10",
   registeredAt: "2024-03-06T01:00:00.000Z",
   hasGuardianConsent: false,
+  photoUrl: null,
   isAufExpired: false,
   groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
 };
+
+const PHOTO_URL = `https://storage.test/member-photos/${MEMBER_ID}/foto.webp?token=a`;
 
 /** Un AUF que escribió el miembro y ningún Admin ha mirado. */
 const PENDING_RECORD: MemberRecord = { ...RECORD, isAufVerified: false };
@@ -264,6 +267,49 @@ describe("ficha en pantalla: carga", () => {
     expect(
       screen.getByRole("link", { name: /volver al directorio/i }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("pantalla de la ficha", () => {
+  it("enseña la foto del miembro con su nombre", async () => {
+    stubApi({ record: { ...RECORD, photoUrl: PHOTO_URL } });
+
+    await renderScreen();
+
+    expect(
+      screen.getByRole("img", { name: "Photo of Paula Player" }),
+    ).toHaveAttribute("src", PHOTO_URL);
+  });
+
+  it("nombra la foto en español", async () => {
+    stubApi({ record: { ...RECORD, photoUrl: PHOTO_URL } });
+
+    await renderScreen("es");
+
+    expect(
+      screen.getByRole("img", { name: "Foto de Paula Player" }),
+    ).toBeInTheDocument();
+  });
+
+  it("enseña las iniciales sin anunciarlas cuando el miembro no tiene foto", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText("PP")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("cae a las iniciales si la foto no carga, y la ficha sigue funcionando", async () => {
+    stubApi({ record: { ...RECORD, photoUrl: PHOTO_URL } });
+    await renderScreen();
+
+    fireEvent.error(screen.getByRole("img", { name: "Photo of Paula Player" }));
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText("PP")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByLabelText("AUF number")).toHaveValue("AUF-1");
+    expect(saveButton()).toBeEnabled();
   });
 });
 

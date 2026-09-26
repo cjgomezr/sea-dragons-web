@@ -82,10 +82,16 @@ export type StoredMemberRecord = {
   /** Sólo si hay uno registrado: quién lo dio es un dato personal del tutor
    * que la ficha no necesita. */
   readonly hasGuardianConsent: boolean;
+  /** La ruta de su foto en Storage (#245), o null si no tiene. */
+  readonly photoPath: string | null;
 };
 
-/** La ficha tal como la sirve la API. */
-export type MemberRecord = StoredMemberRecord & {
+/** La ficha tal como la sirve la API. La ruta de la foto se queda en el
+ * servidor: sale la dirección firmada, que caduca (#354). */
+export type MemberRecord = Omit<StoredMemberRecord, "photoPath"> & {
+  /** Null sin foto, y también si Storage no la firmó: la pantalla pone las
+   * iniciales. */
+  readonly photoUrl: string | null;
   readonly isAufExpired: boolean;
   readonly groups: readonly MemberGroup[];
 };
@@ -191,6 +197,10 @@ export type MemberRecordGateways = Pick<
     ): Promise<DateOfBirthCorrectionResult>;
   };
   readonly groups: Pick<GroupsGateways["groups"], "findClubGroups">;
+  readonly photos: {
+    /** Null si Storage no firmó esa ruta; lanza si la llamada falla. */
+    signPhotoUrl(photoPath: string): Promise<string | null>;
+  };
   readonly audit: AuditLogWriter;
 };
 
@@ -385,6 +395,26 @@ async function findStoredRecord(
   return record;
 }
 
+/** La foto es un adorno de la ficha: si Storage falla, el Admin sigue
+ * pudiendo trabajar con ella, con las iniciales en su lugar. El fallo queda
+ * registrado con su motivo. */
+async function signRecordPhoto(
+  gateways: Pick<MemberRecordGateways, "photos">,
+  photoPath: string | null,
+): Promise<string | null> {
+  if (photoPath === null) {
+    return null;
+  }
+  try {
+    return await gateways.photos.signPhotoUrl(photoPath);
+  } catch (error) {
+    console.error(
+      `[member-record] no se pudo firmar la foto ${photoPath}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return null;
+  }
+}
+
 async function composeRecord(
   gateways: MemberRecordGateways,
   scope: MemberScope,
@@ -397,8 +427,10 @@ async function composeRecord(
       scope.userId,
     ),
   ]);
+  const { photoPath, ...fields } = record;
   return {
-    ...record,
+    ...fields,
+    photoUrl: await signRecordPhoto(gateways, photoPath),
     isAufExpired: isAufExpired(record.aufExpiry, todayInClub),
     groups,
   };
