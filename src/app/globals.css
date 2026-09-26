@@ -3144,7 +3144,7 @@ button.notification-item-content:hover {
 
 /* El formulario de publicar (#330). Sin mockup: sigue a la ficha del
    miembro, con los campos en el mismo panel. */
-.news-publish-body {
+.auth-field .news-publish-body {
   min-height: 12rem;
 }
 
