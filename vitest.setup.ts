@@ -21,3 +21,22 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => false,
   }),
 });
+
+// jsdom has HTMLDialogElement and its `open`, but not `showModal` nor `close`
+// (jsdom/jsdom#3294). The photo viewer (#355) opens a modal `<dialog>`: this
+// gives tests the open/close half. The top layer and the inert page behind it
+// only exist in a real browser, so Playwright covers those.
+if (!("showModal" in HTMLDialogElement.prototype)) {
+  Object.assign(HTMLDialogElement.prototype, {
+    showModal(this: HTMLDialogElement): void {
+      this.open = true;
+    },
+    close(this: HTMLDialogElement): void {
+      if (!this.open) {
+        return;
+      }
+      this.open = false;
+      this.dispatchEvent(new Event("close"));
+    },
+  });
+}

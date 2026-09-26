@@ -177,6 +177,7 @@ function RecordHeader({
           photoUrl={record.photoUrl}
           size={RECORD_AVATAR_SIZE}
           alt={translate("memberRecord.photoAlt", { name: record.fullName })}
+          viewer={{ userId: record.userId, translate }}
         />
         <h1>{record.fullName}</h1>
       </div>

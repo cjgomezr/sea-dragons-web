@@ -6,6 +6,7 @@ import { SignOutButton } from "@/components/auth/SignOutButton";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { AccountIcon, SettingsIcon } from "@/components/NavIcons";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useDismissal } from "@/components/use-dismissal";
 import { ACCOUNT_PAGE_PATH, CLUB_SETTINGS_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator, type Translator } from "@/lib/i18n/translator";
@@ -22,9 +23,7 @@ import { createTranslator, type Translator } from "@/lib/i18n/translator";
  * sale en el idioma nuevo.
  */
 
-/** Lo que se queda con el foco al pulsarlo. Un clic fuera del menú sobre uno
- * de estos le cede el foco; sobre cualquier otra cosa el navegador lo dejaría
- * en el `body`, y ahí se pierde quien navega con teclado. */
+/** Lo que se queda con el foco al pulsarlo. */
 const FOCUSABLE_SELECTOR =
   "a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]";
 
@@ -32,62 +31,6 @@ function canTakeFocus(target: EventTarget | null): boolean {
   return (
     target instanceof Element && target.closest(FOCUSABLE_SELECTOR) !== null
   );
-}
-
-/** Cerrar con Escape, pulsando fuera o cuando el foco sale del menú, y
- * devolver el foco al botón de la cuenta. Copiado de la campana (#266) y no
- * compartido: es la segunda vez que hace falta, y la abstracción espera a la
- * tercera. A diferencia de ella, escucha `mousedown` y no `pointerdown`,
- * porque es el evento cuyo efecto por defecto mueve el foco. */
-function useDismissal(options: {
-  readonly isOpen: boolean;
-  readonly containerRef: React.RefObject<HTMLDivElement | null>;
-  readonly onClose: () => void;
-  readonly onDismiss: () => void;
-}): void {
-  const { isOpen, containerRef, onClose, onDismiss } = options;
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-    function isOutside(target: EventTarget | null): boolean {
-      const container = containerRef.current;
-      return (
-        container !== null &&
-        target instanceof Node &&
-        !container.contains(target)
-      );
-    }
-    function handleKeyDown(event: KeyboardEvent): void {
-      if (event.key === "Escape") {
-        onDismiss();
-      }
-    }
-    function handleMouseDown(event: MouseEvent): void {
-      if (!isOutside(event.target)) {
-        return;
-      }
-      if (canTakeFocus(event.target)) {
-        onClose();
-        return;
-      }
-      event.preventDefault();
-      onDismiss();
-    }
-    function handleFocusIn(event: FocusEvent): void {
-      if (isOutside(event.target)) {
-        onDismiss();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("focusin", handleFocusIn);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("focusin", handleFocusIn);
-    };
-  }, [isOpen, containerRef, onClose, onDismiss]);
 }
 
 function AccountMenuPanel({
@@ -181,11 +124,26 @@ export function AccountMenu({
     setIsOpen(false);
     buttonRef.current?.focus();
   }, [setIsOpen]);
+  // Un clic fuera sobre algo que toma el foco se lo cede; sobre cualquier
+  // otra cosa el navegador lo dejaría en el `body`, y ahí se pierde quien
+  // navega con teclado.
+  const pressOutside = useCallback(
+    (event: MouseEvent) => {
+      if (canTakeFocus(event.target)) {
+        close();
+        return;
+      }
+      event.preventDefault();
+      closeAndReturnFocus();
+    },
+    [close, closeAndReturnFocus],
+  );
   useDismissal({
     isOpen,
     containerRef,
-    onClose: close,
-    onDismiss: closeAndReturnFocus,
+    onEscape: closeAndReturnFocus,
+    onPressOutside: pressOutside,
+    onFocusOutside: closeAndReturnFocus,
   });
 
   useEffect(() => {

@@ -67,6 +67,7 @@ describe("página Mi cuenta", () => {
     render(
       <AccountHeader
         locale="en"
+        userId="cccccccc-0000-4000-8000-00000000000c"
         fullName="Nerea Ruiz"
         role="Coach"
         photoUrl={null}
@@ -84,6 +85,7 @@ describe("página Mi cuenta", () => {
     render(
       <AccountHeader
         locale="es"
+        userId="cccccccc-0000-4000-8000-00000000000c"
         fullName="Nerea Ruiz"
         role="Player"
         photoUrl={null}

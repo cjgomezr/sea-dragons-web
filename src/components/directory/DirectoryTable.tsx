@@ -277,6 +277,7 @@ function MemberRow({
             fullName={member.fullName}
             photoUrl={member.photoUrl}
             size={DIRECTORY_AVATAR_SIZE}
+            viewer={{ userId: member.userId, translate }}
           />
           <span className="directory-identity">
             <MemberName translate={translate} row={row} />

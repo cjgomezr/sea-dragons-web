@@ -58,11 +58,14 @@ function isBusy(status: Status): boolean {
 
 export function ProfilePhoto({
   locale,
+  userId,
   fullName,
   initialPhotoUrl,
   children,
 }: {
   locale: Locale;
+  /** El `user_id` propio, para abrir la foto en grande (#355). */
+  userId: string;
   fullName: string;
   initialPhotoUrl: string | null;
   children: React.ReactNode;
@@ -128,6 +131,7 @@ export function ProfilePhoto({
         photoUrl={photoUrl}
         size={HEADER_AVATAR_SIZE}
         alt={translate("account.photo.alt")}
+        viewer={{ userId, translate }}
       />
       <div className="account-identity">
         {children}

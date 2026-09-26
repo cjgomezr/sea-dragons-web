@@ -14,6 +14,7 @@ import { RoleRequestPanel } from "./RoleRequestPanel";
  * página lee los datos; esto sólo los coloca. */
 export function ProfileScreen({
   locale,
+  userId,
   account,
   profile,
   positionOptions,
@@ -22,6 +23,8 @@ export function ProfileScreen({
   countries,
 }: {
   locale: Locale;
+  /** El `user_id` de quien mira su perfil. */
+  userId: string;
   account: RoleRequestAccount;
   profile: OwnProfile;
   /** Las posiciones del club que se le ofrecen, en su orden (#299). */
@@ -35,6 +38,7 @@ export function ProfileScreen({
     <div className="account">
       <AccountHeader
         locale={locale}
+        userId={userId}
         fullName={account.fullName}
         role={account.role}
         photoUrl={photoUrl}
