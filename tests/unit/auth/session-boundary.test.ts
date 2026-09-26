@@ -16,6 +16,9 @@ import {
   MEMBER_RECORD_PATH,
   MEMBER_ROLE_API_PATH,
   NEWS_API_PATH,
+  NEWS_ATTACHMENT_API_PATH,
+  NEWS_ATTACHMENT_MANAGE_API_PATH,
+  NEWS_ATTACHMENTS_UPLOAD_API_PATH,
   NEWS_POST_API_PATH,
   NEWS_PUBLISH_API_PATH,
   PASSWORD_RECOVERY_PATH,
@@ -650,6 +653,62 @@ describe("frontera de noticias (#327)", () => {
   });
 
   it.each([NEWS_API_PATH, NEWS_POST, NEWS_PUBLISH_API_PATH])(
+    "responde 401 sin sesión a %s",
+    (pathname) => {
+      expect(decideSessionBoundary({ pathname, ...ANONYMOUS })).toEqual({
+        kind: "unauthenticated",
+      });
+    },
+  );
+});
+
+/** Los adjuntos de una publicación (#328). Subir y quitar cuelgan de
+ * publicar; descargar, del detalle, que alcanza cualquier cuenta activa. */
+const NEWS_ATTACHMENTS_UPLOAD = NEWS_ATTACHMENTS_UPLOAD_API_PATH.replace(
+  "[id]",
+  "d3d3d3d3-0000-4000-8000-00000000000d",
+);
+const NEWS_ATTACHMENT_MANAGE = NEWS_ATTACHMENT_MANAGE_API_PATH.replace(
+  "[id]",
+  "d3d3d3d3-0000-4000-8000-00000000000d",
+).replace("[attachmentId]", "e4e4e4e4-0000-4000-8000-00000000000e");
+const NEWS_ATTACHMENT = NEWS_ATTACHMENT_API_PATH.replace(
+  "[id]",
+  "d3d3d3d3-0000-4000-8000-00000000000d",
+).replace("[attachmentId]", "e4e4e4e4-0000-4000-8000-00000000000e");
+
+describe("frontera de los adjuntos de noticias (#328)", () => {
+  it.each(
+    (["Coach", "Player"] as const).flatMap((role) =>
+      [NEWS_ATTACHMENTS_UPLOAD, NEWS_ATTACHMENT_MANAGE].map(
+        (pathname) => [role, pathname] as const,
+      ),
+    ),
+  )("niega a un %s subir o quitar en %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual({
+      kind: "missingCapability",
+    });
+  });
+
+  it.each(
+    (["Admin", "Committee"] as const).flatMap((role) =>
+      [NEWS_ATTACHMENTS_UPLOAD, NEWS_ATTACHMENT_MANAGE].map(
+        (pathname) => [role, pathname] as const,
+      ),
+    ),
+  )("deja a un %s subir o quitar en %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
+      ALLOW,
+    );
+  });
+
+  it.each(ROLES)("deja a un %s pedir un adjunto", (role) => {
+    expect(
+      decideSessionBoundary({ pathname: NEWS_ATTACHMENT, ...activeAs(role) }),
+    ).toEqual(ALLOW);
+  });
+
+  it.each([NEWS_ATTACHMENTS_UPLOAD, NEWS_ATTACHMENT_MANAGE, NEWS_ATTACHMENT])(
     "responde 401 sin sesión a %s",
     (pathname) => {
       expect(decideSessionBoundary({ pathname, ...ANONYMOUS })).toEqual({

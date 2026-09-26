@@ -1,5 +1,6 @@
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type { AccountStatus } from "@/lib/auth/account-status";
+import { type DetectableFileType, detectFileType } from "@/lib/files/file-type";
 
 /**
  * La foto de perfil (#245, RF-7 del PRD de E5, FR-084), contada sin Supabase
@@ -152,40 +153,19 @@ export function validateProfilePhotoFile(file: {
   return file.size > PROFILE_PHOTO_MAX_BYTES ? "photo_too_large" : null;
 }
 
-function startsWithBytes(
-  bytes: Uint8Array,
-  expected: readonly number[],
-  offset = 0,
-): boolean {
-  return expected.every((byte, index) => bytes[offset + index] === byte);
+function isProfilePhotoType(
+  type: DetectableFileType | null,
+): type is ProfilePhotoType {
+  return PROFILE_PHOTO_TYPES.some((photoType) => photoType === type);
 }
-
-function asciiCodes(text: string): readonly number[] {
-  return [...text].map((character) => character.charCodeAt(0));
-}
-
-const JPEG_SIGNATURE = [0xff, 0xd8, 0xff];
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-const RIFF_SIGNATURE = asciiCodes("RIFF");
-const WEBP_SIGNATURE = asciiCodes("WEBP");
-/** En un WebP, "WEBP" va después de "RIFF" y de los cuatro bytes del largo. */
-const WEBP_SIGNATURE_OFFSET = 8;
 
 /** El tipo que dicen los primeros bytes, no el que declara quien sube: una
  * cabecera `Content-Type` se escribe a mano. */
 export function detectProfilePhotoType(
   bytes: Uint8Array,
 ): ProfilePhotoType | null {
-  if (startsWithBytes(bytes, JPEG_SIGNATURE)) {
-    return "image/jpeg";
-  }
-  if (startsWithBytes(bytes, PNG_SIGNATURE)) {
-    return "image/png";
-  }
-  const isWebp =
-    startsWithBytes(bytes, RIFF_SIGNATURE) &&
-    startsWithBytes(bytes, WEBP_SIGNATURE, WEBP_SIGNATURE_OFFSET);
-  return isWebp ? "image/webp" : null;
+  const type = detectFileType(bytes);
+  return isProfilePhotoType(type) ? type : null;
 }
 
 function validatePhotoBytes(bytes: Uint8Array): void {

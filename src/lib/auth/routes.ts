@@ -204,6 +204,19 @@ export const NEWS_POST_API_PATH = `${NEWS_API_PATH}/[id]`;
  * por método, y el feed es de todos. */
 export const NEWS_PUBLISH_API_PATH = `${NEWS_API_PATH}/publish`;
 
+/** Subir un adjunto a una publicación propia (#328, RF-3). `[id]` es el de
+ * la publicación. Cuelga de publicar, así que es sólo de Admin y Committee
+ * por el mismo motivo: la frontera decide por camino, y descargar es de
+ * todos. */
+export const NEWS_ATTACHMENTS_UPLOAD_API_PATH = `${NEWS_PUBLISH_API_PATH}/[id]/attachments`;
+
+/** Quitar un adjunto de una publicación propia (#328): DELETE. */
+export const NEWS_ATTACHMENT_MANAGE_API_PATH = `${NEWS_ATTACHMENTS_UPLOAD_API_PATH}/[attachmentId]`;
+
+/** Pedir la dirección firmada de un adjunto (#328). Lo alcanza cualquier
+ * cuenta activa; quien no es la audiencia de la publicación recibe 404. */
+export const NEWS_ATTACHMENT_API_PATH = `${NEWS_POST_API_PATH}/attachments/[attachmentId]`;
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 
@@ -345,4 +358,13 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   },
   { path: CLUB_SIGN_IN_TEXTS_API_PATH, capability: "manageUsersAndRoles" },
   { path: NEWS_PUBLISH_API_PATH, capability: "publishNewsAndDocuments" },
+  // Cuelgan del anterior; se declaran por el mismo motivo que el cambio de rol.
+  {
+    path: NEWS_ATTACHMENTS_UPLOAD_API_PATH,
+    capability: "publishNewsAndDocuments",
+  },
+  {
+    path: NEWS_ATTACHMENT_MANAGE_API_PATH,
+    capability: "publishNewsAndDocuments",
+  },
 ];
