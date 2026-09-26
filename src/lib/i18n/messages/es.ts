@@ -828,4 +828,37 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.positions.issue.nameTaken": "Otra posición ya se llama así.",
   "clubSettings.positions.error.changed":
     "Otro Admin cambió las posiciones mientras las editabas. Carga las últimas y vuelve a intentarlo.",
+  // Noticias (#329): el feed y la publicación abierta.
+  "news.metaTitle": "Noticias · {club}",
+  "news.metaDescription": "Lo que el club ha publicado para ti.",
+  "news.eyebrow": "Noticias y documentos",
+  "news.title": "Novedades del club",
+  "news.loading": "Cargando las noticias…",
+  "news.empty": "Todavía no hay nada publicado para ti.",
+  "news.loadMore": "Cargar más",
+  "news.loadingMore": "Cargando…",
+  "news.retry": "Volver a intentarlo",
+  "news.category.announcement": "Aviso",
+  "news.category.news": "Noticia",
+  "news.category.document": "Documento",
+  "news.attachmentCount": {
+    one: "{count} adjunto",
+    other: "{count} adjuntos",
+  },
+  "news.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para ver las noticias.",
+  "news.error.unexpected":
+    "No pudimos cargar las noticias. Vuelve a intentarlo.",
+  "news.post.back": "← Volver a Noticias",
+  "news.post.loading": "Cargando la publicación…",
+  "news.post.published": "Publicada el {date}",
+  "news.post.edited": "Editada el {date}",
+  "news.post.withdrawn": "Retirada",
+  "news.post.attachments": "Adjuntos",
+  "news.post.download": "Descargar",
+  "news.post.unavailable": "{name} ya no está disponible.",
+  "news.post.notFound.title": "Esta publicación no existe",
+  "news.post.notFound.lead": "Revisa la dirección o vuelve a Noticias.",
+  "news.post.error.unexpected":
+    "No pudimos abrir la publicación. Vuelve a intentarlo.",
 };

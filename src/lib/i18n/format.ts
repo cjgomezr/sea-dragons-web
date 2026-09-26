@@ -144,3 +144,29 @@ export function formatRelativeTime(
     largestUnit.unit,
   );
 }
+
+const BYTES_PER_KILOBYTE = 1024;
+const BYTES_PER_MEGABYTE = 1024 * BYTES_PER_KILOBYTE;
+const MEGABYTE_FRACTION_DIGITS = 1;
+
+const FILE_SIZE_FORMATTERS = formattersByLocale(
+  (displayLocale) =>
+    new Intl.NumberFormat(displayLocale, {
+      maximumFractionDigits: MEGABYTE_FRACTION_DIGITS,
+    }),
+);
+
+/** El tamaño de un archivo ("240 KB", "2,4 MB"). Los símbolos se escriben
+ * aquí y no con el estilo `unit` de `Intl`, que en inglés escribe "512 byte"
+ * y cambia de un motor a otro, como la fecha y la hora (#188). Sólo el número
+ * sigue al idioma. */
+export function formatFileSize(locale: Locale, bytes: number): string {
+  const formatter = FILE_SIZE_FORMATTERS[locale];
+  if (bytes < BYTES_PER_KILOBYTE) {
+    return `${formatter.format(bytes)} B`;
+  }
+  if (bytes < BYTES_PER_MEGABYTE) {
+    return `${formatter.format(Math.round(bytes / BYTES_PER_KILOBYTE))} KB`;
+  }
+  return `${formatter.format(bytes / BYTES_PER_MEGABYTE)} MB`;
+}

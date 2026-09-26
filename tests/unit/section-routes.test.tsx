@@ -18,7 +18,6 @@ const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");
 const { default: EquiposPage } = await import("@/app/(app)/equipos/page");
 const { default: EvaluacionesPage } =
   await import("@/app/(app)/evaluaciones/page");
-const { default: NoticiasPage } = await import("@/app/(app)/noticias/page");
 const { default: PagosPage } = await import("@/app/(app)/pagos/page");
 const { default: HomePage } = await import("@/app/(app)/page");
 
@@ -30,7 +29,7 @@ async function renderIn(locale: Locale, Page: ServerPage): Promise<void> {
 }
 
 /** Las secciones que siguen siendo un marcador de posición. El directorio
- * salió de aquí en #239, que le dio su pantalla: lo que enseña se prueba en
+ * salió de aquí en #239 y Noticias en #329, que les dieron su pantalla: lo que enseña se prueba en
  * `tests/unit/components/directory-screen.test.tsx`. */
 const SECTIONS: ReadonlyArray<
   readonly [english: string, spanish: string, Page: ServerPage]
@@ -39,7 +38,6 @@ const SECTIONS: ReadonlyArray<
   ["Calendar", "Calendario", CalendarioPage],
   ["Teams", "Equipos", EquiposPage],
   ["Evaluations", "Evaluaciones", EvaluacionesPage],
-  ["News", "Noticias", NoticiasPage],
   ["Payments", "Pagos", PagosPage],
 ];
 

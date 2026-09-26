@@ -7,6 +7,7 @@ import {
 import {
   formatCalendarDay,
   formatClubMoment,
+  formatFileSize,
   formatNumber,
 } from "@/lib/i18n/format";
 import { createTranslator } from "@/lib/i18n/translator";
@@ -149,5 +150,26 @@ describe("fechas mostradas en la validación", () => {
     expect(
       validateDateOfBirthField("1900-01-01", new Date("2026-09-17T00:00:00Z")),
     ).toEqual({ ok: true, value: "1900-01-01" });
+  });
+});
+
+describe("tamaños de archivo", () => {
+  it("deja en bytes lo que no llega a un kilobyte", () => {
+    expect(formatFileSize("en", 512)).toBe("512 B");
+  });
+
+  it("redondea a kilobytes enteros lo que no llega a un megabyte", () => {
+    expect(formatFileSize("en", 240 * 1024 + 300)).toBe("240 KB");
+  });
+
+  it("escribe los megabytes con un decimal y el separador del idioma", () => {
+    const bytes = Math.round(2.4 * 1024 * 1024);
+
+    expect(formatFileSize("en", bytes)).toBe("2.4 MB");
+    expect(formatFileSize("es", bytes)).toBe("2,4 MB");
+  });
+
+  it("no enseña un decimal que es cero", () => {
+    expect(formatFileSize("en", 10 * 1024 * 1024)).toBe("10 MB");
   });
 });
