@@ -285,6 +285,18 @@ export function createNewsGateways(
       },
 
       findPost: (query) => findPost(serviceClient, query),
+
+      async deletePost(postId) {
+        const { error } = await serviceClient
+          .from(POSTS_TABLE)
+          .delete()
+          .eq("id", postId);
+        if (error) {
+          throw new Error(
+            `No se pudo borrar la publicación ${postId}: ${error.message}`,
+          );
+        }
+      },
     },
   };
 }

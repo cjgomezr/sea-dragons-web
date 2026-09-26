@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ApiError } from "@/lib/api/response";
 import { asAccountApiError } from "@/lib/auth/account-api";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
+import { NEWS_ATTACHMENTS_MAX_PER_POST } from "./news-attachments";
 import { InvalidNewsFeedCursorError } from "./news-feed";
 import {
   EmptyNewsAudienceError,
@@ -32,6 +33,12 @@ export const newsDraftSchema = z.object({
     z.object({ kind: z.literal("club") }),
     z.object({ kind: z.literal("groups"), groupIds: z.array(z.uuid()) }),
   ]),
+  // Los ids de las subidas previas (#330), en el orden en que se eligieron.
+  // Opcional: publicar sin adjuntos sigue siendo el mismo cuerpo de #327.
+  attachmentUploadIds: z
+    .array(z.uuid())
+    .max(NEWS_ATTACHMENTS_MAX_PER_POST)
+    .default([]),
 });
 
 /** Un id que no es un uuid no puede nombrar ninguna publicación: responde

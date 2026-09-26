@@ -16,6 +16,10 @@ import {
   MEMBER_RECORD_PATH,
   MEMBER_ROLE_API_PATH,
   NEWS_API_PATH,
+  NEWS_PATH,
+  NEWS_PUBLISH_PATH,
+  NEWS_UPLOAD_API_PATH,
+  NEWS_UPLOADS_API_PATH,
   NEWS_ATTACHMENT_API_PATH,
   NEWS_ATTACHMENT_MANAGE_API_PATH,
   NEWS_ATTACHMENTS_UPLOAD_API_PATH,
@@ -716,4 +720,56 @@ describe("frontera de los adjuntos de noticias (#328)", () => {
       });
     },
   );
+});
+
+/** El formulario de publicar y sus subidas previas (#330). Cuelgan de
+ * publicar, así que sólo los alcanzan Admin y Committee; la pantalla se
+ * declara además por su cuenta, porque esconder el botón no protege nada. */
+const NEWS_UPLOAD = NEWS_UPLOAD_API_PATH.replace(
+  "[uploadId]",
+  "a7a7a7a7-0000-4000-8000-000000000001",
+);
+
+describe("frontera del formulario de publicar (#330)", () => {
+  it.each(
+    (["Coach", "Player"] as const).flatMap((role) =>
+      [NEWS_UPLOADS_API_PATH, NEWS_UPLOAD].map(
+        (pathname) => [role, pathname] as const,
+      ),
+    ),
+  )("niega a un %s %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual({
+      kind: "missingCapability",
+    });
+  });
+
+  it.each(["Coach", "Player"] as const)(
+    "manda al panel a un %s que abre el formulario a mano",
+    (role) => {
+      expect(
+        decideSessionBoundary({
+          pathname: NEWS_PUBLISH_PATH,
+          ...activeAs(role),
+        }),
+      ).toEqual({ kind: "redirect", to: DASHBOARD_PATH });
+    },
+  );
+
+  it.each(
+    (["Admin", "Committee"] as const).flatMap((role) =>
+      [NEWS_PUBLISH_PATH, NEWS_UPLOADS_API_PATH, NEWS_UPLOAD].map(
+        (pathname) => [role, pathname] as const,
+      ),
+    ),
+  )("deja a un %s entrar en %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
+      ALLOW,
+    );
+  });
+
+  it.each(ROLES)("sigue dejando a un %s leer Noticias", (role) => {
+    expect(
+      decideSessionBoundary({ pathname: NEWS_PATH, ...activeAs(role) }),
+    ).toEqual(ALLOW);
+  });
 });

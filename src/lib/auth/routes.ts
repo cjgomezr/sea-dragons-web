@@ -196,6 +196,11 @@ export const NEWS_PATH = "/noticias";
 /** Una publicación abierta (#329). `[id]` es el de la publicación. */
 export const NEWS_POST_PATH = `${NEWS_PATH}/[id]`;
 
+/** El formulario de publicar (#330), abierto desde la cabecera del feed.
+ * Casa también con `NEWS_POST_PATH`, que es de todos: por eso se declara en
+ * `RESTRICTED_ROUTES`, y el botón que lleva a él no es la defensa. */
+export const NEWS_PUBLISH_PATH = `${NEWS_PATH}/publicar`;
+
 /** El feed de noticias (#327, RF-4 del PRD de E11). Lo alcanza cualquier
  * cuenta activa, de cualquier rol, así que no aparece en
  * `RESTRICTED_ROUTES`: qué publicaciones ve cada uno lo decide el servidor
@@ -219,6 +224,14 @@ export const NEWS_ATTACHMENTS_UPLOAD_API_PATH = `${NEWS_PUBLISH_API_PATH}/[id]/a
 
 /** Quitar un adjunto de una publicación propia (#328): DELETE. */
 export const NEWS_ATTACHMENT_MANAGE_API_PATH = `${NEWS_ATTACHMENTS_UPLOAD_API_PATH}/[attachmentId]`;
+
+/** Subir un adjunto mientras se escribe la publicación, antes de que exista
+ * (#330). Cuelga de publicar, así que es sólo de Admin y Committee. */
+export const NEWS_UPLOADS_API_PATH = `${NEWS_PUBLISH_API_PATH}/uploads`;
+
+/** Quitar esa subida antes de publicar: DELETE. `[uploadId]` es el id que
+ * devolvió la subida. */
+export const NEWS_UPLOAD_API_PATH = `${NEWS_UPLOADS_API_PATH}/[uploadId]`;
 
 /** Pedir la dirección firmada de un adjunto (#328). Lo alcanza cualquier
  * cuenta activa; quien no es la audiencia de la publicación recibe 404. */
@@ -374,4 +387,6 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
     path: NEWS_ATTACHMENT_MANAGE_API_PATH,
     capability: "publishNewsAndDocuments",
   },
+  { path: NEWS_UPLOADS_API_PATH, capability: "publishNewsAndDocuments" },
+  { path: NEWS_PUBLISH_PATH, capability: "publishNewsAndDocuments" },
 ];

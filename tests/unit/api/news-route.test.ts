@@ -6,13 +6,18 @@ import {
   NEWS_PUBLISH_API_PATH,
 } from "@/lib/auth/routes";
 import {
+  type FakeAttachmentClub,
+  type FakeAttachmentClubOptions,
+  fakeAttachmentClub,
+  uploadIdFor,
+} from "../helpers/news-attachments-club";
+import {
   CALLER_ID,
-  type FakeClub,
-  type FakeClubOptions,
+  CLUB_ID,
+  INSERTED_POST_ID,
   MASTERS_SQUAD_ID,
   SENIOR_SQUAD_ID,
   aPost,
-  fakeClub,
 } from "../helpers/news-club";
 
 /**
@@ -32,7 +37,7 @@ const DRAFT = {
   audience: { kind: "club" },
 };
 
-let club: FakeClub;
+let club: FakeAttachmentClub;
 
 function mockSessionClient(): void {
   vi.doMock("@/lib/supabase/session-client", () => ({
@@ -46,10 +51,19 @@ function mockSessionClient(): void {
   }));
 }
 
-function mockWiring(options: FakeClubOptions = {}): void {
-  club = fakeClub(options);
+/** Publicar usa los adaptadores de adjuntos (#330), que incluyen los de
+ * noticias; el feed y la publicación abierta, sólo estos. Los dos comparten
+ * el mismo club en memoria. */
+function mockWiring(options: FakeAttachmentClubOptions = {}): void {
+  club = fakeAttachmentClub(options);
   vi.doMock("@/lib/news/supabase-news-gateways", () => ({
     createSupabaseNewsGateways: () => ({
+      kind: "ready",
+      gateways: club.gateways,
+    }),
+  }));
+  vi.doMock("@/lib/news/supabase-news-attachment-gateways", () => ({
+    createSupabaseNewsAttachmentGateways: () => ({
       kind: "ready",
       gateways: club.gateways,
     }),
@@ -108,6 +122,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.doUnmock("@/lib/news/supabase-news-gateways");
+  vi.doUnmock("@/lib/news/supabase-news-attachment-gateways");
   vi.doUnmock("@/lib/supabase/session-client");
   vi.doUnmock("@/lib/auth/session-reader");
   vi.restoreAllMocks();
@@ -198,6 +213,61 @@ describe("POST /api/v1/news/publish", () => {
       expect(club.inserted).toEqual([]);
     },
   );
+
+  it("liga a la publicación los adjuntos que se subieron antes", async () => {
+    mockWiring({
+      callerRole: "Committee",
+      storedFiles: [
+        {
+          storagePath: `${CLUB_ID}/uploads/${CALLER_ID}/${uploadIdFor(1)}`,
+          fileName: "acta.pdf",
+          contentType: "application/pdf",
+          sizeBytes: 12,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    });
+
+    const response = await publish({
+      ...DRAFT,
+      attachmentUploadIds: [uploadIdFor(1)],
+    });
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        id: INSERTED_POST_ID,
+        attachments: [{ fileName: "acta.pdf", contentType: "application/pdf" }],
+      },
+    });
+  });
+
+  it("responde 400 con su motivo a un adjunto que ya no está subido", async () => {
+    mockWiring({ callerRole: "Committee" });
+
+    const response = await publish({
+      ...DRAFT,
+      attachmentUploadIds: [uploadIdFor(1)],
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "validation_error", reason: "attachment_upload_missing" },
+    });
+    expect(club.inserted).toEqual([]);
+  });
+
+  it("responde 400 a más de cinco adjuntos", async () => {
+    mockWiring({ callerRole: "Committee" });
+
+    const response = await publish({
+      ...DRAFT,
+      attachmentUploadIds: [1, 2, 3, 4, 5, 6].map(uploadIdFor),
+    });
+
+    await expectErrorCode(response, 400, "validation_error");
+    expect(club.inserted).toEqual([]);
+  });
 
   it("responde 401 sin sesión", async () => {
     mockAnonymousCaller();

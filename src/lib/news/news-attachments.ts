@@ -1,12 +1,10 @@
-import { hasCapability } from "@/lib/auth/roles";
 import { type DetectableFileType, detectFileType } from "@/lib/files/file-type";
 import {
   type NewsAttachmentSummary,
   type NewsGateways,
-  NewsForbiddenError,
   type NewsPost,
   NewsPostNotFoundError,
-  findNewsReader,
+  findNewsPublisher,
   openNewsPost,
 } from "./news-posts";
 
@@ -36,7 +34,9 @@ export const NEWS_ATTACHMENT_FILE_NAME_MAX_LENGTH = 255;
 
 /** Las extensiones que admite cada tipo. La primera es la que lleva el
  * fichero guardado. */
-const EXTENSIONS: Readonly<Record<DetectableFileType, readonly string[]>> = {
+const EXTENSIONS: Readonly<
+  Record<DetectableFileType, readonly [string, ...string[]]>
+> = {
   "image/jpeg": ["jpg", "jpeg"],
   "image/png": ["png"],
   "image/webp": ["webp"],
@@ -57,6 +57,7 @@ export const NEWS_ATTACHMENT_ISSUE_CODES = [
   "attachment_type_mismatch",
   "attachment_name_invalid",
   "attachment_limit_reached",
+  "attachment_upload_missing",
 ] as const;
 
 export type NewsAttachmentIssueCode =
@@ -71,6 +72,8 @@ const ISSUE_MESSAGES: Readonly<Record<NewsAttachmentIssueCode, string>> = {
     "La extensión del nombre no corresponde con el contenido del archivo.",
   attachment_name_invalid: `El nombre del archivo tiene que tener entre 1 y ${NEWS_ATTACHMENT_FILE_NAME_MAX_LENGTH} caracteres, sin barras ni caracteres de control.`,
   attachment_limit_reached: `Una publicación puede llevar como mucho ${NEWS_ATTACHMENTS_MAX_PER_POST} adjuntos.`,
+  attachment_upload_missing:
+    "Uno de los adjuntos ya no está subido. Quítalo y vuelve a adjuntarlo.",
 };
 
 export class NewsAttachmentValidationError extends Error {
@@ -110,6 +113,15 @@ export type NewsAttachmentDownload =
     }
   | { readonly status: "unavailable"; readonly fileName: string };
 
+/** Lo que el almacenamiento sabe de un fichero: con qué nombre se subió, su
+ * tipo, su tamaño y cuándo llegó. */
+export type StoredNewsFile = {
+  readonly fileName: string;
+  readonly contentType: DetectableFileType;
+  readonly sizeBytes: number;
+  readonly createdAt: string;
+};
+
 export type NewsAttachmentGateways = NewsGateways & {
   readonly attachments: {
     /** Lanza `NewsAttachmentValidationError("attachment_limit_reached")`
@@ -124,11 +136,22 @@ export type NewsAttachmentGateways = NewsGateways & {
     deleteAttachment(attachmentId: string): Promise<void>;
   };
   readonly storage: {
-    upload(
-      storagePath: string,
-      bytes: Uint8Array,
-      type: DetectableFileType,
-    ): Promise<void>;
+    upload(file: {
+      readonly storagePath: string;
+      readonly bytes: Uint8Array;
+      readonly contentType: DetectableFileType;
+      readonly fileName: string;
+    }): Promise<void>;
+    /** Null si el fichero no está. */
+    describe(storagePath: string): Promise<StoredNewsFile | null>;
+    copy(fromPath: string, toPath: string): Promise<void>;
+    /** Los ficheros que cuelgan directamente de la carpeta. */
+    list(folder: string): Promise<
+      readonly {
+        readonly storagePath: string;
+        readonly createdAt: string;
+      }[]
+    >;
     remove(storagePaths: readonly string[]): Promise<void>;
     /** Null cuando Storage no la pudo firmar porque el fichero ya no está. */
     signDownloadUrl(file: {
@@ -187,6 +210,22 @@ function validateFileBytes(
   return type;
 }
 
+/** El nombre y el tipo de un fichero que se quiere adjuntar, o el motivo por
+ * el que no vale. Lo comparten subir a una publicación y subir antes de
+ * publicar (#330). */
+export function validateNewsAttachmentFile(
+  rawName: string,
+  bytes: Uint8Array,
+): { readonly fileName: string; readonly contentType: DetectableFileType } {
+  const fileName = validateFileName(rawName);
+  return { fileName, contentType: validateFileBytes(bytes, fileName) };
+}
+
+/** La extensión con la que se guarda un fichero de ese tipo. */
+export function storedExtensionOf(contentType: DetectableFileType): string {
+  return EXTENSIONS[contentType][0];
+}
+
 /** La publicación de quien llama, si puede publicar y es su autor. Una
  * publicación ajena responde como una que no existe, igual que al abrirla.
  * Una retirada también: sus adjuntos ya no se sirven a nadie, así que
@@ -195,10 +234,7 @@ async function findOwnPost(
   gateways: NewsAttachmentGateways,
   request: { readonly callerId: string; readonly postId: string },
 ): Promise<NewsPost> {
-  const caller = await findNewsReader(gateways, request.callerId);
-  if (!hasCapability(caller.role, "publishNewsAndDocuments")) {
-    throw new NewsForbiddenError();
-  }
+  const caller = await findNewsPublisher(gateways, request.callerId);
   const post = await gateways.posts.findPost({
     clubId: caller.clubId,
     postId: request.postId,
@@ -232,11 +268,12 @@ async function storeAttachment(
   attachment: NewNewsAttachment,
   bytes: Uint8Array,
 ): Promise<NewsAttachmentSummary> {
-  await gateways.storage.upload(
-    attachment.storagePath,
+  await gateways.storage.upload({
+    storagePath: attachment.storagePath,
     bytes,
-    attachment.contentType,
-  );
+    contentType: attachment.contentType,
+    fileName: attachment.fileName,
+  });
   try {
     return await gateways.attachments.insertAttachment(attachment);
   } catch (error) {
@@ -274,12 +311,14 @@ export async function attachNewsFile(
   },
 ): Promise<NewsAttachmentSummary> {
   const post = await findOwnPost(gateways, request);
-  const fileName = validateFileName(request.fileName);
-  const contentType = validateFileBytes(request.bytes, fileName);
+  const { fileName, contentType } = validateNewsAttachmentFile(
+    request.fileName,
+    request.bytes,
+  );
   if (post.attachments.length >= NEWS_ATTACHMENTS_MAX_PER_POST) {
     throw new NewsAttachmentValidationError("attachment_limit_reached");
   }
-  const extension = EXTENSIONS[contentType][0];
+  const extension = storedExtensionOf(contentType);
   return storeAttachment(
     gateways,
     {

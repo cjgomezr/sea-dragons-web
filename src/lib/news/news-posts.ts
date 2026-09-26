@@ -121,6 +121,10 @@ export type NewsPostsGateway = {
     readonly clubId: string;
     readonly postId: string;
   }): Promise<NewsPost | null>;
+  /** Borra la publicación con su audiencia y sus adjuntos. Sólo lo usa
+   * publicar para deshacerse cuando un adjunto no entra: retirar no borra
+   * (decisión D1). */
+  deletePost(postId: string): Promise<void>;
 };
 
 export type NewsGateways = {
@@ -185,6 +189,18 @@ export async function findNewsReader(
   return caller;
 }
 
+/** Quien llama, si puede publicar. */
+export async function findNewsPublisher(
+  gateways: Pick<NewsGateways, "members">,
+  callerId: string,
+): Promise<RoleRequestMember> {
+  const caller = await findNewsReader(gateways, callerId);
+  if (!hasCapability(caller.role, "publishNewsAndDocuments")) {
+    throw new NewsForbiddenError();
+  }
+  return caller;
+}
+
 /** Los ids de los grupos de quien llama, con la consulta de E4. */
 export async function findReaderGroupIds(
   gateways: Pick<NewsGateways, "memberGroups">,
@@ -244,7 +260,7 @@ async function resolveAudience(
   return { kind: "groups", groupIds };
 }
 
-function toDetail(post: NewsPost): NewsPostDetail {
+export function toNewsPostDetail(post: NewsPost): NewsPostDetail {
   return {
     id: post.id,
     category: post.category,
@@ -258,17 +274,18 @@ function toDetail(post: NewsPost): NewsPostDetail {
   };
 }
 
-/** La frontera ya niega esta ruta a quien no publica; esto es el cerrojo del
+/** La publicación lista para guardar, o el motivo por el que no vale. No
+ * escribe nada: publicar con adjuntos (#330) comprueba además sus subidas
+ * antes de guardarla.
+ *
+ * La frontera ya niega publicar a quien no puede; esto es el cerrojo del
  * dominio, para que no dependa de que nadie olvide la línea de
  * `RESTRICTED_ROUTES`. */
-export async function publishNewsPost(
-  gateways: NewsGateways,
+export async function prepareNewsPost(
+  gateways: Pick<NewsGateways, "members" | "posts">,
   request: { readonly callerId: string; readonly draft: NewsDraft },
-): Promise<NewsPostDetail> {
-  const caller = await findNewsReader(gateways, request.callerId);
-  if (!hasCapability(caller.role, "publishNewsAndDocuments")) {
-    throw new NewsForbiddenError();
-  }
+): Promise<NewNewsPost> {
+  const caller = await findNewsPublisher(gateways, request.callerId);
   const { draft } = request;
   const title = normalizeNewsTitle(draft.title);
   const body = requireNewsBody(draft.body);
@@ -277,15 +294,22 @@ export async function publishNewsPost(
     caller.clubId,
     draft.audience,
   );
-  const post = await gateways.posts.insertPost({
+  return {
     clubId: caller.clubId,
     authorId: request.callerId,
     category: draft.category,
     title,
     body,
     audience,
-  });
-  return toDetail(post);
+  };
+}
+
+export async function publishNewsPost(
+  gateways: NewsGateways,
+  request: { readonly callerId: string; readonly draft: NewsDraft },
+): Promise<NewsPostDetail> {
+  const post = await prepareNewsPost(gateways, request);
+  return toNewsPostDetail(await gateways.posts.insertPost(post));
 }
 
 /** Quien publicó ve siempre lo suyo, retirado incluido (RF-5). Los demás,
@@ -326,5 +350,5 @@ export async function openNewsPost(
   if (post === null || !isVisibleTo(post, { id: request.callerId, groupIds })) {
     throw new NewsPostNotFoundError();
   }
-  return toDetail(post);
+  return toNewsPostDetail(post);
 }
