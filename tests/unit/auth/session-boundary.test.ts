@@ -15,6 +15,9 @@ import {
   MEMBER_RECORD_API_PATH,
   MEMBER_RECORD_PATH,
   MEMBER_ROLE_API_PATH,
+  NEWS_API_PATH,
+  NEWS_POST_API_PATH,
+  NEWS_PUBLISH_API_PATH,
   PASSWORD_RECOVERY_PATH,
   REGISTER_API_PATH,
   REGISTRATION_PATH,
@@ -607,6 +610,51 @@ describe("frontera de la ficha reservada al Admin (#242)", () => {
       expect(
         decideSessionBoundary({ pathname: "/directorio", ...activeAs(role) }),
       ).toEqual(ALLOW);
+    },
+  );
+});
+
+/** Una publicación cualquiera, en el segmento dinámico del detalle (#327). */
+const NEWS_POST = NEWS_POST_API_PATH.replace(
+  "[id]",
+  "d3d3d3d3-0000-4000-8000-00000000000d",
+);
+
+describe("frontera de noticias (#327)", () => {
+  it.each(["Coach", "Player"] as const)("niega publicar a un %s", (role) => {
+    expect(
+      decideSessionBoundary({
+        pathname: NEWS_PUBLISH_API_PATH,
+        ...activeAs(role),
+      }),
+    ).toEqual({ kind: "missingCapability" });
+  });
+
+  it.each(["Admin", "Committee"] as const)("deja publicar a un %s", (role) => {
+    expect(
+      decideSessionBoundary({
+        pathname: NEWS_PUBLISH_API_PATH,
+        ...activeAs(role),
+      }),
+    ).toEqual(ALLOW);
+  });
+
+  it.each(
+    ROLES.flatMap((role) =>
+      [NEWS_API_PATH, NEWS_POST].map((pathname) => [role, pathname] as const),
+    ),
+  )("deja a un %s leer %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
+      ALLOW,
+    );
+  });
+
+  it.each([NEWS_API_PATH, NEWS_POST, NEWS_PUBLISH_API_PATH])(
+    "responde 401 sin sesión a %s",
+    (pathname) => {
+      expect(decideSessionBoundary({ pathname, ...ANONYMOUS })).toEqual({
+        kind: "unauthenticated",
+      });
     },
   );
 });
