@@ -265,6 +265,36 @@ describe("pantalla del directorio", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("abre en grande la foto de una fila al pulsarla (#355)", async () => {
+    const photoUrl = "https://storage.test/member-photos/nerea.webp?token=t";
+    const largeUrl = "https://storage.test/member-photos/nerea-l.webp?token=l";
+    const largePhotoPath = `${DIRECTORY_PATH}/${NEREA.userId}/photo`;
+    stubApi({
+      members: [MARIA, { ...NEREA, photoUrl }],
+      respond: (url) =>
+        url === largePhotoPath
+          ? jsonResponse(200, { data: { photoUrl: largeUrl } })
+          : listingFor({ members: [MARIA, { ...NEREA, photoUrl }] }, url),
+    });
+    await renderScreen();
+
+    await userEvent.click(
+      within(memberRow("Nerea Ruiz")).getByRole("button", {
+        name: "Open the photo of Nerea Ruiz",
+      }),
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Nerea Ruiz" });
+    expect(
+      await within(dialog).findByRole("img", { name: "Photo of Nerea Ruiz" }),
+    ).toHaveAttribute("src", largeUrl);
+    expect(
+      within(memberRow("María Ñíguez")).queryByRole("button", {
+        name: /Open the photo/,
+      }),
+    ).not.toBeInTheDocument();
+  });
+
   it("no enseña una foto que no llega por una dirección web", async () => {
     stubApi({
       members: [{ ...NEREA, photoUrl: "javascript:alert(1)" }],

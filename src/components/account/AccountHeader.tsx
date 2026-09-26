@@ -9,11 +9,13 @@ import { ProfilePhoto } from "./ProfilePhoto";
  * (#245) son lo único de cliente. */
 export function AccountHeader({
   locale,
+  userId,
   fullName,
   role,
   photoUrl,
 }: {
   locale: Locale;
+  userId: string;
   fullName: string;
   role: Role;
   photoUrl: string | null;
@@ -23,6 +25,7 @@ export function AccountHeader({
     <header className="account-header">
       <ProfilePhoto
         locale={locale}
+        userId={userId}
         fullName={fullName}
         initialPhotoUrl={photoUrl}
       >

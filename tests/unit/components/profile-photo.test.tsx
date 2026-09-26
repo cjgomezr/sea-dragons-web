@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProfileScreen } from "@/components/account/ProfileScreen";
@@ -19,6 +19,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 const OLD_URL = "https://storage.test/member-photos/vieja.webp?token=a";
 const NEW_URL = "https://storage.test/member-photos/nueva.png?token=b";
+const OWN_USER_ID = "cccccccc-0000-4000-8000-00000000000c";
+const LARGE_URL = "https://storage.test/member-photos/grande.webp?token=c";
 
 type ApiCall = {
   readonly url: string;
@@ -41,8 +43,8 @@ function stubFetch(
   let next = 0;
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string, init: RequestInit) => {
-      calls.push({ url, method: init.method, body: init.body });
+    vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, method: init?.method, body: init?.body });
       const respond = responses[Math.min(next, responses.length - 1)];
       next += 1;
       if (respond === undefined) {
@@ -66,6 +68,7 @@ function renderScreen(
   render(
     <ProfileScreen
       locale={locale}
+      userId={OWN_USER_ID}
       account={{ fullName: "Nerea Ruiz", role: "Player", latestRequest: null }}
       profile={{
         fullName: "Nerea Ruiz",
@@ -118,6 +121,23 @@ describe("perfil con foto", () => {
     expect(
       screen.getByRole("button", { name: "Change photo" }),
     ).toBeInTheDocument();
+  });
+
+  it("abre la foto propia en grande al pulsarla (#355)", async () => {
+    stubFetch(() => jsonResponse(200, { data: { photoUrl: LARGE_URL } }));
+    renderScreen();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open the photo of Nerea Ruiz" }),
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Nerea Ruiz" });
+    expect(
+      await within(dialog).findByRole("img", { name: "Photo of Nerea Ruiz" }),
+    ).toHaveAttribute("src", LARGE_URL);
+    expect(calls.map((call) => call.url)).toEqual([
+      `/api/v1/directory/${OWN_USER_ID}/photo`,
+    ]);
   });
 
   it("sin foto enseña las iniciales, como hasta ahora", () => {

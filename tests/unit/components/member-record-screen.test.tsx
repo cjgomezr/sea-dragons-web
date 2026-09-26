@@ -38,6 +38,8 @@ const RECORD: MemberRecord = {
 };
 
 const PHOTO_URL = `https://storage.test/member-photos/${MEMBER_ID}/foto.webp?token=a`;
+const LARGE_PHOTO_PATH = `/api/v1/directory/${MEMBER_ID}/photo`;
+const LARGE_PHOTO_URL = `https://storage.test/member-photos/${MEMBER_ID}/foto-large.webp?token=l`;
 
 /** Un AUF que escribió el miembro y ningún Admin ha mirado. */
 const PENDING_RECORD: MemberRecord = { ...RECORD, isAufVerified: false };
@@ -122,6 +124,9 @@ function stubApi(stub: Stub = {}): void {
     vi.fn(async (url: string, init?: RequestInit) => {
       if (url === GROUPS_PATH) {
         return jsonResponse(200, { data: { groups: CLUB_GROUPS } });
+      }
+      if (url === LARGE_PHOTO_PATH) {
+        return jsonResponse(200, { data: { photoUrl: LARGE_PHOTO_URL } });
       }
       if (url === INVITATION_PATH && init?.method === "POST") {
         resends.push(url);
@@ -279,6 +284,20 @@ describe("pantalla de la ficha", () => {
     expect(
       screen.getByRole("img", { name: "Photo of Paula Player" }),
     ).toHaveAttribute("src", PHOTO_URL);
+  });
+
+  it("abre la foto en grande al pulsarla (#355)", async () => {
+    stubApi({ record: { ...RECORD, photoUrl: PHOTO_URL } });
+    await renderScreen();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open the photo of Paula Player" }),
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Paula Player" });
+    expect(
+      await within(dialog).findByRole("img", { name: "Photo of Paula Player" }),
+    ).toHaveAttribute("src", LARGE_PHOTO_URL);
   });
 
   it("nombra la foto en español", async () => {

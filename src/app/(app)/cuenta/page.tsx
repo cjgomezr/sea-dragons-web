@@ -148,6 +148,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
   return (
     <ProfileScreen
       locale={locale}
+      userId={caller.userId}
       account={account}
       profile={profile.profile}
       positionOptions={profile.positionOptions}

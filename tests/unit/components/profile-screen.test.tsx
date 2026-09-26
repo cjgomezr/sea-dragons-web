@@ -112,6 +112,7 @@ function renderScreen(
   render(
     <ProfileScreen
       locale={locale}
+      userId="cccccccc-0000-4000-8000-00000000000c"
       account={{ fullName: "Nerea Ruiz", role: "Player", latestRequest: null }}
       profile={options.profile ?? PROFILE}
       positionOptions={options.positionOptions ?? SEEDED_POSITIONS}

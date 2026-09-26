@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { BellIcon } from "@/components/NavIcons";
+import { useDismissal } from "@/components/use-dismissal";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator, type Translator } from "@/lib/i18n/translator";
 import { NotificationPanel } from "./NotificationPanel";
@@ -93,49 +94,6 @@ function useUnreadCount(): UnreadCount {
   return { unreadCount, refresh, clear };
 }
 
-/** Cerrar con Escape, pulsando fuera o cuando el foco sale del panel. Lo
- * último importa en el móvil: la lista tapa la pantalla, y el foco no puede
- * seguir por lo que hay debajo, que no se ve. */
-function useDismissal(options: {
-  readonly isOpen: boolean;
-  readonly containerRef: React.RefObject<HTMLDivElement | null>;
-  readonly onEscape: () => void;
-  readonly onLeave: () => void;
-}): void {
-  const { isOpen, containerRef, onEscape, onLeave } = options;
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-    function isOutside(target: EventTarget | null): boolean {
-      const container = containerRef.current;
-      return (
-        container !== null &&
-        target instanceof Node &&
-        !container.contains(target)
-      );
-    }
-    function handleKeyDown(event: KeyboardEvent): void {
-      if (event.key === "Escape") {
-        onEscape();
-      }
-    }
-    function handleLeave(event: Event): void {
-      if (isOutside(event.target)) {
-        onLeave();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("pointerdown", handleLeave);
-    document.addEventListener("focusin", handleLeave);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("pointerdown", handleLeave);
-      document.removeEventListener("focusin", handleLeave);
-    };
-  }, [isOpen, containerRef, onEscape, onLeave]);
-}
-
 export function NotificationBell({
   locale,
 }: {
@@ -162,11 +120,15 @@ export function NotificationBell({
     close();
     bellRef.current?.focus();
   }, [close]);
+  // Salir del panel lo cierra también por el foco. Importa en el móvil: la
+  // lista tapa la pantalla, y el foco no puede seguir por lo que hay debajo,
+  // que no se ve.
   useDismissal({
     isOpen,
     containerRef,
     onEscape: closeAndReturnFocus,
-    onLeave: close,
+    onPressOutside: close,
+    onFocusOutside: close,
   });
 
   useEffect(() => {

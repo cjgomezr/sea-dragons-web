@@ -1376,6 +1376,149 @@ button.notification-item-content:hover {
   object-fit: cover;
 }
 
+/* La foto que se abre en grande (#355). El botón no añade nada al círculo:
+   el relleno y el margen negativo sólo agrandan lo que se puede tocar hasta
+   44px sin mover la fila. */
+.member-photo-button {
+  display: flex;
+  flex: none;
+  margin: -2px;
+  padding: 2px;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: zoom-in;
+}
+
+.member-photo-button:hover > .member-photo {
+  border-color: var(--color-accent);
+}
+
+.member-photo-button:active > .member-photo {
+  opacity: 0.8;
+}
+
+/* El visor ocupa la pantalla en el móvil: la foto va de lado a lado, y el
+   alto que sobra lo pone el fondo. El `<dialog>` modal ya se centra solo; aquí
+   se le quitan el marco y los márgenes del navegador. */
+.photo-viewer {
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  padding: 0;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+}
+
+.photo-viewer::backdrop {
+  background: rgb(12 26 38 / 85%);
+}
+
+.photo-viewer-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-panel);
+}
+
+.photo-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+}
+
+.photo-viewer-title {
+  min-width: 0;
+  margin: 0;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.photo-viewer-close {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  font-size: 24px;
+  line-height: 1;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.photo-viewer-close:hover {
+  border-color: var(--color-accent);
+}
+
+/* La miniatura, la grande y el aviso de carga se apilan en la misma celda:
+   la grande aparece encima cuando ya se puede pintar entera. */
+.photo-viewer-frame {
+  display: grid;
+  place-items: center;
+  background: var(--color-background);
+}
+
+.photo-viewer-image {
+  grid-area: 1 / 1;
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Lo que deja la cabecera: nunca más alta que la pantalla. */
+  max-height: calc(100dvh - var(--touch-target-min) - 2 * var(--space-2));
+  object-fit: contain;
+}
+
+.photo-viewer-image.is-loading {
+  opacity: 0;
+}
+
+.photo-viewer-loading {
+  grid-area: 1 / 1;
+  align-self: end;
+  margin: var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  font-size: 14px;
+  background: var(--color-panel);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.photo-viewer-error {
+  margin: 0;
+  padding: var(--space-6) var(--space-4);
+  color: var(--color-danger);
+}
+
+/* En escritorio la foto sale a su tamaño, sin pasar de la ventana, en una
+   tarjeta centrada. */
+@media (min-width: 768px) {
+  .photo-viewer {
+    width: fit-content;
+    max-width: calc(100% - 2 * var(--space-8));
+    max-height: calc(100% - 2 * var(--space-8));
+  }
+
+  .photo-viewer-panel {
+    overflow: hidden;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .photo-viewer-image {
+    width: auto;
+    max-width: calc(100vw - 2 * var(--space-8));
+    max-height: calc(
+      100dvh - 2 * var(--space-8) - var(--touch-target-min) - 2 * var(--space-2)
+    );
+  }
+}
+
 .account-photo-actions {
   display: flex;
   flex-wrap: wrap;
