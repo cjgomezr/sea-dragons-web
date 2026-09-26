@@ -125,6 +125,11 @@ export const GROUPS_API_PATH = "/api/v1/groups";
  * la frontera decide por camino y aquí los dos casos comparten el mismo. */
 export const DIRECTORY_API_PATH = "/api/v1/directory";
 
+/** La foto grande de un socio (#353). `[id]` es su `user_id`. Cuelga del
+ * directorio porque la ve quien ve su miniatura en él, así que tampoco
+ * aparece en `RESTRICTED_ROUTES`. */
+export const DIRECTORY_MEMBER_PHOTO_API_PATH = `${DIRECTORY_API_PATH}/[id]/photo`;
+
 /** Los grupos de quien llama (#229, RF-8 del PRD de E4). Va fuera de
  * `/api/v1/groups`, que es de quien gestiona grupos, porque lo alcanza
  * cualquier cuenta activa: por eso no aparece en `RESTRICTED_ROUTES`. Una

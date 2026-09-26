@@ -133,19 +133,21 @@ export function createProfilePhotoGateways(clients: {
         }
       },
 
-      async remove(photoPath) {
+      async remove(photoPaths) {
+        const listed = photoPaths.join(", ");
         const { data, error } = await sessionClient.storage
           .from(PROFILE_PHOTO_BUCKET)
-          .remove([photoPath]);
+          .remove([...photoPaths]);
         if (error) {
           throw new Error(
-            `No se pudo borrar la foto ${photoPath}: ${error.message}`,
+            `No se pudo borrar la foto ${listed}: ${error.message}`,
           );
         }
         // Storage responde bien aunque la policy no le haya dejado borrar
-        // nada: la lista vacía es la única señal de que el fichero sigue ahí.
-        if (data.length === 0) {
-          throw new Error(`Storage no borró la foto ${photoPath}.`);
+        // nada: una lista más corta es la única señal de que algún fichero
+        // sigue ahí.
+        if (data.length < photoPaths.length) {
+          throw new Error(`Storage no borró toda la foto ${listed}.`);
         }
       },
     },

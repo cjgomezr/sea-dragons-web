@@ -4,10 +4,14 @@ import sharp from "sharp";
 import { expect, it } from "vitest";
 import { DEFAULT_CLUB_SLUG } from "@/lib/auth/supabase-auth-gateways";
 import {
+  largePhotoPathOf,
   removeProfilePhoto,
   replaceProfilePhoto,
 } from "@/lib/members/profile-photo";
-import { PROFILE_PHOTO_MAX_SIDE_PX } from "@/lib/members/shrink-profile-photo";
+import {
+  PROFILE_PHOTO_LARGE_SIDE_PX,
+  PROFILE_PHOTO_THUMBNAIL_SIDE_PX,
+} from "@/lib/members/shrink-profile-photo";
 import {
   PROFILE_PHOTO_BUCKET,
   createProfilePhotoGateways,
@@ -45,7 +49,8 @@ function fixture(name: string): Uint8Array {
 const PNG_BYTES = fixture("foto-de-perfil.png");
 const PNG_SIDE_PX = 128;
 const LARGE_PHOTO_BYTES = fixture("foto-apaisada-3000x2000.jpg");
-const MAX_STORED_BYTES = 100 * 1024;
+const THUMBNAIL_MAX_BYTES = 20 * 1024;
+const LARGE_MAX_BYTES = 200 * 1024;
 
 async function seedActiveMember(
   serviceClient: ServiceRoleClient,
@@ -101,6 +106,34 @@ async function emptyFolder(
   }
 }
 
+async function downloadPhoto(
+  serviceClient: ServiceRoleClient,
+  photoPath: string,
+): Promise<Uint8Array> {
+  const { data, error } = await serviceClient.client.storage
+    .from(PROFILE_PHOTO_BUCKET)
+    .download(photoPath);
+  if (error) {
+    throw new Error(`No se pudo bajar la foto ${photoPath}: ${error.message}`);
+  }
+  return new Uint8Array(await data.arrayBuffer());
+}
+
+async function savedPhotoPath(
+  serviceClient: ServiceRoleClient,
+  userId: string,
+): Promise<string> {
+  const { data, error } = await serviceClient.client
+    .from("members")
+    .select("photo_path")
+    .eq("user_id", userId)
+    .single();
+  if (error) {
+    throw new Error(`No se pudo leer la ficha: ${error.message}`);
+  }
+  return String(data.photo_path);
+}
+
 /** Una socia activa con su sesión abierta, y su carpeta vacía al terminar. */
 async function withPhotoOwner<T>(
   serviceClient: ServiceRoleClient,
@@ -150,18 +183,22 @@ describeRls("foto de perfil contra seadragons-dev", () => {
           width: PNG_SIDE_PX,
         });
 
+        const firstFiles = await listFolder(serviceClient, user.id);
+        expect(firstFiles).toHaveLength(2);
+
         await replaceProfilePhoto(gateways, {
           userId: user.id,
           bytes: PNG_BYTES,
         });
         const afterReplace = await listFolder(serviceClient, user.id);
-        expect(afterReplace).toHaveLength(1);
-        const { data: row } = await serviceClient.client
-          .from("members")
-          .select("photo_path")
-          .eq("user_id", user.id)
-          .single();
-        expect(row).toEqual({ photo_path: afterReplace[0] });
+        const photoPath = await savedPhotoPath(serviceClient, user.id);
+        expect(photoPath).toMatch(/-thumb\.webp$/);
+        expect([...afterReplace].sort()).toEqual(
+          [largePhotoPathOf(photoPath), photoPath].sort(),
+        );
+        expect(afterReplace.some((file) => firstFiles.includes(file))).toBe(
+          false,
+        );
 
         await removeProfilePhoto(gateways, user.id);
         await expect(listFolder(serviceClient, user.id)).resolves.toEqual([]);
@@ -171,7 +208,7 @@ describeRls("foto de perfil contra seadragons-dev", () => {
   );
 
   it(
-    "una foto grande queda en el bucket reducida, en WebP y por debajo de 100 KB",
+    "una foto grande queda en el bucket en dos tamaños, en WebP y dentro de su peso",
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);
 
@@ -186,19 +223,21 @@ describeRls("foto de perfil contra seadragons-dev", () => {
           bytes: LARGE_PHOTO_BYTES,
         });
 
-        const [storedPath = ""] = await listFolder(serviceClient, user.id);
-        expect(storedPath).toMatch(/\.webp$/);
-        const { data, error } = await serviceClient.client.storage
-          .from(PROFILE_PHOTO_BUCKET)
-          .download(storedPath);
-        if (error) {
-          throw new Error(`No se pudo bajar la foto: ${error.message}`);
-        }
-        const stored = new Uint8Array(await data.arrayBuffer());
-        expect(stored.length).toBeLessThan(MAX_STORED_BYTES);
-        await expect(sharp(stored).metadata()).resolves.toMatchObject({
+        const thumbnailPath = await savedPhotoPath(serviceClient, user.id);
+        const thumbnail = await downloadPhoto(serviceClient, thumbnailPath);
+        const large = await downloadPhoto(
+          serviceClient,
+          largePhotoPathOf(thumbnailPath),
+        );
+        expect(thumbnail.length).toBeLessThan(THUMBNAIL_MAX_BYTES);
+        expect(large.length).toBeLessThan(LARGE_MAX_BYTES);
+        await expect(sharp(thumbnail).metadata()).resolves.toMatchObject({
           format: "webp",
-          width: PROFILE_PHOTO_MAX_SIDE_PX,
+          width: PROFILE_PHOTO_THUMBNAIL_SIDE_PX,
+        });
+        await expect(sharp(large).metadata()).resolves.toMatchObject({
+          format: "webp",
+          width: PROFILE_PHOTO_LARGE_SIDE_PX,
         });
       });
     },
@@ -219,7 +258,8 @@ describeRls("foto de perfil contra seadragons-dev", () => {
           userId: owner.user.id,
           bytes: PNG_BYTES,
         });
-        const [ownerPhoto] = await listFolder(serviceClient, owner.user.id);
+        const ownerFiles = await listFolder(serviceClient, owner.user.id);
+        const [ownerPhoto] = ownerFiles;
 
         await withPhotoOwner(serviceClient, async (intruder) => {
           const bucket =
@@ -237,7 +277,7 @@ describeRls("foto de perfil contra seadragons-dev", () => {
           expect(download.error).not.toBeNull();
         });
         await expect(listFolder(serviceClient, owner.user.id)).resolves.toEqual(
-          [ownerPhoto],
+          ownerFiles,
         );
       });
     },
