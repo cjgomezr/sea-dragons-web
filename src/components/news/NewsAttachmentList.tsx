@@ -34,10 +34,15 @@ export function NewsAttachmentList({
   readonly attachments: readonly NewsAttachmentSummary[];
 }): React.JSX.Element {
   const [notice, setNotice] = useState<DownloadNotice | null>(null);
+  // El adjunto cuya dirección se está pidiendo: un segundo toque no pide otra
+  // ni navega dos veces.
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
   async function download(attachmentId: string): Promise<void> {
     setNotice(null);
+    setPendingId(attachmentId);
     const outcome = await requestNewsAttachment(postId, attachmentId);
+    setPendingId(null);
     if (outcome.kind === "failed") {
       setNotice({ kind: "failed", failure: outcome });
       return;
@@ -62,6 +67,7 @@ export function NewsAttachmentList({
               type="button"
               className="news-attachment"
               onClick={() => void download(attachment.id)}
+              disabled={pendingId === attachment.id}
             >
               <AttachmentIcon />
               <span className="visually-hidden">

@@ -7998,18 +7998,36 @@ test.describe("noticias en el navegador", () => {
 
     await expect(page.getByText("<b>Bring fins.</b>")).toBeVisible();
     await expect(page.locator("article b")).toHaveCount(0);
-    const lineHeights = await page
+    // "Final" empieza tras un salto y "Training" tras una línea en blanco.
+    // Sólo con los saltos respetados queda entre las dos un renglón vacío:
+    // colapsados, "Training" iría en la misma línea o en la siguiente.
+    const layout = await page
       .getByText(/Final eight confirmed/)
       .evaluate((body) => {
-        const range = document.createRange();
-        range.selectNodeContents(body);
-        const tops = new Set(
-          [...range.getClientRects()].map((rect) => Math.round(rect.top)),
-        );
-        return tops.size;
+        const text = body.firstChild;
+        if (text === null) {
+          throw new Error("El cuerpo no tiene texto.");
+        }
+        const wordRect = (word: string): DOMRect => {
+          const start = (text.textContent ?? "").indexOf(word);
+          const range = document.createRange();
+          range.setStart(text, start);
+          range.setEnd(text, start + word.length);
+          return range.getBoundingClientRect();
+        };
+        return {
+          bodyLeft: body.getBoundingClientRect().left,
+          lineHeight: parseFloat(getComputedStyle(body).lineHeight),
+          final: wordRect("Final"),
+          training: wordRect("Training"),
+          brisbane: wordRect("Brisbane."),
+        };
       });
-    // Tres líneas escritas y una en blanco: al menos cuatro alturas distintas.
-    expect(lineHeights).toBeGreaterThanOrEqual(3);
+    expect(Math.round(layout.final.left)).toBe(Math.round(layout.bodyLeft));
+    expect(layout.final.top).toBeGreaterThan(layout.brisbane.top);
+    expect(layout.training.top - layout.final.top).toBeGreaterThanOrEqual(
+      1.5 * layout.lineHeight,
+    );
   });
 
   test("pulsar un adjunto pide su dirección firmada y navega a ella", async ({

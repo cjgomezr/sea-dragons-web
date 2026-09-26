@@ -132,7 +132,7 @@ describe("publicación abierta", () => {
     );
   });
 
-  it("respeta los saltos de línea del cuerpo", async () => {
+  it("pinta el cuerpo tal cual, con sus saltos de línea", async () => {
     stubApi();
 
     await renderPost();
@@ -141,7 +141,6 @@ describe("publicación abierta", () => {
     expect(body.textContent).toContain(
       "buddy-check policy.\nSignature required.\n\nThanks",
     );
-    expect(body).toHaveClass("news-post-body");
   });
 
   it("enseña las etiquetas HTML del cuerpo como texto, sin interpretarlas", async () => {
@@ -239,6 +238,54 @@ describe("publicación abierta", () => {
     expect(screen.getByText(/Edited 20 September 2026/)).toBeInTheDocument();
   });
 
+  it("marca como retirada la que su autor abre después de retirarla", async () => {
+    stubPost({ ...POST, status: "withdrawn" });
+
+    await renderPost();
+
+    expect(screen.getByText("Withdrawn")).toBeInTheDocument();
+  });
+
+  it("una publicación vigente no lleva la marca de retirada", async () => {
+    stubApi();
+
+    await renderPost();
+
+    expect(screen.queryByText("Withdrawn")).not.toBeInTheDocument();
+  });
+
+  it("mientras pide la dirección, el adjunto no se puede volver a pulsar", async () => {
+    let answer: (response: Response) => void = () => undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url === POST_PATH
+          ? jsonResponse(200, { data: POST })
+          : new Promise<Response>((resolve) => {
+              answer = resolve;
+            }),
+      ),
+    );
+    const user = userEvent.setup();
+    await renderPost();
+    const button = screen.getByRole("button", {
+      name: /Download reglamento\.pdf/,
+    });
+
+    await user.click(button);
+
+    expect(button).toBeDisabled();
+    answer(
+      download({
+        status: "available",
+        fileName: "reglamento.pdf",
+        url: SIGNED_URL,
+      }),
+    );
+    await vi.waitFor(() => expect(startDownload).toHaveBeenCalledTimes(1));
+    expect(button).toBeEnabled();
+  });
+
   it("una publicación sin editar no lo menciona", async () => {
     stubApi();
 
@@ -275,6 +322,22 @@ describe("publicación abierta", () => {
       "href",
       "/noticias",
     );
+  });
+
+  it("un id con barras no sale del camino de la publicación", async () => {
+    const requested: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requested.push(url);
+        return notFound();
+      }),
+    );
+
+    render(<NewsPostScreen locale="en" postId="../directory" />);
+    await screen.findByRole("heading", { level: 1 });
+
+    expect(requested).toEqual(["/api/v1/news/..%2Fdirectory"]);
   });
 
   it("un fallo de red al abrirla lo dice y deja reintentar", async () => {

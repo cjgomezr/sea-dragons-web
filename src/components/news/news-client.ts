@@ -115,7 +115,9 @@ export async function loadNewsFeed(
 
 export async function loadNewsPost(postId: string): Promise<NewsPostLoad> {
   const read = readApiPayload(
-    await requestApi(NEWS_POST_API_PATH.replace("[id]", postId)),
+    await requestApi(
+      NEWS_POST_API_PATH.replace("[id]", encodeURIComponent(postId)),
+    ),
     postResponseSchema,
   );
   return read.kind === "failed"
@@ -129,10 +131,10 @@ export async function requestNewsAttachment(
   postId: string,
   attachmentId: string,
 ): Promise<NewsAttachmentRequest> {
-  const path = NEWS_ATTACHMENT_API_PATH.replace("[id]", postId).replace(
-    "[attachmentId]",
-    attachmentId,
-  );
+  const path = NEWS_ATTACHMENT_API_PATH.replace(
+    "[id]",
+    encodeURIComponent(postId),
+  ).replace("[attachmentId]", encodeURIComponent(attachmentId));
   const read = readApiPayload(await requestApi(path), downloadResponseSchema);
   return read.kind === "failed"
     ? read
