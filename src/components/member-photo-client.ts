@@ -23,7 +23,12 @@ export async function fetchLargeMemberPhoto(
   userId: string,
 ): Promise<LargePhotoResult> {
   const read = readApiPayload(
-    await requestApi(DIRECTORY_MEMBER_PHOTO_API_PATH.replace("[id]", userId)),
+    await requestApi(
+      DIRECTORY_MEMBER_PHOTO_API_PATH.replace(
+        "[id]",
+        encodeURIComponent(userId),
+      ),
+    ),
     largePhotoResponseSchema,
   );
   if (read.kind === "failed" || read.value.data.photoUrl === null) {
