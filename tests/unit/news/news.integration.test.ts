@@ -4,12 +4,14 @@ import { DEFAULT_CLUB_SLUG } from "@/lib/auth/supabase-auth-gateways";
 import { listNewsFeed } from "@/lib/news/news-feed";
 import {
   ForeignNewsGroupError,
-  type NewsGateways,
+  type NewsDraft,
   NewsPostNotFoundError,
+  type NewsPostDetail,
   openNewsPost,
-  publishNewsPost,
 } from "@/lib/news/news-posts";
-import { createNewsGateways } from "@/lib/news/supabase-news-gateways";
+import type { NewsAttachmentGateways } from "@/lib/news/news-attachments";
+import { publishNewsPostWithUploads } from "@/lib/news/news-uploads";
+import { createNewsAttachmentGateways } from "@/lib/news/supabase-news-attachment-gateways";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
   type ServiceRoleClient,
@@ -33,7 +35,7 @@ type SeededClub = {
   readonly squadMember: TestUser;
   readonly outsider: TestUser;
   readonly squadId: string;
-  readonly gateways: NewsGateways;
+  readonly gateways: NewsAttachmentGateways;
 };
 
 async function readClubId(serviceClient: ServiceRoleClient): Promise<string> {
@@ -132,7 +134,9 @@ async function withSeededClub<T>(
                     squadMember,
                     outsider,
                     squadId,
-                    gateways: createNewsGateways(serviceClient.client),
+                    gateways: createNewsAttachmentGateways(
+                      serviceClient.client,
+                    ),
                   }),
                 );
               },
@@ -143,6 +147,18 @@ async function withSeededClub<T>(
   );
 }
 
+/** Publicar sin adjuntos: el mismo camino que usa el endpoint (#330). */
+function publishWithoutAttachments(
+  gateways: NewsAttachmentGateways,
+  request: { readonly callerId: string; readonly draft: NewsDraft },
+): Promise<NewsPostDetail> {
+  return publishNewsPostWithUploads(gateways, {
+    ...request,
+    uploadIds: [],
+    now: new Date(),
+  });
+}
+
 describeRls("noticias contra seadragons-dev", () => {
   it(
     "una publicación dirigida a un grupo la ve un miembro de ese grupo y no la ve otro",
@@ -150,7 +166,7 @@ describeRls("noticias contra seadragons-dev", () => {
       const serviceClient = createServiceRoleTestClient(process.env);
 
       await withSeededClub(serviceClient, async (seeded) => {
-        const post = await publishNewsPost(seeded.gateways, {
+        const post = await publishWithoutAttachments(seeded.gateways, {
           callerId: seeded.admin.id,
           draft: {
             category: "announcement",
@@ -186,7 +202,7 @@ describeRls("noticias contra seadragons-dev", () => {
       const serviceClient = createServiceRoleTestClient(process.env);
 
       await withSeededClub(serviceClient, async (seeded) => {
-        const post = await publishNewsPost(seeded.gateways, {
+        const post = await publishWithoutAttachments(seeded.gateways, {
           callerId: seeded.admin.id,
           draft: {
             category: "document",
@@ -239,7 +255,7 @@ describeRls("noticias contra seadragons-dev", () => {
       const serviceClient = createServiceRoleTestClient(process.env);
 
       await withSeededClub(serviceClient, async (seeded) => {
-        const post = await publishNewsPost(seeded.gateways, {
+        const post = await publishWithoutAttachments(seeded.gateways, {
           callerId: seeded.admin.id,
           draft: {
             category: "news",
@@ -288,11 +304,11 @@ describeRls("noticias contra seadragons-dev", () => {
           body: "Cuerpo.",
           audience: { kind: "club" },
         } as const;
-        const older = await publishNewsPost(seeded.gateways, {
+        const older = await publishWithoutAttachments(seeded.gateways, {
           callerId: seeded.admin.id,
           draft: { ...draft, title: "La anterior" },
         });
-        const newer = await publishNewsPost(seeded.gateways, {
+        const newer = await publishWithoutAttachments(seeded.gateways, {
           callerId: seeded.admin.id,
           draft: { ...draft, title: "La siguiente" },
         });
@@ -317,7 +333,7 @@ describeRls("noticias contra seadragons-dev", () => {
 
       await withSeededClub(serviceClient, async (seeded) => {
         await expect(
-          publishNewsPost(seeded.gateways, {
+          publishWithoutAttachments(seeded.gateways, {
             callerId: seeded.admin.id,
             draft: {
               category: "news",

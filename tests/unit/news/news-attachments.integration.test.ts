@@ -9,7 +9,8 @@ import {
   removeNewsAttachment,
   serveNewsAttachment,
 } from "@/lib/news/news-attachments";
-import { type NewsPostDetail, publishNewsPost } from "@/lib/news/news-posts";
+import type { NewsPostDetail } from "@/lib/news/news-posts";
+import { publishNewsPostWithUploads } from "@/lib/news/news-uploads";
 import {
   NEWS_ATTACHMENTS_BUCKET,
   createNewsAttachmentGateways,
@@ -139,7 +140,9 @@ async function withSeededPost(
           memberRow(clubId, reader, "Player"),
         ],
         async () => {
-          const post = await publishNewsPost(gateways, {
+          const post = await publishNewsPostWithUploads(gateways, {
+            now: new Date(),
+            uploadIds: [],
             callerId: committee.id,
             draft: {
               category: "document",

@@ -304,14 +304,6 @@ export async function prepareNewsPost(
   };
 }
 
-export async function publishNewsPost(
-  gateways: NewsGateways,
-  request: { readonly callerId: string; readonly draft: NewsDraft },
-): Promise<NewsPostDetail> {
-  const post = await prepareNewsPost(gateways, request);
-  return toNewsPostDetail(await gateways.posts.insertPost(post));
-}
-
 /** Quien publicó ve siempre lo suyo, retirado incluido (RF-5). Los demás,
  * sólo lo publicado que va a todo el club o a alguno de sus grupos. */
 function isVisibleTo(

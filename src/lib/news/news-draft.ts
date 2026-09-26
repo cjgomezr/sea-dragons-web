@@ -2,7 +2,7 @@ import { NEWS_TITLE_MAX_LENGTH, type NewsDraft } from "./news-posts";
 
 /**
  * Lo que el formulario de publicar (#330) comprueba antes de mandar nada, con
- * la misma regla que el servidor aplica en `publishNewsPost` (#327). El
+ * la misma regla que el servidor aplica en `prepareNewsPost` (#327). El
  * servidor sigue siendo quien decide: esto sólo adelanta el aviso para
  * enseñarlo junto a su campo.
  */
