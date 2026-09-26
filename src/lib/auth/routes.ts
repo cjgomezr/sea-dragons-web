@@ -189,6 +189,13 @@ export const CLUB_SETTINGS_POSITIONS_ORDER_API_PATH = `${CLUB_SETTINGS_POSITIONS
  * no cuelga de la configuración del club, que es sólo del Admin. */
 export const CLUB_POSITIONS_API_PATH = "/api/v1/club/positions";
 
+/** La sección Noticias (#329). La alcanza cualquier cuenta activa: qué
+ * publicaciones enseña lo decide el endpoint del feed. */
+export const NEWS_PATH = "/noticias";
+
+/** Una publicación abierta (#329). `[id]` es el de la publicación. */
+export const NEWS_POST_PATH = `${NEWS_PATH}/[id]`;
+
 /** El feed de noticias (#327, RF-4 del PRD de E11). Lo alcanza cualquier
  * cuenta activa, de cualquier rol, así que no aparece en
  * `RESTRICTED_ROUTES`: qué publicaciones ve cada uno lo decide el servidor

@@ -7644,3 +7644,461 @@ test.describe("el acento del club sobre la aplicación", () => {
     await context.close();
   });
 });
+
+/* ---------------------------------------------------------------------------
+   Noticias (#329): el feed y la publicación abierta. Mockup del feed:
+   docs/mockups/news-light.png, news-dark.png y sus versiones móviles. La
+   publicación abierta no tiene mockup: se revisa contra design-system.md.
+
+   Las capturas leen datos fijos, servidos por `page.route`, como el
+   directorio: lo publicado de verdad cambia con cada test que publique. Lo
+   que el endpoint responde se prueba aparte, contra la base (#327).
+   --------------------------------------------------------------------------- */
+
+const NEWS_SCREEN_PATH = "/noticias";
+const NEWS_FEED_ENDPOINT = "/api/v1/news";
+const NEWS_POST_ID = "a0a0a0a0-0000-4000-8000-0000000000a1";
+const NEWS_POST_WITHOUT_ATTACHMENTS_ID = "a0a0a0a0-0000-4000-8000-0000000000a2";
+const NEWS_FOREIGN_POST_ID = "a0a0a0a0-0000-4000-8000-0000000000a3";
+const NEWS_AUTHOR = {
+  id: "11111111-0000-4000-8000-000000000011",
+  fullName: "Sofía Castro Echeverri",
+};
+const NEWS_NARROW_WIDTHS = [320, 375, 768] as const;
+
+/** Las tres categorías, una con un título que parte en dos líneas a 375px, y
+ * adjuntos en dos de ellas. Hace cuánto se cuenta desde ahora, así que la
+ * fila dice siempre lo mismo. */
+const STUBBED_FEED_POSTS = [
+  {
+    id: NEWS_POST_ID,
+    category: "announcement",
+    title: "Nationals squad shortlist announced for the August championships",
+    excerpt:
+      "Twelve Seadragons named in the extended squad for the August nationals in Brisbane. Final eight confirmed after trials.",
+    author: NEWS_AUTHOR,
+    publishedAt: hoursAgo(49),
+    attachmentCount: 1,
+  },
+  {
+    id: NEWS_POST_WITHOUT_ATTACHMENTS_ID,
+    category: "news",
+    title: "Winter training schedule is live",
+    excerpt:
+      "Two sessions a week through July: Tuesdays at MSAC, Thursdays at Fitzroy.",
+    author: {
+      id: "22222222-0000-4000-8000-000000000022",
+      fullName: "Liam O'Connor",
+    },
+    publishedAt: hoursAgo(97),
+    attachmentCount: 0,
+  },
+  {
+    id: "a0a0a0a0-0000-4000-8000-0000000000a4",
+    category: "document",
+    title: "Updated pool safety and dive policy",
+    excerpt:
+      "Please review the revised buddy-check and equipment policy before the next session.",
+    author: NEWS_AUTHOR,
+    publishedAt: hoursAgo(24 * 8),
+    attachmentCount: 2,
+  },
+] as const;
+
+/** Fechas fijas: la publicación abierta las escribe enteras, no relativas. */
+const STUBBED_POST = {
+  id: NEWS_POST_ID,
+  category: "announcement",
+  title: STUBBED_FEED_POSTS[0].title,
+  body: "Twelve Seadragons named in the extended squad for the August nationals in Brisbane.\nFinal eight confirmed after trials.\n\nTraining for the squad starts on Tuesday. <b>Bring fins.</b>",
+  author: NEWS_AUTHOR,
+  publishedAt: "2026-09-15T08:00:00.000Z",
+  editedAt: "2026-09-16T01:30:00.000Z",
+  status: "published",
+  attachments: [
+    {
+      id: "d0d0d0d0-0000-4000-8000-0000000000d1",
+      fileName: "reglamento-seleccion-nacional-2026.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 2_516_582,
+    },
+    {
+      id: "d0d0d0d0-0000-4000-8000-0000000000d2",
+      fileName: "mapa-piscina.png",
+      contentType: "image/png",
+      sizeBytes: 245_760,
+    },
+  ],
+} as const;
+
+const STUBBED_POST_WITHOUT_ATTACHMENTS = {
+  ...STUBBED_POST,
+  id: NEWS_POST_WITHOUT_ATTACHMENTS_ID,
+  category: "news",
+  title: STUBBED_FEED_POSTS[1].title,
+  body: "Two sessions a week through July.\nTuesdays at MSAC, Thursdays at Fitzroy.",
+  editedAt: null,
+  attachments: [],
+} as const;
+
+function jsonBody(data: unknown): {
+  status: number;
+  contentType: string;
+  body: string;
+} {
+  return {
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ data }),
+  };
+}
+
+/** El feed y las publicaciones, con el mismo contrato que #327. La de otro
+ * grupo responde 404, como la que no existe. */
+async function stubNewsReads(
+  page: Page,
+  feed: readonly unknown[],
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === NEWS_FEED_ENDPOINT,
+    (route) =>
+      route.fulfill(
+        jsonBody({
+          posts: feed,
+          nextCursor: feed.length > 0 ? "pagina-2" : null,
+        }),
+      ),
+  );
+  await page.route(
+    (url) => url.pathname.startsWith(`${NEWS_FEED_ENDPOINT}/`),
+    (route, request) => {
+      const { pathname } = new URL(request.url());
+      if (pathname.endsWith(NEWS_POST_ID)) {
+        return route.fulfill(jsonBody(STUBBED_POST));
+      }
+      if (pathname.endsWith(NEWS_POST_WITHOUT_ATTACHMENTS_ID)) {
+        return route.fulfill(jsonBody(STUBBED_POST_WITHOUT_ATTACHMENTS));
+      }
+      return route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: { code: "not_found", message: "La publicación no existe." },
+        }),
+      });
+    },
+  );
+}
+
+type NewsState = {
+  readonly name: string;
+  readonly path: string;
+  readonly feed: readonly unknown[];
+  readonly heading: RegExp;
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+  /** Lo que tiene que estar a la vista para que la pantalla haya cargado. */
+  readonly ready: (page: Page) => Promise<void>;
+};
+
+async function waitForFeedRows(page: Page): Promise<void> {
+  await expect(
+    page.getByRole("link", { name: STUBBED_FEED_POSTS[0].title }),
+  ).toBeVisible();
+}
+
+async function waitForEmptyFeed(page: Page): Promise<void> {
+  await expect(
+    page.getByText(/Nothing has been published|Todavía no hay nada publicado/),
+  ).toBeVisible();
+}
+
+async function waitForPost(page: Page): Promise<void> {
+  await expect(page.getByRole("heading", { level: 1 })).not.toHaveText(/^$/);
+  await expect(
+    page.getByText(/Loading the post|Cargando la publicación/),
+  ).toHaveCount(0);
+}
+
+const FEED_HEADING = /Club feed|Novedades del club/;
+const postPath = (id: string): string => `${NEWS_SCREEN_PATH}/${id}`;
+
+const FEED_WITH_POSTS: NewsState = {
+  name: "noticias-con-publicaciones",
+  path: NEWS_SCREEN_PATH,
+  feed: STUBBED_FEED_POSTS,
+  heading: FEED_HEADING,
+  ready: waitForFeedRows,
+};
+
+const POST_WITH_ATTACHMENTS: NewsState = {
+  name: "publicacion-con-adjuntos",
+  path: postPath(NEWS_POST_ID),
+  feed: [],
+  heading: new RegExp(STUBBED_POST.title),
+  ready: waitForPost,
+};
+
+const NEWS_STATES: readonly NewsState[] = [
+  FEED_WITH_POSTS,
+  {
+    name: "noticias-con-publicaciones-es",
+    path: NEWS_SCREEN_PATH,
+    feed: STUBBED_FEED_POSTS,
+    heading: FEED_HEADING,
+    beforeVisit: chooseSpanish,
+    ready: waitForFeedRows,
+  },
+  {
+    name: "noticias-vacio",
+    path: NEWS_SCREEN_PATH,
+    feed: [],
+    heading: FEED_HEADING,
+    ready: waitForEmptyFeed,
+  },
+  {
+    name: "noticias-vacio-es",
+    path: NEWS_SCREEN_PATH,
+    feed: [],
+    heading: FEED_HEADING,
+    beforeVisit: chooseSpanish,
+    ready: waitForEmptyFeed,
+  },
+  POST_WITH_ATTACHMENTS,
+  {
+    name: "publicacion-con-adjuntos-es",
+    path: postPath(NEWS_POST_ID),
+    feed: [],
+    heading: new RegExp(STUBBED_POST.title),
+    beforeVisit: chooseSpanish,
+    ready: waitForPost,
+  },
+  {
+    name: "publicacion-sin-adjuntos",
+    path: postPath(NEWS_POST_WITHOUT_ATTACHMENTS_ID),
+    feed: [],
+    heading: new RegExp(STUBBED_POST_WITHOUT_ATTACHMENTS.title),
+    ready: waitForPost,
+  },
+  {
+    name: "publicacion-no-existe",
+    path: postPath(NEWS_FOREIGN_POST_ID),
+    feed: [],
+    heading: /This post doesn't exist/,
+    ready: waitForPost,
+  },
+];
+
+async function goToNews(
+  page: Page,
+  state: NewsState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await stubNewsReads(page, state.feed);
+  await state.beforeVisit?.(page);
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${state.path}`);
+  } else {
+    await goToWithTheme(page, state.path, theme);
+  }
+  await expect(
+    page.getByRole("heading", { level: 1, name: state.heading }),
+  ).toBeVisible();
+  await state.ready(page);
+}
+
+for (const state of NEWS_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToNews(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of NEWS_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToNews(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToNews(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("noticias en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("a 375px ninguna palabra del feed se parte entre dos líneas", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToNews(page, FEED_WITH_POSTS);
+
+    // Cada palabra, medida con un Range: si ocupa más de un rectángulo, el
+    // navegador la partió al final de una línea.
+    const splitWords = await page.evaluate(() => {
+      const list = document.querySelector("ul[aria-labelledby]");
+      if (list === null) {
+        throw new Error("No está la lista del feed.");
+      }
+      const walker = document.createTreeWalker(list, NodeFilter.SHOW_TEXT);
+      const split: string[] = [];
+      for (
+        let node = walker.nextNode();
+        node !== null;
+        node = walker.nextNode()
+      ) {
+        const text = node.textContent ?? "";
+        for (const match of text.matchAll(/\S+/g)) {
+          const range = document.createRange();
+          range.setStart(node, match.index);
+          range.setEnd(node, match.index + match[0].length);
+          if (range.getClientRects().length > 1) {
+            split.push(match[0]);
+          }
+        }
+      }
+      return split;
+    });
+
+    expect(splitWords).toEqual([]);
+  });
+
+  test("el cuerpo respeta los saltos de línea y enseña el HTML como texto", async ({
+    page,
+  }) => {
+    await goToNews(page, POST_WITH_ATTACHMENTS);
+
+    await expect(page.getByText("<b>Bring fins.</b>")).toBeVisible();
+    await expect(page.locator("article b")).toHaveCount(0);
+    // "Final" empieza tras un salto y "Training" tras una línea en blanco.
+    // Sólo con los saltos respetados queda entre las dos un renglón vacío:
+    // colapsados, "Training" iría en la misma línea o en la siguiente.
+    const layout = await page
+      .getByText(/Final eight confirmed/)
+      .evaluate((body) => {
+        const text = body.firstChild;
+        if (text === null) {
+          throw new Error("El cuerpo no tiene texto.");
+        }
+        const wordRect = (word: string): DOMRect => {
+          const start = (text.textContent ?? "").indexOf(word);
+          const range = document.createRange();
+          range.setStart(text, start);
+          range.setEnd(text, start + word.length);
+          return range.getBoundingClientRect();
+        };
+        return {
+          bodyLeft: body.getBoundingClientRect().left,
+          lineHeight: parseFloat(getComputedStyle(body).lineHeight),
+          final: wordRect("Final"),
+          training: wordRect("Training"),
+          brisbane: wordRect("Brisbane."),
+        };
+      });
+    expect(Math.round(layout.final.left)).toBe(Math.round(layout.bodyLeft));
+    expect(layout.final.top).toBeGreaterThan(layout.brisbane.top);
+    expect(layout.training.top - layout.final.top).toBeGreaterThanOrEqual(
+      1.5 * layout.lineHeight,
+    );
+  });
+
+  test("pulsar un adjunto pide su dirección firmada y navega a ella", async ({
+    page,
+  }) => {
+    const signedUrl = "https://archivos.test/reglamento.pdf?token=firmado";
+    await page.route(signedUrl, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: "%PDF",
+      }),
+    );
+    await goToNews(page, POST_WITH_ATTACHMENTS);
+    await page.route(
+      (url) => url.pathname.includes("/attachments/"),
+      (route) =>
+        route.fulfill(
+          jsonBody({
+            status: "available",
+            fileName: STUBBED_POST.attachments[0].fileName,
+            url: signedUrl,
+          }),
+        ),
+    );
+
+    const requested = page.waitForRequest(signedUrl);
+    await page
+      .getByRole("button", { name: /Download reglamento-seleccion-nacional/ })
+      .click();
+
+    expect((await requested).url()).toBe(signedUrl);
+  });
+
+  test("cargar más añade la página siguiente debajo sin mover lo que ya se leía", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToNews(page, FEED_WITH_POSTS);
+    // La ruta que se registra después gana: la segunda página es otra.
+    await page.route(
+      (url) => url.pathname === NEWS_FEED_ENDPOINT,
+      (route) =>
+        route.fulfill(
+          jsonBody({
+            posts: [
+              {
+                ...STUBBED_FEED_POSTS[2],
+                id: "a0a0a0a0-0000-4000-8000-0000000000b1",
+                title: "Geelong friendly match recap",
+              },
+            ],
+            nextCursor: null,
+          }),
+        ),
+    );
+    await page.getByRole("button", { name: "Load more" }).click();
+
+    await expect(
+      page.getByRole("link", { name: "Geelong friendly match recap" }),
+    ).toBeFocused();
+    await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(
+      0,
+    );
+    const titles = await page
+      .getByRole("list", { name: FEED_HEADING })
+      .getByRole("link")
+      .allTextContents();
+    expect(titles).toEqual([
+      ...STUBBED_FEED_POSTS.map((post) => post.title),
+      "Geelong friendly match recap",
+    ]);
+  });
+});

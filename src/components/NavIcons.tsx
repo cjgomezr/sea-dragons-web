@@ -184,3 +184,13 @@ export const NAV_SECTION_ICONS: Record<NavIconId, () => React.JSX.Element> = {
   pagos: PagosIcon,
   grupos: GruposIcon,
 };
+
+/** Tampoco es de sección: marca los adjuntos de una publicación (#329), en
+ * el feed y en la publicación abierta. */
+export function AttachmentIcon(): React.JSX.Element {
+  return (
+    <IconBase>
+      <path d="m20 11.5-7.8 7.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8" />
+    </IconBase>
+  );
+}
