@@ -34,8 +34,8 @@ export function NewsAttachmentList({
   readonly attachments: readonly NewsAttachmentSummary[];
 }): React.JSX.Element {
   const [notice, setNotice] = useState<DownloadNotice | null>(null);
-  // El adjunto cuya dirección se está pidiendo: un segundo toque no pide otra
-  // ni navega dos veces.
+  // El adjunto cuya dirección se está pidiendo. Se desactiva sólo ese botón:
+  // otro toque en él no pide otra dirección ni navega dos veces.
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   async function download(attachmentId: string): Promise<void> {
