@@ -87,6 +87,16 @@ describe("detectFileType", () => {
     expect(detectFileType(zip)).toBeNull();
   });
 
+  it("no reconoce un ZIP con una carpeta que sólo acaba en word/", () => {
+    const zip = Uint8Array.from([
+      ...ZIP_SIGNATURE,
+      ...new Array<number>(26).fill(0),
+      ...ascii("password/claves.txt"),
+    ]);
+
+    expect(detectFileType(zip)).toBeNull();
+  });
+
   it("no reconoce un documento de Office que no es un Word", () => {
     const spreadsheet = Uint8Array.from([
       ...OLE_SIGNATURE,

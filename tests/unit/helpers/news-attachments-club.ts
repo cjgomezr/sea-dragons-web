@@ -26,6 +26,7 @@ export type FakeAttachmentClubOptions = FakeClubOptions & {
   readonly attachments?: readonly StoredAttachment[];
   readonly storedFiles?: readonly string[];
   readonly failInsert?: boolean;
+  readonly failRemove?: boolean;
 };
 
 export type FakeAttachmentClub = {
@@ -81,6 +82,9 @@ export function fakeAttachmentClub(
         files.add(path);
       },
       remove: async (paths) => {
+        if (options.failRemove === true) {
+          throw new Error("Storage no responde");
+        }
         for (const path of paths) {
           files.delete(path);
         }

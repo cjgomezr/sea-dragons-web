@@ -58,9 +58,10 @@ const WEBP_SIGNATURE = asciiCodes("WEBP");
 const WEBP_SIGNATURE_OFFSET = 8;
 const PDF_SIGNATURE = asciiCodes("%PDF-");
 /** Un .docx es un ZIP; lo que lo distingue de cualquier otro ZIP es la
- * carpeta `word/`, cuyo nombre va sin comprimir en las cabeceras. */
+ * entrada `word/document.xml`, cuyo nombre va sin comprimir en las
+ * cabeceras. Buscar sólo `word/` confundiría una carpeta `password/`. */
 const ZIP_SIGNATURE = [0x50, 0x4b, 0x03, 0x04];
-const DOCX_MARKER = asciiCodes("word/");
+const DOCX_MARKER = asciiCodes("word/document.xml");
 /** Un .doc es un documento compuesto de OLE, igual que un .xls; lo que lo
  * distingue es su flujo `WordDocument`, nombrado en UTF-16. */
 const OLE_SIGNATURE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];

@@ -188,7 +188,9 @@ function validateFileBytes(
 }
 
 /** La publicación de quien llama, si puede publicar y es su autor. Una
- * publicación ajena responde como una que no existe, igual que al abrirla. */
+ * publicación ajena responde como una que no existe, igual que al abrirla.
+ * Una retirada también: sus adjuntos ya no se sirven a nadie, así que
+ * subirle o quitarle uno no tiene sentido. */
 async function findOwnPost(
   gateways: NewsAttachmentGateways,
   request: { readonly callerId: string; readonly postId: string },
@@ -201,7 +203,11 @@ async function findOwnPost(
     clubId: caller.clubId,
     postId: request.postId,
   });
-  if (post === null || post.author.id !== request.callerId) {
+  if (
+    post === null ||
+    post.author.id !== request.callerId ||
+    post.status === "withdrawn"
+  ) {
     throw new NewsPostNotFoundError();
   }
   return post;
@@ -234,8 +240,25 @@ async function storeAttachment(
   try {
     return await gateways.attachments.insertAttachment(attachment);
   } catch (error) {
-    await gateways.storage.remove([attachment.storagePath]);
+    await removeOrphanFile(gateways, attachment.storagePath);
     throw error;
+  }
+}
+
+/** Si tampoco se puede borrar el fichero, queda registrado con su ruta para
+ * limpiarlo a mano, y quien subió recibe el motivo de verdad (el límite, por
+ * ejemplo) y no el de la limpieza. */
+async function removeOrphanFile(
+  gateways: NewsAttachmentGateways,
+  storagePath: string,
+): Promise<void> {
+  try {
+    await gateways.storage.remove([storagePath]);
+  } catch (cleanupError) {
+    console.error(
+      `[news-attachments] quedó sin borrar el adjunto huérfano ${storagePath}`,
+      cleanupError,
+    );
   }
 }
 

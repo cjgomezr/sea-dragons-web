@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   NEWS_ATTACHMENT_MAX_BYTES,
   NEWS_ATTACHMENTS_MAX_PER_POST,
@@ -37,7 +37,6 @@ import {
 
 const POST_ID = "d3d3d3d3-0000-4000-8000-00000000000d";
 const ATTACHMENT_ID = attachmentIdFor(1);
-const STORAGE_PATH = `${CLUB_ID}/${POST_ID}/aaaa.pdf`;
 
 const PDF_BYTES = Uint8Array.from(Buffer.from("%PDF-1.7\n1 0 obj"));
 const PNG_BYTES = Uint8Array.from([
@@ -106,6 +105,10 @@ async function expectRejection(
   expect(error).toBeInstanceOf(NewsAttachmentValidationError);
   expect((error as NewsAttachmentValidationError).code).toBe(code);
 }
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("adjuntos", () => {
   it.each([
@@ -257,6 +260,28 @@ describe("adjuntos", () => {
     );
   });
 
+  it("si tampoco se puede borrar el archivo, responde el motivo de verdad y no el de la limpieza", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const club = clubWithPost({}, { failRemove: true });
+    for (let index = 1; index <= NEWS_ATTACHMENTS_MAX_PER_POST; index += 1) {
+      club.rows.push(storedAttachment(index));
+    }
+
+    await expectRejection(
+      upload(club, { fileName: "acta.pdf", bytes: PDF_BYTES }),
+      "attachment_limit_reached",
+    );
+  });
+
+  it("responde que no existe a quien sube en una publicación retirada", async () => {
+    const club = clubWithPost({ status: "withdrawn" });
+
+    await expect(
+      upload(club, { fileName: "acta.pdf", bytes: PDF_BYTES }),
+    ).rejects.toBeInstanceOf(NewsPostNotFoundError);
+    expect(club.files.size).toBe(0);
+  });
+
   it("responde que no existe a quien sube en una publicación de otro", async () => {
     const club = clubWithPost({
       author: { id: AUTHOR_ID, fullName: "Otra persona" },
@@ -386,10 +411,7 @@ describe("servir un adjunto", () => {
   });
 
   it("el archivo que falta en el almacenamiento se reporta como no disponible", async () => {
-    const club = clubWithPost(
-      {},
-      { attachmentCount: 1, storedFiles: [STORAGE_PATH] },
-    );
+    const club = clubWithPost({}, { attachmentCount: 1, storedFiles: [] });
 
     await expect(serve(club)).resolves.toEqual({
       status: "unavailable",
