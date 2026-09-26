@@ -175,6 +175,18 @@ function isVisible(
   return matchesSearch(record, query.search);
 }
 
+/** Si quien pregunta ve a este socio en el directorio cuando pide todo lo que
+ * su rol le deja pedir. La foto grande de un socio (#353) sigue esta regla. */
+export function canSeeInDirectory(
+  record: DirectoryMemberRecord,
+  callerRole: Role,
+): boolean {
+  return isVisible(record, {
+    ...DEFAULT_DIRECTORY_QUERY,
+    includeInactive: hasCapability(callerRole, "manageUsersAndRoles"),
+  });
+}
+
 function withDirection(
   comparison: number,
   direction: DirectoryDirection,

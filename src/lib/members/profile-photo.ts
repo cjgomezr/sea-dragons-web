@@ -11,8 +11,12 @@ import type { AccountStatus } from "@/lib/auth/account-status";
  * ni el correo ni el nombre de nadie, y la foto nueva no pisa la anterior
  * hasta que ya quedó apuntada en la ficha.
  *
- * Lo que se guarda no es lo que se sube, sino una versión reducida (#271):
- * así el directorio no gasta el tráfico de salida del plan de Supabase.
+ * Lo que se guarda no es lo que se sube, sino dos versiones reducidas (#271,
+ * #353): así el directorio no gasta el tráfico de salida del plan de
+ * Supabase. Las dos comparten nombre y se distinguen por el sufijo
+ * (`<id>-thumb.webp`, `<id>-large.webp`). La ficha apunta a la miniatura, que
+ * es lo que piden el directorio y el perfil, y la ruta de la grande se deduce
+ * de ella: no hace falta otra columna.
  */
 
 /** 2 MB: una foto de móvil recién sacada cabe si es JPEG o WebP, y el
@@ -47,6 +51,24 @@ const FILE_EXTENSIONS: Readonly<Record<ProfilePhotoType, string>> = {
   "image/webp": "webp",
 };
 
+const THUMBNAIL_SUFFIX = "-thumb";
+const LARGE_SUFFIX = "-large";
+
+/** El sufijo de la miniatura justo antes de la extensión, y nada después. */
+const THUMBNAIL_NAME = new RegExp(`${THUMBNAIL_SUFFIX}(\\.[a-z]+)$`);
+
+/** Dónde está la versión grande de la foto que apunta la ficha. Una foto
+ * subida antes de #353 no lleva sufijo porque sólo tiene un tamaño (400 px):
+ * su grande es ella misma, y quien la abre la ve sin error. */
+export function largePhotoPathOf(photoPath: string): string {
+  return photoPath.replace(THUMBNAIL_NAME, `${LARGE_SUFFIX}$1`);
+}
+
+/** Todos los ficheros de una foto, para borrarlos juntos. */
+function photoFilesOf(photoPath: string): readonly string[] {
+  return [...new Set([photoPath, largePhotoPathOf(photoPath)])];
+}
+
 export class ProfilePhotoValidationError extends Error {
   readonly code: ProfilePhotoIssueCode;
 
@@ -66,13 +88,20 @@ export class AccountNotOperatingError extends Error {
   }
 }
 
-/** La foto reducida que se guarda, o la señal de que los bytes empiezan como
- * una imagen admitida pero no se pueden decodificar. */
+/** Una de las dos versiones reducidas que se guardan. */
+export type PhotoVersion = {
+  readonly bytes: Uint8Array;
+  readonly type: ProfilePhotoType;
+};
+
+/** Las dos versiones de la foto (#353): la miniatura de las listas y la
+ * grande que sólo se descarga al abrirla. O la señal de que los bytes empiezan
+ * como una imagen admitida pero no se pueden decodificar. */
 export type ShrunkPhoto =
   | {
       readonly kind: "shrunk";
-      readonly bytes: Uint8Array;
-      readonly type: ProfilePhotoType;
+      readonly thumbnail: PhotoVersion;
+      readonly large: PhotoVersion;
     }
   | { readonly kind: "undecodable" };
 
@@ -93,7 +122,7 @@ export type ProfilePhotoGateways = {
       bytes: Uint8Array,
       type: ProfilePhotoType,
     ): Promise<void>;
-    remove(photoPath: string): Promise<void>;
+    remove(photoPaths: readonly string[]): Promise<void>;
   };
   readonly signing: {
     /** Null cuando Storage no la pudo firmar (el fichero ya no está): quien
@@ -176,13 +205,56 @@ function validatePhotoBytes(bytes: Uint8Array): void {
 async function shrinkValidPhoto(
   gateways: ProfilePhotoGateways,
   bytes: Uint8Array,
-): Promise<{ readonly bytes: Uint8Array; readonly type: ProfilePhotoType }> {
+): Promise<Extract<ShrunkPhoto, { readonly kind: "shrunk" }>> {
   validatePhotoBytes(bytes);
   const shrunk = await gateways.images.shrinkPhoto(bytes);
   if (shrunk.kind === "undecodable") {
     throw new ProfilePhotoValidationError("photo_type_unsupported");
   }
   return shrunk;
+}
+
+function versionPath(
+  userId: string,
+  fileId: string,
+  { suffix, version }: { suffix: string; version: PhotoVersion },
+): string {
+  return `${userId}/${fileId}${suffix}.${FILE_EXTENSIONS[version.type]}`;
+}
+
+/** Sube las dos versiones y devuelve la ruta de la miniatura. Si la grande
+ * no sube, se borra la miniatura: o quedan las dos, o ninguna. */
+async function uploadPhotoVersions(
+  gateways: ProfilePhotoGateways,
+  userId: string,
+  photo: Extract<ShrunkPhoto, { readonly kind: "shrunk" }>,
+): Promise<string> {
+  const fileId = gateways.newFileId();
+  const thumbnailPath = versionPath(userId, fileId, {
+    suffix: THUMBNAIL_SUFFIX,
+    version: photo.thumbnail,
+  });
+  const largePath = versionPath(userId, fileId, {
+    suffix: LARGE_SUFFIX,
+    version: photo.large,
+  });
+
+  await gateways.storage.upload(
+    thumbnailPath,
+    photo.thumbnail.bytes,
+    photo.thumbnail.type,
+  );
+  try {
+    await gateways.storage.upload(
+      largePath,
+      photo.large.bytes,
+      photo.large.type,
+    );
+  } catch (error) {
+    await gateways.storage.remove([thumbnailPath]);
+    throw error;
+  }
+  return thumbnailPath;
 }
 
 async function findOperatingOwner(
@@ -226,13 +298,12 @@ export async function replaceProfilePhoto(
 ): Promise<ProfilePhoto> {
   const owner = await findOperatingOwner(gateways, request.userId);
   const photo = await shrinkValidPhoto(gateways, request.bytes);
-  const photoPath = `${request.userId}/${gateways.newFileId()}.${FILE_EXTENSIONS[photo.type]}`;
+  const photoPath = await uploadPhotoVersions(gateways, request.userId, photo);
 
-  await gateways.storage.upload(photoPath, photo.bytes, photo.type);
   try {
     await gateways.members.savePhotoPath(request.userId, photoPath);
   } catch (error) {
-    await gateways.storage.remove(photoPath);
+    await gateways.storage.remove(photoFilesOf(photoPath));
     throw error;
   }
   if (owner.photoPath !== null) {
@@ -250,7 +321,7 @@ async function removeReplacedPhoto(
   photoPath: string,
 ): Promise<void> {
   try {
-    await gateways.storage.remove(photoPath);
+    await gateways.storage.remove(photoFilesOf(photoPath));
   } catch (error) {
     console.error(
       `[profile-photo] quedó sin borrar la foto reemplazada ${photoPath}`,
@@ -259,9 +330,9 @@ async function removeReplacedPhoto(
   }
 }
 
-/** Deja la ficha sin foto y después borra el fichero. En ese orden, un fallo
- * a mitad deja a lo sumo un fichero que nadie enseña, nunca una ficha que
- * apunta a nada. */
+/** Deja la ficha sin foto y después borra sus ficheros. En ese orden, un
+ * fallo a mitad deja a lo sumo un fichero que nadie enseña, nunca una ficha
+ * que apunta a nada. */
 export async function removeProfilePhoto(
   gateways: ProfilePhotoGateways,
   userId: string,
@@ -271,5 +342,5 @@ export async function removeProfilePhoto(
     return;
   }
   await gateways.members.savePhotoPath(userId, null);
-  await gateways.storage.remove(owner.photoPath);
+  await gateways.storage.remove(photoFilesOf(owner.photoPath));
 }

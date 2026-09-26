@@ -7,6 +7,7 @@ import {
   type ProfilePhotoGateways,
   ProfilePhotoValidationError,
   detectProfilePhotoType,
+  largePhotoPathOf,
   readProfilePhoto,
   removeProfilePhoto,
   replaceProfilePhoto,
@@ -34,28 +35,32 @@ type Owner = { status: AccountStatus; photoPath: string | null } | null;
 
 /** Lo que devuelve el reductor de mentira: bytes que no se parecen a ninguno
  * de los que se suben, para ver cuáles llegan al almacenamiento. */
-const SHRUNK_BYTES = Uint8Array.from([0x52, 0x45, 0x44, 0x55, 0x43, 0x49]);
+const THUMBNAIL_BYTES = Uint8Array.from([0x54, 0x48, 0x55, 0x4d, 0x42]);
+const LARGE_BYTES = Uint8Array.from([0x4c, 0x41, 0x52, 0x47, 0x45]);
 
 type FakeState = {
   owner: Owner;
   readonly stored: Set<string>;
-  readonly uploads: { bytes: Uint8Array; type: string }[];
+  readonly uploads: { path: string; bytes: Uint8Array; type: string }[];
   readonly savedPaths: (string | null)[];
-  failUpload: boolean;
+  failUpload: (path: string) => boolean;
   failSave: boolean;
   isUndecodable: boolean;
 };
 
-function fakeGateways(owner: Owner): {
+function fakeGateways(
+  owner: Owner,
+  storedFiles: readonly string[] = owner?.photoPath ? [owner.photoPath] : [],
+): {
   gateways: ProfilePhotoGateways;
   state: FakeState;
 } {
   const state: FakeState = {
     owner,
-    stored: new Set(owner?.photoPath ? [owner.photoPath] : []),
+    stored: new Set(storedFiles),
     uploads: [],
     savedPaths: [],
-    failUpload: false,
+    failUpload: () => false,
     failSave: false,
     isUndecodable: false,
   };
@@ -73,14 +78,14 @@ function fakeGateways(owner: Owner): {
     },
     storage: {
       async upload(path, bytes, type) {
-        if (state.failUpload) {
+        if (state.failUpload(path)) {
           throw new Error("conexión caída");
         }
         state.stored.add(path);
-        state.uploads.push({ bytes, type });
+        state.uploads.push({ path, bytes, type });
       },
-      async remove(path) {
-        state.stored.delete(path);
+      async remove(paths) {
+        paths.forEach((path) => state.stored.delete(path));
       },
     },
     signing: {
@@ -92,7 +97,11 @@ function fakeGateways(owner: Owner): {
       async shrinkPhoto() {
         return state.isUndecodable
           ? { kind: "undecodable" }
-          : { kind: "shrunk", bytes: SHRUNK_BYTES, type: "image/webp" };
+          : {
+              kind: "shrunk",
+              thumbnail: { bytes: THUMBNAIL_BYTES, type: "image/webp" },
+              large: { bytes: LARGE_BYTES, type: "image/webp" },
+            };
       },
     },
     newFileId: () => NEW_FILE_ID,
@@ -101,8 +110,17 @@ function fakeGateways(owner: Owner): {
 }
 
 const ACTIVE_WITHOUT_PHOTO: Owner = { status: "active", photoPath: null };
+/** Una foto de antes de #353: un solo tamaño, sin sufijo. */
 const OLD_PATH = `${USER_ID}/viejo.png`;
 const ACTIVE_WITH_PHOTO: Owner = { status: "active", photoPath: OLD_PATH };
+const OLD_THUMBNAIL_PATH = `${USER_ID}/viejo-thumb.webp`;
+const OLD_LARGE_PATH = `${USER_ID}/viejo-large.webp`;
+const ACTIVE_WITH_TWO_SIZES: Owner = {
+  status: "active",
+  photoPath: OLD_THUMBNAIL_PATH,
+};
+const THUMBNAIL_PATH = `${USER_ID}/${NEW_FILE_ID}-thumb.webp`;
+const LARGE_PATH = `${USER_ID}/${NEW_FILE_ID}-large.webp`;
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -169,44 +187,60 @@ describe("foto de perfil", () => {
   });
 
   describe("subir", () => {
-    it("guarda la foto en la carpeta del miembro, con un nombre que no dice nada de él", async () => {
+    it("guarda las dos versiones en la carpeta del miembro, con un nombre que no dice nada de él", async () => {
       const { gateways, state } = fakeGateways(ACTIVE_WITHOUT_PHOTO);
 
-      const photo = await replaceProfilePhoto(gateways, {
+      await replaceProfilePhoto(gateways, {
         userId: USER_ID,
         bytes: PNG_BYTES,
       });
 
-      const expectedPath = `${USER_ID}/${NEW_FILE_ID}.webp`;
-      expect([...state.stored]).toEqual([expectedPath]);
-      expect(state.savedPaths).toEqual([expectedPath]);
-      expect(photo.photoUrl).toBe(
-        `https://storage.test/signed/${expectedPath}?token=t`,
+      expect([...state.stored].sort()).toEqual([LARGE_PATH, THUMBNAIL_PATH]);
+    });
+
+    it("guarda las dos versiones reducidas y no la que se subió", async () => {
+      const { gateways, state } = fakeGateways(ACTIVE_WITHOUT_PHOTO);
+
+      await replaceProfilePhoto(gateways, {
+        userId: USER_ID,
+        bytes: JPEG_BYTES,
+      });
+
+      expect(state.uploads).toHaveLength(2);
+      expect(state.uploads).toEqual(
+        expect.arrayContaining([
+          { path: THUMBNAIL_PATH, bytes: THUMBNAIL_BYTES, type: "image/webp" },
+          { path: LARGE_PATH, bytes: LARGE_BYTES, type: "image/webp" },
+        ]),
       );
     });
 
-    it("guarda la versión reducida y no la que se subió", async () => {
+    it("apunta en la ficha la miniatura y responde con su dirección firmada", async () => {
       const { gateways, state } = fakeGateways(ACTIVE_WITHOUT_PHOTO);
 
-      await replaceProfilePhoto(gateways, {
+      const photo = await replaceProfilePhoto(gateways, {
         userId: USER_ID,
         bytes: JPEG_BYTES,
       });
 
-      expect(state.uploads).toEqual([
-        { bytes: SHRUNK_BYTES, type: "image/webp" },
-      ]);
+      expect(state.savedPaths).toEqual([THUMBNAIL_PATH]);
+      expect(photo.photoUrl).toBe(
+        `https://storage.test/signed/${THUMBNAIL_PATH}?token=t`,
+      );
     });
 
-    it("apunta en la ficha la ruta con la extensión de la reducida", async () => {
+    it("no deja ninguna versión si falla la subida de una de las dos", async () => {
       const { gateways, state } = fakeGateways(ACTIVE_WITHOUT_PHOTO);
+      state.failUpload = (path) => path === LARGE_PATH;
 
-      await replaceProfilePhoto(gateways, {
+      const upload = replaceProfilePhoto(gateways, {
         userId: USER_ID,
-        bytes: JPEG_BYTES,
+        bytes: PNG_BYTES,
       });
 
-      expect(state.savedPaths).toEqual([`${USER_ID}/${NEW_FILE_ID}.webp`]);
+      await expect(upload).rejects.toThrow("conexión caída");
+      expect(state.stored.size).toBe(0);
+      expect(state.savedPaths).toEqual([]);
     });
 
     it("rechaza como formato no admitido lo que no se puede decodificar, sin subir nada", async () => {
@@ -268,7 +302,21 @@ describe("foto de perfil", () => {
   });
 
   describe("reemplazo", () => {
-    it("sustituye la foto anterior y la borra del almacenamiento", async () => {
+    it("sustituye una foto de dos tamaños y borra las dos versiones viejas", async () => {
+      const { gateways, state } = fakeGateways(ACTIVE_WITH_TWO_SIZES, [
+        OLD_THUMBNAIL_PATH,
+        OLD_LARGE_PATH,
+      ]);
+
+      await replaceProfilePhoto(gateways, {
+        userId: USER_ID,
+        bytes: PNG_BYTES,
+      });
+
+      expect([...state.stored].sort()).toEqual([LARGE_PATH, THUMBNAIL_PATH]);
+    });
+
+    it("sustituye una foto de antes, de un solo tamaño, y la borra", async () => {
       const { gateways, state } = fakeGateways(ACTIVE_WITH_PHOTO);
 
       await replaceProfilePhoto(gateways, {
@@ -276,12 +324,12 @@ describe("foto de perfil", () => {
         bytes: PNG_BYTES,
       });
 
-      expect([...state.stored]).toEqual([`${USER_ID}/${NEW_FILE_ID}.webp`]);
+      expect([...state.stored].sort()).toEqual([LARGE_PATH, THUMBNAIL_PATH]);
     });
 
     it("conserva la foto anterior si la subida falla a mitad", async () => {
       const { gateways, state } = fakeGateways(ACTIVE_WITH_PHOTO);
-      state.failUpload = true;
+      state.failUpload = () => true;
 
       const upload = replaceProfilePhoto(gateways, {
         userId: USER_ID,
@@ -315,11 +363,11 @@ describe("foto de perfil", () => {
         ...gateways,
         storage: {
           ...gateways.storage,
-          remove: async (path) => {
-            if (path === OLD_PATH) {
+          remove: async (paths) => {
+            if (paths.includes(OLD_PATH)) {
               throw new Error("Storage no respondió");
             }
-            await gateways.storage.remove(path);
+            await gateways.storage.remove(paths);
           },
         },
       };
@@ -329,8 +377,8 @@ describe("foto de perfil", () => {
         bytes: PNG_BYTES,
       });
 
-      expect(photo.photoUrl).toContain(`${USER_ID}/${NEW_FILE_ID}.webp`);
-      expect(state.savedPaths).toEqual([`${USER_ID}/${NEW_FILE_ID}.webp`]);
+      expect(photo.photoUrl).toContain(THUMBNAIL_PATH);
+      expect(state.savedPaths).toEqual([THUMBNAIL_PATH]);
       expect(errors).toHaveBeenCalledWith(
         expect.stringContaining(OLD_PATH),
         expect.any(Error),
@@ -359,6 +407,17 @@ describe("foto de perfil", () => {
       await removeProfilePhoto(gateways, USER_ID);
 
       expect(state.savedPaths).toEqual([null]);
+      expect(state.stored.size).toBe(0);
+    });
+
+    it("borra las dos versiones de una foto de dos tamaños", async () => {
+      const { gateways, state } = fakeGateways(ACTIVE_WITH_TWO_SIZES, [
+        OLD_THUMBNAIL_PATH,
+        OLD_LARGE_PATH,
+      ]);
+
+      await removeProfilePhoto(gateways, USER_ID);
+
       expect(state.stored.size).toBe(0);
     });
 
@@ -394,6 +453,22 @@ describe("foto de perfil", () => {
       await expect(readProfilePhoto(gateways, USER_ID)).rejects.toBeInstanceOf(
         MemberNotFoundError,
       );
+    });
+  });
+
+  describe("la ruta de la versión grande", () => {
+    it("es la de la miniatura con el sufijo de la grande", () => {
+      expect(largePhotoPathOf(OLD_THUMBNAIL_PATH)).toBe(OLD_LARGE_PATH);
+    });
+
+    it("es la misma ruta en una foto de antes, que sólo tiene un tamaño", () => {
+      expect(largePhotoPathOf(OLD_PATH)).toBe(OLD_PATH);
+    });
+
+    it("no confunde un sufijo que no está al final del nombre", () => {
+      const path = `${USER_ID}/a-thumb-b.webp`;
+
+      expect(largePhotoPathOf(path)).toBe(path);
     });
   });
 

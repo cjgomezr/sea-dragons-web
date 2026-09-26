@@ -11,7 +11,8 @@ import {
   type ProfilePhotoGateways,
 } from "@/lib/members/profile-photo";
 import {
-  PROFILE_PHOTO_MAX_SIDE_PX,
+  PROFILE_PHOTO_LARGE_SIDE_PX,
+  PROFILE_PHOTO_THUMBNAIL_SIDE_PX,
   shrinkProfilePhoto,
 } from "@/lib/members/shrink-profile-photo";
 
@@ -24,6 +25,8 @@ import {
 const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
 const OTHER_USER_ID = "1b2c3d4e-5f60-4a3b-9c8d-000000000002";
 const FILE_ID = "5e6f7a8b-0000-4000-8000-0000000000ff";
+const THUMBNAIL_PATH = `${USER_ID}/${FILE_ID}-thumb.webp`;
+const LARGE_PATH = `${USER_ID}/${FILE_ID}-large.webp`;
 const ORIGIN = "http://localhost:3417";
 const CONTINUE_HEADER = "x-middleware-next";
 
@@ -46,7 +49,7 @@ type Store = {
   photoPath: string | null;
   readonly uploadedBy: string[];
   readonly files: Set<string>;
-  readonly uploadedBytes: Uint8Array[];
+  readonly uploadedBytes: Map<string, Uint8Array>;
 };
 
 let store: Store;
@@ -65,10 +68,10 @@ function fakeGateways(): ProfilePhotoGateways {
     storage: {
       async upload(photoPath, bytes) {
         store.files.add(photoPath);
-        store.uploadedBytes.push(bytes);
+        store.uploadedBytes.set(photoPath, bytes);
       },
-      async remove(photoPath) {
-        store.files.delete(photoPath);
+      async remove(photoPaths) {
+        photoPaths.forEach((photoPath) => store.files.delete(photoPath));
       },
     },
     signing: {
@@ -143,7 +146,7 @@ beforeEach(() => {
     photoPath: null,
     uploadedBy: [],
     files: new Set(),
-    uploadedBytes: [],
+    uploadedBytes: new Map(),
   };
 });
 
@@ -155,7 +158,7 @@ describe("endpoints de la foto", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         data: {
-          photoUrl: `https://storage.test/${USER_ID}/${FILE_ID}.webp?token=t`,
+          photoUrl: `https://storage.test/${THUMBNAIL_PATH}?token=t`,
         },
       });
     });
@@ -164,7 +167,7 @@ describe("endpoints de la foto", () => {
       await throughBoundary("PUT", { body: PNG_BYTES });
 
       expect(store.uploadedBy).toEqual([USER_ID]);
-      expect([...store.files]).toEqual([`${USER_ID}/${FILE_ID}.webp`]);
+      expect([...store.files].sort()).toEqual([LARGE_PATH, THUMBNAIL_PATH]);
     });
 
     it("reemplaza la anterior sin dejarla en el almacenamiento", async () => {
@@ -175,23 +178,31 @@ describe("endpoints de la foto", () => {
       const response = await throughBoundary("PUT", { body: PNG_BYTES });
 
       expect(response.status).toBe(200);
-      expect([...store.files]).toEqual([`${USER_ID}/${FILE_ID}.webp`]);
+      expect([...store.files].sort()).toEqual([LARGE_PATH, THUMBNAIL_PATH]);
     });
 
-    it("sube al almacenamiento la foto reducida, no la original", async () => {
-      const response = await throughBoundary("PUT", {
-        body: LARGE_PHOTO_BYTES,
-      });
+    it.each([
+      ["miniatura", THUMBNAIL_PATH, PROFILE_PHOTO_THUMBNAIL_SIDE_PX],
+      ["grande", LARGE_PATH, PROFILE_PHOTO_LARGE_SIDE_PX],
+    ])(
+      "sube al almacenamiento la %s reducida, no la original",
+      async (_name, photoPath, side) => {
+        const response = await throughBoundary("PUT", {
+          body: LARGE_PHOTO_BYTES,
+        });
 
-      expect(response.status).toBe(200);
-      expect(store.uploadedBytes).toHaveLength(1);
-      const [uploaded = new Uint8Array()] = store.uploadedBytes;
-      expect(uploaded.length).toBeLessThan(LARGE_PHOTO_BYTES.length);
-      const { format, width } = await sharp(uploaded).metadata();
-      expect({ format, width }).toEqual({
-        format: "webp",
-        width: PROFILE_PHOTO_MAX_SIDE_PX,
-      });
+        expect(response.status).toBe(200);
+        const uploaded = store.uploadedBytes.get(photoPath) ?? new Uint8Array();
+        expect(uploaded.length).toBeLessThan(LARGE_PHOTO_BYTES.length);
+        const { format, width } = await sharp(uploaded).metadata();
+        expect({ format, width }).toEqual({ format: "webp", width: side });
+      },
+    );
+
+    it("apunta la ficha a la miniatura", async () => {
+      await throughBoundary("PUT", { body: PNG_BYTES });
+
+      expect(store.photoPath).toBe(THUMBNAIL_PATH);
     });
 
     it("rechaza con el mismo 400 de formato un fichero que no se puede decodificar", async () => {
