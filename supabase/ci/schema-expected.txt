@@ -40,6 +40,40 @@ columna evaluation_categories.deactivated_at tipo=timestamp with time zone null=
 columna evaluation_categories.id tipo=uuid null=NO default=gen_random_uuid()
 columna evaluation_categories.name tipo=text null=NO default=-
 columna evaluation_categories.sort_order tipo=integer null=NO default=-
+columna event_groups.club_id tipo=uuid null=NO default=-
+columna event_groups.event_id tipo=uuid null=NO default=-
+columna event_groups.group_id tipo=uuid null=NO default=-
+columna event_series.audience tipo=text null=NO default=-
+columna event_series.author_id tipo=uuid null=NO default=-
+columna event_series.club_id tipo=uuid null=NO default=-
+columna event_series.created_at tipo=timestamp with time zone null=NO default=now()
+columna event_series.ends_on tipo=date null=NO default=-
+columna event_series.event_type tipo=text null=NO default=-
+columna event_series.id tipo=uuid null=NO default=gen_random_uuid()
+columna event_series.location tipo=text null=NO default=-
+columna event_series.notes tipo=text null=YES default=-
+columna event_series.start_time tipo=time without time zone null=NO default=-
+columna event_series.starts_on tipo=date null=NO default=-
+columna event_series.title tipo=text null=NO default=-
+columna event_series.weekdays tipo=ARRAY null=NO default=-
+columna event_series_groups.club_id tipo=uuid null=NO default=-
+columna event_series_groups.group_id tipo=uuid null=NO default=-
+columna event_series_groups.series_id tipo=uuid null=NO default=-
+columna events.audience tipo=text null=NO default=-
+columna events.author_id tipo=uuid null=NO default=-
+columna events.cancelled_at tipo=timestamp with time zone null=YES default=-
+columna events.club_id tipo=uuid null=NO default=-
+columna events.created_at tipo=timestamp with time zone null=NO default=now()
+columna events.event_type tipo=text null=NO default=-
+columna events.id tipo=uuid null=NO default=gen_random_uuid()
+columna events.location tipo=text null=NO default=-
+columna events.notes tipo=text null=YES default=-
+columna events.series_id tipo=uuid null=YES default=-
+columna events.start_time tipo=time without time zone null=NO default=-
+columna events.starts_at tipo=timestamp with time zone null=YES default=-
+columna events.starts_on tipo=date null=NO default=-
+columna events.status tipo=text null=NO default='scheduled'::text
+columna events.title tipo=text null=NO default=-
 columna group_memberships.assigned_at tipo=timestamp with time zone null=NO default=now()
 columna group_memberships.club_id tipo=uuid null=NO default=-
 columna group_memberships.group_id tipo=uuid null=NO default=-
@@ -127,6 +161,7 @@ columna role_requests.justification tipo=text null=YES default=-
 columna role_requests.requested_role tipo=text null=NO default=-
 columna role_requests.status tipo=text null=NO default='pending'::text
 columna role_requests.user_id tipo=uuid null=NO default=-
+funcion are_valid_weekdays(weekdays smallint[])
 funcion change_member_role(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_role text)
 funcion club_position_name_taken(acting_club_id uuid, own_position_id uuid, name_en text, name_es text)
 funcion clubs_seed_default_evaluation_categories()
@@ -272,6 +307,66 @@ grant evaluation_categories service_role SELECT
 grant evaluation_categories service_role TRIGGER
 grant evaluation_categories service_role TRUNCATE
 grant evaluation_categories service_role UPDATE
+grant event_groups authenticated SELECT
+grant event_groups postgres DELETE
+grant event_groups postgres INSERT
+grant event_groups postgres REFERENCES
+grant event_groups postgres SELECT
+grant event_groups postgres TRIGGER
+grant event_groups postgres TRUNCATE
+grant event_groups postgres UPDATE
+grant event_groups service_role DELETE
+grant event_groups service_role INSERT
+grant event_groups service_role REFERENCES
+grant event_groups service_role SELECT
+grant event_groups service_role TRIGGER
+grant event_groups service_role TRUNCATE
+grant event_groups service_role UPDATE
+grant event_series authenticated SELECT
+grant event_series postgres DELETE
+grant event_series postgres INSERT
+grant event_series postgres REFERENCES
+grant event_series postgres SELECT
+grant event_series postgres TRIGGER
+grant event_series postgres TRUNCATE
+grant event_series postgres UPDATE
+grant event_series service_role DELETE
+grant event_series service_role INSERT
+grant event_series service_role REFERENCES
+grant event_series service_role SELECT
+grant event_series service_role TRIGGER
+grant event_series service_role TRUNCATE
+grant event_series service_role UPDATE
+grant event_series_groups authenticated SELECT
+grant event_series_groups postgres DELETE
+grant event_series_groups postgres INSERT
+grant event_series_groups postgres REFERENCES
+grant event_series_groups postgres SELECT
+grant event_series_groups postgres TRIGGER
+grant event_series_groups postgres TRUNCATE
+grant event_series_groups postgres UPDATE
+grant event_series_groups service_role DELETE
+grant event_series_groups service_role INSERT
+grant event_series_groups service_role REFERENCES
+grant event_series_groups service_role SELECT
+grant event_series_groups service_role TRIGGER
+grant event_series_groups service_role TRUNCATE
+grant event_series_groups service_role UPDATE
+grant events authenticated SELECT
+grant events postgres DELETE
+grant events postgres INSERT
+grant events postgres REFERENCES
+grant events postgres SELECT
+grant events postgres TRIGGER
+grant events postgres TRUNCATE
+grant events postgres UPDATE
+grant events service_role DELETE
+grant events service_role INSERT
+grant events service_role REFERENCES
+grant events service_role SELECT
+grant events service_role TRIGGER
+grant events service_role TRUNCATE
+grant events service_role UPDATE
 grant group_memberships authenticated SELECT
 grant group_memberships postgres DELETE
 grant group_memberships postgres INSERT
@@ -470,6 +565,18 @@ indice evaluation_categories_club_id_name_key CREATE UNIQUE INDEX evaluation_cat
 indice evaluation_categories_club_id_sort_order_idx CREATE INDEX evaluation_categories_club_id_sort_order_idx ON public.evaluation_categories USING btree (club_id, sort_order)
 indice evaluation_categories_id_club_id_key CREATE UNIQUE INDEX evaluation_categories_id_club_id_key ON public.evaluation_categories USING btree (id, club_id)
 indice evaluation_categories_pkey CREATE UNIQUE INDEX evaluation_categories_pkey ON public.evaluation_categories USING btree (id)
+indice event_groups_group_id_idx CREATE INDEX event_groups_group_id_idx ON public.event_groups USING btree (group_id)
+indice event_groups_pkey CREATE UNIQUE INDEX event_groups_pkey ON public.event_groups USING btree (event_id, group_id)
+indice event_series_author_id_club_id_idx CREATE INDEX event_series_author_id_club_id_idx ON public.event_series USING btree (author_id, club_id)
+indice event_series_groups_group_id_idx CREATE INDEX event_series_groups_group_id_idx ON public.event_series_groups USING btree (group_id)
+indice event_series_groups_pkey CREATE UNIQUE INDEX event_series_groups_pkey ON public.event_series_groups USING btree (series_id, group_id)
+indice event_series_id_club_id_key CREATE UNIQUE INDEX event_series_id_club_id_key ON public.event_series USING btree (id, club_id)
+indice event_series_pkey CREATE UNIQUE INDEX event_series_pkey ON public.event_series USING btree (id)
+indice events_author_id_club_id_idx CREATE INDEX events_author_id_club_id_idx ON public.events USING btree (author_id, club_id)
+indice events_club_id_starts_at_idx CREATE INDEX events_club_id_starts_at_idx ON public.events USING btree (club_id, starts_at)
+indice events_id_club_id_key CREATE UNIQUE INDEX events_id_club_id_key ON public.events USING btree (id, club_id)
+indice events_pkey CREATE UNIQUE INDEX events_pkey ON public.events USING btree (id)
+indice events_series_id_idx CREATE INDEX events_series_id_idx ON public.events USING btree (series_id)
 indice group_memberships_pkey CREATE UNIQUE INDEX group_memberships_pkey ON public.group_memberships USING btree (group_id, user_id)
 indice group_memberships_user_id_club_id_idx CREATE INDEX group_memberships_user_id_club_id_idx ON public.group_memberships USING btree (user_id, club_id)
 indice groups_club_id_name_key CREATE UNIQUE INDEX groups_club_id_name_key ON public.groups USING btree (club_id, lower(btrim(name)))
@@ -516,6 +623,22 @@ policy clubs.clubs_select_anon cmd=SELECT roles={anon} using=true check=-
 policy clubs.clubs_select_authenticated cmd=SELECT roles={authenticated} using=true check=-
 policy confirmation_email_requests.confirmation_email_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy email_send_requests.email_send_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
+policy event_groups.event_groups_select_own_groups cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
+   FROM group_memberships gm
+  WHERE ((gm.group_id = event_groups.group_id) AND (gm.user_id = ( SELECT auth.uid() AS uid))))) check=-
+policy event_series.event_series_select_audience cmd=SELECT roles={authenticated} using=((EXISTS ( SELECT 1
+   FROM members m
+  WHERE ((m.user_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = event_series.club_id) AND (m.account_status <> 'inactive'::text)))) AND ((audience = 'all'::text) OR is_member_in_groups(( SELECT auth.uid() AS uid), ARRAY( SELECT esg.group_id
+   FROM event_series_groups esg
+  WHERE (esg.series_id = event_series.id))))) check=-
+policy event_series_groups.event_series_groups_select_own_groups cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
+   FROM group_memberships gm
+  WHERE ((gm.group_id = event_series_groups.group_id) AND (gm.user_id = ( SELECT auth.uid() AS uid))))) check=-
+policy events.events_select_audience cmd=SELECT roles={authenticated} using=((EXISTS ( SELECT 1
+   FROM members m
+  WHERE ((m.user_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = events.club_id) AND (m.account_status <> 'inactive'::text)))) AND ((audience = 'all'::text) OR is_member_in_groups(( SELECT auth.uid() AS uid), ARRAY( SELECT eg.group_id
+   FROM event_groups eg
+  WHERE (eg.event_id = events.id))))) check=-
 policy group_memberships.group_memberships_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
 policy groups.groups_select_own cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
    FROM group_memberships gm
@@ -565,6 +688,37 @@ restriccion evaluation_categories.evaluation_categories_club_id_fkey FOREIGN KEY
 restriccion evaluation_categories.evaluation_categories_id_club_id_key UNIQUE (id, club_id)
 restriccion evaluation_categories.evaluation_categories_name_length CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 40)))
 restriccion evaluation_categories.evaluation_categories_pkey PRIMARY KEY (id)
+restriccion event_groups.event_groups_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion event_groups.event_groups_event_same_club_fkey FOREIGN KEY (event_id, club_id) REFERENCES events(id, club_id) ON DELETE CASCADE
+restriccion event_groups.event_groups_group_same_club_fkey FOREIGN KEY (group_id, club_id) REFERENCES groups(id, club_id) ON DELETE CASCADE
+restriccion event_groups.event_groups_pkey PRIMARY KEY (event_id, group_id)
+restriccion event_series.event_series_audience_check CHECK ((audience = ANY (ARRAY['all'::text, 'groups'::text])))
+restriccion event_series.event_series_author_same_club_fkey FOREIGN KEY (author_id, club_id) REFERENCES members(user_id, club_id)
+restriccion event_series.event_series_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion event_series.event_series_date_range CHECK (((ends_on >= starts_on) AND (ends_on <= ((starts_on + '1 year'::interval))::date)))
+restriccion event_series.event_series_event_type_check CHECK ((event_type = ANY (ARRAY['training'::text, 'competition'::text, 'meeting'::text, 'social'::text])))
+restriccion event_series.event_series_id_club_id_key UNIQUE (id, club_id)
+restriccion event_series.event_series_location_length CHECK (((char_length(btrim(location)) >= 1) AND (char_length(btrim(location)) <= 120)))
+restriccion event_series.event_series_notes_length CHECK ((char_length(notes) <= 2000))
+restriccion event_series.event_series_pkey PRIMARY KEY (id)
+restriccion event_series.event_series_title_length CHECK (((char_length(btrim(title)) >= 1) AND (char_length(btrim(title)) <= 80)))
+restriccion event_series.event_series_weekdays_check CHECK (are_valid_weekdays(weekdays))
+restriccion event_series_groups.event_series_groups_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion event_series_groups.event_series_groups_group_same_club_fkey FOREIGN KEY (group_id, club_id) REFERENCES groups(id, club_id) ON DELETE CASCADE
+restriccion event_series_groups.event_series_groups_pkey PRIMARY KEY (series_id, group_id)
+restriccion event_series_groups.event_series_groups_series_same_club_fkey FOREIGN KEY (series_id, club_id) REFERENCES event_series(id, club_id) ON DELETE CASCADE
+restriccion events.events_audience_check CHECK ((audience = ANY (ARRAY['all'::text, 'groups'::text])))
+restriccion events.events_author_same_club_fkey FOREIGN KEY (author_id, club_id) REFERENCES members(user_id, club_id)
+restriccion events.events_cancelled_at_matches_status CHECK (((status = 'cancelled'::text) = (cancelled_at IS NOT NULL)))
+restriccion events.events_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion events.events_event_type_check CHECK ((event_type = ANY (ARRAY['training'::text, 'competition'::text, 'meeting'::text, 'social'::text])))
+restriccion events.events_id_club_id_key UNIQUE (id, club_id)
+restriccion events.events_location_length CHECK (((char_length(btrim(location)) >= 1) AND (char_length(btrim(location)) <= 120)))
+restriccion events.events_notes_length CHECK ((char_length(notes) <= 2000))
+restriccion events.events_pkey PRIMARY KEY (id)
+restriccion events.events_series_same_club_fkey FOREIGN KEY (series_id, club_id) REFERENCES event_series(id, club_id)
+restriccion events.events_status_check CHECK ((status = ANY (ARRAY['scheduled'::text, 'cancelled'::text])))
+restriccion events.events_title_length CHECK (((char_length(btrim(title)) >= 1) AND (char_length(btrim(title)) <= 80)))
 restriccion group_memberships.group_memberships_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion group_memberships.group_memberships_group_same_club_fkey FOREIGN KEY (group_id, club_id) REFERENCES groups(id, club_id) ON DELETE CASCADE
 restriccion group_memberships.group_memberships_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
@@ -644,6 +798,10 @@ tabla clubs rls=t
 tabla confirmation_email_requests rls=t
 tabla email_send_requests rls=t
 tabla evaluation_categories rls=t
+tabla event_groups rls=t
+tabla event_series rls=t
+tabla event_series_groups rls=t
+tabla events rls=t
 tabla group_memberships rls=t
 tabla groups rls=t
 tabla member_evaluation_ratings rls=t
