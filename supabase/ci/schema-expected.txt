@@ -43,6 +43,11 @@ columna evaluation_categories.sort_order tipo=integer null=NO default=-
 columna event_groups.club_id tipo=uuid null=NO default=-
 columna event_groups.event_id tipo=uuid null=NO default=-
 columna event_groups.group_id tipo=uuid null=NO default=-
+columna event_rsvps.club_id tipo=uuid null=NO default=-
+columna event_rsvps.event_id tipo=uuid null=NO default=-
+columna event_rsvps.responded_at tipo=timestamp with time zone null=NO default=now()
+columna event_rsvps.response tipo=text null=NO default=-
+columna event_rsvps.user_id tipo=uuid null=NO default=-
 columna event_series.audience tipo=text null=NO default=-
 columna event_series.author_id tipo=uuid null=NO default=-
 columna event_series.club_id tipo=uuid null=NO default=-
@@ -167,8 +172,8 @@ funcion club_position_name_taken(acting_club_id uuid, own_position_id uuid, name
 funcion clubs_seed_default_evaluation_categories()
 funcion clubs_seed_default_positions()
 funcion create_club_position(acting_club_id uuid, name_en text, name_es text)
-funcion create_events(acting_club_id uuid, acting_user_id uuid, schedule jsonb)
 funcion create_evaluation_category(acting_club_id uuid, category_name text)
+funcion create_events(acting_club_id uuid, acting_user_id uuid, schedule jsonb)
 funcion create_member_evaluation(acting_club_id uuid, target_user_id uuid)
 funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
 funcion evaluation_category_name_taken(acting_club_id uuid, own_category_id uuid, category_name text)
@@ -323,6 +328,21 @@ grant event_groups service_role SELECT
 grant event_groups service_role TRIGGER
 grant event_groups service_role TRUNCATE
 grant event_groups service_role UPDATE
+grant event_rsvps authenticated SELECT
+grant event_rsvps postgres DELETE
+grant event_rsvps postgres INSERT
+grant event_rsvps postgres REFERENCES
+grant event_rsvps postgres SELECT
+grant event_rsvps postgres TRIGGER
+grant event_rsvps postgres TRUNCATE
+grant event_rsvps postgres UPDATE
+grant event_rsvps service_role DELETE
+grant event_rsvps service_role INSERT
+grant event_rsvps service_role REFERENCES
+grant event_rsvps service_role SELECT
+grant event_rsvps service_role TRIGGER
+grant event_rsvps service_role TRUNCATE
+grant event_rsvps service_role UPDATE
 grant event_series authenticated SELECT
 grant event_series postgres DELETE
 grant event_series postgres INSERT
@@ -568,6 +588,8 @@ indice evaluation_categories_id_club_id_key CREATE UNIQUE INDEX evaluation_categ
 indice evaluation_categories_pkey CREATE UNIQUE INDEX evaluation_categories_pkey ON public.evaluation_categories USING btree (id)
 indice event_groups_group_id_idx CREATE INDEX event_groups_group_id_idx ON public.event_groups USING btree (group_id)
 indice event_groups_pkey CREATE UNIQUE INDEX event_groups_pkey ON public.event_groups USING btree (event_id, group_id)
+indice event_rsvps_pkey CREATE UNIQUE INDEX event_rsvps_pkey ON public.event_rsvps USING btree (event_id, user_id)
+indice event_rsvps_user_id_club_id_idx CREATE INDEX event_rsvps_user_id_club_id_idx ON public.event_rsvps USING btree (user_id, club_id)
 indice event_series_author_id_club_id_idx CREATE INDEX event_series_author_id_club_id_idx ON public.event_series USING btree (author_id, club_id)
 indice event_series_groups_group_id_idx CREATE INDEX event_series_groups_group_id_idx ON public.event_series_groups USING btree (group_id)
 indice event_series_groups_pkey CREATE UNIQUE INDEX event_series_groups_pkey ON public.event_series_groups USING btree (series_id, group_id)
@@ -627,6 +649,7 @@ policy email_send_requests.email_send_requests_select_denied cmd=SELECT roles={a
 policy event_groups.event_groups_select_own_groups cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
    FROM group_memberships gm
   WHERE ((gm.group_id = event_groups.group_id) AND (gm.user_id = ( SELECT auth.uid() AS uid))))) check=-
+policy event_rsvps.event_rsvps_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
 policy event_series.event_series_select_audience cmd=SELECT roles={authenticated} using=((EXISTS ( SELECT 1
    FROM members m
   WHERE ((m.user_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = event_series.club_id) AND (m.account_status <> 'inactive'::text)))) AND ((audience = 'all'::text) OR is_member_in_groups(( SELECT auth.uid() AS uid), ARRAY( SELECT esg.group_id
@@ -693,6 +716,11 @@ restriccion event_groups.event_groups_club_id_fkey FOREIGN KEY (club_id) REFEREN
 restriccion event_groups.event_groups_event_same_club_fkey FOREIGN KEY (event_id, club_id) REFERENCES events(id, club_id) ON DELETE CASCADE
 restriccion event_groups.event_groups_group_same_club_fkey FOREIGN KEY (group_id, club_id) REFERENCES groups(id, club_id) ON DELETE CASCADE
 restriccion event_groups.event_groups_pkey PRIMARY KEY (event_id, group_id)
+restriccion event_rsvps.event_rsvps_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion event_rsvps.event_rsvps_event_same_club_fkey FOREIGN KEY (event_id, club_id) REFERENCES events(id, club_id) ON DELETE CASCADE
+restriccion event_rsvps.event_rsvps_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
+restriccion event_rsvps.event_rsvps_pkey PRIMARY KEY (event_id, user_id)
+restriccion event_rsvps.event_rsvps_response_check CHECK ((response = ANY (ARRAY['yes'::text, 'maybe'::text, 'no'::text])))
 restriccion event_series.event_series_audience_check CHECK ((audience = ANY (ARRAY['all'::text, 'groups'::text])))
 restriccion event_series.event_series_author_same_club_fkey FOREIGN KEY (author_id, club_id) REFERENCES members(user_id, club_id)
 restriccion event_series.event_series_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
@@ -800,6 +828,7 @@ tabla confirmation_email_requests rls=t
 tabla email_send_requests rls=t
 tabla evaluation_categories rls=t
 tabla event_groups rls=t
+tabla event_rsvps rls=t
 tabla event_series rls=t
 tabla event_series_groups rls=t
 tabla events rls=t
