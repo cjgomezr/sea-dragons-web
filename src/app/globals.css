@@ -3244,6 +3244,11 @@ button.notification-item-content:hover {
   margin: 0;
 }
 
+/* Un enlace flexible se come el espacio junto a la flecha. */
+.evaluation-categories-header .member-record-back {
+  gap: var(--space-2);
+}
+
 .evaluation-categories-group {
   display: flex;
   flex-direction: column;
@@ -3267,6 +3272,13 @@ button.notification-item-content:hover {
 .evaluation-refresh .auth-note,
 .evaluation-refresh .auth-error {
   margin: 0;
+}
+
+/* Tan ancho como "Editar valoraciones", encima; el texto es largo y en la
+   columna estrecha parte en dos líneas, que necesitan su propio aire. */
+.evaluation-refresh .admin-secondary {
+  align-self: stretch;
+  padding-block: var(--space-2);
 }
 
 .evaluations-panes {

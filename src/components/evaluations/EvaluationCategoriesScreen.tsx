@@ -146,7 +146,7 @@ function Header({ translate }: { translate: Translator }): React.JSX.Element {
   return (
     <header className="evaluation-categories-header">
       <Link href={EVALUATIONS_PATH} className="member-record-back">
-        <span aria-hidden="true">← </span>
+        <span aria-hidden="true">←</span>
         {translate("evaluations.categories.back")}
       </Link>
       <h1>{translate("evaluations.categories.title")}</h1>
