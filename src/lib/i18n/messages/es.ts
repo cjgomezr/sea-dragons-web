@@ -265,6 +265,9 @@ export const spanishMessages: MessageCatalog = {
   // Mis grupos (#229). Sólo los grupos propios, sin sus demás miembros.
   "account.groups.title": "Mis grupos",
   "account.groups.empty": "Todavía no perteneces a ningún grupo.",
+  "account.evaluation.title": "Evaluación",
+  "account.evaluation.staffOnly":
+    "Las notas de las evaluaciones solo las ve el personal de entrenamiento.",
   "account.error.pending":
     "Ya tienes una solicitud esperando respuesta. Recarga la página para verla.",
   "account.error.roleAlreadyHeld": "Ya tienes ese rol.",
@@ -943,6 +946,7 @@ export const spanishMessages: MessageCatalog = {
   "evaluations.list.empty": "Todavía no hay nadie en el club a quien evaluar.",
   "evaluations.list.noMatches": "Ningún miembro coincide con ese nombre.",
   "evaluations.list.notEvaluated": "Sin evaluar",
+  "evaluations.notEvaluatedYet": "Todavía no hay evaluación.",
   "evaluations.list.noRatings": "Sin valoraciones",
   "evaluations.list.overall": "OVR {rating}",
   "evaluations.sheet.label": "Evaluación de {name}",

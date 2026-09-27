@@ -269,6 +269,9 @@ export const englishMessages = {
   // Mis grupos (#229). Sólo los grupos propios, sin sus demás miembros.
   "account.groups.title": "My groups",
   "account.groups.empty": "You don't belong to any group yet.",
+  "account.evaluation.title": "Evaluation",
+  "account.evaluation.staffOnly":
+    "Evaluation ratings are only visible to the coaching staff.",
   "account.error.pending":
     "You already have a request waiting for an answer. Reload the page to see it.",
   "account.error.roleAlreadyHeld": "You already have that role.",
@@ -949,6 +952,7 @@ export const englishMessages = {
   "evaluations.list.empty": "There's nobody in the club to evaluate yet.",
   "evaluations.list.noMatches": "No member matches that name.",
   "evaluations.list.notEvaluated": "Not evaluated",
+  "evaluations.notEvaluatedYet": "No evaluation yet.",
   "evaluations.list.noRatings": "No ratings yet",
   "evaluations.list.overall": "OVR {rating}",
   "evaluations.sheet.label": "Evaluation of {name}",

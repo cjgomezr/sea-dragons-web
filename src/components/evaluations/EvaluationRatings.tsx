@@ -113,6 +113,49 @@ function EditableRating({
   );
 }
 
+function RatingsCard({
+  translate,
+  children,
+}: {
+  translate: Translator;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <div className="card evaluation-ratings">
+      <h3 id={RATINGS_HEADING_ID} className="evaluation-card-title">
+        {translate("evaluations.ratings.title")}
+      </h3>
+      <ul
+        className="evaluation-rating-list"
+        aria-labelledby={RATINGS_HEADING_ID}
+      >
+        {children}
+      </ul>
+    </div>
+  );
+}
+
+/** Sólo para leer: la usa también el perfil (#324), donde no se edita. */
+export function ReadOnlyRatings({
+  translate,
+  ratings,
+}: {
+  translate: Translator;
+  ratings: readonly EvaluationRating[];
+}): React.JSX.Element {
+  return (
+    <RatingsCard translate={translate}>
+      {ratings.map((entry) => (
+        <ReadOnlyRating
+          key={entry.categoryId}
+          translate={translate}
+          entry={entry}
+        />
+      ))}
+    </RatingsCard>
+  );
+}
+
 export function EvaluationRatings({
   translate,
   ratings,
@@ -125,35 +168,22 @@ export function EvaluationRatings({
   draft: RatingsDraft | null;
   onDraftChange: (draft: RatingsDraft) => void;
 }): React.JSX.Element {
+  if (draft === null) {
+    return <ReadOnlyRatings translate={translate} ratings={ratings} />;
+  }
   return (
-    <div className="card evaluation-ratings">
-      <h3 id={RATINGS_HEADING_ID} className="evaluation-card-title">
-        {translate("evaluations.ratings.title")}
-      </h3>
-      <ul
-        className="evaluation-rating-list"
-        aria-labelledby={RATINGS_HEADING_ID}
-      >
-        {ratings.map((entry) =>
-          draft === null ? (
-            <ReadOnlyRating
-              key={entry.categoryId}
-              translate={translate}
-              entry={entry}
-            />
-          ) : (
-            <EditableRating
-              key={entry.categoryId}
-              translate={translate}
-              entry={entry}
-              value={draft[entry.categoryId] ?? entry.rating}
-              onChange={(value) =>
-                onDraftChange({ ...draft, [entry.categoryId]: value })
-              }
-            />
-          ),
-        )}
-      </ul>
-    </div>
+    <RatingsCard translate={translate}>
+      {ratings.map((entry) => (
+        <EditableRating
+          key={entry.categoryId}
+          translate={translate}
+          entry={entry}
+          value={draft[entry.categoryId] ?? entry.rating}
+          onChange={(value) =>
+            onDraftChange({ ...draft, [entry.categoryId]: value })
+          }
+        />
+      ))}
+    </RatingsCard>
   );
 }

@@ -81,6 +81,7 @@ function renderScreen(
       positionOptions={[]}
       photoUrl={options.photoUrl === undefined ? OLD_URL : options.photoUrl}
       groups={[]}
+      evaluation={{ visibility: "staff_only" }}
       countries={listCountryOptions(locale)}
     />,
   );
