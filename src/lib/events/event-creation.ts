@@ -1,3 +1,4 @@
+import type { ClubAudience } from "@/lib/notifications/audience-members";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type {
   RoleRequestGateways,
@@ -52,9 +53,7 @@ const CONTROL_CHARACTER = /\p{Cc}/u;
 
 /** "Todo el club" y "estos grupos" son dos casos, como en las noticias: una
  * audiencia de cero grupos es un valor que se nombra y se rechaza al crear. */
-export type EventAudience =
-  | { readonly kind: "club" }
-  | { readonly kind: "groups"; readonly groupIds: readonly string[] };
+export type EventAudience = ClubAudience;
 
 /** Lo que una serie comparte con cada una de sus ocurrencias. */
 export type EventFields = {
