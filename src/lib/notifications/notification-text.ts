@@ -1,8 +1,13 @@
 import { z } from "zod";
 import { REQUESTABLE_ROLES } from "@/lib/auth/role-request";
-import { ACCOUNT_PAGE_PATH, DIRECTORY_PATH } from "@/lib/auth/routes";
+import {
+  ACCOUNT_PAGE_PATH,
+  DIRECTORY_PATH,
+  NEWS_POST_PATH,
+} from "@/lib/auth/routes";
 import { ROLES } from "@/lib/auth/roles";
 import type { Translator } from "@/lib/i18n/translator";
+import { NEWS_CATEGORIES } from "@/lib/news/news-posts";
 import type { NotificationType } from "./notify-member";
 
 /**
@@ -39,6 +44,12 @@ const roleRequestRejectedData = z.object({
 const roleRequestReceivedData = z.object({
   requesterName: z.string().min(1),
   requestedRole: z.enum(REQUESTABLE_ROLES),
+});
+
+const newsPostPublishedData = z.object({
+  postId: z.uuid(),
+  category: z.enum(NEWS_CATEGORIES),
+  title: z.string().min(1),
 });
 
 /** Un `Record` sobre el catálogo: un tipo nuevo no compila hasta tener texto. */
@@ -81,25 +92,52 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         }),
       };
     },
+    news_post_published: (translate, data) => {
+      const parsed = newsPostPublishedData.safeParse(data);
+      if (!parsed.success) {
+        return null;
+      }
+      return {
+        title: translate("notifications.news_post_published.title", {
+          category: translate(`news.category.${parsed.data.category}`),
+        }),
+        body: parsed.data.title,
+      };
+    },
   };
 
 function isKnownType(type: string): type is NotificationType {
   return Object.hasOwn(DESCRIBE_BY_TYPE, type);
 }
 
-/** La pantalla donde se actúa sobre cada tipo (#338). Un `Record` sobre el
- * catálogo, como los textos: un tipo nuevo no compila sin decir a dónde lleva. */
-const DESTINATION_BY_TYPE: Readonly<Record<NotificationType, string>> = {
-  role_changed: ACCOUNT_PAGE_PATH,
-  role_request_rejected: ACCOUNT_PAGE_PATH,
+/** La pantalla donde se actúa sobre cada tipo (#338), o `null` si sus datos
+ * no dicen a dónde. Un `Record` sobre el catálogo, como los textos: un tipo
+ * nuevo no compila sin decir a dónde lleva. */
+type DestinationOf = (data: Readonly<Record<string, unknown>>) => string | null;
+
+const DESTINATION_BY_TYPE: Readonly<Record<NotificationType, DestinationOf>> = {
+  role_changed: () => ACCOUNT_PAGE_PATH,
+  role_request_rejected: () => ACCOUNT_PAGE_PATH,
   // La bandeja de solicitudes, para aprobarla o rechazarla, está en el
   // directorio.
-  role_request_received: DIRECTORY_PATH,
+  role_request_received: () => DIRECTORY_PATH,
+  // #332: la publicación misma.
+  news_post_published: (data) => {
+    const parsed = newsPostPublishedData.safeParse(data);
+    return parsed.success
+      ? NEWS_POST_PATH.replace("[id]", parsed.data.postId)
+      : null;
+  },
 };
 
-/** `null` para un tipo que esta pantalla no reconoce: se marca, no se sigue. */
-export function notificationDestination(type: string): string | null {
-  return isKnownType(type) ? DESTINATION_BY_TYPE[type] : null;
+/** `null` para un tipo que esta pantalla no reconoce, o para unos datos que
+ * no dicen a dónde llevar: se marca, no se sigue. */
+export function notificationDestination(
+  notification: NotificationToDescribe,
+): string | null {
+  return isKnownType(notification.type)
+    ? DESTINATION_BY_TYPE[notification.type](notification.data)
+    : null;
 }
 
 export function describeNotification(

@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { NOTIFICATION_TYPES } from "@/lib/notifications/notify-member";
 import {
   type RunResult,
   type TemporaryDatabase,
@@ -150,17 +151,14 @@ describeConPostgres("migración de los avisos", () => {
 });
 
 describeConPostgres("el tipo y los datos de un aviso", () => {
-  it.each(["role_changed", "role_request_rejected", "role_request_received"])(
-    "acepta el tipo %s",
-    async (type) => {
-      const database = await migratedDatabase();
-      const userId = await seedMember(database);
+  it.each(NOTIFICATION_TYPES)("acepta el tipo %s", async (type) => {
+    const database = await migratedDatabase();
+    const userId = await seedMember(database);
 
-      const insercion = await insertNotification(database, { userId, type });
+    const insercion = await insertNotification(database, { userId, type });
 
-      expect(insercion.code, insercion.stderr).toBe(0);
-    },
-  );
+    expect(insercion.code, insercion.stderr).toBe(0);
+  });
 
   it.each(["event_created", "ROLE_CHANGED", ""])(
     "rechaza el tipo '%s', que no está en el catálogo",

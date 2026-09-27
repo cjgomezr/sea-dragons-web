@@ -1,11 +1,25 @@
+import type { AccountStatus } from "@/lib/auth/account-status";
 import type {
   NewNewsAttachment,
   NewsAttachmentGateways,
   StoredNewsFile,
 } from "@/lib/news/news-attachments";
 import { NewsAttachmentValidationError } from "@/lib/news/news-attachments";
-import type { NewsAttachmentSummary } from "@/lib/news/news-posts";
-import { type FakeClub, type FakeClubOptions, fakeClub } from "./news-club";
+import type {
+  NewsAudience,
+  NewsAttachmentSummary,
+} from "@/lib/news/news-posts";
+import type { NewsPublishGateways } from "@/lib/news/news-publication-notice";
+import type {
+  NotificationBroadcastWriter,
+  NotificationInsert,
+} from "@/lib/notifications/notify-member";
+import {
+  CLUB_ID,
+  type FakeClub,
+  type FakeClubOptions,
+  fakeClub,
+} from "./news-club";
 
 /**
  * Un club en memoria con almacenamiento, para los adjuntos (#328, #330). El
@@ -33,6 +47,13 @@ export type StoredAttachment = NewNewsAttachment & { readonly id: string };
 export type FakeStoredFile = StoredNewsFile & { readonly storagePath: string };
 
 export type FakeAttachmentClubOptions = FakeClubOptions & {
+  /** Los socios del club con el estado de su cuenta, para los avisos (#332). */
+  readonly clubMembers?: Readonly<Record<string, AccountStatus>>;
+  /** Quién está en cada grupo. */
+  readonly groupMembers?: Readonly<Record<string, readonly string[]>>;
+  readonly failAudience?: boolean;
+  /** Los socios cuyo aviso no se guarda: tumba también la escritura en lote. */
+  readonly failNoticeFor?: readonly string[];
   readonly attachments?: readonly StoredAttachment[];
   readonly storedFiles?: readonly FakeStoredFile[];
   readonly failInsert?: boolean;
@@ -41,7 +62,9 @@ export type FakeAttachmentClubOptions = FakeClubOptions & {
 };
 
 export type FakeAttachmentClub = {
-  readonly gateways: NewsAttachmentGateways;
+  readonly gateways: NewsPublishGateways;
+  /** Los avisos guardados, en el orden en que se escribieron. */
+  readonly notices: NotificationInsert[];
   readonly rows: StoredAttachment[];
   readonly deletedPostIds: string[];
   readonly inserted: FakeClub["inserted"];
@@ -127,6 +150,52 @@ function createFakeStorage(
   };
 }
 
+/** La audiencia como la resuelve la base: todo el club, o quien esté en
+ * alguno de los grupos. Sin quitar repetidos, a propósito: de eso se encarga
+ * la puerta de avisos. */
+function audienceOf(
+  options: FakeAttachmentClubOptions,
+  audience: NewsAudience,
+): readonly string[] {
+  if (audience.kind === "club") {
+    return Object.keys(options.clubMembers ?? {});
+  }
+  return audience.groupIds.flatMap((id) => options.groupMembers?.[id] ?? []);
+}
+
+function createFakeNotices(
+  options: FakeAttachmentClubOptions,
+  notices: NotificationInsert[],
+): NotificationBroadcastWriter {
+  const failsFor = (row: NotificationInsert): boolean =>
+    options.failNoticeFor?.includes(row.userId) === true;
+  return {
+    findRecipients: async (userIds) =>
+      new Map(
+        userIds.flatMap((id) => {
+          const accountStatus = options.clubMembers?.[id];
+          return accountStatus === undefined
+            ? []
+            : [[id, { clubId: CLUB_ID, accountStatus }] as const];
+        }),
+      ),
+    insertNotifications: async (rows) => {
+      if (rows.some(failsFor)) {
+        throw new Error("la escritura en lote se cayó");
+      }
+      notices.push(...rows);
+    },
+    insertNotification: async (row) => {
+      if (failsFor(row)) {
+        throw new Error(`no se guardó el aviso de ${row.userId}`);
+      }
+      notices.push(row);
+    },
+    pruneNotificationsOf: async () => new Map(),
+    runAfterResponse: () => {},
+  };
+}
+
 export function fakeAttachmentClub(
   options: FakeAttachmentClubOptions = {},
 ): FakeAttachmentClub {
@@ -137,7 +206,8 @@ export function fakeAttachmentClub(
     storedFiles.map(({ storagePath, ...file }) => [storagePath, file]),
   );
   const files = new Set(fileInfo.keys());
-  const gateways: NewsAttachmentGateways = {
+  const notices: NotificationInsert[] = [];
+  const gateways: NewsPublishGateways = {
     ...news.gateways,
     attachments: {
       insertAttachment: async (attachment) => {
@@ -162,9 +232,19 @@ export function fakeAttachmentClub(
     },
     storage: createFakeStorage(options, files, fileInfo),
     newFileId: () => NEW_FILE_ID,
+    newsAudience: {
+      findAudienceMemberIds: async ({ audience }) => {
+        if (options.failAudience === true) {
+          throw new Error("la audiencia no se pudo leer");
+        }
+        return audienceOf(options, audience);
+      },
+    },
+    notifications: createFakeNotices(options, notices),
   };
   return {
     gateways,
+    notices,
     rows,
     files,
     fileInfo,

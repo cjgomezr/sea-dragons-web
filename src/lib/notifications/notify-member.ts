@@ -1,6 +1,7 @@
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { RequestableRole } from "@/lib/auth/role-request";
 import type { Role } from "@/lib/auth/roles";
+import type { NewsCategory } from "@/lib/news/news-posts";
 
 /**
  * La única puerta para crear avisos (#265, RF-2 del PRD de E6). La usan esta
@@ -25,6 +26,7 @@ export const NOTIFICATION_TYPES = [
   "role_changed",
   "role_request_rejected",
   "role_request_received",
+  "news_post_published",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -41,6 +43,12 @@ type NotificationDataByType = DataForEveryType<{
   readonly role_request_received: {
     readonly requesterName: string;
     readonly requestedRole: RequestableRole;
+  };
+  /** El título tal como se publicó: si luego se edita, el aviso no cambia. */
+  readonly news_post_published: {
+    readonly postId: string;
+    readonly category: NewsCategory;
+    readonly title: string;
   };
 }>;
 
@@ -87,6 +95,38 @@ export type NotificationWriter = {
   runAfterResponse(work: () => Promise<void>): void;
 };
 
+/** Lo mismo que `NotificationWriter`, para muchos destinatarios a la vez: una
+ * lectura, una escritura y una limpieza, en vez de una por cabeza (#332). */
+export type NotificationBroadcastWriter = Pick<
+  NotificationWriter,
+  "insertNotification" | "runAfterResponse"
+> & {
+  /** Sin entrada para quien no es socio de ningún club. */
+  findRecipients(
+    userIds: readonly string[],
+  ): Promise<ReadonlyMap<string, NotificationRecipient>>;
+  /** Todo o nada: si una fila falla, no se guarda ninguna. */
+  insertNotifications(rows: readonly NotificationInsert[]): Promise<void>;
+  /** Sin entrada para quien se quedó sin ningún aviso. */
+  pruneNotificationsOf(
+    userIds: readonly string[],
+  ): Promise<ReadonlyMap<string, NotificationCleanup>>;
+};
+
+/** El mismo aviso para varios socios. Un destinatario repetido se avisa una
+ * vez. */
+export type NewBroadcast = NotificationContent & {
+  readonly recipientUserIds: readonly string[];
+};
+
+export type NotifyMembersOutcome =
+  | {
+      readonly kind: "notified";
+      readonly savedCount: number;
+      readonly failedCount: number;
+    }
+  | { readonly kind: "failed"; readonly error: unknown };
+
 export type NotifyOutcome =
   | { readonly kind: "saved" }
   | { readonly kind: "recipient_ineligible" }
@@ -95,6 +135,10 @@ export type NotifyOutcome =
 /** Una cuenta dada de baja no recibe avisos: no puede entrar a leerlos. */
 const INELIGIBLE_ACCOUNT_STATUS: AccountStatus = "inactive";
 
+function canReceive(recipient: NotificationRecipient): boolean {
+  return recipient.accountStatus !== INELIGIBLE_ACCOUNT_STATUS;
+}
+
 export async function notifyMember(
   writer: NotificationWriter,
   notification: NewNotification,
@@ -102,10 +146,7 @@ export async function notifyMember(
   const { recipientUserId, ...content } = notification;
   try {
     const recipient = await writer.findRecipient(recipientUserId);
-    if (
-      recipient === null ||
-      recipient.accountStatus === INELIGIBLE_ACCOUNT_STATUS
-    ) {
+    if (recipient === null || !canReceive(recipient)) {
       return { kind: "recipient_ineligible" };
     }
     await writer.insertNotification({
@@ -114,16 +155,100 @@ export async function notifyMember(
       userId: recipientUserId,
     });
   } catch (error) {
-    // Sin los datos: pueden llevar el nombre de alguien.
-    console.error("[notifications] aviso sin guardar", {
-      recipientUserId,
+    logUnsavedNotification({ userId: recipientUserId, ...content }, error);
+    return { kind: "failed", error };
+  }
+  scheduleCleanup(writer, recipientUserId);
+  return { kind: "saved" };
+}
+
+/** El mismo aviso para varios socios, con las reglas de `notifyMember`: no
+ * lanza nunca y deja la limpieza para después de responder. Se escribe en una
+ * sola vez; si esa escritura falla, se reintenta fila por fila para que un
+ * aviso que no entra no se lleve a los demás. */
+export async function notifyMembers(
+  writer: NotificationBroadcastWriter,
+  broadcast: NewBroadcast,
+): Promise<NotifyMembersOutcome> {
+  const { recipientUserIds, ...content } = broadcast;
+  const userIds = [...new Set(recipientUserIds)];
+  let rows: readonly NotificationInsert[];
+  try {
+    rows = await eligibleRows(writer, userIds, content);
+  } catch (error) {
+    console.error("[notifications] destinatarios sin leer", {
       type: content.type,
       error,
     });
     return { kind: "failed", error };
   }
-  scheduleCleanup(writer, recipientUserId);
-  return { kind: "saved" };
+  if (rows.length === 0) {
+    return { kind: "notified", savedCount: 0, failedCount: 0 };
+  }
+  const savedUserIds = await insertAll(writer, rows);
+  scheduleBroadcastCleanup(writer, savedUserIds);
+  return {
+    kind: "notified",
+    savedCount: savedUserIds.length,
+    failedCount: rows.length - savedUserIds.length,
+  };
+}
+
+async function eligibleRows(
+  writer: NotificationBroadcastWriter,
+  userIds: readonly string[],
+  content: NotificationContent,
+): Promise<readonly NotificationInsert[]> {
+  if (userIds.length === 0) {
+    return [];
+  }
+  const recipients = await writer.findRecipients(userIds);
+  return userIds.flatMap((userId) => {
+    const recipient = recipients.get(userId);
+    return recipient !== undefined && canReceive(recipient)
+      ? [{ ...content, clubId: recipient.clubId, userId }]
+      : [];
+  });
+}
+
+/** Devuelve a quiénes les llegó. */
+async function insertAll(
+  writer: NotificationBroadcastWriter,
+  rows: readonly NotificationInsert[],
+): Promise<readonly string[]> {
+  try {
+    await writer.insertNotifications(rows);
+    return rows.map((row) => row.userId);
+  } catch (error) {
+    console.error("[notifications] avisos en lote sin guardar; van uno a uno", {
+      type: rows[0]?.type,
+      count: rows.length,
+      error,
+    });
+  }
+  const results = await Promise.allSettled(
+    rows.map((row) => writer.insertNotification(row)),
+  );
+  return rows.flatMap((row, index) => {
+    const result = results[index];
+    if (result?.status === "rejected") {
+      logUnsavedNotification(row, result.reason);
+      return [];
+    }
+    return [row.userId];
+  });
+}
+
+/** Sin los datos: pueden llevar el nombre de alguien. */
+function logUnsavedNotification(
+  row: Pick<NotificationInsert, "userId" | "type">,
+  error: unknown,
+): void {
+  console.error("[notifications] aviso sin guardar", {
+    recipientUserId: row.userId,
+    type: row.type,
+    error,
+  });
 }
 
 /** Limpiar nunca puede tumbar la acción que originó el aviso: ni cuando no se
@@ -145,17 +270,59 @@ async function pruneRecipient(
 ): Promise<void> {
   try {
     const { keptCount } = await writer.pruneNotifications(recipientUserId);
-    if (keptCount > MAX_NOTIFICATIONS_PER_MEMBER) {
-      // Sólo puede pasar si todo lo que sobra está sin leer, y eso no se
-      // borra nunca.
-      console.warn("[notifications] socio por encima del tope de avisos", {
-        recipientUserId,
-        keptCount,
-      });
-    }
+    warnIfOverCap(recipientUserId, keptCount);
   } catch (error) {
     logCleanupFailure(recipientUserId, error);
   }
+}
+
+function warnIfOverCap(recipientUserId: string, keptCount: number): void {
+  if (keptCount > MAX_NOTIFICATIONS_PER_MEMBER) {
+    // Sólo puede pasar si todo lo que sobra está sin leer, y eso no se borra
+    // nunca.
+    console.warn("[notifications] socio por encima del tope de avisos", {
+      recipientUserId,
+      keptCount,
+    });
+  }
+}
+
+function scheduleBroadcastCleanup(
+  writer: NotificationBroadcastWriter,
+  recipientUserIds: readonly string[],
+): void {
+  if (recipientUserIds.length === 0) {
+    return;
+  }
+  try {
+    writer.runAfterResponse(() => pruneRecipients(writer, recipientUserIds));
+  } catch (error) {
+    logBroadcastCleanupFailure(recipientUserIds, error);
+  }
+}
+
+async function pruneRecipients(
+  writer: NotificationBroadcastWriter,
+  recipientUserIds: readonly string[],
+): Promise<void> {
+  try {
+    const cleanups = await writer.pruneNotificationsOf(recipientUserIds);
+    for (const [recipientUserId, { keptCount }] of cleanups) {
+      warnIfOverCap(recipientUserId, keptCount);
+    }
+  } catch (error) {
+    logBroadcastCleanupFailure(recipientUserIds, error);
+  }
+}
+
+function logBroadcastCleanupFailure(
+  recipientUserIds: readonly string[],
+  error: unknown,
+): void {
+  console.error("[notifications] limpieza de avisos sin hacer", {
+    recipientUserIds,
+    error,
+  });
 }
 
 function logCleanupFailure(recipientUserId: string, error: unknown): void {

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { formatRelativeTime } from "@/lib/i18n/format";
 import { createTranslator } from "@/lib/i18n/translator";
-import { ACCOUNT_PAGE_PATH, DIRECTORY_PATH } from "@/lib/auth/routes";
+import {
+  ACCOUNT_PAGE_PATH,
+  DIRECTORY_PATH,
+  NEWS_POST_PATH,
+} from "@/lib/auth/routes";
 import {
   describeNotification,
   notificationDestination,
@@ -15,6 +19,11 @@ const DATA_FOR_EVERY_TYPE = {
   role_changed: { newRole: "Coach" },
   role_request_rejected: { requestedRole: "Committee" },
   role_request_received: { requesterName: "Ana Ruiz", requestedRole: "Coach" },
+  news_post_published: {
+    postId: "d4000000-0000-4000-8000-000000000004",
+    category: "announcement",
+    title: "Cambia la piscina",
+  },
 } as const;
 
 describe("textos de los avisos", () => {
@@ -108,31 +117,96 @@ describe("textos de los avisos", () => {
 // #338: abrir un aviso lleva a la pantalla donde se actúa sobre él.
 describe("destino de cada aviso", () => {
   it("lleva una solicitud de rol recibida al directorio, donde se decide", () => {
-    expect(notificationDestination("role_request_received")).toBe(
-      DIRECTORY_PATH,
-    );
+    expect(
+      notificationDestination({
+        type: "role_request_received",
+        data: DATA_FOR_EVERY_TYPE.role_request_received,
+      }),
+    ).toBe(DIRECTORY_PATH);
   });
 
   it("lleva un cambio de rol a Mi cuenta", () => {
-    expect(notificationDestination("role_changed")).toBe(ACCOUNT_PAGE_PATH);
+    expect(
+      notificationDestination({
+        type: "role_changed",
+        data: DATA_FOR_EVERY_TYPE.role_changed,
+      }),
+    ).toBe(ACCOUNT_PAGE_PATH);
   });
 
   it("lleva una solicitud de rol rechazada a Mi cuenta", () => {
-    expect(notificationDestination("role_request_rejected")).toBe(
-      ACCOUNT_PAGE_PATH,
-    );
+    expect(
+      notificationDestination({
+        type: "role_request_rejected",
+        data: DATA_FOR_EVERY_TYPE.role_request_rejected,
+      }),
+    ).toBe(ACCOUNT_PAGE_PATH);
   });
 
   it("no lleva a ninguna parte un tipo que la pantalla no reconoce", () => {
-    expect(notificationDestination("event_created")).toBeNull();
+    expect(
+      notificationDestination({ type: "event_created", data: {} }),
+    ).toBeNull();
   });
 
   // Cuando E7 o E11 añadan tipos, este test pide decir a dónde llevan.
   for (const type of NOTIFICATION_TYPES) {
     it(`el tipo ${type} del catálogo declara su destino`, () => {
-      expect(notificationDestination(type)).toMatch(/^\//);
+      expect(
+        notificationDestination({ type, data: DATA_FOR_EVERY_TYPE[type] }),
+      ).toMatch(/^\//);
     });
   }
+});
+
+// #332: el aviso de una publicación nueva.
+describe("el texto del aviso", () => {
+  const PUBLISHED = {
+    type: "news_post_published",
+    data: DATA_FOR_EVERY_TYPE.news_post_published,
+  } as const;
+
+  it("dice la categoría y el título en inglés", () => {
+    const text = describeNotification(createTranslator("en"), PUBLISHED);
+
+    expect(text).toEqual({
+      title: "New post: Announcement",
+      body: "Cambia la piscina",
+    });
+  });
+
+  it("dice la categoría traducida y el título en español", () => {
+    const text = describeNotification(createTranslator("es"), PUBLISHED);
+
+    expect(text).toEqual({
+      title: "Nueva publicación: Aviso",
+      body: "Cambia la piscina",
+    });
+  });
+
+  it("da el texto genérico cuando la categoría no es del catálogo", () => {
+    const text = describeNotification(createTranslator("en"), {
+      type: "news_post_published",
+      data: { ...PUBLISHED.data, category: "gossip" },
+    });
+
+    expect(text.title).toBe("New notification");
+  });
+
+  it("lleva a la publicación", () => {
+    expect(notificationDestination(PUBLISHED)).toBe(
+      NEWS_POST_PATH.replace("[id]", PUBLISHED.data.postId),
+    );
+  });
+
+  it("no lleva a ninguna parte cuando falta la publicación", () => {
+    expect(
+      notificationDestination({
+        type: "news_post_published",
+        data: { category: "news", title: "Sin id" },
+      }),
+    ).toBeNull();
+  });
 });
 
 describe("tiempo relativo", () => {

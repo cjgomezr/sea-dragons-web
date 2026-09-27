@@ -8,6 +8,10 @@ import {
   validateNewsAttachmentFile,
 } from "./news-attachments";
 import {
+  type NewsPublishGateways,
+  announceNewsPost,
+} from "./news-publication-notice";
+import {
   type NewsAttachmentSummary,
   type NewsDraft,
   type NewsPost,
@@ -221,9 +225,10 @@ async function removePublishedUploads(
 }
 
 /** Publica con los adjuntos que se subieron mientras se escribía. Primero se
- * valida todo, subidas incluidas, y sólo entonces se escribe. */
+ * valida todo, subidas incluidas, y sólo entonces se escribe. La audiencia se
+ * entera al final, con la publicación ya entera (#332). */
 export async function publishNewsPostWithUploads(
-  gateways: NewsAttachmentGateways,
+  gateways: NewsPublishGateways,
   request: {
     readonly callerId: string;
     readonly draft: NewsDraft;
@@ -238,6 +243,7 @@ export async function publishNewsPostWithUploads(
   const attachments = await attachUploads(gateways, post, uploads);
   await removePublishedUploads(gateways, uploads);
   await sweepStaleUploads(gateways, publisher, request.now);
+  await announceNewsPost(gateways, post);
   // Quien publica es su autor, y publicar ya exigía poder hacerlo: la puede
   // editar y retirar.
   return { ...toNewsPostDetail(post, true), attachments };

@@ -664,6 +664,7 @@ export const spanishMessages: MessageCatalog = {
     "Un Admin rechazó tu solicitud para ser {role}.",
   "notifications.role_request_received.title": "Nueva solicitud de rol",
   "notifications.role_request_received.body": "{name} pidió ser {role}.",
+  "notifications.news_post_published.title": "Nueva publicación: {category}",
   "notifications.generic.title": "Aviso nuevo",
   "notifications.generic.body": "Algo cambió en tu cuenta.",
   "themeToggle.switchToLight": "Cambiar a tema claro",
