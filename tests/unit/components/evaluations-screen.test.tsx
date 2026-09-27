@@ -50,6 +50,7 @@ function evaluated(
   memberId: string,
   ratings: readonly EvaluationRating[],
   updatedAt = READ_AT,
+  isCurrent = true,
 ): MemberEvaluation {
   const sum = ratings.reduce((total, entry) => total + entry.rating, 0);
   return {
@@ -58,6 +59,7 @@ function evaluated(
     updatedAt,
     overallRating: Math.round((sum * 10) / ratings.length) / 10,
     ratings,
+    isCurrent,
   };
 }
 
@@ -475,6 +477,136 @@ describe("ficha de evaluación", () => {
     );
     expect(
       within(sheet).getByRole("button", { name: /editar valoraciones/i }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("poner al día una evaluación", () => {
+  const BREATH_HOLD_ID = "ca7e0000-0000-4000-8000-000000000011";
+  const REFRESH_PATH = `POST ${ROSTER_PATH}/${CAMILA.userId}/refresh`;
+  const OUTDATED_RATINGS: readonly EvaluationRating[] = [
+    CAMILA_RATINGS[0]!,
+    { ...CAMILA_RATINGS[1]!, isRetired: true },
+  ];
+  const REFRESHED_RATINGS: readonly EvaluationRating[] = [
+    CAMILA_RATINGS[0]!,
+    {
+      categoryId: BREATH_HOLD_ID,
+      name: "Breath hold",
+      rating: 5,
+      isRetired: false,
+    },
+  ];
+
+  function refreshedResponse(): Response {
+    return jsonResponse(200, {
+      data: {
+        outcome: { kind: "refreshed", addedCount: 1, removedCount: 1 },
+        evaluation: evaluated(CAMILA.userId, REFRESHED_RATINGS, SAVED_AT),
+      },
+    });
+  }
+
+  function outdatedApi(refresh: Responder): void {
+    clubApi({
+      [`GET ${ROSTER_PATH}/${CAMILA.userId}`]: () =>
+        jsonResponse(200, {
+          data: evaluated(CAMILA.userId, OUTDATED_RATINGS, READ_AT, false),
+        }),
+      [REFRESH_PATH]: refresh,
+    });
+  }
+
+  function refreshButton(sheet: HTMLElement): HTMLElement {
+    return within(sheet).getByRole("button", {
+      name: /update to the current categories/i,
+    });
+  }
+
+  it("la ofrece cuando el conjunto cambió y, al usarla, enseña el conjunto nuevo y el OVR recalculado", async () => {
+    outdatedApi(refreshedResponse);
+    await renderScreen();
+    const sheet = await openCamila();
+
+    await userEvent.click(refreshButton(sheet));
+
+    expect(await within(sheet).findByText("6.5")).toBeInTheDocument();
+    const ratings = within(sheet).getByRole("list", { name: /skill ratings/i });
+    expect(
+      within(ratings)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["Fitness8 out of 10", "Breath hold5 out of 10"]);
+    expect(within(sheet).getByRole("status")).toHaveTextContent(
+      /now uses the current categories/i,
+    );
+    expect(
+      within(sheet).queryByRole("button", {
+        name: /update to the current categories/i,
+      }),
+    ).toBeNull();
+    expect(memberButton(/camila ortiz/i)).toHaveTextContent("6.5");
+    expect(callsTo("POST")).toHaveLength(1);
+  });
+
+  it("no la ofrece a una evaluación ya al día", async () => {
+    clubApi();
+    await renderScreen();
+
+    const sheet = await openCamila();
+
+    expect(
+      within(sheet).queryByRole("button", {
+        name: /update to the current categories/i,
+      }),
+    ).toBeNull();
+  });
+
+  it("no la ofrece mientras se editan las valoraciones", async () => {
+    outdatedApi(refreshedResponse);
+    await renderScreen();
+    const sheet = await openCamila();
+
+    await startEditing(sheet);
+
+    expect(
+      within(sheet).queryByRole("button", {
+        name: /update to the current categories/i,
+      }),
+    ).toBeNull();
+  });
+
+  it("avisa de un fallo de red y deja reintentar", async () => {
+    let attempts = 0;
+    outdatedApi(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new TypeError("Failed to fetch");
+      }
+      return refreshedResponse();
+    });
+    await renderScreen();
+    const sheet = await openCamila();
+
+    await userEvent.click(refreshButton(sheet));
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent(
+      /couldn't reach the server/i,
+    );
+    await userEvent.click(refreshButton(sheet));
+
+    expect(await within(sheet).findByText("6.5")).toBeInTheDocument();
+  });
+
+  it("sale en español", async () => {
+    outdatedApi(refreshedResponse);
+    await renderScreen("es");
+
+    const sheet = await openMember(/camila ortiz/i);
+
+    expect(
+      await within(sheet).findByRole("button", {
+        name: /poner al día con las categorías actuales/i,
+      }),
     ).toBeInTheDocument();
   });
 });

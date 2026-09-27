@@ -980,4 +980,9 @@ export const spanishMessages: MessageCatalog = {
   "evaluations.error.forbidden":
     "Solo el personal de entrenamiento y la administración ven las evaluaciones.",
   "evaluations.error.unexpected": "Algo salió mal. Vuelve a intentarlo.",
+  "evaluations.refresh.hint":
+    "Las categorías del club cambiaron desde que se hizo esta evaluación.",
+  "evaluations.refresh.action": "Poner al día con las categorías actuales",
+  "evaluations.refresh.running": "Poniendo al día…",
+  "evaluations.refresh.done": "Esta evaluación ya usa las categorías actuales.",
 };

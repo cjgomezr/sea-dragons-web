@@ -985,4 +985,10 @@ export const englishMessages = {
     "Your session ended. Sign in again to see evaluations.",
   "evaluations.error.forbidden": "Only coaches and admins can see evaluations.",
   "evaluations.error.unexpected": "Something went wrong. Try again.",
+  "evaluations.refresh.hint":
+    "The club's categories have changed since this evaluation was made.",
+  "evaluations.refresh.action": "Update to the current categories",
+  "evaluations.refresh.running": "Updating…",
+  "evaluations.refresh.done":
+    "This evaluation now uses the current categories.",
 } as const satisfies Readonly<Record<string, Message>>;

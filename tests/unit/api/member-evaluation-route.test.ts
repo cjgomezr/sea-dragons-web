@@ -31,6 +31,7 @@ const READ_AT = "2026-09-27T01:02:03.123456+00:00";
 
 const STORED: StoredEvaluation = {
   updatedAt: READ_AT,
+  missingCategoryCount: 0,
   ratings: [
     { categoryId: FITNESS_ID, name: "Fitness", rating: 8, isRetired: false },
     { categoryId: SPEED_ID, name: "Speed", rating: 9, isRetired: false },
@@ -267,6 +268,7 @@ describe("endpoints de evaluaciones", () => {
           updatedAt: READ_AT,
           overallRating: 8.5,
           ratings: STORED.ratings,
+          isCurrent: true,
         },
       });
     });
@@ -283,7 +285,7 @@ describe("endpoints de evaluaciones", () => {
     });
 
     it("distingue un OVR nulo de un cero", async () => {
-      stored = { updatedAt: READ_AT, ratings: [] };
+      stored = { updatedAt: READ_AT, missingCategoryCount: 0, ratings: [] };
 
       const response = await getEvaluation();
 

@@ -8777,6 +8777,7 @@ function stubbedEvaluation(
       rating,
       isRetired: false,
     })),
+    isCurrent: true,
   };
 }
 

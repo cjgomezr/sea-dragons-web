@@ -243,6 +243,7 @@ export function EvaluationSheet({
           evaluation={state.evaluation}
           isEditingAtStart={state.isNew}
           onSaved={(evaluation) => showConfirmed(evaluation, false)}
+          onRefreshed={(evaluation) => showConfirmed(evaluation, false)}
           onReload={reload}
         />
       ) : null}

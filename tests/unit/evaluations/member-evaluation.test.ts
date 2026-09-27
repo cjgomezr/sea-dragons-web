@@ -38,6 +38,7 @@ const SAVED_AT = "2026-09-27T01:05:00.654321+00:00";
 
 const TWO_CATEGORIES: StoredEvaluation = {
   updatedAt: READ_AT,
+  missingCategoryCount: 0,
   ratings: [
     { categoryId: FITNESS_ID, name: "Fitness", rating: 7, isRetired: false },
     { categoryId: SPEED_ID, name: "Speed", rating: 8, isRetired: true },
@@ -48,6 +49,7 @@ const TWO_CATEGORIES: StoredEvaluation = {
  * nueva, entró en 5. */
 const REFRESHED: StoredEvaluation = {
   updatedAt: SAVED_AT,
+  missingCategoryCount: 0,
   ratings: [
     { categoryId: FITNESS_ID, name: "Fitness", rating: 7, isRetired: false },
     {
@@ -96,6 +98,7 @@ function fakeGateways(options: FakeOptions = {}): Fake {
         writes.push(`create ${scope.userId}`);
         stored = {
           updatedAt: READ_AT,
+          missingCategoryCount: 0,
           ratings: [
             {
               categoryId: FITNESS_ID,
@@ -160,7 +163,32 @@ describe("leer una evaluación", () => {
       updatedAt: READ_AT,
       overallRating: 7.5,
       ratings: TWO_CATEGORIES.ratings,
+      isCurrent: false,
     });
+  });
+
+  it("dice que está al día si tiene justo las categorías activas", async () => {
+    const { gateways } = fakeGateways({ stored: REFRESHED });
+
+    const evaluation = await readMemberEvaluation(gateways, {
+      callerId: COACH_ID,
+      memberId: MEMBER_ID,
+    });
+
+    expect(evaluation).toMatchObject({ isCurrent: true });
+  });
+
+  it("no está al día si le falta una categoría activa", async () => {
+    const { gateways } = fakeGateways({
+      stored: { ...REFRESHED, missingCategoryCount: 1 },
+    });
+
+    const evaluation = await readMemberEvaluation(gateways, {
+      callerId: COACH_ID,
+      memberId: MEMBER_ID,
+    });
+
+    expect(evaluation).toMatchObject({ isCurrent: false });
   });
 
   it("también se la devuelve a un Admin", async () => {
@@ -193,7 +221,7 @@ describe("leer una evaluación", () => {
 
   it("da un OVR nulo, no cero, a una evaluación sin categorías", async () => {
     const { gateways } = fakeGateways({
-      stored: { updatedAt: READ_AT, ratings: [] },
+      stored: { updatedAt: READ_AT, missingCategoryCount: 0, ratings: [] },
     });
 
     const evaluation = await readMemberEvaluation(gateways, {
@@ -471,6 +499,7 @@ describe("poner al día una evaluación", () => {
         updatedAt: SAVED_AT,
         overallRating: 6,
         ratings: REFRESHED.ratings,
+        isCurrent: true,
       },
     });
   });
