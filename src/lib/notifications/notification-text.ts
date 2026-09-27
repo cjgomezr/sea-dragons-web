@@ -2,10 +2,19 @@ import { z } from "zod";
 import { REQUESTABLE_ROLES } from "@/lib/auth/role-request";
 import {
   ACCOUNT_PAGE_PATH,
+  CALENDAR_PATH,
   DIRECTORY_PATH,
   NEWS_POST_PATH,
 } from "@/lib/auth/routes";
 import { ROLES } from "@/lib/auth/roles";
+import { EVENT_TYPES } from "@/lib/events/event-creation";
+import { ISO_WEEKDAYS } from "@/lib/events/event-occurrences";
+import {
+  formatCalendarDay,
+  formatCalendarDayAt,
+  formatClockTime,
+  formatWeekdays,
+} from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import { NEWS_CATEGORIES } from "@/lib/news/news-posts";
 import type { NotificationType } from "./notify-member";
@@ -50,6 +59,27 @@ const newsPostPublishedData = z.object({
   postId: z.uuid(),
   category: z.enum(NEWS_CATEGORIES),
   title: z.string().min(1),
+});
+
+/** `HH:MM`, sin segundos, como la guarda un evento. */
+const clockTime = z.iso.time({ precision: -1 });
+
+const eventCreatedData = z.object({
+  eventId: z.uuid(),
+  title: z.string().min(1),
+  eventType: z.enum(EVENT_TYPES),
+  startsOn: z.iso.date(),
+  startTime: clockTime,
+});
+
+const eventSeriesCreatedData = z.object({
+  seriesId: z.uuid(),
+  title: z.string().min(1),
+  eventType: z.enum(EVENT_TYPES),
+  weekdays: z.array(z.union(ISO_WEEKDAYS.map((day) => z.literal(day)))).min(1),
+  startsOn: z.iso.date(),
+  endsOn: z.iso.date(),
+  startTime: clockTime,
 });
 
 /** Un `Record` sobre el catálogo: un tipo nuevo no compila hasta tener texto. */
@@ -104,6 +134,46 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         body: parsed.data.title,
       };
     },
+    event_created: (translate, data) => {
+      const parsed = eventCreatedData.safeParse(data);
+      if (!parsed.success) {
+        return null;
+      }
+      const event = parsed.data;
+      return {
+        title: translate("notifications.event_created.title", {
+          eventType: translate(`event.type.${event.eventType}`),
+        }),
+        body: translate("notifications.event_created.body", {
+          title: event.title,
+          moment: formatCalendarDayAt(
+            translate.locale,
+            event.startsOn,
+            event.startTime,
+          ),
+        }),
+      };
+    },
+    event_series_created: (translate, data) => {
+      const parsed = eventSeriesCreatedData.safeParse(data);
+      if (!parsed.success) {
+        return null;
+      }
+      const series = parsed.data;
+      const { locale } = translate;
+      return {
+        title: translate("notifications.event_series_created.title", {
+          eventType: translate(`event.type.${series.eventType}`),
+        }),
+        body: translate("notifications.event_series_created.body", {
+          title: series.title,
+          weekdays: formatWeekdays(locale, series.weekdays),
+          time: formatClockTime(locale, series.startTime),
+          startsOn: formatCalendarDay(locale, series.startsOn),
+          endsOn: formatCalendarDay(locale, series.endsOn),
+        }),
+      };
+    },
   };
 
 function isKnownType(type: string): type is NotificationType {
@@ -128,6 +198,12 @@ const DESTINATION_BY_TYPE: Readonly<Record<NotificationType, DestinationOf>> = {
       ? NEWS_POST_PATH.replace("[id]", parsed.data.postId)
       : null;
   },
+  // #310: al calendario. Llevar al evento mismo queda para cuando tenga
+  // pantalla propia.
+  event_created: (data) =>
+    eventCreatedData.safeParse(data).success ? CALENDAR_PATH : null,
+  event_series_created: (data) =>
+    eventSeriesCreatedData.safeParse(data).success ? CALENDAR_PATH : null,
 };
 
 /** `null` para un tipo que esta pantalla no reconoce, o para unos datos que

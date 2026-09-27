@@ -1,14 +1,21 @@
+import type { AccountStatus } from "@/lib/auth/account-status";
 import type { Role } from "@/lib/auth/roles";
 import type {
+  EventAudience,
   EventDraft,
   EventGateways,
   NewEventSchedule,
 } from "@/lib/events/event-creation";
+import type {
+  NotificationBroadcastWriter,
+  NotificationInsert,
+} from "@/lib/notifications/notify-member";
 
 /**
  * Un club en memoria para los tests de crear eventos (#307). El doble cumple
  * el contrato del adaptador: guarda la serie y sus ocurrencias de una vez y
- * devuelve un id por fecha, en el mismo orden.
+ * devuelve un id por fecha, en el mismo orden. Los socios y los grupos son
+ * para el aviso a la audiencia (#310).
  */
 
 export const CALLER_ID = "a0a0a0a0-0000-4000-8000-00000000000a";
@@ -52,17 +59,75 @@ export type FakeEventsClubOptions = {
   readonly callerRole?: Role;
   readonly callerIsMember?: false;
   readonly clubGroupIds?: readonly string[];
+  /** Los socios del club con el estado de su cuenta. */
+  readonly clubMembers?: Readonly<Record<string, AccountStatus>>;
+  /** Quién está en cada grupo. */
+  readonly groupMembers?: Readonly<Record<string, readonly string[]>>;
+  readonly failAudience?: boolean;
+  /** Ningún aviso se guarda, ni en lote ni uno a uno. */
+  readonly failNotices?: boolean;
 };
 
 export type FakeEventsClub = {
   readonly gateways: EventGateways;
   readonly saved: NewEventSchedule[];
+  /** Los avisos guardados, en el orden en que se escribieron. */
+  readonly notices: NotificationInsert[];
+  /** Cada escritura en lote, con sus filas. */
+  readonly noticeBatches: (readonly NotificationInsert[])[];
 };
+
+/** La audiencia como la resuelve la base: todo el club, o quien esté en
+ * alguno de los grupos, sin quitar repetidos. */
+function audienceOf(
+  options: FakeEventsClubOptions,
+  audience: EventAudience,
+): readonly string[] {
+  if (audience.kind === "club") {
+    return Object.keys(options.clubMembers ?? {});
+  }
+  return audience.groupIds.flatMap((id) => options.groupMembers?.[id] ?? []);
+}
+
+function createFakeNotices(
+  options: FakeEventsClubOptions,
+  club: Pick<FakeEventsClub, "notices" | "noticeBatches">,
+): NotificationBroadcastWriter {
+  const failIfAsked = (): void => {
+    if (options.failNotices === true) {
+      throw new Error("los avisos no se pudieron guardar");
+    }
+  };
+  return {
+    findRecipients: async (userIds) =>
+      new Map(
+        userIds.flatMap((id) => {
+          const accountStatus = options.clubMembers?.[id];
+          return accountStatus === undefined
+            ? []
+            : [[id, { clubId: CLUB_ID, accountStatus }] as const];
+        }),
+      ),
+    insertNotifications: async (rows) => {
+      failIfAsked();
+      club.noticeBatches.push(rows);
+      club.notices.push(...rows);
+    },
+    insertNotification: async (row) => {
+      failIfAsked();
+      club.notices.push(row);
+    },
+    pruneNotificationsOf: async () => new Map(),
+    runAfterResponse: () => {},
+  };
+}
 
 export function fakeEventsClub(
   options: FakeEventsClubOptions = {},
 ): FakeEventsClub {
   const saved: NewEventSchedule[] = [];
+  const notices: NotificationInsert[] = [];
+  const noticeBatches: (readonly NotificationInsert[])[] = [];
   const clubGroupIds = options.clubGroupIds ?? [
     SENIOR_SQUAD_ID,
     MASTERS_SQUAD_ID,
@@ -95,6 +160,15 @@ export function fakeEventsClub(
         };
       },
     },
+    eventAudience: {
+      findAudienceMemberIds: async ({ audience }) => {
+        if (options.failAudience === true) {
+          throw new Error("la audiencia no se pudo leer");
+        }
+        return audienceOf(options, audience);
+      },
+    },
+    notifications: createFakeNotices(options, { notices, noticeBatches }),
   };
-  return { gateways, saved };
+  return { gateways, saved, notices, noticeBatches };
 }

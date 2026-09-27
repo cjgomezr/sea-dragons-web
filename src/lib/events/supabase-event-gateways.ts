@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
+import { createSupabaseAudienceMembersGateway } from "@/lib/notifications/supabase-audience-members";
+import { createSupabaseNotificationWriter } from "@/lib/notifications/supabase-notification-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type {
@@ -18,6 +20,9 @@ import type {
  * ocurrencias y sus audiencias en una sola transacción: PostgREST no abre una
  * entre dos peticiones, y una temporada a medias no se puede deshacer bien
  * desde aquí.
+ *
+ * Después avisa a la audiencia (#310) con la misma audiencia y el mismo
+ * escritor de avisos que las noticias.
  */
 
 const GROUPS_TABLE = "groups";
@@ -118,6 +123,8 @@ export function createEventGateways(
       findClubGroupIds: (query) => findClubGroupIds(serviceClient, query),
       insertSchedule: (schedule) => insertSchedule(serviceClient, schedule),
     },
+    eventAudience: createSupabaseAudienceMembersGateway(serviceClient),
+    notifications: createSupabaseNotificationWriter(serviceClient),
   };
 }
 

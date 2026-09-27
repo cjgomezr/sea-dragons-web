@@ -1,3 +1,4 @@
+import type { ClubAudience } from "@/lib/notifications/audience-members";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type {
   RoleRequestGateways,
@@ -5,6 +6,10 @@ import type {
 } from "@/lib/auth/role-request";
 import { hasCapability } from "@/lib/auth/roles";
 import { clubMoment } from "@/lib/time/club-calendar";
+import {
+  type EventNoticeGateways,
+  announceEvents,
+} from "./event-creation-notice";
 import {
   type IsoWeekday,
   countRangeDays,
@@ -48,9 +53,7 @@ const CONTROL_CHARACTER = /\p{Cc}/u;
 
 /** "Todo el club" y "estos grupos" son dos casos, como en las noticias: una
  * audiencia de cero grupos es un valor que se nombra y se rechaza al crear. */
-export type EventAudience =
-  | { readonly kind: "club" }
-  | { readonly kind: "groups"; readonly groupIds: readonly string[] };
+export type EventAudience = ClubAudience;
 
 /** Lo que una serie comparte con cada una de sus ocurrencias. */
 export type EventFields = {
@@ -119,7 +122,8 @@ export type EventsGateway = {
   insertSchedule(schedule: NewEventSchedule): Promise<SavedEventSchedule>;
 };
 
-export type EventGateways = {
+/** Crear es guardar y después avisar a la audiencia (#310). */
+export type EventGateways = EventNoticeGateways & {
   readonly members: RoleRequestGateways["members"];
   readonly events: EventsGateway;
 };
@@ -348,7 +352,8 @@ function toCreatedEvents(
 }
 
 /** Crea el evento o la serie con todas sus ocurrencias, o dice por qué no.
- * Nada se escribe hasta que todo se ha validado. */
+ * Nada se escribe hasta que todo se ha validado, y la audiencia se entera
+ * sólo de lo que quedó guardado. */
 export async function createEvents(
   gateways: EventGateways,
   request: {
@@ -366,5 +371,11 @@ export async function createEvents(
     ...planned,
   };
   const saved = await gateways.events.insertSchedule(schedule);
-  return toCreatedEvents(schedule, saved);
+  const created = toCreatedEvents(schedule, saved);
+  await announceEvents(gateways, {
+    clubId: caller.clubId,
+    authorId: request.callerId,
+    created,
+  });
+  return created;
 }

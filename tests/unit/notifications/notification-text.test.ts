@@ -3,6 +3,7 @@ import { formatRelativeTime } from "@/lib/i18n/format";
 import { createTranslator } from "@/lib/i18n/translator";
 import {
   ACCOUNT_PAGE_PATH,
+  CALENDAR_PATH,
   DIRECTORY_PATH,
   NEWS_POST_PATH,
 } from "@/lib/auth/routes";
@@ -23,6 +24,22 @@ const DATA_FOR_EVERY_TYPE = {
     postId: "d4000000-0000-4000-8000-000000000004",
     category: "announcement",
     title: "Cambia la piscina",
+  },
+  event_created: {
+    eventId: "e0000000-0000-4000-8000-00000000000e",
+    title: "Liga estatal",
+    eventType: "competition",
+    startsOn: "2027-07-10",
+    startTime: "10:00",
+  },
+  event_series_created: {
+    seriesId: "c2c2c2c2-0000-4000-8000-00000000000c",
+    title: "Entrenamiento",
+    eventType: "training",
+    weekdays: [2, 4],
+    startsOn: "2027-07-01",
+    endsOn: "2027-08-31",
+    startTime: "19:00",
   },
 } as const;
 
@@ -145,7 +162,7 @@ describe("destino de cada aviso", () => {
 
   it("no lleva a ninguna parte un tipo que la pantalla no reconoce", () => {
     expect(
-      notificationDestination({ type: "event_created", data: {} }),
+      notificationDestination({ type: "event_exploded", data: {} }),
     ).toBeNull();
   });
 
@@ -205,6 +222,91 @@ describe("el texto del aviso", () => {
         type: "news_post_published",
         data: { category: "news", title: "Sin id" },
       }),
+    ).toBeNull();
+  });
+});
+
+// #310: el aviso de un evento o una serie nuevos.
+describe("texto de los avisos de evento", () => {
+  const EVENT = {
+    type: "event_created",
+    data: DATA_FOR_EVERY_TYPE.event_created,
+  } as const;
+  const SERIES = {
+    type: "event_series_created",
+    data: DATA_FOR_EVERY_TYPE.event_series_created,
+  } as const;
+
+  it("dice el tipo, el título, la fecha y la hora del evento en inglés", () => {
+    const text = describeNotification(createTranslator("en"), EVENT);
+
+    expect(text).toEqual({
+      title: "New event: Competition",
+      body: "Liga estatal: 10 July 2027 at 10:00 am",
+    });
+  });
+
+  it("dice el tipo, el título, la fecha y la hora del evento en español", () => {
+    const text = describeNotification(createTranslator("es"), EVENT);
+
+    expect(text).toEqual({
+      title: "Nuevo evento: Competición",
+      body: "Liga estatal: 10 de julio de 2027, 10:00",
+    });
+  });
+
+  it("dice los días de la semana y el rango de la serie en inglés", () => {
+    const text = describeNotification(createTranslator("en"), SERIES);
+
+    expect(text).toEqual({
+      title: "New series: Training",
+      body: "Entrenamiento: Tuesday and Thursday at 7:00 pm, from 1 July 2027 to 31 August 2027",
+    });
+  });
+
+  it("dice los días de la semana y el rango de la serie en español", () => {
+    const text = describeNotification(createTranslator("es"), SERIES);
+
+    expect(text).toEqual({
+      title: "Nueva serie: Entrenamiento",
+      body: "Entrenamiento: martes y jueves, 19:00, del 1 de julio de 2027 al 31 de agosto de 2027",
+    });
+  });
+
+  it.each([
+    ["un tipo de evento que no es del catálogo", { eventType: "party" }],
+    ["una fecha que no existe", { startsOn: "2027-02-30" }],
+    ["una hora que no es HH:MM", { startTime: "7pm" }],
+  ])("da el texto genérico con %s", (_case, broken) => {
+    const text = describeNotification(createTranslator("en"), {
+      type: "event_created",
+      data: { ...EVENT.data, ...broken },
+    });
+
+    expect(text.title).toBe("New notification");
+  });
+
+  it.each([
+    ["sin días", { weekdays: [] }],
+    ["con un día fuera de la semana", { weekdays: [8] }],
+    ["con una fecha de fin que no existe", { endsOn: "2027-13-01" }],
+  ])("da el texto genérico para una serie %s", (_case, broken) => {
+    const text = describeNotification(createTranslator("es"), {
+      type: "event_series_created",
+      data: { ...SERIES.data, ...broken },
+    });
+
+    expect(text.title).toBe("Aviso nuevo");
+  });
+
+  it("lleva al calendario", () => {
+    expect(notificationDestination(EVENT)).toBe(CALENDAR_PATH);
+    expect(notificationDestination(SERIES)).toBe(CALENDAR_PATH);
+  });
+
+  it("no lleva a ninguna parte cuando los datos no encajan", () => {
+    expect(
+      notificationDestination({ type: "event_created", data: {} }),
     ).toBeNull();
   });
 });

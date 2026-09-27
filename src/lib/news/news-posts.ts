@@ -1,3 +1,4 @@
+import type { ClubAudience } from "@/lib/notifications/audience-members";
 import type { AuditLogWriter } from "@/lib/audit/audit-log";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type {
@@ -33,9 +34,7 @@ const NON_BLANK = /\S/;
 /** "Todo el club" y "estos grupos" son dos casos, no una lista que puede venir
  * vacía: así una audiencia de cero grupos es un valor que se nombra y se
  * rechaza al publicar, y no un club entero por descuido. */
-export type NewsAudience =
-  | { readonly kind: "club" }
-  | { readonly kind: "groups"; readonly groupIds: readonly string[] };
+export type NewsAudience = ClubAudience;
 
 export type NewsPostStatus = "published" | "withdrawn";
 

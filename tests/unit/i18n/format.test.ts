@@ -6,7 +6,9 @@ import {
 } from "@/lib/auth/registration";
 import {
   formatCalendarDay,
+  formatCalendarDayAt,
   formatClubMoment,
+  formatWeekdays,
   formatFileSize,
   formatNumber,
   formatOverallRating,
@@ -182,5 +184,47 @@ describe("OVR por idioma", () => {
 
   it("usa la coma decimal en español", () => {
     expect(formatOverallRating("es", 7.9)).toBe("7,9");
+  });
+});
+
+// #310: un evento guarda su día y su hora de Melbourne por separado, sin
+// instante, y una serie guarda sus días de la semana.
+describe("día y hora de un evento", () => {
+  it("escribe el día y la hora en inglés australiano", () => {
+    expect(formatCalendarDayAt("en", "2027-07-10", "19:00")).toBe(
+      "10 July 2027 at 7:00 pm",
+    );
+  });
+
+  it("escribe el día y la hora a la española, con reloj de 24 horas", () => {
+    expect(formatCalendarDayAt("es", "2027-07-10", "19:00")).toBe(
+      "10 de julio de 2027, 19:00",
+    );
+  });
+
+  it("escribe la medianoche sin moverla al día de al lado", () => {
+    expect(formatCalendarDayAt("en", "2027-07-10", "00:00")).toBe(
+      "10 July 2027 at 12:00 am",
+    );
+  });
+
+  it("rechaza una hora que no es HH:MM", () => {
+    expect(() => formatCalendarDayAt("en", "2027-07-10", "7pm")).toThrow(
+      RangeError,
+    );
+  });
+});
+
+describe("días de la semana", () => {
+  it("nombra los días en inglés, unidos como una lista", () => {
+    expect(formatWeekdays("en", [2, 4])).toBe("Tuesday and Thursday");
+  });
+
+  it("nombra los días en español, en minúscula", () => {
+    expect(formatWeekdays("es", [1, 3, 5])).toBe("lunes, miércoles y viernes");
+  });
+
+  it("nombra el domingo como el día 7", () => {
+    expect(formatWeekdays("es", [7])).toBe("domingo");
   });
 });
