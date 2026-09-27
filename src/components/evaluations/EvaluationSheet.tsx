@@ -138,7 +138,8 @@ export function EvaluationSheet({
   memberId: string;
   fullName: string;
   onBack: () => void;
-  /** Lo que el servidor confirmó, para que la lista ponga el OVR al día. */
+  /** Lo que el servidor confirmó o devolvió al leer, para que la lista ponga
+   * el OVR al día. */
   onEvaluationChange: (evaluation: MemberEvaluation) => void;
 }): React.JSX.Element {
   const [state, setState] = useState<SheetState>({ kind: "loading" });
