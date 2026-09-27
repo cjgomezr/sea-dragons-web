@@ -6,7 +6,7 @@ import {
 } from "../../support/postgres";
 
 /**
- * `0037_event_rsvps.sql` contra un Postgres desechable (#308, RF-5 del PRD de
+ * `0038_event_rsvps.sql` contra un Postgres desechable (#308, RF-5 del PRD de
  * E7). Lo que la base afirma sola: el valor de la respuesta, una fila por
  * miembro y ocurrencia, el club atado al evento y al miembro, las cascadas y
  * que sólo el servidor escribe. Quién puede responder lo prueba el dominio.

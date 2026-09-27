@@ -10,7 +10,7 @@ import type { EventRsvpGateways, NewEventRsvp, RsvpEvent } from "./event-rsvp";
  * Responder a un evento contra Supabase (#308).
  *
  * Va por la llave de servicio: `authenticated` sólo puede leer sus
- * respuestas (`0037_event_rsvps.sql`), porque quién puede responder depende
+ * respuestas (`0038_event_rsvps.sql`), porque quién puede responder depende
  * de la audiencia y de la hora, y eso lo decide el dominio antes de escribir.
  */
 

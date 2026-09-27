@@ -15,7 +15,7 @@ import type { EventAudience } from "./event-creation";
  */
 
 /** Los mismos que acepta el `check` de `event_rsvps.response` en
- * `0037_event_rsvps.sql` (FR-034). */
+ * `0038_event_rsvps.sql` (FR-034). */
 export const RSVP_RESPONSES = ["yes", "maybe", "no"] as const;
 
 export type RsvpResponse = (typeof RSVP_RESPONSES)[number];
