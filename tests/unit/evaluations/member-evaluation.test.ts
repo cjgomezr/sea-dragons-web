@@ -10,12 +10,14 @@ import {
   EvaluationForbiddenError,
   EvaluationNotFoundError,
   EvaluationValidationError,
+  type EvaluationRefresh,
   type MemberEvaluationGateways,
   NoActiveCategoriesError,
   type RatingsSave,
   type StoredEvaluation,
   createMemberEvaluation,
   readMemberEvaluation,
+  refreshMemberEvaluation,
   saveEvaluationRatings,
 } from "@/lib/evaluations/member-evaluation";
 
@@ -30,6 +32,7 @@ const COACH_ID = "c0c0c0c0-0000-4000-8000-00000000000c";
 const MEMBER_ID = "4e4e4e4e-0000-4000-8000-000000000001";
 const FITNESS_ID = "ca7e0000-0000-4000-8000-000000000001";
 const SPEED_ID = "ca7e0000-0000-4000-8000-000000000002";
+const BREATH_HOLD_ID = "ca7e0000-0000-4000-8000-000000000011";
 const READ_AT = "2026-09-27T01:02:03.123456+00:00";
 const SAVED_AT = "2026-09-27T01:05:00.654321+00:00";
 
@@ -38,6 +41,21 @@ const TWO_CATEGORIES: StoredEvaluation = {
   ratings: [
     { categoryId: FITNESS_ID, name: "Fitness", rating: 7, isRetired: false },
     { categoryId: SPEED_ID, name: "Speed", rating: 8, isRetired: true },
+  ],
+};
+
+/** `TWO_CATEGORIES` puesta al día: Speed, desactivada, salió, y Breath hold,
+ * nueva, entró en 5. */
+const REFRESHED: StoredEvaluation = {
+  updatedAt: SAVED_AT,
+  ratings: [
+    { categoryId: FITNESS_ID, name: "Fitness", rating: 7, isRetired: false },
+    {
+      categoryId: BREATH_HOLD_ID,
+      name: "Breath hold",
+      rating: 5,
+      isRetired: false,
+    },
   ],
 };
 
@@ -55,6 +73,7 @@ type FakeOptions = {
     ReturnType<MemberEvaluationGateways["evaluations"]["createEvaluation"]>
   >;
   readonly save?: RatingsSave;
+  readonly refresh?: EvaluationRefresh;
 };
 
 function fakeGateways(options: FakeOptions = {}): Fake {
@@ -97,6 +116,14 @@ function fakeGateways(options: FakeOptions = {}): Fake {
         const result = options.save ?? { kind: "saved" };
         if (result.kind === "saved") {
           stored = { ...TWO_CATEGORIES, updatedAt: SAVED_AT };
+        }
+        return result;
+      },
+      refreshEvaluation: async (scope) => {
+        writes.push(`refresh ${scope.userId}`);
+        const result = options.refresh ?? { kind: "already_current" };
+        if (result.kind === "refreshed") {
+          stored = REFRESHED;
         }
         return result;
       },
@@ -400,7 +427,119 @@ describe("guardar valoraciones", () => {
   });
 });
 
+describe("una evaluación guardada no cambia sola", () => {
+  it("el OVR cuenta su propio conjunto, también la categoría que el club desactivó", async () => {
+    const { gateways } = fakeGateways({ stored: TWO_CATEGORIES });
+
+    const evaluation = await readMemberEvaluation(gateways, {
+      callerId: COACH_ID,
+      memberId: MEMBER_ID,
+    });
+
+    expect(evaluation).toMatchObject({
+      overallRating: 7.5,
+      ratings: TWO_CATEGORIES.ratings,
+    });
+  });
+
+  it("guardar valoraciones no la pone al día", async () => {
+    const { gateways, writes } = fakeGateways({ stored: TWO_CATEGORIES });
+
+    await saveEvaluationRatings(gateways, SAVE_REQUEST);
+
+    expect(writes.some((write) => write.startsWith("refresh"))).toBe(false);
+  });
+});
+
+const REFRESH_REQUEST = { callerId: COACH_ID, memberId: MEMBER_ID } as const;
+
+describe("poner al día una evaluación", () => {
+  it("devuelve la evaluación con el conjunto nuevo, su OVR y qué pasó", async () => {
+    const { gateways, writes } = fakeGateways({
+      stored: TWO_CATEGORIES,
+      refresh: { kind: "refreshed", addedCount: 1, removedCount: 1 },
+    });
+
+    const result = await refreshMemberEvaluation(gateways, REFRESH_REQUEST);
+
+    expect(writes).toEqual([`refresh ${MEMBER_ID}`]);
+    expect(result).toEqual({
+      outcome: { kind: "refreshed", addedCount: 1, removedCount: 1 },
+      evaluation: {
+        status: "evaluated",
+        memberId: MEMBER_ID,
+        updatedAt: SAVED_AT,
+        overallRating: 6,
+        ratings: REFRESHED.ratings,
+      },
+    });
+  });
+
+  it("dice que ya estaba al día y la devuelve sin cambios", async () => {
+    const { gateways } = fakeGateways({ stored: TWO_CATEGORIES });
+
+    const result = await refreshMemberEvaluation(gateways, REFRESH_REQUEST);
+
+    expect(result.outcome).toEqual({ kind: "already_current" });
+    expect(result.evaluation).toMatchObject({
+      updatedAt: READ_AT,
+      overallRating: 7.5,
+    });
+  });
+
+  it.each<[EvaluationRefresh, new () => Error]>([
+    [{ kind: "evaluation_not_found" }, EvaluationNotFoundError],
+    [{ kind: "no_active_categories" }, NoActiveCategoriesError],
+    [{ kind: "member_inactive" }, EvaluatedMemberInactiveError],
+    [{ kind: "member_not_found" }, EvaluatedMemberNotFoundError],
+  ])("traduce %o de la base a su error", async (refresh, expected) => {
+    const { gateways } = fakeGateways({ stored: TWO_CATEGORIES, refresh });
+
+    const attempt = refreshMemberEvaluation(gateways, REFRESH_REQUEST);
+
+    await expect(attempt).rejects.toBeInstanceOf(expected);
+  });
+
+  it("rechaza a un Player sin tocar la evaluación", async () => {
+    const { gateways, writes } = fakeGateways({
+      role: "Player",
+      stored: TWO_CATEGORIES,
+    });
+
+    const attempt = refreshMemberEvaluation(gateways, REFRESH_REQUEST);
+
+    await expect(attempt).rejects.toBeInstanceOf(EvaluationForbiddenError);
+    expect(writes).toEqual([]);
+  });
+});
+
 describe("bitácora", () => {
+  it("deja una entrada al ponerla al día", async () => {
+    const { gateways, auditRows } = fakeGateways({
+      stored: TWO_CATEGORIES,
+      refresh: { kind: "refreshed", addedCount: 1, removedCount: 0 },
+    });
+
+    await refreshMemberEvaluation(gateways, REFRESH_REQUEST);
+
+    expect(auditRows).toEqual([
+      expect.objectContaining({
+        actor_id: COACH_ID,
+        action: "member_evaluation.refreshed",
+        entity_type: "member",
+        entity_id: MEMBER_ID,
+      }),
+    ]);
+  });
+
+  it("no deja entrada si ya estaba al día", async () => {
+    const { gateways, auditRows } = fakeGateways({ stored: TWO_CATEGORIES });
+
+    await refreshMemberEvaluation(gateways, REFRESH_REQUEST);
+
+    expect(auditRows).toEqual([]);
+  });
+
   it("deja una entrada al crear, con quién evaluó y sobre quién", async () => {
     const { gateways, auditRows } = fakeGateways();
 

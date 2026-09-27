@@ -58,6 +58,20 @@ export const AUDIT_ACTIONS = [
   // OVR. Quién evaluó, sobre quién y cuándo ya están en la entrada.
   "member_evaluation.created",
   "member_evaluation.ratings_saved",
+  // RF-4 de E9 (#320): un Coach o un Admin pone al día la evaluación de un
+  // miembro con el conjunto actual de categorías. Sólo cuando cambió algo; la
+  // entidad es el miembro, sin metadata, como las dos de arriba.
+  "member_evaluation.refreshed",
+  // RF-3 de E9 (#320): un Coach o un Admin configura el catálogo de
+  // categorías. La entidad es la categoría (`evaluation_category`), sin
+  // metadata: ni el nombre nuevo ni el anterior. Reordenar toca todas, así
+  // que su entidad es el club y la metadata lleva los ids en el orden nuevo
+  // (`{ categoryIds }`).
+  "evaluation_category.created",
+  "evaluation_category.renamed",
+  "evaluation_category.reordered",
+  "evaluation_category.deactivated",
+  "evaluation_category.reactivated",
   "payment.status_changed",
 ] as const;
 

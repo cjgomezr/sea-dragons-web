@@ -1,34 +1,19 @@
 import type { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
-import { ApiError } from "@/lib/api/response";
+import { identifyAccountCaller } from "@/lib/auth/account-api";
 import {
-  asAccountApiError,
-  identifyAccountCaller,
-} from "@/lib/auth/account-api";
-import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
-import {
-  EVALUATION_CHANGED_REASON,
-  EVALUATION_EXISTS_REASON,
-  EVALUATION_NOT_FOUND_REASON,
-  EvaluatedMemberInactiveError,
-  EvaluatedMemberNotFoundError,
-  EvaluationAlreadyExistsError,
-  EvaluationChangedError,
-  EvaluationForbiddenError,
-  EvaluationNotFoundError,
-  EvaluationValidationError,
-  MEMBER_INACTIVE_REASON,
-  MEMBER_NOT_FOUND_REASON,
   type MemberEvaluation,
-  type MemberEvaluationGateways,
-  NO_ACTIVE_CATEGORIES_REASON,
-  NoActiveCategoriesError,
   createMemberEvaluation,
   readMemberEvaluation,
   saveEvaluationRatings,
 } from "@/lib/evaluations/member-evaluation";
-import { createSupabaseMemberEvaluationGateways } from "@/lib/evaluations/supabase-member-evaluation-gateways";
+import {
+  type MemberEvaluationRouteContext,
+  asEvaluationApiError,
+  readMemberId,
+  requireMemberEvaluationGateways,
+} from "@/lib/evaluations/member-evaluation-api";
 
 /**
  * La evaluación de un miembro (#319, RF-1, RF-2 y RF-5 del PRD de E9). GET la
@@ -67,75 +52,7 @@ type RatingsBody = z.infer<typeof ratingsBodySchema>;
  * miembro no tiene ninguna. */
 export type MemberEvaluationResponse = MemberEvaluation;
 
-type MemberEvaluationRouteContext = {
-  readonly params: Promise<{ readonly id: string }>;
-};
-
 const CREATED_STATUS = 201;
-
-function requireMemberEvaluationGateways(): MemberEvaluationGateways {
-  const wiring = createSupabaseMemberEvaluationGateways(process.env);
-  if (wiring.kind === "unconfigured") {
-    throw new ApiError(
-      "service_unavailable",
-      describeMissingAuthKeys(wiring.missingKeys),
-    );
-  }
-  return wiring.gateways;
-}
-
-/** Un id que no es un uuid no puede nombrar a ningún miembro: se responde
- * como uno que no existe, sin mandarle a Postgres un valor que rechazaría. */
-async function readMemberId(
-  context: MemberEvaluationRouteContext,
-): Promise<string> {
-  const { id } = await context.params;
-  if (!z.uuid().safeParse(id).success) {
-    throw new ApiError(
-      "not_found",
-      new EvaluatedMemberNotFoundError().message,
-      MEMBER_NOT_FOUND_REASON,
-    );
-  }
-  return id;
-}
-
-/** El código del primer problema va como `reason`, que la pantalla traduce. */
-function asEvaluationApiError(error: unknown): never {
-  if (error instanceof EvaluationValidationError) {
-    throw new ApiError(
-      "validation_error",
-      error.message,
-      error.issues[0]?.code,
-    );
-  }
-  if (error instanceof EvaluationForbiddenError) {
-    throw new ApiError("forbidden", error.message);
-  }
-  if (error instanceof EvaluatedMemberNotFoundError) {
-    throw new ApiError("not_found", error.message, MEMBER_NOT_FOUND_REASON);
-  }
-  if (error instanceof EvaluationNotFoundError) {
-    throw new ApiError("not_found", error.message, EVALUATION_NOT_FOUND_REASON);
-  }
-  if (error instanceof EvaluatedMemberInactiveError) {
-    throw new ApiError("business_rule", error.message, MEMBER_INACTIVE_REASON);
-  }
-  if (error instanceof NoActiveCategoriesError) {
-    throw new ApiError(
-      "business_rule",
-      error.message,
-      NO_ACTIVE_CATEGORIES_REASON,
-    );
-  }
-  if (error instanceof EvaluationAlreadyExistsError) {
-    throw new ApiError("conflict", error.message, EVALUATION_EXISTS_REASON);
-  }
-  if (error instanceof EvaluationChangedError) {
-    throw new ApiError("conflict", error.message, EVALUATION_CHANGED_REASON);
-  }
-  return asAccountApiError(error);
-}
 
 export function GET(
   request: NextRequest,

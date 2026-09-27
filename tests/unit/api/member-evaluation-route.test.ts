@@ -6,6 +6,7 @@ import { EVALUATIONS_API_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
 import type {
   EvaluationCreation,
+  EvaluationRefresh,
   MemberEvaluationGateways,
   RatingsSave,
   StoredEvaluation,
@@ -43,6 +44,7 @@ let memberStatus: AccountStatus | null;
 let stored: StoredEvaluation | null;
 let creation: EvaluationCreation;
 let save: RatingsSave;
+let refresh: EvaluationRefresh;
 
 function memberEvaluationGateways(): MemberEvaluationGateways {
   return {
@@ -70,6 +72,10 @@ function memberEvaluationGateways(): MemberEvaluationGateways {
             .join(",")}`,
         );
         return save;
+      },
+      refreshEvaluation: async () => {
+        writes.push("refresh");
+        return refresh;
       },
     },
     audit: {
@@ -105,6 +111,8 @@ vi.mock("@/lib/evaluations/supabase-member-evaluation-gateways", () => ({
 
 const { proxy } = await import("@/proxy");
 const route = await import("@/app/api/v1/evaluations/[id]/route");
+const refreshRoute =
+  await import("@/app/api/v1/evaluations/[id]/refresh/route");
 
 function givenSession(session: SessionState): void {
   if (session.kind === "active") {
@@ -144,6 +152,15 @@ function postEvaluation(memberId = MEMBER_ID): Promise<Response> {
   );
 }
 
+function postRefresh(memberId = MEMBER_ID): Promise<Response> {
+  return throughBoundary(
+    new NextRequest(new URL(`${evaluationUrl(memberId)}/refresh`), {
+      method: "POST",
+    }),
+    (request) => refreshRoute.POST(request, paramsOf(memberId)),
+  );
+}
+
 function putRequest(body: unknown, memberId = MEMBER_ID): NextRequest {
   return new NextRequest(evaluationUrl(memberId), {
     method: "PUT",
@@ -178,6 +195,7 @@ beforeEach(() => {
   stored = STORED;
   creation = { kind: "created" };
   save = { kind: "saved" };
+  refresh = { kind: "already_current" };
   givenSession({ kind: "active", role: "Coach" });
 });
 
@@ -187,6 +205,7 @@ describe("endpoints de evaluaciones", () => {
       ["GET", getEvaluation],
       ["POST", postEvaluation],
       ["PUT", () => putRatings(ratingsBody(9))],
+      ["POST refresh", () => postRefresh()],
     ] as const)("responde 401 al %s sin sesión", async (_method, call) => {
       givenSession({ kind: "anonymous" });
 
@@ -208,10 +227,11 @@ describe("endpoints de evaluaciones", () => {
         await getEvaluation(memberId),
         await postEvaluation(memberId),
         await putRatings(ratingsBody(9), memberId),
+        await postRefresh(memberId),
       ];
 
       expect(responses.map((response) => response.status)).toEqual([
-        403, 403, 403,
+        403, 403, 403, 403,
       ]);
       expect(writes).toEqual([]);
     });
@@ -418,6 +438,65 @@ describe("endpoints de evaluaciones", () => {
       await expect(errorOf(response)).resolves.toMatchObject({
         reason: "evaluation_not_found",
       });
+    });
+  });
+
+  describe("POST refresh: poner al día", () => {
+    it("responde 200 con qué pasó y la evaluación, y lo anota", async () => {
+      refresh = { kind: "refreshed", addedCount: 1, removedCount: 2 };
+
+      const response = await postRefresh();
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        data: {
+          outcome: { kind: "refreshed", addedCount: 1, removedCount: 2 },
+          evaluation: expect.objectContaining({ status: "evaluated" }),
+        },
+      });
+      expect(writes).toEqual([
+        "refresh",
+        `audit member_evaluation.refreshed ${MEMBER_ID}`,
+      ]);
+    });
+
+    it("responde 200 diciendo que ya estaba al día, sin anotar nada", async () => {
+      const response = await postRefresh();
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        data: { outcome: { kind: "already_current" } },
+      });
+      expect(writes).toEqual(["refresh"]);
+    });
+
+    it("responde 422 si el club no tiene categorías activas", async () => {
+      refresh = { kind: "no_active_categories" };
+
+      const response = await postRefresh();
+
+      expect(response.status).toBe(422);
+      await expect(errorOf(response)).resolves.toMatchObject({
+        reason: "no_active_categories",
+      });
+    });
+
+    it("responde 404 si el miembro no tiene evaluación", async () => {
+      refresh = { kind: "evaluation_not_found" };
+
+      const response = await postRefresh();
+
+      expect(response.status).toBe(404);
+      await expect(errorOf(response)).resolves.toMatchObject({
+        reason: "evaluation_not_found",
+      });
+    });
+
+    it("responde 404 a un id que no es de ningún miembro", async () => {
+      const response = await postRefresh("no-es-un-uuid");
+
+      expect(response.status).toBe(404);
+      expect(writes).toEqual([]);
     });
   });
 });

@@ -2,12 +2,18 @@ import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 import type { Role } from "@/lib/auth/roles";
 import {
+  createEvaluationCategory,
+  setEvaluationCategoryActive,
+} from "@/lib/evaluations/evaluation-categories";
+import {
   EvaluationChangedError,
   type MemberEvaluation,
   createMemberEvaluation,
   readMemberEvaluation,
+  refreshMemberEvaluation,
   saveEvaluationRatings,
 } from "@/lib/evaluations/member-evaluation";
+import { createEvaluationCategoriesGateways } from "@/lib/evaluations/supabase-evaluation-categories-gateways";
 import { createMemberEvaluationGateways } from "@/lib/evaluations/supabase-member-evaluation-gateways";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
@@ -22,8 +28,9 @@ import {
 } from "../../support/rls";
 
 /**
- * La evaluación de un miembro contra `seadragons-dev` (#319), con los
- * adaptadores de verdad y `0032_member_evaluation_writes.sql` aplicada. Lo
+ * La evaluación de un miembro contra `seadragons-dev` (#319, #320), con los
+ * adaptadores de verdad y `0032_member_evaluation_writes.sql` y
+ * `0033_manage_evaluation_categories.sql` aplicadas. Lo
  * que ningún doble dice: que la lectura anidada trae las categorías del club
  * en su orden, que las funciones se llaman con lo que esperan, que la fecha
  * que devuelve la lectura sirve para guardar, y que la sesión de un Player no
@@ -191,6 +198,81 @@ describeRls("la evaluación de un miembro en Supabase", () => {
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS * 2,
+  );
+
+  it(
+    "cambiar el catálogo no toca una evaluación guardada, y ponerla al día sí",
+    async () => {
+      await withCoachAndPlayer(async ({ clubId, coach, player }) => {
+        const serviceClient = createServiceRoleTestClient(process.env);
+        const gateways = createMemberEvaluationGateways(serviceClient.client);
+        const categoriesGateways = createEvaluationCategoriesGateways(
+          serviceClient.client,
+        );
+        const request = { callerId: coach.id, memberId: player.id };
+        const created = asEvaluated(
+          await createMemberEvaluation(gateways, request),
+        );
+        const teamworkId = String(
+          created.ratings.find((entry) => entry.name === "Teamwork")
+            ?.categoryId,
+        );
+        const saved = asEvaluated(
+          await saveEvaluationRatings(gateways, {
+            ...request,
+            expectedUpdatedAt: created.updatedAt,
+            ratings: [{ categoryId: teamworkId, rating: 10 }],
+          }),
+        );
+        expect(saved.overallRating).toBe(5.5);
+
+        await createEvaluationCategory(categoriesGateways, {
+          callerId: coach.id,
+          name: "Breath hold",
+        });
+        await setEvaluationCategoryActive(categoriesGateways, {
+          callerId: coach.id,
+          categoryId: teamworkId,
+          isActive: false,
+        });
+
+        const untouched = asEvaluated(
+          await readMemberEvaluation(gateways, request),
+        );
+        expect(untouched.ratings).toHaveLength(DEFAULT_CATEGORY_COUNT);
+        expect(untouched.overallRating).toBe(5.5);
+        expect(untouched.updatedAt).toBe(saved.updatedAt);
+
+        const refreshed = await refreshMemberEvaluation(gateways, request);
+        expect(refreshed.outcome).toEqual({
+          kind: "refreshed",
+          addedCount: 1,
+          removedCount: 1,
+        });
+        const names = asEvaluated(refreshed.evaluation).ratings.map(
+          (entry) => entry.name,
+        );
+        expect(names).toContain("Breath hold");
+        expect(names).not.toContain("Teamwork");
+        expect(asEvaluated(refreshed.evaluation).overallRating).toBe(5);
+
+        await expect(
+          refreshMemberEvaluation(gateways, request),
+        ).resolves.toMatchObject({ outcome: { kind: "already_current" } });
+
+        const actions = (await readAuditActions(serviceClient, clubId)).map(
+          (entry) => `${String(entry.action)} ${String(entry.entity_type)}`,
+        );
+        expect(actions).toEqual([
+          "member_evaluation.created member",
+          "member_evaluation.ratings_saved member",
+          "evaluation_category.created evaluation_category",
+          "evaluation_category.deactivated evaluation_category",
+          "member_evaluation.refreshed member",
+        ]);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS * 3,
   );
 
   it(
