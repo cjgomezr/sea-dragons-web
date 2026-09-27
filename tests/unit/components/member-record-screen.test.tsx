@@ -1015,6 +1015,7 @@ describe("ficha en pantalla: evaluación (#324)", () => {
                 isRetired: false,
               },
             ],
+            isCurrent: true,
           },
         }),
     });

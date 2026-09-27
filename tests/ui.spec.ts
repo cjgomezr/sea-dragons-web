@@ -4715,6 +4715,7 @@ const STUBBED_RECORD_EVALUATION = {
     rating,
     isRetired: false,
   })),
+  isCurrent: true,
 } as const;
 const CLUB_GROUPS_ENDPOINT = "/api/v1/groups";
 

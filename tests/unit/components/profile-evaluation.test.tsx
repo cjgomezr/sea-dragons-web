@@ -56,6 +56,7 @@ describe("notas privadas en el perfil", () => {
                 isRetired: false,
               },
             ],
+            isCurrent: true,
           },
         }}
       />,

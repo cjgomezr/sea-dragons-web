@@ -33,6 +33,7 @@ const STORED: StoredEvaluation = {
       isRetired: false,
     },
   ],
+  missingCategoryCount: 0,
 };
 
 type Fake = {
@@ -121,6 +122,7 @@ describe("notas privadas", () => {
           updatedAt: READ_AT,
           overallRating: 7.5,
           ratings: STORED.ratings,
+          isCurrent: true,
         },
       });
     },
