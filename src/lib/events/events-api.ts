@@ -15,6 +15,11 @@ import {
   RSVP_RESPONSES,
   RsvpClosedError,
 } from "./event-rsvp";
+import {
+  type EventAgendaGateways,
+  InvalidAgendaCursorError,
+} from "./event-agenda";
+import { createSupabaseEventAgendaGateways } from "./supabase-event-agenda-gateways";
 import { createSupabaseEventGateways } from "./supabase-event-gateways";
 import { createSupabaseEventRsvpGateways } from "./supabase-event-rsvp-gateways";
 
@@ -94,7 +99,21 @@ export function requireEventRsvpGateways(): EventRsvpGateways {
   return wiring.gateways;
 }
 
+export function requireEventAgendaGateways(): EventAgendaGateways {
+  const wiring = createSupabaseEventAgendaGateways(process.env);
+  if (wiring.kind === "unconfigured") {
+    throw new ApiError(
+      "service_unavailable",
+      describeMissingAuthKeys(wiring.missingKeys),
+    );
+  }
+  return wiring.gateways;
+}
+
 export function asEventsApiError(error: unknown): never {
+  if (error instanceof InvalidAgendaCursorError) {
+    throw new ApiError("validation_error", error.message);
+  }
   if (error instanceof EventValidationError) {
     throw new ApiError("business_rule", error.message, error.code);
   }

@@ -264,16 +264,25 @@ export const NEWS_ATTACHMENT_API_PATH = `${NEWS_POST_API_PATH}/attachments/[atta
  * de la serie. */
 export const EVENTS_MANAGE_API_PATH = "/api/v1/events/manage";
 
-/** Los eventos que ve quien llama: el camino de lectura, que completa la
- * agenda de #309. Lo alcanza cualquier cuenta activa, así que no aparece en
- * `RESTRICTED_ROUTES`: qué eventos ve cada uno lo decide su audiencia. */
+/** La agenda de quien llama (#309, RF-7 del PRD de E7): el camino de
+ * lectura. Lo alcanza cualquier cuenta activa, así que no aparece en
+ * `RESTRICTED_ROUTES`: qué eventos ve cada uno lo decide el handler con su
+ * rol y su audiencia, como en el directorio. Las escrituras del organizador
+ * viven a propósito en otro camino, `EVENTS_MANAGE_API_PATH` (#307): la
+ * frontera decide por camino y no por método, y un POST colgado de aquí
+ * quedaría abierto a los cuatro roles. */
 export const EVENTS_API_PATH = "/api/v1/events";
+
+/** El detalle de un evento (#309, RF-6). `[id]` es el de la ocurrencia. Lo
+ * alcanza cualquier cuenta activa; quien está fuera de la audiencia recibe
+ * 404 (AC-052). */
+export const EVENT_API_PATH = `${EVENTS_API_PATH}/[id]`;
 
 /** Responder a un evento (#308, RF-5). `[id]` es el de la ocurrencia. Cuelga
  * del camino de lectura y no de `EVENTS_MANAGE_API_PATH`: responde cualquier
  * miembro de la audiencia, sea cual sea su rol (B7), y quien está fuera
  * recibe 404. */
-export const EVENT_RSVP_API_PATH = `${EVENTS_API_PATH}/[id]/rsvp`;
+export const EVENT_RSVP_API_PATH = `${EVENT_API_PATH}/rsvp`;
 
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";

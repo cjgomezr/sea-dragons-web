@@ -8,7 +8,9 @@ import {
   DASHBOARD_PATH,
   EMAIL_CONFIRMATION_PATH,
   EVALUATIONS_PATH,
+  EVENTS_API_PATH,
   EVENTS_MANAGE_API_PATH,
+  EVENT_API_PATH,
   EVENT_RSVP_API_PATH,
   GROUPS_API_PATH,
   GROUPS_PATH,
@@ -870,6 +872,32 @@ describe("frontera del RSVP (#308)", () => {
   it("responde 401 sin sesión", () => {
     expect(
       decideSessionBoundary({ pathname: EVENT_RSVP, ...ANONYMOUS }),
+    ).toEqual({ kind: "unauthenticated" });
+  });
+});
+
+/** Un evento cualquiera, en el segmento dinámico del detalle (#309). */
+const EVENT_DETAIL = EVENT_API_PATH.replace(
+  "[id]",
+  "e1e1e1e1-0000-4000-8000-00000000000e",
+);
+
+describe("frontera de la agenda y el detalle (#309)", () => {
+  it.each(ROLES)("deja leer la agenda a un %s", (role) => {
+    expect(
+      decideSessionBoundary({ pathname: EVENTS_API_PATH, ...activeAs(role) }),
+    ).toEqual(ALLOW);
+  });
+
+  it.each(ROLES)("deja abrir un evento a un %s", (role) => {
+    expect(
+      decideSessionBoundary({ pathname: EVENT_DETAIL, ...activeAs(role) }),
+    ).toEqual(ALLOW);
+  });
+
+  it("responde 401 sin sesión", () => {
+    expect(
+      decideSessionBoundary({ pathname: EVENTS_API_PATH, ...ANONYMOUS }),
     ).toEqual({ kind: "unauthenticated" });
   });
 });
