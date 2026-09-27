@@ -26,6 +26,7 @@ const SHORTLIST: NewsFeedItem = {
     fullName: "Sofía Castro",
   },
   publishedAt: TWO_DAYS_AGO,
+  status: "published",
   attachmentCount: 2,
 };
 
@@ -39,6 +40,7 @@ const WINTER: NewsFeedItem = {
     fullName: "Santiago Holguín",
   },
   publishedAt: FOUR_DAYS_AGO,
+  status: "published",
   attachmentCount: 0,
 };
 
@@ -52,6 +54,7 @@ const POLICY: NewsFeedItem = {
     fullName: "Liam O'Connor",
   },
   publishedAt: "2026-09-19T08:00:00.000Z",
+  status: "published",
   attachmentCount: 1,
 };
 

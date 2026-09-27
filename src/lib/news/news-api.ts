@@ -4,6 +4,7 @@ import { asAccountApiError } from "@/lib/auth/account-api";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { NEWS_ATTACHMENTS_MAX_PER_POST } from "./news-attachments";
 import { InvalidNewsFeedCursorError } from "./news-feed";
+import { NewsPostChangedError, NewsPostNotYoursError } from "./news-management";
 import {
   EmptyNewsAudienceError,
   ForeignNewsGroupError,
@@ -39,6 +40,19 @@ export const newsDraftSchema = z.object({
     .array(z.uuid())
     .max(NEWS_ATTACHMENTS_MAX_PER_POST)
     .default([]),
+});
+
+/** Una edición (#331): el mismo borrador, sin adjuntos, y la marca de
+ * editada que se tenía delante. Es obligatoria, `null` incluido: sin ella no
+ * hay forma de saber si se pisaría a otra persona. */
+export const newsEditSchema = newsDraftSchema
+  .omit({ attachmentUploadIds: true })
+  .extend({
+    expectedEditedAt: z.iso.datetime({ offset: true }).nullable(),
+  });
+
+export const newsStatusSchema = z.object({
+  status: z.enum(["published", "withdrawn"]),
 });
 
 /** Un id que no es un uuid no puede nombrar ninguna publicación: responde
@@ -81,8 +95,14 @@ export function asNewsApiError(error: unknown): never {
   if (error instanceof NewsPostNotFoundError) {
     throw new ApiError("not_found", error.message);
   }
-  if (error instanceof NewsForbiddenError) {
+  if (
+    error instanceof NewsForbiddenError ||
+    error instanceof NewsPostNotYoursError
+  ) {
     throw new ApiError("forbidden", error.message);
+  }
+  if (error instanceof NewsPostChangedError) {
+    throw new ApiError("conflict", error.message);
   }
   return asAccountApiError(error);
 }

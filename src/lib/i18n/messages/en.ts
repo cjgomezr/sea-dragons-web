@@ -1047,4 +1047,29 @@ export const englishMessages = {
     "Someone else changed the categories in the meantime. Load the latest ones and try again.",
   "evaluations.categories.error.notFound":
     "That category no longer exists. Load the latest categories.",
+  "news.post.edit": "Edit",
+  "news.post.withdraw": "Withdraw",
+  "news.post.withdrawQuestion":
+    "Withdraw this post? It disappears from everyone's feed and its attachments stop being available. It isn't deleted: you can publish it again later.",
+  "news.post.withdrawConfirm": "Withdraw post",
+  "news.post.withdrawing": "Withdrawing…",
+  "news.post.cancel": "Cancel",
+  "news.post.republish": "Publish again",
+  "news.post.republishing": "Publishing…",
+  "news.post.error.withdraw": "We couldn't withdraw it. Try again.",
+  "news.post.error.republish": "We couldn't publish it again. Try again.",
+  "news.edit.metaTitle": "Edit post · {club}",
+  "news.edit.metaDescription": "Correct a post you published.",
+  "news.edit.back": "← Back to the post",
+  "news.edit.title": "Edit post",
+  "news.edit.lead":
+    "Saving doesn't notify anyone. The post will show that it was edited, and when.",
+  "news.edit.loading": "Loading the post…",
+  "news.edit.loadFailed": "We couldn't load the post. Try again.",
+  "news.edit.forbidden": "You can only edit your own posts.",
+  "news.edit.submit": "Save changes",
+  "news.edit.sending": "Saving…",
+  "news.edit.error.conflict":
+    "Someone else saved this post while you were editing it. Reload the page to see their changes before saving yours.",
+  "news.edit.error.unexpected": "We couldn't save the changes. Try again.",
 } as const satisfies Readonly<Record<string, Message>>;

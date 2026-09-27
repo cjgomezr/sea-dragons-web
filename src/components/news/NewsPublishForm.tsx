@@ -9,14 +9,17 @@ import {
   type NewsDraftIssue,
   listNewsDraftIssues,
 } from "@/lib/news/news-draft";
+import type { EditableNewsPost } from "@/lib/news/news-management";
 import {
   NEWS_CATEGORIES,
   NEWS_TITLE_MAX_LENGTH,
   type NewsAudience,
   type NewsCategory,
+  type NewsDraft,
 } from "@/lib/news/news-posts";
 import { type AudienceChoice, NewsAudienceField } from "./NewsAudienceField";
 import { NewsAttachmentsField } from "./NewsAttachmentsField";
+import { describeEditFailure, saveNewsEdit } from "./news-manage-client";
 import {
   describeDraftIssue,
   describePublishFailure,
@@ -32,7 +35,22 @@ import { useNewsAttachments } from "./use-news-attachments";
  * solo: cada campo dice su límite, y lo que falta se marca junto al campo
  * antes de mandar nada, con la misma regla que el servidor. Un fallo al
  * publicar no borra nada: lo escrito y lo subido siguen ahí para reintentar.
+ *
+ * Editar (#331) es el mismo formulario con los valores cargados y otro verbo.
+ * No ofrece adjuntos: la edición cubre categoría, título, cuerpo y audiencia,
+ * y los adjuntos tienen sus propios endpoints. Guarda con la marca de editada
+ * que tenía delante; si alguien guardó entretanto, el servidor responde con
+ * un conflicto y lo escrito se queda para no perderlo.
  */
+
+/** Publicar una nueva, o editar una que ya existe. */
+export type NewsFormIntent =
+  | { readonly kind: "publish"; readonly onPublished: () => void }
+  | {
+      readonly kind: "edit";
+      readonly post: EditableNewsPost;
+      readonly onSaved: () => void;
+    };
 
 type Status =
   | { readonly kind: "editing" }
@@ -62,6 +80,20 @@ const FIELD_IDS = {
 const TITLE_HINT_ID = "publicar-titulo-pista";
 const BODY_HINT_ID = "publicar-cuerpo-pista";
 const UPLOADS_HINT_ID = "publicar-esperando-adjuntos";
+
+function draftOf(post: EditableNewsPost): Draft {
+  return {
+    category: post.category,
+    title: post.title,
+    body: post.body,
+    audience: {
+      kind: post.audience.kind,
+      groupIds: new Set(
+        post.audience.kind === "groups" ? post.audience.groupIds : [],
+      ),
+    },
+  };
+}
 
 function toAudience(choice: AudienceChoice): NewsAudience {
   return choice.kind === "club"
@@ -187,9 +219,11 @@ function TitleAndBodyFields({
 
 function SubmitFailure({
   translate,
+  intent,
   status,
 }: {
   readonly translate: Translator;
+  readonly intent: NewsFormIntent["kind"];
   readonly status: Status;
 }): React.JSX.Element | null {
   if (status.kind !== "failed") {
@@ -197,21 +231,36 @@ function SubmitFailure({
   }
   return (
     <p className="auth-error" role="alert">
-      {describePublishFailure(translate, status)}
+      {intent === "edit"
+        ? describeEditFailure(translate, status)
+        : describePublishFailure(translate, status)}
     </p>
   );
+}
+
+function submitLabel(
+  translate: Translator,
+  intent: NewsFormIntent["kind"],
+  isSending: boolean,
+): string {
+  if (intent === "edit") {
+    return translate(isSending ? "news.edit.sending" : "news.edit.submit");
+  }
+  return translate(isSending ? "news.publish.sending" : "news.publish.submit");
 }
 
 export function NewsPublishForm({
   translate,
   clubGroups,
-  onPublished,
+  intent,
 }: {
   readonly translate: Translator;
   readonly clubGroups: readonly Group[];
-  readonly onPublished: () => void;
+  readonly intent: NewsFormIntent;
 }): React.JSX.Element {
-  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<Draft>(() =>
+    intent.kind === "edit" ? draftOf(intent.post) : EMPTY_DRAFT,
+  );
   const [status, setStatus] = useState<Status>({ kind: "editing" });
   const [issues, setIssues] = useState<readonly NewsDraftIssue[]>([]);
   const attachments = useNewsAttachments();
@@ -239,19 +288,32 @@ export function NewsPublishForm({
     }
     isSendingRef.current = true;
     setStatus({ kind: "sending" });
-    const result = await publishNews({
+    const submission: NewsDraft = {
       category: draft.category,
       title: draft.title,
       body: draft.body,
       audience,
-      attachmentUploadIds: attachments.uploadIds,
-    });
+    };
+    const result =
+      intent.kind === "edit"
+        ? await saveNewsEdit(intent.post.id, {
+            ...submission,
+            expectedEditedAt: intent.post.editedAt,
+          })
+        : await publishNews({
+            ...submission,
+            attachmentUploadIds: attachments.uploadIds,
+          });
     isSendingRef.current = false;
     if (result.kind === "failed") {
       setStatus(result);
       return;
     }
-    onPublished();
+    if (intent.kind === "edit") {
+      intent.onSaved();
+    } else {
+      intent.onPublished();
+    }
   }
 
   const issueTextFor = (field: NewsDraftField): string | null => {
@@ -284,9 +346,18 @@ export function NewsPublishForm({
           issueText={issueTextFor("audience")}
           onChange={(audience) => update({ audience })}
         />
-        <NewsAttachmentsField translate={translate} attachments={attachments} />
+        {intent.kind === "publish" ? (
+          <NewsAttachmentsField
+            translate={translate}
+            attachments={attachments}
+          />
+        ) : null}
       </fieldset>
-      <SubmitFailure translate={translate} status={status} />
+      <SubmitFailure
+        translate={translate}
+        intent={intent.kind}
+        status={status}
+      />
       {attachments.isUploading ? (
         <p className="auth-note" id={UPLOADS_HINT_ID}>
           {translate("news.publish.waitForUploads")}
@@ -298,7 +369,7 @@ export function NewsPublishForm({
         disabled={isSending || attachments.isUploading}
         aria-describedby={attachments.isUploading ? UPLOADS_HINT_ID : undefined}
       >
-        {translate(isSending ? "news.publish.sending" : "news.publish.submit")}
+        {submitLabel(translate, intent.kind, isSending)}
       </button>
     </form>
   );

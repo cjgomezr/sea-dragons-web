@@ -82,7 +82,10 @@ export function NewsPublishScreen({
         <NewsPublishForm
           translate={translate}
           clubGroups={groups.groups}
-          onPublished={() => router.push(NEWS_PATH)}
+          intent={{
+            kind: "publish",
+            onPublished: () => router.push(NEWS_PATH),
+          }}
         />
       ) : null}
     </div>

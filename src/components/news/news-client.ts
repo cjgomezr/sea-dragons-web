@@ -29,6 +29,8 @@ const CURSOR_PARAM = "cursor";
 
 const authorSchema = z.object({ id: z.uuid(), fullName: z.string() });
 
+const statusSchema = z.enum(["published", "withdrawn"]);
+
 const feedItemSchema = z.object({
   id: z.uuid(),
   category: z.enum(NEWS_CATEGORIES),
@@ -36,6 +38,7 @@ const feedItemSchema = z.object({
   excerpt: z.string(),
   author: authorSchema,
   publishedAt: z.iso.datetime({ offset: true }),
+  status: statusSchema,
   attachmentCount: z.number().int().nonnegative(),
 });
 
@@ -46,26 +49,29 @@ const feedResponseSchema = z.object({
   }),
 });
 
-const postResponseSchema = z.object({
-  data: z.object({
-    id: z.uuid(),
-    category: z.enum(NEWS_CATEGORIES),
-    title: z.string(),
-    body: z.string(),
-    author: authorSchema,
-    publishedAt: z.iso.datetime({ offset: true }),
-    editedAt: z.iso.datetime({ offset: true }).nullable(),
-    status: z.enum(["published", "withdrawn"]),
-    attachments: z.array(
-      z.object({
-        id: z.uuid(),
-        fileName: z.string(),
-        contentType: z.string(),
-        sizeBytes: z.number().int().nonnegative(),
-      }),
-    ),
-  }),
+/** La publicación abierta. Editar, retirar y volver a publicar (#331)
+ * responden con la misma forma. */
+export const newsPostDetailSchema = z.object({
+  id: z.uuid(),
+  category: z.enum(NEWS_CATEGORIES),
+  title: z.string(),
+  body: z.string(),
+  author: authorSchema,
+  publishedAt: z.iso.datetime({ offset: true }),
+  editedAt: z.iso.datetime({ offset: true }).nullable(),
+  status: statusSchema,
+  attachments: z.array(
+    z.object({
+      id: z.uuid(),
+      fileName: z.string(),
+      contentType: z.string(),
+      sizeBytes: z.number().int().nonnegative(),
+    }),
+  ),
+  canManage: z.boolean(),
 });
+
+const postResponseSchema = z.object({ data: newsPostDetailSchema });
 
 // Sólo una dirección web: la pantalla navega a ella tal cual.
 const downloadResponseSchema = z.object({

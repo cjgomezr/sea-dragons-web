@@ -250,6 +250,7 @@ describe("abrir una publicación", () => {
       editedAt: "2026-09-27T08:00:00.000000+00:00",
       status: "published",
       attachments: [attachment],
+      canManage: false,
     });
   });
 

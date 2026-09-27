@@ -17,6 +17,10 @@ import {
   MEMBER_ROLE_API_PATH,
   NEWS_API_PATH,
   NEWS_PATH,
+  NEWS_EDIT_PATH,
+  NEWS_POST_MANAGE_API_PATH,
+  NEWS_POST_PATH,
+  NEWS_POST_STATUS_API_PATH,
   NEWS_PUBLISH_PATH,
   NEWS_UPLOAD_API_PATH,
   NEWS_UPLOADS_API_PATH,
@@ -771,5 +775,53 @@ describe("frontera del formulario de publicar (#330)", () => {
     expect(
       decideSessionBoundary({ pathname: NEWS_PATH, ...activeAs(role) }),
     ).toEqual(ALLOW);
+  });
+});
+
+/** Editar y retirar (#331). Cuelgan de publicar, así que sólo los alcanzan
+ * Admin y Committee; la pantalla de editar cuelga de la publicación abierta,
+ * que es de todos, y por eso se declara por su cuenta. */
+const MANAGED_POST_ID = "d3d3d3d3-0000-4000-8000-00000000000d";
+const NEWS_MANAGE = NEWS_POST_MANAGE_API_PATH.replace("[id]", MANAGED_POST_ID);
+const NEWS_STATUS = NEWS_POST_STATUS_API_PATH.replace("[id]", MANAGED_POST_ID);
+const NEWS_EDIT = NEWS_EDIT_PATH.replace("[id]", MANAGED_POST_ID);
+
+describe("frontera de editar y retirar (#331)", () => {
+  it.each(
+    (["Coach", "Player"] as const).flatMap((role) =>
+      [NEWS_MANAGE, NEWS_STATUS].map((pathname) => [role, pathname] as const),
+    ),
+  )("niega a un %s %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual({
+      kind: "missingCapability",
+    });
+  });
+
+  it.each(["Coach", "Player"] as const)(
+    "manda al panel a un %s que abre la edición a mano",
+    (role) => {
+      expect(
+        decideSessionBoundary({ pathname: NEWS_EDIT, ...activeAs(role) }),
+      ).toEqual({ kind: "redirect", to: DASHBOARD_PATH });
+    },
+  );
+
+  it.each(
+    (["Admin", "Committee"] as const).flatMap((role) =>
+      [NEWS_EDIT, NEWS_MANAGE, NEWS_STATUS].map(
+        (pathname) => [role, pathname] as const,
+      ),
+    ),
+  )("deja a un %s entrar en %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
+      ALLOW,
+    );
+  });
+
+  it.each(ROLES)("sigue dejando a un %s abrir una publicación", (role) => {
+    const pathname = NEWS_POST_PATH.replace("[id]", MANAGED_POST_ID);
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
+      ALLOW,
+    );
   });
 });

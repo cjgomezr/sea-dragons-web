@@ -8161,6 +8161,7 @@ const STUBBED_FEED_POSTS = [
       "Twelve Seadragons named in the extended squad for the August nationals in Brisbane. Final eight confirmed after trials.",
     author: NEWS_AUTHOR,
     publishedAt: hoursAgo(49),
+    status: "published",
     attachmentCount: 1,
   },
   {
@@ -8174,6 +8175,7 @@ const STUBBED_FEED_POSTS = [
       fullName: "Liam O'Connor",
     },
     publishedAt: hoursAgo(97),
+    status: "published",
     attachmentCount: 0,
   },
   {
@@ -8184,6 +8186,7 @@ const STUBBED_FEED_POSTS = [
       "Please review the revised buddy-check and equipment policy before the next session.",
     author: NEWS_AUTHOR,
     publishedAt: hoursAgo(24 * 8),
+    status: "published",
     attachmentCount: 2,
   },
 ] as const;
@@ -8198,6 +8201,7 @@ const STUBBED_POST = {
   publishedAt: "2026-09-15T08:00:00.000Z",
   editedAt: "2026-09-16T01:30:00.000Z",
   status: "published",
+  canManage: false,
   attachments: [
     {
       id: "d0d0d0d0-0000-4000-8000-0000000000d1",
@@ -8223,6 +8227,50 @@ const STUBBED_POST_WITHOUT_ATTACHMENTS = {
   editedAt: null,
   attachments: [],
 } as const;
+
+/** Dos de quien mira (#331): una editada, que puede editar y retirar, y otra
+ * que ya retiró. */
+const NEWS_OWN_POST_ID = "a0a0a0a0-0000-4000-8000-0000000000a5";
+const NEWS_OWN_WITHDRAWN_POST_ID = "a0a0a0a0-0000-4000-8000-0000000000a6";
+
+const STUBBED_OWN_POST = {
+  ...STUBBED_POST_WITHOUT_ATTACHMENTS,
+  id: NEWS_OWN_POST_ID,
+  category: "announcement",
+  title: "Pool change: Tuesday training moves to MSAC",
+  editedAt: "2026-09-16T01:30:00.000Z",
+  canManage: true,
+} as const;
+
+const STUBBED_OWN_WITHDRAWN_POST = {
+  ...STUBBED_OWN_POST,
+  id: NEWS_OWN_WITHDRAWN_POST_ID,
+  title: "Call-up for the Sydney friendly",
+  editedAt: null,
+  status: "withdrawn",
+} as const;
+
+const STUBBED_POSTS = [
+  STUBBED_POST,
+  STUBBED_POST_WITHOUT_ATTACHMENTS,
+  STUBBED_OWN_POST,
+  STUBBED_OWN_WITHDRAWN_POST,
+] as const;
+
+/** El feed de quien publicó: lo suyo retirado le llega marcado (#331). */
+const STUBBED_FEED_WITH_WITHDRAWN = [
+  {
+    id: NEWS_OWN_WITHDRAWN_POST_ID,
+    category: "announcement",
+    title: STUBBED_OWN_WITHDRAWN_POST.title,
+    excerpt: "The friendly in Sydney is off. We'll share a new date soon.",
+    author: NEWS_AUTHOR,
+    publishedAt: hoursAgo(26),
+    status: "withdrawn",
+    attachmentCount: 0,
+  },
+  ...STUBBED_FEED_POSTS,
+] as const;
 
 function jsonBody(data: unknown): {
   status: number;
@@ -8256,11 +8304,9 @@ async function stubNewsReads(
     (url) => url.pathname.startsWith(`${NEWS_FEED_ENDPOINT}/`),
     (route, request) => {
       const { pathname } = new URL(request.url());
-      if (pathname.endsWith(NEWS_POST_ID)) {
-        return route.fulfill(jsonBody(STUBBED_POST));
-      }
-      if (pathname.endsWith(NEWS_POST_WITHOUT_ATTACHMENTS_ID)) {
-        return route.fulfill(jsonBody(STUBBED_POST_WITHOUT_ATTACHMENTS));
+      const known = STUBBED_POSTS.find((post) => pathname.endsWith(post.id));
+      if (known !== undefined) {
+        return route.fulfill(jsonBody(known));
       }
       return route.fulfill({
         status: 404,
@@ -8300,6 +8346,23 @@ async function waitForPost(page: Page): Promise<void> {
   await expect(
     page.getByText(/Loading the post|Cargando la publicación/),
   ).toHaveCount(0);
+}
+
+/** La de quien mira, con sus acciones (#331). */
+async function waitForManagedPost(page: Page): Promise<void> {
+  await waitForPost(page);
+  await expect(
+    page.getByRole("link", { name: /^(Edit|Editar)$/ }),
+  ).toBeVisible();
+}
+
+const WITHDRAW_BUTTON = /^(Withdraw|Retirar)$/;
+const WITHDRAW_QUESTION = /^(Withdraw this post\?|¿Retirar esta publicación\?)/;
+
+async function openWithdrawConfirmation(page: Page): Promise<void> {
+  await waitForManagedPost(page);
+  await page.getByRole("button", { name: WITHDRAW_BUTTON }).click();
+  await expect(page.getByText(WITHDRAW_QUESTION)).toBeVisible();
 }
 
 const FEED_HEADING = /Club feed|Novedades del club/;
@@ -8368,6 +8431,42 @@ const NEWS_STATES: readonly NewsState[] = [
     feed: [],
     heading: /This post doesn't exist/,
     ready: waitForPost,
+  },
+  {
+    name: "publicacion-editada-propia",
+    path: postPath(NEWS_OWN_POST_ID),
+    feed: [],
+    heading: new RegExp(STUBBED_OWN_POST.title),
+    ready: waitForManagedPost,
+  },
+  {
+    name: "publicacion-retirar-confirmacion",
+    path: postPath(NEWS_OWN_POST_ID),
+    feed: [],
+    heading: new RegExp(STUBBED_OWN_POST.title),
+    ready: openWithdrawConfirmation,
+  },
+  {
+    name: "publicacion-retirar-confirmacion-es",
+    path: postPath(NEWS_OWN_POST_ID),
+    feed: [],
+    heading: new RegExp(STUBBED_OWN_POST.title),
+    beforeVisit: chooseSpanish,
+    ready: openWithdrawConfirmation,
+  },
+  {
+    name: "publicacion-retirada-propia",
+    path: postPath(NEWS_OWN_WITHDRAWN_POST_ID),
+    feed: [],
+    heading: new RegExp(STUBBED_OWN_WITHDRAWN_POST.title),
+    ready: waitForManagedPost,
+  },
+  {
+    name: "noticias-con-retirada",
+    path: NEWS_SCREEN_PATH,
+    feed: STUBBED_FEED_WITH_WITHDRAWN,
+    heading: FEED_HEADING,
+    ready: waitForFeedRows,
   },
 ];
 
@@ -9521,5 +9620,223 @@ test.describe("categorías de evaluación en el navegador", () => {
     await expect(
       page.getByRole("button", { name: "Move Speed down" }),
     ).toBeFocused();
+  });
+});
+
+/* ---------------------------------------------------------------------------
+   Editar y retirar una publicación (#331). Sin mockup: se revisan contra
+   design-system.md. Editar es el formulario de publicar con los valores
+   cargados, sin adjuntos.
+
+   Como el resto de Noticias, las capturas leen datos fijos servidos por
+   `page.route`. Lo que los endpoints hacen de verdad se prueba contra
+   seadragons-dev (#331).
+   --------------------------------------------------------------------------- */
+
+const NEWS_MANAGE_ENDPOINT = `${NEWS_PUBLISH_ENDPOINT}/${NEWS_OWN_POST_ID}`;
+const NEWS_STATUS_ENDPOINT = `${NEWS_MANAGE_ENDPOINT}/status`;
+const EDIT_HEADING = /^(Edit post|Editar publicación)$/;
+const SAVE_BUTTON = /^(Save changes|Guardar cambios)$/;
+const newsEditPath = (id: string): string => `${postPath(id)}/editar`;
+
+/** Lo que carga el formulario: dirigida a un grupo del club. */
+const STUBBED_EDITABLE_POST = {
+  id: NEWS_OWN_POST_ID,
+  category: STUBBED_OWN_POST.category,
+  title: STUBBED_OWN_POST.title,
+  body: STUBBED_OWN_POST.body,
+  audience: { kind: "groups", groupIds: [PUBLISH_GROUPS[0].id] },
+  editedAt: STUBBED_OWN_POST.editedAt,
+  status: "published",
+} as const;
+
+/** Las lecturas del feed y los grupos, y la publicación editable. Va después
+ * de las de Noticias: Playwright atiende primero la ruta registrada más
+ * tarde, y la del feed casa con todo lo que cuelga de /api/v1/news. */
+async function stubEditReads(page: Page): Promise<void> {
+  await stubNewsReads(page, STUBBED_FEED_POSTS);
+  await stubPublishReads(page, { holdUploads: false });
+  await page.route(
+    (url) => url.pathname === NEWS_MANAGE_ENDPOINT,
+    (route, request) =>
+      request.method() === "GET"
+        ? route.fulfill(jsonBody(STUBBED_EDITABLE_POST))
+        : route.fulfill({
+            status: 409,
+            contentType: "application/json",
+            body: JSON.stringify({
+              error: { code: "conflict", message: "Otra persona guardó." },
+            }),
+          }),
+  );
+}
+
+const EDIT_STATES_EN: readonly PublishState[] = [
+  { name: "editar-publicacion", prepare: async () => undefined },
+  {
+    name: "editar-publicacion-conflicto",
+    prepare: async (page) => {
+      await page.getByLabel(/^(Title|Título)$/).fill("Pool change: MSAC");
+      await page.getByRole("button", { name: SAVE_BUTTON }).click();
+      await expect(
+        page.getByText(/^(Someone else saved|Otra persona guardó)/),
+      ).toBeVisible();
+    },
+  },
+];
+
+const EDIT_STATES: readonly PublishState[] = EDIT_STATES_EN.flatMap((state) => [
+  state,
+  { ...state, name: `${state.name}-es`, beforeVisit: chooseSpanish },
+]);
+
+async function goToEdit(
+  page: Page,
+  state: PublishState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await stubEditReads(page);
+  await state.beforeVisit?.(page);
+  const path = newsEditPath(NEWS_OWN_POST_ID);
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${path}`);
+  } else {
+    await goToWithTheme(page, path, theme);
+  }
+  await expect(
+    page.getByRole("heading", { level: 1, name: EDIT_HEADING }),
+  ).toBeVisible();
+  await expect(page.getByLabel(/^(Title|Título)$/)).toHaveValue(
+    STUBBED_EDITABLE_POST.title,
+  );
+  await state.prepare(page);
+}
+
+for (const state of EDIT_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToEdit(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of NEWS_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToEdit(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToEdit(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("editar y retirar en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+
+  test.describe("como Admin", () => {
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    test("editar abre el formulario cargado y guardar vuelve a la publicación", async ({
+      page,
+    }) => {
+      await stubEditReads(page);
+      let sent: unknown = null;
+      await page.route(
+        (url) => url.pathname === NEWS_MANAGE_ENDPOINT,
+        async (route, request) => {
+          if (request.method() !== "PATCH") {
+            return route.fallback();
+          }
+          sent = request.postDataJSON();
+          return route.fulfill(
+            jsonBody({ ...STUBBED_OWN_POST, title: "Pool change: MSAC" }),
+          );
+        },
+      );
+      await page.goto(`${APP_URL}${postPath(NEWS_OWN_POST_ID)}`);
+
+      await page.getByRole("link", { name: "Edit" }).click();
+      await expect(page).toHaveURL(
+        new RegExp(`${newsEditPath(NEWS_OWN_POST_ID)}$`),
+      );
+      await expect(page.getByLabel(PUBLISH_GROUPS[0].name)).toBeChecked();
+      await page.getByLabel("Title").fill("Pool change: MSAC");
+      await page.getByRole("button", { name: SAVE_BUTTON }).click();
+
+      await expect(page).toHaveURL(
+        new RegExp(`${postPath(NEWS_OWN_POST_ID)}$`),
+      );
+      expect(sent).toEqual({
+        category: STUBBED_EDITABLE_POST.category,
+        title: "Pool change: MSAC",
+        body: STUBBED_EDITABLE_POST.body,
+        audience: STUBBED_EDITABLE_POST.audience,
+        expectedEditedAt: STUBBED_EDITABLE_POST.editedAt,
+      });
+    });
+
+    test("retirar pide confirmación y deja la publicación marcada", async ({
+      page,
+    }) => {
+      await stubNewsReads(page, []);
+      let sent: unknown = null;
+      await page.route(
+        (url) => url.pathname === NEWS_STATUS_ENDPOINT,
+        async (route, request) => {
+          sent = request.postDataJSON();
+          await route.fulfill(
+            jsonBody({ ...STUBBED_OWN_POST, status: "withdrawn" }),
+          );
+        },
+      );
+      await page.goto(`${APP_URL}${postPath(NEWS_OWN_POST_ID)}`);
+
+      await page.getByRole("button", { name: "Withdraw" }).click();
+      expect(sent).toBeNull();
+      await page.getByRole("button", { name: "Withdraw post" }).click();
+
+      await expect(page.getByText("Withdrawn", { exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Publish again" }),
+      ).toBeVisible();
+      expect(sent).toEqual({ status: "withdrawn" });
+    });
+  });
+
+  test.describe("como Player", () => {
+    test.use({ storageState: roleRequestStorageStatePath("perfil-completo") });
+
+    test("la dirección de editar lo manda al panel", async ({ page }) => {
+      await page.goto(`${APP_URL}${newsEditPath(NEWS_OWN_POST_ID)}`);
+
+      await expect(page).toHaveURL(new RegExp("/dashboard$"));
+    });
   });
 });
