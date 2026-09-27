@@ -3131,3 +3131,56 @@ button.notification-item-content:hover {
   flex-shrink: 0;
   color: var(--color-text-secondary);
 }
+
+/* El botón de publicar (#330), a la derecha del título como en
+   docs/mockups/news-light.png. Con poco ancho baja debajo del título. */
+.news-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+/* El formulario de publicar (#330). Sin mockup: sigue a la ficha del
+   miembro, con los campos en el mismo panel. */
+.auth-field .news-publish-body {
+  min-height: 12rem;
+}
+
+/* El grupo de casillas de la audiencia queda sangrado bajo su opción, para
+   que se lea como parte de "Grupos concretos". */
+.news-audience-groups {
+  padding-left: var(--space-6);
+}
+
+.news-audience-groups legend {
+  margin-bottom: var(--space-2);
+}
+
+.news-publish-attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* La fila de un adjunto es la misma caja que en la publicación abierta, pero
+   no se pulsa entera: el botón de quitar es lo único que actúa. */
+.news-publish-attachment {
+  cursor: default;
+}
+
+.news-publish-attachment:hover {
+  border-color: var(--color-border);
+}
+
+.news-publish-attachment .admin-secondary {
+  flex-shrink: 0;
+}
+
+.news-publish-add {
+  align-self: flex-start;
+}

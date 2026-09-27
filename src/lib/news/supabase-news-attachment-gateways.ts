@@ -3,9 +3,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
+import { DETECTABLE_FILE_TYPES } from "@/lib/files/file-type";
 import {
   type NewsAttachmentGateways,
   NewsAttachmentValidationError,
+  type StoredNewsFile,
 } from "./news-attachments";
 import type { NewsAttachmentSummary } from "./news-posts";
 import { createNewsGateways } from "./supabase-news-gateways";
@@ -32,7 +34,23 @@ const ATTACHMENTS_TABLE = "news_post_attachments";
  * sexto adjunto. */
 const MAX_PER_POST_VIOLATION = "news_post_attachments_max_per_post";
 
+/** Dónde guarda Storage el nombre con el que se subió el fichero. */
+const FILE_NAME_METADATA_KEY = "fileName";
+
+/** Las subidas abandonadas de una persona son pocas; una página basta. */
+const LIST_PAGE_SIZE = 100;
+
 type Environment = Readonly<Record<string, string | undefined>>;
+
+const storedFileSchema = z.object({
+  size: z.number().int().nonnegative(),
+  contentType: z.enum(DETECTABLE_FILE_TYPES),
+  createdAt: z.string(),
+  metadata: z.object({ [FILE_NAME_METADATA_KEY]: z.string() }),
+});
+
+/** Storage responde a un fichero que no está con este código. */
+const NOT_FOUND_CODE = "NoSuchKey";
 
 const attachmentRowSchema = z.object({
   id: z.string(),
@@ -137,16 +155,51 @@ function createAttachmentsGateway(
   };
 }
 
+type Bucket = ReturnType<SupabaseClient["storage"]["from"]>;
+
+/** Lo que Storage sabe del fichero, o null si no está. El nombre con el que
+ * se subió viaja en sus metadatos: un fichero sin él, o de un tipo que el
+ * dominio no admite, no lo subió este adaptador y no se da por bueno. */
+async function describeStoredFile(
+  bucket: Bucket,
+  storagePath: string,
+): Promise<StoredNewsFile | null> {
+  const { data, error } = await bucket.info(storagePath);
+  if (error && "code" in error && error.code === NOT_FOUND_CODE) {
+    return null;
+  }
+  if (error) {
+    throw new Error(
+      `No se pudo leer el adjunto ${storagePath}: ${error.message}`,
+    );
+  }
+  const parsed = storedFileSchema.safeParse(data);
+  if (!parsed.success) {
+    console.error(
+      `[news-attachments] el fichero ${storagePath} no tiene la forma de una subida`,
+      parsed.error,
+    );
+    return null;
+  }
+  return {
+    fileName: parsed.data.metadata[FILE_NAME_METADATA_KEY],
+    contentType: parsed.data.contentType,
+    sizeBytes: parsed.data.size,
+    createdAt: parsed.data.createdAt,
+  };
+}
+
 function createStorageGateway(
   serviceClient: SupabaseClient,
   urlLifetimeSeconds: number,
 ): NewsAttachmentGateways["storage"] {
   const bucket = serviceClient.storage.from(NEWS_ATTACHMENTS_BUCKET);
   return {
-    async upload(storagePath, bytes, type) {
+    async upload({ storagePath, bytes, contentType, fileName }) {
       const { error } = await bucket.upload(storagePath, bytes, {
-        contentType: type,
+        contentType,
         upsert: false,
+        metadata: { [FILE_NAME_METADATA_KEY]: fileName },
       });
       if (error) {
         throw new Error(
@@ -168,6 +221,40 @@ function createStorageGateway(
       if (data.length < storagePaths.length) {
         throw new Error(`Storage no borró todo el adjunto ${listed}.`);
       }
+    },
+
+    describe: (storagePath) => describeStoredFile(bucket, storagePath),
+
+    async copy(fromPath, toPath) {
+      const { error } = await bucket.copy(fromPath, toPath);
+      if (error) {
+        throw new Error(
+          `No se pudo copiar el adjunto ${fromPath} a ${toPath}: ${error.message}`,
+        );
+      }
+    },
+
+    async list(folder) {
+      const { data, error } = await bucket.list(folder, {
+        limit: LIST_PAGE_SIZE,
+        sortBy: { column: "created_at", order: "asc" },
+      });
+      if (error) {
+        throw new Error(
+          `No se pudo listar la carpeta ${folder}: ${error.message}`,
+        );
+      }
+      // Las carpetas vienen sin fecha: sólo interesan los ficheros.
+      return data.flatMap((file) =>
+        file.created_at === null
+          ? []
+          : [
+              {
+                storagePath: `${folder}/${file.name}`,
+                createdAt: file.created_at,
+              },
+            ],
+      );
     },
 
     signDownloadUrl: (file) =>

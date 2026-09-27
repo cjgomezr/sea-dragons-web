@@ -8389,3 +8389,311 @@ test.describe("noticias en el navegador", () => {
     ]);
   });
 });
+
+/* ---------------------------------------------------------------------------
+   Publicar en Noticias (#330). El formulario no tiene mockup: se revisa
+   contra design-system.md, siguiendo el alta de miembro. El botón que lo abre
+   sí sale en docs/mockups/news-light.png, en la cabecera del feed.
+
+   Los grupos, las subidas y publicar se sirven con `page.route`: así las
+   capturas no dependen de los grupos que haya en la base, y ninguna subida
+   de prueba acaba en el almacenamiento. Lo que los endpoints hacen de verdad
+   se prueba aparte, contra seadragons-dev (#330).
+   --------------------------------------------------------------------------- */
+
+const NEWS_PUBLISH_SCREEN_PATH = "/noticias/publicar";
+const NEWS_PUBLISH_ENDPOINT = "/api/v1/news/publish";
+const NEWS_UPLOADS_ENDPOINT = "/api/v1/news/publish/uploads";
+const PUBLISH_HEADING = /^(New post|Nueva publicación)$/;
+const PUBLISH_BUTTON = /^(Publish|Publicar)$/;
+const PUBLISH_GROUPS = [
+  { id: "9a9a9a9a-0000-4000-8000-000000000009", name: "Senior squad" },
+  { id: "8b8b8b8b-0000-4000-8000-000000000008", name: "Masters" },
+  { id: "7c7c7c7c-0000-4000-8000-000000000007", name: "Juniors" },
+] as const;
+const PUBLISH_ATTACHMENTS = [
+  { name: "reglamento-seleccion-nacional-2026.pdf", sizeBytes: 2_516_582 },
+  { name: "mapa-piscina.png", sizeBytes: 245_760 },
+] as const;
+
+/** Los grupos del club y las subidas. Una subida responde con el nombre que
+ * se mandó y un tamaño fijo, así la lista dice siempre lo mismo. */
+async function stubPublishReads(
+  page: Page,
+  options: { readonly holdUploads: boolean },
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === CLUB_GROUPS_ENDPOINT,
+    (route) =>
+      route.fulfill(
+        jsonBody({
+          groups: PUBLISH_GROUPS.map((group) => ({ ...group, memberCount: 4 })),
+        }),
+      ),
+  );
+  let uploads = 0;
+  await page.route(
+    (url) => url.pathname === NEWS_UPLOADS_ENDPOINT,
+    async (route, request) => {
+      if (options.holdUploads) {
+        return; // Se queda subiendo: es el estado que se fotografía.
+      }
+      const fileName = new URL(request.url()).searchParams.get("name") ?? "";
+      const known = PUBLISH_ATTACHMENTS.find((file) => file.name === fileName);
+      uploads += 1;
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            id: `a7a7a7a7-0000-4000-8000-${String(uploads).padStart(12, "0")}`,
+            fileName,
+            contentType: "application/pdf",
+            sizeBytes: known?.sizeBytes ?? 1_024,
+          },
+        }),
+      });
+    },
+  );
+}
+
+async function attachPublishFiles(page: Page): Promise<void> {
+  await page.getByLabel(/^(Choose files|Elegir archivos)$/).setInputFiles(
+    PUBLISH_ATTACHMENTS.map((file) => ({
+      name: file.name,
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4\n%%EOF\n"),
+    })),
+  );
+}
+
+async function fillPublishForm(page: Page): Promise<void> {
+  await page.getByLabel(/^(Category|Categoría)$/).selectOption("announcement");
+  await page
+    .getByLabel(/^(Title|Título)$/)
+    .fill("Nationals squad shortlist announced for the August championships");
+  await page
+    .getByLabel(/^(Message|Mensaje)$/)
+    .fill(
+      "Twelve Seadragons named in the extended squad for the August nationals in Brisbane.\nFinal eight confirmed after trials.",
+    );
+  await page.getByLabel(/^(Specific groups|Grupos concretos)$/).check();
+  await page.getByLabel(PUBLISH_GROUPS[0].name).check();
+}
+
+type PublishState = {
+  readonly name: string;
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+  readonly holdUploads?: boolean;
+  /** Lo que se hace en la pantalla antes de mirarla. */
+  readonly prepare: (page: Page) => Promise<void>;
+};
+
+const PUBLISH_STATES_EN: readonly PublishState[] = [
+  { name: "publicar-vacio", prepare: async () => undefined },
+  {
+    name: "publicar-con-datos-y-adjuntos",
+    prepare: async (page) => {
+      await fillPublishForm(page);
+      await attachPublishFiles(page);
+      await expect(
+        page.getByRole("button", { name: /^(Remove|Quitar) mapa-piscina/ }),
+      ).toBeVisible();
+    },
+  },
+  {
+    name: "publicar-aviso-validacion",
+    prepare: async (page) => {
+      await page.getByLabel(/^(Specific groups|Grupos concretos)$/).check();
+      await page.getByRole("button", { name: PUBLISH_BUTTON }).click();
+      await expect(page.getByLabel(/^(Title|Título)$/)).toHaveAttribute(
+        "aria-invalid",
+        "true",
+      );
+    },
+  },
+  {
+    name: "publicar-subiendo",
+    holdUploads: true,
+    prepare: async (page) => {
+      await fillPublishForm(page);
+      await attachPublishFiles(page);
+      await expect(
+        page.getByText(/^(Uploading…|Subiendo…)$/).first(),
+      ).toBeVisible();
+    },
+  },
+];
+
+const PUBLISH_STATES: readonly PublishState[] = PUBLISH_STATES_EN.flatMap(
+  (state) => [
+    state,
+    { ...state, name: `${state.name}-es`, beforeVisit: chooseSpanish },
+  ],
+);
+
+async function goToPublish(
+  page: Page,
+  state: PublishState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await stubPublishReads(page, { holdUploads: state.holdUploads === true });
+  await state.beforeVisit?.(page);
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${NEWS_PUBLISH_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, NEWS_PUBLISH_SCREEN_PATH, theme);
+  }
+  await expect(
+    page.getByRole("heading", { level: 1, name: PUBLISH_HEADING }),
+  ).toBeVisible();
+  await expect(page.getByLabel(/^(Title|Título)$/)).toBeVisible();
+  await state.prepare(page);
+}
+
+for (const state of PUBLISH_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToPublish(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of NEWS_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToPublish(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToPublish(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("publicar en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+
+  test.describe("como Admin", () => {
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    test("el botón del feed abre el formulario", async ({ page }) => {
+      await stubNewsReads(page, STUBBED_FEED_POSTS);
+      await stubPublishReads(page, { holdUploads: false });
+      await page.goto(`${APP_URL}${NEWS_SCREEN_PATH}`);
+
+      await page.getByRole("link", { name: "+ Publish" }).click();
+
+      await expect(page).toHaveURL(new RegExp(`${NEWS_PUBLISH_SCREEN_PATH}$`));
+      await expect(
+        page.getByRole("heading", { level: 1, name: PUBLISH_HEADING }),
+      ).toBeVisible();
+    });
+
+    test("publicar vuelve al feed sin recargar, con la publicación arriba", async ({
+      page,
+    }) => {
+      const published = {
+        ...STUBBED_FEED_POSTS[0],
+        id: "a0a0a0a0-0000-4000-8000-0000000000c1",
+        title: "Pool closed on Tuesday",
+        publishedAt: new Date().toISOString(),
+        attachmentCount: 2,
+      };
+      // El feed casa con todo lo que cuelga de /api/v1/news, así que va antes:
+      // Playwright atiende primero la ruta registrada más tarde.
+      await stubNewsReads(page, [published, ...STUBBED_FEED_POSTS]);
+      await stubPublishReads(page, { holdUploads: false });
+      await page.goto(`${APP_URL}${NEWS_PUBLISH_SCREEN_PATH}`);
+      await page.evaluate(() => {
+        (window as { sinRecargar?: boolean }).sinRecargar = true;
+      });
+      let sent: unknown = null;
+      await page.route(
+        (url) => url.pathname === NEWS_PUBLISH_ENDPOINT,
+        async (route, request) => {
+          sent = request.postDataJSON();
+          await route.fulfill({
+            status: 201,
+            contentType: "application/json",
+            body: JSON.stringify({
+              data: { ...STUBBED_POST, id: published.id },
+            }),
+          });
+        },
+      );
+      await fillPublishForm(page);
+      await attachPublishFiles(page);
+      await expect(
+        page.getByRole("button", { name: /^Remove mapa-piscina/ }),
+      ).toBeVisible();
+
+      await page.getByRole("button", { name: PUBLISH_BUTTON }).click();
+
+      await expect(page).toHaveURL(new RegExp(`${NEWS_SCREEN_PATH}$`));
+      const titles = page
+        .getByRole("list", { name: FEED_HEADING })
+        .getByRole("link");
+      await expect(titles.first()).toHaveText(published.title);
+      expect(
+        await page.evaluate(
+          () => (window as { sinRecargar?: boolean }).sinRecargar,
+        ),
+      ).toBe(true);
+      expect(sent).toMatchObject({
+        category: "announcement",
+        audience: { kind: "groups", groupIds: [PUBLISH_GROUPS[0].id] },
+        attachmentUploadIds: [
+          "a7a7a7a7-0000-4000-8000-000000000001",
+          "a7a7a7a7-0000-4000-8000-000000000002",
+        ],
+      });
+    });
+  });
+
+  test.describe("como Player", () => {
+    test.use({ storageState: roleRequestStorageStatePath("perfil-completo") });
+
+    test("no ve el botón de publicar, y la dirección directa lo manda al panel", async ({
+      page,
+    }) => {
+      await stubNewsReads(page, STUBBED_FEED_POSTS);
+      await page.goto(`${APP_URL}${NEWS_SCREEN_PATH}`);
+      await expect(
+        page.getByRole("link", { name: STUBBED_FEED_POSTS[0].title }),
+      ).toBeVisible();
+      await expect(page.getByRole("link", { name: "+ Publish" })).toHaveCount(
+        0,
+      );
+
+      await page.goto(`${APP_URL}${NEWS_PUBLISH_SCREEN_PATH}`);
+
+      await expect(page).toHaveURL(new RegExp("/dashboard$"));
+    });
+  });
+});

@@ -875,4 +875,64 @@ export const englishMessages = {
   "news.post.notFound.title": "This post doesn't exist",
   "news.post.notFound.lead": "Check the address, or go back to News.",
   "news.post.error.unexpected": "We couldn't open the post. Try again.",
+  // El formulario de publicar (#330).
+  "news.publish": "+ Publish",
+  "news.publish.metaTitle": "Publish · {club}",
+  "news.publish.metaDescription":
+    "Write a post for the club, choose who sees it and attach documents.",
+  "news.publish.back": "← Back to News",
+  "news.publish.title": "New post",
+  "news.publish.lead":
+    "Write it, choose who sees it and attach any documents. It goes to the top of the feed as soon as you publish.",
+  "news.publish.loading": "Loading the club's groups…",
+  "news.publish.loadFailed": "We couldn't load the club's groups. Try again.",
+  "news.publish.category": "Category",
+  "news.publish.titleLabel": "Title",
+  "news.publish.titleHint": "Up to {max} characters.",
+  "news.publish.body": "Message",
+  "news.publish.bodyHint": "Plain text. Line breaks are kept.",
+  "news.publish.audience.legend": "Who sees it",
+  "news.publish.audience.club": "The whole club",
+  "news.publish.audience.groups": "Specific groups",
+  "news.publish.audience.groupsLegend": "Groups",
+  "news.publish.audience.noGroups":
+    "The club has no groups yet, so this can only go to the whole club.",
+  "news.publish.attachments.legend": "Attachments",
+  "news.publish.attachments.hint":
+    "Up to {max} files of {size} MB each: PDF, JPEG, PNG, WebP or Word.",
+  "news.publish.attachments.choose": "Choose files",
+  "news.publish.attachments.add": "Add files",
+  "news.publish.attachments.uploading": "Uploading…",
+  "news.publish.attachments.remove": "Remove",
+  "news.publish.attachments.removeNamed": "Remove {name}",
+  "news.publish.attachments.notice": "{name}: {reason}",
+  "news.publish.attachments.removeFailed": "We couldn't remove it. Try again.",
+  "news.publish.attachments.issue.empty": "The file is empty.",
+  "news.publish.attachments.issue.tooLarge": "Each file can be up to {max} MB.",
+  "news.publish.attachments.issue.typeUnsupported":
+    "Only PDF, images (JPEG, PNG, WebP) and Word documents.",
+  "news.publish.attachments.issue.typeMismatch":
+    "The file's extension doesn't match what's inside it.",
+  "news.publish.attachments.issue.nameInvalid":
+    "The file name isn't valid. Rename it and try again.",
+  "news.publish.attachments.issue.limitReached":
+    "A post can have at most {max} attachments.",
+  "news.publish.attachments.issue.uploadMissing":
+    "An attachment is no longer uploaded. Remove it and attach it again.",
+  "news.publish.issue.titleMissing": "Give the post a title.",
+  "news.publish.issue.titleTooLong":
+    "The title can have up to {max} characters.",
+  "news.publish.issue.bodyMissing": "Write the message.",
+  "news.publish.issue.audienceGroupsEmpty":
+    "Choose at least one group, or send it to the whole club.",
+  "news.publish.submit": "Publish",
+  "news.publish.sending": "Publishing…",
+  "news.publish.waitForUploads":
+    "Wait for the attachments to finish uploading.",
+  "news.publish.error.network":
+    "We couldn't reach the server. Nothing was published: check your connection and try again.",
+  "news.publish.error.signInRequired":
+    "Your session ended. Sign in again to publish.",
+  "news.publish.error.forbidden": "Your role can't publish news.",
+  "news.publish.error.unexpected": "We couldn't publish it. Try again.",
 } as const satisfies Readonly<Record<string, Message>>;

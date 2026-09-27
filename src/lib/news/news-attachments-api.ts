@@ -54,7 +54,9 @@ export async function readNewsAttachmentUpload(
   return { fileName, bytes: body.bytes };
 }
 
-/** Un id que no es un uuid no puede nombrar ningún adjunto. */
+/** Un id que no es un uuid no puede nombrar ningún adjunto ni ninguna subida
+ * previa (#330). En una subida, además, es parte de la ruta del fichero: sin
+ * esto, `..` subiría de carpeta. */
 export function readNewsAttachmentId(value: string): string {
   if (!z.uuid().safeParse(value).success) {
     throw new ApiError("not_found", new NewsAttachmentNotFoundError().message);

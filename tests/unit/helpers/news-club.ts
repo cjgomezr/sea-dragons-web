@@ -35,7 +35,11 @@ export type FakeClub = {
   readonly gateways: NewsGateways;
   readonly inserted: NewNewsPost[];
   readonly feedQueries: NewsFeedQuery[];
+  readonly deletedPostIds: string[];
 };
+
+/** El id que recibe la publicación que guarda el doble. */
+export const INSERTED_POST_ID = "c2c2c2c2-0000-4000-8000-00000000000c";
 
 const PUBLISHED_AT = "2026-09-26T10:00:00.000000+00:00";
 
@@ -94,6 +98,7 @@ function toFeedRow(post: NewsPost): NewsFeedRow {
 export function fakeClub(options: FakeClubOptions = {}): FakeClub {
   const inserted: NewNewsPost[] = [];
   const feedQueries: NewsFeedQuery[] = [];
+  const deletedPostIds: string[] = [];
   const posts = options.posts ?? [];
   const clubGroupIds = options.clubGroupIds ?? [
     SENIOR_SQUAD_ID,
@@ -124,7 +129,7 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
       insertPost: async (post) => {
         inserted.push(post);
         return {
-          id: "c2c2c2c2-0000-4000-8000-00000000000c",
+          id: INSERTED_POST_ID,
           clubId: post.clubId,
           category: post.category,
           title: post.title,
@@ -154,7 +159,10 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
       findPost: async ({ clubId, postId }) =>
         posts.find((post) => post.id === postId && post.clubId === clubId) ??
         null,
+      deletePost: async (postId) => {
+        deletedPostIds.push(postId);
+      },
     },
   };
-  return { gateways, inserted, feedQueries };
+  return { gateways, inserted, feedQueries, deletedPostIds };
 }
