@@ -251,6 +251,24 @@ export const EVALUATIONS_PATH = "/evaluaciones";
  * es su `user_id`: GET la lee, POST la crea y PUT guarda sus valoraciones. */
 export const EVALUATIONS_API_PATH = "/api/v1/evaluations";
 
+/** El catálogo de categorías del club (#320, RF-3 del PRD de E9). GET lo
+ * lista entero, desactivadas incluidas, y POST añade una. Cuelga de
+ * `EVALUATIONS_API_PATH`, así que la frontera ya lo reserva a Admin y Coach,
+ * los que configuran lo que se mide (FR-053). El handler lo vuelve a
+ * comprobar. */
+export const EVALUATION_CATEGORIES_API_PATH = `${EVALUATIONS_API_PATH}/categories`;
+
+/** Renombrar, desactivar o reactivar una categoría. `[id]` es el de la
+ * categoría. */
+export const EVALUATION_CATEGORY_API_PATH = `${EVALUATION_CATEGORIES_API_PATH}/[id]`;
+
+/** Reordenar: PUT con la lista entera de las activas en el orden nuevo. */
+export const EVALUATION_CATEGORIES_ORDER_API_PATH = `${EVALUATION_CATEGORIES_API_PATH}/order`;
+
+/** Poner al día la evaluación de un miembro (#320, RF-4): POST. `[id]` es el
+ * `user_id` del miembro, como en su evaluación. */
+export const EVALUATION_REFRESH_API_PATH = `${EVALUATIONS_API_PATH}/[id]/refresh`;
+
 /** El destino del enlace del correo de confirmación (#132). No es una
  * pantalla del PRD: canjea el token y redirige. Es público por definición,
  * porque quien abre ese enlace todavía no puede iniciar sesión.
