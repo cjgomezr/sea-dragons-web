@@ -14,7 +14,7 @@ import type {
  *
  * Va por la llave de servicio: `authenticated` no puede escribir en las
  * tablas de eventos (`0034_events.sql`). Guardar pasa por
- * `create_events` (`0035_create_events.sql`), que escribe la serie, las
+ * `create_events` (`0036_create_events.sql`), que escribe la serie, las
  * ocurrencias y sus audiencias en una sola transacción: PostgREST no abre una
  * entre dos peticiones, y una temporada a medias no se puede deshacer bien
  * desde aquí.

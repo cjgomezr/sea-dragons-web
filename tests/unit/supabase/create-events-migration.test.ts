@@ -6,7 +6,7 @@ import {
 } from "../../support/postgres";
 
 /**
- * `0035_create_events.sql` contra un Postgres desechable (#307, RF-2 y RF-3
+ * `0036_create_events.sql` contra un Postgres desechable (#307, RF-2 y RF-3
  * del PRD de E7). Una serie son muchas filas: la serie, su audiencia, cada
  * ocurrencia y la audiencia de cada una. La función las escribe todas o
  * ninguna.
