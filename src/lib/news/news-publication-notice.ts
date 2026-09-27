@@ -1,9 +1,10 @@
+import type { AudienceMembersGateway } from "@/lib/notifications/audience-members";
 import {
   type NotificationBroadcastWriter,
   notifyMembers,
 } from "@/lib/notifications/notify-member";
 import type { NewsAttachmentGateways } from "./news-attachments";
-import type { NewsAudience, NewsPost } from "./news-posts";
+import type { NewsPost } from "./news-posts";
 
 /**
  * El aviso a la audiencia cuando se publica algo (#332, RF-7 del PRD de E11,
@@ -16,17 +17,8 @@ import type { NewsAudience, NewsPost } from "./news-posts";
  * cambio de rol (#267).
  */
 
-export type NewsAudienceGateway = {
-  /** Los socios del club a los que llega la audiencia, esté como esté su
-   * cuenta: todos, o los de alguno de esos grupos. */
-  findAudienceMemberIds(query: {
-    readonly clubId: string;
-    readonly audience: NewsAudience;
-  }): Promise<readonly string[]>;
-};
-
 export type NewsNoticeGateways = {
-  readonly newsAudience: NewsAudienceGateway;
+  readonly newsAudience: AudienceMembersGateway;
   readonly notifications: NotificationBroadcastWriter;
 };
 

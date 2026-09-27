@@ -160,7 +160,7 @@ describeConPostgres("el tipo y los datos de un aviso", () => {
     expect(insercion.code, insercion.stderr).toBe(0);
   });
 
-  it.each(["event_created", "ROLE_CHANGED", ""])(
+  it.each(["event_exploded", "ROLE_CHANGED", ""])(
     "rechaza el tipo '%s', que no está en el catálogo",
     async (type) => {
       const database = await migratedDatabase();

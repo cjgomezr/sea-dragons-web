@@ -1,6 +1,8 @@
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { RequestableRole } from "@/lib/auth/role-request";
 import type { Role } from "@/lib/auth/roles";
+import type { EventType } from "@/lib/events/event-creation";
+import type { IsoWeekday } from "@/lib/events/event-occurrences";
 import type { NewsCategory } from "@/lib/news/news-posts";
 
 /**
@@ -27,6 +29,8 @@ export const NOTIFICATION_TYPES = [
   "role_request_rejected",
   "role_request_received",
   "news_post_published",
+  "event_created",
+  "event_series_created",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -49,6 +53,26 @@ type NotificationDataByType = DataForEveryType<{
     readonly postId: string;
     readonly category: NewsCategory;
     readonly title: string;
+  };
+  /** #310. El día y la hora de Melbourne, como se guardaron. */
+  readonly event_created: {
+    readonly eventId: string;
+    readonly title: string;
+    readonly eventType: EventType;
+    /** `YYYY-MM-DD`. */
+    readonly startsOn: string;
+    /** `HH:MM`. */
+    readonly startTime: string;
+  };
+  /** #310. Un aviso por serie, no uno por ocurrencia. */
+  readonly event_series_created: {
+    readonly seriesId: string;
+    readonly title: string;
+    readonly eventType: EventType;
+    readonly weekdays: readonly IsoWeekday[];
+    readonly startsOn: string;
+    readonly endsOn: string;
+    readonly startTime: string;
   };
 }>;
 

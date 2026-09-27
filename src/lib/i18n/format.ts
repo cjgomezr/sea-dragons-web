@@ -1,3 +1,4 @@
+import type { IsoWeekday } from "@/lib/events/event-occurrences";
 import { CLUB_TIME_ZONE } from "@/lib/time/club-calendar";
 import type { Locale } from "./locale";
 
@@ -104,6 +105,70 @@ export function formatClubMoment(locale: Locale, instant: Date): string {
 /** Un día de calendario sin hora (YYYY-MM-DD, como una columna `date`). */
 export function formatCalendarDay(locale: Locale, isoDate: string): string {
   return CALENDAR_DAY_FORMATTERS[locale].format(parseCalendarDay(isoDate));
+}
+
+// Una hora de reloj sin día, como el `HH:MM` de un evento, se formatea igual
+// que un día sin hora: en UTC, sobre el 1 de enero de 1970.
+const CLOCK_TIME_FORMATTERS = formattersByLocale(
+  (displayLocale) =>
+    new Intl.DateTimeFormat(displayLocale, {
+      timeStyle: "short",
+      timeZone: "UTC",
+    }),
+);
+
+const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export function formatClockTime(locale: Locale, clockTime: string): string {
+  if (!CLOCK_TIME.test(clockTime)) {
+    throw new RangeError(`"${clockTime}" no es una hora en formato HH:MM.`);
+  }
+  return CLOCK_TIME_FORMATTERS[locale].format(
+    new Date(`1970-01-01T${clockTime}:00Z`),
+  );
+}
+
+/** Un día y una hora de reloj de Melbourne guardados por separado, como los
+ * de un evento: se escriben tal cual, sin pasar por ningún instante. */
+export function formatCalendarDayAt(
+  locale: Locale,
+  isoDate: string,
+  clockTime: string,
+): string {
+  const day = formatCalendarDay(locale, isoDate);
+  return `${day}${DATE_TIME_JOINERS[locale]}${formatClockTime(locale, clockTime)}`;
+}
+
+const WEEKDAY_FORMATTERS = formattersByLocale(
+  (displayLocale) =>
+    new Intl.DateTimeFormat(displayLocale, {
+      weekday: "long",
+      timeZone: "UTC",
+    }),
+);
+
+const WEEKDAY_LIST_FORMATTERS = formattersByLocale(
+  (displayLocale) =>
+    new Intl.ListFormat(displayLocale, { type: "conjunction" }),
+);
+
+/** El 1 de enero de 2024 fue lunes: el día ISO `n` es `n - 1` días después. */
+const A_MONDAY = "2024-01-01";
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/** Los días de una serie semanal ("Tuesday and Thursday", "martes y
+ * jueves"), en el orden en que llegan. */
+export function formatWeekdays(
+  locale: Locale,
+  weekdays: readonly IsoWeekday[],
+): string {
+  const monday = parseCalendarDay(A_MONDAY).getTime();
+  const names = weekdays.map((weekday) =>
+    WEEKDAY_FORMATTERS[locale].format(
+      new Date(monday + (weekday - 1) * MILLISECONDS_PER_DAY),
+    ),
+  );
+  return WEEKDAY_LIST_FORMATTERS[locale].format(names);
 }
 
 const RELATIVE_TIME_FORMATTERS = formattersByLocale(

@@ -6,6 +6,10 @@ import type {
 import { hasCapability } from "@/lib/auth/roles";
 import { clubMoment } from "@/lib/time/club-calendar";
 import {
+  type EventNoticeGateways,
+  announceEvents,
+} from "./event-creation-notice";
+import {
   type IsoWeekday,
   countRangeDays,
   generateWeeklyOccurrences,
@@ -119,7 +123,8 @@ export type EventsGateway = {
   insertSchedule(schedule: NewEventSchedule): Promise<SavedEventSchedule>;
 };
 
-export type EventGateways = {
+/** Crear es guardar y después avisar a la audiencia (#310). */
+export type EventGateways = EventNoticeGateways & {
   readonly members: RoleRequestGateways["members"];
   readonly events: EventsGateway;
 };
@@ -348,7 +353,8 @@ function toCreatedEvents(
 }
 
 /** Crea el evento o la serie con todas sus ocurrencias, o dice por qué no.
- * Nada se escribe hasta que todo se ha validado. */
+ * Nada se escribe hasta que todo se ha validado, y la audiencia se entera
+ * sólo de lo que quedó guardado. */
 export async function createEvents(
   gateways: EventGateways,
   request: {
@@ -366,5 +372,11 @@ export async function createEvents(
     ...planned,
   };
   const saved = await gateways.events.insertSchedule(schedule);
-  return toCreatedEvents(schedule, saved);
+  const created = toCreatedEvents(schedule, saved);
+  await announceEvents(gateways, {
+    clubId: caller.clubId,
+    authorId: request.callerId,
+    created,
+  });
+  return created;
 }

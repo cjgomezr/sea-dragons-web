@@ -49,6 +49,10 @@ export const ACCOUNT_PAGE_PATH = "/cuenta";
  * grupos, que son tres de los cuatro roles. */
 export const GROUPS_PATH = "/grupos";
 
+/** El calendario del club (E7). Lo alcanza cualquier cuenta activa: es a
+ * donde lleva el aviso de un evento o una serie nuevos (#310). */
+export const CALENDAR_PATH = "/calendario";
+
 /** El endpoint de las solicitudes de rol. Su POST está abierto a los cuatro
  * roles, igual que Mi cuenta: el propio dominio responde a quien no tiene nada
  * que pedir. Por eso la ruta NO aparece en `RESTRICTED_ROUTES`, y la bandeja

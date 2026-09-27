@@ -19,6 +19,8 @@ import {
 
 const ORIGIN = "http://localhost:3417";
 
+const OTHER_MEMBER_ID = "a1000000-0000-4000-8000-000000000001";
+
 /** 2027-06-15 10:00 en Melbourne. */
 const NOW = new Date("2027-06-15T00:00:00Z");
 
@@ -148,6 +150,20 @@ describe("endpoint de crear eventos", () => {
       data: { occurrences: { startsOn: string }[] };
     };
     expect(body.data.occurrences).toHaveLength(18);
+  });
+
+  it("responde 201 y registra el error cuando los avisos no se guardan", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockWiring({
+      clubMembers: { [CALLER_ID]: "active", [OTHER_MEMBER_ID]: "active" },
+      failNotices: true,
+    });
+
+    const response = await createEvent(WEEKLY_TRAINING);
+
+    expect(response.status).toBe(201);
+    expect(club.saved).toHaveLength(1);
+    expect(logged).toHaveBeenCalled();
   });
 
   it("no acepta el club por el cuerpo", async () => {
