@@ -493,6 +493,8 @@ export const englishMessages = {
   "directory.mark.aufNotVerified": "AUF not verified",
   "directory.mark.aufVerified": "AUF verified",
   "directory.mark.pendingActivation": "Pending activation",
+  "directory.mark.notEvaluated": "Not evaluated",
+  "directory.mark.notEvaluatedLabel": "Not evaluated: evaluate {name}",
   "directory.error.signInRequired":
     "Your session ended. Sign in again to see the directory.",
   "directory.error.forbidden": "Your account can't see the club's directory.",

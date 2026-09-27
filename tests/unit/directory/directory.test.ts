@@ -60,6 +60,7 @@ const ANA: DirectoryMemberRecord = {
   aufExpiry: "2027-01-31",
   isAufVerified: true,
   photoPath: "aaaaaaaa-0000-4000-8000-00000000000a/foto.webp",
+  isEvaluated: true,
 };
 
 const BRUNO: DirectoryMemberRecord = {
@@ -74,6 +75,7 @@ const BRUNO: DirectoryMemberRecord = {
   aufExpiry: "2026-09-20",
   isAufVerified: true,
   photoPath: null,
+  isEvaluated: false,
 };
 
 const MARIA: DirectoryMemberRecord = {
@@ -88,6 +90,7 @@ const MARIA: DirectoryMemberRecord = {
   aufExpiry: null,
   isAufVerified: false,
   photoPath: null,
+  isEvaluated: true,
 };
 
 const ZOE: DirectoryMemberRecord = {
@@ -103,6 +106,7 @@ const ZOE: DirectoryMemberRecord = {
   // Lo escribió la socia y ningún Admin lo ha verificado todavía (#274).
   isAufVerified: false,
   photoPath: "dddddddd-0000-4000-8000-00000000000d/foto.png",
+  isEvaluated: false,
 };
 
 const CLUB: readonly DirectoryMemberRecord[] = [ZOE, MARIA, ANA, BRUNO];
@@ -481,19 +485,86 @@ describe("el AUF en el directorio", () => {
     });
   });
 
-  it.each(["Coach", "Committee", "Player"] as const)(
+  it.each([
+    ["Coach", "coach"],
+    ["Committee", "member"],
+    ["Player", "member"],
+  ] as const)(
     "no le cuenta el AUF ni su verificación a un %s",
-    async (callerRole) => {
+    async (callerRole, expectedKind) => {
       const listing = await listDirectory(gateways({ callerRole }), {
         callerId: CALLER_ID,
         query: DEFAULT_DIRECTORY_QUERY,
         todayInClub: TODAY,
       });
 
-      expect(listing.kind).toBe("member");
+      expect(listing.kind).toBe(expectedKind);
       for (const member of listing.members) {
         expect(Object.keys(member)).not.toContain("aufNumber");
         expect(Object.keys(member)).not.toContain("isAufVerified");
+      }
+    },
+  );
+});
+
+describe("marca de sin evaluar", () => {
+  async function listFor(
+    callerRole: Role,
+  ): Promise<ReadonlyMap<string, Record<string, unknown>>> {
+    const listing = await listDirectory(gateways({ callerRole }), {
+      callerId: CALLER_ID,
+      query: DEFAULT_DIRECTORY_QUERY,
+      todayInClub: TODAY,
+    });
+    return new Map(
+      listing.members.map((member) => [member.fullName, { ...member }]),
+    );
+  }
+
+  it.each(["Admin", "Coach"] as const)(
+    "le dice a un %s quién tiene evaluación y quién no",
+    async (callerRole) => {
+      const members = await listFor(callerRole);
+
+      expect(members.get("Ana Admin")).toMatchObject({ isEvaluated: true });
+      expect(members.get("Bruno Beltrán")).toMatchObject({
+        isEvaluated: false,
+      });
+    },
+  );
+
+  it("un Coach recibe la vista con la evaluación, sin lo del Admin", async () => {
+    const listing = await listDirectory(gateways({ callerRole: "Coach" }), {
+      callerId: CALLER_ID,
+      query: { ...DEFAULT_DIRECTORY_QUERY, search: "bruno" },
+      todayInClub: TODAY,
+    });
+
+    expect(listing).toEqual({
+      kind: "coach",
+      members: [
+        {
+          userId: BRUNO.userId,
+          fullName: "Bruno Beltrán",
+          country: "CO",
+          experienceLevel: "Beginner",
+          role: "Coach",
+          position: { id: GOALKEEPER.id, names: GOALKEEPER.names },
+          status: "active",
+          photoUrl: null,
+          isEvaluated: false,
+        },
+      ],
+    });
+  });
+
+  it.each(["Committee", "Player"] as const)(
+    "a un %s no le manda si nadie está evaluado, ni siquiera él",
+    async (callerRole) => {
+      const members = await listFor(callerRole);
+
+      for (const member of members.values()) {
+        expect(Object.keys(member)).not.toContain("isEvaluated");
       }
     },
   );
@@ -535,12 +606,23 @@ describe("el rol nuevo en la lista (#240)", () => {
       aufExpiry: "2020-01-31",
       isAufVerified: true,
       isAufExpired: true,
+      isEvaluated: true,
     };
     const listing: DirectoryListing = { kind: "admin", members: [admin] };
 
     expect(withMemberRole(listing, NEREA.userId, "Committee")).toEqual({
       kind: "admin",
       members: [{ ...admin, role: "Committee" }],
+    });
+  });
+
+  it("conserva la marca de evaluación de la vista del Coach", () => {
+    const coachView = { ...NEREA, isEvaluated: false };
+    const listing: DirectoryListing = { kind: "coach", members: [coachView] };
+
+    expect(withMemberRole(listing, NEREA.userId, "Coach")).toEqual({
+      kind: "coach",
+      members: [{ ...coachView, role: "Coach" }],
     });
   });
 });

@@ -248,6 +248,10 @@ export const EVALUATIONS_PATH = "/evaluaciones";
  * evalúa decide qué se mide, y la frontera ya la reserva a Admin y Coach. */
 export const EVALUATION_CATEGORIES_PATH = `${EVALUATIONS_PATH}/categorias`;
 
+/** Con el `user_id` de un miembro, Evaluaciones abre ya su ficha: es a donde
+ * lleva la marca de sin evaluar del directorio (#324). */
+export const EVALUATION_MEMBER_QUERY_PARAM = "miembro";
+
 /** La evaluación de cada miembro (#319, RF-1, RF-2 y RF-5 del PRD de E9).
  * Todo lo que cuelga de este camino es del personal de entrenamiento: un
  * Player o un Committee no ven ninguna, ni la propia (FR-055). Va fuera de

@@ -29,6 +29,10 @@ import {
  * ser es cambiar sin recargar, y lee por la API v1 que usará la aplicación
  * nativa de Release 2 (CON-002).
  *
+ * Con `initialMemberId` abre ya la ficha de ese miembro: es a donde lleva la
+ * marca de sin evaluar del directorio (#324). Si no está en la lista, se
+ * queda en la lista.
+ *
  * En escritorio la lista y la ficha van lado a lado. En el móvil no caben, y
  * son dos pasos: `data-step` le dice al CSS cuál enseñar, igual que la lista
  * de avisos de #266.
@@ -88,14 +92,16 @@ function withEvaluation(roster: Roster, evaluation: MemberEvaluation): Roster {
 
 export function EvaluationsScreen({
   locale,
+  initialMemberId,
 }: {
   locale: Locale;
+  initialMemberId: string | null;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [state, setState] = useState<RosterState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
   const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialMemberId);
   // A quién devolver el foco al volver de la ficha a la lista.
   const [returnFocusTo, setReturnFocusTo] = useState<string | null>(null);
 

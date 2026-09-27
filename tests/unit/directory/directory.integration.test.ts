@@ -84,6 +84,20 @@ async function insertMember(
   }
 }
 
+/** Una evaluación sin valoraciones basta: el directorio sólo cuenta que
+ * existe (#324). Se va con el socio, por la cascada de `0031`. */
+async function insertEvaluation(
+  serviceClient: ServiceRoleClient,
+  member: { readonly clubId: string; readonly userId: string },
+): Promise<void> {
+  const { error } = await serviceClient.client
+    .from("member_evaluations")
+    .insert({ club_id: member.clubId, user_id: member.userId });
+  if (error) {
+    throw new Error(`No se pudo sembrar la evaluación: ${error.message}`);
+  }
+}
+
 /** El club pone Forward delante de las otras dos (#299): ordenado por
  * posición, el directorio tiene que seguir al club y no al SRD. */
 async function moveForwardFirst(
@@ -193,6 +207,10 @@ describeRls("el directorio contra seadragons-dev", () => {
 
         await withMembers(serviceClient, seeds, async (users) => {
           const [admin, maria] = users as readonly TestUser[];
+          await insertEvaluation(serviceClient, {
+            clubId,
+            userId: maria!.id,
+          });
           const askAs = (
             callerId: string,
             query: Partial<DirectoryQuery> = {},
@@ -218,7 +236,9 @@ describeRls("el directorio contra seadragons-dev", () => {
             aufNumber: "AUF-MARIA",
             aufExpiry: "2020-01-31",
             isAufExpired: true,
+            isEvaluated: true,
           });
+          expect(listed.members[0]).toMatchObject({ isEvaluated: false });
 
           const searched = await askAs(admin!.id, { search: "maria niguez" });
           expect(searched.members.map((member) => member.fullName)).toEqual([
@@ -246,6 +266,7 @@ describeRls("el directorio contra seadragons-dev", () => {
           const asPlayer = await askAs(maria!.id);
           expect(asPlayer.kind).toBe("member");
           expect(asPlayer.members[0]).not.toHaveProperty("aufNumber");
+          expect(asPlayer.members[1]).not.toHaveProperty("isEvaluated");
         });
       });
     },

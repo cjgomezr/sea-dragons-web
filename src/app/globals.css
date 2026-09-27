@@ -2297,6 +2297,18 @@ button.notification-item-content:hover {
   border-color: var(--color-warning);
 }
 
+/* La marca de sin evaluar (#324) es la única que se pulsa: lleva a la
+   evaluación. El subrayado dice que es un enlace sin depender del color. Aquí
+   no se parte ninguna palabra, ni por sílabas: "Not evaluated" y "Sin
+   evaluar" caben en dos líneas a 375px, y una marca que se pulsa se tiene que
+   leer entera. */
+.directory-mark-link {
+  -webkit-hyphens: manual;
+  hyphens: manual;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* A un Admin la columna del rol le cede sitio a la de posición: en ella van
    el selector y su botón (#240), y a 375px no caben en el 28% de la lista de
    quien sólo mira. */

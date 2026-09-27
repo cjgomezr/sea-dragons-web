@@ -45,7 +45,11 @@ const memberSchema = z.object({
   photoUrl: z.url({ protocol: /^https?$/ }).nullable(),
 });
 
-const adminMemberSchema = memberSchema.extend({
+const coachMemberSchema = memberSchema.extend({
+  isEvaluated: z.boolean(),
+});
+
+const adminMemberSchema = coachMemberSchema.extend({
   aufNumber: z.string().nullable(),
   aufExpiry: z.string().nullable(),
   isAufVerified: z.boolean(),
@@ -56,6 +60,7 @@ const adminMemberSchema = memberSchema.extend({
  * adivina por la presencia de un campo si le toca dibujar lo del Admin. */
 const listingSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("member"), members: z.array(memberSchema) }),
+  z.object({ kind: z.literal("coach"), members: z.array(coachMemberSchema) }),
   z.object({ kind: z.literal("admin"), members: z.array(adminMemberSchema) }),
 ]);
 

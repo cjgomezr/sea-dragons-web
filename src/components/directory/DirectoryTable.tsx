@@ -8,7 +8,11 @@ import type {
   DirectoryMember,
   DirectorySort,
 } from "@/lib/directory/directory";
-import { MEMBER_RECORD_PATH } from "@/lib/auth/routes";
+import {
+  EVALUATIONS_PATH,
+  EVALUATION_MEMBER_QUERY_PARAM,
+  MEMBER_RECORD_PATH,
+} from "@/lib/auth/routes";
 import { formatCalendarDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
@@ -35,8 +39,10 @@ import {
  * sus iniciales (#245), su nombre, su país, su nivel, su rol y su posición, y cabeceras
  * que piden el orden.
  *
- * Las columnas de OVR y asistencia del mockup no están: son de E9 y E8, y hoy
- * no hay dato que enseñar.
+ * Las columnas de OVR y asistencia del mockup no están. Del OVR, el directorio
+ * sólo cuenta a Admin y Coach quién está sin evaluar (#324): la nota se ve en
+ * Evaluaciones, y a un Player o un Committee no le llega nada (FR-055). La
+ * asistencia es de E8.
  *
  * Ordenar es cosa del servidor, así que pulsar una cabecera no reordena nada
  * aquí: dice por dónde, y la pantalla vuelve a preguntar.
@@ -62,16 +68,35 @@ type AufView = AufState & { readonly aufExpiry: string | null };
 /** Lo que una fila necesita saber, con lo que sólo un Admin recibe ya
  * resuelto: así la fila no tiene que volver a preguntarse quién la mira. Con
  * `auf` la fila es de Admin: enseña el registro, enlaza la ficha (#242) y
- * deja cambiar el rol (#240). */
+ * deja cambiar el rol (#240). `isEvaluated` es null para quien no ve
+ * evaluaciones (#324). */
 type DirectoryRow = {
   readonly member: DirectoryMember;
   readonly auf: AufView | null;
+  readonly isEvaluated: boolean | null;
 };
 
 function rowsOf(listing: DirectoryListing): readonly DirectoryRow[] {
-  return listing.kind === "admin"
-    ? listing.members.map((member) => ({ member, auf: member }))
-    : listing.members.map((member) => ({ member, auf: null }));
+  switch (listing.kind) {
+    case "admin":
+      return listing.members.map((member) => ({
+        member,
+        auf: member,
+        isEvaluated: member.isEvaluated,
+      }));
+    case "coach":
+      return listing.members.map((member) => ({
+        member,
+        auf: null,
+        isEvaluated: member.isEvaluated,
+      }));
+    case "member":
+      return listing.members.map((member) => ({
+        member,
+        auf: null,
+        isEvaluated: null,
+      }));
+  }
 }
 
 /** La línea del AUF, con el vencimiento escrito en el idioma de la pantalla.
@@ -102,6 +127,19 @@ function isAdminRow(row: DirectoryRow): row is DirectoryRow & {
 
 function memberRecordHref(userId: string): string {
   return MEMBER_RECORD_PATH.replace("[id]", userId);
+}
+
+function memberEvaluationHref(userId: string): string {
+  const params = new URLSearchParams({
+    [EVALUATION_MEMBER_QUERY_PARAM]: userId,
+  });
+  return `${EVALUATIONS_PATH}?${params.toString()}`;
+}
+
+/** A un dado de baja no se le marca: no se le puede crear evaluación (RF-1)
+ * y Evaluaciones no lo lista. */
+function needsEvaluation(row: DirectoryRow): boolean {
+  return row.isEvaluated === false && row.member.status !== "inactive";
 }
 
 const ARIA_SORT: Readonly<
@@ -171,12 +209,39 @@ function marksOf(translate: Translator, row: DirectoryRow): readonly RowMark[] {
   ];
 }
 
-function RowMarks({
-  marks,
+/** La única marca que se pulsa: lleva a crear la evaluación que falta. El
+ * tono es el de lo que pide hacer algo, como el AUF vencido. El nombre
+ * accesible empieza por el texto visible (WCAG 2.5.3) y dice de quién es. */
+function NotEvaluatedMark({
+  translate,
+  member,
 }: {
-  marks: readonly RowMark[];
+  translate: Translator;
+  member: DirectoryMember;
+}): React.JSX.Element {
+  return (
+    <Link
+      href={memberEvaluationHref(member.userId)}
+      className="directory-mark directory-mark-warning directory-mark-link"
+      aria-label={translate("directory.mark.notEvaluatedLabel", {
+        name: member.fullName,
+      })}
+    >
+      {translate("directory.mark.notEvaluated")}
+    </Link>
+  );
+}
+
+function RowMarks({
+  translate,
+  row,
+}: {
+  translate: Translator;
+  row: DirectoryRow;
 }): React.JSX.Element | null {
-  if (marks.length === 0) {
+  const marks = marksOf(translate, row);
+  const isMarkedUnevaluated = needsEvaluation(row);
+  if (marks.length === 0 && !isMarkedUnevaluated) {
     return null;
   }
   return (
@@ -189,6 +254,9 @@ function RowMarks({
           {mark.text}
         </span>
       ))}
+      {isMarkedUnevaluated ? (
+        <NotEvaluatedMark translate={translate} member={row.member} />
+      ) : null}
     </span>
   );
 }
@@ -287,7 +355,7 @@ function MemberRow({
                 {describeAuf(translate, locale, row.auf)}
               </span>
             ) : null}
-            <RowMarks marks={marksOf(translate, row)} />
+            <RowMarks translate={translate} row={row} />
           </span>
         </span>
       </th>

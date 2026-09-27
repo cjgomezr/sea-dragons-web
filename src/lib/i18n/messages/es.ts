@@ -485,6 +485,8 @@ export const spanishMessages: MessageCatalog = {
   "directory.mark.aufNotVerified": "AUF sin verificar",
   "directory.mark.aufVerified": "AUF verificado",
   "directory.mark.pendingActivation": "Pendiente de activar",
+  "directory.mark.notEvaluated": "Sin evaluar",
+  "directory.mark.notEvaluatedLabel": "Sin evaluar: evaluar a {name}",
   "directory.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para ver el directorio.",
   "directory.error.forbidden": "Tu cuenta no puede ver el directorio del club.",
