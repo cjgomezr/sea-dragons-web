@@ -181,14 +181,28 @@ describe("orden de las fronteras", () => {
 });
 
 describe("frontera por rol en pantallas, a través del proxy", () => {
-  it("redirige al panel a un Player que pide evaluaciones", async () => {
-    givenSession({ kind: "active", role: "Player" });
+  it.each(["Player", "Committee"] as const)(
+    "redirige al panel a un %s que pide evaluaciones escribiendo la dirección",
+    async (role) => {
+      givenSession({ kind: "active", role });
 
-    const response = await proxy(requestFor(EVALUATIONS_PATH));
+      const response = await proxy(requestFor(EVALUATIONS_PATH));
 
-    expect(response.status).toBe(TEMPORARY_REDIRECT);
-    expect(redirectedTo(response)).toBe(DASHBOARD_PATH);
-  });
+      expect(response.status).toBe(TEMPORARY_REDIRECT);
+      expect(redirectedTo(response)).toBe(DASHBOARD_PATH);
+    },
+  );
+
+  it.each(["Coach", "Admin"] as const)(
+    "deja pasar a un %s a evaluaciones",
+    async (role) => {
+      givenSession({ kind: "active", role });
+
+      const response = await proxy(requestFor(EVALUATIONS_PATH));
+
+      expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
+    },
+  );
 
   it("lee la sesión una sola vez por petición", async () => {
     givenSession({ kind: "active", role: "Coach" });

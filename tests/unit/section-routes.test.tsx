@@ -16,8 +16,6 @@ vi.mock("@/lib/club/supabase-club-brand", () => ({
 const { default: CalendarioPage } = await import("@/app/(app)/calendario/page");
 const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");
 const { default: EquiposPage } = await import("@/app/(app)/equipos/page");
-const { default: EvaluacionesPage } =
-  await import("@/app/(app)/evaluaciones/page");
 const { default: PagosPage } = await import("@/app/(app)/pagos/page");
 const { default: HomePage } = await import("@/app/(app)/page");
 
@@ -29,15 +27,15 @@ async function renderIn(locale: Locale, Page: ServerPage): Promise<void> {
 }
 
 /** Las secciones que siguen siendo un marcador de posición. El directorio
- * salió de aquí en #239 y Noticias en #329, que les dieron su pantalla: lo que enseña se prueba en
- * `tests/unit/components/directory-screen.test.tsx`. */
+ * salió de aquí en #239, Noticias en #329 y Evaluaciones en #322, que les
+ * dieron su pantalla: lo que enseña cada una se prueba en su test de
+ * `tests/unit/components/`. */
 const SECTIONS: ReadonlyArray<
   readonly [english: string, spanish: string, Page: ServerPage]
 > = [
   ["Dashboard", "Dashboard", DashboardPage],
   ["Calendar", "Calendario", CalendarioPage],
   ["Teams", "Equipos", EquiposPage],
-  ["Evaluations", "Evaluaciones", EvaluacionesPage],
   ["Payments", "Pagos", PagosPage],
 ];
 

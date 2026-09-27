@@ -11,6 +11,7 @@ import {
 } from "@/lib/club/club-positions";
 import type { ExperienceLevel } from "@/lib/members/profile-fields";
 import { isAufExpired } from "@/lib/members/member-record";
+import { matchesNameSearch } from "@/lib/text/name-search";
 import { compareNames } from "@/lib/text/name-order";
 
 /**
@@ -138,15 +139,6 @@ export class DirectoryForbiddenError extends Error {
   }
 }
 
-/** Sin mayúsculas ni acentos, para que "maria" encuentre a "María" (FR-017).
- * `NFD` separa cada letra de su tilde y el reemplazo se queda con la letra. */
-function normalizeForSearch(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
-}
-
 function matchesSearch(
   record: DirectoryMemberRecord,
   search: string | null,
@@ -154,9 +146,7 @@ function matchesSearch(
   if (search === null) {
     return true;
   }
-  return normalizeForSearch(record.fullName).includes(
-    normalizeForSearch(search),
-  );
+  return matchesNameSearch(record.fullName, search);
 }
 
 /** Dado de baja no aparece (FR-085), salvo que un Admin los pida. Una cuenta
