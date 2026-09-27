@@ -167,6 +167,7 @@ funcion club_position_name_taken(acting_club_id uuid, own_position_id uuid, name
 funcion clubs_seed_default_evaluation_categories()
 funcion clubs_seed_default_positions()
 funcion create_club_position(acting_club_id uuid, name_en text, name_es text)
+funcion create_events(acting_club_id uuid, acting_user_id uuid, schedule jsonb)
 funcion create_evaluation_category(acting_club_id uuid, category_name text)
 funcion create_member_evaluation(acting_club_id uuid, target_user_id uuid)
 funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)

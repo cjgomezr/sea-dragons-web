@@ -8,6 +8,7 @@ import {
   DASHBOARD_PATH,
   EMAIL_CONFIRMATION_PATH,
   EVALUATIONS_PATH,
+  EVENTS_MANAGE_API_PATH,
   GROUPS_API_PATH,
   GROUPS_PATH,
   GUARDIAN_CONSENT_API_PATH,
@@ -823,5 +824,31 @@ describe("frontera de editar y retirar (#331)", () => {
     expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
       ALLOW,
     );
+  });
+});
+
+describe("frontera de crear eventos (#307)", () => {
+  it.each(["Coach", "Player"] as const)("niega crear a un %s", (role) => {
+    expect(
+      decideSessionBoundary({
+        pathname: EVENTS_MANAGE_API_PATH,
+        ...activeAs(role),
+      }),
+    ).toEqual({ kind: "missingCapability" });
+  });
+
+  it.each(["Admin", "Committee"] as const)("deja crear a un %s", (role) => {
+    expect(
+      decideSessionBoundary({
+        pathname: EVENTS_MANAGE_API_PATH,
+        ...activeAs(role),
+      }),
+    ).toEqual(ALLOW);
+  });
+
+  it("responde 401 sin sesión", () => {
+    expect(
+      decideSessionBoundary({ pathname: EVENTS_MANAGE_API_PATH, ...ANONYMOUS }),
+    ).toEqual({ kind: "unauthenticated" });
   });
 });
