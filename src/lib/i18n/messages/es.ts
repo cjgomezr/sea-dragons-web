@@ -985,4 +985,53 @@ export const spanishMessages: MessageCatalog = {
   "evaluations.refresh.action": "Poner al día con las categorías actuales",
   "evaluations.refresh.running": "Poniendo al día…",
   "evaluations.refresh.done": "Esta evaluación ya usa las categorías actuales.",
+  "evaluations.categories.link": "Categorías",
+  "evaluations.categories.metaTitle": "Categorías de evaluación · {club}",
+  "evaluations.categories.title": "Categorías de evaluación",
+  "evaluations.categories.lead":
+    "Lo que mide cada evaluación, en el orden en que se enseña. Las evaluaciones guardadas conservan sus categorías hasta que las pongas al día.",
+  "evaluations.categories.back": "Evaluaciones",
+  "evaluations.categories.loading": "Cargando las categorías…",
+  "evaluations.categories.active.title": "Categorías activas",
+  "evaluations.categories.active.empty":
+    "No hay categorías activas. Las evaluaciones nuevas necesitan al menos una.",
+  "evaluations.categories.inactive.title": "Categorías desactivadas",
+  "evaluations.categories.inactive.empty": "No hay categorías desactivadas.",
+  "evaluations.categories.create.title": "Añadir una categoría",
+  "evaluations.categories.create.submit": "Añadir categoría",
+  "evaluations.categories.create.saving": "Añadiendo…",
+  "evaluations.categories.name.label": "Nombre de la categoría",
+  "evaluations.categories.name.hint": "Hasta {max} caracteres.",
+  "evaluations.categories.rename": "Renombrar",
+  "evaluations.categories.rename.label": "Renombrar {name}",
+  "evaluations.categories.rename.submit": "Guardar nombre",
+  "evaluations.categories.rename.saving": "Guardando…",
+  "evaluations.categories.cancel": "Cancelar",
+  "evaluations.categories.move.up": "Subir",
+  "evaluations.categories.move.up.label": "Subir {name}",
+  "evaluations.categories.move.down": "Bajar",
+  "evaluations.categories.move.down.label": "Bajar {name}",
+  "evaluations.categories.deactivate": "Desactivar",
+  "evaluations.categories.deactivate.label": "Desactivar {name}",
+  "evaluations.categories.reactivate": "Reactivar",
+  "evaluations.categories.reactivate.label": "Reactivar {name}",
+  "evaluations.categories.moved":
+    "{name} queda en el puesto {rank} de {total}.",
+  "evaluations.categories.created": "{name} añadida.",
+  "evaluations.categories.renamed": "Nombre guardado.",
+  "evaluations.categories.deactivated":
+    "{name} está desactivada. Las evaluaciones nuevas no la incluyen.",
+  "evaluations.categories.reactivated":
+    "{name} vuelve a estar activa. Las evaluaciones nuevas la incluyen.",
+  "evaluations.categories.retry": "Volver a intentarlo",
+  "evaluations.categories.reloadLatest": "Cargar las últimas categorías",
+  "evaluations.categories.issue.nameRequired":
+    "Escribe un nombre para la categoría.",
+  "evaluations.categories.issue.nameTooLong": "Hasta {max} caracteres.",
+  "evaluations.categories.issue.nameTaken":
+    "Ya hay otra categoría con este nombre.",
+  "evaluations.categories.error.changed":
+    "Alguien más cambió las categorías entretanto. Carga las últimas y vuelve a intentarlo.",
+  "evaluations.categories.error.notFound":
+    "Esa categoría ya no existe. Carga las últimas categorías.",
 };

@@ -991,4 +991,51 @@ export const englishMessages = {
   "evaluations.refresh.running": "Updating…",
   "evaluations.refresh.done":
     "This evaluation now uses the current categories.",
+  "evaluations.categories.link": "Categories",
+  "evaluations.categories.metaTitle": "Evaluation categories · {club}",
+  "evaluations.categories.title": "Evaluation categories",
+  "evaluations.categories.lead":
+    "What every evaluation measures, in the order it's shown. Saved evaluations keep their categories until you update them.",
+  "evaluations.categories.back": "Evaluations",
+  "evaluations.categories.loading": "Loading the categories…",
+  "evaluations.categories.active.title": "Active categories",
+  "evaluations.categories.active.empty":
+    "No active categories. New evaluations need at least one.",
+  "evaluations.categories.inactive.title": "Deactivated categories",
+  "evaluations.categories.inactive.empty": "No deactivated categories.",
+  "evaluations.categories.create.title": "Add a category",
+  "evaluations.categories.create.submit": "Add category",
+  "evaluations.categories.create.saving": "Adding…",
+  "evaluations.categories.name.label": "Category name",
+  "evaluations.categories.name.hint": "Up to {max} characters.",
+  "evaluations.categories.rename": "Rename",
+  "evaluations.categories.rename.label": "Rename {name}",
+  "evaluations.categories.rename.submit": "Save name",
+  "evaluations.categories.rename.saving": "Saving…",
+  "evaluations.categories.cancel": "Cancel",
+  "evaluations.categories.move.up": "Up",
+  "evaluations.categories.move.up.label": "Move {name} up",
+  "evaluations.categories.move.down": "Down",
+  "evaluations.categories.move.down.label": "Move {name} down",
+  "evaluations.categories.deactivate": "Deactivate",
+  "evaluations.categories.deactivate.label": "Deactivate {name}",
+  "evaluations.categories.reactivate": "Reactivate",
+  "evaluations.categories.reactivate.label": "Reactivate {name}",
+  "evaluations.categories.moved": "{name} is now number {rank} of {total}.",
+  "evaluations.categories.created": "{name} added.",
+  "evaluations.categories.renamed": "Name saved.",
+  "evaluations.categories.deactivated":
+    "{name} is deactivated. New evaluations won't include it.",
+  "evaluations.categories.reactivated":
+    "{name} is active again. New evaluations include it.",
+  "evaluations.categories.retry": "Try again",
+  "evaluations.categories.reloadLatest": "Load the latest categories",
+  "evaluations.categories.issue.nameRequired": "Write a name for the category.",
+  "evaluations.categories.issue.nameTooLong": "Up to {max} characters.",
+  "evaluations.categories.issue.nameTaken":
+    "Another category already has this name.",
+  "evaluations.categories.error.changed":
+    "Someone else changed the categories in the meantime. Load the latest ones and try again.",
+  "evaluations.categories.error.notFound":
+    "That category no longer exists. Load the latest categories.",
 } as const satisfies Readonly<Record<string, Message>>;

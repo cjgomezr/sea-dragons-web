@@ -209,6 +209,17 @@ describe("lista de evaluaciones", () => {
     expect(button).not.toHaveTextContent(/ovr/i);
   });
 
+  it("lleva a las categorías desde la cabecera", async () => {
+    clubApi();
+
+    await renderScreen();
+
+    expect(screen.getByRole("link", { name: "Categories" })).toHaveAttribute(
+      "href",
+      "/evaluaciones/categorias",
+    );
+  });
+
   it("filtra por nombre, sin distinguir acentos", async () => {
     clubApi();
     await renderScreen();
