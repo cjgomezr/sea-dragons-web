@@ -231,15 +231,19 @@ describe("días de la semana", () => {
 });
 
 describe("bloque de fecha de la agenda", () => {
-  // En inglés australiano el mes corto de junio es "June" y el de septiembre
-  // "Sept": el mockup dice "JUN", pero el inglés de la aplicación es el de
-  // Melbourne.
   it("parte un día en día de la semana, número y mes, en inglés", () => {
     expect(formatCalendarDayParts("en", "2026-06-23")).toEqual({
       weekday: "Tue",
       day: "23",
-      month: "June",
+      month: "Jun",
     });
+  });
+
+  // En inglés australiano `Intl` escribe "June" y "Sept" según la versión de
+  // ICU: el bloque lleva siempre tres letras, como el mockup, en cualquier
+  // máquina.
+  it("recorta el mes a tres letras aunque ICU lo alargue", () => {
+    expect(formatCalendarDayParts("en", "2026-09-15").month).toBe("Sep");
   });
 
   it("parte el mismo día a la española", () => {

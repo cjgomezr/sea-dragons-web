@@ -129,7 +129,14 @@ const SHORT_WEEKDAY_FORMATTERS = calendarDayPartFormatters({
 const TWO_DIGIT_DAY_FORMATTERS = calendarDayPartFormatters({ day: "2-digit" });
 const SHORT_MONTH_FORMATTERS = calendarDayPartFormatters({ month: "short" });
 
-/** Un día sin hora partido en "Tue", "23" y "June" ("mar", "23", "jun"). */
+/** El bloque de fecha del mockup lleva el mes en tres letras ("JUN"). El mes
+ * corto de `Intl` no lo garantiza: en inglés australiano, según la versión de
+ * ICU, junio sale como "Jun" o "June" y septiembre como "Sep" o "Sept", y
+ * la máquina de quien desarrolla y la de CI no siempre coinciden. Se recorta
+ * para que el bloque sea el mismo en todas. */
+const MONTH_ABBREVIATION_LENGTH = 3;
+
+/** Un día sin hora partido en "Tue", "23" y "Jun" ("mar", "23", "jun"). */
 export function formatCalendarDayParts(
   locale: Locale,
   isoDate: string,
@@ -138,7 +145,9 @@ export function formatCalendarDayParts(
   return {
     weekday: SHORT_WEEKDAY_FORMATTERS[locale].format(midnightUtc),
     day: TWO_DIGIT_DAY_FORMATTERS[locale].format(midnightUtc),
-    month: SHORT_MONTH_FORMATTERS[locale].format(midnightUtc),
+    month: [...SHORT_MONTH_FORMATTERS[locale].format(midnightUtc)]
+      .slice(0, MONTH_ABBREVIATION_LENGTH)
+      .join(""),
   };
 }
 

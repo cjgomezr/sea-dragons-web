@@ -177,7 +177,7 @@ describe("agenda", () => {
     const row = await findRow(POOL_TRAINING.title);
     expect(within(row).getByText("Tue")).toBeInTheDocument();
     expect(within(row).getByText("23")).toBeInTheDocument();
-    expect(within(row).getByText("June")).toBeInTheDocument();
+    expect(within(row).getByText("Jun")).toBeInTheDocument();
     expect(within(row).getByText("Training")).toBeInTheDocument();
     expect(
       within(row).getByText("7:00 pm · MSAC Dive Pool"),
