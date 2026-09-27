@@ -113,7 +113,7 @@ function NotificationItem({
       now={now}
     />
   );
-  const destination = notificationDestination(notification.type);
+  const destination = notificationDestination(notification);
   if (destination !== null) {
     return (
       <Link

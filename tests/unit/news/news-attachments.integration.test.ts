@@ -24,6 +24,7 @@ import {
   withSeededRows,
   withTestUser,
 } from "../../support/rls";
+import { QUIET_NEWS_NOTICES } from "../helpers/quiet-notifications";
 
 /**
  * Los adjuntos contra `seadragons-dev` con los adaptadores de verdad (#328).
@@ -140,17 +141,20 @@ async function withSeededPost(
           memberRow(clubId, reader, "Player"),
         ],
         async () => {
-          const post = await publishNewsPostWithUploads(gateways, {
-            now: new Date(),
-            uploadIds: [],
-            callerId: committee.id,
-            draft: {
-              category: "document",
-              title: "Acta de la asamblea",
-              body: "Adjunta.",
-              audience: { kind: "club" },
+          const post = await publishNewsPostWithUploads(
+            { ...gateways, ...QUIET_NEWS_NOTICES },
+            {
+              now: new Date(),
+              uploadIds: [],
+              callerId: committee.id,
+              draft: {
+                category: "document",
+                title: "Acta de la asamblea",
+                body: "Adjunta.",
+                audience: { kind: "club" },
+              },
             },
-          });
+          );
           try {
             await run({ clubId, committee, reader, post });
           } finally {

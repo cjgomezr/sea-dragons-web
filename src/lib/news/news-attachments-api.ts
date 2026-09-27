@@ -11,7 +11,9 @@ import {
   NewsAttachmentValidationError,
 } from "./news-attachments";
 import { asNewsApiError } from "./news-api";
+import type { NewsPublishGateways } from "./news-publication-notice";
 import { createSupabaseNewsAttachmentGateways } from "./supabase-news-attachment-gateways";
+import { createSupabaseNewsPublishGateways } from "./supabase-news-publish-gateways";
 
 /**
  * Lo que comparten los endpoints de adjuntos (#328): cómo se cablean, cómo
@@ -66,6 +68,17 @@ export function readNewsAttachmentId(value: string): string {
 
 export function requireNewsAttachmentGateways(): NewsAttachmentGateways {
   const wiring = createSupabaseNewsAttachmentGateways(process.env);
+  if (wiring.kind === "unconfigured") {
+    throw new ApiError(
+      "service_unavailable",
+      describeMissingAuthKeys(wiring.missingKeys),
+    );
+  }
+  return wiring.gateways;
+}
+
+export function requireNewsPublishGateways(): NewsPublishGateways {
+  const wiring = createSupabaseNewsPublishGateways(process.env);
   if (wiring.kind === "unconfigured") {
     throw new ApiError(
       "service_unavailable",

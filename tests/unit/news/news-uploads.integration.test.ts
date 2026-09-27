@@ -22,6 +22,7 @@ import {
   withSeededRows,
   withTestUser,
 } from "../../support/rls";
+import { QUIET_NEWS_NOTICES } from "../helpers/quiet-notifications";
 
 /**
  * Las subidas previas contra `seadragons-dev` con los adaptadores de verdad
@@ -150,17 +151,20 @@ describeRls("subidas previas de noticias contra seadragons-dev", () => {
           bytes: PDF_BYTES,
         });
 
-        const post = await publishNewsPostWithUploads(gateways, {
-          callerId: committee.id,
-          draft: {
-            category: "document",
-            title: "Acta de la asamblea",
-            body: "Adjunta.",
-            audience: { kind: "club" },
+        const post = await publishNewsPostWithUploads(
+          { ...gateways, ...QUIET_NEWS_NOTICES },
+          {
+            callerId: committee.id,
+            draft: {
+              category: "document",
+              title: "Acta de la asamblea",
+              body: "Adjunta.",
+              audience: { kind: "club" },
+            },
+            uploadIds: [upload.id],
+            now: new Date(),
           },
-          uploadIds: [upload.id],
-          now: new Date(),
-        });
+        );
         const [attachment] = post.attachments;
         if (attachment === undefined) {
           throw new Error("La publicación no trae su adjunto.");

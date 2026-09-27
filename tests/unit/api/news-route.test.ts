@@ -68,6 +68,12 @@ function mockWiring(options: FakeAttachmentClubOptions = {}): void {
       gateways: club.gateways,
     }),
   }));
+  vi.doMock("@/lib/news/supabase-news-publish-gateways", () => ({
+    createSupabaseNewsPublishGateways: () => ({
+      kind: "ready",
+      gateways: club.gateways,
+    }),
+  }));
   mockSessionClient();
   vi.doMock("@/lib/auth/session-reader", () => ({
     readAuthenticatedUserId: async () => CALLER_ID,

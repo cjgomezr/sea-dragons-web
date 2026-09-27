@@ -670,6 +670,7 @@ export const englishMessages = {
     "An Admin declined your request to be {role}.",
   "notifications.role_request_received.title": "New role request",
   "notifications.role_request_received.body": "{name} asked to be {role}.",
+  "notifications.news_post_published.title": "New post: {category}",
   "notifications.generic.title": "New notification",
   "notifications.generic.body": "Something changed in your account.",
   "themeToggle.switchToLight": "Switch to light theme",

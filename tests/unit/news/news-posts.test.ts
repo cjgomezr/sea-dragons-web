@@ -12,7 +12,7 @@ import {
   type NewsPostDetail,
   openNewsPost,
 } from "@/lib/news/news-posts";
-import type { NewsAttachmentGateways } from "@/lib/news/news-attachments";
+import type { NewsPublishGateways } from "@/lib/news/news-publication-notice";
 import { publishNewsPostWithUploads } from "@/lib/news/news-uploads";
 import { fakeAttachmentClub } from "../helpers/news-attachments-club";
 import {
@@ -35,7 +35,7 @@ const POST_ID = "d3d3d3d3-0000-4000-8000-00000000000d";
 
 /** Publicar sin adjuntos: el mismo camino que usa el endpoint (#330). */
 function publishWithoutAttachments(
-  gateways: NewsAttachmentGateways,
+  gateways: NewsPublishGateways,
   request: { readonly callerId: string; readonly draft: NewsDraft },
 ): Promise<NewsPostDetail> {
   return publishNewsPostWithUploads(gateways, {

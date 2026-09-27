@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
-import { DEFAULT_CLUB_SLUG } from "@/lib/auth/supabase-auth-gateways";
 import { listNewsFeed } from "@/lib/news/news-feed";
 import {
   ForeignNewsGroupError,
@@ -9,14 +8,15 @@ import {
   type NewsPostDetail,
   openNewsPost,
 } from "@/lib/news/news-posts";
-import type { NewsAttachmentGateways } from "@/lib/news/news-attachments";
+import type { NewsPublishGateways } from "@/lib/news/news-publication-notice";
 import {
   NewsPostChangedError,
   changeNewsPostStatus,
   editNewsPost,
 } from "@/lib/news/news-management";
 import { publishNewsPostWithUploads } from "@/lib/news/news-uploads";
-import { createNewsAttachmentGateways } from "@/lib/news/supabase-news-attachment-gateways";
+import { createNewsPublishGateways } from "@/lib/news/supabase-news-publish-gateways";
+import { createSupabaseNotificationWriter } from "@/lib/notifications/supabase-notification-gateways";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
   type ServiceRoleClient,
@@ -40,19 +40,34 @@ type SeededClub = {
   readonly squadMember: TestUser;
   readonly outsider: TestUser;
   readonly squadId: string;
-  readonly gateways: NewsAttachmentGateways;
+  readonly gateways: NewsPublishGateways;
 };
 
-async function readClubId(serviceClient: ServiceRoleClient): Promise<string> {
-  const { data, error } = await serviceClient.client
-    .from("clubs")
-    .select("id")
-    .eq("slug", DEFAULT_CLUB_SLUG)
-    .single();
-  if (error) {
-    throw new Error(`No se pudo leer el club sembrado: ${error.message}`);
-  }
-  return data.id as string;
+/** Publicar avisa a todo el club (#332): en el club sembrado llegaría a sus
+ * socios de verdad. La limpieza de avisos corre en el acto, porque aquí no
+ * hay petición a la que esperar. */
+function withThrowawayClub<T>(
+  serviceClient: ServiceRoleClient,
+  run: (clubId: string) => Promise<T>,
+): Promise<T> {
+  return withSeededRows(
+    serviceClient,
+    "clubs",
+    [{ slug: `noticias-${randomUUID()}`, name: "Club de las noticias" }],
+    ([club]) => run(club?.id as string),
+  );
+}
+
+function publishGatewaysFor(
+  serviceClient: ServiceRoleClient,
+): NewsPublishGateways {
+  return {
+    ...createNewsPublishGateways(serviceClient.client),
+    notifications: createSupabaseNotificationWriter(
+      serviceClient.client,
+      (work) => void work(),
+    ),
+  };
 }
 
 function memberRow(
@@ -105,52 +120,52 @@ async function withAuthorPosts<T>(
   }
 }
 
-/** Un Admin, un socio de un grupo y otro sin grupos. Todo se deshace. */
+/** Un club desechable con un Admin, un socio de un grupo y otro sin grupos.
+ * Todo se deshace. */
 async function withSeededClub<T>(
   serviceClient: ServiceRoleClient,
   run: (seeded: SeededClub) => Promise<T>,
 ): Promise<T> {
-  const clubId = await readClubId(serviceClient);
-  return withTestUser(serviceClient, (admin) =>
-    withTestUser(serviceClient, (squadMember) =>
-      withTestUser(serviceClient, (outsider) =>
-        withSeededRows(
-          serviceClient,
-          "members",
-          [
-            memberRow(clubId, admin, "Admin"),
-            memberRow(clubId, squadMember, "Player"),
-            memberRow(clubId, outsider, "Player"),
-          ],
-          () =>
-            withSeededRows(
-              serviceClient,
-              "groups",
-              [{ club_id: clubId, name: `News Squad ${randomUUID()}` }],
-              async ([squad]) => {
-                const squadId = squad?.id as string;
-                await runSupabase(
-                  "sembrar la pertenencia al grupo",
-                  serviceClient.client.from("group_memberships").insert({
-                    club_id: clubId,
-                    group_id: squadId,
-                    user_id: squadMember.id,
-                  }),
-                );
-                return withAuthorPosts(serviceClient, admin.id, () =>
-                  run({
-                    clubId,
-                    admin,
-                    squadMember,
-                    outsider,
-                    squadId,
-                    gateways: createNewsAttachmentGateways(
-                      serviceClient.client,
-                    ),
-                  }),
-                );
-              },
-            ),
+  return withThrowawayClub(serviceClient, (clubId) =>
+    withTestUser(serviceClient, (admin) =>
+      withTestUser(serviceClient, (squadMember) =>
+        withTestUser(serviceClient, (outsider) =>
+          withSeededRows(
+            serviceClient,
+            "members",
+            [
+              memberRow(clubId, admin, "Admin"),
+              memberRow(clubId, squadMember, "Player"),
+              memberRow(clubId, outsider, "Player"),
+            ],
+            () =>
+              withSeededRows(
+                serviceClient,
+                "groups",
+                [{ club_id: clubId, name: `News Squad ${randomUUID()}` }],
+                async ([squad]) => {
+                  const squadId = squad?.id as string;
+                  await runSupabase(
+                    "sembrar la pertenencia al grupo",
+                    serviceClient.client.from("group_memberships").insert({
+                      club_id: clubId,
+                      group_id: squadId,
+                      user_id: squadMember.id,
+                    }),
+                  );
+                  return withAuthorPosts(serviceClient, admin.id, () =>
+                    run({
+                      clubId,
+                      admin,
+                      squadMember,
+                      outsider,
+                      squadId,
+                      gateways: publishGatewaysFor(serviceClient),
+                    }),
+                  );
+                },
+              ),
+          ),
         ),
       ),
     ),
@@ -159,7 +174,7 @@ async function withSeededClub<T>(
 
 /** Publicar sin adjuntos: el mismo camino que usa el endpoint (#330). */
 function publishWithoutAttachments(
-  gateways: NewsAttachmentGateways,
+  gateways: NewsPublishGateways,
   request: { readonly callerId: string; readonly draft: NewsDraft },
 ): Promise<NewsPostDetail> {
   return publishNewsPostWithUploads(gateways, {
@@ -498,6 +513,72 @@ describeRls("noticias contra seadragons-dev", () => {
             metadata: null,
           },
         ]);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "publicar a un grupo deja un aviso a cada miembro del grupo y ninguno a quien está fuera ni a quien publica (#332)",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, async (seeded) => {
+        const post = await publishWithoutAttachments(seeded.gateways, {
+          callerId: seeded.admin.id,
+          draft: {
+            category: "news",
+            title: "Torneo en Sídney",
+            body: "Apuntaos antes del viernes.",
+            audience: { kind: "groups", groupIds: [seeded.squadId] },
+          },
+        });
+
+        const { data, error } = await serviceClient.client
+          .from("notifications")
+          .select("user_id, type, data")
+          .eq("club_id", seeded.clubId);
+        expect(error).toBeNull();
+        expect(data).toEqual([
+          {
+            user_id: seeded.squadMember.id,
+            type: "news_post_published",
+            data: {
+              postId: post.id,
+              category: "news",
+              title: "Torneo en Sídney",
+            },
+          },
+        ]);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "publicar a todo el club avisa a cada socio activo menos a quien publica (#332)",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, async (seeded) => {
+        await publishWithoutAttachments(seeded.gateways, {
+          callerId: seeded.admin.id,
+          draft: {
+            category: "announcement",
+            title: "Cambia la piscina",
+            body: "El martes entrenamos en MSAC.",
+            audience: { kind: "club" },
+          },
+        });
+
+        const { data, error } = await serviceClient.client
+          .from("notifications")
+          .select("user_id")
+          .eq("club_id", seeded.clubId);
+        expect(error).toBeNull();
+        expect(data?.map((row) => row.user_id).sort()).toEqual(
+          [seeded.squadMember.id, seeded.outsider.id].sort(),
+        );
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,

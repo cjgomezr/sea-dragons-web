@@ -776,7 +776,7 @@ restriccion notifications.notifications_club_id_fkey FOREIGN KEY (club_id) REFER
 restriccion notifications.notifications_data_is_object CHECK ((jsonb_typeof(data) = 'object'::text))
 restriccion notifications.notifications_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
 restriccion notifications.notifications_pkey PRIMARY KEY (id)
-restriccion notifications.notifications_type_check CHECK ((type = ANY (ARRAY['role_changed'::text, 'role_request_rejected'::text, 'role_request_received'::text])))
+restriccion notifications.notifications_type_check CHECK ((type = ANY (ARRAY['role_changed'::text, 'role_request_rejected'::text, 'role_request_received'::text, 'news_post_published'::text])))
 restriccion password_recovery_requests.password_recovery_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion password_recovery_requests.password_recovery_requests_pkey PRIMARY KEY (id)
 restriccion registration_requests.registration_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)

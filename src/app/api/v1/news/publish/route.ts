@@ -4,7 +4,7 @@ import { identifyAccountCaller } from "@/lib/auth/account-api";
 import { newsDraftSchema } from "@/lib/news/news-api";
 import {
   asNewsAttachmentApiError,
-  requireNewsAttachmentGateways,
+  requireNewsPublishGateways,
 } from "@/lib/news/news-attachments-api";
 import type { NewsPostDetail } from "@/lib/news/news-posts";
 import { publishNewsPostWithUploads } from "@/lib/news/news-uploads";
@@ -35,10 +35,12 @@ const postNews = createApiRoute<PublishedNewsPostResponse, NewsDraftBody>({
     const { attachmentUploadIds, ...draft } = body;
     try {
       return {
-        data: await publishNewsPostWithUploads(
-          requireNewsAttachmentGateways(),
-          { callerId, draft, uploadIds: attachmentUploadIds, now: new Date() },
-        ),
+        data: await publishNewsPostWithUploads(requireNewsPublishGateways(), {
+          callerId,
+          draft,
+          uploadIds: attachmentUploadIds,
+          now: new Date(),
+        }),
         status: 201,
       };
     } catch (error) {

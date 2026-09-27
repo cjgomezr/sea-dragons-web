@@ -11,7 +11,10 @@ import type {
 } from "./member-notifications";
 import {
   NOTIFICATION_TYPES,
+  type NotificationBroadcastWriter,
   type NotificationCleanup,
+  type NotificationInsert,
+  type NotificationRecipient,
   type NotificationWriter,
 } from "./notify-member";
 
@@ -46,12 +49,32 @@ const recipientRowSchema = z.object({
   account_status: z.enum(ACCOUNT_STATUSES),
 });
 
+const recipientRowsSchema = z.array(
+  recipientRowSchema.extend({ user_id: z.string() }),
+);
+
 const cleanupRowsSchema = z.array(
   z.object({
+    user_id: z.string(),
     deleted_count: z.number().int(),
     kept_count: z.number().int(),
   }),
 );
+
+function toRecipient(
+  row: z.infer<typeof recipientRowSchema>,
+): NotificationRecipient {
+  return { clubId: row.club_id, accountStatus: row.account_status };
+}
+
+function toNotificationRow(row: NotificationInsert): Record<string, unknown> {
+  return {
+    club_id: row.clubId,
+    user_id: row.userId,
+    type: row.type,
+    data: row.data,
+  };
+}
 
 function toMemberNotification(row: unknown): MemberNotification {
   const parsed = notificationRowSchema.parse(row);
@@ -106,12 +129,33 @@ export function createSupabaseNotificationReader(
 /** Un socio sin ningún aviso no sale en lo que devuelve la limpieza. */
 const EMPTY_CLEANUP: NotificationCleanup = { deletedCount: 0, keptCount: 0 };
 
+/** Limpia los avisos de esos socios en una llamada a la base. */
+async function pruneMembers(
+  serviceClient: SupabaseClient,
+  userIds: readonly string[],
+): Promise<ReadonlyMap<string, NotificationCleanup>> {
+  const { data, error } = await serviceClient.rpc(PRUNE_FUNCTION, {
+    recipient_user_ids: userIds,
+  });
+  if (error) {
+    throw new Error(`No se pudieron limpiar los avisos: ${error.message}`);
+  }
+  return new Map(
+    cleanupRowsSchema
+      .parse(data)
+      .map((row) => [
+        row.user_id,
+        { deletedCount: row.deleted_count, keptCount: row.kept_count },
+      ]),
+  );
+}
+
 /** `runLater` es `after` de Next.js salvo en los tests de integración, que
  * corren fuera de una petición y quieren ver la limpieza terminada. */
 export function createSupabaseNotificationWriter(
   serviceClient: SupabaseClient,
   runLater: NotificationWriter["runAfterResponse"] = runAfterResponse,
-): NotificationWriter {
+): NotificationWriter & NotificationBroadcastWriter {
   return {
     async findRecipient(userId) {
       const { data, error } = await serviceClient
@@ -127,39 +171,46 @@ export function createSupabaseNotificationWriter(
       if (data === null) {
         return null;
       }
-      const recipient = recipientRowSchema.parse(data);
-      return {
-        clubId: recipient.club_id,
-        accountStatus: recipient.account_status,
-      };
+      return toRecipient(recipientRowSchema.parse(data));
+    },
+    async findRecipients(userIds) {
+      const { data, error } = await serviceClient
+        .from(MEMBERS_TABLE)
+        .select("user_id, club_id, account_status")
+        .in("user_id", userIds);
+      if (error) {
+        throw new Error(
+          `No se pudieron leer los destinatarios del aviso: ${error.message}`,
+        );
+      }
+      return new Map(
+        recipientRowsSchema
+          .parse(data)
+          .map((row) => [row.user_id, toRecipient(row)]),
+      );
     },
     async insertNotification(row) {
-      const { error } = await serviceClient.from(NOTIFICATIONS_TABLE).insert({
-        club_id: row.clubId,
-        user_id: row.userId,
-        type: row.type,
-        data: row.data,
-      });
+      const { error } = await serviceClient
+        .from(NOTIFICATIONS_TABLE)
+        .insert(toNotificationRow(row));
       if (error) {
         throw new Error(`No se pudo guardar el aviso: ${error.message}`);
       }
     },
-    async pruneNotifications(userId) {
-      const { data, error } = await serviceClient.rpc(PRUNE_FUNCTION, {
-        recipient_user_ids: [userId],
-      });
+    async insertNotifications(rows) {
+      // Un solo `insert` con todas las filas: la base lo guarda entero o nada.
+      const { error } = await serviceClient
+        .from(NOTIFICATIONS_TABLE)
+        .insert(rows.map(toNotificationRow));
       if (error) {
-        throw new Error(`No se pudieron limpiar los avisos: ${error.message}`);
+        throw new Error(`No se pudieron guardar los avisos: ${error.message}`);
       }
-      const [cleanup] = cleanupRowsSchema.parse(data);
-      if (cleanup === undefined) {
-        return EMPTY_CLEANUP;
-      }
-      return {
-        deletedCount: cleanup.deleted_count,
-        keptCount: cleanup.kept_count,
-      };
     },
+    async pruneNotifications(userId) {
+      const cleanups = await pruneMembers(serviceClient, [userId]);
+      return cleanups.get(userId) ?? EMPTY_CLEANUP;
+    },
+    pruneNotificationsOf: (userIds) => pruneMembers(serviceClient, userIds),
     runAfterResponse: runLater,
   };
 }
