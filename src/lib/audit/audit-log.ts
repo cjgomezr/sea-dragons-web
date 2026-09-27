@@ -52,6 +52,12 @@ export const AUDIT_ACTIONS = [
   "club_position.reordered",
   "club_position.archived",
   "club_position.reactivated",
+  // RF-1 y RF-5 de E9 (#319): un Coach o un Admin crea la evaluación de un
+  // miembro o guarda sus valoraciones. La entidad es el `user_id` del miembro
+  // evaluado (`member`), sin metadata: ni las notas, ni las categorías, ni el
+  // OVR. Quién evaluó, sobre quién y cuándo ya están en la entrada.
+  "member_evaluation.created",
+  "member_evaluation.ratings_saved",
   "payment.status_changed",
 ] as const;
 

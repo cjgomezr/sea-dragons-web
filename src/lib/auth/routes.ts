@@ -230,6 +230,14 @@ export const TEAMS_PATH = "/equipos";
 /** Las evaluaciones. Un Player no las ve, ni las propias (FR-055). */
 export const EVALUATIONS_PATH = "/evaluaciones";
 
+/** La evaluación de cada miembro (#319, RF-1, RF-2 y RF-5 del PRD de E9).
+ * Todo lo que cuelga de este camino es del personal de entrenamiento: un
+ * Player o un Committee no ven ninguna, ni la propia (FR-055). Va fuera de
+ * `MEMBERS_API_PATH`, que es sólo del Admin, porque un Coach también evalúa.
+ * El handler lo vuelve a comprobar. La de un miembro cuelga en `[id]`, que
+ * es su `user_id`: GET la lee, POST la crea y PUT guarda sus valoraciones. */
+export const EVALUATIONS_API_PATH = "/api/v1/evaluations";
+
 /** El destino del enlace del correo de confirmación (#132). No es una
  * pantalla del PRD: canjea el token y redirige. Es público por definición,
  * porque quien abre ese enlace todavía no puede iniciar sesión.
@@ -336,6 +344,7 @@ export type RestrictedRoute = {
 export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: TEAMS_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: EVALUATIONS_PATH, capability: "viewEvaluations" },
+  { path: EVALUATIONS_API_PATH, capability: "viewEvaluations" },
   { path: ROLE_REQUEST_DECISION_API_PATH, capability: "manageUsersAndRoles" },
   { path: MEMBERS_API_PATH, capability: "manageUsersAndRoles" },
   // Cuelga del anterior, así que hoy no añade nada. Se declara igual porque es
