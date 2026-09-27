@@ -259,10 +259,13 @@ const PUBLIC_PAGES: readonly Screen[] = [
 // "home" is the pre-existing landing page; "section" is a destination route
 // off the sidebar menu, standing in for any of the seven (they share the
 // same shell and SectionPlaceholder). Las dos viven detrás de la frontera de
-// sesión, así que sus tests entran antes de mirarlas.
+// sesión, así que sus tests entran antes de mirarlas. La sección tiene que
+// ser una que la sesión de prueba (un Player) pueda abrir: `/equipos` la
+// frontera se la niega y la devuelve al panel, así que la captura sería la
+// del panel y no la de un marcador.
 const APP_PAGES: readonly Screen[] = [
   { name: "home", path: "/" },
-  { name: "section", path: "/equipos" },
+  { name: "section", path: "/pagos" },
 ];
 
 function describeScreen(pg: Screen): void {
