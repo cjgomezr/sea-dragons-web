@@ -107,7 +107,11 @@ function toEventRow(row: unknown): EventRow {
         ? { kind: "club" }
         : {
             kind: "groups",
-            groups: parsed.event_groups.map((row) => row.group),
+            // PostgREST no garantiza el orden de lo embebido: sin esto, la
+            // lista cambiaría de orden entre una petición y otra.
+            groups: parsed.event_groups
+              .map((row) => row.group)
+              .sort((first, second) => first.name.localeCompare(second.name)),
           },
     myResponse: parsed.my_rsvp[0]?.response ?? null,
   };

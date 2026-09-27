@@ -274,6 +274,32 @@ describeRls("agenda y detalle contra la base", () => {
   );
 
   it(
+    "el cursor y la audiencia se aplican a la vez",
+    () =>
+      withAgendaWorld(async (world) => {
+        const gateways = createEventAgendaGateways(world.serviceClient.client);
+        const visibility = {
+          kind: "audience",
+          groupIds: [world.groupId],
+        } as const;
+
+        const [first] = await gateways.agenda.findAgendaPage(
+          farAgendaQuery(world, { visibility, limit: 1 }),
+        );
+        const rest = await gateways.agenda.findAgendaPage(
+          farAgendaQuery(world, {
+            visibility,
+            after: { startsAt: first?.startsAt ?? "", id: first?.id ?? "" },
+          }),
+        );
+
+        expect(first?.id).toBe(world.groupEventId);
+        expect(rest.map((row) => row.id)).toEqual([world.clubEventId]);
+      }),
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "trae la audiencia con nombres, la respuesta propia y sigue el cursor",
     () =>
       withAgendaWorld(async (world) => {
