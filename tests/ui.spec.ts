@@ -8697,3 +8697,315 @@ test.describe("publicar en el navegador", () => {
     });
   });
 });
+
+/* ---------------------------------------------------------------------------
+   Evaluaciones (#322): la lista, la ficha, la ficha en edición y el miembro
+   sin evaluar. Mockup: docs/mockups/evaluations-light.png y
+   evaluations-dark.png, que es de escritorio; en el móvil la lista y la ficha
+   son dos pasos. La tarjeta "Position score" del mockup no se construye.
+
+   Los datos son fijos, servidos por `page.route` como en Noticias: lo que
+   los endpoints responden se prueba contra la base (#319 y #322).
+   --------------------------------------------------------------------------- */
+
+const EVALUATIONS_SCREEN_PATH = "/evaluaciones";
+const EVALUATIONS_ENDPOINT = "/api/v1/evaluations";
+const EVALUATIONS_NARROW_WIDTHS = [320, 375, 768] as const;
+const EVALUATIONS_HEADING = /^(Evaluations|Evaluaciones)$/;
+const EVALUATED_AT = "2026-09-27T01:02:03.123456+00:00";
+
+const CAMILA_ID = "e1e1e1e1-0000-4000-8000-0000000000e1";
+const MATEO_ID = "e1e1e1e1-0000-4000-8000-0000000000e2";
+
+/** Una con un nombre de tres veces lo normal, para el caso de contenido
+ * largo, y una evaluada sin categorías, que no tiene media. */
+const STUBBED_ROSTER = [
+  {
+    status: "evaluated",
+    userId: CAMILA_ID,
+    fullName: "Camila Ortiz",
+    overallRating: 7.9,
+  },
+  {
+    status: "evaluated",
+    userId: "e1e1e1e1-0000-4000-8000-0000000000e3",
+    fullName: "Chloe Nguyen",
+    overallRating: 8.3,
+  },
+  { status: "not_evaluated", userId: MATEO_ID, fullName: "Mateo Fernández" },
+  {
+    status: "evaluated",
+    userId: "e1e1e1e1-0000-4000-8000-0000000000e4",
+    fullName: "Ruby Walsh",
+    overallRating: null,
+  },
+  {
+    status: "evaluated",
+    userId: "e1e1e1e1-0000-4000-8000-0000000000e5",
+    fullName: "Valentina Maximiliana Rodríguez-Etxeberria de la Fuente",
+    overallRating: 6.4,
+  },
+] as const;
+
+/** Las del mockup, más Experience, que es una de las diez del SRD. Suman 79:
+ * el OVR es 7.9, como en el mockup. */
+const CAMILA_RATINGS: readonly (readonly [string, number])[] = [
+  ["Fitness", 8],
+  ["Speed", 9],
+  ["Endurance", 7],
+  ["Experience", 8],
+  ["Game awareness", 8],
+  ["Tactical", 7],
+  ["Passing", 8],
+  ["Ball control", 9],
+  ["Defense", 6],
+  ["Teamwork", 9],
+];
+
+function stubbedEvaluation(
+  ratings: readonly (readonly [string, number])[],
+): unknown {
+  const sum = ratings.reduce((total, [, rating]) => total + rating, 0);
+  return {
+    status: "evaluated",
+    memberId: CAMILA_ID,
+    updatedAt: EVALUATED_AT,
+    overallRating: Math.round((sum * 10) / ratings.length) / 10,
+    ratings: ratings.map(([name, rating], index) => ({
+      categoryId: `ca7e0000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      name,
+      rating,
+      isRetired: false,
+    })),
+  };
+}
+
+async function stubEvaluationReads(
+  page: Page,
+  roster: readonly unknown[],
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === EVALUATIONS_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ members: roster })),
+  );
+  await page.route(
+    (url) => url.pathname.startsWith(`${EVALUATIONS_ENDPOINT}/`),
+    (route, request) => {
+      const isMateo = new URL(request.url()).pathname.endsWith(MATEO_ID);
+      return route.fulfill(
+        jsonBody(
+          isMateo
+            ? { status: "not_evaluated", memberId: MATEO_ID }
+            : stubbedEvaluation(CAMILA_RATINGS),
+        ),
+      );
+    },
+  );
+}
+
+const RATINGS_LIST = /^(Skill ratings|Valoraciones)$/;
+const EDIT_RATINGS = /^(Edit ratings|Editar valoraciones)$/;
+const CAMILA_BUTTON = /Camila Ortiz/;
+
+async function waitForRoster(page: Page): Promise<void> {
+  await expect(page.getByRole("button", { name: CAMILA_BUTTON })).toBeVisible();
+}
+
+async function openCamila(page: Page): Promise<void> {
+  await page.getByRole("button", { name: CAMILA_BUTTON }).click();
+  await expect(page.getByRole("list", { name: RATINGS_LIST })).toBeVisible();
+}
+
+async function openCamilaFromRoster(page: Page): Promise<void> {
+  await waitForRoster(page);
+  await openCamila(page);
+}
+
+type EvaluationsState = {
+  readonly name: string;
+  readonly roster: readonly unknown[];
+  readonly isSpanish?: boolean;
+  readonly ready: (page: Page) => Promise<void>;
+};
+
+const EVALUATIONS_LIST: EvaluationsState = {
+  name: "evaluaciones-lista",
+  roster: STUBBED_ROSTER,
+  ready: waitForRoster,
+};
+
+const EVALUATIONS_STATES: readonly EvaluationsState[] = [
+  EVALUATIONS_LIST,
+  { ...EVALUATIONS_LIST, name: "evaluaciones-lista-es", isSpanish: true },
+  {
+    name: "evaluaciones-ficha",
+    roster: STUBBED_ROSTER,
+    ready: openCamilaFromRoster,
+  },
+  {
+    name: "evaluaciones-ficha-es",
+    roster: STUBBED_ROSTER,
+    isSpanish: true,
+    ready: openCamilaFromRoster,
+  },
+  {
+    name: "evaluaciones-ficha-editando",
+    roster: STUBBED_ROSTER,
+    ready: async (page) => {
+      await openCamilaFromRoster(page);
+      await page.getByRole("button", { name: EDIT_RATINGS }).click();
+      await expect(page.getByRole("slider", { name: "Fitness" })).toBeVisible();
+    },
+  },
+  {
+    name: "evaluaciones-sin-evaluar",
+    roster: STUBBED_ROSTER,
+    ready: async (page) => {
+      await page.getByRole("button", { name: /Mateo Fernández/ }).click();
+      await expect(
+        page.getByRole("button", { name: "Create evaluation" }),
+      ).toBeVisible();
+    },
+  },
+  {
+    name: "evaluaciones-vacia",
+    roster: [],
+    ready: async (page) => {
+      await expect(
+        page.getByText("There's nobody in the club to evaluate yet."),
+      ).toBeVisible();
+    },
+  },
+];
+
+async function goToEvaluations(
+  page: Page,
+  state: EvaluationsState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await stubEvaluationReads(page, state.roster);
+  if (state.isSpanish === true) {
+    await chooseSpanish(page);
+  }
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${EVALUATIONS_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, EVALUATIONS_SCREEN_PATH, theme);
+  }
+  await expect(
+    page.getByRole("heading", { level: 1, name: EVALUATIONS_HEADING }),
+  ).toBeVisible();
+  await state.ready(page);
+}
+
+for (const state of EVALUATIONS_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToEvaluations(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of EVALUATIONS_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToEvaluations(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToEvaluations(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("evaluaciones en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("a 375px la lista y la ficha son dos pasos, con forma de volver", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToEvaluations(page, EVALUATIONS_LIST);
+
+    await openCamila(page);
+    await expect(page.getByRole("searchbox")).toBeHidden();
+    await page.getByRole("button", { name: "All members" }).click();
+
+    await expect(page.getByRole("searchbox")).toBeVisible();
+    await expect(page.getByRole("list", { name: RATINGS_LIST })).toHaveCount(0);
+  });
+
+  test("en escritorio la lista y la ficha van lado a lado", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToEvaluations(page, EVALUATIONS_LIST);
+
+    await openCamila(page);
+
+    await expect(page.getByRole("searchbox")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "All members" }),
+    ).toBeHidden();
+  });
+
+  test("guardar pone el OVR al día sin recargar la página", async ({
+    page,
+  }) => {
+    await goToEvaluations(page, EVALUATIONS_LIST);
+    await page.evaluate(() => {
+      (window as { sinRecargar?: boolean }).sinRecargar = true;
+    });
+    const saved = CAMILA_RATINGS.map(([name, rating]) =>
+      name === "Defense" ? ([name, 10] as const) : ([name, rating] as const),
+    );
+    await page.route(
+      (url) => url.pathname === `${EVALUATIONS_ENDPOINT}/${CAMILA_ID}`,
+      (route, request) =>
+        request.method() === "PUT"
+          ? route.fulfill(jsonBody(stubbedEvaluation(saved)))
+          : route.fallback(),
+    );
+    await openCamila(page);
+    await page.getByRole("button", { name: EDIT_RATINGS }).click();
+
+    await page.getByRole("slider", { name: "Defense" }).fill("10");
+    await page.getByRole("button", { name: "Save ratings" }).click();
+
+    await expect(page.getByText("Ratings saved.")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: CAMILA_BUTTON }),
+    ).toContainText("8.3");
+    expect(
+      await page.evaluate(
+        () => (window as { sinRecargar?: boolean }).sinRecargar,
+      ),
+    ).toBe(true);
+  });
+});
