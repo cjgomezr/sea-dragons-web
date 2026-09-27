@@ -393,6 +393,40 @@ describe("ficha de evaluación", () => {
 
     expect(await within(sheet).findByText("5.0")).toBeInTheDocument();
     expect(within(sheet).queryByRole("slider")).toBeNull();
+    expect(memberButton(/camila ortiz/i)).toHaveTextContent("5.0");
+  });
+
+  it("si alguien más la creó antes, avisa y ofrece recargarla en vez de reintentar", async () => {
+    let reads = 0;
+    clubApi({
+      [`POST ${ROSTER_PATH}/${MATEO.userId}`]: () =>
+        errorResponse(409, "conflict", "evaluation_exists"),
+      [`GET ${ROSTER_PATH}/${MATEO.userId}`]: () => {
+        reads += 1;
+        return jsonResponse(200, {
+          data:
+            reads === 1
+              ? { status: "not_evaluated", memberId: MATEO.userId }
+              : evaluated(MATEO.userId, CAMILA_RATINGS),
+        });
+      },
+    });
+    await renderScreen();
+    const sheet = await openMember(/mateo ruiz/i);
+
+    await userEvent.click(
+      await within(sheet).findByRole("button", { name: /create evaluation/i }),
+    );
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent(
+      /someone else just created/i,
+    );
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: /reload/i }),
+    );
+
+    expect(await within(sheet).findByText("7.5")).toBeInTheDocument();
+    expect(memberButton(/mateo ruiz/i)).toHaveTextContent("7.5");
+    expect(callsTo("POST")).toHaveLength(1);
   });
 
   it("vuelve a la lista con el botón de volver", async () => {

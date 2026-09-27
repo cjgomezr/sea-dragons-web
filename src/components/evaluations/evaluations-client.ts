@@ -9,6 +9,7 @@ import { EVALUATIONS_API_PATH } from "@/lib/auth/routes";
 import type { EvaluationRoster } from "@/lib/evaluations/evaluation-roster";
 import {
   EVALUATION_CHANGED_REASON,
+  EVALUATION_EXISTS_REASON,
   MEMBER_INACTIVE_REASON,
   MEMBER_NOT_FOUND_REASON,
   type MemberEvaluation,
@@ -125,10 +126,13 @@ export function saveMemberEvaluation(
   });
 }
 
-/** Alguien guardó esa evaluación después de que se leyera: lo que toca es
- * recargarla, no reintentar. */
-export function isEvaluationChanged(failure: EvaluationFailure): boolean {
-  return failure.reason === EVALUATION_CHANGED_REASON;
+/** Alguien guardó esa evaluación después de que se leyera, o la creó antes
+ * que quien pulsa crear: lo que toca es recargarla, no reintentar. */
+export function isStaleEvaluation(failure: EvaluationFailure): boolean {
+  return (
+    failure.reason === EVALUATION_CHANGED_REASON ||
+    failure.reason === EVALUATION_EXISTS_REASON
+  );
 }
 
 function describeReason(
@@ -138,6 +142,8 @@ function describeReason(
   switch (reason) {
     case EVALUATION_CHANGED_REASON:
       return translate("evaluations.error.changed");
+    case EVALUATION_EXISTS_REASON:
+      return translate("evaluations.error.exists");
     case MEMBER_NOT_FOUND_REASON:
       return translate("evaluations.error.memberNotFound");
     case MEMBER_INACTIVE_REASON:

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MemberAvatar } from "@/components/MemberAvatar";
 import type { MemberEvaluation } from "@/lib/evaluations/member-evaluation";
 import type { Translator } from "@/lib/i18n/translator";
@@ -9,6 +9,7 @@ import {
   type EvaluationFailure,
   createMemberEvaluation,
   describeEvaluationFailure,
+  isStaleEvaluation,
   loadMemberEvaluation,
 } from "./evaluations-client";
 
@@ -59,18 +60,52 @@ function LoadFailure({
   );
 }
 
+/** Si otro la creó entretanto, crear otra vez fallaría siempre: lo que se
+ * ofrece es recargar. */
+function CreationAction({
+  translate,
+  status,
+  onCreate,
+  onReload,
+}: {
+  translate: Translator;
+  status: CreationStatus;
+  onCreate: () => void;
+  onReload: () => void;
+}): React.JSX.Element {
+  if (status.kind === "failed" && isStaleEvaluation(status.failure)) {
+    return (
+      <button type="button" className="admin-secondary" onClick={onReload}>
+        {translate("evaluations.reload")}
+      </button>
+    );
+  }
+  const isCreating = status.kind === "creating";
+  return (
+    <button
+      type="button"
+      className="auth-submit"
+      disabled={isCreating}
+      onClick={onCreate}
+    >
+      {translate(isCreating ? "evaluations.creating" : "evaluations.create")}
+    </button>
+  );
+}
+
 function NotEvaluated({
   translate,
   fullName,
   status,
   onCreate,
+  onReload,
 }: {
   translate: Translator;
   fullName: string;
   status: CreationStatus;
   onCreate: () => void;
+  onReload: () => void;
 }): React.JSX.Element {
-  const isCreating = status.kind === "creating";
   return (
     <div className="card evaluation-missing">
       <p className="evaluation-missing-title">
@@ -82,14 +117,12 @@ function NotEvaluated({
           {describeEvaluationFailure(translate, status.failure)}
         </p>
       ) : null}
-      <button
-        type="button"
-        className="auth-submit"
-        disabled={isCreating}
-        onClick={onCreate}
-      >
-        {translate(isCreating ? "evaluations.creating" : "evaluations.create")}
-      </button>
+      <CreationAction
+        translate={translate}
+        status={status}
+        onCreate={onCreate}
+        onReload={onReload}
+      />
     </div>
   );
 }
@@ -112,6 +145,14 @@ export function EvaluationSheet({
   const [creation, setCreation] = useState<CreationStatus>({ kind: "idle" });
   // Recargar cuenta como una lectura más, aunque sea del mismo miembro.
   const [reloads, setReloads] = useState(0);
+  // La lista se pone al día también con lo que se lee, no sólo con lo que se
+  // guarda: tras un 409 la ficha y la lista tienen que decir el mismo OVR. Por
+  // referencia, para que un callback nuevo en cada render no relance la
+  // lectura.
+  const notifyChange = useRef(onEvaluationChange);
+  useEffect(() => {
+    notifyChange.current = onEvaluationChange;
+  }, [onEvaluationChange]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -119,11 +160,12 @@ export function EvaluationSheet({
       if (!isCurrent) {
         return;
       }
-      setState(
-        outcome.kind === "loaded"
-          ? { kind: "ready", evaluation: outcome.evaluation, isNew: false }
-          : { kind: "failed", failure: outcome },
-      );
+      if (outcome.kind === "failed") {
+        setState({ kind: "failed", failure: outcome });
+        return;
+      }
+      setState({ kind: "ready", evaluation: outcome.evaluation, isNew: false });
+      notifyChange.current(outcome.evaluation);
     });
     return () => {
       isCurrent = false;
@@ -132,6 +174,7 @@ export function EvaluationSheet({
 
   function reload(): void {
     setState({ kind: "loading" });
+    setCreation({ kind: "idle" });
     setReloads((count) => count + 1);
   }
 
@@ -190,6 +233,7 @@ export function EvaluationSheet({
           fullName={fullName}
           status={creation}
           onCreate={() => void create()}
+          onReload={reload}
         />
       ) : null}
       {state.kind === "ready" && state.evaluation.status === "evaluated" ? (

@@ -1,10 +1,13 @@
-import type { MemberEvaluation } from "@/lib/evaluations/member-evaluation";
+import {
+  type MemberEvaluation,
+  RATING_MAX,
+} from "@/lib/evaluations/member-evaluation";
 import { formatOverallRating } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import { EvaluationRatings } from "./EvaluationRatings";
 import {
   describeEvaluationFailure,
-  isEvaluationChanged,
+  isStaleEvaluation,
 } from "./evaluations-client";
 import { type RatingsEditor, useRatingsEditor } from "./use-ratings-editor";
 
@@ -39,7 +42,7 @@ function OverallScore({
             {formatOverallRating(translate.locale, overallRating)}
           </p>
           <p className="evaluation-overall-scale">
-            {translate("evaluations.overall.outOf")}
+            {translate("evaluations.overall.outOf", { max: RATING_MAX })}
           </p>
         </>
       )}
@@ -70,7 +73,7 @@ function SaveStatusMessage({
   return (
     <div className="auth-error evaluation-save-error" role="alert">
       <p>{describeEvaluationFailure(translate, status.failure)}</p>
-      {isEvaluationChanged(status.failure) ? (
+      {isStaleEvaluation(status.failure) ? (
         <button type="button" className="admin-secondary" onClick={onReload}>
           {translate("evaluations.reload")}
         </button>

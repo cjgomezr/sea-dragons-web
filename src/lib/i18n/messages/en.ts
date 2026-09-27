@@ -955,10 +955,10 @@ export const englishMessages = {
     "Choose a member from the list to see their evaluation.",
   "evaluations.sheet.loading": "Loading the evaluation…",
   "evaluations.overall.title": "Overall score",
-  "evaluations.overall.outOf": "/ 10",
+  "evaluations.overall.outOf": "/ {max}",
   "evaluations.overall.noData": "No data",
   "evaluations.ratings.title": "Skill ratings",
-  "evaluations.ratings.outOf": " out of 10",
+  "evaluations.ratings.outOf": " out of {max}",
   "evaluations.ratings.retired": "Retired",
   "evaluations.notEvaluated.title": "{name} has no evaluation yet.",
   "evaluations.notEvaluated.hint":
@@ -973,6 +973,8 @@ export const englishMessages = {
   "evaluations.reload": "Reload evaluation",
   "evaluations.error.changed":
     "Someone else changed this evaluation while you were editing. Reload it to see their changes.",
+  "evaluations.error.exists":
+    "Someone else just created this evaluation. Reload it to see it.",
   "evaluations.error.memberNotFound": "That member is no longer in the club.",
   "evaluations.error.memberInactive":
     "That member's account is deactivated, so they can't be evaluated.",

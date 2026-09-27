@@ -949,10 +949,10 @@ export const spanishMessages: MessageCatalog = {
     "Elige a un miembro de la lista para ver su evaluación.",
   "evaluations.sheet.loading": "Cargando la evaluación…",
   "evaluations.overall.title": "Valoración global",
-  "evaluations.overall.outOf": "/ 10",
+  "evaluations.overall.outOf": "/ {max}",
   "evaluations.overall.noData": "Sin datos",
   "evaluations.ratings.title": "Valoraciones",
-  "evaluations.ratings.outOf": " de 10",
+  "evaluations.ratings.outOf": " de {max}",
   "evaluations.ratings.retired": "Retirada",
   "evaluations.notEvaluated.title": "{name} todavía no tiene evaluación.",
   "evaluations.notEvaluated.hint":
@@ -967,6 +967,8 @@ export const spanishMessages: MessageCatalog = {
   "evaluations.reload": "Recargar la evaluación",
   "evaluations.error.changed":
     "Alguien más cambió esta evaluación mientras la editabas. Recárgala para ver sus cambios.",
+  "evaluations.error.exists":
+    "Alguien más acaba de crear esta evaluación. Recárgala para verla.",
   "evaluations.error.memberNotFound": "Ese miembro ya no está en el club.",
   "evaluations.error.memberInactive":
     "Ese miembro tiene la cuenta desactivada, así que no se le puede evaluar.",

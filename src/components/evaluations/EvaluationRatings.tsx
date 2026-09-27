@@ -71,7 +71,7 @@ function ReadOnlyRating({
       <span className="evaluation-rating-value">
         {entry.rating}
         <span className="visually-hidden">
-          {translate("evaluations.ratings.outOf")}
+          {translate("evaluations.ratings.outOf", { max: RATING_MAX })}
         </span>
       </span>
     </li>
