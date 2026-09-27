@@ -107,6 +107,50 @@ export function formatCalendarDay(locale: Locale, isoDate: string): string {
   return CALENDAR_DAY_FORMATTERS[locale].format(parseCalendarDay(isoDate));
 }
 
+/** Las tres líneas del bloque de fecha de una fila de la agenda (#311). */
+export type CalendarDayParts = {
+  readonly weekday: string;
+  readonly day: string;
+  readonly month: string;
+};
+
+function calendarDayPartFormatters(
+  options: Intl.DateTimeFormatOptions,
+): Readonly<Record<Locale, Intl.DateTimeFormat>> {
+  return formattersByLocale(
+    (displayLocale) =>
+      new Intl.DateTimeFormat(displayLocale, { ...options, timeZone: "UTC" }),
+  );
+}
+
+const SHORT_WEEKDAY_FORMATTERS = calendarDayPartFormatters({
+  weekday: "short",
+});
+const TWO_DIGIT_DAY_FORMATTERS = calendarDayPartFormatters({ day: "2-digit" });
+const SHORT_MONTH_FORMATTERS = calendarDayPartFormatters({ month: "short" });
+
+/** El bloque de fecha del mockup lleva el mes en tres letras ("JUN"). El mes
+ * corto de `Intl` no lo garantiza: en inglés australiano, según la versión de
+ * ICU, junio sale como "Jun" o "June" y septiembre como "Sep" o "Sept", y
+ * la máquina de quien desarrolla y la de CI no siempre coinciden. Se recorta
+ * para que el bloque sea el mismo en todas. */
+const MONTH_ABBREVIATION_LENGTH = 3;
+
+/** Un día sin hora partido en "Tue", "23" y "Jun" ("mar", "23", "jun"). */
+export function formatCalendarDayParts(
+  locale: Locale,
+  isoDate: string,
+): CalendarDayParts {
+  const midnightUtc = parseCalendarDay(isoDate);
+  return {
+    weekday: SHORT_WEEKDAY_FORMATTERS[locale].format(midnightUtc),
+    day: TWO_DIGIT_DAY_FORMATTERS[locale].format(midnightUtc),
+    month: [...SHORT_MONTH_FORMATTERS[locale].format(midnightUtc)]
+      .slice(0, MONTH_ABBREVIATION_LENGTH)
+      .join(""),
+  };
+}
+
 // Una hora de reloj sin día, como el `HH:MM` de un evento, se formatea igual
 // que un día sin hora: en UTC, sobre el 1 de enero de 1970.
 const CLOCK_TIME_FORMATTERS = formattersByLocale(

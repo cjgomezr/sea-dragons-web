@@ -182,8 +182,9 @@ test.describe("interruptor de idioma dentro de la aplicación", () => {
     await expect(page).toHaveURL(new RegExp(`${CALENDAR_PATH}$`));
     await openAccountMenu(page);
     await expect(spanishToggle(page)).toBeVisible();
+    // Desde #311 el Calendario es la agenda, y su título es el de la pantalla.
     await expect(
-      page.getByRole("heading", { level: 1, name: "Calendario" }),
+      page.getByRole("heading", { level: 1, name: "Próximos eventos" }),
     ).toBeVisible();
     // Si ninguna petición de /calendario lleva la cookie en español, esto
     // agota el tiempo del test y falla.

@@ -7,6 +7,7 @@ import {
 import {
   formatCalendarDay,
   formatCalendarDayAt,
+  formatCalendarDayParts,
   formatClubMoment,
   formatWeekdays,
   formatFileSize,
@@ -226,5 +227,40 @@ describe("días de la semana", () => {
 
   it("nombra el domingo como el día 7", () => {
     expect(formatWeekdays("es", [7])).toBe("domingo");
+  });
+});
+
+describe("bloque de fecha de la agenda", () => {
+  it("parte un día en día de la semana, número y mes, en inglés", () => {
+    expect(formatCalendarDayParts("en", "2026-06-23")).toEqual({
+      weekday: "Tue",
+      day: "23",
+      month: "Jun",
+    });
+  });
+
+  // En inglés australiano `Intl` escribe "June" y "Sept" según la versión de
+  // ICU: el bloque lleva siempre tres letras, como el mockup, en cualquier
+  // máquina.
+  it("recorta el mes a tres letras aunque ICU lo alargue", () => {
+    expect(formatCalendarDayParts("en", "2026-09-15").month).toBe("Sep");
+  });
+
+  it("parte el mismo día a la española", () => {
+    expect(formatCalendarDayParts("es", "2026-06-23")).toEqual({
+      weekday: "mar",
+      day: "23",
+      month: "jun",
+    });
+  });
+
+  it("escribe el número del día con dos cifras, como el mockup", () => {
+    expect(formatCalendarDayParts("en", "2026-07-03").day).toBe("03");
+  });
+
+  it("rechaza un día que no existe en el calendario", () => {
+    expect(() => formatCalendarDayParts("en", "2026-02-30")).toThrow(
+      RangeError,
+    );
   });
 });

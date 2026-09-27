@@ -675,6 +675,47 @@ export const spanishMessages: MessageCatalog = {
   "event.type.competition": "Competición",
   "event.type.meeting": "Reunión",
   "event.type.social": "Social",
+  // La agenda del Calendario (#311, RF-5 a RF-7 del PRD de E7).
+  "calendar.eyebrow": "Calendario y eventos",
+  "calendar.title": "Próximos eventos",
+  "calendar.loading": "Cargando los eventos…",
+  "calendar.empty": "No hay eventos próximos.",
+  "calendar.loadMore": "Ver más",
+  "calendar.loadingMore": "Cargando…",
+  "calendar.retry": "Volver a intentarlo",
+  "calendar.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para ver el calendario.",
+  "calendar.error.unexpected":
+    "No pudimos cargar los eventos. Vuelve a intentarlo.",
+  "calendar.event.cancelled": "Cancelado",
+  "calendar.event.timeAndPlace": "{time} · {location}",
+  "calendar.event.going": {
+    one: "{count} va",
+    other: "{count} van",
+  },
+  "calendar.event.maybe": {
+    one: "{count} quizás",
+    other: "{count} quizás",
+  },
+  "calendar.event.counts": "{going} · {maybe}",
+  "calendar.rsvp.label": "¿Vas?",
+  "calendar.rsvp.groupLabel": "Tu respuesta a {title}",
+  "calendar.rsvp.yes": "Sí",
+  "calendar.rsvp.maybe": "Quizás",
+  "calendar.rsvp.no": "No",
+  "calendar.rsvp.saving": "Guardando…",
+  "calendar.rsvp.error.network":
+    "No pudimos guardar tu respuesta. Revisa tu conexión y vuelve a intentarlo.",
+  "calendar.rsvp.error.started":
+    "Este evento ya empezó: ya no se puede responder.",
+  "calendar.rsvp.error.cancelled":
+    "Este evento se canceló: ya no se puede responder.",
+  "calendar.rsvp.error.notFound":
+    "Este evento ya no está disponible. Recarga el calendario.",
+  "calendar.rsvp.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para responder.",
+  "calendar.rsvp.error.unexpected":
+    "No pudimos guardar tu respuesta. Vuelve a intentarlo.",
   "notifications.generic.title": "Aviso nuevo",
   "notifications.generic.body": "Algo cambió en tu cuenta.",
   "themeToggle.switchToLight": "Cambiar a tema claro",

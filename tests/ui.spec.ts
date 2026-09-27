@@ -259,10 +259,13 @@ const PUBLIC_PAGES: readonly Screen[] = [
 // "home" is the pre-existing landing page; "section" is a destination route
 // off the sidebar menu, standing in for any of the seven (they share the
 // same shell and SectionPlaceholder). Las dos viven detrás de la frontera de
-// sesión, así que sus tests entran antes de mirarlas.
+// sesión, así que sus tests entran antes de mirarlas. La sección tiene que
+// ser una que la sesión de prueba (un Player) pueda abrir: `/equipos` la
+// frontera se la niega y la devuelve al panel, así que la captura sería la
+// del panel y no la de un marcador.
 const APP_PAGES: readonly Screen[] = [
   { name: "home", path: "/" },
-  { name: "section", path: "/calendario" },
+  { name: "section", path: "/pagos" },
 ];
 
 function describeScreen(pg: Screen): void {
@@ -9838,5 +9841,337 @@ test.describe("editar y retirar en el navegador", () => {
 
       await expect(page).toHaveURL(new RegExp("/dashboard$"));
     });
+  });
+});
+
+// La agenda del Calendario (#311). La API se sirve desde el test con el
+// contrato de #308 y #309, así la captura no depende de los eventos que haya
+// en la base de desarrollo.
+const CALENDAR_SCREEN_PATH = "/calendario";
+const CALENDAR_AGENDA_ENDPOINT = "/api/v1/events";
+const CALENDAR_NARROW_WIDTHS = [320, 375, 768] as const;
+const CALENDAR_HEADING = /^(Upcoming events|Próximos eventos)$/;
+const RSVP_MIN_TOUCH_TARGET_PX = 44;
+
+const STUBBED_AGENDA_EVENTS = [
+  {
+    id: "e0e0e0e0-0000-4000-8000-0000000000e1",
+    startsOn: "2026-06-23",
+    startTime: "19:00",
+    title: "Pool Training",
+    eventType: "training",
+    location: "MSAC Dive Pool",
+    status: "scheduled",
+    seriesId: "f0f0f0f0-0000-4000-8000-0000000000f1",
+    goingCount: 14,
+    maybeCount: 2,
+    myResponse: "yes",
+    inAudience: true,
+  },
+  {
+    id: "e0e0e0e0-0000-4000-8000-0000000000e2",
+    startsOn: "2026-06-25",
+    startTime: "19:30",
+    title: "Skills & Conditioning",
+    eventType: "training",
+    location: "Fitzroy Pool",
+    status: "scheduled",
+    seriesId: null,
+    goingCount: 11,
+    maybeCount: 0,
+    myResponse: null,
+    inAudience: true,
+  },
+  {
+    id: "e0e0e0e0-0000-4000-8000-0000000000e3",
+    startsOn: "2026-06-27",
+    startTime: "10:00",
+    title: "Scrimmage vs Geelong Krakens at the Geelong Aquatic Centre",
+    eventType: "competition",
+    location: "Geelong Aquatic Centre, 50 m pool, lanes 1 to 4",
+    status: "scheduled",
+    seriesId: null,
+    goingCount: 18,
+    maybeCount: 1,
+    myResponse: "maybe",
+    inAudience: true,
+  },
+  {
+    id: "e0e0e0e0-0000-4000-8000-0000000000e4",
+    startsOn: "2026-06-28",
+    startTime: "17:00",
+    title: "Committee Meeting",
+    eventType: "meeting",
+    location: "Clubroom / Zoom",
+    status: "scheduled",
+    seriesId: null,
+    goingCount: 6,
+    maybeCount: 0,
+    myResponse: null,
+    inAudience: false,
+  },
+] as const;
+
+const STUBBED_CANCELLED_EVENT = {
+  id: "e0e0e0e0-0000-4000-8000-0000000000e5",
+  startsOn: "2026-07-03",
+  startTime: "19:00",
+  title: "End-of-Season Social",
+  eventType: "social",
+  location: "The Boatbuilders Yard",
+  status: "cancelled",
+  seriesId: null,
+  goingCount: 22,
+  maybeCount: 0,
+  myResponse: null,
+  inAudience: true,
+} as const;
+
+/** La agenda de una sola página, y un 422 de evento empezado a cualquier
+ * respuesta: sólo el estado del error llega a pulsar. */
+async function stubCalendarReads(
+  page: Page,
+  events: readonly unknown[],
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === CALENDAR_AGENDA_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ events, nextCursor: null })),
+  );
+  await page.route(
+    (url) =>
+      url.pathname.startsWith(`${CALENDAR_AGENDA_ENDPOINT}/`) &&
+      url.pathname.endsWith("/rsvp"),
+    (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: {
+            code: "business_rule",
+            message: "El evento ya empezó: ya no se puede responder.",
+            reason: "rsvp_event_started",
+          },
+        }),
+      }),
+  );
+}
+
+type CalendarState = {
+  readonly name: string;
+  readonly events: readonly unknown[];
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+  /** Lo que tiene que estar a la vista para que la pantalla haya cargado. */
+  readonly ready: (page: Page) => Promise<void>;
+};
+
+async function waitForAgendaRows(page: Page): Promise<void> {
+  await expect(
+    page.getByRole("heading", {
+      level: 2,
+      name: STUBBED_AGENDA_EVENTS[0].title,
+    }),
+  ).toBeVisible();
+}
+
+async function waitForEmptyAgenda(page: Page): Promise<void> {
+  await expect(
+    page.getByText(/There are no upcoming events|No hay eventos próximos/),
+  ).toBeVisible();
+}
+
+/** Responde No al primer evento y espera el aviso del 422 en su fila. */
+async function showRsvpError(page: Page): Promise<void> {
+  await waitForAgendaRows(page);
+  const row = page.getByRole("listitem").filter({
+    has: page.getByRole("heading", {
+      level: 2,
+      name: STUBBED_AGENDA_EVENTS[0].title,
+    }),
+  });
+  await row.getByRole("group").getByRole("button", { name: "No" }).click();
+  // Sólo el de la fila: el anunciador de rutas de Next también es un alert.
+  await expect(row.getByRole("alert")).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+const CALENDAR_WITH_EVENTS: CalendarState = {
+  name: "calendario-con-eventos",
+  events: STUBBED_AGENDA_EVENTS,
+  ready: waitForAgendaRows,
+};
+
+const CALENDAR_STATES: readonly CalendarState[] = [
+  CALENDAR_WITH_EVENTS,
+  {
+    name: "calendario-con-eventos-es",
+    events: STUBBED_AGENDA_EVENTS,
+    beforeVisit: chooseSpanish,
+    ready: waitForAgendaRows,
+  },
+  {
+    name: "calendario-vacio",
+    events: [],
+    ready: waitForEmptyAgenda,
+  },
+  {
+    name: "calendario-vacio-es",
+    events: [],
+    beforeVisit: chooseSpanish,
+    ready: waitForEmptyAgenda,
+  },
+  {
+    name: "calendario-con-cancelado",
+    events: [...STUBBED_AGENDA_EVENTS, STUBBED_CANCELLED_EVENT],
+    ready: waitForAgendaRows,
+  },
+  {
+    name: "calendario-con-cancelado-es",
+    events: [...STUBBED_AGENDA_EVENTS, STUBBED_CANCELLED_EVENT],
+    beforeVisit: chooseSpanish,
+    ready: waitForAgendaRows,
+  },
+  {
+    name: "calendario-error-rsvp",
+    events: STUBBED_AGENDA_EVENTS,
+    ready: showRsvpError,
+  },
+  {
+    name: "calendario-error-rsvp-es",
+    events: STUBBED_AGENDA_EVENTS,
+    beforeVisit: chooseSpanish,
+    ready: showRsvpError,
+  },
+];
+
+async function goToCalendar(
+  page: Page,
+  state: CalendarState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await stubCalendarReads(page, state.events);
+  await state.beforeVisit?.(page);
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${CALENDAR_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, CALENDAR_SCREEN_PATH, theme);
+  }
+  await expect(
+    page.getByRole("heading", { level: 1, name: CALENDAR_HEADING }),
+  ).toBeVisible();
+  await state.ready(page);
+}
+
+for (const state of CALENDAR_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToCalendar(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of CALENDAR_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToCalendar(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToCalendar(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("calendario en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("responder marca el botón y pone los conteos del evento", async ({
+    page,
+  }) => {
+    const [event] = STUBBED_AGENDA_EVENTS;
+    await stubCalendarReads(page, STUBBED_AGENDA_EVENTS);
+    let sent: unknown = null;
+    await page.route(
+      (url) => url.pathname === `${CALENDAR_AGENDA_ENDPOINT}/${event.id}/rsvp`,
+      async (route, request) => {
+        sent = request.postDataJSON();
+        await route.fulfill(
+          jsonBody({
+            eventId: event.id,
+            response: "maybe",
+            respondedAt: "2026-06-20T08:00:00.000Z",
+          }),
+        );
+      },
+    );
+    await page.route(
+      (url) => url.pathname === `${CALENDAR_AGENDA_ENDPOINT}/${event.id}`,
+      (route) =>
+        route.fulfill(
+          jsonBody({
+            ...event,
+            myResponse: "maybe",
+            goingCount: 13,
+            maybeCount: 3,
+            notes: null,
+            going: [],
+            maybe: [],
+          }),
+        ),
+    );
+    await page.goto(`${APP_URL}${CALENDAR_SCREEN_PATH}`);
+    const rsvp = page.getByRole("group", { name: `RSVP: ${event.title}` });
+
+    await rsvp.getByRole("button", { name: "Maybe" }).click();
+
+    await expect(rsvp.getByRole("button", { name: "Maybe" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(page.getByText("13 going · 3 maybe")).toBeVisible();
+    expect(sent).toEqual({ response: "maybe" });
+  });
+
+  test("a 375px los botones de RSVP conservan el objetivo táctil de 44px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToCalendar(page, CALENDAR_WITH_EVENTS);
+
+    const heights = await page
+      .getByRole("button", { name: /^(Yes|Maybe|No)$/ })
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.getBoundingClientRect().height),
+      );
+
+    expect(heights.length).toBeGreaterThan(0);
+    for (const height of heights) {
+      expect(height).toBeGreaterThanOrEqual(RSVP_MIN_TOUCH_TARGET_PX);
+    }
   });
 });
