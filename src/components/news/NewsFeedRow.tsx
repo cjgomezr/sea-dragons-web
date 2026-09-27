@@ -11,7 +11,8 @@ import { NewsCategoryLabel } from "./NewsCategoryLabel";
  * Una fila del feed (#329): categoría, hace cuánto, autor, título, extracto y
  * la marca de adjuntos. El enlace es sólo el título, para que un lector de
  * pantalla anuncie cada fila con su título y nada más; la tarjeta entera se
- * pulsa porque el enlace la cubre por CSS.
+ * pulsa porque el enlace la cubre por CSS. Una retirada sólo le llega a
+ * quien la publicó (#331), y va marcada.
  */
 export function NewsFeedRow({
   translate,
@@ -38,6 +39,11 @@ export function NewsFeedRow({
     <li className="news-row">
       <p className="news-row-meta">
         <NewsCategoryLabel translate={translate} category={post.category} />
+        {post.status === "withdrawn" ? (
+          <span className="news-withdrawn">
+            {translate("news.post.withdrawn")}
+          </span>
+        ) : null}
         <span className="news-row-byline">
           <time dateTime={post.publishedAt}>
             {formatRelativeTime(

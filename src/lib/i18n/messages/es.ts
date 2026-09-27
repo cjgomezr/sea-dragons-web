@@ -1034,4 +1034,32 @@ export const spanishMessages: MessageCatalog = {
     "Alguien más cambió las categorías entretanto. Carga las últimas y vuelve a intentarlo.",
   "evaluations.categories.error.notFound":
     "Esa categoría ya no existe. Carga las últimas categorías.",
+  "news.post.edit": "Editar",
+  "news.post.withdraw": "Retirar",
+  "news.post.withdrawQuestion":
+    "¿Retirar esta publicación? Desaparece del feed de todos y sus adjuntos dejan de estar disponibles. No se borra: puedes volver a publicarla más tarde.",
+  "news.post.withdrawConfirm": "Retirar publicación",
+  "news.post.withdrawing": "Retirando…",
+  "news.post.cancel": "Cancelar",
+  "news.post.republish": "Volver a publicar",
+  "news.post.republishing": "Publicando…",
+  "news.post.error.withdraw": "No pudimos retirarla. Vuelve a intentarlo.",
+  "news.post.error.republish":
+    "No pudimos volver a publicarla. Vuelve a intentarlo.",
+  "news.edit.metaTitle": "Editar publicación · {club}",
+  "news.edit.metaDescription": "Corrige una publicación tuya.",
+  "news.edit.back": "← Volver a la publicación",
+  "news.edit.title": "Editar publicación",
+  "news.edit.lead":
+    "Guardar no avisa a nadie. La publicación dirá que se editó y cuándo.",
+  "news.edit.loading": "Cargando la publicación…",
+  "news.edit.loadFailed":
+    "No pudimos cargar la publicación. Vuelve a intentarlo.",
+  "news.edit.forbidden": "Sólo puedes editar tus propias publicaciones.",
+  "news.edit.submit": "Guardar cambios",
+  "news.edit.sending": "Guardando…",
+  "news.edit.error.conflict":
+    "Otra persona guardó esta publicación mientras la editabas. Recarga la página para ver sus cambios antes de guardar los tuyos.",
+  "news.edit.error.unexpected":
+    "No pudimos guardar los cambios. Vuelve a intentarlo.",
 };

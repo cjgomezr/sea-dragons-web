@@ -14,6 +14,7 @@ import {
 } from "./news-client";
 import { NewsAttachmentList } from "./NewsAttachmentList";
 import { NewsCategoryLabel } from "./NewsCategoryLabel";
+import { NewsPostActions } from "./NewsPostActions";
 
 /**
  * Una publicación abierta (#329, RF-5 del PRD de E11): el cuerpo entero, el
@@ -25,6 +26,9 @@ import { NewsCategoryLabel } from "./NewsCategoryLabel";
  * se pinta la misma pantalla para los dos: ninguna pista de que exista. Es de
  * cliente porque lee por la API v1, la misma que usará la aplicación nativa de
  * Release 2 (CON-002).
+ *
+ * A quien puede editarla y retirarla (#331) le ofrece esas acciones bajo la
+ * cabecera; lo que responde el servidor sustituye a lo que había.
  */
 
 type ScreenState =
@@ -49,9 +53,11 @@ function PostNotFound({
 function PostContent({
   translate,
   post,
+  onChanged,
 }: {
   readonly translate: Translator;
   readonly post: NewsPostDetail;
+  readonly onChanged: (post: NewsPostDetail) => void;
 }): React.JSX.Element {
   const formatMoment = (instant: string): string =>
     formatClubMoment(translate.locale, new Date(instant));
@@ -85,6 +91,13 @@ function PostContent({
             </time>
           </p>
         )}
+        {post.canManage ? (
+          <NewsPostActions
+            translate={translate}
+            post={post}
+            onChanged={onChanged}
+          />
+        ) : null}
       </header>
       <p className="news-post-body">{post.body}</p>
       {post.attachments.length > 0 ? (
@@ -159,7 +172,11 @@ export function NewsPostScreen({
         <PostNotFound translate={translate} />
       ) : null}
       {state.kind === "loaded" ? (
-        <PostContent translate={translate} post={state.post} />
+        <PostContent
+          translate={translate}
+          post={state.post}
+          onChanged={(post) => setState({ kind: "loaded", post })}
+        />
       ) : null}
     </div>
   );
