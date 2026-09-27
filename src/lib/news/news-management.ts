@@ -74,8 +74,9 @@ export class NewsPostChangedError extends Error {
 type ManagedPost = { readonly actor: AuditActor; readonly post: NewsPost };
 
 /** Quien llama y la publicación, si puede editarla. Una de otro club responde
- * como una que no existe. Una ajena del club sí dice que es ajena: quien la
- * pide es Admin o Committee, y para ellos el feed ya no guarda secretos. */
+ * como una que no existe. Una ajena del club responde 403, como pide el
+ * ticket: quien la pide ya es Admin o Committee, y los ids son uuid, así que
+ * saber que existe no le sirve para recorrerlas. */
 async function findManagedPost(
   gateways: NewsGateways,
   request: PostRequest,
