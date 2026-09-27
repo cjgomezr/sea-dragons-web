@@ -50,10 +50,13 @@ export type EvaluationRating = {
 };
 
 /** Lo que hay en la base. `updatedAt` va tal cual la devuelve Postgres, con
- * sus microsegundos: es la versión contra la que se guarda. */
+ * sus microsegundos: es la versión contra la que se guarda.
+ * `missingCategoryCount` son las categorías activas del club que la
+ * evaluación todavía no tiene. */
 export type StoredEvaluation = {
   readonly updatedAt: string;
   readonly ratings: readonly EvaluationRating[];
+  readonly missingCategoryCount: number;
 };
 
 export type MemberEvaluation =
@@ -65,6 +68,9 @@ export type MemberEvaluation =
       /** `null` sin ninguna categoría: no hay media de nada. */
       readonly overallRating: number | null;
       readonly ratings: readonly EvaluationRating[];
+      /** Tiene justo las categorías activas del club: ponerla al día no
+       * cambiaría nada. La pantalla sólo ofrece la acción cuando es `false`. */
+      readonly isCurrent: boolean;
     };
 
 export type EvaluationScope = {
@@ -296,6 +302,15 @@ async function findWritableMember(
   }
 }
 
+/** La misma regla que `refresh_member_evaluation`: al día es no tener nada
+ * que quitar ni nada que añadir. */
+function isCurrentEvaluation(stored: StoredEvaluation): boolean {
+  return (
+    stored.missingCategoryCount === 0 &&
+    stored.ratings.every((entry) => !entry.isRetired)
+  );
+}
+
 async function readEvaluation(
   gateways: MemberEvaluationGateways,
   scope: EvaluationScope,
@@ -312,6 +327,7 @@ async function readEvaluation(
       stored.ratings.map((entry) => entry.rating),
     ),
     ratings: stored.ratings,
+    isCurrent: isCurrentEvaluation(stored),
   };
 }
 

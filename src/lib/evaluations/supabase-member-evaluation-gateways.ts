@@ -33,6 +33,7 @@ type Environment = Readonly<Record<string, string | undefined>>;
 
 const MEMBERS_TABLE = "members";
 const EVALUATIONS_TABLE = "member_evaluations";
+const CATEGORIES_TABLE = "evaluation_categories";
 const CREATE_FUNCTION = "create_member_evaluation";
 const SAVE_FUNCTION = "save_member_evaluation_ratings";
 const REFRESH_FUNCTION = "refresh_member_evaluation";
@@ -58,6 +59,8 @@ const evaluationRowSchema = z.object({
 });
 
 type EvaluationRow = z.infer<typeof evaluationRowSchema>;
+
+const activeCategoryRowsSchema = z.array(z.object({ id: z.uuid() }));
 
 const creationResultSchema = z.object({
   outcome: z.enum([
@@ -114,7 +117,10 @@ function parseRow<Row>(
 }
 
 /** En el orden del catálogo del club; dos con el mismo orden, por nombre. */
-function toStoredEvaluation(row: EvaluationRow): StoredEvaluation {
+function toStoredEvaluation(
+  row: EvaluationRow,
+  activeCategoryIds: readonly string[],
+): StoredEvaluation {
   const sorted = [...row.member_evaluation_ratings].sort(
     (first, second) =>
       first.evaluation_categories.sort_order -
@@ -123,8 +129,13 @@ function toStoredEvaluation(row: EvaluationRow): StoredEvaluation {
         second.evaluation_categories.name,
       ),
   );
+  const ratedIds = new Set(
+    sorted.map((entry) => entry.evaluation_categories.id),
+  );
   return {
     updatedAt: row.updated_at,
+    missingCategoryCount: activeCategoryIds.filter((id) => !ratedIds.has(id))
+      .length,
     ratings: sorted.map(({ rating, evaluation_categories: category }) => ({
       categoryId: category.id,
       name: category.name,
@@ -156,6 +167,24 @@ async function findMemberStatus(
   return parseRow(memberRowSchema, data, context).account_status;
 }
 
+async function findActiveCategoryIds(
+  serviceClient: SupabaseClient,
+  clubId: string,
+): Promise<readonly string[]> {
+  const { data, error } = await serviceClient
+    .from(CATEGORIES_TABLE)
+    .select("id")
+    .eq("club_id", clubId)
+    .is("deactivated_at", null);
+  if (error) {
+    throw new Error(
+      `No se pudieron leer las categorías activas del club ${clubId}: ${error.message}`,
+    );
+  }
+  const context = `Las categorías activas del club ${clubId}`;
+  return parseRow(activeCategoryRowsSchema, data, context).map(({ id }) => id);
+}
+
 async function findEvaluation(
   serviceClient: SupabaseClient,
   scope: EvaluationScope,
@@ -175,7 +204,10 @@ async function findEvaluation(
     return null;
   }
   const context = `La evaluación del miembro ${scope.userId}`;
-  return toStoredEvaluation(parseRow(evaluationRowSchema, data, context));
+  return toStoredEvaluation(
+    parseRow(evaluationRowSchema, data, context),
+    await findActiveCategoryIds(serviceClient, scope.clubId),
+  );
 }
 
 /** Un error de la base no es un resultado del dominio: sube con el nombre de

@@ -6,6 +6,7 @@ import {
   COMPLETE_REGISTRATION_PATH,
   DASHBOARD_PATH,
   EVALUATIONS_PATH,
+  EVALUATION_CATEGORIES_PATH,
   SIGN_IN_PATH,
 } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
@@ -199,6 +200,29 @@ describe("frontera por rol en pantallas, a través del proxy", () => {
       givenSession({ kind: "active", role });
 
       const response = await proxy(requestFor(EVALUATIONS_PATH));
+
+      expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
+    },
+  );
+
+  it.each(["Player", "Committee"] as const)(
+    "redirige al panel a un %s que pide las categorías de evaluación",
+    async (role) => {
+      givenSession({ kind: "active", role });
+
+      const response = await proxy(requestFor(EVALUATION_CATEGORIES_PATH));
+
+      expect(response.status).toBe(TEMPORARY_REDIRECT);
+      expect(redirectedTo(response)).toBe(DASHBOARD_PATH);
+    },
+  );
+
+  it.each(["Coach", "Admin"] as const)(
+    "deja pasar a un %s a las categorías de evaluación",
+    async (role) => {
+      givenSession({ kind: "active", role });
+
+      const response = await proxy(requestFor(EVALUATION_CATEGORIES_PATH));
 
       expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
     },

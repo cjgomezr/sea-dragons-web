@@ -3201,6 +3201,86 @@ button.notification-item-content:hover {
   margin-bottom: 0;
 }
 
+/* El título y el paso a las categorías (#323) en la misma línea mientras
+   quepan; en el móvil el enlace baja debajo del título. */
+.evaluations-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.evaluations-heading h1 {
+  margin: 0;
+}
+
+.evaluations-categories-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+/* Las categorías de evaluación (#323). Sin mockup: copia la forma de las
+   posiciones de #300 (sus clases `club-positions-*` en cada categoría y en el
+   formulario), porque el problema es el mismo y conviene que se parezcan. */
+.evaluation-categories {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 720px;
+}
+
+.evaluation-categories-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.evaluation-categories-header h1,
+.evaluation-categories-header .app-lead {
+  margin: 0;
+}
+
+/* Un enlace flexible se come el espacio junto a la flecha. */
+.evaluation-categories-header .member-record-back {
+  gap: var(--space-2);
+}
+
+.evaluation-categories-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.evaluation-categories-group h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+/* La oferta de poner al día (#323), bajo el OVR con las demás acciones. */
+.evaluation-refresh {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.evaluation-refresh .auth-note,
+.evaluation-refresh .auth-error {
+  margin: 0;
+}
+
+/* Tan ancho como "Editar valoraciones", encima; el texto es largo y en la
+   columna estrecha parte en dos líneas, que necesitan su propio aire. */
+.evaluation-refresh .admin-secondary {
+  align-self: stretch;
+  padding-block: var(--space-2);
+}
+
 .evaluations-panes {
   display: grid;
   gap: var(--space-6);

@@ -2137,7 +2137,12 @@ test.describe("un Player que pide una pantalla que su rol no alcanza", () => {
 
   // #213: la navegación ya no las ofrece, pero esconder es comodidad. Quien
   // escribe la dirección a mano se topa igual con la frontera.
-  for (const restrictedPath of ["/equipos", "/evaluaciones", "/grupos"]) {
+  for (const restrictedPath of [
+    "/equipos",
+    "/evaluaciones",
+    "/evaluaciones/categorias",
+    "/grupos",
+  ]) {
     test(`aterriza en el panel al pedir ${restrictedPath}`, async ({
       page,
     }) => {
@@ -8762,8 +8767,11 @@ const CAMILA_RATINGS: readonly (readonly [string, number])[] = [
   ["Teamwork", 9],
 ];
 
+/** `retiredName` es una categoría que el club desactivó después de evaluar:
+ * la evaluación ya no está al día (#323). */
 function stubbedEvaluation(
   ratings: readonly (readonly [string, number])[],
+  retiredName?: string,
 ): unknown {
   const sum = ratings.reduce((total, [, rating]) => total + rating, 0);
   return {
@@ -8775,14 +8783,23 @@ function stubbedEvaluation(
       categoryId: `ca7e0000-0000-4000-8000-${String(index).padStart(12, "0")}`,
       name,
       rating,
-      isRetired: false,
+      isRetired: name === retiredName,
     })),
+    isCurrent: retiredName === undefined,
   };
 }
+
+/** Lo que queda al poner al día a Camila con Experience desactivada y
+ * Breath hold nueva: 79 - 8 + 5 = 76 en diez, un OVR de 7.6. */
+const CAMILA_REFRESHED_RATINGS: readonly (readonly [string, number])[] = [
+  ...CAMILA_RATINGS.filter(([name]) => name !== "Experience"),
+  ["Breath hold", 5],
+];
 
 async function stubEvaluationReads(
   page: Page,
   roster: readonly unknown[],
+  camilaEvaluation: unknown = stubbedEvaluation(CAMILA_RATINGS),
 ): Promise<void> {
   await page.route(
     (url) => url.pathname === EVALUATIONS_ENDPOINT,
@@ -8796,7 +8813,7 @@ async function stubEvaluationReads(
         jsonBody(
           isMateo
             ? { status: "not_evaluated", memberId: MATEO_ID }
-            : stubbedEvaluation(CAMILA_RATINGS),
+            : camilaEvaluation,
         ),
       );
     },
@@ -8804,6 +8821,9 @@ async function stubEvaluationReads(
 }
 
 const RATINGS_LIST = /^(Skill ratings|Valoraciones)$/;
+const REFRESH =
+  /^(Update to the current categories|Poner al día con las categorías actuales)$/;
+const OUTDATED_CAMILA = stubbedEvaluation(CAMILA_RATINGS, "Experience");
 const EDIT_RATINGS = /^(Edit ratings|Editar valoraciones)$/;
 const CAMILA_BUTTON = /Camila Ortiz/;
 
@@ -8824,6 +8844,8 @@ async function openCamilaFromRoster(page: Page): Promise<void> {
 type EvaluationsState = {
   readonly name: string;
   readonly roster: readonly unknown[];
+  /** Lo que sirve la ficha de Camila, si no es la evaluación al día. */
+  readonly camilaEvaluation?: unknown;
   readonly isSpanish?: boolean;
   readonly ready: (page: Page) => Promise<void>;
 };
@@ -8847,6 +8869,25 @@ const EVALUATIONS_STATES: readonly EvaluationsState[] = [
     roster: STUBBED_ROSTER,
     isSpanish: true,
     ready: openCamilaFromRoster,
+  },
+  {
+    name: "evaluaciones-ficha-por-poner-al-dia",
+    roster: STUBBED_ROSTER,
+    camilaEvaluation: OUTDATED_CAMILA,
+    ready: async (page) => {
+      await openCamilaFromRoster(page);
+      await expect(page.getByRole("button", { name: REFRESH })).toBeVisible();
+    },
+  },
+  {
+    name: "evaluaciones-ficha-por-poner-al-dia-es",
+    roster: STUBBED_ROSTER,
+    camilaEvaluation: OUTDATED_CAMILA,
+    isSpanish: true,
+    ready: async (page) => {
+      await openCamilaFromRoster(page);
+      await expect(page.getByRole("button", { name: REFRESH })).toBeVisible();
+    },
   },
   {
     name: "evaluaciones-ficha-editando",
@@ -8883,7 +8924,7 @@ async function goToEvaluations(
   state: EvaluationsState,
   theme?: (typeof themes)[number],
 ): Promise<void> {
-  await stubEvaluationReads(page, state.roster);
+  await stubEvaluationReads(page, state.roster, state.camilaEvaluation);
   if (state.isSpanish === true) {
     await chooseSpanish(page);
   }
@@ -8975,6 +9016,39 @@ test.describe("evaluaciones en el navegador", () => {
     ).toBeHidden();
   });
 
+  test("poner al día enseña el conjunto nuevo y el OVR recalculado", async ({
+    page,
+  }) => {
+    await goToEvaluations(page, {
+      ...EVALUATIONS_LIST,
+      camilaEvaluation: OUTDATED_CAMILA,
+    });
+    await page.route(
+      (url) => url.pathname === `${EVALUATIONS_ENDPOINT}/${CAMILA_ID}/refresh`,
+      (route) =>
+        route.fulfill(
+          jsonBody({
+            outcome: { kind: "refreshed", addedCount: 1, removedCount: 1 },
+            evaluation: stubbedEvaluation(CAMILA_REFRESHED_RATINGS),
+          }),
+        ),
+    );
+    await openCamila(page);
+
+    await page.getByRole("button", { name: REFRESH }).click();
+
+    await expect(
+      page.getByText("This evaluation now uses the current categories."),
+    ).toBeVisible();
+    const ratings = page.getByRole("list", { name: RATINGS_LIST });
+    await expect(ratings).toContainText("Breath hold");
+    await expect(ratings).not.toContainText("Experience");
+    await expect(
+      page.getByRole("button", { name: CAMILA_BUTTON }),
+    ).toContainText("7.6");
+    await expect(page.getByRole("button", { name: REFRESH })).toHaveCount(0);
+  });
+
   test("guardar pone el OVR al día sin recargar la página", async ({
     page,
   }) => {
@@ -9007,5 +9081,242 @@ test.describe("evaluaciones en el navegador", () => {
         () => (window as { sinRecargar?: boolean }).sinRecargar,
       ),
     ).toBe(true);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+   Categorías de evaluación (#323): la lista con una desactivada y el alta
+   con un nombre repetido. Sin mockup: copia la forma de las posiciones de
+   #300. Los datos son fijos, servidos por `page.route`; lo que los endpoints
+   hacen se prueba contra la base (#320).
+   --------------------------------------------------------------------------- */
+
+const EVALUATION_CATEGORIES_SCREEN_PATH = "/evaluaciones/categorias";
+const EVALUATION_CATEGORIES_ENDPOINT = "/api/v1/evaluations/categories";
+const EVALUATION_CATEGORIES_HEADING =
+  /^(Evaluation categories|Categorías de evaluación)$/;
+const ACTIVE_CATEGORIES_LIST = /^(Active categories|Categorías activas)$/;
+
+type StubbedCategory = {
+  readonly id: string;
+  readonly name: string;
+  readonly isActive: boolean;
+};
+
+/** Las diez del SRD, con Experience desactivada, y una de 40 caracteres
+ * para el caso de contenido largo. */
+const STUBBED_CATEGORIES: readonly StubbedCategory[] = [
+  ...[
+    "Fitness",
+    "Speed",
+    "Endurance",
+    "Game awareness",
+    "Tactical",
+    "Passing",
+    "Ball control",
+    "Defense",
+    "Teamwork",
+    "Underwater orientation and breath contro",
+  ].map((name, index) => ({
+    id: `ca7e0000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    name,
+    isActive: true,
+  })),
+  {
+    id: "ca7e0000-0000-4000-8000-000000000099",
+    name: "Experience",
+    isActive: false,
+  },
+];
+
+const REJECTED_CATEGORY_NAME = {
+  code: "validation_error",
+  message: "Ya hay otra categoría con ese nombre.",
+  reason: "name_taken",
+};
+
+/** GET sirve el catálogo; POST rechaza el nombre como repetido; PUT del
+ * orden responde con las activas en el orden que llegó. */
+async function stubEvaluationCategories(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname.startsWith(EVALUATION_CATEGORIES_ENDPOINT),
+    async (route, request) => {
+      if (request.method() === "GET") {
+        await route.fulfill(jsonBody({ categories: STUBBED_CATEGORIES }));
+        return;
+      }
+      if (request.method() === "PUT") {
+        const { categoryIds } = request.postDataJSON() as {
+          categoryIds: string[];
+        };
+        const reordered = [
+          ...categoryIds.map((id) =>
+            STUBBED_CATEGORIES.find((category) => category.id === id)!,
+          ),
+          ...STUBBED_CATEGORIES.filter((category) => !category.isActive),
+        ];
+        await route.fulfill(jsonBody({ categories: reordered }));
+        return;
+      }
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ error: REJECTED_CATEGORY_NAME }),
+      });
+    },
+  );
+}
+
+/** Añade "Speed", que ya existe: el servidor fingido la rechaza y el aviso
+ * sale junto al campo. */
+function addCategoryWithTakenName(labels: {
+  readonly field: string;
+  readonly submit: string;
+  readonly issue: RegExp;
+}) {
+  return async (page: Page): Promise<void> => {
+    await page.getByLabel(labels.field).fill("Speed");
+    await page.getByRole("button", { name: labels.submit }).click();
+    await expect(page.getByText(labels.issue)).toBeVisible();
+    // El puntero se queda sobre el botón pulsado: la captura saldría con su
+    // hover.
+    await page.mouse.move(0, 0);
+  };
+}
+
+type EvaluationCategoriesState = {
+  readonly name: string;
+  readonly isSpanish?: boolean;
+  readonly prepare?: (page: Page) => Promise<void>;
+};
+
+const EVALUATION_CATEGORIES_STATES: readonly EvaluationCategoriesState[] = [
+  { name: "evaluaciones-categorias" },
+  { name: "evaluaciones-categorias-es", isSpanish: true },
+  {
+    name: "evaluaciones-categorias-nombre-repetido",
+    prepare: addCategoryWithTakenName({
+      field: "Category name",
+      submit: "Add category",
+      issue: /Another category already has this name/,
+    }),
+  },
+  {
+    name: "evaluaciones-categorias-nombre-repetido-es",
+    isSpanish: true,
+    prepare: addCategoryWithTakenName({
+      field: "Nombre de la categoría",
+      submit: "Añadir categoría",
+      issue: /Ya hay otra categoría con este nombre/,
+    }),
+  },
+];
+
+async function goToEvaluationCategories(
+  page: Page,
+  state: EvaluationCategoriesState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await stubEvaluationCategories(page);
+  if (state.isSpanish === true) {
+    await chooseSpanish(page);
+  }
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${EVALUATION_CATEGORIES_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, EVALUATION_CATEGORIES_SCREEN_PATH, theme);
+  }
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: EVALUATION_CATEGORIES_HEADING,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("list", { name: ACTIVE_CATEGORIES_LIST }),
+  ).toBeVisible();
+  await state.prepare?.(page);
+}
+
+for (const state of EVALUATION_CATEGORIES_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToEvaluationCategories(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of EVALUATIONS_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToEvaluationCategories(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToEvaluationCategories(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("categorías de evaluación en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("se llega desde la cabecera de Evaluaciones", async ({ page }) => {
+    await goToEvaluations(page, EVALUATIONS_LIST);
+
+    await page.getByRole("link", { name: "Categories" }).click();
+
+    await expect(page).toHaveURL(
+      new RegExp(`${EVALUATION_CATEGORIES_SCREEN_PATH}$`),
+    );
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: EVALUATION_CATEGORIES_HEADING,
+      }),
+    ).toBeVisible();
+  });
+
+  test("se reordena sólo con el teclado", async ({ page }) => {
+    await goToEvaluationCategories(page, { name: "teclado" });
+    const moveSpeedUp = page.getByRole("button", { name: "Move Speed up" });
+
+    await moveSpeedUp.focus();
+    await page.keyboard.press("Enter");
+
+    const names = page
+      .getByRole("list", { name: ACTIVE_CATEGORIES_LIST })
+      .getByRole("heading");
+    await expect(names.nth(0)).toHaveText("Speed");
+    await expect(names.nth(1)).toHaveText("Fitness");
+    await expect(
+      page.getByRole("button", { name: "Move Speed down" }),
+    ).toBeFocused();
   });
 });

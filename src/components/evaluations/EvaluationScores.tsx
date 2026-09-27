@@ -5,6 +5,7 @@ import {
 import { formatOverallRating } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import { EvaluationRatings } from "./EvaluationRatings";
+import { EvaluationRefreshOffer } from "./EvaluationRefreshOffer";
 import {
   describeEvaluationFailure,
   isStaleEvaluation,
@@ -130,6 +131,7 @@ export function EvaluationScores({
   evaluation,
   isEditingAtStart,
   onSaved,
+  onRefreshed,
   onReload,
 }: {
   translate: Translator;
@@ -137,9 +139,13 @@ export function EvaluationScores({
   /** Recién creada, se abre ya para ajustar: es a lo que se venía. */
   isEditingAtStart: boolean;
   onSaved: (evaluation: MemberEvaluation) => void;
+  onRefreshed: (evaluation: MemberEvaluation) => void;
   onReload: () => void;
 }): React.JSX.Element {
   const editor = useRatingsEditor({ evaluation, isEditingAtStart, onSaved });
+  // Poner al día con valoraciones a medio ajustar tiraría lo ajustado: la
+  // oferta sólo sale fuera de la edición.
+  const isEditing = editor.draft !== null;
   return (
     <div className="evaluation-scores">
       <div className="evaluation-summary">
@@ -153,6 +159,13 @@ export function EvaluationScores({
           editor={editor}
           onReload={onReload}
         />
+        {isEditing ? null : (
+          <EvaluationRefreshOffer
+            translate={translate}
+            evaluation={evaluation}
+            onRefreshed={onRefreshed}
+          />
+        )}
       </div>
       <EvaluationRatings
         translate={translate}

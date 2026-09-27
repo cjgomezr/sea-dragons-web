@@ -243,6 +243,11 @@ export const TEAMS_PATH = "/equipos";
 /** Las evaluaciones. Un Player no las ve, ni las propias (FR-055). */
 export const EVALUATIONS_PATH = "/evaluaciones";
 
+/** Las categorías que se evalúan (#323, RF-3 del PRD de E9). Cuelga de
+ * `EVALUATIONS_PATH` y no de la configuración del club (decisión D1): quien
+ * evalúa decide qué se mide, y la frontera ya la reserva a Admin y Coach. */
+export const EVALUATION_CATEGORIES_PATH = `${EVALUATIONS_PATH}/categorias`;
+
 /** La evaluación de cada miembro (#319, RF-1, RF-2 y RF-5 del PRD de E9).
  * Todo lo que cuelga de este camino es del personal de entrenamiento: un
  * Player o un Committee no ven ninguna, ni la propia (FR-055). Va fuera de

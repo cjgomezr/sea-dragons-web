@@ -165,6 +165,7 @@ describeRls("la evaluación de un miembro en Supabase", () => {
         expect(created.ratings).toHaveLength(DEFAULT_CATEGORY_COUNT);
         expect(created.ratings[0]?.name).toBe("Fitness");
         expect(created.overallRating).toBe(5);
+        expect(created.isCurrent).toBe(true);
 
         const [fitness] = created.ratings;
         const saved = asEvaluated(
@@ -232,6 +233,10 @@ describeRls("la evaluación de un miembro en Supabase", () => {
           callerId: coach.id,
           name: "Breath hold",
         });
+        const missingOne = asEvaluated(
+          await readMemberEvaluation(gateways, request),
+        );
+        expect(missingOne.isCurrent).toBe(false);
         await setEvaluationCategoryActive(categoriesGateways, {
           callerId: coach.id,
           categoryId: teamworkId,
@@ -244,6 +249,7 @@ describeRls("la evaluación de un miembro en Supabase", () => {
         expect(untouched.ratings).toHaveLength(DEFAULT_CATEGORY_COUNT);
         expect(untouched.overallRating).toBe(5.5);
         expect(untouched.updatedAt).toBe(saved.updatedAt);
+        expect(untouched.isCurrent).toBe(false);
 
         const refreshed = await refreshMemberEvaluation(gateways, request);
         expect(refreshed.outcome).toEqual({
@@ -257,6 +263,7 @@ describeRls("la evaluación de un miembro en Supabase", () => {
         expect(names).toContain("Breath hold");
         expect(names).not.toContain("Teamwork");
         expect(asEvaluated(refreshed.evaluation).overallRating).toBe(5);
+        expect(asEvaluated(refreshed.evaluation).isCurrent).toBe(true);
 
         await expect(
           refreshMemberEvaluation(gateways, request),

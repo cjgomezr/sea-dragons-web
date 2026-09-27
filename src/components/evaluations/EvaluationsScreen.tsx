@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import { EVALUATION_CATEGORIES_PATH } from "@/lib/auth/routes";
 import type {
   EvaluationRoster as Roster,
   EvaluationRosterEntry,
@@ -150,7 +152,15 @@ export function EvaluationsScreen({
   return (
     <div className="evaluations" data-step={selected ? "sheet" : "list"}>
       <header className="evaluations-header">
-        <h1>{translate("evaluations.title")}</h1>
+        <div className="evaluations-heading">
+          <h1>{translate("evaluations.title")}</h1>
+          <Link
+            href={EVALUATION_CATEGORIES_PATH}
+            className="admin-secondary evaluations-categories-link"
+          >
+            {translate("evaluations.categories.link")}
+          </Link>
+        </div>
         <p className="app-lead">{translate("evaluations.lead")}</p>
       </header>
       {state.kind === "loading" ? (

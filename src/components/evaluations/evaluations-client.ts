@@ -5,7 +5,10 @@ import {
   readApiPayload,
   requestApi,
 } from "@/lib/api/request-api";
-import { EVALUATIONS_API_PATH } from "@/lib/auth/routes";
+import {
+  EVALUATIONS_API_PATH,
+  EVALUATION_REFRESH_API_PATH,
+} from "@/lib/auth/routes";
 import type { EvaluationRoster } from "@/lib/evaluations/evaluation-roster";
 import {
   EVALUATION_CHANGED_REASON,
@@ -59,10 +62,16 @@ const memberEvaluationSchema = z.discriminatedUnion("status", [
         isRetired: z.boolean(),
       }),
     ),
+    isCurrent: z.boolean(),
   }),
 ]);
 
 const evaluationResponseSchema = z.object({ data: memberEvaluationSchema });
+
+/** De la puesta al día sólo interesa cómo quedó: qué cambió ya se ve. */
+const refreshResponseSchema = z.object({
+  data: z.object({ evaluation: memberEvaluationSchema }),
+});
 
 export type EvaluationFailure = ApiRequestFailure;
 
@@ -76,6 +85,13 @@ export type EvaluationLoad =
 
 function memberEvaluationPath(memberId: string): string {
   return `${EVALUATIONS_API_PATH}/${encodeURIComponent(memberId)}`;
+}
+
+function refreshPath(memberId: string): string {
+  return EVALUATION_REFRESH_API_PATH.replace(
+    "[id]",
+    encodeURIComponent(memberId),
+  );
 }
 
 async function requestEvaluation(
@@ -124,6 +140,20 @@ export function saveMemberEvaluation(
     headers: JSON_REQUEST_HEADERS,
     body: JSON.stringify(submission),
   });
+}
+
+/** La lleva al conjunto activo del club (#320). Ya al día también responde
+ * bien, así que un segundo clic no es un error. */
+export async function refreshMemberEvaluation(
+  memberId: string,
+): Promise<EvaluationLoad> {
+  const read = readApiPayload(
+    await requestApi(refreshPath(memberId), { method: "POST" }),
+    refreshResponseSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "loaded", evaluation: read.value.data.evaluation };
 }
 
 /** Alguien guardó esa evaluación después de que se leyera, o la creó antes
