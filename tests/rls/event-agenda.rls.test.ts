@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
+import { type SupabaseClient, createClient } from "@supabase/supabase-js";
 import { expect, it } from "vitest";
 import {
   AGENDA_PAGE_SIZE,
@@ -227,7 +227,7 @@ function farAgendaQuery(
 
 /** Un cliente de servicio que apunta cada petición que hace. */
 function countingServiceClient(): {
-  readonly client: ReturnType<typeof createClient>;
+  readonly client: SupabaseClient;
   readonly requestedUrls: string[];
 } {
   const config = readSupabaseServiceRoleConfig(process.env);
