@@ -251,6 +251,15 @@ export const NEWS_UPLOAD_API_PATH = `${NEWS_UPLOADS_API_PATH}/[uploadId]`;
  * cuenta activa; quien no es la audiencia de la publicación recibe 404. */
 export const NEWS_ATTACHMENT_API_PATH = `${NEWS_POST_API_PATH}/attachments/[attachmentId]`;
 
+/** Crear eventos y series (#307, RF-2 y RF-3 del PRD de E7): sólo Admin y
+ * Committee (`createEvents`, ASS-006). Va en un camino propio, separado de la
+ * agenda y del RSVP que llegan con #308 y #309, porque la frontera decide por
+ * camino y no por método: leer y responder los alcanza cualquier cuenta
+ * activa, y un Coach que juega confirma igual que un Player. Editar y
+ * cancelar (#314, #315) cuelgan de este mismo camino, con el id del evento o
+ * de la serie. */
+export const EVENTS_MANAGE_API_PATH = "/api/v1/events/manage";
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 
@@ -443,4 +452,5 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: NEWS_POST_STATUS_API_PATH, capability: "publishNewsAndDocuments" },
   { path: NEWS_PUBLISH_PATH, capability: "publishNewsAndDocuments" },
   { path: NEWS_EDIT_PATH, capability: "publishNewsAndDocuments" },
+  { path: EVENTS_MANAGE_API_PATH, capability: "createEvents" },
 ];

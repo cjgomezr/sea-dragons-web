@@ -16,3 +16,25 @@ const CLUB_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
 export function clubCalendarDate(instant: Date): string {
   return CLUB_DATE_FORMATTER.format(instant);
 }
+
+/** Una fecha y una hora de pared de Melbourne, como las escribe quien crea un
+ * evento: `YYYY-MM-DD` y `HH:MM`. Comparadas como texto ordenan igual que los
+ * instantes que nombran, salvo dentro de la hora que se repite al terminar el
+ * horario de verano, y a esa escala sobra para decir si algo ya pasó. */
+export type ClubMoment = { readonly date: string; readonly time: string };
+
+// `h23` y no `hour12: false`: con este último, la medianoche sale como "24".
+const CLUB_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+  timeZone: CLUB_TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** La fecha y la hora de Melbourne en las que cae `instant`. */
+export function clubMoment(instant: Date): ClubMoment {
+  return {
+    date: clubCalendarDate(instant),
+    time: CLUB_TIME_FORMATTER.format(instant),
+  };
+}
