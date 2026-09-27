@@ -10,6 +10,7 @@ import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type {
   EvaluationCreation,
+  EvaluationRefresh,
   EvaluationScope,
   MemberEvaluationGateways,
   RatingsSave,
@@ -22,7 +23,8 @@ import type {
  *
  * Va por la llave de servicio: `0031_member_evaluations.sql` no da ningún
  * privilegio a `authenticated` (FR-055), y las escrituras son las funciones de
- * `0032_member_evaluation_writes.sql`, que sólo ejecuta `service_role`. El
+ * `0032_member_evaluation_writes.sql` y la puesta al día de
+ * `0033_manage_evaluation_categories.sql`, que sólo ejecuta `service_role`. El
  * servidor ya comprobó que quien pide es Admin o Coach, y cada consulta va
  * acotada a su club.
  */
@@ -33,6 +35,7 @@ const MEMBERS_TABLE = "members";
 const EVALUATIONS_TABLE = "member_evaluations";
 const CREATE_FUNCTION = "create_member_evaluation";
 const SAVE_FUNCTION = "save_member_evaluation_ratings";
+const REFRESH_FUNCTION = "refresh_member_evaluation";
 
 const EVALUATION_COLUMNS =
   "updated_at, member_evaluation_ratings(rating, evaluation_categories(id, name, sort_order, deactivated_at))";
@@ -77,6 +80,23 @@ const saveResultSchema = z.discriminatedUnion("outcome", [
     ]),
   }),
   z.object({ outcome: z.literal("unknown_category"), category_id: z.uuid() }),
+]);
+
+const refreshResultSchema = z.discriminatedUnion("outcome", [
+  z.object({
+    outcome: z.literal("refreshed"),
+    added_count: z.number().int(),
+    removed_count: z.number().int(),
+  }),
+  z.object({
+    outcome: z.enum([
+      "already_current",
+      "evaluation_not_found",
+      "no_active_categories",
+      "member_inactive",
+      "member_not_found",
+    ]),
+  }),
 ]);
 
 function parseRow<Row>(
@@ -205,6 +225,24 @@ async function saveRatings(
     : { kind: result.outcome };
 }
 
+async function refreshEvaluation(
+  serviceClient: SupabaseClient,
+  scope: EvaluationScope,
+): Promise<EvaluationRefresh> {
+  const data = await callEvaluationFunction(serviceClient, REFRESH_FUNCTION, {
+    acting_club_id: scope.clubId,
+    target_user_id: scope.userId,
+  });
+  const result = parseRow(refreshResultSchema, data, REFRESH_FUNCTION);
+  return result.outcome === "refreshed"
+    ? {
+        kind: "refreshed",
+        addedCount: result.added_count,
+        removedCount: result.removed_count,
+      }
+    : { kind: result.outcome };
+}
+
 export function createMemberEvaluationGateways(
   serviceClient: SupabaseClient,
 ): MemberEvaluationGateways {
@@ -216,6 +254,7 @@ export function createMemberEvaluationGateways(
       createEvaluation: (scope) => createEvaluation(serviceClient, scope),
       saveRatings: (scope, submission) =>
         saveRatings(serviceClient, scope, submission),
+      refreshEvaluation: (scope) => refreshEvaluation(serviceClient, scope),
     },
     audit: createSupabaseAuditLogWriter(serviceClient),
   };

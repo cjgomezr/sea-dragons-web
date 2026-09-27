@@ -97,6 +97,30 @@ export type RatingsSave =
   | { readonly kind: "member_inactive" }
   | { readonly kind: "member_not_found" };
 
+/** Lo que hizo la puesta al día, en la base. */
+export type EvaluationRefresh =
+  | {
+      readonly kind: "refreshed";
+      readonly addedCount: number;
+      readonly removedCount: number;
+    }
+  | { readonly kind: "already_current" }
+  | { readonly kind: "evaluation_not_found" }
+  | { readonly kind: "no_active_categories" }
+  | { readonly kind: "member_inactive" }
+  | { readonly kind: "member_not_found" };
+
+/** Lo que se le cuenta a quien la pidió: qué pasó y cómo quedó. */
+export type RefreshOutcome = Extract<
+  EvaluationRefresh,
+  { readonly kind: "refreshed" | "already_current" }
+>;
+
+export type RefreshedEvaluation = {
+  readonly outcome: RefreshOutcome;
+  readonly evaluation: MemberEvaluation;
+};
+
 export type MemberEvaluationGateways = {
   readonly members: Pick<
     RoleRequestGateways["members"],
@@ -116,6 +140,9 @@ export type MemberEvaluationGateways = {
       scope: EvaluationScope,
       submission: RatingsSubmission,
     ): Promise<RatingsSave>;
+    /** Las categorías activas que le faltan entran en 5 y las desactivadas
+     * salen, en una sola escritura. Ya al día, no toca nada. */
+    refreshEvaluation(scope: EvaluationScope): Promise<EvaluationRefresh>;
   };
   readonly audit: AuditLogWriter;
 };
@@ -239,8 +266,10 @@ export function findRatingsIssues(
   });
 }
 
-async function findEvaluatorActor(
-  gateways: MemberEvaluationGateways,
+/** Quien pide, si es personal de entrenamiento. Lo usa también el catálogo de
+ * categorías, que el SRD deja configurar a los mismos (FR-053). */
+export async function findEvaluatorActor(
+  gateways: Pick<MemberEvaluationGateways, "members">,
   callerId: string,
 ): Promise<AuditActor> {
   const caller = await gateways.members.findRoleRequestMember(callerId);
@@ -400,4 +429,42 @@ export async function saveEvaluationRatings(
     memberId: request.memberId,
   });
   return readEvaluation(gateways, scope);
+}
+
+function assertRefreshed(refresh: EvaluationRefresh): RefreshOutcome {
+  switch (refresh.kind) {
+    case "refreshed":
+    case "already_current":
+      return refresh;
+    case "evaluation_not_found":
+      throw new EvaluationNotFoundError();
+    case "no_active_categories":
+      throw new NoActiveCategoriesError();
+    case "member_inactive":
+      throw new EvaluatedMemberInactiveError();
+    case "member_not_found":
+      throw new EvaluatedMemberNotFoundError();
+  }
+}
+
+/** Lleva la evaluación al conjunto activo del club (FR-053, AC-054). Es una
+ * acción aparte y no un efecto de guardar: editar no migra (AC-035). Si ya
+ * estaba al día no se anota nada, porque nada cambió. */
+export async function refreshMemberEvaluation(
+  gateways: MemberEvaluationGateways,
+  request: EvaluationRequest,
+): Promise<RefreshedEvaluation> {
+  const actor = await findEvaluatorActor(gateways, request.callerId);
+  const scope = { clubId: actor.clubId, userId: request.memberId };
+  const outcome = assertRefreshed(
+    await gateways.evaluations.refreshEvaluation(scope),
+  );
+  if (outcome.kind === "refreshed") {
+    await recordEvaluationEvent(gateways, {
+      actor,
+      action: "member_evaluation.refreshed",
+      memberId: request.memberId,
+    });
+  }
+  return { outcome, evaluation: await readEvaluation(gateways, scope) };
 }
