@@ -8,11 +8,8 @@ import type {
   DirectoryMember,
   DirectorySort,
 } from "@/lib/directory/directory";
-import {
-  EVALUATIONS_PATH,
-  EVALUATION_MEMBER_QUERY_PARAM,
-  MEMBER_RECORD_PATH,
-} from "@/lib/auth/routes";
+import { MEMBER_RECORD_PATH } from "@/lib/auth/routes";
+import { memberEvaluationHref } from "@/lib/evaluations/member-evaluation-href";
 import { formatCalendarDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
@@ -127,13 +124,6 @@ function isAdminRow(row: DirectoryRow): row is DirectoryRow & {
 
 function memberRecordHref(userId: string): string {
   return MEMBER_RECORD_PATH.replace("[id]", userId);
-}
-
-function memberEvaluationHref(userId: string): string {
-  const params = new URLSearchParams({
-    [EVALUATION_MEMBER_QUERY_PARAM]: userId,
-  });
-  return `${EVALUATIONS_PATH}?${params.toString()}`;
 }
 
 /** A un dado de baja no se le marca: no se le puede crear evaluación (RF-1)

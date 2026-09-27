@@ -503,6 +503,9 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.back": "← Volver al directorio",
   "memberRecord.openLabel": "Abrir la ficha de {name}",
   "memberRecord.loading": "Cargando la ficha del miembro…",
+  "memberRecord.evaluation.title": "Evaluación",
+  "memberRecord.evaluation.loading": "Cargando la evaluación…",
+  "memberRecord.evaluation.open": "Abrir en Evaluaciones",
   "memberRecord.lead":
     "Lo que sólo edita un Admin: el registro AUF, la fecha de nacimiento y los grupos.",
   "memberRecord.joinedOn": "Miembro desde el {date}",

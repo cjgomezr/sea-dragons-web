@@ -20,6 +20,7 @@ const INVITATION_PATH = `/api/v1/members/${MEMBER_ID}/invitation`;
 const STATUS_PATH = `/api/v1/members/${MEMBER_ID}/status`;
 const VERIFICATION_PATH = `${RECORD_PATH}/auf-verification`;
 const GROUPS_PATH = "/api/v1/groups";
+const EVALUATION_PATH = `/api/v1/evaluations/${MEMBER_ID}`;
 
 const RECORD: MemberRecord = {
   userId: MEMBER_ID,
@@ -63,6 +64,7 @@ type Stub = {
   readonly resend?: () => Response;
   readonly changeStatus?: (body: unknown) => Response | Promise<Response>;
   readonly verify?: (body: unknown) => Response | Promise<Response>;
+  readonly evaluation?: () => Response;
 };
 
 const resends: string[] = [];
@@ -124,6 +126,14 @@ function stubApi(stub: Stub = {}): void {
     vi.fn(async (url: string, init?: RequestInit) => {
       if (url === GROUPS_PATH) {
         return jsonResponse(200, { data: { groups: CLUB_GROUPS } });
+      }
+      if (url === EVALUATION_PATH) {
+        return (
+          stub.evaluation?.() ??
+          jsonResponse(200, {
+            data: { status: "not_evaluated", memberId: MEMBER_ID },
+          })
+        );
       }
       if (url === LARGE_PHOTO_PATH) {
         return jsonResponse(200, { data: { photoUrl: LARGE_PHOTO_URL } });
@@ -974,5 +984,88 @@ describe("ficha en pantalla: verificar el AUF (#274)", () => {
     expect(
       screen.getByRole("button", { name: "Verificar AUF" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("ficha en pantalla: evaluación (#324)", () => {
+  function evaluationSection(name = "Evaluation"): HTMLElement {
+    return screen.getByRole("region", { name });
+  }
+
+  it("enseña al Admin el OVR y las categorías del miembro", async () => {
+    stubApi({
+      evaluation: () =>
+        jsonResponse(200, {
+          data: {
+            status: "evaluated",
+            memberId: MEMBER_ID,
+            updatedAt: "2026-09-27T01:02:03.123456+00:00",
+            overallRating: 7.5,
+            ratings: [
+              {
+                categoryId: "ca7e0000-0000-4000-8000-000000000001",
+                name: "Fitness",
+                rating: 8,
+                isRetired: false,
+              },
+              {
+                categoryId: "ca7e0000-0000-4000-8000-000000000002",
+                name: "Speed",
+                rating: 7,
+                isRetired: false,
+              },
+            ],
+          },
+        }),
+    });
+    await renderScreen();
+
+    const section = evaluationSection();
+    expect(await within(section).findByText("7.5")).toBeVisible();
+    expect(
+      within(
+        within(section).getByRole("list", { name: "Skill ratings" }),
+      ).getAllByRole("listitem"),
+    ).toHaveLength(2);
+    expect(
+      screen.queryByText(
+        "Evaluation ratings are only visible to the coaching staff.",
+      ),
+    ).toBeNull();
+  });
+
+  it("dice que no tiene evaluación y lleva a crearla", async () => {
+    stubApi();
+    await renderScreen();
+
+    const section = evaluationSection();
+    expect(
+      await within(section).findByText("No evaluation yet."),
+    ).toBeVisible();
+    expect(
+      within(section).getByRole("link", { name: "Open in Evaluations" }),
+    ).toHaveAttribute("href", `/evaluaciones?miembro=${MEMBER_ID}`);
+  });
+
+  it("dice por qué no pudo leer la evaluación", async () => {
+    stubApi({ evaluation: () => errorResponse(403, "forbidden") });
+    await renderScreen();
+
+    expect(
+      await within(evaluationSection()).findByRole("alert"),
+    ).toHaveTextContent("Only coaches and admins can see evaluations.");
+  });
+
+  it("se escribe en español", async () => {
+    stubApi();
+    await renderScreen("es");
+
+    const section = evaluationSection("Evaluación");
+    expect(
+      await within(section).findByText("Todavía no hay evaluación."),
+    ).toBeVisible();
+    expect(
+      within(section).getByRole("link", { name: "Abrir en Evaluaciones" }),
+    ).toBeVisible();
   });
 });

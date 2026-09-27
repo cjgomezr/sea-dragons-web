@@ -512,6 +512,9 @@ export const englishMessages = {
   "memberRecord.back": "← Back to the directory",
   "memberRecord.openLabel": "Open {name}'s record",
   "memberRecord.loading": "Loading the member's record…",
+  "memberRecord.evaluation.title": "Evaluation",
+  "memberRecord.evaluation.loading": "Loading the evaluation…",
+  "memberRecord.evaluation.open": "Open in Evaluations",
   "memberRecord.lead":
     "What only an Admin edits: the AUF registration, the date of birth and the groups.",
   "memberRecord.joinedOn": "Member since {date}",
