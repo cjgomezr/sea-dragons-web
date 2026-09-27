@@ -680,6 +680,45 @@ export const englishMessages = {
   "event.type.competition": "Competition",
   "event.type.meeting": "Meeting",
   "event.type.social": "Social",
+  // La agenda del Calendario (#311, RF-5 a RF-7 del PRD de E7).
+  "calendar.eyebrow": "Calendar & events",
+  "calendar.title": "Upcoming events",
+  "calendar.loading": "Loading the events…",
+  "calendar.empty": "There are no upcoming events.",
+  "calendar.loadMore": "See more",
+  "calendar.loadingMore": "Loading…",
+  "calendar.retry": "Try again",
+  "calendar.error.signInRequired":
+    "Your session ended. Sign in again to see the calendar.",
+  "calendar.error.unexpected": "We couldn't load the events. Try again.",
+  "calendar.event.cancelled": "Cancelled",
+  "calendar.event.timeAndPlace": "{time} · {location}",
+  "calendar.event.going": {
+    one: "{count} going",
+    other: "{count} going",
+  },
+  "calendar.event.maybe": {
+    one: "{count} maybe",
+    other: "{count} maybe",
+  },
+  "calendar.event.counts": "{going} · {maybe}",
+  "calendar.rsvp.label": "RSVP",
+  "calendar.rsvp.groupLabel": "RSVP: {title}",
+  "calendar.rsvp.yes": "Yes",
+  "calendar.rsvp.maybe": "Maybe",
+  "calendar.rsvp.no": "No",
+  "calendar.rsvp.saving": "Saving…",
+  "calendar.rsvp.error.network":
+    "We couldn't save your answer. Check your connection and try again.",
+  "calendar.rsvp.error.started":
+    "This event has already started, so you can't answer anymore.",
+  "calendar.rsvp.error.cancelled":
+    "This event was cancelled, so you can't answer anymore.",
+  "calendar.rsvp.error.notFound":
+    "This event is no longer available. Reload the calendar.",
+  "calendar.rsvp.error.signInRequired":
+    "Your session ended. Sign in again to answer.",
+  "calendar.rsvp.error.unexpected": "We couldn't save your answer. Try again.",
   "notifications.generic.title": "New notification",
   "notifications.generic.body": "Something changed in your account.",
   "themeToggle.switchToLight": "Switch to light theme",

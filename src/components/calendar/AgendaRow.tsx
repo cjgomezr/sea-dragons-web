@@ -1,0 +1,130 @@
+import { useEffect, useRef } from "react";
+import type { AgendaEvent } from "@/lib/events/event-agenda";
+import {
+  formatCalendarDay,
+  formatCalendarDayParts,
+  formatClockTime,
+} from "@/lib/i18n/format";
+import type { Translator } from "@/lib/i18n/translator";
+import { describeRsvpFailure } from "./agenda-client";
+import { EventRsvp } from "./EventRsvp";
+import { useEventRsvp } from "./use-event-rsvp";
+
+/**
+ * Una fila de la agenda (#311, RF-7, AC-046): el bloque de fecha, el título
+ * con su tipo, la hora y el lugar, el RSVP y los conteos. El bloque de fecha
+ * es para la vista; el lector de pantalla oye la fecha entera.
+ *
+ * Responde quien es de la audiencia de un evento que sigue en pie. A un
+ * cancelado no se le responde, y quien organiza ve también los eventos que no
+ * son para él (B7): esos no llevan botones.
+ */
+
+function DateBlock({
+  translate,
+  startsOn,
+}: {
+  readonly translate: Translator;
+  readonly startsOn: string;
+}): React.JSX.Element {
+  const parts = formatCalendarDayParts(translate.locale, startsOn);
+  return (
+    <time className="agenda-date" dateTime={startsOn}>
+      <span aria-hidden="true" className="agenda-date-weekday">
+        {parts.weekday}
+      </span>
+      <span aria-hidden="true" className="agenda-date-day">
+        {parts.day}
+      </span>
+      <span aria-hidden="true" className="agenda-date-month">
+        {parts.month}
+      </span>
+      <span className="visually-hidden">
+        {formatCalendarDay(translate.locale, startsOn)}
+      </span>
+    </time>
+  );
+}
+
+export function AgendaRow({
+  translate,
+  event,
+  shouldTakeFocus,
+}: {
+  readonly translate: Translator;
+  readonly event: AgendaEvent;
+  /** La primera fila de una página recién cargada: recibe el foco para que
+   * quien pulsó "Ver más" siga leyendo desde ahí. */
+  readonly shouldTakeFocus: boolean;
+}): React.JSX.Element {
+  const { state, respond } = useEventRsvp(event);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const isCancelled = event.status === "cancelled";
+  const canRespond = event.inAudience && !isCancelled;
+
+  useEffect(() => {
+    if (shouldTakeFocus) {
+      titleRef.current?.focus();
+    }
+  }, [shouldTakeFocus]);
+
+  return (
+    <li className="agenda-row">
+      <DateBlock translate={translate} startsOn={event.startsOn} />
+      <div className="agenda-body">
+        <div className="agenda-heading">
+          <h2 ref={titleRef} className="agenda-title" tabIndex={-1}>
+            {event.title}
+          </h2>
+          <span className={`agenda-type agenda-type-${event.eventType}`}>
+            {translate(`event.type.${event.eventType}`)}
+          </span>
+          {isCancelled ? (
+            <span className="agenda-cancelled">
+              {translate("calendar.event.cancelled")}
+            </span>
+          ) : null}
+        </div>
+        <p className="agenda-when">
+          {translate("calendar.event.timeAndPlace", {
+            time: formatClockTime(translate.locale, event.startTime),
+            location: event.location,
+          })}
+        </p>
+        <div className="agenda-footer">
+          {canRespond ? (
+            <EventRsvp
+              translate={translate}
+              title={event.title}
+              savedResponse={state.tally.myResponse}
+              pendingResponse={state.pendingResponse}
+              onRespond={respond}
+            />
+          ) : null}
+          <p className="agenda-counts">
+            {translate("calendar.event.counts", {
+              going: translate("calendar.event.going", {
+                count: state.tally.goingCount,
+              }),
+              maybe: translate("calendar.event.maybe", {
+                count: state.tally.maybeCount,
+              }),
+            })}
+          </p>
+        </div>
+        {canRespond ? (
+          <p className="agenda-rsvp-status" role="status">
+            {state.pendingResponse === null
+              ? null
+              : translate("calendar.rsvp.saving")}
+          </p>
+        ) : null}
+        {state.failure === null ? null : (
+          <p className="auth-error agenda-rsvp-error" role="alert">
+            {describeRsvpFailure(translate, state.failure)}
+          </p>
+        )}
+      </div>
+    </li>
+  );
+}
