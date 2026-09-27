@@ -24,6 +24,8 @@ function RosterMark({
   translate: Translator;
   member: EvaluationRosterEntry;
 }): React.JSX.Element {
+  // Sin evaluación y sin ninguna categoría son dos casos distintos, pero
+  // ninguno tiene nota: los dos van con la misma marca y su propio texto.
   if (member.status === "not_evaluated") {
     return (
       <span className="evaluation-roster-pending">
@@ -31,13 +33,18 @@ function RosterMark({
       </span>
     );
   }
-  const rating =
-    member.overallRating === null
-      ? translate("evaluations.overall.noData")
-      : formatOverallRating(translate.locale, member.overallRating);
+  if (member.overallRating === null) {
+    return (
+      <span className="evaluation-roster-pending">
+        {translate("evaluations.list.noRatings")}
+      </span>
+    );
+  }
   return (
     <span className="evaluation-roster-ovr">
-      {translate("evaluations.list.overall", { rating })}
+      {translate("evaluations.list.overall", {
+        rating: formatOverallRating(translate.locale, member.overallRating),
+      })}
     </span>
   );
 }

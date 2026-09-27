@@ -941,6 +941,7 @@ export const spanishMessages: MessageCatalog = {
   "evaluations.list.empty": "Todavía no hay nadie en el club a quien evaluar.",
   "evaluations.list.noMatches": "Ningún miembro coincide con ese nombre.",
   "evaluations.list.notEvaluated": "Sin evaluar",
+  "evaluations.list.noRatings": "Sin valoraciones",
   "evaluations.list.overall": "OVR {rating}",
   "evaluations.sheet.label": "Evaluación de {name}",
   "evaluations.sheet.eyebrow": "Evaluación del jugador",

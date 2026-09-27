@@ -191,6 +191,22 @@ describe("lista de evaluaciones", () => {
     expect(memberButton(/mateo ruiz/i)).toHaveTextContent(/not evaluated/i);
   });
 
+  it("marca con su propio texto una evaluación sin categorías, sin inventar un OVR", async () => {
+    const ruby: EvaluationRosterEntry = {
+      status: "evaluated",
+      userId: "cccccccc-0000-4000-8000-00000000000c",
+      fullName: "Ruby Walsh",
+      overallRating: null,
+    };
+    stubApi(() => jsonResponse(200, { data: { members: [ruby] } }));
+
+    render(<EvaluationsScreen locale="en" />);
+
+    const button = await screen.findByRole("button", { name: /ruby walsh/i });
+    expect(button).toHaveTextContent(/no ratings yet/i);
+    expect(button).not.toHaveTextContent(/ovr/i);
+  });
+
   it("filtra por nombre, sin distinguir acentos", async () => {
     clubApi();
     await renderScreen();
