@@ -87,7 +87,7 @@ export class RsvpClosedError extends Error {
   }
 }
 
-function isInAudience(
+export function isInAudience(
   audience: EventAudience,
   memberGroupIds: readonly string[],
 ): boolean {
