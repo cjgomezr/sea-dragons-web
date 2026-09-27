@@ -30,9 +30,28 @@ const savedScheduleSchema = z.object({
   event_ids: z.array(z.string()),
 });
 
-/** Lo que espera `create_events`: la audiencia con los nombres de la base,
- * donde "todo el club" es `all`. */
-function toScheduleArgument(schedule: NewEventSchedule): object {
+/** Lo que lee `create_events` de su argumento `schedule`. */
+type CreateEventsScheduleArgument = {
+  readonly title: string;
+  readonly event_type: string;
+  readonly start_time: string;
+  readonly location: string;
+  readonly notes: string | null;
+  readonly audience: "all" | "groups";
+  readonly group_ids: readonly string[];
+  readonly occurrence_dates: readonly string[];
+  readonly series: {
+    readonly weekdays: readonly number[];
+    readonly starts_on: string;
+    readonly ends_on: string;
+  } | null;
+};
+
+/** La audiencia va con los nombres de la base, donde "todo el club" es
+ * `all`. */
+function toScheduleArgument(
+  schedule: NewEventSchedule,
+): CreateEventsScheduleArgument {
   const { fields, series } = schedule;
   return {
     title: fields.title,

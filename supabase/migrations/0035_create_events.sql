@@ -39,7 +39,8 @@ declare
   new_series_id uuid;
   new_event_ids uuid[];
 begin
-  if jsonb_array_length(schedule -> 'occurrence_dates') = 0 then
+  -- Sin la clave, `jsonb_array_length` da nulo: cuenta como ninguna fecha.
+  if coalesce(jsonb_array_length(schedule -> 'occurrence_dates'), 0) = 0 then
     raise exception 'un evento necesita al menos una fecha'
       using errcode = 'invalid_parameter_value';
   end if;
