@@ -9,6 +9,7 @@ import {
   formatClubMoment,
   formatFileSize,
   formatNumber,
+  formatOverallRating,
 } from "@/lib/i18n/format";
 import { createTranslator } from "@/lib/i18n/translator";
 
@@ -171,5 +172,15 @@ describe("tamaños de archivo", () => {
 
   it("no enseña un decimal que es cero", () => {
     expect(formatFileSize("en", 10 * 1024 * 1024)).toBe("10 MB");
+  });
+});
+
+describe("OVR por idioma", () => {
+  it("escribe siempre un decimal, también en una media entera", () => {
+    expect(formatOverallRating("en", 5)).toBe("5.0");
+  });
+
+  it("usa la coma decimal en español", () => {
+    expect(formatOverallRating("es", 7.9)).toBe("7,9");
   });
 });

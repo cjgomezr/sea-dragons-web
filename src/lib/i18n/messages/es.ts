@@ -929,4 +929,55 @@ export const spanishMessages: MessageCatalog = {
   "news.publish.error.forbidden": "Tu rol no puede publicar noticias.",
   "news.publish.error.unexpected":
     "No pudimos publicarla. Vuelve a intentarlo.",
+  "evaluations.metaTitle": "Evaluaciones · {club}",
+  "evaluations.title": "Evaluaciones",
+  "evaluations.lead":
+    "Las valoraciones de cada miembro y su OVR. Solo las ven el personal de entrenamiento y la administración.",
+  "evaluations.loading": "Cargando las evaluaciones del club…",
+  "evaluations.retry": "Volver a intentarlo",
+  "evaluations.list.title": "Miembros",
+  "evaluations.search.label": "Buscar por nombre",
+  "evaluations.search.placeholder": "Nombre del miembro",
+  "evaluations.list.empty": "Todavía no hay nadie en el club a quien evaluar.",
+  "evaluations.list.noMatches": "Ningún miembro coincide con ese nombre.",
+  "evaluations.list.notEvaluated": "Sin evaluar",
+  "evaluations.list.noRatings": "Sin valoraciones",
+  "evaluations.list.overall": "OVR {rating}",
+  "evaluations.sheet.label": "Evaluación de {name}",
+  "evaluations.sheet.eyebrow": "Evaluación del jugador",
+  "evaluations.sheet.back": "Todos los miembros",
+  "evaluations.sheet.placeholder":
+    "Elige a un miembro de la lista para ver su evaluación.",
+  "evaluations.sheet.loading": "Cargando la evaluación…",
+  "evaluations.overall.title": "Valoración global",
+  "evaluations.overall.outOf": "/ {max}",
+  "evaluations.overall.noData": "Sin datos",
+  "evaluations.ratings.title": "Valoraciones",
+  "evaluations.ratings.outOf": " de {max}",
+  "evaluations.ratings.retired": "Retirada",
+  "evaluations.notEvaluated.title": "{name} todavía no tiene evaluación.",
+  "evaluations.notEvaluated.hint":
+    "Al crearla, todas las categorías empiezan en 5.",
+  "evaluations.create": "Crear evaluación",
+  "evaluations.creating": "Creando…",
+  "evaluations.edit": "Editar valoraciones",
+  "evaluations.save": "Guardar valoraciones",
+  "evaluations.saving": "Guardando…",
+  "evaluations.cancel": "Cancelar",
+  "evaluations.saved": "Valoraciones guardadas.",
+  "evaluations.reload": "Recargar la evaluación",
+  "evaluations.error.changed":
+    "Alguien más cambió esta evaluación mientras la editabas. Recárgala para ver sus cambios.",
+  "evaluations.error.exists":
+    "Alguien más acaba de crear esta evaluación. Recárgala para verla.",
+  "evaluations.error.memberNotFound": "Ese miembro ya no está en el club.",
+  "evaluations.error.memberInactive":
+    "Ese miembro tiene la cuenta desactivada, así que no se le puede evaluar.",
+  "evaluations.error.noActiveCategories":
+    "El club no tiene ninguna categoría activa. Añade o reactiva una antes de evaluar.",
+  "evaluations.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para ver las evaluaciones.",
+  "evaluations.error.forbidden":
+    "Solo el personal de entrenamiento y la administración ven las evaluaciones.",
+  "evaluations.error.unexpected": "Algo salió mal. Vuelve a intentarlo.",
 };

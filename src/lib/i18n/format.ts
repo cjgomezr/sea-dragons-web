@@ -79,6 +79,20 @@ export function formatNumber(locale: Locale, value: number): string {
   return NUMBER_FORMATTERS[locale].format(value);
 }
 
+/** El OVR siempre a un decimal (FR-052): "5.0" y no "5", para que una media
+ * entera no parezca una nota puesta a mano. */
+const OVERALL_RATING_FORMATTERS = formattersByLocale(
+  (displayLocale) =>
+    new Intl.NumberFormat(displayLocale, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }),
+);
+
+export function formatOverallRating(locale: Locale, value: number): string {
+  return OVERALL_RATING_FORMATTERS[locale].format(value);
+}
+
 /** Un instante del club (un entrenamiento, una solicitud), con fecha y hora de
  * Melbourne sea cual sea el idioma o la zona de quien lo mira. */
 export function formatClubMoment(locale: Locale, instant: Date): string {
