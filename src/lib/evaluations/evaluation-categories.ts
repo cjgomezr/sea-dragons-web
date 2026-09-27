@@ -137,7 +137,7 @@ export function findCategoryNameIssues(name: string): readonly CategoryIssue[] {
   return [];
 }
 
-function validName(name: string): string {
+function requireValidName(name: string): string {
   const issues = findCategoryNameIssues(name);
   if (issues.length > 0) {
     throw new CategoryValidationError(issues);
@@ -145,7 +145,7 @@ function validName(name: string): string {
   return name.trim();
 }
 
-function nameTaken(): CategoryValidationError {
+function createNameTakenError(): CategoryValidationError {
   return new CategoryValidationError([{ code: "name_taken" }]);
 }
 
@@ -184,10 +184,10 @@ export async function createEvaluationCategory(
   request: { readonly callerId: string; readonly name: string },
 ): Promise<EvaluationCategories> {
   const actor = await findEvaluatorActor(gateways, request.callerId);
-  const name = validName(request.name);
+  const name = requireValidName(request.name);
   const result = await gateways.categories.insertCategory(actor.clubId, name);
   if (result.kind === "name_taken") {
-    throw nameTaken();
+    throw createNameTakenError();
   }
   await recordCategoryEvent(gateways, {
     actor,
@@ -206,7 +206,7 @@ export async function renameEvaluationCategory(
   },
 ): Promise<EvaluationCategories> {
   const actor = await findEvaluatorActor(gateways, request.callerId);
-  const name = validName(request.name);
+  const name = requireValidName(request.name);
   const result = await gateways.categories.renameCategory(
     { clubId: actor.clubId, categoryId: request.categoryId },
     name,
@@ -215,7 +215,7 @@ export async function renameEvaluationCategory(
     case "not_found":
       throw new CategoryNotFoundError();
     case "name_taken":
-      throw nameTaken();
+      throw createNameTakenError();
     case "renamed":
       break;
   }

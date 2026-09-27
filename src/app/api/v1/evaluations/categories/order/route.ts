@@ -21,7 +21,9 @@ export const dynamic = "force-dynamic";
 const MAX_CATEGORIES_IN_ORDER = 200;
 
 const orderBodySchema = z
-  .object({ categoryIds: z.array(z.uuid()).max(MAX_CATEGORIES_IN_ORDER) })
+  .object({
+    categoryIds: z.array(z.uuid()).min(1).max(MAX_CATEGORIES_IN_ORDER),
+  })
   .strict();
 
 type OrderBody = z.infer<typeof orderBodySchema>;

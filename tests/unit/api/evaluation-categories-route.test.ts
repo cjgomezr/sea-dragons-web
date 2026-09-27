@@ -382,6 +382,13 @@ describe("endpoints de categorías", () => {
       });
     });
 
+    it("responde 400 a un orden vacío, sin anotar nada", async () => {
+      const response = await putOrder({ categoryIds: [] });
+
+      expect(response.status).toBe(400);
+      expect(writes).toEqual([]);
+    });
+
     it("responde 400 a un id que no es un uuid", async () => {
       const response = await putOrder({ categoryIds: ["no-es-un-uuid"] });
 
