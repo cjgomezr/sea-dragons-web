@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-groups-gateway";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
@@ -12,6 +13,9 @@ import {
   type NewsFeedRow,
   type NewsGateways,
   type NewsPost,
+  type NewsPostEdit,
+  type NewsPostStatus,
+  type NewsPostUpdate,
 } from "./news-posts";
 
 /**
@@ -48,14 +52,24 @@ const POST_COLUMNS = [
 /** `news_post_groups` va embebido sólo para filtrar por él: la fila de un
  * grupo del lector hace que la publicación le alcance. */
 const FEED_COLUMNS = [
-  "id, category, title, body, author_id, published_at",
+  "id, category, title, body, author_id, published_at, status",
   AUTHOR_EMBED,
   "news_post_attachments(count)",
   "news_post_groups(group_id)",
 ].join(", ");
 
 const READER_GROUP_FILTER = "news_post_groups.group_id";
-const AUDIENCE_FILTER = "audience.eq.club,news_post_groups.not.is.null";
+
+/** Lo que va a todo el club o a alguno de sus grupos, y lo suyo esté como
+ * esté (#331): quien publicó ve lo retirado, marcado, y nadie más. El id sale
+ * de la sesión, así que no puede romper la sintaxis del filtro. */
+function audienceFilter(readerId: string): string {
+  return `audience.eq.club,news_post_groups.not.is.null,author_id.eq.${readerId}`;
+}
+
+function statusFilter(readerId: string): string {
+  return `status.eq.published,author_id.eq.${readerId}`;
+}
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -92,6 +106,7 @@ const feedRowSchema = z.object({
   body: z.string(),
   author_id: z.string(),
   published_at: z.string(),
+  status: z.enum(["published", "withdrawn"]),
   author: authorSchema,
   news_post_attachments: z.tuple([z.object({ count: z.number().int() })]),
 });
@@ -139,6 +154,7 @@ function toFeedRow(row: unknown): NewsFeedRow {
     body: parsed.body,
     author: { id: parsed.author_id, fullName: parsed.author.full_name },
     publishedAt: parsed.published_at,
+    status: parsed.status,
     attachmentCount: parsed.news_post_attachments[0].count,
   };
 }
@@ -236,6 +252,105 @@ async function insertPost(
   return stored;
 }
 
+/**
+ * Una edición (#331). La fila se escribe sólo si sigue en la marca de
+ * editada que se tenía delante: si otra persona guardó entretanto, no se
+ * escribe nada y es un conflicto.
+ *
+ * La audiencia va después, en dos peticiones más: PostgREST no abre una
+ * transacción entre peticiones. Primero se quitan los grupos que salen y
+ * luego se añaden los que entran. Si algo falla a medias, la publicación
+ * alcanza a menos gente de la que debería, nunca a alguien que se quitó.
+ */
+async function updatePost(
+  serviceClient: SupabaseClient,
+  edit: NewsPostEdit,
+): Promise<NewsPostUpdate> {
+  const update = serviceClient
+    .from(POSTS_TABLE)
+    .update({
+      category: edit.category,
+      title: edit.title,
+      body: edit.body,
+      audience: edit.audience.kind,
+      edited_at: edit.editedAt,
+    })
+    .eq("id", edit.postId)
+    .eq("club_id", edit.clubId);
+  const { data, error } = await (
+    edit.expectedEditedAt === null
+      ? update.is("edited_at", null)
+      : update.eq("edited_at", edit.expectedEditedAt)
+  ).select("id");
+  if (error) {
+    throw new Error(
+      `No se pudo editar la publicación ${edit.postId}: ${error.message}`,
+    );
+  }
+  if (data.length === 0) {
+    return { kind: "changed" };
+  }
+  await replaceAudienceGroups(serviceClient, edit);
+  return { kind: "updated" };
+}
+
+async function replaceAudienceGroups(
+  serviceClient: SupabaseClient,
+  edit: NewsPostEdit,
+): Promise<void> {
+  const groupIds =
+    edit.audience.kind === "groups" ? edit.audience.groupIds : [];
+  let removal = serviceClient
+    .from(POST_GROUPS_TABLE)
+    .delete()
+    .eq("post_id", edit.postId);
+  if (groupIds.length > 0) {
+    removal = removal.not("group_id", "in", `(${groupIds.join(",")})`);
+  }
+  const removed = await removal;
+  if (removed.error) {
+    throw new Error(
+      `No se pudo quitar la audiencia anterior de la publicación ${edit.postId}: ${removed.error.message}`,
+    );
+  }
+  if (groupIds.length === 0) {
+    return;
+  }
+  const { error } = await serviceClient.from(POST_GROUPS_TABLE).upsert(
+    groupIds.map((groupId) => ({
+      post_id: edit.postId,
+      group_id: groupId,
+      club_id: edit.clubId,
+    })),
+    { onConflict: "post_id,group_id", ignoreDuplicates: true },
+  );
+  if (error) {
+    throw new Error(
+      `No se pudo guardar la audiencia nueva de la publicación ${edit.postId}: ${error.message}`,
+    );
+  }
+}
+
+async function setPostStatus(
+  serviceClient: SupabaseClient,
+  change: {
+    readonly clubId: string;
+    readonly postId: string;
+    readonly status: NewsPostStatus;
+  },
+): Promise<void> {
+  const { error } = await serviceClient
+    .from(POSTS_TABLE)
+    .update({ status: change.status })
+    .eq("id", change.postId)
+    .eq("club_id", change.clubId);
+  if (error) {
+    throw new Error(
+      `No se pudo cambiar el estado de la publicación ${change.postId}: ${error.message}`,
+    );
+  }
+}
+
 export function createNewsGateways(
   serviceClient: SupabaseClient,
 ): NewsGateways {
@@ -261,14 +376,14 @@ export function createNewsGateways(
 
       insertPost: (post) => insertPost(serviceClient, post),
 
-      async findFeedPage({ clubId, audienceGroupIds, after, limit }) {
+      async findFeedPage({ clubId, readerId, audienceGroupIds, after, limit }) {
         let query = serviceClient
           .from(POSTS_TABLE)
           .select(FEED_COLUMNS)
           .eq("club_id", clubId)
-          .eq("status", "published")
+          .or(statusFilter(readerId))
           .in(READER_GROUP_FILTER, audienceGroupIds)
-          .or(AUDIENCE_FILTER);
+          .or(audienceFilter(readerId));
         if (after !== null) {
           query = query.or(olderThanFilter(after));
         }
@@ -297,7 +412,12 @@ export function createNewsGateways(
           );
         }
       },
+
+      updatePost: (edit) => updatePost(serviceClient, edit),
+
+      setPostStatus: (change) => setPostStatus(serviceClient, change),
     },
+    audit: createSupabaseAuditLogWriter(serviceClient),
   };
 }
 

@@ -72,6 +72,13 @@ export const AUDIT_ACTIONS = [
   "evaluation_category.reordered",
   "evaluation_category.deactivated",
   "evaluation_category.reactivated",
+  // RF-6 de E11 (#331): quien publicó, o un Admin, edita, retira o vuelve a
+  // publicar una publicación. La entidad es la publicación (`news_post`), sin
+  // metadata: ni el título, ni el cuerpo, ni la audiencia. Quién, qué acción y
+  // sobre cuál ya están en la entrada.
+  "news_post.edited",
+  "news_post.withdrawn",
+  "news_post.republished",
   "payment.status_changed",
 ] as const;
 

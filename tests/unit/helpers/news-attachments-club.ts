@@ -46,6 +46,9 @@ export type FakeAttachmentClub = {
   readonly deletedPostIds: string[];
   readonly inserted: FakeClub["inserted"];
   readonly feedQueries: FakeClub["feedQueries"];
+  readonly posts: FakeClub["posts"];
+  readonly edits: FakeClub["edits"];
+  readonly audited: FakeClub["audited"];
   /** Las rutas que hay en el almacenamiento. */
   readonly files: Set<string>;
   readonly fileInfo: Map<string, StoredNewsFile>;
@@ -168,5 +171,8 @@ export function fakeAttachmentClub(
     inserted: news.inserted,
     feedQueries: news.feedQueries,
     deletedPostIds: news.deletedPostIds,
+    posts: news.posts,
+    edits: news.edits,
+    audited: news.audited,
   };
 }

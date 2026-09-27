@@ -29,6 +29,8 @@ const CURSOR_PARAM = "cursor";
 
 const authorSchema = z.object({ id: z.uuid(), fullName: z.string() });
 
+const statusSchema = z.enum(["published", "withdrawn"]);
+
 const feedItemSchema = z.object({
   id: z.uuid(),
   category: z.enum(NEWS_CATEGORIES),
@@ -36,6 +38,7 @@ const feedItemSchema = z.object({
   excerpt: z.string(),
   author: authorSchema,
   publishedAt: z.iso.datetime({ offset: true }),
+  status: statusSchema,
   attachmentCount: z.number().int().nonnegative(),
 });
 
@@ -55,7 +58,7 @@ const postResponseSchema = z.object({
     author: authorSchema,
     publishedAt: z.iso.datetime({ offset: true }),
     editedAt: z.iso.datetime({ offset: true }).nullable(),
-    status: z.enum(["published", "withdrawn"]),
+    status: statusSchema,
     attachments: z.array(
       z.object({
         id: z.uuid(),
@@ -64,6 +67,7 @@ const postResponseSchema = z.object({
         sizeBytes: z.number().int().nonnegative(),
       }),
     ),
+    canManage: z.boolean(),
   }),
 });
 

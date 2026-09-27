@@ -1,6 +1,8 @@
+import type { AuditLogInsertRow } from "@/lib/audit/audit-log";
 import type { Role } from "@/lib/auth/roles";
 import type {
   NewNewsPost,
+  NewsPostEdit,
   NewsFeedQuery,
   NewsFeedRow,
   NewsGateways,
@@ -11,7 +13,9 @@ import type {
  * Un club en memoria para los tests del dominio de noticias. El doble cumple
  * el contrato de los adaptadores: el feed trae sólo lo publicado del club que
  * va a todo el club o a alguno de los grupos que se le pasan, de la más
- * reciente a la más antigua.
+ * reciente a la más antigua, y a quien lo publicó también lo suyo retirado.
+ * Editar sólo escribe si la publicación sigue en la edición que se tenía
+ * delante, como la escritura condicional de verdad.
  */
 
 export const CALLER_ID = "a0a0a0a0-0000-4000-8000-00000000000a";
@@ -29,6 +33,9 @@ export type FakeClubOptions = {
   readonly clubGroupIds?: readonly string[];
   readonly posts?: readonly NewsPost[];
   readonly callerIsMember?: false;
+  /** Lo que quien llama cree que hay: la versión que se tenía delante deja
+   * de valer justo antes de guardar, como si otra persona hubiera guardado. */
+  readonly editedMeanwhileAt?: string;
 };
 
 export type FakeClub = {
@@ -36,6 +43,10 @@ export type FakeClub = {
   readonly inserted: NewNewsPost[];
   readonly feedQueries: NewsFeedQuery[];
   readonly deletedPostIds: string[];
+  /** Las publicaciones como están ahora, con lo editado y lo retirado. */
+  readonly posts: NewsPost[];
+  readonly edits: NewsPostEdit[];
+  readonly audited: AuditLogInsertRow[];
 };
 
 /** El id que recibe la publicación que guarda el doble. */
@@ -66,6 +77,14 @@ function reaches(post: NewsPost, groupIds: readonly string[]): boolean {
   );
 }
 
+/** Lo publicado de su audiencia, y lo propio esté como esté. */
+function isInFeedOf(post: NewsPost, query: NewsFeedQuery): boolean {
+  if (post.author.id === query.readerId) {
+    return true;
+  }
+  return post.status === "published" && reaches(post, query.audienceGroupIds);
+}
+
 function isAfter(post: NewsPost, query: NewsFeedQuery): boolean {
   if (query.after === null) {
     return true;
@@ -91,7 +110,19 @@ function toFeedRow(post: NewsPost): NewsFeedRow {
     body: post.body,
     author: post.author,
     publishedAt: post.publishedAt,
+    status: post.status,
     attachmentCount: post.attachments.length,
+  };
+}
+
+function applyEdit(post: NewsPost, edit: NewsPostEdit): NewsPost {
+  return {
+    ...post,
+    category: edit.category,
+    title: edit.title,
+    body: edit.body,
+    audience: edit.audience,
+    editedAt: edit.editedAt,
   };
 }
 
@@ -99,7 +130,11 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
   const inserted: NewNewsPost[] = [];
   const feedQueries: NewsFeedQuery[] = [];
   const deletedPostIds: string[] = [];
-  const posts = options.posts ?? [];
+  const edits: NewsPostEdit[] = [];
+  const audited: AuditLogInsertRow[] = [];
+  const posts = [...(options.posts ?? [])];
+  const indexOf = (clubId: string, postId: string): number =>
+    posts.findIndex((post) => post.id === postId && post.clubId === clubId);
   const clubGroupIds = options.clubGroupIds ?? [
     SENIOR_SQUAD_ID,
     MASTERS_SQUAD_ID,
@@ -148,8 +183,7 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
           .filter(
             (post) =>
               post.clubId === query.clubId &&
-              post.status === "published" &&
-              reaches(post, query.audienceGroupIds) &&
+              isInFeedOf(post, query) &&
               isAfter(post, query),
           )
           .sort(newestFirst)
@@ -162,7 +196,43 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
       deletePost: async (postId) => {
         deletedPostIds.push(postId);
       },
+      updatePost: async (edit) => {
+        const index = indexOf(edit.clubId, edit.postId);
+        const current = posts[index];
+        if (current === undefined) {
+          throw new Error(`no existe ${edit.postId}`);
+        }
+        const editedAt = options.editedMeanwhileAt ?? current.editedAt;
+        if (editedAt !== edit.expectedEditedAt) {
+          return { kind: "changed" };
+        }
+        edits.push(edit);
+        posts[index] = applyEdit(current, edit);
+        return { kind: "updated" };
+      },
+      setPostStatus: async ({ clubId, postId, status }) => {
+        const index = indexOf(clubId, postId);
+        const current = posts[index];
+        if (current === undefined) {
+          throw new Error(`no existe ${postId}`);
+        }
+        posts[index] = { ...current, status };
+      },
+    },
+    audit: {
+      insertAuditLogRow: async (row) => {
+        audited.push(row);
+        return { error: null };
+      },
     },
   };
-  return { gateways, inserted, feedQueries, deletedPostIds };
+  return {
+    gateways,
+    inserted,
+    feedQueries,
+    deletedPostIds,
+    posts,
+    edits,
+    audited,
+  };
 }

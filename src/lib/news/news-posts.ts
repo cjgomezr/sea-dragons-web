@@ -1,9 +1,10 @@
+import type { AuditLogWriter } from "@/lib/audit/audit-log";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type {
   RoleRequestGateways,
   RoleRequestMember,
 } from "@/lib/auth/role-request";
-import { hasCapability } from "@/lib/auth/roles";
+import { type Role, hasCapability } from "@/lib/auth/roles";
 import type { MemberGroupsGateway } from "@/lib/groups/member-groups";
 
 /**
@@ -64,8 +65,12 @@ export type NewsPost = {
 };
 
 /** Lo que recibe quien abre una publicación. Ni el club ni la audiencia: a
- * qué otros grupos iba no es asunto de quien la lee. */
-export type NewsPostDetail = Omit<NewsPost, "clubId" | "audience">;
+ * qué otros grupos iba no es asunto de quien la lee. `canManage` dice si
+ * quien la abre puede editarla y retirarla (#331), para que la pantalla no
+ * tenga que repetir la regla. */
+export type NewsPostDetail = Omit<NewsPost, "clubId" | "audience"> & {
+  readonly canManage: boolean;
+};
 
 /** Lo que manda quien publica, tal como llega. */
 export type NewsDraft = {
@@ -88,6 +93,8 @@ export type NewsFeedRow = {
   readonly body: string;
   readonly author: NewsAuthor;
   readonly publishedAt: string;
+  /** Retirada sólo le llega a quien la publicó (#331). */
+  readonly status: NewsPostStatus;
   readonly attachmentCount: number;
 };
 
@@ -101,10 +108,25 @@ export type NewsFeedPosition = {
 
 export type NewsFeedQuery = {
   readonly clubId: string;
+  /** Quien lee: lo suyo le llega siempre, retirado incluido (#331). */
+  readonly readerId: string;
   readonly audienceGroupIds: readonly string[];
   readonly after: NewsFeedPosition | null;
   readonly limit: number;
 };
+
+/** Una edición (#331). Sólo se escribe si la publicación sigue en
+ * `expectedEditedAt`, la edición que tenía delante quien guarda (`null` si
+ * nunca se editó): si alguien guardó entretanto, no se pisa nada. */
+export type NewsPostEdit = NewsDraft & {
+  readonly postId: string;
+  readonly clubId: string;
+  readonly expectedEditedAt: string | null;
+  readonly editedAt: string;
+};
+
+export type NewsPostUpdate =
+  { readonly kind: "updated" } | { readonly kind: "changed" };
 
 export type NewsPostsGateway = {
   /** Cuáles de estos grupos son del club. */
@@ -125,12 +147,21 @@ export type NewsPostsGateway = {
    * publicar para deshacerse cuando un adjunto no entra: retirar no borra
    * (decisión D1). */
   deletePost(postId: string): Promise<void>;
+  /** Categoría, título, cuerpo, audiencia y la marca de editada. */
+  updatePost(edit: NewsPostEdit): Promise<NewsPostUpdate>;
+  /** Retirar o volver a publicar: cambia el estado y nada más. */
+  setPostStatus(change: {
+    readonly clubId: string;
+    readonly postId: string;
+    readonly status: NewsPostStatus;
+  }): Promise<void>;
 };
 
 export type NewsGateways = {
   readonly members: RoleRequestGateways["members"];
   readonly memberGroups: MemberGroupsGateway;
   readonly posts: NewsPostsGateway;
+  readonly audit: AuditLogWriter;
 };
 
 export class NewsForbiddenError extends Error {
@@ -260,7 +291,39 @@ async function resolveAudience(
   return { kind: "groups", groupIds };
 }
 
-export function toNewsPostDetail(post: NewsPost): NewsPostDetail {
+/** El Admin, sobre cualquiera del club. */
+const MANAGES_EVERY_POST: Role = "Admin";
+
+/** Quien puede editar y retirar la publicación (#331, RF-6): el Admin
+ * cualquiera, y quien puede publicar sólo la suya. Coach y Player, ninguna,
+ * aunque alguna vez la hubieran publicado. */
+export function canManageNewsPost(
+  caller: { readonly id: string; readonly role: Role },
+  post: NewsPost,
+): boolean {
+  if (!hasCapability(caller.role, "publishNewsAndDocuments")) {
+    return false;
+  }
+  return caller.role === MANAGES_EVERY_POST || post.author.id === caller.id;
+}
+
+/** El borrador tal como se guarda, o el motivo por el que no vale. Lo
+ * comparten publicar y editar (#331): una edición cumple las mismas reglas. */
+export async function normalizeNewsDraft(
+  gateways: Pick<NewsGateways, "posts">,
+  clubId: string,
+  draft: NewsDraft,
+): Promise<NewsDraft> {
+  const title = normalizeNewsTitle(draft.title);
+  const body = requireNewsBody(draft.body);
+  const audience = await resolveAudience(gateways, clubId, draft.audience);
+  return { category: draft.category, title, body, audience };
+}
+
+export function toNewsPostDetail(
+  post: NewsPost,
+  canManage: boolean,
+): NewsPostDetail {
   return {
     id: post.id,
     category: post.category,
@@ -271,6 +334,7 @@ export function toNewsPostDetail(post: NewsPost): NewsPostDetail {
     editedAt: post.editedAt,
     status: post.status,
     attachments: post.attachments,
+    canManage,
   };
 }
 
@@ -286,21 +350,10 @@ export async function prepareNewsPost(
   request: { readonly callerId: string; readonly draft: NewsDraft },
 ): Promise<NewNewsPost> {
   const caller = await findNewsPublisher(gateways, request.callerId);
-  const { draft } = request;
-  const title = normalizeNewsTitle(draft.title);
-  const body = requireNewsBody(draft.body);
-  const audience = await resolveAudience(
-    gateways,
-    caller.clubId,
-    draft.audience,
-  );
   return {
+    ...(await normalizeNewsDraft(gateways, caller.clubId, request.draft)),
     clubId: caller.clubId,
     authorId: request.callerId,
-    category: draft.category,
-    title,
-    body,
-    audience,
   };
 }
 
@@ -342,5 +395,8 @@ export async function openNewsPost(
   if (post === null || !isVisibleTo(post, { id: request.callerId, groupIds })) {
     throw new NewsPostNotFoundError();
   }
-  return toNewsPostDetail(post);
+  return toNewsPostDetail(
+    post,
+    canManageNewsPost({ id: request.callerId, role: caller.role }, post),
+  );
 }

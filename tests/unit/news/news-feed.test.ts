@@ -70,6 +70,7 @@ describe("el feed de cada miembro", () => {
     expect(club.feedQueries).toEqual([
       {
         clubId: CLUB_ID,
+        readerId: CALLER_ID,
         audienceGroupIds: [SENIOR_SQUAD_ID],
         after: null,
         limit: NEWS_FEED_PAGE_SIZE + 1,
@@ -89,6 +90,26 @@ describe("el feed de cada miembro", () => {
     const feed = await listNewsFeed(club.gateways, { callerId: CALLER_ID });
 
     expect(feed.posts.map((post) => post.id)).toEqual([postId(1)]);
+  });
+
+  it("a quien publicó le trae también lo suyo retirado, marcado como tal (#331)", async () => {
+    const own = { id: CALLER_ID, fullName: "Quien llama" };
+    const club = fakeClub({
+      posts: [
+        postAtMinute(1),
+        postAtMinute(2, { status: "withdrawn", author: own }),
+        postAtMinute(3, { status: "withdrawn" }),
+      ],
+    });
+
+    const feed = await listNewsFeed(club.gateways, { callerId: CALLER_ID });
+
+    expect(
+      feed.posts.map((post) => ({ id: post.id, status: post.status })),
+    ).toEqual([
+      { id: postId(2), status: "withdrawn" },
+      { id: postId(1), status: "published" },
+    ]);
   });
 
   it("ordena de la más reciente a la más antigua", async () => {
@@ -132,6 +153,7 @@ describe("el feed de cada miembro", () => {
         excerpt: "Horario nuevo.",
         author: AUTHOR,
         publishedAt: "2026-09-26T10:01:00.000000+00:00",
+        status: "published",
         attachmentCount: 2,
       },
     ]);

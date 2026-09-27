@@ -238,5 +238,7 @@ export async function publishNewsPostWithUploads(
   const attachments = await attachUploads(gateways, post, uploads);
   await removePublishedUploads(gateways, uploads);
   await sweepStaleUploads(gateways, publisher, request.now);
-  return { ...toNewsPostDetail(post), attachments };
+  // Quien publica es su autor, y publicar ya exigía poder hacerlo: la puede
+  // editar y retirar.
+  return { ...toNewsPostDetail(post, true), attachments };
 }

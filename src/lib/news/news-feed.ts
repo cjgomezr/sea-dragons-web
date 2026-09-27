@@ -5,6 +5,7 @@ import {
   type NewsFeedPosition,
   type NewsFeedRow,
   type NewsGateways,
+  type NewsPostStatus,
   findNewsReader,
   findReaderGroupIds,
 } from "./news-posts";
@@ -33,6 +34,8 @@ export type NewsFeedItem = {
   readonly excerpt: string;
   readonly author: NewsAuthor;
   readonly publishedAt: string;
+  /** Retirada sólo le llega a quien la publicó, para que la vea marcada. */
+  readonly status: NewsPostStatus;
   readonly attachmentCount: number;
 };
 
@@ -104,6 +107,7 @@ function toFeedItem(row: NewsFeedRow): NewsFeedItem {
     excerpt: excerptNewsBody(row.body),
     author: row.author,
     publishedAt: row.publishedAt,
+    status: row.status,
     attachmentCount: row.attachmentCount,
   };
 }
@@ -122,6 +126,7 @@ export async function listNewsFeed(
   ]);
   const rows = await gateways.posts.findFeedPage({
     clubId: caller.clubId,
+    readerId: request.callerId,
     audienceGroupIds,
     after,
     limit: NEWS_FEED_PAGE_SIZE + 1,

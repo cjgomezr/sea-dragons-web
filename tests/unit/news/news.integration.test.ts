@@ -10,6 +10,11 @@ import {
   openNewsPost,
 } from "@/lib/news/news-posts";
 import type { NewsAttachmentGateways } from "@/lib/news/news-attachments";
+import {
+  NewsPostChangedError,
+  changeNewsPostStatus,
+  editNewsPost,
+} from "@/lib/news/news-management";
 import { publishNewsPostWithUploads } from "@/lib/news/news-uploads";
 import { createNewsAttachmentGateways } from "@/lib/news/supabase-news-attachment-gateways";
 import {
@@ -85,6 +90,11 @@ async function withAuthorPosts<T>(
   try {
     return await run();
   } finally {
+    // Editar y retirar dejan su entrada (#331); nombra al autor como actor.
+    await runSupabase(
+      "borrar la bitácora de la prueba",
+      serviceClient.client.from("audit_log").delete().eq("actor_id", authorId),
+    );
     await runSupabase(
       "borrar las publicaciones de la prueba",
       serviceClient.client
@@ -315,6 +325,7 @@ describeRls("noticias contra seadragons-dev", () => {
 
         const rows = await seeded.gateways.posts.findFeedPage({
           clubId: seeded.clubId,
+          readerId: seeded.outsider.id,
           audienceGroupIds: [],
           after: { publishedAt: newer.publishedAt, id: newer.id },
           limit: 1,
@@ -350,6 +361,143 @@ describeRls("noticias contra seadragons-dev", () => {
           .eq("author_id", seeded.admin.id);
         expect(error).toBeNull();
         expect(count).toBe(0);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "editar guarda la marca, amplía y reduce la audiencia de verdad, y la segunda edición sobre lo viejo es un conflicto (#331)",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, async (seeded) => {
+        const draft = {
+          category: "news",
+          title: "Sólo para el grupo",
+          body: "Entrenamiento extra.",
+          audience: { kind: "groups", groupIds: [seeded.squadId] },
+        } as const;
+        const post = await publishWithoutAttachments(seeded.gateways, {
+          callerId: seeded.admin.id,
+          draft,
+        });
+        const feedIdsOf = async (callerId: string): Promise<string[]> =>
+          (await listNewsFeed(seeded.gateways, { callerId })).posts.map(
+            (row) => row.id,
+          );
+
+        const widened = await editNewsPost(seeded.gateways, {
+          callerId: seeded.admin.id,
+          postId: post.id,
+          draft: {
+            ...draft,
+            title: "Para todo el club",
+            audience: { kind: "club" },
+          },
+          expectedEditedAt: null,
+          now: new Date(),
+        });
+        expect(widened.title).toBe("Para todo el club");
+        expect(widened.editedAt).not.toBeNull();
+        expect(await feedIdsOf(seeded.outsider.id)).toContain(post.id);
+
+        await expect(
+          editNewsPost(seeded.gateways, {
+            callerId: seeded.admin.id,
+            postId: post.id,
+            draft: { ...draft, title: "Pisaría a la primera" },
+            expectedEditedAt: null,
+            now: new Date(),
+          }),
+        ).rejects.toBeInstanceOf(NewsPostChangedError);
+
+        await editNewsPost(seeded.gateways, {
+          callerId: seeded.admin.id,
+          postId: post.id,
+          draft,
+          expectedEditedAt: widened.editedAt,
+          now: new Date(),
+        });
+        expect(await feedIdsOf(seeded.outsider.id)).not.toContain(post.id);
+        expect(await feedIdsOf(seeded.squadMember.id)).toContain(post.id);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "retirar la saca del feed de los demás y la deja marcada en el de quien publicó, sin avisar al volver (#331)",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, async (seeded) => {
+        const post = await publishWithoutAttachments(seeded.gateways, {
+          callerId: seeded.admin.id,
+          draft: {
+            category: "announcement",
+            title: "Se retira",
+            body: "Ya no aplica.",
+            audience: { kind: "club" },
+          },
+        });
+        const countNotifications = async (): Promise<number | null> => {
+          const { count, error } = await serviceClient.client
+            .from("notifications")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", seeded.outsider.id);
+          expect(error).toBeNull();
+          return count;
+        };
+        const notificationsBefore = await countNotifications();
+
+        await changeNewsPostStatus(seeded.gateways, {
+          callerId: seeded.admin.id,
+          postId: post.id,
+          status: "withdrawn",
+        });
+        const outsiderFeed = await listNewsFeed(seeded.gateways, {
+          callerId: seeded.outsider.id,
+        });
+        const authorFeed = await listNewsFeed(seeded.gateways, {
+          callerId: seeded.admin.id,
+        });
+        expect(outsiderFeed.posts.map((row) => row.id)).not.toContain(post.id);
+        expect(authorFeed.posts.find((row) => row.id === post.id)?.status).toBe(
+          "withdrawn",
+        );
+
+        await changeNewsPostStatus(seeded.gateways, {
+          callerId: seeded.admin.id,
+          postId: post.id,
+          status: "published",
+        });
+        const backFeed = await listNewsFeed(seeded.gateways, {
+          callerId: seeded.outsider.id,
+        });
+        expect(backFeed.posts.map((row) => row.id)).toContain(post.id);
+        expect(await countNotifications()).toBe(notificationsBefore);
+
+        const { data, error } = await serviceClient.client
+          .from("audit_log")
+          .select("action, entity_type, entity_id, metadata")
+          .eq("actor_id", seeded.admin.id)
+          .order("created_at");
+        expect(error).toBeNull();
+        expect(data).toEqual([
+          {
+            action: "news_post.withdrawn",
+            entity_type: "news_post",
+            entity_id: post.id,
+            metadata: null,
+          },
+          {
+            action: "news_post.republished",
+            entity_type: "news_post",
+            entity_id: post.id,
+            metadata: null,
+          },
+        ]);
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
