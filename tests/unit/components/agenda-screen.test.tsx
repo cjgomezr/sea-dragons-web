@@ -259,6 +259,27 @@ describe("agenda", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("tras Ver más lleva el foco al primer evento nuevo, y al abrir no lo mueve", async () => {
+    stubApi(({ url }) =>
+      url.searchParams.get("cursor") === "pagina-2"
+        ? pageResponse({ events: [SCRIMMAGE], nextCursor: null })
+        : pageResponse({ events: [POOL_TRAINING], nextCursor: "pagina-2" }),
+    );
+    render(<AgendaScreen locale="en" />);
+    await findRow(POOL_TRAINING.title);
+    expect(
+      screen.getByRole("heading", { name: POOL_TRAINING.title }),
+    ).not.toHaveFocus();
+
+    await userEvent.click(screen.getByRole("button", { name: "See more" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: SCRIMMAGE.title }),
+      ).toHaveFocus(),
+    );
+  });
+
   it("no ofrece Ver más en la última página", async () => {
     stubAgenda([POOL_TRAINING]);
 
@@ -498,6 +519,29 @@ describe("RSVP en la fila", () => {
     await userEvent.click(rsvpButton(row, "No"));
 
     await waitFor(() => expect(rsvpRequests(POOL_TRAINING)).toHaveLength(2));
+  });
+
+  it("con un 422 de evento cancelado dice que se canceló", async () => {
+    stubApi(({ method }) =>
+      method === "PUT"
+        ? jsonResponse(422, {
+            error: {
+              code: "business_rule",
+              message: "El evento está cancelado: ya no se puede responder.",
+              reason: "rsvp_event_cancelled",
+            },
+          })
+        : pageResponse({ events: [SCRIMMAGE], nextCursor: null }),
+    );
+    render(<AgendaScreen locale="en" />);
+    const row = await findRow(SCRIMMAGE.title);
+
+    await userEvent.click(rsvpButton(row, "Yes"));
+
+    expect(await within(row).findByRole("alert")).toHaveTextContent(
+      "This event was cancelled, so you can't answer anymore.",
+    );
+    expect(rsvpButton(row, "Yes")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("dice el error de RSVP en español", async () => {

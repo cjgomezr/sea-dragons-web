@@ -129,7 +129,7 @@ const SHORT_WEEKDAY_FORMATTERS = calendarDayPartFormatters({
 const TWO_DIGIT_DAY_FORMATTERS = calendarDayPartFormatters({ day: "2-digit" });
 const SHORT_MONTH_FORMATTERS = calendarDayPartFormatters({ month: "short" });
 
-/** Un día sin hora partido en "Tue", "23" y "Jun" ("mar", "23", "jun"). */
+/** Un día sin hora partido en "Tue", "23" y "June" ("mar", "23", "jun"). */
 export function formatCalendarDayParts(
   locale: Locale,
   isoDate: string,

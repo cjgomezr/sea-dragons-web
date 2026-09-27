@@ -9840,6 +9840,7 @@ test.describe("editar y retirar en el navegador", () => {
     });
   });
 });
+
 // La agenda del Calendario (#311). La API se sirve desde el test con el
 // contrato de #308 y #309, así la captura no depende de los eventos que haya
 // en la base de desarrollo.
