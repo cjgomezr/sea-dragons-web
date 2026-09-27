@@ -267,7 +267,8 @@ export function findRatingsIssues(
 }
 
 /** Quien pide, si es personal de entrenamiento. Lo usa también el catálogo de
- * categorías, que el SRD deja configurar a los mismos (FR-053). */
+ * categorías, que el SRD deja configurar a los mismos (FR-053), y la lista
+ * de la pantalla (#322). */
 export async function findEvaluatorActor(
   gateways: Pick<MemberEvaluationGateways, "members">,
   callerId: string,

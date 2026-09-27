@@ -13,6 +13,8 @@ import {
   refreshMemberEvaluation,
   saveEvaluationRatings,
 } from "@/lib/evaluations/member-evaluation";
+import { listEvaluationRoster } from "@/lib/evaluations/evaluation-roster";
+import { createEvaluationRosterGateways } from "@/lib/evaluations/supabase-evaluation-roster-gateways";
 import { createEvaluationCategoriesGateways } from "@/lib/evaluations/supabase-evaluation-categories-gateways";
 import { createMemberEvaluationGateways } from "@/lib/evaluations/supabase-member-evaluation-gateways";
 import {
@@ -307,6 +309,39 @@ describeRls("la evaluación de un miembro en Supabase", () => {
             ratings: [],
           }),
         );
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS * 2,
+  );
+
+  it(
+    "la lista del club trae a cada miembro con su OVR en una consulta (#322)",
+    async () => {
+      await withCoachAndPlayer(async ({ coach, player }) => {
+        const serviceClient = createServiceRoleTestClient(process.env);
+        await createMemberEvaluation(
+          createMemberEvaluationGateways(serviceClient.client),
+          { callerId: coach.id, memberId: player.id },
+        );
+
+        const roster = await listEvaluationRoster(
+          createEvaluationRosterGateways(serviceClient.client),
+          coach.id,
+        );
+
+        expect(roster.members).toEqual([
+          {
+            status: "not_evaluated",
+            userId: coach.id,
+            fullName: "Socia Coach de prueba",
+          },
+          {
+            status: "evaluated",
+            userId: player.id,
+            fullName: "Socia Player de prueba",
+            overallRating: 5,
+          },
+        ]);
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS * 2,

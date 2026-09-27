@@ -248,7 +248,8 @@ export const EVALUATIONS_PATH = "/evaluaciones";
  * Player o un Committee no ven ninguna, ni la propia (FR-055). Va fuera de
  * `MEMBERS_API_PATH`, que es sólo del Admin, porque un Coach también evalúa.
  * El handler lo vuelve a comprobar. La de un miembro cuelga en `[id]`, que
- * es su `user_id`: GET la lee, POST la crea y PUT guarda sus valoraciones. */
+ * es su `user_id`: GET la lee, POST la crea y PUT guarda sus valoraciones.
+ * GET sobre el camino a secas es la lista de la pantalla (#322). */
 export const EVALUATIONS_API_PATH = "/api/v1/evaluations";
 
 /** El catálogo de categorías del club (#320, RF-3 del PRD de E9). GET lo
