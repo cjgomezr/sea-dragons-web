@@ -9,6 +9,7 @@ import {
   EMAIL_CONFIRMATION_PATH,
   EVALUATIONS_PATH,
   EVENTS_MANAGE_API_PATH,
+  EVENT_RSVP_API_PATH,
   GROUPS_API_PATH,
   GROUPS_PATH,
   GUARDIAN_CONSENT_API_PATH,
@@ -849,6 +850,26 @@ describe("frontera de crear eventos (#307)", () => {
   it("responde 401 sin sesión", () => {
     expect(
       decideSessionBoundary({ pathname: EVENTS_MANAGE_API_PATH, ...ANONYMOUS }),
+    ).toEqual({ kind: "unauthenticated" });
+  });
+});
+
+/** Un evento cualquiera, en el segmento dinámico del RSVP (#308). */
+const EVENT_RSVP = EVENT_RSVP_API_PATH.replace(
+  "[id]",
+  "e1e1e1e1-0000-4000-8000-00000000000e",
+);
+
+describe("frontera del RSVP (#308)", () => {
+  it.each(ROLES)("deja responder a un %s", (role) => {
+    expect(
+      decideSessionBoundary({ pathname: EVENT_RSVP, ...activeAs(role) }),
+    ).toEqual(ALLOW);
+  });
+
+  it("responde 401 sin sesión", () => {
+    expect(
+      decideSessionBoundary({ pathname: EVENT_RSVP, ...ANONYMOUS }),
     ).toEqual({ kind: "unauthenticated" });
   });
 });

@@ -264,6 +264,17 @@ export const NEWS_ATTACHMENT_API_PATH = `${NEWS_POST_API_PATH}/attachments/[atta
  * de la serie. */
 export const EVENTS_MANAGE_API_PATH = "/api/v1/events/manage";
 
+/** Los eventos que ve quien llama: el camino de lectura, que completa la
+ * agenda de #309. Lo alcanza cualquier cuenta activa, así que no aparece en
+ * `RESTRICTED_ROUTES`: qué eventos ve cada uno lo decide su audiencia. */
+export const EVENTS_API_PATH = "/api/v1/events";
+
+/** Responder a un evento (#308, RF-5). `[id]` es el de la ocurrencia. Cuelga
+ * del camino de lectura y no de `EVENTS_MANAGE_API_PATH`: responde cualquier
+ * miembro de la audiencia, sea cual sea su rol (B7), y quien está fuera
+ * recibe 404. */
+export const EVENT_RSVP_API_PATH = `${EVENTS_API_PATH}/[id]/rsvp`;
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 

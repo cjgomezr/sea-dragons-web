@@ -9,7 +9,14 @@ import {
   EventsForbiddenError,
 } from "./event-creation";
 import { ISO_WEEKDAYS } from "./event-occurrences";
+import {
+  EventNotFoundError,
+  type EventRsvpGateways,
+  RSVP_RESPONSES,
+  RsvpClosedError,
+} from "./event-rsvp";
 import { createSupabaseEventGateways } from "./supabase-event-gateways";
+import { createSupabaseEventRsvpGateways } from "./supabase-event-rsvp-gateways";
 
 /**
  * Lo que comparten los endpoints de eventos (#307): cómo se cablean, la forma
@@ -63,9 +70,39 @@ export function requireEventGateways(): EventGateways {
   return wiring.gateways;
 }
 
+export const eventRsvpSchema = z.object({
+  response: z.enum(RSVP_RESPONSES),
+});
+
+/** Un id que no es uuid no puede ser el de ningún evento: 404, sin preguntarle
+ * a Postgres, que lo rechazaría con un error de tipo. */
+export function readEventId(value: string): string {
+  if (!z.uuid().safeParse(value).success) {
+    throw new ApiError("not_found", new EventNotFoundError().message);
+  }
+  return value;
+}
+
+export function requireEventRsvpGateways(): EventRsvpGateways {
+  const wiring = createSupabaseEventRsvpGateways(process.env);
+  if (wiring.kind === "unconfigured") {
+    throw new ApiError(
+      "service_unavailable",
+      describeMissingAuthKeys(wiring.missingKeys),
+    );
+  }
+  return wiring.gateways;
+}
+
 export function asEventsApiError(error: unknown): never {
   if (error instanceof EventValidationError) {
     throw new ApiError("business_rule", error.message, error.code);
+  }
+  if (error instanceof RsvpClosedError) {
+    throw new ApiError("business_rule", error.message, error.code);
+  }
+  if (error instanceof EventNotFoundError) {
+    throw new ApiError("not_found", error.message);
   }
   if (error instanceof EventsForbiddenError) {
     throw new ApiError("forbidden", error.message);
