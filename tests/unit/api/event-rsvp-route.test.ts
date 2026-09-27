@@ -14,7 +14,7 @@ import {
 /**
  * El endpoint de RSVP (#308, RF-5 del PRD de E7). Qué decide cada caso lo
  * prueba el dominio; aquí se prueba que cada uno sale con su código de la
- * convención: 200, 400, 401, 404 y 422.
+ * convención: 200, 400, 401, 403, 404 y 422.
  */
 
 const ORIGIN = "http://localhost:3417";
@@ -126,6 +126,14 @@ describe("endpoint de RSVP", () => {
     const response = await respond({ response: "yes" });
 
     await expectError(response, 401, { code: "unauthenticated" });
+  });
+
+  it("responde 403 a una sesión sin fila de miembro", async () => {
+    mockWiring({ callerIsMember: false });
+
+    const response = await respond({ response: "yes" });
+
+    await expectError(response, 403, { code: "forbidden" });
   });
 
   it("responde 404 a un id que no es un uuid", async () => {
