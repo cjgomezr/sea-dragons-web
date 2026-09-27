@@ -201,6 +201,12 @@ export const NEWS_POST_PATH = `${NEWS_PATH}/[id]`;
  * `RESTRICTED_ROUTES`, y el botón que lleva a él no es la defensa. */
 export const NEWS_PUBLISH_PATH = `${NEWS_PATH}/publicar`;
 
+/** Editar una publicación (#331), abierto desde la publicación. Casa con
+ * `NEWS_POST_PATH`, que es de todos: por eso se declara en
+ * `RESTRICTED_ROUTES`. Que sea suya, o que quien la abre sea Admin, lo decide
+ * el endpoint. */
+export const NEWS_EDIT_PATH = `${NEWS_POST_PATH}/editar`;
+
 /** El feed de noticias (#327, RF-4 del PRD de E11). Lo alcanza cualquier
  * cuenta activa, de cualquier rol, así que no aparece en
  * `RESTRICTED_ROUTES`: qué publicaciones ve cada uno lo decide el servidor
@@ -215,6 +221,14 @@ export const NEWS_POST_API_PATH = `${NEWS_API_PATH}/[id]`;
  * propio y no en el POST del feed porque la frontera decide por camino, no
  * por método, y el feed es de todos. */
 export const NEWS_PUBLISH_API_PATH = `${NEWS_API_PATH}/publish`;
+
+/** Editar una publicación (#331, RF-6): GET da lo que carga el formulario y
+ * PATCH guarda. Cuelga de publicar, así que es sólo de Admin y Committee; el
+ * dominio exige además que sea suya, salvo al Admin. */
+export const NEWS_POST_MANAGE_API_PATH = `${NEWS_PUBLISH_API_PATH}/[id]`;
+
+/** Retirar o volver a publicar (#331): PUT con el estado. */
+export const NEWS_POST_STATUS_API_PATH = `${NEWS_POST_MANAGE_API_PATH}/status`;
 
 /** Subir un adjunto a una publicación propia (#328, RF-3). `[id]` es el de
  * la publicación. Cuelga de publicar, así que es sólo de Admin y Committee
@@ -421,5 +435,8 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
     capability: "publishNewsAndDocuments",
   },
   { path: NEWS_UPLOADS_API_PATH, capability: "publishNewsAndDocuments" },
+  { path: NEWS_POST_MANAGE_API_PATH, capability: "publishNewsAndDocuments" },
+  { path: NEWS_POST_STATUS_API_PATH, capability: "publishNewsAndDocuments" },
   { path: NEWS_PUBLISH_PATH, capability: "publishNewsAndDocuments" },
+  { path: NEWS_EDIT_PATH, capability: "publishNewsAndDocuments" },
 ];
