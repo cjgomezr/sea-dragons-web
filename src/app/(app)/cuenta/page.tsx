@@ -10,6 +10,11 @@ import {
 import { SIGN_IN_PATH } from "@/lib/auth/routes";
 import { readAuthenticatedUserId } from "@/lib/auth/session-reader";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
+import {
+  type ProfileEvaluation,
+  readProfileEvaluation,
+} from "@/lib/evaluations/profile-evaluation";
+import { createSupabaseMemberEvaluationGateways } from "@/lib/evaluations/supabase-member-evaluation-gateways";
 import { createSupabaseRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { listCountryOptions } from "@/lib/geo/countries";
 import { type MemberGroup, listMemberGroups } from "@/lib/groups/member-groups";
@@ -34,7 +39,8 @@ import { createSessionClient } from "@/lib/supabase/session-client";
  * El perfil propio (#241), que antes era Mi cuenta (#209): la ficha que el
  * miembro edita (FR-084), el rol de quien la abre, los grupos a los que
  * pertenece (#229) y, si le toca, el formulario para pedir Coach o Committee
- * (FR-010), y la foto de perfil (#245). La dirección sigue siendo `/cuenta`,
+ * (FR-010), la foto de perfil (#245) y su evaluación, o el aviso de que sólo
+ * la ve el personal de entrenamiento (#324). La dirección sigue siendo `/cuenta`,
  * la del enlace de la cabecera.
  *
  * Quién llega lo decide la frontera: cualquier cuenta activa, de cualquier
@@ -117,6 +123,28 @@ async function readPhoto({
   }
 }
 
+/** Con la llave de servicio: `authenticated` no tiene ningún privilegio sobre
+ * las evaluaciones (FR-055). El dominio comprueba el rol antes de leerla, así
+ * que a un Player o un Committee no se le lee ninguna. */
+async function readEvaluation(userId: string): Promise<ProfileEvaluation> {
+  const wiring = createSupabaseMemberEvaluationGateways(process.env);
+  if (wiring.kind === "unconfigured") {
+    throw new Error(describeMissingAuthKeys(wiring.missingKeys));
+  }
+  try {
+    return await readProfileEvaluation(wiring.gateways, {
+      callerId: userId,
+      memberId: userId,
+    });
+  } catch (error) {
+    // La misma carrera con la frontera que en `readAccount`.
+    if (error instanceof MemberNotFoundError) {
+      redirect(SIGN_IN_PATH);
+    }
+    throw error;
+  }
+}
+
 async function readAccount(userId: string): Promise<RoleRequestAccount> {
   const wiring = createSupabaseRoleRequestGateways(process.env);
   if (wiring.kind === "unconfigured") {
@@ -139,11 +167,12 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
     readRequestLocale(),
     readCallerSession(),
   ]);
-  const [account, profile, photo, groups] = await Promise.all([
+  const [account, profile, photo, groups, evaluation] = await Promise.all([
     readAccount(caller.userId),
     readProfile(caller),
     readPhoto(caller),
     readGroups(caller),
+    readEvaluation(caller.userId),
   ]);
   return (
     <ProfileScreen
@@ -154,6 +183,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
       positionOptions={profile.positionOptions}
       photoUrl={photo.photoUrl}
       groups={groups}
+      evaluation={evaluation}
       countries={listCountryOptions(locale)}
     />
   );

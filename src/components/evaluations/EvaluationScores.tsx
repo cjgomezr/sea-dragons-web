@@ -1,11 +1,8 @@
-import {
-  type MemberEvaluation,
-  RATING_MAX,
-} from "@/lib/evaluations/member-evaluation";
-import { formatOverallRating } from "@/lib/i18n/format";
+import type { MemberEvaluation } from "@/lib/evaluations/member-evaluation";
 import type { Translator } from "@/lib/i18n/translator";
 import { EvaluationRatings } from "./EvaluationRatings";
 import { EvaluationRefreshOffer } from "./EvaluationRefreshOffer";
+import { OverallScore } from "./OverallScore";
 import {
   describeEvaluationFailure,
   isStaleEvaluation,
@@ -20,36 +17,6 @@ import { type RatingsEditor, useRatingsEditor } from "./use-ratings-editor";
  */
 
 type Evaluated = Extract<MemberEvaluation, { status: "evaluated" }>;
-
-function OverallScore({
-  translate,
-  overallRating,
-}: {
-  translate: Translator;
-  overallRating: number | null;
-}): React.JSX.Element {
-  return (
-    <div className="card evaluation-overall">
-      <h3 className="evaluation-card-title">
-        {translate("evaluations.overall.title")}
-      </h3>
-      {overallRating === null ? (
-        <p className="evaluation-overall-empty">
-          {translate("evaluations.overall.noData")}
-        </p>
-      ) : (
-        <>
-          <p className="evaluation-overall-value">
-            {formatOverallRating(translate.locale, overallRating)}
-          </p>
-          <p className="evaluation-overall-scale">
-            {translate("evaluations.overall.outOf", { max: RATING_MAX })}
-          </p>
-        </>
-      )}
-    </div>
-  );
-}
 
 function SaveStatusMessage({
   translate,

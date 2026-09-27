@@ -269,6 +269,9 @@ export const englishMessages = {
   // Mis grupos (#229). Sólo los grupos propios, sin sus demás miembros.
   "account.groups.title": "My groups",
   "account.groups.empty": "You don't belong to any group yet.",
+  "account.evaluation.title": "Evaluation",
+  "account.evaluation.staffOnly":
+    "Evaluation ratings are only visible to the coaching staff.",
   "account.error.pending":
     "You already have a request waiting for an answer. Reload the page to see it.",
   "account.error.roleAlreadyHeld": "You already have that role.",
@@ -493,6 +496,8 @@ export const englishMessages = {
   "directory.mark.aufNotVerified": "AUF not verified",
   "directory.mark.aufVerified": "AUF verified",
   "directory.mark.pendingActivation": "Pending activation",
+  "directory.mark.notEvaluated": "Not evaluated",
+  "directory.mark.notEvaluatedLabel": "Not evaluated: evaluate {name}",
   "directory.error.signInRequired":
     "Your session ended. Sign in again to see the directory.",
   "directory.error.forbidden": "Your account can't see the club's directory.",
@@ -507,6 +512,9 @@ export const englishMessages = {
   "memberRecord.back": "← Back to the directory",
   "memberRecord.openLabel": "Open {name}'s record",
   "memberRecord.loading": "Loading the member's record…",
+  "memberRecord.evaluation.title": "Evaluation",
+  "memberRecord.evaluation.loading": "Loading the evaluation…",
+  "memberRecord.evaluation.open": "Open in Evaluations",
   "memberRecord.lead":
     "What only an Admin edits: the AUF registration, the date of birth and the groups.",
   "memberRecord.joinedOn": "Member since {date}",
@@ -947,6 +955,7 @@ export const englishMessages = {
   "evaluations.list.empty": "There's nobody in the club to evaluate yet.",
   "evaluations.list.noMatches": "No member matches that name.",
   "evaluations.list.notEvaluated": "Not evaluated",
+  "evaluations.notEvaluatedYet": "No evaluation yet.",
   "evaluations.list.noRatings": "No ratings yet",
   "evaluations.list.overall": "OVR {rating}",
   "evaluations.sheet.label": "Evaluation of {name}",

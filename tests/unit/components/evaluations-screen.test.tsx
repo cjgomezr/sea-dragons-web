@@ -142,8 +142,13 @@ function callsTo(method: string): readonly Call[] {
   return calls.filter((call) => call.method === method);
 }
 
-async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
-  render(<EvaluationsScreen locale={locale} />);
+async function renderScreen(
+  locale: "en" | "es" = "en",
+  initialMemberId: string | null = null,
+): Promise<void> {
+  render(
+    <EvaluationsScreen locale={locale} initialMemberId={initialMemberId} />,
+  );
   await screen.findByRole("list", { name: /members|miembros/i });
 }
 
@@ -202,7 +207,7 @@ describe("lista de evaluaciones", () => {
     };
     stubApi(() => jsonResponse(200, { data: { members: [ruby] } }));
 
-    render(<EvaluationsScreen locale="en" />);
+    render(<EvaluationsScreen locale="en" initialMemberId={null} />);
 
     const button = await screen.findByRole("button", { name: /ruby walsh/i });
     expect(button).toHaveTextContent(/no ratings yet/i);
@@ -248,7 +253,7 @@ describe("lista de evaluaciones", () => {
   it("explica que no hay nadie que evaluar con la lista vacía", async () => {
     stubApi(() => jsonResponse(200, { data: { members: [] } }));
 
-    render(<EvaluationsScreen locale="en" />);
+    render(<EvaluationsScreen locale="en" initialMemberId={null} />);
 
     expect(
       await screen.findByText(/nobody in the club to evaluate/i),
@@ -263,7 +268,7 @@ describe("lista de evaluaciones", () => {
         ? errorResponse(500, "internal_error")
         : jsonResponse(200, { data: { members: [CAMILA] } });
     });
-    render(<EvaluationsScreen locale="en" />);
+    render(<EvaluationsScreen locale="en" initialMemberId={null} />);
 
     await userEvent.click(
       await screen.findByRole("button", { name: /try again/i }),
@@ -622,11 +627,35 @@ describe("poner al día una evaluación", () => {
   });
 });
 
+describe("abrir la ficha desde el directorio (#324)", () => {
+  it("abre ya la ficha del miembro que se pide", async () => {
+    clubApi();
+
+    await renderScreen("en", MATEO.userId);
+
+    const sheet = await screen.findByRole("region", {
+      name: /evaluation of mateo ruiz/i,
+    });
+    expect(
+      await within(sheet).findByRole("button", { name: /create evaluation/i }),
+    ).toBeVisible();
+  });
+
+  it("se queda en la lista si el miembro pedido no está en ella", async () => {
+    clubApi();
+
+    await renderScreen("en", "cccccccc-0000-4000-8000-00000000000c");
+
+    expect(screen.queryByRole("region", { name: /evaluation of/i })).toBeNull();
+    expect(memberButton(/camila ortiz/i)).toBeVisible();
+  });
+});
+
 describe("permisos", () => {
   it("dice que no tiene acceso si la API responde 403", async () => {
     stubApi(() => errorResponse(403, "forbidden"));
 
-    render(<EvaluationsScreen locale="en" />);
+    render(<EvaluationsScreen locale="en" initialMemberId={null} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /only coaches and admins/i,

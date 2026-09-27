@@ -21,7 +21,9 @@ import { compareNames } from "@/lib/text/name-order";
  *
  * Lo alcanza cualquier cuenta activa, sea cual sea su rol. Lo que sí es del
  * Admin lo decide este módulo: el número de AUF con su vencimiento (BR-008) y
- * ver a los socios dados de baja (AC-040).
+ * ver a los socios dados de baja (AC-040). También lo que es del personal de
+ * entrenamiento: quién está sin evaluar (#324, RF-7 del PRD de E9), que a un
+ * Player o un Committee ni se le manda (FR-055).
  *
  * El club sale de la fila de quien pregunta y nunca de un parámetro, como en
  * el resto de las lecturas de club (NFR-009). Buscar, filtrar y ordenar se
@@ -76,6 +78,8 @@ export type DirectoryMemberRecord = {
   /** Dónde está la foto en el almacenamiento (#245). No sale nunca tal cual:
    * se sirve una dirección firmada de vida corta. */
   readonly photoPath: string | null;
+  /** Si tiene evaluación (#324). Sólo si existe: ninguna nota sale de aquí. */
+  readonly isEvaluated: boolean;
 };
 
 /** La posición tal como la pinta el directorio: sus nombres, y la pantalla
@@ -97,8 +101,14 @@ export type DirectoryMember = {
   readonly photoUrl: string | null;
 };
 
-/** Lo mismo, más el registro federativo, que sólo ve un Admin (BR-008). */
-export type AdminDirectoryMember = DirectoryMember & {
+/** Lo mismo, más si tiene evaluación, que sólo ve quien puede verlas
+ * (FR-055): así sabe a quién le falta antes de armar equipos (#324). */
+export type CoachDirectoryMember = DirectoryMember & {
+  readonly isEvaluated: boolean;
+};
+
+/** Lo del Coach, más el registro federativo, que sólo ve un Admin (BR-008). */
+export type AdminDirectoryMember = CoachDirectoryMember & {
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
   readonly isAufVerified: boolean;
@@ -107,9 +117,13 @@ export type AdminDirectoryMember = DirectoryMember & {
 
 /** La lista, marcada con quién la está viendo. Quien la consume no tiene que
  * adivinar por la presencia de un campo si le toca dibujar la columna del
- * AUF. */
+ * AUF o la marca de sin evaluar. */
 export type DirectoryListing =
   | { readonly kind: "member"; readonly members: readonly DirectoryMember[] }
+  | {
+      readonly kind: "coach";
+      readonly members: readonly CoachDirectoryMember[];
+    }
   | {
       readonly kind: "admin";
       readonly members: readonly AdminDirectoryMember[];
@@ -311,6 +325,16 @@ function toDirectoryMember(
   };
 }
 
+function toCoachDirectoryMember(
+  record: DirectoryMemberRecord,
+  context: ListingContext,
+): CoachDirectoryMember {
+  return {
+    ...toDirectoryMember(record, context),
+    isEvaluated: record.isEvaluated,
+  };
+}
+
 /** Cuándo está vencido lo decide la misma regla que la ficha del Admin. */
 function toAdminDirectoryMember(
   record: DirectoryMemberRecord,
@@ -318,7 +342,7 @@ function toAdminDirectoryMember(
   context: ListingContext,
 ): AdminDirectoryMember {
   return {
-    ...toDirectoryMember(record, context),
+    ...toCoachDirectoryMember(record, context),
     aufNumber: record.aufNumber,
     aufExpiry: record.aufExpiry,
     isAufVerified: record.isAufVerified,
@@ -364,11 +388,19 @@ export async function listDirectory(
     signedPhotos: await signListedPhotos(gateways, listed),
   };
 
-  return isAdmin
+  if (isAdmin) {
+    return {
+      kind: "admin",
+      members: listed.map((record) =>
+        toAdminDirectoryMember(record, request.todayInClub, context),
+      ),
+    };
+  }
+  return hasCapability(caller.role, "viewEvaluations")
     ? {
-        kind: "admin",
+        kind: "coach",
         members: listed.map((record) =>
-          toAdminDirectoryMember(record, request.todayInClub, context),
+          toCoachDirectoryMember(record, context),
         ),
       }
     : {
@@ -388,7 +420,12 @@ export function withMemberRole(
   function update<Member extends DirectoryMember>(member: Member): Member {
     return member.userId === userId ? { ...member, role } : member;
   }
-  return listing.kind === "admin"
-    ? { kind: "admin", members: listing.members.map(update) }
-    : { kind: "member", members: listing.members.map(update) };
+  switch (listing.kind) {
+    case "admin":
+      return { kind: "admin", members: listing.members.map(update) };
+    case "coach":
+      return { kind: "coach", members: listing.members.map(update) };
+    case "member":
+      return { kind: "member", members: listing.members.map(update) };
+  }
 }

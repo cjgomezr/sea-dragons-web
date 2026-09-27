@@ -27,8 +27,11 @@ import type { DirectoryGateways, DirectoryMemberRecord } from "./directory";
  */
 
 const MEMBERS_TABLE = "members";
+// Sólo el id de la evaluación: que exista es lo único que el directorio
+// cuenta (#324), y así ninguna nota sale de la base por este camino.
 const DIRECTORY_COLUMNS =
-  "user_id, full_name, country, experience_level, role, position_id, account_status, auf_number, auf_expiry, auf_verified_at, photo_path";
+  "user_id, full_name, country, experience_level, role, position_id, account_status, auf_number, auf_expiry, auf_verified_at, photo_path, member_evaluations(id)";
+const EVALUATIONS_RELATION = "member_evaluations";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -62,6 +65,19 @@ function readOptionalCatalogValue<T>(
     : readCatalogValue(row, column, catalog);
 }
 
+/** PostgREST sirve la evaluación como lista, igual que a la lista de
+ * Evaluaciones: la clave foránea es compuesta y no la ve como uno a uno. Una
+ * restricción única garantiza que haya como mucho una. */
+function hasEvaluation(row: Row): boolean {
+  const evaluations = row[EVALUATIONS_RELATION];
+  if (!Array.isArray(evaluations)) {
+    throw new Error(
+      `${MEMBERS_TABLE}.${EVALUATIONS_RELATION} no llegó como lista: el esquema cambió sin que este archivo se enterara.`,
+    );
+  }
+  return evaluations.length > 0;
+}
+
 function toDirectoryMemberRecord(row: Row): DirectoryMemberRecord {
   return {
     userId: readRequiredText(row, "user_id", MEMBERS_TABLE),
@@ -81,6 +97,7 @@ function toDirectoryMemberRecord(row: Row): DirectoryMemberRecord {
     aufExpiry: readText(row, "auf_expiry", MEMBERS_TABLE),
     isAufVerified: readText(row, "auf_verified_at", MEMBERS_TABLE) !== null,
     photoPath: readText(row, "photo_path", MEMBERS_TABLE),
+    isEvaluated: hasEvaluation(row),
   };
 }
 

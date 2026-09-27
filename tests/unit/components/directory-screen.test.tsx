@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DirectoryScreen } from "@/components/directory/DirectoryScreen";
 import type {
   AdminDirectoryMember,
+  CoachDirectoryMember,
   DirectoryMember,
 } from "@/lib/directory/directory";
 import {
@@ -68,6 +69,7 @@ const ZOE: AdminDirectoryMember = {
   aufExpiry: null,
   isAufVerified: false,
   isAufExpired: false,
+  isEvaluated: true,
 };
 
 const VENCIDA: AdminDirectoryMember = {
@@ -83,6 +85,7 @@ const VENCIDA: AdminDirectoryMember = {
   aufExpiry: "2020-01-31",
   isAufVerified: true,
   isAufExpired: true,
+  isEvaluated: true,
 };
 
 /** La misma socia, tal como la ve un Admin: con su registro federativo al día,
@@ -93,6 +96,7 @@ const MARIA_PARA_ADMIN: AdminDirectoryMember = {
   aufExpiry: "2030-06-30",
   isAufVerified: true,
   isAufExpired: false,
+  isEvaluated: true,
 };
 
 /** El guion que ocupa el sitio de un dato que el socio no tiene. */
@@ -101,13 +105,13 @@ const MISSING = "–";
 const DIRECTORY_PATH = "/api/v1/directory";
 const PENDING_REQUESTS_PATH = "/api/v1/role-requests?status=pending";
 
-type AnyMember = DirectoryMember | AdminDirectoryMember;
+type AnyMember = DirectoryMember | CoachDirectoryMember | AdminDirectoryMember;
 
 type ApiStub = {
   readonly members?: readonly AnyMember[];
   /** Quién mira: sólo un Admin recibe `admin`, y con él el control de los
    * dados de baja y la marca del AUF. */
-  readonly kind?: "member" | "admin";
+  readonly kind?: "member" | "coach" | "admin";
   /** Recibe el camino pedido, para poder contestar distinto según lo que se
    * preguntó (un 403 sólo a quien pide los dados de baja, por ejemplo). */
   readonly respond?: (url: string) => Response | Promise<Response>;
@@ -819,5 +823,93 @@ describe("incluir inactivos", () => {
     expect(
       within(memberRow("María Ñíguez")).queryByText("AUF expired"),
     ).toBeNull();
+  });
+});
+
+describe("marca de sin evaluar", () => {
+  const SIN_EVALUAR: CoachDirectoryMember = { ...NEREA, isEvaluated: false };
+  const EVALUADA: CoachDirectoryMember = { ...MARIA, isEvaluated: true };
+
+  it.each([
+    ["Coach", { kind: "coach", members: [EVALUADA, SIN_EVALUAR] }],
+    [
+      "Admin",
+      {
+        kind: "admin",
+        members: [
+          { ...MARIA_PARA_ADMIN, isEvaluated: true },
+          { ...ZOE, status: "active", isEvaluated: false },
+        ],
+      },
+    ],
+  ] as const)(
+    "a un %s le marca sólo a quien no tiene evaluación",
+    async (_role, stub) => {
+      stubApi(stub);
+
+      await renderScreen();
+
+      const unevaluated = stub.members[1].fullName;
+      expect(
+        within(memberRow(unevaluated)).getByRole("link", {
+          name: `Not evaluated: evaluate ${unevaluated}`,
+        }),
+      ).toBeVisible();
+      expect(
+        within(memberRow("María Ñíguez")).queryByText("Not evaluated"),
+      ).toBeNull();
+    },
+  );
+
+  it("la marca lleva a la evaluación de esa persona", async () => {
+    stubApi({ kind: "coach", members: [SIN_EVALUAR] });
+
+    await renderScreen();
+
+    expect(
+      within(memberRow("Nerea Ruiz")).getByRole("link", {
+        name: /Not evaluated/,
+      }),
+    ).toHaveAttribute("href", `/evaluaciones?miembro=${NEREA.userId}`);
+  });
+
+  it("no marca a un dado de baja: no se le puede crear evaluación", async () => {
+    stubApi({
+      // Sin pedir los dados de baja: aquí sólo importa cómo se pinta la fila.
+      respond: () =>
+        jsonResponse(200, {
+          data: { kind: "admin", members: [{ ...ZOE, isEvaluated: false }] },
+        }),
+    });
+
+    await renderScreen();
+
+    expect(
+      within(memberRow("Zoe Zapata")).getByText("Deactivated"),
+    ).toBeVisible();
+    expect(
+      within(memberRow("Zoe Zapata")).queryByText("Not evaluated"),
+    ).toBeNull();
+  });
+
+  it("a un Player o un Committee no le enseña ninguna marca de evaluación", async () => {
+    stubApi({ kind: "member", members: [MARIA, NEREA] });
+
+    await renderScreen();
+
+    expect(screen.queryByText("Not evaluated")).toBeNull();
+    expect(screen.queryByRole("link", { name: /evaluate/i })).toBeNull();
+  });
+
+  it("se escribe en español", async () => {
+    stubApi({ kind: "coach", members: [SIN_EVALUAR] });
+
+    await renderScreen("es");
+
+    expect(
+      within(memberRow("Nerea Ruiz")).getByRole("link", {
+        name: "Sin evaluar: evaluar a Nerea Ruiz",
+      }),
+    ).toHaveTextContent("Sin evaluar");
   });
 });

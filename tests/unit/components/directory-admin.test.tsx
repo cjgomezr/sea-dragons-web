@@ -41,6 +41,7 @@ const NEREA: AdminDirectoryMember = {
   aufExpiry: null,
   isAufVerified: false,
   isAufExpired: false,
+  isEvaluated: true,
 };
 
 const ANA: AdminDirectoryMember = {
@@ -56,6 +57,7 @@ const ANA: AdminDirectoryMember = {
   aufExpiry: "2030-06-30",
   isAufVerified: true,
   isAufExpired: false,
+  isEvaluated: true,
 };
 
 const COACH_REQUEST: PendingRoleRequest = {
@@ -574,6 +576,7 @@ const VENCIDA: AdminDirectoryMember = {
   aufExpiry: "2020-01-31",
   isAufVerified: true,
   isAufExpired: true,
+  isEvaluated: true,
 };
 
 function memberRow(name: string): HTMLElement {

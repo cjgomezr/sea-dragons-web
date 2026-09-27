@@ -12,13 +12,14 @@ import {
   loadMemberRecord,
 } from "./member-record-client";
 import { InvitationResend } from "./InvitationResend";
+import { MemberRecordEvaluation } from "./MemberRecordEvaluation";
 import { MemberRecordForm } from "./MemberRecordForm";
 import { MemberStatusControl } from "./MemberStatusControl";
 
 /**
  * La ficha reservada al Admin de un miembro (#242, RF-4 del PRD de E5), que se
  * abre desde su fila del directorio: su número de AUF, su vencimiento y sus
- * grupos.
+ * grupos, y su evaluación para leer (#324).
  *
  * La frontera ya mandó al panel a quien no es Admin; si alguien deja de serlo
  * con la pantalla abierta, el 403 del endpoint lo dice aquí. Es de cliente
@@ -112,6 +113,9 @@ export function MemberRecordScreen({
             })}
           />
         </section>
+      ) : null}
+      {state.kind === "loaded" ? (
+        <MemberRecordEvaluation translate={translate} userId={userId} />
       ) : null}
       {state.kind === "loaded" ? (
         <MemberStatusControl

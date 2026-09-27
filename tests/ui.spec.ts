@@ -2608,6 +2608,61 @@ test.describe("Mi cuenta de un Player sin solicitudes", () => {
   }
 });
 
+/* ---------------------------------------------------------------------------
+   Notas privadas en el perfil (#324, RF-5 del PRD de E9). El perfil se pinta
+   en el servidor con los datos de verdad, así que esto va con las sesiones
+   sembradas: un Player ve el aviso y ninguna nota, y la API tampoco le da la
+   suya. Las capturas del perfil de un Player (`perfil-*`) ya lo enseñan.
+   --------------------------------------------------------------------------- */
+
+const STAFF_ONLY_NOTICE =
+  "Evaluation ratings are only visible to the coaching staff.";
+
+test.describe("notas privadas en el perfil de un Player", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("ve el aviso y ninguna nota, ni la suya", async ({ page }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+
+    const section = page.getByRole("region", { name: "Evaluation" });
+    await expect(section.getByText(STAFF_ONLY_NOTICE)).toBeVisible();
+    await expect(page.getByText("Overall score")).toHaveCount(0);
+    await expect(page.getByRole("list", { name: "Skill ratings" })).toHaveCount(
+      0,
+    );
+  });
+
+  test("en español, el aviso sale en español", async ({ page }) => {
+    await chooseSpanish(page);
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+
+    await expect(
+      page
+        .getByRole("region", { name: "Evaluación" })
+        .getByText(
+          "Las notas de las evaluaciones solo las ve el personal de entrenamiento.",
+        ),
+    ).toBeVisible();
+  });
+
+  test("la API le responde 403 cuando pide su propia evaluación", async ({
+    request,
+  }) => {
+    if (E2E_SESSION.kind !== "available") {
+      throw new Error("Sin sesión sembrada, este test no debería correr.");
+    }
+    // Todas las identidades del arranque, y entre ellas la de esta sesión.
+    for (const userId of E2E_SESSION.userIds) {
+      const response = await request.get(
+        `${APP_URL}/api/v1/evaluations/${userId}`,
+      );
+      expect(response.status(), userId).toBe(403);
+    }
+  });
+});
+
 test.describe("Mi cuenta con grupos", () => {
   skipWithoutSession();
   quietNotificationBell();
@@ -2975,6 +3030,21 @@ const ADMIN_STORAGE_STATE = roleRequestStorageStatePath(
    endpoints de verdad responden se prueba aparte, con la sesión del Admin
    sembrado.
    --------------------------------------------------------------------------- */
+
+test.describe("la evaluación en el perfil de un Admin", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("ve la sección de su evaluación, sin el aviso", async ({ page }) => {
+    await page.goto(`${APP_URL}${ACCOUNT_PATH}`);
+
+    await expect(
+      page.getByRole("region", { name: "Evaluation" }),
+    ).toBeVisible();
+    await expect(page.getByText(STAFF_ONLY_NOTICE)).toHaveCount(0);
+  });
+});
 
 const GROUPS_SCREEN_PATH = "/grupos";
 const GROUPS_ENDPOINT = "/api/v1/groups";
@@ -3378,12 +3448,26 @@ const EXPIRED_AUF_MEMBER_ID = "11111111-0000-4000-8000-000000000001";
  * (#274): así la captura del Admin enseña las tres marcas. */
 const UNVERIFIED_AUF_MEMBER_ID = "33333333-0000-4000-8000-000000000003";
 
+/** Quien no tiene evaluación en las listas fijas (#324): los dos nombres más
+ * largos, para que la marca se mida en las tarjetas más estrechas. */
+const UNEVALUATED_MEMBER_IDS: ReadonlySet<string> = new Set([
+  "44444444-0000-4000-8000-000000000004",
+  "66666666-0000-4000-8000-000000000006",
+]);
+
+/** La vista del Coach: la de todos, más si tiene evaluación (#324). */
+function asCoachMember(member: {
+  readonly userId: string;
+}): Record<string, unknown> {
+  return { ...member, isEvaluated: !UNEVALUATED_MEMBER_IDS.has(member.userId) };
+}
+
 function asAdminMember(member: {
   readonly userId: string;
 }): Record<string, unknown> {
   const isAufExpired = member.userId === EXPIRED_AUF_MEMBER_ID;
   return {
-    ...member,
+    ...asCoachMember(member),
     aufNumber: `AUF-${member.userId.slice(0, 2)}`,
     aufExpiry: isAufExpired ? "2020-01-31" : "2030-06-30",
     isAufVerified: member.userId !== UNVERIFIED_AUF_MEMBER_ID,
@@ -3408,15 +3492,36 @@ type StubbedMember = Omit<
 /** Lo que el endpoint de #238 hace con la consulta, reducido a lo que estas
  * capturas necesitan distinguir. El orden lo decide el servidor, así que la
  * lista sale en el orden en que está escrita, que ya es el alfabético. */
+/** Cómo sirve el endpoint la lista a cada rol: sólo un Admin recibe la suya,
+ * y un Coach la de todos con la marca de evaluación (#324). */
+function listingKindOf(options: {
+  readonly asAdmin: boolean;
+  readonly asCoach?: boolean;
+}): "admin" | "coach" | "member" {
+  if (options.asAdmin) {
+    return "admin";
+  }
+  return options.asCoach === true ? "coach" : "member";
+}
+
+const LISTING_MEMBER_VIEWS = {
+  admin: asAdminMember,
+  coach: asCoachMember,
+  member: (member: { readonly userId: string }): Record<string, unknown> => ({
+    ...member,
+  }),
+} as const;
+
 function stubbedListing(
   searchParams: URLSearchParams,
   options: {
     readonly asAdmin: boolean;
+    readonly asCoach?: boolean;
     readonly withPhoto: boolean;
     readonly members: readonly StubbedMember[];
   },
 ): Record<string, unknown> {
-  const { asAdmin } = options;
+  const kind = listingKindOf(options);
   const search = searchParams.get("q");
   const role = searchParams.get("role");
   const includeInactive = searchParams.get("includeInactive") === "true";
@@ -3432,10 +3537,7 @@ function stubbedListing(
       ? { ...member, photoUrl: STUBBED_PHOTO_URL }
       : member,
   );
-  return {
-    kind: asAdmin ? "admin" : "member",
-    members: asAdmin ? listed.map(asAdminMember) : listed,
-  };
+  return { kind, members: listed.map(LISTING_MEMBER_VIEWS[kind]) };
 }
 
 const MEMBERS_ENDPOINT = "/api/v1/members";
@@ -3501,6 +3603,7 @@ async function stubDirectoryReads(
   page: Page,
   options: {
     readonly asAdmin: boolean;
+    readonly asCoach?: boolean;
     readonly withRequests?: boolean;
     readonly withPhoto?: boolean;
     readonly members?: readonly StubbedMember[];
@@ -3522,6 +3625,7 @@ async function stubDirectoryReads(
         body: JSON.stringify({
           data: stubbedListing(new URL(request.url()).searchParams, {
             asAdmin: options.asAdmin,
+            asCoach: options.asCoach,
             withPhoto,
             members: options.members ?? STUBBED_DIRECTORY_MEMBERS,
           }),
@@ -3711,6 +3815,8 @@ type DirectoryState = {
   /** Un Admin recibe la lista marcada como suya, y con ella el control de los
    * dados de baja y la marca del AUF vencido. */
   readonly asAdmin: boolean;
+  /** Un Coach recibe la lista con la marca de sin evaluar (#324). */
+  readonly asCoach?: boolean;
   /** Sólo cuenta para un Admin, que es a quien se le carga la bandeja. */
   readonly withRequests?: boolean;
   /** Una de las filas sale con foto en vez de iniciales (#245). */
@@ -3833,6 +3939,19 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     name: "directorio-admin-sin-solicitudes",
     asAdmin: true,
     listHeading: ENGLISH_DIRECTORY_HEADING,
+  },
+  {
+    name: "directorio-coach-sin-evaluar",
+    asAdmin: false,
+    asCoach: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+  },
+  {
+    name: "directorio-coach-sin-evaluar-es",
+    asAdmin: false,
+    asCoach: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
   },
   {
     name: "directorio-admin-ultimo-admin",
@@ -4096,10 +4215,11 @@ const SINGLE_LINE_NAME_HEIGHT = 24;
 
 async function goToNarrowDirectory(
   page: Page,
-  options: { readonly asAdmin: boolean },
+  options: { readonly asAdmin: boolean; readonly asCoach?: boolean },
 ): Promise<void> {
   await stubDirectoryReads(page, {
     asAdmin: options.asAdmin,
+    asCoach: options.asCoach,
     members: NARROW_DIRECTORY_MEMBERS,
   });
   await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
@@ -4203,6 +4323,26 @@ test.describe("el directorio en pantalla estrecha (#283)", () => {
     expect(await wordsSplitAcrossLines(page)).toEqual([]);
   });
 
+  test("la marca de sin evaluar cabe entera y no parte ninguna palabra (#324)", async ({
+    page,
+  }) => {
+    await goToNarrowDirectory(page, { asAdmin: false, asCoach: true });
+    const card = page.getByRole("row", { name: VERY_LONG_MEMBER_NAME });
+    const mark = card.getByRole("link", { name: /^Not evaluated/ });
+    await expect(mark).toBeVisible();
+
+    const markBox = await mark.boundingBox();
+    const cardBox = await card.boundingBox();
+    if (markBox === null || cardBox === null) {
+      throw new Error("La marca de sin evaluar no se pintó.");
+    }
+    expect(markBox.x + markBox.width).toBeLessThanOrEqual(
+      cardBox.x + cardBox.width,
+    );
+    expect(await wordsSplitAcrossLines(page)).toEqual([]);
+    expect(await hasHorizontalScroll(page)).toBe(false);
+  });
+
   test("un nombre larguísimo se parte entre palabras sin desbordar la tarjeta", async ({
     page,
   }) => {
@@ -4296,6 +4436,23 @@ test.describe("el directorio en pantalla estrecha (#283)", () => {
         .getByRole("row", { name: "Mateo Restrepo" })
         .getByRole("cell", { name: "Coach", exact: true }),
     ).toBeVisible();
+  });
+
+  test("la marca de sin evaluar lleva a la evaluación de esa persona (#324)", async ({
+    page,
+  }) => {
+    await goToNarrowDirectory(page, { asAdmin: false, asCoach: true });
+
+    await page
+      .getByRole("row", { name: LONG_MEMBER_NAME })
+      .getByRole("link", {
+        name: `Not evaluated: evaluate ${LONG_MEMBER_NAME}`,
+      })
+      .click();
+
+    await expect(page).toHaveURL(
+      new RegExp(`/evaluaciones\\?miembro=${MEMBER_WITHOUT_DATA.userId}$`),
+    );
   });
 
   for (const width of [320, 375, 768]) {
@@ -4538,6 +4695,28 @@ test.describe("un Player frente al directorio", () => {
 const RECORD_MEMBER_ID = MEMBER_WITHOUT_DATA.userId;
 const MEMBER_RECORD_SCREEN_PATH = `${DIRECTORY_SCREEN_PATH}/${RECORD_MEMBER_ID}`;
 const MEMBER_RECORD_ENDPOINT = `/api/v1/members/${RECORD_MEMBER_ID}/record`;
+const MEMBER_RECORD_EVALUATION_ENDPOINT = `/api/v1/evaluations/${RECORD_MEMBER_ID}`;
+const MEMBER_RECORD_RATINGS = /^(Skill ratings|Valoraciones)$/;
+
+/** Tres categorías bastan para ver la sección (#324): la pantalla entera de
+ * Evaluaciones ya tiene sus propias capturas con las diez. */
+const STUBBED_RECORD_EVALUATION = {
+  status: "evaluated",
+  memberId: RECORD_MEMBER_ID,
+  updatedAt: "2026-09-27T01:02:03.123456+00:00",
+  overallRating: 7.7,
+  ratings: [
+    ["Fitness", 8],
+    ["Speed", 7],
+    ["Teamwork", 8],
+  ].map(([name, rating], index) => ({
+    categoryId: `ca7e0000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    name,
+    rating,
+    isRetired: false,
+  })),
+  isCurrent: true,
+} as const;
 const CLUB_GROUPS_ENDPOINT = "/api/v1/groups";
 
 const STUBBED_CLUB_GROUPS = [
@@ -4670,6 +4849,15 @@ async function stubMemberRecordReads(
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({ data: { groups: STUBBED_CLUB_GROUPS } }),
+      }),
+  );
+  await page.route(
+    (url) => url.pathname === MEMBER_RECORD_EVALUATION_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: STUBBED_RECORD_EVALUATION }),
       }),
   );
   // Guardar sólo se prueba en la captura del aviso, así que el PATCH fingido
@@ -4871,6 +5059,9 @@ async function goToMemberRecord(
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: state.saveLabel }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("list", { name: MEMBER_RECORD_RATINGS }),
   ).toBeVisible();
   if (state.record.photoUrl !== null) {
     await expect(
@@ -9000,6 +9191,18 @@ test.describe("evaluaciones en el navegador", () => {
 
     await expect(page.getByRole("searchbox")).toBeVisible();
     await expect(page.getByRole("list", { name: RATINGS_LIST })).toHaveCount(0);
+  });
+
+  test("con ?miembro= abre ya la ficha de esa persona (#324)", async ({
+    page,
+  }) => {
+    await stubEvaluationReads(page, STUBBED_ROSTER);
+
+    await page.goto(`${APP_URL}${EVALUATIONS_SCREEN_PATH}?miembro=${MATEO_ID}`);
+
+    await expect(
+      page.getByRole("button", { name: "Create evaluation" }),
+    ).toBeVisible();
   });
 
   test("en escritorio la lista y la ficha van lado a lado", async ({

@@ -34,6 +34,7 @@ const MARIA: DirectoryMemberRecord = {
   aufExpiry: "2020-01-31",
   isAufVerified: true,
   photoPath: null,
+  isEvaluated: true,
 };
 
 const BAJA: DirectoryMemberRecord = {
@@ -48,6 +49,7 @@ const BAJA: DirectoryMemberRecord = {
   aufExpiry: null,
   isAufVerified: false,
   photoPath: null,
+  isEvaluated: true,
 };
 
 const databaseCalls: string[] = [];

@@ -118,6 +118,7 @@ function renderScreen(
       positionOptions={options.positionOptions ?? SEEDED_POSITIONS}
       photoUrl={null}
       groups={[{ id: "g1", name: "Senior Squad" }]}
+      evaluation={{ visibility: "staff_only" }}
       countries={listCountryOptions(locale)}
     />,
   );
@@ -137,6 +138,17 @@ afterEach(() => {
 });
 
 describe("pantalla de perfil", () => {
+  it("explica a un Player que sus notas sólo las ve el personal de entrenamiento", () => {
+    renderScreen();
+
+    expect(
+      within(screen.getByRole("region", { name: "Evaluation" })).getByText(
+        "Evaluation ratings are only visible to the coaching staff.",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText("Overall score")).toBeNull();
+  });
+
   it("carga la ficha con sus valores actuales", () => {
     renderScreen();
 

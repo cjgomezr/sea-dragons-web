@@ -39,6 +39,7 @@ function memberRecord(
     aufExpiry: null,
     isAufVerified: false,
     photoPath: THUMBNAIL_PATH,
+    isEvaluated: true,
     ...overrides,
   };
 }
