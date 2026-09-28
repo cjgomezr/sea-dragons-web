@@ -34,6 +34,25 @@ function listedNames(result: RunResult): string[] {
     .map((line) => path.basename(line));
 }
 
+/** Una socia del club de la semilla con un aviso de cada tipo que añadieron
+ * las migraciones 0035, 0037 y 0042, en ese orden. */
+const NOTIFICATIONS_OF_LATER_TYPES = `
+  insert into auth.users (id) values (
+    'a0000000-0000-4000-8000-000000000001'
+  );
+  insert into public.members (user_id, club_id, email, full_name)
+  select 'a0000000-0000-4000-8000-000000000001', id, 'avisos@example.test', 'Socia con avisos'
+    from public.clubs;
+  insert into public.notifications (user_id, club_id, type)
+  select 'a0000000-0000-4000-8000-000000000001', clubs.id, tipo
+    from public.clubs,
+         unnest(array[
+           'news_post_published',
+           'event_created',
+           'event_changed'
+         ]) as tipo;
+`;
+
 const temporaryDirectories: string[] = [];
 
 async function migrationsDirectory(
@@ -331,6 +350,25 @@ describeConPostgres(
       expect(await database.query("select count(*) from public.clubs")).toBe(
         "1",
       );
+    });
+
+    it("reaplicar el histórico respeta los avisos de los tipos que admitieron migraciones posteriores", async () => {
+      // Producción, 28 de septiembre de 2026: la 0035 recreaba la restricción
+      // de tipos de `notifications` con su lista, y las filas de avisos de
+      // eventos (0037, 0042) que ya había la violaban. Sin datos, como en el
+      // test de arriba, esa clase de fallo no se ve.
+      const database = await freshDatabase();
+      const entorno = { ...process.env, DATABASE_URL: database.url };
+      const primera = await applyMigrations([], entorno);
+      expect(primera.code, primera.stderr).toBe(0);
+      await database.query(NOTIFICATIONS_OF_LATER_TYPES);
+
+      const segunda = await applyMigrations([], entorno);
+
+      expect(segunda.code, segunda.stderr).toBe(0);
+      expect(
+        await database.query("select count(*) from public.notifications"),
+      ).toBe("3");
     });
 
     it("--write regenera una descripción con la que la comparación vuelve a pasar", async () => {

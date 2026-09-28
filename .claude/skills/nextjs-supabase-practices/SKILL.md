@@ -167,6 +167,16 @@ bueno cualquier píxel que estuviera renderizando en ese momento. Si tu ticket
 no puede cerrar porque la línea base espera revisión, comenta eso en el issue
 y para ahí. Es un caso de `needs-human`, no de reintentar.
 
+**Producción reaplica el histórico entero en cada merge**
+(`migraciones-produccion.yml`), así que "idempotente" no es sólo `if not
+exists`: una migración que borra y recrea una restricción que otra posterior
+amplía tiene que saltarse cuando la vigente ya incluye lo suyo, porque la
+lista corta falla contra las filas que llegaron después. Mira el `do` de
+`0035_news_post_notifications.sql` y el guardia de
+`0016_member_profile_fields.sql`. El test de aplicar dos veces corre sobre una
+base vacía y no ve esta clase de fallo; el de los avisos en
+`apply-migrations.test.ts` sí.
+
 **El puerto es el 3417 y es estricto.** Si algo ya responde ahí, no es tu
 servidor: libéralo. Nunca apuntes los tests a otro puerto para esquivarlo.
 
