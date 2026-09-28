@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import type { AgendaEvent } from "@/lib/events/event-agenda";
+import { useEffect, useId, useRef } from "react";
+import type { AgendaEvent, AgendaPeriod } from "@/lib/events/event-agenda";
 import {
   formatCalendarDay,
   formatCalendarDayParts,
@@ -7,7 +7,9 @@ import {
 } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import { describeRsvpFailure } from "./agenda-client";
+import { EventDetailPanel } from "./EventDetailPanel";
 import { EventRsvp } from "./EventRsvp";
+import { useEventDetail } from "./use-event-detail";
 import { useEventRsvp } from "./use-event-rsvp";
 
 /**
@@ -17,7 +19,12 @@ import { useEventRsvp } from "./use-event-rsvp";
  *
  * Responde quien es de la audiencia de un evento que sigue en pie. A un
  * cancelado no se le responde, y quien organiza ve también los eventos que no
- * son para él (B7): esos no llevan botones.
+ * son para él (B7): esos no llevan botones. A un pasado tampoco (#312).
+ *
+ * El título es el botón que despliega la fila con las notas y quién va
+ * (#312, RF-8): un botón dentro del encabezado, el patrón del acordeón, así
+ * Enter y Espacio lo abren y el lector de pantalla anuncia si está
+ * desplegada. Con el ratón se pulsa en cualquier punto de la tarjeta.
  */
 
 function DateBlock({
@@ -49,18 +56,24 @@ function DateBlock({
 export function AgendaRow({
   translate,
   event,
+  period,
   shouldTakeFocus,
 }: {
   readonly translate: Translator;
   readonly event: AgendaEvent;
+  readonly period: AgendaPeriod;
   /** La primera fila de una página recién cargada: recibe el foco para que
    * quien pulsó "Ver más" siga leyendo desde ahí. */
   readonly shouldTakeFocus: boolean;
 }): React.JSX.Element {
-  const { state, respond } = useEventRsvp(event);
+  const { isExpanded, detail, toggle, retry, receive } = useEventDetail(
+    event.id,
+  );
+  const { state, respond } = useEventRsvp(event, receive);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const detailId = useId();
   const isCancelled = event.status === "cancelled";
-  const canRespond = event.inAudience && !isCancelled;
+  const canRespond = period === "upcoming" && event.inAudience && !isCancelled;
 
   useEffect(() => {
     if (shouldTakeFocus) {
@@ -74,7 +87,16 @@ export function AgendaRow({
       <div className="agenda-body">
         <div className="agenda-heading">
           <h2 ref={titleRef} className="agenda-title" tabIndex={-1}>
-            {event.title}
+            <button
+              type="button"
+              className="agenda-toggle"
+              aria-expanded={isExpanded}
+              aria-controls={detailId}
+              onClick={toggle}
+            >
+              {event.title}
+              <span className="agenda-chevron" aria-hidden="true" />
+            </button>
           </h2>
           <span className={`agenda-type agenda-type-${event.eventType}`}>
             {translate(`event.type.${event.eventType}`)}
@@ -124,6 +146,15 @@ export function AgendaRow({
             {describeRsvpFailure(translate, state.failure)}
           </p>
         )}
+        <div id={detailId} className="agenda-detail" hidden={!isExpanded}>
+          {isExpanded ? (
+            <EventDetailPanel
+              translate={translate}
+              detail={detail}
+              onRetry={retry}
+            />
+          ) : null}
+        </div>
       </div>
     </li>
   );

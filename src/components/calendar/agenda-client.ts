@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   type ApiRequestFailure,
+  type ApiRequestOutcome,
   JSON_REQUEST_HEADERS,
   readApiPayload,
   requestApi,
@@ -11,7 +12,11 @@ import {
   EVENT_RSVP_API_PATH,
 } from "@/lib/auth/routes";
 import { EVENT_TYPES } from "@/lib/events/event-creation";
-import type { AgendaPage } from "@/lib/events/event-agenda";
+import type {
+  AgendaPage,
+  AgendaPeriod,
+  NamedEventAudience,
+} from "@/lib/events/event-agenda";
 import { RSVP_RESPONSES, type RsvpResponse } from "@/lib/events/event-rsvp";
 import type { Translator } from "@/lib/i18n/translator";
 
@@ -26,6 +31,7 @@ import type { Translator } from "@/lib/i18n/translator";
  */
 
 const CURSOR_PARAM = "cursor";
+const PERIOD_PARAM = "period";
 
 const agendaEventSchema = z.object({
   id: z.uuid(),
@@ -55,9 +61,26 @@ const tallySchema = agendaEventSchema.pick({
   myResponse: true,
 });
 
-// Del detalle sólo hacen falta los conteos y la respuesta: los nombres son
-// de la fila desplegada (#312).
-const detailResponseSchema = z.object({ data: tallySchema });
+const audienceSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("club") }),
+  z.object({
+    kind: z.literal("groups"),
+    groups: z.array(z.object({ id: z.uuid(), name: z.string() })),
+  }),
+]);
+
+// La audiencia sólo le llega a Admin y Committee (RF-8): a los demás el
+// servidor no la manda.
+const openedEventSchema = z.object({
+  notes: z.string().nullable(),
+  going: z.array(z.string()),
+  maybe: z.array(z.string()),
+  audience: audienceSchema.optional(),
+});
+
+const detailResponseSchema = z.object({
+  data: tallySchema.extend(openedEventSchema.shape),
+});
 
 const savedRsvpResponseSchema = z.object({
   data: z.object({ response: z.enum(RSVP_RESPONSES) }),
@@ -66,37 +89,91 @@ const savedRsvpResponseSchema = z.object({
 /** Lo que cambia en una fila al responder. */
 export type EventTally = z.infer<typeof tallySchema>;
 
+/** Lo que enseña una fila desplegada (#312). `audience` es nula para quien
+ * no organiza: no la puede ver. */
+export type OpenedEvent = {
+  readonly notes: string | null;
+  readonly going: readonly string[];
+  readonly maybe: readonly string[];
+  readonly audience: NamedEventAudience | null;
+};
+
 export type AgendaFailure = ApiRequestFailure;
 
 export type AgendaLoad =
   { readonly kind: "loaded"; readonly page: AgendaPage } | AgendaFailure;
 
-export type RsvpSave =
-  { readonly kind: "saved"; readonly tally: EventTally } | AgendaFailure;
+export type EventOpening =
+  { readonly kind: "opened"; readonly opened: OpenedEvent } | AgendaFailure;
 
-function agendaPath(cursor: string | null): string {
-  if (cursor === null) {
-    return EVENTS_API_PATH;
+/** `opened` es el detalle que se trajo tras guardar, o nulo si no llegó. */
+export type RsvpSave =
+  | {
+      readonly kind: "saved";
+      readonly tally: EventTally;
+      readonly opened: OpenedEvent | null;
+    }
+  | AgendaFailure;
+
+/** Los próximos van sin `period`, que es lo que la API da por defecto. */
+function agendaPath(period: AgendaPeriod, cursor: string | null): string {
+  const params = new URLSearchParams();
+  if (period === "past") {
+    params.set(PERIOD_PARAM, period);
   }
-  const params = new URLSearchParams({ [CURSOR_PARAM]: cursor });
-  return `${EVENTS_API_PATH}?${params.toString()}`;
+  if (cursor !== null) {
+    params.set(CURSOR_PARAM, cursor);
+  }
+  const query = params.toString();
+  return query === "" ? EVENTS_API_PATH : `${EVENTS_API_PATH}?${query}`;
 }
 
 function eventPath(template: string, eventId: string): string {
   return template.replace("[id]", encodeURIComponent(eventId));
 }
 
-/** Una página de los próximos: la primera sin cursor, las demás con el
- * `nextCursor` de la anterior. Nunca rechaza: un fallo de red sale como
- * fallo. */
-export async function loadAgenda(cursor: string | null): Promise<AgendaLoad> {
+/** Una página de los próximos o de los pasados: la primera sin cursor, las
+ * demás con el `nextCursor` de la anterior. Nunca rechaza: un fallo de red
+ * sale como fallo. */
+export async function loadAgenda(
+  period: AgendaPeriod,
+  cursor: string | null,
+): Promise<AgendaLoad> {
   const read = readApiPayload(
-    await requestApi(agendaPath(cursor)),
+    await requestApi(agendaPath(period, cursor)),
     agendaResponseSchema,
   );
   return read.kind === "failed"
     ? read
     : { kind: "loaded", page: read.value.data };
+}
+
+function readDetail(outcome: ApiRequestOutcome):
+  | {
+      readonly kind: "ok";
+      readonly tally: EventTally;
+      readonly opened: OpenedEvent;
+    }
+  | AgendaFailure {
+  const read = readApiPayload(outcome, detailResponseSchema);
+  if (read.kind === "failed") {
+    return read;
+  }
+  const { goingCount, maybeCount, myResponse, audience, ...opened } =
+    read.value.data;
+  return {
+    kind: "ok",
+    tally: { goingCount, maybeCount, myResponse },
+    opened: { ...opened, audience: audience ?? null },
+  };
+}
+
+/** El detalle de un evento, que se pide al desplegar su fila y no antes. */
+export async function openEvent(eventId: string): Promise<EventOpening> {
+  const read = readDetail(await requestApi(eventPath(EVENT_API_PATH, eventId)));
+  return read.kind === "failed"
+    ? read
+    : { kind: "opened", opened: read.opened };
 }
 
 /** Los conteos cuando la respuesta se guardó y el detalle no llegó: quien
@@ -139,17 +216,16 @@ export async function saveRsvp(
   if (saved.kind === "failed") {
     return saved;
   }
-  const detail = readApiPayload(
+  const detail = readDetail(
     await requestApi(eventPath(EVENT_API_PATH, eventId)),
-    detailResponseSchema,
   );
-  return {
-    kind: "saved",
-    tally:
-      detail.kind === "failed"
-        ? recountWithResponse(previous, saved.value.data.response)
-        : detail.value.data,
-  };
+  return detail.kind === "failed"
+    ? {
+        kind: "saved",
+        tally: recountWithResponse(previous, saved.value.data.response),
+        opened: null,
+      }
+    : { kind: "saved", tally: detail.tally, opened: detail.opened };
 }
 
 /** Por qué no cargó la agenda, en el idioma de la pantalla. */
@@ -176,6 +252,23 @@ function isRsvpClosedReason(
   reason: string | null,
 ): reason is keyof typeof RSVP_CLOSED_REASONS {
   return reason !== null && Object.hasOwn(RSVP_CLOSED_REASONS, reason);
+}
+
+/** Por qué no se desplegó una fila, en el idioma de la pantalla. */
+export function describeOpeningFailure(
+  translate: Translator,
+  { failure }: AgendaFailure,
+): string {
+  switch (failure) {
+    case "network":
+      return translate("auth.error.network");
+    case "not_found":
+      return translate("calendar.detail.error.notFound");
+    case "unauthenticated":
+      return translate("calendar.error.signInRequired");
+    default:
+      return translate("calendar.detail.error.unexpected");
+  }
 }
 
 /** Por qué no se guardó una respuesta, en el idioma de la pantalla. El 422
