@@ -107,7 +107,12 @@ function assertSomethingChanged(changedOccurrences: number): void {
 }
 
 /** Cambia la serie y sus ocurrencias futuras no canceladas, o dice por qué
- * no. Si dos organizadores guardan a la vez, queda lo del último. */
+ * no. Si dos organizadores guardan a la vez, queda lo del último.
+ *
+ * Qué ocurrencia es futura se decide con su hora de antes del cambio: a las
+ * 18:00, pasar la serie de las 19:00 a las 17:00 mueve también la de hoy, que
+ * queda en una hora ya pasada. Editar una sola ocurrencia (#314) lo rechaza;
+ * aquí no, porque la serie no tiene una fecha que validar. */
 export async function editSeries(
   gateways: SeriesManagementGateways,
   request: {
