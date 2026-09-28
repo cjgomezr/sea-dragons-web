@@ -330,6 +330,19 @@ describeConPostgres("los repartos de equipos en la base", () => {
       await expect(visibleTo(database, player)).resolves.toEqual(["1|1"]);
     });
 
+    it("un jugador asignado que pasó a inactivo no lee el publicado", async () => {
+      const database = await migratedDatabase();
+      const { splitId, player } = await seededSplit(database, "now()");
+      await database.query(assignSql(splitId, player, "a"));
+
+      await database.query(
+        `update public.members set account_status = 'inactive'
+          where user_id = '${player.userId}'`,
+      );
+
+      await expect(visibleTo(database, player)).resolves.toEqual(["0|0"]);
+    });
+
     it("nadie lee un borrador, ni el jugador asignado", async () => {
       const database = await migratedDatabase();
       const { splitId, player } = await seededSplit(database);

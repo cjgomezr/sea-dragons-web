@@ -87,7 +87,8 @@ create index if not exists team_split_members_user_id_club_id_idx
 -- `team_splits`. En `0029` el ciclo se evitó con una policy de grupos que no
 -- mira la publicación; aquí no basta, porque las filas de un equipo sólo se
 -- leen si el reparto está publicado. Responde sólo por quien pregunta, así
--- que no deja averiguar dónde juega otro.
+-- que no deja averiguar dónde juega otro. Un socio `inactive` queda fuera,
+-- como en `events_select_audience`.
 create or replace function public.is_assigned_to_team_split(
   target_split_id uuid
 )
@@ -100,8 +101,11 @@ as $$
   select exists (
     select 1
       from public.team_split_members tsm
+      join public.members m
+        on m.user_id = tsm.user_id and m.club_id = tsm.club_id
      where tsm.split_id = target_split_id
        and tsm.user_id = (select auth.uid())
+       and m.account_status <> 'inactive'
   )
 $$;
 
