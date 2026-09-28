@@ -179,13 +179,13 @@ Ninguna que bloquee. Las decisiones del dueño:
 
 ## 10. Descomposición en tickets (para write-ticket)
 
-| #   | Título propuesto                                                                           | Tamaño | Depende de | Auto-merge sugerido                             |
-| --- | ------------------------------------------------------------------------------------------ | ------ | ---------- | ----------------------------------------------- |
-| 1   | Guarda el reparto de equipos de cada evento y la función de cada posición, con RLS         | M      | ninguna    | No: tablas nuevas con RLS                       |
-| 2   | Reparte una escuadra en dos equipos con el auto-balance de FR-046, determinista y en 2 s   | M      | ninguna    | No: lógica de negocio con presupuesto de tiempo |
-| 3   | Sirve la escuadra y guarda, balancea y publica el reparto por API, con el aviso al jugador | M      | 1, 2       | No: permisos, avisos y bitácora                 |
-| 4   | Da a Admin y Coach la pantalla del team builder del mockup                                 | M      | 3          | No: pantalla nueva con permisos                 |
-| 5   | Enseña a cada jugador su equipo y la alineación en el evento, con su aviso                 | M      | 3          | No: pantalla nueva y catálogo de avisos         |
-| 6   | Deja al Admin marcar la función de cada posición en la pantalla de posiciones del club     | S      | 1          | No: pantalla existente con dato de negocio      |
+| #   | Issue | Título propuesto                                                                           | Tamaño | Depende de | Auto-merge sugerido                             |
+| --- | ----- | ------------------------------------------------------------------------------------------ | ------ | ---------- | ----------------------------------------------- |
+| 1   | #399  | Guarda el reparto de equipos de cada evento y la función de cada posición, con RLS         | M      | ninguna    | No: tablas nuevas con RLS                       |
+| 2   | #400  | Reparte una escuadra en dos equipos con el auto-balance de FR-046, determinista y en 2 s   | M      | ninguna    | No: lógica de negocio con presupuesto de tiempo |
+| 3   | #401  | Sirve la escuadra y guarda, balancea y publica el reparto por API, con el aviso al jugador | M      | 1, 2       | No: permisos, avisos y bitácora                 |
+| 4   | #402  | Da a Admin y Coach la pantalla del team builder del mockup                                 | M      | 3          | No: pantalla nueva con permisos                 |
+| 5   | #403  | Enseña a cada jugador su equipo y la alineación en el evento, con su aviso                 | M      | 3          | No: pantalla nueva y catálogo de avisos         |
+| 6   | #404  | Deja al Admin marcar la función de cada posición en la pantalla de posiciones del club     | S      | 1          | No: pantalla existente con dato de negocio      |
 
 Traen migración el 1 (las tablas y la función de las posiciones). El 2 es una función pura sin base: va en paralelo con el 1 desde el primer día. Tras el 3, el 4 y el 5 van en paralelo; el 6 se puede hacer en cualquier momento tras el 1. Con dos personas la épica se cierra en tres vueltas.
