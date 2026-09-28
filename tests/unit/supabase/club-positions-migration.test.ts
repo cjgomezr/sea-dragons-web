@@ -523,6 +523,90 @@ describeConPostgres("privilegios de las posiciones", () => {
   });
 });
 
+/** La función de cada posición de `clubId`, por su nombre en inglés. */
+function coverageOf(
+  database: TemporaryDatabase,
+  clubId: string,
+): Promise<string> {
+  return database.query(
+    `select n.name || '|' || coalesce(p.coverage, 'ninguna')
+       from public.club_positions p
+       join public.club_position_names n
+         on n.position_id = p.id and n.locale = 'en'
+      where p.club_id = '${clubId}'
+      order by p.sort_order, n.name`,
+  );
+}
+
+describeConPostgres("la función de cada posición (#399)", () => {
+  it("las tres sembradas cubren portería, defensa y ataque", async () => {
+    const database = await migratedDatabase();
+    const clubId = await clubIdOf(database, SEEDED_CLUB);
+
+    const coverage = await coverageOf(database, clubId);
+
+    expect(coverage.split("\n")).toEqual([
+      "Goalkeeper|goalkeeper",
+      "Defender|defender",
+      "Forward|forward",
+    ]);
+  });
+
+  it("una posición creada después nace sin función", async () => {
+    const database = await migratedDatabase();
+    const clubId = await clubIdOf(database, SEEDED_CLUB);
+
+    await createPosition(database, clubId, "Utility");
+
+    expect((await coverageOf(database, clubId)).split("\n")).toContain(
+      "Utility|ninguna",
+    );
+  });
+
+  it("un club creado después nace con las tres y su función", async () => {
+    const database = await migratedDatabase();
+
+    const otherClub = await createOtherClub(database);
+
+    expect((await coverageOf(database, otherClub)).split("\n")).toEqual([
+      "Goalkeeper|goalkeeper",
+      "Defender|defender",
+      "Forward|forward",
+    ]);
+  });
+
+  it("rechaza una función fuera de las tres", async () => {
+    const database = await migratedDatabase();
+    const clubId = await clubIdOf(database, SEEDED_CLUB);
+    const positionId = await createPosition(database, clubId, "Utility");
+
+    const result = await database.attempt(
+      `update public.club_positions set coverage = 'midfield'
+        where id = '${positionId}'`,
+    );
+
+    expectRejectedBy(result, "club_positions_coverage_check");
+  });
+
+  it("al repetirse no devuelve la función que el club le quitó", async () => {
+    const database = await migratedDatabase();
+    await database.query(
+      `update public.club_positions set coverage = null
+        where id = (select position_id from public.club_position_names
+                     where locale = 'en' and name = 'Forward')`,
+    );
+    const afterFirst = await database.snapshot();
+
+    const second = await applyRepositoryMigrations(database);
+
+    expect(second.code, second.stderr).toBe(0);
+    expect(await database.snapshot()).toBe(afterFirst);
+    expect(
+      await coverageOf(database, await clubIdOf(database, SEEDED_CLUB)),
+    ).toContain("Forward|ninguna");
+  });
+});
+
 describeConPostgres("la migración de las posiciones repetida", () => {
   it("no falla ni duplica nada, ni pisa lo que el club cambió", async () => {
     const database = await migratedDatabase();

@@ -20,6 +20,7 @@ columna club_position_names.name tipo=text null=NO default=-
 columna club_position_names.position_id tipo=uuid null=NO default=-
 columna club_positions.archived_at tipo=timestamp with time zone null=YES default=-
 columna club_positions.club_id tipo=uuid null=NO default=-
+columna club_positions.coverage tipo=text null=YES default=-
 columna club_positions.created_at tipo=timestamp with time zone null=NO default=now()
 columna club_positions.id tipo=uuid null=NO default=gen_random_uuid()
 columna club_positions.sort_order tipo=integer null=NO default=-
@@ -173,6 +174,22 @@ columna role_requests.justification tipo=text null=YES default=-
 columna role_requests.requested_role tipo=text null=NO default=-
 columna role_requests.status tipo=text null=NO default='pending'::text
 columna role_requests.user_id tipo=uuid null=NO default=-
+columna team_split_members.club_id tipo=uuid null=NO default=-
+columna team_split_members.split_id tipo=uuid null=NO default=-
+columna team_split_members.team tipo=text null=NO default=-
+columna team_split_members.user_id tipo=uuid null=NO default=-
+columna team_splits.club_id tipo=uuid null=NO default=-
+columna team_splits.created_at tipo=timestamp with time zone null=NO default=now()
+columna team_splits.created_by tipo=uuid null=YES default=-
+columna team_splits.event_id tipo=uuid null=NO default=-
+columna team_splits.id tipo=uuid null=NO default=gen_random_uuid()
+columna team_splits.mode tipo=text null=NO default=-
+columna team_splits.published_at tipo=timestamp with time zone null=YES default=-
+columna team_splits.team_a_color tipo=text null=NO default=-
+columna team_splits.team_a_name tipo=text null=NO default=-
+columna team_splits.team_b_color tipo=text null=NO default=-
+columna team_splits.team_b_name tipo=text null=NO default=-
+columna team_splits.updated_at tipo=timestamp with time zone null=NO default=now()
 funcion are_valid_weekdays(weekdays smallint[])
 funcion change_member_role(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_role text)
 funcion club_position_name_taken(acting_club_id uuid, own_position_id uuid, name_en text, name_es text)
@@ -187,6 +204,7 @@ funcion evaluation_category_name_taken(acting_club_id uuid, own_category_id uuid
 funcion event_rsvp_tallies(p_event_ids uuid[])
 funcion health_probe()
 funcion insert_club_position_names(acting_club_id uuid, target_position_id uuid, name_en text, name_es text)
+funcion is_assigned_to_team_split(target_split_id uuid)
 funcion is_member_in_groups(target_user_id uuid, group_ids uuid[])
 funcion live_event_rsvps(p_event_ids uuid[])
 funcion lock_club_positions(acting_club_id uuid)
@@ -591,6 +609,36 @@ grant role_requests service_role SELECT
 grant role_requests service_role TRIGGER
 grant role_requests service_role TRUNCATE
 grant role_requests service_role UPDATE
+grant team_split_members authenticated SELECT
+grant team_split_members postgres DELETE
+grant team_split_members postgres INSERT
+grant team_split_members postgres REFERENCES
+grant team_split_members postgres SELECT
+grant team_split_members postgres TRIGGER
+grant team_split_members postgres TRUNCATE
+grant team_split_members postgres UPDATE
+grant team_split_members service_role DELETE
+grant team_split_members service_role INSERT
+grant team_split_members service_role REFERENCES
+grant team_split_members service_role SELECT
+grant team_split_members service_role TRIGGER
+grant team_split_members service_role TRUNCATE
+grant team_split_members service_role UPDATE
+grant team_splits authenticated SELECT
+grant team_splits postgres DELETE
+grant team_splits postgres INSERT
+grant team_splits postgres REFERENCES
+grant team_splits postgres SELECT
+grant team_splits postgres TRIGGER
+grant team_splits postgres TRUNCATE
+grant team_splits postgres UPDATE
+grant team_splits service_role DELETE
+grant team_splits service_role INSERT
+grant team_splits service_role REFERENCES
+grant team_splits service_role SELECT
+grant team_splits service_role TRIGGER
+grant team_splits service_role TRUNCATE
+grant team_splits service_role UPDATE
 grant-columna clubs.accent_color anon SELECT
 grant-columna clubs.initials anon SELECT
 grant-columna clubs.logo_path anon SELECT
@@ -665,6 +713,12 @@ indice role_requests_decided_by_idx CREATE INDEX role_requests_decided_by_idx ON
 indice role_requests_one_pending_per_member CREATE UNIQUE INDEX role_requests_one_pending_per_member ON public.role_requests USING btree (user_id) WHERE (status = 'pending'::text)
 indice role_requests_pkey CREATE UNIQUE INDEX role_requests_pkey ON public.role_requests USING btree (id)
 indice role_requests_user_id_created_at_idx CREATE INDEX role_requests_user_id_created_at_idx ON public.role_requests USING btree (user_id, created_at DESC)
+indice team_split_members_pkey CREATE UNIQUE INDEX team_split_members_pkey ON public.team_split_members USING btree (split_id, user_id)
+indice team_split_members_user_id_club_id_idx CREATE INDEX team_split_members_user_id_club_id_idx ON public.team_split_members USING btree (user_id, club_id)
+indice team_splits_created_by_club_id_idx CREATE INDEX team_splits_created_by_club_id_idx ON public.team_splits USING btree (created_by, club_id)
+indice team_splits_event_id_key CREATE UNIQUE INDEX team_splits_event_id_key ON public.team_splits USING btree (event_id)
+indice team_splits_id_club_id_key CREATE UNIQUE INDEX team_splits_id_club_id_key ON public.team_splits USING btree (id, club_id)
+indice team_splits_pkey CREATE UNIQUE INDEX team_splits_pkey ON public.team_splits USING btree (id)
 policy attendance_records.attendance_records_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
 policy audit_log.audit_log_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy club_position_names.club_position_names_select_own_club cmd=SELECT roles={authenticated} using=(club_id IN ( SELECT m.club_id
@@ -715,6 +769,12 @@ policy notifications.notifications_select_own cmd=SELECT roles={authenticated} u
 policy password_recovery_requests.password_recovery_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy registration_requests.registration_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy role_requests.role_requests_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
+policy team_split_members.team_split_members_select_published cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
+   FROM team_splits s
+  WHERE (s.id = team_split_members.split_id))) check=-
+policy team_splits.team_splits_select_published cmd=SELECT roles={authenticated} using=((published_at IS NOT NULL) AND ((EXISTS ( SELECT 1
+   FROM events e
+  WHERE (e.id = team_splits.event_id))) OR is_assigned_to_team_split(id))) check=-
 restriccion attendance_records.attendance_records_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion attendance_records.attendance_records_event_type_check CHECK ((event_type = 'training'::text))
 restriccion attendance_records.attendance_records_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
@@ -731,6 +791,7 @@ restriccion club_position_names.club_position_names_name_length CHECK (((char_le
 restriccion club_position_names.club_position_names_pkey PRIMARY KEY (position_id, locale)
 restriccion club_position_names.club_position_names_position_same_club_fkey FOREIGN KEY (position_id, club_id) REFERENCES club_positions(id, club_id) ON DELETE CASCADE
 restriccion club_positions.club_positions_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
+restriccion club_positions.club_positions_coverage_check CHECK ((coverage = ANY (ARRAY['goalkeeper'::text, 'defender'::text, 'forward'::text])))
 restriccion club_positions.club_positions_id_club_id_key UNIQUE (id, club_id)
 restriccion club_positions.club_positions_pkey PRIMARY KEY (id)
 restriccion club_sign_in_texts.club_sign_in_texts_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
@@ -859,6 +920,22 @@ restriccion role_requests.role_requests_pkey PRIMARY KEY (id)
 restriccion role_requests.role_requests_requested_role_check CHECK ((requested_role = ANY (ARRAY['Coach'::text, 'Committee'::text])))
 restriccion role_requests.role_requests_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))
 restriccion role_requests.role_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES members(user_id) ON DELETE CASCADE
+restriccion team_split_members.team_split_members_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion team_split_members.team_split_members_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
+restriccion team_split_members.team_split_members_pkey PRIMARY KEY (split_id, user_id)
+restriccion team_split_members.team_split_members_split_same_club_fkey FOREIGN KEY (split_id, club_id) REFERENCES team_splits(id, club_id) ON DELETE CASCADE
+restriccion team_split_members.team_split_members_team_check CHECK ((team = ANY (ARRAY['a'::text, 'b'::text])))
+restriccion team_splits.team_splits_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion team_splits.team_splits_creator_same_club_fkey FOREIGN KEY (created_by, club_id) REFERENCES members(user_id, club_id) ON DELETE SET NULL (created_by)
+restriccion team_splits.team_splits_event_id_key UNIQUE (event_id)
+restriccion team_splits.team_splits_event_same_club_fkey FOREIGN KEY (event_id, club_id) REFERENCES events(id, club_id) ON DELETE CASCADE
+restriccion team_splits.team_splits_id_club_id_key UNIQUE (id, club_id)
+restriccion team_splits.team_splits_mode_check CHECK ((mode = ANY (ARRAY['manual'::text, 'auto'::text])))
+restriccion team_splits.team_splits_pkey PRIMARY KEY (id)
+restriccion team_splits.team_splits_team_a_color_check CHECK ((team_a_color ~ '^#[0-9a-fA-F]{6}$'::text))
+restriccion team_splits.team_splits_team_a_name_length CHECK (((char_length(btrim(team_a_name)) >= 1) AND (char_length(btrim(team_a_name)) <= 40)))
+restriccion team_splits.team_splits_team_b_color_check CHECK ((team_b_color ~ '^#[0-9a-fA-F]{6}$'::text))
+restriccion team_splits.team_splits_team_b_name_length CHECK (((char_length(btrim(team_b_name)) >= 1) AND (char_length(btrim(team_b_name)) <= 40)))
 tabla attendance_records rls=t
 tabla audit_log rls=t
 tabla club_position_names rls=t
@@ -885,6 +962,8 @@ tabla notifications rls=t
 tabla password_recovery_requests rls=t
 tabla registration_requests rls=t
 tabla role_requests rls=t
+tabla team_split_members rls=t
+tabla team_splits rls=t
 trigger clubs_seed_default_evaluation_categories CREATE TRIGGER clubs_seed_default_evaluation_categories AFTER INSERT ON public.clubs FOR EACH ROW EXECUTE FUNCTION clubs_seed_default_evaluation_categories()
 trigger clubs_seed_default_positions CREATE TRIGGER clubs_seed_default_positions AFTER INSERT ON public.clubs FOR EACH ROW EXECUTE FUNCTION clubs_seed_default_positions()
 trigger members_sync_position_id CREATE TRIGGER members_sync_position_id BEFORE INSERT OR UPDATE OF "position" ON public.members FOR EACH ROW EXECUTE FUNCTION members_sync_position_id()
