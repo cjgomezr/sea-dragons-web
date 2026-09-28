@@ -33,6 +33,11 @@ const MANAGED_EVENT_COLUMNS =
 /** Postgres devuelve un `time` como `HH:MM:SS`; el dominio habla en `HH:MM`. */
 const HOURS_AND_MINUTES_LENGTH = 5;
 
+/** Un `time` de Postgres como lo habla el dominio. */
+export function toHoursAndMinutes(time: string): string {
+  return time.slice(0, HOURS_AND_MINUTES_LENGTH);
+}
+
 type Environment = Readonly<Record<string, string | undefined>>;
 
 const managedEventRowSchema = z.object({
@@ -59,7 +64,7 @@ function toManagedEvent(row: ManagedEventRow): ManagedEvent {
     title: row.title,
     eventType: row.event_type,
     startsOn: row.starts_on,
-    startTime: row.start_time.slice(0, HOURS_AND_MINUTES_LENGTH),
+    startTime: toHoursAndMinutes(row.start_time),
     location: row.location,
     notes: row.notes,
     audience:
@@ -106,8 +111,8 @@ async function findEvent(
 }
 
 /** Sólo las claves que cambian, con los nombres de la base, que es lo que
- * lee `update_event`. */
-function toChangesArgument(changes: EventEdit): Record<string, unknown> {
+ * leen `update_event` y `update_series`. */
+export function toChangesArgument(changes: EventEdit): Record<string, unknown> {
   const { audience } = changes;
   return {
     ...(changes.title === undefined ? {} : { title: changes.title }),
