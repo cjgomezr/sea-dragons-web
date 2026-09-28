@@ -1,10 +1,17 @@
 import type { AudienceChoice } from "@/components/AudienceField";
 import type {
+  AgendaEvent,
+  NamedEventAudience,
+} from "@/lib/events/event-agenda";
+import type {
+  EventAudience,
   EventDraft,
   EventIssueCode,
   EventType,
 } from "@/lib/events/event-creation";
+import type { EventEdit } from "@/lib/events/event-management";
 import type { IsoWeekday } from "@/lib/events/event-occurrences";
+import type { SeriesEdit } from "@/lib/events/series-management";
 
 /**
  * Lo que se escribe en el diálogo de evento (#313) y cómo se convierte en lo
@@ -15,7 +22,15 @@ import type { IsoWeekday } from "@/lib/events/event-occurrences";
  * Aquí sólo se comprueba que lo obligatorio no esté en blanco, porque sin
  * eso la API respondería con un 400 que no dice qué campo falta. Todo lo
  * demás lo decide el servidor, y su motivo se pinta junto al campo.
+ *
+ * Al editar (#316) el diálogo arranca con los datos del evento y manda sólo
+ * lo que cambió: al editar una serie, un campo que no se tocó no debe pisar
+ * el que una ocurrencia tenía editado a solas.
  */
+
+/** Qué se escribe en el diálogo: un evento nuevo, uno que ya existe (o una
+ * sola ocurrencia) o una serie de hoy en adelante, que no cambia de fechas. */
+export type EventFormLayout = "create" | "event" | "series";
 
 export type EventRepeat = EventDraft["repeat"];
 
@@ -110,6 +125,17 @@ export function listMissingFields(form: EventForm): readonly EventFormIssue[] {
     .map((field) => ({ field, code: "required" }));
 }
 
+/** Las notas en blanco son ninguna. */
+function toNotes(notes: string): string | null {
+  return notes.trim() === "" ? null : notes;
+}
+
+function toAudience(choice: AudienceChoice): EventAudience {
+  return choice.kind === "club"
+    ? { kind: "club" }
+    : { kind: "groups", groupIds: [...choice.groupIds] };
+}
+
 /** Lo que se manda: los días en orden de la semana, y las notas en blanco
  * como ninguna. */
 export function toEventDraft(form: EventForm): EventDraft {
@@ -118,11 +144,8 @@ export function toEventDraft(form: EventForm): EventDraft {
     eventType: form.eventType,
     startTime: form.startTime,
     location: form.location,
-    notes: form.notes.trim() === "" ? null : form.notes,
-    audience:
-      form.audience.kind === "club"
-        ? { kind: "club" as const }
-        : { kind: "groups" as const, groupIds: [...form.audience.groupIds] },
+    notes: toNotes(form.notes),
+    audience: toAudience(form.audience),
   };
   if (form.repeat === "none") {
     return { ...fields, repeat: "none", startsOn: form.startsOn };
@@ -133,5 +156,79 @@ export function toEventDraft(form: EventForm): EventDraft {
     weekdays: [...form.weekdays].sort((first, second) => first - second),
     startsOn: form.startsOn,
     endsOn: form.endsOn,
+  };
+}
+
+/** El diálogo de editar arranca con lo que el evento tiene guardado. */
+export function formFromEvent(
+  event: AgendaEvent,
+  details: {
+    readonly notes: string | null;
+    readonly audience: NamedEventAudience;
+  },
+): EventForm {
+  return {
+    ...EMPTY_EVENT_FORM,
+    title: event.title,
+    eventType: event.eventType,
+    startsOn: event.startsOn,
+    startTime: event.startTime,
+    location: event.location,
+    notes: details.notes ?? "",
+    audience:
+      details.audience.kind === "club"
+        ? { kind: "club", groupIds: new Set() }
+        : {
+            kind: "groups",
+            groupIds: new Set(details.audience.groups.map((group) => group.id)),
+          },
+  };
+}
+
+function isSameAudience(
+  first: AudienceChoice,
+  second: AudienceChoice,
+): boolean {
+  if (first.kind !== second.kind) {
+    return false;
+  }
+  return (
+    first.kind === "club" ||
+    (first.groupIds.size === second.groupIds.size &&
+      [...first.groupIds].every((groupId) => second.groupIds.has(groupId)))
+  );
+}
+
+/** Lo que cambió de lo que comparten un evento y una serie. */
+export function listSeriesChanges(
+  initial: EventForm,
+  form: EventForm,
+): SeriesEdit {
+  const notes = toNotes(form.notes);
+  return {
+    ...(form.title === initial.title ? {} : { title: form.title }),
+    ...(form.eventType === initial.eventType
+      ? {}
+      : { eventType: form.eventType }),
+    ...(form.startTime === initial.startTime
+      ? {}
+      : { startTime: form.startTime }),
+    ...(form.location === initial.location ? {} : { location: form.location }),
+    ...(notes === toNotes(initial.notes) ? {} : { notes }),
+    ...(isSameAudience(form.audience, initial.audience)
+      ? {}
+      : { audience: toAudience(form.audience) }),
+  };
+}
+
+/** Lo que cambió de un evento suelto o una ocurrencia, que sí cambia de
+ * fecha. */
+export function listEventChanges(
+  initial: EventForm,
+  form: EventForm,
+): EventEdit {
+  return {
+    ...listSeriesChanges(initial, form),
+    ...(form.startsOn === initial.startsOn ? {} : { startsOn: form.startsOn }),
   };
 }

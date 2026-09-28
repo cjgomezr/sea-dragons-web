@@ -10,8 +10,20 @@ import {
   loadAgenda,
 } from "./agenda-client";
 import { AgendaRow } from "./AgendaRow";
-import { type CreatedSummary, describeCreated } from "./event-create-client";
+import {
+  type CreatedSummary,
+  createEvent,
+  describeCreated,
+} from "./event-create-client";
+import {
+  EMPTY_EVENT_FORM,
+  type EventForm as EventFormValues,
+  toEventDraft,
+} from "./event-form";
+import { type ManageNotice, describeManageNotice } from "./event-manage-client";
 import { EventDialog } from "./EventDialog";
+import type { FormSubmission } from "./EventForm";
+import type { EventOrganizer } from "./EventOrganizerActions";
 
 /**
  * La agenda del Calendario (#311, RF-5 a RF-7 del PRD de E7): los eventos de
@@ -32,7 +44,23 @@ import { EventDialog } from "./EventDialog";
  * A quien puede crear eventos le pinta "+ Evento" (#313), que abre el
  * diálogo. Al crear, las vistas se vuelven a montar y piden la agenda otra
  * vez, para que el evento salga en su sitio, ordenado por el servidor.
+ *
+ * Lo mismo al editar o cancelar desde una fila (#316), y también cuando el
+ * servidor dice que el evento ya no admitía cambios: la agenda que había ya
+ * no es la verdad. Tras volver a pedirla, el foco vuelve al título de ese
+ * evento.
  */
+
+/** Lo que la agenda anuncia tras crear, editar o cancelar. */
+type AgendaNotice =
+  { readonly kind: "created"; readonly summary: CreatedSummary } | ManageNotice;
+
+/** Cada vez que la agenda se vuelve a pedir, y el evento cuyo título recibe
+ * el foco al llegar. */
+type AgendaVersion = {
+  readonly number: number;
+  readonly focusEventId: string | null;
+};
 
 type MoreState =
   | { readonly kind: "idle" }
@@ -126,11 +154,13 @@ function AgendaList({
   period,
   events,
   focusEventId,
+  organizer,
 }: {
   readonly translate: Translator;
   readonly period: AgendaPeriod;
   readonly events: readonly AgendaEvent[];
   readonly focusEventId: string | null;
+  readonly organizer: EventOrganizer | null;
 }): React.JSX.Element {
   if (events.length === 0) {
     return (
@@ -146,6 +176,7 @@ function AgendaList({
           event={event}
           period={period}
           shouldTakeFocus={event.id === focusEventId}
+          organizer={organizer}
         />
       ))}
     </ul>
@@ -170,6 +201,15 @@ function CreateEventButton({
     openButtonRef.current?.focus();
   }
 
+  async function submit(form: EventFormValues): Promise<FormSubmission> {
+    const creation = await createEvent(toEventDraft(form));
+    if (creation.kind === "failed") {
+      return creation;
+    }
+    onCreated(creation.summary);
+    return { kind: "finished" };
+  }
+
   return (
     <>
       <button
@@ -187,7 +227,9 @@ function CreateEventButton({
       {isDialogOpen ? (
         <EventDialog
           translate={translate}
-          onCreated={onCreated}
+          layout="create"
+          initialForm={EMPTY_EVENT_FORM}
+          submit={submit}
           onClosed={handleClosed}
         />
       ) : null}
@@ -229,10 +271,15 @@ function AgendaView({
   translate,
   period,
   isActive,
+  focusOnLoad,
+  organizer,
 }: {
   readonly translate: Translator;
   readonly period: AgendaPeriod;
   readonly isActive: boolean;
+  /** El evento cuyo título recibe el foco con la primera página. */
+  readonly focusOnLoad: string | null;
+  readonly organizer: EventOrganizer | null;
 }): React.JSX.Element {
   const [state, setState] = useState<AgendaState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
@@ -250,7 +297,7 @@ function AgendaView({
               events: outcome.page.events,
               nextCursor: outcome.page.nextCursor,
               more: { kind: "idle" },
-              focusEventId: null,
+              focusEventId: reloads === 0 ? focusOnLoad : null,
             }
           : { kind: "failed", failure: outcome },
       );
@@ -258,7 +305,7 @@ function AgendaView({
     return () => {
       isCurrent = false;
     };
-  }, [period, reloads]);
+  }, [period, reloads, focusOnLoad]);
 
   function reloadAgenda(): void {
     setState({ kind: "loading" });
@@ -309,6 +356,7 @@ function AgendaView({
           period={period}
           events={state.events}
           focusEventId={state.focusEventId}
+          organizer={organizer}
         />
       ) : null}
       {state.kind === "ready" && nextCursor !== null ? (
@@ -322,24 +370,51 @@ function AgendaView({
   );
 }
 
+function describeNotice(translate: Translator, notice: AgendaNotice): string {
+  return notice.kind === "created"
+    ? describeCreated(translate, notice.summary)
+    : describeManageNotice(translate, notice);
+}
+
 export function AgendaScreen({
   locale,
-  canCreateEvents,
+  canManageEvents,
 }: {
   readonly locale: Locale;
-  /** Si quien mira puede crear eventos. Sólo decide si se pinta el botón:
-   * el endpoint ya rechaza a quien no tiene `createEvents` (#307). */
-  readonly canCreateEvents: boolean;
+  /** Si quien mira puede crear, editar y cancelar eventos. Sólo decide si se
+   * pintan los botones: los endpoints ya rechazan a quien no tiene
+   * `createEvents` (#307, #314, #315). */
+  readonly canManageEvents: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [period, setPeriod] = useState<AgendaPeriod>("upcoming");
-  const [created, setCreated] = useState<CreatedSummary | null>(null);
-  // Cambia con cada evento creado: la clave nueva vuelve a montar las vistas.
-  const [agendaVersion, setAgendaVersion] = useState(0);
+  const [notice, setNotice] = useState<AgendaNotice | null>(null);
+  // Cambia con cada evento creado, editado o cancelado: la clave nueva vuelve
+  // a montar las vistas.
+  const [agendaVersion, setAgendaVersion] = useState<AgendaVersion>({
+    number: 0,
+    focusEventId: null,
+  });
   // Los periodos ya abiertos: uno se monta la primera vez que se elige.
   const [openedPeriods, setOpenedPeriods] = useState<ReadonlySet<AgendaPeriod>>(
     () => new Set(["upcoming"]),
   );
+
+  function reloadAgenda(focusEventId: string | null): void {
+    setAgendaVersion((version) => ({
+      number: version.number + 1,
+      focusEventId,
+    }));
+  }
+
+  const organizer: EventOrganizer | null = canManageEvents
+    ? {
+        onSettled: (eventId, managed) => {
+          setNotice(managed);
+          reloadAgenda(eventId);
+        },
+      }
+    : null;
 
   function choosePeriod(choice: AgendaPeriod): void {
     setPeriod(choice);
@@ -361,13 +436,13 @@ export function AgendaScreen({
             period={period}
             onChoose={choosePeriod}
           />
-          {canCreateEvents ? (
+          {canManageEvents ? (
             <CreateEventButton
               translate={translate}
-              onOpen={() => setCreated(null)}
+              onOpen={() => setNotice(null)}
               onCreated={(summary) => {
-                setCreated(summary);
-                setAgendaVersion((version) => version + 1);
+                setNotice({ kind: "created", summary });
+                reloadAgenda(null);
               }}
             />
           ) : null}
@@ -375,17 +450,26 @@ export function AgendaScreen({
       </header>
       {/* Siempre en el DOM: un lector de pantalla sólo anuncia los cambios
           de una región que ya estaba. */}
-      {canCreateEvents ? (
+      {canManageEvents ? (
         <p className="agenda-notice" role="status">
-          {created === null ? null : describeCreated(translate, created)}
+          {notice === null || notice.kind === "closed"
+            ? null
+            : describeNotice(translate, notice)}
+        </p>
+      ) : null}
+      {notice?.kind === "closed" ? (
+        <p className="auth-error agenda-closed" role="alert">
+          {describeManageNotice(translate, notice)}
         </p>
       ) : null}
       {PERIODS.filter((choice) => openedPeriods.has(choice)).map((choice) => (
         <AgendaView
-          key={`${choice}-${agendaVersion}`}
+          key={`${choice}-${agendaVersion.number}`}
           translate={translate}
           period={choice}
           isActive={choice === period}
+          focusOnLoad={agendaVersion.focusEventId}
+          organizer={organizer}
         />
       ))}
     </div>

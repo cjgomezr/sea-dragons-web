@@ -4,12 +4,16 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { loadGroups } from "@/components/groups/groups-client";
 import type { Group } from "@/lib/groups/groups";
 import type { Translator } from "@/lib/i18n/translator";
-import type { CreatedSummary } from "./event-create-client";
-import { EventForm } from "./EventForm";
+import type {
+  EventForm as EventFormValues,
+  EventFormLayout,
+} from "./event-form";
+import { EventForm, type FormSubmission } from "./EventForm";
 
 /**
  * El diálogo para crear un evento o una serie (#313, RF-9 del PRD de E7),
- * abierto con "+ Evento". Es un `<dialog>` modal: el navegador pone el rol,
+ * abierto con "+ Evento". Es también el de editar (#316, RF-11 y RF-12),
+ * abierto desde la fila desplegada. Es un `<dialog>` modal: el navegador pone el rol,
  * la capa y deja inerte lo de detrás, como en el visor de la foto (#355).
  *
  * No se cierra al pulsar fuera: es un formulario, y un clic perdido no debe
@@ -72,13 +76,24 @@ function GroupsFailure({
   );
 }
 
+const DIALOG_TITLES = {
+  create: "calendar.form.title",
+  event: "calendar.edit.titleEvent",
+  series: "calendar.edit.titleSeries",
+} as const satisfies Record<EventFormLayout, string>;
+
 export function EventDialog({
   translate,
-  onCreated,
+  layout,
+  initialForm,
+  submit,
   onClosed,
 }: {
   readonly translate: Translator;
-  readonly onCreated: (summary: CreatedSummary) => void;
+  readonly layout: EventFormLayout;
+  readonly initialForm: EventFormValues;
+  /** Guarda lo escrito. Si termina, el diálogo se cierra. */
+  readonly submit: (form: EventFormValues) => Promise<FormSubmission>;
   /** Ya cerrado: quien lo abrió recupera el foco y lo desmonta. */
   readonly onClosed: () => void;
 }): React.JSX.Element {
@@ -98,9 +113,14 @@ export function EventDialog({
     }
   }, []);
 
-  function handleCreated(summary: CreatedSummary): void {
-    onCreated(summary);
-    dialogRef.current?.close();
+  async function submitAndClose(
+    form: EventFormValues,
+  ): Promise<FormSubmission> {
+    const submission = await submit(form);
+    if (submission.kind === "finished") {
+      dialogRef.current?.close();
+    }
+    return submission;
   }
 
   return (
@@ -128,7 +148,7 @@ export function EventDialog({
       <div className="event-dialog-panel">
         <div className="event-dialog-header">
           <h2 id={titleId} className="event-dialog-title">
-            {translate("calendar.form.title")}
+            {translate(DIALOG_TITLES[layout])}
           </h2>
           <button
             type="button"
@@ -157,7 +177,9 @@ export function EventDialog({
             <EventForm
               translate={translate}
               clubGroups={groups.groups}
-              onCreated={handleCreated}
+              layout={layout}
+              initialForm={initialForm}
+              submit={submitAndClose}
               onCancel={close}
               onSendingChange={(isSending) => {
                 isSendingRef.current = isSending;
