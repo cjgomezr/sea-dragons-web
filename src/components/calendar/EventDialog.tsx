@@ -109,8 +109,11 @@ export function EventDialog({
       className="event-dialog"
       aria-labelledby={titleId}
       onClose={onClosed}
-      // El Escape del navegador llega como `cancel`; jsdom sólo manda la
-      // tecla. Los dos pasan por `close`, que respeta el guardado en curso.
+      // El `preventDefault` del keydown es la defensa real contra Escape
+      // mientras guarda: sin activación de usuario entre medias, Chrome no
+      // deja cancelar dos `cancel` seguidos y cerraría el diálogo. jsdom,
+      // además, sólo manda la tecla. Todo pasa por `close`, que respeta el
+      // guardado en curso.
       onCancel={(event) => {
         event.preventDefault();
         close();

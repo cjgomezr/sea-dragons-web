@@ -146,7 +146,8 @@ export function EventForm({
 
   function update(change: Partial<EventFormValues>): void {
     setForm((current) => ({ ...current, ...change }));
-    setIssues([]);
+    // Sólo se va el aviso del campo que cambió: los demás siguen guiando.
+    setIssues((current) => current.filter((issue) => !(issue.field in change)));
   }
 
   function markSending(isSending: boolean): void {
