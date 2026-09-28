@@ -19,7 +19,7 @@ import type { OwnAttendanceGateways } from "./own-attendance";
 /**
  * Adaptador entre la asistencia contada (#394) y Supabase.
  *
- * Las dos funciones de `0044_attendance_stats.sql` sólo las ejecuta
+ * Las dos funciones de `0045_attendance_stats.sql` sólo las ejecuta
  * `service_role`, como los conteos de RSVP: el servidor ya decidió quién
  * pregunta y de qué club, y pasa ese club.
  */

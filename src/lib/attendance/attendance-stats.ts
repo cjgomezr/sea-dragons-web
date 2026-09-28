@@ -2,7 +2,7 @@
  * El porcentaje de asistencia de un miembro y la tasa del club (#394, RF-5 y
  * RF-7 del PRD de E8, FR-042), tal como los sirve la API.
  *
- * Los cuenta y los redondea la base (`0044_attendance_stats.sql`), en una
+ * Los cuenta y los redondea la base (`0045_attendance_stats.sql`), en una
  * sola consulta para toda una página (NFR-008). Lo que se decide aquí es la
  * forma: sin sesiones elegibles no hay porcentaje, y eso es una variante
  * propia y no un 0 ni un `null` a secas (AC-017b), para que ninguna pantalla

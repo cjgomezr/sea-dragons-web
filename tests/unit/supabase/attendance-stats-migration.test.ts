@@ -6,7 +6,7 @@ import {
 } from "../../support/postgres";
 
 /**
- * `0044_attendance_stats.sql` contra un Postgres desechable (#394, RF-5 y RF-7
+ * `0045_attendance_stats.sql` contra un Postgres desechable (#394, RF-5 y RF-7
  * del PRD de E8). La fórmula de FR-042 la cuenta la base: sólo los
  * entrenamientos no cancelados con hoja guardada, con el miembro en la
  * audiencia y desde su fecha de alta (AC-017, D3). Los de toda una página
