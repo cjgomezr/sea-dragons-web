@@ -151,6 +151,11 @@ export const ACCOUNT_PROFILE_API_PATH = "/api/v1/account/profile";
  * activa, así que tampoco aparece en `RESTRICTED_ROUTES`. */
 export const ACCOUNT_PROFILE_PHOTO_API_PATH = `${ACCOUNT_PROFILE_API_PATH}/photo`;
 
+/** El porcentaje y el total de asistencia de quien llama (#394, FR-022).
+ * Los alcanza cualquier cuenta activa, de cualquier rol, y siempre sobre sí
+ * misma, así que no aparece en `RESTRICTED_ROUTES`. */
+export const ACCOUNT_ATTENDANCE_API_PATH = "/api/v1/account/attendance";
+
 /** Los avisos de quien llama (#265, E6): listarlos, contar los no leídos y
  * marcarlos. Los alcanza cualquier cuenta activa, de cualquier rol, y siempre
  * sobre los suyos, así que no aparecen en `RESTRICTED_ROUTES`. */

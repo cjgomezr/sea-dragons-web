@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { Role } from "@/lib/auth/roles";
 import {
@@ -29,6 +30,11 @@ const UNKNOWN_MEMBER_ID = "b1b1b1b1-0000-4000-8000-0000000000ff";
 const SENIOR_ID = "9a9a9a9a-0000-4000-8000-000000000001";
 const UNKNOWN_GROUP_ID = "9a9a9a9a-0000-4000-8000-0000000000ff";
 const JOINED_ON = "2024-03-06";
+const MEMBER_ATTENDANCE: MemberAttendance = {
+  kind: "rate",
+  percent: 75,
+  sessions: 3,
+};
 const REGISTERED_AT = "2024-03-06T01:00:00.000Z";
 const ADULT_BIRTH = "1990-05-10";
 /** 14 años el día del registro. */
@@ -120,6 +126,10 @@ function memberRecordGateways(
         accountStatus = correction.toStatus;
         return { kind: "corrected" };
       },
+    },
+    attendance: {
+      findMemberAttendance: async (_clubId, userIds) =>
+        new Map(userIds.map((userId) => [userId, MEMBER_ATTENDANCE])),
     },
     photos: {
       signPhotoUrl: async () => {
@@ -267,6 +277,7 @@ describe("PATCH /api/v1/members/{id}/record", () => {
         photoUrl: null,
         isAufExpired: false,
         groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
+        attendance: MEMBER_ATTENDANCE,
       },
     });
   });
@@ -422,6 +433,14 @@ describe("GET /api/v1/members/{id}/record", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       data: { userId: MEMBER_ID, joinedOn: JOINED_ON, groups: [] },
+    });
+  });
+
+  it("trae el porcentaje y el total de asistencia del miembro (FR-022)", async () => {
+    const response = await getRecord();
+
+    await expect(response.json()).resolves.toMatchObject({
+      data: { attendance: { kind: "rate", percent: 75, sessions: 3 } },
     });
   });
 

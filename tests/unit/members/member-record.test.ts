@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
 import type { AuditLogInsertRow } from "@/lib/audit/audit-log";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { Role } from "@/lib/auth/roles";
@@ -73,6 +74,14 @@ type FakeOptions = {
   /** Cómo responde Storage al firmarla: `unsigned` es que no firmó esa
    * ruta, `failed` que la llamada entera falló. */
   readonly photoSigning?: "signed" | "unsigned" | "failed";
+  /** Lo que la base cuenta de su asistencia (#394). */
+  readonly attendance?: MemberAttendance;
+};
+
+const MEMBER_ATTENDANCE: MemberAttendance = {
+  kind: "rate",
+  percent: 90,
+  sessions: 9,
 };
 
 type Fake = {
@@ -181,6 +190,16 @@ function fake(options: FakeOptions = {}): Fake {
         dateOfBirth = correction.dateOfBirth;
         accountStatus = correction.toStatus;
         return { kind: "corrected" };
+      },
+    },
+    attendance: {
+      findMemberAttendance: async (clubId, userIds) => {
+        reads.push(`attendance ${clubId} ${userIds.join(",")}`);
+        return new Map(
+          userIds
+            .filter((userId) => isClubMember(clubId, userId))
+            .map((userId) => [userId, options.attendance ?? MEMBER_ATTENDANCE]),
+        );
       },
     },
     photos: {
@@ -332,7 +351,37 @@ describe("ficha reservada al Admin: lectura", () => {
         { id: MASTERS_ID, name: "Masters Squad" },
         { id: SENIOR_ID, name: "Senior Squad" },
       ],
+      attendance: MEMBER_ATTENDANCE,
     });
+  });
+
+  it("trae el porcentaje y el total de asistencia, contados en el club del Admin (FR-022)", async () => {
+    const { gateways, reads } = fake();
+
+    const record = await readMemberRecord(gateways, {
+      callerId: ADMIN_ID,
+      userId: MEMBER_ID,
+      todayInClub: TODAY_IN_CLUB,
+    });
+
+    expect(record.attendance).toEqual({
+      kind: "rate",
+      percent: 90,
+      sessions: 9,
+    });
+    expect(reads).toContain(`attendance ${CLUB_ID} ${MEMBER_ID}`);
+  });
+
+  it("dice sin datos de asistencia a quien no tiene sesiones elegibles (AC-017b)", async () => {
+    const { gateways } = fake({ attendance: { kind: "no_data" } });
+
+    const record = await readMemberRecord(gateways, {
+      callerId: ADMIN_ID,
+      userId: MEMBER_ID,
+      todayInClub: TODAY_IN_CLUB,
+    });
+
+    expect(record.attendance).toEqual({ kind: "no_data" });
   });
 
   it("marca vencido un AUF que caducó antes de hoy", async () => {

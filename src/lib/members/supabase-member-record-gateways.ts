@@ -3,6 +3,7 @@ import {
   type AccountStatus,
   parseAccountStatus,
 } from "@/lib/auth/account-status";
+import { createMemberAttendanceGateway } from "@/lib/attendance/supabase-attendance-stats";
 import { readRequiredText, readText } from "@/lib/auth/supabase-auth-gateways";
 import { createGroupMembersGateways } from "@/lib/groups/supabase-group-members-gateways";
 import { createGroupsGateways } from "@/lib/groups/supabase-groups-gateways";
@@ -190,6 +191,7 @@ export function createMemberRecordGateways(
       signPhotoUrl: (photoPath) =>
         signProfilePhotoUrl(serviceClient, photoPath),
     },
+    attendance: createMemberAttendanceGateway(serviceClient),
     records: {
       async findMemberRecord({ clubId, userId }) {
         const { data, error } = await serviceClient

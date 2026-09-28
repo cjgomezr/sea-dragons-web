@@ -36,6 +36,7 @@ const RECORD: MemberRecord = {
   photoUrl: null,
   isAufExpired: false,
   groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
+  attendance: { kind: "rate", percent: 90, sessions: 9 },
 };
 
 const PHOTO_URL = `https://storage.test/member-photos/${MEMBER_ID}/foto.webp?token=a`;

@@ -18,6 +18,7 @@ import {
   type DirectoryOrder,
   DirectorySortControl,
   SORT_COLUMN_LABELS,
+  type ScreenSort,
 } from "./DirectorySortControl";
 import {
   MemberRoleControl,
@@ -153,7 +154,7 @@ function SortableHeader({
   onSort,
 }: {
   translate: Translator;
-  column: DirectorySort;
+  column: ScreenSort;
   order: DirectoryOrder;
   onSort: (column: DirectorySort) => void;
 }): React.JSX.Element {

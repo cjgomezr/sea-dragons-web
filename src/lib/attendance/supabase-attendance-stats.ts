@@ -11,6 +11,7 @@ import {
   toMemberAttendance,
 } from "./attendance-stats";
 import type { ClubAttendanceRateGateways } from "./club-attendance-rate";
+import type { OwnAttendanceGateways } from "./own-attendance";
 
 /**
  * Adaptador entre la asistencia contada (#394) y Supabase.
@@ -127,5 +128,29 @@ export function createSupabaseClubAttendanceRateGateways(
   return {
     kind: "ready",
     gateways: createClubAttendanceRateGateways(createServiceRoleClient(env)),
+  };
+}
+
+export type OwnAttendanceGatewaysResult =
+  | { readonly kind: "ready"; readonly gateways: OwnAttendanceGateways }
+  | { readonly kind: "unconfigured"; readonly missingKeys: readonly string[] };
+
+/** Raíz de composición de la asistencia propia. Con la llave de servicio
+ * aunque pregunte el propio miembro: la función sólo la ejecuta
+ * `service_role`, y el club sale de su fila. */
+export function createSupabaseOwnAttendanceGateways(
+  env: Environment,
+): OwnAttendanceGatewaysResult {
+  const config = readSupabaseServiceRoleConfig(env);
+  if (config.kind === "missing") {
+    return { kind: "unconfigured", missingKeys: config.missingKeys };
+  }
+  const serviceClient = createServiceRoleClient(env);
+  return {
+    kind: "ready",
+    gateways: {
+      members: createRoleRequestGateways(serviceClient).members,
+      attendance: createMemberAttendanceGateway(serviceClient),
+    },
   };
 }

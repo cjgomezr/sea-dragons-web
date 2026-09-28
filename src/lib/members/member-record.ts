@@ -1,4 +1,9 @@
 import {
+  type MemberAttendance,
+  type MemberAttendanceGateway,
+  attendanceOf,
+} from "@/lib/attendance/attendance-stats";
+import {
   type AuditActor,
   type AuditLogWriter,
   recordAuditEvent,
@@ -94,6 +99,8 @@ export type MemberRecord = Omit<StoredMemberRecord, "photoPath"> & {
   readonly photoUrl: string | null;
   readonly isAufExpired: boolean;
   readonly groups: readonly MemberGroup[];
+  /** Su porcentaje y su total de asistencia, o sin datos (#394, FR-022). */
+  readonly attendance: MemberAttendance;
 };
 
 /** El AUF que el Admin escribió en la ficha. Un número vacío o en null es
@@ -201,6 +208,7 @@ export type MemberRecordGateways = Pick<
     /** Null si Storage no firmó esa ruta; lanza si la llamada falla. */
     signPhotoUrl(photoPath: string): Promise<string | null>;
   };
+  readonly attendance: MemberAttendanceGateway;
   readonly audit: AuditLogWriter;
 };
 
@@ -420,12 +428,13 @@ async function composeRecord(
   scope: MemberScope,
   todayInClub: string,
 ): Promise<MemberRecord> {
-  const [record, groups] = await Promise.all([
+  const [record, groups, attendance] = await Promise.all([
     findStoredRecord(gateways, scope),
     listMemberGroups(
       { listGroupsOf: () => gateways.records.findMemberGroups(scope) },
       scope.userId,
     ),
+    gateways.attendance.findMemberAttendance(scope.clubId, [scope.userId]),
   ]);
   const { photoPath, ...fields } = record;
   return {
@@ -433,6 +442,7 @@ async function composeRecord(
     photoUrl: await signRecordPhoto(gateways, photoPath),
     isAufExpired: isAufExpired(record.aufExpiry, todayInClub),
     groups,
+    attendance: attendanceOf(attendance, scope.userId),
   };
 }
 

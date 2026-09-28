@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 import {
   DEFAULT_DIRECTORY_QUERY,
+  type DirectoryGateways,
   type DirectoryQuery,
   listDirectory,
 } from "@/lib/directory/directory";
@@ -32,6 +33,8 @@ import {
 const CLUBS_TABLE = "clubs";
 const MEMBERS_TABLE = "members";
 const TODAY = "2026-09-21";
+
+type AttendanceStatus = "present" | "late" | "absent";
 
 type MemberSeed = {
   readonly clubId: string;
@@ -144,6 +147,72 @@ async function withMembers<T>(
     });
   }
   return seedFrom(0);
+}
+
+/** Un entrenamiento para todo el club con su hoja guardada, que se borra al
+ * terminar con sus filas: su autor no puede irse del club mientras exista.
+ * Va en 2030 para quedar después del alta de cualquier socio sembrado hoy. */
+async function withSavedTraining<T>(
+  serviceClient: ServiceRoleClient,
+  sheet: {
+    readonly clubId: string;
+    readonly authorId: string;
+    readonly statuses: readonly (readonly [string, AttendanceStatus])[];
+  },
+  run: () => Promise<T>,
+): Promise<T> {
+  return withSeededRows(
+    serviceClient,
+    "events",
+    [
+      {
+        club_id: sheet.clubId,
+        title: "Entrenamiento con hoja",
+        event_type: "training",
+        starts_on: "2030-06-04",
+        start_time: "19:00",
+        location: "MSAC",
+        audience: "all",
+        author_id: sheet.authorId,
+      },
+    ],
+    async ([event]) => {
+      const { error } = await serviceClient.client
+        .from("attendance_records")
+        .insert(
+          sheet.statuses.map(([userId, status]) => ({
+            event_id: event!.id,
+            user_id: userId,
+            club_id: sheet.clubId,
+            status,
+          })),
+        );
+      if (error) {
+        throw new Error(`No se pudo guardar la hoja: ${error.message}`);
+      }
+      return run();
+    },
+  );
+}
+
+/** Los mismos gateways, contando cuántas veces se pide la asistencia. */
+function countingAttendanceCalls(gateways: DirectoryGateways): {
+  readonly gateways: DirectoryGateways;
+  readonly calls: () => number;
+} {
+  let calls = 0;
+  return {
+    calls: () => calls,
+    gateways: {
+      ...gateways,
+      attendance: {
+        findMemberAttendance: (clubId, userIds) => {
+          calls += 1;
+          return gateways.attendance.findMemberAttendance(clubId, userIds);
+        },
+      },
+    },
+  };
 }
 
 describeRls("el directorio contra seadragons-dev", () => {
@@ -267,6 +336,42 @@ describeRls("el directorio contra seadragons-dev", () => {
           expect(asPlayer.kind).toBe("member");
           expect(asPlayer.members[0]).not.toHaveProperty("aufNumber");
           expect(asPlayer.members[1]).not.toHaveProperty("isEvaluated");
+
+          // #394: con una hoja guardada, cada socio trae su porcentaje, y la
+          // lista entera sale de una sola llamada a la función agregada.
+          await withSavedTraining(
+            serviceClient,
+            {
+              clubId,
+              authorId: admin!.id,
+              statuses: [
+                [admin!.id, "present"],
+                [maria!.id, "absent"],
+              ],
+            },
+            async () => {
+              const counting = countingAttendanceCalls(gateways);
+              const withAttendance = await listDirectory(counting.gateways, {
+                callerId: maria!.id,
+                query: {
+                  ...DEFAULT_DIRECTORY_QUERY,
+                  sort: "attendance",
+                  direction: "asc",
+                },
+                todayInClub: TODAY,
+              });
+              expect(
+                withAttendance.members.map((member) => [
+                  member.fullName,
+                  member.attendance,
+                ]),
+              ).toEqual([
+                ["María Ñíguez", { kind: "rate", percent: 0, sessions: 0 }],
+                ["Ana Admin", { kind: "rate", percent: 100, sessions: 1 }],
+              ]);
+              expect(counting.calls()).toBe(1);
+            },
+          );
         });
       });
     },
