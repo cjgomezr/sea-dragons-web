@@ -127,6 +127,14 @@ límites, su bucket privado y sus direcciones firmadas. Se avisa al publicar y
 nunca al editar, que es lo que mantiene creíble la campana de E6. PRD en
 `docs/prd/e11-noticias-documentos.md`.
 
+El 28 de septiembre de 2026, con E7 a un ticket de cerrarse, se escribió el
+PRD de **E8** y pasó de 4 a 5 tickets: la fórmula del porcentaje (FR-042) y
+las pantallas que lo pintan se separan en dos. El dueño decidió que solo los
+entrenamientos llevan hoja, que una sesión sin hoja guardada no cuenta para
+nadie, y que Admin y Coach corrigen sin límite de tiempo, con bitácora. La
+tasa del club de los últimos 30 días se sirve aquí para que E14 solo la pinte.
+PRD en `docs/prd/e8-asistencia.md`.
+
 El 7 de septiembre de 2026, al escribir su PRD, **E16 se partió en E16a y
 E16b**. El motivo es de secuencia, no de tamaño: sus jobs de `pg_cron` necesitan
 las tablas de eventos (E7) y de membresías (E12), y la prueba de carga exige
