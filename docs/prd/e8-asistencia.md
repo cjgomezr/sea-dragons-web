@@ -169,13 +169,13 @@ Ninguna que bloquee. Las decisiones del dueño:
 
 ## 10. Descomposición en tickets (para write-ticket)
 
-| #   | Título propuesto                                                                        | Tamaño | Depende de | Auto-merge sugerido                           |
-| --- | --------------------------------------------------------------------------------------- | ------ | ---------- | --------------------------------------------- |
-| 1   | Guarda la asistencia de cada sesión de entrenamiento, con RLS                           | M      | ninguna    | No: tabla nueva con RLS                       |
-| 2   | Abre y guarda la hoja de asistencia de una sesión por API, con las sesiones recientes   | M      | 1          | No: lógica nueva con permisos y bitácora      |
-| 3   | Calcula el porcentaje y el total de cada miembro y la tasa del club, y sírvelos por API | M      | 1          | No: fórmula de negocio en directorio y perfil |
-| 4   | Da a Admin y Coach la pantalla de Asistencia del mockup                                 | M      | 2          | No: pantalla nueva con permisos               |
-| 5   | Pinta el porcentaje en el directorio, con su orden, y en el perfil y la ficha           | S      | 3          | No: pantallas existentes con dato nuevo       |
+| #   | Issue | Título propuesto                                                                        | Tamaño | Depende de | Auto-merge sugerido                           |
+| --- | ----- | --------------------------------------------------------------------------------------- | ------ | ---------- | --------------------------------------------- |
+| 1   | #392  | Guarda la asistencia de cada sesión de entrenamiento, con RLS                           | M      | ninguna    | No: tabla nueva con RLS                       |
+| 2   | #393  | Abre y guarda la hoja de asistencia de una sesión por API, con las sesiones recientes   | M      | 1          | No: lógica nueva con permisos y bitácora      |
+| 3   | #394  | Calcula el porcentaje y el total de cada miembro y la tasa del club, y sírvelos por API | M      | 1          | No: fórmula de negocio en directorio y perfil |
+| 4   | #395  | Da a Admin y Coach la pantalla de Asistencia del mockup                                 | M      | 2          | No: pantalla nueva con permisos               |
+| 5   | #396  | Pinta el porcentaje en el directorio, con su orden, y en el perfil y la ficha           | S      | 3          | No: pantallas existentes con dato nuevo       |
 
 Traen migración el 1 y el 3 (la función agregada). Tras el 1, el 2 y el 3 van en paralelo; tras ellos, el 4 y el 5. Con dos personas la épica se cierra en dos vueltas.
 
