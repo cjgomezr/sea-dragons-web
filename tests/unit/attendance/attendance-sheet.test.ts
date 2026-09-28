@@ -15,12 +15,14 @@ import {
   ATTENDANCE_NOW,
   type FakeAttendanceClubOptions,
   type FakeMember,
+  GOALKEEPER,
   OTHER_CLUB_ID,
   SENIOR_SQUAD_ID,
   STARTED_TRAINING,
   TRAINING_ID,
   fakeAttendanceClub,
   memberId,
+  signedPhotoUrl,
 } from "../helpers/attendance-club";
 
 /**
@@ -63,6 +65,8 @@ describe("la hoja de asistencia", () => {
           {
             userId: ANA.userId,
             fullName: ANA.fullName,
+            photoUrl: null,
+            position: null,
             status: "present",
             rsvpResponse: null,
             isInactive: false,
@@ -70,6 +74,8 @@ describe("la hoja de asistencia", () => {
           {
             userId: BRUNO.userId,
             fullName: BRUNO.fullName,
+            photoUrl: null,
+            position: null,
             status: "present",
             rsvpResponse: null,
             isInactive: false,
@@ -78,6 +84,39 @@ describe("la hoja de asistencia", () => {
       });
     },
   );
+
+  it("da a cada miembro su foto firmada y su posición, para pintar la fila (#395)", async () => {
+    const sheet = await open({
+      members: [
+        {
+          ...ANA,
+          photoPath: `${ANA.userId}/thumb.webp`,
+          positionId: GOALKEEPER.id,
+        },
+        BRUNO,
+      ],
+      positions: [GOALKEEPER],
+    });
+
+    expect(
+      sheet.members.map(({ photoUrl, position }) => ({ photoUrl, position })),
+    ).toEqual([
+      {
+        photoUrl: signedPhotoUrl(`${ANA.userId}/thumb.webp`),
+        position: { id: GOALKEEPER.id, names: GOALKEEPER.names },
+      },
+      { photoUrl: null, position: null },
+    ]);
+  });
+
+  it("deja las iniciales a quien tiene foto que no se pudo firmar", async () => {
+    const sheet = await open({
+      members: [{ ...ANA, photoPath: `${ANA.userId}/thumb.webp` }],
+      unsignablePhotos: true,
+    });
+
+    expect(sheet.members.map((entry) => entry.photoUrl)).toEqual([null]);
+  });
 
   it("pone primero los Sí, luego los Quizás y luego el resto, por nombre", async () => {
     const sheet = await open({

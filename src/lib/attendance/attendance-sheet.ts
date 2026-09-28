@@ -7,10 +7,29 @@ import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { RoleRequestGateways } from "@/lib/auth/role-request";
 import { hasCapability } from "@/lib/auth/roles";
+import {
+  type ClubPositions,
+  type ClubPositionsGateway,
+  type NamedPosition,
+  findClubPosition,
+} from "@/lib/club/club-positions";
 import type { EventAudience, EventType } from "@/lib/events/event-creation";
 import { EventNotFoundError, type RsvpResponse } from "@/lib/events/event-rsvp";
 import type { AudienceMembersGateway } from "@/lib/notifications/audience-members";
 import { compareNames } from "@/lib/text/name-order";
+import {
+  ATTENDANCE_STATUSES,
+  type AttendanceStatus,
+  type AttendanceTotals,
+  countAttendance,
+} from "./attendance-status";
+
+export {
+  ATTENDANCE_STATUSES,
+  type AttendanceStatus,
+  type AttendanceTotals,
+  countAttendance,
+};
 
 /**
  * La hoja de asistencia de un entrenamiento (#393, RF-2 y RF-3 del PRD de
@@ -25,12 +44,6 @@ import { compareNames } from "@/lib/text/name-order";
  * baja, más cualquiera que ya tenga fila guardada, aunque haya salido de la
  * audiencia o esté de baja. Quien no tiene fila empieza en `present`.
  */
-
-/** Los mismos que acepta el `check` de `attendance_records.status` en
- * `0043_attendance_records.sql` (FR-038). */
-export const ATTENDANCE_STATUSES = ["present", "late", "absent"] as const;
-
-export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number];
 
 /** El estado con el que empieza quien todavía no tiene fila (FR-039). */
 const DEFAULT_STATUS: AttendanceStatus = "present";
@@ -71,6 +84,10 @@ export type SheetMemberRecord = {
   readonly userId: string;
   readonly fullName: string;
   readonly status: AccountStatus;
+  /** Una posición del catálogo del club, o null sin posición. */
+  readonly positionId: string | null;
+  /** Dónde está la foto; sale firmada, nunca tal cual. */
+  readonly photoPath: string | null;
 };
 
 export type MemberRsvp = {
@@ -113,12 +130,23 @@ export type AttendanceGateways = {
     /** Sustituye la hoja entera, todo o nada. */
     saveSheet(sheet: NewAttendanceSheet): Promise<AttendanceSaveOutcome>;
   };
+  readonly positions: ClubPositionsGateway;
+  readonly photos: {
+    /** Las direcciones firmadas, por ruta. Una ruta que no se pudo firmar
+     * falta en el mapa. */
+    signPhotoUrls(
+      photoPaths: readonly string[],
+    ): Promise<ReadonlyMap<string, string>>;
+  };
   readonly audit: AuditLogWriter;
 };
 
 export type AttendanceSheetEntry = {
   readonly userId: string;
   readonly fullName: string;
+  /** Null sin foto o sin firma: la fila enseña entonces las iniciales. */
+  readonly photoUrl: string | null;
+  readonly position: NamedPosition | null;
   readonly status: AttendanceStatus;
   /** La respuesta al RSVP, como pista; `null` si no respondió. */
   readonly rsvpResponse: RsvpResponse | null;
@@ -134,8 +162,6 @@ export type AttendanceSheet = {
   readonly isSaved: boolean;
   readonly members: readonly AttendanceSheetEntry[];
 };
-
-export type AttendanceTotals = Readonly<Record<AttendanceStatus, number>>;
 
 export type SavedAttendanceSheet = {
   readonly eventId: string;
@@ -202,16 +228,6 @@ export async function findAttendanceTaker(
     throw new AttendanceForbiddenError();
   }
   return { id: callerId, clubId: caller.clubId };
-}
-
-export function countAttendance(
-  statuses: readonly AttendanceStatus[],
-): AttendanceTotals {
-  return {
-    present: statuses.filter((status) => status === "present").length,
-    late: statuses.filter((status) => status === "late").length,
-    absent: statuses.filter((status) => status === "absent").length,
-  };
 }
 
 /** El entrenamiento al que se le puede pasar lista ahora, o por qué no. */
@@ -283,6 +299,51 @@ function compareEntries(
   );
 }
 
+type MemberLooks = Pick<AttendanceSheetEntry, "photoUrl" | "position">;
+
+function distinctPresent(
+  values: readonly (string | null)[],
+): readonly string[] {
+  return [...new Set(values.filter((value) => value !== null))].sort();
+}
+
+function positionOf(
+  positions: ClubPositions,
+  positionId: string | null,
+): NamedPosition | null {
+  if (positionId === null) {
+    return null;
+  }
+  const { id, names } = findClubPosition(positions, positionId);
+  return { id, names };
+}
+
+/** Con qué se pinta cada fila (#395): la foto firmada y la posición, como en
+ * el directorio. Una foto sin firma deja las iniciales: una foto rota no
+ * tumba la hoja, y el adaptador ya registró por qué no se firmó. */
+async function readMemberLooks(
+  gateways: AttendanceGateways,
+  clubId: string,
+  members: readonly SheetMemberRecord[],
+): Promise<(member: SheetMemberRecord) => MemberLooks> {
+  const [positions, signedPhotos] = await Promise.all([
+    gateways.positions.findClubPositions(
+      clubId,
+      distinctPresent(members.map((member) => member.positionId)),
+    ),
+    gateways.photos.signPhotoUrls(
+      distinctPresent(members.map((member) => member.photoPath)),
+    ),
+  ]);
+  return (member) => ({
+    photoUrl:
+      member.photoPath === null
+        ? null
+        : (signedPhotos.get(member.photoPath) ?? null),
+    position: positionOf(positions, member.positionId),
+  });
+}
+
 /** La hoja de un entrenamiento ya empezado, para marcarla (RF-2). El club
  * sale de la fila de quien llama, nunca de la petición (NFR-009). */
 export async function openAttendanceSheet(
@@ -303,9 +364,11 @@ export async function openAttendanceSheet(
     gateways.sheets.findRsvps(event.id),
   ]);
   const responses = new Map(rsvps.map((rsvp) => [rsvp.userId, rsvp.response]));
+  const looks = await readMemberLooks(gateways, event.clubId, roster.members);
   const entries = roster.members.map((member): AttendanceSheetEntry => ({
     userId: member.userId,
     fullName: member.fullName,
+    ...looks(member),
     status: roster.recorded.get(member.userId) ?? DEFAULT_STATUS,
     rsvpResponse: responses.get(member.userId) ?? null,
     isInactive: member.status === INACTIVE_STATUS,
