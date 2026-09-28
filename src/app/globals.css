@@ -3863,6 +3863,183 @@ button.notification-item-content:hover {
   margin: 0;
 }
 
+/* La fila desplegable (#312). El título es el botón, y su ::after cubre la
+   tarjeta entera, como el enlace de una noticia: se pulsa en cualquier punto.
+   Lo que se toca dentro (el RSVP, el aviso, el detalle) queda por encima, así
+   un Sí no pliega la fila y el texto del detalle se puede seleccionar. */
+.agenda-row {
+  position: relative;
+}
+
+.agenda-row:hover {
+  border-color: var(--color-accent);
+}
+
+.agenda-row:has(.agenda-toggle:focus-visible) {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.agenda-toggle {
+  display: inline;
+  padding: 0;
+  font: inherit;
+  text-align: start;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.agenda-toggle:focus-visible {
+  outline: none;
+}
+
+.agenda-toggle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+}
+
+/* Un chevrón hecho con dos bordes: apunta abajo plegada y arriba desplegada.
+   Lo que se anuncia es aria-expanded; esto es sólo para la vista. */
+.agenda-chevron {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-inline-start: var(--space-2);
+  vertical-align: 0.2em;
+  border-right: 2px solid var(--color-text-secondary);
+  border-bottom: 2px solid var(--color-text-secondary);
+  transform: rotate(45deg);
+}
+
+.agenda-toggle[aria-expanded="true"] .agenda-chevron {
+  vertical-align: -0.1em;
+  transform: rotate(-135deg);
+}
+
+.agenda-rsvp,
+.agenda-rsvp-error,
+.agenda-detail {
+  position: relative;
+  z-index: 1;
+}
+
+.agenda-detail {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  cursor: auto;
+}
+
+.agenda-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.agenda-detail-item dt {
+  margin-bottom: var(--space-1);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.agenda-detail-item dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.agenda-detail-notes {
+  max-width: 70ch;
+  white-space: pre-line;
+}
+
+.agenda-detail-empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+/* Los nombres, separados por comas, se parten entre líneas donde haga falta:
+   un nombre larguísimo se corta antes que ensanchar la tarjeta. */
+.agenda-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agenda-names li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.agenda-names li:not(:last-child)::after {
+  content: ",";
+}
+
+.agenda-detail-failure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.agenda-detail-failure .auth-error {
+  margin: 0;
+}
+
+/* Próximos y pasados, con la forma del control Mes/Semana/Agenda del mockup. */
+.agenda-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.agenda-period {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.agenda-period-choice {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.agenda-period-choice:hover {
+  color: var(--color-text);
+}
+
+.agenda-period-choice[aria-pressed="true"] {
+  color: var(--color-text);
+  background: var(--color-background);
+  border-color: var(--color-border);
+}
+
 .agenda-more {
   display: flex;
   flex-direction: column;
@@ -3886,6 +4063,10 @@ button.notification-item-content:hover {
 
   .agenda-rsvp-choice {
     min-width: 64px;
+    min-height: 36px;
+  }
+
+  .agenda-period-choice {
     min-height: 36px;
   }
 }

@@ -95,6 +95,7 @@ export function AgendaRow({
               onClick={toggle}
             >
               {event.title}
+              <span className="agenda-chevron" aria-hidden="true" />
             </button>
           </h2>
           <span className={`agenda-type agenda-type-${event.eventType}`}>
