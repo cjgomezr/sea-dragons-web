@@ -41,7 +41,7 @@ describe("secciones por rol", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("un Coach ve además Equipos, Evaluaciones y Grupos, y no Administración", () => {
+  it("un Coach ve además Asistencia, Equipos, Evaluaciones y Grupos, y no Administración", () => {
     usePathname.mockReturnValue("/dashboard");
     render(<SidebarNav locale="es" role="Coach" />);
 
@@ -49,6 +49,7 @@ describe("secciones por rol", () => {
       "Dashboard",
       "Directorio",
       "Calendario",
+      "Asistencia",
       "Equipos",
       "Evaluaciones",
       "Noticias",
@@ -65,6 +66,7 @@ describe("secciones por rol", () => {
       "Dashboard",
       "Directorio",
       "Calendario",
+      "Asistencia",
       "Equipos",
       "Evaluaciones",
       "Noticias",
@@ -112,6 +114,7 @@ describe("navegación traducida", () => {
       "Dashboard",
       "Directory",
       "Calendar",
+      "Attendance",
       "Teams",
       "Evaluations",
       "News",
