@@ -300,6 +300,20 @@ export const EVENT_API_PATH = `${EVENTS_API_PATH}/[id]`;
  * recibe 404. */
 export const EVENT_RSVP_API_PATH = `${EVENT_API_PATH}/rsvp`;
 
+/** Pasar lista (#393, RF-2 a RF-4 del PRD de E8). Todo lo que cuelga de
+ * este camino es de Admin y Coach (`buildTeamsAndTrackAttendance`): un
+ * Committee o un Player no leen ni escriben ninguna hoja (AC-007). El
+ * handler lo vuelve a comprobar. */
+export const ATTENDANCE_API_PATH = "/api/v1/attendance";
+
+/** Los entrenamientos de los últimos 30 días a los que se puede pasar lista,
+ * con sus totales (RF-4). */
+export const ATTENDANCE_SESSIONS_API_PATH = `${ATTENDANCE_API_PATH}/sessions`;
+
+/** La hoja de un entrenamiento: GET la abre y PUT la guarda entera.
+ * `[eventId]` es el de la ocurrencia. */
+export const ATTENDANCE_SHEET_API_PATH = `${ATTENDANCE_API_PATH}/[eventId]`;
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 
@@ -498,4 +512,5 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: EVENT_CANCELLATION_API_PATH, capability: "createEvents" },
   { path: EVENT_SERIES_MANAGE_API_PATH, capability: "createEvents" },
   { path: EVENT_SERIES_CANCELLATION_API_PATH, capability: "createEvents" },
+  { path: ATTENDANCE_API_PATH, capability: "buildTeamsAndTrackAttendance" },
 ];
