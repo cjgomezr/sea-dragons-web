@@ -56,11 +56,12 @@ export type EventFormField =
   | "audience";
 
 /** Los motivos de la API que van junto a un campo. `event_started` y
- * `event_cancelled` hablan de un evento que ya existe (#314): crear no los
+ * `event_cancelled` hablan de un evento que ya existe (#314), y
+ * `series_without_upcoming` de una serie que ya existe (#315): crear no los
  * devuelve nunca. */
 export type FieldIssueCode = Exclude<
   EventIssueCode,
-  "event_started" | "event_cancelled"
+  "event_started" | "event_cancelled" | "series_without_upcoming"
 >;
 
 export type EventFormIssue = {
