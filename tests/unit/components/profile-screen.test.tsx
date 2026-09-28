@@ -5,6 +5,7 @@ import { ProfileScreen } from "@/components/account/ProfileScreen";
 import { ACCOUNT_PROFILE_API_PATH } from "@/lib/auth/routes";
 import { listCountryOptions } from "@/lib/geo/countries";
 import type { Locale } from "@/lib/i18n/locale";
+import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
 import type { OwnAuf, OwnProfile } from "@/lib/members/own-profile";
 import type { ClubPosition, ClubPositions } from "@/lib/club/club-positions";
 import {
@@ -106,6 +107,7 @@ function renderScreen(
     readonly locale?: Locale;
     readonly profile?: OwnProfile;
     readonly positionOptions?: ClubPositions;
+    readonly attendance?: MemberAttendance;
   } = {},
 ): void {
   const locale = options.locale ?? "en";
@@ -119,6 +121,7 @@ function renderScreen(
       photoUrl={null}
       groups={[{ id: "g1", name: "Senior Squad" }]}
       evaluation={{ visibility: "staff_only" }}
+      attendance={options.attendance ?? { kind: "no_data" }}
       countries={listCountryOptions(locale)}
     />,
   );
@@ -185,7 +188,7 @@ describe("pantalla de perfil", () => {
       screen.getByRole("heading", { name: "Request a role" }),
     ).toBeInTheDocument();
     const groups = screen.getByRole("region", { name: "My groups" });
-    expect(within(groups).getByText("Senior Squad")).toBeInTheDocument();
+    expect(groups).toHaveTextContent("Senior Squad");
   });
 
   it("guarda los cinco campos, lo confirma y refresca la cabecera", async () => {
@@ -610,5 +613,62 @@ describe("perfil propio: las posiciones del club (#299)", () => {
         name: "Portería",
       }),
     ).toBeInTheDocument();
+  });
+});
+
+/** La asistencia en el perfil propio (#396, FR-022): el porcentaje grande y
+ * las sesiones debajo, o "Sin datos" a quien no tiene sesiones elegibles. */
+describe("perfil propio: la asistencia", () => {
+  function attendanceRegion(name = "Attendance"): HTMLElement {
+    return screen.getByRole("region", { name });
+  }
+
+  it("enseña el porcentaje y cuántas sesiones lleva", () => {
+    renderScreen({
+      attendance: { kind: "rate", percent: 90, sessions: 18 },
+    });
+
+    expect(within(attendanceRegion()).getByText("90%")).toBeVisible();
+    expect(within(attendanceRegion()).getByText("18 sessions")).toBeVisible();
+  });
+
+  it("dice una sesión en singular", () => {
+    renderScreen({ attendance: { kind: "rate", percent: 100, sessions: 1 } });
+
+    expect(within(attendanceRegion()).getByText("1 session")).toBeVisible();
+  });
+
+  it("un lector de pantalla oye el porcentaje con su nombre", () => {
+    renderScreen({
+      attendance: { kind: "rate", percent: 90, sessions: 18 },
+    });
+
+    expect(attendanceRegion()).toHaveTextContent("Attendance: 90%");
+  });
+
+  it("sin sesiones elegibles dice sin datos, no un 0", () => {
+    renderScreen({ attendance: { kind: "no_data" } });
+
+    expect(attendanceRegion()).toHaveTextContent("Attendance: No data");
+    expect(within(attendanceRegion()).queryByText(/0%|sessions/)).toBeNull();
+  });
+
+  it("en español, con el símbolo separado y las sesiones en español", () => {
+    renderScreen({
+      locale: "es",
+      attendance: { kind: "rate", percent: 90, sessions: 18 },
+    });
+
+    const region = attendanceRegion("Asistencia");
+    expect(region).toHaveTextContent("Asistencia: 90 %");
+    expect(within(region).getByText("18 sesiones")).toBeVisible();
+  });
+
+  it("en español, sin datos", () => {
+    renderScreen({ locale: "es", attendance: { kind: "no_data" } });
+
+    expect(attendanceRegion("Asistencia")).toHaveTextContent(
+      "Asistencia: Sin datos",
+    );
   });
 });

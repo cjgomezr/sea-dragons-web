@@ -483,6 +483,16 @@ export const englishMessages = {
   "directory.column.member": "Member",
   "directory.column.role": "Role",
   "directory.column.position": "Position",
+  "directory.column.attendance": "Attendance",
+  // El porcentaje de asistencia de un miembro (#396): en el directorio, el
+  // perfil propio y la ficha. El prefijo sólo lo oye un lector de pantalla.
+  "memberAttendance.title": "Attendance",
+  "memberAttendance.noData": "No data",
+  "memberAttendance.spokenPrefix": "Attendance: ",
+  "memberAttendance.sessions": {
+    one: "{count} session",
+    other: "{count} sessions",
+  },
   // #283: por debajo de 768px la tabla es una lista de tarjetas, sin
   // cabeceras. Cada dato lleva su etiqueta y el orden tiene su propio control.
   "directory.field.country": "Country",

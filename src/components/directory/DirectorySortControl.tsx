@@ -1,5 +1,6 @@
 import {
   DIRECTORY_DIRECTIONS,
+  DIRECTORY_SORTS,
   type DirectoryDirection,
   type DirectorySort,
 } from "@/lib/directory/directory";
@@ -23,23 +24,14 @@ export type DirectoryOrder = {
   readonly direction: DirectoryDirection;
 };
 
-/** Los órdenes que la pantalla ofrece. La API ordena también por asistencia
- * (#394); la columna y su orden llegan a la pantalla con #396. */
-export const SCREEN_SORTS = [
-  "name",
-  "role",
-  "position",
-] as const satisfies readonly DirectorySort[];
-
-export type ScreenSort = (typeof SCREEN_SORTS)[number];
-
 /** El título de cada columna, que es también el nombre del campo en el
  * selector: los dos controles hablan de lo mismo con las mismas palabras. */
 export const SORT_COLUMN_LABELS = {
   name: "directory.column.member",
   role: "directory.column.role",
   position: "directory.column.position",
-} as const satisfies Readonly<Record<ScreenSort, string>>;
+  attendance: "directory.column.attendance",
+} as const satisfies Readonly<Record<DirectorySort, string>>;
 
 /** Los dos grupos son radios con nombre propio: con el del filtro por rol
  * compartirían selección. */
@@ -79,7 +71,7 @@ export function DirectorySortControl({
       <fieldset className="directory-roles">
         <legend>{translate("directory.sort.label")}</legend>
         <div className="directory-role-options">
-          {SCREEN_SORTS.map((sort) => (
+          {DIRECTORY_SORTS.map((sort) => (
             <SortOption
               key={sort}
               name={SORT_GROUP_NAME}

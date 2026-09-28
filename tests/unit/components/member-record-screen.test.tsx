@@ -1071,3 +1071,37 @@ describe("ficha en pantalla: evaluación (#324)", () => {
     ).toBeVisible();
   });
 });
+
+/** La asistencia en la ficha (#396): el mismo bloque que el perfil propio,
+ * con lo que la ficha ya trae desde #394. */
+describe("ficha en pantalla: asistencia", () => {
+  it("enseña el porcentaje y cuántas sesiones lleva el miembro", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    const region = screen.getByRole("region", { name: "Attendance" });
+    expect(region).toHaveTextContent("Attendance: 90%");
+    expect(within(region).getByText("9 sessions")).toBeVisible();
+  });
+
+  it("dice sin datos a quien no tiene sesiones elegibles", async () => {
+    stubApi({ record: { ...RECORD, attendance: { kind: "no_data" } } });
+
+    await renderScreen();
+
+    const region = screen.getByRole("region", { name: "Attendance" });
+    expect(region).toHaveTextContent("Attendance: No data");
+    expect(within(region).queryByText(/sessions/)).toBeNull();
+  });
+
+  it("sale en español", async () => {
+    stubApi();
+
+    await renderScreen("es");
+
+    const region = screen.getByRole("region", { name: "Asistencia" });
+    expect(region).toHaveTextContent("Asistencia: 90 %");
+    expect(within(region).getByText("9 sesiones")).toBeVisible();
+  });
+});

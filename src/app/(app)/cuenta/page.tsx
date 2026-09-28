@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ProfileScreen } from "@/components/account/ProfileScreen";
+import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
+import { readOwnAttendance } from "@/lib/attendance/own-attendance";
+import { createSupabaseOwnAttendanceGateways } from "@/lib/attendance/supabase-attendance-stats";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import {
   type RoleRequestAccount,
@@ -39,8 +42,8 @@ import { createSessionClient } from "@/lib/supabase/session-client";
  * El perfil propio (#241), que antes era Mi cuenta (#209): la ficha que el
  * miembro edita (FR-084), el rol de quien la abre, los grupos a los que
  * pertenece (#229) y, si le toca, el formulario para pedir Coach o Committee
- * (FR-010), la foto de perfil (#245) y su evaluación, o el aviso de que sólo
- * la ve el personal de entrenamiento (#324). La dirección sigue siendo `/cuenta`,
+ * (FR-010), la foto de perfil (#245), su asistencia (#396) y su evaluación,
+ * o el aviso de que sólo la ve el personal de entrenamiento (#324). La dirección sigue siendo `/cuenta`,
  * la del enlace de la cabecera.
  *
  * Quién llega lo decide la frontera: cualquier cuenta activa, de cualquier
@@ -145,6 +148,25 @@ async function readEvaluation(userId: string): Promise<ProfileEvaluation> {
   }
 }
 
+/** Con la llave de servicio: el porcentaje lo cuenta una función de la base
+ * que no se concede a `authenticated` (#394). Se lee siempre sobre quien
+ * tiene la sesión, nunca sobre otro. */
+async function readAttendance(userId: string): Promise<MemberAttendance> {
+  const wiring = createSupabaseOwnAttendanceGateways(process.env);
+  if (wiring.kind === "unconfigured") {
+    throw new Error(describeMissingAuthKeys(wiring.missingKeys));
+  }
+  try {
+    return await readOwnAttendance(wiring.gateways, userId);
+  } catch (error) {
+    // La misma carrera con la frontera que en `readAccount`.
+    if (error instanceof MemberNotFoundError) {
+      redirect(SIGN_IN_PATH);
+    }
+    throw error;
+  }
+}
+
 async function readAccount(userId: string): Promise<RoleRequestAccount> {
   const wiring = createSupabaseRoleRequestGateways(process.env);
   if (wiring.kind === "unconfigured") {
@@ -167,13 +189,15 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
     readRequestLocale(),
     readCallerSession(),
   ]);
-  const [account, profile, photo, groups, evaluation] = await Promise.all([
-    readAccount(caller.userId),
-    readProfile(caller),
-    readPhoto(caller),
-    readGroups(caller),
-    readEvaluation(caller.userId),
-  ]);
+  const [account, profile, photo, groups, evaluation, attendance] =
+    await Promise.all([
+      readAccount(caller.userId),
+      readProfile(caller),
+      readPhoto(caller),
+      readGroups(caller),
+      readEvaluation(caller.userId),
+      readAttendance(caller.userId),
+    ]);
   return (
     <ProfileScreen
       locale={locale}
@@ -184,6 +208,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
       photoUrl={photo.photoUrl}
       groups={groups}
       evaluation={evaluation}
+      attendance={attendance}
       countries={listCountryOptions(locale)}
     />
   );

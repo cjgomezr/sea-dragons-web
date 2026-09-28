@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { MemberAvatar } from "@/components/MemberAvatar";
+import { describeAttendance } from "@/components/attendance/MemberAttendanceSummary";
 import type {
   DirectoryDirection,
   DirectoryListing,
@@ -18,7 +19,6 @@ import {
   type DirectoryOrder,
   DirectorySortControl,
   SORT_COLUMN_LABELS,
-  type ScreenSort,
 } from "./DirectorySortControl";
 import {
   MemberRoleControl,
@@ -34,13 +34,12 @@ import {
 
 /**
  * La tabla del directorio (FR-015, FR-019): una fila por socio con su foto o
- * sus iniciales (#245), su nombre, su país, su nivel, su rol y su posición, y cabeceras
- * que piden el orden.
+ * sus iniciales (#245), su nombre, su país, su nivel, su rol, su posición y su
+ * asistencia (#396), y cabeceras que piden el orden.
  *
- * Las columnas de OVR y asistencia del mockup no están. Del OVR, el directorio
- * sólo cuenta a Admin y Coach quién está sin evaluar (#324): la nota se ve en
- * Evaluaciones, y a un Player o un Committee no le llega nada (FR-055). La
- * asistencia es de E8.
+ * La columna de OVR del mockup no está. Del OVR, el directorio sólo cuenta a
+ * Admin y Coach quién está sin evaluar (#324): la nota se ve en Evaluaciones,
+ * y a un Player o un Committee no le llega nada (FR-055).
  *
  * Ordenar es cosa del servidor, así que pulsar una cabecera no reordena nada
  * aquí: dice por dónde, y la pantalla vuelve a preguntar.
@@ -154,7 +153,7 @@ function SortableHeader({
   onSort,
 }: {
   translate: Translator;
-  column: ScreenSort;
+  column: DirectorySort;
   order: DirectoryOrder;
   onSort: (column: DirectorySort) => void;
 }): React.JSX.Element {
@@ -369,6 +368,12 @@ function MemberRow({
           {describePosition(translate, member.position)}
         </span>
       </td>
+      <td
+        className="directory-attendance-cell"
+        data-label={translate("directory.column.attendance")}
+      >
+        {describeAttendance(translate, locale, member.attendance)}
+      </td>
     </tr>
   );
 }
@@ -433,6 +438,12 @@ export function DirectoryTable({
               <SortableHeader
                 translate={translate}
                 column="position"
+                order={order}
+                onSort={onSort}
+              />
+              <SortableHeader
+                translate={translate}
+                column="attendance"
                 order={order}
                 onSort={onSort}
               />

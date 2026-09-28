@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { MemberAttendanceSummary } from "@/components/attendance/MemberAttendanceSummary";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import { DIRECTORY_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
@@ -19,7 +20,7 @@ import { MemberStatusControl } from "./MemberStatusControl";
 /**
  * La ficha reservada al Admin de un miembro (#242, RF-4 del PRD de E5), que se
  * abre desde su fila del directorio: su número de AUF, su vencimiento y sus
- * grupos, y su evaluación para leer (#324).
+ * grupos, su asistencia (#396) y su evaluación para leer (#324).
  *
  * La frontera ya mandó al panel a quien no es Admin; si alguien deja de serlo
  * con la pantalla abierta, el 403 del endpoint lo dice aquí. Es de cliente
@@ -113,6 +114,15 @@ export function MemberRecordScreen({
             })}
           />
         </section>
+      ) : null}
+      {state.kind === "loaded" ? (
+        <MemberAttendanceSummary
+          translate={translate}
+          locale={locale}
+          attendance={state.record.attendance}
+          headingId="ficha-asistencia"
+          className="admin-section"
+        />
       ) : null}
       {state.kind === "loaded" ? (
         <MemberRecordEvaluation translate={translate} userId={userId} />
