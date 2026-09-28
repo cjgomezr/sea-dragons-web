@@ -719,6 +719,27 @@ export const englishMessages = {
   "calendar.rsvp.error.signInRequired":
     "Your session ended. Sign in again to answer.",
   "calendar.rsvp.error.unexpected": "We couldn't save your answer. Try again.",
+  // Próximos y pasados, y la fila desplegada (#312, RF-7 y RF-8).
+  "calendar.period.label": "Which events to show",
+  "calendar.period.upcoming": "Upcoming",
+  "calendar.period.past": "Past",
+  "calendar.pastTitle": "Past events",
+  "calendar.pastEmpty": "There are no past events.",
+  "calendar.detail.loading": "Loading the details…",
+  "calendar.detail.notes": "Notes",
+  "calendar.detail.noNotes": "This event has no notes.",
+  "calendar.detail.responses": "Responses",
+  "calendar.detail.noResponses": "Nobody has answered yet.",
+  "calendar.detail.going": "Going",
+  "calendar.detail.maybe": "Maybe",
+  "calendar.detail.nobodyYet": "Nobody yet.",
+  "calendar.detail.audience": "Audience",
+  "calendar.detail.audience.club": "The whole club",
+  "calendar.detail.audience.noGroups":
+    "No groups: only Admins and the Committee see it.",
+  "calendar.detail.error.notFound":
+    "This event is no longer available. Reload the calendar.",
+  "calendar.detail.error.unexpected": "We couldn't load this event. Try again.",
   "notifications.generic.title": "New notification",
   "notifications.generic.body": "Something changed in your account.",
   "themeToggle.switchToLight": "Switch to light theme",

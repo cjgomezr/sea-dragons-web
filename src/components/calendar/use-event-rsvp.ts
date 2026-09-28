@@ -1,12 +1,21 @@
 import { useRef, useState } from "react";
 import type { AgendaEvent } from "@/lib/events/event-agenda";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
-import { type AgendaFailure, type EventTally, saveRsvp } from "./agenda-client";
+import {
+  type AgendaFailure,
+  type EventTally,
+  type OpenedEvent,
+  saveRsvp,
+} from "./agenda-client";
 
 /**
  * La respuesta de quien mira a un evento de la agenda y sus conteos (#311).
  * La fila arranca con lo que sirvió la agenda y sólo cambia con lo que la API
  * guardó: un fallo deja la respuesta y los conteos de antes, y el aviso.
+ *
+ * Tras guardar llega el detalle del evento con los nombres ya al día: se le
+ * pasa a `onOpened` para que la fila desplegada no enseñe la lista de antes
+ * (#312).
  */
 
 export type EventRsvpState = {
@@ -16,7 +25,10 @@ export type EventRsvpState = {
   readonly failure: AgendaFailure | null;
 };
 
-export function useEventRsvp(event: AgendaEvent): {
+export function useEventRsvp(
+  event: AgendaEvent,
+  onOpened: (opened: OpenedEvent) => void,
+): {
   readonly state: EventRsvpState;
   readonly respond: (response: RsvpResponse) => void;
 } {
@@ -35,6 +47,9 @@ export function useEventRsvp(event: AgendaEvent): {
   async function save(response: RsvpResponse): Promise<void> {
     const outcome = await saveRsvp(event.id, state.tally, response);
     isSavingRef.current = false;
+    if (outcome.kind === "saved" && outcome.opened !== null) {
+      onOpened(outcome.opened);
+    }
     setState((current) =>
       outcome.kind === "saved"
         ? { tally: outcome.tally, pendingResponse: null, failure: null }

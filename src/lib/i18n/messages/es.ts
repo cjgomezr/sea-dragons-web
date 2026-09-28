@@ -716,6 +716,28 @@ export const spanishMessages: MessageCatalog = {
     "Tu sesión terminó. Vuelve a entrar para responder.",
   "calendar.rsvp.error.unexpected":
     "No pudimos guardar tu respuesta. Vuelve a intentarlo.",
+  // Próximos y pasados, y la fila desplegada (#312, RF-7 y RF-8).
+  "calendar.period.label": "Qué eventos ver",
+  "calendar.period.upcoming": "Próximos",
+  "calendar.period.past": "Pasados",
+  "calendar.pastTitle": "Eventos pasados",
+  "calendar.pastEmpty": "No hay eventos pasados.",
+  "calendar.detail.loading": "Cargando el detalle…",
+  "calendar.detail.notes": "Notas",
+  "calendar.detail.noNotes": "Este evento no tiene notas.",
+  "calendar.detail.responses": "Respuestas",
+  "calendar.detail.noResponses": "Todavía no ha respondido nadie.",
+  "calendar.detail.going": "Van",
+  "calendar.detail.maybe": "Quizás",
+  "calendar.detail.nobodyYet": "Nadie todavía.",
+  "calendar.detail.audience": "Audiencia",
+  "calendar.detail.audience.club": "Todo el club",
+  "calendar.detail.audience.noGroups":
+    "Sin grupos: solo lo ven Admin y Committee.",
+  "calendar.detail.error.notFound":
+    "Este evento ya no está disponible. Recarga el calendario.",
+  "calendar.detail.error.unexpected":
+    "No pudimos cargar este evento. Vuelve a intentarlo.",
   "notifications.generic.title": "Aviso nuevo",
   "notifications.generic.body": "Algo cambió en tu cuenta.",
   "themeToggle.switchToLight": "Cambiar a tema claro",
