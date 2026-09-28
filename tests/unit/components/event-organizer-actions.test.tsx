@@ -264,7 +264,13 @@ function renderAgenda(
   options: { readonly canManage?: boolean; readonly locale?: "en" | "es" } = {},
 ): void {
   const { canManage = true, locale = "en" } = options;
-  render(<AgendaScreen locale={locale} canManageEvents={canManage} />);
+  render(
+    <AgendaScreen
+      locale={locale}
+      canManageEvents={canManage}
+      canTakeAttendance={false}
+    />,
+  );
 }
 
 async function openEditDialog(

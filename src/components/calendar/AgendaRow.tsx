@@ -1,11 +1,18 @@
+import Link from "next/link";
 import { useEffect, useId, useRef } from "react";
+import {
+  ATTENDANCE_PATH,
+  ATTENDANCE_SESSION_QUERY_PARAM,
+} from "@/lib/auth/routes";
 import type { AgendaEvent, AgendaPeriod } from "@/lib/events/event-agenda";
+import { isStillAhead } from "@/lib/events/event-occurrences";
 import {
   formatCalendarDay,
   formatCalendarDayParts,
   formatClockTime,
 } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
+import { clubMoment } from "@/lib/time/club-calendar";
 import { describeRsvpFailure } from "./agenda-client";
 import { EventDetailPanel } from "./EventDetailPanel";
 import {
@@ -32,7 +39,42 @@ import { useEventRsvp } from "./use-event-rsvp";
  *
  * A quien organiza, la fila desplegada de un evento futuro que sigue en pie
  * le ofrece editarlo y cancelarlo (#316).
+ *
+ * A quien pasa lista, la de un entrenamiento que ya empezó y sigue en pie le
+ * ofrece "Pasar lista" (#395), que abre Asistencia con esa sesión. Puede estar
+ * en Próximos: el de hoy sigue ahí aunque ya haya empezado.
  */
+
+function canTakeAttendanceOf(event: AgendaEvent): boolean {
+  return (
+    event.eventType === "training" &&
+    event.status === "scheduled" &&
+    !isStillAhead(
+      { date: event.startsOn, time: event.startTime },
+      clubMoment(new Date()),
+    )
+  );
+}
+
+function TakeAttendanceLink({
+  translate,
+  eventId,
+}: {
+  readonly translate: Translator;
+  readonly eventId: string;
+}): React.JSX.Element {
+  const query = new URLSearchParams({
+    [ATTENDANCE_SESSION_QUERY_PARAM]: eventId,
+  });
+  return (
+    <Link
+      href={`${ATTENDANCE_PATH}?${query.toString()}`}
+      className="admin-secondary agenda-take-attendance"
+    >
+      {translate("calendar.takeAttendance")}
+    </Link>
+  );
+}
 
 function DateBlock({
   translate,
@@ -66,6 +108,7 @@ export function AgendaRow({
   period,
   shouldTakeFocus,
   organizer,
+  canTakeAttendance,
 }: {
   readonly translate: Translator;
   readonly event: AgendaEvent;
@@ -75,6 +118,9 @@ export function AgendaRow({
   readonly shouldTakeFocus: boolean;
   /** Nulo para quien no organiza eventos. */
   readonly organizer: EventOrganizer | null;
+  /** Si quien mira registra asistencia. Sólo decide si se pinta el enlace:
+   * la frontera ya reserva Asistencia a Admin y Coach. */
+  readonly canTakeAttendance: boolean;
 }): React.JSX.Element {
   const { isExpanded, detail, toggle, retry, receive } = useEventDetail(
     event.id,
@@ -164,6 +210,9 @@ export function AgendaRow({
               detail={detail}
               onRetry={retry}
             />
+          ) : null}
+          {isExpanded && canTakeAttendance && canTakeAttendanceOf(event) ? (
+            <TakeAttendanceLink translate={translate} eventId={event.id} />
           ) : null}
           {canManage &&
           detail.kind === "loaded" &&

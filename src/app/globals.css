@@ -4680,3 +4680,17 @@ button.notification-item-content:hover {
     min-height: 36px;
   }
 }
+
+/* "Ir al calendario" y "Pasar lista" (#395) son enlaces con la forma del
+   botón secundario. */
+.attendance-no-sessions a.admin-secondary,
+a.agenda-take-attendance {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+a.agenda-take-attendance {
+  align-self: flex-start;
+  margin-top: var(--space-3);
+}
