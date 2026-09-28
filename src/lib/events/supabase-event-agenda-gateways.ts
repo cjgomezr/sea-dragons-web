@@ -14,6 +14,7 @@ import type {
 } from "./event-agenda";
 import { EVENT_TYPES } from "./event-creation";
 import { RSVP_RESPONSES } from "./event-rsvp";
+import { toHoursAndMinutes } from "./supabase-event-management-gateways";
 
 /**
  * La agenda y el detalle contra Supabase (#309).
@@ -86,15 +87,12 @@ const responderRowSchema = z.object({
   response: z.enum(["yes", "maybe"]),
 });
 
-/** `time` llega como `HH:MM:SS`; la agenda enseña `HH:MM`, como se creó. */
-const HOURS_AND_MINUTES_LENGTH = 5;
-
 function toEventRow(row: unknown): EventRow {
   const parsed = eventRowSchema.parse(row);
   return {
     id: parsed.id,
     startsOn: parsed.starts_on,
-    startTime: parsed.start_time.slice(0, HOURS_AND_MINUTES_LENGTH),
+    startTime: toHoursAndMinutes(parsed.start_time),
     startsAt: parsed.starts_at,
     title: parsed.title,
     eventType: parsed.event_type,

@@ -14,6 +14,8 @@ import {
   EVENT_MANAGE_API_PATH,
   EVENT_API_PATH,
   EVENT_RSVP_API_PATH,
+  EVENT_SERIES_CANCELLATION_API_PATH,
+  EVENT_SERIES_MANAGE_API_PATH,
   GROUPS_API_PATH,
   GROUPS_PATH,
   GUARDIAN_CONSENT_API_PATH,
@@ -879,6 +881,35 @@ describe("frontera de editar y cancelar eventos (#314)", () => {
   it.each(
     (["Admin", "Committee"] as const).flatMap((role) =>
       MANAGED_EVENT_PATHS.map((pathname) => [role, pathname] as const),
+    ),
+  )("deja a un %s el camino %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
+      ALLOW,
+    );
+  });
+});
+
+/** Una serie cualquiera, en el camino de editarla y en el de cancelarla
+ * (#315). */
+const MANAGED_SERIES_PATHS = [
+  EVENT_SERIES_MANAGE_API_PATH,
+  EVENT_SERIES_CANCELLATION_API_PATH,
+].map((path) => path.replace("[id]", "c3c3c3c3-0000-4000-8000-00000000000c"));
+
+describe("frontera de editar y cancelar series (#315)", () => {
+  it.each(
+    (["Coach", "Player"] as const).flatMap((role) =>
+      MANAGED_SERIES_PATHS.map((pathname) => [role, pathname] as const),
+    ),
+  )("niega a un %s el camino %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual({
+      kind: "missingCapability",
+    });
+  });
+
+  it.each(
+    (["Admin", "Committee"] as const).flatMap((role) =>
+      MANAGED_SERIES_PATHS.map((pathname) => [role, pathname] as const),
     ),
   )("deja a un %s el camino %s", (role, pathname) => {
     expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(

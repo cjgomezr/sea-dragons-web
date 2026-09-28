@@ -121,12 +121,13 @@ async function readBackEvent(
   return event;
 }
 
-/** Las mismas reglas que al crear, sólo sobre lo que viene. */
-async function normalizeChanges(
+/** Las mismas reglas que al crear, sólo sobre lo que viene. También las usa
+ * editar una serie (#315). */
+export async function normalizeChanges<Edit extends EventEdit>(
   gateways: Pick<EventManagementGateways, "events">,
   clubId: string,
-  edit: EventEdit,
-): Promise<EventEdit> {
+  edit: Edit,
+): Promise<Edit> {
   return {
     ...edit,
     ...(edit.title === undefined ? {} : { title: normalizeTitle(edit.title) }),

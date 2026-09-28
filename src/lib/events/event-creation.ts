@@ -141,6 +141,7 @@ export const EVENT_ISSUE_CODES = [
   "series_without_sessions",
   "event_started",
   "event_cancelled",
+  "series_without_upcoming",
 ] as const;
 
 export type EventIssueCode = (typeof EVENT_ISSUE_CODES)[number];
@@ -160,6 +161,8 @@ const ISSUE_MESSAGES: Readonly<Record<EventIssueCode, string>> = {
     "Con esos días y esas fechas no saldría ninguna sesión.",
   event_started: "El evento ya empezó: ya no se puede cambiar.",
   event_cancelled: "El evento está cancelado: ya no se puede cambiar.",
+  series_without_upcoming:
+    "La serie no tiene sesiones futuras sin cancelar: no queda nada que cambiar.",
 };
 
 export class EventValidationError extends Error {
