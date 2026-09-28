@@ -342,6 +342,17 @@ export const EVALUATION_CATEGORIES_ORDER_API_PATH = `${EVALUATION_CATEGORIES_API
  * `user_id` del miembro, como en su evaluación. */
 export const EVALUATION_REFRESH_API_PATH = `${EVALUATIONS_API_PATH}/[id]/refresh`;
 
+/** La asistencia (E8). Todo lo que cuelga de este camino es de quien pasa
+ * lista, Admin y Coach (`buildTeamsAndTrackAttendance`): la hoja de cada
+ * sesión y lo que se cuenta con ellas. El porcentaje de cada miembro no vive
+ * aquí: lo sirven el directorio, el perfil y la ficha, que alcanza cada uno
+ * quien los alcanza. */
+export const ATTENDANCE_API_PATH = "/api/v1/attendance";
+
+/** La tasa de asistencia del club en los últimos 30 días (#394, RF-7 del PRD
+ * de E8), para la tesela del dashboard de E14 (FR-076). */
+export const ATTENDANCE_CLUB_RATE_API_PATH = `${ATTENDANCE_API_PATH}/club-rate`;
+
 /** El destino del enlace del correo de confirmación (#132). No es una
  * pantalla del PRD: canjea el token y redirige. Es público por definición,
  * porque quien abre ese enlace todavía no puede iniciar sesión.
@@ -498,4 +509,5 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: EVENT_CANCELLATION_API_PATH, capability: "createEvents" },
   { path: EVENT_SERIES_MANAGE_API_PATH, capability: "createEvents" },
   { path: EVENT_SERIES_CANCELLATION_API_PATH, capability: "createEvents" },
+  { path: ATTENDANCE_API_PATH, capability: "buildTeamsAndTrackAttendance" },
 ];
