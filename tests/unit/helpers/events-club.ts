@@ -6,6 +6,7 @@ import type {
   EventGateways,
   NewEventSchedule,
 } from "@/lib/events/event-creation";
+import type { EventNoticeGateways } from "@/lib/events/event-creation-notice";
 import type {
   NotificationBroadcastWriter,
   NotificationInsert,
@@ -55,10 +56,9 @@ export const WEEKLY_DRAFT: Extract<EventDraft, { repeat: "weekly" }> = {
   endsOn: "2027-08-31",
 };
 
-export type FakeEventsClubOptions = {
-  readonly callerRole?: Role;
-  readonly callerIsMember?: false;
-  readonly clubGroupIds?: readonly string[];
+/** La audiencia y los avisos, que comparten crear (#310) y editar o cancelar
+ * (#317). */
+export type FakeNoticeOptions = {
   /** Los socios del club con el estado de su cuenta. */
   readonly clubMembers?: Readonly<Record<string, AccountStatus>>;
   /** Quién está en cada grupo. */
@@ -68,19 +68,28 @@ export type FakeEventsClubOptions = {
   readonly failNotices?: boolean;
 };
 
-export type FakeEventsClub = {
-  readonly gateways: EventGateways;
-  readonly saved: NewEventSchedule[];
+export type FakeEventsClubOptions = FakeNoticeOptions & {
+  readonly callerRole?: Role;
+  readonly callerIsMember?: false;
+  readonly clubGroupIds?: readonly string[];
+};
+
+export type FakeNotices = {
   /** Los avisos guardados, en el orden en que se escribieron. */
   readonly notices: NotificationInsert[];
   /** Cada escritura en lote, con sus filas. */
   readonly noticeBatches: (readonly NotificationInsert[])[];
 };
 
+export type FakeEventsClub = FakeNotices & {
+  readonly gateways: EventGateways;
+  readonly saved: NewEventSchedule[];
+};
+
 /** La audiencia como la resuelve la base: todo el club, o quien esté en
  * alguno de los grupos, sin quitar repetidos. */
 function audienceOf(
-  options: FakeEventsClubOptions,
+  options: FakeNoticeOptions,
   audience: EventAudience,
 ): readonly string[] {
   if (audience.kind === "club") {
@@ -90,8 +99,8 @@ function audienceOf(
 }
 
 function createFakeNotices(
-  options: FakeEventsClubOptions,
-  club: Pick<FakeEventsClub, "notices" | "noticeBatches">,
+  options: FakeNoticeOptions,
+  club: FakeNotices,
 ): NotificationBroadcastWriter {
   const failIfAsked = (): void => {
     if (options.failNotices === true) {
@@ -122,12 +131,33 @@ function createFakeNotices(
   };
 }
 
+/** La audiencia como la resuelve la base y los avisos que se guardan. */
+export function fakeEventNotices(
+  options: FakeNoticeOptions,
+): EventNoticeGateways & FakeNotices {
+  const notices: NotificationInsert[] = [];
+  const noticeBatches: (readonly NotificationInsert[])[] = [];
+  return {
+    eventAudience: {
+      findAudienceMemberIds: async ({ audience }) => {
+        if (options.failAudience === true) {
+          throw new Error("la audiencia no se pudo leer");
+        }
+        return audienceOf(options, audience);
+      },
+    },
+    notifications: createFakeNotices(options, { notices, noticeBatches }),
+    notices,
+    noticeBatches,
+  };
+}
+
 export function fakeEventsClub(
   options: FakeEventsClubOptions = {},
 ): FakeEventsClub {
   const saved: NewEventSchedule[] = [];
-  const notices: NotificationInsert[] = [];
-  const noticeBatches: (readonly NotificationInsert[])[] = [];
+  const { notices, noticeBatches, ...noticeGateways } =
+    fakeEventNotices(options);
   const clubGroupIds = options.clubGroupIds ?? [
     SENIOR_SQUAD_ID,
     MASTERS_SQUAD_ID,
@@ -160,15 +190,7 @@ export function fakeEventsClub(
         };
       },
     },
-    eventAudience: {
-      findAudienceMemberIds: async ({ audience }) => {
-        if (options.failAudience === true) {
-          throw new Error("la audiencia no se pudo leer");
-        }
-        return audienceOf(options, audience);
-      },
-    },
-    notifications: createFakeNotices(options, { notices, noticeBatches }),
+    ...noticeGateways,
   };
   return { gateways, saved, notices, noticeBatches };
 }

@@ -31,6 +31,10 @@ export const NOTIFICATION_TYPES = [
   "news_post_published",
   "event_created",
   "event_series_created",
+  "event_changed",
+  "event_cancelled",
+  "event_series_changed",
+  "event_series_cancelled",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -72,6 +76,36 @@ type NotificationDataByType = DataForEveryType<{
     readonly weekdays: readonly IsoWeekday[];
     readonly startsOn: string;
     readonly endsOn: string;
+    readonly startTime: string;
+  };
+  /** #317. Lo que quedó después del cambio: el aviso cuenta lo nuevo. */
+  readonly event_changed: {
+    readonly eventId: string;
+    readonly title: string;
+    readonly startsOn: string;
+    readonly startTime: string;
+    readonly location: string;
+  };
+  /** #317. El día y la hora que se pierden. */
+  readonly event_cancelled: {
+    readonly eventId: string;
+    readonly title: string;
+    readonly startsOn: string;
+    readonly startTime: string;
+  };
+  /** #317. Un aviso por serie; sus días y fechas no se editan. */
+  readonly event_series_changed: {
+    readonly seriesId: string;
+    readonly title: string;
+    readonly weekdays: readonly IsoWeekday[];
+    readonly startTime: string;
+    readonly location: string;
+  };
+  /** #317. Una serie se cancela de hoy en adelante, con un solo aviso. */
+  readonly event_series_cancelled: {
+    readonly seriesId: string;
+    readonly title: string;
+    readonly weekdays: readonly IsoWeekday[];
     readonly startTime: string;
   };
 }>;

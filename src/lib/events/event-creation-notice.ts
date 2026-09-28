@@ -64,27 +64,48 @@ function audienceOf(created: CreatedEvents): EventAudience {
     : created.series.audience;
 }
 
-export async function announceEvents(
+/** Un aviso para la audiencia de un evento o una serie, sin quien lo
+ * provocó. No lanza: si no se puede leer la audiencia o guardar los avisos,
+ * lo registra y sigue, porque el cambio que lo originó ya está guardado.
+ * También lo usan editar y cancelar (#317). */
+export async function notifyEventAudience(
   gateways: EventNoticeGateways,
-  announcement: EventAnnouncement,
+  notice: {
+    readonly clubId: string;
+    readonly authorId: string;
+    readonly audience: EventAudience;
+    readonly content: NotificationContent;
+  },
 ): Promise<void> {
-  const { clubId, authorId, created } = announcement;
+  const { clubId, authorId, audience, content } = notice;
   let audienceIds: readonly string[];
   try {
     audienceIds = await gateways.eventAudience.findAudienceMemberIds({
       clubId,
-      audience: audienceOf(created),
+      audience,
     });
   } catch (error) {
     console.error(
-      `[events] no se pudo leer la audiencia en el club ${clubId}; nadie recibe el aviso del evento`,
+      `[events] no se pudo leer la audiencia en el club ${clubId}; nadie recibe el aviso ${content.type}`,
       error,
     );
     return;
   }
   // `notifyMembers` no lanza: un aviso perdido queda registrado allí.
   await notifyMembers(gateways.notifications, {
-    ...noticeOf(created),
+    ...content,
     recipientUserIds: audienceIds.filter((id) => id !== authorId),
+  });
+}
+
+export async function announceEvents(
+  gateways: EventNoticeGateways,
+  announcement: EventAnnouncement,
+): Promise<void> {
+  const { created } = announcement;
+  await notifyEventAudience(gateways, {
+    ...announcement,
+    audience: audienceOf(created),
+    content: noticeOf(created),
   });
 }
