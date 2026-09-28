@@ -84,11 +84,14 @@ as $$
 $$;
 
 -- RF-7, para la tesela de E14 (FR-076): todas las filas de los entrenamientos
--- no cancelados desde `p_since`. Sin ninguna fila, sin porcentaje. El día lo
--- pone el servidor en la hora del club (NFR-003).
+-- no cancelados entre `p_since` y `p_until`, los dos incluidos. El tope de
+-- arriba deja fuera la hoja de un entrenamiento que se movió a una fecha
+-- futura después de pasar lista. Sin ninguna fila, sin porcentaje. Los días
+-- los pone el servidor en la hora del club (NFR-003).
 create or replace function public.club_attendance_rate(
   p_club_id uuid,
-  p_since date
+  p_since date,
+  p_until date
 )
   returns table (
     total_records integer,
@@ -109,7 +112,7 @@ as $$
       join public.events e on e.id = ar.event_id
      where ar.club_id = p_club_id
        and e.status = 'scheduled'
-       and e.starts_on >= p_since
+       and e.starts_on between p_since and p_until
   )
   select c.total_records,
          c.attended_records,
@@ -127,9 +130,9 @@ revoke all on function public.attendance_stats(uuid, uuid[])
 grant execute on function public.attendance_stats(uuid, uuid[])
   to service_role;
 
-revoke all on function public.club_attendance_rate(uuid, date)
+revoke all on function public.club_attendance_rate(uuid, date, date)
   from public, anon, authenticated;
-grant execute on function public.club_attendance_rate(uuid, date)
+grant execute on function public.club_attendance_rate(uuid, date, date)
   to service_role;
 
 notify pgrst, 'reload schema';

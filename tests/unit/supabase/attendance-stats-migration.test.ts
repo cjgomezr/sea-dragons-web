@@ -116,15 +116,19 @@ function stats(
   );
 }
 
+type RateWindow = { readonly since: string; readonly until: string };
+
+const WHOLE_YEAR: RateWindow = { since: "2027-01-01", until: "2027-12-31" };
+
 function clubRate(
   database: TemporaryDatabase,
   clubId: string,
-  since: string,
+  { since, until }: RateWindow,
 ): Promise<string> {
   return database.query(
     `select r.total_records || ' ' || r.attended_records || ' ' ||
             coalesce(r.attendance_percent::text, '-')
-       from public.club_attendance_rate('${clubId}', '${since}') r`,
+       from public.club_attendance_rate('${clubId}', '${since}', '${until}') r`,
   );
 }
 
@@ -306,7 +310,7 @@ describeConPostgres("el porcentaje de asistencia en la base", () => {
 });
 
 describeConPostgres("la tasa de asistencia del club en la base", () => {
-  it("es present y late sobre todas las filas de los entrenamientos desde la fecha pedida (RF-7)", async () => {
+  it("es present y late sobre todas las filas de los entrenamientos del periodo, con los dos extremos (RF-7)", async () => {
     const database = await migratedDatabase();
     const { coach, player } = await seededCoachAndPlayer(database);
     const recent = await trainingWithSheet(database, coach, {
@@ -317,14 +321,22 @@ describeConPostgres("la tasa de asistencia del club en la base", () => {
       startsOn: "2027-06-20",
     });
     await record(database, other, player, "absent");
-    const old = await trainingWithSheet(database, coach, {
-      startsOn: "2027-05-01",
+    const before = await trainingWithSheet(database, coach, {
+      startsOn: "2027-06-09",
     });
-    await record(database, old, player, "absent");
+    await record(database, before, player, "absent");
+    // Una hoja de un entrenamiento que después se movió a otra fecha.
+    const after = await trainingWithSheet(database, coach, {
+      startsOn: "2027-06-21",
+    });
+    await record(database, after, player, "absent");
 
-    await expect(clubRate(database, coach.clubId, "2027-06-01")).resolves.toBe(
-      "4 3 75",
-    );
+    await expect(
+      clubRate(database, coach.clubId, {
+        since: "2027-06-10",
+        until: "2027-06-20",
+      }),
+    ).resolves.toBe("4 3 75");
   });
 
   it("no cuenta las filas de un entrenamiento cancelado", async () => {
@@ -337,7 +349,7 @@ describeConPostgres("la tasa de asistencia del club en la base", () => {
         where id = '${cancelled}'`,
     );
 
-    await expect(clubRate(database, coach.clubId, "2027-01-01")).resolves.toBe(
+    await expect(clubRate(database, coach.clubId, WHOLE_YEAR)).resolves.toBe(
       "0 0 -",
     );
   });
@@ -346,9 +358,7 @@ describeConPostgres("la tasa de asistencia del club en la base", () => {
     const database = await migratedDatabase();
     const clubId = await seededClubId(database);
 
-    await expect(clubRate(database, clubId, "2027-01-01")).resolves.toBe(
-      "0 0 -",
-    );
+    await expect(clubRate(database, clubId, WHOLE_YEAR)).resolves.toBe("0 0 -");
   });
 });
 

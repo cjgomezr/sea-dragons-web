@@ -10,7 +10,10 @@ import {
   toClubAttendanceRate,
   toMemberAttendance,
 } from "./attendance-stats";
-import type { ClubAttendanceRateGateways } from "./club-attendance-rate";
+import type {
+  ClubAttendanceRateGateways,
+  ClubRateWindow,
+} from "./club-attendance-rate";
 import type { OwnAttendanceGateways } from "./own-attendance";
 
 /**
@@ -73,15 +76,16 @@ async function findMemberAttendance(
 async function findClubAttendanceRate(
   serviceClient: SupabaseClient,
   clubId: string,
-  since: string,
+  window: ClubRateWindow,
 ): Promise<ClubAttendanceRate> {
   const { data, error } = await serviceClient.rpc(CLUB_RATE_FUNCTION, {
     p_club_id: clubId,
-    p_since: since,
+    p_since: window.since,
+    p_until: window.until,
   });
   if (error) {
     throw new Error(
-      `No se pudo contar la asistencia del club ${clubId} desde ${since}: ${error.message}`,
+      `No se pudo contar la asistencia del club ${clubId} del ${window.since} al ${window.until}: ${error.message}`,
     );
   }
   const [row] = clubRateRowsSchema.parse(data);
@@ -106,8 +110,8 @@ export function createClubAttendanceRateGateways(
   return {
     members: createRoleRequestGateways(serviceClient).members,
     clubRate: {
-      findClubAttendanceRate: (clubId, since) =>
-        findClubAttendanceRate(serviceClient, clubId, since),
+      findClubAttendanceRate: (clubId, window) =>
+        findClubAttendanceRate(serviceClient, clubId, window),
     },
   };
 }

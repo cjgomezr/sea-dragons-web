@@ -5,6 +5,7 @@ import type { ClubAttendanceRate } from "@/lib/attendance/attendance-stats";
 import {
   AttendanceForbiddenError,
   type ClubAttendanceRateGateways,
+  type ClubRateWindow,
   readClubAttendanceRate,
 } from "@/lib/attendance/club-attendance-rate";
 
@@ -19,7 +20,10 @@ const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
 const TODAY = "2026-10-05";
 const RATE: ClubAttendanceRate = { kind: "rate", percent: 75, records: 4 };
 
-type RateRequest = { readonly clubId: string; readonly since: string };
+type RateRequest = {
+  readonly clubId: string;
+  readonly window: ClubRateWindow;
+};
 
 function gatewaysFor(role: Role | null): {
   readonly gateways: ClubAttendanceRateGateways;
@@ -36,8 +40,8 @@ function gatewaysFor(role: Role | null): {
             : { clubId: CLUB_ID, fullName: "Carla Coach", role },
       },
       clubRate: {
-        findClubAttendanceRate: async (clubId, since) => {
-          requests.push({ clubId, since });
+        findClubAttendanceRate: async (clubId, window) => {
+          requests.push({ clubId, window });
           return RATE;
         },
       },
@@ -47,7 +51,7 @@ function gatewaysFor(role: Role | null): {
 
 describe("la tasa de asistencia del club", () => {
   it.each<Role>(["Admin", "Coach"])(
-    "se la da a un %s, del club de quien pregunta y desde hace 30 días",
+    "se la da a un %s, del club de quien pregunta y de los últimos 30 días con hoy",
     async (role) => {
       const { gateways, requests } = gatewaysFor(role);
 
@@ -57,7 +61,9 @@ describe("la tasa de asistencia del club", () => {
       });
 
       expect(rate).toEqual(RATE);
-      expect(requests).toEqual([{ clubId: CLUB_ID, since: "2026-09-05" }]);
+      expect(requests).toEqual([
+        { clubId: CLUB_ID, window: { since: "2026-09-06", until: TODAY } },
+      ]);
     },
   );
 

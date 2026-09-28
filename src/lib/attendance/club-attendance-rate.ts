@@ -17,13 +17,19 @@ import {
  * club sale de la fila de quien pregunta, nunca de un parámetro (NFR-009).
  */
 
+/** Los días del club (YYYY-MM-DD) que cubre la tasa, los dos incluidos. */
+export type ClubRateWindow = {
+  readonly since: string;
+  readonly until: string;
+};
+
 export type ClubAttendanceRateGateways = {
   readonly members: RoleRequestGateways["members"];
   readonly clubRate: {
-    /** Las filas de los entrenamientos no cancelados desde `since`. */
+    /** Las filas de los entrenamientos no cancelados del periodo. */
     findClubAttendanceRate(
       clubId: string,
-      since: string,
+      window: ClubRateWindow,
     ): Promise<ClubAttendanceRate>;
   };
 };
@@ -53,8 +59,9 @@ export async function readClubAttendanceRate(
   if (!hasCapability(caller.role, "buildTeamsAndTrackAttendance")) {
     throw new AttendanceForbiddenError();
   }
-  return gateways.clubRate.findClubAttendanceRate(
-    caller.clubId,
-    subtractClubDays(request.todayInClub, CLUB_RATE_WINDOW_DAYS),
-  );
+  // Hoy y los 29 días anteriores: 30 días de calendario.
+  return gateways.clubRate.findClubAttendanceRate(caller.clubId, {
+    since: subtractClubDays(request.todayInClub, CLUB_RATE_WINDOW_DAYS - 1),
+    until: request.todayInClub,
+  });
 }
