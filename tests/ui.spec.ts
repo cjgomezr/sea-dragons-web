@@ -1419,6 +1419,7 @@ test.describe("dentro de la aplicación", () => {
           "Dashboard",
           "Directory",
           "Calendar",
+          "Attendance",
           "Teams",
           "Evaluations",
           "News",
@@ -1443,7 +1444,13 @@ test.describe("dentro de la aplicación", () => {
         await openMore(page, ENGLISH_SHELL);
         await expect(
           tabBar.locator(".app-tabbar-overflow").getByRole("link"),
-        ).toHaveText(["Directory", "Evaluations", "Payments", "Groups"]);
+        ).toHaveText([
+          "Directory",
+          "Attendance",
+          "Evaluations",
+          "Payments",
+          "Groups",
+        ]);
       });
     });
   });
