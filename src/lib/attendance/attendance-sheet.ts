@@ -331,6 +331,19 @@ function assertWellFormedList(records: readonly AttendanceRecord[]): void {
   }
 }
 
+/** Se comprueba antes de bloquear el evento: si alguien sale de la audiencia
+ * justo entretanto, su fila se guarda igual. Sigue siendo del club, y la clave
+ * compuesta de `0043` impide cualquier otro. */
+function assertMembersOnSheet(
+  roster: SheetRoster,
+  records: readonly AttendanceRecord[],
+): void {
+  const sheetIds = new Set(roster.members.map((member) => member.userId));
+  if (records.some((record) => !sheetIds.has(record.userId))) {
+    throw new AttendanceMemberOutsideSheetError();
+  }
+}
+
 function assertSaved(outcome: AttendanceSaveOutcome): void {
   switch (outcome) {
     case "saved":
@@ -361,11 +374,7 @@ export async function saveAttendanceSheet(
     ...request,
     clubId: actor.clubId,
   });
-  const roster = await readSheetRoster(gateways, event);
-  const sheetIds = new Set(roster.members.map((member) => member.userId));
-  if (request.records.some((record) => !sheetIds.has(record.userId))) {
-    throw new AttendanceMemberOutsideSheetError();
-  }
+  assertMembersOnSheet(await readSheetRoster(gateways, event), request.records);
   assertSaved(
     await gateways.sheets.saveSheet({
       clubId: actor.clubId,
