@@ -20,7 +20,7 @@ fábrica: solo sus tickets lo son.
 | **E7** — Calendario y eventos + RSVP    | Eventos puntuales y recurrentes (semanal), 4 tipos, targeting por audiencia, agenda, RSVP con agregados, notificación al crear; editar y cancelar eventos y series. FR-028–037                                                                                 | L (12)        | E4, E6            | #7        |
 | **E8** — Asistencia                     | Registro Present/Late/Absent por sesión, contadores en vivo, % de asistencia sobre sesiones elegibles para directorio/perfil/dashboard. FR-038–042                                                                                                             | M (4)         | E7                | #8        |
 | **E9** — Evaluaciones                   | Ratings 1–10 por categoría configurable, OVR a 1 decimal, set de categorías inmutable por evaluación, visibilidad estricta Admin/Coach garantizada por RLS. FR-050–056                                                                                         | M (5)         | E3, E5            | #9        |
-| **E10** — Team builder                  | Modo manual + auto-balance determinista server-side (< 2s para 30 jugadores, NFR-002), no evaluados a 5.0 virtual, swap sugerido, vista del jugador asignado. FR-043–049, FR-086 · NFR-002                                                                     | L (6)         | E7, E8, E9        | #10       |
+| **E10** — Team builder                  | Modo manual + auto-balance determinista server-side (< 2s para 30 jugadores, NFR-002), no evaluados a 5.0 virtual, swap sugerido, vista del jugador asignado. FR-043–049, FR-086 · NFR-002                                                                     | L (6)         | E7, E9            | #10       |
 | **E11** — Noticias y documentos         | Posts con adjuntos (PDF/doc/imagen) vía Supabase Storage, targeting a grupos, feed cronológico inverso, notificaciones; editar y retirar una publicación. FR-057–061                                                                                           | L (7)         | E4, E6            | #11       |
 | **E12** — Stripe base                   | 3 membresías en AUD (Full, Student, Casual), cargo mensual recurrente para los planes recurrentes, panel de plan, cambio de plan al siguiente ciclo, tarjeta tokenizada (NFR-006), historial, webhooks. FR-062/063/065–068 · INT-001/002/003 · NFR-006         | L (6-7)       | E2, E6            | #12       |
 | **E13** — Stripe avanzado               | Packs prepagos Casual con decremento por asistencia y saldo congelado al cambiar de plan, levies one-off gestionados en Stripe, recuperación de pago fallido, aviso pre-renovación. FR-064/069–072/080/087 · INT-007                                           | L (5-6)       | E12, E8           | #13       |
@@ -135,6 +135,16 @@ nadie, y que Admin y Coach corrigen sin límite de tiempo, con bitácora. La
 tasa del club de los últimos 30 días se sirve aquí para que E14 solo la pinte.
 PRD en `docs/prd/e8-asistencia.md`.
 
+El 28 de septiembre de 2026, con E7 cerrada, se escribió el PRD de **E10**
+con 6 tickets, los que el plan estimaba. La escuadra sale del RSVP (B7): los
+"Sí" entran a la lista y los "Quizás" quedan aparte para arrastrarlos. Para
+que el auto-balance sepa cuál es el portero con posiciones que el club
+renombra (E18a), cada posición lleva una función (`goalkeeper`, `defender`,
+`forward` o ninguna), y las tres sembradas nacen con la suya. Guardar no
+avisa; publicar avisa a los asignados. El jugador ve su equipo y la
+alineación, nunca los OVR. E10 no depende ya de E8: armar equipos con la hoja
+de asistencia queda fuera de alcance. PRD en `docs/prd/e10-team-builder.md`.
+
 El 7 de septiembre de 2026, al escribir su PRD, **E16 se partió en E16a y
 E16b**. El motivo es de secuencia, no de tamaño: sus jobs de `pg_cron` necesitan
 las tablas de eventos (E7) y de membresías (E12), y la prueba de carga exige
@@ -186,7 +196,6 @@ graph LR
   subgraph Deportivo
     E7 --> E8
     E9 --> E10
-    E8 --> E10
     E7 --> E10
   end
   subgraph Comunicacion
@@ -224,7 +233,8 @@ carriles paralelos** que no compiten entre sí y pueden avanzar de forma
 independiente en la fábrica:
 
 1. **Deportivo:** E7 (eventos) → E8 (asistencia) y E9 (evaluaciones) → E10
-   (team builder, que necesita eventos, asistencia y evaluaciones).
+   (team builder, que necesita eventos y evaluaciones; la asistencia quedó
+   fuera de su alcance el 28 de septiembre de 2026).
 2. **Comunicación:** E11 (noticias y documentos).
 3. **Billing:** E12 (Stripe base) → E13 (Stripe avanzado, que además consume
    la asistencia de E8 para decrementar packs Casual).
