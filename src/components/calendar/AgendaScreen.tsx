@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AgendaEvent } from "@/lib/events/event-agenda";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
@@ -10,6 +10,8 @@ import {
   loadAgenda,
 } from "./agenda-client";
 import { AgendaRow } from "./AgendaRow";
+import { type CreatedSummary, describeCreated } from "./event-create-client";
+import { EventDialog } from "./EventDialog";
 
 /**
  * La agenda del Calendario (#311, RF-5 a RF-7 del PRD de E7): los eventos de
@@ -20,6 +22,10 @@ import { AgendaRow } from "./AgendaRow";
  * siguiente al final sin volver a pedir ni reordenar lo que ya hay, y cada
  * fila guarda su respuesta. Lee por la API v1, la misma que usará la
  * aplicación nativa de Release 2 (CON-002).
+ *
+ * A quien puede crear eventos le pinta "+ Evento" (#313), que abre el
+ * diálogo; al crear, vuelve a pedir la agenda para que el evento salga en su
+ * sitio, ordenado por el servidor.
  */
 
 type MoreState =
@@ -118,14 +124,62 @@ function AgendaList({
   );
 }
 
+/** "+ Evento" y el diálogo que abre. Al cerrarse, el foco vuelve al botón. */
+function CreateEventButton({
+  translate,
+  onOpen,
+  onCreated,
+}: {
+  readonly translate: Translator;
+  readonly onOpen: () => void;
+  readonly onCreated: (summary: CreatedSummary) => void;
+}): React.JSX.Element {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const openButtonRef = useRef<HTMLButtonElement>(null);
+
+  function handleClosed(): void {
+    setIsDialogOpen(false);
+    openButtonRef.current?.focus();
+  }
+
+  return (
+    <>
+      <button
+        ref={openButtonRef}
+        type="button"
+        className="auth-submit agenda-create"
+        onClick={() => {
+          onOpen();
+          setIsDialogOpen(true);
+        }}
+      >
+        <span aria-hidden="true">+ </span>
+        {translate("calendar.create.open")}
+      </button>
+      {isDialogOpen ? (
+        <EventDialog
+          translate={translate}
+          onCreated={onCreated}
+          onClosed={handleClosed}
+        />
+      ) : null}
+    </>
+  );
+}
+
 export function AgendaScreen({
   locale,
+  canCreateEvents,
 }: {
   readonly locale: Locale;
+  /** Si quien mira puede crear eventos. Sólo decide si se pinta el botón:
+   * el endpoint ya rechaza a quien no tiene `createEvents` (#307). */
+  readonly canCreateEvents: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [state, setState] = useState<AgendaState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
+  const [created, setCreated] = useState<CreatedSummary | null>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -150,7 +204,7 @@ export function AgendaScreen({
     };
   }, [reloads]);
 
-  function retryLoad(): void {
+  function reloadAgenda(): void {
     setState({ kind: "loading" });
     setReloads((count) => count + 1);
   }
@@ -184,9 +238,28 @@ export function AgendaScreen({
   return (
     <div className="agenda">
       <header className="agenda-header">
-        <p className="agenda-eyebrow">{translate("calendar.eyebrow")}</p>
-        <h1 id={TITLE_ID}>{translate("calendar.title")}</h1>
+        <div>
+          <p className="agenda-eyebrow">{translate("calendar.eyebrow")}</p>
+          <h1 id={TITLE_ID}>{translate("calendar.title")}</h1>
+        </div>
+        {canCreateEvents ? (
+          <CreateEventButton
+            translate={translate}
+            onOpen={() => setCreated(null)}
+            onCreated={(summary) => {
+              setCreated(summary);
+              reloadAgenda();
+            }}
+          />
+        ) : null}
       </header>
+      {/* Siempre en el DOM: un lector de pantalla sólo anuncia los cambios
+          de una región que ya estaba. */}
+      {canCreateEvents ? (
+        <p className="agenda-notice" role="status">
+          {created === null ? null : describeCreated(translate, created)}
+        </p>
+      ) : null}
       {state.kind === "loading" ? (
         <p className="admin-empty">{translate("calendar.loading")}</p>
       ) : null}
@@ -194,7 +267,7 @@ export function AgendaScreen({
         <LoadFailure
           translate={translate}
           failure={state.failure}
-          onRetry={retryLoad}
+          onRetry={reloadAgenda}
         />
       ) : null}
       {state.kind === "ready" ? (

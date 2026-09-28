@@ -716,6 +716,63 @@ export const spanishMessages: MessageCatalog = {
     "Tu sesión terminó. Vuelve a entrar para responder.",
   "calendar.rsvp.error.unexpected":
     "No pudimos guardar tu respuesta. Vuelve a intentarlo.",
+  "calendar.create.open": "Evento",
+  "calendar.create.created": "Evento creado. Avisamos a los miembros.",
+  "calendar.create.createdSeries": {
+    one: "Se creó {count} sesión. Avisamos a los miembros.",
+    other: "Se crearon {count} sesiones. Avisamos a los miembros.",
+  },
+  "calendar.form.title": "Nuevo evento",
+  "calendar.form.close": "Cerrar",
+  "calendar.form.loading": "Cargando los grupos del club…",
+  "calendar.form.loadFailed":
+    "No pudimos cargar los grupos del club. Vuelve a intentarlo.",
+  "calendar.form.retry": "Reintentar",
+  "calendar.form.titleLabel": "Título",
+  "calendar.form.titlePlaceholder": "p. ej. Entrenamiento en piscina",
+  "calendar.form.type": "Tipo",
+  "calendar.form.date": "Fecha",
+  "calendar.form.time": "Hora",
+  "calendar.form.location": "Lugar",
+  "calendar.form.locationPlaceholder": "p. ej. MSAC, piscina de saltos",
+  "calendar.form.notes": "Notas",
+  "calendar.form.repeat": "Repetición",
+  "calendar.form.repeat.none": "Una vez",
+  "calendar.form.repeat.weekly": "Semanal",
+  "calendar.form.weekdays": "Se repite los",
+  "calendar.form.startsOn": "Empieza",
+  "calendar.form.endsOn": "Termina",
+  "calendar.form.audience": "A quién va",
+  "calendar.form.cancel": "Cancelar",
+  "calendar.form.submit": "Crear evento",
+  "calendar.form.sending": "Guardando…",
+  "calendar.form.issue.required": "Rellena este campo.",
+  "calendar.form.issue.event_title_invalid":
+    "Escribe un título de hasta {max} caracteres.",
+  "calendar.form.issue.event_location_invalid":
+    "Escribe un lugar de hasta {max} caracteres.",
+  "calendar.form.issue.event_notes_too_long":
+    "Las notas pueden tener hasta {max} caracteres.",
+  "calendar.form.issue.event_audience_empty":
+    "Elige todo el club o al menos un grupo.",
+  "calendar.form.issue.event_audience_foreign_group":
+    "Uno de estos grupos ya no existe. Cierra y vuelve a abrir el formulario.",
+  "calendar.form.issue.event_in_past": "Esa fecha y esa hora ya pasaron.",
+  "calendar.form.issue.series_weekdays_empty":
+    "Elige al menos un día de la semana.",
+  "calendar.form.issue.series_range_inverted":
+    "La fecha de fin va antes que la de inicio.",
+  "calendar.form.issue.series_range_too_long":
+    "Una serie puede durar como mucho {max} días.",
+  "calendar.form.issue.series_without_sessions":
+    "Con esos días y esas fechas no sale ninguna sesión. Cambia los días o el rango.",
+  "calendar.form.error.network":
+    "No pudimos hablar con el servidor. Revisa tu conexión y vuelve a intentarlo.",
+  "calendar.form.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para crear el evento.",
+  "calendar.form.error.forbidden": "Tu rol no permite crear eventos.",
+  "calendar.form.error.unexpected":
+    "No pudimos crear el evento. Vuelve a intentarlo.",
   "notifications.generic.title": "Aviso nuevo",
   "notifications.generic.body": "Algo cambió en tu cuenta.",
   "themeToggle.switchToLight": "Cambiar a tema claro",
@@ -944,10 +1001,10 @@ export const spanishMessages: MessageCatalog = {
   "news.publish.body": "Mensaje",
   "news.publish.bodyHint": "Texto plano. Se respetan los saltos de línea.",
   "news.publish.audience.legend": "Quién la ve",
-  "news.publish.audience.club": "Todo el club",
-  "news.publish.audience.groups": "Grupos concretos",
-  "news.publish.audience.groupsLegend": "Grupos",
-  "news.publish.audience.noGroups":
+  "audience.club": "Todo el club",
+  "audience.groups": "Grupos concretos",
+  "audience.groupsLegend": "Grupos",
+  "audience.noGroups":
     "El club todavía no tiene grupos, así que sólo puede ir a todo el club.",
   "news.publish.attachments.legend": "Adjuntos",
   "news.publish.attachments.hint":

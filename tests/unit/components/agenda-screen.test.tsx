@@ -172,7 +172,7 @@ describe("agenda", () => {
   it("pinta cada evento con su bloque de fecha, título, tipo, hora, lugar y conteos", async () => {
     stubAgenda([POOL_TRAINING]);
 
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
 
     const row = await findRow(POOL_TRAINING.title);
     expect(within(row).getByText("Tue")).toBeInTheDocument();
@@ -188,7 +188,7 @@ describe("agenda", () => {
   it("titula la sección Próximos eventos y deja los eventos en el orden del servidor", async () => {
     stubAgenda([POOL_TRAINING, SCRIMMAGE]);
 
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
 
     const list = await screen.findByRole("list", { name: "Upcoming events" });
     const titles = within(list)
@@ -200,7 +200,7 @@ describe("agenda", () => {
   it("pide la agenda de los próximos a la API v1", async () => {
     stubAgenda([POOL_TRAINING]);
 
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
 
     await findRow(POOL_TRAINING.title);
     expect(requests).toEqual([{ method: "GET", path: AGENDA_PATH }]);
@@ -209,7 +209,7 @@ describe("agenda", () => {
   it("marca el evento cancelado y no le pone botones de RSVP", async () => {
     stubAgenda([CANCELLED_SOCIAL]);
 
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
 
     const row = await findRow(CANCELLED_SOCIAL.title);
     expect(within(row).getByText("Cancelled")).toBeInTheDocument();
@@ -219,7 +219,7 @@ describe("agenda", () => {
   it("no le pone botones de RSVP a un evento fuera de la audiencia de quien organiza", async () => {
     stubAgenda([COMMITTEE_ONLY]);
 
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
 
     const row = await findRow(COMMITTEE_ONLY.title);
     expect(within(row).queryAllByRole("button")).toEqual([]);
@@ -229,7 +229,7 @@ describe("agenda", () => {
   it("dice con una frase que no hay eventos", async () => {
     stubAgenda([]);
 
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
 
     expect(
       await screen.findByText("There are no upcoming events."),
@@ -243,7 +243,7 @@ describe("agenda", () => {
         ? pageResponse({ events: [SCRIMMAGE], nextCursor: null })
         : pageResponse({ events: [POOL_TRAINING], nextCursor: "pagina-2" }),
     );
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
     await findRow(POOL_TRAINING.title);
 
     await userEvent.click(screen.getByRole("button", { name: "See more" }));
@@ -265,7 +265,7 @@ describe("agenda", () => {
         ? pageResponse({ events: [SCRIMMAGE], nextCursor: null })
         : pageResponse({ events: [POOL_TRAINING], nextCursor: "pagina-2" }),
     );
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
     await findRow(POOL_TRAINING.title);
     expect(
       screen.getByRole("heading", { name: POOL_TRAINING.title }),
@@ -283,7 +283,7 @@ describe("agenda", () => {
   it("no ofrece Ver más en la última página", async () => {
     stubAgenda([POOL_TRAINING]);
 
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
 
     await findRow(POOL_TRAINING.title);
     expect(
@@ -300,7 +300,7 @@ describe("agenda", () => {
       }
       return pageResponse({ events: [POOL_TRAINING], nextCursor: null });
     });
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /couldn't reach the server/i,
@@ -313,7 +313,7 @@ describe("agenda", () => {
   it("escribe textos, fechas y horas en español", async () => {
     stubAgenda([POOL_TRAINING, CANCELLED_SOCIAL]);
 
-    render(<AgendaScreen locale="es" />);
+    render(<AgendaScreen locale="es" canCreateEvents={false} />);
 
     const row = await findRow(POOL_TRAINING.title);
     expect(
@@ -333,7 +333,7 @@ describe("agenda", () => {
   it("escribe en singular una sola persona que va en español", async () => {
     stubAgenda([{ ...SCRIMMAGE, goingCount: 1, maybeCount: 0 }]);
 
-    render(<AgendaScreen locale="es" />);
+    render(<AgendaScreen locale="es" canCreateEvents={false} />);
 
     const row = await findRow(SCRIMMAGE.title);
     expect(within(row).getByText("1 va · 0 quizás")).toBeInTheDocument();
@@ -342,7 +342,7 @@ describe("agenda", () => {
   it("dice que no hay eventos en español", async () => {
     stubAgenda([]);
 
-    render(<AgendaScreen locale="es" />);
+    render(<AgendaScreen locale="es" canCreateEvents={false} />);
 
     expect(
       await screen.findByText("No hay eventos próximos."),
@@ -354,7 +354,7 @@ describe("RSVP en la fila", () => {
   it("anuncia qué respuesta está elegida", async () => {
     stubAgenda([POOL_TRAINING]);
 
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
 
     const row = await findRow(POOL_TRAINING.title);
     const group = within(row).getByRole("group", {
@@ -389,7 +389,7 @@ describe("RSVP en la fila", () => {
       }
       return pageResponse({ events: [SCRIMMAGE], nextCursor: null });
     });
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
     const row = await findRow(SCRIMMAGE.title);
 
     await userEvent.click(rsvpButton(row, "Maybe"));
@@ -411,7 +411,7 @@ describe("RSVP en la fila", () => {
       }
       return pageResponse({ events: [POOL_TRAINING], nextCursor: null });
     });
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
     const row = await findRow(POOL_TRAINING.title);
 
     await userEvent.click(rsvpButton(row, "Maybe"));
@@ -436,7 +436,7 @@ describe("RSVP en la fila", () => {
       }
       return pageResponse({ events: [SCRIMMAGE], nextCursor: null });
     });
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
     const row = await findRow(SCRIMMAGE.title);
 
     await userEvent.click(rsvpButton(row, "Yes"));
@@ -466,7 +466,7 @@ describe("RSVP en la fila", () => {
       }
       return pageResponse({ events: [SCRIMMAGE], nextCursor: null });
     });
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
     const row = await findRow(SCRIMMAGE.title);
 
     await userEvent.click(rsvpButton(row, "Yes"));
@@ -492,7 +492,7 @@ describe("RSVP en la fila", () => {
         ? startedResponse()
         : pageResponse({ events: [POOL_TRAINING], nextCursor: null }),
     );
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
     const row = await findRow(POOL_TRAINING.title);
 
     await userEvent.click(rsvpButton(row, "No"));
@@ -511,7 +511,7 @@ describe("RSVP en la fila", () => {
         ? startedResponse()
         : pageResponse({ events: [POOL_TRAINING], nextCursor: null }),
     );
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
     const row = await findRow(POOL_TRAINING.title);
     await userEvent.click(rsvpButton(row, "No"));
     await within(row).findByRole("alert");
@@ -533,7 +533,7 @@ describe("RSVP en la fila", () => {
           })
         : pageResponse({ events: [SCRIMMAGE], nextCursor: null }),
     );
-    render(<AgendaScreen locale="en" />);
+    render(<AgendaScreen locale="en" canCreateEvents={false} />);
     const row = await findRow(SCRIMMAGE.title);
 
     await userEvent.click(rsvpButton(row, "Yes"));
@@ -550,7 +550,7 @@ describe("RSVP en la fila", () => {
         ? startedResponse()
         : pageResponse({ events: [POOL_TRAINING], nextCursor: null }),
     );
-    render(<AgendaScreen locale="es" />);
+    render(<AgendaScreen locale="es" canCreateEvents={false} />);
     const row = await findRow(POOL_TRAINING.title);
 
     await userEvent.click(rsvpButton(row, "No"));
