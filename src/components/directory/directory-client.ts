@@ -33,6 +33,17 @@ import { namedPositionSchema } from "@/components/club/positions-client";
  * para que el aviso cambie de idioma con el interruptor (E17).
  */
 
+/** La asistencia de un miembro (#394): su porcentaje y su total, o sin
+ * datos. La ficha del Admin la lee con la misma forma. */
+export const memberAttendanceSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("rate"),
+    percent: z.number().int(),
+    sessions: z.number().int(),
+  }),
+  z.object({ kind: z.literal("no_data") }),
+]);
+
 const memberSchema = z.object({
   userId: z.uuid(),
   fullName: z.string(),
@@ -43,6 +54,7 @@ const memberSchema = z.object({
   status: z.enum(ACCOUNT_STATUSES),
   // Sólo una dirección web: la pantalla la pone tal cual en una imagen.
   photoUrl: z.url({ protocol: /^https?$/ }).nullable(),
+  attendance: memberAttendanceSchema,
 });
 
 const coachMemberSchema = memberSchema.extend({

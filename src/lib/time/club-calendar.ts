@@ -38,3 +38,14 @@ export function clubMoment(instant: Date): ClubMoment {
     time: CLUB_TIME_FORMATTER.format(instant),
   };
 }
+
+const ISO_DATE_LENGTH = "YYYY-MM-DD".length;
+
+/** El día del club `days` días antes de `date` (YYYY-MM-DD). Se cuenta en UTC
+ * a propósito: es aritmética de calendario, y ahí no hay cambio de horario
+ * que pueda comerse o duplicar un día. */
+export function subtractClubDays(date: string, days: number): string {
+  const day = new Date(`${date}T00:00:00.000Z`);
+  day.setUTCDate(day.getUTCDate() - days);
+  return day.toISOString().slice(0, ISO_DATE_LENGTH);
+}

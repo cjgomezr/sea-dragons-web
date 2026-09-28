@@ -151,6 +151,11 @@ export const ACCOUNT_PROFILE_API_PATH = "/api/v1/account/profile";
  * activa, así que tampoco aparece en `RESTRICTED_ROUTES`. */
 export const ACCOUNT_PROFILE_PHOTO_API_PATH = `${ACCOUNT_PROFILE_API_PATH}/photo`;
 
+/** El porcentaje y el total de asistencia de quien llama (#394, FR-022).
+ * Los alcanza cualquier cuenta activa, de cualquier rol, y siempre sobre sí
+ * misma, así que no aparece en `RESTRICTED_ROUTES`. */
+export const ACCOUNT_ATTENDANCE_API_PATH = "/api/v1/account/attendance";
+
 /** Los avisos de quien llama (#265, E6): listarlos, contar los no leídos y
  * marcarlos. Los alcanza cualquier cuenta activa, de cualquier rol, y siempre
  * sobre los suyos, así que no aparecen en `RESTRICTED_ROUTES`. */
@@ -355,6 +360,12 @@ export const EVALUATION_CATEGORIES_ORDER_API_PATH = `${EVALUATION_CATEGORIES_API
 /** Poner al día la evaluación de un miembro (#320, RF-4): POST. `[id]` es el
  * `user_id` del miembro, como en su evaluación. */
 export const EVALUATION_REFRESH_API_PATH = `${EVALUATIONS_API_PATH}/[id]/refresh`;
+
+/** La tasa de asistencia del club en los últimos 30 días (#394, RF-7 del PRD
+ * de E8), para la tesela del dashboard de E14 (FR-076). Cuelga del camino de
+ * pasar lista (#393), así que es de Admin y Coach. El porcentaje de cada
+ * miembro no vive aquí: lo sirven el directorio, el perfil y la ficha. */
+export const ATTENDANCE_CLUB_RATE_API_PATH = `${ATTENDANCE_API_PATH}/club-rate`;
 
 /** El destino del enlace del correo de confirmación (#132). No es una
  * pantalla del PRD: canjea el token y redirige. Es público por definición,

@@ -3,6 +3,7 @@ import { parseAccountStatus } from "@/lib/auth/account-status";
 import { parseRole } from "@/lib/auth/roles";
 import { readRequiredText, readText } from "@/lib/auth/supabase-auth-gateways";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
+import { createMemberAttendanceGateway } from "@/lib/attendance/supabase-attendance-stats";
 import type { ClubPositionsGateway } from "@/lib/club/club-positions";
 import { cachedClubPositions } from "@/lib/club/supabase-club-positions";
 import { parseExperienceLevel } from "@/lib/members/profile-fields";
@@ -128,6 +129,7 @@ export function createDirectoryGateways(
       signPhotoUrls: (photoPaths) =>
         signProfilePhotoUrls(serviceClient, photoPaths),
     },
+    attendance: createMemberAttendanceGateway(serviceClient),
   };
 }
 

@@ -1,3 +1,8 @@
+import {
+  type MemberAttendance,
+  type MemberAttendanceGateway,
+  attendanceOf,
+} from "@/lib/attendance/attendance-stats";
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { RoleRequestGateways } from "@/lib/auth/role-request";
@@ -33,7 +38,12 @@ import { compareNames } from "@/lib/text/name-order";
  * extensión de Postgres.
  */
 
-export const DIRECTORY_SORTS = ["name", "role", "position"] as const;
+export const DIRECTORY_SORTS = [
+  "name",
+  "role",
+  "position",
+  "attendance",
+] as const;
 
 export type DirectorySort = (typeof DIRECTORY_SORTS)[number];
 
@@ -99,6 +109,9 @@ export type DirectoryMember = {
   readonly status: AccountStatus;
   /** Null sin foto: la fila enseña entonces las iniciales. */
   readonly photoUrl: string | null;
+  /** Su porcentaje de asistencia, o sin datos (#394, FR-015). Es de todo el
+   * club, no sólo del personal de entrenamiento. */
+  readonly attendance: MemberAttendance;
 };
 
 /** Lo mismo, más si tiene evaluación, que sólo ve quien puede verlas
@@ -144,6 +157,7 @@ export type DirectoryGateways = {
       photoPaths: readonly string[],
     ): Promise<ReadonlyMap<string, string>>;
   };
+  readonly attendance: MemberAttendanceGateway;
 };
 
 export class DirectoryForbiddenError extends Error {
@@ -216,12 +230,30 @@ function comparePositions(
   );
 }
 
+/** Sin datos va al final en los dos sentidos, como quien no tiene posición
+ * (AC-010): no es ni más ni menos asistencia que nadie. */
+function compareAttendance(
+  [first, second]: readonly [MemberAttendance, MemberAttendance],
+  direction: DirectoryDirection,
+): number {
+  if (first.kind === "no_data" || second.kind === "no_data") {
+    return first.kind === second.kind ? 0 : first.kind === "no_data" ? 1 : -1;
+  }
+  return withDirection(first.percent - second.percent, direction);
+}
+
+/** Lo que se lee aparte para ordenar, además de las filas. */
+type SortContext = {
+  readonly positions: ClubPositions;
+  readonly attendance: ReadonlyMap<string, MemberAttendance>;
+};
+
 /** El criterio pedido primero y el nombre después, para que dos socios que
  * empatan salgan siempre en el mismo orden. */
 function comparePrimary(
   [first, second]: readonly [DirectoryMemberRecord, DirectoryMemberRecord],
   query: DirectoryQuery,
-  positions: ClubPositions,
+  { positions, attendance }: SortContext,
 ): number {
   switch (query.sort) {
     case "name":
@@ -240,15 +272,23 @@ function comparePrimary(
         [first.positionId, second.positionId],
         query.direction,
       );
+    case "attendance":
+      return compareAttendance(
+        [
+          attendanceOf(attendance, first.userId),
+          attendanceOf(attendance, second.userId),
+        ],
+        query.direction,
+      );
   }
 }
 
 function compareForQuery(
   pair: readonly [DirectoryMemberRecord, DirectoryMemberRecord],
   query: DirectoryQuery,
-  positions: ClubPositions,
+  context: SortContext,
 ): number {
-  const primary = comparePrimary(pair, query, positions);
+  const primary = comparePrimary(pair, query, context);
   const [first, second] = pair;
   return primary === 0
     ? compareNames(first.fullName, second.fullName)
@@ -304,14 +344,13 @@ function referencedPositionIds(
 }
 
 /** Lo que se lee para armar cada fila, aparte de la fila misma. */
-type ListingContext = {
-  readonly positions: ClubPositions;
+type ListingContext = SortContext & {
   readonly signedPhotos: SignedPhotos;
 };
 
 function toDirectoryMember(
   record: DirectoryMemberRecord,
-  { positions, signedPhotos }: ListingContext,
+  { positions, signedPhotos, attendance }: ListingContext,
 ): DirectoryMember {
   return {
     userId: record.userId,
@@ -322,6 +361,7 @@ function toDirectoryMember(
     position: directoryPositionOf(positions, record.positionId),
     status: record.status,
     photoUrl: photoUrlOf(record, signedPhotos),
+    attendance: attendanceOf(attendance, record.userId),
   };
 }
 
@@ -378,13 +418,21 @@ export async function listDirectory(
     caller.clubId,
     referencedPositionIds(records),
   );
-  const listed = records
-    .filter((record) => isVisible(record, request.query))
-    .sort((first, second) =>
-      compareForQuery([first, second], request.query, positions),
-    );
-  const context = {
+  const visible = records.filter((record) => isVisible(record, request.query));
+  // Una sola consulta para toda la lista (NFR-008), antes de ordenar: el
+  // orden por asistencia la necesita.
+  const sortContext = {
     positions,
+    attendance: await gateways.attendance.findMemberAttendance(
+      caller.clubId,
+      visible.map((record) => record.userId),
+    ),
+  };
+  const listed = [...visible].sort((first, second) =>
+    compareForQuery([first, second], request.query, sortContext),
+  );
+  const context = {
+    ...sortContext,
     signedPhotos: await signListedPhotos(gateways, listed),
   };
 

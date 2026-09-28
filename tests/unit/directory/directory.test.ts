@@ -11,6 +11,7 @@ import {
   listDirectory,
   withMemberRole,
 } from "@/lib/directory/directory";
+import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
 import type { ClubPosition } from "@/lib/club/club-positions";
 
 /**
@@ -111,6 +112,22 @@ const ZOE: DirectoryMemberRecord = {
 
 const CLUB: readonly DirectoryMemberRecord[] = [ZOE, MARIA, ANA, BRUNO];
 
+/** Ana y Zoe empatan: el nombre decide entre las dos. Bruno no tiene
+ * sesiones elegibles (AC-017b). */
+const ATTENDANCE: ReadonlyMap<string, MemberAttendance> = new Map([
+  [ANA.userId, { kind: "rate", percent: 90, sessions: 9 }],
+  [BRUNO.userId, { kind: "no_data" }],
+  [MARIA.userId, { kind: "rate", percent: 40, sessions: 2 }],
+  [ZOE.userId, { kind: "rate", percent: 90, sessions: 5 }],
+]);
+
+type AttendanceRequest = {
+  readonly clubId: string;
+  readonly userIds: readonly string[];
+};
+
+const attendanceRequests: AttendanceRequest[] = [];
+
 const clubsRead: string[] = [];
 const photosSigned: string[] = [];
 
@@ -125,6 +142,7 @@ function gateways(
   photosSigned.length = 0;
   clubsWhosePositionsWereRead.length = 0;
   positionsReferenced.length = 0;
+  attendanceRequests.length = 0;
   return {
     members: {
       findRoleRequestMember: async () =>
@@ -153,6 +171,15 @@ function gateways(
       signPhotoUrls: async (photoPaths) => {
         photosSigned.push(...photoPaths);
         return new Map(photoPaths.map((path) => [path, signedUrlOf(path)]));
+      },
+    },
+    attendance: {
+      findMemberAttendance: async (clubId, userIds) => {
+        // En orden, para que el test no dependa del de la lista.
+        attendanceRequests.push({ clubId, userIds: [...userIds].sort() });
+        return new Map(
+          [...ATTENDANCE].filter(([userId]) => userIds.includes(userId)),
+        );
       },
     },
   };
@@ -261,6 +288,34 @@ describe("directorio", () => {
         position: { id: DEFENDER.id, names: DEFENDER.names },
         status: "active",
         photoUrl: null,
+        attendance: { kind: "rate", percent: 40, sessions: 2 },
+      },
+    ]);
+  });
+
+  it("trae a un Player el porcentaje de los demás, o sin datos (FR-015)", async () => {
+    const listing = await listDirectory(gateways({ callerRole: "Player" }), {
+      callerId: CALLER_ID,
+      query: DEFAULT_DIRECTORY_QUERY,
+      todayInClub: TODAY,
+    });
+
+    expect(
+      listing.members.map((member) => [member.fullName, member.attendance]),
+    ).toEqual([
+      ["Ana Admin", { kind: "rate", percent: 90, sessions: 9 }],
+      ["Bruno Beltrán", { kind: "no_data" }],
+      ["María Ñíguez", { kind: "rate", percent: 40, sessions: 2 }],
+    ]);
+  });
+
+  it("cuenta la asistencia de toda la lista en una sola consulta (NFR-008)", async () => {
+    await listNames({ search: "a" });
+
+    expect(attendanceRequests).toEqual([
+      {
+        clubId: CLUB_ID,
+        userIds: [ANA.userId, BRUNO.userId, MARIA.userId].sort(),
       },
     ]);
   });
@@ -400,6 +455,18 @@ describe("el orden del directorio", () => {
       "position",
       "desc",
       ["María Ñíguez", "Bruno Beltrán", "Zoe Zapata", "Ana Admin"],
+    ],
+    // Sin datos al final en los dos sentidos (AC-010); Ana y Zoe empatan y
+    // las ordena el nombre.
+    [
+      "attendance",
+      "asc",
+      ["María Ñíguez", "Ana Admin", "Zoe Zapata", "Bruno Beltrán"],
+    ],
+    [
+      "attendance",
+      "desc",
+      ["Ana Admin", "Zoe Zapata", "María Ñíguez", "Bruno Beltrán"],
     ],
   ] as const)("ordena por %s %s", async (sort, direction, expected) => {
     await expect(orderedBy(sort, direction)).resolves.toEqual(expected);
@@ -552,6 +619,7 @@ describe("marca de sin evaluar", () => {
           position: { id: GOALKEEPER.id, names: GOALKEEPER.names },
           status: "active",
           photoUrl: null,
+          attendance: { kind: "no_data" },
           isEvaluated: false,
         },
       ],
@@ -580,6 +648,7 @@ describe("el rol nuevo en la lista (#240)", () => {
     position: { id: GOALKEEPER.id, names: GOALKEEPER.names },
     status: "active",
     photoUrl: null,
+    attendance: { kind: "no_data" },
   } as const;
   const TOMAS = {
     ...NEREA,

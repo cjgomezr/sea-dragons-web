@@ -191,7 +191,9 @@ columna team_splits.team_b_color tipo=text null=NO default=-
 columna team_splits.team_b_name tipo=text null=NO default=-
 columna team_splits.updated_at tipo=timestamp with time zone null=NO default=now()
 funcion are_valid_weekdays(weekdays smallint[])
+funcion attendance_stats(p_club_id uuid, p_user_ids uuid[])
 funcion change_member_role(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_role text)
+funcion club_attendance_rate(p_club_id uuid, p_since date, p_until date)
 funcion club_position_name_taken(acting_club_id uuid, own_position_id uuid, name_en text, name_es text)
 funcion clubs_seed_default_evaluation_categories()
 funcion clubs_seed_default_positions()

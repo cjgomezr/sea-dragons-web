@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { CLUB_TIME_ZONE, clubCalendarDate } from "@/lib/time/club-calendar";
+import {
+  CLUB_TIME_ZONE,
+  clubCalendarDate,
+  subtractClubDays,
+} from "@/lib/time/club-calendar";
 
 describe("calendario del club", () => {
   it("opera en la zona horaria de Melbourne", () => {
@@ -23,5 +27,20 @@ describe("calendario del club", () => {
     const instant = new Date("2026-03-05T00:00:00.000Z");
 
     expect(clubCalendarDate(instant)).toBe("2026-03-05");
+  });
+});
+
+describe("restar días a una fecha del club", () => {
+  it("cruza el cambio de mes", () => {
+    expect(subtractClubDays("2026-10-05", 30)).toBe("2026-09-05");
+  });
+
+  it("no se mueve con el cambio de horario de verano", () => {
+    // El 4 de octubre de 2026 Melbourne pasa a AEDT.
+    expect(subtractClubDays("2026-10-10", 7)).toBe("2026-10-03");
+  });
+
+  it("cruza el fin de año", () => {
+    expect(subtractClubDays("2027-01-10", 30)).toBe("2026-12-11");
   });
 });

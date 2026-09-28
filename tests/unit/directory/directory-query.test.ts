@@ -41,6 +41,7 @@ describe("la consulta del directorio", () => {
   it.each([
     ["sort", "role"],
     ["sort", "position"],
+    ["sort", "attendance"],
     ["direction", "desc"],
   ] as const)("acepta %s=%s", (parameter, value) => {
     expect(parse(`${parameter}=${value}`)).toMatchObject({

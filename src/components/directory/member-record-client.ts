@@ -29,6 +29,7 @@ import {
   type MemberRecordSubmission,
 } from "@/lib/members/member-record";
 import { loadGroups } from "@/components/groups/groups-client";
+import { memberAttendanceSchema } from "./directory-client";
 
 /**
  * Lo que la ficha reservada al Admin (#242) le pide a la API v1 y cómo reduce
@@ -55,6 +56,7 @@ const recordSchema = z.object({
   photoUrl: z.url().nullable(),
   isAufExpired: z.boolean(),
   groups: z.array(z.object({ id: z.uuid(), name: z.string() })),
+  attendance: memberAttendanceSchema,
 });
 
 const responseSchema = z.object({ data: recordSchema });

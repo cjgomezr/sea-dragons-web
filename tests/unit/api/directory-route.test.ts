@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
 import type { DirectoryMemberRecord } from "@/lib/directory/directory";
 import type { Role } from "@/lib/auth/roles";
 import { DIRECTORY_API_PATH } from "@/lib/auth/routes";
@@ -36,6 +37,15 @@ const MARIA: DirectoryMemberRecord = {
   photoPath: null,
   isEvaluated: true,
 };
+
+/** María vino a tres de cuatro; Zoe no tiene sesiones elegibles. */
+const ATTENDANCE: ReadonlyMap<string, MemberAttendance> = new Map([
+  [
+    "cccccccc-0000-4000-8000-00000000000c",
+    { kind: "rate", percent: 75, sessions: 3 },
+  ],
+  ["dddddddd-0000-4000-8000-00000000000d", { kind: "no_data" }],
+]);
 
 const BAJA: DirectoryMemberRecord = {
   userId: "dddddddd-0000-4000-8000-00000000000d",
@@ -86,6 +96,17 @@ function mockWiring(callerRole: Role = "Player"): void {
           },
         },
         photos: { signPhotoUrls: async () => new Map() },
+        attendance: {
+          findMemberAttendance: async (
+            clubId: string,
+            userIds: readonly string[],
+          ) => {
+            databaseCalls.push(`attendance ${clubId} ${userIds.length}`);
+            return new Map(
+              [...ATTENDANCE].filter(([userId]) => userIds.includes(userId)),
+            );
+          },
+        },
       },
     }),
   }));
@@ -151,12 +172,36 @@ describe("GET /api/v1/directory", () => {
             position: asDirectoryPosition(DEFENDER),
             status: "active",
             photoUrl: null,
+            attendance: { kind: "rate", percent: 75, sessions: 3 },
           },
         ],
       },
     });
-    expect(databaseCalls).toEqual([`list ${CLUB_ID}`]);
+    expect(databaseCalls).toEqual([
+      `list ${CLUB_ID}`,
+      `attendance ${CLUB_ID} 1`,
+    ]);
   });
+
+  it.each(["asc", "desc"])(
+    "ordena por asistencia en sentido %s, con sin datos al final",
+    async (direction) => {
+      mockWiring("Admin");
+
+      const response = await getDirectory(
+        `?sort=attendance&direction=${direction}&includeInactive=true`,
+      );
+
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        data: { members: readonly { fullName: string }[] };
+      };
+      expect(body.data.members.map((member) => member.fullName)).toEqual([
+        "María Ñíguez",
+        "Zoe Zapata",
+      ]);
+    },
+  );
 
   it("responde 200 con la lista vacía cuando la búsqueda no encuentra a nadie", async () => {
     mockWiring();

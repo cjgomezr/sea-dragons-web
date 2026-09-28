@@ -30,6 +30,7 @@ const MARIA: DirectoryMember = {
   position: asDirectoryPosition(FORWARD),
   status: "active",
   photoUrl: null,
+  attendance: { kind: "no_data" },
 };
 
 /** Sin país, sin nivel y sin posición: los tres huecos del criterio del
@@ -43,6 +44,7 @@ const TOMAS: DirectoryMember = {
   position: null,
   status: "active",
   photoUrl: null,
+  attendance: { kind: "no_data" },
 };
 
 const NEREA: DirectoryMember = {
@@ -54,6 +56,7 @@ const NEREA: DirectoryMember = {
   position: asDirectoryPosition(GOALKEEPER),
   status: "active",
   photoUrl: null,
+  attendance: { kind: "no_data" },
 };
 
 const ZOE: AdminDirectoryMember = {
@@ -65,6 +68,7 @@ const ZOE: AdminDirectoryMember = {
   position: asDirectoryPosition(DEFENDER),
   status: "inactive",
   photoUrl: null,
+  attendance: { kind: "no_data" },
   aufNumber: null,
   aufExpiry: null,
   isAufVerified: false,
@@ -81,6 +85,7 @@ const VENCIDA: AdminDirectoryMember = {
   position: asDirectoryPosition(DEFENDER),
   status: "active",
   photoUrl: null,
+  attendance: { kind: "no_data" },
   aufNumber: "AUF-7",
   aufExpiry: "2020-01-31",
   isAufVerified: true,
