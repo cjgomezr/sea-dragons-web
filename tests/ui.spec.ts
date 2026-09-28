@@ -2141,6 +2141,7 @@ test.describe("un Player que pide una pantalla que su rol no alcanza", () => {
   // #213: la navegación ya no las ofrece, pero esconder es comodidad. Quien
   // escribe la dirección a mano se topa igual con la frontera.
   for (const restrictedPath of [
+    "/asistencia",
     "/equipos",
     "/evaluaciones",
     "/evaluaciones/categorias",
@@ -10911,6 +10912,433 @@ test.describe("editar y cancelar en el navegador", () => {
     expect(heights.length).toBeGreaterThan(0);
     for (const height of heights) {
       expect(height).toBeGreaterThanOrEqual(RSVP_MIN_TOUCH_TARGET_PX);
+    }
+  });
+});
+/* ---------------------------------------------------------------------------
+   Asistencia (#395, RF-8 del PRD de E8): la hoja con estados mezclados, tras
+   guardar, con un error, vacía y sin sesiones. Mockup:
+   docs/mockups/attendance-light.png y attendance-dark.png, que es de
+   escritorio; en el móvil los tres botones bajan a lo ancho de la fila.
+
+   Los datos son fijos, servidos por `page.route` como en Evaluaciones: lo que
+   los endpoints responden y guardan se prueba contra la base (#393).
+   --------------------------------------------------------------------------- */
+
+const ATTENDANCE_SCREEN_PATH = "/asistencia";
+const ATTENDANCE_SESSIONS_ENDPOINT = "/api/v1/attendance/sessions";
+const ATTENDANCE_ENDPOINT = "/api/v1/attendance";
+const ATTENDANCE_NARROW_WIDTHS = [320, 375, 768] as const;
+const ATTENDANCE_MIN_TOUCH_TARGET_PX = 44;
+
+const POOL_TRAINING_SESSION = {
+  eventId: "a7a7a7a7-0000-4000-8000-0000000000a1",
+  title: "Pool Training",
+  // Martes 23 de junio, 19:00 en Melbourne.
+  startsAt: "2026-06-23T09:00:00.000Z",
+  hasSheet: false,
+  totals: { present: 0, late: 0, absent: 0 },
+};
+
+const ATTENDANCE_SESSIONS = [
+  POOL_TRAINING_SESSION,
+  {
+    eventId: "a7a7a7a7-0000-4000-8000-0000000000a2",
+    title: "Skills & Conditioning",
+    startsAt: "2026-06-18T09:00:00.000Z",
+    hasSheet: true,
+    totals: { present: 12, late: 1, absent: 1 },
+  },
+  {
+    eventId: "a7a7a7a7-0000-4000-8000-0000000000a3",
+    title: "Scrimmage",
+    startsAt: "2026-06-13T00:00:00.000Z",
+    hasSheet: true,
+    totals: { present: 13, late: 0, absent: 1 },
+  },
+] as const;
+
+const ATTENDANCE_POSITIONS = {
+  forward: {
+    id: "b0b0b0b0-0000-4000-8000-0000000000b1",
+    names: { en: "Forward", es: "Ataque" },
+  },
+  goalkeeper: {
+    id: "b0b0b0b0-0000-4000-8000-0000000000b2",
+    names: { en: "Goalkeeper", es: "Portería" },
+  },
+  defender: {
+    id: "b0b0b0b0-0000-4000-8000-0000000000b3",
+    names: { en: "Defender", es: "Defensa" },
+  },
+} as const;
+
+type StubbedAttendanceMember = {
+  readonly fullName: string;
+  readonly position: keyof typeof ATTENDANCE_POSITIONS | null;
+  readonly status: "present" | "late" | "absent";
+  readonly rsvpResponse: "yes" | "maybe" | "no" | null;
+  readonly isInactive?: boolean;
+};
+
+function attendanceMember(
+  fullName: string,
+  position: StubbedAttendanceMember["position"],
+  status: StubbedAttendanceMember["status"],
+  rsvpResponse: StubbedAttendanceMember["rsvpResponse"],
+): StubbedAttendanceMember {
+  return { fullName, position, status, rsvpResponse };
+}
+
+const FIRST_ATTENDEE = "Mateo Restrepo";
+const LONG_NAMED_ATTENDEE =
+  "Maximiliana Alejandra Fernández-Rodríguez de la Torre";
+
+/** Los del mockup, con sus estados, más un nombre de tres veces lo normal
+ * para el caso de contenido largo y una cuenta desactivada con fila. */
+const ATTENDANCE_MEMBERS: readonly StubbedAttendanceMember[] = [
+  attendanceMember(FIRST_ATTENDEE, "forward", "present", "yes"),
+  attendanceMember("Valentina Gómez", "goalkeeper", "present", "yes"),
+  attendanceMember("Liam O'Connor", "defender", "present", "yes"),
+  attendanceMember("Chloe Nguyen", "forward", "present", "yes"),
+  attendanceMember("Santiago Herrera", "defender", "present", "yes"),
+  attendanceMember("Ruby Tan", "goalkeeper", "absent", "maybe"),
+  attendanceMember("Camila Ortiz", "forward", "present", "maybe"),
+  attendanceMember("Jack Thompson", "defender", "present", null),
+  attendanceMember(LONG_NAMED_ATTENDEE, "forward", "present", null),
+  attendanceMember("Noah Williams", "goalkeeper", "absent", "no"),
+  attendanceMember("Ethan Brown", "forward", "late", "no"),
+  {
+    ...attendanceMember("Oliver Smith", null, "present", null),
+    isInactive: true,
+  },
+];
+
+function stubbedAttendanceSheet(
+  members: readonly StubbedAttendanceMember[],
+): unknown {
+  return {
+    eventId: POOL_TRAINING_SESSION.eventId,
+    title: POOL_TRAINING_SESSION.title,
+    startsAt: POOL_TRAINING_SESSION.startsAt,
+    isSaved: false,
+    members: members.map((member, index) => ({
+      userId: `a7a7a7a7-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      fullName: member.fullName,
+      photoUrl: null,
+      position:
+        member.position === null ? null : ATTENDANCE_POSITIONS[member.position],
+      status: member.status,
+      rsvpResponse: member.rsvpResponse,
+      isInactive: member.isInactive ?? false,
+    })),
+  };
+}
+
+type SavedRecords = {
+  readonly records: readonly { readonly status: string }[];
+};
+
+function totalsOfSaved({ records }: SavedRecords): unknown {
+  const count = (status: string) =>
+    records.filter((record) => record.status === status).length;
+  return {
+    present: count("present"),
+    late: count("late"),
+    absent: count("absent"),
+  };
+}
+
+type AttendanceReads = {
+  readonly sessions: readonly unknown[];
+  readonly members: readonly StubbedAttendanceMember[];
+  /** Lo que responde guardar; sin él, los totales de lo que llega. */
+  readonly saveFailure?: { readonly status: number; readonly error: unknown };
+};
+
+/** GET de las sesiones y de cualquier hoja; PUT guarda y responde con los
+ * totales, o con el fallo pedido. Devuelve los cuerpos que llegaron a PUT. */
+async function stubAttendance(
+  page: Page,
+  reads: AttendanceReads,
+): Promise<SavedRecords[]> {
+  const saved: SavedRecords[] = [];
+  await page.route(
+    (url) => url.pathname === ATTENDANCE_SESSIONS_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ sessions: reads.sessions })),
+  );
+  await page.route(
+    (url) =>
+      url.pathname.startsWith(`${ATTENDANCE_ENDPOINT}/`) &&
+      url.pathname !== ATTENDANCE_SESSIONS_ENDPOINT,
+    (route, request) => {
+      if (request.method() !== "PUT") {
+        return route.fulfill(jsonBody(stubbedAttendanceSheet(reads.members)));
+      }
+      const body = request.postDataJSON() as SavedRecords;
+      saved.push(body);
+      if (reads.saveFailure !== undefined) {
+        return route.fulfill({
+          status: reads.saveFailure.status,
+          contentType: "application/json",
+          body: JSON.stringify({ error: reads.saveFailure.error }),
+        });
+      }
+      return route.fulfill(
+        jsonBody({
+          eventId: POOL_TRAINING_SESSION.eventId,
+          totals: totalsOfSaved(body),
+        }),
+      );
+    },
+  );
+  return saved;
+}
+
+const ATTENDANCE_SAVE = /^(Save attendance|Guardar asistencia)/;
+const ATTENDANCE_LATE = /^(Late|Tarde)$/;
+const CANCELLED_SESSION_FAILURE = {
+  status: 422,
+  error: {
+    code: "business_rule",
+    message: "El entrenamiento está cancelado: no lleva asistencia.",
+    reason: "attendance_session_cancelled",
+  },
+};
+
+function attendanceRow(page: Page, fullName: string): Locator {
+  return page
+    .getByRole("listitem")
+    .filter({ has: page.getByRole("group", { name: fullName }) });
+}
+
+async function waitForAttendanceSheet(page: Page): Promise<void> {
+  await expect(page.getByRole("group", { name: FIRST_ATTENDEE })).toBeVisible();
+}
+
+/** Marca a Mateo como Tarde y guarda; espera la confirmación o el aviso. */
+async function markLateAndSave(
+  page: Page,
+  outcome: "status" | "alert",
+): Promise<void> {
+  await waitForAttendanceSheet(page);
+  await attendanceRow(page, FIRST_ATTENDEE)
+    .getByRole("button", { name: ATTENDANCE_LATE })
+    .click();
+  await page.getByRole("button", { name: ATTENDANCE_SAVE }).click();
+  // El anunciador de rutas de Next también es un alert: se busca el aviso de
+  // la pantalla por su texto.
+  await expect(
+    outcome === "status"
+      ? page.getByText(/^(Attendance saved|Asistencia guardada)/)
+      : page.getByText(/cancelled: it doesn't|está cancelado: no/),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+type AttendanceState = AttendanceReads & {
+  readonly name: string;
+  readonly isSpanish?: boolean;
+  readonly ready: (page: Page) => Promise<void>;
+};
+
+function withSpanish(state: AttendanceState): readonly AttendanceState[] {
+  return [state, { ...state, name: `${state.name}-es`, isSpanish: true }];
+}
+
+const ATTENDANCE_SHEET_STATE: AttendanceState = {
+  name: "asistencia-hoja",
+  sessions: ATTENDANCE_SESSIONS,
+  members: ATTENDANCE_MEMBERS,
+  ready: waitForAttendanceSheet,
+};
+
+const ATTENDANCE_STATES: readonly AttendanceState[] = [
+  ...withSpanish(ATTENDANCE_SHEET_STATE),
+  ...withSpanish({
+    name: "asistencia-guardada",
+    sessions: ATTENDANCE_SESSIONS,
+    members: ATTENDANCE_MEMBERS,
+    ready: (page) => markLateAndSave(page, "status"),
+  }),
+  ...withSpanish({
+    name: "asistencia-error",
+    sessions: ATTENDANCE_SESSIONS,
+    members: ATTENDANCE_MEMBERS,
+    saveFailure: CANCELLED_SESSION_FAILURE,
+    ready: (page) => markLateAndSave(page, "alert"),
+  }),
+  ...withSpanish({
+    name: "asistencia-vacia",
+    sessions: ATTENDANCE_SESSIONS,
+    members: [],
+    ready: async (page) => {
+      await expect(
+        page.getByText(
+          /^(Nobody is expected at this session\.|No se espera a nadie en esta sesión\.)$/,
+        ),
+      ).toBeVisible();
+    },
+  }),
+  ...withSpanish({
+    name: "asistencia-sin-sesiones",
+    sessions: [],
+    members: [],
+    ready: async (page) => {
+      await expect(
+        page.getByRole("link", {
+          name: /^(Go to the calendar|Ir al calendario)$/,
+        }),
+      ).toBeVisible();
+    },
+  }),
+];
+
+async function goToAttendance(
+  page: Page,
+  state: AttendanceState,
+  theme?: (typeof themes)[number],
+): Promise<SavedRecords[]> {
+  const saved = await stubAttendance(page, state);
+  if (state.isSpanish === true) {
+    await chooseSpanish(page);
+  }
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${ATTENDANCE_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, ATTENDANCE_SCREEN_PATH, theme);
+  }
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await state.ready(page);
+  return saved;
+}
+
+for (const state of ATTENDANCE_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToAttendance(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of ATTENDANCE_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToAttendance(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToAttendance(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("asistencia en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("marcar cambia los contadores y guardar manda la hoja entera una vez", async ({
+    page,
+  }) => {
+    const saved = await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+    const totals = page.getByRole("list", { name: "Totals" });
+    await expect(totals).toHaveText(/^9Present1Late2Absent$/);
+
+    await attendanceRow(page, FIRST_ATTENDEE)
+      .getByRole("button", { name: "Late" })
+      .click();
+    await expect(totals).toHaveText(/^8Present2Late2Absent$/);
+    await page.getByRole("button", { name: ATTENDANCE_SAVE }).dblclick();
+
+    await expect(
+      page.getByText("Attendance saved: 8 present, 2 late, 2 absent."),
+    ).toBeVisible();
+    expect(saved.map((body) => body.records.length)).toEqual([
+      ATTENDANCE_MEMBERS.length,
+    ]);
+  });
+
+  test("cambiar de sesión con cambios sin guardar pregunta antes", async ({
+    page,
+  }) => {
+    await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+    await attendanceRow(page, FIRST_ATTENDEE)
+      .getByRole("button", { name: "Late" })
+      .click();
+    const question = page.waitForEvent("dialog");
+
+    await page
+      .getByRole("group", { name: "Sessions" })
+      .getByRole("button", { name: "Thu 18 · Skills & Conditioning" })
+      .click();
+
+    const dialog = await question;
+    expect(dialog.message()).toBe(
+      "You have unsaved changes on this session. Discard them?",
+    );
+    await dialog.dismiss();
+    await expect(
+      page.getByRole("heading", { level: 1, name: /^Pool Training · / }),
+    ).toBeVisible();
+  });
+
+  test("con ?sesion= abre esa hoja", async ({ page }) => {
+    await stubAttendance(page, ATTENDANCE_SHEET_STATE);
+    const opened = page.waitForRequest((request) =>
+      request
+        .url()
+        .endsWith(`${ATTENDANCE_ENDPOINT}/${POOL_TRAINING_SESSION.eventId}`),
+    );
+
+    await page.goto(
+      `${APP_URL}${ATTENDANCE_SCREEN_PATH}?sesion=${POOL_TRAINING_SESSION.eventId}`,
+    );
+
+    await opened;
+    await waitForAttendanceSheet(page);
+  });
+
+  test("a 375px cada botón de la fila mide al menos 44px de alto", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+
+    const heights = await page
+      .getByRole("group", { name: LONG_NAMED_ATTENDEE })
+      .getByRole("button")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.getBoundingClientRect().height),
+      );
+
+    expect(heights).toHaveLength(3);
+    for (const height of heights) {
+      expect(height).toBeGreaterThanOrEqual(ATTENDANCE_MIN_TOUCH_TARGET_PX);
     }
   });
 });
