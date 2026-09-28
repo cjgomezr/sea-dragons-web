@@ -13,18 +13,35 @@
 -- Sin privilegios nuevos: los avisos los escribe el servidor con la llave de
 -- servicio. Idempotente como el resto del histórico.
 
-alter table public.notifications
-  drop constraint if exists notifications_type_check;
-alter table public.notifications
-  add constraint notifications_type_check check (type in (
-    'role_changed',
-    'role_request_rejected',
-    'role_request_received',
-    'news_post_published',
-    'event_created',
-    'event_series_created',
-    'event_changed',
-    'event_cancelled',
-    'event_series_changed',
-    'event_series_cancelled'
-  ));
+-- Sólo si la restricción vigente aún no admite el tipo. Sobre una base a la
+-- que una migración posterior ya le amplió el catálogo, recrearla con esta
+-- lista fallaría por las filas de los tipos que llegaron después: así se
+-- rompió la corrida de producción del 28 de septiembre de 2026.
+do $$
+begin
+  if exists (
+    select 1
+      from pg_constraint
+     where conrelid = 'public.notifications'::regclass
+       and conname = 'notifications_type_check'
+       and pg_get_constraintdef(oid) like '%event_changed%'
+  ) then
+    return;
+  end if;
+  alter table public.notifications
+    drop constraint if exists notifications_type_check;
+  alter table public.notifications
+    add constraint notifications_type_check check (type in (
+      'role_changed',
+      'role_request_rejected',
+      'role_request_received',
+      'news_post_published',
+      'event_created',
+      'event_series_created',
+      'event_changed',
+      'event_cancelled',
+      'event_series_changed',
+      'event_series_cancelled'
+    ));
+end
+$$;
