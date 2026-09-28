@@ -10665,3 +10665,252 @@ test.describe("diálogo de evento en el navegador", () => {
     });
   });
 });
+// Editar y cancelar desde la fila desplegada (#316). La primera fila es una
+// ocurrencia de una serie, así que cada acción pregunta primero el alcance.
+// Todo se sirve desde el test: nada se edita ni se cancela de verdad.
+const ORGANIZER_EDIT = /^(Edit|Editar)$/;
+const ORGANIZER_CANCEL = /^(Cancel|Cancelar)$/;
+const ORGANIZER_WHOLE_SERIES =
+  /^(The whole series from today on|Toda la serie de hoy en adelante)$/;
+const ORGANIZER_CONFIRM_SERIES = /^(Cancel series|Cancelar serie)$/;
+const EDIT_SERIES_DIALOG_NAME = /^(Edit series|Editar serie)$/;
+const EDIT_EVENT_DIALOG_NAME = /^(Edit event|Editar evento)$/;
+
+const ORGANIZER_OPENED_EVENT = {
+  ...PLAYER_OPENED_EVENT,
+  audience: {
+    kind: "groups",
+    groups: [
+      {
+        id: STUBBED_EVENT_GROUPS[0].id,
+        name: STUBBED_EVENT_GROUPS[0].name,
+      },
+    ],
+  },
+} as const;
+
+function firstAgendaRow(page: Page): Locator {
+  return agendaRow(page, STUBBED_AGENDA_EVENTS[0].title);
+}
+
+async function stubEventGroups(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname === EVENT_DIALOG_GROUPS_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ groups: STUBBED_EVENT_GROUPS })),
+  );
+}
+
+/** Despliega la ocurrencia y pulsa Editar: sale la elección de alcance. */
+async function showScopeChoice(page: Page): Promise<void> {
+  await expandFirstRow(page);
+  const row = firstAgendaRow(page);
+  await row.getByRole("button", { name: ORGANIZER_EDIT }).click();
+  await expect(
+    row.getByRole("button", { name: ORGANIZER_WHOLE_SERIES }),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+async function showSeriesCancelConfirmation(page: Page): Promise<void> {
+  await expandFirstRow(page);
+  const row = firstAgendaRow(page);
+  await row.getByRole("button", { name: ORGANIZER_CANCEL }).click();
+  await row.getByRole("button", { name: ORGANIZER_WHOLE_SERIES }).click();
+  await expect(
+    row.getByRole("button", { name: ORGANIZER_CONFIRM_SERIES }),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+async function showEditSeriesDialog(page: Page): Promise<void> {
+  await stubEventGroups(page);
+  await expandFirstRow(page);
+  const row = firstAgendaRow(page);
+  await row.getByRole("button", { name: ORGANIZER_EDIT }).click();
+  await row.getByRole("button", { name: ORGANIZER_WHOLE_SERIES }).click();
+  const dialog = page.getByRole("dialog", { name: EDIT_SERIES_DIALOG_NAME });
+  await expect(
+    dialog.getByRole("radio", { name: /^(The whole club|Todo el club)$/ }),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+function organizerStates(
+  name: string,
+  ready: (page: Page) => Promise<void>,
+): readonly [CalendarState, CalendarState] {
+  const state = {
+    events: STUBBED_AGENDA_EVENTS,
+    opened: ORGANIZER_OPENED_EVENT,
+    ready,
+  };
+  return [
+    { ...state, name },
+    { ...state, name: `${name}-es`, beforeVisit: chooseSpanish },
+  ];
+}
+
+const ORGANIZER_ACTIONS_STATES = organizerStates(
+  "calendario-organizador-acciones",
+  expandFirstRow,
+);
+const ORGANIZER_CONFIRM_STATES = organizerStates(
+  "calendario-organizador-confirmar-cancelar",
+  showSeriesCancelConfirmation,
+);
+
+const ORGANIZER_ROW_STATES: readonly CalendarState[] = [
+  ...ORGANIZER_ACTIONS_STATES,
+  ...organizerStates("calendario-organizador-alcance", showScopeChoice),
+  ...ORGANIZER_CONFIRM_STATES,
+];
+
+const ORGANIZER_DIALOG_STATES: readonly CalendarState[] = organizerStates(
+  "calendario-organizador-editar-serie",
+  showEditSeriesDialog,
+);
+
+for (const state of [...ORGANIZER_ROW_STATES, ...ORGANIZER_DIALOG_STATES]) {
+  // El diálogo vive en la capa superior: se fotografía lo que se ve, no la
+  // página entera, como en el de crear.
+  const isFullPage = ORGANIZER_ROW_STATES.includes(state);
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToCalendar(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({
+                  ...SCREENSHOT_OPTIONS,
+                  fullPage: isFullPage,
+                }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: isFullPage,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of CALENDAR_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToCalendar(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToCalendar(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("editar y cancelar en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  const [OCCURRENCE] = STUBBED_AGENDA_EVENTS;
+  const [ACTIONS] = ORGANIZER_ACTIONS_STATES;
+  const [CONFIRM] = ORGANIZER_CONFIRM_STATES;
+
+  test("al confirmar, la serie queda cancelada y el foco vuelve a su título", async ({
+    page,
+  }) => {
+    let hasCancelled = false;
+    await page.route(
+      (url) =>
+        url.pathname ===
+        `${EVENTS_MANAGE_ENDPOINT}/series/${OCCURRENCE.seriesId}/cancellation`,
+      (route) => {
+        hasCancelled = true;
+        return route.fulfill(
+          jsonBody({
+            seriesId: OCCURRENCE.seriesId,
+            cancelledAt: "2026-06-20T08:00:00.000Z",
+            cancelledOccurrences: 6,
+          }),
+        );
+      },
+    );
+    await goToCalendar(page, CONFIRM);
+    // La agenda que se pide tras cancelar trae la ocurrencia cancelada.
+    await page.route(
+      (url) => url.pathname === CALENDAR_AGENDA_ENDPOINT,
+      (route) =>
+        route.fulfill(
+          jsonBody({
+            events: hasCancelled
+              ? [{ ...OCCURRENCE, status: "cancelled" }]
+              : STUBBED_AGENDA_EVENTS,
+            nextCursor: null,
+          }),
+        ),
+    );
+
+    await firstAgendaRow(page)
+      .getByRole("button", { name: ORGANIZER_CONFIRM_SERIES })
+      .click();
+
+    await expect(
+      page.getByText("Cancelled 6 sessions. We let the audience know."),
+    ).toBeVisible();
+    await expect(firstAgendaRow(page).getByText("Cancelled")).toBeVisible();
+    await expect(
+      firstAgendaRow(page).getByRole("heading", { name: OCCURRENCE.title }),
+    ).toBeFocused();
+  });
+
+  test("Escape cierra el diálogo de editar y devuelve el foco a Editar", async ({
+    page,
+  }) => {
+    await stubEventGroups(page);
+    await goToCalendar(page, ACTIONS);
+    const row = firstAgendaRow(page);
+    await row.getByRole("button", { name: ORGANIZER_EDIT }).click();
+    await row.getByRole("button", { name: "Only this one" }).click();
+    const dialog = page.getByRole("dialog", { name: EDIT_EVENT_DIALOG_NAME });
+    await expect(dialog.getByLabel("Title")).toHaveValue(OCCURRENCE.title);
+
+    await page.keyboard.press("Escape");
+
+    await expect(dialog).toBeHidden();
+    await expect(
+      row.getByRole("button", { name: ORGANIZER_EDIT }),
+    ).toBeFocused();
+  });
+
+  test("a 375px los botones de confirmar conservan el objetivo táctil de 44px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToCalendar(page, CONFIRM);
+
+    const heights = await firstAgendaRow(page)
+      .getByRole("group", { name: /said they're going|dijo que va|dijeron/ })
+      .getByRole("button")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.getBoundingClientRect().height),
+      );
+
+    expect(heights.length).toBeGreaterThan(0);
+    for (const height of heights) {
+      expect(height).toBeGreaterThanOrEqual(RSVP_MIN_TOUCH_TARGET_PX);
+    }
+  });
+});

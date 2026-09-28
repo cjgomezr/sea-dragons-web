@@ -8,6 +8,10 @@ import {
 import type { Translator } from "@/lib/i18n/translator";
 import { describeRsvpFailure } from "./agenda-client";
 import { EventDetailPanel } from "./EventDetailPanel";
+import {
+  type EventOrganizer,
+  EventOrganizerActions,
+} from "./EventOrganizerActions";
 import { EventRsvp } from "./EventRsvp";
 import { useEventDetail } from "./use-event-detail";
 import { useEventRsvp } from "./use-event-rsvp";
@@ -25,6 +29,9 @@ import { useEventRsvp } from "./use-event-rsvp";
  * (#312, RF-8): un botón dentro del encabezado, el patrón del acordeón, así
  * Enter y Espacio lo abren y el lector de pantalla anuncia si está
  * desplegada. Con el ratón se pulsa en cualquier punto de la tarjeta.
+ *
+ * A quien organiza, la fila desplegada de un evento futuro que sigue en pie
+ * le ofrece editarlo y cancelarlo (#316).
  */
 
 function DateBlock({
@@ -58,6 +65,7 @@ export function AgendaRow({
   event,
   period,
   shouldTakeFocus,
+  organizer,
 }: {
   readonly translate: Translator;
   readonly event: AgendaEvent;
@@ -65,6 +73,8 @@ export function AgendaRow({
   /** La primera fila de una página recién cargada: recibe el foco para que
    * quien pulsó "Ver más" siga leyendo desde ahí. */
   readonly shouldTakeFocus: boolean;
+  /** Nulo para quien no organiza eventos. */
+  readonly organizer: EventOrganizer | null;
 }): React.JSX.Element {
   const { isExpanded, detail, toggle, retry, receive } = useEventDetail(
     event.id,
@@ -74,6 +84,7 @@ export function AgendaRow({
   const detailId = useId();
   const isCancelled = event.status === "cancelled";
   const canRespond = period === "upcoming" && event.inAudience && !isCancelled;
+  const canManage = organizer !== null && period === "upcoming" && !isCancelled;
 
   useEffect(() => {
     if (shouldTakeFocus) {
@@ -152,6 +163,20 @@ export function AgendaRow({
               translate={translate}
               detail={detail}
               onRetry={retry}
+            />
+          ) : null}
+          {canManage &&
+          detail.kind === "loaded" &&
+          detail.opened.audience !== null ? (
+            <EventOrganizerActions
+              translate={translate}
+              event={event}
+              details={{
+                notes: detail.opened.notes,
+                audience: detail.opened.audience,
+              }}
+              goingCount={state.tally.goingCount}
+              organizer={organizer}
             />
           ) : null}
         </div>

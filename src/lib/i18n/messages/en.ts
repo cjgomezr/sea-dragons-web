@@ -735,6 +735,53 @@ export const englishMessages = {
     one: "Created {count} session. We let the members know.",
     other: "Created {count} sessions. We let the members know.",
   },
+  "calendar.edit.titleEvent": "Edit event",
+  "calendar.edit.titleSeries": "Edit series",
+  "calendar.edit.submit": "Save changes",
+  "calendar.edit.seriesWarning":
+    "These changes apply to every session from today on, including the ones that were edited on their own.",
+  "calendar.manage.edit": "Edit",
+  "calendar.manage.cancel": "Cancel",
+  "calendar.manage.scopeQuestion.edit": "Which sessions do you want to edit?",
+  "calendar.manage.scopeQuestion.cancel":
+    "Which sessions do you want to cancel?",
+  "calendar.manage.scope.event": "Only this one",
+  "calendar.manage.scope.series": "The whole series from today on",
+  "calendar.manage.back": "Back",
+  "calendar.manage.cancelQuestion.event": {
+    one: "{count} person said they're going. We'll let the audience know it's cancelled.",
+    other:
+      "{count} people said they're going. We'll let the audience know it's cancelled.",
+  },
+  "calendar.manage.cancelQuestion.series": {
+    one: "Every session from today on will be cancelled. {count} person said they're going to this one.",
+    other:
+      "Every session from today on will be cancelled. {count} people said they're going to this one.",
+  },
+  "calendar.manage.confirm.event": "Cancel event",
+  "calendar.manage.confirm.series": "Cancel series",
+  "calendar.manage.cancelling": "Cancelling…",
+  "calendar.manage.keep": "Keep it",
+  "calendar.manage.edited": "Changes saved.",
+  "calendar.manage.editedSeries": {
+    one: "Changes saved to {count} session.",
+    other: "Changes saved to {count} sessions.",
+  },
+  "calendar.manage.cancelled": "Event cancelled. We let the audience know.",
+  "calendar.manage.cancelledSeries": {
+    one: "Cancelled {count} session. We let the audience know.",
+    other: "Cancelled {count} sessions. We let the audience know.",
+  },
+  "calendar.manage.closed.event_started":
+    "This event has already started, so it can't be changed anymore. We refreshed the calendar.",
+  "calendar.manage.closed.event_cancelled":
+    "This event was already cancelled. We refreshed the calendar.",
+  "calendar.manage.closed.series_without_upcoming":
+    "This series has no sessions left from today on. We refreshed the calendar.",
+  "calendar.manage.closed.not_found":
+    "This event no longer exists. We refreshed the calendar.",
+  "calendar.manage.error.forbidden": "Your role can't change events.",
+  "calendar.manage.error.unexpected": "We couldn't save the change. Try again.",
   "calendar.form.title": "New event",
   "calendar.form.close": "Close",
   "calendar.form.loading": "Loading the club's groups…",

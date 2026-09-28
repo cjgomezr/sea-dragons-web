@@ -17,7 +17,7 @@ export default async function CalendarioPage(): Promise<React.JSX.Element> {
   return (
     <AgendaScreen
       locale={locale}
-      canCreateEvents={hasCapability(role, "createEvents")}
+      canManageEvents={hasCapability(role, "createEvents")}
     />
   );
 }

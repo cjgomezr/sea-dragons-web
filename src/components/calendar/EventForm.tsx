@@ -6,21 +6,19 @@ import type { ApiRequestFailure } from "@/lib/api/request-api";
 import type { Group } from "@/lib/groups/groups";
 import type { Translator } from "@/lib/i18n/translator";
 import {
-  type CreatedSummary,
-  createEvent,
   describeCreateFailure,
   describeEventIssue,
   readEventIssue,
 } from "./event-create-client";
 import {
-  EMPTY_EVENT_FORM,
   type EventForm as EventFormValues,
   type EventFormField,
   type EventFormIssue,
+  type EventFormLayout,
   issueFromApi,
   listMissingFields,
-  toEventDraft,
 } from "./event-form";
+import { describeManageFailure } from "./event-manage-client";
 import {
   type FieldProps,
   InputField,
@@ -35,15 +33,35 @@ import {
  * al guardar no borra nada: lo escrito sigue ahí para corregirlo o
  * reintentar. El motivo de un 422 va junto a su campo; el resto (la red, la
  * sesión) va arriba de los botones.
+ *
+ * Es el mismo para crear y para editar (#316): quien lo abre dice qué campos
+ * lleva y qué hacer al guardar. Al editar no hay repetición, y una serie
+ * tampoco enseña la fecha: sus días y sus fechas no se editan.
  */
+
+/** Lo que devuelve guardar: terminado (el diálogo se cierra) o un fallo que
+ * el formulario pinta sin borrar nada. */
+export type FormSubmission = { readonly kind: "finished" } | ApiRequestFailure;
 
 type Status =
   | { readonly kind: "editing" }
   | { readonly kind: "sending" }
   | ApiRequestFailure;
 
-function ScheduleFields(props: FieldProps): React.JSX.Element {
-  const { translate, form } = props;
+function ScheduleFields(
+  props: FieldProps & { readonly layout: EventFormLayout },
+): React.JSX.Element {
+  const { translate, form, layout } = props;
+  if (layout === "series") {
+    return (
+      <InputField
+        {...props}
+        field="startTime"
+        type="time"
+        label={translate("calendar.form.time")}
+      />
+    );
+  }
   if (form.repeat === "none") {
     return (
       <div className="event-form-row">
@@ -91,9 +109,11 @@ function ScheduleFields(props: FieldProps): React.JSX.Element {
 
 function SubmitFailure({
   translate,
+  layout,
   status,
 }: {
   readonly translate: Translator;
+  readonly layout: EventFormLayout;
   readonly status: Status;
 }): React.JSX.Element | null {
   if (status.kind !== "failed") {
@@ -101,10 +121,18 @@ function SubmitFailure({
   }
   return (
     <p className="auth-error" role="alert">
-      {describeCreateFailure(translate, status)}
+      {layout === "create"
+        ? describeCreateFailure(translate, status)
+        : describeManageFailure(translate, status)}
     </p>
   );
 }
+
+const SUBMIT_LABELS = {
+  create: "calendar.form.submit",
+  event: "calendar.edit.submit",
+  series: "calendar.edit.submit",
+} as const satisfies Record<EventFormLayout, string>;
 
 /** El motivo de la API junto a su campo, o el fallo entero si no tiene
  * campo. */
@@ -121,18 +149,22 @@ function readFailure(failure: ApiRequestFailure): {
 export function EventForm({
   translate,
   clubGroups,
-  onCreated,
+  layout,
+  initialForm,
+  submit,
   onCancel,
   onSendingChange,
 }: {
   readonly translate: Translator;
   readonly clubGroups: readonly Group[];
-  readonly onCreated: (summary: CreatedSummary) => void;
+  readonly layout: EventFormLayout;
+  readonly initialForm: EventFormValues;
+  readonly submit: (form: EventFormValues) => Promise<FormSubmission>;
   readonly onCancel: () => void;
   /** Mientras se guarda, el diálogo no se deja cerrar. */
   readonly onSendingChange: (isSending: boolean) => void;
 }): React.JSX.Element {
-  const [form, setForm] = useState<EventFormValues>(EMPTY_EVENT_FORM);
+  const [form, setForm] = useState<EventFormValues>(initialForm);
   const [status, setStatus] = useState<Status>({ kind: "editing" });
   const [issues, setIssues] = useState<readonly EventFormIssue[]>([]);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -169,10 +201,9 @@ export function EventForm({
     }
     markSending(true);
     setStatus({ kind: "sending" });
-    const result = await createEvent(toEventDraft(form));
+    const result = await submit(form);
     markSending(false);
-    if (result.kind === "created") {
-      onCreated(result.summary);
+    if (result.kind === "finished") {
       return;
     }
     const failure = readFailure(result);
@@ -194,6 +225,11 @@ export function EventForm({
 
   return (
     <form className="event-form" onSubmit={handleSubmit} noValidate>
+      {layout === "series" ? (
+        <p className="event-form-warning">
+          {translate("calendar.edit.seriesWarning")}
+        </p>
+      ) : null}
       <fieldset className="event-form-fields" disabled={isSending}>
         <InputField
           {...fieldProps}
@@ -204,8 +240,8 @@ export function EventForm({
           inputRef={titleRef}
         />
         <TypeField {...fieldProps} />
-        <RepeatField {...fieldProps} />
-        <ScheduleFields {...fieldProps} />
+        {layout === "create" ? <RepeatField {...fieldProps} /> : null}
+        <ScheduleFields {...fieldProps} layout={layout} />
         <InputField
           {...fieldProps}
           field="location"
@@ -223,7 +259,7 @@ export function EventForm({
           onChange={(audience) => update({ audience })}
         />
       </fieldset>
-      <SubmitFailure translate={translate} status={status} />
+      <SubmitFailure translate={translate} layout={layout} status={status} />
       <div className="event-form-actions">
         <button
           type="button"
@@ -235,7 +271,7 @@ export function EventForm({
         </button>
         <button type="submit" className="auth-submit" disabled={isSending}>
           {translate(
-            isSending ? "calendar.form.sending" : "calendar.form.submit",
+            isSending ? "calendar.form.sending" : SUBMIT_LABELS[layout],
           )}
         </button>
       </div>

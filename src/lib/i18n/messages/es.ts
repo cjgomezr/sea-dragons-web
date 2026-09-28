@@ -733,6 +733,53 @@ export const spanishMessages: MessageCatalog = {
     one: "Se creó {count} sesión. Avisamos a los miembros.",
     other: "Se crearon {count} sesiones. Avisamos a los miembros.",
   },
+  "calendar.edit.titleEvent": "Editar evento",
+  "calendar.edit.titleSeries": "Editar serie",
+  "calendar.edit.submit": "Guardar cambios",
+  "calendar.edit.seriesWarning":
+    "Estos cambios se aplican a todas las sesiones de hoy en adelante, también a las que se editaron solas.",
+  "calendar.manage.edit": "Editar",
+  "calendar.manage.cancel": "Cancelar",
+  "calendar.manage.scopeQuestion.edit": "¿Qué sesiones quieres editar?",
+  "calendar.manage.scopeQuestion.cancel": "¿Qué sesiones quieres cancelar?",
+  "calendar.manage.scope.event": "Solo esta",
+  "calendar.manage.scope.series": "Toda la serie de hoy en adelante",
+  "calendar.manage.back": "Volver",
+  "calendar.manage.cancelQuestion.event": {
+    one: "{count} persona dijo que va. Avisaremos a la audiencia de que se cancela.",
+    other:
+      "{count} personas dijeron que van. Avisaremos a la audiencia de que se cancela.",
+  },
+  "calendar.manage.cancelQuestion.series": {
+    one: "Se cancelan todas las sesiones de hoy en adelante. {count} persona dijo que va a esta.",
+    other:
+      "Se cancelan todas las sesiones de hoy en adelante. {count} personas dijeron que van a esta.",
+  },
+  "calendar.manage.confirm.event": "Cancelar evento",
+  "calendar.manage.confirm.series": "Cancelar serie",
+  "calendar.manage.cancelling": "Cancelando…",
+  "calendar.manage.keep": "No cancelar",
+  "calendar.manage.edited": "Cambios guardados.",
+  "calendar.manage.editedSeries": {
+    one: "Cambios guardados en {count} sesión.",
+    other: "Cambios guardados en {count} sesiones.",
+  },
+  "calendar.manage.cancelled": "Evento cancelado. Avisamos a la audiencia.",
+  "calendar.manage.cancelledSeries": {
+    one: "Cancelamos {count} sesión. Avisamos a la audiencia.",
+    other: "Cancelamos {count} sesiones. Avisamos a la audiencia.",
+  },
+  "calendar.manage.closed.event_started":
+    "Este evento ya empezó, así que ya no se puede cambiar. Actualizamos el calendario.",
+  "calendar.manage.closed.event_cancelled":
+    "Este evento ya estaba cancelado. Actualizamos el calendario.",
+  "calendar.manage.closed.series_without_upcoming":
+    "Esta serie ya no tiene sesiones de hoy en adelante. Actualizamos el calendario.",
+  "calendar.manage.closed.not_found":
+    "Este evento ya no existe. Actualizamos el calendario.",
+  "calendar.manage.error.forbidden": "Tu rol no puede cambiar eventos.",
+  "calendar.manage.error.unexpected":
+    "No pudimos guardar el cambio. Vuelve a intentarlo.",
   "calendar.form.title": "Nuevo evento",
   "calendar.form.close": "Cerrar",
   "calendar.form.loading": "Cargando los grupos del club…",
