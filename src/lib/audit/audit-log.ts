@@ -79,6 +79,11 @@ export const AUDIT_ACTIONS = [
   "news_post.edited",
   "news_post.withdrawn",
   "news_post.republished",
+  // RF-3 de E8 (#393): un Admin o un Coach guarda la hoja de asistencia de
+  // un entrenamiento, la primera vez o al corregirla. La entidad es el evento
+  // (`event`), sin metadata: ni los estados ni a quién. Quién, qué sesión y
+  // cuándo ya están en la entrada.
+  "attendance.saved",
   "payment.status_changed",
 ] as const;
 

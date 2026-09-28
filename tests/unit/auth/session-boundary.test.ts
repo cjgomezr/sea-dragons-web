@@ -3,6 +3,9 @@ import {
   ACCOUNT_API_PATH,
   ACCOUNT_GROUPS_API_PATH,
   ACCOUNT_PAGE_PATH,
+  ATTENDANCE_API_PATH,
+  ATTENDANCE_SESSIONS_API_PATH,
+  ATTENDANCE_SHEET_API_PATH,
   COMPLETE_REGISTRATION_PATH,
   CONFIRMATION_EMAIL_API_PATH,
   DASHBOARD_PATH,
@@ -961,5 +964,43 @@ describe("frontera de la agenda y el detalle (#309)", () => {
     expect(
       decideSessionBoundary({ pathname: EVENTS_API_PATH, ...ANONYMOUS }),
     ).toEqual({ kind: "unauthenticated" });
+  });
+});
+
+/** Las sesiones recientes y la hoja de un entrenamiento cualquiera (#393). */
+const ATTENDANCE_PATHS = [
+  ATTENDANCE_API_PATH,
+  ATTENDANCE_SESSIONS_API_PATH,
+  ATTENDANCE_SHEET_API_PATH.replace(
+    "[eventId]",
+    "e1e1e1e1-0000-4000-8000-00000000000e",
+  ),
+];
+
+describe("frontera de la asistencia (#393)", () => {
+  it.each(
+    (["Committee", "Player"] as const).flatMap((role) =>
+      ATTENDANCE_PATHS.map((pathname) => [role, pathname] as const),
+    ),
+  )("niega a un %s el camino %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual({
+      kind: "missingCapability",
+    });
+  });
+
+  it.each(
+    (["Admin", "Coach"] as const).flatMap((role) =>
+      ATTENDANCE_PATHS.map((pathname) => [role, pathname] as const),
+    ),
+  )("deja a un %s el camino %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
+      ALLOW,
+    );
+  });
+
+  it.each(ATTENDANCE_PATHS)("responde 401 sin sesión en %s", (pathname) => {
+    expect(decideSessionBoundary({ pathname, ...ANONYMOUS })).toEqual({
+      kind: "unauthenticated",
+    });
   });
 });
