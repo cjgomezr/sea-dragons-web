@@ -34,7 +34,6 @@ import {
  * son las que saben si hay cambios que descartar antes de irse.
  */
 
-const TITLE_ID = "asistencia-titulo";
 const MEMBERS_LABEL_ID = "asistencia-miembros";
 
 function sheetTitle(translate: Translator, sheet: OpenedSheet): string {
@@ -284,7 +283,7 @@ export function AttendanceSheetPanel({
           <p className="attendance-eyebrow">
             {translate("attendance.eyebrow")}
           </p>
-          <h1 id={TITLE_ID}>
+          <h1>
             {state.kind === "ready"
               ? sheetTitle(translate, state.sheet)
               : translate("nav.label.attendance")}
