@@ -293,6 +293,23 @@ describe("avisos de cambio y cancelación", () => {
     expect(club.notices).toEqual([]);
   });
 
+  it("no avisa a nadie cuando a la serie le cambia sólo la audiencia", async () => {
+    const club = await editSeriesAs({
+      audience: { kind: "groups", groupIds: [MASTERS_SQUAD_ID] },
+    });
+
+    expect(club.notices).toEqual([]);
+  });
+
+  it("avisa a la audiencia nueva de la serie cuando cambian la audiencia y la hora", async () => {
+    const club = await editSeriesAs({
+      audience: { kind: "groups", groupIds: [MASTERS_SQUAD_ID] },
+      startTime: "18:00",
+    });
+
+    expect(notifiedIn(club)).toEqual([CARO]);
+  });
+
   it("avisa una sola vez de la cancelación de la serie", async () => {
     const club = fakeManagedSeriesClub(NOTICE_OPTIONS);
 

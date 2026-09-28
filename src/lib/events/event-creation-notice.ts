@@ -64,18 +64,21 @@ function audienceOf(created: CreatedEvents): EventAudience {
     : created.series.audience;
 }
 
+/** Qué avisar, a qué audiencia y a quién no: a quien lo provocó. */
+export type AudienceNotice = {
+  readonly clubId: string;
+  readonly authorId: string;
+  readonly audience: EventAudience;
+  readonly content: NotificationContent;
+};
+
 /** Un aviso para la audiencia de un evento o una serie, sin quien lo
  * provocó. No lanza: si no se puede leer la audiencia o guardar los avisos,
  * lo registra y sigue, porque el cambio que lo originó ya está guardado.
  * También lo usan editar y cancelar (#317). */
 export async function notifyEventAudience(
   gateways: EventNoticeGateways,
-  notice: {
-    readonly clubId: string;
-    readonly authorId: string;
-    readonly audience: EventAudience;
-    readonly content: NotificationContent;
-  },
+  notice: AudienceNotice,
 ): Promise<void> {
   const { clubId, authorId, audience, content } = notice;
   let audienceIds: readonly string[];
