@@ -2199,8 +2199,11 @@ button.notification-item-content:hover {
   overflow-wrap: anywhere;
 }
 
+/* Un título de columna es una palabra: no se parte, y si con la flecha se
+   pasa unos píxeles, ocupa parte del aire de la celda. */
 .directory-table thead th {
   padding: 0;
+  overflow-wrap: normal;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -2440,7 +2443,18 @@ button.notification-item-content:hover {
      ancho que en la lista de quien sólo mira: el rol cede lo que haga falta,
      y su botón baja debajo del selector si no le cabe al lado. */
   .directory-table-admin th:nth-child(2) {
-    width: 26%;
+    width: 24%;
+  }
+
+  /* Con cuatro columnas, lo que queda para el nombre de un Admin tiene que
+     dejar entero "Errekondo" y la marca de sin evaluar: la posición y la
+     asistencia se quedan en lo justo para "Goalkeeper" y "Attendance". */
+  .directory-table-admin th:nth-child(3) {
+    width: 22%;
+  }
+
+  .directory-table-admin th:nth-child(4) {
+    width: 20%;
   }
 
   .directory-sort {

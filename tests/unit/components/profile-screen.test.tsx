@@ -188,7 +188,7 @@ describe("pantalla de perfil", () => {
       screen.getByRole("heading", { name: "Request a role" }),
     ).toBeInTheDocument();
     const groups = screen.getByRole("region", { name: "My groups" });
-    expect(groups).toHaveTextContent("Senior Squad");
+    expect(within(groups).getByText("Senior Squad")).toBeInTheDocument();
   });
 
   it("guarda los cinco campos, lo confirma y refresca la cabecera", async () => {
@@ -660,7 +660,7 @@ describe("perfil propio: la asistencia", () => {
     });
 
     const region = attendanceRegion("Asistencia");
-    expect(region).toHaveTextContent("Asistencia: 90 %");
+    expect(region.textContent).toContain("Asistencia: 90 %");
     expect(within(region).getByText("18 sesiones")).toBeVisible();
   });
 

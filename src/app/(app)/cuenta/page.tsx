@@ -43,8 +43,8 @@ import { createSessionClient } from "@/lib/supabase/session-client";
  * miembro edita (FR-084), el rol de quien la abre, los grupos a los que
  * pertenece (#229) y, si le toca, el formulario para pedir Coach o Committee
  * (FR-010), la foto de perfil (#245), su asistencia (#396) y su evaluación,
- * o el aviso de que sólo la ve el personal de entrenamiento (#324). La dirección sigue siendo `/cuenta`,
- * la del enlace de la cabecera.
+ * o el aviso de que sólo la ve el personal de entrenamiento (#324). La
+ * dirección sigue siendo `/cuenta`, la del enlace de la cabecera.
  *
  * Quién llega lo decide la frontera: cualquier cuenta activa, de cualquier
  * rol. Una incompleta acaba en completar registro y una sin sesión en la

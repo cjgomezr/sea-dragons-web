@@ -60,6 +60,8 @@ export function ProfileScreen({
         countries={countries}
       />
       <MyGroups locale={locale} groups={groups} />
+      {/* La misma tarjeta que Mis grupos y la evaluación: la clase es la de
+          esa tarjeta, no dice qué lleva dentro. */}
       <MemberAttendanceSummary
         translate={createTranslator(locale)}
         locale={locale}

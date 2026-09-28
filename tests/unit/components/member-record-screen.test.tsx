@@ -1101,7 +1101,7 @@ describe("ficha en pantalla: asistencia", () => {
     await renderScreen("es");
 
     const region = screen.getByRole("region", { name: "Asistencia" });
-    expect(region).toHaveTextContent("Asistencia: 90 %");
+    expect(region.textContent).toContain("Asistencia: 90 %");
     expect(within(region).getByText("9 sesiones")).toBeVisible();
   });
 });
