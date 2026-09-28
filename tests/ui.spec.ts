@@ -3365,6 +3365,11 @@ const LONG_MEMBER_NAME = "Tomás Errekondo Aranburu de la Hoz";
 
 /** Sin país, sin nivel y sin posición: los tres huecos que la fila rellena
  * con un guion. */
+/** La asistencia que el directorio y la ficha exigen desde #394. Ninguna
+ * pantalla la pinta todavía (la columna llega con #396), así que las listas
+ * fijas la llevan vacía. */
+const STUBBED_ATTENDANCE = { kind: "no_data" } as const;
+
 const MEMBER_WITHOUT_DATA = {
   userId: "44444444-0000-4000-8000-000000000004",
   fullName: LONG_MEMBER_NAME,
@@ -3374,6 +3379,7 @@ const MEMBER_WITHOUT_DATA = {
   position: null,
   status: "active",
   photoUrl: null,
+  attendance: STUBBED_ATTENDANCE,
 } as const;
 
 /** Una dirección que no existe: la captura la sirve con la foto fija, igual
@@ -3409,6 +3415,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     position: STUBBED_POSITIONS.Defender,
     status: "active",
     photoUrl: null,
+    attendance: STUBBED_ATTENDANCE,
   },
   {
     userId: "22222222-0000-4000-8000-000000000002",
@@ -3419,6 +3426,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     position: STUBBED_POSITIONS.Forward,
     status: "active",
     photoUrl: null,
+    attendance: STUBBED_ATTENDANCE,
   },
   {
     userId: "33333333-0000-4000-8000-000000000003",
@@ -3429,6 +3437,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     position: STUBBED_POSITIONS.Goalkeeper,
     status: "active",
     photoUrl: null,
+    attendance: STUBBED_ATTENDANCE,
   },
   MEMBER_WITHOUT_DATA,
   {
@@ -3440,6 +3449,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     position: STUBBED_POSITIONS.Defender,
     status: "inactive",
     photoUrl: null,
+    attendance: STUBBED_ATTENDANCE,
   },
 ] as const;
 
@@ -4754,6 +4764,11 @@ type StubbedMemberRecord = {
   readonly photoUrl: string | null;
   readonly isAufExpired: boolean;
   readonly groups: readonly { readonly id: string; readonly name: string }[];
+  readonly attendance: {
+    readonly kind: "rate";
+    readonly percent: number;
+    readonly sessions: number;
+  };
 };
 
 /** El nombre más largo de la lista, para el caso de contenido largo. Sin
@@ -4771,6 +4786,7 @@ const CURRENT_RECORD: StubbedMemberRecord = {
   hasGuardianConsent: false,
   photoUrl: null,
   isAufExpired: false,
+  attendance: { kind: "rate", percent: 90, sessions: 9 },
   groups: [STUBBED_CLUB_GROUPS[0], STUBBED_CLUB_GROUPS[2]].map(
     ({ id, name }) => ({ id, name }),
   ),
