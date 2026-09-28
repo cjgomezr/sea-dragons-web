@@ -8,7 +8,7 @@ import {
 } from "../../support/postgres";
 
 /**
- * `0045_team_splits.sql` contra un Postgres desechable (#399, RF-1 del PRD de
+ * `0046_team_splits.sql` contra un Postgres desechable (#399, RF-1 del PRD de
  * E10). Lo que la base afirma sola: un reparto por evento con sus dos equipos,
  * una fila por jugador, que todo sea del mismo club, las cascadas, quién lee
  * un reparto publicado y que sólo el servidor escribe.
