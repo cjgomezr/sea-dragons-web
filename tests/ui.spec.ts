@@ -3373,9 +3373,8 @@ const LONG_MEMBER_NAME = "Tomás Errekondo Aranburu de la Hoz";
 
 /** Sin país, sin nivel y sin posición: los tres huecos que la fila rellena
  * con un guion. */
-/** La asistencia que el directorio y la ficha exigen desde #394. Ninguna
- * pantalla la pinta todavía (la columna llega con #396), así que las listas
- * fijas la llevan vacía. */
+/** Quien no tiene sesiones elegibles: el directorio y la ficha escriben
+ * "Sin datos" (#396, AC-017b). */
 const STUBBED_ATTENDANCE = { kind: "no_data" } as const;
 
 const MEMBER_WITHOUT_DATA = {
@@ -3423,7 +3422,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     position: STUBBED_POSITIONS.Defender,
     status: "active",
     photoUrl: null,
-    attendance: STUBBED_ATTENDANCE,
+    attendance: { kind: "rate", percent: 92, sessions: 23 },
   },
   {
     userId: "22222222-0000-4000-8000-000000000002",
@@ -3434,7 +3433,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     position: STUBBED_POSITIONS.Forward,
     status: "active",
     photoUrl: null,
-    attendance: STUBBED_ATTENDANCE,
+    attendance: { kind: "rate", percent: 88, sessions: 22 },
   },
   {
     userId: "33333333-0000-4000-8000-000000000003",
@@ -3445,7 +3444,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     position: STUBBED_POSITIONS.Goalkeeper,
     status: "active",
     photoUrl: null,
-    attendance: STUBBED_ATTENDANCE,
+    attendance: { kind: "rate", percent: 64, sessions: 16 },
   },
   MEMBER_WITHOUT_DATA,
   {
@@ -3510,9 +3509,6 @@ type StubbedMember = Omit<
   "userId" | "fullName"
 > & { readonly userId: string; readonly fullName: string };
 
-/** Lo que el endpoint de #238 hace con la consulta, reducido a lo que estas
- * capturas necesitan distinguir. El orden lo decide el servidor, así que la
- * lista sale en el orden en que está escrita, que ya es el alfabético. */
 /** Cómo sirve el endpoint la lista a cada rol: sólo un Admin recibe la suya,
  * y un Coach la de todos con la marca de evaluación (#324). */
 function listingKindOf(options: {
@@ -3533,6 +3529,32 @@ const LISTING_MEMBER_VIEWS = {
   }),
 } as const;
 
+/** El porcentaje por el que se ordena, o null para quien no tiene datos. */
+function stubbedPercent(member: StubbedMember): number | null {
+  return member.attendance.kind === "rate" ? member.attendance.percent : null;
+}
+
+/** El orden por asistencia (#396) como lo hace el servidor (#394): por
+ * porcentaje, y los sin datos al final en los dos sentidos. */
+function sortedByAttendance(
+  members: readonly StubbedMember[],
+  direction: string | null,
+): readonly StubbedMember[] {
+  const sign = direction === "desc" ? -1 : 1;
+  return [...members].sort((first, second) => {
+    const firstPercent = stubbedPercent(first);
+    const secondPercent = stubbedPercent(second);
+    if (firstPercent === null || secondPercent === null) {
+      return Number(firstPercent === null) - Number(secondPercent === null);
+    }
+    return sign * (firstPercent - secondPercent);
+  });
+}
+
+/** Lo que el endpoint de #238 hace con la consulta, reducido a lo que estas
+ * capturas necesitan distinguir. El orden lo decide el servidor: la lista
+ * sale en el orden en que está escrita, que ya es el alfabético, salvo que
+ * se pida por asistencia, que es lo que cambia la captura de ese orden. */
 function stubbedListing(
   searchParams: URLSearchParams,
   options: {
@@ -3553,7 +3575,11 @@ function stubbedListing(
       (search === null ||
         normalizeName(member.fullName).includes(normalizeName(search))),
   );
-  const listed = members.map((member) =>
+  const ordered =
+    searchParams.get("sort") === "attendance"
+      ? sortedByAttendance(members, searchParams.get("direction"))
+      : members;
+  const listed = ordered.map((member) =>
     options.withPhoto && member.userId === MEMBER_WITH_PHOTO_ID
       ? { ...member, photoUrl: STUBBED_PHOTO_URL }
       : member,
@@ -3734,6 +3760,31 @@ function includeFormerMembers(label: string) {
   return async (page: Page): Promise<void> => {
     await page.getByRole("checkbox", { name: label }).check();
     await expect(page.getByRole("row", { name: "Zoe Zapata" })).toBeVisible();
+  };
+}
+
+/** Pide el orden por asistencia de menor a mayor y espera a que llegue:
+ * desde la cabecera en la tabla y desde el control en la lista de tarjetas,
+ * según el ancho. Ascendente para que la captura se distinga del orden
+ * alfabético, y con quien no tiene datos al final (AC-010). */
+function sortByAttendance(labels: {
+  readonly column: string;
+  readonly sortGroup: string;
+}) {
+  return async (page: Page): Promise<void> => {
+    const header = page.getByRole("columnheader", { name: labels.column });
+    if (await header.isVisible()) {
+      await header.getByRole("button").click();
+      await expect(header).toHaveAttribute("aria-sort", "ascending");
+    } else {
+      await sortOption(page, labels.sortGroup, labels.column).click();
+    }
+    await expect(page.locator("tbody tr").first()).toHaveAccessibleName(
+      "Nerea Ruiz",
+    );
+    await expect(page.locator("tbody tr").last()).toHaveAccessibleName(
+      LONG_MEMBER_NAME,
+    );
   };
 }
 
@@ -3975,6 +4026,22 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     beforeVisit: chooseSpanish,
   },
   {
+    name: "directorio-orden-asistencia",
+    asAdmin: false,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: sortByAttendance({ column: "Attendance", sortGroup: "Sort by" }),
+  },
+  {
+    name: "directorio-orden-asistencia-es",
+    asAdmin: false,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: sortByAttendance({
+      column: "Asistencia",
+      sortGroup: "Ordenar por",
+    }),
+  },
+  {
     name: "directorio-admin-ultimo-admin",
     asAdmin: true,
     listHeading: ENGLISH_DIRECTORY_HEADING,
@@ -4044,6 +4111,41 @@ for (const state of DIRECTORY_STATES) {
     });
   });
 }
+
+/* En la lista de tarjetas no hay cabeceras que den nombre a la cifra: la
+   etiqueta que escribe la hoja de estilos entra en el nombre accesible de la
+   celda, y un lector de pantalla oye "Attendance 92%", no un número suelto
+   (#396). jsdom no aplica la hoja de estilos, así que sólo se ve aquí. */
+test.describe("la asistencia en la lista de tarjetas", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 375, height: 812 },
+  });
+
+  const state: DirectoryState = {
+    name: "directorio-con-miembros",
+    asAdmin: false,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+  };
+
+  test("cada cifra se oye con su nombre, con datos y sin datos", async ({
+    page,
+  }) => {
+    await goToDirectory(page, state);
+
+    await expect(
+      page.getByRole("row", { name: "Ana Admin" }).getByRole("cell").last(),
+    ).toHaveAccessibleName(/^Attendance\s*92%$/);
+    await expect(
+      page
+        .getByRole("row", { name: LONG_MEMBER_NAME })
+        .getByRole("cell")
+        .last(),
+    ).toHaveAccessibleName(/^Attendance\s*No data$/);
+  });
+});
 
 /** Cómo queda la foto grande en la pantalla, medido en el navegador. */
 type RenderedPhoto = {
@@ -4450,7 +4552,7 @@ test.describe("el directorio en pantalla estrecha (#283)", () => {
     await page.setViewportSize(TABLE_VIEWPORT);
     await goToNarrowDirectory(page, { asAdmin: false });
 
-    await expect(page.getByRole("columnheader")).toHaveCount(3);
+    await expect(page.getByRole("columnheader")).toHaveCount(4);
     await expect(page.getByRole("group", { name: "Sort by" })).toBeHidden();
     await expect(
       page
@@ -4772,11 +4874,13 @@ type StubbedMemberRecord = {
   readonly photoUrl: string | null;
   readonly isAufExpired: boolean;
   readonly groups: readonly { readonly id: string; readonly name: string }[];
-  readonly attendance: {
-    readonly kind: "rate";
-    readonly percent: number;
-    readonly sessions: number;
-  };
+  readonly attendance:
+    | {
+        readonly kind: "rate";
+        readonly percent: number;
+        readonly sessions: number;
+      }
+    | { readonly kind: "no_data" };
 };
 
 /** El nombre más largo de la lista, para el caso de contenido largo. Sin
@@ -4812,6 +4916,8 @@ const PHOTO_RECORD: StubbedMemberRecord = {
 const PENDING_RECORD: StubbedMemberRecord = {
   ...CURRENT_RECORD,
   accountStatus: "incomplete",
+  // Quien no entró nunca no tiene sesiones: la ficha dice "Sin datos" (#396).
+  attendance: STUBBED_ATTENDANCE,
 };
 
 /** Quien tiene la cuenta desactivada: la ficha ofrece reactivarla (#273). */

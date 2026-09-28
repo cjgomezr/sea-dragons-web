@@ -1600,6 +1600,32 @@ button.notification-item-content:hover {
   color: var(--color-text-secondary);
 }
 
+/* La asistencia (#396): la cifra grande del mockup del perfil, con las
+   sesiones debajo. La ficha del Admin usa el mismo bloque. */
+.member-attendance .member-attendance-figure {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text);
+}
+
+/* Sin datos no es una cifra: se escribe con la letra del texto y más
+   pequeño, para que no se lea como un resultado. */
+.member-attendance .member-attendance-empty {
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.member-attendance .member-attendance-sessions {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
 /* La textarea de la justificación hereda el campo de .auth-field y sólo
    cambia lo que una caja de varias líneas necesita. */
 .auth-field textarea {
@@ -2188,6 +2214,11 @@ button.notification-item-content:hover {
   width: 28%;
 }
 
+/* La asistencia (#396) es una cifra corta: le basta el ancho de su título. */
+.directory-table th:nth-child(4) {
+  width: 20%;
+}
+
 .directory-sort {
   display: flex;
   align-items: center;
@@ -2324,6 +2355,15 @@ button.notification-item-content:hover {
   width: 24%;
 }
 
+/* La asistencia se escribe como en el mockup: en la letra de las cifras y en
+   el gris de lo secundario, que sobre el panel pasa el contraste AA. */
+.directory-attendance-cell {
+  font-family: var(--font-family-mono);
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
 /* El selector y su botón se ponen uno al lado del otro cuando caben y uno
    debajo del otro cuando no, sin un punto de corte fijo: el ancho de la celda
    depende de la barra lateral y del idioma. */
@@ -2376,29 +2416,35 @@ button.notification-item-content:hover {
     font-size: 16px;
   }
 
+  /* A 768px la barra lateral deja unos 500px para cuatro columnas (#396):
+     el aire horizontal es el mínimo de la escala, y vuelve desde 1024px. Así
+     "Attendance" y "Goalkeeper" caben enteros en su columna. */
   .directory-table th,
   .directory-table td {
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-3) var(--space-2);
   }
 
-  .directory-table th:nth-child(2),
+  .directory-table th:nth-child(2) {
+    width: 20%;
+  }
+
   .directory-table th:nth-child(3) {
-    width: 27%;
+    width: 24%;
+  }
+
+  .directory-table th:nth-child(4) {
+    width: 21%;
   }
 
   /* La posición recupera aquí su pastilla, y "Goalkeeper" necesita el mismo
      ancho que en la lista de quien sólo mira: el rol cede lo que haga falta,
      y su botón baja debajo del selector si no le cabe al lado. */
   .directory-table-admin th:nth-child(2) {
-    width: 30%;
-  }
-
-  .directory-table-admin th:nth-child(3) {
-    width: 27%;
+    width: 26%;
   }
 
   .directory-sort {
-    padding: var(--space-2) var(--space-4);
+    padding: var(--space-2);
     font-size: 12px;
   }
 
@@ -2412,6 +2458,17 @@ button.notification-item-content:hover {
   /* Con cabeceras, el orden se pide desde ellas. */
   .directory-sort-control {
     display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .directory-table th,
+  .directory-table td {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .directory-sort {
+    padding: var(--space-2) var(--space-4);
   }
 }
 
@@ -2488,10 +2545,26 @@ button.notification-item-content:hover {
   }
 
   /* El selector del rol y su botón no caben en media tarjeta: el rol de un
-     Admin ocupa las dos columnas de datos, y la posición baja debajo. */
-  .directory-table-admin .directory-role-cell,
-  .directory-table-admin .directory-role-cell + td {
+     Admin ocupa las dos columnas de datos, y la posición y la asistencia
+     bajan juntas debajo. */
+  .directory-table-admin .directory-role-cell {
     grid-column: 2 / -1;
+  }
+
+  .directory-table-admin .directory-role-cell + td {
+    grid-column: 2;
+  }
+
+  /* Quien sólo mira tiene el rol y la posición en la primera fila de datos:
+     la asistencia abre la segunda, bajo el rol. A un Admin le cae en la
+     columna de la derecha, junto a la posición. */
+  .directory-attendance-cell {
+    grid-column: 2;
+    color: var(--color-text);
+  }
+
+  .directory-table-admin .directory-attendance-cell {
+    grid-column: 3;
   }
 
   .directory-member {
