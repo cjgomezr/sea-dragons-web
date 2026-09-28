@@ -97,7 +97,7 @@ async function insertSchedule(
   return { seriesId: saved.series_id, eventIds: saved.event_ids };
 }
 
-async function findClubGroupIds(
+export async function findClubGroupIds(
   serviceClient: SupabaseClient,
   query: { readonly clubId: string; readonly groupIds: readonly string[] },
 ): Promise<ReadonlySet<string>> {

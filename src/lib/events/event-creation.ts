@@ -139,6 +139,8 @@ export const EVENT_ISSUE_CODES = [
   "series_range_inverted",
   "series_range_too_long",
   "series_without_sessions",
+  "event_started",
+  "event_cancelled",
 ] as const;
 
 export type EventIssueCode = (typeof EVENT_ISSUE_CODES)[number];
@@ -156,6 +158,8 @@ const ISSUE_MESSAGES: Readonly<Record<EventIssueCode, string>> = {
   series_range_too_long: `Una serie puede durar como mucho ${SERIES_MAX_DAYS} días.`,
   series_without_sessions:
     "Con esos días y esas fechas no saldría ninguna sesión.",
+  event_started: "El evento ya empezó: ya no se puede cambiar.",
+  event_cancelled: "El evento está cancelado: ya no se puede cambiar.",
 };
 
 export class EventValidationError extends Error {
@@ -170,15 +174,15 @@ export class EventValidationError extends Error {
 
 export class EventsForbiddenError extends Error {
   constructor() {
-    super("Tu rol no te permite crear eventos.");
+    super("Tu rol no te permite organizar eventos.");
     this.name = "EventsForbiddenError";
   }
 }
 
-/** Quien llama, si puede crear eventos. La frontera ya niega el camino a
- * quien no puede; esto es el cerrojo del dominio, para que no dependa de que
- * nadie olvide la línea de `RESTRICTED_ROUTES`. */
-async function findEventOrganizer(
+/** Quien llama, si puede crear, editar y cancelar eventos. La frontera ya
+ * niega el camino a quien no puede; esto es el cerrojo del dominio, para que
+ * no dependa de que nadie olvide la línea de `RESTRICTED_ROUTES`. */
+export async function findEventOrganizer(
   gateways: Pick<EventGateways, "members">,
   callerId: string,
 ): Promise<RoleRequestMember> {
@@ -207,9 +211,21 @@ function normalizeLine(
   return value;
 }
 
+export function normalizeTitle(raw: string): string {
+  return normalizeLine(raw, EVENT_TITLE_MAX_LENGTH, "event_title_invalid");
+}
+
+export function normalizeLocation(raw: string): string {
+  return normalizeLine(
+    raw,
+    EVENT_LOCATION_MAX_LENGTH,
+    "event_location_invalid",
+  );
+}
+
 /** Las notas son texto libre con saltos de línea; unas en blanco no dicen
  * nada y se guardan como ninguna. */
-function normalizeNotes(raw: string | null): string | null {
+export function normalizeNotes(raw: string | null): string | null {
   const notes = raw?.trim() ?? "";
   if (notes.length === 0) {
     return null;
@@ -222,8 +238,10 @@ function normalizeNotes(raw: string | null): string | null {
 
 /** Una audiencia de grupos vacía se rechaza aquí y no en la base: borrar un
  * grupo puede dejar un evento así, y la base no debe impedirlo. */
-async function resolveAudience(
-  gateways: Pick<EventGateways, "events">,
+export async function resolveAudience(
+  gateways: {
+    readonly events: Pick<EventsGateway, "findClubGroupIds">;
+  },
   clubId: string,
   audience: EventAudience,
 ): Promise<EventAudience> {
@@ -250,18 +268,10 @@ async function normalizeFields(
   draft: EventDraft,
 ): Promise<EventFields> {
   return {
-    title: normalizeLine(
-      draft.title,
-      EVENT_TITLE_MAX_LENGTH,
-      "event_title_invalid",
-    ),
+    title: normalizeTitle(draft.title),
     eventType: draft.eventType,
     startTime: draft.startTime,
-    location: normalizeLine(
-      draft.location,
-      EVENT_LOCATION_MAX_LENGTH,
-      "event_location_invalid",
-    ),
+    location: normalizeLocation(draft.location),
     notes: normalizeNotes(draft.notes),
     audience: await resolveAudience(gateways, clubId, draft.audience),
   };

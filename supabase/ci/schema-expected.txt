@@ -198,6 +198,7 @@ funcion seed_default_evaluation_categories(target_club_id uuid)
 funcion set_club_position_archived(acting_club_id uuid, target_position_id uuid, archived boolean)
 funcion set_evaluation_category_active(acting_club_id uuid, target_category_id uuid, active boolean)
 funcion set_member_status(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_status text)
+funcion update_event(acting_club_id uuid, target_event_id uuid, changes jsonb)
 grant audit_log postgres DELETE
 grant audit_log postgres INSERT
 grant audit_log postgres REFERENCES
