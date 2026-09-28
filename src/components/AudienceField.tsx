@@ -2,13 +2,14 @@ import type { Group } from "@/lib/groups/groups";
 import type { Translator } from "@/lib/i18n/translator";
 
 /**
- * A quién va una publicación (#330, RF-2): todo el club o los grupos que se
- * marquen, de entre los grupos vigentes del club (E4). "Todo el club" y
- * "estos grupos" son dos opciones y no una lista que puede quedar vacía, como
- * en el dominio (`NewsAudience`).
+ * A quién va algo: todo el club o los grupos que se marquen, de entre los
+ * grupos vigentes del club (E4). "Todo el club" y "estos grupos" son dos
+ * opciones y no una lista que puede quedar vacía, como en el dominio
+ * (`ClubAudience`).
  *
- * E7 va a necesitar lo mismo al crear un evento. Cuando llegue, este campo
- * es el que tiene que reutilizar o copiar en forma.
+ * Nació para publicar noticias (#330) y lo reutiliza el diálogo de eventos
+ * (#313). Cada uno pone su propia leyenda: una noticia se "ve" y a un evento
+ * se "invita".
  */
 
 export type AudienceChoice = {
@@ -16,8 +17,8 @@ export type AudienceChoice = {
   readonly groupIds: ReadonlySet<string>;
 };
 
-const LEGEND_ID = "publicar-audiencia";
-const GROUPS_ID = "publicar-audiencia-grupos";
+const LEGEND_ID = "audiencia";
+const GROUPS_ID = "audiencia-grupos";
 
 function AudienceOption({
   value,
@@ -66,7 +67,7 @@ function GroupChoices({
       aria-describedby={issueText === null ? undefined : issueId}
       aria-invalid={issueText !== null}
     >
-      <legend>{translate("news.publish.audience.groupsLegend")}</legend>
+      <legend>{translate("audience.groupsLegend")}</legend>
       {clubGroups.map((group) => {
         const inputId = `${GROUPS_ID}-${group.id}`;
         return (
@@ -90,14 +91,16 @@ function GroupChoices({
   );
 }
 
-export function NewsAudienceField({
+export function AudienceField({
   translate,
+  legend,
   clubGroups,
   audience,
   issueText,
   onChange,
 }: {
   readonly translate: Translator;
+  readonly legend: string;
   readonly clubGroups: readonly Group[];
   readonly audience: AudienceChoice;
   /** El aviso de los grupos, o null si no tiene ninguno. */
@@ -116,21 +119,19 @@ export function NewsAudienceField({
 
   return (
     <fieldset className="member-record-groups news-audience">
-      <legend>{translate("news.publish.audience.legend")}</legend>
+      <legend>{legend}</legend>
       <AudienceOption
         value="club"
-        label={translate("news.publish.audience.club")}
+        label={translate("audience.club")}
         isChecked={audience.kind === "club"}
         onChoose={() => onChange({ ...audience, kind: "club" })}
       />
       {clubGroups.length === 0 ? (
-        <p className="auth-note">
-          {translate("news.publish.audience.noGroups")}
-        </p>
+        <p className="auth-note">{translate("audience.noGroups")}</p>
       ) : (
         <AudienceOption
           value="groups"
-          label={translate("news.publish.audience.groups")}
+          label={translate("audience.groups")}
           isChecked={audience.kind === "groups"}
           onChoose={() => onChange({ ...audience, kind: "groups" })}
         />

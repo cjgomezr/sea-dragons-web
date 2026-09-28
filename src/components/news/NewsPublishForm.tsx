@@ -17,7 +17,7 @@ import {
   type NewsCategory,
   type NewsDraft,
 } from "@/lib/news/news-posts";
-import { type AudienceChoice, NewsAudienceField } from "./NewsAudienceField";
+import { type AudienceChoice, AudienceField } from "@/components/AudienceField";
 import { NewsAttachmentsField } from "./NewsAttachmentsField";
 import { describeEditFailure, saveNewsEdit } from "./news-manage-client";
 import {
@@ -339,8 +339,9 @@ export function NewsPublishForm({
       <fieldset className="member-record-fields" disabled={isSending}>
         <CategoryField {...fieldProps} />
         <TitleAndBodyFields {...fieldProps} />
-        <NewsAudienceField
+        <AudienceField
           translate={translate}
+          legend={translate("news.publish.audience.legend")}
           clubGroups={clubGroups}
           audience={draft.audience}
           issueText={issueTextFor("audience")}

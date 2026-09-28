@@ -719,6 +719,62 @@ export const englishMessages = {
   "calendar.rsvp.error.signInRequired":
     "Your session ended. Sign in again to answer.",
   "calendar.rsvp.error.unexpected": "We couldn't save your answer. Try again.",
+  "calendar.create.open": "Event",
+  "calendar.create.created": "Event created. We let the members know.",
+  "calendar.create.createdSeries": {
+    one: "Created {count} session. We let the members know.",
+    other: "Created {count} sessions. We let the members know.",
+  },
+  "calendar.form.title": "New event",
+  "calendar.form.close": "Close",
+  "calendar.form.loading": "Loading the club's groups…",
+  "calendar.form.loadFailed": "We couldn't load the club's groups. Try again.",
+  "calendar.form.retry": "Try again",
+  "calendar.form.titleLabel": "Title",
+  "calendar.form.titlePlaceholder": "e.g. Pool Training",
+  "calendar.form.type": "Type",
+  "calendar.form.date": "Date",
+  "calendar.form.time": "Time",
+  "calendar.form.location": "Location",
+  "calendar.form.locationPlaceholder": "e.g. MSAC Dive Pool",
+  "calendar.form.notes": "Notes",
+  "calendar.form.repeat": "Repeat",
+  "calendar.form.repeat.none": "One-time",
+  "calendar.form.repeat.weekly": "Weekly",
+  "calendar.form.weekdays": "Repeats on",
+  "calendar.form.startsOn": "Starts",
+  "calendar.form.endsOn": "Ends",
+  "calendar.form.audience": "Who's invited",
+  "calendar.form.cancel": "Cancel",
+  "calendar.form.submit": "Create event",
+  "calendar.form.sending": "Saving…",
+  "calendar.form.issue.required": "Fill in this field.",
+  "calendar.form.issue.event_title_invalid":
+    "Write a title of up to {max} characters.",
+  "calendar.form.issue.event_location_invalid":
+    "Write a location of up to {max} characters.",
+  "calendar.form.issue.event_notes_too_long":
+    "The notes can be up to {max} characters long.",
+  "calendar.form.issue.event_audience_empty":
+    "Choose the whole club or at least one group.",
+  "calendar.form.issue.event_audience_foreign_group":
+    "One of these groups no longer exists. Close and open the form again.",
+  "calendar.form.issue.event_in_past":
+    "That date and time have already passed.",
+  "calendar.form.issue.series_weekdays_empty":
+    "Choose at least one day of the week.",
+  "calendar.form.issue.series_range_inverted":
+    "The end date is before the start date.",
+  "calendar.form.issue.series_range_too_long":
+    "A series can last up to {max} days.",
+  "calendar.form.issue.series_without_sessions":
+    "Those days and dates don't give any session. Change the days or the range.",
+  "calendar.form.error.network":
+    "We couldn't reach the server. Check your connection and try again.",
+  "calendar.form.error.signInRequired":
+    "Your session ended. Sign in again to create the event.",
+  "calendar.form.error.forbidden": "Your role can't create events.",
+  "calendar.form.error.unexpected": "We couldn't create the event. Try again.",
   // Próximos y pasados, y la fila desplegada (#312, RF-7 y RF-8).
   "calendar.period.label": "Which events to show",
   "calendar.period.upcoming": "Upcoming",
@@ -970,10 +1026,10 @@ export const englishMessages = {
   "news.publish.body": "Message",
   "news.publish.bodyHint": "Plain text. Line breaks are kept.",
   "news.publish.audience.legend": "Who sees it",
-  "news.publish.audience.club": "The whole club",
-  "news.publish.audience.groups": "Specific groups",
-  "news.publish.audience.groupsLegend": "Groups",
-  "news.publish.audience.noGroups":
+  "audience.club": "The whole club",
+  "audience.groups": "Specific groups",
+  "audience.groupsLegend": "Groups",
+  "audience.noGroups":
     "The club has no groups yet, so this can only go to the whole club.",
   "news.publish.attachments.legend": "Attachments",
   "news.publish.attachments.hint":

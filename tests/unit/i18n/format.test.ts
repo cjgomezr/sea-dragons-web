@@ -9,6 +9,7 @@ import {
   formatCalendarDayAt,
   formatCalendarDayParts,
   formatClubMoment,
+  formatWeekdayName,
   formatWeekdays,
   formatFileSize,
   formatNumber,
@@ -227,6 +228,14 @@ describe("días de la semana", () => {
 
   it("nombra el domingo como el día 7", () => {
     expect(formatWeekdays("es", [7])).toBe("domingo");
+  });
+
+  it("da el nombre entero de un solo día", () => {
+    expect(formatWeekdayName("en", 2, "long")).toBe("Tuesday");
+  });
+
+  it("da el nombre corto de un día, en español", () => {
+    expect(formatWeekdayName("es", 1, "short")).toBe("lun");
   });
 });
 

@@ -200,17 +200,31 @@ const WEEKDAY_LIST_FORMATTERS = formattersByLocale(
 const A_MONDAY = "2024-01-01";
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
+function dayOfWeek(weekday: IsoWeekday): Date {
+  const monday = parseCalendarDay(A_MONDAY).getTime();
+  return new Date(monday + (weekday - 1) * MILLISECONDS_PER_DAY);
+}
+
+/** El nombre de un día de la semana, entero ("Tuesday") o corto ("Tue"),
+ * como los que se marcan al crear una serie (#313). */
+export function formatWeekdayName(
+  locale: Locale,
+  weekday: IsoWeekday,
+  width: "long" | "short",
+): string {
+  const formatters =
+    width === "long" ? WEEKDAY_FORMATTERS : SHORT_WEEKDAY_FORMATTERS;
+  return formatters[locale].format(dayOfWeek(weekday));
+}
+
 /** Los días de una serie semanal ("Tuesday and Thursday", "martes y
  * jueves"), en el orden en que llegan. */
 export function formatWeekdays(
   locale: Locale,
   weekdays: readonly IsoWeekday[],
 ): string {
-  const monday = parseCalendarDay(A_MONDAY).getTime();
   const names = weekdays.map((weekday) =>
-    WEEKDAY_FORMATTERS[locale].format(
-      new Date(monday + (weekday - 1) * MILLISECONDS_PER_DAY),
-    ),
+    formatWeekdayName(locale, weekday, "long"),
   );
   return WEEKDAY_LIST_FORMATTERS[locale].format(names);
 }

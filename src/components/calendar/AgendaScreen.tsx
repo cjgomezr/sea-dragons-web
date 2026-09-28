@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AgendaEvent, AgendaPeriod } from "@/lib/events/event-agenda";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
@@ -10,6 +10,8 @@ import {
   loadAgenda,
 } from "./agenda-client";
 import { AgendaRow } from "./AgendaRow";
+import { type CreatedSummary, describeCreated } from "./event-create-client";
+import { EventDialog } from "./EventDialog";
 
 /**
  * La agenda del Calendario (#311, RF-5 a RF-7 del PRD de E7): los eventos de
@@ -26,6 +28,10 @@ import { AgendaRow } from "./AgendaRow";
  * Una vista abierta no se desmonta al cambiar de periodo, sólo se esconde:
  * al volver a Próximos sigue todo como estaba, con las filas desplegadas y
  * las respuestas guardadas, sin pedir la agenda otra vez.
+ *
+ * A quien puede crear eventos le pinta "+ Evento" (#313), que abre el
+ * diálogo. Al crear, las vistas se vuelven a montar y piden la agenda otra
+ * vez, para que el evento salga en su sitio, ordenado por el servidor.
  */
 
 type MoreState =
@@ -146,6 +152,49 @@ function AgendaList({
   );
 }
 
+/** "+ Evento" y el diálogo que abre. Al cerrarse, el foco vuelve al botón. */
+function CreateEventButton({
+  translate,
+  onOpen,
+  onCreated,
+}: {
+  readonly translate: Translator;
+  readonly onOpen: () => void;
+  readonly onCreated: (summary: CreatedSummary) => void;
+}): React.JSX.Element {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const openButtonRef = useRef<HTMLButtonElement>(null);
+
+  function handleClosed(): void {
+    setIsDialogOpen(false);
+    openButtonRef.current?.focus();
+  }
+
+  return (
+    <>
+      <button
+        ref={openButtonRef}
+        type="button"
+        className="auth-submit agenda-create"
+        onClick={() => {
+          onOpen();
+          setIsDialogOpen(true);
+        }}
+      >
+        <span aria-hidden="true">+ </span>
+        {translate("calendar.create.open")}
+      </button>
+      {isDialogOpen ? (
+        <EventDialog
+          translate={translate}
+          onCreated={onCreated}
+          onClosed={handleClosed}
+        />
+      ) : null}
+    </>
+  );
+}
+
 function PeriodChoice({
   translate,
   period,
@@ -211,7 +260,7 @@ function AgendaView({
     };
   }, [period, reloads]);
 
-  function retryLoad(): void {
+  function reloadAgenda(): void {
     setState({ kind: "loading" });
     setReloads((count) => count + 1);
   }
@@ -251,7 +300,7 @@ function AgendaView({
         <LoadFailure
           translate={translate}
           failure={state.failure}
-          onRetry={retryLoad}
+          onRetry={reloadAgenda}
         />
       ) : null}
       {state.kind === "ready" ? (
@@ -275,11 +324,18 @@ function AgendaView({
 
 export function AgendaScreen({
   locale,
+  canCreateEvents,
 }: {
   readonly locale: Locale;
+  /** Si quien mira puede crear eventos. Sólo decide si se pinta el botón:
+   * el endpoint ya rechaza a quien no tiene `createEvents` (#307). */
+  readonly canCreateEvents: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [period, setPeriod] = useState<AgendaPeriod>("upcoming");
+  const [created, setCreated] = useState<CreatedSummary | null>(null);
+  // Cambia con cada evento creado: la clave nueva vuelve a montar las vistas.
+  const [agendaVersion, setAgendaVersion] = useState(0);
   // Los periodos ya abiertos: uno se monta la primera vez que se elige.
   const [openedPeriods, setOpenedPeriods] = useState<ReadonlySet<AgendaPeriod>>(
     () => new Set(["upcoming"]),
@@ -299,15 +355,34 @@ export function AgendaScreen({
           <p className="agenda-eyebrow">{translate("calendar.eyebrow")}</p>
           <h1 id={TITLE_ID}>{translate(PERIOD_TEXTS[period].title)}</h1>
         </div>
-        <PeriodChoice
-          translate={translate}
-          period={period}
-          onChoose={choosePeriod}
-        />
+        <div className="agenda-actions">
+          <PeriodChoice
+            translate={translate}
+            period={period}
+            onChoose={choosePeriod}
+          />
+          {canCreateEvents ? (
+            <CreateEventButton
+              translate={translate}
+              onOpen={() => setCreated(null)}
+              onCreated={(summary) => {
+                setCreated(summary);
+                setAgendaVersion((version) => version + 1);
+              }}
+            />
+          ) : null}
+        </div>
       </header>
+      {/* Siempre en el DOM: un lector de pantalla sólo anuncia los cambios
+          de una región que ya estaba. */}
+      {canCreateEvents ? (
+        <p className="agenda-notice" role="status">
+          {created === null ? null : describeCreated(translate, created)}
+        </p>
+      ) : null}
       {PERIODS.filter((choice) => openedPeriods.has(choice)).map((choice) => (
         <AgendaView
-          key={choice}
+          key={`${choice}-${agendaVersion}`}
           translate={translate}
           period={choice}
           isActive={choice === period}
