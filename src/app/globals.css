@@ -4367,3 +4367,316 @@ button.notification-item-content:hover {
   border-left: 4px solid var(--color-warning);
   border-radius: var(--radius);
 }
+
+/* La pantalla de Asistencia (#395). Sigue docs/mockups/attendance-light.png:
+   la cabecera con el título y el botón de guardar, las fichas de las sesiones,
+   tres contadores y la lista en un solo panel. Sin mockup móvil: los tres
+   botones de cada fila bajan a lo ancho de la fila, como el RSVP del
+   calendario, y cada uno mide al menos 44px. */
+.attendance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 780px;
+}
+
+.attendance-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.attendance-header h1 {
+  margin: 0;
+  overflow-wrap: break-word;
+}
+
+.attendance-eyebrow {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.attendance-save {
+  flex: none;
+}
+
+.attendance-save:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.attendance-sessions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.attendance-session {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.attendance-session:hover {
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+
+.attendance-session[aria-pressed="true"] {
+  font-weight: 700;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.attendance-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attendance-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+/* El punto de color es decoración: el nombre del estado va escrito al lado. */
+.attendance-total::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.attendance-total-count {
+  font-family: var(--font-family-mono);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.attendance-total-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.attendance-present::before {
+  background: var(--color-success);
+}
+
+.attendance-late::before {
+  background: var(--color-warning);
+}
+
+.attendance-absent::before {
+  background: var(--color-danger);
+}
+
+.attendance-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.attendance-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.attendance-row + .attendance-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.attendance-member {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.attendance-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.attendance-member-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.attendance-name {
+  font-weight: 700;
+  overflow-wrap: break-word;
+}
+
+.attendance-hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.attendance-position {
+  padding: 0 var(--space-2);
+  font-family: var(--font-family-mono);
+  color: var(--color-text);
+  background: var(--color-background);
+  border-radius: var(--radius);
+}
+
+.attendance-inactive {
+  padding: 0 var(--space-2);
+  color: var(--color-danger);
+  border: 1px solid currentcolor;
+  border-radius: var(--radius);
+}
+
+.attendance-segment {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.attendance-choice {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-2);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+}
+
+.attendance-choice + .attendance-choice {
+  border-left: none;
+}
+
+.attendance-choice:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.attendance-choice:last-child {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.attendance-choice:hover {
+  color: var(--color-text);
+}
+
+/* El relleno se mezcla con el color del texto para que el texto del botón,
+   el del panel, pase AA en los dos temas: en claro oscurece el estado y en
+   oscuro lo aclara. */
+.attendance-choice[aria-pressed="true"] {
+  color: var(--color-panel);
+  border-color: transparent;
+}
+
+.attendance-choice-present[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-success) 60%, var(--color-text));
+}
+
+.attendance-choice-late[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-warning) 60%, var(--color-text));
+}
+
+.attendance-choice-absent[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-danger) 60%, var(--color-text));
+}
+
+/* Como `.agenda-notice`: vacía no ocupa sitio, pero sigue en el DOM para que
+   la confirmación se anuncie al llegar. */
+.attendance-notice {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-success);
+  border-radius: var(--radius);
+}
+
+.attendance-notice:empty {
+  display: none;
+}
+
+.attendance-no-sessions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .attendance-session {
+    min-height: 36px;
+  }
+
+  .attendance-totals {
+    gap: var(--space-4);
+  }
+
+  .attendance-total {
+    padding: var(--space-4);
+  }
+
+  .attendance-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .attendance-segment {
+    flex: none;
+  }
+
+  .attendance-choice {
+    min-width: 72px;
+    min-height: 36px;
+  }
+}

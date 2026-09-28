@@ -1261,4 +1261,45 @@ export const spanishMessages: MessageCatalog = {
     "Otra persona guardó esta publicación mientras la editabas. Recarga la página para ver sus cambios antes de guardar los tuyos.",
   "news.edit.error.unexpected":
     "No pudimos guardar los cambios. Vuelve a intentarlo.",
+  "attendance.metaTitle": "Asistencia · {club}",
+  "attendance.eyebrow": "Asistencia",
+  "attendance.title": "{title} · {date}",
+  "attendance.loading": "Cargando las sesiones…",
+  "attendance.loadingSheet": "Cargando la hoja de asistencia…",
+  "attendance.retry": "Reintentar",
+  "attendance.sessions.label": "Sesiones",
+  "attendance.sessions.choice": "{weekday} {day} · {title}",
+  "attendance.noSessions":
+    "No ha empezado ningún entrenamiento en los últimos 30 días.",
+  "attendance.toCalendar": "Ir al calendario",
+  "attendance.totals.label": "Totales",
+  "attendance.members.label": "Miembros",
+  "attendance.status.present": "Presente",
+  "attendance.status.late": "Tarde",
+  "attendance.status.absent": "Ausente",
+  "attendance.emptySheet": "No se espera a nadie en esta sesión.",
+  "attendance.rsvp.yes": "RSVP: Sí",
+  "attendance.rsvp.maybe": "RSVP: Quizás",
+  "attendance.rsvp.no": "RSVP: No",
+  "attendance.rsvp.none": "Sin RSVP",
+  "attendance.inactive": "Desactivada",
+  "attendance.save": "Guardar asistencia",
+  "attendance.unsaved": "Cambios sin guardar",
+  "attendance.saving": "Guardando…",
+  "attendance.saved":
+    "Asistencia guardada. Presentes: {present}; tarde: {late}; ausentes: {absent}.",
+  "attendance.discardQuestion":
+    "Hay cambios sin guardar en esta sesión. ¿Los descartas?",
+  "attendance.error.notStarted":
+    "Este entrenamiento todavía no empezó: la asistencia se pasa desde su hora de inicio.",
+  "attendance.error.cancelled":
+    "Este entrenamiento está cancelado: no lleva asistencia.",
+  "attendance.error.outsideSheet":
+    "Alguien de la lista ya no se espera en esta sesión. Recarga la página y vuelve a intentarlo.",
+  "attendance.error.notFound": "Esa sesión no existe o no es un entrenamiento.",
+  "attendance.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para pasar lista.",
+  "attendance.error.forbidden": "Sólo Admin y Coach pasan lista.",
+  "attendance.error.unexpected": "Algo salió mal. Vuelve a intentarlo.",
+  "calendar.takeAttendance": "Pasar lista",
 };

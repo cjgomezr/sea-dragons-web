@@ -1256,4 +1256,45 @@ export const englishMessages = {
   "news.edit.error.conflict":
     "Someone else saved this post while you were editing it. Reload the page to see their changes before saving yours.",
   "news.edit.error.unexpected": "We couldn't save the changes. Try again.",
+  "attendance.metaTitle": "Attendance · {club}",
+  "attendance.eyebrow": "Attendance",
+  "attendance.title": "{title} · {date}",
+  "attendance.loading": "Loading the sessions…",
+  "attendance.loadingSheet": "Loading the attendance sheet…",
+  "attendance.retry": "Try again",
+  "attendance.sessions.label": "Sessions",
+  "attendance.sessions.choice": "{weekday} {day} · {title}",
+  "attendance.noSessions": "No training has started in the last 30 days.",
+  "attendance.toCalendar": "Go to the calendar",
+  "attendance.totals.label": "Totals",
+  "attendance.members.label": "Members",
+  "attendance.status.present": "Present",
+  "attendance.status.late": "Late",
+  "attendance.status.absent": "Absent",
+  "attendance.emptySheet": "Nobody is expected at this session.",
+  "attendance.rsvp.yes": "RSVP: Yes",
+  "attendance.rsvp.maybe": "RSVP: Maybe",
+  "attendance.rsvp.no": "RSVP: No",
+  "attendance.rsvp.none": "No RSVP",
+  "attendance.inactive": "Deactivated",
+  "attendance.save": "Save attendance",
+  "attendance.unsaved": "Unsaved changes",
+  "attendance.saving": "Saving…",
+  "attendance.saved":
+    "Attendance saved: {present} present, {late} late, {absent} absent.",
+  "attendance.discardQuestion":
+    "You have unsaved changes on this session. Discard them?",
+  "attendance.error.notStarted":
+    "This training hasn't started yet: attendance opens at its start time.",
+  "attendance.error.cancelled":
+    "This training was cancelled: it doesn't take attendance.",
+  "attendance.error.outsideSheet":
+    "Someone on the list is no longer expected at this session. Reload the page and try again.",
+  "attendance.error.notFound":
+    "That session doesn't exist or isn't a training.",
+  "attendance.error.signInRequired":
+    "Your session ended. Sign in again to take attendance.",
+  "attendance.error.forbidden": "Only Admins and Coaches take attendance.",
+  "attendance.error.unexpected": "Something went wrong. Try again.",
+  "calendar.takeAttendance": "Take attendance",
 } as const satisfies Readonly<Record<string, Message>>;
