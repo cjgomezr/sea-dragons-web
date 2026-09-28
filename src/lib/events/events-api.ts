@@ -21,9 +21,14 @@ import {
 } from "./event-agenda";
 import { createSupabaseEventAgendaGateways } from "./supabase-event-agenda-gateways";
 import type { EventManagementGateways } from "./event-management";
+import {
+  type SeriesManagementGateways,
+  SeriesNotFoundError,
+} from "./series-management";
 import { createSupabaseEventGateways } from "./supabase-event-gateways";
 import { createSupabaseEventManagementGateways } from "./supabase-event-management-gateways";
 import { createSupabaseEventRsvpGateways } from "./supabase-event-rsvp-gateways";
+import { createSupabaseSeriesManagementGateways } from "./supabase-series-management-gateways";
 
 /**
  * Lo que comparten los endpoints de eventos (#307): cómo se cablean, la forma
@@ -75,6 +80,28 @@ export const eventEditSchema = eventFieldsSchema
     message: "Envía al menos un campo que cambiar.",
   });
 
+/** Lo que cambia de una serie: los mismos campos que al crear salvo la
+ * fecha, todos opcionales, y al menos uno. Los días y las fechas de la serie
+ * no se editan (#315), así que mandarlos es un 400 y no se ignoran en
+ * silencio. */
+export const seriesEditSchema = eventFieldsSchema
+  .partial()
+  .strict()
+  .refine((edit) => Object.values(edit).some((value) => value !== undefined), {
+    message: "Envía al menos un campo que cambiar.",
+  });
+
+export function requireSeriesManagementGateways(): SeriesManagementGateways {
+  const wiring = createSupabaseSeriesManagementGateways(process.env);
+  if (wiring.kind === "unconfigured") {
+    throw new ApiError(
+      "service_unavailable",
+      describeMissingAuthKeys(wiring.missingKeys),
+    );
+  }
+  return wiring.gateways;
+}
+
 export function requireEventManagementGateways(): EventManagementGateways {
   const wiring = createSupabaseEventManagementGateways(process.env);
   if (wiring.kind === "unconfigured") {
@@ -106,6 +133,14 @@ export const eventRsvpSchema = z.object({
 export function readEventId(value: string): string {
   if (!z.uuid().safeParse(value).success) {
     throw new ApiError("not_found", new EventNotFoundError().message);
+  }
+  return value;
+}
+
+/** Lo mismo para una serie (#315). */
+export function readSeriesId(value: string): string {
+  if (!z.uuid().safeParse(value).success) {
+    throw new ApiError("not_found", new SeriesNotFoundError().message);
   }
   return value;
 }
@@ -142,7 +177,10 @@ export function asEventsApiError(error: unknown): never {
   if (error instanceof RsvpClosedError) {
     throw new ApiError("business_rule", error.message, error.code);
   }
-  if (error instanceof EventNotFoundError) {
+  if (
+    error instanceof EventNotFoundError ||
+    error instanceof SeriesNotFoundError
+  ) {
     throw new ApiError("not_found", error.message);
   }
   if (error instanceof EventsForbiddenError) {
