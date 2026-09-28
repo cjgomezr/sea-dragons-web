@@ -90,15 +90,13 @@ export function toClubAttendanceRate(
   };
 }
 
-/** La asistencia de un miembro que la consulta tenía que traer. Que falte es
- * que la lista y la consulta leyeron clubes o miembros distintos. */
+/** La asistencia de un miembro de la lista. La consulta trae una fila por
+ * miembro del club, así que faltar sólo puede ser que se dio de baja entre
+ * la lectura de la lista y la de la asistencia: sale sin datos, que es lo
+ * que la base diría de él, en vez de tumbar la lista entera. */
 export function attendanceOf(
   attendance: ReadonlyMap<string, MemberAttendance>,
   userId: string,
 ): MemberAttendance {
-  const found = attendance.get(userId);
-  if (found === undefined) {
-    throw new Error(`No llegó la asistencia del miembro ${userId}.`);
-  }
-  return found;
+  return attendance.get(userId) ?? { kind: "no_data" };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  attendanceOf,
   toClubAttendanceRate,
   toMemberAttendance,
 } from "@/lib/attendance/attendance-stats";
@@ -50,6 +51,24 @@ describe("el porcentaje de asistencia", () => {
         percent: null,
       }),
     ).toThrow(/porcentaje/);
+  });
+});
+
+describe("la asistencia de cada miembro de la lista", () => {
+  const MEMBER_ID = "e39bfd53-6a91-43ba-bc5a-1f8f7c1c90a9";
+
+  it("sirve la que trajo la consulta", () => {
+    const counted = { kind: "rate", percent: 80, sessions: 8 } as const;
+
+    const attendance = attendanceOf(new Map([[MEMBER_ID, counted]]), MEMBER_ID);
+
+    expect(attendance).toEqual(counted);
+  });
+
+  it("dice sin datos de quien se dio de baja entre las dos consultas", () => {
+    const attendance = attendanceOf(new Map(), MEMBER_ID);
+
+    expect(attendance).toEqual({ kind: "no_data" });
   });
 });
 
