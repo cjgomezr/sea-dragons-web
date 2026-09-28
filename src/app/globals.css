@@ -3992,6 +3992,16 @@ button.notification-item-content:hover {
   border: none;
 }
 
+/* Mientras guarda, todo el formulario se ve bloqueado, como los botones. */
+.event-form-fields:disabled .auth-field input,
+.event-form-fields:disabled .auth-field select,
+.event-form-fields:disabled .auth-field textarea,
+.event-form-fields:disabled .event-form-segment label,
+.event-form-fields:disabled .event-form-day label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .event-form-notes {
   min-height: 5rem;
   padding: var(--space-2) var(--space-3);
