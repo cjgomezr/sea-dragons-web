@@ -860,6 +860,39 @@ describe("fila desplegable", () => {
     expect(await within(row).findByText("Zoe Park")).toBeInTheDocument();
     expect(within(row).queryByText("Liam O'Connor")).not.toBeInTheDocument();
   });
+  it("un detalle que llega tarde no pisa los nombres que trajo una respuesta", async () => {
+    let finishFirstOpening: (response: Response) => void = () => undefined;
+    let openings = 0;
+    stubApi(({ method, url }) => {
+      if (method === "PUT") {
+        return savedResponse(SCRIMMAGE.id, "yes");
+      }
+      if (url.pathname === eventPath(SCRIMMAGE)) {
+        openings += 1;
+        if (openings === 1) {
+          return new Promise<Response>((resolve) => {
+            finishFirstOpening = resolve;
+          });
+        }
+        return openedResponse(
+          { ...SCRIMMAGE, myResponse: "yes" },
+          { ...WITH_RESPONSES, going: ["Zoe Park"] },
+        );
+      }
+      return pageResponse({ events: [SCRIMMAGE], nextCursor: null });
+    });
+    render(<AgendaScreen locale="en" />);
+    const row = await expandRow(SCRIMMAGE.title);
+    await userEvent.click(rsvpButton(row, "Yes"));
+    await within(row).findByText("Zoe Park");
+
+    finishFirstOpening(openedResponse(SCRIMMAGE, WITH_RESPONSES));
+
+    await waitFor(() => expect(openings).toBe(2));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(within(row).getByText("Zoe Park")).toBeInTheDocument();
+    expect(within(row).queryByText("Liam O'Connor")).not.toBeInTheDocument();
+  });
   it("escribe el detalle en español", async () => {
     stubAgendaWithDetail([POOL_TRAINING], {
       notes: null,

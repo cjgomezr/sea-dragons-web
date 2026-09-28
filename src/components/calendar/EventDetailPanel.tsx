@@ -9,6 +9,10 @@ import type { EventDetailState } from "./use-event-detail";
  * Ningún apartado se queda en blanco: si no hay nada, una frase lo dice.
  */
 
+function hasNotes(notes: string | null): notes is string {
+  return notes !== null && notes.trim() !== "";
+}
+
 function NameList({
   label,
   names,
@@ -99,12 +103,12 @@ function OpenedDetail({
     <dl className="agenda-detail-list">
       <div className="agenda-detail-item">
         <dt>{translate("calendar.detail.notes")}</dt>
-        {opened.notes === null || opened.notes.trim() === "" ? (
+        {hasNotes(opened.notes) ? (
+          <dd className="agenda-detail-notes">{opened.notes}</dd>
+        ) : (
           <dd className="agenda-detail-empty">
             {translate("calendar.detail.noNotes")}
           </dd>
-        ) : (
-          <dd className="agenda-detail-notes">{opened.notes}</dd>
         )}
       </div>
       <Responses translate={translate} opened={opened} />

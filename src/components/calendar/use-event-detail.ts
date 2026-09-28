@@ -31,6 +31,9 @@ export function useEventDetail(eventId: string): {
   // Como en el RSVP: el estado tarda un render, la ref corta ya el segundo
   // despliegue mientras el primero sigue pidiendo.
   const isLoadingRef = useRef(false);
+  // Sube con cada detalle que llega por otro camino: una petición que sale
+  // antes y vuelve después trae nombres más viejos y no se pinta.
+  const versionRef = useRef(0);
 
   async function load(): Promise<void> {
     if (isLoadingRef.current) {
@@ -38,8 +41,12 @@ export function useEventDetail(eventId: string): {
     }
     isLoadingRef.current = true;
     setDetail({ kind: "loading" });
+    const version = versionRef.current;
     const outcome = await openEvent(eventId);
     isLoadingRef.current = false;
+    if (version !== versionRef.current) {
+      return;
+    }
     setDetail(
       outcome.kind === "opened"
         ? { kind: "loaded", opened: outcome.opened }
@@ -60,6 +67,9 @@ export function useEventDetail(eventId: string): {
     detail,
     toggle,
     retry: () => void load(),
-    receive: (opened) => setDetail({ kind: "loaded", opened }),
+    receive: (opened) => {
+      versionRef.current += 1;
+      setDetail({ kind: "loaded", opened });
+    },
   };
 }
