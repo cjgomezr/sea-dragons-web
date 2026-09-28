@@ -9,8 +9,11 @@ import { isStillAhead } from "@/lib/events/event-occurrences";
 import {
   CALLER_ID,
   CLUB_ID,
+  type FakeNoticeOptions,
+  type FakeNotices,
   MASTERS_SQUAD_ID,
   SENIOR_SQUAD_ID,
+  fakeEventNotices,
 } from "./events-club";
 
 /**
@@ -81,7 +84,7 @@ function initialEvents(): readonly ManagedEvent[] {
   ];
 }
 
-export type FakeManagedEventsClubOptions = {
+export type FakeManagedEventsClubOptions = FakeNoticeOptions & {
   readonly callerRole?: Role;
   readonly callerIsMember?: false;
   readonly clubGroupIds?: readonly string[];
@@ -89,7 +92,7 @@ export type FakeManagedEventsClubOptions = {
   readonly cancelledMeanwhile?: string;
 };
 
-export type FakeManagedEventsClub = {
+export type FakeManagedEventsClub = FakeNotices & {
   readonly gateways: EventManagementGateways;
   /** El estado de cada evento, por id. */
   event(id: string): ManagedEvent | undefined;
@@ -123,6 +126,8 @@ export function fakeManagedEventsClub(
     MASTERS_SQUAD_ID,
   ];
   let writes = 0;
+  const { notices, noticeBatches, ...noticeGateways } =
+    fakeEventNotices(options);
   const cancelMeanwhile = (id: string): void => {
     const event = events.get(id);
     if (options.cancelledMeanwhile === id && event !== undefined) {
@@ -134,6 +139,7 @@ export function fakeManagedEventsClub(
     }
   };
   const gateways: EventManagementGateways = {
+    ...noticeGateways,
     members: {
       findRoleRequestMember: async () =>
         options.callerIsMember === false
@@ -187,5 +193,7 @@ export function fakeManagedEventsClub(
     event: (id) => events.get(id),
     rsvps,
     writeCount: () => writes,
+    notices,
+    noticeBatches,
   };
 }

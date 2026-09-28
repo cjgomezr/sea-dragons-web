@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
+import { createSupabaseAudienceMembersGateway } from "@/lib/notifications/supabase-audience-members";
+import { createSupabaseNotificationWriter } from "@/lib/notifications/supabase-notification-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { EVENT_TYPES } from "./event-creation";
@@ -193,6 +195,8 @@ export function createEventManagementGateways(
       updateEvent: (update) => updateEvent(serviceClient, update),
       cancelEvent: (cancellation) => cancelEvent(serviceClient, cancellation),
     },
+    eventAudience: createSupabaseAudienceMembersGateway(serviceClient),
+    notifications: createSupabaseNotificationWriter(serviceClient),
   };
 }
 

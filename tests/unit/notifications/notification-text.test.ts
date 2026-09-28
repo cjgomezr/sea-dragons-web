@@ -41,6 +41,32 @@ const DATA_FOR_EVERY_TYPE = {
     endsOn: "2027-08-31",
     startTime: "19:00",
   },
+  event_changed: {
+    eventId: "e0000000-0000-4000-8000-00000000000e",
+    title: "Liga estatal",
+    startsOn: "2027-07-11",
+    startTime: "11:30",
+    location: "Aquatic Centre",
+  },
+  event_cancelled: {
+    eventId: "e0000000-0000-4000-8000-00000000000e",
+    title: "Liga estatal",
+    startsOn: "2027-07-10",
+    startTime: "10:00",
+  },
+  event_series_changed: {
+    seriesId: "c2c2c2c2-0000-4000-8000-00000000000c",
+    title: "Entrenamiento",
+    weekdays: [2, 4],
+    startTime: "18:00",
+    location: "Aquatic Centre",
+  },
+  event_series_cancelled: {
+    seriesId: "c2c2c2c2-0000-4000-8000-00000000000c",
+    title: "Entrenamiento",
+    weekdays: [2, 4],
+    startTime: "19:00",
+  },
 } as const;
 
 describe("textos de los avisos", () => {
@@ -309,6 +335,83 @@ describe("texto de los avisos de evento", () => {
       notificationDestination({ type: "event_created", data: {} }),
     ).toBeNull();
   });
+});
+
+describe("texto de los avisos de cambio y cancelación", () => {
+  const cases = [
+    {
+      type: "event_changed",
+      en: {
+        title: "Event changed",
+        body: "Liga estatal: now 11 July 2027 at 11:30 am, at Aquatic Centre",
+      },
+      es: {
+        title: "Evento cambiado",
+        body: "Liga estatal: ahora el 11 de julio de 2027, 11:30, en Aquatic Centre",
+      },
+    },
+    {
+      type: "event_cancelled",
+      en: {
+        title: "Event cancelled",
+        body: "Liga estatal: 10 July 2027 at 10:00 am",
+      },
+      es: {
+        title: "Evento cancelado",
+        body: "Liga estatal: 10 de julio de 2027, 10:00",
+      },
+    },
+    {
+      type: "event_series_changed",
+      en: {
+        title: "Series changed",
+        body: "Entrenamiento: now Tuesday and Thursday at 6:00 pm, at Aquatic Centre",
+      },
+      es: {
+        title: "Serie cambiada",
+        body: "Entrenamiento: ahora martes y jueves, 18:00, en Aquatic Centre",
+      },
+    },
+    {
+      type: "event_series_cancelled",
+      en: {
+        title: "Series cancelled",
+        body: "Entrenamiento: Tuesday and Thursday at 7:00 pm, from today on",
+      },
+      es: {
+        title: "Serie cancelada",
+        body: "Entrenamiento: martes y jueves, 19:00, de hoy en adelante",
+      },
+    },
+  ] as const;
+
+  for (const { type, ...byLocale } of cases) {
+    for (const locale of ["en", "es"] as const) {
+      it(`cuenta ${type} en ${locale}`, () => {
+        const text = describeNotification(createTranslator(locale), {
+          type,
+          data: DATA_FOR_EVERY_TYPE[type],
+        });
+
+        expect(text).toEqual(byLocale[locale]);
+      });
+    }
+
+    it(`${type} lleva al calendario`, () => {
+      expect(
+        notificationDestination({ type, data: DATA_FOR_EVERY_TYPE[type] }),
+      ).toBe(CALENDAR_PATH);
+    });
+
+    it(`${type} da el texto genérico con una hora que no es HH:MM`, () => {
+      const text = describeNotification(createTranslator("en"), {
+        type,
+        data: { ...DATA_FOR_EVERY_TYPE[type], startTime: "7pm" },
+      });
+
+      expect(text.title).toBe("New notification");
+    });
+  }
 });
 
 describe("tiempo relativo", () => {

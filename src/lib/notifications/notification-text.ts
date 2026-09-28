@@ -64,6 +64,10 @@ const newsPostPublishedData = z.object({
 /** `HH:MM`, sin segundos, como la guarda un evento. */
 const clockTime = z.iso.time({ precision: -1 });
 
+const seriesWeekdays = z
+  .array(z.union(ISO_WEEKDAYS.map((day) => z.literal(day))))
+  .min(1);
+
 const eventCreatedData = z.object({
   eventId: z.uuid(),
   title: z.string().min(1),
@@ -76,9 +80,39 @@ const eventSeriesCreatedData = z.object({
   seriesId: z.uuid(),
   title: z.string().min(1),
   eventType: z.enum(EVENT_TYPES),
-  weekdays: z.array(z.union(ISO_WEEKDAYS.map((day) => z.literal(day)))).min(1),
+  weekdays: seriesWeekdays,
   startsOn: z.iso.date(),
   endsOn: z.iso.date(),
+  startTime: clockTime,
+});
+
+const eventChangedData = z.object({
+  eventId: z.uuid(),
+  title: z.string().min(1),
+  startsOn: z.iso.date(),
+  startTime: clockTime,
+  location: z.string().min(1),
+});
+
+const eventCancelledData = z.object({
+  eventId: z.uuid(),
+  title: z.string().min(1),
+  startsOn: z.iso.date(),
+  startTime: clockTime,
+});
+
+const eventSeriesChangedData = z.object({
+  seriesId: z.uuid(),
+  title: z.string().min(1),
+  weekdays: seriesWeekdays,
+  startTime: clockTime,
+  location: z.string().min(1),
+});
+
+const eventSeriesCancelledData = z.object({
+  seriesId: z.uuid(),
+  title: z.string().min(1),
+  weekdays: seriesWeekdays,
   startTime: clockTime,
 });
 
@@ -174,6 +208,76 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         }),
       };
     },
+    event_changed: (translate, data) => {
+      const parsed = eventChangedData.safeParse(data);
+      if (!parsed.success) {
+        return null;
+      }
+      const event = parsed.data;
+      return {
+        title: translate("notifications.event_changed.title"),
+        body: translate("notifications.event_changed.body", {
+          title: event.title,
+          moment: formatCalendarDayAt(
+            translate.locale,
+            event.startsOn,
+            event.startTime,
+          ),
+          location: event.location,
+        }),
+      };
+    },
+    event_cancelled: (translate, data) => {
+      const parsed = eventCancelledData.safeParse(data);
+      if (!parsed.success) {
+        return null;
+      }
+      const event = parsed.data;
+      return {
+        title: translate("notifications.event_cancelled.title"),
+        body: translate("notifications.event_cancelled.body", {
+          title: event.title,
+          moment: formatCalendarDayAt(
+            translate.locale,
+            event.startsOn,
+            event.startTime,
+          ),
+        }),
+      };
+    },
+    event_series_changed: (translate, data) => {
+      const parsed = eventSeriesChangedData.safeParse(data);
+      if (!parsed.success) {
+        return null;
+      }
+      const series = parsed.data;
+      const { locale } = translate;
+      return {
+        title: translate("notifications.event_series_changed.title"),
+        body: translate("notifications.event_series_changed.body", {
+          title: series.title,
+          weekdays: formatWeekdays(locale, series.weekdays),
+          time: formatClockTime(locale, series.startTime),
+          location: series.location,
+        }),
+      };
+    },
+    event_series_cancelled: (translate, data) => {
+      const parsed = eventSeriesCancelledData.safeParse(data);
+      if (!parsed.success) {
+        return null;
+      }
+      const series = parsed.data;
+      const { locale } = translate;
+      return {
+        title: translate("notifications.event_series_cancelled.title"),
+        body: translate("notifications.event_series_cancelled.body", {
+          title: series.title,
+          weekdays: formatWeekdays(locale, series.weekdays),
+          time: formatClockTime(locale, series.startTime),
+        }),
+      };
+    },
   };
 
 function isKnownType(type: string): type is NotificationType {
@@ -204,6 +308,15 @@ const DESTINATION_BY_TYPE: Readonly<Record<NotificationType, DestinationOf>> = {
     eventCreatedData.safeParse(data).success ? CALENDAR_PATH : null,
   event_series_created: (data) =>
     eventSeriesCreatedData.safeParse(data).success ? CALENDAR_PATH : null,
+  // #317: al calendario, donde se ve lo que quedó.
+  event_changed: (data) =>
+    eventChangedData.safeParse(data).success ? CALENDAR_PATH : null,
+  event_cancelled: (data) =>
+    eventCancelledData.safeParse(data).success ? CALENDAR_PATH : null,
+  event_series_changed: (data) =>
+    eventSeriesChangedData.safeParse(data).success ? CALENDAR_PATH : null,
+  event_series_cancelled: (data) =>
+    eventSeriesCancelledData.safeParse(data).success ? CALENDAR_PATH : null,
 };
 
 /** `null` para un tipo que esta pantalla no reconoce, o para unos datos que

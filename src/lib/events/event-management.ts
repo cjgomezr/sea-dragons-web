@@ -10,6 +10,11 @@ import {
   normalizeTitle,
   resolveAudience,
 } from "./event-creation";
+import {
+  announceEventCancellation,
+  announceEventChange,
+} from "./event-change-notice";
+import type { EventNoticeGateways } from "./event-creation-notice";
 import { isStillAhead } from "./event-occurrences";
 import { EventNotFoundError } from "./event-rsvp";
 
@@ -64,7 +69,7 @@ export type ManagedEventsGateway = {
   }): Promise<ManagedEventWrite>;
 };
 
-export type EventManagementGateways = {
+export type EventManagementGateways = EventNoticeGateways & {
   readonly members: RoleRequestGateways["members"];
   readonly events: Pick<EventsGateway, "findClubGroupIds">;
   readonly managedEvents: ManagedEventsGateway;
@@ -157,7 +162,8 @@ function assertStillAheadAfter(
 }
 
 /** Cambia lo que viene de un evento futuro, o dice por qué no. Si dos
- * organizadores guardan a la vez, queda lo del último. */
+ * organizadores guardan a la vez, queda lo del último. La audiencia se entera
+ * si cambió la fecha, la hora o el lugar (#317). */
 export async function editEvent(
   gateways: EventManagementGateways,
   request: {
@@ -181,11 +187,18 @@ export async function editEvent(
     eventId: request.eventId,
     changes,
   });
-  return readBackEvent(gateways, target, write);
+  const edited = await readBackEvent(gateways, target, write);
+  await announceEventChange(gateways, {
+    clubId: caller.clubId,
+    authorId: request.callerId,
+    before: event,
+    after: edited,
+  });
+  return edited;
 }
 
 /** Marca cancelado un evento futuro, con la hora, sin borrar sus
- * respuestas. */
+ * respuestas, y se lo avisa a la audiencia (#317). */
 export async function cancelEvent(
   gateways: EventManagementGateways,
   request: {
@@ -202,5 +215,11 @@ export async function cancelEvent(
     eventId: request.eventId,
     cancelledAt: request.now,
   });
-  return readBackEvent(gateways, target, write);
+  const cancelled = await readBackEvent(gateways, target, write);
+  await announceEventCancellation(gateways, {
+    clubId: caller.clubId,
+    authorId: request.callerId,
+    cancelled,
+  });
+  return cancelled;
 }

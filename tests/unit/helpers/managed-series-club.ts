@@ -9,8 +9,11 @@ import { clubMoment } from "@/lib/time/club-calendar";
 import {
   CALLER_ID,
   CLUB_ID,
+  type FakeNoticeOptions,
+  type FakeNotices,
   MASTERS_SQUAD_ID,
   SENIOR_SQUAD_ID,
+  fakeEventNotices,
 } from "./events-club";
 
 /**
@@ -110,14 +113,14 @@ function initialOccurrences(): readonly ManagedEvent[] {
   ];
 }
 
-export type FakeManagedSeriesClubOptions = {
+export type FakeManagedSeriesClubOptions = FakeNoticeOptions & {
   readonly callerRole?: Role;
   readonly clubGroupIds?: readonly string[];
   /** Una escritura que revienta en la base. */
   readonly failingWrites?: true;
 };
 
-export type FakeManagedSeriesClub = {
+export type FakeManagedSeriesClub = FakeNotices & {
   readonly gateways: SeriesManagementGateways;
   series(id: string): ManagedSeries | undefined;
   occurrence(id: string): ManagedEvent | undefined;
@@ -152,6 +155,8 @@ export function fakeManagedSeriesClub(
     MASTERS_SQUAD_ID,
   ];
   let writes = 0;
+  const { notices, noticeBatches, ...noticeGateways } =
+    fakeEventNotices(options);
   const openOccurrencesOf = (
     seriesId: string,
     now: Date,
@@ -166,6 +171,7 @@ export function fakeManagedSeriesClub(
     }
   };
   const gateways: SeriesManagementGateways = {
+    ...noticeGateways,
     members: {
       findRoleRequestMember: async () => ({
         clubId: CLUB_ID,
@@ -217,5 +223,7 @@ export function fakeManagedSeriesClub(
     occurrence: (id) => occurrences.get(id),
     rsvps,
     writeCount: () => writes,
+    notices,
+    noticeBatches,
   };
 }

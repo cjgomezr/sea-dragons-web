@@ -1,3 +1,7 @@
+import {
+  announceSeriesCancellation,
+  announceSeriesChange,
+} from "./event-change-notice";
 import type { IsoWeekday } from "./event-occurrences";
 import {
   type EventFields,
@@ -60,7 +64,7 @@ export type ManagedSeriesGateway = {
 
 export type SeriesManagementGateways = Pick<
   EventManagementGateways,
-  "members" | "events"
+  "members" | "events" | "eventAudience" | "notifications"
 > & {
   readonly managedSeries: ManagedSeriesGateway;
 };
@@ -112,7 +116,9 @@ function assertSomethingChanged(changedOccurrences: number): void {
  * Qué ocurrencia es futura se decide con su hora de antes del cambio: a las
  * 18:00, pasar la serie de las 19:00 a las 17:00 mueve también la de hoy, que
  * queda en una hora ya pasada. Editar una sola ocurrencia (#314) lo rechaza;
- * aquí no, porque la serie no tiene una fecha que validar. */
+ * aquí no, porque la serie no tiene una fecha que validar.
+ *
+ * Si cambió la hora o el lugar, la audiencia recibe un solo aviso (#317). */
 export async function editSeries(
   gateways: SeriesManagementGateways,
   request: {
@@ -123,7 +129,7 @@ export async function editSeries(
 ): Promise<EditedSeries> {
   const caller = await findEventOrganizer(gateways, request.callerId);
   const target = { clubId: caller.clubId, seriesId: request.seriesId };
-  await findExistingSeries(gateways, target);
+  const before = await findExistingSeries(gateways, target);
   const changes = await normalizeChanges(
     gateways,
     caller.clubId,
@@ -134,14 +140,19 @@ export async function editSeries(
     changes,
   });
   assertSomethingChanged(updatedOccurrences);
-  return {
-    series: await findExistingSeries(gateways, target),
-    updatedOccurrences,
-  };
+  const series = await findExistingSeries(gateways, target);
+  await announceSeriesChange(gateways, {
+    clubId: caller.clubId,
+    authorId: request.callerId,
+    before,
+    after: series,
+  });
+  return { series, updatedOccurrences };
 }
 
 /** Cancela las ocurrencias futuras de una serie, con la hora, sin borrar sus
- * respuestas. Las pasadas se quedan como estaban. */
+ * respuestas, y se lo avisa una vez a la audiencia (#317). Las pasadas se
+ * quedan como estaban. */
 export async function cancelSeries(
   gateways: SeriesManagementGateways,
   request: {
@@ -152,12 +163,17 @@ export async function cancelSeries(
 ): Promise<CancelledSeries> {
   const caller = await findEventOrganizer(gateways, request.callerId);
   const target = { clubId: caller.clubId, seriesId: request.seriesId };
-  await findExistingSeries(gateways, target);
+  const series = await findExistingSeries(gateways, target);
   const cancelledOccurrences = await gateways.managedSeries.cancelSeries({
     ...target,
     cancelledAt: request.now,
   });
   assertSomethingChanged(cancelledOccurrences);
+  await announceSeriesCancellation(gateways, {
+    clubId: caller.clubId,
+    authorId: request.callerId,
+    cancelled: series,
+  });
   return {
     seriesId: request.seriesId,
     cancelledAt: request.now.toISOString(),
