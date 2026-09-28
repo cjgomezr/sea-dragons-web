@@ -4,6 +4,7 @@ import {
   ACCOUNT_GROUPS_API_PATH,
   ACCOUNT_PAGE_PATH,
   ATTENDANCE_API_PATH,
+  ATTENDANCE_PATH,
   ATTENDANCE_SESSIONS_API_PATH,
   ATTENDANCE_SHEET_API_PATH,
   COMPLETE_REGISTRATION_PATH,
@@ -321,12 +322,16 @@ describe("frontera por rol en páginas", () => {
   ])[] = [
     ["Player", TEAMS_PATH, TO_DASHBOARD],
     ["Player", EVALUATIONS_PATH, TO_DASHBOARD],
+    ["Player", ATTENDANCE_PATH, TO_DASHBOARD],
     ["Committee", TEAMS_PATH, TO_DASHBOARD],
     ["Committee", EVALUATIONS_PATH, TO_DASHBOARD],
+    ["Committee", ATTENDANCE_PATH, TO_DASHBOARD],
     ["Coach", TEAMS_PATH, ALLOW],
     ["Coach", EVALUATIONS_PATH, ALLOW],
+    ["Coach", ATTENDANCE_PATH, ALLOW],
     ["Admin", TEAMS_PATH, ALLOW],
     ["Admin", EVALUATIONS_PATH, ALLOW],
+    ["Admin", ATTENDANCE_PATH, ALLOW],
     ...ROLES.flatMap((role) =>
       PAGES_OPEN_TO_EVERY_ROLE.map(
         (pathname) => [role, pathname, ALLOW] as const,

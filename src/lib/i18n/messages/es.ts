@@ -206,6 +206,7 @@ export const spanishMessages: MessageCatalog = {
   "nav.label.dashboard": "Dashboard",
   "nav.label.directory": "Directorio",
   "nav.label.calendar": "Calendario",
+  "nav.label.attendance": "Asistencia",
   "nav.label.teams": "Equipos",
   "nav.label.evaluations": "Evaluaciones",
   "nav.label.news": "Noticias",

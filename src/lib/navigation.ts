@@ -10,6 +10,7 @@ export type NavIconId =
   | "dashboard"
   | "directorio"
   | "calendario"
+  | "asistencia"
   | "equipos"
   | "evaluaciones"
   | "noticias"
@@ -59,6 +60,13 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     href: "/calendario",
     icon: "calendario",
     mobileLabelKey: "nav.label.calendarShort",
+  },
+  // Entre Calendario y Equipos, como en docs/mockups/attendance-light.png:
+  // se pasa lista a una sesión del calendario (#395).
+  {
+    labelKey: "nav.label.attendance",
+    href: "/asistencia",
+    icon: "asistencia",
   },
   { labelKey: "nav.label.teams", href: "/equipos", icon: "equipos" },
   {

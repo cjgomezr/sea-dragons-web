@@ -210,6 +210,7 @@ export const englishMessages = {
   "nav.label.dashboard": "Dashboard",
   "nav.label.directory": "Directory",
   "nav.label.calendar": "Calendar",
+  "nav.label.attendance": "Attendance",
   "nav.label.teams": "Teams",
   "nav.label.evaluations": "Evaluations",
   "nav.label.news": "News",
