@@ -13,8 +13,9 @@ import { EventForm, type FormSubmission } from "./EventForm";
 /**
  * El diálogo para crear un evento o una serie (#313, RF-9 del PRD de E7),
  * abierto con "+ Evento". Es también el de editar (#316, RF-11 y RF-12),
- * abierto desde la fila desplegada. Es un `<dialog>` modal: el navegador pone el rol,
- * la capa y deja inerte lo de detrás, como en el visor de la foto (#355).
+ * abierto desde la fila desplegada. Es un `<dialog>` modal: el navegador
+ * pone el rol, la capa y deja inerte lo de detrás, como en el visor de la
+ * foto (#355).
  *
  * No se cierra al pulsar fuera: es un formulario, y un clic perdido no debe
  * tirar lo escrito. Escape y "Cancelar" sí lo cierran, salvo mientras guarda,
