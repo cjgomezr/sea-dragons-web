@@ -11290,18 +11290,21 @@ test.describe("asistencia en el navegador", () => {
     await attendanceRow(page, FIRST_ATTENDEE)
       .getByRole("button", { name: "Late" })
       .click();
-    const question = page.waitForEvent("dialog");
+    const questions: string[] = [];
+    // La pregunta es el diálogo nativo: el clic no termina hasta contestarla.
+    page.once("dialog", (dialog) => {
+      questions.push(dialog.message());
+      void dialog.dismiss();
+    });
 
     await page
       .getByRole("group", { name: "Sessions" })
       .getByRole("button", { name: "Thu 18 · Skills & Conditioning" })
       .click();
 
-    const dialog = await question;
-    expect(dialog.message()).toBe(
+    expect(questions).toEqual([
       "You have unsaved changes on this session. Discard them?",
-    );
-    await dialog.dismiss();
+    ]);
     await expect(
       page.getByRole("heading", { level: 1, name: /^Pool Training · / }),
     ).toBeVisible();

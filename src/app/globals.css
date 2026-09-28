@@ -4403,8 +4403,11 @@ button.notification-item-content:hover {
   color: var(--color-text-secondary);
 }
 
+/* En el móvil ocupa el ancho, y con "Cambios sin guardar" parte la línea en
+   vez de empujar la pantalla hacia un lado. */
 .attendance-save {
-  flex: none;
+  flex: 1 1 100%;
+  padding: var(--space-2) var(--space-4);
 }
 
 .attendance-save:disabled {
@@ -4653,6 +4656,10 @@ button.notification-item-content:hover {
 }
 
 @media (min-width: 768px) {
+  .attendance-save {
+    flex: none;
+  }
+
   .attendance-session {
     min-height: 36px;
   }
