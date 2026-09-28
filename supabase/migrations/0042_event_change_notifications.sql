@@ -24,7 +24,7 @@ begin
       from pg_constraint
      where conrelid = 'public.notifications'::regclass
        and conname = 'notifications_type_check'
-       and pg_get_constraintdef(oid) like '%event_changed%'
+       and strpos(pg_get_constraintdef(oid), '''event_changed''') > 0
   ) then
     return;
   end if;

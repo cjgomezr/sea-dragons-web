@@ -22,7 +22,7 @@ begin
       from pg_constraint
      where conrelid = 'public.notifications'::regclass
        and conname = 'notifications_type_check'
-       and pg_get_constraintdef(oid) like '%news_post_published%'
+       and strpos(pg_get_constraintdef(oid), '''news_post_published''') > 0
   ) then
     return;
   end if;
