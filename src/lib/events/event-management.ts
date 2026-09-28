@@ -41,9 +41,6 @@ export type ManagedEvent = EventFields & {
 /** Lo que se puede cambiar de un evento; lo que no viene se queda igual. */
 export type EventEdit = Partial<EventFields & { readonly startsOn: string }>;
 
-/** Los cambios ya validados, listos para escribir. */
-export type EventChanges = EventEdit;
-
 /** `closed` si el evento se canceló o empezó entre leerlo y escribirlo. */
 export type ManagedEventWrite = "saved" | "closed";
 
@@ -58,7 +55,7 @@ export type ManagedEventsGateway = {
   updateEvent(update: {
     readonly clubId: string;
     readonly eventId: string;
-    readonly changes: EventChanges;
+    readonly changes: EventEdit;
   }): Promise<ManagedEventWrite>;
   cancelEvent(cancellation: {
     readonly clubId: string;
@@ -129,7 +126,7 @@ async function normalizeChanges(
   gateways: Pick<EventManagementGateways, "events">,
   clubId: string,
   edit: EventEdit,
-): Promise<EventChanges> {
+): Promise<EventEdit> {
   return {
     ...edit,
     ...(edit.title === undefined ? {} : { title: normalizeTitle(edit.title) }),
@@ -146,7 +143,7 @@ async function normalizeChanges(
 /** La fecha y la hora que tendrá el evento después de editarlo. */
 function assertStillAheadAfter(
   event: ManagedEvent,
-  changes: EventChanges,
+  changes: EventEdit,
   now: Date,
 ): void {
   const session = {

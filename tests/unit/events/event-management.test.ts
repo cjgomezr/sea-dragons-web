@@ -298,6 +298,21 @@ describe("cancelar un evento", () => {
     expect(club.event(PAST_EVENT_ID)?.status).toBe("scheduled");
   });
 
+  it("rechaza con 422 si otro organizador lo canceló entretanto", async () => {
+    const club = fakeManagedEventsClub({
+      cancelledMeanwhile: SINGLE_EVENT_ID,
+    });
+
+    const attempt = cancelEvent(club.gateways, {
+      callerId: CALLER_ID,
+      eventId: SINGLE_EVENT_ID,
+      now: NOW,
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(EventValidationError);
+    await expect(attempt).rejects.toMatchObject({ code: "event_cancelled" });
+  });
+
   it("rechaza con 422 un evento ya cancelado", async () => {
     const club = fakeManagedEventsClub();
 

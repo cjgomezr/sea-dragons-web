@@ -1,6 +1,6 @@
 import type { Role } from "@/lib/auth/roles";
 import type {
-  EventChanges,
+  EventEdit,
   EventManagementGateways,
   ManagedEvent,
 } from "@/lib/events/event-management";
@@ -99,10 +99,7 @@ export type FakeManagedEventsClub = {
   writeCount(): number;
 };
 
-function applyChanges(
-  event: ManagedEvent,
-  changes: EventChanges,
-): ManagedEvent {
+function applyChanges(event: ManagedEvent, changes: EventEdit): ManagedEvent {
   return { ...event, ...changes } as ManagedEvent;
 }
 

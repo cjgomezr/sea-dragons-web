@@ -5,7 +5,7 @@ import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { EVENT_TYPES } from "./event-creation";
 import type {
-  EventChanges,
+  EventEdit,
   EventManagementGateways,
   ManagedEvent,
   ManagedEventWrite,
@@ -107,7 +107,7 @@ async function findEvent(
 
 /** Sólo las claves que cambian, con los nombres de la base, que es lo que
  * lee `update_event`. */
-function toChangesArgument(changes: EventChanges): Record<string, unknown> {
+function toChangesArgument(changes: EventEdit): Record<string, unknown> {
   const { audience } = changes;
   return {
     ...(changes.title === undefined ? {} : { title: changes.title }),
@@ -134,7 +134,7 @@ async function updateEvent(
   update: {
     readonly clubId: string;
     readonly eventId: string;
-    readonly changes: EventChanges;
+    readonly changes: EventEdit;
   },
 ): Promise<ManagedEventWrite> {
   const { data, error } = await serviceClient.rpc(UPDATE_EVENT_FUNCTION, {
