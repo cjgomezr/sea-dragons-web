@@ -10,6 +10,8 @@ import {
   EVALUATIONS_PATH,
   EVENTS_API_PATH,
   EVENTS_MANAGE_API_PATH,
+  EVENT_CANCELLATION_API_PATH,
+  EVENT_MANAGE_API_PATH,
   EVENT_API_PATH,
   EVENT_RSVP_API_PATH,
   GROUPS_API_PATH,
@@ -853,6 +855,35 @@ describe("frontera de crear eventos (#307)", () => {
     expect(
       decideSessionBoundary({ pathname: EVENTS_MANAGE_API_PATH, ...ANONYMOUS }),
     ).toEqual({ kind: "unauthenticated" });
+  });
+});
+
+/** Un evento cualquiera, en el camino de editarlo y en el de cancelarlo
+ * (#314). */
+const MANAGED_EVENT_PATHS = [
+  EVENT_MANAGE_API_PATH,
+  EVENT_CANCELLATION_API_PATH,
+].map((path) => path.replace("[id]", "e1e1e1e1-0000-4000-8000-00000000000e"));
+
+describe("frontera de editar y cancelar eventos (#314)", () => {
+  it.each(
+    (["Coach", "Player"] as const).flatMap((role) =>
+      MANAGED_EVENT_PATHS.map((pathname) => [role, pathname] as const),
+    ),
+  )("niega a un %s el camino %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual({
+      kind: "missingCapability",
+    });
+  });
+
+  it.each(
+    (["Admin", "Committee"] as const).flatMap((role) =>
+      MANAGED_EVENT_PATHS.map((pathname) => [role, pathname] as const),
+    ),
+  )("deja a un %s el camino %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
+      ALLOW,
+    );
   });
 });
 

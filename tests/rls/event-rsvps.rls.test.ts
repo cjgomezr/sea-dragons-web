@@ -1,4 +1,6 @@
 import { expect, it } from "vitest";
+import { RsvpClosedError, respondToEvent } from "@/lib/events/event-rsvp";
+import { createEventManagementGateways } from "@/lib/events/supabase-event-management-gateways";
 import { createEventRsvpGateways } from "@/lib/events/supabase-event-rsvp-gateways";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
@@ -248,6 +250,76 @@ describeRls("RLS de respuestas a eventos", () => {
         ),
       );
     },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "tras cancelar por el adaptador, la respuesta guardada sigue y responder da 422 (#314)",
+    () =>
+      withTwoAnswers(async ({ serviceClient, clubId, eventId, socia }) => {
+        const { managedEvents } = createEventManagementGateways(
+          serviceClient.client,
+        );
+
+        const write = await managedEvents.cancelEvent({
+          clubId,
+          eventId,
+          cancelledAt: new Date(),
+        });
+        const attempt = respondToEvent(
+          createEventRsvpGateways(serviceClient.client),
+          {
+            callerId: socia.id,
+            eventId,
+            response: "maybe",
+            now: new Date(),
+          },
+        );
+
+        expect(write).toBe("saved");
+        await expect(attempt).rejects.toBeInstanceOf(RsvpClosedError);
+        await expect(attempt).rejects.toMatchObject({
+          code: "rsvp_event_cancelled",
+        });
+        await expect(
+          managedEvents.findEvent({ clubId, eventId }),
+        ).resolves.toMatchObject({ status: "cancelled" });
+        const { data, error } = await serviceClient.client
+          .from("event_rsvps")
+          .select("response")
+          .eq("event_id", eventId)
+          .order("response");
+        expect(error).toBeNull();
+        expect(data).toEqual([{ response: "no" }, { response: "yes" }]);
+      }),
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "cancelar por el adaptador un evento ya cancelado no escribe nada (#314)",
+    () =>
+      withTwoAnswers(async ({ serviceClient, clubId, eventId }) => {
+        const { managedEvents } = createEventManagementGateways(
+          serviceClient.client,
+        );
+        const first = new Date();
+        await managedEvents.cancelEvent({
+          clubId,
+          eventId,
+          cancelledAt: first,
+        });
+
+        const second = await managedEvents.cancelEvent({
+          clubId,
+          eventId,
+          cancelledAt: new Date(first.getTime() + 1000),
+        });
+
+        expect(second).toBe("closed");
+        await expect(
+          managedEvents.findEvent({ clubId, eventId }),
+        ).resolves.toMatchObject({ cancelledAt: first.toISOString() });
+      }),
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
 });

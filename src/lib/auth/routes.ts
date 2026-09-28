@@ -264,6 +264,14 @@ export const NEWS_ATTACHMENT_API_PATH = `${NEWS_POST_API_PATH}/attachments/[atta
  * de la serie. */
 export const EVENTS_MANAGE_API_PATH = "/api/v1/events/manage";
 
+/** Editar un evento suelto o una ocurrencia (#314, RF-11): PATCH con lo que
+ * cambia. `[id]` es el de la ocurrencia. Cuelga de crear, así que es sólo de
+ * Admin y Committee. */
+export const EVENT_MANAGE_API_PATH = `${EVENTS_MANAGE_API_PATH}/[id]`;
+
+/** Cancelar un evento suelto o una ocurrencia (#314): POST. Marca, no borra. */
+export const EVENT_CANCELLATION_API_PATH = `${EVENT_MANAGE_API_PATH}/cancellation`;
+
 /** La agenda de quien llama (#309, RF-7 del PRD de E7): el camino de
  * lectura. Lo alcanza cualquier cuenta activa, así que no aparece en
  * `RESTRICTED_ROUTES`: qué eventos ve cada uno lo decide el handler con su
@@ -477,4 +485,7 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: NEWS_PUBLISH_PATH, capability: "publishNewsAndDocuments" },
   { path: NEWS_EDIT_PATH, capability: "publishNewsAndDocuments" },
   { path: EVENTS_MANAGE_API_PATH, capability: "createEvents" },
+  // Cuelgan del anterior; se declaran por el mismo motivo que el cambio de rol.
+  { path: EVENT_MANAGE_API_PATH, capability: "createEvents" },
+  { path: EVENT_CANCELLATION_API_PATH, capability: "createEvents" },
 ];
