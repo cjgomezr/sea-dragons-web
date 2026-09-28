@@ -23,12 +23,13 @@ function sectionAt(href: string): (typeof NAV_SECTIONS)[number] {
 }
 
 describe("navegación", () => {
-  it("contiene las siete secciones de socio y Grupos al final, cada una con su ruta", () => {
+  it("contiene las secciones de socio, Asistencia entre Calendario y Equipos como el mockup, y Grupos al final, cada una con su ruta", () => {
     expect(NAV_SECTIONS.map((section) => [section.href, section.icon])).toEqual(
       [
         ["/dashboard", "dashboard"],
         ["/directorio", "directorio"],
         ["/calendario", "calendario"],
+        ["/asistencia", "asistencia"],
         ["/equipos", "equipos"],
         ["/evaluaciones", "evaluaciones"],
         ["/noticias", "noticias"],
@@ -60,13 +61,14 @@ describe("navegación", () => {
 // E17 RF-5: los nombres en inglés son los del mockup de escritorio
 // (docs/mockups/dashboard-light.png).
 describe("navegación traducida", () => {
-  it("nombra las ocho secciones en inglés", () => {
+  it("nombra las nueve secciones en inglés", () => {
     expect(
       NAV_SECTIONS.map((section) => getSectionLabel(section, english)),
     ).toEqual([
       "Dashboard",
       "Directory",
       "Calendar",
+      "Attendance",
       "Teams",
       "Evaluations",
       "News",
@@ -75,13 +77,14 @@ describe("navegación traducida", () => {
     ]);
   });
 
-  it("nombra las ocho secciones en español igual que antes de traducirlas", () => {
+  it("nombra las nueve secciones en español igual que antes de traducirlas", () => {
     expect(
       NAV_SECTIONS.map((section) => getSectionLabel(section, spanish)),
     ).toEqual([
       "Dashboard",
       "Directorio",
       "Calendario",
+      "Asistencia",
       "Equipos",
       "Evaluaciones",
       "Noticias",
@@ -126,6 +129,13 @@ describe("secciones por rol", () => {
     expect(hrefsOf(getVisibleSections("Player"))).toEqual(MEMBER_SECTIONS);
   });
 
+  it.each(["Player", "Committee"] as const)(
+    "un %s no ve Asistencia, que su rol no registra",
+    (role) => {
+      expect(hrefsOf(getVisibleSections(role))).not.toContain("/asistencia");
+    },
+  );
+
   it("un Player no ve Grupos, que su rol no gestiona", () => {
     expect(hrefsOf(getVisibleSections("Player"))).not.toContain("/grupos");
   });
@@ -137,11 +147,12 @@ describe("secciones por rol", () => {
     ]);
   });
 
-  it("un Coach ve además Equipos, Evaluaciones y Grupos", () => {
+  it("un Coach ve además Asistencia, Equipos, Evaluaciones y Grupos", () => {
     expect(hrefsOf(getVisibleSections("Coach"))).toEqual([
       "/dashboard",
       "/directorio",
       "/calendario",
+      "/asistencia",
       "/equipos",
       "/evaluaciones",
       "/noticias",
@@ -174,7 +185,7 @@ describe("barra móvil por rol", () => {
     },
   );
 
-  it("un Coach tiene fijas Inicio, Eventos, Equipos y Noticias, y en Más Directorio, Evaluaciones, Pagos y Grupos", () => {
+  it("un Coach tiene fijas Inicio, Eventos, Equipos y Noticias, y en Más Directorio, Asistencia, Evaluaciones, Pagos y Grupos", () => {
     const { primary, overflow } = getMobileSections("Coach");
 
     expect(hrefsOf(primary)).toEqual([
@@ -185,6 +196,7 @@ describe("barra móvil por rol", () => {
     ]);
     expect(hrefsOf(overflow)).toEqual([
       "/directorio",
+      "/asistencia",
       "/evaluaciones",
       "/pagos",
       "/grupos",
@@ -199,6 +211,7 @@ describe("barra móvil por rol", () => {
     );
     expect(hrefsOf(overflow)).toEqual([
       "/directorio",
+      "/asistencia",
       "/evaluaciones",
       "/pagos",
       "/grupos",

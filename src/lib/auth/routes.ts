@@ -319,6 +319,15 @@ export const ATTENDANCE_SESSIONS_API_PATH = `${ATTENDANCE_API_PATH}/sessions`;
  * `[eventId]` es el de la ocurrencia. */
 export const ATTENDANCE_SHEET_API_PATH = `${ATTENDANCE_API_PATH}/[eventId]`;
 
+/** La pantalla de Asistencia (#395, RF-8 del PRD de E8): donde Admin y
+ * Coach pasan lista. Sólo la alcanza quien registra asistencia, como sus
+ * endpoints. */
+export const ATTENDANCE_PATH = "/asistencia";
+
+/** Con el id de una sesión, Asistencia abre ya su hoja, aunque tenga más de
+ * 30 días: es a donde lleva "Pasar lista" desde el calendario (#395). */
+export const ATTENDANCE_SESSION_QUERY_PARAM = "sesion";
+
 /** El team builder (FR-043). */
 export const TEAMS_PATH = "/equipos";
 
@@ -524,4 +533,5 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: EVENT_SERIES_MANAGE_API_PATH, capability: "createEvents" },
   { path: EVENT_SERIES_CANCELLATION_API_PATH, capability: "createEvents" },
   { path: ATTENDANCE_API_PATH, capability: "buildTeamsAndTrackAttendance" },
+  { path: ATTENDANCE_PATH, capability: "buildTeamsAndTrackAttendance" },
 ];

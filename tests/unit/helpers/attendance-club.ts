@@ -6,8 +6,12 @@ import type {
   AttendanceStatus,
   NewAttendanceSheet,
 } from "@/lib/attendance/attendance-sheet";
+import type { ClubPosition } from "@/lib/club/club-positions";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
 import type { ClubAudience } from "@/lib/notifications/audience-members";
+import { GOALKEEPER } from "./seeded-positions";
+
+export { GOALKEEPER };
 
 /**
  * Un club en memoria para los tests de la hoja de asistencia (#393). El doble
@@ -41,6 +45,8 @@ export type FakeMember = {
   readonly fullName: string;
   readonly status?: AccountStatus;
   readonly groupIds?: readonly string[];
+  readonly positionId?: string;
+  readonly photoPath?: string;
 };
 
 export type FakeAttendanceClubOptions = {
@@ -49,7 +55,15 @@ export type FakeAttendanceClubOptions = {
   readonly members?: readonly FakeMember[];
   readonly rsvps?: Readonly<Record<string, RsvpResponse>>;
   readonly records?: Readonly<Record<string, AttendanceStatus>>;
+  readonly positions?: readonly ClubPosition[];
+  /** El almacenamiento no firma ninguna foto. */
+  readonly unsignablePhotos?: boolean;
 };
+
+/** La dirección firmada que el doble da a una ruta de foto. */
+export function signedPhotoUrl(photoPath: string): string {
+  return `https://storage.test/signed/${photoPath}`;
+}
 
 export type FakeAttendanceClub = {
   readonly gateways: AttendanceGateways;
@@ -109,6 +123,8 @@ export function fakeAttendanceClub(
             userId: member.userId,
             fullName: member.fullName,
             status: member.status ?? "active",
+            positionId: member.positionId ?? null,
+            photoPath: member.photoPath ?? null,
           })),
       findRsvps: async () =>
         Object.entries(options.rsvps ?? {}).map(([userId, response]) => ({
@@ -125,6 +141,17 @@ export function fakeAttendanceClub(
         );
         return "saved";
       },
+    },
+    positions: {
+      findClubPositions: async () => options.positions ?? [],
+    },
+    photos: {
+      signPhotoUrls: async (photoPaths) =>
+        new Map(
+          options.unsignablePhotos
+            ? []
+            : photoPaths.map((path) => [path, signedPhotoUrl(path)]),
+        ),
     },
     audit: {
       insertAuditLogRow: async (row) => {

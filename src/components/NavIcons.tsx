@@ -1,6 +1,6 @@
 import type { NavIconId } from "@/lib/navigation";
 
-// Diez SVG inline, sin librería: el repo no traía ninguna y instalar una para
+// Once SVG inline, sin librería: el repo no traía ninguna y instalar una para
 // tan pocos glifos habría sido peso de bundle sin uso real (#53). Todos
 // comparten trazo para leerse como un mismo set.
 const STROKE_WIDTH = 1.8;
@@ -109,6 +109,17 @@ function CalendarioIcon(): React.JSX.Element {
   );
 }
 
+/** Una lista con una marca en cada renglón: pasar lista (#395). Se distingue
+ * de Evaluaciones, que dibuja una sola marca sobre una tabla con pinza. */
+function AsistenciaIcon(): React.JSX.Element {
+  return (
+    <IconBase>
+      <path d="M4 7l1.5 1.5L8 6M4 12.5 5.5 14 8 11.5M4 18l1.5 1.5L8 17" />
+      <path d="M11 7.5h9M11 13h9M11 18.5h9" />
+    </IconBase>
+  );
+}
+
 function EquiposIcon(): React.JSX.Element {
   return (
     <IconBase>
@@ -178,6 +189,7 @@ export const NAV_SECTION_ICONS: Record<NavIconId, () => React.JSX.Element> = {
   dashboard: DashboardIcon,
   directorio: DirectorioIcon,
   calendario: CalendarioIcon,
+  asistencia: AsistenciaIcon,
   equipos: EquiposIcon,
   evaluaciones: EvaluacionesIcon,
   noticias: NoticiasIcon,

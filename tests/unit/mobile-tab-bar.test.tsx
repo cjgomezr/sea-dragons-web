@@ -42,7 +42,7 @@ describe("barra móvil por rol", () => {
     },
   );
 
-  it("un Coach tiene fijas Inicio, Agenda, Equipos y Noticias, y en Más Directorio, Evaluaciones, Pagos y Grupos", async () => {
+  it("un Coach tiene fijas Inicio, Agenda, Equipos y Noticias, y en Más Directorio, Asistencia, Evaluaciones, Pagos y Grupos", async () => {
     usePathname.mockReturnValue("/dashboard");
     render(<MobileTabBar locale="es" role="Coach" />);
 
@@ -54,6 +54,7 @@ describe("barra móvil por rol", () => {
     ]);
     expect(await openMoreAndListIt()).toEqual([
       "Directorio",
+      "Asistencia",
       "Evaluaciones",
       "Pagos",
       "Grupos",
@@ -67,6 +68,7 @@ describe("barra móvil por rol", () => {
     expect(fixedTabLabels()).toEqual(["Home", "Events", "Teams", "News"]);
     expect(await openMoreAndListIt()).toEqual([
       "Directory",
+      "Attendance",
       "Evaluations",
       "Payments",
       "Groups",
@@ -256,7 +258,13 @@ describe("navegación traducida en la barra móvil", () => {
 
     await user.click(screen.getByRole("button", { name: "More" }));
 
-    const overflow = ["Directory", "Evaluations", "Payments", "Groups"];
+    const overflow = [
+      "Directory",
+      "Attendance",
+      "Evaluations",
+      "Payments",
+      "Groups",
+    ];
     for (const label of overflow) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }

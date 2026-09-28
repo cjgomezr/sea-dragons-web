@@ -161,7 +161,9 @@ function createCalls(): Call[] {
 }
 
 async function openDialog(): Promise<HTMLElement> {
-  render(<AgendaScreen locale="en" canManageEvents />);
+  render(
+    <AgendaScreen locale="en" canManageEvents canTakeAttendance={false} />,
+  );
   await userEvent.click(await screen.findByRole("button", { name: "Event" }));
   const dialog = await screen.findByRole("dialog", { name: "New event" });
   await within(dialog).findByRole("radio", { name: "The whole club" });
@@ -216,7 +218,9 @@ describe("botón + Evento", () => {
   it("lo pinta a quien puede crear eventos", async () => {
     stubApi({});
 
-    render(<AgendaScreen locale="en" canManageEvents />);
+    render(
+      <AgendaScreen locale="en" canManageEvents canTakeAttendance={false} />,
+    );
 
     expect(
       await screen.findByRole("button", { name: "Event" }),
@@ -226,7 +230,13 @@ describe("botón + Evento", () => {
   it("no lo pinta a quien no puede crear eventos", async () => {
     stubApi({});
 
-    render(<AgendaScreen locale="en" canManageEvents={false} />);
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+      />,
+    );
 
     await screen.findByText("There are no upcoming events.");
     expect(
@@ -237,7 +247,9 @@ describe("botón + Evento", () => {
   it("se llama Evento en español", async () => {
     stubApi({});
 
-    render(<AgendaScreen locale="es" canManageEvents />);
+    render(
+      <AgendaScreen locale="es" canManageEvents canTakeAttendance={false} />,
+    );
 
     await userEvent.click(
       await screen.findByRole("button", { name: "Evento" }),
@@ -418,7 +430,9 @@ describe("diálogo de evento", () => {
   it("no avisa de nada antes de crear", async () => {
     stubApi({});
 
-    render(<AgendaScreen locale="en" canManageEvents />);
+    render(
+      <AgendaScreen locale="en" canManageEvents canTakeAttendance={false} />,
+    );
 
     await screen.findByText("There are no upcoming events.");
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
@@ -514,7 +528,9 @@ describe("diálogo de evento", () => {
 
   it("pinta la audiencia vacía junto a los grupos, en español", async () => {
     stubApi({ respondToCreate: () => businessRule("event_audience_empty") });
-    render(<AgendaScreen locale="es" canManageEvents />);
+    render(
+      <AgendaScreen locale="es" canManageEvents canTakeAttendance={false} />,
+    );
     await userEvent.click(
       await screen.findByRole("button", { name: "Evento" }),
     );
@@ -696,7 +712,9 @@ describe("diálogo de evento", () => {
         return jsonResponse(200, { data: { events: [], nextCursor: null } });
       }),
     );
-    render(<AgendaScreen locale="en" canManageEvents />);
+    render(
+      <AgendaScreen locale="en" canManageEvents canTakeAttendance={false} />,
+    );
     await userEvent.click(await screen.findByRole("button", { name: "Event" }));
     const dialog = await screen.findByRole("dialog", { name: "New event" });
 

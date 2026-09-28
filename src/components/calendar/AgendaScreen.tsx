@@ -155,12 +155,14 @@ function AgendaList({
   events,
   focusEventId,
   organizer,
+  canTakeAttendance,
 }: {
   readonly translate: Translator;
   readonly period: AgendaPeriod;
   readonly events: readonly AgendaEvent[];
   readonly focusEventId: string | null;
   readonly organizer: EventOrganizer | null;
+  readonly canTakeAttendance: boolean;
 }): React.JSX.Element {
   if (events.length === 0) {
     return (
@@ -177,6 +179,7 @@ function AgendaList({
           period={period}
           shouldTakeFocus={event.id === focusEventId}
           organizer={organizer}
+          canTakeAttendance={canTakeAttendance}
         />
       ))}
     </ul>
@@ -273,6 +276,7 @@ function AgendaView({
   isActive,
   focusOnLoad,
   organizer,
+  canTakeAttendance,
 }: {
   readonly translate: Translator;
   readonly period: AgendaPeriod;
@@ -280,6 +284,7 @@ function AgendaView({
   /** El evento cuyo título recibe el foco con la primera página. */
   readonly focusOnLoad: string | null;
   readonly organizer: EventOrganizer | null;
+  readonly canTakeAttendance: boolean;
 }): React.JSX.Element {
   const [state, setState] = useState<AgendaState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
@@ -357,6 +362,7 @@ function AgendaView({
           events={state.events}
           focusEventId={state.focusEventId}
           organizer={organizer}
+          canTakeAttendance={canTakeAttendance}
         />
       ) : null}
       {state.kind === "ready" && nextCursor !== null ? (
@@ -379,12 +385,16 @@ function describeNotice(translate: Translator, notice: AgendaNotice): string {
 export function AgendaScreen({
   locale,
   canManageEvents,
+  canTakeAttendance,
 }: {
   readonly locale: Locale;
   /** Si quien mira puede crear, editar y cancelar eventos. Sólo decide si se
    * pintan los botones: los endpoints ya rechazan a quien no tiene
    * `createEvents` (#307, #314, #315). */
   readonly canManageEvents: boolean;
+  /** Si quien mira registra asistencia: decide si un entrenamiento empezado
+   * ofrece "Pasar lista" (#395). */
+  readonly canTakeAttendance: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [period, setPeriod] = useState<AgendaPeriod>("upcoming");
@@ -470,6 +480,7 @@ export function AgendaScreen({
           isActive={choice === period}
           focusOnLoad={agendaVersion.focusEventId}
           organizer={organizer}
+          canTakeAttendance={canTakeAttendance}
         />
       ))}
     </div>

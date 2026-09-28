@@ -3,7 +3,9 @@ import { z } from "zod";
 import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
 import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
+import { cachedClubPositions } from "@/lib/club/supabase-club-positions";
 import { EVENT_TYPES } from "@/lib/events/event-creation";
+import { signProfilePhotoUrls } from "@/lib/members/supabase-profile-photo-gateways";
 import { RSVP_RESPONSES } from "@/lib/events/event-rsvp";
 import { createSupabaseAudienceMembersGateway } from "@/lib/notifications/supabase-audience-members";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
@@ -58,6 +60,8 @@ const memberRowsSchema = z.array(
     user_id: z.string(),
     full_name: z.string(),
     account_status: z.enum(ACCOUNT_STATUSES),
+    position_id: z.string().nullable(),
+    photo_path: z.string().nullable(),
   }),
 );
 
@@ -138,7 +142,7 @@ async function findMembers(
   }
   const { data, error } = await serviceClient
     .from(MEMBERS_TABLE)
-    .select("user_id, full_name, account_status")
+    .select("user_id, full_name, account_status, position_id, photo_path")
     .eq("club_id", query.clubId)
     .in("user_id", query.userIds);
   if (error) {
@@ -150,6 +154,8 @@ async function findMembers(
     userId: row.user_id,
     fullName: row.full_name,
     status: row.account_status,
+    positionId: row.position_id,
+    photoPath: row.photo_path,
   }));
 }
 
@@ -251,6 +257,11 @@ export function createAttendanceGateways(
       findRsvps: (eventId) => findRsvps(serviceClient, eventId),
       findRecords: (eventId) => findRecords(serviceClient, eventId),
       saveSheet: (sheet) => saveSheet(serviceClient, sheet),
+    },
+    positions: cachedClubPositions,
+    photos: {
+      signPhotoUrls: (photoPaths) =>
+        signProfilePhotoUrls(serviceClient, photoPaths),
     },
     audit: createSupabaseAuditLogWriter(serviceClient),
   };
