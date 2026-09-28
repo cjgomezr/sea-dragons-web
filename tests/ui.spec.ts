@@ -10175,3 +10175,265 @@ test.describe("calendario en el navegador", () => {
     }
   });
 });
+
+// El diálogo para crear eventos (#313). Los grupos y la creación se sirven
+// desde el test, como la agenda: la captura no depende de los grupos que haya
+// en la base de desarrollo, y nada se guarda de verdad.
+const EVENTS_MANAGE_ENDPOINT = "/api/v1/events/manage";
+const EVENT_DIALOG_GROUPS_ENDPOINT = "/api/v1/groups";
+const EVENT_DIALOG_NAME = /^(New event|Nuevo evento)$/;
+const EVENT_DIALOG_OPEN = /^(Event|Evento)$/;
+const EVENT_DIALOG_SUBMIT = /^(Create event|Crear evento)$/;
+const EVENT_DIALOG_TAB_PRESSES = 30;
+
+const STUBBED_EVENT_GROUPS = [
+  {
+    id: "a1a1a1a1-0000-4000-8000-0000000000a1",
+    name: "Senior Squad",
+    memberCount: 14,
+  },
+  {
+    id: "a1a1a1a1-0000-4000-8000-0000000000a2",
+    name: "Masters",
+    memberCount: 8,
+  },
+] as const;
+
+function eventDialog(page: Page): Locator {
+  return page.getByRole("dialog", { name: EVENT_DIALOG_NAME });
+}
+
+/** Abre "+ Evento" con los grupos servidos y espera al formulario. */
+async function openEventDialog(page: Page): Promise<Locator> {
+  await page.route(
+    (url) => url.pathname === EVENT_DIALOG_GROUPS_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ groups: STUBBED_EVENT_GROUPS })),
+  );
+  await waitForEmptyAgenda(page);
+  await page.getByRole("button", { name: EVENT_DIALOG_OPEN }).click();
+  const dialog = eventDialog(page);
+  await expect(
+    dialog.getByRole("radio", { name: /^(The whole club|Todo el club)$/ }),
+  ).toBeVisible();
+  return dialog;
+}
+
+async function fillEventBasics(dialog: Locator): Promise<void> {
+  await dialog.getByLabel(/^(Title|Título)$/).fill("Pool Training");
+  await dialog.getByLabel(/^(Time|Hora)$/).fill("19:00");
+  await dialog.getByLabel(/^(Location|Lugar)$/).fill("MSAC Dive Pool");
+}
+
+async function showOneTimeDialog(page: Page): Promise<void> {
+  const dialog = await openEventDialog(page);
+  await fillEventBasics(dialog);
+  await dialog.getByLabel(/^(Date|Fecha)$/).fill("2026-10-06");
+  await page.mouse.move(0, 0);
+}
+
+async function showWeeklyDialog(page: Page): Promise<void> {
+  const dialog = await openEventDialog(page);
+  await fillEventBasics(dialog);
+  await dialog.getByRole("radio", { name: /^(Weekly|Semanal)$/ }).check();
+  await dialog.getByRole("checkbox", { name: /^(Tuesday|martes)$/ }).check();
+  await dialog.getByRole("checkbox", { name: /^(Thursday|jueves)$/ }).check();
+  await dialog.getByLabel(/^(Starts|Empieza)$/).fill("2026-10-06");
+  await dialog.getByLabel(/^(Ends|Termina)$/).fill("2026-12-17");
+  await dialog
+    .getByRole("radio", { name: /^(Specific groups|Grupos concretos)$/ })
+    .check();
+  await dialog
+    .getByRole("checkbox", { name: STUBBED_EVENT_GROUPS[0].name })
+    .check();
+  await page.mouse.move(0, 0);
+}
+
+async function showDialogWithError(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname === EVENTS_MANAGE_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: {
+            code: "business_rule",
+            message: "La fecha y la hora del evento ya pasaron.",
+            reason: "event_in_past",
+          },
+        }),
+      }),
+  );
+  await showOneTimeDialog(page);
+  const dialog = eventDialog(page);
+  await dialog.getByRole("button", { name: EVENT_DIALOG_SUBMIT }).click();
+  await expect(dialog.getByLabel(/^(Date|Fecha)$/)).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await page.mouse.move(0, 0);
+}
+
+/** La creación no responde nunca: el diálogo se queda guardando. */
+async function showSavingDialog(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname === EVENTS_MANAGE_ENDPOINT,
+    () => undefined,
+  );
+  await showOneTimeDialog(page);
+  const dialog = eventDialog(page);
+  await dialog.getByRole("button", { name: EVENT_DIALOG_SUBMIT }).click();
+  await expect(
+    dialog.getByRole("button", { name: /^(Saving…|Guardando…)$/ }),
+  ).toBeDisabled();
+  await page.mouse.move(0, 0);
+}
+
+function inBothLanguages(
+  name: string,
+  ready: (page: Page) => Promise<void>,
+): readonly CalendarState[] {
+  return [
+    { name, events: [], ready },
+    { name: `${name}-es`, events: [], beforeVisit: chooseSpanish, ready },
+  ];
+}
+
+const EVENT_DIALOG_STATES: readonly CalendarState[] = [
+  ...inBothLanguages("calendario-dialogo-una-vez", showOneTimeDialog),
+  ...inBothLanguages("calendario-dialogo-semanal", showWeeklyDialog),
+  ...inBothLanguages("calendario-dialogo-error", showDialogWithError),
+  ...inBothLanguages("calendario-dialogo-guardando", showSavingDialog),
+];
+
+for (const state of EVENT_DIALOG_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            // Sin `fullPage`: el diálogo vive en la capa superior, sobre lo
+            // que se ve de la pantalla, y es eso lo que se revisa.
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToCalendar(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot(SCREENSHOT_OPTIONS),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of CALENDAR_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToCalendar(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToCalendar(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("diálogo de evento en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  const ONE_TIME_DIALOG: CalendarState = {
+    name: "calendario-dialogo-una-vez",
+    events: [],
+    ready: showOneTimeDialog,
+  };
+
+  test("Escape lo cierra y devuelve el foco a + Evento", async ({ page }) => {
+    await goToCalendar(page, ONE_TIME_DIALOG);
+
+    await page.keyboard.press("Escape");
+
+    await expect(eventDialog(page)).toBeHidden();
+    await expect(
+      page.getByRole("button", { name: EVENT_DIALOG_OPEN }),
+    ).toBeFocused();
+  });
+
+  // Al pasar del último control, Chrome lleva el foco a su propia barra (el
+  // documento se queda con `body`): eso es del navegador, no de la página.
+  // Lo que no puede pasar es que el foco caiga en la agenda de detrás.
+  test("el foco no cae en la página de detrás mientras está abierto", async ({
+    page,
+  }) => {
+    await goToCalendar(page, ONE_TIME_DIALOG);
+
+    for (let step = 0; step < EVENT_DIALOG_TAB_PRESSES; step += 1) {
+      await page.keyboard.press("Tab");
+      const isBehind = await eventDialog(page).evaluate(
+        (dialog) =>
+          document.activeElement !== document.body &&
+          !dialog.contains(document.activeElement),
+      );
+      expect(isBehind).toBe(false);
+    }
+  });
+
+  test("al crear cierra el diálogo y avisa en la agenda", async ({ page }) => {
+    let sent: unknown = null;
+    await page.route(
+      (url) => url.pathname === EVENTS_MANAGE_ENDPOINT,
+      async (route, request) => {
+        sent = request.postDataJSON();
+        await route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify({
+            data: {
+              repeat: "none",
+              event: {
+                id: "e0e0e0e0-0000-4000-8000-0000000000e9",
+                startsOn: "2026-10-06",
+                title: "Pool Training",
+                eventType: "training",
+                startTime: "19:00",
+                location: "MSAC Dive Pool",
+                notes: null,
+                audience: { kind: "club" },
+              },
+            },
+          }),
+        });
+      },
+    );
+    await goToCalendar(page, ONE_TIME_DIALOG);
+
+    await eventDialog(page)
+      .getByRole("button", { name: EVENT_DIALOG_SUBMIT })
+      .click();
+
+    await expect(eventDialog(page)).toBeHidden();
+    await expect(
+      page.getByText("Event created. We let the members know."),
+    ).toBeVisible();
+    expect(sent).toMatchObject({
+      repeat: "none",
+      title: "Pool Training",
+      startsOn: "2026-10-06",
+      startTime: "19:00",
+    });
+  });
+});

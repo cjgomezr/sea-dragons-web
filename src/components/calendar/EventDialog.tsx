@@ -136,7 +136,14 @@ export function EventDialog({
             <span aria-hidden="true">×</span>
           </button>
         </div>
-        <div className="event-dialog-body">
+        {/* Se enfoca para poder desplazarlo con el teclado aunque, mientras
+            guarda, todos sus controles estén desactivados. */}
+        <div
+          className="event-dialog-body"
+          role="region"
+          aria-labelledby={titleId}
+          tabIndex={0}
+        >
           {groups.kind === "loading" ? (
             <p className="admin-empty">{translate("calendar.form.loading")}</p>
           ) : null}
