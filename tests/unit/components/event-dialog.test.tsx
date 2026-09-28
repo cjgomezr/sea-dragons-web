@@ -540,6 +540,24 @@ describe("diálogo de evento", () => {
     expect(within(dialog).getByLabelText("Título")).toHaveValue("Entreno");
   });
 
+  it("un motivo de la API sin campo va al aviso general sin marcar ninguno", async () => {
+    stubApi({ respondToCreate: () => businessRule("event_started") });
+    const dialog = await openDialog();
+    fillSingleEvent(dialog);
+
+    await submit(dialog);
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "We couldn't create the event. Try again.",
+    );
+    expect(
+      within(dialog)
+        .getAllByRole("textbox")
+        .filter((field) => field.getAttribute("aria-invalid") === "true"),
+    ).toEqual([]);
+    expect(within(dialog).getByLabelText("Title")).toHaveValue("Pool Training");
+  });
+
   it("marca los campos obligatorios vacíos sin llamar a la API", async () => {
     stubApi({});
     const dialog = await openDialog();
