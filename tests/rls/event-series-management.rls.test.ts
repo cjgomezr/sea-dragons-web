@@ -60,7 +60,9 @@ function occurrenceRow(
 
 /** Una serie con una ocurrencia pasada y dos futuras, y una respuesta en la
  * primera futura. Todo se borra al terminar. */
-async function withSeries(run: (world: SeriesWorld) => Promise<void>) {
+async function withSeries(
+  run: (world: SeriesWorld) => Promise<void>,
+): Promise<void> {
   const serviceClient = createServiceRoleTestClient(process.env);
   const clubId = await seededClubId(serviceClient);
   await withTestUser(serviceClient, (author) =>
