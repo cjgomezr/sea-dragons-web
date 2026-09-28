@@ -1,3 +1,10 @@
+columna attendance_records.club_id tipo=uuid null=NO default=-
+columna attendance_records.event_id tipo=uuid null=NO default=-
+columna attendance_records.event_type tipo=text null=NO default='training'::text
+columna attendance_records.recorded_at tipo=timestamp with time zone null=NO default=now()
+columna attendance_records.recorded_by tipo=uuid null=YES default=-
+columna attendance_records.status tipo=text null=NO default=-
+columna attendance_records.user_id tipo=uuid null=NO default=-
 columna audit_log.action tipo=text null=NO default=-
 columna audit_log.actor_id tipo=uuid null=NO default=-
 columna audit_log.club_id tipo=uuid null=NO default=-
@@ -200,6 +207,21 @@ funcion set_evaluation_category_active(acting_club_id uuid, target_category_id u
 funcion set_member_status(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_status text)
 funcion update_event(acting_club_id uuid, target_event_id uuid, changes jsonb)
 funcion update_series(acting_club_id uuid, target_series_id uuid, changes jsonb)
+grant attendance_records authenticated SELECT
+grant attendance_records postgres DELETE
+grant attendance_records postgres INSERT
+grant attendance_records postgres REFERENCES
+grant attendance_records postgres SELECT
+grant attendance_records postgres TRIGGER
+grant attendance_records postgres TRUNCATE
+grant attendance_records postgres UPDATE
+grant attendance_records service_role DELETE
+grant attendance_records service_role INSERT
+grant attendance_records service_role REFERENCES
+grant attendance_records service_role SELECT
+grant attendance_records service_role TRIGGER
+grant attendance_records service_role TRUNCATE
+grant attendance_records service_role UPDATE
 grant audit_log postgres DELETE
 grant audit_log postgres INSERT
 grant audit_log postgres REFERENCES
@@ -572,6 +594,9 @@ grant-columna clubs.accent_color anon SELECT
 grant-columna clubs.initials anon SELECT
 grant-columna clubs.logo_path anon SELECT
 grant-columna clubs.name anon SELECT
+indice attendance_records_pkey CREATE UNIQUE INDEX attendance_records_pkey ON public.attendance_records USING btree (event_id, user_id)
+indice attendance_records_recorded_by_club_id_idx CREATE INDEX attendance_records_recorded_by_club_id_idx ON public.attendance_records USING btree (recorded_by, club_id)
+indice attendance_records_user_id_club_id_idx CREATE INDEX attendance_records_user_id_club_id_idx ON public.attendance_records USING btree (user_id, club_id)
 indice audit_log_club_id_created_at_idx CREATE INDEX audit_log_club_id_created_at_idx ON public.audit_log USING btree (club_id, created_at DESC)
 indice audit_log_pkey CREATE UNIQUE INDEX audit_log_pkey ON public.audit_log USING btree (id)
 indice club_position_names_club_id_locale_name_key CREATE UNIQUE INDEX club_position_names_club_id_locale_name_key ON public.club_position_names USING btree (club_id, locale, lower(btrim(name)))
@@ -601,6 +626,7 @@ indice event_series_id_club_id_key CREATE UNIQUE INDEX event_series_id_club_id_k
 indice event_series_pkey CREATE UNIQUE INDEX event_series_pkey ON public.event_series USING btree (id)
 indice events_author_id_club_id_idx CREATE INDEX events_author_id_club_id_idx ON public.events USING btree (author_id, club_id)
 indice events_club_id_starts_at_idx CREATE INDEX events_club_id_starts_at_idx ON public.events USING btree (club_id, starts_at)
+indice events_id_club_id_event_type_key CREATE UNIQUE INDEX events_id_club_id_event_type_key ON public.events USING btree (id, club_id, event_type)
 indice events_id_club_id_key CREATE UNIQUE INDEX events_id_club_id_key ON public.events USING btree (id, club_id)
 indice events_pkey CREATE UNIQUE INDEX events_pkey ON public.events USING btree (id)
 indice events_series_id_idx CREATE INDEX events_series_id_idx ON public.events USING btree (series_id)
@@ -638,6 +664,7 @@ indice role_requests_decided_by_idx CREATE INDEX role_requests_decided_by_idx ON
 indice role_requests_one_pending_per_member CREATE UNIQUE INDEX role_requests_one_pending_per_member ON public.role_requests USING btree (user_id) WHERE (status = 'pending'::text)
 indice role_requests_pkey CREATE UNIQUE INDEX role_requests_pkey ON public.role_requests USING btree (id)
 indice role_requests_user_id_created_at_idx CREATE INDEX role_requests_user_id_created_at_idx ON public.role_requests USING btree (user_id, created_at DESC)
+policy attendance_records.attendance_records_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
 policy audit_log.audit_log_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy club_position_names.club_position_names_select_own_club cmd=SELECT roles={authenticated} using=(club_id IN ( SELECT m.club_id
    FROM members m
@@ -687,6 +714,13 @@ policy notifications.notifications_select_own cmd=SELECT roles={authenticated} u
 policy password_recovery_requests.password_recovery_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy registration_requests.registration_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy role_requests.role_requests_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
+restriccion attendance_records.attendance_records_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion attendance_records.attendance_records_event_type_check CHECK ((event_type = 'training'::text))
+restriccion attendance_records.attendance_records_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
+restriccion attendance_records.attendance_records_pkey PRIMARY KEY (event_id, user_id)
+restriccion attendance_records.attendance_records_recorder_same_club_fkey FOREIGN KEY (recorded_by, club_id) REFERENCES members(user_id, club_id) ON DELETE SET NULL (recorded_by)
+restriccion attendance_records.attendance_records_status_check CHECK ((status = ANY (ARRAY['present'::text, 'late'::text, 'absent'::text])))
+restriccion attendance_records.attendance_records_training_fkey FOREIGN KEY (event_id, club_id, event_type) REFERENCES events(id, club_id, event_type) ON DELETE CASCADE
 restriccion audit_log.audit_log_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion audit_log.audit_log_pkey PRIMARY KEY (id)
 restriccion audit_log.audit_log_result_check CHECK ((result = ANY (ARRAY['success'::text, 'failure'::text])))
@@ -745,6 +779,7 @@ restriccion events.events_author_same_club_fkey FOREIGN KEY (author_id, club_id)
 restriccion events.events_cancelled_at_matches_status CHECK (((status = 'cancelled'::text) = (cancelled_at IS NOT NULL)))
 restriccion events.events_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion events.events_event_type_check CHECK ((event_type = ANY (ARRAY['training'::text, 'competition'::text, 'meeting'::text, 'social'::text])))
+restriccion events.events_id_club_id_event_type_key UNIQUE (id, club_id, event_type)
 restriccion events.events_id_club_id_key UNIQUE (id, club_id)
 restriccion events.events_location_length CHECK (((char_length(btrim(location)) >= 1) AND (char_length(btrim(location)) <= 120)))
 restriccion events.events_notes_length CHECK ((char_length(notes) <= 2000))
@@ -823,6 +858,7 @@ restriccion role_requests.role_requests_pkey PRIMARY KEY (id)
 restriccion role_requests.role_requests_requested_role_check CHECK ((requested_role = ANY (ARRAY['Coach'::text, 'Committee'::text])))
 restriccion role_requests.role_requests_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))
 restriccion role_requests.role_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES members(user_id) ON DELETE CASCADE
+tabla attendance_records rls=t
 tabla audit_log rls=t
 tabla club_position_names rls=t
 tabla club_positions rls=t
