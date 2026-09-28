@@ -9927,15 +9927,113 @@ const STUBBED_CANCELLED_EVENT = {
   inAudience: true,
 } as const;
 
+// Los pasados y la fila desplegada (#312). El detalle es el mismo para
+// cualquier evento; cómo lo ve un Player o un Committee sólo cambia en que al
+// segundo la API le manda la audiencia, que es lo que decide la pantalla.
+const STUBBED_PAST_EVENTS = [
+  {
+    ...STUBBED_AGENDA_EVENTS[2],
+    id: "e0e0e0e0-0000-4000-8000-0000000000e6",
+    startsOn: "2026-05-30",
+    title: "Round 3 vs Sydney Stingrays",
+    myResponse: "yes",
+    goingCount: 16,
+    maybeCount: 0,
+  },
+  {
+    ...STUBBED_AGENDA_EVENTS[0],
+    id: "e0e0e0e0-0000-4000-8000-0000000000e7",
+    startsOn: "2026-05-26",
+    goingCount: 12,
+    maybeCount: 1,
+    myResponse: null,
+  },
+  {
+    ...STUBBED_CANCELLED_EVENT,
+    id: "e0e0e0e0-0000-4000-8000-0000000000e8",
+    startsOn: "2026-05-15",
+    title: "Autumn Quiz Night",
+  },
+] as const;
+
+const PLAYER_OPENED_EVENT = {
+  notes:
+    "Bring fins, mask and snorkel. Warm-up starts 15 minutes early.\nParking is at the rear entrance on Aughtie Drive.",
+  going: [
+    "Ana Ruiz",
+    "Ben Walker",
+    "Chloe Nguyen",
+    "Daniel Okafor",
+    "Emma Johansson",
+    "Felipe Castro",
+    "Grace Lee",
+    "Hamish MacLeod",
+    "Isabella Rossi",
+    "Jack Thompson",
+    "Liam O'Connor",
+    "Maximiliana Alejandra Fernández-Rodríguez de la Torre",
+    "Noah Williams",
+    "Olivia Brown",
+  ],
+  maybe: ["Mia Chen", "Sam Patel"],
+} as const;
+
+const COMMITTEE_OPENED_EVENT = {
+  ...PLAYER_OPENED_EVENT,
+  audience: {
+    kind: "groups",
+    groups: [
+      { id: "a0a0a0a0-0000-4000-8000-0000000000a1", name: "Juniors" },
+      { id: "a0a0a0a0-0000-4000-8000-0000000000a2", name: "Masters" },
+      {
+        id: "a0a0a0a0-0000-4000-8000-0000000000a3",
+        name: "Women's Development Squad",
+      },
+    ],
+  },
+} as const;
+
+const EMPTY_OPENED_EVENT = { notes: null, going: [], maybe: [] } as const;
+
+type CalendarReads = {
+  readonly events: readonly unknown[];
+  readonly pastEvents?: readonly unknown[];
+  /** Lo que el detalle añade a cualquier evento al desplegarlo. */
+  readonly opened?: object;
+};
+
 /** La agenda de una sola página, y un 422 de evento empezado a cualquier
  * respuesta: sólo el estado del error llega a pulsar. */
 async function stubCalendarReads(
   page: Page,
-  events: readonly unknown[],
+  reads: CalendarReads,
 ): Promise<void> {
+  const pastEvents = reads.pastEvents ?? [];
   await page.route(
     (url) => url.pathname === CALENDAR_AGENDA_ENDPOINT,
-    (route) => route.fulfill(jsonBody({ events, nextCursor: null })),
+    (route, request) => {
+      const isPast =
+        new URL(request.url()).searchParams.get("period") === "past";
+      return route.fulfill(
+        jsonBody({
+          events: isPast ? pastEvents : reads.events,
+          nextCursor: null,
+        }),
+      );
+    },
+  );
+  const opened = reads.opened ?? PLAYER_OPENED_EVENT;
+  const allEvents = [...reads.events, ...pastEvents];
+  await page.route(
+    (url) =>
+      allEvents.some((event) => url.pathname === calendarEventPath(event)),
+    (route, request) => {
+      const { pathname } = new URL(request.url());
+      const event = allEvents.find(
+        (candidate) => pathname === calendarEventPath(candidate),
+      );
+      return route.fulfill(jsonBody({ ...(event as object), ...opened }));
+    },
   );
   await page.route(
     (url) =>
@@ -9956,9 +10054,13 @@ async function stubCalendarReads(
   );
 }
 
-type CalendarState = {
+function calendarEventPath(event: unknown): string {
+  const { id } = event as { readonly id: string };
+  return `${CALENDAR_AGENDA_ENDPOINT}/${id}`;
+}
+
+type CalendarState = CalendarReads & {
   readonly name: string;
-  readonly events: readonly unknown[];
   readonly beforeVisit?: (page: Page) => Promise<void>;
   /** Lo que tiene que estar a la vista para que la pantalla haya cargado. */
   readonly ready: (page: Page) => Promise<void>;
@@ -9982,17 +10084,48 @@ async function waitForEmptyAgenda(page: Page): Promise<void> {
 /** Responde No al primer evento y espera el aviso del 422 en su fila. */
 async function showRsvpError(page: Page): Promise<void> {
   await waitForAgendaRows(page);
-  const row = page.getByRole("listitem").filter({
-    has: page.getByRole("heading", {
-      level: 2,
-      name: STUBBED_AGENDA_EVENTS[0].title,
-    }),
-  });
+  const row = agendaRow(page, STUBBED_AGENDA_EVENTS[0].title);
   await row.getByRole("group").getByRole("button", { name: "No" }).click();
   // Sólo el de la fila: el anunciador de rutas de Next también es un alert.
   await expect(row.getByRole("alert")).toBeVisible();
   await page.mouse.move(0, 0);
 }
+
+function agendaRow(page: Page, title: string): Locator {
+  return page.getByRole("listitem").filter({
+    has: page.getByRole("heading", { level: 2, name: title }),
+  });
+}
+
+/** Despliega el primer evento y espera a que su detalle esté pintado. */
+async function expandFirstRow(page: Page): Promise<void> {
+  await waitForAgendaRows(page);
+  const { title } = STUBBED_AGENDA_EVENTS[0];
+  const row = agendaRow(page, title);
+  await row.getByRole("button", { name: title }).click();
+  await expect(row.getByRole("term").first()).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+/** Cambia a los pasados y espera a que estén pintados. */
+async function showPastEvents(page: Page): Promise<void> {
+  await waitForAgendaRows(page);
+  await page.getByRole("button", { name: /^(Past|Pasados)$/ }).click();
+  await expect(
+    page.getByRole("heading", {
+      level: 2,
+      name: STUBBED_PAST_EVENTS[0].title,
+    }),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+const CALENDAR_EXPANDED_AS_PLAYER: CalendarState = {
+  name: "calendario-desplegado-player",
+  events: STUBBED_AGENDA_EVENTS,
+  opened: PLAYER_OPENED_EVENT,
+  ready: expandFirstRow,
+};
 
 const CALENDAR_WITH_EVENTS: CalendarState = {
   name: "calendario-con-eventos",
@@ -10041,6 +10174,47 @@ const CALENDAR_STATES: readonly CalendarState[] = [
     beforeVisit: chooseSpanish,
     ready: showRsvpError,
   },
+  CALENDAR_EXPANDED_AS_PLAYER,
+  {
+    ...CALENDAR_EXPANDED_AS_PLAYER,
+    name: "calendario-desplegado-player-es",
+    beforeVisit: chooseSpanish,
+  },
+  {
+    ...CALENDAR_EXPANDED_AS_PLAYER,
+    name: "calendario-desplegado-committee",
+    opened: COMMITTEE_OPENED_EVENT,
+  },
+  {
+    ...CALENDAR_EXPANDED_AS_PLAYER,
+    name: "calendario-desplegado-committee-es",
+    opened: COMMITTEE_OPENED_EVENT,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    ...CALENDAR_EXPANDED_AS_PLAYER,
+    name: "calendario-desplegado-sin-notas",
+    opened: EMPTY_OPENED_EVENT,
+  },
+  {
+    ...CALENDAR_EXPANDED_AS_PLAYER,
+    name: "calendario-desplegado-sin-notas-es",
+    opened: EMPTY_OPENED_EVENT,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "calendario-pasados",
+    events: STUBBED_AGENDA_EVENTS,
+    pastEvents: STUBBED_PAST_EVENTS,
+    ready: showPastEvents,
+  },
+  {
+    name: "calendario-pasados-es",
+    events: STUBBED_AGENDA_EVENTS,
+    pastEvents: STUBBED_PAST_EVENTS,
+    beforeVisit: chooseSpanish,
+    ready: showPastEvents,
+  },
 ];
 
 async function goToCalendar(
@@ -10048,7 +10222,7 @@ async function goToCalendar(
   state: CalendarState,
   theme?: (typeof themes)[number],
 ): Promise<void> {
-  await stubCalendarReads(page, state.events);
+  await stubCalendarReads(page, state);
   await state.beforeVisit?.(page);
   if (theme === undefined) {
     await page.goto(`${APP_URL}${CALENDAR_SCREEN_PATH}`);
@@ -10114,7 +10288,7 @@ test.describe("calendario en el navegador", () => {
     page,
   }) => {
     const [event] = STUBBED_AGENDA_EVENTS;
-    await stubCalendarReads(page, STUBBED_AGENDA_EVENTS);
+    await stubCalendarReads(page, { events: STUBBED_AGENDA_EVENTS });
     let sent: unknown = null;
     await page.route(
       (url) => url.pathname === `${CALENDAR_AGENDA_ENDPOINT}/${event.id}/rsvp`,
@@ -10173,6 +10347,60 @@ test.describe("calendario en el navegador", () => {
     for (const height of heights) {
       expect(height).toBeGreaterThanOrEqual(RSVP_MIN_TOUCH_TARGET_PX);
     }
+  });
+
+  test("con el teclado la fila se despliega con Enter, se pliega con Espacio y lo anuncia", async ({
+    page,
+  }) => {
+    await goToCalendar(page, CALENDAR_WITH_EVENTS);
+    const { title } = STUBBED_AGENDA_EVENTS[0];
+    const toggle = agendaRow(page, title).getByRole("button", { name: title });
+    await toggle.focus();
+
+    await page.keyboard.press("Enter");
+
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      agendaRow(page, title).getByText(PLAYER_OPENED_EVENT.going[0]),
+    ).toBeVisible();
+    await page.keyboard.press("Space");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  test("pulsar Sí en una fila desplegada no la pliega", async ({ page }) => {
+    await goToCalendar(page, CALENDAR_EXPANDED_AS_PLAYER);
+    const { title } = STUBBED_AGENDA_EVENTS[0];
+    const row = agendaRow(page, title);
+
+    await row.getByRole("group").getByRole("button", { name: "Yes" }).click();
+
+    await expect(row.getByRole("button", { name: title })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
+
+  test("a 375px una lista de nombres larga se parte dentro de la fila", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToCalendar(page, CALENDAR_EXPANDED_AS_PLAYER);
+    const row = agendaRow(page, STUBBED_AGENDA_EVENTS[0].title);
+
+    const rowBox = await row.boundingBox();
+    const namesBox = await row
+      .getByRole("list", { name: /^(Going|Van)$/ })
+      .boundingBox();
+
+    expect(rowBox).not.toBeNull();
+    expect(namesBox).not.toBeNull();
+    if (rowBox === null || namesBox === null) {
+      return;
+    }
+    expect(namesBox.x + namesBox.width).toBeLessThanOrEqual(
+      rowBox.x + rowBox.width,
+    );
+    expect(namesBox.height).toBeGreaterThan(0);
   });
 });
 

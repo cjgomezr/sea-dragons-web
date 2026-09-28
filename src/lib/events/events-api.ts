@@ -20,7 +20,9 @@ import {
   InvalidAgendaCursorError,
 } from "./event-agenda";
 import { createSupabaseEventAgendaGateways } from "./supabase-event-agenda-gateways";
+import type { EventManagementGateways } from "./event-management";
 import { createSupabaseEventGateways } from "./supabase-event-gateways";
+import { createSupabaseEventManagementGateways } from "./supabase-event-management-gateways";
 import { createSupabaseEventRsvpGateways } from "./supabase-event-rsvp-gateways";
 
 /**
@@ -63,6 +65,26 @@ export const eventDraftSchema = z.discriminatedUnion("repeat", [
     endsOn: z.iso.date(),
   }),
 ]);
+
+/** Lo que cambia de un evento suelto o una ocurrencia: los mismos campos que
+ * al crear, todos opcionales, y al menos uno. */
+export const eventEditSchema = eventFieldsSchema
+  .extend({ startsOn: z.iso.date() })
+  .partial()
+  .refine((edit) => Object.values(edit).some((value) => value !== undefined), {
+    message: "Envía al menos un campo que cambiar.",
+  });
+
+export function requireEventManagementGateways(): EventManagementGateways {
+  const wiring = createSupabaseEventManagementGateways(process.env);
+  if (wiring.kind === "unconfigured") {
+    throw new ApiError(
+      "service_unavailable",
+      describeMissingAuthKeys(wiring.missingKeys),
+    );
+  }
+  return wiring.gateways;
+}
 
 export function requireEventGateways(): EventGateways {
   const wiring = createSupabaseEventGateways(process.env);

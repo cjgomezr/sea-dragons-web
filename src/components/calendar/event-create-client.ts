@@ -7,16 +7,18 @@ import {
 } from "@/lib/api/request-api";
 import { EVENTS_MANAGE_API_PATH } from "@/lib/auth/routes";
 import {
-  EVENT_ISSUE_CODES,
   EVENT_LOCATION_MAX_LENGTH,
   EVENT_NOTES_MAX_LENGTH,
   EVENT_TITLE_MAX_LENGTH,
   type EventDraft,
-  type EventIssueCode,
   SERIES_MAX_DAYS,
 } from "@/lib/events/event-creation";
 import type { Translator } from "@/lib/i18n/translator";
-import type { EventFormIssue } from "./event-form";
+import {
+  type EventFormIssue,
+  type FieldIssueCode,
+  isFieldIssueCode,
+} from "./event-form";
 
 /**
  * Lo que el diálogo de evento (#313) le pide a la API v1 (#307) y cómo reduce
@@ -69,13 +71,14 @@ export async function createEvent(draft: EventDraft): Promise<EventCreation> {
 }
 
 /** El motivo de un 422 que el diálogo sabe poner junto a un campo, o null. */
-export function readEventIssue(
-  failure: ApiRequestFailure,
-): EventIssueCode | null {
-  if (failure.failure !== "business_rule") {
+export function readEventIssue({
+  failure,
+  reason,
+}: ApiRequestFailure): FieldIssueCode | null {
+  if (failure !== "business_rule" || reason === null) {
     return null;
   }
-  return EVENT_ISSUE_CODES.find((code) => code === failure.reason) ?? null;
+  return isFieldIssueCode(reason) ? reason : null;
 }
 
 export function describeEventIssue(

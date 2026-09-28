@@ -55,12 +55,20 @@ export type EventFormField =
   | "notes"
   | "audience";
 
+/** Los motivos de la API que van junto a un campo. `event_started` y
+ * `event_cancelled` hablan de un evento que ya existe (#314): crear no los
+ * devuelve nunca. */
+export type FieldIssueCode = Exclude<
+  EventIssueCode,
+  "event_started" | "event_cancelled"
+>;
+
 export type EventFormIssue = {
   readonly field: EventFormField;
-  readonly code: EventIssueCode | "required";
+  readonly code: FieldIssueCode | "required";
 };
 
-const ISSUE_FIELDS: Readonly<Record<EventIssueCode, EventFormField>> = {
+const ISSUE_FIELDS: Readonly<Record<FieldIssueCode, EventFormField>> = {
   event_title_invalid: "title",
   event_location_invalid: "location",
   event_notes_too_long: "notes",
@@ -74,8 +82,12 @@ const ISSUE_FIELDS: Readonly<Record<EventIssueCode, EventFormField>> = {
   series_without_sessions: "weekdays",
 };
 
+export function isFieldIssueCode(reason: string): reason is FieldIssueCode {
+  return Object.hasOwn(ISSUE_FIELDS, reason);
+}
+
 /** El campo junto al que se pinta un motivo de la API. */
-export function issueFromApi(code: EventIssueCode): EventFormIssue {
+export function issueFromApi(code: FieldIssueCode): EventFormIssue {
   return { field: ISSUE_FIELDS[code], code };
 }
 
