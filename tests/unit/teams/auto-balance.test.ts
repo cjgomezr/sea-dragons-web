@@ -319,6 +319,7 @@ describe("presupuesto de tiempo", () => {
     expect(result.isTimeBudgetExhausted).toBe(true);
     expect(result.a).toHaveLength(6);
     expect(result.b).toHaveLength(6);
+    expect(countCoverage(result.a, "goalkeeper")).toBe(2);
   });
 
   it("no avisa de nada cuando termina dentro del presupuesto", () => {

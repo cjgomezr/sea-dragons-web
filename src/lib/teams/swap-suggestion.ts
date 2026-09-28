@@ -76,8 +76,9 @@ export function swapPlayers(
 function findBestSwap(split: TeamSplit): ScoredSwap | null {
   let best: ScoredSwap | null = null;
   let bestScore = scoreSplit(split);
+  const rankedB = sortByRanking(split.b);
   for (const playerFromA of sortByRanking(split.a)) {
-    for (const playerFromB of sortByRanking(split.b)) {
+    for (const playerFromB of rankedB) {
       const score = scoreSplit(swapPlayers(split, playerFromA, playerFromB));
       if (isBetterScore(score, bestScore)) {
         best = { playerFromA, playerFromB, score };
