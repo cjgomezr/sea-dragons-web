@@ -23,6 +23,7 @@ import {
 } from "./squad";
 import { suggestSwap } from "./swap-suggestion";
 import {
+  BUILDABLE_EVENT_TYPES,
   TEAM_IDS,
   type TeamAssignment,
   type TeamId,
@@ -48,6 +49,7 @@ import { type SplitTotals, calculateSplitTotals } from "./team-totals";
  */
 
 export {
+  BUILDABLE_EVENT_TYPES,
   TEAM_IDS,
   TEAM_SPLIT_MODES,
   type TeamAssignment,
@@ -63,12 +65,6 @@ export const DEFAULT_TEAM_LABELS: TeamLabels = {
   a: { name: "Team Kelp", color: "#1C6EA4" },
   b: { name: "Team Tide", color: "#C99A3E" },
 };
-
-/** Sólo los entrenamientos y las competiciones se arman (D2). */
-export const BUILDABLE_EVENT_TYPES: readonly EventType[] = [
-  "training",
-  "competition",
-];
 
 /** Lo que hace falta de un evento para decidir si se arma y para avisar. */
 export type TeamBuilderEvent = {

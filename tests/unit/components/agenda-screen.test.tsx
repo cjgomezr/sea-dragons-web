@@ -125,6 +125,11 @@ function stubApi(respond: Respond): void {
       const url = new URL(input, "http://localhost");
       const method = init?.method ?? "GET";
       requests.push({ method, path: `${url.pathname}${url.search}` });
+      // Los equipos de la fila desplegada (#403) tienen su propio test: aquí
+      // nunca hay reparto publicado.
+      if (url.pathname.endsWith("/team")) {
+        return jsonResponse(200, { data: { status: "not_published" } });
+      }
       const body: unknown =
         typeof init?.body === "string" ? JSON.parse(init.body) : null;
       return respond({ method, url, body });

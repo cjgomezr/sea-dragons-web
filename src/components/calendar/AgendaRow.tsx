@@ -12,6 +12,7 @@ import {
   formatClockTime,
 } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
+import { BUILDABLE_EVENT_TYPES } from "@/lib/teams/team-ids";
 import { clubMoment } from "@/lib/time/club-calendar";
 import { describeRsvpFailure } from "./agenda-client";
 import { EventDetailPanel } from "./EventDetailPanel";
@@ -20,8 +21,10 @@ import {
   EventOrganizerActions,
 } from "./EventOrganizerActions";
 import { EventRsvp } from "./EventRsvp";
+import { EventTeams } from "./EventTeams";
 import { useEventDetail } from "./use-event-detail";
 import { useEventRsvp } from "./use-event-rsvp";
+import { useEventTeam } from "./use-event-team";
 
 /**
  * Una fila de la agenda (#311, RF-7, AC-046): el bloque de fecha, el título
@@ -43,6 +46,9 @@ import { useEventRsvp } from "./use-event-rsvp";
  * A quien pasa lista, la de un entrenamiento que ya empezó y sigue en pie le
  * ofrece "Pasar lista" (#395), que abre Asistencia con esa sesión. Puede estar
  * en Próximos: el de hoy sigue ahí aunque ya haya empezado.
+ *
+ * La de un entrenamiento o una competición enseña además los equipos del
+ * reparto publicado (#403). Los demás eventos no se arman: no se piden.
  */
 
 function canTakeAttendanceOf(event: AgendaEvent): boolean {
@@ -126,6 +132,8 @@ export function AgendaRow({
     event.id,
   );
   const { state, respond } = useEventRsvp(event, receive);
+  const teams = useEventTeam(event.id);
+  const canHaveTeams = BUILDABLE_EVENT_TYPES.includes(event.eventType);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const detailId = useId();
   const isCancelled = event.status === "cancelled";
@@ -149,7 +157,12 @@ export function AgendaRow({
               className="agenda-toggle"
               aria-expanded={isExpanded}
               aria-controls={detailId}
-              onClick={toggle}
+              onClick={() => {
+                if (!isExpanded && canHaveTeams) {
+                  teams.open();
+                }
+                toggle();
+              }}
             >
               {event.title}
               <span className="agenda-chevron" aria-hidden="true" />
@@ -209,6 +222,14 @@ export function AgendaRow({
               translate={translate}
               detail={detail}
               onRetry={retry}
+            />
+          ) : null}
+          {isExpanded && canHaveTeams ? (
+            <EventTeams
+              translate={translate}
+              state={teams.team}
+              isCancelled={isCancelled}
+              onRetry={teams.retry}
             />
           ) : null}
           {isExpanded && canTakeAttendance && canTakeAttendanceOf(event) ? (
