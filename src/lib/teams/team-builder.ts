@@ -591,9 +591,7 @@ function toSquadPlayer(entry: SquadEntry): SquadPlayer {
   };
 }
 
-function toSuggestedSwap(
-  split: TeamSplit,
-): SuggestedSwap | null {
+function toSuggestedSwap(split: TeamSplit): SuggestedSwap | null {
   const swap = suggestSwap(split);
   return swap === null
     ? null

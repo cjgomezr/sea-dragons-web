@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuditWriteError } from "@/lib/audit/audit-log";
 import type { Role } from "@/lib/auth/roles";
 import {
   DEFAULT_TEAM_LABELS,
@@ -181,7 +182,7 @@ describe("publicar", () => {
       split: draftWith([{ userId: ANA, team: "a" }]),
     });
 
-    await expect(publishing).rejects.toThrow();
+    await expect(publishing).rejects.toBeInstanceOf(AuditWriteError);
     expect(club.split()?.publishedAt).toEqual(PUBLISHED_AT);
     expect(club.notices.map((notice) => notice.userId)).toEqual([ANA]);
   });
