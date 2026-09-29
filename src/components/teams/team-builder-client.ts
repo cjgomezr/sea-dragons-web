@@ -114,13 +114,16 @@ export type EventsLoad =
 export type BuilderLoad =
   { readonly kind: "loaded"; readonly builder: OpenedBuilder } | TeamsFailure;
 
+/** Los dos equipos que repartió el servidor, con cada jugador entero: puede
+ * traer a alguien que dijo Sí después de abrir la pantalla. */
+export type BalancedSplit = {
+  readonly teams: TeamLabels;
+  readonly a: readonly RosterEntry[];
+  readonly b: readonly RosterEntry[];
+};
+
 export type BalanceOutcome =
-  | {
-      readonly kind: "balanced";
-      readonly teams: TeamLabels;
-      readonly assignments: readonly TeamAssignment[];
-    }
-  | TeamsFailure;
+  { readonly kind: "balanced"; readonly split: BalancedSplit } | TeamsFailure;
 
 export type SaveOutcome = { readonly kind: "saved" } | TeamsFailure;
 
@@ -169,15 +172,7 @@ export async function autoBalance(eventId: string): Promise<BalanceOutcome> {
   if (read.kind === "failed") {
     return read;
   }
-  const { teams, a, b } = read.value.data;
-  return {
-    kind: "balanced",
-    teams,
-    assignments: [
-      ...a.map(({ userId }) => ({ userId, team: "a" as const })),
-      ...b.map(({ userId }) => ({ userId, team: "b" as const })),
-    ],
-  };
+  return { kind: "balanced", split: read.value.data };
 }
 
 /** Manda el reparto entero: el nuevo sustituye al anterior (RF-4). */

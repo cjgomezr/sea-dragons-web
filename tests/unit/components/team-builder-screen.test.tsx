@@ -597,6 +597,26 @@ describe("balancear", () => {
     expect(saveButton()).toHaveAccessibleName("Save");
   });
 
+  it("pinta también a quien dijo Sí después de abrir la pantalla", async () => {
+    stubBalancing(
+      jsonResponse(200, { data: { ...BALANCED, b: [DANIELA, ETHAN, LIAM] } }),
+    );
+    await openScreen();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Balance teams" }),
+    );
+
+    await screen.findByText("Teams balanced and saved as a draft.");
+    expect(region("Team Tide")).toHaveTextContent(LIAM.fullName);
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Remove Liam O'Connor from Team Tide",
+      }),
+    );
+    expect(region("Available")).toHaveTextContent(LIAM.fullName);
+  });
+
   it("vuelve a Manual si luego se toca algo a mano", async () => {
     stubBalancing();
     await openScreen();

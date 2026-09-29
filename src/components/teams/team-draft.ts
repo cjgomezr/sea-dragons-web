@@ -1,6 +1,7 @@
 import type { SquadPlayer, TeamSplit } from "@/lib/teams/squad";
 import { suggestSwap, type SwapImprovement } from "@/lib/teams/swap-suggestion";
 import {
+  TEAM_IDS,
   type TeamAssignment,
   type TeamId,
   type TeamLabels,
@@ -10,7 +11,11 @@ import {
   type SplitTotals,
   calculateSplitTotals,
 } from "@/lib/teams/team-totals";
-import type { OpenedBuilder, RosterEntry } from "./team-builder-client";
+import type {
+  BalancedSplit,
+  OpenedBuilder,
+  RosterEntry,
+} from "./team-builder-client";
 
 /**
  * El reparto que se está armando en la pantalla de Equipos (#402), en
@@ -116,17 +121,23 @@ export function swapPlayers(
 /** El auto-balance ya quedó guardado en el servidor: es la nueva referencia. */
 export function applyBalance(
   draft: TeamDraft,
-  balanced: {
-    readonly teams: TeamLabels;
-    readonly assignments: readonly TeamAssignment[];
-  },
+  balanced: BalancedSplit,
 ): TeamDraft {
+  const assignments = TEAM_IDS.flatMap((team) =>
+    balanced[team].map(({ userId }) => ({ userId, team })),
+  );
+  // El servidor reparte sólo los "Sí": quien falte en la escuadra abierta
+  // respondió después, y si se le quita vuelve a los disponibles.
+  const newcomers = [...balanced.a, ...balanced.b].filter(
+    (entry) => !draft.roster.some((player) => player.userId === entry.userId),
+  );
   return {
     ...draft,
     teams: balanced.teams,
     mode: "auto",
-    assignments: balanced.assignments,
-    saved: balanced.assignments,
+    roster: [...draft.roster, ...withOrigin(newcomers, "available")],
+    assignments,
+    saved: assignments,
   };
 }
 

@@ -188,7 +188,7 @@ export function useTeamBuilder(eventId: string): TeamBuilderControls {
       }
       update((ready) => ({
         ...ready,
-        draft: applyBalance(ready.draft, outcome),
+        draft: applyBalance(ready.draft, outcome.split),
         action: { kind: "balanced" },
         lastMove: null,
       }));
