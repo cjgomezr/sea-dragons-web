@@ -2,7 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 import {
   createRunId,
-  deleteSeededMembers,
+  e2eMemberEmail,
+  resetSeededMembers,
   PHOTOGRAPHED_ROLE_REQUEST_MEMBERS,
   RUN_NAMED_MEMBERS,
   seededMemberName,
@@ -17,6 +18,7 @@ function availableState(runId: string, userIds: readonly string[] = []) {
     email: "e2e@example.test",
     password: "secret",
     runId,
+    poolSlot: 0,
     userIds,
     createdGroupIds: [],
   } as const satisfies E2eSessionState;
@@ -126,12 +128,17 @@ describe("las capturas no dependen del sufijo", () => {
 type FakeServiceClient = {
   readonly client: SupabaseClient;
   readonly deletedUserIds: string[];
+  readonly resetMemberRows: string[];
+  readonly releasedLeases: string[];
 };
 
-/** Un proyecto de dev que sólo registra qué identidades se borran; las
- * carpetas de fotos están vacías. */
+/** Un proyecto de dev que sólo registra qué filas de socio se deshacen, qué
+ * identidades se borran y qué plazas de la reserva se sueltan; las carpetas
+ * de fotos están vacías. */
 function fakeServiceClient(): FakeServiceClient {
   const deletedUserIds: string[] = [];
+  const resetMemberRows: string[] = [];
+  const releasedLeases: string[] = [];
   const client = {
     auth: {
       admin: {
@@ -141,23 +148,66 @@ function fakeServiceClient(): FakeServiceClient {
         }),
       },
     },
+    from: () => ({
+      delete: () => ({
+        eq: async (_column: string, userId: string) => {
+          resetMemberRows.push(userId);
+          return { error: null };
+        },
+      }),
+    }),
     storage: {
       from: () => ({
         list: async () => ({ data: [], error: null }),
-        remove: async () => ({ data: [], error: null }),
+        remove: async (paths: string[]) => {
+          releasedLeases.push(...paths);
+          return { data: [], error: null };
+        },
       }),
     },
   } as unknown as SupabaseClient;
-  return { client, deletedUserIds };
+  return { client, deletedUserIds, resetMemberRows, releasedLeases };
 }
 
 describe("el cierre de la corrida", () => {
-  it("borra sus propios miembros y no toca los de otra corrida", async () => {
+  it("deshace las filas de sus propios socios y no toca las de otra corrida", async () => {
     const fake = fakeServiceClient();
     const mine = availableState("aaaa1111", ["mine-1", "mine-2"]);
 
-    await deleteSeededMembers(fake.client, mine);
+    await resetSeededMembers(fake.client, mine);
 
-    expect(fake.deletedUserIds).toEqual(["mine-1", "mine-2"]);
+    expect(fake.resetMemberRows).toEqual(["mine-1", "mine-2"]);
+  });
+
+  it("no borra ninguna identidad: son las de la siguiente corrida", async () => {
+    const fake = fakeServiceClient();
+
+    await resetSeededMembers(
+      fake.client,
+      availableState("aaaa1111", ["mine-1"]),
+    );
+
+    expect(fake.deletedUserIds).toEqual([]);
+  });
+
+  it("suelta la plaza de la reserva que arrendó", async () => {
+    const fake = fakeServiceClient();
+
+    await resetSeededMembers(fake.client, {
+      ...availableState("aaaa1111", ["mine-1"]),
+      poolSlot: 3,
+    });
+
+    expect(fake.releasedLeases).toContain("leases/e2e/3.json");
+  });
+});
+
+describe("los correos de la reserva de Playwright", () => {
+  it("son fijos por papel, sin sufijo en la plaza 0", () => {
+    expect(e2eMemberEmail("un-dato", 0)).toBe("e2e-un-dato@example.test");
+  });
+
+  it("llevan la plaza en las demás, para que dos corridas a la vez no compartan socio", () => {
+    expect(e2eMemberEmail("un-dato", 2)).toBe("e2e-un-dato-2@example.test");
   });
 });

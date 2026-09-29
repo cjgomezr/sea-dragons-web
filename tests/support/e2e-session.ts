@@ -14,10 +14,14 @@ import { createSessionClient } from "@/lib/supabase/session-client";
 import { loadLocalEnvFile } from "./load-local-env";
 import { decideSupabaseCredentials } from "./supabase-credentials";
 import {
-  createConfirmedUser,
-  describeSupabaseFailure,
-  withSupabaseRetry,
-} from "./supabase-retry";
+  createSupabaseTestMemberPool,
+  releasePoolSlot,
+  resetPooledMember,
+} from "./supabase-test-member-pool";
+import { describeSupabaseFailure, withSupabaseRetry } from "./supabase-retry";
+import { createRunId, type TestMemberPool } from "./test-member-pool";
+
+export { createRunId };
 
 /**
  * Los socios de prueba con los que Playwright entra a la aplicación.
@@ -32,9 +36,16 @@ import {
  * entrada. Las capturas de la barra de pestañas, del menú lateral y de las
  * secciones necesitan, por tanto, una sesión de verdad.
  *
- * Se crea con la llave de servicio contra `seadragons-dev` y se borra al
- * terminar. No manda ningún correo: la identidad nace confirmada, que es lo
- * que `admin.createUser` permite.
+ * Salen de la reserva de socios de prueba (#415): cada papel tiene un correo
+ * fijo (`e2e-<papel>@example.test`), la identidad se crea sólo la primera vez
+ * y no se borra nunca. Lo que distingue a cada papel (estado, rol, foto,
+ * grupos, solicitud) vive en su fila de `members`, que el arranque vuelve a
+ * sembrar desde cero y el cierre deshace. No manda ningún correo: la
+ * identidad nace confirmada, que es lo que `admin.createUser` permite.
+ *
+ * Dos corridas a la vez (dos personas, o los shards de CI) arriendan plazas
+ * distintas de la reserva, y cada plaza tiene sus propios socios: la plaza 0
+ * es `e2e-<papel>@example.test` y la 1, `e2e-<papel>-1@example.test`.
  *
  * Cuando el entorno no tiene credenciales de Supabase (una máquina sin
  * `.env.local`), el estado queda `unavailable` con las variables que faltan, y
@@ -158,16 +169,6 @@ export const RUN_NAMED_MEMBERS = {
 } as const;
 
 export type RunNamedMember = keyof typeof RUN_NAMED_MEMBERS;
-
-/** Ocho caracteres de un UUID: de sobra para que dos corridas no coincidan, y
- * cortos para que el nombre siga cabiendo en su fila. */
-const RUN_ID_LENGTH = 8;
-
-/** El identificador de una corrida. Lo calcula el arranque global una vez y
- * viaja a los tests dentro del estado de la sesión. */
-export function createRunId(): string {
-  return randomUUID().slice(0, RUN_ID_LENGTH);
-}
 
 function runMemberName(member: RunNamedMember, runId: string): string {
   return `${RUN_NAMED_MEMBERS[member]} ${runId}`;
@@ -372,8 +373,11 @@ export type E2eSessionState =
       readonly password: string;
       /** El sufijo de los nombres que siembra esta corrida. */
       readonly runId: string;
-      /** Todas las identidades que abrió el arranque, la activa y las que
-       * están a medias. El cierre las borra sin tener que saber cuál es cuál. */
+      /** La plaza de la reserva que arrendó esta corrida. */
+      readonly poolSlot: number;
+      /** Los socios de la reserva que sembró el arranque, el activo y los que
+       * están a medias. El cierre deshace sus filas sin tener que saber cuál
+       * es cuál, y no borra sus identidades. */
       readonly userIds: readonly string[];
       /** Los grupos que creó el arranque para el socio con grupos. Sobreviven
        * a sus socios, así que el cierre los borra aparte cuando nadie más los
@@ -538,60 +542,56 @@ async function findClubId(serviceClient: SupabaseClient): Promise<string> {
   return data.id as string;
 }
 
-/** Crea una identidad ya confirmada y su fila de socio. Las columnas que
- * distinguen a un socio de otro llegan en `columns`: lo demás es idéntico,
- * porque lo que cambia entre los socios de prueba es qué les falta. */
+/** La reserva de Playwright: sus plazas no se mezclan con las del arnés RLS. */
+const E2E_POOL_NAMESPACE = "e2e";
+
+/** El correo fijo de un papel en una plaza de la reserva. La plaza 0 no lleva
+ * sufijo, que es la que usa una persona corriendo la suite sola. */
+export function e2eMemberEmail(role: string, slot: number): string {
+  return slot === 0
+    ? `e2e-${role}@example.test`
+    : `e2e-${role}-${slot}@example.test`;
+}
+
+type SeedTarget = {
+  readonly pool: TestMemberPool;
+  readonly serviceClient: SupabaseClient;
+  readonly clubId: string;
+  readonly slot: number;
+};
+
+/** El socio de la reserva para ese papel, con su fila sembrada desde cero.
+ * Las columnas que distinguen a un socio de otro llegan en `columns`: lo demás
+ * es idéntico, porque lo que cambia entre los socios de prueba es qué les
+ * falta. Lo que dejó una corrida anterior (una que murió sin cerrar) se
+ * deshace antes. */
 async function seedMember(
-  serviceClient: SupabaseClient,
-  clubId: string,
+  target: SeedTarget,
+  role: string,
   columns: Readonly<Record<string, string | null>>,
 ): Promise<SeededMember> {
-  const email = `e2e-${randomUUID()}@example.test`;
-  const password = randomUUID();
+  const { pool, serviceClient } = target;
+  const member = await pool.provideMember(e2eMemberEmail(role, target.slot));
+  await pool.resetMember(member.id);
 
-  const user = await createConfirmedUser(serviceClient.auth.admin, {
-    email,
-    password,
-    operation: "crear el socio de prueba",
-  });
-
-  // Como mensaje y no como throw: si el insert agota el reintento, el usuario
-  // ya creado se borra igual y no queda huérfano en dev.
   const memberFailure = await describeSupabaseFailure(
     "crear la fila de miembro de prueba",
     () =>
       serviceClient.from(MEMBERS_TABLE).insert({
-        club_id: clubId,
-        user_id: user.id,
+        club_id: target.clubId,
+        user_id: member.id,
         full_name: "Socio de prueba",
-        email,
+        email: member.email,
         ...columns,
       }),
   );
   if (memberFailure !== null) {
-    await deleteTestUser(serviceClient, user.id);
     throw new Error(
       `No se pudo crear la fila de miembro de prueba: ${memberFailure}`,
     );
   }
 
-  return { userId: user.id, email, password };
-}
-
-/** Borra una identidad de prueba. Un fallo aquí se registra y no se lanza:
- * quien llama ya está saliendo por otro error, o está limpiando al final, y
- * ese es el resultado que importa. */
-async function deleteTestUser(
-  serviceClient: SupabaseClient,
-  userId: string,
-): Promise<void> {
-  const failure = await describeSupabaseFailure(
-    "borrar el socio de prueba",
-    () => serviceClient.auth.admin.deleteUser(userId),
-  );
-  if (failure !== null) {
-    console.error(`No se pudo borrar el socio de prueba ${userId}: ${failure}`);
-  }
+  return { userId: member.id, email: member.email, password: member.password };
 }
 
 /** Sube la foto fija a la carpeta del socio y la apunta en su ficha, como
@@ -624,33 +624,8 @@ async function seedProfilePhoto(
   }
 }
 
-/** Vacía la carpeta de fotos de un socio de prueba. La cascada de `members`
- * no llega a Storage, así que sin esto las fotos se quedarían en dev. */
-async function deleteTestPhotos(
-  serviceClient: SupabaseClient,
-  userId: string,
-): Promise<void> {
-  const bucket = serviceClient.storage.from(PHOTOS_BUCKET);
-  const { data, error } = await bucket.list(userId);
-  if (error) {
-    console.error(`No se pudo listar las fotos de ${userId}: ${error.message}`);
-    return;
-  }
-  if (data.length === 0) {
-    return;
-  }
-  const { error: removeError } = await bucket.remove(
-    data.map((file) => `${userId}/${file.name}`),
-  );
-  if (removeError) {
-    console.error(
-      `No se pudo borrar las fotos de ${userId}: ${removeError.message}`,
-    );
-  }
-}
-
 /** La solicitud pendiente con la que nace un socio de Mi cuenta, si lleva
- * una. Se borra con la identidad por las cascadas de 0003 y 0012. */
+ * una. Se va con su fila de socio por la cascada de 0012. */
 async function seedPendingRequest(
   serviceClient: SupabaseClient,
   seed: {
@@ -673,7 +648,6 @@ async function seedPendingRequest(
       }),
   );
   if (failure !== null) {
-    await deleteTestUser(serviceClient, seed.userId);
     throw new Error(
       `No se pudo crear la solicitud de rol de prueba: ${failure}`,
     );
@@ -741,8 +715,8 @@ async function findOrCreateGroup(
 }
 
 /** Mete al socio en los grupos del ejemplo del ticket y devuelve los ids de
- * los que tuvo que crear. La pertenencia se va con la identidad por las
- * cascadas de 0003 y 0015. */
+ * los que tuvo que crear. La pertenencia se va con su fila de socio por la
+ * cascada de 0015. */
 async function seedGroupMemberships(
   serviceClient: SupabaseClient,
   seed: { readonly clubId: string; readonly userId: string },
@@ -862,26 +836,17 @@ async function ensureArchivedE2ePosition(
   return winner;
 }
 
-/** El socio activo y uno por cada estado de completar registro, cada uno con
- * su archivo de cookies. Son cuentas distintas porque el estado vive en la
- * fila: no hay forma de cambiarlo desde el navegador a mitad de una corrida. */
-async function createTestMembers(): Promise<E2eSessionState> {
-  const serviceClient = createServiceRoleClient(process.env);
-  const clubId = await findClubId(serviceClient);
-  const runId = createRunId();
+/** Los papeles que no son ni un socio a medias ni uno de Mi cuenta. */
+const ACTIVE_ROLE = "activo";
+const GROUPED_ROLE = "con-grupos";
 
-  const active = await seedMember(serviceClient, clubId, {
-    account_status: "active",
-  });
-  await writeStorageState(
-    active.email,
-    active.password,
-    E2E_STORAGE_STATE_PATH,
-  );
-
-  const userIds = [active.userId];
+/** Siembra a los socios a medias y apunta sus `userId` en `userIds`. */
+async function seedIncompleteMembers(
+  target: SeedTarget,
+  userIds: string[],
+): Promise<void> {
   for (const name of INCOMPLETE_MEMBER_NAMES) {
-    const member = await seedMember(serviceClient, clubId, {
+    const member = await seedMember(target, name, {
       account_status: "incomplete",
       ...INCOMPLETE_MEMBERS[name],
     });
@@ -892,13 +857,20 @@ async function createTestMembers(): Promise<E2eSessionState> {
       incompleteStorageStatePath(name),
     );
   }
+}
 
+/** Siembra a los socios de Mi cuenta y apunta sus `userId` en `userIds`. */
+async function seedRoleRequestMembers(
+  target: SeedTarget,
+  runId: string,
+  userIds: string[],
+): Promise<void> {
   const archivedPositionId = await ensureArchivedE2ePosition(
-    serviceClient,
-    clubId,
+    target.serviceClient,
+    target.clubId,
   );
   for (const name of ROLE_REQUEST_MEMBER_NAMES) {
-    const member = await seedMember(serviceClient, clubId, {
+    const member = await seedMember(target, name, {
       account_status: "active",
       ...seededRoleRequestColumns(name, runId),
       ...(MEMBERS_WITH_ARCHIVED_POSITION.includes(name)
@@ -906,13 +878,13 @@ async function createTestMembers(): Promise<E2eSessionState> {
         : {}),
     });
     userIds.push(member.userId);
-    await seedPendingRequest(serviceClient, {
-      clubId,
+    await seedPendingRequest(target.serviceClient, {
+      clubId: target.clubId,
       userId: member.userId,
       requestedRole: ROLE_REQUEST_MEMBERS[name].pendingRequest,
     });
     if (MEMBERS_WITH_PHOTO.includes(name)) {
-      await seedProfilePhoto(serviceClient, member.userId);
+      await seedProfilePhoto(target.serviceClient, member.userId);
     }
     await writeStorageState(
       member.email,
@@ -920,29 +892,64 @@ async function createTestMembers(): Promise<E2eSessionState> {
       roleRequestStorageStatePath(name),
     );
   }
+}
 
-  const grouped = await seedMember(serviceClient, clubId, {
-    account_status: "active",
-  });
-  userIds.push(grouped.userId);
-  const createdGroupIds = await seedGroupMemberships(serviceClient, {
-    clubId,
-    userId: grouped.userId,
-  });
-  await writeStorageState(
-    grouped.email,
-    grouped.password,
-    GROUPED_MEMBER_STORAGE_STATE_PATH,
-  );
+/** El socio activo y uno por cada estado de completar registro, cada uno con
+ * su archivo de cookies. Son cuentas distintas porque el estado vive en la
+ * fila: no hay forma de cambiarlo desde el navegador a mitad de una corrida.
+ *
+ * Salen de la plaza de la reserva que arrienda esta corrida. Si la siembra
+ * falla a medias, la plaza se suelta igual: sus filas las deshace la
+ * siguiente corrida que la arriende. */
+async function createTestMembers(): Promise<E2eSessionState> {
+  const serviceClient = createServiceRoleClient(process.env);
+  const clubId = await findClubId(serviceClient);
+  const runId = createRunId();
+  const pool = createSupabaseTestMemberPool(serviceClient, runId);
+  const lease = await pool.leaseSlot(E2E_POOL_NAMESPACE);
+  const target: SeedTarget = { pool, serviceClient, clubId, slot: lease.slot };
 
-  return {
-    kind: "available",
-    email: active.email,
-    password: active.password,
-    runId,
-    userIds,
-    createdGroupIds,
-  };
+  try {
+    const active = await seedMember(target, ACTIVE_ROLE, {
+      account_status: "active",
+    });
+    await writeStorageState(
+      active.email,
+      active.password,
+      E2E_STORAGE_STATE_PATH,
+    );
+
+    const userIds = [active.userId];
+    await seedIncompleteMembers(target, userIds);
+    await seedRoleRequestMembers(target, runId, userIds);
+
+    const grouped = await seedMember(target, GROUPED_ROLE, {
+      account_status: "active",
+    });
+    userIds.push(grouped.userId);
+    const createdGroupIds = await seedGroupMemberships(serviceClient, {
+      clubId,
+      userId: grouped.userId,
+    });
+    await writeStorageState(
+      grouped.email,
+      grouped.password,
+      GROUPED_MEMBER_STORAGE_STATE_PATH,
+    );
+
+    return {
+      kind: "available",
+      email: active.email,
+      password: active.password,
+      runId,
+      poolSlot: lease.slot,
+      userIds,
+      createdGroupIds,
+    };
+  } catch (failure) {
+    await lease.release();
+    throw failure;
+  }
 }
 
 /** Lo llama el arranque global de Playwright, antes de cualquier test. */
@@ -960,29 +967,46 @@ export async function prepareE2eSession(): Promise<void> {
   writeState(await createTestMembers());
 }
 
-/** Borra lo que sembró esta corrida, y sólo eso: va por los `userId` que
+/** Deshace lo que sembró esta corrida, y sólo eso: va por los `userId` que
  * guardó el arranque, así que los socios de otra corrida a la vez siguen en
- * pie aunque se llamen igual. */
-export async function deleteSeededMembers(
+ * pie. Las identidades se quedan (#415): son las de la siguiente corrida que
+ * arriende esta plaza. Un fallo aquí se registra y no se lanza, porque el
+ * resultado que importa es el de los tests. */
+export async function resetSeededMembers(
   serviceClient: SupabaseClient,
   state: Extract<E2eSessionState, { kind: "available" }>,
 ): Promise<void> {
   for (const userId of state.userIds) {
-    await deleteTestPhotos(serviceClient, userId);
-    await deleteTestUser(serviceClient, userId);
+    await logFailure(`deshacer la fila del socio de prueba ${userId}`, () =>
+      resetPooledMember(serviceClient, userId),
+    );
   }
-  // Después de los socios: sus pertenencias se van con ellos, y sólo
+  // Después de los socios: sus pertenencias se van con sus filas, y sólo
   // entonces se sabe qué grupo quedó vacío.
   await deleteEmptyGroups(serviceClient, state.createdGroupIds);
+  await logFailure("soltar la plaza de la reserva", () =>
+    releasePoolSlot(serviceClient, E2E_POOL_NAMESPACE, state.poolSlot),
+  );
 }
 
-/** Lo llama el cierre global de Playwright. Borrar la identidad se lleva por
- * delante su fila de miembro (`on delete cascade`), así que no queda residuo
- * en el proyecto de desarrollo. */
+async function logFailure(
+  operation: string,
+  action: () => Promise<void>,
+): Promise<void> {
+  try {
+    await action();
+  } catch (failure) {
+    const message =
+      failure instanceof Error ? failure.message : String(failure);
+    console.error(`No se pudo ${operation}: ${message}`);
+  }
+}
+
+/** Lo llama el cierre global de Playwright. */
 export async function discardE2eSession(): Promise<void> {
   const state = readE2eSessionState();
   if (state.kind === "available") {
-    await deleteSeededMembers(createServiceRoleClient(process.env), state);
+    await resetSeededMembers(createServiceRoleClient(process.env), state);
   }
   rmSync(STATE_PATH, { force: true });
   for (const statePath of everyStorageStatePath()) {

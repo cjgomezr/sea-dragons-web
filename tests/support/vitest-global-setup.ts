@@ -1,4 +1,4 @@
-import { describeSkippedIntegrationTests } from "./test-selection";
+import { describeSkippedIntegrationTests } from "./test-selection.mts";
 
 /** Avisa una sola vez por corrida, y no en cada archivo, de que los tests de
  * integración no corrieron. */

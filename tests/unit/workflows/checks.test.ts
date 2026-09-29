@@ -6,7 +6,7 @@ import {
   readEnvironmentManifest,
   variablesFromSource,
 } from "../../../scripts/lib/entornos-manifest";
-import { RUN_INTEGRATION_TESTS_ENV } from "../../support/test-selection";
+import { RUN_INTEGRATION_TESTS_ENV } from "../../support/test-selection.mts";
 
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const WORKFLOW_PATH = path.join(REPO_ROOT, ".github/workflows/checks.yml");

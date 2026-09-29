@@ -4,7 +4,7 @@ import {
   INTEGRATION_TEST_PATTERNS,
   RUN_INTEGRATION_TESTS_ENV,
   selectExcludedTests,
-} from "../../support/test-selection";
+} from "../../support/test-selection.mts";
 
 describe("la selección de tests de Vitest", () => {
   it("excluye los de integración y los de RLS cuando la variable no está", () => {
