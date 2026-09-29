@@ -184,6 +184,7 @@ columna team_splits.created_by tipo=uuid null=YES default=-
 columna team_splits.event_id tipo=uuid null=NO default=-
 columna team_splits.id tipo=uuid null=NO default=gen_random_uuid()
 columna team_splits.mode tipo=text null=NO default=-
+columna team_splits.published_assignments tipo=jsonb null=NO default='[]'::jsonb
 columna team_splits.published_at tipo=timestamp with time zone null=YES default=-
 columna team_splits.team_a_color tipo=text null=NO default=-
 columna team_splits.team_a_name tipo=text null=NO default=-
@@ -215,6 +216,7 @@ funcion lock_evaluation_categories(acting_club_id uuid)
 funcion members_sync_position_id()
 funcion news_post_attachments_enforce_max()
 funcion prune_member_notifications(recipient_user_ids uuid[])
+funcion publish_team_split(acting_club_id uuid, target_event_id uuid)
 funcion refresh_member_evaluation(acting_club_id uuid, target_user_id uuid)
 funcion rename_club_position(acting_club_id uuid, target_position_id uuid, name_en text, name_es text)
 funcion rename_evaluation_category(acting_club_id uuid, target_category_id uuid, category_name text)
@@ -222,6 +224,7 @@ funcion reorder_club_positions(acting_club_id uuid, ordered_ids uuid[])
 funcion reorder_evaluation_categories(acting_club_id uuid, ordered_ids uuid[])
 funcion save_attendance_sheet(acting_club_id uuid, acting_user_id uuid, target_event_id uuid, records jsonb)
 funcion save_member_evaluation_ratings(acting_club_id uuid, target_user_id uuid, expected_updated_at timestamp with time zone, ratings jsonb)
+funcion save_team_split(acting_club_id uuid, acting_user_id uuid, target_event_id uuid, split jsonb)
 funcion seed_default_evaluation_categories(target_club_id uuid)
 funcion set_club_position_archived(acting_club_id uuid, target_position_id uuid, archived boolean)
 funcion set_evaluation_category_active(acting_club_id uuid, target_category_id uuid, active boolean)
@@ -908,7 +911,7 @@ restriccion notifications.notifications_club_id_fkey FOREIGN KEY (club_id) REFER
 restriccion notifications.notifications_data_is_object CHECK ((jsonb_typeof(data) = 'object'::text))
 restriccion notifications.notifications_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
 restriccion notifications.notifications_pkey PRIMARY KEY (id)
-restriccion notifications.notifications_type_check CHECK ((type = ANY (ARRAY['role_changed'::text, 'role_request_rejected'::text, 'role_request_received'::text, 'news_post_published'::text, 'event_created'::text, 'event_series_created'::text, 'event_changed'::text, 'event_cancelled'::text, 'event_series_changed'::text, 'event_series_cancelled'::text])))
+restriccion notifications.notifications_type_check CHECK ((type = ANY (ARRAY['role_changed'::text, 'role_request_rejected'::text, 'role_request_received'::text, 'news_post_published'::text, 'event_created'::text, 'event_series_created'::text, 'event_changed'::text, 'event_cancelled'::text, 'event_series_changed'::text, 'event_series_cancelled'::text, 'team_assigned'::text, 'team_unassigned'::text])))
 restriccion password_recovery_requests.password_recovery_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion password_recovery_requests.password_recovery_requests_pkey PRIMARY KEY (id)
 restriccion registration_requests.registration_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
