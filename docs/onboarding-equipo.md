@@ -78,23 +78,21 @@ La aplicación y buena parte de las pruebas hablan con Supabase de verdad. Para
 eso necesitas un archivo `.env.local` en la raíz del repositorio. **No está en
 git y nunca debe estarlo.**
 
-Crea el archivo con estas cinco variables:
+Crea el archivo con estas tres variables:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
-RESEND_API_KEY=...
-EMAIL_FROM=...
 ```
 
-**De dónde sale cada una:**
+Las tres salen del panel de `seadragons-dev`, en **Settings → API**. La URL y
+la clave `anon` están a la vista. La `service_role` está más abajo, oculta tras
+un botón de revelar.
 
-- Las tres de Supabase, del panel de `seadragons-dev`, en **Settings → API**.
-  La URL y la clave `anon` están a la vista. La `service_role` está más abajo,
-  oculta tras un botón de revelar.
-- Las dos de Resend te las pasa quien lleva el proyecto. Resend es lo que manda
-  los correos de la aplicación.
+Las variables de Resend, el servicio que manda los correos, no hacen falta en
+tu máquina. Sin ellas la aplicación dice que el envío de correos no está
+disponible y sigue funcionando, y las pruebas no las usan.
 
 **Tres reglas con esto:**
 
@@ -114,8 +112,12 @@ Corre esto en orden. Si algo falla, no sigas: mira la tabla del final.
 ```bash
 npm run lint        # sin avisos
 npm run typecheck   # sin errores
-npm test            # unas 3.000 pruebas, unos 4 minutos
+npm test            # unas 5.000 pruebas, unos 10 minutos
 ```
+
+`npm test` se salta las pruebas de integración y de RLS, las que hablan con
+`seadragons-dev`, y lo dice en una línea al empezar. Las corre CI en cada pull
+request. Para correrlas en tu máquina: `RUN_INTEGRATION_TESTS=1 npm test`.
 
 Después, levanta la aplicación:
 
