@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 import type { Role } from "@/lib/auth/roles";
+import { listBuildableEvents } from "@/lib/teams/buildable-events";
 import { openMyTeam } from "@/lib/teams/my-team";
 import {
   createMyTeamGateways,
@@ -337,6 +338,57 @@ describeRls("el team builder en Supabase", () => {
             metadata: { assignedCount: 2 },
           },
         ]);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "lista los entrenamientos del club por armar, sin las reuniones ni los cancelados",
+    async () => {
+      await withSquad(async (squad) => {
+        const { data: training } = await squad.serviceClient.client
+          .from("events")
+          .select("starts_on")
+          .eq("id", squad.eventId)
+          .single();
+        const sameDay = {
+          club_id: squad.clubId,
+          starts_on: training?.starts_on,
+          start_time: "18:00",
+          location: "MSAC",
+          audience: "all",
+          author_id: squad.coach.id,
+        };
+        await withSeededRows(
+          squad.serviceClient,
+          "events",
+          [
+            { ...sameDay, title: "Reunión", event_type: "meeting" },
+            {
+              ...sameDay,
+              title: "Cancelado",
+              event_type: "competition",
+              status: "cancelled",
+            },
+          ],
+          async () => {
+            const { events } = await listBuildableEvents(
+              createTeamBuilderGateways(squad.serviceClient.client),
+              { callerId: squad.coach.id, now: new Date() },
+            );
+
+            expect(events).toEqual([
+              {
+                id: squad.eventId,
+                title: "Scrimmage para armar",
+                eventType: "training",
+                startsOn: training?.starts_on,
+                startTime: "10:00",
+              },
+            ]);
+          },
+        );
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,

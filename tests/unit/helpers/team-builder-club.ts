@@ -7,12 +7,13 @@ import type {
   NotificationInsert,
 } from "@/lib/notifications/notify-member";
 import type { PositionCoverage } from "@/lib/teams/squad";
-import type {
-  NewTeamSplit,
-  StoredTeamSplit,
-  TeamAssignment,
-  TeamBuilderEvent,
-  TeamBuilderGateways,
+import {
+  BUILDABLE_EVENT_TYPES,
+  type NewTeamSplit,
+  type StoredTeamSplit,
+  type TeamAssignment,
+  type TeamBuilderEvent,
+  type TeamBuilderGateways,
 } from "@/lib/teams/team-builder";
 import type { MyTeamGateways } from "@/lib/teams/my-team";
 import { SEEDED_POSITIONS } from "./seeded-positions";
@@ -144,6 +145,28 @@ export function fakeTeamsClub(
     findEvent: async ({ clubId, eventId }) =>
       events.find((event) => event.id === eventId && event.clubId === clubId) ??
       null,
+    findBuildableEvents: async ({ clubId, today, limit }) =>
+      events
+        .filter(
+          (event) =>
+            event.clubId === clubId &&
+            BUILDABLE_EVENT_TYPES.includes(event.eventType) &&
+            event.status === "scheduled" &&
+            event.startsOn >= today,
+        )
+        .sort((first, second) =>
+          `${first.startsOn}T${first.startTime}`.localeCompare(
+            `${second.startsOn}T${second.startTime}`,
+          ),
+        )
+        .slice(0, limit)
+        .map(({ id, title, eventType, startsOn, startTime }) => ({
+          id,
+          title,
+          eventType,
+          startsOn,
+          startTime,
+        })),
     findLiveResponses: async () =>
       players.flatMap((player) =>
         player.response === "yes" || player.response === "maybe"

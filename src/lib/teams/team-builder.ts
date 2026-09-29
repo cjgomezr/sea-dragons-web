@@ -60,7 +60,10 @@ export const DEFAULT_TEAM_LABELS: TeamLabels = {
 };
 
 /** Sólo los entrenamientos y las competiciones se arman (D2). */
-const BUILDABLE_EVENT_TYPES: readonly EventType[] = ["training", "competition"];
+export const BUILDABLE_EVENT_TYPES: readonly EventType[] = [
+  "training",
+  "competition",
+];
 
 /** Lo que hace falta de un evento para decidir si se arma y para avisar. */
 export type TeamBuilderEvent = {
@@ -74,6 +77,12 @@ export type TeamBuilderEvent = {
   readonly startTime: string;
   readonly audience: EventAudience;
 };
+
+/** Lo que hace falta de un evento para nombrarlo en el builder. */
+export type TeamBuilderEventSummary = Pick<
+  TeamBuilderEvent,
+  "id" | "title" | "eventType" | "startsOn" | "startTime"
+>;
 
 /** Una respuesta que cuenta: de la audiencia activa y a un evento vivo. */
 export type SquadResponse = {
@@ -139,6 +148,14 @@ export type TeamSplitsGateway = {
     readonly clubId: string;
     readonly eventId: string;
   }): Promise<TeamBuilderEvent | null>;
+  /** Los entrenamientos y competiciones no cancelados del club desde `today`
+   * (`YYYY-MM-DD` de Melbourne), del más cercano al más lejano, hasta
+   * `limit`. */
+  findBuildableEvents(query: {
+    readonly clubId: string;
+    readonly today: string;
+    readonly limit: number;
+  }): Promise<readonly TeamBuilderEventSummary[]>;
   findLiveResponses(eventId: string): Promise<readonly SquadResponse[]>;
   /** Los miembros del club con esos ids, con su posición y sus notas, en
    * una consulta (NFR del PRD: nada de una por jugador). */
@@ -191,10 +208,7 @@ export type BuilderSplit = {
 };
 
 export type TeamBuilder = {
-  readonly event: Pick<
-    TeamBuilderEvent,
-    "id" | "title" | "eventType" | "startsOn" | "startTime"
-  >;
+  readonly event: TeamBuilderEventSummary;
   /** Los del reparto guardado, o los de por defecto si no hay. */
   readonly teams: TeamLabels;
   readonly available: readonly SquadEntry[];

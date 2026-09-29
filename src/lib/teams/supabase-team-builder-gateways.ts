@@ -11,6 +11,7 @@ import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type { MyTeamGateways } from "./my-team";
 import {
+  BUILDABLE_EVENT_TYPES,
   TEAM_IDS,
   TEAM_SPLIT_MODES,
   type NewTeamSplit,
@@ -18,6 +19,7 @@ import {
   type SquadResponse,
   type StoredTeamSplit,
   type TeamBuilderEvent,
+  type TeamBuilderEventSummary,
   type TeamBuilderGateways,
   type TeamSplitPublication,
   type TeamSplitSaveOutcome,
@@ -180,6 +182,49 @@ async function findEvent(
   return data === null ? null : toEvent(eventRowSchema.parse(data));
 }
 
+const buildableEventRowsSchema = z.array(
+  eventRowSchema.pick({
+    id: true,
+    event_type: true,
+    title: true,
+    starts_on: true,
+    start_time: true,
+  }),
+);
+
+async function findBuildableEvents(
+  serviceClient: SupabaseClient,
+  query: {
+    readonly clubId: string;
+    readonly today: string;
+    readonly limit: number;
+  },
+): Promise<readonly TeamBuilderEventSummary[]> {
+  const { data, error } = await serviceClient
+    .from(EVENTS_TABLE)
+    .select("id, event_type, title, starts_on, start_time")
+    .eq("club_id", query.clubId)
+    .eq("status", "scheduled")
+    .in("event_type", BUILDABLE_EVENT_TYPES)
+    .gte("starts_on", query.today)
+    .order("starts_on")
+    .order("start_time")
+    .order("id")
+    .limit(query.limit);
+  if (error) {
+    throw new Error(
+      `No se pudieron leer los eventos armables del club ${query.clubId}: ${error.message}`,
+    );
+  }
+  return buildableEventRowsSchema.parse(data).map((row) => ({
+    id: row.id,
+    eventType: row.event_type,
+    title: row.title,
+    startsOn: row.starts_on,
+    startTime: toHoursAndMinutes(row.start_time),
+  }));
+}
+
 async function findLiveResponses(
   serviceClient: SupabaseClient,
   eventId: string,
@@ -320,6 +365,7 @@ function createTeamSplitsGateway(
 ): TeamSplitsGateway {
   return {
     findEvent: (query) => findEvent(serviceClient, query),
+    findBuildableEvents: (query) => findBuildableEvents(serviceClient, query),
     findLiveResponses: (eventId) => findLiveResponses(serviceClient, eventId),
     findPlayers: (query) => findPlayers(serviceClient, query),
     findSplit: (eventId) => findSplit(serviceClient, eventId),

@@ -328,7 +328,8 @@ export const ATTENDANCE_SHEET_API_PATH = `${ATTENDANCE_API_PATH}/[eventId]`;
 /** El team builder (#401, RF-3 a RF-7 del PRD de E10). Todo lo que cuelga
  * de este camino es de Admin y Coach (`buildTeamsAndTrackAttendance`): un
  * Committee o un Player no leen ni escriben ningún reparto, ni ven un OVR
- * (FR-055). El handler lo vuelve a comprobar. */
+ * (FR-055). El handler lo vuelve a comprobar. GET, en la raíz, lista los
+ * eventos que se pueden armar (#402). */
 export const TEAMS_API_PATH = "/api/v1/teams";
 
 /** La escuadra y el reparto de un evento: GET los abre y PUT guarda el
