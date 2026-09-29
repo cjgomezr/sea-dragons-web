@@ -829,6 +829,10 @@ button.notification-item-content:hover {
 
   .app-main {
     max-width: none;
+    /* Es un elemento flex: sin esto su ancho mínimo es el de su contenido, y
+       un select o una palabra larga de cualquier pantalla empujan la página
+       más allá de la ventana (#402). */
+    min-width: 0;
     padding-bottom: var(--space-8);
     margin: 0;
   }
@@ -4869,6 +4873,7 @@ a.agenda-take-attendance {
 }
 
 .team-event-picker select {
+  width: 100%;
   max-width: 100%;
   min-height: var(--touch-target-min);
   padding: 0 var(--space-3);
@@ -5158,6 +5163,14 @@ a.agenda-take-attendance {
     flex-direction: row;
     align-items: flex-end;
     justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  /* El selector crece y, si el modo y el botón de balancear no caben a su
+     lado, bajan de línea: sin esto el ancho intrínseco del select empujaba
+     la página más allá de la ventana a 768px. */
+  .team-event-picker {
+    flex: 1 1 16rem;
   }
 
   .team-mode button,

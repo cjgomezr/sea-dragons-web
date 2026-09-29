@@ -354,6 +354,7 @@ describeRls("el team builder en Supabase", () => {
           .single();
         const sameDay = {
           club_id: squad.clubId,
+          status: "scheduled",
           starts_on: training?.starts_on,
           start_time: "18:00",
           location: "MSAC",
@@ -370,6 +371,7 @@ describeRls("el team builder en Supabase", () => {
               title: "Cancelado",
               event_type: "competition",
               status: "cancelled",
+              cancelled_at: new Date().toISOString(),
             },
           ],
           async () => {
