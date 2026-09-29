@@ -123,7 +123,9 @@ function liveSlots(
 /** La clave con la que una sola corrida gana el derecho a recuperar un
  * arrendamiento caducado. Lleva la fecha del caducado, así que no vuelve a
  * servir para el siguiente: se queda como rastro, y ocupa un objeto por
- * corrida que murió. */
+ * corrida que murió. Si una corrida muere justo después de ganarla, esa
+ * plaza queda apartada para siempre; las demás absorben el hueco, y se
+ * recupera borrando su marca del bucket a mano. */
 function reclaimKey(key: string, staleLeasedAt: string): string {
   return `reclaims/${key}@${new Date(staleLeasedAt).getTime()}`;
 }
