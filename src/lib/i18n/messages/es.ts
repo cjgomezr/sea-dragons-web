@@ -693,6 +693,10 @@ export const spanishMessages: MessageCatalog = {
   "notifications.event_series_cancelled.title": "Serie cancelada",
   "notifications.event_series_cancelled.body":
     "{title}: {weekdays}, {time}, de hoy en adelante",
+  "notifications.team_assigned.title": "Juegas en {team}",
+  "notifications.team_assigned.body": "{title}: {moment}",
+  "notifications.team_unassigned.title": "Ya no estás en ningún equipo",
+  "notifications.team_unassigned.body": "{title}: {moment}",
   "event.type.training": "Entrenamiento",
   "event.type.competition": "Competición",
   "event.type.meeting": "Reunión",

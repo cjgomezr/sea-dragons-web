@@ -116,6 +116,18 @@ const eventSeriesCancelledData = z.object({
   startTime: clockTime,
 });
 
+const teamUnassignedData = z.object({
+  eventId: z.uuid(),
+  title: z.string().min(1),
+  startsOn: z.iso.date(),
+  startTime: clockTime,
+});
+
+const teamAssignedData = teamUnassignedData.extend({
+  teamName: z.string().min(1),
+  teamColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+});
+
 /** Un `Record` sobre el catálogo: un tipo nuevo no compila hasta tener texto. */
 const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
   {
@@ -278,6 +290,44 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         }),
       };
     },
+    team_assigned: (translate, data) => {
+      const parsed = teamAssignedData.safeParse(data);
+      if (!parsed.success) {
+        return null;
+      }
+      const assignment = parsed.data;
+      return {
+        title: translate("notifications.team_assigned.title", {
+          team: assignment.teamName,
+        }),
+        body: translate("notifications.team_assigned.body", {
+          title: assignment.title,
+          moment: formatCalendarDayAt(
+            translate.locale,
+            assignment.startsOn,
+            assignment.startTime,
+          ),
+        }),
+      };
+    },
+    team_unassigned: (translate, data) => {
+      const parsed = teamUnassignedData.safeParse(data);
+      if (!parsed.success) {
+        return null;
+      }
+      const event = parsed.data;
+      return {
+        title: translate("notifications.team_unassigned.title"),
+        body: translate("notifications.team_unassigned.body", {
+          title: event.title,
+          moment: formatCalendarDayAt(
+            translate.locale,
+            event.startsOn,
+            event.startTime,
+          ),
+        }),
+      };
+    },
   };
 
 function isKnownType(type: string): type is NotificationType {
@@ -317,6 +367,11 @@ const DESTINATION_BY_TYPE: Readonly<Record<NotificationType, DestinationOf>> = {
     eventSeriesChangedData.safeParse(data).success ? CALENDAR_PATH : null,
   event_series_cancelled: (data) =>
     eventSeriesCancelledData.safeParse(data).success ? CALENDAR_PATH : null,
+  // #401: al calendario, donde el evento enseña el equipo (#403).
+  team_assigned: (data) =>
+    teamAssignedData.safeParse(data).success ? CALENDAR_PATH : null,
+  team_unassigned: (data) =>
+    teamUnassignedData.safeParse(data).success ? CALENDAR_PATH : null,
 };
 
 /** `null` para un tipo que esta pantalla no reconoce, o para unos datos que

@@ -67,6 +67,20 @@ const DATA_FOR_EVERY_TYPE = {
     weekdays: [2, 4],
     startTime: "19:00",
   },
+  team_assigned: {
+    eventId: "e1e1e1e1-0000-4000-8000-00000000000e",
+    title: "Scrimmage",
+    startsOn: "2027-07-10",
+    startTime: "10:00",
+    teamName: "Team Kelp",
+    teamColor: "#1C6EA4",
+  },
+  team_unassigned: {
+    eventId: "e1e1e1e1-0000-4000-8000-00000000000e",
+    title: "Scrimmage",
+    startsOn: "2027-07-10",
+    startTime: "10:00",
+  },
 } as const;
 
 describe("textos de los avisos", () => {
@@ -337,7 +351,7 @@ describe("texto de los avisos de evento", () => {
   });
 });
 
-describe("texto de los avisos de cambio y cancelación", () => {
+describe("texto de los avisos de cambio, cancelación y equipos", () => {
   const cases = [
     {
       type: "event_changed",
@@ -381,6 +395,28 @@ describe("texto de los avisos de cambio y cancelación", () => {
       es: {
         title: "Serie cancelada",
         body: "Entrenamiento: martes y jueves, 19:00, de hoy en adelante",
+      },
+    },
+    {
+      type: "team_assigned",
+      en: {
+        title: "You're playing in Team Kelp",
+        body: "Scrimmage: 10 July 2027 at 10:00 am",
+      },
+      es: {
+        title: "Juegas en Team Kelp",
+        body: "Scrimmage: 10 de julio de 2027, 10:00",
+      },
+    },
+    {
+      type: "team_unassigned",
+      en: {
+        title: "You're no longer in a team",
+        body: "Scrimmage: 10 July 2027 at 10:00 am",
+      },
+      es: {
+        title: "Ya no estás en ningún equipo",
+        body: "Scrimmage: 10 de julio de 2027, 10:00",
       },
     },
   ] as const;
