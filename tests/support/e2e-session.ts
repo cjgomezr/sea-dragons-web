@@ -19,7 +19,11 @@ import {
   resetPooledMember,
 } from "./supabase-test-member-pool";
 import { describeSupabaseFailure, withSupabaseRetry } from "./supabase-retry";
-import { createRunId, type TestMemberPool } from "./test-member-pool";
+import {
+  createRunId,
+  describeFailure,
+  type TestMemberPool,
+} from "./test-member-pool";
 
 export { createRunId };
 
@@ -899,8 +903,7 @@ async function seedRoleRequestMembers(
  * fila: no hay forma de cambiarlo desde el navegador a mitad de una corrida.
  *
  * Salen de la plaza de la reserva que arrienda esta corrida. Si la siembra
- * falla a medias, la plaza se suelta igual: sus filas las deshace la
- * siguiente corrida que la arriende. */
+ * falla a medias, deshace las filas que ya sembró y suelta la plaza. */
 async function createTestMembers(): Promise<E2eSessionState> {
   const serviceClient = createServiceRoleClient(process.env);
   const clubId = await findClubId(serviceClient);
@@ -909,6 +912,7 @@ async function createTestMembers(): Promise<E2eSessionState> {
   const lease = await pool.leaseSlot(E2E_POOL_NAMESPACE);
   const target: SeedTarget = { pool, serviceClient, clubId, slot: lease.slot };
 
+  const userIds: string[] = [];
   try {
     const active = await seedMember(target, ACTIVE_ROLE, {
       account_status: "active",
@@ -919,7 +923,7 @@ async function createTestMembers(): Promise<E2eSessionState> {
       E2E_STORAGE_STATE_PATH,
     );
 
-    const userIds = [active.userId];
+    userIds.push(active.userId);
     await seedIncompleteMembers(target, userIds);
     await seedRoleRequestMembers(target, runId, userIds);
 
@@ -947,6 +951,13 @@ async function createTestMembers(): Promise<E2eSessionState> {
       createdGroupIds,
     };
   } catch (failure) {
+    // Los grupos que llegara a crear se quedan: sólo se crean al final, y
+    // otra corrida los reutiliza por nombre en vez de duplicarlos.
+    for (const userId of userIds) {
+      await logFailure(`deshacer la fila del socio de prueba ${userId}`, () =>
+        pool.resetMember(userId),
+      );
+    }
     await lease.release();
     throw failure;
   }
@@ -993,12 +1004,9 @@ async function logFailure(
   operation: string,
   action: () => Promise<void>,
 ): Promise<void> {
-  try {
-    await action();
-  } catch (failure) {
-    const message =
-      failure instanceof Error ? failure.message : String(failure);
-    console.error(`No se pudo ${operation}: ${message}`);
+  const failure = await describeFailure(action);
+  if (failure !== null) {
+    console.error(`No se pudo ${operation}: ${failure}`);
   }
 }
 

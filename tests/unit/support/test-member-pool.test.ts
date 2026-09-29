@@ -59,7 +59,7 @@ function fakeIdentityDirectory(
       users.set(email, id);
       return id;
     }),
-    setPassword: vi.fn(async () => undefined),
+    setPassword: vi.fn(async () => true),
   };
 }
 
@@ -307,5 +307,47 @@ describe("withPooledMember", () => {
 
     expect(seen).toBe("rls-1@example.test");
     expect(leases.held.has("rls/0")).toBe(true);
+  });
+});
+
+describe("la reserva ante corridas que murieron o identidades que ya no están", () => {
+  it("no da la misma plaza caducada a dos corridas que la recuperan a la vez", async () => {
+    const leases = fakeLeaseStore({
+      "rls/0": { runId: "muerta", leasedAt: TWO_HOURS_AGO.toISOString() },
+    });
+    // La segunda corrida listó antes de que la primera recuperara la plaza:
+    // todavía la ve caducada.
+    const staleListing = await leases.list("rls");
+    const firstRun = poolFor({ leases, runId: "corrida1" });
+    const secondRun = poolFor({
+      leases: { ...leases, list: async () => staleListing },
+      runId: "corrida2",
+    });
+
+    const first = await firstRun.leaseSlot("rls");
+    const second = await secondRun.leaseSlot("rls");
+
+    expect(second.slot).not.toBe(first.slot);
+    expect(leases.held.get(`rls/${first.slot}`)?.runId).toBe("corrida1");
+  });
+
+  it("vuelve a crear la identidad cuando la apuntada ya no existe en Auth", async () => {
+    const identities = fakeIdentityDirectory({
+      "rls-0@example.test": "borrada",
+    });
+    const pool = poolFor({
+      identities: {
+        ...identities,
+        setPassword: async (userId) => userId !== "borrada",
+      },
+    });
+
+    const member = await pool.provideMember("rls-0@example.test");
+
+    expect(member.id).not.toBe("borrada");
+    expect(identities.createUser).toHaveBeenCalledWith(
+      "rls-0@example.test",
+      "contraseña-nueva",
+    );
   });
 });

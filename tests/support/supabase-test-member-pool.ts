@@ -38,6 +38,8 @@ const JSON_CONTENT_TYPE = "application/json";
 /** Storage contesta "ya existe" y "no existe" con estos `statusCode`. */
 const ALREADY_EXISTS_STATUS_CODE = "409";
 const NOT_FOUND_STATUS_CODE = "404";
+/** Lo que contesta Auth al tocar una identidad que ya no existe. */
+const AUTH_NOT_FOUND_STATUS = 404;
 /** Más plazas de las que una reserva llega a tener, para listar de una vez. */
 const LEASE_LIST_LIMIT = 1_000;
 
@@ -183,16 +185,23 @@ function createAuthIdentityDirectory(
     knownIds.set(email, userId);
   }
 
-  async function setPassword(userId: string, password: string): Promise<void> {
+  async function setPassword(
+    userId: string,
+    password: string,
+  ): Promise<boolean> {
     const { error } = await withSupabaseRetry(
       "cambiar la contraseña del socio de prueba",
       () => client.auth.admin.updateUserById(userId, { password }),
     );
+    if (error?.status === AUTH_NOT_FOUND_STATUS) {
+      return false;
+    }
     if (error) {
       throw new Error(
         `No se pudo cambiar la contraseña del socio de prueba ${userId}: ${error.message}`,
       );
     }
+    return true;
   }
 
   async function readRegistry(email: string): Promise<string | null> {
@@ -225,7 +234,9 @@ function createAuthIdentityDirectory(
     if (existing === null) {
       throw creationFailure;
     }
-    await setPassword(existing.id, password);
+    if (!(await setPassword(existing.id, password))) {
+      throw creationFailure;
+    }
     await register(email, existing.id);
     return existing.id;
   }

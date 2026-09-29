@@ -62,7 +62,9 @@ export type LeaseStore = {
 export type IdentityDirectory = {
   readonly findUserId: (email: string) => Promise<string | null>;
   readonly createUser: (email: string, password: string) => Promise<string>;
-  readonly setPassword: (userId: string, password: string) => Promise<void>;
+  /** `false` si la identidad ya no existe en Auth: alguien la borró de dev
+   * y el registro de la reserva se quedó apuntando a ella. */
+  readonly setPassword: (userId: string, password: string) => Promise<boolean>;
 };
 
 export type PooledMember = {
@@ -118,13 +120,33 @@ function liveSlots(
   );
 }
 
+/** La clave con la que una sola corrida gana el derecho a recuperar un
+ * arrendamiento caducado. Lleva la fecha del caducado, así que no vuelve a
+ * servir para el siguiente: se queda como rastro, y ocupa un objeto por
+ * corrida que murió. */
+function reclaimKey(key: string, staleLeasedAt: string): string {
+  return `reclaims/${key}@${new Date(staleLeasedAt).getTime()}`;
+}
+
+/** Recuperar un arrendamiento caducado es borrarlo y volver a darlo de alta,
+ * y el borrado no es atómico: otra corrida que también lo vio caducado podría
+ * borrar el que esta acaba de crear. Por eso antes se gana, con otra alta
+ * atómica, el derecho a recuperarlo; quien la pierde pasa a la siguiente. */
 async function claimSlot(
   deps: TestMemberPoolDependencies,
   key: string,
-  staleKeys: ReadonlySet<string>,
+  staleLeases: ReadonlyMap<string, string>,
 ): Promise<boolean> {
   const lease = { runId: deps.runId, leasedAt: deps.now().toISOString() };
-  if (staleKeys.has(key)) {
+  const staleLeasedAt = staleLeases.get(key);
+  if (staleLeasedAt !== undefined) {
+    const mayReclaim = await deps.leases.claim(
+      reclaimKey(key, staleLeasedAt),
+      lease,
+    );
+    if (!mayReclaim) {
+      return false;
+    }
     await deps.leases.release(key);
   }
   return deps.leases.claim(key, lease);
@@ -137,16 +159,16 @@ async function leaseSlot(
   const listed = await deps.leases.list(namespace);
   const now = deps.now();
   const taken = liveSlots(namespace, listed, now);
-  const staleKeys = new Set(
+  const staleLeases = new Map(
     listed
       .filter((lease) => isStale(lease.leasedAt, now))
-      .map((lease) => lease.key),
+      .map((lease) => [lease.key, lease.leasedAt]),
   );
   for (let slot = 0; slot < MAX_SLOTS; slot += 1) {
     const key = slotKey(namespace, slot);
     // Una plaza que la lista daba por libre puede habérsela llevado otra
     // corrida entre la lista y el alta: el alta falla y se prueba la siguiente.
-    if (!taken.has(slot) && (await claimSlot(deps, key, staleKeys))) {
+    if (!taken.has(slot) && (await claimSlot(deps, key, staleLeases))) {
       return { slot, release: () => deps.leases.release(key) };
     }
   }
@@ -161,12 +183,14 @@ async function provideMember(
 ): Promise<PooledMember> {
   const password = deps.createPassword();
   const existingId = await deps.identities.findUserId(email);
-  if (existingId === null) {
-    const id = await deps.identities.createUser(email, password);
-    return { id, email, password };
+  if (
+    existingId !== null &&
+    (await deps.identities.setPassword(existingId, password))
+  ) {
+    return { id: existingId, email, password };
   }
-  await deps.identities.setPassword(existingId, password);
-  return { id: existingId, email, password };
+  const id = await deps.identities.createUser(email, password);
+  return { id, email, password };
 }
 
 export function createTestMemberPool(
@@ -188,7 +212,7 @@ function describeError(thrown: unknown): string {
   return thrown instanceof Error ? thrown.message : String(thrown);
 }
 
-async function describeFailure(
+export async function describeFailure(
   action: () => Promise<void>,
 ): Promise<string | null> {
   try {
