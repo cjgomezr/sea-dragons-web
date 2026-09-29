@@ -22,6 +22,13 @@ import {
   UNRATED_PLAYER_RATING,
 } from "./squad";
 import { suggestSwap } from "./swap-suggestion";
+import {
+  TEAM_IDS,
+  type TeamAssignment,
+  type TeamId,
+  type TeamLabels,
+  type TeamSplitMode,
+} from "./team-ids";
 import { type SplitTotals, calculateSplitTotals } from "./team-totals";
 
 /**
@@ -40,17 +47,15 @@ import { type SplitTotals, calculateSplitTotals } from "./team-totals";
  * 5,0 virtual y la marca de no evaluado (FR-086).
  */
 
-export const TEAM_IDS = ["a", "b"] as const;
-
-export type TeamId = (typeof TEAM_IDS)[number];
-
-export const TEAM_SPLIT_MODES = ["manual", "auto"] as const;
-
-export type TeamSplitMode = (typeof TEAM_SPLIT_MODES)[number];
-
-export type TeamLabel = { readonly name: string; readonly color: string };
-
-export type TeamLabels = { readonly [Team in TeamId]: TeamLabel };
+export {
+  TEAM_IDS,
+  TEAM_SPLIT_MODES,
+  type TeamAssignment,
+  type TeamId,
+  type TeamLabel,
+  type TeamLabels,
+  type TeamSplitMode,
+} from "./team-ids";
 
 /** D5: "Team Kelp" azul y "Team Tide" amarillo, los del mockup, con los
  * colores de acento y de aviso de `design-system.md`. */
@@ -98,11 +103,6 @@ export type PlayerRecord = {
   readonly coverage: PositionCoverage | null;
   /** `null` sin evaluación; una lista vacía es una evaluación sin notas. */
   readonly ratings: readonly number[] | null;
-};
-
-export type TeamAssignment = {
-  readonly userId: string;
-  readonly team: TeamId;
 };
 
 export type StoredTeamSplit = {

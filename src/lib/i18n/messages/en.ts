@@ -1311,4 +1311,92 @@ export const englishMessages = {
   "attendance.error.forbidden": "Only Admins and Coaches take attendance.",
   "attendance.error.unexpected": "Something went wrong. Try again.",
   "calendar.takeAttendance": "Take attendance",
+  "teams.metaTitle": "Teams · {club}",
+  "teams.eyebrow": "Team builder",
+  "teams.lead":
+    "Auto-balance splits the squad by overall score and checks position coverage, so both teams field a keeper, defenders and forwards of similar strength.",
+  "teams.title": "{day} · {title}",
+  "teams.loading": "Loading the events…",
+  "teams.loadingSquad": "Loading the squad…",
+  "teams.retry": "Try again",
+  "teams.noEvents":
+    "There are no trainings or competitions coming up to build teams for.",
+  "teams.toCalendar": "Go to the calendar",
+  "teams.event.label": "Event",
+  "teams.event.choice": "{day} · {time} · {title}",
+  "teams.mode.label": "Mode",
+  "teams.mode.manual": "Manual",
+  "teams.mode.auto": "Auto-balance",
+  "teams.balance": "Balance teams",
+  "teams.balancing": "Balancing…",
+  "teams.totals.label": "Totals",
+  "teams.totals.team": "{team} · {points} pts",
+  "teams.totals.difference": "Difference {difference}",
+  "teams.column.average": "Avg {average}",
+  "teams.column.players": {
+    one: "{count} player",
+    other: "{count} players",
+  },
+  "teams.column.empty": "No one on this team yet.",
+  "teams.available.title": "Available",
+  "teams.available.empty": "Nobody else has said Yes.",
+  "teams.maybe.title": "Maybe",
+  "teams.maybe.empty": "Nobody else has said Maybe.",
+  "teams.player.unrated": "Unrated",
+  "teams.player.outside": "No longer coming",
+  "teams.move.to": "To {team}",
+  "teams.move.toNamed": "Move {player} to {team}",
+  "teams.move.switch": "Switch",
+  "teams.move.switchNamed": "Switch {player} to {team}",
+  "teams.move.remove": "Remove",
+  "teams.move.removeNamed": "Remove {player} from {team}",
+  "teams.announce.moved": "{player} moved to {list}.",
+  "teams.announce.removed": "{player} is off the teams.",
+  "teams.announce.totals":
+    "{teamA} {pointsA} points, {teamB} {pointsB} points, difference {difference}.",
+  "teams.suggestion.title": "Suggested swap",
+  "teams.suggestion.coverage":
+    "{first} ↔ {second}, to cover the positions on both teams.",
+  "teams.suggestion.rating":
+    "{first} ↔ {second}, to bring the difference down to {difference}.",
+  "teams.suggestion.apply": "Apply",
+  "teams.save": "Save",
+  "teams.saving": "Saving…",
+  "teams.unsaved": "Unsaved changes",
+  "teams.saved": "Teams saved as a draft. Nobody has been notified yet.",
+  "teams.balanced": "Teams balanced and saved as a draft.",
+  "teams.publish": "Publish teams",
+  "teams.publishing": "Publishing…",
+  "teams.publishQuestion": {
+    one: "Publish the teams? {count} player will get a notification with their team.",
+    other:
+      "Publish the teams? {count} players will get a notification with their team.",
+  },
+  "teams.republishQuestion": {
+    one: "Publish the changes? Of the {count} player on the teams, only someone who joins, leaves or changes team gets a notification.",
+    other:
+      "Publish the changes? Of the {count} players on the teams, only those who join, leave or change team get a notification.",
+  },
+  "teams.publishConfirm": "Publish and notify",
+  "teams.publishCancel": "Not yet",
+  "teams.published": {
+    one: "Teams published. {count} player notified.",
+    other: "Teams published. {count} players notified.",
+  },
+  "teams.discardQuestion":
+    "You have unsaved changes on these teams. Discard them?",
+  "teams.error.notBuildable": "Only trainings and competitions have teams.",
+  "teams.error.cancelled":
+    "This event was cancelled: its teams can no longer be changed.",
+  "teams.error.past": "This event is over: its teams can no longer be changed.",
+  "teams.error.squadEmpty":
+    "Nobody has said Yes to this event: there is no one to balance.",
+  "teams.error.splitEmpty": "Put at least one player on a team to publish.",
+  "teams.error.outsideSquad":
+    "Someone on the teams is no longer coming. Remove the players marked “No longer coming” and try again.",
+  "teams.error.notFound": "That event doesn't exist.",
+  "teams.error.signInRequired":
+    "Your session ended. Sign in again to build teams.",
+  "teams.error.forbidden": "Only Admins and Coaches build teams.",
+  "teams.error.unexpected": "Something went wrong. Try again.",
 } as const satisfies Readonly<Record<string, Message>>;
