@@ -52,7 +52,7 @@ function everyonePresent(
 
 describe("la hoja de asistencia", () => {
   it.each<Role>(["Coach", "Admin"])(
-    "da a un %s una hoja nueva con toda la audiencia en present",
+    "da a un %s una hoja nueva con quien no respondió en absent",
     async (callerRole) => {
       const sheet = await open({ callerRole, members: [ANA, BRUNO] });
 
@@ -67,7 +67,7 @@ describe("la hoja de asistencia", () => {
             fullName: ANA.fullName,
             photoUrl: null,
             position: null,
-            status: "present",
+            status: "absent",
             rsvpResponse: null,
             isInactive: false,
           },
@@ -76,7 +76,7 @@ describe("la hoja de asistencia", () => {
             fullName: BRUNO.fullName,
             photoUrl: null,
             position: null,
-            status: "present",
+            status: "absent",
             rsvpResponse: null,
             isInactive: false,
           },
@@ -118,14 +118,33 @@ describe("la hoja de asistencia", () => {
     expect(sheet.members.map((entry) => entry.photoUrl)).toEqual([null]);
   });
 
-  it("pone primero los Sí, luego los Quizás y luego el resto, por nombre", async () => {
+  it("empieza una hoja nueva en present a quien dijo Sí o Quizás y en absent a quien dijo No o no respondió (D6)", async () => {
+    const sheet = await open({
+      members: [ANA, BRUNO, CARLA, DIEGO],
+      rsvps: {
+        [ANA.userId]: "yes",
+        [BRUNO.userId]: "maybe",
+        [CARLA.userId]: "no",
+      },
+    });
+
+    expect(
+      sheet.members.map((entry) => [entry.fullName, entry.status]),
+    ).toEqual([
+      [ANA.fullName, "present"],
+      [BRUNO.fullName, "present"],
+      [DIEGO.fullName, "absent"],
+      [CARLA.fullName, "absent"],
+    ]);
+  });
+
+  it("pone primero los Sí, luego los Quizás, luego quien no respondió y al final los No, por nombre", async () => {
     const sheet = await open({
       members: [ANA, BRUNO, CARLA, DIEGO],
       rsvps: {
         [ANA.userId]: "no",
         [BRUNO.userId]: "maybe",
         [CARLA.userId]: "yes",
-        [DIEGO.userId]: "yes",
       },
     });
 
@@ -133,9 +152,33 @@ describe("la hoja de asistencia", () => {
       sheet.members.map((entry) => [entry.fullName, entry.rsvpResponse]),
     ).toEqual([
       [CARLA.fullName, "yes"],
-      [DIEGO.fullName, "yes"],
       [BRUNO.fullName, "maybe"],
+      [DIEGO.fullName, null],
       [ANA.fullName, "no"],
+    ]);
+  });
+
+  it("en una hoja guardada conserva lo guardado sea cual sea la respuesta, y quien entró después sigue su respuesta", async () => {
+    const sheet = await open({
+      members: [ANA, BRUNO, CARLA, DIEGO],
+      rsvps: {
+        [ANA.userId]: "no",
+        [BRUNO.userId]: "yes",
+        [CARLA.userId]: "yes",
+      },
+      records: {
+        [ANA.userId]: "present",
+        [BRUNO.userId]: "absent",
+      },
+    });
+
+    expect(
+      sheet.members.map((entry) => [entry.fullName, entry.status]),
+    ).toEqual([
+      [BRUNO.fullName, "absent"],
+      [CARLA.fullName, "present"],
+      [DIEGO.fullName, "absent"],
+      [ANA.fullName, "present"],
     ]);
   });
 
@@ -193,7 +236,7 @@ describe("la hoja de asistencia", () => {
       [ANA.fullName, "late", false],
       [BRUNO.fullName, "absent", false],
       [CARLA.fullName, "present", true],
-      [DIEGO.fullName, "present", false],
+      [DIEGO.fullName, "absent", false],
     ]);
   });
 
