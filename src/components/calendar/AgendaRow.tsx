@@ -140,6 +140,13 @@ export function AgendaRow({
   const canRespond = period === "upcoming" && event.inAudience && !isCancelled;
   const canManage = organizer !== null && period === "upcoming" && !isCancelled;
 
+  function toggleRow(): void {
+    if (!isExpanded && canHaveTeams) {
+      teams.open();
+    }
+    toggle();
+  }
+
   useEffect(() => {
     if (shouldTakeFocus) {
       titleRef.current?.focus();
@@ -157,12 +164,7 @@ export function AgendaRow({
               className="agenda-toggle"
               aria-expanded={isExpanded}
               aria-controls={detailId}
-              onClick={() => {
-                if (!isExpanded && canHaveTeams) {
-                  teams.open();
-                }
-                toggle();
-              }}
+              onClick={toggleRow}
             >
               {event.title}
               <span className="agenda-chevron" aria-hidden="true" />

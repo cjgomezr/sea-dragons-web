@@ -21,7 +21,8 @@ const positionSchema = z.object({
 
 const publishedTeamSchema = z.object({
   name: z.string(),
-  color: z.string(),
+  // Como lo valida el servidor al guardar: `nameTeamColor` no sabe de otro.
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   players: z.array(
     z.object({
       userId: z.uuid(),

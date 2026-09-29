@@ -33,6 +33,10 @@ describe("nameTeamColor", () => {
     expect(nameTeamColor(hex)).toBe(name);
   });
 
+  it("rechaza lo que no es un #RRGGBB", () => {
+    expect(() => nameTeamColor("red")).toThrow("#RRGGBB");
+  });
+
   it("lee el hexadecimal en minúsculas igual que en mayúsculas", () => {
     expect(nameTeamColor("#1c6ea4")).toBe("blue");
   });
