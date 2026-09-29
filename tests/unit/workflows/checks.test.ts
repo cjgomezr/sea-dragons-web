@@ -6,6 +6,7 @@ import {
   readEnvironmentManifest,
   variablesFromSource,
 } from "../../../scripts/lib/entornos-manifest";
+import { RUN_INTEGRATION_TESTS_ENV } from "../../support/test-selection";
 
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const WORKFLOW_PATH = path.join(REPO_ROOT, ".github/workflows/checks.yml");
@@ -117,12 +118,25 @@ describe("workflow de checks", () => {
   // saltaban enteras: el check salía verde sin haber probado nada. Ahora sí
   // los referencia, y lo que se vigila es de dónde salen.
   it("da a los tests las credenciales de desarrollo que el manifiesto declara en CI", () => {
-    const env = stepNamed("Tests").env ?? {};
+    const credentials = Object.entries(stepNamed("Tests").env ?? {}).filter(
+      ([name]) => name !== RUN_INTEGRATION_TESTS_ENV,
+    );
 
-    expect(Object.keys(env).sort()).toEqual(developmentCredentials().sort());
-    for (const [name, value] of Object.entries(env)) {
+    expect(credentials.map(([name]) => name).sort()).toEqual(
+      developmentCredentials().sort(),
+    );
+    for (const [name, value] of credentials) {
       expect(value).toBe(`\${{ secrets.${name} }}`);
     }
+  });
+
+  // Fuera de CI, `npm test` se salta los tests que hablan con seadragons-dev
+  // (#415). Aquí se exigen: sin la variable, el check saldría verde sin
+  // haberlos corrido, que es el agujero que cerró el #149.
+  it("corre los tests de integración y de RLS con RUN_INTEGRATION_TESTS=1", () => {
+    const env = stepNamed("Tests").env ?? {};
+
+    expect(env[RUN_INTEGRATION_TESTS_ENV]).toBe("1");
   });
 
   it("no referencia ningún secreto que el manifiesto no ponga en CI como de desarrollo", () => {
