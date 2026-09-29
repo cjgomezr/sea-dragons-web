@@ -11254,6 +11254,8 @@ type StubbedAttendanceMember = {
   readonly status: "present" | "late" | "absent";
   readonly rsvpResponse: "yes" | "maybe" | "no" | null;
   readonly isInactive?: boolean;
+  /** Sin ella, la fila enseña las iniciales. */
+  readonly photoUrl?: string;
 };
 
 function attendanceMember(
@@ -11269,11 +11271,22 @@ const FIRST_ATTENDEE = "Mateo Restrepo";
 const LONG_NAMED_ATTENDEE =
   "Maximiliana Alejandra Fernández-Rodríguez de la Torre";
 
+/** El `userId` de cada fila servida, por su puesto en la lista. */
+function attendeeId(index: number): string {
+  return `a7a7a7a7-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
+}
+
+const FIRST_ATTENDEE_ID = attendeeId(0);
+
 /** Los del mockup, con sus estados, en los cuatro grupos por respuesta y
  * con quien no dijo que venía en Ausente (#412), más un nombre de tres veces lo normal
- * para el caso de contenido largo y una cuenta desactivada con fila. */
+ * para el caso de contenido largo y una cuenta desactivada con fila. El
+ * primero lleva foto, que se abre en grande (#414). */
 const ATTENDANCE_MEMBERS: readonly StubbedAttendanceMember[] = [
-  attendanceMember(FIRST_ATTENDEE, "forward", "present", "yes"),
+  {
+    ...attendanceMember(FIRST_ATTENDEE, "forward", "present", "yes"),
+    photoUrl: STUBBED_PHOTO_URL,
+  },
   attendanceMember("Valentina Gómez", "goalkeeper", "present", "yes"),
   attendanceMember("Liam O'Connor", "defender", "present", "yes"),
   attendanceMember("Chloe Nguyen", "forward", "present", "yes"),
@@ -11290,18 +11303,22 @@ const ATTENDANCE_MEMBERS: readonly StubbedAttendanceMember[] = [
   attendanceMember("Ethan Brown", "forward", "late", "no"),
 ];
 
+type AttendanceViewer = "admin" | "coach";
+
 function stubbedAttendanceSheet(
   members: readonly StubbedAttendanceMember[],
+  viewer: AttendanceViewer,
 ): unknown {
   return {
     eventId: POOL_TRAINING_SESSION.eventId,
     title: POOL_TRAINING_SESSION.title,
     startsAt: POOL_TRAINING_SESSION.startsAt,
     isSaved: false,
+    viewer,
     members: members.map((member, index) => ({
-      userId: `a7a7a7a7-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      userId: attendeeId(index),
       fullName: member.fullName,
-      photoUrl: null,
+      photoUrl: member.photoUrl ?? null,
       position:
         member.position === null ? null : ATTENDANCE_POSITIONS[member.position],
       status: member.status,
@@ -11328,6 +11345,9 @@ function totalsOfSaved({ records }: SavedRecords): unknown {
 type AttendanceReads = {
   readonly sessions: readonly unknown[];
   readonly members: readonly StubbedAttendanceMember[];
+  /** Como quién la mira, según la API (#414); sin él, como Admin, que es la
+   * sesión de estas pruebas. */
+  readonly viewer?: AttendanceViewer;
   /** Lo que responde guardar; sin él, los totales de lo que llega. */
   readonly saveFailure?: { readonly status: number; readonly error: unknown };
 };
@@ -11339,6 +11359,7 @@ async function stubAttendance(
   reads: AttendanceReads,
 ): Promise<SavedRecords[]> {
   const saved: SavedRecords[] = [];
+  await stubDirectoryPhoto(page);
   await page.route(
     (url) => url.pathname === ATTENDANCE_SESSIONS_ENDPOINT,
     (route) => route.fulfill(jsonBody({ sessions: reads.sessions })),
@@ -11349,7 +11370,11 @@ async function stubAttendance(
       url.pathname !== ATTENDANCE_SESSIONS_ENDPOINT,
     (route, request) => {
       if (request.method() !== "PUT") {
-        return route.fulfill(jsonBody(stubbedAttendanceSheet(reads.members)));
+        return route.fulfill(
+          jsonBody(
+            stubbedAttendanceSheet(reads.members, reads.viewer ?? "admin"),
+          ),
+        );
       }
       const body = request.postDataJSON() as SavedRecords;
       saved.push(body);
@@ -11388,8 +11413,11 @@ function attendanceRow(page: Page, fullName: string): Locator {
     .filter({ has: page.getByRole("group", { name: fullName }) });
 }
 
+/** Con la foto de la primera fila pintada: una a medio cargar cambia la
+ * captura. */
 async function waitForAttendanceSheet(page: Page): Promise<void> {
   await expect(page.getByRole("group", { name: FIRST_ATTENDEE })).toBeVisible();
+  await waitForDirectoryPhoto(page);
 }
 
 /** Marca a Mateo como Tarde y guarda; espera la confirmación o el aviso. */
@@ -11429,8 +11457,16 @@ const ATTENDANCE_SHEET_STATE: AttendanceState = {
   ready: waitForAttendanceSheet,
 };
 
+/** A un Coach los nombres le salen en texto (#414): la ficha es del Admin. */
+const ATTENDANCE_COACH_SHEET_STATE: AttendanceState = {
+  ...ATTENDANCE_SHEET_STATE,
+  name: "asistencia-hoja-coach",
+  viewer: "coach",
+};
+
 const ATTENDANCE_STATES: readonly AttendanceState[] = [
   ...withSpanish(ATTENDANCE_SHEET_STATE),
+  ...withSpanish(ATTENDANCE_COACH_SHEET_STATE),
   ...withSpanish({
     name: "asistencia-guardada",
     sessions: ATTENDANCE_SESSIONS,
@@ -11638,7 +11674,125 @@ test.describe("asistencia en el navegador", () => {
       expect(height).toBeGreaterThanOrEqual(ATTENDANCE_MIN_TOUCH_TARGET_PX);
     }
   });
+
+  test("a 375px el nombre y la foto miden 44px de alto sin pisar los estados (#414)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+    const row = attendanceRow(page, FIRST_ATTENDEE);
+    const segmentTop = await boxOf(row.getByRole("group"), "y");
+
+    for (const target of [
+      row.getByRole("link", { name: ATTENDANCE_RECORD_LINK }),
+      row.getByRole("button", { name: OPEN_PHOTO_BUTTON }),
+    ]) {
+      const box = await target.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(
+        ATTENDANCE_MIN_TOUCH_TARGET_PX,
+      );
+      expect(Number(box?.y) + Number(box?.height)).toBeLessThanOrEqual(
+        segmentTop,
+      );
+    }
+  });
+
+  test("abre la foto de una fila y la cierra con Escape (#414)", async ({
+    page,
+  }) => {
+    await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+    await stubAttendeeLargePhoto(page);
+    const photo = page.getByRole("button", { name: OPEN_PHOTO_BUTTON });
+
+    await photo.click();
+    const dialog = photoDialog(page);
+    await expect(
+      dialog.getByRole("img", { name: LARGE_PHOTO_NAME }),
+    ).toHaveJSProperty("complete", true);
+    await page.keyboard.press("Escape");
+
+    await expect(dialog).toBeHidden();
+    await expect(photo).toBeFocused();
+  });
+
+  test("sin cambios, el nombre lleva a la ficha sin preguntar (#414)", async ({
+    page,
+  }) => {
+    await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+    const questions: string[] = [];
+    page.on("dialog", (dialog) => {
+      questions.push(dialog.message());
+      void dialog.dismiss();
+    });
+
+    await page.getByRole("link", { name: ATTENDANCE_RECORD_LINK }).click();
+
+    await expect(page).toHaveURL(
+      `${APP_URL}${DIRECTORY_SCREEN_PATH}/${FIRST_ATTENDEE_ID}`,
+    );
+    expect(questions).toEqual([]);
+  });
+
+  test("con cambios sin guardar, el nombre pregunta y se queda si no se acepta (#414)", async ({
+    page,
+  }) => {
+    await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+    const late = attendanceRow(page, FIRST_ATTENDEE).getByRole("button", {
+      name: "Late",
+    });
+    await late.click();
+    const questions: string[] = [];
+    page.once("dialog", (dialog) => {
+      questions.push(dialog.message());
+      void dialog.dismiss();
+    });
+
+    await page.getByRole("link", { name: ATTENDANCE_RECORD_LINK }).click();
+
+    expect(questions).toEqual([
+      "You have unsaved changes on this session. Discard them?",
+    ]);
+    await expect(page).toHaveURL(`${APP_URL}${ATTENDANCE_SCREEN_PATH}`);
+    await expect(late).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("a un Coach los nombres de la hoja no son enlaces (#414)", async ({
+    page,
+  }) => {
+    await goToAttendance(page, ATTENDANCE_COACH_SHEET_STATE);
+
+    await expect(
+      page.getByRole("region", { name: "Confirmed" }).getByRole("link"),
+    ).toHaveCount(0);
+    await expect(
+      attendanceRow(page, FIRST_ATTENDEE).getByText(FIRST_ATTENDEE),
+    ).toBeVisible();
+  });
 });
+
+const ATTENDANCE_RECORD_LINK = `Open ${FIRST_ATTENDEE}'s record`;
+
+/** Una coordenada de la caja de un elemento que tiene que estar pintado. */
+async function boxOf(locator: Locator, edge: "y"): Promise<number> {
+  const box = await locator.boundingBox();
+  if (box === null) {
+    throw new Error("El elemento no está pintado.");
+  }
+  return box[edge];
+}
+
+/** La foto grande de la primera fila, servida como en el directorio. */
+async function stubAttendeeLargePhoto(page: Page): Promise<void> {
+  const photo = await largeVersionOf("landscape");
+  await page.route(STUBBED_LARGE_PHOTO_URL, (route) =>
+    route.fulfill({ status: 200, contentType: "image/webp", body: photo }),
+  );
+  await page.route(
+    (url) =>
+      url.pathname === `${DIRECTORY_ENDPOINT}/${FIRST_ATTENDEE_ID}/photo`,
+    (route) => route.fulfill(jsonBody({ photoUrl: STUBBED_LARGE_PHOTO_URL })),
+  );
+}
 /* ---------------------------------------------------------------------------
    Equipos (#402, RF-9 del PRD de E10): sin eventos, a mano con jugadores en
    las tres listas, balanceado con no evaluados, confirmando la publicación y
