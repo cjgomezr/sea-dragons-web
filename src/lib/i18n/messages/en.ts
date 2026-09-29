@@ -1352,6 +1352,7 @@ export const englishMessages = {
   "teams.move.removeNamed": "Remove {player} from {team}",
   "teams.announce.moved": "{player} moved to {list}.",
   "teams.announce.removed": "{player} is off the teams.",
+  "teams.announce.swapped": "{first} and {second} swapped teams.",
   "teams.announce.totals":
     "{teamA} {pointsA} points, {teamB} {pointsB} points, difference {difference}.",
   "teams.suggestion.title": "Suggested swap",

@@ -139,7 +139,7 @@ function ModeControl({
 function destinationName(
   translate: Translator,
   draft: TeamDraft,
-  move: LastMove,
+  move: Extract<LastMove, { kind: "move" }>,
 ): string | null {
   if (move.destination !== "bench") {
     return draft.teams[move.destination].name;
@@ -148,21 +148,36 @@ function destinationName(
   return origin === "outside" ? null : translate(`teams.${origin}.title`);
 }
 
+/** Quién fue a dónde, sin los totales. */
+function describeWhere(
+  translate: Translator,
+  draft: TeamDraft,
+  move: LastMove,
+): string {
+  const nameOf = (userId: string) => findPlayer(draft, userId).fullName;
+  if (move.kind === "swap") {
+    return translate("teams.announce.swapped", {
+      first: nameOf(move.fromA),
+      second: nameOf(move.fromB),
+    });
+  }
+  const player = nameOf(move.userId);
+  const list = destinationName(translate, draft, move);
+  return list === null
+    ? translate("teams.announce.removed", { player })
+    : translate("teams.announce.moved", { player, list });
+}
+
 /** Lo que se lee al mover: a dónde fue y cómo quedan los totales. */
 function describeMove(
   translate: Translator,
   draft: TeamDraft,
   move: LastMove,
 ): string {
-  const player = findPlayer(draft, move.userId).fullName;
-  const list = destinationName(translate, draft, move);
   const totals = draftTotals(draft);
   const points = (value: number) =>
     formatOverallRating(translate.locale, value);
-  const where =
-    list === null
-      ? translate("teams.announce.removed", { player })
-      : translate("teams.announce.moved", { player, list });
+  const where = describeWhere(translate, draft, move);
   return `${where} ${translate("teams.announce.totals", {
     teamA: draft.teams.a.name,
     pointsA: points(totals.a.combinedRating),

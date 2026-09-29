@@ -676,6 +676,21 @@ describe("sugerencia", () => {
     expect(writes()).toEqual([]);
   });
 
+  it("anuncia a los dos que cambiaron de equipo y los nuevos totales", async () => {
+    stubClub({ builders: [DRAFTED] });
+    await openScreen();
+
+    await userEvent.click(
+      within(region("Suggested swap")).getByRole("button", { name: "Apply" }),
+    );
+
+    expect(
+      screen.getByText(
+        "Mateo Restrepo and Ethan Brown swapped teams. Team Kelp 13.0 points, Team Tide 9.0 points, difference 4.0.",
+      ),
+    ).toHaveAttribute("aria-live", "polite");
+  });
+
   it("no enseña nada cuando no hay intercambio que mejore", async () => {
     stubClub();
 

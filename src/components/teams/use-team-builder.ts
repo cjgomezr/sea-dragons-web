@@ -40,11 +40,15 @@ export type BuilderAction =
   | { readonly kind: "published"; readonly notifiedCount: number }
   | { readonly kind: "failed"; readonly failure: TeamsFailure };
 
-/** El último movimiento, para anunciarlo. */
-export type LastMove = {
-  readonly userId: string;
-  readonly destination: Destination;
-};
+/** El último movimiento, para anunciarlo: un jugador, o los dos de un
+ * intercambio. */
+export type LastMove =
+  | {
+      readonly kind: "move";
+      readonly userId: string;
+      readonly destination: Destination;
+    }
+  | { readonly kind: "swap"; readonly fromA: string; readonly fromB: string };
 
 export type BuilderState =
   | { readonly kind: "loading" }
@@ -158,7 +162,7 @@ export function useTeamBuilder(eventId: string): TeamBuilderControls {
       ...ready,
       draft: movePlayer(ready.draft, userId, destination),
       action: actionAfterEdit(ready.action),
-      lastMove: { userId, destination },
+      lastMove: { kind: "move", userId, destination },
     }));
   }
 
@@ -167,7 +171,7 @@ export function useTeamBuilder(eventId: string): TeamBuilderControls {
       ...ready,
       draft: swapPlayers(ready.draft, fromA, fromB),
       action: actionAfterEdit(ready.action),
-      lastMove: { userId: fromA, destination: "b" },
+      lastMove: { kind: "swap", fromA, fromB },
     }));
   }
 

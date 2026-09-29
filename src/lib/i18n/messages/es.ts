@@ -1357,6 +1357,7 @@ export const spanishMessages: MessageCatalog = {
   "teams.move.removeNamed": "Quitar a {player} de {team}",
   "teams.announce.moved": "{player} pasó a {list}.",
   "teams.announce.removed": "{player} salió de los equipos.",
+  "teams.announce.swapped": "{first} y {second} cambiaron de equipo.",
   "teams.announce.totals":
     "{teamA} {pointsA} puntos, {teamB} {pointsB} puntos, diferencia {difference}.",
   "teams.suggestion.title": "Intercambio sugerido",
