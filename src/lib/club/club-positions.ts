@@ -17,6 +17,21 @@ import { type Locale, otherLocale } from "@/lib/i18n/locale";
  * posición sin ninguno. */
 export type PositionNames = { readonly [L in Locale]: string | null };
 
+/** La función de una posición en el auto-balance (D4 del PRD de E10): qué
+ * hueco cubre aunque el club la renombre. El valor guardado es el código en
+ * inglés, el `check` de `0046`. */
+export const POSITION_COVERAGES = [
+  "goalkeeper",
+  "defender",
+  "forward",
+] as const;
+
+export type PositionCoverage = (typeof POSITION_COVERAGES)[number];
+
+export function isPositionCoverage(value: unknown): value is PositionCoverage {
+  return POSITION_COVERAGES.some((coverage) => coverage === value);
+}
+
 export type ClubPosition = {
   readonly id: string;
   readonly names: PositionNames;

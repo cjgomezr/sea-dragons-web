@@ -7,8 +7,8 @@ import {
   CLUB_SETTINGS_POSITIONS_ORDER_API_PATH,
 } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
-import type { ClubPosition } from "@/lib/club/club-positions";
 import type {
+  ManagedPosition,
   ManagedPositionsGateways,
   PositionInsertResult,
 } from "@/lib/club/manage-club-positions";
@@ -26,15 +26,17 @@ const ADMIN_ID = "a0a0a0a0-0000-4000-8000-00000000000a";
 const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
 const OTHER_CLUBS_POSITION_ID = "00000000-0000-4000-8000-000000000099";
 
-const GOALKEEPER: ClubPosition = {
+const GOALKEEPER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000001",
   names: { en: "Goalkeeper", es: "Portería" },
   isArchived: false,
+  coverage: "goalkeeper",
 };
-const DEFENDER: ClubPosition = {
+const DEFENDER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000002",
   names: { en: "Defender", es: "Defensa" },
   isArchived: true,
+  coverage: null,
 };
 const CATALOG = [GOALKEEPER, DEFENDER];
 const NEW_POSITION_ID = "00000000-0000-4000-8000-000000000004";
@@ -83,6 +85,13 @@ function managedPositionsGateways(): ManagedPositionsGateways {
           return { kind: "not_found" };
         }
         writes.push(`archive ${isArchived}`);
+        return { kind: "changed" };
+      },
+      setPositionCoverage: async ({ positionId }, coverage) => {
+        if (!isOwnPosition(positionId)) {
+          return { kind: "not_found" };
+        }
+        writes.push(`coverage ${coverage ?? "none"}`);
         return { kind: "changed" };
       },
     },
@@ -295,7 +304,7 @@ describe("endpoints de posiciones", () => {
     });
   });
 
-  describe("PATCH: renombrar, archivar y reactivar", () => {
+  describe("PATCH: renombrar, archivar, reactivar y cambiar la función", () => {
     it("renombra, anota e invalida la caché", async () => {
       const response = await patchPosition(GOALKEEPER.id, {
         names: { en: "Keeper", es: "Portería" },
@@ -327,6 +336,29 @@ describe("endpoints de posiciones", () => {
       ]);
     });
 
+    it("cambia la función, anota e invalida la caché", async () => {
+      const response = await patchPosition(GOALKEEPER.id, {
+        coverage: "defender",
+      });
+
+      expect(response.status).toBe(200);
+      expect(writes).toEqual([
+        "coverage defender",
+        "audit club_position.coverage_changed",
+      ]);
+      expect(invalidateClubPositions).toHaveBeenCalledOnce();
+    });
+
+    it("le quita la función con null", async () => {
+      const response = await patchPosition(GOALKEEPER.id, { coverage: null });
+
+      expect(response.status).toBe(200);
+      expect(writes).toEqual([
+        "coverage none",
+        "audit club_position.coverage_changed",
+      ]);
+    });
+
     it("responde 404 con una posición de otro club", async () => {
       const response = await patchPosition(OTHER_CLUBS_POSITION_ID, {
         isArchived: true,
@@ -346,6 +378,12 @@ describe("endpoints de posiciones", () => {
       ["vacío", {}],
       ["con nombres y archivo a la vez", { ...VALID_NAMES, isArchived: true }],
       ["con el archivo como texto", { isArchived: "true" }],
+      ["con una función fuera de las tres", { coverage: "midfielder" }],
+      ["con la función en español", { coverage: "Portero" }],
+      [
+        "con la función y el archivo a la vez",
+        { coverage: "forward", isArchived: true },
+      ],
     ])("responde 400 a un cuerpo %s", async (_case, body) => {
       const response = await patchPosition(GOALKEEPER.id, body);
 
@@ -400,11 +438,12 @@ describe("endpoints de posiciones", () => {
           await postPosition(VALID_NAMES),
           await patchPosition(GOALKEEPER.id, VALID_NAMES),
           await patchPosition(GOALKEEPER.id, { isArchived: true }),
+          await patchPosition(GOALKEEPER.id, { coverage: "forward" }),
           await putOrder({ positionIds: [GOALKEEPER.id] }),
         ];
 
         expect(responses.map((response) => response.status)).toEqual([
-          403, 403, 403, 403, 403,
+          403, 403, 403, 403, 403, 403,
         ]);
         expect(writes).toEqual([]);
       },

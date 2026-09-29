@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
-import type { ClubPosition, ClubPositions } from "@/lib/club/club-positions";
+import type {
+  ManagedPosition,
+  ManagedPositions,
+} from "@/lib/club/manage-club-positions";
 import { createManagedPositionsGateways } from "@/lib/club/supabase-manage-club-positions";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
@@ -37,8 +40,8 @@ function positionsGateway() {
 
 /** Las tres que siembra cada club nuevo, en su orden. */
 function seededThree(
-  positions: ClubPositions,
-): readonly [ClubPosition, ClubPosition, ClubPosition] {
+  positions: ManagedPositions,
+): readonly [ManagedPosition, ManagedPosition, ManagedPosition] {
   const [first, second, third] = positions;
   if (first === undefined || second === undefined || third === undefined) {
     throw new Error(`El club tiene ${positions.length} posiciones, no tres.`);
@@ -46,7 +49,7 @@ function seededThree(
   return [first, second, third];
 }
 
-function englishNames(positions: ClubPositions): (string | null)[] {
+function englishNames(positions: ManagedPositions): (string | null)[] {
   return positions
     .filter((position) => !position.isArchived)
     .map((position) => position.names.en);
@@ -105,6 +108,45 @@ describeRls("administrar posiciones en Supabase", () => {
   );
 
   it(
+    "guarda la función de cada posición y dice cuándo no cambió",
+    async () => {
+      await withThrowawayClub(async (clubId) => {
+        const gateway = positionsGateway();
+        const [, defender, forward] = seededThree(
+          await gateway.findClubPositions(clubId),
+        );
+
+        await expect(
+          gateway.setPositionCoverage(
+            { clubId, positionId: forward.id },
+            "defender",
+          ),
+        ).resolves.toEqual({ kind: "changed" });
+        await expect(
+          gateway.setPositionCoverage(
+            { clubId, positionId: forward.id },
+            "defender",
+          ),
+        ).resolves.toEqual({ kind: "unchanged" });
+        await expect(
+          gateway.setPositionCoverage(
+            { clubId, positionId: defender.id },
+            null,
+          ),
+        ).resolves.toEqual({ kind: "changed" });
+
+        const positions = await gateway.findClubPositions(clubId);
+        expect(positions.map((position) => position.coverage)).toEqual([
+          "goalkeeper",
+          null,
+          "defender",
+        ]);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "dice en qué idioma se repite el nombre",
     async () => {
       await withThrowawayClub(async (clubId) => {
@@ -131,6 +173,9 @@ describeRls("administrar posiciones en Supabase", () => {
         ).resolves.toEqual({ kind: "not_found" });
         await expect(
           gateway.setPositionArchived(target, true),
+        ).resolves.toEqual({ kind: "not_found" });
+        await expect(
+          gateway.setPositionCoverage(target, "forward"),
         ).resolves.toEqual({ kind: "not_found" });
         await expect(
           gateway.reorderPositions(clubId, [randomUUID()]),

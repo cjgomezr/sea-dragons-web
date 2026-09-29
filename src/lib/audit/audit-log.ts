@@ -52,6 +52,10 @@ export const AUDIT_ACTIONS = [
   "club_position.reordered",
   "club_position.archived",
   "club_position.reactivated",
+  // RF-2 de E10 (#404): un Admin cambia la función de una posición (portero,
+  // defensa, ataque o ninguna). La entidad es la posición y la metadata lleva
+  // la función nueva (`{ coverage: "goalkeeper" }`, `null` si se la quitó).
+  "club_position.coverage_changed",
   // RF-1 y RF-5 de E9 (#319): un Coach o un Admin crea la evaluación de un
   // miembro o guarda sus valoraciones. La entidad es el `user_id` del miembro
   // evaluado (`member`), sin metadata: ni las notas, ni las categorías, ni el

@@ -1,13 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AuditLogInsertRow } from "@/lib/audit/audit-log";
 import type { Role } from "@/lib/auth/roles";
-import type {
-  ClubPosition,
-  ClubPositions,
-  PositionNames,
-} from "@/lib/club/club-positions";
+import type { ClubPositions, PositionNames } from "@/lib/club/club-positions";
 import { ClubSettingsForbiddenError } from "@/lib/club/club-settings";
 import {
+  type ManagedPosition,
   type ManagedPositionsGateways,
   POSITION_NAME_MAX_LENGTH,
   PositionNotFoundError,
@@ -19,6 +16,7 @@ import {
   renamePosition,
   reorderPositions,
   setPositionArchived,
+  setPositionCoverage,
 } from "@/lib/club/manage-club-positions";
 
 /**
@@ -32,20 +30,23 @@ const ADMIN_ID = "a0a0a0a0-0000-4000-8000-00000000000a";
 const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
 const OTHER_CLUBS_POSITION_ID = "00000000-0000-4000-8000-000000000099";
 
-const GOALKEEPER: ClubPosition = {
+const GOALKEEPER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000001",
   names: { en: "Goalkeeper", es: "Portería" },
   isArchived: false,
+  coverage: "goalkeeper",
 };
-const DEFENDER: ClubPosition = {
+const DEFENDER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000002",
   names: { en: "Defender", es: "Defensa" },
   isArchived: false,
+  coverage: "defender",
 };
-const FORWARD: ClubPosition = {
+const FORWARD: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000003",
   names: { en: "Forward", es: "Ataque" },
   isArchived: false,
+  coverage: "forward",
 };
 
 const NEW_POSITION_ID = "00000000-0000-4000-8000-000000000004";
@@ -54,7 +55,7 @@ const NEW_POSITION_ID = "00000000-0000-4000-8000-000000000004";
 const MEMBER_POSITIONS = new Map([["nerea", DEFENDER.id]]);
 
 let callerRole: Role;
-let catalog: ClubPosition[];
+let catalog: ManagedPosition[];
 let auditRows: AuditLogInsertRow[];
 
 function sameName(a: string | null, b: string | null): boolean {
@@ -73,7 +74,7 @@ function takenLocale(
   );
 }
 
-function positionWithId(positionId: string): ClubPosition | undefined {
+function positionWithId(positionId: string): ManagedPosition | undefined {
   return catalog.find((position) => position.id === positionId);
 }
 
@@ -95,7 +96,7 @@ function gateways(): ManagedPositionsGateways {
         }
         catalog = [
           ...catalog,
-          { id: NEW_POSITION_ID, names, isArchived: false },
+          { id: NEW_POSITION_ID, names, isArchived: false, coverage: null },
         ];
         return { kind: "created", positionId: NEW_POSITION_ID };
       },
@@ -142,6 +143,19 @@ function gateways(): ManagedPositionsGateways {
           ...catalog.filter((other) => other !== position),
           { ...position, isArchived },
         ];
+        return { kind: "changed" };
+      },
+      setPositionCoverage: async ({ positionId }, coverage) => {
+        const position = positionWithId(positionId);
+        if (position === undefined) {
+          return { kind: "not_found" };
+        }
+        if (position.coverage === coverage) {
+          return { kind: "unchanged" };
+        }
+        catalog = catalog.map((other) =>
+          other === position ? { ...position, coverage } : other,
+        );
         return { kind: "changed" };
       },
     },
@@ -318,9 +332,59 @@ describe("administrar posiciones", () => {
     });
   });
 
+  describe("función", () => {
+    it("guarda la función nueva de la posición", async () => {
+      const positions = await setPositionCoverage(gateways(), {
+        callerId: ADMIN_ID,
+        positionId: FORWARD.id,
+        coverage: "defender",
+      });
+
+      expect(positions.map((position) => position.coverage)).toEqual([
+        "goalkeeper",
+        "defender",
+        "defender",
+      ]);
+    });
+
+    it("deja que dos posiciones compartan función", async () => {
+      await setPositionCoverage(gateways(), {
+        callerId: ADMIN_ID,
+        positionId: DEFENDER.id,
+        coverage: "forward",
+      });
+
+      expect(catalog.map((position) => position.coverage)).toEqual([
+        "goalkeeper",
+        "forward",
+        "forward",
+      ]);
+    });
+
+    it("le quita la función con null", async () => {
+      const positions = await setPositionCoverage(gateways(), {
+        callerId: ADMIN_ID,
+        positionId: GOALKEEPER.id,
+        coverage: null,
+      });
+
+      expect(positions[0]?.coverage).toBeNull();
+    });
+
+    it("no encuentra la posición de otro club", async () => {
+      await expect(
+        setPositionCoverage(gateways(), {
+          callerId: ADMIN_ID,
+          positionId: OTHER_CLUBS_POSITION_ID,
+          coverage: "forward",
+        }),
+      ).rejects.toBeInstanceOf(PositionNotFoundError);
+    });
+  });
+
   describe("quién puede", () => {
     it.each(["Coach", "Committee", "Player"] as const)(
-      "un %s no puede crear, renombrar, reordenar ni archivar",
+      "un %s no puede crear, renombrar, reordenar, archivar ni cambiar la función",
       async (role) => {
         callerRole = role;
         const request = { callerId: ADMIN_ID };
@@ -349,6 +413,13 @@ describe("administrar posiciones", () => {
             ...request,
             positionId: DEFENDER.id,
             isArchived: true,
+          }),
+        ).rejects.toBeInstanceOf(ClubSettingsForbiddenError);
+        await expect(
+          setPositionCoverage(gateways(), {
+            ...request,
+            positionId: DEFENDER.id,
+            coverage: "forward",
           }),
         ).rejects.toBeInstanceOf(ClubSettingsForbiddenError);
         expect(catalog).toEqual([GOALKEEPER, DEFENDER, FORWARD]);
@@ -460,6 +531,24 @@ describe("bitácora", () => {
     ]);
   });
 
+  it("anota el cambio de función con la posición y la función nueva", async () => {
+    await setPositionCoverage(gateways(), {
+      callerId: ADMIN_ID,
+      positionId: FORWARD.id,
+      coverage: "goalkeeper",
+    });
+
+    expect(auditRows).toEqual([
+      expect.objectContaining({
+        actor_id: ADMIN_ID,
+        action: "club_position.coverage_changed",
+        entity_type: "club_position",
+        entity_id: FORWARD.id,
+        metadata: { coverage: "goalkeeper" },
+      }),
+    ]);
+  });
+
   it("no lleva los nombres ni ningún otro dato de la posición", async () => {
     await createPosition(gateways(), {
       callerId: ADMIN_ID,
@@ -475,6 +564,11 @@ describe("bitácora", () => {
       callerId: ADMIN_ID,
       positionId: GOALKEEPER.id,
       isArchived: false,
+    });
+    await setPositionCoverage(gateways(), {
+      callerId: ADMIN_ID,
+      positionId: GOALKEEPER.id,
+      coverage: "goalkeeper",
     });
     await createPosition(gateways(), {
       callerId: ADMIN_ID,

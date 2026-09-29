@@ -2,9 +2,9 @@ import { z } from "zod";
 import { ApiError } from "@/lib/api/response";
 import { asAccountApiError } from "@/lib/auth/account-api";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
-import type { ClubPositions } from "./club-positions";
 import { ClubSettingsForbiddenError } from "./club-settings";
 import {
+  type ManagedPositions,
   type ManagedPositionsGateways,
   POSITION_NAME_MAX_LENGTH,
   POSITIONS_CHANGED_REASON,
@@ -21,10 +21,10 @@ import { createSupabaseManagedPositionsGateways } from "./supabase-manage-club-p
  * error del dominio y cómo se avisa a la caché del catálogo.
  */
 
-/** Todas las del club, archivadas incluidas, en su orden, tal como quedaron
- * después de la petición. */
+/** Todas las del club, archivadas incluidas, en su orden y con su función,
+ * tal como quedaron después de la petición. */
 export type ManagedPositionsResponse = {
-  readonly positions: ClubPositions;
+  readonly positions: ManagedPositions;
 };
 
 /** Un tope holgado sólo para no arrastrar un cuerpo de megas hasta el
@@ -62,7 +62,7 @@ export function readPositionId(value: string): string {
 /** Después de cualquier cambio: el perfil y el directorio leen de la caché,
  * y sin esto seguirían con el catálogo de antes hasta que caducara. */
 export function positionsChanged(
-  positions: ClubPositions,
+  positions: ManagedPositions,
 ): ManagedPositionsResponse {
   invalidateClubPositions();
   return { positions };
