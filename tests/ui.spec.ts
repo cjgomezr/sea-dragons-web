@@ -10125,11 +10125,83 @@ const COMMITTEE_OPENED_EVENT = {
 
 const EMPTY_OPENED_EVENT = { notes: null, going: [], maybe: [] } as const;
 
+// Los equipos del reparto publicado en la fila desplegada (#403). Mockup:
+// docs/mockups/mobile-team-light.png y mobile-team-dark.png. Sin reparto
+// publicado, la fila no enseña nada de equipos.
+const NOT_PUBLISHED_TEAMS = { status: "not_published" } as const;
+
+const CALENDAR_TEAM_POSITIONS = {
+  forward: {
+    id: "b1b1b1b1-0000-4000-8000-0000000000b1",
+    names: { en: "Forward", es: "Ataque" },
+  },
+  goalkeeper: {
+    id: "b1b1b1b1-0000-4000-8000-0000000000b2",
+    names: { en: "Goalkeeper", es: "Portería" },
+  },
+  defender: {
+    id: "b1b1b1b1-0000-4000-8000-0000000000b3",
+    names: { en: "Defender", es: "Defensa" },
+  },
+} as const;
+
+function lineupPlayer(
+  index: number,
+  fullName: string,
+  position: keyof typeof CALENDAR_TEAM_POSITIONS | null,
+): Record<string, unknown> {
+  return {
+    userId: `7f7f7f7f-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    fullName,
+    position: position === null ? null : CALENDAR_TEAM_POSITIONS[position],
+  };
+}
+
+const PUBLISHED_TEAMS = {
+  status: "published",
+  publishedAt: "2026-06-20T08:00:00.000Z",
+  me: { team: "a", position: CALENDAR_TEAM_POSITIONS.forward },
+  teams: {
+    a: {
+      name: "Team Kelp",
+      color: "#1C6EA4",
+      players: [
+        lineupPlayer(1, "Daniela Vargas", "forward"),
+        lineupPlayer(2, "Ethan Brown", "forward"),
+        lineupPlayer(3, "Isabella Muñoz", "defender"),
+        lineupPlayer(4, "Jack Thompson", "defender"),
+        lineupPlayer(5, "Mateo Restrepo", "forward"),
+        lineupPlayer(6, "Valentina Gómez", "goalkeeper"),
+      ],
+    },
+    b: {
+      name: "Team Tide",
+      color: "#C99A3E",
+      players: [
+        lineupPlayer(7, "Chloe Nguyen", "forward"),
+        lineupPlayer(8, "Grace Lee", "goalkeeper"),
+        lineupPlayer(9, "Hamish MacLeod", "defender"),
+        lineupPlayer(10, "Liam O'Connor", "forward"),
+        lineupPlayer(
+          11,
+          "Maximiliana Alejandra Fernández-Rodríguez de la Torre",
+          "defender",
+        ),
+        lineupPlayer(12, "Sam Patel", null),
+      ],
+    },
+  },
+} as const;
+
+const UNASSIGNED_TEAMS = { ...PUBLISHED_TEAMS, me: null } as const;
+
 type CalendarReads = {
   readonly events: readonly unknown[];
   readonly pastEvents?: readonly unknown[];
   /** Lo que el detalle añade a cualquier evento al desplegarlo. */
   readonly opened?: object;
+  /** Los equipos de cualquier evento; sin reparto publicado si falta. */
+  readonly teams?: object;
 };
 
 /** La agenda de una sola página, y un 422 de evento empezado a cualquier
@@ -10154,6 +10226,12 @@ async function stubCalendarReads(
   );
   const opened = reads.opened ?? PLAYER_OPENED_EVENT;
   const allEvents = [...reads.events, ...pastEvents];
+  await page.route(
+    (url) =>
+      url.pathname.startsWith(`${CALENDAR_AGENDA_ENDPOINT}/`) &&
+      url.pathname.endsWith("/team"),
+    (route) => route.fulfill(jsonBody(reads.teams ?? NOT_PUBLISHED_TEAMS)),
+  );
   await page.route(
     (url) =>
       allEvents.some((event) => url.pathname === calendarEventPath(event)),
@@ -10235,6 +10313,15 @@ async function expandFirstRow(page: Page): Promise<void> {
   await row.getByRole("button", { name: title }).click();
   await expect(row.getByRole("term").first()).toBeVisible();
   await page.mouse.move(0, 0);
+}
+
+/** Despliega el primer evento y espera a que sus equipos estén pintados. */
+async function expandFirstRowWithTeams(page: Page): Promise<void> {
+  await expandFirstRow(page);
+  const row = agendaRow(page, STUBBED_AGENDA_EVENTS[0].title);
+  await expect(
+    row.getByRole("list", { name: PUBLISHED_TEAMS.teams.b.name }),
+  ).toBeVisible();
 }
 
 /** Cambia a los pasados y espera a que estén pintados. */
@@ -10331,6 +10418,32 @@ const CALENDAR_STATES: readonly CalendarState[] = [
     name: "calendario-desplegado-sin-notas-es",
     opened: EMPTY_OPENED_EVENT,
     beforeVisit: chooseSpanish,
+  },
+  {
+    ...CALENDAR_EXPANDED_AS_PLAYER,
+    name: "calendario-mi-equipo",
+    teams: PUBLISHED_TEAMS,
+    ready: expandFirstRowWithTeams,
+  },
+  {
+    ...CALENDAR_EXPANDED_AS_PLAYER,
+    name: "calendario-mi-equipo-es",
+    teams: PUBLISHED_TEAMS,
+    beforeVisit: chooseSpanish,
+    ready: expandFirstRowWithTeams,
+  },
+  {
+    ...CALENDAR_EXPANDED_AS_PLAYER,
+    name: "calendario-equipos-sin-asignar",
+    teams: UNASSIGNED_TEAMS,
+    ready: expandFirstRowWithTeams,
+  },
+  {
+    ...CALENDAR_EXPANDED_AS_PLAYER,
+    name: "calendario-equipos-sin-asignar-es",
+    teams: UNASSIGNED_TEAMS,
+    beforeVisit: chooseSpanish,
+    ready: expandFirstRowWithTeams,
   },
   {
     name: "calendario-pasados",
