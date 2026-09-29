@@ -85,14 +85,11 @@ function resolveConcurrency(context: RunContext): {
   };
 }
 
-let nextRunId = 1000;
-
-function pullRequestRun(number: number): RunContext {
-  nextRunId += 1;
+function pullRequestRun(number: number, runId: string): RunContext {
   return {
     event_name: "pull_request",
     ref: `refs/pull/${number}/merge`,
-    run_id: String(nextRunId),
+    run_id: runId,
     workflow: "Visual baselines (Linux)",
     event: { pull_request: { number } },
   };
@@ -101,12 +98,12 @@ function pullRequestRun(number: number): RunContext {
 function branchRun(
   eventName: "push" | "workflow_dispatch",
   branch: string,
+  runId: string,
 ): RunContext {
-  nextRunId += 1;
   return {
     event_name: eventName,
     ref: `refs/heads/${branch}`,
-    run_id: String(nextRunId),
+    run_id: runId,
     workflow: "Visual baselines (Linux)",
     event: {},
   };
@@ -114,26 +111,26 @@ function branchRun(
 
 describe("concurrencia de visual-baselines.yml", () => {
   it("cancela la visual anterior cuando llega otro push al mismo PR", () => {
-    const previous = resolveConcurrency(pullRequestRun(407));
-    const next = resolveConcurrency(pullRequestRun(407));
+    const previous = resolveConcurrency(pullRequestRun(407, "1"));
+    const next = resolveConcurrency(pullRequestRun(407, "2"));
 
     expect(next.group).toBe(previous.group);
     expect(next.cancelsInProgress).toBe(true);
   });
 
   it("no mezcla las visuales de dos PRs distintos", () => {
-    const first = resolveConcurrency(pullRequestRun(407));
-    const second = resolveConcurrency(pullRequestRun(408));
+    const first = resolveConcurrency(pullRequestRun(407, "3"));
+    const second = resolveConcurrency(pullRequestRun(408, "4"));
 
     expect(second.group).not.toBe(first.group);
   });
 
   it("deja la aceptación de líneas base en su propio grupo, sin cancelarla", () => {
     const acceptance = resolveConcurrency(
-      branchRun("workflow_dispatch", "impl-407"),
+      branchRun("workflow_dispatch", "impl-407", "5"),
     );
-    const pushToBranch = resolveConcurrency(branchRun("push", "impl-407"));
-    const pullRequest = resolveConcurrency(pullRequestRun(407));
+    const pushToBranch = resolveConcurrency(branchRun("push", "impl-407", "6"));
+    const pullRequest = resolveConcurrency(pullRequestRun(407, "7"));
 
     expect(acceptance.cancelsInProgress).toBe(false);
     expect(acceptance.group).not.toBe(pushToBranch.group);
@@ -141,8 +138,8 @@ describe("concurrencia de visual-baselines.yml", () => {
   });
 
   it("no cancela ni pone en espera la visual de un merge anterior a main", () => {
-    const previousMerge = resolveConcurrency(branchRun("push", "main"));
-    const nextMerge = resolveConcurrency(branchRun("push", "main"));
+    const previousMerge = resolveConcurrency(branchRun("push", "main", "8"));
+    const nextMerge = resolveConcurrency(branchRun("push", "main", "9"));
 
     expect(nextMerge.cancelsInProgress).toBe(false);
     expect(nextMerge.group).not.toBe(previousMerge.group);
