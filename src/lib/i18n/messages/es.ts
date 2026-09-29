@@ -477,6 +477,16 @@ export const spanishMessages: MessageCatalog = {
   "directory.column.member": "Miembro",
   "directory.column.role": "Rol",
   "directory.column.position": "Posición",
+  "directory.column.attendance": "Asistencia",
+  // El porcentaje de asistencia de un miembro (#396): en el directorio, el
+  // perfil propio y la ficha. El prefijo sólo lo oye un lector de pantalla.
+  "memberAttendance.title": "Asistencia",
+  "memberAttendance.noData": "Sin datos",
+  "memberAttendance.spokenPrefix": "Asistencia: ",
+  "memberAttendance.sessions": {
+    one: "{count} sesión",
+    other: "{count} sesiones",
+  },
   "directory.field.country": "País",
   "directory.field.level": "Nivel",
   "directory.sort.label": "Ordenar por",

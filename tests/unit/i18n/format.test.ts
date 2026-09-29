@@ -14,6 +14,7 @@ import {
   formatFileSize,
   formatNumber,
   formatOverallRating,
+  formatPercent,
 } from "@/lib/i18n/format";
 import { createTranslator } from "@/lib/i18n/translator";
 
@@ -186,6 +187,18 @@ describe("OVR por idioma", () => {
 
   it("usa la coma decimal en español", () => {
     expect(formatOverallRating("es", 7.9)).toBe("7,9");
+  });
+});
+
+// #396: el porcentaje de asistencia lleva el símbolo pegado en inglés y
+// separado en español, con un espacio que no se parte.
+describe("porcentaje", () => {
+  it("pega el símbolo al número en inglés", () => {
+    expect(formatPercent("en", 90)).toBe("90%");
+  });
+
+  it("separa el símbolo con un espacio que no se parte en español", () => {
+    expect(formatPercent("es", 90)).toBe("90 %");
   });
 });
 

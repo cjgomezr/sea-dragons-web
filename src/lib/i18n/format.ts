@@ -94,6 +94,21 @@ export function formatOverallRating(locale: Locale, value: number): string {
   return OVERALL_RATING_FORMATTERS[locale].format(value);
 }
 
+/** Un porcentaje entero, 0 a 100, como lo sirve la asistencia (#394). El
+ * símbolo va pegado en inglés y separado en español, con un espacio que no
+ * se parte: lo decide el idioma, no la pantalla. */
+const PERCENT_FORMATTERS = formattersByLocale(
+  (displayLocale) =>
+    new Intl.NumberFormat(displayLocale, {
+      style: "percent",
+      maximumFractionDigits: 0,
+    }),
+);
+
+export function formatPercent(locale: Locale, percent: number): string {
+  return PERCENT_FORMATTERS[locale].format(percent / 100);
+}
+
 /** Un instante del club (un entrenamiento, una solicitud), con fecha y hora de
  * Melbourne sea cual sea el idioma o la zona de quien lo mira. */
 export function formatClubMoment(locale: Locale, instant: Date): string {

@@ -406,6 +406,7 @@ describe("pantalla del directorio", () => {
   it.each([
     ["Role", "role"],
     ["Position", "position"],
+    ["Attendance", "attendance"],
   ])("ordena por %s al pulsar su cabecera", async (column, sort) => {
     stubApi();
     await renderScreen();
@@ -644,7 +645,7 @@ describe("orden desde el control de la lista estrecha", () => {
       within(sortGroup())
         .getAllByRole("radio")
         .map((radio) => radio.closest("label")?.textContent),
-    ).toEqual(["Member", "Role", "Position"]);
+    ).toEqual(["Member", "Role", "Position", "Attendance"]);
     expect(
       within(directionGroup())
         .getAllByRole("radio")
@@ -916,5 +917,113 @@ describe("marca de sin evaluar", () => {
         name: "Sin evaluar: evaluar a Nerea Ruiz",
       }),
     ).toHaveTextContent("Sin evaluar");
+  });
+});
+
+/** La columna de asistencia (#396, FR-015, FR-019). El porcentaje lo cuenta
+ * y ordena el servidor (#394): la pantalla lo pinta, pinta "Sin datos" a
+ * quien no tiene sesiones elegibles y pide el orden. */
+describe("columna de asistencia", () => {
+  const CON_ASISTENCIA: DirectoryMember = {
+    ...MARIA,
+    attendance: { kind: "rate", percent: 90, sessions: 18 },
+  };
+  const SIN_ASISTENCIA: DirectoryMember = NEREA;
+
+  function attendanceCell(name: string): HTMLElement {
+    const row = memberRow(name);
+    const cells = within(row).getAllByRole("cell");
+    const lastCell = cells[cells.length - 1];
+    if (lastCell === undefined) {
+      throw new Error(`La fila de ${name} no tiene celdas.`);
+    }
+    return lastCell;
+  }
+
+  it("pinta el porcentaje de cada socio bajo la cabecera de asistencia", async () => {
+    stubApi({ members: [CON_ASISTENCIA, SIN_ASISTENCIA] });
+
+    await renderScreen();
+
+    expect(columnHeader("Attendance")).toBeVisible();
+    expect(attendanceCell("María Ñíguez")).toHaveTextContent(/^90%$/);
+  });
+
+  it("pinta sin datos a quien no tiene sesiones elegibles, no un 0", async () => {
+    stubApi({ members: [CON_ASISTENCIA, SIN_ASISTENCIA] });
+
+    await renderScreen();
+
+    expect(attendanceCell("Nerea Ruiz")).toHaveTextContent(/^No data$/);
+  });
+
+  it("se escribe en español, con el símbolo separado", async () => {
+    stubApi({ members: [CON_ASISTENCIA, SIN_ASISTENCIA] });
+
+    await renderScreen("es");
+
+    expect(columnHeader("Asistencia")).toBeVisible();
+    expect(attendanceCell("María Ñíguez").textContent).toBe("90 %");
+    expect(attendanceCell("Nerea Ruiz")).toHaveTextContent(/^Sin datos$/);
+  });
+
+  it.each([
+    ["Ascending", "asc"],
+    ["Descending", "desc"],
+  ])(
+    "pide el orden por asistencia %s desde el control de la lista estrecha",
+    async (directionLabel, direction) => {
+      stubApi();
+      await renderScreen();
+      const user = userEvent.setup();
+
+      await user.click(
+        within(sortGroup()).getByRole("radio", { name: "Attendance" }),
+      );
+      await user.click(
+        within(directionGroup()).getByRole("radio", { name: directionLabel }),
+      );
+
+      await waitFor(() => {
+        expect(lastRequest().get("direction")).toBe(direction);
+      });
+      expect(lastRequest().get("sort")).toBe("attendance");
+      expect(columnHeader("Attendance")).toHaveAttribute(
+        "aria-sort",
+        direction === "asc" ? "ascending" : "descending",
+      );
+    },
+  );
+
+  it("enseña la lista en el orden que responde el servidor, con los sin datos al final", async () => {
+    const MENOS: DirectoryMember = {
+      ...TOMAS,
+      attendance: { kind: "rate", percent: 40, sessions: 4 },
+    };
+    stubApi({ members: [CON_ASISTENCIA, MENOS, SIN_ASISTENCIA] });
+    await renderScreen();
+
+    await sortBy("Attendance");
+
+    await waitFor(() => {
+      expect(lastRequest().get("sort")).toBe("attendance");
+    });
+    expect(listedNames()).toEqual([
+      "María Ñíguez",
+      "Tomás Errekondo Aranburu",
+      "Nerea Ruiz",
+    ]);
+  });
+
+  it("ofrece el orden por asistencia en español", async () => {
+    stubApi();
+
+    await renderScreen("es");
+
+    expect(
+      within(sortGroup("Ordenar por")).getByRole("radio", {
+        name: "Asistencia",
+      }),
+    ).not.toBeChecked();
   });
 });
