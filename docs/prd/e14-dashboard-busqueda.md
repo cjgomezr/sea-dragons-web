@@ -146,11 +146,11 @@ Ninguna que bloquee. Decisiones tomadas:
 
 ## 10. Descomposición en tickets (para write-ticket)
 
-| #   | Título propuesto                                                                                     | Tamaño | Depende de | Auto-merge sugerido                          |
-| --- | ---------------------------------------------------------------------------------------------------- | ------ | ---------- | -------------------------------------------- |
-| 1   | Sirve el dashboard por API: teselas por rol, próximos eventos, últimas noticias y la marca de visita | M      | ninguna    | No: reglas de negocio nuevas y una migración |
-| 2   | Pinta el dashboard del mockup como pantalla de inicio, con el RSVP del próximo entrenamiento         | M      | 1          | No: pantalla nueva, `ui-review`              |
-| 3   | Sirve la búsqueda global por API, con los permisos de cada dominio y sin acentos                     | M      | ninguna    | No: permisos                                 |
-| 4   | Pone la búsqueda en la barra superior y en la lupa del móvil, con resultados agrupados               | M      | 3          | No: pantalla nueva, `ui-review`              |
+| #   | Issue | Título propuesto                                                                                     | Tamaño | Depende de | Auto-merge sugerido                          |
+| --- | ----- | ---------------------------------------------------------------------------------------------------- | ------ | ---------- | -------------------------------------------- |
+| 1   | #424  | Sirve el dashboard por API: teselas por rol, próximos eventos, últimas noticias y la marca de visita | M      | ninguna    | No: reglas de negocio nuevas y una migración |
+| 2   | #426  | Pinta el dashboard del mockup como pantalla de inicio, con el RSVP del próximo entrenamiento         | M      | #424       | No: pantalla nueva, `ui-review`              |
+| 3   | #425  | Sirve la búsqueda global por API, con los permisos de cada dominio y sin acentos                     | M      | ninguna    | No: permisos                                 |
+| 4   | #427  | Pone la búsqueda en la barra superior y en la lupa del móvil, con resultados agrupados               | M      | #425       | No: pantalla nueva, `ui-review`              |
 
 Los tickets 1 y 3 van en paralelo; el 2 y el 4 detrás de cada uno.
