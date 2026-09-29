@@ -84,6 +84,11 @@ export const AUDIT_ACTIONS = [
   // (`event`), sin metadata: ni los estados ni a quién. Quién, qué sesión y
   // cuándo ya están en la entrada.
   "attendance.saved",
+  // RF-7 de E10 (#401): un Admin o un Coach publica el reparto de equipos de
+  // un evento. La entidad es el evento (`event`) y la metadata lleva sólo
+  // cuántos quedaron asignados (`{ assignedCount }`), nunca quiénes
+  // (NFR-010).
+  "team_split.published",
   "payment.status_changed",
 ] as const;
 

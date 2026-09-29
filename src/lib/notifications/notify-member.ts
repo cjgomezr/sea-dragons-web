@@ -35,6 +35,8 @@ export const NOTIFICATION_TYPES = [
   "event_cancelled",
   "event_series_changed",
   "event_series_cancelled",
+  "team_assigned",
+  "team_unassigned",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -106,6 +108,24 @@ type NotificationDataByType = DataForEveryType<{
     readonly seriesId: string;
     readonly title: string;
     readonly weekdays: readonly IsoWeekday[];
+    readonly startTime: string;
+  };
+  /** #401. A quien entra en un equipo o cambia de equipo al publicar el
+   * reparto, con el nombre y el color tal como se publicaron. */
+  readonly team_assigned: {
+    readonly eventId: string;
+    readonly title: string;
+    readonly startsOn: string;
+    readonly startTime: string;
+    readonly teamName: string;
+    /** `#RRGGBB`. */
+    readonly teamColor: string;
+  };
+  /** #401. A quien sale del reparto al volver a publicarlo (D6). */
+  readonly team_unassigned: {
+    readonly eventId: string;
+    readonly title: string;
+    readonly startsOn: string;
     readonly startTime: string;
   };
 }>;

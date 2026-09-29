@@ -697,6 +697,10 @@ export const englishMessages = {
   "notifications.event_series_cancelled.title": "Series cancelled",
   "notifications.event_series_cancelled.body":
     "{title}: {weekdays} at {time}, from today on",
+  "notifications.team_assigned.title": "You're playing in {team}",
+  "notifications.team_assigned.body": "{title}: {moment}",
+  "notifications.team_unassigned.title": "You're no longer in a team",
+  "notifications.team_unassigned.body": "{title}: {moment}",
   "event.type.training": "Training",
   "event.type.competition": "Competition",
   "event.type.meeting": "Meeting",
