@@ -32,6 +32,13 @@ A task is ONLY finished when ALL of the following are true. The Stop hook
 enforces this; you cannot end the session with failing checks.
 
 1. All tests pass (`npm test`), including new tests for the new behavior.
+   Locally `npm test` skips the tests that talk to `seadragons-dev`
+   (`*.integration.test.ts` and `tests/rls/**`) and says so in one line: CI
+   (`checks.yml`) runs and requires them with `RUN_INTEGRATION_TESTS=1`. To
+   run them by hand: `RUN_INTEGRATION_TESTS=1 npm test`. They take their
+   identities from the test member pool (`tests/support/test-member-pool.ts`),
+   never create their own: every new Auth identity counts as a monthly user
+   in Supabase even after it is deleted (#415).
 2. Lint passes with zero warnings (`npm run lint`).
 3. Type check passes (`npm run typecheck`).
 4. If UI changed: visual regression + accessibility tests pass
@@ -41,6 +48,10 @@ enforces this; you cannot end the session with failing checks.
    the app's URL, that is a blocker, not a nuisance: a server you did not
    start may belong to another project, and every screenshot taken against it
    is meaningless. Free the port or set `APP_URL`; never review around it.
+   The Stop gate runs Playwright only when the branch changed a path listed
+   in `.github/visual-paths.txt` (the same list `visual-baselines.yml`
+   filters on); otherwise it says so in one line and skips it. CI still runs
+   it on the PR. To run it by hand: `npx playwright test`.
    The `ui-reviewer` subagent (APPROVED) is additionally required according
    to the UI-review policy in `factory-models.json` → `review.uiReview`:
    `"always"` = every UI change; `"label"` (default) = only when this issue
@@ -262,10 +273,15 @@ is no board) alongside the label and the comment.
   stop; it leaves `.factory/gate-gave-up`): you are FORBIDDEN from opening a PR
   or marking one ready. Label the issue `needs-human` and comment which checks
   are still red.
-- **Integration tests without credentials in the cloud:** if the runner lacks
-  the app's env vars and the ticket does not depend on those services, you may
-  skip those tests declaring "⚠ integration tests not run in CI" in the PR. If
-  the ticket does depend on them, `needs-human` naming the missing repo secret.
+- **Integration tests without credentials in the cloud:** integration, RLS
+  and Playwright tests are required in CI (`checks.yml` sets
+  `RUN_INTEGRATION_TESTS=1`; `visual-baselines.yml` runs Playwright), not in
+  the local Stop gate. Run them by hand with `RUN_INTEGRATION_TESTS=1 npm test`
+  and `npx playwright test` when your ticket touches what they cover. If the
+  runner lacks the app's env vars and the ticket does not depend on those
+  services, you may skip those tests declaring "⚠ integration tests not run in
+  CI" in the PR. If the ticket does depend on them, `needs-human` naming the
+  missing repo secret.
 - **Never print the contents of a `.env*` file** (not in comments, PRs or
   logs). To check a variable exists use `grep -c '^NAME=' .env.local` or
   `[ -n "${NAME:-}" ]`.
