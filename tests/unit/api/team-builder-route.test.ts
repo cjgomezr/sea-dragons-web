@@ -6,6 +6,7 @@ import {
   TEAM_AUTO_BALANCE_API_PATH,
   TEAM_BUILDER_API_PATH,
   TEAM_PUBLICATION_API_PATH,
+  TEAMS_API_PATH,
 } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
 import {
@@ -79,6 +80,7 @@ vi.mock("@/lib/teams/supabase-team-builder-gateways", () => ({
   }),
 }));
 
+const eventsRoute = await import("@/app/api/v1/teams/route");
 const builderRoute = await import("@/app/api/v1/teams/[eventId]/route");
 const autoBalanceRoute =
   await import("@/app/api/v1/teams/[eventId]/auto-balance/route");
@@ -164,6 +166,11 @@ function publish(eventId: string = EVENT_ID): Promise<Response> {
   return throughProxy(request, () =>
     publicationRoute.POST(request, { params: Promise.resolve({ eventId }) }),
   );
+}
+
+function listEvents(): Promise<Response> {
+  const request = requestTo(TEAMS_API_PATH);
+  return throughProxy(request, () => eventsRoute.GET(request));
 }
 
 function openMyTeam(eventId: string = EVENT_ID): Promise<Response> {
@@ -427,6 +434,47 @@ describe("POST /api/v1/teams/[eventId]/publication", () => {
       code: "business_rule",
       reason: "team_split_empty",
     });
+  });
+});
+
+describe("GET /api/v1/teams", () => {
+  it.each<Role>(["Coach", "Admin"])(
+    "sirve a un %s los eventos armables",
+    async (role) => {
+      givenSession({ kind: "active", role });
+
+      const response = await listEvents();
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        data: {
+          events: [
+            {
+              id: SCRIMMAGE.id,
+              title: SCRIMMAGE.title,
+              eventType: SCRIMMAGE.eventType,
+              startsOn: SCRIMMAGE.startsOn,
+              startTime: SCRIMMAGE.startTime,
+            },
+          ],
+        },
+      });
+    },
+  );
+
+  it.each<Role>(["Committee", "Player"])(
+    "responde 403 a un %s",
+    async (role) => {
+      givenSession({ kind: "active", role });
+
+      await expectError(await listEvents(), 403, { code: "forbidden" });
+    },
+  );
+
+  it("responde 401 sin sesión", async () => {
+    givenSession({ kind: "anonymous" });
+
+    expect((await listEvents()).status).toBe(401);
   });
 });
 

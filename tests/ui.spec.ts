@@ -11474,3 +11474,451 @@ test.describe("asistencia en el navegador", () => {
     }
   });
 });
+/* ---------------------------------------------------------------------------
+   Equipos (#402, RF-9 del PRD de E10): sin eventos, a mano con jugadores en
+   las tres listas, balanceado con no evaluados, confirmando la publicación y
+   publicado. Mockup: docs/mockups/team-light.png y team-dark.png, que es de
+   escritorio; en el móvil las columnas van una debajo de otra.
+
+   Los datos son fijos, servidos por `page.route` como en Asistencia: lo que
+   los endpoints responden y guardan se prueba contra la base (#401).
+   --------------------------------------------------------------------------- */
+
+const TEAMS_SCREEN_PATH = "/equipos";
+const TEAMS_ENDPOINT = "/api/v1/teams";
+const TEAMS_NARROW_WIDTHS = [320, 375, 768] as const;
+const TEAMS_MIN_TOUCH_TARGET_PX = 44;
+
+const TEAMS_EVENT = {
+  id: "7e7e7e7e-0000-4000-8000-0000000000e1",
+  title: "Scrimmage vs Geelong",
+  eventType: "training",
+  startsOn: "2026-06-20",
+  startTime: "10:00",
+} as const;
+
+const TEAMS_EVENTS = [
+  TEAMS_EVENT,
+  {
+    id: "7e7e7e7e-0000-4000-8000-0000000000e2",
+    title: "Pool Training",
+    eventType: "training",
+    startsOn: "2026-06-23",
+    startTime: "19:00",
+  },
+] as const;
+
+const TEAMS_LABELS = {
+  a: { name: "Team Kelp", color: "#1C6EA4" },
+  b: { name: "Team Tide", color: "#C99A3E" },
+} as const;
+
+type TeamsPosition = keyof typeof ATTENDANCE_POSITIONS;
+
+/** Un jugador como lo sirve la API: la posición del club con su función, y
+ * el OVR o el 5,0 virtual del no evaluado. */
+function teamsPlayer(
+  index: number,
+  fullName: string,
+  position: TeamsPosition,
+  rating: number | null,
+): Record<string, unknown> & { readonly userId: string } {
+  return {
+    userId: `7e7e7e7e-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    fullName,
+    position: ATTENDANCE_POSITIONS[position],
+    coverage: position,
+    rating: rating ?? 5,
+    isUnrated: rating === null,
+  };
+}
+
+const LONG_NAMED_PLAYER =
+  "Maximiliana Alejandra Fernández-Rodríguez de la Torre";
+
+/** Los doce del mockup, con Ethan sin evaluar, más un nombre de tres veces
+ * lo normal para el caso de contenido largo. */
+const TEAMS_PLAYERS = {
+  mateo: teamsPlayer(1, "Mateo Restrepo", "forward", 8.6),
+  daniela: teamsPlayer(2, "Daniela Vargas", "forward", 8),
+  valentina: teamsPlayer(3, "Valentina Gómez", "goalkeeper", 7.4),
+  isabella: teamsPlayer(4, "Isabella Muñoz", "defender", 7.2),
+  jack: teamsPlayer(5, "Jack Thompson", "defender", 6.8),
+  ethan: teamsPlayer(6, "Ethan Brown", "forward", null),
+  camila: teamsPlayer(7, "Camila Ortiz", "forward", 8.3),
+  liam: teamsPlayer(8, "Liam O'Connor", "defender", 8.1),
+  santiago: teamsPlayer(9, "Santiago Herrera", "defender", 7.8),
+  chloe: teamsPlayer(10, "Chloe Nguyen", "forward", 7),
+  noah: teamsPlayer(11, "Noah Williams", "goalkeeper", 6.5),
+  ruby: teamsPlayer(12, "Ruby Tan", "goalkeeper", 5.9),
+  long: teamsPlayer(13, LONG_NAMED_PLAYER, "forward", 6.1),
+} as const;
+
+const P = TEAMS_PLAYERS;
+const KELP = [P.mateo, P.daniela, P.valentina, P.isabella, P.jack, P.ethan];
+const TIDE = [P.camila, P.liam, P.santiago, P.chloe, P.noah, P.ruby];
+
+type TeamsPlayerEntry = (typeof KELP)[number];
+
+function assignedTo(
+  team: "a" | "b",
+  players: readonly TeamsPlayerEntry[],
+  outside: readonly TeamsPlayerEntry[] = [],
+): unknown[] {
+  return players.map((player) => ({
+    ...player,
+    team,
+    isOutsideSquad: outside.includes(player),
+  }));
+}
+
+/** A mano, con gente en las tres listas: tres por equipo (Noah ya no
+ * viene), cuatro disponibles con el no evaluado y el nombre largo, y dos
+ * "Quizás". */
+const MANUAL_BUILDER = {
+  event: TEAMS_EVENT,
+  teams: TEAMS_LABELS,
+  available: [
+    P.camila,
+    P.daniela,
+    P.ethan,
+    P.isabella,
+    P.jack,
+    P.liam,
+    P.long,
+    P.mateo,
+    P.valentina,
+  ],
+  maybe: [P.chloe, P.ruby],
+  split: {
+    mode: "manual",
+    publishedAt: null,
+    assignments: [
+      ...assignedTo("a", [P.mateo, P.valentina, P.isabella]),
+      ...assignedTo("b", [P.camila, P.liam, P.noah], [P.noah]),
+    ],
+  },
+};
+
+/** Sin reparto: los doce del mockup dijeron Sí y el nombre largo, Quizás. */
+const OPEN_BUILDER = {
+  event: TEAMS_EVENT,
+  teams: TEAMS_LABELS,
+  available: [...KELP, ...TIDE],
+  maybe: [P.long],
+  split: null,
+};
+
+/** El reparto del mockup, guardado en borrador y listo para publicar. */
+const DRAFTED_BUILDER = {
+  ...OPEN_BUILDER,
+  split: {
+    mode: "auto",
+    publishedAt: null,
+    assignments: [...assignedTo("a", KELP), ...assignedTo("b", TIDE)],
+  },
+};
+
+const BALANCED_SPLIT = {
+  teams: TEAMS_LABELS,
+  mode: "auto",
+  a: KELP,
+  b: TIDE,
+  totals: {
+    a: { playerCount: 6, combinedRating: 43, averageRating: 7.2 },
+    b: { playerCount: 6, combinedRating: 43.6, averageRating: 7.3 },
+    ratingDifference: 0.6,
+  },
+  suggestion: null,
+  isTimeBudgetExhausted: false,
+};
+
+type TeamsWrite = { readonly method: string; readonly path: string };
+
+type TeamsReads = {
+  readonly events: readonly unknown[];
+  readonly builder: unknown;
+};
+
+/** GET de los eventos y del builder; el auto-balance, guardar y publicar
+ * responden bien. Devuelve las escrituras que llegaron. */
+async function stubTeams(page: Page, reads: TeamsReads): Promise<TeamsWrite[]> {
+  const writes: TeamsWrite[] = [];
+  await page.route(
+    (url) => url.pathname === TEAMS_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ events: reads.events })),
+  );
+  await page.route(
+    (url) => url.pathname.startsWith(`${TEAMS_ENDPOINT}/`),
+    (route, request) => {
+      const path = new URL(request.url()).pathname;
+      if (request.method() === "GET") {
+        return route.fulfill(jsonBody(reads.builder));
+      }
+      writes.push({ method: request.method(), path });
+      if (path.endsWith("/auto-balance")) {
+        return route.fulfill(jsonBody(BALANCED_SPLIT));
+      }
+      if (path.endsWith("/publication")) {
+        return route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify({
+            data: {
+              eventId: TEAMS_EVENT.id,
+              publishedAt: "2026-06-18T10:05:00.000Z",
+              assignedCount: 12,
+              notifiedCount: 12,
+            },
+          }),
+        });
+      }
+      return route.fulfill(
+        jsonBody({ eventId: TEAMS_EVENT.id, mode: "manual", assignedCount: 0 }),
+      );
+    },
+  );
+  return writes;
+}
+
+const TEAMS_AVAILABLE = /^(Available|Disponibles)$/;
+const TEAMS_BALANCE = /^(Balance teams|Balancear equipos)$/;
+const TEAMS_PUBLISH = /^(Publish teams|Publicar equipos)$/;
+const TEAMS_CONFIRM_PUBLISH = /^(Publish and notify|Publicar y avisar)$/;
+
+function teamsRegion(page: Page, name: string | RegExp): Locator {
+  return page.getByRole("region", { name });
+}
+
+function teamsPlayerRow(page: Page, fullName: string): Locator {
+  return page
+    .getByRole("listitem")
+    .filter({ has: page.getByRole("group", { name: fullName }) });
+}
+
+async function waitForTeamBuilder(page: Page): Promise<void> {
+  await expect(teamsRegion(page, TEAMS_AVAILABLE)).toBeVisible();
+}
+
+async function balanceTeams(page: Page): Promise<void> {
+  await waitForTeamBuilder(page);
+  await page.getByRole("button", { name: TEAMS_BALANCE }).click();
+  await expect(
+    page.getByText(/^(Teams balanced|Equipos balanceados)/),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+async function askToPublish(page: Page): Promise<void> {
+  await waitForTeamBuilder(page);
+  await page.getByRole("button", { name: TEAMS_PUBLISH }).click();
+  await expect(
+    page.getByRole("button", { name: TEAMS_CONFIRM_PUBLISH }),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+async function publishTeams(page: Page): Promise<void> {
+  await askToPublish(page);
+  await page.getByRole("button", { name: TEAMS_CONFIRM_PUBLISH }).click();
+  await expect(
+    page.getByText(/^(Teams published|Equipos publicados)/),
+  ).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+type TeamsState = TeamsReads & {
+  readonly name: string;
+  readonly isSpanish?: boolean;
+  readonly ready: (page: Page) => Promise<void>;
+};
+
+function teamsWithSpanish(state: TeamsState): readonly TeamsState[] {
+  return [state, { ...state, name: `${state.name}-es`, isSpanish: true }];
+}
+
+const TEAMS_MANUAL_STATE: TeamsState = {
+  name: "equipos-manual",
+  events: TEAMS_EVENTS,
+  builder: MANUAL_BUILDER,
+  ready: waitForTeamBuilder,
+};
+
+const TEAMS_STATES: readonly TeamsState[] = [
+  ...teamsWithSpanish({
+    name: "equipos-vacio",
+    events: [],
+    builder: OPEN_BUILDER,
+    ready: async (page) => {
+      await expect(
+        page.getByRole("link", {
+          name: /^(Go to the calendar|Ir al calendario)$/,
+        }),
+      ).toBeVisible();
+    },
+  }),
+  ...teamsWithSpanish(TEAMS_MANUAL_STATE),
+  ...teamsWithSpanish({
+    name: "equipos-balanceado",
+    events: TEAMS_EVENTS,
+    builder: OPEN_BUILDER,
+    ready: balanceTeams,
+  }),
+  ...teamsWithSpanish({
+    name: "equipos-confirmar-publicar",
+    events: TEAMS_EVENTS,
+    builder: DRAFTED_BUILDER,
+    ready: askToPublish,
+  }),
+  ...teamsWithSpanish({
+    name: "equipos-publicado",
+    events: TEAMS_EVENTS,
+    builder: DRAFTED_BUILDER,
+    ready: publishTeams,
+  }),
+];
+
+async function goToTeams(
+  page: Page,
+  state: TeamsState,
+  theme?: (typeof themes)[number],
+): Promise<TeamsWrite[]> {
+  const writes = await stubTeams(page, state);
+  if (state.isSpanish === true) {
+    await chooseSpanish(page);
+  }
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${TEAMS_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, TEAMS_SCREEN_PATH, theme);
+  }
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await state.ready(page);
+  return writes;
+}
+
+for (const state of TEAMS_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToTeams(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of TEAMS_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToTeams(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToTeams(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("equipos en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("mover con los botones cambia los totales al instante sin guardar", async ({
+    page,
+  }) => {
+    const writes = await goToTeams(page, TEAMS_MANUAL_STATE);
+    const totals = page.getByRole("group", { name: "Totals" });
+    await expect(totals).toContainText("Difference 0.3");
+
+    await page
+      .getByRole("button", { name: "Move Daniela Vargas to Team Kelp" })
+      .click();
+
+    await expect(totals).toContainText("Team Kelp · 31.2 pts");
+    await expect(totals).toContainText("Difference 8.3");
+    await expect(teamsRegion(page, "Team Kelp")).toContainText(
+      "Daniela Vargas",
+    );
+    expect(writes).toEqual([]);
+  });
+
+  test("arrastrar a un disponible a una columna lo mueve", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToTeams(page, TEAMS_MANUAL_STATE);
+
+    await teamsPlayerRow(page, "Jack Thompson").dragTo(
+      teamsRegion(page, "Team Tide"),
+    );
+
+    await expect(teamsRegion(page, "Team Tide")).toContainText("Jack Thompson");
+    await expect(teamsRegion(page, TEAMS_AVAILABLE)).not.toContainText(
+      "Jack Thompson",
+    );
+  });
+
+  test("balancear y publicar con doble toque manda una sola publicación", async ({
+    page,
+  }) => {
+    const writes = await goToTeams(page, {
+      ...TEAMS_MANUAL_STATE,
+      builder: OPEN_BUILDER,
+    });
+    await balanceTeams(page);
+    await expect(
+      teamsPlayerRow(page, "Ethan Brown").getByText("Unrated"),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Publish teams" }).click();
+
+    await page.getByRole("button", { name: "Publish and notify" }).dblclick();
+
+    await expect(
+      page.getByText("Teams published. 12 players notified."),
+    ).toBeVisible();
+    expect(writes.map(({ method, path }) => `${method} ${path}`)).toEqual([
+      `POST ${TEAMS_ENDPOINT}/${TEAMS_EVENT.id}/auto-balance`,
+      `POST ${TEAMS_ENDPOINT}/${TEAMS_EVENT.id}/publication`,
+    ]);
+  });
+
+  test("a 375px cada botón de mover mide al menos 44px de alto", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToTeams(page, TEAMS_MANUAL_STATE);
+
+    const heights = await page
+      .getByRole("group", { name: LONG_NAMED_PLAYER })
+      .getByRole("button")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.getBoundingClientRect().height),
+      );
+
+    expect(heights).toHaveLength(2);
+    for (const height of heights) {
+      expect(height).toBeGreaterThanOrEqual(TEAMS_MIN_TOUCH_TARGET_PX);
+    }
+  });
+});

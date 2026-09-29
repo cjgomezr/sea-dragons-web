@@ -829,6 +829,10 @@ button.notification-item-content:hover {
 
   .app-main {
     max-width: none;
+    /* Es un elemento flex: sin esto su ancho mínimo es el de su contenido, y
+       un select o una palabra larga de cualquier pantalla empujan la página
+       más allá de la ventana (#402). */
+    min-width: 0;
     padding-bottom: var(--space-8);
     margin: 0;
   }
@@ -4787,4 +4791,417 @@ a.agenda-take-attendance {
 a.agenda-take-attendance {
   align-self: flex-start;
   margin-top: var(--space-3);
+}
+
+/* Equipos (#402, RF-9 del PRD de E10), siguiendo docs/mockups/team-light.png:
+   la barra de totales y las dos columnas son del mockup; el selector, las
+   listas de disponibles y "Quizás" y los botones de mover siguen su forma. */
+.teams {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 1100px;
+}
+
+.team-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.team-header h1 {
+  margin: 0;
+  overflow-wrap: break-word;
+}
+
+.team-heading {
+  min-width: 0;
+  max-width: 64ch;
+}
+
+.team-eyebrow {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.team-lead {
+  margin: var(--space-2) 0 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+/* En el móvil los dos botones reparten el ancho, y "Cambios sin guardar"
+   parte la línea en vez de empujar la pantalla hacia un lado. */
+.team-actions {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.team-actions button {
+  flex: 1 1 auto;
+  min-height: var(--touch-target-min);
+  padding: var(--space-2) var(--space-4);
+}
+
+.team-publish:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.team-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.team-event-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.team-event-picker select {
+  width: 100%;
+  max-width: 100%;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.team-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.team-mode {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.team-mode button {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.team-mode button[aria-pressed="true"] {
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.team-balance {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+}
+
+.team-totals,
+.team-column,
+.team-bench-list,
+.team-confirm {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.team-totals-text {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-2);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.team-totals-difference {
+  font-family: var(--font-family-mono);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* La barra es decoración: lo que dice va escrito encima. */
+.team-totals-bar {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+.team-totals-bar span {
+  display: block;
+  height: 100%;
+}
+
+.team-columns,
+.team-bench {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.team-list-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 16px;
+}
+
+.team-swatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.team-column-summary {
+  margin: var(--space-1) 0 var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.team-list {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-list-empty {
+  margin: var(--space-2) 0 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.team-player {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) 0;
+}
+
+.team-player + .team-player {
+  border-top: 1px solid var(--color-border);
+}
+
+.team-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.team-player-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.team-player-name {
+  overflow-wrap: anywhere;
+}
+
+.team-player-hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.team-position {
+  padding: 0 var(--space-2);
+  font-family: var(--font-family-mono);
+  color: var(--color-text);
+  background: var(--color-background);
+  border-radius: var(--radius);
+}
+
+.team-outside {
+  padding: 0 var(--space-2);
+  color: var(--color-danger);
+  border: 1px solid currentcolor;
+  border-radius: var(--radius);
+}
+
+.team-rating {
+  font-family: var(--font-family-mono);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.team-unrated {
+  padding: 0 var(--space-2);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  border: 1px solid currentcolor;
+  border-radius: var(--radius);
+}
+
+/* En el móvil los botones van en su propia línea, debajo del nombre. */
+.team-moves {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: var(--space-2);
+}
+
+.team-move {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.team-move:hover {
+  border-color: var(--color-accent);
+}
+
+.team-suggestion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-accent);
+  border-radius: var(--radius);
+}
+
+.team-suggestion-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Como `.attendance-notice`: vacía no ocupa sitio, pero sigue en el DOM para
+   que la confirmación se anuncie al llegar. */
+.team-notice {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-success);
+  border-radius: var(--radius);
+}
+
+.team-notice:empty {
+  display: none;
+}
+
+.team-no-events {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.team-no-events a.admin-secondary {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+@media (min-width: 768px) {
+  .team-actions {
+    flex: none;
+  }
+
+  .team-toolbar {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  /* El selector crece y, si el modo y el botón de balancear no caben a su
+     lado, bajan de línea: sin esto el ancho intrínseco del select empujaba
+     la página más allá de la ventana a 768px. */
+  .team-event-picker {
+    flex: 1 1 16rem;
+  }
+
+  .team-mode button,
+  .team-balance,
+  .team-actions button,
+  .team-event-picker select {
+    min-height: 36px;
+  }
+
+  .team-columns,
+  .team-bench {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .team-player[draggable="true"] {
+    cursor: grab;
+  }
+
+  .team-move {
+    min-height: 32px;
+  }
+}
+
+/* Con las columnas anchas, los botones caben en la fila del jugador. */
+@media (min-width: 1200px) {
+  .team-player {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  .team-moves {
+    grid-column: auto;
+    flex-wrap: nowrap;
+  }
 }

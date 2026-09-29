@@ -22,6 +22,13 @@ import {
   UNRATED_PLAYER_RATING,
 } from "./squad";
 import { suggestSwap } from "./swap-suggestion";
+import {
+  TEAM_IDS,
+  type TeamAssignment,
+  type TeamId,
+  type TeamLabels,
+  type TeamSplitMode,
+} from "./team-ids";
 import { type SplitTotals, calculateSplitTotals } from "./team-totals";
 
 /**
@@ -40,17 +47,15 @@ import { type SplitTotals, calculateSplitTotals } from "./team-totals";
  * 5,0 virtual y la marca de no evaluado (FR-086).
  */
 
-export const TEAM_IDS = ["a", "b"] as const;
-
-export type TeamId = (typeof TEAM_IDS)[number];
-
-export const TEAM_SPLIT_MODES = ["manual", "auto"] as const;
-
-export type TeamSplitMode = (typeof TEAM_SPLIT_MODES)[number];
-
-export type TeamLabel = { readonly name: string; readonly color: string };
-
-export type TeamLabels = { readonly [Team in TeamId]: TeamLabel };
+export {
+  TEAM_IDS,
+  TEAM_SPLIT_MODES,
+  type TeamAssignment,
+  type TeamId,
+  type TeamLabel,
+  type TeamLabels,
+  type TeamSplitMode,
+} from "./team-ids";
 
 /** D5: "Team Kelp" azul y "Team Tide" amarillo, los del mockup, con los
  * colores de acento y de aviso de `design-system.md`. */
@@ -60,7 +65,10 @@ export const DEFAULT_TEAM_LABELS: TeamLabels = {
 };
 
 /** Sólo los entrenamientos y las competiciones se arman (D2). */
-const BUILDABLE_EVENT_TYPES: readonly EventType[] = ["training", "competition"];
+export const BUILDABLE_EVENT_TYPES: readonly EventType[] = [
+  "training",
+  "competition",
+];
 
 /** Lo que hace falta de un evento para decidir si se arma y para avisar. */
 export type TeamBuilderEvent = {
@@ -74,6 +82,12 @@ export type TeamBuilderEvent = {
   readonly startTime: string;
   readonly audience: EventAudience;
 };
+
+/** Lo que hace falta de un evento para nombrarlo en el builder. */
+export type TeamBuilderEventSummary = Pick<
+  TeamBuilderEvent,
+  "id" | "title" | "eventType" | "startsOn" | "startTime"
+>;
 
 /** Una respuesta que cuenta: de la audiencia activa y a un evento vivo. */
 export type SquadResponse = {
@@ -89,11 +103,6 @@ export type PlayerRecord = {
   readonly coverage: PositionCoverage | null;
   /** `null` sin evaluación; una lista vacía es una evaluación sin notas. */
   readonly ratings: readonly number[] | null;
-};
-
-export type TeamAssignment = {
-  readonly userId: string;
-  readonly team: TeamId;
 };
 
 export type StoredTeamSplit = {
@@ -139,6 +148,14 @@ export type TeamSplitsGateway = {
     readonly clubId: string;
     readonly eventId: string;
   }): Promise<TeamBuilderEvent | null>;
+  /** Los entrenamientos y competiciones no cancelados del club desde `today`
+   * (`YYYY-MM-DD` de Melbourne), del más cercano al más lejano, hasta
+   * `limit`. */
+  findBuildableEvents(query: {
+    readonly clubId: string;
+    readonly today: string;
+    readonly limit: number;
+  }): Promise<readonly TeamBuilderEventSummary[]>;
   findLiveResponses(eventId: string): Promise<readonly SquadResponse[]>;
   /** Los miembros del club con esos ids, con su posición y sus notas, en
    * una consulta (NFR del PRD: nada de una por jugador). */
@@ -191,10 +208,7 @@ export type BuilderSplit = {
 };
 
 export type TeamBuilder = {
-  readonly event: Pick<
-    TeamBuilderEvent,
-    "id" | "title" | "eventType" | "startsOn" | "startTime"
-  >;
+  readonly event: TeamBuilderEventSummary;
   /** Los del reparto guardado, o los de por defecto si no hay. */
   readonly teams: TeamLabels;
   readonly available: readonly SquadEntry[];

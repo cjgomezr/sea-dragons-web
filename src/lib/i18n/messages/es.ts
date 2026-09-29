@@ -1316,4 +1316,96 @@ export const spanishMessages: MessageCatalog = {
   "attendance.error.forbidden": "Sólo Admin y Coach pasan lista.",
   "attendance.error.unexpected": "Algo salió mal. Vuelve a intentarlo.",
   "calendar.takeAttendance": "Pasar lista",
+  "teams.metaTitle": "Equipos · {club}",
+  "teams.eyebrow": "Armar equipos",
+  "teams.lead":
+    "El auto-balance reparte la escuadra por puntaje y cuida las posiciones, para que los dos equipos tengan portero, defensas y atacantes de fuerza parecida.",
+  "teams.title": "{day} · {title}",
+  "teams.loading": "Cargando los eventos…",
+  "teams.loadingSquad": "Cargando la escuadra…",
+  "teams.retry": "Reintentar",
+  "teams.noEvents":
+    "No hay entrenamientos ni competiciones por delante para armar equipos.",
+  "teams.toCalendar": "Ir al calendario",
+  "teams.event.label": "Evento",
+  "teams.event.choice": "{day} · {time} · {title}",
+  "teams.mode.label": "Modo",
+  "teams.mode.manual": "Manual",
+  "teams.mode.auto": "Auto-balance",
+  "teams.balance": "Balancear equipos",
+  "teams.balancing": "Balanceando…",
+  "teams.totals.label": "Totales",
+  "teams.totals.team": "{team} · {points} pts",
+  "teams.totals.difference": "Diferencia {difference}",
+  "teams.column.average": "Media {average}",
+  "teams.column.players": {
+    one: "{count} jugador",
+    other: "{count} jugadores",
+  },
+  "teams.column.empty": "Todavía no hay nadie en este equipo.",
+  "teams.available.title": "Disponibles",
+  "teams.available.empty": "No queda nadie más que haya dicho Sí.",
+  "teams.maybe.title": "Quizás",
+  "teams.maybe.empty": "No queda nadie más que haya dicho Quizás.",
+  "teams.player.unrated": "Sin evaluar",
+  "teams.player.outside": "Ya no viene",
+  "teams.move.to": "A {team}",
+  "teams.move.toNamed": "Mover a {player} a {team}",
+  "teams.move.switch": "Cambiar",
+  "teams.move.switchNamed": "Cambiar a {player} a {team}",
+  "teams.move.remove": "Quitar",
+  "teams.move.removeNamed": "Quitar a {player} de {team}",
+  "teams.announce.moved": "{player} pasó a {list}.",
+  "teams.announce.removed": "{player} salió de los equipos.",
+  "teams.announce.swapped": "{first} y {second} cambiaron de equipo.",
+  "teams.announce.totals":
+    "{teamA} {pointsA} puntos, {teamB} {pointsB} puntos, diferencia {difference}.",
+  "teams.suggestion.title": "Intercambio sugerido",
+  "teams.suggestion.coverage":
+    "{first} ↔ {second}, para cubrir las posiciones en los dos equipos.",
+  "teams.suggestion.rating":
+    "{first} ↔ {second}, para bajar la diferencia a {difference}.",
+  "teams.suggestion.apply": "Aplicar",
+  "teams.save": "Guardar",
+  "teams.saving": "Guardando…",
+  "teams.unsaved": "Cambios sin guardar",
+  "teams.saved":
+    "Equipos guardados como borrador. Todavía no se avisó a nadie.",
+  "teams.balanced": "Equipos balanceados y guardados como borrador.",
+  "teams.publish": "Publicar equipos",
+  "teams.publishing": "Publicando…",
+  "teams.publishQuestion": {
+    one: "¿Publicas los equipos? {count} jugador recibirá un aviso con su equipo.",
+    other:
+      "¿Publicas los equipos? {count} jugadores recibirán un aviso con su equipo.",
+  },
+  "teams.republishQuestion": {
+    one: "¿Publicas los cambios? De {count} jugador en los equipos, sólo se avisa si entra, sale o cambia de equipo.",
+    other:
+      "¿Publicas los cambios? De los {count} jugadores en los equipos, sólo reciben aviso quienes entran, salen o cambian de equipo.",
+  },
+  "teams.publishConfirm": "Publicar y avisar",
+  "teams.publishCancel": "Todavía no",
+  "teams.published": {
+    one: "Equipos publicados. Se avisó a {count} jugador.",
+    other: "Equipos publicados. Se avisó a {count} jugadores.",
+  },
+  "teams.discardQuestion":
+    "Hay cambios sin guardar en estos equipos. ¿Los descartas?",
+  "teams.error.notBuildable":
+    "Sólo los entrenamientos y las competiciones llevan equipos.",
+  "teams.error.cancelled":
+    "El evento se canceló: sus equipos ya no se pueden cambiar.",
+  "teams.error.past": "El evento ya pasó: sus equipos ya no se pueden cambiar.",
+  "teams.error.squadEmpty":
+    "Nadie ha dicho Sí a este evento: no hay a quién balancear.",
+  "teams.error.splitEmpty":
+    "Pon al menos a un jugador en un equipo para publicar.",
+  "teams.error.outsideSquad":
+    "Alguien de los equipos ya no viene. Quita a los marcados “Ya no viene” y vuelve a intentarlo.",
+  "teams.error.notFound": "Ese evento no existe.",
+  "teams.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para armar equipos.",
+  "teams.error.forbidden": "Sólo Admin y Coach arman equipos.",
+  "teams.error.unexpected": "Algo salió mal. Vuelve a intentarlo.",
 };
