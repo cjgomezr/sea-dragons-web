@@ -20,6 +20,7 @@ import {
   EVENT_RSVP_API_PATH,
   EVENT_SERIES_CANCELLATION_API_PATH,
   EVENT_SERIES_MANAGE_API_PATH,
+  EVENT_TEAM_API_PATH,
   GROUPS_API_PATH,
   GROUPS_PATH,
   GUARDIAN_CONSENT_API_PATH,
@@ -47,7 +48,11 @@ import {
   ROLE_REQUESTS_API_PATH,
   ROLE_REQUEST_DECISION_API_PATH,
   SIGN_IN_PATH,
+  TEAMS_API_PATH,
   TEAMS_PATH,
+  TEAM_AUTO_BALANCE_API_PATH,
+  TEAM_BUILDER_API_PATH,
+  TEAM_PUBLICATION_API_PATH,
 } from "@/lib/auth/routes";
 import { ROLES, type Role } from "@/lib/auth/roles";
 import {
@@ -1007,5 +1012,65 @@ describe("frontera de la asistencia (#393)", () => {
     expect(decideSessionBoundary({ pathname, ...ANONYMOUS })).toEqual({
       kind: "unauthenticated",
     });
+  });
+});
+
+/** El builder de un evento cualquiera, con sus escrituras (#401). */
+const TEAM_BUILDER_PATHS = [
+  TEAMS_API_PATH,
+  ...[
+    TEAM_BUILDER_API_PATH,
+    TEAM_AUTO_BALANCE_API_PATH,
+    TEAM_PUBLICATION_API_PATH,
+  ].map((path) =>
+    path.replace("[eventId]", "e1e1e1e1-0000-4000-8000-00000000000e"),
+  ),
+];
+
+describe("frontera del team builder (#401)", () => {
+  it.each(
+    (["Committee", "Player"] as const).flatMap((role) =>
+      TEAM_BUILDER_PATHS.map((pathname) => [role, pathname] as const),
+    ),
+  )("niega a un %s el camino %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual({
+      kind: "missingCapability",
+    });
+  });
+
+  it.each(
+    (["Admin", "Coach"] as const).flatMap((role) =>
+      TEAM_BUILDER_PATHS.map((pathname) => [role, pathname] as const),
+    ),
+  )("deja a un %s el camino %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
+      ALLOW,
+    );
+  });
+
+  it.each(TEAM_BUILDER_PATHS)("responde 401 sin sesión en %s", (pathname) => {
+    expect(decideSessionBoundary({ pathname, ...ANONYMOUS })).toEqual({
+      kind: "unauthenticated",
+    });
+  });
+});
+
+/** El equipo propio en un evento cualquiera (#401). */
+const EVENT_TEAM = EVENT_TEAM_API_PATH.replace(
+  "[id]",
+  "e1e1e1e1-0000-4000-8000-00000000000e",
+);
+
+describe("frontera de mi equipo (#401)", () => {
+  it.each(ROLES)("deja pedir su equipo a un %s", (role) => {
+    expect(
+      decideSessionBoundary({ pathname: EVENT_TEAM, ...activeAs(role) }),
+    ).toEqual(ALLOW);
+  });
+
+  it("responde 401 sin sesión", () => {
+    expect(
+      decideSessionBoundary({ pathname: EVENT_TEAM, ...ANONYMOUS }),
+    ).toEqual({ kind: "unauthenticated" });
   });
 });

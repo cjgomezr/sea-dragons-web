@@ -305,6 +305,12 @@ export const EVENT_API_PATH = `${EVENTS_API_PATH}/[id]`;
  * recibe 404. */
 export const EVENT_RSVP_API_PATH = `${EVENT_API_PATH}/rsvp`;
 
+/** El equipo de quien llama en un evento (#401, RF-8 del PRD de E10): su
+ * equipo y la alineación de un reparto publicado, sin ningún OVR. Cuelga del
+ * camino de lectura: lo pide cualquier cuenta activa, y quien no ve el evento
+ * recibe 404. */
+export const EVENT_TEAM_API_PATH = `${EVENT_API_PATH}/team`;
+
 /** Pasar lista (#393, RF-2 a RF-4 del PRD de E8). Todo lo que cuelga de
  * este camino es de Admin y Coach (`buildTeamsAndTrackAttendance`): un
  * Committee o un Player no leen ni escriben ninguna hoja (AC-007). El
@@ -318,6 +324,22 @@ export const ATTENDANCE_SESSIONS_API_PATH = `${ATTENDANCE_API_PATH}/sessions`;
 /** La hoja de un entrenamiento: GET la abre y PUT la guarda entera.
  * `[eventId]` es el de la ocurrencia. */
 export const ATTENDANCE_SHEET_API_PATH = `${ATTENDANCE_API_PATH}/[eventId]`;
+
+/** El team builder (#401, RF-3 a RF-7 del PRD de E10). Todo lo que cuelga
+ * de este camino es de Admin y Coach (`buildTeamsAndTrackAttendance`): un
+ * Committee o un Player no leen ni escriben ningún reparto, ni ven un OVR
+ * (FR-055). El handler lo vuelve a comprobar. */
+export const TEAMS_API_PATH = "/api/v1/teams";
+
+/** La escuadra y el reparto de un evento: GET los abre y PUT guarda el
+ * reparto entero a mano. `[eventId]` es el de la ocurrencia. */
+export const TEAM_BUILDER_API_PATH = `${TEAMS_API_PATH}/[eventId]`;
+
+/** POST reparte la escuadra con el auto-balance y lo guarda (RF-5). */
+export const TEAM_AUTO_BALANCE_API_PATH = `${TEAM_BUILDER_API_PATH}/auto-balance`;
+
+/** POST publica el reparto guardado y avisa a quien cambió (RF-7). */
+export const TEAM_PUBLICATION_API_PATH = `${TEAM_BUILDER_API_PATH}/publication`;
 
 /** La pantalla de Asistencia (#395, RF-8 del PRD de E8): donde Admin y
  * Coach pasan lista. Sólo la alcanza quien registra asistencia, como sus
@@ -534,4 +556,5 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: EVENT_SERIES_CANCELLATION_API_PATH, capability: "createEvents" },
   { path: ATTENDANCE_API_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: ATTENDANCE_PATH, capability: "buildTeamsAndTrackAttendance" },
+  { path: TEAMS_API_PATH, capability: "buildTeamsAndTrackAttendance" },
 ];
