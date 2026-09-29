@@ -2830,6 +2830,20 @@ button.notification-item-content:hover {
   overflow-wrap: anywhere;
 }
 
+/* La función de la posición (#404): la etiqueta, el desplegable y su botón en
+   una fila que se parte en dos a 375px antes que desbordar. */
+.club-positions-coverage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.club-positions-coverage label {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
 .club-positions-form {
   display: flex;
   flex-direction: column;

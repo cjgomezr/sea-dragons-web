@@ -6,9 +6,9 @@ import type { Translator } from "@/lib/i18n/translator";
 
 /**
  * Una posición en la sección de posiciones de la configuración (#300): su
- * nombre en el idioma de la pantalla, el del otro idioma debajo y sus
- * acciones. Las activas se mueven, renombran y archivan; las archivadas sólo
- * se reactivan.
+ * nombre en el idioma de la pantalla, el del otro idioma debajo, su función
+ * (#404) y sus acciones. Las activas se mueven, renombran y archivan; las
+ * archivadas sólo se reactivan.
  */
 
 export type Direction = "up" | "down";
@@ -101,6 +101,7 @@ export function ActivePositionItem({
   total,
   isBusy,
   isEditing,
+  coverageControl,
   onMove,
   onToggleRename,
   onArchive,
@@ -114,6 +115,7 @@ export function ActivePositionItem({
   total: number;
   isBusy: boolean;
   isEditing: boolean;
+  coverageControl: React.ReactNode;
   onMove: (direction: Direction) => void;
   onToggleRename: () => void;
   onArchive: () => void;
@@ -145,6 +147,7 @@ export function ActivePositionItem({
         position={position}
         rank={rank}
       />
+      {coverageControl}
       <div className="groups-actions">
         {moveButton("up")}
         {moveButton("down")}
@@ -183,12 +186,14 @@ export function ArchivedPositionItem({
   locale,
   position,
   isBusy,
+  coverageControl,
   onReactivate,
 }: {
   translate: Translator;
   locale: Locale;
   position: ClubPosition;
   isBusy: boolean;
+  coverageControl: React.ReactNode;
   onReactivate: () => void;
 }): React.JSX.Element {
   return (
@@ -198,6 +203,7 @@ export function ArchivedPositionItem({
         locale={locale}
         position={position}
       />
+      {coverageControl}
       <div className="groups-actions">
         <button
           type="button"
