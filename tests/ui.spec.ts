@@ -6595,6 +6595,8 @@ type StubbedPosition = {
   readonly id: string;
   readonly names: { readonly en: string | null; readonly es: string | null };
   readonly isArchived: boolean;
+  /** La función en el auto-balance (#404); `null` es "ninguna". */
+  readonly coverage: "goalkeeper" | "defender" | "forward" | null;
 };
 
 type PositionCreate = "hangs" | "rejects_name_taken";
@@ -6604,27 +6606,32 @@ const STUBBED_ACTIVE_POSITIONS: readonly StubbedPosition[] = [
     id: "90000000-0000-4000-8000-000000000001",
     names: { en: "Goalkeeper", es: "Portería" },
     isArchived: false,
+    coverage: "goalkeeper",
   },
   {
     id: "90000000-0000-4000-8000-000000000002",
     names: { en: "Defender", es: "Defensa" },
     isArchived: false,
+    coverage: "defender",
   },
   {
     id: "90000000-0000-4000-8000-000000000003",
     names: { en: "Forward", es: "Ataque" },
     isArchived: false,
+    coverage: "forward",
   },
 ];
 
-/** Una archivada sin nombre en español y otra con nombres cerca del máximo
- * que admite la base (40 caracteres), para el caso de contenido largo. */
+/** Una archivada sin nombre en español ni función y otra con nombres cerca
+ * del máximo que admite la base (40 caracteres), para el caso de contenido
+ * largo. La segunda comparte función con Defender (#404). */
 const STUBBED_POSITIONS_WITH_ARCHIVED: readonly StubbedPosition[] = [
   ...STUBBED_ACTIVE_POSITIONS,
   {
     id: "90000000-0000-4000-8000-000000000004",
     names: { en: "Utility", es: null },
     isArchived: true,
+    coverage: null,
   },
   {
     id: "90000000-0000-4000-8000-000000000005",
@@ -6633,6 +6640,7 @@ const STUBBED_POSITIONS_WITH_ARCHIVED: readonly StubbedPosition[] = [
       es: "Apoyo de segunda línea tras la cesta",
     },
     isArchived: true,
+    coverage: "defender",
   },
 ];
 
@@ -7305,10 +7313,35 @@ test.describe("un Admin frente a la configuración de verdad", () => {
 
     expect(read.status()).toBe(200);
     const { data } = (await read.json()) as {
-      data: { positions: { isArchived: boolean }[] };
+      data: { positions: { isArchived: boolean; coverage: unknown }[] };
     };
     expect(data.positions.length).toBeGreaterThan(0);
     expect(typeof data.positions[0]?.isArchived).toBe("boolean");
+    // #404: con su función, sólo en la configuración.
+    expect(data.positions[0]).toHaveProperty("coverage");
+  });
+
+  // #404: una función fuera de las tres no llega a la base.
+  test("el endpoint de posiciones rechaza una función desconocida con 400", async ({
+    request,
+  }) => {
+    const read = await request.get(
+      `${APP_URL}${CLUB_POSITIONS_ADMIN_ENDPOINT}`,
+    );
+    const { data } = (await read.json()) as {
+      data: { positions: { id: string }[] };
+    };
+    const first = data.positions[0];
+    if (first === undefined) {
+      throw new Error("El club no tiene ninguna posición.");
+    }
+
+    const write = await request.patch(
+      `${APP_URL}${CLUB_POSITIONS_ADMIN_ENDPOINT}/${first.id}`,
+      { data: { coverage: "midfielder" } },
+    );
+
+    expect(write.status()).toBe(400);
   });
 
   test("el endpoint de posiciones rechaza una sin nombre con 400", async ({
