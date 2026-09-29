@@ -187,6 +187,21 @@ describe("GET /api/v1/attendance/[eventId]", () => {
     },
   );
 
+  it.each([
+    ["Admin", "admin"],
+    ["Coach", "coach"],
+  ] as const)(
+    "dice a un %s que mira la hoja como %s (#414)",
+    async (role, viewer) => {
+      givenSession({ kind: "active", role });
+
+      const response = await openSheet();
+
+      const body = (await response.json()) as { data: { viewer: string } };
+      expect(body.data.viewer).toBe(viewer);
+    },
+  );
+
   it.each<Role>(["Committee", "Player"])(
     "responde 403 a un %s",
     async (role) => {

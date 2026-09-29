@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
+import type { AnchorHTMLAttributes } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AttendanceScreen } from "@/components/attendance/AttendanceScreen";
@@ -18,6 +19,30 @@ import { ROLES } from "@/lib/auth/roles";
  */
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/asistencia" }));
+
+const navigate = vi.fn();
+
+/** Como el `Link` de Next: un `onClick` que cancela el clic cancela también
+ * la navegación. Aquí la navegación sólo queda anotada. */
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    onClick,
+    ...rest
+  }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => (
+    <a
+      href={href}
+      {...rest}
+      onClick={(event) => {
+        onClick?.(event);
+        if (!event.defaultPrevented) {
+          navigate(href);
+        }
+        event.preventDefault();
+      }}
+    />
+  ),
+}));
 
 const SESSIONS_PATH = "/api/v1/attendance/sessions";
 
@@ -92,11 +117,16 @@ function sheetFor(
     title: session.title,
     startsAt,
     isSaved: false,
+    viewer: "coach",
     members,
   };
 }
 
 const POOL_SHEET = sheetFor(POOL_TRAINING, [MATEO, VALENTINA, RUBY]);
+const ADMIN_POOL_SHEET: AttendanceSheet = { ...POOL_SHEET, viewer: "admin" };
+
+const THUMBNAIL_URL = `https://storage.test/member-photos/${MATEO.userId}/thumb.webp?token=t`;
+const LARGE_URL = `https://storage.test/member-photos/${MATEO.userId}/large.webp?token=l`;
 const SKILLS_SHEET = sheetFor(SKILLS, [VALENTINA], SKILLS.startsAt);
 
 type Respond = (request: {
@@ -166,6 +196,9 @@ function stubClub(
     if (path === SESSIONS_PATH) {
       return jsonResponse(200, { data: { sessions } });
     }
+    if (path === `/api/v1/directory/${MATEO.userId}/photo`) {
+      return jsonResponse(200, { data: { photoUrl: LARGE_URL } });
+    }
     const sheet = sheets.find(
       (candidate) => sheetPath(candidate.eventId) === path,
     );
@@ -221,7 +254,12 @@ function sessionChip(name: string): HTMLElement {
   );
 }
 
+function recordLink(name: string): HTMLElement {
+  return screen.getByRole("link", { name: `Open ${name}'s record` });
+}
+
 afterEach(() => {
+  navigate.mockReset();
   requests.length = 0;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -633,6 +671,131 @@ describe("la hoja", () => {
     expect(
       within(await findRow(RUBY.fullName)).getByText("Deactivated"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("la fila como en el directorio (#414)", () => {
+  it("a un Admin el nombre le abre la ficha del socio", async () => {
+    stubClub([POOL_TRAINING], [ADMIN_POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(recordLink(MATEO.fullName)).toHaveAttribute(
+      "href",
+      `/directorio/${MATEO.userId}`,
+    );
+    expect(recordLink(MATEO.fullName)).toHaveTextContent(MATEO.fullName);
+  });
+
+  it("a un Coach el nombre es texto, sin enlace", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    const mateo = await findRow(MATEO.fullName);
+    expect(within(mateo).getByText(MATEO.fullName)).toBeInTheDocument();
+    expect(within(mateo).queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("nombra el enlace a la ficha en español", async () => {
+    stubClub([POOL_TRAINING], [ADMIN_POOL_SHEET]);
+
+    render(<AttendanceScreen locale="es" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(
+      screen.getByRole("link", { name: "Abrir la ficha de Mateo Restrepo" }),
+    ).toBeInTheDocument();
+  });
+
+  it("sin cambios el nombre navega sin preguntar", async () => {
+    stubClub([POOL_TRAINING], [ADMIN_POOL_SHEET]);
+    const confirm = vi.spyOn(window, "confirm");
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await findRow(MATEO.fullName);
+
+    await userEvent.click(recordLink(MATEO.fullName));
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith(`/directorio/${MATEO.userId}`);
+  });
+
+  it("con cambios sin guardar el nombre pregunta y, si no se acepta, se queda con lo marcado", async () => {
+    stubClub([POOL_TRAINING], [ADMIN_POOL_SHEET]);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+    await userEvent.click(choice(mateo, "Late"));
+
+    await userEvent.click(recordLink(MATEO.fullName));
+
+    expect(confirm).toHaveBeenCalledWith(
+      "You have unsaved changes on this session. Discard them?",
+    );
+    expect(navigate).not.toHaveBeenCalled();
+    expect(choice(mateo, "Late")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("con cambios sin guardar el nombre navega si se acepta descartarlos", async () => {
+    stubClub([POOL_TRAINING], [ADMIN_POOL_SHEET]);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await userEvent.click(choice(await findRow(MATEO.fullName), "Late"));
+
+    await userEvent.click(recordLink(MATEO.fullName));
+
+    expect(navigate).toHaveBeenCalledWith(`/directorio/${MATEO.userId}`);
+  });
+
+  it("abre la foto en grande y al cerrarla devuelve el foco a la foto", async () => {
+    stubClub(
+      [POOL_TRAINING],
+      [sheetFor(POOL_TRAINING, [{ ...MATEO, photoUrl: THUMBNAIL_URL }])],
+    );
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const photo = within(await findRow(MATEO.fullName)).getByRole("button", {
+      name: "Open the photo of Mateo Restrepo",
+    });
+
+    await userEvent.click(photo);
+    const dialog = screen.getByRole("dialog", { name: MATEO.fullName });
+    expect(
+      await within(dialog).findByRole("img", {
+        name: "Photo of Mateo Restrepo",
+      }),
+    ).toHaveAttribute("src", LARGE_URL);
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(photo).toHaveFocus();
+  });
+
+  it("nombra el botón de la foto en español", async () => {
+    stubClub(
+      [POOL_TRAINING],
+      [sheetFor(POOL_TRAINING, [{ ...MATEO, photoUrl: THUMBNAIL_URL }])],
+    );
+
+    render(<AttendanceScreen locale="es" initialSessionId={null} />);
+
+    expect(
+      within(await findRow(MATEO.fullName)).getByRole("button", {
+        name: "Abrir la foto de Mateo Restrepo",
+      }),
+    ).toHaveAttribute("aria-haspopup", "dialog");
+  });
+
+  it("quien no tiene foto enseña sus iniciales, que no se pulsan", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    const ruby = await findRow(RUBY.fullName);
+    expect(within(ruby).getByText("RT")).toBeInTheDocument();
+    expect(
+      within(ruby).queryByRole("button", { name: /Open the photo/ }),
+    ).not.toBeInTheDocument();
   });
 });
 

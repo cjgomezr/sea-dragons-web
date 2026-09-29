@@ -61,6 +61,7 @@ describe("la hoja de asistencia", () => {
         title: STARTED_TRAINING.title,
         startsAt: STARTED_TRAINING.startsAt.toISOString(),
         isSaved: false,
+        viewer: callerRole === "Admin" ? "admin" : "coach",
         members: [
           {
             userId: ANA.userId,
@@ -82,6 +83,18 @@ describe("la hoja de asistencia", () => {
           },
         ],
       });
+    },
+  );
+
+  it.each([
+    ["Admin", "admin"],
+    ["Coach", "coach"],
+  ] as const)(
+    "le dice a un %s que la mira como %s, para decidir si el nombre abre la ficha (#414)",
+    async (callerRole, viewer) => {
+      const sheet = await open({ callerRole, members: [ANA] });
+
+      expect(sheet.viewer).toBe(viewer);
     },
   );
 

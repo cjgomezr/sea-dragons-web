@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { MemberAvatar } from "@/components/MemberAvatar";
+import type { SheetViewer } from "@/lib/attendance/attendance-sheet";
 import {
   ATTENDANCE_STATUSES,
   type AttendanceStatus,
 } from "@/lib/attendance/attendance-status";
+import { MEMBER_RECORD_PATH } from "@/lib/auth/routes";
 import { positionName } from "@/lib/club/club-positions";
 import type { Translator } from "@/lib/i18n/translator";
 import type { SheetMember } from "./attendance-client";
@@ -15,19 +18,68 @@ import type { SheetMember } from "./attendance-client";
  *
  * Marcar no guarda: cambia la hoja que se está pasando, y se manda entera con
  * "Guardar asistencia". Por eso el botón se marca al momento.
+ *
+ * La foto y el nombre se comportan como en el directorio (#414): la foto se
+ * abre en grande para quien pasa lista, y al Admin el nombre le abre la ficha.
  */
 
 /** En píxeles, como `.attendance-avatar`. */
 const AVATAR_SIZE = 36;
 
+/** Quién mira la hoja y si puede salir de ella sin perder lo marcado. */
+export type RowViewer = {
+  readonly kind: SheetViewer;
+  /** Con cambios sin guardar, pregunta si se descartan. */
+  readonly canLeaveSheet: () => boolean;
+};
+
+function memberRecordHref(userId: string): string {
+  return MEMBER_RECORD_PATH.replace("[id]", userId);
+}
+
+/** Como en el directorio, el nombre accesible del enlace dice a dónde lleva y
+ * contiene el nombre visible (WCAG 2.5.3). Si no se acepta descartar lo
+ * marcado, el clic no navega. */
+function MemberName({
+  translate,
+  member,
+  viewer,
+}: {
+  readonly translate: Translator;
+  readonly member: SheetMember;
+  readonly viewer: RowViewer;
+}): React.JSX.Element {
+  if (viewer.kind === "coach") {
+    return <span className="attendance-name">{member.fullName}</span>;
+  }
+  return (
+    <Link
+      href={memberRecordHref(member.userId)}
+      className="attendance-name attendance-record-link"
+      aria-label={translate("memberRecord.openLabel", {
+        name: member.fullName,
+      })}
+      onClick={(event) => {
+        if (!viewer.canLeaveSheet()) {
+          event.preventDefault();
+        }
+      }}
+    >
+      {member.fullName}
+    </Link>
+  );
+}
+
 export function AttendanceRow({
   translate,
   member,
+  viewer,
   status,
   onMark,
 }: {
   readonly translate: Translator;
   readonly member: SheetMember;
+  readonly viewer: RowViewer;
   readonly status: AttendanceStatus;
   readonly onMark: (status: AttendanceStatus) => void;
 }): React.JSX.Element {
@@ -39,9 +91,10 @@ export function AttendanceRow({
           photoUrl={member.photoUrl}
           size={AVATAR_SIZE}
           className="attendance-avatar"
+          viewer={{ userId: member.userId, translate }}
         />
         <div className="attendance-member-text">
-          <span className="attendance-name">{member.fullName}</span>
+          <MemberName translate={translate} member={member} viewer={viewer} />
           <span className="attendance-hints">
             {member.position === null ? null : (
               <span className="attendance-position">

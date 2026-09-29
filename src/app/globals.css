@@ -4794,6 +4794,30 @@ button.notification-item-content:hover {
   overflow-wrap: break-word;
 }
 
+/* Al Admin el nombre le abre la ficha (#414), con la forma de
+   `.directory-record-link`. Mide los 44px de toque de alto de verdad: con un
+   margen negativo, la línea de la posición taparía la mitad de abajo. */
+.attendance-record-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: var(--touch-target-min);
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.attendance-record-link:hover {
+  color: var(--color-accent-text);
+}
+
+/* La foto mide 36px: su botón le suma 4px por lado, y no los 2px del
+   directorio, para llegar a los 44px sin mover la fila. */
+.attendance-member .member-photo-button {
+  margin: -4px;
+  padding: 4px;
+}
+
 .attendance-hints {
   display: flex;
   flex-wrap: wrap;
