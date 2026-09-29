@@ -42,11 +42,16 @@ export {
  *
  * Quién sale en la hoja (D1): la audiencia del entrenamiento que no está de
  * baja, más cualquiera que ya tenga fila guardada, aunque haya salido de la
- * audiencia o esté de baja. Quien no tiene fila empieza en `present`.
+ * audiencia o esté de baja. Quien no tiene fila empieza según su respuesta
+ * al RSVP (D6).
  */
 
-/** El estado con el que empieza quien todavía no tiene fila (FR-039). */
-const DEFAULT_STATUS: AttendanceStatus = "present";
+/** El estado con el que empieza quien todavía no tiene fila (FR-039, D6):
+ * quien no dijo que venía empieza en Ausente, porque un Presente que nadie
+ * revisó no se ve, infla el porcentaje y en E12 descuenta una sesión. */
+function defaultStatus(response: RsvpResponse | null): AttendanceStatus {
+  return response === "yes" || response === "maybe" ? "present" : "absent";
+}
 
 const INACTIVE_STATUS: AccountStatus = "inactive";
 
@@ -56,11 +61,11 @@ const TRAINING_TYPE: EventType = "training";
 /** En la bitácora la entidad es la sesión: "qué hoja". */
 const AUDITED_ENTITY_TYPE = "event";
 
-/** El orden de la hoja nueva: los Sí, luego los Quizás, luego el resto (D1). */
+/** El orden de la hoja: los Sí, los Quizás, quien no respondió y los No (D6). */
 const RSVP_RANK: Readonly<Record<RsvpResponse, number>> = {
   yes: 0,
   maybe: 1,
-  no: 2,
+  no: 3,
 };
 const NO_RSVP_RANK = 2;
 
@@ -148,7 +153,8 @@ export type AttendanceSheetEntry = {
   readonly photoUrl: string | null;
   readonly position: NamedPosition | null;
   readonly status: AttendanceStatus;
-  /** La respuesta al RSVP, como pista; `null` si no respondió. */
+  /** La respuesta al RSVP, que decide el grupo de la fila; `null` si no
+   * respondió. */
   readonly rsvpResponse: RsvpResponse | null;
   /** Está de baja: sólo sale si ya tenía fila guardada. */
   readonly isInactive: boolean;
@@ -365,14 +371,17 @@ export async function openAttendanceSheet(
   ]);
   const responses = new Map(rsvps.map((rsvp) => [rsvp.userId, rsvp.response]));
   const looks = await readMemberLooks(gateways, event.clubId, roster.members);
-  const entries = roster.members.map((member): AttendanceSheetEntry => ({
-    userId: member.userId,
-    fullName: member.fullName,
-    ...looks(member),
-    status: roster.recorded.get(member.userId) ?? DEFAULT_STATUS,
-    rsvpResponse: responses.get(member.userId) ?? null,
-    isInactive: member.status === INACTIVE_STATUS,
-  }));
+  const entries = roster.members.map((member): AttendanceSheetEntry => {
+    const rsvpResponse = responses.get(member.userId) ?? null;
+    return {
+      userId: member.userId,
+      fullName: member.fullName,
+      ...looks(member),
+      status: roster.recorded.get(member.userId) ?? defaultStatus(rsvpResponse),
+      rsvpResponse,
+      isInactive: member.status === INACTIVE_STATUS,
+    };
+  });
   return {
     eventId: event.id,
     title: event.title,

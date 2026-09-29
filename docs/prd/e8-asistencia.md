@@ -4,7 +4,7 @@
 
 Fuente: `docs/SRD_Victoria_Seadragons_Club_Platform.md` (v1.4), epic E8 de `docs/plan-maestro.md` y la matriz de permisos de su sección 4. Cubre FR-038 a FR-042 y los criterios AC-016, AC-017 y AC-017b, más la parte de asistencia de FR-015, FR-019 y FR-022 (la columna del directorio, su orden y el perfil). Aplica B4 (la fórmula del porcentaje) y B7 (la participación sale del RSVP y de los grupos, nunca del rol) de `docs/preguntas-abiertas.md`. Ese archivo no deja nada sin resolver para esta épica.
 
-Las decisiones que el SRD no tomaba las tomó el dueño el 28 de septiembre de 2026 y van marcadas como D1 a D5.
+Las decisiones que el SRD no tomaba las tomó el dueño el 28 de septiembre de 2026 y van marcadas como D1 a D5. El 29 de septiembre de 2026 añadió D6, que cambia el estado inicial de FR-039 y el orden de D1.
 
 ## 1. Problema
 
@@ -66,9 +66,9 @@ Una fila por sesión y miembro, con su estado, quién la registró y cuándo. So
 
 La lista de quién se espera en la sesión, con el estado de cada uno, para marcar.
 
-- **Dado** un Admin o un Coach, **cuando** abre la hoja de un entrenamiento, **entonces** ve a cada miembro activo de la audiencia del evento, sea cual sea su rol (B7), con su estado: el guardado si la hoja ya se guardó, y `present` si es nueva (FR-039).
-- **Dado** una hoja nueva, **cuando** se lista, **entonces** los que respondieron "Sí" al RSVP van primero, luego los "Quizás", luego los demás, y dentro de cada grupo por nombre; cada fila enseña la respuesta que dio, como pista (D1).
-- **Dado** una hoja ya guardada, **cuando** se lista, **entonces** salen todos los que tienen fila guardada aunque hayan salido de la audiencia o estén de baja, con la marca de baja si aplica, más quien entró en la audiencia después, en `present` (D1).
+- **Dado** un Admin o un Coach, **cuando** abre la hoja de un entrenamiento, **entonces** ve a cada miembro activo de la audiencia del evento, sea cual sea su rol (B7), con su estado: el guardado si la hoja ya se guardó; si es nueva, `present` para quien respondió "Sí" o "Quizás" y `absent` para quien respondió "No" o no respondió (FR-039, D6). Los totales lo reflejan antes de tocar nada.
+- **Dado** una hoja, nueva o guardada, **cuando** se lista, **entonces** las filas van en cuatro grupos con cabecera y en este orden: "Confirmaron" (Sí), "Quizás", "Sin respuesta" y "Dijeron que no"; dentro de cada grupo por nombre. Un grupo sin nadie no se pinta (D1, D6).
+- **Dado** una hoja ya guardada, **cuando** se lista, **entonces** salen todos los que tienen fila guardada aunque hayan salido de la audiencia o estén de baja, con la marca de baja si aplica, más quien entró en la audiencia después, con el estado que le daría una hoja nueva según su respuesta (D1, D6).
 - **Dado** un Coach que no está en la audiencia del entrenamiento, **cuando** abre la hoja, **entonces** la ve igual: para asistencia, Admin y Coach ven todos los entrenamientos del club.
 - **Dado** un Committee o un Player, **cuando** pide la hoja, **entonces** recibe 403.
 - **Dado** un evento que no es de entrenamiento, de otro club o que no existe, **cuando** se pide su hoja, **entonces** 404.
@@ -128,7 +128,7 @@ Sigue `docs/mockups/attendance-light.png` y `attendance-dark.png`.
 
 - **Sin entrenamientos empezados en 30 días:** la pantalla lo dice con una frase y ofrece ir al calendario.
 - **Audiencia vacía:** un entrenamiento cuyo grupo se borró tiene hoja vacía; la pantalla lo dice y no hay nada que guardar.
-- **Un miembro entra en la audiencia después de guardar la hoja:** aparece en `present` la próxima vez que se abre, sin fila hasta que se vuelve a guardar; su porcentaje no cuenta esa sesión mientras tanto.
+- **Un miembro entra en la audiencia después de guardar la hoja:** aparece según su respuesta al RSVP (D6) la próxima vez que se abre, sin fila hasta que se vuelve a guardar; su porcentaje no cuenta esa sesión mientras tanto.
 - **Un miembro sale de la audiencia o pasa a `inactive` después de guardar:** su fila se queda y sigue contando en su historial (FR-085).
 - **Cancelan un entrenamiento después de pasar lista:** las filas se quedan pero la sesión deja de contar para el porcentaje y no se puede volver a guardar.
 - **Editan la hora del entrenamiento a una futura después de pasar lista:** la hoja queda como está y no se puede volver a guardar hasta que empiece.
@@ -142,10 +142,10 @@ Sigue `docs/mockups/attendance-light.png` y `attendance-dark.png`.
 
 - Mockups: `docs/mockups/attendance-light.png` y `attendance-dark.png`. No hay mockup móvil: revisión heurística contra `design-system.md` siguiendo el de escritorio, con los tres botones a lo ancho de la fila como el RSVP del calendario. La columna del directorio y el bloque del perfil siguen sus mockups existentes (`directory-*.png`, `mobile-profile-*.png`).
 - Pantallas:
-  - **Asistencia (Admin, Coach):** ruta `/asistencia`, con entrada "Asistencia" en el menú solo para ellos, entre Calendario y Equipos como en el mockup. Cabecera con título y fecha de la sesión y el botón de guardar; fichas de las sesiones recientes; tres contadores con su punto de color; lista con avatar, nombre, chip de posición, la pista del RSVP y el segmento `Presente · Tarde · Ausente`.
+  - **Asistencia (Admin, Coach):** ruta `/asistencia`, con entrada "Asistencia" en el menú solo para ellos, entre Calendario y Equipos como en el mockup. Cabecera con título y fecha de la sesión y el botón de guardar; fichas de las sesiones recientes; tres contadores con su punto de color; lista agrupada por la respuesta al RSVP, con una cabecera por grupo, y en cada fila avatar, nombre, chip de posición y el segmento `Presente · Tarde · Ausente` (D6).
   - **Directorio:** la columna de asistencia y "Asistencia" en el control de orden.
   - **Perfil y ficha:** "Asistencia" con el porcentaje grande y "N sesiones" debajo, o "Sin datos".
-- Flujo principal: el Coach abre Asistencia al empezar la sesión, ve a todos en Presente con los que dijeron "Sí" arriba, toca "Tarde" en dos y "Ausente" en uno, ve 11 · 2 · 1, guarda y lee la confirmación.
+- Flujo principal: el Coach abre Asistencia al empezar la sesión, ve en Presente a los que dijeron "Sí" o "Quizás", arriba y agrupados, y en Ausente al resto, toca "Tarde" en dos y "Ausente" en uno, ve 11 · 2 · 1, guarda y lee la confirmación.
 - Viewports: 375 / 768 / 1440, en tema claro y oscuro, en inglés y en español.
 
 ## 8. Requerimientos no funcionales
@@ -161,11 +161,12 @@ Sigue `docs/mockups/attendance-light.png` y `attendance-dark.png`.
 
 Ninguna que bloquee. Las decisiones del dueño:
 
-- **D1 · Quién aparece en la hoja:** toda la audiencia del entrenamiento, con los que dijeron "Sí" primero y la respuesta de cada uno como pista. Quien tiene fila guardada aparece siempre.
+- **D1 · Quién aparece en la hoja:** toda la audiencia del entrenamiento, agrupada por la respuesta al RSVP (D6). Quien tiene fila guardada aparece siempre.
 - **D2 · Qué sesiones cuentan:** solo eventos de tipo `training`, como pide FR-042.
 - **D3 · Sin hoja guardada no hay sesión elegible:** una sesión que nadie pasó no cuenta para nadie. Es la única lectura de FR-042 que no inventa estados.
 - **D4 · Desde cuándo se pasa lista:** desde la hora de inicio de la sesión; antes, 422.
 - **D5 · Correcciones:** Admin y Coach editan sin límite de tiempo, y queda en la bitácora.
+- **D6 · Estado inicial y grupos (29 de septiembre de 2026):** quien no dijo que venía empieza en Ausente. Un Presente que nadie revisó no se ve, infla el porcentaje y en E12 descuenta una sesión del bono (FR-064). La hoja se agrupa por respuesta con cabecera ("Confirmaron", "Quizás", "Sin respuesta", "Dijeron que no") para que el Coach vea de un vistazo a quién le toca revisar; la pista del RSVP de cada fila desaparece. Lo ya guardado no se recalcula (#412).
 
 ## 10. Descomposición en tickets (para write-ticket)
 

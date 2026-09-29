@@ -179,8 +179,8 @@ describeRls("la hoja de asistencia en Supabase", () => {
         expect(
           fresh.members.map((entry) => [entry.fullName, entry.status]),
         ).toEqual([
-          ["Carla Coach", "present"],
-          ["Pía Player", "present"],
+          ["Carla Coach", "absent"],
+          ["Pía Player", "absent"],
         ]);
 
         await expect(

@@ -11236,7 +11236,8 @@ const FIRST_ATTENDEE = "Mateo Restrepo";
 const LONG_NAMED_ATTENDEE =
   "Maximiliana Alejandra Fernández-Rodríguez de la Torre";
 
-/** Los del mockup, con sus estados, más un nombre de tres veces lo normal
+/** Los del mockup, con sus estados, en los cuatro grupos por respuesta y
+ * con quien no dijo que venía en Ausente (#412), más un nombre de tres veces lo normal
  * para el caso de contenido largo y una cuenta desactivada con fila. */
 const ATTENDANCE_MEMBERS: readonly StubbedAttendanceMember[] = [
   attendanceMember(FIRST_ATTENDEE, "forward", "present", "yes"),
@@ -11246,14 +11247,14 @@ const ATTENDANCE_MEMBERS: readonly StubbedAttendanceMember[] = [
   attendanceMember("Santiago Herrera", "defender", "present", "yes"),
   attendanceMember("Ruby Tan", "goalkeeper", "absent", "maybe"),
   attendanceMember("Camila Ortiz", "forward", "present", "maybe"),
-  attendanceMember("Jack Thompson", "defender", "present", null),
-  attendanceMember(LONG_NAMED_ATTENDEE, "forward", "present", null),
-  attendanceMember("Noah Williams", "goalkeeper", "absent", "no"),
-  attendanceMember("Ethan Brown", "forward", "late", "no"),
+  attendanceMember("Jack Thompson", "defender", "absent", null),
+  attendanceMember(LONG_NAMED_ATTENDEE, "forward", "absent", null),
   {
-    ...attendanceMember("Oliver Smith", null, "present", null),
+    ...attendanceMember("Oliver Smith", null, "absent", null),
     isInactive: true,
   },
+  attendanceMember("Noah Williams", "goalkeeper", "absent", "no"),
+  attendanceMember("Ethan Brown", "forward", "late", "no"),
 ];
 
 function stubbedAttendanceSheet(
@@ -11509,20 +11510,38 @@ test.describe("asistencia en el navegador", () => {
   }) => {
     const saved = await goToAttendance(page, ATTENDANCE_SHEET_STATE);
     const totals = page.getByRole("list", { name: "Totals" });
-    await expect(totals).toHaveText(/^9Present1Late2Absent$/);
+    await expect(totals).toHaveText(/^6Present1Late5Absent$/);
 
     await attendanceRow(page, FIRST_ATTENDEE)
       .getByRole("button", { name: "Late" })
       .click();
-    await expect(totals).toHaveText(/^8Present2Late2Absent$/);
+    await expect(totals).toHaveText(/^5Present2Late5Absent$/);
     await page.getByRole("button", { name: ATTENDANCE_SAVE }).dblclick();
 
     await expect(
-      page.getByText("Attendance saved: 8 present, 2 late, 2 absent."),
+      page.getByText("Attendance saved: 5 present, 2 late, 5 absent."),
     ).toBeVisible();
     expect(saved.map((body) => body.records.length)).toEqual([
       ATTENDANCE_MEMBERS.length,
     ]);
+  });
+
+  test("agrupa la hoja en cuatro regiones, en el orden de las respuestas", async ({
+    page,
+  }) => {
+    await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+
+    await expect(page.getByRole("heading", { level: 2 })).toHaveText([
+      "Confirmed",
+      "Maybe",
+      "No response",
+      "Said no",
+    ]);
+    await expect(
+      page
+        .getByRole("region", { name: "Said no" })
+        .getByRole("group", { name: "Noah Williams" }),
+    ).toBeVisible();
   });
 
   test("cambiar de sesión con cambios sin guardar pregunta antes", async ({

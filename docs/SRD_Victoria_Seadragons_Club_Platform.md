@@ -181,7 +181,7 @@ Permission matrix (from the validated prototype):
 | ID | Requirement |
 |---|---|
 | FR-038 | The system shall allow an Admin or Coach to record each member's attendance for a training session as Present, Late, or Absent. |
-| FR-039 | The system shall default each member's attendance status to Present for a new session record. |
+| FR-039 | The system shall default each member's attendance status for a new session record from their RSVP: Present for "Yes" or "Maybe", Absent for "No" or no response. *(Cambiado el 29 de septiembre de 2026 por el dueño; antes todos empezaban en Present. D6 del PRD de E8.)* |
 | FR-040 | The system shall display live summary counts of Present, Late, and Absent while attendance is being recorded. |
 | FR-041 | The system shall persist a session's attendance records when the recorder saves, and confirm the save to the recorder. |
 | FR-042 | The system shall compute each member's attendance percentage as `(Present + Late) / eligible sessions`, where an eligible session is a Training event whose target audience included the member and whose date falls on or after the member's join date; the result is rounded to the nearest whole percent and displayed in the directory, member profile, and dashboard statistics. Where a member has zero eligible sessions the system shall display "no data" rather than 0%. |
@@ -314,7 +314,7 @@ Permission matrix (from the validated prototype):
 - **AC-013** *(FR-028, FR-037)* — Given a Committee member creating a one-time Competition event targeted to "Senior Squad", When they save it, Then the event shall appear only in Senior Squad members' calendars and each of those members shall receive a notification.
 - **AC-014** *(FR-030, FR-031)* — Given a weekly recurring Training event on Tuesdays and Thursdays from 1 July to 31 August, When it is created, Then one event occurrence shall exist for every Tuesday and Thursday in that range.
 - **AC-015** *(FR-034, FR-035, FR-036)* — Given a targeted member viewing an event, When they select "Maybe" and later change to "Yes" before the event starts, Then the stored RSVP shall be "Yes" and the event's aggregate counts shall update accordingly.
-- **AC-016** *(FR-038, FR-039, FR-040, FR-041)* — Given a Coach opening attendance for a session, Then every rostered member shall default to Present; When the Coach marks two members Late and one Absent and saves, Then the summary shall read the correct counts, the records shall persist, and a save confirmation shall be shown.
+- **AC-016** *(FR-038, FR-039, FR-040, FR-041)* — Given a Coach opening attendance for a session, Then every rostered member who answered "Yes" or "Maybe" shall default to Present and everyone else to Absent, grouped under "Confirmed", "Maybe", "No response" and "Said no" *(cambiado el 29 de septiembre de 2026 por el dueño)*; When the Coach marks two members Late and one Absent and saves, Then the summary shall read the correct counts, the records shall persist, and a save confirmation shall be shown.
 - **AC-017** *(FR-042)* — Given a member who joined on 1 May and was targeted at 10 Training sessions dated on or after that day, of which 9 are recorded Present or Late, Then their displayed attendance shall be 90%; Given the club also held Training sessions in April and sessions the member was not targeted at, Then those shall not change the number.
 - **AC-017b** *(FR-042)* — Given a member targeted at zero Training sessions since joining, Then the directory, their profile and the dashboard shall show "no data" rather than 0%.
 

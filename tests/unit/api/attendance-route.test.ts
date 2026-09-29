@@ -170,7 +170,7 @@ afterEach(() => {
 
 describe("GET /api/v1/attendance/[eventId]", () => {
   it.each<Role>(["Coach", "Admin"])(
-    "sirve a un %s la hoja con toda la audiencia",
+    "sirve a un %s la hoja con toda la audiencia, en absent sin RSVP",
     async (role) => {
       givenSession({ kind: "active", role });
 
@@ -181,8 +181,8 @@ describe("GET /api/v1/attendance/[eventId]", () => {
         data: { members: { userId: string; status: string }[] };
       };
       expect(body.data.members.map((entry) => entry.status)).toEqual([
-        "present",
-        "present",
+        "absent",
+        "absent",
       ]);
     },
   );
