@@ -4,7 +4,9 @@
  * base es cosa del handler.
  */
 
-export type PositionCoverage = "goalkeeper" | "defender" | "forward";
+import type { PositionCoverage } from "@/lib/club/club-positions";
+
+export type { PositionCoverage };
 
 export type SquadPlayer = {
   readonly userId: string;

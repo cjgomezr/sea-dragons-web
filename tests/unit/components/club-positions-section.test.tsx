@@ -2,45 +2,50 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClubPositionsSection } from "@/components/club/ClubPositionsSection";
-import type { ClubPosition } from "@/lib/club/club-positions";
+import type { ManagedPosition } from "@/lib/club/manage-club-positions";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
 
 /**
  * La sección de posiciones de la configuración del club (#300, RF-7 del PRD
  * de E18a): el Admin ve las activas en su orden y las archivadas aparte, y
- * crea, renombra, reordena (también con el teclado), archiva y reactiva. El
+ * crea, renombra, reordena (también con el teclado), archiva y reactiva. Y
+ * le dice a cada una qué función cubre en el auto-balance (#404). El
  * servidor es un doble que guarda el catálogo en memoria.
  */
 
 const POSITIONS_PATH = "/api/v1/club/settings/positions";
 const ORDER_PATH = `${POSITIONS_PATH}/order`;
 
-const GOALKEEPER: ClubPosition = {
+const GOALKEEPER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000001",
   names: { en: "Goalkeeper", es: "Portería" },
   isArchived: false,
+  coverage: "goalkeeper",
 };
-const DEFENDER: ClubPosition = {
+const DEFENDER: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000002",
   names: { en: "Defender", es: "Defensa" },
   isArchived: false,
+  coverage: "defender",
 };
-const FORWARD: ClubPosition = {
+const FORWARD: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000003",
   names: { en: "Forward", es: "Ataque" },
   isArchived: false,
+  coverage: "forward",
 };
-const UTILITY: ClubPosition = {
+const UTILITY: ManagedPosition = {
   id: "00000000-0000-4000-8000-000000000004",
   names: { en: "Utility", es: null },
   isArchived: true,
+  coverage: null,
 };
 const NEW_POSITION_ID = "00000000-0000-4000-8000-000000000005";
 
 type Request = { readonly method: string; readonly url: string; body: unknown };
 
-let catalog: ClubPosition[];
+let catalog: ManagedPosition[];
 let requests: Request[];
 /** La respuesta de la próxima petición que no sea la carga, si no es la del
  * doble. */
@@ -81,8 +86,9 @@ function applyWrite(request: Request): Response {
       ...catalog,
       {
         id: NEW_POSITION_ID,
-        names: body.names as ClubPosition["names"],
+        names: body.names as ManagedPosition["names"],
         isArchived: false,
+        coverage: null,
       },
     ];
     return catalogResponse(201);
@@ -92,9 +98,16 @@ function applyWrite(request: Request): Response {
     if (position.id !== positionId) {
       return position;
     }
-    return "names" in body
-      ? { ...position, names: body.names as ClubPosition["names"] }
-      : { ...position, isArchived: body.isArchived as boolean };
+    if ("names" in body) {
+      return { ...position, names: body.names as ManagedPosition["names"] };
+    }
+    if ("coverage" in body) {
+      return {
+        ...position,
+        coverage: body.coverage as ManagedPosition["coverage"],
+      };
+    }
+    return { ...position, isArchived: body.isArchived as boolean };
   });
   return catalogResponse();
 }
@@ -479,6 +492,120 @@ describe("pantalla de posiciones", () => {
     expect(
       await screen.findByRole("list", { name: "Active positions" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("la función de cada posición", () => {
+  function coverageOf(name: string): HTMLElement {
+    return screen.getByRole("combobox", { name: `Role of ${name}` });
+  }
+
+  it("enseña la función de cada posición, archivadas incluidas", async () => {
+    await renderSection();
+
+    expect(coverageOf("Goalkeeper")).toHaveDisplayValue("Goalkeeper");
+    expect(coverageOf("Defender")).toHaveDisplayValue("Defender");
+    expect(coverageOf("Forward")).toHaveDisplayValue("Forward");
+    expect(coverageOf("Utility")).toHaveDisplayValue("No role");
+  });
+
+  it("ofrece las tres funciones y ninguna", async () => {
+    await renderSection();
+
+    expect(
+      within(coverageOf("Goalkeeper"))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["No role", "Goalkeeper", "Defender", "Forward"]);
+  });
+
+  it("no deja guardar hasta que la función cambia", async () => {
+    await renderSection();
+
+    expect(
+      screen.getByRole("button", { name: "Save role of Forward" }),
+    ).toBeDisabled();
+  });
+
+  it("guarda la función nueva, la enseña y lo anuncia", async () => {
+    await renderSection();
+
+    await userEvent.selectOptions(coverageOf("Forward"), "Defender");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Save role of Forward" }),
+    );
+
+    expect(
+      await screen.findByText("Forward now counts as Defender."),
+    ).toHaveAttribute("aria-live", "polite");
+    expect(requests).toEqual([
+      {
+        method: "PATCH",
+        url: `${POSITIONS_PATH}/${FORWARD.id}`,
+        body: { coverage: "defender" },
+      },
+    ]);
+    // Dos posiciones pueden compartir función.
+    expect(coverageOf("Forward")).toHaveDisplayValue("Defender");
+    expect(coverageOf("Defender")).toHaveDisplayValue("Defender");
+    expect(
+      screen.getByRole("button", { name: "Save role of Forward" }),
+    ).toBeDisabled();
+    expect(coverageOf("Forward")).toHaveFocus();
+  });
+
+  it("le quita la función con la opción de ninguna", async () => {
+    await renderSection();
+
+    await userEvent.selectOptions(coverageOf("Goalkeeper"), "No role");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Save role of Goalkeeper" }),
+    );
+
+    expect(
+      await screen.findByText("Goalkeeper no longer counts as any role."),
+    ).toBeInTheDocument();
+    expect(requests[0]?.body).toEqual({ coverage: null });
+  });
+
+  it("tras un fallo de red conserva la elegida y reintenta con un botón", async () => {
+    await renderSection();
+    nextWriteResponse = networkFailure;
+
+    await userEvent.selectOptions(coverageOf("Forward"), "Goalkeeper");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Save role of Forward" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /couldn't reach the server/i,
+    );
+    expect(coverageOf("Forward")).toHaveDisplayValue("Goalkeeper");
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await vi.waitFor(() =>
+      expect(catalog.find(({ id }) => id === FORWARD.id)?.coverage).toBe(
+        "goalkeeper",
+      ),
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("en español nombra la función de cada posición", async () => {
+    await renderSection("es");
+
+    const control = screen.getByRole("combobox", {
+      name: "Función de Portería",
+    });
+    expect(control).toHaveDisplayValue("Portero");
+    expect(
+      within(control)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["Sin función", "Portero", "Defensa", "Ataque"]);
+    expect(
+      screen.getByRole("button", { name: "Guardar la función de Portería" }),
+    ).toBeDisabled();
   });
 });
 

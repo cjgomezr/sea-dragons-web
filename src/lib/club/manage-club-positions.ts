@@ -5,7 +5,11 @@ import {
   recordAuditEvent,
 } from "@/lib/audit/audit-log";
 import type { Locale } from "@/lib/i18n/locale";
-import type { ClubPositions, PositionNames } from "./club-positions";
+import type {
+  ClubPosition,
+  PositionCoverage,
+  PositionNames,
+} from "./club-positions";
 import { type ClubSettingsGateways, findAdministrator } from "./club-settings";
 
 /**
@@ -17,6 +21,15 @@ import { type ClubSettingsGateways, findAdministrator } from "./club-settings";
  * tienen. Cada acción devuelve el catálogo entero tal como quedó, que es lo
  * que la pantalla vuelve a pintar.
  */
+
+/** Una posición tal como la ve el Admin: con su función (#404), que sólo se
+ * enseña en la configuración y la usa el team builder. `null` es "ninguna". */
+export type ManagedPosition = ClubPosition & {
+  readonly coverage: PositionCoverage | null;
+};
+
+/** Todas las del club, archivadas incluidas, en el orden que decidió. */
+export type ManagedPositions = readonly ManagedPosition[];
 
 /** El límite de `club_position_names_name_length` en `0025`. */
 export const POSITION_NAME_MAX_LENGTH = 40;
@@ -40,7 +53,10 @@ export type PositionNamesInput = {
 
 export const POSITIONS_CHANGED_REASON = "club_positions_changed";
 
-type PositionTarget = { readonly clubId: string; readonly positionId: string };
+export type PositionTarget = {
+  readonly clubId: string;
+  readonly positionId: string;
+};
 
 export type PositionInsertResult =
   | { readonly kind: "created"; readonly positionId: string }
@@ -59,11 +75,13 @@ export type PositionArchiveResult =
   | { readonly kind: "unchanged" }
   | { readonly kind: "not_found" };
 
+export type PositionCoverageResult = PositionArchiveResult;
+
 export type ManagedPositionsGateways = {
   readonly members: ClubSettingsGateways["members"];
   readonly positions: {
     /** Todas, archivadas incluidas, en el orden del club. */
-    findClubPositions(clubId: string): Promise<ClubPositions>;
+    findClubPositions(clubId: string): Promise<ManagedPositions>;
     insertPosition(
       clubId: string,
       names: PositionNames,
@@ -81,6 +99,10 @@ export type ManagedPositionsGateways = {
       target: PositionTarget,
       isArchived: boolean,
     ): Promise<PositionArchiveResult>;
+    setPositionCoverage(
+      target: PositionTarget,
+      coverage: PositionCoverage | null,
+    ): Promise<PositionCoverageResult>;
   };
   readonly audit: AuditLogWriter;
 };
@@ -174,14 +196,16 @@ function nameTaken(locale: Locale): PositionValidationError {
   return new PositionValidationError([{ code: TAKEN_ISSUE[locale] }]);
 }
 
-/** Sin metadata salvo al reordenar: quién, qué y sobre qué ya están en la
- * entrada, y el nombre no hace falta para saber qué pasó. */
+/** Sin metadata salvo al reordenar y al cambiar la función: quién, qué y
+ * sobre qué ya están en la entrada, y el nombre no hace falta para saber qué
+ * pasó. */
 function recordPositionEvent(
   gateways: ManagedPositionsGateways,
   event: {
     readonly actor: AuditActor;
     readonly action: AuditAction;
     readonly positionId: string;
+    readonly metadata?: Record<string, unknown>;
   },
 ): Promise<void> {
   return recordAuditEvent(gateways.audit, {
@@ -191,6 +215,7 @@ function recordPositionEvent(
     entityType: POSITION_ENTITY_TYPE,
     entityId: event.positionId,
     result: "success",
+    metadata: event.metadata,
   });
 }
 
@@ -205,7 +230,7 @@ async function findAdministratorActor(
 export async function listManagedPositions(
   gateways: ManagedPositionsGateways,
   callerId: string,
-): Promise<ClubPositions> {
+): Promise<ManagedPositions> {
   const actor = await findAdministratorActor(gateways, callerId);
   return gateways.positions.findClubPositions(actor.clubId);
 }
@@ -215,7 +240,7 @@ export async function listManagedPositions(
 export async function createPosition(
   gateways: ManagedPositionsGateways,
   request: { readonly callerId: string; readonly names: PositionNamesInput },
-): Promise<ClubPositions> {
+): Promise<ManagedPositions> {
   const names = validNames(request.names);
   const actor = await findAdministratorActor(gateways, request.callerId);
   const result = await gateways.positions.insertPosition(actor.clubId, names);
@@ -237,7 +262,7 @@ export async function renamePosition(
     readonly positionId: string;
     readonly names: PositionNamesInput;
   },
-): Promise<ClubPositions> {
+): Promise<ManagedPositions> {
   const names = validNames(request.names);
   const actor = await findAdministratorActor(gateways, request.callerId);
   const result = await gateways.positions.renamePosition(
@@ -268,7 +293,7 @@ export async function reorderPositions(
     readonly callerId: string;
     readonly positionIds: readonly string[];
   },
-): Promise<ClubPositions> {
+): Promise<ManagedPositions> {
   const actor = await findAdministratorActor(gateways, request.callerId);
   const result = await gateways.positions.reorderPositions(
     actor.clubId,
@@ -297,7 +322,7 @@ export async function setPositionArchived(
     readonly positionId: string;
     readonly isArchived: boolean;
   },
-): Promise<ClubPositions> {
+): Promise<ManagedPositions> {
   const actor = await findAdministratorActor(gateways, request.callerId);
   const result = await gateways.positions.setPositionArchived(
     { clubId: actor.clubId, positionId: request.positionId },
@@ -313,6 +338,36 @@ export async function setPositionArchived(
         ? "club_position.archived"
         : "club_position.reactivated",
       positionId: request.positionId,
+    });
+  }
+  return gateways.positions.findClubPositions(actor.clubId);
+}
+
+/** Dos posiciones pueden compartir función. Dejarle la que ya tiene no es un
+ * cambio, y no se anota; el cambio sí, con la función nueva. */
+export async function setPositionCoverage(
+  gateways: ManagedPositionsGateways,
+  request: {
+    readonly callerId: string;
+    readonly positionId: string;
+    readonly coverage: PositionCoverage | null;
+  },
+): Promise<ManagedPositions> {
+  const { coverage } = request;
+  const actor = await findAdministratorActor(gateways, request.callerId);
+  const result = await gateways.positions.setPositionCoverage(
+    { clubId: actor.clubId, positionId: request.positionId },
+    coverage,
+  );
+  if (result.kind === "not_found") {
+    throw new PositionNotFoundError();
+  }
+  if (result.kind === "changed") {
+    await recordPositionEvent(gateways, {
+      actor,
+      action: "club_position.coverage_changed",
+      positionId: request.positionId,
+      metadata: { coverage },
     });
   }
   return gateways.positions.findClubPositions(actor.clubId);

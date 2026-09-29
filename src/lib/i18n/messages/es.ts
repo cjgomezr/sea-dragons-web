@@ -1060,6 +1060,23 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.positions.archived":
     "{name} archivada: quien la tiene la conserva.",
   "clubSettings.positions.reactivated": "{name} se puede volver a elegir.",
+  // La función de cada posición en el auto-balance (#404). Sólo se ve aquí.
+  // Aquí sí va "Portero": es lo que cubre la posición, como pide el ticket.
+  "clubSettings.positions.coverage.hint":
+    "La función le dice al team builder si una posición cuenta como portero, defensa o ataque al equilibrar los equipos. Los miembros no la ven.",
+  "clubSettings.positions.coverage.label": "Función",
+  "clubSettings.positions.coverage.control.label": "Función de {name}",
+  "clubSettings.positions.coverage.none": "Sin función",
+  "clubSettings.positions.coverage.goalkeeper": "Portero",
+  "clubSettings.positions.coverage.defender": "Defensa",
+  "clubSettings.positions.coverage.forward": "Ataque",
+  "clubSettings.positions.coverage.save": "Guardar",
+  "clubSettings.positions.coverage.save.label": "Guardar la función de {name}",
+  "clubSettings.positions.coverage.saving": "Guardando…",
+  "clubSettings.positions.coverage.saved":
+    "{name} ahora cuenta como {coverage}.",
+  "clubSettings.positions.coverage.cleared":
+    "{name} ya no cuenta con ninguna función.",
   "clubSettings.positions.retry": "Volver a intentarlo",
   "clubSettings.positions.reloadLatest": "Cargar las últimas posiciones",
   "clubSettings.positions.issue.nameRequired":

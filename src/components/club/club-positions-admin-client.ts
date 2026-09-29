@@ -10,8 +10,12 @@ import {
   CLUB_SETTINGS_POSITIONS_API_PATH,
   CLUB_SETTINGS_POSITIONS_ORDER_API_PATH,
 } from "@/lib/auth/routes";
-import type { ClubPositions } from "@/lib/club/club-positions";
 import {
+  POSITION_COVERAGES,
+  type PositionCoverage,
+} from "@/lib/club/club-positions";
+import {
+  type ManagedPositions,
   POSITION_ISSUE_CODES,
   POSITION_NAME_MAX_LENGTH,
   POSITIONS_CHANGED_REASON,
@@ -30,12 +34,17 @@ import { namedPositionSchema } from "./positions-client";
 
 const responseSchema = z.object({
   data: z.object({
-    positions: z.array(namedPositionSchema.extend({ isArchived: z.boolean() })),
+    positions: z.array(
+      namedPositionSchema.extend({
+        isArchived: z.boolean(),
+        coverage: z.enum(POSITION_COVERAGES).nullable(),
+      }),
+    ),
   }),
 });
 
 export type ManagedPositionsRead =
-  | { readonly kind: "loaded"; readonly positions: ClubPositions }
+  | { readonly kind: "loaded"; readonly positions: ManagedPositions }
   | ApiRequestFailure;
 
 async function readPositionsResponse(
@@ -87,6 +96,14 @@ export function setManagedPositionArchived(
   isArchived: boolean,
 ): Promise<ManagedPositionsRead> {
   return sendJson(positionPath(positionId), "PATCH", { isArchived });
+}
+
+/** `null` le quita la función. */
+export function setManagedPositionCoverage(
+  positionId: string,
+  coverage: PositionCoverage | null,
+): Promise<ManagedPositionsRead> {
+  return sendJson(positionPath(positionId), "PATCH", { coverage });
 }
 
 export function reorderManagedPositions(

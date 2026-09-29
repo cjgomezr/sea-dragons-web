@@ -5,10 +5,14 @@ import { usePendingAction } from "@/components/groups/use-pending-action";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import {
   type ClubPosition,
-  type ClubPositions,
+  type PositionCoverage,
   positionName,
 } from "@/lib/club/club-positions";
-import type { PositionNamesInput } from "@/lib/club/manage-club-positions";
+import type {
+  ManagedPosition,
+  ManagedPositions,
+  PositionNamesInput,
+} from "@/lib/club/manage-club-positions";
 import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
 import {
@@ -20,6 +24,7 @@ import {
   renameManagedPosition,
   reorderManagedPositions,
   setManagedPositionArchived,
+  setManagedPositionCoverage,
 } from "./club-positions-admin-client";
 import {
   ActivePositionItem,
@@ -30,6 +35,11 @@ import {
   type Direction,
 } from "./ClubPositionItems";
 import {
+  coverageFocusKey,
+  describeCoverage,
+  PositionCoverageControl,
+} from "./PositionCoverageControl";
+import {
   type PositionFormOutcome,
   PositionNamesForm,
 } from "./PositionNamesForm";
@@ -37,7 +47,8 @@ import {
 /**
  * Las posiciones del club dentro de su configuración (#300, RF-7 del PRD de
  * E18a). El Admin ve las activas en su orden y las archivadas aparte, y las
- * crea, renombra, reordena, archiva y reactiva.
+ * crea, renombra, reordena, archiva y reactiva. Cada una lleva además su
+ * función en el auto-balance (#404), que sólo se ve aquí.
  *
  * Reordenar se hace con botones de subir y bajar, no arrastrando, para que
  * se pueda con el teclado. Cada movimiento manda la lista entera en el orden
@@ -60,7 +71,7 @@ type PositionsAction = {
   readonly key: string;
   readonly send: () => Promise<ManagedPositionsRead>;
   /** Lo que se anuncia cuando sale bien, con el catálogo que quedó. */
-  readonly describeDone: (positions: ClubPositions) => string;
+  readonly describeDone: (positions: ManagedPositions) => string;
 };
 
 const TITLE_ID = "club-posiciones";
@@ -71,13 +82,13 @@ const CREATE_ACTION = "create";
 
 const EMPTY_NAMES: PositionNamesInput = { en: null, es: null };
 
-function activeOf(positions: ClubPositions): ClubPositions {
+function activeOf(positions: ManagedPositions): ManagedPositions {
   return positions.filter((position) => !position.isArchived);
 }
 
 /** Las activas con `positionId` cambiada de sitio con su vecina. */
 function movedOrder(
-  active: ClubPositions,
+  active: ManagedPositions,
   positionId: string,
   direction: Direction,
 ): readonly string[] {
@@ -183,7 +194,7 @@ export function ClubPositionsSection({
     focusAfterUpdate.current = null;
     if (key !== null) {
       sectionRef.current
-        ?.querySelector<HTMLButtonElement>(`[${FOCUS_KEY_ATTRIBUTE}="${key}"]`)
+        ?.querySelector<HTMLElement>(`[${FOCUS_KEY_ATTRIBUTE}="${key}"]`)
         ?.focus();
     }
   }, [state, editingId]);
@@ -231,8 +242,8 @@ export function ClubPositionsSection({
   }
 
   async function move(
-    active: ClubPositions,
-    position: ClubPosition,
+    active: ManagedPositions,
+    position: ManagedPosition,
     direction: Direction,
   ): Promise<void> {
     const isMoved = await runListAction({
@@ -274,6 +285,29 @@ export function ClubPositionsSection({
     });
   }
 
+  async function saveCoverage(
+    position: ManagedPosition,
+    coverage: PositionCoverage | null,
+  ): Promise<void> {
+    const isSaved = await runListAction({
+      key: coverageFocusKey(position.id),
+      send: () => setManagedPositionCoverage(position.id, coverage),
+      describeDone: () =>
+        coverage === null
+          ? translate("clubSettings.positions.coverage.cleared", {
+              name: nameOf(position),
+            })
+          : translate("clubSettings.positions.coverage.saved", {
+              name: nameOf(position),
+              coverage: describeCoverage(translate, coverage),
+            }),
+    });
+    if (isSaved) {
+      // El botón pulsado queda desactivado: el foco vuelve a la función.
+      focusAfterUpdate.current = coverageFocusKey(position.id);
+    }
+  }
+
   function closeEditor(positionId: string): void {
     focusAfterUpdate.current = renameFocusKey(positionId);
     setEditingId(null);
@@ -312,7 +346,24 @@ export function ClubPositionsSection({
 
   const isBusy = pending !== null;
 
-  function renderActive(active: ClubPositions): React.JSX.Element {
+  /** Se monta otra vez cuando cambia la función guardada, y así el borrador
+   * empieza por la del servidor. */
+  function renderCoverage(position: ManagedPosition): React.JSX.Element {
+    return (
+      <PositionCoverageControl
+        key={`${position.id}:${position.coverage ?? "none"}`}
+        translate={translate}
+        positionId={position.id}
+        name={nameOf(position)}
+        coverage={position.coverage}
+        isBusy={isBusy}
+        isSaving={pending === coverageFocusKey(position.id)}
+        onSave={(coverage) => void saveCoverage(position, coverage)}
+      />
+    );
+  }
+
+  function renderActive(active: ManagedPositions): React.JSX.Element {
     if (active.length === 0) {
       return (
         <p className="admin-empty">
@@ -332,6 +383,7 @@ export function ClubPositionsSection({
             total={active.length}
             isBusy={isBusy}
             isEditing={editingId === position.id}
+            coverageControl={renderCoverage(position)}
             onMove={(direction) => void move(active, position, direction)}
             onToggleRename={() =>
               editingId === position.id
@@ -362,7 +414,7 @@ export function ClubPositionsSection({
     );
   }
 
-  function renderArchived(archived: ClubPositions): React.JSX.Element {
+  function renderArchived(archived: ManagedPositions): React.JSX.Element {
     if (archived.length === 0) {
       return (
         <p className="admin-empty">
@@ -379,6 +431,7 @@ export function ClubPositionsSection({
             locale={locale}
             position={position}
             isBusy={isBusy}
+            coverageControl={renderCoverage(position)}
             onReactivate={() => setArchived(position, false)}
           />
         ))}
@@ -386,7 +439,7 @@ export function ClubPositionsSection({
     );
   }
 
-  function renderCatalog(positions: ClubPositions): React.JSX.Element {
+  function renderCatalog(positions: ManagedPositions): React.JSX.Element {
     return (
       <>
         <div className="club-positions-group">
@@ -436,6 +489,9 @@ export function ClubPositionsSection({
     >
       <h2 id={TITLE_ID}>{translate("clubSettings.positions.title")}</h2>
       <p className="auth-hint">{translate("clubSettings.positions.lead")}</p>
+      <p className="auth-hint">
+        {translate("clubSettings.positions.coverage.hint")}
+      </p>
       {state.kind === "loading" ? (
         <p className="admin-empty">
           {translate("clubSettings.positions.loading")}

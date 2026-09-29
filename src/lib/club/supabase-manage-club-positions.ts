@@ -4,15 +4,17 @@ import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
-import type { PositionNames } from "./club-positions";
+import type { PositionCoverage, PositionNames } from "./club-positions";
 import type {
   ManagedPositionsGateways,
   PositionArchiveResult,
+  PositionCoverageResult,
+  PositionTarget,
   PositionInsertResult,
   PositionRenameResult,
   PositionReorderResult,
 } from "./manage-club-positions";
-import { fetchClubPositions } from "./supabase-club-positions";
+import { fetchManagedPositions } from "./supabase-club-positions";
 
 /**
  * Adaptador entre la administración de posiciones (#300) y Supabase: cada
@@ -135,6 +137,58 @@ async function setPositionArchived(
   return { kind: result.outcome };
 }
 
+const POSITIONS_TABLE = "club_positions";
+
+/** Si la posición existe en el club, para decir por qué no se escribió nada. */
+async function positionExists(
+  serviceClient: SupabaseClient,
+  target: PositionTarget,
+): Promise<boolean> {
+  const { data, error } = await serviceClient
+    .from(POSITIONS_TABLE)
+    .select("id")
+    .eq("id", target.positionId)
+    .eq("club_id", target.clubId)
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `No se pudo leer la posición ${target.positionId}: ${error.message}`,
+    );
+  }
+  return data !== null;
+}
+
+/** Una sola columna sin reglas entre filas: un `update` directo, sin función
+ * de `0027`. Sólo escribe si la función es otra, así que cero filas es "ya la
+ * tenía" o "no existe", y la segunda lectura dice cuál. */
+async function setPositionCoverage(
+  serviceClient: SupabaseClient,
+  target: PositionTarget,
+  coverage: PositionCoverage | null,
+): Promise<PositionCoverageResult> {
+  const update = serviceClient
+    .from(POSITIONS_TABLE)
+    .update({ coverage })
+    .eq("id", target.positionId)
+    .eq("club_id", target.clubId);
+  const { data, error } = await (
+    coverage === null
+      ? update.not("coverage", "is", null)
+      : update.or(`coverage.is.null,coverage.neq.${coverage}`)
+  ).select("id");
+  if (error) {
+    throw new Error(
+      `No se pudo guardar la función de la posición ${target.positionId}: ${error.message}`,
+    );
+  }
+  if (data.length > 0) {
+    return { kind: "changed" };
+  }
+  return (await positionExists(serviceClient, target))
+    ? { kind: "unchanged" }
+    : { kind: "not_found" };
+}
+
 /** Sin caché: el Admin tiene que ver lo que acaba de guardar. */
 export function createManagedPositionsGateways(
   serviceClient: SupabaseClient,
@@ -142,7 +196,8 @@ export function createManagedPositionsGateways(
   return {
     members: createRoleRequestGateways(serviceClient).members,
     positions: {
-      findClubPositions: (clubId) => fetchClubPositions(serviceClient, clubId),
+      findClubPositions: (clubId) =>
+        fetchManagedPositions(serviceClient, clubId),
       insertPosition: (clubId, names) =>
         insertPosition(serviceClient, clubId, names),
       renamePosition: (target, names) =>
@@ -151,6 +206,8 @@ export function createManagedPositionsGateways(
         reorderPositions(serviceClient, clubId, positionIds),
       setPositionArchived: (target, isArchived) =>
         setPositionArchived(serviceClient, target, isArchived),
+      setPositionCoverage: (target, coverage) =>
+        setPositionCoverage(serviceClient, target, coverage),
     },
     audit: createSupabaseAuditLogWriter(serviceClient),
   };

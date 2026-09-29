@@ -1063,6 +1063,21 @@ export const englishMessages = {
   "clubSettings.positions.archived":
     "{name} archived: members who have it keep it.",
   "clubSettings.positions.reactivated": "{name} can be chosen again.",
+  // La función de cada posición en el auto-balance (#404). Sólo se ve aquí.
+  "clubSettings.positions.coverage.hint":
+    "A position's role tells the team builder whether it counts as goalkeeper, defender or forward when it balances the teams. Members never see it.",
+  "clubSettings.positions.coverage.label": "Role",
+  "clubSettings.positions.coverage.control.label": "Role of {name}",
+  "clubSettings.positions.coverage.none": "No role",
+  "clubSettings.positions.coverage.goalkeeper": "Goalkeeper",
+  "clubSettings.positions.coverage.defender": "Defender",
+  "clubSettings.positions.coverage.forward": "Forward",
+  "clubSettings.positions.coverage.save": "Save",
+  "clubSettings.positions.coverage.save.label": "Save role of {name}",
+  "clubSettings.positions.coverage.saving": "Saving…",
+  "clubSettings.positions.coverage.saved": "{name} now counts as {coverage}.",
+  "clubSettings.positions.coverage.cleared":
+    "{name} no longer counts as any role.",
   "clubSettings.positions.retry": "Try again",
   "clubSettings.positions.reloadLatest": "Load the latest positions",
   "clubSettings.positions.issue.nameRequired":

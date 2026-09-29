@@ -41,4 +41,25 @@ describeRls("las posiciones del club contra seadragons-dev", () => {
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
+
+  // #404: la función sólo la lee la configuración del Admin; el perfil y el
+  // directorio siguen con el catálogo de siempre.
+  it(
+    "no trae la función de las posiciones",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withClubWithArchivedPosition(serviceClient, async ({ clubId }) => {
+        const positions = await fetchClubPositions(
+          serviceClient.client,
+          clubId,
+        );
+
+        expect(positions.every((position) => !("coverage" in position))).toBe(
+          true,
+        );
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
 });

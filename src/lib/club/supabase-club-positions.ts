@@ -3,8 +3,13 @@ import { isLocale } from "@/lib/i18n/locale";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
+import type {
+  ManagedPosition,
+  ManagedPositions,
+} from "./manage-club-positions";
 import {
   type ClubPosition,
+  isPositionCoverage,
   type ClubPositions,
   type ClubPositionsGateway,
   type PositionChoicesGateways,
@@ -31,6 +36,12 @@ type PositionRow = {
   readonly archivedAt: string | null;
   readonly names: readonly { readonly locale: string; readonly name: string }[];
 };
+
+type ManagedPositionRow = PositionRow & { readonly coverage: string | null };
+
+/** La función sólo la lee la configuración del Admin (#404): el perfil y el
+ * directorio siguen con las columnas de siempre. */
+const MANAGED_POSITIONS_COLUMNS = `${POSITIONS_COLUMNS}, coverage`;
 
 /** El `check` de `0025` sólo deja los idiomas de la aplicación. Sin ningún
  * nombre la posición no se puede pintar: se falla en vez de servirla. */
@@ -63,24 +74,64 @@ function toClubPosition(row: PositionRow): ClubPosition {
 
 /** En el orden del club. Un empate de `sort_order` lo deshace el orden de
  * creación, como dice `0025`, y el id lo deja fijo entre lecturas. */
-export async function fetchClubPositions(
+async function selectPositionRows<Row>(
   client: SupabaseClient,
   clubId: string,
-): Promise<ClubPositions> {
+  columns: string,
+): Promise<Row[]> {
   const { data, error } = await client
     .from(POSITIONS_TABLE)
-    .select(POSITIONS_COLUMNS)
+    .select(columns)
     .eq("club_id", clubId)
     .order("sort_order")
     .order("created_at")
     .order("id")
-    .overrideTypes<PositionRow[], { merge: false }>();
+    .overrideTypes<Row[], { merge: false }>();
   if (error) {
     throw new Error(
       `No se pudieron leer las posiciones del club ${clubId}: ${error.message}`,
     );
   }
-  return data.map(toClubPosition);
+  return data;
+}
+
+export async function fetchClubPositions(
+  client: SupabaseClient,
+  clubId: string,
+): Promise<ClubPositions> {
+  const rows = await selectPositionRows<PositionRow>(
+    client,
+    clubId,
+    POSITIONS_COLUMNS,
+  );
+  return rows.map(toClubPosition);
+}
+
+/** El `check` de `0046` sólo deja las tres; otra cosa es una base que el
+ * dominio no conoce, y se falla en vez de pintarla como "ninguna". */
+function toCoverage(row: ManagedPositionRow): ManagedPosition["coverage"] {
+  if (row.coverage === null || isPositionCoverage(row.coverage)) {
+    return row.coverage;
+  }
+  throw new Error(
+    `La posición ${row.id} tiene la función ${row.coverage}, que el dominio no conoce.`,
+  );
+}
+
+/** Las del club con su función, para la configuración del Admin (#404). */
+export async function fetchManagedPositions(
+  client: SupabaseClient,
+  clubId: string,
+): Promise<ManagedPositions> {
+  const rows = await selectPositionRows<ManagedPositionRow>(
+    client,
+    clubId,
+    MANAGED_POSITIONS_COLUMNS,
+  );
+  return rows.map((row) => ({
+    ...toClubPosition(row),
+    coverage: toCoverage(row),
+  }));
 }
 
 /** Sin caché, para quien necesita ver un cambio en el acto: los tests de

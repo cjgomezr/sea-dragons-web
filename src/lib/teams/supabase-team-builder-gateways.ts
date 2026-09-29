@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
+import { POSITION_COVERAGES } from "@/lib/club/club-positions";
 import { cachedClubPositions } from "@/lib/club/supabase-club-positions";
 import { EVENT_TYPES } from "@/lib/events/event-creation";
 import { toHoursAndMinutes } from "@/lib/events/supabase-event-management-gateways";
@@ -84,7 +85,7 @@ const playerRowsSchema = z.array(
     position_id: z.string().nullable(),
     position: z
       .object({
-        coverage: z.enum(["goalkeeper", "defender", "forward"]).nullable(),
+        coverage: z.enum(POSITION_COVERAGES).nullable(),
       })
       .nullable(),
     member_evaluations: z
