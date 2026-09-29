@@ -103,6 +103,18 @@ on:
 permissions:
   contents: read
 
+# Un push nuevo al PR deja sin valor la visual del commit anterior, y cada
+# corrida son cuatro máquinas contra `seadragons-dev` (#416). Sólo se cancela
+# en `pull_request`. Fuera de un PR el grupo lleva el id de la corrida y no la
+# rama: GitHub deja una sola corrida en espera por grupo y descarta la que ya
+# esperaba, así que un grupo por rama sin cancelar pondría en cola los merges a
+# `main` y perdería el del medio. Cada merge comprueba su árbol y
+# `report-incident` depende de que termine; una aceptación a mano tampoco se
+# corta ni se queda esperando.
+concurrency:
+  group: visual-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # La suite se reparte en varias máquinas (#255): en una sola, comparar
   # tardaba más de 8 minutos y aceptar entre 13 y 16. Cada parte siembra sus
