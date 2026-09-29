@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -11,11 +11,11 @@ import {
   readSupabaseConfig,
   readSupabaseServiceRoleConfig,
 } from "@/lib/supabase/config";
+import { createServiceRoleTestClient, leaseTestUser } from "../../support/rls";
 
-// Este archivo monta y desmonta su propio usuario autenticado de prueba en
-// vez de reusar `tests/support/rls.ts`: migrarlo es trabajo aparte, para no
-// tocar casos ya verdes de concurrencia y de `recordAuditEvent` en este
-// ticket. `.env.local` ya está cargado y verificado contra el proyecto de
+// Este archivo monta sus propios clientes en vez de usar `describeRls`; el
+// usuario autenticado sí sale de la reserva de `tests/support/rls.ts`.
+// `.env.local` ya está cargado y verificado contra el proyecto de
 // desarrollo por `vitest.setup.ts`, que corre antes que este archivo.
 
 const supabaseConfig = readSupabaseConfig(process.env);
@@ -59,7 +59,7 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
   let asAuthenticatedUser: SupabaseClient;
   let clubId: string;
   let testUserId: string;
-  let testUserEmail: string;
+  let releaseTestUser: (() => Promise<void>) | undefined;
 
   beforeAll(async () => {
     if (
@@ -94,20 +94,12 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
     }
     clubId = club.id as string;
 
-    testUserEmail = `audit-log-rls-${randomUUID()}@example.test`;
-    const password = randomBytes(18).toString("base64url");
-    const { data: created, error: createError } =
-      await serviceClient.auth.admin.createUser({
-        email: testUserEmail,
-        password,
-        email_confirm: true,
-      });
-    if (createError || !created.user) {
-      throw new Error(
-        `No se pudo crear el usuario de prueba: ${createError?.message}`,
-      );
-    }
-    testUserId = created.user.id;
+    // El usuario sale de la reserva de socios de prueba (#415): crear uno
+    // por corrida contaba como usuario del mes en Supabase aunque se borrara.
+    const lease = await leaseTestUser(createServiceRoleTestClient(process.env));
+    releaseTestUser = lease.release;
+    testUserId = lease.user.id;
+    const { email, password } = lease.user;
 
     const anonClient = createClient(
       supabaseConfig.url,
@@ -115,10 +107,7 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
     const { data: session, error: signInError } =
-      await anonClient.auth.signInWithPassword({
-        email: testUserEmail,
-        password,
-      });
+      await anonClient.auth.signInWithPassword({ email, password });
     if (signInError || !session.session) {
       throw new Error(
         `No se pudo autenticar al usuario de prueba: ${signInError?.message}`,
@@ -140,9 +129,7 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
   }, TEST_TIMEOUT_MS);
 
   afterAll(async () => {
-    if (testUserId) {
-      await serviceClient.auth.admin.deleteUser(testUserId);
-    }
+    await releaseTestUser?.();
   }, TEST_TIMEOUT_MS);
 
   it(

@@ -112,10 +112,16 @@ jobs:
       # enteras y el check sale verde sin haberlas corrido (issue #149). Que
       # apunten al proyecto de desarrollo lo verifica el guardia de entorno
       # antes del primer test, no la confianza en quien pegó el secreto.
+      #
+      # `RUN_INTEGRATION_TESTS=1` porque fuera de CI esas pruebas se saltan
+      # (#415): el Stop gate de cada worker las corría tras cada turno y el
+      # proyecto de desarrollo se acercaba al límite de usuarios de Supabase.
+      # Aquí se exigen.
       - name: Tests
         if: steps.repo.outputs.bootstrapped == 'true'
         run: npm test
         env:
+          RUN_INTEGRATION_TESTS: "1"
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

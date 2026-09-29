@@ -1,15 +1,22 @@
-import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { describe } from "vitest";
 import { readSupabaseConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
+import { runWithCleanup } from "./run-with-cleanup";
+import { createSupabaseTestMemberPool } from "./supabase-test-member-pool";
 import { decideSupabaseCredentials } from "./supabase-credentials";
 import {
-  createConfirmedUser,
   describeSupabaseFailure,
   SUPABASE_RETRY_BUDGET_MS,
   withSupabaseRetry,
 } from "./supabase-retry";
+import {
+  createRunId,
+  leasePooledMember,
+  type PooledMember,
+  type TestMemberPool,
+  withPooledMember,
+} from "./test-member-pool";
 
 // `.env.local` ya está cargado y verificado contra el proyecto de desarrollo
 // por `vitest.setup.ts` (que corre antes que cualquier archivo de test): no
@@ -128,63 +135,58 @@ export function skippedSuiteName(name: string, reason: string): string {
   return `${name} (saltado: ${reason})`;
 }
 
-/** Ejecuta `run` y siempre intenta `cleanup` después, sin dejar que un fallo
- * de limpieza tape la razón real por la que `run` falló: si las dos fallan,
- * la de `run` es la que se relanza y la de limpieza queda registrada aparte.
- * `cleanup` devuelve el mensaje de su fallo, o `null` si limpió. */
-async function runWithCleanup<T>(
-  run: () => Promise<T>,
-  cleanup: () => Promise<string | null>,
-  cleanupFailureMessage: string,
-): Promise<T> {
-  let result: T;
-  try {
-    result = await run();
-  } catch (runError) {
-    const cleanupFailure = await cleanup();
-    if (cleanupFailure !== null) {
-      console.error(`${cleanupFailureMessage}: ${cleanupFailure}`);
-    }
-    throw runError;
-  }
+export type TestUser = PooledMember;
 
-  const cleanupFailure = await cleanup();
-  if (cleanupFailure !== null) {
-    throw new Error(`${cleanupFailureMessage}: ${cleanupFailure}`);
-  }
-  return result;
+/** El `runId` de este proceso de Vitest: marca las plazas que arrienda, para
+ * saber de quién es una que se quedó colgada. */
+const HARNESS_RUN_ID = createRunId();
+
+/** La reserva del arnés: sus socios se llaman `rls-<plaza>@example.test`. */
+const HARNESS_POOL_NAMESPACE = "rls";
+
+function harnessPool(serviceClient: ServiceRoleClient): TestMemberPool {
+  return createSupabaseTestMemberPool(serviceClient.client, HARNESS_RUN_ID);
 }
 
-export type TestUser = {
-  readonly id: string;
-  readonly email: string;
-  readonly password: string;
-};
-
-/** Crea un usuario real de Supabase Auth con la llave de servicio, lo pasa a
- * `run`, y lo borra al terminar incluso si `run` lanza. Es la única forma
- * correcta de obtener una identidad "authenticated" para `createRlsClient`. */
+/** Pasa a `run` un usuario real de Supabase Auth que nadie más está usando, y
+ * al terminar le borra la fila de socio y lo devuelve a la reserva, incluso si
+ * `run` lanza. No crea una identidad por llamada ni la borra (#415): sale de
+ * la reserva, y sólo se crea una nueva si todas están ocupadas. Es la única
+ * forma correcta de obtener una identidad "authenticated" para
+ * `createRlsClient`. */
 export async function withTestUser<T>(
   serviceClient: ServiceRoleClient,
   run: (user: TestUser) => Promise<T>,
 ): Promise<T> {
-  const email = `rls-harness-${randomUUID()}@example.test`;
-  const password = randomUUID();
-
-  const createdUser = await createConfirmedUser(
-    serviceClient.client.auth.admin,
-    { email, password, operation: "crear el usuario de prueba del arnés RLS" },
+  return withPooledMember(
+    harnessPool(serviceClient),
+    HARNESS_POOL_NAMESPACE,
+    run,
   );
+}
 
-  const user: TestUser = { id: createdUser.id, email, password };
-  return runWithCleanup(
-    () => run(user),
-    () =>
-      describeSupabaseFailure("borrar el usuario de prueba del arnés RLS", () =>
-        serviceClient.client.auth.admin.deleteUser(user.id),
-      ),
-    "No se pudo limpiar el usuario de prueba del arnés RLS",
+/** Como `withTestUser`, para los tests que montan su usuario en un
+ * `beforeAll` y lo sueltan en un `afterAll`. `release` lanza si no pudo
+ * dejarlo limpio. */
+export async function leaseTestUser(serviceClient: ServiceRoleClient): Promise<{
+  readonly user: TestUser;
+  readonly release: () => Promise<void>;
+}> {
+  const { member, returnToPool } = await leasePooledMember(
+    harnessPool(serviceClient),
+    HARNESS_POOL_NAMESPACE,
   );
+  return {
+    user: member,
+    async release() {
+      const failure = await returnToPool();
+      if (failure !== null) {
+        throw new Error(
+          `No se pudo devolver a la reserva al socio de prueba ${member.email}: ${failure}`,
+        );
+      }
+    },
+  };
 }
 
 /** Siembra `rows` en `table` con la llave de servicio, pasa las filas

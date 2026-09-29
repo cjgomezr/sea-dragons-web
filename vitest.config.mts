@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { selectExcludedTests } from "./tests/support/test-selection.mts";
 
 export default defineConfig({
   plugins: [react()],
@@ -29,5 +30,7 @@ export default defineConfig({
       "tests/unit/**/*.test.tsx",
       "tests/rls/**/*.test.ts",
     ],
+    exclude: [...selectExcludedTests(process.env)],
+    globalSetup: ["./tests/support/vitest-global-setup.ts"],
   },
 });

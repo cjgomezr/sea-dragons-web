@@ -133,8 +133,16 @@ $KIT_OUT"
 fi
 
 # 4. Visual regression + accessibility (only if playwright config exists)
+#
+# Sólo si la rama tocó algo que pueda mover una captura: la misma lista que
+# filtra visual-baselines.yml. Cada corrida siembra socios de prueba en
+# seadragons-dev, y el gate corre tras cada turno de cada worker (#415). El PR
+# corre Playwright igual en CI.
+VISUAL_PATHS_CHECK="$(dirname "$0")/../../scripts/branch-touches-visual-paths.sh"
 if [ -f "playwright.config.ts" ] || [ -f "playwright.config.js" ]; then
-  if ! E2E_OUT=$(npx playwright test 2>&1); then
+  if ! bash "$VISUAL_PATHS_CHECK"; then
+    echo "Playwright no corre: la rama no toca ninguna ruta de .github/visual-paths.txt (lo corre CI en el PR)."
+  elif ! E2E_OUT=$(npx playwright test 2>&1); then
     fail "❌ Playwright (visual/a11y) failed. Fix before finishing:
 $E2E_OUT"
   fi

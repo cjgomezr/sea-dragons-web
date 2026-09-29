@@ -1,0 +1,17 @@
+# Las rutas que pueden cambiar un píxel. Las leen dos sitios: el `paths` de
+# .github/workflows/visual-baselines.yml (que Actions no sabe cargar de un
+# archivo, así que allí van copiadas y un test comprueba que son las mismas) y
+# el Stop gate local, que sólo corre Playwright si la rama tocó alguna (#415).
+# Mismo glob que Actions: `*` no cruza `/` y `**` sí.
+src/**
+tests/*.spec.ts
+tests/**/*.spec.ts
+tests/ui.spec.ts-snapshots/**
+tests/support/**
+playwright.config.ts
+next.config.ts
+.nvmrc
+package.json
+package-lock.json
+.github/workflows/visual-baselines.yml
+.github/actions/playwright-browsers/**

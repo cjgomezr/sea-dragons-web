@@ -175,12 +175,12 @@ export type ConfirmedUserRequest = {
 const EMAIL_EXISTS_CODE = "email_exists";
 const USERS_PAGE_SIZE = 1_000;
 
-/** Busca por correo recorriendo las páginas de usuarios. El correo del arnés
- * es un UUID aleatorio, así que no puede coincidir con el de nadie más. */
-async function findUserByEmail(
+/** Busca por correo recorriendo las páginas de usuarios: Auth no filtra por
+ * correo. Es lento con muchos usuarios, así que es el camino de excepción. */
+export async function findUserByEmail(
   admin: AuthAdmin,
   email: string,
-  sleep: Sleep,
+  sleep: Sleep = waitFor,
 ): Promise<User | null> {
   for (let page = 1; ; page += 1) {
     const { data, error } = await withSupabaseRetry(
