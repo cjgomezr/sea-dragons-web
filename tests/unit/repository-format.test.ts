@@ -20,7 +20,10 @@ const CODE_LINE_WIDTH = 80;
 
 // Formatear el repositorio entero tarda unos 7 s en solitario, pero bajo
 // `npm test` compite con el resto de los workers y pasó de los 20 s globales.
-const PRETTIER_CHECK_TIMEOUT_MS = 90_000;
+// Desde el #415 la suite local ya no corre los tests de red, que dejaban la
+// CPU libre mientras esperaban a Supabase: el resto corre más apretado, y aquí
+// se midieron 20 s en solitario y de 126 a 134 s bajo la suite entera.
+const PRETTIER_CHECK_TIMEOUT_MS = 240_000;
 
 function countChangedLines(before: string, after: string): number {
   const beforeLines = before.split(/\r?\n/);
