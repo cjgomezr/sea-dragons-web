@@ -17,7 +17,9 @@ import {
 export const UNIT_PROJECT_NAME = "unit";
 export const INTEGRATION_PROJECT_NAME = "integration";
 
-/** Un solo worker: los archivos de red nunca se solapan. */
+/** Un solo worker: los archivos de red nunca se solapan. Vitest los manda a
+ * su grupo secuencial, tras los unitarios, sólo con `isolate: true` (el valor
+ * por defecto); con `isolate: false` se negaría a arrancar. */
 const SEQUENTIAL_WORKERS = 1;
 
 // *.test.ts(x) is Vitest; *.spec.ts is Playwright. Keeping the split on the
