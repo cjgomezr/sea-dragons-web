@@ -786,6 +786,48 @@ describe("la fila como en el directorio (#414)", () => {
     ).toHaveAttribute("aria-haspopup", "dialog");
   });
 
+  it.each([
+    ["coach", false],
+    ["admin", true],
+  ] as const)(
+    "a un %s se le ofrece abrir la foto de un socio de baja: %s",
+    async (viewer, canOpen) => {
+      stubClub(
+        [POOL_TRAINING],
+        [
+          {
+            ...sheetFor(POOL_TRAINING, [
+              { ...MATEO, photoUrl: THUMBNAIL_URL, isInactive: true },
+            ]),
+            viewer,
+          },
+        ],
+      );
+
+      render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+      const photoButton = within(await findRow(MATEO.fullName)).queryByRole(
+        "button",
+        { name: "Open the photo of Mateo Restrepo" },
+      );
+      expect(photoButton !== null).toBe(canOpen);
+    },
+  );
+
+  it("con cambios sin guardar, abrir la ficha en otra pestaña no pregunta", async () => {
+    stubClub([POOL_TRAINING], [ADMIN_POOL_SHEET]);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await userEvent.click(choice(await findRow(MATEO.fullName), "Late"));
+
+    const user = userEvent.setup();
+    await user.keyboard("{Control>}");
+    await user.click(recordLink(MATEO.fullName));
+    await user.keyboard("{/Control}");
+
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
   it("quien no tiene foto enseña sus iniciales, que no se pulsan", async () => {
     stubClub([POOL_TRAINING], [POOL_SHEET]);
 

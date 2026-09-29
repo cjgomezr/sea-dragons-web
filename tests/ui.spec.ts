@@ -11681,7 +11681,7 @@ test.describe("asistencia en el navegador", () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await goToAttendance(page, ATTENDANCE_SHEET_STATE);
     const row = attendanceRow(page, FIRST_ATTENDEE);
-    const segmentTop = await boxOf(row.getByRole("group"), "y");
+    const segmentTop = await topOf(row.getByRole("group"));
 
     for (const target of [
       row.getByRole("link", { name: ATTENDANCE_RECORD_LINK }),
@@ -11772,13 +11772,13 @@ test.describe("asistencia en el navegador", () => {
 
 const ATTENDANCE_RECORD_LINK = `Open ${FIRST_ATTENDEE}'s record`;
 
-/** Una coordenada de la caja de un elemento que tiene que estar pintado. */
-async function boxOf(locator: Locator, edge: "y"): Promise<number> {
+/** Dónde empieza, en vertical, un elemento que tiene que estar pintado. */
+async function topOf(locator: Locator): Promise<number> {
   const box = await locator.boundingBox();
   if (box === null) {
     throw new Error("El elemento no está pintado.");
   }
-  return box[edge];
+  return box.y;
 }
 
 /** La foto grande de la primera fila, servida como en el directorio. */

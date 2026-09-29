@@ -37,6 +37,19 @@ function memberRecordHref(userId: string): string {
   return MEMBER_RECORD_PATH.replace("[id]", userId);
 }
 
+/** Abrir en otra pestaña o ventana no saca de la hoja: no hay nada que
+ * descartar, y preguntar cancelaría esa apertura si se contesta que no. */
+function opensElsewhere(event: React.MouseEvent): boolean {
+  return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey;
+}
+
+/** La foto grande se pide con la regla del directorio (#353), que esconde
+ * al socio de baja a quien no es Admin. La hoja sí lo lista si tiene fila
+ * guardada: a un Coach su foto no se le ofrece, porque siempre fallaría. */
+function canOpenPhoto(member: SheetMember, viewer: RowViewer): boolean {
+  return viewer.kind === "admin" || !member.isInactive;
+}
+
 /** Como en el directorio, el nombre accesible del enlace dice a dónde lleva y
  * contiene el nombre visible (WCAG 2.5.3). Si no se acepta descartar lo
  * marcado, el clic no navega. */
@@ -60,7 +73,7 @@ function MemberName({
         name: member.fullName,
       })}
       onClick={(event) => {
-        if (!viewer.canLeaveSheet()) {
+        if (!opensElsewhere(event) && !viewer.canLeaveSheet()) {
           event.preventDefault();
         }
       }}
@@ -91,7 +104,11 @@ export function AttendanceRow({
           photoUrl={member.photoUrl}
           size={AVATAR_SIZE}
           className="attendance-avatar"
-          viewer={{ userId: member.userId, translate }}
+          viewer={
+            canOpenPhoto(member, viewer)
+              ? { userId: member.userId, translate }
+              : undefined
+          }
         />
         <div className="attendance-member-text">
           <MemberName translate={translate} member={member} viewer={viewer} />
