@@ -217,6 +217,10 @@ function stubApi(options: {
       if (opened !== undefined && method === "GET") {
         return jsonResponse(200, { data: detailOf(opened) });
       }
+      // Los equipos del evento (#403): aquí nunca hay reparto publicado.
+      if (url.pathname.endsWith("/team") && method === "GET") {
+        return jsonResponse(200, { data: { status: "not_published" } });
+      }
       throw new Error(`Petición inesperada: ${method} ${url.pathname}`);
     }),
   );

@@ -36,6 +36,9 @@
      que la hoja lee tiene su valor en :root (tests/unit/theme-css.test.ts). */
   --club-accent-link-light: var(--color-accent-text);
   --club-accent-link-dark: var(--color-accent-text);
+  /* El color del equipo de quien mira en el evento desplegado (#403): la
+     tarjeta lo pone en línea con el del reparto. */
+  --team-color: var(--color-accent);
   --shadow: 0 1px 2px rgba(13, 36, 54, 0.06), 0 6px 18px rgba(13, 36, 54, 0.06);
   --shadow-sm: 0 1px 2px rgba(13, 36, 54, 0.07);
 
@@ -4088,6 +4091,119 @@ button.notification-item-content:hover {
 
 .agenda-detail-failure .auth-error {
   margin: 0;
+}
+
+/* Los equipos del reparto publicado en la fila desplegada (#403), como en
+   docs/mockups/mobile-team-light.png. El color del equipo tiñe la tarjeta con
+   color-mix, como los chips de tipo: el texto sigue en el color de siempre y
+   el contraste no depende del color que eligiera el coach. */
+.event-teams {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.event-teams-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.event-teams-heading h3 {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.event-my-team {
+  padding: var(--space-3) var(--space-4);
+  background: color-mix(in srgb, var(--team-color) 22%, var(--color-panel));
+  border-left: 6px solid var(--team-color);
+  border-radius: var(--radius);
+}
+
+.event-my-team p {
+  margin: 0;
+}
+
+.event-my-team-eyebrow {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.event-my-team-name {
+  font-size: 22px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.event-my-team-meta {
+  font-size: 14px;
+}
+
+.event-lineups {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .event-lineups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.event-lineup {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.event-lineup-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.event-lineup-list {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event-lineup-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) 0;
+  font-size: 14px;
+}
+
+.event-lineup-player + .event-lineup-player {
+  border-top: 1px solid var(--color-border);
+}
+
+.event-lineup-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.event-lineup-player .team-position {
+  flex: none;
+  font-size: 12px;
 }
 
 /* Próximos y pasados, con la forma del control Mes/Semana/Agenda del mockup. */
