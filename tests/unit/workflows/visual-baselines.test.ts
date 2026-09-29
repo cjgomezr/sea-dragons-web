@@ -417,3 +417,26 @@ describe("aplicación compilada en CI (#255)", () => {
     },
   );
 });
+
+const VISUAL_PATHS_LIST = path.join(REPO_ROOT, ".github/visual-paths.txt");
+
+/** Las rutas del archivo compartido, sin comentarios ni líneas vacías. */
+function readVisualPathsList(): string[] {
+  return readFileSync(VISUAL_PATHS_LIST, "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && !line.startsWith("#"));
+}
+
+// El Stop gate decide si corre Playwright con la misma lista que filtra este
+// workflow (#415). Actions no sabe leer `paths` de un archivo, así que la
+// lista vive en los dos sitios y este test impide que se separen.
+describe("la lista de rutas visuales compartida con el Stop gate", () => {
+  it("es la misma que filtra los pull requests", () => {
+    const workflow = parseWorkflow() as {
+      on: { pull_request?: { paths?: string[] } };
+    };
+
+    expect(readVisualPathsList()).toEqual(workflow.on.pull_request?.paths);
+  });
+});
