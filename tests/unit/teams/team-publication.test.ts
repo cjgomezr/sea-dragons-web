@@ -175,6 +175,17 @@ describe("publicar", () => {
     expect(logged).toHaveBeenCalled();
   });
 
+  it("avisa aunque falle la bitácora, que ya no puede deshacer lo publicado", async () => {
+    const { club, publishing } = publish({
+      failingAudit: true,
+      split: draftWith([{ userId: ANA, team: "a" }]),
+    });
+
+    await expect(publishing).rejects.toThrow();
+    expect(club.split()?.publishedAt).toEqual(PUBLISHED_AT);
+    expect(club.notices.map((notice) => notice.userId)).toEqual([ANA]);
+  });
+
   it("responde que el reparto está vacío si no tiene a nadie", async () => {
     const { club, publishing } = publish({ split: draftWith([]) });
 

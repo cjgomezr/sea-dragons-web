@@ -1,4 +1,4 @@
-import { recordAuditEvent } from "@/lib/audit/audit-log";
+import { type AuditActor, recordAuditEvent } from "@/lib/audit/audit-log";
 import { notifyMembers } from "@/lib/notifications/notify-member";
 import {
   TEAM_IDS,
@@ -112,6 +112,27 @@ async function sendPublicationNotices(
   }
 }
 
+/** Quién, qué evento y cuántos, sin nombres (NFR-010). */
+async function recordPublication(
+  gateways: Pick<TeamBuilderGateways, "audit">,
+  publication: {
+    readonly actor: AuditActor;
+    readonly eventId: string;
+    readonly assignedCount: number;
+  },
+): Promise<void> {
+  const { actor, eventId, assignedCount } = publication;
+  await recordAuditEvent(gateways.audit, {
+    actor,
+    clubId: actor.clubId,
+    action: "team_split.published",
+    entityType: AUDITED_ENTITY_TYPE,
+    entityId: eventId,
+    result: "success",
+    metadata: { assignedCount },
+  });
+}
+
 export async function publishTeamSplit(
   gateways: TeamBuilderGateways,
   request: {
@@ -136,23 +157,21 @@ export async function publishTeamSplit(
     throw rejectionError(publication.kind);
   }
   const assignedCount = publication.current.length;
-  await recordAuditEvent(gateways.audit, {
-    actor,
-    clubId: actor.clubId,
-    action: "team_split.published",
-    entityType: AUDITED_ENTITY_TYPE,
-    entityId: event.id,
-    result: "success",
-    metadata: { assignedCount },
-  });
   const notices = withoutPublisher(
     diffPublishedAssignments(publication.previous, publication.current),
     actor.id,
   );
+  // Avisar antes de la bitácora: la foto ya quedó guardada, y si la bitácora
+  // fallara primero, al reintentar el diff saldría vacío y nadie se enteraría.
   await sendPublicationNotices(gateways, {
     event,
     teams: publication.teams,
     notices,
+  });
+  await recordPublication(gateways, {
+    actor,
+    eventId: event.id,
+    assignedCount,
   });
   return {
     eventId: event.id,

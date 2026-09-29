@@ -70,6 +70,8 @@ export type FakeTeamsClubOptions = {
   readonly positions?: readonly ClubPosition[];
   /** Guardar los avisos falla siempre. */
   readonly failingNotifications?: boolean;
+  /** Escribir en la bitácora falla siempre. */
+  readonly failingAudit?: boolean;
 };
 
 export type SentNotice = {
@@ -198,6 +200,9 @@ export function fakeTeamsClub(
     ),
     audit: {
       insertAuditLogRow: async (row) => {
+        if (options.failingAudit) {
+          return { error: { message: "La bitácora no responde." } };
+        }
         auditRows.push(row);
         return { error: null };
       },

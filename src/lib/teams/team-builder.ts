@@ -18,6 +18,7 @@ import { autoBalanceTeams } from "./auto-balance";
 import {
   type PositionCoverage,
   type SquadPlayer,
+  type TeamSplit,
   UNRATED_PLAYER_RATING,
 } from "./squad";
 import { suggestSwap } from "./swap-suggestion";
@@ -518,7 +519,11 @@ function assertWellFormedSplit(assignments: readonly TeamAssignment[]): void {
   }
 }
 
-/** Se comprueba antes de bloquear el evento: quien cambia su RSVP justo
+/** Vale también para quien ya estaba asignado y salió de la escuadra: el
+ * PRD (RF-4) quiere que guardar con él dentro responda 422, para que el coach
+ * decida qué hacer con quien ya no viene antes de seguir.
+ *
+ * Se comprueba antes de bloquear el evento: quien cambia su RSVP justo
  * entretanto queda asignado y marcado fuera, como si lo hubiera cambiado
  * después. La clave compuesta de `0046` impide a cualquiera de otro club. */
 function assertPlayersInSquad(
@@ -587,7 +592,7 @@ function toSquadPlayer(entry: SquadEntry): SquadPlayer {
 }
 
 function toSuggestedSwap(
-  split: Parameters<typeof suggestSwap>[0],
+  split: TeamSplit,
 ): SuggestedSwap | null {
   const swap = suggestSwap(split);
   return swap === null
@@ -598,6 +603,12 @@ function toSuggestedSwap(
         improvement: swap.improvement,
         ratingDifferenceAfter: swap.ratingDifferenceAfter,
       };
+}
+
+function assignmentsOf(split: TeamSplit): readonly TeamAssignment[] {
+  return TEAM_IDS.flatMap((team) =>
+    split[team].map((player) => ({ userId: player.userId, team })),
+  );
 }
 
 function entriesOf(
@@ -638,9 +649,7 @@ export async function autoBalanceEventTeams(
     savedBy: actor.id,
     mode: "auto",
     teams,
-    assignments: TEAM_IDS.flatMap((team) =>
-      balanced[team].map((player) => ({ userId: player.userId, team })),
-    ),
+    assignments: assignmentsOf(balanced),
   });
   return {
     teams,
