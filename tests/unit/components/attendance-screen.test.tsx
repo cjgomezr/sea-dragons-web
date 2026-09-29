@@ -74,6 +74,13 @@ const VALENTINA = member(
 const RUBY = member("33333333-0000-4000-8000-000000000003", "Ruby Tan", {
   status: "absent",
 });
+const NOAH = member("44444444-0000-4000-8000-000000000004", "Noah Williams", {
+  status: "absent",
+  rsvpResponse: "no",
+});
+const CHLOE = member("55555555-0000-4000-8000-000000000005", "Chloe Nguyen", {
+  rsvpResponse: "yes",
+});
 
 function sheetFor(
   session: { readonly eventId: string; readonly title: string },
@@ -187,6 +194,18 @@ function choice(row: HTMLElement, name: string): HTMLElement {
   return within(row).getByRole("button", { name });
 }
 
+/** Cada grupo de la hoja, por su cabecera, con los nombres de sus filas. */
+function groupedRows(): [string, (string | null)[]][] {
+  return screen.getAllByRole("heading", { level: 2 }).map((heading) => {
+    const name = String(heading.textContent);
+    const region = screen.getByRole("region", { name });
+    const rows = within(within(region).getByRole("list", { name }))
+      .getAllByRole("listitem")
+      .map((row) => within(row).getByRole("group").getAttribute("aria-label"));
+    return [name, rows];
+  });
+}
+
 function totals(): HTMLElement {
   return screen.getByRole("list", { name: "Totals" });
 }
@@ -242,28 +261,57 @@ describe("la hoja", () => {
     );
   });
 
-  it("pinta cada miembro en el orden del servidor, con iniciales, posición y la pista del RSVP", async () => {
+  it("pinta cada miembro con iniciales y posición, sin la pista del RSVP", async () => {
     stubClub([POOL_TRAINING], [POOL_SHEET]);
 
     render(<AttendanceScreen locale="en" initialSessionId={null} />);
 
-    const list = await screen.findByRole("list", { name: "Members" });
-    const rows = within(list).getAllByRole("listitem");
-    expect(
-      rows.map((row) =>
-        within(row).getByRole("group").getAttribute("aria-label"),
-      ),
-    ).toEqual([MATEO.fullName, VALENTINA.fullName, RUBY.fullName]);
     const mateo = await findRow(MATEO.fullName);
     expect(within(mateo).getByText("MR")).toBeInTheDocument();
     expect(within(mateo).getByText("Forward")).toBeInTheDocument();
-    expect(within(mateo).getByText("RSVP: Yes")).toBeInTheDocument();
+    expect(within(mateo).queryByText(/RSVP/)).not.toBeInTheDocument();
+  });
+
+  it("agrupa las filas en Confirmed, Maybe, No response y Said no, cada grupo una región con sus filas", async () => {
+    stubClub(
+      [POOL_TRAINING],
+      [sheetFor(POOL_TRAINING, [MATEO, CHLOE, VALENTINA, RUBY, NOAH])],
+    );
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(groupedRows()).toEqual([
+      ["Confirmed", [MATEO.fullName, CHLOE.fullName]],
+      ["Maybe", [VALENTINA.fullName]],
+      ["No response", [RUBY.fullName]],
+      ["Said no", [NOAH.fullName]],
+    ]);
+  });
+
+  it("no pinta el grupo de quien dijo que no cuando nadie lo dijo", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(groupedRows().map(([name]) => name)).toEqual([
+      "Confirmed",
+      "Maybe",
+      "No response",
+    ]);
     expect(
-      within(await findRow(VALENTINA.fullName)).getByText("RSVP: Maybe"),
-    ).toBeInTheDocument();
-    expect(
-      within(await findRow(RUBY.fullName)).getByText("No RSVP"),
-    ).toBeInTheDocument();
+      screen.queryByRole("heading", { name: "Said no" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("con todos en un solo grupo deja esa única cabecera", async () => {
+    stubClub([POOL_TRAINING], [sheetFor(POOL_TRAINING, [RUBY])]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await findRow(RUBY.fullName);
+    expect(groupedRows()).toEqual([["No response", [RUBY.fullName]]]);
   });
 
   it("marca con aria-pressed el estado de cada fila", async () => {
@@ -541,6 +589,23 @@ describe("la hoja", () => {
     expect(await findRow(MATEO.fullName)).toBeInTheDocument();
   });
 
+  it("escribe las cabeceras de los grupos en español", async () => {
+    stubClub(
+      [POOL_TRAINING],
+      [sheetFor(POOL_TRAINING, [MATEO, VALENTINA, RUBY, NOAH])],
+    );
+
+    render(<AttendanceScreen locale="es" initialSessionId={null} />);
+
+    await findRow(MATEO.fullName);
+    expect(groupedRows().map(([name]) => name)).toEqual([
+      "Confirmaron",
+      "Quizás",
+      "Sin respuesta",
+      "Dijeron que no",
+    ]);
+  });
+
   it("escribe la hoja en español", async () => {
     stubClub([POOL_TRAINING], [POOL_SHEET]);
 
@@ -548,7 +613,6 @@ describe("la hoja", () => {
 
     const mateo = await findRow(MATEO.fullName);
     expect(within(mateo).getByText("Ataque")).toBeInTheDocument();
-    expect(within(mateo).getByText("RSVP: Sí")).toBeInTheDocument();
     expect(choice(mateo, "Presente")).toHaveAttribute("aria-pressed", "true");
     expect(
       screen.getByRole("button", { name: /^Guardar asistencia/ }),

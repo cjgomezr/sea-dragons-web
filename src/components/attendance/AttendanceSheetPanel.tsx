@@ -4,10 +4,12 @@ import {
   ATTENDANCE_STATUSES,
   type AttendanceTotals,
 } from "@/lib/attendance/attendance-status";
+import type { RsvpResponse } from "@/lib/events/event-rsvp";
 import type { Translator } from "@/lib/i18n/translator";
 import {
   type OpenedSheet,
   type SessionChoice,
+  type SheetMember,
   describeAttendanceFailure,
 } from "./attendance-client";
 import {
@@ -27,14 +29,22 @@ import {
 /**
  * La hoja de una sesión (#395), siguiendo docs/mockups/attendance-light.png:
  * el título con la fecha y el botón de guardar, las fichas de las sesiones
- * recientes, los tres contadores y la lista.
+ * recientes, los tres contadores y la lista, agrupada por la respuesta al
+ * RSVP (#412, D6) para que el Coach vea a quién le toca revisar.
  *
  * Se monta de nuevo con cada sesión (la pantalla le pone su id como clave),
  * así lo marcado en una no se cuela en otra. Por eso las fichas viven aquí:
  * son las que saben si hay cambios que descartar antes de irse.
  */
 
-const MEMBERS_LABEL_ID = "asistencia-miembros";
+type RsvpGroup = RsvpResponse | "none";
+
+/** El orden de los grupos, el mismo en que el servidor ordena las filas. */
+const RSVP_GROUPS: readonly RsvpGroup[] = ["yes", "maybe", "none", "no"];
+
+function groupOf(member: SheetMember): RsvpGroup {
+  return member.rsvpResponse ?? "none";
+}
 
 function sheetTitle(translate: Translator, sheet: OpenedSheet): string {
   const { weekday, day, month } = sessionDay(translate.locale, sheet.startsAt);
@@ -169,6 +179,41 @@ function SaveNotices({
   );
 }
 
+function MemberGroup({
+  translate,
+  group,
+  members,
+  marks,
+  onMark,
+}: {
+  readonly translate: Translator;
+  readonly group: RsvpGroup;
+  readonly members: readonly SheetMember[];
+  readonly marks: SheetMarks;
+  readonly onMark: AttendanceSheetControls["mark"];
+}): React.JSX.Element {
+  const headingId = `asistencia-grupo-${group}`;
+  return (
+    <section className="attendance-group" aria-labelledby={headingId}>
+      <h2 id={headingId} className="attendance-group-title">
+        {translate(`attendance.group.${group}`)}
+      </h2>
+      <ul className="attendance-list" aria-labelledby={headingId}>
+        {members.map((member) => (
+          <AttendanceRow
+            key={member.userId}
+            translate={translate}
+            member={member}
+            status={statusOf(marks, member.userId)}
+            onMark={(status) => onMark(member.userId, status)}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Un grupo sin nadie no se pinta, ni su cabecera. */
 function MemberList({
   translate,
   sheet,
@@ -185,20 +230,21 @@ function MemberList({
   }
   return (
     <>
-      <h2 id={MEMBERS_LABEL_ID} className="visually-hidden">
-        {translate("attendance.members.label")}
-      </h2>
-      <ul className="attendance-list" aria-labelledby={MEMBERS_LABEL_ID}>
-        {sheet.members.map((member) => (
-          <AttendanceRow
-            key={member.userId}
+      {RSVP_GROUPS.map((group) => {
+        const members = sheet.members.filter(
+          (member) => groupOf(member) === group,
+        );
+        return members.length === 0 ? null : (
+          <MemberGroup
+            key={group}
             translate={translate}
-            member={member}
-            status={statusOf(marks, member.userId)}
-            onMark={(status) => onMark(member.userId, status)}
+            group={group}
+            members={members}
+            marks={marks}
+            onMark={onMark}
           />
-        ))}
-      </ul>
+        );
+      })}
     </>
   );
 }
