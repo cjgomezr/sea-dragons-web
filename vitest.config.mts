@@ -1,7 +1,9 @@
+import { availableParallelism, totalmem } from "node:os";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 import { selectExcludedTests } from "./tests/support/test-selection.mts";
+import { selectMaxWorkers } from "./tests/support/test-workers.mts";
 
 export default defineConfig({
   plugins: [react()],
@@ -23,6 +25,12 @@ export default defineConfig({
     // El precio es que un test genuinamente colgado tarde 20 s en fallar en
     // vez de 5. Sale barato comparado con perseguir el siguiente.
     testTimeout: 20_000,
+    // Los workers los limita también la memoria, no sólo los núcleos: ver
+    // `tests/support/test-workers.mts`.
+    maxWorkers: selectMaxWorkers({
+      cpuCount: availableParallelism(),
+      totalMemoryBytes: totalmem(),
+    }),
     // *.test.ts(x) is Vitest; *.spec.ts is Playwright. Keeping the split on the
     // extension stops each runner from collecting the other one's suite.
     include: [
