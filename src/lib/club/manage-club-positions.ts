@@ -53,7 +53,10 @@ export type PositionNamesInput = {
 
 export const POSITIONS_CHANGED_REASON = "club_positions_changed";
 
-type PositionTarget = { readonly clubId: string; readonly positionId: string };
+export type PositionTarget = {
+  readonly clubId: string;
+  readonly positionId: string;
+};
 
 export type PositionInsertResult =
   | { readonly kind: "created"; readonly positionId: string }
@@ -193,8 +196,9 @@ function nameTaken(locale: Locale): PositionValidationError {
   return new PositionValidationError([{ code: TAKEN_ISSUE[locale] }]);
 }
 
-/** Sin metadata salvo al reordenar y al cambiar la función: quién, qué y sobre qué ya están en la
- * entrada, y el nombre no hace falta para saber qué pasó. */
+/** Sin metadata salvo al reordenar y al cambiar la función: quién, qué y
+ * sobre qué ya están en la entrada, y el nombre no hace falta para saber qué
+ * pasó. */
 function recordPositionEvent(
   gateways: ManagedPositionsGateways,
   event: {

@@ -9,6 +9,7 @@ import type {
   ManagedPositionsGateways,
   PositionArchiveResult,
   PositionCoverageResult,
+  PositionTarget,
   PositionInsertResult,
   PositionRenameResult,
   PositionReorderResult,
@@ -137,8 +138,6 @@ async function setPositionArchived(
 }
 
 const POSITIONS_TABLE = "club_positions";
-
-type PositionTarget = { readonly clubId: string; readonly positionId: string };
 
 /** Si la posición existe en el club, para decir por qué no se escribió nada. */
 async function positionExists(
