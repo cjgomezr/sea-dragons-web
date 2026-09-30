@@ -58,16 +58,16 @@ const FEED_COLUMNS = [
   "news_post_groups(group_id)",
 ].join(", ");
 
-export const READER_GROUP_FILTER = "news_post_groups.group_id";
+const READER_GROUP_FILTER = "news_post_groups.group_id";
 
 /** Lo que va a todo el club o a alguno de sus grupos, y lo suyo esté como
  * esté (#331): quien publicó ve lo retirado, marcado, y nadie más. El id sale
  * de la sesión, así que no puede romper la sintaxis del filtro. */
-export function audienceFilter(readerId: string): string {
+function audienceFilter(readerId: string): string {
   return `audience.eq.club,news_post_groups.not.is.null,author_id.eq.${readerId}`;
 }
 
-export function statusFilter(readerId: string): string {
+function statusFilter(readerId: string): string {
   return `status.eq.published,author_id.eq.${readerId}`;
 }
 

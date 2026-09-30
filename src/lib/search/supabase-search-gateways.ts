@@ -7,20 +7,10 @@ import {
   toDirectoryMemberRecord,
 } from "@/lib/directory/supabase-directory-gateways";
 import { EVENT_TYPES } from "@/lib/events/event-creation";
-import {
-  READER_AUDIENCE_FILTER,
-  READER_GROUP_FILTER as EVENT_READER_GROUP_FILTER,
-  READER_GROUPS_EMBED,
-} from "@/lib/events/supabase-event-agenda-gateways";
 import { toHoursAndMinutes } from "@/lib/events/supabase-event-management-gateways";
 import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-groups-gateway";
 import { signProfilePhotoUrls } from "@/lib/members/supabase-profile-photo-gateways";
 import { NEWS_CATEGORIES } from "@/lib/news/news-posts";
-import {
-  READER_GROUP_FILTER as NEWS_READER_GROUP_FILTER,
-  audienceFilter,
-  statusFilter,
-} from "@/lib/news/supabase-news-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type {
@@ -37,9 +27,10 @@ import type {
  *
  * Va por la llave de servicio, como las tres secciones que busca. Cada grupo
  * es una sola llamada a su función de `0049_search.sql`, que normaliza y
- * escapa el texto en la base; sobre lo que devuelve se aplican los mismos
- * filtros que la agenda y el feed, importados de sus adaptadores para que
- * la audiencia no tenga dos copias.
+ * escapa el texto en la base. La audiencia de eventos y noticias también la
+ * aplican esas funciones, con lo que decide el dominio: PostgREST no deja
+ * filtrar con un `or` sobre lo embebido en el resultado de una función, que
+ * es como lo hacen la agenda y el feed.
  */
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -48,10 +39,12 @@ const MEMBERS_FUNCTION = "search_members";
 const EVENTS_FUNCTION = "search_events";
 const NEWS_FUNCTION = "search_news_posts";
 
+// `starts_at` sólo sirve para ordenar, pero tiene que ir en la lista: sobre
+// el resultado de una función, PostgREST no ordena por una columna que no
+// selecciona ("column events.starts_at does not exist").
 const EVENT_COLUMNS =
-  "id, title, starts_on, start_time, location, event_type, status";
-const NEWS_COLUMNS =
-  "id, title, category, published_at, news_post_groups(group_id)";
+  "id, title, starts_on, start_time, starts_at, location, event_type, status";
+const NEWS_COLUMNS = "id, title, category, published_at";
 
 const eventMatchSchema = z.object({
   id: z.string(),
@@ -74,6 +67,17 @@ type SearchArguments = { readonly p_club_id: string; readonly p_text: string };
 
 function searchArguments(clubId: string, text: string): SearchArguments {
   return { p_club_id: clubId, p_text: text };
+}
+
+/** La visibilidad que decidió el dominio, como la entiende la función. */
+function eventSearchArguments(query: EventSearchQuery): SearchArguments & {
+  readonly p_whole_club: boolean;
+  readonly p_group_ids: readonly string[];
+} {
+  const base = searchArguments(query.clubId, query.text);
+  return query.visibility.kind === "club"
+    ? { ...base, p_whole_club: true, p_group_ids: [] }
+    : { ...base, p_whole_club: false, p_group_ids: query.visibility.groupIds };
 }
 
 function toEventMatch(row: unknown): EventMatch {
@@ -145,33 +149,22 @@ async function findMembersMatching(
     .map(toDirectoryMemberRecord);
 }
 
-/** La audiencia y el periodo como en `findAgendaPage`: los próximos desde
- * hoy por inicio ascendente, los pasados hasta ayer por inicio descendente. */
+/** El periodo y el orden como en `findAgendaPage`: los próximos desde hoy
+ * por inicio ascendente, los pasados hasta ayer por inicio descendente. */
 function findEventsMatching(
   serviceClient: SupabaseClient,
   query: EventSearchQuery,
 ): Promise<SearchMatches<EventMatch>> {
-  const isAudience = query.visibility.kind === "audience";
-  const columns = isAudience
-    ? `${EVENT_COLUMNS}, ${READER_GROUPS_EMBED}`
-    : EVENT_COLUMNS;
-  let request = serviceClient
-    .rpc(EVENTS_FUNCTION, searchArguments(query.clubId, query.text), {
-      count: "exact",
-    })
-    .select(columns);
-  request =
+  const request = serviceClient
+    .rpc(EVENTS_FUNCTION, eventSearchArguments(query), { count: "exact" })
+    .select(EVENT_COLUMNS);
+  const inPeriod =
     query.period === "upcoming"
       ? request.gte("starts_on", query.today)
       : request.lt("starts_on", query.today);
-  if (query.visibility.kind === "audience") {
-    request = request
-      .in(EVENT_READER_GROUP_FILTER, query.visibility.groupIds)
-      .or(READER_AUDIENCE_FILTER);
-  }
   const ascending = query.period === "upcoming";
   return readMatches(
-    request
+    inPeriod
       .order("starts_at", { ascending })
       .order("id", { ascending })
       .limit(query.limit),
@@ -182,20 +175,23 @@ function findEventsMatching(
   );
 }
 
-/** Los mismos filtros que `findFeedPage`, y el mismo orden. */
+/** El orden del feed: lo más reciente primero. */
 function findNewsMatching(
   serviceClient: SupabaseClient,
   query: NewsSearchQuery,
 ): Promise<SearchMatches<NewsMatch>> {
   return readMatches(
     serviceClient
-      .rpc(NEWS_FUNCTION, searchArguments(query.clubId, query.text), {
-        count: "exact",
-      })
+      .rpc(
+        NEWS_FUNCTION,
+        {
+          ...searchArguments(query.clubId, query.text),
+          p_reader_id: query.readerId,
+          p_group_ids: query.audienceGroupIds,
+        },
+        { count: "exact" },
+      )
       .select(NEWS_COLUMNS)
-      .or(statusFilter(query.readerId))
-      .in(NEWS_READER_GROUP_FILTER, query.audienceGroupIds)
-      .or(audienceFilter(query.readerId))
       .order("published_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(query.limit),

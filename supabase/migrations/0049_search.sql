@@ -15,10 +15,9 @@
 -- un cincuenta seguido de un por ciento y no "50 y cualquier cosa".
 --
 -- Las tres búsquedas devuelven filas enteras de su tabla, para que PostgREST
--- pueda embeber y filtrar sobre ellas como sobre la tabla misma: la
--- audiencia de eventos y noticias la aplica el servidor con los mismos
--- filtros que la agenda y el feed. Sólo las llama el servidor con la llave
--- de servicio, igual que esas dos lecturas.
+-- pueda embeber, filtrar, ordenar y contar sobre ellas como sobre la tabla
+-- misma. Sólo las llama el servidor con la llave de servicio, igual que el
+-- directorio, la agenda y el feed.
 --
 -- Idempotente como el resto del histórico.
 
@@ -86,9 +85,16 @@ as $$
          like public.search_like_pattern(p_text)
 $$;
 
+-- `p_whole_club` es la visibilidad de la agenda (`eventVisibilityFor`):
+-- quien organiza ve todo el club; los demás, lo que va a todo el club o a
+-- alguno de `p_group_ids`. La decide el servidor; aquí sólo se aplica,
+-- porque PostgREST no deja filtrar con un `or` sobre lo embebido en el
+-- resultado de una función, que es como lo hace `findAgendaPage`.
 create or replace function public.search_events(
   p_club_id uuid,
-  p_text text
+  p_text text,
+  p_whole_club boolean,
+  p_group_ids uuid[]
 )
   returns setof public.events
   language sql
@@ -100,6 +106,16 @@ as $$
     from public.events e
    where e.club_id = p_club_id
      and (
+       p_whole_club
+       or e.audience = 'all'
+       or exists (
+         select 1
+           from public.event_groups eg
+          where eg.event_id = e.id
+            and eg.group_id = any (p_group_ids)
+       )
+     )
+     and (
        public.search_normalize(e.title)
          like public.search_like_pattern(p_text)
        or public.search_normalize(e.location)
@@ -107,9 +123,14 @@ as $$
      )
 $$;
 
+-- Las reglas del feed (`findFeedPage`) por la misma razón: lo publicado que
+-- va a todo el club o a alguno de `p_group_ids`, y lo de `p_reader_id` esté
+-- como esté, retirado incluido.
 create or replace function public.search_news_posts(
   p_club_id uuid,
-  p_text text
+  p_text text,
+  p_reader_id uuid,
+  p_group_ids uuid[]
 )
   returns setof public.news_posts
   language sql
@@ -120,6 +141,17 @@ as $$
   select n.*
     from public.news_posts n
    where n.club_id = p_club_id
+     and (n.status = 'published' or n.author_id = p_reader_id)
+     and (
+       n.audience = 'club'
+       or n.author_id = p_reader_id
+       or exists (
+         select 1
+           from public.news_post_groups g
+          where g.post_id = n.id
+            and g.group_id = any (p_group_ids)
+       )
+     )
      and (
        public.search_normalize(n.title)
          like public.search_like_pattern(p_text)
@@ -143,13 +175,14 @@ revoke all on function public.search_members(uuid, text)
   from public, anon, authenticated;
 grant execute on function public.search_members(uuid, text) to service_role;
 
-revoke all on function public.search_events(uuid, text)
+revoke all on function public.search_events(uuid, text, boolean, uuid[])
   from public, anon, authenticated;
-grant execute on function public.search_events(uuid, text) to service_role;
+grant execute on function public.search_events(uuid, text, boolean, uuid[])
+  to service_role;
 
-revoke all on function public.search_news_posts(uuid, text)
+revoke all on function public.search_news_posts(uuid, text, uuid, uuid[])
   from public, anon, authenticated;
-grant execute on function public.search_news_posts(uuid, text)
+grant execute on function public.search_news_posts(uuid, text, uuid, uuid[])
   to service_role;
 
 -- Trigramas sobre la forma normalizada: sirven a un `like '%...%'` con tres

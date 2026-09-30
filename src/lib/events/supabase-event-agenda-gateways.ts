@@ -41,9 +41,9 @@ const AUDIENCE_EMBED =
 
 /** La misma tabla otra vez, filtrada a los grupos de quien consulta: una
  * fila hace que el evento le alcance. */
-export const READER_GROUPS_EMBED = "reader_groups:event_groups(group_id)";
-export const READER_GROUP_FILTER = "reader_groups.group_id";
-export const READER_AUDIENCE_FILTER = "audience.eq.all,reader_groups.not.is.null";
+const READER_GROUPS_EMBED = "reader_groups:event_groups(group_id)";
+const READER_GROUP_FILTER = "reader_groups.group_id";
+const READER_AUDIENCE_FILTER = "audience.eq.all,reader_groups.not.is.null";
 
 /** La respuesta propia, filtrada a quien consulta. */
 const MY_RSVP_EMBED = "my_rsvp:event_rsvps(response)";
