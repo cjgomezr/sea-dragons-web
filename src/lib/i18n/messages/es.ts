@@ -227,6 +227,7 @@ export const spanishMessages: MessageCatalog = {
   "app.metaDescription":
     "Plataforma del club de rugby subacuático {club} (Melbourne).",
   "section.underConstruction": "Esta sección está en construcción.",
+  "section.loading": "Cargando",
   "home.lead":
     "Plataforma del club de rugby subacuático. Esta es la cáscara inicial: el resto de las funcionalidades llega epic por epic, cada una con sus tickets y su revisión.",
   "home.status.title": "Estado del servicio",

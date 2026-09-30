@@ -853,6 +853,44 @@ button.notification-item-content:hover {
   color: var(--color-text-secondary);
 }
 
+/* El estado de carga de una sección (#435). El título ocupa el sitio del h1
+   (32px con interlínea 1.2): el de verdad llega a la misma altura. */
+.section-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.section-loading-title,
+.section-loading-block {
+  background: var(--color-border);
+  border-radius: var(--radius);
+  animation: section-loading-pulse 1.6s ease-in-out infinite;
+}
+
+.section-loading-title {
+  width: min(40%, 280px);
+  height: calc(32px * 1.2);
+  margin-bottom: var(--space-4);
+}
+
+.section-loading-block {
+  height: calc(var(--space-12) * 2);
+}
+
+@keyframes section-loading-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-loading-title,
+  .section-loading-block {
+    animation: none;
+  }
+}
+
 .card {
   padding: var(--space-6);
   background: var(--color-panel);
