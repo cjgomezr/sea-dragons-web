@@ -14,8 +14,11 @@ import {
 // Sin esto Next lo genera una vez en el build, con la marca de ese momento.
 export const dynamic = "force-dynamic";
 
+// El de la pestaña va el último a propósito: Chrome y Safari eligen el icono
+// por tamaño, pero Firefox se queda con el último `link` declarado, y el de
+// 512 px lleva el cuadro del acento que en la pestaña no queremos.
 export function generateImageMetadata(): Promise<ClubIconMetadata[]> {
-  return describeServedClubIcons([TAB_ICON_SIZE_PX, ANDROID_ICON_SIZE_PX]);
+  return describeServedClubIcons([ANDROID_ICON_SIZE_PX, TAB_ICON_SIZE_PX]);
 }
 
 export default function Icon({

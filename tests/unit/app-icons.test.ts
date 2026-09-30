@@ -65,14 +65,16 @@ afterEach(() => {
 });
 
 describe("icono de la pestaña (src/app/icon)", () => {
-  it("declara uno de 32 px y otro de 512 px, los dos PNG", async () => {
+  it("declara uno de 512 px y otro de 32 px, los dos PNG, con el de la pestaña el último", async () => {
     const entries = await iconRoute.generateImageMetadata();
 
+    // Firefox usa el último `link` declarado; Chrome y Safari eligen por
+    // tamaño. El último tiene que ser el de la pestaña, sin fondo.
     expect(
       entries.map(({ size, contentType }) => ({ size, contentType })),
     ).toEqual([
-      { size: { width: 32, height: 32 }, contentType: "image/png" },
       { size: { width: 512, height: 512 }, contentType: "image/png" },
+      { size: { width: 32, height: 32 }, contentType: "image/png" },
     ]);
   });
 
