@@ -421,6 +421,22 @@ describe("el texto", () => {
     );
   });
 
+  it("quita el carácter nulo, que Postgres no admite en un texto", async () => {
+    const { gateways, recorded } = fakeGateways();
+
+    await search(gateways, "gee\u0000long");
+
+    expect(recorded.memberTexts).toEqual(["geelong"]);
+  });
+
+  it("un texto que sólo tiene nulos y una letra es demasiado corto", async () => {
+    const { gateways } = fakeGateways();
+
+    await expect(search(gateways, "a\u0000\u0000")).rejects.toBeInstanceOf(
+      InvalidSearchTextError,
+    );
+  });
+
   it("pasa comodines y comillas tal cual, como texto", async () => {
     const { gateways, recorded } = fakeGateways();
 

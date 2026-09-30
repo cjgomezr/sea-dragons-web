@@ -173,10 +173,13 @@ export type SearchRequest = {
   readonly now: Date;
 };
 
+/** Postgres no admite este carácter en un `text`: llegaría como un 500. */
+const NULL_CHARACTER = /\u0000/g;
+
 /** Sin los espacios de los extremos y cortado en caracteres, no en unidades
  * de UTF-16, para no partir una letra en dos. */
 function readSearchText(raw: string): string {
-  const characters = [...raw.trim()];
+  const characters = [...raw.replace(NULL_CHARACTER, "").trim()];
   if (characters.length < SEARCH_TEXT_MIN_LENGTH) {
     throw new InvalidSearchTextError();
   }
