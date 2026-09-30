@@ -151,6 +151,35 @@ Dos cosas a saber:
 Para volver a `seadragons-dev`, cambia las tres variables en `.env.local`. CI
 sigue usando siempre `seadragons-dev`.
 
+#### Copiar los datos de `seadragons-dev` a tu base local
+
+Sirve para ver la aplicación con socios, grupos, eventos y noticias de verdad,
+o para reproducir un fallo que alguien vio en desarrollo. Necesitas
+`SUPABASE_DEV_DB_URL` en `.env.local`: sale del panel de `seadragons-dev`, en
+**Connect → Session pooler**, con la contraseña de la base en lugar de
+`[YOUR-PASSWORD]`. La contraseña la tiene quien administra el proyecto. Y la
+base local tiene que estar arrancada (`npm run db:start`): la copia usa el
+`psql` que ya trae su contenedor, así que no hace falta instalarlo.
+
+```bash
+npm run db:copy-dev                 # dice qué va a hacer, sin tocar nada
+npm run db:copy-dev -- --yes        # respalda tu base local y copia desarrollo
+npm run db:restore-backup -- --yes  # devuelve lo que había antes de la copia
+```
+
+- Copia los datos de `public` y `auth`, así que entras con cualquier cuenta que
+  exista en desarrollo. Las fotos y adjuntos de Storage no se copian: la
+  aplicación los muestra como no disponibles.
+- Antes de vaciar nada guarda tu base local en `.factory/db-backup/`. Sólo hay
+  un respaldo: cada copia reemplaza el anterior.
+- Si tu rama trae una migración que desarrollo aún no tiene, copia igual y las
+  tablas nuevas quedan vacías. Si es desarrollo el que va por delante, se
+  detiene sin tocar nada y te pide actualizar la rama con `main` y correr
+  `npm run db:reset`.
+- Nunca escribe en desarrollo, se niega a copiar desde producción, y sólo
+  escribe en la base local (`127.0.0.1:54322`). Si la copia falla a mitad, tu
+  base local queda como estaba.
+
 ## 4. Comprobar que quedó bien
 
 Corre esto en orden. Si algo falla, no sigas: mira la tabla del final.

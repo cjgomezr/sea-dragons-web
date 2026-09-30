@@ -412,6 +412,7 @@ el manifiesto se separan.
 | `SUPABASE_SERVICE_ROLE_KEY`  | production    | Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Production             |
 | `SUPABASE_SERVICE_ROLE_KEY`  | ci            | GitHub, repositorio sea-dragons-web, Settings, Secrets and variables, Actions                        |
 | `SUPABASE_ACCESS_TOKEN`      | local         | .env.local, en la máquina de quien desarrolla, fuera de git                                          |
+| `SUPABASE_DEV_DB_URL`        | local         | .env.local, en la máquina de quien desarrolla, fuera de git                                          |
 | `SUPABASE_PRODUCTION_DB_URL` | ci-produccion | GitHub, repositorio sea-dragons-web, Settings, Environments, entorno Production, Environment secrets |
 | `RESEND_API_KEY`             | production    | Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Production             |
 
@@ -723,6 +724,14 @@ de proyecto). No aplica a preview ni a producción: no lo lee el runtime de la
 aplicación, solo el CLI/MCP de quien desarrolla. Tampoco aplica hoy a CI:
 nadie corre el CLI de Supabase ahí todavía. Cada quien genera el suyo en
 Supabase Dashboard → Account → Access Tokens.
+
+`SUPABASE_DEV_DB_URL`: opcional en local. Es la cadena de conexión de
+`seadragons-dev` con la contraseña de la base, y sólo la lee
+`npm run db:copy-dev` para copiar sus datos a la base local de Docker (#448).
+El script sólo lee de ella, se niega si la cadena es de otro proyecto
+(producción incluida) y nunca la imprime. No aplica a preview, a producción ni
+a CI. Sale del panel de `seadragons-dev`, en **Connect → Session pooler**; la
+contraseña la tiene quien administra el proyecto.
 
 `APP_URL`: opcional en local (si no se pone, usa `http://localhost:3417`).
 La leen `scripts/ui-preflight.sh` y las specs de Playwright para saber contra
