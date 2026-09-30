@@ -1685,7 +1685,12 @@ test.describe("dentro de la aplicación", () => {
       await expect(visibleSectionLink(page, DIRECTORY_PATH)).toHaveAttribute(
         "aria-current",
         "page",
+        { timeout: INSTANT_RESPONSE_MS },
       );
+      // La marca llegó mientras la sección aún cargaba, no con la página.
+      await expect(page.locator(".section-loading")).toBeVisible();
+      // En escritorio la cabecera vive dentro de `.app-sidebar`: si el
+      // elemento sigue siendo el mismo, ni el menú ni ella se repintaron.
       const isSameShell = await page.evaluate(
         () =>
           document.querySelector(".app-sidebar") ===
