@@ -30,7 +30,7 @@ import type { DirectoryGateways, DirectoryMemberRecord } from "./directory";
 const MEMBERS_TABLE = "members";
 // Sólo el id de la evaluación: que exista es lo único que el directorio
 // cuenta (#324), y así ninguna nota sale de la base por este camino.
-const DIRECTORY_COLUMNS =
+export const DIRECTORY_COLUMNS =
   "user_id, full_name, country, experience_level, role, position_id, account_status, auf_number, auf_expiry, auf_verified_at, photo_path, member_evaluations(id)";
 const EVALUATIONS_RELATION = "member_evaluations";
 
@@ -79,7 +79,7 @@ function hasEvaluation(row: Row): boolean {
   return evaluations.length > 0;
 }
 
-function toDirectoryMemberRecord(row: Row): DirectoryMemberRecord {
+export function toDirectoryMemberRecord(row: Row): DirectoryMemberRecord {
   return {
     userId: readRequiredText(row, "user_id", MEMBERS_TABLE),
     fullName: readRequiredText(row, "full_name", MEMBERS_TABLE),
