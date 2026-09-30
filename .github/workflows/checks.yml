@@ -76,7 +76,11 @@ jobs:
     if: always() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true'
     runs-on: ubuntu-latest
     steps:
+      # Con toda la historia: el paso `texto` compara la rama con main, y el
+      # checkout por defecto trae un solo commit sin merge-base con nada.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -106,6 +110,21 @@ jobs:
       - name: Tests del kit
         if: steps.repo.outputs.has_kit == 'true'
         run: npm run test:kit
+      # Un PR que solo cambia texto (.github/text-only-paths.txt) no puede
+      # romper un test de red, y cada corrida completa son unos 40.000 viajes
+      # a seadragons-dev (#439). Solo en pull_request: en un push a main el
+      # paso no corre, la salida queda vacía y los tests corren completos. Si
+      # el script no puede comparar con main, responde que no es texto.
+      - id: texto
+        name: Averigua si el PR solo cambia texto
+        if: github.event_name == 'pull_request'
+        run: |
+          if bash scripts/branch-is-text-only.sh; then
+            echo "solo_texto=true" >> "$GITHUB_OUTPUT"
+            echo "PR de solo texto: todos sus archivos están en .github/text-only-paths.txt, así que los tests de red no corren y no reciben credenciales."
+          else
+            echo "solo_texto=false" >> "$GITHUB_OUTPUT"
+          fi
       # Las credenciales de `seadragons-dev`, y sólo en este paso: el build no
       # las necesita y la llave de servicio no tiene nada que hacer cerca de un
       # bundle. Sin ellas, las pruebas de integración y de RLS se saltan
@@ -116,15 +135,19 @@ jobs:
       # `RUN_INTEGRATION_TESTS=1` porque fuera de CI esas pruebas se saltan
       # (#415): el Stop gate de cada worker las corría tras cada turno y el
       # proyecto de desarrollo se acercaba al límite de usuarios de Supabase.
-      # Aquí se exigen.
+      # Aquí se exigen, salvo en un PR de solo texto.
+      #
+      # Actions no tiene operador ternario, y `cond && '' || '1'` daría
+      # siempre '1' porque la cadena vacía es falsa. Por eso la condición va
+      # negada y el valor que se quiere va en medio.
       - name: Tests
         if: steps.repo.outputs.bootstrapped == 'true'
         run: npm test
         env:
-          RUN_INTEGRATION_TESTS: "1"
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUN_INTEGRATION_TESTS: ${{ steps.texto.outputs.solo_texto != 'true' && '1' || '' }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
       - name: Lint
         if: steps.repo.outputs.bootstrapped == 'true'
         run: npm run lint
