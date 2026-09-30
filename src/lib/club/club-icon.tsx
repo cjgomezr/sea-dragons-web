@@ -51,8 +51,6 @@ const INITIALS_COLOR = "#ffffff";
  * tres letras siguen cabiendo. */
 const INITIALS_FONT_SHARE = 0.42;
 
-const INITIALS_FONT_WEIGHT = 700;
-
 /** Doce cifras hexadecimales bastan para que dos logos no choquen. */
 const FINGERPRINT_LENGTH = 12;
 
@@ -90,7 +88,6 @@ async function renderInitialsIcon(
         background: paintableAccentColor(brand.accentColor),
         color: INITIALS_COLOR,
         fontSize: Math.round(sizePx * INITIALS_FONT_SHARE),
-        fontWeight: INITIALS_FONT_WEIGHT,
       }}
     >
       {brand.initials}

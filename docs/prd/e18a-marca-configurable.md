@@ -239,7 +239,12 @@ constantes ni de los catálogos de idioma.
 
 - [ ] ¿El club puede cambiar su `slug`? Propuesta: no en v1, porque hoy es la
       llave con la que el servidor encuentra al club.
-- [ ] ¿El favicon entra en una segunda vuelta? Propuesta: sí, fuera de v1.
+- [x] ¿El favicon entra en una segunda vuelta? Propuesta: sí, fuera de v1.
+      Respondida el 29 de septiembre de 2026: sí, en la segunda vuelta. La
+      pestaña, los marcadores y el acceso directo del móvil enseñan el logo
+      del club, o sus iniciales sobre el acento si no tiene. Lo implementa el
+      #421, con un manifest mínimo y sin service worker. La vista previa al
+      compartir un enlace (Open Graph) sigue fuera.
 
 ## 11. Descomposición en tickets
 
