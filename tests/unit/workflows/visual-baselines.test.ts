@@ -50,6 +50,7 @@ interface WorkflowJob {
   if?: string;
   needs?: string | string[];
   env?: Record<string, string>;
+  outputs?: Record<string, string>;
   permissions?: Record<string, string>;
   strategy?: {
     "fail-fast"?: boolean;
@@ -438,5 +439,91 @@ describe("la lista de rutas visuales compartida con el Stop gate", () => {
     };
 
     expect(readVisualPathsList()).toEqual(workflow.on.pull_request?.paths);
+  });
+});
+
+const GATE_JOB = "arbol-ya-verificado";
+const SKIP_UNLESS_VERIFIED = `needs.${GATE_JOB}.outputs.ya_verificado != 'true'`;
+
+// Cada push a main repetía la visual entera sobre el árbol que su PR acababa
+// de comparar en verde (#441). El job previo lo averigua en segundos.
+describe("main no repite la visual que el PR ya pasó (#441)", () => {
+  it("pregunta primero, en un job que expone ya_verificado", () => {
+    const gate = parseWorkflow().jobs[GATE_JOB];
+
+    expect(gate).toBeDefined();
+    expect(Object.keys(gate?.outputs ?? {})).toContain("ya_verificado");
+  });
+
+  it("la pregunta sólo se hace en push, nunca en un PR ni en una aceptación", () => {
+    expect(parseWorkflow().jobs[GATE_JOB]?.if).toBe(
+      "github.event_name == 'push'",
+    );
+  });
+
+  it("la responde el script compartido con checks.yml, apuntado a este workflow", () => {
+    const step = stepsOf(GATE_JOB).find((candidate) =>
+      candidate.run?.includes("checks-already-green-on-pr.sh"),
+    );
+
+    expect(step?.env?.WORKFLOW_FILE).toBe("visual-baselines.yml");
+    expect(step?.env?.HEAD_COMMIT_MESSAGE).toBe(
+      "${{ github.event.head_commit.message }}",
+    );
+  });
+
+  it("la pregunta sólo pide permisos de lectura", () => {
+    const permissions = parseWorkflow().jobs[GATE_JOB]?.permissions ?? {};
+
+    expect(Object.values(permissions)).not.toContain("write");
+    expect(permissions["pull-requests"]).toBe("read");
+    expect(permissions.actions).toBe("read");
+  });
+
+  it("compare depende de la pregunta y se salta sólo cuando la respuesta es que sí", () => {
+    const compare = parseWorkflow().jobs.compare;
+
+    expect(compare?.needs).toContain(GATE_JOB);
+    expect(compare?.if).toContain(SKIP_UNLESS_VERIFIED);
+  });
+
+  // En un pull request el job de la pregunta no arranca, y sin `always()`
+  // Actions saltaría también `compare`, que dejaría todos los PRs sin visual.
+  it("compare sigue corriendo en pull_request, donde la pregunta no se hace", () => {
+    const condition = parseWorkflow().jobs.compare?.if ?? "";
+
+    expect(condition).toMatch(/always\(\)/);
+    expect(condition).toMatch(/github\.event_name == 'pull_request'/);
+    expect(condition).toMatch(/github\.event_name == 'push'/);
+  });
+
+  it("compare no arranca en una aceptación, igual que antes", () => {
+    const condition = parseWorkflow().jobs.compare?.if ?? "";
+
+    expect(condition).not.toMatch(/workflow_dispatch/);
+  });
+
+  // Un `compare` saltado deja su resultado en `skipped`, no en `failure`, así
+  // que ni el incidente ni el diff tienen de qué partir.
+  it.each(["report-incident", "visual-diff"])(
+    "el job %s sólo reacciona a un compare que falló de verdad",
+    (jobName) => {
+      const condition = parseWorkflow().jobs[jobName]?.if ?? "";
+
+      expect(condition).toMatch(/needs\.compare\.result\s*==\s*'failure'/);
+    },
+  );
+
+  it("el reparto no se toca: sólo lista la suite, no la corre", () => {
+    const reparto = parseWorkflow().jobs.reparto;
+
+    expect(reparto?.needs).toBeUndefined();
+  });
+
+  it("la aceptación a mano no espera a la pregunta", () => {
+    const { regenerate, accept } = parseWorkflow().jobs;
+
+    expect(regenerate?.needs).toBeUndefined();
+    expect(accept?.needs).toEqual("regenerate");
   });
 });

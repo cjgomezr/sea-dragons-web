@@ -368,11 +368,13 @@ describe("main no repite el trabajo del PR", () => {
     expect(gate?.permissions?.actions).toBe("read");
   });
 
-  // El visual es el único que puede desajustarse en main sin que ningún PR lo
-  // note: el commit que `accept` empuja deja su comparación en
-  // `action_required`, y si alguien mergea sin aprobarla, main llega con la
-  // captura sin verificar. Por eso ahí no se deduplica nada.
-  it("el visual sigue comparando en cada push a main", () => {
+  // El visual puede desajustarse en main sin que ningún PR lo note: el commit
+  // que `accept` empuja deja su comparación en `action_required`, y si alguien
+  // mergea sin aprobarla, main llega con la captura sin verificar. Por eso el
+  // push a main sigue disparando la visual; sólo se la salta cuando la cabeza
+  // del PR ya comparó en verde ese mismo árbol (#441, ver
+  // tests/unit/workflows/visual-baselines.test.ts).
+  it("el visual sigue arrancando en cada push a main", () => {
     const { on, jobs } = readWorkflow(VISUAL);
 
     expect(on.push?.branches).toContain("main");

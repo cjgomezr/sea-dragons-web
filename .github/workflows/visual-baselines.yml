@@ -116,6 +116,35 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # En un push a main, ¿este árbol es el mismo que la visual del PR acaba de
+  # comparar en verde? La fábrica mergea con squash un PR rebasado, así que
+  # casi siempre lo es, y repetir cuatro máquinas contra `seadragons-dev` no
+  # puede descubrir nada (#441). El script es el de `checks.yml`, apuntado a
+  # este workflow; ante cualquier duda responde que no y se compara.
+  #
+  # El commit que empuja `accept` no rompe esto: su `compare` sobre la rama
+  # queda en `action_required` hasta que alguien lo aprueba, y sólo una
+  # corrida de `pull_request` terminada en verde sobre la cabeza del PR
+  # cuenta. Mergear sin aprobarla deja la respuesta en "no".
+  arbol-ya-verificado:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    outputs:
+      ya_verificado: ${{ steps.pregunta.outputs.ya_verificado }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: pregunta
+        run: bash scripts/checks-already-green-on-pr.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          WORKFLOW_FILE: visual-baselines.yml
+
   # La suite se reparte en varias máquinas (#255): en una sola, comparar
   # tardaba más de 8 minutos y aceptar entre 13 y 16. Cada parte siembra sus
   # propios miembros de prueba en `seadragons-dev` con un nombre único por
@@ -127,7 +156,15 @@ jobs:
   # `regenerate` se reparte exactamente igual; scripts/check-shard-coverage.ts
   # lo comprueba en el job `reparto`.
   compare:
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    needs: [arbol-ya-verificado]
+    # `always()` porque en un pull request la pregunta no arranca, y sin una
+    # función de estado Actions exige que la dependencia haya salido bien: la
+    # visual se saltaría en todos los PRs. Un `compare` saltado queda
+    # `skipped`, así que ni `visual-diff` ni `report-incident` arrancan.
+    if: >-
+      always()
+      && (github.event_name == 'pull_request' || github.event_name == 'push')
+      && needs.arbol-ya-verificado.outputs.ya_verificado != 'true'
     runs-on: ubuntu-latest
     strategy:
       # Que una parte falle no cancela las demás: el diff de cada una es lo
