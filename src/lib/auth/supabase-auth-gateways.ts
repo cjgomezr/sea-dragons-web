@@ -47,6 +47,7 @@ import type {
   MemberDirectory,
   RegistrationGateways,
 } from "./register-member";
+import { forgetCachedSession } from "./session-cache";
 import { createSupabaseEmailRequestLog } from "./supabase-email-request-log";
 import { createSupabaseRegistrationRequestLog } from "./supabase-registration-request-log";
 
@@ -423,18 +424,24 @@ function createMemberAccountStore(
     },
 
     async activateMember(memberId) {
-      const { error } = await serviceClient
+      const { data, error } = await serviceClient
         .from(MEMBERS_TABLE)
         .update({ account_status: "active" })
         .eq("id", memberId)
         // La condición sobre el estado no sobra. Entre leer la fila y escribir
         // este `update` cabe una baja de socio (FR-085, E5), y sin ella la
         // baja se revive sola: sólo se activa lo que todavía está a medias.
-        .eq("account_status", "incomplete");
+        .eq("account_status", "incomplete")
+        .select("user_id");
       if (error) {
         throw new Error(
           `No se pudo activar el miembro ${memberId}: ${error.message}`,
         );
+      }
+      // La frontera recordaba esta cuenta como incompleta. Se olvida para que
+      // quien acaba de terminar su registro entre ya, sin esperar 30 segundos.
+      for (const row of data) {
+        forgetCachedSession(readRequiredText(row, "user_id", MEMBERS_TABLE));
       }
     },
   };

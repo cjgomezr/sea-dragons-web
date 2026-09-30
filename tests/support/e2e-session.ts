@@ -170,6 +170,7 @@ export const RUN_NAMED_MEMBERS = {
   "admin-de-administracion": "Admin de administración",
   "socio-para-decidir": "Socio para decidir",
   "perfil-para-foto": "Socia que sube su foto",
+  "socio-para-dar-de-baja": "Socio para dar de baja",
 } as const;
 
 export type RunNamedMember = keyof typeof RUN_NAMED_MEMBERS;
@@ -267,6 +268,10 @@ export const ROLE_REQUEST_MEMBERS = {
     pendingRequest: null,
     columns: { full_name: "Rita Retirada", country: "AU" },
   },
+  /** Lo da de baja un Admin a mitad de su sesión, para ver que la frontera
+   * lo deja fuera en su siguiente petición aunque recordara su estado (#434).
+   * El arranque de la corrida siguiente lo vuelve a sembrar activo. */
+  "socio-para-dar-de-baja": { pendingRequest: null, columns: {} },
 } as const;
 
 export type RoleRequestMemberName = keyof typeof ROLE_REQUEST_MEMBERS;

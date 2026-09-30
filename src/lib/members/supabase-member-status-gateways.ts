@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
 import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
 import { createSupabaseAuthGateways } from "@/lib/auth/supabase-auth-gateways";
+import { forgetCachedSession } from "@/lib/auth/session-cache";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type {
@@ -95,6 +96,9 @@ export function createMemberStatusWriters(
             `El cambio de estado del miembro ${input.targetUserId} volvió con una forma que el dominio no reconoce: ${parsed.error.message}`,
           );
         }
+        // Una baja deja fuera al socio desde su siguiente petición en este
+        // servidor, sin esperar a que caduque lo que la frontera recordaba.
+        forgetCachedSession(input.targetUserId);
         return toStatusWrite(parsed.data);
       },
     },

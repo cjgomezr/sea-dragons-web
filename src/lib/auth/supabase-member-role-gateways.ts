@@ -9,6 +9,7 @@ import type {
   MemberRoleChangeWrite,
 } from "./member-role-change";
 import { ROLES } from "./roles";
+import { forgetCachedSession } from "./session-cache";
 import { createRoleRequestGateways } from "./supabase-role-request-gateways";
 
 /**
@@ -81,6 +82,9 @@ export function createMemberRoleGateways(
             `El cambio de rol del socio ${input.targetUserId} volvió con una forma que el dominio no reconoce: ${parsed.error.message}`,
           );
         }
+        // El rol nuevo vale desde la siguiente petición del socio en este
+        // servidor, sin esperar a que caduque lo que la frontera recordaba.
+        forgetCachedSession(input.targetUserId);
         return toRoleChangeWrite(parsed.data);
       },
     },

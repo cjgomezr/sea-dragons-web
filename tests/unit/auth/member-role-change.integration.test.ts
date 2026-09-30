@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 import {
@@ -142,14 +143,21 @@ async function readNotifications(
   return data;
 }
 
-/** El rol con el que la frontera ve la siguiente petición del socio, leído
- * con su propia sesión como lo lee el proxy. */
-async function sessionRoleOf(member: SeededMember): Promise<SessionState> {
+/** Una sesión del socio, abierta una vez y reutilizada: la frontera recuerda
+ * su estado bajo ese token (#434), así que leer dos veces con el mismo cliente
+ * es lo que prueba que el cambio olvida lo recordado. */
+async function openSessionOf(member: SeededMember): Promise<SupabaseClient> {
   const { client } = await createRlsClient(
     { role: "authenticated", email: member.email, password: member.password },
     process.env,
   );
-  return readSessionState(client);
+  return client;
+}
+
+/** El rol con el que la frontera ve la siguiente petición del socio, leído
+ * con su propia sesión como lo lee el proxy. */
+function sessionRoleOf(session: SupabaseClient): Promise<SessionState> {
+  return readSessionState(session);
 }
 
 describeRls("cambiar el rol de un socio contra seadragons-dev", () => {
@@ -165,7 +173,8 @@ describeRls("cambiar el rol de un socio contra seadragons-dev", () => {
             serviceClient,
             { clubId, role: "Player" },
             async (player) => {
-              await expect(sessionRoleOf(player)).resolves.toEqual({
+              const session = await openSessionOf(player);
+              await expect(sessionRoleOf(session)).resolves.toEqual({
                 kind: "active",
                 role: "Player",
               });
@@ -181,7 +190,7 @@ describeRls("cambiar el rol de un socio contra seadragons-dev", () => {
                 previousRole: "Player",
                 role: "Committee",
               });
-              await expect(sessionRoleOf(player)).resolves.toEqual({
+              await expect(sessionRoleOf(session)).resolves.toEqual({
                 kind: "active",
                 role: "Committee",
               });
@@ -258,7 +267,7 @@ describeRls("cambiar el rol de un socio contra seadragons-dev", () => {
               const decideFor = async () =>
                 decideSessionBoundary({
                   pathname,
-                  session: await sessionRoleOf(coach),
+                  session: await sessionRoleOf(await openSessionOf(coach)),
                 });
               await expect(decideFor()).resolves.toEqual({
                 kind: "missingCapability",

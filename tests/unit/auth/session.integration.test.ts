@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, type NextResponse } from "next/server";
-import { beforeAll, expect, it } from "vitest";
+import { beforeAll, expect, it, vi } from "vitest";
 import { DELETE, POST } from "@/app/api/v1/auth/session/route";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import {
@@ -8,6 +8,7 @@ import {
   DASHBOARD_PATH,
   SIGN_IN_PATH,
 } from "@/lib/auth/routes";
+import { SESSION_CACHE_TTL_MS } from "@/lib/auth/session-cache";
 import { INVALID_CREDENTIALS_MESSAGE } from "@/lib/auth/sign-in";
 import { proxy } from "@/proxy";
 import {
@@ -264,6 +265,34 @@ describeRls("sesión contra Supabase", () => {
         await expect(replayed.json()).resolves.toMatchObject({
           error: { code: "unauthenticated" },
         });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  // La frontera recuerda 30 segundos el estado de un token que ya vio (#434).
+  // Una copia de las cookies de una sesión cerrada vale, como mucho, hasta que
+  // se cumplen. El reloj se adelanta a mano: el test no espera de verdad.
+  it(
+    "deja de valer como mucho 30 segundos después el token ya visto de una sesión cerrada",
+    async () => {
+      await withMember("active", async ({ email, password }) => {
+        const cookies = cookiesOf(await signIn(email, password));
+        const seen = await proxy(requestWith(PROTECTED_API_PATH, cookies));
+        expect(seen.status).toBe(200);
+        await DELETE(requestWith(SESSION_URL, cookies, { method: "DELETE" }));
+
+        vi.useFakeTimers({ toFake: ["Date"] });
+        try {
+          vi.setSystemTime(Date.now() + SESSION_CACHE_TTL_MS);
+          const replayed = await proxy(
+            requestWith(PROTECTED_API_PATH, cookies),
+          );
+
+          expect(replayed.status).toBe(401);
+        } finally {
+          vi.useRealTimers();
+        }
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
