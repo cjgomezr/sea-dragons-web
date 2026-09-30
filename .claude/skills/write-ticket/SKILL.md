@@ -103,6 +103,13 @@ gh issue create --title "[Epic] <group title>" --body "<group summary>" --label 
 #    number and not the GraphQL node id. Fetch it explicitly:
 DB_ID=$(gh api "repos/$REPO/issues/$CHILD_NUMBER" --jq .id)
 gh api --method POST "repos/$REPO/issues/$PARENT_NUMBER/sub_issues" -F "sub_issue_id=$DB_ID"
+
+# 3. If the epic was already closed, reopen it NOW. GitHub Actions has no
+#    trigger for "sub-issue attached", so without this the epic stays closed
+#    until the daily reconcile (labels-cleanup.yml, 06:17 UTC). It closes an
+#    epic whose sub-issues are all closed and reopens one that got a new
+#    open sub-issue; it does nothing when the epic is already right.
+bash scripts/reconcile-epic.sh "$PARENT_NUMBER"
 ```
 
 ### Board (optional)
