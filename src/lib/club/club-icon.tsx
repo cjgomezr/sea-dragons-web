@@ -1,18 +1,20 @@
 import { createHash } from "node:crypto";
 import { ImageResponse } from "next/og";
 import sharp from "sharp";
-import {
-  DEFAULT_ACCENT_COLOR,
-  LIGHT_ACCENT_SURFACES,
-  isHexColor,
-} from "./accent-color";
+import { DEFAULT_ACCENT_COLOR, isHexColor } from "./accent-color";
 import type { ClubBrand } from "./club-brand";
 import { LOGO_MAX_INPUT_PIXELS } from "./decode-club-logo";
 
 /**
  * El icono de la pestaña, los marcadores y la pantalla de inicio (#421, E18a).
- * Sigue a la marca de la cabecera (`ClubBrandMark`): el logo entero sobre el
- * panel, o las iniciales sobre el acento si no hay logo o no se puede leer.
+ * Sigue a la marca de la cabecera (`ClubBrandMark`): el logo entero, o las
+ * iniciales sobre el acento si no hay logo o no se puede leer.
+ *
+ * Qué va detrás del logo lo decide quien pide el icono (`IconSurface`). En la
+ * pestaña y los marcadores, nada: el logo se ve como en la cabecera, sobre lo
+ * que haya. En la pantalla de inicio, el acento del club con un margen, porque
+ * iOS rellena de negro la transparencia y Android recorta el icono con una
+ * máscara.
  *
  * El logo lo compone sharp, que decodifica PNG y WebP. Las iniciales las
  * pinta `next/og` y no un SVG pasado por sharp: librsvg busca las fuentes en
@@ -32,17 +34,26 @@ export type LogoBytesReader = (
   signal: AbortSignal,
 ) => Promise<Uint8Array>;
 
+/** Lo que va detrás del logo. `paddingShare` es el margen a cada lado como
+ * fracción del lado del icono. */
+export type IconSurface =
+  | { readonly kind: "transparent" }
+  | {
+      readonly kind: "solid";
+      readonly color: string;
+      readonly paddingShare: number;
+    };
+
 export type RenderClubIconOptions = {
   readonly brand: ClubIconBrand;
   readonly sizePx: number;
+  readonly surface: IconSurface;
   readonly readLogoBytes: LogoBytesReader;
   /** Pasado este plazo se pinta con las iniciales. */
   readonly readTimeoutMs: number;
 };
 
-/** El panel del tema claro, el fondo sobre el que el logo se lee en la
- * cabecera. */
-const LIGHT_PANEL_COLOR = LIGHT_ACCENT_SURFACES[0];
+const TRANSPARENT_BACKGROUND = { r: 0, g: 0, b: 0, alpha: 0 };
 
 /** El texto del recuadro de iniciales de la cabecera. */
 const INITIALS_COLOR = "#ffffff";
@@ -56,12 +67,14 @@ const FINGERPRINT_LENGTH = 12;
 
 /** Cambia cuando cambia lo que el icono enseña, para que la dirección nueva
  * no la tape la caché del navegador. La dirección del logo sirve de huella:
- * cada subida lleva un nombre de fichero nuevo (`club-logo.ts`). */
+ * cada subida lleva un nombre de fichero nuevo (`club-logo.ts`). El acento va
+ * siempre: sin logo es el fondo de las iniciales, y con logo es el fondo de la
+ * pantalla de inicio. */
 export function clubIconFingerprint(brand: ClubIconBrand): string {
   const source =
     brand.logoUrl === null
       ? `initials:${brand.initials}:${brand.accentColor}`
-      : `logo:${brand.logoUrl}`;
+      : `logo:${brand.logoUrl}:${brand.accentColor}`;
   return createHash("sha256")
     .update(source)
     .digest("hex")
@@ -101,15 +114,36 @@ async function renderInitialsIcon(
 async function renderLogoIcon(
   logoBytes: Uint8Array,
   sizePx: number,
+  surface: IconSurface,
 ): Promise<Uint8Array> {
   // `failOn: "truncated"`: un fichero cortado falla en vez de pintarse a
   // medias, como en `decode-club-logo.ts`.
-  return sharp(logoBytes, {
+  const logo = sharp(logoBytes, {
     failOn: "truncated",
     limitInputPixels: LOGO_MAX_INPUT_PIXELS,
-  })
-    .resize(sizePx, sizePx, { fit: "contain", background: LIGHT_PANEL_COLOR })
-    .flatten({ background: LIGHT_PANEL_COLOR })
+  });
+  if (surface.kind === "transparent") {
+    return logo
+      .resize(sizePx, sizePx, {
+        fit: "contain",
+        background: TRANSPARENT_BACKGROUND,
+      })
+      .png()
+      .toBuffer();
+  }
+  const background = paintableAccentColor(surface.color);
+  const padding = Math.round(sizePx * surface.paddingShare);
+  const innerPx = sizePx - 2 * padding;
+  return logo
+    .resize(innerPx, innerPx, { fit: "contain", background })
+    .flatten({ background })
+    .extend({
+      top: padding,
+      bottom: padding,
+      left: padding,
+      right: padding,
+      background,
+    })
     .png()
     .toBuffer();
 }
@@ -126,7 +160,6 @@ async function readLogoWithinTimeout(
       reject(new Error(`el logo no llegó en ${readTimeoutMs}ms`));
     }, readTimeoutMs);
   });
-
   try {
     return await Promise.race([
       readLogoBytes(logoUrl, controller.signal),
@@ -151,13 +184,16 @@ export type ClubIcon = {
 export async function renderClubIcon(
   options: RenderClubIconOptions,
 ): Promise<ClubIcon> {
-  const { brand, sizePx } = options;
+  const { brand, sizePx, surface } = options;
   if (brand.logoUrl === null) {
     return { kind: "brand", png: await renderInitialsIcon(brand, sizePx) };
   }
   try {
     const logoBytes = await readLogoWithinTimeout(brand.logoUrl, options);
-    return { kind: "brand", png: await renderLogoIcon(logoBytes, sizePx) };
+    return {
+      kind: "brand",
+      png: await renderLogoIcon(logoBytes, sizePx, surface),
+    };
   } catch (error) {
     console.error(
       `[club-icon] no se pudo pintar el logo ${brand.logoUrl}; se pintan las iniciales:`,

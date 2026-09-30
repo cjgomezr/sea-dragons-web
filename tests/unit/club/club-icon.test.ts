@@ -5,6 +5,7 @@ import { DEFAULT_ACCENT_COLOR } from "@/lib/club/accent-color";
 import {
   type ClubIcon,
   type ClubIconBrand,
+  type IconSurface,
   type LogoBytesReader,
   clubIconFingerprint,
   renderClubIcon,
@@ -13,14 +14,27 @@ import {
 /**
  * #421 (E18a): el icono de la pestaña, los marcadores y la pantalla de inicio
  * sale del logo del club, o de sus iniciales sobre el acento si no hay logo o
- * no se puede leer.
+ * no se puede leer. El de la pestaña va sin nada detrás, como en la cabecera;
+ * el de la pantalla de inicio va sobre el acento con un margen, porque iOS y
+ * Android no admiten transparencia.
  */
 
 const LOGO_RED = { r: 200, g: 20, b: 20 };
-const PANEL_WHITE = { r: 255, g: 255, b: 255 };
 const ACCENT = "#7b3fa0";
 const ACCENT_RGB = { r: 0x7b, g: 0x3f, b: 0xa0 };
 const TEST_READ_TIMEOUT_MS = 50;
+const OPAQUE = 255;
+const TRANSPARENT_ALPHA = 0;
+
+/** La pestaña: el logo tal cual, sin nada detrás. */
+const TRANSPARENT: IconSurface = { kind: "transparent" };
+/** La pantalla de inicio: fondo del acento y un margen de un octavo del
+ * lado, para que la máscara de Android no recorte el logo. */
+const ON_ACCENT: IconSurface = {
+  kind: "solid",
+  color: ACCENT,
+  paddingShare: 0.125,
+};
 
 const WITHOUT_LOGO: ClubIconBrand = {
   initials: "HO",
@@ -34,6 +48,7 @@ const WITH_LOGO: ClubIconBrand = {
 };
 
 type Rgb = { readonly r: number; readonly g: number; readonly b: number };
+type Rgba = Rgb & { readonly alpha: number };
 
 async function solidPng(width: number, height: number): Promise<Uint8Array> {
   return sharp({
@@ -43,9 +58,24 @@ async function solidPng(width: number, height: number): Promise<Uint8Array> {
     .toBuffer();
 }
 
-async function pixelAt(png: Uint8Array, x: number, y: number): Promise<Rgb> {
+/** Un logo del todo transparente: lo que el club sube suele traer fondo
+ * transparente alrededor del dibujo. */
+async function transparentPng(side: number): Promise<Uint8Array> {
+  return sharp({
+    create: {
+      width: side,
+      height: side,
+      channels: 4,
+      background: { ...LOGO_RED, alpha: 0 },
+    },
+  })
+    .png()
+    .toBuffer();
+}
+
+async function pixelAt(png: Uint8Array, x: number, y: number): Promise<Rgba> {
   const { data, info } = await sharp(png)
-    .removeAlpha()
+    .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
   const offset = (y * info.width + x) * info.channels;
@@ -53,6 +83,7 @@ async function pixelAt(png: Uint8Array, x: number, y: number): Promise<Rgb> {
     r: data[offset] ?? -1,
     g: data[offset + 1] ?? -1,
     b: data[offset + 2] ?? -1,
+    alpha: data[offset + 3] ?? -1,
   };
 }
 
@@ -71,10 +102,12 @@ function renderResult(
   brand: ClubIconBrand,
   sizePx: number,
   readLogoBytes: LogoBytesReader,
+  surface: IconSurface = TRANSPARENT,
 ): Promise<ClubIcon> {
   return renderClubIcon({
     brand,
     sizePx,
+    surface,
     readLogoBytes,
     readTimeoutMs: TEST_READ_TIMEOUT_MS,
   });
@@ -84,8 +117,9 @@ async function render(
   brand: ClubIconBrand,
   sizePx: number,
   readLogoBytes: LogoBytesReader,
+  surface: IconSurface = TRANSPARENT,
 ): Promise<Uint8Array> {
-  return (await renderResult(brand, sizePx, readLogoBytes)).png;
+  return (await renderResult(brand, sizePx, readLogoBytes, surface)).png;
 }
 
 beforeEach(() => {
@@ -96,7 +130,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("renderClubIcon con logo", () => {
+describe("renderClubIcon con logo, en la pestaña", () => {
   it("devuelve un PNG cuadrado del tamaño pedido", async () => {
     const logo = await solidPng(200, 100);
 
@@ -106,26 +140,35 @@ describe("renderClubIcon con logo", () => {
     expect(metadata).toMatchObject({ format: "png", width: 180, height: 180 });
   });
 
-  it("encaja un logo apaisado entero, con bandas de panel arriba y abajo", async () => {
+  it("encaja un logo apaisado entero y deja transparente lo de arriba y abajo", async () => {
     const logo = await solidPng(200, 100);
 
     const icon = await render(WITH_LOGO, 32, readerReturning(logo));
 
     expectColorClose(await pixelAt(icon, 0, 16), LOGO_RED);
     expectColorClose(await pixelAt(icon, 31, 16), LOGO_RED);
-    expectColorClose(await pixelAt(icon, 16, 0), PANEL_WHITE);
-    expectColorClose(await pixelAt(icon, 16, 31), PANEL_WHITE);
+    expect((await pixelAt(icon, 0, 16)).alpha).toBe(OPAQUE);
+    expect((await pixelAt(icon, 16, 0)).alpha).toBe(TRANSPARENT_ALPHA);
+    expect((await pixelAt(icon, 16, 31)).alpha).toBe(TRANSPARENT_ALPHA);
   });
 
-  it("encaja un logo vertical entero, con bandas de panel a los lados", async () => {
+  it("encaja un logo vertical entero y deja transparentes los lados", async () => {
     const logo = await solidPng(100, 200);
 
     const icon = await render(WITH_LOGO, 32, readerReturning(logo));
 
     expectColorClose(await pixelAt(icon, 16, 0), LOGO_RED);
     expectColorClose(await pixelAt(icon, 16, 31), LOGO_RED);
-    expectColorClose(await pixelAt(icon, 0, 16), PANEL_WHITE);
-    expectColorClose(await pixelAt(icon, 31, 16), PANEL_WHITE);
+    expect((await pixelAt(icon, 0, 16)).alpha).toBe(TRANSPARENT_ALPHA);
+    expect((await pixelAt(icon, 31, 16)).alpha).toBe(TRANSPARENT_ALPHA);
+  });
+
+  it("conserva la transparencia que trae el logo", async () => {
+    const logo = await transparentPng(40);
+
+    const icon = await render(WITH_LOGO, 32, readerReturning(logo));
+
+    expect((await pixelAt(icon, 16, 16)).alpha).toBe(TRANSPARENT_ALPHA);
   });
 
   it("pide los bytes a la dirección del logo", async () => {
@@ -137,6 +180,52 @@ describe("renderClubIcon con logo", () => {
       WITH_LOGO.logoUrl,
       expect.any(AbortSignal),
     );
+  });
+});
+
+describe("renderClubIcon con logo, en la pantalla de inicio", () => {
+  it("pone el logo sobre el acento con un margen alrededor", async () => {
+    const logo = await solidPng(200, 100);
+
+    const icon = await render(WITH_LOGO, 32, readerReturning(logo), ON_ACCENT);
+
+    // Un octavo de 32 son 4 px de margen: el logo apaisado ocupa 24 × 12,
+    // centrado, así que la fila del medio es logo de la columna 4 a la 27 y
+    // todo lo demás es acento.
+    expectColorClose(await pixelAt(icon, 16, 16), LOGO_RED);
+    expectColorClose(await pixelAt(icon, 4, 16), LOGO_RED);
+    expectColorClose(await pixelAt(icon, 27, 16), LOGO_RED);
+    expectColorClose(await pixelAt(icon, 1, 16), ACCENT_RGB);
+    expectColorClose(await pixelAt(icon, 16, 1), ACCENT_RGB);
+    expectColorClose(await pixelAt(icon, 16, 30), ACCENT_RGB);
+    expect((await pixelAt(icon, 0, 0)).alpha).toBe(OPAQUE);
+  });
+
+  it("rellena con el acento la transparencia del logo", async () => {
+    const logo = await transparentPng(40);
+
+    const icon = await render(WITH_LOGO, 32, readerReturning(logo), ON_ACCENT);
+
+    expectColorClose(await pixelAt(icon, 16, 16), ACCENT_RGB);
+    expect((await pixelAt(icon, 16, 16)).alpha).toBe(OPAQUE);
+  });
+
+  it("usa el acento por defecto si el color del fondo no es un color", async () => {
+    const logo = await solidPng(10, 10);
+
+    const icon = await render(WITH_LOGO, 32, readerReturning(logo), {
+      ...ON_ACCENT,
+      color: "</svg>",
+    });
+
+    const [r, g, b] = [1, 3, 5].map((start) =>
+      parseInt(DEFAULT_ACCENT_COLOR.slice(start, start + 2), 16),
+    );
+    expectColorClose(await pixelAt(icon, 0, 0), {
+      r: r ?? -1,
+      g: g ?? -1,
+      b: b ?? -1,
+    });
   });
 });
 
@@ -153,6 +242,13 @@ describe("renderClubIcon sin logo", () => {
     });
     expectColorClose(await pixelAt(icon, 0, 0), ACCENT_RGB);
     expect(reader).not.toHaveBeenCalled();
+  });
+
+  it("pinta las iniciales sobre el acento también en la pestaña: sin logo no hay nada que dejar ver", async () => {
+    const icon = await render(WITHOUT_LOGO, 32, vi.fn<LogoBytesReader>());
+
+    expectColorClose(await pixelAt(icon, 0, 0), ACCENT_RGB);
+    expect((await pixelAt(icon, 0, 0)).alpha).toBe(OPAQUE);
   });
 
   it("pinta las iniciales en blanco", async () => {
@@ -258,6 +354,12 @@ describe("clubIconFingerprint", () => {
     };
 
     expect(clubIconFingerprint(other)).not.toBe(clubIconFingerprint(WITH_LOGO));
+  });
+
+  it("con logo, cambia con el acento: la pantalla de inicio lo lleva de fondo", () => {
+    expect(
+      clubIconFingerprint({ ...WITH_LOGO, accentColor: "#123456" }),
+    ).not.toBe(clubIconFingerprint(WITH_LOGO));
   });
 
   it("cambia cuando el Admin quita el logo", () => {
