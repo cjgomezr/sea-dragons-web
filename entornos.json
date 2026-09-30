@@ -84,6 +84,17 @@
         "ci-produccion": null
       }
     },
+    "SUPABASE_DEV_DB_URL": {
+      "secret": true,
+      "writeCredential": true,
+      "scopes": {
+        "local": "seadragons-dev",
+        "preview": null,
+        "production": null,
+        "ci": null,
+        "ci-produccion": null
+      }
+    },
     "APP_URL": {
       "secret": false,
       "writeCredential": false,
