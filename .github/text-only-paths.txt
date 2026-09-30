@@ -2,9 +2,10 @@
 # corre `checks` sin los tests contra seadragons-dev ni sus credenciales
 # (#439); los unitarios, el lint, los tipos y el build corren igual, porque
 # varios tests leen docs/ y CLAUDE.md. La lee scripts/branch-is-text-only.sh.
-# Mismo glob que .github/visual-paths.txt: `*` no cruza `/` y `**` sí, y
-# `**/` también vale cero directorios. Una línea con `!` delante excluye, y
-# gana la última que coincide: por eso las exclusiones van al final.
+# Mismo formato que .github/visual-paths.txt (`*` no cruza `/` y `**` sí),
+# con dos añadidos que aquel no admite: `**/` también vale cero directorios, y
+# una línea con `!` delante excluye. Gana la última que coincide, por eso las
+# exclusiones van al final.
 docs/**
 **/*.md
 .claude/skills/**

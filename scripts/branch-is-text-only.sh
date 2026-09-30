@@ -27,29 +27,36 @@ glob_to_regex() {
   echo "^${regex}$"
 }
 
-PATTERNS=()
+# Cada patrón, ya en expresión regular, con su efecto al coincidir: 0 si
+# incluye (es texto) y 1 si excluye.
+REGEXES=()
+EFFECTS=()
 while IFS= read -r line; do
   line="${line%$'\r'}"
   [ -z "$line" ] && continue
   [ "${line:0:1}" = "#" ] && continue
-  PATTERNS+=("$line")
+  if [ "${line:0:1}" = "$EXCLUSION_PREFIX" ]; then
+    REGEXES+=("$(glob_to_regex "${line:1}")")
+    EFFECTS+=(1)
+  else
+    REGEXES+=("$(glob_to_regex "$line")")
+    EFFECTS+=(0)
+  fi
 done <"$PATHS_FILE"
-readonly PATTERNS
+readonly REGEXES EFFECTS
 
 # Gana el último patrón que coincide, como en el `paths` de Actions.
 is_text_file() {
-  local file="$1" pattern is_text=1
-  for pattern in "${PATTERNS[@]}"; do
-    if [ "${pattern:0:1}" = "$EXCLUSION_PREFIX" ]; then
-      [[ "$file" =~ $(glob_to_regex "${pattern:1}") ]] && is_text=1
-    else
-      [[ "$file" =~ $(glob_to_regex "$pattern") ]] && is_text=0
-    fi
+  local file="$1" index is_text=1
+  for index in "${!REGEXES[@]}"; do
+    [[ "$file" =~ ${REGEXES[$index]} ]] && is_text="${EFFECTS[$index]}"
   done
   return "$is_text"
 }
 
-if ! CHANGED=$(git diff --name-only origin/main...HEAD 2>/dev/null); then
+# `--no-renames` porque un renombrado se listaría solo por su ruta nueva: mover
+# src/a.ts a docs/ también borra código.
+if ! CHANGED=$(git diff --no-renames --name-only origin/main...HEAD 2>/dev/null); then
   exit 1
 fi
 [ -z "$CHANGED" ] && exit 1

@@ -30,11 +30,15 @@ type ProcessResult = {
 function runProcess(
   command: string,
   args: readonly string[],
-  cwd: string,
+  options: {
+    readonly cwd: string;
+    readonly env?: Readonly<Record<string, string>>;
+  },
 ): Promise<ProcessResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      cwd,
+      cwd: options.cwd,
+      env: { ...process.env, ...options.env },
       stdio: ["ignore", "pipe", "pipe"],
     });
     let output = "";
@@ -52,13 +56,20 @@ function toBashPath(nativePath: string): string {
   return nativePath.replace(/\\/g, "/");
 }
 
+type BranchOptions = {
+  /** Sin remoto: el caso del clon sin base con la que comparar. */
+  readonly withOrigin: boolean;
+  /** Un archivo que ya está en main y la rama mueve con `git mv`. */
+  readonly move?: { readonly from: string; readonly to: string };
+};
+
 /** Un repo con `origin/main` de verdad y una rama `impl` con un commit que
- * toca `files`. Con `withOrigin: false` no hay remoto: el caso del clon sin
- * base con la que comparar. */
+ * toca `files` y, si se pide, mueve un archivo de main. */
 async function createBranchTouching(
   files: readonly string[],
-  options: { readonly withOrigin: boolean },
+  options: BranchOptions,
 ): Promise<readonly string[]> {
+  const move = options.move ?? { from: "", to: "" };
   const originDir = await mkdtemp(path.join(tmpdir(), "seadragons-origin-"));
   const workDir = await mkdtemp(path.join(tmpdir(), "seadragons-work-"));
   const script = `
@@ -68,10 +79,18 @@ async function createBranchTouching(
     git config user.email test@example.com
     git config user.name Test
     echo '{"name": "fixture"}' > package.json
+    if [ -n "$MOVE_FROM" ]; then
+      mkdir -p "$(dirname "$MOVE_FROM")"
+      echo 'original' > "$MOVE_FROM"
+    fi
     git add -A
     git commit -q -m baseline
     ${options.withOrigin ? "git push -q -u origin HEAD:main" : "git remote remove origin"}
     git checkout -q -b impl
+    if [ -n "$MOVE_FROM" ]; then
+      mkdir -p "$(dirname "$MOVE_TO")"
+      git mv "$MOVE_FROM" "$MOVE_TO"
+    fi
     for file in "$@"; do
       mkdir -p "$(dirname "$file")"
       echo 'cambio' >> "$file"
@@ -82,7 +101,7 @@ async function createBranchTouching(
   const { code, output } = await runProcess(
     "bash",
     ["-c", script, "_", ...files],
-    workDir,
+    { cwd: workDir, env: { MOVE_FROM: move.from, MOVE_TO: move.to } },
   );
   if (code !== 0) {
     throw new Error(`No se pudo preparar el repo de prueba: ${output}`);
@@ -101,7 +120,7 @@ describe("branch-is-text-only.sh", () => {
 
   async function exitCodeForBranchTouching(
     files: readonly string[],
-    options: { readonly withOrigin: boolean } = { withOrigin: true },
+    options: BranchOptions = { withOrigin: true },
   ): Promise<number | null> {
     const dirs = await createBranchTouching(files, options);
     tempDirs.push(...dirs);
@@ -110,11 +129,9 @@ describe("branch-is-text-only.sh", () => {
       throw new Error("createBranchTouching no devolvió el repo de trabajo");
     }
 
-    const { code } = await runProcess(
-      "bash",
-      [toBashPath(TEXT_ONLY_SCRIPT)],
-      workDir,
-    );
+    const { code } = await runProcess("bash", [toBashPath(TEXT_ONLY_SCRIPT)], {
+      cwd: workDir,
+    });
     return code;
   }
 
@@ -146,6 +163,21 @@ describe("branch-is-text-only.sh", () => {
       expect(await exitCodeForBranchTouching(files)).toBe(
         NOT_TEXT_ONLY_EXIT_CODE,
       );
+    },
+    REAL_PROCESS_TEST_TIMEOUT_MS,
+  );
+
+  // `git diff` lista un renombrado por su ruta nueva; la vieja, fuera de la
+  // lista, también cuenta: el PR borra código.
+  it(
+    "responde que no es solo texto cuando la rama mueve código a docs/",
+    async () => {
+      expect(
+        await exitCodeForBranchTouching([], {
+          withOrigin: true,
+          move: { from: "src/a.ts", to: "docs/a.ts" },
+        }),
+      ).toBe(NOT_TEXT_ONLY_EXIT_CODE);
     },
     REAL_PROCESS_TEST_TIMEOUT_MS,
   );
