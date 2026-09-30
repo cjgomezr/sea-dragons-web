@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 /** Arnés de `copy-dev-to-local.sh` y `restore-local-backup.sh` (#448): un
- * `supabase` y un `psql` de mentira delante del PATH, con el mismo patrón que
+ * `supabase` y un `docker` de mentira delante del PATH, con el mismo patrón que
  * `tests/unit/scripts/task-status.test.ts`. Cada invocación queda en un log;
  * lo que responden se decide con archivos en `fixtures/`. */
 
@@ -71,18 +71,25 @@ exit 0
 `;
 }
 
-/** `psql`: si lee `schema-snapshot.sql`, describe la base con
- * `schema-local.txt` o `schema-dev.txt` según el puerto de la URL. Si no,
- * es una restauración: guarda la entrada en `restore-input.sql` y sale con
- * `restore.exit`, escribiendo `restore.stderr` en stderr. */
-function fakePsql(logFile: string, fixturesDir: string): string {
+/** `docker`: los scripts corren `psql` dentro del contenedor de la base local
+ * con `docker exec`, y la conexión llega en la variable `PSQL_TARGET_URL`.
+ * El log anota los argumentos de `docker` y sólo el host y el puerto de esa
+ * conexión, nunca la contraseña. Si lleva `--tuples-only`, describe la base
+ * con `schema-local.txt` (la que ve el contenedor en 127.0.0.1:5432) o con
+ * `schema-dev.txt`. Si no, es una restauración: guarda la entrada en
+ * `restore-input.sql` y sale con `restore.exit`, escribiendo
+ * `restore.stderr` en stderr. */
+function fakeDocker(logFile: string, fixturesDir: string): string {
   return `#!/usr/bin/env bash
-echo "psql $*" >> "${logFile}"
+target="\${PSQL_TARGET_URL:-}"
+target="\${target#*@}"
+echo "docker $* [target \${target%%/*}]" >> "${logFile}"
 FIXTURES="${fixturesDir}"
+[ "$1" = "exec" ] || exit 0
 case "$*" in
-  *schema-snapshot.sql*)
-    case "$1" in
-      *:54322*) cat "$FIXTURES/schema-local.txt" ;;
+  *--tuples-only*)
+    case "\${PSQL_TARGET_URL:-}" in
+      *@127.0.0.1:5432/*) cat "$FIXTURES/schema-local.txt" ;;
       *) cat "$FIXTURES/schema-dev.txt" ;;
     esac
     exit 0
@@ -150,8 +157,8 @@ export async function installFakeLocalDb(
     fakeSupabase(bashLog, bashFixtures),
   );
   await installExecutable(
-    path.join(binDir, "psql"),
-    fakePsql(bashLog, bashFixtures),
+    path.join(binDir, "docker"),
+    fakeDocker(bashLog, bashFixtures),
   );
 
   const env: NodeJS.ProcessEnv = {

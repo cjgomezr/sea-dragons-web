@@ -84,7 +84,8 @@ describe("restore-local-backup.sh", () => {
     const restoreCall = (await db.calls()).find((call) =>
       call.includes("--single-transaction"),
     );
-    expect(restoreCall).toContain("127.0.0.1:54322");
+    expect(restoreCall).toContain("supabase_db_sea-dragons-web");
+    expect(restoreCall).toContain("[target 127.0.0.1:5432]");
     const input = await db.restoreInput();
     expect(input).toMatch(/truncate/i);
     expect(input.search(/truncate/i)).toBeLessThan(
@@ -104,5 +105,19 @@ describe("restore-local-backup.sh", () => {
 
     expect(code).not.toBe(0);
     expect(stderr).toContain("public.members");
+  });
+
+  it("si psql ni siquiera llega a correr, muestra la causa y no inventa una tabla", async () => {
+    const db = await setup({ withBackup: true });
+    const dockerError =
+      "Error response from daemon: container supabase_db_sea-dragons-web is not running";
+    await db.setFixture("restore.exit", "1");
+    await db.setFixture("restore.stderr", `${dockerError}\n`);
+
+    const { code, stderr } = await db.run(SCRIPT, ["--yes"]);
+
+    expect(code).not.toBe(0);
+    expect(stderr).toContain(dockerError);
+    expect(stderr).not.toContain("tabla desconocida");
   });
 });

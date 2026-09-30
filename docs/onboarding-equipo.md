@@ -157,9 +157,9 @@ Sirve para ver la aplicación con socios, grupos, eventos y noticias de verdad,
 o para reproducir un fallo que alguien vio en desarrollo. Necesitas
 `SUPABASE_DEV_DB_URL` en `.env.local`: sale del panel de `seadragons-dev`, en
 **Connect → Session pooler**, con la contraseña de la base en lugar de
-`[YOUR-PASSWORD]`. La contraseña la tiene quien administra el proyecto. También
-necesitas `psql` en el PATH (en Windows, el instalador de postgresql.org con
-sólo "Command Line Tools").
+`[YOUR-PASSWORD]`. La contraseña la tiene quien administra el proyecto. Y la
+base local tiene que estar arrancada (`npm run db:start`): la copia usa el
+`psql` que ya trae su contenedor, así que no hace falta instalarlo.
 
 ```bash
 npm run db:copy-dev                 # dice qué va a hacer, sin tocar nada

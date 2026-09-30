@@ -15,9 +15,10 @@
 # es la base local, y SUPABASE_LOCAL_DB_URL sólo existe para decirlo con
 # `localhost` en vez de `127.0.0.1`: cualquier otro destino se rechaza.
 #
-# Requires: psql, y la CLI de Supabase del proyecto (`npm run` la pone en el
-# PATH). Los volcados los hace esa CLI dentro de Docker, con el pg_dump de la
-# versión correcta: no depende del pg_dump de cada máquina.
+# Requires: Docker con el stack local arrancado, y la CLI de Supabase del
+# proyecto (`npm run` la pone en el PATH). Los volcados los hace esa CLI y
+# `psql` corre dentro del contenedor de la base local, los dos con la versión
+# correcta: no depende de tener pg_dump ni psql instalados.
 
 set -euo pipefail
 
@@ -61,16 +62,17 @@ print_plan() {
   echo "No se ha tocado nada. Para hacerlo: npm run db:copy-dev -- --yes"
 }
 
-# Misma lectura del catálogo que `scripts/check-schema-snapshot.sh`; el
-# `tr -d '\r'` es por el psql de Windows, que termina las líneas con CRLF.
+# Misma lectura del catálogo que `scripts/check-schema-snapshot.sh`. El psql
+# del contenedor es de Linux y no escribe CRLF; el `tr -d '\r'` se queda como
+# defensa, porque una sola `\r` haría que los dos esquemas nunca coincidieran.
 describe_schema() {
-  psql "$1" \
+  run_psql "$1" \
     --no-psqlrc \
     --quiet \
     --set ON_ERROR_STOP=1 \
     --tuples-only \
     --no-align \
-    --file "$SNAPSHOT_QUERY" | tr -d '\r'
+    --file=- < "$SNAPSHOT_QUERY" | tr -d '\r'
 }
 
 # Objetos que Supabase crea por su cuenta en los proyectos alojados y que
@@ -179,7 +181,6 @@ main() {
     return 0
   fi
 
-  check_psql_available
   check_local_stack_running
 
   # El volcado de desarrollo trae datos personales (NFR-011): vive fuera del
@@ -187,12 +188,12 @@ main() {
   local work_dir
   work_dir="$(native_path "$(mktemp -d)")"
   # shellcheck disable=SC2064
-  trap "rm -rf '$work_dir'" EXIT
+  trap "rm -rf $(printf '%q' "$work_dir")" EXIT
 
   check_schema_compatible "$dev_url" "$local_url" "$work_dir"
   save_local_backup
   dump_dev_data "$dev_url" "$work_dir/dev-data.sql"
-  restore_in_transaction "$local_url" "$work_dir/dev-data.sql"
+  restore_in_transaction "$local_url" "$work_dir/dev-data.sql" "$work_dir"
   echo "==> base local copiada de seadragons-dev. Para volver atrás: npm run db:restore-backup -- --yes" >&2
 }
 

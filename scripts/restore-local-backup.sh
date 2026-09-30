@@ -9,8 +9,9 @@
 # Como la copia, sólo escribe en la base local: SUPABASE_LOCAL_DB_URL puede
 # decirla con `localhost`, y cualquier otro destino se rechaza.
 #
-# Requires: psql, y la CLI de Supabase del proyecto (`npm run` la pone en el
-# PATH).
+# Requires: Docker con el stack local arrancado, y la CLI de Supabase del
+# proyecto (`npm run` la pone en el PATH). `psql` corre dentro del contenedor
+# de la base local.
 
 set -euo pipefail
 
@@ -45,9 +46,15 @@ main() {
     return 0
   fi
 
-  check_psql_available
   check_local_stack_running
-  restore_in_transaction "$local_url" "$BACKUP_FILE"
+
+  # La restauración escribe una copia de los datos en un temporal: se borra al
+  # salir, bien, mal o con Ctrl+C.
+  local work_dir
+  work_dir="$(mktemp -d)"
+  # shellcheck disable=SC2064
+  trap "rm -rf $(printf '%q' "$work_dir")" EXIT
+  restore_in_transaction "$local_url" "$BACKUP_FILE" "$work_dir"
   echo "==> base local restaurada desde $BACKUP_FILE" >&2
 }
 

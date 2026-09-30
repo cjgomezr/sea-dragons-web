@@ -349,7 +349,7 @@ describe("copy-dev-to-local.sh · restauración", () => {
     expect(restoreIndex).toBeGreaterThan(devDumpIndex);
     expect(calls[devDumpIndex]).toContain("--data-only");
     expect(calls[devDumpIndex]).toContain("--schema public,auth");
-    expect(calls[restoreIndex]).toContain("127.0.0.1:54322");
+    expect(calls[restoreIndex]).toContain("[target 127.0.0.1:5432]");
     expect(calls[restoreIndex]).toContain("ON_ERROR_STOP=1");
 
     const input = await db.restoreInput();
@@ -360,6 +360,36 @@ describe("copy-dev-to-local.sh · restauración", () => {
     expect(input.search(/truncate/i)).toBeLessThan(
       input.indexOf("-- volcado dev"),
     );
+  });
+
+  it("corre psql dentro del contenedor de la base local, sin pedirlo instalado", async () => {
+    const db = await setup();
+
+    const { code } = await db.run(SCRIPT, ["--yes"]);
+
+    expect(code).toBe(0);
+    const psqlCalls = (await db.calls()).filter((call) =>
+      call.startsWith("docker exec"),
+    );
+    expect(psqlCalls.length).toBeGreaterThanOrEqual(3);
+    for (const call of psqlCalls) {
+      expect(call).toContain("-e PSQL_TARGET_URL supabase_db_sea-dragons-web");
+    }
+    expect(psqlCalls.some((call) => call.includes(POOLER_HOST))).toBe(true);
+  });
+
+  it("nunca pasa la contraseña de desarrollo en los argumentos de docker", async () => {
+    const db = await setup();
+
+    await db.run(SCRIPT, ["--yes"]);
+
+    const dockerCalls = (await db.calls()).filter((call) =>
+      call.startsWith("docker "),
+    );
+    expect(dockerCalls.length).toBeGreaterThan(0);
+    for (const call of dockerCalls) {
+      expect(call).not.toContain(DEV_PASSWORD);
+    }
   });
 
   it("vuelca desarrollo fuera del repositorio y borra el archivo al terminar", async () => {

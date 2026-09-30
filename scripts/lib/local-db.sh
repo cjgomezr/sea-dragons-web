@@ -143,12 +143,50 @@ check_local_target_url() {
   return 1
 }
 
-check_psql_available() {
-  if command -v psql > /dev/null 2>&1; then
-    return 0
+# `psql` corre dentro del contenedor de la base local, que ya lo trae en la
+# versión de la base, en vez de pedir que cada persona lo instale. El nombre
+# del contenedor lo pone la CLI con el `project_id` de `supabase/config.toml`.
+SUPABASE_CONFIG="$LOCAL_DB_LIB_DIR/../../supabase/config.toml"
+
+# Dentro de su contenedor, la base local escucha en el 5432 de siempre; el
+# 54322 es sólo el puerto que publica hacia la máquina.
+CONTAINER_LOCAL_DB_URL="postgresql://postgres:postgres@127.0.0.1:5432/postgres"
+
+local_db_container() {
+  local project_id
+  project_id="$(sed -n 's/^project_id = "\([^"]*\)".*/\1/p' "$SUPABASE_CONFIG" | head -n 1)"
+  if [ -z "$project_id" ]; then
+    echo "error: no encuentro project_id en $SUPABASE_CONFIG" >&2
+    return 1
   fi
-  echo "error: falta psql en el PATH. Instala el cliente de PostgreSQL (en Windows, el instalador de postgresql.org con sólo 'Command Line Tools')." >&2
-  return 1
+  echo "supabase_db_$project_id"
+}
+
+# La conexión tal como la ve psql desde dentro del contenedor. Para la base
+# local, de su URL sólo cuenta que haya pasado `check_local_target_url`: dentro
+# del contenedor se conecta siempre como el `postgres` del stack local, en su
+# puerto interno. La de desarrollo sale por la red del contenedor sin cambios.
+container_view_of_url() {
+  local url="$1"
+  case "$(url_host "$url")" in
+    127.0.0.1 | localhost) echo "$CONTAINER_LOCAL_DB_URL" ;;
+    *) echo "$url" ;;
+  esac
+}
+
+# `run_psql URL [argumentos de psql...]`, con la entrada por stdin. La
+# conexión viaja en una variable de entorno y no como argumento de `docker`,
+# porque los argumentos de un proceso los puede leer cualquiera en la
+# máquina, y la de desarrollo lleva la contraseña. `MSYS_NO_PATHCONV` evita
+# que Git Bash reescriba como rutas de Windows los argumentos que empiezan
+# por `/`.
+run_psql() {
+  local url="$1" container
+  shift
+  container="$(local_db_container)" || return 1
+  PSQL_TARGET_URL="$(container_view_of_url "$url")" MSYS_NO_PATHCONV=1 \
+    docker exec -i -e PSQL_TARGET_URL "$container" \
+    sh -c 'exec psql "$PSQL_TARGET_URL" "$@"' psql "$@"
 }
 
 check_local_stack_running() {
@@ -214,12 +252,14 @@ failed_table_from_psql_errors() {
 # falla, la base queda como estaba. `--single-transaction` envuelve la entrada
 # entera, que llega por stdin para que el vaciado y el volcado vayan juntos.
 # La entrada se guarda en un archivo para poder buscar en ella la línea que
-# cite el error; lleva datos del volcado, así que se borra al terminar.
+# cite el error; lleva datos del volcado, así que va dentro del directorio
+# temporal de quien llama, que lo borra con un `trap` aunque se corte con
+# Ctrl+C a mitad.
 restore_in_transaction() {
-  local target_url="$1" dump_file="$2" scratch status=0
-  scratch="$(mktemp -d)"
+  local target_url="$1" dump_file="$2" scratch_parent="$3" scratch status=0
+  scratch="$(mktemp -d "$scratch_parent/restore.XXXXXX")"
   { emptying_sql; cat "$dump_file"; } > "$scratch/input.sql"
-  psql "$target_url" \
+  run_psql "$target_url" \
     --no-psqlrc \
     --quiet \
     --set ON_ERROR_STOP=1 \
@@ -231,13 +271,28 @@ restore_in_transaction() {
     return 0
   fi
 
-  local errors table
+  local errors error_lines table
   errors="$(cat "$scratch/errors.txt")"
+  error_lines="$(printf '%s\n' "$errors" | grep 'ERROR:' || true)"
+
+  # Sin ningún `ERROR:` de Postgres, psql no llegó a restaurar nada: el
+  # contenedor está parado, la conexión falló, o falta el project_id. Se
+  # muestra la causa entera en vez de culpar a una tabla.
+  if [ -z "$error_lines" ]; then
+    rm -rf "$scratch"
+    {
+      echo "error: no se pudo ejecutar psql en el contenedor de la base local:"
+      printf '%s\n' "$errors"
+      echo "No se ha tocado la base local."
+    } >&2
+    return 1
+  fi
+
   table="$(failed_table_from_psql_errors "$errors" "$scratch/input.sql")"
   rm -rf "$scratch"
   {
     echo "error: falló la restauración en la tabla $table."
-    printf '%s\n' "$errors" | grep 'ERROR:' || true
+    printf '%s\n' "$error_lines"
     echo "La transacción se deshizo: la base local quedó como estaba antes."
   } >&2
   return 1
