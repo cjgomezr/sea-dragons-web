@@ -1,6 +1,7 @@
 import { isAuthSessionMissingError } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SessionState } from "./session-boundary";
+import { type SessionCache, sharedSessionCache } from "./session-cache";
 import {
   type MemberAccess,
   findMemberAccess,
@@ -9,18 +10,21 @@ import {
 /**
  * Quién está pidiendo algo, en los términos que la frontera entiende.
  *
- * Son dos preguntas seguidas y las dos viajan a Supabase. La primera usa
- * `getUser()`, que pregunta al servidor de autenticación en vez de verificar
- * el token en local: una sesión recién cerrada deja un token que todavía no ha
- * caducado, y verificarlo en local lo daría por bueno. La segunda lee la fila
- * de miembro, porque una cuenta `incomplete` tiene sesión válida y aun así no
- * puede operar (FR-083), y trae en la misma consulta el rol que decide qué
- * alcanza. Ese es el precio de que cerrar sesión signifique algo y de que la
- * puerta del registro a medias esté en el servidor.
+ * Son dos preguntas y las dos viajan a Supabase. La primera usa `getUser()`,
+ * que pregunta al servidor de autenticación en vez de verificar el token en
+ * local: una sesión recién cerrada deja un token que todavía no ha caducado, y
+ * verificarlo en local lo daría por bueno. La segunda lee la fila de miembro,
+ * porque una cuenta `incomplete` tiene sesión válida y aun así no puede operar
+ * (FR-083), y trae en la misma consulta el rol que decide qué alcanza. El rol
+ * se lee de la base y no del token, para que un cambio no espere a que el
+ * token caduque ni obligue a cerrar sesión.
  *
- * El rol se lee de la base en cada petición y no del token: un rol que un
- * Admin acaba de cambiar vale desde la siguiente petición, sin esperar a que
- * el token caduque ni obligar a cerrar sesión.
+ * Hasta el 30 de septiembre de 2026 las dos se hacían en cada petición. Ese
+ * día el dueño aceptó hasta 30 segundos de retraso en que un cierre de sesión
+ * ajeno, una baja o un cambio de rol surtan efecto (#434): la respuesta se
+ * guarda en `session-cache.ts` bajo el token de acceso. Quien cierra su propia
+ * sesión sale al instante, porque su navegador ya no manda la cookie; y quien
+ * cambia un rol o un estado olvida lo guardado de ese socio en ese momento.
  */
 
 const ANONYMOUS: SessionState = { kind: "anonymous" };
@@ -95,14 +99,26 @@ function toSessionState(
   }
 }
 
-export async function readSessionState(
-  client: SupabaseClient,
-): Promise<SessionState> {
-  const userId = await readAuthenticatedUserId(client);
-  if (userId === null) {
-    return ANONYMOUS;
+/**
+ * El token de acceso que trae la cookie, o `null` si no llegó ninguna sesión.
+ * `getSession()` no viaja con un token vivo; con uno caducado lo refresca, y
+ * las cookies nuevas quedan grabadas para la respuesta como antes.
+ */
+async function readAccessToken(client: SupabaseClient): Promise<string | null> {
+  const { data, error } = await client.auth.getSession();
+  if (error) {
+    // Un refresco que no se pudo hacer: se niega el paso y queda rastro, como
+    // con cualquier otra avería de la sesión.
+    console.error("[sesión] no se pudo leer la sesión:", error.message);
+    return null;
   }
+  return data.session?.access_token ?? null;
+}
 
+async function askSupabaseForSessionState(
+  client: SupabaseClient,
+  userId: string,
+): Promise<SessionState> {
   try {
     return toSessionState(userId, await findMemberAccess(client, userId));
   } catch (error) {
@@ -114,4 +130,28 @@ export async function readSessionState(
     );
     return ANONYMOUS;
   }
+}
+
+export async function readSessionState(
+  client: SupabaseClient,
+  cache: SessionCache = sharedSessionCache,
+): Promise<SessionState> {
+  const accessToken = await readAccessToken(client);
+  if (accessToken === null) {
+    return ANONYMOUS;
+  }
+  const remembered = cache.read(accessToken);
+  if (remembered !== null) {
+    return remembered;
+  }
+
+  const userId = await readAuthenticatedUserId(client);
+  if (userId === null) {
+    return ANONYMOUS;
+  }
+  const state = await askSupabaseForSessionState(client, userId);
+  if (state.kind !== "anonymous") {
+    cache.remember({ accessToken, userId, state });
+  }
+  return state;
 }

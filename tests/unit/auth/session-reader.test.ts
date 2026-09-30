@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AuthSessionMissingError } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  SESSION_CACHE_TTL_MS,
+  type SessionCache,
+  createSessionCache,
+} from "@/lib/auth/session-cache";
 import { readSessionState } from "@/lib/auth/session-reader";
 
 /**
@@ -20,32 +25,62 @@ type MemberRow = {
   readonly role: string;
 } | null;
 
+const NOW_MS = Date.UTC(2026, 8, 30, 9, 0, 0);
+const TOKEN_LIFETIME_MS = 60 * 60 * 1000;
+
+/** Un token con la forma de un JWT que caduca cuando se pide. */
+function accessTokenExpiringAt(expiresAtMs: number): string {
+  const encode = (value: object): string =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  return `${encode({ alg: "HS256" })}.${encode({ sub: USER_ID, exp: Math.floor(expiresAtMs / 1000) })}.firma`;
+}
+
+const ACCESS_TOKEN = accessTokenExpiringAt(NOW_MS + TOKEN_LIFETIME_MS);
+
 type FakeSupabase = {
   readonly client: SupabaseClient;
   /** Cada consulta que se hizo, con la tabla y las columnas que pidió. */
   readonly queries: { readonly table: string; readonly columns: string }[];
+  /** Cuántas veces se le preguntó al servidor de autenticación. */
+  readonly getUserCalls: () => number;
 };
 
-/** Un doble con la forma que usa `readSessionState`: `auth.getUser()` y una
- * consulta a `members` que termina en `maybeSingle()`. La fila se lee en cada
- * consulta, así que un test puede cambiarla entre dos peticiones. */
+/** Un doble con la forma que usa `readSessionState`: `auth.getSession()` para
+ * leer el token de la cookie, `auth.getUser()` y una consulta a `members` que
+ * termina en `maybeSingle()`. La fila se lee en cada consulta, así que un test
+ * puede cambiarla entre dos peticiones. Sin `accessToken` hay cookie de sesión
+ * con un token vivo; con `null`, no llegó ninguna. */
 function fakeSupabase(options: {
   readonly user: { readonly id: string; readonly email?: string } | null;
+  readonly accessToken?: string | null;
+  readonly sessionError?: Error;
   readonly authError?: Error;
   readonly member?: MemberRow | (() => MemberRow);
   readonly memberError?: { readonly message: string };
 }): FakeSupabase {
   const queries: { table: string; columns: string }[] = [];
+  let getUserCount = 0;
   const readMember = (): MemberRow =>
     typeof options.member === "function"
       ? options.member()
       : (options.member ?? null);
+  const accessToken =
+    options.accessToken === undefined ? ACCESS_TOKEN : options.accessToken;
   const client = {
     auth: {
-      getUser: async () => ({
-        data: { user: options.user },
-        error: options.authError ?? null,
+      getSession: async () => ({
+        data: {
+          session: accessToken === null ? null : { access_token: accessToken },
+        },
+        error: options.sessionError ?? null,
       }),
+      getUser: async () => {
+        getUserCount += 1;
+        return {
+          data: { user: options.user },
+          error: options.authError ?? null,
+        };
+      },
     },
     from: (table: string) => ({
       select: (columns: string) => {
@@ -61,11 +96,17 @@ function fakeSupabase(options: {
       },
     }),
   } as unknown as SupabaseClient;
-  return { client, queries };
+  return { client, queries, getUserCalls: () => getUserCount };
 }
+
+/** El reloj de la memoria, que cada test adelanta a mano. */
+let clock: { now: number };
+let cache: SessionCache;
 
 beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
+  clock = { now: NOW_MS };
+  cache = createSessionCache({ now: () => clock.now });
 });
 
 afterEach(() => {
@@ -76,10 +117,11 @@ describe("estado de sesión", () => {
   it("es anónimo cuando no llega ninguna cookie de sesión", async () => {
     const { client } = fakeSupabase({
       user: null,
+      accessToken: null,
       authError: new AuthSessionMissingError(),
     });
 
-    await expect(readSessionState(client)).resolves.toEqual({
+    await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "anonymous",
     });
   });
@@ -87,10 +129,11 @@ describe("estado de sesión", () => {
   it("no ensucia los registros con la visita anónima, que es el caso normal", async () => {
     const { client } = fakeSupabase({
       user: null,
+      accessToken: null,
       authError: new AuthSessionMissingError(),
     });
 
-    await readSessionState(client);
+    await readSessionState(client, cache);
 
     expect(console.error).not.toHaveBeenCalled();
   });
@@ -101,7 +144,7 @@ describe("estado de sesión", () => {
       authError: new Error("Supabase no responde"),
     });
 
-    await expect(readSessionState(client)).resolves.toEqual({
+    await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "anonymous",
     });
     expect(console.error).toHaveBeenCalled();
@@ -113,7 +156,7 @@ describe("estado de sesión", () => {
       member: { account_status: "active", role: "Player" },
     });
 
-    await expect(readSessionState(client)).resolves.toEqual({
+    await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "active",
       role: "Player",
     });
@@ -125,7 +168,7 @@ describe("estado de sesión", () => {
       member: { account_status: "incomplete", role: "Player" },
     });
 
-    await expect(readSessionState(client)).resolves.toEqual({
+    await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "incomplete",
     });
   });
@@ -136,7 +179,7 @@ describe("estado de sesión", () => {
       member: { account_status: "inactive", role: "Player" },
     });
 
-    await expect(readSessionState(client)).resolves.toEqual({
+    await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "anonymous",
     });
   });
@@ -144,7 +187,7 @@ describe("estado de sesión", () => {
   it("trata como anónima la sesión de una identidad sin fila de miembro", async () => {
     const { client } = fakeSupabase({ user: USER, member: null });
 
-    await expect(readSessionState(client)).resolves.toEqual({
+    await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "anonymous",
     });
   });
@@ -155,7 +198,7 @@ describe("estado de sesión", () => {
       member: { account_status: "active", role: "Player" },
     });
 
-    await expect(readSessionState(client)).resolves.toEqual({
+    await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "anonymous",
     });
   });
@@ -166,7 +209,7 @@ describe("estado de sesión", () => {
       memberError: { message: "connection refused" },
     });
 
-    await expect(readSessionState(client)).resolves.toEqual({
+    await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "anonymous",
     });
     expect(console.error).toHaveBeenCalled();
@@ -180,7 +223,7 @@ describe("lectura del rol", () => {
       member: { account_status: "active", role: "Coach" },
     });
 
-    await expect(readSessionState(client)).resolves.toEqual({
+    await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "active",
       role: "Coach",
     });
@@ -192,7 +235,7 @@ describe("lectura del rol", () => {
       member: { account_status: "active", role: "admin" },
     });
 
-    await expect(readSessionState(client)).resolves.toEqual({
+    await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "anonymous",
     });
     expect(console.error).toHaveBeenCalled();
@@ -204,7 +247,7 @@ describe("lectura del rol", () => {
       member: { account_status: "active", role: "Coach" },
     });
 
-    await readSessionState(client);
+    await readSessionState(client, cache);
 
     expect(queries).toHaveLength(1);
     expect(queries[0]?.table).toBe("members");
@@ -215,13 +258,165 @@ describe("lectura del rol", () => {
   it("aplica en la siguiente petición el rol que un Admin acaba de cambiar", async () => {
     let row: MemberRow = { account_status: "active", role: "Coach" };
     const { client } = fakeSupabase({ user: USER, member: () => row });
-    await readSessionState(client);
+    await readSessionState(client, cache);
 
     row = { account_status: "active", role: "Player" };
+    cache.forgetMember(USER_ID);
 
-    await expect(readSessionState(client)).resolves.toEqual({
+    await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "active",
       role: "Player",
     });
+  });
+
+  it("aplica a los 30 segundos un rol cambiado en otro servidor, que no pudo olvidarlo aquí", async () => {
+    let row: MemberRow = { account_status: "active", role: "Coach" };
+    const { client } = fakeSupabase({ user: USER, member: () => row });
+    await readSessionState(client, cache);
+    row = { account_status: "active", role: "Player" };
+
+    const withinWindow = await readSessionState(client, cache);
+    clock.now += SESSION_CACHE_TTL_MS;
+    const afterWindow = await readSessionState(client, cache);
+
+    expect(withinWindow).toEqual({ kind: "active", role: "Coach" });
+    expect(afterWindow).toEqual({ kind: "active", role: "Player" });
+  });
+});
+
+describe("memoria entre peticiones", () => {
+  it("dos peticiones seguidas con el mismo token viajan una sola vez a Supabase", async () => {
+    const { client, queries, getUserCalls } = fakeSupabase({
+      user: USER,
+      member: { account_status: "active", role: "Player" },
+    });
+
+    const first = await readSessionState(client, cache);
+    const second = await readSessionState(client, cache);
+
+    expect(second).toEqual(first);
+    expect(getUserCalls()).toBe(1);
+    expect(queries).toHaveLength(1);
+  });
+
+  it("guarda también la cuenta incompleta, que es un estado con sesión", async () => {
+    const { client, getUserCalls } = fakeSupabase({
+      user: USER,
+      member: { account_status: "incomplete", role: "Player" },
+    });
+
+    await readSessionState(client, cache);
+    await readSessionState(client, cache);
+
+    expect(getUserCalls()).toBe(1);
+  });
+
+  it("vuelve a preguntar cuando el estado guardado pasa de 30 segundos", async () => {
+    const { client, queries, getUserCalls } = fakeSupabase({
+      user: USER,
+      member: { account_status: "active", role: "Player" },
+    });
+    await readSessionState(client, cache);
+
+    clock.now += SESSION_CACHE_TTL_MS;
+    await readSessionState(client, cache);
+
+    expect(getUserCalls()).toBe(2);
+    expect(queries).toHaveLength(2);
+  });
+
+  it("no sirve desde memoria un token que caducó dentro de los 30 segundos", async () => {
+    const { client, getUserCalls } = fakeSupabase({
+      user: USER,
+      accessToken: accessTokenExpiringAt(NOW_MS + 5_000),
+      member: { account_status: "active", role: "Player" },
+    });
+    await readSessionState(client, cache);
+
+    clock.now += 5_000;
+    await readSessionState(client, cache);
+
+    expect(getUserCalls()).toBe(2);
+  });
+
+  it("no pregunta a nadie cuando no llega ninguna cookie de sesión", async () => {
+    const { client, queries, getUserCalls } = fakeSupabase({
+      user: null,
+      accessToken: null,
+    });
+
+    await readSessionState(client, cache);
+
+    expect(getUserCalls()).toBe(0);
+    expect(queries).toHaveLength(0);
+  });
+
+  it("no guarda un token que Supabase rechaza: la siguiente petición vuelve a preguntar", async () => {
+    const { client, getUserCalls } = fakeSupabase({
+      user: null,
+      authError: new Error("invalid JWT"),
+    });
+
+    await readSessionState(client, cache);
+    await readSessionState(client, cache);
+
+    expect(getUserCalls()).toBe(2);
+  });
+
+  it("no guarda la sesión de una baja: la siguiente petición vuelve a preguntar", async () => {
+    const { client, getUserCalls } = fakeSupabase({
+      user: USER,
+      member: { account_status: "inactive", role: "Player" },
+    });
+
+    await readSessionState(client, cache);
+    await readSessionState(client, cache);
+
+    expect(getUserCalls()).toBe(2);
+  });
+
+  it("no guarda una avería de la base: la siguiente petición vuelve a preguntar", async () => {
+    const { client, queries } = fakeSupabase({
+      user: USER,
+      memberError: { message: "connection refused" },
+    });
+
+    await readSessionState(client, cache);
+    await readSessionState(client, cache);
+
+    expect(queries).toHaveLength(2);
+  });
+
+  it("una avería no alarga la vida de un estado guardado más allá de sus 30 segundos", async () => {
+    const healthy = fakeSupabase({
+      user: USER,
+      member: { account_status: "active", role: "Player" },
+    });
+    await readSessionState(healthy.client, cache);
+    const broken = fakeSupabase({
+      user: USER,
+      memberError: { message: "connection refused" },
+    });
+
+    clock.now += SESSION_CACHE_TTL_MS;
+
+    await expect(readSessionState(broken.client, cache)).resolves.toEqual({
+      kind: "anonymous",
+    });
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it("es anónimo, y deja rastro, cuando no se puede refrescar un token caducado", async () => {
+    const { client, getUserCalls } = fakeSupabase({
+      user: null,
+      accessToken: null,
+      sessionError: new Error("Supabase no responde"),
+    });
+
+    await expect(readSessionState(client, cache)).resolves.toEqual({
+      kind: "anonymous",
+    });
+    expect(console.error).toHaveBeenCalled();
+    expect(getUserCalls()).toBe(0);
   });
 });

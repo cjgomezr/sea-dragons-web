@@ -12,6 +12,7 @@ import {
   type RoleRequestDecisionWrite,
 } from "./role-request-decision";
 import { ROLES } from "./roles";
+import { forgetCachedSession } from "./session-cache";
 import { createRoleRequestGateways } from "./supabase-role-request-gateways";
 
 /**
@@ -125,6 +126,11 @@ export function createRoleRequestDecisionGateways(
           throw new Error(
             `La decisión de la solicitud ${input.requestId} volvió con una forma que el dominio no reconoce: ${parsed.error.message}`,
           );
+        }
+        // Aprobar una solicitud cambia el rol de quien la pidió: la frontera
+        // olvida lo que recordaba de esa persona.
+        if (parsed.data.outcome === "approved") {
+          forgetCachedSession(parsed.data.user_id);
         }
         return toDecisionWrite(parsed.data);
       },

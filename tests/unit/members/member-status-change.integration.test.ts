@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 import { createSupabaseAuthGateways } from "@/lib/auth/supabase-auth-gateways";
@@ -168,14 +169,21 @@ async function readAuditEntries(
   return data;
 }
 
-/** Lo que la frontera ve en la siguiente petición del socio, leído con su
- * propia sesión como lo lee el proxy. */
-async function sessionOf(member: SeededMember): Promise<string> {
+/** Una sesión del socio, abierta una vez y reutilizada: la frontera recuerda
+ * su estado bajo ese token (#434), así que leer con el mismo cliente antes y
+ * después es lo que prueba que la baja olvida lo recordado. */
+async function openSessionOf(member: SeededMember): Promise<SupabaseClient> {
   const { client } = await createRlsClient(
     { role: "authenticated", email: member.email, password: member.password },
     process.env,
   );
-  return (await readSessionState(client)).kind;
+  return client;
+}
+
+/** Lo que la frontera ve en la siguiente petición del socio, leído con su
+ * propia sesión como lo lee el proxy. */
+async function sessionOf(session: SupabaseClient): Promise<string> {
+  return (await readSessionState(session)).kind;
 }
 
 function requireGateways(
@@ -231,7 +239,8 @@ describeRls("la baja y la reactivación contra seadragons-dev", () => {
               const groupCount = async () =>
                 (await groups.groups.findClubGroups(clubId))[0]?.memberCount;
 
-              await expect(sessionOf(player)).resolves.toBe("active");
+              const session = await openSessionOf(player);
+              await expect(sessionOf(session)).resolves.toBe("active");
               await expect(groupCount()).resolves.toBe(1);
 
               const deactivated = await changeMemberStatus(gateways, {
@@ -245,7 +254,7 @@ describeRls("la baja y la reactivación contra seadragons-dev", () => {
                 previousStatus: "active",
                 status: "inactive",
               });
-              await expect(sessionOf(player)).resolves.toBe("anonymous");
+              await expect(sessionOf(session)).resolves.toBe("anonymous");
               await expect(directoryNames()).resolves.toEqual([
                 [admin.fullName, "active"],
               ]);
@@ -277,7 +286,7 @@ describeRls("la baja y la reactivación contra seadragons-dev", () => {
                 previousStatus: "inactive",
                 status: "active",
               });
-              await expect(sessionOf(player)).resolves.toBe("active");
+              await expect(sessionOf(session)).resolves.toBe("active");
               await expect(directoryNames()).resolves.toEqual([
                 [admin.fullName, "active"],
                 [player.fullName, "active"],

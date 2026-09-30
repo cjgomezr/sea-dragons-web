@@ -8,6 +8,7 @@ import {
   DEFAULT_CLUB_SLUG,
   createSupabaseAuthGateways,
 } from "@/lib/auth/supabase-auth-gateways";
+import { readSessionState } from "@/lib/auth/session-reader";
 import {
   RLS_NETWORK_TEST_TIMEOUT_MS,
   type ServiceRoleClient,
@@ -134,6 +135,51 @@ describeRls("completar registro contra seadragons-dev", () => {
           await expect(
             readAccountStatus(serviceClient, member.userId),
           ).resolves.toBe("active");
+        },
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  // La frontera recuerda 30 segundos el estado de una sesión (#434). Leer con
+  // el mismo cliente antes y después es lo que prueba que activar la cuenta
+  // olvida el `incomplete` recordado.
+  it(
+    "deja entrar ya en su siguiente petición a quien acaba de completar el registro",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = realGateways();
+
+      await withIncompleteMember(
+        serviceClient,
+        {
+          country: "AU",
+          date_of_birth: "1994-03-02",
+          membership_type: null,
+        },
+        async (member) => {
+          const { client: session } = await createRlsClient(
+            {
+              role: "authenticated",
+              email: member.email,
+              password: member.password,
+            },
+            process.env,
+          );
+          await expect(readSessionState(session)).resolves.toEqual({
+            kind: "incomplete",
+          });
+
+          await completeRegistration(gateways, {
+            userId: member.userId,
+            values: { membershipType: "Student" },
+            now: new Date(),
+          });
+
+          await expect(readSessionState(session)).resolves.toEqual({
+            kind: "active",
+            role: "Player",
+          });
         },
       );
     },
