@@ -728,6 +728,10 @@ const DECIDABLE_MEMBER_NAME = seededMemberName(
   E2E_SESSION,
   "socio-para-decidir",
 );
+const DEACTIVATED_MEMBER_NAME = seededMemberName(
+  E2E_SESSION,
+  "socio-para-dar-de-baja",
+);
 
 test.describe("dentro de la aplicación", () => {
   test.skip(
@@ -1534,6 +1538,53 @@ test.describe("dentro de la aplicación", () => {
     await segunda.reload();
 
     await expect(segunda).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
+  });
+
+  // La frontera recuerda 30 segundos el estado de una sesión (#434). La baja
+  // la guarda un handler de este mismo servidor, que olvida lo recordado de
+  // ese socio: su siguiente petición ya no entra, sin esperar a que caduque.
+  test("un Admin que da de baja a un socio lo deja fuera en su siguiente petición", async ({
+    browser,
+  }) => {
+    const member = await browser.newContext({
+      storageState: roleRequestStorageStatePath("socio-para-dar-de-baja"),
+    });
+    const admin = await browser.newContext({
+      storageState: roleRequestStorageStatePath("admin-de-administracion"),
+    });
+    try {
+      const memberPage = await member.newPage();
+      await memberPage.goto(`${APP_URL}/dashboard`);
+      await expect(memberPage).toHaveURL(/\/dashboard$/);
+
+      const listing = await admin.request.get(
+        `${APP_URL}/api/v1/directory?q=${encodeURIComponent(DEACTIVATED_MEMBER_NAME)}`,
+      );
+      expect(listing.status()).toBe(200);
+      const { data } = (await listing.json()) as {
+        data: { members: { userId: string; fullName: string }[] };
+      };
+      const target = data.members.find(
+        ({ fullName }) => fullName === DEACTIVATED_MEMBER_NAME,
+      );
+      if (target === undefined) {
+        throw new Error(
+          `${DEACTIVATED_MEMBER_NAME} no sale en el directorio del Admin`,
+        );
+      }
+      const deactivation = await admin.request.patch(
+        `${APP_URL}/api/v1/members/${target.userId}/status`,
+        { data: { status: "inactive" } },
+      );
+      expect(deactivation.status()).toBe(200);
+
+      await memberPage.reload();
+
+      await expect(memberPage).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
+    } finally {
+      await member.close();
+      await admin.close();
+    }
   });
 
   test("entrar por el formulario lleva al panel principal", async ({
