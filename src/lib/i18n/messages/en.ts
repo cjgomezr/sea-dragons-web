@@ -229,6 +229,7 @@ export const englishMessages = {
   "app.metaDescription":
     "The platform of the {club} underwater rugby club (Melbourne).",
   "section.underConstruction": "This section is under construction.",
+  "section.loading": "Loading",
   "home.lead":
     "The underwater rugby club platform. This is the initial shell: the rest of the features arrive epic by epic, each with its own tickets and review.",
   "home.status.title": "Service status",

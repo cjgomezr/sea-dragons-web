@@ -58,6 +58,7 @@ import {
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
 import { isStatePhotographed } from "./support/spanish-captures";
 import { snapshotCreatedNotice } from "./support/visual-baseline-notice";
+import { servesCompiledApp } from "./support/web-server-command";
 import {
   type AccentPalette,
   evaluateAccentColor,
@@ -1641,6 +1642,202 @@ test.describe("dentro de la aplicación", () => {
     } finally {
       await member.close();
       await admin.close();
+    }
+  });
+
+  /* El estado de carga de las secciones (#435). La respuesta de la sección
+     se retiene a mano para que el esqueleto se vea aunque el servidor local
+     conteste rápido: lo que se prueba es que el toque no espera al servidor,
+     porque el esqueleto ya llegó con la precarga del enlace. */
+  test.describe("estado de carga al cambiar de sección", () => {
+    // `next dev` no precarga ningún enlace, así que ahí el esqueleto también
+    // espera al servidor. CI corre la suite contra la aplicación compilada.
+    test.skip(
+      !servesCompiledApp(process.env),
+      "la precarga sólo existe en la aplicación compilada (CI, o CI=1 en local tras npm run build)",
+    );
+
+    const DIRECTORY_PATH = "/directorio";
+    // Lo que el ticket llama "al instante": por debajo se lee como respuesta
+    // directa al toque.
+    const INSTANT_RESPONSE_MS = 200;
+    const SLOW_SECTION_DELAY_MS = 2_000;
+    // Más que cualquier test: la captura se toma con la sección aún cargando.
+    const HELD_SECTION_DELAY_MS = 60_000;
+
+    /** Retrasa la navegación a la sección, no su precarga: la precarga es
+     * justo la que trae el esqueleto, y retenerla probaría otra cosa. */
+    async function delaySectionNavigation(
+      page: Page,
+      sectionPath: string,
+      delayMs: number,
+    ): Promise<void> {
+      await page.route(
+        (url) => url.pathname === sectionPath,
+        async (route) => {
+          const headers = route.request().headers();
+          const isNavigationPayload =
+            headers.rsc === "1" &&
+            headers["next-router-prefetch"] === undefined;
+          if (isNavigationPayload) {
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+          }
+          await route.continue();
+        },
+      );
+    }
+
+    /** Abre el panel y espera a que Next precargue la sección: la petición
+     * de precarga en la red es lo que el ticket pide ver. */
+    async function openDashboardWithSectionPrefetched(
+      page: Page,
+      open: () => Promise<void> = async () => {
+        await page.goto(`${APP_URL}/dashboard`);
+      },
+    ): Promise<void> {
+      const prefetch = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === DIRECTORY_PATH &&
+          response.request().headers()["next-router-prefetch"] !== undefined,
+      );
+      await open();
+      await prefetch;
+      // Una sección se precarga en varias peticiones, una por segmento.
+      await page.waitForLoadState("networkidle");
+    }
+
+    function visibleSectionLink(page: Page, sectionPath: string): Locator {
+      return page.locator(`a[href="${sectionPath}"]:visible`);
+    }
+
+    async function showSectionLoading(page: Page): Promise<Locator> {
+      await delaySectionNavigation(page, DIRECTORY_PATH, HELD_SECTION_DELAY_MS);
+      await visibleSectionLink(page, DIRECTORY_PATH).click();
+      const loading = page.locator(".section-loading");
+      await expect(loading).toBeVisible();
+      return loading;
+    }
+
+    test.afterEach(async ({ page }) => {
+      await page.unrouteAll({ behavior: "ignoreErrors" });
+    });
+
+    test("tocar Directory enseña la carga al instante y el menú ya la marca", async ({
+      page,
+    }) => {
+      await page.setViewportSize(DESKTOP);
+      await openDashboardWithSectionPrefetched(page);
+      await page.evaluate(() => {
+        Object.assign(window, {
+          shellBeforeNavigation: document.querySelector(".app-sidebar"),
+        });
+      });
+      await delaySectionNavigation(page, DIRECTORY_PATH, SLOW_SECTION_DELAY_MS);
+
+      await visibleSectionLink(page, DIRECTORY_PATH).click();
+
+      await expect(page.locator(".section-loading")).toBeVisible({
+        timeout: INSTANT_RESPONSE_MS,
+      });
+      await expect(visibleSectionLink(page, DIRECTORY_PATH)).toHaveAttribute(
+        "aria-current",
+        "page",
+        { timeout: INSTANT_RESPONSE_MS },
+      );
+      // La marca llegó mientras la sección aún cargaba, no con la página.
+      await expect(page.locator(".section-loading")).toBeVisible();
+      // En escritorio la cabecera vive dentro de `.app-sidebar`: si el
+      // elemento sigue siendo el mismo, ni el menú ni ella se repintaron.
+      const isSameShell = await page.evaluate(
+        () =>
+          document.querySelector(".app-sidebar") ===
+          Reflect.get(window, "shellBeforeNavigation"),
+      );
+      expect(isSameShell, "el menú y la cabecera se repintaron").toBe(true);
+    });
+
+    test("la carga se anuncia en inglés", async ({ page }) => {
+      await openDashboardWithSectionPrefetched(page);
+
+      const loading = await showSectionLoading(page);
+
+      await expect(loading).toHaveAttribute("role", "status");
+      await expect(loading).toHaveText("Loading");
+    });
+
+    test("la carga se anuncia en español", async ({ page }) => {
+      await chooseSpanish(page);
+      await openDashboardWithSectionPrefetched(page);
+
+      const loading = await showSectionLoading(page);
+
+      await expect(loading).toHaveText("Cargando");
+    });
+
+    test("la carga no se mueve para quien pide movimiento reducido", async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await openDashboardWithSectionPrefetched(page);
+
+      const loading = await showSectionLoading(page);
+
+      await expect(loading.locator(".section-loading-block").first()).toHaveCSS(
+        "animation-name",
+        "none",
+      );
+    });
+
+    test("cargando-seccion: has no accessibility violations (axe-core)", async ({
+      page,
+    }) => {
+      await openDashboardWithSectionPrefetched(page);
+      await showSectionLoading(page);
+
+      const results = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa"])
+        .analyze();
+
+      expect(
+        results.violations,
+        JSON.stringify(results.violations, null, 2),
+      ).toEqual([]);
+    });
+
+    for (const vp of viewports) {
+      test.describe(`cargando-seccion @ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await openDashboardWithSectionPrefetched(page, () =>
+              goToWithTheme(page, "/dashboard", theme),
+            );
+            await showSectionLoading(page);
+            const name = `cargando-seccion-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(name, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(name, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await openDashboardWithSectionPrefetched(page);
+          await showSectionLoading(page);
+
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
     }
   });
 
