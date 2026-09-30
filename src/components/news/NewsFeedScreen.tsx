@@ -10,6 +10,7 @@ import {
   type NewsFailure,
   describeNewsFailure,
   loadNewsFeed,
+  recordNewsVisit,
 } from "./news-client";
 import { NewsFeedRow } from "./NewsFeedRow";
 
@@ -112,6 +113,12 @@ export function NewsFeedScreen({
   const translate = createTranslator(locale);
   const [state, setState] = useState<FeedState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
+
+  // Abrir Noticias es la visita que pone a cero las sin leer del inicio
+  // (#424). Una sola vez: reintentar la carga no es otra visita.
+  useEffect(() => {
+    void recordNewsVisit();
+  }, []);
 
   useEffect(() => {
     let isCurrent = true;

@@ -5,6 +5,7 @@ import {
   requestApi,
 } from "@/lib/api/request-api";
 import {
+  ACCOUNT_NEWS_SEEN_API_PATH,
   NEWS_API_PATH,
   NEWS_ATTACHMENT_API_PATH,
   NEWS_POST_API_PATH,
@@ -163,4 +164,13 @@ export function describeNewsFailure(
     default:
       return translate(unexpected);
   }
+}
+
+/** Registra la visita a Noticias de quien mira (#424, D2 del PRD de E14): lo
+ * publicado hasta ahora deja de contar como sin leer en el inicio. El
+ * resultado no se enseña a propósito: si falla, sólo queda la cuenta del
+ * inicio más alta hasta la próxima visita, y quien mira no puede hacer nada
+ * con el aviso. */
+export async function recordNewsVisit(): Promise<void> {
+  await requestApi(ACCOUNT_NEWS_SEEN_API_PATH, { method: "POST" });
 }
