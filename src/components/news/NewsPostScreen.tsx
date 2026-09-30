@@ -11,6 +11,7 @@ import {
   type NewsFailure,
   describeNewsFailure,
   loadNewsPost,
+  recordNewsVisit,
 } from "./news-client";
 import { NewsAttachmentList } from "./NewsAttachmentList";
 import { NewsCategoryLabel } from "./NewsCategoryLabel";
@@ -121,6 +122,11 @@ export function NewsPostScreen({
   const translate = createTranslator(locale);
   const [state, setState] = useState<ScreenState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
+
+  // Abrir una publicación también cuenta como visita a Noticias (#424).
+  useEffect(() => {
+    void recordNewsVisit();
+  }, [postId]);
 
   useEffect(() => {
     let isCurrent = true;

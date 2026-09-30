@@ -61,6 +61,8 @@ const POLICY: NewsFeedItem = {
 type FeedStub = (cursor: string | null) => Response | Promise<Response>;
 
 const requestedCursors: (string | null)[] = [];
+const NEWS_SEEN_PATH = "/api/v1/account/news-seen";
+const newsVisits: string[] = [];
 
 function jsonResponse(status: number, payload: unknown): Response {
   return new Response(JSON.stringify(payload), {
@@ -76,8 +78,12 @@ function pageResponse(page: NewsFeedPage): Response {
 function stubFeed(respond: FeedStub): void {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (input: string) => {
+    vi.fn(async (input: string, init?: RequestInit) => {
       const url = new URL(input, "http://localhost");
+      if (url.pathname === NEWS_SEEN_PATH) {
+        newsVisits.push(init?.method ?? "GET");
+        return new Response(null, { status: 204 });
+      }
       if (url.pathname !== FEED_PATH) {
         throw new Error(`Petición inesperada: ${input}`);
       }
@@ -98,6 +104,7 @@ function feedList(): HTMLElement {
 
 beforeEach(() => {
   requestedCursors.length = 0;
+  newsVisits.length = 0;
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
 });
@@ -108,6 +115,15 @@ afterEach(() => {
 });
 
 describe("feed de noticias", () => {
+  it("registra la visita a Noticias una sola vez al abrirse (#424)", async () => {
+    stubSinglePage([SHORTLIST]);
+
+    render(<NewsFeedScreen locale="en" canPublish={false} />);
+
+    await screen.findByRole("link", { name: SHORTLIST.title });
+    expect(newsVisits).toEqual(["POST"]);
+  });
+
   it("enseña las publicaciones en el orden en que las sirve el servidor, de la más reciente a la más antigua", async () => {
     stubSinglePage([SHORTLIST, WINTER, POLICY]);
 

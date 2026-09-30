@@ -25,6 +25,9 @@ const RULES_ID = "d1d1d1d1-0000-4000-8000-0000000000d1";
 const MAP_ID = "d2d2d2d2-0000-4000-8000-0000000000d2";
 const RULES_PATH = `${POST_PATH}/attachments/${RULES_ID}`;
 const SIGNED_URL = "https://storage.test/news/reglamento.pdf?token=firmado";
+const NEWS_SEEN_PATH = "/api/v1/account/news-seen";
+
+const newsVisits: string[] = [];
 
 const POST: NewsPostDetail = {
   id: POST_ID,
@@ -80,9 +83,13 @@ function download(value: NewsAttachmentDownload): Response {
 function stubApi(stub: Stub = {}): void {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string) => {
+    vi.fn(async (url: string, init?: RequestInit) => {
       if (url === POST_PATH) {
         return stub.post?.() ?? jsonResponse(200, { data: POST });
+      }
+      if (url === NEWS_SEEN_PATH) {
+        newsVisits.push(init?.method ?? "GET");
+        return new Response(null, { status: 204 });
       }
       if (url === RULES_PATH) {
         return (
@@ -110,6 +117,7 @@ async function renderPost(locale: "en" | "es" = "en"): Promise<void> {
 
 beforeEach(() => {
   startDownload.mockClear();
+  newsVisits.length = 0;
 });
 
 afterEach(() => {
@@ -117,6 +125,14 @@ afterEach(() => {
 });
 
 describe("publicación abierta", () => {
+  it("registra la visita a Noticias al abrirse (#424)", async () => {
+    stubApi();
+
+    await renderPost();
+
+    expect(newsVisits).toEqual(["POST"]);
+  });
+
   it("enseña el título, la categoría, el autor, la fecha y el cuerpo entero", async () => {
     stubApi();
 
@@ -338,7 +354,10 @@ describe("publicación abierta", () => {
     render(<NewsPostScreen locale="en" postId="../directory" />);
     await screen.findByRole("heading", { level: 1 });
 
-    expect(requested).toEqual(["/api/v1/news/..%2Fdirectory"]);
+    // La visita a Noticias (#424) va a su propio camino fijo, sin el id.
+    expect(requested.filter((url) => url !== NEWS_SEEN_PATH)).toEqual([
+      "/api/v1/news/..%2Fdirectory",
+    ]);
   });
 
   it("un fallo de red al abrirla lo dice y deja reintentar", async () => {

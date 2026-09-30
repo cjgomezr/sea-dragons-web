@@ -123,6 +123,7 @@ columna members.guardian_name tipo=text null=YES default=-
 columna members.id tipo=uuid null=NO default=gen_random_uuid()
 columna members.joined_on tipo=date null=NO default=((now() AT TIME ZONE 'Australia/Melbourne'::text))::date
 columna members.membership_type tipo=text null=YES default=-
+columna members.news_seen_at tipo=timestamp with time zone null=YES default=-
 columna members.photo_path tipo=text null=YES default=-
 columna members.position tipo=text null=YES default=-
 columna members.position_id tipo=uuid null=YES default=-
