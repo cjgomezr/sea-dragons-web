@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_ACCENT_COLOR } from "@/lib/club/accent-color";
 import {
+  type ClubIcon,
   type ClubIconBrand,
   type LogoBytesReader,
   clubIconFingerprint,
@@ -66,17 +67,25 @@ function readerReturning(bytes: Uint8Array): LogoBytesReader {
   return async () => bytes;
 }
 
-function render(
+function renderResult(
   brand: ClubIconBrand,
   sizePx: number,
   readLogoBytes: LogoBytesReader,
-): Promise<Uint8Array> {
+): Promise<ClubIcon> {
   return renderClubIcon({
     brand,
     sizePx,
     readLogoBytes,
     readTimeoutMs: TEST_READ_TIMEOUT_MS,
   });
+}
+
+async function render(
+  brand: ClubIconBrand,
+  sizePx: number,
+  readLogoBytes: LogoBytesReader,
+): Promise<Uint8Array> {
+  return (await renderResult(brand, sizePx, readLogoBytes)).png;
 }
 
 beforeEach(() => {
@@ -206,6 +215,32 @@ describe("renderClubIcon con un logo que no se puede leer", () => {
     expectColorClose(await pixelAt(icon, 0, 0), ACCENT_RGB);
     expect(signalSeen?.aborted).toBe(true);
     expect(console.error).toHaveBeenCalled();
+  });
+});
+
+describe("renderClubIcon: qué pintó", () => {
+  it("dice que pintó la marca cuando el logo se leyó", async () => {
+    const logo = await solidPng(10, 10);
+
+    const icon = await renderResult(WITH_LOGO, 32, readerReturning(logo));
+
+    expect(icon.kind).toBe("brand");
+  });
+
+  it("dice que pintó la marca cuando el club no tiene logo", async () => {
+    const icon = await renderResult(WITHOUT_LOGO, 32, vi.fn<LogoBytesReader>());
+
+    expect(icon.kind).toBe("brand");
+  });
+
+  it("dice que pintó el respaldo cuando el logo no se pudo leer", async () => {
+    const reader: LogoBytesReader = async () => {
+      throw new Error("el logo respondió 404");
+    };
+
+    const icon = await renderResult(WITH_LOGO, 32, reader);
+
+    expect(icon.kind).toBe("logo_fallback");
   });
 });
 

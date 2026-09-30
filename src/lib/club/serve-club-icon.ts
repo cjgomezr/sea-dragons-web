@@ -20,6 +20,11 @@ export const ANDROID_ICON_SIZE_PX = 512;
  * espera a que caduque: es otra dirección. */
 const CLUB_ICON_CACHE_CONTROL = "public, max-age=86400";
 
+/** Las iniciales de respaldo van a la dirección del logo, que no cambia
+ * cuando el almacenamiento vuelve. Cinco minutos, como la caché de la marca:
+ * la visita siguiente vuelve a intentar el logo. */
+const FALLBACK_ICON_CACHE_CONTROL = "public, max-age=300";
+
 /** El icono sale con las iniciales antes de los dos segundos que pide el
  * ticket aunque el almacenamiento no conteste. */
 const LOGO_READ_TIMEOUT_MS = 1_500;
@@ -42,16 +47,19 @@ export async function describeServedClubIcons(
 
 export async function serveClubIcon(id: Promise<string>): Promise<Response> {
   const [brand, iconId] = await Promise.all([readClubBrand(), id]);
-  const png = await renderClubIcon({
+  const icon = await renderClubIcon({
     brand,
     sizePx: clubIconSizeFromId(iconId),
     readLogoBytes: fetchLogoBytes,
     readTimeoutMs: LOGO_READ_TIMEOUT_MS,
   });
-  return new Response(new Uint8Array(png), {
+  return new Response(new Uint8Array(icon.png), {
     headers: {
       "Content-Type": CLUB_ICON_CONTENT_TYPE,
-      "Cache-Control": CLUB_ICON_CACHE_CONTROL,
+      "Cache-Control":
+        icon.kind === "brand"
+          ? CLUB_ICON_CACHE_CONTROL
+          : FALLBACK_ICON_CACHE_CONTROL,
     },
   });
 }

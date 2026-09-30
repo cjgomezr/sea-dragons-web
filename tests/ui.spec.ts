@@ -670,6 +670,11 @@ test("la página declara un manifest con el nombre del club, servido sin sesión
   };
   expect(manifest.name).toBeTruthy();
   expect(manifest.icons?.[0]?.sizes).toBe("512x512");
+  const icon = await request.get(
+    new URL(manifest.icons?.[0]?.src ?? "", APP_URL).toString(),
+  );
+  expect(icon.status()).toBe(200);
+  expect(icon.headers()["content-type"]).toBe("image/png");
 });
 
 /** La pantalla de entrada con el error de credenciales. La respuesta del

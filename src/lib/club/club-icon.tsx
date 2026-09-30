@@ -137,25 +137,36 @@ async function readLogoWithinTimeout(
   }
 }
 
+/** El PNG y qué enseña. `logo_fallback` son las iniciales puestas porque el
+ * logo no se pudo leer: quien lo sirve no debe cachearlo como si fuera la
+ * marca, o un fallo pasajero se queda pegado en el navegador. */
+export type ClubIcon = {
+  readonly kind: "brand" | "logo_fallback";
+  readonly png: Uint8Array;
+};
+
 /** El icono cuadrado de `sizePx` en PNG. Nunca lanza por el logo: si no se
  * puede leer o no es una imagen, deja el fallo en el log y pinta las
  * iniciales. */
 export async function renderClubIcon(
   options: RenderClubIconOptions,
-): Promise<Uint8Array> {
+): Promise<ClubIcon> {
   const { brand, sizePx } = options;
   if (brand.logoUrl === null) {
-    return renderInitialsIcon(brand, sizePx);
+    return { kind: "brand", png: await renderInitialsIcon(brand, sizePx) };
   }
   try {
     const logoBytes = await readLogoWithinTimeout(brand.logoUrl, options);
-    return await renderLogoIcon(logoBytes, sizePx);
+    return { kind: "brand", png: await renderLogoIcon(logoBytes, sizePx) };
   } catch (error) {
     console.error(
       `[club-icon] no se pudo pintar el logo ${brand.logoUrl}; se pintan las iniciales:`,
       error,
     );
-    return renderInitialsIcon(brand, sizePx);
+    return {
+      kind: "logo_fallback",
+      png: await renderInitialsIcon(brand, sizePx),
+    };
   }
 }
 

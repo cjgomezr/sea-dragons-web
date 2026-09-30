@@ -147,6 +147,19 @@ describe("icono de la pestaña (src/app/icon)", () => {
     expect(console.error).toHaveBeenCalled();
   });
 
+  it("no deja las iniciales de respaldo un día en la caché del navegador", async () => {
+    servedBrand.current = { ...BRAND_WITHOUT_LOGO, logoUrl: LOGO_URL };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("Not Found", { status: 404 })),
+    );
+    const { id } = await iconEntryOfWidth(32);
+
+    const response = await iconRoute.default({ id: Promise.resolve(id) });
+
+    expect(response.headers.get("cache-control")).toBe("public, max-age=300");
+  });
+
   it("se genera en cada petición y no en el build, para seguir a la marca", () => {
     expect(iconRoute.dynamic).toBe("force-dynamic");
   });

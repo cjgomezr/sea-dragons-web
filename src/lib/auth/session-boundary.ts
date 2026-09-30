@@ -84,6 +84,12 @@ function isApiPath(pathname: string): boolean {
   return isPathWithin(pathname, API_V1_PREFIX);
 }
 
+/** Lo público que abre también lo que cuelga de ello. */
+const PUBLIC_PREFIX_PATHS: readonly string[] = [
+  ...PUBLIC_PAGE_PATHS,
+  ...PUBLIC_BROWSER_ASSET_PATHS,
+];
+
 /**
  * Una pantalla pública abre también lo que cuelga de ella, porque el registro
  * crecerá en pasos (`/registro/tutor`). Un endpoint público NO: se compara por
@@ -93,7 +99,7 @@ function isApiPath(pathname: string): boolean {
  */
 export function isPublicPath(pathname: string): boolean {
   return (
-    [...PUBLIC_PAGE_PATHS, ...PUBLIC_BROWSER_ASSET_PATHS].some((publicPath) =>
+    PUBLIC_PREFIX_PATHS.some((publicPath) =>
       isPathWithin(pathname, publicPath),
     ) || PUBLIC_API_PATHS.includes(pathname)
   );
