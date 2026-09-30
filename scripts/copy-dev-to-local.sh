@@ -73,6 +73,21 @@ describe_schema() {
     --file "$SNAPSHOT_QUERY" | tr -d '\r'
 }
 
+# Objetos que Supabase crea por su cuenta en los proyectos alojados y que
+# ninguna migración declara. `rls_auto_enable()` es la función del event
+# trigger `ensure_rls`, la opción de activar RLS sola en cada tabla nueva: la
+# base local no la tiene ni la necesita para recibir los datos, y contarla
+# haría que desarrollo saliera siempre por delante.
+PLATFORM_INSTALLED_OBJECTS="funcion rls_auto_enable()"
+
+# Filtro de stdin a stdout. `grep` sale con 1 cuando no deja ninguna línea,
+# que aquí es un resultado válido; sólo un 2 es un fallo.
+without_platform_objects() {
+  local status=0
+  grep -v -x -F "$PLATFORM_INSTALLED_OBJECTS" || status=$?
+  [ "$status" -le 1 ]
+}
+
 # Copia sólo si todo lo que tiene desarrollo existe en la local. La local va
 # como "repositorio" y desarrollo como "base": una rama con migraciones nuevas
 # sale `repositorio-por-delante`, y sus tablas nuevas quedan vacías.
@@ -82,7 +97,7 @@ check_schema_compatible() {
     echo "error: no se pudo describir el esquema de la base local" >&2
     return 1
   fi
-  if ! describe_schema "$dev_url" > "$work_dir/schema-dev.txt"; then
+  if ! describe_schema "$dev_url" | without_platform_objects > "$work_dir/schema-dev.txt"; then
     echo "error: no se pudo describir el esquema de seadragons-dev ($(url_host "$dev_url"))" >&2
     return 1
   fi

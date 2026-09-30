@@ -221,6 +221,19 @@ describe("copy-dev-to-local.sh · esquema", () => {
     expect(await db.restoreInput()).toContain("-- volcado dev");
   });
 
+  it("no cuenta como esquema de desarrollo la función que Supabase instala sola en los proyectos alojados", async () => {
+    const db = await setup();
+    await db.setFixture(
+      "schema-dev.txt",
+      `${DEFAULT_SCHEMA}funcion rls_auto_enable()\n`,
+    );
+
+    const { code } = await db.run(SCRIPT, ["--yes"]);
+
+    expect(code).toBe(0);
+    expect(await db.restoreInput()).toContain("-- volcado dev");
+  });
+
   it.each([
     [
       "base-por-delante",
