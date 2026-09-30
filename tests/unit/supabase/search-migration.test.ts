@@ -161,6 +161,49 @@ function searchNewsTitles(
   );
 }
 
+/** El volumen de NFR-008. Uno de cada cien eventos y noticias habla de
+ * Geelong, para que la búsqueda tenga algo que contar. */
+const SCALE = { members: 500, events: 5000, news: 1000 } as const;
+const ONE_SECOND_MS = 1000;
+
+async function seedClubAtScale(
+  database: TemporaryDatabase,
+  clubId: string,
+): Promise<void> {
+  const author = await seedMember(database, clubId, "'Ana Gil'");
+  await database.query(
+    `with users as (
+       insert into auth.users (id)
+       select gen_random_uuid() from generate_series(1, ${SCALE.members})
+       returning id
+     )
+     insert into public.members
+       (club_id, user_id, full_name, email, account_status)
+     select '${clubId}', id, 'Socio ' || row_number() over (),
+            id || '@example.test', 'active'
+       from users;
+     insert into public.events
+       (club_id, title, event_type, starts_on, start_time, location,
+        audience, author_id)
+     select '${clubId}',
+            case when i % 100 = 0 then 'Scrimmage vs Geelong'
+                 else 'Entrenamiento ' || i end,
+            'training', current_date - 2500 + i, '19:00',
+            'Piscina ' || (i % 20), 'all', '${author.userId}'
+       from generate_series(1, ${SCALE.events}) i;
+     insert into public.news_posts
+       (club_id, category, title, body, author_id, audience)
+     select '${clubId}', 'news',
+            case when i % 100 = 0 then 'Viaje a Geelong'
+                 else 'Noticia ' || i end,
+            'Cuerpo de la noticia ' || i, '${author.userId}', 'club'
+       from generate_series(1, ${SCALE.news}) i;
+     analyze public.members;
+     analyze public.events;
+     analyze public.news_posts;`,
+  );
+}
+
 /** Los nombres que devuelve `search_members`, en orden alfabético. */
 function searchMemberNames(
   database: TemporaryDatabase,
@@ -453,6 +496,37 @@ describeConPostgres("la búsqueda global en la base", () => {
         "search_news_posts service_role",
       ].join(","),
     );
+  });
+
+  it("con 500 socios, 5.000 eventos y 1.000 noticias responde en menos de un segundo", async () => {
+    const database = await migratedDatabase();
+    const clubId = await seededClubId(database);
+    await seedClubAtScale(database, clubId);
+    const squad = await seedGroup(database, clubId);
+    const reader = await seedMember(database, clubId, "'Leo Lector'");
+
+    const started = performance.now();
+    await database.query(
+      `set role service_role;
+       ${["geelong", "pi"]
+         .map(
+           (text) => `
+       select count(*) from public.search_members('${clubId}', '${text}');
+       select count(*), min(starts_at)
+         from public.search_events('${clubId}', '${text}', false,
+                                   array['${squad}']::uuid[])
+        where starts_on >= current_date;
+       select count(*), max(published_at)
+         from public.search_news_posts('${clubId}', '${text}',
+                                       '${reader.userId}',
+                                       array['${squad}']::uuid[]);`,
+         )
+         .join("\n")}`,
+    );
+    const elapsedMs = performance.now() - started;
+
+    // Incluye arrancar psql: el tiempo de la base es menor todavía.
+    expect(elapsedMs).toBeLessThan(ONE_SECOND_MS);
   });
 
   it("es idempotente: aplicada dos veces no falla ni cambia nada", async () => {
