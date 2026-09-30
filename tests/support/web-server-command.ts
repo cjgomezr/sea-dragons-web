@@ -7,8 +7,14 @@
  * workflow compila antes de lanzar la suite (#255). En local sigue `next dev`,
  * que no obliga a compilar tras cada cambio.
  */
-export function webServerCommand(
-  environment: Readonly<Record<string, string | undefined>>,
-): string {
-  return environment.CI ? "npm run start" : "npm run dev";
+type Environment = Readonly<Record<string, string | undefined>>;
+
+export function webServerCommand(environment: Environment): string {
+  return servesCompiledApp(environment) ? "npm run start" : "npm run dev";
+}
+
+/** Lo que sólo pasa en la aplicación compilada, como la precarga de los
+ * enlaces (Next la apaga en `next dev`), sólo se puede probar aquí (#435). */
+export function servesCompiledApp(environment: Environment): boolean {
+  return Boolean(environment.CI);
 }
