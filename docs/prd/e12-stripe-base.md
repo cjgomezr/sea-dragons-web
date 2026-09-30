@@ -179,14 +179,14 @@ Ninguna que bloquee. Decisiones tomadas el 30 de septiembre de 2026:
 
 ## 10. Descomposición en tickets (para write-ticket)
 
-| #   | Título propuesto                                                                             | Tamaño | Depende de | Auto-merge sugerido             |
-| --- | -------------------------------------------------------------------------------------------- | ------ | ---------- | ------------------------------- |
-| 1   | Guarda la membresía y los pagos de cada socio, con sus estados y RLS                         | M      | ninguna    | No: modelo de datos nuevo       |
-| 2   | Recibe y aplica los webhooks de Stripe, firmados, idempotentes y a prueba de desorden        | M      | 1          | No: integración de pagos        |
-| 3   | Cierra la puerta a quien no está al día: frontera, menú, RSVP, escuadra y hoja de asistencia | M      | 1          | No: permisos                    |
-| 4   | Lleva al socio nuevo a Stripe Checkout con un mes de prueba y abre la puerta al volver       | M      | 2, 3       | No: pagos                       |
-| 5   | Panel de membresía del mockup: plan, estado, tarjeta, cambio de tarjeta e historial          | M      | 2          | No: pantalla nueva, `ui-review` |
-| 6   | Cambio de plan al siguiente ciclo, con anulación                                             | S      | 5          | No: pagos                       |
-| 7   | Exención manual del Admin desde la ficha, con bitácora y estado visible en el directorio     | S      | 3          | No: permisos, `ui-review`       |
+| #   | Issue | Título propuesto                                                                             | Tamaño | Depende de | Auto-merge sugerido             |
+| --- | ----- | -------------------------------------------------------------------------------------------- | ------ | ---------- | ------------------------------- |
+| 1   | #451  | Guarda la membresía y los pagos de cada socio, con sus estados y RLS                         | M      | ninguna    | No: modelo de datos nuevo       |
+| 2   | #452  | Recibe y aplica los webhooks de Stripe, firmados, idempotentes y a prueba de desorden        | M      | 1          | No: integración de pagos        |
+| 3   | #453  | Cierra la puerta a quien no está al día: frontera, menú, RSVP, escuadra y hoja de asistencia | M      | 1          | No: permisos                    |
+| 4   | #454  | Lleva al socio nuevo a Stripe Checkout con un mes de prueba y abre la puerta al volver       | M      | 2, 3       | No: pagos                       |
+| 5   | #455  | Panel de membresía del mockup: plan, estado, tarjeta, cambio de tarjeta e historial          | M      | 2          | No: pantalla nueva, `ui-review` |
+| 6   | #456  | Cambio de plan al siguiente ciclo, con anulación                                             | S      | 5          | No: pagos                       |
+| 7   | #457  | Exención manual del Admin desde la ficha, con bitácora y estado visible en el directorio     | S      | 3          | No: permisos, `ui-review`       |
 
 Los tickets 2 y 3 van en paralelo tras el 1; el 4 y el 5 detrás; el 6 y el 7 al final. Antes del ticket 2 hace falta la cuenta de Stripe del club en modo de prueba con los dos precios creados y las llaves puestas en `.env.local` de quien lo trabaje y en los secretos de GitHub: es un paso del dueño.
