@@ -141,6 +141,18 @@ dump_dev_data() {
   fi
 }
 
+# En Git Bash, `/tmp/...` sólo existe para el propio bash: la CLI de Supabase
+# es un programa de Windows y lo leería como `C:\tmp\...`. `cygpath -m` da la
+# ruta de Windows con barras normales, que entienden los dos. Fuera de Windows
+# no hay cygpath y la ruta ya es la buena.
+native_path() {
+  if command -v cygpath > /dev/null 2>&1; then
+    cygpath -m "$1"
+  else
+    echo "$1"
+  fi
+}
+
 main() {
   local confirmed=false
   if [ $# -gt 0 ]; then
@@ -173,7 +185,7 @@ main() {
   # El volcado de desarrollo trae datos personales (NFR-011): vive fuera del
   # repositorio y se borra al salir, bien o mal.
   local work_dir
-  work_dir="$(mktemp -d)"
+  work_dir="$(native_path "$(mktemp -d)")"
   # shellcheck disable=SC2064
   trap "rm -rf '$work_dir'" EXIT
 
