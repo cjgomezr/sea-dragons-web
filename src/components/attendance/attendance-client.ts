@@ -9,6 +9,7 @@ import {
   ATTENDANCE_STATUSES,
   type AttendanceTotals,
 } from "@/lib/attendance/attendance-status";
+import { SHEET_VIEWERS } from "@/lib/attendance/attendance-sheet";
 import {
   ATTENDANCE_SESSIONS_API_PATH,
   ATTENDANCE_SHEET_API_PATH,
@@ -63,6 +64,7 @@ const sheetResponseSchema = z.object({
     title: z.string(),
     startsAt: z.iso.datetime({ offset: true }),
     isSaved: z.boolean(),
+    viewer: z.enum(SHEET_VIEWERS),
     members: z.array(sheetMemberSchema),
   }),
 });

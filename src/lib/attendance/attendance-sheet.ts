@@ -160,12 +160,19 @@ export type AttendanceSheetEntry = {
   readonly isInactive: boolean;
 };
 
+/** Cómo mira la hoja quien la abre (#414). Al Admin el nombre de cada fila
+ * le abre la ficha del socio, que es suya; a un Coach le daría 403. Lo decide
+ * la API y no la pantalla, como el `kind` del directorio. */
+export const SHEET_VIEWERS = ["admin", "coach"] as const;
+export type SheetViewer = (typeof SHEET_VIEWERS)[number];
+
 export type AttendanceSheet = {
   readonly eventId: string;
   readonly title: string;
   readonly startsAt: string;
   /** Alguien ya guardó esta hoja alguna vez. */
   readonly isSaved: boolean;
+  readonly viewer: SheetViewer;
   readonly members: readonly AttendanceSheetEntry[];
 };
 
@@ -222,10 +229,15 @@ export class AttendanceListInvalidError extends Error {
   }
 }
 
-export async function findAttendanceTaker(
+type AttendanceTaker = {
+  readonly actor: AuditActor;
+  readonly viewer: SheetViewer;
+};
+
+async function findTaker(
   gateways: Pick<AttendanceGateways, "members">,
   callerId: string,
-): Promise<AuditActor> {
+): Promise<AttendanceTaker> {
   const caller = await gateways.members.findRoleRequestMember(callerId);
   if (caller === null) {
     throw new MemberNotFoundError(callerId);
@@ -233,7 +245,19 @@ export async function findAttendanceTaker(
   if (!hasCapability(caller.role, "buildTeamsAndTrackAttendance")) {
     throw new AttendanceForbiddenError();
   }
-  return { id: callerId, clubId: caller.clubId };
+  return {
+    actor: { id: callerId, clubId: caller.clubId },
+    viewer: hasCapability(caller.role, "manageUsersAndRoles")
+      ? "admin"
+      : "coach",
+  };
+}
+
+export async function findAttendanceTaker(
+  gateways: Pick<AttendanceGateways, "members">,
+  callerId: string,
+): Promise<AuditActor> {
+  return (await findTaker(gateways, callerId)).actor;
 }
 
 /** El entrenamiento al que se le puede pasar lista ahora, o por qué no. */
@@ -360,7 +384,7 @@ export async function openAttendanceSheet(
     readonly now: Date;
   },
 ): Promise<AttendanceSheet> {
-  const actor = await findAttendanceTaker(gateways, request.callerId);
+  const { actor, viewer } = await findTaker(gateways, request.callerId);
   const event = await findOpenTraining(gateways, {
     ...request,
     clubId: actor.clubId,
@@ -387,6 +411,7 @@ export async function openAttendanceSheet(
     title: event.title,
     startsAt: event.startsAt.toISOString(),
     isSaved: roster.recorded.size > 0,
+    viewer,
     members: entries.sort(compareEntries),
   };
 }

@@ -18,7 +18,7 @@ import {
   statusOf,
   totalsOf,
 } from "./attendance-marks";
-import { AttendanceRow } from "./AttendanceRow";
+import { AttendanceRow, type RowViewer } from "./AttendanceRow";
 import { sessionDay } from "./session-day";
 import {
   type AttendanceSheetControls,
@@ -179,18 +179,23 @@ function SaveNotices({
   );
 }
 
+type MemberRowsProps = {
+  readonly translate: Translator;
+  readonly viewer: RowViewer;
+  readonly marks: SheetMarks;
+  readonly onMark: AttendanceSheetControls["mark"];
+};
+
 function MemberGroup({
   translate,
+  viewer,
   group,
   members,
   marks,
   onMark,
-}: {
-  readonly translate: Translator;
+}: MemberRowsProps & {
   readonly group: RsvpGroup;
   readonly members: readonly SheetMember[];
-  readonly marks: SheetMarks;
-  readonly onMark: AttendanceSheetControls["mark"];
 }): React.JSX.Element {
   const headingId = `asistencia-grupo-${group}`;
   return (
@@ -204,6 +209,7 @@ function MemberGroup({
             key={member.userId}
             translate={translate}
             member={member}
+            viewer={viewer}
             status={statusOf(marks, member.userId)}
             onMark={(status) => onMark(member.userId, status)}
           />
@@ -216,15 +222,11 @@ function MemberGroup({
 /** Un grupo sin nadie no se pinta, ni su cabecera. */
 function MemberList({
   translate,
+  viewer,
   sheet,
   marks,
   onMark,
-}: {
-  readonly translate: Translator;
-  readonly sheet: OpenedSheet;
-  readonly marks: SheetMarks;
-  readonly onMark: AttendanceSheetControls["mark"];
-}): React.JSX.Element {
+}: MemberRowsProps & { readonly sheet: OpenedSheet }): React.JSX.Element {
   if (sheet.members.length === 0) {
     return <p className="admin-empty">{translate("attendance.emptySheet")}</p>;
   }
@@ -238,6 +240,7 @@ function MemberList({
           <MemberGroup
             key={group}
             translate={translate}
+            viewer={viewer}
             group={group}
             members={members}
             marks={marks}
@@ -252,9 +255,11 @@ function MemberList({
 function SheetBody({
   translate,
   controls,
+  canLeaveSheet,
 }: {
   readonly translate: Translator;
   readonly controls: AttendanceSheetControls;
+  readonly canLeaveSheet: () => boolean;
 }): React.JSX.Element {
   const { state } = controls;
   switch (state.kind) {
@@ -283,6 +288,7 @@ function SheetBody({
           <Totals translate={translate} totals={totalsOf(state.marks)} />
           <MemberList
             translate={translate}
+            viewer={{ kind: state.sheet.viewer, canLeaveSheet }}
             sheet={state.sheet}
             marks={state.marks}
             onMark={controls.mark}
@@ -307,16 +313,17 @@ export function AttendanceSheetPanel({
   const { state } = controls;
   const hasChanges = state.kind === "ready" && hasUnsavedChanges(state.marks);
 
+  // Lo preguntan las fichas de sesión y el nombre que abre la ficha (#414).
+  // El diálogo nativo basta: es una pregunta de sí o no, el navegador la
+  // hace accesible y devuelve el foco a lo que la abrió.
+  function canLeaveSheet(): boolean {
+    return (
+      !hasChanges || window.confirm(translate("attendance.discardQuestion"))
+    );
+  }
+
   function chooseSession(choice: string): void {
-    if (choice === eventId) {
-      return;
-    }
-    // El diálogo nativo basta: es una pregunta de sí o no, el navegador la
-    // hace accesible y devuelve el foco al botón que la abrió.
-    if (
-      hasChanges &&
-      !window.confirm(translate("attendance.discardQuestion"))
-    ) {
+    if (choice === eventId || !canLeaveSheet()) {
       return;
     }
     onChooseSession(choice);
@@ -356,7 +363,11 @@ export function AttendanceSheetPanel({
       {state.kind === "ready" ? (
         <SaveNotices translate={translate} save={state.save} />
       ) : null}
-      <SheetBody translate={translate} controls={controls} />
+      <SheetBody
+        translate={translate}
+        controls={controls}
+        canLeaveSheet={canLeaveSheet}
+      />
     </>
   );
 }
