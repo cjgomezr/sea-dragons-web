@@ -13,6 +13,13 @@ const WORKFLOW_PATH = path.join(REPO_ROOT, ".github/workflows/checks.yml");
 
 const DEVELOPMENT_SOURCE = "seadragons-dev";
 
+const TEXT_ONLY_STEP_ID = "texto";
+const TEXT_ONLY_OUTPUT = `steps.${TEXT_ONLY_STEP_ID}.outputs.solo_texto`;
+/** Actions no tiene operador ternario: `cond && '' || '1'` daría siempre `'1'`
+ * porque la cadena vacía es falsa. Por eso la condición va negada y el valor
+ * que se quiere va en medio. */
+const NOT_TEXT_ONLY_CONDITION = `${TEXT_ONLY_OUTPUT} != 'true'`;
+
 /** Las credenciales que el manifiesto pone en los secretos del repositorio.
  * Sale de ahí y no de una lista escrita a mano: declarar una cuarta en el
  * manifiesto y olvidarla en el workflow tiene que dejar esto en rojo. */
@@ -34,13 +41,18 @@ function referencedSecrets(): string[] {
 }
 
 interface WorkflowStep {
+  id?: string;
   name?: string;
   uses?: string;
   run?: string;
   if?: string;
   env?: Record<string, string>;
   "continue-on-error"?: boolean;
-  with?: { "node-version"?: number; "node-version-file"?: string };
+  with?: {
+    "node-version"?: number;
+    "node-version-file"?: string;
+    "fetch-depth"?: number;
+  };
 }
 
 interface WorkflowJob {
@@ -126,17 +138,21 @@ describe("workflow de checks", () => {
       developmentCredentials().sort(),
     );
     for (const [name, value] of credentials) {
-      expect(value).toBe(`\${{ secrets.${name} }}`);
+      expect(value).toBe(
+        `\${{ ${NOT_TEXT_ONLY_CONDITION} && secrets.${name} || '' }}`,
+      );
     }
   });
 
   // Fuera de CI, `npm test` se salta los tests que hablan con seadragons-dev
   // (#415). Aquí se exigen: sin la variable, el check saldría verde sin
   // haberlos corrido, que es el agujero que cerró el #149.
-  it("corre los tests de integración y de RLS con RUN_INTEGRATION_TESTS=1", () => {
+  it("corre los tests de integración y de RLS con RUN_INTEGRATION_TESTS=1 salvo en un PR de solo texto", () => {
     const env = stepNamed("Tests").env ?? {};
 
-    expect(env[RUN_INTEGRATION_TESTS_ENV]).toBe("1");
+    expect(env[RUN_INTEGRATION_TESTS_ENV]).toBe(
+      `\${{ ${NOT_TEXT_ONLY_CONDITION} && '1' || '' }}`,
+    );
   });
 
   it("no referencia ningún secreto que el manifiesto no ponga en CI como de desarrollo", () => {
@@ -235,5 +251,74 @@ describe("workflow de checks", () => {
 
     expect(probe.run).toMatch(/\{\{TEST_CMD\}\}/);
     expect(probe.run).toMatch(/test:kit/);
+  });
+
+  // Un PR que solo cambia texto no necesita los tests que hablan con
+  // seadragons-dev ni sus credenciales (#439). Los unitarios, el lint, los
+  // tipos y el build siguen corriendo: varios tests leen docs/.
+  describe("en un PR de solo texto", () => {
+    function checksSteps(): WorkflowStep[] {
+      const job = parseWorkflow().jobs.checks;
+      if (!job) {
+        throw new Error("el workflow no tiene el job checks");
+      }
+      return job.steps;
+    }
+
+    function textOnlyStep(): WorkflowStep {
+      const step = checksSteps().find(
+        (candidate) => candidate.id === TEXT_ONLY_STEP_ID,
+      );
+      if (!step) {
+        throw new Error(
+          `el job checks no tiene el paso "${TEXT_ONLY_STEP_ID}"`,
+        );
+      }
+      return step;
+    }
+
+    it("lo decide el script que compara la rama con la lista de rutas de texto", () => {
+      expect(textOnlyStep().run).toMatch(/scripts\/branch-is-text-only\.sh/);
+    });
+
+    it("lo decide solo en pull_request: un push a main corre completo", () => {
+      expect(textOnlyStep().if).toMatch(/github\.event_name == 'pull_request'/);
+    });
+
+    it("lo decide antes de correr los tests", () => {
+      const steps = checksSteps();
+      const decisionIndex = steps.findIndex(
+        (step) => step.id === TEXT_ONLY_STEP_ID,
+      );
+      const testIndex = steps.findIndex((step) => step.name === "Tests");
+
+      expect(decisionIndex).toBeGreaterThanOrEqual(0);
+      expect(testIndex).toBeGreaterThan(decisionIndex);
+    });
+
+    it("dice en el log que el PR es solo texto y por qué", () => {
+      expect(textOnlyStep().run).toMatch(/solo texto.*text-only-paths\.txt/);
+    });
+
+    // El checkout por defecto trae un solo commit: sin historia no hay
+    // merge-base con main, y el script respondería siempre que no.
+    it("baja la historia completa para poder comparar con main", () => {
+      const checkout = checksSteps().find((step) =>
+        step.uses?.startsWith("actions/checkout"),
+      );
+
+      expect(checkout?.with?.["fetch-depth"]).toBe(0);
+    });
+
+    it("lint, tipos, build y bundle no dependen de esa decisión", () => {
+      for (const name of [
+        "Lint",
+        "Tipos",
+        "Build",
+        "Bundle del navegador sin secretos",
+      ]) {
+        expect(JSON.stringify(stepNamed(name))).not.toMatch(/solo_texto/);
+      }
+    });
   });
 });
