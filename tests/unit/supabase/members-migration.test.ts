@@ -93,6 +93,7 @@ describeConPostgres("migración de miembros", () => {
       "id uuid null=NO",
       "joined_on date null=NO",
       "membership_type text null=YES",
+      "news_seen_at timestamp with time zone null=YES",
       "photo_path text null=YES",
       "position text null=YES",
       "position_id uuid null=YES",
