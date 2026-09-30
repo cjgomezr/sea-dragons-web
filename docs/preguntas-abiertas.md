@@ -8,8 +8,9 @@ Las decisiones están escritas en el SRD v1.4 y en el plan maestro; este archivo
 queda como registro de qué se preguntó y qué se respondió. Cada punto apunta al
 FR o AC que lo cierra.
 
-**Abierto después:** B5, el 16 de septiembre de 2026, que bloquea los tickets de
-E12, y B6, el 22 de septiembre de 2026, que bloquea los de E18b.
+**Abierto después:** B5, el 16 de septiembre de 2026, resuelto el 30 de
+septiembre de 2026 en `docs/prd/e12-stripe-base.md`; y B6, el 22 de septiembre
+de 2026, que bloquea los de E18b.
 
 ---
 
@@ -85,7 +86,7 @@ vuelo, sin persistir ninguna evaluación, y la interfaz lo marca "sin evaluar". 
 se crean evaluaciones fantasma ni se obliga al coach a asignar a mano. Escrito en
 FR-086 y AC-053.
 
-### B5 · Qué significa elegir membresía antes de pagarla · E12 · SIN RESOLVER
+### B5 · Qué significa elegir membresía antes de pagarla · E12 · RESUELTO
 
 **Qué se observó.** Al probar el registro en producción (16 de septiembre de
 2026), quien se registra elige su tipo de membresía y, en cuanto confirma el
@@ -120,6 +121,16 @@ al día". Lo que no hace es definir la segunda.
 **Qué no se toca mientras tanto.** El registro sigue pidiendo la membresía y
 activando la cuenta como hoy. Decidirlo ahora sería adelantar trabajo: no hay
 nada que cobrar hasta E12.
+
+**Decisión (30 de septiembre de 2026), en `docs/prd/e12-stripe-base.md`, D1 a
+D7.** La membresía tiene seis estados (`pending`, `trialing`, `active`,
+`past_due`, `cancelled`, `waived`) que mueven los webhooks de Stripe y la
+exención del Admin. La barrera es el pago: quien no está al día ve su perfil,
+Pagos y el calendario en lectura, y no responde al RSVP ni entra en escuadras
+ni en hojas de asistencia; el registro sigue abierto y sin aprobación manual.
+El primer pago se pide al primer inicio de sesión, con un mes de prueba en
+Stripe y tarjeta obligatoria. Entrenadores y voluntarios quedan exentos a mano
+por el Admin, con motivo y bitácora. Casual queda `pending` hasta E13.
 
 ### B6 · De quién son las cuentas de cada instalación · E18b · SIN RESOLVER
 
