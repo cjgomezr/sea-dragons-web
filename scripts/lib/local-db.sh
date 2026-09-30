@@ -120,9 +120,16 @@ check_dev_source_url() {
 }
 
 # Falla cuando el destino no es la base local: escribir en cualquier otra
-# sería vaciarla.
+# sería vaciarla. Una URL con parámetros se rechaza entera, porque libpq deja
+# que `?host=` y `?port=` pisen el host y el puerto que se acaban de comprobar.
 check_local_target_url() {
   local url="$1" host port
+  case "$url" in
+    *\?*)
+      echo "error: el destino lleva parámetros (?host=, ?port=...), y libpq podría usarlos para salir de la base local (127.0.0.1:$LOCAL_DB_PORT o localhost:$LOCAL_DB_PORT). No se escribe nada." >&2
+      return 1
+      ;;
+  esac
   host="$(url_host "$url")"
   port="$(url_port "$url")"
   case "$host" in
@@ -177,12 +184,26 @@ $$;
 SQL
 }
 
-# Nombre de la tabla que hizo fallar la restauración, sacado de los errores de
-# psql. Prefiere el nombre calificado del INSERT; si el error no lo trae, se
-# queda con la relación que nombra el mensaje.
+# Tabla calificada (`esquema.tabla`) de una línea `INSERT INTO "e"."t" ...`.
+qualified_table_of_insert() {
+  sed -n 's/.*INSERT INTO "\([^"]*\)"\."\([^"]*\)".*/\1.\2/p' | head -n 1
+}
+
+# Nombre de la tabla que hizo fallar la restauración. Lo más fiable es la
+# línea de la entrada que psql cita (`psql:<stdin>:N:`): el volcado escribe un
+# INSERT con muchas filas, una por línea, así que la tabla es la del último
+# `INSERT INTO` hasta esa línea. Un error de tipo (`invalid input syntax`) no
+# nombra ninguna relación, y el `LINE n:` que cita psql puede ser una fila
+# suelta. Si no hay número de línea, se queda con lo que traiga el mensaje.
 failed_table_from_psql_errors() {
-  local errors="$1" table
-  table="$(printf '%s\n' "$errors" | sed -n 's/.*INSERT INTO "\([^"]*\)"\."\([^"]*\)".*/\1.\2/p' | head -n 1)"
+  local errors="$1" input_file="$2" line table=""
+  line="$(printf '%s\n' "$errors" | sed -n 's/^psql:<stdin>:\([0-9]*\): ERROR:.*/\1/p' | head -n 1)"
+  if [ -n "$line" ]; then
+    table="$(awk -v last="$line" 'NR <= last && /^INSERT INTO / { insert = $0 } END { print insert }' "$input_file" | qualified_table_of_insert)"
+  fi
+  if [ -z "$table" ]; then
+    table="$(printf '%s\n' "$errors" | qualified_table_of_insert)"
+  fi
   if [ -z "$table" ]; then
     table="$(printf '%s\n' "$errors" | sed -n 's/.*relation "\([^"]*\)".*/\1/p' | head -n 1)"
   fi
@@ -192,26 +213,30 @@ failed_table_from_psql_errors() {
 # Vacía la base local y restaura el volcado, todo en una transacción: si algo
 # falla, la base queda como estaba. `--single-transaction` envuelve la entrada
 # entera, que llega por stdin para que el vaciado y el volcado vayan juntos.
+# La entrada se guarda en un archivo para poder buscar en ella la línea que
+# cite el error; lleva datos del volcado, así que se borra al terminar.
 restore_in_transaction() {
-  local target_url="$1" dump_file="$2" errors_file status=0
-  errors_file="$(mktemp)"
-  { emptying_sql; cat "$dump_file"; } | psql "$target_url" \
+  local target_url="$1" dump_file="$2" scratch status=0
+  scratch="$(mktemp -d)"
+  { emptying_sql; cat "$dump_file"; } > "$scratch/input.sql"
+  psql "$target_url" \
     --no-psqlrc \
     --quiet \
     --set ON_ERROR_STOP=1 \
     --single-transaction \
-    --file=- > /dev/null 2> "$errors_file" || status=$?
+    --file=- < "$scratch/input.sql" > /dev/null 2> "$scratch/errors.txt" || status=$?
 
   if [ "$status" -eq 0 ]; then
-    rm -f "$errors_file"
+    rm -rf "$scratch"
     return 0
   fi
 
-  local errors
-  errors="$(cat "$errors_file")"
-  rm -f "$errors_file"
+  local errors table
+  errors="$(cat "$scratch/errors.txt")"
+  table="$(failed_table_from_psql_errors "$errors" "$scratch/input.sql")"
+  rm -rf "$scratch"
   {
-    echo "error: falló la restauración en la tabla $(failed_table_from_psql_errors "$errors")."
+    echo "error: falló la restauración en la tabla $table."
     printf '%s\n' "$errors" | grep 'ERROR:' || true
     echo "La transacción se deshizo: la base local quedó como estaba antes."
   } >&2

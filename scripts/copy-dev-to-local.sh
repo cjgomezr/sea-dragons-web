@@ -38,7 +38,7 @@ read_dev_db_url() {
     return 0
   fi
   if [ -f .env.local ]; then
-    sed -n 's/^SUPABASE_DEV_DB_URL=//p' .env.local | tail -n 1 | tr -d '\r' | sed 's/^"\(.*\)"$/\1/'
+    sed -n 's/^SUPABASE_DEV_DB_URL=//p' .env.local | tail -n 1 | tr -d '\r' | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/"
   fi
 }
 

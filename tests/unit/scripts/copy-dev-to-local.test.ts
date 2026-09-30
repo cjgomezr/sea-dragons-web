@@ -80,6 +80,19 @@ describe("copy-dev-to-local.sh · sin --yes", () => {
     expect(stdout).toContain(POOLER_HOST);
   });
 
+  it("acepta el valor de .env.local entre comillas simples", async () => {
+    const db = await setup(null);
+    await writeFile(
+      path.join(db.workDir, ".env.local"),
+      `SUPABASE_DEV_DB_URL='${DEV_URL}'\n`,
+    );
+
+    const { code, stdout } = await db.run(SCRIPT, []);
+
+    expect(code).toBe(0);
+    expect(stdout).toContain(POOLER_HOST);
+  });
+
   it("acepta la conexión directa de seadragons-dev además del pooler", async () => {
     const db = await setup(
       `postgresql://postgres:${DEV_PASSWORD}@db.${DEVELOPMENT_SUPABASE_PROJECT_REF}.supabase.co:5432/postgres`,
@@ -140,6 +153,10 @@ describe("copy-dev-to-local.sh · protecciones", () => {
       "postgresql://postgres:postgres@db.example.com:54322/postgres",
     ],
     ["otro puerto", "postgresql://postgres:postgres@127.0.0.1:5432/postgres"],
+    [
+      "parámetros que cambian el host",
+      "postgresql://postgres:postgres@127.0.0.1:54322/postgres?host=db.example.com&port=5432",
+    ],
   ])("se niega cuando el destino no es la base local (%s)", async (_, url) => {
     const db = await setup();
     db.env.SUPABASE_LOCAL_DB_URL = url;
@@ -383,5 +400,39 @@ describe("copy-dev-to-local.sh · restauración", () => {
 
     expect(code).not.toBe(0);
     expect(stderr).toContain("groups");
+  });
+
+  it("nombra la tabla por la línea del error cuando el mensaje no trae ni relación ni INSERT", async () => {
+    const db = await setup();
+    const groupRows = Array.from(
+      { length: 100 },
+      (_, index) => `\t('grupo-${index}'),`,
+    );
+    await db.setFixture(
+      "dev-dump.sql",
+      [
+        'INSERT INTO "public"."groups" ("id") VALUES',
+        ...groupRows,
+        "\t('ultimo');",
+        'INSERT INTO "public"."members" ("id") VALUES',
+        "\t('socia');",
+        "",
+      ].join("\n"),
+    );
+    await db.setFixture("restore.exit", "3");
+    await db.setFixture(
+      "restore.stderr",
+      [
+        'psql:<stdin>:80: ERROR:  invalid input syntax for type uuid: "grupo-50"',
+        "LINE 51: \t('grupo-50'),",
+        "",
+      ].join("\n"),
+    );
+
+    const { code, stderr } = await db.run(SCRIPT, ["--yes"]);
+
+    expect(code).not.toBe(0);
+    expect(stderr).toContain("public.groups");
+    expect(stderr).not.toContain("public.members");
   });
 });

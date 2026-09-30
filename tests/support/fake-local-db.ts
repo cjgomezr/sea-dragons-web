@@ -10,9 +10,6 @@ import path from "node:path";
 
 export const REPO_ROOT = path.resolve(__dirname, "..", "..");
 
-export const LOCAL_DB_URL =
-  "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
-
 /** Esquema por defecto de las dos bases: iguales. */
 export const DEFAULT_SCHEMA = "table public.members\ntable public.groups\n";
 
@@ -24,7 +21,6 @@ export interface RunResult {
 
 export interface FakeLocalDb {
   readonly workDir: string;
-  readonly fixturesDir: string;
   readonly env: NodeJS.ProcessEnv;
   readonly run: (script: string, args: readonly string[]) => Promise<RunResult>;
   readonly calls: () => Promise<string[]>;
@@ -38,8 +34,9 @@ function toBashPath(nativePath: string): string {
 }
 
 /** `supabase`: `status` sale con `status.exit` (0 si no existe); `db dump`
- * escribe en el `-f` un volcado que dice de dónde salió, salvo que exista
- * `backup.exit` y el volcado sea el local. Anota la ruta de cada volcado en
+ * escribe en el `-f` un volcado que dice de dónde salió (el de desarrollo
+ * sigue con `dev-dump.sql`, si existe), salvo que exista `backup.exit` y el
+ * volcado sea el local. Anota la ruta de cada volcado en
  * `dump-files.log`, para poder comprobar después que el de desarrollo se
  * borró. */
 function fakeSupabase(logFile: string, fixturesDir: string): string {
@@ -62,7 +59,12 @@ if [ "$1" = "db" ] && [ "$2" = "dump" ]; then
   if [ "$origin" = "local" ] && [ -f "$FIXTURES/backup.exit" ]; then
     exit "$(cat "$FIXTURES/backup.exit")"
   fi
-  printf -- '-- volcado %s\\nINSERT INTO "public"."members" ("id") VALUES (1);\\n' "$origin" > "$file"
+  printf -- '-- volcado %s\\n' "$origin" > "$file"
+  if [ "$origin" = "dev" ] && [ -f "$FIXTURES/dev-dump.sql" ]; then
+    cat "$FIXTURES/dev-dump.sql" >> "$file"
+  else
+    printf -- 'INSERT INTO "public"."members" ("id") VALUES (1);\\n' >> "$file"
+  fi
   exit 0
 fi
 exit 0
@@ -167,7 +169,6 @@ export async function installFakeLocalDb(
 
   return {
     workDir,
-    fixturesDir,
     env,
     run: (script, args) => runScript(script, args, { cwd: workDir, env }),
     calls: () => lines(logFile),
