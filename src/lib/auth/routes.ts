@@ -156,6 +156,17 @@ export const ACCOUNT_PROFILE_PHOTO_API_PATH = `${ACCOUNT_PROFILE_API_PATH}/photo
  * misma, así que no aparece en `RESTRICTED_ROUTES`. */
 export const ACCOUNT_ATTENDANCE_API_PATH = "/api/v1/account/attendance";
 
+/** La marca de la última visita a Noticias de quien llama (#424, D2 del PRD
+ * de E14): de ella sale la cuenta sin leer del dashboard. La alcanza
+ * cualquier cuenta activa, siempre sobre sí misma, así que no aparece en
+ * `RESTRICTED_ROUTES`. */
+export const ACCOUNT_NEWS_SEEN_API_PATH = "/api/v1/account/news-seen";
+
+/** Todo lo que pinta la pantalla de inicio en una sola petición (#424, RF-6
+ * del PRD de E14). Lo alcanza cualquier cuenta activa: qué ve cada rol lo
+ * decide cada fuente, así que no aparece en `RESTRICTED_ROUTES`. */
+export const DASHBOARD_API_PATH = "/api/v1/dashboard";
+
 /** Los avisos de quien llama (#265, E6): listarlos, contar los no leídos y
  * marcarlos. Los alcanza cualquier cuenta activa, de cualquier rol, y siempre
  * sobre los suyos, así que no aparecen en `RESTRICTED_ROUTES`. */
