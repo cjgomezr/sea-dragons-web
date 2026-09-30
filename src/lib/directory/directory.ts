@@ -297,7 +297,7 @@ function compareForQuery(
 
 type SignedPhotos = ReadonlyMap<string, string>;
 
-function photoUrlOf(
+export function photoUrlOf(
   record: DirectoryMemberRecord,
   signedPhotos: SignedPhotos,
 ): string | null {
@@ -311,8 +311,8 @@ function photoUrlOf(
 
 /** Sólo se firman las fotos de quien sale en la lista: una baja que un
  * Player no ve tampoco le deja una dirección de su foto. */
-function signListedPhotos(
-  gateways: DirectoryGateways,
+export function signListedPhotos(
+  gateways: Pick<DirectoryGateways, "photos">,
   listed: readonly DirectoryMemberRecord[],
 ): Promise<SignedPhotos> {
   return gateways.photos.signPhotoUrls(
@@ -322,7 +322,7 @@ function signListedPhotos(
   );
 }
 
-function directoryPositionOf(
+export function directoryPositionOf(
   positions: ClubPositions,
   positionId: string | null,
 ): DirectoryPosition | null {
@@ -334,7 +334,7 @@ function directoryPositionOf(
 }
 
 /** Las posiciones que tienen los socios, sin repetir y en un orden fijo. */
-function referencedPositionIds(
+export function referencedPositionIds(
   records: readonly DirectoryMemberRecord[],
 ): readonly string[] {
   const ids = records.flatMap((record) =>
