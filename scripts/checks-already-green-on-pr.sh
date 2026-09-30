@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Responde una sola pregunta: ¿el árbol que este push deja en `main` es el
-# mismo que ya pasó los checks en verde en su pull request?
+# mismo que ya pasó en verde, en su pull request, el workflow que pregunta?
+# Lo usan `checks.yml` y `visual-baselines.yml` (#441).
 #
 # La fábrica mergea con squash un PR que se rebasó sobre main y salió verde, así
 # que el commit que aterriza en main casi siempre tiene un SHA nuevo y un ÁRBOL
 # idéntico al que se acaba de comprobar. Volver a correr la suite entera sobre
-# ese mismo árbol cuesta ocho minutos de Actions y no puede descubrir nada.
+# ese mismo árbol cuesta minutos de Actions (y, en la visual, decenas de miles
+# de peticiones a `seadragons-dev`) y no puede descubrir nada.
 #
 # Se compara el árbol y no el SHA a propósito: el SHA cambia siempre (el squash
 # reescribe el commit), y el árbol es lo único que los tests ven.
@@ -18,15 +20,17 @@
 # Usage: scripts/checks-already-green-on-pr.sh
 # Requires: gh con lectura de pull-requests y de actions.
 # Entrada:  GH_REPO, GITHUB_SHA, HEAD_COMMIT_MESSAGE (el mensaje del commit
-#           empujado, que el workflow pasa desde el evento).
+#           empujado, que el workflow pasa desde el evento) y WORKFLOW_FILE
+#           (el workflow cuya corrida verde se busca; checks.yml si falta).
 # Salida:   `ya_verificado=true|false` en $GITHUB_OUTPUT.
 
 set -uo pipefail
 
 # El workflow cuya corrida verde estamos buscando. Si se renombra el archivo,
-# esto tiene que seguirlo: una consulta a un workflow inexistente devuelve cero
-# corridas, y cero corridas es "no", que es seguro pero deja de ahorrar.
-CHECKS_WORKFLOW="checks.yml"
+# quien llama tiene que seguirlo: una consulta a un workflow inexistente
+# devuelve cero corridas, y cero corridas es "no", que es seguro pero deja de
+# ahorrar.
+WORKFLOW_FILE="${WORKFLOW_FILE:-checks.yml}"
 
 responde() {
   local veredicto="$1" motivo="$2"
@@ -74,17 +78,22 @@ fi
 # Sin branch protection (plan gratuito, repositorio privado) se puede mergear un
 # PR con el check en rojo, o antes de que termine.
 #
-# `event=pull_request` no es adorno: una corrida cuyo único job quedó `skipped`
-# también concluye `success`, y a partir de este cambio eso es justo lo que este
-# workflow produce en `main`. Sin el filtro, una corrida saltada podría contar
-# como prueba de que el árbol pasó, que es la única forma de que esto mienta.
+# `event=pull_request` no es adorno: una corrida cuyos jobs quedaron `skipped`
+# también concluye `success`, y eso es justo lo que el workflow produce en
+# `main` cuando esto responde que sí. Sin el filtro, una corrida saltada podría
+# contar como prueba de que el árbol pasó, que es la única forma de que esto
+# mienta. En la visual deja fuera además la aceptación a mano
+# (`workflow_dispatch`): sale verde sin haber comparado nada.
+#
+# `head_sha` es la cabeza del PR y no cualquier commit suyo: una visual verde
+# sobre un commit anterior no dice nada del árbol que se mergeó.
 corridas_verdes=$(
-  gh api "repos/$GH_REPO/actions/workflows/$CHECKS_WORKFLOW/runs?event=pull_request&head_sha=$cabeza_del_pr" \
+  gh api "repos/$GH_REPO/actions/workflows/$WORKFLOW_FILE/runs?event=pull_request&head_sha=$cabeza_del_pr" \
     --jq '[.workflow_runs[] | select(.conclusion == "success")] | length' 2>/dev/null
 )
 
 if [ "${corridas_verdes:-0}" -gt 0 ] 2>/dev/null; then
-  responde true "Este árbol ya pasó los checks en verde en el PR #$numero_de_pr: no se repiten."
+  responde true "Este árbol ya pasó $WORKFLOW_FILE en verde en el PR #$numero_de_pr: no se repite."
 fi
 
-responde false "El árbol del PR #$numero_de_pr nunca pasó los checks en verde: hay que comprobarlo."
+responde false "El árbol del PR #$numero_de_pr nunca pasó $WORKFLOW_FILE en verde: hay que comprobarlo."
