@@ -78,6 +78,12 @@ La aplicación y buena parte de las pruebas hablan con Supabase de verdad. Para
 eso necesitas un archivo `.env.local` en la raíz del repositorio. **No está en
 git y nunca debe estarlo.**
 
+Tienes dos opciones de base, y el archivo lleva las mismas tres variables en
+las dos: `seadragons-dev`, la base compartida del equipo, o una base local en
+Docker, solo tuya (sección 3.2).
+
+### 3.1 Opción A: `seadragons-dev`
+
 Crea el archivo con estas tres variables:
 
 ```
@@ -105,6 +111,46 @@ disponible y sigue funcionando, y las pruebas no las usan.
 3. **No la copies dentro del repositorio** en ningún otro archivo, ni en un
    comentario "temporal".
 
+### 3.2 Opción B: una base local en Docker
+
+Con la base local tus pruebas no chocan con las de nadie, puedes probar una
+migración sin avisar, y ninguna identidad de prueba cuenta para el límite de
+usuarios de Supabase. Necesitas Docker Desktop abierto.
+
+```bash
+npm run db:start     # levanta Supabase y aplica todas las migraciones
+npx supabase status  # muestra la URL y las claves de tu base local
+```
+
+La primera vez descarga las imágenes y tarda unos minutos; después arranca en
+segundos. En `.env.local` pon:
+
+- `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: la `ANON_KEY` que muestra `npx supabase status`.
+- `SUPABASE_SERVICE_ROLE_KEY`: la `SERVICE_ROLE_KEY` de ese mismo comando.
+
+Esas claves son públicas por diseño, iguales en todas las máquinas y solo
+sirven para tu base local. Aun así viven en `.env.local`, nunca en un archivo
+versionado.
+
+La base arranca con el club y nada más: las pruebas crean sus propios socios.
+Otros comandos:
+
+```bash
+npm run db:stop      # la apaga; los datos se conservan para la próxima vez
+npm run db:reset     # borra los datos y vuelve a aplicar las migraciones
+```
+
+Dos cosas a saber:
+
+- **Pide unos 2 a 3 GB de RAM.** En una máquina de 8 GB apágala con
+  `npm run db:stop` cuando no la uses.
+- **Los correos no salen.** Los de confirmar la cuenta o recuperar la
+  contraseña se ven en un buzón falso en `http://127.0.0.1:54324`.
+
+Para volver a `seadragons-dev`, cambia las tres variables en `.env.local`. CI
+sigue usando siempre `seadragons-dev`.
+
 ## 4. Comprobar que quedó bien
 
 Corre esto en orden. Si algo falla, no sigas: mira la tabla del final.
@@ -115,8 +161,8 @@ npm run typecheck   # sin errores
 npm test            # unas 5.000 pruebas, unos 10 minutos
 ```
 
-`npm test` se salta las pruebas de integración y de RLS, las que hablan con
-`seadragons-dev`, y lo dice en una línea al empezar. Las corre CI en cada pull
+`npm test` se salta las pruebas de integración y de RLS, las que hablan con la
+base, y lo dice en una línea al empezar. Las corre CI en cada pull
 request. Para correrlas en tu máquina: `RUN_INTEGRATION_TESTS=1 npm test`.
 
 Después, levanta la aplicación:

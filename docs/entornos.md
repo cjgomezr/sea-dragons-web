@@ -30,7 +30,9 @@ organización está en plan `free` y el segundo proyecto cuesta 0 al mes.
   poder alcanzarlo, ni siquiera por accidente: el guardia de entorno de la
   suite (`src/lib/supabase/environment-guard.ts`, enganchado en
   `vitest.setup.ts`, que corre antes que cualquier archivo de test) falla de
-  inmediato si la URL configurada no es la de `seadragons-dev`.
+  inmediato si la URL configurada no es la de `seadragons-dev` o la del
+  Supabase local de la CLI (`http://127.0.0.1:54321` o
+  `http://localhost:54321`, #447).
 
 El ref y la URL son públicos: viajan en cada petición que hace el navegador.
 Lo que nunca sale de su sitio son las claves, y eso es lo que cubre la sección
@@ -178,9 +180,11 @@ zona y nunca por aritmética de horas.
 Ninguna clave de ningún proyecto vive en este documento ni en ningún otro
 archivo versionado del repositorio.
 
-- **En local:** solo credenciales de `seadragons-dev`, en `.env.local`, fuera
-  de git. Qué variable hace falta y para qué sirve se describe en
-  `.env.example`, sin valores reales (issue #90).
+- **En local:** credenciales de `seadragons-dev` o de la base local en Docker
+  (`docs/onboarding-equipo.md`, sección 3.2), en `.env.local`, fuera de git.
+  Las de la base local las da `npx supabase status`. Qué variable hace falta
+  y para qué sirve se describe en `.env.example`, sin valores reales (issue
+  #90).
 - **En CI:** también sólo de `seadragons-dev`, en los secretos del repositorio
   (Settings, Secrets and variables, Actions), con los valores que da el panel
   de Supabase de ese proyecto en Project Settings, API. Por qué las tiene, y
@@ -237,7 +241,8 @@ alta que eso afloja una regla que se puso a propósito. Lo que la compensa:
 
 - El guardia de entorno (`src/lib/supabase/environment-guard.ts`), enganchado
   en `vitest.setup.ts` y en el arranque de Playwright, sólo admite la URL de
-  `seadragons-dev`. Un secreto mal pegado detiene la corrida entera antes de
+  `seadragons-dev` y la del Supabase local de la CLI, que en CI no existe. Un
+  secreto mal pegado detiene la corrida entera antes de
   que ningún test escriba, y si apunta a producción el mensaje lo dice con ese
   nombre.
 - La regla 1 sigue intacta: un origen de producción en `ci` deja el test del
@@ -679,7 +684,8 @@ Los cinco entornos posibles:
   CI, y existe para que las migraciones puedan aplicarse solas sin abrirle
   producción a todo lo que corra en Actions.
 
-`NEXT_PUBLIC_SUPABASE_URL`: en local, `.env.local` apunta a `seadragons-dev`.
+`NEXT_PUBLIC_SUPABASE_URL`: en local, `.env.local` apunta a `seadragons-dev`
+o a la base local en Docker (`http://127.0.0.1:54321`).
 En preview, apunta a `seadragons-dev`, **nunca** al proyecto de producción. En
 producción, apunta a `seadragons-prod`. En CI, a `seadragons-dev` desde el
 issue #149: sin ella, las pruebas que hablan con la base se saltaban y su check
@@ -687,7 +693,8 @@ salía verde sin haber probado nada. La pone quien desarrolla en local; en
 Vercel, quien administre el proyecto; en Actions, quien administre el
 repositorio.
 
-`NEXT_PUBLIC_SUPABASE_ANON_KEY`: en local, la del proyecto `seadragons-dev`.
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`: en local, la del proyecto `seadragons-dev` o
+la que da `npx supabase status` para la base local.
 En preview, la misma llave anónima de `seadragons-dev`. En producción, la
 llave anónima de `seadragons-prod`, distinta a la de desarrollo. En CI, la de
 `seadragons-dev`, por el mismo motivo que la anterior. La pone quien desarrolla
@@ -695,7 +702,8 @@ en local; en Vercel, quien administre el proyecto; en Actions, quien administre
 el repositorio.
 
 `SUPABASE_SERVICE_ROLE_KEY`: la llave de servicio, la única que se salta
-RLS. En local, la de `seadragons-dev`, en `.env.local`, nunca en un `.env`
+RLS. En local, la de `seadragons-dev` o la de la base local, en `.env.local`,
+nunca en un `.env`
 versionado. **En preview no existe**, ni siquiera la de desarrollo: es lo que
 impide que el preview de un fork reciba una credencial de escritura (ver
 "Secretos por entorno"). En producción, la de `seadragons-prod`, nunca la misma

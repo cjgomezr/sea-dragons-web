@@ -972,7 +972,8 @@ async function createTestMembers(): Promise<E2eSessionState> {
 export async function prepareE2eSession(): Promise<void> {
   loadLocalEnvFile();
   // El mismo guardia que `vitest.setup.ts`: la suite no crea usuarios en
-  // ningún proyecto de Supabase que no sea el de desarrollo.
+  // ningún proyecto de Supabase que no sea el de desarrollo o el local de la
+  // CLI.
   assertTestSupabaseEnvironment();
 
   const decision = decideSupabaseCredentials(process.env);

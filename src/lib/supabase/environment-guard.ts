@@ -1,11 +1,9 @@
 import { SUPABASE_URL_ENV } from "./config";
 
 /** Ref del proyecto de desarrollo (`seadragons-dev`, Sídney). Ver
- * `docs/entornos.md`: es el único proyecto de Supabase que la suite de tests
- * tiene permitido alcanzar. Un Supabase local vía CLI (`127.0.0.1:54321`)
- * también se rechaza a propósito: este proyecto no lo usa como flujo
- * soportado, así que cualquier URL que no sea exactamente esta cuenta como
- * "proyecto equivocado". */
+ * `docs/entornos.md`: es el único proyecto de Supabase alojado que la suite
+ * de tests tiene permitido alcanzar. El otro destino permitido es el Supabase
+ * local de la CLI (`LOCAL_SUPABASE_ORIGINS`). */
 export const DEVELOPMENT_SUPABASE_PROJECT_REF = "xcfrpcvomjjmfoztifuo";
 
 /** Ref del proyecto de producción (`seadragons-prod`). El guardia lo conoce
@@ -18,18 +16,34 @@ export const PRODUCTION_SUPABASE_PROJECT_REF = "weqhmtpvgewomslpvefu";
 const DEVELOPMENT_SUPABASE_HOSTNAME = `${DEVELOPMENT_SUPABASE_PROJECT_REF}.supabase.co`;
 const PRODUCTION_SUPABASE_HOSTNAME = `${PRODUCTION_SUPABASE_PROJECT_REF}.supabase.co`;
 
+/** El Supabase local que levanta `npm run db:start` (#447), con la API en el
+ * puerto de `supabase/config.toml`. Se compara el origen entero (protocolo,
+ * host y puerto) y no sólo el host: "cualquier localhost" dejaría pasar la
+ * propia app en el 3417 o cualquier otro servicio de la máquina. */
+const LOCAL_SUPABASE_ORIGINS: readonly string[] = [
+  "http://127.0.0.1:54321",
+  "http://localhost:54321",
+];
+
 type Environment = Readonly<Record<string, string | undefined>>;
 
 export type TestSupabaseEnvironmentCheck =
   | { readonly kind: "ok" }
   | { readonly kind: "wrong-project"; readonly message: string };
 
-function hostnameOf(url: string): string | null {
+function parseUrl(url: string): URL | null {
   try {
-    return new URL(url).hostname;
+    return new URL(url);
   } catch {
     return null;
   }
+}
+
+function isAllowedTestSupabase(parsed: URL): boolean {
+  return (
+    parsed.hostname === DEVELOPMENT_SUPABASE_HOSTNAME ||
+    LOCAL_SUPABASE_ORIGINS.includes(parsed.origin)
+  );
 }
 
 /** Qué se le dice a quien lea el fallo. Un secreto de CI que apunta a
@@ -48,7 +62,8 @@ function wrongProjectMessage(hostname: string | null): string {
   }
   return (
     `${SUPABASE_URL_ENV} no apunta al proyecto de desarrollo declarado ` +
-    `(${DEVELOPMENT_SUPABASE_PROJECT_REF}). La suite de tests no puede ` +
+    `(${DEVELOPMENT_SUPABASE_PROJECT_REF}) ni al Supabase local ` +
+    `(${LOCAL_SUPABASE_ORIGINS.join(" o ")}). La suite de tests no puede ` +
     "alcanzar ningún otro proyecto de Supabase, ni siquiera por accidente."
   );
 }
@@ -64,9 +79,15 @@ export function checkTestSupabaseEnvironment(
     return { kind: "ok" };
   }
 
-  const hostname = hostnameOf(url);
-  if (hostname !== DEVELOPMENT_SUPABASE_HOSTNAME) {
-    return { kind: "wrong-project", message: wrongProjectMessage(hostname) };
+  const parsed = parseUrl(url);
+  if (parsed === null) {
+    return { kind: "wrong-project", message: wrongProjectMessage(null) };
+  }
+  if (!isAllowedTestSupabase(parsed)) {
+    return {
+      kind: "wrong-project",
+      message: wrongProjectMessage(parsed.hostname),
+    };
   }
 
   return { kind: "ok" };

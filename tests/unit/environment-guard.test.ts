@@ -62,10 +62,39 @@ describe("guardia de entorno de tests", () => {
     expect(checkTestSupabaseEnvironment(env).kind).toBe("wrong-project");
   });
 
-  it("falla con un Supabase local vía CLI: no es un flujo soportado por este guardia", () => {
-    const env = { [SUPABASE_URL_ENV]: "http://127.0.0.1:54321" };
+  // #447: el Supabase local de la CLI (`npm run db:start`) es un destino
+  // soportado. Se aceptan sólo sus dos orígenes exactos: ni otro puerto, ni
+  // https, ni otra dirección de loopback.
+  it.each(["http://127.0.0.1:54321", "http://localhost:54321"])(
+    "pasa con el Supabase local de la CLI en %s",
+    (url) => {
+      const env = { [SUPABASE_URL_ENV]: url };
+
+      expect(checkTestSupabaseEnvironment(env)).toEqual({ kind: "ok" });
+      expect(() => assertTestSupabaseEnvironment(env)).not.toThrow();
+    },
+  );
+
+  it.each([
+    "http://localhost:3000",
+    "https://localhost:54321",
+    "http://127.0.0.2:54321",
+    "http://localhost",
+  ])("falla con %s, que no es el origen del Supabase local", (url) => {
+    const env = { [SUPABASE_URL_ENV]: url };
 
     expect(checkTestSupabaseEnvironment(env).kind).toBe("wrong-project");
+  });
+
+  it("dice en el error que el Supabase local también se admite", () => {
+    const env = { [SUPABASE_URL_ENV]: "https://otro-proyecto.supabase.co" };
+
+    const check = checkTestSupabaseEnvironment(env);
+
+    expect(check.kind).toBe("wrong-project");
+    if (check.kind === "wrong-project") {
+      expect(check.message).toContain("http://127.0.0.1:54321");
+    }
   });
 
   it("falla cuando la URL configurada no es una URL válida", () => {
