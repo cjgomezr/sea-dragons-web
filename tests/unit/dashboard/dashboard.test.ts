@@ -37,7 +37,8 @@ const COACHES_GROUP = "0a000000-0000-4000-8000-00000000000c";
 const NOW = new Date("2026-09-30T08:00:00.000Z");
 const TODAY_IN_CLUB = "2026-09-30";
 
-type FakeSource = "clubRate" | "attendance" | "agenda" | "feed" | "roster";
+type FakeSource =
+  "clubRate" | "attendance" | "agenda" | "feed" | "roster" | "newsSeen";
 
 type Club = {
   role: Role;
@@ -220,6 +221,7 @@ function gateways(): DashboardGateways {
       },
       findNewsSeenAt: async () => {
         failIf("roster");
+        failIf("newsSeen");
         return club.newsSeenAt;
       },
     },
@@ -608,6 +610,20 @@ describe("sin leer", () => {
 });
 
 describe("fuentes caídas", () => {
+  it("sin la marca de visita, sólo cae la cuenta sin leer", async () => {
+    club.failing.add("newsSeen");
+    club.posts = [post({ publishedAt: "2026-09-29T00:00:00.000Z" })];
+
+    const result = await dashboard();
+
+    expect(result.tiles.unreadNews).toEqual({ kind: "unavailable" });
+    expect(result.latestNews).toMatchObject({
+      kind: "news",
+      posts: [{ title: "Crónica del torneo" }],
+    });
+    expect(reported.map((failure) => failure.source)).toEqual(["news_seen"]);
+  });
+
   it("la tasa del club llega no disponible y el resto se sirve", async () => {
     club.role = "Admin";
     club.failing.add("clubRate");
