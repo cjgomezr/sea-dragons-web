@@ -235,6 +235,29 @@ describe("checks-already-green-on-pr con WORKFLOW_FILE=visual-baselines.yml", ()
     expect(output).toContain("ya_verificado=false");
   });
 
+  it("dice que sí cuando la visual salió verde sólo tras aceptar la línea base", async () => {
+    // La cabeza del PR es el commit del bot con las capturas aceptadas, así que
+    // su árbol ya las incluye. La corrida roja es la del commit anterior, y la
+    // aceptación en sí (workflow_dispatch) no cuenta.
+    const { output } = await run({
+      runs: [
+        {
+          ...GREEN_VISUAL_ON_HEAD,
+          headSha: EARLIER_PR_SHA,
+          conclusion: "failure",
+        },
+        {
+          ...GREEN_VISUAL_ON_HEAD,
+          headSha: EARLIER_PR_SHA,
+          event: "workflow_dispatch",
+        },
+        GREEN_VISUAL_ON_HEAD,
+      ],
+    });
+
+    expect(output).toContain("ya_verificado=true");
+  });
+
   it("dice que no cuando la visual verde es de un commit anterior del PR", async () => {
     const { output } = await run({
       runs: [{ ...GREEN_VISUAL_ON_HEAD, headSha: EARLIER_PR_SHA }],
@@ -294,9 +317,8 @@ describe("checks-already-green-on-pr sin WORKFLOW_FILE", () => {
     const binDir = await installFakeGh(workDir);
     const runsFile = path.join(workDir, "runs.json");
     await writeFile(runsFile, "[]");
-    const inheritedEnv = Object.fromEntries(
-      Object.entries(process.env).filter(([name]) => name !== "WORKFLOW_FILE"),
-    );
+    const inheritedEnv: NodeJS.ProcessEnv = { ...process.env };
+    delete inheritedEnv.WORKFLOW_FILE;
 
     await spawnScript(workDir, {
       ...inheritedEnv,

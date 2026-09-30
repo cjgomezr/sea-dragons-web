@@ -378,7 +378,7 @@ describe("main no repite el trabajo del PR", () => {
     const { on, jobs } = readWorkflow(VISUAL);
 
     expect(on.push?.branches).toContain("main");
-    expect(jobs.compare?.if).toMatch(/push/);
+    expect(jobs.compare?.if).toContain("github.event_name == 'push'");
     expect(jobs["report-incident"]).toBeDefined();
   });
 });

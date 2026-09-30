@@ -487,12 +487,16 @@ describe("main no repite la visual que el PR ya pasó (#441)", () => {
     expect(compare?.if).toContain(SKIP_UNLESS_VERIFIED);
   });
 
-  // En un pull request el job de la pregunta no arranca, y sin `always()`
-  // Actions saltaría también `compare`, que dejaría todos los PRs sin visual.
+  // En un pull request el job de la pregunta no arranca, y sin una función de
+  // estado Actions saltaría también `compare`: todos los PRs sin visual. Tiene
+  // que ser `!cancelled()` y no `always()`: al cancelar una corrida, GitHub no
+  // corta un job cuyo `if` sigue dando true, y con `always()` un push nuevo al
+  // PR dejaría las cuatro partes viejas contra `seadragons-dev` (#416).
   it("compare sigue corriendo en pull_request, donde la pregunta no se hace", () => {
     const condition = parseWorkflow().jobs.compare?.if ?? "";
 
-    expect(condition).toMatch(/always\(\)/);
+    expect(condition).toMatch(/!cancelled\(\)/);
+    expect(condition).not.toMatch(/always\(\)/);
     expect(condition).toMatch(/github\.event_name == 'pull_request'/);
     expect(condition).toMatch(/github\.event_name == 'push'/);
   });

@@ -157,12 +157,15 @@ jobs:
   # lo comprueba en el job `reparto`.
   compare:
     needs: [arbol-ya-verificado]
-    # `always()` porque en un pull request la pregunta no arranca, y sin una
-    # función de estado Actions exige que la dependencia haya salido bien: la
-    # visual se saltaría en todos los PRs. Un `compare` saltado queda
-    # `skipped`, así que ni `visual-diff` ni `report-incident` arrancan.
+    # En un pull request la pregunta no arranca, y sin una función de estado
+    # Actions exige que la dependencia haya salido bien: la visual se saltaría
+    # en todos los PRs. `!cancelled()` y no `always()`: al cancelar una
+    # corrida, GitHub no corta un job cuyo `if` sigue dando true, así que con
+    # `always()` un push nuevo al PR dejaría las cuatro partes viejas corriendo
+    # contra `seadragons-dev` (#416). Un `compare` saltado queda `skipped`, y
+    # ni `visual-diff` ni `report-incident` arrancan.
     if: >-
-      always()
+      !cancelled()
       && (github.event_name == 'pull_request' || github.event_name == 'push')
       && needs.arbol-ya-verificado.outputs.ya_verificado != 'true'
     runs-on: ubuntu-latest
