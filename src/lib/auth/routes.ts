@@ -409,6 +409,28 @@ export const ATTENDANCE_CLUB_RATE_API_PATH = `${ATTENDANCE_API_PATH}/club-rate`;
  * decida, y ahí toca compararlo por igualdad en vez de por prefijo. */
 export const EMAIL_CONFIRMATION_PATH = "/auth/confirmar";
 
+/** Los iconos del club (#421): `src/app/icon.tsx` y `src/app/apple-icon.tsx`
+ * los sirven bajo estos caminos, con la huella de la marca como último
+ * segmento. */
+export const CLUB_ICON_PATH = "/icon";
+export const CLUB_APPLE_ICON_PATH = "/apple-icon";
+
+/** El manifest de la pantalla de inicio (#421), de `src/app/manifest.ts`. */
+export const CLUB_MANIFEST_PATH = "/manifest.webmanifest";
+
+/**
+ * Lo que el navegador pide por su cuenta para pintar la pestaña, los
+ * marcadores y el acceso directo. Lo pide sin las cookies de la aplicación, y
+ * también desde la pantalla de entrada, así que exigirle sesión dejaba el
+ * icono roto. Como las pantallas públicas, abren lo que cuelga de ellos:
+ * los iconos llevan la huella como un segmento más.
+ */
+export const PUBLIC_BROWSER_ASSET_PATHS: readonly string[] = [
+  CLUB_ICON_PATH,
+  CLUB_APPLE_ICON_PATH,
+  CLUB_MANIFEST_PATH,
+];
+
 export const PUBLIC_PAGE_PATHS: readonly string[] = [
   SIGN_IN_PATH,
   REGISTRATION_PATH,

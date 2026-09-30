@@ -11,7 +11,7 @@ import sharp from "sharp";
 
 /** Un logo no necesita más de 4096 × 4096. El tope corta antes de
  * decodificar un PNG pequeño que se despliega en gigas de píxeles. */
-const LOGO_MAX_INPUT_PIXELS = 4096 * 4096;
+export const LOGO_MAX_INPUT_PIXELS = 4096 * 4096;
 
 export async function isDecodableLogo(bytes: Uint8Array): Promise<boolean> {
   try {

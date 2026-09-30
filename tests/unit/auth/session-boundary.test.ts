@@ -7,6 +7,9 @@ import {
   ATTENDANCE_PATH,
   ATTENDANCE_SESSIONS_API_PATH,
   ATTENDANCE_SHEET_API_PATH,
+  CLUB_APPLE_ICON_PATH,
+  CLUB_ICON_PATH,
+  CLUB_MANIFEST_PATH,
   COMPLETE_REGISTRATION_PATH,
   CONFIRMATION_EMAIL_API_PATH,
   DASHBOARD_PATH,
@@ -143,6 +146,24 @@ describe("frontera de sesión: sin sesión", () => {
     expect(
       decideSessionBoundary({ pathname: "/api/v1/healthcheck", ...ANONYMOUS }),
     ).toEqual({ kind: "unauthenticated" });
+  });
+
+  // #421: el navegador pide el icono y el manifest sin las cookies de la
+  // aplicación, y los pide también desde la pantalla de entrada.
+  it.each([
+    `${CLUB_ICON_PATH}/32-0123456789ab`,
+    `${CLUB_APPLE_ICON_PATH}/180-0123456789ab`,
+    CLUB_MANIFEST_PATH,
+  ])("deja pasar sin sesión el icono o el manifest %s", (pathname) => {
+    expect(decideSessionBoundary({ pathname, ...ANONYMOUS })).toEqual({
+      kind: "allow",
+    });
+  });
+
+  it("no confunde una pantalla que solo empieza igual que el icono", () => {
+    expect(
+      decideSessionBoundary({ pathname: "/iconos", ...ANONYMOUS }),
+    ).toEqual({ kind: "redirect", to: SIGN_IN_PATH });
   });
 
   it("no confunde una pantalla que solo empieza igual que una pública", () => {

@@ -620,6 +620,63 @@ test("el endpoint de salud sigue siendo público", async ({ request }) => {
   expect(response.status()).not.toBe(401);
 });
 
+// #421: la pestaña, los marcadores y el acceso directo del móvil enseñan la
+// marca del club. El navegador pide el icono y el manifest sin sesión, así
+// que se piden con un contexto sin cookies.
+test("la pantalla de entrada declara los iconos del club y se sirven sin sesión", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/entrar");
+
+  const iconLinks = page.locator('head link[rel="icon"]');
+  await expect(iconLinks).toHaveCount(2);
+  await expect(page.locator('head link[rel="apple-touch-icon"]')).toHaveCount(
+    1,
+  );
+  const hrefs = [
+    ...(await iconLinks.evaluateAll((links) =>
+      links.map((link) => link.getAttribute("href") ?? ""),
+    )),
+    (await page
+      .locator('head link[rel="apple-touch-icon"]')
+      .getAttribute("href")) ?? "",
+  ];
+  for (const href of hrefs) {
+    const response = await request.get(new URL(href, APP_URL).toString());
+    expect(response.status(), href).toBe(200);
+    expect(response.headers()["content-type"], href).toBe("image/png");
+    expect(response.headers()["cache-control"], href).toBe(
+      "public, max-age=86400",
+    );
+  }
+});
+
+test("la página declara un manifest con el nombre del club, servido sin sesión", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/entrar");
+
+  const href = await page
+    .locator('head link[rel="manifest"]')
+    .getAttribute("href");
+  const response = await request.get(new URL(href ?? "", APP_URL).toString());
+
+  expect(response.status()).toBe(200);
+  const manifest = (await response.json()) as {
+    name?: string;
+    icons?: { src: string; sizes: string }[];
+  };
+  expect(manifest.name).toBeTruthy();
+  expect(manifest.icons?.[0]?.sizes).toBe("512x512");
+  const icon = await request.get(
+    new URL(manifest.icons?.[0]?.src ?? "", APP_URL).toString(),
+  );
+  expect(icon.status()).toBe(200);
+  expect(icon.headers()["content-type"]).toBe("image/png");
+});
+
 /** La pantalla de entrada con el error de credenciales. La respuesta del
  * endpoint se sustituye por un doble: comprobar el mensaje no necesita hablar
  * con Supabase, y así este caso corre también donde no hay credenciales. */
