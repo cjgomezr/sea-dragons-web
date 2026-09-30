@@ -1,6 +1,7 @@
 import type { ClubIconMetadata } from "@/lib/club/club-icon";
 import {
   ANDROID_ICON_SIZE_PX,
+  TAB_ICON_SIZE_PX,
   describeServedClubIcons,
   serveClubIcon,
 } from "@/lib/club/serve-club-icon";
@@ -12,8 +13,6 @@ import {
 
 // Sin esto Next lo genera una vez en el build, con la marca de ese momento.
 export const dynamic = "force-dynamic";
-
-const TAB_ICON_SIZE_PX = 32;
 
 export function generateImageMetadata(): Promise<ClubIconMetadata[]> {
   return describeServedClubIcons([TAB_ICON_SIZE_PX, ANDROID_ICON_SIZE_PX]);

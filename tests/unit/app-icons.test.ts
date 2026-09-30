@@ -193,6 +193,85 @@ describe("icono de iOS (src/app/apple-icon)", () => {
   });
 });
 
+/** El logo que sube un club: un dibujo con fondo transparente alrededor. */
+async function transparentLogoPng(): Promise<Uint8Array> {
+  return sharp({
+    create: {
+      width: 64,
+      height: 64,
+      channels: 4,
+      background: { r: 200, g: 20, b: 20, alpha: 0 },
+    },
+  })
+    .png()
+    .toBuffer();
+}
+
+async function cornerPixel(
+  response: Response,
+): Promise<{ r: number; g: number; b: number; alpha: number }> {
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const { data } = await sharp(bytes)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  return {
+    r: data[0] ?? -1,
+    g: data[1] ?? -1,
+    b: data[2] ?? -1,
+    alpha: data[3] ?? -1,
+  };
+}
+
+function serveLogo(logo: Uint8Array): void {
+  servedBrand.current = { ...BRAND_WITHOUT_LOGO, logoUrl: LOGO_URL };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(new Uint8Array(logo))),
+  );
+}
+
+describe("qué hay detrás del logo en cada icono", () => {
+  it("la pestaña (32 px) deja el logo sobre nada, como la cabecera", async () => {
+    serveLogo(await transparentLogoPng());
+    const { id } = await iconEntryOfWidth(32);
+
+    const response = await iconRoute.default({ id: Promise.resolve(id) });
+
+    expect((await cornerPixel(response)).alpha).toBe(0);
+  });
+
+  it("el de Android (512 px) va sobre el acento, porque la máscara no admite transparencia", async () => {
+    serveLogo(await transparentLogoPng());
+    const { id } = await iconEntryOfWidth(512);
+
+    const response = await iconRoute.default({ id: Promise.resolve(id) });
+
+    expect(await cornerPixel(response)).toEqual({
+      r: 0x7b,
+      g: 0x3f,
+      b: 0xa0,
+      alpha: 255,
+    });
+  });
+
+  it("el de iOS (180 px) va sobre el acento, porque iOS rellena de negro la transparencia", async () => {
+    serveLogo(await transparentLogoPng());
+    const [entry] = await appleIconRoute.generateImageMetadata();
+
+    const response = await appleIconRoute.default({
+      id: Promise.resolve(entry?.id ?? ""),
+    });
+
+    expect(await cornerPixel(response)).toEqual({
+      r: 0x7b,
+      g: 0x3f,
+      b: 0xa0,
+      alpha: 255,
+    });
+  });
+});
+
 describe("manifest (src/app/manifest)", () => {
   it("lleva el nombre del club, su acento y el icono de 512 px", async () => {
     const icon512 = await iconEntryOfWidth(512);

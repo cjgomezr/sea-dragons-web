@@ -1,6 +1,8 @@
 import {
   CLUB_ICON_CONTENT_TYPE,
+  type ClubIconBrand,
   type ClubIconMetadata,
+  type IconSurface,
   type LogoBytesReader,
   clubIconSizeFromId,
   describeClubIcons,
@@ -13,8 +15,16 @@ import { readClubBrand } from "./supabase-club-brand";
  * la marca, traer el logo y responder el PNG.
  */
 
+/** El icono de la pestaña y los marcadores. */
+export const TAB_ICON_SIZE_PX = 32;
+
 /** El icono de Android: lo declaran `icon.tsx` y el manifest. */
 export const ANDROID_ICON_SIZE_PX = 512;
+
+/** En la pantalla de inicio el logo va sobre el acento con un margen de un
+ * octavo del lado: Android recorta el icono con una máscara (redonda o de
+ * esquinas redondeadas) y sin margen el logo saldría cortado. */
+const HOME_SCREEN_PADDING_SHARE = 0.125;
 
 /** Un día. La dirección lleva la huella de la marca, así que un logo nuevo no
  * espera a que caduque: es otra dirección. */
@@ -28,6 +38,23 @@ const FALLBACK_ICON_CACHE_CONTROL = "public, max-age=300";
 /** El icono sale con las iniciales antes de los dos segundos que pide el
  * ticket aunque el almacenamiento no conteste. */
 const LOGO_READ_TIMEOUT_MS = 1_500;
+
+/** La pestaña enseña el logo sobre nada, como la cabecera. Cualquier otro
+ * tamaño es de pantalla de inicio, y ahí iOS y Android no admiten
+ * transparencia. */
+export function surfaceForIcon(
+  sizePx: number,
+  brand: ClubIconBrand,
+): IconSurface {
+  if (sizePx === TAB_ICON_SIZE_PX) {
+    return { kind: "transparent" };
+  }
+  return {
+    kind: "solid",
+    color: brand.accentColor,
+    paddingShare: HOME_SCREEN_PADDING_SHARE,
+  };
+}
 
 /** El logo está en el cajón público `club-logos`: se trae por su dirección,
  * sin llave. */
@@ -47,9 +74,11 @@ export async function describeServedClubIcons(
 
 export async function serveClubIcon(id: Promise<string>): Promise<Response> {
   const [brand, iconId] = await Promise.all([readClubBrand(), id]);
+  const sizePx = clubIconSizeFromId(iconId);
   const icon = await renderClubIcon({
     brand,
-    sizePx: clubIconSizeFromId(iconId),
+    sizePx,
+    surface: surfaceForIcon(sizePx, brand),
     readLogoBytes: fetchLogoBytes,
     readTimeoutMs: LOGO_READ_TIMEOUT_MS,
   });
