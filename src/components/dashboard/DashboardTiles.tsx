@@ -30,12 +30,15 @@ import type { ClubMoment } from "@/lib/time/club-calendar";
  * ninguna, porque Asistencia es sólo de Admin y Coach.
  */
 
-/** Lo que pinta una tesela. Sin `href` no es un enlace. */
+/** Lo que pinta una tesela. Sin `href` no es un enlace. En el móvil la
+ * tarjeta del próximo entrenamiento ocupa el sitio de su tesela (el mockup
+ * del móvil no la tiene aparte), así que esa se esconde ahí. */
 type TileContent = {
   readonly label: string;
   readonly value: string;
   readonly caption: string | null;
   readonly href: string | null;
+  readonly isReplacedByCardOnMobile: boolean;
 };
 
 function unavailableTile(translate: Translator, label: string): TileContent {
@@ -44,6 +47,7 @@ function unavailableTile(translate: Translator, label: string): TileContent {
     value: translate("dashboard.unavailable"),
     caption: null,
     href: null,
+        isReplacedByCardOnMobile: false,
   };
 }
 
@@ -61,6 +65,7 @@ function describeAttendance(
             : translate("dashboard.tile.noData"),
         caption: translate("dashboard.tile.clubRate.caption"),
         href: ATTENDANCE_PATH,
+        isReplacedByCardOnMobile: false,
       };
     case "own_attendance":
       return {
@@ -76,6 +81,7 @@ function describeAttendance(
               })
             : null,
         href: null,
+        isReplacedByCardOnMobile: false,
       };
     case "unavailable":
       return unavailableTile(translate, translate("dashboard.tile.attendance"));
@@ -100,6 +106,7 @@ function describeMembers(
           })
         : null,
     href: DIRECTORY_PATH,
+        isReplacedByCardOnMobile: false,
   };
 }
 
@@ -147,6 +154,7 @@ function describeNextTraining(
           location: training.location,
         }),
         href: CALENDAR_PATH,
+        isReplacedByCardOnMobile: true,
       };
     }
     case "none":
@@ -155,6 +163,7 @@ function describeNextTraining(
         value: translate("dashboard.tile.nextTraining.none"),
         caption: null,
         href: CALENDAR_PATH,
+        isReplacedByCardOnMobile: false,
       };
     case "unavailable":
       return unavailableTile(translate, label);
@@ -182,6 +191,7 @@ function describeUnreadNews(
           })
         : null,
     href: NEWS_PATH,
+        isReplacedByCardOnMobile: false,
   };
 }
 
@@ -217,7 +227,13 @@ function Tile({
   );
   const describedBy = content.caption === null ? undefined : captionId;
   return (
-    <li className="dashboard-tile-item">
+    <li
+      className={
+        content.isReplacedByCardOnMobile
+          ? "dashboard-tile-item dashboard-tile-item--replaced-by-card"
+          : "dashboard-tile-item"
+      }
+    >
       {content.href === null ? (
         <div
           className="dashboard-tile"

@@ -12794,16 +12794,31 @@ test.describe("el inicio en el navegador", () => {
       .getByRole("listitem");
   }
 
-  test("a 375px las teselas van en dos filas de dos", async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
-
-    const boxes = await tileList(page).evaluateAll((tiles) =>
-      tiles.map((tile) => {
-        const { top, left } = tile.getBoundingClientRect();
-        return { top: Math.round(top), left: Math.round(left) };
-      }),
+  /** Las teselas que se ven, con su caja. Una escondida no cuenta. */
+  function visibleTileBoxes(
+    page: Page,
+  ): Promise<{ top: number; left: number; right: number }[]> {
+    return tileList(page).evaluateAll((tiles) =>
+      tiles
+        .filter((tile) => tile.getClientRects().length > 0)
+        .map((tile) => {
+          const { top, left, right } = tile.getBoundingClientRect();
+          return {
+            top: Math.round(top),
+            left: Math.round(left),
+            right: Math.round(right),
+          };
+        }),
     );
+  }
+
+  test("a 375px sin entrenamiento a la vista las teselas van en dos filas de dos", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToDashboard(page, { dashboard: EMPTY_DASHBOARD });
+
+    const boxes = await visibleTileBoxes(page);
 
     expect(boxes).toHaveLength(4);
     const [first, second, third, fourth] = boxes;
@@ -12811,6 +12826,27 @@ test.describe("el inicio en el navegador", () => {
     expect(fourth?.top).toBe(third?.top);
     expect(third?.top).toBeGreaterThan(first?.top ?? 0);
     expect(third?.left).toBe(first?.left);
+  });
+
+  test("a 375px la tarjeta ocupa el sitio de la tesela del entrenamiento y la última va a todo el ancho", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
+
+    const boxes = await visibleTileBoxes(page);
+
+    // Tres teselas: la del entrenamiento la sustituye la tarjeta, que es
+    // donde está el RSVP, para no contar el mismo entrenamiento dos veces.
+    expect(boxes).toHaveLength(3);
+    const [first, second, third] = boxes;
+    expect(second?.top).toBe(first?.top);
+    expect(third?.top).toBeGreaterThan(first?.top ?? 0);
+    expect(third?.left).toBe(first?.left);
+    expect(third?.right).toBe(second?.right);
+    await expect(
+      page.getByRole("region", { name: "Next training" }),
+    ).toBeVisible();
   });
 
   test("en el móvil la tarjeta lleva el RSVP y no hay Nuevo entrenamiento", async ({

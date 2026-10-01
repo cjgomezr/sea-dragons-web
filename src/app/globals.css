@@ -5419,8 +5419,8 @@ a.agenda-take-attendance {
 /* La pantalla de inicio (#426). Sigue docs/mockups/dashboard-light.png en
    escritorio y mobile-home-light.png en el móvil: el saludo, cuatro teselas
    (dos filas de dos en el móvil), y debajo Próximos y Últimas noticias. La
-   tarjeta del próximo entrenamiento con el RSVP es sólo del móvil, y
-   "Nuevo entrenamiento" sólo de escritorio. */
+   tarjeta del próximo entrenamiento con el RSVP es sólo del móvil, donde
+   ocupa el sitio de su tesela, y "Nuevo entrenamiento" sólo de escritorio. */
 .dashboard {
   display: flex;
   flex-direction: column;
@@ -5458,6 +5458,19 @@ a.agenda-take-attendance {
 
 .dashboard-tile-item {
   display: flex;
+}
+
+/* En el móvil la tarjeta del próximo entrenamiento sustituye a su tesela
+   (mobile-home-light.png no la tiene aparte), y la que sigue, noticias sin
+   leer, se queda sola en su fila y ocupa las dos columnas. Sin entrenamiento
+   a la vista no hay tarjeta, y las cuatro teselas se quedan en dos filas de
+   dos. */
+.dashboard-tile-item--replaced-by-card {
+  display: none;
+}
+
+.dashboard-tile-item--replaced-by-card + .dashboard-tile-item {
+  grid-column: 1 / -1;
 }
 
 .dashboard-tile {
@@ -5646,6 +5659,14 @@ a.dashboard-tile:hover {
 
   .dashboard-training-card {
     display: none;
+  }
+
+  .dashboard-tile-item--replaced-by-card {
+    display: flex;
+  }
+
+  .dashboard-tile-item--replaced-by-card + .dashboard-tile-item {
+    grid-column: auto;
   }
 
   .dashboard-tile {
