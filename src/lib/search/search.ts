@@ -22,6 +22,7 @@ import type { MemberGroupsGateway } from "@/lib/groups/member-groups";
 import type { NewsCategory } from "@/lib/news/news-posts";
 import { compareNames } from "@/lib/text/name-order";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
+import { SEARCH_GROUP_SIZE, SEARCH_TEXT_MIN_LENGTH } from "./search-limits";
 
 /**
  * La búsqueda global (#425, RF-7 del PRD de E14): socios, eventos y
@@ -34,11 +35,7 @@ import { clubCalendarDate } from "@/lib/time/club-calendar";
  * le llega siempre como un valor, nunca como parte de un patrón.
  */
 
-/** Cuántos resultados enseña cada grupo (RF-7). */
-export const SEARCH_GROUP_SIZE = 5;
-
-/** Con una sola letra coincide medio club: no es una búsqueda (RF-7). */
-export const SEARCH_TEXT_MIN_LENGTH = 2;
+export { SEARCH_GROUP_SIZE, SEARCH_TEXT_MIN_LENGTH };
 
 /** Lo que sobra se ignora en vez de rechazarse: nadie escribe un nombre de
  * más de 100 caracteres, y quien pega un párrafo sigue obteniendo algo. */
