@@ -1,6 +1,7 @@
 # Aplica las migraciones del repositorio en el Supabase de producción cuando un
-# merge a `main` trae alguna (RF-5 del PRD de E16a). Es la otra mitad de
-# `migrations.yml`: aquel comprueba en cada PR que el histórico aplica limpio
+# merge a `main` trae alguna, o cambia lo que las aplica y comprueba (RF-5
+# del PRD de E16a). Es la otra mitad de `migrations.yml`: aquel comprueba en
+# cada PR que el histórico aplica limpio
 # sobre un Postgres desechable, y este lo lleva a la base de verdad. Hasta hoy
 # ese último paso lo daba una persona por MCP desde su sesión, y era la única
 # pieza del despliegue que dependía de que alguien se acordara.
@@ -28,11 +29,11 @@ name: migraciones en producción
 on:
   push:
     branches: [main]
-    # Un merge que no toca las migraciones no tiene nada que hacer aquí. El
-    # histórico completo ya se comprobó en su PR, contra un Postgres limpio.
-    # El aplicador y el comprobador sí cuentan: un cambio en cómo se describe
-    # el esquema (#460) se verifica contra producción en el mismo merge, no
-    # en el siguiente que traiga una migración. Reaplicar es idempotente.
+    # Un merge que no toca las migraciones ni su aplicador o comprobador no
+    # tiene nada que hacer aquí: el histórico completo ya se comprobó en su
+    # PR, contra un Postgres limpio. Un cambio en cómo se describe el esquema
+    # (#460) sí se verifica contra producción en el mismo merge, no en el
+    # siguiente que traiga una migración. Reaplicar es idempotente.
     paths:
       - "supabase/migrations/**"
       - "supabase/ci/**"
