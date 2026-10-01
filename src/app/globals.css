@@ -5945,6 +5945,11 @@ a.dashboard-tile:hover {
     display: none;
   }
 
+  /* En el inicio reducido (#453) no hay tesela que la sustituya. */
+  .dashboard-training-card--read-only {
+    display: flex;
+  }
+
   .dashboard-tile-item--replaced-by-card {
     display: flex;
   }

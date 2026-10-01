@@ -4,6 +4,7 @@ import type { Role } from "@/lib/auth/roles";
 import { DASHBOARD_API_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
 import type { DashboardGateways } from "@/lib/dashboard/dashboard";
+import type { MembershipStatus } from "@/lib/membership/membership";
 
 /**
  * El dashboard por API (#424, RF-6 del PRD de E14): una sola petición para
@@ -20,6 +21,7 @@ const readSessionState = vi.fn();
 let memberExists: boolean;
 let role: Role;
 let clubRateFails: boolean;
+let membershipStatus: MembershipStatus;
 
 function unused(): never {
   throw new Error("el dashboard no escribe");
@@ -79,6 +81,20 @@ function dashboardGateways(): DashboardGateways {
       countActiveMembers: async () => ({ active: 1, joinedRecently: 1 }),
       findNewsSeenAt: async () => null,
     },
+    membership: {
+      findByUserId: async () => ({
+        userId: USER_ID,
+        clubId: CLUB_ID,
+        plan: "Full",
+        status: membershipStatus,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        currentPeriodEnd: null,
+        trialEnd: null,
+        card: null,
+        waiver: null,
+      }),
+    },
     failures: { report: () => undefined },
   };
 }
@@ -125,6 +141,7 @@ beforeEach(() => {
   memberExists = true;
   role = "Player";
   clubRateFails = false;
+  membershipStatus = "active";
 });
 
 describe("GET /api/v1/dashboard", () => {
@@ -170,6 +187,7 @@ describe("GET /api/v1/dashboard", () => {
 
     await expect(response.json()).resolves.toEqual({
       data: {
+        kind: "member",
         viewer: { firstName: "Alba" },
         tiles: {
           attendance: {
@@ -230,5 +248,24 @@ describe("GET /api/v1/dashboard", () => {
     );
 
     expect(response.status).toBe(405);
+  });
+});
+
+describe("GET /api/v1/dashboard sin la membresía al día (#453)", () => {
+  it("sirve el inicio reducido, sin teselas ni noticias", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: false });
+    membershipStatus = "past_due";
+
+    const response = await getDashboard();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        kind: "restricted",
+        viewer: { firstName: "Alba" },
+        block: "past_due",
+        nextTraining: { kind: "none" },
+      },
+    });
   });
 });

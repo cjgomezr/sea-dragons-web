@@ -8,7 +8,7 @@ import {
 } from "@/lib/auth/routes";
 import type {
   AttendanceTile,
-  Dashboard,
+  MemberDashboard,
   MembersTile,
   NextTrainingTile,
   UnreadNewsTile,
@@ -263,7 +263,7 @@ export function DashboardTiles({
   now,
 }: {
   readonly translate: Translator;
-  readonly tiles: Dashboard["tiles"];
+  readonly tiles: MemberDashboard["tiles"];
   /** La hora del club con la que se calculó la pantalla. */
   readonly now: ClubMoment;
 }): React.JSX.Element {

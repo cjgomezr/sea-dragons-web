@@ -152,6 +152,7 @@ describe("panel principal", () => {
           new Response(
             JSON.stringify({
               data: {
+                kind: "member",
                 viewer: { firstName: "Alba" },
                 tiles: {
                   attendance: { kind: "unavailable" },

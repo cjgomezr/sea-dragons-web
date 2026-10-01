@@ -13004,6 +13004,7 @@ const DASHBOARD_LATEST_NEWS = [
 ];
 
 const ADMIN_DASHBOARD = {
+  kind: "member",
   viewer: { firstName: "Liam" },
   tiles: {
     attendance: {
@@ -13031,6 +13032,7 @@ const PLAYER_DASHBOARD = {
 
 // Un club recién creado: lo que el PRD describe en sus casos borde.
 const EMPTY_DASHBOARD = {
+  kind: "member",
   viewer: { firstName: "Liam" },
   tiles: {
     attendance: { kind: "club_rate", rate: { kind: "no_data" } },

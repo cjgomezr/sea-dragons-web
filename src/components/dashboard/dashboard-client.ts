@@ -106,18 +106,34 @@ const latestNewsSchema = z.discriminatedUnion("kind", [
   unavailableSchema,
 ]);
 
-const dashboardResponseSchema = z.object({
-  data: z.object({
-    viewer: z.object({ firstName: z.string() }),
-    tiles: z.object({
-      attendance: attendanceTileSchema,
-      members: membersTileSchema,
-      nextTraining: nextTrainingTileSchema,
-      unreadNews: unreadNewsTileSchema,
-    }),
-    upcomingEvents: upcomingEventsSchema,
-    latestNews: latestNewsSchema,
+const viewerSchema = z.object({ firstName: z.string() });
+
+const memberDashboardSchema = z.object({
+  kind: z.literal("member"),
+  viewer: viewerSchema,
+  tiles: z.object({
+    attendance: attendanceTileSchema,
+    members: membersTileSchema,
+    nextTraining: nextTrainingTileSchema,
+    unreadNews: unreadNewsTileSchema,
   }),
+  upcomingEvents: upcomingEventsSchema,
+  latestNews: latestNewsSchema,
+});
+
+/** El de quien no tiene la membresía al día (#453). */
+const restrictedDashboardSchema = z.object({
+  kind: z.literal("restricted"),
+  viewer: viewerSchema,
+  block: z.enum(["pending", "past_due", "cancelled"]),
+  nextTraining: nextTrainingTileSchema,
+});
+
+const dashboardResponseSchema = z.object({
+  data: z.discriminatedUnion("kind", [
+    memberDashboardSchema,
+    restrictedDashboardSchema,
+  ]),
 });
 
 export type DashboardFailure = ApiRequestFailure;

@@ -8,8 +8,14 @@ import type { Role } from "@/lib/auth/roles";
 import {
   type DashboardGateways,
   type DashboardSource,
+  type MemberDashboard,
+  type RestrictedDashboard,
   readDashboard,
 } from "@/lib/dashboard/dashboard";
+import type {
+  MembershipRecord,
+  MembershipStatus,
+} from "@/lib/membership/membership";
 import type { EventType } from "@/lib/events/event-creation";
 import type {
   AgendaQuery,
@@ -49,6 +55,8 @@ type Club = {
   ownAttendance: MemberAttendance;
   activeMembers: { active: number; joinedRecently: number };
   newsSeenAt: string | null;
+  /** La membresía de quien mira; `null` si no tiene. */
+  membership: MembershipRecord | null;
   failing: Set<FakeSource>;
 };
 
@@ -225,6 +233,9 @@ function gateways(): DashboardGateways {
         return club.newsSeenAt;
       },
     },
+    membership: {
+      findByUserId: async () => club.membership,
+    },
     failures: {
       report: (source, error) => {
         reported.push({ source, error });
@@ -233,8 +244,43 @@ function gateways(): DashboardGateways {
   };
 }
 
-function dashboard(): ReturnType<typeof readDashboard> {
-  return readDashboard(gateways(), { callerId: CALLER_ID, now: NOW });
+function membershipWith(status: MembershipStatus): MembershipRecord {
+  return {
+    userId: CALLER_ID,
+    clubId: CLUB_ID,
+    plan: "Full",
+    status,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    currentPeriodEnd: null,
+    trialEnd: null,
+    card: null,
+    waiver: null,
+  };
+}
+
+/** El inicio de un socio al día, que es el de casi todos los tests. */
+async function dashboard(): Promise<MemberDashboard> {
+  const result = await readDashboard(gateways(), {
+    callerId: CALLER_ID,
+    now: NOW,
+  });
+  if (result.kind !== "member") {
+    throw new Error(`Se esperaba el inicio de socio y llegó ${result.kind}`);
+  }
+  return result;
+}
+
+/** El inicio de quien no tiene la membresía al día (#453). */
+async function restrictedDashboard(): Promise<RestrictedDashboard> {
+  const result = await readDashboard(gateways(), {
+    callerId: CALLER_ID,
+    now: NOW,
+  });
+  if (result.kind !== "restricted") {
+    throw new Error(`Se esperaba el inicio reducido y llegó ${result.kind}`);
+  }
+  return result;
 }
 
 beforeEach(() => {
@@ -250,6 +296,7 @@ beforeEach(() => {
     ownAttendance: { kind: "rate", percent: 75, sessions: 6 },
     activeMembers: { active: 1, joinedRecently: 0 },
     newsSeenAt: null,
+    membership: membershipWith("active"),
     failing: new Set(),
   };
 });
@@ -692,6 +739,7 @@ describe("vacío", () => {
     const result = await dashboard();
 
     expect(result).toEqual({
+      kind: "member",
       viewer: { firstName: "Alba" },
       tiles: {
         attendance: { kind: "own_attendance", attendance: { kind: "no_data" } },
@@ -711,5 +759,73 @@ describe("quien mira", () => {
     const result = await dashboard();
 
     expect(result.viewer).toEqual({ firstName: "Alba" });
+  });
+});
+
+describe("quien no tiene la membresía al día (#453)", () => {
+  it.each(["pending", "past_due", "cancelled"] as const)(
+    "a una membresía %s le da el saludo, el motivo y el próximo entrenamiento",
+    async (status) => {
+      club.membership = membershipWith(status);
+      club.events = [
+        event({ startsOn: "2026-10-01", startTime: "19:00", title: "Piscina" }),
+      ];
+
+      const result = await restrictedDashboard();
+
+      expect(result.viewer).toEqual({ firstName: "Alba" });
+      expect(result.block).toBe(status);
+      expect(result.nextTraining).toMatchObject({
+        kind: "training",
+        training: { title: "Piscina" },
+      });
+    },
+  );
+
+  it("no le da teselas de club ni noticias", async () => {
+    club.membership = membershipWith("pending");
+    club.posts = [post({ publishedAt: "2026-09-29T08:00:00.000Z" })];
+
+    const result = await restrictedDashboard();
+
+    expect(Object.keys(result).sort()).toEqual([
+      "block",
+      "kind",
+      "nextTraining",
+      "viewer",
+    ]);
+  });
+
+  it("cuenta como pendiente a quien no tiene membresía", async () => {
+    club.membership = null;
+
+    const result = await restrictedDashboard();
+
+    expect(result.block).toBe("pending");
+  });
+
+  it("dice que no hay entrenamiento cuando no hay ninguno a la vista", async () => {
+    club.membership = membershipWith("past_due");
+
+    const result = await restrictedDashboard();
+
+    expect(result.nextTraining).toEqual({ kind: "none" });
+  });
+
+  it("vale lo mismo para el personal: un Admin sin pagar ve el inicio reducido", async () => {
+    club.role = "Admin";
+    club.membership = membershipWith("cancelled");
+
+    const result = await restrictedDashboard();
+
+    expect(result.block).toBe("cancelled");
+  });
+
+  it("a quien está al día le da el inicio de siempre", async () => {
+    club.membership = membershipWith("trialing");
+
+    const result = await dashboard();
+
+    expect(result.kind).toBe("member");
   });
 });
