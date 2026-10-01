@@ -99,6 +99,8 @@ export type PlayerRecord = {
   readonly coverage: PositionCoverage | null;
   /** `null` sin evaluación; una lista vacía es una evaluación sin notas. */
   readonly ratings: readonly number[] | null;
+  /** Si su membresía está al día (#453): sin ella no entra en la escuadra. */
+  readonly membershipCurrent: boolean;
 };
 
 export type StoredTeamSplit = {
@@ -392,20 +394,14 @@ function distinctPositionIds(
   ].sort();
 }
 
-/** Los jugadores con esos ids ya listos para pintar, por id. */
-export async function readSquadEntries(
-  gateways: {
-    readonly teams: Pick<TeamSplitsGateway, "findPlayers">;
-    readonly positions: ClubPositionsGateway;
-  },
-  query: { readonly clubId: string; readonly userIds: readonly string[] },
+/** Los jugadores ya leídos, listos para pintar, por id. */
+async function toSquadEntries(
+  gateways: { readonly positions: ClubPositionsGateway },
+  clubId: string,
+  players: readonly PlayerRecord[],
 ): Promise<ReadonlyMap<string, SquadEntry>> {
-  if (query.userIds.length === 0) {
-    return new Map();
-  }
-  const players = await gateways.teams.findPlayers(query);
   const positions = await gateways.positions.findClubPositions(
-    query.clubId,
+    clubId,
     distinctPositionIds(players),
   );
   return new Map(
@@ -425,6 +421,21 @@ export async function readSquadEntries(
   );
 }
 
+/** Los jugadores con esos ids ya listos para pintar, por id. */
+export async function readSquadEntries(
+  gateways: {
+    readonly teams: Pick<TeamSplitsGateway, "findPlayers">;
+    readonly positions: ClubPositionsGateway;
+  },
+  query: { readonly clubId: string; readonly userIds: readonly string[] },
+): Promise<ReadonlyMap<string, SquadEntry>> {
+  if (query.userIds.length === 0) {
+    return new Map();
+  }
+  const players = await gateways.teams.findPlayers(query);
+  return toSquadEntries(gateways, query.clubId, players);
+}
+
 type Squad = {
   readonly available: readonly SquadEntry[];
   readonly maybe: readonly SquadEntry[];
@@ -436,22 +447,49 @@ function byName(first: SquadEntry, second: SquadEntry): number {
   return compareNames(first.fullName, second.fullName);
 }
 
-/** La escuadra del evento, más los asignados que ya no están en ella. */
+/** Los jugadores de esas respuestas y de esos asignados, en una lectura. */
+async function readSquadPlayers(
+  gateways: Pick<TeamBuilderGateways, "teams">,
+  query: {
+    readonly clubId: string;
+    readonly responses: readonly SquadResponse[];
+    readonly assignedIds: readonly string[];
+  },
+): Promise<readonly PlayerRecord[]> {
+  const userIds = [
+    ...new Set([
+      ...query.responses.map((row) => row.userId),
+      ...query.assignedIds,
+    ]),
+  ];
+  return userIds.length === 0
+    ? []
+    : gateways.teams.findPlayers({ clubId: query.clubId, userIds });
+}
+
+/** La escuadra del evento, más los asignados que ya no están en ella. Quien
+ * no tiene la membresía al día no entra aunque respondiera (#453, D2 del PRD
+ * de E12); si ya estaba asignado, sale como fuera de la escuadra. */
 async function readSquad(
   gateways: Pick<TeamBuilderGateways, "teams" | "positions">,
   event: TeamBuilderEvent,
   assignedIds: readonly string[] = [],
 ): Promise<Squad> {
   const responses = await gateways.teams.findLiveResponses(event.id);
-  const entries = await readSquadEntries(gateways, {
+  const players = await readSquadPlayers(gateways, {
     clubId: event.clubId,
-    userIds: [
-      ...new Set([...responses.map((row) => row.userId), ...assignedIds]),
-    ],
+    responses,
+    assignedIds,
   });
+  const entries = await toSquadEntries(gateways, event.clubId, players);
+  const currentIds = new Set(
+    players
+      .filter((player) => player.membershipCurrent)
+      .map((player) => player.userId),
+  );
   const withResponse = (response: SquadResponse["response"]): SquadEntry[] =>
     responses
-      .filter((row) => row.response === response)
+      .filter((row) => row.response === response && currentIds.has(row.userId))
       .flatMap((row) => entries.get(row.userId) ?? [])
       .sort(byName);
   return {
