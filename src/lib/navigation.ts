@@ -1,5 +1,7 @@
-import type { Role } from "@/lib/auth/roles";
-import { isAllowedForRole } from "@/lib/auth/session-boundary";
+import {
+  type ActiveAccess,
+  isAllowedForAccess,
+} from "@/lib/auth/session-boundary";
 import type { MessageKey } from "@/lib/i18n/message";
 import type { Translator } from "@/lib/i18n/translator";
 
@@ -82,11 +84,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   { labelKey: "nav.label.groups", href: "/grupos", icon: "grupos" },
 ];
 
-/** Las secciones que el rol puede abrir, en el orden de `NAV_SECTIONS`.
- * Esconder el resto es comodidad: quien escriba la dirección a mano se topa
- * igual con la frontera, que es la que decide. */
-export function getVisibleSections(role: Role): readonly NavSection[] {
-  return NAV_SECTIONS.filter((section) => isAllowedForRole(section.href, role));
+/** Las secciones que la cuenta puede abrir por su rol y su membresía (#453),
+ * en el orden de `NAV_SECTIONS`. Esconder el resto es comodidad: quien
+ * escriba la dirección a mano se topa igual con la frontera, que es la que
+ * decide. */
+export function getVisibleSections(
+  access: ActiveAccess,
+): readonly NavSection[] {
+  return NAV_SECTIONS.filter((section) =>
+    isAllowedForAccess(section.href, access),
+  );
 }
 
 export type MobileSections = {
@@ -100,12 +107,13 @@ export type MobileSections = {
 // "Más". Cuáles van fijas es una decisión de producto, no de layout: las de uso
 // diario (#22) que el rol puede abrir (#213). Cada ranura lista sus candidatas
 // por preferencia y se queda con la primera que el rol alcance: quien no ve
-// Equipos tiene Directorio en ese mismo hueco.
+// Equipos tiene Directorio en ese mismo hueco, y quien no tiene la membresía
+// al día y no ve Noticias tiene Pagos en el suyo (#453).
 const MOBILE_PRIMARY_SLOTS: readonly (readonly string[])[] = [
   ["/dashboard"],
   ["/calendario"],
   ["/equipos", "/directorio"],
-  ["/noticias"],
+  ["/noticias", "/pagos"],
 ];
 
 function pickSlotSection(
@@ -117,8 +125,8 @@ function pickSlotSection(
     .find((section) => section !== undefined);
 }
 
-export function getMobileSections(role: Role): MobileSections {
-  const visible = getVisibleSections(role);
+export function getMobileSections(access: ActiveAccess): MobileSections {
+  const visible = getVisibleSections(access);
   const primary = MOBILE_PRIMARY_SLOTS.map((candidates) =>
     pickSlotSection(candidates, visible),
   ).filter((section) => section !== undefined);

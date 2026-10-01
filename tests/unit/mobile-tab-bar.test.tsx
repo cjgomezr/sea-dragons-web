@@ -30,7 +30,9 @@ describe("barra móvil por rol", () => {
     "un %s tiene fijas Inicio, Agenda, Gente y Noticias, y el resto en Más",
     async (role, overflowLabels) => {
       usePathname.mockReturnValue("/dashboard");
-      render(<MobileTabBar locale="es" role={role} />);
+      render(
+        <MobileTabBar locale="es" access={{ role, membershipCurrent: true }} />,
+      );
 
       expect(fixedTabLabels()).toEqual([
         "Inicio",
@@ -44,7 +46,12 @@ describe("barra móvil por rol", () => {
 
   it("un Coach tiene fijas Inicio, Agenda, Equipos y Noticias, y en Más Directorio, Asistencia, Evaluaciones, Pagos y Grupos", async () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<MobileTabBar locale="es" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     expect(fixedTabLabels()).toEqual([
       "Inicio",
@@ -63,7 +70,12 @@ describe("barra móvil por rol", () => {
 
   it("un Admin tiene las fijas del Coach, y en Más Grupos pero ninguna Administración", async () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<MobileTabBar locale="en" role="Admin" />);
+    render(
+      <MobileTabBar
+        locale="en"
+        access={{ role: "Admin", membershipCurrent: true }}
+      />,
+    );
 
     expect(fixedTabLabels()).toEqual(["Home", "Events", "Teams", "News"]);
     expect(await openMoreAndListIt()).toEqual([
@@ -79,14 +91,24 @@ describe("barra móvil por rol", () => {
   // ancho y nombra la sección como la barra lateral.
   it("nombra Directorio completo en Más aunque su pestaña use la corta", async () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<MobileTabBar locale="en" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="en"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     expect(await openMoreAndListIt()).toContain("Directory");
   });
 
   it("marca Más cuando un Admin está en Grupos", () => {
     usePathname.mockReturnValue("/grupos");
-    render(<MobileTabBar locale="es" role="Admin" />);
+    render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Admin", membershipCurrent: true }}
+      />,
+    );
 
     expect(screen.getByRole("button", { name: "Más" })).toHaveAttribute(
       "aria-current",
@@ -98,7 +120,12 @@ describe("barra móvil por rol", () => {
 describe("barra de pestañas móvil", () => {
   it("muestra las cuatro secciones frecuentes como pestañas fijas", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<MobileTabBar locale="es" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     const tabs = screen.getAllByRole("link");
     expect(tabs.map((tab) => tab.textContent)).toEqual([
@@ -111,7 +138,12 @@ describe("barra de pestañas móvil", () => {
 
   it("la pestaña Inicio sigue enlazando a /dashboard aunque su etiqueta cambie (#85)", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<MobileTabBar locale="es" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     expect(screen.getByRole("link", { name: "Inicio" })).toHaveAttribute(
       "href",
@@ -121,7 +153,12 @@ describe("barra de pestañas móvil", () => {
 
   it("mantiene las secciones restantes fuera del alcance hasta abrir Más", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<MobileTabBar locale="es" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     expect(
       screen.queryByRole("link", { name: "Pagos" }),
@@ -135,7 +172,12 @@ describe("barra de pestañas móvil", () => {
   it("revela las secciones restantes al pulsar Más", async () => {
     const user = userEvent.setup();
     usePathname.mockReturnValue("/dashboard");
-    render(<MobileTabBar locale="es" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     await user.click(screen.getByRole("button", { name: "Más" }));
 
@@ -155,7 +197,12 @@ describe("barra de pestañas móvil", () => {
 
   it("marca como actual la pestaña que corresponde a la ruta activa, y solo esa", () => {
     usePathname.mockReturnValue("/calendario");
-    render(<MobileTabBar locale="es" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     const current = screen.getAllByRole("link", { current: "page" });
     expect(current).toHaveLength(1);
@@ -164,7 +211,12 @@ describe("barra de pestañas móvil", () => {
 
   it("marca el botón Más cuando la ruta activa vive en el desbordamiento", () => {
     usePathname.mockReturnValue("/pagos");
-    render(<MobileTabBar locale="es" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     expect(screen.getByRole("button", { name: "Más" })).toHaveAttribute(
       "aria-current",
@@ -177,7 +229,12 @@ describe("barra de pestañas móvil", () => {
 
   it("no marca nada cuando la ruta no pertenece al menú", () => {
     usePathname.mockReturnValue("/");
-    render(<MobileTabBar locale="es" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     expect(
       screen.queryByRole("link", { current: "page" }),
@@ -189,7 +246,12 @@ describe("barra de pestañas móvil", () => {
 
   it("muestra un icono decorativo además de la etiqueta en cada pestaña fija", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<MobileTabBar locale="es" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     const tabs = screen.getAllByRole("link");
     expect(tabs).toHaveLength(4);
@@ -202,7 +264,12 @@ describe("barra de pestañas móvil", () => {
 
   it("el nombre accesible de cada pestaña es solo su etiqueta, sin texto del icono", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<MobileTabBar locale="es" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     for (const label of ["Inicio", "Agenda", "Equipos", "Noticias"]) {
       expect(screen.getByRole("link", { name: label })).toHaveAccessibleName(
@@ -213,7 +280,12 @@ describe("barra de pestañas móvil", () => {
 
   it("el botón Más tiene icono propio, distinto de los de sección, y conserva aria-expanded", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<MobileTabBar locale="es" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     const moreButton = screen.getByRole("button", { name: "Más" });
     const moreIcon = moreButton.querySelector("svg");
@@ -236,7 +308,12 @@ describe("barra de pestañas móvil", () => {
 describe("navegación traducida en la barra móvil", () => {
   it("nombra las pestañas fijas en inglés", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<MobileTabBar locale="en" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="en"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     const tabs = screen.getAllByRole("link");
     expect(tabs.map((tab) => tab.textContent)).toEqual([
@@ -254,7 +331,12 @@ describe("navegación traducida en la barra móvil", () => {
   it("revela en inglés las secciones restantes al pulsar More", async () => {
     const user = userEvent.setup();
     usePathname.mockReturnValue("/dashboard");
-    render(<MobileTabBar locale="en" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="en"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     await user.click(screen.getByRole("button", { name: "More" }));
 
@@ -277,7 +359,12 @@ describe("navegación traducida en la barra móvil", () => {
     "nombra la barra en el idioma de la visita (%s)",
     (locale, name) => {
       usePathname.mockReturnValue("/dashboard");
-      render(<MobileTabBar locale={locale} role="Coach" />);
+      render(
+        <MobileTabBar
+          locale={locale}
+          access={{ role: "Coach", membershipCurrent: true }}
+        />,
+      );
 
       expect(screen.getByRole("navigation", { name })).toBeInTheDocument();
     },
@@ -290,7 +377,12 @@ describe("navegación traducida en la barra móvil", () => {
     "marca la pestaña de la ruta activa igual en los dos idiomas (%s)",
     (locale, label) => {
       usePathname.mockReturnValue("/calendario");
-      render(<MobileTabBar locale={locale} role="Coach" />);
+      render(
+        <MobileTabBar
+          locale={locale}
+          access={{ role: "Coach", membershipCurrent: true }}
+        />,
+      );
 
       const current = screen.getAllByRole("link", { current: "page" });
       expect(current).toHaveLength(1);
@@ -300,11 +392,33 @@ describe("navegación traducida en la barra móvil", () => {
 
   it("marca el botón More cuando la ruta activa vive en el desbordamiento", () => {
     usePathname.mockReturnValue("/pagos");
-    render(<MobileTabBar locale="en" role="Coach" />);
+    render(
+      <MobileTabBar
+        locale="en"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     expect(screen.getByRole("button", { name: "More" })).toHaveAttribute(
       "aria-current",
       "true",
     );
+  });
+});
+
+describe("barra móvil de quien no tiene la membresía al día (#453)", () => {
+  it("un Player tiene fijas Inicio, Agenda y Pagos, y ningún Más vacío", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Player", membershipCurrent: false }}
+      />,
+    );
+
+    expect(fixedTabLabels()).toEqual(["Inicio", "Agenda", "Pagos"]);
+    expect(
+      screen.queryByRole("button", { name: "Más" }),
+    ).not.toBeInTheDocument();
   });
 });

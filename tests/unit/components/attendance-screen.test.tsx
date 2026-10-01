@@ -843,7 +843,9 @@ describe("la fila como en el directorio (#414)", () => {
 
 describe("permisos", () => {
   it.each(ROLES)("el menú de un %s", (role) => {
-    render(<SidebarNav locale="en" role={role} />);
+    render(
+      <SidebarNav locale="en" access={{ role, membershipCurrent: true }} />,
+    );
 
     const link = screen.queryByRole("link", { name: "Attendance" });
     if (role === "Admin" || role === "Coach") {

@@ -90,6 +90,17 @@ describe("disposición de la aplicación", () => {
     expect(sidebar).not.toHaveTextContent("Administration");
   });
 
+  it("dibuja la navegación reducida de un Player que no está al día (#453)", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: false });
+
+    await renderAppLayout();
+
+    const sidebar = screen.getByRole("navigation", { name: "Main" });
+    expect(sidebar).toHaveTextContent("Payments");
+    expect(sidebar).not.toHaveTextContent("Directory");
+    expect(sidebar).not.toHaveTextContent("News");
+  });
+
   it("manda a la entrada a quien ya no tiene sesión", async () => {
     givenSession({ kind: "anonymous" });
 

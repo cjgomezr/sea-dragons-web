@@ -20,7 +20,12 @@ const MEMBER_LABELS = [
 describe("secciones por rol", () => {
   it("un Player ve Panel, Directorio, Calendario, Noticias y Pagos, sin Grupos", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<SidebarNav locale="es" role="Player" />);
+    render(
+      <SidebarNav
+        locale="es"
+        access={{ role: "Player", membershipCurrent: true }}
+      />,
+    );
 
     expect(renderedLabels()).toEqual(MEMBER_LABELS);
     expect(
@@ -33,7 +38,12 @@ describe("secciones por rol", () => {
 
   it("un Committee ve lo del Player y además Grupos, y no Administración", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<SidebarNav locale="es" role="Committee" />);
+    render(
+      <SidebarNav
+        locale="es"
+        access={{ role: "Committee", membershipCurrent: true }}
+      />,
+    );
 
     expect(renderedLabels()).toEqual([...MEMBER_LABELS, "Grupos"]);
     expect(
@@ -43,7 +53,12 @@ describe("secciones por rol", () => {
 
   it("un Coach ve además Asistencia, Equipos, Evaluaciones y Grupos, y no Administración", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<SidebarNav locale="es" role="Coach" />);
+    render(
+      <SidebarNav
+        locale="es"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />,
+    );
 
     expect(renderedLabels()).toEqual([
       "Dashboard",
@@ -60,7 +75,12 @@ describe("secciones por rol", () => {
 
   it("un Admin ve todas las secciones y Grupos, y ninguna Administración", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<SidebarNav locale="es" role="Admin" />);
+    render(
+      <SidebarNav
+        locale="es"
+        access={{ role: "Admin", membershipCurrent: true }}
+      />,
+    );
 
     expect(renderedLabels()).toEqual([
       "Dashboard",
@@ -86,7 +106,12 @@ describe("secciones por rol", () => {
 describe("navegación", () => {
   it("enlaza cada sección a su ruta", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<SidebarNav locale="es" role="Player" />);
+    render(
+      <SidebarNav
+        locale="es"
+        access={{ role: "Player", membershipCurrent: true }}
+      />,
+    );
 
     expect(screen.getByRole("link", { name: "Calendario" })).toHaveAttribute(
       "href",
@@ -96,7 +121,12 @@ describe("navegación", () => {
 
   it("no marca ninguna sección como actual fuera del menú", () => {
     usePathname.mockReturnValue("/");
-    render(<SidebarNav locale="es" role="Player" />);
+    render(
+      <SidebarNav
+        locale="es"
+        access={{ role: "Player", membershipCurrent: true }}
+      />,
+    );
 
     expect(
       screen.queryByRole("link", { current: "page" }),
@@ -107,7 +137,12 @@ describe("navegación", () => {
 describe("navegación traducida", () => {
   it("nombra las secciones en inglés sin cambiar a dónde llevan", () => {
     usePathname.mockReturnValue("/dashboard");
-    render(<SidebarNav locale="en" role="Admin" />);
+    render(
+      <SidebarNav
+        locale="en"
+        access={{ role: "Admin", membershipCurrent: true }}
+      />,
+    );
 
     const links = screen.getAllByRole("link");
     expect(links.map((link) => link.textContent)).toEqual([
@@ -134,7 +169,12 @@ describe("navegación traducida", () => {
     "nombra el menú en el idioma de la visita (%s)",
     (locale, name) => {
       usePathname.mockReturnValue("/dashboard");
-      render(<SidebarNav locale={locale} role="Player" />);
+      render(
+        <SidebarNav
+          locale={locale}
+          access={{ role: "Player", membershipCurrent: true }}
+        />,
+      );
 
       expect(screen.getByRole("navigation", { name })).toBeInTheDocument();
     },
@@ -147,11 +187,42 @@ describe("navegación traducida", () => {
     "marca como actual la sección de la ruta activa, y solo esa (%s)",
     (locale, label) => {
       usePathname.mockReturnValue("/calendario");
-      render(<SidebarNav locale={locale} role="Player" />);
+      render(
+        <SidebarNav
+          locale={locale}
+          access={{ role: "Player", membershipCurrent: true }}
+        />,
+      );
 
       const current = screen.getAllByRole("link", { current: "page" });
       expect(current).toHaveLength(1);
       expect(current[0]).toHaveTextContent(label);
     },
   );
+});
+
+describe("secciones de quien no tiene la membresía al día (#453)", () => {
+  it("un Player solo ve Dashboard, Calendario y Pagos", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(
+      <SidebarNav
+        locale="es"
+        access={{ role: "Player", membershipCurrent: false }}
+      />,
+    );
+
+    expect(renderedLabels()).toEqual(["Dashboard", "Calendario", "Pagos"]);
+  });
+
+  it("un Admin conserva el Directorio, que gestiona", () => {
+    usePathname.mockReturnValue("/dashboard");
+    render(
+      <SidebarNav
+        locale="es"
+        access={{ role: "Admin", membershipCurrent: false }}
+      />,
+    );
+
+    expect(renderedLabels()).toContain("Directorio");
+  });
 });

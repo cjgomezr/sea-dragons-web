@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import type { Role } from "@/lib/auth/roles";
+import type { ActiveAccess } from "@/lib/auth/session-boundary";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
 import {
@@ -21,15 +21,15 @@ const OVERFLOW_PANEL_ID = "app-tabbar-overflow";
 // remains a Server Component.
 export function MobileTabBar({
   locale,
-  role,
+  access,
 }: {
   locale: Locale;
-  role: Role;
+  access: ActiveAccess;
 }): React.JSX.Element {
   const pathname = usePathname();
   const translate = createTranslator(locale);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
-  const { primary, overflow } = getMobileSections(role);
+  const { primary, overflow } = getMobileSections(access);
 
   const hasActiveOverflowSection = overflow.some((section) =>
     isSectionActive(section.href, pathname),
@@ -72,20 +72,24 @@ export function MobileTabBar({
             </li>
           );
         })}
-        <li>
-          <button
-            type="button"
-            aria-controls={OVERFLOW_PANEL_ID}
-            aria-expanded={isOverflowOpen}
-            // "true", not "page": the current page is inside this group, it is
-            // not this control.
-            aria-current={hasActiveOverflowSection ? "true" : undefined}
-            onClick={() => setIsOverflowOpen((isOpen) => !isOpen)}
-          >
-            <OverflowIcon />
-            {translate("nav.more")}
-          </button>
-        </li>
+        {/* Sin nada que desbordar no hay Más: quien no tiene la membresía
+            al día cabe entero en las pestañas fijas (#453). */}
+        {overflow.length === 0 ? null : (
+          <li>
+            <button
+              type="button"
+              aria-controls={OVERFLOW_PANEL_ID}
+              aria-expanded={isOverflowOpen}
+              // "true", not "page": the current page is inside this group, it is
+              // not this control.
+              aria-current={hasActiveOverflowSection ? "true" : undefined}
+              onClick={() => setIsOverflowOpen((isOpen) => !isOpen)}
+            >
+              <OverflowIcon />
+              {translate("nav.more")}
+            </button>
+          </li>
+        )}
       </ul>
     </nav>
   );

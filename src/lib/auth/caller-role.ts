@@ -2,13 +2,14 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import type { Role } from "./roles";
 import { COMPLETE_REGISTRATION_PATH, SIGN_IN_PATH } from "./routes";
+import type { ActiveAccess } from "./session-boundary";
 import { readSessionState, readSessionUserId } from "./session-reader";
 import { describeMissingAuthKeys } from "./supabase-auth-gateways";
 import { readServerCookies } from "@/lib/supabase/server-cookies";
 import { createSessionClient } from "@/lib/supabase/session-client";
 
 /**
- * El rol de quien pide la pantalla, leído en el servidor con la misma lectura
+ * El rol y la membresía de quien pide la pantalla (#453), leídos en el servidor con la misma lectura
  * que usa la frontera y no pedido al navegador: una cookie o un prop que el
  * cliente pudiera tocar decidiría qué se le ofrece.
  *
@@ -16,11 +17,11 @@ import { createSessionClient } from "@/lib/supabase/session-client";
  * casos son una carrera con ella (la sesión se cerró o cambió entre medias) y
  * se resuelven igual que ella los resolvería.
  *
- * Lo leen la cáscara (#213) y las pantallas que enseñan algo según el rol,
- * como el botón de publicar (#330). `cache` hace que sea una sola lectura por
- * petición aunque la pidan los dos.
+ * Lo leen la cáscara (#213) y las pantallas que enseñan algo según el rol o
+ * la membresía, como el botón de publicar (#330) o el RSVP (#453). `cache`
+ * hace que sea una sola lectura por petición aunque la pidan varias.
  */
-export const readCallerRole = cache(async (): Promise<Role> => {
+export const readCallerAccess = cache(async (): Promise<ActiveAccess> => {
   const session = createSessionClient(process.env, await readServerCookies());
   if (session.kind === "unconfigured") {
     throw new Error(describeMissingAuthKeys(session.missingKeys));
@@ -28,13 +29,18 @@ export const readCallerRole = cache(async (): Promise<Role> => {
   const state = await readSessionState(session.client);
   switch (state.kind) {
     case "active":
-      return state.role;
+      return { role: state.role, membershipCurrent: state.membershipCurrent };
     case "incomplete":
       redirect(COMPLETE_REGISTRATION_PATH);
     case "anonymous":
       redirect(SIGN_IN_PATH);
   }
 });
+
+/** Sólo el rol, para las pantallas a las que la membresía no les cambia nada. */
+export const readCallerRole = cache(
+  async (): Promise<Role> => (await readCallerAccess()).role,
+);
 
 /**
  * El id de quien pide la pantalla, leído igual que el rol: en el servidor y

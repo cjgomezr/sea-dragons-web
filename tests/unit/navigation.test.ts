@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { ROLES, type Role } from "@/lib/auth/roles";
-import { decideSessionBoundary } from "@/lib/auth/session-boundary";
+import {
+  type ActiveAccess,
+  decideSessionBoundary,
+} from "@/lib/auth/session-boundary";
 import { createTranslator } from "@/lib/i18n/translator";
 import {
   NAV_SECTIONS,
@@ -10,6 +13,16 @@ import {
   getVisibleSections,
   isSectionActive,
 } from "@/lib/navigation";
+
+/** Un socio de ese rol con la membresía al día: el menú de siempre. */
+function currentAs(role: Role): ActiveAccess {
+  return { role, membershipCurrent: true };
+}
+
+/** Un socio de ese rol cuya membresía no está al día (#453). */
+function notCurrentAs(role: Role): ActiveAccess {
+  return { role, membershipCurrent: false };
+}
 
 const english = createTranslator("en");
 const spanish = createTranslator("es");
@@ -110,12 +123,14 @@ const MEMBER_SECTIONS = [
 // cambio de rol viven ahí, y la navegación ya no tiene a dónde llevar.
 describe("navegación", () => {
   it.each(ROLES)("no ofrece ninguna sección Administración a un %s", (role) => {
-    const labels = getVisibleSections(role).map((section) =>
+    const labels = getVisibleSections(currentAs(role)).map((section) =>
       getSectionLabel(section, english),
     );
 
     expect(labels).not.toContain("Administration");
-    expect(hrefsOf(getVisibleSections(role))).not.toContain("/administracion");
+    expect(hrefsOf(getVisibleSections(currentAs(role)))).not.toContain(
+      "/administracion",
+    );
   });
 
   it("no guarda la sección en ninguna lista, ni para quien la pudiera abrir", () => {
@@ -126,29 +141,35 @@ describe("navegación", () => {
 // FR-013 (#213): la navegación ofrece sólo lo que la frontera deja abrir.
 describe("secciones por rol", () => {
   it("un Player ve Panel, Directorio, Calendario, Noticias y Pagos", () => {
-    expect(hrefsOf(getVisibleSections("Player"))).toEqual(MEMBER_SECTIONS);
+    expect(hrefsOf(getVisibleSections(currentAs("Player")))).toEqual(
+      MEMBER_SECTIONS,
+    );
   });
 
   it.each(["Player", "Committee"] as const)(
     "un %s no ve Asistencia, que su rol no registra",
     (role) => {
-      expect(hrefsOf(getVisibleSections(role))).not.toContain("/asistencia");
+      expect(hrefsOf(getVisibleSections(currentAs(role)))).not.toContain(
+        "/asistencia",
+      );
     },
   );
 
   it("un Player no ve Grupos, que su rol no gestiona", () => {
-    expect(hrefsOf(getVisibleSections("Player"))).not.toContain("/grupos");
+    expect(hrefsOf(getVisibleSections(currentAs("Player")))).not.toContain(
+      "/grupos",
+    );
   });
 
   it("un Committee ve lo mismo que un Player, y además Grupos", () => {
-    expect(hrefsOf(getVisibleSections("Committee"))).toEqual([
+    expect(hrefsOf(getVisibleSections(currentAs("Committee")))).toEqual([
       ...MEMBER_SECTIONS,
       "/grupos",
     ]);
   });
 
   it("un Coach ve además Asistencia, Equipos, Evaluaciones y Grupos", () => {
-    expect(hrefsOf(getVisibleSections("Coach"))).toEqual([
+    expect(hrefsOf(getVisibleSections(currentAs("Coach")))).toEqual([
       "/dashboard",
       "/directorio",
       "/calendario",
@@ -162,7 +183,9 @@ describe("secciones por rol", () => {
   });
 
   it("un Admin ve todas las secciones", () => {
-    expect(hrefsOf(getVisibleSections("Admin"))).toEqual(hrefsOf(NAV_SECTIONS));
+    expect(hrefsOf(getVisibleSections(currentAs("Admin")))).toEqual(
+      hrefsOf(NAV_SECTIONS),
+    );
   });
 });
 
@@ -173,7 +196,7 @@ describe("barra móvil por rol", () => {
   ] as const)(
     "un %s tiene fijas Inicio, Eventos, Directorio y Noticias, y el resto en Más",
     (role, overflowHrefs) => {
-      const { primary, overflow } = getMobileSections(role);
+      const { primary, overflow } = getMobileSections(currentAs(role));
 
       expect(hrefsOf(primary)).toEqual([
         "/dashboard",
@@ -186,7 +209,7 @@ describe("barra móvil por rol", () => {
   );
 
   it("un Coach tiene fijas Inicio, Eventos, Equipos y Noticias, y en Más Directorio, Asistencia, Evaluaciones, Pagos y Grupos", () => {
-    const { primary, overflow } = getMobileSections("Coach");
+    const { primary, overflow } = getMobileSections(currentAs("Coach"));
 
     expect(hrefsOf(primary)).toEqual([
       "/dashboard",
@@ -204,10 +227,10 @@ describe("barra móvil por rol", () => {
   });
 
   it("un Admin tiene las mismas fijas y el mismo Más que un Coach", () => {
-    const { primary, overflow } = getMobileSections("Admin");
+    const { primary, overflow } = getMobileSections(currentAs("Admin"));
 
     expect(hrefsOf(primary)).toEqual(
-      hrefsOf(getMobileSections("Coach").primary),
+      hrefsOf(getMobileSections(currentAs("Coach")).primary),
     );
     expect(hrefsOf(overflow)).toEqual([
       "/directorio",
@@ -221,12 +244,14 @@ describe("barra móvil por rol", () => {
   it.each(ROLES)(
     "reparte las secciones visibles de un %s sin perder ni duplicar ninguna",
     (role) => {
-      const { primary, overflow } = getMobileSections(role);
+      const { primary, overflow } = getMobileSections(currentAs(role));
       const repartidas = hrefsOf([...primary, ...overflow]);
 
-      expect(repartidas).toHaveLength(getVisibleSections(role).length);
+      expect(repartidas).toHaveLength(
+        getVisibleSections(currentAs(role)).length,
+      );
       expect(new Set(repartidas)).toEqual(
-        new Set(hrefsOf(getVisibleSections(role))),
+        new Set(hrefsOf(getVisibleSections(currentAs(role)))),
       );
     },
   );
@@ -251,14 +276,16 @@ describe("navegación y matriz", () => {
         isOpenedByBoundary(section.href, role),
       );
 
-      expect(hrefsOf(getVisibleSections(role))).toEqual(hrefsOf(opened));
+      expect(hrefsOf(getVisibleSections(currentAs(role)))).toEqual(
+        hrefsOf(opened),
+      );
     },
   );
 
   it.each(ROLES)(
     "no pone en la barra móvil de un %s nada que la frontera le cierre",
     (role) => {
-      const { primary, overflow } = getMobileSections(role);
+      const { primary, overflow } = getMobileSections(currentAs(role));
 
       for (const section of [...primary, ...overflow]) {
         expect(isOpenedByBoundary(section.href, role)).toBe(true);
@@ -298,4 +325,63 @@ describe("etiqueta corta para la barra móvil (#85)", () => {
     expect(getMobileLabel(calendario, spanish)).toBe("Agenda");
     expect(getMobileLabel(calendario, english)).toBe("Events");
   });
+});
+
+describe("navegación de quien no tiene la membresía al día (#453)", () => {
+  it("a un Player le deja Inicio, Calendario y Pagos, y nada más", () => {
+    expect(hrefsOf(getVisibleSections(notCurrentAs("Player")))).toEqual([
+      "/dashboard",
+      "/calendario",
+      "/pagos",
+    ]);
+  });
+
+  it("a un Coach le deja además lo que gestiona, sin Directorio ni Noticias", () => {
+    expect(hrefsOf(getVisibleSections(notCurrentAs("Coach")))).toEqual([
+      "/dashboard",
+      "/calendario",
+      "/asistencia",
+      "/equipos",
+      "/evaluaciones",
+      "/pagos",
+      "/grupos",
+    ]);
+  });
+
+  it("a un Committee le deja Noticias, que publica, y no el Directorio", () => {
+    expect(hrefsOf(getVisibleSections(notCurrentAs("Committee")))).toEqual([
+      "/dashboard",
+      "/calendario",
+      "/noticias",
+      "/pagos",
+      "/grupos",
+    ]);
+  });
+
+  it("a un Admin le deja todas sus pantallas de gestión", () => {
+    expect(hrefsOf(getVisibleSections(notCurrentAs("Admin")))).toEqual(
+      hrefsOf(NAV_SECTIONS),
+    );
+  });
+
+  it("pone Pagos como pestaña fija del Player, sin nada en Más", () => {
+    const { primary, overflow } = getMobileSections(notCurrentAs("Player"));
+
+    expect(hrefsOf(primary)).toEqual(["/dashboard", "/calendario", "/pagos"]);
+    expect(overflow).toEqual([]);
+  });
+
+  it.each(ROLES)(
+    "a un %s no le ofrece nada que la frontera no le abra",
+    (role) => {
+      for (const section of getVisibleSections(notCurrentAs(role))) {
+        expect(
+          decideSessionBoundary({
+            pathname: section.href,
+            session: { kind: "active", ...notCurrentAs(role) },
+          }),
+        ).toEqual({ kind: "allow" });
+      }
+    },
+  );
 });

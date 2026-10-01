@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { Role } from "@/lib/auth/roles";
+import type { ActiveAccess } from "@/lib/auth/session-boundary";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
 import {
@@ -15,13 +15,13 @@ import {
 // Components cannot read; usePathname() is the documented reason this leaf
 // is a Client Component instead of the whole shell. For the same reason it
 // can't read the locale cookie itself, so the shell passes the locale down,
-// and the role the server read (#213).
+// and the role and membership the server read (#213, #453).
 export function SidebarNav({
   locale,
-  role,
+  access,
 }: {
   locale: Locale;
-  role: Role;
+  access: ActiveAccess;
 }): React.JSX.Element {
   const pathname = usePathname();
   const translate = createTranslator(locale);
@@ -29,7 +29,7 @@ export function SidebarNav({
   return (
     <nav aria-label={translate("nav.sidebarLabel")} className="app-nav">
       <ul>
-        {getVisibleSections(role).map((section) => {
+        {getVisibleSections(access).map((section) => {
           const isCurrent = isSectionActive(section.href, pathname);
           return (
             <li key={section.href}>
