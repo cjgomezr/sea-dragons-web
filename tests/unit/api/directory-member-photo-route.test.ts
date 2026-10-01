@@ -48,6 +48,7 @@ function memberRecord(
     isAufVerified: false,
     photoPath: THUMBNAIL_PATH,
     isEvaluated: true,
+    membershipStatus: "active",
     ...overrides,
   };
 }

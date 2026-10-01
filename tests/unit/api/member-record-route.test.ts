@@ -99,6 +99,7 @@ function memberRecordGateways(
               registeredAt: REGISTERED_AT,
               hasGuardianConsent: false,
               photoPath: memberPhotoPath,
+              membershipStatus: "active",
             }
           : null,
       findMemberGroups: async () =>
@@ -275,6 +276,7 @@ describe("PATCH /api/v1/members/{id}/record", () => {
         dateOfBirth: ADULT_BIRTH,
         registeredAt: REGISTERED_AT,
         hasGuardianConsent: false,
+        membershipStatus: "active",
         photoUrl: null,
         isAufExpired: false,
         groups: [{ id: SENIOR_ID, name: "Senior Squad" }],

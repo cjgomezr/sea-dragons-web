@@ -8,7 +8,9 @@ import {
   type MembershipPlan,
   type MembershipRecord,
   type MembershipStanding,
+  type MembershipStatus,
   type MembershipWaiver,
+  resolveStandingStatus,
 } from "./membership";
 
 /**
@@ -82,6 +84,16 @@ export function parseMembershipStanding(
     currentPeriodEnd: toDate(row.current_period_end),
     waivedUntil: toDate(row.waived_until),
   };
+}
+
+/** El estado que cuenta hoy de la membresía embebida, o `null` si el socio
+ * no tiene: lo que enseña el chip del Admin (#453). */
+export function readEmbeddedMembershipStatus(
+  embedded: unknown,
+  now: Date,
+): MembershipStatus | null {
+  const standing = parseMembershipStanding(embedded);
+  return standing === null ? null : resolveStandingStatus(standing, now);
 }
 
 function toDate(value: string | null): Date | null {

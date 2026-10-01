@@ -7,6 +7,7 @@ import {
 import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
 import { ROLES } from "@/lib/auth/roles";
 import { DIRECTORY_API_PATH } from "@/lib/auth/routes";
+import { MEMBERSHIP_STATUSES } from "@/lib/membership/membership";
 import type {
   DirectoryListing,
   DirectoryQuery,
@@ -61,11 +62,15 @@ const coachMemberSchema = memberSchema.extend({
   isEvaluated: z.boolean(),
 });
 
+/** El estado de la membresía del chip del Admin (#453), o `null` sin ella. */
+export const membershipStatusSchema = z.enum(MEMBERSHIP_STATUSES).nullable();
+
 const adminMemberSchema = coachMemberSchema.extend({
   aufNumber: z.string().nullable(),
   aufExpiry: z.string().nullable(),
   isAufVerified: z.boolean(),
   isAufExpired: z.boolean(),
+  membershipStatus: membershipStatusSchema,
 });
 
 /** La misma unión discriminada que sirve el endpoint: quien la consume no

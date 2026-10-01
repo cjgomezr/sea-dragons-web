@@ -14,6 +14,7 @@ import {
   findClubPosition,
   positionRank,
 } from "@/lib/club/club-positions";
+import type { MembershipStatus } from "@/lib/membership/membership";
 import type { ExperienceLevel } from "@/lib/members/profile-fields";
 import { isAufExpired } from "@/lib/members/member-record";
 import { matchesNameSearch } from "@/lib/text/name-search";
@@ -90,6 +91,9 @@ export type DirectoryMemberRecord = {
   readonly photoPath: string | null;
   /** Si tiene evaluación (#324). Sólo si existe: ninguna nota sale de aquí. */
   readonly isEvaluated: boolean;
+  /** El estado de su membresía tal como cuenta hoy (#453), o `null` si no
+   * tiene. Sólo lo ve un Admin. */
+  readonly membershipStatus: MembershipStatus | null;
 };
 
 /** La posición tal como la pinta el directorio: sus nombres, y la pantalla
@@ -120,12 +124,14 @@ export type CoachDirectoryMember = DirectoryMember & {
   readonly isEvaluated: boolean;
 };
 
-/** Lo del Coach, más el registro federativo, que sólo ve un Admin (BR-008). */
+/** Lo del Coach, más el registro federativo (BR-008) y el estado de la
+ * membresía (#453), que sólo ve un Admin. */
 export type AdminDirectoryMember = CoachDirectoryMember & {
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
   readonly isAufVerified: boolean;
   readonly isAufExpired: boolean;
+  readonly membershipStatus: MembershipStatus | null;
 };
 
 /** La lista, marcada con quién la está viendo. Quien la consume no tiene que
@@ -387,6 +393,7 @@ function toAdminDirectoryMember(
     aufExpiry: record.aufExpiry,
     isAufVerified: record.isAufVerified,
     isAufExpired: isAufExpired(record.aufExpiry, todayInClub),
+    membershipStatus: record.membershipStatus,
   };
 }
 

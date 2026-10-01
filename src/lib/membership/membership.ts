@@ -146,7 +146,12 @@ export function resolveMembership(
 }
 
 export function isMembershipCurrent(membership: Membership): boolean {
-  return CURRENT_STATUSES.has(membership.status);
+  return isStatusCurrent(membership.status);
+}
+
+/** Si un estado ya resuelto (sin exenciones vencidas) cuenta como al día. */
+export function isStatusCurrent(status: MembershipStatus): boolean {
+  return CURRENT_STATUSES.has(status);
 }
 
 /** El estado que cuenta hoy: el guardado, salvo una exención vencida, que

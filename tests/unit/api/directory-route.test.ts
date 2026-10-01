@@ -36,6 +36,7 @@ const MARIA: DirectoryMemberRecord = {
   isAufVerified: true,
   photoPath: null,
   isEvaluated: true,
+  membershipStatus: "active",
 };
 
 /** María vino a tres de cuatro; Zoe no tiene sesiones elegibles. */
@@ -60,6 +61,7 @@ const BAJA: DirectoryMemberRecord = {
   isAufVerified: false,
   photoPath: null,
   isEvaluated: true,
+  membershipStatus: "active",
 };
 
 const databaseCalls: string[] = [];

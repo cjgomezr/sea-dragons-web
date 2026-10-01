@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
 import type { AuditLogInsertRow } from "@/lib/audit/audit-log";
 import type { AccountStatus } from "@/lib/auth/account-status";
+import type { MembershipStatus } from "@/lib/membership/membership";
 import type { Role } from "@/lib/auth/roles";
 import { InactiveMemberError } from "@/lib/groups/group-members";
 import { GroupNotFoundError } from "@/lib/groups/groups";
@@ -76,6 +77,8 @@ type FakeOptions = {
   readonly photoSigning?: "signed" | "unsigned" | "failed";
   /** Lo que la base cuenta de su asistencia (#394). */
   readonly attendance?: MemberAttendance;
+  /** El estado de su membresía (#453); sin decirlo, activa. */
+  readonly membershipStatus?: MembershipStatus | null;
 };
 
 const MEMBER_ATTENDANCE: MemberAttendance = {
@@ -139,6 +142,10 @@ function fake(options: FakeOptions = {}): Fake {
               registeredAt: REGISTERED_AT,
               hasGuardianConsent: options.hasGuardianConsent ?? false,
               photoPath: options.photoPath ?? null,
+              membershipStatus:
+                options.membershipStatus === undefined
+                  ? "active"
+                  : options.membershipStatus,
             }
           : null;
       },
@@ -345,6 +352,7 @@ describe("ficha reservada al Admin: lectura", () => {
       dateOfBirth: ADULT_BIRTH,
       registeredAt: REGISTERED_AT,
       hasGuardianConsent: false,
+      membershipStatus: "active",
       photoUrl: null,
       isAufExpired: false,
       groups: [
@@ -435,6 +443,23 @@ describe("ficha reservada al Admin: lectura", () => {
       }),
     ).rejects.toBeInstanceOf(MemberRecordNotFoundError);
   });
+});
+
+describe("la membresía en la ficha (#453)", () => {
+  it.each<MembershipStatus | null>(["past_due", "waived", null])(
+    "trae el estado %s de la membresía del socio",
+    async (membershipStatus) => {
+      const { gateways } = fake({ membershipStatus });
+
+      const record = await readMemberRecord(gateways, {
+        callerId: ADMIN_ID,
+        userId: MEMBER_ID,
+        todayInClub: TODAY_IN_CLUB,
+      });
+
+      expect(record.membershipStatus).toBe(membershipStatus);
+    },
+  );
 });
 
 describe("la foto en la ficha", () => {

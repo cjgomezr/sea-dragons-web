@@ -538,6 +538,13 @@ export const spanishMessages: MessageCatalog = {
   "directory.mark.aufNotVerified": "AUF sin verificar",
   "directory.mark.aufVerified": "AUF verificado",
   "directory.mark.pendingActivation": "Pendiente de activar",
+  "directory.mark.membership.none": "Sin membresía",
+  "directory.mark.membership.pending": "Membresía pendiente",
+  "directory.mark.membership.trialing": "En prueba",
+  "directory.mark.membership.active": "Membresía activa",
+  "directory.mark.membership.pastDue": "Pago atrasado",
+  "directory.mark.membership.cancelled": "Membresía cancelada",
+  "directory.mark.membership.waived": "Membresía exenta",
   "directory.mark.notEvaluated": "Sin evaluar",
   "directory.mark.notEvaluatedLabel": "Sin evaluar: evaluar a {name}",
   "directory.error.signInRequired":

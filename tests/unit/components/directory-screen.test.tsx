@@ -74,6 +74,7 @@ const ZOE: AdminDirectoryMember = {
   isAufVerified: false,
   isAufExpired: false,
   isEvaluated: true,
+  membershipStatus: "active",
 };
 
 const VENCIDA: AdminDirectoryMember = {
@@ -91,6 +92,7 @@ const VENCIDA: AdminDirectoryMember = {
   isAufVerified: true,
   isAufExpired: true,
   isEvaluated: true,
+  membershipStatus: "active",
 };
 
 /** La misma socia, tal como la ve un Admin: con su registro federativo al día,
@@ -102,6 +104,7 @@ const MARIA_PARA_ADMIN: AdminDirectoryMember = {
   isAufVerified: true,
   isAufExpired: false,
   isEvaluated: true,
+  membershipStatus: "active",
 };
 
 /** El guion que ocupa el sitio de un dato que el socio no tiene. */
@@ -829,6 +832,60 @@ describe("incluir inactivos", () => {
     expect(
       within(memberRow("María Ñíguez")).queryByText("AUF expired"),
     ).toBeNull();
+  });
+});
+
+describe("chip de membresía (#453)", () => {
+  it("enseña a un Admin el estado de la membresía de cada fila", async () => {
+    stubApi({
+      kind: "admin",
+      members: [{ ...VENCIDA, membershipStatus: "pending" }, MARIA_PARA_ADMIN],
+    });
+
+    await renderScreen();
+
+    expect(
+      within(memberRow("Ana Admin")).getByText("Membership pending"),
+    ).toBeVisible();
+    expect(
+      within(memberRow("María Ñíguez")).getByText("Membership active"),
+    ).toBeVisible();
+  });
+
+  it("pinta como aviso la membresía que no está al día", async () => {
+    stubApi({
+      kind: "admin",
+      members: [{ ...MARIA_PARA_ADMIN, membershipStatus: "cancelled" }],
+    });
+
+    await renderScreen();
+
+    expect(
+      within(memberRow("María Ñíguez")).getByText("Membership cancelled"),
+    ).toHaveClass("directory-mark-warning");
+  });
+
+  it("no enseña la membresía a quien no es Admin", async () => {
+    stubApi({ kind: "member", members: [MARIA] });
+
+    await renderScreen();
+
+    expect(
+      within(memberRow("María Ñíguez")).queryByText(/Membership/),
+    ).toBeNull();
+  });
+
+  it("se escribe en español", async () => {
+    stubApi({
+      kind: "admin",
+      members: [{ ...MARIA_PARA_ADMIN, membershipStatus: "past_due" }],
+    });
+
+    await renderScreen("es");
+
+    expect(
+      within(memberRow("María Ñíguez")).getByText("Pago atrasado"),
+    ).toBeVisible();
   });
 });
 

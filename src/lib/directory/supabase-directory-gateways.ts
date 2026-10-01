@@ -6,6 +6,10 @@ import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gate
 import { createMemberAttendanceGateway } from "@/lib/attendance/supabase-attendance-stats";
 import type { ClubPositionsGateway } from "@/lib/club/club-positions";
 import { cachedClubPositions } from "@/lib/club/supabase-club-positions";
+import {
+  MEMBERSHIP_STANDING_EMBED,
+  readEmbeddedMembershipStatus,
+} from "@/lib/membership/supabase-membership-gateways";
 import { parseExperienceLevel } from "@/lib/members/profile-fields";
 import { signProfilePhotoUrls } from "@/lib/members/supabase-profile-photo-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
@@ -30,9 +34,10 @@ import type { DirectoryGateways, DirectoryMemberRecord } from "./directory";
 const MEMBERS_TABLE = "members";
 // Sólo el id de la evaluación: que exista es lo único que el directorio
 // cuenta (#324), y así ninguna nota sale de la base por este camino.
-export const DIRECTORY_COLUMNS =
-  "user_id, full_name, country, experience_level, role, position_id, account_status, auf_number, auf_expiry, auf_verified_at, photo_path, member_evaluations(id)";
+// La membresía va por el `left join` del chip del Admin (#453).
+export const DIRECTORY_COLUMNS = `user_id, full_name, country, experience_level, role, position_id, account_status, auf_number, auf_expiry, auf_verified_at, photo_path, member_evaluations(id), ${MEMBERSHIP_STANDING_EMBED}`;
 const EVALUATIONS_RELATION = "member_evaluations";
+const MEMBERSHIPS_RELATION = "memberships";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -79,7 +84,11 @@ function hasEvaluation(row: Row): boolean {
   return evaluations.length > 0;
 }
 
-export function toDirectoryMemberRecord(row: Row): DirectoryMemberRecord {
+/** `now` decide si una exención con fecha de fin ya venció (#453). */
+export function toDirectoryMemberRecord(
+  row: Row,
+  now: Date,
+): DirectoryMemberRecord {
   return {
     userId: readRequiredText(row, "user_id", MEMBERS_TABLE),
     fullName: readRequiredText(row, "full_name", MEMBERS_TABLE),
@@ -99,6 +108,10 @@ export function toDirectoryMemberRecord(row: Row): DirectoryMemberRecord {
     isAufVerified: readText(row, "auf_verified_at", MEMBERS_TABLE) !== null,
     photoPath: readText(row, "photo_path", MEMBERS_TABLE),
     isEvaluated: hasEvaluation(row),
+    membershipStatus: readEmbeddedMembershipStatus(
+      row[MEMBERSHIPS_RELATION],
+      now,
+    ),
   };
 }
 
@@ -121,7 +134,8 @@ export function createDirectoryGateways(
             `No se pudo leer el directorio del club ${clubId}: ${error.message}`,
           );
         }
-        return data.map(toDirectoryMemberRecord);
+        const now = new Date();
+        return data.map((row) => toDirectoryMemberRecord(row, now));
       },
     },
     positions,

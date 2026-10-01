@@ -545,6 +545,13 @@ export const englishMessages = {
   "directory.mark.aufNotVerified": "AUF not verified",
   "directory.mark.aufVerified": "AUF verified",
   "directory.mark.pendingActivation": "Pending activation",
+  "directory.mark.membership.none": "No membership",
+  "directory.mark.membership.pending": "Membership pending",
+  "directory.mark.membership.trialing": "On trial",
+  "directory.mark.membership.active": "Membership active",
+  "directory.mark.membership.pastDue": "Payment overdue",
+  "directory.mark.membership.cancelled": "Membership cancelled",
+  "directory.mark.membership.waived": "Membership waived",
   "directory.mark.notEvaluated": "Not evaluated",
   "directory.mark.notEvaluatedLabel": "Not evaluated: evaluate {name}",
   "directory.error.signInRequired":
