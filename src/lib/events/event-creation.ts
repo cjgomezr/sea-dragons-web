@@ -38,6 +38,10 @@ export const EVENT_TYPES = [
 
 export type EventType = (typeof EVENT_TYPES)[number];
 
+export function isEventType(value: string): value is EventType {
+  return EVENT_TYPES.some((type) => type === value);
+}
+
 /** Los mismos topes que los `check` de `0034_events.sql`. La pantalla los
  * usará para su formulario. */
 export const EVENT_TITLE_MAX_LENGTH = 80;

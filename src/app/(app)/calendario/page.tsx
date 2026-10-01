@@ -3,9 +3,11 @@ import { readCallerRole } from "@/lib/auth/caller-role";
 import { hasCapability } from "@/lib/auth/roles";
 import {
   CALENDAR_EVENT_QUERY_PARAM,
+  CALENDAR_NEW_EVENT_QUERY_PARAM,
   CALENDAR_PERIOD_QUERY_PARAM,
 } from "@/lib/auth/routes";
 import type { AgendaPeriod } from "@/lib/events/event-agenda";
+import { type EventType, isEventType } from "@/lib/events/event-creation";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 
 /**
@@ -17,7 +19,8 @@ import { readRequestLocale } from "@/lib/i18n/request-locale";
  *
  * `?evento=<id>` lleva el foco a la fila de ese evento, y `?periodo=past`
  * la busca entre los pasados: es a donde lleva un evento encontrado en la
- * búsqueda global (#427).
+ * búsqueda global (#427). `?nuevo=<tipo>` abre ya el formulario de crear con
+ * ese tipo (#426), a quien puede crear eventos.
  */
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -34,6 +37,12 @@ function readInitialPeriod(params: SearchParams): AgendaPeriod {
     : "upcoming";
 }
 
+/** Un parámetro repetido o un tipo que no existe no abren nada. */
+function readNewEventType(params: SearchParams): EventType | null {
+  const value = readSingle(params[CALENDAR_NEW_EVENT_QUERY_PARAM]);
+  return value !== null && isEventType(value) ? value : null;
+}
+
 export default async function CalendarioPage({
   searchParams,
 }: {
@@ -46,6 +55,7 @@ export default async function CalendarioPage({
   ]);
   const focusEventId = readSingle(params[CALENDAR_EVENT_QUERY_PARAM]);
   const initialPeriod = readInitialPeriod(params);
+  const canManageEvents = hasCapability(role, "createEvents");
   return (
     <AgendaScreen
       // Llegar a otro evento sin salir del calendario vuelve a montar la
@@ -54,8 +64,9 @@ export default async function CalendarioPage({
       initialPeriod={initialPeriod}
       focusEventId={focusEventId}
       locale={locale}
-      canManageEvents={hasCapability(role, "createEvents")}
+      canManageEvents={canManageEvents}
       canTakeAttendance={hasCapability(role, "buildTeamsAndTrackAttendance")}
+      openCreateWith={canManageEvents ? readNewEventType(params) : null}
     />
   );
 }

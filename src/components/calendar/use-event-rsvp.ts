@@ -25,8 +25,15 @@ export type EventRsvpState = {
   readonly failure: AgendaFailure | null;
 };
 
+/** Lo que hace falta de un evento para responder: lo tiene una fila de la
+ * agenda y también el próximo entrenamiento del inicio (#426). */
+export type RsvpTarget = Pick<
+  AgendaEvent,
+  "id" | "goingCount" | "maybeCount" | "myResponse"
+>;
+
 export function useEventRsvp(
-  event: AgendaEvent,
+  event: RsvpTarget,
   onOpened: (opened: OpenedEvent) => void,
 ): {
   readonly state: EventRsvpState;

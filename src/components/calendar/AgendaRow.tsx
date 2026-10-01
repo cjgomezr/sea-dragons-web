@@ -82,7 +82,8 @@ function TakeAttendanceLink({
   );
 }
 
-function DateBlock({
+/** El bloque de fecha de la fila; también lo usa el inicio (#426). */
+export function DateBlock({
   translate,
   startsOn,
 }: {

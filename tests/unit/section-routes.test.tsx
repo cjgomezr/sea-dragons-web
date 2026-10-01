@@ -1,8 +1,10 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Role } from "@/lib/auth/roles";
 import type { Locale } from "@/lib/i18n/locale";
 
 const requestLocale = { current: "en" as Locale };
+const callerRole = { current: "Player" as Role };
 
 vi.mock("@/lib/i18n/request-locale", () => ({
   readRequestLocale: async () => requestLocale.current,
@@ -11,6 +13,9 @@ vi.mock("@/lib/i18n/request-locale", () => ({
 // así que un nombre escrito a mano en la pantalla no pasaría.
 vi.mock("@/lib/club/supabase-club-brand", () => ({
   readClubBrand: async () => ({ name: "Hobart Orcas", initials: "HO" }),
+}));
+vi.mock("@/lib/auth/caller-role", () => ({
+  readCallerRole: async () => callerRole.current,
 }));
 
 const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");
@@ -26,14 +31,12 @@ async function renderIn(locale: Locale, Page: ServerPage): Promise<void> {
 
 /** Las secciones que siguen siendo un marcador de posición. El directorio
  * salió de aquí en #239, Noticias en #329, Evaluaciones en #322, el
- * Calendario en #311 y Equipos en #402, que les dieron su pantalla: lo que
- * enseña cada una se prueba en su test de `tests/unit/components/`. */
+ * Calendario en #311, Equipos en #402 y el Dashboard en #426, que les dieron
+ * su pantalla: lo que enseña cada una se prueba en su test de
+ * `tests/unit/components/`. */
 const SECTIONS: ReadonlyArray<
   readonly [english: string, spanish: string, Page: ServerPage]
-> = [
-  ["Dashboard", "Dashboard", DashboardPage],
-  ["Payments", "Pagos", PagosPage],
-];
+> = [["Payments", "Pagos", PagosPage]];
 
 describe("secciones", () => {
   it.each(SECTIONS)(
@@ -64,36 +67,89 @@ describe("secciones", () => {
 });
 
 describe("panel principal", () => {
-  it("explica en inglés qué es la plataforma y dónde mirar su estado", async () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // La pantalla pide el dashboard al montarse; aquí sólo importa qué ruta
+  // la pinta, así que la petición se queda sin responder.
+  function stubPendingDashboard(): void {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+  }
+
+  it.each<[string, ServerPage]>([
+    ["/", HomePage],
+    ["/dashboard", DashboardPage],
+  ])(
+    "%s pinta el dashboard y no el marcador del bootstrap",
+    async (_path, Page) => {
+      stubPendingDashboard();
+
+      await renderIn("en", Page);
+
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Dashboard" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Service status")).not.toBeInTheDocument();
+      expect(screen.queryByText(/under construction/i)).not.toBeInTheDocument();
+    },
+  );
+
+  /** Un dashboard vacío pero cargado: la cabecera, donde vive el botón, sólo
+   * se pinta cuando la petición ya llegó. */
+  function stubLoadedDashboard(): void {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              data: {
+                viewer: { firstName: "Alba" },
+                tiles: {
+                  attendance: { kind: "unavailable" },
+                  members: { kind: "unavailable" },
+                  nextTraining: { kind: "none" },
+                  unreadNews: { kind: "unavailable" },
+                },
+                upcomingEvents: { kind: "events", events: [] },
+                latestNews: { kind: "news", posts: [] },
+              },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+      ),
+    );
+  }
+
+  it("ofrece Nuevo entrenamiento al Admin cuando llega el dashboard", async () => {
+    callerRole.current = "Admin";
+    stubLoadedDashboard();
+
     await renderIn("en", HomePage);
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Hobart Orcas" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/underwater rugby club/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Service status" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "GET /api/v1/health" }),
-    ).toHaveAttribute("href", "/api/v1/health");
-  });
-
-  it("dice en español lo mismo que antes de traducirlo", async () => {
-    await renderIn("es", HomePage);
-
-    expect(
-      screen.getByText(
-        "Plataforma del club de rugby subacuático. Esta es la cáscara inicial: el resto de las funcionalidades llega epic por epic, cada una con sus tickets y su revisión.",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Estado del servicio" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "La API versionada responde en el endpoint de salud, que consulta la base de datos.",
-      ),
+      await screen.findByRole("link", { name: "New training" }),
     ).toBeInTheDocument();
   });
+
+  it.each<Role>(["Coach", "Committee", "Player"])(
+    "no ofrece Nuevo entrenamiento a un %s ni con el dashboard cargado",
+    async (role) => {
+      callerRole.current = role;
+      stubLoadedDashboard();
+
+      await renderIn("en", HomePage);
+
+      // Con la petición sin responder el botón no estaría para nadie: hay que
+      // esperar al saludo, que llega con la misma respuesta que la cabecera.
+      await screen.findByRole("heading", { level: 1, name: /Alba/ });
+      expect(
+        screen.queryByRole("link", { name: "New training" }),
+      ).not.toBeInTheDocument();
+    },
+  );
 });

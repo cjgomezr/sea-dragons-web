@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AgendaEvent, AgendaPeriod } from "@/lib/events/event-agenda";
+import type { EventType } from "@/lib/events/event-creation";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import {
@@ -221,17 +222,20 @@ function AgendaList({
   );
 }
 
-/** "+ Evento" y el diálogo que abre. Al cerrarse, el foco vuelve al botón. */
+/** "+ Evento" y el diálogo que abre. Al cerrarse, el foco vuelve al botón.
+ * Con `openWith` el diálogo ya llega abierto con ese tipo elegido. */
 function CreateEventButton({
   translate,
+  openWith,
   onOpen,
   onCreated,
 }: {
   readonly translate: Translator;
+  readonly openWith: EventType | null;
   readonly onOpen: () => void;
   readonly onCreated: (summary: CreatedSummary) => void;
 }): React.JSX.Element {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(openWith !== null);
   const openButtonRef = useRef<HTMLButtonElement>(null);
 
   function handleClosed(): void {
@@ -266,7 +270,11 @@ function CreateEventButton({
         <EventDialog
           translate={translate}
           layout="create"
-          initialForm={EMPTY_EVENT_FORM}
+          initialForm={
+            openWith === null
+              ? EMPTY_EVENT_FORM
+              : { ...EMPTY_EVENT_FORM, eventType: openWith }
+          }
           submit={submit}
           onClosed={handleClosed}
         />
@@ -424,6 +432,7 @@ export function AgendaScreen({
   canTakeAttendance,
   initialPeriod = "upcoming",
   focusEventId = null,
+  openCreateWith = null,
 }: {
   readonly locale: Locale;
   /** Si quien mira puede crear, editar y cancelar eventos. Sólo decide si se
@@ -439,6 +448,9 @@ export function AgendaScreen({
   /** El evento cuyo título recibe el foco al llegar, como el que se abrió
    * desde la búsqueda global (#427). */
   readonly focusEventId?: string | null;
+  /** El tipo con el que el formulario de crear llega ya abierto, como lo
+   * pide "Nuevo entrenamiento" desde el inicio (#426). */
+  readonly openCreateWith?: EventType | null;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [period, setPeriod] = useState<AgendaPeriod>(initialPeriod);
@@ -493,6 +505,7 @@ export function AgendaScreen({
           {canManageEvents ? (
             <CreateEventButton
               translate={translate}
+              openWith={openCreateWith}
               onOpen={() => setNotice(null)}
               onCreated={(summary) => {
                 setNotice({ kind: "created", summary });

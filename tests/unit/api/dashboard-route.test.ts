@@ -166,6 +166,7 @@ describe("GET /api/v1/dashboard", () => {
 
     await expect(response.json()).resolves.toEqual({
       data: {
+        viewer: { firstName: "Alba" },
         tiles: {
           attendance: {
             kind: "own_attendance",
