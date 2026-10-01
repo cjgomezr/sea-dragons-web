@@ -4237,6 +4237,18 @@ button.notification-item-content:hover {
   border-style: solid;
 }
 
+/* Sin la membresía al día no se responde (#453): el botón se ve apagado y
+   no reacciona al pasar por encima. */
+.agenda-rsvp-choice:disabled {
+  color: var(--color-text-secondary);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.agenda-rsvp-choice:disabled:hover {
+  border-color: var(--color-border);
+}
+
 .agenda-counts {
   margin: 0;
   font-size: 13px;
@@ -4606,6 +4618,23 @@ button.notification-item-content:hover {
 
 .agenda-notice:empty {
   display: none;
+}
+
+/* El aviso de quien no tiene la membresía al día (#453), en el calendario y
+   en el inicio: dice qué le falta y lleva a Pagos. */
+.membership-notice {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-warning);
+  border-radius: var(--radius);
+}
+
+.membership-notice a {
+  color: var(--color-accent-text);
+  font-weight: 600;
 }
 
 /* Lo que se desplaza es el cuerpo, no el diálogo: el título y su cierre se

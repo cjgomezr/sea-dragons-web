@@ -779,6 +779,11 @@ export const spanishMessages: MessageCatalog = {
     "Este evento ya no está disponible. Recarga el calendario.",
   "calendar.rsvp.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para responder.",
+  "calendar.rsvp.error.membershipNotCurrent":
+    "Tu membresía no está al día. Ponla al día en Pagos para responder.",
+  "calendar.membership.notice":
+    "Tu membresía no está al día: todavía no puedes responder a los eventos.",
+  "calendar.membership.toPayments": "Ir a Pagos",
   "calendar.rsvp.error.unexpected":
     "No pudimos guardar tu respuesta. Vuelve a intentarlo.",
   "calendar.create.open": "Evento",

@@ -116,6 +116,7 @@ export function AgendaRow({
   shouldTakeFocus,
   organizer,
   canTakeAttendance,
+  rsvpDisabledReasonId,
 }: {
   readonly translate: Translator;
   readonly event: AgendaEvent;
@@ -128,6 +129,9 @@ export function AgendaRow({
   /** Si quien mira registra asistencia. Sólo decide si se pinta el enlace:
    * la frontera ya reserva Asistencia a Admin y Coach. */
   readonly canTakeAttendance: boolean;
+  /** El id de la frase que dice por qué quien mira no puede responder (#453),
+   * o `null` si puede. */
+  readonly rsvpDisabledReasonId: string | null;
 }): React.JSX.Element {
   const { isExpanded, detail, toggle, retry, receive } = useEventDetail(
     event.id,
@@ -194,6 +198,7 @@ export function AgendaRow({
               savedResponse={state.tally.myResponse}
               pendingResponse={state.pendingResponse}
               onRespond={respond}
+              disabledReasonId={rsvpDisabledReasonId}
             />
           ) : null}
           <p className="agenda-counts">

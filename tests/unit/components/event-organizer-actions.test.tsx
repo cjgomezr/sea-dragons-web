@@ -273,6 +273,7 @@ function renderAgenda(
       locale={locale}
       canManageEvents={canManage}
       canTakeAttendance={false}
+      canRespond
     />,
   );
 }

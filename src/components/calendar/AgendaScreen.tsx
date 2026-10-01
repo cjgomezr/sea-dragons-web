@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useEffect, useId, useRef, useState } from "react";
+import { PAYMENTS_PATH } from "@/lib/auth/routes";
 import type { AgendaEvent, AgendaPeriod } from "@/lib/events/event-agenda";
 import type { EventType } from "@/lib/events/event-creation";
 import type { Locale } from "@/lib/i18n/locale";
@@ -192,6 +194,7 @@ function AgendaList({
   focusEventId,
   organizer,
   canTakeAttendance,
+  rsvpDisabledReasonId,
 }: {
   readonly translate: Translator;
   readonly period: AgendaPeriod;
@@ -199,6 +202,7 @@ function AgendaList({
   readonly focusEventId: string | null;
   readonly organizer: EventOrganizer | null;
   readonly canTakeAttendance: boolean;
+  readonly rsvpDisabledReasonId: string | null;
 }): React.JSX.Element {
   if (events.length === 0) {
     return (
@@ -216,6 +220,7 @@ function AgendaList({
           shouldTakeFocus={event.id === focusEventId}
           organizer={organizer}
           canTakeAttendance={canTakeAttendance}
+          rsvpDisabledReasonId={rsvpDisabledReasonId}
         />
       ))}
     </ul>
@@ -320,6 +325,7 @@ function AgendaView({
   focusOnLoad,
   organizer,
   canTakeAttendance,
+  rsvpDisabledReasonId,
 }: {
   readonly translate: Translator;
   readonly period: AgendaPeriod;
@@ -328,6 +334,7 @@ function AgendaView({
   readonly focusOnLoad: string | null;
   readonly organizer: EventOrganizer | null;
   readonly canTakeAttendance: boolean;
+  readonly rsvpDisabledReasonId: string | null;
 }): React.JSX.Element {
   const [state, setState] = useState<AgendaState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
@@ -407,6 +414,7 @@ function AgendaView({
           focusEventId={state.focusEventId}
           organizer={organizer}
           canTakeAttendance={canTakeAttendance}
+          rsvpDisabledReasonId={rsvpDisabledReasonId}
         />
       ) : null}
       {state.kind === "ready" && nextCursor !== null ? (
@@ -426,10 +434,30 @@ function describeNotice(translate: Translator, notice: AgendaNotice): string {
     : describeManageNotice(translate, notice);
 }
 
+/** La frase de quien no puede responder porque su membresía no está al día
+ * (#453), con el enlace a donde se arregla. */
+function MembershipRsvpNotice({
+  translate,
+  id,
+}: {
+  readonly translate: Translator;
+  readonly id: string;
+}): React.JSX.Element {
+  return (
+    <p className="membership-notice">
+      <span id={id}>{translate("calendar.membership.notice")}</span>{" "}
+      <Link href={PAYMENTS_PATH}>
+        {translate("calendar.membership.toPayments")}
+      </Link>
+    </p>
+  );
+}
+
 export function AgendaScreen({
   locale,
   canManageEvents,
   canTakeAttendance,
+  canRespond,
   initialPeriod = "upcoming",
   focusEventId = null,
   openCreateWith = null,
@@ -442,6 +470,10 @@ export function AgendaScreen({
   /** Si quien mira registra asistencia: decide si un entrenamiento empezado
    * ofrece "Pasar lista" (#395). */
   readonly canTakeAttendance: boolean;
+  /** Si quien mira puede responder al RSVP. Sin la membresía al día ve los
+   * eventos con los botones deshabilitados (#453); el endpoint ya responde
+   * 403. */
+  readonly canRespond: boolean;
   /** Dónde abre: un evento pasado de la búsqueda global vive en los pasados
    * (#427). */
   readonly initialPeriod?: AgendaPeriod;
@@ -453,6 +485,8 @@ export function AgendaScreen({
   readonly openCreateWith?: EventType | null;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
+  const membershipNoticeId = useId();
+  const rsvpDisabledReasonId = canRespond ? null : membershipNoticeId;
   const [period, setPeriod] = useState<AgendaPeriod>(initialPeriod);
   const [notice, setNotice] = useState<AgendaNotice | null>(null);
   // Cambia con cada evento creado, editado o cancelado: la clave nueva vuelve
@@ -515,6 +549,9 @@ export function AgendaScreen({
           ) : null}
         </div>
       </header>
+      {rsvpDisabledReasonId === null ? null : (
+        <MembershipRsvpNotice translate={translate} id={rsvpDisabledReasonId} />
+      )}
       {/* Siempre en el DOM: un lector de pantalla sólo anuncia los cambios
           de una región que ya estaba. */}
       {canManageEvents ? (
@@ -538,6 +575,7 @@ export function AgendaScreen({
           focusOnLoad={agendaVersion.focusEventId}
           organizer={organizer}
           canTakeAttendance={canTakeAttendance}
+          rsvpDisabledReasonId={rsvpDisabledReasonId}
         />
       ))}
     </div>

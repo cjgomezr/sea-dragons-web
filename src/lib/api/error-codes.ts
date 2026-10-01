@@ -24,6 +24,11 @@ export const API_ERROR_CODES = [
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
+/** El motivo del 403 de quien pide algo de socio sin tener la membresía al
+ * día (#453, RF-2 del PRD de E12). Lo responde la frontera; la pantalla lo
+ * traduce y lleva a Pagos. */
+export const MEMBERSHIP_NOT_CURRENT_REASON = "membership_not_current";
+
 /** El código de una respuesta de error, estrechado contra la convención. Un
  * código desconocido, o una respuesta que no es de la API (la página de un
  * proxy caído), no es ninguno: la pantalla dice entonces su error genérico. */

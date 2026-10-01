@@ -9,12 +9,17 @@ import type { Role } from "@/lib/auth/roles";
  */
 
 const callerRole = { current: "Player" as Role };
+const callerMembershipCurrent = { current: true };
 
 vi.mock("@/lib/i18n/request-locale", () => ({
   readRequestLocale: async () => "en",
 }));
 vi.mock("@/lib/auth/caller-role", () => ({
   readCallerRole: async () => callerRole.current,
+  readCallerAccess: async () => ({
+    role: callerRole.current,
+    membershipCurrent: callerMembershipCurrent.current,
+  }),
 }));
 
 const { default: CalendarioPage } = await import("@/app/(app)/calendario/page");
@@ -47,6 +52,7 @@ async function renderAs(
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  callerMembershipCurrent.current = true;
 });
 
 describe("botón + Evento en la página", () => {
@@ -158,5 +164,50 @@ describe("?nuevo= desde el inicio (#426)", () => {
     expect(
       screen.queryByRole("dialog", { name: "New event" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+// #453: quien no tiene la membresía al día ve el calendario en lectura.
+describe("el calendario de quien no tiene la membresía al día", () => {
+  it("le deshabilita el RSVP y le enlaza Pagos", async () => {
+    callerMembershipCurrent.current = false;
+    callerRole.current = "Player";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              data: {
+                events: [
+                  {
+                    id: "aaaaaaaa-0000-4000-8000-00000000000a",
+                    seriesId: null,
+                    title: "Pool training",
+                    eventType: "training",
+                    startsOn: "2999-06-23",
+                    startTime: "19:00",
+                    location: "MSAC",
+                    status: "scheduled",
+                    inAudience: true,
+                    goingCount: 1,
+                    maybeCount: 0,
+                    myResponse: null,
+                  },
+                ],
+                nextCursor: null,
+              },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+      ),
+    );
+
+    render(await CalendarioPage({ searchParams: Promise.resolve({}) }));
+
+    expect(await screen.findByRole("button", { name: "Yes" })).toBeDisabled();
+    expect(
+      screen.getByRole("link", { name: "Go to Payments" }),
+    ).toBeInTheDocument();
   });
 });

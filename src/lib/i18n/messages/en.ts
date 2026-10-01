@@ -781,6 +781,11 @@ export const englishMessages = {
     "This event is no longer available. Reload the calendar.",
   "calendar.rsvp.error.signInRequired":
     "Your session ended. Sign in again to answer.",
+  "calendar.rsvp.error.membershipNotCurrent":
+    "Your membership isn't up to date. Sort it out in Payments to answer.",
+  "calendar.membership.notice":
+    "Your membership isn't up to date, so you can't answer events yet.",
+  "calendar.membership.toPayments": "Go to Payments",
   "calendar.rsvp.error.unexpected": "We couldn't save your answer. Try again.",
   "calendar.create.open": "Event",
   "calendar.create.created": "Event created. We let the members know.",
