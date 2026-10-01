@@ -3800,6 +3800,9 @@ function asAdminMember(member: {
     aufExpiry: isAufExpired ? "2020-01-31" : "2030-06-30",
     isAufVerified: member.userId !== UNVERIFIED_AUF_MEMBER_ID,
     isAufExpired,
+    // La fila del AUF vencido carga además el chip de la membresía atrasada
+    // (#453): la de más marcas, para medirlas en la tarjeta más estrecha.
+    membershipStatus: isAufExpired ? "past_due" : "active",
   };
 }
 
@@ -5183,6 +5186,7 @@ type StubbedMemberRecord = {
   readonly dateOfBirth: string;
   readonly registeredAt: string;
   readonly hasGuardianConsent: boolean;
+  readonly membershipStatus: "active" | "past_due" | null;
   readonly photoUrl: string | null;
   readonly isAufExpired: boolean;
   readonly groups: readonly { readonly id: string; readonly name: string }[];
@@ -5208,6 +5212,7 @@ const CURRENT_RECORD: StubbedMemberRecord = {
   dateOfBirth: "1990-05-10",
   registeredAt: "2024-03-06T01:00:00.000Z",
   hasGuardianConsent: false,
+  membershipStatus: "active",
   photoUrl: null,
   isAufExpired: false,
   attendance: { kind: "rate", percent: 90, sessions: 9 },
