@@ -5415,3 +5415,276 @@ a.agenda-take-attendance {
     flex-wrap: nowrap;
   }
 }
+
+/* La pantalla de inicio (#426). Sigue docs/mockups/dashboard-light.png en
+   escritorio y mobile-home-light.png en el móvil: el saludo, cuatro teselas
+   (dos filas de dos en el móvil), y debajo Próximos y Últimas noticias. La
+   tarjeta del próximo entrenamiento con el RSVP es sólo del móvil, donde
+   ocupa el sitio de su tesela, y "Nuevo entrenamiento" sólo de escritorio. */
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 1100px;
+}
+
+.dashboard h1 {
+  margin: 0;
+  overflow-wrap: break-word;
+}
+
+.dashboard-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.dashboard-new-training {
+  display: none;
+  align-items: center;
+  text-decoration: none;
+}
+
+.dashboard-tile-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard-tile-item {
+  display: flex;
+}
+
+/* En el móvil la tarjeta del próximo entrenamiento sustituye a su tesela
+   (mobile-home-light.png no la tiene aparte), y la que sigue, noticias sin
+   leer, se queda sola en su fila y ocupa las dos columnas. Sin entrenamiento
+   a la vista no hay tarjeta, y las cuatro teselas se quedan en dos filas de
+   dos. */
+.dashboard-tile-item--replaced-by-card {
+  display: none;
+}
+
+.dashboard-tile-item--replaced-by-card + .dashboard-tile-item {
+  grid-column: 1 / -1;
+}
+
+.dashboard-tile {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-4);
+  color: var(--color-text);
+  text-decoration: none;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+a.dashboard-tile:hover {
+  border-color: var(--color-accent);
+}
+
+.dashboard-tile-label,
+.dashboard-tile-caption {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  overflow-wrap: break-word;
+}
+
+.dashboard-tile-value {
+  font-family: var(--font-family-mono);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-training-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-training-card-title {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.dashboard-training-card-event {
+  display: flex;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.dashboard-panels {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.dashboard-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dashboard-panel-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.dashboard-panel-all {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-accent-text);
+  text-decoration: none;
+}
+
+.dashboard-panel-all:hover {
+  text-decoration: underline;
+}
+
+.dashboard-event-list,
+.dashboard-news-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard-event {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  color: var(--color-text);
+  text-decoration: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.dashboard-event:hover {
+  border-color: var(--color-accent);
+}
+
+.dashboard-event-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.dashboard-event-title {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: break-word;
+}
+
+.dashboard-event-when {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  overflow-wrap: break-word;
+}
+
+.dashboard-event .agenda-type {
+  flex: 0 0 auto;
+}
+
+.dashboard-news {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dashboard-news-link {
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-news-link:hover {
+  text-decoration: underline;
+}
+
+.dashboard-news-when {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+@media (min-width: 768px) {
+  .dashboard-new-training {
+    display: inline-flex;
+  }
+
+  .dashboard-training-card {
+    display: none;
+  }
+
+  .dashboard-tile-item--replaced-by-card {
+    display: flex;
+  }
+
+  .dashboard-tile-item--replaced-by-card + .dashboard-tile-item {
+    grid-column: auto;
+  }
+
+  .dashboard-tile {
+    padding: var(--space-4) var(--space-6);
+  }
+
+  .dashboard-tile-value {
+    font-size: 28px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dashboard-tile-list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .dashboard-panels {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}

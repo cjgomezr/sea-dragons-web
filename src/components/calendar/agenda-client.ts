@@ -33,7 +33,8 @@ import type { Translator } from "@/lib/i18n/translator";
 const CURSOR_PARAM = "cursor";
 const PERIOD_PARAM = "period";
 
-const agendaEventSchema = z.object({
+/** Un evento como lo sirve la agenda; el inicio lo lee igual (#426). */
+export const agendaEventSchema = z.object({
   id: z.uuid(),
   startsOn: z.iso.date(),
   startTime: z.string(),

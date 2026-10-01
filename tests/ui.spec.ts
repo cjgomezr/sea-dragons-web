@@ -257,17 +257,15 @@ const PUBLIC_PAGES: readonly Screen[] = [
   { name: "registro", path: "/registro" },
 ];
 
-// "home" is the pre-existing landing page; "section" is a destination route
-// off the sidebar menu, standing in for any of the seven (they share the
-// same shell and SectionPlaceholder). Las dos viven detrás de la frontera de
-// sesión, así que sus tests entran antes de mirarlas. La sección tiene que
+// "section" is a destination route off the sidebar menu, standing in for the
+// ones that are still a SectionPlaceholder. Vive detrás de la frontera de
+// sesión, así que sus tests entran antes de mirarla. La sección tiene que
 // ser una que la sesión de prueba (un Player) pueda abrir: `/equipos` la
 // frontera se la niega y la devuelve al panel, así que la captura sería la
-// del panel y no la de un marcador.
-const APP_PAGES: readonly Screen[] = [
-  { name: "home", path: "/" },
-  { name: "section", path: "/pagos" },
-];
+// del panel y no la de un marcador. La pantalla de inicio dejó de ser un
+// marcador con #426: sus capturas son los estados `inicio-*`, con el
+// dashboard fingido, más abajo.
+const APP_PAGES: readonly Screen[] = [{ name: "section", path: "/pagos" }];
 
 function describeScreen(pg: Screen): void {
   for (const vp of viewports) {
@@ -1706,8 +1704,12 @@ test.describe("dentro de la aplicación", () => {
       await page.waitForLoadState("networkidle");
     }
 
+    /** El enlace del menú, no cualquier enlace a la sección: el dashboard
+     * también enlaza a Directorio desde su tesela de socios activos. */
     function visibleSectionLink(page: Page, sectionPath: string): Locator {
-      return page.locator(`a[href="${sectionPath}"]:visible`);
+      return page
+        .getByRole("navigation")
+        .locator(`a[href="${sectionPath}"]:visible`);
     }
 
     async function showSectionLoading(page: Page): Promise<Locator> {
@@ -12543,6 +12545,457 @@ test.describe("equipos en el navegador", () => {
     expect(heights).toHaveLength(2);
     for (const height of heights) {
       expect(height).toBeGreaterThanOrEqual(TEAMS_MIN_TOUCH_TARGET_PX);
+    }
+  });
+});
+/* ---------------------------------------------------------------------------
+   La pantalla de inicio (#426, RF-1 a RF-4 del PRD de E14). Mockups:
+   docs/mockups/dashboard-light.png y dashboard-dark.png (escritorio),
+   mobile-home-light.png y mobile-home-dark.png (móvil). Sin el botón
+   "Export" y sin la tesela "Overall" del móvil (D1); la barra de búsqueda
+   llega con #427.
+
+   Las capturas leen un dashboard fijo, servido por `page.route`, y un reloj
+   fijo: el saludo, "2 d" y "hace N" salen de la hora en que se pinta. Lo que
+   el endpoint de verdad responde se prueba en sus tests de Vitest (#424); el
+   RSVP con datos de verdad, al final de esta sección.
+   --------------------------------------------------------------------------- */
+
+const DASHBOARD_ENDPOINT = "/api/v1/dashboard";
+const HOME_SCREEN_PATH = "/";
+const DASHBOARD_NARROW_WIDTHS = [320, 375, 768] as const;
+// Miércoles 30 de septiembre de 2026 a las 18:00 en Melbourne (AEST).
+const DASHBOARD_NOW = new Date("2026-09-30T08:00:00.000Z");
+const DASHBOARD_GREETING = /^(Good|Buenos|Buenas) .+, Liam$/;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+function dashboardDaysAgo(days: number): string {
+  return new Date(DASHBOARD_NOW.getTime() - days * DAY_IN_MS).toISOString();
+}
+
+const DASHBOARD_TRAINING = {
+  id: "d0d0d0d0-0000-4000-8000-0000000000d1",
+  title: "Pool Training",
+  startsOn: "2026-10-02",
+  startTime: "19:00",
+  location: "MSAC",
+  goingCount: 14,
+  maybeCount: 2,
+  myResponse: "yes",
+} as const;
+
+function dashboardEvent(overrides: {
+  readonly id: string;
+  readonly title: string;
+  readonly startsOn: string;
+  readonly startTime: string;
+  readonly eventType: string;
+  readonly location: string;
+}): object {
+  return {
+    status: "scheduled",
+    seriesId: null,
+    goingCount: 0,
+    maybeCount: 0,
+    myResponse: null,
+    inAudience: true,
+    ...overrides,
+  };
+}
+
+const DASHBOARD_UPCOMING = [
+  dashboardEvent({
+    id: DASHBOARD_TRAINING.id,
+    title: "Pool Training",
+    startsOn: "2026-10-02",
+    startTime: "19:00",
+    eventType: "training",
+    location: "MSAC Dive Pool",
+  }),
+  dashboardEvent({
+    id: "d0d0d0d0-0000-4000-8000-0000000000d2",
+    title: "Skills & Conditioning",
+    startsOn: "2026-10-04",
+    startTime: "19:30",
+    eventType: "training",
+    location: "Fitzroy Pool",
+  }),
+  dashboardEvent({
+    id: "d0d0d0d0-0000-4000-8000-0000000000d3",
+    title: "Scrimmage vs Geelong Krakens",
+    startsOn: "2026-10-06",
+    startTime: "10:00",
+    eventType: "competition",
+    location: "Geelong Aquatic Centre",
+  }),
+];
+
+const DASHBOARD_LATEST_NEWS = [
+  {
+    id: "d0d0d0d0-0000-4000-8000-0000000000d4",
+    category: "announcement",
+    title: "Nationals squad shortlist announced",
+    publishedAt: dashboardDaysAgo(2),
+  },
+  {
+    id: "d0d0d0d0-0000-4000-8000-0000000000d5",
+    category: "news",
+    title: "Winter training schedule is live",
+    publishedAt: dashboardDaysAgo(4),
+  },
+  {
+    id: "d0d0d0d0-0000-4000-8000-0000000000d6",
+    category: "document",
+    title: "Updated pool safety & dive policy",
+    publishedAt: dashboardDaysAgo(8),
+  },
+];
+
+const ADMIN_DASHBOARD = {
+  viewer: { firstName: "Liam" },
+  tiles: {
+    attendance: {
+      kind: "club_rate",
+      rate: { kind: "rate", percent: 86, records: 42 },
+    },
+    members: { kind: "members", active: 48, joinedRecently: 3 },
+    nextTraining: { kind: "training", training: DASHBOARD_TRAINING },
+    unreadNews: { kind: "unread", count: 3, announcements: 1 },
+  },
+  upcomingEvents: { kind: "events", events: DASHBOARD_UPCOMING },
+  latestNews: { kind: "news", posts: DASHBOARD_LATEST_NEWS },
+};
+
+const PLAYER_DASHBOARD = {
+  ...ADMIN_DASHBOARD,
+  tiles: {
+    ...ADMIN_DASHBOARD.tiles,
+    attendance: {
+      kind: "own_attendance",
+      attendance: { kind: "rate", percent: 90, sessions: 10 },
+    },
+  },
+};
+
+// Un club recién creado: lo que el PRD describe en sus casos borde.
+const EMPTY_DASHBOARD = {
+  viewer: { firstName: "Liam" },
+  tiles: {
+    attendance: { kind: "club_rate", rate: { kind: "no_data" } },
+    members: { kind: "members", active: 1, joinedRecently: 0 },
+    nextTraining: { kind: "none" },
+    unreadNews: { kind: "unread", count: 0, announcements: 0 },
+  },
+  upcomingEvents: { kind: "events", events: [] },
+  latestNews: { kind: "news", posts: [] },
+};
+
+type DashboardScreenState = {
+  readonly name: string;
+  readonly dashboard: object;
+  readonly storageState: string;
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+};
+
+function dashboardStates(
+  name: string,
+  dashboard: object,
+  storageState: string,
+): readonly DashboardScreenState[] {
+  return [
+    { name, dashboard, storageState },
+    { name: `${name}-es`, dashboard, storageState, beforeVisit: chooseSpanish },
+  ];
+}
+
+const DASHBOARD_STATES: readonly DashboardScreenState[] = [
+  ...dashboardStates("inicio-admin", ADMIN_DASHBOARD, ADMIN_STORAGE_STATE),
+  ...dashboardStates(
+    "inicio-jugador",
+    PLAYER_DASHBOARD,
+    E2E_STORAGE_STATE_PATH,
+  ),
+  ...dashboardStates("inicio-vacio", EMPTY_DASHBOARD, ADMIN_STORAGE_STATE),
+];
+
+async function serveDashboard(page: Page, dashboard: object): Promise<void> {
+  await page.route(
+    (url) => url.pathname === DASHBOARD_ENDPOINT,
+    (route) => route.fulfill(jsonBody(dashboard)),
+  );
+}
+
+async function goToDashboard(
+  page: Page,
+  state: Pick<DashboardScreenState, "dashboard" | "beforeVisit">,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await page.clock.setFixedTime(DASHBOARD_NOW);
+  await serveDashboard(page, state.dashboard);
+  await state.beforeVisit?.(page);
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${HOME_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, HOME_SCREEN_PATH, theme);
+  }
+  await expect(
+    page.getByRole("heading", { level: 1, name: DASHBOARD_GREETING }),
+  ).toBeVisible();
+}
+
+for (const state of DASHBOARD_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: state.storageState });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToDashboard(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const width of DASHBOARD_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await goToDashboard(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToDashboard(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+test.describe("el inicio en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  function tileList(page: Page): Locator {
+    return page
+      .getByRole("region", { name: "Club at a glance" })
+      .getByRole("listitem");
+  }
+
+  /** Las teselas que se ven, con su caja. Una escondida no cuenta. */
+  function visibleTileBoxes(
+    page: Page,
+  ): Promise<{ top: number; left: number; right: number }[]> {
+    return tileList(page).evaluateAll((tiles) =>
+      tiles
+        .filter((tile) => tile.getClientRects().length > 0)
+        .map((tile) => {
+          const { top, left, right } = tile.getBoundingClientRect();
+          return {
+            top: Math.round(top),
+            left: Math.round(left),
+            right: Math.round(right),
+          };
+        }),
+    );
+  }
+
+  test("a 375px sin entrenamiento a la vista las teselas van en dos filas de dos", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToDashboard(page, { dashboard: EMPTY_DASHBOARD });
+
+    const boxes = await visibleTileBoxes(page);
+
+    expect(boxes).toHaveLength(4);
+    const [first, second, third, fourth] = boxes;
+    expect(second?.top).toBe(first?.top);
+    expect(fourth?.top).toBe(third?.top);
+    expect(third?.top).toBeGreaterThan(first?.top ?? 0);
+    expect(third?.left).toBe(first?.left);
+  });
+
+  test("a 375px la tarjeta ocupa el sitio de la tesela del entrenamiento y la última va a todo el ancho", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
+
+    const boxes = await visibleTileBoxes(page);
+
+    // Tres teselas: la del entrenamiento la sustituye la tarjeta, que es
+    // donde está el RSVP, para no contar el mismo entrenamiento dos veces.
+    expect(boxes).toHaveLength(3);
+    const [first, second, third] = boxes;
+    expect(second?.top).toBe(first?.top);
+    expect(third?.top).toBeGreaterThan(first?.top ?? 0);
+    expect(third?.left).toBe(first?.left);
+    expect(third?.right).toBe(second?.right);
+    await expect(
+      page.getByRole("region", { name: "Next training" }),
+    ).toBeVisible();
+  });
+
+  test("en el móvil la tarjeta lleva el RSVP y no hay Nuevo entrenamiento", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
+
+    const card = page.getByRole("region", { name: "Next training" });
+    await expect(
+      card.getByRole("group", { name: `RSVP: ${DASHBOARD_TRAINING.title}` }),
+    ).toBeVisible();
+    await expect(card.getByRole("button", { name: "Yes" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(page.getByRole("link", { name: "New training" })).toBeHidden();
+  });
+
+  test("en escritorio no hay botones de RSVP y sí Nuevo entrenamiento", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
+
+    await expect(page.getByRole("button", { name: "Yes" })).toBeHidden();
+    await expect(
+      page.getByRole("link", { name: "New training" }),
+    ).toBeVisible();
+  });
+
+  test("Nuevo entrenamiento abre el calendario con el formulario y entrenamiento elegido", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToDashboard(page, { dashboard: ADMIN_DASHBOARD });
+
+    await page.getByRole("link", { name: "New training" }).click();
+
+    await expect(page).toHaveURL(/\/calendario\?nuevo=training$/);
+    const dialog = page.getByRole("dialog", { name: "New event" });
+    await expect(dialog.getByLabel("Type")).toHaveValue("training");
+  });
+
+  test("con la red caída lo dice y vuelve a pedir al reintentar", async ({
+    page,
+  }) => {
+    await page.clock.setFixedTime(DASHBOARD_NOW);
+    // La red falla hasta que se pulsa reintentar. Contar peticiones no
+    // sirve: en desarrollo React monta el efecto dos veces y la primera
+    // respuesta se descarta.
+    let isNetworkDown = true;
+    await page.route(
+      (url) => url.pathname === DASHBOARD_ENDPOINT,
+      (route) =>
+        isNetworkDown
+          ? route.abort("internetdisconnected")
+          : route.fulfill(jsonBody(ADMIN_DASHBOARD)),
+    );
+    await page.goto(`${APP_URL}${HOME_SCREEN_PATH}`);
+
+    // Sólo el de la pantalla: el anunciador de rutas de Next también es un
+    // alert.
+    await expect(page.locator(".dashboard").getByRole("alert")).toBeVisible();
+    await expectNoAxeViolations(page);
+    isNetworkDown = false;
+    await page.getByRole("button", { name: "Try again" }).click();
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: DASHBOARD_GREETING }),
+    ).toBeVisible();
+  });
+});
+
+type RealNextTraining =
+  | {
+      readonly kind: "training";
+      readonly training: {
+        readonly id: string;
+        readonly title: string;
+        readonly startsOn: string;
+        readonly myResponse: "yes" | "maybe" | "no" | null;
+      };
+    }
+  | { readonly kind: "none" | "unavailable" };
+
+const RSVP_BUTTON_NAMES = { yes: "Yes", maybe: "Maybe", no: "No" } as const;
+
+test.describe("el RSVP del inicio con los datos de verdad", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("responder en la tarjeta deja la respuesta en el calendario", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const dashboardRead = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === DASHBOARD_ENDPOINT,
+    );
+    await page.goto(`${APP_URL}${HOME_SCREEN_PATH}`);
+    const body = (await (await dashboardRead).json()) as {
+      readonly data: {
+        readonly tiles: { readonly nextTraining: RealNextTraining };
+      };
+    };
+    const { nextTraining } = body.data.tiles;
+    test.skip(
+      nextTraining.kind !== "training",
+      "seadragons-dev no tiene ningún entrenamiento a la vista del socio de prueba",
+    );
+    if (nextTraining.kind !== "training") {
+      return;
+    }
+    const { training } = nextTraining;
+    const answer = training.myResponse === "maybe" ? "no" : "maybe";
+    const card = page.getByRole("region", { name: "Next training" });
+
+    try {
+      await card
+        .getByRole("button", { name: RSVP_BUTTON_NAMES[answer] })
+        .click();
+      await expect(
+        card.getByRole("button", { name: RSVP_BUTTON_NAMES[answer] }),
+      ).toHaveAttribute("aria-pressed", "true");
+
+      await page.goto(`${APP_URL}${CALENDAR_SCREEN_PATH}`);
+      const row = page.getByRole("listitem").filter({
+        has: page.locator(`time[datetime="${training.startsOn}"]`),
+        hasText: training.title,
+      });
+      await expect(
+        row
+          .first()
+          .getByRole("group", { name: `RSVP: ${training.title}` })
+          .getByRole("button", { name: RSVP_BUTTON_NAMES[answer] }),
+      ).toHaveAttribute("aria-pressed", "true");
+    } finally {
+      // Deja la respuesta que tenía, para que la próxima corrida parta igual.
+      if (training.myResponse !== null) {
+        await page.request.put(
+          `${APP_URL}${CALENDAR_AGENDA_ENDPOINT}/${training.id}/rsvp`,
+          { data: { response: training.myResponse } },
+        );
+      }
     }
   });
 });

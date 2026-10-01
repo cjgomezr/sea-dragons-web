@@ -1,4 +1,4 @@
-import { EVENT_TYPES, type EventType } from "@/lib/events/event-creation";
+import { EVENT_TYPES, isEventType } from "@/lib/events/event-creation";
 import { ISO_WEEKDAYS, type IsoWeekday } from "@/lib/events/event-occurrences";
 import { formatWeekdayName } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
@@ -116,10 +116,6 @@ export function NotesField({
       <FieldIssue field="notes" text={issueText} />
     </div>
   );
-}
-
-function isEventType(value: string): value is EventType {
-  return EVENT_TYPES.some((type) => type === value);
 }
 
 export function TypeField({

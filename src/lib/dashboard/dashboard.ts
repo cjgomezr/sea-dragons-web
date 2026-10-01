@@ -76,6 +76,10 @@ export type NextTraining = {
   readonly startsOn: string;
   readonly startTime: string;
   readonly location: string;
+  /** Los conteos van con la respuesta: la tarjeta del móvil responde con
+   * ellos igual que una fila del calendario (#426). */
+  readonly goingCount: number;
+  readonly maybeCount: number;
   readonly myResponse: RsvpResponse | null;
 };
 
@@ -107,7 +111,11 @@ export type LatestNews =
   | { readonly kind: "news"; readonly posts: readonly LatestNewsItem[] }
   | Unavailable;
 
+/** Quien mira, para el saludo de la pantalla (#426, RF-4). */
+export type DashboardViewer = { readonly firstName: string };
+
 export type Dashboard = {
+  readonly viewer: DashboardViewer;
   readonly tiles: {
     readonly attendance: AttendanceTile;
     readonly members: MembersTile;
@@ -159,6 +167,13 @@ export type DashboardRequest = {
 };
 
 const UNAVAILABLE: Unavailable = { kind: "unavailable" };
+
+/** La primera palabra del nombre completo: el saludo dice "Alba", no
+ * "Alba Ferrer". */
+function firstNameOf(fullName: string): string {
+  const [firstName = fullName] = fullName.trim().split(/\s+/);
+  return firstName;
+}
 
 /** Admin y Coach, los que pasan lista, ven la tasa del club (D1). */
 function seesClubRate(role: Role): boolean {
@@ -228,6 +243,8 @@ function toNextTrainingTile(events: readonly AgendaEvent[]): NextTrainingTile {
       startsOn: training.startsOn,
       startTime: training.startTime,
       location: training.location,
+      goingCount: training.goingCount,
+      maybeCount: training.maybeCount,
       myResponse: training.myResponse,
     },
   };
@@ -436,6 +453,7 @@ export async function readDashboard(
     readNewsParts(gateways, request),
   ]);
   return {
+    viewer: { firstName: firstNameOf(caller.fullName) },
     tiles: {
       attendance,
       members,

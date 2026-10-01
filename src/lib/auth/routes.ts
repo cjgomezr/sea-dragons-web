@@ -53,6 +53,11 @@ export const GROUPS_PATH = "/grupos";
  * donde lleva el aviso de un evento o una serie nuevos (#310). */
 export const CALENDAR_PATH = "/calendario";
 
+/** Con un tipo de evento, el calendario abre ya el formulario de crear con
+ * ese tipo elegido, a quien puede crear: es a donde lleva "Nuevo
+ * entrenamiento" desde el inicio (#426). */
+export const CALENDAR_NEW_EVENT_QUERY_PARAM = "nuevo";
+
 /** El endpoint de las solicitudes de rol. Su POST está abierto a los cuatro
  * roles, igual que Mi cuenta: el propio dominio responde a quien no tiene nada
  * que pedir. Por eso la ruta NO aparece en `RESTRICTED_ROUTES`, y la bandeja
