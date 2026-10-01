@@ -2,7 +2,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import type { Role } from "./roles";
 import { COMPLETE_REGISTRATION_PATH, SIGN_IN_PATH } from "./routes";
-import { readSessionState } from "./session-reader";
+import { readSessionState, readSessionUserId } from "./session-reader";
 import { describeMissingAuthKeys } from "./supabase-auth-gateways";
 import { readServerCookies } from "@/lib/supabase/server-cookies";
 import { createSessionClient } from "@/lib/supabase/session-client";
@@ -34,4 +34,24 @@ export const readCallerRole = cache(async (): Promise<Role> => {
     case "anonymous":
       redirect(SIGN_IN_PATH);
   }
+});
+
+/**
+ * El id de quien pide la pantalla, leído igual que el rol: en el servidor y
+ * de la sesión. Lo lee la cáscara para que la búsqueda (#427) sepa cuándo un
+ * socio encontrado es uno mismo. Va detrás del rol a propósito: esa lectura
+ * deja el id en la memoria de sesión, y así no cuesta otro viaje (#434). Sin
+ * identidad, la sesión se cerró entre medias, y se resuelve como la frontera.
+ */
+export const readCallerId = cache(async (): Promise<string> => {
+  await readCallerRole();
+  const session = createSessionClient(process.env, await readServerCookies());
+  if (session.kind === "unconfigured") {
+    throw new Error(describeMissingAuthKeys(session.missingKeys));
+  }
+  const userId = await readSessionUserId(session.client);
+  if (userId === null) {
+    redirect(SIGN_IN_PATH);
+  }
+  return userId;
 });

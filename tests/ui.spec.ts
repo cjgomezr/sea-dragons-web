@@ -5090,7 +5090,11 @@ test.describe("un Player frente al directorio", () => {
     await expect(
       page.getByRole("heading", { name: "Pending requests" }),
     ).toHaveCount(0);
-    await expect(page.getByRole("combobox")).toHaveCount(0);
+    // La búsqueda global de la barra (#427) también es un combobox: el que
+    // no puede estar es el del rol de una fila.
+    await expect(page.getByRole("combobox", { name: /^Role for/ })).toHaveCount(
+      0,
+    );
   });
 
   test("la ruta vieja de administración lo lleva al directorio", async ({
@@ -12548,6 +12552,354 @@ test.describe("equipos en el navegador", () => {
     }
   });
 });
+/* ---------------------------------------------------------------------------
+   La búsqueda global (#427, RF-8 del PRD de E14). El cuadro de la barra de
+   arriba sigue docs/mockups/dashboard-light.png; la lupa del móvil, la
+   pantalla entera y la lista agrupada no están dibujadas y se revisan contra
+   design-system.md. Las capturas responden con una API de mentira, para que
+   los resultados sean los mismos en cada corrida; una prueba aparte busca con
+   la API de verdad.
+   --------------------------------------------------------------------------- */
+
+const SEARCH_ENDPOINT = "/api/v1/search";
+const SEARCH_SCREEN_PATH = "/dashboard";
+const SEARCH_NAME = /^(Search|Buscar)$/;
+const SEARCH_CLOSE_NAME = /^(Close search|Cerrar la búsqueda)$/;
+const NOTHING_MATCHES = /^(Nothing matches|Nada coincide con)/;
+/** Por debajo, la cáscara es la del móvil: la lupa en vez del cuadro. */
+const DESKTOP_MIN_WIDTH = 768;
+/** Cinco miembros y "See all members" van antes que el primer evento. */
+const ARROWS_TO_FIRST_EVENT = 7;
+
+function fakeSearchId(index: number): string {
+  return `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
+}
+
+const SEARCHED_MEMBER_NAMES = [
+  "Grace Geelong",
+  "Gemma Geeves",
+  "Geoffrey Geelan-Whitcombe",
+  "Georgia Gee",
+  "Gerard Geelhoed",
+] as const;
+
+const SEARCH_RESULTS = {
+  members: {
+    total: 12,
+    items: SEARCHED_MEMBER_NAMES.map((fullName, index) => ({
+      kind: "member",
+      userId: fakeSearchId(index + 1),
+      fullName,
+      position:
+        index === 0
+          ? { id: fakeSearchId(90), names: { en: "Forward", es: "Delantero" } }
+          : null,
+      photoUrl: null,
+    })),
+  },
+  events: {
+    total: 2,
+    items: [
+      {
+        kind: "event",
+        id: fakeSearchId(20),
+        title: "Scrimmage vs Geelong Krakens",
+        startsOn: "2026-10-10",
+        startTime: "10:00",
+        location: "Geelong Aquatic Centre",
+        eventType: "competition",
+        isCancelled: false,
+      },
+      {
+        kind: "event",
+        id: fakeSearchId(21),
+        title: "Geelong away day",
+        startsOn: "2026-08-15",
+        startTime: "09:30",
+        location: "Geelong Waterfront",
+        eventType: "social",
+        isCancelled: true,
+      },
+    ],
+  },
+  news: {
+    total: 1,
+    items: [
+      {
+        kind: "news",
+        id: fakeSearchId(30),
+        title: "Travel details for the Geelong tournament",
+        category: "announcement",
+        publishedAt: "2026-09-20T09:00:00.000Z",
+      },
+    ],
+  },
+} as const;
+
+const NO_SEARCH_RESULTS = {
+  members: { total: 0, items: [] },
+  events: { total: 0, items: [] },
+  news: { total: 0, items: [] },
+} as const;
+
+type FakeSearchResults = typeof SEARCH_RESULTS | typeof NO_SEARCH_RESULTS;
+
+async function serveSearch(
+  page: Page,
+  results: FakeSearchResults,
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === SEARCH_ENDPOINT,
+    (route) => route.fulfill({ json: { data: results } }),
+  );
+}
+
+function isDesktopWidth(page: Page): boolean {
+  return (page.viewportSize()?.width ?? 0) >= DESKTOP_MIN_WIDTH;
+}
+
+/** El cuadro visible: el de la barra en escritorio, el de la pantalla entera
+ * que abre la lupa en el móvil. */
+async function openSearch(page: Page): Promise<Locator> {
+  if (!isDesktopWidth(page)) {
+    await page.getByRole("button", { name: SEARCH_NAME }).click();
+  }
+  const box = page.getByRole("combobox", { name: SEARCH_NAME });
+  await box.click();
+  return box;
+}
+
+async function searchGlobally(page: Page, text: string): Promise<void> {
+  const box = await openSearch(page);
+  await box.fill(text);
+}
+
+async function waitForSearchAnswer(
+  page: Page,
+  results: FakeSearchResults,
+): Promise<void> {
+  if (results.members.total === 0) {
+    await expect(page.getByText(NOTHING_MATCHES)).toBeVisible();
+    return;
+  }
+  await expect(page.getByRole("listbox")).toBeVisible();
+}
+
+type SearchCapture = {
+  readonly name: string;
+  readonly results: FakeSearchResults;
+  readonly text: string;
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+};
+
+const SEARCH_CAPTURES: readonly SearchCapture[] = [
+  { name: "busqueda-resultados", results: SEARCH_RESULTS, text: "Gee" },
+  {
+    name: "busqueda-resultados-es",
+    results: SEARCH_RESULTS,
+    text: "Gee",
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "busqueda-sin-resultados",
+    results: NO_SEARCH_RESULTS,
+    text: "Zanzibar",
+  },
+  {
+    name: "busqueda-sin-resultados-es",
+    results: NO_SEARCH_RESULTS,
+    text: "Zanzíbar",
+    beforeVisit: chooseSpanish,
+  },
+];
+
+async function showSearch(page: Page, capture: SearchCapture): Promise<void> {
+  await searchGlobally(page, capture.text);
+  await waitForSearchAnswer(page, capture.results);
+}
+
+for (const capture of SEARCH_CAPTURES) {
+  test.describe(capture.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(capture.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await capture.beforeVisit?.(page);
+              await serveSearch(page, capture.results);
+              await goToWithTheme(page, SEARCH_SCREEN_PATH, theme);
+              await showSearch(page, capture);
+              // El ratón se queda sobre el cuadro o la lupa, y una opción
+              // debajo saldría con su hover.
+              await page.mouse.move(0, 0);
+              const snapshot = `${capture.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot(SCREENSHOT_OPTIONS),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+
+        test("has no horizontal scroll with the search open", async ({
+          page,
+        }) => {
+          await capture.beforeVisit?.(page);
+          await serveSearch(page, capture.results);
+          await page.goto(`${APP_URL}${SEARCH_SCREEN_PATH}`);
+          await showSearch(page, capture);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+
+        test("has no accessibility violations with the search open (axe-core)", async ({
+          page,
+        }) => {
+          await capture.beforeVisit?.(page);
+          await serveSearch(page, capture.results);
+          await page.goto(`${APP_URL}${SEARCH_SCREEN_PATH}`);
+          await showSearch(page, capture);
+          await expectNoAxeViolations(page);
+        });
+      });
+    }
+  });
+}
+
+// La lupa sólo existe en el móvil: recién abierta, la pantalla entera con el
+// cuadro vacío y el foco en él.
+test.describe("busqueda-movil-abierta", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: E2E_STORAGE_STATE_PATH,
+    viewport: { width: 375, height: 812 },
+  });
+
+  for (const theme of themes) {
+    test(`matches approved baseline (${theme})`, async ({ page }) => {
+      await goToWithTheme(page, SEARCH_SCREEN_PATH, theme);
+      await openSearch(page);
+      await page.mouse.move(0, 0);
+      const snapshot = `busqueda-movil-abierta-mobile-${theme}.png`;
+      await createMissingLocalBaseline(snapshot, () =>
+        page.screenshot(SCREENSHOT_OPTIONS),
+      );
+      await expect(page).toHaveScreenshot(snapshot, {
+        ...SCREENSHOT_OPTIONS,
+        maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+      });
+    });
+  }
+
+  test("has no accessibility violations with the search open (axe-core)", async ({
+    page,
+  }) => {
+    await chooseSpanish(page);
+    await page.goto(`${APP_URL}${SEARCH_SCREEN_PATH}`);
+    await openSearch(page);
+    await expectNoAxeViolations(page);
+  });
+});
+
+test.describe("la búsqueda global en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("en escritorio, / lleva el foco al cuadro de la barra", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${APP_URL}${SEARCH_SCREEN_PATH}`);
+    await expect(page.getByRole("search")).toBeVisible();
+
+    await page.locator("body").click({ position: { x: 600, y: 400 } });
+    await page.keyboard.press("/");
+
+    await expect(
+      page.getByRole("combobox", { name: SEARCH_NAME }),
+    ).toBeFocused();
+  });
+
+  test("en el móvil la barra no se ve y la lupa sí", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto(`${APP_URL}${SEARCH_SCREEN_PATH}`);
+
+    await expect(page.getByRole("button", { name: SEARCH_NAME })).toBeVisible();
+    await expect(page.getByRole("search")).toBeHidden();
+  });
+
+  test("en el móvil, Cerrar devuelve el foco a la lupa", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto(`${APP_URL}${SEARCH_SCREEN_PATH}`);
+    const magnifier = page.getByRole("button", { name: SEARCH_NAME });
+
+    await magnifier.click();
+    await expect(
+      page.getByRole("combobox", { name: SEARCH_NAME }),
+    ).toBeFocused();
+    await page.getByRole("button", { name: SEARCH_CLOSE_NAME }).click();
+
+    await expect(page.getByRole("dialog", { name: SEARCH_NAME })).toBeHidden();
+    await expect(magnifier).toBeFocused();
+  });
+
+  test("las flechas y Enter abren el evento en su fila del calendario", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await serveSearch(page, SEARCH_RESULTS);
+    await page.goto(`${APP_URL}${SEARCH_SCREEN_PATH}`);
+    await searchGlobally(page, "Geelong");
+    await expect(page.getByRole("listbox")).toBeVisible();
+    await expect(page.getByRole("status")).toContainText("15 results");
+
+    for (let step = 0; step < ARROWS_TO_FIRST_EVENT; step += 1) {
+      await page.keyboard.press("ArrowDown");
+    }
+    await page.keyboard.press("Enter");
+
+    await expect(page).toHaveURL(
+      new RegExp(`/calendario\\?evento=${fakeSearchId(20)}$`),
+    );
+    await expect(page.getByRole("listbox")).toBeHidden();
+  });
+});
+
+test.describe("la búsqueda global con los datos de verdad", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("un Admin encuentra a un miembro y llega a su ficha", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${APP_URL}${SEARCH_SCREEN_PATH}`);
+
+    await searchGlobally(page, DECIDABLE_MEMBER_NAME);
+    await page
+      .getByRole("option", { name: new RegExp(DECIDABLE_MEMBER_NAME) })
+      .click();
+
+    await expect(page).toHaveURL(/\/directorio\/[0-9a-f-]{36}$/);
+  });
+});
+
 /* ---------------------------------------------------------------------------
    La pantalla de inicio (#426, RF-1 a RF-4 del PRD de E14). Mockups:
    docs/mockups/dashboard-light.png y dashboard-dark.png (escritorio),

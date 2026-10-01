@@ -7,6 +7,7 @@ import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import {
   type AgendaFailure,
+  type AgendaLoad,
   describeAgendaFailure,
   loadAgenda,
 } from "./agenda-client";
@@ -99,6 +100,40 @@ const PERIOD_TEXTS = {
     empty: "calendar.pastEmpty",
   },
 } as const satisfies Record<AgendaPeriod, Record<string, string>>;
+
+/** Hasta dónde se busca el evento al que se llega desde la búsqueda global
+ * (#427): 200 eventos, meses de entrenamientos semanales. Más allá, la agenda
+ * se queda en lo cargado y "Ver más" sigue a mano. */
+const MAX_PAGES_TO_FIND_EVENT = 4;
+
+/** La primera página y, si el evento buscado no está en ella, las siguientes
+ * hasta encontrarlo o llegar al tope. Un fallo en una página de más no tumba
+ * la agenda: se enseña lo que ya llegó. */
+async function loadFirstPages(
+  period: AgendaPeriod,
+  soughtEventId: string | null,
+): Promise<AgendaLoad> {
+  const first = await loadAgenda(period, null);
+  if (first.kind === "failed" || soughtEventId === null) {
+    return first;
+  }
+  let { events, nextCursor } = first.page;
+  for (
+    let pages = 1;
+    pages < MAX_PAGES_TO_FIND_EVENT &&
+    nextCursor !== null &&
+    !events.some((event) => event.id === soughtEventId);
+    pages += 1
+  ) {
+    const next = await loadAgenda(period, nextCursor);
+    if (next.kind === "failed") {
+      break;
+    }
+    events = [...events, ...next.page.events];
+    nextCursor = next.page.nextCursor;
+  }
+  return { kind: "loaded", page: { events, nextCursor } };
+}
 
 function LoadFailure({
   translate,
@@ -299,7 +334,8 @@ function AgendaView({
 
   useEffect(() => {
     let isCurrent = true;
-    void loadAgenda(period, null).then((outcome) => {
+    const soughtEventId = reloads === 0 ? focusOnLoad : null;
+    void loadFirstPages(period, soughtEventId).then((outcome) => {
       if (!isCurrent) {
         return;
       }
@@ -310,7 +346,7 @@ function AgendaView({
               events: outcome.page.events,
               nextCursor: outcome.page.nextCursor,
               more: { kind: "idle" },
-              focusEventId: reloads === 0 ? focusOnLoad : null,
+              focusEventId: soughtEventId,
             }
           : { kind: "failed", failure: outcome },
       );
@@ -394,6 +430,8 @@ export function AgendaScreen({
   locale,
   canManageEvents,
   canTakeAttendance,
+  initialPeriod = "upcoming",
+  focusEventId = null,
   openCreateWith = null,
 }: {
   readonly locale: Locale;
@@ -404,28 +442,34 @@ export function AgendaScreen({
   /** Si quien mira registra asistencia: decide si un entrenamiento empezado
    * ofrece "Pasar lista" (#395). */
   readonly canTakeAttendance: boolean;
+  /** Dónde abre: un evento pasado de la búsqueda global vive en los pasados
+   * (#427). */
+  readonly initialPeriod?: AgendaPeriod;
+  /** El evento cuyo título recibe el foco al llegar, como el que se abrió
+   * desde la búsqueda global (#427). */
+  readonly focusEventId?: string | null;
   /** El tipo con el que el formulario de crear llega ya abierto, como lo
    * pide "Nuevo entrenamiento" desde el inicio (#426). */
   readonly openCreateWith?: EventType | null;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
-  const [period, setPeriod] = useState<AgendaPeriod>("upcoming");
+  const [period, setPeriod] = useState<AgendaPeriod>(initialPeriod);
   const [notice, setNotice] = useState<AgendaNotice | null>(null);
   // Cambia con cada evento creado, editado o cancelado: la clave nueva vuelve
   // a montar las vistas.
   const [agendaVersion, setAgendaVersion] = useState<AgendaVersion>({
     number: 0,
-    focusEventId: null,
+    focusEventId,
   });
   // Los periodos ya abiertos: uno se monta la primera vez que se elige.
   const [openedPeriods, setOpenedPeriods] = useState<ReadonlySet<AgendaPeriod>>(
-    () => new Set(["upcoming"]),
+    () => new Set([initialPeriod]),
   );
 
-  function reloadAgenda(focusEventId: string | null): void {
+  function reloadAgenda(eventToFocus: string | null): void {
     setAgendaVersion((version) => ({
       number: version.number + 1,
-      focusEventId,
+      focusEventId: eventToFocus,
     }));
   }
 

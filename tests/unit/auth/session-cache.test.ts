@@ -61,6 +61,35 @@ describe("memoria del estado de sesión", () => {
     expect(cache.read(LIVE_TOKEN)).toEqual(ACTIVE_PLAYER);
   });
 
+  // #427: la cáscara necesita el id de quien mira sin volver a preguntarlo.
+  it("sirve también el id del socio de ese token mientras vale", () => {
+    const clock = { now: START_MS };
+    const { cache } = cacheAt(clock);
+    cache.remember({
+      accessToken: LIVE_TOKEN,
+      userId: USER_ID,
+      state: ACTIVE_PLAYER,
+    });
+
+    clock.now += SESSION_CACHE_TTL_MS - 1;
+
+    expect(cache.readUserId(LIVE_TOKEN)).toBe(USER_ID);
+  });
+
+  it("deja de servir el id cuando el estado deja de valer", () => {
+    const clock = { now: START_MS };
+    const { cache } = cacheAt(clock);
+    cache.remember({
+      accessToken: LIVE_TOKEN,
+      userId: USER_ID,
+      state: ACTIVE_PLAYER,
+    });
+
+    clock.now += SESSION_CACHE_TTL_MS;
+
+    expect(cache.readUserId(LIVE_TOKEN)).toBeNull();
+  });
+
   it("deja de servirlo en cuanto se cumplen los 30 segundos", () => {
     const clock = { now: START_MS };
     const { cache } = cacheAt(clock);

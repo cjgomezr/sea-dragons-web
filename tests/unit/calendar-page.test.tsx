@@ -71,6 +71,60 @@ describe("botón + Evento en la página", () => {
   );
 });
 
+// #427: un evento de la búsqueda global llega con su id y, si ya pasó, con
+// el periodo.
+describe("llegar a un evento", () => {
+  it("con ?periodo=past abre los pasados", async () => {
+    callerRole.current = "Player";
+    const requested: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requested.push(url);
+        return new Response(
+          JSON.stringify({ data: { events: [], nextCursor: null } }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }),
+    );
+
+    render(
+      await CalendarioPage({
+        searchParams: Promise.resolve({ evento: "evento-1", periodo: "past" }),
+      }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Past events" }),
+    ).toBeInTheDocument();
+    expect(requested).toEqual(["/api/v1/events?period=past"]);
+  });
+
+  it("un periodo que no conoce abre los próximos", async () => {
+    callerRole.current = "Player";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ data: { events: [], nextCursor: null } }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+      ),
+    );
+
+    render(
+      await CalendarioPage({
+        searchParams: Promise.resolve({ periodo: "ayer" }),
+      }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Upcoming events" }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("?nuevo= desde el inicio (#426)", () => {
   it("abre a un Admin el formulario de crear con entrenamiento elegido", async () => {
     await renderAs("Admin", { nuevo: "training" });

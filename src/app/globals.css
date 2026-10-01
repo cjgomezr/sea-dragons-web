@@ -165,18 +165,24 @@ h6 {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-3);
   background: var(--color-sidebar-background);
   border-bottom: 1px solid var(--color-sidebar-border);
 }
 
-/* En el móvil el nombre y los dos controles (campana y cuenta) comparten una
-   sola fila, también a 360px: el resto vive en el menú de la cuenta (#287). */
+/* En el móvil el nombre y los tres controles (lupa, campana y cuenta)
+   comparten una sola fila, también a 360px: el resto vive en el menú de la
+   cuenta (#287). Con la lupa (#427) los tres botones de 44px ocupan 132px, y
+   al nombre le quedan 176px a 360 con los huecos de antes. Con la fuente del
+   sistema de Linux (la de CI; Archivo no se carga) el nombre sembrado mide
+   203px a 18px, así que en el móvil el nombre baja a 16px (180px), la
+   cabecera acolcha 12px a los lados y los iconos van pegados: sus 44px ya
+   los separan. En la barra lateral todo vuelve a su medida. */
 .app-sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 /* En el móvil el logo va encima del nombre (#295): al lado, uno apaisado
@@ -211,7 +217,7 @@ h6 {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--color-sidebar-text);
   text-overflow: ellipsis;
@@ -370,7 +376,7 @@ h6 {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: var(--space-2);
+  gap: 0;
 }
 
 /* La campana y el botón de la cuenta, los dos iconos de la misma esquina. */
@@ -695,6 +701,7 @@ button.notification-item-content:hover {
      por la izquierda sin motivo. */
   .app-sidebar-actions {
     position: relative;
+    gap: var(--space-2);
   }
 
   .notification-panel,
@@ -766,6 +773,244 @@ button.notification-item-content:hover {
   }
 }
 
+/* La búsqueda global (#427, RF-8 del PRD de E14). En escritorio, el cuadro
+   del mockup del panel vive en una barra encima del contenido y la lista
+   cuelga de él; en el móvil la abre la lupa de la cabecera a pantalla
+   entera, con la misma forma que la lista de la campana. */
+.app-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-topbar {
+  display: none;
+}
+
+.global-search {
+  position: relative;
+}
+
+.global-search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.global-search-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  color: var(--color-text-secondary);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+/* El anillo de foco lo dibuja el recuadro entero, con la lupa dentro: el
+   cuadro solo quedaría encogido a la derecha del icono. */
+.global-search-field:focus-within {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+/* 16px: con menos, Safari en el iPhone acerca la página al tocar el cuadro. */
+.global-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+}
+
+.global-search-input:focus,
+.global-search-input:focus-visible {
+  outline: none;
+}
+
+.global-search-input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 1;
+}
+
+.global-search-popup {
+  margin-top: var(--space-3);
+  overflow: hidden;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.search-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+.search-message p {
+  margin: 0;
+}
+
+.search-failure p {
+  color: var(--color-danger);
+}
+
+.search-group + .search-group {
+  border-top: 1px solid var(--color-border);
+}
+
+.search-group-header {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4) var(--space-1);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+}
+
+.search-group-total {
+  font-family: var(--font-family-mono);
+}
+
+.search-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target-min);
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.search-option:hover,
+.search-option[aria-selected="true"] {
+  background: var(--color-background);
+}
+
+/* La opción marcada con las flechas lleva además la raya de acento: el fondo
+   solo no se distingue del de pasar el ratón. */
+.search-option[aria-selected="true"] {
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.search-option:last-child {
+  margin-bottom: var(--space-2);
+}
+
+.search-see-all {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-accent-text);
+}
+
+.search-result-avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+}
+
+.search-result-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Un título largo se recorta en vez de ensanchar la lista: a 375px los tres
+   grupos caben sin desplazarse de lado. */
+.search-result-title,
+.search-result-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.search-result-detail {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* En el móvil, la búsqueda abierta es una pantalla entera por encima de la
+   barra de pestañas, como la lista de avisos. */
+.search-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  overflow-y: auto;
+  padding: var(--space-4);
+  color: var(--color-text);
+  background: var(--color-background);
+}
+
+.search-screen .global-search-field {
+  background: var(--color-panel);
+}
+
+@media (min-width: 768px) {
+  .mobile-search {
+    display: none;
+  }
+
+  .app-topbar {
+    display: flex;
+    align-items: center;
+    padding: var(--space-3) var(--space-8);
+    background: var(--color-panel);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .global-search-bar {
+    width: min(100%, 360px);
+  }
+
+  .global-search-input {
+    font-size: 15px;
+  }
+
+  .global-search-bar .global-search-popup {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    left: 0;
+    z-index: 20;
+    /* Sin alto máximo a propósito: con su propio scroll la lista sería una
+       región que el teclado no alcanza, porque el foco se queda en el
+       cuadro. Con tres grupos llenos, la que crece es la página. */
+    width: min(440px, calc(100vw - 240px - 2 * var(--space-8)));
+    margin: 0;
+    box-shadow: var(--shadow);
+  }
+}
+
 .app-main {
   flex: 1;
   width: 100%;
@@ -785,6 +1030,7 @@ button.notification-item-content:hover {
   .app-sidebar {
     width: 240px;
     flex-shrink: 0;
+    padding: var(--space-4);
     border-bottom: none;
     border-right: 1px solid var(--color-sidebar-border);
   }
@@ -792,6 +1038,7 @@ button.notification-item-content:hover {
   .app-sidebar-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: var(--space-4);
   }
 
   /* El logo y el nombre en una fila, como en el mockup del panel (#352). */
@@ -818,6 +1065,7 @@ button.notification-item-content:hover {
     flex: 1 1 0;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    font-size: 18px;
     line-clamp: 2;
     white-space: normal;
   }

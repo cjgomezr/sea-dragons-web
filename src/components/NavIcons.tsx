@@ -80,6 +80,17 @@ export function BellIcon(): React.JSX.Element {
   );
 }
 
+/** La lupa de la búsqueda global (#427): junto a la campana en el móvil y
+ * dentro del cuadro en escritorio. */
+export function SearchIcon(): React.JSX.Element {
+  return (
+    <IconBase>
+      <circle cx="11" cy="11" r="6" />
+      <path d="m15.5 15.5 4 4" />
+    </IconBase>
+  );
+}
+
 function DashboardIcon(): React.JSX.Element {
   return (
     <IconBase>

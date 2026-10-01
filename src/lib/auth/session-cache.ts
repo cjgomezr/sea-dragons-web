@@ -38,6 +38,8 @@ export type CachedSession = {
 
 export type SessionCache = {
   read(accessToken: string): RememberedSessionState | null;
+  /** El socio de ese token, con la misma vida que su estado. */
+  readUserId(accessToken: string): string | null;
   remember(entry: {
     readonly accessToken: string;
     readonly userId: string;
@@ -111,18 +113,26 @@ export function createSessionCache(options: {
     }
   }
 
+  function readLiveEntry(accessToken: string): CachedSession | null {
+    const key = hashAccessToken(accessToken);
+    const entry = entries.get(key);
+    if (entry === undefined) {
+      return null;
+    }
+    if (options.now() >= entry.validUntilMs) {
+      forgetKey(key);
+      return null;
+    }
+    return entry;
+  }
+
   return {
     read(accessToken) {
-      const key = hashAccessToken(accessToken);
-      const entry = entries.get(key);
-      if (entry === undefined) {
-        return null;
-      }
-      if (options.now() >= entry.validUntilMs) {
-        forgetKey(key);
-        return null;
-      }
-      return entry.state;
+      return readLiveEntry(accessToken)?.state ?? null;
+    },
+
+    readUserId(accessToken) {
+      return readLiveEntry(accessToken)?.userId ?? null;
     },
 
     remember({ accessToken, userId, state }) {

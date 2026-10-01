@@ -1027,3 +1027,19 @@ describe("columna de asistencia", () => {
     ).not.toBeChecked();
   });
 });
+
+// #427: "Ver todos" y un socio de la búsqueda global llegan con el texto.
+describe("llegar con un texto buscado", () => {
+  it("pone el texto en la búsqueda y la primera lectura ya lo filtra", async () => {
+    stubApi({ members: [MARIA, NEREA] });
+
+    render(<DirectoryScreen locale="en" initialSearch="nerea" />);
+
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["Nerea Ruiz"]);
+    });
+    expect(screen.getByLabelText("Search by name")).toHaveValue("nerea");
+    expect(requestedUrls).toHaveLength(1);
+    expect(lastRequest().get("q")).toBe("nerea");
+  });
+});

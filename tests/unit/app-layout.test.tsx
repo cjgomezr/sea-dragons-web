@@ -36,6 +36,8 @@ vi.mock("@/lib/supabase/session-client", () => ({
 }));
 vi.mock("@/lib/auth/session-reader", () => ({
   readSessionState: (...args: unknown[]) => readSessionState(...args),
+  // #427: la cáscara también recibe quién mira, para la búsqueda global.
+  readSessionUserId: async () => "00000000-0000-4000-8000-000000000001",
 }));
 vi.mock("@/lib/club/supabase-club-brand", () => ({
   readClubBrand: async () => ({ name: "Hobart Orcas", initials: "HO" }),

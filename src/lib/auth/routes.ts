@@ -53,6 +53,14 @@ export const GROUPS_PATH = "/grupos";
  * donde lleva el aviso de un evento o una serie nuevos (#310). */
 export const CALENDAR_PATH = "/calendario";
 
+/** Con el id de un evento, el calendario lleva el foco a su fila: es a donde
+ * lleva un evento encontrado en la búsqueda (#427). */
+export const CALENDAR_EVENT_QUERY_PARAM = "evento";
+
+/** `past` abre el calendario en los pasados, donde está la fila de un evento
+ * que ya ocurrió. Sin él, en los próximos. */
+export const CALENDAR_PERIOD_QUERY_PARAM = "periodo";
+
 /** Con un tipo de evento, el calendario abre ya el formulario de crear con
  * ese tipo elegido, a quien puede crear: es a donde lleva "Nuevo
  * entrenamiento" desde el inicio (#426). */

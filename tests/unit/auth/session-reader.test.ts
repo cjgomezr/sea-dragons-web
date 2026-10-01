@@ -6,7 +6,7 @@ import {
   type SessionCache,
   createSessionCache,
 } from "@/lib/auth/session-cache";
-import { readSessionState } from "@/lib/auth/session-reader";
+import { readSessionState, readSessionUserId } from "@/lib/auth/session-reader";
 
 /**
  * Quién está pidiendo, visto desde el servidor: si hay sesión de verdad y, si
@@ -417,6 +417,42 @@ describe("memoria entre peticiones", () => {
       kind: "anonymous",
     });
     expect(console.error).toHaveBeenCalled();
+    expect(getUserCalls()).toBe(0);
+  });
+});
+
+// #427: la cáscara lee quién mira para la búsqueda global, y no puede costar
+// otro viaje a Supabase en cada pantalla (#434).
+describe("id de quien tiene la sesión", () => {
+  it("lo saca de la memoria tras leer el estado, sin volver a preguntar", async () => {
+    const { client, getUserCalls } = fakeSupabase({
+      user: USER,
+      member: { account_status: "active", role: "Player" },
+    });
+    await readSessionState(client, cache);
+
+    const userId = await readSessionUserId(client, cache);
+
+    expect(userId).toBe(USER.id);
+    expect(getUserCalls()).toBe(1);
+  });
+
+  it("lo pregunta al servidor de autenticación si la memoria no lo tiene", async () => {
+    const { client, getUserCalls } = fakeSupabase({ user: USER });
+
+    const userId = await readSessionUserId(client, cache);
+
+    expect(userId).toBe(USER.id);
+    expect(getUserCalls()).toBe(1);
+  });
+
+  it("es nulo, sin preguntar a nadie, cuando no llega ninguna cookie", async () => {
+    const { client, getUserCalls } = fakeSupabase({
+      user: USER,
+      accessToken: null,
+    });
+
+    expect(await readSessionUserId(client, cache)).toBeNull();
     expect(getUserCalls()).toBe(0);
   });
 });
