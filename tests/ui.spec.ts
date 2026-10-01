@@ -1704,8 +1704,12 @@ test.describe("dentro de la aplicación", () => {
       await page.waitForLoadState("networkidle");
     }
 
+    /** El enlace del menú, no cualquier enlace a la sección: el dashboard
+     * también enlaza a Directorio desde su tesela de socios activos. */
     function visibleSectionLink(page: Page, sectionPath: string): Locator {
-      return page.locator(`a[href="${sectionPath}"]:visible`);
+      return page
+        .getByRole("navigation")
+        .locator(`a[href="${sectionPath}"]:visible`);
     }
 
     async function showSectionLoading(page: Page): Promise<Locator> {
