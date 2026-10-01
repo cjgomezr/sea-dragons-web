@@ -311,11 +311,14 @@ export function GlobalSearch({
           />
         </div>
       </div>
-      {/* Siempre en el DOM: un lector de pantalla sólo anuncia los cambios
-          de una región que ya estaba. */}
-      <p className="visually-hidden" role="status">
-        {announcementOf(translate, state)}
-      </p>
+      {/* Desde que se abre la búsqueda y no antes: un lector de pantalla
+          sólo anuncia los cambios de una región que ya estaba, y una región
+          vacía en cada pantalla sería una más que tropezar sin motivo. */}
+      {isExpanded ? (
+        <p className="visually-hidden" role="status">
+          {announcementOf(translate, state)}
+        </p>
+      ) : null}
       {isPopupOpen ? (
         <div className="global-search-popup">
           <SearchPopup
