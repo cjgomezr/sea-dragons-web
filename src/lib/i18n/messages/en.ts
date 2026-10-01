@@ -783,6 +783,12 @@ export const englishMessages = {
     "Your session ended. Sign in again to answer.",
   "calendar.rsvp.error.membershipNotCurrent":
     "Your membership isn't up to date. Sort it out in Payments to answer.",
+  "membership.block.pending":
+    "Your membership is pending: you haven't added a card yet.",
+  "membership.block.pastDue": "Your last payment didn't go through.",
+  "membership.block.cancelled": "Your membership is cancelled.",
+  "membership.block.scope":
+    "Until it's up to date you only see your profile, Payments and the calendar.",
   "calendar.membership.notice":
     "Your membership isn't up to date, so you can't answer events yet.",
   "calendar.membership.toPayments": "Go to Payments",

@@ -176,6 +176,34 @@ export function isStandingCurrent(
   );
 }
 
+/** Por qué la puerta de socio está cerrada (#453): el estado que la cierra.
+ * Una exención vencida ya llega resuelta a uno de los tres. */
+export type MembershipBlock = Extract<
+  MembershipStatus,
+  "pending" | "past_due" | "cancelled"
+>;
+
+/** El motivo de la puerta cerrada, o `null` si está al día. Sin membresía,
+ * el socio está como quien todavía no puso tarjeta. */
+export function membershipBlockOf(
+  reading: MembershipReading,
+): MembershipBlock | null {
+  if (reading.kind === "none") {
+    return "pending";
+  }
+  const { membership } = reading;
+  switch (membership.status) {
+    case "pending":
+    case "past_due":
+    case "cancelled":
+      return membership.status;
+    case "trialing":
+    case "active":
+    case "waived":
+      return null;
+  }
+}
+
 export async function readMembership(
   gateway: MembershipGateway,
   input: { readonly userId: string; readonly now: Date },

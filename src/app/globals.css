@@ -4623,6 +4623,9 @@ button.notification-item-content:hover {
 /* El aviso de quien no tiene la membresía al día (#453), en el calendario y
    en el inicio: dice qué le falta y lleva a Pagos. */
 .membership-notice {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
   margin: 0;
   padding: var(--space-3) var(--space-4);
   color: var(--color-text);
@@ -4630,6 +4633,10 @@ button.notification-item-content:hover {
   border: 1px solid var(--color-border);
   border-left: 4px solid var(--color-warning);
   border-radius: var(--radius);
+}
+
+.membership-notice p {
+  margin: 0;
 }
 
 .membership-notice a {

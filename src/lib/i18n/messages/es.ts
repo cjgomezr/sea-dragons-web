@@ -781,6 +781,12 @@ export const spanishMessages: MessageCatalog = {
     "Tu sesión terminó. Vuelve a entrar para responder.",
   "calendar.rsvp.error.membershipNotCurrent":
     "Tu membresía no está al día. Ponla al día en Pagos para responder.",
+  "membership.block.pending":
+    "Tu membresía está pendiente: todavía no has añadido una tarjeta.",
+  "membership.block.pastDue": "Tu último pago no se pudo cobrar.",
+  "membership.block.cancelled": "Tu membresía está cancelada.",
+  "membership.block.scope":
+    "Hasta que esté al día solo ves tu perfil, Pagos y el calendario.",
   "calendar.membership.notice":
     "Tu membresía no está al día: todavía no puedes responder a los eventos.",
   "calendar.membership.toPayments": "Ir a Pagos",

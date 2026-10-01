@@ -6,6 +6,7 @@ import {
   type MembershipStanding,
   isMembershipCurrent,
   isStandingCurrent,
+  membershipBlockOf,
   readMembership,
   resolveMembership,
 } from "@/lib/membership/membership";
@@ -230,5 +231,35 @@ describe("si una membresía leída con el socio está al día (#453)", () => {
     });
 
     expect(isStandingCurrent(standing, NOW)).toBe(true);
+  });
+});
+
+describe("por qué está cerrada la puerta (#453)", () => {
+  it("sin membresía, está pendiente", () => {
+    expect(membershipBlockOf({ kind: "none" })).toBe("pending");
+  });
+
+  it.each(["pending", "past_due", "cancelled"] as const)(
+    "una membresía %s la cierra con su estado",
+    (status) => {
+      const membership = resolveMembership(aRecord({ status }), NOW);
+
+      expect(membershipBlockOf({ kind: "found", membership })).toBe(status);
+    },
+  );
+
+  it.each(["trialing", "active"] as const)(
+    "una membresía %s no la cierra",
+    (status) => {
+      const membership = resolveMembership(aRecord({ status }), NOW);
+
+      expect(membershipBlockOf({ kind: "found", membership })).toBeNull();
+    },
+  );
+
+  it("una exención vencida sin suscripción la cierra como pendiente", () => {
+    const membership = resolveMembership(aWaivedRecord(YESTERDAY), NOW);
+
+    expect(membershipBlockOf({ kind: "found", membership })).toBe("pending");
   });
 });
