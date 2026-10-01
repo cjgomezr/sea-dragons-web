@@ -196,7 +196,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   writes.length = 0;
   insertResult = { kind: "created", categoryId: NEW_CATEGORY_ID };
-  givenSession({ kind: "active", role: "Coach" });
+  givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 });
 
 describe("endpoints de categorías", () => {
@@ -204,7 +204,7 @@ describe("endpoints de categorías", () => {
     it.each<Role>(["Player", "Committee"])(
       "responde 403 a un %s en cada endpoint, sin tocar nada",
       async (role) => {
-        givenSession({ kind: "active", role });
+        givenSession({ kind: "active", role, membershipCurrent: true });
 
         const responses = [
           await getCategories(),
@@ -221,7 +221,7 @@ describe("endpoints de categorías", () => {
     );
 
     it("el handler también responde 403 a un Player que se salte la frontera", async () => {
-      givenSession({ kind: "active", role: "Player" });
+      givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
       const response = await collection.POST(
         jsonRequest(EVALUATION_CATEGORIES_API_PATH, "POST", {
@@ -242,7 +242,7 @@ describe("endpoints de categorías", () => {
     });
 
     it.each<Role>(["Coach", "Admin"])("responde 200 a un %s", async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await getCategories();
 

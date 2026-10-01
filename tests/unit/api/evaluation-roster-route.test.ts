@@ -90,7 +90,7 @@ describe("GET /api/v1/evaluations", () => {
   it.each<Role>(["Coach", "Admin"])(
     "sirve a un %s los miembros con su OVR",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await getRoster();
 
@@ -113,7 +113,7 @@ describe("GET /api/v1/evaluations", () => {
   it.each<Role>(["Player", "Committee"])(
     "responde 403 a un %s",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await getRoster();
 
@@ -130,7 +130,7 @@ describe("GET /api/v1/evaluations", () => {
   });
 
   it("no acepta escrituras en la lista", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     const response = await route.POST(
       new NextRequest(new URL(EVALUATIONS_API_PATH, ORIGIN), {

@@ -139,7 +139,7 @@ async function throughBoundary(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  givenSession({ kind: "active", role: "Player" });
+  givenSession({ kind: "active", role: "Player", membershipCurrent: true });
   readAuthenticatedUserId.mockResolvedValue(USER_ID);
   store = {
     status: "active",

@@ -107,6 +107,7 @@ function mockWiring(options: WiringOptions = {}): void {
     readSessionState: async () => ({
       kind: "active",
       role: options.callerRole ?? "Coach",
+      membershipCurrent: true,
     }),
   }));
 }
@@ -365,6 +366,7 @@ describe("los socios de un grupo en la frontera", () => {
       const response = await boundaryResponse(path, {
         kind: "active",
         role: "Player",
+        membershipCurrent: true,
       });
 
       await expectErrorCode(response, 403, "forbidden");

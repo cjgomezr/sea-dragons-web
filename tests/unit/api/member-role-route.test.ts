@@ -93,7 +93,11 @@ function mockWiring(options: WiringOptions = {}): void {
   mockSessionClient();
   vi.doMock("@/lib/auth/session-reader", () => ({
     readAuthenticatedUserId: async () => ADMIN_ID,
-    readSessionState: async () => ({ kind: "active", role: "Admin" }),
+    readSessionState: async () => ({
+      kind: "active",
+      role: "Admin",
+      membershipCurrent: true,
+    }),
   }));
 }
 
@@ -298,7 +302,11 @@ describe("PATCH /api/v1/members/{id}/role en la frontera", () => {
   it.each(["Coach", "Committee", "Player"] as const)(
     "responde 403 a un %s sin llegar a la ruta",
     async (role) => {
-      const response = await boundaryResponse({ kind: "active", role });
+      const response = await boundaryResponse({
+        kind: "active",
+        role,
+        membershipCurrent: true,
+      });
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toMatchObject({
@@ -308,7 +316,11 @@ describe("PATCH /api/v1/members/{id}/role en la frontera", () => {
   );
 
   it("deja pasar a un Admin", async () => {
-    const response = await boundaryResponse({ kind: "active", role: "Admin" });
+    const response = await boundaryResponse({
+      kind: "active",
+      role: "Admin",
+      membershipCurrent: true,
+    });
 
     expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
   });

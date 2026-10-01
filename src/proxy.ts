@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { apiError } from "@/lib/api/response";
+import { MEMBERSHIP_NOT_CURRENT_REASON, apiError } from "@/lib/api/response";
 import {
   type SessionBoundaryOutcome,
   decideSessionBoundary,
@@ -16,12 +16,12 @@ import {
  * La frontera de sesión (NFR-004), en el servidor y para el 100% de las
  * peticiones. En Next 16 esto se llama `proxy`; era `middleware` hasta la 15.
  *
- * Decide, en este orden, si hay alguien, si su cuenta puede operar y si su
- * rol alcanza la ruta (FR-013). La matriz por rol se aplica aquí a propósito:
- * redirigir desde el proxy es lo único que cubre también a quien escribe la
+ * Decide, en este orden, si hay alguien, si su cuenta puede operar, si su
+ * rol alcanza la ruta (FR-013) y si su membresía está al día (#453). La
+ * matriz por rol se aplica aquí a propósito: redirigir desde el proxy es lo único que cubre también a quien escribe la
  * dirección de una pantalla a mano, y un endpoint restringido responde 403
  * sin que su handler tenga que acordarse de comprobarlo. Qué exige cada ruta
- * se declara en `RESTRICTED_ROUTES`, no en este archivo. Las policies de la
+ * se declara en `RESTRICTED_ROUTES` y `MEMBER_ONLY_ROUTES`, no en este archivo. Las policies de la
  * base siguen siendo la otra mitad: protegen los datos aunque se llegue a
  * ellos por otro camino.
  *
@@ -34,6 +34,8 @@ const UNAUTHENTICATED_MESSAGE =
 const INCOMPLETE_ACCOUNT_MESSAGE =
   "Tu cuenta todavía está incompleta. Termina tu registro antes de usar este endpoint.";
 const MISSING_CAPABILITY_MESSAGE = "Tu rol no te permite usar este endpoint.";
+const MEMBERSHIP_NOT_CURRENT_MESSAGE =
+  "Tu membresía no está al día. Ponla al día en Pagos para usar este endpoint.";
 
 function buildResponse(
   outcome: SessionBoundaryOutcome,
@@ -50,6 +52,12 @@ function buildResponse(
       return apiError("forbidden", INCOMPLETE_ACCOUNT_MESSAGE);
     case "missingCapability":
       return apiError("forbidden", MISSING_CAPABILITY_MESSAGE);
+    case "membershipNotCurrent":
+      return apiError(
+        "forbidden",
+        MEMBERSHIP_NOT_CURRENT_MESSAGE,
+        MEMBERSHIP_NOT_CURRENT_REASON,
+      );
   }
 }
 

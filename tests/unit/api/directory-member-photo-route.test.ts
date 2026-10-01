@@ -115,7 +115,11 @@ async function throughBoundary(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  readSessionState.mockResolvedValue({ kind: "active", role: "Player" });
+  readSessionState.mockResolvedValue({
+    kind: "active",
+    role: "Player",
+    membershipCurrent: true,
+  });
   readAuthenticatedUserId.mockResolvedValue(CALLER_ID);
   club = { callerRole: "Player", member: memberRecord() };
 });
@@ -161,7 +165,11 @@ describe("GET /api/v1/directory/{id}/photo", () => {
   });
 
   it("responde 200 a un Admin que pide la foto de un socio dado de baja", async () => {
-    readSessionState.mockResolvedValue({ kind: "active", role: "Admin" });
+    readSessionState.mockResolvedValue({
+      kind: "active",
+      role: "Admin",
+      membershipCurrent: true,
+    });
     club = {
       callerRole: "Admin",
       member: memberRecord({ status: "inactive" }),

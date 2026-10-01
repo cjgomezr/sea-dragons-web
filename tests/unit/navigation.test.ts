@@ -236,7 +236,7 @@ function isOpenedByBoundary(href: string, role: Role): boolean {
   return (
     decideSessionBoundary({
       pathname: href,
-      session: { kind: "active", role },
+      session: { kind: "active", role, membershipCurrent: true },
     }).kind === "allow"
   );
 }

@@ -3,7 +3,9 @@ import {
   type MembershipGateway,
   type MembershipRecord,
   type MembershipStatus,
+  type MembershipStanding,
   isMembershipCurrent,
+  isStandingCurrent,
   readMembership,
   resolveMembership,
 } from "@/lib/membership/membership";
@@ -175,5 +177,58 @@ describe("readMembership", () => {
       kind: "found",
       membership: { status: "pending" },
     });
+  });
+});
+
+function aStanding(
+  overrides: Partial<MembershipStanding> = {},
+): MembershipStanding {
+  return {
+    status: "pending",
+    stripeSubscriptionId: null,
+    trialEnd: null,
+    currentPeriodEnd: null,
+    waivedUntil: null,
+    ...overrides,
+  };
+}
+
+describe("si una membresía leída con el socio está al día (#453)", () => {
+  it.each<[MembershipStatus, boolean]>([
+    ["pending", false],
+    ["trialing", true],
+    ["active", true],
+    ["past_due", false],
+    ["cancelled", false],
+    ["waived", true],
+  ])("cuenta %s como al día: %s", (status, expected) => {
+    expect(isStandingCurrent(aStanding({ status }), NOW)).toBe(expected);
+  });
+
+  it("no cuenta como al día a quien no tiene membresía", () => {
+    expect(isStandingCurrent(null, NOW)).toBe(false);
+  });
+
+  it("deja de contar una exención vencida sin suscripción", () => {
+    const standing = aStanding({ status: "waived", waivedUntil: YESTERDAY });
+
+    expect(isStandingCurrent(standing, NOW)).toBe(false);
+  });
+
+  it("cuenta una exención vigente", () => {
+    const standing = aStanding({ status: "waived", waivedUntil: TOMORROW });
+
+    expect(isStandingCurrent(standing, NOW)).toBe(true);
+  });
+
+  it("cuenta una exención vencida cuya suscripción sigue en curso", () => {
+    const standing = aStanding({
+      status: "waived",
+      waivedUntil: YESTERDAY,
+      stripeSubscriptionId: "sub_1",
+      currentPeriodEnd: TOMORROW,
+    });
+
+    expect(isStandingCurrent(standing, NOW)).toBe(true);
   });
 });

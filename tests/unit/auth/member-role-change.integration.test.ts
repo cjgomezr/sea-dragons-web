@@ -174,7 +174,7 @@ describeRls("cambiar el rol de un socio contra seadragons-dev", () => {
             { clubId, role: "Player" },
             async (player) => {
               const session = await openSessionOf(player);
-              await expect(sessionRoleOf(session)).resolves.toEqual({
+              await expect(sessionRoleOf(session)).resolves.toMatchObject({
                 kind: "active",
                 role: "Player",
               });
@@ -190,7 +190,7 @@ describeRls("cambiar el rol de un socio contra seadragons-dev", () => {
                 previousRole: "Player",
                 role: "Committee",
               });
-              await expect(sessionRoleOf(session)).resolves.toEqual({
+              await expect(sessionRoleOf(session)).resolves.toMatchObject({
                 kind: "active",
                 role: "Committee",
               });

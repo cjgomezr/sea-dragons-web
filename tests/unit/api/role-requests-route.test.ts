@@ -299,7 +299,11 @@ describe("POST /api/v1/role-requests en la frontera", () => {
   it.each([["Admin"], ["Coach"], ["Committee"], ["Player"]] as const)(
     "deja pasar a un %s con la cuenta activa",
     async (role) => {
-      const response = await boundaryResponse({ kind: "active", role });
+      const response = await boundaryResponse({
+        kind: "active",
+        role,
+        membershipCurrent: true,
+      });
 
       expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
     },

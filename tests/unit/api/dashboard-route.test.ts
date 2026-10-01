@@ -131,7 +131,11 @@ describe("GET /api/v1/dashboard", () => {
   it.each<Role>(["Admin", "Coach", "Committee", "Player"])(
     "sirve el dashboard a un %s",
     async (sessionRole) => {
-      givenSession({ kind: "active", role: sessionRole });
+      givenSession({
+        kind: "active",
+        role: sessionRole,
+        membershipCurrent: true,
+      });
       role = sessionRole;
 
       const response = await getDashboard();
@@ -147,7 +151,7 @@ describe("GET /api/v1/dashboard", () => {
   );
 
   it("sirve la tasa del club a un Coach", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
     role = "Coach";
 
     const response = await getDashboard();
@@ -160,7 +164,7 @@ describe("GET /api/v1/dashboard", () => {
   });
 
   it("un club recién creado recibe cada parte vacía", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
     const response = await getDashboard();
 
@@ -183,7 +187,7 @@ describe("GET /api/v1/dashboard", () => {
   });
 
   it("responde 200 con la tesela caída marcada como no disponible", async () => {
-    givenSession({ kind: "active", role: "Admin" });
+    givenSession({ kind: "active", role: "Admin", membershipCurrent: true });
     role = "Admin";
     clubRateFails = true;
 
@@ -212,7 +216,7 @@ describe("GET /api/v1/dashboard", () => {
   });
 
   it("responde 403 a una sesión que no corresponde a ningún socio", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
     memberExists = false;
 
     const response = await getDashboard();

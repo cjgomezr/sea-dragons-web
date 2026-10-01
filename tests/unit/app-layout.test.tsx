@@ -61,7 +61,7 @@ beforeEach(() => {
 describe("disposición de la aplicación", () => {
   // #292: la cabecera enseña la marca que guarda la base.
   it("pone en la cabecera el nombre guardado del club", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
     await renderAppLayout();
 
@@ -69,7 +69,7 @@ describe("disposición de la aplicación", () => {
   });
 
   it("dibuja la navegación de un Player sin Equipos, Evaluaciones ni Administración", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
     await renderAppLayout();
 
@@ -81,7 +81,7 @@ describe("disposición de la aplicación", () => {
   });
 
   it("dibuja la navegación de un Admin sin Administración, que vive en el directorio", async () => {
-    givenSession({ kind: "active", role: "Admin" });
+    givenSession({ kind: "active", role: "Admin", membershipCurrent: true });
 
     await renderAppLayout();
 

@@ -86,7 +86,7 @@ describe("GET /api/v1/account/attendance", () => {
   it.each<Role>(["Admin", "Coach", "Committee", "Player"])(
     "sirve a un %s su porcentaje y su total",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await getOwnAttendance();
 
@@ -99,7 +99,7 @@ describe("GET /api/v1/account/attendance", () => {
   );
 
   it("dice sin datos a quien no tiene sesiones elegibles", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
     storedAttendance = { kind: "no_data" };
 
     const response = await getOwnAttendance();
@@ -118,7 +118,7 @@ describe("GET /api/v1/account/attendance", () => {
   });
 
   it("no acepta escrituras", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
     const response = await route.POST(
       new NextRequest(new URL(ACCOUNT_ATTENDANCE_API_PATH, ORIGIN), {

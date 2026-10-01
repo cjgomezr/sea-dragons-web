@@ -144,7 +144,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   writes.length = 0;
   isDecodable = true;
-  givenSession({ kind: "active", role: "Admin" });
+  givenSession({ kind: "active", role: "Admin", membershipCurrent: true });
 });
 
 describe("endpoint del logo", () => {
@@ -216,7 +216,7 @@ describe("endpoint del logo", () => {
     it.each(["Coach", "Committee", "Player"] as const)(
       "responde 403 a un %s sin guardar nada",
       async (role) => {
-        givenSession({ kind: "active", role });
+        givenSession({ kind: "active", role, membershipCurrent: true });
 
         const response = await putLogo(PNG_BYTES);
 
@@ -241,7 +241,7 @@ describe("endpoint del logo", () => {
     it.each(["Coach", "Committee", "Player"] as const)(
       "responde 403 a un %s sin borrar nada",
       async (role) => {
-        givenSession({ kind: "active", role });
+        givenSession({ kind: "active", role, membershipCurrent: true });
 
         const response = await deleteLogo();
 

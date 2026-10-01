@@ -5,7 +5,10 @@ import type { Capability } from "@/lib/auth/roles";
 import {
   COMPLETE_REGISTRATION_PATH,
   DASHBOARD_PATH,
+  DIRECTORY_PATH,
   EVALUATIONS_PATH,
+  EVENT_RSVP_API_PATH,
+  PAYMENTS_PATH,
   EVALUATION_CATEGORIES_PATH,
   SIGN_IN_PATH,
 } from "@/lib/auth/routes";
@@ -99,7 +102,7 @@ beforeEach(() => {
 
 describe("frontera por rol en endpoints", () => {
   it("responde 403 con la forma de error, sin ejecutar el handler, al rol sin la capacidad", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
     const response = await requestThroughBoundary(RESTRICTED_TEST_API_PATH);
 
@@ -111,7 +114,7 @@ describe("frontera por rol en endpoints", () => {
   });
 
   it("ejecuta el handler para el rol que tiene la capacidad", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     const response = await requestThroughBoundary(RESTRICTED_TEST_API_PATH);
 
@@ -120,7 +123,11 @@ describe("frontera por rol en endpoints", () => {
   });
 
   it("no ejecuta el handler tampoco en lo que cuelga del endpoint restringido", async () => {
-    givenSession({ kind: "active", role: "Committee" });
+    givenSession({
+      kind: "active",
+      role: "Committee",
+      membershipCurrent: true,
+    });
 
     const response = await requestThroughBoundary(
       `${RESTRICTED_TEST_API_PATH}/123`,
@@ -135,7 +142,7 @@ describe("frontera por rol en endpoints", () => {
     const incompleteMessage = await (
       await requestThroughBoundary(RESTRICTED_TEST_API_PATH)
     ).json();
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
     const roleMessage = await (
       await requestThroughBoundary(RESTRICTED_TEST_API_PATH)
@@ -185,7 +192,7 @@ describe("frontera por rol en pantallas, a través del proxy", () => {
   it.each(["Player", "Committee"] as const)(
     "redirige al panel a un %s que pide evaluaciones escribiendo la dirección",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await proxy(requestFor(EVALUATIONS_PATH));
 
@@ -197,7 +204,7 @@ describe("frontera por rol en pantallas, a través del proxy", () => {
   it.each(["Coach", "Admin"] as const)(
     "deja pasar a un %s a evaluaciones",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await proxy(requestFor(EVALUATIONS_PATH));
 
@@ -208,7 +215,7 @@ describe("frontera por rol en pantallas, a través del proxy", () => {
   it.each(["Player", "Committee"] as const)(
     "redirige al panel a un %s que pide las categorías de evaluación",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await proxy(requestFor(EVALUATION_CATEGORIES_PATH));
 
@@ -220,7 +227,7 @@ describe("frontera por rol en pantallas, a través del proxy", () => {
   it.each(["Coach", "Admin"] as const)(
     "deja pasar a un %s a las categorías de evaluación",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await proxy(requestFor(EVALUATION_CATEGORIES_PATH));
 
@@ -229,10 +236,49 @@ describe("frontera por rol en pantallas, a través del proxy", () => {
   );
 
   it("lee la sesión una sola vez por petición", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     await proxy(requestFor(EVALUATIONS_PATH));
 
     expect(readSessionState).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("frontera de la membresía, a través del proxy (#453)", () => {
+  const rsvpPath = EVENT_RSVP_API_PATH.replace(
+    "[id]",
+    "e1e1e1e1-0000-4000-8000-00000000000e",
+  );
+
+  it("responde 403 con el motivo membership_not_current al RSVP de quien no está al día", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: false });
+
+    const response = await proxy(requestFor(rsvpPath));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "forbidden",
+        message: expect.any(String),
+        reason: "membership_not_current",
+      },
+    });
+  });
+
+  it("lleva a Pagos a quien no está al día y abre el directorio", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: false });
+
+    const response = await proxy(requestFor(DIRECTORY_PATH));
+
+    expect(response.status).toBe(TEMPORARY_REDIRECT);
+    expect(redirectedTo(response)).toBe(PAYMENTS_PATH);
+  });
+
+  it("deja seguir el RSVP de quien está al día", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
+
+    const response = await proxy(requestFor(rsvpPath));
+
+    expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
   });
 });

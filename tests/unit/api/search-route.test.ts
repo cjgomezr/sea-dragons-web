@@ -113,7 +113,11 @@ describe("GET /api/v1/search", () => {
   it.each<Role>(["Admin", "Coach", "Committee", "Player"])(
     "responde a un %s con los tres grupos en orden",
     async (sessionRole) => {
-      givenSession({ kind: "active", role: sessionRole });
+      givenSession({
+        kind: "active",
+        role: sessionRole,
+        membershipCurrent: true,
+      });
       role = sessionRole;
 
       const response = await search("geelong");
@@ -140,7 +144,7 @@ describe("GET /api/v1/search", () => {
   );
 
   it("busca con el texto de `q` sin los espacios de los extremos", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
     await search("  50%_o'neil ");
 
@@ -150,7 +154,7 @@ describe("GET /api/v1/search", () => {
   it.each([null, "", "a", "    "])(
     "responde 400 con motivo a q=%j",
     async (query) => {
-      givenSession({ kind: "active", role: "Player" });
+      givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
       const response = await search(query);
 
@@ -181,7 +185,7 @@ describe("GET /api/v1/search", () => {
   });
 
   it("responde 403 a una sesión que no corresponde a ningún socio", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
     memberExists = false;
 
     const response = await search("geelong");

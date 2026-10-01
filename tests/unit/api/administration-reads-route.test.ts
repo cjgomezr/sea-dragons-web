@@ -83,7 +83,11 @@ function mockWiring(callerRole: Role = "Admin"): void {
   mockSessionClient();
   vi.doMock("@/lib/auth/session-reader", () => ({
     readAuthenticatedUserId: async () => ADMIN_ID,
-    readSessionState: async () => ({ kind: "active", role: callerRole }),
+    readSessionState: async () => ({
+      kind: "active",
+      role: callerRole,
+      membershipCurrent: true,
+    }),
   }));
 }
 
@@ -220,6 +224,7 @@ describe("las lecturas de administración en la frontera", () => {
       const response = await boundaryResponse(MEMBERS_API_PATH, {
         kind: "active",
         role,
+        membershipCurrent: true,
       });
 
       expect(response.status).toBe(403);
@@ -233,6 +238,7 @@ describe("las lecturas de administración en la frontera", () => {
     const response = await boundaryResponse(MEMBERS_API_PATH, {
       kind: "active",
       role: "Admin",
+      membershipCurrent: true,
     });
 
     expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
@@ -242,6 +248,7 @@ describe("las lecturas de administración en la frontera", () => {
     const response = await boundaryResponse(ROLE_REQUESTS_API_PATH, {
       kind: "active",
       role: "Player",
+      membershipCurrent: true,
     });
 
     expect(response.headers.get(CONTINUE_HEADER)).toBe("1");

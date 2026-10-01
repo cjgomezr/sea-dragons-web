@@ -113,7 +113,11 @@ function mockWiring(callerRole: Role = "Player"): void {
   mockSessionClient();
   vi.doMock("@/lib/auth/session-reader", () => ({
     readAuthenticatedUserId: async () => CALLER_ID,
-    readSessionState: async () => ({ kind: "active", role: callerRole }),
+    readSessionState: async () => ({
+      kind: "active",
+      role: callerRole,
+      membershipCurrent: true,
+    }),
   }));
 }
 
@@ -357,7 +361,11 @@ describe("el directorio en la frontera", () => {
   it.each(["Admin", "Coach", "Committee", "Player"] as const)(
     "deja pasar a un %s",
     async (role) => {
-      const response = await boundaryResponse({ kind: "active", role });
+      const response = await boundaryResponse({
+        kind: "active",
+        role,
+        membershipCurrent: true,
+      });
 
       expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
     },

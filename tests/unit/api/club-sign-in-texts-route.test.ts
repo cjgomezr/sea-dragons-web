@@ -137,7 +137,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   writes.length = 0;
   stored = NO_SIGN_IN_TEXTS;
-  givenSession({ kind: "active", role: "Admin" });
+  givenSession({ kind: "active", role: "Admin", membershipCurrent: true });
 });
 
 describe("endpoint", () => {
@@ -154,7 +154,7 @@ describe("endpoint", () => {
     it.each(["Coach", "Committee", "Player"] as const)(
       "responde 403 a un %s",
       async (role) => {
-        givenSession({ kind: "active", role });
+        givenSession({ kind: "active", role, membershipCurrent: true });
 
         const response = await getTexts();
 
@@ -190,7 +190,7 @@ describe("endpoint", () => {
     it.each(["Coach", "Committee", "Player"] as const)(
       "responde 403 a un %s sin escribir nada",
       async (role) => {
-        givenSession({ kind: "active", role });
+        givenSession({ kind: "active", role, membershipCurrent: true });
 
         const response = await putTexts(CLUB_TEXTS);
 

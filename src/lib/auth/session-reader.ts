@@ -1,6 +1,7 @@
 import { isAuthSessionMissingError } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SessionState } from "./session-boundary";
+import { isStandingCurrent } from "@/lib/membership/membership";
 import { type SessionCache, sharedSessionCache } from "./session-cache";
 import {
   type MemberAccess,
@@ -15,13 +16,13 @@ import {
  * local: una sesión recién cerrada deja un token que todavía no ha caducado, y
  * verificarlo en local lo daría por bueno. La segunda lee la fila de miembro,
  * porque una cuenta `incomplete` tiene sesión válida y aun así no puede operar
- * (FR-083), y trae en la misma consulta el rol que decide qué alcanza. El rol
- * se lee de la base y no del token, para que un cambio no espere a que el
- * token caduque ni obligue a cerrar sesión.
+ * (FR-083), y trae en la misma consulta el rol y la membresía que deciden qué
+ * alcanza (#453). Los dos se leen de la base y no del token, para que un
+ * cambio no espere a que el token caduque ni obligue a cerrar sesión.
  *
  * Hasta el 30 de septiembre de 2026 las dos se hacían en cada petición. Ese
  * día el dueño aceptó hasta 30 segundos de retraso en que un cierre de sesión
- * ajeno, una baja o un cambio de rol surtan efecto (#434): la respuesta se
+ * ajeno, una baja, un cambio de rol o de membresía surtan efecto (#434): la respuesta se
  * guarda en `session-cache.ts` bajo el token de acceso. Quien cierra su propia
  * sesión sale al instante, porque su navegador ya no manda la cookie; y quien
  * cambia un rol o un estado olvida lo guardado de ese socio en ese momento.
@@ -79,6 +80,7 @@ export async function readAuthenticatedUserId(
 function toSessionState(
   userId: string,
   access: MemberAccess | null,
+  now: Date,
 ): SessionState {
   if (access === null) {
     return ANONYMOUS;
@@ -91,7 +93,11 @@ function toSessionState(
   }
   switch (access.accountStatus) {
     case "active":
-      return { kind: "active", role: access.role };
+      return {
+        kind: "active",
+        role: access.role,
+        membershipCurrent: isStandingCurrent(access.membership, now),
+      };
     case "incomplete":
       return { kind: "incomplete" };
     default:
@@ -120,7 +126,8 @@ async function askSupabaseForSessionState(
   userId: string,
 ): Promise<SessionState> {
   try {
-    return toSessionState(userId, await findMemberAccess(client, userId));
+    const access = await findMemberAccess(client, userId);
+    return toSessionState(userId, access, new Date());
   } catch (error) {
     // Una frontera que se cae hacia el lado abierto cuando la base no contesta
     // no es una frontera. Se niega el paso y se deja escrito por qué.

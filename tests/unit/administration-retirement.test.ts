@@ -9,7 +9,10 @@ import {
   ROLE_REQUESTS_API_PATH,
   ROLE_REQUEST_DECISION_API_PATH,
 } from "@/lib/auth/routes";
-import { decideSessionBoundary } from "@/lib/auth/session-boundary";
+import {
+  type SessionState,
+  decideSessionBoundary,
+} from "@/lib/auth/session-boundary";
 import type { Role } from "@/lib/auth/roles";
 
 /**
@@ -26,10 +29,8 @@ const REQUEST_ID = "0f0e0d0c-0b0a-4908-8706-050403020100";
 
 const NON_ADMIN_ROLES = ["Coach", "Committee", "Player"] as const;
 
-function activeAs(role: Role): {
-  readonly session: { readonly kind: "active"; readonly role: Role };
-} {
-  return { session: { kind: "active", role } };
+function activeAs(role: Role): { readonly session: SessionState } {
+  return { session: { kind: "active", role, membershipCurrent: true } };
 }
 
 async function declaredRedirects() {

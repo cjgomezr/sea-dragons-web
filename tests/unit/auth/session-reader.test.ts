@@ -20,10 +20,41 @@ const EMAIL = "nerea@example.test";
  * porque toda cuenta de este proyecto nace de un registro con correo. */
 const USER = { id: USER_ID, email: EMAIL } as const;
 
+type MembershipRow = {
+  readonly status: string;
+  readonly stripe_subscription_id: string | null;
+  readonly trial_end: string | null;
+  readonly current_period_end: string | null;
+  readonly waived_until: string | null;
+};
+
 type MemberRow = {
   readonly account_status: string;
   readonly role: string;
+  /** La membresía que trae el `left join`: nula si el socio no tiene. */
+  readonly memberships?: MembershipRow | null;
 } | null;
+
+/** Una membresía pagada y en curso: la del socio al día de siempre. */
+const CURRENT_MEMBERSHIP: MembershipRow = {
+  status: "active",
+  stripe_subscription_id: "sub_123",
+  trial_end: null,
+  current_period_end: "2999-01-01T00:00:00.000Z",
+  waived_until: null,
+};
+
+function membership(overrides: Partial<MembershipRow>): MembershipRow {
+  return { ...CURRENT_MEMBERSHIP, ...overrides };
+}
+
+/** La fila de una cuenta activa con ese rol, al día salvo que se diga. */
+function activeRow(
+  role: string,
+  memberships: MembershipRow | null = CURRENT_MEMBERSHIP,
+): MemberRow {
+  return { account_status: "active", role, memberships };
+}
 
 const NOW_MS = Date.UTC(2026, 8, 30, 9, 0, 0);
 const TOKEN_LIFETIME_MS = 60 * 60 * 1000;
@@ -153,12 +184,13 @@ describe("estado de sesión", () => {
   it("es activo cuando la fila de miembro lo dice", async () => {
     const { client } = fakeSupabase({
       user: USER,
-      member: { account_status: "active", role: "Player" },
+      member: activeRow("Player"),
     });
 
     await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "active",
       role: "Player",
+      membershipCurrent: true,
     });
   });
 
@@ -195,7 +227,7 @@ describe("estado de sesión", () => {
   it("trata como anónima una identidad sin correo, que aquí no puede existir", async () => {
     const { client } = fakeSupabase({
       user: { id: USER_ID },
-      member: { account_status: "active", role: "Player" },
+      member: activeRow("Player"),
     });
 
     await expect(readSessionState(client, cache)).resolves.toEqual({
@@ -220,19 +252,20 @@ describe("lectura del rol", () => {
   it("lleva el rol de la fila en una cuenta activa", async () => {
     const { client } = fakeSupabase({
       user: USER,
-      member: { account_status: "active", role: "Coach" },
+      member: activeRow("Coach"),
     });
 
     await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "active",
       role: "Coach",
+      membershipCurrent: true,
     });
   });
 
   it("cierra la frontera, y deja rastro, cuando el rol no está en el catálogo", async () => {
     const { client } = fakeSupabase({
       user: USER,
-      member: { account_status: "active", role: "admin" },
+      member: activeRow("admin"),
     });
 
     await expect(readSessionState(client, cache)).resolves.toEqual({
@@ -244,7 +277,7 @@ describe("lectura del rol", () => {
   it("lee el estado de la cuenta y el rol en una sola consulta a members", async () => {
     const { client, queries } = fakeSupabase({
       user: USER,
-      member: { account_status: "active", role: "Coach" },
+      member: activeRow("Coach"),
     });
 
     await readSessionState(client, cache);
@@ -256,31 +289,188 @@ describe("lectura del rol", () => {
   });
 
   it("aplica en la siguiente petición el rol que un Admin acaba de cambiar", async () => {
-    let row: MemberRow = { account_status: "active", role: "Coach" };
+    let row: MemberRow = activeRow("Coach");
     const { client } = fakeSupabase({ user: USER, member: () => row });
     await readSessionState(client, cache);
 
-    row = { account_status: "active", role: "Player" };
+    row = activeRow("Player");
     cache.forgetMember(USER_ID);
 
     await expect(readSessionState(client, cache)).resolves.toEqual({
       kind: "active",
       role: "Player",
+      membershipCurrent: true,
     });
   });
 
   it("aplica a los 30 segundos un rol cambiado en otro servidor, que no pudo olvidarlo aquí", async () => {
-    let row: MemberRow = { account_status: "active", role: "Coach" };
+    let row: MemberRow = activeRow("Coach");
     const { client } = fakeSupabase({ user: USER, member: () => row });
     await readSessionState(client, cache);
-    row = { account_status: "active", role: "Player" };
+    row = activeRow("Player");
 
     const withinWindow = await readSessionState(client, cache);
     clock.now += SESSION_CACHE_TTL_MS;
     const afterWindow = await readSessionState(client, cache);
 
-    expect(withinWindow).toEqual({ kind: "active", role: "Coach" });
-    expect(afterWindow).toEqual({ kind: "active", role: "Player" });
+    expect(withinWindow).toEqual({
+      kind: "active",
+      role: "Coach",
+      membershipCurrent: true,
+    });
+    expect(afterWindow).toEqual({
+      kind: "active",
+      role: "Player",
+      membershipCurrent: true,
+    });
+  });
+});
+
+describe("lectura de la membresía (#453)", () => {
+  it("lleva la membresía al día de una cuenta activa que paga", async () => {
+    const { client } = fakeSupabase({
+      user: USER,
+      member: activeRow("Player"),
+    });
+
+    await expect(readSessionState(client, cache)).resolves.toEqual({
+      kind: "active",
+      role: "Player",
+      membershipCurrent: true,
+    });
+  });
+
+  it.each(["trialing", "active"])(
+    "cuenta como al día una membresía %s",
+    async (status) => {
+      const { client } = fakeSupabase({
+        user: USER,
+        member: activeRow("Player", membership({ status })),
+      });
+
+      await expect(readSessionState(client, cache)).resolves.toMatchObject({
+        membershipCurrent: true,
+      });
+    },
+  );
+
+  it.each(["pending", "past_due", "cancelled"])(
+    "no cuenta como al día una membresía %s",
+    async (status) => {
+      const { client } = fakeSupabase({
+        user: USER,
+        member: activeRow("Player", membership({ status })),
+      });
+
+      await expect(readSessionState(client, cache)).resolves.toEqual({
+        kind: "active",
+        role: "Player",
+        membershipCurrent: false,
+      });
+    },
+  );
+
+  it("cuenta como al día una exención vigente", async () => {
+    const { client } = fakeSupabase({
+      user: USER,
+      member: activeRow(
+        "Player",
+        membership({
+          status: "waived",
+          stripe_subscription_id: null,
+          waived_until: "2999-01-01T00:00:00.000Z",
+        }),
+      ),
+    });
+
+    await expect(readSessionState(client, cache)).resolves.toMatchObject({
+      membershipCurrent: true,
+    });
+  });
+
+  it("no cuenta como al día una exención vencida sin suscripción", async () => {
+    const { client } = fakeSupabase({
+      user: USER,
+      member: activeRow(
+        "Player",
+        membership({
+          status: "waived",
+          stripe_subscription_id: null,
+          waived_until: "2020-01-01T00:00:00.000Z",
+        }),
+      ),
+    });
+
+    await expect(readSessionState(client, cache)).resolves.toMatchObject({
+      membershipCurrent: false,
+    });
+  });
+
+  it("no cuenta como al día a quien no tiene membresía", async () => {
+    const { client } = fakeSupabase({
+      user: USER,
+      member: activeRow("Admin", null),
+    });
+
+    await expect(readSessionState(client, cache)).resolves.toEqual({
+      kind: "active",
+      role: "Admin",
+      membershipCurrent: false,
+    });
+  });
+
+  it("acepta la membresía que llega como lista de una sola fila", async () => {
+    const { client } = fakeSupabase({
+      user: USER,
+      member: {
+        account_status: "active",
+        role: "Player",
+        memberships: [CURRENT_MEMBERSHIP],
+      } as unknown as MemberRow,
+    });
+
+    await expect(readSessionState(client, cache)).resolves.toMatchObject({
+      membershipCurrent: true,
+    });
+  });
+
+  it("cierra la frontera, y deja rastro, cuando la membresía trae un estado que no existe", async () => {
+    const { client } = fakeSupabase({
+      user: USER,
+      member: activeRow("Player", membership({ status: "paid" })),
+    });
+
+    await expect(readSessionState(client, cache)).resolves.toEqual({
+      kind: "anonymous",
+    });
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it("lee la membresía en la misma consulta a members, con un join a memberships", async () => {
+    const { client, queries } = fakeSupabase({
+      user: USER,
+      member: activeRow("Player"),
+    });
+
+    await readSessionState(client, cache);
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]?.table).toBe("members");
+    expect(queries[0]?.columns).toContain("memberships");
+  });
+
+  it("aplica a los 30 segundos una membresía que dejó de estar al día en otro servidor", async () => {
+    let row = activeRow("Player");
+    const { client } = fakeSupabase({ user: USER, member: () => row });
+    await readSessionState(client, cache);
+    row = activeRow("Player", membership({ status: "past_due" }));
+
+    const withinWindow = await readSessionState(client, cache);
+    clock.now += SESSION_CACHE_TTL_MS;
+    const afterWindow = await readSessionState(client, cache);
+
+    expect(withinWindow).toMatchObject({ membershipCurrent: true });
+    expect(afterWindow).toMatchObject({ membershipCurrent: false });
   });
 });
 
@@ -288,7 +478,7 @@ describe("memoria entre peticiones", () => {
   it("dos peticiones seguidas con el mismo token viajan una sola vez a Supabase", async () => {
     const { client, queries, getUserCalls } = fakeSupabase({
       user: USER,
-      member: { account_status: "active", role: "Player" },
+      member: activeRow("Player"),
     });
 
     const first = await readSessionState(client, cache);
@@ -314,7 +504,7 @@ describe("memoria entre peticiones", () => {
   it("vuelve a preguntar cuando el estado guardado pasa de 30 segundos", async () => {
     const { client, queries, getUserCalls } = fakeSupabase({
       user: USER,
-      member: { account_status: "active", role: "Player" },
+      member: activeRow("Player"),
     });
     await readSessionState(client, cache);
 
@@ -329,7 +519,7 @@ describe("memoria entre peticiones", () => {
     const { client, getUserCalls } = fakeSupabase({
       user: USER,
       accessToken: accessTokenExpiringAt(NOW_MS + 5_000),
-      member: { account_status: "active", role: "Player" },
+      member: activeRow("Player"),
     });
     await readSessionState(client, cache);
 
@@ -390,7 +580,7 @@ describe("memoria entre peticiones", () => {
   it("una avería no alarga la vida de un estado guardado más allá de sus 30 segundos", async () => {
     const healthy = fakeSupabase({
       user: USER,
-      member: { account_status: "active", role: "Player" },
+      member: activeRow("Player"),
     });
     await readSessionState(healthy.client, cache);
     const broken = fakeSupabase({
@@ -427,7 +617,7 @@ describe("id de quien tiene la sesión", () => {
   it("lo saca de la memoria tras leer el estado, sin volver a preguntar", async () => {
     const { client, getUserCalls } = fakeSupabase({
       user: USER,
-      member: { account_status: "active", role: "Player" },
+      member: activeRow("Player"),
     });
     await readSessionState(client, cache);
 

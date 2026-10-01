@@ -85,7 +85,7 @@ describe("GET /api/v1/attendance/club-rate", () => {
   it.each<Role>(["Admin", "Coach"])(
     "sirve a un %s la tasa del club",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await getClubRate();
 
@@ -97,7 +97,7 @@ describe("GET /api/v1/attendance/club-rate", () => {
   );
 
   it("dice sin datos cuando el club no tiene ninguna hoja", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
     storedRate = { kind: "no_data" };
 
     const response = await getClubRate();
@@ -111,7 +111,7 @@ describe("GET /api/v1/attendance/club-rate", () => {
   it.each<Role>(["Committee", "Player"])(
     "responde 403 a un %s",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await getClubRate();
 
@@ -128,7 +128,7 @@ describe("GET /api/v1/attendance/club-rate", () => {
   });
 
   it("no acepta escrituras", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     const response = await route.POST(
       new NextRequest(new URL(ATTENDANCE_CLUB_RATE_API_PATH, ORIGIN), {

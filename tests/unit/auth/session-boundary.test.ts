@@ -12,8 +12,13 @@ import {
   CLUB_MANIFEST_PATH,
   COMPLETE_REGISTRATION_PATH,
   CONFIRMATION_EMAIL_API_PATH,
+  DASHBOARD_API_PATH,
   DASHBOARD_PATH,
+  DIRECTORY_API_PATH,
+  DIRECTORY_MEMBER_PHOTO_API_PATH,
+  DIRECTORY_PATH,
   EMAIL_CONFIRMATION_PATH,
+  EVALUATIONS_API_PATH,
   EVALUATIONS_PATH,
   EVENTS_API_PATH,
   EVENTS_MANAGE_API_PATH,
@@ -45,11 +50,19 @@ import {
   NEWS_ATTACHMENTS_UPLOAD_API_PATH,
   NEWS_POST_API_PATH,
   NEWS_PUBLISH_API_PATH,
+  NOTIFICATIONS_API_PATH,
   PASSWORD_RECOVERY_PATH,
+  PAYMENTS_PATH,
+  ACCOUNT_PROFILE_API_PATH,
+  ACCOUNT_PROFILE_PHOTO_API_PATH,
+  CALENDAR_PATH,
+  CLUB_POSITIONS_API_PATH,
   REGISTER_API_PATH,
   REGISTRATION_PATH,
   ROLE_REQUESTS_API_PATH,
   ROLE_REQUEST_DECISION_API_PATH,
+  SEARCH_API_PATH,
+  SESSION_API_PATH,
   SIGN_IN_PATH,
   TEAMS_API_PATH,
   TEAMS_PATH,
@@ -65,12 +78,25 @@ import {
 
 const ANONYMOUS = { session: { kind: "anonymous" } } as const;
 const INCOMPLETE = { session: { kind: "incomplete" } } as const;
-const ACTIVE = { session: { kind: "active", role: "Player" } } as const;
+const ACTIVE = {
+  session: { kind: "active", role: "Player", membershipCurrent: true },
+} as const;
 
-function activeAs(role: Role): {
-  readonly session: { readonly kind: "active"; readonly role: Role };
-} {
-  return { session: { kind: "active", role } };
+type ActiveSession = {
+  readonly session: {
+    readonly kind: "active";
+    readonly role: Role;
+    readonly membershipCurrent: boolean;
+  };
+};
+
+function activeAs(role: Role): ActiveSession {
+  return { session: { kind: "active", role, membershipCurrent: true } };
+}
+
+/** Una cuenta activa cuya membresía no está al día (#453, D2 de E12). */
+function notCurrentAs(role: Role): ActiveSession {
+  return { session: { kind: "active", role, membershipCurrent: false } };
 }
 
 describe("frontera de sesión: sin sesión", () => {
@@ -1093,5 +1119,163 @@ describe("frontera de mi equipo (#401)", () => {
     expect(
       decideSessionBoundary({ pathname: EVENT_TEAM, ...ANONYMOUS }),
     ).toEqual({ kind: "unauthenticated" });
+  });
+});
+
+/** Un id cualquiera para los caminos con segmento dinámico. */
+const SOME_ID = "e1e1e1e1-0000-4000-8000-00000000000e";
+
+function withId(path: string): string {
+  return path.replace(/\[[^\]]+\]/g, SOME_ID);
+}
+
+const MEMBERSHIP_NOT_CURRENT: SessionBoundaryOutcome = {
+  kind: "membershipNotCurrent",
+};
+const TO_PAYMENTS: SessionBoundaryOutcome = {
+  kind: "redirect",
+  to: PAYMENTS_PATH,
+};
+
+describe("frontera de la membresía: un Player que no está al día (#453)", () => {
+  it.each([DASHBOARD_PATH, ACCOUNT_PAGE_PATH, CALENDAR_PATH, PAYMENTS_PATH])(
+    "le deja abrir %s, que es lo que D2 le deja ver",
+    (pathname) => {
+      expect(
+        decideSessionBoundary({ pathname, ...notCurrentAs("Player") }),
+      ).toEqual(ALLOW);
+    },
+  );
+
+  it.each([
+    EVENTS_API_PATH,
+    withId(EVENT_API_PATH),
+    DASHBOARD_API_PATH,
+    ACCOUNT_PROFILE_API_PATH,
+    ACCOUNT_PROFILE_PHOTO_API_PATH,
+    CLUB_POSITIONS_API_PATH,
+    NOTIFICATIONS_API_PATH,
+    ROLE_REQUESTS_API_PATH,
+    SESSION_API_PATH,
+  ])(
+    "le deja pedir %s: su perfil, el calendario en lectura o salir",
+    (pathname) => {
+      expect(
+        decideSessionBoundary({ pathname, ...notCurrentAs("Player") }),
+      ).toEqual(ALLOW);
+    },
+  );
+
+  it.each([DIRECTORY_PATH, NEWS_PATH, withId(NEWS_POST_PATH)])(
+    "lo lleva a Pagos si abre %s",
+    (pathname) => {
+      expect(
+        decideSessionBoundary({ pathname, ...notCurrentAs("Player") }),
+      ).toEqual(TO_PAYMENTS);
+    },
+  );
+
+  it.each([
+    withId(EVENT_RSVP_API_PATH),
+    DIRECTORY_API_PATH,
+    withId(DIRECTORY_MEMBER_PHOTO_API_PATH),
+    NEWS_API_PATH,
+    withId(NEWS_POST_API_PATH),
+    withId(NEWS_ATTACHMENT_API_PATH),
+    SEARCH_API_PATH,
+  ])("responde 403 por membresía en %s", (pathname) => {
+    expect(
+      decideSessionBoundary({ pathname, ...notCurrentAs("Player") }),
+    ).toEqual(MEMBERSHIP_NOT_CURRENT);
+  });
+
+  it("sigue cerrándole por rol lo que su rol no alcanza", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: TEAMS_API_PATH,
+        ...notCurrentAs("Player"),
+      }),
+    ).toEqual({ kind: "missingCapability" });
+  });
+});
+
+describe("frontera de la membresía: el personal que no está al día (#453)", () => {
+  it.each(ROLES)("niega el RSVP a un %s", (role) => {
+    expect(
+      decideSessionBoundary({
+        pathname: withId(EVENT_RSVP_API_PATH),
+        ...notCurrentAs(role),
+      }),
+    ).toEqual(MEMBERSHIP_NOT_CURRENT);
+  });
+
+  it.each([
+    DIRECTORY_PATH,
+    withId(MEMBER_RECORD_PATH),
+    DIRECTORY_API_PATH,
+    withId(MEMBER_RECORD_API_PATH),
+  ])("deja al Admin su directorio y su ficha: %s", (pathname) => {
+    expect(
+      decideSessionBoundary({ pathname, ...notCurrentAs("Admin") }),
+    ).toEqual(ALLOW);
+  });
+
+  it.each([
+    ATTENDANCE_PATH,
+    ATTENDANCE_API_PATH,
+    TEAMS_PATH,
+    TEAMS_API_PATH,
+    EVALUATIONS_PATH,
+    EVALUATIONS_API_PATH,
+  ])("deja al Coach su gestión: %s", (pathname) => {
+    expect(
+      decideSessionBoundary({ pathname, ...notCurrentAs("Coach") }),
+    ).toEqual(ALLOW);
+  });
+
+  it.each([NEWS_PATH, NEWS_API_PATH, NEWS_PUBLISH_API_PATH, NEWS_PUBLISH_PATH])(
+    "deja al Committee sus noticias: %s",
+    (pathname) => {
+      expect(
+        decideSessionBoundary({ pathname, ...notCurrentAs("Committee") }),
+      ).toEqual(ALLOW);
+    },
+  );
+
+  it("lleva a Pagos al Coach que abre el directorio, que no gestiona", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: DIRECTORY_PATH,
+        ...notCurrentAs("Coach"),
+      }),
+    ).toEqual(TO_PAYMENTS);
+  });
+
+  it("responde 403 por membresía al Committee que pide el directorio", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: DIRECTORY_API_PATH,
+        ...notCurrentAs("Committee"),
+      }),
+    ).toEqual(MEMBERSHIP_NOT_CURRENT);
+  });
+});
+
+describe("frontera de la membresía: quien está al día (#453)", () => {
+  it.each(
+    ROLES.flatMap((role) =>
+      [
+        withId(EVENT_RSVP_API_PATH),
+        DIRECTORY_API_PATH,
+        NEWS_API_PATH,
+        SEARCH_API_PATH,
+        DIRECTORY_PATH,
+        NEWS_PATH,
+      ].map((pathname) => [role, pathname] as const),
+    ),
+  )("deja a un %s al día lo de socio: %s", (role, pathname) => {
+    expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
+      ALLOW,
+    );
   });
 });

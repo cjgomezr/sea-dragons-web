@@ -155,7 +155,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   writes.length = 0;
   identityUpdate = null;
-  givenSession({ kind: "active", role: "Admin" });
+  givenSession({ kind: "active", role: "Admin", membershipCurrent: true });
 });
 
 describe("endpoint de la configuración: GET", () => {
@@ -180,7 +180,7 @@ describe("endpoint de la configuración: GET", () => {
   it.each(["Coach", "Committee", "Player"] as const)(
     "responde 403 a un %s",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await getSettings();
 
@@ -256,7 +256,7 @@ describe("endpoint de la configuración: PATCH", () => {
   it.each(["Coach", "Committee", "Player"] as const)(
     "responde 403 a un %s sin escribir nada",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await patchSettings(VALID_BODY);
 
@@ -355,7 +355,7 @@ describe("la pantalla de configuración en la frontera", () => {
   it.each(["Coach", "Committee", "Player"] as const)(
     "manda al panel a un %s, como a cualquier pantalla que su rol no alcanza",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await requestScreen();
 

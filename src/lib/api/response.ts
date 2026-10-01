@@ -32,6 +32,10 @@ const HTTP_STATUS_BY_ERROR_CODE: Record<ApiErrorCode, number> = {
   internal_error: 500,
 };
 
+/** El motivo del 403 de quien pide algo de socio sin tener la membresía al
+ * día (#453, RF-2 del PRD de E12). La pantalla lo traduce y lleva a Pagos. */
+export const MEMBERSHIP_NOT_CURRENT_REASON = "membership_not_current";
+
 const DEFAULT_SUCCESS_STATUS: ApiSuccessStatus = 200;
 
 export const NO_CONTENT_STATUS = 204;
