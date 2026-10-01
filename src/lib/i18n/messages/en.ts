@@ -1437,7 +1437,7 @@ export const englishMessages = {
     "Your session ended. Sign in again to build teams.",
   "teams.error.forbidden": "Only Admins and Coaches build teams.",
   "teams.error.unexpected": "Something went wrong. Try again.",
-"search.label": "Search",
+  "search.label": "Search",
   "search.placeholder": "Search members, events, news…",
   "search.results": "Search results",
   "search.group.members": "Members",
