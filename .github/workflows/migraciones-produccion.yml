@@ -30,8 +30,15 @@ on:
     branches: [main]
     # Un merge que no toca las migraciones no tiene nada que hacer aquí. El
     # histórico completo ya se comprobó en su PR, contra un Postgres limpio.
+    # El aplicador y el comprobador sí cuentan: un cambio en cómo se describe
+    # el esquema (#460) se verifica contra producción en el mismo merge, no
+    # en el siguiente que traiga una migración. Reaplicar es idempotente.
     paths:
       - "supabase/migrations/**"
+      - "supabase/ci/**"
+      - "scripts/apply-migrations.sh"
+      - "scripts/check-schema-snapshot.sh"
+      - "scripts/lib/schema-drift.sh"
 
 permissions:
   contents: read

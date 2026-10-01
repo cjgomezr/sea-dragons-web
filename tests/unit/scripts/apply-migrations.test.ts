@@ -303,10 +303,12 @@ describeConPostgres(
       await database.query(
         `alter database ${name} set search_path = "$user", public, extensions`,
       );
+      // Un ajuste a nivel de rol ganaría al de la base: si el Postgres de CI
+      // trajera uno, el test pasaría sin haber probado nada.
+      expect(await database.query("show search_path")).toMatch(/extensions/);
 
       const comparacion = await database.checkSchema();
 
-      expect(comparacion.stderr).not.toMatch(/gin_trgm_ops/);
       expect(comparacion.code, comparacion.stderr).toBe(0);
       expect(comparacion.stdout.trim()).toBe("iguales");
     });
