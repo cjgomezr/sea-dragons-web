@@ -368,6 +368,8 @@ describe("el próximo entrenamiento", () => {
         startsOn: TODAY_IN_CLUB,
         startTime: "19:00",
         location: "MSAC",
+        goingCount: 0,
+        maybeCount: 0,
         myResponse: "yes",
       },
     });

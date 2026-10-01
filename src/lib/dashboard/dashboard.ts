@@ -76,6 +76,10 @@ export type NextTraining = {
   readonly startsOn: string;
   readonly startTime: string;
   readonly location: string;
+  /** Los conteos van con la respuesta: la tarjeta del móvil responde con
+   * ellos igual que una fila del calendario (#426). */
+  readonly goingCount: number;
+  readonly maybeCount: number;
   readonly myResponse: RsvpResponse | null;
 };
 
@@ -239,6 +243,8 @@ function toNextTrainingTile(events: readonly AgendaEvent[]): NextTrainingTile {
       startsOn: training.startsOn,
       startTime: training.startTime,
       location: training.location,
+      goingCount: training.goingCount,
+      maybeCount: training.maybeCount,
       myResponse: training.myResponse,
     },
   };
