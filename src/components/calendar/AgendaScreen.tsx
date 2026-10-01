@@ -454,10 +454,10 @@ export function AgendaScreen({
     () => new Set([initialPeriod]),
   );
 
-  function reloadAgenda(focusEventId: string | null): void {
+  function reloadAgenda(eventToFocus: string | null): void {
     setAgendaVersion((version) => ({
       number: version.number + 1,
-      focusEventId,
+      focusEventId: eventToFocus,
     }));
   }
 
