@@ -98,8 +98,9 @@ describe("panel principal", () => {
     },
   );
 
-  it("ofrece Nuevo entrenamiento al Admin cuando llega el dashboard", async () => {
-    callerRole.current = "Admin";
+  /** Un dashboard vacío pero cargado: la cabecera, donde vive el botón, sólo
+   * se pinta cuando la petición ya llegó. */
+  function stubLoadedDashboard(): void {
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -122,6 +123,11 @@ describe("panel principal", () => {
           ),
       ),
     );
+  }
+
+  it("ofrece Nuevo entrenamiento al Admin cuando llega el dashboard", async () => {
+    callerRole.current = "Admin";
+    stubLoadedDashboard();
 
     await renderIn("en", HomePage);
 
@@ -131,13 +137,16 @@ describe("panel principal", () => {
   });
 
   it.each<Role>(["Coach", "Committee", "Player"])(
-    "no ofrece Nuevo entrenamiento a un %s",
+    "no ofrece Nuevo entrenamiento a un %s ni con el dashboard cargado",
     async (role) => {
       callerRole.current = role;
-      stubPendingDashboard();
+      stubLoadedDashboard();
 
       await renderIn("en", HomePage);
 
+      // Con la petición sin responder el botón no estaría para nadie: hay que
+      // esperar al saludo, que llega con la misma respuesta que la cabecera.
+      await screen.findByRole("heading", { level: 1, name: /Alba/ });
       expect(
         screen.queryByRole("link", { name: "New training" }),
       ).not.toBeInTheDocument();
