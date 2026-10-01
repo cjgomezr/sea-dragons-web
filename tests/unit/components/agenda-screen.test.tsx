@@ -1468,3 +1468,67 @@ describe("pasar lista desde la fila", () => {
     ).toHaveAttribute("href", `/asistencia?sesion=${OLDER_PAST_TRAINING.id}`);
   });
 });
+
+// #427: un evento encontrado en la búsqueda global lleva a su fila.
+describe("llegar a un evento desde la búsqueda", () => {
+  it("lleva el foco al título del evento pedido", async () => {
+    stubAgenda([POOL_TRAINING, SCRIMMAGE]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        focusEventId={SCRIMMAGE.id}
+      />,
+    );
+
+    const title = await screen.findByRole("heading", {
+      name: SCRIMMAGE.title,
+    });
+    await waitFor(() => expect(title).toHaveFocus());
+  });
+
+  it("abre en los pasados cuando el evento ya ocurrió", async () => {
+    stubAgenda([POOL_TRAINING]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        initialPeriod="past"
+        focusEventId={POOL_TRAINING.id}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("list", { name: "Past events" }),
+    ).toBeInTheDocument();
+    expect(requests).toEqual([
+      { method: "GET", path: `${AGENDA_PATH}?period=past` },
+    ]);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: POOL_TRAINING.title }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it("sin evento pedido no mueve el foco", async () => {
+    stubAgenda([POOL_TRAINING]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+      />,
+    );
+
+    const title = await screen.findByRole("heading", {
+      name: POOL_TRAINING.title,
+    });
+    expect(title).not.toHaveFocus();
+  });
+});

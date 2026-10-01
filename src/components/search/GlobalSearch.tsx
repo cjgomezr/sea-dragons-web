@@ -182,12 +182,15 @@ export function GlobalSearch({
   viewer,
   layout,
   onClose,
+  leading = null,
 }: {
   readonly locale: Locale;
   readonly viewer: SearchViewer;
   readonly layout: SearchLayout;
   /** Se cerró la búsqueda: con Escape o al abrir un resultado. */
   readonly onClose?: () => void;
+  /** Lo que va antes del cuadro en su fila: la flecha de cerrar del móvil. */
+  readonly leading?: React.ReactNode;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const router = useRouter();
@@ -274,36 +277,39 @@ export function GlobalSearch({
 
   return (
     <div ref={containerRef} className={`global-search global-search-${layout}`}>
-      <div className="global-search-field">
-        <SearchIcon />
-        <label className="visually-hidden" htmlFor={`${baseId}-cuadro`}>
-          {translate("search.label")}
-        </label>
-        <input
-          ref={inputRef}
-          id={`${baseId}-cuadro`}
-          type="search"
-          role="combobox"
-          className="global-search-input"
-          placeholder={translate("search.placeholder")}
-          autoComplete="off"
-          enterKeyHint="search"
-          aria-autocomplete="list"
-          aria-expanded={hasListbox}
-          aria-controls={hasListbox ? listboxId : undefined}
-          aria-activedescendant={
-            hasListbox && activeIndex !== null
-              ? optionId(activeIndex)
-              : undefined
-          }
-          value={search.text}
-          onChange={(event) => {
-            search.setText(event.target.value);
-            setIsExpanded(true);
-          }}
-          onFocus={() => setIsExpanded(true)}
-          onKeyDown={handleKeyDown}
-        />
+      <div className="global-search-row">
+        {leading}
+        <div className="global-search-field">
+          <SearchIcon />
+          <label className="visually-hidden" htmlFor={`${baseId}-cuadro`}>
+            {translate("search.label")}
+          </label>
+          <input
+            ref={inputRef}
+            id={`${baseId}-cuadro`}
+            type="search"
+            role="combobox"
+            className="global-search-input"
+            placeholder={translate("search.placeholder")}
+            autoComplete="off"
+            enterKeyHint="search"
+            aria-autocomplete="list"
+            aria-expanded={hasListbox}
+            aria-controls={hasListbox ? listboxId : undefined}
+            aria-activedescendant={
+              hasListbox && activeIndex !== null
+                ? optionId(activeIndex)
+                : undefined
+            }
+            value={search.text}
+            onChange={(event) => {
+              search.setText(event.target.value);
+              setIsExpanded(true);
+            }}
+            onFocus={() => setIsExpanded(true)}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
       </div>
       {/* Siempre en el DOM: un lector de pantalla sólo anuncia los cambios
           de una región que ya estaba. */}

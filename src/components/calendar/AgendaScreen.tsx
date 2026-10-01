@@ -386,6 +386,8 @@ export function AgendaScreen({
   locale,
   canManageEvents,
   canTakeAttendance,
+  initialPeriod = "upcoming",
+  focusEventId = null,
 }: {
   readonly locale: Locale;
   /** Si quien mira puede crear, editar y cancelar eventos. Sólo decide si se
@@ -395,19 +397,25 @@ export function AgendaScreen({
   /** Si quien mira registra asistencia: decide si un entrenamiento empezado
    * ofrece "Pasar lista" (#395). */
   readonly canTakeAttendance: boolean;
+  /** Dónde abre: un evento pasado de la búsqueda global vive en los pasados
+   * (#427). */
+  readonly initialPeriod?: AgendaPeriod;
+  /** El evento cuyo título recibe el foco al llegar, como el que se abrió
+   * desde la búsqueda global (#427). */
+  readonly focusEventId?: string | null;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
-  const [period, setPeriod] = useState<AgendaPeriod>("upcoming");
+  const [period, setPeriod] = useState<AgendaPeriod>(initialPeriod);
   const [notice, setNotice] = useState<AgendaNotice | null>(null);
   // Cambia con cada evento creado, editado o cancelado: la clave nueva vuelve
   // a montar las vistas.
   const [agendaVersion, setAgendaVersion] = useState<AgendaVersion>({
     number: 0,
-    focusEventId: null,
+    focusEventId,
   });
   // Los periodos ya abiertos: uno se monta la primera vez que se elige.
   const [openedPeriods, setOpenedPeriods] = useState<ReadonlySet<AgendaPeriod>>(
-    () => new Set(["upcoming"]),
+    () => new Set([initialPeriod]),
   );
 
   function reloadAgenda(focusEventId: string | null): void {

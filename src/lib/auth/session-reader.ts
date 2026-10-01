@@ -155,3 +155,21 @@ export async function readSessionState(
   }
   return state;
 }
+
+/**
+ * El id de quien tiene la sesión, para lo que no decide ningún permiso: la
+ * cáscara lo pasa a la búsqueda global para reconocer al propio socio (#427).
+ * Tras `readSessionState` lo tiene la memoria, así que no cuesta otro viaje
+ * a Supabase por pantalla (#434); sin ella, se pregunta como siempre.
+ */
+export async function readSessionUserId(
+  client: SupabaseClient,
+  cache: SessionCache = sharedSessionCache,
+): Promise<string | null> {
+  const accessToken = await readAccessToken(client);
+  if (accessToken === null) {
+    return null;
+  }
+  const remembered = cache.readUserId(accessToken);
+  return remembered === null ? readAuthenticatedUserId(client) : remembered;
+}

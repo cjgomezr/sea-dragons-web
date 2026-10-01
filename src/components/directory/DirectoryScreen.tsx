@@ -126,11 +126,17 @@ function EmptyDirectory({
 
 export function DirectoryScreen({
   locale,
+  initialSearch = "",
 }: {
   locale: Locale;
+  /** El nombre con el que llega, como desde la búsqueda global (#427). */
+  initialSearch?: string;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
-  const [filters, setFilters] = useState<DirectoryFilterState>(INITIAL_FILTERS);
+  const [filters, setFilters] = useState<DirectoryFilterState>({
+    ...INITIAL_FILTERS,
+    search: initialSearch,
+  });
   const [order, setOrder] = useState<DirectoryOrder>(INITIAL_SORT);
   const [state, setState] = useState<ScreenState>({ kind: "loading" });
   // Volver a intentarlo cuenta como una lectura más, aunque la consulta sea la

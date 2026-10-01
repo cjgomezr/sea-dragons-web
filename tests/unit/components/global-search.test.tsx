@@ -228,7 +228,7 @@ describe("el cuadro", () => {
 
     expect(searchBox(/buscar/i)).toHaveAttribute(
       "placeholder",
-      "Buscar socios, eventos, noticias…",
+      "Buscar miembros, eventos, noticias…",
     );
   });
 });
@@ -309,7 +309,7 @@ describe("pedir", () => {
 });
 
 describe("los grupos", () => {
-  it("pone cada resultado bajo Socios, Eventos y Noticias con su total", async () => {
+  it("pone cada resultado bajo Miembros, Eventos y Noticias con su total", async () => {
     const user = setUpUser();
     renderSearch();
 
@@ -396,7 +396,7 @@ describe("los grupos", () => {
     const groups = within(await screen.findByRole("listbox")).getAllByRole(
       "group",
     );
-    expect(groups[0]).toHaveAccessibleName("Socios (1)");
+    expect(groups[0]).toHaveAccessibleName("Miembros (1)");
     expect(groups[1]).toHaveAccessibleName("Eventos (1)");
     expect(groups[2]).toHaveAccessibleName("Noticias (1)");
   });
@@ -693,7 +693,7 @@ describe("el idioma", () => {
     expect(searchBox(/buscar/i)).toHaveValue("Geelong");
     expect(
       within(screen.getByRole("listbox")).getAllByRole("group")[0],
-    ).toHaveAccessibleName("Socios (1)");
+    ).toHaveAccessibleName("Miembros (1)");
     expect(screen.getByRole("status")).toHaveTextContent("3 resultados");
   });
 });

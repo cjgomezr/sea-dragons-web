@@ -766,6 +766,243 @@ button.notification-item-content:hover {
   }
 }
 
+/* La búsqueda global (#427, RF-8 del PRD de E14). En escritorio, el cuadro
+   del mockup del panel vive en una barra encima del contenido y la lista
+   cuelga de él; en el móvil la abre la lupa de la cabecera a pantalla
+   entera, con la misma forma que la lista de la campana. */
+.app-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-topbar {
+  display: none;
+}
+
+.global-search {
+  position: relative;
+}
+
+.global-search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.global-search-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  color: var(--color-text-secondary);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+/* El anillo de foco lo dibuja el recuadro entero, con la lupa dentro: el
+   cuadro solo quedaría encogido a la derecha del icono. */
+.global-search-field:focus-within {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+/* 16px: con menos, Safari en el iPhone acerca la página al tocar el cuadro. */
+.global-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+}
+
+.global-search-input:focus,
+.global-search-input:focus-visible {
+  outline: none;
+}
+
+.global-search-input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 1;
+}
+
+.global-search-popup {
+  margin-top: var(--space-3);
+  overflow: hidden;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.search-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+.search-message p {
+  margin: 0;
+}
+
+.search-failure p {
+  color: var(--color-danger);
+}
+
+.search-group + .search-group {
+  border-top: 1px solid var(--color-border);
+}
+
+.search-group-header {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4) var(--space-1);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+}
+
+.search-group-total {
+  font-family: var(--font-family-mono);
+}
+
+.search-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target-min);
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.search-option:hover,
+.search-option[aria-selected="true"] {
+  background: var(--color-background);
+}
+
+/* La opción marcada con las flechas lleva además la raya de acento: el fondo
+   solo no se distingue del de pasar el ratón. */
+.search-option[aria-selected="true"] {
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.search-option:last-child {
+  margin-bottom: var(--space-2);
+}
+
+.search-see-all {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-accent-text);
+}
+
+.search-result-avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+}
+
+.search-result-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Un título largo se recorta en vez de ensanchar la lista: a 375px los tres
+   grupos caben sin desplazarse de lado. */
+.search-result-title,
+.search-result-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.search-result-detail {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* En el móvil, la búsqueda abierta es una pantalla entera por encima de la
+   barra de pestañas, como la lista de avisos. */
+.search-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  overflow-y: auto;
+  padding: var(--space-4);
+  color: var(--color-text);
+  background: var(--color-background);
+}
+
+.search-screen .global-search-field {
+  background: var(--color-panel);
+}
+
+@media (min-width: 768px) {
+  .mobile-search {
+    display: none;
+  }
+
+  .app-topbar {
+    display: flex;
+    align-items: center;
+    padding: var(--space-3) var(--space-8);
+    background: var(--color-panel);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .global-search-bar {
+    width: min(100%, 360px);
+  }
+
+  .global-search-input {
+    font-size: 15px;
+  }
+
+  .global-search-bar .global-search-popup {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    left: 0;
+    z-index: 20;
+    width: min(440px, calc(100vw - 240px - 2 * var(--space-8)));
+    max-height: min(70vh, 560px);
+    margin: 0;
+    overflow-y: auto;
+    box-shadow: var(--shadow);
+  }
+}
+
 .app-main {
   flex: 1;
   width: 100%;

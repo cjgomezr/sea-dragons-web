@@ -23,13 +23,15 @@ const BRAND: ClubBrand = {
 const LONGEST_CLUB_NAME =
   "Asociación Deportiva de Rugby Subacuático del Sur · Tasmania";
 
+const VIEWER_ID = "00000000-0000-4000-8000-000000000001";
+
 function renderShell(
   locale: Locale = "en",
   brand: ClubBrand = BRAND,
   role: Role = "Player",
 ): void {
   render(
-    <AppShell locale={locale} role={role} brand={brand}>
+    <AppShell locale={locale} role={role} viewerId={VIEWER_ID} brand={brand}>
       <p>Contenido de la sección</p>
     </AppShell>,
   );
@@ -153,15 +155,17 @@ describe("app shell", () => {
 
   // #287: tema, idioma, Mi perfil y cerrar sesión viven en el menú de la
   // cuenta, así que la cabecera sólo lleva el nombre y dos controles.
-  it("la cabecera lleva sólo el nombre, la campana y el botón de la cuenta", () => {
+  // #427: la lupa del móvil se suma junto a la campana.
+  it("la cabecera lleva sólo el nombre, la lupa, la campana y la cuenta", () => {
     usePathname.mockReturnValue("/calendario");
     renderShell();
 
     const sidebar = screen.getByRole("complementary");
     const controls = within(sidebar).getAllByRole("button");
-    expect(controls).toHaveLength(2);
-    expect(controls[0]).toHaveAccessibleName(/^Notifications/);
-    expect(controls[1]).toHaveAccessibleName("My account");
+    expect(controls).toHaveLength(3);
+    expect(controls[0]).toHaveAccessibleName("Search");
+    expect(controls[1]).toHaveAccessibleName(/^Notifications/);
+    expect(controls[2]).toHaveAccessibleName("My account");
     expect(screen.queryByRole("button", { name: /theme/i })).toBeNull();
     expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
   });
@@ -286,7 +290,7 @@ describe("app shell", () => {
   it("nombra las dos navegaciones en el idioma de la visita", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="es" role="Player" brand={BRAND}>
+      <AppShell locale="es" role="Player" viewerId={VIEWER_ID} brand={BRAND}>
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -304,7 +308,7 @@ describe("app shell", () => {
   it("ofrece a cada navegación sólo lo que el rol recibido puede abrir", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="en" role="Player" brand={BRAND}>
+      <AppShell locale="en" role="Player" viewerId={VIEWER_ID} brand={BRAND}>
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -322,7 +326,7 @@ describe("app shell", () => {
   it("no enseña Administración en ninguna de las dos navegaciones a un Admin", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="en" role="Admin" brand={BRAND}>
+      <AppShell locale="en" role="Admin" viewerId={VIEWER_ID} brand={BRAND}>
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -338,12 +342,76 @@ describe("app shell", () => {
   it("muestra el contenido recibido dentro del área principal", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="en" role="Player" brand={BRAND}>
+      <AppShell locale="en" role="Player" viewerId={VIEWER_ID} brand={BRAND}>
         <p>Contenido de la sección</p>
       </AppShell>,
     );
 
     const main = screen.getByRole("main");
     expect(main).toContainElement(screen.getByText("Contenido de la sección"));
+  });
+});
+
+// #427, RF-8 del PRD de E14: la búsqueda global.
+describe("la búsqueda en la cáscara", () => {
+  it("pone el cuadro de búsqueda en la barra de arriba del contenido", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell();
+
+    const searchBar = screen.getByRole("search");
+    expect(
+      within(searchBar).getByRole("combobox", { name: "Search" }),
+    ).toHaveAttribute("placeholder", "Search members, events, news…");
+    expect(searchBar.compareDocumentPosition(screen.getByRole("main"))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it("pone la lupa del móvil justo antes de la campana", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell("es");
+
+    const magnifier = screen.getByRole("button", { name: "Buscar" });
+    const bell = screen.getByRole("button", { name: /^Avisos/ });
+    expect(magnifier.parentElement?.nextElementSibling).toBe(
+      bell.parentElement,
+    );
+    expect(magnifier).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("la lupa abre la búsqueda a pantalla completa con el foco en el cuadro", async () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell();
+    const magnifier = screen.getByRole("button", { name: "Search" });
+
+    await userEvent.click(magnifier);
+
+    const screenSearch = screen.getByRole("dialog", { name: "Search" });
+    expect(within(screenSearch).getByRole("combobox")).toHaveFocus();
+    expect(magnifier).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("Cerrar cierra la búsqueda y devuelve el foco a la lupa", async () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell();
+    const magnifier = screen.getByRole("button", { name: "Search" });
+    await userEvent.click(magnifier);
+
+    await userEvent.click(screen.getByRole("button", { name: "Close search" }));
+
+    expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
+    expect(magnifier).toHaveFocus();
+  });
+
+  it("Escape en la pantalla entera la cierra y devuelve el foco a la lupa", async () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell();
+    const magnifier = screen.getByRole("button", { name: "Search" });
+    await userEvent.click(magnifier);
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
+    expect(magnifier).toHaveFocus();
   });
 });
