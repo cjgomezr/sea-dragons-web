@@ -14,6 +14,15 @@
 -- el repositorio.
 --
 -- Correr con: psql -At -f supabase/ci/schema-snapshot.sql
+--
+-- El `search_path` decide cómo imprime el catálogo lo que no vive en `public`:
+-- `pg_get_indexdef` cualifica `extensions.gin_trgm_ops` sólo si `extensions`
+-- no está en la ruta. En Supabase el rol `postgres` conecta con `"$user",
+-- public, extensions`, el Postgres desechable del PR con `"$user", public`, y
+-- sin fijarlo aquí los dos describían el mismo esquema con líneas distintas
+-- (#460). Se fija a `public`, no a vacío: con la ruta vacía `regclass::text` y
+-- las funciones propias saldrían como `public.x` y cambiaría el archivo entero.
+set search_path = public;
 with objetos as (
   select format('tabla %s rls=%s', c.relname, c.relrowsecurity) as descripcion
     from pg_class c

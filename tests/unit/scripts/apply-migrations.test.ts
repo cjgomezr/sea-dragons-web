@@ -286,6 +286,33 @@ describeConPostgres(
       );
     });
 
+    it("describe el mismo esquema aunque el rol lleve `extensions` en su search_path, como el postgres de Supabase", async () => {
+      // En Supabase el rol `postgres` conecta con `"$user", public,
+      // extensions`. Con `extensions` en la ruta, el catálogo deja de
+      // cualificar lo que vive ahí (la clase de operador `gin_trgm_ops` de
+      // los índices de búsqueda) y la descripción sale distinta de la que
+      // generó el Postgres desechable del PR. Así quedó en rojo
+      // `migraciones en producción` tras el #459 (#460).
+      const database = await freshDatabase();
+      const applied = await applyMigrations([], {
+        ...process.env,
+        DATABASE_URL: database.url,
+      });
+      expect(applied.code, applied.stderr).toBe(0);
+      const name = await database.query("select current_database()");
+      await database.query(
+        `alter database ${name} set search_path = "$user", public, extensions`,
+      );
+      // Un ajuste a nivel de rol ganaría al de la base: si el Postgres de CI
+      // trajera uno, el test pasaría sin haber probado nada.
+      expect(await database.query("show search_path")).toMatch(/extensions/);
+
+      const comparacion = await database.checkSchema();
+
+      expect(comparacion.code, comparacion.stderr).toBe(0);
+      expect(comparacion.stdout.trim()).toBe("iguales");
+    });
+
     it("la comparación nota que el esquema de la base no es el declarado", async () => {
       // Sin esto, la comparación de arriba pasaría igual siendo incapaz de ver
       // una diferencia.

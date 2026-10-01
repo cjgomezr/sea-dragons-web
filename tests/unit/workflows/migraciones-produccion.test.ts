@@ -98,8 +98,18 @@ describe("workflow de migraciones en main", () => {
     expect(on.workflow_dispatch).toBeUndefined();
   });
 
-  it("un merge que no trae migraciones no toca producción", () => {
-    expect(parseWorkflow().on.push?.paths).toEqual(["supabase/migrations/**"]);
+  it("sólo un merge con migraciones, o con el aplicador o el comprobador que las verifican, toca producción", () => {
+    // El comprobador y su descripción del esquema son parte de la
+    // verificación: un cambio ahí (#460) tiene que comprobarse contra
+    // producción en el mismo merge, no en el siguiente que traiga una
+    // migración. Reaplicar el histórico es idempotente, así que no cuesta.
+    expect(parseWorkflow().on.push?.paths).toEqual([
+      "supabase/migrations/**",
+      "supabase/ci/**",
+      "scripts/apply-migrations.sh",
+      "scripts/check-schema-snapshot.sh",
+      "scripts/lib/schema-drift.sh",
+    ]);
   });
 
   it("serializa las corridas en vez de cancelar la que está aplicando", () => {
