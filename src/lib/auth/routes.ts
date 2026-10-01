@@ -167,6 +167,11 @@ export const ACCOUNT_NEWS_SEEN_API_PATH = "/api/v1/account/news-seen";
  * decide cada fuente, así que no aparece en `RESTRICTED_ROUTES`. */
 export const DASHBOARD_API_PATH = "/api/v1/dashboard";
 
+/** La búsqueda global (#425, RF-7 del PRD de E14). La alcanza cualquier
+ * cuenta activa: qué encuentra cada rol lo decide cada sección (D3), así que
+ * no aparece en `RESTRICTED_ROUTES`. */
+export const SEARCH_API_PATH = "/api/v1/search";
+
 /** Los avisos de quien llama (#265, E6): listarlos, contar los no leídos y
  * marcarlos. Los alcanza cualquier cuenta activa, de cualquier rol, y siempre
  * sobre los suyos, así que no aparecen en `RESTRICTED_ROUTES`. */

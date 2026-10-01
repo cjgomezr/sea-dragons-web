@@ -184,6 +184,17 @@ function seesWholeCalendar(role: Role): boolean {
   return hasCapability(role, "createEvents");
 }
 
+/** Qué parte del calendario alcanza a quien consulta. La búsqueda (#425)
+ * la comparte con la agenda para que las dos vean lo mismo (D3 de E14). */
+export function eventVisibilityFor(
+  role: Role,
+  groupIds: readonly string[],
+): EventVisibility {
+  return seesWholeCalendar(role)
+    ? { kind: "club" }
+    : { kind: "audience", groupIds };
+}
+
 type Viewer = {
   readonly clubId: string;
   readonly role: Role;
@@ -272,9 +283,7 @@ export async function listAgenda(
   const rows = await gateways.agenda.findAgendaPage({
     clubId: viewer.clubId,
     callerId: request.callerId,
-    visibility: seesWholeCalendar(viewer.role)
-      ? { kind: "club" }
-      : { kind: "audience", groupIds: viewer.groupIds },
+    visibility: eventVisibilityFor(viewer.role, viewer.groupIds),
     period: request.period,
     today: clubCalendarDate(request.now),
     after,
