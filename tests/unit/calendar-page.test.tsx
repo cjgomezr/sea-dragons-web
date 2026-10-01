@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Role } from "@/lib/auth/roles";
 
@@ -19,19 +19,29 @@ vi.mock("@/lib/auth/caller-role", () => ({
 
 const { default: CalendarioPage } = await import("@/app/(app)/calendario/page");
 
-async function renderAs(role: Role): Promise<void> {
+const GROUPS_PATH = "/api/v1/groups";
+
+type SearchParams = Record<string, string | string[] | undefined>;
+
+async function renderAs(
+  role: Role,
+  searchParams: SearchParams = {},
+): Promise<void> {
   callerRole.current = role;
   vi.stubGlobal(
     "fetch",
-    vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({ data: { events: [], nextCursor: null } }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        ),
-    ),
+    vi.fn(async (input: string) => {
+      // El diálogo de crear pide los grupos para la audiencia.
+      const payload = input.startsWith(GROUPS_PATH)
+        ? { data: { groups: [] } }
+        : { data: { events: [], nextCursor: null } };
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }),
   );
-  render(await CalendarioPage());
+  render(await CalendarioPage({ searchParams: Promise.resolve(searchParams) }));
   await screen.findByText("There are no upcoming events.");
 }
 
@@ -59,4 +69,40 @@ describe("botón + Evento en la página", () => {
       ).not.toBeInTheDocument();
     },
   );
+});
+
+describe("?nuevo= desde el inicio (#426)", () => {
+  it("abre a un Admin el formulario de crear con entrenamiento elegido", async () => {
+    await renderAs("Admin", { nuevo: "training" });
+
+    const dialog = await screen.findByRole("dialog", { name: "New event" });
+    expect(within(dialog).getByRole("combobox", { name: "Type" })).toHaveValue(
+      "training",
+    );
+  });
+
+  it("elige el tipo que nombra el parámetro", async () => {
+    await renderAs("Committee", { nuevo: "meeting" });
+
+    const dialog = await screen.findByRole("dialog", { name: "New event" });
+    expect(within(dialog).getByRole("combobox", { name: "Type" })).toHaveValue(
+      "meeting",
+    );
+  });
+
+  it("no abre nada a quien no puede crear eventos", async () => {
+    await renderAs("Player", { nuevo: "training" });
+
+    expect(
+      screen.queryByRole("dialog", { name: "New event" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("no abre nada con un tipo que no existe", async () => {
+    await renderAs("Admin", { nuevo: "picnic" });
+
+    expect(
+      screen.queryByRole("dialog", { name: "New event" }),
+    ).not.toBeInTheDocument();
+  });
 });
