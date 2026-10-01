@@ -47,7 +47,7 @@ function unavailableTile(translate: Translator, label: string): TileContent {
     value: translate("dashboard.unavailable"),
     caption: null,
     href: null,
-        isReplacedByCardOnMobile: false,
+    isReplacedByCardOnMobile: false,
   };
 }
 
@@ -106,7 +106,7 @@ function describeMembers(
           })
         : null,
     href: DIRECTORY_PATH,
-        isReplacedByCardOnMobile: false,
+    isReplacedByCardOnMobile: false,
   };
 }
 
@@ -191,7 +191,7 @@ function describeUnreadNews(
           })
         : null,
     href: NEWS_PATH,
-        isReplacedByCardOnMobile: false,
+    isReplacedByCardOnMobile: false,
   };
 }
 
