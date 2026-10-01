@@ -12859,15 +12859,16 @@ test.describe("el inicio en el navegador", () => {
     page,
   }) => {
     await page.clock.setFixedTime(DASHBOARD_NOW);
-    let attempts = 0;
+    // La red falla hasta que se pulsa reintentar. Contar peticiones no
+    // sirve: en desarrollo React monta el efecto dos veces y la primera
+    // respuesta se descarta.
+    let isNetworkDown = true;
     await page.route(
       (url) => url.pathname === DASHBOARD_ENDPOINT,
-      (route) => {
-        attempts += 1;
-        return attempts === 1
+      (route) =>
+        isNetworkDown
           ? route.abort("internetdisconnected")
-          : route.fulfill(jsonBody(ADMIN_DASHBOARD));
-      },
+          : route.fulfill(jsonBody(ADMIN_DASHBOARD)),
     );
     await page.goto(`${APP_URL}${HOME_SCREEN_PATH}`);
 
@@ -12875,6 +12876,7 @@ test.describe("el inicio en el navegador", () => {
     // alert.
     await expect(page.locator(".dashboard").getByRole("alert")).toBeVisible();
     await expectNoAxeViolations(page);
+    isNetworkDown = false;
     await page.getByRole("button", { name: "Try again" }).click();
 
     await expect(
