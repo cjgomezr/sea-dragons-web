@@ -138,7 +138,11 @@ export function AgendaRow({
   );
   const { state, respond } = useEventRsvp(event, receive);
   const teams = useEventTeam(event.id);
-  const canHaveTeams = BUILDABLE_EVENT_TYPES.includes(event.eventType);
+  // Los equipos son de socio (#453): sin la membresía al día la frontera los
+  // cierra, así que ni se piden.
+  const isMembershipCurrent = rsvpDisabledReasonId === null;
+  const canHaveTeams =
+    isMembershipCurrent && BUILDABLE_EVENT_TYPES.includes(event.eventType);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const detailId = useId();
   const isCancelled = event.status === "cancelled";

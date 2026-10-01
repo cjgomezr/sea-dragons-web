@@ -341,8 +341,8 @@ export const EVENT_RSVP_API_PATH = `${EVENT_API_PATH}/rsvp`;
 
 /** El equipo de quien llama en un evento (#401, RF-8 del PRD de E10): su
  * equipo y la alineación de un reparto publicado, sin ningún OVR. Cuelga del
- * camino de lectura: lo pide cualquier cuenta activa, y quien no ve el evento
- * recibe 404. */
+ * camino de lectura: lo pide cualquier cuenta activa con la membresía al día
+ * (#453), y quien no ve el evento recibe 404. */
 export const EVENT_TEAM_API_PATH = `${EVENT_API_PATH}/team`;
 
 /** Pasar lista (#393, RF-2 a RF-4 del PRD de E8). Todo lo que cuelga de
@@ -628,17 +628,20 @@ export type MemberOnlyRoute = {
  * Lo que una cuenta activa pierde cuando su membresía no está al día (#453,
  * RF-2 y D2 del PRD de E12): RSVP, directorio, noticias, equipos, asistencia,
  * evaluaciones y búsqueda. Quien no está al día ve su perfil, Pagos y el
- * calendario en lectura; lo que no esté aquí lo sigue alcanzando.
+ * calendario en lectura; lo que no esté aquí lo sigue alcanzando. La campana
+ * sigue abierta: sólo trae avisos que ya le llegaron, y está en la cabecera
+ * de todas las pantallas que le quedan.
  *
  * Va aparte de `RESTRICTED_ROUTES` porque responde a otra pregunta: aquélla
  * es qué deja la matriz a cada rol, ésta qué pide además estar al día. Un
  * Admin, un Coach o un Committee sin pagar conserva sus pantallas de gestión,
- * así que cada ruta dice con qué capacidad se conserva. El RSVP y la búsqueda
- * no los conserva nadie: responder es de socio, y la búsqueda encuentra
- * socios y noticias de todo el club.
+ * así que cada ruta dice con qué capacidad se conserva. El RSVP, el equipo
+ * propio y la búsqueda no los conserva nadie: responder y jugar son de socio,
+ * y la búsqueda encuentra socios y noticias de todo el club.
  */
 export const MEMBER_ONLY_ROUTES: readonly MemberOnlyRoute[] = [
   { path: EVENT_RSVP_API_PATH, managedWith: null },
+  { path: EVENT_TEAM_API_PATH, managedWith: null },
   { path: SEARCH_API_PATH, managedWith: null },
   { path: DIRECTORY_PATH, managedWith: "manageUsersAndRoles" },
   { path: DIRECTORY_API_PATH, managedWith: "manageUsersAndRoles" },

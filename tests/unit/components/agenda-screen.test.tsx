@@ -1681,6 +1681,27 @@ describe("quien no tiene la membresía al día (#453)", () => {
     expect(within(row).getByText("14 going · 2 maybe")).toBeInTheDocument();
   });
 
+  it("no pide los equipos al desplegar un entrenamiento: son de socio", async () => {
+    stubAgenda([POOL_TRAINING]);
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond={false}
+      />,
+    );
+    const row = await findRow(POOL_TRAINING.title);
+
+    await userEvent.click(
+      within(row).getByRole("button", { name: POOL_TRAINING.title }),
+    );
+
+    expect(requests.some((request) => request.path.endsWith("/team"))).toBe(
+      false,
+    );
+  });
+
   it("le dice por qué con un enlace a Pagos", async () => {
     stubAgenda([POOL_TRAINING]);
 

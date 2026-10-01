@@ -1177,6 +1177,7 @@ describe("frontera de la membresía: un Player que no está al día (#453)", () 
 
   it.each([
     withId(EVENT_RSVP_API_PATH),
+    withId(EVENT_TEAM_API_PATH),
     DIRECTORY_API_PATH,
     withId(DIRECTORY_MEMBER_PHOTO_API_PATH),
     NEWS_API_PATH,
@@ -1266,6 +1267,7 @@ describe("frontera de la membresía: quien está al día (#453)", () => {
     ROLES.flatMap((role) =>
       [
         withId(EVENT_RSVP_API_PATH),
+        withId(EVENT_TEAM_API_PATH),
         DIRECTORY_API_PATH,
         NEWS_API_PATH,
         SEARCH_API_PATH,

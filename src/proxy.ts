@@ -18,12 +18,13 @@ import {
  *
  * Decide, en este orden, si hay alguien, si su cuenta puede operar, si su
  * rol alcanza la ruta (FR-013) y si su membresía está al día (#453). La
- * matriz por rol se aplica aquí a propósito: redirigir desde el proxy es lo único que cubre también a quien escribe la
- * dirección de una pantalla a mano, y un endpoint restringido responde 403
- * sin que su handler tenga que acordarse de comprobarlo. Qué exige cada ruta
- * se declara en `RESTRICTED_ROUTES` y `MEMBER_ONLY_ROUTES`, no en este archivo. Las policies de la
- * base siguen siendo la otra mitad: protegen los datos aunque se llegue a
- * ellos por otro camino.
+ * matriz por rol se aplica aquí a propósito: redirigir desde el proxy es lo
+ * único que cubre también a quien escribe la dirección de una pantalla a
+ * mano, y un endpoint restringido responde 403 sin que su handler tenga que
+ * acordarse de comprobarlo. Qué exige cada ruta se declara en
+ * `RESTRICTED_ROUTES` y `MEMBER_ONLY_ROUTES`, no en este archivo. Las
+ * policies de la base siguen siendo la otra mitad: protegen los datos aunque
+ * se llegue a ellos por otro camino.
  *
  * Una Server Action no pasa por ese mapa: se invoca con un POST a cualquier
  * página, así que una restringida comprueba la capacidad por sí misma.

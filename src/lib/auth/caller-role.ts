@@ -9,9 +9,10 @@ import { readServerCookies } from "@/lib/supabase/server-cookies";
 import { createSessionClient } from "@/lib/supabase/session-client";
 
 /**
- * El rol y la membresía de quien pide la pantalla (#453), leídos en el servidor con la misma lectura
- * que usa la frontera y no pedido al navegador: una cookie o un prop que el
- * cliente pudiera tocar decidiría qué se le ofrece.
+ * El rol y la membresía de quien pide la pantalla (#453), leídos en el
+ * servidor con la misma lectura que usa la frontera y no pedidos al
+ * navegador: una cookie o un prop que el cliente pudiera tocar decidiría qué
+ * se le ofrece.
  *
  * La frontera ya dejó pasar sólo a una cuenta activa, así que los otros dos
  * casos son una carrera con ella (la sesión se cerró o cambió entre medias) y
