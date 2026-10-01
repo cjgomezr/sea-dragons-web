@@ -4249,6 +4249,14 @@ button.notification-item-content:hover {
   border-color: var(--color-border);
 }
 
+/* La respuesta que ya dio sigue rellena y legible: apagarle el texto sobre el
+   acento lo dejaba sin contraste. */
+.agenda-rsvp-choice[aria-pressed="true"]:disabled,
+.agenda-rsvp-choice[aria-pressed="true"]:disabled:hover {
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+
 .agenda-counts {
   margin: 0;
   font-size: 13px;

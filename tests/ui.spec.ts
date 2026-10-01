@@ -50,6 +50,7 @@ import {
   GROUPED_MEMBER_STORAGE_STATE_PATH,
   PHOTOGRAPHED_MEMBERS,
   PROFILE_PHOTO_FIXTURE_PATH,
+  UNPAID_MEMBER_STORAGE_STATE_PATH,
   incompleteStorageStatePath,
   readE2eSessionState,
   roleRequestStorageStatePath,
@@ -10613,6 +10614,8 @@ function calendarEventPath(event: unknown): string {
 
 type CalendarState = CalendarReads & {
   readonly name: string;
+  /** Quién mira. Sin él, un Admin. */
+  readonly storageState?: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   /** Lo que tiene que estar a la vista para que la pantalla haya cargado. */
   readonly ready: (page: Page) => Promise<void>;
@@ -10790,6 +10793,19 @@ const CALENDAR_STATES: readonly CalendarState[] = [
     ready: expandFirstRowWithTeams,
   },
   {
+    name: "calendario-sin-membresia",
+    events: STUBBED_AGENDA_EVENTS,
+    storageState: UNPAID_MEMBER_STORAGE_STATE_PATH,
+    ready: waitForAgendaRows,
+  },
+  {
+    name: "calendario-sin-membresia-es",
+    events: STUBBED_AGENDA_EVENTS,
+    storageState: UNPAID_MEMBER_STORAGE_STATE_PATH,
+    beforeVisit: chooseSpanish,
+    ready: waitForAgendaRows,
+  },
+  {
     name: "calendario-pasados",
     events: STUBBED_AGENDA_EVENTS,
     pastEvents: STUBBED_PAST_EVENTS,
@@ -10826,7 +10842,7 @@ for (const state of CALENDAR_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
     quietNotificationBell();
-    test.use({ storageState: ADMIN_STORAGE_STATE });
+    test.use({ storageState: state.storageState ?? ADMIN_STORAGE_STATE });
 
     for (const vp of viewports) {
       test.describe(`@ ${vp.name}`, () => {
@@ -10865,6 +10881,45 @@ for (const state of CALENDAR_STATES) {
     });
   });
 }
+
+// Sin stubs: la frontera de verdad, con la membresía `pending` sembrada.
+test.describe("la puerta de quien no está al día (#453)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: UNPAID_MEMBER_STORAGE_STATE_PATH });
+
+  test("el directorio lo lleva a Pagos", async ({ page }) => {
+    await page.goto(`${APP_URL}/directorio`);
+
+    await expect(page).toHaveURL(/\/pagos$/);
+  });
+
+  test("el RSVP responde 403 con el motivo", async ({ page }) => {
+    const [event] = STUBBED_AGENDA_EVENTS;
+
+    const response = await page.request.post(
+      `${APP_URL}${CALENDAR_AGENDA_ENDPOINT}/${event.id}/rsvp`,
+      { data: { response: "yes" } },
+    );
+
+    expect(response.status()).toBe(403);
+    expect(await response.json()).toMatchObject({
+      error: { reason: "membership_not_current" },
+    });
+  });
+
+  test("el calendario deshabilita el RSVP y enlaza Pagos", async ({ page }) => {
+    await stubCalendarReads(page, { events: STUBBED_AGENDA_EVENTS });
+    await page.goto(`${APP_URL}${CALENDAR_SCREEN_PATH}`);
+    await waitForAgendaRows(page);
+
+    const row = agendaRow(page, STUBBED_AGENDA_EVENTS[1].title);
+    await expect(row.getByRole("button", { name: "Yes" })).toBeDisabled();
+    await expect(
+      page.getByRole("link", { name: "Go to Payments" }),
+    ).toBeVisible();
+  });
+});
 
 test.describe("calendario en el navegador", () => {
   skipWithoutSession();
@@ -13044,6 +13099,18 @@ const EMPTY_DASHBOARD = {
   latestNews: { kind: "news", posts: [] },
 };
 
+// El inicio reducido de quien no tiene la membresía al día (#453): el aviso
+// con el motivo y el próximo entrenamiento, sin RSVP ni teselas de club.
+const RESTRICTED_DASHBOARD = {
+  kind: "restricted",
+  viewer: { firstName: "Liam" },
+  block: "pending",
+  nextTraining: {
+    kind: "training",
+    training: { ...DASHBOARD_TRAINING, myResponse: null },
+  },
+};
+
 type DashboardScreenState = {
   readonly name: string;
   readonly dashboard: object;
@@ -13070,6 +13137,11 @@ const DASHBOARD_STATES: readonly DashboardScreenState[] = [
     E2E_STORAGE_STATE_PATH,
   ),
   ...dashboardStates("inicio-vacio", EMPTY_DASHBOARD, ADMIN_STORAGE_STATE),
+  ...dashboardStates(
+    "inicio-sin-membresia",
+    RESTRICTED_DASHBOARD,
+    UNPAID_MEMBER_STORAGE_STATE_PATH,
+  ),
 ];
 
 async function serveDashboard(page: Page, dashboard: object): Promise<void> {

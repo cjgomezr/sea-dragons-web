@@ -362,6 +362,14 @@ export const GROUPED_MEMBER_STORAGE_STATE_PATH = path.join(
   "e2e-storage-state-con-grupos.json",
 );
 
+/** El socio activo cuya membresía no está al día (#453): ve el menú
+ * reducido, el inicio reducido y el calendario sin RSVP. */
+export const UNPAID_MEMBER_STORAGE_STATE_PATH = path.join(
+  REPO_ROOT,
+  "test-results",
+  "e2e-storage-state-sin-membresia.json",
+);
+
 const APP_URL = process.env.APP_URL ?? "http://localhost:3417";
 
 const CLUB_SLUG = "victoria-seadragons";
@@ -370,6 +378,7 @@ const CLUBS_TABLE = "clubs";
 const ROLE_REQUESTS_TABLE = "role_requests";
 const GROUPS_TABLE = "groups";
 const GROUP_MEMBERSHIPS_TABLE = "group_memberships";
+const MEMBERSHIPS_TABLE = "memberships";
 const PHOTOS_BUCKET = "member-photos";
 /** El código de Postgres de una violación de unicidad: otra corrida creó el
  * mismo grupo entre la búsqueda y el alta. */
@@ -503,6 +512,7 @@ function everyStorageStatePath(): readonly string[] {
     ...INCOMPLETE_MEMBER_NAMES.map(incompleteStorageStatePath),
     ...ROLE_REQUEST_MEMBER_NAMES.map(roleRequestStorageStatePath),
     GROUPED_MEMBER_STORAGE_STATE_PATH,
+    UNPAID_MEMBER_STORAGE_STATE_PATH,
   ];
 }
 
@@ -599,8 +609,38 @@ async function seedMember(
       `No se pudo crear la fila de miembro de prueba: ${memberFailure}`,
     );
   }
+  await seedMembershipStatus(serviceClient, {
+    clubId: target.clubId,
+    userId: member.id,
+    status: "active",
+  });
 
   return { userId: member.id, email: member.email, password: member.password };
+}
+
+/** Pone la membresía del socio en `status` (#453). Todos nacen al día, porque
+ * sin ella la frontera los trata como quien no pagó; el socio sin membresía
+ * la vuelve a `pending` después. Se va con la fila del socio en cascada. */
+async function seedMembershipStatus(
+  serviceClient: SupabaseClient,
+  membership: {
+    readonly clubId: string;
+    readonly userId: string;
+    readonly status: "active" | "pending";
+  },
+): Promise<void> {
+  const failure = await describeSupabaseFailure(
+    "sembrar la membresía del socio de prueba",
+    () =>
+      serviceClient.from(MEMBERSHIPS_TABLE).upsert({
+        club_id: membership.clubId,
+        user_id: membership.userId,
+        status: membership.status,
+      }),
+  );
+  if (failure !== null) {
+    throw new Error(`No se pudo sembrar la membresía de prueba: ${failure}`);
+  }
 }
 
 /** Sube la foto fija a la carpeta del socio y la apunta en su ficha, como
@@ -848,6 +888,7 @@ async function ensureArchivedE2ePosition(
 /** Los papeles que no son ni un socio a medias ni uno de Mi cuenta. */
 const ACTIVE_ROLE = "activo";
 const GROUPED_ROLE = "con-grupos";
+const UNPAID_ROLE = "sin-membresia";
 
 /** Siembra a los socios a medias y apunta sus `userId` en `userIds`. */
 async function seedIncompleteMembers(
@@ -944,6 +985,21 @@ async function createTestMembers(): Promise<E2eSessionState> {
       grouped.email,
       grouped.password,
       GROUPED_MEMBER_STORAGE_STATE_PATH,
+    );
+
+    const unpaid = await seedMember(target, UNPAID_ROLE, {
+      account_status: "active",
+    });
+    userIds.push(unpaid.userId);
+    await seedMembershipStatus(serviceClient, {
+      clubId,
+      userId: unpaid.userId,
+      status: "pending",
+    });
+    await writeStorageState(
+      unpaid.email,
+      unpaid.password,
+      UNPAID_MEMBER_STORAGE_STATE_PATH,
     );
 
     return {
