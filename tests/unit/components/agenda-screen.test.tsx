@@ -1515,6 +1515,66 @@ describe("llegar a un evento desde la búsqueda", () => {
     );
   });
 
+  it("sigue pidiendo páginas hasta encontrar el evento pedido", async () => {
+    stubApi(({ url }) =>
+      url.searchParams.get("cursor") === "pagina-2"
+        ? pageResponse({ events: [SCRIMMAGE], nextCursor: "pagina-3" })
+        : pageResponse({ events: [POOL_TRAINING], nextCursor: "pagina-2" }),
+    );
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        focusEventId={SCRIMMAGE.id}
+      />,
+    );
+
+    const title = await screen.findByRole("heading", {
+      name: SCRIMMAGE.title,
+    });
+    await waitFor(() => expect(title).toHaveFocus());
+    expect(requests.map((request) => request.path)).toEqual([
+      AGENDA_PATH,
+      `${AGENDA_PATH}?cursor=pagina-2`,
+    ]);
+    expect(
+      screen.getByRole("button", { name: "See more" }),
+    ).toBeInTheDocument();
+  });
+
+  it("deja de buscar el evento tras unas pocas páginas", async () => {
+    let page = 0;
+    stubApi(() => {
+      page += 1;
+      return pageResponse({
+        events: [
+          {
+            ...POOL_TRAINING,
+            id: `00000000-0000-4000-8000-${String(page).padStart(12, "0")}`,
+          },
+        ],
+        nextCursor: `pagina-${page + 1}`,
+      });
+    });
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        focusEventId="un-evento-que-no-esta"
+      />,
+    );
+
+    await screen.findAllByRole("heading", { name: POOL_TRAINING.title });
+    await waitFor(() => expect(requests).toHaveLength(4));
+    expect(
+      screen.getAllByRole("heading", { name: POOL_TRAINING.title }),
+    ).toHaveLength(4);
+  });
+
   it("sin evento pedido no mueve el foco", async () => {
     stubAgenda([POOL_TRAINING]);
 

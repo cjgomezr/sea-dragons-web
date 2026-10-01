@@ -62,6 +62,9 @@ export function MobileSearch({
         <div
           id={screenId}
           role="dialog"
+          // Tapa la pantalla entera, y sacar el foco de ella la cierra: lo de
+          // debajo no se alcanza mientras está abierta.
+          aria-modal="true"
           aria-label={translate("search.label")}
           className="search-screen"
         >

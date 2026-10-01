@@ -20,6 +20,7 @@ import {
   type SearchOptionGroup,
   SearchResultList,
 } from "./SearchResultList";
+import { isArrowKey, useActiveOption } from "./use-active-option";
 import { type GlobalSearchState, useGlobalSearch } from "./use-global-search";
 
 /**
@@ -159,22 +160,62 @@ function SearchPopup({
   }
 }
 
-/** La opción marcada vale sólo para la respuesta en la que se marcó. */
-type ActiveOption = {
-  readonly results: SearchResults;
-  readonly index: number;
+type SearchComboboxProps = {
+  readonly id: string;
+  readonly inputRef: React.RefObject<HTMLInputElement | null>;
+  readonly translate: Translator;
+  readonly text: string;
+  readonly listboxId: string | null;
+  readonly activeOptionId: string | null;
+  readonly leading: React.ReactNode;
+  readonly onTextChange: (text: string) => void;
+  readonly onFocus: () => void;
+  readonly onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
 };
 
-function nextIndex(
-  current: number | null,
-  count: number,
-  key: "ArrowDown" | "ArrowUp",
-): number {
-  if (current === null) {
-    return key === "ArrowDown" ? 0 : count - 1;
-  }
-  const step = key === "ArrowDown" ? 1 : -1;
-  return (current + step + count) % count;
+/** El cuadro con su lupa: el combobox del patrón ARIA. Controla la lista sólo
+ * mientras hay una que controlar. */
+function SearchCombobox({
+  id,
+  inputRef,
+  translate,
+  text,
+  listboxId,
+  activeOptionId,
+  leading,
+  onTextChange,
+  onFocus,
+  onKeyDown,
+}: SearchComboboxProps): React.JSX.Element {
+  return (
+    <div className="global-search-row">
+      {leading}
+      <div className="global-search-field">
+        <SearchIcon />
+        <label className="visually-hidden" htmlFor={id}>
+          {translate("search.label")}
+        </label>
+        <input
+          ref={inputRef}
+          id={id}
+          type="search"
+          role="combobox"
+          className="global-search-input"
+          placeholder={translate("search.placeholder")}
+          autoComplete="off"
+          enterKeyHint="search"
+          aria-autocomplete="list"
+          aria-expanded={listboxId !== null}
+          aria-controls={listboxId ?? undefined}
+          aria-activedescendant={activeOptionId ?? undefined}
+          value={text}
+          onChange={(event) => onTextChange(event.target.value)}
+          onFocus={onFocus}
+          onKeyDown={onKeyDown}
+        />
+      </div>
+    </div>
+  );
 }
 
 export function GlobalSearch({
@@ -201,7 +242,6 @@ export function GlobalSearch({
   const { state } = search;
   // En la pantalla entera la lista es la pantalla: siempre está abierta.
   const [isExpanded, setIsExpanded] = useState(layout === "screen");
-  const [active, setActive] = useState<ActiveOption | null>(null);
   const collapse = useCallback(
     () => setIsExpanded(layout === "screen"),
     [layout],
@@ -221,6 +261,7 @@ export function GlobalSearch({
     }
   }, [layout]);
 
+  const results = state.kind === "found" ? state.results : null;
   const groups =
     state.kind === "found"
       ? listOptionGroups(state.results, {
@@ -230,18 +271,15 @@ export function GlobalSearch({
         })
       : [];
   const options = groups.flatMap((group) => group.options);
+  const active = useActiveOption(results, options.length);
   const isPopupOpen = isExpanded && state.kind !== "idle";
   const hasListbox = isPopupOpen && options.length > 0;
-  const activeIndex =
-    state.kind === "found" && active?.results === state.results
-      ? active.index
-      : null;
   const listboxId = `${baseId}-resultados`;
   const optionId = (index: number): string => `${baseId}-opcion-${index}`;
 
   function close(): void {
     search.setText("");
-    setActive(null);
+    active.clear();
     collapse();
     onClose?.();
   }
@@ -257,21 +295,20 @@ export function GlobalSearch({
       close();
       return;
     }
-    if (!hasListbox || state.kind !== "found") {
+    if (!hasListbox) {
       return;
     }
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if (isArrowKey(event.key)) {
       event.preventDefault();
-      const index = nextIndex(activeIndex, options.length, event.key);
-      setActive({ results: state.results, index });
       // El foco no se mueve del cuadro, así que el navegador no desplaza la
       // página hasta la opción marcada: se trae a la vista a mano.
-      document.getElementById(optionId(index))?.scrollIntoView({
-        block: "nearest",
-      });
+      document
+        .getElementById(optionId(active.move(event.key)))
+        ?.scrollIntoView({ block: "nearest" });
       return;
     }
-    const chosen = activeIndex === null ? undefined : options[activeIndex];
+    const chosen =
+      active.activeIndex === null ? undefined : options[active.activeIndex];
     if (event.key === "Enter" && chosen !== undefined) {
       event.preventDefault();
       choose(chosen.href);
@@ -280,40 +317,25 @@ export function GlobalSearch({
 
   return (
     <div ref={containerRef} className={`global-search global-search-${layout}`}>
-      <div className="global-search-row">
-        {leading}
-        <div className="global-search-field">
-          <SearchIcon />
-          <label className="visually-hidden" htmlFor={`${baseId}-cuadro`}>
-            {translate("search.label")}
-          </label>
-          <input
-            ref={inputRef}
-            id={`${baseId}-cuadro`}
-            type="search"
-            role="combobox"
-            className="global-search-input"
-            placeholder={translate("search.placeholder")}
-            autoComplete="off"
-            enterKeyHint="search"
-            aria-autocomplete="list"
-            aria-expanded={hasListbox}
-            aria-controls={hasListbox ? listboxId : undefined}
-            aria-activedescendant={
-              hasListbox && activeIndex !== null
-                ? optionId(activeIndex)
-                : undefined
-            }
-            value={search.text}
-            onChange={(event) => {
-              search.setText(event.target.value);
-              setIsExpanded(true);
-            }}
-            onFocus={() => setIsExpanded(true)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-      </div>
+      <SearchCombobox
+        id={`${baseId}-cuadro`}
+        inputRef={inputRef}
+        translate={translate}
+        text={search.text}
+        listboxId={hasListbox ? listboxId : null}
+        activeOptionId={
+          hasListbox && active.activeIndex !== null
+            ? optionId(active.activeIndex)
+            : null
+        }
+        leading={leading}
+        onTextChange={(text) => {
+          search.setText(text);
+          setIsExpanded(true);
+        }}
+        onFocus={() => setIsExpanded(true)}
+        onKeyDown={handleKeyDown}
+      />
       {/* Desde que se abre la búsqueda y no antes: un lector de pantalla
           sólo anuncia los cambios de una región que ya estaba, y una región
           vacía en cada pantalla sería una más que tropezar sin motivo. */}
@@ -334,7 +356,7 @@ export function GlobalSearch({
                 id={listboxId}
                 translate={translate}
                 groups={groups}
-                activeIndex={activeIndex}
+                activeIndex={active.activeIndex}
                 optionId={optionId}
                 onChoose={choose}
               />

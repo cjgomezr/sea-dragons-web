@@ -170,13 +170,15 @@ h6 {
   border-bottom: 1px solid var(--color-sidebar-border);
 }
 
-/* En el móvil el nombre y los dos controles (campana y cuenta) comparten una
-   sola fila, también a 360px: el resto vive en el menú de la cuenta (#287). */
+/* En el móvil el nombre y los tres controles (lupa, campana y cuenta)
+   comparten una sola fila, también a 360px: el resto vive en el menú de la
+   cuenta (#287). Con la lupa (#427) los huecos se estrechan para que el
+   nombre siga entero; en la barra lateral vuelven a su medida. */
 .app-sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 /* En el móvil el logo va encima del nombre (#295): al lado, uno apaisado
@@ -370,7 +372,7 @@ h6 {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 /* La campana y el botón de la cuenta, los dos iconos de la misma esquina. */
@@ -695,6 +697,7 @@ button.notification-item-content:hover {
      por la izquierda sin motivo. */
   .app-sidebar-actions {
     position: relative;
+    gap: var(--space-2);
   }
 
   .notification-panel,
@@ -1030,6 +1033,7 @@ button.notification-item-content:hover {
   .app-sidebar-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: var(--space-4);
   }
 
   /* El logo y el nombre en una fila, como en el mockup del panel (#352). */
