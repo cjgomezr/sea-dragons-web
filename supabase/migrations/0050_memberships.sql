@@ -42,6 +42,7 @@ create table if not exists public.memberships (
   waived_until timestamptz,
   waived_by uuid,
   created_at timestamptz not null default now(),
+  -- Sin trigger, como en `team_splits`: lo pone quien escribe la fila.
   updated_at timestamptz not null default now(),
   constraint memberships_waived_reason_check
     check (status <> 'waived' or waived_reason is not null),
@@ -72,7 +73,9 @@ create table if not exists public.payments (
   -- Centavos enteros (CON-005), nunca un decimal.
   amount_cents integer not null
     constraint payments_amount_cents_check check (amount_cents >= 0),
-  currency text not null default 'aud',
+  -- En minúsculas, como la manda Stripe: así 'aud' y 'AUD' no conviven.
+  currency text not null default 'aud'
+    constraint payments_currency_check check (currency ~ '^[a-z]{3}$'),
   description text,
   status text not null
     constraint payments_status_check

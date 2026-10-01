@@ -361,7 +361,7 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
   );
 
   it(
-    "el enlace de la invitación deja elegir contraseña, y al completar el registro la cuenta queda activa",
+    "el enlace de la invitación deja elegir contraseña, y al completar el registro la cuenta queda activa con su membresía pending",
     async () => {
       await withScenario(
         async ({ serviceClient, clubId, adminId, groupId }) => {
@@ -419,6 +419,17 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
             await expect(
               activateAccountIfComplete(auth.gateways, created.member.userId),
             ).resolves.toEqual({ kind: "activated" });
+            // Repetir la activación no puede duplicar la membresía.
+            await activateAccountIfComplete(
+              auth.gateways,
+              created.member.userId,
+            );
+            const { data: memberships, error } = await serviceClient.client
+              .from("memberships")
+              .select("plan, status")
+              .eq("user_id", created.member.userId);
+            expect(error).toBeNull();
+            expect(memberships).toEqual([{ plan: "Full", status: "pending" }]);
           });
         },
       );

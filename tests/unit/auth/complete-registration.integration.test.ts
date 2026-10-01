@@ -102,7 +102,143 @@ async function readAccountStatus(
   return data === null ? null : (data.account_status as string);
 }
 
+type MembershipRow = { readonly plan: string | null; readonly status: string };
+
+async function readMemberships(
+  serviceClient: ServiceRoleClient,
+  userId: string,
+): Promise<readonly MembershipRow[]> {
+  const { data, error } = await serviceClient.client
+    .from("memberships")
+    .select("plan, status")
+    .eq("user_id", userId);
+  if (error) {
+    throw new Error(`No se pudo leer la membresía de prueba: ${error.message}`);
+  }
+  return data as MembershipRow[];
+}
+
+async function seedMembership(
+  serviceClient: ServiceRoleClient,
+  userId: string,
+  membership: MembershipRow,
+): Promise<void> {
+  const { data: member, error: memberError } = await serviceClient.client
+    .from(MEMBERS_TABLE)
+    .select("club_id")
+    .eq("user_id", userId)
+    .single();
+  if (memberError) {
+    throw new Error(
+      `No se pudo leer el socio de prueba: ${memberError.message}`,
+    );
+  }
+  const { error } = await serviceClient.client
+    .from("memberships")
+    .insert({ user_id: userId, club_id: member.club_id, ...membership });
+  if (error) {
+    throw new Error(`No se pudo sembrar la membresía: ${error.message}`);
+  }
+}
+
 describeRls("completar registro contra seadragons-dev", () => {
+  it(
+    "al activar la cuenta crea su membresía pending con el plan elegido",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = realGateways();
+
+      await withIncompleteMember(
+        serviceClient,
+        {
+          country: "AU",
+          date_of_birth: "1994-03-02",
+          membership_type: null,
+        },
+        async (member) => {
+          await completeRegistration(gateways, {
+            userId: member.userId,
+            values: { membershipType: "Student" },
+            now: new Date(),
+          });
+
+          await expect(
+            readMemberships(serviceClient, member.userId),
+          ).resolves.toEqual([{ plan: "Student", status: "pending" }]);
+        },
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "al activar a quien el relleno dejó sin plan le pone el plan elegido",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = realGateways();
+
+      await withIncompleteMember(
+        serviceClient,
+        {
+          country: "AU",
+          date_of_birth: "1994-03-02",
+          membership_type: null,
+        },
+        async (member) => {
+          // Lo que deja `0050` a un socio a medias que aún no había elegido.
+          await seedMembership(serviceClient, member.userId, {
+            plan: null,
+            status: "pending",
+          });
+
+          await completeRegistration(gateways, {
+            userId: member.userId,
+            values: { membershipType: "Student" },
+            now: new Date(),
+          });
+
+          await expect(
+            readMemberships(serviceClient, member.userId),
+          ).resolves.toEqual([{ plan: "Student", status: "pending" }]);
+        },
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "activar a quien ya tenía membresía no la duplica ni la resetea",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = realGateways();
+
+      await withIncompleteMember(
+        serviceClient,
+        {
+          country: "AU",
+          date_of_birth: "1994-03-02",
+          membership_type: "Full",
+        },
+        async (member) => {
+          // La que le dio el relleno de 0050, ya movida por Stripe.
+          await seedMembership(serviceClient, member.userId, {
+            plan: "Full",
+            status: "active",
+          });
+          const account = await gateways.accounts.findByUserId(member.userId);
+
+          await gateways.accounts.activateMember(account!.memberId);
+          await gateways.accounts.activateMember(account!.memberId);
+
+          await expect(
+            readMemberships(serviceClient, member.userId),
+          ).resolves.toEqual([{ plan: "Full", status: "active" }]);
+        },
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
   it(
     "pide sólo el dato que falta y activa la cuenta al guardarlo",
     async () => {

@@ -401,6 +401,18 @@ describeConPostgres("membresías y pagos en la base", () => {
       expect(intento.stderr).toMatch(/payments_amount_cents_check/);
     });
 
+    it("rechaza una moneda que no viene en minúsculas como la manda Stripe", async () => {
+      const database = await migratedDatabase();
+      const member = await seededMember(database);
+
+      const intento = await database.attempt(
+        insertPaymentSql(member, { currency: "'AUD'" }),
+      );
+
+      expect(intento.code).toBeGreaterThan(0);
+      expect(intento.stderr).toMatch(/payments_currency_check/);
+    });
+
     it("rechaza un pago cuyo club no es el del socio", async () => {
       const database = await migratedDatabase();
       const member = await seededMember(database);
@@ -578,7 +590,9 @@ describeConPostgres("membresías y pagos en la base", () => {
       const database = await migratedDatabase();
       const member = await seededMember(database);
       const other = await seededMember(database);
-      await database.query(insertPaymentSql(member, { description: "'Propio'" }));
+      await database.query(
+        insertPaymentSql(member, { description: "'Propio'" }),
+      );
       await database.query(insertPaymentSql(other, { description: "'Ajeno'" }));
 
       const lectura = await database.query(

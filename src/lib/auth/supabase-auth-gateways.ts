@@ -47,6 +47,8 @@ import type {
   MemberDirectory,
   RegistrationGateways,
 } from "./register-member";
+import { ensurePendingMembership } from "@/lib/membership/supabase-membership-gateways";
+import { MEMBERSHIP_TYPES, type MembershipType } from "./registration";
 import { forgetCachedSession } from "./session-cache";
 import { createSupabaseEmailRequestLog } from "./supabase-email-request-log";
 import { createSupabaseRegistrationRequestLog } from "./supabase-registration-request-log";
@@ -272,6 +274,54 @@ export function readRequiredText(
   return value;
 }
 
+/** El `check` de `0003_members.sql` sólo deja los tres tipos o nulo. Otro
+ * valor es un esquema que cambió sin que este archivo se enterara. */
+function readMembershipType(
+  row: Record<string, unknown>,
+): MembershipType | null {
+  const value = readText(row, "membership_type", MEMBERS_TABLE);
+  if (value === null) {
+    return null;
+  }
+  const membershipType = MEMBERSHIP_TYPES.find((type) => type === value);
+  if (membershipType === undefined) {
+    throw new Error(
+      `La columna ${MEMBERS_TABLE}.membership_type devolvió un tipo desconocido: ${value}.`,
+    );
+  }
+  return membershipType;
+}
+
+/**
+ * Toda cuenta activa tiene su membresía (RF-1 de E12), y nace `pending` con
+ * el tipo que eligió al registrarse. Va antes de activar: si fallara después,
+ * la cuenta ya no estaría a medias y reintentar no la crearía nunca.
+ */
+async function ensureMembershipBeforeActivation(
+  serviceClient: SupabaseClient,
+  memberId: string,
+): Promise<void> {
+  const { data, error } = await serviceClient
+    .from(MEMBERS_TABLE)
+    .select("user_id, club_id, membership_type")
+    .eq("id", memberId)
+    .eq("account_status", "incomplete")
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `No se pudo leer el miembro ${memberId} antes de activarlo: ${error.message}`,
+    );
+  }
+  if (data === null) {
+    return;
+  }
+  await ensurePendingMembership(serviceClient, {
+    userId: readRequiredText(data, "user_id", MEMBERS_TABLE),
+    clubId: readRequiredText(data, "club_id", MEMBERS_TABLE),
+    plan: readMembershipType(data),
+  });
+}
+
 function createEmailConfirmationGateway(
   anonClient: SupabaseClient,
 ): EmailConfirmationGateway {
@@ -424,6 +474,7 @@ function createMemberAccountStore(
     },
 
     async activateMember(memberId) {
+      await ensureMembershipBeforeActivation(serviceClient, memberId);
       const { data, error } = await serviceClient
         .from(MEMBERS_TABLE)
         .update({ account_status: "active" })
