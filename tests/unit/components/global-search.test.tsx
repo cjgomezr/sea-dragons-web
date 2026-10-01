@@ -161,7 +161,14 @@ async function search(
   await waitOutDebounce();
 }
 
+let scrolledIntoView: Element[];
+
 beforeEach(() => {
+  // jsdom no desplaza nada: se apunta a qué se pidió traer a la vista.
+  scrolledIntoView = [];
+  Element.prototype.scrollIntoView = function (this: Element): void {
+    scrolledIntoView.push(this);
+  };
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(NOW);
   push.mockReset();
@@ -454,6 +461,19 @@ describe("teclado", () => {
       options[1]!.id,
     );
     expect(searchBox()).toHaveFocus();
+  });
+
+  it("trae a la vista el resultado marcado", async () => {
+    const user = setUpUser();
+    renderSearch();
+    await search(user, "Geelong");
+    const options = within(await screen.findByRole("listbox")).getAllByRole(
+      "option",
+    );
+
+    await user.keyboard("{ArrowUp}");
+
+    expect(scrolledIntoView).toEqual([options[2]]);
   });
 
   it("la flecha abajo en el último vuelve al primero", async () => {

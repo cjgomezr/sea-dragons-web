@@ -995,10 +995,11 @@ button.notification-item-content:hover {
     top: calc(100% + var(--space-2));
     left: 0;
     z-index: 20;
+    /* Sin alto máximo a propósito: con su propio scroll la lista sería una
+       región que el teclado no alcanza, porque el foco se queda en el
+       cuadro. Con tres grupos llenos, la que crece es la página. */
     width: min(440px, calc(100vw - 240px - 2 * var(--space-8)));
-    max-height: min(70vh, 560px);
     margin: 0;
-    overflow-y: auto;
     box-shadow: var(--shadow);
   }
 }

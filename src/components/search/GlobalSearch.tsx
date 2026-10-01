@@ -262,9 +262,12 @@ export function GlobalSearch({
     }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
-      setActive({
-        results: state.results,
-        index: nextIndex(activeIndex, options.length, event.key),
+      const index = nextIndex(activeIndex, options.length, event.key);
+      setActive({ results: state.results, index });
+      // El foco no se mueve del cuadro, así que el navegador no desplaza la
+      // página hasta la opción marcada: se trae a la vista a mano.
+      document.getElementById(optionId(index))?.scrollIntoView({
+        block: "nearest",
       });
       return;
     }
