@@ -165,15 +165,19 @@ h6 {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-3);
   background: var(--color-sidebar-background);
   border-bottom: 1px solid var(--color-sidebar-border);
 }
 
 /* En el móvil el nombre y los tres controles (lupa, campana y cuenta)
    comparten una sola fila, también a 360px: el resto vive en el menú de la
-   cuenta (#287). Con la lupa (#427) los huecos se estrechan para que el
-   nombre siga entero; en la barra lateral vuelven a su medida. */
+   cuenta (#287). Con la lupa (#427) los tres botones de 44px ocupan 132px, y
+   al nombre le quedan 176px a 360 con los huecos de antes. Con la fuente del
+   sistema de Linux (la de CI; Archivo no se carga) "Victoria Seadragons" mide
+   203px a 18px, así que en el móvil el nombre baja a 16px (180px), la
+   cabecera acolcha 12px a los lados y los iconos van pegados: sus 44px ya
+   los separan. En la barra lateral todo vuelve a su medida. */
 .app-sidebar-header {
   display: flex;
   align-items: center;
@@ -213,7 +217,7 @@ h6 {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--color-sidebar-text);
   text-overflow: ellipsis;
@@ -372,7 +376,7 @@ h6 {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: var(--space-1);
+  gap: 0;
 }
 
 /* La campana y el botón de la cuenta, los dos iconos de la misma esquina. */
@@ -1026,6 +1030,7 @@ button.notification-item-content:hover {
   .app-sidebar {
     width: 240px;
     flex-shrink: 0;
+    padding: var(--space-4);
     border-bottom: none;
     border-right: 1px solid var(--color-sidebar-border);
   }
@@ -1060,6 +1065,7 @@ button.notification-item-content:hover {
     flex: 1 1 0;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    font-size: 18px;
     line-clamp: 2;
     white-space: normal;
   }
