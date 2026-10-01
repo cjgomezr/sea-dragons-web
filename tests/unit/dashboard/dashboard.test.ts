@@ -690,6 +690,7 @@ describe("vacío", () => {
     const result = await dashboard();
 
     expect(result).toEqual({
+      viewer: { firstName: "Alba" },
       tiles: {
         attendance: { kind: "own_attendance", attendance: { kind: "no_data" } },
         members: { kind: "members", active: 1, joinedRecently: 0 },
@@ -700,5 +701,13 @@ describe("vacío", () => {
       latestNews: { kind: "news", posts: [] },
     });
     expect(reported).toEqual([]);
+  });
+});
+
+describe("quien mira", () => {
+  it("sirve el nombre de pila para el saludo", async () => {
+    const result = await dashboard();
+
+    expect(result.viewer).toEqual({ firstName: "Alba" });
   });
 });
