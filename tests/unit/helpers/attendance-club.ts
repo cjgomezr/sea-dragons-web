@@ -47,6 +47,8 @@ export type FakeMember = {
   readonly groupIds?: readonly string[];
   readonly positionId?: string;
   readonly photoPath?: string;
+  /** Si su membresía está al día (#453); sin decirlo, lo está. */
+  readonly membershipCurrent?: boolean;
 };
 
 export type FakeAttendanceClubOptions = {
@@ -125,6 +127,7 @@ export function fakeAttendanceClub(
             status: member.status ?? "active",
             positionId: member.positionId ?? null,
             photoPath: member.photoPath ?? null,
+            membershipCurrent: member.membershipCurrent ?? true,
           })),
       findRsvps: async () =>
         Object.entries(options.rsvps ?? {}).map(([userId, response]) => ({

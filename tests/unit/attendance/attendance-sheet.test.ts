@@ -203,6 +203,28 @@ describe("la hoja de asistencia", () => {
     expect(sheet.members.map((entry) => entry.userId)).toEqual([ANA.userId]);
   });
 
+  it("deja fuera de una hoja nueva a quien no tiene la membresía al día (#453)", async () => {
+    const sheet = await open({
+      members: [ANA, { ...BRUNO, membershipCurrent: false }],
+    });
+
+    expect(sheet.members.map((entry) => entry.userId)).toEqual([ANA.userId]);
+  });
+
+  it("conserva en una hoja guardada a quien ya tenía fila aunque deje de estar al día (#453, D1 de E8)", async () => {
+    const sheet = await open({
+      members: [ANA, { ...BRUNO, membershipCurrent: false }],
+      records: { [ANA.userId]: "present", [BRUNO.userId]: "late" },
+    });
+
+    expect(
+      sheet.members.map((entry) => [entry.fullName, entry.status]),
+    ).toEqual([
+      [ANA.fullName, "present"],
+      [BRUNO.fullName, "late"],
+    ]);
+  });
+
   it("sirve solo a la audiencia de un entrenamiento para grupos", async () => {
     const sheet = await open({
       events: [
@@ -425,6 +447,10 @@ describe("guardar la hoja", () => {
   it.each([
     ["no es de la audiencia", BRUNO],
     ["está de baja y no tiene fila", { ...ANA, status: "inactive" as const }],
+    [
+      "no está al día y no tiene fila (#453)",
+      { ...ANA, groupIds: [SENIOR_SQUAD_ID], membershipCurrent: false },
+    ],
   ])("no escribe nada si un miembro %s", async (_, outsider: FakeMember) => {
     const club = fakeAttendanceClub({
       events: [

@@ -7,6 +7,11 @@ import { cachedClubPositions } from "@/lib/club/supabase-club-positions";
 import { EVENT_TYPES } from "@/lib/events/event-creation";
 import { signProfilePhotoUrls } from "@/lib/members/supabase-profile-photo-gateways";
 import { RSVP_RESPONSES } from "@/lib/events/event-rsvp";
+import { isStandingCurrent } from "@/lib/membership/membership";
+import {
+  MEMBERSHIP_STANDING_EMBED,
+  parseMembershipStanding,
+} from "@/lib/membership/supabase-membership-gateways";
 import { createSupabaseAudienceMembersGateway } from "@/lib/notifications/supabase-audience-members";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
@@ -62,6 +67,8 @@ const memberRowsSchema = z.array(
     account_status: z.enum(ACCOUNT_STATUSES),
     position_id: z.string().nullable(),
     photo_path: z.string().nullable(),
+    // La membresía del `left join`; la estrecha `parseMembershipStanding`.
+    memberships: z.unknown(),
   }),
 );
 
@@ -142,7 +149,9 @@ async function findMembers(
   }
   const { data, error } = await serviceClient
     .from(MEMBERS_TABLE)
-    .select("user_id, full_name, account_status, position_id, photo_path")
+    .select(
+      `user_id, full_name, account_status, position_id, photo_path, ${MEMBERSHIP_STANDING_EMBED}`,
+    )
     .eq("club_id", query.clubId)
     .in("user_id", query.userIds);
   if (error) {
@@ -150,12 +159,17 @@ async function findMembers(
       `No se pudieron leer los miembros de la hoja en el club ${query.clubId}: ${error.message}`,
     );
   }
+  const now = new Date();
   return memberRowsSchema.parse(data).map((row) => ({
     userId: row.user_id,
     fullName: row.full_name,
     status: row.account_status,
     positionId: row.position_id,
     photoPath: row.photo_path,
+    membershipCurrent: isStandingCurrent(
+      parseMembershipStanding(row.memberships),
+      now,
+    ),
   }));
 }
 

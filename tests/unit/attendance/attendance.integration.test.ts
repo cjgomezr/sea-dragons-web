@@ -17,6 +17,7 @@ import {
   type TestUser,
   createServiceRoleTestClient,
   describeRls,
+  seedCurrentMembership,
   withSeededRows,
   withTestUser,
 } from "../../support/rls";
@@ -77,9 +78,15 @@ async function withTemporaryClub<T>(
   );
 }
 
+/** Un socio activo, al día con su membresía salvo que se diga (#453). */
 async function withActiveMember<T>(
   serviceClient: ServiceRoleClient,
-  seed: { readonly clubId: string; readonly role: Role; readonly name: string },
+  seed: {
+    readonly clubId: string;
+    readonly role: Role;
+    readonly name: string;
+    readonly isMembershipCurrent?: boolean;
+  },
   run: (member: TestUser) => Promise<T>,
 ): Promise<T> {
   return withTestUser(serviceClient, (user) =>
@@ -96,7 +103,15 @@ async function withActiveMember<T>(
           role: seed.role,
         },
       ],
-      () => run(user),
+      async () => {
+        if (seed.isMembershipCurrent ?? true) {
+          await seedCurrentMembership(serviceClient, {
+            clubId: seed.clubId,
+            userId: user.id,
+          });
+        }
+        return run(user);
+      },
     ),
   );
 }
@@ -260,6 +275,39 @@ describeRls("la hoja de asistencia en Supabase", () => {
         const sorted = (records: readonly AttendanceRecord[]) =>
           [...records].sort((a, b) => a.userId.localeCompare(b.userId));
         expect([sorted(first), sorted(second)]).toContainEqual(stored);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "deja fuera de la hoja nueva a quien no tiene la membresía al día (#453)",
+    async () => {
+      await withRoll(async (roll) => {
+        await withActiveMember(
+          roll.serviceClient,
+          {
+            clubId: roll.clubId,
+            role: "Player",
+            name: "Nico Sin Pagar",
+            isMembershipCurrent: false,
+          },
+          async () => {
+            const sheet = await openAttendanceSheet(
+              createAttendanceGateways(roll.serviceClient.client),
+              {
+                callerId: roll.coach.id,
+                eventId: roll.eventId,
+                now: new Date(),
+              },
+            );
+
+            expect(sheet.members.map((entry) => entry.fullName)).toEqual([
+              "Carla Coach",
+              "Pía Player",
+            ]);
+          },
+        );
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
