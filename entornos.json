@@ -249,6 +249,17 @@
         "ci": "stripe-test",
         "ci-produccion": null
       }
+    },
+    "STRIPE_PRICE_CASUAL_SESSION": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": "stripe-test",
+        "preview": null,
+        "production": "stripe-test",
+        "ci": "stripe-test",
+        "ci-produccion": null
+      }
     }
   }
 }
