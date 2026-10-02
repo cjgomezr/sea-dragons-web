@@ -177,16 +177,21 @@ Ninguna que bloquee. Decisiones tomadas el 30 de septiembre de 2026:
 - **D6 · La tarjeta se cambia en Stripe**, nunca en la aplicación.
 - **D7 · Los webhooks son la única fuente de verdad** del estado, idempotentes por id de evento y a prueba de desorden.
 
+Añadida el 2 de octubre de 2026, al probar el registro en producción:
+
+- **D8 · El tipo de membresía se elige en Pagos, no en el registro.** El registro deja de preguntarlo y la membresía nace sin plan. Quien está `pending` ve en Pagos las tres opciones con su precio (Full y Student con el mes de prueba, Casual con sus packs de E13) y puede cambiar de opción libremente mientras no haya pagado nada; elegir lleva a Checkout. Una vez hay suscripción, el cambio de plan es el de D5. Quien ya eligió en el registro conserva su elección, que sale preseleccionada. Reescribe FR-009 (SRD v1.5).
+
 ## 10. Descomposición en tickets (para write-ticket)
 
-| #   | Issue | Título propuesto                                                                             | Tamaño | Depende de | Auto-merge sugerido             |
-| --- | ----- | -------------------------------------------------------------------------------------------- | ------ | ---------- | ------------------------------- |
-| 1   | #451  | Guarda la membresía y los pagos de cada socio, con sus estados y RLS                         | M      | ninguna    | No: modelo de datos nuevo       |
-| 2   | #452  | Recibe y aplica los webhooks de Stripe, firmados, idempotentes y a prueba de desorden        | M      | 1          | No: integración de pagos        |
-| 3   | #453  | Cierra la puerta a quien no está al día: frontera, menú, RSVP, escuadra y hoja de asistencia | M      | 1          | No: permisos                    |
-| 4   | #454  | Lleva al socio nuevo a Stripe Checkout con un mes de prueba y abre la puerta al volver       | M      | 2, 3       | No: pagos                       |
-| 5   | #455  | Panel de membresía del mockup: plan, estado, tarjeta, cambio de tarjeta e historial          | M      | 2          | No: pantalla nueva, `ui-review` |
-| 6   | #456  | Cambio de plan al siguiente ciclo, con anulación                                             | S      | 5          | No: pagos                       |
-| 7   | #457  | Exención manual del Admin desde la ficha, con bitácora y estado visible en el directorio     | S      | 3          | No: permisos, `ui-review`       |
+| #   | Issue | Título propuesto                                                                                | Tamaño | Depende de | Auto-merge sugerido             |
+| --- | ----- | ----------------------------------------------------------------------------------------------- | ------ | ---------- | ------------------------------- |
+| 1   | #451  | Guarda la membresía y los pagos de cada socio, con sus estados y RLS                            | M      | ninguna    | No: modelo de datos nuevo       |
+| 2   | #452  | Recibe y aplica los webhooks de Stripe, firmados, idempotentes y a prueba de desorden           | M      | 1          | No: integración de pagos        |
+| 3   | #453  | Cierra la puerta a quien no está al día: frontera, menú, RSVP, escuadra y hoja de asistencia    | M      | 1          | No: permisos                    |
+| 4   | #454  | Lleva al socio nuevo a Stripe Checkout con un mes de prueba y abre la puerta al volver          | M      | 2, 3       | No: pagos                       |
+| 5   | #455  | Panel de membresía del mockup: plan, estado, tarjeta, cambio de tarjeta e historial             | M      | 2          | No: pantalla nueva, `ui-review` |
+| 6   | #456  | Cambio de plan al siguiente ciclo, con anulación                                                | S      | 5          | No: pagos                       |
+| 7   | #457  | Exención manual del Admin desde la ficha, con bitácora y estado visible en el directorio        | S      | 3          | No: permisos, `ui-review`       |
+| 8   | #479  | Elige el tipo de membresía en Pagos antes del primer pago (D8, añadido el 2 de octubre de 2026) | M      | 5          | No: pagos, `ui-review`          |
 
 Los tickets 2 y 3 van en paralelo tras el 1; el 4 y el 5 detrás; el 6 y el 7 al final. Antes del ticket 2 hace falta la cuenta de Stripe del club en modo de prueba con los dos precios creados y las llaves puestas en `.env.local` de quien lo trabaje y en los secretos de GitHub: es un paso del dueño.
