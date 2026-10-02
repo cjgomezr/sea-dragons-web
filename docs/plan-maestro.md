@@ -145,6 +145,16 @@ avisa; publicar avisa a los asignados. El jugador ve su equipo y la
 alineación, nunca los OVR. E10 no depende ya de E8: armar equipos con la hoja
 de asistencia queda fuera de alcance. PRD en `docs/prd/e10-team-builder.md`.
 
+El 2 de octubre de 2026, con E12 a dos tickets de cerrarse, se escribió el PRD
+de **E13** con 7 tickets (#468 a #474), uno más que lo estimado: el saldo de
+un Casual y su pantalla se separan. El dueño decidió que un Casual está al día
+mientras le queden sesiones y nunca queda a deber, que los packs de inicio son
+de 5 y 10 sesiones, que el aviso de renovación sale siete días antes por correo
+y en la campana, y que los levies los ve y los paga cualquier socio. El aviso
+de renovación lo dispara Stripe con `invoice.upcoming`, así que E13 ya no
+espera por `pg_cron` y E16b no tiene que moverlo. PRD en
+`docs/prd/e13-stripe-avanzado.md`.
+
 El 7 de septiembre de 2026, al escribir su PRD, **E16 se partió en E16a y
 E16b**. El motivo es de secuencia, no de tamaño: sus jobs de `pg_cron` necesitan
 las tablas de eventos (E7) y de membresías (E12), y la prueba de carga exige

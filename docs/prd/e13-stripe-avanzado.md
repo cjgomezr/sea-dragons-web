@@ -1,6 +1,6 @@
 # PRD: E13 · Stripe avanzado
 
-**Estado:** borrador · **Fecha:** 2 de octubre de 2026 · **Autor:** sesión de planificación (Claude Code)
+**Estado:** aprobado · **Fecha:** 2 de octubre de 2026 · **Autor:** sesión de planificación (Claude Code)
 
 Fuente: `docs/SRD_Victoria_Seadragons_Club_Platform.md` (v1.4) y el epic E13 de `docs/plan-maestro.md`. Cubre FR-064, FR-069 a FR-072, FR-080 y FR-087, la parte Casual de FR-065, INT-007 y los criterios AC-041. Se apoya en lo que dejó E12 (`docs/prd/e12-stripe-base.md`): la membresía con sus seis estados, la barrera, el webhook firmado e idempotente, Checkout y el panel de Pagos.
 
@@ -154,14 +154,14 @@ E12 dejó a un socio Casual sin forma de ponerse al día: nace `pending`, la bar
 
 ## 12. Descomposición en tickets (para write-ticket)
 
-| #   | Título propuesto                                                                                       | Tamaño | Depende de | Auto-merge sugerido                  |
-| --- | ------------------------------------------------------------------------------------------------------ | ------ | ---------- | ------------------------------------ |
-| 1   | Lleva el saldo de sesiones de cada Casual como un libro: compras, asistencia, correcciones y congelado | M      | ninguna    | No: modelo de datos y estado de pago |
-| 2   | Deja al Admin y al Committee elegir los packs de sesiones que se ofrecen                               | S      | ninguna    | No: permisos, `ui-review`            |
-| 3   | Vende packs de sesiones por Stripe Checkout y abre la puerta al Casual que paga                        | M      | 1, 2, #454 | No: pagos                            |
-| 4   | Enseña en Pagos el saldo del Casual, sus movimientos y el saldo congelado                              | S      | 1, #455    | No: pantalla nueva, `ui-review`      |
-| 5   | Lista y cobra los levies que el comité crea en Stripe                                                  | M      | #454, #455 | No: pagos, `ui-review`               |
-| 6   | Avisa del pago fallido en toda la aplicación y deja reintentarlo en Stripe                             | S      | #455       | No: pagos, `ui-review`               |
-| 7   | Avisa por correo y en la campana siete días antes de cada renovación                                   | S      | ninguna    | No: pagos y correos a socios         |
+| #   | Issue | Título propuesto                                                                                       | Tamaño | Depende de | Auto-merge sugerido                  |
+| --- | ----- | ------------------------------------------------------------------------------------------------------ | ------ | ---------- | ------------------------------------ |
+| 1   | #468  | Lleva el saldo de sesiones de cada Casual como un libro: compras, asistencia, correcciones y congelado | M      | ninguna    | No: modelo de datos y estado de pago |
+| 2   | #469  | Deja al Admin y al Committee elegir los packs de sesiones que se ofrecen                               | S      | ninguna    | No: permisos, `ui-review`            |
+| 3   | #471  | Vende packs de sesiones por Stripe Checkout y abre la puerta al Casual que paga                        | M      | 1, 2, #454 | No: pagos                            |
+| 4   | #472  | Enseña en Pagos el saldo del Casual, sus movimientos y el saldo congelado                              | S      | 1, #455    | No: pantalla nueva, `ui-review`      |
+| 5   | #473  | Lista y cobra los levies que el comité crea en Stripe                                                  | M      | #454, #455 | No: pagos, `ui-review`               |
+| 6   | #474  | Avisa del pago fallido en toda la aplicación y deja reintentarlo en Stripe                             | S      | #455       | No: pagos, `ui-review`               |
+| 7   | #470  | Avisa por correo y en la campana siete días antes de cada renovación                                   | S      | ninguna    | No: pagos y correos a socios         |
 
 El 1, el 2 y el 7 pueden ir en paralelo desde ya. El 3 espera al 1, al 2 y al #454 (Checkout de E12); el 4, el 5 y el 6 esperan al #455 (el panel de Pagos). Ninguno se recomienda para auto-merge: todos tocan dinero, permisos o lo que ve el socio.
