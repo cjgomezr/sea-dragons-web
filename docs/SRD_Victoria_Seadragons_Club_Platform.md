@@ -7,7 +7,7 @@
 | **Date** | 23 August 2026 |
 | **Author** | Sebastián V. (PacifiCode) |
 | **Source** | Claude Design handoff bundle — `Seadragons Platform.dc.html` prototype + stakeholder interview |
-| **Status** | For review — v1.1 resolved: casual prepaid packs, coach event permissions, configurable skill categories, minor-consent registration. v1.2 resolved: plan changes at next cycle, Stripe-managed one-off charges, no evaluation versioning, no dashboard export. v1.3 resolved: no pack discounts. v1.4 resolved: Family membership deferred beyond Release 1, post-OAuth registration completion (FR-083), self-service profile editing (FR-084), member deactivation (FR-085), attendance-percentage formula (FR-042), unevaluated-player handling in auto-balance (FR-086), evaluation category-set immutability (FR-053), auto-balance objective order and algorithm (FR-046), Casual excluded from recurring billing and prepaid-balance handling on plan change (FR-087), plus acceptance criteria for the eleven requirements that lacked one |
+| **Status** | For review — v1.1 resolved: casual prepaid packs, coach event permissions, configurable skill categories, minor-consent registration. v1.2 resolved: plan changes at next cycle, Stripe-managed one-off charges, no evaluation versioning, no dashboard export. v1.3 resolved: no pack discounts. v1.4 resolved: Family membership deferred beyond Release 1, post-OAuth registration completion (FR-083), self-service profile editing (FR-084), member deactivation (FR-085), attendance-percentage formula (FR-042), unevaluated-player handling in auto-balance (FR-086), evaluation category-set immutability (FR-053), auto-balance objective order and algorithm (FR-046), Casual excluded from recurring billing and prepaid-balance handling on plan change (FR-087), plus acceptance criteria for the eleven requirements that lacked one. v1.5 resolved: the membership type is chosen in Payments before the first payment instead of during sign-up (FR-009) |
 
 ---
 
@@ -121,7 +121,7 @@ Permission matrix (from the validated prototype):
 | FR-006 | The system shall allow a user to request a password reset link delivered to their registered email address. |
 | FR-007 | The system shall allow a signed-in user to sign out from any screen. |
 | FR-008 | The system shall assign the Player role to every newly created account. |
-| FR-009 | The system shall require the user to select a membership type (Full, Student, or Casual) during sign-up. |
+| FR-009 | The system shall require the member to select a membership type (Full, Student, or Casual) in the Payments area before their first payment, and shall let them change that selection freely while no payment has been made. Sign-up does not ask for a membership type (v1.5 resolution). |
 | FR-010 | The system shall allow a user to submit a role request for Coach or Committee, with an optional justification text. |
 | FR-011 | The system shall allow an Admin to approve or reject pending role requests. |
 | FR-081 | The system shall capture the registrant's date of birth during account sign-up and member creation. |
