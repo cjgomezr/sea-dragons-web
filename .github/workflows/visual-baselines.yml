@@ -215,6 +215,7 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_PRICE_FULL: ${{ secrets.STRIPE_PRICE_FULL }}
           STRIPE_PRICE_STUDENT: ${{ secrets.STRIPE_PRICE_STUDENT }}
+          STRIPE_PRICE_CASUAL_SESSION: ${{ secrets.STRIPE_PRICE_CASUAL_SESSION }}
       # Un nombre por parte: dos subidas con el mismo nombre chocan. El job
       # `visual-diff` las junta después en el artefacto que la gente conoce.
       - name: Guarda el diff para que alguien lo mire
@@ -347,6 +348,7 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_PRICE_FULL: ${{ secrets.STRIPE_PRICE_FULL }}
           STRIPE_PRICE_STUDENT: ${{ secrets.STRIPE_PRICE_STUDENT }}
+          STRIPE_PRICE_CASUAL_SESSION: ${{ secrets.STRIPE_PRICE_CASUAL_SESSION }}
       # Sólo las capturas que esta parte regeneró. Subir la carpeta entera
       # haría que la copia vieja de otra parte pisara, al juntarlas, la
       # captura nueva de ésta.

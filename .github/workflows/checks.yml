@@ -152,6 +152,7 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.STRIPE_WEBHOOK_SECRET || '' }}
           STRIPE_PRICE_FULL: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.STRIPE_PRICE_FULL || '' }}
           STRIPE_PRICE_STUDENT: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.STRIPE_PRICE_STUDENT || '' }}
+          STRIPE_PRICE_CASUAL_SESSION: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.STRIPE_PRICE_CASUAL_SESSION || '' }}
       - name: Lint
         if: steps.repo.outputs.bootstrapped == 'true'
         run: npm run lint
