@@ -37,7 +37,8 @@
     "developer": { "production": false },
     "platform": { "production": false },
     "test-harness": { "production": false },
-    "resend": { "production": true }
+    "resend": { "production": true },
+    "stripe-test": { "production": false }
   },
   "variables": {
     "NEXT_PUBLIC_SUPABASE_URL": {
@@ -202,6 +203,50 @@
         "preview": null,
         "production": "resend",
         "ci": null,
+        "ci-produccion": null
+      }
+    },
+    "STRIPE_SECRET_KEY": {
+      "secret": true,
+      "writeCredential": false,
+      "scopes": {
+        "local": "stripe-test",
+        "preview": null,
+        "production": "stripe-test",
+        "ci": "stripe-test",
+        "ci-produccion": null
+      }
+    },
+    "STRIPE_WEBHOOK_SECRET": {
+      "secret": true,
+      "writeCredential": false,
+      "scopes": {
+        "local": "stripe-test",
+        "preview": null,
+        "production": "stripe-test",
+        "ci": "stripe-test",
+        "ci-produccion": null
+      }
+    },
+    "STRIPE_PRICE_FULL": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": "stripe-test",
+        "preview": null,
+        "production": "stripe-test",
+        "ci": "stripe-test",
+        "ci-produccion": null
+      }
+    },
+    "STRIPE_PRICE_STUDENT": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": "stripe-test",
+        "preview": null,
+        "production": "stripe-test",
+        "ci": "stripe-test",
         "ci-produccion": null
       }
     }
