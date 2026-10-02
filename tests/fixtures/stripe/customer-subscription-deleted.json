@@ -1,0 +1,32 @@
+{
+  "id": "evt_test_subscription_deleted",
+  "object": "event",
+  "api_version": "2026-09-30.endive",
+  "created": 1795000000,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": { "id": null, "idempotency_key": null },
+  "type": "customer.subscription.deleted",
+  "data": {
+    "object": {
+      "id": "sub_TestSeadragons",
+      "object": "subscription",
+      "customer": "cus_TestSeadragons",
+      "status": "canceled",
+      "trial_end": null,
+      "metadata": { "user_id": "7b0e5a52-3c1d-4e8f-9a6b-2d4c8e1f0a37" },
+      "default_payment_method": null,
+      "items": {
+        "object": "list",
+        "data": [
+          {
+            "id": "si_TestSeadragons",
+            "object": "subscription_item",
+            "current_period_end": 1795000000,
+            "price": { "id": "price_full_test", "object": "price" }
+          }
+        ]
+      }
+    }
+  }
+}

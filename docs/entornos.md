@@ -272,10 +272,15 @@ qué corre sin credenciales, con la condición escrita en el workflow.
 | `SUPABASE_SERVICE_ROLE_KEY`     | no se pone       | `seadragons-prod` |
 | `RESEND_API_KEY`                | no se pone       | `resend`          |
 | `EMAIL_FROM`                    | no se pone       | `resend`          |
+| `STRIPE_SECRET_KEY`             | no se pone       | `stripe-test`     |
+| `STRIPE_WEBHOOK_SECRET`         | no se pone       | `stripe-test`     |
+| `STRIPE_PRICE_FULL`             | no se pone       | `stripe-test`     |
+| `STRIPE_PRICE_STUDENT`          | no se pone       | `stripe-test`     |
 
 Las dos primeras salen de Supabase Dashboard → el proyecto que toque → Project
 Settings → API. La tercera, del mismo sitio, y sólo en Production. Las dos de
-Resend se explican en "Correo transaccional".
+Resend se explican en "Correo transaccional", y las cuatro de Stripe en "Pagos
+con Stripe".
 
 **Ojo al ámbito Development de Vercel.** Existe, y es el que la integración de
 Supabase habría rellenado sola. Se deja vacío a propósito: en este proyecto el
@@ -399,6 +404,34 @@ puede. Mandar correo en nombre del club también es un poder que cuesta caro
 equivocar, pero lo que la separa de preview es su origen de producción, no ese
 campo.
 
+## Pagos con Stripe (issue #452)
+
+Las cuotas se cobran con Stripe (E12, `docs/prd/e12-stripe-base.md`). Son
+cuatro variables, puestas por el dueño el 2 de octubre de 2026 en `.env.local`,
+en los secretos del repositorio y en el ámbito Production de Vercel:
+
+- `STRIPE_SECRET_KEY`: la llave secreta de la API (`sk_test_...`). Dashboard de
+  Stripe, Developers, API keys.
+- `STRIPE_WEBHOOK_SECRET`: el secreto con el que Stripe firma cada webhook
+  (`whsec_...`). Developers, Webhooks, el endpoint
+  `/api/v1/stripe/webhook`, Signing secret. En local vale el que imprime
+  `stripe listen --forward-to localhost:3417/api/v1/stripe/webhook`.
+- `STRIPE_PRICE_FULL` y `STRIPE_PRICE_STUDENT`: el id (`price_...`) del precio
+  mensual en AUD de cada plan, en Product catalog. No son secretos.
+
+**Hoy todo es modo de prueba, también en producción.** El webhook de prueba
+apunta a producción a propósito, para que el equipo pruebe pagos con tarjeta de
+prueba mientras no haya socios reales. Por eso el origen es `stripe-test` en
+los tres ámbitos y no cuenta como de producción. El día que el club cobre de
+verdad, Production recibe las llaves reales (`sk_live_...`) y el manifiesto
+gana un origen de producción para ellas, que la regla 1 mantendrá fuera de
+local y de CI.
+
+Ninguna de las dos llaves es `writeCredential`: ese campo habla de escribir en
+una base de Supabase, y estas escriben en Stripe. Preview no recibe ninguna,
+y sin ellas el webhook responde 503 con `reason: "stripe_not_configured"`: el
+resto de la aplicación sigue sirviendo.
+
 ## Rotación de credenciales
 
 Cuando una clave se rota hay que cambiarla en **todos** los sitios donde vive,
@@ -415,6 +448,12 @@ el manifiesto se separan.
 | `SUPABASE_DEV_DB_URL`        | local         | .env.local, en la máquina de quien desarrolla, fuera de git                                          |
 | `SUPABASE_PRODUCTION_DB_URL` | ci-produccion | GitHub, repositorio sea-dragons-web, Settings, Environments, entorno Production, Environment secrets |
 | `RESEND_API_KEY`             | production    | Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Production             |
+| `STRIPE_SECRET_KEY`          | local         | .env.local, en la máquina de quien desarrolla, fuera de git                                          |
+| `STRIPE_SECRET_KEY`          | production    | Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Production             |
+| `STRIPE_SECRET_KEY`          | ci            | GitHub, repositorio sea-dragons-web, Settings, Secrets and variables, Actions                        |
+| `STRIPE_WEBHOOK_SECRET`      | local         | .env.local, en la máquina de quien desarrolla, fuera de git                                          |
+| `STRIPE_WEBHOOK_SECRET`      | production    | Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Production             |
+| `STRIPE_WEBHOOK_SECRET`      | ci            | GitHub, repositorio sea-dragons-web, Settings, Secrets and variables, Actions                        |
 
 El orden importa. Primero se genera la clave nueva, después se actualiza cada
 fila de la tabla, y sólo al final se revoca la vieja: al revés deja la

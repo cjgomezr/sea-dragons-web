@@ -66,7 +66,7 @@ export const IGNORED_ENV_VARS = new Set<string>([
  * navegador filtraría una credencial de servidor. Sale del manifiesto de
  * entornos, que es donde se declara qué es secreto: duplicar la lista aquí
  * dejaría al chequeo del bundle y a los tests mirando conjuntos distintos.
- * Cuando E12 añada `STRIPE_SECRET_KEY`, se marca `secret` allí y aparece sola.
+ * Así entraron las llaves de Stripe con E12 (#452): marcadas `secret` allí.
  */
 export const SECRET_ENV_VARS: readonly string[] = secretVariableNames(
   readEnvironmentManifest(),
