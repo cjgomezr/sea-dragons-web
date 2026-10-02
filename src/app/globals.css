@@ -4713,25 +4713,19 @@ button.notification-item-content:hover {
   flex: none;
   width: 6px;
   height: 6px;
-  background: var(--chip-tone);
+  background: currentcolor;
   border-radius: 50%;
 }
 
 .payments-chip-positive {
-  --chip-tone: var(--color-success);
-
   background: color-mix(in srgb, var(--color-success) 16%, var(--color-panel));
 }
 
 .payments-chip-attention {
-  --chip-tone: var(--color-warning);
-
   background: color-mix(in srgb, var(--color-warning) 24%, var(--color-panel));
 }
 
 .payments-chip-negative {
-  --chip-tone: var(--color-danger);
-
   background: color-mix(in srgb, var(--color-danger) 16%, var(--color-panel));
 }
 
@@ -4844,20 +4838,24 @@ button.notification-item-content:hover {
   flex: none;
   width: 6px;
   height: 6px;
-  background: var(--payment-tone);
+  background: currentcolor;
   border-radius: 50%;
 }
 
-.payments-payment-status-paid {
-  --payment-tone: var(--color-success);
+/* El punto de cada tono. */
+.payments-chip-positive::before,
+.payments-payment-status-paid::before {
+  background: var(--color-success);
 }
 
-.payments-payment-status-failed {
-  --payment-tone: var(--color-danger);
+.payments-chip-attention::before,
+.payments-payment-status-pending::before {
+  background: var(--color-warning);
 }
 
-.payments-payment-status-pending {
-  --payment-tone: var(--color-warning);
+.payments-chip-negative::before,
+.payments-payment-status-failed::before {
+  background: var(--color-danger);
 }
 
 /* Por debajo de 768px cada pago es una tarjeta, como el directorio (#283):
