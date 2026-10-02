@@ -276,6 +276,7 @@ qué corre sin credenciales, con la condición escrita en el workflow.
 | `STRIPE_WEBHOOK_SECRET`         | no se pone       | `stripe-test`     |
 | `STRIPE_PRICE_FULL`             | no se pone       | `stripe-test`     |
 | `STRIPE_PRICE_STUDENT`          | no se pone       | `stripe-test`     |
+| `STRIPE_PRICE_CASUAL_SESSION`   | no se pone       | `stripe-test`     |
 
 Las dos primeras salen de Supabase Dashboard → el proyecto que toque → Project
 Settings → API. La tercera, del mismo sitio, y sólo en Production. Las dos de
@@ -418,6 +419,9 @@ en los secretos del repositorio y en el ámbito Production de Vercel:
   `stripe listen --forward-to localhost:3417/api/v1/stripe/webhook`.
 - `STRIPE_PRICE_FULL` y `STRIPE_PRICE_STUDENT`: el id (`price_...`) del precio
   mensual en AUD de cada plan, en Product catalog. No son secretos.
+- `STRIPE_PRICE_CASUAL_SESSION`: el id (`price_...`) del precio de pago único de
+  una sesión Casual, 15 AUD. Un pack se vende como ese precio por la cantidad
+  de sesiones (E13). Puesto por el dueño el 2 de octubre de 2026.
 
 **Hoy todo es modo de prueba, también en producción.** El webhook de prueba
 apunta a producción a propósito, para que el equipo pruebe pagos con tarjeta de
