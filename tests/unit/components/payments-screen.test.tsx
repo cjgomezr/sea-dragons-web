@@ -408,6 +408,16 @@ describe("PaymentsScreen: actualizar la tarjeta", () => {
     ).toBeInTheDocument();
   });
 
+  it("ofrece la tarjeta a quien tiene un cobro fallido aunque no se sepa cuál tenía", async () => {
+    await renderLoaded(
+      view(panel({ status: "past_due", nextChargeAt: null, card: null })),
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Update card" }),
+    ).toBeInTheDocument();
+  });
+
   it("lo dice en español", async () => {
     await renderLoaded(PAST_DUE_FULL, { locale: "es" });
 
@@ -764,6 +774,32 @@ describe("PaymentsScreen: vuelta de Checkout", () => {
     expect(statusChip()).toHaveTextContent(
       "En prueba hasta el día 1 de noviembre de 2026",
     );
+  });
+
+  it("al volver de suscribirse otra vez espera a Stripe sin ofrecer otra suscripción", async () => {
+    let answers = 0;
+    stubFetch({
+      membership: () => {
+        answers += 1;
+        return jsonResponse({
+          data: answers < 3 ? CANCELLED_FULL : ACTIVE_FULL,
+        });
+      },
+    });
+    renderScreen({ checkoutReturn: "ok" });
+
+    expect(await screen.findByText(/waiting for Stripe/)).toHaveAttribute(
+      "role",
+      "status",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Subscribe again" }),
+    ).not.toBeInTheDocument();
+
+    await act(() => vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS / 2));
+
+    expect(statusChip()).toHaveTextContent("Active");
+    expect(screen.queryByText(/waiting for Stripe/)).not.toBeInTheDocument();
   });
 
   it("deja de consultar a los 30 segundos y lo dice", async () => {

@@ -158,20 +158,51 @@ function PlanDetails({
   );
 }
 
+function isWaitingForSubscription(waiting: Waiting): boolean {
+  return waiting.kind !== "none" && waiting.target.kind === "subscription";
+}
+
+/** Lo que se dice mientras el webhook de la suscripción no llega, en vez de
+ * ofrecer otra. */
+function SubscriptionWaitStatus({
+  translate,
+  waiting,
+}: {
+  readonly translate: Translator;
+  readonly waiting: Waiting;
+}): React.JSX.Element {
+  return (
+    <p className="payments-status" role="status">
+      {translate(
+        waiting.kind === "polling"
+          ? "payments.checkout.waiting"
+          : "payments.checkout.timedOut",
+      )}
+    </p>
+  );
+}
+
 /** Cambiar la tarjeta a quien Stripe le cobra o le falló el cobro, y volver
  * a suscribirse a quien canceló (sin prueba si ya la tuvo, #454). La
- * exención no tiene nada que tocar. */
+ * exención no tiene nada que tocar. A quien le falló el cobro se le ofrece
+ * aunque la base no sepa su tarjeta: es su única salida, y tiene cliente en
+ * Stripe porque tiene suscripción. */
 function PlanActions({
   translate,
   membership,
+  waiting,
 }: {
   readonly translate: Translator;
   readonly membership: MembershipPanelView;
+  readonly waiting: Waiting;
 }): React.JSX.Element | null {
   const { status, card, plan } = membership;
+  if (isWaitingForSubscription(waiting)) {
+    return <SubscriptionWaitStatus translate={translate} waiting={waiting} />;
+  }
   const canUpdateCard =
-    card !== null &&
-    (status === "active" || status === "trialing" || status === "past_due");
+    status === "past_due" ||
+    (card !== null && (status === "active" || status === "trialing"));
   if (canUpdateCard) {
     return (
       <div className="payments-plan-actions">
@@ -212,16 +243,8 @@ function PendingOffer({
   readonly waiting: Waiting;
   readonly checkoutReturn: CheckoutReturn | null;
 }): React.JSX.Element | null {
-  if (waiting.kind !== "none" && waiting.target.kind === "subscription") {
-    return (
-      <p className="payments-status" role="status">
-        {translate(
-          waiting.kind === "polling"
-            ? "payments.checkout.waiting"
-            : "payments.checkout.timedOut",
-        )}
-      </p>
-    );
+  if (isWaitingForSubscription(waiting)) {
+    return <SubscriptionWaitStatus translate={translate} waiting={waiting} />;
   }
   if (membership.plan === "Casual") {
     return <p>{translate("payments.offer.casual")}</p>;
@@ -304,7 +327,11 @@ export function PlanCard({
         />
       ) : null}
       {status !== "pending" && view.paymentsConfigured ? (
-        <PlanActions translate={translate} membership={membership} />
+        <PlanActions
+          translate={translate}
+          membership={membership}
+          waiting={waiting}
+        />
       ) : null}
     </section>
   );

@@ -17,8 +17,9 @@ import { loadMembershipView } from "./payments-client";
 const POLL_INTERVAL_MS = 3_000;
 const POLL_TIMEOUT_MS = 30_000;
 
-/** Lo que se espera: la suscripción del alta (deja de estar pendiente) o la
- * tarjeta nueva (deja de ser la que había al volver). */
+/** Lo que se espera: la suscripción del alta o de la vuelta tras cancelar
+ * (deja de estar pendiente o cancelada) o la tarjeta nueva (deja de ser la
+ * que había al volver). */
 export type WaitTarget =
   | { readonly kind: "subscription" }
   | { readonly kind: "card"; readonly previousCard: MembershipCard | null };
@@ -35,8 +36,11 @@ export type StripeReturns = {
   readonly cardReturn: CheckoutReturn | null;
 };
 
-export function isPending(view: MembershipView): boolean {
-  return view.membership?.status === "pending";
+/** Quien vuelve de Checkout sin suscripción todavía: el alta (#454) o la
+ * vuelta de quien canceló (#455). */
+function isAwaitingSubscription(view: MembershipView): boolean {
+  const status = view.membership?.status;
+  return status === "pending" || status === "cancelled";
 }
 
 function isSameCard(
@@ -57,19 +61,21 @@ function isSameCard(
 function hasSettled(target: WaitTarget, view: MembershipView): boolean {
   switch (target.kind) {
     case "subscription":
-      return !isPending(view);
+      return !isAwaitingSubscription(view);
     case "card":
       return !isSameCard(target.previousCard, view.membership?.card ?? null);
   }
 }
 
 /** Qué esperar según con qué volvió el socio de Stripe, mirando la primera
- * membresía que llega. */
+ * membresía que llega. Si el webhook de la tarjeta llegó antes que ella, la
+ * "anterior" ya es la nueva y la espera acaba en el aviso prudente de los
+ * 30 s; se acepta, porque la tarjeta que se ve es la buena. */
 export function initialWaiting(
   view: MembershipView,
   returns: StripeReturns,
 ): Waiting {
-  if (returns.checkoutReturn === "ok" && isPending(view)) {
+  if (returns.checkoutReturn === "ok" && isAwaitingSubscription(view)) {
     return { kind: "polling", target: { kind: "subscription" } };
   }
   if (returns.cardReturn === "ok") {

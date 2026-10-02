@@ -4660,6 +4660,7 @@ button.notification-item-content:hover {
   display: grid;
   gap: var(--space-4);
   max-width: 820px;
+  margin-top: var(--space-4);
 }
 
 .payments-plan-card {
