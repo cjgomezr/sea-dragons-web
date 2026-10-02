@@ -48,30 +48,37 @@ type FactsOf<Kind extends string, Extra> = {
   readonly lookup: MembershipLookup;
 } & Extra;
 
+/** Un Checkout sólo dice qué suscripción nació y de qué socio. Lo demás hay
+ * que pedírselo a Stripe: ver `subscriptionFactsFromCheckout`. */
+export type CheckoutCompletedFacts = FactsOf<
+  "checkoutCompleted",
+  { readonly subscriptionId: string }
+>;
+
+export type SubscriptionChangedFacts = FactsOf<
+  "subscriptionChanged",
+  {
+    readonly customerId: string;
+    readonly subscriptionId: string;
+    readonly stripeStatus: string;
+    readonly trialEnd: Date | null;
+    readonly currentPeriodEnd: Date | null;
+    readonly priceId: string | null;
+    readonly paymentMethod: PaymentMethodReference;
+  }
+>;
+
 export type StripeEventFacts =
   | { readonly kind: "ignored" }
-  | FactsOf<
-      "checkoutCompleted",
-      { readonly customerId: string; readonly subscriptionId: string }
-    >
-  | FactsOf<
-      "subscriptionChanged",
-      {
-        readonly customerId: string;
-        readonly subscriptionId: string;
-        readonly stripeStatus: string;
-        readonly trialEnd: Date | null;
-        readonly currentPeriodEnd: Date | null;
-        readonly priceId: string | null;
-        readonly paymentMethod: PaymentMethodReference;
-      }
-    >
+  | CheckoutCompletedFacts
+  | SubscriptionChangedFacts
   | FactsOf<"subscriptionDeleted", Record<never, never>>
   | FactsOf<"invoiceSettled", { readonly payment: StripePayment }>;
 
-export type AppliedStripeEventFacts = Exclude<
+/** Lo que el plan sabe escribir sin preguntarle nada más a Stripe. */
+export type PlannableStripeEventFacts = Exclude<
   StripeEventFacts,
-  { readonly kind: "ignored" }
+  { readonly kind: "ignored" } | CheckoutCompletedFacts
 >;
 
 /** La membresía tal como la ve el webhook: la fila y el `created` del último
@@ -165,7 +172,6 @@ function readCheckoutFacts(
       customerId,
       subscriptionId,
     },
-    customerId,
     subscriptionId,
   };
 }
@@ -215,7 +221,7 @@ function subscriptionLookup(
 function readSubscriptionFacts(
   subscription: Stripe.Subscription,
   created: Date,
-): StripeEventFacts {
+): SubscriptionChangedFacts {
   const item = subscription.items.data[0];
   return {
     kind: "subscriptionChanged",
@@ -229,6 +235,28 @@ function readSubscriptionFacts(
       item === undefined ? null : fromStripeTime(item.current_period_end),
     priceId: item === undefined ? null : item.price.id,
     paymentMethod: readPaymentMethod(subscription.default_payment_method),
+  };
+}
+
+/**
+ * Lo que dice un Checkout terminado, con la suscripción que se le pidió a
+ * Stripe. Stripe suele mandar `customer.subscription.created` antes que el
+ * Checkout y en paralelo: si aún no se conocía al socio, ese evento se perdió,
+ * y sin esto la membresía se quedaría `pending` hasta el siguiente cambio de
+ * la suscripción, un mes después. El socio sale del Checkout
+ * (`client_reference_id`), que es lo único seguro de este punto.
+ */
+export function subscriptionFactsFromCheckout(
+  checkout: CheckoutCompletedFacts,
+  subscription: Stripe.Subscription,
+): SubscriptionChangedFacts {
+  const facts = readSubscriptionFacts(subscription, checkout.created);
+  return {
+    ...facts,
+    lookup: {
+      ...facts.lookup,
+      userId: checkout.lookup.userId ?? facts.lookup.userId,
+    },
   };
 }
 
@@ -293,7 +321,7 @@ export function readStripeEventFacts(event: Stripe.Event): StripeEventFacts {
 }
 
 type PlanInput = {
-  readonly facts: AppliedStripeEventFacts;
+  readonly facts: PlannableStripeEventFacts;
   readonly membership: StripeMembership;
   /** La tarjeta del método de pago, ya resuelta; nula si no hay ninguna. */
   readonly card: MembershipCard | null;
@@ -348,7 +376,7 @@ function statusFromStripe(
 }
 
 function planSubscriptionChange(
-  facts: Extract<AppliedStripeEventFacts, { kind: "subscriptionChanged" }>,
+  facts: SubscriptionChangedFacts,
   input: PlanInput,
 ): MembershipPlanChange {
   const status = statusFromStripe(facts.stripeStatus, input);
@@ -371,14 +399,6 @@ function planSubscriptionChange(
 function planMembershipChange(input: PlanInput): MembershipPlanChange | null {
   const { facts } = input;
   switch (facts.kind) {
-    case "checkoutCompleted":
-      return {
-        changes: {
-          stripeCustomerId: facts.customerId,
-          stripeSubscriptionId: facts.subscriptionId,
-        },
-        warnings: [],
-      };
     case "subscriptionChanged":
       return planSubscriptionChange(facts, input);
     case "subscriptionDeleted":

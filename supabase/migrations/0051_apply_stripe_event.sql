@@ -17,6 +17,9 @@
 -- garantiza, y dos eventos de la misma suscripción pueden aplicarse a la vez.
 -- Un evento anterior al último que movió el estado (`stripe_event_at`) no
 -- toca la membresía. El pago sí entra: el historial guarda lo que pasó.
+-- También vuelve a mirar la exención: el servidor ya omite el estado mientras
+-- esté vigente, pero un Admin pudo eximir al socio entre esa lectura y esta
+-- escritura, y la exención es suya, no de Stripe (RF-4).
 --
 -- Una factura es una fila (`payments_stripe_invoice_id_key`): un cobro que
 -- falla y luego se paga la deja pagada, y un fallo que llega tarde no
@@ -58,7 +61,11 @@ begin
 
   if membership_changes is not null then
     update public.memberships m
-       set status = case when changes ? 'status'
+       set status = case when m.status = 'waived'
+                              and (m.waived_until is null
+                                   or m.waived_until > now())
+                         then m.status
+                         when changes ? 'status'
                          then changes ->> 'status' else m.status end,
            plan = case when changes ? 'plan'
                        then changes ->> 'plan' else m.plan end,

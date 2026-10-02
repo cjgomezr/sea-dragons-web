@@ -1,15 +1,19 @@
 // @vitest-environment node
+import type Stripe from "stripe";
 import { describe, expect, it } from "vitest";
 import type {
   MembershipCard,
   MembershipRecord,
 } from "@/lib/membership/membership";
 import {
+  type CheckoutCompletedFacts,
+  type PlannableStripeEventFacts,
   type StripeEventFacts,
   type StripeEventWrites,
   type StripeMembership,
   planStripeEventWrites,
   readStripeEventFacts,
+  subscriptionFactsFromCheckout,
 } from "@/lib/stripe/webhook-events";
 import {
   FIXTURE_CUSTOMER_ID,
@@ -63,11 +67,9 @@ function membership(
   return { record: pendingRecord(change), lastStripeEventAt };
 }
 
-function appliedFacts(
-  facts: StripeEventFacts,
-): Exclude<StripeEventFacts, { kind: "ignored" }> {
-  if (facts.kind === "ignored") {
-    throw new Error("El evento de ejemplo debería aplicarse.");
+function plannableFacts(facts: StripeEventFacts): PlannableStripeEventFacts {
+  if (facts.kind === "ignored" || facts.kind === "checkoutCompleted") {
+    throw new Error("El evento de ejemplo debería planificarse tal cual.");
   }
   return facts;
 }
@@ -80,7 +82,7 @@ function plan(
   } = {},
 ): StripeEventWrites {
   return planStripeEventWrites({
-    facts: appliedFacts(readStripeEventFacts(event)),
+    facts: plannableFacts(readStripeEventFacts(event)),
     membership: input.membership ?? membership(),
     card: input.card ?? null,
     prices: FIXTURE_PRICES,
@@ -171,20 +173,68 @@ describe("qué dice cada evento", () => {
 });
 
 describe("checkout.session.completed", () => {
-  it("guarda el cliente y la suscripción de Stripe en la membresía del socio", () => {
-    const writes = plan(stripeEvent("checkout.session.completed"));
-
-    expect(writes.membership).toEqual({
-      stripeCustomerId: FIXTURE_CUSTOMER_ID,
-      stripeSubscriptionId: FIXTURE_SUBSCRIPTION_ID,
+  /** La suscripción tal como Stripe la devuelve al pedirla, sin los
+   * metadatos del socio: el caso en que el Checkout es la única pista. */
+  function subscriptionWithoutMetadata(): Stripe.Subscription {
+    const event = stripeEvent("customer.subscription.updated", {
+      object: { metadata: {} },
     });
-    expect(writes.payment).toBeNull();
+    return event.data.object as Stripe.Subscription;
+  }
+
+  function checkoutFacts(): CheckoutCompletedFacts {
+    const facts = readStripeEventFacts(
+      stripeEvent("checkout.session.completed"),
+    );
+    if (facts.kind !== "checkoutCompleted") {
+      throw new Error("El Checkout de ejemplo debería leerse como tal.");
+    }
+    return facts;
+  }
+
+  it("aplica la suscripción que se le pide a Stripe, con el socio del Checkout", () => {
+    const checkout = checkoutFacts();
+
+    const facts = subscriptionFactsFromCheckout(
+      checkout,
+      subscriptionWithoutMetadata(),
+    );
+
+    expect(facts).toMatchObject({
+      kind: "subscriptionChanged",
+      created: checkout.created,
+      lookup: {
+        userId: FIXTURE_USER_ID,
+        customerId: FIXTURE_CUSTOMER_ID,
+        subscriptionId: FIXTURE_SUBSCRIPTION_ID,
+      },
+    });
   });
 
-  it("no mueve el estado: lo mueve la suscripción", () => {
-    const writes = plan(stripeEvent("checkout.session.completed"));
+  it("deja la membresía en prueba con su fin, el plan, la tarjeta y los ids de Stripe", () => {
+    const checkout = checkoutFacts();
 
-    expect(writes.membership).not.toHaveProperty("status");
+    const writes = planStripeEventWrites({
+      facts: subscriptionFactsFromCheckout(
+        checkout,
+        subscriptionWithoutMetadata(),
+      ),
+      membership: membership(),
+      card: VISA,
+      prices: FIXTURE_PRICES,
+      now: NOW,
+    });
+
+    expect(writes.membership).toEqual({
+      status: "trialing",
+      plan: "Full",
+      stripeCustomerId: FIXTURE_CUSTOMER_ID,
+      stripeSubscriptionId: FIXTURE_SUBSCRIPTION_ID,
+      trialEnd: secondsToDate(1792592000),
+      currentPeriodEnd: secondsToDate(1792592000),
+      card: VISA,
+      stripeEventAt: checkout.created,
+    });
   });
 });
 
@@ -388,8 +438,21 @@ describe("eventos fuera de orden", () => {
   });
 
   it("un Checkout más viejo que lo último aplicado no devuelve la suscripción", () => {
-    const writes = plan(stripeEvent("checkout.session.completed"), {
+    const checkout = readStripeEventFacts(
+      stripeEvent("checkout.session.completed"),
+    );
+    if (checkout.kind !== "checkoutCompleted") {
+      throw new Error("El Checkout de ejemplo debería leerse como tal.");
+    }
+    const subscription = stripeEvent("customer.subscription.updated").data
+      .object as Stripe.Subscription;
+
+    const writes = planStripeEventWrites({
+      facts: subscriptionFactsFromCheckout(checkout, subscription),
       membership: membership({ status: "cancelled" }, LATER),
+      card: null,
+      prices: FIXTURE_PRICES,
+      now: NOW,
     });
 
     expect(writes.membership).toBeNull();

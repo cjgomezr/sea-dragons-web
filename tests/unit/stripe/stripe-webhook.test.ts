@@ -1,4 +1,5 @@
 // @vitest-environment node
+import type Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MembershipCard } from "@/lib/membership/membership";
 import {
@@ -46,12 +47,14 @@ const KNOWN_MEMBERSHIP: StripeMembership = {
 const findMembership = vi.fn<StripeWebhookGateway["findMembership"]>();
 const applyEvent = vi.fn<StripeWebhookGateway["applyEvent"]>();
 const readCard = vi.fn<(paymentMethodId: string) => Promise<MembershipCard>>();
+const readSubscription =
+  vi.fn<(subscriptionId: string) => Promise<Stripe.Subscription>>();
 const log = vi.fn<(line: string) => void>();
 
 function handle(event: ReturnType<typeof stripeEvent>) {
   return handleStripeEvent(event, {
     gateway: { findMembership, applyEvent },
-    cards: { readCard },
+    stripe: { readCard, readSubscription },
     prices: FIXTURE_PRICES,
     now: NOW,
     log,
@@ -63,6 +66,11 @@ beforeEach(() => {
   findMembership.mockResolvedValue(KNOWN_MEMBERSHIP);
   applyEvent.mockResolvedValue("applied");
   readCard.mockResolvedValue(MASTERCARD);
+  readSubscription.mockResolvedValue(
+    stripeEvent("customer.subscription.updated", {
+      object: { metadata: {} },
+    }).data.object as Stripe.Subscription,
+  );
 });
 
 describe("handleStripeEvent", () => {
@@ -137,6 +145,30 @@ describe("handleStripeEvent", () => {
     await handle(stripeEvent("customer.subscription.updated"));
 
     expect(readCard).not.toHaveBeenCalled();
+  });
+
+  it("con un Checkout pide la suscripción a Stripe y la aplica entera", async () => {
+    const event = stripeEvent("checkout.session.completed");
+
+    const outcome = await handle(event);
+
+    expect(outcome).toBe("applied");
+    expect(readSubscription).toHaveBeenCalledWith("sub_TestSeadragons");
+    expect(findMembership).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: FIXTURE_USER_ID }),
+    );
+    expect(applyEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: expect.objectContaining({ type: "checkout.session.completed" }),
+        writes: expect.objectContaining({
+          membership: expect.objectContaining({
+            status: "trialing",
+            plan: "Full",
+            card: { brand: "visa", last4: "4242", expMonth: 12, expYear: 2030 },
+          }),
+        }),
+      }),
+    );
   });
 
   it("deja en el log lo que no pudo reconocer", async () => {

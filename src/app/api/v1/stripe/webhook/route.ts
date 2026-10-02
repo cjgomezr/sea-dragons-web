@@ -4,7 +4,7 @@ import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
 import { createStripeWebhookGateway } from "@/lib/membership/supabase-membership-gateways";
 import {
-  createStripeCardReader,
+  createStripeReader,
   createStripeSetup,
 } from "@/lib/stripe/stripe-client";
 import {
@@ -22,6 +22,7 @@ export type StripeWebhookReceipt = { readonly outcome: StripeWebhookOutcome };
 
 const SIGNATURE_HEADER = "stripe-signature";
 const NOT_CONFIGURED_REASON = "stripe_not_configured";
+const NOT_CONFIGURED_MESSAGE = "Los pagos no están configurados.";
 const INVALID_SIGNATURE_REASON = "invalid_signature";
 const INVALID_SIGNATURE_MESSAGE =
   "La firma del webhook de Stripe no es válida.";
@@ -62,16 +63,20 @@ const receiveStripeWebhook = createApiRoute<StripeWebhookReceipt>({
   handler: async ({ request }) => {
     const stripe = createStripeSetup(process.env);
     if (stripe.kind === "unconfigured") {
+      // Quien llama aquí puede ser cualquiera y todavía no firmó nada: los
+      // nombres de lo que falta van al registro del servidor, no a la
+      // respuesta.
+      console.warn(`[stripe/webhook] faltan ${stripe.missingKeys.join(", ")}`);
       throw new ApiError(
         "service_unavailable",
-        `Los pagos no están configurados: faltan ${stripe.missingKeys.join(", ")}.`,
+        NOT_CONFIGURED_MESSAGE,
         NOT_CONFIGURED_REASON,
       );
     }
     const event = await verifyEvent(request, stripe);
     const outcome = await handleStripeEvent(event, {
       gateway: createStripeWebhookGateway(createServiceRoleClient(process.env)),
-      cards: createStripeCardReader(stripe.client),
+      stripe: createStripeReader(stripe.client),
       prices: stripe.prices,
       now: new Date(),
       log: (line) => console.warn(line),

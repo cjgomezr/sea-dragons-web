@@ -144,6 +144,9 @@ function lookupColumns(
   );
 }
 
+/** `maybeSingle` lanza si hay más de una fila, y por `user_id` las habrá el
+ * día que un socio lo sea de dos clubes (NFR-009). Release 1 opera uno solo;
+ * con varios, el webhook tendrá que saber de qué club es la cuenta de Stripe. */
 async function findMembershipBy(
   serviceClient: SupabaseClient,
   [column, value]: readonly [string, string],

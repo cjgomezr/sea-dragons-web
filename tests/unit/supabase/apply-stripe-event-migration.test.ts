@@ -221,6 +221,45 @@ describeConPostgres("aplicar un evento de Stripe en la base", () => {
     ).resolves.toBe("1");
   });
 
+  it("no pisa una exención vigente aunque el evento traiga estado", async () => {
+    const database = await migratedDatabase();
+    const member = await seedMemberWithMembership(database);
+    await database.query(
+      `update public.memberships
+          set status = 'waived', waived_reason = 'Entrenador'
+        where user_id = '${member.userId}'`,
+    );
+
+    await applyStripeEvent(database, member, {
+      id: "evt_1",
+      membership: { status: "past_due", stripe_subscription_id: "sub_1" },
+    });
+
+    await expect(
+      readMembership(database, member, "status, stripe_subscription_id"),
+    ).resolves.toBe("waived|sub_1");
+  });
+
+  it("con la exención vencida, el estado vuelve a seguir al evento", async () => {
+    const database = await migratedDatabase();
+    const member = await seedMemberWithMembership(database);
+    await database.query(
+      `update public.memberships
+          set status = 'waived', waived_reason = 'Entrenador',
+              waived_until = now() - interval '1 day'
+        where user_id = '${member.userId}'`,
+    );
+
+    await applyStripeEvent(database, member, {
+      id: "evt_1",
+      membership: { status: "active" },
+    });
+
+    await expect(readMembership(database, member, "status")).resolves.toBe(
+      "active",
+    );
+  });
+
   it("guarda el pago con el socio y el club de la membresía", async () => {
     const database = await migratedDatabase();
     const member = await seedMemberWithMembership(database);

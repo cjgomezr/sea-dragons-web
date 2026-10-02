@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import type { StripeCardReader } from "./stripe-webhook";
+import type { StripeReader } from "./stripe-webhook";
 import { type StripePrices, readCard } from "./webhook-events";
 
 /**
@@ -61,11 +61,17 @@ export function createStripeSetup(env: Environment): StripeSetup {
   };
 }
 
-/** La tarjeta de un método de pago que la suscripción trae sólo como id. */
-export function createStripeCardReader(client: Stripe): StripeCardReader {
+/** Lo que el webhook pide a la API de Stripe. La suscripción viene con su
+ * método de pago expandido, para no tener que pedir la tarjeta aparte. */
+export function createStripeReader(client: Stripe): StripeReader {
   return {
     async readCard(paymentMethodId) {
       return readCard(await client.paymentMethods.retrieve(paymentMethodId));
+    },
+    readSubscription(subscriptionId) {
+      return client.subscriptions.retrieve(subscriptionId, {
+        expand: ["default_payment_method"],
+      });
     },
   };
 }

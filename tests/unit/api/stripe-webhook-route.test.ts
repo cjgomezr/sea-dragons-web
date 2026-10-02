@@ -108,6 +108,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   process.env = { ...ORIGINAL_ENV };
 });
 
@@ -187,17 +188,23 @@ describe("POST /api/v1/stripe/webhook", () => {
     "STRIPE_WEBHOOK_SECRET",
     "STRIPE_PRICE_FULL",
     "STRIPE_PRICE_STUDENT",
-  ])("responde 503 con su motivo cuando falta %s", async (name) => {
-    delete process.env[name];
+  ])(
+    "responde 503 con su motivo, sin nombrarla, cuando falta %s",
+    async (name) => {
+      vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      delete process.env[name];
 
-    const response = await signedPost();
+      const response = await signedPost();
 
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toMatchObject({
-      error: { code: "service_unavailable", reason: "stripe_not_configured" },
-    });
-    expect(createServiceRoleClient).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(503);
+      const rawBody = await response.text();
+      expect(JSON.parse(rawBody)).toMatchObject({
+        error: { code: "service_unavailable", reason: "stripe_not_configured" },
+      });
+      expect(rawBody).not.toContain(name);
+      expect(createServiceRoleClient).not.toHaveBeenCalled();
+    },
+  );
 
   it("es pública: la frontera no pregunta por ninguna sesión", async () => {
     const response = await signedPost();
