@@ -1,0 +1,42 @@
+{
+  "id": "evt_test_subscription_updated",
+  "object": "event",
+  "api_version": "2026-09-30.endive",
+  "created": 1790000100,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": { "id": null, "idempotency_key": null },
+  "type": "customer.subscription.updated",
+  "data": {
+    "object": {
+      "id": "sub_TestSeadragons",
+      "object": "subscription",
+      "customer": "cus_TestSeadragons",
+      "status": "trialing",
+      "trial_end": 1792592000,
+      "metadata": { "user_id": "7b0e5a52-3c1d-4e8f-9a6b-2d4c8e1f0a37" },
+      "default_payment_method": {
+        "id": "pm_TestSeadragons",
+        "object": "payment_method",
+        "type": "card",
+        "card": {
+          "brand": "visa",
+          "last4": "4242",
+          "exp_month": 12,
+          "exp_year": 2030
+        }
+      },
+      "items": {
+        "object": "list",
+        "data": [
+          {
+            "id": "si_TestSeadragons",
+            "object": "subscription_item",
+            "current_period_end": 1792592000,
+            "price": { "id": "price_full_test", "object": "price" }
+          }
+        ]
+      }
+    }
+  }
+}

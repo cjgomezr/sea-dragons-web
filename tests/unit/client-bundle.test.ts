@@ -130,13 +130,15 @@ describe("bundle de cliente", () => {
 
   // #448 sumó la cadena de conexión de desarrollo, con su contraseña: si
   // llegara al bundle, cualquiera podría escribir en seadragons-dev.
-  it("busca las cinco variables secretas de hoy y el prefijo de clave", () => {
+  it("busca las siete variables secretas de hoy y el prefijo de clave", () => {
     expect(forbiddenNeedles(readEnvironmentManifest())).toEqual([
       "SUPABASE_SERVICE_ROLE_KEY",
       "SUPABASE_ACCESS_TOKEN",
       "SUPABASE_DEV_DB_URL",
       "SUPABASE_PRODUCTION_DB_URL",
       "RESEND_API_KEY",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
       FORBIDDEN_KEY_PREFIX,
     ]);
   });

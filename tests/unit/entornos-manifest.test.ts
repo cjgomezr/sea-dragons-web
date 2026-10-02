@@ -323,13 +323,15 @@ describe("manifiesto de entornos", () => {
     }
   });
 
-  it("marca como secreta la llave de servicio, el token de cuenta, las conexiones a desarrollo y a producción y la clave de Resend", () => {
+  it("marca como secreta la llave de servicio, el token de cuenta, las conexiones a desarrollo y a producción, la clave de Resend y las dos de Stripe", () => {
     expect(secretVariableNames(readEnvironmentManifest())).toEqual([
       "SUPABASE_SERVICE_ROLE_KEY",
       "SUPABASE_ACCESS_TOKEN",
       "SUPABASE_DEV_DB_URL",
       "SUPABASE_PRODUCTION_DB_URL",
       "RESEND_API_KEY",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
     ]);
   });
 });

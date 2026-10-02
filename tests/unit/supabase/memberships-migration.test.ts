@@ -125,6 +125,7 @@ describeConPostgres("membresías y pagos en la base", () => {
           "plan:text",
           "status:text",
           "stripe_customer_id:text",
+          "stripe_event_at:timestamp with time zone",
           "stripe_subscription_id:text",
           "trial_end:timestamp with time zone",
           "updated_at:timestamp with time zone",

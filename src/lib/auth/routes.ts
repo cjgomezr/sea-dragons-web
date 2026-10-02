@@ -516,6 +516,10 @@ export const PASSWORD_RECOVERY_API_PATH = "/api/v1/auth/password-recovery";
  * credencial: exigir además una sesión lo haría imposible de usar. */
 export const PASSWORD_RESET_API_PATH = "/api/v1/auth/password-reset";
 
+/** Los webhooks de Stripe (#452). Quien llama es Stripe, que no tiene sesión:
+ * la credencial es la firma, y la verifica el propio endpoint. */
+export const STRIPE_WEBHOOK_API_PATH = "/api/v1/stripe/webhook";
+
 /**
  * Los únicos endpoints de la API que no exigen sesión.
  *
@@ -531,6 +535,7 @@ export const PUBLIC_API_PATHS: readonly string[] = [
   CONFIRMATION_EMAIL_API_PATH,
   PASSWORD_RECOVERY_API_PATH,
   PASSWORD_RESET_API_PATH,
+  STRIPE_WEBHOOK_API_PATH,
 ];
 
 export const API_V1_PREFIX = "/api/v1";

@@ -1,0 +1,45 @@
+{
+  "id": "evt_test_invoice_payment_failed",
+  "object": "event",
+  "api_version": "2026-09-30.endive",
+  "created": 1792592200,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": { "id": null, "idempotency_key": null },
+  "type": "invoice.payment_failed",
+  "data": {
+    "object": {
+      "id": "in_TestSeadragonsFailed",
+      "object": "invoice",
+      "customer": "cus_TestSeadragons",
+      "amount_due": 3200,
+      "amount_paid": 0,
+      "currency": "aud",
+      "description": null,
+      "created": 1792592000,
+      "status_transitions": {
+        "finalized_at": 1792592000,
+        "marked_uncollectible_at": null,
+        "paid_at": null,
+        "voided_at": null
+      },
+      "lines": {
+        "object": "list",
+        "data": [
+          {
+            "id": "il_TestSeadragonsFailed",
+            "object": "line_item",
+            "description": "1 × Student membership (at $32.00 / month)"
+          }
+        ]
+      },
+      "parent": {
+        "type": "subscription_details",
+        "subscription_details": {
+          "subscription": "sub_TestSeadragons",
+          "metadata": { "user_id": "7b0e5a52-3c1d-4e8f-9a6b-2d4c8e1f0a37" }
+        }
+      }
+    }
+  }
+}

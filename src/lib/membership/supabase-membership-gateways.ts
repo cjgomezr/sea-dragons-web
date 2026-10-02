@@ -12,6 +12,13 @@ import {
   type MembershipWaiver,
   resolveStandingStatus,
 } from "./membership";
+import type { StripeWebhookGateway } from "@/lib/stripe/stripe-webhook";
+import type {
+  MembershipChanges,
+  MembershipLookup,
+  StripeMembership,
+  StripePayment,
+} from "@/lib/stripe/webhook-events";
 
 /**
  * Adaptador entre la membresía (#451) y Supabase.
@@ -163,6 +170,149 @@ export function createMembershipGateway(
       return data === null
         ? null
         : toMembershipRecord(membershipRowSchema.parse(data));
+    },
+  };
+}
+
+const STRIPE_MEMBERSHIP_COLUMNS = `${MEMBERSHIP_COLUMNS}, stripe_event_at`;
+const APPLY_STRIPE_EVENT_FUNCTION = "apply_stripe_event";
+const APPLY_STRIPE_EVENT_OUTCOMES = ["applied", "duplicate"] as const;
+
+const stripeMembershipRowSchema = membershipRowSchema.extend({
+  stripe_event_at: z.string().nullable(),
+});
+
+/** De lo más preciso a lo menos: la suscripción es de una sola membresía; el
+ * socio de los metadatos, sólo un respaldo para cuando la suscripción llega
+ * antes que el Checkout que la guarda. */
+function lookupColumns(
+  lookup: MembershipLookup,
+): readonly (readonly [column: string, value: string])[] {
+  const candidates = [
+    ["stripe_subscription_id", lookup.subscriptionId],
+    ["stripe_customer_id", lookup.customerId],
+    ["user_id", lookup.userId],
+  ] as const;
+  return candidates.flatMap(([column, value]) =>
+    value === null ? [] : [[column, value] as const],
+  );
+}
+
+/** `maybeSingle` lanza si hay más de una fila, y por `user_id` las habrá el
+ * día que un socio lo sea de dos clubes (NFR-009). Release 1 opera uno solo;
+ * con varios, el webhook tendrá que saber de qué club es la cuenta de Stripe. */
+async function findMembershipBy(
+  serviceClient: SupabaseClient,
+  [column, value]: readonly [string, string],
+): Promise<StripeMembership | null> {
+  const { data, error } = await serviceClient
+    .from(MEMBERSHIPS_TABLE)
+    .select(STRIPE_MEMBERSHIP_COLUMNS)
+    .eq(column, value)
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `No se pudo buscar la membresía por ${column}: ${error.message}`,
+    );
+  }
+  if (data === null) {
+    return null;
+  }
+  const row = stripeMembershipRowSchema.parse(data);
+  return {
+    record: toMembershipRecord(row),
+    lastStripeEventAt: toDate(row.stripe_event_at),
+  };
+}
+
+function toNullableIso(date: Date | null): string | null {
+  return date === null ? null : date.toISOString();
+}
+
+/** Sólo las claves que el evento cambia: la función no toca las ausentes. */
+function toMembershipChangesJson(
+  changes: MembershipChanges,
+): Record<string, unknown> {
+  const { card } = changes;
+  return {
+    ...(changes.status === undefined ? {} : { status: changes.status }),
+    ...(changes.plan === undefined ? {} : { plan: changes.plan }),
+    ...(changes.stripeCustomerId === undefined
+      ? {}
+      : { stripe_customer_id: changes.stripeCustomerId }),
+    ...(changes.stripeSubscriptionId === undefined
+      ? {}
+      : { stripe_subscription_id: changes.stripeSubscriptionId }),
+    ...(changes.trialEnd === undefined
+      ? {}
+      : { trial_end: toNullableIso(changes.trialEnd) }),
+    ...(changes.currentPeriodEnd === undefined
+      ? {}
+      : { current_period_end: toNullableIso(changes.currentPeriodEnd) }),
+    ...(card === undefined
+      ? {}
+      : {
+          card_brand: card.brand,
+          card_last4: card.last4,
+          card_exp_month: card.expMonth,
+          card_exp_year: card.expYear,
+        }),
+    ...(changes.stripeEventAt === undefined
+      ? {}
+      : { stripe_event_at: changes.stripeEventAt.toISOString() }),
+  };
+}
+
+function toPaymentJson(payment: StripePayment): Record<string, unknown> {
+  return {
+    stripe_invoice_id: payment.invoiceId,
+    amount_cents: payment.amountCents,
+    currency: payment.currency,
+    description: payment.description,
+    status: payment.status,
+    paid_at: toNullableIso(payment.paidAt),
+  };
+}
+
+/** Lo que necesita el webhook de Stripe (#452): encontrar la membresía de un
+ * evento y escribirlo todo de una vez con `apply_stripe_event`
+ * (`0051_apply_stripe_event.sql`). */
+export function createStripeWebhookGateway(
+  serviceClient: SupabaseClient,
+): StripeWebhookGateway {
+  return {
+    async findMembership(lookup) {
+      for (const candidate of lookupColumns(lookup)) {
+        const membership = await findMembershipBy(serviceClient, candidate);
+        if (membership !== null) {
+          return membership;
+        }
+      }
+      return null;
+    },
+    async applyEvent({ event, owner, writes }) {
+      const { data, error } = await serviceClient.rpc(
+        APPLY_STRIPE_EVENT_FUNCTION,
+        {
+          event_id: event.id,
+          event_type: event.type,
+          event_created: event.created.toISOString(),
+          target_user_id: owner.userId,
+          target_club_id: owner.clubId,
+          membership_changes:
+            writes.membership === null
+              ? null
+              : toMembershipChangesJson(writes.membership),
+          payment:
+            writes.payment === null ? null : toPaymentJson(writes.payment),
+        },
+      );
+      if (error) {
+        throw new Error(
+          `No se pudo aplicar el evento de Stripe ${event.id}: ${error.message}`,
+        );
+      }
+      return z.enum(APPLY_STRIPE_EVENT_OUTCOMES).parse(data);
     },
   };
 }
