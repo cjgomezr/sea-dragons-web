@@ -54,7 +54,9 @@ function PaymentRow({
         {formatAudCents(locale, payment.amountCents)}
       </td>
       <td data-label={labels.status}>
-        <span className={`payments-payment-status-${payment.status}`}>
+        <span
+          className={`payments-payment-status payments-payment-status-${payment.status}`}
+        >
           {translate(PAYMENT_STATUS_KEYS[payment.status])}
         </span>
       </td>
