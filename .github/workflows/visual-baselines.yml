@@ -208,6 +208,13 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Pagos ofrece Checkout sólo con Stripe configurado (#454): sin
+          # estas, el estado `pagos-pendiente` fotografiaría "pagos sin
+          # configurar". Son las llaves del modo de prueba.
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_FULL: ${{ secrets.STRIPE_PRICE_FULL }}
+          STRIPE_PRICE_STUDENT: ${{ secrets.STRIPE_PRICE_STUDENT }}
       # Un nombre por parte: dos subidas con el mismo nombre chocan. El job
       # `visual-diff` las junta después en el artefacto que la gente conoce.
       - name: Guarda el diff para que alguien lo mire
@@ -333,6 +340,13 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Pagos ofrece Checkout sólo con Stripe configurado (#454): sin
+          # estas, el estado `pagos-pendiente` fotografiaría "pagos sin
+          # configurar". Son las llaves del modo de prueba.
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_FULL: ${{ secrets.STRIPE_PRICE_FULL }}
+          STRIPE_PRICE_STUDENT: ${{ secrets.STRIPE_PRICE_STUDENT }}
       # Sólo las capturas que esta parte regeneró. Subir la carpeta entera
       # haría que la copia vieja de otra parte pisara, al juntarlas, la
       # captura nueva de ésta.

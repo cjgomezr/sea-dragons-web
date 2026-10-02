@@ -799,6 +799,32 @@ export const englishMessages = {
   "calendar.membership.notice":
     "Your membership isn't up to date, so you can't answer events yet.",
   "calendar.membership.toPayments": "Go to Payments",
+  // Pagos con el alta en Stripe Checkout (#454, RF-3 del PRD de E12).
+  "payments.offer.plan": "{plan} membership · {price} a month",
+  "payments.offer.trial":
+    "Your first month is free. The first charge is in 30 days, then once a month.",
+  "payments.offer.noTrial":
+    "You've already had your free month, so the first charge is today, then once a month.",
+  "payments.offer.stripe":
+    "You add the card on Stripe: it never passes through the club's app.",
+  "payments.offer.addCard": "Add card",
+  "payments.offer.opening": "Opening Stripe…",
+  "payments.offer.retry": "Try again",
+  "payments.offer.casual":
+    "Casual session packs arrive with a later update. In the meantime, an Admin can activate your membership.",
+  "payments.offer.notConfigured":
+    "Payments aren't set up yet. Write to the club so an Admin can activate your membership.",
+  "payments.checkout.cancelled":
+    "You left Stripe without adding a card. You can try again whenever you like.",
+  "payments.checkout.waiting":
+    "Card added. We're waiting for Stripe to confirm it, which can take a few seconds.",
+  "payments.checkout.timedOut":
+    "Stripe hasn't confirmed yet. Reload the page in a minute; if it still says pending, write to the club.",
+  "payments.trialing": "On trial until {date}",
+  "payments.error.unavailable":
+    "We couldn't open Stripe. Try again in a moment.",
+  "payments.error.unexpected":
+    "Something went wrong opening Stripe. Try again.",
   "calendar.rsvp.error.unexpected": "We couldn't save your answer. Try again.",
   "calendar.create.open": "Event",
   "calendar.create.created": "Event created. We let the members know.",

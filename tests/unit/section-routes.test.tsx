@@ -2,7 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Role } from "@/lib/auth/roles";
 import type { Locale } from "@/lib/i18n/locale";
-import type { MembershipBlock } from "@/lib/membership/membership";
+import type { MembershipStatus } from "@/lib/membership/membership";
+import type { MembershipView } from "@/lib/membership/membership-view";
 
 const requestLocale = { current: "en" as Locale };
 const callerRole = { current: "Player" as Role };
@@ -18,20 +19,25 @@ vi.mock("@/lib/club/supabase-club-brand", () => ({
 vi.mock("@/lib/auth/caller-role", () => ({
   readCallerRole: async () => callerRole.current,
 }));
-const callerBlock = { current: null as MembershipBlock | null };
+const callerStatus = { current: "active" as MembershipStatus };
 vi.mock("@/lib/membership/caller-membership", () => ({
-  readCallerMembershipBlock: async () => callerBlock.current,
+  readCallerMembershipView: async (): Promise<MembershipView> => ({
+    paymentsConfigured: true,
+    membership: { plan: "Full", status: callerStatus.current, trialEnd: null },
+  }),
 }));
 
 const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");
 const { default: PagosPage } = await import("@/app/(app)/pagos/page");
 const { default: HomePage } = await import("@/app/(app)/page");
 
-type ServerPage = () => Promise<React.JSX.Element>;
+type ServerPage = (props: {
+  readonly searchParams: Promise<Record<string, string>>;
+}) => Promise<React.JSX.Element>;
 
 async function renderIn(locale: Locale, Page: ServerPage): Promise<void> {
   requestLocale.current = locale;
-  render(await Page());
+  render(await Page({ searchParams: Promise.resolve({}) }));
 }
 
 /** Las secciones que siguen siendo un marcador de posición. El directorio
@@ -71,19 +77,20 @@ describe("secciones", () => {
   );
 });
 
-// #453: Pagos es a donde la frontera lleva a quien no está al día. Hasta su
-// pantalla (#455) basta el marcador con el motivo.
+// #453: Pagos es a donde la frontera lleva a quien no está al día, y le dice
+// por qué. Lo que ofrece a cada uno (#454) se prueba en
+// `tests/unit/components/payments-screen.test.tsx`.
 describe("Pagos de quien no tiene la membresía al día", () => {
   afterEach(() => {
-    callerBlock.current = null;
+    callerStatus.current = "active";
   });
 
-  it.each<[MembershipBlock, string]>([
+  it.each<[MembershipStatus, string]>([
     ["pending", "Your membership is pending: you haven't added a card yet."],
     ["past_due", "Your last payment didn't go through."],
     ["cancelled", "Your membership is cancelled."],
-  ])("dice el motivo de una membresía %s", async (block, reason) => {
-    callerBlock.current = block;
+  ])("dice el motivo de una membresía %s", async (status, reason) => {
+    callerStatus.current = status;
 
     await renderIn("en", PagosPage);
 
@@ -94,13 +101,28 @@ describe("Pagos de quien no tiene la membresía al día", () => {
   });
 
   it("dice el motivo en español", async () => {
-    callerBlock.current = "past_due";
+    callerStatus.current = "past_due";
 
     await renderIn("es", PagosPage);
 
     expect(
       screen.getByText("Tu último pago no se pudo cobrar."),
     ).toBeInTheDocument();
+  });
+
+  it("lee de la dirección con qué vuelve el socio de Checkout", async () => {
+    callerStatus.current = "pending";
+    requestLocale.current = "en";
+
+    render(
+      await PagosPage({
+        searchParams: Promise.resolve({ checkout: "cancelado" }),
+      }),
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /without adding a card/,
+    );
   });
 
   it("no dice ningún motivo a quien está al día", async () => {

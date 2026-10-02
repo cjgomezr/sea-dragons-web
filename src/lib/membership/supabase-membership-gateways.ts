@@ -13,6 +13,7 @@ import {
   resolveStandingStatus,
 } from "./membership";
 import type { StripeWebhookGateway } from "@/lib/stripe/stripe-webhook";
+import type { MemberEmailGateway } from "./checkout";
 import type {
   MembershipChanges,
   MembershipLookup,
@@ -374,4 +375,30 @@ async function insertMembershipIfMissing(
       `No se pudo crear la membresía de ${member.userId}: ${error.message}`,
     );
   }
+}
+
+const MEMBERS_TABLE = "members";
+const memberEmailRowSchema = z.object({ email: z.string() });
+
+/** El correo con el que Checkout crea el cliente de Stripe (#454). Es la
+ * copia de `members`, la misma que leen el directorio y los avisos. Va por la
+ * llave de servicio, acotada al id de quien llama. */
+export function createMemberEmailGateway(
+  serviceClient: SupabaseClient,
+): MemberEmailGateway {
+  return {
+    async findEmail(userId) {
+      const { data, error } = await serviceClient
+        .from(MEMBERS_TABLE)
+        .select("email")
+        .eq("user_id", userId)
+        .single();
+      if (error) {
+        throw new Error(
+          `No se pudo leer el correo de ${userId}: ${error.message}`,
+        );
+      }
+      return memberEmailRowSchema.parse(data).email;
+    },
+  };
 }

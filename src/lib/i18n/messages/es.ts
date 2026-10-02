@@ -797,6 +797,32 @@ export const spanishMessages: MessageCatalog = {
   "calendar.membership.notice":
     "Tu membresía no está al día: todavía no puedes responder a los eventos.",
   "calendar.membership.toPayments": "Ir a Pagos",
+  // Pagos con el alta en Stripe Checkout (#454, RF-3 del PRD de E12).
+  "payments.offer.plan": "Membresía {plan} · {price} al mes",
+  "payments.offer.trial":
+    "El primer mes es gratis. El primer cobro es dentro de 30 días, y después uno cada mes.",
+  "payments.offer.noTrial":
+    "Ya tuviste tu mes gratis, así que el primer cobro es hoy, y después uno cada mes.",
+  "payments.offer.stripe":
+    "La tarjeta la pones en Stripe: nunca pasa por la aplicación del club.",
+  "payments.offer.addCard": "Añadir tarjeta",
+  "payments.offer.opening": "Abriendo Stripe…",
+  "payments.offer.retry": "Reintentar",
+  "payments.offer.casual":
+    "Los packs de sesiones de Casual llegan en una entrega posterior. Mientras tanto, un Admin puede activar tu membresía.",
+  "payments.offer.notConfigured":
+    "Los pagos todavía no están configurados. Escribe al club para que un Admin active tu membresía.",
+  "payments.checkout.cancelled":
+    "Saliste de Stripe sin añadir la tarjeta. Puedes intentarlo otra vez cuando quieras.",
+  "payments.checkout.waiting":
+    "Tarjeta añadida. Estamos esperando la confirmación de Stripe, que puede tardar unos segundos.",
+  "payments.checkout.timedOut":
+    "Stripe todavía no ha confirmado. Recarga la página en un minuto; si sigue pendiente, escribe al club.",
+  "payments.trialing": "En prueba hasta el día {date}",
+  "payments.error.unavailable":
+    "No pudimos abrir Stripe. Vuelve a intentarlo en un momento.",
+  "payments.error.unexpected":
+    "Algo falló al abrir Stripe. Vuelve a intentarlo.",
   "calendar.rsvp.error.unexpected":
     "No pudimos guardar tu respuesta. Vuelve a intentarlo.",
   "calendar.create.open": "Evento",

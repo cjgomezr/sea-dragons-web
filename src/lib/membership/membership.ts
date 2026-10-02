@@ -11,6 +11,17 @@ import type { MembershipType } from "@/lib/auth/registration";
 /** El plan es el tipo que el socio eligió al registrarse (FR-062). */
 export type MembershipPlan = MembershipType;
 
+/** Los planes con cuota mensual por Stripe (FR-063); Casual paga packs (E13). */
+export type RecurringPlan = Exclude<MembershipPlan, "Casual">;
+
+/** Lo que cuesta cada plan al mes, en centavos de AUD (FR-062, CON-005). Lo
+ * cobra el `Price` de Stripe configurado por variable de entorno; esto es lo
+ * que Pagos enseña antes de ir a Stripe, y tiene que coincidir con él. */
+export const MONTHLY_PRICE_CENTS: Readonly<Record<RecurringPlan, number>> = {
+  Full: 4500,
+  Student: 3200,
+};
+
 export const MEMBERSHIP_STATUSES = [
   "pending",
   "trialing",
@@ -193,15 +204,21 @@ export type MembershipBlock = Extract<
 export function membershipBlockOf(
   reading: MembershipReading,
 ): MembershipBlock | null {
-  if (reading.kind === "none") {
-    return "pending";
-  }
-  const { membership } = reading;
-  switch (membership.status) {
+  return reading.kind === "none"
+    ? "pending"
+    : membershipBlockOfStatus(reading.membership.status);
+}
+
+/** El motivo de la puerta cerrada para un estado ya resuelto, o `null` si
+ * está al día. */
+export function membershipBlockOfStatus(
+  status: MembershipStatus,
+): MembershipBlock | null {
+  switch (status) {
     case "pending":
     case "past_due":
     case "cancelled":
-      return membership.status;
+      return status;
     case "trialing":
     case "active":
     case "waived":

@@ -13,16 +13,18 @@ const WORKFLOW_PATH = path.join(
   ".github/workflows/visual-baselines.yml",
 );
 
-const DEVELOPMENT_SOURCE = "seadragons-dev";
+/** Los orígenes de prueba que el manifiesto pone en CI: la base de desarrollo
+ * y la cuenta de Stripe en modo de prueba (#454), con la que Pagos ofrece
+ * Checkout y el test de integración abre una sesión de verdad. */
+const DEVELOPMENT_SOURCES = ["seadragons-dev", "stripe-test"] as const;
 
 /** Las credenciales que el manifiesto pone en los secretos del repositorio.
  * Sale de ahí y no de una lista escrita a mano: declarar una cuarta en el
  * manifiesto y olvidarla en el workflow tiene que dejar esto en rojo. */
 function developmentCredentials(): string[] {
-  return variablesFromSource(
-    readEnvironmentManifest(),
-    "ci",
-    DEVELOPMENT_SOURCE,
+  const manifest = readEnvironmentManifest();
+  return DEVELOPMENT_SOURCES.flatMap((source) =>
+    variablesFromSource(manifest, "ci", source),
   );
 }
 
