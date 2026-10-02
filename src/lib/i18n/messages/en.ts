@@ -817,7 +817,7 @@ export const englishMessages = {
   "payments.checkout.waiting":
     "Card added. We're waiting for Stripe to confirm it, which can take a few seconds.",
   "payments.checkout.timedOut":
-    "Stripe hasn't confirmed yet. Reload the page in a minute; if it still says pending, write to the club.",
+    "Stripe hasn't confirmed yet. Reload the page in a minute; if your membership still hasn't changed, write to the club.",
   "payments.trialing": "On trial until {date}",
   "payments.error.unavailable":
     "We couldn't open Stripe. Try again in a moment.",

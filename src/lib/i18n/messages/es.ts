@@ -815,7 +815,7 @@ export const spanishMessages: MessageCatalog = {
   "payments.checkout.waiting":
     "Tarjeta añadida. Estamos esperando la confirmación de Stripe, que puede tardar unos segundos.",
   "payments.checkout.timedOut":
-    "Stripe todavía no ha confirmado. Recarga la página en un minuto; si sigue pendiente, escribe al club.",
+    "Stripe todavía no ha confirmado. Recarga la página en un minuto; si tu membresía sigue sin cambiar, escribe al club.",
   "payments.trialing": "En prueba hasta el día {date}",
   "payments.error.unavailable":
     "No pudimos abrir Stripe. Vuelve a intentarlo en un momento.",
