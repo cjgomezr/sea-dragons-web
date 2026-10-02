@@ -10926,6 +10926,80 @@ test.describe("la puerta de quien no está al día (#453)", () => {
   });
 });
 
+// Pagos del socio pendiente (#454): la oferta de Checkout con el plan, el
+// precio y el mes gratis. Sin stubs: la página lee la membresía sembrada al
+// pintarse. El servidor necesita las llaves de prueba de Stripe; sin ellas
+// la pantalla dice que los pagos no están configurados.
+const PAYMENTS_SCREEN_PATH = "/pagos";
+const ADD_CARD_BUTTON_NAME = /^(Add card|Añadir tarjeta)$/;
+
+type PaymentsScreenState = {
+  readonly name: string;
+  readonly beforeVisit?: (page: Page) => Promise<void>;
+};
+
+const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
+  { name: "pagos-pendiente" },
+  { name: "pagos-pendiente-es", beforeVisit: chooseSpanish },
+];
+
+async function goToPayments(
+  page: Page,
+  state: PaymentsScreenState,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await state.beforeVisit?.(page);
+  if (theme === undefined) {
+    await page.goto(`${APP_URL}${PAYMENTS_SCREEN_PATH}`);
+  } else {
+    await goToWithTheme(page, PAYMENTS_SCREEN_PATH, theme);
+  }
+  await expect(
+    page.getByRole("button", { name: ADD_CARD_BUTTON_NAME }),
+  ).toBeVisible();
+}
+
+for (const state of PAYMENTS_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: UNPAID_MEMBER_STORAGE_STATE_PATH });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToPayments(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                fullPage: true,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToPayments(page, state);
+          expect(await hasHorizontalScroll(page)).toBe(false);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToPayments(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
 test.describe("calendario en el navegador", () => {
   skipWithoutSession();
   quietNotificationBell();

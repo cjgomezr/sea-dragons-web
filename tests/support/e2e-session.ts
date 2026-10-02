@@ -379,6 +379,7 @@ const ROLE_REQUESTS_TABLE = "role_requests";
 const GROUPS_TABLE = "groups";
 const GROUP_MEMBERSHIPS_TABLE = "group_memberships";
 const MEMBERSHIPS_TABLE = "memberships";
+const SEEDED_MEMBERSHIP_PLAN = "Full";
 const PHOTOS_BUCKET = "member-photos";
 /** El código de Postgres de una violación de unicidad: otra corrida creó el
  * mismo grupo entre la búsqueda y el alta. */
@@ -620,7 +621,10 @@ async function seedMember(
 
 /** Pone la membresía del socio en `status` (#453). Todos nacen al día, porque
  * sin ella la frontera los trata como quien no pagó; el socio sin membresía
- * la vuelve a `pending` después. Se va con la fila del socio en cascada. */
+ * la vuelve a `pending` después. Se va con la fila del socio en cascada.
+ *
+ * Todos son Full: sin plan, Pagos no tiene qué ofrecerle al socio pendiente
+ * (#454), y el estado `pagos-pendiente` fotografía su oferta de Checkout. */
 async function seedMembershipStatus(
   serviceClient: SupabaseClient,
   membership: {
@@ -635,6 +639,7 @@ async function seedMembershipStatus(
       serviceClient.from(MEMBERSHIPS_TABLE).upsert({
         club_id: membership.clubId,
         user_id: membership.userId,
+        plan: SEEDED_MEMBERSHIP_PLAN,
         status: membership.status,
       }),
   );
