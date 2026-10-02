@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { readStringAt } from "@/lib/api/read-string-at";
 import { describeAuthIssue } from "@/lib/auth/issue-messages";
@@ -16,6 +17,7 @@ import { REGISTRATION_WINDOW_MINUTES } from "@/lib/auth/registration-rate-limit"
 import {
   CONFIRMATION_EMAIL_API_PATH,
   REGISTER_API_PATH,
+  SIGN_IN_PATH,
 } from "@/lib/auth/routes";
 import type { CountryOption } from "@/lib/geo/countries";
 import type { Locale } from "@/lib/i18n/locale";
@@ -508,6 +510,13 @@ export function RegistrationForm({
       >
         {translate("auth.registration.submit")}
       </button>
+
+      {/* El espejo de "¿Nuevo en el club?" de entrar (#478): quien llegó aquí
+          por error no depende del botón atrás del navegador. */}
+      <p className="auth-note">
+        {translate("auth.registration.haveAccount")}{" "}
+        <Link href={SIGN_IN_PATH}>{translate("auth.registration.signIn")}</Link>
+      </p>
     </form>
   );
 }

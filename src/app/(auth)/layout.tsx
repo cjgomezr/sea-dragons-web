@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ClubBrandMark } from "@/components/ClubBrandMark";
+import { AuthBrandHeader } from "@/components/auth/AuthBrandHeader";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { clubSignInText } from "@/lib/club/sign-in-texts";
@@ -36,7 +37,9 @@ export default async function AuthLayout({
   return (
     <div className="auth-shell">
       <aside className="auth-brand">
-        <div className="auth-brand-header">
+        <AuthBrandHeader
+          signInLabel={translate("auth.brand.signInLink", { club: brand.name })}
+        >
           <ClubBrandMark
             logoUrl={brand.logoUrl}
             logoAlt={translate("club.logoAlt", { club: brand.name })}
@@ -47,7 +50,7 @@ export default async function AuthLayout({
             }
           />
           <span className="auth-brand-name">{brand.name}</span>
-        </div>
+        </AuthBrandHeader>
         <div className="auth-brand-pitch">
           <p className="auth-brand-eyebrow">
             {translate("auth.brand.eyebrow")}

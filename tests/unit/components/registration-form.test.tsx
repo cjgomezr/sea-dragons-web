@@ -5,6 +5,7 @@ import { RegistrationForm } from "@/components/auth/RegistrationForm";
 import {
   CONFIRMATION_EMAIL_API_PATH,
   REGISTER_API_PATH,
+  SIGN_IN_PATH,
 } from "@/lib/auth/routes";
 import { listCountryOptions } from "@/lib/geo/countries";
 import { RESEND_BUTTON_LABEL } from "../helpers/confirmation-copy";
@@ -336,6 +337,30 @@ async function clickResend(): Promise<void> {
     .setup()
     .click(screen.getByRole("button", { name: "Reenviar el correo" }));
 }
+
+// #478: quien entró en el registro por error vuelve al inicio de sesión sin
+// el botón atrás del navegador.
+describe("vuelta al inicio de sesión desde el registro", () => {
+  it("bajo el formulario ofrece iniciar sesión a quien ya tiene cuenta", () => {
+    renderForm();
+
+    expect(screen.getByText(/¿Ya tienes cuenta\?/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Inicia sesión" })).toHaveAttribute(
+      "href",
+      SIGN_IN_PATH,
+    );
+  });
+
+  it("en inglés la ofrece con los textos en inglés", () => {
+    render(<RegistrationForm locale="en" countries={COUNTRIES} />);
+
+    expect(screen.getByText(/Already have an account\?/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      SIGN_IN_PATH,
+    );
+  });
+});
 
 describe("pantalla de confirmación", () => {
   afterEach(() => {
