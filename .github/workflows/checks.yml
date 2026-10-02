@@ -148,6 +148,10 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
+          STRIPE_SECRET_KEY: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.STRIPE_SECRET_KEY || '' }}
+          STRIPE_WEBHOOK_SECRET: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.STRIPE_WEBHOOK_SECRET || '' }}
+          STRIPE_PRICE_FULL: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.STRIPE_PRICE_FULL || '' }}
+          STRIPE_PRICE_STUDENT: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.STRIPE_PRICE_STUDENT || '' }}
       - name: Lint
         if: steps.repo.outputs.bootstrapped == 'true'
         run: npm run lint

@@ -11,7 +11,10 @@ import { RUN_INTEGRATION_TESTS_ENV } from "../../support/test-selection.mts";
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const WORKFLOW_PATH = path.join(REPO_ROOT, ".github/workflows/checks.yml");
 
-const DEVELOPMENT_SOURCE = "seadragons-dev";
+/** Los orígenes de prueba que el manifiesto pone en CI: la base de desarrollo
+ * y la cuenta de Stripe en modo de prueba (#454), con la que Pagos ofrece
+ * Checkout y el test de integración abre una sesión de verdad. */
+const DEVELOPMENT_SOURCES = ["seadragons-dev", "stripe-test"] as const;
 
 const TEXT_ONLY_STEP_ID = "texto";
 const TEXT_ONLY_OUTPUT = `steps.${TEXT_ONLY_STEP_ID}.outputs.solo_texto`;
@@ -24,10 +27,9 @@ const NOT_TEXT_ONLY_CONDITION = `${TEXT_ONLY_OUTPUT} != 'true'`;
  * Sale de ahí y no de una lista escrita a mano: declarar una cuarta en el
  * manifiesto y olvidarla en el workflow tiene que dejar esto en rojo. */
 function developmentCredentials(): string[] {
-  return variablesFromSource(
-    readEnvironmentManifest(),
-    "ci",
-    DEVELOPMENT_SOURCE,
+  const manifest = readEnvironmentManifest();
+  return DEVELOPMENT_SOURCES.flatMap((source) =>
+    variablesFromSource(manifest, "ci", source),
   );
 }
 
