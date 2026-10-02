@@ -2,8 +2,17 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EmailConfirmationResult } from "@/lib/auth/email-confirmation";
 
-const CONFIRM_URL = "http://localhost/auth/confirmar";
+/**
+ * El enlace del correo se abre con un GET, y los escáneres de enlaces del
+ * correo de empresa (Safe Links y similares) lo abren antes que la persona
+ * (#477). Por eso el GET sólo pinta el botón y el canje del token de un solo
+ * uso vive en el POST que manda ese botón.
+ */
+const APP_ORIGIN = "http://localhost";
+const REDEEM_URL = `${APP_ORIGIN}/auth/confirmar/canjear`;
 const TOKEN_HASH = "un-token-de-confirmacion";
+const SEE_OTHER = 303;
+const FORBIDDEN = 403;
 
 type ConfirmArgs = { tokenHash: string; type: string };
 
@@ -39,9 +48,24 @@ function mockDependencies(
   }));
 }
 
-async function openConfirmationLink(query: string): Promise<Response> {
-  const { GET } = await import("@/app/auth/confirmar/route");
-  return GET(new NextRequest(`${CONFIRM_URL}${query}`));
+async function pressConfirmButton(
+  fields: Readonly<Record<string, string>>,
+  origin: string | null = APP_ORIGIN,
+): Promise<Response> {
+  const { POST } = await import("@/app/(auth)/auth/confirmar/canjear/route");
+  const headers = new Headers({
+    "content-type": "application/x-www-form-urlencoded",
+  });
+  if (origin !== null) {
+    headers.set("origin", origin);
+  }
+  return POST(
+    new NextRequest(REDEEM_URL, {
+      method: "POST",
+      headers,
+      body: new URLSearchParams(fields).toString(),
+    }),
+  );
 }
 
 function locationOf(response: Response): string {
@@ -52,78 +76,101 @@ function locationOf(response: Response): string {
   return new URL(location).pathname + new URL(location).search;
 }
 
-describe("GET /auth/confirmar", () => {
+const VALID_FIELDS = { token_hash: TOKEN_HASH, type: "signup" } as const;
+
+describe("POST /auth/confirmar/canjear", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.doUnmock("@/lib/auth/supabase-auth-gateways");
     vi.doUnmock("@/lib/auth/email-confirmation");
+    vi.restoreAllMocks();
     confirmCalls.length = 0;
   });
 
-  it("canjea el enlace y lleva a la pantalla que anuncia la cuenta activa", async () => {
+  it("canjea el token y lleva a la pantalla que anuncia la cuenta activa", async () => {
     mockDependencies();
 
-    const response = await openConfirmationLink(
-      `?token_hash=${TOKEN_HASH}&type=signup`,
-    );
+    const response = await pressConfirmButton(VALID_FIELDS);
 
     expect(confirmCalls).toEqual([{ tokenHash: TOKEN_HASH, type: "signup" }]);
     expect(locationOf(response)).toBe("/registro?confirmacion=ok");
   });
 
+  it("redirige con 303 para que el navegador pida la pantalla con un GET", async () => {
+    mockDependencies();
+
+    const response = await pressConfirmButton(VALID_FIELDS);
+
+    expect(response.status).toBe(SEE_OTHER);
+  });
+
   it("avisa de que todavía falta algo si la cuenta no quedó activa", async () => {
     mockDependencies({ result: { kind: "confirmed_still_incomplete" } });
 
-    const response = await openConfirmationLink(
-      `?token_hash=${TOKEN_HASH}&type=signup`,
-    );
+    const response = await pressConfirmButton(VALID_FIELDS);
 
     expect(locationOf(response)).toBe("/registro?confirmacion=pendiente");
   });
 
-  it("trata un enlace caducado o ya usado como enlace inválido", async () => {
+  it("trata un token caducado o ya canjeado como enlace inválido", async () => {
     mockDependencies({
       result: { kind: "rejected", reason: "Token has expired" },
     });
     vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const response = await openConfirmationLink(
-      `?token_hash=${TOKEN_HASH}&type=signup`,
-    );
+    const response = await pressConfirmButton(VALID_FIELDS);
 
     expect(locationOf(response)).toBe("/registro?confirmacion=invalida");
   });
 
-  it("no canjea nada si el enlace llega sin token", async () => {
+  it("no canjea nada si el formulario llega sin token", async () => {
     mockDependencies();
 
-    const response = await openConfirmationLink("?type=signup");
+    const response = await pressConfirmButton({ type: "signup" });
 
     expect(confirmCalls).toEqual([]);
     expect(locationOf(response)).toBe("/registro?confirmacion=invalida");
   });
 
-  it("no canjea nada si el tipo del enlace no confirma ningún correo", async () => {
+  it("no canjea nada si el tipo no confirma ningún correo", async () => {
     mockDependencies();
 
-    const response = await openConfirmationLink(
-      `?token_hash=${TOKEN_HASH}&type=recovery`,
-    );
+    const response = await pressConfirmButton({
+      token_hash: TOKEN_HASH,
+      type: "recovery",
+    });
 
     expect(confirmCalls).toEqual([]);
     expect(locationOf(response)).toBe("/registro?confirmacion=invalida");
+  });
+
+  it("rechaza el POST que llega desde otro origen sin canjear nada", async () => {
+    mockDependencies();
+
+    const response = await pressConfirmButton(
+      VALID_FIELDS,
+      "https://otro-sitio.example",
+    );
+
+    expect(response.status).toBe(FORBIDDEN);
+    expect(confirmCalls).toEqual([]);
+  });
+
+  it("rechaza el POST que no dice de qué origen viene", async () => {
+    mockDependencies();
+
+    const response = await pressConfirmButton(VALID_FIELDS, null);
+
+    expect(response.status).toBe(FORBIDDEN);
+    expect(confirmCalls).toEqual([]);
   });
 
   it("no deja al visitante en una página de error si el servidor falla al canjear", async () => {
     mockDependencies({ throws: new Error("members read failed") });
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const response = await openConfirmationLink(
-      `?token_hash=${TOKEN_HASH}&type=signup`,
-    );
+    const response = await pressConfirmButton(VALID_FIELDS);
 
-    // El token ya se consumió, así que reintentar el mismo enlace no sirve: la
-    // pantalla tiene que decir que el fallo es del servidor, no del enlace.
     expect(locationOf(response)).toBe("/registro?confirmacion=error");
   });
 
@@ -131,9 +178,7 @@ describe("GET /auth/confirmar", () => {
     mockDependencies({ unconfigured: ["SUPABASE_SERVICE_ROLE_KEY"] });
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const response = await openConfirmationLink(
-      `?token_hash=${TOKEN_HASH}&type=signup`,
-    );
+    const response = await pressConfirmButton(VALID_FIELDS);
 
     expect(locationOf(response)).toBe("/registro?confirmacion=error");
   });

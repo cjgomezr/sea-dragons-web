@@ -434,14 +434,21 @@ export const EVALUATION_REFRESH_API_PATH = `${EVALUATIONS_API_PATH}/[id]/refresh
 export const ATTENDANCE_CLUB_RATE_API_PATH = `${ATTENDANCE_API_PATH}/club-rate`;
 
 /** El destino del enlace del correo de confirmación (#132). No es una
- * pantalla del PRD: canjea el token y redirige. Es público por definición,
- * porque quien abre ese enlace todavía no puede iniciar sesión.
+ * pantalla del PRD: pinta el botón que confirma el correo (#477). Es público
+ * por definición, porque quien abre ese enlace todavía no puede iniciar
+ * sesión.
  *
  * Va en la lista de pantallas a sabiendas de que esa lista abre también lo que
- * cuelga de la ruta. Hoy no cuelga nada, y `/auth` a secas sigue protegida. Si
- * alguna vez nace algo bajo este camino, nacerá público sin que nadie lo
+ * cuelga de la ruta, y `/auth` a secas sigue protegida. Lo único que cuelga es
+ * `EMAIL_CONFIRMATION_REDEEM_PATH`, que tiene que ser público por lo mismo. Si
+ * alguna vez nace algo más bajo este camino, nacerá público sin que nadie lo
  * decida, y ahí toca compararlo por igualdad en vez de por prefijo. */
 export const EMAIL_CONFIRMATION_PATH = "/auth/confirmar";
+
+/** Donde el botón de esa pantalla manda el token (#477). El canje vive en un
+ * POST porque los escáneres de enlaces del correo abren la URL con un GET
+ * antes que la persona, y un token de un solo uso no sobrevive a esa visita. */
+export const EMAIL_CONFIRMATION_REDEEM_PATH = `${EMAIL_CONFIRMATION_PATH}/canjear`;
 
 /** Los iconos del club (#421): `src/app/icon.tsx` y `src/app/apple-icon.tsx`
  * los sirven bajo estos caminos, con la huella de la marca como último
