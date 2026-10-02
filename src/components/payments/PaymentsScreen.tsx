@@ -1,302 +1,238 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MembershipNotice } from "@/components/MembershipNotice";
-import { formatAudCents, formatCalendarDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import type { CheckoutReturn } from "@/lib/membership/checkout-return";
-import {
-  MONTHLY_PRICE_CENTS,
-  type MembershipStatus,
-  type RecurringPlan,
-  membershipBlockOfStatus,
-} from "@/lib/membership/membership";
+import { membershipBlockOfStatus } from "@/lib/membership/membership";
 import type { MembershipView } from "@/lib/membership/membership-view";
-import { clubCalendarDate } from "@/lib/time/club-calendar";
-import { openCheckout } from "./checkout-navigation";
+import { PaymentHistory } from "./PaymentHistory";
 import {
   type PaymentsFailure,
-  describeCheckoutFailure,
+  describeLoadFailure,
   loadMembershipView,
-  requestCheckout,
 } from "./payments-client";
+import { PlanCard } from "./PlanCard";
+import {
+  NOT_WAITING,
+  type StripeReturns,
+  type Waiting,
+  initialWaiting,
+  useMembershipWait,
+} from "./use-membership-wait";
 
 /**
- * Pagos (#454, RF-3 del PRD de E12): a quien no ha puesto tarjeta le explica
- * su plan y el mes de prueba y lo lleva a Stripe Checkout; al volver, espera
- * a que el webhook (#452) confirme y enseña la prueba. El panel completo, con
- * tarjeta e historial, es #455.
+ * Pagos (#454, #455; RF-3, RF-5 y RF-7 del PRD de E12): el panel de la
+ * membresía del mockup con el plan, su estado, la tarjeta y el historial; el
+ * alta en Stripe Checkout de quien aún no puso tarjeta; y la espera del
+ * webhook al volver de Stripe.
  *
- * Es de cliente por el botón y por la espera: al volver de Checkout el
- * webhook puede no haber llegado, así que vuelve a pedir la membresía a
- * `GET /api/v1/membership` durante un rato.
+ * Es de cliente por los botones y por la espera: la membresía se pide a
+ * `GET /api/v1/membership`, el mismo endpoint que leerá la aplicación nativa
+ * (CON-002), y se vuelve a pedir mientras el webhook no ha llegado.
  */
 
-/** Cada cuánto se vuelve a preguntar y hasta cuándo: Stripe suele mandar el
- * webhook en segundos. */
-const POLL_INTERVAL_MS = 3_000;
-const POLL_TIMEOUT_MS = 30_000;
+type LoadState =
+  | { readonly kind: "loading" }
+  | { readonly kind: "failed"; readonly failure: PaymentsFailure }
+  | { readonly kind: "ready"; readonly view: MembershipView };
 
-type Waiting = "none" | "polling" | "timed_out";
-
-type CheckoutState =
-  | { readonly kind: "idle" }
-  | { readonly kind: "opening" }
-  | { readonly kind: "failed"; readonly failure: PaymentsFailure };
-
-function isRecurringPlan(plan: string | null): plan is RecurringPlan {
-  return plan === "Full" || plan === "Student";
-}
-
-function initialWaiting(
-  view: MembershipView,
-  checkoutReturn: CheckoutReturn | null,
-): Waiting {
-  return checkoutReturn === "ok" && view.membership?.status === "pending"
-    ? "polling"
-    : "none";
-}
-
-/** Vuelve a pedir la membresía hasta que deja de estar pendiente o se acaba
- * el tiempo. Un fallo de una consulta no corta la espera: la siguiente puede
- * salir bien. */
-function useWebhookWait(
-  waiting: Waiting,
-  onSettled: (view: MembershipView) => void,
-  onTimeout: () => void,
-): void {
-  useEffect(() => {
-    if (waiting !== "polling") {
-      return;
-    }
-    let isActive = true;
-    const interval = window.setInterval(async () => {
-      const load = await loadMembershipView();
-      if (isActive && load.kind === "loaded" && !isPending(load.view)) {
-        onSettled(load.view);
-      }
-    }, POLL_INTERVAL_MS);
-    const timeout = window.setTimeout(() => {
-      if (isActive) {
-        onTimeout();
-      }
-    }, POLL_TIMEOUT_MS);
-    return () => {
-      isActive = false;
-      window.clearInterval(interval);
-      window.clearTimeout(timeout);
-    };
-  }, [waiting, onSettled, onTimeout]);
-}
-
-function isPending(view: MembershipView): boolean {
-  return view.membership?.status === "pending";
-}
-
-function TrialLine({
-  translate,
-  trialEnd,
-}: {
-  readonly translate: Translator;
-  readonly trialEnd: string;
-}): React.JSX.Element {
-  const date = formatCalendarDay(
-    translate.locale,
-    clubCalendarDate(new Date(trialEnd)),
-  );
-  return (
-    <p className="payments-trial">{translate("payments.trialing", { date })}</p>
-  );
-}
-
-function CheckoutOffer({
-  translate,
-  plan,
-  hasHadTrial,
-}: {
-  readonly translate: Translator;
-  readonly plan: RecurringPlan;
-  readonly hasHadTrial: boolean;
-}): React.JSX.Element {
-  const [checkout, setCheckout] = useState<CheckoutState>({ kind: "idle" });
-  const isOpening = checkout.kind === "opening";
-
-  // Quien vuelve de Stripe con Atrás puede recibir la página guardada en la
-  // caché del navegador, con el botón aún en "Abriendo Stripe…".
-  useEffect(() => {
-    function resetWhenRestored(event: PageTransitionEvent): void {
-      if (event.persisted) {
-        setCheckout({ kind: "idle" });
-      }
-    }
-    window.addEventListener("pageshow", resetWhenRestored);
-    return () => window.removeEventListener("pageshow", resetWhenRestored);
-  }, []);
-
-  async function startCheckout(): Promise<void> {
-    setCheckout({ kind: "opening" });
-    const outcome = await requestCheckout();
-    if (outcome.kind === "created") {
-      openCheckout(outcome.url);
-      return;
-    }
-    setCheckout({ kind: "failed", failure: outcome });
-  }
-
-  return (
-    <section className="payments-offer">
-      <p className="payments-plan">
-        {translate("payments.offer.plan", {
-          plan,
-          price: formatAudCents(translate.locale, MONTHLY_PRICE_CENTS[plan]),
-        })}
-      </p>
-      <p>
-        {translate(
-          hasHadTrial ? "payments.offer.noTrial" : "payments.offer.trial",
-        )}
-      </p>
-      <p className="app-lead">{translate("payments.offer.stripe")}</p>
-      {checkout.kind === "failed" ? (
-        <p className="auth-error" role="alert">
-          {describeCheckoutFailure(translate, checkout.failure)}
-        </p>
-      ) : null}
-      <button
-        type="button"
-        className="auth-submit"
-        disabled={isOpening}
-        onClick={startCheckout}
-      >
-        {translate(offerButtonLabel(checkout))}
-      </button>
-    </section>
-  );
-}
-
-function offerButtonLabel(
-  checkout: CheckoutState,
-):
-  "payments.offer.opening" | "payments.offer.retry" | "payments.offer.addCard" {
-  switch (checkout.kind) {
-    case "opening":
-      return "payments.offer.opening";
-    case "failed":
-      return "payments.offer.retry";
-    case "idle":
-      return "payments.offer.addCard";
-  }
-}
-
-/** Lo que se ofrece a quien no ha puesto tarjeta, según su plan y si los
- * pagos están configurados (RF-9). */
-function PendingContent({
-  translate,
-  view,
-  waiting,
-  checkoutReturn,
-}: {
-  readonly translate: Translator;
-  readonly view: MembershipView;
+/** La membresía, pedida al montar y otra vez con cada reintento. La primera
+ * que llega decide qué se espera de Stripe. */
+function useMembershipLoad(returns: StripeReturns): {
+  readonly state: LoadState;
   readonly waiting: Waiting;
-  readonly checkoutReturn: CheckoutReturn | null;
+  readonly retry: () => void;
+} {
+  const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const [waiting, setWaiting] = useState<Waiting>(NOT_WAITING);
+  const [reloads, setReloads] = useState(0);
+  const hasDecidedWaiting = useRef(false);
+  const { checkoutReturn, cardReturn } = returns;
+
+  useEffect(() => {
+    let isCurrent = true;
+    void loadMembershipView().then((outcome) => {
+      if (!isCurrent) {
+        return;
+      }
+      if (outcome.kind !== "loaded") {
+        setState({ kind: "failed", failure: outcome });
+        return;
+      }
+      setState({ kind: "ready", view: outcome.view });
+      if (!hasDecidedWaiting.current) {
+        hasDecidedWaiting.current = true;
+        setWaiting(
+          initialWaiting(outcome.view, { checkoutReturn, cardReturn }),
+        );
+      }
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, [reloads, checkoutReturn, cardReturn]);
+
+  const onLoaded = useCallback((view: MembershipView, hasSettled: boolean) => {
+    setState({ kind: "ready", view });
+    if (hasSettled) {
+      setWaiting(NOT_WAITING);
+    }
+  }, []);
+  const onTimeout = useCallback(
+    () =>
+      setWaiting((current) =>
+        current.kind === "polling"
+          ? { kind: "timed_out", target: current.target }
+          : current,
+      ),
+    [],
+  );
+  useMembershipWait(waiting, { onLoaded, onTimeout });
+
+  function retry(): void {
+    setState({ kind: "loading" });
+    setReloads((count) => count + 1);
+  }
+
+  return { state, waiting, retry };
+}
+
+function LoadFailure({
+  translate,
+  failure,
+  onRetry,
+}: {
+  readonly translate: Translator;
+  readonly failure: PaymentsFailure;
+  readonly onRetry: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="admin-load-failure">
+      <p className="auth-error" role="alert">
+        {describeLoadFailure(translate, failure)}
+      </p>
+      <button type="button" className="auth-submit" onClick={onRetry}>
+        {translate("payments.load.retry")}
+      </button>
+    </div>
+  );
+}
+
+/** Lo que se dice al volver de cambiar la tarjeta en Stripe. */
+function CardReturnStatus({
+  translate,
+  waiting,
+  cardReturn,
+}: {
+  readonly translate: Translator;
+  readonly waiting: Waiting;
+  readonly cardReturn: CheckoutReturn | null;
 }): React.JSX.Element | null {
-  if (waiting !== "none") {
+  if (waiting.kind !== "none" && waiting.target.kind === "card") {
     return (
       <p className="payments-status" role="status">
         {translate(
-          waiting === "polling"
-            ? "payments.checkout.waiting"
-            : "payments.checkout.timedOut",
+          waiting.kind === "polling"
+            ? "payments.card.waiting"
+            : "payments.card.timedOut",
         )}
       </p>
     );
   }
-  const { membership } = view;
-  if (membership === null) {
-    return null;
+  if (cardReturn === "cancelado") {
+    return (
+      <p className="payments-status" role="status">
+        {translate("payments.card.cancelled")}
+      </p>
+    );
   }
-  const { plan } = membership;
-  if (plan === "Casual") {
-    return <p>{translate("payments.offer.casual")}</p>;
-  }
-  if (!isRecurringPlan(plan)) {
-    return null;
-  }
-  if (!view.paymentsConfigured) {
-    return <p>{translate("payments.offer.notConfigured")}</p>;
-  }
-  return (
-    <>
-      {checkoutReturn === "cancelado" ? (
-        <p className="payments-status" role="status">
-          {translate("payments.checkout.cancelled")}
-        </p>
-      ) : null}
-      <CheckoutOffer
-        translate={translate}
-        plan={plan}
-        hasHadTrial={membership.trialEnd !== null}
-      />
-    </>
-  );
+  return null;
 }
 
-function statusOf(view: MembershipView): MembershipStatus {
-  return view.membership?.status ?? "pending";
+function MembershipPanel({
+  translate,
+  view,
+  waiting,
+  returns,
+}: {
+  readonly translate: Translator;
+  readonly view: MembershipView;
+  readonly waiting: Waiting;
+  readonly returns: StripeReturns;
+}): React.JSX.Element {
+  const { membership } = view;
+  // Sin membresía, el socio está como quien todavía no puso tarjeta.
+  const block =
+    membership === null
+      ? "pending"
+      : membershipBlockOfStatus(membership.status);
+  return (
+    <div className="payments-panel">
+      {block === null ? null : (
+        <MembershipNotice
+          translate={translate}
+          block={block}
+          linksToPayments={false}
+        />
+      )}
+      <CardReturnStatus
+        translate={translate}
+        waiting={waiting}
+        cardReturn={returns.cardReturn}
+      />
+      {membership === null ? null : (
+        <PlanCard
+          translate={translate}
+          view={view}
+          membership={membership}
+          waiting={waiting}
+          checkoutReturn={returns.checkoutReturn}
+        />
+      )}
+      <PaymentHistory translate={translate} payments={view.payments} />
+    </div>
+  );
 }
 
 export function PaymentsScreen({
   locale,
-  initialView,
   checkoutReturn,
+  cardReturn,
 }: {
   readonly locale: Locale;
-  readonly initialView: MembershipView;
   readonly checkoutReturn: CheckoutReturn | null;
+  readonly cardReturn: CheckoutReturn | null;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
-  const [view, setView] = useState(initialView);
-  const [waiting, setWaiting] = useState<Waiting>(() =>
-    initialWaiting(initialView, checkoutReturn),
-  );
-  const settle = useCallback((settled: MembershipView) => {
-    setView(settled);
-    setWaiting("none");
-  }, []);
-  const timeOut = useCallback(() => setWaiting("timed_out"), []);
-  useWebhookWait(waiting, settle, timeOut);
-
-  const status = statusOf(view);
-  const block = membershipBlockOfStatus(status);
-  const trialEnd = view.membership?.trialEnd ?? null;
+  const { state, waiting, retry } = useMembershipLoad({
+    checkoutReturn,
+    cardReturn,
+  });
   return (
     <>
       <h1>{translate("nav.label.payments")}</h1>
-      {status === "trialing" && trialEnd !== null ? (
-        <TrialLine translate={translate} trialEnd={trialEnd} />
+      {state.kind === "loading" ? (
+        <p className="admin-empty" role="status">
+          {translate("payments.loading")}
+        </p>
       ) : null}
-      {status === "pending" ? null : (
-        <p className="app-lead">{translate("section.underConstruction")}</p>
-      )}
-      {block === null ? null : (
-        <div className="payments-pending">
-          <MembershipNotice
-            translate={translate}
-            block={block}
-            linksToPayments={false}
-          />
-          {status === "pending" ? (
-            <PendingContent
-              translate={translate}
-              view={view}
-              waiting={waiting}
-              checkoutReturn={checkoutReturn}
-            />
-          ) : null}
-        </div>
-      )}
+      {state.kind === "failed" ? (
+        <LoadFailure
+          translate={translate}
+          failure={state.failure}
+          onRetry={retry}
+        />
+      ) : null}
+      {state.kind === "ready" ? (
+        <MembershipPanel
+          translate={translate}
+          view={state.view}
+          waiting={waiting}
+          returns={{ checkoutReturn, cardReturn }}
+        />
+      ) : null}
     </>
   );
 }

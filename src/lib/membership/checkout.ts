@@ -103,12 +103,15 @@ function checkSubscribable(
   return { membership, plan: membership.plan };
 }
 
-function buildPaymentsUrl(
+/** La vuelta de Stripe a Pagos, con el parámetro que dice de qué sesión
+ * vuelve y cómo acabó. */
+export function buildPaymentsReturnUrl(
   origin: string,
+  queryParam: string,
   checkoutReturn: CheckoutReturn,
 ): string {
   const url = new URL(PAYMENTS_PATH, origin);
-  url.searchParams.set(CHECKOUT_RETURN_QUERY_PARAM, checkoutReturn);
+  url.searchParams.set(queryParam, checkoutReturn);
   return url.toString();
 }
 
@@ -155,14 +158,22 @@ async function buildSessionParams(
     client_reference_id: membership.userId,
     ...(await buildCustomerParams(membership, context.memberEmails)),
     subscription_data: buildSubscriptionData(membership),
-    success_url: buildPaymentsUrl(context.origin, "ok"),
-    cancel_url: buildPaymentsUrl(context.origin, "cancelado"),
+    success_url: buildPaymentsReturnUrl(
+      context.origin,
+      CHECKOUT_RETURN_QUERY_PARAM,
+      "ok",
+    ),
+    cancel_url: buildPaymentsReturnUrl(
+      context.origin,
+      CHECKOUT_RETURN_QUERY_PARAM,
+      "cancelado",
+    ),
   };
 }
 
 /** Lleva los parámetros dentro: Stripe rechaza una llave repetida con otros
  * parámetros, y un cambio de plan o de origen tiene que abrir otra sesión. */
-function idempotencyKeyFor(
+export function idempotencyKeyFor(
   params: Stripe.Checkout.SessionCreateParams,
   now: Date,
 ): string {

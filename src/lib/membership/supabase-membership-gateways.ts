@@ -14,6 +14,10 @@ import {
 } from "./membership";
 import type { StripeWebhookGateway } from "@/lib/stripe/stripe-webhook";
 import type { MemberEmailGateway } from "./checkout";
+import {
+  PAYMENT_STATUSES,
+  type PaymentHistoryGateway,
+} from "./membership-view";
 import type {
   MembershipChanges,
   MembershipLookup,
@@ -171,6 +175,51 @@ export function createMembershipGateway(
       return data === null
         ? null
         : toMembershipRecord(membershipRowSchema.parse(data));
+    },
+  };
+}
+
+const PAYMENTS_TABLE = "payments";
+const PAYMENT_COLUMNS =
+  "id, amount_cents, description, status, paid_at, created_at";
+
+const paymentRowSchema = z.object({
+  id: z.string(),
+  amount_cents: z.number().int(),
+  description: z.string().nullable(),
+  status: z.enum(PAYMENT_STATUSES),
+  paid_at: z.string().nullable(),
+  created_at: z.string(),
+});
+
+/** El historial de pagos de un socio (#455). Con el cliente de la sesión,
+ * `payments_select_own` sólo deja leer los propios. El orden lo pone el
+ * dominio, que fecha cada pago por cuándo se cobró. */
+export function createPaymentHistoryGateway(
+  client: SupabaseClient,
+): PaymentHistoryGateway {
+  return {
+    async listByUserId(userId) {
+      const { data, error } = await client
+        .from(PAYMENTS_TABLE)
+        .select(PAYMENT_COLUMNS)
+        .eq("user_id", userId);
+      if (error) {
+        throw new Error(
+          `No se pudieron leer los pagos de ${userId}: ${error.message}`,
+        );
+      }
+      return z
+        .array(paymentRowSchema)
+        .parse(data)
+        .map((row) => ({
+          id: row.id,
+          amountCents: row.amount_cents,
+          description: row.description,
+          status: row.status,
+          paidAt: toDate(row.paid_at),
+          createdAt: new Date(row.created_at),
+        }));
     },
   };
 }

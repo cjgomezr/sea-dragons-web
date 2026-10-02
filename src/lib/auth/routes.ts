@@ -528,6 +528,9 @@ export const MEMBERSHIP_API_PATH = "/api/v1/membership";
 /** Abrir Stripe Checkout para poner la tarjeta (#454, RF-3 del PRD de E12). */
 export const MEMBERSHIP_CHECKOUT_API_PATH = `${MEMBERSHIP_API_PATH}/checkout`;
 
+/** Abrir Stripe Checkout en modo `setup` para cambiar la tarjeta (#455). */
+export const MEMBERSHIP_CARD_API_PATH = `${MEMBERSHIP_API_PATH}/card`;
+
 /**
  * Los únicos endpoints de la API que no exigen sesión.
  *

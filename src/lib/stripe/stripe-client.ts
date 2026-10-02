@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import type { StripeReader } from "./stripe-webhook";
+import type { SetupCard, StripeApi } from "./stripe-webhook";
 import { type StripePrices, readCard } from "./webhook-events";
 
 /**
@@ -67,10 +67,40 @@ export function createStripeSetup(env: Environment): StripeSetup {
   };
 }
 
+async function readSetupCard(
+  client: Stripe,
+  setupIntentId: string,
+): Promise<SetupCard | null> {
+  const setupIntent = await client.setupIntents.retrieve(setupIntentId, {
+    expand: ["payment_method"],
+  });
+  const paymentMethod = setupIntent.payment_method;
+  if (paymentMethod === null || typeof paymentMethod === "string") {
+    return null;
+  }
+  const card = readCard(paymentMethod);
+  return card === null ? null : { paymentMethodId: paymentMethod.id, card };
+}
+
 /** Lo que el webhook pide a la API de Stripe. La suscripción viene con su
  * método de pago expandido, para no tener que pedir la tarjeta aparte. */
-export function createStripeReader(client: Stripe): StripeReader {
+export function createStripeApi(client: Stripe): StripeApi {
   return {
+    readSetupCard: (setupIntentId) => readSetupCard(client, setupIntentId),
+    async makeDefaultPaymentMethod({
+      customerId,
+      subscriptionId,
+      paymentMethodId,
+    }) {
+      await client.customers.update(customerId, {
+        invoice_settings: { default_payment_method: paymentMethodId },
+      });
+      if (subscriptionId !== null) {
+        await client.subscriptions.update(subscriptionId, {
+          default_payment_method: paymentMethodId,
+        });
+      }
+    },
     async readCard(paymentMethodId) {
       return readCard(await client.paymentMethods.retrieve(paymentMethodId));
     },

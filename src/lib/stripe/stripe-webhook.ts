@@ -1,6 +1,7 @@
 import type Stripe from "stripe";
 import type { MembershipCard } from "@/lib/membership/membership";
 import {
+  type CardSetupCompletedFacts,
   type MembershipLookup,
   type PlannableStripeEventFacts,
   type StripeEventFacts,
@@ -39,15 +40,31 @@ export type StripeWebhookGateway = {
   applyEvent(input: StripeEventToApply): Promise<"applied" | "duplicate">;
 };
 
-/** Lo que el webhook le pregunta a Stripe cuando el evento no lo trae. */
-export type StripeReader = {
+/** La tarjeta que guardó un SetupIntent, con el id de su método de pago. */
+export type SetupCard = {
+  readonly paymentMethodId: string;
+  readonly card: MembershipCard;
+};
+
+/** Lo que el webhook le pide a Stripe cuando el evento no lo trae, y lo
+ * único que le escribe: la tarjeta nueva de un cambio de tarjeta (#455). */
+export type StripeApi = {
   readCard(paymentMethodId: string): Promise<MembershipCard | null>;
   readSubscription(subscriptionId: string): Promise<Stripe.Subscription>;
+  /** Nula si el SetupIntent no guardó una tarjeta. */
+  readSetupCard(setupIntentId: string): Promise<SetupCard | null>;
+  /** Por defecto en el cliente y, si la tiene, en la suscripción: es con la
+   * que Stripe cobra la próxima cuota y reintenta la fallida. */
+  makeDefaultPaymentMethod(input: {
+    readonly customerId: string;
+    readonly subscriptionId: string | null;
+    readonly paymentMethodId: string;
+  }): Promise<void>;
 };
 
 export type StripeWebhookDependencies = {
   readonly gateway: StripeWebhookGateway;
-  readonly stripe: StripeReader;
+  readonly stripe: StripeApi;
   readonly prices: StripePrices;
   readonly now: Date;
   readonly log: (line: string) => void;
@@ -55,10 +72,33 @@ export type StripeWebhookDependencies = {
 
 const LOG_PREFIX = "[stripe/webhook]";
 
+/** La tarjeta de un cambio de tarjeta, puesta ya por defecto en Stripe.
+ * Repetir el evento la vuelve a poner, que no cambia nada. */
+async function adoptSetupCard(
+  facts: CardSetupCompletedFacts,
+  membership: StripeMembership,
+  stripe: StripeApi,
+): Promise<MembershipCard | null> {
+  const setup = await stripe.readSetupCard(facts.setupIntentId);
+  if (setup === null) {
+    return null;
+  }
+  await stripe.makeDefaultPaymentMethod({
+    customerId: facts.customerId,
+    subscriptionId: membership.record.stripeSubscriptionId,
+    paymentMethodId: setup.paymentMethodId,
+  });
+  return setup.card;
+}
+
 async function resolveCard(
   facts: PlannableStripeEventFacts,
-  stripe: StripeReader,
+  membership: StripeMembership,
+  stripe: StripeApi,
 ): Promise<MembershipCard | null> {
+  if (facts.kind === "cardSetupCompleted") {
+    return adoptSetupCard(facts, membership, stripe);
+  }
   if (facts.kind !== "subscriptionChanged") {
     return null;
   }
@@ -76,7 +116,7 @@ async function resolveCard(
 /** Un Checkout sólo nombra la suscripción: se le pide entera a Stripe. */
 async function toPlannableFacts(
   facts: Exclude<StripeEventFacts, { kind: "ignored" }>,
-  stripe: StripeReader,
+  stripe: StripeApi,
 ): Promise<PlannableStripeEventFacts> {
   if (facts.kind !== "checkoutCompleted") {
     return facts;
@@ -111,7 +151,7 @@ export async function handleStripeEvent(
   const writes = planStripeEventWrites({
     facts: plannable,
     membership,
-    card: await resolveCard(plannable, dependencies.stripe),
+    card: await resolveCard(plannable, membership, dependencies.stripe),
     prices: dependencies.prices,
     now: dependencies.now,
   });

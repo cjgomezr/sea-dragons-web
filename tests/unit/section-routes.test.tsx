@@ -2,7 +2,6 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Role } from "@/lib/auth/roles";
 import type { Locale } from "@/lib/i18n/locale";
-import type { MembershipStatus } from "@/lib/membership/membership";
 import type { MembershipView } from "@/lib/membership/membership-view";
 
 const requestLocale = { current: "en" as Locale };
@@ -19,14 +18,6 @@ vi.mock("@/lib/club/supabase-club-brand", () => ({
 vi.mock("@/lib/auth/caller-role", () => ({
   readCallerRole: async () => callerRole.current,
 }));
-const callerStatus = { current: "active" as MembershipStatus };
-vi.mock("@/lib/membership/caller-membership", () => ({
-  readCallerMembershipView: async (): Promise<MembershipView> => ({
-    paymentsConfigured: true,
-    membership: { plan: "Full", status: callerStatus.current, trialEnd: null },
-  }),
-}));
-
 const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");
 const { default: PagosPage } = await import("@/app/(app)/pagos/page");
 const { default: HomePage } = await import("@/app/(app)/page");
@@ -40,78 +31,47 @@ async function renderIn(locale: Locale, Page: ServerPage): Promise<void> {
   render(await Page({ searchParams: Promise.resolve({}) }));
 }
 
-/** Las secciones que siguen siendo un marcador de posición. El directorio
- * salió de aquí en #239, Noticias en #329, Evaluaciones en #322, el
- * Calendario en #311, Equipos en #402 y el Dashboard en #426, que les dieron
- * su pantalla: lo que enseña cada una se prueba en su test de
- * `tests/unit/components/`. */
-const SECTIONS: ReadonlyArray<
-  readonly [english: string, spanish: string, Page: ServerPage]
-> = [["Payments", "Pagos", PagosPage]];
-
-describe("secciones", () => {
-  it.each(SECTIONS)(
-    "la ruta de %s se titula y avisa en inglés que está en construcción",
-    async (english, _spanish, Page) => {
-      await renderIn("en", Page);
-
-      expect(
-        screen.getByRole("heading", { level: 1, name: english }),
-      ).toBeInTheDocument();
-      expect(screen.getByText(/under construction/i)).toBeInTheDocument();
-    },
-  );
-
-  it.each(SECTIONS)(
-    "la ruta de %s dice en español lo mismo que antes de traducirla",
-    async (_english, spanish, Page) => {
-      await renderIn("es", Page);
-
-      expect(
-        screen.getByRole("heading", { level: 1, name: spanish }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("Esta sección está en construcción."),
-      ).toBeInTheDocument();
-    },
-  );
-});
-
-// #453: Pagos es a donde la frontera lleva a quien no está al día, y le dice
-// por qué. Lo que ofrece a cada uno (#454) se prueba en
-// `tests/unit/components/payments-screen.test.tsx`.
-describe("Pagos de quien no tiene la membresía al día", () => {
+// Pagos dejó de ser un marcador con #455, la última sección que lo era: lo
+// que enseña se prueba en `tests/unit/components/payments-screen.test.tsx`.
+// Aquí sólo importa que la ruta le pase con qué se vuelve de Stripe.
+describe("Pagos", () => {
   afterEach(() => {
-    callerStatus.current = "active";
+    vi.unstubAllGlobals();
   });
 
-  it.each<[MembershipStatus, string]>([
-    ["pending", "Your membership is pending: you haven't added a card yet."],
-    ["past_due", "Your last payment didn't go through."],
-    ["cancelled", "Your membership is cancelled."],
-  ])("dice el motivo de una membresía %s", async (status, reason) => {
-    callerStatus.current = status;
+  function stubMembership(view: MembershipView): void {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ data: view }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      ),
+    );
+  }
 
-    await renderIn("en", PagosPage);
-
-    expect(screen.getByText(reason)).toBeInTheDocument();
-    expect(
-      screen.getByText(/you only see your profile, Payments and the calendar/),
-    ).toBeInTheDocument();
-  });
-
-  it("dice el motivo en español", async () => {
-    callerStatus.current = "past_due";
-
-    await renderIn("es", PagosPage);
-
-    expect(
-      screen.getByText("Tu último pago no se pudo cobrar."),
-    ).toBeInTheDocument();
-  });
+  const ACTIVE_PANEL: NonNullable<MembershipView["membership"]> = {
+    plan: "Full",
+    status: "active",
+    monthlyPriceCents: 4500,
+    trialEnd: null,
+    nextChargeAt: "2026-11-01T09:00:00.000Z",
+    card: { brand: "visa", last4: "4242", expMonth: 8, expYear: 2028 },
+    waiver: null,
+  };
+  const ACTIVE_FULL: MembershipView = {
+    paymentsConfigured: true,
+    membership: ACTIVE_PANEL,
+    payments: [],
+  };
 
   it("lee de la dirección con qué vuelve el socio de Checkout", async () => {
-    callerStatus.current = "pending";
+    stubMembership({
+      ...ACTIVE_FULL,
+      membership: { ...ACTIVE_PANEL, status: "pending", card: null },
+    });
     requestLocale.current = "en";
 
     render(
@@ -120,15 +80,25 @@ describe("Pagos de quien no tiene la membresía al día", () => {
       }),
     );
 
-    expect(screen.getByRole("status")).toHaveTextContent(
-      /without adding a card/,
+    expect(await screen.findByText(/without adding a card/)).toHaveAttribute(
+      "role",
+      "status",
     );
   });
 
-  it("no dice ningún motivo a quien está al día", async () => {
-    await renderIn("en", PagosPage);
+  it("lee de la dirección con qué vuelve el socio de cambiar la tarjeta", async () => {
+    stubMembership(ACTIVE_FULL);
+    requestLocale.current = "en";
 
-    expect(screen.queryByText(/only see your profile/)).not.toBeInTheDocument();
+    render(
+      await PagosPage({
+        searchParams: Promise.resolve({ tarjeta: "cancelado" }),
+      }),
+    );
+
+    expect(
+      await screen.findByText(/without changing your card/),
+    ).toHaveAttribute("role", "status");
   });
 });
 

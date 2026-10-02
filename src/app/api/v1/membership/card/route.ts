@@ -1,11 +1,11 @@
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError, type ApiErrorCode } from "@/lib/api/response";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
-import { type CheckoutRefusal, startCheckout } from "@/lib/membership/checkout";
 import {
-  createMemberEmailGateway,
-  createMembershipGateway,
-} from "@/lib/membership/supabase-membership-gateways";
+  type CardUpdateRefusal,
+  startCardUpdate,
+} from "@/lib/membership/card-update";
+import { createMembershipGateway } from "@/lib/membership/supabase-membership-gateways";
 import {
   asStripeUnavailable,
   resolveRouteCheckoutStripe,
@@ -13,55 +13,41 @@ import {
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 
 /**
- * Abre Stripe Checkout para que el socio ponga la tarjeta (#454, RF-3 del
- * PRD de E12, D3). Responde la dirección; la pantalla lleva allí al socio.
- * No escribe nada: la membresía la mueve el webhook (#452) cuando Stripe
- * confirma.
+ * Abre Stripe Checkout en modo `setup` para cambiar la tarjeta (#455, RF-5
+ * del PRD de E12, D6). Responde la dirección; la tarjeta nueva la escribe
+ * Stripe y la trae el webhook (#452). Lo alcanza también quien tiene un cobro
+ * fallido: cambiar la tarjeta es como se pone al día.
  */
 
 // Cada petición abre una sesión de Stripe para quien llama.
 export const dynamic = "force-dynamic";
 
-export type MembershipCheckoutResponse = { readonly url: string };
+export type MembershipCardResponse = { readonly url: string };
+
+const LOG_PREFIX = "[membership/card]";
 
 const REFUSALS: Record<
-  CheckoutRefusal,
+  CardUpdateRefusal,
   { readonly code: ApiErrorCode; readonly message: string }
 > = {
   stripe_not_configured: {
     code: "service_unavailable",
     message: "Los pagos no están configurados.",
   },
-  no_plan: {
+  no_stripe_customer: {
     code: "conflict",
-    message: "Tu membresía no tiene plan todavía.",
-  },
-  membership_current: {
-    code: "conflict",
-    message: "Tu membresía ya está al día.",
-  },
-  payment_past_due: {
-    code: "conflict",
-    message:
-      "Tu suscripción tiene un cobro fallido: actualiza la tarjeta en vez de abrir otra.",
-  },
-  casual_plan: {
-    code: "conflict",
-    message:
-      "Los packs de Casual llegan más adelante; un Admin puede activarte.",
+    message: "Aún no tienes tarjeta en Stripe: añádela desde Pagos.",
   },
 };
 
-const LOG_PREFIX = "[membership/checkout]";
-
-const createCheckout = createApiRoute<MembershipCheckoutResponse>({
+const createCardSession = createApiRoute<MembershipCardResponse>({
   handler: async ({ request, decorateResponse }) => {
     const userId = await identifyAccountCaller({ request, decorateResponse });
-    const serviceClient = createServiceRoleClient(process.env);
-    const outcome = await startCheckout(
+    const outcome = await startCardUpdate(
       {
-        membership: createMembershipGateway(serviceClient),
-        memberEmails: createMemberEmailGateway(serviceClient),
+        membership: createMembershipGateway(
+          createServiceRoleClient(process.env),
+        ),
         stripe: resolveRouteCheckoutStripe(LOG_PREFIX),
       },
       { userId, origin: request.nextUrl.origin, now: new Date() },
@@ -75,5 +61,5 @@ const createCheckout = createApiRoute<MembershipCheckoutResponse>({
 });
 
 export const { GET, POST, PUT, PATCH, DELETE } = createApiModule({
-  POST: createCheckout,
+  POST: createCardSession,
 });
