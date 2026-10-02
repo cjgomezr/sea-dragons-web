@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import {
   EMAIL_CONFIRMATION_TOKEN_HASH_PARAM,
   EMAIL_CONFIRMATION_TYPE_PARAM,
+  type EmailConfirmationLink,
   type EmailConfirmationResult,
   confirmEmailAndActivate,
   parseEmailConfirmationLink,
@@ -48,16 +49,30 @@ function isSameOriginRequest(request: NextRequest): boolean {
   return request.headers.get("origin") === request.nextUrl.origin;
 }
 
+/** `formData()` lanza si el cuerpo no es un formulario. Eso no lo manda
+ * nuestro botón, así que se trata igual que un formulario sin token. */
+async function readSubmittedLink(
+  request: NextRequest,
+): Promise<EmailConfirmationLink | null> {
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch (error) {
+    console.warn("[auth/confirmar] el cuerpo no es un formulario", error);
+    return null;
+  }
+  return parseEmailConfirmationLink(
+    form.get(EMAIL_CONFIRMATION_TOKEN_HASH_PARAM),
+    form.get(EMAIL_CONFIRMATION_TYPE_PARAM),
+  );
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!isSameOriginRequest(request)) {
     return new NextResponse(null, { status: FORBIDDEN });
   }
 
-  const form = await request.formData();
-  const link = parseEmailConfirmationLink(
-    form.get(EMAIL_CONFIRMATION_TOKEN_HASH_PARAM),
-    form.get(EMAIL_CONFIRMATION_TYPE_PARAM),
-  );
+  const link = await readSubmittedLink(request);
   if (link === null) {
     return redirectToRegistration(request, "invalida");
   }

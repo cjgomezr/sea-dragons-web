@@ -144,6 +144,23 @@ describe("POST /auth/confirmar/canjear", () => {
     expect(locationOf(response)).toBe("/registro?confirmacion=invalida");
   });
 
+  it("trata un cuerpo que no es un formulario como enlace inválido", async () => {
+    mockDependencies();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { POST } = await import("@/app/(auth)/auth/confirmar/canjear/route");
+
+    const response = await POST(
+      new NextRequest(REDEEM_URL, {
+        method: "POST",
+        headers: { origin: APP_ORIGIN, "content-type": "application/json" },
+        body: JSON.stringify(VALID_FIELDS),
+      }),
+    );
+
+    expect(confirmCalls).toEqual([]);
+    expect(locationOf(response)).toBe("/registro?confirmacion=invalida");
+  });
+
   it("rechaza el POST que llega desde otro origen sin canjear nada", async () => {
     mockDependencies();
 
