@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type CheckoutGateways,
   type CheckoutSessions,
+  IDEMPOTENCY_WINDOW_MS,
   startCheckout,
 } from "@/lib/membership/checkout";
 import type {
@@ -169,6 +170,18 @@ describe("startCheckout", () => {
     expect(first.idempotencyKey).toBe(second.idempotencyKey);
   });
 
+  it("abre otra sesión pasada la ventana de idempotencia", async () => {
+    const sessions = sessionsDouble();
+    const target = gateways(membership(), sessions);
+
+    await start(target);
+    await start(target, new Date(NOW.getTime() + IDEMPOTENCY_WINDOW_MS));
+
+    const [, first] = requestedSession(sessions, 0);
+    const [, second] = requestedSession(sessions, 1);
+    expect(first.idempotencyKey).not.toBe(second.idempotencyKey);
+  });
+
   it("no reutiliza la sesión si cambió lo que se pide", async () => {
     const sessions = sessionsDouble();
 
@@ -225,15 +238,16 @@ describe("startCheckout", () => {
     expect(outcome).toEqual({ kind: "refused", reason: "payment_past_due" });
   });
 
-  it("rechaza a quien no tiene membresía ni plan", async () => {
-    await expect(start(gateways(null))).resolves.toEqual({
-      kind: "refused",
-      reason: "no_plan",
-    });
-    await expect(start(gateways(membership({ plan: null })))).resolves.toEqual({
-      kind: "refused",
-      reason: "no_plan",
-    });
+  it("rechaza a quien no tiene membresía", async () => {
+    const outcome = await start(gateways(null));
+
+    expect(outcome).toEqual({ kind: "refused", reason: "no_plan" });
+  });
+
+  it("rechaza a quien tiene membresía sin plan", async () => {
+    const outcome = await start(gateways(membership({ plan: null })));
+
+    expect(outcome).toEqual({ kind: "refused", reason: "no_plan" });
   });
 
   it("dice que Stripe no está configurado sin leer la membresía", async () => {

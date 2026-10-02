@@ -58,7 +58,7 @@ const REFUSALS: Record<
   },
 };
 
-function checkoutStripe(): CheckoutStripe {
+function resolveCheckoutStripe(): CheckoutStripe {
   const stripe = createStripeSetup(process.env);
   if (stripe.kind === "unconfigured") {
     // Los nombres de lo que falta van al registro del servidor, no a la
@@ -97,7 +97,7 @@ const createCheckout = createApiRoute<MembershipCheckoutResponse>({
       {
         membership: createMembershipGateway(serviceClient),
         memberEmails: createMemberEmailGateway(serviceClient),
-        stripe: checkoutStripe(),
+        stripe: resolveCheckoutStripe(),
       },
       { userId, origin: request.nextUrl.origin, now: new Date() },
     ).catch(asStripeUnavailable);

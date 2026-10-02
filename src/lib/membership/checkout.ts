@@ -26,8 +26,10 @@ export const TRIAL_PERIOD_DAYS = 30;
 
 /** Un doble toque llega dentro de esta ventana y recibe la misma sesión:
  * Stripe devuelve la respuesta guardada para una misma llave de idempotencia.
- * Pasada la ventana, un nuevo intento abre otra. */
-const IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
+ * Pasada la ventana, un nuevo intento abre otra. Stripe guarda también los
+ * errores 4xx: un precio mal configurado y corregido sigue fallando hasta que
+ * la ventana cambia. */
+export const IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
 
 /** Lo único que se le pide al SDK de Stripe. `client.checkout.sessions` lo
  * cumple tal cual. */
@@ -101,7 +103,10 @@ function checkSubscribable(
   return { membership, plan: membership.plan };
 }
 
-function paymentsUrl(origin: string, checkoutReturn: CheckoutReturn): string {
+function buildPaymentsUrl(
+  origin: string,
+  checkoutReturn: CheckoutReturn,
+): string {
   const url = new URL(PAYMENTS_PATH, origin);
   url.searchParams.set(CHECKOUT_RETURN_QUERY_PARAM, checkoutReturn);
   return url.toString();
@@ -109,7 +114,7 @@ function paymentsUrl(origin: string, checkoutReturn: CheckoutReturn): string {
 
 /** El cliente que ya tiene en Stripe, o su correo para que Checkout lo cree.
  * Stripe no acepta los dos a la vez. */
-async function customerParams(
+async function buildCustomerParams(
   membership: Membership,
   memberEmails: MemberEmailGateway,
 ): Promise<
@@ -124,7 +129,7 @@ async function customerParams(
 /** Sin prueba si la membresía ya tuvo una alguna vez. Los metadatos llevan al
  * socio para que el webhook lo encuentre por la suscripción aunque sus
  * eventos lleguen antes que `checkout.session.completed`. */
-function subscriptionData(
+function buildSubscriptionData(
   membership: Membership,
 ): Stripe.Checkout.SessionCreateParams.SubscriptionData {
   const metadata = { user_id: membership.userId };
@@ -148,10 +153,10 @@ async function buildSessionParams(
     line_items: [{ price, quantity: 1 }],
     payment_method_collection: "always",
     client_reference_id: membership.userId,
-    ...(await customerParams(membership, context.memberEmails)),
-    subscription_data: subscriptionData(membership),
-    success_url: paymentsUrl(context.origin, "ok"),
-    cancel_url: paymentsUrl(context.origin, "cancelado"),
+    ...(await buildCustomerParams(membership, context.memberEmails)),
+    subscription_data: buildSubscriptionData(membership),
+    success_url: buildPaymentsUrl(context.origin, "ok"),
+    cancel_url: buildPaymentsUrl(context.origin, "cancelado"),
   };
 }
 

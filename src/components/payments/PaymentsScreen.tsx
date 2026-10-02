@@ -122,6 +122,18 @@ function CheckoutOffer({
   const [checkout, setCheckout] = useState<CheckoutState>({ kind: "idle" });
   const isOpening = checkout.kind === "opening";
 
+  // Quien vuelve de Stripe con Atrás puede recibir la página guardada en la
+  // caché del navegador, con el botón aún en "Abriendo Stripe…".
+  useEffect(() => {
+    function resetWhenRestored(event: PageTransitionEvent): void {
+      if (event.persisted) {
+        setCheckout({ kind: "idle" });
+      }
+    }
+    window.addEventListener("pageshow", resetWhenRestored);
+    return () => window.removeEventListener("pageshow", resetWhenRestored);
+  }, []);
+
   async function startCheckout(): Promise<void> {
     setCheckout({ kind: "opening" });
     const outcome = await requestCheckout();

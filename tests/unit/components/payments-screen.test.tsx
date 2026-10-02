@@ -155,6 +155,23 @@ describe("PaymentsScreen: socio pendiente", () => {
     );
   });
 
+  it("vuelve a ofrecer la tarjeta si el socio regresa de Stripe con Atrás", async () => {
+    stubFetch({
+      checkout: () => jsonResponse({ data: { url: CHECKOUT_URL } }),
+    });
+    renderScreen(PENDING_FULL);
+    await userEvent.click(screen.getByRole("button", { name: "Add card" }));
+    await waitFor(() => expect(openCheckout).toHaveBeenCalled());
+    const restoredFromCache = new Event("pageshow");
+    Object.defineProperty(restoredFromCache, "persisted", { value: true });
+
+    act(() => {
+      window.dispatchEvent(restoredFromCache);
+    });
+
+    expect(screen.getByRole("button", { name: "Add card" })).toBeEnabled();
+  });
+
   it("pide una sola sesión ante un doble toque", async () => {
     const fetchDouble = stubFetch({
       checkout: () => new Promise<Response>(() => undefined),
