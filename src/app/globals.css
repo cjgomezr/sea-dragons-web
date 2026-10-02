@@ -1196,7 +1196,6 @@ button.notification-item-content:hover {
 .auth-brand-header {
   display: flex;
   align-items: center;
-  align-self: flex-start;
   gap: var(--space-3);
 }
 
@@ -1204,6 +1203,7 @@ button.notification-item-content:hover {
    pareciendo la marca, no un enlace del texto; el anillo de foco va en el
    color del panel porque el de acento se pierde sobre el azul oscuro. */
 a.auth-brand-header {
+  align-self: flex-start;
   color: inherit;
   text-decoration: none;
 }

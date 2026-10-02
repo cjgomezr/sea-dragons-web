@@ -95,6 +95,7 @@ describe("la marca como vuelta al inicio de sesión", () => {
   it.each([
     REGISTRATION_PATH,
     PASSWORD_RECOVERY_PATH,
+    `${PASSWORD_RECOVERY_PATH}/nueva`,
     COMPLETE_REGISTRATION_PATH,
   ])("en %s la marca es un enlace a entrar", async (path) => {
     currentPath.value = path;
