@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MembershipCard } from "@/lib/membership/membership";
 import {
+  type StripeApi,
   type StripeWebhookGateway,
   handleStripeEvent,
 } from "@/lib/stripe/stripe-webhook";
@@ -49,12 +50,19 @@ const applyEvent = vi.fn<StripeWebhookGateway["applyEvent"]>();
 const readCard = vi.fn<(paymentMethodId: string) => Promise<MembershipCard>>();
 const readSubscription =
   vi.fn<(subscriptionId: string) => Promise<Stripe.Subscription>>();
+const readSetupCard = vi.fn<StripeApi["readSetupCard"]>();
+const makeDefaultPaymentMethod = vi.fn<StripeApi["makeDefaultPaymentMethod"]>();
 const log = vi.fn<(line: string) => void>();
 
 function handle(event: ReturnType<typeof stripeEvent>) {
   return handleStripeEvent(event, {
     gateway: { findMembership, applyEvent },
-    stripe: { readCard, readSubscription },
+    stripe: {
+      readCard,
+      readSubscription,
+      readSetupCard,
+      makeDefaultPaymentMethod,
+    },
     prices: FIXTURE_PRICES,
     now: NOW,
     log,
@@ -66,6 +74,11 @@ beforeEach(() => {
   findMembership.mockResolvedValue(KNOWN_MEMBERSHIP);
   applyEvent.mockResolvedValue("applied");
   readCard.mockResolvedValue(MASTERCARD);
+  readSetupCard.mockResolvedValue({
+    paymentMethodId: "pm_TarjetaNueva",
+    card: MASTERCARD,
+  });
+  makeDefaultPaymentMethod.mockResolvedValue(undefined);
   readSubscription.mockResolvedValue(
     stripeEvent("customer.subscription.updated", {
       object: { metadata: {} },
@@ -188,5 +201,69 @@ describe("handleStripeEvent", () => {
     );
 
     expect(log).toHaveBeenCalledWith(expect.stringContaining("paused"));
+  });
+
+  // #455: el cambio de tarjeta vuelve como un Checkout en modo `setup`.
+  describe("con un Checkout de cambio de tarjeta", () => {
+    const SUBSCRIBED_MEMBERSHIP: StripeMembership = {
+      ...KNOWN_MEMBERSHIP,
+      record: {
+        ...KNOWN_MEMBERSHIP.record,
+        status: "past_due",
+        stripeCustomerId: "cus_TestSeadragons",
+        stripeSubscriptionId: "sub_TestSeadragons",
+      },
+    };
+
+    function setupCheckout(): ReturnType<typeof stripeEvent> {
+      return stripeEvent("checkout.session.completed", {
+        object: {
+          mode: "setup",
+          subscription: null,
+          setup_intent: "seti_TestSeadragons",
+        },
+      });
+    }
+
+    beforeEach(() => {
+      findMembership.mockResolvedValue(SUBSCRIBED_MEMBERSHIP);
+    });
+
+    it("pone la tarjeta nueva por defecto en el cliente y en la suscripción", async () => {
+      await handle(setupCheckout());
+
+      expect(readSetupCard).toHaveBeenCalledWith("seti_TestSeadragons");
+      expect(makeDefaultPaymentMethod).toHaveBeenCalledWith({
+        customerId: "cus_TestSeadragons",
+        subscriptionId: "sub_TestSeadragons",
+        paymentMethodId: "pm_TarjetaNueva",
+      });
+    });
+
+    it("guarda la tarjeta nueva en la membresía", async () => {
+      const outcome = await handle(setupCheckout());
+
+      expect(outcome).toBe("applied");
+      expect(applyEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          writes: expect.objectContaining({
+            membership: { card: MASTERCARD },
+          }),
+        }),
+      );
+    });
+
+    it("no toca Stripe ni la membresía si el SetupIntent no trae tarjeta", async () => {
+      readSetupCard.mockResolvedValue(null);
+
+      await handle(setupCheckout());
+
+      expect(makeDefaultPaymentMethod).not.toHaveBeenCalled();
+      expect(applyEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          writes: expect.objectContaining({ membership: null }),
+        }),
+      );
+    });
   });
 });

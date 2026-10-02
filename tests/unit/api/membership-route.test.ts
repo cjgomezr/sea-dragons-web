@@ -4,11 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MEMBERSHIP_API_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
 import type { MembershipRecord } from "@/lib/membership/membership";
+import type { PaymentRecord } from "@/lib/membership/membership-view";
 
 /**
- * `GET /api/v1/membership` (#454): la membresía de quien llama, que Pagos
- * vuelve a pedir mientras espera el webhook de Stripe. La alcanza cualquier
- * cuenta activa, al día o no. Entra por el proxy de verdad.
+ * `GET /api/v1/membership` (#454, #455): la membresía de quien llama y su
+ * historial, que pinta Pagos y vuelve a pedir mientras espera el webhook de
+ * Stripe. La alcanza cualquier cuenta activa, al día o no. Entra por el proxy
+ * de verdad.
  */
 
 const ORIGIN = "http://localhost:3417";
@@ -16,6 +18,8 @@ const CONTINUE_HEADER = "x-middleware-next";
 const USER_ID = "7b0e5a52-3c1d-4e8f-9a6b-2d4c8e1f0a37";
 const CLUB_ID = "c1ab0000-0000-4000-8000-000000000001";
 const TRIAL_END = "2026-11-01T09:00:00.000Z";
+const PERIOD_END = "2026-11-01T09:00:00.000Z";
+const PAID_AT = "2026-10-01T09:00:00.000Z";
 const ORIGINAL_ENV = { ...process.env };
 
 const PENDING_FULL: MembershipRecord = {
@@ -33,6 +37,7 @@ const PENDING_FULL: MembershipRecord = {
 
 const readSessionState = vi.fn();
 const findByUserId = vi.fn<() => Promise<MembershipRecord | null>>();
+const listByUserId = vi.fn<() => Promise<readonly PaymentRecord[]>>();
 
 vi.mock("@/lib/supabase/session-client", () => ({
   readIncomingCookies: () => [],
@@ -51,6 +56,7 @@ vi.mock("@/lib/auth/session-reader", () => ({
 
 vi.mock("@/lib/membership/supabase-membership-gateways", () => ({
   createMembershipGateway: () => ({ findByUserId }),
+  createPaymentHistoryGateway: () => ({ listByUserId }),
 }));
 
 const { proxy } = await import("@/proxy");
@@ -81,6 +87,7 @@ beforeEach(() => {
   configureStripe();
   givenSession({ kind: "active", role: "Player", membershipCurrent: false });
   findByUserId.mockResolvedValue(PENDING_FULL);
+  listByUserId.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -95,7 +102,16 @@ describe("GET /api/v1/membership", () => {
     await expect(response.json()).resolves.toEqual({
       data: {
         paymentsConfigured: true,
-        membership: { plan: "Full", status: "pending", trialEnd: null },
+        membership: {
+          plan: "Full",
+          status: "pending",
+          monthlyPriceCents: 4500,
+          trialEnd: null,
+          nextChargeAt: null,
+          card: null,
+          waiver: null,
+        },
+        payments: [],
       },
     });
   });
@@ -112,6 +128,48 @@ describe("GET /api/v1/membership", () => {
 
     await expect(response.json()).resolves.toMatchObject({
       data: { membership: { status: "trialing", trialEnd: TRIAL_END } },
+    });
+  });
+
+  it("sirve la tarjeta, el próximo cobro y el historial de quien está activo", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
+    findByUserId.mockResolvedValue({
+      ...PENDING_FULL,
+      status: "active",
+      stripeCustomerId: "cus_123",
+      stripeSubscriptionId: "sub_123",
+      currentPeriodEnd: new Date(PERIOD_END),
+      card: { brand: "visa", last4: "4242", expMonth: 8, expYear: 2028 },
+    });
+    listByUserId.mockResolvedValue([
+      {
+        id: "pay-1",
+        amountCents: 4500,
+        description: "Monthly membership",
+        status: "paid",
+        paidAt: new Date(PAID_AT),
+        createdAt: new Date(PAID_AT),
+      },
+    ]);
+
+    const response = await getMembership();
+
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        membership: {
+          nextChargeAt: PERIOD_END,
+          card: { brand: "visa", last4: "4242", expMonth: 8, expYear: 2028 },
+        },
+        payments: [
+          {
+            id: "pay-1",
+            date: PAID_AT,
+            description: "Monthly membership",
+            amountCents: 4500,
+            status: "paid",
+          },
+        ],
+      },
     });
   });
 

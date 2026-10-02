@@ -519,3 +519,62 @@ describe("una membresía exenta", () => {
     expect(writes.membership?.status).toBe("trialing");
   });
 });
+
+// #455: cambiar la tarjeta es un Checkout en modo `setup`. No trae
+// suscripción; trae el SetupIntent con la tarjeta nueva.
+describe("checkout.session.completed en modo setup", () => {
+  const SETUP_INTENT_ID = "seti_TestSeadragons";
+
+  function setupCheckout(
+    object: Record<string, unknown> = {},
+  ): ReturnType<typeof stripeEvent> {
+    return stripeEvent("checkout.session.completed", {
+      object: {
+        mode: "setup",
+        subscription: null,
+        setup_intent: SETUP_INTENT_ID,
+        ...object,
+      },
+    });
+  }
+
+  it("lee el SetupIntent y busca la membresía por el cliente y el socio", () => {
+    const facts = readStripeEventFacts(setupCheckout());
+
+    expect(facts).toMatchObject({
+      kind: "cardSetupCompleted",
+      setupIntentId: SETUP_INTENT_ID,
+      customerId: FIXTURE_CUSTOMER_ID,
+      lookup: {
+        userId: FIXTURE_USER_ID,
+        customerId: FIXTURE_CUSTOMER_ID,
+        subscriptionId: null,
+      },
+    });
+  });
+
+  it("ignora un Checkout en modo setup sin SetupIntent", () => {
+    const facts = readStripeEventFacts(setupCheckout({ setup_intent: null }));
+
+    expect(facts).toEqual({ kind: "ignored" });
+  });
+
+  it("guarda sólo la tarjeta nueva, sin tocar el estado ni la fecha del último evento", () => {
+    const writes = plan(setupCheckout(), {
+      membership: membership({
+        status: "past_due",
+        stripeCustomerId: FIXTURE_CUSTOMER_ID,
+        stripeSubscriptionId: FIXTURE_SUBSCRIPTION_ID,
+      }),
+      card: VISA,
+    });
+
+    expect(writes.membership).toEqual({ card: VISA });
+  });
+
+  it("no escribe nada si el SetupIntent no trae tarjeta", () => {
+    const writes = plan(setupCheckout(), { card: null });
+
+    expect(writes.membership).toBeNull();
+  });
+});

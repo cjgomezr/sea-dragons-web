@@ -5,6 +5,9 @@
  * aquél arrastra el SDK de Stripe.
  */
 export const CHECKOUT_RETURN_QUERY_PARAM = "checkout";
+/** La vuelta del cambio de tarjeta (#455), otra sesión de Checkout en modo
+ * `setup`: `ok` le dice a la pantalla que espere la tarjeta nueva. */
+export const CARD_RETURN_QUERY_PARAM = "tarjeta";
 export const CHECKOUT_RETURN_VALUES = ["ok", "cancelado"] as const;
 export type CheckoutReturn = (typeof CHECKOUT_RETURN_VALUES)[number];
 

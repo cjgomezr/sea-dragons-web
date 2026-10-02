@@ -228,7 +228,6 @@ export const englishMessages = {
   "nav.label.directoryShort": "People",
   "app.metaDescription":
     "The platform of the {club} underwater rugby club (Melbourne).",
-  "section.underConstruction": "This section is under construction.",
   "section.loading": "Loading",
   "dashboard.eyebrow": "Dashboard",
   "dashboard.greeting.morning": "Good morning, {name}",
@@ -800,7 +799,6 @@ export const englishMessages = {
     "Your membership isn't up to date, so you can't answer events yet.",
   "calendar.membership.toPayments": "Go to Payments",
   // Pagos con el alta en Stripe Checkout (#454, RF-3 del PRD de E12).
-  "payments.offer.plan": "{plan} membership · {price} a month",
   "payments.offer.trial":
     "Your first month is free. The first charge is in 30 days, then once a month.",
   "payments.offer.noTrial":
@@ -819,12 +817,48 @@ export const englishMessages = {
   "payments.checkout.waiting":
     "Card added. We're waiting for Stripe to confirm it, which can take a few seconds.",
   "payments.checkout.timedOut":
-    "Stripe hasn't confirmed yet. Reload the page in a minute; if it still says pending, write to the club.",
+    "Stripe hasn't confirmed yet. Reload the page in a minute; if your membership still hasn't changed, write to the club.",
   "payments.trialing": "On trial until {date}",
   "payments.error.unavailable":
     "We couldn't open Stripe. Try again in a moment.",
   "payments.error.unexpected":
     "Something went wrong opening Stripe. Try again.",
+  // El panel de membresía (#455, RF-5 y RF-7 del PRD de E12).
+  "payments.loading": "Loading your membership…",
+  "payments.load.failed": "We couldn't load your membership. Try again.",
+  "payments.load.retry": "Try again",
+  "payments.plan.title": "Current plan",
+  "payments.plan.name": "{plan} membership",
+  "payments.plan.monthlyPrice": "{price} a month",
+  "payments.plan.nextCharge": "Next charge {date}",
+  "payments.plan.noRecurringCharge": "No recurring charge",
+  "payments.plan.card": "{brand} ending in {last4}, expires {expiry}",
+  "payments.status.active": "Active",
+  "payments.status.trialing": "On trial",
+  "payments.status.pending": "Pending",
+  "payments.status.pastDue": "Payment failed",
+  "payments.status.cancelled": "Cancelled",
+  "payments.status.waived": "Waived",
+  "payments.waiver.reason": "Reason: {reason}",
+  "payments.waiver.until": "Until {date}",
+  "payments.card.update": "Update card",
+  "payments.card.resubscribe": "Subscribe again",
+  "payments.card.waiting":
+    "Your new card is saved in Stripe. It shows here as soon as Stripe confirms it.",
+  "payments.card.timedOut":
+    "If your new card isn't shown yet, reload the page in a minute.",
+  "payments.card.cancelled":
+    "You left Stripe without changing your card. Your current card still works.",
+  "payments.history.title": "Payment history",
+  "payments.history.date": "Date",
+  "payments.history.description": "Description",
+  "payments.history.amount": "Amount",
+  "payments.history.status": "Status",
+  "payments.history.defaultDescription": "Membership payment",
+  "payments.history.empty": "No payments yet.",
+  "payments.history.paid": "Paid",
+  "payments.history.failed": "Failed",
+  "payments.history.pending": "Pending",
   "calendar.rsvp.error.unexpected": "We couldn't save your answer. Try again.",
   "calendar.create.open": "Event",
   "calendar.create.created": "Event created. We let the members know.",

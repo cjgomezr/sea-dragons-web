@@ -55,6 +55,14 @@ export type CheckoutCompletedFacts = FactsOf<
   { readonly subscriptionId: string }
 >;
 
+/** Un cambio de tarjeta (#455): Checkout en modo `setup` guardó una tarjeta
+ * en el SetupIntent. Ponerla por defecto y leerla hay que pedírselo a Stripe:
+ * ver `handleStripeEvent`. */
+export type CardSetupCompletedFacts = FactsOf<
+  "cardSetupCompleted",
+  { readonly customerId: string; readonly setupIntentId: string }
+>;
+
 export type SubscriptionChangedFacts = FactsOf<
   "subscriptionChanged",
   {
@@ -71,6 +79,7 @@ export type SubscriptionChangedFacts = FactsOf<
 export type StripeEventFacts =
   | { readonly kind: "ignored" }
   | CheckoutCompletedFacts
+  | CardSetupCompletedFacts
   | SubscriptionChangedFacts
   | FactsOf<"subscriptionDeleted", Record<never, never>>
   | FactsOf<"invoiceSettled", { readonly payment: StripePayment }>;
@@ -151,10 +160,39 @@ function readMetadataUserId(
   return parsed.success ? parsed.data : null;
 }
 
+function readCheckoutUserId(session: Stripe.Checkout.Session): string | null {
+  return userIdSchema.safeParse(session.client_reference_id).data ?? null;
+}
+
+function readCardSetupFacts(
+  session: Stripe.Checkout.Session,
+  created: Date,
+): StripeEventFacts {
+  const customerId = optionalIdOf(session.customer);
+  const setupIntentId = optionalIdOf(session.setup_intent);
+  if (customerId === null || setupIntentId === null) {
+    return { kind: "ignored" };
+  }
+  return {
+    kind: "cardSetupCompleted",
+    created,
+    lookup: {
+      userId: readCheckoutUserId(session),
+      customerId,
+      subscriptionId: null,
+    },
+    customerId,
+    setupIntentId,
+  };
+}
+
 function readCheckoutFacts(
   session: Stripe.Checkout.Session,
   created: Date,
 ): StripeEventFacts {
+  if (session.mode === "setup") {
+    return readCardSetupFacts(session, created);
+  }
   const customerId = optionalIdOf(session.customer);
   const subscriptionId = optionalIdOf(session.subscription);
   if (
@@ -168,7 +206,7 @@ function readCheckoutFacts(
     kind: "checkoutCompleted",
     created,
     lookup: {
-      userId: userIdSchema.safeParse(session.client_reference_id).data ?? null,
+      userId: readCheckoutUserId(session),
       customerId,
       subscriptionId,
     },
@@ -410,6 +448,11 @@ function planMembershipChange(input: PlanInput): MembershipPlanChange | null {
         },
         warnings: [],
       };
+    case "cardSetupCompleted":
+      // Sin `stripeEventAt`: la tarjeta no mueve el estado.
+      return input.card === null
+        ? null
+        : { changes: { card: input.card }, warnings: [] };
     case "invoiceSettled":
       return null;
   }

@@ -1,17 +1,15 @@
-import Stripe from "stripe";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError, type ApiErrorCode } from "@/lib/api/response";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
-import {
-  type CheckoutRefusal,
-  type CheckoutStripe,
-  startCheckout,
-} from "@/lib/membership/checkout";
+import { type CheckoutRefusal, startCheckout } from "@/lib/membership/checkout";
 import {
   createMemberEmailGateway,
   createMembershipGateway,
 } from "@/lib/membership/supabase-membership-gateways";
-import { createStripeSetup } from "@/lib/stripe/stripe-client";
+import {
+  asStripeUnavailable,
+  resolveRouteCheckoutStripe,
+} from "@/lib/stripe/stripe-route";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 
 /**
@@ -25,10 +23,6 @@ import { createServiceRoleClient } from "@/lib/supabase/service-client";
 export const dynamic = "force-dynamic";
 
 export type MembershipCheckoutResponse = { readonly url: string };
-
-const STRIPE_UNAVAILABLE_REASON = "stripe_unavailable";
-const STRIPE_UNAVAILABLE_MESSAGE =
-  "Stripe no contesta. Vuelve a intentarlo en un momento.";
 
 const REFUSALS: Record<
   CheckoutRefusal,
@@ -58,36 +52,7 @@ const REFUSALS: Record<
   },
 };
 
-function resolveCheckoutStripe(): CheckoutStripe {
-  const stripe = createStripeSetup(process.env);
-  if (stripe.kind === "unconfigured") {
-    // Los nombres de lo que falta van al registro del servidor, no a la
-    // respuesta, como en el webhook.
-    console.warn(
-      `[membership/checkout] faltan ${stripe.missingKeys.join(", ")}`,
-    );
-    return { kind: "unconfigured" };
-  }
-  return {
-    kind: "configured",
-    prices: stripe.prices,
-    sessions: stripe.client.checkout.sessions,
-  };
-}
-
-/** Un fallo de Stripe (red, llave, precio) no es culpa de quien pide: 503
- * para que la pantalla ofrezca reintentar. Lo demás se relanza. */
-function asStripeUnavailable(error: unknown): never {
-  if (error instanceof Stripe.errors.StripeError) {
-    console.warn(`[membership/checkout] Stripe falló: ${error.message}`);
-    throw new ApiError(
-      "service_unavailable",
-      STRIPE_UNAVAILABLE_MESSAGE,
-      STRIPE_UNAVAILABLE_REASON,
-    );
-  }
-  throw error;
-}
+const LOG_PREFIX = "[membership/checkout]";
 
 const createCheckout = createApiRoute<MembershipCheckoutResponse>({
   handler: async ({ request, decorateResponse }) => {
@@ -97,10 +62,10 @@ const createCheckout = createApiRoute<MembershipCheckoutResponse>({
       {
         membership: createMembershipGateway(serviceClient),
         memberEmails: createMemberEmailGateway(serviceClient),
-        stripe: resolveCheckoutStripe(),
+        stripe: resolveRouteCheckoutStripe(LOG_PREFIX),
       },
       { userId, origin: request.nextUrl.origin, now: new Date() },
-    ).catch(asStripeUnavailable);
+    ).catch(asStripeUnavailable(LOG_PREFIX));
     if (outcome.kind === "refused") {
       const refusal = REFUSALS[outcome.reason];
       throw new ApiError(refusal.code, refusal.message, outcome.reason);

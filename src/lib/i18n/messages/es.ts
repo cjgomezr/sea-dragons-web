@@ -226,7 +226,6 @@ export const spanishMessages: MessageCatalog = {
   "nav.label.directoryShort": "Gente",
   "app.metaDescription":
     "Plataforma del club de rugby subacuático {club} (Melbourne).",
-  "section.underConstruction": "Esta sección está en construcción.",
   "section.loading": "Cargando",
   "dashboard.eyebrow": "Inicio",
   "dashboard.greeting.morning": "Buenos días, {name}",
@@ -798,7 +797,6 @@ export const spanishMessages: MessageCatalog = {
     "Tu membresía no está al día: todavía no puedes responder a los eventos.",
   "calendar.membership.toPayments": "Ir a Pagos",
   // Pagos con el alta en Stripe Checkout (#454, RF-3 del PRD de E12).
-  "payments.offer.plan": "Membresía {plan} · {price} al mes",
   "payments.offer.trial":
     "El primer mes es gratis. El primer cobro es dentro de 30 días, y después uno cada mes.",
   "payments.offer.noTrial":
@@ -817,12 +815,49 @@ export const spanishMessages: MessageCatalog = {
   "payments.checkout.waiting":
     "Tarjeta añadida. Estamos esperando la confirmación de Stripe, que puede tardar unos segundos.",
   "payments.checkout.timedOut":
-    "Stripe todavía no ha confirmado. Recarga la página en un minuto; si sigue pendiente, escribe al club.",
+    "Stripe todavía no ha confirmado. Recarga la página en un minuto; si tu membresía sigue sin cambiar, escribe al club.",
   "payments.trialing": "En prueba hasta el día {date}",
   "payments.error.unavailable":
     "No pudimos abrir Stripe. Vuelve a intentarlo en un momento.",
   "payments.error.unexpected":
     "Algo falló al abrir Stripe. Vuelve a intentarlo.",
+  // El panel de membresía (#455, RF-5 y RF-7 del PRD de E12).
+  "payments.loading": "Cargando tu membresía…",
+  "payments.load.failed":
+    "No pudimos cargar tu membresía. Vuelve a intentarlo.",
+  "payments.load.retry": "Reintentar",
+  "payments.plan.title": "Plan actual",
+  "payments.plan.name": "Membresía {plan}",
+  "payments.plan.monthlyPrice": "{price} al mes",
+  "payments.plan.nextCharge": "Próximo cobro el {date}",
+  "payments.plan.noRecurringCharge": "Sin cobro recurrente",
+  "payments.plan.card": "{brand} terminada en {last4}, caduca {expiry}",
+  "payments.status.active": "Activa",
+  "payments.status.trialing": "En prueba",
+  "payments.status.pending": "Pendiente",
+  "payments.status.pastDue": "Pago fallido",
+  "payments.status.cancelled": "Cancelada",
+  "payments.status.waived": "Exenta",
+  "payments.waiver.reason": "Motivo: {reason}",
+  "payments.waiver.until": "Hasta el {date}",
+  "payments.card.update": "Actualizar tarjeta",
+  "payments.card.resubscribe": "Volver a suscribirse",
+  "payments.card.waiting":
+    "Tu tarjeta nueva está guardada en Stripe. Aparece aquí en cuanto Stripe la confirme.",
+  "payments.card.timedOut":
+    "Si todavía no ves tu tarjeta nueva, recarga la página en un minuto.",
+  "payments.card.cancelled":
+    "Saliste de Stripe sin cambiar la tarjeta. La que tienes sigue valiendo.",
+  "payments.history.title": "Historial de pagos",
+  "payments.history.date": "Fecha",
+  "payments.history.description": "Descripción",
+  "payments.history.amount": "Importe",
+  "payments.history.status": "Estado",
+  "payments.history.defaultDescription": "Pago de membresía",
+  "payments.history.empty": "Todavía no hay pagos.",
+  "payments.history.paid": "Pagado",
+  "payments.history.failed": "Fallido",
+  "payments.history.pending": "Pendiente",
   "calendar.rsvp.error.unexpected":
     "No pudimos guardar tu respuesta. Vuelve a intentarlo.",
   "calendar.create.open": "Evento",

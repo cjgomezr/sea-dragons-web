@@ -4652,32 +4652,259 @@ button.notification-item-content:hover {
   font-weight: 600;
 }
 
-/* Pagos (#454): el aviso de la puerta y, debajo, la oferta de Checkout. */
-.payments-pending {
+/* Pagos (#454, #455): sigue docs/mockups/payments-light.png sin la tarjeta
+   de proveedores ni la alerta roja. Arriba el aviso de la puerta, si lo hay;
+   luego "Plan actual" y el historial. El ancho es el del contenido del
+   mockup, para que la tarjeta no se estire por toda la pantalla. */
+.payments-panel {
   display: grid;
   gap: var(--space-4);
-  max-width: 40rem;
+  max-width: 820px;
+  margin-top: var(--space-4);
+}
+
+.payments-plan-card {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  min-width: 0;
+}
+
+.payments-plan-card p {
+  margin: 0;
+}
+
+.payments-plan-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  justify-self: stretch;
+}
+
+.card .payments-eyebrow {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* El chip dice el estado con su palabra; el punto de color sólo la
+   acompaña. La palabra va en el color del texto, como el tipo de la agenda:
+   el tono sobre su propio fondo claro no llega a AA con 12px. */
+.payments-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px var(--space-3);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+  border-radius: 999px;
+  overflow-wrap: anywhere;
+}
+
+.payments-chip::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  background: currentcolor;
+  border-radius: 50%;
+}
+
+.payments-chip-positive {
+  background: color-mix(in srgb, var(--color-success) 16%, var(--color-panel));
+}
+
+.payments-chip-attention {
+  background: color-mix(in srgb, var(--color-warning) 24%, var(--color-panel));
+}
+
+.payments-chip-negative {
+  background: color-mix(in srgb, var(--color-danger) 16%, var(--color-panel));
+}
+
+.payments-plan-card .payments-plan-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.payments-plan-card .payments-price {
+  margin-top: var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.payments-plan-details {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  list-style: none;
+}
+
+.payments-plan-details:empty {
+  display: none;
+}
+
+.payments-plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
 .payments-offer {
   display: grid;
   gap: var(--space-2);
   justify-items: start;
-  padding: var(--space-4);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  margin-top: var(--space-2);
 }
 
 .payments-offer p,
-.payments-status,
-.payments-trial {
+.payments-status {
   margin: 0;
 }
 
-.payments-plan,
-.payments-trial {
-  font-weight: 600;
+.payments-history {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.card.payments-history h2 {
+  margin: 0;
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  font-size: 16px;
+}
+
+.card.payments-history > p {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.payments-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.payments-table th,
+.payments-table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  border-top: 1px solid var(--color-border);
+}
+
+.payments-table th {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.payments-table td {
+  color: var(--color-text-secondary);
+}
+
+.payments-table .payments-cell-data {
+  font-family: var(--font-family-mono);
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+/* El estado del pago, con el punto del tono delante de la palabra. */
+.payments-payment-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+}
+
+.payments-payment-status::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  background: currentcolor;
+  border-radius: 50%;
+}
+
+/* El punto de cada tono. */
+.payments-chip-positive::before,
+.payments-payment-status-paid::before {
+  background: var(--color-success);
+}
+
+.payments-chip-attention::before,
+.payments-payment-status-pending::before {
+  background: var(--color-warning);
+}
+
+.payments-chip-negative::before,
+.payments-payment-status-failed::before {
+  background: var(--color-danger);
+}
+
+/* Por debajo de 768px cada pago es una tarjeta, como el directorio (#283):
+   cuatro columnas no caben en 375px. Cada dato lleva su etiqueta desde su
+   `data-label`, porque las cabeceras se esconden. */
+@media (width < 768px) {
+  .payments-table,
+  .payments-table tbody,
+  .payments-table td {
+    display: block;
+  }
+
+  .payments-table thead {
+    display: none;
+  }
+
+  .payments-table tbody {
+    display: grid;
+    gap: var(--space-3);
+    padding: 0 var(--space-4) var(--space-4);
+  }
+
+  .payments-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+  }
+
+  .payments-table td {
+    min-width: 0;
+    padding: 0;
+    overflow-wrap: break-word;
+    border-top: none;
+  }
+
+  .payments-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: var(--space-1);
+    font-family: var(--font-family-mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+  }
 }
 
 /* Lo que se desplaza es el cuerpo, no el diálogo: el título y su cierre se

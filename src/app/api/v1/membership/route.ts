@@ -1,17 +1,21 @@
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { openAccountSession } from "@/lib/auth/account-api";
-import { readMembership } from "@/lib/membership/membership";
 import {
   type MembershipView,
-  toMembershipView,
+  readMembershipView,
 } from "@/lib/membership/membership-view";
-import { createMembershipGateway } from "@/lib/membership/supabase-membership-gateways";
+import {
+  createMembershipGateway,
+  createPaymentHistoryGateway,
+} from "@/lib/membership/supabase-membership-gateways";
 import { isStripeConfigured } from "@/lib/stripe/stripe-client";
 
 /**
- * La membresía de quien llama (#454): Pagos la vuelve a pedir mientras espera
- * que el webhook de Stripe confirme el Checkout. Va con el cliente de la
- * sesión: `memberships_select_own` deja a cada socio leer sólo la suya.
+ * La membresía de quien llama (#454, #455): el panel de Pagos con su plan,
+ * estado, próximo cobro, tarjeta, exención e historial. Pagos la vuelve a
+ * pedir mientras espera al webhook de Stripe. Va con el cliente de la sesión:
+ * `memberships_select_own` y `payments_select_own` dejan a cada socio leer
+ * sólo lo suyo.
  */
 
 // Depende de la sesión de quien llama y de lo que acaba de escribir el webhook.
@@ -22,13 +26,18 @@ export type MembershipResponse = MembershipView;
 const getMembership = createApiRoute<MembershipResponse>({
   handler: async ({ request, decorateResponse }) => {
     const session = await openAccountSession({ request, decorateResponse });
-    const reading = await readMembership(
-      createMembershipGateway(session.client),
-      { userId: session.userId, now: new Date() },
+    const view = await readMembershipView(
+      {
+        membership: createMembershipGateway(session.client),
+        payments: createPaymentHistoryGateway(session.client),
+      },
+      {
+        userId: session.userId,
+        now: new Date(),
+        paymentsConfigured: isStripeConfigured(process.env),
+      },
     );
-    return {
-      data: toMembershipView(reading, isStripeConfigured(process.env)),
-    };
+    return { data: view };
   },
 });
 

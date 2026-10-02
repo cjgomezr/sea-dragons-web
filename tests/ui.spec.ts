@@ -258,16 +258,6 @@ const PUBLIC_PAGES: readonly Screen[] = [
   { name: "registro", path: "/registro" },
 ];
 
-// "section" is a destination route off the sidebar menu, standing in for the
-// ones that are still a SectionPlaceholder. Vive detrás de la frontera de
-// sesión, así que sus tests entran antes de mirarla. La sección tiene que
-// ser una que la sesión de prueba (un Player) pueda abrir: `/equipos` la
-// frontera se la niega y la devuelve al panel, así que la captura sería la
-// del panel y no la de un marcador. La pantalla de inicio dejó de ser un
-// marcador con #426: sus capturas son los estados `inicio-*`, con el
-// dashboard fingido, más abajo.
-const APP_PAGES: readonly Screen[] = [{ name: "section", path: "/pagos" }];
-
 function describeScreen(pg: Screen): void {
   for (const vp of viewports) {
     test.describe(`${pg.name} @ ${vp.name}`, () => {
@@ -802,20 +792,6 @@ test.describe("dentro de la aplicación", () => {
   // test agotaba la cuarentena de intentos de Supabase Auth a mitad de la
   // corrida, y ese límite es el que el ticket dice que no se reimplementa.
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
-
-  for (const pg of APP_PAGES) {
-    describeScreen(pg);
-  }
-
-  // E17 RF-5: el panel y las secciones cambian de largo y de `lang` en
-  // español, y eso no lo ve la pasada de axe en inglés.
-  for (const pg of APP_PAGES) {
-    test(`${pg.name} en español: has no accessibility violations (axe-core)`, async ({
-      page,
-    }) => {
-      await expectNoAxeViolationsInSpanish(page, pg.path);
-    });
-  }
 
   describeTogglesCorner({ name: "panel", path: "/dashboard" }, async (page) => {
     await openAccountMenu(page);
@@ -10926,28 +10902,172 @@ test.describe("la puerta de quien no está al día (#453)", () => {
   });
 });
 
-// Pagos del socio pendiente (#454): la oferta de Checkout con el plan, el
-// precio y el mes gratis. Sin stubs: la página lee la membresía sembrada al
-// pintarse. El servidor necesita las llaves de prueba de Stripe; sin ellas
-// la pantalla dice que los pagos no están configurados.
+// Pagos (#454, #455). El del socio pendiente va sin stubs: la página lee la
+// membresía sembrada al pintarse, y el servidor necesita las llaves de prueba
+// de Stripe; sin ellas la pantalla dice que los pagos no están configurados.
+// Los demás estados fingen `GET /api/v1/membership`, porque el socio de
+// prueba sólo tiene una membresía en `seadragons-dev`.
 const PAYMENTS_SCREEN_PATH = "/pagos";
+const MEMBERSHIP_ENDPOINT = "/api/v1/membership";
 const ADD_CARD_BUTTON_NAME = /^(Add card|Añadir tarjeta)$/;
+const PAYMENT_HISTORY_HEADING = /^(Payment history|Historial de pagos)$/;
+
+const PAYMENTS_CARD = {
+  brand: "visa",
+  last4: "4242",
+  expMonth: 8,
+  expYear: 2028,
+} as const;
+
+function paidMembershipFee(id: string, date: string): object {
+  return {
+    id,
+    date,
+    description: "Monthly membership",
+    amountCents: 4500,
+    status: "paid",
+  };
+}
+
+const PAYMENTS_HISTORY = [
+  paidMembershipFee(
+    "e0e0e0e0-0000-4000-8000-0000000000e1",
+    "2026-09-01T00:00:00.000Z",
+  ),
+  paidMembershipFee(
+    "e0e0e0e0-0000-4000-8000-0000000000e2",
+    "2026-08-01T00:00:00.000Z",
+  ),
+  {
+    id: "e0e0e0e0-0000-4000-8000-0000000000e3",
+    date: "2026-07-12T00:00:00.000Z",
+    description: "Nationals levy",
+    amountCents: 8000,
+    status: "paid",
+  },
+  paidMembershipFee(
+    "e0e0e0e0-0000-4000-8000-0000000000e4",
+    "2026-07-01T00:00:00.000Z",
+  ),
+];
+
+const FAILED_PAYMENT = {
+  id: "e0e0e0e0-0000-4000-8000-0000000000e5",
+  date: "2026-10-01T00:00:00.000Z",
+  description: null,
+  amountCents: 4500,
+  status: "failed",
+} as const;
+
+function membershipView(
+  membership: object,
+  payments: readonly object[],
+): object {
+  return {
+    paymentsConfigured: true,
+    membership: {
+      plan: "Full",
+      monthlyPriceCents: 4500,
+      trialEnd: null,
+      nextChargeAt: null,
+      card: PAYMENTS_CARD,
+      waiver: null,
+      ...membership,
+    },
+    payments,
+  };
+}
+
+const ACTIVE_MEMBERSHIP_VIEW = membershipView(
+  { status: "active", nextChargeAt: "2026-10-01T00:00:00.000Z" },
+  PAYMENTS_HISTORY,
+);
+
+const TRIALING_MEMBERSHIP_VIEW = membershipView(
+  {
+    plan: "Student",
+    status: "trialing",
+    monthlyPriceCents: 3200,
+    trialEnd: "2026-10-30T00:00:00.000Z",
+    nextChargeAt: "2026-10-30T00:00:00.000Z",
+  },
+  [],
+);
+
+const PAST_DUE_MEMBERSHIP_VIEW = membershipView({ status: "past_due" }, [
+  FAILED_PAYMENT,
+  ...PAYMENTS_HISTORY,
+]);
+
+const CANCELLED_MEMBERSHIP_VIEW = membershipView(
+  { status: "cancelled", trialEnd: "2026-07-01T00:00:00.000Z" },
+  [FAILED_PAYMENT, ...PAYMENTS_HISTORY],
+);
+
+const WAIVED_MEMBERSHIP_VIEW = membershipView(
+  {
+    status: "waived",
+    card: null,
+    waiver: { reason: "Life member", until: "2027-06-30T00:00:00.000Z" },
+  },
+  PAYMENTS_HISTORY,
+);
+
+// Casual: sin cuota mensual ni cobro recurrente, y todavía sin pagos.
+const EMPTY_HISTORY_MEMBERSHIP_VIEW = membershipView(
+  { plan: "Casual", status: "active", monthlyPriceCents: null, card: null },
+  [],
+);
 
 type PaymentsScreenState = {
   readonly name: string;
+  /** Lo que sirve el endpoint fingido; sin él, la membresía sembrada. */
+  readonly view?: object;
+  readonly storageState: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
 };
 
+function paymentsStates(
+  name: string,
+  view: object,
+): readonly PaymentsScreenState[] {
+  const storageState = E2E_STORAGE_STATE_PATH;
+  return [
+    { name, view, storageState },
+    { name: `${name}-es`, view, storageState, beforeVisit: chooseSpanish },
+  ];
+}
+
 const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
-  { name: "pagos-pendiente" },
-  { name: "pagos-pendiente-es", beforeVisit: chooseSpanish },
+  { name: "pagos-pendiente", storageState: UNPAID_MEMBER_STORAGE_STATE_PATH },
+  {
+    name: "pagos-pendiente-es",
+    storageState: UNPAID_MEMBER_STORAGE_STATE_PATH,
+    beforeVisit: chooseSpanish,
+  },
+  ...paymentsStates("pagos-activa", ACTIVE_MEMBERSHIP_VIEW),
+  ...paymentsStates("pagos-prueba", TRIALING_MEMBERSHIP_VIEW),
+  ...paymentsStates("pagos-fallida", PAST_DUE_MEMBERSHIP_VIEW),
+  ...paymentsStates("pagos-cancelada", CANCELLED_MEMBERSHIP_VIEW),
+  ...paymentsStates("pagos-exenta", WAIVED_MEMBERSHIP_VIEW),
+  ...paymentsStates("pagos-historial-vacio", EMPTY_HISTORY_MEMBERSHIP_VIEW),
 ];
+
+async function serveMembership(page: Page, view: object): Promise<void> {
+  await page.route(
+    (url) => url.pathname === MEMBERSHIP_ENDPOINT,
+    (route) => route.fulfill(jsonBody(view)),
+  );
+}
 
 async function goToPayments(
   page: Page,
-  state: PaymentsScreenState,
+  state: Pick<PaymentsScreenState, "view" | "beforeVisit">,
   theme?: (typeof themes)[number],
 ): Promise<void> {
+  if (state.view !== undefined) {
+    await serveMembership(page, state.view);
+  }
   await state.beforeVisit?.(page);
   if (theme === undefined) {
     await page.goto(`${APP_URL}${PAYMENTS_SCREEN_PATH}`);
@@ -10955,15 +11075,20 @@ async function goToPayments(
     await goToWithTheme(page, PAYMENTS_SCREEN_PATH, theme);
   }
   await expect(
-    page.getByRole("button", { name: ADD_CARD_BUTTON_NAME }),
+    page.getByRole("heading", { level: 2, name: PAYMENT_HISTORY_HEADING }),
   ).toBeVisible();
+  if (state.view === undefined) {
+    await expect(
+      page.getByRole("button", { name: ADD_CARD_BUTTON_NAME }),
+    ).toBeVisible();
+  }
 }
 
 for (const state of PAYMENTS_STATES) {
   test.describe(state.name, () => {
     skipWithoutSession();
     quietNotificationBell();
-    test.use({ storageState: UNPAID_MEMBER_STORAGE_STATE_PATH });
+    test.use({ storageState: state.storageState });
 
     for (const vp of viewports) {
       test.describe(`@ ${vp.name}`, () => {
@@ -11000,6 +11125,55 @@ for (const state of PAYMENTS_STATES) {
   });
 }
 
+test.describe("Pagos en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("a 375px el historial es una lista de tarjetas con la etiqueta de cada dato", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPayments(page, { view: ACTIVE_MEMBERSHIP_VIEW });
+
+    const table = page.getByRole("table", { name: "Payment history" });
+    await expect(table.locator("thead")).toBeHidden();
+    const amountLabel = await table
+      .locator("td[data-label='Amount']")
+      .first()
+      .evaluate((cell) => getComputedStyle(cell, "::before").content);
+    expect(amountLabel).toBe('"Amount"');
+  });
+
+  test("con la red caída lo dice y vuelve a pedir al reintentar", async ({
+    page,
+  }) => {
+    // La red falla hasta que se pulsa reintentar. Contar peticiones no
+    // sirve: en desarrollo React monta el efecto dos veces.
+    let isNetworkDown = true;
+    await page.route(
+      (url) => url.pathname === MEMBERSHIP_ENDPOINT,
+      (route) =>
+        isNetworkDown
+          ? route.abort("internetdisconnected")
+          : route.fulfill(jsonBody(ACTIVE_MEMBERSHIP_VIEW)),
+    );
+    await page.goto(`${APP_URL}${PAYMENTS_SCREEN_PATH}`);
+
+    // Sólo el de la pantalla: el anunciador de rutas de Next también es un
+    // alert.
+    await expect(
+      page.locator(".admin-load-failure").getByRole("alert"),
+    ).toBeVisible();
+    await expectNoAxeViolations(page);
+    isNetworkDown = false;
+    await page.getByRole("button", { name: "Try again" }).click();
+
+    await expect(
+      page.getByRole("button", { name: "Update card" }),
+    ).toBeVisible();
+  });
+});
 test.describe("calendario en el navegador", () => {
   skipWithoutSession();
   quietNotificationBell();

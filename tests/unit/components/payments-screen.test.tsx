@@ -1,16 +1,21 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PaymentsScreen } from "@/components/payments/PaymentsScreen";
 import type { Locale } from "@/lib/i18n/locale";
 import type { CheckoutReturn } from "@/lib/membership/checkout-return";
-import type { MembershipView } from "@/lib/membership/membership-view";
+import type {
+  MembershipPanelView,
+  MembershipView,
+  PaymentView,
+} from "@/lib/membership/membership-view";
 
 /**
- * Pagos con el alta en Stripe (#454, RF-3 del PRD de E12): la explicación
- * del plan y el mes de prueba, "Añadir tarjeta", la espera del webhook al
- * volver de Checkout y los fallos. Lo que la pantalla pide pasa por los dos
- * endpoints de la membresía, doblados aquí con `fetch`.
+ * Pagos (#454, #455; RF-3, RF-5 y RF-7 del PRD de E12): el panel de la
+ * membresía con su chip de estado, el próximo cobro y la tarjeta, el cambio
+ * de tarjeta en Stripe, el historial, y el alta en Checkout de quien aún no
+ * puso tarjeta. Lo que la pantalla pide pasa por los endpoints de la
+ * membresía, doblados aquí con `fetch`.
  */
 
 const openCheckout = vi.fn();
@@ -18,23 +23,77 @@ vi.mock("@/components/payments/checkout-navigation", () => ({
   openCheckout: (url: string) => openCheckout(url),
 }));
 
+const MEMBERSHIP_PATH = "/api/v1/membership";
+const CHECKOUT_PATH = "/api/v1/membership/checkout";
+const CARD_PATH = "/api/v1/membership/card";
 const CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_123";
+const SETUP_URL = "https://checkout.stripe.com/c/pay/cs_test_setup";
 const TRIAL_END = "2026-11-01T09:00:00.000Z";
+const PERIOD_END = "2026-07-01T09:00:00.000Z";
 const POLL_TIMEOUT_MS = 30_000;
+const VISA = { brand: "visa", last4: "4242", expMonth: 8, expYear: 2028 };
+const MASTERCARD = {
+  brand: "mastercard",
+  last4: "4444",
+  expMonth: 3,
+  expYear: 2031,
+};
 
-function view(
-  membership: MembershipView["membership"],
-  paymentsConfigured = true,
-): MembershipView {
-  return { paymentsConfigured, membership };
+function panel(change: Partial<MembershipPanelView> = {}): MembershipPanelView {
+  return {
+    plan: "Full",
+    status: "active",
+    monthlyPriceCents: 4500,
+    trialEnd: null,
+    nextChargeAt: PERIOD_END,
+    card: VISA,
+    waiver: null,
+    ...change,
+  };
 }
 
-const PENDING_FULL = view({ plan: "Full", status: "pending", trialEnd: null });
-const TRIALING_FULL = view({
-  plan: "Full",
-  status: "trialing",
-  trialEnd: TRIAL_END,
-});
+function view(
+  membership: MembershipPanelView | null,
+  change: Partial<Omit<MembershipView, "membership">> = {},
+): MembershipView {
+  return { paymentsConfigured: true, membership, payments: [], ...change };
+}
+
+const ACTIVE_FULL = view(panel());
+const PENDING_FULL = view(
+  panel({ status: "pending", nextChargeAt: null, card: null }),
+);
+const TRIALING_FULL = view(
+  panel({ status: "trialing", trialEnd: TRIAL_END, nextChargeAt: TRIAL_END }),
+);
+const PAST_DUE_FULL = view(panel({ status: "past_due", nextChargeAt: null }));
+const CANCELLED_FULL = view(
+  panel({ status: "cancelled", nextChargeAt: null, trialEnd: TRIAL_END }),
+);
+
+const PAYMENTS: readonly PaymentView[] = [
+  {
+    id: "pay-jun",
+    date: "2026-06-01T09:00:00.000Z",
+    description: "Monthly membership",
+    amountCents: 4500,
+    status: "paid",
+  },
+  {
+    id: "pay-may",
+    date: "2026-05-01T09:00:00.000Z",
+    description: null,
+    amountCents: 4500,
+    status: "failed",
+  },
+  {
+    id: "pay-apr",
+    date: "2026-04-12T09:00:00.000Z",
+    description: "Nationals levy",
+    amountCents: 8000,
+    status: "pending",
+  },
+];
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -43,40 +102,75 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+function serviceUnavailable(): Response {
+  return jsonResponse(
+    {
+      error: {
+        code: "service_unavailable",
+        message: "Stripe no contesta.",
+        reason: "stripe_unavailable",
+      },
+    },
+    503,
+  );
+}
+
 type FetchRoutes = {
-  readonly membership?: () => Response;
+  readonly membership?: () => Response | Promise<Response>;
   readonly checkout?: () => Response | Promise<Response>;
+  readonly card?: () => Response | Promise<Response>;
 };
 
 function stubFetch(routes: FetchRoutes): ReturnType<typeof vi.fn> {
+  const handlers: Record<
+    string,
+    (() => Response | Promise<Response>) | undefined
+  > = {
+    [MEMBERSHIP_PATH]: routes.membership,
+    [CHECKOUT_PATH]: routes.checkout,
+    [CARD_PATH]: routes.card,
+  };
   const fetchDouble = vi.fn(async (input: RequestInfo | URL) => {
     const path = String(input);
-    if (path === "/api/v1/membership/checkout" && routes.checkout) {
-      return routes.checkout();
+    const handler = handlers[path];
+    if (handler === undefined) {
+      throw new Error(`petición inesperada a ${path}`);
     }
-    if (path === "/api/v1/membership" && routes.membership) {
-      return routes.membership();
-    }
-    throw new Error(`petición inesperada a ${path}`);
+    return handler();
   });
   vi.stubGlobal("fetch", fetchDouble);
   return fetchDouble;
 }
 
-function renderScreen(
-  initialView: MembershipView,
-  options: {
-    readonly locale?: Locale;
-    readonly checkoutReturn?: CheckoutReturn | null;
-  } = {},
-): void {
+type RenderOptions = {
+  readonly locale?: Locale;
+  readonly checkoutReturn?: CheckoutReturn | null;
+  readonly cardReturn?: CheckoutReturn | null;
+};
+
+function renderScreen(options: RenderOptions = {}): void {
   render(
     <PaymentsScreen
       locale={options.locale ?? "en"}
-      initialView={initialView}
       checkoutReturn={options.checkoutReturn ?? null}
+      cardReturn={options.cardReturn ?? null}
     />,
   );
+}
+
+/** Pinta la pantalla con la membresía que sirve el endpoint, y espera a que
+ * llegue. */
+async function renderLoaded(
+  loaded: MembershipView,
+  options: RenderOptions & { readonly routes?: FetchRoutes } = {},
+): Promise<ReturnType<typeof vi.fn>> {
+  const fetchDouble = stubFetch({
+    membership: () => jsonResponse({ data: loaded }),
+    ...options.routes,
+  });
+  renderScreen(options);
+  await screen.findByRole("heading", { level: 2, name: /history|Historial/ });
+  return fetchDouble;
 }
 
 function countCalls(
@@ -85,6 +179,11 @@ function countCalls(
 ): number {
   return fetchDouble.mock.calls.filter(([input]) => String(input) === path)
     .length;
+}
+
+/** La tarjeta "Plan actual" del mockup, donde vive el chip de estado. */
+function statusChip(): HTMLElement {
+  return screen.getByRole("region", { name: /^(Current plan|Plan actual)$/ });
 }
 
 beforeEach(() => {
@@ -96,42 +195,397 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("PaymentsScreen: socio pendiente", () => {
-  it("explica el plan, el precio, el mes gratis y el primer cobro en 30 días", () => {
-    renderScreen(PENDING_FULL);
+describe("PaymentsScreen: carga", () => {
+  it("se titula Pagos y dice que carga mientras el endpoint contesta", () => {
+    stubFetch({ membership: () => new Promise<Response>(() => undefined) });
+
+    renderScreen();
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Payments" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Full membership/)).toHaveTextContent("$45.00");
+    expect(screen.getByRole("status")).toHaveTextContent(/Loading/);
+  });
+
+  it("dice el fallo de red y vuelve a pedir la membresía al reintentar", async () => {
+    let attempts = 0;
+    stubFetch({
+      membership: () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new TypeError("Failed to fetch");
+        }
+        return jsonResponse({ data: ACTIVE_FULL });
+      },
+    });
+    renderScreen();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't reach the server",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByText("Full membership")).toBeInTheDocument();
+  });
+
+  it("dice en español que no pudo cargar la membresía", async () => {
+    stubFetch({ membership: () => jsonResponse({}, 500) });
+
+    renderScreen({ locale: "es" });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "No pudimos cargar tu membresía",
+    );
+    expect(screen.getByRole("button", { name: "Reintentar" })).toBeEnabled();
+  });
+});
+
+describe("PaymentsScreen: plan actual", () => {
+  it("enseña el plan, el precio mensual, el próximo cobro y la tarjeta", async () => {
+    await renderLoaded(ACTIVE_FULL);
+
+    const plan = screen.getByRole("region", { name: "Current plan" });
+    expect(within(plan).getByText("Full membership")).toBeInTheDocument();
+    expect(within(plan).getByText("$45.00 a month")).toBeInTheDocument();
+    expect(
+      within(plan).getByText("Next charge 1 July 2026"),
+    ).toBeInTheDocument();
+    expect(
+      within(plan).getByText("Visa ending in 4242, expires 08/2028"),
+    ).toBeInTheDocument();
+  });
+
+  it.each<[string, MembershipView, string]>([
+    ["activa", ACTIVE_FULL, "Active"],
+    ["en prueba", TRIALING_FULL, "On trial until 1 November 2026"],
+    ["con cobro fallido", PAST_DUE_FULL, "Payment failed"],
+    ["cancelada", CANCELLED_FULL, "Cancelled"],
+    [
+      "exenta",
+      view(
+        panel({ status: "waived", waiver: { reason: "Coach", until: null } }),
+      ),
+      "Waived",
+    ],
+  ])("pone el chip de una membresía %s", async (_name, loaded, chip) => {
+    await renderLoaded(loaded);
+
+    expect(statusChip()).toHaveTextContent(chip);
+  });
+
+  it("pone los chips en español", async () => {
+    await renderLoaded(TRIALING_FULL, { locale: "es" });
+
+    expect(statusChip()).toHaveTextContent(
+      "En prueba hasta el día 1 de noviembre de 2026",
+    );
+    expect(screen.getByText("Membresía Full")).toBeInTheDocument();
+    expect(screen.getByText("45,00 AUD al mes")).toBeInTheDocument();
+    expect(
+      screen.getByText("Próximo cobro el 1 de noviembre de 2026"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Visa terminada en 4242, caduca 08/2028"),
+    ).toBeInTheDocument();
+  });
+
+  it("dice Sin cobro recurrente a un Casual en vez del próximo cobro", async () => {
+    await renderLoaded(
+      view(
+        panel({
+          plan: "Casual",
+          monthlyPriceCents: null,
+          nextChargeAt: null,
+          card: null,
+          status: "waived",
+          waiver: { reason: "Volunteer", until: null },
+        }),
+      ),
+    );
+
+    expect(screen.getByText("No recurring charge")).toBeInTheDocument();
+    expect(screen.queryByText(/a month/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Next charge/)).not.toBeInTheDocument();
+  });
+
+  it("lo dice en español", async () => {
+    await renderLoaded(
+      view(
+        panel({
+          plan: "Casual",
+          monthlyPriceCents: null,
+          nextChargeAt: null,
+          card: null,
+          status: "waived",
+          waiver: { reason: "Voluntaria", until: null },
+        }),
+      ),
+      { locale: "es" },
+    );
+
+    expect(screen.getByText("Sin cobro recurrente")).toBeInTheDocument();
+  });
+});
+
+describe("PaymentsScreen: exenta", () => {
+  const WAIVED = view(
+    panel({
+      status: "waived",
+      nextChargeAt: null,
+      waiver: { reason: "Head coach", until: "2027-01-31T13:00:00.000Z" },
+    }),
+  );
+
+  it("enseña el motivo y la fecha de fin, sin ningún botón de tarjeta", async () => {
+    await renderLoaded(WAIVED);
+
+    expect(screen.getByText("Reason: Head coach")).toBeInTheDocument();
+    expect(screen.getByText("Until 1 February 2027")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /card|subscribe/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("no pone fecha a una exención que no vence", async () => {
+    await renderLoaded(
+      view(
+        panel({ status: "waived", waiver: { reason: "Coach", until: null } }),
+      ),
+    );
+
+    expect(screen.queryByText(/^Until/)).not.toBeInTheDocument();
+  });
+
+  it("lo dice en español", async () => {
+    await renderLoaded(WAIVED, { locale: "es" });
+
+    expect(statusChip()).toHaveTextContent("Exenta");
+    expect(screen.getByText("Motivo: Head coach")).toBeInTheDocument();
+    expect(
+      screen.getByText("Hasta el 1 de febrero de 2027"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("PaymentsScreen: actualizar la tarjeta", () => {
+  it("lleva a Stripe con la dirección que responde el endpoint de la tarjeta", async () => {
+    const fetchDouble = await renderLoaded(ACTIVE_FULL, {
+      routes: { card: () => jsonResponse({ data: { url: SETUP_URL } }) },
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Update card" }));
+
+    await waitFor(() => expect(openCheckout).toHaveBeenCalledWith(SETUP_URL));
+    expect(fetchDouble).toHaveBeenCalledWith(
+      CARD_PATH,
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("ofrece reintentar cuando Stripe no contesta", async () => {
+    await renderLoaded(ACTIVE_FULL, { routes: { card: serviceUnavailable } });
+
+    await userEvent.click(screen.getByRole("button", { name: "Update card" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't open Stripe",
+    );
+    expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+    expect(openCheckout).not.toHaveBeenCalled();
+  });
+
+  it("explica a quien tiene un cobro fallido que la puerta está cerrada y le ofrece la tarjeta", async () => {
+    await renderLoaded(PAST_DUE_FULL);
+
+    expect(
+      screen.getByText("Your last payment didn't go through."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/you only see your profile, Payments and the calendar/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Update card" }),
+    ).toBeInTheDocument();
+  });
+
+  it("ofrece la tarjeta a quien tiene un cobro fallido aunque no se sepa cuál tenía", async () => {
+    await renderLoaded(
+      view(panel({ status: "past_due", nextChargeAt: null, card: null })),
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Update card" }),
+    ).toBeInTheDocument();
+  });
+
+  it("lo dice en español", async () => {
+    await renderLoaded(PAST_DUE_FULL, { locale: "es" });
+
+    expect(statusChip()).toHaveTextContent("Pago fallido");
+    expect(
+      screen.getByText("Tu último pago no se pudo cobrar."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Actualizar tarjeta" }),
+    ).toBeInTheDocument();
+  });
+
+  it("no ofrece la tarjeta si los pagos no están configurados", async () => {
+    await renderLoaded({ ...ACTIVE_FULL, paymentsConfigured: false });
+
+    expect(
+      screen.queryByRole("button", { name: "Update card" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("al volver de Stripe espera la tarjeta nueva y la enseña", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let answers = 0;
+    stubFetch({
+      membership: () => {
+        answers += 1;
+        const card = answers < 3 ? VISA : MASTERCARD;
+        return jsonResponse({ data: view(panel({ card })) });
+      },
+    });
+    renderScreen({ cardReturn: "ok" });
+
+    expect(
+      await screen.findByText(/new card is saved in Stripe/),
+    ).toHaveAttribute("role", "status");
+    await act(() => vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS / 2));
+
+    expect(
+      screen.getByText("Mastercard ending in 4444, expires 03/2031"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("dice que salió de Stripe sin cambiar la tarjeta", async () => {
+    await renderLoaded(ACTIVE_FULL, { cardReturn: "cancelado" });
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /without changing your card/,
+    );
+  });
+});
+
+describe("PaymentsScreen: cancelada", () => {
+  it("explica la puerta cerrada y ofrece volver a suscribirse por Checkout", async () => {
+    const fetchDouble = await renderLoaded(CANCELLED_FULL, {
+      routes: { checkout: () => jsonResponse({ data: { url: CHECKOUT_URL } }) },
+    });
+
+    expect(
+      screen.getByText("Your membership is cancelled."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Update card" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Subscribe again" }),
+    );
+
+    await waitFor(() =>
+      expect(openCheckout).toHaveBeenCalledWith(CHECKOUT_URL),
+    );
+    expect(countCalls(fetchDouble, CHECKOUT_PATH)).toBe(1);
+  });
+
+  it("lo dice en español", async () => {
+    await renderLoaded(CANCELLED_FULL, { locale: "es" });
+
+    expect(statusChip()).toHaveTextContent("Cancelada");
+    expect(
+      screen.getByRole("button", { name: "Volver a suscribirse" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("PaymentsScreen: historial", () => {
+  it("pinta cada pago con su fecha, descripción, importe y estado, en el orden servido", async () => {
+    await renderLoaded(view(panel(), { payments: PAYMENTS }));
+
+    const table = screen.getByRole("table", { name: "Payment history" });
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "1 June 2026Monthly membership$45.00Paid",
+      "1 May 2026Membership payment$45.00Failed",
+      "12 April 2026Nationals levy$80.00Pending",
+    ]);
+  });
+
+  it("escribe fechas, importes y estados en español", async () => {
+    await renderLoaded(view(panel(), { payments: PAYMENTS }), {
+      locale: "es",
+    });
+
+    const table = screen.getByRole("table", { name: "Historial de pagos" });
+    const [, firstRow, secondRow] = within(table).getAllByRole("row");
+    expect(firstRow).toHaveTextContent("1 de junio de 2026");
+    expect(firstRow).toHaveTextContent("45,00 AUD");
+    expect(firstRow).toHaveTextContent("Pagado");
+    expect(secondRow).toHaveTextContent("Pago de membresía");
+    expect(secondRow).toHaveTextContent("Fallido");
+  });
+
+  it("dice que no hay pagos cuando el historial está vacío", async () => {
+    await renderLoaded(ACTIVE_FULL);
+
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getByText("No payments yet.")).toBeInTheDocument();
+  });
+
+  it("lo dice en español", async () => {
+    await renderLoaded(ACTIVE_FULL, { locale: "es" });
+
+    expect(screen.getByText("Todavía no hay pagos.")).toBeInTheDocument();
+  });
+});
+
+describe("PaymentsScreen: socio pendiente", () => {
+  it("explica el plan, el precio, el mes gratis y el primer cobro en 30 días", async () => {
+    await renderLoaded(PENDING_FULL);
+
+    expect(screen.getByText("Full membership")).toBeInTheDocument();
+    expect(screen.getByText("$45.00 a month")).toBeInTheDocument();
     expect(screen.getByText(/first month is free/)).toHaveTextContent(
       "30 days",
     );
     expect(
       screen.getByRole("button", { name: "Add card" }),
     ).toBeInTheDocument();
+    expect(statusChip()).toHaveTextContent("Pending");
   });
 
-  it("lo dice en español", () => {
-    renderScreen(view({ plan: "Student", status: "pending", trialEnd: null }), {
-      locale: "es",
-    });
+  it("lo dice en español", async () => {
+    await renderLoaded(
+      view(
+        panel({
+          plan: "Student",
+          monthlyPriceCents: 3200,
+          status: "pending",
+          nextChargeAt: null,
+          card: null,
+        }),
+      ),
+      { locale: "es" },
+    );
 
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Pagos" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/Membresía Student/)).toHaveTextContent("32,00");
+    expect(screen.getByText("Membresía Student")).toBeInTheDocument();
+    expect(screen.getByText("32,00 AUD al mes")).toBeInTheDocument();
     expect(screen.getByText(/primer mes es gratis/)).toHaveTextContent(
       "30 días",
     );
+    expect(statusChip()).toHaveTextContent("Pendiente");
     expect(
       screen.getByRole("button", { name: "Añadir tarjeta" }),
     ).toBeInTheDocument();
   });
 
-  it("no promete el mes gratis a quien ya lo tuvo", () => {
-    renderScreen(
-      view({ plan: "Full", status: "pending", trialEnd: TRIAL_END }),
+  it("no promete el mes gratis a quien ya lo tuvo", async () => {
+    await renderLoaded(
+      view(panel({ status: "pending", trialEnd: TRIAL_END, card: null })),
     );
 
     expect(screen.queryByText(/first month is free/)).not.toBeInTheDocument();
@@ -139,10 +593,9 @@ describe("PaymentsScreen: socio pendiente", () => {
   });
 
   it("lleva a Stripe con la dirección que responde el endpoint", async () => {
-    const fetchDouble = stubFetch({
-      checkout: () => jsonResponse({ data: { url: CHECKOUT_URL } }),
+    const fetchDouble = await renderLoaded(PENDING_FULL, {
+      routes: { checkout: () => jsonResponse({ data: { url: CHECKOUT_URL } }) },
     });
-    renderScreen(PENDING_FULL);
 
     await userEvent.click(screen.getByRole("button", { name: "Add card" }));
 
@@ -150,16 +603,15 @@ describe("PaymentsScreen: socio pendiente", () => {
       expect(openCheckout).toHaveBeenCalledWith(CHECKOUT_URL),
     );
     expect(fetchDouble).toHaveBeenCalledWith(
-      "/api/v1/membership/checkout",
+      CHECKOUT_PATH,
       expect.objectContaining({ method: "POST" }),
     );
   });
 
   it("vuelve a ofrecer la tarjeta si el socio regresa de Stripe con Atrás", async () => {
-    stubFetch({
-      checkout: () => jsonResponse({ data: { url: CHECKOUT_URL } }),
+    await renderLoaded(PENDING_FULL, {
+      routes: { checkout: () => jsonResponse({ data: { url: CHECKOUT_URL } }) },
     });
-    renderScreen(PENDING_FULL);
     await userEvent.click(screen.getByRole("button", { name: "Add card" }));
     await waitFor(() => expect(openCheckout).toHaveBeenCalled());
     const restoredFromCache = new Event("pageshow");
@@ -173,34 +625,22 @@ describe("PaymentsScreen: socio pendiente", () => {
   });
 
   it("pide una sola sesión ante un doble toque", async () => {
-    const fetchDouble = stubFetch({
-      checkout: () => new Promise<Response>(() => undefined),
+    const fetchDouble = await renderLoaded(PENDING_FULL, {
+      routes: { checkout: () => new Promise<Response>(() => undefined) },
     });
-    renderScreen(PENDING_FULL);
 
     await userEvent.dblClick(screen.getByRole("button", { name: "Add card" }));
 
-    expect(countCalls(fetchDouble, "/api/v1/membership/checkout")).toBe(1);
+    expect(countCalls(fetchDouble, CHECKOUT_PATH)).toBe(1);
     expect(
       screen.getByRole("button", { name: /Opening Stripe/ }),
     ).toBeDisabled();
   });
 
   it("ofrece reintentar cuando Stripe no contesta", async () => {
-    stubFetch({
-      checkout: () =>
-        jsonResponse(
-          {
-            error: {
-              code: "service_unavailable",
-              message: "Stripe no contesta.",
-              reason: "stripe_unavailable",
-            },
-          },
-          503,
-        ),
+    await renderLoaded(PENDING_FULL, {
+      routes: { checkout: serviceUnavailable },
     });
-    renderScreen(PENDING_FULL);
 
     await userEvent.click(screen.getByRole("button", { name: "Add card" }));
 
@@ -212,13 +652,14 @@ describe("PaymentsScreen: socio pendiente", () => {
   });
 
   it("dice el error de red en español y ofrece reintentar", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        throw new TypeError("Failed to fetch");
-      }),
-    );
-    renderScreen(PENDING_FULL, { locale: "es" });
+    await renderLoaded(PENDING_FULL, {
+      locale: "es",
+      routes: {
+        checkout: () => {
+          throw new TypeError("Failed to fetch");
+        },
+      },
+    });
 
     await userEvent.click(
       screen.getByRole("button", { name: "Añadir tarjeta" }),
@@ -230,8 +671,8 @@ describe("PaymentsScreen: socio pendiente", () => {
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeEnabled();
   });
 
-  it("sigue ofreciendo la tarjeta a quien canceló en Checkout", () => {
-    renderScreen(PENDING_FULL, { checkoutReturn: "cancelado" });
+  it("sigue ofreciendo la tarjeta a quien canceló en Checkout", async () => {
+    await renderLoaded(PENDING_FULL, { checkoutReturn: "cancelado" });
 
     expect(screen.getByRole("status")).toHaveTextContent(
       /without adding a card/,
@@ -241,19 +682,27 @@ describe("PaymentsScreen: socio pendiente", () => {
     ).toBeInTheDocument();
   });
 
-  it("dice que los pagos no están configurados y no ofrece la tarjeta", () => {
-    renderScreen(
-      view({ plan: "Full", status: "pending", trialEnd: null }, false),
-    );
+  it("dice que los pagos no están configurados y no ofrece la tarjeta", async () => {
+    await renderLoaded({ ...PENDING_FULL, paymentsConfigured: false });
 
     expect(screen.getByText(/Payments aren't set up yet/)).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });
 
-describe("PaymentsScreen: Casual", () => {
-  it("dice que los packs llegan más adelante y que un Admin puede activarlo, sin Checkout", () => {
-    renderScreen(view({ plan: "Casual", status: "pending", trialEnd: null }));
+describe("PaymentsScreen: Casual pendiente", () => {
+  const PENDING_CASUAL = view(
+    panel({
+      plan: "Casual",
+      status: "pending",
+      monthlyPriceCents: null,
+      nextChargeAt: null,
+      card: null,
+    }),
+  );
+
+  it("dice que los packs llegan más adelante y que un Admin puede activarlo, sin Checkout", async () => {
+    await renderLoaded(PENDING_CASUAL);
 
     expect(screen.getByText(/session packs/)).toHaveTextContent(
       "an Admin can activate",
@@ -261,10 +710,8 @@ describe("PaymentsScreen: Casual", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("lo dice en español", () => {
-    renderScreen(view({ plan: "Casual", status: "pending", trialEnd: null }), {
-      locale: "es",
-    });
+  it("lo dice en español", async () => {
+    await renderLoaded(PENDING_CASUAL, { locale: "es" });
 
     expect(screen.getByText(/packs de sesiones/)).toHaveTextContent(
       "un Admin puede activar",
@@ -277,15 +724,36 @@ describe("PaymentsScreen: vuelta de Checkout", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
 
-  it("enseña la prueba en cuanto el webhook llegó", () => {
-    renderScreen(TRIALING_FULL, { checkoutReturn: "ok" });
+  it("enseña la prueba en cuanto el webhook llegó", async () => {
+    await renderLoaded(TRIALING_FULL, { checkoutReturn: "ok" });
 
-    expect(screen.getByText(/On trial until/)).toHaveTextContent(
-      "1 November 2026",
-    );
+    expect(statusChip()).toHaveTextContent("1 November 2026");
   });
 
   it("dice que espera a Stripe y vuelve a consultar hasta que llega la prueba", async () => {
+    let answers = 0;
+    stubFetch({
+      membership: () => {
+        answers += 1;
+        return jsonResponse({
+          data: answers < 3 ? PENDING_FULL : TRIALING_FULL,
+        });
+      },
+    });
+    renderScreen({ checkoutReturn: "ok" });
+
+    expect(await screen.findByText(/waiting for Stripe/)).toHaveAttribute(
+      "role",
+      "status",
+    );
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+
+    await act(() => vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS / 2));
+
+    expect(statusChip()).toHaveTextContent("On trial until 1 November 2026");
+  });
+
+  it("lo dice en español", async () => {
     let answers = 0;
     stubFetch({
       membership: () => {
@@ -295,64 +763,60 @@ describe("PaymentsScreen: vuelta de Checkout", () => {
         });
       },
     });
-    renderScreen(PENDING_FULL, { checkoutReturn: "ok" });
+    renderScreen({ locale: "es", checkoutReturn: "ok" });
 
-    expect(screen.getByRole("status")).toHaveTextContent(/waiting for Stripe/);
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(/esperando la confirmación de Stripe/),
+    ).toHaveAttribute("role", "status");
 
     await act(() => vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS / 2));
 
-    expect(screen.getByText(/On trial until/)).toHaveTextContent(
-      "1 November 2026",
+    expect(statusChip()).toHaveTextContent(
+      "En prueba hasta el día 1 de noviembre de 2026",
     );
   });
 
-  it("lo dice en español", async () => {
-    stubFetch({ membership: () => jsonResponse({ data: TRIALING_FULL }) });
-    renderScreen(PENDING_FULL, { locale: "es", checkoutReturn: "ok" });
+  it("al volver de suscribirse otra vez espera a Stripe sin ofrecer otra suscripción", async () => {
+    let answers = 0;
+    stubFetch({
+      membership: () => {
+        answers += 1;
+        return jsonResponse({
+          data: answers < 3 ? CANCELLED_FULL : ACTIVE_FULL,
+        });
+      },
+    });
+    renderScreen({ checkoutReturn: "ok" });
 
-    expect(screen.getByRole("status")).toHaveTextContent(
-      /esperando la confirmación de Stripe/,
+    expect(await screen.findByText(/waiting for Stripe/)).toHaveAttribute(
+      "role",
+      "status",
     );
+    expect(
+      screen.queryByRole("button", { name: "Subscribe again" }),
+    ).not.toBeInTheDocument();
 
     await act(() => vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS / 2));
 
-    expect(screen.getByText(/En prueba hasta el día/)).toHaveTextContent(
-      "1 de noviembre de 2026",
-    );
+    expect(statusChip()).toHaveTextContent("Active");
+    expect(screen.queryByText(/waiting for Stripe/)).not.toBeInTheDocument();
   });
 
   it("deja de consultar a los 30 segundos y lo dice", async () => {
     const fetchDouble = stubFetch({
       membership: () => jsonResponse({ data: PENDING_FULL }),
     });
-    renderScreen(PENDING_FULL, { checkoutReturn: "ok" });
+    renderScreen({ checkoutReturn: "ok" });
+    await screen.findByText(/waiting for Stripe/);
 
     await act(() => vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS));
-    const callsAtTimeout = countCalls(fetchDouble, "/api/v1/membership");
+    const callsAtTimeout = countCalls(fetchDouble, MEMBERSHIP_PATH);
     await act(() => vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS));
 
-    expect(callsAtTimeout).toBeGreaterThan(1);
-    expect(countCalls(fetchDouble, "/api/v1/membership")).toBe(callsAtTimeout);
+    expect(callsAtTimeout).toBeGreaterThan(2);
+    expect(countCalls(fetchDouble, MEMBERSHIP_PATH)).toBe(callsAtTimeout);
     expect(screen.getByRole("status")).toHaveTextContent(
       /hasn't confirmed yet/,
     );
-  });
-});
-
-describe("PaymentsScreen: otros estados", () => {
-  it("no ofrece la tarjeta a quien está al día", () => {
-    renderScreen(view({ plan: "Full", status: "active", trialEnd: null }));
-
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
-    expect(screen.getByText(/under construction/)).toBeInTheDocument();
-  });
-
-  it("sigue diciendo el motivo de un cobro fallido", () => {
-    renderScreen(view({ plan: "Full", status: "past_due", trialEnd: null }));
-
-    expect(
-      screen.getByText("Your last payment didn't go through."),
-    ).toBeInTheDocument();
   });
 });

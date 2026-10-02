@@ -3,10 +3,7 @@ import type { NextRequest } from "next/server";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
 import { createStripeWebhookGateway } from "@/lib/membership/supabase-membership-gateways";
-import {
-  createStripeReader,
-  createStripeSetup,
-} from "@/lib/stripe/stripe-client";
+import { createStripeApi, createStripeSetup } from "@/lib/stripe/stripe-client";
 import {
   type StripeWebhookOutcome,
   handleStripeEvent,
@@ -76,7 +73,7 @@ const receiveStripeWebhook = createApiRoute<StripeWebhookReceipt>({
     const event = await verifyEvent(request, stripe);
     const outcome = await handleStripeEvent(event, {
       gateway: createStripeWebhookGateway(createServiceRoleClient(process.env)),
-      stripe: createStripeReader(stripe.client),
+      stripe: createStripeApi(stripe.client),
       prices: stripe.prices,
       now: new Date(),
       log: (line) => console.warn(line),
