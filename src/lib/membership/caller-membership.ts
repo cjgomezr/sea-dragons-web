@@ -1,25 +1,23 @@
 import { cache } from "react";
 import { readCallerId } from "@/lib/auth/caller-role";
 import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
+import { isStripeConfigured } from "@/lib/stripe/stripe-client";
 import { readServerCookies } from "@/lib/supabase/server-cookies";
 import { createSessionClient } from "@/lib/supabase/session-client";
-import {
-  type MembershipBlock,
-  membershipBlockOf,
-  readMembership,
-} from "./membership";
+import { readMembership } from "./membership";
+import { type MembershipView, toMembershipView } from "./membership-view";
 import { createMembershipGateway } from "./supabase-membership-gateways";
 
 /**
- * Por qué la puerta de socio está cerrada para quien pide la pantalla, o
- * `null` si está al día (#453). Lo lee Pagos para decir el motivo.
+ * La membresía de quien pide Pagos, tal como la pinta la pantalla (#453,
+ * #454): el motivo de la puerta cerrada, el plan y la prueba.
  *
  * Va con el cliente de la sesión y no con la llave de servicio:
  * `memberships_select_own` deja a cada socio leer su propia membresía, que
  * es la única que se pide.
  */
-export const readCallerMembershipBlock = cache(
-  async (): Promise<MembershipBlock | null> => {
+export const readCallerMembershipView = cache(
+  async (): Promise<MembershipView> => {
     const session = createSessionClient(process.env, await readServerCookies());
     if (session.kind === "unconfigured") {
       throw new Error(describeMissingAuthKeys(session.missingKeys));
@@ -28,6 +26,6 @@ export const readCallerMembershipBlock = cache(
       createMembershipGateway(session.client),
       { userId: await readCallerId(), now: new Date() },
     );
-    return membershipBlockOf(reading);
+    return toMembershipView(reading, isStripeConfigured(process.env));
   },
 );

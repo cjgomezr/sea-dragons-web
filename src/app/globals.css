@@ -4652,6 +4652,34 @@ button.notification-item-content:hover {
   font-weight: 600;
 }
 
+/* Pagos (#454): el aviso de la puerta y, debajo, la oferta de Checkout. */
+.payments-pending {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 40rem;
+}
+
+.payments-offer {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  padding: var(--space-4);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.payments-offer p,
+.payments-status,
+.payments-trial {
+  margin: 0;
+}
+
+.payments-plan,
+.payments-trial {
+  font-weight: 600;
+}
+
 /* Lo que se desplaza es el cuerpo, no el diálogo: el título y su cierre se
    quedan arriba, y los botones abajo (ver `.event-form-actions`). */
 .event-dialog {

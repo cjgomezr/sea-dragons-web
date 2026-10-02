@@ -3,8 +3,13 @@ import type Stripe from "stripe";
 import { PAYMENTS_PATH } from "@/lib/auth/routes";
 import type { StripePrices } from "@/lib/stripe/webhook-events";
 import {
+  CHECKOUT_RETURN_QUERY_PARAM,
+  type CheckoutReturn,
+} from "./checkout-return";
+import {
   type Membership,
   type MembershipGateway,
+  type RecurringPlan,
   isMembershipCurrent,
   readMembership,
 } from "./membership";
@@ -18,12 +23,6 @@ import {
 
 /** El mes de prueba de D3: el primer cobro es el día 31. */
 export const TRIAL_PERIOD_DAYS = 30;
-
-/** Con qué vuelve el socio de Checkout a Pagos, para que la pantalla sepa si
- * tiene que esperar al webhook. */
-export const CHECKOUT_RETURN_QUERY_PARAM = "checkout";
-export const CHECKOUT_RETURN_VALUES = ["ok", "cancelado"] as const;
-export type CheckoutReturn = (typeof CHECKOUT_RETURN_VALUES)[number];
 
 /** Un doble toque llega dentro de esta ventana y recibe la misma sesión:
  * Stripe devuelve la respuesta guardada para una misma llave de idempotencia.
@@ -79,11 +78,9 @@ export type CheckoutRequest = {
   readonly now: Date;
 };
 
-type SubscribablePlan = "Full" | "Student";
-
 type Subscribable = {
   readonly membership: Membership;
-  readonly plan: SubscribablePlan;
+  readonly plan: RecurringPlan;
 };
 
 function checkSubscribable(

@@ -1,27 +1,32 @@
-import { MembershipNotice } from "@/components/MembershipNotice";
-import { SectionPlaceholder } from "@/components/SectionPlaceholder";
+import { PaymentsScreen } from "@/components/payments/PaymentsScreen";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
-import { createTranslator } from "@/lib/i18n/translator";
-import { readCallerMembershipBlock } from "@/lib/membership/caller-membership";
+import { readCallerMembershipView } from "@/lib/membership/caller-membership";
+import {
+  CHECKOUT_RETURN_QUERY_PARAM,
+  readCheckoutReturn,
+} from "@/lib/membership/checkout-return";
 
-/** Pagos, todavía como marcador (#455 trae la pantalla). Es a donde la
- * frontera lleva a quien no tiene la membresía al día (#453), así que ya le
- * dice por qué. */
-export default async function PagosPage(): Promise<React.JSX.Element> {
-  const [locale, block] = await Promise.all([
+/** Pagos (#454): el alta en Stripe Checkout para quien no ha puesto tarjeta y
+ * la espera del webhook al volver. Es a donde la frontera lleva a quien no
+ * tiene la membresía al día (#453). La membresía se lee al pintar, para que
+ * la pantalla llegue ya con su estado; #455 completa el panel.
+ *
+ * `?checkout=ok` o `?checkout=cancelado` es con lo que vuelve de Stripe. */
+export default async function PagosPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<React.JSX.Element> {
+  const [locale, view, params] = await Promise.all([
     readRequestLocale(),
-    readCallerMembershipBlock(),
+    readCallerMembershipView(),
+    searchParams,
   ]);
   return (
-    <>
-      <SectionPlaceholder locale={locale} titleKey="nav.label.payments" />
-      {block === null ? null : (
-        <MembershipNotice
-          translate={createTranslator(locale)}
-          block={block}
-          linksToPayments={false}
-        />
-      )}
-    </>
+    <PaymentsScreen
+      locale={locale}
+      initialView={view}
+      checkoutReturn={readCheckoutReturn(params[CHECKOUT_RETURN_QUERY_PARAM])}
+    />
   );
 }

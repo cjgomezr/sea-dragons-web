@@ -109,6 +109,22 @@ export function formatPercent(locale: Locale, percent: number): string {
   return PERCENT_FORMATTERS[locale].format(percent / 100);
 }
 
+/** Los importes del club son en AUD (FR-062) y se guardan en centavos enteros
+ * (CON-005); sólo al pintarlos se convierten a unidades. */
+const AUD_FORMATTERS = formattersByLocale(
+  (displayLocale) =>
+    new Intl.NumberFormat(displayLocale, {
+      style: "currency",
+      currency: "AUD",
+    }),
+);
+
+const CENTS_PER_DOLLAR = 100;
+
+export function formatAudCents(locale: Locale, cents: number): string {
+  return AUD_FORMATTERS[locale].format(cents / CENTS_PER_DOLLAR);
+}
+
 /** Un instante del club (un entrenamiento, una solicitud), con fecha y hora de
  * Melbourne sea cual sea el idioma o la zona de quien lo mira. */
 export function formatClubMoment(locale: Locale, instant: Date): string {
