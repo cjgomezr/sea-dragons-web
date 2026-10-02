@@ -61,7 +61,7 @@ beforeEach(() => {
 describe("disposición de la aplicación", () => {
   // #292: la cabecera enseña la marca que guarda la base.
   it("pone en la cabecera el nombre guardado del club", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
     await renderAppLayout();
 
@@ -69,7 +69,7 @@ describe("disposición de la aplicación", () => {
   });
 
   it("dibuja la navegación de un Player sin Equipos, Evaluaciones ni Administración", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
     await renderAppLayout();
 
@@ -81,13 +81,24 @@ describe("disposición de la aplicación", () => {
   });
 
   it("dibuja la navegación de un Admin sin Administración, que vive en el directorio", async () => {
-    givenSession({ kind: "active", role: "Admin" });
+    givenSession({ kind: "active", role: "Admin", membershipCurrent: true });
 
     await renderAppLayout();
 
     const sidebar = screen.getByRole("navigation", { name: "Main" });
     expect(sidebar).toHaveTextContent("Groups");
     expect(sidebar).not.toHaveTextContent("Administration");
+  });
+
+  it("dibuja la navegación reducida de un Player que no está al día (#453)", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: false });
+
+    await renderAppLayout();
+
+    const sidebar = screen.getByRole("navigation", { name: "Main" });
+    expect(sidebar).toHaveTextContent("Payments");
+    expect(sidebar).not.toHaveTextContent("Directory");
+    expect(sidebar).not.toHaveTextContent("News");
   });
 
   it("manda a la entrada a quien ya no tiene sesión", async () => {

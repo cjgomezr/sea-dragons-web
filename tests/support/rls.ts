@@ -220,6 +220,28 @@ export async function withSeededRows<T>(
   );
 }
 
+/**
+ * Pone al día la membresía de un socio ya sembrado (#453): sin ella la
+ * frontera, el inicio y las audiencias vivas lo tratan como quien no pagó.
+ * No hace falta limpiarla: `memberships` cuelga de `members` en cascada, así
+ * que se va con la fila del socio.
+ */
+export async function seedCurrentMembership(
+  serviceClient: ServiceRoleClient,
+  member: { readonly clubId: string; readonly userId: string },
+): Promise<void> {
+  const { error } = await serviceClient.client.from("memberships").upsert({
+    club_id: member.clubId,
+    user_id: member.userId,
+    status: "active",
+  });
+  if (error) {
+    throw new Error(
+      `No se pudo poner al día la membresía de ${member.userId}: ${error.message}`,
+    );
+  }
+}
+
 export type RlsQueryError = {
   readonly code?: string;
   readonly message: string;

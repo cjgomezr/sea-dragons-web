@@ -1,5 +1,5 @@
 import { AgendaScreen } from "@/components/calendar/AgendaScreen";
-import { readCallerRole } from "@/lib/auth/caller-role";
+import { readCallerAccess } from "@/lib/auth/caller-role";
 import { hasCapability } from "@/lib/auth/roles";
 import {
   CALENDAR_EVENT_QUERY_PARAM,
@@ -15,7 +15,8 @@ import { readRequestLocale } from "@/lib/i18n/request-locale";
  * activa, así que la ruta no está en `RESTRICTED_ROUTES`: qué eventos ve cada
  * uno lo decide el endpoint de la agenda (#309), que es de donde lee la
  * pantalla. El rol sólo decide si se pinta "+ Evento" (#313) y "Pasar
- * lista" (#395).
+ * lista" (#395), y la membresía si el RSVP responde o sale deshabilitado
+ * (#453).
  *
  * `?evento=<id>` lleva el foco a la fila de ese evento, y `?periodo=past`
  * la busca entre los pasados: es a donde lleva un evento encontrado en la
@@ -48,9 +49,9 @@ export default async function CalendarioPage({
 }: {
   searchParams: Promise<SearchParams>;
 }): Promise<React.JSX.Element> {
-  const [locale, role, params] = await Promise.all([
+  const [locale, { role, membershipCurrent }, params] = await Promise.all([
     readRequestLocale(),
-    readCallerRole(),
+    readCallerAccess(),
     searchParams,
   ]);
   const focusEventId = readSingle(params[CALENDAR_EVENT_QUERY_PARAM]);
@@ -66,6 +67,7 @@ export default async function CalendarioPage({
       locale={locale}
       canManageEvents={canManageEvents}
       canTakeAttendance={hasCapability(role, "buildTeamsAndTrackAttendance")}
+      canRespond={membershipCurrent}
       openCreateWith={canManageEvents ? readNewEventType(params) : null}
     />
   );

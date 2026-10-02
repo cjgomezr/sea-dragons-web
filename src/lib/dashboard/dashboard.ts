@@ -19,6 +19,12 @@ import {
   listAgenda,
 } from "@/lib/events/event-agenda";
 import { isStillAhead } from "@/lib/events/event-occurrences";
+import {
+  type MembershipBlock,
+  type MembershipGateway,
+  membershipBlockOf,
+  readMembership,
+} from "@/lib/membership/membership";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
 import {
   type NewsFeedItem,
@@ -42,6 +48,11 @@ import {
  * ella. Las fuentes se piden a la vez y cada una puede caer sola: la que
  * falla llega como `unavailable`, se apunta en el log con su causa, y el
  * resto se sirve igual (RF-6).
+ *
+ * Quien no tiene la membresía al día (#453, D2 del PRD de E12) recibe el
+ * inicio reducido: el saludo, el motivo y el próximo entrenamiento, sin
+ * teselas de club ni noticias. Vale para todos los roles: el personal
+ * conserva sus pantallas de gestión desde el menú, no desde el inicio.
  */
 
 /** Cuántos eventos y noticias enseña el inicio (FR-077). */
@@ -114,7 +125,9 @@ export type LatestNews =
 /** Quien mira, para el saludo de la pantalla (#426, RF-4). */
 export type DashboardViewer = { readonly firstName: string };
 
-export type Dashboard = {
+/** El inicio de un socio al día. */
+export type MemberDashboard = {
+  readonly kind: "member";
   readonly viewer: DashboardViewer;
   readonly tiles: {
     readonly attendance: AttendanceTile;
@@ -125,6 +138,17 @@ export type Dashboard = {
   readonly upcomingEvents: UpcomingEvents;
   readonly latestNews: LatestNews;
 };
+
+/** El inicio de quien no tiene la membresía al día (#453). */
+export type RestrictedDashboard = {
+  readonly kind: "restricted";
+  readonly viewer: DashboardViewer;
+  /** Por qué: lo que dice el aviso que lleva a Pagos. */
+  readonly block: MembershipBlock;
+  readonly nextTraining: NextTrainingTile;
+};
+
+export type Dashboard = MemberDashboard | RestrictedDashboard;
 
 export type ActiveMembers = {
   readonly active: number;
@@ -158,6 +182,7 @@ export type DashboardGateways = {
   readonly agenda: EventAgendaGateways;
   readonly news: NewsGateways;
   readonly roster: DashboardRosterGateway;
+  readonly membership: MembershipGateway;
   readonly failures: DashboardFailureLog;
 };
 
@@ -430,14 +455,15 @@ async function readNewsParts(
   return { unreadNews, latestNews };
 }
 
-export async function readDashboard(
+type DashboardCaller = NonNullable<
+  Awaited<ReturnType<DashboardGateways["members"]["findRoleRequestMember"]>>
+>;
+
+async function readMemberDashboard(
   gateways: DashboardGateways,
-  request: DashboardRequest,
-): Promise<Dashboard> {
-  const caller = await gateways.members.findRoleRequestMember(request.callerId);
-  if (caller === null) {
-    throw new MemberNotFoundError(request.callerId);
-  }
+  request: DashboardRequest & { readonly caller: DashboardCaller },
+): Promise<MemberDashboard> {
+  const { caller } = request;
   const [attendance, members, eventParts, newsParts] = await Promise.all([
     orUnavailable(
       gateways,
@@ -453,6 +479,7 @@ export async function readDashboard(
     readNewsParts(gateways, request),
   ]);
   return {
+    kind: "member",
     viewer: { firstName: firstNameOf(caller.fullName) },
     tiles: {
       attendance,
@@ -463,4 +490,41 @@ export async function readDashboard(
     upcomingEvents: eventParts.upcomingEvents,
     latestNews: newsParts.latestNews,
   };
+}
+
+async function readRestrictedDashboard(
+  gateways: DashboardGateways,
+  request: DashboardRequest & {
+    readonly caller: DashboardCaller;
+    readonly block: MembershipBlock;
+  },
+): Promise<RestrictedDashboard> {
+  const { nextTraining } = await readEventParts(gateways, request);
+  return {
+    kind: "restricted",
+    viewer: { firstName: firstNameOf(request.caller.fullName) },
+    block: request.block,
+    nextTraining,
+  };
+}
+
+export async function readDashboard(
+  gateways: DashboardGateways,
+  request: DashboardRequest,
+): Promise<Dashboard> {
+  const caller = await gateways.members.findRoleRequestMember(request.callerId);
+  if (caller === null) {
+    throw new MemberNotFoundError(request.callerId);
+  }
+  // Sin orUnavailable: si no se sabe si está al día, no se le sirve el
+  // inicio de socio. La puerta se cierra hacia el lado seguro.
+  const block = membershipBlockOf(
+    await readMembership(gateways.membership, {
+      userId: request.callerId,
+      now: request.now,
+    }),
+  );
+  return block === null
+    ? readMemberDashboard(gateways, { ...request, caller })
+    : readRestrictedDashboard(gateways, { ...request, caller, block });
 }

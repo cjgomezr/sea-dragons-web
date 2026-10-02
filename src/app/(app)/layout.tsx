@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/AppShell";
-import { readCallerId, readCallerRole } from "@/lib/auth/caller-role";
+import { readCallerAccess, readCallerId } from "@/lib/auth/caller-role";
 import { readClubBrand } from "@/lib/club/supabase-club-brand";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 
@@ -11,14 +11,14 @@ import { readRequestLocale } from "@/lib/i18n/request-locale";
 export default async function AppLayout({
   children,
 }: Readonly<{ children: ReactNode }>): Promise<React.JSX.Element> {
-  const [locale, role, viewerId, brand] = await Promise.all([
+  const [locale, access, viewerId, brand] = await Promise.all([
     readRequestLocale(),
-    readCallerRole(),
+    readCallerAccess(),
     readCallerId(),
     readClubBrand(),
   ]);
   return (
-    <AppShell locale={locale} role={role} viewerId={viewerId} brand={brand}>
+    <AppShell locale={locale} access={access} viewerId={viewerId} brand={brand}>
       {children}
     </AppShell>
   );

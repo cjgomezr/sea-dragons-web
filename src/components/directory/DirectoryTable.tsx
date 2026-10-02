@@ -14,7 +14,9 @@ import { memberEvaluationHref } from "@/lib/evaluations/member-evaluation-href";
 import { formatCalendarDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
+import type { MembershipStatus } from "@/lib/membership/membership";
 import { type AufState, type RowMark, aufMarksOf } from "./auf-marks";
+import { membershipMarkOf } from "./membership-mark";
 import {
   type DirectoryOrder,
   DirectorySortControl,
@@ -62,14 +64,20 @@ const DIRECTORY_AVATAR_SIZE = 40;
 /** El registro federativo de una fila, que sólo recibe un Admin (BR-008). */
 type AufView = AufState & { readonly aufExpiry: string | null };
 
+/** Lo que de una fila sólo recibe un Admin: el registro federativo y el
+ * estado de la membresía (#453). */
+type AdminView = AufView & {
+  readonly membershipStatus: MembershipStatus | null;
+};
+
 /** Lo que una fila necesita saber, con lo que sólo un Admin recibe ya
  * resuelto: así la fila no tiene que volver a preguntarse quién la mira. Con
- * `auf` la fila es de Admin: enseña el registro, enlaza la ficha (#242) y
- * deja cambiar el rol (#240). `isEvaluated` es null para quien no ve
+ * `admin` la fila es de Admin: enseña el registro y la membresía, enlaza la
+ * ficha (#242) y deja cambiar el rol (#240). `isEvaluated` es null para quien no ve
  * evaluaciones (#324). */
 type DirectoryRow = {
   readonly member: DirectoryMember;
-  readonly auf: AufView | null;
+  readonly admin: AdminView | null;
   readonly isEvaluated: boolean | null;
 };
 
@@ -78,19 +86,19 @@ function rowsOf(listing: DirectoryListing): readonly DirectoryRow[] {
     case "admin":
       return listing.members.map((member) => ({
         member,
-        auf: member,
+        admin: member,
         isEvaluated: member.isEvaluated,
       }));
     case "coach":
       return listing.members.map((member) => ({
         member,
-        auf: null,
+        admin: null,
         isEvaluated: member.isEvaluated,
       }));
     case "member":
       return listing.members.map((member) => ({
         member,
-        auf: null,
+        admin: null,
         isEvaluated: null,
       }));
   }
@@ -114,12 +122,12 @@ function describeAuf(
       });
 }
 
-/** Sólo la lista de un Admin trae el AUF, y es la misma marca que le da el
+/** Sólo la lista de un Admin trae el AUF y la membresía, y es la misma marca que le da el
  * enlace a la ficha y el cambio de rol. */
 function isAdminRow(row: DirectoryRow): row is DirectoryRow & {
-  readonly auf: AufView;
+  readonly admin: AdminView;
 } {
-  return row.auf !== null;
+  return row.admin !== null;
 }
 
 function memberRecordHref(userId: string): string {
@@ -195,7 +203,12 @@ function marksOf(translate: Translator, row: DirectoryRow): readonly RowMark[] {
           },
         ]
       : []),
-    ...(row.auf === null ? [] : aufMarksOf(translate, row.auf)),
+    ...(row.admin === null
+      ? []
+      : [
+          ...aufMarksOf(translate, row.admin),
+          membershipMarkOf(translate, row.admin.membershipStatus),
+        ]),
   ];
 }
 
@@ -342,7 +355,7 @@ function MemberRow({
             <MemberFacts translate={translate} member={member} />
             {isAdminRow(row) ? (
               <span className="directory-meta">
-                {describeAuf(translate, locale, row.auf)}
+                {describeAuf(translate, locale, row.admin)}
               </span>
             ) : null}
             <RowMarks translate={translate} row={row} />

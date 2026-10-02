@@ -27,7 +27,11 @@ const { proxy } = await import("@/proxy");
 
 const ANONYMOUS: SessionState = { kind: "anonymous" };
 const INCOMPLETE: SessionState = { kind: "incomplete" };
-const ACTIVE_PLAYER: SessionState = { kind: "active", role: "Player" };
+const ACTIVE_PLAYER: SessionState = {
+  kind: "active",
+  role: "Player",
+  membershipCurrent: true,
+};
 
 const ORIGIN = "http://localhost:3417";
 const TEMPORARY_REDIRECT = 307;

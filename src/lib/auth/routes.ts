@@ -44,6 +44,11 @@ export const DASHBOARD_PATH = "/dashboard";
  * en `RESTRICTED_ROUTES`. E5 la convierte después en el perfil. */
 export const ACCOUNT_PAGE_PATH = "/cuenta";
 
+/** Pagos (#455, RF-5 del PRD de E12). Lo alcanza cualquier cuenta activa, al
+ * día o no: es a donde la frontera manda a quien no lo está (#453), para que
+ * pueda ponerse al día. */
+export const PAYMENTS_PATH = "/pagos";
+
 /** La sección Grupos (#228, RF-2 a RF-7 del PRD de E4): la lista de grupos
  * del club, con quién está en cada uno. Sólo la alcanza quien gestiona
  * grupos, que son tres de los cuatro roles. */
@@ -336,8 +341,8 @@ export const EVENT_RSVP_API_PATH = `${EVENT_API_PATH}/rsvp`;
 
 /** El equipo de quien llama en un evento (#401, RF-8 del PRD de E10): su
  * equipo y la alineación de un reparto publicado, sin ningún OVR. Cuelga del
- * camino de lectura: lo pide cualquier cuenta activa, y quien no ve el evento
- * recibe 404. */
+ * camino de lectura: lo pide cualquier cuenta activa con la membresía al día
+ * (#453), y quien no ve el evento recibe 404. */
 export const EVENT_TEAM_API_PATH = `${EVENT_API_PATH}/team`;
 
 /** Pasar lista (#393, RF-2 a RF-4 del PRD de E8). Todo lo que cuelga de
@@ -614,4 +619,43 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: ATTENDANCE_API_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: ATTENDANCE_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: TEAMS_API_PATH, capability: "buildTeamsAndTrackAttendance" },
+];
+
+/** Una ruta de socio, que sólo alcanza quien tiene la membresía al día. */
+export type MemberOnlyRoute = {
+  readonly path: string;
+  /** La capacidad de gestión con la que un rol la conserva aunque no esté al
+   * día, o `null` si es sólo de socio y no la conserva nadie. */
+  readonly managedWith: Capability | null;
+};
+
+/**
+ * Lo que una cuenta activa pierde cuando su membresía no está al día (#453,
+ * RF-2 y D2 del PRD de E12): RSVP, directorio, noticias, equipos, asistencia,
+ * evaluaciones y búsqueda. Quien no está al día ve su perfil, Pagos y el
+ * calendario en lectura; lo que no esté aquí lo sigue alcanzando. La campana
+ * sigue abierta: sólo trae avisos que ya le llegaron, y está en la cabecera
+ * de todas las pantallas que le quedan.
+ *
+ * Va aparte de `RESTRICTED_ROUTES` porque responde a otra pregunta: aquélla
+ * es qué deja la matriz a cada rol, ésta qué pide además estar al día. Un
+ * Admin, un Coach o un Committee sin pagar conserva sus pantallas de gestión,
+ * así que cada ruta dice con qué capacidad se conserva. El RSVP, el equipo
+ * propio y la búsqueda no los conserva nadie: responder y jugar son de socio,
+ * y la búsqueda encuentra socios y noticias de todo el club.
+ */
+export const MEMBER_ONLY_ROUTES: readonly MemberOnlyRoute[] = [
+  { path: EVENT_RSVP_API_PATH, managedWith: null },
+  { path: EVENT_TEAM_API_PATH, managedWith: null },
+  { path: SEARCH_API_PATH, managedWith: null },
+  { path: DIRECTORY_PATH, managedWith: "manageUsersAndRoles" },
+  { path: DIRECTORY_API_PATH, managedWith: "manageUsersAndRoles" },
+  { path: NEWS_PATH, managedWith: "publishNewsAndDocuments" },
+  { path: NEWS_API_PATH, managedWith: "publishNewsAndDocuments" },
+  { path: TEAMS_PATH, managedWith: "buildTeamsAndTrackAttendance" },
+  { path: TEAMS_API_PATH, managedWith: "buildTeamsAndTrackAttendance" },
+  { path: ATTENDANCE_PATH, managedWith: "buildTeamsAndTrackAttendance" },
+  { path: ATTENDANCE_API_PATH, managedWith: "buildTeamsAndTrackAttendance" },
+  { path: EVALUATIONS_PATH, managedWith: "viewEvaluations" },
+  { path: EVALUATIONS_API_PATH, managedWith: "viewEvaluations" },
 ];

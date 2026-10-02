@@ -49,6 +49,7 @@ function memberRecord(
     isAufVerified: true,
     photoPath: null,
     isEvaluated: true,
+    membershipStatus: "active",
     ...overrides,
   };
 }

@@ -14,6 +14,7 @@ import {
   isAufNumberTooLong,
 } from "@/lib/members/member-record";
 import { aufMarksOf } from "./auf-marks";
+import { membershipMarkOf } from "./membership-mark";
 import { GroupsField, TextField } from "./record-fields";
 import {
   type MemberRecordFailure,
@@ -167,7 +168,10 @@ function RecordHeader({
   locale: Locale;
   record: MemberRecord;
 }): React.JSX.Element {
-  const marks = aufMarksOf(translate, record);
+  const marks = [
+    ...aufMarksOf(translate, record),
+    membershipMarkOf(translate, record.membershipStatus),
+  ];
   return (
     <header className="member-record-header">
       <div className="member-record-identity">
@@ -187,18 +191,16 @@ function RecordHeader({
           date: formatCalendarDay(locale, record.joinedOn),
         })}
       </p>
-      {marks.length === 0 ? null : (
-        <span className="directory-marks">
-          {marks.map((mark) => (
-            <span
-              key={mark.text}
-              className={`directory-mark directory-mark-${mark.tone}`}
-            >
-              {mark.text}
-            </span>
-          ))}
-        </span>
-      )}
+      <span className="directory-marks">
+        {marks.map((mark) => (
+          <span
+            key={mark.text}
+            className={`directory-mark directory-mark-${mark.tone}`}
+          >
+            {mark.text}
+          </span>
+        ))}
+      </span>
     </header>
   );
 }

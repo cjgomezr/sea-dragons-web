@@ -143,6 +143,7 @@ function givenRole(role: Role): void {
   readSessionState.mockResolvedValue({
     kind: "active",
     role,
+    membershipCurrent: true,
   } satisfies SessionState);
 }
 

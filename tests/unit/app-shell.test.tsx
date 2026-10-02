@@ -29,9 +29,15 @@ function renderShell(
   locale: Locale = "en",
   brand: ClubBrand = BRAND,
   role: Role = "Player",
+  membershipCurrent = true,
 ): void {
   render(
-    <AppShell locale={locale} role={role} viewerId={VIEWER_ID} brand={brand}>
+    <AppShell
+      locale={locale}
+      access={{ role, membershipCurrent }}
+      viewerId={VIEWER_ID}
+      brand={brand}
+    >
       <p>Contenido de la sección</p>
     </AppShell>,
   );
@@ -290,7 +296,12 @@ describe("app shell", () => {
   it("nombra las dos navegaciones en el idioma de la visita", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="es" role="Player" viewerId={VIEWER_ID} brand={BRAND}>
+      <AppShell
+        locale="es"
+        access={{ role: "Player", membershipCurrent: true }}
+        viewerId={VIEWER_ID}
+        brand={BRAND}
+      >
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -308,7 +319,12 @@ describe("app shell", () => {
   it("ofrece a cada navegación sólo lo que el rol recibido puede abrir", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="en" role="Player" viewerId={VIEWER_ID} brand={BRAND}>
+      <AppShell
+        locale="en"
+        access={{ role: "Player", membershipCurrent: true }}
+        viewerId={VIEWER_ID}
+        brand={BRAND}
+      >
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -326,7 +342,12 @@ describe("app shell", () => {
   it("no enseña Administración en ninguna de las dos navegaciones a un Admin", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="en" role="Admin" viewerId={VIEWER_ID} brand={BRAND}>
+      <AppShell
+        locale="en"
+        access={{ role: "Admin", membershipCurrent: true }}
+        viewerId={VIEWER_ID}
+        brand={BRAND}
+      >
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -342,7 +363,12 @@ describe("app shell", () => {
   it("muestra el contenido recibido dentro del área principal", () => {
     usePathname.mockReturnValue("/dashboard");
     render(
-      <AppShell locale="en" role="Player" viewerId={VIEWER_ID} brand={BRAND}>
+      <AppShell
+        locale="en"
+        access={{ role: "Player", membershipCurrent: true }}
+        viewerId={VIEWER_ID}
+        brand={BRAND}
+      >
         <p>Contenido de la sección</p>
       </AppShell>,
     );
@@ -413,5 +439,28 @@ describe("la búsqueda en la cáscara", () => {
 
     expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
     expect(magnifier).toHaveFocus();
+  });
+});
+
+describe("la cáscara de quien no tiene la membresía al día (#453)", () => {
+  it("no ofrece la búsqueda, que encuentra socios y noticias", () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell("en", BRAND, "Player", false);
+
+    expect(screen.queryByRole("search")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /search/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("sigue ofreciendo la cuenta, con Mi perfil y cerrar sesión", async () => {
+    usePathname.mockReturnValue("/dashboard");
+    renderShell("en", BRAND, "Player", false);
+
+    const menu = await openAccountMenu();
+
+    expect(
+      within(menu).getByRole("link", { name: "My profile" }),
+    ).toBeInTheDocument();
   });
 });

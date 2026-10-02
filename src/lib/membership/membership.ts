@@ -74,6 +74,20 @@ export type Membership =
     })
   | (MembershipDetails & { readonly status: UnwaivedStatus });
 
+/**
+ * Lo justo de una membresía para saber si está al día, sin la tarjeta ni el
+ * cliente de Stripe: la frontera (#453) y las audiencias vivas lo leen en la
+ * misma consulta que la fila del socio.
+ */
+export type MembershipStanding = {
+  readonly status: MembershipStatus;
+  readonly stripeSubscriptionId: string | null;
+  readonly trialEnd: Date | null;
+  readonly currentPeriodEnd: Date | null;
+  /** El fin de la exención; sin fecha, no vence. */
+  readonly waivedUntil: Date | null;
+};
+
 export type MembershipReading =
   | { readonly kind: "found"; readonly membership: Membership }
   | { readonly kind: "none" };
@@ -93,7 +107,10 @@ function isAfter(date: Date | null, now: Date): boolean {
  * terminada.
  */
 function statusAfterWaiver(
-  record: MembershipRecord,
+  record: Pick<
+    MembershipStanding,
+    "stripeSubscriptionId" | "trialEnd" | "currentPeriodEnd"
+  >,
   now: Date,
 ): UnwaivedStatus {
   if (record.stripeSubscriptionId === null) {
@@ -105,8 +122,8 @@ function statusAfterWaiver(
   return isAfter(record.currentPeriodEnd, now) ? "active" : "cancelled";
 }
 
-function hasWaiverExpired(waiver: MembershipWaiver, now: Date): boolean {
-  return waiver.until !== null && !isAfter(waiver.until, now);
+function hasWaiverExpired(until: Date | null, now: Date): boolean {
+  return until !== null && !isAfter(until, now);
 }
 
 export function resolveMembership(
@@ -122,14 +139,74 @@ export function resolveMembership(
       `La membresía de ${record.userId} está exenta sin exención: la base debería impedirlo.`,
     );
   }
-  if (hasWaiverExpired(waiver, now)) {
+  if (hasWaiverExpired(waiver.until, now)) {
     return { ...details, status: statusAfterWaiver(record, now) };
   }
   return { ...details, status, waiver };
 }
 
 export function isMembershipCurrent(membership: Membership): boolean {
-  return CURRENT_STATUSES.has(membership.status);
+  return isStatusCurrent(membership.status);
+}
+
+/** Si un estado ya resuelto (sin exenciones vencidas) cuenta como al día. */
+export function isStatusCurrent(status: MembershipStatus): boolean {
+  return CURRENT_STATUSES.has(status);
+}
+
+/** El estado que cuenta hoy: el guardado, salvo una exención vencida, que
+ * vale lo que digan sus fechas. Es la misma regla que `resolveMembership`. */
+export function resolveStandingStatus(
+  standing: MembershipStanding,
+  now: Date,
+): MembershipStatus {
+  if (
+    standing.status === "waived" &&
+    hasWaiverExpired(standing.waivedUntil, now)
+  ) {
+    return statusAfterWaiver(standing, now);
+  }
+  return standing.status;
+}
+
+/** Si quien tiene esta membresía está al día (D1). Sin membresía, no: la
+ * barrera se cierra hacia el lado seguro. */
+export function isStandingCurrent(
+  standing: MembershipStanding | null,
+  now: Date,
+): boolean {
+  return (
+    standing !== null &&
+    CURRENT_STATUSES.has(resolveStandingStatus(standing, now))
+  );
+}
+
+/** Por qué la puerta de socio está cerrada (#453): el estado que la cierra.
+ * Una exención vencida ya llega resuelta a uno de los tres. */
+export type MembershipBlock = Extract<
+  MembershipStatus,
+  "pending" | "past_due" | "cancelled"
+>;
+
+/** El motivo de la puerta cerrada, o `null` si está al día. Sin membresía,
+ * el socio está como quien todavía no puso tarjeta. */
+export function membershipBlockOf(
+  reading: MembershipReading,
+): MembershipBlock | null {
+  if (reading.kind === "none") {
+    return "pending";
+  }
+  const { membership } = reading;
+  switch (membership.status) {
+    case "pending":
+    case "past_due":
+    case "cancelled":
+      return membership.status;
+    case "trialing":
+    case "active":
+    case "waived":
+      return null;
+  }
 }
 
 export async function readMembership(

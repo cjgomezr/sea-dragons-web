@@ -545,6 +545,13 @@ export const englishMessages = {
   "directory.mark.aufNotVerified": "AUF not verified",
   "directory.mark.aufVerified": "AUF verified",
   "directory.mark.pendingActivation": "Pending activation",
+  "directory.mark.membership.none": "No membership",
+  "directory.mark.membership.pending": "Membership pending",
+  "directory.mark.membership.trialing": "On trial",
+  "directory.mark.membership.active": "Membership active",
+  "directory.mark.membership.pastDue": "Payment overdue",
+  "directory.mark.membership.cancelled": "Membership cancelled",
+  "directory.mark.membership.waived": "Membership waived",
   "directory.mark.notEvaluated": "Not evaluated",
   "directory.mark.notEvaluatedLabel": "Not evaluated: evaluate {name}",
   "directory.error.signInRequired":
@@ -781,6 +788,17 @@ export const englishMessages = {
     "This event is no longer available. Reload the calendar.",
   "calendar.rsvp.error.signInRequired":
     "Your session ended. Sign in again to answer.",
+  "calendar.rsvp.error.membershipNotCurrent":
+    "Your membership isn't up to date. Sort it out in Payments to answer.",
+  "membership.block.pending":
+    "Your membership is pending: you haven't added a card yet.",
+  "membership.block.pastDue": "Your last payment didn't go through.",
+  "membership.block.cancelled": "Your membership is cancelled.",
+  "membership.block.scope":
+    "Until it's up to date you only see your profile, Payments and the calendar.",
+  "calendar.membership.notice":
+    "Your membership isn't up to date, so you can't answer events yet.",
+  "calendar.membership.toPayments": "Go to Payments",
   "calendar.rsvp.error.unexpected": "We couldn't save your answer. Try again.",
   "calendar.create.open": "Event",
   "calendar.create.created": "Event created. We let the members know.",

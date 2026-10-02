@@ -184,6 +184,7 @@ describe("agenda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -206,6 +207,7 @@ describe("agenda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -224,6 +226,7 @@ describe("agenda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -239,6 +242,7 @@ describe("agenda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -255,6 +259,7 @@ describe("agenda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -271,6 +276,7 @@ describe("agenda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -291,6 +297,7 @@ describe("agenda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     await findRow(POOL_TRAINING.title);
@@ -319,6 +326,7 @@ describe("agenda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     await findRow(POOL_TRAINING.title);
@@ -343,6 +351,7 @@ describe("agenda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -366,6 +375,7 @@ describe("agenda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -385,6 +395,7 @@ describe("agenda", () => {
         locale="es"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -411,6 +422,7 @@ describe("agenda", () => {
         locale="es"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -426,6 +438,7 @@ describe("agenda", () => {
         locale="es"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -444,6 +457,7 @@ describe("RSVP en la fila", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -485,6 +499,7 @@ describe("RSVP en la fila", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await findRow(SCRIMMAGE.title);
@@ -513,6 +528,7 @@ describe("RSVP en la fila", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await findRow(POOL_TRAINING.title);
@@ -544,6 +560,7 @@ describe("RSVP en la fila", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await findRow(SCRIMMAGE.title);
@@ -580,6 +597,7 @@ describe("RSVP en la fila", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await findRow(SCRIMMAGE.title);
@@ -612,6 +630,7 @@ describe("RSVP en la fila", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await findRow(POOL_TRAINING.title);
@@ -637,6 +656,7 @@ describe("RSVP en la fila", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await findRow(POOL_TRAINING.title);
@@ -665,6 +685,7 @@ describe("RSVP en la fila", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await findRow(SCRIMMAGE.title);
@@ -688,6 +709,7 @@ describe("RSVP en la fila", () => {
         locale="es"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await findRow(POOL_TRAINING.title);
@@ -757,6 +779,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -776,6 +799,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -803,6 +827,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -820,6 +845,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await expandRow(POOL_TRAINING.title);
@@ -844,6 +870,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -865,6 +892,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -887,6 +915,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -906,6 +935,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -931,6 +961,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -951,6 +982,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -970,6 +1002,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -996,6 +1029,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await expandRow(POOL_TRAINING.title);
@@ -1018,6 +1052,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await findRow(POOL_TRAINING.title);
@@ -1039,6 +1074,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await expandRow(POOL_TRAINING.title);
@@ -1077,6 +1113,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await expandRow(SCRIMMAGE.title);
@@ -1113,6 +1150,7 @@ describe("fila desplegable", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await expandRow(SCRIMMAGE.title);
@@ -1138,6 +1176,7 @@ describe("fila desplegable", () => {
         locale="es"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -1191,6 +1230,7 @@ describe("próximos y pasados", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -1206,6 +1246,7 @@ describe("próximos y pasados", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     await findRow(POOL_TRAINING.title);
@@ -1235,6 +1276,7 @@ describe("próximos y pasados", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     await findRow(POOL_TRAINING.title);
@@ -1260,6 +1302,7 @@ describe("próximos y pasados", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     await findRow(POOL_TRAINING.title);
@@ -1284,6 +1327,7 @@ describe("próximos y pasados", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     await findRow(POOL_TRAINING.title);
@@ -1306,6 +1350,7 @@ describe("próximos y pasados", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     await findRow(POOL_TRAINING.title);
@@ -1324,6 +1369,7 @@ describe("próximos y pasados", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     const row = await expandRow(POOL_TRAINING.title);
@@ -1350,6 +1396,7 @@ describe("próximos y pasados", () => {
         locale="es"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
     await findRow(POOL_TRAINING.title);
@@ -1396,6 +1443,7 @@ describe("pasar lista desde la fila", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={canTakeAttendance}
+        canRespond
       />,
     );
     const row = await expandRow(event.title);
@@ -1455,7 +1503,12 @@ describe("pasar lista desde la fila", () => {
         : pageResponse({ events: [], nextCursor: null });
     });
     render(
-      <AgendaScreen locale="es" canManageEvents={false} canTakeAttendance />,
+      <AgendaScreen
+        locale="es"
+        canManageEvents={false}
+        canTakeAttendance
+        canRespond
+      />,
     );
     await userEvent.click(
       await screen.findByRole("button", { name: "Pasados" }),
@@ -1479,6 +1532,7 @@ describe("llegar a un evento desde la búsqueda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
         focusEventId={SCRIMMAGE.id}
       />,
     );
@@ -1497,6 +1551,7 @@ describe("llegar a un evento desde la búsqueda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
         initialPeriod="past"
         focusEventId={POOL_TRAINING.id}
       />,
@@ -1527,6 +1582,7 @@ describe("llegar a un evento desde la búsqueda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
         focusEventId={SCRIMMAGE.id}
       />,
     );
@@ -1564,6 +1620,7 @@ describe("llegar a un evento desde la búsqueda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
         focusEventId="un-evento-que-no-esta"
       />,
     );
@@ -1583,6 +1640,7 @@ describe("llegar a un evento desde la búsqueda", () => {
         locale="en"
         canManageEvents={false}
         canTakeAttendance={false}
+        canRespond
       />,
     );
 
@@ -1590,5 +1648,175 @@ describe("llegar a un evento desde la búsqueda", () => {
       name: POOL_TRAINING.title,
     });
     expect(title).not.toHaveFocus();
+  });
+});
+
+function membershipNotCurrentResponse(): Response {
+  return jsonResponse(403, {
+    error: {
+      code: "forbidden",
+      message: "Tu membresía no está al día.",
+      reason: "membership_not_current",
+    },
+  });
+}
+
+describe("quien no tiene la membresía al día (#453)", () => {
+  it("ve los eventos con los botones de RSVP deshabilitados", async () => {
+    stubAgenda([POOL_TRAINING]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond={false}
+      />,
+    );
+
+    const row = await findRow(POOL_TRAINING.title);
+    for (const name of ["Yes", "Maybe", "No"]) {
+      expect(rsvpButton(row, name)).toBeDisabled();
+    }
+    expect(within(row).getByText("14 going · 2 maybe")).toBeInTheDocument();
+  });
+
+  it("no pide los equipos al desplegar un entrenamiento: son de socio", async () => {
+    stubAgenda([POOL_TRAINING]);
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond={false}
+      />,
+    );
+    const row = await findRow(POOL_TRAINING.title);
+
+    await userEvent.click(
+      within(row).getByRole("button", { name: POOL_TRAINING.title }),
+    );
+
+    expect(requests.some((request) => request.path.endsWith("/team"))).toBe(
+      false,
+    );
+  });
+
+  it("le dice por qué con un enlace a Pagos", async () => {
+    stubAgenda([POOL_TRAINING]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond={false}
+      />,
+    );
+
+    await findRow(POOL_TRAINING.title);
+    expect(
+      screen.getByText(/Your membership isn't up to date/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Go to Payments" }),
+    ).toHaveAttribute("href", "/pagos");
+  });
+
+  it("anuda la frase a los botones, para que un lector de pantalla sepa por qué no responden", async () => {
+    stubAgenda([POOL_TRAINING]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond={false}
+      />,
+    );
+
+    const row = await findRow(POOL_TRAINING.title);
+    expect(
+      within(row).getByRole("group", { name: /^RSVP:/ }),
+    ).toHaveAccessibleDescription(/Your membership isn't up to date/);
+  });
+
+  it("no manda ninguna respuesta aunque se pulse", async () => {
+    stubAgenda([POOL_TRAINING]);
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond={false}
+      />,
+    );
+    const row = await findRow(POOL_TRAINING.title);
+
+    await userEvent.click(rsvpButton(row, "Yes"));
+
+    expect(rsvpRequests(POOL_TRAINING)).toEqual([]);
+  });
+
+  it("escribe la frase en español", async () => {
+    stubAgenda([POOL_TRAINING]);
+
+    render(
+      <AgendaScreen
+        locale="es"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond={false}
+      />,
+    );
+
+    await screen.findByRole("heading", { name: POOL_TRAINING.title });
+    expect(screen.getByText(/Tu membresía no está al día/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ir a Pagos" })).toHaveAttribute(
+      "href",
+      "/pagos",
+    );
+  });
+
+  it("no pinta la frase a quien está al día", async () => {
+    stubAgenda([POOL_TRAINING]);
+
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+
+    await findRow(POOL_TRAINING.title);
+    expect(
+      screen.queryByRole("link", { name: "Go to Payments" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("explica el 403 de una membresía que dejó de estar al día con la pantalla abierta", async () => {
+    stubApi(({ method, url }) => {
+      if (method === "PUT" && url.pathname === rsvpPath(POOL_TRAINING)) {
+        return membershipNotCurrentResponse();
+      }
+      return pageResponse({ events: [POOL_TRAINING], nextCursor: null });
+    });
+    render(
+      <AgendaScreen
+        locale="en"
+        canManageEvents={false}
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+    const row = await findRow(POOL_TRAINING.title);
+
+    await userEvent.click(rsvpButton(row, "Yes"));
+
+    expect(await within(row).findByRole("alert")).toHaveTextContent(
+      "Your membership isn't up to date. Sort it out in Payments to answer.",
+    );
   });
 });

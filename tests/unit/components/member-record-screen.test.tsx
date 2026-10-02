@@ -33,6 +33,7 @@ const RECORD: MemberRecord = {
   dateOfBirth: "1990-05-10",
   registeredAt: "2024-03-06T01:00:00.000Z",
   hasGuardianConsent: false,
+  membershipStatus: "active",
   photoUrl: null,
   isAufExpired: false,
   groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
@@ -229,6 +230,22 @@ describe("ficha en pantalla: carga", () => {
     await renderScreen();
 
     expect(screen.queryByText("AUF expired")).not.toBeInTheDocument();
+  });
+
+  it("enseña el estado de la membresía (#453)", async () => {
+    stubApi({ record: { ...RECORD, membershipStatus: "past_due" } });
+
+    await renderScreen();
+
+    expect(screen.getByText("Payment overdue")).toBeInTheDocument();
+  });
+
+  it("dice que no tiene membresía quien no la tiene (#453)", async () => {
+    stubApi({ record: { ...RECORD, membershipStatus: null } });
+
+    await renderScreen();
+
+    expect(screen.getByText("No membership")).toBeInTheDocument();
   });
 
   it("ofrece volver al directorio", async () => {

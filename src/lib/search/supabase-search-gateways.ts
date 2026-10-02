@@ -143,10 +143,11 @@ async function findMembersMatching(
       `No se pudo buscar entre los socios del club ${clubId}: ${error.message}`,
     );
   }
+  const now = new Date();
   return z
     .array(z.record(z.string(), z.unknown()))
     .parse(data)
-    .map(toDirectoryMemberRecord);
+    .map((row) => toDirectoryMemberRecord(row, now));
 }
 
 /** El periodo y el orden como en `findAgendaPage`: los próximos desde hoy

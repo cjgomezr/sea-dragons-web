@@ -16,7 +16,11 @@ const START_MS = Date.UTC(2026, 8, 30, 9, 0, 0);
 const ONE_HOUR_S = 60 * 60;
 const USER_ID = "0f5c2f4e-1b8e-4d2a-9a5e-4f2b0c8d1a33";
 const OTHER_USER_ID = "7a1d9c3b-5e2f-4b8a-8c6d-2e9f1a0b3c44";
-const ACTIVE_PLAYER = { kind: "active", role: "Player" } as const;
+const ACTIVE_PLAYER = {
+  kind: "active",
+  role: "Player",
+  membershipCurrent: true,
+} as const;
 
 function base64Url(value: string): string {
   return Buffer.from(value).toString("base64url");
@@ -232,10 +236,14 @@ describe("memoria del estado de sesión", () => {
     cache.remember({
       accessToken: LIVE_TOKEN,
       userId: USER_ID,
-      state: { kind: "active", role: "Coach" },
+      state: { kind: "active", role: "Coach", membershipCurrent: true },
     });
 
     expect(entries.size).toBe(1);
-    expect(cache.read(LIVE_TOKEN)).toEqual({ kind: "active", role: "Coach" });
+    expect(cache.read(LIVE_TOKEN)).toEqual({
+      kind: "active",
+      role: "Coach",
+      membershipCurrent: true,
+    });
   });
 });

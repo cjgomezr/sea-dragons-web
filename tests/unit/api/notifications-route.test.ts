@@ -151,7 +151,7 @@ function givenMarkReadOutcome(outcome: MarkReadOutcome): void {
 beforeEach(() => {
   vi.clearAllMocks();
   isMarkerConfigured = true;
-  givenSession({ kind: "active", role: "Player" });
+  givenSession({ kind: "active", role: "Player", membershipCurrent: true });
   readAuthenticatedUserId.mockResolvedValue(USER_ID);
   listRecent.mockResolvedValue([NEWEST, OLDEST]);
   countUnread.mockResolvedValue(3);
@@ -164,7 +164,7 @@ describe("endpoints de avisos", () => {
     it.each(["Admin", "Coach", "Committee", "Player"] as const)(
       "responde 200 a un %s con sus avisos tal como los da la base",
       async (role) => {
-        givenSession({ kind: "active", role });
+        givenSession({ kind: "active", role, membershipCurrent: true });
 
         const response = await requestThroughBoundary(LIST);
 

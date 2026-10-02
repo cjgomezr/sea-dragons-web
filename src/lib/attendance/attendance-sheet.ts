@@ -93,6 +93,8 @@ export type SheetMemberRecord = {
   readonly positionId: string | null;
   /** Dónde está la foto; sale firmada, nunca tal cual. */
   readonly photoPath: string | null;
+  /** Si su membresía está al día (#453): sin ella sale de la hoja viva. */
+  readonly membershipCurrent: boolean;
 };
 
 export type MemberRsvp = {
@@ -287,6 +289,13 @@ type SheetRoster = {
   readonly recorded: ReadonlyMap<string, AttendanceStatus>;
 };
 
+/** Quien está en la audiencia viva de una hoja: activo y al día con su
+ * membresía (#453, D2 del PRD de E12). Quien ya tiene fila guardada sale
+ * igual, sea como sea su cuenta (D1 de E8). */
+function isInLiveAudience(member: SheetMemberRecord): boolean {
+  return member.status !== INACTIVE_STATUS && member.membershipCurrent;
+}
+
 /** Quién sale en la hoja y el estado guardado de cada uno, si lo tiene. */
 async function readSheetRoster(
   gateways: AttendanceGateways,
@@ -308,8 +317,7 @@ async function readSheetRoster(
   });
   return {
     members: members.filter(
-      (member) =>
-        recorded.has(member.userId) || member.status !== INACTIVE_STATUS,
+      (member) => recorded.has(member.userId) || isInLiveAudience(member),
     ),
     recorded,
   };

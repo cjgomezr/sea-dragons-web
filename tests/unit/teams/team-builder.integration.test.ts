@@ -20,6 +20,7 @@ import {
   type TestUser,
   createServiceRoleTestClient,
   describeRls,
+  seedCurrentMembership,
   withSeededRows,
   withTestUser,
 } from "../../support/rls";
@@ -106,7 +107,13 @@ async function withActiveMember<T>(
           role: seed.role,
         },
       ],
-      () => run(user),
+      async () => {
+        await seedCurrentMembership(serviceClient, {
+          clubId: seed.clubId,
+          userId: user.id,
+        });
+        return run(user);
+      },
     ),
   );
 }
@@ -391,6 +398,33 @@ describeRls("el team builder en Supabase", () => {
             ]);
           },
         );
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "deja fuera de la escuadra a quien dejó de estar al día (#453)",
+    async () => {
+      await withSquad(async (squad) => {
+        const { error } = await squad.serviceClient.client
+          .from("memberships")
+          .update({ status: "past_due" })
+          .eq("user_id", squad.maya.id);
+        if (error) {
+          throw new Error(`No se pudo mover la membresía: ${error.message}`);
+        }
+
+        const builder = await openTeamBuilder(
+          createTeamBuilderGateways(squad.serviceClient.client),
+          { callerId: squad.coach.id, eventId: squad.eventId, now: new Date() },
+        );
+
+        expect(builder.maybe).toEqual([]);
+        expect(builder.available.map((entry) => entry.fullName)).toEqual([
+          "Beto Base",
+          "Pía Portera",
+        ]);
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,

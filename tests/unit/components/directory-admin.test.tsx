@@ -43,6 +43,7 @@ const NEREA: AdminDirectoryMember = {
   isAufVerified: false,
   isAufExpired: false,
   isEvaluated: true,
+  membershipStatus: "active",
 };
 
 const ANA: AdminDirectoryMember = {
@@ -60,6 +61,7 @@ const ANA: AdminDirectoryMember = {
   isAufVerified: true,
   isAufExpired: false,
   isEvaluated: true,
+  membershipStatus: "active",
 };
 
 const COACH_REQUEST: PendingRoleRequest = {
@@ -579,6 +581,7 @@ const VENCIDA: AdminDirectoryMember = {
   isAufVerified: true,
   isAufExpired: true,
   isEvaluated: true,
+  membershipStatus: "active",
 };
 
 function memberRow(name: string): HTMLElement {

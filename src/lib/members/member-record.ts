@@ -13,6 +13,7 @@ import {
   requiresGuardianConsent,
 } from "@/lib/auth/account-activation";
 import type { AccountStatus } from "@/lib/auth/account-status";
+import type { MembershipStatus } from "@/lib/membership/membership";
 import {
   isRealCalendarDate,
   validateDateOfBirthOn,
@@ -89,6 +90,9 @@ export type StoredMemberRecord = {
   readonly hasGuardianConsent: boolean;
   /** La ruta de su foto en Storage (#245), o null si no tiene. */
   readonly photoPath: string | null;
+  /** El estado de su membresía tal como cuenta hoy (#453), o `null` si no
+   * tiene. La ficha ya es sólo del Admin. */
+  readonly membershipStatus: MembershipStatus | null;
 };
 
 /** La ficha tal como la sirve la API. La ruta de la foto se queda en el

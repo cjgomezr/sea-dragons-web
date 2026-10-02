@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MEMBERSHIP_NOT_CURRENT_REASON } from "@/lib/api/error-codes";
 import {
   type ApiRequestFailure,
   type ApiRequestOutcome,
@@ -273,13 +274,17 @@ export function describeOpeningFailure(
 }
 
 /** Por qué no se guardó una respuesta, en el idioma de la pantalla. El 422
- * trae en `reason` si el evento empezó o se canceló (#308). */
+ * trae en `reason` si el evento empezó o se canceló (#308), y el 403 si la
+ * membresía dejó de estar al día con la pantalla abierta (#453). */
 export function describeRsvpFailure(
   translate: Translator,
   { failure, reason }: AgendaFailure,
 ): string {
   if (failure === "business_rule" && isRsvpClosedReason(reason)) {
     return translate(RSVP_CLOSED_REASONS[reason]);
+  }
+  if (failure === "forbidden" && reason === MEMBERSHIP_NOT_CURRENT_REASON) {
+    return translate("calendar.rsvp.error.membershipNotCurrent");
   }
   switch (failure) {
     case "network":

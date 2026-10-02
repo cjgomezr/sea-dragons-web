@@ -80,7 +80,7 @@ describe("GET /api/v1/account/groups", () => {
   it.each(["Admin", "Coach", "Committee", "Player"] as const)(
     "responde 200 a un %s con sus grupos, con id y nombre",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await requestThroughBoundary();
 
@@ -92,7 +92,7 @@ describe("GET /api/v1/account/groups", () => {
   );
 
   it("responde una lista vacía a quien no pertenece a ningún grupo", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
     listGroupsOf.mockResolvedValue([]);
 
     const response = await requestThroughBoundary();
@@ -102,7 +102,7 @@ describe("GET /api/v1/account/groups", () => {
   });
 
   it("lee con la sesión de quien llama y sólo por su id", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
     await requestThroughBoundary();
 
@@ -135,7 +135,7 @@ describe("GET /api/v1/account/groups", () => {
   });
 
   it("responde 401 si la sesión caduca entre la frontera y el handler", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
     readAuthenticatedUserId.mockResolvedValue(null);
 
     const response = await requestThroughBoundary();
@@ -145,7 +145,7 @@ describe("GET /api/v1/account/groups", () => {
   });
 
   it("responde 500 sin filtrar el mensaje cuando la base falla", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
     listGroupsOf.mockRejectedValue(new Error("relation groups is on fire"));
     vi.spyOn(console, "error").mockImplementation(() => undefined);
 

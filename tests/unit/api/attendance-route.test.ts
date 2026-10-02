@@ -172,7 +172,7 @@ describe("GET /api/v1/attendance/[eventId]", () => {
   it.each<Role>(["Coach", "Admin"])(
     "sirve a un %s la hoja con toda la audiencia, en absent sin RSVP",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await openSheet();
 
@@ -193,7 +193,7 @@ describe("GET /api/v1/attendance/[eventId]", () => {
   ] as const)(
     "dice a un %s que mira la hoja como %s (#414)",
     async (role, viewer) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await openSheet();
 
@@ -205,7 +205,7 @@ describe("GET /api/v1/attendance/[eventId]", () => {
   it.each<Role>(["Committee", "Player"])(
     "responde 403 a un %s",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       await expectError(await openSheet(), 403, { code: "forbidden" });
     },
@@ -220,14 +220,14 @@ describe("GET /api/v1/attendance/[eventId]", () => {
   it.each(["no-es-un-uuid", "e9e9e9e9-0000-4000-8000-00000000000e"])(
     "responde 404 con el evento %s",
     async (eventId) => {
-      givenSession({ kind: "active", role: "Coach" });
+      givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
       await expectError(await openSheet(eventId), 404, { code: "not_found" });
     },
   );
 
   it("responde 422 con un entrenamiento que todavía no empezó", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
     givenClub({
       events: [
         {
@@ -244,7 +244,7 @@ describe("GET /api/v1/attendance/[eventId]", () => {
   });
 
   it("responde 422 con un entrenamiento cancelado", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
     givenClub({ events: [{ ...STARTED_TRAINING, status: "cancelled" }] });
 
     await expectError(await openSheet(), 422, {
@@ -256,7 +256,7 @@ describe("GET /api/v1/attendance/[eventId]", () => {
 
 describe("PUT /api/v1/attendance/[eventId]", () => {
   it("guarda la hoja y responde 200 con los totales", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     const response = await saveSheet(EVERYONE_PRESENT);
 
@@ -282,7 +282,7 @@ describe("PUT /api/v1/attendance/[eventId]", () => {
     ["un id que no es uuid", [{ userId: "ana", status: "present" }]],
     ["una lista vacía", []],
   ])("responde 400 con %s y no escribe nada", async (_, records) => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     await expectError(await saveSheet({ records }), 400, {
       code: "validation_error",
@@ -291,7 +291,7 @@ describe("PUT /api/v1/attendance/[eventId]", () => {
   });
 
   it("responde 422 con alguien que no es de la hoja", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     await expectError(
       await saveSheet({
@@ -304,7 +304,7 @@ describe("PUT /api/v1/attendance/[eventId]", () => {
   });
 
   it("responde 422 con un entrenamiento cancelado", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
     givenClub({ events: [{ ...STARTED_TRAINING, status: "cancelled" }] });
 
     await expectError(await saveSheet(EVERYONE_PRESENT), 422, {
@@ -314,7 +314,7 @@ describe("PUT /api/v1/attendance/[eventId]", () => {
   });
 
   it("responde 404 con un evento que no existe", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     await expectError(
       await saveSheet(EVERYONE_PRESENT, "e9e9e9e9-0000-4000-8000-00000000000e"),
@@ -326,7 +326,7 @@ describe("PUT /api/v1/attendance/[eventId]", () => {
   it.each<Role>(["Committee", "Player"])(
     "responde 403 a un %s",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       await expectError(await saveSheet(EVERYONE_PRESENT), 403, {
         code: "forbidden",
@@ -345,7 +345,7 @@ describe("GET /api/v1/attendance/sessions", () => {
   it.each<Role>(["Coach", "Admin"])(
     "sirve a un %s las sesiones con sus totales",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await listSessions();
 
@@ -369,7 +369,7 @@ describe("GET /api/v1/attendance/sessions", () => {
   it.each<Role>(["Committee", "Player"])(
     "responde 403 a un %s",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       await expectError(await listSessions(), 403, { code: "forbidden" });
     },

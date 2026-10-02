@@ -58,6 +58,8 @@ export type FakePlayer = {
   readonly coverage?: PositionCoverage;
   /** Sin evaluación si falta. */
   readonly ratings?: readonly number[];
+  /** Si su membresía está al día (#453); sin decirlo, lo está. */
+  readonly membershipCurrent?: boolean;
 };
 
 export type FakeTeamsClubOptions = {
@@ -182,6 +184,7 @@ export function fakeTeamsClub(
           positionId: player.positionId ?? null,
           coverage: player.coverage ?? null,
           ratings: player.ratings ?? null,
+          membershipCurrent: player.membershipCurrent ?? true,
         })),
     findSplit: async () => split,
     saveSplit: async (newSplit) => {

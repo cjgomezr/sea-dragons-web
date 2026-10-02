@@ -105,6 +105,7 @@ function mockWiring(options: WiringOptions = {}): void {
     readSessionState: async () => ({
       kind: "active",
       role: options.callerRole ?? "Coach",
+      membershipCurrent: true,
     }),
   }));
 }
@@ -368,6 +369,7 @@ describe("los grupos en la frontera", () => {
       const response = await boundaryResponse(path, {
         kind: "active",
         role: "Player",
+        membershipCurrent: true,
       });
 
       await expectErrorCode(response, 403, "forbidden");
@@ -396,6 +398,7 @@ describe("los grupos en la frontera", () => {
       const response = await boundaryResponse(GROUPS_API_PATH, {
         kind: "active",
         role,
+        membershipCurrent: true,
       });
 
       expect(response.headers.get(CONTINUE_HEADER)).toBe("1");

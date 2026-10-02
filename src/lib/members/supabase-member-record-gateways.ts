@@ -9,6 +9,10 @@ import { createGroupMembersGateways } from "@/lib/groups/supabase-group-members-
 import { createGroupsGateways } from "@/lib/groups/supabase-groups-gateways";
 import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-groups-gateway";
 import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
+import {
+  MEMBERSHIP_STANDING_EMBED,
+  readEmbeddedMembershipStatus,
+} from "@/lib/membership/supabase-membership-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { signProfilePhotoUrl } from "./supabase-profile-photo-gateways";
@@ -42,8 +46,9 @@ import type {
  */
 
 const MEMBERS_TABLE = "members";
-const RECORD_COLUMNS =
-  "user_id, full_name, joined_on, account_status, auf_number, auf_expiry, auf_verified_at, date_of_birth, created_at, guardian_consent_at, photo_path";
+// La membresía va por el `left join` del chip del Admin (#453).
+const RECORD_COLUMNS = `user_id, full_name, joined_on, account_status, auf_number, auf_expiry, auf_verified_at, date_of_birth, created_at, guardian_consent_at, photo_path, ${MEMBERSHIP_STANDING_EMBED}`;
+const MEMBERSHIPS_RELATION = "memberships";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -58,7 +63,7 @@ function readAccountStatus(row: Row): AccountStatus {
   return status;
 }
 
-function toStoredMemberRecord(row: Row): StoredMemberRecord {
+function toStoredMemberRecord(row: Row, now: Date): StoredMemberRecord {
   return {
     userId: readRequiredText(row, "user_id", MEMBERS_TABLE),
     fullName: readRequiredText(row, "full_name", MEMBERS_TABLE),
@@ -74,6 +79,10 @@ function toStoredMemberRecord(row: Row): StoredMemberRecord {
     hasGuardianConsent:
       readText(row, "guardian_consent_at", MEMBERS_TABLE) !== null,
     photoPath: readText(row, "photo_path", MEMBERS_TABLE),
+    membershipStatus: readEmbeddedMembershipStatus(
+      row[MEMBERSHIPS_RELATION],
+      now,
+    ),
   };
 }
 
@@ -205,7 +214,7 @@ export function createMemberRecordGateways(
             `No se pudo leer la ficha del socio ${userId}: ${error.message}`,
           );
         }
-        return data === null ? null : toStoredMemberRecord(data);
+        return data === null ? null : toStoredMemberRecord(data, new Date());
       },
 
       findMemberGroups: ({ userId }) => memberGroups.listGroupsOf(userId),

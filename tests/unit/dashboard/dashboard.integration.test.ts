@@ -11,6 +11,7 @@ import {
   type TestUser,
   createServiceRoleTestClient,
   describeRls,
+  seedCurrentMembership,
   withSeededRows,
   withTestUser,
 } from "../../support/rls";
@@ -66,7 +67,10 @@ function withPlayer<T>(
           role: "Player",
         },
       ],
-      () => run(user),
+      async () => {
+        await seedCurrentMembership(serviceClient, { clubId, userId: user.id });
+        return run(user);
+      },
     ),
   );
 }
@@ -148,6 +152,9 @@ describeRls("el dashboard en Supabase", () => {
         const fresh = await readDashboard(gateways, request);
 
         expect(reported).toEqual([]);
+        if (fresh.kind !== "member") {
+          throw new Error("Un socio al día recibe el inicio de socio.");
+        }
         expect(fresh.tiles).toEqual({
           attendance: {
             kind: "own_attendance",
@@ -187,10 +194,44 @@ describeRls("el dashboard en Supabase", () => {
         });
         const afterVisit = await readDashboard(gateways, request);
 
-        expect(afterVisit.tiles.unreadNews).toEqual({
+        expect(afterVisit).toMatchObject({ kind: "member" });
+        expect(
+          afterVisit.kind === "member" && afterVisit.tiles.unreadNews,
+        ).toEqual({
           kind: "unread",
           count: 0,
           announcements: 0,
+        });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "sirve el inicio reducido a quien dejó de estar al día (#453)",
+    async () => {
+      await withHome(async (home) => {
+        const { error } = await home.serviceClient.client
+          .from("memberships")
+          .update({ status: "past_due" })
+          .eq("user_id", home.player.id);
+        if (error) {
+          throw new Error(`No se pudo mover la membresía: ${error.message}`);
+        }
+
+        const result = await readDashboard(
+          createDashboardGateways(home.serviceClient.client),
+          { callerId: home.player.id, now: new Date() },
+        );
+
+        expect(result).toEqual({
+          kind: "restricted",
+          viewer: { firstName: "Pía" },
+          block: "past_due",
+          nextTraining: {
+            kind: "training",
+            training: expect.objectContaining({ id: home.trainingId }),
+          },
         });
       });
     },

@@ -7,7 +7,10 @@ import {
   type MembershipGateway,
   type MembershipPlan,
   type MembershipRecord,
+  type MembershipStanding,
+  type MembershipStatus,
   type MembershipWaiver,
+  resolveStandingStatus,
 } from "./membership";
 import type { StripeWebhookGateway } from "@/lib/stripe/stripe-webhook";
 import type {
@@ -48,6 +51,57 @@ const membershipRowSchema = z.object({
 });
 
 type MembershipRow = z.infer<typeof membershipRowSchema>;
+
+/**
+ * La membresía como `left join` desde `members` (#453), con lo justo para
+ * saber si está al día. `memberships` tiene dos claves foráneas hacia
+ * `members` (el socio y quien lo eximió), así que se nombra la del socio: sin
+ * ella PostgREST no sabe cuál seguir y la consulta falla.
+ */
+export const MEMBERSHIP_STANDING_EMBED =
+  "memberships!memberships_member_same_club_fkey(status, stripe_subscription_id, trial_end, current_period_end, waived_until)";
+
+const standingRowSchema = z.object({
+  status: z.enum(MEMBERSHIP_STATUSES),
+  stripe_subscription_id: z.string().nullable(),
+  trial_end: z.string().nullable(),
+  current_period_end: z.string().nullable(),
+  waived_until: z.string().nullable(),
+});
+
+/** La clave primaria de `memberships` es la foránea, así que PostgREST la
+ * embebe como un objeto; se acepta también la lista de una fila por si una
+ * versión la sirve así. Ausente o vacía, el socio no tiene membresía. */
+const embeddedStandingSchema = z
+  .union([standingRowSchema, z.array(standingRowSchema).max(1)])
+  .nullish();
+
+export function parseMembershipStanding(
+  embedded: unknown,
+): MembershipStanding | null {
+  const parsed = embeddedStandingSchema.parse(embedded);
+  const row = Array.isArray(parsed) ? parsed[0] : parsed;
+  if (row === undefined || row === null) {
+    return null;
+  }
+  return {
+    status: row.status,
+    stripeSubscriptionId: row.stripe_subscription_id,
+    trialEnd: toDate(row.trial_end),
+    currentPeriodEnd: toDate(row.current_period_end),
+    waivedUntil: toDate(row.waived_until),
+  };
+}
+
+/** El estado que cuenta hoy de la membresía embebida, o `null` si el socio
+ * no tiene: lo que enseña el chip del Admin (#453). */
+export function readEmbeddedMembershipStatus(
+  embedded: unknown,
+  now: Date,
+): MembershipStatus | null {
+  const standing = parseMembershipStanding(embedded);
+  return standing === null ? null : resolveStandingStatus(standing, now);
+}
 
 function toDate(value: string | null): Date | null {
   return value === null ? null : new Date(value);

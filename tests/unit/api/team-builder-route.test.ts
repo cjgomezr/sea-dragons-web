@@ -228,7 +228,7 @@ describe("la frontera del builder", () => {
       BUILDER_CALLS.map(([name, call]) => [role, name, call] as const),
     ),
   )("responde 403 a un %s en %s", async (role, _, call) => {
-    givenSession({ kind: "active", role });
+    givenSession({ kind: "active", role, membershipCurrent: true });
 
     await expectError(await call(), 403, { code: "forbidden" });
   });
@@ -242,7 +242,7 @@ describe("la frontera del builder", () => {
   it.each(BUILDER_CALLS)(
     "responde 404 con un evento que no existe en %s",
     async (name) => {
-      givenSession({ kind: "active", role: "Coach" });
+      givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
       const calls = {
         GET: () => openBuilder(MISSING_EVENT_ID),
         PUT: () => saveSplit(MANUAL_SPLIT, MISSING_EVENT_ID),
@@ -257,7 +257,7 @@ describe("la frontera del builder", () => {
   it.each(BUILDER_CALLS)(
     "responde 422 con un evento cancelado en %s",
     async (_, call) => {
-      givenSession({ kind: "active", role: "Coach" });
+      givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
       givenClub({
         events: [{ ...SCRIMMAGE, status: "cancelled" }],
         split: DRAFT,
@@ -275,7 +275,7 @@ describe("GET /api/v1/teams/[eventId]", () => {
   it.each<Role>(["Coach", "Admin"])(
     "sirve a un %s la escuadra con su OVR",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await openBuilder();
 
@@ -293,7 +293,7 @@ describe("GET /api/v1/teams/[eventId]", () => {
   );
 
   it("responde 404 con un id que no es uuid", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     await expectError(await openBuilder("no-es-un-uuid"), 404, {
       code: "not_found",
@@ -304,7 +304,7 @@ describe("GET /api/v1/teams/[eventId]", () => {
     ["team_event_not_buildable", { ...SCRIMMAGE, eventType: "meeting" }],
     ["team_event_past", { ...SCRIMMAGE, startsOn: "2027-06-14" }],
   ] as const)("responde 422 con %s", async (reason, event) => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
     givenClub({ events: [event] });
 
     await expectError(await openBuilder(), 422, {
@@ -316,7 +316,7 @@ describe("GET /api/v1/teams/[eventId]", () => {
 
 describe("PUT /api/v1/teams/[eventId]", () => {
   it("guarda el reparto en borrador y responde 200", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     const response = await saveSplit(MANUAL_SPLIT);
 
@@ -361,7 +361,7 @@ describe("PUT /api/v1/teams/[eventId]", () => {
       { ...MANUAL_SPLIT, assignments: [{ userId: "ana", team: "a" }] },
     ],
   ])("responde 400 con %s y no escribe nada", async (_, body) => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     await expectError(await saveSplit(body), 400, {
       code: "validation_error",
@@ -370,7 +370,7 @@ describe("PUT /api/v1/teams/[eventId]", () => {
   });
 
   it("responde 422 con alguien fuera de la escuadra y no escribe nada", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     await expectError(
       await saveSplit({
@@ -386,7 +386,7 @@ describe("PUT /api/v1/teams/[eventId]", () => {
 
 describe("POST /api/v1/teams/[eventId]/auto-balance", () => {
   it("responde 200 con los dos equipos y los totales", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     const response = await autoBalance();
 
@@ -399,7 +399,7 @@ describe("POST /api/v1/teams/[eventId]/auto-balance", () => {
   });
 
   it("responde 422 con la escuadra vacía", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
     givenClub({ players: [] });
 
     await expectError(await autoBalance(), 422, {
@@ -411,7 +411,7 @@ describe("POST /api/v1/teams/[eventId]/auto-balance", () => {
 
 describe("POST /api/v1/teams/[eventId]/publication", () => {
   it("publica y responde 201 con cuántos se avisaron", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
     givenClub({ split: DRAFT });
 
     const response = await publish();
@@ -428,7 +428,7 @@ describe("POST /api/v1/teams/[eventId]/publication", () => {
   });
 
   it("responde 422 con un reparto vacío", async () => {
-    givenSession({ kind: "active", role: "Coach" });
+    givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 
     await expectError(await publish(), 422, {
       code: "business_rule",
@@ -441,7 +441,7 @@ describe("GET /api/v1/teams", () => {
   it.each<Role>(["Coach", "Admin"])(
     "sirve a un %s los eventos armables",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await listEvents();
 
@@ -465,7 +465,7 @@ describe("GET /api/v1/teams", () => {
   it.each<Role>(["Committee", "Player"])(
     "responde 403 a un %s",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       await expectError(await listEvents(), 403, { code: "forbidden" });
     },
@@ -482,7 +482,7 @@ describe("GET /api/v1/events/[id]/team", () => {
   it.each<Role>(["Player", "Committee", "Coach", "Admin"])(
     "sirve a un %s el reparto publicado sin OVR",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
       givenClub({ split: { ...DRAFT, publishedAt: PUBLISHED_AT } });
 
       const response = await openMyTeam();
@@ -497,7 +497,7 @@ describe("GET /api/v1/events/[id]/team", () => {
   );
 
   it("responde que no hay equipos publicados con un borrador", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
     givenClub({ split: DRAFT });
 
     const response = await openMyTeam();
@@ -511,7 +511,7 @@ describe("GET /api/v1/events/[id]/team", () => {
   it.each(["no-es-un-uuid", MISSING_EVENT_ID])(
     "responde 404 con el evento %s",
     async (eventId) => {
-      givenSession({ kind: "active", role: "Player" });
+      givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
       await expectError(await openMyTeam(eventId), 404, {
         code: "not_found",

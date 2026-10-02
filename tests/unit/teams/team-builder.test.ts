@@ -160,6 +160,40 @@ describe("la escuadra", () => {
     await expect(open({ events: [today] })).resolves.toBeDefined();
   });
 
+  it("deja fuera de la escuadra a quien no tiene la membresía al día, aunque dijera Sí o Quizás (#453)", async () => {
+    const builder = await open({
+      players: [
+        ANA,
+        { ...BRUNO, membershipCurrent: false },
+        { ...CARLA, membershipCurrent: false },
+      ],
+    });
+
+    expect(builder.available.map((entry) => entry.userId)).toEqual([
+      ANA.userId,
+    ]);
+    expect(builder.maybe).toEqual([]);
+  });
+
+  it("marca fuera de la escuadra a un asignado que dejó de estar al día (#453)", async () => {
+    const builder = await open({
+      players: [ANA, { ...BRUNO, membershipCurrent: false }],
+      split: draftWith([
+        { userId: ANA.userId, team: "a" },
+        { userId: BRUNO.userId, team: "b" },
+      ]),
+    });
+
+    expect(builder.split?.assignments).toEqual([
+      expect.objectContaining({ userId: ANA.userId, isOutsideSquad: false }),
+      expect.objectContaining({
+        userId: BRUNO.userId,
+        fullName: BRUNO.fullName,
+        isOutsideSquad: true,
+      }),
+    ]);
+  });
+
   it("marca fuera de la escuadra a un asignado que cambió a No", async () => {
     const builder = await open({
       players: [ANA, DIEGO],
@@ -291,6 +325,19 @@ describe("guardar el reparto", () => {
     expect(club.split()?.assignments).toEqual([
       { userId: BRUNO.userId, team: "a" },
     ]);
+  });
+
+  it("rechaza a quien no tiene la membresía al día sin escribir nada (#453)", async () => {
+    const { club, saving } = save(
+      { players: [ANA, { ...BRUNO, membershipCurrent: false }] },
+      [
+        { userId: ANA.userId, team: "a" },
+        { userId: BRUNO.userId, team: "b" },
+      ],
+    );
+
+    await expect(saving).rejects.toBeInstanceOf(TeamPlayerOutsideSquadError);
+    expect(club.saves).toEqual([]);
   });
 
   it("rechaza a alguien fuera de la escuadra sin escribir nada", async () => {

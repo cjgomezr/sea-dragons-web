@@ -62,6 +62,7 @@ const ANA: DirectoryMemberRecord = {
   isAufVerified: true,
   photoPath: "aaaaaaaa-0000-4000-8000-00000000000a/foto.webp",
   isEvaluated: true,
+  membershipStatus: "active",
 };
 
 const BRUNO: DirectoryMemberRecord = {
@@ -77,6 +78,7 @@ const BRUNO: DirectoryMemberRecord = {
   isAufVerified: true,
   photoPath: null,
   isEvaluated: false,
+  membershipStatus: "pending",
 };
 
 const MARIA: DirectoryMemberRecord = {
@@ -92,6 +94,7 @@ const MARIA: DirectoryMemberRecord = {
   isAufVerified: false,
   photoPath: null,
   isEvaluated: true,
+  membershipStatus: "waived",
 };
 
 const ZOE: DirectoryMemberRecord = {
@@ -108,6 +111,7 @@ const ZOE: DirectoryMemberRecord = {
   isAufVerified: false,
   photoPath: "dddddddd-0000-4000-8000-00000000000d/foto.png",
   isEvaluated: false,
+  membershipStatus: null,
 };
 
 const CLUB: readonly DirectoryMemberRecord[] = [ZOE, MARIA, ANA, BRUNO];
@@ -473,6 +477,51 @@ describe("el orden del directorio", () => {
   });
 });
 
+describe("la membresía en el directorio (#453)", () => {
+  it("le da al Admin el estado de la membresía de cada socio", async () => {
+    const listing = await listDirectory(gateways({ callerRole: "Admin" }), {
+      callerId: CALLER_ID,
+      query: { ...DEFAULT_DIRECTORY_QUERY, includeInactive: true },
+      todayInClub: TODAY,
+    });
+    if (listing.kind !== "admin") {
+      throw new Error("Un Admin tiene que recibir la vista de Admin.");
+    }
+
+    expect(
+      Object.fromEntries(
+        listing.members.map((member) => [
+          member.fullName,
+          member.membershipStatus,
+        ]),
+      ),
+    ).toEqual({
+      [ANA.fullName]: "active",
+      [BRUNO.fullName]: "pending",
+      [MARIA.fullName]: "waived",
+      [ZOE.fullName]: null,
+    });
+  });
+
+  it.each<Role>(["Coach", "Committee", "Player"])(
+    "no le da el estado de la membresía a un %s, y lista igual a quien no está al día",
+    async (callerRole) => {
+      const listing = await listDirectory(gateways({ callerRole }), {
+        callerId: CALLER_ID,
+        query: DEFAULT_DIRECTORY_QUERY,
+        todayInClub: TODAY,
+      });
+
+      expect(listing.members.map((member) => member.fullName)).toContain(
+        BRUNO.fullName,
+      );
+      for (const member of listing.members) {
+        expect(member).not.toHaveProperty("membershipStatus");
+      }
+    },
+  );
+});
+
 describe("el AUF en el directorio", () => {
   async function listForAdmin(): Promise<
     ReadonlyMap<string, Record<string, unknown>>
@@ -676,6 +725,7 @@ describe("el rol nuevo en la lista (#240)", () => {
       isAufVerified: true,
       isAufExpired: true,
       isEvaluated: true,
+      membershipStatus: "active" as const,
     };
     const listing: DirectoryListing = { kind: "admin", members: [admin] };
 

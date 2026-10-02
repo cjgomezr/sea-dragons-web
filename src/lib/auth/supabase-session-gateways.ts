@@ -9,6 +9,11 @@ import {
   createSessionClient,
   expireSessionCookies,
 } from "@/lib/supabase/session-client";
+import type { MembershipStanding } from "@/lib/membership/membership";
+import {
+  MEMBERSHIP_STANDING_EMBED,
+  parseMembershipStanding,
+} from "@/lib/membership/supabase-membership-gateways";
 import { type AccountStatus, parseAccountStatus } from "./account-status";
 import { type Role, parseRole } from "./roles";
 import type {
@@ -29,6 +34,7 @@ import type {
 const MEMBERS_TABLE = "members";
 const ACCOUNT_STATUS_COLUMN = "account_status";
 const ROLE_COLUMN = "role";
+const MEMBERSHIP_EMBED_KEY = "memberships";
 
 /** Los códigos con los que Supabase Auth dice "esas credenciales no valen".
  * Cualquier otro error es un problema del servicio, y confundirlos sería
@@ -113,18 +119,21 @@ function createIdentityGateway(client: SupabaseClient): IdentityGateway {
   };
 }
 
-/** Lo que la fila de miembro dice de quién puede qué. Cada campo es `null`
- * cuando la base guarda un valor que el catálogo no reconoce: qué hacer con
- * eso lo decide quien llama, no la consulta. */
+/** Lo que la fila de miembro dice de quién puede qué. El estado y el rol son
+ * `null` cuando la base guarda un valor que el catálogo no reconoce: qué hacer
+ * con eso lo decide quien llama, no la consulta. La membresía es `null` si el
+ * socio no tiene. */
 export type MemberAccess = {
   readonly accountStatus: AccountStatus | null;
   readonly role: Role | null;
+  readonly membership: MembershipStanding | null;
 };
 
 /**
- * El estado de la cuenta y el rol, en una sola consulta: la frontera los
- * necesita los dos en cada petición, y dos viajes a la base por petición serían
- * el doble de latencia para la misma fila.
+ * El estado de la cuenta, el rol y la membresía (#453), en una sola consulta:
+ * la frontera los necesita en cada petición, y un viaje a la base por cada
+ * uno sería más latencia para la misma fila. La membresía llega por un `left
+ * join` que `memberships_select_own` deja leer, porque es la propia.
  *
  * Lo usan dos sitios: el inicio de sesión, que decide a dónde manda a quien
  * entra, y la frontera de sesión, que decide qué alcanza en cada petición.
@@ -137,7 +146,9 @@ export async function findMemberAccess(
 ): Promise<MemberAccess | null> {
   const { data, error } = await client
     .from(MEMBERS_TABLE)
-    .select(`${ACCOUNT_STATUS_COLUMN}, ${ROLE_COLUMN}`)
+    .select(
+      `${ACCOUNT_STATUS_COLUMN}, ${ROLE_COLUMN}, ${MEMBERSHIP_STANDING_EMBED}`,
+    )
     .eq("user_id", userId)
     .maybeSingle();
   if (error) {
@@ -148,6 +159,7 @@ export async function findMemberAccess(
     : {
         accountStatus: parseAccountStatus(data[ACCOUNT_STATUS_COLUMN]),
         role: parseRole(data[ROLE_COLUMN]),
+        membership: parseMembershipStanding(data[MEMBERSHIP_EMBED_KEY]),
       };
 }
 

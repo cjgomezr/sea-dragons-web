@@ -6,7 +6,12 @@ import {
   CALENDAR_NEW_EVENT_QUERY_PARAM,
   CALENDAR_PATH,
 } from "@/lib/auth/routes";
-import type { Dashboard } from "@/lib/dashboard/dashboard";
+import { MembershipNotice } from "@/components/MembershipNotice";
+import type {
+  Dashboard,
+  MemberDashboard,
+  RestrictedDashboard,
+} from "@/lib/dashboard/dashboard";
 import { greetingPeriodAt } from "@/lib/dashboard/dashboard-view";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
@@ -18,7 +23,7 @@ import {
 } from "./dashboard-client";
 import { LatestNewsPanel, UpcomingPanel } from "./DashboardLists";
 import { DashboardTiles } from "./DashboardTiles";
-import { NextTrainingCard } from "./NextTrainingCard";
+import { NextTrainingCard, ReadOnlyTrainingCard } from "./NextTrainingCard";
 
 /**
  * La pantalla de inicio (#426, RF-1 a RF-4 del PRD de E14): el saludo, las
@@ -31,6 +36,10 @@ import { NextTrainingCard } from "./NextTrainingCard";
  * `GET /api/v1/dashboard` (#424) en una petición, la misma que usará la
  * aplicación nativa de Release 2 (CON-002). Cambiar de idioma vuelve a
  * pintar lo que ya llegó, sin pedirlo otra vez.
+ *
+ * A quien no tiene la membresía al día el endpoint le sirve el inicio
+ * reducido (#453): el saludo, el aviso que lleva a Pagos y el próximo
+ * entrenamiento sin RSVP.
  */
 
 const NEW_TRAINING_HREF = `${CALENDAR_PATH}?${new URLSearchParams({
@@ -109,17 +118,46 @@ function LoadFailure({
   );
 }
 
-function DashboardContent({
+type ContentProps<Shown extends Dashboard> = {
+  readonly translate: Translator;
+  readonly dashboard: Shown;
+  readonly loadedAt: Date;
+  readonly canCreateTrainings: boolean;
+};
+
+function RestrictedContent({
   translate,
   dashboard,
   loadedAt,
   canCreateTrainings,
-}: {
-  readonly translate: Translator;
-  readonly dashboard: Dashboard;
-  readonly loadedAt: Date;
-  readonly canCreateTrainings: boolean;
-}): React.JSX.Element {
+}: ContentProps<RestrictedDashboard>): React.JSX.Element {
+  return (
+    <>
+      <DashboardHeader
+        translate={translate}
+        firstName={dashboard.viewer.firstName}
+        now={clubMoment(loadedAt)}
+        canCreateTrainings={canCreateTrainings}
+      />
+      <MembershipNotice
+        translate={translate}
+        block={dashboard.block}
+        linksToPayments
+      />
+      <ReadOnlyTrainingCard
+        translate={translate}
+        nextTraining={dashboard.nextTraining}
+      />
+    </>
+  );
+}
+
+function MemberContent({
+  translate,
+  dashboard,
+  loadedAt,
+  canCreateTrainings,
+}: ContentProps<MemberDashboard>): React.JSX.Element {
   const now = clubMoment(loadedAt);
   const { nextTraining } = dashboard.tiles;
   return (
@@ -208,8 +246,16 @@ export function DashboardScreen({
           onRetry={retry}
         />
       ) : null}
-      {state.kind === "ready" ? (
-        <DashboardContent
+      {state.kind === "ready" && state.dashboard.kind === "member" ? (
+        <MemberContent
+          translate={translate}
+          dashboard={state.dashboard}
+          loadedAt={state.loadedAt}
+          canCreateTrainings={canCreateTrainings}
+        />
+      ) : null}
+      {state.kind === "ready" && state.dashboard.kind === "restricted" ? (
+        <RestrictedContent
           translate={translate}
           dashboard={state.dashboard}
           loadedAt={state.loadedAt}

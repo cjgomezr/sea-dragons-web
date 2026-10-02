@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Role } from "@/lib/auth/roles";
 import type { Locale } from "@/lib/i18n/locale";
+import type { MembershipBlock } from "@/lib/membership/membership";
 
 const requestLocale = { current: "en" as Locale };
 const callerRole = { current: "Player" as Role };
@@ -16,6 +17,10 @@ vi.mock("@/lib/club/supabase-club-brand", () => ({
 }));
 vi.mock("@/lib/auth/caller-role", () => ({
   readCallerRole: async () => callerRole.current,
+}));
+const callerBlock = { current: null as MembershipBlock | null };
+vi.mock("@/lib/membership/caller-membership", () => ({
+  readCallerMembershipBlock: async () => callerBlock.current,
 }));
 
 const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");
@@ -66,6 +71,45 @@ describe("secciones", () => {
   );
 });
 
+// #453: Pagos es a donde la frontera lleva a quien no está al día. Hasta su
+// pantalla (#455) basta el marcador con el motivo.
+describe("Pagos de quien no tiene la membresía al día", () => {
+  afterEach(() => {
+    callerBlock.current = null;
+  });
+
+  it.each<[MembershipBlock, string]>([
+    ["pending", "Your membership is pending: you haven't added a card yet."],
+    ["past_due", "Your last payment didn't go through."],
+    ["cancelled", "Your membership is cancelled."],
+  ])("dice el motivo de una membresía %s", async (block, reason) => {
+    callerBlock.current = block;
+
+    await renderIn("en", PagosPage);
+
+    expect(screen.getByText(reason)).toBeInTheDocument();
+    expect(
+      screen.getByText(/you only see your profile, Payments and the calendar/),
+    ).toBeInTheDocument();
+  });
+
+  it("dice el motivo en español", async () => {
+    callerBlock.current = "past_due";
+
+    await renderIn("es", PagosPage);
+
+    expect(
+      screen.getByText("Tu último pago no se pudo cobrar."),
+    ).toBeInTheDocument();
+  });
+
+  it("no dice ningún motivo a quien está al día", async () => {
+    await renderIn("en", PagosPage);
+
+    expect(screen.queryByText(/only see your profile/)).not.toBeInTheDocument();
+  });
+});
+
 describe("panel principal", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -108,6 +152,7 @@ describe("panel principal", () => {
           new Response(
             JSON.stringify({
               data: {
+                kind: "member",
                 viewer: { firstName: "Alba" },
                 tiles: {
                   attendance: { kind: "unavailable" },

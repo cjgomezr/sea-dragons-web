@@ -2,7 +2,12 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
-import type { Dashboard, NextTraining } from "@/lib/dashboard/dashboard";
+import type {
+  Dashboard,
+  MemberDashboard,
+  NextTraining,
+  RestrictedDashboard,
+} from "@/lib/dashboard/dashboard";
 import type { AgendaEvent } from "@/lib/events/event-agenda";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
 import { formatClockTime, formatPercent } from "@/lib/i18n/format";
@@ -90,7 +95,8 @@ const LATEST_NEWS = [
   },
 ] as const;
 
-const ADMIN_DASHBOARD: Dashboard = {
+const ADMIN_DASHBOARD: MemberDashboard = {
+  kind: "member",
   viewer: { firstName: "Alba" },
   tiles: {
     attendance: {
@@ -105,7 +111,7 @@ const ADMIN_DASHBOARD: Dashboard = {
   latestNews: { kind: "news", posts: LATEST_NEWS },
 };
 
-const PLAYER_DASHBOARD: Dashboard = {
+const PLAYER_DASHBOARD: MemberDashboard = {
   ...ADMIN_DASHBOARD,
   tiles: {
     ...ADMIN_DASHBOARD.tiles,
@@ -116,7 +122,8 @@ const PLAYER_DASHBOARD: Dashboard = {
   },
 };
 
-const EMPTY_DASHBOARD: Dashboard = {
+const EMPTY_DASHBOARD: MemberDashboard = {
+  kind: "member",
   viewer: { firstName: "Alba" },
   tiles: {
     attendance: { kind: "club_rate", rate: { kind: "no_data" } },
@@ -651,6 +658,77 @@ describe("errores", () => {
     );
     expect(
       screen.getByRole("button", { name: "Try again" }),
+    ).toBeInTheDocument();
+  });
+});
+
+const RESTRICTED_DASHBOARD: RestrictedDashboard = {
+  kind: "restricted",
+  viewer: { firstName: "Alba" },
+  block: "pending",
+  nextTraining: { kind: "training", training: POOL_TRAINING },
+};
+
+describe("el inicio de quien no tiene la membresía al día (#453)", () => {
+  it("saluda y avisa del motivo con el enlace a Pagos", async () => {
+    stubDashboard(RESTRICTED_DASHBOARD);
+
+    await renderScreen();
+
+    expect(
+      screen.getByText(
+        "Your membership is pending: you haven't added a card yet.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Go to Payments" }),
+    ).toHaveAttribute("href", "/pagos");
+  });
+
+  it("enseña el próximo entrenamiento sin RSVP", async () => {
+    stubDashboard(RESTRICTED_DASHBOARD);
+
+    await renderScreen();
+
+    expect(
+      within(trainingCard()).getByText("Pool Training"),
+    ).toBeInTheDocument();
+    expect(
+      within(trainingCard()).queryByRole("button", { name: "Yes" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("no pinta teselas de club ni noticias", async () => {
+    stubDashboard(RESTRICTED_DASHBOARD);
+
+    await renderScreen();
+
+    expect(
+      screen.queryByRole("region", { name: "Club at a glance" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Latest news/i)).not.toBeInTheDocument();
+  });
+
+  it("dice cuando no hay entrenamiento a la vista", async () => {
+    stubDashboard({ ...RESTRICTED_DASHBOARD, nextTraining: { kind: "none" } });
+
+    await renderScreen();
+
+    expect(
+      within(trainingCard()).getByText("No training scheduled"),
+    ).toBeInTheDocument();
+  });
+
+  it("avisa en español", async () => {
+    stubDashboard({ ...RESTRICTED_DASHBOARD, block: "cancelled" });
+
+    await renderScreen({ locale: "es" });
+
+    expect(
+      screen.getByText("Tu membresía está cancelada."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Ir a Pagos" }),
     ).toBeInTheDocument();
   });
 });

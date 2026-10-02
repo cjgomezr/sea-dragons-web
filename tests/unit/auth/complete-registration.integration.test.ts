@@ -312,9 +312,12 @@ describeRls("completar registro contra seadragons-dev", () => {
             now: new Date(),
           });
 
+          // Recién activada, su membresía nace `pending`: entra, pero con la
+          // puerta de socio cerrada hasta que pague (#453).
           await expect(readSessionState(session)).resolves.toEqual({
             kind: "active",
             role: "Player",
+            membershipCurrent: false,
           });
         },
       );

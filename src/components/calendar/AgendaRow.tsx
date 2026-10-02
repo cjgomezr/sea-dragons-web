@@ -116,6 +116,7 @@ export function AgendaRow({
   shouldTakeFocus,
   organizer,
   canTakeAttendance,
+  rsvpDisabledReasonId,
 }: {
   readonly translate: Translator;
   readonly event: AgendaEvent;
@@ -128,13 +129,20 @@ export function AgendaRow({
   /** Si quien mira registra asistencia. Sólo decide si se pinta el enlace:
    * la frontera ya reserva Asistencia a Admin y Coach. */
   readonly canTakeAttendance: boolean;
+  /** El id de la frase que dice por qué quien mira no puede responder (#453),
+   * o `null` si puede. */
+  readonly rsvpDisabledReasonId: string | null;
 }): React.JSX.Element {
   const { isExpanded, detail, toggle, retry, receive } = useEventDetail(
     event.id,
   );
   const { state, respond } = useEventRsvp(event, receive);
   const teams = useEventTeam(event.id);
-  const canHaveTeams = BUILDABLE_EVENT_TYPES.includes(event.eventType);
+  // Los equipos son de socio (#453): sin la membresía al día la frontera los
+  // cierra, así que ni se piden.
+  const isMembershipCurrent = rsvpDisabledReasonId === null;
+  const canHaveTeams =
+    isMembershipCurrent && BUILDABLE_EVENT_TYPES.includes(event.eventType);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const detailId = useId();
   const isCancelled = event.status === "cancelled";
@@ -194,6 +202,7 @@ export function AgendaRow({
               savedResponse={state.tally.myResponse}
               pendingResponse={state.pendingResponse}
               onRespond={respond}
+              disabledReasonId={rsvpDisabledReasonId}
             />
           ) : null}
           <p className="agenda-counts">

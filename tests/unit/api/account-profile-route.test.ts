@@ -107,7 +107,7 @@ async function patchThroughBoundary(body: unknown): Promise<Response> {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  givenSession({ kind: "active", role: "Player" });
+  givenSession({ kind: "active", role: "Player", membershipCurrent: true });
   readAuthenticatedUserId.mockResolvedValue(USER_ID);
   givenStoredAuf(NO_AUF);
   updateOwnProfile.mockImplementation(
@@ -137,7 +137,7 @@ describe("PATCH /api/v1/account/profile", () => {
   it.each(["Admin", "Coach", "Committee", "Player"] as const)(
     "responde 200 con el perfil guardado a un %s",
     async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await patchThroughBoundary(VALID_BODY);
 

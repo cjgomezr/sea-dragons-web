@@ -6,6 +6,7 @@ import {
 } from "@/lib/attendance/supabase-attendance-stats";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { createEventAgendaGateways } from "@/lib/events/supabase-event-agenda-gateways";
+import { createMembershipGateway } from "@/lib/membership/supabase-membership-gateways";
 import { createNewsGateways } from "@/lib/news/supabase-news-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
@@ -119,6 +120,7 @@ export function createDashboardGateways(
     agenda: createEventAgendaGateways(serviceClient),
     news: createNewsGateways(serviceClient),
     roster: createDashboardRosterGateway(serviceClient),
+    membership: createMembershipGateway(serviceClient),
     failures: consoleFailureLog,
   };
 }

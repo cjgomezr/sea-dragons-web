@@ -197,7 +197,7 @@ beforeEach(() => {
   creation = { kind: "created" };
   save = { kind: "saved" };
   refresh = { kind: "already_current" };
-  givenSession({ kind: "active", role: "Coach" });
+  givenSession({ kind: "active", role: "Coach", membershipCurrent: true });
 });
 
 describe("endpoints de evaluaciones", () => {
@@ -221,7 +221,7 @@ describe("endpoints de evaluaciones", () => {
       ["Committee", "otro miembro"],
       ["Committee", "su propia evaluación"],
     ])("responde 403 a un %s que pide %s", async (role, target) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
       const memberId = target === "otro miembro" ? MEMBER_ID : CALLER_ID;
 
       const responses = [
@@ -238,7 +238,7 @@ describe("endpoints de evaluaciones", () => {
     });
 
     it("el handler también responde 403 a un Player que se salte la frontera", async () => {
-      givenSession({ kind: "active", role: "Player" });
+      givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
       const response = await route.GET(
         new NextRequest(evaluationUrl(CALLER_ID)),
@@ -249,7 +249,7 @@ describe("endpoints de evaluaciones", () => {
     });
 
     it.each<Role>(["Coach", "Admin"])("responde 200 a un %s", async (role) => {
-      givenSession({ kind: "active", role });
+      givenSession({ kind: "active", role, membershipCurrent: true });
 
       const response = await getEvaluation();
 

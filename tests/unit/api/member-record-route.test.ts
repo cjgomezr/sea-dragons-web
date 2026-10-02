@@ -99,6 +99,7 @@ function memberRecordGateways(
               registeredAt: REGISTERED_AT,
               hasGuardianConsent: false,
               photoPath: memberPhotoPath,
+              membershipStatus: "active",
             }
           : null,
       findMemberGroups: async () =>
@@ -204,6 +205,7 @@ function givenRole(role: Role): void {
   readSessionState.mockResolvedValue({
     kind: "active",
     role,
+    membershipCurrent: true,
   } satisfies SessionState);
 }
 
@@ -274,6 +276,7 @@ describe("PATCH /api/v1/members/{id}/record", () => {
         dateOfBirth: ADULT_BIRTH,
         registeredAt: REGISTERED_AT,
         hasGuardianConsent: false,
+        membershipStatus: "active",
         photoUrl: null,
         isAufExpired: false,
         groups: [{ id: SENIOR_ID, name: "Senior Squad" }],

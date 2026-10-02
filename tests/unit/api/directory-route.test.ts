@@ -36,6 +36,7 @@ const MARIA: DirectoryMemberRecord = {
   isAufVerified: true,
   photoPath: null,
   isEvaluated: true,
+  membershipStatus: "active",
 };
 
 /** María vino a tres de cuatro; Zoe no tiene sesiones elegibles. */
@@ -60,6 +61,7 @@ const BAJA: DirectoryMemberRecord = {
   isAufVerified: false,
   photoPath: null,
   isEvaluated: true,
+  membershipStatus: "active",
 };
 
 const databaseCalls: string[] = [];
@@ -113,7 +115,11 @@ function mockWiring(callerRole: Role = "Player"): void {
   mockSessionClient();
   vi.doMock("@/lib/auth/session-reader", () => ({
     readAuthenticatedUserId: async () => CALLER_ID,
-    readSessionState: async () => ({ kind: "active", role: callerRole }),
+    readSessionState: async () => ({
+      kind: "active",
+      role: callerRole,
+      membershipCurrent: true,
+    }),
   }));
 }
 
@@ -357,7 +363,11 @@ describe("el directorio en la frontera", () => {
   it.each(["Admin", "Coach", "Committee", "Player"] as const)(
     "deja pasar a un %s",
     async (role) => {
-      const response = await boundaryResponse({ kind: "active", role });
+      const response = await boundaryResponse({
+        kind: "active",
+        role,
+        membershipCurrent: true,
+      });
 
       expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
     },

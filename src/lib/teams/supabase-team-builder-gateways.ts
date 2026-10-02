@@ -7,6 +7,11 @@ import { cachedClubPositions } from "@/lib/club/supabase-club-positions";
 import { EVENT_TYPES } from "@/lib/events/event-creation";
 import { toHoursAndMinutes } from "@/lib/events/supabase-event-management-gateways";
 import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-groups-gateway";
+import { isStandingCurrent } from "@/lib/membership/membership";
+import {
+  MEMBERSHIP_STANDING_EMBED,
+  parseMembershipStanding,
+} from "@/lib/membership/supabase-membership-gateways";
 import { createSupabaseNotificationWriter } from "@/lib/notifications/supabase-notification-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
@@ -53,6 +58,7 @@ const PLAYER_COLUMNS = [
   "user_id, full_name, position_id",
   "position:club_positions!members_position_same_club_fkey(coverage)",
   "member_evaluations(member_evaluation_ratings(rating))",
+  MEMBERSHIP_STANDING_EMBED,
 ].join(", ");
 
 const SPLIT_COLUMNS = [
@@ -83,6 +89,8 @@ const playerRowsSchema = z.array(
     user_id: z.string(),
     full_name: z.string(),
     position_id: z.string().nullable(),
+    // La membresía del `left join`; la estrecha `parseMembershipStanding`.
+    memberships: z.unknown(),
     position: z
       .object({
         coverage: z.enum(POSITION_COVERAGES).nullable(),
@@ -260,6 +268,7 @@ async function findPlayers(
       `No se pudieron leer los jugadores del club ${query.clubId}: ${error.message}`,
     );
   }
+  const now = new Date();
   return playerRowsSchema.parse(data).map((row) => {
     const [evaluation] = row.member_evaluations;
     return {
@@ -271,6 +280,10 @@ async function findPlayers(
         evaluation === undefined
           ? null
           : evaluation.member_evaluation_ratings.map(({ rating }) => rating),
+      membershipCurrent: isStandingCurrent(
+        parseMembershipStanding(row.memberships),
+        now,
+      ),
     };
   });
 }

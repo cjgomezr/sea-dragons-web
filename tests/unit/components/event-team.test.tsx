@@ -144,6 +144,7 @@ async function expandEvent(
       locale={locale}
       canManageEvents={false}
       canTakeAttendance={false}
+      canRespond
     />,
   );
   const heading = await screen.findByRole("heading", { name: event.title });

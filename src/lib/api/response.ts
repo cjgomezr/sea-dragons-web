@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { ApiErrorCode } from "./error-codes";
 
 export type { ApiErrorCode };
+export { MEMBERSHIP_NOT_CURRENT_REASON } from "./error-codes";
 
 export type ApiSuccessStatus = 200 | 201;
 

@@ -79,7 +79,7 @@ beforeEach(() => {
 
 describe("POST /api/v1/account/news-seen", () => {
   it("pone la marca de quien llama en ahora y responde 204", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
 
     const response = await postNewsSeen();
 
@@ -109,7 +109,7 @@ describe("POST /api/v1/account/news-seen", () => {
   });
 
   it("responde 403 a una sesión que no corresponde a ningún socio", async () => {
-    givenSession({ kind: "active", role: "Player" });
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
     memberExists = false;
 
     const response = await postNewsSeen();
