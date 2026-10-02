@@ -1,0 +1,21 @@
+{
+  "id": "evt_test_checkout_completed",
+  "object": "event",
+  "api_version": "2026-09-30.endive",
+  "created": 1790000000,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": { "id": null, "idempotency_key": null },
+  "type": "checkout.session.completed",
+  "data": {
+    "object": {
+      "id": "cs_test_seadragons",
+      "object": "checkout.session",
+      "mode": "subscription",
+      "status": "complete",
+      "client_reference_id": "7b0e5a52-3c1d-4e8f-9a6b-2d4c8e1f0a37",
+      "customer": "cus_TestSeadragons",
+      "subscription": "sub_TestSeadragons"
+    }
+  }
+}
