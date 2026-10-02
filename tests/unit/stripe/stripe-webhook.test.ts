@@ -171,6 +171,15 @@ describe("handleStripeEvent", () => {
     );
   });
 
+  it("no escribe nada si Stripe no devuelve la suscripción del Checkout", async () => {
+    readSubscription.mockRejectedValue(new Error("Stripe no contesta"));
+
+    await expect(
+      handle(stripeEvent("checkout.session.completed")),
+    ).rejects.toThrow("Stripe no contesta");
+    expect(applyEvent).not.toHaveBeenCalled();
+  });
+
   it("deja en el log lo que no pudo reconocer", async () => {
     await handle(
       stripeEvent("customer.subscription.updated", {

@@ -3,6 +3,7 @@ import type { MembershipCard } from "@/lib/membership/membership";
 import {
   type MembershipLookup,
   type PlannableStripeEventFacts,
+  type StripeEventFacts,
   type StripeEventWrites,
   type StripeMembership,
   type StripePrices,
@@ -14,8 +15,8 @@ import {
 /**
  * Aplicar un evento de Stripe ya verificado (#452, RF-8 del PRD de E12): se
  * busca la membresía, se le pregunta a Stripe lo que el evento no trae y se
- * escribe todo de una vez,
- * con el id del evento delante para que un repetido no se aplique dos veces.
+ * escribe todo de una vez, con el id del evento delante para que un repetido
+ * no se aplique dos veces.
  */
 
 export type StripeWebhookOutcome =
@@ -72,6 +73,18 @@ async function resolveCard(
   }
 }
 
+/** Un Checkout sólo nombra la suscripción: se le pide entera a Stripe. */
+async function toPlannableFacts(
+  facts: Exclude<StripeEventFacts, { kind: "ignored" }>,
+  stripe: StripeReader,
+): Promise<PlannableStripeEventFacts> {
+  if (facts.kind !== "checkoutCompleted") {
+    return facts;
+  }
+  const subscription = await stripe.readSubscription(facts.subscriptionId);
+  return subscriptionFactsFromCheckout(facts, subscription);
+}
+
 function describeLookup(lookup: MembershipLookup): string {
   return `socio ${lookup.userId ?? "-"}, cliente ${lookup.customerId ?? "-"}, suscripción ${lookup.subscriptionId ?? "-"}`;
 }
@@ -94,13 +107,7 @@ export async function handleStripeEvent(
     return "unknown_member";
   }
 
-  const plannable =
-    facts.kind === "checkoutCompleted"
-      ? subscriptionFactsFromCheckout(
-          facts,
-          await dependencies.stripe.readSubscription(facts.subscriptionId),
-        )
-      : facts;
+  const plannable = await toPlannableFacts(facts, dependencies.stripe);
   const writes = planStripeEventWrites({
     facts: plannable,
     membership,
