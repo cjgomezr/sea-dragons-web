@@ -520,6 +520,14 @@ export const PASSWORD_RESET_API_PATH = "/api/v1/auth/password-reset";
  * la credencial es la firma, y la verifica el propio endpoint. */
 export const STRIPE_WEBHOOK_API_PATH = "/api/v1/stripe/webhook";
 
+/** La membresía de quien llama (#454). La alcanza cualquier cuenta activa,
+ * al día o no: es el camino para ponerse al día, así que no aparece en
+ * `MEMBER_ONLY_ROUTES`. */
+export const MEMBERSHIP_API_PATH = "/api/v1/membership";
+
+/** Abrir Stripe Checkout para poner la tarjeta (#454, RF-3 del PRD de E12). */
+export const MEMBERSHIP_CHECKOUT_API_PATH = `${MEMBERSHIP_API_PATH}/checkout`;
+
 /**
  * Los únicos endpoints de la API que no exigen sesión.
  *

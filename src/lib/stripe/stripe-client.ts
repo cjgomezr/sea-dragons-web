@@ -37,6 +37,12 @@ function readRequired(env: Environment, key: string): string | null {
   return value ? value : null;
 }
 
+/** Si están las cuatro variables, sin crear el cliente: lo que pregunta Pagos
+ * para decir que los pagos no están configurados (RF-9). */
+export function isStripeConfigured(env: Environment): boolean {
+  return STRIPE_ENV_KEYS.every((key) => readRequired(env, key) !== null);
+}
+
 export function createStripeSetup(env: Environment): StripeSetup {
   const missingKeys = STRIPE_ENV_KEYS.filter(
     (key) => readRequired(env, key) === null,
