@@ -8,6 +8,7 @@ export const spanishMessages: MessageCatalog = {
     one: "Podrás pedir otro enlace dentro de {count} minuto.",
     other: "Podrás pedir otro enlace dentro de {count} minutos.",
   },
+  "auth.brand.signInLink": "{club}: inicio de sesión",
   "auth.brand.eyebrow": "Rugby subacuático · Melbourne",
   "auth.brand.headline": "Tu club, bajo la superficie.",
   "auth.brand.copy":
@@ -50,6 +51,8 @@ export const spanishMessages: MessageCatalog = {
   "auth.registration.lead":
     "Con estos datos el club te da de alta. Te mandaremos un enlace para confirmar tu correo.",
   "auth.registration.submit": "Crear cuenta",
+  "auth.registration.haveAccount": "¿Ya tienes cuenta?",
+  "auth.registration.signIn": "Inicia sesión",
   "auth.registration.rejected":
     "No pudimos crear tu cuenta con estos datos. Revísalos y vuelve a intentarlo.",
   "auth.registration.rateLimited": {

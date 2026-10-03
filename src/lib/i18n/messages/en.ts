@@ -11,6 +11,7 @@ export const englishMessages = {
     one: "{count} minute to go before you can ask for another link.",
     other: "{count} minutes to go before you can ask for another link.",
   },
+  "auth.brand.signInLink": "{club}: sign in",
   "auth.brand.eyebrow": "Underwater rugby · Melbourne",
   "auth.brand.headline": "Your club, beneath the surface.",
   "auth.brand.copy":
@@ -53,6 +54,8 @@ export const englishMessages = {
   "auth.registration.lead":
     "The club signs you up with these details. We'll send you a link to confirm your email.",
   "auth.registration.submit": "Create account",
+  "auth.registration.haveAccount": "Already have an account?",
+  "auth.registration.signIn": "Sign in",
   "auth.registration.rejected":
     "We couldn't create your account with these details. Check them and try again.",
   "auth.registration.rateLimited": {

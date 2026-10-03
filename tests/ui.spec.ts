@@ -2113,6 +2113,32 @@ for (const state of ["ok", "pendiente"] as const) {
   }
 }
 
+// #478: quien entró en el registro por error vuelve a entrar sin el botón
+// atrás del navegador, por la línea de bajo el formulario o por la marca.
+test("desde el registro la línea de bajo el formulario lleva a entrar", async ({
+  page,
+}) => {
+  await page.goto(`${APP_URL}/registro`);
+
+  await page.getByRole("link", { name: "Sign in", exact: true }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Welcome back" }),
+  ).toBeVisible();
+});
+
+test("desde el registro la marca de la cabecera lleva a entrar", async ({
+  page,
+}) => {
+  await page.goto(`${APP_URL}/registro`);
+
+  await page.getByRole("link", { name: /: sign in$/ }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Welcome back" }),
+  ).toBeVisible();
+});
+
 test("el formulario de registro no manda nada al servidor con la contraseña corta", async ({
   page,
 }) => {

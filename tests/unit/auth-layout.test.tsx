@@ -2,8 +2,15 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
 import { LOCALE_COOKIE_NAME } from "@/lib/i18n/locale";
+import {
+  COMPLETE_REGISTRATION_PATH,
+  PASSWORD_RECOVERY_PATH,
+  REGISTRATION_PATH,
+  SIGN_IN_PATH,
+} from "@/lib/auth/routes";
 
 const incoming = { cookies: new Map<string, string>() };
+const currentPath = { value: SIGN_IN_PATH };
 const storedBrand: { current: ClubBrand } = {
   current: { ...DEFAULT_CLUB_BRAND, name: "Hobart Orcas", initials: "HO" },
 };
@@ -17,7 +24,10 @@ vi.mock("next/headers", () => ({
   }),
   headers: async () => new Headers(),
 }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+  usePathname: () => currentPath.value,
+}));
 vi.mock("@/lib/club/supabase-club-brand", () => ({
   readClubBrand: async () => storedBrand.current,
 }));
@@ -30,6 +40,7 @@ async function renderAuthLayout(): Promise<void> {
 
 beforeEach(() => {
   incoming.cookies.clear();
+  currentPath.value = SIGN_IN_PATH;
   storedBrand.current = {
     ...DEFAULT_CLUB_BRAND,
     name: "Hobart Orcas",
@@ -76,6 +87,56 @@ describe("la marca en la pantalla de entrar", () => {
       "https://storage.example.test/club-logos/club/logo.png",
     );
     expect(screen.queryByText("HO")).toBeNull();
+  });
+});
+
+// #478: desde cualquier otra pantalla de cuenta, la marca vuelve a entrar.
+describe("la marca como vuelta al inicio de sesión", () => {
+  it.each([
+    REGISTRATION_PATH,
+    PASSWORD_RECOVERY_PATH,
+    `${PASSWORD_RECOVERY_PATH}/nueva`,
+    COMPLETE_REGISTRATION_PATH,
+  ])("en %s la marca es un enlace a entrar", async (path) => {
+    currentPath.value = path;
+
+    await renderAuthLayout();
+
+    expect(
+      screen.getByRole("link", { name: "Hobart Orcas: sign in" }),
+    ).toHaveAttribute("href", SIGN_IN_PATH);
+  });
+
+  it("en español el enlace se llama con el club y el inicio de sesión", async () => {
+    incoming.cookies.set(LOCALE_COOKIE_NAME, "es");
+    currentPath.value = REGISTRATION_PATH;
+
+    await renderAuthLayout();
+
+    expect(
+      screen.getByRole("link", { name: "Hobart Orcas: inicio de sesión" }),
+    ).toHaveAttribute("href", SIGN_IN_PATH);
+  });
+
+  it("con logo el enlace se sigue llamando como el club y no como el logo", async () => {
+    storedBrand.current = {
+      ...storedBrand.current,
+      logoUrl: "https://storage.example.test/club-logos/club/logo.png",
+    };
+    currentPath.value = REGISTRATION_PATH;
+
+    await renderAuthLayout();
+
+    expect(
+      screen.getByRole("link", { name: "Hobart Orcas: sign in" }),
+    ).toBeInTheDocument();
+  });
+
+  it("en la propia pantalla de entrar la marca no es un enlace", async () => {
+    await renderAuthLayout();
+
+    expect(screen.getByText("Hobart Orcas")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Hobart Orcas/ })).toBeNull();
   });
 });
 
