@@ -113,6 +113,16 @@ as $$
 declare
   derived_status text;
 begin
+  -- Bloquear la membresía antes de sumar. Sin esto, un crédito que no cambia
+  -- el estado no toma el bloqueo, y una hoja que se guarda a la vez suma sin
+  -- verlo y deja `pending` a un Casual con saldo. Así la hoja espera en su
+  -- `for update` a que el crédito confirme, y su siguiente suma ya lo ve.
+  perform 1
+     from public.memberships m
+    where m.user_id = target_user_id
+      and m.club_id = target_club_id
+      for update;
+
   select case when coalesce(sum(l.delta), 0) > 0
               then 'active' else 'pending' end
     into derived_status
@@ -216,9 +226,12 @@ $$;
 -- última sesión, y el orden evita que se bloqueen mutuamente.
 --
 -- Quien sale de la hoja pierde su movimiento por la cascada de la fila de
--- asistencia; quien queda Absent lo pierde aquí. Quien queda Present o Late
--- siendo Casual y no tiene ya su movimiento resta uno si le queda saldo; sin
--- saldo no resta (D1) y deja una línea en el log.
+-- asistencia; quien queda Absent lo pierde aquí. Sólo resta quien este
+-- guardado convierte en asistencia (fila nueva o que estaba Absent) siendo
+-- Casual: volver a guardar la hoja para corregir a otro no cobra a quien ya
+-- estaba, ni con un pack comprado después, ni con un plan que cambió desde
+-- entonces, ni en las hojas de antes de este libro. Sin saldo no resta (D1)
+-- y deja una línea en el log.
 create or replace function public.save_attendance_sheet(
   acting_club_id uuid,
   acting_user_id uuid,
@@ -234,6 +247,7 @@ as $$
 declare
   target public.events%rowtype;
   attendee uuid;
+  previous_attendees uuid[];
 begin
   select * into target
     from public.events e
@@ -263,6 +277,12 @@ begin
               where a.event_id = target_event_id))
     order by m.user_id
       for update;
+
+  previous_attendees := array(
+    select a.user_id
+      from public.attendance_records a
+     where a.event_id = target_event_id
+       and a.status in ('present', 'late'));
 
   delete from public.attendance_records a
    where a.event_id = target_event_id
@@ -300,6 +320,7 @@ begin
      where a.event_id = target_event_id
        and a.status in ('present', 'late')
        and m.plan = 'Casual'
+       and a.user_id <> all (previous_attendees)
        and not exists (
          select 1 from public.session_ledger l
           where l.attendance_event_id = a.event_id
@@ -342,5 +363,12 @@ revoke all on function public.save_attendance_sheet(uuid, uuid, uuid, jsonb)
   from public, anon, authenticated, service_role;
 grant execute on function public.save_attendance_sheet(uuid, uuid, uuid, jsonb)
   to service_role;
+
+-- Los Casual que ya existían quedan como dice su saldo, que empieza vacío:
+-- `0050` los dejó `pending` y E12 no tenía cómo ponerlos al día, así que en
+-- la práctica no cambia nada, pero ninguno queda `active` sin sesiones.
+select public.refresh_casual_membership_status(m.user_id, m.club_id)
+  from public.memberships m
+ where m.plan = 'Casual';
 
 notify pgrst, 'reload schema';

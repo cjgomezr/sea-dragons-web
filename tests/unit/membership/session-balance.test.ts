@@ -89,6 +89,23 @@ describe("readSessionBalance", () => {
     ]);
   });
 
+  it("con la misma fecha ordena por id para que el orden no cambie", async () => {
+    const createdAt = new Date("2026-10-05T09:00:00Z");
+    const gateway = ledgerWith([
+      anAttendance({ id: "a", createdAt }),
+      aPurchase({ id: "c", createdAt }),
+      anAttendance({ id: "b", eventId: "evt-2", createdAt }),
+    ]);
+
+    const balance = await readSessionBalance(gateway, { userId: USER_ID });
+
+    expect(balance.movements.map((movement) => movement.id)).toEqual([
+      "c",
+      "b",
+      "a",
+    ]);
+  });
+
   it("pide al libro los movimientos del socio que lee", async () => {
     const requested: string[] = [];
     const gateway: SessionLedgerGateway = {

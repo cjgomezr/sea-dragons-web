@@ -39,8 +39,12 @@ export type SessionLedgerGateway = {
 function newestFirst(
   movements: readonly SessionMovement[],
 ): readonly SessionMovement[] {
+  // Los movimientos de una misma transacción comparten `created_at`; el id
+  // los desempata para que el orden no dependa de cómo los sirva la base.
   return [...movements].sort(
-    (first, second) => second.createdAt.getTime() - first.createdAt.getTime(),
+    (first, second) =>
+      second.createdAt.getTime() - first.createdAt.getTime() ||
+      second.id.localeCompare(first.id),
   );
 }
 

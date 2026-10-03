@@ -505,6 +505,71 @@ describeConPostgres("el libro de sesiones de un Casual en la base", () => {
       },
     );
 
+    it("comprar un pack después no cobra la asistencia que se guardó sin saldo", async () => {
+      const database = await migratedDatabase();
+      const { coach, eventId } = await seededTraining(database);
+      const casual = await seedMembership(database);
+      const rows = [{ user_id: casual.userId, status: "present" }];
+      await saveSheet(database, { coach, eventId, rows });
+      await creditFreshPack(database, casual, 5);
+
+      await saveSheet(database, { coach, eventId, rows });
+
+      await expect(balanceOf(database, casual)).resolves.toBe("5");
+    });
+
+    it("volver a guardar una hoja de antes del libro no descuenta a quien ya estaba", async () => {
+      const database = await migratedDatabase();
+      const { coach, eventId } = await seededTraining(database);
+      const casual = await seedMembership(database);
+      await creditFreshPack(database, casual, 5);
+      await database.query(
+        `insert into public.attendance_records
+           (event_id, user_id, club_id, status)
+         values ('${eventId}', '${casual.userId}', '${casual.clubId}',
+                 'present')`,
+      );
+
+      await saveSheet(database, {
+        coach,
+        eventId,
+        rows: [{ user_id: casual.userId, status: "late" }],
+      });
+
+      await expect(balanceOf(database, casual)).resolves.toBe("5");
+    });
+
+    it("no cobra a quien era Full el día que se guardó y hoy es Casual", async () => {
+      const database = await migratedDatabase();
+      const { coach, eventId } = await seededTraining(database);
+      const member = await seedMembership(database);
+      await creditFreshPack(database, member, 3);
+      await changePlan(database, member, "Full");
+      const rows = [{ user_id: member.userId, status: "present" }];
+      await saveSheet(database, { coach, eventId, rows });
+      await changePlan(database, member, "Casual");
+
+      await saveSheet(database, { coach, eventId, rows });
+
+      await expect(balanceOf(database, member)).resolves.toBe("3");
+    });
+
+    it("corregirla a absent y otra vez a present vuelve a descontar una", async () => {
+      const database = await migratedDatabase();
+      const { coach, eventId } = await seededTraining(database);
+      const casual = await seedMembership(database);
+      await creditFreshPack(database, casual, 5);
+      for (const status of ["present", "absent", "present"]) {
+        await saveSheet(database, {
+          coach,
+          eventId,
+          rows: [{ user_id: casual.userId, status }],
+        });
+      }
+
+      await expect(balanceOf(database, casual)).resolves.toBe("4");
+    });
+
     it("no descuenta a quien no tiene membresía", async () => {
       const database = await migratedDatabase();
       const { coach, eventId } = await seededTraining(database);
