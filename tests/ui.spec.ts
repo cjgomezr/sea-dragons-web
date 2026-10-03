@@ -415,11 +415,40 @@ for (const pg of PASSWORD_RECOVERY_SCREENS) {
   describeScreen(pg);
 }
 
+/* ---------------------------------------------------------------------------
+   Confirmar el correo con un botón (#477). Abrir el enlace no canjea nada, así
+   que un token inventado basta para dibujar la pantalla.
+   --------------------------------------------------------------------------- */
+
+const EMAIL_CONFIRMATION_SCREEN: Screen = {
+  name: "confirmar-correo",
+  path: "/auth/confirmar?token_hash=enlace-de-prueba&type=signup",
+};
+
+describeScreen(EMAIL_CONFIRMATION_SCREEN);
+
+// El POST del botón exige el mismo origen. Este recorrido es el que prueba que
+// el navegador de verdad lo manda: con el token inventado, Supabase lo
+// rechaza y la pantalla es la de enlace inválido, no un 403.
+test("confirmar-correo: el botón canjea el enlace y lleva a su desenlace", async ({
+  page,
+}) => {
+  await page.goto(`${APP_URL}${EMAIL_CONFIRMATION_SCREEN.path}`);
+
+  await page.getByRole("button", { name: "Confirm my email" }).click();
+
+  await expect(page).toHaveURL(/\/registro\?confirmacion=invalida$/);
+  await expect(
+    page.getByRole("heading", { name: "This link no longer works" }),
+  ).toBeVisible();
+});
+
 // Las pantallas de cuentas que se alcanzan sin sesión, más el desenlace del
 // enlace de confirmación, que es el panel con más texto.
 for (const pg of [
   ...PUBLIC_PAGES,
   ...PASSWORD_RECOVERY_SCREENS,
+  EMAIL_CONFIRMATION_SCREEN,
   { name: "registro-enlace-invalido", path: "/registro?confirmacion=invalida" },
 ]) {
   test(`${pg.name} en español: has no accessibility violations (axe-core)`, async ({

@@ -84,6 +84,14 @@ export const spanishMessages: MessageCatalog = {
   "auth.registration.resendUnexpected":
     "No pudimos pedir otro correo. Vuelve a intentarlo en un momento.",
 
+  "auth.confirmEmail.metaTitle": "Confirma tu correo · {club}",
+  "auth.confirmEmail.metaDescription":
+    "Confirma la dirección de correo de tu cuenta del club {club}.",
+  "auth.confirmEmail.title": "Confirma tu correo",
+  "auth.confirmEmail.lead":
+    "Pulsa el botón para terminar de confirmar tu dirección de correo.",
+  "auth.confirmEmail.submit": "Confirmar mi correo",
+
   "auth.confirmation.confirmedTitle": "Tu correo quedó confirmado",
   "auth.confirmation.activeBody":
     "Tu cuenta ya está activa. Entra con este correo y tu contraseña.",

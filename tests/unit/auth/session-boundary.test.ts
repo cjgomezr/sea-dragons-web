@@ -18,6 +18,7 @@ import {
   DIRECTORY_MEMBER_PHOTO_API_PATH,
   DIRECTORY_PATH,
   EMAIL_CONFIRMATION_PATH,
+  EMAIL_CONFIRMATION_REDEEM_PATH,
   EVALUATIONS_API_PATH,
   EVALUATIONS_PATH,
   EVENTS_API_PATH,
@@ -163,6 +164,17 @@ describe("frontera de sesión: sin sesión", () => {
     expect(
       decideSessionBoundary({
         pathname: EMAIL_CONFIRMATION_PATH,
+        ...ANONYMOUS,
+      }),
+    ).toEqual({ kind: "allow" });
+  });
+
+  // #477: el canje se mudó al POST del botón de esa pantalla. Quien lo pulsa
+  // tampoco tiene sesión todavía.
+  it("deja pasar el canje del botón de confirmación, que se pulsa sin sesión", () => {
+    expect(
+      decideSessionBoundary({
+        pathname: EMAIL_CONFIRMATION_REDEEM_PATH,
         ...ANONYMOUS,
       }),
     ).toEqual({ kind: "allow" });
