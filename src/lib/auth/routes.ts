@@ -538,6 +538,11 @@ export const MEMBERSHIP_CHECKOUT_API_PATH = `${MEMBERSHIP_API_PATH}/checkout`;
 /** Abrir Stripe Checkout en modo `setup` para cambiar la tarjeta (#455). */
 export const MEMBERSHIP_CARD_API_PATH = `${MEMBERSHIP_API_PATH}/card`;
 
+/** Los precios del club leídos de Stripe (#486). Cuelga de la membresía, así
+ * que también lo alcanza quien no está al día: es lo que mira antes de
+ * pagar. */
+export const MEMBERSHIP_PRICES_API_PATH = `${MEMBERSHIP_API_PATH}/prices`;
+
 /**
  * Los únicos endpoints de la API que no exigen sesión.
  *
