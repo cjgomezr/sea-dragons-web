@@ -28,6 +28,7 @@ function aRecord(overrides: Partial<MembershipRecord> = {}): MembershipRecord {
     trialEnd: null,
     card: null,
     waiver: null,
+    scheduledChange: null,
     ...overrides,
   };
 }

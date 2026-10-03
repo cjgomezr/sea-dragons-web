@@ -538,6 +538,10 @@ export const MEMBERSHIP_CHECKOUT_API_PATH = `${MEMBERSHIP_API_PATH}/checkout`;
 /** Abrir Stripe Checkout en modo `setup` para cambiar la tarjeta (#455). */
 export const MEMBERSHIP_CARD_API_PATH = `${MEMBERSHIP_API_PATH}/card`;
 
+/** Cambiar de plan al siguiente ciclo, o anular el cambio (#456, RF-6). Lo
+ * alcanza también quien no está al día: un Casual lo usa para ir a Checkout. */
+export const MEMBERSHIP_PLAN_API_PATH = `${MEMBERSHIP_API_PATH}/plan`;
+
 /**
  * Los únicos endpoints de la API que no exigen sesión.
  *

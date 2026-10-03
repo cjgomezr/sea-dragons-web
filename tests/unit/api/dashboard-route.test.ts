@@ -93,6 +93,7 @@ function dashboardGateways(): DashboardGateways {
         trialEnd: null,
         card: null,
         waiver: null,
+        scheduledChange: null,
       }),
     },
     failures: { report: () => undefined },

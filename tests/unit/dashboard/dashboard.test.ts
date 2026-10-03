@@ -256,6 +256,7 @@ function membershipWith(status: MembershipStatus): MembershipRecord {
     trialEnd: null,
     card: null,
     waiver: null,
+    scheduledChange: null,
   };
 }
 

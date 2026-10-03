@@ -34,6 +34,7 @@ function aRecord(overrides: Partial<MembershipRecord> = {}): MembershipRecord {
     trialEnd: null,
     card: VISA,
     waiver: null,
+    scheduledChange: null,
     ...overrides,
   };
 }
@@ -86,6 +87,7 @@ describe("readMembershipView: la membresía", () => {
       nextChargeAt: PERIOD_END,
       card: VISA,
       waiver: null,
+      scheduledChange: null,
     });
   });
 

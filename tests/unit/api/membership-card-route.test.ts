@@ -30,6 +30,7 @@ const PAST_DUE_FULL: MembershipRecord = {
   trialEnd: null,
   card: null,
   waiver: null,
+  scheduledChange: null,
 };
 
 const readSessionState = vi.fn();
