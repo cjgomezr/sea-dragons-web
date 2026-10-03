@@ -217,7 +217,11 @@ describe("readMembershipView: el cambio de plan (#456)", () => {
 
   it("ofrece el cambio a un Casual, que va a Checkout", async () => {
     const view = await viewOf(
-      aRecord({ plan: "Casual", status: "pending", stripeSubscriptionId: null }),
+      aRecord({
+        plan: "Casual",
+        status: "pending",
+        stripeSubscriptionId: null,
+      }),
     );
 
     expect(view.membership?.canChangePlan).toBe(true);
