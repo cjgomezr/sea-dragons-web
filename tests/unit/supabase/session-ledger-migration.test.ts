@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   type TemporaryDatabase,
   applyRepositoryMigrations,
+  databaseBeforeMigration,
   describeConPostgres,
   migratedDatabase,
 } from "../../support/postgres";
@@ -15,6 +16,7 @@ import {
  */
 
 const SEEDED_CLUB = "victoria-seadragons";
+const MIGRATION_PREFIX = "0052";
 const STARTED_ON = "2020-01-07";
 
 type Member = { readonly clubId: string; readonly userId: string };
@@ -743,6 +745,16 @@ describeConPostgres("el libro de sesiones de un Casual en la base", () => {
 
       await expect(statusOf(database, member)).resolves.toBe("active");
     });
+  });
+
+  it("deja pending a un Casual que ya estaba active sin sesiones", async () => {
+    const database = await databaseBeforeMigration(MIGRATION_PREFIX);
+    const casual = await seedMembership(database, { status: "active" });
+
+    const applied = await applyRepositoryMigrations(database);
+
+    expect(applied.code, applied.stderr).toBe(0);
+    await expect(statusOf(database, casual)).resolves.toBe("pending");
   });
 
   it("es idempotente: aplicada dos veces no falla ni cambia nada", async () => {
