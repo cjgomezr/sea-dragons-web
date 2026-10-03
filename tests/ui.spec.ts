@@ -11076,6 +11076,29 @@ const EMPTY_HISTORY_MEMBERSHIP_VIEW = membershipView(
   [],
 );
 
+// El cambio de plan (#456): el selector a quien puede cambiar, y el cambio
+// programado con su anulación.
+const PLAN_CHANGE_MEMBERSHIP_VIEW = membershipView(
+  {
+    status: "active",
+    nextChargeAt: "2026-10-01T00:00:00.000Z",
+    canChangePlan: true,
+  },
+  PAYMENTS_HISTORY,
+);
+
+const SCHEDULED_CHANGE_MEMBERSHIP_VIEW = membershipView(
+  {
+    status: "active",
+    nextChargeAt: "2026-10-01T00:00:00.000Z",
+    scheduledChange: {
+      plan: "Student",
+      effectiveAt: "2026-10-01T00:00:00.000Z",
+    },
+  },
+  PAYMENTS_HISTORY,
+);
+
 type PaymentsScreenState = {
   readonly name: string;
   /** Lo que sirve el endpoint fingido; sin él, la membresía sembrada. */
@@ -11108,6 +11131,11 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   ...paymentsStates("pagos-cancelada", CANCELLED_MEMBERSHIP_VIEW),
   ...paymentsStates("pagos-exenta", WAIVED_MEMBERSHIP_VIEW),
   ...paymentsStates("pagos-historial-vacio", EMPTY_HISTORY_MEMBERSHIP_VIEW),
+  ...paymentsStates("pagos-cambio-de-plan", PLAN_CHANGE_MEMBERSHIP_VIEW),
+  ...paymentsStates(
+    "pagos-cambio-programado",
+    SCHEDULED_CHANGE_MEMBERSHIP_VIEW,
+  ),
 ];
 
 async function serveMembership(page: Page, view: object): Promise<void> {

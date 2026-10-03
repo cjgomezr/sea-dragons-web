@@ -1906,6 +1906,13 @@ a.auth-brand-header:focus-visible {
   color: var(--color-text-secondary);
 }
 
+/* El enlace del tipo de membresía a Pagos (#456), con el color del aviso de
+   la puerta, que lleva al mismo sitio. */
+.account-evaluation a {
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+
 /* La asistencia (#396): la cifra grande del mockup del perfil, con las
    sesiones debajo. La ficha del Admin usa el mismo bloque. */
 .member-attendance .member-attendance-figure {
