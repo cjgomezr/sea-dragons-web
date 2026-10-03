@@ -112,6 +112,7 @@ describe("GET /api/v1/membership", () => {
           card: null,
           waiver: null,
           scheduledChange: null,
+          canChangePlan: false,
         },
         payments: [],
       },

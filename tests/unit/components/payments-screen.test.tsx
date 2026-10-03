@@ -48,6 +48,8 @@ function panel(change: Partial<MembershipPanelView> = {}): MembershipPanelView {
     nextChargeAt: PERIOD_END,
     card: VISA,
     waiver: null,
+    scheduledChange: null,
+    canChangePlan: false,
     ...change,
   };
 }

@@ -5,8 +5,10 @@ import {
   type MembershipGateway,
   type MembershipPlan,
   type MembershipStatus,
+  type ScheduledPlanChange,
   readMembership,
 } from "./membership";
+import { canChangePlan } from "./plan-change";
 
 /**
  * Lo que Pagos pinta de la membresía de quien la abre (#454, #455; RF-5 y
@@ -50,6 +52,12 @@ export type MembershipWaiverView = {
   readonly until: string | null;
 };
 
+export type ScheduledPlanChangeView = {
+  readonly plan: MembershipPlan;
+  /** ISO 8601: cuándo Stripe aplica el cambio. */
+  readonly effectiveAt: string;
+};
+
 export type MembershipPanelView = {
   readonly plan: MembershipPlan | null;
   readonly status: MembershipStatus;
@@ -57,11 +65,17 @@ export type MembershipPanelView = {
   readonly monthlyPriceCents: number | null;
   /** ISO 8601. Que exista dice además que ya tuvo su mes de prueba. */
   readonly trialEnd: string | null;
-  /** ISO 8601. Sólo lo hay mientras Stripe va a cobrar: en prueba o activa. */
+  /** ISO 8601. Sólo lo hay mientras Stripe va a cobrar: en prueba o activa,
+   * y sin un paso a Casual programado. */
   readonly nextChargeAt: string | null;
   readonly card: MembershipCard | null;
   /** Sólo la de una membresía exenta hoy. */
   readonly waiver: MembershipWaiverView | null;
+  /** El cambio de plan que Stripe aplicará al acabar el periodo (#456). */
+  readonly scheduledChange: ScheduledPlanChangeView | null;
+  /** Si Pagos ofrece cambiar de plan (#456): la misma regla que el
+   * endpoint, para que la aplicación nativa no la repita. */
+  readonly canChangePlan: boolean;
 };
 
 export type MembershipView = {
@@ -88,7 +102,11 @@ function monthlyPriceOf(plan: MembershipPlan | null): number | null {
 /** Stripe cobra al acabar la prueba o el periodo en curso; en cualquier otro
  * estado no hay cobro a la vista. */
 function nextChargeOf(membership: Membership): Date | null {
-  if (membership.plan === null || membership.plan === "Casual") {
+  if (
+    membership.plan === null ||
+    membership.plan === "Casual" ||
+    isMovingToCasual(membership.scheduledChange)
+  ) {
     return null;
   }
   switch (membership.status) {
@@ -101,7 +119,24 @@ function nextChargeOf(membership: Membership): Date | null {
   }
 }
 
-function toPanelView(membership: Membership): MembershipPanelView {
+/** Pasar a Casual cancela la suscripción al final del periodo: ya no hay
+ * otro cobro. */
+function isMovingToCasual(change: ScheduledPlanChange | null): boolean {
+  return change !== null && change.plan === "Casual";
+}
+
+function toScheduledChangeView(
+  change: ScheduledPlanChange | null,
+): ScheduledPlanChangeView | null {
+  return change === null
+    ? null
+    : { plan: change.plan, effectiveAt: change.effectiveAt.toISOString() };
+}
+
+function toPanelView(
+  membership: Membership,
+  paymentsConfigured: boolean,
+): MembershipPanelView {
   return {
     plan: membership.plan,
     status: membership.status,
@@ -116,6 +151,8 @@ function toPanelView(membership: Membership): MembershipPanelView {
             until: toIso(membership.waiver.until),
           }
         : null,
+    scheduledChange: toScheduledChangeView(membership.scheduledChange),
+    canChangePlan: paymentsConfigured && canChangePlan(membership),
   };
 }
 
@@ -150,7 +187,9 @@ export async function readMembershipView(
   return {
     paymentsConfigured: input.paymentsConfigured,
     membership:
-      reading.kind === "none" ? null : toPanelView(reading.membership),
+      reading.kind === "none"
+        ? null
+        : toPanelView(reading.membership, input.paymentsConfigured),
     payments: newestFirst(payments),
   };
 }

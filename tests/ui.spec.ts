@@ -11027,6 +11027,8 @@ function membershipView(
       nextChargeAt: null,
       card: PAYMENTS_CARD,
       waiver: null,
+      scheduledChange: null,
+      canChangePlan: false,
       ...membership,
     },
     payments,

@@ -46,6 +46,13 @@ const membershipViewSchema = z.object({
       waiver: z
         .object({ reason: z.string(), until: isoInstantSchema.nullable() })
         .nullable(),
+      scheduledChange: z
+        .object({
+          plan: z.enum(MEMBERSHIP_TYPES),
+          effectiveAt: isoInstantSchema,
+        })
+        .nullable(),
+      canChangePlan: z.boolean(),
     })
     .nullable(),
   payments: z.array(
