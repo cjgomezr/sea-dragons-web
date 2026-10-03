@@ -14,6 +14,7 @@ import {
 } from "./membership";
 import type { StripeWebhookGateway } from "@/lib/stripe/stripe-webhook";
 import type { MemberEmailGateway } from "./checkout";
+import type { SessionLedgerGateway, SessionMovement } from "./session-balance";
 import {
   PAYMENT_STATUSES,
   type PaymentHistoryGateway,
@@ -220,6 +221,75 @@ export function createPaymentHistoryGateway(
           paidAt: toDate(row.paid_at),
           createdAt: new Date(row.created_at),
         }));
+    },
+  };
+}
+
+const SESSION_LEDGER_TABLE = "session_ledger";
+const SESSION_LEDGER_COLUMNS =
+  "id, kind, delta, pack_payment_id, attendance_event_id, created_at";
+
+/** `session_ledger_reference_check` ata cada tipo a su referencia; el
+ * esquema lo vuelve a decir para que el dominio reciba la unión ya cerrada. */
+const sessionMovementRowSchema = z.discriminatedUnion("kind", [
+  z.object({
+    id: z.string(),
+    kind: z.literal("pack_purchase"),
+    delta: z.number().int().positive(),
+    pack_payment_id: z.string(),
+    created_at: z.string(),
+  }),
+  z.object({
+    id: z.string(),
+    kind: z.literal("attendance"),
+    delta: z.literal(-1),
+    attendance_event_id: z.string(),
+    created_at: z.string(),
+  }),
+]);
+
+function toSessionMovement(
+  row: z.infer<typeof sessionMovementRowSchema>,
+): SessionMovement {
+  const createdAt = new Date(row.created_at);
+  return row.kind === "pack_purchase"
+    ? {
+        kind: row.kind,
+        id: row.id,
+        delta: row.delta,
+        paymentId: row.pack_payment_id,
+        createdAt,
+      }
+    : {
+        kind: row.kind,
+        id: row.id,
+        delta: row.delta,
+        eventId: row.attendance_event_id,
+        createdAt,
+      };
+}
+
+/** Los movimientos del saldo de un socio (#468). Con el cliente de la sesión,
+ * `session_ledger_select_own` sólo deja leer los propios. El orden lo pone el
+ * dominio. */
+export function createSessionLedgerGateway(
+  client: SupabaseClient,
+): SessionLedgerGateway {
+  return {
+    async listByUserId(userId) {
+      const { data, error } = await client
+        .from(SESSION_LEDGER_TABLE)
+        .select(SESSION_LEDGER_COLUMNS)
+        .eq("user_id", userId);
+      if (error) {
+        throw new Error(
+          `No se pudo leer el saldo de sesiones de ${userId}: ${error.message}`,
+        );
+      }
+      return z
+        .array(sessionMovementRowSchema)
+        .parse(data)
+        .map(toSessionMovement);
     },
   };
 }
