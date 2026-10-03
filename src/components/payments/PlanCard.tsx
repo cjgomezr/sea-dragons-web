@@ -119,6 +119,19 @@ function isRecurringPlan(plan: MembershipPlan | null): boolean {
   return plan === "Full" || plan === "Student";
 }
 
+/** El precio lo lee de Stripe el endpoint (#486). Nulo en un plan con cuota
+ * es que Stripe no lo dio, y entonces se dice en vez de inventarlo. */
+function describeMonthlyPrice(
+  translate: Translator,
+  monthlyPriceCents: number | null,
+): string {
+  return monthlyPriceCents === null
+    ? translate("payments.plan.priceUnavailable")
+    : translate("payments.plan.monthlyPrice", {
+        price: formatAudCents(translate.locale, monthlyPriceCents),
+      });
+}
+
 /** El próximo cobro o, para Casual, que no lo hay (FR-065); la tarjeta; y
  * la exención con su motivo y su fin. */
 function PlanDetails({
@@ -309,13 +322,11 @@ export function PlanCard({
           {translate("payments.plan.name", { plan })}
         </p>
       )}
-      {monthlyPriceCents === null ? null : (
+      {isRecurringPlan(plan) ? (
         <p className="payments-price">
-          {translate("payments.plan.monthlyPrice", {
-            price: formatAudCents(translate.locale, monthlyPriceCents),
-          })}
+          {describeMonthlyPrice(translate, monthlyPriceCents)}
         </p>
-      )}
+      ) : null}
       <PlanDetails translate={translate} membership={membership} />
       {status === "pending" ? (
         <PendingOffer

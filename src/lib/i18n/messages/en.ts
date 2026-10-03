@@ -841,6 +841,7 @@ export const englishMessages = {
   "payments.plan.title": "Current plan",
   "payments.plan.name": "{plan} membership",
   "payments.plan.monthlyPrice": "{price} a month",
+  "payments.plan.priceUnavailable": "Price not available",
   "payments.plan.nextCharge": "Next charge {date}",
   "payments.plan.noRecurringCharge": "No recurring charge",
   "payments.plan.card": "{brand} ending in {last4}, expires {expiry}",

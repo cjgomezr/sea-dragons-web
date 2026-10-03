@@ -4,10 +4,15 @@ import type {
   MembershipRecord,
 } from "@/lib/membership/membership";
 import {
-  type PaymentHistoryGateway,
+  type MembershipViewGateways,
   type PaymentRecord,
   readMembershipView,
 } from "@/lib/membership/membership-view";
+import type {
+  ClubPrice,
+  ClubPriceKey,
+  ClubPrices,
+} from "@/lib/membership/stripe-prices";
 
 /**
  * Lo que el panel de membresía (#455, RF-5 y RF-7 del PRD de E12) recibe de
@@ -50,24 +55,32 @@ function aPayment(overrides: Partial<PaymentRecord> = {}): PaymentRecord {
   };
 }
 
+/** Lo que vale cada precio en el Stripe doblado: nada que ver con los
+ * importes de antes, para que se note si alguien vuelve a escribirlos. */
+const STRIPE_PRICES: ClubPrices = {
+  full: { amountCents: 5150, currency: "AUD" },
+  student: { amountCents: 3675, currency: "AUD" },
+  casualSession: { amountCents: 1990, currency: "AUD" },
+};
+
 function gateways(
   record: MembershipRecord | null,
   payments: readonly PaymentRecord[] = [],
-): {
-  readonly membership: MembershipGateway;
-  readonly payments: PaymentHistoryGateway;
-} {
+  prices: ClubPrices = STRIPE_PRICES,
+): MembershipViewGateways & { readonly membership: MembershipGateway } {
   return {
     membership: { findByUserId: async () => record },
     payments: { listByUserId: async () => payments },
+    prices: { readPrice: async (key: ClubPriceKey) => prices[key] },
   };
 }
 
 async function viewOf(
   record: MembershipRecord | null,
   payments: readonly PaymentRecord[] = [],
+  prices: ClubPrices = STRIPE_PRICES,
 ): ReturnType<typeof readMembershipView> {
-  return readMembershipView(gateways(record, payments), {
+  return readMembershipView(gateways(record, payments, prices), {
     userId: USER_ID,
     now: NOW,
     paymentsConfigured: true,
@@ -81,7 +94,7 @@ describe("readMembershipView: la membresía", () => {
     expect(view.membership).toEqual({
       plan: "Full",
       status: "active",
-      monthlyPriceCents: 4500,
+      monthlyPriceCents: 5150,
       trialEnd: null,
       nextChargeAt: PERIOD_END,
       card: VISA,
@@ -99,7 +112,7 @@ describe("readMembershipView: la membresía", () => {
     );
 
     expect(view.membership).toMatchObject({
-      monthlyPriceCents: 3200,
+      monthlyPriceCents: 3675,
       trialEnd: TRIAL_END,
       nextChargeAt: TRIAL_END,
     });
@@ -113,6 +126,24 @@ describe("readMembershipView: la membresía", () => {
       expect(view.membership?.nextChargeAt).toBeNull();
     },
   );
+
+  it("da un precio mensual nulo cuando el de Stripe no está disponible", async () => {
+    const unavailable: ClubPrice = {
+      amountCents: null,
+      reason: "stripe_unavailable",
+    };
+
+    const view = await viewOf(aRecord(), [], {
+      ...STRIPE_PRICES,
+      full: unavailable,
+    });
+
+    expect(view.membership).toMatchObject({
+      plan: "Full",
+      status: "active",
+      monthlyPriceCents: null,
+    });
+  });
 
   it("no da precio mensual ni próximo cobro a un Casual", async () => {
     const view = await viewOf(aRecord({ plan: "Casual", status: "active" }));

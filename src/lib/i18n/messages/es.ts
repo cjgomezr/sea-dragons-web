@@ -840,6 +840,7 @@ export const spanishMessages: MessageCatalog = {
   "payments.plan.title": "Plan actual",
   "payments.plan.name": "Membresía {plan}",
   "payments.plan.monthlyPrice": "{price} al mes",
+  "payments.plan.priceUnavailable": "Precio no disponible",
   "payments.plan.nextCharge": "Próximo cobro el {date}",
   "payments.plan.noRecurringCharge": "Sin cobro recurrente",
   "payments.plan.card": "{brand} terminada en {last4}, caduca {expiry}",

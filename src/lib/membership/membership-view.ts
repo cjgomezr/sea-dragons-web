@@ -1,19 +1,21 @@
 import {
-  MONTHLY_PRICE_CENTS,
   type Membership,
   type MembershipCard,
   type MembershipGateway,
   type MembershipPlan,
   type MembershipStatus,
+  type RecurringPlan,
   readMembership,
 } from "./membership";
+import type { ClubPriceKey, ClubPriceReader } from "./stripe-prices";
 
 /**
  * Lo que Pagos pinta de la membresía de quien la abre (#454, #455; RF-5 y
  * RF-7 del PRD de E12): el plan con su precio, el estado que cuenta hoy, el
  * próximo cobro, la tarjeta, la exención y el historial de pagos. Es lo que
  * sirve `GET /api/v1/membership`, leído de la base y nunca de Stripe en
- * caliente: lo que la base sabe lo escribió el webhook (#452).
+ * caliente: lo que la base sabe lo escribió el webhook (#452). La excepción
+ * es el precio del plan, que es el del `Price` de Stripe (#486).
  */
 
 export const PAYMENT_STATUSES = ["paid", "failed", "pending"] as const;
@@ -53,7 +55,9 @@ export type MembershipWaiverView = {
 export type MembershipPanelView = {
   readonly plan: MembershipPlan | null;
   readonly status: MembershipStatus;
-  /** Nulo para Casual, que no tiene cuota mensual (FR-065). */
+  /** El `unit_amount` del precio de Stripe del plan (#486). Nulo para
+   * Casual, que no tiene cuota mensual (FR-065), y para Full o Student cuando
+   * no se pudo leer: la pantalla dice entonces que no está disponible. */
   readonly monthlyPriceCents: number | null;
   /** ISO 8601. Que exista dice además que ya tuvo su mes de prueba. */
   readonly trialEnd: string | null;
@@ -75,14 +79,27 @@ export type MembershipView = {
 export type MembershipViewGateways = {
   readonly membership: MembershipGateway;
   readonly payments: PaymentHistoryGateway;
+  readonly prices: Pick<ClubPriceReader, "readPrice">;
+};
+
+const PRICE_KEY_OF: Readonly<Record<RecurringPlan, ClubPriceKey>> = {
+  Full: "full",
+  Student: "student",
 };
 
 function toIso(date: Date | null): string | null {
   return date === null ? null : date.toISOString();
 }
 
-function monthlyPriceOf(plan: MembershipPlan | null): number | null {
-  return plan === null || plan === "Casual" ? null : MONTHLY_PRICE_CENTS[plan];
+async function readMonthlyPriceCents(
+  prices: MembershipViewGateways["prices"],
+  plan: MembershipPlan | null,
+): Promise<number | null> {
+  if (plan === null || plan === "Casual") {
+    return null;
+  }
+  const price = await prices.readPrice(PRICE_KEY_OF[plan]);
+  return price.amountCents;
 }
 
 /** Stripe cobra al acabar la prueba o el periodo en curso; en cualquier otro
@@ -101,11 +118,14 @@ function nextChargeOf(membership: Membership): Date | null {
   }
 }
 
-function toPanelView(membership: Membership): MembershipPanelView {
+function toPanelView(
+  membership: Membership,
+  monthlyPriceCents: number | null,
+): MembershipPanelView {
   return {
     plan: membership.plan,
     status: membership.status,
-    monthlyPriceCents: monthlyPriceOf(membership.plan),
+    monthlyPriceCents,
     trialEnd: toIso(membership.trialEnd),
     nextChargeAt: toIso(nextChargeOf(membership)),
     card: membership.card,
@@ -150,7 +170,15 @@ export async function readMembershipView(
   return {
     paymentsConfigured: input.paymentsConfigured,
     membership:
-      reading.kind === "none" ? null : toPanelView(reading.membership),
+      reading.kind === "none"
+        ? null
+        : toPanelView(
+            reading.membership,
+            await readMonthlyPriceCents(
+              gateways.prices,
+              reading.membership.plan,
+            ),
+          ),
     payments: newestFirst(payments),
   };
 }
