@@ -96,6 +96,18 @@ function periodEndOf(subscription: Stripe.Subscription): Date {
   return fromStripeTime(item.current_period_end);
 }
 
+/** Suelta la programación de la suscripción, si tiene: sigue con la fase en
+ * curso. */
+async function releaseSchedule(
+  client: SubscriptionPlanClient,
+  subscriptionId: string,
+): Promise<void> {
+  const subscription = await client.subscriptions.retrieve(subscriptionId);
+  if (subscription.schedule !== null) {
+    await client.subscriptionSchedules.release(idOf(subscription.schedule));
+  }
+}
+
 export function createSubscriptionPlanApi(
   client: SubscriptionPlanClient,
 ): SubscriptionPlanApi {
@@ -117,13 +129,13 @@ export function createSubscriptionPlanApi(
       });
       return fromStripeTime(current.end_date);
     },
-    async cancelPriceChange(subscriptionId) {
-      const subscription = await client.subscriptions.retrieve(subscriptionId);
-      if (subscription.schedule !== null) {
-        await client.subscriptionSchedules.release(idOf(subscription.schedule));
-      }
-    },
+    cancelPriceChange: (subscriptionId) =>
+      releaseSchedule(client, subscriptionId),
     async cancelAtPeriodEnd(subscriptionId) {
+      // Stripe no deja tocar `cancel_at_period_end` en una suscripción que
+      // gobierna una programación: una que quedó puesta sin llegar a la base
+      // (el guardado falló tras aceptarla Stripe) se suelta antes.
+      await releaseSchedule(client, subscriptionId);
       const subscription = await client.subscriptions.update(subscriptionId, {
         cancel_at_period_end: true,
       });

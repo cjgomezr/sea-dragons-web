@@ -162,6 +162,21 @@ describe("pasar a Casual", () => {
     expect(endsAt).toEqual(new Date(PERIOD_END * 1000));
   });
 
+  it("suelta antes una programación que haya quedado puesta, que Stripe no deja cancelar", async () => {
+    const client = clientDouble(subscription({ schedule: SCHEDULE_ID }));
+
+    await apiOver(client).cancelAtPeriodEnd(SUBSCRIPTION_ID);
+
+    expect(client.subscriptionSchedules.release).toHaveBeenCalledWith(
+      SCHEDULE_ID,
+    );
+    expect(
+      client.subscriptionSchedules.release.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      client.subscriptions.update.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
   it("anularlo deja la suscripción como estaba", async () => {
     const client = clientDouble();
 
