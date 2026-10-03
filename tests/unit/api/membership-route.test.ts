@@ -33,6 +33,7 @@ const PENDING_FULL: MembershipRecord = {
   trialEnd: null,
   card: null,
   waiver: null,
+  scheduledChange: null,
 };
 
 const readSessionState = vi.fn();
@@ -110,6 +111,8 @@ describe("GET /api/v1/membership", () => {
           nextChargeAt: null,
           card: null,
           waiver: null,
+          scheduledChange: null,
+          canChangePlan: false,
         },
         payments: [],
       },

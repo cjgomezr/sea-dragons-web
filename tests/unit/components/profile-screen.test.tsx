@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProfileScreen } from "@/components/account/ProfileScreen";
@@ -7,6 +7,7 @@ import { listCountryOptions } from "@/lib/geo/countries";
 import type { Locale } from "@/lib/i18n/locale";
 import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
 import type { OwnAuf, OwnProfile } from "@/lib/members/own-profile";
+import type { MembershipPlan } from "@/lib/membership/membership";
 import type { ClubPosition, ClubPositions } from "@/lib/club/club-positions";
 import {
   DEFENDER,
@@ -108,6 +109,7 @@ function renderScreen(
     readonly profile?: OwnProfile;
     readonly positionOptions?: ClubPositions;
     readonly attendance?: MemberAttendance;
+    readonly membershipPlan?: MembershipPlan | null;
   } = {},
 ): void {
   const locale = options.locale ?? "en";
@@ -123,6 +125,9 @@ function renderScreen(
       evaluation={{ visibility: "staff_only" }}
       attendance={options.attendance ?? { kind: "no_data" }}
       countries={listCountryOptions(locale)}
+      membershipPlan={
+        options.membershipPlan === undefined ? "Full" : options.membershipPlan
+      }
     />,
   );
 }
@@ -138,6 +143,54 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("pantalla de perfil: el tipo de membresía (#456)", () => {
+  it("enseña el tipo de membresía sin dejar editarlo, y enlaza a Pagos", () => {
+    renderScreen({ membershipPlan: "Student" });
+
+    const membership = screen.getByRole("region", { name: "Membership" });
+    expect(
+      within(membership).getByText("Membership type: Student"),
+    ).toBeInTheDocument();
+    expect(
+      within(membership).getByRole("link", { name: "Change it in Payments" }),
+    ).toHaveAttribute("href", "/pagos");
+    expect(screen.queryByLabelText(/membership type/i)).toBeNull();
+  });
+
+  it("dice que aún no hay tipo a quien no lo eligió", () => {
+    renderScreen({ membershipPlan: null });
+
+    expect(
+      within(screen.getByRole("region", { name: "Membership" })).getByText(
+        "You haven't chosen a membership type yet.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("lo dice en español", () => {
+    renderScreen({ locale: "es", membershipPlan: "Full" });
+
+    const membership = screen.getByRole("region", { name: "Membresía" });
+    expect(
+      within(membership).getByText("Tipo de membresía: Full"),
+    ).toBeInTheDocument();
+    expect(
+      within(membership).getByRole("link", { name: "Cambiarlo en Pagos" }),
+    ).toHaveAttribute("href", "/pagos");
+  });
+
+  it("no manda el tipo de membresía al guardar la ficha", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(saveButton());
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]?.body).not.toHaveProperty("membershipType");
+  });
 });
 
 describe("pantalla de perfil", () => {

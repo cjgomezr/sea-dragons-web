@@ -60,6 +60,8 @@ describe("Pagos", () => {
     nextChargeAt: "2026-11-01T09:00:00.000Z",
     card: { brand: "visa", last4: "4242", expMonth: 8, expYear: 2028 },
     waiver: null,
+    scheduledChange: null,
+    canChangePlan: false,
   };
   const ACTIVE_FULL: MembershipView = {
     paymentsConfigured: true,

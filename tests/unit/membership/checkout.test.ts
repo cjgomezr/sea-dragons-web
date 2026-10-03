@@ -37,6 +37,7 @@ function membership(change: Partial<MembershipRecord> = {}): MembershipRecord {
     trialEnd: null,
     card: null,
     waiver: null,
+    scheduledChange: null,
     ...change,
   };
 }

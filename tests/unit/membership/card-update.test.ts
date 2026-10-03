@@ -30,6 +30,7 @@ function membership(change: Partial<MembershipRecord> = {}): MembershipRecord {
     trialEnd: null,
     card: { brand: "visa", last4: "4242", expMonth: 8, expYear: 2028 },
     waiver: null,
+    scheduledChange: null,
     ...change,
   };
 }

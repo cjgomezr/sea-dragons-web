@@ -123,6 +123,8 @@ describeConPostgres("membresías y pagos en la base", () => {
           "created_at:timestamp with time zone",
           "current_period_end:timestamp with time zone",
           "plan:text",
+          "scheduled_at:timestamp with time zone",
+          "scheduled_plan:text",
           "status:text",
           "stripe_customer_id:text",
           "stripe_event_at:timestamp with time zone",
