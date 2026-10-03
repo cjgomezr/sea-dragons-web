@@ -86,6 +86,14 @@ export const englishMessages = {
   "auth.registration.resendUnexpected":
     "We couldn't ask for another email. Try again in a moment.",
 
+  "auth.confirmEmail.metaTitle": "Confirm your email · {club}",
+  "auth.confirmEmail.metaDescription":
+    "Confirm the email address of your {club} club account.",
+  "auth.confirmEmail.title": "Confirm your email",
+  "auth.confirmEmail.lead":
+    "Press the button to finish confirming your email address.",
+  "auth.confirmEmail.submit": "Confirm my email",
+
   "auth.confirmation.confirmedTitle": "Your email is confirmed",
   "auth.confirmation.activeBody":
     "Your account is now active. Sign in with this email and your password.",

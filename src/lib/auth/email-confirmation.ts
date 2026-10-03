@@ -51,6 +51,27 @@ export function parseEmailConfirmationOtpType(
   );
 }
 
+export type EmailConfirmationLink = {
+  readonly tokenHash: string;
+  readonly type: EmailConfirmationOtpType;
+};
+
+/** Lo que hace falta para canjear el enlace, venga de su URL o del formulario
+ * que pinta la pantalla. Null es un enlace que no vale: sin token o con un tipo
+ * que no confirma ningún correo. */
+export function parseEmailConfirmationLink(
+  tokenHash: unknown,
+  type: unknown,
+): EmailConfirmationLink | null {
+  if (typeof tokenHash !== "string" || tokenHash.length === 0) {
+    return null;
+  }
+  const otpType = parseEmailConfirmationOtpType(
+    typeof type === "string" ? type : null,
+  );
+  return otpType === null ? null : { tokenHash, type: otpType };
+}
+
 export type EmailConfirmation =
   | { readonly kind: "confirmed"; readonly userId: string }
   | { readonly kind: "rejected"; readonly reason: string };
@@ -76,10 +97,7 @@ export async function confirmEmailAndActivate(
     readonly accounts: MemberAccountStore;
     readonly identities: IdentityConfirmationReader;
   },
-  input: {
-    readonly tokenHash: string;
-    readonly type: EmailConfirmationOtpType;
-  },
+  input: EmailConfirmationLink,
 ): Promise<EmailConfirmationResult> {
   const confirmation = await gateways.confirmations.confirmEmail({
     tokenHash: input.tokenHash,
