@@ -204,6 +204,14 @@ columna role_requests.justification tipo=text null=YES default=-
 columna role_requests.requested_role tipo=text null=NO default=-
 columna role_requests.status tipo=text null=NO default='pending'::text
 columna role_requests.user_id tipo=uuid null=NO default=-
+columna session_ledger.attendance_event_id tipo=uuid null=YES default=-
+columna session_ledger.club_id tipo=uuid null=NO default=-
+columna session_ledger.created_at tipo=timestamp with time zone null=NO default=now()
+columna session_ledger.delta tipo=integer null=NO default=-
+columna session_ledger.id tipo=uuid null=NO default=gen_random_uuid()
+columna session_ledger.kind tipo=text null=NO default=-
+columna session_ledger.pack_payment_id tipo=uuid null=YES default=-
+columna session_ledger.user_id tipo=uuid null=NO default=-
 columna stripe_events.created tipo=timestamp with time zone null=NO default=-
 columna stripe_events.id tipo=text null=NO default=-
 columna stripe_events.processed_at tipo=timestamp with time zone null=NO default=now()
@@ -237,6 +245,7 @@ funcion create_club_position(acting_club_id uuid, name_en text, name_es text)
 funcion create_evaluation_category(acting_club_id uuid, category_name text)
 funcion create_events(acting_club_id uuid, acting_user_id uuid, schedule jsonb)
 funcion create_member_evaluation(acting_club_id uuid, target_user_id uuid)
+funcion credit_session_pack(user_id uuid, club_id uuid, sessions integer, payment_id uuid)
 funcion decide_role_request(target_request_id uuid, deciding_club_id uuid, deciding_user_id uuid, decision text)
 funcion evaluation_category_name_taken(acting_club_id uuid, own_category_id uuid, category_name text)
 funcion event_rsvp_tallies(p_event_ids uuid[])
@@ -250,9 +259,11 @@ funcion lock_club_positions(acting_club_id uuid)
 funcion lock_evaluated_member(acting_club_id uuid, target_user_id uuid)
 funcion lock_evaluation_categories(acting_club_id uuid)
 funcion members_sync_position_id()
+funcion memberships_refresh_casual_status()
 funcion news_post_attachments_enforce_max()
 funcion prune_member_notifications(recipient_user_ids uuid[])
 funcion publish_team_split(acting_club_id uuid, target_event_id uuid)
+funcion refresh_casual_membership_status(target_user_id uuid, target_club_id uuid)
 funcion refresh_member_evaluation(acting_club_id uuid, target_user_id uuid)
 funcion rename_club_position(acting_club_id uuid, target_position_id uuid, name_en text, name_es text)
 funcion rename_evaluation_category(acting_club_id uuid, target_category_id uuid, category_name text)
@@ -267,6 +278,7 @@ funcion search_members(p_club_id uuid, p_text text)
 funcion search_news_posts(p_club_id uuid, p_text text, p_reader_id uuid, p_group_ids uuid[])
 funcion search_normalize(p_text text)
 funcion seed_default_evaluation_categories(target_club_id uuid)
+funcion session_ledger_refresh_status()
 funcion set_club_position_archived(acting_club_id uuid, target_position_id uuid, archived boolean)
 funcion set_evaluation_category_active(acting_club_id uuid, target_category_id uuid, active boolean)
 funcion set_member_status(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_status text)
@@ -685,6 +697,21 @@ grant role_requests service_role SELECT
 grant role_requests service_role TRIGGER
 grant role_requests service_role TRUNCATE
 grant role_requests service_role UPDATE
+grant session_ledger authenticated SELECT
+grant session_ledger postgres DELETE
+grant session_ledger postgres INSERT
+grant session_ledger postgres REFERENCES
+grant session_ledger postgres SELECT
+grant session_ledger postgres TRIGGER
+grant session_ledger postgres TRUNCATE
+grant session_ledger postgres UPDATE
+grant session_ledger service_role DELETE
+grant session_ledger service_role INSERT
+grant session_ledger service_role REFERENCES
+grant session_ledger service_role SELECT
+grant session_ledger service_role TRIGGER
+grant session_ledger service_role TRUNCATE
+grant session_ledger service_role UPDATE
 grant stripe_events postgres DELETE
 grant stripe_events postgres INSERT
 grant stripe_events postgres REFERENCES
@@ -806,6 +833,7 @@ indice notifications_unread_user_id_idx CREATE INDEX notifications_unread_user_i
 indice notifications_user_id_created_at_idx CREATE INDEX notifications_user_id_created_at_idx ON public.notifications USING btree (user_id, created_at DESC)
 indice password_recovery_requests_email_hash_requested_at_idx CREATE INDEX password_recovery_requests_email_hash_requested_at_idx ON public.password_recovery_requests USING btree (email_hash, requested_at DESC)
 indice password_recovery_requests_pkey CREATE UNIQUE INDEX password_recovery_requests_pkey ON public.password_recovery_requests USING btree (id)
+indice payments_id_user_id_club_id_key CREATE UNIQUE INDEX payments_id_user_id_club_id_key ON public.payments USING btree (id, user_id, club_id)
 indice payments_pkey CREATE UNIQUE INDEX payments_pkey ON public.payments USING btree (id)
 indice payments_stripe_charge_id_key CREATE UNIQUE INDEX payments_stripe_charge_id_key ON public.payments USING btree (stripe_charge_id)
 indice payments_stripe_invoice_id_key CREATE UNIQUE INDEX payments_stripe_invoice_id_key ON public.payments USING btree (stripe_invoice_id)
@@ -816,6 +844,10 @@ indice role_requests_decided_by_idx CREATE INDEX role_requests_decided_by_idx ON
 indice role_requests_one_pending_per_member CREATE UNIQUE INDEX role_requests_one_pending_per_member ON public.role_requests USING btree (user_id) WHERE (status = 'pending'::text)
 indice role_requests_pkey CREATE UNIQUE INDEX role_requests_pkey ON public.role_requests USING btree (id)
 indice role_requests_user_id_created_at_idx CREATE INDEX role_requests_user_id_created_at_idx ON public.role_requests USING btree (user_id, created_at DESC)
+indice session_ledger_attendance_key CREATE UNIQUE INDEX session_ledger_attendance_key ON public.session_ledger USING btree (attendance_event_id, user_id)
+indice session_ledger_pack_payment_id_key CREATE UNIQUE INDEX session_ledger_pack_payment_id_key ON public.session_ledger USING btree (pack_payment_id)
+indice session_ledger_pkey CREATE UNIQUE INDEX session_ledger_pkey ON public.session_ledger USING btree (id)
+indice session_ledger_user_id_club_id_idx CREATE INDEX session_ledger_user_id_club_id_idx ON public.session_ledger USING btree (user_id, club_id)
 indice stripe_events_pkey CREATE UNIQUE INDEX stripe_events_pkey ON public.stripe_events USING btree (id)
 indice team_split_members_pkey CREATE UNIQUE INDEX team_split_members_pkey ON public.team_split_members USING btree (split_id, user_id)
 indice team_split_members_user_id_club_id_idx CREATE INDEX team_split_members_user_id_club_id_idx ON public.team_split_members USING btree (user_id, club_id)
@@ -875,6 +907,7 @@ policy password_recovery_requests.password_recovery_requests_select_denied cmd=S
 policy payments.payments_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
 policy registration_requests.registration_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy role_requests.role_requests_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
+policy session_ledger.session_ledger_select_own cmd=SELECT roles={authenticated} using=(user_id = ( SELECT auth.uid() AS uid)) check=-
 policy team_split_members.team_split_members_select_published cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
    FROM team_splits s
   WHERE (s.id = team_split_members.split_id))) check=-
@@ -1029,6 +1062,7 @@ restriccion password_recovery_requests.password_recovery_requests_pkey PRIMARY K
 restriccion payments.payments_amount_cents_check CHECK ((amount_cents >= 0))
 restriccion payments.payments_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion payments.payments_currency_check CHECK ((currency ~ '^[a-z]{3}$'::text))
+restriccion payments.payments_id_user_id_club_id_key UNIQUE (id, user_id, club_id)
 restriccion payments.payments_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
 restriccion payments.payments_pkey PRIMARY KEY (id)
 restriccion payments.payments_status_check CHECK ((status = ANY (ARRAY['paid'::text, 'failed'::text, 'pending'::text])))
@@ -1046,6 +1080,16 @@ restriccion role_requests.role_requests_pkey PRIMARY KEY (id)
 restriccion role_requests.role_requests_requested_role_check CHECK ((requested_role = ANY (ARRAY['Coach'::text, 'Committee'::text])))
 restriccion role_requests.role_requests_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))
 restriccion role_requests.role_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES members(user_id) ON DELETE CASCADE
+restriccion session_ledger.session_ledger_attendance_fkey FOREIGN KEY (attendance_event_id, user_id) REFERENCES attendance_records(event_id, user_id) ON DELETE CASCADE
+restriccion session_ledger.session_ledger_attendance_key UNIQUE (attendance_event_id, user_id)
+restriccion session_ledger.session_ledger_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion session_ledger.session_ledger_delta_check CHECK ((delta <> 0))
+restriccion session_ledger.session_ledger_kind_check CHECK ((kind = ANY (ARRAY['pack_purchase'::text, 'attendance'::text])))
+restriccion session_ledger.session_ledger_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
+restriccion session_ledger.session_ledger_pack_payment_fkey FOREIGN KEY (pack_payment_id, user_id, club_id) REFERENCES payments(id, user_id, club_id)
+restriccion session_ledger.session_ledger_pack_payment_id_key UNIQUE (pack_payment_id)
+restriccion session_ledger.session_ledger_pkey PRIMARY KEY (id)
+restriccion session_ledger.session_ledger_reference_check CHECK ((((kind = 'pack_purchase'::text) AND (delta > 0) AND (pack_payment_id IS NOT NULL) AND (attendance_event_id IS NULL)) OR ((kind = 'attendance'::text) AND (delta = '-1'::integer) AND (attendance_event_id IS NOT NULL) AND (pack_payment_id IS NULL))))
 restriccion stripe_events.stripe_events_pkey PRIMARY KEY (id)
 restriccion team_split_members.team_split_members_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion team_split_members.team_split_members_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
@@ -1091,10 +1135,13 @@ tabla password_recovery_requests rls=t
 tabla payments rls=t
 tabla registration_requests rls=t
 tabla role_requests rls=t
+tabla session_ledger rls=t
 tabla stripe_events rls=t
 tabla team_split_members rls=t
 tabla team_splits rls=t
 trigger clubs_seed_default_evaluation_categories CREATE TRIGGER clubs_seed_default_evaluation_categories AFTER INSERT ON public.clubs FOR EACH ROW EXECUTE FUNCTION clubs_seed_default_evaluation_categories()
 trigger clubs_seed_default_positions CREATE TRIGGER clubs_seed_default_positions AFTER INSERT ON public.clubs FOR EACH ROW EXECUTE FUNCTION clubs_seed_default_positions()
 trigger members_sync_position_id CREATE TRIGGER members_sync_position_id BEFORE INSERT OR UPDATE OF "position" ON public.members FOR EACH ROW EXECUTE FUNCTION members_sync_position_id()
+trigger memberships_refresh_casual_status CREATE TRIGGER memberships_refresh_casual_status AFTER INSERT OR UPDATE OF plan ON public.memberships FOR EACH ROW WHEN ((new.plan = 'Casual'::text)) EXECUTE FUNCTION memberships_refresh_casual_status()
 trigger news_post_attachments_enforce_max CREATE TRIGGER news_post_attachments_enforce_max BEFORE INSERT OR UPDATE OF post_id ON public.news_post_attachments FOR EACH ROW EXECUTE FUNCTION news_post_attachments_enforce_max()
+trigger session_ledger_refresh_status CREATE TRIGGER session_ledger_refresh_status AFTER INSERT OR DELETE ON public.session_ledger FOR EACH ROW EXECUTE FUNCTION session_ledger_refresh_status()
