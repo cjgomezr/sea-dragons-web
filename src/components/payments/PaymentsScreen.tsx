@@ -23,10 +23,10 @@ import {
 } from "./use-membership-wait";
 
 /**
- * Pagos (#454, #455; RF-3, RF-5 y RF-7 del PRD de E12): el panel de la
- * membresía del mockup con el plan, su estado, la tarjeta y el historial; el
- * alta en Stripe Checkout de quien aún no puso tarjeta; y la espera del
- * webhook al volver de Stripe.
+ * Pagos (#454, #455, #456; RF-3, RF-5, RF-6 y RF-7 del PRD de E12): el
+ * panel de la membresía del mockup con el plan, su estado, la tarjeta y el
+ * historial; el alta en Stripe Checkout de quien aún no puso tarjeta; el
+ * cambio de plan; y la espera del webhook al volver de Stripe.
  *
  * Es de cliente por los botones y por la espera: la membresía se pide a
  * `GET /api/v1/membership`, el mismo endpoint que leerá la aplicación nativa
@@ -38,12 +38,14 @@ type LoadState =
   | { readonly kind: "failed"; readonly failure: PaymentsFailure }
   | { readonly kind: "ready"; readonly view: MembershipView };
 
-/** La membresía, pedida al montar y otra vez con cada reintento. La primera
- * que llega decide qué se espera de Stripe. */
+/** La membresía, pedida al montar, con cada reintento y tras cambiar de
+ * plan. La primera que llega decide qué se espera de Stripe. */
 function useMembershipLoad(returns: StripeReturns): {
   readonly state: LoadState;
   readonly waiting: Waiting;
   readonly retry: () => void;
+  /** La vuelve a pedir sin quitar de la pantalla la que hay. */
+  readonly refresh: () => void;
 } {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [waiting, setWaiting] = useState<Waiting>(NOT_WAITING);
@@ -91,12 +93,16 @@ function useMembershipLoad(returns: StripeReturns): {
   );
   useMembershipWait(waiting, { onLoaded, onTimeout });
 
-  function retry(): void {
-    setState({ kind: "loading" });
+  function refresh(): void {
     setReloads((count) => count + 1);
   }
 
-  return { state, waiting, retry };
+  function retry(): void {
+    setState({ kind: "loading" });
+    refresh();
+  }
+
+  return { state, waiting, retry, refresh };
 }
 
 function LoadFailure({
@@ -156,11 +162,13 @@ function MembershipPanel({
   view,
   waiting,
   returns,
+  onPlanChanged,
 }: {
   readonly translate: Translator;
   readonly view: MembershipView;
   readonly waiting: Waiting;
   readonly returns: StripeReturns;
+  readonly onPlanChanged: () => void;
 }): React.JSX.Element {
   const { membership } = view;
   // Sin membresía, el socio está como quien todavía no puso tarjeta.
@@ -189,6 +197,7 @@ function MembershipPanel({
           membership={membership}
           waiting={waiting}
           checkoutReturn={returns.checkoutReturn}
+          onPlanChanged={onPlanChanged}
         />
       )}
       <PaymentHistory translate={translate} payments={view.payments} />
@@ -206,7 +215,7 @@ export function PaymentsScreen({
   readonly cardReturn: CheckoutReturn | null;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
-  const { state, waiting, retry } = useMembershipLoad({
+  const { state, waiting, retry, refresh } = useMembershipLoad({
     checkoutReturn,
     cardReturn,
   });
@@ -231,6 +240,7 @@ export function PaymentsScreen({
           view={state.view}
           waiting={waiting}
           returns={{ checkoutReturn, cardReturn }}
+          onPlanChanged={refresh}
         />
       ) : null}
     </>

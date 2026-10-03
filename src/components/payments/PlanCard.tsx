@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import { formatAudCents, formatCalendarDay } from "@/lib/i18n/format";
+import { formatAudCents } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import type { CheckoutReturn } from "@/lib/membership/checkout-return";
 import type {
@@ -13,8 +13,9 @@ import type {
   MembershipPanelView,
   MembershipView,
 } from "@/lib/membership/membership-view";
-import { clubCalendarDate } from "@/lib/time/club-calendar";
+import { formatClubDay } from "./format-club-day";
 import { requestCardUpdate, requestCheckout } from "./payments-client";
+import { PlanChange } from "./PlanChange";
 import { StripeSessionButton } from "./StripeSessionButton";
 import type { Waiting } from "./use-membership-wait";
 
@@ -22,7 +23,8 @@ import type { Waiting } from "./use-membership-wait";
  * La tarjeta "Plan actual" del mockup de Pagos (#455, RF-5 del PRD de E12):
  * el plan con su precio, el chip de estado, el próximo cobro, la tarjeta o la
  * exención, y lo que el socio puede hacer según su estado. A quien aún no
- * puso tarjeta le ofrece el alta en Checkout (#454).
+ * puso tarjeta le ofrece el alta en Checkout (#454), y a quien puede, el
+ * cambio de plan (#456).
  */
 
 /** El chip lleva siempre la palabra: el color sólo la acompaña. */
@@ -50,14 +52,6 @@ const CARD_BRAND_NAMES: Readonly<Record<string, string>> = {
 };
 
 const EXPIRY_MONTH_DIGITS = 2;
-
-/** Un instante como el día de Melbourne en que cae ("1 July 2026"). */
-function formatClubDay(translate: Translator, instant: string): string {
-  return formatCalendarDay(
-    translate.locale,
-    clubCalendarDate(new Date(instant)),
-  );
-}
 
 function formatCardBrand(brand: string): string {
   return (
@@ -287,12 +281,15 @@ export function PlanCard({
   membership,
   waiting,
   checkoutReturn,
+  onPlanChanged,
 }: {
   readonly translate: Translator;
   readonly view: MembershipView;
   readonly membership: MembershipPanelView;
   readonly waiting: Waiting;
   readonly checkoutReturn: CheckoutReturn | null;
+  /** Pagos vuelve a leer la membresía cuando el cambio de plan sale bien. */
+  readonly onPlanChanged: () => void;
 }): React.JSX.Element {
   const titleId = useId();
   const { plan, monthlyPriceCents, status } = membership;
@@ -333,6 +330,13 @@ export function PlanCard({
           waiting={waiting}
         />
       ) : null}
+      {isWaitingForSubscription(waiting) ? null : (
+        <PlanChange
+          translate={translate}
+          membership={membership}
+          onChanged={onPlanChanged}
+        />
+      )}
     </section>
   );
 }
