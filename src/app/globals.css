@@ -4847,6 +4847,90 @@ a.auth-brand-header:focus-visible {
   accent-color: var(--color-accent);
 }
 
+/* Elegir plan antes del primer pago (#479): tres tarjetas seleccionables con
+   el precio destacado. Se apilan cuando no caben tres de ancho mínimo. El
+   radio sigue a la vista: es lo que dice cuál está elegida, y el borde de
+   acento sólo lo acompaña. */
+.payments-choice {
+  display: grid;
+  gap: var(--space-2);
+  justify-self: stretch;
+  min-width: 0;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.payments-choice legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+}
+
+.payments-choice-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-3);
+}
+
+.payments-choice-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--space-2);
+  row-gap: var(--space-1);
+  align-items: center;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.payments-choice-option:hover {
+  border-color: var(--color-accent);
+}
+
+.payments-choice-option:has(input:focus-visible) {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.payments-choice-option:has(input:checked) {
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-panel));
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.payments-choice-option input {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
+.payments-choice-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.payments-choice-price,
+.payments-choice-note {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
+
+.payments-choice-price {
+  font-family: var(--font-family-mono);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.payments-choice-note {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
 .payments-history {
   min-width: 0;
   padding: 0;

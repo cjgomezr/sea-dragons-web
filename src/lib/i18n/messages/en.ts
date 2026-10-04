@@ -871,6 +871,13 @@ export const englishMessages = {
   "payments.history.paid": "Paid",
   "payments.history.failed": "Failed",
   "payments.history.pending": "Pending",
+  "payments.choice.title": "Choose your membership",
+  "payments.choice.hint": "You can change it until you pay.",
+  "payments.choice.sessionPrice": "{price} per session",
+  "payments.choice.trial": "First month free",
+  "payments.choice.packs": "Paid in session packs",
+  "payments.choice.saving": "Saving…",
+  "payments.choice.failed": "We couldn't save your choice. Try again.",
   "payments.planChange.title": "Change plan",
   "payments.planChange.hint":
     "The change starts with your next billing cycle, with no proration.",

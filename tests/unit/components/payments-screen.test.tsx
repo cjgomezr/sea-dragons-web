@@ -1170,3 +1170,183 @@ describe("PaymentsScreen: cambio de plan (#456)", () => {
     );
   });
 });
+
+describe("PaymentsScreen: elegir plan antes del primer pago (#479)", () => {
+  const CHOOSING = panel({
+    plan: null,
+    status: "pending",
+    monthlyPriceCents: null,
+    nextChargeAt: null,
+    card: null,
+    canChoosePlan: true,
+    planPrices: { Full: 4500, Student: 3200 },
+    casualSessionPriceCents: 1500,
+  });
+
+  function choosing(change: Partial<MembershipPanelView> = {}): MembershipView {
+    return view({ ...CHOOSING, ...change });
+  }
+
+  function choiceGroup(): HTMLElement {
+    return screen.getByRole("group", { name: "Choose your membership" });
+  }
+
+  function savedChoice(plan: "Full" | "Student" | "Casual"): RouteHandler {
+    return () =>
+      jsonResponse({
+        data: choosing({
+          plan,
+          monthlyPriceCents: plan === "Casual" ? null : 4500,
+        }),
+      });
+  }
+
+  it("ofrece las tres opciones con su precio y ninguna marcada sin plan guardado", async () => {
+    await renderLoaded(choosing());
+
+    const group = choiceGroup();
+    const radios = within(group).getAllByRole("radio");
+    expect(radios).toHaveLength(3);
+    expect(radios.every((radio) => !(radio as HTMLInputElement).checked)).toBe(
+      true,
+    );
+    expect(
+      within(group).getByRole("radio", { name: /^Full/ }),
+    ).toHaveAccessibleName(/\$45\.00 a month.*First month free/);
+    expect(
+      within(group).getByRole("radio", { name: /^Student/ }),
+    ).toHaveAccessibleName(/\$32\.00 a month.*First month free/);
+    expect(
+      within(group).getByRole("radio", { name: /^Casual/ }),
+    ).toHaveAccessibleName(/\$15\.00 per session.*session packs/);
+    expect(
+      screen.queryByRole("button", { name: "Add card" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("marca el plan que ya tiene guardado", async () => {
+    await renderLoaded(choosing({ plan: "Student", monthlyPriceCents: 3200 }));
+
+    expect(
+      within(choiceGroup()).getByRole("radio", { name: /^Student/ }),
+    ).toBeChecked();
+  });
+
+  it("dice que el precio no está disponible si Stripe no lo dio", async () => {
+    await renderLoaded(
+      choosing({
+        planPrices: { Full: null, Student: 3200 },
+        casualSessionPriceCents: null,
+      }),
+    );
+
+    expect(
+      within(choiceGroup()).getByRole("radio", { name: /^Full/ }),
+    ).toHaveAccessibleName(/Price not available/);
+    expect(
+      within(choiceGroup()).getByRole("radio", { name: /^Casual/ }),
+    ).toHaveAccessibleName(/Price not available/);
+  });
+
+  it("guarda la opción elegida con PUT y enseña la membresía que responde", async () => {
+    const fetchDouble = await renderLoaded(choosing(), {
+      routes: { plan: savedChoice("Full") },
+    });
+
+    await userEvent.click(screen.getByRole("radio", { name: /^Full/ }));
+
+    expect(
+      await screen.findByRole("button", { name: "Add card" }),
+    ).toBeInTheDocument();
+    expect(fetchDouble).toHaveBeenCalledWith(
+      PLAN_PATH,
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ plan: "Full" }),
+      }),
+    );
+    expect(screen.getByRole("radio", { name: /^Full/ })).toBeChecked();
+  });
+
+  it("con Full o Student guardado, continuar lleva a Checkout", async () => {
+    const fetchDouble = await renderLoaded(
+      choosing({ plan: "Full", monthlyPriceCents: 4500 }),
+      {
+        routes: {
+          checkout: () => jsonResponse({ data: { url: CHECKOUT_URL } }),
+        },
+      },
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Add card" }));
+
+    await waitFor(() =>
+      expect(openCheckout).toHaveBeenCalledWith(CHECKOUT_URL),
+    );
+    expect(fetchDouble).toHaveBeenCalledWith(
+      CHECKOUT_PATH,
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("al elegir Casual dice que los packs llegan con E13 y que un Admin puede activarlo, sin Checkout", async () => {
+    await renderLoaded(choosing(), { routes: { plan: savedChoice("Casual") } });
+
+    await userEvent.click(screen.getByRole("radio", { name: /^Casual/ }));
+
+    expect(await screen.findByText(/session packs arrive/)).toHaveTextContent(
+      "an Admin can activate",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Add card" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("no ofrece además el cambio de plan del #456", async () => {
+    await renderLoaded(choosing({ plan: "Casual", canChangePlan: true }));
+
+    expect(
+      screen.queryByRole("button", { name: "Confirm the change" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("si no se pudo guardar, lo dice y deja marcada la opción que había", async () => {
+    await renderLoaded(choosing({ plan: "Student", monthlyPriceCents: 3200 }), {
+      routes: { plan: serviceUnavailable },
+    });
+
+    await userEvent.click(screen.getByRole("radio", { name: /^Full/ }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't save your choice",
+    );
+    expect(screen.getByRole("radio", { name: /^Student/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /^Full/ })).not.toBeChecked();
+  });
+
+  it("no deja elegir otra mientras guarda la primera", async () => {
+    const fetchDouble = await renderLoaded(choosing(), {
+      routes: { plan: () => new Promise<Response>(() => undefined) },
+    });
+
+    await userEvent.click(screen.getByRole("radio", { name: /^Full/ }));
+    await userEvent.click(screen.getByRole("radio", { name: /^Student/ }));
+
+    expect(countCalls(fetchDouble, PLAN_PATH)).toBe(1);
+    expect(screen.getByRole("status")).toHaveTextContent("Saving");
+  });
+
+  it("lo dice en español, con los precios en su formato", async () => {
+    await renderLoaded(choosing(), { locale: "es" });
+
+    const group = screen.getByRole("group", { name: "Elige tu membresía" });
+    expect(
+      within(group).getByRole("radio", { name: /^Full/ }),
+    ).toHaveAccessibleName(/^Full 45,00\sAUD al mes Primer mes gratis$/);
+    expect(
+      within(group).getByRole("radio", { name: /^Casual/ }),
+    ).toHaveAccessibleName(
+      /15,00\sAUD por sesión Se paga en packs de sesiones$/,
+    );
+  });
+});

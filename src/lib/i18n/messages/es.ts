@@ -870,6 +870,14 @@ export const spanishMessages: MessageCatalog = {
   "payments.history.paid": "Pagado",
   "payments.history.failed": "Fallido",
   "payments.history.pending": "Pendiente",
+  "payments.choice.title": "Elige tu membresía",
+  "payments.choice.hint": "Puedes cambiarla mientras no hayas pagado.",
+  "payments.choice.sessionPrice": "{price} por sesión",
+  "payments.choice.trial": "Primer mes gratis",
+  "payments.choice.packs": "Se paga en packs de sesiones",
+  "payments.choice.saving": "Guardando…",
+  "payments.choice.failed":
+    "No pudimos guardar tu elección. Inténtalo de nuevo.",
   "payments.planChange.title": "Cambiar de plan",
   "payments.planChange.hint":
     "El cambio empieza con tu siguiente ciclo de cobro, sin prorrateo.",

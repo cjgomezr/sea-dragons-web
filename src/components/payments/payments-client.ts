@@ -167,6 +167,27 @@ export async function requestPlanChange(
     : { kind: "scheduled" };
 }
 
+/** Lo que respondió la elección de plan antes del primer pago (#479): la
+ * membresía con el plan guardado, como la sirve `GET`. */
+export type PlanChoiceSubmission =
+  { readonly kind: "saved"; readonly view: MembershipView } | PaymentsFailure;
+
+export async function requestPlanChoice(
+  plan: MembershipPlan,
+): Promise<PlanChoiceSubmission> {
+  const read = readApiPayload(
+    await requestApi(MEMBERSHIP_PLAN_API_PATH, {
+      method: "PUT",
+      headers: JSON_REQUEST_HEADERS,
+      body: JSON.stringify({ plan }),
+    }),
+    membershipResponseSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "saved", view: read.value.data };
+}
+
 export async function requestPlanChangeCancellation(): Promise<
   { readonly kind: "cancelled" } | PaymentsFailure
 > {
@@ -191,6 +212,16 @@ export function describePlanChangeFailure(
     default:
       return translate("payments.planChange.failed");
   }
+}
+
+/** Por qué no se guardó el plan elegido (#479). */
+export function describePlanChoiceFailure(
+  translate: Translator,
+  { failure }: PaymentsFailure,
+): string {
+  return failure === "network"
+    ? translate("auth.error.network")
+    : translate("payments.choice.failed");
 }
 
 /** Por qué no se pudo cargar la membresía, en el idioma de la pantalla. */
