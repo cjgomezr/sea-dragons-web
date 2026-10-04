@@ -15,6 +15,7 @@ import {
 } from "./membership";
 import type { StripeWebhookGateway } from "@/lib/stripe/stripe-webhook";
 import type { MemberEmailGateway } from "./checkout";
+import type { PlanChoiceGateway } from "./choose-plan";
 import type { ScheduledPlanChangeGateway } from "./plan-change";
 import type { SessionLedgerGateway, SessionMovement } from "./session-balance";
 import {
@@ -450,6 +451,39 @@ export function createStripeWebhookGateway(
         );
       }
       return z.enum(APPLY_STRIPE_EVENT_OUTCOMES).parse(data);
+    },
+  };
+}
+
+/** Los estados guardados en los que se puede elegir plan (#479). `waived`
+ * llega aquí sólo con la exención ya vencida: el dominio lo resolvió antes. */
+const PLAN_CHOICE_STORED_STATUSES: readonly MembershipStatus[] = [
+  "pending",
+  "cancelled",
+  "waived",
+];
+
+/** Guarda el plan que el socio elige en Pagos antes de pagar (#479). La
+ * condición va en la misma escritura para que un webhook que llega entre
+ * la lectura y el `update` no deje cambiar el plan de una suscripción. */
+export function createPlanChoiceGateway(
+  serviceClient: SupabaseClient,
+): PlanChoiceGateway {
+  return {
+    async savePlanChoice(userId, plan) {
+      const { data, error } = await serviceClient
+        .from(MEMBERSHIPS_TABLE)
+        .update({ plan, updated_at: new Date().toISOString() })
+        .eq("user_id", userId)
+        .is("stripe_subscription_id", null)
+        .in("status", PLAN_CHOICE_STORED_STATUSES)
+        .select("user_id");
+      if (error) {
+        throw new Error(
+          `No se pudo guardar el plan elegido por ${userId}: ${error.message}`,
+        );
+      }
+      return data.length > 0;
     },
   };
 }

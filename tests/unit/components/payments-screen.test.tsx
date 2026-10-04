@@ -52,6 +52,8 @@ function panel(change: Partial<MembershipPanelView> = {}): MembershipPanelView {
     scheduledChange: null,
     canChangePlan: false,
     planPrices: { Full: 4500, Student: 3675 },
+    canChoosePlan: false,
+    casualSessionPriceCents: null,
     ...change,
   };
 }

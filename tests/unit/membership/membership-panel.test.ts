@@ -103,6 +103,8 @@ describe("readMembershipView: la membresía", () => {
       scheduledChange: null,
       canChangePlan: true,
       planPrices: { Full: 5150, Student: 3675 },
+      canChoosePlan: false,
+      casualSessionPriceCents: null,
     });
   });
 
@@ -282,6 +284,56 @@ describe("readMembershipView: el cambio de plan (#456)", () => {
     });
 
     expect(view.membership?.canChangePlan).toBe(false);
+  });
+});
+
+describe("readMembershipView: elegir plan antes del primer pago (#479)", () => {
+  const PENDING_WITHOUT_PLAN = aRecord({
+    plan: null,
+    status: "pending",
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    currentPeriodEnd: null,
+    card: null,
+  });
+
+  it("ofrece elegir a quien está pending sin plan, con el precio de Stripe de las tres opciones", async () => {
+    const view = await viewOf(PENDING_WITHOUT_PLAN);
+
+    expect(view.membership).toMatchObject({
+      plan: null,
+      canChoosePlan: true,
+      planPrices: { Full: 5150, Student: 3675 },
+      casualSessionPriceCents: 1990,
+    });
+  });
+
+  it("lo ofrece también a quien ya guardó un plan y no ha pagado", async () => {
+    const view = await viewOf({ ...PENDING_WITHOUT_PLAN, plan: "Casual" });
+
+    expect(view.membership).toMatchObject({
+      plan: "Casual",
+      canChoosePlan: true,
+      casualSessionPriceCents: 1990,
+    });
+  });
+
+  it("dice nulo el precio de la sesión Casual que Stripe no dio", async () => {
+    const view = await viewOf(PENDING_WITHOUT_PLAN, [], {
+      ...STRIPE_PRICES,
+      casualSession: { amountCents: null, reason: "not_configured" },
+    });
+
+    expect(view.membership?.casualSessionPriceCents).toBeNull();
+  });
+
+  it("no lo ofrece a quien ya tiene suscripción", async () => {
+    const view = await viewOf(aRecord({ status: "past_due" }));
+
+    expect(view.membership).toMatchObject({
+      canChoosePlan: false,
+      casualSessionPriceCents: null,
+    });
   });
 });
 

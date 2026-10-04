@@ -38,6 +38,7 @@ const PENDING_FULL: MembershipRecord = {
 
 const FULL_PRICE_CENTS = 5150;
 const STUDENT_PRICE_CENTS = 3675;
+const CASUAL_SESSION_PRICE_CENTS = 1990;
 
 function monthlyStripePrice(id: string, unitAmount: number): object {
   return {
@@ -55,6 +56,13 @@ const STRIPE_PRICES: Readonly<Record<string, object>> = {
     "price_student_test",
     STUDENT_PRICE_CENTS,
   ),
+  price_casual_test: {
+    id: "price_casual_test",
+    unit_amount: CASUAL_SESSION_PRICE_CENTS,
+    currency: "aud",
+    type: "one_time",
+    recurring: null,
+  },
 };
 
 const readSessionState = vi.fn();
@@ -101,6 +109,7 @@ function configureStripe(): void {
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_secreto_de_prueba";
   process.env.STRIPE_PRICE_FULL = "price_full_test";
   process.env.STRIPE_PRICE_STUDENT = "price_student_test";
+  process.env.STRIPE_PRICE_CASUAL_SESSION = "price_casual_test";
 }
 
 function givenSession(session: SessionState): void {
@@ -156,6 +165,8 @@ describe("GET /api/v1/membership", () => {
           scheduledChange: null,
           canChangePlan: false,
           planPrices: { Full: FULL_PRICE_CENTS, Student: STUDENT_PRICE_CENTS },
+          canChoosePlan: true,
+          casualSessionPriceCents: CASUAL_SESSION_PRICE_CENTS,
         },
         payments: [],
       },

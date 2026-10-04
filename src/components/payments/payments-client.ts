@@ -62,6 +62,8 @@ const membershipViewSchema = z.object({
         Full: z.number().int().nullable(),
         Student: z.number().int().nullable(),
       }),
+      canChoosePlan: z.boolean(),
+      casualSessionPriceCents: z.number().int().nullable(),
     })
     .nullable(),
   payments: z.array(
