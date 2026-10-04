@@ -1014,7 +1014,9 @@ describe("ficha en pantalla: exención de cuota (#457)", () => {
       await screen.findByText("La cuota de Paula Player queda exenta."),
     ).toBeVisible();
     expect(screen.getByText("Motivo: Entrenadora")).toBeInTheDocument();
-    expect(screen.getByText("Termina el 1 de marzo de 2027")).toBeInTheDocument();
+    expect(
+      screen.getByText("Termina el 1 de marzo de 2027"),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Retirar la exención" }),
     ).toBeInTheDocument();
