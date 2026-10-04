@@ -140,25 +140,21 @@ function CurrentPlan({
   );
 }
 
-/** Elegir plan antes de pagar (#479) o cambiarlo con la suscripción en
- * marcha (#456): nunca los dos. Mientras se espera a Stripe, ninguno. */
-function PlanSelection({
+/** Quien aún no ha pagado elige plan entre las opciones (#479), que ya
+ * dicen el precio; los demás ven el plan que tienen. Mientras se espera a
+ * Stripe no se elige nada. */
+function PlanSummary({
   translate,
   membership,
   waiting,
   onViewReplaced,
-  onPlanChanged,
 }: {
   readonly translate: Translator;
   readonly membership: MembershipPanelView;
   readonly waiting: Waiting;
   readonly onViewReplaced: (view: MembershipView) => void;
-  readonly onPlanChanged: () => void;
 }): React.JSX.Element | null {
-  if (isWaitingForSubscription(waiting)) {
-    return null;
-  }
-  if (membership.canChoosePlan) {
+  if (membership.canChoosePlan && !isWaitingForSubscription(waiting)) {
     return (
       <PlanChoice
         translate={translate}
@@ -167,13 +163,7 @@ function PlanSelection({
       />
     );
   }
-  return (
-    <PlanChange
-      translate={translate}
-      membership={membership}
-      onChanged={onPlanChanged}
-    />
-  );
+  return <CurrentPlan translate={translate} membership={membership} />;
 }
 
 /** El precio lo lee de Stripe el endpoint (#486). Nulo en un plan con cuota
@@ -380,9 +370,12 @@ export function PlanCard({
         </h2>
         <StatusChip translate={translate} membership={membership} />
       </div>
-      {membership.canChoosePlan ? null : (
-        <CurrentPlan translate={translate} membership={membership} />
-      )}
+      <PlanSummary
+        translate={translate}
+        membership={membership}
+        waiting={waiting}
+        onViewReplaced={onViewReplaced}
+      />
       <PlanDetails translate={translate} membership={membership} />
       {status === "pending" ? (
         <PendingOffer
@@ -400,13 +393,14 @@ export function PlanCard({
           waiting={waiting}
         />
       ) : null}
-      <PlanSelection
-        translate={translate}
-        membership={membership}
-        waiting={waiting}
-        onViewReplaced={onViewReplaced}
-        onPlanChanged={onPlanChanged}
-      />
+      {/* Quien elige plan no lo cambia además por el camino del #456. */}
+      {membership.canChoosePlan || isWaitingForSubscription(waiting) ? null : (
+        <PlanChange
+          translate={translate}
+          membership={membership}
+          onChanged={onPlanChanged}
+        />
+      )}
     </section>
   );
 }

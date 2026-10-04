@@ -11102,6 +11102,35 @@ const SCHEDULED_CHANGE_MEMBERSHIP_VIEW = membershipView(
   PAYMENTS_HISTORY,
 );
 
+// Elegir plan antes del primer pago (#479): las tres opciones sin ninguna
+// marcada, y con Casual guardado, que no ofrece Checkout.
+const CHOOSE_PLAN_MEMBERSHIP_VIEW = membershipView(
+  {
+    plan: null,
+    status: "pending",
+    monthlyPriceCents: null,
+    card: null,
+    canChoosePlan: true,
+    planPrices: { Full: 4500, Student: 3200 },
+    casualSessionPriceCents: 1500,
+  },
+  [],
+);
+
+const CHOOSE_CASUAL_MEMBERSHIP_VIEW = membershipView(
+  {
+    plan: "Casual",
+    status: "pending",
+    monthlyPriceCents: null,
+    card: null,
+    canChoosePlan: true,
+    canChangePlan: true,
+    planPrices: { Full: 4500, Student: 3200 },
+    casualSessionPriceCents: 1500,
+  },
+  [],
+);
+
 type PaymentsScreenState = {
   readonly name: string;
   /** Lo que sirve el endpoint fingido; sin él, la membresía sembrada. */
@@ -11139,6 +11168,8 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
     "pagos-cambio-programado",
     SCHEDULED_CHANGE_MEMBERSHIP_VIEW,
   ),
+  ...paymentsStates("pagos-elegir-plan", CHOOSE_PLAN_MEMBERSHIP_VIEW),
+  ...paymentsStates("pagos-elegir-plan-casual", CHOOSE_CASUAL_MEMBERSHIP_VIEW),
 ];
 
 async function serveMembership(page: Page, view: object): Promise<void> {
@@ -11231,6 +11262,26 @@ test.describe("Pagos en el navegador", () => {
       .first()
       .evaluate((cell) => getComputedStyle(cell, "::before").content);
     expect(amountLabel).toBe('"Amount"');
+  });
+
+  test("a 375px las tres opciones de plan se apilan", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPayments(page, { view: CHOOSE_PLAN_MEMBERSHIP_VIEW });
+
+    const options = page
+      .getByRole("group", { name: "Choose your membership" })
+      .locator("label");
+    await expect(options).toHaveCount(3);
+    const boxes = await options.evaluateAll((labels) =>
+      labels.map((label) => {
+        const box = label.getBoundingClientRect();
+        return { left: box.left, top: box.top, bottom: box.bottom };
+      }),
+    );
+    expect(new Set(boxes.map((box) => box.left)).size).toBe(1);
+    boxes.slice(1).forEach((box, index) => {
+      expect(box.top).toBeGreaterThanOrEqual(boxes[index]!.bottom);
+    });
   });
 
   test("con la red caída lo dice y vuelve a pedir al reintentar", async ({

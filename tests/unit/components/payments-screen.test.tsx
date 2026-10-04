@@ -1336,6 +1336,16 @@ describe("PaymentsScreen: elegir plan antes del primer pago (#479)", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Saving");
   });
 
+  it("al volver de Checkout espera a Stripe y no ofrece elegir otra vez", async () => {
+    await renderLoaded(choosing({ plan: "Full", monthlyPriceCents: 4500 }), {
+      checkoutReturn: "ok",
+    });
+
+    expect(screen.getByText(/waiting for Stripe/)).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.getByText("Full membership")).toBeInTheDocument();
+  });
+
   it("lo dice en español, con los precios en su formato", async () => {
     await renderLoaded(choosing(), { locale: "es" });
 
