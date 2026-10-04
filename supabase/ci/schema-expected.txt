@@ -24,6 +24,11 @@ columna club_positions.coverage tipo=text null=YES default=-
 columna club_positions.created_at tipo=timestamp with time zone null=NO default=now()
 columna club_positions.id tipo=uuid null=NO default=gen_random_uuid()
 columna club_positions.sort_order tipo=integer null=NO default=-
+columna club_session_pack_options.club_id tipo=uuid null=NO default=-
+columna club_session_pack_options.created_at tipo=timestamp with time zone null=NO default=now()
+columna club_session_pack_options.id tipo=uuid null=NO default=gen_random_uuid()
+columna club_session_pack_options.position tipo=integer null=NO default=-
+columna club_session_pack_options.sessions tipo=integer null=NO default=-
 columna club_sign_in_texts.club_id tipo=uuid null=NO default=-
 columna club_sign_in_texts.locale tipo=text null=NO default=-
 columna club_sign_in_texts.tagline tipo=text null=YES default=-
@@ -243,6 +248,7 @@ funcion club_attendance_rate(p_club_id uuid, p_since date, p_until date)
 funcion club_position_name_taken(acting_club_id uuid, own_position_id uuid, name_en text, name_es text)
 funcion clubs_seed_default_evaluation_categories()
 funcion clubs_seed_default_positions()
+funcion clubs_seed_default_session_pack_options()
 funcion create_club_position(acting_club_id uuid, name_en text, name_es text)
 funcion create_evaluation_category(acting_club_id uuid, category_name text)
 funcion create_events(acting_club_id uuid, acting_user_id uuid, schedule jsonb)
@@ -272,6 +278,7 @@ funcion rename_club_position(acting_club_id uuid, target_position_id uuid, name_
 funcion rename_evaluation_category(acting_club_id uuid, target_category_id uuid, category_name text)
 funcion reorder_club_positions(acting_club_id uuid, ordered_ids uuid[])
 funcion reorder_evaluation_categories(acting_club_id uuid, ordered_ids uuid[])
+funcion replace_club_session_pack_options(acting_club_id uuid, pack_sessions integer[])
 funcion save_attendance_sheet(acting_club_id uuid, acting_user_id uuid, target_event_id uuid, records jsonb)
 funcion save_member_evaluation_ratings(acting_club_id uuid, target_user_id uuid, expected_updated_at timestamp with time zone, ratings jsonb)
 funcion save_team_split(acting_club_id uuid, acting_user_id uuid, target_event_id uuid, split jsonb)
@@ -281,6 +288,7 @@ funcion search_members(p_club_id uuid, p_text text)
 funcion search_news_posts(p_club_id uuid, p_text text, p_reader_id uuid, p_group_ids uuid[])
 funcion search_normalize(p_text text)
 funcion seed_default_evaluation_categories(target_club_id uuid)
+funcion seed_default_session_pack_options(target_club_id uuid)
 funcion session_ledger_refresh_status()
 funcion set_club_position_archived(acting_club_id uuid, target_position_id uuid, archived boolean)
 funcion set_evaluation_category_active(acting_club_id uuid, target_category_id uuid, active boolean)
@@ -347,6 +355,21 @@ grant club_positions service_role SELECT
 grant club_positions service_role TRIGGER
 grant club_positions service_role TRUNCATE
 grant club_positions service_role UPDATE
+grant club_session_pack_options authenticated SELECT
+grant club_session_pack_options postgres DELETE
+grant club_session_pack_options postgres INSERT
+grant club_session_pack_options postgres REFERENCES
+grant club_session_pack_options postgres SELECT
+grant club_session_pack_options postgres TRIGGER
+grant club_session_pack_options postgres TRUNCATE
+grant club_session_pack_options postgres UPDATE
+grant club_session_pack_options service_role DELETE
+grant club_session_pack_options service_role INSERT
+grant club_session_pack_options service_role REFERENCES
+grant club_session_pack_options service_role SELECT
+grant club_session_pack_options service_role TRIGGER
+grant club_session_pack_options service_role TRUNCATE
+grant club_session_pack_options service_role UPDATE
 grant club_sign_in_texts anon SELECT
 grant club_sign_in_texts authenticated SELECT
 grant club_sign_in_texts postgres DELETE
@@ -774,6 +797,9 @@ indice club_position_names_pkey CREATE UNIQUE INDEX club_position_names_pkey ON 
 indice club_positions_club_id_sort_order_idx CREATE INDEX club_positions_club_id_sort_order_idx ON public.club_positions USING btree (club_id, sort_order)
 indice club_positions_id_club_id_key CREATE UNIQUE INDEX club_positions_id_club_id_key ON public.club_positions USING btree (id, club_id)
 indice club_positions_pkey CREATE UNIQUE INDEX club_positions_pkey ON public.club_positions USING btree (id)
+indice club_session_pack_options_club_id_position_key CREATE UNIQUE INDEX club_session_pack_options_club_id_position_key ON public.club_session_pack_options USING btree (club_id, "position")
+indice club_session_pack_options_club_id_sessions_key CREATE UNIQUE INDEX club_session_pack_options_club_id_sessions_key ON public.club_session_pack_options USING btree (club_id, sessions)
+indice club_session_pack_options_pkey CREATE UNIQUE INDEX club_session_pack_options_pkey ON public.club_session_pack_options USING btree (id)
 indice club_sign_in_texts_pkey CREATE UNIQUE INDEX club_sign_in_texts_pkey ON public.club_sign_in_texts USING btree (club_id, locale)
 indice clubs_pkey CREATE UNIQUE INDEX clubs_pkey ON public.clubs USING btree (id)
 indice clubs_slug_key CREATE UNIQUE INDEX clubs_slug_key ON public.clubs USING btree (slug)
@@ -867,6 +893,9 @@ policy club_position_names.club_position_names_select_own_club cmd=SELECT roles=
 policy club_positions.club_positions_select_own_club cmd=SELECT roles={authenticated} using=(club_id IN ( SELECT m.club_id
    FROM members m
   WHERE (m.user_id = ( SELECT auth.uid() AS uid)))) check=-
+policy club_session_pack_options.club_session_pack_options_select_own_club cmd=SELECT roles={authenticated} using=(club_id IN ( SELECT m.club_id
+   FROM members m
+  WHERE ((m.user_id = ( SELECT auth.uid() AS uid)) AND (m.account_status = 'active'::text)))) check=-
 policy club_sign_in_texts.club_sign_in_texts_select_public cmd=SELECT roles={anon,authenticated} using=true check=-
 policy clubs.clubs_select_anon cmd=SELECT roles={anon} using=true check=-
 policy clubs.clubs_select_authenticated cmd=SELECT roles={authenticated} using=true check=-
@@ -937,6 +966,12 @@ restriccion club_positions.club_positions_club_id_fkey FOREIGN KEY (club_id) REF
 restriccion club_positions.club_positions_coverage_check CHECK ((coverage = ANY (ARRAY['goalkeeper'::text, 'defender'::text, 'forward'::text])))
 restriccion club_positions.club_positions_id_club_id_key UNIQUE (id, club_id)
 restriccion club_positions.club_positions_pkey PRIMARY KEY (id)
+restriccion club_session_pack_options.club_session_pack_options_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
+restriccion club_session_pack_options.club_session_pack_options_club_id_position_key UNIQUE (club_id, "position")
+restriccion club_session_pack_options.club_session_pack_options_club_id_sessions_key UNIQUE (club_id, sessions)
+restriccion club_session_pack_options.club_session_pack_options_pkey PRIMARY KEY (id)
+restriccion club_session_pack_options.club_session_pack_options_position_check CHECK (("position" >= 1))
+restriccion club_session_pack_options.club_session_pack_options_sessions_check CHECK (((sessions >= 1) AND (sessions <= 50)))
 restriccion club_sign_in_texts.club_sign_in_texts_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
 restriccion club_sign_in_texts.club_sign_in_texts_locale_check CHECK ((locale = ANY (ARRAY['en'::text, 'es'::text])))
 restriccion club_sign_in_texts.club_sign_in_texts_pkey PRIMARY KEY (club_id, locale)
@@ -1117,6 +1152,7 @@ tabla attendance_records rls=t
 tabla audit_log rls=t
 tabla club_position_names rls=t
 tabla club_positions rls=t
+tabla club_session_pack_options rls=t
 tabla club_sign_in_texts rls=t
 tabla clubs rls=t
 tabla confirmation_email_requests rls=t
@@ -1147,6 +1183,7 @@ tabla team_split_members rls=t
 tabla team_splits rls=t
 trigger clubs_seed_default_evaluation_categories CREATE TRIGGER clubs_seed_default_evaluation_categories AFTER INSERT ON public.clubs FOR EACH ROW EXECUTE FUNCTION clubs_seed_default_evaluation_categories()
 trigger clubs_seed_default_positions CREATE TRIGGER clubs_seed_default_positions AFTER INSERT ON public.clubs FOR EACH ROW EXECUTE FUNCTION clubs_seed_default_positions()
+trigger clubs_seed_default_session_pack_options CREATE TRIGGER clubs_seed_default_session_pack_options AFTER INSERT ON public.clubs FOR EACH ROW EXECUTE FUNCTION clubs_seed_default_session_pack_options()
 trigger members_sync_position_id CREATE TRIGGER members_sync_position_id BEFORE INSERT OR UPDATE OF "position" ON public.members FOR EACH ROW EXECUTE FUNCTION members_sync_position_id()
 trigger memberships_refresh_casual_status CREATE TRIGGER memberships_refresh_casual_status AFTER INSERT OR UPDATE OF plan ON public.memberships FOR EACH ROW WHEN ((new.plan = 'Casual'::text)) EXECUTE FUNCTION memberships_refresh_casual_status()
 trigger news_post_attachments_enforce_max CREATE TRIGGER news_post_attachments_enforce_max BEFORE INSERT OR UPDATE OF post_id ON public.news_post_attachments FOR EACH ROW EXECUTE FUNCTION news_post_attachments_enforce_max()
