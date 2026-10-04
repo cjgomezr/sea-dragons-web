@@ -6,7 +6,7 @@ import {
 } from "../../support/postgres";
 
 /**
- * `0052_membership_waiver.sql` contra un Postgres desechable (#457, RF-4 del
+ * `0054_membership_waiver.sql` contra un Postgres desechable (#457, RF-4 del
  * PRD de E12). Eximir deja la membresía `waived` con motivo, fin y quién;
  * retirar la devuelve a lo que digan sus fechas; sólo un Admin activo del
  * club puede hacer ninguna de las dos, y nadie más que `service_role` las
@@ -243,6 +243,34 @@ describeConPostgres("la exención manual del Admin en la base", () => {
       expect(outcome).toEqual({ outcome: "removed", status: expected });
     },
   );
+
+  it("al retirar, un Casual vuelve a lo que diga su saldo de sesiones (#468)", async () => {
+    const database = await migratedDatabase();
+    const seeded = await seedClub(database);
+    const paymentId = await database.query(
+      `insert into public.payments
+         (user_id, club_id, stripe_charge_id, amount_cents, status)
+       values ('${seeded.playerId}', '${seeded.clubId}', 'ch_pack', 9000,
+               'paid')
+       returning id`,
+    );
+    await database.query(
+      `select public.credit_session_pack('${seeded.playerId}',
+         '${seeded.clubId}', 5, '${paymentId}')`,
+    );
+    await database.query(
+      `update public.memberships set plan = 'Casual'
+        where user_id = '${seeded.playerId}'`,
+    );
+    await waive(database, seeded);
+
+    const outcome = JSON.parse(await removeWaiver(database, seeded));
+
+    expect(outcome).toEqual({ outcome: "removed", status: "active" });
+    await expect(readMembership(database, seeded)).resolves.toBe(
+      "active|-|-|-",
+    );
+  });
 
   it("no retira nada de una membresía que no está exenta", async () => {
     const database = await migratedDatabase();

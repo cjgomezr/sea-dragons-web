@@ -23,7 +23,7 @@ import {
 
 /**
  * La exención manual del Admin contra `seadragons-dev`, con los adaptadores
- * de verdad y `0052_membership_waiver.sql` aplicada (#457). Lo que ningún
+ * de verdad y `0054_membership_waiver.sql` aplicada (#457). Lo que ningún
  * doble puede decir: que eximir abre la puerta de socio en la siguiente
  * petición con la misma sesión (la frontera olvida lo que recordaba, #434),
  * que retirarla la cierra, y qué queda en `audit_log`.

@@ -9,7 +9,8 @@
 -- Retirar no escribe `pending` a ciegas. Quien tenía suscripción vuelve a lo
 -- que digan sus fechas, con la misma regla que aplica la aplicación a una
 -- exención vencida (`statusAfterWaiver` en `src/lib/membership/membership.ts`):
--- en prueba, en curso o ya terminada.
+-- en prueba, en curso o ya terminada. Un Casual vuelve a lo que diga su saldo
+-- de sesiones.
 --
 -- Las dos funciones devuelven además lo que el servidor necesita para
 -- cancelar en Stripe la suscripción de quien queda exento: el estado
@@ -176,6 +177,16 @@ begin
          updated_at = now()
    where user_id = target_user_id
      and club_id = acting_club_id;
+
+  -- Un Casual no tiene suscripción: lo que vale es su saldo de sesiones
+  -- (`0053_session_ledger.sql`), que ya no frena la exención.
+  perform public.refresh_casual_membership_status(
+    target_user_id, acting_club_id
+  );
+  select ms.status into next_status
+    from public.memberships ms
+   where ms.user_id = target_user_id
+     and ms.club_id = acting_club_id;
 
   return jsonb_build_object('outcome', 'removed', 'status', next_status);
 end;

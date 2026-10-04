@@ -20,7 +20,7 @@ import {
 /**
  * La exención manual del Admin (#457, RF-4 del PRD de E12, D4), contada sin
  * Supabase ni Stripe delante. Quién puede y cómo queda la fila lo vuelve a
- * mirar `0052_membership_waiver.sql`; aquí se prueba qué se valida antes de
+ * mirar `0054_membership_waiver.sql`; aquí se prueba qué se valida antes de
  * escribir, qué queda en la bitácora (NFR-010) y cuándo se cancela la
  * suscripción de Stripe.
  */
