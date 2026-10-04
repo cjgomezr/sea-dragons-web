@@ -21,6 +21,8 @@ const SEEDED_CLUB = "victoria-seadragons";
 type MembershipSeed = {
   readonly status: string;
   readonly stripe_subscription_id: string | null;
+  readonly waived_reason?: string;
+  readonly waived_until?: string;
 };
 
 async function seededClubId(serviceClient: ServiceRoleClient): Promise<string> {
@@ -96,6 +98,36 @@ describeRls("el plan elegido en Pagos contra la base", () => {
 
           expect(isSaved).toBe(true);
           await expect(readPlan(serviceClient, user)).resolves.toBe("Student");
+        },
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it.each([
+    ["vencida", "2020-01-01T00:00:00.000Z", "Full"],
+    ["vigente", "2999-01-01T00:00:00.000Z", null],
+  ] as const)(
+    "con una exención %s sin suscripción, guarda el plan sólo si venció",
+    async (_which, waivedUntil, expectedPlan) => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      await withMembership(
+        serviceClient,
+        {
+          status: "waived",
+          stripe_subscription_id: null,
+          waived_reason: "Entrenadora",
+          waived_until: waivedUntil,
+        },
+        async (user) => {
+          const gateway = createPlanChoiceGateway(serviceClient.client);
+
+          const isSaved = await gateway.savePlanChoice(user.id, "Full");
+
+          expect(isSaved).toBe(expectedPlan !== null);
+          await expect(readPlan(serviceClient, user)).resolves.toBe(
+            expectedPlan,
+          );
         },
       );
     },

@@ -455,13 +455,12 @@ export function createStripeWebhookGateway(
   };
 }
 
-/** Los estados guardados en los que se puede elegir plan (#479). `waived`
- * llega aquí sólo con la exención ya vencida: el dominio lo resolvió antes. */
-const PLAN_CHOICE_STORED_STATUSES: readonly MembershipStatus[] = [
-  "pending",
-  "cancelled",
-  "waived",
-];
+/** Los estados guardados en los que se puede elegir plan (#479): sin pagar
+ * todavía, o con una exención que ya venció. Una exención vigente que un
+ * Admin concede entre la lectura y la escritura no deja pasar el cambio. */
+function planChoiceStatusFilter(now: Date): string {
+  return `status.in.(pending,cancelled),and(status.eq.waived,waived_until.lte.${now.toISOString()})`;
+}
 
 /** Guarda el plan que el socio elige en Pagos antes de pagar (#479). La
  * condición va en la misma escritura para que un webhook que llega entre
@@ -471,12 +470,13 @@ export function createPlanChoiceGateway(
 ): PlanChoiceGateway {
   return {
     async savePlanChoice(userId, plan) {
+      const now = new Date();
       const { data, error } = await serviceClient
         .from(MEMBERSHIPS_TABLE)
-        .update({ plan, updated_at: new Date().toISOString() })
+        .update({ plan, updated_at: now.toISOString() })
         .eq("user_id", userId)
         .is("stripe_subscription_id", null)
-        .in("status", PLAN_CHOICE_STORED_STATUSES)
+        .or(planChoiceStatusFilter(now))
         .select("user_id");
       if (error) {
         throw new Error(
