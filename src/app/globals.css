@@ -1906,6 +1906,13 @@ a.auth-brand-header:focus-visible {
   color: var(--color-text-secondary);
 }
 
+/* El enlace del tipo de membresía a Pagos (#456), con el color del aviso de
+   la puerta, que lleva al mismo sitio. */
+.account-evaluation a {
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+
 /* La asistencia (#396): la cifra grande del mockup del perfil, con las
    sesiones debajo. La ficha del Admin usa el mismo bloque. */
 .member-attendance .member-attendance-figure {
@@ -4787,6 +4794,57 @@ a.auth-brand-header:focus-visible {
 .payments-offer p,
 .payments-status {
   margin: 0;
+}
+
+/* El cambio de plan (#456) es un bloque más de la tarjeta del plan, bajo una
+   línea: lo que pasará, separado de lo que hay. */
+.payments-plan-change {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  justify-self: stretch;
+  min-width: 0;
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.payments-plan-picker {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.payments-plan-picker legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+}
+
+.payments-plan-options {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.payments-plan-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target-min);
+  font-size: 16px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.payments-plan-option input {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--color-accent);
 }
 
 .payments-history {

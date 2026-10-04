@@ -8,6 +8,7 @@ import {
   createMembershipGateway,
   createPaymentHistoryGateway,
 } from "@/lib/membership/supabase-membership-gateways";
+import { createRouteClubPriceReader } from "@/lib/stripe/club-prices";
 import { isStripeConfigured } from "@/lib/stripe/stripe-client";
 
 /**
@@ -15,7 +16,7 @@ import { isStripeConfigured } from "@/lib/stripe/stripe-client";
  * estado, próximo cobro, tarjeta, exención e historial. Pagos la vuelve a
  * pedir mientras espera al webhook de Stripe. Va con el cliente de la sesión:
  * `memberships_select_own` y `payments_select_own` dejan a cada socio leer
- * sólo lo suyo.
+ * sólo lo suyo. El precio del plan se lee de Stripe (#486).
  */
 
 // Depende de la sesión de quien llama y de lo que acaba de escribir el webhook.
@@ -30,6 +31,7 @@ const getMembership = createApiRoute<MembershipResponse>({
       {
         membership: createMembershipGateway(session.client),
         payments: createPaymentHistoryGateway(session.client),
+        prices: createRouteClubPriceReader(),
       },
       {
         userId: session.userId,

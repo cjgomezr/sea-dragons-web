@@ -33,9 +33,41 @@ const PENDING_FULL: MembershipRecord = {
   trialEnd: null,
   card: null,
   waiver: null,
+  scheduledChange: null,
+};
+
+const FULL_PRICE_CENTS = 5150;
+const STUDENT_PRICE_CENTS = 3675;
+
+function monthlyStripePrice(id: string, unitAmount: number): object {
+  return {
+    id,
+    unit_amount: unitAmount,
+    currency: "aud",
+    type: "recurring",
+    recurring: { interval: "month", interval_count: 1 },
+  };
+}
+
+const STRIPE_PRICES: Readonly<Record<string, object>> = {
+  price_full_test: monthlyStripePrice("price_full_test", FULL_PRICE_CENTS),
+  price_student_test: monthlyStripePrice(
+    "price_student_test",
+    STUDENT_PRICE_CENTS,
+  ),
 };
 
 const readSessionState = vi.fn();
+const retrievePrice = vi.fn<(priceId: string) => Promise<object>>();
+
+vi.mock("stripe", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("stripe")>();
+  class FakeStripe {
+    static errors = actual.default.errors;
+    prices = { retrieve: (priceId: string) => retrievePrice(priceId) };
+  }
+  return { default: FakeStripe };
+});
 const findByUserId = vi.fn<() => Promise<MembershipRecord | null>>();
 const listByUserId = vi.fn<() => Promise<readonly PaymentRecord[]>>();
 
@@ -59,6 +91,8 @@ vi.mock("@/lib/membership/supabase-membership-gateways", () => ({
   createPaymentHistoryGateway: () => ({ listByUserId }),
 }));
 
+const { default: Stripe } = await import("stripe");
+const { clearClubPriceCache } = await import("@/lib/stripe/club-prices");
 const { proxy } = await import("@/proxy");
 const { GET, POST } = await import("@/app/api/v1/membership/route");
 
@@ -83,14 +117,23 @@ async function getMembership(): Promise<Response> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearClubPriceCache();
   process.env = { ...ORIGINAL_ENV };
   configureStripe();
   givenSession({ kind: "active", role: "Player", membershipCurrent: false });
   findByUserId.mockResolvedValue(PENDING_FULL);
   listByUserId.mockResolvedValue([]);
+  retrievePrice.mockImplementation(async (priceId) => {
+    const price = STRIPE_PRICES[priceId];
+    if (price === undefined) {
+      throw new Error(`precio inesperado ${priceId}`);
+    }
+    return price;
+  });
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   process.env = { ...ORIGINAL_ENV };
 });
 
@@ -105,13 +148,84 @@ describe("GET /api/v1/membership", () => {
         membership: {
           plan: "Full",
           status: "pending",
-          monthlyPriceCents: 4500,
+          monthlyPriceCents: FULL_PRICE_CENTS,
           trialEnd: null,
           nextChargeAt: null,
           card: null,
           waiver: null,
+          scheduledChange: null,
+          canChangePlan: false,
+          planPrices: { Full: FULL_PRICE_CENTS, Student: STUDENT_PRICE_CENTS },
         },
         payments: [],
+      },
+    });
+  });
+
+  it("sirve el precio mensual del plan Student leído de Stripe", async () => {
+    findByUserId.mockResolvedValue({ ...PENDING_FULL, plan: "Student" });
+
+    const response = await getMembership();
+
+    await expect(response.json()).resolves.toMatchObject({
+      data: { membership: { monthlyPriceCents: STUDENT_PRICE_CENTS } },
+    });
+    expect(retrievePrice).toHaveBeenCalledWith("price_student_test");
+  });
+
+  it("sirve un precio nulo, y el resto de la membresía, cuando Stripe no contesta", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    retrievePrice.mockRejectedValue(
+      new Stripe.errors.StripeConnectionError({ message: "socket hang up" }),
+    );
+
+    const response = await getMembership();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { membership: { plan: "Full", monthlyPriceCents: null } },
+    });
+  });
+
+  // Un Casual no tiene cuota mensual (#486), y si además no puede cambiar de
+  // plan (exento), nada en su Pagos enseña un precio: no se pregunta.
+  it("no pide precio a Stripe para un Casual exento, que no enseña ninguno", async () => {
+    findByUserId.mockResolvedValue({
+      ...PENDING_FULL,
+      plan: "Casual",
+      status: "waived",
+      waiver: { reason: "Entrenador", until: null, waivedBy: null },
+    });
+
+    const response = await getMembership();
+
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        membership: {
+          plan: "Casual",
+          monthlyPriceCents: null,
+          planPrices: { Full: null, Student: null },
+        },
+      },
+    });
+    expect(retrievePrice).not.toHaveBeenCalled();
+  });
+
+  // El selector del cambio de plan (#456) le ofrece Full y Student con su
+  // precio, que sale de Stripe como el resto.
+  it("sirve a un Casual los precios de Stripe para pasar a Full o Student", async () => {
+    findByUserId.mockResolvedValue({ ...PENDING_FULL, plan: "Casual" });
+
+    const response = await getMembership();
+
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        membership: {
+          plan: "Casual",
+          monthlyPriceCents: null,
+          canChangePlan: true,
+          planPrices: { Full: FULL_PRICE_CENTS, Student: STUDENT_PRICE_CENTS },
+        },
       },
     });
   });

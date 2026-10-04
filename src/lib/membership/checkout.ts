@@ -80,7 +80,7 @@ export type CheckoutRequest = {
   readonly now: Date;
 };
 
-type Subscribable = {
+export type Subscribable = {
   readonly membership: Membership;
   readonly plan: RecurringPlan;
 };
@@ -184,6 +184,36 @@ export function idempotencyKeyFor(
   return `checkout-${digest}-${window}`;
 }
 
+/** Lo que hace falta para abrir la suscripción de un socio en Checkout. */
+export type SubscriptionCheckoutContext = {
+  readonly stripe: Extract<CheckoutStripe, { readonly kind: "configured" }>;
+  readonly memberEmails: MemberEmailGateway;
+  readonly request: CheckoutRequest;
+};
+
+/** Abre en Checkout la suscripción de `plan`: la del plan de la membresía en
+ * el alta (#454), o la que elige un Casual al cambiar de plan (#456). */
+export async function openSubscriptionCheckout(
+  subscribable: Subscribable,
+  context: SubscriptionCheckoutContext,
+): Promise<string> {
+  const { stripe, request } = context;
+  const params = await buildSessionParams(subscribable, {
+    prices: stripe.prices,
+    memberEmails: context.memberEmails,
+    origin: request.origin,
+  });
+  const session = await stripe.sessions.create(params, {
+    idempotencyKey: idempotencyKeyFor(params, request.now),
+  });
+  if (session.url === null) {
+    throw new Error(
+      `Stripe creó la sesión de Checkout de ${request.userId} sin dirección.`,
+    );
+  }
+  return session.url;
+}
+
 export async function startCheckout(
   gateways: CheckoutGateways,
   request: CheckoutRequest,
@@ -199,18 +229,10 @@ export async function startCheckout(
   if (typeof subscribable === "string") {
     return { kind: "refused", reason: subscribable };
   }
-  const params = await buildSessionParams(subscribable, {
-    prices: stripe.prices,
+  const url = await openSubscriptionCheckout(subscribable, {
+    stripe,
     memberEmails: gateways.memberEmails,
-    origin: request.origin,
+    request,
   });
-  const session = await stripe.sessions.create(params, {
-    idempotencyKey: idempotencyKeyFor(params, request.now),
-  });
-  if (session.url === null) {
-    throw new Error(
-      `Stripe creó la sesión de Checkout de ${request.userId} sin dirección.`,
-    );
-  }
-  return { kind: "created", url: session.url };
+  return { kind: "created", url };
 }

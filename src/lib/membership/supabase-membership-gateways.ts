@@ -10,10 +10,12 @@ import {
   type MembershipStanding,
   type MembershipStatus,
   type MembershipWaiver,
+  type ScheduledPlanChange,
   resolveStandingStatus,
 } from "./membership";
 import type { StripeWebhookGateway } from "@/lib/stripe/stripe-webhook";
 import type { MemberEmailGateway } from "./checkout";
+import type { ScheduledPlanChangeGateway } from "./plan-change";
 import type { SessionLedgerGateway, SessionMovement } from "./session-balance";
 import {
   PAYMENT_STATUSES,
@@ -35,7 +37,7 @@ import type {
 
 const MEMBERSHIPS_TABLE = "memberships";
 const MEMBERSHIP_COLUMNS =
-  "user_id, club_id, plan, status, stripe_customer_id, stripe_subscription_id, current_period_end, trial_end, card_brand, card_last4, card_exp_month, card_exp_year, waived_reason, waived_until, waived_by";
+  "user_id, club_id, plan, status, stripe_customer_id, stripe_subscription_id, current_period_end, trial_end, card_brand, card_last4, card_exp_month, card_exp_year, waived_reason, waived_until, waived_by, scheduled_plan, scheduled_at";
 const PENDING_STATUS = "pending";
 
 const membershipRowSchema = z.object({
@@ -54,6 +56,8 @@ const membershipRowSchema = z.object({
   waived_reason: z.string().nullable(),
   waived_until: z.string().nullable(),
   waived_by: z.string().nullable(),
+  scheduled_plan: z.enum(MEMBERSHIP_TYPES).nullable(),
+  scheduled_at: z.string().nullable(),
 });
 
 type MembershipRow = z.infer<typeof membershipRowSchema>;
@@ -143,6 +147,15 @@ function toWaiver(row: MembershipRow): MembershipWaiver | null {
   };
 }
 
+/** La base guarda el plan y la fecha juntos
+ * (`memberships_scheduled_change_check`): sin alguno no hay cambio. */
+function toScheduledChange(row: MembershipRow): ScheduledPlanChange | null {
+  if (row.scheduled_plan === null || row.scheduled_at === null) {
+    return null;
+  }
+  return { plan: row.scheduled_plan, effectiveAt: new Date(row.scheduled_at) };
+}
+
 function toMembershipRecord(row: MembershipRow): MembershipRecord {
   return {
     userId: row.user_id,
@@ -155,6 +168,7 @@ function toMembershipRecord(row: MembershipRow): MembershipRecord {
     trialEnd: toDate(row.trial_end),
     card: toCard(row),
     waiver: toWaiver(row),
+    scheduledChange: toScheduledChange(row),
   };
 }
 
@@ -377,6 +391,9 @@ function toMembershipChangesJson(
           card_exp_month: card.expMonth,
           card_exp_year: card.expYear,
         }),
+    ...(changes.scheduledChange === undefined
+      ? {}
+      : { scheduled_plan: null, scheduled_at: null }),
     ...(changes.stripeEventAt === undefined
       ? {}
       : { stripe_event_at: changes.stripeEventAt.toISOString() }),
@@ -433,6 +450,31 @@ export function createStripeWebhookGateway(
         );
       }
       return z.enum(APPLY_STRIPE_EVENT_OUTCOMES).parse(data);
+    },
+  };
+}
+
+/** Guarda o borra el cambio de plan programado (#456). Lo escribe Pagos
+ * después de que Stripe lo aceptó; el webhook lo borra al aplicarse. */
+export function createScheduledPlanChangeGateway(
+  serviceClient: SupabaseClient,
+): ScheduledPlanChangeGateway {
+  return {
+    async saveScheduledChange(userId, change) {
+      const { error } = await serviceClient
+        .from(MEMBERSHIPS_TABLE)
+        .update({
+          scheduled_plan: change === null ? null : change.plan,
+          scheduled_at:
+            change === null ? null : change.effectiveAt.toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId);
+      if (error) {
+        throw new Error(
+          `No se pudo guardar el cambio de plan de ${userId}: ${error.message}`,
+        );
+      }
     },
   };
 }

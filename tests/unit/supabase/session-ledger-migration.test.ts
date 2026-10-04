@@ -8,7 +8,7 @@ import {
 } from "../../support/postgres";
 
 /**
- * `0052_session_ledger.sql` contra un Postgres desechable (#468, RF-1 a RF-3
+ * `0053_session_ledger.sql` contra un Postgres desechable (#468, RF-1 a RF-3
  * del PRD de E13, D1, D6 y D7). El saldo de un Casual es la suma de un libro:
  * el crédito de un pack entra una vez por pago, guardar la asistencia resta
  * una sesión en la misma transacción y corregirla la devuelve, el saldo nunca
@@ -16,7 +16,7 @@ import {
  */
 
 const SEEDED_CLUB = "victoria-seadragons";
-const MIGRATION_PREFIX = "0052";
+const MIGRATION_PREFIX = "0053";
 const STARTED_ON = "2020-01-07";
 
 type Member = { readonly clubId: string; readonly userId: string };

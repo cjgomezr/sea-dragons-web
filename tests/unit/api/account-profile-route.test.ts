@@ -257,6 +257,16 @@ describe("PATCH /api/v1/account/profile", () => {
     expect(updateOwnProfile).not.toHaveBeenCalled();
   });
 
+  it("responde 400 al tipo de membresía, que se cambia en Pagos (#456), y no escribe nada", async () => {
+    const response = await patchThroughBoundary({
+      ...VALID_BODY,
+      membershipType: "Student",
+    });
+
+    expect(response.status).toBe(400);
+    expect(updateOwnProfile).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["role", "Admin"],
     ["groups", ["Senior Squad"]],

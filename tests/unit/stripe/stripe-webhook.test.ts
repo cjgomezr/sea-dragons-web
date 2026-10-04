@@ -41,6 +41,7 @@ const KNOWN_MEMBERSHIP: StripeMembership = {
     trialEnd: null,
     card: null,
     waiver: null,
+    scheduledChange: null,
   },
   lastStripeEventAt: null,
 };

@@ -841,6 +841,7 @@ export const englishMessages = {
   "payments.plan.title": "Current plan",
   "payments.plan.name": "{plan} membership",
   "payments.plan.monthlyPrice": "{price} a month",
+  "payments.plan.priceUnavailable": "Price not available",
   "payments.plan.nextCharge": "Next charge {date}",
   "payments.plan.noRecurringCharge": "No recurring charge",
   "payments.plan.card": "{brand} ending in {last4}, expires {expiry}",
@@ -870,6 +871,30 @@ export const englishMessages = {
   "payments.history.paid": "Paid",
   "payments.history.failed": "Failed",
   "payments.history.pending": "Pending",
+  "payments.planChange.title": "Change plan",
+  "payments.planChange.hint":
+    "The change starts with your next billing cycle, with no proration.",
+  "payments.planChange.casualHint":
+    "Choosing Full or Student takes you to Stripe.",
+  "payments.planChange.recurringOption": "{plan} · {price} a month",
+  "payments.planChange.recurringOptionPriceUnavailable":
+    "{plan} · Price not available",
+  "payments.planChange.casualOption": "Casual · No recurring charge",
+  "payments.planChange.confirm": "Confirm the change",
+  "payments.planChange.saving": "Saving…",
+  "payments.planChange.retry": "Try again",
+  "payments.planChange.scheduled": "Moves to {plan} on {date}.",
+  "payments.planChange.scheduledCasual":
+    "Moves to Casual on {date}: your subscription ends that day.",
+  "payments.planChange.cancel": "Cancel the change",
+  "payments.planChange.unavailable":
+    "Stripe isn't responding, so nothing changed. Try again in a moment.",
+  "payments.planChange.failed":
+    "We couldn't change your plan. Reload the page and try again.",
+  "account.membership.title": "Membership",
+  "account.membership.type": "Membership type: {plan}",
+  "account.membership.none": "You haven't chosen a membership type yet.",
+  "account.membership.change": "Change it in Payments",
   "calendar.rsvp.error.unexpected": "We couldn't save your answer. Try again.",
   "calendar.create.open": "Event",
   "calendar.create.created": "Event created. We let the members know.",

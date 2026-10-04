@@ -83,6 +83,7 @@ function renderScreen(
       groups={[]}
       evaluation={{ visibility: "staff_only" }}
       attendance={{ kind: "no_data" }}
+      membershipPlan="Full"
       countries={listCountryOptions(locale)}
     />,
   );

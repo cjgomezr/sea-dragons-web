@@ -14,14 +14,6 @@ export type MembershipPlan = MembershipType;
 /** Los planes con cuota mensual por Stripe (FR-063); Casual paga packs (E13). */
 export type RecurringPlan = Exclude<MembershipPlan, "Casual">;
 
-/** Lo que cuesta cada plan al mes, en centavos de AUD (FR-062, CON-005). Lo
- * cobra el `Price` de Stripe configurado por variable de entorno; esto es lo
- * que Pagos enseña antes de ir a Stripe, y tiene que coincidir con él. */
-export const MONTHLY_PRICE_CENTS: Readonly<Record<RecurringPlan, number>> = {
-  Full: 4500,
-  Student: 3200,
-};
-
 export const MEMBERSHIP_STATUSES = [
   "pending",
   "trialing",
@@ -59,6 +51,14 @@ export type MembershipWaiver = {
   readonly waivedBy: string | null;
 };
 
+/** Un cambio de plan que Stripe aplicará al acabar el periodo en curso (#456,
+ * RF-6, D5). Se guarda en la membresía para que Pagos lo enseñe sin
+ * preguntar a Stripe; el webhook lo limpia cuando se aplica. */
+export type ScheduledPlanChange = {
+  readonly plan: MembershipPlan;
+  readonly effectiveAt: Date;
+};
+
 type MembershipDetails = {
   readonly userId: string;
   readonly clubId: string;
@@ -69,6 +69,7 @@ type MembershipDetails = {
   readonly currentPeriodEnd: Date | null;
   readonly trialEnd: Date | null;
   readonly card: MembershipCard | null;
+  readonly scheduledChange: ScheduledPlanChange | null;
 };
 
 /** La fila tal como la guarda la base, antes de mirar la fecha. */
