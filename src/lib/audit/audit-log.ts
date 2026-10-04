@@ -94,6 +94,13 @@ export const AUDIT_ACTIONS = [
   // (NFR-010).
   "team_split.published",
   "payment.status_changed",
+  // RF-4 de E12 (#457): un Admin exime de cuota a un socio o le retira la
+  // exención. La entidad es el `user_id` del socio (`member`). La exención
+  // lleva el motivo y la fecha de fin (`{ reason, until }`), que es lo que
+  // justifica no cobrarle; la retirada, el estado al que vuelve
+  // (`{ newStatus }`).
+  "membership.waived",
+  "membership.waiver_removed",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
