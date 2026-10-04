@@ -2015,6 +2015,18 @@ a.auth-brand-header:focus-visible {
   line-height: 1.3;
 }
 
+/* El motivo y el fin de la exención de cuota en la ficha (#457), con la
+   misma lectura que los detalles del plan en Pagos. */
+.member-waiver-details {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  list-style: none;
+}
+
 .admin-empty {
   margin: 0;
   color: var(--color-text-secondary);

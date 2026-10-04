@@ -33,6 +33,7 @@ import {
   memberAttendanceSchema,
   membershipStatusSchema,
 } from "./directory-client";
+import { membershipWaiverSchema } from "./membership-waiver-client";
 
 /**
  * Lo que la ficha reservada al Admin (#242) le pide a la API v1 y cómo reduce
@@ -57,6 +58,7 @@ const recordSchema = z.object({
   registeredAt: z.string(),
   hasGuardianConsent: z.boolean(),
   membershipStatus: membershipStatusSchema,
+  membershipWaiver: membershipWaiverSchema,
   photoUrl: z.url().nullable(),
   isAufExpired: z.boolean(),
   groups: z.array(z.object({ id: z.uuid(), name: z.string() })),

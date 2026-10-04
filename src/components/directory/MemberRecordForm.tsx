@@ -13,6 +13,7 @@ import {
   correctionRequiresGuardianConsent,
   isAufNumberTooLong,
 } from "@/lib/members/member-record";
+import type { MembershipStatus } from "@/lib/membership/membership";
 import { aufMarksOf } from "./auf-marks";
 import { membershipMarkOf } from "./membership-mark";
 import { GroupsField, TextField } from "./record-fields";
@@ -163,14 +164,16 @@ function RecordHeader({
   translate,
   locale,
   record,
+  membershipStatus,
 }: {
   translate: Translator;
   locale: Locale;
   record: MemberRecord;
+  membershipStatus: MembershipStatus | null;
 }): React.JSX.Element {
   const marks = [
     ...aufMarksOf(translate, record),
-    membershipMarkOf(translate, record.membershipStatus),
+    membershipMarkOf(translate, membershipStatus),
   ];
   return (
     <header className="member-record-header">
@@ -406,7 +409,14 @@ export function MemberRecordForm({
 
   return (
     <>
-      <RecordHeader translate={translate} locale={locale} record={record} />
+      {/* La membresía no la guarda este formulario sino la exención (#457):
+          el chip lee la de la pantalla, que es la que ésta cambia. */}
+      <RecordHeader
+        translate={translate}
+        locale={locale}
+        record={record}
+        membershipStatus={initialRecord.membershipStatus}
+      />
       <form
         className="auth-pending member-record-form"
         onSubmit={handleSubmit}

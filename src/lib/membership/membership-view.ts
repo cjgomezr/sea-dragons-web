@@ -90,6 +90,10 @@ export type MembershipPanelView = {
   /** El precio de Stripe de una sesión Casual (#486), sólo para quien elige
    * plan. Nulo si no se pudo leer o no se enseña. */
   readonly casualSessionPriceCents: number | null;
+  /** ISO 8601. Sólo de un socio exento con la suscripción todavía en curso:
+   * eximirlo la canceló al final del periodo (#457), y ahí termina sin
+   * volver a cobrar. */
+  readonly subscriptionEndsAt: string | null;
 };
 
 export type PlanPrices = Readonly<Record<RecurringPlan, number | null>>;
@@ -215,11 +219,30 @@ function toScheduledChangeView(
     : { plan: change.plan, effectiveAt: change.effectiveAt.toISOString() };
 }
 
+/** Hasta cuándo sigue la suscripción que la exención canceló, si sigue. */
+function subscriptionEndOf(membership: Membership, now: Date): Date | null {
+  const { status, stripeSubscriptionId, currentPeriodEnd } = membership;
+  if (
+    status !== "waived" ||
+    stripeSubscriptionId === null ||
+    currentPeriodEnd === null ||
+    currentPeriodEnd.getTime() <= now.getTime()
+  ) {
+    return null;
+  }
+  return currentPeriodEnd;
+}
+
 function toPanelView(
   membership: Membership,
-  paymentsConfigured: boolean,
-  { planPrices, casualSessionPriceCents }: ShownPrices,
+  context: {
+    readonly paymentsConfigured: boolean;
+    readonly shownPrices: ShownPrices;
+    readonly now: Date;
+  },
 ): MembershipPanelView {
+  const { paymentsConfigured, now } = context;
+  const { planPrices, casualSessionPriceCents } = context.shownPrices;
   return {
     plan: membership.plan,
     status: membership.status,
@@ -239,6 +262,7 @@ function toPanelView(
     planPrices,
     canChoosePlan: canChoosePlan(membership),
     casualSessionPriceCents,
+    subscriptionEndsAt: toIso(subscriptionEndOf(membership, now)),
   };
 }
 
@@ -275,14 +299,14 @@ export async function readMembershipView(
     membership:
       reading.kind === "none"
         ? null
-        : toPanelView(
-            reading.membership,
-            input.paymentsConfigured,
-            await readShownPrices(reading.membership, {
+        : toPanelView(reading.membership, {
+            paymentsConfigured: input.paymentsConfigured,
+            shownPrices: await readShownPrices(reading.membership, {
               prices: gateways.prices,
               paymentsConfigured: input.paymentsConfigured,
             }),
-          ),
+            now: input.now,
+          }),
     payments: newestFirst(payments),
   };
 }

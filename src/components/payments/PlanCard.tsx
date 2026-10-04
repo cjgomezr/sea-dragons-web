@@ -162,7 +162,8 @@ function describeMonthlyPrice(
 }
 
 /** El próximo cobro o, para Casual, que no lo hay (FR-065); la tarjeta; y
- * la exención con su motivo y su fin. */
+ * la exención con su motivo, su fin y, si tenía suscripción, cuándo termina
+ * ésta (#457). */
 function PlanDetails({
   translate,
   membership,
@@ -170,7 +171,7 @@ function PlanDetails({
   readonly translate: Translator;
   readonly membership: MembershipPanelView;
 }): React.JSX.Element {
-  const { plan, nextChargeAt, card, waiver } = membership;
+  const { plan, nextChargeAt, card, waiver, subscriptionEndsAt } = membership;
   return (
     <ul className="payments-plan-details">
       {plan === "Casual" ? (
@@ -193,6 +194,13 @@ function PlanDetails({
         <li>
           {translate("payments.waiver.until", {
             date: formatClubDay(translate, waiver.until),
+          })}
+        </li>
+      )}
+      {subscriptionEndsAt === null ? null : (
+        <li>
+          {translate("payments.waiver.subscriptionEnds", {
+            date: formatClubDay(translate, subscriptionEndsAt),
           })}
         </li>
       )}

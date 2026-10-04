@@ -54,6 +54,7 @@ function panel(change: Partial<MembershipPanelView> = {}): MembershipPanelView {
     planPrices: { Full: 4500, Student: 3675 },
     canChoosePlan: false,
     casualSessionPriceCents: null,
+    subscriptionEndsAt: null,
     ...change,
   };
 }
@@ -393,6 +394,51 @@ describe("PaymentsScreen: exenta", () => {
     expect(
       screen.queryByRole("button", { name: /card|subscribe/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("dice que la suscripción de Stripe termina sin volver a cobrar", async () => {
+    await renderLoaded(
+      view(
+        panel({
+          status: "waived",
+          nextChargeAt: null,
+          waiver: { reason: "Coach", until: null },
+          subscriptionEndsAt: PERIOD_END,
+        }),
+      ),
+    );
+
+    expect(
+      screen.getByText(
+        "Your subscription ends on 1 July 2026 and won't be charged again",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("dice en español que la suscripción termina", async () => {
+    await renderLoaded(
+      view(
+        panel({
+          status: "waived",
+          nextChargeAt: null,
+          waiver: { reason: "Entrenador", until: null },
+          subscriptionEndsAt: PERIOD_END,
+        }),
+      ),
+      { locale: "es" },
+    );
+
+    expect(
+      screen.getByText(
+        "Tu suscripción termina el 1 de julio de 2026 y no se te volverá a cobrar",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("no habla de suscripción a quien no la tiene", async () => {
+    await renderLoaded(WAIVED);
+
+    expect(screen.queryByText(/subscription ends/)).not.toBeInTheDocument();
   });
 
   it("no pone fecha a una exención que no vence", async () => {

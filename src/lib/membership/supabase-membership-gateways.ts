@@ -19,6 +19,7 @@ import type { PlanChoiceGateway } from "./choose-plan";
 import type { ScheduledPlanChangeGateway } from "./plan-change";
 import type { SessionLedgerGateway, SessionMovement } from "./session-balance";
 import {
+  type MembershipWaiverView,
   PAYMENT_STATUSES,
   type PaymentHistoryGateway,
 } from "./membership-view";
@@ -87,14 +88,9 @@ const embeddedStandingSchema = z
   .union([standingRowSchema, z.array(standingRowSchema).max(1)])
   .nullish();
 
-export function parseMembershipStanding(
-  embedded: unknown,
-): MembershipStanding | null {
-  const parsed = embeddedStandingSchema.parse(embedded);
-  const row = Array.isArray(parsed) ? parsed[0] : parsed;
-  if (row === undefined || row === null) {
-    return null;
-  }
+function toStanding(
+  row: z.infer<typeof standingRowSchema>,
+): MembershipStanding {
   return {
     status: row.status,
     stripeSubscriptionId: row.stripe_subscription_id,
@@ -102,6 +98,23 @@ export function parseMembershipStanding(
     currentPeriodEnd: toDate(row.current_period_end),
     waivedUntil: toDate(row.waived_until),
   };
+}
+
+/** La fila embebida, o `null` si el socio no tiene membresía. */
+function singleEmbeddedRow<Row extends object>(
+  parsed: Row | Row[] | null | undefined,
+): Row | null {
+  if (Array.isArray(parsed)) {
+    return parsed[0] ?? null;
+  }
+  return parsed ?? null;
+}
+
+export function parseMembershipStanding(
+  embedded: unknown,
+): MembershipStanding | null {
+  const row = singleEmbeddedRow(embeddedStandingSchema.parse(embedded));
+  return row === null ? null : toStanding(row);
 }
 
 /** El estado que cuenta hoy de la membresía embebida, o `null` si el socio
@@ -112,6 +125,46 @@ export function readEmbeddedMembershipStatus(
 ): MembershipStatus | null {
   const standing = parseMembershipStanding(embedded);
   return standing === null ? null : resolveStandingStatus(standing, now);
+}
+
+/** La membresía embebida con el motivo de la exención: lo que la ficha del
+ * Admin enseña (#457). */
+export const MEMBERSHIP_SUMMARY_EMBED =
+  "memberships!memberships_member_same_club_fkey(status, stripe_subscription_id, trial_end, current_period_end, waived_until, waived_reason)";
+
+const summaryRowSchema = standingRowSchema.extend({
+  waived_reason: z.string().nullable(),
+});
+
+const embeddedSummarySchema = z
+  .union([summaryRowSchema, z.array(summaryRowSchema).max(1)])
+  .nullish();
+
+/** El estado que cuenta hoy y la exención, si está exento hoy. */
+export type MembershipSummary = {
+  readonly status: MembershipStatus | null;
+  readonly waiver: MembershipWaiverView | null;
+};
+
+export function readEmbeddedMembershipSummary(
+  embedded: unknown,
+  now: Date,
+): MembershipSummary {
+  const row = singleEmbeddedRow(embeddedSummarySchema.parse(embedded));
+  if (row === null) {
+    return { status: null, waiver: null };
+  }
+  const status = resolveStandingStatus(toStanding(row), now);
+  if (status !== "waived" || row.waived_reason === null) {
+    return { status, waiver: null };
+  }
+  return {
+    status,
+    waiver: {
+      reason: row.waived_reason,
+      until: toNullableIso(toDate(row.waived_until)),
+    },
+  };
 }
 
 function toDate(value: string | null): Date | null {

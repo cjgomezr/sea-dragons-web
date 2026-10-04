@@ -14,6 +14,7 @@ import {
 } from "@/lib/auth/account-activation";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { MembershipStatus } from "@/lib/membership/membership";
+import type { MembershipWaiverView } from "@/lib/membership/membership-view";
 import {
   isRealCalendarDate,
   validateDateOfBirthOn,
@@ -93,6 +94,8 @@ export type StoredMemberRecord = {
   /** El estado de su membresía tal como cuenta hoy (#453), o `null` si no
    * tiene. La ficha ya es sólo del Admin. */
   readonly membershipStatus: MembershipStatus | null;
+  /** El motivo y el fin de su exención, sólo si está exento hoy (#457). */
+  readonly membershipWaiver: MembershipWaiverView | null;
 };
 
 /** La ficha tal como la sirve la API. La ruta de la foto se queda en el

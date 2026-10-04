@@ -5217,7 +5217,11 @@ type StubbedMemberRecord = {
   readonly dateOfBirth: string;
   readonly registeredAt: string;
   readonly hasGuardianConsent: boolean;
-  readonly membershipStatus: "active" | "past_due" | null;
+  readonly membershipStatus: "active" | "past_due" | "waived" | null;
+  readonly membershipWaiver: {
+    readonly reason: string;
+    readonly until: string | null;
+  } | null;
   readonly photoUrl: string | null;
   readonly isAufExpired: boolean;
   readonly groups: readonly { readonly id: string; readonly name: string }[];
@@ -5244,6 +5248,7 @@ const CURRENT_RECORD: StubbedMemberRecord = {
   registeredAt: "2024-03-06T01:00:00.000Z",
   hasGuardianConsent: false,
   membershipStatus: "active",
+  membershipWaiver: null,
   photoUrl: null,
   isAufExpired: false,
   attendance: { kind: "rate", percent: 90, sessions: 9 },
@@ -5278,6 +5283,18 @@ const EXPIRED_RECORD: StubbedMemberRecord = {
   ...CURRENT_RECORD,
   aufExpiry: "2025-01-31",
   isAufExpired: true,
+};
+
+/** Quien está exento de cuota (#457): la ficha enseña el motivo y el fin, y
+ * ofrece retirar la exención. El motivo es largo a propósito. */
+const WAIVED_RECORD: StubbedMemberRecord = {
+  ...CURRENT_RECORD,
+  membershipStatus: "waived",
+  membershipWaiver: {
+    reason:
+      "Head coach of the juniors on Thursdays and Saturdays, and helps run the club's come-and-try sessions",
+    until: "2027-02-28T13:00:00.000Z",
+  },
 };
 
 /** El AUF que escribió el miembro: la ficha lo marca y ofrece verificarlo
@@ -5389,6 +5406,22 @@ function typeMinorBirth(noticeText: RegExp) {
   };
 }
 
+/** Abre el diálogo de la exención (#457) y lo deja escrito, sin confirmar. */
+function fillWaiverDialog(labels: {
+  readonly open: string;
+  readonly reason: string;
+  readonly until: RegExp;
+  readonly text: string;
+}) {
+  return async (page: Page): Promise<void> => {
+    await page.getByRole("button", { name: labels.open }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel(labels.reason).fill(labels.text);
+    await dialog.getByLabel(labels.until).fill("2027-03-01");
+    await expect(dialog).toBeVisible();
+  };
+}
+
 type MemberRecordState = {
   readonly name: string;
   readonly record: StubbedMemberRecord;
@@ -5467,6 +5500,40 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
     record: DEACTIVATED_RECORD,
     saveLabel: SPANISH_SAVE_RECORD,
     beforeVisit: chooseSpanish,
+  },
+  {
+    name: "ficha-exenta",
+    record: WAIVED_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+  },
+  {
+    name: "ficha-exenta-es",
+    record: WAIVED_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "ficha-eximir-confirmacion",
+    record: CURRENT_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+    prepare: fillWaiverDialog({
+      open: "Waive membership fee",
+      reason: "Reason",
+      until: /End date/,
+      text: "Head coach of the juniors",
+    }),
+  },
+  {
+    name: "ficha-eximir-confirmacion-es",
+    record: CURRENT_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    beforeVisit: chooseSpanish,
+    prepare: fillWaiverDialog({
+      open: "Eximir de cuota",
+      reason: "Motivo",
+      until: /Fecha de fin/,
+      text: "Entrenadora de los juveniles",
+    }),
   },
   {
     name: "ficha-aviso-validacion",
@@ -11032,6 +11099,7 @@ function membershipView(
       planPrices: { Full: 4500, Student: 3200 },
       canChoosePlan: false,
       casualSessionPriceCents: null,
+      subscriptionEndsAt: null,
       ...membership,
     },
     payments,

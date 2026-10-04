@@ -167,6 +167,7 @@ describe("GET /api/v1/membership", () => {
           planPrices: { Full: FULL_PRICE_CENTS, Student: STUDENT_PRICE_CENTS },
           canChoosePlan: true,
           casualSessionPriceCents: CASUAL_SESSION_PRICE_CENTS,
+          subscriptionEndsAt: null,
         },
         payments: [],
       },

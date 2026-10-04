@@ -712,6 +712,46 @@ export const englishMessages = {
     "The membership changed, but it couldn't be logged. Reload the record and tell whoever maintains the platform.",
   "memberStatus.error.unexpected":
     "We couldn't change their membership. Try again.",
+  // La exención de cuota desde la ficha (#457, RF-4 de E12).
+  "membershipWaiver.title": "Membership fee",
+  "membershipWaiver.lead.notWaived":
+    "{name} pays the membership fee in Payments. Coaches and volunteers can be waived.",
+  "membershipWaiver.lead.waived":
+    "{name} doesn't pay the membership fee while the waiver lasts.",
+  "membershipWaiver.reason": "Reason: {reason}",
+  "membershipWaiver.until": "Ends on {date}",
+  "membershipWaiver.noEndDate": "No end date",
+  "membershipWaiver.waive": "Waive membership fee",
+  "membershipWaiver.remove": "Remove waiver",
+  "membershipWaiver.dialog.waiveTitle": "Waive {name}'s membership fee",
+  "membershipWaiver.dialog.waiveLead":
+    "They'll be up to date without paying. If they have a Stripe subscription, it's cancelled at the end of the period already paid.",
+  "membershipWaiver.field.reason": "Reason",
+  "membershipWaiver.field.reasonHint": "Required, up to 200 characters.",
+  "membershipWaiver.field.until": "End date (optional)",
+  "membershipWaiver.field.untilHint":
+    "The waiver stops counting on this day. Leave it empty if it doesn't end.",
+  "membershipWaiver.confirmWaive": "Waive fee",
+  "membershipWaiver.cancel": "Cancel",
+  "membershipWaiver.saving": "Saving…",
+  "membershipWaiver.dialog.removeTitle": "Remove {name}'s waiver?",
+  "membershipWaiver.dialog.removeLead":
+    "Their membership goes back to pending, or to what's left of their Stripe subscription, which still ends at the end of its period. Until they're up to date they can't use member features.",
+  "membershipWaiver.confirmRemove": "Remove waiver",
+  "membershipWaiver.waived": "{name}'s membership fee is waived.",
+  "membershipWaiver.removed": "{name}'s waiver was removed.",
+  "membershipWaiver.error.reasonRequired": "Write the reason for the waiver.",
+  "membershipWaiver.error.reasonTooLong":
+    "The reason can't be longer than 200 characters.",
+  "membershipWaiver.error.untilNotADate": "The end date isn't a valid day.",
+  "membershipWaiver.error.untilNotAfterToday":
+    "The end date has to be after today.",
+  "membershipWaiver.error.notWaived":
+    "This member's fee isn't waived any more. Reload the record.",
+  "membershipWaiver.error.notAudited":
+    "The waiver changed, but it couldn't be logged. Reload the record and tell whoever maintains the platform.",
+  "membershipWaiver.error.unexpected":
+    "We couldn't save the waiver. Try again.",
   // La campana y su lista (#266). Cada tipo de aviso tiene su título y su
   // cuerpo; los datos del aviso entran como parámetros.
   "notifications.bell.label": {
@@ -860,6 +900,8 @@ export const englishMessages = {
   "payments.status.waived": "Waived",
   "payments.waiver.reason": "Reason: {reason}",
   "payments.waiver.until": "Until {date}",
+  "payments.waiver.subscriptionEnds":
+    "Your subscription ends on {date} and won't be charged again",
   "payments.card.update": "Update card",
   "payments.card.resubscribe": "Subscribe again",
   "payments.card.waiting":

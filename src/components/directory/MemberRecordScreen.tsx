@@ -6,6 +6,7 @@ import { MemberAttendanceSummary } from "@/components/attendance/MemberAttendanc
 import type { AccountStatus } from "@/lib/auth/account-status";
 import { DIRECTORY_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
+import type { MembershipWaiverChange } from "@/lib/membership/membership-waiver";
 import { createTranslator } from "@/lib/i18n/translator";
 import {
   type MemberRecordLoad,
@@ -16,6 +17,7 @@ import { InvitationResend } from "./InvitationResend";
 import { MemberRecordEvaluation } from "./MemberRecordEvaluation";
 import { MemberRecordForm } from "./MemberRecordForm";
 import { MemberStatusControl } from "./MemberStatusControl";
+import { MembershipWaiverControl } from "./MembershipWaiverControl";
 
 /**
  * La ficha reservada al Admin de un miembro (#242, RF-4 del PRD de E5), que se
@@ -65,6 +67,26 @@ export function MemberRecordScreen({
     setState((current) =>
       current.kind === "loaded"
         ? { ...current, record: { ...current.record, accountStatus } }
+        : current,
+    );
+  }
+
+  /** La exención (#457) cambia sólo la membresía: el chip de la cabecera y
+   * la sección de la cuota la leen de la misma ficha. */
+  function applyWaiver({
+    membershipStatus,
+    waiver,
+  }: MembershipWaiverChange): void {
+    setState((current) =>
+      current.kind === "loaded"
+        ? {
+            ...current,
+            record: {
+              ...current.record,
+              membershipStatus,
+              membershipWaiver: waiver,
+            },
+          }
         : current,
     );
   }
@@ -126,6 +148,13 @@ export function MemberRecordScreen({
       ) : null}
       {state.kind === "loaded" ? (
         <MemberRecordEvaluation translate={translate} userId={userId} />
+      ) : null}
+      {state.kind === "loaded" ? (
+        <MembershipWaiverControl
+          translate={translate}
+          member={state.record}
+          onWaiverChanged={applyWaiver}
+        />
       ) : null}
       {state.kind === "loaded" ? (
         <MemberStatusControl

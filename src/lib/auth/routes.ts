@@ -123,6 +123,12 @@ export const MEMBER_INVITATION_API_PATH = `${MEMBERS_API_PATH}/[id]/invitation`;
  * el mismo motivo que el cambio de rol. */
 export const MEMBER_STATUS_API_PATH = `${MEMBERS_API_PATH}/[id]/status`;
 
+/** Eximir de cuota a un miembro (POST) y retirarle la exención (DELETE)
+ * (#457, RF-4 del PRD de E12). `[id]` es el `user_id` del miembro. Cuelga de
+ * `MEMBERS_API_PATH`, y se declara igual por el mismo motivo que el cambio de
+ * rol. */
+export const MEMBERSHIP_WAIVER_API_PATH = `${MEMBERS_API_PATH}/[id]/membership-waiver`;
+
 /** La pantalla de esa ficha, abierta desde el directorio. El directorio lo
  * alcanza cualquier cuenta activa, pero lo que cuelga de él con un id es del
  * Admin: quien no lo es y la pide a mano vuelve al panel, como con Equipos. */
@@ -608,6 +614,7 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   },
   { path: MEMBER_INVITATION_API_PATH, capability: "manageUsersAndRoles" },
   { path: MEMBER_STATUS_API_PATH, capability: "manageUsersAndRoles" },
+  { path: MEMBERSHIP_WAIVER_API_PATH, capability: "manageUsersAndRoles" },
   { path: MEMBER_RECORD_PATH, capability: "manageUsersAndRoles" },
   { path: NEW_MEMBER_PATH, capability: "manageUsersAndRoles" },
   { path: GROUPS_API_PATH, capability: "manageGroups" },

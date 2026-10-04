@@ -105,6 +105,7 @@ describe("readMembershipView: la membresía", () => {
       planPrices: { Full: 5150, Student: 3675 },
       canChoosePlan: false,
       casualSessionPriceCents: null,
+      subscriptionEndsAt: null,
     });
   });
 
@@ -178,6 +179,39 @@ describe("readMembershipView: la membresía", () => {
       nextChargeAt: null,
       waiver: { reason: "Entrenador", until: WAIVED_UNTIL },
     });
+  });
+
+  it("dice hasta cuándo dura la suscripción que eximir canceló al final del periodo", async () => {
+    const view = await viewOf(
+      aRecord({
+        status: "waived",
+        waiver: { reason: "Entrenador", until: null, waivedBy: null },
+      }),
+    );
+
+    expect(view.membership).toMatchObject({
+      nextChargeAt: null,
+      subscriptionEndsAt: PERIOD_END,
+    });
+  });
+
+  it.each<[string, Partial<MembershipRecord>]>([
+    ["sin suscripción", { stripeSubscriptionId: null }],
+    [
+      "cuya suscripción ya terminó",
+      { currentPeriodEnd: new Date("2026-09-01T09:00:00Z") },
+    ],
+    ["que no está exenta", { status: "active", waiver: null }],
+  ])("no dice fin de suscripción a un socio %s", async (_case, overrides) => {
+    const view = await viewOf(
+      aRecord({
+        status: "waived",
+        waiver: { reason: "Entrenador", until: null, waivedBy: null },
+        ...overrides,
+      }),
+    );
+
+    expect(view.membership).toMatchObject({ subscriptionEndsAt: null });
   });
 
   it("no sirve una exención vencida, que ya vale lo que digan sus fechas", async () => {
