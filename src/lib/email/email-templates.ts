@@ -6,6 +6,11 @@ import {
 import type { ClubBrand } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import {
+  type RenewalCharge,
+  describeRenewalCharge,
+  formatRenewalDay,
+} from "@/lib/membership/renewal-charge";
 
 /**
  * Las plantillas del correo transaccional (INT-006). Son funciones puras: dan
@@ -329,5 +334,33 @@ export function renderMemberInvitationEmail(
       url: input.acceptUrl,
     },
     outro: [t("email.invitation.ifExpired"), t("email.invitation.notYou")],
+  });
+}
+
+/** El aviso de renovación (#470, RF-8 del PRD de E13, D3): lo mismo que la
+ * campana, y a Pagos por si el socio quiere cambiar algo antes del cobro. */
+export function renderRenewalReminderEmail(input: {
+  readonly renewal: RenewalCharge;
+  readonly paymentsUrl: string;
+  /** El idioma guardado en la fila del socio: el correo sale de un webhook. */
+  readonly locale: Locale;
+  readonly brand: ClubBrand;
+}): RenderedEmail {
+  const t = createTranslator(input.locale);
+  return renderEmail(t, input.brand, {
+    subject: t("email.renewal.subject", {
+      clubName: input.brand.name,
+      date: formatRenewalDay(t, input.renewal),
+    }),
+    intro: [
+      describeRenewalCharge(t, input.renewal),
+      t("email.renewal.changeBefore"),
+    ],
+    action: {
+      buttonLabel: t("email.renewal.button"),
+      label: t("email.renewal.linkLabel"),
+      url: input.paymentsUrl,
+    },
+    outro: [],
   });
 }

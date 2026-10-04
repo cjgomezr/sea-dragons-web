@@ -1062,7 +1062,7 @@ restriccion notifications.notifications_club_id_fkey FOREIGN KEY (club_id) REFER
 restriccion notifications.notifications_data_is_object CHECK ((jsonb_typeof(data) = 'object'::text))
 restriccion notifications.notifications_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
 restriccion notifications.notifications_pkey PRIMARY KEY (id)
-restriccion notifications.notifications_type_check CHECK ((type = ANY (ARRAY['role_changed'::text, 'role_request_rejected'::text, 'role_request_received'::text, 'news_post_published'::text, 'event_created'::text, 'event_series_created'::text, 'event_changed'::text, 'event_cancelled'::text, 'event_series_changed'::text, 'event_series_cancelled'::text, 'team_assigned'::text, 'team_unassigned'::text])))
+restriccion notifications.notifications_type_check CHECK ((type = ANY (ARRAY['role_changed'::text, 'role_request_rejected'::text, 'role_request_received'::text, 'news_post_published'::text, 'event_created'::text, 'event_series_created'::text, 'event_changed'::text, 'event_cancelled'::text, 'event_series_changed'::text, 'event_series_cancelled'::text, 'team_assigned'::text, 'team_unassigned'::text, 'membership_renewal_upcoming'::text])))
 restriccion password_recovery_requests.password_recovery_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion password_recovery_requests.password_recovery_requests_pkey PRIMARY KEY (id)
 restriccion payments.payments_amount_cents_check CHECK ((amount_cents >= 0))

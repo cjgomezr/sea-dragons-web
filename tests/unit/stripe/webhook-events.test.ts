@@ -8,9 +8,11 @@ import type {
 import {
   type CheckoutCompletedFacts,
   type PlannableStripeEventFacts,
+  type RenewalUpcomingFacts,
   type StripeEventFacts,
   type StripeEventWrites,
   type StripeMembership,
+  planRenewalNotice,
   planStripeEventWrites,
   readStripeEventFacts,
   subscriptionFactsFromCheckout,
@@ -69,7 +71,11 @@ function membership(
 }
 
 function plannableFacts(facts: StripeEventFacts): PlannableStripeEventFacts {
-  if (facts.kind === "ignored" || facts.kind === "checkoutCompleted") {
+  if (
+    facts.kind === "ignored" ||
+    facts.kind === "checkoutCompleted" ||
+    facts.kind === "renewalUpcoming"
+  ) {
     throw new Error("El evento de ejemplo debería planificarse tal cual.");
   }
   return facts;
@@ -661,5 +667,135 @@ describe("checkout.session.completed en modo setup", () => {
     const writes = plan(setupCheckout(), { card: null });
 
     expect(writes.membership).toBeNull();
+  });
+});
+
+describe("invoice.upcoming (#470)", () => {
+  const ACTIVE = {
+    status: "active",
+    stripeCustomerId: FIXTURE_CUSTOMER_ID,
+    stripeSubscriptionId: FIXTURE_SUBSCRIPTION_ID,
+    card: VISA,
+  } as const;
+
+  function renewalFacts(
+    event = stripeEvent("invoice.upcoming"),
+  ): RenewalUpcomingFacts {
+    const facts = readStripeEventFacts(event);
+    if (facts.kind !== "renewalUpcoming") {
+      throw new Error(`Se esperaba una renovación y llegó ${facts.kind}.`);
+    }
+    return facts;
+  }
+
+  function noticeFor(change: Partial<MembershipRecord>) {
+    return planRenewalNotice({
+      facts: renewalFacts(),
+      membership: membership(change),
+      now: NOW,
+    });
+  }
+
+  it("lee el importe, la fecha del cobro y de quién es la suscripción", () => {
+    const event = stripeEvent("invoice.upcoming");
+
+    expect(readStripeEventFacts(event)).toEqual({
+      kind: "renewalUpcoming",
+      created: secondsToDate(event.created),
+      lookup: {
+        userId: FIXTURE_USER_ID,
+        customerId: FIXTURE_CUSTOMER_ID,
+        subscriptionId: FIXTURE_SUBSCRIPTION_ID,
+      },
+      amountCents: 4500,
+      chargeAt: new Date("2026-10-28T14:15:00Z"),
+    });
+  });
+
+  it("sin intento de cobro fijado, toma la fecha en que nacerá la factura", () => {
+    const facts = renewalFacts(
+      stripeEvent("invoice.upcoming", {
+        object: { next_payment_attempt: null, created: 1793200000 },
+      }),
+    );
+
+    expect(facts.chargeAt).toEqual(secondsToDate(1793200000));
+  });
+
+  it.each(["active", "trialing"] as const)(
+    "avisa a una membresía %s con el importe, la fecha y la tarjeta",
+    (status) => {
+      const notice = noticeFor({ ...ACTIVE, status });
+
+      expect(notice).toEqual({
+        userId: FIXTURE_USER_ID,
+        clubId: CLUB_ID,
+        amountCents: 4500,
+        chargeAt: new Date("2026-10-28T14:15:00Z"),
+        card: { brand: "visa", last4: "4242" },
+      });
+    },
+  );
+
+  it("avisa sin tarjeta cuando la membresía no tiene ninguna guardada", () => {
+    const notice = noticeFor({ ...ACTIVE, card: null });
+
+    expect(notice).toMatchObject({ card: null });
+  });
+
+  it.each(["pending", "past_due", "cancelled"] as const)(
+    "no avisa a una membresía %s",
+    (status) => {
+      expect(noticeFor({ ...ACTIVE, status })).toBeNull();
+    },
+  );
+
+  it("no avisa a una membresía exenta", () => {
+    const notice = noticeFor({
+      ...ACTIVE,
+      status: "waived",
+      waiver: { reason: "Beca", until: null, waivedBy: null },
+    });
+
+    expect(notice).toBeNull();
+  });
+
+  it("avisa cuando la exención ya venció y la suscripción sigue en curso", () => {
+    const notice = noticeFor({
+      ...ACTIVE,
+      status: "waived",
+      waiver: {
+        reason: "Beca",
+        until: new Date("2026-09-01T00:00:00Z"),
+        waivedBy: null,
+      },
+      currentPeriodEnd: new Date("2026-10-28T14:15:00Z"),
+    });
+
+    expect(notice).not.toBeNull();
+  });
+
+  it("no avisa si la suscripción se cancela al final del periodo", () => {
+    const notice = noticeFor({
+      ...ACTIVE,
+      scheduledChange: {
+        plan: "Casual",
+        effectiveAt: new Date("2026-10-28T14:15:00Z"),
+      },
+    });
+
+    expect(notice).toBeNull();
+  });
+
+  it("avisa si lo programado es un cambio a otro plan con cuota", () => {
+    const notice = noticeFor({
+      ...ACTIVE,
+      scheduledChange: {
+        plan: "Student",
+        effectiveAt: new Date("2026-10-28T14:15:00Z"),
+      },
+    });
+
+    expect(notice).not.toBeNull();
   });
 });

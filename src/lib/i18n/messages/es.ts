@@ -794,6 +794,12 @@ export const spanishMessages: MessageCatalog = {
   "notifications.team_assigned.body": "{title}: {moment}",
   "notifications.team_unassigned.title": "Ya no estás en ningún equipo",
   "notifications.team_unassigned.body": "{title}: {moment}",
+  // #470: siete días antes de cada renovación.
+  "notifications.membership_renewal_upcoming.title":
+    "Tu membresía se renueva pronto",
+  "membership.renewal.charge": "El {date} se cobrarán {amount} en tu {card}.",
+  "membership.renewal.chargeWithoutCard": "El {date} se cobrarán {amount}.",
+  "membership.renewal.card": "{brand} terminada en {last4}",
   "event.type.training": "Entrenamiento",
   "event.type.competition": "Competición",
   "event.type.meeting": "Reunión",
@@ -1143,6 +1149,11 @@ export const spanishMessages: MessageCatalog = {
     "Si caduca, pide al club que te reenvíe la invitación.",
   "email.invitation.notYou":
     "Si no esperabas esta invitación, ignora este correo: sin activarla, la cuenta no se usa.",
+  "email.renewal.subject": "Tu membresía de {clubName} se renueva el {date}",
+  "email.renewal.changeBefore":
+    "Si quieres cambiar la tarjeta o el plan, hazlo en Pagos antes de esa fecha.",
+  "email.renewal.button": "Ir a Pagos",
+  "email.renewal.linkLabel": "Para ver tus pagos, abre este enlace",
   // La configuración del club (#296, RF-6 del PRD de E18a), sólo del Admin.
   "clubSettings.metaTitle": "Configuración del club · {club}",
   "clubSettings.metaDescription":

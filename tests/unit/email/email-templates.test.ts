@@ -10,6 +10,7 @@ import {
   renderAccountConfirmationEmail,
   renderMemberInvitationEmail,
   renderPasswordRecoveryEmail,
+  renderRenewalReminderEmail,
 } from "@/lib/email/email-templates";
 import {
   REGISTERING_AGAIN_SENDS_A_LINK,
@@ -24,6 +25,12 @@ const CONFIRM_URL =
 const INVITATION_URL =
   "https://victoria-seadragons.vercel.app/recuperar-contrasena/nueva?token_hash=inv";
 const LIFETIME_MINUTES = 60;
+const PAYMENTS_URL = "https://victoria-seadragons.vercel.app/pagos";
+const RENEWAL = {
+  amountCents: 4500,
+  chargeOn: "2026-10-29",
+  card: { brand: "visa", last4: "4242" },
+} as const;
 
 /** Lo que ve alguien cuyo cliente no pinta HTML, sacado del propio HTML: sin
  * etiquetas, con las entidades resueltas y con los espacios aplanados. */
@@ -79,6 +86,15 @@ const TEMPLATES = {
     }),
     url: INVITATION_URL,
   },
+  renovación: {
+    email: renderRenewalReminderEmail({
+      renewal: RENEWAL,
+      paymentsUrl: PAYMENTS_URL,
+      locale: "es",
+      brand: DEFAULT_CLUB_BRAND,
+    }),
+    url: PAYMENTS_URL,
+  },
 } as const;
 
 const ENGLISH_TEMPLATES = {
@@ -108,6 +124,15 @@ const ENGLISH_TEMPLATES = {
       brand: DEFAULT_CLUB_BRAND,
     }),
     url: INVITATION_URL,
+  },
+  renewal: {
+    email: renderRenewalReminderEmail({
+      renewal: RENEWAL,
+      paymentsUrl: PAYMENTS_URL,
+      locale: "en",
+      brand: DEFAULT_CLUB_BRAND,
+    }),
+    url: PAYMENTS_URL,
   },
 } as const;
 
@@ -241,6 +266,46 @@ describe("invitación", () => {
     expect(ENGLISH_TEMPLATES.invitation.email.text).toMatch(
       /ask the club to resend your invitation/i,
     );
+  });
+});
+
+// #470: el aviso de renovación siete días antes del cobro.
+describe("aviso de renovación", () => {
+  it("sale en español con el importe a la española, el día, la tarjeta y Pagos", () => {
+    const { email } = TEMPLATES.renovación;
+
+    expect(email.subject).toBe(
+      "Tu membresía de Victoria Seadragons se renueva el 29 de octubre de 2026",
+    );
+    expect(email.text).toContain(
+      "El 29 de octubre de 2026 se cobrarán 45,00\u00a0AUD en tu Visa terminada en 4242.",
+    );
+    expect(email.html).toContain(`href="${PAYMENTS_URL}"`);
+    expect(email.html).toContain("Ir a Pagos");
+  });
+
+  it("sale en inglés con el importe en dólares, el día, la tarjeta y Pagos", () => {
+    const { email } = ENGLISH_TEMPLATES.renewal;
+
+    expect(email.subject).toBe(
+      "Your Victoria Seadragons membership renews on 29 October 2026",
+    );
+    expect(email.text).toContain(
+      "$45.00 will be charged to your Visa ending in 4242 on 29 October 2026.",
+    );
+    expect(email.html).toContain("Go to Payments");
+    expect(email.text).not.toContain("cobrar");
+  });
+
+  it("sin tarjeta guardada, cuenta el importe y el día", () => {
+    const email = renderRenewalReminderEmail({
+      renewal: { ...RENEWAL, card: null },
+      paymentsUrl: PAYMENTS_URL,
+      locale: "en",
+      brand: DEFAULT_CLUB_BRAND,
+    });
+
+    expect(email.text).toContain("$45.00 will be charged on 29 October 2026.");
   });
 });
 
