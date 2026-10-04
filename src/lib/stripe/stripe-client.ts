@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import type { SetupCard, StripeApi } from "./stripe-webhook";
+import type { StripePriceSetup } from "@/lib/membership/stripe-prices";
 import { type StripePrices, readCard } from "./webhook-events";
 
 /**
@@ -13,6 +14,11 @@ export const STRIPE_SECRET_KEY_ENV = "STRIPE_SECRET_KEY";
 export const STRIPE_WEBHOOK_SECRET_ENV = "STRIPE_WEBHOOK_SECRET";
 export const STRIPE_PRICE_FULL_ENV = "STRIPE_PRICE_FULL";
 export const STRIPE_PRICE_STUDENT_ENV = "STRIPE_PRICE_STUDENT";
+export const STRIPE_PRICE_CASUAL_SESSION_ENV = "STRIPE_PRICE_CASUAL_SESSION";
+
+/** Leer un precio no puede colgar Pagos: si Stripe tarda más, el precio sale
+ * como no disponible y el resto de la pantalla se pinta igual. */
+const PRICE_READ_TIMEOUT_MS = 5000;
 
 const STRIPE_ENV_KEYS = [
   STRIPE_SECRET_KEY_ENV,
@@ -64,6 +70,27 @@ export function createStripeSetup(env: Environment): StripeSetup {
     client: new Stripe(secretKey),
     webhookSecret,
     prices: { full, student },
+  };
+}
+
+/** Lo que hace falta para leer los precios del club (#486). Sólo pide la
+ * llave: sin el secreto del webhook los precios se siguen pudiendo enseñar, y
+ * cada precio sin su variable sale como no configurado. */
+export function readStripePriceSetup(env: Environment): StripePriceSetup {
+  const secretKey = readRequired(env, STRIPE_SECRET_KEY_ENV);
+  return {
+    source:
+      secretKey === null
+        ? null
+        : new Stripe(secretKey, {
+            timeout: PRICE_READ_TIMEOUT_MS,
+            maxNetworkRetries: 0,
+          }).prices,
+    priceIds: {
+      full: readRequired(env, STRIPE_PRICE_FULL_ENV),
+      student: readRequired(env, STRIPE_PRICE_STUDENT_ENV),
+      casualSession: readRequired(env, STRIPE_PRICE_CASUAL_SESSION_ENV),
+    },
   };
 }
 

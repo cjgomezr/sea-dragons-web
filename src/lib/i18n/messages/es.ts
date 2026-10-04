@@ -840,6 +840,7 @@ export const spanishMessages: MessageCatalog = {
   "payments.plan.title": "Plan actual",
   "payments.plan.name": "Membresía {plan}",
   "payments.plan.monthlyPrice": "{price} al mes",
+  "payments.plan.priceUnavailable": "Precio no disponible",
   "payments.plan.nextCharge": "Próximo cobro el {date}",
   "payments.plan.noRecurringCharge": "Sin cobro recurrente",
   "payments.plan.card": "{brand} terminada en {last4}, caduca {expiry}",
@@ -874,6 +875,8 @@ export const spanishMessages: MessageCatalog = {
     "El cambio empieza con tu siguiente ciclo de cobro, sin prorrateo.",
   "payments.planChange.casualHint": "Al elegir Full o Student vas a Stripe.",
   "payments.planChange.recurringOption": "{plan} · {price} al mes",
+  "payments.planChange.recurringOptionPriceUnavailable":
+    "{plan} · Precio no disponible",
   "payments.planChange.casualOption": "Casual · Sin cobro recurrente",
   "payments.planChange.confirm": "Confirmar el cambio",
   "payments.planChange.saving": "Guardando…",

@@ -423,6 +423,13 @@ en los secretos del repositorio y en el ámbito Production de Vercel:
   una sesión Casual, 15 AUD. Un pack se vende como ese precio por la cantidad
   de sesiones (E13). Puesto por el dueño el 2 de octubre de 2026.
 
+Los importes que enseña la aplicación salen de esos tres precios de Stripe, no
+del código (#486), con una caché del servidor de diez minutos. Cambiar un
+precio del club es crear un `Price` nuevo en Stripe y cambiar su id en la
+variable. Un precio que no está en AUD, o que no es mensual (Full, Student) o
+de pago único (sesión Casual), se enseña como "Precio no disponible" y queda
+anotado en el log del servidor.
+
 **Hoy todo es modo de prueba, también en producción.** El webhook de prueba
 apunta a producción a propósito, para que el equipo pruebe pagos con tarjeta de
 prueba mientras no haya socios reales. Por eso el origen es `stripe-test` en

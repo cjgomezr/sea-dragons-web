@@ -4,12 +4,10 @@ import { useEffect, useId, useState } from "react";
 import { MEMBERSHIP_TYPES } from "@/lib/auth/registration";
 import { formatAudCents } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
-import {
-  MONTHLY_PRICE_CENTS,
-  type MembershipPlan,
-} from "@/lib/membership/membership";
+import type { MembershipPlan } from "@/lib/membership/membership";
 import type {
   MembershipPanelView,
+  PlanPrices,
   ScheduledPlanChangeView,
 } from "@/lib/membership/membership-view";
 import { openCheckout } from "./checkout-navigation";
@@ -70,13 +68,25 @@ function SubmissionError({
   );
 }
 
-function describeOption(translate: Translator, plan: MembershipPlan): string {
+/** El precio sale de Stripe (#486); sin él, la opción lo dice en vez de
+ * inventar un importe. */
+function describeOption(
+  translate: Translator,
+  plan: MembershipPlan,
+  planPrices: PlanPrices,
+): string {
   if (plan === "Casual") {
     return translate("payments.planChange.casualOption");
   }
+  const priceCents = planPrices[plan];
+  if (priceCents === null) {
+    return translate("payments.planChange.recurringOptionPriceUnavailable", {
+      plan,
+    });
+  }
   return translate("payments.planChange.recurringOption", {
     plan,
-    price: formatAudCents(translate.locale, MONTHLY_PRICE_CENTS[plan]),
+    price: formatAudCents(translate.locale, priceCents),
   });
 }
 
@@ -138,10 +148,12 @@ function ScheduledChange({
 function PlanPicker({
   translate,
   currentPlan,
+  planPrices,
   onChanged,
 }: {
   readonly translate: Translator;
   readonly currentPlan: MembershipPlan | null;
+  readonly planPrices: PlanPrices;
   readonly onChanged: () => void;
 }): React.JSX.Element {
   const [chosen, setChosen] = useState<MembershipPlan | null>(null);
@@ -198,7 +210,7 @@ function PlanPicker({
               checked={chosen === plan}
               onChange={() => setChosen(plan)}
             />
-            {describeOption(translate, plan)}
+            {describeOption(translate, plan, planPrices)}
           </label>
         ))}
       </div>
@@ -245,6 +257,7 @@ export function PlanChange({
         <PlanPicker
           translate={translate}
           currentPlan={membership.plan}
+          planPrices={membership.planPrices}
           onChanged={onChanged}
         />
       ) : (

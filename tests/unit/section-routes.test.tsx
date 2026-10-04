@@ -62,6 +62,7 @@ describe("Pagos", () => {
     waiver: null,
     scheduledChange: null,
     canChangePlan: false,
+    planPrices: { Full: 4500, Student: 3200 },
   };
   const ACTIVE_FULL: MembershipView = {
     paymentsConfigured: true,

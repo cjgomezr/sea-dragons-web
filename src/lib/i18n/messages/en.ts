@@ -841,6 +841,7 @@ export const englishMessages = {
   "payments.plan.title": "Current plan",
   "payments.plan.name": "{plan} membership",
   "payments.plan.monthlyPrice": "{price} a month",
+  "payments.plan.priceUnavailable": "Price not available",
   "payments.plan.nextCharge": "Next charge {date}",
   "payments.plan.noRecurringCharge": "No recurring charge",
   "payments.plan.card": "{brand} ending in {last4}, expires {expiry}",
@@ -876,6 +877,8 @@ export const englishMessages = {
   "payments.planChange.casualHint":
     "Choosing Full or Student takes you to Stripe.",
   "payments.planChange.recurringOption": "{plan} · {price} a month",
+  "payments.planChange.recurringOptionPriceUnavailable":
+    "{plan} · Price not available",
   "payments.planChange.casualOption": "Casual · No recurring charge",
   "payments.planChange.confirm": "Confirm the change",
   "payments.planChange.saving": "Saving…",

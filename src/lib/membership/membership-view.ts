@@ -1,21 +1,23 @@
 import {
-  MONTHLY_PRICE_CENTS,
   type Membership,
   type MembershipCard,
   type MembershipGateway,
   type MembershipPlan,
   type MembershipStatus,
+  type RecurringPlan,
   type ScheduledPlanChange,
   readMembership,
 } from "./membership";
 import { canChangePlan } from "./plan-change";
+import type { ClubPriceKey, ClubPriceReader } from "./stripe-prices";
 
 /**
  * Lo que Pagos pinta de la membresía de quien la abre (#454, #455; RF-5 y
  * RF-7 del PRD de E12): el plan con su precio, el estado que cuenta hoy, el
  * próximo cobro, la tarjeta, la exención y el historial de pagos. Es lo que
  * sirve `GET /api/v1/membership`, leído de la base y nunca de Stripe en
- * caliente: lo que la base sabe lo escribió el webhook (#452).
+ * caliente: lo que la base sabe lo escribió el webhook (#452). La excepción
+ * es el precio del plan, que es el del `Price` de Stripe (#486).
  */
 
 export const PAYMENT_STATUSES = ["paid", "failed", "pending"] as const;
@@ -61,7 +63,9 @@ export type ScheduledPlanChangeView = {
 export type MembershipPanelView = {
   readonly plan: MembershipPlan | null;
   readonly status: MembershipStatus;
-  /** Nulo para Casual, que no tiene cuota mensual (FR-065). */
+  /** El `unit_amount` del precio de Stripe del plan (#486). Nulo para
+   * Casual, que no tiene cuota mensual (FR-065), y para Full o Student cuando
+   * no se pudo leer: la pantalla dice entonces que no está disponible. */
   readonly monthlyPriceCents: number | null;
   /** ISO 8601. Que exista dice además que ya tuvo su mes de prueba. */
   readonly trialEnd: string | null;
@@ -76,7 +80,12 @@ export type MembershipPanelView = {
   /** Si Pagos ofrece cambiar de plan (#456): la misma regla que el
    * endpoint, para que la aplicación nativa no la repita. */
   readonly canChangePlan: boolean;
+  /** El precio mensual de Stripe de cada plan recurrente (#486), para que el
+   * selector del cambio de plan los enseñe. Nulo el que no se pudo leer. */
+  readonly planPrices: PlanPrices;
 };
+
+export type PlanPrices = Readonly<Record<RecurringPlan, number | null>>;
 
 export type MembershipView = {
   /** Sin las variables de Stripe no se ofrece Checkout (RF-9). */
@@ -89,14 +98,47 @@ export type MembershipView = {
 export type MembershipViewGateways = {
   readonly membership: MembershipGateway;
   readonly payments: PaymentHistoryGateway;
+  readonly prices: Pick<ClubPriceReader, "readPrice">;
+};
+
+const PRICE_KEY_OF: Readonly<Record<RecurringPlan, ClubPriceKey>> = {
+  Full: "full",
+  Student: "student",
 };
 
 function toIso(date: Date | null): string | null {
   return date === null ? null : date.toISOString();
 }
 
-function monthlyPriceOf(plan: MembershipPlan | null): number | null {
-  return plan === null || plan === "Casual" ? null : MONTHLY_PRICE_CENTS[plan];
+async function readPlanPrices(
+  prices: MembershipViewGateways["prices"],
+): Promise<PlanPrices> {
+  const [full, student] = await Promise.all([
+    prices.readPrice(PRICE_KEY_OF.Full),
+    prices.readPrice(PRICE_KEY_OF.Student),
+  ]);
+  return { Full: full.amountCents, Student: student.amountCents };
+}
+
+/** Sin nada que enseñar no se pregunta a Stripe: un Casual no tiene cuota
+ * mensual, y si además no se le ofrece cambiar de plan, ningún precio sale
+ * en su Pagos (#486). */
+const NO_PLAN_PRICES: PlanPrices = { Full: null, Student: null };
+
+function showsPlanPrices(
+  membership: Membership,
+  paymentsConfigured: boolean,
+): boolean {
+  const hasMonthlyPrice =
+    membership.plan !== null && membership.plan !== "Casual";
+  return hasMonthlyPrice || (paymentsConfigured && canChangePlan(membership));
+}
+
+function monthlyPriceOf(
+  plan: MembershipPlan | null,
+  planPrices: PlanPrices,
+): number | null {
+  return plan === null || plan === "Casual" ? null : planPrices[plan];
 }
 
 /** Stripe cobra al acabar la prueba o el periodo en curso; en cualquier otro
@@ -136,11 +178,12 @@ function toScheduledChangeView(
 function toPanelView(
   membership: Membership,
   paymentsConfigured: boolean,
+  planPrices: PlanPrices,
 ): MembershipPanelView {
   return {
     plan: membership.plan,
     status: membership.status,
-    monthlyPriceCents: monthlyPriceOf(membership.plan),
+    monthlyPriceCents: monthlyPriceOf(membership.plan, planPrices),
     trialEnd: toIso(membership.trialEnd),
     nextChargeAt: toIso(nextChargeOf(membership)),
     card: membership.card,
@@ -153,6 +196,7 @@ function toPanelView(
         : null,
     scheduledChange: toScheduledChangeView(membership.scheduledChange),
     canChangePlan: paymentsConfigured && canChangePlan(membership),
+    planPrices,
   };
 }
 
@@ -189,7 +233,13 @@ export async function readMembershipView(
     membership:
       reading.kind === "none"
         ? null
-        : toPanelView(reading.membership, input.paymentsConfigured),
+        : toPanelView(
+            reading.membership,
+            input.paymentsConfigured,
+            showsPlanPrices(reading.membership, input.paymentsConfigured)
+              ? await readPlanPrices(gateways.prices)
+              : NO_PLAN_PRICES,
+          ),
     payments: newestFirst(payments),
   };
 }

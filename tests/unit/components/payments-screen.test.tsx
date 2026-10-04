@@ -51,6 +51,7 @@ function panel(change: Partial<MembershipPanelView> = {}): MembershipPanelView {
     waiver: null,
     scheduledChange: null,
     canChangePlan: false,
+    planPrices: { Full: 4500, Student: 3675 },
     ...change,
   };
 }
@@ -262,6 +263,44 @@ describe("PaymentsScreen: plan actual", () => {
     ).toBeInTheDocument();
   });
 
+  it("enseña el precio que sirve el endpoint, sea el que sea", async () => {
+    await renderLoaded(view(panel({ monthlyPriceCents: 5150 })));
+
+    const plan = screen.getByRole("region", { name: "Current plan" });
+    expect(within(plan).getByText("$51.50 a month")).toBeInTheDocument();
+  });
+
+  it("dice Price not available cuando el precio de Full no se pudo leer, y pinta lo demás", async () => {
+    await renderLoaded(view(panel({ monthlyPriceCents: null })));
+
+    const plan = screen.getByRole("region", { name: "Current plan" });
+    expect(within(plan).getByText("Price not available")).toBeInTheDocument();
+    expect(within(plan).queryByText(/a month/)).not.toBeInTheDocument();
+    expect(
+      within(plan).getByText("Next charge 1 July 2026"),
+    ).toBeInTheDocument();
+  });
+
+  it("dice Precio no disponible en español", async () => {
+    await renderLoaded(
+      view(
+        panel({
+          plan: "Student",
+          monthlyPriceCents: null,
+          status: "pending",
+          nextChargeAt: null,
+          card: null,
+        }),
+      ),
+      { locale: "es" },
+    );
+
+    expect(screen.getByText("Precio no disponible")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Añadir tarjeta" }),
+    ).toBeInTheDocument();
+  });
+
   it.each<[string, MembershipView, string]>([
     ["activa", ACTIVE_FULL, "Active"],
     ["en prueba", TRIALING_FULL, "On trial until 1 November 2026"],
@@ -312,6 +351,7 @@ describe("PaymentsScreen: plan actual", () => {
 
     expect(screen.getByText("No recurring charge")).toBeInTheDocument();
     expect(screen.queryByText(/a month/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Price not available")).not.toBeInTheDocument();
     expect(screen.queryByText(/Next charge/)).not.toBeInTheDocument();
   });
 
@@ -891,12 +931,29 @@ describe("PaymentsScreen: cambio de plan (#456)", () => {
     expect(screen.queryByRole("group", { name: "Change plan" })).toBeNull();
   });
 
+  it("dice que el precio no está disponible si el de Stripe no se pudo leer", async () => {
+    await renderLoaded(
+      view(
+        panel({
+          canChangePlan: true,
+          planPrices: { Full: 4500, Student: null },
+        }),
+      ),
+    );
+
+    expect(
+      within(planChangeGroup()).getByRole("radio", {
+        name: "Student · Price not available",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("ofrece los otros planes con su precio, y no el que ya tiene", async () => {
     await renderLoaded(CHANGEABLE_FULL);
 
     const group = planChangeGroup();
     expect(
-      within(group).getByRole("radio", { name: "Student · $32.00 a month" }),
+      within(group).getByRole("radio", { name: "Student · $36.75 a month" }),
     ).toBeInTheDocument();
     expect(
       within(group).getByRole("radio", {
@@ -1072,7 +1129,7 @@ describe("PaymentsScreen: cambio de plan (#456)", () => {
     expect(
       // Intl separa el importe de la moneda con un espacio duro.
       within(group).getByRole("radio", {
-        name: /^Student · 32,00\sAUD al mes$/,
+        name: /^Student · 36,75\sAUD al mes$/,
       }),
     ).toBeInTheDocument();
     expect(
