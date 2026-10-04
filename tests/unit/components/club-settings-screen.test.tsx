@@ -16,6 +16,14 @@ import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
 const SETTINGS_PATH = "/api/v1/club/settings";
 const POSITIONS_PATH = `${SETTINGS_PATH}/positions`;
 const SIGN_IN_TEXTS_PATH = `${SETTINGS_PATH}/sign-in-texts`;
+const SESSION_PACKS_PATH = "/api/v1/club/session-packs";
+const SESSION_PACKS = {
+  packs: [5, 10].map((sessions) => ({
+    sessions,
+    price: { amountCents: null, reason: "not_configured" },
+  })),
+  sessionPrice: { amountCents: null, reason: "not_configured" },
+};
 
 const STORED: ClubSettings = {
   name: "Harbour Hammerheads",
@@ -75,6 +83,10 @@ function stubApi(stub: Stub = {}): void {
       if (url === SIGN_IN_TEXTS_PATH) {
         return jsonResponse(200, { data: NO_SIGN_IN_TEXTS });
       }
+      // La de los packs de sesiones (#469) también: aquí los de inicio.
+      if (url === SESSION_PACKS_PATH) {
+        return jsonResponse(200, { data: SESSION_PACKS });
+      }
       if (url !== SETTINGS_PATH) {
         throw new Error(`Petición inesperada: ${url}`);
       }
@@ -92,7 +104,7 @@ function stubApi(stub: Stub = {}): void {
 }
 
 async function renderScreen(locale: "en" | "es" = "en"): Promise<void> {
-  render(<ClubSettingsScreen locale={locale} />);
+  render(<ClubSettingsScreen locale={locale} canManageClub />);
   await screen.findByRole("button", {
     name: /save settings|guardar la configuración/i,
   });
@@ -188,7 +200,7 @@ describe("pantalla de configuración: carga", () => {
           : jsonResponse(200, { data: STORED });
       },
     });
-    render(<ClubSettingsScreen locale="en" />);
+    render(<ClubSettingsScreen locale="en" canManageClub />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't reach the server.",
@@ -203,7 +215,7 @@ describe("pantalla de configuración: carga", () => {
   it("no habla de guardar cuando lo que falló fue la carga", async () => {
     stubApi({ load: () => errorResponse(500, "internal_error") });
 
-    render(<ClubSettingsScreen locale="en" />);
+    render(<ClubSettingsScreen locale="en" canManageClub />);
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(
@@ -691,5 +703,34 @@ describe("guardado del color", () => {
       backgroundColor: "rgb(28, 110, 164)",
     });
     expect(patches).toEqual([]);
+  });
+});
+
+describe("los packs de sesiones en la pantalla (#469)", () => {
+  it("un Admin ve la sección de los packs junto a lo demás", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(
+      await screen.findByRole("heading", { name: "Session packs" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Club name")).toBeInTheDocument();
+  });
+
+  it("quien sólo configura los packs ve esa sección y nada más", async () => {
+    stubApi();
+
+    render(<ClubSettingsScreen locale="en" canManageClub={false} />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Session packs" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Choose the session packs that Casual members can buy."),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Club name")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Positions" })).toBeNull();
+    expect(loads).toBe(0);
   });
 });
