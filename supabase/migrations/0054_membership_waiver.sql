@@ -95,6 +95,10 @@ begin
          waived_reason = waiver_reason,
          waived_until = waiver_until,
          waived_by = acting_user_id,
+         -- Cancelar la suscripción suelta el cambio de plan programado
+         -- (#456): ya no va a pasar, y Pagos no debe anunciarlo.
+         scheduled_plan = null,
+         scheduled_at = null,
          updated_at = now()
    where user_id = target_user_id
      and club_id = acting_club_id;

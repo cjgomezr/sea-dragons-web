@@ -4,6 +4,10 @@ import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
 import { forgetCachedSession } from "@/lib/auth/session-cache";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { createStripeSetup } from "@/lib/stripe/stripe-client";
+import {
+  type SubscriptionPlanClient,
+  createSubscriptionPlanApi,
+} from "@/lib/stripe/subscription-plan-api";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { MEMBERSHIP_STATUSES } from "./membership";
@@ -139,21 +143,28 @@ export function createMembershipWaiverWriters(
   };
 }
 
-/** Sin las variables de Stripe no hay suscripciones que cancelar; el dominio
- * lo deja en el log si aun así encuentra una. */
-function createSubscriptionCanceller(env: Environment): SubscriptionCanceller {
-  const setup = createStripeSetup(env);
-  if (setup.kind === "unconfigured") {
-    return { kind: "unconfigured" };
-  }
+/** Cancela con el adaptador del cambio de plan (#456): una suscripción con
+ * un cambio programado la gobierna un `SubscriptionSchedule`, y ese adaptador
+ * lo suelta antes, o Stripe rechazaría la cancelación. */
+export function createSubscriptionCanceller(
+  client: SubscriptionPlanClient,
+): SubscriptionCanceller {
+  const planApi = createSubscriptionPlanApi(client);
   return {
     kind: "configured",
     async cancelAtPeriodEnd(subscriptionId) {
-      await setup.client.subscriptions.update(subscriptionId, {
-        cancel_at_period_end: true,
-      });
+      await planApi.cancelAtPeriodEnd(subscriptionId);
     },
   };
+}
+
+/** Sin las variables de Stripe no hay suscripciones que cancelar; el dominio
+ * lo deja en el log si aun así encuentra una. */
+function subscriptionCancellerFor(env: Environment): SubscriptionCanceller {
+  const setup = createStripeSetup(env);
+  return setup.kind === "unconfigured"
+    ? { kind: "unconfigured" }
+    : createSubscriptionCanceller(setup.client);
 }
 
 export type MembershipWaiverGatewaysResult =
@@ -175,7 +186,7 @@ export function createSupabaseMembershipWaiverGateways(
     gateways: {
       members: createRoleRequestGateways(serviceClient).members,
       waivers: createMembershipWaiverWriters(serviceClient),
-      subscriptions: createSubscriptionCanceller(env),
+      subscriptions: subscriptionCancellerFor(env),
       audit: createSupabaseAuditLogWriter(serviceClient),
       log: (line) => console.error(line),
     },

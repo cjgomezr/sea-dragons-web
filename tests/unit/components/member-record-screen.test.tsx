@@ -846,7 +846,7 @@ describe("ficha en pantalla: exención de cuota (#457)", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByText("Membership waived")).toBeInTheDocument();
     expect(screen.getByText("Reason: Head coach")).toBeInTheDocument();
-    expect(screen.getByText("Until 1 March 2027")).toBeInTheDocument();
+    expect(screen.getByText("Ends on 1 March 2027")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Remove waiver" }),
     ).toBeInTheDocument();
@@ -930,7 +930,7 @@ describe("ficha en pantalla: exención de cuota (#457)", () => {
     await renderScreen();
 
     expect(screen.getByText("Reason: Head coach")).toBeInTheDocument();
-    expect(screen.getByText("Until 1 March 2027")).toBeInTheDocument();
+    expect(screen.getByText("Ends on 1 March 2027")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Waive membership fee" }),
     ).not.toBeInTheDocument();
@@ -1014,7 +1014,7 @@ describe("ficha en pantalla: exención de cuota (#457)", () => {
       await screen.findByText("La cuota de Paula Player queda exenta."),
     ).toBeVisible();
     expect(screen.getByText("Motivo: Entrenadora")).toBeInTheDocument();
-    expect(screen.getByText("Hasta el 1 de marzo de 2027")).toBeInTheDocument();
+    expect(screen.getByText("Termina el 1 de marzo de 2027")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Retirar la exención" }),
     ).toBeInTheDocument();

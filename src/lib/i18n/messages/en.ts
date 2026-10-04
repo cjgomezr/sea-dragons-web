@@ -719,7 +719,7 @@ export const englishMessages = {
   "membershipWaiver.lead.waived":
     "{name} doesn't pay the membership fee while the waiver lasts.",
   "membershipWaiver.reason": "Reason: {reason}",
-  "membershipWaiver.until": "Until {date}",
+  "membershipWaiver.until": "Ends on {date}",
   "membershipWaiver.noEndDate": "No end date",
   "membershipWaiver.waive": "Waive membership fee",
   "membershipWaiver.remove": "Remove waiver",
@@ -736,7 +736,7 @@ export const englishMessages = {
   "membershipWaiver.saving": "Saving…",
   "membershipWaiver.dialog.removeTitle": "Remove {name}'s waiver?",
   "membershipWaiver.dialog.removeLead":
-    "Their membership goes back to pending, or to their Stripe subscription if they have one. Until they're up to date they can't use member features.",
+    "Their membership goes back to pending, or to what's left of their Stripe subscription, which still ends at the end of its period. Until they're up to date they can't use member features.",
   "membershipWaiver.confirmRemove": "Remove waiver",
   "membershipWaiver.waived": "{name}'s membership fee is waived.",
   "membershipWaiver.removed": "{name}'s waiver was removed.",

@@ -714,7 +714,7 @@ export const spanishMessages: MessageCatalog = {
   "membershipWaiver.lead.waived":
     "{name} no paga cuota mientras dure la exención.",
   "membershipWaiver.reason": "Motivo: {reason}",
-  "membershipWaiver.until": "Hasta el {date}",
+  "membershipWaiver.until": "Termina el {date}",
   "membershipWaiver.noEndDate": "Sin fecha de fin",
   "membershipWaiver.waive": "Eximir de cuota",
   "membershipWaiver.remove": "Retirar la exención",
@@ -731,7 +731,7 @@ export const spanishMessages: MessageCatalog = {
   "membershipWaiver.saving": "Guardando…",
   "membershipWaiver.dialog.removeTitle": "¿Retirar la exención de {name}?",
   "membershipWaiver.dialog.removeLead":
-    "Su membresía vuelve a pendiente, o a su suscripción de Stripe si la tiene. Mientras no esté al día no podrá usar las funciones de miembro.",
+    "Su membresía vuelve a pendiente, o a lo que quede de su suscripción de Stripe, que sigue terminando al final de su periodo. Mientras no esté al día no podrá usar las funciones de miembro.",
   "membershipWaiver.confirmRemove": "Retirar la exención",
   "membershipWaiver.waived": "La cuota de {name} queda exenta.",
   "membershipWaiver.removed": "Se retiró la exención de {name}.",

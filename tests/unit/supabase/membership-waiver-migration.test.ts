@@ -148,6 +148,28 @@ describeConPostgres("la exención manual del Admin en la base", () => {
     });
   });
 
+  it("borra el cambio de plan programado, que la cancelación anula (#456)", async () => {
+    const database = await migratedDatabase();
+    const seeded = await seedClub(database);
+    await database.query(
+      `update public.memberships
+          set status = 'active', stripe_subscription_id = 'sub_1',
+              scheduled_plan = 'Student',
+              scheduled_at = now() + interval '10 days'
+        where user_id = '${seeded.playerId}'`,
+    );
+
+    await waive(database, seeded);
+
+    await expect(
+      database.query(
+        `select concat_ws('|', coalesce(scheduled_plan, '-'),
+                          coalesce(scheduled_at::text, '-'))
+           from public.memberships where user_id = '${seeded.playerId}'`,
+      ),
+    ).resolves.toBe("-|-");
+  });
+
   it("crea la membresía de quien todavía no la tiene", async () => {
     const database = await migratedDatabase();
     const seeded = await seedClub(database);
