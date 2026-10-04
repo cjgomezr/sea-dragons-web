@@ -64,6 +64,7 @@ const membershipViewSchema = z.object({
       }),
       canChoosePlan: z.boolean(),
       casualSessionPriceCents: z.number().int().nullable(),
+      subscriptionEndsAt: isoInstantSchema.nullable(),
     })
     .nullable(),
   payments: z.array(

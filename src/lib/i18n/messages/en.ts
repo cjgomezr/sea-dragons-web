@@ -853,6 +853,8 @@ export const englishMessages = {
   "payments.status.waived": "Waived",
   "payments.waiver.reason": "Reason: {reason}",
   "payments.waiver.until": "Until {date}",
+  "payments.waiver.subscriptionEnds":
+    "Your subscription ends on {date} and won't be charged again",
   "payments.card.update": "Update card",
   "payments.card.resubscribe": "Subscribe again",
   "payments.card.waiting":

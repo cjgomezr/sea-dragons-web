@@ -11032,6 +11032,7 @@ function membershipView(
       planPrices: { Full: 4500, Student: 3200 },
       canChoosePlan: false,
       casualSessionPriceCents: null,
+      subscriptionEndsAt: null,
       ...membership,
     },
     payments,

@@ -852,6 +852,8 @@ export const spanishMessages: MessageCatalog = {
   "payments.status.waived": "Exenta",
   "payments.waiver.reason": "Motivo: {reason}",
   "payments.waiver.until": "Hasta el {date}",
+  "payments.waiver.subscriptionEnds":
+    "Tu suscripción termina el {date} y no se te volverá a cobrar",
   "payments.card.update": "Actualizar tarjeta",
   "payments.card.resubscribe": "Volver a suscribirse",
   "payments.card.waiting":
