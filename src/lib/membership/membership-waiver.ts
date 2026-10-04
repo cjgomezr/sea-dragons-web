@@ -17,7 +17,7 @@ import type { MembershipWaiverView } from "./membership-view";
  * retirarle la exención. Contado sin Supabase ni Stripe delante.
  *
  * La escritura es de `waive_membership` y `remove_membership_waiver`
- * (`0054_membership_waiver.sql`), que vuelven a mirar que quien actúa siga
+ * (`0055_membership_waiver.sql`), que vuelven a mirar que quien actúa siga
  * siendo Admin. Aquí se valida lo escrito, se cancela en Stripe la
  * suscripción de quien queda exento y se deja la bitácora.
  *

@@ -6,7 +6,7 @@ import {
 } from "../../support/postgres";
 
 /**
- * `0054_membership_waiver.sql` contra un Postgres desechable (#457, RF-4 del
+ * `0055_membership_waiver.sql` contra un Postgres desechable (#457, RF-4 del
  * PRD de E12). Eximir deja la membresía `waived` con motivo, fin y quién;
  * retirar la devuelve a lo que digan sus fechas; sólo un Admin activo del
  * club puede hacer ninguna de las dos, y nadie más que `service_role` las
