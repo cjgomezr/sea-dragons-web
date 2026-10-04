@@ -267,6 +267,7 @@ funcion prune_member_notifications(recipient_user_ids uuid[])
 funcion publish_team_split(acting_club_id uuid, target_event_id uuid)
 funcion refresh_casual_membership_status(target_user_id uuid, target_club_id uuid)
 funcion refresh_member_evaluation(acting_club_id uuid, target_user_id uuid)
+funcion remove_membership_waiver(target_user_id uuid, acting_club_id uuid, acting_user_id uuid)
 funcion rename_club_position(acting_club_id uuid, target_position_id uuid, name_en text, name_es text)
 funcion rename_evaluation_category(acting_club_id uuid, target_category_id uuid, category_name text)
 funcion reorder_club_positions(acting_club_id uuid, ordered_ids uuid[])
@@ -286,6 +287,7 @@ funcion set_evaluation_category_active(acting_club_id uuid, target_category_id u
 funcion set_member_status(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_status text)
 funcion update_event(acting_club_id uuid, target_event_id uuid, changes jsonb)
 funcion update_series(acting_club_id uuid, target_series_id uuid, changes jsonb)
+funcion waive_membership(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, reason text, until_day date)
 grant attendance_records authenticated SELECT
 grant attendance_records postgres DELETE
 grant attendance_records postgres INSERT
