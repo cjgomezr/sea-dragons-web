@@ -352,7 +352,21 @@ describe("la pantalla de configuración en la frontera", () => {
     expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
   });
 
-  it.each(["Coach", "Committee", "Player"] as const)(
+  // #469: el Committee la abre para configurar los packs de sesiones, que es
+  // lo único que la pantalla le enseña.
+  it("deja pasar a un Committee", async () => {
+    givenSession({
+      kind: "active",
+      role: "Committee",
+      membershipCurrent: true,
+    });
+
+    const response = await requestScreen();
+
+    expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
+  });
+
+  it.each(["Coach", "Player"] as const)(
     "manda al panel a un %s, como a cualquier pantalla que su rol no alcanza",
     async (role) => {
       givenSession({ kind: "active", role, membershipCurrent: true });

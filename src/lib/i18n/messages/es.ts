@@ -1236,9 +1236,9 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.signInTexts.saved": "Textos de entrada guardados.",
   "clubSettings.sessionPacks.title": "Packs de sesiones",
   "clubSettings.sessionPacks.lead":
-    "Lo que pueden comprar los socios Casual. Cada pack cuesta el precio de la sesión Casual en Stripe por sus sesiones.",
+    "Lo que pueden comprar los miembros Casual. Cada pack cuesta el precio de la sesión Casual en Stripe por sus sesiones.",
   "clubSettings.sessionPacks.leadOnly":
-    "Elige los packs de sesiones que pueden comprar los socios Casual.",
+    "Elige los packs de sesiones que pueden comprar los miembros Casual.",
   "clubSettings.sessionPacks.loading": "Cargando los packs de sesiones…",
   "clubSettings.sessionPacks.pack": {
     one: "{count} sesión",
