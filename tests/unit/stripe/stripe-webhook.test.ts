@@ -2,6 +2,7 @@
 import type Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MembershipCard } from "@/lib/membership/membership";
+import type { RenewalNoticeSender } from "@/lib/stripe/renewal-notice";
 import {
   type StripeApi,
   type StripeWebhookGateway,
@@ -54,6 +55,8 @@ const readSubscription =
 const readSetupCard = vi.fn<StripeApi["readSetupCard"]>();
 const makeDefaultPaymentMethod = vi.fn<StripeApi["makeDefaultPaymentMethod"]>();
 const log = vi.fn<(line: string) => void>();
+const notifyUpcomingRenewal =
+  vi.fn<RenewalNoticeSender["notifyUpcomingRenewal"]>();
 
 function handle(event: ReturnType<typeof stripeEvent>) {
   return handleStripeEvent(event, {
@@ -64,6 +67,7 @@ function handle(event: ReturnType<typeof stripeEvent>) {
       readSetupCard,
       makeDefaultPaymentMethod,
     },
+    renewalNotices: { notifyUpcomingRenewal },
     prices: FIXTURE_PRICES,
     now: NOW,
     log,
@@ -80,6 +84,7 @@ beforeEach(() => {
     card: MASTERCARD,
   });
   makeDefaultPaymentMethod.mockResolvedValue(undefined);
+  notifyUpcomingRenewal.mockResolvedValue(undefined);
   readSubscription.mockResolvedValue(
     stripeEvent("customer.subscription.updated", {
       object: { metadata: {} },
@@ -266,5 +271,75 @@ describe("handleStripeEvent", () => {
         }),
       );
     });
+  });
+});
+
+describe("handleStripeEvent con invoice.upcoming (#470)", () => {
+  const ACTIVE_MEMBERSHIP: StripeMembership = {
+    ...KNOWN_MEMBERSHIP,
+    record: { ...KNOWN_MEMBERSHIP.record, status: "active", card: MASTERCARD },
+  };
+
+  beforeEach(() => {
+    findMembership.mockResolvedValue(ACTIVE_MEMBERSHIP);
+  });
+
+  it("apunta el evento sin escribir nada más y avisa al socio", async () => {
+    const event = stripeEvent("invoice.upcoming");
+
+    const outcome = await handle(event);
+
+    expect(outcome).toBe("applied");
+    expect(applyEvent).toHaveBeenCalledWith({
+      event: {
+        id: event.id,
+        type: "invoice.upcoming",
+        created: new Date(event.created * 1000),
+      },
+      owner: { userId: FIXTURE_USER_ID, clubId: CLUB_ID },
+      writes: { membership: null, payment: null, warnings: [] },
+    });
+    expect(notifyUpcomingRenewal).toHaveBeenCalledWith({
+      userId: FIXTURE_USER_ID,
+      clubId: CLUB_ID,
+      amountCents: 4500,
+      chargeAt: new Date("2026-10-28T14:15:00Z"),
+      card: { brand: "mastercard", last4: "4444" },
+    });
+  });
+
+  it("no vuelve a avisar de un evento repetido", async () => {
+    applyEvent.mockResolvedValue("duplicate");
+
+    const outcome = await handle(stripeEvent("invoice.upcoming"));
+
+    expect(outcome).toBe("duplicate");
+    expect(notifyUpcomingRenewal).not.toHaveBeenCalled();
+  });
+
+  it("no avisa ni apunta nada si la membresía no se renueva", async () => {
+    findMembership.mockResolvedValue({
+      ...ACTIVE_MEMBERSHIP,
+      record: { ...ACTIVE_MEMBERSHIP.record, status: "cancelled" },
+    });
+
+    const outcome = await handle(stripeEvent("invoice.upcoming"));
+
+    expect(outcome).toBe("ignored");
+    expect(applyEvent).not.toHaveBeenCalled();
+    expect(notifyUpcomingRenewal).not.toHaveBeenCalled();
+  });
+
+  it("de un socio que la base no conoce no escribe nada y deja una línea en el log", async () => {
+    findMembership.mockResolvedValue(null);
+    const event = stripeEvent("invoice.upcoming");
+
+    const outcome = await handle(event);
+
+    expect(outcome).toBe("unknown_member");
+    expect(applyEvent).not.toHaveBeenCalled();
+    expect(notifyUpcomingRenewal).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining(event.id));
   });
 });

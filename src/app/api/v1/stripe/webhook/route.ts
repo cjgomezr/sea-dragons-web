@@ -3,11 +3,14 @@ import type { NextRequest } from "next/server";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
 import { createStripeWebhookGateway } from "@/lib/membership/supabase-membership-gateways";
+import { createSupabaseNotificationWriter } from "@/lib/notifications/supabase-notification-gateways";
+import { createRenewalNoticeSender } from "@/lib/stripe/renewal-notice";
 import { createStripeApi, createStripeSetup } from "@/lib/stripe/stripe-client";
 import {
   type StripeWebhookOutcome,
   handleStripeEvent,
 } from "@/lib/stripe/stripe-webhook";
+import { createSupabaseRenewalEmailGateway } from "@/lib/stripe/supabase-renewal-email";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 
 // Cada evento escribe en la base: nunca una respuesta guardada.
@@ -71,12 +74,22 @@ const receiveStripeWebhook = createApiRoute<StripeWebhookReceipt>({
       );
     }
     const event = await verifyEvent(request, stripe);
+    const serviceClient = createServiceRoleClient(process.env);
+    const log = (line: string): void => console.warn(line);
     const outcome = await handleStripeEvent(event, {
-      gateway: createStripeWebhookGateway(createServiceRoleClient(process.env)),
+      gateway: createStripeWebhookGateway(serviceClient),
       stripe: createStripeApi(stripe.client),
+      renewalNotices: createRenewalNoticeSender({
+        notifications: createSupabaseNotificationWriter(serviceClient),
+        email: createSupabaseRenewalEmailGateway(serviceClient, {
+          env: process.env,
+          appUrl: request.url,
+        }),
+        log,
+      }),
       prices: stripe.prices,
       now: new Date(),
-      log: (line) => console.warn(line),
+      log,
     });
     return { data: { outcome } };
   },

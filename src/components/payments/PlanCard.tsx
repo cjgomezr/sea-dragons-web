@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { formatAudCents } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
+import { formatCardBrand } from "@/lib/membership/card-brand";
 import type { CheckoutReturn } from "@/lib/membership/checkout-return";
 import type {
   MembershipCard,
@@ -40,26 +41,7 @@ const CHIP_TONES: Readonly<Record<MembershipStatus, ChipTone>> = {
   cancelled: "negative",
 };
 
-/** Las marcas como las escribe Stripe y como se leen. Una que no está aquí
- * se escribe con mayúscula inicial. */
-const CARD_BRAND_NAMES: Readonly<Record<string, string>> = {
-  amex: "American Express",
-  diners: "Diners Club",
-  discover: "Discover",
-  jcb: "JCB",
-  mastercard: "Mastercard",
-  unionpay: "UnionPay",
-  visa: "Visa",
-};
-
 const EXPIRY_MONTH_DIGITS = 2;
-
-function formatCardBrand(brand: string): string {
-  return (
-    CARD_BRAND_NAMES[brand] ??
-    `${brand.charAt(0).toUpperCase()}${brand.slice(1)}`
-  );
-}
 
 function describeCard(translate: Translator, card: MembershipCard): string {
   const month = String(card.expMonth).padStart(EXPIRY_MONTH_DIGITS, "0");

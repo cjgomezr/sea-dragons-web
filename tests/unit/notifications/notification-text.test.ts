@@ -6,6 +6,7 @@ import {
   CALENDAR_PATH,
   DIRECTORY_PATH,
   NEWS_POST_PATH,
+  PAYMENTS_PATH,
 } from "@/lib/auth/routes";
 import {
   describeNotification,
@@ -80,6 +81,11 @@ const DATA_FOR_EVERY_TYPE = {
     title: "Scrimmage",
     startsOn: "2027-07-10",
     startTime: "10:00",
+  },
+  membership_renewal_upcoming: {
+    amountCents: 4500,
+    chargeOn: "2026-10-29",
+    card: { brand: "visa", last4: "4242" },
   },
 } as const;
 
@@ -506,5 +512,56 @@ describe("tiempo relativo", () => {
     const instant = new Date("2026-09-22T10:02:00.000Z");
 
     expect(formatRelativeTime("en", instant, now)).toBe("now");
+  });
+});
+
+// #470: el aviso de renovación siete días antes del cobro.
+describe("el aviso de renovación", () => {
+  const RENEWAL = {
+    type: "membership_renewal_upcoming",
+    data: DATA_FOR_EVERY_TYPE.membership_renewal_upcoming,
+  };
+
+  it("cuenta en inglés el importe, el día del cobro y la tarjeta", () => {
+    const text = describeNotification(createTranslator("en"), RENEWAL);
+
+    expect(text).toEqual({
+      title: "Your membership renews soon",
+      body: "$45.00 will be charged to your Visa ending in 4242 on 29 October 2026.",
+    });
+  });
+
+  it("cuenta lo mismo en español, con el importe a la española", () => {
+    const text = describeNotification(createTranslator("es"), RENEWAL);
+
+    expect(text).toEqual({
+      title: "Tu membresía se renueva pronto",
+      body: "El 29 de octubre de 2026 se cobrarán 45,00\u00a0AUD en tu Visa terminada en 4242.",
+    });
+  });
+
+  it("sin tarjeta guardada, cuenta el importe y el día", () => {
+    const text = describeNotification(createTranslator("en"), {
+      ...RENEWAL,
+      data: { ...RENEWAL.data, card: null },
+    });
+
+    expect(text.body).toBe("$45.00 will be charged on 29 October 2026.");
+  });
+
+  it("lleva a Pagos", () => {
+    expect(notificationDestination(RENEWAL)).toBe(PAYMENTS_PATH);
+  });
+
+  it("con un importe que no es de centavos enteros da el texto genérico", () => {
+    const text = describeNotification(createTranslator("en"), {
+      ...RENEWAL,
+      data: { ...RENEWAL.data, amountCents: 45.5 },
+    });
+
+    expect(text.title).toBe(
+      describeNotification(createTranslator("en"), { type: "x", data: {} })
+        .title,
+    );
   });
 });
