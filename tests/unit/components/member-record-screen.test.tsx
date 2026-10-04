@@ -18,6 +18,7 @@ const MASTERS_ID = "9a9a9a9a-0000-4000-8000-000000000002";
 const RECORD_PATH = `/api/v1/members/${MEMBER_ID}/record`;
 const INVITATION_PATH = `/api/v1/members/${MEMBER_ID}/invitation`;
 const STATUS_PATH = `/api/v1/members/${MEMBER_ID}/status`;
+const WAIVER_PATH = `/api/v1/members/${MEMBER_ID}/membership-waiver`;
 const VERIFICATION_PATH = `${RECORD_PATH}/auf-verification`;
 const GROUPS_PATH = "/api/v1/groups";
 const EVALUATION_PATH = `/api/v1/evaluations/${MEMBER_ID}`;
@@ -34,6 +35,7 @@ const RECORD: MemberRecord = {
   registeredAt: "2024-03-06T01:00:00.000Z",
   hasGuardianConsent: false,
   membershipStatus: "active",
+  membershipWaiver: null,
   photoUrl: null,
   isAufExpired: false,
   groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
@@ -67,11 +69,14 @@ type Stub = {
   readonly changeStatus?: (body: unknown) => Response | Promise<Response>;
   readonly verify?: (body: unknown) => Response | Promise<Response>;
   readonly evaluation?: () => Response;
+  readonly waive?: (body: unknown) => Response | Promise<Response>;
+  readonly removeWaiver?: () => Response | Promise<Response>;
 };
 
 const resends: string[] = [];
 const statusChanges: unknown[] = [];
 const verifications: unknown[] = [];
+const waiverRequests: Request[] = [];
 
 function jsonResponse(status: number, payload: unknown): Response {
   return new Response(JSON.stringify(payload), {
@@ -122,6 +127,40 @@ function changedStatus(body: unknown): Response {
   });
 }
 
+/** Lo que el servidor respondería a eximir: la exención con el fin como el
+ * principio de ese día en Melbourne. */
+function waivedResponse(body: unknown): Response {
+  const { reason, until } = body as { reason: string; until: string | null };
+  return jsonResponse(200, {
+    data: {
+      userId: MEMBER_ID,
+      membershipStatus: "waived",
+      waiver: {
+        reason,
+        until: until === null ? null : `${until}T00:00:00+11:00`,
+      },
+    },
+  });
+}
+
+function answerWaiver(
+  stub: Stub,
+  init?: RequestInit,
+): Response | Promise<Response> {
+  if (init?.method === "DELETE") {
+    waiverRequests.push({ method: "DELETE", body: null });
+    return (
+      stub.removeWaiver?.() ??
+      jsonResponse(200, {
+        data: { userId: MEMBER_ID, membershipStatus: "pending", waiver: null },
+      })
+    );
+  }
+  const body: unknown = JSON.parse(String(init?.body));
+  waiverRequests.push({ method: "POST", body });
+  return stub.waive?.(body) ?? waivedResponse(body);
+}
+
 function stubApi(stub: Stub = {}): void {
   vi.stubGlobal(
     "fetch",
@@ -153,6 +192,9 @@ function stubApi(stub: Stub = {}): void {
           stub.verify?.(body) ??
           jsonResponse(200, { data: { ...RECORD, isAufVerified: true } })
         );
+      }
+      if (url === WAIVER_PATH) {
+        return answerWaiver(stub, init);
       }
       if (url === STATUS_PATH && init?.method === "PATCH") {
         const body: unknown = JSON.parse(String(init.body));
@@ -190,6 +232,7 @@ beforeEach(() => {
   resends.length = 0;
   statusChanges.length = 0;
   verifications.length = 0;
+  waiverRequests.length = 0;
 });
 
 afterEach(() => {
@@ -757,6 +800,240 @@ describe("ficha en pantalla: baja y reactivación (#244)", () => {
     ).toBeVisible();
     expect(
       screen.getByRole("button", { name: "Reactivar cuenta" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("ficha en pantalla: exención de cuota (#457)", () => {
+  const WAIVED: MemberRecord = {
+    ...RECORD,
+    membershipStatus: "waived",
+    membershipWaiver: {
+      reason: "Head coach",
+      until: "2027-02-28T13:00:00.000Z",
+    },
+  };
+
+  async function openWaiverDialog(
+    user: ReturnType<typeof userEvent.setup>,
+  ): Promise<HTMLElement> {
+    await user.click(
+      screen.getByRole("button", { name: "Waive membership fee" }),
+    );
+    return screen.getByRole("dialog", {
+      name: "Waive Paula Player's membership fee",
+    });
+  }
+
+  it("exime con motivo y fecha de fin, y la ficha pasa a enseñarla", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+
+    const dialog = await openWaiverDialog(user);
+    await user.type(within(dialog).getByLabelText("Reason"), "Head coach");
+    fireEvent.change(within(dialog).getByLabelText(/End date/), {
+      target: { value: "2027-03-01" },
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Waive fee" }));
+
+    expect(
+      await screen.findByText("Paula Player's membership fee is waived."),
+    ).toBeVisible();
+    expect(waiverRequests).toEqual([
+      { method: "POST", body: { reason: "Head coach", until: "2027-03-01" } },
+    ]);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Membership waived")).toBeInTheDocument();
+    expect(screen.getByText("Reason: Head coach")).toBeInTheDocument();
+    expect(screen.getByText("Until 1 March 2027")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove waiver" }),
+    ).toBeInTheDocument();
+  });
+
+  it("exime sin fecha de fin", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+
+    const dialog = await openWaiverDialog(user);
+    await user.type(within(dialog).getByLabelText("Reason"), "Volunteer");
+    await user.click(within(dialog).getByRole("button", { name: "Waive fee" }));
+
+    await screen.findByText("Paula Player's membership fee is waived.");
+    expect(waiverRequests).toEqual([
+      { method: "POST", body: { reason: "Volunteer", until: null } },
+    ]);
+    expect(screen.getByText("No end date")).toBeInTheDocument();
+  });
+
+  it("no deja confirmar sin motivo", async () => {
+    stubApi();
+    await renderScreen();
+
+    const dialog = await openWaiverDialog(userEvent.setup());
+
+    expect(
+      within(dialog).getByRole("button", { name: "Waive fee" }),
+    ).toBeDisabled();
+  });
+
+  it("limita el motivo a 200 caracteres", async () => {
+    stubApi();
+    await renderScreen();
+
+    const dialog = await openWaiverDialog(userEvent.setup());
+
+    expect(within(dialog).getByLabelText("Reason")).toHaveAttribute(
+      "maxlength",
+      "200",
+    );
+  });
+
+  it("cancelar cierra el diálogo sin pedir nada", async () => {
+    stubApi();
+    await renderScreen();
+    const user = userEvent.setup();
+
+    const dialog = await openWaiverDialog(user);
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(waiverRequests).toEqual([]);
+  });
+
+  it("explica una fecha de fin pasada sin cerrar el diálogo", async () => {
+    stubApi({
+      waive: () =>
+        errorResponse(400, "validation_error", "until_not_after_today"),
+    });
+    await renderScreen();
+    const user = userEvent.setup();
+
+    const dialog = await openWaiverDialog(user);
+    await user.type(within(dialog).getByLabelText("Reason"), "Coach");
+    fireEvent.change(within(dialog).getByLabelText(/End date/), {
+      target: { value: "2020-01-01" },
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Waive fee" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "The end date has to be after today.",
+    );
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("enseña el motivo y la fecha de fin de un socio exento", async () => {
+    stubApi({ record: WAIVED });
+
+    await renderScreen();
+
+    expect(screen.getByText("Reason: Head coach")).toBeInTheDocument();
+    expect(screen.getByText("Until 1 March 2027")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Waive membership fee" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("retira la exención tras confirmarla, y vuelve a ofrecer eximir", async () => {
+    stubApi({ record: WAIVED });
+    await renderScreen();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Remove waiver" }));
+    const dialog = screen.getByRole("dialog", {
+      name: "Remove Paula Player's waiver?",
+    });
+    await user.click(
+      within(dialog).getByRole("button", { name: "Remove waiver" }),
+    );
+
+    expect(
+      await screen.findByText("Paula Player's waiver was removed."),
+    ).toBeVisible();
+    expect(waiverRequests).toEqual([{ method: "DELETE", body: null }]);
+    expect(screen.getByText("Membership pending")).toBeInTheDocument();
+    expect(screen.queryByText("Reason: Head coach")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Waive membership fee" }),
+    ).toBeInTheDocument();
+  });
+
+  it("no retira nada si se cancela la confirmación", async () => {
+    stubApi({ record: WAIVED });
+    await renderScreen();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Remove waiver" }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Cancel",
+      }),
+    );
+
+    expect(waiverRequests).toEqual([]);
+    expect(screen.getByText("Reason: Head coach")).toBeInTheDocument();
+  });
+
+  it("explica un rechazo al retirar dentro de la confirmación", async () => {
+    stubApi({
+      record: WAIVED,
+      removeWaiver: () => errorResponse(403, "forbidden"),
+    });
+    await renderScreen();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Remove waiver" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Remove waiver" }),
+    );
+
+    expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Reason: Head coach")).toBeInTheDocument();
+  });
+
+  it("lo dice todo en español", async () => {
+    stubApi();
+    render(<MemberRecordScreen locale="es" userId={MEMBER_ID} />);
+    await screen.findByRole("heading", { level: 1, name: "Paula Player" });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Eximir de cuota" }));
+    const dialog = screen.getByRole("dialog", {
+      name: "Eximir de cuota a Paula Player",
+    });
+    await user.type(within(dialog).getByLabelText("Motivo"), "Entrenadora");
+    fireEvent.change(within(dialog).getByLabelText(/Fecha de fin/), {
+      target: { value: "2027-03-01" },
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Eximir" }));
+
+    expect(
+      await screen.findByText("La cuota de Paula Player queda exenta."),
+    ).toBeVisible();
+    expect(screen.getByText("Motivo: Entrenadora")).toBeInTheDocument();
+    expect(screen.getByText("Hasta el 1 de marzo de 2027")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Retirar la exención" }),
+    ).toBeInTheDocument();
+  });
+
+  it("confirma la retirada en español", async () => {
+    stubApi({ record: WAIVED });
+    render(<MemberRecordScreen locale="es" userId={MEMBER_ID} />);
+    await screen.findByRole("heading", { level: 1, name: "Paula Player" });
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Retirar la exención" }),
+    );
+
+    expect(
+      screen.getByRole("dialog", {
+        name: "¿Retirar la exención de Paula Player?",
+      }),
     ).toBeInTheDocument();
   });
 });

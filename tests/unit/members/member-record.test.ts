@@ -3,6 +3,7 @@ import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
 import type { AuditLogInsertRow } from "@/lib/audit/audit-log";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { MembershipStatus } from "@/lib/membership/membership";
+import type { MembershipWaiverView } from "@/lib/membership/membership-view";
 import type { Role } from "@/lib/auth/roles";
 import { InactiveMemberError } from "@/lib/groups/group-members";
 import { GroupNotFoundError } from "@/lib/groups/groups";
@@ -79,6 +80,7 @@ type FakeOptions = {
   readonly attendance?: MemberAttendance;
   /** El estado de su membresía (#453); sin decirlo, activa. */
   readonly membershipStatus?: MembershipStatus | null;
+  readonly membershipWaiver?: MembershipWaiverView | null;
 };
 
 const MEMBER_ATTENDANCE: MemberAttendance = {
@@ -146,6 +148,7 @@ function fake(options: FakeOptions = {}): Fake {
                 options.membershipStatus === undefined
                   ? "active"
                   : options.membershipStatus,
+              membershipWaiver: options.membershipWaiver ?? null,
             }
           : null;
       },
@@ -353,6 +356,7 @@ describe("ficha reservada al Admin: lectura", () => {
       registeredAt: REGISTERED_AT,
       hasGuardianConsent: false,
       membershipStatus: "active",
+      membershipWaiver: null,
       photoUrl: null,
       isAufExpired: false,
       groups: [
@@ -460,6 +464,24 @@ describe("la membresía en la ficha (#453)", () => {
       expect(record.membershipStatus).toBe(membershipStatus);
     },
   );
+});
+
+describe("la exención en la ficha (#457)", () => {
+  it("trae el motivo y la fecha de fin de la exención del socio", async () => {
+    const membershipWaiver = {
+      reason: "Entrenador",
+      until: "2027-02-28T13:00:00.000Z",
+    };
+    const { gateways } = fake({ membershipStatus: "waived", membershipWaiver });
+
+    const record = await readMemberRecord(gateways, {
+      callerId: ADMIN_ID,
+      userId: MEMBER_ID,
+      todayInClub: TODAY_IN_CLUB,
+    });
+
+    expect(record.membershipWaiver).toEqual(membershipWaiver);
+  });
 });
 
 describe("la foto en la ficha", () => {

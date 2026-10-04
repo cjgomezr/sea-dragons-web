@@ -707,6 +707,47 @@ export const spanishMessages: MessageCatalog = {
     "La membresía cambió, pero no quedó en la bitácora. Recarga la ficha y avisa a quien mantiene la plataforma.",
   "memberStatus.error.unexpected":
     "No pudimos cambiar la membresía. Vuelve a intentarlo.",
+  // La exención de cuota desde la ficha (#457, RF-4 de E12).
+  "membershipWaiver.title": "Cuota",
+  "membershipWaiver.lead.notWaived":
+    "{name} paga la cuota en Pagos. A entrenadores y voluntarios se les puede eximir.",
+  "membershipWaiver.lead.waived":
+    "{name} no paga cuota mientras dure la exención.",
+  "membershipWaiver.reason": "Motivo: {reason}",
+  "membershipWaiver.until": "Hasta el {date}",
+  "membershipWaiver.noEndDate": "Sin fecha de fin",
+  "membershipWaiver.waive": "Eximir de cuota",
+  "membershipWaiver.remove": "Retirar la exención",
+  "membershipWaiver.dialog.waiveTitle": "Eximir de cuota a {name}",
+  "membershipWaiver.dialog.waiveLead":
+    "Quedará al día sin pagar. Si tiene suscripción en Stripe, se cancela al final del periodo ya pagado.",
+  "membershipWaiver.field.reason": "Motivo",
+  "membershipWaiver.field.reasonHint": "Obligatorio, hasta 200 caracteres.",
+  "membershipWaiver.field.until": "Fecha de fin (opcional)",
+  "membershipWaiver.field.untilHint":
+    "La exención deja de contar ese día. Déjala vacía si no termina.",
+  "membershipWaiver.confirmWaive": "Eximir",
+  "membershipWaiver.cancel": "Cancelar",
+  "membershipWaiver.saving": "Guardando…",
+  "membershipWaiver.dialog.removeTitle": "¿Retirar la exención de {name}?",
+  "membershipWaiver.dialog.removeLead":
+    "Su membresía vuelve a pendiente, o a su suscripción de Stripe si la tiene. Mientras no esté al día no podrá usar las funciones de miembro.",
+  "membershipWaiver.confirmRemove": "Retirar la exención",
+  "membershipWaiver.waived": "La cuota de {name} queda exenta.",
+  "membershipWaiver.removed": "Se retiró la exención de {name}.",
+  "membershipWaiver.error.reasonRequired": "Escribe el motivo de la exención.",
+  "membershipWaiver.error.reasonTooLong":
+    "El motivo no puede pasar de 200 caracteres.",
+  "membershipWaiver.error.untilNotADate":
+    "La fecha de fin no es un día válido.",
+  "membershipWaiver.error.untilNotAfterToday":
+    "La fecha de fin tiene que ser posterior a hoy.",
+  "membershipWaiver.error.notWaived":
+    "La cuota de este miembro ya no está exenta. Vuelve a cargar la ficha.",
+  "membershipWaiver.error.notAudited":
+    "La exención cambió, pero no se pudo registrar en la bitácora. Vuelve a cargar la ficha y avisa a quien mantiene la plataforma.",
+  "membershipWaiver.error.unexpected":
+    "No pudimos guardar la exención. Vuelve a intentarlo.",
   // La campana y su lista (#266). Cada tipo de aviso tiene su título y su
   // cuerpo; los datos del aviso entran como parámetros.
   "notifications.bell.label": {
