@@ -120,11 +120,11 @@ async function readPlanPrices(
   return { Full: full.amountCents, Student: student.amountCents };
 }
 
+const NO_PLAN_PRICES: PlanPrices = { Full: null, Student: null };
+
 /** Sin nada que enseñar no se pregunta a Stripe: un Casual no tiene cuota
  * mensual, y si además no se le ofrece cambiar de plan, ningún precio sale
  * en su Pagos (#486). */
-const NO_PLAN_PRICES: PlanPrices = { Full: null, Student: null };
-
 function showsPlanPrices(
   membership: Membership,
   paymentsConfigured: boolean,
