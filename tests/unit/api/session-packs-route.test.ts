@@ -156,7 +156,10 @@ describe("GET /api/v1/club/session-packs", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
-        data: { packs: [pricedPack(10), pricedPack(5)] },
+        data: {
+          packs: [pricedPack(10), pricedPack(5)],
+          sessionPrice: { amountCents: SESSION_PRICE_CENTS, currency: "AUD" },
+        },
       });
     },
   );
@@ -181,6 +184,7 @@ describe("GET /api/v1/club/session-packs", () => {
           sessions,
           price: { amountCents: null, reason: "stripe_unavailable" },
         })),
+        sessionPrice: { amountCents: null, reason: "stripe_unavailable" },
       },
     });
   });
@@ -204,7 +208,10 @@ describe("PUT /api/v1/club/session-packs", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
-        data: { packs: [pricedPack(20), pricedPack(5), pricedPack(1)] },
+        data: {
+          packs: [pricedPack(20), pricedPack(5), pricedPack(1)],
+          sessionPrice: { amountCents: SESSION_PRICE_CENTS, currency: "AUD" },
+        },
       });
       expect(storedSizes).toEqual([20, 5, 1]);
     },

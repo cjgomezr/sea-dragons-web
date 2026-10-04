@@ -10,7 +10,7 @@ import {
   listSessionPacks,
   MAX_PACK_SESSIONS,
   replaceSessionPacks,
-  type SessionPackOffers,
+  type SessionPacksCatalog,
   SessionPacksForbiddenError,
   type SessionPacksGateways,
   SessionPacksValidationError,
@@ -42,9 +42,7 @@ const sessionPacksBodySchema = z
 
 type SessionPacksBody = z.infer<typeof sessionPacksBodySchema>;
 
-export type SessionPacksResponse = {
-  readonly packs: SessionPackOffers;
-};
+export type SessionPacksResponse = SessionPacksCatalog;
 
 function requireSessionPacksGateways(): SessionPacksGateways {
   const wiring = createSupabaseSessionPacksGateways(process.env);
@@ -72,12 +70,7 @@ const getSessionPacks = createApiRoute<SessionPacksResponse>({
     const callerId = await identifyAccountCaller({ request, decorateResponse });
     try {
       return {
-        data: {
-          packs: await listSessionPacks(
-            requireSessionPacksGateways(),
-            callerId,
-          ),
-        },
+        data: await listSessionPacks(requireSessionPacksGateways(), callerId),
       };
     } catch (error) {
       asSessionPacksApiError(error);
@@ -94,12 +87,10 @@ const putSessionPacks = createApiRoute<SessionPacksResponse, SessionPacksBody>({
     });
     try {
       return {
-        data: {
-          packs: await replaceSessionPacks(requireSessionPacksGateways(), {
-            callerId,
-            sizes: body.sessions,
-          }),
-        },
+        data: await replaceSessionPacks(requireSessionPacksGateways(), {
+          callerId,
+          sizes: body.sessions,
+        }),
       };
     } catch (error) {
       asSessionPacksApiError(error);

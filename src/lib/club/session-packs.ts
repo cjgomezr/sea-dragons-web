@@ -36,6 +36,13 @@ export type SessionPackOffer = {
 
 export type SessionPackOffers = readonly SessionPackOffer[];
 
+/** Los packs y el precio de una sesión, con el que la pantalla calcula el de
+ * un pack que todavía no se guardó. */
+export type SessionPacksCatalog = {
+  readonly packs: SessionPackOffers;
+  readonly sessionPrice: ClubPrice;
+};
+
 export type SessionPacksGateways = {
   readonly members: ClubSettingsGateways["members"];
   readonly packs: {
@@ -114,26 +121,29 @@ async function findCaller(
   return caller;
 }
 
-async function readOffers(
+async function readCatalog(
   gateways: SessionPacksGateways,
   clubId: string,
-): Promise<SessionPackOffers> {
+): Promise<SessionPacksCatalog> {
   const [sizes, sessionPrice] = await Promise.all([
     gateways.packs.findPackSizes(clubId),
     gateways.sessionPrice.readCasualSessionPrice(),
   ]);
-  return sizes.map((sessions) => ({
-    sessions,
-    price: priceSessionPack(sessionPrice, sessions),
-  }));
+  return {
+    packs: sizes.map((sessions) => ({
+      sessions,
+      price: priceSessionPack(sessionPrice, sessions),
+    })),
+    sessionPrice,
+  };
 }
 
 export async function listSessionPacks(
   gateways: SessionPacksGateways,
   callerId: string,
-): Promise<SessionPackOffers> {
+): Promise<SessionPacksCatalog> {
   const caller = await findCaller(gateways, callerId);
-  return readOffers(gateways, caller.clubId);
+  return readCatalog(gateways, caller.clubId);
 }
 
 /** Valida antes de leer nada y anota después de escribir: auditar primero
@@ -142,7 +152,7 @@ export async function listSessionPacks(
 export async function replaceSessionPacks(
   gateways: SessionPacksGateways,
   request: { readonly callerId: string; readonly sizes: readonly number[] },
-): Promise<SessionPackOffers> {
+): Promise<SessionPacksCatalog> {
   const issue = findSessionPackIssue(request.sizes);
   if (issue !== null) {
     throw new SessionPacksValidationError(issue);
@@ -161,5 +171,5 @@ export async function replaceSessionPacks(
     result: "success",
     metadata: { sessions: request.sizes },
   });
-  return readOffers(gateways, caller.clubId);
+  return readCatalog(gateways, caller.clubId);
 }
