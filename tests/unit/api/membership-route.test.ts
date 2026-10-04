@@ -33,6 +33,7 @@ const PENDING_FULL: MembershipRecord = {
   trialEnd: null,
   card: null,
   waiver: null,
+  scheduledChange: null,
 };
 
 const FULL_PRICE_CENTS = 5150;
@@ -152,6 +153,9 @@ describe("GET /api/v1/membership", () => {
           nextChargeAt: null,
           card: null,
           waiver: null,
+          scheduledChange: null,
+          canChangePlan: false,
+          planPrices: { Full: FULL_PRICE_CENTS, Student: STUDENT_PRICE_CENTS },
         },
         payments: [],
       },
@@ -183,15 +187,47 @@ describe("GET /api/v1/membership", () => {
     });
   });
 
-  it("no pide precio a Stripe para un Casual, que no tiene cuota mensual", async () => {
+  // Un Casual no tiene cuota mensual (#486), y si además no puede cambiar de
+  // plan (exento), nada en su Pagos enseña un precio: no se pregunta.
+  it("no pide precio a Stripe para un Casual exento, que no enseña ninguno", async () => {
+    findByUserId.mockResolvedValue({
+      ...PENDING_FULL,
+      plan: "Casual",
+      status: "waived",
+      waiver: { reason: "Entrenador", until: null, waivedBy: null },
+    });
+
+    const response = await getMembership();
+
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        membership: {
+          plan: "Casual",
+          monthlyPriceCents: null,
+          planPrices: { Full: null, Student: null },
+        },
+      },
+    });
+    expect(retrievePrice).not.toHaveBeenCalled();
+  });
+
+  // El selector del cambio de plan (#456) le ofrece Full y Student con su
+  // precio, que sale de Stripe como el resto.
+  it("sirve a un Casual los precios de Stripe para pasar a Full o Student", async () => {
     findByUserId.mockResolvedValue({ ...PENDING_FULL, plan: "Casual" });
 
     const response = await getMembership();
 
     await expect(response.json()).resolves.toMatchObject({
-      data: { membership: { plan: "Casual", monthlyPriceCents: null } },
+      data: {
+        membership: {
+          plan: "Casual",
+          monthlyPriceCents: null,
+          canChangePlan: true,
+          planPrices: { Full: FULL_PRICE_CENTS, Student: STUDENT_PRICE_CENTS },
+        },
+      },
     });
-    expect(retrievePrice).not.toHaveBeenCalled();
   });
 
   it("sirve el fin de la prueba cuando el webhook ya llegó", async () => {

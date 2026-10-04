@@ -39,6 +39,7 @@ function aRecord(overrides: Partial<MembershipRecord> = {}): MembershipRecord {
     trialEnd: null,
     card: VISA,
     waiver: null,
+    scheduledChange: null,
     ...overrides,
   };
 }
@@ -99,6 +100,9 @@ describe("readMembershipView: la membresía", () => {
       nextChargeAt: PERIOD_END,
       card: VISA,
       waiver: null,
+      scheduledChange: null,
+      canChangePlan: true,
+      planPrices: { Full: 5150, Student: 3675 },
     });
   });
 
@@ -197,6 +201,87 @@ describe("readMembershipView: la membresía", () => {
       membership: null,
       payments: [],
     });
+  });
+});
+
+describe("readMembershipView: el cambio de plan (#456)", () => {
+  it("sirve el precio mensual de Stripe de cada plan para el selector", async () => {
+    const view = await viewOf(aRecord({ plan: "Casual", status: "active" }));
+
+    expect(view.membership?.planPrices).toEqual({ Full: 5150, Student: 3675 });
+  });
+
+  it("da nulo el precio de un plan cuyo precio de Stripe no está disponible", async () => {
+    const view = await viewOf(aRecord(), [], {
+      ...STRIPE_PRICES,
+      student: { amountCents: null, reason: "stripe_unavailable" },
+    });
+
+    expect(view.membership?.planPrices).toEqual({ Full: 5150, Student: null });
+  });
+
+  it("sirve el cambio programado con su plan y su fecha", async () => {
+    const view = await viewOf(
+      aRecord({
+        scheduledChange: { plan: "Student", effectiveAt: new Date(PERIOD_END) },
+      }),
+    );
+
+    expect(view.membership).toMatchObject({
+      scheduledChange: { plan: "Student", effectiveAt: PERIOD_END },
+      nextChargeAt: PERIOD_END,
+    });
+  });
+
+  it("sin próximo cobro cuando lo programado es pasar a Casual", async () => {
+    const view = await viewOf(
+      aRecord({
+        scheduledChange: { plan: "Casual", effectiveAt: new Date(PERIOD_END) },
+      }),
+    );
+
+    expect(view.membership).toMatchObject({
+      scheduledChange: { plan: "Casual", effectiveAt: PERIOD_END },
+      nextChargeAt: null,
+    });
+  });
+
+  it.each([
+    ["un socio con cobro fallido", { status: "past_due" }],
+    [
+      "un socio exento",
+      {
+        status: "waived",
+        waiver: { reason: "Entrenador", until: null, waivedBy: null },
+      },
+    ],
+    ["un socio sin suscripción", { stripeSubscriptionId: null }],
+  ] as const)("no ofrece el cambio a %s", async (_who, change) => {
+    const view = await viewOf(aRecord(change));
+
+    expect(view.membership?.canChangePlan).toBe(false);
+  });
+
+  it("ofrece el cambio a un Casual, que va a Checkout", async () => {
+    const view = await viewOf(
+      aRecord({
+        plan: "Casual",
+        status: "pending",
+        stripeSubscriptionId: null,
+      }),
+    );
+
+    expect(view.membership?.canChangePlan).toBe(true);
+  });
+
+  it("no lo ofrece si los pagos no están configurados", async () => {
+    const view = await readMembershipView(gateways(aRecord()), {
+      userId: USER_ID,
+      now: NOW,
+      paymentsConfigured: false,
+    });
+
+    expect(view.membership?.canChangePlan).toBe(false);
   });
 });
 

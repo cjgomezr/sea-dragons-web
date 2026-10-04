@@ -38,6 +38,7 @@ const PENDING_FULL: MembershipRecord = {
   trialEnd: null,
   card: null,
   waiver: null,
+  scheduledChange: null,
 };
 
 /** La dirección de Checkout lleva el id de la sesión en la ruta. */

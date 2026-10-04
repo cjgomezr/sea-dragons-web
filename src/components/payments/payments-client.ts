@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   type ApiRequestFailure,
+  JSON_REQUEST_HEADERS,
   readApiPayload,
   requestApi,
 } from "@/lib/api/request-api";
@@ -8,10 +9,14 @@ import {
   MEMBERSHIP_API_PATH,
   MEMBERSHIP_CARD_API_PATH,
   MEMBERSHIP_CHECKOUT_API_PATH,
+  MEMBERSHIP_PLAN_API_PATH,
 } from "@/lib/auth/routes";
 import { MEMBERSHIP_TYPES } from "@/lib/auth/registration";
 import type { Translator } from "@/lib/i18n/translator";
-import { MEMBERSHIP_STATUSES } from "@/lib/membership/membership";
+import {
+  MEMBERSHIP_STATUSES,
+  type MembershipPlan,
+} from "@/lib/membership/membership";
 import {
   type MembershipView,
   PAYMENT_STATUSES,
@@ -46,6 +51,17 @@ const membershipViewSchema = z.object({
       waiver: z
         .object({ reason: z.string(), until: isoInstantSchema.nullable() })
         .nullable(),
+      scheduledChange: z
+        .object({
+          plan: z.enum(MEMBERSHIP_TYPES),
+          effectiveAt: isoInstantSchema,
+        })
+        .nullable(),
+      canChangePlan: z.boolean(),
+      planPrices: z.object({
+        Full: z.number().int().nullable(),
+        Student: z.number().int().nullable(),
+      }),
     })
     .nullable(),
   payments: z.array(
@@ -63,6 +79,21 @@ const membershipResponseSchema = z.object({ data: membershipViewSchema });
 
 const stripeSessionResponseSchema = z.object({
   data: z.object({ url: z.url() }),
+});
+
+const planChangeResponseSchema = z.object({
+  data: z.discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("scheduled"),
+      plan: z.enum(MEMBERSHIP_TYPES),
+      effectiveAt: isoInstantSchema,
+    }),
+    z.object({ kind: z.literal("checkout"), url: z.url() }),
+  ]),
+});
+
+const planChangeCancellationResponseSchema = z.object({
+  data: z.object({ scheduledChange: z.null() }),
 });
 
 export type PaymentsFailure = ApiRequestFailure;
@@ -105,6 +136,59 @@ export function requestCheckout(): Promise<StripeSessionOutcome> {
 
 export function requestCardUpdate(): Promise<StripeSessionOutcome> {
   return requestStripeSession(MEMBERSHIP_CARD_API_PATH);
+}
+
+/** Lo que respondió el cambio de plan (#456): programado, que Pagos vuelve
+ * a leer, o Checkout para el Casual que pasa a Full o Student. */
+export type PlanChangeSubmission =
+  | { readonly kind: "scheduled" }
+  | { readonly kind: "checkout"; readonly url: string }
+  | PaymentsFailure;
+
+export async function requestPlanChange(
+  plan: MembershipPlan,
+): Promise<PlanChangeSubmission> {
+  const read = readApiPayload(
+    await requestApi(MEMBERSHIP_PLAN_API_PATH, {
+      method: "POST",
+      headers: JSON_REQUEST_HEADERS,
+      body: JSON.stringify({ plan }),
+    }),
+    planChangeResponseSchema,
+  );
+  if (read.kind === "failed") {
+    return read;
+  }
+  const { data } = read.value;
+  return data.kind === "checkout"
+    ? { kind: "checkout", url: data.url }
+    : { kind: "scheduled" };
+}
+
+export async function requestPlanChangeCancellation(): Promise<
+  { readonly kind: "cancelled" } | PaymentsFailure
+> {
+  const read = readApiPayload(
+    await requestApi(MEMBERSHIP_PLAN_API_PATH, { method: "DELETE" }),
+    planChangeCancellationResponseSchema,
+  );
+  return read.kind === "failed" ? read : { kind: "cancelled" };
+}
+
+/** Por qué no se cambió el plan. Un 409 es que la membresía cambió desde
+ * que se cargó la pantalla: recargarla dice por qué. */
+export function describePlanChangeFailure(
+  translate: Translator,
+  { failure }: PaymentsFailure,
+): string {
+  switch (failure) {
+    case "network":
+      return translate("auth.error.network");
+    case "service_unavailable":
+      return translate("payments.planChange.unavailable");
+    default:
+      return translate("payments.planChange.failed");
+  }
 }
 
 /** Por qué no se pudo cargar la membresía, en el idioma de la pantalla. */

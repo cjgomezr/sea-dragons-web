@@ -56,6 +56,7 @@ function pendingRecord(
     trialEnd: null,
     card: null,
     waiver: null,
+    scheduledChange: null,
     ...change,
   };
 }
@@ -381,6 +382,90 @@ describe("customer.subscription.deleted", () => {
       stripeSubscriptionId: null,
       stripeEventAt: secondsToDate(event.created),
     });
+  });
+});
+
+describe("un cambio de plan programado (#456)", () => {
+  const PERIOD_END = secondsToDate(1792592000);
+
+  function studentSubscriptionEvent(): ReturnType<typeof stripeEvent> {
+    return stripeEvent("customer.subscription.updated", {
+      object: {
+        status: "active",
+        items: {
+          object: "list",
+          data: [
+            {
+              id: "si_Student",
+              object: "subscription_item",
+              current_period_end: 1795270400,
+              price: { id: FIXTURE_PRICES.student, object: "price" },
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  it("cuando Stripe aplica el precio programado, deja el plan nuevo y borra el cambio", () => {
+    const writes = plan(studentSubscriptionEvent(), {
+      membership: membership({
+        status: "active",
+        scheduledChange: { plan: "Student", effectiveAt: PERIOD_END },
+      }),
+    });
+
+    expect(writes.membership).toMatchObject({
+      plan: "Student",
+      scheduledChange: null,
+    });
+  });
+
+  it("mientras el precio no cambia, el cambio programado sigue", () => {
+    const writes = plan(stripeEvent("customer.subscription.updated"), {
+      membership: membership({
+        status: "active",
+        scheduledChange: { plan: "Student", effectiveAt: PERIOD_END },
+      }),
+    });
+
+    expect(writes.membership).not.toHaveProperty("scheduledChange");
+  });
+
+  it("al acabar la suscripción con Casual programado, queda pending como Casual", () => {
+    const event = stripeEvent("customer.subscription.deleted");
+
+    const writes = plan(event, {
+      membership: membership({
+        status: "active",
+        stripeSubscriptionId: FIXTURE_SUBSCRIPTION_ID,
+        scheduledChange: { plan: "Casual", effectiveAt: PERIOD_END },
+      }),
+    });
+
+    expect(writes.membership).toEqual({
+      status: "pending",
+      plan: "Casual",
+      stripeSubscriptionId: null,
+      scheduledChange: null,
+      stripeEventAt: secondsToDate(event.created),
+    });
+  });
+
+  it("si la suscripción acaba con otro cambio programado, se cancela y el cambio se borra", () => {
+    const writes = plan(stripeEvent("customer.subscription.deleted"), {
+      membership: membership({
+        status: "past_due",
+        stripeSubscriptionId: FIXTURE_SUBSCRIPTION_ID,
+        scheduledChange: { plan: "Student", effectiveAt: PERIOD_END },
+      }),
+    });
+
+    expect(writes.membership).toMatchObject({
+      status: "cancelled",
+      scheduledChange: null,
+    });
+    expect(writes.membership).not.toHaveProperty("plan");
   });
 });
 

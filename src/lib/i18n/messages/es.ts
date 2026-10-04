@@ -870,6 +870,29 @@ export const spanishMessages: MessageCatalog = {
   "payments.history.paid": "Pagado",
   "payments.history.failed": "Fallido",
   "payments.history.pending": "Pendiente",
+  "payments.planChange.title": "Cambiar de plan",
+  "payments.planChange.hint":
+    "El cambio empieza con tu siguiente ciclo de cobro, sin prorrateo.",
+  "payments.planChange.casualHint": "Al elegir Full o Student vas a Stripe.",
+  "payments.planChange.recurringOption": "{plan} · {price} al mes",
+  "payments.planChange.recurringOptionPriceUnavailable":
+    "{plan} · Precio no disponible",
+  "payments.planChange.casualOption": "Casual · Sin cobro recurrente",
+  "payments.planChange.confirm": "Confirmar el cambio",
+  "payments.planChange.saving": "Guardando…",
+  "payments.planChange.retry": "Reintentar",
+  "payments.planChange.scheduled": "Pasa a {plan} el {date}.",
+  "payments.planChange.scheduledCasual":
+    "Pasa a Casual el {date}: ese día termina tu suscripción.",
+  "payments.planChange.cancel": "Anular el cambio",
+  "payments.planChange.unavailable":
+    "Stripe no contesta, así que no cambió nada. Vuelve a intentarlo en un momento.",
+  "payments.planChange.failed":
+    "No pudimos cambiar tu plan. Recarga la página y vuelve a intentarlo.",
+  "account.membership.title": "Membresía",
+  "account.membership.type": "Tipo de membresía: {plan}",
+  "account.membership.none": "Todavía no elegiste tipo de membresía.",
+  "account.membership.change": "Cambiarlo en Pagos",
   "calendar.rsvp.error.unexpected":
     "No pudimos guardar tu respuesta. Vuelve a intentarlo.",
   "calendar.create.open": "Evento",

@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import { z } from "zod";
 import {
   type MembershipCard,
+  type MembershipPlan,
   type MembershipRecord,
   type UnwaivedStatus,
   resolveMembership,
@@ -100,12 +101,16 @@ export type StripeMembership = {
 /** Sólo las columnas que el evento cambia: una clave ausente no se toca. */
 export type MembershipChanges = {
   readonly status?: UnwaivedStatus;
-  readonly plan?: "Full" | "Student";
+  /** Casual sólo llega cuando acaba la suscripción de quien lo programó. */
+  readonly plan?: MembershipPlan;
   readonly stripeCustomerId?: string;
   readonly stripeSubscriptionId?: string | null;
   readonly trialEnd?: Date | null;
   readonly currentPeriodEnd?: Date | null;
   readonly card?: MembershipCard;
+  /** El webhook sólo borra el cambio de plan programado (#456): lo programa
+   * Pagos. */
+  readonly scheduledChange?: null;
   /** Sólo lo ponen los eventos de la suscripción, que son los que mueven el
    * estado y por tanto los que no pueden retroceder. */
   readonly stripeEventAt?: Date;
@@ -413,6 +418,20 @@ function statusFromStripe(
   return { changes: statusChange(status, input), warnings: [] };
 }
 
+/** El cambio programado (#456) se cumplió cuando Stripe ya cobra el precio
+ * de su plan. */
+function scheduledChangeApplied(
+  plan: MembershipChanges["plan"],
+  input: PlanInput,
+): Pick<MembershipChanges, "scheduledChange"> {
+  const { scheduledChange } = input.membership.record;
+  return plan !== undefined &&
+    scheduledChange !== null &&
+    scheduledChange.plan === plan
+    ? { scheduledChange: null }
+    : {};
+}
+
 function planSubscriptionChange(
   facts: SubscriptionChangedFacts,
   input: PlanInput,
@@ -423,6 +442,7 @@ function planSubscriptionChange(
     changes: {
       ...status.changes,
       ...plan.changes,
+      ...scheduledChangeApplied(plan.changes.plan, input),
       stripeCustomerId: facts.customerId,
       stripeSubscriptionId: facts.subscriptionId,
       trialEnd: facts.trialEnd,
@@ -434,6 +454,25 @@ function planSubscriptionChange(
   };
 }
 
+/** Quien programó Casual (#456) se queda como Casual sin pagar, a la espera
+ * de su pack (E13). Cualquier otro final cancela. Sin suscripción no queda
+ * ningún cambio por aplicar. */
+function subscriptionEndChanges(
+  created: Date,
+  input: PlanInput,
+): MembershipChanges {
+  const { scheduledChange } = input.membership.record;
+  const isMovingToCasual =
+    scheduledChange !== null && scheduledChange.plan === "Casual";
+  return {
+    ...statusChange(isMovingToCasual ? "pending" : "cancelled", input),
+    ...(isMovingToCasual ? { plan: "Casual" } : {}),
+    stripeSubscriptionId: null,
+    ...(scheduledChange === null ? {} : { scheduledChange: null }),
+    stripeEventAt: created,
+  };
+}
+
 function planMembershipChange(input: PlanInput): MembershipPlanChange | null {
   const { facts } = input;
   switch (facts.kind) {
@@ -441,11 +480,7 @@ function planMembershipChange(input: PlanInput): MembershipPlanChange | null {
       return planSubscriptionChange(facts, input);
     case "subscriptionDeleted":
       return {
-        changes: {
-          ...statusChange("cancelled", input),
-          stripeSubscriptionId: null,
-          stripeEventAt: facts.created,
-        },
+        changes: subscriptionEndChanges(facts.created, input),
         warnings: [],
       };
     case "cardSetupCompleted":

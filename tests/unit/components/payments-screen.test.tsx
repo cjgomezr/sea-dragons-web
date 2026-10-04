@@ -26,6 +26,7 @@ vi.mock("@/components/payments/checkout-navigation", () => ({
 const MEMBERSHIP_PATH = "/api/v1/membership";
 const CHECKOUT_PATH = "/api/v1/membership/checkout";
 const CARD_PATH = "/api/v1/membership/card";
+const PLAN_PATH = "/api/v1/membership/plan";
 const CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_123";
 const SETUP_URL = "https://checkout.stripe.com/c/pay/cs_test_setup";
 const TRIAL_END = "2026-11-01T09:00:00.000Z";
@@ -48,6 +49,9 @@ function panel(change: Partial<MembershipPanelView> = {}): MembershipPanelView {
     nextChargeAt: PERIOD_END,
     card: VISA,
     waiver: null,
+    scheduledChange: null,
+    canChangePlan: false,
+    planPrices: { Full: 4500, Student: 3675 },
     ...change,
   };
 }
@@ -115,29 +119,33 @@ function serviceUnavailable(): Response {
   );
 }
 
+type RouteHandler = (init?: RequestInit) => Response | Promise<Response>;
+
 type FetchRoutes = {
-  readonly membership?: () => Response | Promise<Response>;
-  readonly checkout?: () => Response | Promise<Response>;
-  readonly card?: () => Response | Promise<Response>;
+  readonly membership?: RouteHandler;
+  readonly checkout?: RouteHandler;
+  readonly card?: RouteHandler;
+  /** `POST` y `DELETE` del cambio de plan (#456): el método va en `init`. */
+  readonly plan?: RouteHandler;
 };
 
 function stubFetch(routes: FetchRoutes): ReturnType<typeof vi.fn> {
-  const handlers: Record<
-    string,
-    (() => Response | Promise<Response>) | undefined
-  > = {
+  const handlers: Record<string, RouteHandler | undefined> = {
     [MEMBERSHIP_PATH]: routes.membership,
     [CHECKOUT_PATH]: routes.checkout,
     [CARD_PATH]: routes.card,
+    [PLAN_PATH]: routes.plan,
   };
-  const fetchDouble = vi.fn(async (input: RequestInfo | URL) => {
-    const path = String(input);
-    const handler = handlers[path];
-    if (handler === undefined) {
-      throw new Error(`petición inesperada a ${path}`);
-    }
-    return handler();
-  });
+  const fetchDouble = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      const handler = handlers[path];
+      if (handler === undefined) {
+        throw new Error(`petición inesperada a ${path}`);
+      }
+      return handler(init);
+    },
+  );
   vi.stubGlobal("fetch", fetchDouble);
   return fetchDouble;
 }
@@ -856,6 +864,307 @@ describe("PaymentsScreen: vuelta de Checkout", () => {
     expect(countCalls(fetchDouble, MEMBERSHIP_PATH)).toBe(callsAtTimeout);
     expect(screen.getByRole("status")).toHaveTextContent(
       /hasn't confirmed yet/,
+    );
+  });
+});
+describe("PaymentsScreen: cambio de plan (#456)", () => {
+  const CHANGEABLE_FULL = view(panel({ canChangePlan: true }));
+  const SCHEDULED_STUDENT = view(
+    panel({
+      scheduledChange: { plan: "Student", effectiveAt: PERIOD_END },
+    }),
+  );
+  const SCHEDULED_CASUAL = view(
+    panel({
+      nextChargeAt: null,
+      scheduledChange: { plan: "Casual", effectiveAt: PERIOD_END },
+    }),
+  );
+  const CHANGEABLE_CASUAL = view(
+    panel({
+      plan: "Casual",
+      status: "pending",
+      monthlyPriceCents: null,
+      nextChargeAt: null,
+      card: null,
+      canChangePlan: true,
+    }),
+  );
+
+  /** La membresía que sirve el endpoint: la primera al cargar, la segunda
+   * al volver a pedirla tras el cambio. */
+  function membershipSequence(
+    first: MembershipView,
+    second: MembershipView,
+  ): RouteHandler {
+    let served = 0;
+    return () => {
+      served += 1;
+      return jsonResponse({ data: served === 1 ? first : second });
+    };
+  }
+
+  function planCalls(
+    fetchDouble: ReturnType<typeof vi.fn>,
+  ): readonly { readonly method: string; readonly body: unknown }[] {
+    return fetchDouble.mock.calls
+      .filter(([input]) => String(input) === PLAN_PATH)
+      .map(([, init]) => {
+        const request = init as RequestInit;
+        return {
+          method: String(request.method),
+          body:
+            request.body === undefined
+              ? undefined
+              : (JSON.parse(String(request.body)) as unknown),
+        };
+      });
+  }
+
+  function planChangeGroup(name = "Change plan"): HTMLElement {
+    return screen.getByRole("group", { name });
+  }
+
+  it("no ofrece el cambio a quien no puede cambiar de plan", async () => {
+    await renderLoaded(ACTIVE_FULL);
+
+    expect(screen.queryByRole("group", { name: "Change plan" })).toBeNull();
+  });
+
+  it("dice que el precio no está disponible si el de Stripe no se pudo leer", async () => {
+    await renderLoaded(
+      view(
+        panel({
+          canChangePlan: true,
+          planPrices: { Full: 4500, Student: null },
+        }),
+      ),
+    );
+
+    expect(
+      within(planChangeGroup()).getByRole("radio", {
+        name: "Student · Price not available",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("ofrece los otros planes con su precio, y no el que ya tiene", async () => {
+    await renderLoaded(CHANGEABLE_FULL);
+
+    const group = planChangeGroup();
+    expect(
+      within(group).getByRole("radio", { name: "Student · $36.75 a month" }),
+    ).toBeInTheDocument();
+    expect(
+      within(group).getByRole("radio", {
+        name: "Casual · No recurring charge",
+      }),
+    ).toBeInTheDocument();
+    expect(within(group).queryByRole("radio", { name: /^Full/ })).toBeNull();
+    expect(
+      screen.getByText(
+        "The change starts with your next billing cycle, with no proration.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("no deja confirmar hasta elegir un plan", async () => {
+    await renderLoaded(CHANGEABLE_FULL);
+
+    expect(
+      screen.getByRole("button", { name: "Confirm the change" }),
+    ).toBeDisabled();
+  });
+
+  it("programa el plan elegido y dice cuándo pasa a él", async () => {
+    const fetchDouble = await renderLoaded(CHANGEABLE_FULL, {
+      routes: {
+        membership: membershipSequence(CHANGEABLE_FULL, SCHEDULED_STUDENT),
+        plan: () =>
+          jsonResponse({
+            data: {
+              kind: "scheduled",
+              plan: "Student",
+              effectiveAt: PERIOD_END,
+            },
+          }),
+      },
+    });
+
+    await userEvent.click(screen.getByRole("radio", { name: /^Student/ }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Confirm the change" }),
+    );
+
+    expect(
+      await screen.findByText("Moves to Student on 1 July 2026."),
+    ).toBeInTheDocument();
+    expect(planCalls(fetchDouble)).toEqual([
+      { method: "POST", body: { plan: "Student" } },
+    ]);
+    expect(
+      screen.getByRole("button", { name: "Cancel the change" }),
+    ).toBeEnabled();
+  });
+
+  it("anula el cambio programado y vuelve a enseñar sólo el plan actual", async () => {
+    const fetchDouble = await renderLoaded(SCHEDULED_STUDENT, {
+      routes: {
+        membership: membershipSequence(SCHEDULED_STUDENT, ACTIVE_FULL),
+        plan: () => jsonResponse({ data: { scheduledChange: null } }),
+      },
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Cancel the change" }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText(/Moves to Student/)).toBeNull(),
+    );
+    expect(planCalls(fetchDouble)).toEqual([
+      { method: "DELETE", body: undefined },
+    ]);
+    expect(screen.getByText("Full membership")).toBeInTheDocument();
+  });
+
+  it("dice que pasar a Casual termina la suscripción, sin próximo cobro", async () => {
+    await renderLoaded(SCHEDULED_CASUAL);
+
+    expect(
+      screen.getByText(
+        "Moves to Casual on 1 July 2026: your subscription ends that day.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Next charge/)).toBeNull();
+  });
+
+  it("lleva a Stripe al Casual que elige Full", async () => {
+    await renderLoaded(CHANGEABLE_CASUAL, {
+      routes: {
+        plan: () =>
+          jsonResponse({ data: { kind: "checkout", url: CHECKOUT_URL } }),
+      },
+    });
+
+    expect(
+      screen.getByText("Choosing Full or Student takes you to Stripe."),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("radio", { name: /^Full/ }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Confirm the change" }),
+    );
+
+    await waitFor(() =>
+      expect(openCheckout).toHaveBeenCalledWith(CHECKOUT_URL),
+    );
+  });
+
+  it("manda una sola petición ante un doble toque", async () => {
+    const fetchDouble = await renderLoaded(CHANGEABLE_FULL, {
+      routes: { plan: () => new Promise<Response>(() => undefined) },
+    });
+
+    await userEvent.click(screen.getByRole("radio", { name: /^Student/ }));
+    await userEvent.dblClick(
+      screen.getByRole("button", { name: "Confirm the change" }),
+    );
+
+    expect(countCalls(fetchDouble, PLAN_PATH)).toBe(1);
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
+  });
+
+  it("anula con una sola petición ante un doble toque", async () => {
+    const fetchDouble = await renderLoaded(SCHEDULED_STUDENT, {
+      routes: { plan: () => new Promise<Response>(() => undefined) },
+    });
+
+    await userEvent.dblClick(
+      screen.getByRole("button", { name: "Cancel the change" }),
+    );
+
+    expect(countCalls(fetchDouble, PLAN_PATH)).toBe(1);
+  });
+
+  it("si Stripe no contesta, lo dice, no cambia nada y ofrece reintentar", async () => {
+    const fetchDouble = await renderLoaded(CHANGEABLE_FULL, {
+      routes: { plan: serviceUnavailable },
+    });
+
+    await userEvent.click(screen.getByRole("radio", { name: /^Student/ }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Confirm the change" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Stripe isn't responding, so nothing changed.",
+    );
+    expect(screen.queryByText(/Moves to/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(countCalls(fetchDouble, PLAN_PATH)).toBe(2);
+  });
+
+  it("si Stripe no contesta al anular, el cambio sigue y ofrece reintentar", async () => {
+    await renderLoaded(SCHEDULED_STUDENT, {
+      routes: { plan: serviceUnavailable },
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Cancel the change" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Stripe isn't responding, so nothing changed.",
+    );
+    expect(
+      screen.getByText("Moves to Student on 1 July 2026."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+  });
+
+  it("lo ofrece en español", async () => {
+    await renderLoaded(CHANGEABLE_FULL, { locale: "es" });
+
+    const group = planChangeGroup("Cambiar de plan");
+    expect(
+      // Intl separa el importe de la moneda con un espacio duro.
+      within(group).getByRole("radio", {
+        name: /^Student · 36,75\sAUD al mes$/,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(group).getByRole("radio", {
+        name: "Casual · Sin cobro recurrente",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Confirmar el cambio" }),
+    ).toBeDisabled();
+  });
+
+  it("dice el cambio programado y su anulación en español", async () => {
+    await renderLoaded(SCHEDULED_STUDENT, { locale: "es" });
+
+    expect(
+      screen.getByText("Pasa a Student el 1 de julio de 2026."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Anular el cambio" }),
+    ).toBeEnabled();
+  });
+
+  it("dice en español que Stripe no contesta", async () => {
+    await renderLoaded(SCHEDULED_STUDENT, {
+      locale: "es",
+      routes: { plan: serviceUnavailable },
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Anular el cambio" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Stripe no contesta, así que no cambió nada.",
     );
   });
 });
