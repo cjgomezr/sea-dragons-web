@@ -8,6 +8,7 @@ import {
   type ScheduledPlanChange,
   readMembership,
 } from "./membership";
+import { canChoosePlan } from "./choose-plan";
 import { canChangePlan } from "./plan-change";
 import type { ClubPriceKey, ClubPriceReader } from "./stripe-prices";
 
@@ -83,6 +84,12 @@ export type MembershipPanelView = {
   /** El precio mensual de Stripe de cada plan recurrente (#486), para que el
    * selector del cambio de plan los enseñe. Nulo el que no se pudo leer. */
   readonly planPrices: PlanPrices;
+  /** Si Pagos ofrece elegir plan antes del primer pago (#479, D8): la
+   * misma regla que `PUT /api/v1/membership/plan`. */
+  readonly canChoosePlan: boolean;
+  /** El precio de Stripe de una sesión Casual (#486), sólo para quien elige
+   * plan. Nulo si no se pudo leer o no se enseña. */
+  readonly casualSessionPriceCents: number | null;
 };
 
 export type PlanPrices = Readonly<Record<RecurringPlan, number | null>>;
@@ -123,15 +130,48 @@ async function readPlanPrices(
 const NO_PLAN_PRICES: PlanPrices = { Full: null, Student: null };
 
 /** Sin nada que enseñar no se pregunta a Stripe: un Casual no tiene cuota
- * mensual, y si además no se le ofrece cambiar de plan, ningún precio sale
- * en su Pagos (#486). */
+ * mensual, y si además no se le ofrece cambiar ni elegir plan, ningún precio
+ * sale en su Pagos (#486). */
 function showsPlanPrices(
   membership: Membership,
   paymentsConfigured: boolean,
 ): boolean {
   const hasMonthlyPrice =
     membership.plan !== null && membership.plan !== "Casual";
-  return hasMonthlyPrice || (paymentsConfigured && canChangePlan(membership));
+  return (
+    hasMonthlyPrice ||
+    canChoosePlan(membership) ||
+    (paymentsConfigured && canChangePlan(membership))
+  );
+}
+
+/** Los precios que enseña la membresía. La sesión Casual sólo sale en la
+ * elección de plan. */
+type ShownPrices = {
+  readonly planPrices: PlanPrices;
+  readonly casualSessionPriceCents: number | null;
+};
+
+async function readShownPrices(
+  membership: Membership,
+  context: {
+    readonly prices: MembershipViewGateways["prices"];
+    readonly paymentsConfigured: boolean;
+  },
+): Promise<ShownPrices> {
+  const [planPrices, casualSession] = await Promise.all([
+    showsPlanPrices(membership, context.paymentsConfigured)
+      ? readPlanPrices(context.prices)
+      : NO_PLAN_PRICES,
+    canChoosePlan(membership)
+      ? context.prices.readPrice("casualSession")
+      : null,
+  ]);
+  return {
+    planPrices,
+    casualSessionPriceCents:
+      casualSession === null ? null : casualSession.amountCents,
+  };
 }
 
 function monthlyPriceOf(
@@ -178,7 +218,7 @@ function toScheduledChangeView(
 function toPanelView(
   membership: Membership,
   paymentsConfigured: boolean,
-  planPrices: PlanPrices,
+  { planPrices, casualSessionPriceCents }: ShownPrices,
 ): MembershipPanelView {
   return {
     plan: membership.plan,
@@ -197,6 +237,8 @@ function toPanelView(
     scheduledChange: toScheduledChangeView(membership.scheduledChange),
     canChangePlan: paymentsConfigured && canChangePlan(membership),
     planPrices,
+    canChoosePlan: canChoosePlan(membership),
+    casualSessionPriceCents,
   };
 }
 
@@ -236,9 +278,10 @@ export async function readMembershipView(
         : toPanelView(
             reading.membership,
             input.paymentsConfigured,
-            showsPlanPrices(reading.membership, input.paymentsConfigured)
-              ? await readPlanPrices(gateways.prices)
-              : NO_PLAN_PRICES,
+            await readShownPrices(reading.membership, {
+              prices: gateways.prices,
+              paymentsConfigured: input.paymentsConfigured,
+            }),
           ),
     payments: newestFirst(payments),
   };

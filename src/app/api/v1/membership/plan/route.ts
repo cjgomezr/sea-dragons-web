@@ -1,9 +1,21 @@
 import { z } from "zod";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError, type ApiErrorCode } from "@/lib/api/response";
-import { identifyAccountCaller } from "@/lib/auth/account-api";
+import {
+  type AccountSession,
+  identifyAccountCaller,
+  openAccountSession,
+} from "@/lib/auth/account-api";
 import { MEMBERSHIP_TYPES } from "@/lib/auth/registration";
+import {
+  type PlanChoiceRefusal,
+  choosePlan,
+} from "@/lib/membership/choose-plan";
 import type { MembershipPlan } from "@/lib/membership/membership";
+import {
+  type MembershipView,
+  readMembershipView,
+} from "@/lib/membership/membership-view";
 import {
   type PlanChangeCancellationRefusal,
   type PlanChangeGateways,
@@ -14,8 +26,12 @@ import {
 import {
   createMemberEmailGateway,
   createMembershipGateway,
+  createPaymentHistoryGateway,
+  createPlanChoiceGateway,
   createScheduledPlanChangeGateway,
 } from "@/lib/membership/supabase-membership-gateways";
+import { createRouteClubPriceReader } from "@/lib/stripe/club-prices";
+import { isStripeConfigured } from "@/lib/stripe/stripe-client";
 import {
   asStripeUnavailable,
   resolveRoutePlanChangeStripe,
@@ -25,9 +41,10 @@ import { createServiceRoleClient } from "@/lib/supabase/service-client";
 /**
  * Cambiar de plan al siguiente ciclo (#456, RF-6 del PRD de E12, D5).
  * `POST` lo programa en Stripe para el fin del periodo, sin prorrateo, o lleva
- * a Checkout al Casual que elige Full o Student. `DELETE` lo anula. La
- * membresía guarda el cambio con la llave de servicio, porque `authenticated`
- * no escribe en `memberships`.
+ * a Checkout al Casual que elige Full o Student. `DELETE` lo anula. `PUT`
+ * guarda el plan que elige quien aún no ha pagado (#479, D8) y responde la
+ * membresía como `GET /api/v1/membership`. La membresía se escribe con la
+ * llave de servicio, porque `authenticated` no escribe en `memberships`.
  */
 
 // Cada petición pide algo a Stripe para quien llama.
@@ -50,10 +67,17 @@ const planBodySchema = z.object({ plan: z.enum(MEMBERSHIP_TYPES) }).strict();
 
 type PlanBody = z.infer<typeof planBodySchema>;
 
+/** El plan se comprueba en el handler para que el 400 diga su motivo. */
+const planChoiceBodySchema = z.object({ plan: z.string() }).strict();
+
+type PlanChoiceBody = z.infer<typeof planChoiceBodySchema>;
+
+export type MembershipPlanChoiceResponse = MembershipView;
+
 type Refusal = { readonly code: ApiErrorCode; readonly message: string };
 
 const REFUSALS: Record<
-  PlanChangeRefusal | PlanChangeCancellationRefusal,
+  PlanChangeRefusal | PlanChangeCancellationRefusal | PlanChoiceRefusal,
   Refusal
 > = {
   stripe_not_configured: {
@@ -81,6 +105,11 @@ const REFUSALS: Record<
   no_scheduled_change: {
     code: "conflict",
     message: "No hay ningún cambio de plan programado.",
+  },
+  no_membership: { code: "conflict", message: "No tienes membresía." },
+  membership_started: {
+    code: "conflict",
+    message: "Tu membresía ya está en marcha: cambia de plan en su lugar.",
   },
 };
 
@@ -142,7 +171,63 @@ const deletePlan = createApiRoute<MembershipPlanCancellationResponse>({
   },
 });
 
+function isMembershipPlan(plan: string): plan is MembershipPlan {
+  return MEMBERSHIP_TYPES.some((type) => type === plan);
+}
+
+function requireMembershipPlan(plan: string): MembershipPlan {
+  if (!isMembershipPlan(plan)) {
+    throw new ApiError(
+      "validation_error",
+      `El plan tiene que ser ${MEMBERSHIP_TYPES.join(", ")}.`,
+      "unknown_plan",
+    );
+  }
+  return plan;
+}
+
+/** Lo mismo que `GET /api/v1/membership`, con el cliente de la sesión. */
+function readCallerMembershipView(
+  session: AccountSession,
+  now: Date,
+): Promise<MembershipView> {
+  return readMembershipView(
+    {
+      membership: createMembershipGateway(session.client),
+      payments: createPaymentHistoryGateway(session.client),
+      prices: createRouteClubPriceReader(),
+    },
+    {
+      userId: session.userId,
+      now,
+      paymentsConfigured: isStripeConfigured(process.env),
+    },
+  );
+}
+
+const putPlan = createApiRoute<MembershipPlanChoiceResponse, PlanChoiceBody>({
+  schema: planChoiceBodySchema,
+  handler: async ({ request, body, decorateResponse }) => {
+    const session = await openAccountSession({ request, decorateResponse });
+    const plan = requireMembershipPlan(body.plan);
+    const serviceClient = createServiceRoleClient(process.env);
+    const now = new Date();
+    const outcome = await choosePlan(
+      {
+        membership: createMembershipGateway(serviceClient),
+        planChoices: createPlanChoiceGateway(serviceClient),
+      },
+      { userId: session.userId, plan, now },
+    );
+    if (outcome.kind === "refused") {
+      return refuse(outcome.reason);
+    }
+    return { data: await readCallerMembershipView(session, now) };
+  },
+});
+
 export const { GET, POST, PUT, PATCH, DELETE } = createApiModule({
   POST: postPlan,
+  PUT: putPlan,
   DELETE: deletePlan,
 });

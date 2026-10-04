@@ -15,6 +15,7 @@ import {
 } from "./membership";
 import type { StripeWebhookGateway } from "@/lib/stripe/stripe-webhook";
 import type { MemberEmailGateway } from "./checkout";
+import type { PlanChoiceGateway } from "./choose-plan";
 import type { ScheduledPlanChangeGateway } from "./plan-change";
 import type { SessionLedgerGateway, SessionMovement } from "./session-balance";
 import {
@@ -450,6 +451,39 @@ export function createStripeWebhookGateway(
         );
       }
       return z.enum(APPLY_STRIPE_EVENT_OUTCOMES).parse(data);
+    },
+  };
+}
+
+/** Los estados guardados en los que se puede elegir plan (#479): sin pagar
+ * todavía, o con una exención que ya venció. Una exención vigente que un
+ * Admin concede entre la lectura y la escritura no deja pasar el cambio. */
+function planChoiceStatusFilter(now: Date): string {
+  return `status.in.(pending,cancelled),and(status.eq.waived,waived_until.lte.${now.toISOString()})`;
+}
+
+/** Guarda el plan que el socio elige en Pagos antes de pagar (#479). La
+ * condición va en la misma escritura para que un webhook que llega entre
+ * la lectura y el `update` no deje cambiar el plan de una suscripción. */
+export function createPlanChoiceGateway(
+  serviceClient: SupabaseClient,
+): PlanChoiceGateway {
+  return {
+    async savePlanChoice(userId, plan) {
+      const now = new Date();
+      const { data, error } = await serviceClient
+        .from(MEMBERSHIPS_TABLE)
+        .update({ plan, updated_at: now.toISOString() })
+        .eq("user_id", userId)
+        .is("stripe_subscription_id", null)
+        .or(planChoiceStatusFilter(now))
+        .select("user_id");
+      if (error) {
+        throw new Error(
+          `No se pudo guardar el plan elegido por ${userId}: ${error.message}`,
+        );
+      }
+      return data.length > 0;
     },
   };
 }
