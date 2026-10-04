@@ -756,6 +756,13 @@ export const englishMessages = {
   "notifications.team_assigned.body": "{title}: {moment}",
   "notifications.team_unassigned.title": "You're no longer in a team",
   "notifications.team_unassigned.body": "{title}: {moment}",
+  // #470: siete días antes de cada renovación.
+  "notifications.membership_renewal_upcoming.title":
+    "Your membership renews soon",
+  "membership.renewal.charge":
+    "{amount} will be charged to your {card} on {date}.",
+  "membership.renewal.chargeWithoutCard": "{amount} will be charged on {date}.",
+  "membership.renewal.card": "{brand} ending in {last4}",
   "event.type.training": "Training",
   "event.type.competition": "Competition",
   "event.type.meeting": "Meeting",
@@ -1102,6 +1109,11 @@ export const englishMessages = {
     "If it expires, ask the club to resend your invitation.",
   "email.invitation.notYou":
     "If you weren't expecting this invitation, ignore this email: the account stays unused until it is activated.",
+  "email.renewal.subject": "Your {clubName} membership renews on {date}",
+  "email.renewal.changeBefore":
+    "To change your card or your plan, go to Payments before then.",
+  "email.renewal.button": "Go to Payments",
+  "email.renewal.linkLabel": "To see your payments, open this link",
   // La configuración del club (#296, RF-6 del PRD de E18a), sólo del Admin.
   "clubSettings.metaTitle": "Club settings · {club}",
   "clubSettings.metaDescription":

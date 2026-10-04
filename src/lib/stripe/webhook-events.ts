@@ -4,6 +4,7 @@ import {
   type MembershipCard,
   type MembershipPlan,
   type MembershipRecord,
+  type MembershipStatus,
   type UnwaivedStatus,
   resolveMembership,
 } from "@/lib/membership/membership";
@@ -77,18 +78,30 @@ export type SubscriptionChangedFacts = FactsOf<
   }
 >;
 
+/** Una cuota que Stripe va a cobrar (#470, RF-8 del PRD de E13, D3). No
+ * escribe nada en la membresía: sólo se avisa al socio. */
+export type RenewalUpcomingFacts = FactsOf<
+  "renewalUpcoming",
+  {
+    /** Centavos enteros, como los manda Stripe (CON-005). */
+    readonly amountCents: number;
+    readonly chargeAt: Date;
+  }
+>;
+
 export type StripeEventFacts =
   | { readonly kind: "ignored" }
   | CheckoutCompletedFacts
   | CardSetupCompletedFacts
   | SubscriptionChangedFacts
   | FactsOf<"subscriptionDeleted", Record<never, never>>
-  | FactsOf<"invoiceSettled", { readonly payment: StripePayment }>;
+  | FactsOf<"invoiceSettled", { readonly payment: StripePayment }>
+  | RenewalUpcomingFacts;
 
 /** Lo que el plan sabe escribir sin preguntarle nada más a Stripe. */
 export type PlannableStripeEventFacts = Exclude<
   StripeEventFacts,
-  { readonly kind: "ignored" } | CheckoutCompletedFacts
+  { readonly kind: "ignored" } | CheckoutCompletedFacts | RenewalUpcomingFacts
 >;
 
 /** La membresía tal como la ve el webhook: la fila y el `created` del último
@@ -321,20 +334,39 @@ function readInvoicePayment(
   };
 }
 
+function invoiceLookup(invoice: Stripe.Invoice): MembershipLookup {
+  const subscriptionDetails = invoice.parent?.subscription_details ?? null;
+  return {
+    userId: readMetadataUserId(subscriptionDetails?.metadata),
+    customerId: optionalIdOf(invoice.customer),
+    subscriptionId: optionalIdOf(subscriptionDetails?.subscription ?? null),
+  };
+}
+
 function readInvoiceFacts(
   invoice: Stripe.Invoice,
   input: { readonly created: Date; readonly status: StripePayment["status"] },
 ): StripeEventFacts {
-  const subscriptionDetails = invoice.parent?.subscription_details ?? null;
   return {
     kind: "invoiceSettled",
     created: input.created,
-    lookup: {
-      userId: readMetadataUserId(subscriptionDetails?.metadata),
-      customerId: optionalIdOf(invoice.customer),
-      subscriptionId: optionalIdOf(subscriptionDetails?.subscription ?? null),
-    },
+    lookup: invoiceLookup(invoice),
     payment: readInvoicePayment(invoice, input.status),
+  };
+}
+
+/** Una factura próxima todavía no existe: su `created` es cuándo nacerá, que
+ * es el día del cobro si Stripe aún no fijó el intento. */
+function readUpcomingRenewalFacts(
+  invoice: Stripe.Invoice,
+  created: Date,
+): RenewalUpcomingFacts {
+  return {
+    kind: "renewalUpcoming",
+    created,
+    lookup: invoiceLookup(invoice),
+    amountCents: invoice.amount_due,
+    chargeAt: fromStripeTime(invoice.next_payment_attempt ?? invoice.created),
   };
 }
 
@@ -358,6 +390,8 @@ export function readStripeEventFacts(event: Stripe.Event): StripeEventFacts {
       return readInvoiceFacts(event.data.object, { created, status: "paid" });
     case "invoice.payment_failed":
       return readInvoiceFacts(event.data.object, { created, status: "failed" });
+    case "invoice.upcoming":
+      return readUpcomingRenewalFacts(event.data.object, created);
     default:
       return { kind: "ignored" };
   }
@@ -512,4 +546,54 @@ export function planStripeEventWrites(input: PlanInput): StripeEventWrites {
     return { membership: null, payment, warnings: [] };
   }
   return { membership: change.changes, payment, warnings: change.warnings };
+}
+
+/** Lo que se cuenta de una renovación: a quién, cuánto, cuándo y con qué
+ * tarjeta. De la tarjeta, sólo lo que dice cuál es (NFR-006). */
+export type RenewalNotice = {
+  readonly userId: string;
+  readonly clubId: string;
+  /** Centavos enteros en AUD (CON-005). */
+  readonly amountCents: number;
+  readonly chargeAt: Date;
+  readonly card: Pick<MembershipCard, "brand" | "last4"> | null;
+};
+
+/** Las membresías que de verdad se van a cobrar. Una exención vigente no
+ * paga, y las demás no tienen una cuota en curso. */
+const RENEWING_STATUSES: ReadonlySet<MembershipStatus> = new Set([
+  "active",
+  "trialing",
+]);
+
+/** Ir a Casual (#456) es cancelar la suscripción al acabar el periodo: esa
+ * cuota no llega a cobrarse. */
+function isCancellingAtPeriodEnd(record: MembershipRecord): boolean {
+  return record.scheduledChange?.plan === "Casual";
+}
+
+/** `null` cuando no hay a quién avisar: la membresía no se renueva. */
+export function planRenewalNotice(input: {
+  readonly facts: RenewalUpcomingFacts;
+  readonly membership: StripeMembership;
+  readonly now: Date;
+}): RenewalNotice | null {
+  const { record } = input.membership;
+  const current = resolveMembership(record, input.now);
+  if (
+    !RENEWING_STATUSES.has(current.status) ||
+    isCancellingAtPeriodEnd(record)
+  ) {
+    return null;
+  }
+  return {
+    userId: record.userId,
+    clubId: record.clubId,
+    amountCents: input.facts.amountCents,
+    chargeAt: input.facts.chargeAt,
+    card:
+      record.card === null
+        ? null
+        : { brand: record.card.brand, last4: record.card.last4 },
+  };
 }

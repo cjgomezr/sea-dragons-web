@@ -4,6 +4,7 @@ import customerSubscriptionDeleted from "./customer-subscription-deleted.json";
 import customerSubscriptionUpdated from "./customer-subscription-updated.json";
 import invoicePaid from "./invoice-paid.json";
 import invoicePaymentFailed from "./invoice-payment-failed.json";
+import invoiceUpcoming from "./invoice-upcoming.json";
 
 /**
  * Eventos de ejemplo de Stripe (#452), con la forma de la versión de la API
@@ -26,6 +27,7 @@ const FIXTURES = {
   "customer.subscription.deleted": customerSubscriptionDeleted,
   "invoice.paid": invoicePaid,
   "invoice.payment_failed": invoicePaymentFailed,
+  "invoice.upcoming": invoiceUpcoming,
 } as const;
 
 export type FixtureEventType = keyof typeof FIXTURES;

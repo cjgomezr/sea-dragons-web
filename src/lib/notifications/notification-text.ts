@@ -5,6 +5,7 @@ import {
   CALENDAR_PATH,
   DIRECTORY_PATH,
   NEWS_POST_PATH,
+  PAYMENTS_PATH,
 } from "@/lib/auth/routes";
 import { ROLES } from "@/lib/auth/roles";
 import { EVENT_TYPES } from "@/lib/events/event-creation";
@@ -16,6 +17,7 @@ import {
   formatWeekdays,
 } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
+import { describeRenewalCharge } from "@/lib/membership/renewal-charge";
 import { NEWS_CATEGORIES } from "@/lib/news/news-posts";
 import type { NotificationType } from "./notify-member";
 
@@ -126,6 +128,14 @@ const teamUnassignedData = z.object({
 const teamAssignedData = teamUnassignedData.extend({
   teamName: z.string().min(1),
   teamColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+});
+
+const membershipRenewalUpcomingData = z.object({
+  amountCents: z.number().int().nonnegative(),
+  chargeOn: z.iso.date(),
+  card: z
+    .object({ brand: z.string().min(1), last4: z.string().regex(/^\d{4}$/) })
+    .nullable(),
 });
 
 /** Un `Record` sobre el catálogo: un tipo nuevo no compila hasta tener texto. */
@@ -328,6 +338,16 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         }),
       };
     },
+    membership_renewal_upcoming: (translate, data) => {
+      const parsed = membershipRenewalUpcomingData.safeParse(data);
+      if (!parsed.success) {
+        return null;
+      }
+      return {
+        title: translate("notifications.membership_renewal_upcoming.title"),
+        body: describeRenewalCharge(translate, parsed.data),
+      };
+    },
   };
 
 function isKnownType(type: string): type is NotificationType {
@@ -372,6 +392,11 @@ const DESTINATION_BY_TYPE: Readonly<Record<NotificationType, DestinationOf>> = {
     teamAssignedData.safeParse(data).success ? CALENDAR_PATH : null,
   team_unassigned: (data) =>
     teamUnassignedData.safeParse(data).success ? CALENDAR_PATH : null,
+  // #470: a Pagos, donde se cambia la tarjeta o el plan antes del cobro.
+  membership_renewal_upcoming: (data) =>
+    membershipRenewalUpcomingData.safeParse(data).success
+      ? PAYMENTS_PATH
+      : null,
 };
 
 /** `null` para un tipo que esta pantalla no reconoce, o para unos datos que

@@ -3,6 +3,8 @@ import { NextRequest } from "next/server";
 import Stripe from "stripe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STRIPE_WEBHOOK_API_PATH } from "@/lib/auth/routes";
+import type { NotificationWriter } from "@/lib/notifications/notify-member";
+import type { RenewalEmailGateway } from "@/lib/stripe/renewal-notice";
 import type { StripeWebhookGateway } from "@/lib/stripe/stripe-webhook";
 import type { StripeMembership } from "@/lib/stripe/webhook-events";
 import {
@@ -45,6 +47,8 @@ const readSessionState = vi.fn();
 const findMembership = vi.fn<StripeWebhookGateway["findMembership"]>();
 const applyEvent = vi.fn<StripeWebhookGateway["applyEvent"]>();
 const createServiceRoleClient = vi.fn();
+const insertNotification = vi.fn<NotificationWriter["insertNotification"]>();
+const sendRenewalEmail = vi.fn<RenewalEmailGateway["sendRenewalEmail"]>();
 
 vi.mock("@/lib/auth/session-reader", () => ({
   readSessionState: (...args: unknown[]) => readSessionState(...args),
@@ -58,6 +62,23 @@ vi.mock("@/lib/supabase/service-client", () => ({
 
 vi.mock("@/lib/membership/supabase-membership-gateways", () => ({
   createStripeWebhookGateway: () => ({ findMembership, applyEvent }),
+}));
+
+vi.mock("@/lib/notifications/supabase-notification-gateways", () => ({
+  createSupabaseNotificationWriter: (): NotificationWriter => ({
+    findRecipient: () =>
+      Promise.resolve({ clubId: CLUB_ID, accountStatus: "active" }),
+    insertNotification,
+    pruneNotifications: () =>
+      Promise.resolve({ deletedCount: 0, keptCount: 1 }),
+    runAfterResponse: () => undefined,
+  }),
+}));
+
+vi.mock("@/lib/stripe/supabase-renewal-email", () => ({
+  createSupabaseRenewalEmailGateway: (): RenewalEmailGateway => ({
+    sendRenewalEmail,
+  }),
 }));
 
 const { proxy } = await import("@/proxy");
@@ -106,6 +127,8 @@ beforeEach(() => {
   configureStripe();
   findMembership.mockResolvedValue(KNOWN_MEMBERSHIP);
   applyEvent.mockResolvedValue("applied");
+  insertNotification.mockResolvedValue(undefined);
+  sendRenewalEmail.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -212,6 +235,53 @@ describe("POST /api/v1/stripe/webhook", () => {
 
     expect(response.status).toBe(200);
     expect(readSessionState).not.toHaveBeenCalled();
+  });
+
+  describe("invoice.upcoming (#470)", () => {
+    beforeEach(() => {
+      findMembership.mockResolvedValue({
+        ...KNOWN_MEMBERSHIP,
+        record: {
+          ...KNOWN_MEMBERSHIP.record,
+          status: "active",
+          card: { brand: "visa", last4: "4242", expMonth: 12, expYear: 2030 },
+        },
+      });
+    });
+
+    it("crea un aviso en la campana y manda un correo", async () => {
+      const response = await signedPost(stripeEvent("invoice.upcoming"));
+
+      expect(response.status).toBe(200);
+      expect(insertNotification).toHaveBeenCalledTimes(1);
+      expect(insertNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "membership_renewal_upcoming",
+          userId: FIXTURE_USER_ID,
+        }),
+      );
+      expect(sendRenewalEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it("repetido, responde 200 sin aviso ni correo", async () => {
+      applyEvent.mockResolvedValue("duplicate");
+
+      const response = await signedPost(stripeEvent("invoice.upcoming"));
+
+      expect(response.status).toBe(200);
+      expect(insertNotification).not.toHaveBeenCalled();
+      expect(sendRenewalEmail).not.toHaveBeenCalled();
+    });
+
+    it("responde 200 aunque el correo no salga", async () => {
+      vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      sendRenewalEmail.mockRejectedValue(new Error("Resend no contesta"));
+
+      const response = await signedPost(stripeEvent("invoice.upcoming"));
+
+      expect(response.status).toBe(200);
+      expect(insertNotification).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("responde 405 a un GET", async () => {

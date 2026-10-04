@@ -1,13 +1,16 @@
 import type Stripe from "stripe";
 import type { MembershipCard } from "@/lib/membership/membership";
+import type { RenewalNoticeSender } from "./renewal-notice";
 import {
   type CardSetupCompletedFacts,
   type MembershipLookup,
   type PlannableStripeEventFacts,
+  type RenewalUpcomingFacts,
   type StripeEventFacts,
   type StripeEventWrites,
   type StripeMembership,
   type StripePrices,
+  planRenewalNotice,
   planStripeEventWrites,
   readStripeEventFacts,
   subscriptionFactsFromCheckout,
@@ -65,6 +68,9 @@ export type StripeApi = {
 export type StripeWebhookDependencies = {
   readonly gateway: StripeWebhookGateway;
   readonly stripe: StripeApi;
+  /** El aviso de renovación (#470). No lanza: un correo que no sale no puede
+   * hacer que Stripe reintente un evento ya apuntado. */
+  readonly renewalNotices: RenewalNoticeSender;
   readonly prices: StripePrices;
   readonly now: Date;
   readonly log: (line: string) => void;
@@ -115,7 +121,7 @@ async function resolveCard(
 
 /** Un Checkout sólo nombra la suscripción: se le pide entera a Stripe. */
 async function toPlannableFacts(
-  facts: Exclude<StripeEventFacts, { kind: "ignored" }>,
+  facts: Exclude<StripeEventFacts, { kind: "ignored" } | RenewalUpcomingFacts>,
   stripe: StripeApi,
 ): Promise<PlannableStripeEventFacts> {
   if (facts.kind !== "checkoutCompleted") {
@@ -147,6 +153,10 @@ export async function handleStripeEvent(
     return "unknown_member";
   }
 
+  if (facts.kind === "renewalUpcoming") {
+    return handleUpcomingRenewal({ event, facts, membership }, dependencies);
+  }
+
   const plannable = await toPlannableFacts(facts, dependencies.stripe);
   const writes = planStripeEventWrites({
     facts: plannable,
@@ -165,4 +175,41 @@ export async function handleStripeEvent(
     owner: { userId, clubId },
     writes,
   });
+}
+
+const NO_WRITES: StripeEventWrites = {
+  membership: null,
+  payment: null,
+  warnings: [],
+};
+
+/** El evento se apunta sin escribir nada más, y sólo se avisa si entró por
+ * primera vez: un repetido no manda un segundo aviso ni un segundo correo.
+ * Una membresía que no se renueva no se apunta: no hay nada que repetir. */
+async function handleUpcomingRenewal(
+  input: {
+    readonly event: Stripe.Event;
+    readonly facts: RenewalUpcomingFacts;
+    readonly membership: StripeMembership;
+  },
+  dependencies: StripeWebhookDependencies,
+): Promise<StripeWebhookOutcome> {
+  const { event, facts, membership } = input;
+  const notice = planRenewalNotice({
+    facts,
+    membership,
+    now: dependencies.now,
+  });
+  if (notice === null) {
+    return "ignored";
+  }
+  const outcome = await dependencies.gateway.applyEvent({
+    event: { id: event.id, type: event.type, created: facts.created },
+    owner: { userId: notice.userId, clubId: notice.clubId },
+    writes: NO_WRITES,
+  });
+  if (outcome === "applied") {
+    await dependencies.renewalNotices.notifyUpcomingRenewal(notice);
+  }
+  return outcome;
 }

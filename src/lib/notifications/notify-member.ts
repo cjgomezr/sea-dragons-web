@@ -3,6 +3,7 @@ import type { RequestableRole } from "@/lib/auth/role-request";
 import type { Role } from "@/lib/auth/roles";
 import type { EventType } from "@/lib/events/event-creation";
 import type { IsoWeekday } from "@/lib/events/event-occurrences";
+import type { RenewalCharge } from "@/lib/membership/renewal-charge";
 import type { NewsCategory } from "@/lib/news/news-posts";
 
 /**
@@ -37,6 +38,7 @@ export const NOTIFICATION_TYPES = [
   "event_series_cancelled",
   "team_assigned",
   "team_unassigned",
+  "membership_renewal_upcoming",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -128,6 +130,8 @@ type NotificationDataByType = DataForEveryType<{
     readonly startsOn: string;
     readonly startTime: string;
   };
+  /** #470. Siete días antes de cada renovación, con lo que se va a cobrar. */
+  readonly membership_renewal_upcoming: RenewalCharge;
 }>;
 
 /** Un tipo con sus datos. Al ser una unión discriminada, quien avisa no puede
