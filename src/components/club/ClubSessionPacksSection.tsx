@@ -430,7 +430,7 @@ function SessionPacksEditorView({
   return (
     <div className="club-session-packs" ref={editorRef}>
       <ol
-        className="groups-list club-positions-list"
+        className="groups-items"
         aria-label={translate("clubSettings.sessionPacks.title")}
       >
         {packs.sizes.map((sessions, index) => (

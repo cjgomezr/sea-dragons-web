@@ -7181,6 +7181,48 @@ function signInTextsSection(page: Page): Locator {
   });
 }
 
+const CLUB_SESSION_PACKS_ENDPOINT = "/api/v1/club/session-packs";
+
+/** Lo que diría Stripe de una sesión Casual (#469): el precio de verdad lo
+ * pone Stripe, y fingirlo deja la captura igual pase lo que pase allí. */
+const STUBBED_SESSION_PRICE = { amountCents: 1500, currency: "AUD" } as const;
+
+/** Los packs de inicio y uno grande, para ver un precio de cuatro cifras. */
+const STUBBED_SESSION_PACKS: readonly number[] = [5, 10, 50];
+
+async function stubSessionPacks(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname === CLUB_SESSION_PACKS_ENDPOINT,
+    async (route, request) => {
+      if (request.method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            data: {
+              packs: STUBBED_SESSION_PACKS.map((sessions) => ({
+                sessions,
+                price: {
+                  ...STUBBED_SESSION_PRICE,
+                  amountCents: STUBBED_SESSION_PRICE.amountCents * sessions,
+                },
+              })),
+              sessionPrice: STUBBED_SESSION_PRICE,
+            },
+          }),
+        });
+      }
+      // PUT: sin respuesta, la sección se queda guardando.
+    },
+  );
+}
+
+function sessionPacksSection(page: Page): Locator {
+  return page.getByRole("region", {
+    name: /^(Session packs|Packs de sesiones)$/,
+  });
+}
+
 /** Un lema de 141 caracteres: la pantalla lo rechaza junto al campo sin
  * mandar nada. */
 function writeTooLongTagline(labels: {
@@ -7303,6 +7345,7 @@ async function goToClubSettings(
     create: state.createPosition ?? "hangs",
   });
   await stubSignInTexts(page, state.signInTexts ?? NO_STUBBED_SIGN_IN_TEXTS);
+  await stubSessionPacks(page);
   await state.beforeVisit?.(page);
   if (theme === undefined) {
     await page.goto(`${APP_URL}${CLUB_SETTINGS_SCREEN_PATH}`);
@@ -7310,6 +7353,11 @@ async function goToClubSettings(
     await goToWithTheme(page, CLUB_SETTINGS_SCREEN_PATH, theme);
   }
   await expect(clubNameField(page)).toHaveValue(STUBBED_CLUB_SETTINGS.name);
+  // La última sección en cargar (#469): sin esperarla, la captura de la
+  // pantalla entera podría salir con su "Cargando".
+  await expect(
+    sessionPacksSection(page).getByRole("list").first(),
+  ).toBeVisible();
   await state.prepare?.(page);
   // El puntero se queda sobre el botón pulsado: la captura saldría con su
   // hover.
@@ -7538,6 +7586,60 @@ for (const state of CLUB_SIGN_IN_TEXTS_STATES) {
 
     test("has no accessibility violations (axe-core)", async ({ page }) => {
       await goToSignInTextsSection(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+const CLUB_SESSION_PACKS_STATES: readonly ClubSettingsState[] = [
+  { name: "club-packs" },
+  { name: "club-packs-es", beforeVisit: chooseSpanish },
+];
+
+/* #469: como las posiciones, la sección se fotografía sola, sin la barra de
+   pestañas del móvil encima. `goToClubSettings` ya esperó a su lista. */
+for (const state of CLUB_SESSION_PACKS_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToClubSettings(page, state, theme);
+              const section = sessionPacksSection(page);
+              await page.addStyleTag({ content: HIDDEN_TAB_BAR_STYLE });
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                section.screenshot(SCREENSHOT_OPTIONS),
+              );
+              await expect(section).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToClubSettings(page, state);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToClubSettings(page, state);
       await expectNoAxeViolations(page);
     });
   });
@@ -8305,6 +8407,7 @@ async function goToClubSettingsWithLogo(
 ): Promise<void> {
   await serveClubLogos(page);
   await stubClubSettings(page);
+  await stubSessionPacks(page);
   // Registrada después, gana a la de `stubClubSettings`.
   await page.route(
     (url) => url.pathname === CLUB_SETTINGS_ENDPOINT,
