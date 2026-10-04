@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  type RunResult,
   type TemporaryDatabase,
   applyRepositoryMigrations,
   databaseBeforeMigration,
@@ -66,7 +67,7 @@ function insertPack(
     readonly sessions: number;
     readonly position: number;
   },
-): Promise<{ readonly code: number; readonly stderr: string }> {
+): Promise<RunResult> {
   return database.attempt(
     `insert into public.club_session_pack_options (club_id, sessions, position)
      values ('${pack.clubId}', ${pack.sessions}, ${pack.position})`,
@@ -77,7 +78,7 @@ function replacePacks(
   database: TemporaryDatabase,
   clubId: string,
   sessions: string,
-): Promise<{ readonly code: number; readonly stderr: string }> {
+): Promise<RunResult> {
   return database.attempt(
     `select public.replace_club_session_pack_options(
        '${clubId}', array[${sessions}]::integer[])`,
