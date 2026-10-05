@@ -3869,6 +3869,53 @@ const LISTING_MEMBER_VIEWS = {
   }),
 } as const;
 
+/** Los filtros de #497 que el servidor deja usar a cada vista. */
+const STUBBED_AVAILABLE_FILTERS = {
+  admin: ["position", "group", "auf", "membership"],
+  coach: ["position", "group"],
+  member: ["position"],
+} as const;
+
+/** Las opciones de los filtros: las posiciones del club y sus grupos, fijas
+ * para que la captura no dependa de lo que otro test haya sembrado. */
+const CLUB_POSITIONS_ENDPOINT = "/api/v1/club/positions";
+const DIRECTORY_GROUPS_ENDPOINT = "/api/v1/groups";
+const STUBBED_DIRECTORY_GROUPS = [
+  {
+    id: "77777777-0000-4000-8000-000000000001",
+    name: "Senior Squad",
+    memberCount: 3,
+  },
+  {
+    id: "77777777-0000-4000-8000-000000000002",
+    name: "Junior Squad",
+    memberCount: 1,
+  },
+] as const;
+
+async function stubFilterChoices(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname === CLUB_POSITIONS_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: { positions: Object.values(STUBBED_POSITIONS) },
+        }),
+      }),
+  );
+  await page.route(
+    (url) => url.pathname === DIRECTORY_GROUPS_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { groups: STUBBED_DIRECTORY_GROUPS } }),
+      }),
+  );
+}
+
 /** El porcentaje por el que se ordena, o null para quien no tiene datos. */
 function stubbedPercent(member: StubbedMember): number | null {
   return member.attendance.kind === "rate" ? member.attendance.percent : null;
@@ -3908,10 +3955,16 @@ function stubbedListing(
   const search = searchParams.get("q");
   const role = searchParams.get("role");
   const includeInactive = searchParams.get("includeInactive") === "true";
+  const position = searchParams.get("position");
+  // Nadie de la lista fija está en un grupo: filtrar por uno es la manera de
+  // llegar a "sin resultados" desde los filtros de #497.
+  const isGroupFiltered = searchParams.has("group");
   const members = options.members.filter(
     (member) =>
+      !isGroupFiltered &&
       (role === null || member.role === role) &&
       (includeInactive || member.status !== "inactive") &&
+      (position === null || (member.position?.id ?? "none") === position) &&
       (search === null ||
         normalizeName(member.fullName).includes(normalizeName(search))),
   );
@@ -3924,7 +3977,11 @@ function stubbedListing(
       ? { ...member, photoUrl: STUBBED_PHOTO_URL }
       : member,
   );
-  return { kind, members: listed.map(LISTING_MEMBER_VIEWS[kind]) };
+  return {
+    kind,
+    members: listed.map(LISTING_MEMBER_VIEWS[kind]),
+    availableFilters: STUBBED_AVAILABLE_FILTERS[kind],
+  };
 }
 
 const MEMBERS_ENDPOINT = "/api/v1/members";
@@ -4003,6 +4060,7 @@ async function stubDirectoryReads(
   if (withPhoto) {
     await stubDirectoryPhoto(page);
   }
+  await stubFilterChoices(page);
   await page.route(
     (url) => url.pathname === DIRECTORY_ENDPOINT,
     (route, request) =>
@@ -4222,6 +4280,110 @@ function openLargePhoto(shape: LargePhotoShape | "failed") {
   };
 }
 
+/* Los filtros de #497. En escritorio están en la barra sobre la tabla; por
+   debajo de 768px, detrás del botón "Filtros", en una hoja que sube desde
+   abajo. */
+
+type FilterLabels = {
+  readonly toggle: string;
+  readonly sheet: string;
+  readonly apply: string;
+  readonly bar: string;
+  readonly position: string;
+  readonly forward: string;
+  readonly auf: string;
+  readonly expired: string;
+  readonly group: string;
+  readonly senior: string;
+};
+
+const ENGLISH_FILTER_LABELS: FilterLabels = {
+  toggle: "Filters",
+  sheet: "Filters",
+  apply: "Show results",
+  bar: "More filters",
+  position: "Position",
+  forward: "Forward",
+  auf: "AUF",
+  expired: "Expired",
+  group: "Group",
+  senior: "Senior Squad",
+};
+
+const SPANISH_FILTER_LABELS: FilterLabels = {
+  toggle: "Filtros",
+  sheet: "Filtros",
+  apply: "Ver resultados",
+  bar: "Más filtros",
+  position: "Posición",
+  forward: "Ataque",
+  auf: "AUF",
+  expired: "Vencido",
+  group: "Grupo",
+  senior: "Senior Squad",
+};
+
+function filterToggle(page: Page, labels: FilterLabels): Locator {
+  return page.getByRole("button", {
+    name: new RegExp(`^${labels.toggle}`),
+  });
+}
+
+/** Donde están los filtros en este ancho: la barra, o la hoja ya abierta. */
+async function filterContainer(
+  page: Page,
+  labels: FilterLabels,
+): Promise<Locator> {
+  const toggle = filterToggle(page, labels);
+  if (!(await toggle.isVisible())) {
+    return page.getByRole("group", { name: labels.bar });
+  }
+  await toggle.click();
+  const sheet = page.getByRole("dialog", { name: labels.sheet });
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+
+/** Elige una posición y el AUF vencido. Con `keepSheetOpen`, en el móvil la
+ * hoja se queda abierta para la captura; si no, se cierra y el botón dice
+ * cuántos filtros hay activos. */
+function chooseFilters(labels: FilterLabels, keepSheetOpen: boolean) {
+  return async (page: Page): Promise<void> => {
+    const container = await filterContainer(page, labels);
+    await container
+      .getByRole("combobox", { name: labels.position })
+      .selectOption({ label: labels.forward });
+    await container
+      .getByRole("combobox", { name: labels.auf })
+      .selectOption({ label: labels.expired });
+    await expect(page.getByRole("row", { name: "Ana Admin" })).toHaveCount(0);
+    await expect(
+      page.getByRole("row", { name: "Mateo Restrepo" }),
+    ).toBeVisible();
+    const sheet = page.getByRole("dialog", { name: labels.sheet });
+    if (!keepSheetOpen && (await sheet.isVisible())) {
+      await sheet.getByRole("button", { name: labels.apply }).click();
+      await expect(sheet).toHaveCount(0);
+    }
+  };
+}
+
+/** Un grupo en el que no está nadie de la lista: el estado vacío con el
+ * botón de quitar los filtros. */
+function filterToNobody(labels: FilterLabels, emptyText: RegExp) {
+  return async (page: Page): Promise<void> => {
+    const container = await filterContainer(page, labels);
+    await container
+      .getByRole("combobox", { name: labels.group })
+      .selectOption({ label: labels.senior });
+    const sheet = page.getByRole("dialog", { name: labels.sheet });
+    if (await sheet.isVisible()) {
+      await sheet.getByRole("button", { name: labels.apply }).click();
+    }
+    await expect(page.getByText(emptyText)).toBeVisible();
+  };
+}
+
 type DirectoryState = {
   readonly name: string;
   /** Un Admin recibe la lista marcada como suya, y con ella el control de los
@@ -4387,6 +4549,47 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     listHeading: ENGLISH_DIRECTORY_HEADING,
     prepare: refuseLastAdminChange,
   },
+  {
+    name: "directorio-filtros-abiertos",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: chooseFilters(ENGLISH_FILTER_LABELS, false),
+  },
+  {
+    name: "directorio-filtros-abiertos-es",
+    asAdmin: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: chooseFilters(SPANISH_FILTER_LABELS, false),
+  },
+  {
+    name: "directorio-filtros-movil",
+    asAdmin: true,
+    endsInModal: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: chooseFilters(ENGLISH_FILTER_LABELS, true),
+  },
+  {
+    name: "directorio-filtros-movil-es",
+    asAdmin: true,
+    endsInModal: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: chooseFilters(SPANISH_FILTER_LABELS, true),
+  },
+  {
+    name: "directorio-filtrado-sin-resultados",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: filterToNobody(ENGLISH_FILTER_LABELS, /No member matches/),
+  },
+  {
+    name: "directorio-filtrado-sin-resultados-es",
+    asAdmin: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: filterToNobody(SPANISH_FILTER_LABELS, /Nadie del club coincide/),
+  },
 ];
 
 async function goToDirectory(
@@ -4484,6 +4687,84 @@ test.describe("la asistencia en la lista de tarjetas", () => {
         .getByRole("cell")
         .last(),
     ).toHaveAccessibleName(/^Attendance\s*No data$/);
+  });
+});
+
+/* La hoja de filtros del móvil (#497) con el teclado: el foco entra al
+   abrirla, no sale mientras está abierta, y Escape la cierra devolviéndolo al
+   botón. Y cada control mide al menos 44 px. */
+test.describe("la hoja de filtros del directorio en el móvil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 375, height: 812 },
+  });
+
+  const state: DirectoryState = {
+    name: "directorio-filtros-movil",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+  };
+
+  test("se recorre con el teclado y Escape devuelve el foco al botón", async ({
+    page,
+  }) => {
+    await goToDirectory(page, state);
+    const toggle = filterToggle(page, ENGLISH_FILTER_LABELS);
+    await expect(
+      page.getByRole("group", { name: ENGLISH_FILTER_LABELS.bar }),
+    ).toBeHidden();
+
+    await toggle.focus();
+    await page.keyboard.press("Enter");
+
+    const sheet = page.getByRole("dialog", { name: "Filters" });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByRole("combobox").first()).toBeFocused();
+    for (let step = 0; step < 8; step += 1) {
+      await page.keyboard.press("Tab");
+      expect(
+        await sheet.evaluate((element) =>
+          element.contains(document.activeElement),
+        ),
+      ).toBe(true);
+    }
+
+    await page.keyboard.press("Escape");
+
+    await expect(sheet).toHaveCount(0);
+    await expect(toggle).toBeFocused();
+  });
+
+  test("el botón y cada control de la hoja miden al menos 44 px", async ({
+    page,
+  }) => {
+    await goToDirectory(page, state);
+    const toggle = filterToggle(page, ENGLISH_FILTER_LABELS);
+    expect((await toggle.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+
+    await toggle.click();
+
+    const sheet = page.getByRole("dialog", { name: "Filters" });
+    const controls = sheet.locator("select, button");
+    await expect(controls).toHaveCount(5);
+    for (const control of await controls.all()) {
+      expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test("los filtros elegidos siguen ahí al recargar", async ({ page }) => {
+    await goToDirectory(page, state);
+    await chooseFilters(ENGLISH_FILTER_LABELS, false)(page);
+    await expect(page).toHaveURL(/auf=expired/);
+
+    await page.reload();
+
+    await expect(
+      page.getByRole("button", { name: "Filters: 2 active" }),
+    ).toBeVisible();
+    await expect(page.getByRole("row", { name: "Ana Admin" })).toHaveCount(0);
   });
 });
 

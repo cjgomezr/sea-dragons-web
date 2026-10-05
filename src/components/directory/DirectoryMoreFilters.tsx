@@ -265,6 +265,35 @@ function FilterFields(props: FieldsProps): React.JSX.Element {
   );
 }
 
+const FOCUSABLE_SELECTOR = "select, button";
+
+function focusableIn(panel: HTMLElement | null): readonly HTMLElement[] {
+  return panel === null
+    ? []
+    : [...panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)];
+}
+
+/** Tab desde el último control vuelve al primero, y Mayúsculas+Tab desde el
+ * primero va al último. El `<dialog>` modal deja inerte la página, pero no
+ * impide que el foco salga a la barra del navegador. */
+function cycleFocus(
+  event: React.KeyboardEvent,
+  panel: HTMLElement | null,
+): void {
+  if (event.key !== "Tab") {
+    return;
+  }
+  const focusable = focusableIn(panel);
+  const first = focusable.at(0);
+  const last = focusable.at(-1);
+  const edge = event.shiftKey ? first : last;
+  if (edge === undefined || document.activeElement !== edge) {
+    return;
+  }
+  event.preventDefault();
+  (event.shiftKey ? last : first)?.focus();
+}
+
 /** La hoja del móvil: un `<dialog>` modal, como el visor de la foto (#355),
  * con lo que comparte con él por `useDismissal`. Cerrarla devuelve el foco
  * al botón que la abrió. */
@@ -282,7 +311,7 @@ function FilterSheet({
   const panelRef = useRef<HTMLDivElement>(null);
 
   const focusFirstField = useCallback(() => {
-    panelRef.current?.querySelector<HTMLElement>("select, button")?.focus();
+    focusableIn(panelRef.current).at(0)?.focus();
   }, []);
 
   useEffect(() => {
@@ -317,6 +346,7 @@ function FilterSheet({
       className="directory-sheet"
       aria-labelledby={titleId}
       onClose={onClosed}
+      onKeyDown={(event) => cycleFocus(event, panelRef.current)}
     >
       <div ref={panelRef} className="directory-sheet-panel">
         <h2 id={titleId} className="directory-sheet-title">
