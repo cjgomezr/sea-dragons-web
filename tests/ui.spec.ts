@@ -2574,6 +2574,20 @@ async function chooseTooLargePhoto(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+/** Escribe sólo el nombre del contacto de emergencia y guarda: el
+ * formulario lo para y avisa junto a los dos datos que faltan (#496). No
+ * llega al servidor, así que no cambia al socio compartido. */
+async function saveHalfEmergencyContact(page: Page): Promise<void> {
+  await page
+    .getByLabel(/^(Contact name|Nombre del contacto)$/)
+    .fill("Lucía Ruiz");
+  await page.getByRole("button", { name: SAVE_PROFILE_BUTTON }).click();
+  await expect(page.getByLabel(/^(Relationship|Relación)$/)).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+}
+
 async function failProfileSaveOnNetwork(page: Page): Promise<void> {
   await page.route(`**${ACCOUNT_PROFILE_ENDPOINT}`, (route) =>
     route.abort("internetdisconnected"),
@@ -2695,6 +2709,39 @@ const ACCOUNT_STATES: readonly AccountState[] = [
   {
     name: "perfil-posicion-retirada-es",
     storageState: roleRequestStorageStatePath("perfil-posicion-retirada"),
+    beforeVisit: chooseSpanish,
+  },
+  // El teléfono y el contacto de emergencia (#496). Vacío es ya
+  // `perfil-completo`, que no tiene ninguno; éstos son el contacto guardado
+  // (con el aviso de que el teléfono es el propio), el contacto a medias que
+  // el formulario no deja enviar, y la menor a la que se le propone su tutor.
+  {
+    name: "perfil-contacto-completo",
+    storageState: roleRequestStorageStatePath("perfil-contacto-completo"),
+  },
+  {
+    name: "perfil-contacto-completo-es",
+    storageState: roleRequestStorageStatePath("perfil-contacto-completo"),
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "perfil-contacto-errores",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    prepare: saveHalfEmergencyContact,
+  },
+  {
+    name: "perfil-contacto-errores-es",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    beforeVisit: chooseSpanish,
+    prepare: saveHalfEmergencyContact,
+  },
+  {
+    name: "perfil-contacto-menor",
+    storageState: roleRequestStorageStatePath("perfil-contacto-menor"),
+  },
+  {
+    name: "perfil-contacto-menor-es",
+    storageState: roleRequestStorageStatePath("perfil-contacto-menor"),
     beforeVisit: chooseSpanish,
   },
 ];
