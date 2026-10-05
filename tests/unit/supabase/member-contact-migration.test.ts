@@ -7,7 +7,7 @@ import {
 } from "../../support/postgres";
 
 /**
- * `0057_member_contact.sql` contra un Postgres desechable (#496, RF-1 del PRD
+ * `0058_member_contact.sql` contra un Postgres desechable (#496, RF-1 del PRD
  * de E19). El teléfono propio y el contacto de emergencia son opcionales, y
  * el contacto va entero o no va: la base lo cierra aunque alguien escriba la
  * fila sin pasar por la API.

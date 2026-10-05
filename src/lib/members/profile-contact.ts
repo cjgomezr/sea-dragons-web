@@ -9,7 +9,7 @@
  * emergencia va entero o no va: un nombre sin teléfono no sirve a quien
  * tenga que llamar.
  *
- * `0057_member_contact.sql` cierra las mismas reglas en la base.
+ * `0058_member_contact.sql` cierra las mismas reglas en la base.
  */
 
 export const PHONE_MIN_DIGITS = 8;
