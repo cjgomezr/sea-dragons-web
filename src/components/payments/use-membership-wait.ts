@@ -22,6 +22,8 @@ const POLL_TIMEOUT_MS = 30_000;
  * que había al volver). */
 export type WaitTarget =
   | { readonly kind: "subscription" }
+  /** El pack de un Casual pendiente (#471): deja de estar pendiente. */
+  | { readonly kind: "pack" }
   | { readonly kind: "card"; readonly previousCard: MembershipCard | null };
 
 export type Waiting =
@@ -34,6 +36,7 @@ export const NOT_WAITING: Waiting = { kind: "none" };
 export type StripeReturns = {
   readonly checkoutReturn: CheckoutReturn | null;
   readonly cardReturn: CheckoutReturn | null;
+  readonly packReturn: CheckoutReturn | null;
 };
 
 /** Quien vuelve de Checkout sin suscripción todavía: el alta (#454) o la
@@ -62,6 +65,8 @@ function hasSettled(target: WaitTarget, view: MembershipView): boolean {
   switch (target.kind) {
     case "subscription":
       return !isAwaitingSubscription(view);
+    case "pack":
+      return view.membership?.status !== "pending";
     case "card":
       return !isSameCard(target.previousCard, view.membership?.card ?? null);
   }
@@ -77,6 +82,11 @@ export function initialWaiting(
 ): Waiting {
   if (returns.checkoutReturn === "ok" && isAwaitingSubscription(view)) {
     return { kind: "polling", target: { kind: "subscription" } };
+  }
+  // Quien ya estaba al día no tiene nada que esperar: el saldo no se enseña
+  // todavía, así que la pantalla sólo dice que se sumará.
+  if (returns.packReturn === "ok" && view.membership?.status === "pending") {
+    return { kind: "polling", target: { kind: "pack" } };
   }
   if (returns.cardReturn === "ok") {
     return {

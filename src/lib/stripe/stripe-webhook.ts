@@ -6,6 +6,8 @@ import {
   type MembershipLookup,
   type PlannableStripeEventFacts,
   type RenewalUpcomingFacts,
+  type SessionPackPaidFacts,
+  type SessionPackPayment,
   type StripeEventFacts,
   type StripeEventWrites,
   type StripeMembership,
@@ -41,6 +43,20 @@ export type StripeWebhookGateway = {
   /** Todo o nada: el id del evento, la membresía y el pago. `duplicate` si
    * el id ya estaba, sin escribir nada más. */
   applyEvent(input: StripeEventToApply): Promise<"applied" | "duplicate">;
+  /** Todo o nada, como `applyEvent`: el id del evento, el pago y el crédito
+   * del pack. El estado del Casual lo recalcula la base al sumar. */
+  applySessionPackPayment(
+    input: SessionPackPaymentToApply,
+  ): Promise<"applied" | "duplicate">;
+};
+
+/** Un pack pagado (#471): el pago y las sesiones que suma al libro. */
+export type SessionPackPaymentToApply = Pick<
+  StripeEventToApply,
+  "event" | "owner"
+> & {
+  readonly sessions: number;
+  readonly payment: SessionPackPayment;
 };
 
 /** La tarjeta que guardó un SetupIntent, con el id de su método de pago. */
@@ -121,7 +137,10 @@ async function resolveCard(
 
 /** Un Checkout sólo nombra la suscripción: se le pide entera a Stripe. */
 async function toPlannableFacts(
-  facts: Exclude<StripeEventFacts, { kind: "ignored" } | RenewalUpcomingFacts>,
+  facts: Exclude<
+    StripeEventFacts,
+    { kind: "ignored" } | RenewalUpcomingFacts | SessionPackPaidFacts
+  >,
   stripe: StripeApi,
 ): Promise<PlannableStripeEventFacts> {
   if (facts.kind !== "checkoutCompleted") {
@@ -155,6 +174,15 @@ export async function handleStripeEvent(
 
   if (facts.kind === "renewalUpcoming") {
     return handleUpcomingRenewal({ event, facts, membership }, dependencies);
+  }
+  if (facts.kind === "sessionPackPaid") {
+    const { userId, clubId } = membership.record;
+    return gateway.applySessionPackPayment({
+      event: { id: event.id, type: event.type, created: facts.created },
+      owner: { userId, clubId },
+      sessions: facts.sessions,
+      payment: facts.payment,
+    });
   }
 
   const plannable = await toPlannableFacts(facts, dependencies.stripe);

@@ -117,7 +117,7 @@ export function buildPaymentsReturnUrl(
 
 /** El cliente que ya tiene en Stripe, o su correo para que Checkout lo cree.
  * Stripe no acepta los dos a la vez. */
-async function buildCustomerParams(
+export async function buildCustomerParams(
   membership: Membership,
   memberEmails: MemberEmailGateway,
 ): Promise<

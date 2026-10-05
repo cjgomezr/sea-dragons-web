@@ -296,14 +296,15 @@ function PendingOffer({
   if (isWaitingForSubscription(waiting)) {
     return <SubscriptionWaitStatus translate={translate} waiting={waiting} />;
   }
-  if (membership.plan === "Casual") {
-    return <p>{translate("payments.offer.casual")}</p>;
-  }
-  if (!isRecurringPlan(membership.plan)) {
+  if (membership.plan === null) {
     return null;
   }
   if (!view.paymentsConfigured) {
     return <p>{translate("payments.offer.notConfigured")}</p>;
+  }
+  // Un Casual se pone al día con un pack: Pagos le ofrece los suyos aparte.
+  if (!isRecurringPlan(membership.plan)) {
+    return null;
   }
   return (
     <div className="payments-offer">

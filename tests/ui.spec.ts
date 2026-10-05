@@ -11347,6 +11347,23 @@ const CHOOSE_CASUAL_MEMBERSHIP_VIEW = membershipView(
   [],
 );
 
+// Los packs de un Casual (#471): uno pendiente que se pone al día comprando
+// un pack. Vino de Full, así que no elige plan otra vez.
+const CASUAL_PACKS_MEMBERSHIP_VIEW = membershipView(
+  {
+    plan: "Casual",
+    status: "pending",
+    monthlyPriceCents: null,
+    card: null,
+    canChangePlan: true,
+    planPrices: { Full: 4500, Student: 3200 },
+    casualSessionPriceCents: 1500,
+  },
+  [],
+);
+
+const BUY_PACK_BUTTON_NAME = /^(Buy|Comprar) 5 (sessions|sesiones)/;
+
 type PaymentsScreenState = {
   readonly name: string;
   /** Lo que sirve el endpoint fingido; sin él, la membresía sembrada. */
@@ -11386,7 +11403,19 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   ),
   ...paymentsStates("pagos-elegir-plan", CHOOSE_PLAN_MEMBERSHIP_VIEW),
   ...paymentsStates("pagos-elegir-plan-casual", CHOOSE_CASUAL_MEMBERSHIP_VIEW),
+  ...paymentsStates("pagos-casual-packs", CASUAL_PACKS_MEMBERSHIP_VIEW),
 ];
+
+function isCasualView(view: object | undefined): boolean {
+  return (
+    view !== undefined &&
+    "membership" in view &&
+    typeof view.membership === "object" &&
+    view.membership !== null &&
+    "plan" in view.membership &&
+    view.membership.plan === "Casual"
+  );
+}
 
 async function serveMembership(page: Page, view: object): Promise<void> {
   await page.route(
@@ -11402,6 +11431,9 @@ async function goToPayments(
 ): Promise<void> {
   if (state.view !== undefined) {
     await serveMembership(page, state.view);
+    // Un Casual ve los packs del club (#471): fingidos, para que la captura
+    // no dependa de la lista de dev ni del precio de Stripe.
+    await stubSessionPacks(page);
   }
   await state.beforeVisit?.(page);
   if (theme === undefined) {
@@ -11415,6 +11447,11 @@ async function goToPayments(
   if (state.view === undefined) {
     await expect(
       page.getByRole("button", { name: ADD_CARD_BUTTON_NAME }),
+    ).toBeVisible();
+  }
+  if (isCasualView(state.view)) {
+    await expect(
+      page.getByRole("button", { name: BUY_PACK_BUTTON_NAME }),
     ).toBeVisible();
   }
 }

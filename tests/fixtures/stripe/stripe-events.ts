@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import checkoutSessionCompleted from "./checkout-session-completed.json";
+import checkoutSessionPackCompleted from "./checkout-session-pack-completed.json";
 import customerSubscriptionDeleted from "./customer-subscription-deleted.json";
 import customerSubscriptionUpdated from "./customer-subscription-updated.json";
 import invoicePaid from "./invoice-paid.json";
@@ -21,8 +22,14 @@ export const FIXTURE_PRICES = {
   student: "price_student_test",
 } as const;
 
+/** El pack de sesiones del Checkout en modo `payment` de #471. */
+export const FIXTURE_PAYMENT_INTENT_ID = "pi_TestSeadragonsPack";
+export const FIXTURE_PACK_SESSIONS = 5;
+
+/** Las claves nombran el ejemplo; el tipo del evento va dentro de cada uno. */
 const FIXTURES = {
   "checkout.session.completed": checkoutSessionCompleted,
+  "checkout.session.completed (pack)": checkoutSessionPackCompleted,
   "customer.subscription.updated": customerSubscriptionUpdated,
   "customer.subscription.deleted": customerSubscriptionDeleted,
   "invoice.paid": invoicePaid,

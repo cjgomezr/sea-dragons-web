@@ -58,16 +58,23 @@ async function replacePackSizes(
   }
 }
 
+/** La lista del club: la lee también la compra de un pack (#471). */
+export function createPackOptionsGateway(
+  serviceClient: SupabaseClient,
+): SessionPacksGateways["packs"] {
+  return {
+    findPackSizes: (clubId) => findPackSizes(serviceClient, clubId),
+    replacePackSizes: (clubId, sizes) =>
+      replacePackSizes(serviceClient, clubId, sizes),
+  };
+}
+
 export function createSessionPacksGateways(
   serviceClient: SupabaseClient,
 ): SessionPacksGateways {
   return {
     members: createRoleRequestGateways(serviceClient).members,
-    packs: {
-      findPackSizes: (clubId) => findPackSizes(serviceClient, clubId),
-      replacePackSizes: (clubId, sizes) =>
-        replacePackSizes(serviceClient, clubId, sizes),
-    },
+    packs: createPackOptionsGateway(serviceClient),
     sessionPrice: {
       readCasualSessionPrice: () =>
         createRouteClubPriceReader().readPrice("casualSession"),

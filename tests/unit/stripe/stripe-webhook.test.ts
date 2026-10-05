@@ -10,6 +10,8 @@ import {
 } from "@/lib/stripe/stripe-webhook";
 import type { StripeMembership } from "@/lib/stripe/webhook-events";
 import {
+  FIXTURE_PACK_SESSIONS,
+  FIXTURE_PAYMENT_INTENT_ID,
   FIXTURE_PRICES,
   FIXTURE_USER_ID,
   stripeEvent,
@@ -49,6 +51,8 @@ const KNOWN_MEMBERSHIP: StripeMembership = {
 
 const findMembership = vi.fn<StripeWebhookGateway["findMembership"]>();
 const applyEvent = vi.fn<StripeWebhookGateway["applyEvent"]>();
+const applySessionPackPayment =
+  vi.fn<StripeWebhookGateway["applySessionPackPayment"]>();
 const readCard = vi.fn<(paymentMethodId: string) => Promise<MembershipCard>>();
 const readSubscription =
   vi.fn<(subscriptionId: string) => Promise<Stripe.Subscription>>();
@@ -60,7 +64,7 @@ const notifyUpcomingRenewal =
 
 function handle(event: ReturnType<typeof stripeEvent>) {
   return handleStripeEvent(event, {
-    gateway: { findMembership, applyEvent },
+    gateway: { findMembership, applyEvent, applySessionPackPayment },
     stripe: {
       readCard,
       readSubscription,
@@ -341,5 +345,94 @@ describe("handleStripeEvent con invoice.upcoming (#470)", () => {
     expect(notifyUpcomingRenewal).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledWith(expect.stringContaining(event.id));
+  });
+});
+
+// #471: un pack pagado no toca la membresía por aquí: entra el pago y el libro
+// suma sus sesiones, en una sola escritura; la base abre la puerta.
+describe("un pack de sesiones pagado", () => {
+  const CASUAL_MEMBERSHIP: StripeMembership = {
+    ...KNOWN_MEMBERSHIP,
+    record: { ...KNOWN_MEMBERSHIP.record, plan: "Casual" },
+  };
+
+  beforeEach(() => {
+    findMembership.mockResolvedValue(CASUAL_MEMBERSHIP);
+    applySessionPackPayment.mockResolvedValue("applied");
+  });
+
+  it("escribe el pago y las sesiones del pack una sola vez, con el id del evento", async () => {
+    const event = stripeEvent("checkout.session.completed (pack)");
+
+    const outcome = await handle(event);
+
+    expect(outcome).toBe("applied");
+    expect(findMembership).toHaveBeenCalledWith({
+      userId: FIXTURE_USER_ID,
+      customerId: null,
+      subscriptionId: null,
+    });
+    expect(applySessionPackPayment).toHaveBeenCalledWith({
+      event: {
+        id: event.id,
+        type: "checkout.session.completed",
+        created: new Date(event.created * 1000),
+      },
+      owner: { userId: FIXTURE_USER_ID, clubId: CLUB_ID },
+      sessions: FIXTURE_PACK_SESSIONS,
+      payment: {
+        paymentIntentId: FIXTURE_PAYMENT_INTENT_ID,
+        amountCents: 7500,
+        currency: "aud",
+        description: "Casual session pack (5 sessions)",
+        paidAt: new Date(event.created * 1000),
+      },
+    });
+    expect(applyEvent).not.toHaveBeenCalled();
+    expect(readSubscription).not.toHaveBeenCalled();
+  });
+
+  it("responde que ya estaba aplicado cuando el evento se repite", async () => {
+    applySessionPackPayment.mockResolvedValue("duplicate");
+
+    const outcome = await handle(
+      stripeEvent("checkout.session.completed (pack)"),
+    );
+
+    expect(outcome).toBe("duplicate");
+  });
+
+  it("no suma nada de un pack sin pagar", async () => {
+    const outcome = await handle(
+      stripeEvent("checkout.session.completed (pack)", {
+        object: { payment_status: "unpaid" },
+      }),
+    );
+
+    expect(outcome).toBe("ignored");
+    expect(applySessionPackPayment).not.toHaveBeenCalled();
+  });
+
+  it("no suma nada de un Checkout de pago que no es de un pack", async () => {
+    const outcome = await handle(
+      stripeEvent("checkout.session.completed (pack)", {
+        object: { metadata: {} },
+      }),
+    );
+
+    expect(outcome).toBe("ignored");
+    expect(applySessionPackPayment).not.toHaveBeenCalled();
+  });
+
+  it("no suma nada de un pack de un socio que la base no conoce y lo deja en el log", async () => {
+    findMembership.mockResolvedValue(null);
+
+    const outcome = await handle(
+      stripeEvent("checkout.session.completed (pack)"),
+    );
+
+    expect(outcome).toBe("unknown_member");
+    expect(applySessionPackPayment).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledOnce();
   });
 });

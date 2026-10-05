@@ -19,6 +19,8 @@ import {
 } from "@/lib/stripe/webhook-events";
 import {
   FIXTURE_CUSTOMER_ID,
+  FIXTURE_PACK_SESSIONS,
+  FIXTURE_PAYMENT_INTENT_ID,
   FIXTURE_PRICES,
   FIXTURE_SUBSCRIPTION_ID,
   FIXTURE_USER_ID,
@@ -74,7 +76,8 @@ function plannableFacts(facts: StripeEventFacts): PlannableStripeEventFacts {
   if (
     facts.kind === "ignored" ||
     facts.kind === "checkoutCompleted" ||
-    facts.kind === "renewalUpcoming"
+    facts.kind === "renewalUpcoming" ||
+    facts.kind === "sessionPackPaid"
   ) {
     throw new Error("El evento de ejemplo debería planificarse tal cual.");
   }
@@ -797,5 +800,92 @@ describe("invoice.upcoming (#470)", () => {
     });
 
     expect(notice).not.toBeNull();
+  });
+});
+
+// #471: un pack de sesiones es un Checkout en modo `payment`. No trae
+// suscripción; trae el PaymentIntent, el importe y el pack en los metadatos.
+describe("checkout.session.completed de un pack de sesiones", () => {
+  function packCheckout(
+    object: Record<string, unknown> = {},
+  ): ReturnType<typeof stripeEvent> {
+    return stripeEvent("checkout.session.completed (pack)", { object });
+  }
+
+  it("lee el pago del pack y busca la membresía por el socio de los metadatos", () => {
+    const event = packCheckout();
+
+    const facts = readStripeEventFacts(event);
+
+    expect(facts).toEqual({
+      kind: "sessionPackPaid",
+      created: secondsToDate(event.created),
+      lookup: {
+        userId: FIXTURE_USER_ID,
+        customerId: null,
+        subscriptionId: null,
+      },
+      sessions: FIXTURE_PACK_SESSIONS,
+      payment: {
+        paymentIntentId: FIXTURE_PAYMENT_INTENT_ID,
+        amountCents: 7500,
+        currency: "aud",
+        description: "Casual session pack (5 sessions)",
+        paidAt: secondsToDate(event.created),
+      },
+    });
+  });
+
+  it.each(["unpaid", "no_payment_required"])(
+    "ignora un pack con el pago %s",
+    (paymentStatus) => {
+      const facts = readStripeEventFacts(
+        packCheckout({ payment_status: paymentStatus }),
+      );
+
+      expect(facts).toEqual({ kind: "ignored" });
+    },
+  );
+
+  it("ignora un Checkout de pago que no es de un pack", () => {
+    const facts = readStripeEventFacts(
+      packCheckout({ metadata: { user_id: FIXTURE_USER_ID, kind: "otro" } }),
+    );
+
+    expect(facts).toEqual({ kind: "ignored" });
+  });
+
+  it.each(["0", "-3", "cinco", "2.5"])(
+    "ignora un pack con un tamaño que no vale (%s)",
+    (packSessions) => {
+      const facts = readStripeEventFacts(
+        packCheckout({
+          metadata: {
+            user_id: FIXTURE_USER_ID,
+            kind: "session_pack",
+            pack_sessions: packSessions,
+          },
+        }),
+      );
+
+      expect(facts).toEqual({ kind: "ignored" });
+    },
+  );
+
+  it("ignora un pack sin PaymentIntent", () => {
+    const facts = readStripeEventFacts(packCheckout({ payment_intent: null }));
+
+    expect(facts).toEqual({ kind: "ignored" });
+  });
+
+  it("ignora un pack caducado: checkout.session.expired no suma nada", () => {
+    const facts = readStripeEventFacts(
+      stripeEvent("checkout.session.completed (pack)", {
+        type: "checkout.session.expired",
+        object: { status: "expired", payment_status: "unpaid" },
+      }),
+    );
+
+    expect(facts).toEqual({ kind: "ignored" });
   });
 });
