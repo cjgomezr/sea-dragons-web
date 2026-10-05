@@ -54,6 +54,10 @@ export const CONTACT_ISSUE_CODES = [
 
 export type ContactIssueCode = (typeof CONTACT_ISSUE_CODES)[number];
 
+export function isContactIssueCode(code: string): code is ContactIssueCode {
+  return CONTACT_ISSUE_CODES.some((contactCode) => contactCode === code);
+}
+
 export type ContactField =
   | "phone"
   | "emergencyContactName"

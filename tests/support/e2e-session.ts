@@ -276,9 +276,9 @@ export const ROLE_REQUEST_MEMBERS = {
     columns: {
       full_name: "Clara Contacto",
       country: "AU",
-      phone: "+61 412 345 678",
+      phone: "0412 345 678",
       emergency_contact_name: "Lucía Contacto",
-      emergency_contact_phone: "0412 345 678",
+      emergency_contact_phone: "0412-345-678",
       emergency_contact_relationship: "Hermana",
     },
   },

@@ -17,6 +17,7 @@ import {
   type EmergencyContact,
   PHONE_MAX_DIGITS,
   PHONE_MIN_DIGITS,
+  isContactIssueCode,
 } from "@/lib/members/profile-contact";
 import {
   parseExperienceLevel,
@@ -185,6 +186,9 @@ export function describeProfileIssue(
   translate: Translator,
   code: ProfileIssueCode,
 ): string {
+  if (isContactIssueCode(code)) {
+    return describeContactIssue(translate, code);
+  }
   switch (code) {
     case "full_name_missing":
       return translate("account.profile.issue.fullNameMissing");
@@ -210,8 +214,6 @@ export function describeProfileIssue(
       return translate("account.profile.issue.aufExpiryNotADate");
     case "auf_expiry_before_joined":
       return translate("account.profile.issue.aufExpiryBeforeJoined");
-    default:
-      return describeContactIssue(translate, code);
   }
 }
 

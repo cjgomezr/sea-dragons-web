@@ -737,6 +737,7 @@ describe("perfil propio: la asistencia", () => {
     );
   });
 });
+
 const EMERGENCY_CONTACT = {
   name: "Lucía Ruiz",
   phone: "0412 345 678",
@@ -930,11 +931,29 @@ describe("perfil propio: el contacto (#496)", () => {
     ).toBeInTheDocument();
   });
 
-  it("al menor que guarda la propuesta sin teléfono le pide el teléfono", async () => {
+  it("guarda el resto del perfil sin contacto si el menor no tocó la propuesta", async () => {
     echoSavedProfile();
     const user = userEvent.setup();
     renderScreen({ emergencyContactProposal: { guardianName: "Marta Soto" } });
 
+    await user.selectOptions(screen.getByLabelText("Gender"), "undisclosed");
+    await user.click(saveButton());
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Changes saved.",
+    );
+    expect(calls[0]?.body).toMatchObject({
+      gender: "undisclosed",
+      emergencyContact: null,
+    });
+  });
+
+  it("pide el teléfono si el menor editó la propuesta y no lo escribió", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen({ emergencyContactProposal: { guardianName: "Marta Soto" } });
+
+    await user.type(screen.getByLabelText("Contact name"), " Pérez");
     await user.click(saveButton());
 
     expect(screen.getByLabelText("Contact phone")).toHaveAttribute(
@@ -978,6 +997,7 @@ describe("perfil propio: el contacto (#496)", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Relación")).toHaveValue("Tutor");
     await user.type(screen.getByLabelText("Tu teléfono (opcional)"), "12");
+    await user.type(screen.getByLabelText("Nombre del contacto"), " Pérez");
     await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
 
     expect(

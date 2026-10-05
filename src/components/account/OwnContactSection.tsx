@@ -25,11 +25,14 @@ const SAME_PHONE_ID = "perfil-emergencia-mismo-telefono";
  * cada aviso. */
 export type ContactDraft = Readonly<Record<ContactField, string>>;
 
-/** Lo que el formulario propone a quien no tiene contacto: su tutor, sin
- * teléfono, porque del tutor sólo se guarda el correo. */
+/** Lo que el formulario propone a quien no tiene contacto: su tutor, con la
+ * relación ya en el idioma de la pantalla y sin teléfono, porque del tutor
+ * sólo se guarda el correo. */
+export type GuardianProposal = Omit<EmergencyContact, "phone">;
+
 export function contactDraftOf(
   contact: ProfileContact,
-  proposal: Omit<EmergencyContact, "phone"> | null,
+  proposal: GuardianProposal | null,
 ): ContactDraft {
   const emergency = contact.emergencyContact ?? {
     name: proposal === null ? "" : proposal.name,
@@ -44,10 +47,26 @@ export function contactDraftOf(
   };
 }
 
+/** La propuesta del tutor tal como se rellenó, sin que el socio la tocara. */
+function isUntouchedProposal(
+  draft: ContactDraft,
+  proposal: GuardianProposal | null,
+): boolean {
+  return (
+    proposal !== null &&
+    draft.emergencyContactPhone.trim() === "" &&
+    draft.emergencyContactName === proposal.name &&
+    draft.emergencyContactRelationship === proposal.relationship
+  );
+}
+
 /** Un teléfono vacío va como null, y un contacto con los tres datos vacíos
- * también. A medias va tal cual, para que el dominio diga qué falta. */
+ * también. A medias va tal cual, para que el dominio diga qué falta. La
+ * propuesta del tutor sin tocar va como null: es nuestra, no del socio, y no
+ * debe impedirle guardar el resto del perfil. */
 export function toContactSubmission(
   draft: ContactDraft,
+  proposal: GuardianProposal | null,
 ): ProfileContactSubmission {
   const emergencyContact = {
     name: draft.emergencyContactName,
@@ -59,7 +78,10 @@ export function toContactSubmission(
   );
   return {
     phone: draft.phone.trim() === "" ? null : draft.phone,
-    emergencyContact: isEmergencyEmpty ? null : emergencyContact,
+    emergencyContact:
+      isEmergencyEmpty || isUntouchedProposal(draft, proposal)
+        ? null
+        : emergencyContact,
   };
 }
 

@@ -31,6 +31,7 @@ import { EXPERIENCE_LEVELS, GENDERS } from "@/lib/members/profile-fields";
 import { type AufDraft, OwnAufSection } from "./OwnAufSection";
 import {
   type ContactDraft,
+  type GuardianProposal,
   OwnContactSection,
   contactDraftOf,
   toContactSubmission,
@@ -80,13 +81,6 @@ type Draft = AufDraft &
 const FULL_NAME_ID = "perfil-nombre";
 const FULL_NAME_ERROR_ID = "perfil-nombre-error";
 
-/** El tutor que se propone, ya con la relación en el idioma de la
- * pantalla, o null si no se propone nadie. */
-type GuardianProposal = {
-  readonly name: string;
-  readonly relationship: string;
-};
-
 function toDraft(
   profile: OwnProfile,
   guardian: GuardianProposal | null,
@@ -118,14 +112,18 @@ function toAufProposal(draft: Draft, auf: OwnAuf): AufProposal | null {
   return { number: draft.aufNumber, expiry: orNull(draft.aufExpiry) };
 }
 
-function toSubmission(draft: Draft, auf: OwnAuf): OwnProfileSubmission {
+function toSubmission(
+  draft: Draft,
+  auf: OwnAuf,
+  guardian: GuardianProposal | null,
+): OwnProfileSubmission {
   return {
     fullName: draft.fullName,
     country: draft.country,
     positionId: orNull(draft.positionId),
     experienceLevel: orNull(draft.experienceLevel),
     gender: orNull(draft.gender),
-    ...toContactSubmission(draft),
+    ...toContactSubmission(draft, guardian),
     auf: toAufProposal(draft, auf),
   };
 }
@@ -340,14 +338,12 @@ export function ProfileForm({
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const router = useRouter();
-  const [draft, setDraft] = useState<Draft>(() =>
-    toDraft(profile, guardianProposalOf(translate, emergencyContactProposal)),
-  );
   // La propuesta es para la primera vez: quien guardó ya decidió, aunque
   // fuera dejar el contacto vacío.
-  const [isGuardianProposed, setIsGuardianProposed] = useState(
-    emergencyContactProposal !== null,
+  const [guardian, setGuardian] = useState(() =>
+    guardianProposalOf(translate, emergencyContactProposal),
   );
+  const [draft, setDraft] = useState<Draft>(() => toDraft(profile, guardian));
   const [auf, setAuf] = useState<OwnAuf>(profile.auf);
   // La posición guardada decide si la retirada se sigue ofreciendo: quien la
   // cambió y guardó ya no puede volver a ella.
@@ -375,7 +371,7 @@ export function ProfileForm({
     if (isSendingRef.current) {
       return;
     }
-    const submission = toSubmission(draft, auf);
+    const submission = toSubmission(draft, auf, guardian);
     const localIssues = localIssuesOf(submission);
     if (hasLocalIssues(localIssues)) {
       setIssues(localIssues);
@@ -391,7 +387,7 @@ export function ProfileForm({
       return;
     }
     setDraft(toDraft(result.profile, null));
-    setIsGuardianProposed(false);
+    setGuardian(null);
     setAuf(result.profile.auf);
     setSavedPositionId(result.profile.positionId);
     setStatus({ kind: "saved" });
@@ -472,7 +468,7 @@ export function ProfileForm({
           translate={translate}
           draft={draft}
           issueTextOf={(field) => contactIssueText(translate, issues, field)}
-          isGuardianProposed={isGuardianProposed}
+          isGuardianProposed={guardian !== null}
           onChange={update}
         />
         <SaveOutcome translate={translate} status={status} />
