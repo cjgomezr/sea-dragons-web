@@ -30,4 +30,15 @@ describe("catálogo de mensajes", () => {
 
     expect(mismatches).toEqual([]);
   });
+
+  // D8 de E12 (#480): el tipo de membresía se elige en Pagos, no en el
+  // registro, y los textos de ese campo se fueron con él.
+  it.each([
+    "auth.field.membershipType",
+    "auth.field.membershipTypePlaceholder",
+    "auth.issue.membershipTypeUnknown",
+  ])("ninguno de los dos idiomas conserva %s", (key) => {
+    expect(Object.keys(english)).not.toContain(key);
+    expect(Object.keys(spanish)).not.toContain(key);
+  });
 });
