@@ -13,6 +13,11 @@ import {
   readOwnProfile,
   updateOwnProfile,
 } from "@/lib/members/own-profile";
+import {
+  EMERGENCY_CONTACT_TEXT_MAX_LENGTH,
+  type EmergencyContact,
+  isSamePhone,
+} from "@/lib/members/profile-contact";
 import type { ClubPosition, ClubPositions } from "@/lib/club/club-positions";
 import {
   DEFENDER,
@@ -53,6 +58,8 @@ const STORED: OwnProfile = {
   positionId: DEFENDER.id,
   experienceLevel: "Intermediate",
   gender: "female",
+  phone: null,
+  emergencyContact: null,
   auf: NO_AUF,
 };
 
@@ -62,6 +69,8 @@ const VALID_FIELDS = {
   positionId: FORWARD.id,
   experienceLevel: "Advanced",
   gender: "undisclosed",
+  phone: null,
+  emergencyContact: null,
 } as const satisfies OwnProfileFields;
 
 const VALID_SUBMISSION: OwnProfileSubmission = {
@@ -96,6 +105,7 @@ function fakeProfiles(
   options: {
     readonly verifiedMeanwhile?: boolean;
     readonly positions?: ClubPositions;
+    readonly guardianName?: string;
   } = {},
 ): FakeProfiles {
   const writes: ProfileWrite[] = [];
@@ -117,7 +127,12 @@ function fakeProfiles(
         findOwnProfile: async () =>
           stored === null
             ? null
-            : { profile: stored, joinedOn: JOINED_ON, clubId: CLUB_ID },
+            : {
+                profile: stored,
+                joinedOn: JOINED_ON,
+                clubId: CLUB_ID,
+                guardianName: options.guardianName ?? null,
+              },
         updateOwnProfile: async (userId, fields, auf) => {
           if (stored === null) {
             return { kind: "member_not_found" };
@@ -251,6 +266,8 @@ describe("editar el perfil propio", () => {
       positionId: "Striker",
       experienceLevel: "expert",
       gender: "other",
+      phone: null,
+      emergencyContact: null,
       auf: null,
     });
 
@@ -289,9 +306,11 @@ describe("editar el perfil propio", () => {
 
     expect(Object.keys(writes[0]?.fields ?? {}).sort()).toEqual([
       "country",
+      "emergencyContact",
       "experienceLevel",
       "fullName",
       "gender",
+      "phone",
       "positionId",
     ]);
   });
@@ -315,6 +334,7 @@ describe("leer el perfil propio", () => {
     await expect(readOwnProfile(gateways, USER_ID)).resolves.toEqual({
       profile: STORED,
       positionOptions: [GOALKEEPER, DEFENDER, FORWARD],
+      emergencyContactProposal: null,
     });
   });
 
@@ -628,5 +648,241 @@ describe("AUF propuesto por el miembro", () => {
 
     expect(writes[0]?.auf).toEqual({ kind: "keep" });
     expect(saved.auf).toEqual(PENDING_AUF);
+  });
+});
+
+const EMERGENCY_CONTACT: EmergencyContact = {
+  name: "Lucía Ruiz",
+  phone: "0412 345 678",
+  relationship: "Hermana",
+};
+
+function withContact(
+  contact: Partial<Pick<OwnProfileSubmission, "phone" | "emergencyContact">>,
+): OwnProfileSubmission {
+  return { ...VALID_SUBMISSION, ...contact };
+}
+
+async function savedContactOf(
+  submission: OwnProfileSubmission,
+): Promise<Pick<OwnProfileFields, "phone" | "emergencyContact"> | undefined> {
+  const { gateways, writes } = fakeProfiles();
+  await updateOwnProfile(gateways, { userId: USER_ID, submission });
+  const fields = writes[0]?.fields;
+  return fields === undefined
+    ? undefined
+    : { phone: fields.phone, emergencyContact: fields.emergencyContact };
+}
+
+describe("perfil propio: el teléfono (#496)", () => {
+  it.each([
+    ["8 dígitos", "41234567"],
+    ["15 dígitos", "123456789012345"],
+    ["espacios, guiones y paréntesis", "(03) 9876-5432"],
+    ["un + inicial", "+61 412 345 678"],
+  ])("acepta un teléfono con %s", async (_case, phone) => {
+    await expect(savedContactOf(withContact({ phone }))).resolves.toEqual({
+      phone,
+      emergencyContact: null,
+    });
+  });
+
+  it("lo guarda tal como se escribió, sin espacios sobrantes", async () => {
+    const saved = await savedContactOf(
+      withContact({ phone: "  +61   412  345 678 " }),
+    );
+
+    expect(saved?.phone).toBe("+61 412 345 678");
+  });
+
+  it.each([null, "", "   "])(
+    "deja sin teléfono a quien no escribe ninguno (%j)",
+    async (phone) => {
+      const saved = await savedContactOf(withContact({ phone }));
+
+      expect(saved?.phone).toBeNull();
+    },
+  );
+
+  it.each([
+    ["7 dígitos", "4123456", "phone_too_short"],
+    ["16 dígitos", "1234567890123456", "phone_too_long"],
+    ["letras", "0412 ABC 678", "phone_invalid_characters"],
+    ["un + que no va al principio", "61+412345678", "phone_invalid_characters"],
+    ["más de 30 caracteres", `0412${" -".repeat(14)}345678`, "phone_too_long"],
+  ])(
+    "rechaza un teléfono con %s y dice qué está mal",
+    async (_c, phone, code) => {
+      const error = await captureValidationError(withContact({ phone }));
+
+      expect(error.issues).toEqual([{ field: "phone", code }]);
+    },
+  );
+});
+
+describe("perfil propio: el contacto de emergencia (#496)", () => {
+  it("guarda el contacto entero, sin los espacios de los extremos", async () => {
+    const saved = await savedContactOf(
+      withContact({
+        emergencyContact: {
+          name: "  Lucía Ruiz ",
+          phone: " 0412  345 678",
+          relationship: " Hermana  ",
+        },
+      }),
+    );
+
+    expect(saved?.emergencyContact).toEqual(EMERGENCY_CONTACT);
+  });
+
+  it("deja sin contacto a quien manda los tres datos vacíos", async () => {
+    const saved = await savedContactOf(
+      withContact({
+        emergencyContact: { name: " ", phone: "", relationship: "" },
+      }),
+    );
+
+    expect(saved?.emergencyContact).toBeNull();
+  });
+
+  it("rechaza un contacto a medias y dice qué dato falta", async () => {
+    const error = await captureValidationError(
+      withContact({
+        emergencyContact: { name: "Lucía Ruiz", phone: "", relationship: " " },
+      }),
+    );
+
+    expect(error.issues).toEqual([
+      {
+        field: "emergencyContactPhone",
+        code: "emergency_contact_phone_missing",
+      },
+      {
+        field: "emergencyContactRelationship",
+        code: "emergency_contact_relationship_missing",
+      },
+    ]);
+  });
+
+  it("rechaza un contacto con sólo el teléfono", async () => {
+    const error = await captureValidationError(
+      withContact({
+        emergencyContact: { name: "", phone: "0412345678", relationship: "" },
+      }),
+    );
+
+    expect(error.issues).toEqual([
+      { field: "emergencyContactName", code: "emergency_contact_name_missing" },
+      {
+        field: "emergencyContactRelationship",
+        code: "emergency_contact_relationship_missing",
+      },
+    ]);
+  });
+
+  it("rechaza un nombre y una relación de más de 100 caracteres", async () => {
+    const tooLong = "a".repeat(EMERGENCY_CONTACT_TEXT_MAX_LENGTH + 1);
+
+    const error = await captureValidationError(
+      withContact({
+        emergencyContact: {
+          ...EMERGENCY_CONTACT,
+          name: tooLong,
+          relationship: tooLong,
+        },
+      }),
+    );
+
+    expect(error.issues).toEqual([
+      {
+        field: "emergencyContactName",
+        code: "emergency_contact_name_too_long",
+      },
+      {
+        field: "emergencyContactRelationship",
+        code: "emergency_contact_relationship_too_long",
+      },
+    ]);
+  });
+
+  it("acepta 100 caracteres contados como letras", async () => {
+    const name = "🐉".repeat(EMERGENCY_CONTACT_TEXT_MAX_LENGTH);
+
+    const saved = await savedContactOf(
+      withContact({ emergencyContact: { ...EMERGENCY_CONTACT, name } }),
+    );
+
+    expect(saved?.emergencyContact?.name).toBe(name);
+  });
+
+  it("rechaza el teléfono del contacto con las reglas del teléfono propio", async () => {
+    const error = await captureValidationError(
+      withContact({
+        emergencyContact: { ...EMERGENCY_CONTACT, phone: "4123456" },
+      }),
+    );
+
+    expect(error.issues).toEqual([
+      {
+        field: "emergencyContactPhone",
+        code: "emergency_contact_phone_too_short",
+      },
+    ]);
+  });
+
+  it("acepta como contacto el mismo teléfono que el propio", async () => {
+    const saved = await savedContactOf(
+      withContact({
+        phone: "0412 345 678",
+        emergencyContact: { ...EMERGENCY_CONTACT, phone: "0412-345-678" },
+      }),
+    );
+
+    expect(saved?.emergencyContact?.phone).toBe("0412-345-678");
+  });
+});
+
+describe("perfil propio: el mismo teléfono (#496)", () => {
+  it("reconoce el mismo número escrito de otra forma", () => {
+    expect(isSamePhone("0412 345 678", "(0412) 345-678")).toBe(true);
+  });
+
+  it("distingue dos números distintos", () => {
+    expect(isSamePhone("0412 345 678", "0412 345 679")).toBe(false);
+  });
+
+  it("no da por igual un teléfono vacío", () => {
+    expect(isSamePhone("", "  ")).toBe(false);
+  });
+});
+
+describe("perfil propio: el tutor como contacto propuesto (#496)", () => {
+  it("propone al tutor registrado a quien no tiene contacto", async () => {
+    const { gateways } = fakeProfiles(STORED, { guardianName: "Marta Soto" });
+
+    const screen = await readOwnProfile(gateways, USER_ID);
+
+    expect(screen.emergencyContactProposal).toEqual({
+      guardianName: "Marta Soto",
+    });
+  });
+
+  it("no propone nada a quien ya tiene contacto", async () => {
+    const { gateways } = fakeProfiles(
+      { ...STORED, emergencyContact: EMERGENCY_CONTACT },
+      { guardianName: "Marta Soto" },
+    );
+
+    const screen = await readOwnProfile(gateways, USER_ID);
+
+    expect(screen.emergencyContactProposal).toBeNull();
+  });
+
+  it("no propone nada a quien no tiene tutor", async () => {
+    const { gateways } = fakeProfiles();
+
+    const screen = await readOwnProfile(gateways, USER_ID);
+
+    expect(screen.emergencyContactProposal).toBeNull();
   });
 });

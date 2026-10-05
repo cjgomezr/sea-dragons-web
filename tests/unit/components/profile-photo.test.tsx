@@ -76,9 +76,12 @@ function renderScreen(
         positionId: null,
         experienceLevel: null,
         gender: null,
+        phone: null,
+        emergencyContact: null,
         auf: { status: "none" },
       }}
       positionOptions={[]}
+      emergencyContactProposal={null}
       photoUrl={options.photoUrl === undefined ? OLD_URL : options.photoUrl}
       groups={[]}
       evaluation={{ visibility: "staff_only" }}

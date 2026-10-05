@@ -9,6 +9,14 @@ import { isRealCalendarDate } from "@/lib/auth/registration";
 import { isKnownCountryCode } from "@/lib/geo/countries";
 import { isAufNumberTooLong } from "./member-record";
 import {
+  CONTACT_ISSUE_CODES,
+  type ContactField,
+  type ProfileContact,
+  type ProfileContactSubmission,
+  contactIssuesOf,
+  toValidContact,
+} from "./profile-contact";
+import {
   type ExperienceLevel,
   type Gender,
   parseExperienceLevel,
@@ -31,14 +39,17 @@ import {
  *
  * La posición es una del catálogo de su club (#299): una activa, o la
  * archivada que ya tenía. Una vez que la cambia, no puede volver a ella.
+ *
+ * El teléfono y el contacto de emergencia (#496) también son suyos, con sus
+ * reglas en `profile-contact.ts`.
  */
 
 /** Largo máximo del nombre, en caracteres y no en unidades UTF-16. */
 export const FULL_NAME_MAX_LENGTH = 120;
 
-/** Los cinco campos que el miembro edita libremente. El país puede faltar
- * en una fila vieja; al guardar se exige. */
-export type OwnProfileFields = {
+/** Los campos que el miembro edita libremente: los cinco de la ficha y su
+ * contacto. El país puede faltar en una fila vieja; al guardar se exige. */
+export type OwnProfileFields = ProfileContact & {
   readonly fullName: string;
   readonly country: string | null;
   /** Una posición del catálogo del club, o null sin posición. */
@@ -70,7 +81,7 @@ export type AufProposal = {
 /** Lo que llega a guardarse, sin validar todavía. Null en los tres catálogos
  * es vaciarlos a propósito. `auf` en null es no tocar el registro: el miembro
  * no puede borrarlo, sólo proponer otro. */
-export type OwnProfileSubmission = {
+export type OwnProfileSubmission = ProfileContactSubmission & {
   readonly fullName: string;
   readonly country: string;
   readonly positionId: string | null;
@@ -89,7 +100,8 @@ export type OwnAufChange =
       readonly expiry: string | null;
     };
 
-export type ProfileField = keyof OwnProfileFields | "aufNumber" | "aufExpiry";
+export type ProfileField =
+  keyof OwnProfileFields | "aufNumber" | "aufExpiry" | ContactField;
 
 export const PROFILE_ISSUE_CODES = [
   "full_name_missing",
@@ -102,6 +114,7 @@ export const PROFILE_ISSUE_CODES = [
   "auf_number_too_long",
   "auf_expiry_not_a_date",
   "auf_expiry_before_joined",
+  ...CONTACT_ISSUE_CODES,
 ] as const;
 
 export type ProfileIssueCode = (typeof PROFILE_ISSUE_CODES)[number];
@@ -144,13 +157,21 @@ export type StoredOwnProfile = {
   readonly joinedOn: string;
   /** De qué club son las posiciones que puede elegir (#299). */
   readonly clubId: string;
+  /** El tutor que consintió por un menor (FR-082), o null sin tutor. */
+  readonly guardianName: string | null;
 };
+
+/** El tutor que el formulario propone como contacto de emergencia a quien
+ * no tiene ninguno (#496). Sólo el nombre: del tutor se guarda el correo, no
+ * el teléfono. */
+export type EmergencyContactProposal = { readonly guardianName: string };
 
 /** La ficha y las posiciones que su desplegable ofrece, en el orden del
  * club. Vacías si el club archivó todas y el miembro no tiene ninguna. */
 export type OwnProfileScreen = {
   readonly profile: OwnProfile;
   readonly positionOptions: ClubPositions;
+  readonly emergencyContactProposal: EmergencyContactProposal | null;
 };
 
 export type OwnProfileUpdateResult =
@@ -281,6 +302,7 @@ function toValidFields(
   const issues = [
     ...fieldIssuesOf(submission, positionContext),
     ...aufIssuesOf(submission.auf),
+    ...contactIssuesOf(submission),
   ];
   if (issues.length > 0) {
     throw new ProfileValidationError(issues);
@@ -291,6 +313,7 @@ function toValidFields(
     positionId: submission.positionId,
     experienceLevel: parseExperienceLevel(submission.experienceLevel),
     gender: parseGender(submission.gender),
+    ...toValidContact(submission),
   };
 }
 
@@ -345,18 +368,29 @@ async function findStoredProfile(
   return stored;
 }
 
+function emergencyContactProposalOf(
+  stored: StoredOwnProfile,
+): EmergencyContactProposal | null {
+  return stored.profile.emergencyContact === null &&
+    stored.guardianName !== null
+    ? { guardianName: stored.guardianName }
+    : null;
+}
+
 export async function readOwnProfile(
   gateways: OwnProfileGateways,
   userId: string,
 ): Promise<OwnProfileScreen> {
-  const { profile, clubId } = await findStoredProfile(gateways, userId);
+  const stored = await findStoredProfile(gateways, userId);
+  const { profile } = stored;
   const positions = await gateways.positions.findClubPositions(
-    clubId,
+    stored.clubId,
     presentIds([profile.positionId]),
   );
   return {
     profile,
     positionOptions: offeredPositions(positions, profile.positionId),
+    emergencyContactProposal: emergencyContactProposalOf(stored),
   };
 }
 

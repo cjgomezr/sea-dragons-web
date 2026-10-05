@@ -7,7 +7,10 @@ import type { MemberGroup } from "@/lib/groups/member-groups";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
 import type { ClubPositions } from "@/lib/club/club-positions";
-import type { OwnProfile } from "@/lib/members/own-profile";
+import type {
+  EmergencyContactProposal,
+  OwnProfile,
+} from "@/lib/members/own-profile";
 import type { MembershipPlan } from "@/lib/membership/membership";
 import { AccountHeader } from "./AccountHeader";
 import { MembershipTypeSummary } from "./MembershipTypeSummary";
@@ -27,6 +30,7 @@ export function ProfileScreen({
   account,
   profile,
   positionOptions,
+  emergencyContactProposal,
   photoUrl,
   groups,
   evaluation,
@@ -41,6 +45,8 @@ export function ProfileScreen({
   profile: OwnProfile;
   /** Las posiciones del club que se le ofrecen, en su orden (#299). */
   positionOptions: ClubPositions;
+  /** El tutor que se propone como contacto de emergencia (#496). */
+  emergencyContactProposal: EmergencyContactProposal | null;
   /** La dirección firmada de la foto (#245), o null sin foto. */
   photoUrl: string | null;
   groups: readonly MemberGroup[];
@@ -65,6 +71,7 @@ export function ProfileScreen({
         profile={profile}
         positionOptions={positionOptions}
         countries={countries}
+        emergencyContactProposal={emergencyContactProposal}
       />
       <MembershipTypeSummary translate={translate} plan={membershipPlan} />
       <MyGroups locale={locale} groups={groups} />

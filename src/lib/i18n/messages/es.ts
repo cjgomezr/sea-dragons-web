@@ -371,6 +371,34 @@ export const spanishMessages: MessageCatalog = {
     "El vencimiento no puede ser anterior al día en que ingresaste al club.",
   "account.profile.error.aufVerified":
     "Tu AUF ya está verificado. Sólo un Admin puede cambiarlo.",
+  // El teléfono y el contacto de emergencia del perfil propio (#496).
+  "account.profile.contact.title": "Contacto",
+  "account.profile.contact.phone": "Tu teléfono (opcional)",
+  "account.profile.contact.emergencyLegend": "Contacto de emergencia",
+  "account.profile.contact.emergencyHint":
+    "A quién llamamos si te pasa algo en el agua. Rellena los tres datos o déjalos vacíos.",
+  "account.profile.contact.emergencyName": "Nombre del contacto",
+  "account.profile.contact.emergencyPhone": "Teléfono del contacto",
+  "account.profile.contact.emergencyRelationship": "Relación",
+  "account.profile.contact.samePhone":
+    "Es tu propio teléfono. El contacto de emergencia debería ser otra persona.",
+  "account.profile.contact.guardianRelationship": "Tutor",
+  "account.profile.contact.guardianProposed":
+    "Te proponemos a tu tutor. Escribe su teléfono para guardarlo.",
+  "account.profile.issue.phoneInvalidCharacters":
+    "Usa sólo dígitos, espacios, guiones, paréntesis y un + al principio.",
+  "account.profile.issue.phoneTooShort":
+    "Un teléfono necesita al menos {min} dígitos.",
+  "account.profile.issue.phoneTooLong":
+    "Un teléfono puede tener como mucho {max} dígitos.",
+  "account.profile.issue.emergencyNameMissing":
+    "Escribe el nombre del contacto o deja los tres datos vacíos.",
+  "account.profile.issue.emergencyPhoneMissing":
+    "Escribe el teléfono del contacto o deja los tres datos vacíos.",
+  "account.profile.issue.emergencyRelationshipMissing":
+    "Escribe tu relación con esa persona o deja los tres datos vacíos.",
+  "account.profile.issue.emergencyTextTooLong":
+    "Puede tener como mucho {max} caracteres.",
   // La foto de perfil (#245): el círculo de la cabecera y sus controles.
   "account.photo.alt": "Tu foto de perfil",
   "account.photo.add": "Añadir foto",

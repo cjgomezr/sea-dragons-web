@@ -1961,6 +1961,27 @@ a.auth-brand-header:focus-visible {
   border: 0;
 }
 
+/* El contacto de emergencia del perfil (#496). El `fieldset` sólo está por
+   su `legend`, que agrupa los tres datos que van juntos o no van: sin
+   recuadro, porque ya están dentro del panel de la ficha. */
+.account-emergency-contact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.account-emergency-contact legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-family: var(--font-family-heading);
+  font-size: 16px;
+  font-weight: 700;
+}
+
 .account-role-options legend {
   margin-bottom: var(--space-2);
   padding: 0;

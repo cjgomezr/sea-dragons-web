@@ -6,7 +6,11 @@ import { ACCOUNT_PROFILE_API_PATH } from "@/lib/auth/routes";
 import { listCountryOptions } from "@/lib/geo/countries";
 import type { Locale } from "@/lib/i18n/locale";
 import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
-import type { OwnAuf, OwnProfile } from "@/lib/members/own-profile";
+import type {
+  EmergencyContactProposal,
+  OwnAuf,
+  OwnProfile,
+} from "@/lib/members/own-profile";
 import type { MembershipPlan } from "@/lib/membership/membership";
 import type { ClubPosition, ClubPositions } from "@/lib/club/club-positions";
 import {
@@ -33,6 +37,8 @@ const PROFILE: OwnProfile = {
   positionId: DEFENDER.id,
   experienceLevel: "Intermediate",
   gender: "female",
+  phone: null,
+  emergencyContact: null,
   auf: { status: "none" },
 };
 
@@ -42,6 +48,8 @@ const EMPTY_PROFILE: OwnProfile = {
   positionId: null,
   experienceLevel: null,
   gender: null,
+  phone: null,
+  emergencyContact: null,
   auf: { status: "none" },
 };
 
@@ -110,6 +118,7 @@ function renderScreen(
     readonly positionOptions?: ClubPositions;
     readonly attendance?: MemberAttendance;
     readonly membershipPlan?: MembershipPlan | null;
+    readonly emergencyContactProposal?: EmergencyContactProposal | null;
   } = {},
 ): void {
   const locale = options.locale ?? "en";
@@ -120,6 +129,7 @@ function renderScreen(
       account={{ fullName: "Nerea Ruiz", role: "Player", latestRequest: null }}
       profile={options.profile ?? PROFILE}
       positionOptions={options.positionOptions ?? SEEDED_POSITIONS}
+      emergencyContactProposal={options.emergencyContactProposal ?? null}
       photoUrl={null}
       groups={[{ id: "g1", name: "Senior Squad" }]}
       evaluation={{ visibility: "staff_only" }}
@@ -267,6 +277,8 @@ describe("pantalla de perfil", () => {
           positionId: FORWARD.id,
           experienceLevel: "Intermediate",
           gender: "undisclosed",
+          phone: null,
+          emergencyContact: null,
         },
       },
     ]);
@@ -722,6 +734,261 @@ describe("perfil propio: la asistencia", () => {
 
     expect(attendanceRegion("Asistencia")).toHaveTextContent(
       "Asistencia: Sin datos",
+    );
+  });
+});
+const EMERGENCY_CONTACT = {
+  name: "Lucía Ruiz",
+  phone: "0412 345 678",
+  relationship: "Sister",
+} as const;
+
+const OWN_PHONE_LABEL = "Your phone (optional)";
+
+function contactRegion(name = "Contact"): HTMLElement {
+  return screen.getByRole("region", { name });
+}
+
+describe("perfil propio: el contacto (#496)", () => {
+  it("enseña la sección Contacto con el teléfono y el contacto de emergencia", () => {
+    renderScreen();
+
+    const contact = contactRegion();
+    expect(within(contact).getByLabelText(OWN_PHONE_LABEL)).toHaveValue("");
+    const emergency = within(contact).getByRole("group", {
+      name: "Emergency contact",
+    });
+    expect(within(emergency).getByLabelText("Contact name")).toHaveValue("");
+    expect(within(emergency).getByLabelText("Contact phone")).toHaveValue("");
+    expect(within(emergency).getByLabelText("Relationship")).toHaveValue("");
+  });
+
+  it("carga el teléfono y el contacto guardados", () => {
+    renderScreen({
+      profile: {
+        ...PROFILE,
+        phone: "+61 3 9876 5432",
+        emergencyContact: EMERGENCY_CONTACT,
+      },
+    });
+
+    expect(screen.getByLabelText(OWN_PHONE_LABEL)).toHaveValue(
+      "+61 3 9876 5432",
+    );
+    expect(screen.getByLabelText("Contact name")).toHaveValue("Lucía Ruiz");
+    expect(screen.getByLabelText("Contact phone")).toHaveValue("0412 345 678");
+    expect(screen.getByLabelText("Relationship")).toHaveValue("Sister");
+  });
+
+  it("manda el teléfono y el contacto escritos y los enseña guardados", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.type(screen.getByLabelText(OWN_PHONE_LABEL), "+61 3 9876 5432");
+    await user.type(screen.getByLabelText("Contact name"), "Lucía Ruiz");
+    await user.type(screen.getByLabelText("Contact phone"), "0412 345 678");
+    await user.type(screen.getByLabelText("Relationship"), "Sister");
+    await user.click(saveButton());
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Changes saved.",
+    );
+    expect(calls[0]?.body).toMatchObject({
+      phone: "+61 3 9876 5432",
+      emergencyContact: EMERGENCY_CONTACT,
+    });
+    expect(screen.getByLabelText("Contact name")).toHaveValue("Lucía Ruiz");
+  });
+
+  it("no envía un teléfono con letras y lo dice junto al campo", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.type(screen.getByLabelText(OWN_PHONE_LABEL), "0412 ABC");
+    await user.click(saveButton());
+
+    const phone = screen.getByLabelText(OWN_PHONE_LABEL);
+    expect(phone).toHaveAttribute("aria-invalid", "true");
+    expect(phone).toHaveAccessibleDescription(
+      "Use only digits, spaces, hyphens, brackets and a + at the start.",
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it("no envía un teléfono de 7 dígitos y dice cuántos hacen falta", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.type(screen.getByLabelText(OWN_PHONE_LABEL), "4123456");
+    await user.click(saveButton());
+
+    expect(screen.getByLabelText(OWN_PHONE_LABEL)).toHaveAccessibleDescription(
+      "A phone number needs at least 8 digits.",
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it("no envía un contacto a medias y avisa junto a cada dato que falta", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.type(screen.getByLabelText("Contact name"), "Lucía Ruiz");
+    await user.click(saveButton());
+
+    expect(screen.getByLabelText("Contact phone")).toHaveAccessibleDescription(
+      expect.stringContaining(
+        "Add the contact's phone, or leave all three empty.",
+      ),
+    );
+    expect(screen.getByLabelText("Relationship")).toHaveAccessibleDescription(
+      expect.stringContaining(
+        "Add how you're related, or leave all three empty.",
+      ),
+    );
+    expect(screen.getByLabelText("Contact name")).toHaveAttribute(
+      "aria-invalid",
+      "false",
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it("borra el aviso de un dato en cuanto se escribe", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen();
+    await user.type(screen.getByLabelText("Contact name"), "Lucía Ruiz");
+    await user.click(saveButton());
+
+    await user.type(screen.getByLabelText("Contact phone"), "0");
+
+    expect(screen.getByLabelText("Contact phone")).toHaveAttribute(
+      "aria-invalid",
+      "false",
+    );
+    expect(screen.getByLabelText("Relationship")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+  });
+
+  it("no envía un nombre de contacto de más de 100 caracteres", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen({
+      profile: {
+        ...PROFILE,
+        emergencyContact: { ...EMERGENCY_CONTACT, name: "a".repeat(101) },
+      },
+    });
+
+    await user.click(saveButton());
+
+    expect(screen.getByLabelText("Contact name")).toHaveAccessibleDescription(
+      expect.stringContaining("This can be at most 100 characters."),
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it("avisa de que el contacto debería ser otra persona, pero guarda", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen({
+      profile: {
+        ...PROFILE,
+        phone: "0412 345 678",
+        emergencyContact: { ...EMERGENCY_CONTACT, phone: "0412-345-678" },
+      },
+    });
+
+    expect(screen.getByLabelText("Contact phone")).toHaveAccessibleDescription(
+      expect.stringContaining(
+        "This is your own phone. Your emergency contact should be someone else.",
+      ),
+    );
+
+    await user.click(saveButton());
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Changes saved.",
+    );
+  });
+
+  it("a un menor sin contacto le propone a su tutor, sin teléfono", () => {
+    renderScreen({ emergencyContactProposal: { guardianName: "Marta Soto" } });
+
+    expect(screen.getByLabelText("Contact name")).toHaveValue("Marta Soto");
+    expect(screen.getByLabelText("Relationship")).toHaveValue("Guardian");
+    expect(screen.getByLabelText("Contact phone")).toHaveValue("");
+    expect(
+      screen.getByText(
+        "We've suggested your guardian. Add their phone number to save it.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("al menor que guarda la propuesta sin teléfono le pide el teléfono", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen({ emergencyContactProposal: { guardianName: "Marta Soto" } });
+
+    await user.click(saveButton());
+
+    expect(screen.getByLabelText("Contact phone")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it("traduce el motivo de un 400 del servidor sobre el contacto", async () => {
+    stubFetch(() =>
+      jsonResponse(400, {
+        error: {
+          code: "validation_error",
+          message: "no vale",
+          reason: "emergency_contact_phone_too_long",
+        },
+      }),
+    );
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(saveButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "A phone number can have at most 15 digits.",
+    );
+  });
+
+  it("en español, la sección, la propuesta del tutor y los avisos salen en español", async () => {
+    echoSavedProfile();
+    const user = userEvent.setup();
+    renderScreen({
+      locale: "es",
+      emergencyContactProposal: { guardianName: "Marta Soto" },
+    });
+
+    const contact = contactRegion("Contacto");
+    expect(
+      within(contact).getByRole("group", { name: "Contacto de emergencia" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Relación")).toHaveValue("Tutor");
+    await user.type(screen.getByLabelText("Tu teléfono (opcional)"), "12");
+    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    expect(
+      screen.getByLabelText("Tu teléfono (opcional)"),
+    ).toHaveAccessibleDescription("Un teléfono necesita al menos 8 dígitos.");
+    expect(
+      screen.getByLabelText("Teléfono del contacto"),
+    ).toHaveAccessibleDescription(
+      expect.stringContaining(
+        "Escribe el teléfono del contacto o deja los tres datos vacíos.",
+      ),
     );
   });
 });

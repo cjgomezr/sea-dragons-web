@@ -14,6 +14,7 @@ import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import {
   type AufProposal,
+  type EmergencyContactProposal,
   type OwnAuf,
   type OwnProfile,
   type OwnProfileSubmission,
@@ -21,8 +22,19 @@ import {
   validateAufNumber,
   validateFullName,
 } from "@/lib/members/own-profile";
+import {
+  type ContactField,
+  type ContactIssue,
+  contactIssuesOf,
+} from "@/lib/members/profile-contact";
 import { EXPERIENCE_LEVELS, GENDERS } from "@/lib/members/profile-fields";
 import { type AufDraft, OwnAufSection } from "./OwnAufSection";
+import {
+  type ContactDraft,
+  OwnContactSection,
+  contactDraftOf,
+  toContactSubmission,
+} from "./OwnContactSection";
 import {
   describeProfileFailure,
   describeProfileIssue,
@@ -31,7 +43,8 @@ import {
 
 /**
  * La ficha editable del perfil propio (#241, FR-084): nombre, país,
- * posición, nivel y género, y el AUF que el miembro propone (#274). Nada más
+ * posición, nivel y género, el AUF que el miembro propone (#274) y su
+ * teléfono y contacto de emergencia (#496). Nada más
  * de lo que la decisión B3 reserva al Admin aparece aquí, ni siquiera
  * desactivado.
  *
@@ -55,19 +68,31 @@ type Status =
 
 /** Lo que hay en los controles. Una cadena vacía en un desplegable es "sin
  * indicar", y se manda como null. */
-type Draft = AufDraft & {
-  readonly fullName: string;
-  readonly country: string;
-  readonly positionId: string;
-  readonly experienceLevel: string;
-  readonly gender: string;
-};
+type Draft = AufDraft &
+  ContactDraft & {
+    readonly fullName: string;
+    readonly country: string;
+    readonly positionId: string;
+    readonly experienceLevel: string;
+    readonly gender: string;
+  };
 
 const FULL_NAME_ID = "perfil-nombre";
 const FULL_NAME_ERROR_ID = "perfil-nombre-error";
 
-function toDraft(profile: OwnProfile): Draft {
+/** El tutor que se propone, ya con la relación en el idioma de la
+ * pantalla, o null si no se propone nadie. */
+type GuardianProposal = {
+  readonly name: string;
+  readonly relationship: string;
+};
+
+function toDraft(
+  profile: OwnProfile,
+  guardian: GuardianProposal | null,
+): Draft {
   return {
+    ...contactDraftOf(profile, guardian),
     fullName: profile.fullName,
     country: profile.country ?? "",
     positionId: profile.positionId ?? "",
@@ -100,6 +125,7 @@ function toSubmission(draft: Draft, auf: OwnAuf): OwnProfileSubmission {
     positionId: orNull(draft.positionId),
     experienceLevel: orNull(draft.experienceLevel),
     gender: orNull(draft.gender),
+    ...toContactSubmission(draft),
     auf: toAufProposal(draft, auf),
   };
 }
@@ -108,16 +134,65 @@ function toSubmission(draft: Draft, auf: OwnAuf): OwnProfileSubmission {
 type LocalIssues = {
   readonly fullName: ProfileIssueCode | null;
   readonly aufNumber: ProfileIssueCode | null;
+  readonly contact: readonly ContactIssue[];
 };
 
-const NO_LOCAL_ISSUES: LocalIssues = { fullName: null, aufNumber: null };
+const NO_LOCAL_ISSUES: LocalIssues = {
+  fullName: null,
+  aufNumber: null,
+  contact: [],
+};
 
 function localIssuesOf(submission: OwnProfileSubmission): LocalIssues {
   return {
     fullName: validateFullName(submission.fullName),
     aufNumber:
       submission.auf === null ? null : validateAufNumber(submission.auf.number),
+    contact: contactIssuesOf(submission),
   };
+}
+
+function hasLocalIssues(issues: LocalIssues): boolean {
+  return (
+    issues.fullName !== null ||
+    issues.aufNumber !== null ||
+    issues.contact.length > 0
+  );
+}
+
+/** Editar un campo borra su aviso y deja los demás. */
+function withoutIssuesOf(
+  issues: LocalIssues,
+  change: Partial<Draft>,
+): LocalIssues {
+  return {
+    fullName: "fullName" in change ? null : issues.fullName,
+    aufNumber: "aufNumber" in change ? null : issues.aufNumber,
+    contact: issues.contact.filter((issue) => !(issue.field in change)),
+  };
+}
+
+function guardianProposalOf(
+  translate: Translator,
+  proposal: EmergencyContactProposal | null,
+): GuardianProposal | null {
+  return proposal === null
+    ? null
+    : {
+        name: proposal.guardianName,
+        relationship: translate("account.profile.contact.guardianRelationship"),
+      };
+}
+
+function contactIssueText(
+  translate: Translator,
+  issues: LocalIssues,
+  field: ContactField,
+): string | null {
+  const issue = issues.contact.find((candidate) => candidate.field === field);
+  return issue === undefined
+    ? null
+    : describeProfileIssue(translate, issue.code);
 }
 
 type SelectOption = { readonly value: string; readonly label: string };
@@ -255,15 +330,24 @@ export function ProfileForm({
   profile,
   positionOptions,
   countries,
+  emergencyContactProposal,
 }: {
   locale: Locale;
   profile: OwnProfile;
   positionOptions: ClubPositions;
   countries: readonly CountryOption[];
+  emergencyContactProposal: EmergencyContactProposal | null;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const router = useRouter();
-  const [draft, setDraft] = useState<Draft>(() => toDraft(profile));
+  const [draft, setDraft] = useState<Draft>(() =>
+    toDraft(profile, guardianProposalOf(translate, emergencyContactProposal)),
+  );
+  // La propuesta es para la primera vez: quien guardó ya decidió, aunque
+  // fuera dejar el contacto vacío.
+  const [isGuardianProposed, setIsGuardianProposed] = useState(
+    emergencyContactProposal !== null,
+  );
   const [auf, setAuf] = useState<OwnAuf>(profile.auf);
   // La posición guardada decide si la retirada se sigue ofreciendo: quien la
   // cambió y guardó ya no puede volver a ella.
@@ -276,10 +360,7 @@ export function ProfileForm({
 
   function update(change: Partial<Draft>): void {
     setDraft((current) => ({ ...current, ...change }));
-    setIssues((current) => ({
-      fullName: "fullName" in change ? null : current.fullName,
-      aufNumber: "aufNumber" in change ? null : current.aufNumber,
-    }));
+    setIssues((current) => withoutIssuesOf(current, change));
     // Un aviso habla del envío anterior. Mientras se envía no se toca, o el
     // botón volvería a activarse.
     setStatus((current) =>
@@ -296,7 +377,7 @@ export function ProfileForm({
     }
     const submission = toSubmission(draft, auf);
     const localIssues = localIssuesOf(submission);
-    if (localIssues.fullName !== null || localIssues.aufNumber !== null) {
+    if (hasLocalIssues(localIssues)) {
       setIssues(localIssues);
       return;
     }
@@ -309,7 +390,8 @@ export function ProfileForm({
       setStatus(result);
       return;
     }
-    setDraft(toDraft(result.profile));
+    setDraft(toDraft(result.profile, null));
+    setIsGuardianProposed(false);
     setAuf(result.profile.auf);
     setSavedPositionId(result.profile.positionId);
     setStatus({ kind: "saved" });
@@ -384,6 +466,13 @@ export function ProfileForm({
               ? null
               : describeProfileIssue(translate, issues.aufNumber)
           }
+          onChange={update}
+        />
+        <OwnContactSection
+          translate={translate}
+          draft={draft}
+          issueTextOf={(field) => contactIssueText(translate, issues, field)}
+          isGuardianProposed={isGuardianProposed}
           onChange={update}
         />
         <SaveOutcome translate={translate} status={status} />

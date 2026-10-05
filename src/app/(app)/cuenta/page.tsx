@@ -232,6 +232,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
       account={account}
       profile={profile.profile}
       positionOptions={profile.positionOptions}
+      emergencyContactProposal={profile.emergencyContactProposal}
       photoUrl={photo.photoUrl}
       groups={groups}
       evaluation={evaluation}
