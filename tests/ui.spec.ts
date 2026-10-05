@@ -4768,6 +4768,35 @@ test.describe("la hoja de filtros del directorio en el móvil", () => {
   });
 });
 
+/* Los filtros de #497 piden axe en cada ancho y en los dos temas, no sólo en
+   el ancho por defecto: la barra y la hoja son controles distintos. */
+test.describe("los filtros del directorio con axe en cada ancho y tema", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  const filterStates = DIRECTORY_STATES.filter((state) =>
+    /^directorio-(filtros|filtrado-sin)/.test(state.name),
+  );
+
+  for (const vp of viewports) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const state of filterStates) {
+        for (const theme of themes) {
+          test(`${state.name} (${theme}) no tiene violaciones`, async ({
+            page,
+          }) => {
+            await goToDirectory(page, state, theme);
+            await expectNoAxeViolations(page);
+          });
+        }
+      }
+    });
+  }
+});
+
 /** Cómo queda la foto grande en la pantalla, medido en el navegador. */
 type RenderedPhoto = {
   readonly width: number;
