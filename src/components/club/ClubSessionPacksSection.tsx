@@ -447,12 +447,15 @@ function SessionPacksEditorView({
           />
         ))}
       </ol>
-      <AddPackForm
-        translate={translate}
-        issue={addIssue}
-        isBusy={isSending}
-        onAdd={editor.add}
-      />
+      <div className="club-positions-group">
+        <h3>{translate("clubSettings.sessionPacks.add.title")}</h3>
+        <AddPackForm
+          translate={translate}
+          issue={addIssue}
+          isBusy={isSending}
+          onAdd={editor.add}
+        />
+      </div>
       {notice === null ? null : (
         <p className="auth-note" role="status">
           {notice}
@@ -489,7 +492,7 @@ export function ClubSessionPacksSection({
       <h2 id="club-packs-sesiones">
         {translate("clubSettings.sessionPacks.title")}
       </h2>
-      <p className="app-lead">{translate("clubSettings.sessionPacks.lead")}</p>
+      <p className="auth-hint">{translate("clubSettings.sessionPacks.lead")}</p>
       {status.kind === "loading" ? (
         <p className="admin-empty">
           {translate("clubSettings.sessionPacks.loading")}

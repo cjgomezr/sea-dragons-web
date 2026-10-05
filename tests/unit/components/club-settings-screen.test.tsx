@@ -727,8 +727,8 @@ describe("los packs de sesiones en la pantalla (#469)", () => {
       await screen.findByRole("heading", { name: "Session packs" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Choose the session packs that Casual members can buy."),
-    ).toBeInTheDocument();
+      screen.queryByText(/How the club appears to its members/),
+    ).toBeNull();
     expect(screen.queryByLabelText("Club name")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Positions" })).toBeNull();
     expect(loads).toBe(0);

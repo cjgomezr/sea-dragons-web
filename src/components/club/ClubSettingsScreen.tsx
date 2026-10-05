@@ -104,13 +104,11 @@ export function ClubSettingsScreen({
     <div className="club-settings">
       <header className="member-record-header">
         <h1>{translate("clubSettings.title")}</h1>
-        <p className="app-lead">
-          {translate(
-            canManageClub
-              ? "clubSettings.lead"
-              : "clubSettings.sessionPacks.leadOnly",
-          )}
-        </p>
+        {/* Al Committee le basta la entradilla de la sección de los packs:
+            la de la pantalla habla de lo que sólo cambia el Admin. */}
+        {canManageClub ? (
+          <p className="app-lead">{translate("clubSettings.lead")}</p>
+        ) : null}
       </header>
       {canManageClub ? (
         <AdminClubSettings locale={locale} translate={translate} />

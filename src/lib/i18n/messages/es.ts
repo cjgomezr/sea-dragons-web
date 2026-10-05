@@ -1237,8 +1237,6 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.sessionPacks.title": "Packs de sesiones",
   "clubSettings.sessionPacks.lead":
     "Lo que pueden comprar los miembros Casual. Cada pack cuesta el precio de la sesión Casual en Stripe por sus sesiones.",
-  "clubSettings.sessionPacks.leadOnly":
-    "Elige los packs de sesiones que pueden comprar los miembros Casual.",
   "clubSettings.sessionPacks.loading": "Cargando los packs de sesiones…",
   "clubSettings.sessionPacks.pack": {
     one: "{count} sesión",
@@ -1248,6 +1246,7 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.sessionPacks.move.down": "Bajar el pack de {pack}",
   "clubSettings.sessionPacks.remove": "Quitar",
   "clubSettings.sessionPacks.remove.label": "Quitar el pack de {pack}",
+  "clubSettings.sessionPacks.add.title": "Añadir un pack",
   "clubSettings.sessionPacks.add.label": "Sesiones del pack nuevo",
   "clubSettings.sessionPacks.add.hint": "De {min} a {max}.",
   "clubSettings.sessionPacks.add.submit": "Añadir pack",
