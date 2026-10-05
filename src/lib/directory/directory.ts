@@ -233,8 +233,8 @@ export class DirectoryForbiddenError extends Error {
   }
 }
 
-/** El motivo del 403 de un filtro que el rol de quien pide no tiene (#497):
- * el mismo código cubre también los dados de baja y la cuenta inactiva. */
+/** El motivo del 403 de un filtro que el rol de quien pide no tiene (#497).
+ * Distingue este 403 de los otros del endpoint, que no llevan motivo. */
 export const DIRECTORY_FILTER_FORBIDDEN_REASON = "directory_filter_forbidden";
 
 export class DirectoryFilterForbiddenError extends Error {
