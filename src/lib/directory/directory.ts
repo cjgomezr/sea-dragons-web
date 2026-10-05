@@ -6,7 +6,12 @@ import {
 import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type { AccountStatus } from "@/lib/auth/account-status";
 import type { RoleRequestGateways } from "@/lib/auth/role-request";
-import { ROLES, type Role, hasCapability } from "@/lib/auth/roles";
+import {
+  type Capability,
+  ROLES,
+  type Role,
+  hasCapability,
+} from "@/lib/auth/roles";
 import {
   type ClubPositions,
   type ClubPositionsGateway,
@@ -14,9 +19,13 @@ import {
   findClubPosition,
   positionRank,
 } from "@/lib/club/club-positions";
-import type { MembershipStatus } from "@/lib/membership/membership";
+import {
+  MEMBERSHIP_STATUSES,
+  type MembershipStatus,
+} from "@/lib/membership/membership";
 import type { ExperienceLevel } from "@/lib/members/profile-fields";
 import { isAufExpired } from "@/lib/members/member-record";
+import { addClubDays } from "@/lib/time/club-calendar";
 import { matchesNameSearch } from "@/lib/text/name-search";
 import { compareNames } from "@/lib/text/name-order";
 
@@ -52,7 +61,39 @@ export const DIRECTORY_DIRECTIONS = ["asc", "desc"] as const;
 
 export type DirectoryDirection = (typeof DIRECTORY_DIRECTIONS)[number];
 
-/** Qué se pide. `search` y `role` en null es "sin filtrar"; la pantalla y la
+/** Los filtros de #497 (RF-4 del PRD de E19). La búsqueda y el rol son de
+ * todos y no cuentan aquí: esta es la lista de lo que depende del rol. */
+export const DIRECTORY_FILTERS = [
+  "position",
+  "group",
+  "auf",
+  "membership",
+] as const;
+
+export type DirectoryFilter = (typeof DIRECTORY_FILTERS)[number];
+
+/** Una posición del catálogo del club (#299), o quien no tiene ninguna. */
+export type DirectoryPositionFilter =
+  | { readonly kind: "position"; readonly positionId: string }
+  | { readonly kind: "unassigned" };
+
+/** Sin número; vencido; vigente pero vence en los próximos 30 días del club;
+ * con número y sin la confirmación de un Admin (#274). */
+export const AUF_FILTERS = [
+  "missing",
+  "expired",
+  "expiring",
+  "unverified",
+] as const;
+
+export type AufFilter = (typeof AUF_FILTERS)[number];
+
+/** Los estados de la membresía (#453), más quien no tiene ninguna. */
+export const MEMBERSHIP_FILTERS = [...MEMBERSHIP_STATUSES, "none"] as const;
+
+export type MembershipFilter = (typeof MEMBERSHIP_FILTERS)[number];
+
+/** Qué se pide. Un filtro en null es "sin filtrar"; la pantalla y la
  * aplicación de Release 2 construyen esto desde sus controles. */
 export type DirectoryQuery = {
   readonly search: string | null;
@@ -60,6 +101,10 @@ export type DirectoryQuery = {
   readonly sort: DirectorySort;
   readonly direction: DirectoryDirection;
   readonly includeInactive: boolean;
+  readonly position: DirectoryPositionFilter | null;
+  readonly groupId: string | null;
+  readonly auf: AufFilter | null;
+  readonly membership: MembershipFilter | null;
 };
 
 /** Lo que pide quien no pide nada: todo el club activo, por nombre. */
@@ -69,7 +114,15 @@ export const DEFAULT_DIRECTORY_QUERY: DirectoryQuery = {
   sort: "name",
   direction: "asc",
   includeInactive: false,
+  position: null,
+  groupId: null,
+  auf: null,
+  membership: null,
 };
+
+/** "Vence en los próximos 30 días" (#497): de hoy en Melbourne al día 30
+ * después, los dos incluidos. */
+const AUF_EXPIRING_WINDOW_DAYS = 30;
 
 /** Un socio tal como lo guarda la base, con lo reservado al Admin incluido.
  * No sale de aquí: es la materia prima con la que se arma la respuesta. */
@@ -94,6 +147,8 @@ export type DirectoryMemberRecord = {
   /** El estado de su membresía tal como cuenta hoy (#453), o `null` si no
    * tiene. Sólo lo ve un Admin. */
   readonly membershipStatus: MembershipStatus | null;
+  /** Los grupos a los que pertenece (#497). Sólo filtran: no salen nunca. */
+  readonly groupIds: readonly string[];
 };
 
 /** La posición tal como la pinta el directorio: sus nombres, y la pantalla
@@ -136,8 +191,12 @@ export type AdminDirectoryMember = CoachDirectoryMember & {
 
 /** La lista, marcada con quién la está viendo. Quien la consume no tiene que
  * adivinar por la presencia de un campo si le toca dibujar la columna del
- * AUF o la marca de sin evaluar. */
-export type DirectoryListing =
+ * AUF o la marca de sin evaluar. `availableFilters` le dice qué filtros puede
+ * ofrecer (#497): un Committee recibe la vista de socio y aun así filtra por
+ * grupo, así que no se deduce de `kind`. */
+export type DirectoryListing = {
+  readonly availableFilters: readonly DirectoryFilter[];
+} & (
   | { readonly kind: "member"; readonly members: readonly DirectoryMember[] }
   | {
       readonly kind: "coach";
@@ -146,7 +205,8 @@ export type DirectoryListing =
   | {
       readonly kind: "admin";
       readonly members: readonly AdminDirectoryMember[];
-    };
+    }
+);
 
 export type DirectoryGateways = {
   readonly members: RoleRequestGateways["members"];
@@ -173,6 +233,61 @@ export class DirectoryForbiddenError extends Error {
   }
 }
 
+/** El motivo del 403 de un filtro que el rol de quien pide no tiene (#497):
+ * el mismo código cubre también los dados de baja y la cuenta inactiva. */
+export const DIRECTORY_FILTER_FORBIDDEN_REASON = "directory_filter_forbidden";
+
+export class DirectoryFilterForbiddenError extends Error {
+  readonly filter: DirectoryFilter;
+
+  constructor(filter: DirectoryFilter) {
+    super(`Tu rol no puede filtrar el directorio por ${filter}.`);
+    this.name = "DirectoryFilterForbiddenError";
+    this.filter = filter;
+  }
+}
+
+/** Qué capacidad abre cada filtro. La posición es de todos; el grupo, de
+ * quien gestiona grupos; el AUF y la membresía, sólo del Admin (la pregunta
+ * de si el Committee también sigue abierta en el PRD). */
+const FILTER_CAPABILITIES: Readonly<Record<DirectoryFilter, Capability>> = {
+  position: "useMemberFeatures",
+  group: "manageGroups",
+  auf: "manageUsersAndRoles",
+  membership: "manageUsersAndRoles",
+};
+
+export function availableDirectoryFilters(
+  role: Role,
+): readonly DirectoryFilter[] {
+  return DIRECTORY_FILTERS.filter((filter) =>
+    hasCapability(role, FILTER_CAPABILITIES[filter]),
+  );
+}
+
+/** Los filtros que trae la consulta, con el nombre que les da la lista. */
+function requestedFilters(query: DirectoryQuery): readonly DirectoryFilter[] {
+  const values: Readonly<Record<DirectoryFilter, unknown>> = {
+    position: query.position,
+    group: query.groupId,
+    auf: query.auf,
+    membership: query.membership,
+  };
+  return DIRECTORY_FILTERS.filter((filter) => values[filter] !== null);
+}
+
+/** Antes de leer nada: a quien no puede pedir un filtro no se le contesta
+ * con una lista que ya dice algo de lo que filtra. */
+function assertFiltersAllowed(query: DirectoryQuery, role: Role): void {
+  const available = availableDirectoryFilters(role);
+  const forbidden = requestedFilters(query).find(
+    (filter) => !available.includes(filter),
+  );
+  if (forbidden !== undefined) {
+    throw new DirectoryFilterForbiddenError(forbidden);
+  }
+}
+
 function matchesSearch(
   record: DirectoryMemberRecord,
   search: string | null,
@@ -181,6 +296,79 @@ function matchesSearch(
     return true;
   }
   return matchesNameSearch(record.fullName, search);
+}
+
+function matchesPosition(
+  record: DirectoryMemberRecord,
+  position: DirectoryPositionFilter | null,
+): boolean {
+  if (position === null) {
+    return true;
+  }
+  return position.kind === "unassigned"
+    ? record.positionId === null
+    : record.positionId === position.positionId;
+}
+
+function matchesGroup(
+  record: DirectoryMemberRecord,
+  groupId: string | null,
+): boolean {
+  return groupId === null || record.groupIds.includes(groupId);
+}
+
+/** Vence hoy cuenta como vigente, igual que en `isAufExpired`. */
+function isAufExpiring(aufExpiry: string | null, todayInClub: string): boolean {
+  return (
+    aufExpiry !== null &&
+    aufExpiry >= todayInClub &&
+    aufExpiry <= addClubDays(todayInClub, AUF_EXPIRING_WINDOW_DAYS)
+  );
+}
+
+function matchesAuf(
+  record: DirectoryMemberRecord,
+  auf: AufFilter | null,
+  todayInClub: string,
+): boolean {
+  switch (auf) {
+    case null:
+      return true;
+    case "missing":
+      return record.aufNumber === null;
+    case "expired":
+      return isAufExpired(record.aufExpiry, todayInClub);
+    case "expiring":
+      return isAufExpiring(record.aufExpiry, todayInClub);
+    case "unverified":
+      return record.aufNumber !== null && !record.isAufVerified;
+  }
+}
+
+function matchesMembership(
+  record: DirectoryMemberRecord,
+  membership: MembershipFilter | null,
+): boolean {
+  if (membership === null) {
+    return true;
+  }
+  return membership === "none"
+    ? record.membershipStatus === null
+    : record.membershipStatus === membership;
+}
+
+/** Lo que la consulta pide a cada socio, todo a la vez (#497). */
+function matchesFilters(
+  record: DirectoryMemberRecord,
+  query: DirectoryQuery,
+  todayInClub: string,
+): boolean {
+  return (
+    matchesPosition(record, query.position) &&
+    matchesGroup(record, query.groupId) &&
+    matchesAuf(record, query.auf, todayInClub) &&
+    matchesMembership(record, query.membership)
+  );
 }
 
 /** Dado de baja no aparece (FR-085), salvo que un Admin los pida. Una cuenta
@@ -419,13 +607,18 @@ export async function listDirectory(
   if (request.query.includeInactive && !isAdmin) {
     throw new DirectoryForbiddenError();
   }
+  assertFiltersAllowed(request.query, caller.role);
 
   const records = await gateways.directory.findDirectoryMembers(caller.clubId);
   const positions = await gateways.positions.findClubPositions(
     caller.clubId,
     referencedPositionIds(records),
   );
-  const visible = records.filter((record) => isVisible(record, request.query));
+  const visible = records.filter(
+    (record) =>
+      isVisible(record, request.query) &&
+      matchesFilters(record, request.query, request.todayInClub),
+  );
   // Una sola consulta para toda la lista (NFR-008), antes de ordenar: el
   // orden por asistencia la necesita.
   const sortContext = {
@@ -443,12 +636,14 @@ export async function listDirectory(
     signedPhotos: await signListedPhotos(gateways, listed),
   };
 
+  const availableFilters = availableDirectoryFilters(caller.role);
   if (isAdmin) {
     return {
       kind: "admin",
       members: listed.map((record) =>
         toAdminDirectoryMember(record, request.todayInClub, context),
       ),
+      availableFilters,
     };
   }
   return hasCapability(caller.role, "viewEvaluations")
@@ -457,10 +652,12 @@ export async function listDirectory(
         members: listed.map((record) =>
           toCoachDirectoryMember(record, context),
         ),
+        availableFilters,
       }
     : {
         kind: "member",
         members: listed.map((record) => toDirectoryMember(record, context)),
+        availableFilters,
       };
 }
 
@@ -477,10 +674,10 @@ export function withMemberRole(
   }
   switch (listing.kind) {
     case "admin":
-      return { kind: "admin", members: listing.members.map(update) };
+      return { ...listing, members: listing.members.map(update) };
     case "coach":
-      return { kind: "coach", members: listing.members.map(update) };
+      return { ...listing, members: listing.members.map(update) };
     case "member":
-      return { kind: "member", members: listing.members.map(update) };
+      return { ...listing, members: listing.members.map(update) };
   }
 }

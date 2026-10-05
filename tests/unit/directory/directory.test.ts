@@ -3,7 +3,9 @@ import { MemberNotFoundError } from "@/lib/auth/account-activation";
 import type { Role } from "@/lib/auth/roles";
 import {
   DEFAULT_DIRECTORY_QUERY,
+  DIRECTORY_FILTERS,
   type DirectoryGateways,
+  DirectoryFilterForbiddenError,
   DirectoryForbiddenError,
   type DirectoryMemberRecord,
   type DirectoryQuery,
@@ -49,6 +51,9 @@ const CLUB_POSITIONS = [FORWARD, GOALKEEPER, DEFENDER] as const;
 const clubsWhosePositionsWereRead: string[] = [];
 const positionsReferenced: (readonly string[])[] = [];
 
+const SENIOR_GROUP_ID = "9a9a9a9a-0000-4000-8000-000000000001";
+const JUNIOR_GROUP_ID = "9a9a9a9a-0000-4000-8000-000000000002";
+
 const ANA: DirectoryMemberRecord = {
   userId: "aaaaaaaa-0000-4000-8000-00000000000a",
   fullName: "Ana Admin",
@@ -63,6 +68,7 @@ const ANA: DirectoryMemberRecord = {
   photoPath: "aaaaaaaa-0000-4000-8000-00000000000a/foto.webp",
   isEvaluated: true,
   membershipStatus: "active",
+  groupIds: [SENIOR_GROUP_ID],
 };
 
 const BRUNO: DirectoryMemberRecord = {
@@ -79,6 +85,7 @@ const BRUNO: DirectoryMemberRecord = {
   photoPath: null,
   isEvaluated: false,
   membershipStatus: "pending",
+  groupIds: [JUNIOR_GROUP_ID],
 };
 
 const MARIA: DirectoryMemberRecord = {
@@ -95,6 +102,7 @@ const MARIA: DirectoryMemberRecord = {
   photoPath: null,
   isEvaluated: true,
   membershipStatus: "waived",
+  groupIds: [SENIOR_GROUP_ID, JUNIOR_GROUP_ID],
 };
 
 const ZOE: DirectoryMemberRecord = {
@@ -112,6 +120,7 @@ const ZOE: DirectoryMemberRecord = {
   photoPath: "dddddddd-0000-4000-8000-00000000000d/foto.png",
   isEvaluated: false,
   membershipStatus: null,
+  groupIds: [],
 };
 
 const CLUB: readonly DirectoryMemberRecord[] = [ZOE, MARIA, ANA, BRUNO];
@@ -672,6 +681,7 @@ describe("marca de sin evaluar", () => {
           isEvaluated: false,
         },
       ],
+      availableFilters: ["position", "group"],
     });
   });
 
@@ -709,11 +719,13 @@ describe("el rol nuevo en la lista (#240)", () => {
     const listing: DirectoryListing = {
       kind: "member",
       members: [NEREA, TOMAS],
+      availableFilters: ["position"],
     };
 
     expect(withMemberRole(listing, NEREA.userId, "Coach")).toEqual({
       kind: "member",
       members: [{ ...NEREA, role: "Coach" }, TOMAS],
+      availableFilters: ["position"],
     });
   });
 
@@ -727,21 +739,216 @@ describe("el rol nuevo en la lista (#240)", () => {
       isEvaluated: true,
       membershipStatus: "active" as const,
     };
-    const listing: DirectoryListing = { kind: "admin", members: [admin] };
+    const listing: DirectoryListing = {
+      kind: "admin",
+      members: [admin],
+      availableFilters: DIRECTORY_FILTERS,
+    };
 
     expect(withMemberRole(listing, NEREA.userId, "Committee")).toEqual({
       kind: "admin",
       members: [{ ...admin, role: "Committee" }],
+      availableFilters: DIRECTORY_FILTERS,
     });
   });
 
   it("conserva la marca de evaluación de la vista del Coach", () => {
     const coachView = { ...NEREA, isEvaluated: false };
-    const listing: DirectoryListing = { kind: "coach", members: [coachView] };
+    const listing: DirectoryListing = {
+      kind: "coach",
+      members: [coachView],
+      availableFilters: ["position", "group"],
+    };
 
     expect(withMemberRole(listing, NEREA.userId, "Coach")).toEqual({
       kind: "coach",
       members: [{ ...coachView, role: "Coach" }],
+      availableFilters: ["position", "group"],
     });
+  });
+});
+
+describe("los filtros del directorio (#497)", () => {
+  /** Zoe tiene que estar para contar: es la única con el AUF que vence hoy. */
+  function asAdmin(query: Partial<DirectoryQuery>): Promise<readonly string[]> {
+    return listNames({ includeInactive: true, ...query }, "Admin");
+  }
+
+  it("filtra por una posición del catálogo", async () => {
+    await expect(
+      listNames({ position: { kind: "position", positionId: GOALKEEPER.id } }),
+    ).resolves.toEqual(["Bruno Beltrán"]);
+  });
+
+  it("filtra a quien no tiene posición", async () => {
+    await expect(
+      listNames({ position: { kind: "unassigned" } }),
+    ).resolves.toEqual(["Ana Admin"]);
+  });
+
+  it("devuelve la lista vacía con una posición que nadie tiene", async () => {
+    await expect(
+      listNames({
+        position: {
+          kind: "position",
+          positionId: "f0f0f0f0-0000-4000-8000-0000000000ff",
+        },
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it.each(["Admin", "Coach", "Committee"] as const)(
+    "deja a un %s filtrar por grupo",
+    async (callerRole) => {
+      await expect(
+        listNames({ groupId: SENIOR_GROUP_ID }, callerRole),
+      ).resolves.toEqual(["Ana Admin", "María Ñíguez"]);
+    },
+  );
+
+  it.each([
+    ["missing", ["María Ñíguez"]],
+    ["expired", ["Bruno Beltrán"]],
+    // Vence hoy: todavía no está vencido, y vence dentro de los 30 días.
+    ["expiring", ["Zoe Zapata"]],
+    // Con número y sin la confirmación de un Admin; sin número no cuenta.
+    ["unverified", ["Zoe Zapata"]],
+  ] as const)("filtra el AUF %s", async (auf, expected) => {
+    await expect(asAdmin({ auf })).resolves.toEqual(expected);
+  });
+
+  it.each([
+    ["active", ["Ana Admin"]],
+    ["pending", ["Bruno Beltrán"]],
+    ["waived", ["María Ñíguez"]],
+    ["trialing", []],
+    ["past_due", []],
+    ["cancelled", []],
+    ["none", ["Zoe Zapata"]],
+  ] as const)("filtra la membresía %s", async (membership, expected) => {
+    await expect(asAdmin({ membership })).resolves.toEqual(expected);
+  });
+
+  it("combina los filtros entre sí y con la búsqueda, el rol y el orden", async () => {
+    await expect(
+      asAdmin({
+        groupId: JUNIOR_GROUP_ID,
+        membership: "pending",
+        role: "Coach",
+        search: "bruno",
+      }),
+    ).resolves.toEqual(["Bruno Beltrán"]);
+    await expect(
+      asAdmin({ groupId: SENIOR_GROUP_ID, sort: "name", direction: "desc" }),
+    ).resolves.toEqual(["María Ñíguez", "Ana Admin"]);
+    await expect(
+      asAdmin({ groupId: SENIOR_GROUP_ID, auf: "expired" }),
+    ).resolves.toEqual([]);
+  });
+
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "niega a un %s los filtros del AUF y de la membresía, sin leer el directorio",
+    async (callerRole) => {
+      for (const query of [
+        { auf: "expired" },
+        { membership: "active" },
+      ] as const) {
+        const wiring = gateways({ callerRole });
+
+        await expect(
+          listDirectory(wiring, {
+            callerId: CALLER_ID,
+            query: { ...DEFAULT_DIRECTORY_QUERY, ...query },
+            todayInClub: TODAY,
+          }),
+        ).rejects.toBeInstanceOf(DirectoryFilterForbiddenError);
+        expect(clubsRead).toEqual([]);
+      }
+    },
+  );
+
+  it("niega a un Player el filtro por grupo y dice cuál", async () => {
+    const rejection = listDirectory(gateways({ callerRole: "Player" }), {
+      callerId: CALLER_ID,
+      query: { ...DEFAULT_DIRECTORY_QUERY, groupId: SENIOR_GROUP_ID },
+      todayInClub: TODAY,
+    });
+
+    await expect(rejection).rejects.toBeInstanceOf(
+      DirectoryFilterForbiddenError,
+    );
+    await expect(rejection).rejects.toMatchObject({ filter: "group" });
+  });
+
+  it.each([
+    ["Player", ["position"]],
+    ["Coach", ["position", "group"]],
+    ["Committee", ["position", "group"]],
+    ["Admin", ["position", "group", "auf", "membership"]],
+  ] as const)(
+    "dice a un %s qué filtros puede usar",
+    async (callerRole, expected) => {
+      const listing = await listDirectory(gateways({ callerRole }), {
+        callerId: CALLER_ID,
+        query: DEFAULT_DIRECTORY_QUERY,
+        todayInClub: TODAY,
+      });
+
+      expect(listing.availableFilters).toEqual(expected);
+    },
+  );
+});
+
+describe("el AUF que vence en los próximos 30 días (#497)", () => {
+  /** El 1 de octubre de 2026 en Melbourne: el 30 de septiembre en UTC. */
+  const MELBOURNE_TODAY = "2026-10-01";
+
+  async function expiringOf(aufExpiry: string): Promise<boolean> {
+    const record: DirectoryMemberRecord = {
+      ...ANA,
+      aufExpiry,
+      fullName: "Socia de prueba",
+    };
+    const wiring = gateways({ callerRole: "Admin" });
+    const listing = await listDirectory(
+      {
+        ...wiring,
+        directory: { findDirectoryMembers: async () => [record] },
+      },
+      {
+        callerId: CALLER_ID,
+        query: { ...DEFAULT_DIRECTORY_QUERY, auf: "expiring" },
+        todayInClub: MELBOURNE_TODAY,
+      },
+    );
+    return listing.members.length === 1;
+  }
+
+  it.each([
+    ["el que venció ayer", "2026-09-30", false],
+    ["el que vence hoy", "2026-10-01", true],
+    ["el que vence dentro de 30 días", "2026-10-31", true],
+    ["el que vence dentro de 31 días", "2026-11-01", false],
+  ] as const)("cuenta %s: %s", async (_case, aufExpiry, isExpiring) => {
+    await expect(expiringOf(aufExpiry)).resolves.toBe(isExpiring);
+  });
+
+  it("no cuenta a quien no tiene vencimiento", async () => {
+    const wiring = gateways({ callerRole: "Admin" });
+    const listing = await listDirectory(
+      {
+        ...wiring,
+        directory: {
+          findDirectoryMembers: async () => [{ ...ANA, aufExpiry: null }],
+        },
+      },
+      {
+        callerId: CALLER_ID,
+        query: { ...DEFAULT_DIRECTORY_QUERY, auf: "expiring" },
+        todayInClub: TODAY,
+      },
+    );
+
+    expect(listing.members).toEqual([]);
   });
 });

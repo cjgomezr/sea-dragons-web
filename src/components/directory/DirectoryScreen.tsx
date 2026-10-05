@@ -12,6 +12,7 @@ import {
   type DirectorySort,
   withMemberRole,
 } from "@/lib/directory/directory";
+import { writeDirectoryQuery } from "@/lib/directory/directory-query";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import { AdministrationNotice } from "./AdministrationNotice";
@@ -24,10 +25,12 @@ import {
   type DirectoryFilterState,
   DirectoryFilters,
 } from "./DirectoryFilters";
+import { NO_MORE_FILTERS, countActiveFilters } from "./DirectoryMoreFilters";
 import type { DirectoryOrder } from "./DirectorySortControl";
 import { DirectoryTable } from "./DirectoryTable";
 import { RoleRequestsPanel } from "./RoleRequestsPanel";
 import { useDebouncedValue } from "./use-debounced-value";
+import { useFilterChoices } from "./use-filter-choices";
 import { useMemberRoleChange } from "./use-member-role-change";
 
 /**
@@ -59,16 +62,31 @@ type ScreenState =
   | { readonly kind: "failed"; readonly failure: DirectoryFailure }
   | { readonly kind: "ready"; readonly listing: DirectoryListing };
 
-const INITIAL_FILTERS: DirectoryFilterState = {
-  search: "",
-  role: DEFAULT_DIRECTORY_QUERY.role,
-  includeInactive: DEFAULT_DIRECTORY_QUERY.includeInactive,
-};
+/** Lo que la pantalla enseña en sus controles para una consulta. */
+function filtersOf(query: DirectoryQuery): DirectoryFilterState {
+  return {
+    search: query.search ?? "",
+    role: query.role,
+    includeInactive: query.includeInactive,
+    position: query.position,
+    groupId: query.groupId,
+    auf: query.auf,
+    membership: query.membership,
+  };
+}
 
-const INITIAL_SORT: DirectoryOrder = {
-  sort: DEFAULT_DIRECTORY_QUERY.sort,
-  direction: DEFAULT_DIRECTORY_QUERY.direction,
-};
+/** Los filtros viven en la dirección (#497): recargar o compartirla devuelve
+ * la misma lista. Se reemplaza la entrada del historial en vez de apilar una
+ * por letra escrita, y Next la sincroniza con su router. */
+function writeQueryToAddress(query: DirectoryQuery): void {
+  const written = writeDirectoryQuery(query).toString();
+  const { pathname } = window.location;
+  window.history.replaceState(
+    null,
+    "",
+    written === "" ? pathname : `${pathname}?${written}`,
+  );
+}
 
 /** Un nombre de sólo espacios no filtra nada, igual que para el endpoint. */
 function asSearchQuery(search: string): string | null {
@@ -126,18 +144,21 @@ function EmptyDirectory({
 
 export function DirectoryScreen({
   locale,
-  initialSearch = "",
+  initialQuery = DEFAULT_DIRECTORY_QUERY,
 }: {
   locale: Locale;
-  /** El nombre con el que llega, como desde la búsqueda global (#427). */
-  initialSearch?: string;
+  /** La consulta con la que llega: la de la dirección (#497), como el nombre
+   * que trae la búsqueda global (#427). */
+  initialQuery?: DirectoryQuery;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
-  const [filters, setFilters] = useState<DirectoryFilterState>({
-    ...INITIAL_FILTERS,
-    search: initialSearch,
+  const [filters, setFilters] = useState<DirectoryFilterState>(() =>
+    filtersOf(initialQuery),
+  );
+  const [order, setOrder] = useState<DirectoryOrder>({
+    sort: initialQuery.sort,
+    direction: initialQuery.direction,
   });
-  const [order, setOrder] = useState<DirectoryOrder>(INITIAL_SORT);
   const [state, setState] = useState<ScreenState>({ kind: "loading" });
   // Volver a intentarlo cuenta como una lectura más, aunque la consulta sea la
   // misma de antes: así el pedido vive sólo en el efecto.
@@ -149,11 +170,32 @@ export function DirectoryScreen({
       search: asSearchQuery(settledSearch),
       role: filters.role,
       includeInactive: filters.includeInactive,
+      position: filters.position,
+      groupId: filters.groupId,
+      auf: filters.auf,
+      membership: filters.membership,
       sort: order.sort,
       direction: order.direction,
     }),
-    [settledSearch, filters.role, filters.includeInactive, order],
+    [
+      settledSearch,
+      filters.role,
+      filters.includeInactive,
+      filters.position,
+      filters.groupId,
+      filters.auf,
+      filters.membership,
+      order,
+    ],
   );
+
+  useEffect(() => {
+    writeQueryToAddress(query);
+  }, [query]);
+
+  const availableFilters =
+    state.kind === "ready" ? state.listing.availableFilters : [];
+  const choices = useFilterChoices(availableFilters.includes("group"));
 
   // La lista anterior se queda a la vista mientras llega la nueva: quien
   // escribe un nombre no ve parpadear la pantalla entre letra y letra. Una
@@ -175,15 +217,23 @@ export function DirectoryScreen({
     };
   }, [query, reloads]);
 
-  /** Reintentar tras un 403 quita lo único que esta pantalla puede dejar de
-   * pedir: los dados de baja, que sólo un Admin alcanza. Sin esto, a quien deja
-   * de ser Admin con la pantalla abierta le queda un botón que repite el mismo
-   * 403 para siempre, porque la casilla que lo causa ya no se dibuja. El otro
-   * 403 del endpoint, el de una cuenta que deja de estar activa, no se arregla
-   * desde aquí: ahí reintentar vuelve a fallar, y así tiene que ser. */
+  /** Reintentar tras un 403 quita lo que esta pantalla puede dejar de pedir
+   * y depende del rol: los dados de baja y los filtros de grupo, AUF y
+   * membresía (#497). Sin esto, a quien deja de ser Admin con la pantalla
+   * abierta, o a quien abre una dirección compartida por un Admin, le queda un
+   * botón que repite el mismo 403 para siempre, porque el control que lo causa
+   * ya no se dibuja. El otro 403 del endpoint, el de una cuenta que deja de
+   * estar activa, no se arregla desde aquí: ahí reintentar vuelve a fallar, y
+   * así tiene que ser. */
   function retryLoad(): void {
     if (state.kind === "failed" && state.failure.failure === "forbidden") {
-      setFilters((current) => ({ ...current, includeInactive: false }));
+      setFilters((current) => ({
+        ...current,
+        includeInactive: false,
+        groupId: null,
+        auf: null,
+        membership: null,
+      }));
     }
     setState({ kind: "loading" });
     setReloads((count) => count + 1);
@@ -214,7 +264,9 @@ export function DirectoryScreen({
   const roleChange = useMemberRoleChange(translate, applyRole);
 
   const hasNarrowingFilters =
-    asSearchQuery(filters.search) !== null || filters.role !== null;
+    asSearchQuery(filters.search) !== null ||
+    filters.role !== null ||
+    countActiveFilters(filters) > 0;
 
   return (
     <div className="directory">
@@ -249,8 +301,11 @@ export function DirectoryScreen({
           <AdministrationNotice notice={roleChange.notice} />
           <DirectoryFilters
             translate={translate}
+            locale={locale}
             filters={filters}
             canIncludeInactive={state.listing.kind === "admin"}
+            availableFilters={availableFilters}
+            choices={choices}
             onChange={setFilters}
           />
           {state.listing.members.length === 0 ? (
@@ -260,6 +315,7 @@ export function DirectoryScreen({
               onClear={() =>
                 setFilters((current) => ({
                   ...current,
+                  ...NO_MORE_FILTERS,
                   search: "",
                   role: null,
                 }))

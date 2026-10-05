@@ -50,6 +50,7 @@ function memberRecord(
     photoPath: null,
     isEvaluated: true,
     membershipStatus: "active",
+    groupIds: [],
     ...overrides,
   };
 }
