@@ -3,6 +3,7 @@ import { readRequestLocale } from "@/lib/i18n/request-locale";
 import {
   CARD_RETURN_QUERY_PARAM,
   CHECKOUT_RETURN_QUERY_PARAM,
+  PACK_RETURN_QUERY_PARAM,
   readCheckoutReturn,
 } from "@/lib/membership/checkout-return";
 
@@ -11,8 +12,8 @@ import {
  * membresía al día (#453). La pantalla pide la membresía al endpoint, como
  * la aplicación nativa (CON-002).
  *
- * `?checkout=` y `?tarjeta=` (`ok` o `cancelado`) es con lo que se vuelve de
- * Stripe tras suscribirse o cambiar la tarjeta. */
+ * `?checkout=`, `?tarjeta=` y `?pack=` (`ok` o `cancelado`) es con lo que se
+ * vuelve de Stripe tras suscribirse, cambiar la tarjeta o comprar un pack. */
 export default async function PagosPage({
   searchParams,
 }: {
@@ -27,6 +28,7 @@ export default async function PagosPage({
       locale={locale}
       checkoutReturn={readCheckoutReturn(params[CHECKOUT_RETURN_QUERY_PARAM])}
       cardReturn={readCheckoutReturn(params[CARD_RETURN_QUERY_PARAM])}
+      packReturn={readCheckoutReturn(params[PACK_RETURN_QUERY_PARAM])}
     />
   );
 }

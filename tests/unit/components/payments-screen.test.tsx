@@ -27,6 +27,9 @@ const MEMBERSHIP_PATH = "/api/v1/membership";
 const CHECKOUT_PATH = "/api/v1/membership/checkout";
 const CARD_PATH = "/api/v1/membership/card";
 const PLAN_PATH = "/api/v1/membership/plan";
+const PACKS_PATH = "/api/v1/club/session-packs";
+const PACK_CHECKOUT_PATH = "/api/v1/membership/session-packs/checkout";
+const PACK_CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_pack";
 const CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_123";
 const SETUP_URL = "https://checkout.stripe.com/c/pay/cs_test_setup";
 const TRIAL_END = "2026-11-01T09:00:00.000Z";
@@ -130,7 +133,22 @@ type FetchRoutes = {
   readonly card?: RouteHandler;
   /** `POST` y `DELETE` del cambio de plan (#456): el método va en `init`. */
   readonly plan?: RouteHandler;
+  /** Los packs del club (#469); por defecto, 5 y 10 a 15 AUD la sesión. */
+  readonly packs?: RouteHandler;
+  readonly packCheckout?: RouteHandler;
 };
+
+function packsResponse(): Response {
+  return jsonResponse({
+    data: {
+      packs: [
+        { sessions: 5, price: { amountCents: 7500, currency: "AUD" } },
+        { sessions: 10, price: { amountCents: 15000, currency: "AUD" } },
+      ],
+      sessionPrice: { amountCents: 1500, currency: "AUD" },
+    },
+  });
+}
 
 function stubFetch(routes: FetchRoutes): ReturnType<typeof vi.fn> {
   const handlers: Record<string, RouteHandler | undefined> = {
@@ -138,6 +156,8 @@ function stubFetch(routes: FetchRoutes): ReturnType<typeof vi.fn> {
     [CHECKOUT_PATH]: routes.checkout,
     [CARD_PATH]: routes.card,
     [PLAN_PATH]: routes.plan,
+    [PACKS_PATH]: routes.packs ?? packsResponse,
+    [PACK_CHECKOUT_PATH]: routes.packCheckout,
   };
   const fetchDouble = vi.fn(
     async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -157,6 +177,7 @@ type RenderOptions = {
   readonly locale?: Locale;
   readonly checkoutReturn?: CheckoutReturn | null;
   readonly cardReturn?: CheckoutReturn | null;
+  readonly packReturn?: CheckoutReturn | null;
 };
 
 function renderScreen(options: RenderOptions = {}): void {
@@ -165,6 +186,7 @@ function renderScreen(options: RenderOptions = {}): void {
       locale={options.locale ?? "en"}
       checkoutReturn={options.checkoutReturn ?? null}
       cardReturn={options.cardReturn ?? null}
+      packReturn={options.packReturn ?? null}
     />,
   );
 }
@@ -785,7 +807,7 @@ describe("PaymentsScreen: socio pendiente", () => {
   });
 });
 
-describe("PaymentsScreen: Casual pendiente", () => {
+describe("PaymentsScreen: packs de un Casual (#471)", () => {
   const PENDING_CASUAL = view(
     panel({
       plan: "Casual",
@@ -795,22 +817,190 @@ describe("PaymentsScreen: Casual pendiente", () => {
       card: null,
     }),
   );
+  const ACTIVE_CASUAL = view(
+    panel({
+      plan: "Casual",
+      status: "active",
+      monthlyPriceCents: null,
+      nextChargeAt: null,
+      card: null,
+    }),
+  );
 
-  it("dice que los packs llegan más adelante y que un Admin puede activarlo, sin Checkout", async () => {
+  function packSection(): HTMLElement {
+    return screen.getByRole("region", {
+      name: /^(Session packs|Packs de sesiones)$/,
+    });
+  }
+
+  it("ofrece un botón por pack con sus sesiones y su precio en AUD", async () => {
     await renderLoaded(PENDING_CASUAL);
 
-    expect(screen.getByText(/session packs/)).toHaveTextContent(
-      "an Admin can activate",
-    );
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    const section = await waitFor(packSection);
+    const buttons = await within(section).findAllByRole("button");
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      "Buy 5 sessions · $75.00",
+      "Buy 10 sessions · $150.00",
+    ]);
   });
 
   it("lo dice en español", async () => {
     await renderLoaded(PENDING_CASUAL, { locale: "es" });
 
-    expect(screen.getByText(/packs de sesiones/)).toHaveTextContent(
-      "un Admin puede activar",
+    expect(
+      await screen.findByRole("button", {
+        name: /^Comprar 5 sesiones · 75,00/,
+      }),
+    ).toBeInTheDocument();
+    expect(packSection()).toHaveTextContent("sin cobros recurrentes");
+  });
+
+  it("lleva a Stripe Checkout con el pack que se toca", async () => {
+    const fetchDouble = await renderLoaded(PENDING_CASUAL, {
+      routes: {
+        packCheckout: () => jsonResponse({ data: { url: PACK_CHECKOUT_URL } }),
+      },
+    });
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /^Buy 10 sessions/ }),
     );
+
+    await waitFor(() =>
+      expect(openCheckout).toHaveBeenCalledWith(PACK_CHECKOUT_URL),
+    );
+    const [, init] =
+      fetchDouble.mock.calls.find(
+        ([input]) => String(input) === PACK_CHECKOUT_PATH,
+      ) ?? [];
+    expect(init).toMatchObject({ method: "POST" });
+    expect(JSON.parse(String(init?.body))).toEqual({ sessions: 10 });
+  });
+
+  it("dice por qué no se abrió Stripe y deja reintentar", async () => {
+    await renderLoaded(PENDING_CASUAL, {
+      routes: { packCheckout: serviceUnavailable },
+    });
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /^Buy 5 sessions/ }),
+    );
+
+    expect(await within(packSection()).findByRole("alert")).toHaveTextContent(
+      "We couldn't open Stripe",
+    );
+    expect(openCheckout).not.toHaveBeenCalled();
+  });
+
+  it("dice Precio no disponible cuando Stripe no da el de la sesión", async () => {
+    const unavailable = { amountCents: null, reason: "stripe_unavailable" };
+    await renderLoaded(PENDING_CASUAL, {
+      routes: {
+        packs: () =>
+          jsonResponse({
+            data: {
+              packs: [{ sessions: 5, price: unavailable }],
+              sessionPrice: unavailable,
+            },
+          }),
+      },
+    });
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Buy 5 sessions · Price not available",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("dice que no pudo cargar los packs sin romper el resto de Pagos", async () => {
+    await renderLoaded(PENDING_CASUAL, {
+      routes: { packs: serviceUnavailable },
+    });
+
+    expect(
+      await within(packSection()).findByText(/couldn't load the session packs/),
+    ).toBeInTheDocument();
+    expect(statusChip()).toHaveTextContent("Pending");
+  });
+
+  it("también se los ofrece a un Casual que ya está al día", async () => {
+    await renderLoaded(ACTIVE_CASUAL);
+
+    expect(
+      await screen.findByRole("button", { name: /^Buy 5 sessions/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("no ofrece packs a un Full ni los pide", async () => {
+    const fetchDouble = await renderLoaded(ACTIVE_FULL);
+
+    expect(countCalls(fetchDouble, PACKS_PATH)).toBe(0);
+    expect(
+      screen.queryByRole("region", { name: "Session packs" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("sin pagos configurados lo dice y no ofrece packs", async () => {
+    await renderLoaded({ ...PENDING_CASUAL, paymentsConfigured: false });
+
+    expect(screen.getByText(/Payments aren't set up yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  describe("vuelta de Checkout", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+
+    it("espera a Stripe y vuelve a consultar hasta que la membresía se abre", async () => {
+      let answers = 0;
+      stubFetch({
+        membership: () => {
+          answers += 1;
+          return jsonResponse({
+            data: answers < 3 ? PENDING_CASUAL : ACTIVE_CASUAL,
+          });
+        },
+      });
+      renderScreen({ packReturn: "ok" });
+
+      expect(
+        await screen.findByText(/Pack paid\. We're waiting for Stripe/),
+      ).toHaveAttribute("role", "status");
+
+      await act(() => vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS / 2));
+
+      expect(statusChip()).toHaveTextContent("Active");
+      expect(
+        screen.queryByText(/We're waiting for Stripe/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("lo dice en español", async () => {
+      stubFetch({ membership: () => jsonResponse({ data: PENDING_CASUAL }) });
+      renderScreen({ locale: "es", packReturn: "ok" });
+
+      expect(
+        await screen.findByText(/Pack pagado\. Estamos esperando/),
+      ).toHaveAttribute("role", "status");
+    });
+
+    it("a un Casual ya al día le dice que las sesiones se suman al confirmar", async () => {
+      await renderLoaded(ACTIVE_CASUAL, { packReturn: "ok" });
+
+      expect(
+        screen.getByText(/sessions are added as soon as Stripe confirms/),
+      ).toHaveAttribute("role", "status");
+    });
+
+    it("dice que salió sin comprar cuando vuelve cancelado", async () => {
+      await renderLoaded(PENDING_CASUAL, { packReturn: "cancelado" });
+
+      expect(
+        screen.getByText(/You left Stripe without buying a pack/),
+      ).toHaveAttribute("role", "status");
+    });
   });
 });
 
@@ -1335,14 +1525,14 @@ describe("PaymentsScreen: elegir plan antes del primer pago (#479)", () => {
     );
   });
 
-  it("al elegir Casual dice que los packs llegan con E13 y que un Admin puede activarlo, sin Checkout", async () => {
+  it("al elegir Casual ofrece sus packs, sin la tarjeta", async () => {
     await renderLoaded(choosing(), { routes: { plan: savedChoice("Casual") } });
 
     await userEvent.click(screen.getByRole("radio", { name: /^Casual/ }));
 
-    expect(await screen.findByText(/session packs arrive/)).toHaveTextContent(
-      "an Admin can activate",
-    );
+    expect(
+      await screen.findByRole("button", { name: /^Buy 5 sessions/ }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Add card" }),
     ).not.toBeInTheDocument();
