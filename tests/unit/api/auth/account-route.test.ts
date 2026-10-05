@@ -321,6 +321,9 @@ describe("guardar lo que falta", () => {
     });
 
     expect(response.status).toBe(200);
+    expect(profileWrites).toEqual([
+      { memberId: MEMBER_ID, values: { dateOfBirth: "1994-03-08" } },
+    ]);
   });
 
   it("con sólo el tipo de membresía, no escribe nada y devuelve la cuenta al día", async () => {
