@@ -1,10 +1,10 @@
 # PRD: E19 · El directorio para la administración
 
-**Estado:** borrador · **Fecha:** 5 de octubre de 2026 · **Autor:** sesión de planificación (Claude Code)
+**Estado:** aprobado · **Fecha:** 5 de octubre de 2026 · **Autor:** sesión de planificación (Claude Code)
 
 Fuente: la conversación con el dueño del 4 y el 5 de octubre de 2026. Es una épica añadida después del plan (ver `docs/plan-maestro.md`) y amplía la E5 (directorio y perfiles). Ningún FR del SRD la cubre todavía: al aprobarla, el SRD sube a v1.6 con los FR nuevos (ver la sección 9). `docs/preguntas-abiertas.md` no tiene nada pendiente sobre ella.
 
-Las decisiones que tomó el dueño van marcadas como D1 a D7:
+Las decisiones que tomó el dueño van marcadas como D1 a D8:
 
 - **D1.** El teléfono propio es opcional.
 - **D2.** El contacto de emergencia (nombre, teléfono y relación) es obligatorio, pero no bloquea nada: no se pide al crear la cuenta, se completa en el perfil y un aviso que no se puede cerrar lo recuerda en el inicio y en el perfil.
@@ -13,6 +13,7 @@ Las decisiones que tomó el dueño van marcadas como D1 a D7:
 - **D5.** El correo y el teléfono de un socio los ven Admin y Committee. El contacto de emergencia lo ven Admin, Committee y Coach, porque el Coach es quien está en la piscina.
 - **D6.** La exportación es solo CSV, sin librerías nuevas. Excel lo abre directamente.
 - **D7.** Los correos se mandan desde la propia aplicación, a los socios que se elijan en el directorio.
+- **D8.** El directorio puede mandar como mucho 50 correos cada 24 horas. El resto del cupo de Resend queda para los correos de cuenta.
 
 ## 1. Problema
 
@@ -132,7 +133,7 @@ Admin y Committee escriben un correo a los socios de la lista y la aplicación l
 
 Los correos de cuenta (invitación, confirmación, recuperación) salen del mismo cupo del proveedor y no pueden quedarse sin él.
 
-- **Dado** el cupo diario de correos, **cuando** se calcula cuántos puede mandar un envío del directorio, **entonces** se descuenta una reserva para los correos de cuenta que el envío nunca toca.
+- **Dado** los envíos del directorio de las últimas 24 horas, **cuando** se calcula cuántos caben, **entonces** son 50 menos los ya mandados por el directorio (D8), y los correos de cuenta conservan su propio cupo sin que el directorio les reste.
 - **Dado** un envío con más destinatarios de los que caben, **cuando** se intenta, **entonces** no se manda nada y el formulario dice cuántos caben hoy, para que reduzca la lista o espere.
 - **Dado** el proveedor caído o sin configurar, **cuando** se intenta enviar, **entonces** no se manda nada y se dice que el envío no está disponible ahora.
 - **Dado** dos envíos a la vez, **cuando** se cuentan contra el cupo, **entonces** entre los dos no pasan de lo que cabe.
@@ -175,7 +176,7 @@ Los correos de cuenta (invitación, confirmación, recuperación) salen del mism
 
 ## 9. Preguntas abiertas
 
-- [ ] **Plan de Resend.** El plan gratuito da 100 correos al día, compartidos con los correos de cuenta, y hoy el cupo propio corta en 80. Un correo a todo el club no cabe con margen. RF-7 lo deja seguro, pero si se van a mandar correos a todo el club a menudo, hace falta un plan de pago. La decisión es del dueño, y no bloquea los tickets.
+- [ ] **Plan de Resend.** El plan gratuito da 100 correos al día, compartidos con los correos de cuenta, y hoy el cupo propio corta en 80. Un correo a todo el club no cabe con margen. RF-7 deja al directorio en 50 correos cada 24 horas (D8), pero si se van a mandar correos a todo el club a menudo, hace falta un plan de pago. La decisión es del dueño, y no bloquea los tickets.
 - [ ] **¿Committee ve el AUF y el estado de la membresía?** Hoy solo los ve el Admin (BR-008, #453), y este PRD lo deja así: Committee no tiene esos filtros ni esas columnas en el CSV. La decisión es del dueño.
 - [ ] **Baja de los correos del club.** Este PRD trata los correos como mensajes operativos del club a sus socios, sin enlace para darse de baja. Si el comité quiere usarlos para promociones o patrocinadores, la ley australiana de spam pide ese enlace. La decisión es del comité.
 - [ ] **SRD v1.6.** Al aprobar este PRD, el SRD añade los FR nuevos (teléfono y contacto de emergencia, avisos, contacto por rol, filtros, exportación y correo) con su criterio de aceptación, y deja escrito que esta exportación no es la del panel que la v1.2 sacó del alcance (ASS-009).
