@@ -54,7 +54,6 @@ const REGISTRATION_LABELS: Readonly<
       readonly fullName: string;
       readonly email: string;
       readonly country: string;
-      readonly membershipType: string;
       readonly dateOfBirth: string;
       readonly password: string;
       readonly submit: string;
@@ -66,7 +65,6 @@ const REGISTRATION_LABELS: Readonly<
     fullName: "Full name",
     email: "Email",
     country: "Country",
-    membershipType: "Membership type",
     dateOfBirth: "Date of birth",
     password: "Password",
     submit: "Create account",
@@ -76,7 +74,6 @@ const REGISTRATION_LABELS: Readonly<
     fullName: "Nombre completo",
     email: "Correo electrónico",
     country: "País",
-    membershipType: "Tipo de membresía",
     dateOfBirth: "Fecha de nacimiento",
     password: "Contraseña",
     submit: "Crear cuenta",
@@ -94,10 +91,6 @@ async function readConfirmationScreen(locale: Locale): Promise<string> {
   await user.type(screen.getByLabelText(labels.fullName), "Nerea Silva");
   await user.type(screen.getByLabelText(labels.email), EMAIL);
   await user.selectOptions(screen.getByLabelText(labels.country), "AU");
-  await user.selectOptions(
-    screen.getByLabelText(labels.membershipType),
-    "Full",
-  );
   await user.type(screen.getByLabelText(labels.dateOfBirth), "1994-03-02");
   await user.type(screen.getByLabelText(labels.password), "bajoelagua");
   await user.click(screen.getByRole("button", { name: labels.submit }));

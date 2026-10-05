@@ -17,7 +17,6 @@ function profileWith(overrides: Partial<MemberProfile> = {}): MemberProfile {
   return {
     country: "AU",
     dateOfBirth: "1994-03-02",
-    membershipType: "Full",
     guardianConsentAt: null,
     registeredAt: "2026-09-12T03:00:00.000Z",
     ...overrides,
@@ -60,7 +59,6 @@ describe("estado de la cuenta", () => {
   it.each([
     ["el país", { country: null }],
     ["la fecha de nacimiento", { dateOfBirth: null }],
-    ["el tipo de membresía", { membershipType: null }],
   ] as const)("sigue incompleta si falta %s", (_label, missing) => {
     expect(
       resolveAccountStatus({

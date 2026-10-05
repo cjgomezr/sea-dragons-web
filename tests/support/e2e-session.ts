@@ -94,8 +94,8 @@ export const E2E_STORAGE_STATE_PATH = path.join(
  * fotografiar: Supabase no da sesión a una identidad sin confirmar, así que
  * esa cuenta ni siquiera llega a la pantalla.
  */
-const FALTA_LA_MEMBRESIA = {
-  country: "AU",
+const FALTA_EL_PAIS = {
+  country: null,
   date_of_birth: "1994-03-02",
   membership_type: null,
 } as const;
@@ -114,11 +114,11 @@ function minorDateOfBirth(): string {
 const FALTA_EL_TUTOR = {
   country: "AU",
   date_of_birth: minorDateOfBirth(),
-  membership_type: "Student",
+  membership_type: null,
 } as const;
 
 export const INCOMPLETE_MEMBERS = {
-  "un-dato": FALTA_LA_MEMBRESIA,
+  "un-dato": FALTA_EL_PAIS,
   "varios-datos": {
     country: null,
     date_of_birth: null,
@@ -126,12 +126,12 @@ export const INCOMPLETE_MEMBERS = {
   },
   "menor-sin-consentimiento": FALTA_EL_TUTOR,
   /** Lo activa el test que guarda el último dato. */
-  "para-activar": FALTA_LA_MEMBRESIA,
+  "para-activar": FALTA_EL_PAIS,
   /** Lo activa el test que registra el consentimiento del tutor. */
   "menor-para-consentir": FALTA_EL_TUTOR,
   /** Cierra su propia sesión, que es justo lo que lo inutiliza para todo lo
    * demás. Por eso no lo comparte con nadie. */
-  "para-cerrar-sesion": FALTA_LA_MEMBRESIA,
+  "para-cerrar-sesion": FALTA_EL_PAIS,
 } as const;
 
 export type IncompleteMemberName = keyof typeof INCOMPLETE_MEMBERS;

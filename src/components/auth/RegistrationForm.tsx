@@ -6,7 +6,6 @@ import { readStringAt } from "@/lib/api/read-string-at";
 import { describeAuthIssue } from "@/lib/auth/issue-messages";
 import type { ConfirmationReceiptOutcome } from "@/lib/auth/register-member";
 import {
-  MEMBERSHIP_TYPES,
   PASSWORD_MIN_LENGTH,
   type RegistrationField,
   type RegistrationIssue,
@@ -31,7 +30,6 @@ const EMPTY_DRAFT: RegistrationRequest = {
   email: "",
   country: "",
   password: "",
-  membershipType: "",
   dateOfBirth: "",
 };
 
@@ -457,26 +455,6 @@ export function RegistrationForm({
           onChange={(event) => update("dateOfBirth", event.target.value)}
         />
         {fieldError("dateOfBirth")}
-      </div>
-
-      <div className="auth-field">
-        <label htmlFor="registro-membershipType">
-          {labelOfField(translate, "membershipType")}
-        </label>
-        <select
-          {...fieldProps("membershipType")}
-          onChange={(event) => update("membershipType", event.target.value)}
-        >
-          <option value="">
-            {translate("auth.field.membershipTypePlaceholder")}
-          </option>
-          {MEMBERSHIP_TYPES.map((membershipType) => (
-            <option key={membershipType} value={membershipType}>
-              {membershipType}
-            </option>
-          ))}
-        </select>
-        {fieldError("membershipType")}
       </div>
 
       <div className="auth-field">

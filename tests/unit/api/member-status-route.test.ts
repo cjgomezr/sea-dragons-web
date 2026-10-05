@@ -62,7 +62,6 @@ function mockWiring(options: WiringOptions = {}): void {
             profile: {
               country: "AU",
               dateOfBirth: "1990-04-01",
-              membershipType: "full",
               guardianConsentAt: null,
               registeredAt: "2026-01-10T00:00:00.000Z",
             },

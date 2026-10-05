@@ -177,7 +177,6 @@ describeRls("registro contra seadragons-dev", () => {
               email,
               country: "AU",
               password: PASSWORD,
-              membershipType: "Student",
               dateOfBirth: "1994-03-02",
             },
             clubId,
@@ -201,7 +200,7 @@ describeRls("registro contra seadragons-dev", () => {
         expect(member).toMatchObject({
           role: "Player",
           account_status: "incomplete",
-          membership_type: "Student",
+          membership_type: null,
           club_id: clubId,
           email_locale: "en",
         });
@@ -227,7 +226,6 @@ describeRls("registro contra seadragons-dev", () => {
           email,
           country: "AU",
           password: PASSWORD,
-          membershipType: "Full",
           dateOfBirth: "1994-03-02",
         };
         const registration = {
@@ -296,7 +294,6 @@ describeRls("registro contra seadragons-dev", () => {
           email,
           country: "AU",
           date_of_birth: "1994-03-02",
-          membership_type: "Full",
           role: "Player",
           account_status: "incomplete",
           email_locale: "es",

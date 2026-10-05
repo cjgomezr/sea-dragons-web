@@ -36,7 +36,6 @@ const ADMIN_NAME = "Ana Admin";
 const COMPLETE_PROFILE: MemberProfile = {
   country: "AU",
   dateOfBirth: "1990-04-01",
-  membershipType: "full",
   guardianConsentAt: null,
   registeredAt: "2026-01-10T00:00:00.000Z",
 };

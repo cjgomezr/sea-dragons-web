@@ -35,7 +35,6 @@ function requestWith(
     email: "Nerea@Example.Test",
     country: "AU",
     password: "bajoelagua",
-    membershipType: "Full",
     dateOfBirth: "1994-03-02",
     ...overrides,
   };
@@ -267,12 +266,12 @@ describe("registro con el envío no disponible", () => {
 });
 
 describe("registro", () => {
-  it("crea la cuenta con el rol Player y el tipo de membresía elegido", async () => {
+  it("crea la cuenta con el rol Player y sin tipo de membresía", async () => {
     const given = doubles();
 
-    await register(given, requestWith({ membershipType: "Student" }));
+    await register(given, requestWith());
 
-    expect(given.insertedRows).toEqual([
+    expect(given.insertedRows).toStrictEqual([
       {
         club_id: CLUB_ID,
         user_id: USER_ID,
@@ -280,7 +279,6 @@ describe("registro", () => {
         email: "nerea@example.test",
         country: "AU",
         date_of_birth: "1994-03-02",
-        membership_type: "Student",
         role: "Player",
         account_status: "incomplete",
         email_locale: "en",

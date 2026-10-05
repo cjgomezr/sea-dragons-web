@@ -113,7 +113,6 @@ function bodyWith(
     email: EMAIL,
     country: "AU",
     password: "bajoelagua",
-    membershipType: "Full",
     dateOfBirth: "1994-03-02",
     ...overrides,
   };
@@ -326,7 +325,7 @@ describe("el límite no gasta el cupo de correos", () => {
     mockWiring();
 
     const response = await postRegistration({
-      body: bodyWith({ membershipType: "Platinum" }),
+      body: bodyWith({ country: "XX" }),
     });
 
     expect(response.status).toBe(422);

@@ -38,8 +38,7 @@ const INCOMPLETE_RECORD: MemberAccountRecord = {
   accountStatus: "incomplete",
   profile: {
     country: "AU",
-    dateOfBirth: "1994-03-08",
-    membershipType: null,
+    dateOfBirth: null,
     guardianConsentAt: null,
     registeredAt: "2026-09-12T00:00:00.000Z",
   },
@@ -136,7 +135,7 @@ describe("consultar qué le falta a la cuenta", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: { accountStatus: "incomplete", pending: ["membershipType"] },
+      data: { accountStatus: "incomplete", pending: ["dateOfBirth"] },
     });
   });
 
@@ -203,14 +202,14 @@ describe("guardar lo que falta", () => {
   it("guarda el dato y devuelve la cuenta ya activa", async () => {
     mockWiring();
 
-    const response = await patchAccount({ membershipType: "Student" });
+    const response = await patchAccount({ dateOfBirth: "1994-03-08" });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       data: { accountStatus: "active", pending: [] },
     });
     expect(profileWrites).toEqual([
-      { memberId: MEMBER_ID, values: { membershipType: "Student" } },
+      { memberId: MEMBER_ID, values: { dateOfBirth: "1994-03-08" } },
     ]);
     expect(activations).toEqual([MEMBER_ID]);
   });
@@ -218,18 +217,18 @@ describe("guardar lo que falta", () => {
   it("responde 422 nombrando el campo cuando el valor no vale", async () => {
     mockWiring();
 
-    const response = await patchAccount({ membershipType: "Platinum" });
+    const response = await patchAccount({ dateOfBirth: "2026-02-30" });
 
     expect(response.status).toBe(422);
     const payload = (await response.json()) as { error: { message: string } };
-    expect(payload.error.message).toContain("membershipType");
+    expect(payload.error.message).toContain("dateOfBirth");
     expect(profileWrites).toEqual([]);
   });
 
   it("responde 400 a un campo con un tipo que no es texto", async () => {
     mockWiring();
 
-    const response = await patchAccount({ membershipType: 7 });
+    const response = await patchAccount({ dateOfBirth: 7 });
 
     expect(response.status).toBe(400);
     expect(profileWrites).toEqual([]);
@@ -240,11 +239,11 @@ describe("guardar lo que falta", () => {
       record: {
         ...INCOMPLETE_RECORD,
         accountStatus: "active",
-        profile: { ...INCOMPLETE_RECORD.profile, membershipType: "Full" },
+        profile: { ...INCOMPLETE_RECORD.profile, dateOfBirth: "1994-03-08" },
       },
     });
 
-    const response = await patchAccount({ membershipType: "Student" });
+    const response = await patchAccount({ dateOfBirth: "1994-03-08" });
 
     expect(response.status).toBe(409);
     expect(profileWrites).toEqual([]);
@@ -253,7 +252,7 @@ describe("guardar lo que falta", () => {
   it("responde 401 a quien no trae sesión, sin tocar nada", async () => {
     mockWiring({ callerId: null });
 
-    const response = await patchAccount({ membershipType: "Student" });
+    const response = await patchAccount({ dateOfBirth: "1994-03-08" });
 
     expect(response.status).toBe(401);
     expect(profileWrites).toEqual([]);
@@ -265,12 +264,12 @@ describe("guardar lo que falta", () => {
     mockWiring();
 
     await patchAccount({
-      membershipType: "Student",
+      dateOfBirth: "1994-03-08",
       guardianConsentAt: "2026-09-12T00:00:00Z",
     });
 
     expect(profileWrites).toEqual([
-      { memberId: MEMBER_ID, values: { membershipType: "Student" } },
+      { memberId: MEMBER_ID, values: { dateOfBirth: "1994-03-08" } },
     ]);
   });
 
@@ -283,7 +282,7 @@ describe("guardar lo que falta", () => {
     const OTHER_ID = "00000000-0000-4000-8000-000000000000";
 
     await patchAccount({
-      membershipType: "Student",
+      dateOfBirth: "1994-03-08",
       userId: OTHER_ID,
       memberId: OTHER_ID,
       id: OTHER_ID,
@@ -292,8 +291,55 @@ describe("guardar lo que falta", () => {
     });
 
     expect(profileWrites).toEqual([
-      { memberId: MEMBER_ID, values: { membershipType: "Student" } },
+      { memberId: MEMBER_ID, values: { dateOfBirth: "1994-03-08" } },
     ]);
     expect(activations).toEqual([MEMBER_ID]);
+  });
+
+  // D8 de E12: el tipo de membresía se elige en Pagos. Quien tenga abierta la
+  // pantalla vieja todavía lo manda, y eso no puede romperle el registro.
+  it("ignora un tipo de membresía que llegue junto a otro dato", async () => {
+    mockWiring();
+
+    const response = await patchAccount({
+      dateOfBirth: "1994-03-08",
+      membershipType: "Full",
+    });
+
+    expect(response.status).toBe(200);
+    expect(profileWrites).toEqual([
+      { memberId: MEMBER_ID, values: { dateOfBirth: "1994-03-08" } },
+    ]);
+  });
+
+  it("ignora incluso un tipo de membresía que no existe", async () => {
+    mockWiring();
+
+    const response = await patchAccount({
+      dateOfBirth: "1994-03-08",
+      membershipType: "Platinum",
+    });
+
+    expect(response.status).toBe(200);
+    expect(profileWrites).toEqual([
+      { memberId: MEMBER_ID, values: { dateOfBirth: "1994-03-08" } },
+    ]);
+  });
+
+  it("con sólo el tipo de membresía, no escribe nada y devuelve la cuenta al día", async () => {
+    mockWiring({
+      record: {
+        ...INCOMPLETE_RECORD,
+        profile: { ...INCOMPLETE_RECORD.profile, dateOfBirth: "1994-03-08" },
+      },
+    });
+
+    const response = await patchAccount({ membershipType: "Full" });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: { accountStatus: "active", pending: [] },
+    });
+    expect(profileWrites).toEqual([]);
   });
 });

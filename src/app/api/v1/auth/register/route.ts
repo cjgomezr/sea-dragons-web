@@ -27,15 +27,15 @@ import { readApiRequestLocale } from "@/lib/i18n/request-locale";
 // no puede servirse desde una caché.
 export const dynamic = "force-dynamic";
 
-/** Sólo la forma del cuerpo. Que el país exista, que la contraseña llegue al
- * mínimo y que el tipo de membresía esté en el conjunto cerrado son reglas del
- * dominio, y se responden con 422 nombrando el campo, no con 400. */
+/** Sólo la forma del cuerpo. Que el país exista y que la contraseña llegue al
+ * mínimo son reglas del dominio, y se responden con 422 nombrando el campo, no
+ * con 400. `z.object` descarta las claves que no conoce: el `membershipType`
+ * que todavía manda una pantalla vieja se ignora (D8 de E12, #480). */
 const registrationBodySchema = z.object({
   fullName: z.string(),
   email: z.string(),
   country: z.string(),
   password: z.string(),
-  membershipType: z.string(),
   dateOfBirth: z.string(),
 });
 

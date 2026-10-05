@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   EARLIEST_DATE_OF_BIRTH,
-  MEMBERSHIP_TYPES,
   PASSWORD_MAX_BYTES,
   PASSWORD_MIN_LENGTH,
   type RegistrationIssue,
@@ -20,7 +19,6 @@ function requestWith(
     email: "nerea@example.test",
     country: "AU",
     password: "bajoelagua",
-    membershipType: "Full",
     dateOfBirth: "1994-03-02",
     ...overrides,
   };
@@ -61,18 +59,9 @@ describe("registro: validación", () => {
         email: "nerea@example.test",
         country: "AU",
         password: "bajoelagua",
-        membershipType: "Full",
         dateOfBirth: "1994-03-02",
       },
     });
-  });
-
-  it("acepta los tres tipos de membresía del SRD", () => {
-    for (const membershipType of MEMBERSHIP_TYPES) {
-      expect(
-        validateRegistration(requestWith({ membershipType }), { now: NOW }).ok,
-      ).toBe(true);
-    }
   });
 
   it("rechaza una contraseña de 7 caracteres nombrando el mínimo de 8", () => {
@@ -118,15 +107,6 @@ describe("registro: validación", () => {
     expect(
       issueFor(requestWith({ password: acentuada }), "password"),
     ).toBeDefined();
-  });
-
-  it("rechaza un tipo de membresía fuera del conjunto cerrado", () => {
-    const issue = issueFor(
-      requestWith({ membershipType: "Platinum" }),
-      "membershipType",
-    );
-
-    expect(issue.code).toBe("membership_type_unknown");
   });
 
   it("rechaza una fecha de nacimiento en el futuro", () => {
@@ -187,9 +167,9 @@ describe("registro: validación", () => {
 
   it("reporta todos los campos inválidos a la vez, no solo el primero", () => {
     const fields = issuesOf(
-      requestWith({ country: "", password: "corta", membershipType: "Gold" }),
+      requestWith({ country: "", password: "corta", dateOfBirth: "ayer" }),
     ).map((issue) => issue.field);
 
-    expect(fields).toEqual(["country", "password", "membershipType"]);
+    expect(fields).toEqual(["country", "password", "dateOfBirth"]);
   });
 });

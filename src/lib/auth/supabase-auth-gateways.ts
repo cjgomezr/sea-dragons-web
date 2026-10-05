@@ -293,9 +293,12 @@ function readMembershipType(
 }
 
 /**
- * Toda cuenta activa tiene su membresía (RF-1 de E12), y nace `pending` con
- * el tipo que eligió al registrarse. Va antes de activar: si fallara después,
- * la cuenta ya no estaría a medias y reintentar no la crearía nunca.
+ * Toda cuenta activa tiene su membresía (RF-1 de E12), y nace `pending`. Desde
+ * D8 de E12 (#480) el registro ya no escribe `members.membership_type`, así
+ * que nace sin plan y el socio lo elige en Pagos. Se sigue copiando para el
+ * socio que lo eligió en el registro antes de ese cambio: su elección no se
+ * pierde. Va antes de activar: si fallara después, la cuenta ya no estaría a
+ * medias y reintentar no la crearía nunca.
  */
 async function ensureMembershipBeforeActivation(
   serviceClient: SupabaseClient,
@@ -387,7 +390,6 @@ function toMemberAccountRecord(
     profile: {
       country: readText(row, "country", MEMBERS_TABLE),
       dateOfBirth: readText(row, "date_of_birth", MEMBERS_TABLE),
-      membershipType: readText(row, "membership_type", MEMBERS_TABLE),
       guardianConsentAt: readText(row, "guardian_consent_at", MEMBERS_TABLE),
       registeredAt: readRequiredText(row, "created_at", MEMBERS_TABLE),
     },
@@ -395,7 +397,7 @@ function toMemberAccountRecord(
 }
 
 const MEMBER_ACCOUNT_COLUMNS =
-  "id, club_id, account_status, country, date_of_birth, membership_type, guardian_consent_at, created_at";
+  "id, club_id, account_status, country, date_of_birth, guardian_consent_at, created_at";
 
 /** Las columnas de `members` que escribe completar registro, con el nombre que
  * tienen en la base. La conversión vive aquí y no en el dominio: snake_case es
@@ -406,9 +408,6 @@ function toMemberColumns(values: CompletedValues): Record<string, string> {
     ...(values.dateOfBirth === undefined
       ? {}
       : { date_of_birth: values.dateOfBirth }),
-    ...(values.membershipType === undefined
-      ? {}
-      : { membership_type: values.membershipType }),
   };
 }
 

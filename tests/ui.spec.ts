@@ -1904,7 +1904,6 @@ async function goToConfirmationPending(
   await page.getByLabel("Email").fill(CONFIRMATION_STUB_EMAIL);
   await page.getByLabel("Country").selectOption("AU");
   await page.getByLabel("Date of birth").fill("1994-03-02");
-  await page.getByLabel("Membership type").selectOption("Full");
   await page.getByLabel("Password").fill("bajoelagua");
   await page.getByRole("button", { name: "Create account" }).click();
 
@@ -2153,7 +2152,6 @@ test("el formulario de registro no manda nada al servidor con la contraseña cor
   await page.getByLabel("Email").fill(CONFIRMATION_STUB_EMAIL);
   await page.getByLabel("Country").selectOption("AU");
   await page.getByLabel("Date of birth").fill("1994-03-02");
-  await page.getByLabel("Membership type").selectOption("Full");
   await page.getByLabel("Password").fill("1234567");
   await page.getByRole("button", { name: "Create account" }).click();
 
@@ -2271,8 +2269,8 @@ test.describe("una cuenta incompleta en un navegador de verdad", () => {
   }) => {
     await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
 
-    await expect(page.getByLabel("Membership type")).toBeVisible();
-    await expect(page.getByLabel("Country")).toHaveCount(0);
+    await expect(page.getByLabel("Country")).toBeVisible();
+    await expect(page.getByLabel("Membership type")).toHaveCount(0);
     await expect(page.getByLabel("Date of birth")).toHaveCount(0);
     await expect(page.getByLabel("Full name")).toHaveCount(0);
   });
@@ -2343,7 +2341,7 @@ test.describe("una cuenta incompleta que cambia de estado", () => {
     }) => {
       await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
 
-      await page.getByLabel("Membership type").selectOption("Student");
+      await page.getByLabel("Country").selectOption("AU");
       await submitAccountChange(page, {
         method: "PATCH",
         endpoint: ACCOUNT_ENDPOINT,
@@ -2402,7 +2400,7 @@ test.describe("un menor sin el consentimiento de su tutor", () => {
         page.getByRole("heading", { name: /your guardian's consent/i }),
       ).toBeVisible();
       await expect(page.getByLabel("Guardian's name")).toBeVisible();
-      await expect(page.getByLabel("Membership type")).toHaveCount(0);
+      await expect(page.getByLabel("Country")).toHaveCount(0);
       await expect(page.getByLabel("Date of birth")).toHaveCount(0);
     });
 

@@ -26,14 +26,17 @@ import { describeIssuesForApi } from "@/lib/auth/issue-messages";
 // instante: no hay respuesta que una caché pueda reutilizar.
 export const dynamic = "force-dynamic";
 
-/** Sólo la forma del cuerpo. Que el país exista y que el tipo de membresía
- * esté en el conjunto cerrado son reglas del dominio, y se responden con 422
- * nombrando el campo, no con 400. Los campos son opcionales porque a una
- * cuenta casi nunca le faltan los tres. */
+/** Sólo la forma del cuerpo. Que el país exista es una regla del dominio, y se
+ * responde con 422 nombrando el campo, no con 400. Los campos son opcionales
+ * porque a una cuenta casi nunca le faltan todos.
+ *
+ * `membershipType` ya no se pide aquí: se elige en Pagos (D8 de E12, #480).
+ * Se acepta con cualquier valor y se ignora, para no romperle el registro a
+ * quien tenga abierta la pantalla vieja. */
 const completionBodySchema = z.object({
   country: z.string().optional(),
   dateOfBirth: z.string().optional(),
-  membershipType: z.string().optional(),
+  membershipType: z.unknown().optional(),
 });
 
 type CompletionBody = z.infer<typeof completionBodySchema>;
@@ -71,18 +74,39 @@ const getAccount = createApiRoute<AccountResponse>({
   },
 });
 
+/** La pantalla vieja pedía sólo el tipo cuando era lo único que faltaba. Ese
+ * envío ya no trae nada que guardar, pero la cuenta tampoco tiene nada
+ * pendiente: se responde lo que diga la consulta, que la activa si toca. */
+function sentOnlyRetiredField(body: CompletionBody): boolean {
+  return (
+    body.membershipType !== undefined &&
+    body.country === undefined &&
+    body.dateOfBirth === undefined
+  );
+}
+
+async function saveCompletion(
+  userId: string,
+  body: CompletionBody,
+): Promise<AccountCompletion> {
+  const gateways = requireAuthGateways();
+  if (sentOnlyRetiredField(body)) {
+    return describeAccountCompletion(gateways, { userId });
+  }
+  const { country, dateOfBirth } = body;
+  return completeRegistration(gateways, {
+    userId,
+    values: { country, dateOfBirth },
+    now: new Date(),
+  });
+}
+
 const patchAccount = createApiRoute<AccountResponse, CompletionBody>({
   schema: completionBodySchema,
   handler: async ({ request, body, decorateResponse }) => {
     const userId = await identifyAccountCaller({ request, decorateResponse });
     try {
-      return {
-        data: await completeRegistration(requireAuthGateways(), {
-          userId,
-          values: body,
-          now: new Date(),
-        }),
-      };
+      return { data: await saveCompletion(userId, body) };
     } catch (error) {
       asApiError(error);
     }

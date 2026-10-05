@@ -1,9 +1,9 @@
 import { isKnownCountryCode } from "@/lib/geo/countries";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
 
-/** FR-009: el conjunto es cerrado y lo cierran también la migración
- * `0003_members.sql` y este validador. La base es la última palabra; esto
- * existe para poder decir cuál era el campo malo antes de llegar a ella. */
+/** FR-009: el conjunto es cerrado y lo cierra también el `check` de
+ * `0050_memberships.sql`. Se elige en Pagos antes del primer pago, no en el
+ * registro (D8 de E12, #480). */
 export const MEMBERSHIP_TYPES = ["Full", "Student", "Casual"] as const;
 
 export type MembershipType = (typeof MEMBERSHIP_TYPES)[number];
@@ -32,19 +32,17 @@ export type RegistrationRequest = {
   readonly email: string;
   readonly country: string;
   readonly password: string;
-  readonly membershipType: string;
   readonly dateOfBirth: string;
 };
 
-/** Lo mismo que `RegistrationRequest`, ya normalizado y con el tipo de
- * membresía estrechado: es lo único que el resto del registro acepta, para que
- * nadie pueda escribir en la base algo que no pasó por aquí. */
+/** Lo mismo que `RegistrationRequest`, ya normalizado: es lo único que el
+ * resto del registro acepta, para que nadie pueda escribir en la base algo que
+ * no pasó por aquí. */
 export type RegistrationDetails = {
   readonly fullName: string;
   readonly email: string;
   readonly country: string;
   readonly password: string;
-  readonly membershipType: MembershipType;
   readonly dateOfBirth: string;
 };
 
@@ -59,7 +57,6 @@ export const FIELD_ISSUE_CODES = [
   "country_unknown",
   "password_too_short",
   "password_too_long",
-  "membership_type_unknown",
   "date_of_birth_not_a_date",
   "date_of_birth_in_future",
   "date_of_birth_too_early",
@@ -119,7 +116,7 @@ function validateEmail(value: string): FieldIssueCode | null {
  * El resultado de validar UN campo: o vale, ya normalizado y con el tipo
  * estrechado, o no vale y dice por qué.
  *
- * Existe porque estos tres campos se validan en dos sitios: el registro, que
+ * Existe porque estos campos se validan en dos sitios: el registro, que
  * los pide todos, y la pantalla de completar registro, que pide sólo los que
  * falten. Devolver el valor normalizado junto al veredicto es lo que impide
  * que el segundo sitio se escriba su propia copia del `trim`.
@@ -152,19 +149,6 @@ export function validatePasswordField(value: string): FieldValidation<string> {
   return PASSWORD_ENCODER.encode(value).length > PASSWORD_MAX_BYTES
     ? { ok: false, code: "password_too_long" }
     : { ok: true, value };
-}
-
-/** Buscar el valor en la tupla en vez de comprobar la pertenencia con un
- * `includes` es lo que deja construir `RegistrationDetails` sin un `as`. */
-export function validateMembershipTypeField(
-  value: string,
-): FieldValidation<MembershipType> {
-  const membershipType = MEMBERSHIP_TYPES.find(
-    (candidate) => candidate === value,
-  );
-  return membershipType === undefined
-    ? { ok: false, code: "membership_type_unknown" }
-    : { ok: true, value: membershipType };
 }
 
 export function validateDateOfBirthField(
@@ -206,7 +190,6 @@ export function validateRegistration(
   options: { readonly now: Date },
 ): RegistrationValidation {
   const country = validateCountryField(request.country);
-  const membershipType = validateMembershipTypeField(request.membershipType);
   const dateOfBirth = validateDateOfBirthField(
     request.dateOfBirth,
     options.now,
@@ -216,22 +199,16 @@ export function validateRegistration(
     ["email", validateEmail(request.email)],
     ["country", codeOf(country)],
     ["password", codeOf(validatePasswordField(request.password))],
-    ["membershipType", codeOf(membershipType)],
     ["dateOfBirth", codeOf(dateOfBirth)],
   ];
 
   const issues = checks.flatMap(([field, code]) =>
     code === null ? [] : [{ field, code }],
   );
-  // Los tres últimos términos no pueden ser ciertos sin el primero: si alguno
+  // Los dos últimos términos no pueden ser ciertos sin el primero: si alguno
   // de esos campos no valía, `issues` ya lo recogió. Están aquí porque son los
   // que estrechan el tipo.
-  if (
-    issues.length > 0 ||
-    !country.ok ||
-    !membershipType.ok ||
-    !dateOfBirth.ok
-  ) {
+  if (issues.length > 0 || !country.ok || !dateOfBirth.ok) {
     return { ok: false, issues };
   }
 
@@ -242,7 +219,6 @@ export function validateRegistration(
       email: request.email.trim().toLowerCase(),
       country: country.value,
       password: request.password,
-      membershipType: membershipType.value,
       dateOfBirth: dateOfBirth.value,
     },
   };

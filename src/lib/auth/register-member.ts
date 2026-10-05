@@ -8,7 +8,6 @@ import {
   enforceRegistrationRateLimit,
 } from "./registration-rate-limit";
 import {
-  type MembershipType,
   type RegistrationDetails,
   type RegistrationIssue,
   type RegistrationRequest,
@@ -31,7 +30,8 @@ export type AuthIdentityGateway = {
 };
 
 /** Columnas de `public.members` que escribe el registro. Nombres en snake_case
- * porque es la fila que va a la base, no un modelo de la aplicación. */
+ * porque es la fila que va a la base, no un modelo de la aplicación.
+ * `membership_type` no está: el tipo se elige en Pagos (D8 de E12, #480). */
 export type NewMemberRow = {
   readonly club_id: string;
   readonly user_id: string;
@@ -39,7 +39,6 @@ export type NewMemberRow = {
   readonly email: string;
   readonly country: string;
   readonly date_of_birth: string;
-  readonly membership_type: MembershipType;
   readonly role: "Player";
   readonly account_status: "incomplete";
   readonly email_locale: Locale;
@@ -246,7 +245,6 @@ async function createAccountAndRequestEmail(
     email: details.email,
     country: details.country,
     date_of_birth: details.dateOfBirth,
-    membership_type: details.membershipType,
     role: "Player",
     account_status: "incomplete",
     email_locale: input.locale,
