@@ -8,6 +8,7 @@ import {
   type UnwaivedStatus,
   resolveMembership,
 } from "@/lib/membership/membership";
+import { SESSION_PACK_METADATA_KIND } from "@/lib/membership/session-pack-checkout";
 
 /**
  * Qué escribe cada webhook de Stripe sobre la membresía y el historial (#452,
@@ -89,6 +90,24 @@ export type RenewalUpcomingFacts = FactsOf<
   }
 >;
 
+/** El pago de un pack de sesiones (#471): un cobro suelto, sin factura. Se
+ * guarda por su PaymentIntent, que es único como la factura de una cuota. */
+export type SessionPackPayment = {
+  readonly paymentIntentId: string;
+  /** Centavos enteros, como los manda Stripe (CON-005). */
+  readonly amountCents: number;
+  readonly currency: string;
+  readonly description: string;
+  readonly paidAt: Date;
+};
+
+/** Un pack pagado (#471, RF-5 del PRD de E13). No toca la membresía: el
+ * libro suma las sesiones y la base recalcula el estado del Casual. */
+export type SessionPackPaidFacts = FactsOf<
+  "sessionPackPaid",
+  { readonly sessions: number; readonly payment: SessionPackPayment }
+>;
+
 export type StripeEventFacts =
   | { readonly kind: "ignored" }
   | CheckoutCompletedFacts
@@ -96,12 +115,16 @@ export type StripeEventFacts =
   | SubscriptionChangedFacts
   | FactsOf<"subscriptionDeleted", Record<never, never>>
   | FactsOf<"invoiceSettled", { readonly payment: StripePayment }>
-  | RenewalUpcomingFacts;
+  | RenewalUpcomingFacts
+  | SessionPackPaidFacts;
 
 /** Lo que el plan sabe escribir sin preguntarle nada más a Stripe. */
 export type PlannableStripeEventFacts = Exclude<
   StripeEventFacts,
-  { readonly kind: "ignored" } | CheckoutCompletedFacts | RenewalUpcomingFacts
+  | { readonly kind: "ignored" }
+  | CheckoutCompletedFacts
+  | RenewalUpcomingFacts
+  | SessionPackPaidFacts
 >;
 
 /** La membresía tal como la ve el webhook: la fila y el `created` del último
@@ -150,6 +173,13 @@ const MEMBERSHIP_STATUS_BY_STRIPE_STATUS: Readonly<
 };
 
 const userIdSchema = z.uuid();
+
+/** Los metadatos de Stripe son texto: `"5"`, nunca `"2.5"` ni `"0"`. */
+const packSessionsSchema = z
+  .string()
+  .regex(/^\d+$/)
+  .transform(Number)
+  .pipe(z.number().int().positive());
 
 function fromStripeTime(seconds: number): Date {
   return new Date(seconds * MILLISECONDS_PER_SECOND);
@@ -204,12 +234,62 @@ function readCardSetupFacts(
   };
 }
 
+function describeSessionPack(sessions: number): string {
+  return `Casual session pack (${sessions} sessions)`;
+}
+
+/** Sólo un pack ya cobrado suma: uno sin pagar o de otro tipo no es nada que
+ * apuntar. El socio sale de los metadatos que pone la compra, que son los
+ * mismos que `client_reference_id`. */
+function readSessionPackFacts(
+  session: Stripe.Checkout.Session,
+  created: Date,
+): StripeEventFacts {
+  const { metadata } = session;
+  if (
+    metadata?.kind !== SESSION_PACK_METADATA_KIND ||
+    session.payment_status !== "paid"
+  ) {
+    return { kind: "ignored" };
+  }
+  const sessions = packSessionsSchema.safeParse(metadata.pack_sessions);
+  const paymentIntentId = optionalIdOf(session.payment_intent);
+  if (
+    !sessions.success ||
+    paymentIntentId === null ||
+    session.amount_total === null ||
+    session.currency === null
+  ) {
+    return { kind: "ignored" };
+  }
+  return {
+    kind: "sessionPackPaid",
+    created,
+    lookup: {
+      userId: readMetadataUserId(metadata) ?? readCheckoutUserId(session),
+      customerId: null,
+      subscriptionId: null,
+    },
+    sessions: sessions.data,
+    payment: {
+      paymentIntentId,
+      amountCents: session.amount_total,
+      currency: session.currency,
+      description: describeSessionPack(sessions.data),
+      paidAt: created,
+    },
+  };
+}
+
 function readCheckoutFacts(
   session: Stripe.Checkout.Session,
   created: Date,
 ): StripeEventFacts {
   if (session.mode === "setup") {
     return readCardSetupFacts(session, created);
+  }
+  if (session.mode === "payment") {
+    return readSessionPackFacts(session, created);
   }
   const customerId = optionalIdOf(session.customer);
   const subscriptionId = optionalIdOf(session.subscription);

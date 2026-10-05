@@ -561,6 +561,11 @@ export const MEMBERSHIP_PLAN_API_PATH = `${MEMBERSHIP_API_PATH}/plan`;
  * pagar. */
 export const MEMBERSHIP_PRICES_API_PATH = `${MEMBERSHIP_API_PATH}/prices`;
 
+/** Comprar un pack de sesiones en Stripe Checkout (#471, RF-5 del PRD de
+ * E13). Cuelga de la membresía, así que también lo alcanza quien no está al
+ * día: es como se pone al día un Casual. */
+export const MEMBERSHIP_SESSION_PACK_CHECKOUT_API_PATH = `${MEMBERSHIP_API_PATH}/session-packs/checkout`;
+
 /**
  * Los únicos endpoints de la API que no exigen sesión.
  *

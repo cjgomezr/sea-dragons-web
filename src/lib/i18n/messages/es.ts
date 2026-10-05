@@ -860,8 +860,6 @@ export const spanishMessages: MessageCatalog = {
   "payments.offer.addCard": "Añadir tarjeta",
   "payments.offer.opening": "Abriendo Stripe…",
   "payments.offer.retry": "Reintentar",
-  "payments.offer.casual":
-    "Los packs de sesiones de Casual llegan en una entrega posterior. Mientras tanto, un Admin puede activar tu membresía.",
   "payments.offer.notConfigured":
     "Los pagos todavía no están configurados. Escribe al club para que un Admin active tu membresía.",
   "payments.checkout.cancelled":
@@ -870,6 +868,20 @@ export const spanishMessages: MessageCatalog = {
     "Tarjeta añadida. Estamos esperando la confirmación de Stripe, que puede tardar unos segundos.",
   "payments.checkout.timedOut":
     "Stripe todavía no ha confirmado. Recarga la página en un minuto; si tu membresía sigue sin cambiar, escribe al club.",
+  // Los packs de sesiones de un Casual (#471, RF-5 del PRD de E13).
+  "payments.packs.title": "Packs de sesiones",
+  "payments.packs.lead":
+    "Cada entrenamiento al que vas gasta una sesión. Pagas una vez en Stripe, sin cobros recurrentes.",
+  "payments.packs.loading": "Cargando los packs de sesiones…",
+  "payments.packs.loadFailed":
+    "No pudimos cargar los packs de sesiones. Recarga la página para intentarlo otra vez.",
+  "payments.packs.buy": "Comprar {pack} · {price}",
+  "payments.packs.waiting":
+    "Pack pagado. Estamos esperando la confirmación de Stripe, que puede tardar unos segundos.",
+  "payments.packs.paid":
+    "Pack pagado. Tus sesiones se suman en cuanto Stripe confirma el pago.",
+  "payments.packs.cancelled":
+    "Saliste de Stripe sin comprar un pack. Puedes intentarlo otra vez cuando quieras.",
   "payments.trialing": "En prueba hasta el día {date}",
   "payments.error.unavailable":
     "No pudimos abrir Stripe. Vuelve a intentarlo en un momento.",

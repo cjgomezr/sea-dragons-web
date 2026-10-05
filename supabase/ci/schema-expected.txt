@@ -240,6 +240,7 @@ columna team_splits.team_a_name tipo=text null=NO default=-
 columna team_splits.team_b_color tipo=text null=NO default=-
 columna team_splits.team_b_name tipo=text null=NO default=-
 columna team_splits.updated_at tipo=timestamp with time zone null=NO default=now()
+funcion apply_session_pack_payment(event_id text, event_type text, event_created timestamp with time zone, target_user_id uuid, target_club_id uuid, payment jsonb, pack_sessions integer)
 funcion apply_stripe_event(event_id text, event_type text, event_created timestamp with time zone, target_user_id uuid, target_club_id uuid, membership_changes jsonb, payment jsonb)
 funcion are_valid_weekdays(weekdays smallint[])
 funcion attendance_stats(p_club_id uuid, p_user_ids uuid[])

@@ -6,12 +6,15 @@ import {
   requestApi,
 } from "@/lib/api/request-api";
 import {
+  CLUB_SESSION_PACKS_API_PATH,
   MEMBERSHIP_API_PATH,
   MEMBERSHIP_CARD_API_PATH,
   MEMBERSHIP_CHECKOUT_API_PATH,
   MEMBERSHIP_PLAN_API_PATH,
+  MEMBERSHIP_SESSION_PACK_CHECKOUT_API_PATH,
 } from "@/lib/auth/routes";
 import { MEMBERSHIP_TYPES } from "@/lib/auth/registration";
+import type { SessionPackOffers } from "@/lib/club/session-packs";
 import type { Translator } from "@/lib/i18n/translator";
 import {
   MEMBERSHIP_STATUSES,
@@ -21,6 +24,7 @@ import {
   type MembershipView,
   PAYMENT_STATUSES,
 } from "@/lib/membership/membership-view";
+import type { ClubPrice } from "@/lib/membership/stripe-prices";
 
 /**
  * Lo que Pagos (#454, #455) pide a los endpoints de la membresía: el panel,
@@ -139,6 +143,54 @@ export function requestCheckout(): Promise<StripeSessionOutcome> {
 
 export function requestCardUpdate(): Promise<StripeSessionOutcome> {
   return requestStripeSession(MEMBERSHIP_CARD_API_PATH);
+}
+
+/** Abre Checkout para pagar un pack de `sessions` sesiones (#471). */
+export async function requestSessionPackCheckout(
+  sessions: number,
+): Promise<StripeSessionOutcome> {
+  const read = readApiPayload(
+    await requestApi(MEMBERSHIP_SESSION_PACK_CHECKOUT_API_PATH, {
+      method: "POST",
+      headers: JSON_REQUEST_HEADERS,
+      body: JSON.stringify({ sessions }),
+    }),
+    stripeSessionResponseSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "created", url: read.value.data.url };
+}
+
+const clubPriceSchema: z.ZodType<ClubPrice> = z.union([
+  z.object({ amountCents: z.number().int(), currency: z.literal("AUD") }),
+  z.object({
+    amountCents: z.null(),
+    reason: z.enum(["not_configured", "stripe_unavailable", "misconfigured"]),
+  }),
+]);
+
+const sessionPacksResponseSchema = z.object({
+  data: z.object({
+    packs: z.array(
+      z.object({ sessions: z.number().int(), price: clubPriceSchema }),
+    ),
+  }),
+});
+
+export type SessionPackOffersLoad =
+  | { readonly kind: "loaded"; readonly packs: SessionPackOffers }
+  | PaymentsFailure;
+
+/** Los packs que el club ofrece, con el precio de cada uno (#469). */
+export async function loadSessionPackOffers(): Promise<SessionPackOffersLoad> {
+  const read = readApiPayload(
+    await requestApi(CLUB_SESSION_PACKS_API_PATH),
+    sessionPacksResponseSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "loaded", packs: read.value.data.packs };
 }
 
 /** Lo que respondió el cambio de plan (#456): programado, que Pagos vuelve

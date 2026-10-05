@@ -4813,6 +4813,23 @@ a.auth-brand-header:focus-visible {
   margin-top: var(--space-2);
 }
 
+/* Los packs de un Casual (#471): un botón por pack, cada uno con su aviso
+   si Stripe no abre. */
+.payments-packs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.payments-packs li {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
 .payments-offer {
   display: grid;
   gap: var(--space-2);
