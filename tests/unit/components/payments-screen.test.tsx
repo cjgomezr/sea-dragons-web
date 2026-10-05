@@ -986,6 +986,21 @@ describe("PaymentsScreen: packs de un Casual (#471)", () => {
       ).toHaveAttribute("role", "status");
     });
 
+    it("pasados los 30 segundos lo dice y vuelve a ofrecer los packs", async () => {
+      stubFetch({ membership: () => jsonResponse({ data: PENDING_CASUAL }) });
+      renderScreen({ packReturn: "ok" });
+      await screen.findByText(/Pack paid\. We're waiting for Stripe/);
+
+      await act(() => vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS));
+
+      expect(
+        await screen.findByText(/Stripe hasn't confirmed yet/),
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByRole("button", { name: /^Buy 5 sessions/ }),
+      ).toBeInTheDocument();
+    });
+
     it("a un Casual ya al día le dice que las sesiones se suman al confirmar", async () => {
       await renderLoaded(ACTIVE_CASUAL, { packReturn: "ok" });
 

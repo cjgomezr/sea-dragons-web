@@ -160,7 +160,7 @@ export function SessionPackOffer({
         packReturn={packReturn}
       />
       {/* Mientras se espera el pago no se ofrece comprar otro. */}
-      {isWaitingForPack(waiting) ? null : (
+      {isWaitingForPack(waiting) && waiting.kind === "polling" ? null : (
         <PacksBody translate={translate} state={state} />
       )}
     </section>
