@@ -414,7 +414,6 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
             );
             await auth.gateways.accounts.updateProfile(account!.memberId, {
               dateOfBirth: "1990-05-04",
-              membershipType: "Full",
             });
             await expect(
               activateAccountIfComplete(auth.gateways, created.member.userId),
@@ -429,7 +428,8 @@ describeRls("alta de un miembro contra seadragons-dev", () => {
               .select("plan, status")
               .eq("user_id", created.member.userId);
             expect(error).toBeNull();
-            expect(memberships).toEqual([{ plan: "Full", status: "pending" }]);
+            // El tipo se elige en Pagos antes del primer pago (D8 de E12).
+            expect(memberships).toEqual([{ plan: null, status: "pending" }]);
           });
         },
       );

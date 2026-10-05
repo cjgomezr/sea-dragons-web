@@ -44,7 +44,6 @@ const SIXTEEN_YEAR_OLD_BIRTH = "2010-05-20";
 const ADULT_PROFILE: MemberProfile = {
   country: "AU",
   dateOfBirth: "1994-03-08",
-  membershipType: "Full",
   guardianConsentAt: null,
   registeredAt: REGISTERED_AT,
 };
@@ -155,14 +154,14 @@ describe("consentimiento de tutor", () => {
   it("16 años sin consentimiento deja la cuenta incomplete", async () => {
     const doubles = doublesFor(
       incompleteRecord({
+        country: null,
         dateOfBirth: SIXTEEN_YEAR_OLD_BIRTH,
-        membershipType: null,
       }),
     );
 
     const completion = await completeRegistration(doubles.gateways, {
       userId: USER_ID,
-      values: { membershipType: "Student" },
+      values: { country: "AU" },
       now: NOW,
     });
 

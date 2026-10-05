@@ -44,7 +44,6 @@ describe("validación traducida", () => {
         email: "nerea-sin-arroba",
         country: "AU",
         password: "bajoelagua",
-        membershipType: "Full",
         dateOfBirth: "1994-03-02",
       },
       { now: NOW },

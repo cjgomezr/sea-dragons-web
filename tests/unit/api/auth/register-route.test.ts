@@ -19,7 +19,6 @@ function validBody(overrides: Body = {}): Body {
     email: EMAIL,
     country: "AU",
     password: "bajoelagua",
-    membershipType: "Full",
     dateOfBirth: "1994-03-02",
     ...overrides,
   };
@@ -197,9 +196,9 @@ describe("POST /api/v1/auth/register", () => {
   it("escribe la fila del socio con el rol Player y el estado incomplete", async () => {
     mockWiring();
 
-    await registerAndDeliver(validBody({ membershipType: "Casual" }));
+    await registerAndDeliver(validBody());
 
-    expect(insertedRows).toEqual([
+    expect(insertedRows).toStrictEqual([
       {
         club_id: CLUB_ID,
         user_id: USER_ID,
@@ -207,7 +206,6 @@ describe("POST /api/v1/auth/register", () => {
         email: EMAIL,
         country: "AU",
         date_of_birth: "1994-03-02",
-        membership_type: "Casual",
         role: "Player",
         account_status: "incomplete",
         email_locale: "en",
@@ -251,17 +249,16 @@ describe("POST /api/v1/auth/register", () => {
     );
   });
 
-  it("responde 422 nombrando el campo cuando el tipo de membresía no existe", async () => {
+  it("acepta el tipo de membresía de una pantalla vieja y no lo escribe", async () => {
     mockWiring();
 
-    const response = await postRegistration(
+    const response = await registerAndDeliver(
       validBody({ membershipType: "Platinum" }),
     );
 
-    expect(response.status).toBe(422);
-    const body = await errorBodyOf(response);
-    expect(body.error.code).toBe("business_rule");
-    expect(body.error.message).toContain("membershipType");
+    expect(response.status).toBe(200);
+    expect(insertedRows).toHaveLength(1);
+    expect(insertedRows[0]).not.toHaveProperty("membership_type");
   });
 
   it("responde 422 y nombra el mínimo de 8 con una contraseña de 7 caracteres", async () => {
@@ -608,10 +605,6 @@ describe("validación del registro", () => {
     },
     "con una fecha de nacimiento futura": {
       body: validBody({ dateOfBirth: "3026-01-01" }),
-      status: 422,
-    },
-    "con un tipo de membresía que no existe": {
-      body: validBody({ membershipType: "Platinum" }),
       status: 422,
     },
   };

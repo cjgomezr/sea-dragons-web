@@ -129,7 +129,6 @@ async function post(endpoint: Endpoint): Promise<Response> {
         email: EMAIL,
         country: "AU",
         password: "bajoelagua",
-        membershipType: "Full",
         dateOfBirth: "1994-03-02",
       }),
     );

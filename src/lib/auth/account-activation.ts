@@ -10,7 +10,6 @@ export const ADULT_AGE = 18;
 export type MemberProfile = {
   readonly country: string | null;
   readonly dateOfBirth: string | null;
-  readonly membershipType: string | null;
   readonly guardianConsentAt: string | null;
   /** El instante en que nació la fila (`members.created_at`). Es el que decide
    * si hace falta el consentimiento del tutor: ver `requiresGuardianConsent`. */
@@ -20,15 +19,15 @@ export type MemberProfile = {
 /**
  * Lo que puede estar pendiente en una cuenta `incomplete`.
  *
- * Los tres primeros son columnas de `members` que la pantalla de completar
+ * Los dos primeros son columnas de `members` que la pantalla de completar
  * registro pide en su formulario. Los dos últimos no se rellenan escribiendo:
  * el consentimiento lo da otra persona (FR-082) y la confirmación llega
- * abriendo el enlace del correo.
+ * abriendo el enlace del correo. El tipo de membresía no cuenta: se elige en
+ * Pagos antes del primer pago (D8 de E12, #480).
  */
 export const PENDING_REQUIREMENTS = [
   "country",
   "dateOfBirth",
-  "membershipType",
   "guardianConsent",
   "emailConfirmation",
 ] as const;
@@ -149,9 +148,6 @@ export function listPendingRequirements(input: {
   }
   if (profile.dateOfBirth === null) {
     pending.push("dateOfBirth");
-  }
-  if (profile.membershipType === null) {
-    pending.push("membershipType");
   }
   if (requiresGuardianConsent(profile) && profile.guardianConsentAt === null) {
     pending.push("guardianConsent");

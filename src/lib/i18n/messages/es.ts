@@ -19,9 +19,7 @@ export const spanishMessages: MessageCatalog = {
   "auth.field.password": "Contraseña",
   "auth.field.country": "País",
   "auth.field.dateOfBirth": "Fecha de nacimiento",
-  "auth.field.membershipType": "Tipo de membresía",
   "auth.field.countryPlaceholder": "Selecciona tu país",
-  "auth.field.membershipTypePlaceholder": "Selecciona tu membresía",
   "auth.field.passwordHint": "Al menos {min} caracteres.",
   "auth.form.fieldIssues": "Revisa estos campos antes de continuar:",
   "auth.error.network":
@@ -195,8 +193,6 @@ export const spanishMessages: MessageCatalog = {
     "La contraseña debe tener al menos {min} caracteres.",
   "auth.issue.passwordTooLong":
     "La contraseña no puede pasar de {max} caracteres (las letras acentuadas y los emojis cuentan doble).",
-  "auth.issue.membershipTypeUnknown":
-    "El tipo de membresía debe ser uno de {types}.",
   "auth.issue.dateOfBirthNotADate":
     "La fecha de nacimiento debe existir en el calendario y escribirse como AAAA-MM-DD.",
   "auth.issue.dateOfBirthInFuture":

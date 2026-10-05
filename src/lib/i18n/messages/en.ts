@@ -22,9 +22,7 @@ export const englishMessages = {
   "auth.field.password": "Password",
   "auth.field.country": "Country",
   "auth.field.dateOfBirth": "Date of birth",
-  "auth.field.membershipType": "Membership type",
   "auth.field.countryPlaceholder": "Select your country",
-  "auth.field.membershipTypePlaceholder": "Select your membership",
   "auth.field.passwordHint": "At least {min} characters.",
   "auth.form.fieldIssues": "Check these fields before continuing:",
   "auth.error.network":
@@ -202,7 +200,6 @@ export const englishMessages = {
   "auth.issue.passwordTooShort": "Password must be at least {min} characters.",
   "auth.issue.passwordTooLong":
     "Password can't be longer than {max} characters (accented letters and emojis count double).",
-  "auth.issue.membershipTypeUnknown": "Membership type must be one of {types}.",
   "auth.issue.dateOfBirthNotADate":
     "Date of birth must be a real calendar date written as YYYY-MM-DD.",
   "auth.issue.dateOfBirthInFuture": "Date of birth can't be in the future.",

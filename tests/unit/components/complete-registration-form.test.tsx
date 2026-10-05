@@ -84,26 +84,30 @@ afterEach(() => {
 });
 
 describe("completar registro: pide solo lo que falta", () => {
-  it("pide el tipo de membresía y nada más cuando es lo único que falta", () => {
-    renderForm(["membershipType"]);
+  it("pide el país y nada más cuando es lo único que falta", () => {
+    renderForm(["country"]);
 
-    expect(screen.getByLabelText("Tipo de membresía")).toBeInTheDocument();
-    expect(screen.queryByLabelText("País")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("País")).toBeInTheDocument();
     expect(
       screen.queryByLabelText("Fecha de nacimiento"),
     ).not.toBeInTheDocument();
   });
 
-  it("pide los tres cuando faltan los tres", () => {
-    renderForm(["country", "dateOfBirth", "membershipType"]);
+  it("pide los dos cuando faltan los dos", () => {
+    renderForm(["country", "dateOfBirth"]);
 
     expect(screen.getByLabelText("País")).toBeInTheDocument();
     expect(screen.getByLabelText("Fecha de nacimiento")).toBeInTheDocument();
-    expect(screen.getByLabelText("Tipo de membresía")).toBeInTheDocument();
+  });
+
+  it("no pregunta el tipo de membresía: se elige en Pagos (D8 de E12)", () => {
+    renderForm(["country", "dateOfBirth"]);
+
+    expect(screen.queryByLabelText("Tipo de membresía")).toBeNull();
   });
 
   it("nunca vuelve a pedir el nombre, el correo ni la contraseña", () => {
-    renderForm(["country", "dateOfBirth", "membershipType"]);
+    renderForm(["country", "dateOfBirth"]);
 
     expect(screen.queryByLabelText("Nombre completo")).not.toBeInTheDocument();
     expect(
@@ -141,7 +145,7 @@ describe("completar registro: pide solo lo que falta", () => {
   });
 
   it("ofrece cerrar sesión, que es la otra única cosa que esta cuenta puede hacer", () => {
-    renderForm(["membershipType"]);
+    renderForm(["country"]);
 
     expect(
       screen.getByRole("button", { name: "Cerrar sesión" }),
@@ -164,31 +168,25 @@ describe("completar registro: pide solo lo que falta", () => {
 describe("completar registro: guardar", () => {
   it("manda sólo el campo que falta al endpoint de la cuenta", async () => {
     stubApi();
-    renderForm(["membershipType"]);
+    renderForm(["country"]);
     const user = userEvent.setup();
 
-    await user.selectOptions(
-      screen.getByLabelText("Tipo de membresía"),
-      "Student",
-    );
+    await user.selectOptions(screen.getByLabelText("País"), "ES");
     await user.click(saveButton());
 
     await waitFor(() => {
       expect(calls).toEqual([
-        { url: ACCOUNT_API_PATH, body: { membershipType: "Student" } },
+        { url: ACCOUNT_API_PATH, body: { country: "ES" } },
       ]);
     });
   });
 
   it("lleva al panel principal cuando la cuenta queda activa", async () => {
     stubApi();
-    renderForm(["membershipType"]);
+    renderForm(["country"]);
     const user = userEvent.setup();
 
-    await user.selectOptions(
-      screen.getByLabelText("Tipo de membresía"),
-      "Full",
-    );
+    await user.selectOptions(screen.getByLabelText("País"), "AU");
     await user.click(saveButton());
 
     await waitFor(() => {
@@ -207,13 +205,10 @@ describe("completar registro: guardar", () => {
         },
       },
     });
-    renderForm(["membershipType"]);
+    renderForm(["country"]);
     const user = userEvent.setup();
 
-    await user.selectOptions(
-      screen.getByLabelText("Tipo de membresía"),
-      "Full",
-    );
+    await user.selectOptions(screen.getByLabelText("País"), "AU");
     await user.click(saveButton());
 
     expect(
@@ -228,13 +223,10 @@ describe("completar registro: guardar", () => {
         data: { accountStatus: "incomplete", pending: ["emailConfirmation"] },
       },
     });
-    renderForm(["membershipType"]);
+    renderForm(["country"]);
     const user = userEvent.setup();
 
-    await user.selectOptions(
-      screen.getByLabelText("Tipo de membresía"),
-      "Casual",
-    );
+    await user.selectOptions(screen.getByLabelText("País"), "AU");
     await user.click(saveButton());
 
     await waitFor(() => {
@@ -271,16 +263,13 @@ describe("completar registro: guardar", () => {
     stubApi({
       status: 422,
       body: {
-        error: { code: "business_rule", message: "membershipType: no vale." },
+        error: { code: "business_rule", message: "country: no vale." },
       },
     });
-    renderForm(["membershipType"]);
+    renderForm(["country"]);
     const user = userEvent.setup();
 
-    await user.selectOptions(
-      screen.getByLabelText("Tipo de membresía"),
-      "Full",
-    );
+    await user.selectOptions(screen.getByLabelText("País"), "AU");
     await user.click(saveButton());
 
     const alert = await screen.findByRole("alert");

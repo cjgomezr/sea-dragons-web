@@ -11,7 +11,6 @@ import {
 import {
   EARLIEST_DATE_OF_BIRTH,
   FIELD_ISSUE_CODES,
-  MEMBERSHIP_TYPES,
   PASSWORD_MAX_BYTES,
   PASSWORD_MIN_LENGTH,
 } from "./registration";
@@ -57,10 +56,6 @@ export function describeAuthIssue(
     case "password_too_long":
       return translate("auth.issue.passwordTooLong", {
         max: PASSWORD_MAX_BYTES,
-      });
-    case "membership_type_unknown":
-      return translate("auth.issue.membershipTypeUnknown", {
-        types: MEMBERSHIP_TYPES.join(", "),
       });
     case "date_of_birth_not_a_date":
       return translate("auth.issue.dateOfBirthNotADate");
