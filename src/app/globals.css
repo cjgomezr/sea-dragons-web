@@ -3173,6 +3173,23 @@ a.auth-brand-header:focus-visible {
   margin: 0;
 }
 
+/* Los packs de sesiones (#469): la lista con la forma de las posiciones, y
+   debajo el alta y el botón de guardar, cada uno a su ancho. */
+.club-session-packs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.club-session-packs .club-positions-form .admin-secondary,
+.club-session-packs > .auth-submit {
+  align-self: flex-start;
+}
+
+.club-session-packs > .auth-note {
+  margin: 0;
+}
+
 .club-positions-fields {
   display: flex;
   flex-direction: column;

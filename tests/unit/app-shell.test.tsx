@@ -235,7 +235,19 @@ describe("app shell", () => {
     ).toHaveAttribute("href", "/club");
   });
 
-  it.each<Role>(["Coach", "Committee", "Player"])(
+  // #469: el Committee la abre para configurar los packs de sesiones.
+  it("enlaza la configuración del club en el menú de un Committee", async () => {
+    usePathname.mockReturnValue("/calendario");
+    renderShell("en", BRAND, "Committee");
+
+    const menu = await openAccountMenu();
+
+    expect(
+      within(menu).getByRole("link", { name: "Club settings" }),
+    ).toHaveAttribute("href", "/club");
+  });
+
+  it.each<Role>(["Coach", "Player"])(
     "no enlaza la configuración del club en el menú de un %s",
     async (role) => {
       usePathname.mockReturnValue("/calendario");

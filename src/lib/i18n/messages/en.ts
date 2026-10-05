@@ -1236,6 +1236,36 @@ export const englishMessages = {
   "clubSettings.signInTexts.save": "Save sign-in texts",
   "clubSettings.signInTexts.saving": "Saving texts…",
   "clubSettings.signInTexts.saved": "Sign-in texts saved.",
+  "clubSettings.sessionPacks.title": "Session packs",
+  "clubSettings.sessionPacks.lead":
+    "What Casual members can buy. Each pack costs the Casual session price set in Stripe, times its sessions.",
+  "clubSettings.sessionPacks.loading": "Loading the session packs…",
+  "clubSettings.sessionPacks.pack": {
+    one: "{count} session",
+    other: "{count} sessions",
+  },
+  "clubSettings.sessionPacks.move.up": "Move the {pack} pack up",
+  "clubSettings.sessionPacks.move.down": "Move the {pack} pack down",
+  "clubSettings.sessionPacks.remove": "Remove",
+  "clubSettings.sessionPacks.remove.label": "Remove the {pack} pack",
+  "clubSettings.sessionPacks.add.title": "Add a pack",
+  "clubSettings.sessionPacks.add.label": "Sessions in the new pack",
+  "clubSettings.sessionPacks.add.hint": "From {min} to {max}.",
+  "clubSettings.sessionPacks.add.submit": "Add pack",
+  "clubSettings.sessionPacks.moved": "{pack} is now number {rank} of {total}.",
+  "clubSettings.sessionPacks.added": "{pack} pack added. Save to offer it.",
+  "clubSettings.sessionPacks.removed":
+    "{pack} pack removed. Save to stop offering it.",
+  "clubSettings.sessionPacks.save": "Save packs",
+  "clubSettings.sessionPacks.saving": "Saving…",
+  "clubSettings.sessionPacks.saved": "Packs saved.",
+  "clubSettings.sessionPacks.issue.required": "Keep at least one pack.",
+  "clubSettings.sessionPacks.issue.outOfRange":
+    "A pack has from {min} to {max} sessions.",
+  "clubSettings.sessionPacks.issue.repeated":
+    "There is already a pack with that many sessions.",
+  "clubSettings.sessionPacks.error.forbidden":
+    "Only an Admin or a Committee member can change the session packs.",
   "clubSettings.positions.title": "Positions",
   "clubSettings.positions.lead":
     "The playing positions members choose in their profile, in the order the directory follows. Archiving a position keeps it for the members who have it, but nobody else can choose it.",

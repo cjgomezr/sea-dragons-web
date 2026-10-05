@@ -1234,6 +1234,38 @@ export const spanishMessages: MessageCatalog = {
   "clubSettings.signInTexts.save": "Guardar los textos",
   "clubSettings.signInTexts.saving": "Guardando los textos…",
   "clubSettings.signInTexts.saved": "Textos de entrada guardados.",
+  "clubSettings.sessionPacks.title": "Packs de sesiones",
+  "clubSettings.sessionPacks.lead":
+    "Lo que pueden comprar los miembros Casual. Cada pack cuesta el precio de la sesión Casual en Stripe por sus sesiones.",
+  "clubSettings.sessionPacks.loading": "Cargando los packs de sesiones…",
+  "clubSettings.sessionPacks.pack": {
+    one: "{count} sesión",
+    other: "{count} sesiones",
+  },
+  "clubSettings.sessionPacks.move.up": "Subir el pack de {pack}",
+  "clubSettings.sessionPacks.move.down": "Bajar el pack de {pack}",
+  "clubSettings.sessionPacks.remove": "Quitar",
+  "clubSettings.sessionPacks.remove.label": "Quitar el pack de {pack}",
+  "clubSettings.sessionPacks.add.title": "Añadir un pack",
+  "clubSettings.sessionPacks.add.label": "Sesiones del pack nuevo",
+  "clubSettings.sessionPacks.add.hint": "De {min} a {max}.",
+  "clubSettings.sessionPacks.add.submit": "Añadir pack",
+  "clubSettings.sessionPacks.moved":
+    "El pack de {pack} es ahora el {rank} de {total}.",
+  "clubSettings.sessionPacks.added":
+    "Pack de {pack} añadido. Guarda para ofrecerlo.",
+  "clubSettings.sessionPacks.removed":
+    "Pack de {pack} quitado. Guarda para dejar de ofrecerlo.",
+  "clubSettings.sessionPacks.save": "Guardar los packs",
+  "clubSettings.sessionPacks.saving": "Guardando…",
+  "clubSettings.sessionPacks.saved": "Packs guardados.",
+  "clubSettings.sessionPacks.issue.required": "Deja al menos un pack.",
+  "clubSettings.sessionPacks.issue.outOfRange":
+    "Un pack tiene de {min} a {max} sesiones.",
+  "clubSettings.sessionPacks.issue.repeated":
+    "Ya hay un pack con esas sesiones.",
+  "clubSettings.sessionPacks.error.forbidden":
+    "Solo un Admin o alguien del Committee puede cambiar los packs de sesiones.",
   "clubSettings.positions.title": "Posiciones",
   "clubSettings.positions.lead":
     "Las posiciones de juego que cada miembro elige en su perfil, en el orden que sigue el directorio. Archivar una posición la conserva para quien ya la tiene, pero nadie más puede elegirla.",

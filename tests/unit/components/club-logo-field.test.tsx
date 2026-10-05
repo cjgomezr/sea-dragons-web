@@ -15,6 +15,14 @@ const SETTINGS_PATH = "/api/v1/club/settings";
 const LOGO_PATH = "/api/v1/club/settings/logo";
 const POSITIONS_PATH = "/api/v1/club/settings/positions";
 const SIGN_IN_TEXTS_PATH = `${SETTINGS_PATH}/sign-in-texts`;
+const SESSION_PACKS_PATH = "/api/v1/club/session-packs";
+const SESSION_PACKS = {
+  packs: [5, 10].map((sessions) => ({
+    sessions,
+    price: { amountCents: null, reason: "not_configured" },
+  })),
+  sessionPrice: { amountCents: null, reason: "not_configured" },
+};
 const LOGO_URL = "https://storage.example.test/club-logos/club/logo.png";
 const NEW_LOGO_URL = "https://storage.example.test/club-logos/club/nuevo.png";
 const LOGO_ALT = "Harbour Hammerheads logo";
@@ -58,6 +66,10 @@ function stubApi(options: {
       if (url === SIGN_IN_TEXTS_PATH) {
         return jsonResponse(200, { data: NO_SIGN_IN_TEXTS });
       }
+      // La de los packs de sesiones (#469) también: aquí los de inicio.
+      if (url === SESSION_PACKS_PATH) {
+        return jsonResponse(200, { data: SESSION_PACKS });
+      }
       if (url === LOGO_PATH) {
         const method = init?.method ?? "GET";
         logoCalls.push({ method, body: init?.body });
@@ -74,7 +86,7 @@ function stubApi(options: {
 }
 
 async function renderScreen(): Promise<void> {
-  render(<ClubSettingsScreen locale="en" />);
+  render(<ClubSettingsScreen locale="en" canManageClub />);
   await screen.findByRole("button", { name: "Save settings" });
 }
 

@@ -21,6 +21,7 @@ export type Capability =
   | "manageUsersAndRoles"
   | "buildTeamsAndTrackAttendance"
   | "manageGroups"
+  | "configureSessionPacks"
   | "useMemberFeatures";
 
 /** Una fila de la matriz. Al ser un `Record` de los cuatro roles, una fila que
@@ -58,6 +59,14 @@ export const CAPABILITY_MATRIX: Readonly<Record<Capability, RoleGrants>> = {
     Player: false,
   },
   manageGroups: { Admin: true, Coach: true, Committee: true, Player: false },
+  // Los packs de sesiones que se ofrecen a los Casual. No es una fila de la
+  // tabla de la sección 4, sino de FR-080, que la da al Admin y al Committee.
+  configureSessionPacks: {
+    Admin: true,
+    Coach: false,
+    Committee: true,
+    Player: false,
+  },
   // Directorio, calendario, noticias, RSVP, perfil propio y pagos.
   useMemberFeatures: {
     Admin: true,
