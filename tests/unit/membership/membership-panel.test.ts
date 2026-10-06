@@ -72,6 +72,7 @@ function gateways(
   return {
     membership: { findByUserId: async () => record },
     payments: { listByUserId: async () => payments },
+    sessionLedger: { listByUserId: async () => [] },
     prices: { readPrice: async (key: ClubPriceKey) => prices[key] },
   };
 }
@@ -229,13 +230,14 @@ describe("readMembershipView: la membresía", () => {
     expect(view.membership).toMatchObject({ status: "active", waiver: null });
   });
 
-  it("sirve una membresía nula y un historial vacío a quien no tiene", async () => {
+  it("sirve una membresía nula, un historial vacío y ningún saldo a quien no tiene", async () => {
     const view = await viewOf(null);
 
     expect(view).toEqual({
       paymentsConfigured: true,
       membership: null,
       payments: [],
+      sessionBalance: { sessions: 0, movements: [] },
     });
   });
 });

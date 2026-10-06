@@ -5,6 +5,7 @@ import { MEMBERSHIP_API_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
 import type { MembershipRecord } from "@/lib/membership/membership";
 import type { PaymentRecord } from "@/lib/membership/membership-view";
+import type { SessionMovement } from "@/lib/membership/session-balance";
 
 /**
  * `GET /api/v1/membership` (#454, #455): la membresía de quien llama y su
@@ -78,6 +79,8 @@ vi.mock("stripe", async (importOriginal) => {
 });
 const findByUserId = vi.fn<() => Promise<MembershipRecord | null>>();
 const listByUserId = vi.fn<() => Promise<readonly PaymentRecord[]>>();
+const listMovementsByUserId =
+  vi.fn<() => Promise<readonly SessionMovement[]>>();
 
 vi.mock("@/lib/supabase/session-client", () => ({
   readIncomingCookies: () => [],
@@ -97,6 +100,9 @@ vi.mock("@/lib/auth/session-reader", () => ({
 vi.mock("@/lib/membership/supabase-membership-gateways", () => ({
   createMembershipGateway: () => ({ findByUserId }),
   createPaymentHistoryGateway: () => ({ listByUserId }),
+  createSessionLedgerGateway: () => ({
+    listByUserId: listMovementsByUserId,
+  }),
 }));
 
 const { default: Stripe } = await import("stripe");
@@ -132,6 +138,7 @@ beforeEach(() => {
   givenSession({ kind: "active", role: "Player", membershipCurrent: false });
   findByUserId.mockResolvedValue(PENDING_FULL);
   listByUserId.mockResolvedValue([]);
+  listMovementsByUserId.mockResolvedValue([]);
   retrievePrice.mockImplementation(async (priceId) => {
     const price = STRIPE_PRICES[priceId];
     if (price === undefined) {
@@ -170,6 +177,7 @@ describe("GET /api/v1/membership", () => {
           subscriptionEndsAt: null,
         },
         payments: [],
+        sessionBalance: { sessions: 0, movements: [] },
       },
     });
   });
@@ -295,6 +303,73 @@ describe("GET /api/v1/membership", () => {
             status: "paid",
           },
         ],
+      },
+    });
+  });
+
+  // El saldo del Casual y sus movimientos (#472, FR-065, FR-087): el de un
+  // Full o Student es el congelado, y se sirve igual.
+  it("sirve el saldo de sesiones con sus movimientos, del más reciente al más antiguo", async () => {
+    findByUserId.mockResolvedValue({
+      ...PENDING_FULL,
+      plan: "Casual",
+      status: "active",
+    });
+    listMovementsByUserId.mockResolvedValue([
+      {
+        kind: "pack_purchase",
+        id: "mov-compra",
+        delta: 5,
+        paymentId: "pay-1",
+        createdAt: new Date("2026-10-01T09:00:00.000Z"),
+      },
+      {
+        kind: "attendance",
+        id: "mov-asistencia",
+        delta: -1,
+        eventId: "evt-1",
+        training: { title: "Tuesday training", startsOn: "2026-10-06" },
+        createdAt: new Date("2026-10-06T09:30:00.000Z"),
+      },
+      {
+        kind: "attendance",
+        id: "mov-oculto",
+        delta: -1,
+        eventId: "evt-2",
+        training: null,
+        createdAt: new Date("2026-10-03T09:30:00.000Z"),
+      },
+    ]);
+
+    const response = await getMembership();
+
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        sessionBalance: {
+          sessions: 3,
+          movements: [
+            {
+              kind: "attendance",
+              id: "mov-asistencia",
+              sessions: -1,
+              date: "2026-10-06T09:30:00.000Z",
+              training: { title: "Tuesday training", startsOn: "2026-10-06" },
+            },
+            {
+              kind: "attendance",
+              id: "mov-oculto",
+              sessions: -1,
+              date: "2026-10-03T09:30:00.000Z",
+              training: null,
+            },
+            {
+              kind: "pack_purchase",
+              id: "mov-compra",
+              sessions: 5,
+              date: "2026-10-01T09:00:00.000Z",
+            },
+          ],
+        },
       },
     });
   });

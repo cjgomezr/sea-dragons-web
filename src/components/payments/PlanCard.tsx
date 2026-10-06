@@ -18,15 +18,17 @@ import { formatClubDay } from "./format-club-day";
 import { requestCardUpdate, requestCheckout } from "./payments-client";
 import { PlanChange } from "./PlanChange";
 import { PlanChoice } from "./PlanChoice";
+import { SessionBalanceSummary } from "./SessionBalanceSummary";
 import { StripeSessionButton } from "./StripeSessionButton";
 import type { Waiting } from "./use-membership-wait";
 
 /**
  * La tarjeta "Plan actual" del mockup de Pagos (#455, RF-5 del PRD de E12):
  * el plan con su precio, el chip de estado, el próximo cobro, la tarjeta o la
- * exención, y lo que el socio puede hacer según su estado. A quien aún no
- * puso tarjeta le ofrece elegir plan (#479) y el alta en Checkout (#454), y
- * a quien ya tiene suscripción, el cambio de plan (#456).
+ * exención, el saldo de sesiones (#472), y lo que el socio puede hacer según
+ * su estado. A quien aún no puso tarjeta le ofrece elegir plan (#479) y el
+ * alta en Checkout (#454), y a quien ya tiene suscripción, el cambio de plan
+ * (#456).
  */
 
 /** El chip lleva siempre la palabra: el color sólo la acompaña. */
@@ -368,6 +370,11 @@ export function PlanCard({
         onViewReplaced={onViewReplaced}
       />
       <PlanDetails translate={translate} membership={membership} />
+      <SessionBalanceSummary
+        translate={translate}
+        plan={membership.plan}
+        sessionBalance={view.sessionBalance}
+      />
       {status === "pending" ? (
         <PendingOffer
           translate={translate}

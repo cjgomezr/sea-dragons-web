@@ -987,6 +987,28 @@ export const englishMessages = {
   "payments.history.paid": "Paid",
   "payments.history.failed": "Failed",
   "payments.history.pending": "Pending",
+  "payments.sessions.left": {
+    one: "You have {count} session left",
+    other: "You have {count} sessions left",
+  },
+  "payments.sessions.empty": "Buy a pack to keep training.",
+  "payments.sessions.frozen": {
+    one: "Frozen balance: {count} session",
+    other: "Frozen balance: {count} sessions",
+  },
+  "payments.sessions.frozenHint":
+    "Frozen while you have a monthly plan: it counts again if you switch to Casual.",
+  "payments.sessions.activity.title": "Session activity",
+  "payments.sessions.activity.date": "Date",
+  "payments.sessions.activity.movement": "Movement",
+  "payments.sessions.activity.sessions": "Sessions",
+  "payments.sessions.activity.empty": "No session activity yet.",
+  "payments.sessions.activity.pack": {
+    one: "Pack of {count} session",
+    other: "Pack of {count} sessions",
+  },
+  "payments.sessions.activity.training": "Training on {date}: {title}",
+  "payments.sessions.activity.trainingUnavailable": "Training session",
   "payments.choice.title": "Choose your membership",
   "payments.choice.hint": "You can change it until you pay.",
   "payments.choice.sessionPrice": "{price} per session",

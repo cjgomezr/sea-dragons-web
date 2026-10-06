@@ -10,12 +10,19 @@ import {
 } from "./membership";
 import { canChoosePlan } from "./choose-plan";
 import { canChangePlan } from "./plan-change";
+import {
+  type SessionLedgerGateway,
+  type SessionMovement,
+  type SessionTraining,
+  readSessionBalance,
+} from "./session-balance";
 import type { ClubPriceKey, ClubPriceReader } from "./stripe-prices";
 
 /**
  * Lo que Pagos pinta de la membresía de quien la abre (#454, #455; RF-5 y
  * RF-7 del PRD de E12): el plan con su precio, el estado que cuenta hoy, el
- * próximo cobro, la tarjeta, la exención y el historial de pagos. Es lo que
+ * próximo cobro, la tarjeta, la exención, el historial de pagos y el saldo
+ * de sesiones (#472). Es lo que
  * sirve `GET /api/v1/membership`, leído de la base y nunca de Stripe en
  * caliente: lo que la base sabe lo escribió el webhook (#452). La excepción
  * es el precio del plan, que es el del `Price` de Stripe (#486).
@@ -96,6 +103,34 @@ export type MembershipPanelView = {
   readonly subscriptionEndsAt: string | null;
 };
 
+/** Un movimiento del saldo (#472): `sessions` es lo que suma o resta. */
+export type SessionMovementView =
+  | {
+      readonly kind: "pack_purchase";
+      readonly id: string;
+      readonly sessions: number;
+      /** ISO 8601: cuándo se acreditó el pack. */
+      readonly date: string;
+    }
+  | {
+      readonly kind: "attendance";
+      readonly id: string;
+      readonly sessions: -1;
+      /** ISO 8601: cuándo se guardó la asistencia. */
+      readonly date: string;
+      /** Nulo si el socio ya no ve el entrenamiento. */
+      readonly training: SessionTraining | null;
+    };
+
+/** El saldo de sesiones (#468, #472). Para un Casual es lo que le queda;
+ * para un Full o un Student, el congelado hasta que vuelva a Casual
+ * (FR-087). */
+export type SessionBalanceView = {
+  readonly sessions: number;
+  /** Del más reciente al más antiguo. */
+  readonly movements: readonly SessionMovementView[];
+};
+
 export type PlanPrices = Readonly<Record<RecurringPlan, number | null>>;
 
 export type MembershipView = {
@@ -104,11 +139,13 @@ export type MembershipView = {
   readonly membership: MembershipPanelView | null;
   /** Del más reciente al más antiguo (FR-068). */
   readonly payments: readonly PaymentView[];
+  readonly sessionBalance: SessionBalanceView;
 };
 
 export type MembershipViewGateways = {
   readonly membership: MembershipGateway;
   readonly payments: PaymentHistoryGateway;
+  readonly sessionLedger: SessionLedgerGateway;
   readonly prices: Pick<ClubPriceReader, "readPrice">;
 };
 
@@ -282,6 +319,30 @@ function newestFirst(payments: readonly PaymentRecord[]): PaymentView[] {
     .sort((first, second) => second.date.localeCompare(first.date));
 }
 
+function toSessionMovementView(movement: SessionMovement): SessionMovementView {
+  const date = movement.createdAt.toISOString();
+  return movement.kind === "pack_purchase"
+    ? { kind: movement.kind, id: movement.id, sessions: movement.delta, date }
+    : {
+        kind: movement.kind,
+        id: movement.id,
+        sessions: movement.delta,
+        date,
+        training: movement.training,
+      };
+}
+
+async function readSessionBalanceView(
+  ledger: SessionLedgerGateway,
+  userId: string,
+): Promise<SessionBalanceView> {
+  const balance = await readSessionBalance(ledger, { userId });
+  return {
+    sessions: balance.sessions,
+    movements: balance.movements.map(toSessionMovementView),
+  };
+}
+
 export async function readMembershipView(
   gateways: MembershipViewGateways,
   input: {
@@ -290,9 +351,10 @@ export async function readMembershipView(
     readonly paymentsConfigured: boolean;
   },
 ): Promise<MembershipView> {
-  const [reading, payments] = await Promise.all([
+  const [reading, payments, sessionBalance] = await Promise.all([
     readMembership(gateways.membership, input),
     gateways.payments.listByUserId(input.userId),
+    readSessionBalanceView(gateways.sessionLedger, input.userId),
   ]);
   return {
     paymentsConfigured: input.paymentsConfigured,
@@ -308,5 +370,6 @@ export async function readMembershipView(
             now: input.now,
           }),
     payments: newestFirst(payments),
+    sessionBalance,
   };
 }

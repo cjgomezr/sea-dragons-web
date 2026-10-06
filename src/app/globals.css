@@ -4913,6 +4913,30 @@ a.auth-brand-header:focus-visible {
   display: none;
 }
 
+/* El saldo de sesiones (#472): lo que le queda a un Casual o el congelado de
+   un Full o Student. En cero lleva el borde de aviso, como
+   `.member-record-warning`; la frase de debajo lo dice sin el color. */
+.payments-session-balance {
+  display: grid;
+  gap: var(--space-1);
+  justify-self: stretch;
+  padding: var(--space-3) var(--space-4);
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.payments-plan-card .payments-session-count {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.payments-session-balance-empty {
+  border-left: 4px solid var(--color-warning);
+}
+
 .payments-plan-actions {
   display: flex;
   flex-wrap: wrap;
@@ -5207,6 +5231,12 @@ a.auth-brand-header:focus-visible {
     padding: 0;
     overflow-wrap: break-word;
     border-top: none;
+  }
+
+  /* La tabla de sesiones (#472) tiene tres columnas: la tercera ocupa la
+     fila entera en vez de dejar media vacía. */
+  .payments-table .payments-session-delta {
+    grid-column: 1 / -1;
   }
 
   .payments-table td::before {

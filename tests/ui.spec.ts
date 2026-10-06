@@ -11543,9 +11543,12 @@ const FAILED_PAYMENT = {
   status: "failed",
 } as const;
 
+const NO_SESSIONS = { sessions: 0, movements: [] } as const;
+
 function membershipView(
   membership: object,
   payments: readonly object[],
+  sessionBalance: object = NO_SESSIONS,
 ): object {
   return {
     paymentsConfigured: true,
@@ -11565,6 +11568,7 @@ function membershipView(
       ...membership,
     },
     payments,
+    sessionBalance,
   };
 }
 
@@ -11676,6 +11680,60 @@ const CASUAL_PACKS_MEMBERSHIP_VIEW = membershipView(
   [],
 );
 
+// El saldo de sesiones (#472): un Casual con saldo y movimientos, uno sin
+// saldo ni movimientos, y un Full con saldo congelado.
+const CASUAL_SESSION_MOVEMENTS = {
+  sessions: 3,
+  movements: [
+    {
+      kind: "attendance",
+      id: "e0e0e0e0-0000-4000-8000-0000000000f3",
+      sessions: -1,
+      date: "2026-09-29T10:00:00.000Z",
+      training: { title: "Tuesday training", startsOn: "2026-09-29" },
+    },
+    {
+      kind: "attendance",
+      id: "e0e0e0e0-0000-4000-8000-0000000000f2",
+      sessions: -1,
+      date: "2026-09-22T10:00:00.000Z",
+      training: null,
+    },
+    {
+      kind: "pack_purchase",
+      id: "e0e0e0e0-0000-4000-8000-0000000000f1",
+      sessions: 5,
+      date: "2026-09-15T00:00:00.000Z",
+    },
+  ],
+} as const;
+
+const CASUAL_MEMBERSHIP = {
+  plan: "Casual",
+  status: "active",
+  monthlyPriceCents: null,
+  card: null,
+  canChangePlan: true,
+  planPrices: { Full: 4500, Student: 3200 },
+} as const;
+
+const CASUAL_BALANCE_MEMBERSHIP_VIEW = membershipView(
+  CASUAL_MEMBERSHIP,
+  [],
+  CASUAL_SESSION_MOVEMENTS,
+);
+
+const CASUAL_NO_BALANCE_MEMBERSHIP_VIEW = membershipView(
+  { ...CASUAL_MEMBERSHIP, status: "pending" },
+  [],
+);
+
+const FROZEN_BALANCE_MEMBERSHIP_VIEW = membershipView(
+  { status: "active", nextChargeAt: "2026-10-01T00:00:00.000Z" },
+  PAYMENTS_HISTORY,
+  { ...CASUAL_SESSION_MOVEMENTS, sessions: 2 },
+);
+
 const BUY_PACK_BUTTON_NAME = /^(Buy|Comprar) 5 (sessions|sesiones)/;
 
 type PaymentsScreenState = {
@@ -11718,6 +11776,12 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   ...paymentsStates("pagos-elegir-plan", CHOOSE_PLAN_MEMBERSHIP_VIEW),
   ...paymentsStates("pagos-elegir-plan-casual", CHOOSE_CASUAL_MEMBERSHIP_VIEW),
   ...paymentsStates("pagos-casual-packs", CASUAL_PACKS_MEMBERSHIP_VIEW),
+  ...paymentsStates("pagos-casual-saldo", CASUAL_BALANCE_MEMBERSHIP_VIEW),
+  ...paymentsStates(
+    "pagos-casual-sin-saldo",
+    CASUAL_NO_BALANCE_MEMBERSHIP_VIEW,
+  ),
+  ...paymentsStates("pagos-full-congelado", FROZEN_BALANCE_MEMBERSHIP_VIEW),
 ];
 
 function isCasualView(view: object | undefined): boolean {
