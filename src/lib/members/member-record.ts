@@ -28,6 +28,14 @@ import {
 } from "@/lib/groups/group-members";
 import { GroupNotFoundError, type GroupsGateways } from "@/lib/groups/groups";
 import { type MemberGroup, listMemberGroups } from "@/lib/groups/member-groups";
+import {
+  CONTACT_ISSUE_CODES,
+  type ContactField,
+  type ProfileContact,
+  type ProfileContactSubmission,
+  contactIssuesOf,
+  toValidContact,
+} from "./profile-contact";
 
 /**
  * La ficha reservada al Admin (#242, RF-4 del PRD de E5): lo que de un miembro
@@ -51,6 +59,10 @@ import { type MemberGroup, listMemberGroups } from "@/lib/groups/member-groups";
  * Los grupos no se escriben aquí. Se agregan y se quitan con las funciones de
  * la sección Grupos (#227), para que valgan sus mismas reglas y los conteos
  * no puedan divergir según desde dónde se cambió.
+ *
+ * Desde #499 el Admin también corrige el teléfono y el contacto de emergencia
+ * del miembro, por ejemplo si se los pasaron por mensaje. Valen las reglas
+ * del perfil propio (`profile-contact.ts`) y queda en la bitácora.
  */
 
 /** El mismo tope que el `check` de `members.auf_number` en
@@ -68,8 +80,9 @@ export type AufRegistration =
       readonly expiry: string | null;
     };
 
-/** La fila del miembro, con lo que la ficha necesita leer. */
-export type StoredMemberRecord = {
+/** La fila del miembro, con lo que la ficha necesita leer. Su teléfono y su
+ * contacto de emergencia (#499) van con ella. */
+export type StoredMemberRecord = ProfileContact & {
   readonly userId: string;
   readonly fullName: string;
   /** YYYY-MM-DD, el día del club en que ingresó (#237). */
@@ -127,6 +140,10 @@ export type MemberRecordSubmission = {
   /** Null sólo vale para quien todavía no tiene fecha: la corrección no
    * borra la que ya hay. */
   readonly dateOfBirth: string | null;
+  /** Null es que el Admin no tocó el contacto (#499): el guardado se queda
+   * como esté, aunque el miembro lo haya cambiado desde que se abrió la
+   * ficha, igual que el AUF. */
+  readonly contact: ProfileContactSubmission | null;
 };
 
 export const MEMBER_RECORD_ISSUE_CODES = [
@@ -137,12 +154,16 @@ export const MEMBER_RECORD_ISSUE_CODES = [
   "date_of_birth_in_future",
   "date_of_birth_too_early",
   "date_of_birth_required",
+  ...CONTACT_ISSUE_CODES,
 ] as const;
 
 export type MemberRecordIssueCode = (typeof MEMBER_RECORD_ISSUE_CODES)[number];
 
+export type MemberRecordField =
+  "aufNumber" | "aufExpiry" | "dateOfBirth" | ContactField;
+
 export type MemberRecordIssue = {
-  readonly field: "aufNumber" | "aufExpiry" | "dateOfBirth";
+  readonly field: MemberRecordField;
   readonly code: MemberRecordIssueCode;
 };
 
@@ -162,6 +183,8 @@ export type MemberScope = { readonly clubId: string; readonly userId: string };
 
 export type AufUpdateResult =
   { readonly kind: "updated" } | { readonly kind: "member_not_found" };
+
+export type ContactUpdateResult = AufUpdateResult;
 
 /** Un registro con número, que es lo único que se puede verificar. */
 export type RegisteredAuf = Extract<AufRegistration, { kind: "registered" }>;
@@ -209,6 +232,11 @@ export type MemberRecordGateways = Pick<
       scope: MemberScope,
       correction: DateOfBirthCorrection,
     ): Promise<DateOfBirthCorrectionResult>;
+    /** El teléfono y el contacto de emergencia en una sola escritura (#499). */
+    updateMemberContact(
+      scope: MemberScope,
+      contact: ProfileContact,
+    ): Promise<ContactUpdateResult>;
   };
   readonly groups: Pick<GroupsGateways["groups"], "findClubGroups">;
   readonly photos: {
@@ -337,9 +365,10 @@ function assertSubmissionShape(
   submission: MemberRecordSubmission,
   todayInClub: string,
 ): void {
-  const issues = [
+  const issues: MemberRecordIssue[] = [
     ...aufIssuesOf(submission.auf),
     ...dateOfBirthIssuesOf(submission.dateOfBirth, todayInClub),
+    ...(submission.contact === null ? [] : contactIssuesOf(submission.contact)),
   ];
   if (issues.length > 0) {
     throw new MemberRecordValidationError(issues);
@@ -620,6 +649,52 @@ async function applyAufChange(
   }
 }
 
+function isSameContact(
+  contact: ProfileContact,
+  record: StoredMemberRecord,
+): boolean {
+  const [written, stored] = [contact.emergencyContact, record.emergencyContact];
+  const isSameEmergencyContact =
+    written === null || stored === null
+      ? written === stored
+      : written.name === stored.name &&
+        written.phone === stored.phone &&
+        written.relationship === stored.relationship;
+  return contact.phone === record.phone && isSameEmergencyContact;
+}
+
+/**
+ * Escribe el contacto sólo si el Admin lo cambió (#499). La bitácora va sin
+ * metadata: ni los números ni los nombres, que son datos personales, y el del
+ * contacto de emergencia es además de un tercero.
+ */
+async function applyContactChange(
+  gateways: MemberRecordGateways,
+  request: {
+    readonly actor: AuditActor;
+    readonly scope: MemberScope;
+    readonly record: StoredMemberRecord;
+  },
+  contact: ProfileContact | null,
+): Promise<void> {
+  const { actor, scope, record } = request;
+  if (contact === null || isSameContact(contact, record)) {
+    return;
+  }
+  const result = await gateways.records.updateMemberContact(scope, contact);
+  if (result.kind === "member_not_found") {
+    throw new MemberRecordNotFoundError();
+  }
+  await recordAuditEvent(gateways.audit, {
+    actor,
+    clubId: actor.clubId,
+    action: "member.contact_corrected",
+    entityType: AUDITED_ENTITY_TYPE,
+    entityId: scope.userId,
+    result: "success",
+  });
+}
+
 export async function updateMemberRecord(
   gateways: MemberRecordGateways,
   request: MemberRecordRequest & {
@@ -659,6 +734,11 @@ export async function updateMemberRecord(
     submission.dateOfBirth,
   );
   await applyAufChange(gateways, changeRequest, registration);
+  await applyContactChange(
+    gateways,
+    changeRequest,
+    submission.contact === null ? null : toValidContact(submission.contact),
+  );
   return composeRecord(gateways, scope, request.todayInClub);
 }
 

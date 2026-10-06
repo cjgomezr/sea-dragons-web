@@ -574,6 +574,9 @@ export const englishMessages = {
   "directory.filter.membership.cancelled": "Cancelled",
   "directory.filter.membership.waived": "Waived",
   "directory.filter.membership.none": "No membership",
+  // Los filtros de contacto (#499), de quien ve todo el contacto.
+  "directory.filter.withoutPhone": "No phone",
+  "directory.filter.withoutEmergencyContact": "No emergency contact",
   "directory.filter.toggle": "Filters",
   "directory.filter.toggleActive": {
     one: "Filters: {count} active",
@@ -587,6 +590,12 @@ export const englishMessages = {
   "directory.column.role": "Role",
   "directory.column.position": "Position",
   "directory.column.attendance": "Attendance",
+  // El contacto de cada socio (#499), según quién mira.
+  "directory.column.contact": "Contact",
+  "directory.contact.email": "Email",
+  "directory.contact.phone": "Phone",
+  "directory.contact.emergency": "Emergency contact",
+  "directory.contact.emergencyPerson": "{name} ({relationship})",
   // El porcentaje de asistencia de un miembro (#396): en el directorio, el
   // perfil propio y la ficha. El prefijo sólo lo oye un lector de pantalla.
   "memberAttendance.title": "Attendance",
@@ -661,6 +670,17 @@ export const englishMessages = {
   "memberRecord.birth.guardianNotice":
     "When you save, {name} will have to give a guardian's details and consent the next time they sign in.",
   "memberRecord.groups.legend": "Groups",
+  // El teléfono y el contacto de emergencia que corrige el Admin (#499).
+  "memberRecord.contact.title": "Contact",
+  "memberRecord.contact.phone": "Phone (optional)",
+  "memberRecord.contact.emergencyLegend": "Emergency contact",
+  "memberRecord.contact.emergencyHint":
+    "Who the club calls if something happens to {name} in the water. Fill in all three, or leave them empty.",
+  "memberRecord.contact.emergencyName": "Contact name",
+  "memberRecord.contact.emergencyPhone": "Contact phone",
+  "memberRecord.contact.emergencyRelationship": "Relationship",
+  "memberRecord.contact.samePhone":
+    "This is {name}'s own phone. The emergency contact should be someone else.",
   "memberRecord.groups.empty": "The club has no groups yet.",
   "memberRecord.save": "Save the record",
   "memberRecord.saving": "Saving…",
@@ -670,6 +690,8 @@ export const englishMessages = {
   "memberRecord.issue.aufExpiryNotADate": "That expiry isn't a valid date.",
   "memberRecord.issue.aufExpiryBeforeJoined":
     "The expiry can't be before the date they joined ({date}).",
+  "memberRecord.issue.emergencyRelationshipMissing":
+    "Add how they're related, or leave all three empty.",
   "memberRecord.issue.dateOfBirthRequired":
     "A date of birth that's already recorded can't be cleared.",
   "memberRecord.error.memberNotFound": "That member isn't in the club.",

@@ -36,6 +36,12 @@ const RECORD: MemberRecord = {
   hasGuardianConsent: false,
   membershipStatus: "active",
   membershipWaiver: null,
+  phone: "0412 345 678",
+  emergencyContact: {
+    name: "Rosa Player",
+    phone: "0499 111 222",
+    relationship: "Mother",
+  },
   photoUrl: null,
   isAufExpired: false,
   groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
@@ -94,13 +100,15 @@ function errorResponse(
 }
 
 /** Lo que el servidor respondería al guardar: la ficha con lo pedido. Sin
- * AUF en la petición, el guardado se queda como estaba. */
+ * AUF o sin contacto en la petición, el guardado se queda como estaba. */
 function savedRecord(body: unknown): MemberRecord {
-  const { groupIds, dateOfBirth, ...auf } = body as {
+  const { groupIds, dateOfBirth, phone, emergencyContact, ...auf } = body as {
     aufNumber?: string | null;
     aufExpiry?: string | null;
     groupIds: string[];
     dateOfBirth: string | null;
+    phone?: MemberRecord["phone"];
+    emergencyContact?: MemberRecord["emergencyContact"];
   };
   const aufNumber =
     auf.aufNumber === undefined ? RECORD.aufNumber : auf.aufNumber;
@@ -113,6 +121,11 @@ function savedRecord(body: unknown): MemberRecord {
     aufExpiry: aufNumber === null ? null : aufExpiry,
     // Lo que escribe un Admin nace verificado.
     isAufVerified: aufNumber !== null,
+    phone: phone === undefined ? RECORD.phone : phone,
+    emergencyContact:
+      emergencyContact === undefined
+        ? RECORD.emergencyContact
+        : emergencyContact,
     groups: CLUB_GROUPS.filter((group) => groupIds.includes(group.id)).map(
       ({ id, name }) => ({ id, name }),
     ),
@@ -1399,5 +1412,163 @@ describe("ficha en pantalla: asistencia", () => {
     const region = screen.getByRole("region", { name: "Asistencia" });
     expect(region.textContent).toContain("Asistencia: 90 %");
     expect(within(region).getByText("9 sesiones")).toBeVisible();
+  });
+});
+describe("ficha en pantalla: contacto (#499)", () => {
+  it("enseña el teléfono y el contacto de emergencia del socio", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    const section = screen.getByRole("region", { name: "Contact" });
+    expect(within(section).getByLabelText("Phone (optional)")).toHaveValue(
+      "0412 345 678",
+    );
+    expect(within(section).getByLabelText("Contact name")).toHaveValue(
+      "Rosa Player",
+    );
+    expect(within(section).getByLabelText("Contact phone")).toHaveValue(
+      "0499 111 222",
+    );
+    expect(within(section).getByLabelText("Relationship")).toHaveValue(
+      "Mother",
+    );
+  });
+
+  it("no manda el contacto si no lo tocó: el socio puede haberlo cambiado entretanto", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(screen.getByRole("checkbox", { name: "Masters Squad" }));
+    await user.click(saveButton());
+
+    await screen.findByRole("status");
+    expect(patches[0]?.body).not.toHaveProperty("phone");
+    expect(patches[0]?.body).not.toHaveProperty("emergencyContact");
+  });
+
+  it("manda el contacto corregido entero y enseña lo guardado", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.clear(screen.getByLabelText("Phone (optional)"));
+    await user.type(screen.getByLabelText("Phone (optional)"), "0400 000 111");
+    await user.clear(screen.getByLabelText("Relationship"));
+    await user.type(screen.getByLabelText("Relationship"), "Aunt");
+    await user.click(saveButton());
+
+    expect(patches[0]?.body).toMatchObject({
+      phone: "0400 000 111",
+      emergencyContact: {
+        name: "Rosa Player",
+        phone: "0499 111 222",
+        relationship: "Aunt",
+      },
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Record saved.",
+    );
+    expect(screen.getByLabelText("Relationship")).toHaveValue("Aunt");
+  });
+
+  it("manda vacíos como null el teléfono y el contacto que se borran", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.clear(screen.getByLabelText("Phone (optional)"));
+    await user.clear(screen.getByLabelText("Contact name"));
+    await user.clear(screen.getByLabelText("Contact phone"));
+    await user.clear(screen.getByLabelText("Relationship"));
+    await user.click(saveButton());
+
+    expect(patches[0]?.body).toMatchObject({
+      phone: null,
+      emergencyContact: null,
+    });
+  });
+
+  it("avisa junto al campo de un teléfono con pocos dígitos, sin mandar nada", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.clear(screen.getByLabelText("Phone (optional)"));
+    await user.type(screen.getByLabelText("Phone (optional)"), "1234");
+    await user.click(saveButton());
+
+    expect(patches).toEqual([]);
+    const phone = screen.getByLabelText("Phone (optional)");
+    expect(phone).toHaveAccessibleDescription(
+      "A phone number needs at least 8 digits.",
+    );
+    expect(phone).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("avisa de lo que falta en un contacto de emergencia a medias, sin mandar nada", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.clear(screen.getByLabelText("Relationship"));
+    await user.click(saveButton());
+
+    expect(patches).toEqual([]);
+    expect(screen.getByLabelText("Relationship")).toHaveAccessibleDescription(
+      "Add how they're related, or leave all three empty.",
+    );
+  });
+
+  it("explica junto al campo el rechazo del servidor", async () => {
+    stubApi({
+      save: () => errorResponse(400, "validation_error", "phone_too_long"),
+    });
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.type(screen.getByLabelText("Phone (optional)"), "9");
+    await user.click(saveButton());
+
+    await vi.waitFor(() =>
+      expect(
+        screen.getByLabelText("Phone (optional)"),
+      ).toHaveAccessibleDescription(
+        "A phone number can have at most 15 digits.",
+      ),
+    );
+  });
+
+  it("avisa si el contacto de emergencia tiene el teléfono del propio socio", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.clear(screen.getByLabelText("Contact phone"));
+    await user.type(screen.getByLabelText("Contact phone"), "0412-345-678");
+
+    expect(screen.getByLabelText("Contact phone")).toHaveAccessibleDescription(
+      "This is Paula Player's own phone. The emergency contact should be someone else.",
+    );
+  });
+
+  it("sale en español", async () => {
+    stubApi();
+
+    await renderScreen("es");
+
+    const section = screen.getByRole("region", { name: "Contacto" });
+    expect(
+      within(section).getByLabelText("Teléfono (opcional)"),
+    ).toBeInTheDocument();
+    expect(
+      within(section).getByRole("group", { name: "Contacto de emergencia" }),
+    ).toHaveAccessibleDescription(
+      "A quién llama el club si a Paula Player le pasa algo en el agua. Rellena los tres datos o déjalos vacíos.",
+    );
+    expect(
+      within(section).getByLabelText("Nombre del contacto"),
+    ).toBeInTheDocument();
   });
 });

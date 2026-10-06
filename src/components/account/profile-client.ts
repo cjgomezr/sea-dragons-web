@@ -150,7 +150,7 @@ export async function saveOwnProfile(
 
 /** El teléfono propio y el del contacto fallan por lo mismo, y se dicen
  * igual: el aviso va junto al campo que falló. */
-function describeContactIssue(
+export function describeContactIssue(
   translate: Translator,
   code: ContactIssueCode,
 ): string {

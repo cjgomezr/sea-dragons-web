@@ -51,6 +51,9 @@ function memberRecord(
     isEvaluated: true,
     membershipStatus: "active",
     groupIds: [],
+    email: "lucia@club.test",
+    phone: null,
+    emergencyContact: null,
     ...overrides,
   };
 }

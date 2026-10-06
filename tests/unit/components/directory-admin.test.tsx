@@ -44,6 +44,9 @@ const NEREA: AdminDirectoryMember = {
   isAufExpired: false,
   isEvaluated: true,
   membershipStatus: "active",
+  email: "nerea@club.test",
+  phone: null,
+  emergencyContact: null,
 };
 
 const ANA: AdminDirectoryMember = {
@@ -62,6 +65,9 @@ const ANA: AdminDirectoryMember = {
   isAufExpired: false,
   isEvaluated: true,
   membershipStatus: "active",
+  email: "ana@club.test",
+  phone: null,
+  emergencyContact: null,
 };
 
 const COACH_REQUEST: PendingRoleRequest = {
@@ -599,6 +605,9 @@ const VENCIDA: AdminDirectoryMember = {
   isAufExpired: true,
   isEvaluated: true,
   membershipStatus: "active",
+  email: "vencida@club.test",
+  phone: null,
+  emergencyContact: null,
 };
 
 function memberRow(name: string): HTMLElement {

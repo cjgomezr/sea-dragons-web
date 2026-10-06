@@ -23,6 +23,7 @@ import {
   MEMBERSHIP_STATUSES,
   type MembershipStatus,
 } from "@/lib/membership/membership";
+import type { EmergencyContact } from "@/lib/members/profile-contact";
 import type { ExperienceLevel } from "@/lib/members/profile-fields";
 import { isAufExpired } from "@/lib/members/member-record";
 import { addClubDays } from "@/lib/time/club-calendar";
@@ -38,7 +39,10 @@ import { compareNames } from "@/lib/text/name-order";
  * Admin lo decide este módulo: el número de AUF con su vencimiento (BR-008) y
  * ver a los socios dados de baja (AC-040). También lo que es del personal de
  * entrenamiento: quién está sin evaluar (#324, RF-7 del PRD de E9), que a un
- * Player o un Committee ni se le manda (FR-055).
+ * Player o un Committee ni se le manda (FR-055). Y el contacto de cada socio
+ * (#499, D5 del PRD de E19): el correo y el teléfono son de Admin y
+ * Committee; el contacto de emergencia, además, del Coach, que es quien está
+ * en la piscina.
  *
  * El club sale de la fila de quien pregunta y nunca de un parámetro, como en
  * el resto de las lecturas de club (NFR-009). Buscar, filtrar y ordenar se
@@ -61,13 +65,16 @@ export const DIRECTORY_DIRECTIONS = ["asc", "desc"] as const;
 
 export type DirectoryDirection = (typeof DIRECTORY_DIRECTIONS)[number];
 
-/** Los filtros de #497 (RF-4 del PRD de E19). La búsqueda y el rol son de
- * todos y no cuentan aquí: esta es la lista de lo que depende del rol. */
+/** Los filtros de #497 y los de contacto de #499 (RF-4 del PRD de E19). La
+ * búsqueda y el rol son de todos y no cuentan aquí: esta es la lista de lo
+ * que depende del rol. */
 export const DIRECTORY_FILTERS = [
   "position",
   "group",
   "auf",
   "membership",
+  "withoutPhone",
+  "withoutEmergencyContact",
 ] as const;
 
 export type DirectoryFilter = (typeof DIRECTORY_FILTERS)[number];
@@ -105,6 +112,10 @@ export type DirectoryQuery = {
   readonly groupId: string | null;
   readonly auf: AufFilter | null;
   readonly membership: MembershipFilter | null;
+  /** Sólo quien no tiene teléfono propio (#499). */
+  readonly withoutPhone: boolean;
+  /** Sólo quien no tiene contacto de emergencia (#499). */
+  readonly withoutEmergencyContact: boolean;
 };
 
 /** Lo que pide quien no pide nada: todo el club activo, por nombre. */
@@ -118,6 +129,8 @@ export const DEFAULT_DIRECTORY_QUERY: DirectoryQuery = {
   groupId: null,
   auf: null,
   membership: null,
+  withoutPhone: false,
+  withoutEmergencyContact: false,
 };
 
 /** "Vence en los próximos 30 días" (#497): de hoy en Melbourne al día 30
@@ -149,6 +162,11 @@ export type DirectoryMemberRecord = {
   readonly membershipStatus: MembershipStatus | null;
   /** Los grupos a los que pertenece (#497). Sólo filtran: no salen nunca. */
   readonly groupIds: readonly string[];
+  /** El correo de su cuenta, su teléfono y su contacto de emergencia (#499).
+   * Cada uno sale sólo a quien puede verlo. */
+  readonly email: string;
+  readonly phone: string | null;
+  readonly emergencyContact: EmergencyContact | null;
 };
 
 /** La posición tal como la pinta el directorio: sus nombres, y la pantalla
@@ -173,31 +191,56 @@ export type DirectoryMember = {
   readonly attendance: MemberAttendance;
 };
 
-/** Lo mismo, más si tiene evaluación, que sólo ve quien puede verlas
- * (FR-055): así sabe a quién le falta antes de armar equipos (#324). */
-export type CoachDirectoryMember = DirectoryMember & {
-  readonly isEvaluated: boolean;
+/** El contacto de emergencia (#499): a quién llamar si le pasa algo en la
+ * piscina. Null si el socio todavía no lo dio. */
+export type EmergencyContactView = {
+  readonly emergencyContact: EmergencyContact | null;
 };
 
-/** Lo del Coach, más el registro federativo (BR-008) y el estado de la
- * membresía (#453), que sólo ve un Admin. */
-export type AdminDirectoryMember = CoachDirectoryMember & {
-  readonly aufNumber: string | null;
-  readonly aufExpiry: string | null;
-  readonly isAufVerified: boolean;
-  readonly isAufExpired: boolean;
-  readonly membershipStatus: MembershipStatus | null;
+/** Todo el contacto (#499): el de emergencia, el correo de su cuenta y su
+ * teléfono, que es opcional (D1). */
+export type MemberContactView = EmergencyContactView & {
+  readonly email: string;
+  readonly phone: string | null;
 };
+
+/** Lo que ve un Committee: la vista de socio con el contacto (D5), sin el
+ * AUF ni la membresía, que siguen siendo del Admin. */
+export type CommitteeDirectoryMember = DirectoryMember & MemberContactView;
+
+/** Lo mismo, más si tiene evaluación, que sólo ve quien puede verlas
+ * (FR-055): así sabe a quién le falta antes de armar equipos (#324). Y el
+ * contacto de emergencia, que el Coach necesita en la piscina (#499). */
+export type CoachDirectoryMember = DirectoryMember &
+  EmergencyContactView & {
+    readonly isEvaluated: boolean;
+  };
+
+/** Lo del Coach, más todo el contacto (#499), el registro federativo
+ * (BR-008) y el estado de la membresía (#453), que sólo ve un Admin. */
+export type AdminDirectoryMember = CoachDirectoryMember &
+  MemberContactView & {
+    readonly aufNumber: string | null;
+    readonly aufExpiry: string | null;
+    readonly isAufVerified: boolean;
+    readonly isAufExpired: boolean;
+    readonly membershipStatus: MembershipStatus | null;
+  };
 
 /** La lista, marcada con quién la está viendo. Quien la consume no tiene que
  * adivinar por la presencia de un campo si le toca dibujar la columna del
- * AUF o la marca de sin evaluar. `availableFilters` le dice qué filtros puede
- * ofrecer (#497): un Committee recibe la vista de socio y aun así filtra por
- * grupo, así que no se deduce de `kind`. */
+ * AUF, la marca de sin evaluar o la columna del contacto (#499).
+ * `availableFilters` le dice qué filtros puede ofrecer (#497): un Coach
+ * recibe su vista y filtra por grupo pero no por contacto, así que no se
+ * deduce de `kind`. */
 export type DirectoryListing = {
   readonly availableFilters: readonly DirectoryFilter[];
 } & (
   | { readonly kind: "member"; readonly members: readonly DirectoryMember[] }
+  | {
+      readonly kind: "committee";
+      readonly members: readonly CommitteeDirectoryMember[];
+    }
   | {
       readonly kind: "coach";
       readonly members: readonly CoachDirectoryMember[];
@@ -247,33 +290,65 @@ export class DirectoryFilterForbiddenError extends Error {
   }
 }
 
-/** Qué capacidad abre cada filtro. La posición es de todos; el grupo, de
+/** Cuánto del contacto de los socios ve cada rol (D5 del PRD de E19). No es
+ * una fila de la matriz de la sección 4 del SRD, sino de FR-089, y por eso
+ * vive aquí y no en `roles.ts`. */
+export type ContactAccess = "none" | "emergency" | "full";
+
+const CONTACT_ACCESS: Readonly<Record<Role, ContactAccess>> = {
+  Admin: "full",
+  Committee: "full",
+  Coach: "emergency",
+  Player: "none",
+};
+
+export function contactAccessOf(role: Role): ContactAccess {
+  return CONTACT_ACCESS[role];
+}
+
+/** Quien ve el teléfono y el contacto de emergencia de todos, y por eso
+ * puede pedir a quién le faltan. El Coach ve el de emergencia, pero listar a
+ * quién le falta es trabajo de administración (RF-4). */
+function canFilterByContact(role: Role): boolean {
+  return contactAccessOf(role) === "full";
+}
+
+function grantedBy(capability: Capability): (role: Role) => boolean {
+  return (role) => hasCapability(role, capability);
+}
+
+/** Quién puede pedir cada filtro. La posición es de todos; el grupo, de
  * quien gestiona grupos; el AUF y la membresía, sólo del Admin (la pregunta
- * de si el Committee también sigue abierta en el PRD). */
-const FILTER_CAPABILITIES: Readonly<Record<DirectoryFilter, Capability>> = {
-  position: "useMemberFeatures",
-  group: "manageGroups",
-  auf: "manageUsersAndRoles",
-  membership: "manageUsersAndRoles",
+ * de si el Committee también sigue abierta en el PRD); los de contacto, de
+ * quien ve todo el contacto. */
+const FILTER_ACCESS: Readonly<
+  Record<DirectoryFilter, (role: Role) => boolean>
+> = {
+  position: grantedBy("useMemberFeatures"),
+  group: grantedBy("manageGroups"),
+  auf: grantedBy("manageUsersAndRoles"),
+  membership: grantedBy("manageUsersAndRoles"),
+  withoutPhone: canFilterByContact,
+  withoutEmergencyContact: canFilterByContact,
 };
 
 export function availableDirectoryFilters(
   role: Role,
 ): readonly DirectoryFilter[] {
-  return DIRECTORY_FILTERS.filter((filter) =>
-    hasCapability(role, FILTER_CAPABILITIES[filter]),
-  );
+  return DIRECTORY_FILTERS.filter((filter) => FILTER_ACCESS[filter](role));
 }
 
 /** Los filtros que trae la consulta, con el nombre que les da la lista. */
 function requestedFilters(query: DirectoryQuery): readonly DirectoryFilter[] {
-  const values: Readonly<Record<DirectoryFilter, unknown>> = {
-    position: query.position,
-    group: query.groupId,
-    auf: query.auf,
-    membership: query.membership,
+  const isRequested: Readonly<Record<DirectoryFilter, boolean>> = {
+    position: query.position !== null,
+    group: query.groupId !== null,
+    auf: query.auf !== null,
+    membership: query.membership !== null,
+    withoutPhone: query.withoutPhone,
+    withoutEmergencyContact: query.withoutEmergencyContact,
   };
-  return DIRECTORY_FILTERS.filter((filter) => values[filter] !== null);
+  return DIRECTORY_FILTERS.filter((filter) => isRequested[filter]);
 }
 
 /** Antes de leer nada: a quien no puede pedir un filtro no se le contesta
@@ -357,7 +432,17 @@ function matchesMembership(
     : record.membershipStatus === membership;
 }
 
-/** Lo que la consulta pide a cada socio, todo a la vez (#497). */
+function matchesContact(
+  record: DirectoryMemberRecord,
+  query: Pick<DirectoryQuery, "withoutPhone" | "withoutEmergencyContact">,
+): boolean {
+  return (
+    (!query.withoutPhone || record.phone === null) &&
+    (!query.withoutEmergencyContact || record.emergencyContact === null)
+  );
+}
+
+/** Lo que la consulta pide a cada socio, todo a la vez (#497, #499). */
 function matchesFilters(
   record: DirectoryMemberRecord,
   query: DirectoryQuery,
@@ -367,7 +452,8 @@ function matchesFilters(
     matchesPosition(record, query.position) &&
     matchesGroup(record, query.groupId) &&
     matchesAuf(record, query.auf, todayInClub) &&
-    matchesMembership(record, query.membership)
+    matchesMembership(record, query.membership) &&
+    matchesContact(record, query)
   );
 }
 
@@ -559,6 +645,24 @@ function toDirectoryMember(
   };
 }
 
+function memberContactOf(record: DirectoryMemberRecord): MemberContactView {
+  return {
+    email: record.email,
+    phone: record.phone,
+    emergencyContact: record.emergencyContact,
+  };
+}
+
+function toCommitteeDirectoryMember(
+  record: DirectoryMemberRecord,
+  context: ListingContext,
+): CommitteeDirectoryMember {
+  return {
+    ...toDirectoryMember(record, context),
+    ...memberContactOf(record),
+  };
+}
+
 function toCoachDirectoryMember(
   record: DirectoryMemberRecord,
   context: ListingContext,
@@ -566,6 +670,7 @@ function toCoachDirectoryMember(
   return {
     ...toDirectoryMember(record, context),
     isEvaluated: record.isEvaluated,
+    emergencyContact: record.emergencyContact,
   };
 }
 
@@ -577,6 +682,7 @@ function toAdminDirectoryMember(
 ): AdminDirectoryMember {
   return {
     ...toCoachDirectoryMember(record, context),
+    ...memberContactOf(record),
     aufNumber: record.aufNumber,
     aufExpiry: record.aufExpiry,
     isAufVerified: record.isAufVerified,
@@ -636,29 +742,50 @@ export async function listDirectory(
     signedPhotos: await signListedPhotos(gateways, listed),
   };
 
-  const availableFilters = availableDirectoryFilters(caller.role);
-  if (isAdmin) {
+  return listingFor(caller.role, listed, {
+    ...context,
+    todayInClub: request.todayInClub,
+  });
+}
+
+/** La vista que toca a cada rol: el servidor decide qué campos salen, nunca
+ * la pantalla (NFR-004). */
+function listingFor(
+  role: Role,
+  listed: readonly DirectoryMemberRecord[],
+  context: ListingContext & { readonly todayInClub: string },
+): DirectoryListing {
+  const availableFilters = availableDirectoryFilters(role);
+  if (hasCapability(role, "manageUsersAndRoles")) {
     return {
       kind: "admin",
       members: listed.map((record) =>
-        toAdminDirectoryMember(record, request.todayInClub, context),
+        toAdminDirectoryMember(record, context.todayInClub, context),
       ),
       availableFilters,
     };
   }
-  return hasCapability(caller.role, "viewEvaluations")
-    ? {
-        kind: "coach",
-        members: listed.map((record) =>
-          toCoachDirectoryMember(record, context),
-        ),
-        availableFilters,
-      }
-    : {
-        kind: "member",
-        members: listed.map((record) => toDirectoryMember(record, context)),
-        availableFilters,
-      };
+  if (hasCapability(role, "viewEvaluations")) {
+    return {
+      kind: "coach",
+      members: listed.map((record) => toCoachDirectoryMember(record, context)),
+      availableFilters,
+    };
+  }
+  if (contactAccessOf(role) === "full") {
+    return {
+      kind: "committee",
+      members: listed.map((record) =>
+        toCommitteeDirectoryMember(record, context),
+      ),
+      availableFilters,
+    };
+  }
+  return {
+    kind: "member",
+    members: listed.map((record) => toDirectoryMember(record, context)),
+    availableFilters,
+  };
 }
 
 /** La misma lista con el rol nuevo de un miembro, sin tocar a nadie más. Es
@@ -676,6 +803,8 @@ export function withMemberRole(
     case "admin":
       return { ...listing, members: listing.members.map(update) };
     case "coach":
+      return { ...listing, members: listing.members.map(update) };
+    case "committee":
       return { ...listing, members: listing.members.map(update) };
     case "member":
       return { ...listing, members: listing.members.map(update) };

@@ -2784,6 +2784,63 @@ a.auth-brand-header:focus-visible {
   white-space: nowrap;
 }
 
+/* El contacto de cada socio (#499): una columna compacta en la que cada dato
+   lleva su etiqueta, porque la cabecera sólo dice "Contacto". El título no
+   ordena nada, pero se alinea con los botones de las demás cabeceras. */
+.directory-column-title {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.directory-contact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: 14px;
+}
+
+.directory-contact-line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: flex-start;
+}
+
+.directory-contact-label {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+/* Como el nombre que abre la ficha: del color del texto, y el subrayado dice
+   que se pulsa. */
+.directory-contact-link {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.directory-contact-link:hover {
+  color: var(--color-accent-text);
+}
+
+/* Las casillas de los filtros de contacto se alinean con el pie de los
+   desplegables de la barra. */
+.directory-filter-check {
+  align-items: center;
+  align-self: flex-end;
+  min-height: var(--touch-target-min);
+}
+
 /* El selector y su botón se ponen uno al lado del otro cuando caben y uno
    debajo del otro cuando no, sin un punto de corte fijo: el ancho de la celda
    depende de la barra lateral y del idioma. */
@@ -2887,6 +2944,29 @@ a.auth-brand-header:focus-visible {
 
   .directory-table-admin th:nth-child(4) {
     width: 20%;
+  }
+
+  /* Con la columna del contacto (#499) cada una cede un poco, y el contacto
+     se queda con lo que necesita un correo partido en dos líneas. */
+  .directory-table-contact th:nth-child(2),
+  .directory-table-contact th:nth-child(3) {
+    width: 17%;
+  }
+
+  .directory-table-contact th:nth-child(4) {
+    width: 15%;
+  }
+
+  .directory-table-contact th:nth-child(5) {
+    width: 26%;
+  }
+
+  .directory-table-admin.directory-table-contact th:nth-child(2) {
+    width: 20%;
+  }
+
+  .directory-table-admin.directory-table-contact th:nth-child(3) {
+    width: 16%;
   }
 
   .directory-sort {
@@ -3013,6 +3093,21 @@ a.auth-brand-header:focus-visible {
     grid-column: 3;
   }
 
+  /* El contacto (#499) ocupa las dos columnas de datos, al final de la
+     tarjeta, y cada enlace mide lo que pide un dedo. */
+  .directory-contact-cell {
+    grid-column: 2 / -1;
+  }
+
+  .directory-contact-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch-target-min);
+    /* El dedo sigue teniendo sus 44 px, pero el texto queda pegado a su
+       etiqueta como el de los datos que no se pulsan. */
+    margin-block: calc((var(--touch-target-min) - 1lh) / -2);
+  }
+
   .directory-member {
     align-items: flex-start;
   }
@@ -3055,6 +3150,150 @@ a.auth-brand-header:focus-visible {
   /* Una marca se lee entera: si no cabe al lado de la otra, baja entera. */
   .directory-mark {
     white-space: nowrap;
+  }
+}
+/* Con la columna del contacto (#499) la tabla no cabe en lo que deja la
+   barra lateral entre 768px y 1200px: cinco columnas en unos 500px parten
+   cada nombre por sílabas. En ese tramo la lista de quien ve el contacto es
+   la misma lista de tarjetas del móvil, con el selector del orden en lugar
+   de las cabeceras. Las reglas son las de arriba, sólo para esa lista. */
+@media (768px <= width < 1200px) {
+  .directory-list-contact .directory-card {
+    overflow: visible;
+    background: none;
+    border: none;
+    border-radius: 0;
+  }
+
+  .directory-list-contact .directory-table,
+  .directory-list-contact .directory-table caption,
+  .directory-list-contact .directory-table tbody,
+  .directory-list-contact .directory-table th,
+  .directory-list-contact .directory-table td {
+    display: block;
+  }
+
+  .directory-list-contact .directory-table thead {
+    display: none;
+  }
+
+  .directory-list-contact .directory-count {
+    padding: 0 0 var(--space-3);
+    border-bottom: none;
+  }
+
+  .directory-list-contact .directory-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .directory-list-contact .directory-table tbody tr {
+    display: grid;
+    grid-template-columns: 40px 1fr 1fr;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--color-panel);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+  }
+
+  .directory-list-contact .directory-table th,
+  .directory-list-contact .directory-table td,
+  .directory-list-contact .directory-table tbody tr + tr th,
+  .directory-list-contact .directory-table tbody tr + tr td {
+    min-width: 0;
+    padding: 0;
+    overflow-wrap: break-word;
+    border-top: none;
+  }
+
+  .directory-list-contact .directory-table tbody th {
+    grid-column: 1 / -1;
+  }
+
+  .directory-list-contact .directory-role-cell {
+    grid-column: 2;
+  }
+
+  .directory-list-contact .directory-table-admin .directory-role-cell {
+    grid-column: 2 / -1;
+  }
+
+  .directory-list-contact .directory-table-admin .directory-role-cell + td {
+    grid-column: 2;
+  }
+
+  .directory-list-contact .directory-attendance-cell {
+    grid-column: 2;
+    color: var(--color-text);
+  }
+
+  .directory-list-contact .directory-table-admin .directory-attendance-cell {
+    grid-column: 3;
+  }
+
+  .directory-list-contact .directory-contact-cell {
+    grid-column: 2 / -1;
+  }
+
+  .directory-list-contact .directory-contact-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch-target-min);
+    /* El dedo sigue teniendo sus 44 px, pero el texto queda pegado a su
+       etiqueta como el de los datos que no se pulsan. */
+    margin-block: calc((var(--touch-target-min) - 1lh) / -2);
+  }
+
+  .directory-list-contact .directory-member {
+    align-items: flex-start;
+  }
+
+  .directory-list-contact .directory-identity {
+    flex: 1;
+  }
+
+  .directory-list-contact .directory-facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+
+  .directory-list-contact .directory-fact-separator {
+    display: none;
+  }
+
+  .directory-list-contact .directory-fact,
+  .directory-list-contact .directory-position {
+    font-size: 14px;
+    color: var(--color-text);
+  }
+
+  .directory-list-contact .directory-table td::before,
+  .directory-list-contact .directory-fact::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: var(--space-1);
+    font-family: var(--font-family-mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+  }
+
+  .directory-list-contact .directory-mark {
+    white-space: nowrap;
+  }
+
+  .directory-list-contact .directory-table th,
+  .directory-list-contact .directory-table td {
+    width: auto;
+  }
+
+  .directory-list-contact .directory-sort-control {
+    display: flex;
   }
 }
 

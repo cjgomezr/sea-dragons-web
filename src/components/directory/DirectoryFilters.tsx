@@ -9,9 +9,9 @@ import type { FilterChoices } from "./use-filter-choices";
 
 /**
  * Los controles con los que se recorta el directorio (RF-2 del PRD de E5): la
- * búsqueda por nombre, el filtro por rol, los de posición, grupo, AUF y
- * membresía que el rol deja usar (#497) y, sólo para un Admin, los socios
- * dados de baja.
+ * búsqueda por nombre, el filtro por rol, los de posición, grupo, AUF,
+ * membresía (#497) y contacto (#499) que el rol deja usar y, sólo para un
+ * Admin, los socios dados de baja.
  *
  * No filtran nada por su cuenta: dicen qué se pidió y la pantalla vuelve a
  * preguntárselo al servidor, que es quien decide qué puede ver cada rol.

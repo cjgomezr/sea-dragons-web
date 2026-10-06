@@ -28,8 +28,14 @@ import {
   type AufSubmission,
   type MemberRecordSubmission,
 } from "@/lib/members/member-record";
-import { loadGroups } from "@/components/groups/groups-client";
 import {
+  type ProfileContactSubmission,
+  isContactIssueCode,
+} from "@/lib/members/profile-contact";
+import { loadGroups } from "@/components/groups/groups-client";
+import { describeContactIssue } from "@/components/account/profile-client";
+import {
+  emergencyContactSchema,
   memberAttendanceSchema,
   membershipStatusSchema,
 } from "./directory-client";
@@ -59,6 +65,8 @@ const recordSchema = z.object({
   hasGuardianConsent: z.boolean(),
   membershipStatus: membershipStatusSchema,
   membershipWaiver: membershipWaiverSchema,
+  phone: z.string().nullable(),
+  emergencyContact: emergencyContactSchema,
   photoUrl: z.url().nullable(),
   isAufExpired: z.boolean(),
   groups: z.array(z.object({ id: z.uuid(), name: z.string() })),
@@ -105,14 +113,21 @@ export async function loadMemberRecord(
   return { kind: "loaded", record: read.value.data, clubGroups: groups.groups };
 }
 
-/** El cuerpo que espera la API: el AUF en dos campos planos, y sin él no va
- * ninguno, que es no tocarlo. */
+/** El cuerpo que espera la API: el AUF en dos campos planos, y el contacto
+ * (#499) en otros dos. Sin uno de ellos no van sus campos, que es no
+ * tocarlo. */
 function toRequestBody({
   auf,
+  contact,
   ...rest
-}: MemberRecordSubmission): Omit<MemberRecordSubmission, "auf"> &
-  Partial<AufSubmission> {
-  return auf === null ? rest : { ...auf, ...rest };
+}: MemberRecordSubmission): Omit<MemberRecordSubmission, "auf" | "contact"> &
+  Partial<AufSubmission> &
+  Partial<ProfileContactSubmission> {
+  return {
+    ...rest,
+    ...(auf === null ? {} : auf),
+    ...(contact === null ? {} : contact),
+  };
 }
 
 export async function saveMemberRecord(
@@ -175,6 +190,14 @@ export function describeMemberRecordIssue(
     readonly joinedOn: string;
   },
 ): string {
+  if (code === "emergency_contact_relationship_missing") {
+    return translate("memberRecord.issue.emergencyRelationshipMissing");
+  }
+  // Las mismas frases que el perfil propio, que valida con las mismas reglas
+  // (#496); la de la relación habla del socio y no de quien rellena.
+  if (isContactIssueCode(code)) {
+    return describeContactIssue(translate, code);
+  }
   switch (code) {
     case "auf_number_too_long":
       return translate("memberRecord.issue.aufNumberTooLong", {
