@@ -5,6 +5,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { runWithCleanup } from "./run-with-cleanup";
 import { createSupabaseTestMemberPool } from "./supabase-test-member-pool";
 import { decideSupabaseCredentials } from "./supabase-credentials";
+import { SUPABASE_FETCH_WORST_CASE_MS } from "./supabase-fetch-timeout";
 import {
   describeSupabaseFailure,
   SUPABASE_RETRY_BUDGET_MS,
@@ -31,12 +32,16 @@ import {
  * Encima va el presupuesto de dos reintentos completos (#165): un test crea el
  * usuario, inicia sesión, consulta y limpia, y un corte puede pillar a más de
  * una de esas llamadas. Sin ese margen el test caería por plazo antes de que
- * el reintento pudiera recuperarlo. */
+ * el reintento pudiera recuperarlo.
+ *
+ * Y encima, una lectura colgada en todos sus intentos (#506): si el test se
+ * agotara antes, el fallo diría "timeout" en vez de nombrar la petición. */
 const NETWORK_TEST_BASE_TIMEOUT_MS = 20_000;
 const RETRIES_COVERED_PER_TEST = 2;
 export const RLS_NETWORK_TEST_TIMEOUT_MS =
   NETWORK_TEST_BASE_TIMEOUT_MS +
-  SUPABASE_RETRY_BUDGET_MS * RETRIES_COVERED_PER_TEST;
+  SUPABASE_RETRY_BUDGET_MS * RETRIES_COVERED_PER_TEST +
+  SUPABASE_FETCH_WORST_CASE_MS;
 
 type Environment = Readonly<Record<string, string | undefined>>;
 

@@ -58,10 +58,17 @@ function isServerErrorStatus(status: number | undefined): boolean {
   );
 }
 
+/** Con lo que empieza todo fallo que el arnés ya dio por perdido: un reintento
+ * agotado o una petición abortada por tiempo (#506). auth-js lo envuelve en un
+ * `AuthRetryableFetchError` que sólo conserva el mensaje, así que es el mensaje
+ * lo que impide repetirlo otra vez desde fuera (PostgREST le antepone el
+ * nombre del error, de ahí que se busque y no se exija al principio). */
+export const SUPABASE_GAVE_UP_PREFIX = "Supabase dev no contestó";
+
 /** Describe el fallo si es pasajero (5xx o red), o `null` si no lo es. */
 function describeTransientResult(result: SupabaseResult): string | null {
   const { error } = result;
-  if (error === null) {
+  if (error === null || error.message.includes(SUPABASE_GAVE_UP_PREFIX)) {
     return null;
   }
   const status = error.status ?? result.status;
@@ -134,7 +141,7 @@ export async function withSupabaseRetry<T extends SupabaseResult>(
     const delay = SUPABASE_RETRY_DELAYS_MS[attemptIndex];
     if (delay === undefined) {
       throw new SupabaseRetryExhaustedError(
-        `Supabase dev no contestó a ${operation} tras ${attemptIndex + 1} intentos (último: ${transientFailure})`,
+        `${SUPABASE_GAVE_UP_PREFIX} a ${operation} tras ${attemptIndex + 1} intentos (último: ${transientFailure})`,
       );
     }
     await sleep(delay);
