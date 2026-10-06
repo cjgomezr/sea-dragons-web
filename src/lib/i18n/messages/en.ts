@@ -375,6 +375,34 @@ export const englishMessages = {
     "The expiry can't be before the day you joined the club.",
   "account.profile.error.aufVerified":
     "Your AUF is already verified. Only an Admin can change it.",
+  // El teléfono y el contacto de emergencia del perfil propio (#496).
+  "account.profile.contact.title": "Contact",
+  "account.profile.contact.phone": "Your phone (optional)",
+  "account.profile.contact.emergencyLegend": "Emergency contact",
+  "account.profile.contact.emergencyHint":
+    "Who we call if something happens in the water. Fill in all three, or leave them empty.",
+  "account.profile.contact.emergencyName": "Contact name",
+  "account.profile.contact.emergencyPhone": "Contact phone",
+  "account.profile.contact.emergencyRelationship": "Relationship",
+  "account.profile.contact.samePhone":
+    "This is your own phone. Your emergency contact should be someone else.",
+  "account.profile.contact.guardianRelationship": "Guardian",
+  "account.profile.contact.guardianProposed":
+    "We've suggested your guardian. Add their phone number to save it.",
+  "account.profile.issue.phoneInvalidCharacters":
+    "Use only digits, spaces, hyphens, brackets and a + at the start.",
+  "account.profile.issue.phoneTooShort":
+    "A phone number needs at least {min} digits.",
+  "account.profile.issue.phoneTooLong":
+    "A phone number can have at most {max} digits.",
+  "account.profile.issue.emergencyNameMissing":
+    "Add the contact's name, or leave all three empty.",
+  "account.profile.issue.emergencyPhoneMissing":
+    "Add the contact's phone, or leave all three empty.",
+  "account.profile.issue.emergencyRelationshipMissing":
+    "Add how you're related, or leave all three empty.",
+  "account.profile.issue.emergencyTextTooLong":
+    "This can be at most {max} characters.",
   // La foto de perfil (#245): el círculo de la cabecera y sus controles.
   "account.photo.alt": "Your profile photo",
   "account.photo.add": "Add photo",

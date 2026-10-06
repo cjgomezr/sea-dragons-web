@@ -90,6 +90,13 @@ describe("formulario de registro", () => {
     expect(screen.queryByLabelText("Tipo de membresía")).toBeNull();
   });
 
+  it("no pide el teléfono ni el contacto de emergencia: van en el perfil (#496)", () => {
+    renderForm();
+
+    expect(screen.queryByLabelText(/teléfono/i)).toBeNull();
+    expect(screen.queryByText(/contacto de emergencia/i)).toBeNull();
+  });
+
   it("envía el registro al endpoint de la API v1", async () => {
     stubApi();
     renderForm();

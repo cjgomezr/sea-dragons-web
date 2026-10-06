@@ -203,6 +203,40 @@ describeRls("RLS de miembros", () => {
   );
 
   it(
+    "no devuelve a un miembro el contacto de otro socio de su club (#496)",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const clubId = await seededClubId(serviceClient);
+
+      await withMember(serviceClient, clubId, (otro) =>
+        withMember(serviceClient, clubId, async (socio) => {
+          const { error: seedError } = await serviceClient.client
+            .from(MEMBERS_TABLE)
+            .update({
+              phone: "0412 345 678",
+              emergency_contact_name: "Lucia Ruiz",
+              emergency_contact_phone: "0498 765 432",
+              emergency_contact_relationship: "Hermana",
+            })
+            .eq("user_id", otro.id);
+          expect(seedError).toBeNull();
+          const rlsClient = await authenticatedClientFor(socio);
+
+          const { data, error } = await rlsClient.client
+            .from(MEMBERS_TABLE)
+            .select("email, phone, emergency_contact_name");
+
+          expect(error).toBeNull();
+          expect(data).toEqual([
+            { email: socio.email, phone: null, emergency_contact_name: null },
+          ]);
+        }),
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "no deja a un miembro cambiar su propio rol",
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);

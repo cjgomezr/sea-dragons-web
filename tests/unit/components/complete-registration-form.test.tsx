@@ -106,6 +106,13 @@ describe("completar registro: pide solo lo que falta", () => {
     expect(screen.queryByLabelText("Tipo de membresía")).toBeNull();
   });
 
+  it("no pide el teléfono ni el contacto de emergencia: van en el perfil (#496)", () => {
+    renderForm(["country", "dateOfBirth"]);
+
+    expect(screen.queryByLabelText(/teléfono/i)).toBeNull();
+    expect(screen.queryByText(/contacto de emergencia/i)).toBeNull();
+  });
+
   it("nunca vuelve a pedir el nombre, el correo ni la contraseña", () => {
     renderForm(["country", "dateOfBirth"]);
 

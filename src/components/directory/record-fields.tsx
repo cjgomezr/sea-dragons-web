@@ -62,17 +62,21 @@ export function TextField({
   value,
   issueText,
   hintIds = [],
+  autoComplete = "off",
   onChange,
 }: {
   id: string;
   label: string;
-  type: "text" | "email" | "date";
+  type: "text" | "email" | "date" | "tel";
   value: string;
   /** El aviso de este campo, o null si no tiene ninguno. */
   issueText: string | null;
   /** Los textos que lo describen además del aviso, en el orden en que se
    * leen. */
   hintIds?: readonly string[];
+  /** Sólo para un dato de quien rellena el formulario, como su teléfono: el
+   * resto son de otra persona y el navegador no debe proponer los suyos. */
+  autoComplete?: "off" | "tel";
   onChange: (value: string) => void;
 }): React.JSX.Element {
   const issueId = `${id}-aviso`;
@@ -87,7 +91,7 @@ export function TextField({
         id={id}
         type={type}
         value={value}
-        autoComplete="off"
+        autoComplete={autoComplete}
         aria-invalid={issueText !== null}
         aria-describedby={describedBy === "" ? undefined : describedBy}
         onChange={(event) => onChange(event.target.value)}

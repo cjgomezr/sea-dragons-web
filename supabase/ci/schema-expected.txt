@@ -119,6 +119,9 @@ columna members.created_at tipo=timestamp with time zone null=NO default=now()
 columna members.date_of_birth tipo=date null=YES default=-
 columna members.email tipo=text null=NO default=-
 columna members.email_locale tipo=text null=NO default='es'::text
+columna members.emergency_contact_name tipo=text null=YES default=-
+columna members.emergency_contact_phone tipo=text null=YES default=-
+columna members.emergency_contact_relationship tipo=text null=YES default=-
 columna members.experience_level tipo=text null=YES default=-
 columna members.full_name tipo=text null=NO default=-
 columna members.gender tipo=text null=YES default=-
@@ -129,6 +132,7 @@ columna members.id tipo=uuid null=NO default=gen_random_uuid()
 columna members.joined_on tipo=date null=NO default=((now() AT TIME ZONE 'Australia/Melbourne'::text))::date
 columna members.membership_type tipo=text null=YES default=-
 columna members.news_seen_at tipo=timestamp with time zone null=YES default=-
+columna members.phone tipo=text null=YES default=-
 columna members.photo_path tipo=text null=YES default=-
 columna members.position tipo=text null=YES default=-
 columna members.position_id tipo=uuid null=YES default=-
@@ -1052,10 +1056,15 @@ restriccion members.members_auf_number_length CHECK (((char_length(btrim(auf_num
 restriccion members.members_auf_verified_requires_number CHECK (((auf_verified_at IS NULL) OR (auf_number IS NOT NULL)))
 restriccion members.members_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion members.members_email_locale_check CHECK ((email_locale = ANY (ARRAY['en'::text, 'es'::text])))
+restriccion members.members_emergency_contact_complete CHECK ((num_nonnulls(emergency_contact_name, emergency_contact_phone, emergency_contact_relationship) = ANY (ARRAY[0, 3])))
+restriccion members.members_emergency_contact_name_check CHECK (((btrim(emergency_contact_name) <> ''::text) AND (char_length(emergency_contact_name) <= 100)))
+restriccion members.members_emergency_contact_phone_check CHECK (((emergency_contact_phone ~ '^\+?[0-9 ()-]+$'::text) AND (char_length(emergency_contact_phone) <= 30) AND ((char_length(regexp_replace(emergency_contact_phone, '[^0-9]'::text, ''::text, 'g'::text)) >= 8) AND (char_length(regexp_replace(emergency_contact_phone, '[^0-9]'::text, ''::text, 'g'::text)) <= 15))))
+restriccion members.members_emergency_contact_relationship_check CHECK (((btrim(emergency_contact_relationship) <> ''::text) AND (char_length(emergency_contact_relationship) <= 100)))
 restriccion members.members_experience_level_check CHECK ((experience_level = ANY (ARRAY['Beginner'::text, 'Intermediate'::text, 'Advanced'::text])))
 restriccion members.members_gender_check CHECK ((gender = ANY (ARRAY['female'::text, 'male'::text, 'non_binary'::text, 'undisclosed'::text])))
 restriccion members.members_guardian_consent_complete CHECK ((((guardian_consent_at IS NULL) AND (guardian_name IS NULL) AND (guardian_email IS NULL)) OR ((guardian_consent_at IS NOT NULL) AND (COALESCE(btrim(guardian_name), ''::text) <> ''::text) AND (COALESCE(btrim(guardian_email), ''::text) <> ''::text))))
 restriccion members.members_membership_type_check CHECK ((membership_type = ANY (ARRAY['Full'::text, 'Student'::text, 'Casual'::text])))
+restriccion members.members_phone_check CHECK (((phone ~ '^\+?[0-9 ()-]+$'::text) AND (char_length(phone) <= 30) AND ((char_length(regexp_replace(phone, '[^0-9]'::text, ''::text, 'g'::text)) >= 8) AND (char_length(regexp_replace(phone, '[^0-9]'::text, ''::text, 'g'::text)) <= 15))))
 restriccion members.members_photo_path_in_own_folder CHECK (starts_with(photo_path, ((user_id)::text || '/'::text)))
 restriccion members.members_pkey PRIMARY KEY (id)
 restriccion members.members_position_same_club_fkey FOREIGN KEY (position_id, club_id) REFERENCES club_positions(id, club_id)

@@ -53,6 +53,8 @@ function unchangedFields(
     positionId: member.positionIds.Defender,
     experienceLevel: "Beginner",
     gender: "female",
+    phone: null,
+    emergencyContact: null,
   };
 }
 
@@ -130,6 +132,48 @@ async function withActiveMember<T>(
 
 describeRls("perfil propio contra seadragons-dev", () => {
   it(
+    "guarda el teléfono y el contacto de emergencia, y los relee (#496)",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateways = createOwnProfileGateways(
+        serviceClient.client,
+        createClubPositionsGateway(serviceClient.client),
+      );
+
+      await withActiveMember(serviceClient, async (member) => {
+        const contact = {
+          phone: "+61 (3) 9876-5432",
+          emergencyContact: {
+            name: "Lucía Ruiz",
+            phone: "0412 345 678",
+            relationship: "Hermana",
+          },
+        };
+
+        await updateOwnProfile(gateways, {
+          userId: member.userId,
+          submission: { ...unchangedFields(member), ...contact, auf: null },
+        });
+
+        await expect(
+          readOwnProfile(gateways, member.userId),
+        ).resolves.toMatchObject({ profile: contact });
+
+        await updateOwnProfile(gateways, {
+          userId: member.userId,
+          submission: { ...unchangedFields(member), auf: null },
+        });
+        await expect(
+          readOwnProfile(gateways, member.userId),
+        ).resolves.toMatchObject({
+          profile: { phone: null, emergencyContact: null },
+        });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "guarda los cinco campos y el directorio enseña los valores nuevos",
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);
@@ -147,6 +191,8 @@ describeRls("perfil propio contra seadragons-dev", () => {
             positionId: positionIds.Forward,
             experienceLevel: "Advanced",
             gender: "undisclosed",
+            phone: null,
+            emergencyContact: null,
             auf: null,
           },
         });
@@ -157,6 +203,8 @@ describeRls("perfil propio contra seadragons-dev", () => {
           positionId: positionIds.Forward,
           experienceLevel: "Advanced",
           gender: "undisclosed",
+          phone: null,
+          emergencyContact: null,
           auf: { status: "none" },
         };
         expect(saved).toEqual(expected);
@@ -210,6 +258,8 @@ describeRls("perfil propio contra seadragons-dev", () => {
             positionId: null,
             experienceLevel: null,
             gender: null,
+            phone: null,
+            emergencyContact: null,
             auf: null,
           },
         });
@@ -255,6 +305,8 @@ describeRls("perfil propio contra seadragons-dev", () => {
             positionId: positionIds.Goalkeeper,
             experienceLevel: "Intermediate",
             gender: "female",
+            phone: null,
+            emergencyContact: null,
             auf: null,
           },
         });
