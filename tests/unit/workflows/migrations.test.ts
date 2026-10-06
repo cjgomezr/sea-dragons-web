@@ -48,11 +48,12 @@ function parseWorkflow(): WorkflowFile {
   return load(readWorkflowSource()) as WorkflowFile;
 }
 
+/** El job que aplica las migraciones. El otro, `solo-lineas-base`, solo
+ * pregunta si hace falta (#494) y lo vigila baselines-only-skip.test.ts. */
 function theJob(): WorkflowJob {
-  const jobs = Object.values(parseWorkflow().jobs);
-  const [job] = jobs;
-  if (!job || jobs.length !== 1) {
-    throw new Error(`se esperaba un único job, hay ${jobs.length}`);
+  const job = parseWorkflow().jobs.migraciones;
+  if (!job) {
+    throw new Error("el workflow no tiene el job migraciones");
   }
   return job;
 }

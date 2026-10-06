@@ -71,7 +71,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Un commit de aceptación de capturas solo trae PNG de Linux, pero el filtro
+  # `paths` mira el PR entero y lo dispara igual si el PR toca supabase/. Si
+  # el empujón solo trae líneas base y el commit anterior pasó `migraciones`
+  # de verdad, no hay nada nuevo que aplicar (#494). Ver checks.yml.
+  solo-lineas-base:
+    if: github.event_name == 'pull_request' && github.event.action == 'synchronize'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      ya_verificado: ${{ steps.pregunta.outputs.ya_verificado }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: pregunta
+        run: bash scripts/baselines-only-after-green.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          WORKFLOW_FILE: migrations.yml
+          HEAVY_JOB: migraciones
+
   migraciones:
+    needs: [solo-lineas-base]
+    # `!cancelled()` porque sin función de estado Actions exige que la
+    # pregunta haya terminado en success, y en un push a main ni arranca.
+    if: "!cancelled() && needs.solo-lineas-base.outputs.ya_verificado != 'true'"
     runs-on: ubuntu-latest
     services:
       postgres:
