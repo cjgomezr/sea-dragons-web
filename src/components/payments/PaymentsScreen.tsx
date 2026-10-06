@@ -14,6 +14,7 @@ import {
   loadMembershipView,
 } from "./payments-client";
 import { PlanCard } from "./PlanCard";
+import { SessionActivity } from "./SessionActivity";
 import { SessionPackOffer } from "./SessionPackOffer";
 import {
   NOT_WAITING,
@@ -26,9 +27,9 @@ import {
 /**
  * Pagos (#454, #455, #456, #479; RF-3, RF-5, RF-6 y RF-7 del PRD de E12):
  * el panel de la membresía del mockup con el plan, su estado, la tarjeta y
- * el historial; la elección de plan y el alta en Stripe Checkout de quien
- * aún no puso tarjeta; el cambio de plan; y la espera del webhook al volver
- * de Stripe.
+ * el historial; el saldo de sesiones de un Casual y sus movimientos (#472);
+ * la elección de plan y el alta en Stripe Checkout de quien aún no puso
+ * tarjeta; el cambio de plan; y la espera del webhook al volver de Stripe.
  *
  * Es de cliente por los botones y por la espera: la membresía se pide a
  * `GET /api/v1/membership`, el mismo endpoint que leerá la aplicación nativa
@@ -220,6 +221,12 @@ function MembershipPanel({
           translate={translate}
           waiting={waiting}
           packReturn={returns.packReturn}
+        />
+      ) : null}
+      {membership?.plan === "Casual" ? (
+        <SessionActivity
+          translate={translate}
+          movements={view.sessionBalance.movements}
         />
       ) : null}
       <PaymentHistory translate={translate} payments={view.payments} />

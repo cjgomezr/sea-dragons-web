@@ -578,6 +578,9 @@ export const spanishMessages: MessageCatalog = {
   "directory.filter.membership.cancelled": "Cancelada",
   "directory.filter.membership.waived": "Exenta",
   "directory.filter.membership.none": "Sin membresía",
+  // Los filtros de contacto (#499), de quien ve todo el contacto.
+  "directory.filter.withoutPhone": "Sin teléfono",
+  "directory.filter.withoutEmergencyContact": "Sin contacto de emergencia",
   "directory.filter.toggle": "Filtros",
   "directory.filter.toggleActive": {
     one: "Filtros: {count} activo",
@@ -591,6 +594,12 @@ export const spanishMessages: MessageCatalog = {
   "directory.column.role": "Rol",
   "directory.column.position": "Posición",
   "directory.column.attendance": "Asistencia",
+  // El contacto de cada socio (#499), según quién mira.
+  "directory.column.contact": "Contacto",
+  "directory.contact.email": "Correo",
+  "directory.contact.phone": "Teléfono",
+  "directory.contact.emergency": "Contacto de emergencia",
+  "directory.contact.emergencyPerson": "{name} ({relationship})",
   // El porcentaje de asistencia de un miembro (#396): en el directorio, el
   // perfil propio y la ficha. El prefijo sólo lo oye un lector de pantalla.
   "memberAttendance.title": "Asistencia",
@@ -663,6 +672,17 @@ export const spanishMessages: MessageCatalog = {
   "memberRecord.birth.guardianNotice":
     "Al guardar, {name} tendrá que dar los datos y el consentimiento de su tutor la próxima vez que entre.",
   "memberRecord.groups.legend": "Grupos",
+  // El teléfono y el contacto de emergencia que corrige el Admin (#499).
+  "memberRecord.contact.title": "Contacto",
+  "memberRecord.contact.phone": "Teléfono (opcional)",
+  "memberRecord.contact.emergencyLegend": "Contacto de emergencia",
+  "memberRecord.contact.emergencyHint":
+    "A quién llama el club si a {name} le pasa algo en el agua. Rellena los tres datos o déjalos vacíos.",
+  "memberRecord.contact.emergencyName": "Nombre del contacto",
+  "memberRecord.contact.emergencyPhone": "Teléfono del contacto",
+  "memberRecord.contact.emergencyRelationship": "Relación",
+  "memberRecord.contact.samePhone":
+    "Es el teléfono de {name}. El contacto de emergencia debería ser otra persona.",
   "memberRecord.groups.empty": "El club todavía no tiene grupos.",
   "memberRecord.save": "Guardar la ficha",
   "memberRecord.saving": "Guardando…",
@@ -673,6 +693,8 @@ export const spanishMessages: MessageCatalog = {
     "Ese vencimiento no es una fecha válida.",
   "memberRecord.issue.aufExpiryBeforeJoined":
     "El vencimiento no puede ser anterior a su fecha de ingreso ({date}).",
+  "memberRecord.issue.emergencyRelationshipMissing":
+    "Escribe qué relación tiene con esa persona o deja los tres datos vacíos.",
   "memberRecord.issue.dateOfBirthRequired":
     "Una fecha de nacimiento ya registrada no se puede borrar.",
   "memberRecord.error.memberNotFound": "Ese miembro no está en el club.",
@@ -995,6 +1017,28 @@ export const spanishMessages: MessageCatalog = {
   "payments.history.paid": "Pagado",
   "payments.history.failed": "Fallido",
   "payments.history.pending": "Pendiente",
+  "payments.sessions.left": {
+    one: "Te queda {count} sesión",
+    other: "Te quedan {count} sesiones",
+  },
+  "payments.sessions.empty": "Compra un pack para seguir entrenando.",
+  "payments.sessions.frozen": {
+    one: "Saldo congelado: {count} sesión",
+    other: "Saldo congelado: {count} sesiones",
+  },
+  "payments.sessions.frozenHint":
+    "Congelado mientras tengas un plan mensual: vuelve a valer si pasas a Casual.",
+  "payments.sessions.activity.title": "Movimientos de sesiones",
+  "payments.sessions.activity.date": "Fecha",
+  "payments.sessions.activity.movement": "Movimiento",
+  "payments.sessions.activity.sessions": "Sesiones",
+  "payments.sessions.activity.empty": "Todavía no hay movimientos de sesiones.",
+  "payments.sessions.activity.pack": {
+    one: "Pack de {count} sesión",
+    other: "Pack de {count} sesiones",
+  },
+  "payments.sessions.activity.training": "Entrenamiento del {date}: {title}",
+  "payments.sessions.activity.trainingUnavailable": "Entrenamiento",
   "payments.choice.title": "Elige tu membresía",
   "payments.choice.hint": "Puedes cambiarla mientras no hayas pagado.",
   "payments.choice.sessionPrice": "{price} por sesión",

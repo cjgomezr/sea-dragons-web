@@ -202,6 +202,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
               auf: { aufNumber: null, aufExpiry: null },
               groupIds: groups,
               dateOfBirth: null,
+              contact: null,
             },
             todayInClub: TODAY_IN_CLUB,
           });
@@ -248,6 +249,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
             auf: { aufNumber: longestNumber, aufExpiry: "2025-12-31" },
             groupIds: [],
             dateOfBirth: null,
+            contact: null,
           },
           todayInClub: TODAY_IN_CLUB,
         });
@@ -296,6 +298,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
             auf: { aufNumber, aufExpiry: "2027-06-30" },
             groupIds: [],
             dateOfBirth: null,
+            contact: null,
           },
           todayInClub: TODAY_IN_CLUB,
         });
@@ -366,6 +369,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
               auf: { aufNumber: "AUF-1", aufExpiry: "2024-03-05" },
               groupIds: [],
               dateOfBirth: null,
+              contact: null,
             },
             todayInClub: TODAY_IN_CLUB,
           }),
@@ -391,6 +395,7 @@ describeRls("ficha reservada al Admin contra seadragons-dev", () => {
               auf: { aufNumber: null, aufExpiry: null },
               groupIds: [],
               dateOfBirth: MINOR_BIRTH,
+              contact: null,
             },
             todayInClub: TODAY_IN_CLUB,
           },
@@ -598,6 +603,50 @@ describeRls("verificar el AUF contra seadragons-dev", () => {
   );
 
   it(
+    "el Admin corrige el teléfono y el contacto de emergencia del socio y queda en la bitácora (#499)",
+    async () => {
+      await withScenario(
+        async ({ serviceClient, clubId, adminId, players }) => {
+          const gateways = createMemberRecordGateways(serviceClient.client);
+          const contact = {
+            phone: "0412 345 678",
+            emergencyContact: {
+              name: "Rosa Player",
+              phone: "+61 499 111 222",
+              relationship: "Madre",
+            },
+          };
+
+          const saved = await updateMemberRecord(gateways, {
+            callerId: adminId,
+            userId: players[0]!,
+            submission: {
+              auf: null,
+              groupIds: [],
+              dateOfBirth: null,
+              contact,
+            },
+            todayInClub: TODAY_IN_CLUB,
+          });
+
+          expect(saved).toMatchObject(contact);
+          await expect(readAuditRows(serviceClient, clubId)).resolves.toEqual([
+            {
+              actor_id: adminId,
+              action: "member.contact_corrected",
+              entity_type: "member",
+              entity_id: players[0]!,
+              result: "success",
+              metadata: null,
+            },
+          ]);
+        },
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "el AUF que escribe el Admin en la ficha nace verificado",
     async () => {
       await withScenario(async ({ serviceClient, adminId, players }) => {
@@ -610,6 +659,7 @@ describeRls("verificar el AUF contra seadragons-dev", () => {
             auf: { aufNumber: "AUF-DEL-ADMIN", aufExpiry: "2030-06-30" },
             groupIds: [],
             dateOfBirth: null,
+            contact: null,
           },
           todayInClub: TODAY_IN_CLUB,
         });

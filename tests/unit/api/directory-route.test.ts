@@ -44,6 +44,13 @@ const MARIA: DirectoryMemberRecord = {
   isEvaluated: true,
   membershipStatus: "active",
   groupIds: [SENIOR_GROUP_ID],
+  email: "maria@club.test",
+  phone: "0412 345 678",
+  emergencyContact: {
+    name: "Rosa Ñíguez",
+    phone: "0499 111 222",
+    relationship: "Madre",
+  },
 };
 
 /** María vino a tres de cuatro; Zoe no tiene sesiones elegibles. */
@@ -70,6 +77,9 @@ const BAJA: DirectoryMemberRecord = {
   isEvaluated: true,
   membershipStatus: "active",
   groupIds: [],
+  email: "zoe@club.test",
+  phone: null,
+  emergencyContact: null,
 };
 
 const databaseCalls: string[] = [];
@@ -287,6 +297,11 @@ describe("GET /api/v1/directory", () => {
     ["un grupo que no es un identificador", "?group=senior"],
     ["un AUF que no existe", "?auf=soon"],
     ["una membresía que no existe", "?membership=paid"],
+    ["un sin teléfono que no es booleano", "?withoutPhone=1"],
+    [
+      "un sin contacto de emergencia que no es booleano",
+      "?withoutEmergencyContact=yes",
+    ],
   ])("responde 400 a %s sin tocar la base", async (_case, search) => {
     mockWiring();
 
@@ -326,6 +341,10 @@ describe("GET /api/v1/directory", () => {
     ["Player", "?group=9a9a9a9a-0000-4000-8000-000000000001"],
     ["Coach", "?auf=expired"],
     ["Committee", "?membership=active"],
+    ["Coach", "?withoutPhone=true"],
+    ["Coach", "?withoutEmergencyContact=true"],
+    ["Player", "?withoutPhone=true"],
+    ["Player", "?withoutEmergencyContact=true"],
   ] as const)(
     "responde 403 con motivo a un %s que pide %s, sin leer el directorio",
     async (callerRole, search) => {
@@ -373,7 +392,6 @@ describe("privacidad del directorio", () => {
     "guardianName",
     "guardianEmail",
     "membershipType",
-    "email",
   ];
 
   it.each(["Coach", "Committee", "Player"] as const)(
@@ -394,6 +412,80 @@ describe("privacidad del directorio", () => {
       }
     },
   );
+});
+
+describe("el contacto en la respuesta del directorio (#499)", () => {
+  async function membersFor(
+    callerRole: Role,
+  ): Promise<readonly Record<string, unknown>[]> {
+    mockWiring(callerRole);
+    const response = await getDirectory();
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      data: { members: readonly Record<string, unknown>[] };
+    };
+    return body.data.members;
+  }
+
+  it.each(["Admin", "Committee"] as const)(
+    "a un %s le trae el correo, el teléfono y el contacto de emergencia",
+    async (callerRole) => {
+      const [maria] = await membersFor(callerRole);
+
+      expect(maria).toMatchObject({
+        email: "maria@club.test",
+        phone: "0412 345 678",
+        emergencyContact: MARIA.emergencyContact,
+      });
+    },
+  );
+
+  it("a un Coach le trae el contacto de emergencia y no el correo ni el teléfono", async () => {
+    const [maria] = await membersFor("Coach");
+
+    expect(maria).toMatchObject({
+      emergencyContact: MARIA.emergencyContact,
+    });
+    expect(maria).not.toHaveProperty("email");
+    expect(maria).not.toHaveProperty("phone");
+  });
+
+  it("a un Player no le trae ni el correo, ni el teléfono, ni el contacto de emergencia", async () => {
+    const members = await membersFor("Player");
+
+    expect(members).not.toHaveLength(0);
+    for (const member of members) {
+      expect(member).not.toHaveProperty("email");
+      expect(member).not.toHaveProperty("phone");
+      expect(member).not.toHaveProperty("emergencyContact");
+    }
+  });
+
+  it("deja a un Committee pedir a quien no tiene teléfono", async () => {
+    mockWiring("Committee");
+
+    const response = await getDirectory("?withoutPhone=true");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { kind: "committee", members: [] },
+    });
+  });
+
+  it("deja a un Admin combinar los dos filtros con los dados de baja", async () => {
+    mockWiring("Admin");
+
+    const response = await getDirectory(
+      "?withoutPhone=true&withoutEmergencyContact=true&includeInactive=true",
+    );
+
+    const body = (await response.json()) as {
+      data: { members: readonly { fullName: string }[] };
+    };
+    expect(body.data.members.map((member) => member.fullName)).toEqual([
+      "Zoe Zapata",
+    ]);
+  });
 });
 
 describe("el directorio en la frontera", () => {

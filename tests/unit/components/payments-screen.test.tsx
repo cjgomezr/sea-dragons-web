@@ -8,6 +8,7 @@ import type {
   MembershipPanelView,
   MembershipView,
   PaymentView,
+  SessionBalanceView,
 } from "@/lib/membership/membership-view";
 
 /**
@@ -43,6 +44,8 @@ const MASTERCARD = {
   expYear: 2031,
 };
 
+const NO_SESSIONS: SessionBalanceView = { sessions: 0, movements: [] };
+
 function panel(change: Partial<MembershipPanelView> = {}): MembershipPanelView {
   return {
     plan: "Full",
@@ -66,7 +69,13 @@ function view(
   membership: MembershipPanelView | null,
   change: Partial<Omit<MembershipView, "membership">> = {},
 ): MembershipView {
-  return { paymentsConfigured: true, membership, payments: [], ...change };
+  return {
+    paymentsConfigured: true,
+    membership,
+    payments: [],
+    sessionBalance: NO_SESSIONS,
+    ...change,
+  };
 }
 
 const ACTIVE_FULL = view(panel());
@@ -1609,5 +1618,178 @@ describe("PaymentsScreen: elegir plan antes del primer pago (#479)", () => {
     ).toHaveAccessibleName(
       /15,00\sAUD por sesión Se paga en packs de sesiones$/,
     );
+  });
+});
+
+describe("PaymentsScreen: saldo de sesiones (#472)", () => {
+  const CASUAL = panel({
+    plan: "Casual",
+    status: "active",
+    monthlyPriceCents: null,
+    nextChargeAt: null,
+    card: null,
+  });
+  const MOVEMENTS: SessionBalanceView = {
+    sessions: 4,
+    movements: [
+      {
+        kind: "attendance",
+        id: "mov-asistencia",
+        sessions: -1,
+        date: "2026-10-06T09:30:00.000Z",
+        training: { title: "Tuesday training", startsOn: "2026-10-06" },
+      },
+      {
+        kind: "attendance",
+        id: "mov-oculto",
+        sessions: -1,
+        date: "2026-10-03T09:30:00.000Z",
+        training: null,
+      },
+      {
+        kind: "pack_purchase",
+        id: "mov-compra",
+        sessions: 5,
+        date: "2026-10-01T09:00:00.000Z",
+      },
+    ],
+  };
+
+  function activityTable(name: string): HTMLElement {
+    return screen.getByRole("table", { name });
+  }
+
+  it("dice a un Casual cuántas sesiones le quedan, junto a Sin cobro recurrente", async () => {
+    await renderLoaded(view(CASUAL, { sessionBalance: MOVEMENTS }));
+
+    const plan = statusChip();
+    expect(within(plan).getByText("No recurring charge")).toBeInTheDocument();
+    expect(
+      within(plan).getByText("You have 4 sessions left"),
+    ).toBeInTheDocument();
+    expect(within(plan).queryByText(/Next charge/)).not.toBeInTheDocument();
+  });
+
+  it("con una sola sesión la nombra en singular", async () => {
+    await renderLoaded(
+      view(CASUAL, { sessionBalance: { sessions: 1, movements: [] } }),
+    );
+
+    expect(screen.getByText("You have 1 session left")).toBeInTheDocument();
+  });
+
+  it("con saldo cero lo dice con un aviso para comprar un pack", async () => {
+    await renderLoaded(view(CASUAL));
+
+    const plan = statusChip();
+    expect(
+      within(plan).getByText("You have 0 sessions left"),
+    ).toBeInTheDocument();
+    expect(
+      within(plan).getByText("Buy a pack to keep training."),
+    ).toBeInTheDocument();
+  });
+
+  it("con saldo no dice que compre un pack", async () => {
+    await renderLoaded(view(CASUAL, { sessionBalance: MOVEMENTS }));
+
+    expect(
+      screen.queryByText("Buy a pack to keep training."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("pinta los movimientos con su signo, su descripción y su fecha, en el orden servido", async () => {
+    await renderLoaded(view(CASUAL, { sessionBalance: MOVEMENTS }));
+
+    const table = activityTable("Session activity");
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "6 October 2026Training on 6 October 2026: Tuesday training-1",
+      "3 October 2026Training session-1",
+      "1 October 2026Pack of 5 sessions+5",
+    ]);
+  });
+
+  it("sin movimientos lo dice con una frase", async () => {
+    await renderLoaded(view(CASUAL));
+
+    expect(
+      screen.queryByRole("table", { name: "Session activity" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("No session activity yet.")).toBeInTheDocument();
+  });
+
+  it("lo escribe todo en español, con sus fechas", async () => {
+    await renderLoaded(view(CASUAL, { sessionBalance: MOVEMENTS }), {
+      locale: "es",
+    });
+
+    expect(screen.getByText("Sin cobro recurrente")).toBeInTheDocument();
+    expect(screen.getByText("Te quedan 4 sesiones")).toBeInTheDocument();
+    const rows = within(activityTable("Movimientos de sesiones"))
+      .getAllByRole("row")
+      .slice(1);
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "6 de octubre de 2026Entrenamiento del 6 de octubre de 2026: Tuesday training-1",
+      "3 de octubre de 2026Entrenamiento-1",
+      "1 de octubre de 2026Pack de 5 sesiones+5",
+    ]);
+  });
+
+  it("en español dice el saldo cero, el aviso y la falta de movimientos", async () => {
+    await renderLoaded(view(CASUAL), { locale: "es" });
+
+    expect(screen.getByText("Te quedan 0 sesiones")).toBeInTheDocument();
+    expect(
+      screen.getByText("Compra un pack para seguir entrenando."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Todavía no hay movimientos de sesiones."),
+    ).toBeInTheDocument();
+  });
+
+  it("a un Full con saldo congelado le enseña el saldo y por qué no cuenta", async () => {
+    await renderLoaded(
+      view(panel(), { sessionBalance: { ...MOVEMENTS, sessions: 3 } }),
+    );
+
+    const plan = statusChip();
+    expect(
+      within(plan).getByText("Frozen balance: 3 sessions"),
+    ).toBeInTheDocument();
+    expect(
+      within(plan).getByText(
+        "Frozen while you have a monthly plan: it counts again if you switch to Casual.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/sessions? left/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", { name: "Session activity" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("lo dice en español a un Student", async () => {
+    await renderLoaded(
+      view(panel({ plan: "Student" }), {
+        sessionBalance: { sessions: 1, movements: [] },
+      }),
+      { locale: "es" },
+    );
+
+    expect(screen.getByText("Saldo congelado: 1 sesión")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Congelado mientras tengas un plan mensual: vuelve a valer si pasas a Casual.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("a un Full sin saldo no le enseña nada de sesiones", async () => {
+    await renderLoaded(view(panel()));
+
+    expect(screen.queryByText(/Frozen|sessions? left/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Session activity" }),
+    ).not.toBeInTheDocument();
   });
 });

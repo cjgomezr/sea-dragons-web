@@ -12,8 +12,12 @@ import type {
   OwnProfileUpdateResult,
   StoredOwnProfile,
 } from "./own-profile";
-import type { EmergencyContact } from "./profile-contact";
 import { parseExperienceLevel, parseGender } from "./profile-fields";
+import {
+  CONTACT_COLUMNS,
+  readProfileContact,
+  toContactColumns,
+} from "./supabase-profile-contact";
 
 /**
  * Adaptador entre el perfil propio (#241) y Supabase.
@@ -29,8 +33,7 @@ import { parseExperienceLevel, parseGender } from "./profile-fields";
  */
 
 const MEMBERS_TABLE = "members";
-const PROFILE_COLUMNS =
-  "full_name, country, position_id, experience_level, gender, phone, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, auf_number, auf_expiry, auf_verified_at, joined_on, club_id, guardian_name";
+const PROFILE_COLUMNS = `full_name, country, position_id, experience_level, gender, ${CONTACT_COLUMNS}, auf_number, auf_expiry, auf_verified_at, joined_on, club_id, guardian_name`;
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -74,24 +77,6 @@ function toOwnAuf(row: Row): OwnAuf {
   };
 }
 
-/** El `check` `members_emergency_contact_complete` de `0057` garantiza
- * que estén las tres o ninguna. */
-export function toEmergencyContact(row: Row): EmergencyContact | null {
-  const name = readText(row, "emergency_contact_name", MEMBERS_TABLE);
-  if (name === null) {
-    return null;
-  }
-  return {
-    name,
-    phone: readRequiredText(row, "emergency_contact_phone", MEMBERS_TABLE),
-    relationship: readRequiredText(
-      row,
-      "emergency_contact_relationship",
-      MEMBERS_TABLE,
-    ),
-  };
-}
-
 function toStoredOwnProfile(row: Row): StoredOwnProfile {
   return {
     profile: {
@@ -104,25 +89,12 @@ function toStoredOwnProfile(row: Row): StoredOwnProfile {
         parseExperienceLevel,
       ),
       gender: readOptionalCatalogValue(row, "gender", parseGender),
-      phone: readText(row, "phone", MEMBERS_TABLE),
-      emergencyContact: toEmergencyContact(row),
+      ...readProfileContact(row),
       auf: toOwnAuf(row),
     },
     joinedOn: readRequiredText(row, "joined_on", MEMBERS_TABLE),
     clubId: readRequiredText(row, "club_id", MEMBERS_TABLE),
     guardianName: readText(row, "guardian_name", MEMBERS_TABLE),
-  };
-}
-
-/** Sin contacto, las tres a null: el `check` de `0057` no deja otra. */
-function toEmergencyContactColumns(
-  contact: EmergencyContact | null,
-): Record<string, string | null> {
-  return {
-    emergency_contact_name: contact === null ? null : contact.name,
-    emergency_contact_phone: contact === null ? null : contact.phone,
-    emergency_contact_relationship:
-      contact === null ? null : contact.relationship,
   };
 }
 
@@ -138,8 +110,7 @@ function toProfileColumns(
     position_id: fields.positionId,
     experience_level: fields.experienceLevel,
     gender: fields.gender,
-    phone: fields.phone,
-    ...toEmergencyContactColumns(fields.emergencyContact),
+    ...toContactColumns(fields),
   };
   return auf.kind === "keep"
     ? profileColumns

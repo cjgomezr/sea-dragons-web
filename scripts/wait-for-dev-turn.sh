@@ -53,7 +53,10 @@ DEV_WORKFLOWS=(
 OPEN_STATUSES=(in_progress queued)
 RUN_FIELDS='"\(.run_started_at) \(.event) \(.head_branch) \(.path)"'
 
-declare -A final_turn_state=()
+# Caché de estados terminados, una línea "id@arranque estado" por corrida. Es
+# texto y no un `declare -A` porque el bash 3.2 de macOS no tiene arrays
+# asociativos, y `npm test` corre este script en local (#512).
+final_turn_states=""
 
 run_url() {
   echo "${GITHUB_SERVER_URL:-https://github.com}/$GH_REPO/actions/runs/$1"
@@ -86,6 +89,14 @@ list_open_runs() {
   done
 }
 
+# Imprime el estado guardado de una corrida, o nada si aún no lo tiene.
+cached_turn_state() {
+  local key state
+  while read -r key state; do
+    [ "$key" = "$1" ] && echo "$state" && return
+  done <<< "$final_turn_states"
+}
+
 # Deja en `turn_state` cómo va el job de turno de una corrida: `skipped`,
 # `success`, `in_progress`, `absent` si aún no existe... Un estado terminado no
 # cambia mientras la corrida siga abierta, así que se guarda y no se vuelve a
@@ -94,7 +105,7 @@ list_open_runs() {
 # el log del job.
 read_turn_state() {
   local id="$1" started="$2" key="$1@$2"
-  turn_state="${final_turn_state[$key]:-}"
+  turn_state=$(cached_turn_state "$key")
   [ -n "$turn_state" ] && return
   if ! turn_state=$(gh api "repos/$GH_REPO/actions/runs/$id/jobs?per_page=100" \
     --jq "[.jobs[] | select(.name == \"$TURN_JOB\") | .conclusion // .status] | .[0] // \"absent\""); then
@@ -102,7 +113,8 @@ read_turn_state() {
     turn_state="unknown"
   fi
   case "$turn_state" in
-    success | failure | cancelled | skipped) final_turn_state[$key]="$turn_state" ;;
+    success | failure | cancelled | skipped)
+      final_turn_states+="$key $turn_state"$'\n' ;;
   esac
 }
 
@@ -136,11 +148,14 @@ earlier_dev_runs() {
 
 # Deja en `blocker` la corrida más vieja que va delante y necesita dev, o
 # vacío si no hay ninguna. Se ordena a mano y no con `sort`: en Git Bash el
-# PATH de Windows puede dar con el sort.exe de System32.
+# PATH de Windows puede dar con el sort.exe de System32. Los candidatos se
+# leen con `while read` y no con `mapfile`, que el bash 3.2 de macOS no tiene.
 find_blocker() {
-  local -a candidates
-  local oldest index started id
-  mapfile -t candidates < <(earlier_dev_runs "$1")
+  local -a candidates=()
+  local candidate oldest index started id
+  while read -r candidate; do
+    [ -n "$candidate" ] && candidates+=("$candidate")
+  done <<< "$(earlier_dev_runs "$1")"
   blocker=""
   while [ "${#candidates[@]}" -gt 0 ]; do
     oldest=0

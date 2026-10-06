@@ -72,6 +72,7 @@ describe("Pagos", () => {
     paymentsConfigured: true,
     membership: ACTIVE_PANEL,
     payments: [],
+    sessionBalance: { sessions: 0, movements: [] },
   };
 
   it("lee de la dirección con qué vuelve el socio de Checkout", async () => {

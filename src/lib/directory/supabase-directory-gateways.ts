@@ -12,6 +12,10 @@ import {
 } from "@/lib/membership/supabase-membership-gateways";
 import { parseExperienceLevel } from "@/lib/members/profile-fields";
 import { signProfilePhotoUrls } from "@/lib/members/supabase-profile-photo-gateways";
+import {
+  CONTACT_COLUMNS,
+  readProfileContact,
+} from "@/lib/members/supabase-profile-contact";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type { DirectoryGateways, DirectoryMemberRecord } from "./directory";
@@ -35,8 +39,10 @@ const MEMBERS_TABLE = "members";
 // Sólo el id de la evaluación: que exista es lo único que el directorio
 // cuenta (#324), y así ninguna nota sale de la base por este camino.
 // La membresía va por el `left join` del chip del Admin (#453). De los grupos
-// basta el id: el filtro por grupo (#497) no pinta ningún nombre.
-export const DIRECTORY_COLUMNS = `user_id, full_name, country, experience_level, role, position_id, account_status, auf_number, auf_expiry, auf_verified_at, photo_path, member_evaluations(id), group_memberships(group_id), ${MEMBERSHIP_STANDING_EMBED}`;
+// basta el id: el filtro por grupo (#497) no pinta ningún nombre. El
+// correo y el contacto (#499) se leen siempre; el dominio decide a quién
+// le salen.
+export const DIRECTORY_COLUMNS = `user_id, full_name, country, experience_level, role, position_id, account_status, auf_number, auf_expiry, auf_verified_at, photo_path, email, ${CONTACT_COLUMNS}, member_evaluations(id), group_memberships(group_id), ${MEMBERSHIP_STANDING_EMBED}`;
 const EVALUATIONS_RELATION = "member_evaluations";
 const GROUP_MEMBERSHIPS_RELATION = "group_memberships";
 const MEMBERSHIPS_RELATION = "memberships";
@@ -128,6 +134,8 @@ export function toDirectoryMemberRecord(
       now,
     ),
     groupIds: readGroupIds(row),
+    email: readRequiredText(row, "email", MEMBERS_TABLE),
+    ...readProfileContact(row),
   };
 }
 

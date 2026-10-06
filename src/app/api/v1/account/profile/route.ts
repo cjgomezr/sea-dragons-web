@@ -18,9 +18,9 @@ import {
   updateOwnProfile,
 } from "@/lib/members/own-profile";
 import {
-  EMERGENCY_CONTACT_TEXT_MAX_LENGTH,
-  PHONE_MAX_LENGTH,
-} from "@/lib/members/profile-contact";
+  emergencyContactBodySchema,
+  phoneBodySchema,
+} from "@/lib/members/profile-contact-body";
 import { createSupabaseOwnProfileGateways } from "@/lib/members/supabase-own-profile-gateways";
 
 /**
@@ -59,18 +59,6 @@ const RESERVED_PROFILE_FIELDS = [
  * dominio, que cuenta en caracteres y no en unidades UTF-16. */
 const FULL_NAME_BODY_MAX_LENGTH = FULL_NAME_MAX_LENGTH * 4;
 const AUF_NUMBER_BODY_MAX_LENGTH = AUF_NUMBER_MAX_LENGTH * 4;
-const PHONE_BODY_MAX_LENGTH = PHONE_MAX_LENGTH * 4;
-const CONTACT_TEXT_BODY_MAX_LENGTH = EMERGENCY_CONTACT_TEXT_MAX_LENGTH * 4;
-
-/** Las tres partes van siempre: que estén todas o ninguna lo decide el
- * dominio, que dice cuál falta. */
-const emergencyContactSchema = z
-  .object({
-    name: z.string().max(CONTACT_TEXT_BODY_MAX_LENGTH),
-    phone: z.string().max(PHONE_BODY_MAX_LENGTH),
-    relationship: z.string().max(CONTACT_TEXT_BODY_MAX_LENGTH),
-  })
-  .strict();
 
 /** Se aceptan en la forma sólo para poder rechazarlos por su nombre. */
 const reservedField = z.unknown().optional();
@@ -88,8 +76,8 @@ const profileBodySchema = z
     positionId: z.string().nullable(),
     experienceLevel: z.string().nullable(),
     gender: z.string().nullable(),
-    phone: z.string().max(PHONE_BODY_MAX_LENGTH).nullable(),
-    emergencyContact: emergencyContactSchema.nullable(),
+    phone: phoneBodySchema.nullable(),
+    emergencyContact: emergencyContactBodySchema.nullable(),
     aufNumber: z.string().max(AUF_NUMBER_BODY_MAX_LENGTH).optional(),
     aufExpiry: z.string().nullable().optional(),
     role: reservedField,

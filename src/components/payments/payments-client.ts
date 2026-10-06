@@ -35,6 +35,26 @@ import type { ClubPrice } from "@/lib/membership/stripe-prices";
 
 const isoInstantSchema = z.iso.datetime({ offset: true });
 
+const calendarDaySchema = z.iso.date();
+
+const sessionMovementSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("pack_purchase"),
+    id: z.string(),
+    sessions: z.number().int().positive(),
+    date: isoInstantSchema,
+  }),
+  z.object({
+    kind: z.literal("attendance"),
+    id: z.string(),
+    sessions: z.literal(-1),
+    date: isoInstantSchema,
+    training: z
+      .object({ title: z.string(), startsOn: calendarDaySchema })
+      .nullable(),
+  }),
+]);
+
 const membershipViewSchema = z.object({
   paymentsConfigured: z.boolean(),
   membership: z
@@ -80,6 +100,10 @@ const membershipViewSchema = z.object({
       status: z.enum(PAYMENT_STATUSES),
     }),
   ),
+  sessionBalance: z.object({
+    sessions: z.number().int(),
+    movements: z.array(sessionMovementSchema),
+  }),
 });
 
 const membershipResponseSchema = z.object({ data: membershipViewSchema });

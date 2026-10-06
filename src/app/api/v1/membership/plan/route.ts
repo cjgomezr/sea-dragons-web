@@ -27,6 +27,7 @@ import {
   createMemberEmailGateway,
   createMembershipGateway,
   createPaymentHistoryGateway,
+  createSessionLedgerGateway,
   createPlanChoiceGateway,
   createScheduledPlanChangeGateway,
 } from "@/lib/membership/supabase-membership-gateways";
@@ -195,6 +196,7 @@ function readCallerMembershipView(
     {
       membership: createMembershipGateway(session.client),
       payments: createPaymentHistoryGateway(session.client),
+      sessionLedger: createSessionLedgerGateway(session.client),
       prices: createRouteClubPriceReader(),
     },
     {

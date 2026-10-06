@@ -114,6 +114,7 @@ vi.mock("@/lib/membership/supabase-membership-gateways", () => ({
   createScheduledPlanChangeGateway: () => ({ saveScheduledChange }),
   createPlanChoiceGateway: () => ({ savePlanChoice }),
   createPaymentHistoryGateway: () => ({ listByUserId: async () => [] }),
+  createSessionLedgerGateway: () => ({ listByUserId: async () => [] }),
   createMemberEmailGateway: () => ({
     findEmail: async () => "alba@example.com",
   }),

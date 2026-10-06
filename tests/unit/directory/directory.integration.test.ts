@@ -46,6 +46,15 @@ type MemberSeed = {
   readonly experienceLevel: "Beginner" | "Intermediate" | "Advanced" | null;
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
+  /** El teléfono y el contacto de emergencia (#499). Sin ellos, null. */
+  readonly contact?: {
+    readonly phone: string;
+    readonly emergencyContact: {
+      readonly name: string;
+      readonly phone: string;
+      readonly relationship: string;
+    };
+  };
 };
 
 async function withTwoClubs<T>(
@@ -81,6 +90,11 @@ async function insertMember(
     experience_level: seed.experienceLevel,
     auf_number: seed.aufNumber,
     auf_expiry: seed.aufExpiry,
+    phone: seed.contact?.phone ?? null,
+    emergency_contact_name: seed.contact?.emergencyContact.name ?? null,
+    emergency_contact_phone: seed.contact?.emergencyContact.phone ?? null,
+    emergency_contact_relationship:
+      seed.contact?.emergencyContact.relationship ?? null,
   });
   if (error) {
     throw new Error(`No se pudo sembrar a ${seed.fullName}: ${error.message}`);
@@ -277,6 +291,14 @@ describeRls("el directorio contra seadragons-dev", () => {
             experienceLevel: "Intermediate",
             aufNumber: "AUF-MARIA",
             aufExpiry: "2020-01-31",
+            contact: {
+              phone: "0412 345 678",
+              emergencyContact: {
+                name: "Rosa Ñíguez",
+                phone: "+61 499 111 222",
+                relationship: "Madre",
+              },
+            },
           },
           {
             clubId,
@@ -337,6 +359,27 @@ describeRls("el directorio contra seadragons-dev", () => {
           });
           expect(listed.members[0]).toMatchObject({ isEvaluated: false });
 
+          // #499: el correo de la cuenta y el contacto llegan en la misma
+          // lectura, y los dos filtros de contacto los usan.
+          expect(listed.members[1]).toMatchObject({
+            email: maria!.email,
+            phone: "0412 345 678",
+            emergencyContact: {
+              name: "Rosa Ñíguez",
+              phone: "+61 499 111 222",
+              relationship: "Madre",
+            },
+          });
+          expect(listed.members[0]).toMatchObject({
+            email: admin!.email,
+            phone: null,
+            emergencyContact: null,
+          });
+          const withoutPhone = await askAs(admin!.id, { withoutPhone: true });
+          expect(withoutPhone.members.map((member) => member.fullName)).toEqual(
+            ["Ana Admin"],
+          );
+
           const searched = await askAs(admin!.id, { search: "maria niguez" });
           expect(searched.members.map((member) => member.fullName)).toEqual([
             "María Ñíguez",
@@ -376,6 +419,11 @@ describeRls("el directorio contra seadragons-dev", () => {
           expect(asPlayer.kind).toBe("member");
           expect(asPlayer.members[0]).not.toHaveProperty("aufNumber");
           expect(asPlayer.members[1]).not.toHaveProperty("isEvaluated");
+          for (const member of asPlayer.members) {
+            expect(member).not.toHaveProperty("email");
+            expect(member).not.toHaveProperty("phone");
+            expect(member).not.toHaveProperty("emergencyContact");
+          }
 
           // #394: con una hoja guardada, cada socio trae su porcentaje, y la
           // lista entera sale de una sola llamada a la función agregada.

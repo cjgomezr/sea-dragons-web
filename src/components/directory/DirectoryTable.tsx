@@ -8,6 +8,7 @@ import type {
   DirectoryListing,
   DirectoryMember,
   DirectorySort,
+  MemberContactView,
 } from "@/lib/directory/directory";
 import { MEMBER_RECORD_PATH } from "@/lib/auth/routes";
 import { memberEvaluationHref } from "@/lib/evaluations/member-evaluation-href";
@@ -16,6 +17,7 @@ import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
 import type { MembershipStatus } from "@/lib/membership/membership";
 import { type AufState, type RowMark, aufMarksOf } from "./auf-marks";
+import { DirectoryContactCell, type RowContact } from "./DirectoryContactCell";
 import { membershipMarkOf } from "./membership-mark";
 import {
   type DirectoryOrder,
@@ -56,6 +58,10 @@ import {
  * A un Admin la celda del rol le da además el control para cambiarlo (#240).
  * Lo decide la marca de la lista, no un rol leído aparte: el endpoint del
  * cambio de rol lo comprueba igual por su cuenta.
+ *
+ * Quien ve el contacto de los socios (#499) tiene además una columna
+ * "Contacto" al final: Admin y Committee con todo, el Coach con el de
+ * emergencia. La marca de la lista dice cuál, igual que con el AUF.
  */
 
 /** El círculo de cada fila, en píxeles; `.directory-avatar` dice lo mismo. */
@@ -79,7 +85,19 @@ type DirectoryRow = {
   readonly member: DirectoryMember;
   readonly admin: AdminView | null;
   readonly isEvaluated: boolean | null;
+  readonly contact: RowContact;
 };
+
+const NO_CONTACT: RowContact = { kind: "none" };
+
+function fullContactOf(member: MemberContactView): RowContact {
+  return {
+    kind: "full",
+    email: member.email,
+    phone: member.phone,
+    emergencyContact: member.emergencyContact,
+  };
+}
 
 function rowsOf(listing: DirectoryListing): readonly DirectoryRow[] {
   switch (listing.kind) {
@@ -88,18 +106,31 @@ function rowsOf(listing: DirectoryListing): readonly DirectoryRow[] {
         member,
         admin: member,
         isEvaluated: member.isEvaluated,
+        contact: fullContactOf(member),
+      }));
+    case "committee":
+      return listing.members.map((member) => ({
+        member,
+        admin: null,
+        isEvaluated: null,
+        contact: fullContactOf(member),
       }));
     case "coach":
       return listing.members.map((member) => ({
         member,
         admin: null,
         isEvaluated: member.isEvaluated,
+        contact: {
+          kind: "emergency",
+          emergencyContact: member.emergencyContact,
+        },
       }));
     case "member":
       return listing.members.map((member) => ({
         member,
         admin: null,
         isEvaluated: null,
+        contact: NO_CONTACT,
       }));
   }
 }
@@ -387,8 +418,21 @@ function MemberRow({
       >
         {describeAttendance(translate, locale, member.attendance)}
       </td>
+      {row.contact.kind === "none" ? null : (
+        <DirectoryContactCell translate={translate} contact={row.contact} />
+      )}
     </tr>
   );
+}
+
+/** Las clases de la tabla según lo que trae la lista: la hoja de estilos
+ * reparte el ancho distinto con el control del rol y con el contacto. */
+function tableClassName(listing: DirectoryListing): string {
+  return [
+    "directory-table",
+    ...(listing.kind === "admin" ? ["directory-table-admin"] : []),
+    ...(listing.kind === "member" ? [] : ["directory-table-contact"]),
+  ].join(" ");
 }
 
 export function DirectoryTable({
@@ -415,7 +459,13 @@ export function DirectoryTable({
   const rows = rowsOf(listing);
   const roleDrafts = useRoleDrafts(onSaveRole);
   return (
-    <>
+    <div
+      className={
+        listing.kind === "member"
+          ? "directory-list"
+          : "directory-list directory-list-contact"
+      }
+    >
       <DirectorySortControl
         translate={translate}
         order={order}
@@ -424,13 +474,7 @@ export function DirectoryTable({
       {/* La tarjeta es el div y no la tabla: un `border-radius` sobre una
           tabla no recorta las esquinas de su primera y su última fila. */}
       <div className="directory-card">
-        <table
-          className={
-            listing.kind === "admin"
-              ? "directory-table directory-table-admin"
-              : "directory-table"
-          }
-        >
+        <table className={tableClassName(listing)}>
           <caption className="directory-count">
             {translate("directory.memberCount", { count: rows.length })}
           </caption>
@@ -460,6 +504,13 @@ export function DirectoryTable({
                 order={order}
                 onSort={onSort}
               />
+              {listing.kind === "member" ? null : (
+                <th scope="col">
+                  <span className="directory-column-title">
+                    {translate("directory.column.contact")}
+                  </span>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -475,6 +526,6 @@ export function DirectoryTable({
           </tbody>
         </table>
       </div>
-    </>
+    </div>
   );
 }

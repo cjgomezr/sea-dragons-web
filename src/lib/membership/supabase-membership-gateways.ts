@@ -17,7 +17,11 @@ import type { StripeWebhookGateway } from "@/lib/stripe/stripe-webhook";
 import type { MemberEmailGateway } from "./checkout";
 import type { PlanChoiceGateway } from "./choose-plan";
 import type { ScheduledPlanChangeGateway } from "./plan-change";
-import type { SessionLedgerGateway, SessionMovement } from "./session-balance";
+import type {
+  SessionLedgerGateway,
+  SessionMovement,
+  SessionTraining,
+} from "./session-balance";
 import {
   type MembershipWaiverView,
   PAYMENT_STATUSES,
@@ -317,8 +321,22 @@ const sessionMovementRowSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 
+type SessionMovementRow = z.infer<typeof sessionMovementRowSchema>;
+
+const EVENTS_TABLE = "events";
+const SESSION_TRAINING_COLUMNS = "id, title, starts_on";
+
+const sessionTrainingRowSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  starts_on: z.string(),
+});
+
+type TrainingsById = ReadonlyMap<string, SessionTraining>;
+
 function toSessionMovement(
-  row: z.infer<typeof sessionMovementRowSchema>,
+  row: SessionMovementRow,
+  trainings: TrainingsById,
 ): SessionMovement {
   const createdAt = new Date(row.created_at);
   return row.kind === "pack_purchase"
@@ -334,13 +352,44 @@ function toSessionMovement(
         id: row.id,
         delta: row.delta,
         eventId: row.attendance_event_id,
+        training: trainings.get(row.attendance_event_id) ?? null,
         createdAt,
       };
 }
 
-/** Los movimientos del saldo de un socio (#468). Con el cliente de la sesión,
- * `session_ledger_select_own` sólo deja leer los propios. El orden lo pone el
- * dominio. */
+/** El título y el día de los entrenamientos que gastaron sesiones (#472).
+ * Va con el mismo cliente: `events_select_audience` calla los eventos que el
+ * socio ya no ve, y esos movimientos salen sin entrenamiento. */
+async function readSessionTrainings(
+  client: SupabaseClient,
+  rows: readonly SessionMovementRow[],
+): Promise<TrainingsById> {
+  const eventIds = rows.flatMap((row) =>
+    row.kind === "attendance" ? [row.attendance_event_id] : [],
+  );
+  if (eventIds.length === 0) {
+    return new Map();
+  }
+  const { data, error } = await client
+    .from(EVENTS_TABLE)
+    .select(SESSION_TRAINING_COLUMNS)
+    .in("id", eventIds);
+  if (error) {
+    throw new Error(
+      `No se pudieron leer los entrenamientos del saldo de sesiones: ${error.message}`,
+    );
+  }
+  return new Map(
+    z
+      .array(sessionTrainingRowSchema)
+      .parse(data)
+      .map((row) => [row.id, { title: row.title, startsOn: row.starts_on }]),
+  );
+}
+
+/** Los movimientos del saldo de un socio (#468) con sus entrenamientos
+ * (#472). Con el cliente de la sesión, `session_ledger_select_own` sólo deja
+ * leer los propios. El orden lo pone el dominio. */
 export function createSessionLedgerGateway(
   client: SupabaseClient,
 ): SessionLedgerGateway {
@@ -355,10 +404,9 @@ export function createSessionLedgerGateway(
           `No se pudo leer el saldo de sesiones de ${userId}: ${error.message}`,
         );
       }
-      return z
-        .array(sessionMovementRowSchema)
-        .parse(data)
-        .map(toSessionMovement);
+      const rows = z.array(sessionMovementRowSchema).parse(data);
+      const trainings = await readSessionTrainings(client, rows);
+      return rows.map((row) => toSessionMovement(row, trainings));
     },
   };
 }

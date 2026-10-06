@@ -19,8 +19,10 @@ import type { FilterChoices } from "./use-filter-choices";
 
 /**
  * Los filtros por posición, grupo, AUF y membresía del directorio (#497, RF-4
- * del PRD de E19). Qué filtros se ofrecen lo dice el servidor al responder la
- * lista: un Committee recibe la vista de socio y aun así filtra por grupo.
+ * del PRD de E19), y los de quien no tiene teléfono o contacto de emergencia
+ * (#499), que se marcan en una casilla. Qué filtros se ofrecen lo dice el
+ * servidor al responder la lista, no la marca de la vista: un Coach recibe
+ * la suya y filtra por grupo, pero no por lo que le falta a cada contacto.
  *
  * En escritorio van en la barra sobre la tabla. En el móvil no caben junto a
  * la búsqueda y los roles: van detrás de un botón "Filtros", con cuántos hay
@@ -30,7 +32,12 @@ import type { FilterChoices } from "./use-filter-choices";
 
 export type MoreFilters = Pick<
   DirectoryQuery,
-  "position" | "groupId" | "auf" | "membership"
+  | "position"
+  | "groupId"
+  | "auf"
+  | "membership"
+  | "withoutPhone"
+  | "withoutEmergencyContact"
 >;
 
 export const NO_MORE_FILTERS: MoreFilters = {
@@ -38,6 +45,8 @@ export const NO_MORE_FILTERS: MoreFilters = {
   groupId: null,
   auf: null,
   membership: null,
+  withoutPhone: false,
+  withoutEmergencyContact: false,
 };
 
 /** "Sin filtrar" en un `<select>`, que sólo habla en textos. */
@@ -61,16 +70,23 @@ const MEMBERSHIP_KEYS = {
   none: "directory.filter.membership.none",
 } as const satisfies Record<MembershipFilter, MessageKey>;
 
-/** Los cuatro y ninguno más: quien llama puede pasar el estado entero de la
+/** Los seis y ninguno más: quien llama puede pasar el estado entero de la
  * pantalla, con la búsqueda y el rol, que no cuentan en el botón. */
 export function countActiveFilters({
   position,
   groupId,
   auf,
   membership,
+  withoutPhone,
+  withoutEmergencyContact,
 }: MoreFilters): number {
-  return [position, groupId, auf, membership].filter((value) => value !== null)
-    .length;
+  const chosen = [position, groupId, auf, membership].filter(
+    (value) => value !== null,
+  ).length;
+  const checked = [withoutPhone, withoutEmergencyContact].filter(
+    (isChecked) => isChecked,
+  ).length;
+  return chosen + checked;
 }
 
 function positionValue(position: DirectoryPositionFilter | null): string {
@@ -251,6 +267,61 @@ function MembershipField({
   );
 }
 
+/** Una casilla y su etiqueta. El `id` sale de `useId` porque la misma
+ * casilla vive a la vez en la barra y en la hoja. */
+function FilterCheckbox({
+  label,
+  isChecked,
+  onChange,
+}: {
+  label: string;
+  isChecked: boolean;
+  onChange: (isChecked: boolean) => void;
+}): React.JSX.Element {
+  const id = useId();
+  return (
+    <div className="auth-consent directory-filter directory-filter-check">
+      <input
+        id={id}
+        type="checkbox"
+        checked={isChecked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <label htmlFor={id}>{label}</label>
+    </div>
+  );
+}
+
+function WithoutPhoneField({
+  translate,
+  filters,
+  onChange,
+}: FieldsProps): React.JSX.Element {
+  return (
+    <FilterCheckbox
+      label={translate("directory.filter.withoutPhone")}
+      isChecked={filters.withoutPhone}
+      onChange={(withoutPhone) => onChange({ ...filters, withoutPhone })}
+    />
+  );
+}
+
+function WithoutEmergencyContactField({
+  translate,
+  filters,
+  onChange,
+}: FieldsProps): React.JSX.Element {
+  return (
+    <FilterCheckbox
+      label={translate("directory.filter.withoutEmergencyContact")}
+      isChecked={filters.withoutEmergencyContact}
+      onChange={(withoutEmergencyContact) =>
+        onChange({ ...filters, withoutEmergencyContact })
+      }
+    />
+  );
+}
+
 /** Los mismos campos en la barra y en la hoja, en el orden del ticket. */
 function FilterFields(props: FieldsProps): React.JSX.Element {
   const offers = (filter: DirectoryFilter): boolean =>
@@ -261,11 +332,15 @@ function FilterFields(props: FieldsProps): React.JSX.Element {
       {offers("group") ? <GroupField {...props} /> : null}
       {offers("auf") ? <AufField {...props} /> : null}
       {offers("membership") ? <MembershipField {...props} /> : null}
+      {offers("withoutPhone") ? <WithoutPhoneField {...props} /> : null}
+      {offers("withoutEmergencyContact") ? (
+        <WithoutEmergencyContactField {...props} />
+      ) : null}
     </>
   );
 }
 
-const FOCUSABLE_SELECTOR = "select, button";
+const FOCUSABLE_SELECTOR = "select, input, button";
 
 function focusableIn(panel: HTMLElement | null): readonly HTMLElement[] {
   return panel === null

@@ -69,6 +69,13 @@ const ANA: DirectoryMemberRecord = {
   isEvaluated: true,
   membershipStatus: "active",
   groupIds: [SENIOR_GROUP_ID],
+  email: "ana@club.test",
+  phone: "0412 345 678",
+  emergencyContact: {
+    name: "Luis Admin",
+    phone: "0499 111 222",
+    relationship: "Pareja",
+  },
 };
 
 const BRUNO: DirectoryMemberRecord = {
@@ -86,6 +93,14 @@ const BRUNO: DirectoryMemberRecord = {
   isEvaluated: false,
   membershipStatus: "pending",
   groupIds: [JUNIOR_GROUP_ID],
+  email: "bruno@club.test",
+  // Sin teléfono propio, que es opcional (D1), y con contacto de emergencia.
+  phone: null,
+  emergencyContact: {
+    name: "Rosa Beltrán",
+    phone: "+57 300 123 4567",
+    relationship: "Madre",
+  },
 };
 
 const MARIA: DirectoryMemberRecord = {
@@ -103,6 +118,9 @@ const MARIA: DirectoryMemberRecord = {
   isEvaluated: true,
   membershipStatus: "waived",
   groupIds: [SENIOR_GROUP_ID, JUNIOR_GROUP_ID],
+  email: "maria@club.test",
+  phone: "0400 000 111",
+  emergencyContact: null,
 };
 
 const ZOE: DirectoryMemberRecord = {
@@ -121,6 +139,9 @@ const ZOE: DirectoryMemberRecord = {
   isEvaluated: false,
   membershipStatus: null,
   groupIds: [],
+  email: "zoe@club.test",
+  phone: null,
+  emergencyContact: null,
 };
 
 const CLUB: readonly DirectoryMemberRecord[] = [ZOE, MARIA, ANA, BRUNO];
@@ -612,7 +633,7 @@ describe("el AUF en el directorio", () => {
 
   it.each([
     ["Coach", "coach"],
-    ["Committee", "member"],
+    ["Committee", "committee"],
     ["Player", "member"],
   ] as const)(
     "no le cuenta el AUF ni su verificación a un %s",
@@ -679,6 +700,7 @@ describe("marca de sin evaluar", () => {
           photoUrl: null,
           attendance: { kind: "no_data" },
           isEvaluated: false,
+          emergencyContact: BRUNO.emergencyContact,
         },
       ],
       availableFilters: ["position", "group"],
@@ -738,6 +760,9 @@ describe("el rol nuevo en la lista (#240)", () => {
       isAufExpired: true,
       isEvaluated: true,
       membershipStatus: "active" as const,
+      email: "nerea@club.test",
+      phone: null,
+      emergencyContact: null,
     };
     const listing: DirectoryListing = {
       kind: "admin",
@@ -752,8 +777,28 @@ describe("el rol nuevo en la lista (#240)", () => {
     });
   });
 
+  it("conserva el contacto de la vista del Committee (#499)", () => {
+    const committeeView = {
+      ...NEREA,
+      email: "nerea@club.test",
+      phone: "0412 000 000",
+      emergencyContact: null,
+    };
+    const listing: DirectoryListing = {
+      kind: "committee",
+      members: [committeeView],
+      availableFilters: ["position", "group"],
+    };
+
+    expect(withMemberRole(listing, NEREA.userId, "Coach")).toEqual({
+      kind: "committee",
+      members: [{ ...committeeView, role: "Coach" }],
+      availableFilters: ["position", "group"],
+    });
+  });
+
   it("conserva la marca de evaluación de la vista del Coach", () => {
-    const coachView = { ...NEREA, isEvaluated: false };
+    const coachView = { ...NEREA, isEvaluated: false, emergencyContact: null };
     const listing: DirectoryListing = {
       kind: "coach",
       members: [coachView],
@@ -883,8 +928,21 @@ describe("los filtros del directorio (#497)", () => {
   it.each([
     ["Player", ["position"]],
     ["Coach", ["position", "group"]],
-    ["Committee", ["position", "group"]],
-    ["Admin", ["position", "group", "auf", "membership"]],
+    [
+      "Committee",
+      ["position", "group", "withoutPhone", "withoutEmergencyContact"],
+    ],
+    [
+      "Admin",
+      [
+        "position",
+        "group",
+        "auf",
+        "membership",
+        "withoutPhone",
+        "withoutEmergencyContact",
+      ],
+    ],
   ] as const)(
     "dice a un %s qué filtros puede usar",
     async (callerRole, expected) => {
@@ -951,4 +1009,164 @@ describe("el AUF que vence en los próximos 30 días (#497)", () => {
 
     expect(listing.members).toEqual([]);
   });
+});
+describe("el contacto en el directorio (#499)", () => {
+  async function listFor(callerRole: Role): Promise<DirectoryListing> {
+    return listDirectory(gateways({ callerRole }), {
+      callerId: CALLER_ID,
+      query: DEFAULT_DIRECTORY_QUERY,
+      todayInClub: TODAY,
+    });
+  }
+
+  function byName(
+    listing: DirectoryListing,
+  ): ReadonlyMap<string, Record<string, unknown>> {
+    return new Map(
+      listing.members.map((member) => [member.fullName, { ...member }]),
+    );
+  }
+
+  it.each(["Admin", "Committee"] as const)(
+    "le da a un %s el correo, el teléfono y el contacto de emergencia de cada socio",
+    async (callerRole) => {
+      const members = byName(await listFor(callerRole));
+
+      expect(members.get("Ana Admin")).toMatchObject({
+        email: "ana@club.test",
+        phone: "0412 345 678",
+        emergencyContact: ANA.emergencyContact,
+      });
+      expect(members.get("Bruno Beltrán")).toMatchObject({
+        email: "bruno@club.test",
+        phone: null,
+        emergencyContact: BRUNO.emergencyContact,
+      });
+      expect(members.get("María Ñíguez")).toMatchObject({
+        email: "maria@club.test",
+        phone: "0400 000 111",
+        emergencyContact: null,
+      });
+    },
+  );
+
+  it("un Committee recibe su propia vista: el contacto, sin el AUF, la membresía ni la evaluación", async () => {
+    const listing = await listDirectory(gateways({ callerRole: "Committee" }), {
+      callerId: CALLER_ID,
+      query: { ...DEFAULT_DIRECTORY_QUERY, search: "maria" },
+      todayInClub: TODAY,
+    });
+
+    expect(listing).toEqual({
+      kind: "committee",
+      members: [
+        {
+          userId: MARIA.userId,
+          fullName: "María Ñíguez",
+          country: null,
+          experienceLevel: "Intermediate",
+          role: "Player",
+          position: { id: DEFENDER.id, names: DEFENDER.names },
+          status: "active",
+          photoUrl: null,
+          attendance: { kind: "rate", percent: 40, sessions: 2 },
+          email: "maria@club.test",
+          phone: "0400 000 111",
+          emergencyContact: null,
+        },
+      ],
+      availableFilters: [
+        "position",
+        "group",
+        "withoutPhone",
+        "withoutEmergencyContact",
+      ],
+    });
+  });
+
+  it("a un Coach le da el contacto de emergencia y nada más de lo de contacto", async () => {
+    const members = byName(await listFor("Coach"));
+
+    expect(members.get("Bruno Beltrán")).toMatchObject({
+      emergencyContact: BRUNO.emergencyContact,
+    });
+    expect(members.get("María Ñíguez")).toMatchObject({
+      emergencyContact: null,
+    });
+    for (const member of members.values()) {
+      expect(Object.keys(member)).not.toContain("email");
+      expect(Object.keys(member)).not.toContain("phone");
+    }
+  });
+
+  it("a un Player no le manda ni el correo, ni el teléfono, ni el contacto de emergencia de nadie", async () => {
+    const members = byName(await listFor("Player"));
+
+    for (const member of members.values()) {
+      expect(Object.keys(member)).not.toContain("email");
+      expect(Object.keys(member)).not.toContain("phone");
+      expect(Object.keys(member)).not.toContain("emergencyContact");
+    }
+  });
+});
+
+describe("los filtros de contacto (#499)", () => {
+  it.each(["Admin", "Committee"] as const)(
+    "deja a un %s filtrar a quien no tiene teléfono",
+    async (callerRole) => {
+      await expect(
+        listNames({ withoutPhone: true }, callerRole),
+      ).resolves.toEqual(["Bruno Beltrán"]);
+    },
+  );
+
+  it.each(["Admin", "Committee"] as const)(
+    "deja a un %s filtrar a quien no tiene contacto de emergencia",
+    async (callerRole) => {
+      await expect(
+        listNames({ withoutEmergencyContact: true }, callerRole),
+      ).resolves.toEqual(["María Ñíguez"]);
+    },
+  );
+
+  it("combina los dos entre sí y con la búsqueda, el rol y los dados de baja", async () => {
+    await expect(
+      listNames(
+        {
+          withoutPhone: true,
+          withoutEmergencyContact: true,
+          includeInactive: true,
+        },
+        "Admin",
+      ),
+    ).resolves.toEqual(["Zoe Zapata"]);
+    await expect(
+      listNames({ withoutPhone: true, role: "Player" }, "Committee"),
+    ).resolves.toEqual([]);
+    await expect(
+      listNames({ withoutEmergencyContact: true, search: "ñig" }, "Admin"),
+    ).resolves.toEqual(["María Ñíguez"]);
+  });
+
+  it.each(["Coach", "Player"] as const)(
+    "niega a un %s los dos filtros, sin leer el directorio",
+    async (callerRole) => {
+      for (const [query, filter] of [
+        [{ withoutPhone: true }, "withoutPhone"],
+        [{ withoutEmergencyContact: true }, "withoutEmergencyContact"],
+      ] as const) {
+        const rejection = listDirectory(gateways({ callerRole }), {
+          callerId: CALLER_ID,
+          query: { ...DEFAULT_DIRECTORY_QUERY, ...query },
+          todayInClub: TODAY,
+        });
+
+        await expect(rejection).rejects.toBeInstanceOf(
+          DirectoryFilterForbiddenError,
+        );
+        await expect(rejection).rejects.toMatchObject({ filter });
+        expect(clubsRead).toEqual([]);
+      }
+    },
+  );
 });

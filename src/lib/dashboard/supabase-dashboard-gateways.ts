@@ -8,7 +8,7 @@ import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gate
 import { createEventAgendaGateways } from "@/lib/events/supabase-event-agenda-gateways";
 import { readText } from "@/lib/auth/supabase-auth-gateways";
 import type { ProfileContact } from "@/lib/members/profile-contact";
-import { toEmergencyContact } from "@/lib/members/supabase-own-profile-gateways";
+import { readEmergencyContact } from "@/lib/members/supabase-profile-contact";
 import { createMembershipGateway } from "@/lib/membership/supabase-membership-gateways";
 import { createNewsGateways } from "@/lib/news/supabase-news-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
@@ -112,7 +112,7 @@ async function findOwnContact(
   }
   return {
     phone: readText(data, "phone", MEMBERS_TABLE),
-    emergencyContact: toEmergencyContact(data),
+    emergencyContact: readEmergencyContact(data),
   };
 }
 

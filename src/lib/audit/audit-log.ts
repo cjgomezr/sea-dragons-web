@@ -35,6 +35,10 @@ export const AUDIT_ACTIONS = [
   // están en la entrada. El alta de un miembro (#243) también deja su AUF
   // verificado, pero no escribe esta entrada: ahí el AUF nace con la fila.
   "member.auf_verified",
+  // RF-3 de E19 (#499): un Admin corrige el teléfono o el contacto de
+  // emergencia de otro socio desde su ficha. Sin metadata: ni los números ni
+  // los nombres, que son datos personales, y el del contacto es de un tercero.
+  "member.contact_corrected",
   // RF-6 de E18a (#296): un Admin cambia la configuración del club. La
   // metadata sólo nombra los campos que cambiaron (`{ fields: ["name"] }`),
   // nunca sus valores ni los anteriores. La entidad es el id del club.
