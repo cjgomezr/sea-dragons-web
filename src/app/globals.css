@@ -5233,6 +5233,12 @@ a.auth-brand-header:focus-visible {
     border-top: none;
   }
 
+  /* La tabla de sesiones (#472) tiene tres columnas: la tercera ocupa la
+     fila entera en vez de dejar media vacía. */
+  .payments-table .payments-session-delta {
+    grid-column: 1 / -1;
+  }
+
   .payments-table td::before {
     content: attr(data-label);
     display: block;

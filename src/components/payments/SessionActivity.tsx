@@ -60,7 +60,10 @@ function MovementRow({
       <td data-label={labels.movement}>
         {describeMovement(translate, movement)}
       </td>
-      <td data-label={labels.sessions} className="payments-cell-data">
+      <td
+        data-label={labels.sessions}
+        className="payments-cell-data payments-session-delta"
+      >
         {formatSessionDelta(translate, movement.sessions)}
       </td>
     </tr>
