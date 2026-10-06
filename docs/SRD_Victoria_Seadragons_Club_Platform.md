@@ -3,11 +3,11 @@
 
 | | |
 |---|---|
-| **Version** | 1.4 (Draft) |
+| **Version** | 1.6 (Draft) |
 | **Date** | 23 August 2026 |
 | **Author** | Sebastián V. (PacifiCode) |
 | **Source** | Claude Design handoff bundle — `Seadragons Platform.dc.html` prototype + stakeholder interview |
-| **Status** | For review — v1.1 resolved: casual prepaid packs, coach event permissions, configurable skill categories, minor-consent registration. v1.2 resolved: plan changes at next cycle, Stripe-managed one-off charges, no evaluation versioning, no dashboard export. v1.3 resolved: no pack discounts. v1.4 resolved: Family membership deferred beyond Release 1, post-OAuth registration completion (FR-083), self-service profile editing (FR-084), member deactivation (FR-085), attendance-percentage formula (FR-042), unevaluated-player handling in auto-balance (FR-086), evaluation category-set immutability (FR-053), auto-balance objective order and algorithm (FR-046), Casual excluded from recurring billing and prepaid-balance handling on plan change (FR-087), plus acceptance criteria for the eleven requirements that lacked one. v1.5 resolved: the membership type is chosen in Payments before the first payment instead of during sign-up (FR-009) |
+| **Status** | For review — v1.1 resolved: casual prepaid packs, coach event permissions, configurable skill categories, minor-consent registration. v1.2 resolved: plan changes at next cycle, Stripe-managed one-off charges, no evaluation versioning, no dashboard export. v1.3 resolved: no pack discounts. v1.4 resolved: Family membership deferred beyond Release 1, post-OAuth registration completion (FR-083), self-service profile editing (FR-084), member deactivation (FR-085), attendance-percentage formula (FR-042), unevaluated-player handling in auto-balance (FR-086), evaluation category-set immutability (FR-053), auto-balance objective order and algorithm (FR-046), Casual excluded from recurring billing and prepaid-balance handling on plan change (FR-087), plus acceptance criteria for the eleven requirements that lacked one. v1.5 resolved: the membership type is chosen in Payments before the first payment instead of during sign-up (FR-009). v1.6 resolved: the directory for administration (epic E19): own phone and emergency contact on the profile (FR-088, FR-089), contact visible by role (FR-090), extra directory filters (FR-091), CSV export of the directory (FR-092) and email to members from the directory (FR-093) |
 
 ---
 
@@ -63,7 +63,7 @@
 - Direct messaging or chat between members
 - Month and week calendar visualisations (agenda list view is the Release 1 requirement; see FR-033)
 - Family membership (the $70/month plan covering up to four linked members) — deferred beyond Release 1. Release 1 offers Full, Student and Casual only; the member-linking model is not designed or built (v1.4 resolution)
-- Dashboard data export (the prototype's "Export" control is removed from scope)
+- Dashboard data export (the prototype's "Export" control is removed from scope). This is not the directory CSV export of FR-092, added in v1.6, which stays in scope
 - Per-season evaluation history/versioning (each member has a single current evaluation)
 - Public-facing marketing website
 
@@ -150,6 +150,12 @@ Permission matrix (from the validated prototype):
 | FR-022 | The system shall display, on a member's own profile, their attendance percentage and total sessions attended. |
 | FR-084 | The system shall allow a member to edit their own profile: full name, country, position, experience level, gender and profile photo. Role, AUF number, AUF expiry date, group assignments and account status are editable only by an Admin. |
 | FR-085 | The system shall allow an Admin to set a member's status to `active` or `inactive`. An `inactive` member shall not be able to sign in, shall be excluded from the directory unless an Admin enables the "include inactive" filter, and shall not be selectable as an event or post audience; their attendance, evaluation and payment history shall be retained. |
+| FR-088 | The system shall let a member record on their own profile an optional phone number and an emergency contact (name, phone number and relationship). Neither is asked for when the account is created; the emergency contact is complete or absent, never partial; a minor is offered their guardian's name with the relationship "Guardian" and must add the phone number. |
+| FR-089 | The system shall remind a member who has no emergency contact, on the home screen and on their profile, with a notice that cannot be dismissed, and a member who has no phone number with a notice that can be dismissed. Neither notice shall block any other action. |
+| FR-090 | The system shall show each member's email and phone number in the directory only to an Admin or a Committee member, and their emergency contact only to an Admin, a Committee member or a Coach. An Admin may correct a member's phone number and emergency contact from the member record, and the change is audited. |
+| FR-091 | The system shall allow the directory to be filtered, in combination with search and role, by position (any member); by group (Admin, Coach, Committee); by AUF state (no number, expired, expiring within 30 days, unverified) and membership status (Admin only); and by missing phone number or missing emergency contact (Admin, Committee). The filters shall be kept in the page address. |
+| FR-092 | The system shall allow an Admin or a Committee member to download the currently filtered directory as a CSV file containing the columns their role can see, and shall audit each export with its filters and row count. |
+| FR-093 | The system shall allow an Admin or a Committee member to send a plain-text email to the members of the currently filtered directory, each recipient receiving their own copy with replies going to the sender. Emails sent from the directory shall be limited to 50 in any 24-hour period, without reducing the allowance for account emails (invitation, confirmation, password recovery), and each send shall be audited without its body. |
 
 ### 6.4 Groups
 
@@ -369,6 +375,12 @@ Permission matrix (from the validated prototype):
 - **AC-052** *(FR-032)* — Given an event targeted at "Senior Squad", When a member outside that group requests the event directly by its identifier through the API, Then the system shall deny it rather than relying on the list view to hide it.
 - **AC-053** *(FR-086)* — Given a squad where three players have no saved evaluation, When auto-balance runs, Then those players shall be distributed using a score of 5.0, no evaluation record shall be created for them, and the builder shall mark each as "not evaluated".
 - **AC-054** *(FR-053)* — Given a saved evaluation with ten categories and a Coach who has since added an eleventh, When the Coach edits the evaluation's ratings, Then it shall still present its original ten categories; When the Coach chooses "update to the current category set", Then it shall present eleven categories with the new one at 5 and the OVR recomputed over all eleven.
+- **AC-055** *(FR-088)*: Given a member saving an emergency contact with a name and a relationship but no phone number, When they save, Then the save shall be rejected with a message next to the missing field; Given the same member completing all three parts, When they save, Then the contact shall be stored, and the sign-up screens shall still ask for neither the phone number nor the emergency contact.
+- **AC-056** *(FR-089)*: Given an active member without an emergency contact, When they open the home screen, Then they shall see a notice with no dismiss control and a link to the contact section of their profile, and they shall still be able to RSVP and pay.
+- **AC-057** *(FR-090)*: Given a member with a phone number and an emergency contact, When a Committee member opens the directory, Then they shall see the email, phone number and emergency contact; When a Coach opens it, Then they shall see only the emergency contact; When a Player requests the directory API, Then the response shall contain none of the three.
+- **AC-058** *(FR-091)*: Given an Admin, When they filter the directory by position "Forward" and AUF "expired", Then the directory shall list only members who meet both conditions, state how many there are, and keep both filters after a page reload; When a Player requests the AUF filter through the API, Then it shall be refused with 403.
+- **AC-059** *(FR-092)*: Given a Committee member viewing a filtered directory of twelve members, When they export, Then they shall receive a UTF-8 CSV file with twelve rows, without AUF or membership columns, with any cell starting with `=`, `+`, `-` or `@` escaped, and the export shall appear in the audit log with its filters and row count.
+- **AC-060** *(FR-093)*: Given that the directory has sent 45 emails in the last 24 hours, When an Admin tries to send an email to ten members, Then nothing shall be sent and the form shall state that five can be sent now; Given a send of five, When it completes, Then each recipient shall receive their own copy with replies addressed to the Admin, and the allowance for account emails shall be unchanged.
 
 ---
 
@@ -378,7 +390,7 @@ Key entities and their principal attributes. Attribute lists are requirements-le
 
 | Entity | Key attributes | Relationships |
 |---|---|---|
-| **Member** | Full name, email, date of birth, role, position (Goalkeeper/Defender/Forward), experience level (Beginner/Intermediate/Advanced), gender, country, AUF number, AUF expiry date, join date, status (incomplete/active/inactive, see FR-083 and FR-085); for members under 18: guardian name, guardian email, consent record (timestamp) | Belongs to many Groups; has one Membership; has many RSVPs, AttendanceRecords, Evaluations, Payments, Notifications |
+| **Member** | Full name, email, date of birth, role, position (Goalkeeper/Defender/Forward), experience level (Beginner/Intermediate/Advanced), gender, country, AUF number, AUF expiry date, join date, status (incomplete/active/inactive, see FR-083 and FR-085); for members under 18: guardian name, guardian email, consent record (timestamp); optional phone number; emergency contact (name, phone number, relationship), complete or absent (FR-088) | Belongs to many Groups; has one Membership; has many RSVPs, AttendanceRecords, Evaluations, Payments, Notifications |
 | **Group** | Name, member count (derived) | Has many Members; targeted by Events and Posts |
 | **Event** | Title, type (Training/Competition/Meeting/Social), date, time, location, notes, audience (all/groups), recurrence (none or weekly: days, start, end), parent series (for occurrences) | Targeted at Groups; has many RSVPs; has at most one TeamSplit; has one AttendanceSheet (Training) |
 | **RSVP** | Response (Yes/Maybe/No), responded at | One per Member per Event (latest wins) |
@@ -459,7 +471,7 @@ Key entities and their principal attributes. Attribute lists are requirements-le
 | ASS-006 | *Resolved in v1.1:* Coaches cannot create events of any kind. Event creation is restricted to Admin and Committee (Section 4 matrix, FR-028, FR-030). |
 | ASS-007 | *Resolved in v1.1:* Casual membership is prepaid. Members purchase session packs whose sizes are configurable by Admin/Committee (FR-080) at $15 AUD per session (FR-064); the balance decrements per attended session. Pack price is exactly sessions × $15 AUD — no volume discounts of any kind (*confirmed in v1.3*). |
 | ASS-008 | *Resolved in v1.2:* no per-season evaluation history or versioning is required. Each member has a single current evaluation that Admin/Coach edit in place. |
-| ASS-009 | *Resolved in v1.2:* the dashboard "Export" control shown in the prototype is removed from scope entirely (see Section 3.2). |
+| ASS-009 | *Resolved in v1.2:* the dashboard "Export" control shown in the prototype is removed from scope entirely (see Section 3.2). The directory CSV export added in v1.6 (FR-092) is a separate feature and does not reopen it. |
 | ASS-010 | Month and week calendar views shown as toggles in the prototype are visual variants deferred beyond Release 1; the agenda list (the prototype's active view) is the Release 1 requirement. |
 | ASS-011 | *Resolved in v1.4:* Family membership is deferred beyond Release 1. The prototype's $70/month Family plan is not offered at launch and no member-linking model is built; a family of members joins as individual Full or Student memberships. |
 
@@ -498,7 +510,7 @@ Key entities and their principal attributes. Attribute lists are requirements-le
 
 | BR | FR | Acceptance Criteria |
 |---|---|---|
-| BR-001 | FR-001–FR-014, FR-015–FR-022, FR-023–FR-027, FR-076–FR-079, FR-084, FR-085 | AC-001–AC-012, AC-031–AC-033, AC-039, AC-040, AC-047, AC-049 |
+| BR-001 | FR-001–FR-014, FR-015–FR-022, FR-023–FR-027, FR-076–FR-079, FR-084, FR-085, FR-088–FR-093 | AC-001–AC-012, AC-031–AC-033, AC-039, AC-040, AC-047, AC-049, AC-055–AC-060 |
 | BR-002 | FR-028–FR-037, FR-038–FR-042 | AC-013–AC-017b, AC-046, AC-050–AC-052 |
 | BR-003 | FR-043–FR-049, FR-086 | AC-018, AC-019, AC-019b, AC-019c, AC-020, AC-042, AC-044, AC-053 |
 | BR-004 | FR-050–FR-054 | AC-021, AC-022, AC-035, AC-045, AC-054 |
@@ -507,7 +519,7 @@ Key entities and their principal attributes. Attribute lists are requirements-le
 | BR-007 | FR-012–FR-014, FR-016, FR-055, FR-056, FR-081, FR-082, FR-083 | AC-007–AC-009, AC-023, AC-036, AC-038, AC-048 |
 | BR-008 | FR-020 (AUF fields) | AC-011 |
 
-**Orphan check:** re-run in full for v1.4 rather than asserted. The v1.3 claim was wrong: FR-012, FR-022, FR-033, FR-043, FR-047, FR-054 and FR-066 had no acceptance criterion, and FR-026, FR-027, FR-029 and FR-032 were only covered inside somebody else's. All eleven now have their own (AC-042 to AC-052), as do the five requirements added in v1.4 (FR-083 to FR-087). Every FR maps to at least one BR and is covered by at least one AC; every NFR carries a number, unit, condition and the place it gets verified. Open item remaining: data retention after member departure (Section 9), a committee policy decision (APP 11), not a build blocker. Resolved in v1.1: casual billing model, coach event permissions, position-score weightings (replaced by configurable categories), minor-consent flow. Resolved in v1.2: plan changes take effect next cycle (FR-066), one-off charges are Stripe-managed and member-payable (FR-069, INT-007, AC-037), no evaluation versioning (ASS-008), dashboard export removed (ASS-009). Resolved in v1.3: pack pricing is strictly sessions × $15, no discounts (ASS-007).
+**Orphan check:** re-run in full for v1.4 rather than asserted. The v1.3 claim was wrong: FR-012, FR-022, FR-033, FR-043, FR-047, FR-054 and FR-066 had no acceptance criterion, and FR-026, FR-027, FR-029 and FR-032 were only covered inside somebody else's. All eleven now have their own (AC-042 to AC-052), as do the five requirements added in v1.4 (FR-083 to FR-087). Every FR maps to at least one BR and is covered by at least one AC; every NFR carries a number, unit, condition and the place it gets verified. Open item remaining: data retention after member departure (Section 9), a committee policy decision (APP 11), not a build blocker. Resolved in v1.1: casual billing model, coach event permissions, position-score weightings (replaced by configurable categories), minor-consent flow. Resolved in v1.2: plan changes take effect next cycle (FR-066), one-off charges are Stripe-managed and member-payable (FR-069, INT-007, AC-037), no evaluation versioning (ASS-008), dashboard export removed (ASS-009). Resolved in v1.3: pack pricing is strictly sessions × $15, no discounts (ASS-007). Added in v1.6: FR-088 to FR-093 (epic E19), each with its own acceptance criterion (AC-055 to AC-060), traced to BR-001.
 
 ---
 *End of document.*
