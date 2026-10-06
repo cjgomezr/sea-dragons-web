@@ -159,6 +159,9 @@ jobs:
     needs: [arbol-ya-verificado]
     if: "!cancelled() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true'"
     runs-on: ubuntu-latest
+    # Red por si una llamada a la API se cuelga: el máximo del script sólo
+    # cuenta las esperas entre consultas, y el de Actions son seis horas.
+    timeout-minutes: 75
     permissions:
       contents: read
       actions: read

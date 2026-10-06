@@ -135,8 +135,21 @@ describe("cola entre corridas para seadragons-dev (#507)", () => {
     },
   );
 
-  // `checks` lleva `always()` y `compare` `!cancelled()`: sin exigir el
-  // resultado del turno, correrían igual contra dev tras agotarse la espera.
+  // El script da por libre el sitio de una corrida cancelada. Con `always()`,
+  // GitHub no corta un job que ya corre y los checks viejos seguirían contra
+  // dev a la vez que los nuevos (#416).
+  it.each(DEV_JOBS)(
+    "%s: %s se corta cuando se cancela su corrida",
+    (file, name) => {
+      const condition = readWorkflow(file).jobs[name]?.if ?? "";
+
+      expect(condition).toMatch(/!cancelled\(\)/);
+      expect(condition).not.toMatch(/always\(\)/);
+    },
+  );
+
+  // Con una función de estado en el `if`, sin exigir el resultado del turno
+  // estos jobs correrían igual contra dev tras agotarse la espera.
   it.each(DEV_JOBS)(
     "%s: %s no arranca si el turno no salió bien",
     (file, name) => {

@@ -80,6 +80,9 @@ jobs:
     needs: [arbol-ya-verificado]
     if: "!cancelled() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true'"
     runs-on: ubuntu-latest
+    # Red por si una llamada a la API se cuelga: el máximo del script sólo
+    # cuenta las esperas entre consultas, y el de Actions son seis horas.
+    timeout-minutes: 75
     permissions:
       contents: read
       actions: read
@@ -93,13 +96,18 @@ jobs:
 
   checks:
     needs: [arbol-ya-verificado, turno-dev]
-    # `always()` es obligatorio: sin una función de estado explícita, Actions
-    # exige implícitamente que la dependencia haya terminado en success(), y en
-    # un pull request ese job ni siquiera arranca. Sin esto, los checks se
-    # saltarían en todos los PRs, que es lo contrario de lo que se busca. Por
-    # eso mismo hay que pedir el turno en dev a mano: `always()` arrancaría
-    # aunque la espera se hubiera agotado.
-    if: always() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true' && needs.turno-dev.result == 'success'
+    # Una función de estado es obligatoria: sin ella, Actions exige
+    # implícitamente que la dependencia haya terminado en success(), y en un
+    # pull request ese job ni siquiera arranca. Sin esto, los checks se
+    # saltarían en todos los PRs, que es lo contrario de lo que se busca.
+    #
+    # `!cancelled()` y no `always()`: al cancelar una corrida, GitHub no corta
+    # un job cuyo `if` sigue dando true. Con `always()`, un push nuevo al PR
+    # dejaba los checks viejos contra dev junto a los nuevos, y la cola da por
+    # libre el sitio de una corrida cancelada (#416, #507). Por la función de
+    # estado hay que pedir el turno en dev a mano: arrancaría aunque la espera
+    # se hubiera agotado.
+    if: "!cancelled() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true' && needs.turno-dev.result == 'success'"
     runs-on: ubuntu-latest
     steps:
       # Con toda la historia: el paso `texto` compara la rama con main, y el

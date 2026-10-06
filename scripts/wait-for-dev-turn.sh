@@ -34,9 +34,11 @@ set -uo pipefail
 # es una cola de varias por delante. Más que eso es que algo se ha quedado
 # colgado, y es mejor un rojo que diga detrás de quién que esperar para siempre.
 MAX_WAIT_MINUTES="${DEV_TURN_MAX_WAIT_MINUTES:-60}"
-# Cada vuelta son dos consultas de la lista, y el GITHUB_TOKEN tiene 1.000
-# peticiones por hora para todo el repositorio. Con un minuto caben varias
-# corridas esperando a la vez.
+# Cada vuelta son dos consultas de la lista y, como mucho, una de jobs: unas
+# 180 peticiones por hora por corrida que espera. El GITHUB_TOKEN tiene 1.000
+# por hora para todo el repositorio, así que caben cuatro o cinco esperando a
+# la vez. Si se pasa, la API deja de contestar y esto acaba fallando por
+# tiempo, no arrancando a ciegas.
 POLL_SECONDS=60
 # El job que pide turno. Si se renombra en los workflows, hay que seguirlo
 # aquí: una corrida sin ese job contaría siempre como que necesita dev.
@@ -88,13 +90,17 @@ list_open_runs() {
 # `success`, `in_progress`, `absent` si aún no existe... Un estado terminado no
 # cambia mientras la corrida siga abierta, así que se guarda y no se vuelve a
 # pedir. Variable global y no salida: en una subshell se perdería lo guardado.
+# Si la API falla, `unknown` cuenta como que va delante, y el error queda en
+# el log del job.
 read_turn_state() {
   local id="$1" started="$2" key="$1@$2"
   turn_state="${final_turn_state[$key]:-}"
   [ -n "$turn_state" ] && return
-  turn_state=$(gh api "repos/$GH_REPO/actions/runs/$id/jobs?per_page=100" \
-    --jq "[.jobs[] | select(.name == \"$TURN_JOB\") | .conclusion // .status] | .[0] // \"absent\"" \
-    2>/dev/null) || turn_state="unknown"
+  if ! turn_state=$(gh api "repos/$GH_REPO/actions/runs/$id/jobs?per_page=100" \
+    --jq "[.jobs[] | select(.name == \"$TURN_JOB\") | .conclusion // .status] | .[0] // \"absent\""); then
+    echo "No pude leer los jobs de la corrida $id: cuenta como que va delante." >&2
+    turn_state="unknown"
+  fi
   case "$turn_state" in
     success | failure | cancelled | skipped) final_turn_state[$key]="$turn_state" ;;
   esac
