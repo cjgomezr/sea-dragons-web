@@ -20,8 +20,9 @@ import type { FilterChoices } from "./use-filter-choices";
 /**
  * Los filtros por posición, grupo, AUF y membresía del directorio (#497, RF-4
  * del PRD de E19), y los de quien no tiene teléfono o contacto de emergencia
- * (#499), que se marcan en una casilla. Qué filtros se ofrecen lo dice el servidor al responder la
- * lista: un Committee recibe la vista de socio y aun así filtra por grupo.
+ * (#499), que se marcan en una casilla. Qué filtros se ofrecen lo dice el
+ * servidor al responder la lista, no la marca de la vista: un Coach recibe
+ * la suya y filtra por grupo, pero no por lo que le falta a cada contacto.
  *
  * En escritorio van en la barra sobre la tabla. En el móvil no caben junto a
  * la búsqueda y los roles: van detrás de un botón "Filtros", con cuántos hay

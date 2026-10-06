@@ -229,9 +229,10 @@ export type AdminDirectoryMember = CoachDirectoryMember &
 
 /** La lista, marcada con quién la está viendo. Quien la consume no tiene que
  * adivinar por la presencia de un campo si le toca dibujar la columna del
- * AUF o la marca de sin evaluar. `availableFilters` le dice qué filtros puede
- * ofrecer (#497): un Committee recibe la vista de socio y aun así filtra por
- * grupo, así que no se deduce de `kind`. */
+ * AUF, la marca de sin evaluar o la columna del contacto (#499).
+ * `availableFilters` le dice qué filtros puede ofrecer (#497): un Coach
+ * recibe su vista y filtra por grupo pero no por contacto, así que no se
+ * deduce de `kind`. */
 export type DirectoryListing = {
   readonly availableFilters: readonly DirectoryFilter[];
 } & (

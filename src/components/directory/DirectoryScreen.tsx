@@ -225,8 +225,8 @@ export function DirectoryScreen({
 
   /** Reintentar tras un 403 quita lo que esta pantalla puede dejar de pedir
    * y depende del rol: los dados de baja, los filtros de grupo, AUF y
-   * membresía (#497) y los de contacto (#499). Sin esto, a quien deja de ser Admin con la pantalla
-   * abierta, o a quien abre una dirección compartida por un Admin, le queda un
+   * membresía (#497) y los de contacto (#499). Sin esto, a quien deja de ser
+   * Admin con la pantalla abierta, o a quien abre una dirección compartida por un Admin, le queda un
    * botón que repite el mismo 403 para siempre, porque el control que lo causa
    * ya no se dibuja. El otro 403 del endpoint, el de una cuenta que deja de
    * estar activa, no se arregla desde aquí: ahí reintentar vuelve a fallar, y

@@ -82,8 +82,14 @@ const recordBodySchema = z
 type RecordBody = z.infer<typeof recordBodySchema>;
 
 function toSubmission(body: RecordBody): MemberRecordSubmission {
-  const { aufNumber, aufExpiry, groupIds, dateOfBirth, phone } = body;
-  const { emergencyContact } = body;
+  const {
+    aufNumber,
+    aufExpiry,
+    groupIds,
+    dateOfBirth,
+    phone,
+    emergencyContact,
+  } = body;
   return {
     auf:
       aufNumber === undefined || aufExpiry === undefined
