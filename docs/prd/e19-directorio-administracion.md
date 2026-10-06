@@ -2,7 +2,7 @@
 
 **Estado:** aprobado · **Fecha:** 5 de octubre de 2026 · **Autor:** sesión de planificación (Claude Code)
 
-Fuente: la conversación con el dueño del 4 y el 5 de octubre de 2026. Es una épica añadida después del plan (ver `docs/plan-maestro.md`) y amplía la E5 (directorio y perfiles). Ningún FR del SRD la cubre todavía: al aprobarla, el SRD sube a v1.6 con los FR nuevos (ver la sección 9). `docs/preguntas-abiertas.md` no tiene nada pendiente sobre ella.
+Fuente: la conversación con el dueño del 4 y el 5 de octubre de 2026. Es una épica añadida después del plan (ver `docs/plan-maestro.md`) y amplía la E5 (directorio y perfiles). El SRD v1.6 la recoge en FR-088 a FR-093, con sus criterios AC-055 a AC-060. `docs/preguntas-abiertas.md` no tiene nada pendiente sobre ella.
 
 Las decisiones que tomó el dueño van marcadas como D1 a D8:
 
@@ -179,7 +179,7 @@ Los correos de cuenta (invitación, confirmación, recuperación) salen del mism
 - [ ] **Plan de Resend.** El plan gratuito da 100 correos al día, compartidos con los correos de cuenta, y hoy el cupo propio corta en 80. Un correo a todo el club no cabe con margen. RF-7 deja al directorio en 50 correos cada 24 horas (D8), pero si se van a mandar correos a todo el club a menudo, hace falta un plan de pago. La decisión es del dueño, y no bloquea los tickets.
 - [ ] **¿Committee ve el AUF y el estado de la membresía?** Hoy solo los ve el Admin (BR-008, #453), y este PRD lo deja así: Committee no tiene esos filtros ni esas columnas en el CSV. La decisión es del dueño.
 - [ ] **Baja de los correos del club.** Este PRD trata los correos como mensajes operativos del club a sus socios, sin enlace para darse de baja. Si el comité quiere usarlos para promociones o patrocinadores, la ley australiana de spam pide ese enlace. La decisión es del comité.
-- [ ] **SRD v1.6.** Al aprobar este PRD, el SRD añade los FR nuevos (teléfono y contacto de emergencia, avisos, contacto por rol, filtros, exportación y correo) con su criterio de aceptación, y deja escrito que esta exportación no es la del panel que la v1.2 sacó del alcance (ASS-009).
+- [x] **SRD v1.6.** Resuelto: el SRD añade FR-088 a FR-093 con AC-055 a AC-060, y deja escrito en la sección 3.2 y en ASS-009 que esta exportación no es la del panel que la v1.2 sacó del alcance.
 
 ## 10. Descomposición en tickets (para write-ticket)
 
