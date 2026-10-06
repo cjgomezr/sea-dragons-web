@@ -419,7 +419,11 @@ describeRls("el directorio contra seadragons-dev", () => {
           expect(asPlayer.kind).toBe("member");
           expect(asPlayer.members[0]).not.toHaveProperty("aufNumber");
           expect(asPlayer.members[1]).not.toHaveProperty("isEvaluated");
-          expect(asPlayer.members[1]).not.toHaveProperty("emergencyContact");
+          for (const member of asPlayer.members) {
+            expect(member).not.toHaveProperty("email");
+            expect(member).not.toHaveProperty("phone");
+            expect(member).not.toHaveProperty("emergencyContact");
+          }
 
           // #394: con una hoja guardada, cada socio trae su porcentaje, y la
           // lista entera sale de una sola llamada a la función agregada.

@@ -1569,10 +1569,6 @@ describe("el contacto en el directorio", () => {
     emergencyContact: null,
   } as const;
 
-  function contactCell(name: string): HTMLElement {
-    return memberRow(name);
-  }
-
   it.each([
     [
       "Admin",
@@ -1592,7 +1588,7 @@ describe("el contacto en el directorio", () => {
       await renderScreen();
 
       expect(columnHeader("Contact")).toBeVisible();
-      const cell = contactCell("María Ñíguez");
+      const cell = memberRow("María Ñíguez");
       expect(
         within(cell).getByRole("link", { name: "maria@club.test" }),
       ).toHaveAttribute("href", "mailto:maria@club.test");
@@ -1610,11 +1606,19 @@ describe("el contacto en el directorio", () => {
   it("a un Coach le enseña sólo el contacto de emergencia", async () => {
     stubApi({
       kind: "coach",
-      members: [{ ...MARIA, isEvaluated: true, emergencyContact: LUIS }],
+      // Aunque el servidor mandara el correo, la vista del Coach no lo pinta.
+      members: [
+        {
+          ...MARIA,
+          isEvaluated: true,
+          emergencyContact: LUIS,
+          email: "maria@club.test",
+        },
+      ],
     });
     await renderScreen();
 
-    const cell = contactCell("María Ñíguez");
+    const cell = memberRow("María Ñíguez");
     expect(within(cell).getByText(/Emergency contact/)).toBeVisible();
     expect(
       within(cell).getByRole("link", { name: "+61 499 111 222" }),
@@ -1647,7 +1651,7 @@ describe("el contacto en el directorio", () => {
     });
     await renderScreen();
 
-    const cell = contactCell("Nerea Ruiz");
+    const cell = memberRow("Nerea Ruiz");
     expect(within(cell).getByText("Phone").parentElement).toHaveTextContent(
       `Phone${MISSING}`,
     );
