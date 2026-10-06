@@ -53,7 +53,6 @@ async function fillValidForm(): Promise<void> {
     "nerea@example.test",
   );
   await user.selectOptions(screen.getByLabelText("País"), "AU");
-  await user.selectOptions(screen.getByLabelText("Tipo de membresía"), "Full");
   await user.type(screen.getByLabelText("Fecha de nacimiento"), "1994-03-02");
   await user.type(screen.getByLabelText("Contraseña"), "bajoelagua");
 }
@@ -79,24 +78,23 @@ describe("formulario de registro", () => {
       "Correo electrónico",
       "País",
       "Fecha de nacimiento",
-      "Tipo de membresía",
       "Contraseña",
     ]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
   });
 
-  it("ofrece exactamente los tres tipos de membresía del SRD", () => {
+  it("no pregunta el tipo de membresía: se elige en Pagos (D8 de E12)", () => {
     renderForm();
-    const options = screen
-      .getAllByRole("option")
-      .filter((option) =>
-        ["Full", "Student", "Casual"].includes(
-          (option as HTMLOptionElement).value,
-        ),
-      );
 
-    expect(options).toHaveLength(3);
+    expect(screen.queryByLabelText("Tipo de membresía")).toBeNull();
+  });
+
+  it("no pide el teléfono ni el contacto de emergencia: van en el perfil (#496)", () => {
+    renderForm();
+
+    expect(screen.queryByLabelText(/teléfono/i)).toBeNull();
+    expect(screen.queryByText(/contacto de emergencia/i)).toBeNull();
   });
 
   it("envía el registro al endpoint de la API v1", async () => {
@@ -113,7 +111,6 @@ describe("formulario de registro", () => {
       email: "nerea@example.test",
       country: "AU",
       password: "bajoelagua",
-      membershipType: "Full",
       dateOfBirth: "1994-03-02",
     });
   });
@@ -262,7 +259,7 @@ describe("formulario de registro", () => {
       body: {
         error: {
           code: "business_rule",
-          message: "membershipType: no es un tipo válido.",
+          message: "country: no es un país conocido.",
         },
       },
     });
@@ -275,7 +272,7 @@ describe("formulario de registro", () => {
     expect(alert).toHaveTextContent(
       "No pudimos crear tu cuenta con estos datos. Revísalos y vuelve a intentarlo.",
     );
-    expect(alert).not.toHaveTextContent("membershipType");
+    expect(alert).not.toHaveTextContent("country");
   });
 
   it("avisa sin filtrar detalles técnicos si la red falla", async () => {

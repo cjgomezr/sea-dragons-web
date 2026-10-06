@@ -27,7 +27,6 @@ const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
 const FULL_PROFILE: MemberProfile = {
   country: "AU",
   dateOfBirth: "1994-03-08",
-  membershipType: "Full",
   guardianConsentAt: null,
   registeredAt: "2026-09-01T00:00:00.000Z",
 };
@@ -95,7 +94,7 @@ describe("completar registro: pide sólo lo que falta", () => {
 
   it("nombra los varios que faltan cuando falta más de uno", async () => {
     const store = storeWith({
-      record: incompleteRecord({ country: null, membershipType: null }),
+      record: incompleteRecord({ country: null, dateOfBirth: null }),
       emailConfirmed: false,
     });
 
@@ -105,7 +104,7 @@ describe("completar registro: pide sólo lo que falta", () => {
 
     expect(completion.pending).toEqual([
       "country",
-      "membershipType",
+      "dateOfBirth",
       "emailConfirmation",
     ]);
   });
@@ -178,7 +177,7 @@ describe("completar registro: guardar", () => {
 
   it("sigue incompleta, y no se activa, mientras quede otro pendiente", async () => {
     const store = storeWith({
-      record: incompleteRecord({ country: null, membershipType: null }),
+      record: incompleteRecord({ country: null, dateOfBirth: null }),
     });
 
     const completion = await completeRegistration(store.gateways, {
@@ -190,7 +189,7 @@ describe("completar registro: guardar", () => {
     expect(store.activations).toEqual([]);
     expect(completion).toEqual({
       accountStatus: "incomplete",
-      pending: ["membershipType"],
+      pending: ["dateOfBirth"],
     });
   });
 
@@ -227,18 +226,17 @@ describe("completar registro: guardar", () => {
 
   it("conserva lo que ya había escrito, y no lo reescribe", async () => {
     const store = storeWith({
-      record: incompleteRecord({ membershipType: null }),
+      record: incompleteRecord({ dateOfBirth: null }),
     });
 
     await completeRegistration(store.gateways, {
       userId: USER_ID,
-      values: { membershipType: "Student" },
+      values: { dateOfBirth: "1994-03-08" },
       now: NOW,
     });
 
-    expect(store.writes).toEqual([{ membershipType: "Student" }]);
+    expect(store.writes).toEqual([{ dateOfBirth: "1994-03-08" }]);
     expect(store.profile.country).toBe("AU");
-    expect(store.profile.dateOfBirth).toBe("1994-03-08");
   });
 
   it("normaliza el país igual que el registro", async () => {
@@ -262,7 +260,6 @@ describe("completar registro: lo que rechaza", () => {
       record: incompleteRecord({
         country: null,
         dateOfBirth: null,
-        membershipType: null,
       }),
     });
     try {
@@ -285,14 +282,6 @@ describe("completar registro: lo que rechaza", () => {
     expect(error.issues.map((issue) => issue.field)).toEqual(["country"]);
   });
 
-  it("rechaza un tipo de membresía fuera del conjunto cerrado", async () => {
-    const error = await rejectionOf({ membershipType: "Platinum" });
-
-    expect(error.issues.map((issue) => issue.field)).toEqual([
-      "membershipType",
-    ]);
-  });
-
   it("rechaza una fecha de nacimiento que no existe en el calendario", async () => {
     const error = await rejectionOf({ dateOfBirth: "2026-02-30" });
 
@@ -308,12 +297,12 @@ describe("completar registro: lo que rechaza", () => {
   it("devuelve todos los campos malos a la vez, no el primero", async () => {
     const error = await rejectionOf({
       country: "Australia",
-      membershipType: "Platinum",
+      dateOfBirth: "2026-02-30",
     });
 
     expect(error.issues.map((issue) => issue.field)).toEqual([
       "country",
-      "membershipType",
+      "dateOfBirth",
     ]);
   });
 
@@ -329,7 +318,7 @@ describe("completar registro: lo que rechaza", () => {
     await expect(
       completeRegistration(store.gateways, {
         userId: USER_ID,
-        values: { country: "AU", membershipType: "Casual" },
+        values: { country: "AU", dateOfBirth: "1994-03-08" },
         now: NOW,
       }),
     ).rejects.toBeInstanceOf(CompletionValidationError);

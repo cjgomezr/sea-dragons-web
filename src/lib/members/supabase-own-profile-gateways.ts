@@ -12,6 +12,7 @@ import type {
   OwnProfileUpdateResult,
   StoredOwnProfile,
 } from "./own-profile";
+import type { EmergencyContact } from "./profile-contact";
 import { parseExperienceLevel, parseGender } from "./profile-fields";
 
 /**
@@ -23,13 +24,13 @@ import { parseExperienceLevel, parseGender } from "./profile-fields";
  * propósito: `authenticated` no tiene `update` sobre `members`, y así el rol,
  * la verificación del AUF o el estado no se pueden cambiar atacando la base
  * directamente. El servidor identifica a quien pide por su cookie y escribe
- * sólo su fila, y sólo las cinco columnas del perfil y el AUF propuesto
- * (#274), que siempre se escribe sin verificar.
+ * sólo su fila, y sólo las cinco columnas del perfil, su contacto (#496) y
+ * el AUF propuesto (#274), que siempre se escribe sin verificar.
  */
 
 const MEMBERS_TABLE = "members";
 const PROFILE_COLUMNS =
-  "full_name, country, position_id, experience_level, gender, auf_number, auf_expiry, auf_verified_at, joined_on, club_id";
+  "full_name, country, position_id, experience_level, gender, phone, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, auf_number, auf_expiry, auf_verified_at, joined_on, club_id, guardian_name";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -73,6 +74,24 @@ function toOwnAuf(row: Row): OwnAuf {
   };
 }
 
+/** El `check` `members_emergency_contact_complete` de `0057` garantiza
+ * que estén las tres o ninguna. */
+function toEmergencyContact(row: Row): EmergencyContact | null {
+  const name = readText(row, "emergency_contact_name", MEMBERS_TABLE);
+  if (name === null) {
+    return null;
+  }
+  return {
+    name,
+    phone: readRequiredText(row, "emergency_contact_phone", MEMBERS_TABLE),
+    relationship: readRequiredText(
+      row,
+      "emergency_contact_relationship",
+      MEMBERS_TABLE,
+    ),
+  };
+}
+
 function toStoredOwnProfile(row: Row): StoredOwnProfile {
   return {
     profile: {
@@ -85,10 +104,25 @@ function toStoredOwnProfile(row: Row): StoredOwnProfile {
         parseExperienceLevel,
       ),
       gender: readOptionalCatalogValue(row, "gender", parseGender),
+      phone: readText(row, "phone", MEMBERS_TABLE),
+      emergencyContact: toEmergencyContact(row),
       auf: toOwnAuf(row),
     },
     joinedOn: readRequiredText(row, "joined_on", MEMBERS_TABLE),
     clubId: readRequiredText(row, "club_id", MEMBERS_TABLE),
+    guardianName: readText(row, "guardian_name", MEMBERS_TABLE),
+  };
+}
+
+/** Sin contacto, las tres a null: el `check` de `0057` no deja otra. */
+function toEmergencyContactColumns(
+  contact: EmergencyContact | null,
+): Record<string, string | null> {
+  return {
+    emergency_contact_name: contact === null ? null : contact.name,
+    emergency_contact_phone: contact === null ? null : contact.phone,
+    emergency_contact_relationship:
+      contact === null ? null : contact.relationship,
   };
 }
 
@@ -104,6 +138,8 @@ function toProfileColumns(
     position_id: fields.positionId,
     experience_level: fields.experienceLevel,
     gender: fields.gender,
+    phone: fields.phone,
+    ...toEmergencyContactColumns(fields.emergencyContact),
   };
   return auf.kind === "keep"
     ? profileColumns

@@ -306,7 +306,6 @@ describe("recuperación de contraseña", () => {
         email: REGISTERED_EMAIL,
         country: "AU",
         password: shortPassword,
-        membershipType: "Full",
         dateOfBirth: "1994-03-02",
       },
       { now: NOW },

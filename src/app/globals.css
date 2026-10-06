@@ -1961,6 +1961,27 @@ a.auth-brand-header:focus-visible {
   border: 0;
 }
 
+/* El contacto de emergencia del perfil (#496). El `fieldset` sólo está por
+   su `legend`, que agrupa los tres datos que van juntos o no van: sin
+   recuadro, porque ya están dentro del panel de la ficha. */
+.account-emergency-contact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.account-emergency-contact legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-family: var(--font-family-heading);
+  font-size: 16px;
+  font-weight: 700;
+}
+
 .account-role-options legend {
   margin-bottom: var(--space-2);
   padding: 0;
@@ -2480,6 +2501,77 @@ a.auth-brand-header:focus-visible {
   align-items: center;
 }
 
+/* Los filtros de #497. En el móvil van detrás del botón "Filtros", en una
+   hoja que sube desde abajo; desde 768px, en la barra sobre la tabla. Los dos
+   están siempre en el documento y esto decide cuál se ve. */
+.directory-filter-bar {
+  display: none;
+}
+
+.directory-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--space-2);
+}
+
+.directory-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--space-1);
+  font-size: 12px;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-radius: 12px;
+}
+
+.directory-filter {
+  min-width: 0;
+}
+
+.directory-filter select {
+  width: 100%;
+}
+
+.directory-sheet {
+  inset: auto 0 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 85vh;
+  margin: 0;
+  padding: 0;
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  box-shadow: var(--shadow);
+}
+
+.directory-sheet::backdrop {
+  background: rgb(12 26 38 / 60%);
+}
+
+.directory-sheet-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-4);
+}
+
+.directory-sheet-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.directory-sheet-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 .directory-empty {
   display: flex;
   flex-direction: column;
@@ -2733,6 +2825,21 @@ a.auth-brand-header:focus-visible {
     flex-direction: row;
     flex-wrap: wrap;
     align-items: flex-end;
+  }
+
+  .directory-filter-toggle {
+    display: none;
+  }
+
+  .directory-filter-bar {
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+  }
+
+  .directory-filter {
+    flex: 1 1 180px;
   }
 
   .directory-search {
@@ -3170,6 +3277,23 @@ a.auth-brand-header:focus-visible {
 
 .club-positions-form .auth-hint,
 .club-positions-form .auth-error {
+  margin: 0;
+}
+
+/* Los packs de sesiones (#469): la lista con la forma de las posiciones, y
+   debajo el alta y el botón de guardar, cada uno a su ancho. */
+.club-session-packs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.club-session-packs .club-positions-form .admin-secondary,
+.club-session-packs > .auth-submit {
+  align-self: flex-start;
+}
+
+.club-session-packs > .auth-note {
   margin: 0;
 }
 
@@ -4794,6 +4918,23 @@ a.auth-brand-header:focus-visible {
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-2);
+}
+
+/* Los packs de un Casual (#471): un botón por pack, cada uno con su aviso
+   si Stripe no abre. */
+.payments-packs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.payments-packs li {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
 }
 
 .payments-offer {

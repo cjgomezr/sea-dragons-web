@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   type MemberProfile,
+  PENDING_REQUIREMENTS,
   listPendingRequirements,
   resolveAccountStatus,
 } from "@/lib/auth/account-activation";
@@ -15,7 +16,6 @@ import {
 const COMPLETE_ADULT_PROFILE: MemberProfile = {
   country: "AU",
   dateOfBirth: "1994-03-08",
-  membershipType: "Full",
   guardianConsentAt: null,
   registeredAt: "2026-09-12T00:00:00.000Z",
 };
@@ -43,8 +43,8 @@ describe("qué le falta a una cuenta", () => {
     expect(pendingFor({ dateOfBirth: null })).toEqual(["dateOfBirth"]);
   });
 
-  it("nombra el tipo de membresía cuando la fila no lo tiene", () => {
-    expect(pendingFor({ membershipType: null })).toEqual(["membershipType"]);
+  it("no cuenta el tipo de membresía: se elige en Pagos, no en el registro", () => {
+    expect(PENDING_REQUIREMENTS).not.toContain("membershipType");
   });
 
   it("nombra la confirmación del correo, que es otra razón para seguir incompleta", () => {
@@ -71,15 +71,9 @@ describe("qué le falta a una cuenta", () => {
   });
 
   it("devuelve todos los pendientes a la vez, no el primero", () => {
-    expect(
-      pendingFor(
-        { country: null, membershipType: null, dateOfBirth: null },
-        false,
-      ),
-    ).toEqual([
+    expect(pendingFor({ country: null, dateOfBirth: null }, false)).toEqual([
       "country",
       "dateOfBirth",
-      "membershipType",
       "emailConfirmation",
     ]);
   });
@@ -98,7 +92,6 @@ describe("el estado de cuenta sale de la misma lista", () => {
   it.each([
     ["el país", { country: null }],
     ["la fecha de nacimiento", { dateOfBirth: null }],
-    ["el tipo de membresía", { membershipType: null }],
     ["el consentimiento del tutor", { dateOfBirth: "2012-05-20" }],
   ])("sigue incomplete cuando falta %s", (_name, missing) => {
     expect(

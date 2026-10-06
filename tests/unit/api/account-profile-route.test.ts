@@ -40,6 +40,14 @@ const VALID_BODY = {
   positionId: FORWARD.id,
   experienceLevel: "Advanced",
   gender: "undisclosed",
+  phone: null,
+  emergencyContact: null,
+} as const;
+
+const EMERGENCY_CONTACT = {
+  name: "Lucía Ruiz",
+  phone: "0412 345 678",
+  relationship: "Hermana",
 } as const;
 
 const NO_AUF: OwnAuf = { status: "none" };
@@ -129,6 +137,7 @@ function givenStoredAuf(auf: OwnAuf): void {
     profile: { ...VALID_BODY, auf },
     joinedOn: "2024-03-06",
     clubId: CLUB_ID,
+    guardianName: null,
   };
   findOwnProfile.mockResolvedValue(stored);
 }
@@ -402,6 +411,80 @@ describe("PATCH /api/v1/account/profile", () => {
     const response = await patchThroughBoundary({
       ...VALID_BODY,
       aufExpiry: "2030-01-01",
+    });
+
+    expect(response.status).toBe(400);
+    expect(updateOwnProfile).not.toHaveBeenCalled();
+  });
+
+  it("guarda el teléfono y el contacto de emergencia sin espacios sobrantes", async () => {
+    const response = await patchThroughBoundary({
+      ...VALID_BODY,
+      phone: " +61  412 345 678 ",
+      emergencyContact: { ...EMERGENCY_CONTACT, name: " Lucía Ruiz " },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        ...VALID_BODY,
+        phone: "+61 412 345 678",
+        emergencyContact: EMERGENCY_CONTACT,
+        auf: NO_AUF,
+      },
+    });
+  });
+
+  it.each([
+    ["un teléfono con 7 dígitos", { phone: "4123456" }, "phone_too_short"],
+    [
+      "un teléfono con letras",
+      { phone: "0412 ABC 678" },
+      "phone_invalid_characters",
+    ],
+    [
+      "un contacto sin teléfono",
+      { emergencyContact: { ...EMERGENCY_CONTACT, phone: "" } },
+      "emergency_contact_phone_missing",
+    ],
+    [
+      "una relación de más de 100 caracteres",
+      {
+        emergencyContact: {
+          ...EMERGENCY_CONTACT,
+          relationship: "a".repeat(101),
+        },
+      },
+      "emergency_contact_relationship_too_long",
+    ],
+  ])(
+    "responde 400 con el motivo a %s y no escribe nada",
+    async (_case, change, reason) => {
+      const response = await patchThroughBoundary({ ...VALID_BODY, ...change });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "validation_error", reason },
+      });
+      expect(updateOwnProfile).not.toHaveBeenCalled();
+    },
+  );
+
+  it("responde 400 a un contacto con campos que no conoce", async () => {
+    const response = await patchThroughBoundary({
+      ...VALID_BODY,
+      emergencyContact: { ...EMERGENCY_CONTACT, email: "lucia@example.test" },
+    });
+
+    expect(response.status).toBe(400);
+    expect(updateOwnProfile).not.toHaveBeenCalled();
+  });
+
+  it("no deja escribir el contacto de otro socio", async () => {
+    const response = await patchThroughBoundary({
+      ...VALID_BODY,
+      userId: "0f0e0d0c-0b0a-4908-8706-050403020100",
+      emergencyContact: EMERGENCY_CONTACT,
     });
 
     expect(response.status).toBe(400);

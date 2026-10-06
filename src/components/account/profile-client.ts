@@ -12,6 +12,14 @@ import {
   type ProfileIssueCode,
 } from "@/lib/members/own-profile";
 import {
+  type ContactIssueCode,
+  EMERGENCY_CONTACT_TEXT_MAX_LENGTH,
+  type EmergencyContact,
+  PHONE_MAX_DIGITS,
+  PHONE_MIN_DIGITS,
+  isContactIssueCode,
+} from "@/lib/members/profile-contact";
+import {
   parseExperienceLevel,
   parseGender,
 } from "@/lib/members/profile-fields";
@@ -54,13 +62,32 @@ function readSavedAuf(payload: unknown): OwnAuf | null {
   };
 }
 
+/** El contacto de emergencia de la respuesta: los tres datos o ninguno. A
+ * medias, la respuesta no vale. */
+function readSavedEmergencyContact(
+  payload: unknown,
+): { readonly contact: EmergencyContact | null } | null {
+  const readPart = (part: keyof EmergencyContact): string | null =>
+    readStringAt(payload, ["data", "emergencyContact", part]);
+  const name = readPart("name");
+  const phone = readPart("phone");
+  const relationship = readPart("relationship");
+  if (name === null && phone === null && relationship === null) {
+    return { contact: null };
+  }
+  return name === null || phone === null || relationship === null
+    ? null
+    : { contact: { name, phone, relationship } };
+}
+
 /** La ficha que devuelve un 200, sin fiarse de su forma. Un catálogo en null
  * es un campo vacío; con un valor que no se reconoce, la respuesta no vale.
  * La posición es un id del catálogo del club (#299): la valida el servidor. */
 function readSavedProfile(payload: unknown): OwnProfile | null {
   const fullName = readStringAt(payload, ["data", "fullName"]);
   const auf = readSavedAuf(payload);
-  if (fullName === null || auf === null) {
+  const emergencyContact = readSavedEmergencyContact(payload);
+  if (fullName === null || auf === null || emergencyContact === null) {
     return null;
   }
   const experienceLevel = readStringAt(payload, ["data", "experienceLevel"]);
@@ -71,6 +98,8 @@ function readSavedProfile(payload: unknown): OwnProfile | null {
     positionId: readStringAt(payload, ["data", "positionId"]),
     experienceLevel: parseExperienceLevel(experienceLevel),
     gender: parseGender(gender),
+    phone: readStringAt(payload, ["data", "phone"]),
+    emergencyContact: emergencyContact.contact,
     auf,
   };
   const isRecognized =
@@ -83,7 +112,7 @@ function readSavedProfile(payload: unknown): OwnProfile | null {
  * va ninguno, que es no tocarlo. */
 function toRequestBody(
   submission: OwnProfileSubmission,
-): Readonly<Record<string, string | null>> {
+): Readonly<Record<string, unknown>> {
   const { auf, ...fields } = submission;
   return auf === null
     ? fields
@@ -119,10 +148,47 @@ export async function saveOwnProfile(
     : { kind: "saved", profile };
 }
 
+/** El teléfono propio y el del contacto fallan por lo mismo, y se dicen
+ * igual: el aviso va junto al campo que falló. */
+function describeContactIssue(
+  translate: Translator,
+  code: ContactIssueCode,
+): string {
+  switch (code) {
+    case "phone_invalid_characters":
+    case "emergency_contact_phone_invalid_characters":
+      return translate("account.profile.issue.phoneInvalidCharacters");
+    case "phone_too_short":
+    case "emergency_contact_phone_too_short":
+      return translate("account.profile.issue.phoneTooShort", {
+        min: PHONE_MIN_DIGITS,
+      });
+    case "phone_too_long":
+    case "emergency_contact_phone_too_long":
+      return translate("account.profile.issue.phoneTooLong", {
+        max: PHONE_MAX_DIGITS,
+      });
+    case "emergency_contact_name_missing":
+      return translate("account.profile.issue.emergencyNameMissing");
+    case "emergency_contact_phone_missing":
+      return translate("account.profile.issue.emergencyPhoneMissing");
+    case "emergency_contact_relationship_missing":
+      return translate("account.profile.issue.emergencyRelationshipMissing");
+    case "emergency_contact_name_too_long":
+    case "emergency_contact_relationship_too_long":
+      return translate("account.profile.issue.emergencyTextTooLong", {
+        max: EMERGENCY_CONTACT_TEXT_MAX_LENGTH,
+      });
+  }
+}
+
 export function describeProfileIssue(
   translate: Translator,
   code: ProfileIssueCode,
 ): string {
+  if (isContactIssueCode(code)) {
+    return describeContactIssue(translate, code);
+  }
   switch (code) {
     case "full_name_missing":
       return translate("account.profile.issue.fullNameMissing");

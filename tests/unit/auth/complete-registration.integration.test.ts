@@ -143,7 +143,7 @@ async function seedMembership(
 
 describeRls("completar registro contra seadragons-dev", () => {
   it(
-    "al activar la cuenta crea su membresía pending con el plan elegido",
+    "al activar la cuenta crea su membresía pending y sin plan",
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);
       const gateways = realGateways();
@@ -152,19 +152,19 @@ describeRls("completar registro contra seadragons-dev", () => {
         serviceClient,
         {
           country: "AU",
-          date_of_birth: "1994-03-02",
+          date_of_birth: null,
           membership_type: null,
         },
         async (member) => {
           await completeRegistration(gateways, {
             userId: member.userId,
-            values: { membershipType: "Student" },
+            values: { dateOfBirth: "1994-03-02" },
             now: new Date(),
           });
 
           await expect(
             readMemberships(serviceClient, member.userId),
-          ).resolves.toEqual([{ plan: "Student", status: "pending" }]);
+          ).resolves.toEqual([{ plan: null, status: "pending" }]);
         },
       );
     },
@@ -172,7 +172,7 @@ describeRls("completar registro contra seadragons-dev", () => {
   );
 
   it(
-    "al activar a quien el relleno dejó sin plan le pone el plan elegido",
+    "a quien eligió plan en el registro antes de D8 se lo conserva al activar",
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);
       const gateways = realGateways();
@@ -180,12 +180,13 @@ describeRls("completar registro contra seadragons-dev", () => {
       await withIncompleteMember(
         serviceClient,
         {
-          country: "AU",
+          country: null,
           date_of_birth: "1994-03-02",
-          membership_type: null,
+          membership_type: "Student",
         },
         async (member) => {
-          // Lo que deja `0050` a un socio a medias que aún no había elegido.
+          // Lo que deja `0050` a un socio a medias que eligió tipo en el registro
+          // viejo después del relleno: la fila lo tiene y la membresía no.
           await seedMembership(serviceClient, member.userId, {
             plan: null,
             status: "pending",
@@ -193,7 +194,7 @@ describeRls("completar registro contra seadragons-dev", () => {
 
           await completeRegistration(gateways, {
             userId: member.userId,
-            values: { membershipType: "Student" },
+            values: { country: "AU" },
             now: new Date(),
           });
 
@@ -249,7 +250,7 @@ describeRls("completar registro contra seadragons-dev", () => {
         serviceClient,
         {
           country: "AU",
-          date_of_birth: "1994-03-02",
+          date_of_birth: null,
           membership_type: null,
         },
         async (member) => {
@@ -258,12 +259,12 @@ describeRls("completar registro contra seadragons-dev", () => {
           });
           expect(before).toEqual({
             accountStatus: "incomplete",
-            pending: ["membershipType"],
+            pending: ["dateOfBirth"],
           });
 
           const after = await completeRegistration(gateways, {
             userId: member.userId,
-            values: { membershipType: "Student" },
+            values: { dateOfBirth: "1994-03-02" },
             now: new Date(),
           });
 
@@ -290,7 +291,7 @@ describeRls("completar registro contra seadragons-dev", () => {
         serviceClient,
         {
           country: "AU",
-          date_of_birth: "1994-03-02",
+          date_of_birth: null,
           membership_type: null,
         },
         async (member) => {
@@ -308,7 +309,7 @@ describeRls("completar registro contra seadragons-dev", () => {
 
           await completeRegistration(gateways, {
             userId: member.userId,
-            values: { membershipType: "Student" },
+            values: { dateOfBirth: "1994-03-02" },
             now: new Date(),
           });
 
@@ -342,7 +343,7 @@ describeRls("completar registro contra seadragons-dev", () => {
           });
 
           expect(after.accountStatus).toBe("incomplete");
-          expect(after.pending).toEqual(["dateOfBirth", "membershipType"]);
+          expect(after.pending).toEqual(["dateOfBirth"]);
           await expect(
             readAccountStatus(serviceClient, member.userId),
           ).resolves.toBe("incomplete");

@@ -76,6 +76,8 @@ const COACH_REQUEST: PendingRoleRequest = {
 
 const DIRECTORY_PATH = "/api/v1/directory";
 const PENDING_REQUESTS_PATH = "/api/v1/role-requests?status=pending";
+const POSITIONS_PATH = "/api/v1/club/positions";
+const GROUPS_PATH = "/api/v1/groups";
 
 type ApiCall = {
   readonly url: string;
@@ -116,9 +118,24 @@ function readResponse(stub: ApiStub, url: string): Promise<Response> {
   if (url.startsWith(DIRECTORY_PATH)) {
     return Promise.resolve(
       jsonResponse(200, {
-        data: { kind: stub.kind ?? "admin", members: stub.members ?? [NEREA] },
+        data: {
+          kind: stub.kind ?? "admin",
+          members: stub.members ?? [NEREA],
+          availableFilters:
+            (stub.kind ?? "admin") === "admin"
+              ? ["position", "group", "auf", "membership"]
+              : ["position"],
+        },
       }),
     );
+  }
+  // Las opciones de los filtros (#497) se prueban en
+  // `directory-screen.test.tsx`: aquí llegan vacías.
+  if (url === POSITIONS_PATH) {
+    return Promise.resolve(jsonResponse(200, { data: { positions: [] } }));
+  }
+  if (url === GROUPS_PATH) {
+    return Promise.resolve(jsonResponse(200, { data: { groups: [] } }));
   }
   if (url === PENDING_REQUESTS_PATH) {
     return (
@@ -735,7 +752,10 @@ describe("directorio para quien no es Admin", () => {
       expect(
         screen.queryByRole("region", { name: "Pending requests" }),
       ).toBeNull();
-      expect(screen.queryByRole("combobox")).toBeNull();
+      // El control de rol vive en la fila; los filtros de #497 quedan fuera.
+      expect(
+        within(screen.getByRole("table")).queryByRole("combobox"),
+      ).toBeNull();
       expect(screen.queryByRole("link", { name: /record/ })).toBeNull();
       expect(screen.queryByText(/AUF/)).toBeNull();
       expect(

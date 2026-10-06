@@ -1904,7 +1904,6 @@ async function goToConfirmationPending(
   await page.getByLabel("Email").fill(CONFIRMATION_STUB_EMAIL);
   await page.getByLabel("Country").selectOption("AU");
   await page.getByLabel("Date of birth").fill("1994-03-02");
-  await page.getByLabel("Membership type").selectOption("Full");
   await page.getByLabel("Password").fill("bajoelagua");
   await page.getByRole("button", { name: "Create account" }).click();
 
@@ -2153,7 +2152,6 @@ test("el formulario de registro no manda nada al servidor con la contraseña cor
   await page.getByLabel("Email").fill(CONFIRMATION_STUB_EMAIL);
   await page.getByLabel("Country").selectOption("AU");
   await page.getByLabel("Date of birth").fill("1994-03-02");
-  await page.getByLabel("Membership type").selectOption("Full");
   await page.getByLabel("Password").fill("1234567");
   await page.getByRole("button", { name: "Create account" }).click();
 
@@ -2271,8 +2269,8 @@ test.describe("una cuenta incompleta en un navegador de verdad", () => {
   }) => {
     await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
 
-    await expect(page.getByLabel("Membership type")).toBeVisible();
-    await expect(page.getByLabel("Country")).toHaveCount(0);
+    await expect(page.getByLabel("Country")).toBeVisible();
+    await expect(page.getByLabel("Membership type")).toHaveCount(0);
     await expect(page.getByLabel("Date of birth")).toHaveCount(0);
     await expect(page.getByLabel("Full name")).toHaveCount(0);
   });
@@ -2343,7 +2341,7 @@ test.describe("una cuenta incompleta que cambia de estado", () => {
     }) => {
       await page.goto(`${APP_URL}${COMPLETE_REGISTRATION_PATH}`);
 
-      await page.getByLabel("Membership type").selectOption("Student");
+      await page.getByLabel("Country").selectOption("AU");
       await submitAccountChange(page, {
         method: "PATCH",
         endpoint: ACCOUNT_ENDPOINT,
@@ -2402,7 +2400,7 @@ test.describe("un menor sin el consentimiento de su tutor", () => {
         page.getByRole("heading", { name: /your guardian's consent/i }),
       ).toBeVisible();
       await expect(page.getByLabel("Guardian's name")).toBeVisible();
-      await expect(page.getByLabel("Membership type")).toHaveCount(0);
+      await expect(page.getByLabel("Country")).toHaveCount(0);
       await expect(page.getByLabel("Date of birth")).toHaveCount(0);
     });
 
@@ -2576,6 +2574,20 @@ async function chooseTooLargePhoto(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+/** Escribe sólo el nombre del contacto de emergencia y guarda: el
+ * formulario lo para y avisa junto a los dos datos que faltan (#496). No
+ * llega al servidor, así que no cambia al socio compartido. */
+async function saveHalfEmergencyContact(page: Page): Promise<void> {
+  await page
+    .getByLabel(/^(Contact name|Nombre del contacto)$/)
+    .fill("Lucía Ruiz");
+  await page.getByRole("button", { name: SAVE_PROFILE_BUTTON }).click();
+  await expect(page.getByLabel(/^(Relationship|Relación)$/)).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+}
+
 async function failProfileSaveOnNetwork(page: Page): Promise<void> {
   await page.route(`**${ACCOUNT_PROFILE_ENDPOINT}`, (route) =>
     route.abort("internetdisconnected"),
@@ -2697,6 +2709,39 @@ const ACCOUNT_STATES: readonly AccountState[] = [
   {
     name: "perfil-posicion-retirada-es",
     storageState: roleRequestStorageStatePath("perfil-posicion-retirada"),
+    beforeVisit: chooseSpanish,
+  },
+  // El teléfono y el contacto de emergencia (#496). Vacío es ya
+  // `perfil-completo`, que no tiene ninguno; éstos son el contacto guardado
+  // (con el aviso de que el teléfono es el propio), el contacto a medias que
+  // el formulario no deja enviar, y la menor a la que se le propone su tutor.
+  {
+    name: "perfil-contacto-completo",
+    storageState: roleRequestStorageStatePath("perfil-contacto-completo"),
+  },
+  {
+    name: "perfil-contacto-completo-es",
+    storageState: roleRequestStorageStatePath("perfil-contacto-completo"),
+    beforeVisit: chooseSpanish,
+  },
+  {
+    name: "perfil-contacto-errores",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    prepare: saveHalfEmergencyContact,
+  },
+  {
+    name: "perfil-contacto-errores-es",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    beforeVisit: chooseSpanish,
+    prepare: saveHalfEmergencyContact,
+  },
+  {
+    name: "perfil-contacto-menor",
+    storageState: roleRequestStorageStatePath("perfil-contacto-menor"),
+  },
+  {
+    name: "perfil-contacto-menor-es",
+    storageState: roleRequestStorageStatePath("perfil-contacto-menor"),
     beforeVisit: chooseSpanish,
   },
 ];
@@ -3156,6 +3201,8 @@ test.describe("un socio que edita su perfil", () => {
           positionId: null,
           experienceLevel: null,
           gender: null,
+          phone: null,
+          emergencyContact: null,
           role: "Admin",
           groups: [],
           status: "active",
@@ -3194,6 +3241,8 @@ test.describe("una socia con el AUF verificado", () => {
           positionId: null,
           experienceLevel: null,
           gender: null,
+          phone: null,
+          emergencyContact: null,
           aufNumber: "AUF-OTRO",
           aufExpiry: "2030-06-30",
         },
@@ -3871,6 +3920,53 @@ const LISTING_MEMBER_VIEWS = {
   }),
 } as const;
 
+/** Los filtros de #497 que el servidor deja usar a cada vista. */
+const STUBBED_AVAILABLE_FILTERS = {
+  admin: ["position", "group", "auf", "membership"],
+  coach: ["position", "group"],
+  member: ["position"],
+} as const;
+
+/** Las opciones de los filtros: las posiciones del club y sus grupos, fijas
+ * para que la captura no dependa de lo que otro test haya sembrado. */
+const CLUB_POSITIONS_ENDPOINT = "/api/v1/club/positions";
+const DIRECTORY_GROUPS_ENDPOINT = "/api/v1/groups";
+const STUBBED_DIRECTORY_GROUPS = [
+  {
+    id: "77777777-0000-4000-8000-000000000001",
+    name: "Senior Squad",
+    memberCount: 3,
+  },
+  {
+    id: "77777777-0000-4000-8000-000000000002",
+    name: "Junior Squad",
+    memberCount: 1,
+  },
+] as const;
+
+async function stubFilterChoices(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname === CLUB_POSITIONS_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: { positions: Object.values(STUBBED_POSITIONS) },
+        }),
+      }),
+  );
+  await page.route(
+    (url) => url.pathname === DIRECTORY_GROUPS_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { groups: STUBBED_DIRECTORY_GROUPS } }),
+      }),
+  );
+}
+
 /** El porcentaje por el que se ordena, o null para quien no tiene datos. */
 function stubbedPercent(member: StubbedMember): number | null {
   return member.attendance.kind === "rate" ? member.attendance.percent : null;
@@ -3910,10 +4006,16 @@ function stubbedListing(
   const search = searchParams.get("q");
   const role = searchParams.get("role");
   const includeInactive = searchParams.get("includeInactive") === "true";
+  const position = searchParams.get("position");
+  // Nadie de la lista fija está en un grupo: filtrar por uno es la manera de
+  // llegar a "sin resultados" desde los filtros de #497.
+  const isGroupFiltered = searchParams.has("group");
   const members = options.members.filter(
     (member) =>
+      !isGroupFiltered &&
       (role === null || member.role === role) &&
       (includeInactive || member.status !== "inactive") &&
+      (position === null || (member.position?.id ?? "none") === position) &&
       (search === null ||
         normalizeName(member.fullName).includes(normalizeName(search))),
   );
@@ -3926,7 +4028,11 @@ function stubbedListing(
       ? { ...member, photoUrl: STUBBED_PHOTO_URL }
       : member,
   );
-  return { kind, members: listed.map(LISTING_MEMBER_VIEWS[kind]) };
+  return {
+    kind,
+    members: listed.map(LISTING_MEMBER_VIEWS[kind]),
+    availableFilters: STUBBED_AVAILABLE_FILTERS[kind],
+  };
 }
 
 const MEMBERS_ENDPOINT = "/api/v1/members";
@@ -4005,6 +4111,7 @@ async function stubDirectoryReads(
   if (withPhoto) {
     await stubDirectoryPhoto(page);
   }
+  await stubFilterChoices(page);
   await page.route(
     (url) => url.pathname === DIRECTORY_ENDPOINT,
     (route, request) =>
@@ -4224,6 +4331,110 @@ function openLargePhoto(shape: LargePhotoShape | "failed") {
   };
 }
 
+/* Los filtros de #497. En escritorio están en la barra sobre la tabla; por
+   debajo de 768px, detrás del botón "Filtros", en una hoja que sube desde
+   abajo. */
+
+type FilterLabels = {
+  readonly toggle: string;
+  readonly sheet: string;
+  readonly apply: string;
+  readonly bar: string;
+  readonly position: string;
+  readonly forward: string;
+  readonly auf: string;
+  readonly expired: string;
+  readonly group: string;
+  readonly senior: string;
+};
+
+const ENGLISH_FILTER_LABELS: FilterLabels = {
+  toggle: "Filters",
+  sheet: "Filters",
+  apply: "Show results",
+  bar: "More filters",
+  position: "Position",
+  forward: "Forward",
+  auf: "AUF",
+  expired: "Expired",
+  group: "Group",
+  senior: "Senior Squad",
+};
+
+const SPANISH_FILTER_LABELS: FilterLabels = {
+  toggle: "Filtros",
+  sheet: "Filtros",
+  apply: "Ver resultados",
+  bar: "Más filtros",
+  position: "Posición",
+  forward: "Ataque",
+  auf: "AUF",
+  expired: "Vencido",
+  group: "Grupo",
+  senior: "Senior Squad",
+};
+
+function filterToggle(page: Page, labels: FilterLabels): Locator {
+  return page.getByRole("button", {
+    name: new RegExp(`^${labels.toggle}`),
+  });
+}
+
+/** Donde están los filtros en este ancho: la barra, o la hoja ya abierta. */
+async function filterContainer(
+  page: Page,
+  labels: FilterLabels,
+): Promise<Locator> {
+  const toggle = filterToggle(page, labels);
+  if (!(await toggle.isVisible())) {
+    return page.getByRole("group", { name: labels.bar });
+  }
+  await toggle.click();
+  const sheet = page.getByRole("dialog", { name: labels.sheet });
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+
+/** Elige una posición y el AUF vencido. Con `keepSheetOpen`, en el móvil la
+ * hoja se queda abierta para la captura; si no, se cierra y el botón dice
+ * cuántos filtros hay activos. */
+function chooseFilters(labels: FilterLabels, keepSheetOpen: boolean) {
+  return async (page: Page): Promise<void> => {
+    const container = await filterContainer(page, labels);
+    await container
+      .getByRole("combobox", { name: labels.position })
+      .selectOption({ label: labels.forward });
+    await container
+      .getByRole("combobox", { name: labels.auf })
+      .selectOption({ label: labels.expired });
+    await expect(page.getByRole("row", { name: "Ana Admin" })).toHaveCount(0);
+    await expect(
+      page.getByRole("row", { name: "Mateo Restrepo" }),
+    ).toBeVisible();
+    const sheet = page.getByRole("dialog", { name: labels.sheet });
+    if (!keepSheetOpen && (await sheet.isVisible())) {
+      await sheet.getByRole("button", { name: labels.apply }).click();
+      await expect(sheet).toHaveCount(0);
+    }
+  };
+}
+
+/** Un grupo en el que no está nadie de la lista: el estado vacío con el
+ * botón de quitar los filtros. */
+function filterToNobody(labels: FilterLabels, emptyText: RegExp) {
+  return async (page: Page): Promise<void> => {
+    const container = await filterContainer(page, labels);
+    await container
+      .getByRole("combobox", { name: labels.group })
+      .selectOption({ label: labels.senior });
+    const sheet = page.getByRole("dialog", { name: labels.sheet });
+    if (await sheet.isVisible()) {
+      await sheet.getByRole("button", { name: labels.apply }).click();
+    }
+    await expect(page.getByText(emptyText)).toBeVisible();
+  };
+}
+
 type DirectoryState = {
   readonly name: string;
   /** Un Admin recibe la lista marcada como suya, y con ella el control de los
@@ -4389,6 +4600,47 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     listHeading: ENGLISH_DIRECTORY_HEADING,
     prepare: refuseLastAdminChange,
   },
+  {
+    name: "directorio-filtros-abiertos",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: chooseFilters(ENGLISH_FILTER_LABELS, false),
+  },
+  {
+    name: "directorio-filtros-abiertos-es",
+    asAdmin: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: chooseFilters(SPANISH_FILTER_LABELS, false),
+  },
+  {
+    name: "directorio-filtros-movil",
+    asAdmin: true,
+    endsInModal: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: chooseFilters(ENGLISH_FILTER_LABELS, true),
+  },
+  {
+    name: "directorio-filtros-movil-es",
+    asAdmin: true,
+    endsInModal: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: chooseFilters(SPANISH_FILTER_LABELS, true),
+  },
+  {
+    name: "directorio-filtrado-sin-resultados",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: filterToNobody(ENGLISH_FILTER_LABELS, /No member matches/),
+  },
+  {
+    name: "directorio-filtrado-sin-resultados-es",
+    asAdmin: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: filterToNobody(SPANISH_FILTER_LABELS, /Nadie del club coincide/),
+  },
 ];
 
 async function goToDirectory(
@@ -4487,6 +4739,113 @@ test.describe("la asistencia en la lista de tarjetas", () => {
         .last(),
     ).toHaveAccessibleName(/^Attendance\s*No data$/);
   });
+});
+
+/* La hoja de filtros del móvil (#497) con el teclado: el foco entra al
+   abrirla, no sale mientras está abierta, y Escape la cierra devolviéndolo al
+   botón. Y cada control mide al menos 44 px. */
+test.describe("la hoja de filtros del directorio en el móvil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 375, height: 812 },
+  });
+
+  const state: DirectoryState = {
+    name: "directorio-filtros-movil",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+  };
+
+  test("se recorre con el teclado y Escape devuelve el foco al botón", async ({
+    page,
+  }) => {
+    await goToDirectory(page, state);
+    const toggle = filterToggle(page, ENGLISH_FILTER_LABELS);
+    await expect(
+      page.getByRole("group", { name: ENGLISH_FILTER_LABELS.bar }),
+    ).toBeHidden();
+
+    await toggle.focus();
+    await page.keyboard.press("Enter");
+
+    const sheet = page.getByRole("dialog", { name: "Filters" });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByRole("combobox").first()).toBeFocused();
+    for (let step = 0; step < 8; step += 1) {
+      await page.keyboard.press("Tab");
+      expect(
+        await sheet.evaluate((element) =>
+          element.contains(document.activeElement),
+        ),
+      ).toBe(true);
+    }
+
+    await page.keyboard.press("Escape");
+
+    await expect(sheet).toHaveCount(0);
+    await expect(toggle).toBeFocused();
+  });
+
+  test("el botón y cada control de la hoja miden al menos 44 px", async ({
+    page,
+  }) => {
+    await goToDirectory(page, state);
+    const toggle = filterToggle(page, ENGLISH_FILTER_LABELS);
+    expect((await toggle.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+
+    await toggle.click();
+
+    const sheet = page.getByRole("dialog", { name: "Filters" });
+    const controls = sheet.locator("select, button");
+    await expect(controls).toHaveCount(5);
+    for (const control of await controls.all()) {
+      expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test("los filtros elegidos siguen ahí al recargar", async ({ page }) => {
+    await goToDirectory(page, state);
+    await chooseFilters(ENGLISH_FILTER_LABELS, false)(page);
+    await expect(page).toHaveURL(/auf=expired/);
+
+    await page.reload();
+
+    await expect(
+      page.getByRole("button", { name: "Filters: 2 active" }),
+    ).toBeVisible();
+    await expect(page.getByRole("row", { name: "Ana Admin" })).toHaveCount(0);
+  });
+});
+
+/* Los filtros de #497 piden axe en cada ancho y en los dos temas, no sólo en
+   el ancho por defecto: la barra y la hoja son controles distintos. */
+test.describe("los filtros del directorio con axe en cada ancho y tema", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  const filterStates = DIRECTORY_STATES.filter((state) =>
+    /^directorio-(filtros|filtrado-sin)/.test(state.name),
+  );
+
+  for (const vp of viewports) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const state of filterStates) {
+        for (const theme of themes) {
+          test(`${state.name} (${theme}) no tiene violaciones`, async ({
+            page,
+          }) => {
+            await goToDirectory(page, state, theme);
+            await expectNoAxeViolations(page);
+          });
+        }
+      }
+    });
+  }
 });
 
 /** Cómo queda la foto grande en la pantalla, medido en el navegador. */
@@ -7181,6 +7540,48 @@ function signInTextsSection(page: Page): Locator {
   });
 }
 
+const CLUB_SESSION_PACKS_ENDPOINT = "/api/v1/club/session-packs";
+
+/** Lo que diría Stripe de una sesión Casual (#469): el precio de verdad lo
+ * pone Stripe, y fingirlo deja la captura igual pase lo que pase allí. */
+const STUBBED_SESSION_PRICE = { amountCents: 1500, currency: "AUD" } as const;
+
+/** Los packs de inicio y uno grande, para ver un precio de cuatro cifras. */
+const STUBBED_SESSION_PACKS: readonly number[] = [5, 10, 50];
+
+async function stubSessionPacks(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname === CLUB_SESSION_PACKS_ENDPOINT,
+    async (route, request) => {
+      if (request.method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            data: {
+              packs: STUBBED_SESSION_PACKS.map((sessions) => ({
+                sessions,
+                price: {
+                  ...STUBBED_SESSION_PRICE,
+                  amountCents: STUBBED_SESSION_PRICE.amountCents * sessions,
+                },
+              })),
+              sessionPrice: STUBBED_SESSION_PRICE,
+            },
+          }),
+        });
+      }
+      // PUT: sin respuesta, la sección se queda guardando.
+    },
+  );
+}
+
+function sessionPacksSection(page: Page): Locator {
+  return page.getByRole("region", {
+    name: /^(Session packs|Packs de sesiones)$/,
+  });
+}
+
 /** Un lema de 141 caracteres: la pantalla lo rechaza junto al campo sin
  * mandar nada. */
 function writeTooLongTagline(labels: {
@@ -7303,6 +7704,7 @@ async function goToClubSettings(
     create: state.createPosition ?? "hangs",
   });
   await stubSignInTexts(page, state.signInTexts ?? NO_STUBBED_SIGN_IN_TEXTS);
+  await stubSessionPacks(page);
   await state.beforeVisit?.(page);
   if (theme === undefined) {
     await page.goto(`${APP_URL}${CLUB_SETTINGS_SCREEN_PATH}`);
@@ -7310,6 +7712,11 @@ async function goToClubSettings(
     await goToWithTheme(page, CLUB_SETTINGS_SCREEN_PATH, theme);
   }
   await expect(clubNameField(page)).toHaveValue(STUBBED_CLUB_SETTINGS.name);
+  // La última sección en cargar (#469): sin esperarla, la captura de la
+  // pantalla entera podría salir con su "Cargando".
+  await expect(
+    sessionPacksSection(page).getByRole("list").first(),
+  ).toBeVisible();
   await state.prepare?.(page);
   // El puntero se queda sobre el botón pulsado: la captura saldría con su
   // hover.
@@ -7538,6 +7945,60 @@ for (const state of CLUB_SIGN_IN_TEXTS_STATES) {
 
     test("has no accessibility violations (axe-core)", async ({ page }) => {
       await goToSignInTextsSection(page, state);
+      await expectNoAxeViolations(page);
+    });
+  });
+}
+
+const CLUB_SESSION_PACKS_STATES: readonly ClubSettingsState[] = [
+  { name: "club-packs" },
+  { name: "club-packs-es", beforeVisit: chooseSpanish },
+];
+
+/* #469: como las posiciones, la sección se fotografía sola, sin la barra de
+   pestañas del móvil encima. `goToClubSettings` ya esperó a su lista. */
+for (const state of CLUB_SESSION_PACKS_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of viewports) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToClubSettings(page, state, theme);
+              const section = sessionPacksSection(page);
+              await page.addStyleTag({ content: HIDDEN_TAB_BAR_STYLE });
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                section.screenshot(SCREENSHOT_OPTIONS),
+              );
+              await expect(section).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToClubSettings(page, state);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+
+    test("has no accessibility violations (axe-core)", async ({ page }) => {
+      await goToClubSettings(page, state);
       await expectNoAxeViolations(page);
     });
   });
@@ -8305,6 +8766,7 @@ async function goToClubSettingsWithLogo(
 ): Promise<void> {
   await serveClubLogos(page);
   await stubClubSettings(page);
+  await stubSessionPacks(page);
   // Registrada después, gana a la de `stubClubSettings`.
   await page.route(
     (url) => url.pathname === CLUB_SETTINGS_ENDPOINT,
@@ -11199,6 +11661,23 @@ const CHOOSE_CASUAL_MEMBERSHIP_VIEW = membershipView(
   [],
 );
 
+// Los packs de un Casual (#471): uno pendiente que se pone al día comprando
+// un pack. Vino de Full, así que no elige plan otra vez.
+const CASUAL_PACKS_MEMBERSHIP_VIEW = membershipView(
+  {
+    plan: "Casual",
+    status: "pending",
+    monthlyPriceCents: null,
+    card: null,
+    canChangePlan: true,
+    planPrices: { Full: 4500, Student: 3200 },
+    casualSessionPriceCents: 1500,
+  },
+  [],
+);
+
+const BUY_PACK_BUTTON_NAME = /^(Buy|Comprar) 5 (sessions|sesiones)/;
+
 type PaymentsScreenState = {
   readonly name: string;
   /** Lo que sirve el endpoint fingido; sin él, la membresía sembrada. */
@@ -11238,7 +11717,19 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   ),
   ...paymentsStates("pagos-elegir-plan", CHOOSE_PLAN_MEMBERSHIP_VIEW),
   ...paymentsStates("pagos-elegir-plan-casual", CHOOSE_CASUAL_MEMBERSHIP_VIEW),
+  ...paymentsStates("pagos-casual-packs", CASUAL_PACKS_MEMBERSHIP_VIEW),
 ];
+
+function isCasualView(view: object | undefined): boolean {
+  return (
+    view !== undefined &&
+    "membership" in view &&
+    typeof view.membership === "object" &&
+    view.membership !== null &&
+    "plan" in view.membership &&
+    view.membership.plan === "Casual"
+  );
+}
 
 async function serveMembership(page: Page, view: object): Promise<void> {
   await page.route(
@@ -11254,6 +11745,9 @@ async function goToPayments(
 ): Promise<void> {
   if (state.view !== undefined) {
     await serveMembership(page, state.view);
+    // Un Casual ve los packs del club (#471): fingidos, para que la captura
+    // no dependa de la lista de dev ni del precio de Stripe.
+    await stubSessionPacks(page);
   }
   await state.beforeVisit?.(page);
   if (theme === undefined) {
@@ -11267,6 +11761,11 @@ async function goToPayments(
   if (state.view === undefined) {
     await expect(
       page.getByRole("button", { name: ADD_CARD_BUTTON_NAME }),
+    ).toBeVisible();
+  }
+  if (isCasualView(state.view)) {
+    await expect(
+      page.getByRole("button", { name: BUY_PACK_BUTTON_NAME }),
     ).toBeVisible();
   }
 }

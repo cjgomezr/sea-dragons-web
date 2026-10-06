@@ -14,6 +14,7 @@ import {
   loadMembershipView,
 } from "./payments-client";
 import { PlanCard } from "./PlanCard";
+import { SessionPackOffer } from "./SessionPackOffer";
 import {
   NOT_WAITING,
   type StripeReturns,
@@ -54,7 +55,7 @@ function useMembershipLoad(returns: StripeReturns): {
   const [waiting, setWaiting] = useState<Waiting>(NOT_WAITING);
   const [reloads, setReloads] = useState(0);
   const hasDecidedWaiting = useRef(false);
-  const { checkoutReturn, cardReturn } = returns;
+  const { checkoutReturn, cardReturn, packReturn } = returns;
 
   useEffect(() => {
     let isCurrent = true;
@@ -70,14 +71,18 @@ function useMembershipLoad(returns: StripeReturns): {
       if (!hasDecidedWaiting.current) {
         hasDecidedWaiting.current = true;
         setWaiting(
-          initialWaiting(outcome.view, { checkoutReturn, cardReturn }),
+          initialWaiting(outcome.view, {
+            checkoutReturn,
+            cardReturn,
+            packReturn,
+          }),
         );
       }
     });
     return () => {
       isCurrent = false;
     };
-  }, [reloads, checkoutReturn, cardReturn]);
+  }, [reloads, checkoutReturn, cardReturn, packReturn]);
 
   const onLoaded = useCallback((view: MembershipView, hasSettled: boolean) => {
     setState({ kind: "ready", view });
@@ -210,6 +215,13 @@ function MembershipPanel({
           onPlanChanged={onPlanChanged}
         />
       )}
+      {membership?.plan === "Casual" && view.paymentsConfigured ? (
+        <SessionPackOffer
+          translate={translate}
+          waiting={waiting}
+          packReturn={returns.packReturn}
+        />
+      ) : null}
       <PaymentHistory translate={translate} payments={view.payments} />
     </div>
   );
@@ -219,15 +231,18 @@ export function PaymentsScreen({
   locale,
   checkoutReturn,
   cardReturn,
+  packReturn,
 }: {
   readonly locale: Locale;
   readonly checkoutReturn: CheckoutReturn | null;
   readonly cardReturn: CheckoutReturn | null;
+  readonly packReturn: CheckoutReturn | null;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const { state, waiting, retry, refresh, replace } = useMembershipLoad({
     checkoutReturn,
     cardReturn,
+    packReturn,
   });
   return (
     <>
@@ -249,7 +264,7 @@ export function PaymentsScreen({
           translate={translate}
           view={state.view}
           waiting={waiting}
-          returns={{ checkoutReturn, cardReturn }}
+          returns={{ checkoutReturn, cardReturn, packReturn }}
           onViewReplaced={replace}
           onPlanChanged={refresh}
         />

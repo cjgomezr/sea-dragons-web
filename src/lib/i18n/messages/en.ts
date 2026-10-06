@@ -22,9 +22,7 @@ export const englishMessages = {
   "auth.field.password": "Password",
   "auth.field.country": "Country",
   "auth.field.dateOfBirth": "Date of birth",
-  "auth.field.membershipType": "Membership type",
   "auth.field.countryPlaceholder": "Select your country",
-  "auth.field.membershipTypePlaceholder": "Select your membership",
   "auth.field.passwordHint": "At least {min} characters.",
   "auth.form.fieldIssues": "Check these fields before continuing:",
   "auth.error.network":
@@ -202,7 +200,6 @@ export const englishMessages = {
   "auth.issue.passwordTooShort": "Password must be at least {min} characters.",
   "auth.issue.passwordTooLong":
     "Password can't be longer than {max} characters (accented letters and emojis count double).",
-  "auth.issue.membershipTypeUnknown": "Membership type must be one of {types}.",
   "auth.issue.dateOfBirthNotADate":
     "Date of birth must be a real calendar date written as YYYY-MM-DD.",
   "auth.issue.dateOfBirthInFuture": "Date of birth can't be in the future.",
@@ -378,6 +375,34 @@ export const englishMessages = {
     "The expiry can't be before the day you joined the club.",
   "account.profile.error.aufVerified":
     "Your AUF is already verified. Only an Admin can change it.",
+  // El teléfono y el contacto de emergencia del perfil propio (#496).
+  "account.profile.contact.title": "Contact",
+  "account.profile.contact.phone": "Your phone (optional)",
+  "account.profile.contact.emergencyLegend": "Emergency contact",
+  "account.profile.contact.emergencyHint":
+    "Who we call if something happens in the water. Fill in all three, or leave them empty.",
+  "account.profile.contact.emergencyName": "Contact name",
+  "account.profile.contact.emergencyPhone": "Contact phone",
+  "account.profile.contact.emergencyRelationship": "Relationship",
+  "account.profile.contact.samePhone":
+    "This is your own phone. Your emergency contact should be someone else.",
+  "account.profile.contact.guardianRelationship": "Guardian",
+  "account.profile.contact.guardianProposed":
+    "We've suggested your guardian. Add their phone number to save it.",
+  "account.profile.issue.phoneInvalidCharacters":
+    "Use only digits, spaces, hyphens, brackets and a + at the start.",
+  "account.profile.issue.phoneTooShort":
+    "A phone number needs at least {min} digits.",
+  "account.profile.issue.phoneTooLong":
+    "A phone number can have at most {max} digits.",
+  "account.profile.issue.emergencyNameMissing":
+    "Add the contact's name, or leave all three empty.",
+  "account.profile.issue.emergencyPhoneMissing":
+    "Add the contact's phone, or leave all three empty.",
+  "account.profile.issue.emergencyRelationshipMissing":
+    "Add how you're related, or leave all three empty.",
+  "account.profile.issue.emergencyTextTooLong":
+    "This can be at most {max} characters.",
   // La foto de perfil (#245): el círculo de la cabecera y sus controles.
   "account.photo.alt": "Your profile photo",
   "account.photo.add": "Add photo",
@@ -528,6 +553,36 @@ export const englishMessages = {
   "directory.includeInactive": "Include deactivated accounts",
   "directory.empty": "No member matches what you're looking for.",
   "directory.clearFilters": "Clear the filters",
+  "directory.filter.legend": "More filters",
+  "directory.filter.position": "Position",
+  "directory.filter.position.all": "All positions",
+  "directory.filter.position.none": "No position",
+  "directory.filter.group": "Group",
+  "directory.filter.group.all": "All groups",
+  "directory.filter.auf": "AUF",
+  "directory.filter.auf.all": "Any AUF",
+  "directory.filter.auf.missing": "No AUF number",
+  "directory.filter.auf.expired": "Expired",
+  "directory.filter.auf.expiring": "Expires within 30 days",
+  "directory.filter.auf.unverified": "Not verified",
+  "directory.filter.membership": "Membership",
+  "directory.filter.membership.all": "Any membership",
+  "directory.filter.membership.pending": "Pending",
+  "directory.filter.membership.trialing": "Trial",
+  "directory.filter.membership.active": "Active",
+  "directory.filter.membership.pastDue": "Payment failed",
+  "directory.filter.membership.cancelled": "Cancelled",
+  "directory.filter.membership.waived": "Waived",
+  "directory.filter.membership.none": "No membership",
+  "directory.filter.toggle": "Filters",
+  "directory.filter.toggleActive": {
+    one: "Filters: {count} active",
+    other: "Filters: {count} active",
+  },
+  "directory.filter.sheetTitle": "Filters",
+  "directory.filter.apply": "Show results",
+  "directory.error.filterForbidden":
+    "Your role can't use one of these filters. Try again without them.",
   "directory.column.member": "Member",
   "directory.column.role": "Role",
   "directory.column.position": "Position",
@@ -866,8 +921,6 @@ export const englishMessages = {
   "payments.offer.addCard": "Add card",
   "payments.offer.opening": "Opening Stripe…",
   "payments.offer.retry": "Try again",
-  "payments.offer.casual":
-    "Casual session packs arrive with a later update. In the meantime, an Admin can activate your membership.",
   "payments.offer.notConfigured":
     "Payments aren't set up yet. Write to the club so an Admin can activate your membership.",
   "payments.checkout.cancelled":
@@ -876,6 +929,20 @@ export const englishMessages = {
     "Card added. We're waiting for Stripe to confirm it, which can take a few seconds.",
   "payments.checkout.timedOut":
     "Stripe hasn't confirmed yet. Reload the page in a minute; if your membership still hasn't changed, write to the club.",
+  // Los packs de sesiones de un Casual (#471, RF-5 del PRD de E13).
+  "payments.packs.title": "Session packs",
+  "payments.packs.lead":
+    "Each training you attend uses one session. You pay once in Stripe, with no recurring charge.",
+  "payments.packs.loading": "Loading the session packs…",
+  "payments.packs.loadFailed":
+    "We couldn't load the session packs. Reload the page to try again.",
+  "payments.packs.buy": "Buy {pack} · {price}",
+  "payments.packs.waiting":
+    "Pack paid. We're waiting for Stripe to confirm it, which can take a few seconds.",
+  "payments.packs.paid":
+    "Pack paid. Your sessions are added as soon as Stripe confirms the payment.",
+  "payments.packs.cancelled":
+    "You left Stripe without buying a pack. You can try again whenever you like.",
   "payments.trialing": "On trial until {date}",
   "payments.error.unavailable":
     "We couldn't open Stripe. Try again in a moment.",
@@ -1236,6 +1303,36 @@ export const englishMessages = {
   "clubSettings.signInTexts.save": "Save sign-in texts",
   "clubSettings.signInTexts.saving": "Saving texts…",
   "clubSettings.signInTexts.saved": "Sign-in texts saved.",
+  "clubSettings.sessionPacks.title": "Session packs",
+  "clubSettings.sessionPacks.lead":
+    "What Casual members can buy. Each pack costs the Casual session price set in Stripe, times its sessions.",
+  "clubSettings.sessionPacks.loading": "Loading the session packs…",
+  "clubSettings.sessionPacks.pack": {
+    one: "{count} session",
+    other: "{count} sessions",
+  },
+  "clubSettings.sessionPacks.move.up": "Move the {pack} pack up",
+  "clubSettings.sessionPacks.move.down": "Move the {pack} pack down",
+  "clubSettings.sessionPacks.remove": "Remove",
+  "clubSettings.sessionPacks.remove.label": "Remove the {pack} pack",
+  "clubSettings.sessionPacks.add.title": "Add a pack",
+  "clubSettings.sessionPacks.add.label": "Sessions in the new pack",
+  "clubSettings.sessionPacks.add.hint": "From {min} to {max}.",
+  "clubSettings.sessionPacks.add.submit": "Add pack",
+  "clubSettings.sessionPacks.moved": "{pack} is now number {rank} of {total}.",
+  "clubSettings.sessionPacks.added": "{pack} pack added. Save to offer it.",
+  "clubSettings.sessionPacks.removed":
+    "{pack} pack removed. Save to stop offering it.",
+  "clubSettings.sessionPacks.save": "Save packs",
+  "clubSettings.sessionPacks.saving": "Saving…",
+  "clubSettings.sessionPacks.saved": "Packs saved.",
+  "clubSettings.sessionPacks.issue.required": "Keep at least one pack.",
+  "clubSettings.sessionPacks.issue.outOfRange":
+    "A pack has from {min} to {max} sessions.",
+  "clubSettings.sessionPacks.issue.repeated":
+    "There is already a pack with that many sessions.",
+  "clubSettings.sessionPacks.error.forbidden":
+    "Only an Admin or a Committee member can change the session packs.",
   "clubSettings.positions.title": "Positions",
   "clubSettings.positions.lead":
     "The playing positions members choose in their profile, in the order the directory follows. Archiving a position keeps it for the members who have it, but nobody else can choose it.",

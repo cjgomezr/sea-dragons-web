@@ -11,10 +11,8 @@ import type { AccountStatus } from "./account-status";
 import {
   type FieldIssueCode,
   type FieldValidation,
-  type MembershipType,
   validateCountryField,
   validateDateOfBirthField,
-  validateMembershipTypeField,
 } from "./registration";
 
 /**
@@ -30,11 +28,7 @@ import {
 /** Los pendientes que se rellenan escribiendo. El consentimiento del tutor
  * tiene su propia puerta (`guardian-consent.ts`) y la confirmación del correo
  * llega por un enlace, así que ninguno de los dos se manda a este endpoint. */
-export const COMPLETION_FIELDS = [
-  "country",
-  "dateOfBirth",
-  "membershipType",
-] as const;
+export const COMPLETION_FIELDS = ["country", "dateOfBirth"] as const;
 
 export type CompletionField = (typeof COMPLETION_FIELDS)[number];
 
@@ -53,14 +47,13 @@ export type CompletionIssue = {
 
 /** Lo que llega del formulario o de la API: un subconjunto de los campos, sin
  * validar. Es parcial a propósito, porque a una cuenta casi nunca le faltan
- * los tres. */
+ * todos. */
 export type CompletionValues = Partial<Record<CompletionField, string>>;
 
 /** Lo mismo ya validado y normalizado. Es lo único que llega a la base. */
 export type CompletedValues = {
   readonly country?: string;
   readonly dateOfBirth?: string;
-  readonly membershipType?: MembershipType;
 };
 
 export type MemberProfileWriter = {
@@ -162,15 +155,10 @@ export function validateCompletionValues(input: {
   const dateOfBirth = takeField(values.dateOfBirth, (value) =>
     validateDateOfBirthField(value, now),
   );
-  const membershipType = takeField(
-    values.membershipType,
-    validateMembershipTypeField,
-  );
 
   const issues = [
     ...issuesOf("country", country),
     ...issuesOf("dateOfBirth", dateOfBirth),
-    ...issuesOf("membershipType", membershipType),
   ];
   if (issues.length > 0) {
     return { ok: false, issues };
@@ -182,9 +170,6 @@ export function validateCompletionValues(input: {
       ...(country.kind === "accepted" ? { country: country.value } : {}),
       ...(dateOfBirth.kind === "accepted"
         ? { dateOfBirth: dateOfBirth.value }
-        : {}),
-      ...(membershipType.kind === "accepted"
-        ? { membershipType: membershipType.value }
         : {}),
     },
   };

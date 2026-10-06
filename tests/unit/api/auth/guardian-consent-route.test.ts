@@ -23,7 +23,6 @@ const MINOR_RECORD: MemberAccountRecord = {
   profile: {
     country: "AU",
     dateOfBirth: "2010-05-20",
-    membershipType: "Full",
     guardianConsentAt: null,
     registeredAt: "2026-09-12T00:00:00.000Z",
   },

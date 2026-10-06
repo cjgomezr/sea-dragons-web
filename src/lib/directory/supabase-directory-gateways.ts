@@ -34,9 +34,11 @@ import type { DirectoryGateways, DirectoryMemberRecord } from "./directory";
 const MEMBERS_TABLE = "members";
 // Sólo el id de la evaluación: que exista es lo único que el directorio
 // cuenta (#324), y así ninguna nota sale de la base por este camino.
-// La membresía va por el `left join` del chip del Admin (#453).
-export const DIRECTORY_COLUMNS = `user_id, full_name, country, experience_level, role, position_id, account_status, auf_number, auf_expiry, auf_verified_at, photo_path, member_evaluations(id), ${MEMBERSHIP_STANDING_EMBED}`;
+// La membresía va por el `left join` del chip del Admin (#453). De los grupos
+// basta el id: el filtro por grupo (#497) no pinta ningún nombre.
+export const DIRECTORY_COLUMNS = `user_id, full_name, country, experience_level, role, position_id, account_status, auf_number, auf_expiry, auf_verified_at, photo_path, member_evaluations(id), group_memberships(group_id), ${MEMBERSHIP_STANDING_EMBED}`;
 const EVALUATIONS_RELATION = "member_evaluations";
+const GROUP_MEMBERSHIPS_RELATION = "group_memberships";
 const MEMBERSHIPS_RELATION = "memberships";
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -84,6 +86,19 @@ function hasEvaluation(row: Row): boolean {
   return evaluations.length > 0;
 }
 
+/** Las pertenencias llegan como lista, una fila por grupo. */
+function readGroupIds(row: Row): readonly string[] {
+  const memberships = row[GROUP_MEMBERSHIPS_RELATION];
+  if (!Array.isArray(memberships)) {
+    throw new Error(
+      `${MEMBERS_TABLE}.${GROUP_MEMBERSHIPS_RELATION} no llegó como lista: el esquema cambió sin que este archivo se enterara.`,
+    );
+  }
+  return memberships.map((membership: Row) =>
+    readRequiredText(membership, "group_id", GROUP_MEMBERSHIPS_RELATION),
+  );
+}
+
 /** `now` decide si una exención con fecha de fin ya venció (#453). */
 export function toDirectoryMemberRecord(
   row: Row,
@@ -112,6 +127,7 @@ export function toDirectoryMemberRecord(
       row[MEMBERSHIPS_RELATION],
       now,
     ),
+    groupIds: readGroupIds(row),
   };
 }
 

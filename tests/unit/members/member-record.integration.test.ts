@@ -518,6 +518,8 @@ async function proposeAuf(
         positionId: null,
         experienceLevel: null,
         gender: null,
+        phone: null,
+        emergencyContact: null,
         auf: { number: "AUF-PROPUESTO", expiry },
       },
     },

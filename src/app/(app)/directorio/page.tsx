@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import { DirectoryScreen } from "@/components/directory/DirectoryScreen";
 import { readMetadataContext } from "@/lib/club/metadata-context";
-import { SEARCH_QUERY_PARAM } from "@/lib/directory/directory-query";
+import {
+  DEFAULT_DIRECTORY_QUERY,
+  type DirectoryQuery,
+} from "@/lib/directory/directory";
+import {
+  InvalidDirectoryQueryError,
+  parseDirectoryQuery,
+} from "@/lib/directory/directory-query";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 
 /**
@@ -14,8 +21,9 @@ import { readRequestLocale } from "@/lib/i18n/request-locale";
  * de donde la pantalla lee: son los mismos endpoints que usará la aplicación
  * nativa de Release 2 (CON-002).
  *
- * `?q=` llega ya puesto en la búsqueda: es a donde llevan "Ver todos" y un
- * socio encontrado en la búsqueda global (#427).
+ * La consulta llega en la dirección: `?q=` es a donde llevan "Ver todos" y un
+ * socio encontrado en la búsqueda global (#427), y los filtros viven ahí para
+ * que recargar o compartir la página devuelva la misma lista (#497).
  */
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -24,6 +32,27 @@ export async function generateMetadata(): Promise<Metadata> {
     title: translate("directory.metaTitle", { club }),
     description: translate("directory.metaDescription"),
   };
+}
+
+/** Los mismos parámetros que lee el endpoint. Una dirección que no sabe leer
+ * (escrita a mano, o de una versión anterior) no rompe la página: abre el
+ * directorio sin filtros, igual que si no trajera ninguno. */
+function readInitialQuery(
+  params: Record<string, string | string[] | undefined>,
+): DirectoryQuery {
+  const searchParams = new URLSearchParams(
+    Object.entries(params).flatMap(([name, value]) =>
+      typeof value === "string" ? [[name, value]] : [],
+    ),
+  );
+  try {
+    return parseDirectoryQuery(searchParams);
+  } catch (error) {
+    if (error instanceof InvalidDirectoryQueryError) {
+      return DEFAULT_DIRECTORY_QUERY;
+    }
+    throw error;
+  }
 }
 
 export default async function DirectorioPage({
@@ -35,14 +64,14 @@ export default async function DirectorioPage({
     readRequestLocale(),
     searchParams,
   ]);
-  const search = params[SEARCH_QUERY_PARAM];
-  const initialSearch = typeof search === "string" ? search : "";
+  const initialQuery = readInitialQuery(params);
   return (
-    // Llegar con otro texto sin salir del directorio vuelve a montarlo con él.
+    // Llegar con otra consulta sin salir del directorio, como desde la
+    // búsqueda global, vuelve a montarlo con ella.
     <DirectoryScreen
-      key={initialSearch}
+      key={JSON.stringify(initialQuery)}
       locale={locale}
-      initialSearch={initialSearch}
+      initialQuery={initialQuery}
     />
   );
 }

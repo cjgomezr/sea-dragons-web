@@ -26,6 +26,7 @@ import {
 import type {
   MembershipChanges,
   MembershipLookup,
+  SessionPackPayment,
   StripeMembership,
   StripePayment,
 } from "@/lib/stripe/webhook-events";
@@ -364,6 +365,7 @@ export function createSessionLedgerGateway(
 
 const STRIPE_MEMBERSHIP_COLUMNS = `${MEMBERSHIP_COLUMNS}, stripe_event_at`;
 const APPLY_STRIPE_EVENT_FUNCTION = "apply_stripe_event";
+const APPLY_SESSION_PACK_PAYMENT_FUNCTION = "apply_session_pack_payment";
 const APPLY_STRIPE_EVENT_OUTCOMES = ["applied", "duplicate"] as const;
 
 const stripeMembershipRowSchema = membershipRowSchema.extend({
@@ -465,6 +467,20 @@ function toPaymentJson(payment: StripePayment): Record<string, unknown> {
   };
 }
 
+/** Un pack se guarda por su PaymentIntent: es un cobro suelto, sin factura
+ * (#471). Siempre pagado: uno sin pagar no llega hasta aquí. */
+function toSessionPackPaymentJson(
+  payment: SessionPackPayment,
+): Record<string, unknown> {
+  return {
+    stripe_charge_id: payment.paymentIntentId,
+    amount_cents: payment.amountCents,
+    currency: payment.currency,
+    description: payment.description,
+    paid_at: payment.paidAt.toISOString(),
+  };
+}
+
 /** Lo que necesita el webhook de Stripe (#452): encontrar la membresía de un
  * evento y escribirlo todo de una vez con `apply_stripe_event`
  * (`0051_apply_stripe_event.sql`). */
@@ -501,6 +517,26 @@ export function createStripeWebhookGateway(
       if (error) {
         throw new Error(
           `No se pudo aplicar el evento de Stripe ${event.id}: ${error.message}`,
+        );
+      }
+      return z.enum(APPLY_STRIPE_EVENT_OUTCOMES).parse(data);
+    },
+    async applySessionPackPayment({ event, owner, sessions, payment }) {
+      const { data, error } = await serviceClient.rpc(
+        APPLY_SESSION_PACK_PAYMENT_FUNCTION,
+        {
+          event_id: event.id,
+          event_type: event.type,
+          event_created: event.created.toISOString(),
+          target_user_id: owner.userId,
+          target_club_id: owner.clubId,
+          payment: toSessionPackPaymentJson(payment),
+          pack_sessions: sessions,
+        },
+      );
+      if (error) {
+        throw new Error(
+          `No se pudo aplicar el pack del evento de Stripe ${event.id}: ${error.message}`,
         );
       }
       return z.enum(APPLY_STRIPE_EVENT_OUTCOMES).parse(data);

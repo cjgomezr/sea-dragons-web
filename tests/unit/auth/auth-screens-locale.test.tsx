@@ -201,7 +201,7 @@ describe("pantallas de autenticación en los dos idiomas", () => {
 
     expect(screen.getByLabelText("Full name")).toBeInTheDocument();
     expect(screen.getByLabelText("Date of birth")).toBeInTheDocument();
-    expect(screen.getByLabelText("Membership type")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Membership type")).toBeNull();
     expect(screen.getByLabelText("Password")).toHaveAccessibleDescription(
       "At least 8 characters.",
     );

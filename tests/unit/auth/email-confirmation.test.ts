@@ -43,7 +43,6 @@ function doubles(options: {
           profile: {
             country: options.country === undefined ? "AU" : options.country,
             dateOfBirth: "1994-03-02",
-            membershipType: "Full",
             guardianConsentAt: null,
             registeredAt: "2026-09-12T00:00:00.000Z",
           },

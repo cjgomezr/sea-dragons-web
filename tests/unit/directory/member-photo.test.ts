@@ -41,6 +41,7 @@ function memberRecord(
     photoPath: THUMBNAIL_PATH,
     isEvaluated: true,
     membershipStatus: "active",
+    groupIds: [],
     ...overrides,
   };
 }

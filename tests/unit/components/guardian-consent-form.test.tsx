@@ -124,7 +124,7 @@ describe("bloque del tutor", () => {
   });
 
   it("no aparece cuando el consentimiento no hace falta", () => {
-    renderForm(["membershipType"]);
+    renderForm(["country"]);
 
     expect(screen.queryByLabelText("Nombre del tutor")).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();

@@ -2,7 +2,11 @@ import Stripe from "stripe";
 import { ApiError } from "@/lib/api/response";
 import type { CheckoutStripe } from "@/lib/membership/checkout";
 import type { PlanChangeStripe } from "@/lib/membership/plan-change";
-import { createStripeSetup } from "./stripe-client";
+import type { SessionPackCheckoutStripe } from "@/lib/membership/session-pack-checkout";
+import {
+  STRIPE_PRICE_CASUAL_SESSION_ENV,
+  createStripeSetup,
+} from "./stripe-client";
 import { createSubscriptionPlanApi } from "./subscription-plan-api";
 
 /**
@@ -26,6 +30,29 @@ export function resolveRouteCheckoutStripe(logPrefix: string): CheckoutStripe {
   return {
     kind: "configured",
     prices: stripe.prices,
+    sessions: stripe.client.checkout.sessions,
+  };
+}
+
+/** Lo que necesita la compra de un pack (#471): Checkout y el precio de una
+ * sesión Casual, que no forma parte de la configuración base de E12. */
+export function resolveRouteSessionPackStripe(
+  logPrefix: string,
+): SessionPackCheckoutStripe {
+  const stripe = createStripeSetup(process.env);
+  const casualSessionPrice =
+    process.env[STRIPE_PRICE_CASUAL_SESSION_ENV]?.trim() ?? "";
+  const missingKeys = [
+    ...(stripe.kind === "unconfigured" ? stripe.missingKeys : []),
+    ...(casualSessionPrice === "" ? [STRIPE_PRICE_CASUAL_SESSION_ENV] : []),
+  ];
+  if (stripe.kind === "unconfigured" || casualSessionPrice === "") {
+    console.warn(`${logPrefix} faltan ${missingKeys.join(", ")}`);
+    return { kind: "unconfigured" };
+  }
+  return {
+    kind: "configured",
+    casualSessionPrice,
     sessions: stripe.client.checkout.sessions,
   };
 }

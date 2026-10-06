@@ -45,7 +45,13 @@ const ISO_DATE_LENGTH = "YYYY-MM-DD".length;
  * a propósito: es aritmética de calendario, y ahí no hay cambio de horario
  * que pueda comerse o duplicar un día. */
 export function subtractClubDays(date: string, days: number): string {
+  return addClubDays(date, -days);
+}
+
+/** El día del club `days` días después de `date` (YYYY-MM-DD), con la misma
+ * aritmética de calendario que `subtractClubDays`. */
+export function addClubDays(date: string, days: number): string {
   const day = new Date(`${date}T00:00:00.000Z`);
-  day.setUTCDate(day.getUTCDate() - days);
+  day.setUTCDate(day.getUTCDate() + days);
   return day.toISOString().slice(0, ISO_DATE_LENGTH);
 }

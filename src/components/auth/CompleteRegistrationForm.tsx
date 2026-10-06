@@ -16,7 +16,6 @@ import {
   REQUIRED_ISSUE_CODE,
   describeAuthIssue,
 } from "@/lib/auth/issue-messages";
-import { MEMBERSHIP_TYPES } from "@/lib/auth/registration";
 import {
   ACCOUNT_API_PATH,
   CONFIRMATION_EMAIL_API_PATH,
@@ -360,39 +359,6 @@ export function CompleteRegistrationForm({
                 onChange={(event) => update("dateOfBirth", event.target.value)}
               />
               {fieldError("dateOfBirth")}
-            </div>
-          )}
-
-          {fields.includes("membershipType") && (
-            <div className="auth-field">
-              <label htmlFor="completar-membershipType">
-                {labelOfField(translate, "membershipType")}
-              </label>
-              <select
-                id="completar-membershipType"
-                name="membershipType"
-                value={draft.membershipType ?? ""}
-                required
-                aria-invalid={issueFor("membershipType") !== undefined}
-                aria-describedby={
-                  issueFor("membershipType")
-                    ? errorIdOf("membershipType")
-                    : undefined
-                }
-                onChange={(event) =>
-                  update("membershipType", event.target.value)
-                }
-              >
-                <option value="">
-                  {translate("auth.field.membershipTypePlaceholder")}
-                </option>
-                {MEMBERSHIP_TYPES.map((membershipType) => (
-                  <option key={membershipType} value={membershipType}>
-                    {membershipType}
-                  </option>
-                ))}
-              </select>
-              {fieldError("membershipType")}
             </div>
           )}
 

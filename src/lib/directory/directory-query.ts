@@ -1,10 +1,13 @@
 import { z } from "zod";
 import { ROLES } from "@/lib/auth/roles";
 import {
+  AUF_FILTERS,
   DEFAULT_DIRECTORY_QUERY,
   DIRECTORY_DIRECTIONS,
   DIRECTORY_SORTS,
+  type DirectoryPositionFilter,
   type DirectoryQuery,
+  MEMBERSHIP_FILTERS,
 } from "./directory";
 
 /**
@@ -23,6 +26,16 @@ export const ROLE_QUERY_PARAM = "role";
 export const SORT_QUERY_PARAM = "sort";
 export const DIRECTION_QUERY_PARAM = "direction";
 export const INCLUDE_INACTIVE_QUERY_PARAM = "includeInactive";
+export const POSITION_QUERY_PARAM = "position";
+export const GROUP_QUERY_PARAM = "group";
+export const AUF_QUERY_PARAM = "auf";
+export const MEMBERSHIP_QUERY_PARAM = "membership";
+
+/** El valor de `position` que pide a quien no tiene ninguna. */
+const UNASSIGNED_POSITION_VALUE = "none";
+
+/** El motivo del 400 de una consulta mal escrita (#497). */
+export const INVALID_DIRECTORY_QUERY_REASON = "invalid_directory_query";
 
 /** `includeInactive` se escribe entero: un booleano de verdad, no "1" ni "on"
  * ni la mera presencia del parámetro. Pedir a los dados de baja es cosa de un
@@ -35,6 +48,15 @@ const directoryQuerySchema = z.object({
   [SORT_QUERY_PARAM]: z.enum(DIRECTORY_SORTS).optional(),
   [DIRECTION_QUERY_PARAM]: z.enum(DIRECTORY_DIRECTIONS).optional(),
   [INCLUDE_INACTIVE_QUERY_PARAM]: z.enum(BOOLEAN_VALUES).optional(),
+  // Un identificador y no un nombre: el nombre de una posición cambia con el
+  // idioma (#299). Uno con buena forma que no es del club no encuentra a
+  // nadie, igual que un grupo de otro club: así no se sabe si existe.
+  [POSITION_QUERY_PARAM]: z
+    .union([z.uuid(), z.literal(UNASSIGNED_POSITION_VALUE)])
+    .optional(),
+  [GROUP_QUERY_PARAM]: z.uuid().optional(),
+  [AUF_QUERY_PARAM]: z.enum(AUF_FILTERS).optional(),
+  [MEMBERSHIP_QUERY_PARAM]: z.enum(MEMBERSHIP_FILTERS).optional(),
 });
 
 export class InvalidDirectoryQueryError extends Error {
@@ -50,6 +72,10 @@ const QUERY_PARAMS = [
   SORT_QUERY_PARAM,
   DIRECTION_QUERY_PARAM,
   INCLUDE_INACTIVE_QUERY_PARAM,
+  POSITION_QUERY_PARAM,
+  GROUP_QUERY_PARAM,
+  AUF_QUERY_PARAM,
+  MEMBERSHIP_QUERY_PARAM,
 ] as const;
 
 /** Sólo los parámetros que el endpoint conoce, y sin los que no llegaron: un
@@ -74,6 +100,17 @@ function readSearch(value: string | undefined): string | null {
   return search === "" ? null : search;
 }
 
+function readPosition(
+  value: string | undefined,
+): DirectoryPositionFilter | null {
+  if (value === undefined) {
+    return DEFAULT_DIRECTORY_QUERY.position;
+  }
+  return value === UNASSIGNED_POSITION_VALUE
+    ? { kind: "unassigned" }
+    : { kind: "position", positionId: value };
+}
+
 export function parseDirectoryQuery(
   searchParams: URLSearchParams,
 ): DirectoryQuery {
@@ -95,5 +132,47 @@ export function parseDirectoryQuery(
       query[INCLUDE_INACTIVE_QUERY_PARAM] === undefined
         ? DEFAULT_DIRECTORY_QUERY.includeInactive
         : query[INCLUDE_INACTIVE_QUERY_PARAM] === "true",
+    position: readPosition(query[POSITION_QUERY_PARAM]),
+    groupId: query[GROUP_QUERY_PARAM] ?? DEFAULT_DIRECTORY_QUERY.groupId,
+    auf: query[AUF_QUERY_PARAM] ?? DEFAULT_DIRECTORY_QUERY.auf,
+    membership:
+      query[MEMBERSHIP_QUERY_PARAM] ?? DEFAULT_DIRECTORY_QUERY.membership,
   };
+}
+
+function writePosition(position: DirectoryPositionFilter): string {
+  return position.kind === "unassigned"
+    ? UNASSIGNED_POSITION_VALUE
+    : position.positionId;
+}
+
+/** La consulta como parámetros, sin lo que ya es por defecto: es la
+ * dirección de la pantalla (#497), que se recarga y se comparte, y
+ * `parseDirectoryQuery` la vuelve a leer igual. */
+export function writeDirectoryQuery(query: DirectoryQuery): URLSearchParams {
+  const written: readonly (readonly [string, string | null])[] = [
+    [SEARCH_QUERY_PARAM, query.search],
+    [ROLE_QUERY_PARAM, query.role],
+    [
+      SORT_QUERY_PARAM,
+      query.sort === DEFAULT_DIRECTORY_QUERY.sort ? null : query.sort,
+    ],
+    [
+      DIRECTION_QUERY_PARAM,
+      query.direction === DEFAULT_DIRECTORY_QUERY.direction
+        ? null
+        : query.direction,
+    ],
+    [INCLUDE_INACTIVE_QUERY_PARAM, query.includeInactive ? "true" : null],
+    [
+      POSITION_QUERY_PARAM,
+      query.position === null ? null : writePosition(query.position),
+    ],
+    [GROUP_QUERY_PARAM, query.groupId],
+    [AUF_QUERY_PARAM, query.auf],
+    [MEMBERSHIP_QUERY_PARAM, query.membership],
+  ];
+  return new URLSearchParams(
+    written.flatMap(([name, value]) => (value === null ? [] : [[name, value]])),
+  );
 }

@@ -94,8 +94,8 @@ export const E2E_STORAGE_STATE_PATH = path.join(
  * fotografiar: Supabase no da sesión a una identidad sin confirmar, así que
  * esa cuenta ni siquiera llega a la pantalla.
  */
-const FALTA_LA_MEMBRESIA = {
-  country: "AU",
+const FALTA_EL_PAIS = {
+  country: null,
   date_of_birth: "1994-03-02",
   membership_type: null,
 } as const;
@@ -114,11 +114,11 @@ function minorDateOfBirth(): string {
 const FALTA_EL_TUTOR = {
   country: "AU",
   date_of_birth: minorDateOfBirth(),
-  membership_type: "Student",
+  membership_type: null,
 } as const;
 
 export const INCOMPLETE_MEMBERS = {
-  "un-dato": FALTA_LA_MEMBRESIA,
+  "un-dato": FALTA_EL_PAIS,
   "varios-datos": {
     country: null,
     date_of_birth: null,
@@ -126,12 +126,12 @@ export const INCOMPLETE_MEMBERS = {
   },
   "menor-sin-consentimiento": FALTA_EL_TUTOR,
   /** Lo activa el test que guarda el último dato. */
-  "para-activar": FALTA_LA_MEMBRESIA,
+  "para-activar": FALTA_EL_PAIS,
   /** Lo activa el test que registra el consentimiento del tutor. */
   "menor-para-consentir": FALTA_EL_TUTOR,
   /** Cierra su propia sesión, que es justo lo que lo inutiliza para todo lo
    * demás. Por eso no lo comparte con nadie. */
-  "para-cerrar-sesion": FALTA_LA_MEMBRESIA,
+  "para-cerrar-sesion": FALTA_EL_PAIS,
 } as const;
 
 export type IncompleteMemberName = keyof typeof INCOMPLETE_MEMBERS;
@@ -268,6 +268,34 @@ export const ROLE_REQUEST_MEMBERS = {
     pendingRequest: null,
     columns: { full_name: "Rita Retirada", country: "AU" },
   },
+  /** El teléfono y el contacto de emergencia ya guardados (#496). El
+   * contacto tiene el mismo teléfono que la socia, para que la captura
+   * enseñe el aviso de que debería ser otra persona. */
+  "perfil-contacto-completo": {
+    pendingRequest: null,
+    columns: {
+      full_name: "Clara Contacto",
+      country: "AU",
+      phone: "0412 345 678",
+      emergency_contact_name: "Lucía Contacto",
+      emergency_contact_phone: "0412-345-678",
+      emergency_contact_relationship: "Hermana",
+    },
+  },
+  /** Una menor con tutor registrado (FR-082) y sin contacto: el formulario
+   * le propone al tutor (#496). Las fechas son fijas para que la captura no
+   * dependa del día de la corrida. */
+  "perfil-contacto-menor": {
+    pendingRequest: null,
+    columns: {
+      full_name: "Mía Menor",
+      country: "AU",
+      date_of_birth: "2012-05-04",
+      guardian_name: "Marta Menor",
+      guardian_email: "marta.menor@example.test",
+      guardian_consent_at: SEEDED_AUF_VERIFIED_AT,
+    },
+  },
   /** Lo da de baja un Admin a mitad de su sesión, para ver que la frontera
    * lo deja fuera en su siguiente petición aunque recordara su estado (#434).
    * El arranque de la corrida siguiente lo vuelve a sembrar activo. */
@@ -283,6 +311,8 @@ export const PHOTOGRAPHED_ROLE_REQUEST_MEMBERS = [
   "perfil-auf-pendiente",
   "perfil-auf-verificado",
   "perfil-posicion-retirada",
+  "perfil-contacto-completo",
+  "perfil-contacto-menor",
 ] as const satisfies readonly RoleRequestMemberName[];
 
 /** Las columnas con las que nace uno de estos socios en la corrida `runId`:

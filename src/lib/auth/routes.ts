@@ -202,8 +202,9 @@ export const SEARCH_API_PATH = "/api/v1/search";
 export const NOTIFICATIONS_API_PATH = "/api/v1/notifications";
 
 /** La configuración del club (#296, RF-6 del PRD de E18a): nombre,
- * iniciales, acento y logo. Es sólo del Admin, y se abre desde el menú de la
- * cuenta. */
+ * iniciales, acento y logo, que son del Admin, y los packs de sesiones
+ * (#469), que también cambia el Committee. Se abre desde el menú de la
+ * cuenta; al Committee sólo le enseña los packs. */
 export const CLUB_SETTINGS_PATH = "/club";
 
 /** El endpoint de esa pantalla. Sólo del Admin, como ella; el handler lo
@@ -232,6 +233,13 @@ export const CLUB_SETTINGS_POSITION_API_PATH = `${CLUB_SETTINGS_POSITIONS_API_PA
 
 /** Reordenar: PUT con la lista entera de las activas en el orden nuevo. */
 export const CLUB_SETTINGS_POSITIONS_ORDER_API_PATH = `${CLUB_SETTINGS_POSITIONS_API_PATH}/order`;
+
+/** Los packs de sesiones que el club ofrece a sus Casual (#469, FR-080). GET
+ * los lee cualquier cuenta activa, también quien no está al día, que es
+ * quien va a comprar uno; PUT los cambia y es del Admin y del Committee. La
+ * frontera decide por camino y no por método, así que no está en
+ * `RESTRICTED_ROUTES`: el permiso del PUT lo comprueba el dominio. */
+export const CLUB_SESSION_PACKS_API_PATH = "/api/v1/club/session-packs";
 
 /** Las posiciones que se pueden elegir en el club de quien llama (#299).
  * Las lee cualquier cuenta activa, así que no está en `RESTRICTED_ROUTES`:
@@ -553,6 +561,11 @@ export const MEMBERSHIP_PLAN_API_PATH = `${MEMBERSHIP_API_PATH}/plan`;
  * pagar. */
 export const MEMBERSHIP_PRICES_API_PATH = `${MEMBERSHIP_API_PATH}/prices`;
 
+/** Comprar un pack de sesiones en Stripe Checkout (#471, RF-5 del PRD de
+ * E13). Cuelga de la membresía, así que también lo alcanza quien no está al
+ * día: es como se pone al día un Casual. */
+export const MEMBERSHIP_SESSION_PACK_CHECKOUT_API_PATH = `${MEMBERSHIP_API_PATH}/session-packs/checkout`;
+
 /**
  * Los únicos endpoints de la API que no exigen sesión.
  *
@@ -619,9 +632,11 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: NEW_MEMBER_PATH, capability: "manageUsersAndRoles" },
   { path: GROUPS_API_PATH, capability: "manageGroups" },
   { path: GROUPS_PATH, capability: "manageGroups" },
+  // La pantalla la abre también el Committee, que sólo ve los packs de
+  // sesiones (#469). Lo demás que enseña se lee de los endpoints de abajo.
+  { path: CLUB_SETTINGS_PATH, capability: "configureSessionPacks" },
   // La matriz del SRD no tiene fila para configurar el club: la única que es
   // sólo del Admin es la de usuarios y roles.
-  { path: CLUB_SETTINGS_PATH, capability: "manageUsersAndRoles" },
   { path: CLUB_SETTINGS_API_PATH, capability: "manageUsersAndRoles" },
   // Cuelga del anterior; se declara por el mismo motivo que el cambio de rol.
   {

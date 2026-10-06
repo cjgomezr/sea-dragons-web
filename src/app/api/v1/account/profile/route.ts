@@ -17,6 +17,10 @@ import {
   ProfileValidationError,
   updateOwnProfile,
 } from "@/lib/members/own-profile";
+import {
+  EMERGENCY_CONTACT_TEXT_MAX_LENGTH,
+  PHONE_MAX_LENGTH,
+} from "@/lib/members/profile-contact";
 import { createSupabaseOwnProfileGateways } from "@/lib/members/supabase-own-profile-gateways";
 
 /**
@@ -30,6 +34,9 @@ import { createSupabaseOwnProfileGateways } from "@/lib/members/supabase-own-pro
  * excepción: sin `aufNumber` no se toca, porque el miembro no puede borrarlo,
  * sólo proponer otro. Lo que propone queda sin verificar; si ya está
  * verificado, cambiarlo responde 403 con `reason: auf_verified`.
+ *
+ * El teléfono y el contacto de emergencia (#496) también van siempre: null
+ * es no tenerlos. Como el resto, sólo se escriben en la fila de quien llama.
  */
 
 // Depende de la sesión de quien llama y escribe su fila.
@@ -52,6 +59,18 @@ const RESERVED_PROFILE_FIELDS = [
  * dominio, que cuenta en caracteres y no en unidades UTF-16. */
 const FULL_NAME_BODY_MAX_LENGTH = FULL_NAME_MAX_LENGTH * 4;
 const AUF_NUMBER_BODY_MAX_LENGTH = AUF_NUMBER_MAX_LENGTH * 4;
+const PHONE_BODY_MAX_LENGTH = PHONE_MAX_LENGTH * 4;
+const CONTACT_TEXT_BODY_MAX_LENGTH = EMERGENCY_CONTACT_TEXT_MAX_LENGTH * 4;
+
+/** Las tres partes van siempre: que estén todas o ninguna lo decide el
+ * dominio, que dice cuál falta. */
+const emergencyContactSchema = z
+  .object({
+    name: z.string().max(CONTACT_TEXT_BODY_MAX_LENGTH),
+    phone: z.string().max(PHONE_BODY_MAX_LENGTH),
+    relationship: z.string().max(CONTACT_TEXT_BODY_MAX_LENGTH),
+  })
+  .strict();
 
 /** Se aceptan en la forma sólo para poder rechazarlos por su nombre. */
 const reservedField = z.unknown().optional();
@@ -69,6 +88,8 @@ const profileBodySchema = z
     positionId: z.string().nullable(),
     experienceLevel: z.string().nullable(),
     gender: z.string().nullable(),
+    phone: z.string().max(PHONE_BODY_MAX_LENGTH).nullable(),
+    emergencyContact: emergencyContactSchema.nullable(),
     aufNumber: z.string().max(AUF_NUMBER_BODY_MAX_LENGTH).optional(),
     aufExpiry: z.string().nullable().optional(),
     role: reservedField,
@@ -149,6 +170,8 @@ const patchProfile = createApiRoute<AccountProfileResponse, ProfileBody>({
             positionId: body.positionId,
             experienceLevel: body.experienceLevel,
             gender: body.gender,
+            phone: body.phone,
+            emergencyContact: body.emergencyContact,
             auf: toAufProposal(body),
           },
         }),
