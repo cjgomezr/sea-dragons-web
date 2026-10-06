@@ -2801,13 +2801,14 @@ a.auth-brand-header:focus-visible {
 .directory-contact {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   font-size: 14px;
 }
 
 .directory-contact-line {
   display: flex;
   flex-direction: column;
+  gap: var(--space-1);
   align-items: flex-start;
 }
 
@@ -3102,6 +3103,9 @@ a.auth-brand-header:focus-visible {
     display: inline-flex;
     align-items: center;
     min-height: var(--touch-target-min);
+    /* El dedo sigue teniendo sus 44 px, pero el texto queda pegado a su
+       etiqueta como el de los datos que no se pulsan. */
+    margin-block: calc((var(--touch-target-min) - 1lh) / -2);
   }
 
   .directory-member {
@@ -3237,6 +3241,9 @@ a.auth-brand-header:focus-visible {
     display: inline-flex;
     align-items: center;
     min-height: var(--touch-target-min);
+    /* El dedo sigue teniendo sus 44 px, pero el texto queda pegado a su
+       etiqueta como el de los datos que no se pulsan. */
+    margin-block: calc((var(--touch-target-min) - 1lh) / -2);
   }
 
   .directory-list-contact .directory-member {
