@@ -12,6 +12,7 @@ import type {
   AufRegistration,
   MemberRecordGateways,
 } from "@/lib/members/member-record";
+import type { ProfileContact } from "@/lib/members/profile-contact";
 
 /**
  * La ficha reservada al Admin por la API (#242, RF-4 del PRD de E5). La
@@ -77,6 +78,7 @@ function memberRecordGateways(
   const memberships = new Set<string>();
   let dateOfBirth: string = ADULT_BIRTH;
   let accountStatus: AccountStatus = "active";
+  let contact: ProfileContact = { phone: null, emergencyContact: null };
   const isKnown = (userId: string): boolean => userId === MEMBER_ID;
   return {
     members: {
@@ -101,6 +103,7 @@ function memberRecordGateways(
               photoPath: memberPhotoPath,
               membershipStatus: "active",
               membershipWaiver: null,
+              ...contact,
             }
           : null,
       findMemberGroups: async () =>
@@ -127,6 +130,11 @@ function memberRecordGateways(
         dateOfBirth = correction.dateOfBirth;
         accountStatus = correction.toStatus;
         return { kind: "corrected" };
+      },
+      updateMemberContact: async (_scope, written) => {
+        writes.push("contact");
+        contact = written;
+        return { kind: "updated" };
       },
     },
     attendance: {
@@ -279,6 +287,8 @@ describe("PATCH /api/v1/members/{id}/record", () => {
         hasGuardianConsent: false,
         membershipStatus: "active",
         membershipWaiver: null,
+        phone: null,
+        emergencyContact: null,
         photoUrl: null,
         isAufExpired: false,
         groups: [{ id: SENIOR_ID, name: "Senior Squad" }],
@@ -672,4 +682,84 @@ describe("POST /api/v1/members/{id}/record/auf-verification", () => {
     expect(response.status).toBe(400);
     expect(writes).toEqual([]);
   });
+});
+describe("endpoint de la ficha: contacto (#499)", () => {
+  const ROSA = {
+    name: "Rosa Player",
+    phone: "0499 111 222",
+    relationship: "Madre",
+  } as const;
+  const KEPT_RECORD = { groupIds: [], dateOfBirth: ADULT_BIRTH } as const;
+
+  it("guarda el teléfono y el contacto de emergencia, lo deja en la bitácora y responde la ficha", async () => {
+    const response = await patchRecord({
+      ...KEPT_RECORD,
+      phone: "0412 345 678",
+      emergencyContact: ROSA,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { phone: "0412 345 678", emergencyContact: ROSA },
+    });
+    expect(writes).toEqual(["contact", "audit member.contact_corrected"]);
+  });
+
+  it("sin el contacto en el cuerpo no lo toca", async () => {
+    const response = await patchRecord(KEPT_RECORD);
+
+    expect(response.status).toBe(200);
+    expect(writes).toEqual([]);
+  });
+
+  it("responde 400 si llega el teléfono sin el contacto de emergencia", async () => {
+    const response = await patchRecord({
+      ...KEPT_RECORD,
+      phone: "0412 345 678",
+    });
+
+    expect(response.status).toBe(400);
+    expect(writes).toEqual([]);
+  });
+
+  it("responde 400 con el motivo a un teléfono con pocos dígitos", async () => {
+    const response = await patchRecord({
+      ...KEPT_RECORD,
+      phone: "1234",
+      emergencyContact: null,
+    });
+
+    expect(response.status).toBe(400);
+    await expect(reasonOf(response)).resolves.toBe("phone_too_short");
+    expect(writes).toEqual([]);
+  });
+
+  it("responde 400 con el motivo a un contacto de emergencia a medias", async () => {
+    const response = await patchRecord({
+      ...KEPT_RECORD,
+      phone: null,
+      emergencyContact: { name: "Rosa", phone: "", relationship: "Madre" },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(reasonOf(response)).resolves.toBe(
+      "emergency_contact_phone_missing",
+    );
+  });
+
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "responde 403 a un %s que intenta corregir el contacto",
+    async (role) => {
+      givenRole(role);
+
+      const response = await patchRecord({
+        ...KEPT_RECORD,
+        phone: "0412 345 678",
+        emergencyContact: ROSA,
+      });
+
+      expect(response.status).toBe(403);
+      expect(writes).toEqual([]);
+    },
+  );
 });

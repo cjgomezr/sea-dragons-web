@@ -58,8 +58,9 @@ const memberSchema = z.object({
   attendance: memberAttendanceSchema,
 });
 
-/** El contacto de emergencia de un socio (#499), o `null` si no lo dio. */
-const emergencyContactSchema = z
+/** El contacto de emergencia de un socio (#499), o `null` si no lo dio. La
+ * ficha del Admin lo lee con la misma forma. */
+export const emergencyContactSchema = z
   .object({ name: z.string(), phone: z.string(), relationship: z.string() })
   .nullable();
 

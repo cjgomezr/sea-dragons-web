@@ -19,7 +19,8 @@ import type { FilterChoices } from "./use-filter-choices";
 
 /**
  * Los filtros por posición, grupo, AUF y membresía del directorio (#497, RF-4
- * del PRD de E19). Qué filtros se ofrecen lo dice el servidor al responder la
+ * del PRD de E19), y los de quien no tiene teléfono o contacto de emergencia
+ * (#499), que se marcan en una casilla. Qué filtros se ofrecen lo dice el servidor al responder la
  * lista: un Committee recibe la vista de socio y aun así filtra por grupo.
  *
  * En escritorio van en la barra sobre la tabla. En el móvil no caben junto a
@@ -265,6 +266,61 @@ function MembershipField({
   );
 }
 
+/** Una casilla y su etiqueta. El `id` sale de `useId` porque la misma
+ * casilla vive a la vez en la barra y en la hoja. */
+function FilterCheckbox({
+  label,
+  isChecked,
+  onChange,
+}: {
+  label: string;
+  isChecked: boolean;
+  onChange: (isChecked: boolean) => void;
+}): React.JSX.Element {
+  const id = useId();
+  return (
+    <div className="auth-consent directory-filter directory-filter-check">
+      <input
+        id={id}
+        type="checkbox"
+        checked={isChecked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <label htmlFor={id}>{label}</label>
+    </div>
+  );
+}
+
+function WithoutPhoneField({
+  translate,
+  filters,
+  onChange,
+}: FieldsProps): React.JSX.Element {
+  return (
+    <FilterCheckbox
+      label={translate("directory.filter.withoutPhone")}
+      isChecked={filters.withoutPhone}
+      onChange={(withoutPhone) => onChange({ ...filters, withoutPhone })}
+    />
+  );
+}
+
+function WithoutEmergencyContactField({
+  translate,
+  filters,
+  onChange,
+}: FieldsProps): React.JSX.Element {
+  return (
+    <FilterCheckbox
+      label={translate("directory.filter.withoutEmergencyContact")}
+      isChecked={filters.withoutEmergencyContact}
+      onChange={(withoutEmergencyContact) =>
+        onChange({ ...filters, withoutEmergencyContact })
+      }
+    />
+  );
+}
+
 /** Los mismos campos en la barra y en la hoja, en el orden del ticket. */
 function FilterFields(props: FieldsProps): React.JSX.Element {
   const offers = (filter: DirectoryFilter): boolean =>
@@ -275,11 +331,15 @@ function FilterFields(props: FieldsProps): React.JSX.Element {
       {offers("group") ? <GroupField {...props} /> : null}
       {offers("auf") ? <AufField {...props} /> : null}
       {offers("membership") ? <MembershipField {...props} /> : null}
+      {offers("withoutPhone") ? <WithoutPhoneField {...props} /> : null}
+      {offers("withoutEmergencyContact") ? (
+        <WithoutEmergencyContactField {...props} />
+      ) : null}
     </>
   );
 }
 
-const FOCUSABLE_SELECTOR = "select, button";
+const FOCUSABLE_SELECTOR = "select, input, button";
 
 function focusableIn(panel: HTMLElement | null): readonly HTMLElement[] {
   return panel === null

@@ -22,6 +22,10 @@ import {
   updateMemberRecord,
   verifyMemberAuf,
 } from "@/lib/members/member-record";
+import type {
+  EmergencyContact,
+  ProfileContactSubmission,
+} from "@/lib/members/profile-contact";
 
 /**
  * La ficha reservada al Admin (#242, RF-4 del PRD de E5): el número de AUF,
@@ -81,6 +85,9 @@ type FakeOptions = {
   /** El estado de su membresía (#453); sin decirlo, activa. */
   readonly membershipStatus?: MembershipStatus | null;
   readonly membershipWaiver?: MembershipWaiverView | null;
+  /** Su teléfono y su contacto de emergencia (#499); sin decirlo, ninguno. */
+  readonly phone?: string | null;
+  readonly emergencyContact?: EmergencyContact | null;
 };
 
 const MEMBER_ATTENDANCE: MemberAttendance = {
@@ -112,6 +119,10 @@ function fake(options: FakeOptions = {}): Fake {
   let dateOfBirth =
     options.dateOfBirth === undefined ? ADULT_BIRTH : options.dateOfBirth;
   let accountStatus = options.memberStatus ?? "active";
+  let contact = {
+    phone: options.phone ?? null,
+    emergencyContact: options.emergencyContact ?? null,
+  };
   const isClubMember = (clubId: string, userId: string): boolean =>
     clubId === memberClubId && userId === MEMBER_ID;
   const groupName = (groupId: string): string =>
@@ -149,6 +160,7 @@ function fake(options: FakeOptions = {}): Fake {
                   ? "active"
                   : options.membershipStatus,
               membershipWaiver: options.membershipWaiver ?? null,
+              ...contact,
             }
           : null;
       },
@@ -200,6 +212,14 @@ function fake(options: FakeOptions = {}): Fake {
         dateOfBirth = correction.dateOfBirth;
         accountStatus = correction.toStatus;
         return { kind: "corrected" };
+      },
+      updateMemberContact: async ({ clubId, userId }, written) => {
+        writes.push(`contact ${JSON.stringify(written)}`);
+        if (!isClubMember(clubId, userId)) {
+          return { kind: "member_not_found" };
+        }
+        contact = { ...written };
+        return { kind: "updated" };
       },
     },
     attendance: {
@@ -292,7 +312,7 @@ function submission(
     dateOfBirth: ADULT_BIRTH,
     ...overrides,
   };
-  return { ...rest, auf: { aufNumber, aufExpiry } };
+  return { ...rest, auf: { aufNumber, aufExpiry }, contact: null };
 }
 
 async function save(
@@ -357,6 +377,8 @@ describe("ficha reservada al Admin: lectura", () => {
       hasGuardianConsent: false,
       membershipStatus: "active",
       membershipWaiver: null,
+      phone: null,
+      emergencyContact: null,
       photoUrl: null,
       isAufExpired: false,
       groups: [
@@ -1220,5 +1242,172 @@ describe("verificar el AUF", () => {
     });
 
     expect(record).toMatchObject({ isAufVerified: true, isAufExpired: true });
+  });
+});
+describe("el contacto en la ficha (#499)", () => {
+  const ROSA: EmergencyContact = {
+    name: "Rosa Player",
+    phone: "0499 111 222",
+    relationship: "Madre",
+  };
+
+  function saveContact(
+    { gateways }: Fake,
+    contact: ProfileContactSubmission,
+    callerId: string = ADMIN_ID,
+  ): ReturnType<typeof updateMemberRecord> {
+    return updateMemberRecord(gateways, {
+      callerId,
+      userId: MEMBER_ID,
+      submission: { ...submission(), auf: null, contact },
+      todayInClub: TODAY_IN_CLUB,
+    });
+  }
+
+  it("trae el teléfono y el contacto de emergencia del socio", async () => {
+    const { gateways } = fake({
+      phone: "0412 345 678",
+      emergencyContact: ROSA,
+    });
+
+    const record = await readMemberRecord(gateways, {
+      callerId: ADMIN_ID,
+      userId: MEMBER_ID,
+      todayInClub: TODAY_IN_CLUB,
+    });
+
+    expect(record).toMatchObject({
+      phone: "0412 345 678",
+      emergencyContact: ROSA,
+    });
+  });
+
+  it("guarda la corrección del Admin con las reglas del perfil y la devuelve", async () => {
+    const store = fake();
+
+    const record = await saveContact(store, {
+      phone: "  0412   345 678 ",
+      emergencyContact: {
+        name: " Rosa Player ",
+        phone: "0499  111 222",
+        relationship: "Madre ",
+      },
+    });
+
+    expect(store.writes).toEqual([
+      `contact ${JSON.stringify({ phone: "0412 345 678", emergencyContact: ROSA })}`,
+    ]);
+    expect(record).toMatchObject({
+      phone: "0412 345 678",
+      emergencyContact: ROSA,
+    });
+  });
+
+  it("borra el teléfono y el contacto de emergencia que se dejan vacíos", async () => {
+    const store = fake({ phone: "0412 345 678", emergencyContact: ROSA });
+
+    const record = await saveContact(store, {
+      phone: "",
+      emergencyContact: { name: "", phone: "", relationship: "" },
+    });
+
+    expect(record).toMatchObject({ phone: null, emergencyContact: null });
+  });
+
+  it("deja en la bitácora quién corrigió el contacto, sobre quién y sin los datos", async () => {
+    const store = fake(UNCHANGED_AUF);
+
+    await saveContact(store, { phone: "0412 345 678", emergencyContact: ROSA });
+
+    expect(store.auditRows).toEqual([
+      {
+        club_id: CLUB_ID,
+        actor_id: ADMIN_ID,
+        action: "member.contact_corrected",
+        entity_type: "member",
+        entity_id: MEMBER_ID,
+        result: "success",
+        metadata: null,
+      },
+    ]);
+    const logged = JSON.stringify(store.auditRows);
+    expect(logged).not.toContain("0412");
+    expect(logged).not.toContain("Rosa");
+  });
+
+  it("no escribe ni deja rastro si el contacto no cambió", async () => {
+    const store = fake({
+      ...UNCHANGED_AUF,
+      phone: "0412 345 678",
+      emergencyContact: ROSA,
+    });
+
+    await saveContact(store, { phone: "0412 345 678", emergencyContact: ROSA });
+
+    expect(store.writes).toEqual([]);
+    expect(store.auditRows).toEqual([]);
+  });
+
+  it("no toca el contacto si el formulario no lo manda", async () => {
+    const store = fake({ ...UNCHANGED_AUF, phone: "0412 345 678" });
+
+    const record = await save(store);
+
+    expect(store.writes).toEqual([]);
+    expect(record.phone).toBe("0412 345 678");
+  });
+
+  it("rechaza un teléfono con pocos dígitos sin leer ni escribir nada", async () => {
+    const store = fake();
+
+    await expect(
+      issuesOf(saveContact(store, { phone: "1234", emergencyContact: null })),
+    ).resolves.toEqual([{ field: "phone", code: "phone_too_short" }]);
+    expect(store.reads).toEqual([]);
+    expect(store.writes).toEqual([]);
+  });
+
+  it("rechaza un contacto de emergencia a medias y dice qué falta", async () => {
+    const store = fake();
+
+    await expect(
+      issuesOf(
+        saveContact(store, {
+          phone: null,
+          emergencyContact: { name: "Rosa", phone: "", relationship: "" },
+        }),
+      ),
+    ).resolves.toEqual([
+      {
+        field: "emergencyContactPhone",
+        code: "emergency_contact_phone_missing",
+      },
+      {
+        field: "emergencyContactRelationship",
+        code: "emergency_contact_relationship_missing",
+      },
+    ]);
+    expect(store.writes).toEqual([]);
+  });
+
+  it.each(["Coach", "Committee", "Player"] as const)(
+    "no deja a un %s corregir el contacto de otro",
+    async (callerRole) => {
+      const store = fake({ callerRole });
+
+      await expect(
+        saveContact(store, { phone: "0412 345 678", emergencyContact: null }),
+      ).rejects.toBeInstanceOf(MemberRecordForbiddenError);
+      expect(store.writes).toEqual([]);
+    },
+  );
+
+  it("responde que no existe un socio de otro club, sin escribir nada", async () => {
+    const store = fake({ memberClubId: OTHER_CLUB_ID });
+
+    await expect(
+      saveContact(store, { phone: "0412 345 678", emergencyContact: null }),
+    ).rejects.toBeInstanceOf(MemberRecordNotFoundError);
+    expect(store.writes).toEqual([]);
   });
 });

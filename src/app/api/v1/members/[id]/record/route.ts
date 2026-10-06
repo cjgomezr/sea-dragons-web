@@ -15,12 +15,17 @@ import {
   readMemberId,
   requireMemberRecordGateways,
 } from "@/lib/members/member-record-api";
+import {
+  emergencyContactBodySchema,
+  phoneBodySchema,
+} from "@/lib/members/profile-contact-body";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
 
 /**
  * La ficha reservada al Admin de un socio (#242, RF-4 del PRD de E5): su
  * número de AUF, su vencimiento y sus grupos (FR-020, BR-008), y la
- * corrección de su fecha de nacimiento (#272, RF-10).
+ * corrección de su fecha de nacimiento (#272, RF-10). Desde #499, también su
+ * teléfono y su contacto de emergencia, con las reglas del perfil propio.
  *
  * Quién puede llamarlo lo decide la frontera: `RESTRICTED_ROUTES` lo reserva a
  * quien gestiona usuarios y roles, que sólo es Admin, y el dominio lo vuelve a
@@ -45,13 +50,17 @@ const AUF_NUMBER_BODY_MAX_LENGTH = AUF_NUMBER_MAX_LENGTH * 4;
  * cualquier campo que no sea de esta ficha, como el rol o el nombre.
  *
  * El AUF va entero o no va (#274): sin él no se toca el guardado, que el
- * miembro puede haber cambiado desde que el Admin abrió la ficha. */
+ * miembro puede haber cambiado desde que el Admin abrió la ficha. El
+ * contacto (#499), igual: `phone` y `emergencyContact` van juntos o no va
+ * ninguno, y null es no tenerlo. */
 const recordBodySchema = z
   .object({
     aufNumber: z.string().max(AUF_NUMBER_BODY_MAX_LENGTH).nullable().optional(),
     aufExpiry: z.string().nullable().optional(),
     groupIds: z.array(z.uuid()),
     dateOfBirth: z.string().nullable(),
+    phone: phoneBodySchema.nullable().optional(),
+    emergencyContact: emergencyContactBodySchema.nullable().optional(),
   })
   .strict()
   .refine(
@@ -60,12 +69,21 @@ const recordBodySchema = z
       message: "aufNumber y aufExpiry van juntos, o no va ninguno.",
       path: ["aufNumber"],
     },
+  )
+  .refine(
+    (body) =>
+      (body.phone === undefined) === (body.emergencyContact === undefined),
+    {
+      message: "phone y emergencyContact van juntos, o no va ninguno.",
+      path: ["phone"],
+    },
   );
 
 type RecordBody = z.infer<typeof recordBodySchema>;
 
 function toSubmission(body: RecordBody): MemberRecordSubmission {
-  const { aufNumber, aufExpiry, groupIds, dateOfBirth } = body;
+  const { aufNumber, aufExpiry, groupIds, dateOfBirth, phone } = body;
+  const { emergencyContact } = body;
   return {
     auf:
       aufNumber === undefined || aufExpiry === undefined
@@ -73,6 +91,10 @@ function toSubmission(body: RecordBody): MemberRecordSubmission {
         : { aufNumber, aufExpiry },
     groupIds,
     dateOfBirth,
+    contact:
+      phone === undefined || emergencyContact === undefined
+        ? null
+        : { phone, emergencyContact },
   };
 }
 

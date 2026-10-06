@@ -2,20 +2,28 @@
 
 import { useRef, useState } from "react";
 import { MemberAvatar } from "@/components/MemberAvatar";
+import type { ContactDraft } from "@/components/account/OwnContactSection";
 import type { Group } from "@/lib/groups/groups";
 import { formatCalendarDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import {
   type MemberRecord,
+  type MemberRecordField,
   type MemberRecordIssueCode,
   type MemberRecordSubmission,
   correctionRequiresGuardianConsent,
   isAufNumberTooLong,
 } from "@/lib/members/member-record";
+import { contactIssuesOf } from "@/lib/members/profile-contact";
 import type { MembershipStatus } from "@/lib/membership/membership";
 import { aufMarksOf } from "./auf-marks";
 import { membershipMarkOf } from "./membership-mark";
+import {
+  MemberRecordContact,
+  recordContactDraftOf,
+  toRecordContactSubmission,
+} from "./MemberRecordContact";
 import { GroupsField, TextField } from "./record-fields";
 import {
   type MemberRecordFailure,
@@ -40,6 +48,9 @@ import {
  * verifica con su botón, que manda el AUF guardado y no el de los controles;
  * por eso el botón desaparece en cuanto el número o el vencimiento se editan:
  * entonces guardar ya lo deja verificado.
+ *
+ * El teléfono y el contacto de emergencia (#499) siguen la misma regla que el
+ * AUF: sólo se mandan si el Admin los tocó.
  */
 
 type Status =
@@ -52,7 +63,7 @@ type Status =
 
 /** Lo que hay en los controles. Una cadena vacía es "sin valor", y se manda
  * como null. */
-type Draft = {
+type Draft = ContactDraft & {
   readonly aufNumber: string;
   readonly aufExpiry: string;
   readonly groupIds: ReadonlySet<string>;
@@ -61,7 +72,7 @@ type Draft = {
 
 /** Un aviso que va junto a su campo y no en el aviso general. */
 type FieldIssue = {
-  readonly field: "aufNumber" | "aufExpiry" | "dateOfBirth";
+  readonly field: MemberRecordField;
   readonly code: MemberRecordIssueCode;
 };
 
@@ -82,6 +93,7 @@ function toDraft(record: MemberRecord): Draft {
     aufExpiry: record.aufExpiry ?? "",
     groupIds: new Set(record.groups.map((group) => group.id)),
     dateOfBirth: record.dateOfBirth ?? "",
+    ...recordContactDraftOf(record),
   };
 }
 
@@ -112,6 +124,7 @@ function toSubmission(
         },
     groupIds: [...draft.groupIds],
     dateOfBirth: orNull(draft.dateOfBirth),
+    contact: toRecordContactSubmission(record, draft),
   };
 }
 
@@ -125,6 +138,17 @@ const FIELD_OF_ISSUE: Readonly<
   date_of_birth_in_future: "dateOfBirth",
   date_of_birth_too_early: "dateOfBirth",
   date_of_birth_required: "dateOfBirth",
+  phone_invalid_characters: "phone",
+  phone_too_short: "phone",
+  phone_too_long: "phone",
+  emergency_contact_name_missing: "emergencyContactName",
+  emergency_contact_name_too_long: "emergencyContactName",
+  emergency_contact_phone_missing: "emergencyContactPhone",
+  emergency_contact_phone_invalid_characters: "emergencyContactPhone",
+  emergency_contact_phone_too_short: "emergencyContactPhone",
+  emergency_contact_phone_too_long: "emergencyContactPhone",
+  emergency_contact_relationship_missing: "emergencyContactRelationship",
+  emergency_contact_relationship_too_long: "emergencyContactRelationship",
 };
 
 function toFieldIssue(code: MemberRecordIssueCode): FieldIssue {
@@ -307,12 +331,24 @@ function AufVerification({
 }
 
 /** El aviso de campo que trajo el último envío, si el servidor rechazó uno. */
-function serverIssueOf(status: Status): FieldIssue | null {
+function serverIssuesOf(status: Status): readonly FieldIssue[] {
   if (status.kind !== "failed") {
-    return null;
+    return [];
   }
   const code = readIssueCode(status);
-  return code === null ? null : toFieldIssue(code);
+  return code === null ? [] : [toFieldIssue(code)];
+}
+
+/** Lo que se puede avisar antes de mandar nada: el largo del AUF y el
+ * contacto, con las reglas del perfil (#499). */
+function localIssuesOf(submission: MemberRecordSubmission): FieldIssue[] {
+  const aufNumber = submission.auf?.aufNumber ?? "";
+  return [
+    ...(isAufNumberTooLong(aufNumber)
+      ? [toFieldIssue("auf_number_too_long")]
+      : []),
+    ...(submission.contact === null ? [] : contactIssuesOf(submission.contact)),
+  ];
 }
 
 export function MemberRecordForm({
@@ -328,14 +364,14 @@ export function MemberRecordForm({
   const [record, setRecord] = useState(initialRecord);
   const [draft, setDraft] = useState<Draft>(() => toDraft(initialRecord));
   const [status, setStatus] = useState<Status>({ kind: "editing" });
-  const [localIssue, setLocalIssue] = useState<FieldIssue | null>(null);
+  const [localIssues, setLocalIssues] = useState<readonly FieldIssue[]>([]);
   // El estado desactiva el botón en el siguiente pintado, pero un doble clic
   // llega antes. La referencia cambia en el acto.
   const isSendingRef = useRef(false);
 
   function update(change: Partial<Draft>): void {
     setDraft((current) => ({ ...current, ...change }));
-    setLocalIssue(null);
+    setLocalIssues([]);
     // Un aviso habla del envío anterior. Mientras se envía no se toca, o el
     // botón volvería a activarse.
     setStatus((current) =>
@@ -360,13 +396,13 @@ export function MemberRecordForm({
     if (isSendingRef.current) {
       return;
     }
-    if (isAufNumberTooLong(draft.aufNumber)) {
-      setLocalIssue(toFieldIssue("auf_number_too_long"));
+    const submission = toSubmission(draft, record);
+    const issues = localIssuesOf(submission);
+    if (issues.length > 0) {
+      setLocalIssues(issues);
       return;
     }
-    await send("sending", () =>
-      saveMemberRecord(record.userId, toSubmission(draft, record)),
-    );
+    await send("sending", () => saveMemberRecord(record.userId, submission));
   }
 
   /** Guardar y verificar comparten el candado y el desenlace: los dos
@@ -396,15 +432,17 @@ export function MemberRecordForm({
     await send("verifying", () => verifyMemberRecordAuf(record.userId, shown));
   }
 
-  const issue = localIssue ?? serverIssueOf(status);
-  const issueTextFor = (field: FieldIssue["field"]): string | null =>
-    issue?.field === field
-      ? describeMemberRecordIssue(translate, {
+  const issues = localIssues.length > 0 ? localIssues : serverIssuesOf(status);
+  const issueTextFor = (field: MemberRecordField): string | null => {
+    const issue = issues.find((candidate) => candidate.field === field);
+    return issue === undefined
+      ? null
+      : describeMemberRecordIssue(translate, {
           code: issue.code,
           locale,
           joinedOn: record.joinedOn,
-        })
-      : null;
+        });
+  };
   const isSending = status.kind === "sending" || status.kind === "verifying";
 
   return (
@@ -462,6 +500,13 @@ export function MemberRecordForm({
             value={draft.dateOfBirth}
             issueText={issueTextFor("dateOfBirth")}
             onChange={(dateOfBirth) => update({ dateOfBirth })}
+          />
+          <MemberRecordContact
+            translate={translate}
+            fullName={record.fullName}
+            draft={draft}
+            issueTextOf={issueTextFor}
+            onChange={update}
           />
           <GroupsField
             translate={translate}

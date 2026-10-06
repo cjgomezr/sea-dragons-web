@@ -16,6 +16,11 @@ import {
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { signProfilePhotoUrl } from "./supabase-profile-photo-gateways";
+import {
+  CONTACT_COLUMNS,
+  readProfileContact,
+  toContactColumns,
+} from "./supabase-profile-contact";
 import type {
   AufRegistration,
   AufVerificationResult,
@@ -47,8 +52,9 @@ import type {
 
 const MEMBERS_TABLE = "members";
 // La membresía va por el `left join` del chip del Admin (#453), con el motivo
-// de la exención (#457).
-const RECORD_COLUMNS = `user_id, full_name, joined_on, account_status, auf_number, auf_expiry, auf_verified_at, date_of_birth, created_at, guardian_consent_at, photo_path, ${MEMBERSHIP_SUMMARY_EMBED}`;
+// de la exención (#457). El teléfono y el contacto de emergencia (#499) los
+// corrige el Admin desde aquí.
+const RECORD_COLUMNS = `user_id, full_name, joined_on, account_status, auf_number, auf_expiry, auf_verified_at, date_of_birth, created_at, guardian_consent_at, photo_path, ${CONTACT_COLUMNS}, ${MEMBERSHIP_SUMMARY_EMBED}`;
 const MEMBERSHIPS_RELATION = "memberships";
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -86,6 +92,7 @@ function toStoredMemberRecord(row: Row, now: Date): StoredMemberRecord {
     photoPath: readText(row, "photo_path", MEMBERS_TABLE),
     membershipStatus: membership.status,
     membershipWaiver: membership.waiver,
+    ...readProfileContact(row),
   };
 }
 
@@ -247,6 +254,26 @@ export function createMemberRecordGateways(
 
       correctDateOfBirth: (scope, correction) =>
         correctDateOfBirth(serviceClient, scope, correction),
+
+      // Las cuatro columnas en un solo `update`: el `check` de `0058` pide
+      // las tres del contacto de emergencia juntas.
+      async updateMemberContact({ clubId, userId }, contact) {
+        const { data, error } = await serviceClient
+          .from(MEMBERS_TABLE)
+          .update(toContactColumns(contact))
+          .eq("user_id", userId)
+          .eq("club_id", clubId)
+          .select("user_id")
+          .maybeSingle();
+        if (error) {
+          throw new Error(
+            `No se pudo guardar el contacto del socio ${userId}: ${error.message}`,
+          );
+        }
+        return data === null
+          ? { kind: "member_not_found" }
+          : { kind: "updated" };
+      },
     },
   };
 }
