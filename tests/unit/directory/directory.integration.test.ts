@@ -101,6 +101,34 @@ async function insertEvaluation(
   }
 }
 
+/** Un grupo con un solo socio. Borrar el grupo se lleva la pertenencia, por
+ * la cascada de `0015_groups.sql`. */
+async function withGroupOf<T>(
+  serviceClient: ServiceRoleClient,
+  member: { readonly clubId: string; readonly userId: string },
+  run: (groupId: string) => Promise<T>,
+): Promise<T> {
+  return withSeededRows(
+    serviceClient,
+    "groups",
+    [{ club_id: member.clubId, name: "Grupo del directorio" }],
+    async ([group]) => {
+      const groupId = group!.id as string;
+      const { error } = await serviceClient.client
+        .from("group_memberships")
+        .insert({
+          group_id: groupId,
+          user_id: member.userId,
+          club_id: member.clubId,
+        });
+      if (error) {
+        throw new Error(`No se pudo sembrar el grupo: ${error.message}`);
+      }
+      return run(groupId);
+    },
+  );
+}
+
 /** El club pone Forward delante de las otras dos (#299): ordenado por
  * posición, el directorio tiene que seguir al club y no al SRD. */
 async function moveForwardFirst(
@@ -316,6 +344,18 @@ describeRls("el directorio contra seadragons-dev", () => {
 
           const byRole = await askAs(admin!.id, { role: "Committee" });
           expect(byRole.members).toEqual([]);
+
+          // #497: los grupos de cada socio llegan en la misma lectura.
+          await withGroupOf(
+            serviceClient,
+            { clubId, userId: maria!.id },
+            async (groupId) => {
+              const byGroup = await askAs(admin!.id, { groupId });
+              expect(byGroup.members.map((member) => member.fullName)).toEqual([
+                "María Ñíguez",
+              ]);
+            },
+          );
 
           const withInactive = await askAs(admin!.id, {
             includeInactive: true,

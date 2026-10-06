@@ -1,7 +1,11 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
-import type { DirectoryMemberRecord } from "@/lib/directory/directory";
+import {
+  DIRECTORY_FILTER_FORBIDDEN_REASON,
+  type DirectoryMemberRecord,
+} from "@/lib/directory/directory";
+import { INVALID_DIRECTORY_QUERY_REASON } from "@/lib/directory/directory-query";
 import type { Role } from "@/lib/auth/roles";
 import { DIRECTORY_API_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
@@ -23,6 +27,8 @@ const ORIGIN = "http://localhost:3417";
 const CALLER_ID = "a0a0a0a0-0000-4000-8000-00000000000a";
 const CLUB_ID = "5c1ab000-0000-4000-8000-000000000001";
 
+const SENIOR_GROUP_ID = "9a9a9a9a-0000-4000-8000-000000000001";
+
 const MARIA: DirectoryMemberRecord = {
   userId: "cccccccc-0000-4000-8000-00000000000c",
   fullName: "María Ñíguez",
@@ -37,6 +43,7 @@ const MARIA: DirectoryMemberRecord = {
   photoPath: null,
   isEvaluated: true,
   membershipStatus: "active",
+  groupIds: [SENIOR_GROUP_ID],
 };
 
 /** María vino a tres de cuatro; Zoe no tiene sesiones elegibles. */
@@ -62,6 +69,7 @@ const BAJA: DirectoryMemberRecord = {
   photoPath: null,
   isEvaluated: true,
   membershipStatus: "active",
+  groupIds: [],
 };
 
 const databaseCalls: string[] = [];
@@ -181,6 +189,7 @@ describe("GET /api/v1/directory", () => {
             attendance: { kind: "rate", percent: 75, sessions: 3 },
           },
         ],
+        availableFilters: ["position"],
       },
     });
     expect(databaseCalls).toEqual([
@@ -216,7 +225,7 @@ describe("GET /api/v1/directory", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: { kind: "member", members: [] },
+      data: { kind: "member", members: [], availableFilters: ["position"] },
     });
   });
 
@@ -274,6 +283,10 @@ describe("GET /api/v1/directory", () => {
     // Pedir las bajas es cosa de un Admin: la bandera se escribe entera y no
     // se adivina desde un "1" ni desde la mera presencia del parámetro.
     ["un incluir inactivos que no es booleano", "?includeInactive=1"],
+    ["una posición que no es un identificador", "?position=Forward"],
+    ["un grupo que no es un identificador", "?group=senior"],
+    ["un AUF que no existe", "?auf=soon"],
+    ["una membresía que no existe", "?membership=paid"],
   ])("responde 400 a %s sin tocar la base", async (_case, search) => {
     mockWiring();
 
@@ -282,6 +295,54 @@ describe("GET /api/v1/directory", () => {
     await expectErrorCode(response, 400, "validation_error");
     expect(databaseCalls).toEqual([]);
   });
+
+  it("dice el motivo del 400 de un filtro desconocido", async () => {
+    mockWiring("Admin");
+
+    const response = await getDirectory("?auf=soon");
+
+    await expect(response.json()).resolves.toMatchObject({
+      error: { reason: INVALID_DIRECTORY_QUERY_REASON },
+    });
+  });
+
+  it("responde 200 con los socios que cumplen los filtros", async () => {
+    mockWiring("Admin");
+
+    const response = await getDirectory(
+      `?group=${SENIOR_GROUP_ID}&auf=expired&membership=active&position=${DEFENDER.id}`,
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      data: { members: readonly { fullName: string }[] };
+    };
+    expect(body.data.members.map((member) => member.fullName)).toEqual([
+      "María Ñíguez",
+    ]);
+  });
+
+  it.each([
+    ["Player", "?group=9a9a9a9a-0000-4000-8000-000000000001"],
+    ["Coach", "?auf=expired"],
+    ["Committee", "?membership=active"],
+  ] as const)(
+    "responde 403 con motivo a un %s que pide %s, sin leer el directorio",
+    async (callerRole, search) => {
+      mockWiring(callerRole);
+
+      const response = await getDirectory(search);
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error: {
+          code: "forbidden",
+          reason: DIRECTORY_FILTER_FORBIDDEN_REASON,
+        },
+      });
+      expect(databaseCalls).toEqual([]);
+    },
+  );
 
   it("responde 401 sin sesión", async () => {
     mockAnonymousCaller();
@@ -358,6 +419,26 @@ describe("el directorio en la frontera", () => {
     const response = await boundaryResponse({ kind: "incomplete" });
 
     await expectErrorCode(response, 403, "forbidden");
+  });
+
+  it("deja llegar a la ruta un filtro que el rol no tiene: el 403 es de ella", async () => {
+    mockSessionClient();
+    vi.doMock("@/lib/auth/session-reader", () => ({
+      readSessionState: async () => ({
+        kind: "active",
+        role: "Player",
+        membershipCurrent: true,
+      }),
+    }));
+    const { proxy } = await import("@/proxy");
+
+    const response = await proxy(
+      new NextRequest(
+        new URL(`${DIRECTORY_API_PATH}?group=${SENIOR_GROUP_ID}`, ORIGIN),
+      ),
+    );
+
+    expect(response.headers.get(CONTINUE_HEADER)).toBe("1");
   });
 
   it.each(["Admin", "Coach", "Committee", "Player"] as const)(

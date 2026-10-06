@@ -7,10 +7,12 @@ import type {
   CoachDirectoryMember,
   DirectoryMember,
 } from "@/lib/directory/directory";
+import { DEFAULT_DIRECTORY_QUERY } from "@/lib/directory/directory";
 import {
   DEFENDER,
   FORWARD,
   GOALKEEPER,
+  SEEDED_POSITIONS,
   asDirectoryPosition,
 } from "../helpers/seeded-positions";
 
@@ -112,6 +114,22 @@ const MISSING = "–";
 
 const DIRECTORY_PATH = "/api/v1/directory";
 const PENDING_REQUESTS_PATH = "/api/v1/role-requests?status=pending";
+const POSITIONS_PATH = "/api/v1/club/positions";
+const GROUPS_PATH = "/api/v1/groups";
+
+const SENIOR_GROUP = {
+  id: "9a9a9a9a-0000-4000-8000-000000000001",
+  name: "Senior Squad",
+  memberCount: 2,
+};
+
+/** Lo que el servidor deja filtrar a cada vista, si el test no dice otra
+ * cosa. Un Committee recibe la vista de socio con el grupo: lo pide así. */
+const FILTERS_BY_KIND = {
+  member: ["position"],
+  coach: ["position", "group"],
+  admin: ["position", "group", "auf", "membership"],
+} as const;
 
 type AnyMember = DirectoryMember | CoachDirectoryMember | AdminDirectoryMember;
 
@@ -123,9 +141,12 @@ type ApiStub = {
   /** Recibe el camino pedido, para poder contestar distinto según lo que se
    * preguntó (un 403 sólo a quien pide los dados de baja, por ejemplo). */
   readonly respond?: (url: string) => Response | Promise<Response>;
+  /** Los filtros que el servidor dice que se pueden usar (#497). */
+  readonly availableFilters?: readonly string[];
 };
 
 const requestedUrls: string[] = [];
+const groupRequests: string[] = [];
 
 function jsonResponse(status: number, payload: unknown): Response {
   return new Response(JSON.stringify(payload), {
@@ -154,14 +175,23 @@ function listingFor(stub: ApiStub, url: string): Response {
   const search = params.get("q");
   const role = params.get("role");
   const includeInactive = params.get("includeInactive") === "true";
+  const position = params.get("position");
   const members = (stub.members ?? [MARIA]).filter(
     (member) =>
       (role === null || member.role === role) &&
       (includeInactive || member.status !== "inactive") &&
+      (position === null || (member.position?.id ?? "none") === position) &&
       (search === null ||
         normalize(member.fullName).includes(normalize(search))),
   );
-  return jsonResponse(200, { data: { kind: stub.kind ?? "member", members } });
+  const kind = stub.kind ?? "member";
+  return jsonResponse(200, {
+    data: {
+      kind,
+      members,
+      availableFilters: stub.availableFilters ?? FILTERS_BY_KIND[kind],
+    },
+  });
 }
 
 /** Una respuesta que resuelve cuando el test quiera, para poder contestar dos
@@ -183,7 +213,9 @@ function deferredResponses(): {
 }
 
 function listingResponse(members: readonly AnyMember[]): Response {
-  return jsonResponse(200, { data: { kind: "member", members } });
+  return jsonResponse(200, {
+    data: { kind: "member", members, availableFilters: ["position"] },
+  });
 }
 
 function stubApi(stub: ApiStub = {}): void {
@@ -194,6 +226,17 @@ function stubApi(stub: ApiStub = {}): void {
       // (#240) se prueba en `directory-admin.test.tsx`: aquí llega vacía.
       if (url === PENDING_REQUESTS_PATH) {
         return jsonResponse(200, { data: { requests: [] } });
+      }
+      // Las opciones de los filtros (#497): las posiciones del club y sus
+      // grupos. No cuentan como lecturas del directorio.
+      if (url === POSITIONS_PATH) {
+        return jsonResponse(200, {
+          data: { positions: SEEDED_POSITIONS.map(asDirectoryPosition) },
+        });
+      }
+      if (url === GROUPS_PATH) {
+        groupRequests.push(url);
+        return jsonResponse(200, { data: { groups: [SENIOR_GROUP] } });
       }
       requestedUrls.push(url);
       if (!url.startsWith(DIRECTORY_PATH)) {
@@ -239,6 +282,8 @@ async function sortBy(column: string): Promise<void> {
 
 beforeEach(() => {
   requestedUrls.length = 0;
+  groupRequests.length = 0;
+  window.history.replaceState(null, "", "/directorio");
 });
 
 afterEach(() => {
@@ -483,7 +528,11 @@ describe("pantalla del directorio", () => {
           throw new TypeError("sin red");
         }
         return jsonResponse(200, {
-          data: { kind: "member", members: [MARIA] },
+          data: {
+            kind: "member",
+            members: [MARIA],
+            availableFilters: ["position"],
+          },
         });
       },
     });
@@ -941,7 +990,11 @@ describe("marca de sin evaluar", () => {
       // Sin pedir los dados de baja: aquí sólo importa cómo se pinta la fila.
       respond: () =>
         jsonResponse(200, {
-          data: { kind: "admin", members: [{ ...ZOE, isEvaluated: false }] },
+          data: {
+            kind: "admin",
+            members: [{ ...ZOE, isEvaluated: false }],
+            availableFilters: FILTERS_BY_KIND.admin,
+          },
         }),
     });
 
@@ -1090,7 +1143,12 @@ describe("llegar con un texto buscado", () => {
   it("pone el texto en la búsqueda y la primera lectura ya lo filtra", async () => {
     stubApi({ members: [MARIA, NEREA] });
 
-    render(<DirectoryScreen locale="en" initialSearch="nerea" />);
+    render(
+      <DirectoryScreen
+        locale="en"
+        initialQuery={{ ...DEFAULT_DIRECTORY_QUERY, search: "nerea" }}
+      />,
+    );
 
     await waitFor(() => {
       expect(listedNames()).toEqual(["Nerea Ruiz"]);
@@ -1098,5 +1156,359 @@ describe("llegar con un texto buscado", () => {
     expect(screen.getByLabelText("Search by name")).toHaveValue("nerea");
     expect(requestedUrls).toHaveLength(1);
     expect(lastRequest().get("q")).toBe("nerea");
+  });
+});
+
+// #497: filtros por posición, grupo, AUF y membresía, en la dirección.
+describe("filtros del directorio", () => {
+  function filterBar(): HTMLElement {
+    return screen.getByRole("group", { name: "More filters" });
+  }
+
+  function optionsOf(select: HTMLElement): readonly string[] {
+    return within(select)
+      .getAllByRole("option")
+      .map((option) => option.textContent ?? "");
+  }
+
+  it("ofrece a cualquiera la posición, con las del club y sin posición", async () => {
+    stubApi({ members: [MARIA, TOMAS] });
+    await renderScreen();
+
+    const position = await within(filterBar()).findByRole("combobox", {
+      name: "Position",
+    });
+    await waitFor(() => {
+      expect(optionsOf(position)).toEqual([
+        "All positions",
+        "Goalkeeper",
+        "Defender",
+        "Forward",
+        "No position",
+      ]);
+    });
+  });
+
+  it("a un Player no le enseña el grupo, el AUF ni la membresía, ni pide los grupos", async () => {
+    stubApi({ kind: "member", availableFilters: ["position"] });
+    await renderScreen();
+
+    const bar = filterBar();
+    expect(
+      within(bar).queryByRole("combobox", { name: "Group" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(bar).queryByRole("combobox", { name: "AUF" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(bar).queryByRole("combobox", { name: "Membership" }),
+    ).not.toBeInTheDocument();
+    expect(groupRequests).toEqual([]);
+  });
+
+  it.each([
+    ["Coach", "coach"],
+    ["Committee", "member"],
+  ] as const)(
+    "a un %s le ofrece el grupo, pero no el AUF ni la membresía",
+    async (_role, kind) => {
+      stubApi({
+        kind,
+        members: [{ ...MARIA, isEvaluated: true }],
+        availableFilters: ["position", "group"],
+      });
+      await renderScreen();
+
+      const group = await within(filterBar()).findByRole("combobox", {
+        name: "Group",
+      });
+      await waitFor(() => {
+        expect(optionsOf(group)).toEqual(["All groups", "Senior Squad"]);
+      });
+      expect(
+        within(filterBar()).queryByRole("combobox", { name: "AUF" }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("ofrece a un Admin el AUF y la membresía con todos sus valores", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+    await renderScreen();
+
+    expect(
+      optionsOf(within(filterBar()).getByRole("combobox", { name: "AUF" })),
+    ).toEqual([
+      "Any AUF",
+      "No AUF number",
+      "Expired",
+      "Expires within 30 days",
+      "Not verified",
+    ]);
+    expect(
+      optionsOf(
+        within(filterBar()).getByRole("combobox", { name: "Membership" }),
+      ),
+    ).toEqual([
+      "Any membership",
+      "Pending",
+      "Trial",
+      "Active",
+      "Payment failed",
+      "Cancelled",
+      "Waived",
+      "No membership",
+    ]);
+  });
+
+  it("pide al servidor la posición elegida y enseña lo que responde", async () => {
+    stubApi({ members: [MARIA, NEREA, TOMAS] });
+    await renderScreen();
+    const user = userEvent.setup();
+    const position = within(filterBar()).getByRole("combobox", {
+      name: "Position",
+    });
+    await within(position).findByRole("option", { name: "Goalkeeper" });
+
+    await user.selectOptions(position, "Goalkeeper");
+
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["Nerea Ruiz"]);
+    });
+    expect(lastRequest().get("position")).toBe(GOALKEEPER.id);
+    expect(screen.getByText("1 member")).toBeVisible();
+  });
+
+  it("combina los filtros con el rol y la búsqueda en la misma petición", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+    await renderScreen();
+    const user = userEvent.setup();
+    const bar = filterBar();
+    await within(bar).findByRole("option", { name: "Senior Squad" });
+
+    await user.click(screen.getByRole("radio", { name: "Coach" }));
+    await user.selectOptions(
+      within(bar).getByRole("combobox", { name: "Group" }),
+      "Senior Squad",
+    );
+    await user.selectOptions(
+      within(bar).getByRole("combobox", { name: "AUF" }),
+      "Expires within 30 days",
+    );
+    await user.selectOptions(
+      within(bar).getByRole("combobox", { name: "Membership" }),
+      "No membership",
+    );
+    await user.type(screen.getByLabelText("Search by name"), "mar");
+
+    await waitFor(() => {
+      expect(lastRequest().get("q")).toBe("mar");
+    });
+    expect(Object.fromEntries(lastRequest())).toMatchObject({
+      role: "Coach",
+      group: SENIOR_GROUP.id,
+      auf: "expiring",
+      membership: "none",
+    });
+  });
+
+  it("dice que no hay nadie con esos filtros y deja quitarlos", async () => {
+    stubApi({ members: [MARIA] });
+    await renderScreen();
+    const user = userEvent.setup();
+    const position = within(filterBar()).getByRole("combobox", {
+      name: "Position",
+    });
+    await within(position).findByRole("option", { name: "No position" });
+
+    await user.selectOptions(position, "No position");
+    await waitFor(() => {
+      expect(
+        screen.getByText("No member matches what you're looking for."),
+      ).toBeVisible();
+    });
+    await user.click(screen.getByRole("button", { name: "Clear the filters" }));
+
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["María Ñíguez"]);
+    });
+    expect(lastRequest().get("position")).toBeNull();
+    expect(
+      within(filterBar()).getByRole("combobox", { name: "Position" }),
+    ).toHaveValue("");
+  });
+
+  it("guarda los filtros en la dirección de la página", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+    await renderScreen();
+    const user = userEvent.setup();
+
+    await user.selectOptions(
+      within(filterBar()).getByRole("combobox", { name: "AUF" }),
+      "Expired",
+    );
+
+    await waitFor(() => {
+      expect(window.location.search).toBe("?auf=expired");
+    });
+    expect(window.location.pathname).toBe("/directorio");
+  });
+
+  it("arranca con los filtros que trae la dirección", async () => {
+    stubApi({ members: [MARIA, NEREA] });
+
+    render(
+      <DirectoryScreen
+        locale="en"
+        initialQuery={{
+          ...DEFAULT_DIRECTORY_QUERY,
+          position: { kind: "position", positionId: FORWARD.id },
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["María Ñíguez"]);
+    });
+    expect(requestedUrls).toHaveLength(1);
+    expect(lastRequest().get("position")).toBe(FORWARD.id);
+    await waitFor(() => {
+      expect(
+        within(filterBar()).getByRole("combobox", { name: "Position" }),
+      ).toHaveValue(FORWARD.id);
+    });
+  });
+
+  it("dice en el botón Filtros cuántos filtros hay activos", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+    await renderScreen();
+    const user = userEvent.setup();
+    expect(screen.getByRole("button", { name: "Filters" })).toBeVisible();
+
+    await user.selectOptions(
+      within(filterBar()).getByRole("combobox", { name: "AUF" }),
+      "Expired",
+    );
+    await user.selectOptions(
+      within(filterBar()).getByRole("combobox", { name: "Membership" }),
+      "Active",
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Filters: 2 active" }),
+    ).toBeVisible();
+  });
+
+  it("abre los filtros en una hoja y devuelve el foco al botón al cerrarla con Escape", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+    await renderScreen();
+    const user = userEvent.setup();
+    const toggle = screen.getByRole("button", { name: "Filters" });
+
+    await user.click(toggle);
+
+    const sheet = screen.getByRole("dialog", { name: "Filters" });
+    expect(sheet).toContainElement(document.activeElement as HTMLElement);
+    expect(
+      within(sheet).getByRole("combobox", { name: "Membership" }),
+    ).toBeVisible();
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(toggle).toHaveFocus();
+  });
+
+  it("aplica lo que se elige en la hoja", async () => {
+    stubApi({ members: [MARIA, NEREA] });
+    await renderScreen();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Filters" }));
+    const sheet = screen.getByRole("dialog", { name: "Filters" });
+    const position = within(sheet).getByRole("combobox", { name: "Position" });
+    await within(position).findByRole("option", { name: "Forward" });
+
+    await user.selectOptions(position, "Forward");
+    await user.click(
+      within(sheet).getByRole("button", { name: "Show results" }),
+    );
+
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["María Ñíguez"]);
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filters: 1 active" }),
+    ).toHaveFocus();
+  });
+
+  it("explica el 403 de un filtro del rol y al reintentar pide sin él", async () => {
+    stubApi({
+      respond: (url) =>
+        new URL(url, "http://localhost").searchParams.has("group")
+          ? jsonResponse(403, {
+              error: {
+                code: "forbidden",
+                message: "x",
+                reason: "directory_filter_forbidden",
+              },
+            })
+          : listingFor({ members: [MARIA] }, url),
+    });
+    render(
+      <DirectoryScreen
+        locale="en"
+        initialQuery={{ ...DEFAULT_DIRECTORY_QUERY, groupId: SENIOR_GROUP.id }}
+      />,
+    );
+
+    expect(
+      await screen.findByText(
+        "Your role can't use one of these filters. Try again without them.",
+      ),
+    ).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["María Ñíguez"]);
+    });
+    expect(lastRequest().get("group")).toBeNull();
+  });
+
+  it("escribe en español los filtros y sus valores", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+    await renderScreen("es");
+
+    const bar = screen.getByRole("group", { name: "Más filtros" });
+    const position = within(bar).getByRole("combobox", { name: "Posición" });
+    await within(position).findByRole("option", { name: "Portería" });
+    expect(optionsOf(position)).toEqual([
+      "Todas las posiciones",
+      "Portería",
+      "Defensa",
+      "Ataque",
+      "Sin posición",
+    ]);
+    expect(
+      optionsOf(within(bar).getByRole("combobox", { name: "AUF" })),
+    ).toEqual([
+      "Cualquier AUF",
+      "Sin número de AUF",
+      "Vencido",
+      "Vence en los próximos 30 días",
+      "Sin verificar",
+    ]);
+    expect(
+      optionsOf(within(bar).getByRole("combobox", { name: "Membresía" })),
+    ).toEqual([
+      "Cualquier membresía",
+      "Pendiente",
+      "En prueba",
+      "Activa",
+      "Pago fallido",
+      "Cancelada",
+      "Exenta",
+      "Sin membresía",
+    ]);
+    expect(screen.getByRole("button", { name: "Filtros" })).toBeVisible();
   });
 });

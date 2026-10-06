@@ -3,6 +3,7 @@ import { DEFAULT_DIRECTORY_QUERY } from "@/lib/directory/directory";
 import {
   InvalidDirectoryQueryError,
   parseDirectoryQuery,
+  writeDirectoryQuery,
 } from "@/lib/directory/directory-query";
 
 /**
@@ -22,6 +23,10 @@ describe("la consulta del directorio", () => {
       sort: "name",
       direction: "asc",
       includeInactive: false,
+      position: null,
+      groupId: null,
+      auf: null,
+      membership: null,
     });
     expect(DEFAULT_DIRECTORY_QUERY).toEqual(parse(""));
   });
@@ -61,6 +66,12 @@ describe("la consulta del directorio", () => {
     ["un orden que no existe", "sort=country"],
     ["una dirección que no existe", "direction=descending"],
     ["un incluir inactivos que no es booleano", "includeInactive=1"],
+    ["una posición que no es un identificador", "position=Forward"],
+    ["una posición vacía", "position="],
+    ["un grupo que no es un identificador", "group=senior"],
+    ["un grupo «none»", "group=none"],
+    ["un AUF que no existe", "auf=soon"],
+    ["una membresía que no existe", "membership=paid"],
   ])("rechaza %s", (_case, search) => {
     expect(() => parse(search)).toThrow(InvalidDirectoryQueryError);
   });
@@ -71,5 +82,88 @@ describe("la consulta del directorio", () => {
 
   it("ignora los parámetros que no conoce", () => {
     expect(parse("page=2")).toEqual(DEFAULT_DIRECTORY_QUERY);
+  });
+});
+
+const POSITION_ID = "f0f0f0f0-0000-4000-8000-000000000003";
+const GROUP_ID = "9a9a9a9a-0000-4000-8000-000000000001";
+
+describe("los filtros de la consulta (#497)", () => {
+  it("acepta una posición del catálogo por su identificador", () => {
+    expect(parse(`position=${POSITION_ID}`).position).toEqual({
+      kind: "position",
+      positionId: POSITION_ID,
+    });
+  });
+
+  it("acepta pedir a quien no tiene posición", () => {
+    expect(parse("position=none").position).toEqual({ kind: "unassigned" });
+  });
+
+  it("acepta un grupo por su identificador", () => {
+    expect(parse(`group=${GROUP_ID}`).groupId).toBe(GROUP_ID);
+  });
+
+  it.each(["missing", "expired", "expiring", "unverified"] as const)(
+    "acepta el AUF %s",
+    (auf) => {
+      expect(parse(`auf=${auf}`).auf).toBe(auf);
+    },
+  );
+
+  it.each([
+    "pending",
+    "trialing",
+    "active",
+    "past_due",
+    "cancelled",
+    "waived",
+    "none",
+  ] as const)("acepta la membresía %s", (membership) => {
+    expect(parse(`membership=${membership}`).membership).toBe(membership);
+  });
+});
+
+describe("la consulta escrita en la dirección (#497)", () => {
+  it("no escribe nada de lo que ya es por defecto", () => {
+    expect(writeDirectoryQuery(DEFAULT_DIRECTORY_QUERY).toString()).toBe("");
+  });
+
+  it("escribe cada filtro con el nombre y el valor que el endpoint lee", () => {
+    const written = writeDirectoryQuery({
+      ...DEFAULT_DIRECTORY_QUERY,
+      search: "ana",
+      role: "Player",
+      sort: "attendance",
+      direction: "desc",
+      includeInactive: true,
+      position: { kind: "unassigned" },
+      groupId: GROUP_ID,
+      auf: "expiring",
+      membership: "past_due",
+    });
+
+    expect(Object.fromEntries(written)).toEqual({
+      q: "ana",
+      role: "Player",
+      sort: "attendance",
+      direction: "desc",
+      includeInactive: "true",
+      position: "none",
+      group: GROUP_ID,
+      auf: "expiring",
+      membership: "past_due",
+    });
+  });
+
+  it("vuelve a leer exactamente lo que escribió", () => {
+    const query = {
+      ...DEFAULT_DIRECTORY_QUERY,
+      position: { kind: "position", positionId: POSITION_ID },
+      membership: "none",
+      auf: "unverified",
+    } as const;
+
+    expect(parseDirectoryQuery(writeDirectoryQuery(query))).toEqual(query);
   });
 });

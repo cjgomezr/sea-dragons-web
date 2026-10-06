@@ -9,10 +9,13 @@ import {
   type DirectoryGateways,
   type DirectoryListing,
   type DirectoryQuery,
+  DIRECTORY_FILTER_FORBIDDEN_REASON,
+  DirectoryFilterForbiddenError,
   DirectoryForbiddenError,
   listDirectory,
 } from "@/lib/directory/directory";
 import {
+  INVALID_DIRECTORY_QUERY_REASON,
   InvalidDirectoryQueryError,
   parseDirectoryQuery,
 } from "@/lib/directory/directory-query";
@@ -52,6 +55,13 @@ function asDirectoryApiError(error: unknown): never {
   if (error instanceof DirectoryForbiddenError) {
     throw new ApiError("forbidden", error.message);
   }
+  if (error instanceof DirectoryFilterForbiddenError) {
+    throw new ApiError(
+      "forbidden",
+      error.message,
+      DIRECTORY_FILTER_FORBIDDEN_REASON,
+    );
+  }
   return asAccountApiError(error);
 }
 
@@ -63,7 +73,11 @@ function readDirectoryQuery(searchParams: URLSearchParams): DirectoryQuery {
     return parseDirectoryQuery(searchParams);
   } catch (error) {
     if (error instanceof InvalidDirectoryQueryError) {
-      throw new ApiError("validation_error", error.message);
+      throw new ApiError(
+        "validation_error",
+        error.message,
+        INVALID_DIRECTORY_QUERY_REASON,
+      );
     }
     throw error;
   }
