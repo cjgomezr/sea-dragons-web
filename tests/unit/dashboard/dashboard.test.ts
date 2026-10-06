@@ -28,6 +28,10 @@ import type {
   NewsFeedRow,
   NewsPostStatus,
 } from "@/lib/news/news-posts";
+import type {
+  EmergencyContact,
+  ProfileContact,
+} from "@/lib/members/profile-contact";
 
 /**
  * El dashboard de E14 (#424, RF-1, RF-2, RF-5 y RF-6) sin Supabase delante.
@@ -43,8 +47,20 @@ const COACHES_GROUP = "0a000000-0000-4000-8000-00000000000c";
 const NOW = new Date("2026-09-30T08:00:00.000Z");
 const TODAY_IN_CLUB = "2026-09-30";
 
+const SISTER: EmergencyContact = {
+  name: "Lucía Ferrer",
+  phone: "0412 999 888",
+  relationship: "Hermana",
+};
+
 type FakeSource =
-  "clubRate" | "attendance" | "agenda" | "feed" | "roster" | "newsSeen";
+  | "clubRate"
+  | "attendance"
+  | "agenda"
+  | "feed"
+  | "roster"
+  | "newsSeen"
+  | "contact";
 
 type Club = {
   role: Role;
@@ -55,6 +71,8 @@ type Club = {
   ownAttendance: MemberAttendance;
   activeMembers: { active: number; joinedRecently: number };
   newsSeenAt: string | null;
+  /** El teléfono y el contacto de emergencia de quien mira (#498). */
+  contact: ProfileContact;
   /** La membresía de quien mira; `null` si no tiene. */
   membership: MembershipRecord | null;
   failing: Set<FakeSource>;
@@ -232,6 +250,10 @@ function gateways(): DashboardGateways {
         failIf("newsSeen");
         return club.newsSeenAt;
       },
+      findOwnContact: async () => {
+        failIf("contact");
+        return club.contact;
+      },
     },
     membership: {
       findByUserId: async () => club.membership,
@@ -297,6 +319,7 @@ beforeEach(() => {
     ownAttendance: { kind: "rate", percent: 75, sessions: 6 },
     activeMembers: { active: 1, joinedRecently: 0 },
     newsSeenAt: null,
+    contact: { phone: "0412 345 678", emergencyContact: SISTER },
     membership: membershipWith("active"),
     failing: new Set(),
   };
@@ -750,6 +773,7 @@ describe("vacío", () => {
       },
       upcomingEvents: { kind: "events", events: [] },
       latestNews: { kind: "news", posts: [] },
+      contactReminder: { kind: "reminder", reminder: "none" },
     });
     expect(reported).toEqual([]);
   });
@@ -760,6 +784,56 @@ describe("quien mira", () => {
     const result = await dashboard();
 
     expect(result.viewer).toEqual({ firstName: "Alba" });
+  });
+});
+
+describe("el aviso del contacto (#498)", () => {
+  it("pide los dos a quien no tiene ni teléfono ni contacto", async () => {
+    club.contact = { phone: null, emergencyContact: null };
+
+    const result = await dashboard();
+
+    expect(result.contactReminder).toEqual({
+      kind: "reminder",
+      reminder: "both",
+    });
+  });
+
+  it("pide el teléfono a quien ya tiene contacto", async () => {
+    club.contact = { phone: null, emergencyContact: SISTER };
+
+    const result = await dashboard();
+
+    expect(result.contactReminder).toEqual({
+      kind: "reminder",
+      reminder: "phone",
+    });
+  });
+
+  it("también avisa en el inicio reducido: el aviso no depende de pagar", async () => {
+    club.membership = membershipWith("pending");
+    club.contact = { phone: "0412 345 678", emergencyContact: null };
+
+    const result = await restrictedDashboard();
+
+    expect(result.contactReminder).toEqual({
+      kind: "reminder",
+      reminder: "emergency_contact",
+    });
+  });
+
+  it("sin la lectura del contacto llega no disponible, con el fallo en el log, y el resto se sirve", async () => {
+    club.failing.add("contact");
+
+    const result = await dashboard();
+
+    expect(result.contactReminder).toEqual({ kind: "unavailable" });
+    expect(result.tiles.members).toEqual({
+      kind: "members",
+      active: 1,
+      joinedRecently: 0,
+    });
+    expect(reported.map(({ source }) => source)).toEqual(["contact"]);
   });
 });
 
@@ -791,6 +865,7 @@ describe("quien no tiene la membresía al día (#453)", () => {
 
     expect(Object.keys(result).sort()).toEqual([
       "block",
+      "contactReminder",
       "kind",
       "nextTraining",
       "viewer",

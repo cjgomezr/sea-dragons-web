@@ -76,7 +76,7 @@ function toOwnAuf(row: Row): OwnAuf {
 
 /** El `check` `members_emergency_contact_complete` de `0057` garantiza
  * que estén las tres o ninguna. */
-function toEmergencyContact(row: Row): EmergencyContact | null {
+export function toEmergencyContact(row: Row): EmergencyContact | null {
   const name = readText(row, "emergency_contact_name", MEMBERS_TABLE);
   if (name === null) {
     return null;

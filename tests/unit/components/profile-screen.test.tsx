@@ -120,9 +120,15 @@ function renderScreen(
     readonly membershipPlan?: MembershipPlan | null;
     readonly emergencyContactProposal?: EmergencyContactProposal | null;
   } = {},
-): void {
+): ReturnType<typeof render> {
+  return render(profileScreen(options));
+}
+
+function profileScreen(
+  options: Parameters<typeof renderScreen>[0] = {},
+): React.JSX.Element {
   const locale = options.locale ?? "en";
-  render(
+  return (
     <ProfileScreen
       locale={locale}
       userId="cccccccc-0000-4000-8000-00000000000c"
@@ -138,7 +144,7 @@ function renderScreen(
       membershipPlan={
         options.membershipPlan === undefined ? "Full" : options.membershipPlan
       }
-    />,
+    />
   );
 }
 
@@ -153,6 +159,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  window.localStorage.clear();
 });
 
 describe("pantalla de perfil: el tipo de membresía (#456)", () => {
@@ -1010,5 +1017,124 @@ describe("perfil propio: el contacto (#496)", () => {
         "Escribe el teléfono del contacto o deja los tres datos vacíos.",
       ),
     );
+  });
+});
+
+const SISTER = {
+  name: "Lucía Ruiz",
+  phone: "0412 999 888",
+  relationship: "Sister",
+} as const;
+
+describe("pantalla de perfil: el aviso del contacto (#498)", () => {
+  it("sin contacto de emergencia explica para qué es, lleva a Contacto y no se puede cerrar", () => {
+    renderScreen({
+      profile: { ...PROFILE, phone: "0412 345 678", emergencyContact: null },
+    });
+
+    const note = screen.getByRole("note", {
+      name: "Add your emergency contact",
+    });
+    expect(
+      within(note).getByText(
+        "So the club knows who to call if something happens to you at the pool.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(note).getByRole("link", {
+        name: "Complete it in Contact, on your profile",
+      }),
+    ).toHaveAttribute("href", "/cuenta#perfil-contacto");
+    expect(within(note).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("el enlace lleva a la sección Contacto del formulario", () => {
+    renderScreen({ profile: { ...PROFILE, emergencyContact: null } });
+
+    expect(screen.getByRole("heading", { name: "Contact" })).toHaveAttribute(
+      "id",
+      "perfil-contacto",
+    );
+  });
+
+  it("sin teléfono avisa con un aviso que se cierra y no vuelve", async () => {
+    const user = userEvent.setup();
+    const view = renderScreen({
+      profile: { ...PROFILE, phone: null, emergencyContact: SISTER },
+    });
+
+    await user.click(
+      within(
+        await screen.findByRole("note", { name: "Add your phone number" }),
+      ).getByRole("button", { name: "Dismiss phone reminder" }),
+    );
+
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    view.unmount();
+    renderScreen({
+      profile: { ...PROFILE, phone: null, emergencyContact: SISTER },
+    });
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("con los dos datos no pinta ningún aviso", () => {
+    renderScreen({
+      profile: { ...PROFILE, phone: "0412 345 678", emergencyContact: SISTER },
+    });
+
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("cuando faltan los dos pinta un solo aviso que pide los dos", () => {
+    renderScreen({
+      profile: { ...PROFILE, phone: null, emergencyContact: null },
+    });
+
+    expect(screen.getAllByRole("note")).toHaveLength(1);
+    expect(
+      screen.getByRole("note", {
+        name: "Add your phone number and emergency contact",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("no impide guardar la ficha", () => {
+    renderScreen({ profile: { ...PROFILE, emergencyContact: null } });
+
+    expect(saveButton()).toBeEnabled();
+  });
+
+  it("desaparece cuando la página vuelve con el contacto guardado", () => {
+    const view = renderScreen({
+      profile: { ...PROFILE, phone: "0412 345 678", emergencyContact: null },
+    });
+
+    view.rerender(
+      profileScreen({
+        profile: {
+          ...PROFILE,
+          phone: "0412 345 678",
+          emergencyContact: SISTER,
+        },
+      }),
+    );
+
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("se lee en español", () => {
+    renderScreen({
+      locale: "es",
+      profile: { ...PROFILE, phone: null, emergencyContact: null },
+    });
+
+    const note = screen.getByRole("note", {
+      name: "Añade tu teléfono y tu contacto de emergencia",
+    });
+    expect(
+      within(note).getByRole("link", {
+        name: "Complétalo en Contacto, en tu perfil",
+      }),
+    ).toBeInTheDocument();
   });
 });

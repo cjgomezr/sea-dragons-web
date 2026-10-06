@@ -371,6 +371,16 @@ export const spanishMessages: MessageCatalog = {
     "El vencimiento no puede ser anterior al día en que ingresaste al club.",
   "account.profile.error.aufVerified":
     "Tu AUF ya está verificado. Sólo un Admin puede cambiarlo.",
+  // El aviso de los datos de contacto que faltan (#498).
+  "contactReminder.emergencyContact.title": "Añade tu contacto de emergencia",
+  "contactReminder.phone.title": "Añade tu teléfono",
+  "contactReminder.both.title": "Añade tu teléfono y tu contacto de emergencia",
+  "contactReminder.emergencyContact.why":
+    "Para que el club sepa a quién llamar si te pasa algo en la piscina.",
+  "contactReminder.phone.why":
+    "Para que el club pueda localizarte si hace falta.",
+  "contactReminder.link": "Complétalo en Contacto, en tu perfil",
+  "contactReminder.dismissPhone": "Cerrar el aviso del teléfono",
   // El teléfono y el contacto de emergencia del perfil propio (#496).
   "account.profile.contact.title": "Contacto",
   "account.profile.contact.phone": "Tu teléfono (opcional)",

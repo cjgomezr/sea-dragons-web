@@ -7,6 +7,7 @@ import {
   CALENDAR_PATH,
 } from "@/lib/auth/routes";
 import { MembershipNotice } from "@/components/MembershipNotice";
+import { ContactReminderNotice } from "@/components/account/ContactReminderNotice";
 import type {
   Dashboard,
   MemberDashboard,
@@ -40,6 +41,10 @@ import { NextTrainingCard, ReadOnlyTrainingCard } from "./NextTrainingCard";
  * A quien no tiene la membresía al día el endpoint le sirve el inicio
  * reducido (#453): el saludo, el aviso que lleva a Pagos y el próximo
  * entrenamiento sin RSVP.
+ *
+ * Los dos inicios llevan bajo el saludo el aviso de los datos de contacto
+ * que faltan (#498). Se pide al montar, así que al volver del perfil con el
+ * contacto guardado el aviso ya no está.
  */
 
 const NEW_TRAINING_HREF = `${CALENDAR_PATH}?${new URLSearchParams({
@@ -120,13 +125,34 @@ function LoadFailure({
 
 type ContentProps<Shown extends Dashboard> = {
   readonly translate: Translator;
+  readonly userId: string;
   readonly dashboard: Shown;
   readonly loadedAt: Date;
   readonly canCreateTrainings: boolean;
 };
 
+/** Sin poder leer el contacto no se avisa: el resto del inicio sigue. */
+function DashboardContactReminder({
+  translate,
+  userId,
+  dashboard,
+}: Pick<
+  ContentProps<Dashboard>,
+  "translate" | "userId" | "dashboard"
+>): React.JSX.Element | null {
+  const { contactReminder } = dashboard;
+  return contactReminder.kind === "unavailable" ? null : (
+    <ContactReminderNotice
+      locale={translate.locale}
+      userId={userId}
+      reminder={contactReminder.reminder}
+    />
+  );
+}
+
 function RestrictedContent({
   translate,
+  userId,
   dashboard,
   loadedAt,
   canCreateTrainings,
@@ -138,6 +164,11 @@ function RestrictedContent({
         firstName={dashboard.viewer.firstName}
         now={clubMoment(loadedAt)}
         canCreateTrainings={canCreateTrainings}
+      />
+      <DashboardContactReminder
+        translate={translate}
+        userId={userId}
+        dashboard={dashboard}
       />
       <MembershipNotice
         translate={translate}
@@ -154,6 +185,7 @@ function RestrictedContent({
 
 function MemberContent({
   translate,
+  userId,
   dashboard,
   loadedAt,
   canCreateTrainings,
@@ -167,6 +199,11 @@ function MemberContent({
         firstName={dashboard.viewer.firstName}
         now={now}
         canCreateTrainings={canCreateTrainings}
+      />
+      <DashboardContactReminder
+        translate={translate}
+        userId={userId}
+        dashboard={dashboard}
       />
       <DashboardTiles translate={translate} tiles={dashboard.tiles} now={now} />
       {nextTraining.kind === "training" ? (
@@ -193,9 +230,12 @@ function MemberContent({
 
 export function DashboardScreen({
   locale,
+  userId,
   canCreateTrainings,
 }: {
   readonly locale: Locale;
+  /** Quien mira: el cierre del aviso del teléfono es de su cuenta (#498). */
+  readonly userId: string;
   /** Si se pinta "Nuevo entrenamiento". Sólo decide el botón: crear lo
    * vuelve a comprobar el endpoint (#307). */
   readonly canCreateTrainings: boolean;
@@ -249,6 +289,7 @@ export function DashboardScreen({
       {state.kind === "ready" && state.dashboard.kind === "member" ? (
         <MemberContent
           translate={translate}
+          userId={userId}
           dashboard={state.dashboard}
           loadedAt={state.loadedAt}
           canCreateTrainings={canCreateTrainings}
@@ -257,6 +298,7 @@ export function DashboardScreen({
       {state.kind === "ready" && state.dashboard.kind === "restricted" ? (
         <RestrictedContent
           translate={translate}
+          userId={userId}
           dashboard={state.dashboard}
           loadedAt={state.loadedAt}
           canCreateTrainings={canCreateTrainings}

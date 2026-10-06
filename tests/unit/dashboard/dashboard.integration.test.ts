@@ -208,6 +208,43 @@ describeRls("el dashboard en Supabase", () => {
   );
 
   it(
+    "pide el contacto mientras falte y deja de pedirlo cuando se guarda (#498)",
+    async () => {
+      await withHome(async (home) => {
+        const gateways = createDashboardGateways(home.serviceClient.client);
+        const request = { callerId: home.player.id, now: new Date() };
+
+        const before = await readDashboard(gateways, request);
+
+        expect(before.contactReminder).toEqual({
+          kind: "reminder",
+          reminder: "both",
+        });
+
+        const { error } = await home.serviceClient.client
+          .from("members")
+          .update({
+            phone: "0412 345 678",
+            emergency_contact_name: "Pablo Player",
+            emergency_contact_phone: "0412 999 888",
+            emergency_contact_relationship: "Hermano",
+          })
+          .eq("user_id", home.player.id);
+        if (error) {
+          throw new Error(`No se pudo guardar el contacto: ${error.message}`);
+        }
+        const after = await readDashboard(gateways, request);
+
+        expect(after.contactReminder).toEqual({
+          kind: "reminder",
+          reminder: "none",
+        });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "sirve el inicio reducido a quien dejó de estar al día (#453)",
     async () => {
       await withHome(async (home) => {
@@ -232,6 +269,7 @@ describeRls("el dashboard en Supabase", () => {
             kind: "training",
             training: expect.objectContaining({ id: home.trainingId }),
           },
+          contactReminder: { kind: "reminder", reminder: "both" },
         });
       });
     },

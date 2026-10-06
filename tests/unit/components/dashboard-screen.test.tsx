@@ -11,6 +11,7 @@ import type {
 import type { AgendaEvent } from "@/lib/events/event-agenda";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
 import { formatClockTime, formatPercent } from "@/lib/i18n/format";
+import type { ContactReminder } from "@/lib/members/contact-reminder";
 
 /**
  * La pantalla de inicio (#426, RF-1 a RF-4 del PRD de E14). Qué se cuenta y
@@ -18,6 +19,8 @@ import { formatClockTime, formatPercent } from "@/lib/i18n/format";
  * pantalla pinta lo que responde, en el idioma y con la hora del club, y que
  * el RSVP de la tarjeta guarda como en el calendario.
  */
+
+const USER_ID = "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d";
 
 // 30 de septiembre de 2026 a las 18:00 en Melbourne (AEST, UTC+10).
 const NOW = new Date("2026-09-30T08:00:00.000Z");
@@ -109,6 +112,7 @@ const ADMIN_DASHBOARD: MemberDashboard = {
   },
   upcomingEvents: { kind: "events", events: UPCOMING },
   latestNews: { kind: "news", posts: LATEST_NEWS },
+  contactReminder: { kind: "reminder", reminder: "none" },
 };
 
 const PLAYER_DASHBOARD: MemberDashboard = {
@@ -133,6 +137,7 @@ const EMPTY_DASHBOARD: MemberDashboard = {
   },
   upcomingEvents: { kind: "events", events: [] },
   latestNews: { kind: "news", posts: [] },
+  contactReminder: { kind: "reminder", reminder: "none" },
 };
 
 type RecordedRequest = { readonly method: string; readonly path: string };
@@ -206,6 +211,7 @@ async function renderScreen(
   const view = render(
     <DashboardScreen
       locale={options.locale ?? "en"}
+      userId={USER_ID}
       canCreateTrainings={options.canCreateTrainings ?? false}
     />,
   );
@@ -246,6 +252,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  window.localStorage.clear();
 });
 
 describe("el saludo", () => {
@@ -511,7 +519,13 @@ describe("próximos y noticias", () => {
     stubDashboard(ADMIN_DASHBOARD);
     const view = await renderScreen();
 
-    view.rerender(<DashboardScreen locale="es" canCreateTrainings={false} />);
+    view.rerender(
+      <DashboardScreen
+        locale="es"
+        userId={USER_ID}
+        canCreateTrainings={false}
+      />,
+    );
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Buenas tardes, Alba" }),
@@ -630,7 +644,13 @@ describe("errores", () => {
       }
       return jsonResponse(200, { data: ADMIN_DASHBOARD });
     });
-    render(<DashboardScreen locale="en" canCreateTrainings={false} />);
+    render(
+      <DashboardScreen
+        locale="en"
+        userId={USER_ID}
+        canCreateTrainings={false}
+      />,
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /couldn't reach the server/i,
@@ -651,7 +671,13 @@ describe("errores", () => {
         error: { code: "internal_error", message: "Falló." },
       }),
     );
-    render(<DashboardScreen locale="en" canCreateTrainings={false} />);
+    render(
+      <DashboardScreen
+        locale="en"
+        userId={USER_ID}
+        canCreateTrainings={false}
+      />,
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't load the dashboard. Try again.",
@@ -667,6 +693,7 @@ const RESTRICTED_DASHBOARD: RestrictedDashboard = {
   viewer: { firstName: "Alba" },
   block: "pending",
   nextTraining: { kind: "training", training: POOL_TRAINING },
+  contactReminder: { kind: "reminder", reminder: "none" },
 };
 
 describe("el inicio de quien no tiene la membresía al día (#453)", () => {
@@ -730,5 +757,205 @@ describe("el inicio de quien no tiene la membresía al día (#453)", () => {
     expect(
       screen.getByRole("link", { name: "Ir a Pagos" }),
     ).toBeInTheDocument();
+  });
+});
+
+function withReminder(
+  reminder: ContactReminder,
+  dashboard: Dashboard = ADMIN_DASHBOARD,
+): Dashboard {
+  return { ...dashboard, contactReminder: { kind: "reminder", reminder } };
+}
+
+const EMERGENCY_NOTE = "Add your emergency contact";
+const PHONE_NOTE = "Add your phone number";
+const BOTH_NOTE = "Add your phone number and emergency contact";
+const CONTACT_LINK = "Complete it in Contact, on your profile";
+
+describe("el aviso del contacto (#498)", () => {
+  it("sin contacto de emergencia explica para qué es, enlaza a Contacto y no se puede cerrar", async () => {
+    stubDashboard(withReminder("emergency_contact"));
+
+    await renderScreen();
+
+    const note = screen.getByRole("note", { name: EMERGENCY_NOTE });
+    expect(
+      within(note).getByText(
+        "So the club knows who to call if something happens to you at the pool.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(note).getByRole("link", { name: CONTACT_LINK }),
+    ).toHaveAttribute("href", "/cuenta#perfil-contacto");
+    expect(within(note).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("sin teléfono avisa con un aviso que se puede cerrar", async () => {
+    stubDashboard(withReminder("phone"));
+
+    await renderScreen();
+
+    const note = screen.getByRole("note", { name: PHONE_NOTE });
+    expect(
+      within(note).getByRole("link", { name: CONTACT_LINK }),
+    ).toHaveAttribute("href", "/cuenta#perfil-contacto");
+    expect(
+      within(note).getByRole("button", { name: "Dismiss phone reminder" }),
+    ).toBeInTheDocument();
+  });
+
+  it("cerrado, el aviso del teléfono no vuelve en ese navegador", async () => {
+    stubDashboard(withReminder("phone"));
+    const user = userEvent.setup();
+    const view = await renderScreen();
+
+    await user.click(
+      screen.getByRole("button", { name: "Dismiss phone reminder" }),
+    );
+
+    expect(
+      screen.queryByRole("note", { name: PHONE_NOTE }),
+    ).not.toBeInTheDocument();
+    view.unmount();
+    await renderScreen();
+    expect(
+      screen.queryByRole("note", { name: PHONE_NOTE }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("cerrar el del teléfono no lo cierra para otra cuenta del mismo navegador", async () => {
+    stubDashboard(withReminder("phone"));
+    const user = userEvent.setup();
+    const view = await renderScreen();
+    await user.click(
+      screen.getByRole("button", { name: "Dismiss phone reminder" }),
+    );
+    view.unmount();
+
+    render(
+      <DashboardScreen
+        locale="en"
+        userId="00000000-0000-4000-8000-0000000000aa"
+        canCreateTrainings={false}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("note", { name: PHONE_NOTE }),
+    ).toBeInTheDocument();
+  });
+
+  it("sin almacenamiento en el navegador el del teléfono sale y se cierra igual", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("bloqueado", "SecurityError");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("bloqueado", "SecurityError");
+    });
+    stubDashboard(withReminder("phone"));
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await user.click(
+      screen.getByRole("button", { name: "Dismiss phone reminder" }),
+    );
+
+    expect(
+      screen.queryByRole("note", { name: PHONE_NOTE }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("cuando faltan los dos pinta un solo aviso que pide los dos", async () => {
+    stubDashboard(withReminder("both"));
+
+    await renderScreen();
+
+    expect(screen.getAllByRole("note")).toHaveLength(1);
+    const note = screen.getByRole("note", { name: BOTH_NOTE });
+    expect(within(note).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("con los dos datos no pinta ningún aviso", async () => {
+    stubDashboard(withReminder("none"));
+
+    await renderScreen();
+
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("si no se pudo leer el contacto no pinta ningún aviso", async () => {
+    stubDashboard({
+      ...ADMIN_DASHBOARD,
+      contactReminder: { kind: "unavailable" },
+    });
+
+    await renderScreen();
+
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("no bloquea el RSVP ni el resto del inicio", async () => {
+    stubDashboard(withReminder("both"));
+
+    await renderScreen();
+
+    expect(rsvpButton("Yes")).toBeEnabled();
+    expect(tiles()).toBeInTheDocument();
+  });
+
+  it("también avisa en el inicio reducido, sin tapar el enlace a Pagos", async () => {
+    stubDashboard(withReminder("emergency_contact", RESTRICTED_DASHBOARD));
+
+    await renderScreen();
+
+    expect(
+      screen.getByRole("note", { name: EMERGENCY_NOTE }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Go to Payments" }),
+    ).toBeInTheDocument();
+  });
+
+  it("al volver al inicio con el contacto ya guardado el aviso no está", async () => {
+    stubDashboard(withReminder("emergency_contact"));
+    const view = await renderScreen();
+    expect(
+      screen.getByRole("note", { name: EMERGENCY_NOTE }),
+    ).toBeInTheDocument();
+    view.unmount();
+
+    stubDashboard(withReminder("none"));
+    await renderScreen();
+
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("cambia con el idioma sin volver a pedir", async () => {
+    stubDashboard(withReminder("emergency_contact"));
+    const view = await renderScreen();
+    const requestsBefore = requests.length;
+
+    view.rerender(
+      <DashboardScreen
+        locale="es"
+        userId={USER_ID}
+        canCreateTrainings={false}
+      />,
+    );
+
+    const note = screen.getByRole("note", {
+      name: "Añade tu contacto de emergencia",
+    });
+    expect(
+      within(note).getByText(
+        "Para que el club sepa a quién llamar si te pasa algo en la piscina.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(note).getByRole("link", {
+        name: "Complétalo en Contacto, en tu perfil",
+      }),
+    ).toBeInTheDocument();
+    expect(requests).toHaveLength(requestsBefore);
   });
 });
