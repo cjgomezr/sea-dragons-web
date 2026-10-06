@@ -42,9 +42,10 @@ import { NextTrainingCard, ReadOnlyTrainingCard } from "./NextTrainingCard";
  * reducido (#453): el saludo, el aviso que lleva a Pagos y el próximo
  * entrenamiento sin RSVP.
  *
- * Los dos inicios llevan bajo el saludo el aviso de los datos de contacto
- * que faltan (#498). Se pide al montar, así que al volver del perfil con el
- * contacto guardado el aviso ya no está.
+ * Los dos inicios llevan el aviso de los datos de contacto que faltan (#498)
+ * detrás de la tarjeta del entrenamiento, para que en el móvil no empuje el
+ * RSVP fuera de la primera pantalla. Se pide al montar, así que al volver del
+ * perfil con el contacto guardado el aviso ya no está.
  */
 
 const NEW_TRAINING_HREF = `${CALENDAR_PATH}?${new URLSearchParams({
@@ -165,11 +166,6 @@ function RestrictedContent({
         now={clubMoment(loadedAt)}
         canCreateTrainings={canCreateTrainings}
       />
-      <DashboardContactReminder
-        translate={translate}
-        userId={userId}
-        dashboard={dashboard}
-      />
       <MembershipNotice
         translate={translate}
         block={dashboard.block}
@@ -178,6 +174,11 @@ function RestrictedContent({
       <ReadOnlyTrainingCard
         translate={translate}
         nextTraining={dashboard.nextTraining}
+      />
+      <DashboardContactReminder
+        translate={translate}
+        userId={userId}
+        dashboard={dashboard}
       />
     </>
   );
@@ -200,11 +201,6 @@ function MemberContent({
         now={now}
         canCreateTrainings={canCreateTrainings}
       />
-      <DashboardContactReminder
-        translate={translate}
-        userId={userId}
-        dashboard={dashboard}
-      />
       <DashboardTiles translate={translate} tiles={dashboard.tiles} now={now} />
       {nextTraining.kind === "training" ? (
         <NextTrainingCard
@@ -213,6 +209,11 @@ function MemberContent({
           training={nextTraining.training}
         />
       ) : null}
+      <DashboardContactReminder
+        translate={translate}
+        userId={userId}
+        dashboard={dashboard}
+      />
       <div className="dashboard-panels">
         <UpcomingPanel
           translate={translate}

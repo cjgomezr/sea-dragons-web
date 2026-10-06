@@ -4810,9 +4810,10 @@ a.auth-brand-header:focus-visible {
 
 /* El aviso de los datos de contacto que faltan (#498), en el inicio y en el
    perfil. Es primo del de la membresía: el mismo borde de aviso a la
-   izquierda, pero más compacto, para que en el móvil no empuje la tarjeta del
-   entrenamiento fuera de la primera pantalla. El botón de cerrar (sólo el del
-   teléfono) mide 44px, el mínimo de un objetivo táctil. */
+   izquierda, pero más compacto. En el inicio va detrás de la tarjeta del
+   entrenamiento, para no empujar el RSVP fuera de la primera pantalla del
+   móvil. El botón de cerrar (sólo el del teléfono) va a la derecha y mide
+   44px, el mínimo de un objetivo táctil. */
 .contact-reminder {
   display: flex;
   align-items: flex-start;
@@ -4834,10 +4835,10 @@ a.auth-brand-header:focus-visible {
   gap: var(--space-1);
   justify-items: start;
   min-width: 0;
-  max-width: 70ch;
 }
 
 .contact-reminder-text p {
+  max-width: 70ch;
   margin: 0;
 }
 
