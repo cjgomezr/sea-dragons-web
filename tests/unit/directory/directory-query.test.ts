@@ -27,6 +27,8 @@ describe("la consulta del directorio", () => {
       groupId: null,
       auf: null,
       membership: null,
+      withoutPhone: false,
+      withoutEmergencyContact: false,
     });
     expect(DEFAULT_DIRECTORY_QUERY).toEqual(parse(""));
   });
@@ -72,6 +74,8 @@ describe("la consulta del directorio", () => {
     ["un grupo «none»", "group=none"],
     ["un AUF que no existe", "auf=soon"],
     ["una membresía que no existe", "membership=paid"],
+    ["un sin teléfono que no es booleano", "withoutPhone=1"],
+    ["un sin contacto de emergencia vacío", "withoutEmergencyContact="],
   ])("rechaza %s", (_case, search) => {
     expect(() => parse(search)).toThrow(InvalidDirectoryQueryError);
   });
@@ -124,6 +128,16 @@ describe("los filtros de la consulta (#497)", () => {
   });
 });
 
+describe("los filtros de contacto de la consulta (#499)", () => {
+  it.each(["withoutPhone", "withoutEmergencyContact"] as const)(
+    "acepta %s como booleano",
+    (parameter) => {
+      expect(parse(`${parameter}=true`)[parameter]).toBe(true);
+      expect(parse(`${parameter}=false`)[parameter]).toBe(false);
+    },
+  );
+});
+
 describe("la consulta escrita en la dirección (#497)", () => {
   it("no escribe nada de lo que ya es por defecto", () => {
     expect(writeDirectoryQuery(DEFAULT_DIRECTORY_QUERY).toString()).toBe("");
@@ -141,6 +155,8 @@ describe("la consulta escrita en la dirección (#497)", () => {
       groupId: GROUP_ID,
       auf: "expiring",
       membership: "past_due",
+      withoutPhone: true,
+      withoutEmergencyContact: true,
     });
 
     expect(Object.fromEntries(written)).toEqual({
@@ -153,6 +169,8 @@ describe("la consulta escrita en la dirección (#497)", () => {
       group: GROUP_ID,
       auf: "expiring",
       membership: "past_due",
+      withoutPhone: "true",
+      withoutEmergencyContact: "true",
     });
   });
 
@@ -162,6 +180,7 @@ describe("la consulta escrita en la dirección (#497)", () => {
       position: { kind: "position", positionId: POSITION_ID },
       membership: "none",
       auf: "unverified",
+      withoutEmergencyContact: true,
     } as const;
 
     expect(parseDirectoryQuery(writeDirectoryQuery(query))).toEqual(query);

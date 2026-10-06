@@ -5,6 +5,7 @@ import { DirectoryScreen } from "@/components/directory/DirectoryScreen";
 import type {
   AdminDirectoryMember,
   CoachDirectoryMember,
+  CommitteeDirectoryMember,
   DirectoryMember,
 } from "@/lib/directory/directory";
 import { DEFAULT_DIRECTORY_QUERY } from "@/lib/directory/directory";
@@ -77,6 +78,9 @@ const ZOE: AdminDirectoryMember = {
   isAufExpired: false,
   isEvaluated: true,
   membershipStatus: "active",
+  email: "zoe@club.test",
+  phone: null,
+  emergencyContact: null,
 };
 
 const VENCIDA: AdminDirectoryMember = {
@@ -95,6 +99,9 @@ const VENCIDA: AdminDirectoryMember = {
   isAufExpired: true,
   isEvaluated: true,
   membershipStatus: "active",
+  email: "vencida@club.test",
+  phone: null,
+  emergencyContact: null,
 };
 
 /** La misma socia, tal como la ve un Admin: con su registro federativo al día,
@@ -107,6 +114,9 @@ const MARIA_PARA_ADMIN: AdminDirectoryMember = {
   isAufExpired: false,
   isEvaluated: true,
   membershipStatus: "active",
+  email: "maria.para.admin@club.test",
+  phone: null,
+  emergencyContact: null,
 };
 
 /** El guion que ocupa el sitio de un dato que el socio no tiene. */
@@ -127,17 +137,29 @@ const SENIOR_GROUP = {
  * cosa. Un Committee recibe la vista de socio con el grupo: lo pide así. */
 const FILTERS_BY_KIND = {
   member: ["position"],
+  committee: ["position", "group", "withoutPhone", "withoutEmergencyContact"],
   coach: ["position", "group"],
-  admin: ["position", "group", "auf", "membership"],
+  admin: [
+    "position",
+    "group",
+    "auf",
+    "membership",
+    "withoutPhone",
+    "withoutEmergencyContact",
+  ],
 } as const;
 
-type AnyMember = DirectoryMember | CoachDirectoryMember | AdminDirectoryMember;
+type AnyMember =
+  | DirectoryMember
+  | CommitteeDirectoryMember
+  | CoachDirectoryMember
+  | AdminDirectoryMember;
 
 type ApiStub = {
   readonly members?: readonly AnyMember[];
   /** Quién mira: sólo un Admin recibe `admin`, y con él el control de los
    * dados de baja y la marca del AUF. */
-  readonly kind?: "member" | "coach" | "admin";
+  readonly kind?: "member" | "committee" | "coach" | "admin";
   /** Recibe el camino pedido, para poder contestar distinto según lo que se
    * preguntó (un 403 sólo a quien pide los dados de baja, por ejemplo). */
   readonly respond?: (url: string) => Response | Promise<Response>;
@@ -939,8 +961,16 @@ describe("chip de membresía (#453)", () => {
 });
 
 describe("marca de sin evaluar", () => {
-  const SIN_EVALUAR: CoachDirectoryMember = { ...NEREA, isEvaluated: false };
-  const EVALUADA: CoachDirectoryMember = { ...MARIA, isEvaluated: true };
+  const SIN_EVALUAR: CoachDirectoryMember = {
+    ...NEREA,
+    isEvaluated: false,
+    emergencyContact: null,
+  };
+  const EVALUADA: CoachDirectoryMember = {
+    ...MARIA,
+    isEvaluated: true,
+    emergencyContact: null,
+  };
 
   it.each([
     ["Coach", { kind: "coach", members: [EVALUADA, SIN_EVALUAR] }],
@@ -1207,14 +1237,23 @@ describe("filtros del directorio", () => {
   });
 
   it.each([
-    ["Coach", "coach"],
-    ["Committee", "member"],
+    ["Coach", "coach", { ...MARIA, isEvaluated: true, emergencyContact: null }],
+    [
+      "Committee",
+      "committee",
+      {
+        ...MARIA,
+        email: "maria@club.test",
+        phone: null,
+        emergencyContact: null,
+      },
+    ],
   ] as const)(
     "a un %s le ofrece el grupo, pero no el AUF ni la membresía",
-    async (_role, kind) => {
+    async (_role, kind, member) => {
       stubApi({
         kind,
-        members: [{ ...MARIA, isEvaluated: true }],
+        members: [member],
         availableFilters: ["position", "group"],
       });
       await renderScreen();

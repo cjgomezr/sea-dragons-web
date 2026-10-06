@@ -95,6 +95,7 @@ function rowsOf(listing: DirectoryListing): readonly DirectoryRow[] {
         admin: null,
         isEvaluated: member.isEvaluated,
       }));
+    case "committee":
     case "member":
       return listing.members.map((member) => ({
         member,

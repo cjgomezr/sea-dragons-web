@@ -72,6 +72,8 @@ function filtersOf(query: DirectoryQuery): DirectoryFilterState {
     groupId: query.groupId,
     auf: query.auf,
     membership: query.membership,
+    withoutPhone: query.withoutPhone,
+    withoutEmergencyContact: query.withoutEmergencyContact,
   };
 }
 
@@ -174,6 +176,8 @@ export function DirectoryScreen({
       groupId: filters.groupId,
       auf: filters.auf,
       membership: filters.membership,
+      withoutPhone: filters.withoutPhone,
+      withoutEmergencyContact: filters.withoutEmergencyContact,
       sort: order.sort,
       direction: order.direction,
     }),
@@ -185,6 +189,8 @@ export function DirectoryScreen({
       filters.groupId,
       filters.auf,
       filters.membership,
+      filters.withoutPhone,
+      filters.withoutEmergencyContact,
       order,
     ],
   );
@@ -218,8 +224,8 @@ export function DirectoryScreen({
   }, [query, reloads]);
 
   /** Reintentar tras un 403 quita lo que esta pantalla puede dejar de pedir
-   * y depende del rol: los dados de baja y los filtros de grupo, AUF y
-   * membresía (#497). Sin esto, a quien deja de ser Admin con la pantalla
+   * y depende del rol: los dados de baja, los filtros de grupo, AUF y
+   * membresía (#497) y los de contacto (#499). Sin esto, a quien deja de ser Admin con la pantalla
    * abierta, o a quien abre una dirección compartida por un Admin, le queda un
    * botón que repite el mismo 403 para siempre, porque el control que lo causa
    * ya no se dibuja. El otro 403 del endpoint, el de una cuenta que deja de
@@ -233,6 +239,8 @@ export function DirectoryScreen({
         groupId: null,
         auf: null,
         membership: null,
+        withoutPhone: false,
+        withoutEmergencyContact: false,
       }));
     }
     setState({ kind: "loading" });

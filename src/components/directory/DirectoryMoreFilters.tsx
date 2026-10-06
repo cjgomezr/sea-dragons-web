@@ -30,7 +30,12 @@ import type { FilterChoices } from "./use-filter-choices";
 
 export type MoreFilters = Pick<
   DirectoryQuery,
-  "position" | "groupId" | "auf" | "membership"
+  | "position"
+  | "groupId"
+  | "auf"
+  | "membership"
+  | "withoutPhone"
+  | "withoutEmergencyContact"
 >;
 
 export const NO_MORE_FILTERS: MoreFilters = {
@@ -38,6 +43,8 @@ export const NO_MORE_FILTERS: MoreFilters = {
   groupId: null,
   auf: null,
   membership: null,
+  withoutPhone: false,
+  withoutEmergencyContact: false,
 };
 
 /** "Sin filtrar" en un `<select>`, que sólo habla en textos. */
@@ -61,16 +68,23 @@ const MEMBERSHIP_KEYS = {
   none: "directory.filter.membership.none",
 } as const satisfies Record<MembershipFilter, MessageKey>;
 
-/** Los cuatro y ninguno más: quien llama puede pasar el estado entero de la
+/** Los seis y ninguno más: quien llama puede pasar el estado entero de la
  * pantalla, con la búsqueda y el rol, que no cuentan en el botón. */
 export function countActiveFilters({
   position,
   groupId,
   auf,
   membership,
+  withoutPhone,
+  withoutEmergencyContact,
 }: MoreFilters): number {
-  return [position, groupId, auf, membership].filter((value) => value !== null)
-    .length;
+  const chosen = [position, groupId, auf, membership].filter(
+    (value) => value !== null,
+  ).length;
+  const checked = [withoutPhone, withoutEmergencyContact].filter(
+    (isChecked) => isChecked,
+  ).length;
+  return chosen + checked;
 }
 
 function positionValue(position: DirectoryPositionFilter | null): string {
