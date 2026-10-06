@@ -13,7 +13,10 @@ import {
  * la aplicación no pone tiempo máximo ni reintenta (#165).
  */
 
-/** Lo más que se espera a que dev conteste una petición. */
+/** Lo más que se espera a que dev conteste una petición. Cubre el intercambio
+ * entero, cuerpo incluido: un cuerpo que termina de llegar pasado el plazo
+ * aborta su lectura sin reintento ni etiqueta, cosa que no se ha visto en dev
+ * y no compensa complicar esto. */
 export const SUPABASE_FETCH_TIMEOUT_MS = 10_000;
 
 const ATTEMPTS_PER_READ = SUPABASE_RETRY_DELAYS_MS.length + 1;

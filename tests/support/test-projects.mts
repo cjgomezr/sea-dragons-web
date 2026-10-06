@@ -1,4 +1,5 @@
 import { configDefaults } from "vitest/config";
+import { NETWORK_TEST_TIMEOUT_MS } from "./network-test-timeout";
 import {
   INTEGRATION_TEST_PATTERNS,
   selectExcludedTests,
@@ -50,11 +51,15 @@ export type TestProjectSelection =
       readonly name: typeof UNIT_PROJECT_NAME;
       readonly fileParallelism?: undefined;
       readonly maxWorkers?: undefined;
+      readonly testTimeout?: undefined;
+      readonly hookTimeout?: undefined;
     })
   | (ProjectFiles & {
       readonly name: typeof INTEGRATION_PROJECT_NAME;
       readonly fileParallelism: false;
       readonly maxWorkers: typeof SEQUENTIAL_WORKERS;
+      readonly testTimeout: number;
+      readonly hookTimeout: number;
     });
 
 export function selectTestProjects(
@@ -74,6 +79,10 @@ export function selectTestProjects(
       setupFiles: [SHARED_SETUP_FILE, INTEGRATION_FETCH_TIMEOUT_SETUP_FILE],
       fileParallelism: false,
       maxWorkers: SEQUENTIAL_WORKERS,
+      // Un test o un hook que no fije su plazo no debe agotarse antes que una
+      // lectura colgada con todos sus reintentos (#506).
+      testTimeout: NETWORK_TEST_TIMEOUT_MS,
+      hookTimeout: NETWORK_TEST_TIMEOUT_MS,
     },
   ];
 }
