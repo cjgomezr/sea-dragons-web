@@ -459,7 +459,13 @@ export function DirectoryTable({
   const rows = rowsOf(listing);
   const roleDrafts = useRoleDrafts(onSaveRole);
   return (
-    <>
+    <div
+      className={
+        listing.kind === "member"
+          ? "directory-list"
+          : "directory-list directory-list-contact"
+      }
+    >
       <DirectorySortControl
         translate={translate}
         order={order}
@@ -520,6 +526,6 @@ export function DirectoryTable({
           </tbody>
         </table>
       </div>
-    </>
+    </div>
   );
 }

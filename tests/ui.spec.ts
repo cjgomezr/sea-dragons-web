@@ -4522,32 +4522,27 @@ function filterToNobody(labels: FilterLabels, emptyText: RegExp) {
    casilla "Sin teléfono" de quien ve todo el contacto. */
 
 type ContactLabels = {
-  readonly column: string;
   readonly withoutPhone: string;
   readonly filters: FilterLabels;
 };
 
 const ENGLISH_CONTACT_LABELS: ContactLabels = {
-  column: "Contact",
   withoutPhone: "No phone",
   filters: ENGLISH_FILTER_LABELS,
 };
 
 const SPANISH_CONTACT_LABELS: ContactLabels = {
-  column: "Contacto",
   withoutPhone: "Sin teléfono",
   filters: SPANISH_FILTER_LABELS,
 };
 
-function waitForContactColumn(labels: ContactLabels) {
-  return async (page: Page): Promise<void> => {
-    await expect(
-      page.getByRole("link", { name: "0488 222 333" }).first(),
-    ).toBeAttached();
-    await expect(
-      page.getByRole("columnheader", { name: labels.column }),
-    ).toBeAttached();
-  };
+/** La columna del contacto ya pintada. Se espera al enlace del contacto de
+ * emergencia de Nerea y no a la cabecera: en el móvil la cabecera se esconde
+ * y no queda en el árbol de accesibilidad. */
+async function waitForContactColumn(page: Page): Promise<void> {
+  await expect(
+    page.getByRole("link", { name: "0488 222 333" }).first(),
+  ).toBeVisible();
 }
 
 /** Marca "Sin teléfono": quedan Nerea, con contacto de emergencia, y el
@@ -4565,7 +4560,7 @@ function filterWithoutPhone(labels: ContactLabels) {
       await expect(sheet).toHaveCount(0);
     }
     await expect(page.getByRole("row", { name: "Ana Admin" })).toHaveCount(0);
-    await waitForContactColumn(labels)(page);
+    await waitForContactColumn(page);
   };
 }
 
@@ -4786,7 +4781,7 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     asAdmin: false,
     asCoach: true,
     listHeading: ENGLISH_DIRECTORY_HEADING,
-    prepare: waitForContactColumn(ENGLISH_CONTACT_LABELS),
+    prepare: waitForContactColumn,
   },
   {
     name: "directorio-contacto-coach-es",
@@ -4794,7 +4789,7 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     asCoach: true,
     listHeading: SPANISH_DIRECTORY_HEADING,
     beforeVisit: chooseSpanish,
-    prepare: waitForContactColumn(SPANISH_CONTACT_LABELS),
+    prepare: waitForContactColumn,
   },
   {
     name: "directorio-filtrado-sin-resultados-es",

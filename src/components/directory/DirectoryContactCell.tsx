@@ -31,6 +31,17 @@ function telHref(phone: string): string {
   return `tel:${phone.replace(/[^\d+]/g, "")}`;
 }
 
+/** Un correo largo no cabe entero en la tarjeta de 375px. Se deja partir
+ * después de la arroba y de cada punto, que es donde se lee bien, y no a
+ * mitad de una palabra. */
+function breakableEmail(email: string): React.ReactNode[] {
+  return email
+    .split(/(?<=[@.])/)
+    .flatMap((part, index) =>
+      index === 0 ? [part] : [<wbr key={index} />, part],
+    );
+}
+
 function PhoneLink({ phone }: { phone: string }): React.JSX.Element {
   return (
     <a className="directory-contact-link" href={telHref(phone)}>
@@ -102,7 +113,7 @@ export function DirectoryContactCell({
                 className="directory-contact-link"
                 href={`mailto:${contact.email}`}
               >
-                {contact.email}
+                {breakableEmail(contact.email)}
               </a>
             </ContactLine>
             <ContactLine label={translate("directory.contact.phone")}>

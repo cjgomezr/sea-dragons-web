@@ -28,10 +28,12 @@ import {
   type AufSubmission,
   type MemberRecordSubmission,
 } from "@/lib/members/member-record";
-import type { ProfileContactSubmission } from "@/lib/members/profile-contact";
+import {
+  type ProfileContactSubmission,
+  isContactIssueCode,
+} from "@/lib/members/profile-contact";
 import { loadGroups } from "@/components/groups/groups-client";
 import { describeContactIssue } from "@/components/account/profile-client";
-import { isContactIssueCode } from "@/lib/members/profile-contact";
 import {
   emergencyContactSchema,
   memberAttendanceSchema,
