@@ -3863,11 +3863,84 @@ const UNEVALUATED_MEMBER_IDS: ReadonlySet<string> = new Set([
   "66666666-0000-4000-8000-000000000006",
 ]);
 
-/** La vista del Coach: la de todos, más si tiene evaluación (#324). */
+type StubbedContact = {
+  readonly email: string;
+  readonly phone: string | null;
+  readonly emergencyContact: {
+    readonly name: string;
+    readonly phone: string;
+    readonly relationship: string;
+  } | null;
+};
+
+/** El contacto de cada socio de la lista fija (#499). Hay de todo: con los
+ * tres datos, sin teléfono propio, sin contacto de emergencia y, en el nombre
+ * más largo, sin ninguno de los dos y con el correo más largo. */
+const STUBBED_CONTACTS: Readonly<Record<string, StubbedContact>> = {
+  "11111111-0000-4000-8000-000000000001": {
+    email: "ana.admin@seadragons.test",
+    phone: "0412 345 678",
+    emergencyContact: {
+      name: "Luis Admin",
+      phone: "0499 111 222",
+      relationship: "Partner",
+    },
+  },
+  "22222222-0000-4000-8000-000000000002": {
+    email: "mateo.restrepo@seadragons.test",
+    phone: "+57 300 123 4567",
+    emergencyContact: {
+      name: "Rosa Restrepo",
+      phone: "+57 300 765 4321",
+      relationship: "Mother",
+    },
+  },
+  "33333333-0000-4000-8000-000000000003": {
+    email: "nerea.ruiz@seadragons.test",
+    phone: null,
+    emergencyContact: {
+      name: "Iñaki Ruiz",
+      phone: "0488 222 333",
+      relationship: "Father",
+    },
+  },
+  "44444444-0000-4000-8000-000000000004": {
+    email: "tomas.errekondo.aranburu@seadragons.test",
+    phone: null,
+    emergencyContact: null,
+  },
+  "55555555-0000-4000-8000-000000000005": {
+    email: "zoe.zapata@seadragons.test",
+    phone: "0400 000 111",
+    emergencyContact: null,
+  },
+};
+
+/** Un socio que un describe añade a la lista sin contacto propio sale sin
+ * teléfono ni contacto de emergencia. */
+function stubbedContactOf(member: {
+  readonly userId: string;
+  readonly fullName?: string;
+}): StubbedContact {
+  return (
+    STUBBED_CONTACTS[member.userId] ?? {
+      email: `${member.userId.slice(0, 8)}@seadragons.test`,
+      phone: null,
+      emergencyContact: null,
+    }
+  );
+}
+
+/** La vista del Coach: la de todos, más si tiene evaluación (#324) y el
+ * contacto de emergencia (#499). */
 function asCoachMember(member: {
   readonly userId: string;
 }): Record<string, unknown> {
-  return { ...member, isEvaluated: !UNEVALUATED_MEMBER_IDS.has(member.userId) };
+  return {
+    ...member,
+    isEvaluated: !UNEVALUATED_MEMBER_IDS.has(member.userId),
+    emergencyContact: stubbedContactOf(member).emergencyContact,
+  };
 }
 
 function asAdminMember(member: {
@@ -3876,6 +3949,7 @@ function asAdminMember(member: {
   const isAufExpired = member.userId === EXPIRED_AUF_MEMBER_ID;
   return {
     ...asCoachMember(member),
+    ...stubbedContactOf(member),
     aufNumber: `AUF-${member.userId.slice(0, 2)}`,
     aufExpiry: isAufExpired ? "2020-01-31" : "2030-06-30",
     isAufVerified: member.userId !== UNVERIFIED_AUF_MEMBER_ID,
@@ -3922,7 +3996,14 @@ const LISTING_MEMBER_VIEWS = {
 
 /** Los filtros de #497 que el servidor deja usar a cada vista. */
 const STUBBED_AVAILABLE_FILTERS = {
-  admin: ["position", "group", "auf", "membership"],
+  admin: [
+    "position",
+    "group",
+    "auf",
+    "membership",
+    "withoutPhone",
+    "withoutEmergencyContact",
+  ],
   coach: ["position", "group"],
   member: ["position"],
 } as const;
@@ -4010,9 +4091,11 @@ function stubbedListing(
   // Nadie de la lista fija está en un grupo: filtrar por uno es la manera de
   // llegar a "sin resultados" desde los filtros de #497.
   const isGroupFiltered = searchParams.has("group");
+  const isWithoutPhone = searchParams.get("withoutPhone") === "true";
   const members = options.members.filter(
     (member) =>
       !isGroupFiltered &&
+      (!isWithoutPhone || stubbedContactOf(member).phone === null) &&
       (role === null || member.role === role) &&
       (includeInactive || member.status !== "inactive") &&
       (position === null || (member.position?.id ?? "none") === position) &&
@@ -4435,6 +4518,57 @@ function filterToNobody(labels: FilterLabels, emptyText: RegExp) {
   };
 }
 
+/* El contacto de cada socio (#499): una columna para quien lo ve, y la
+   casilla "Sin teléfono" de quien ve todo el contacto. */
+
+type ContactLabels = {
+  readonly column: string;
+  readonly withoutPhone: string;
+  readonly filters: FilterLabels;
+};
+
+const ENGLISH_CONTACT_LABELS: ContactLabels = {
+  column: "Contact",
+  withoutPhone: "No phone",
+  filters: ENGLISH_FILTER_LABELS,
+};
+
+const SPANISH_CONTACT_LABELS: ContactLabels = {
+  column: "Contacto",
+  withoutPhone: "Sin teléfono",
+  filters: SPANISH_FILTER_LABELS,
+};
+
+function waitForContactColumn(labels: ContactLabels) {
+  return async (page: Page): Promise<void> => {
+    await expect(
+      page.getByRole("link", { name: "0488 222 333" }).first(),
+    ).toBeAttached();
+    await expect(
+      page.getByRole("columnheader", { name: labels.column }),
+    ).toBeAttached();
+  };
+}
+
+/** Marca "Sin teléfono": quedan Nerea, con contacto de emergencia, y el
+ * nombre más largo, sin ninguno. Se cierra la hoja del móvil para que la
+ * captura enseñe la lista. */
+function filterWithoutPhone(labels: ContactLabels) {
+  return async (page: Page): Promise<void> => {
+    const container = await filterContainer(page, labels.filters);
+    await container
+      .getByRole("checkbox", { name: labels.withoutPhone })
+      .check();
+    const sheet = page.getByRole("dialog", { name: labels.filters.sheet });
+    if (await sheet.isVisible()) {
+      await sheet.getByRole("button", { name: labels.filters.apply }).click();
+      await expect(sheet).toHaveCount(0);
+    }
+    await expect(page.getByRole("row", { name: "Ana Admin" })).toHaveCount(0);
+    await waitForContactColumn(labels)(page);
+  };
+}
+
 type DirectoryState = {
   readonly name: string;
   /** Un Admin recibe la lista marcada como suya, y con ella el control de los
@@ -4635,6 +4769,34 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     prepare: filterToNobody(ENGLISH_FILTER_LABELS, /No member matches/),
   },
   {
+    name: "directorio-contacto-admin",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: filterWithoutPhone(ENGLISH_CONTACT_LABELS),
+  },
+  {
+    name: "directorio-contacto-admin-es",
+    asAdmin: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: filterWithoutPhone(SPANISH_CONTACT_LABELS),
+  },
+  {
+    name: "directorio-contacto-coach",
+    asAdmin: false,
+    asCoach: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: waitForContactColumn(ENGLISH_CONTACT_LABELS),
+  },
+  {
+    name: "directorio-contacto-coach-es",
+    asAdmin: false,
+    asCoach: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: waitForContactColumn(SPANISH_CONTACT_LABELS),
+  },
+  {
     name: "directorio-filtrado-sin-resultados-es",
     asAdmin: true,
     listHeading: SPANISH_DIRECTORY_HEADING,
@@ -4820,14 +4982,16 @@ test.describe("la hoja de filtros del directorio en el móvil", () => {
 });
 
 /* Los filtros de #497 piden axe en cada ancho y en los dos temas, no sólo en
-   el ancho por defecto: la barra y la hoja son controles distintos. */
+   el ancho por defecto: la barra y la hoja son controles distintos. El
+   contacto de #499 también: la columna de la tabla y la tarjeta del móvil
+   son marcados distintos. */
 test.describe("los filtros del directorio con axe en cada ancho y tema", () => {
   skipWithoutSession();
   quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
   const filterStates = DIRECTORY_STATES.filter((state) =>
-    /^directorio-(filtros|filtrado-sin)/.test(state.name),
+    /^directorio-(filtros|filtrado-sin|contacto)/.test(state.name),
   );
 
   for (const vp of viewports) {
@@ -5397,6 +5561,89 @@ test.describe("el directorio con los datos de verdad", () => {
   });
 });
 
+/* El contacto de los socios (#499) con los datos de verdad: a un Player no le
+   llega nada de nadie, ni en la pantalla ni en la API. En el club sembrado
+   hay al menos una socia con teléfono y contacto de emergencia (la del
+   perfil con contacto), así que si se colara, se vería. */
+test.describe("el contacto en el directorio con los datos de verdad", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: FULL_PROFILE_STORAGE_STATE });
+
+  test("un Player no ve ningún dato de contacto en la pantalla", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+    await waitForDirectory(page, ENGLISH_DIRECTORY_HEADING);
+
+    await expect(
+      page.getByRole("columnheader", { name: "Contact" }),
+    ).toHaveCount(0);
+    await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
+    await expect(page.locator('a[href^="mailto:"]')).toHaveCount(0);
+  });
+
+  test("a un Player la API no le trae el correo, el teléfono ni el contacto de emergencia", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+    const response = await page.request.get(`${APP_URL}${DIRECTORY_ENDPOINT}`);
+
+    expect(response.status()).toBe(200);
+    const body = (await response.json()) as {
+      data: { kind: string; members: readonly Record<string, unknown>[] };
+    };
+    expect(body.data.kind).toBe("member");
+    expect(body.data.members.length).toBeGreaterThan(0);
+    for (const member of body.data.members) {
+      expect(member).not.toHaveProperty("email");
+      expect(member).not.toHaveProperty("phone");
+      expect(member).not.toHaveProperty("emergencyContact");
+    }
+  });
+
+  test("a un Player la API le niega el filtro sin teléfono", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+    const response = await page.request.get(
+      `${APP_URL}${DIRECTORY_ENDPOINT}?withoutPhone=true`,
+    );
+
+    expect(response.status()).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { reason: "directory_filter_forbidden" },
+    });
+  });
+});
+
+/* En el móvil, cada teléfono y cada correo del contacto se pulsa con el dedo
+   (#499): miden al menos 44 px de alto. */
+test.describe("los enlaces del contacto en el móvil", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 375, height: 812 },
+  });
+
+  test("cada enlace tel: y mailto: mide al menos 44 px", async ({ page }) => {
+    const state = DIRECTORY_STATES.find(
+      (candidate) => candidate.name === "directorio-admin-sin-solicitudes",
+    );
+    if (state === undefined) {
+      throw new Error("Falta el estado del directorio del Admin.");
+    }
+    await goToDirectory(page, state);
+
+    const links = page.locator('a[href^="tel:"], a[href^="mailto:"]');
+    expect(await links.count()).toBeGreaterThan(0);
+    for (const link of await links.all()) {
+      expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    }
+  });
+});
+
 test.describe("un Admin que decide una solicitud desde el directorio", () => {
   skipWithoutSession();
   quietNotificationBell();
@@ -5581,6 +5828,8 @@ type StubbedMemberRecord = {
     readonly reason: string;
     readonly until: string | null;
   } | null;
+  readonly phone: string | null;
+  readonly emergencyContact: StubbedContact["emergencyContact"];
   readonly photoUrl: string | null;
   readonly isAufExpired: boolean;
   readonly groups: readonly { readonly id: string; readonly name: string }[];
@@ -5608,6 +5857,12 @@ const CURRENT_RECORD: StubbedMemberRecord = {
   hasGuardianConsent: false,
   membershipStatus: "active",
   membershipWaiver: null,
+  phone: "0412 345 678",
+  emergencyContact: {
+    name: "Miren Aranburu Etxeberria",
+    phone: "+61 499 111 222",
+    relationship: "Mother",
+  },
   photoUrl: null,
   isAufExpired: false,
   attendance: { kind: "rate", percent: 90, sessions: 9 },
@@ -5762,6 +6017,15 @@ function typeMinorBirth(noticeText: RegExp) {
   return async (page: Page): Promise<void> => {
     await page.locator("#ficha-nacimiento").fill(MINOR_BIRTH);
     await expect(page.getByText(noticeText)).toBeVisible();
+  };
+}
+
+/** Pone en el contacto de emergencia el teléfono del propio socio, sin
+ * guardar: la ficha avisa de que debería ser otra persona (#499). */
+function typeOwnPhoneAsEmergency(warning: RegExp) {
+  return async (page: Page): Promise<void> => {
+    await page.locator("#ficha-emergencia-telefono").fill("0412-345-678");
+    await expect(page.getByText(warning)).toBeVisible();
   };
 }
 
@@ -5947,6 +6211,19 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
     beforeVisit: chooseSpanish,
     prepare: typeMinorBirth(/tendrá que dar los datos y el consentimiento/),
   },
+  {
+    name: "ficha-contacto",
+    record: CURRENT_RECORD,
+    saveLabel: ENGLISH_SAVE_RECORD,
+    prepare: typeOwnPhoneAsEmergency(/should be someone else/),
+  },
+  {
+    name: "ficha-contacto-es",
+    record: CURRENT_RECORD,
+    saveLabel: SPANISH_SAVE_RECORD,
+    beforeVisit: chooseSpanish,
+    prepare: typeOwnPhoneAsEmergency(/debería ser otra persona/),
+  },
 ];
 
 async function goToMemberRecord(
@@ -6023,6 +6300,34 @@ for (const state of MEMBER_RECORD_STATES) {
     });
   });
 }
+
+/* La sección de contacto de la ficha (#499) con axe en cada ancho y tema. */
+test.describe("el contacto de la ficha con axe en cada ancho y tema", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  const contactStates = MEMBER_RECORD_STATES.filter((state) =>
+    state.name.startsWith("ficha-contacto"),
+  );
+
+  for (const vp of viewports) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const state of contactStates) {
+        for (const theme of themes) {
+          test(`${state.name} (${theme}) no tiene violaciones`, async ({
+            page,
+          }) => {
+            await goToMemberRecord(page, state, theme);
+            await expectNoAxeViolations(page);
+          });
+        }
+      }
+    });
+  }
+});
 
 test.describe("la ficha con una foto que no carga", () => {
   skipWithoutSession();
