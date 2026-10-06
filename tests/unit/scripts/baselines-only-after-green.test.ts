@@ -435,9 +435,9 @@ describe("baselines-only-after-green", () => {
     expect(output).toContain("ya_verificado=true");
   });
 
-  it("explica en la salida por qué no se salta", async () => {
-    const { stdout } = await run({ ...GREEN_BEFORE, runs: [] });
+  it("explica en el resumen por qué no se salta, nombrando el commit anterior", async () => {
+    const { summary } = await run({ ...GREEN_BEFORE, runs: [] });
 
-    expect(stdout.trim()).not.toBe("");
+    expect(summary).toContain(BEFORE_SHA);
   });
 });

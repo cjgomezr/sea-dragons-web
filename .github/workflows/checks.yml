@@ -72,6 +72,9 @@ jobs:
   # entera sobre el código que acababa de salir verde. Si el empujón solo trae
   # líneas base y el commit anterior pasó el job `checks` de verdad, se salta.
   # Solo en `synchronize`: es el único evento con commit anterior (#494).
+  # La corrida anterior probó la rama mezclada con el main de entonces; si
+  # main avanzó después, el salto no prueba la mezcla nueva. Es el mismo
+  # riesgo que `arbol-ya-verificado` ya acepta en el push a main.
   solo-lineas-base:
     if: github.event_name == 'pull_request' && github.event.action == 'synchronize'
     runs-on: ubuntu-latest

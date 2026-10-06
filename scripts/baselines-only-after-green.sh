@@ -14,6 +14,11 @@
 # forzado, un commit anterior sin corrida verde, una respuesta que no llega, un
 # diff que no se puede leer entero) responde "no" y deja que la suite corra.
 #
+# Un salto de aquí deja una corrida de PR en `success`, y el push a main
+# (`checks-already-green-on-pr.sh`) la acepta como prueba del árbol. Eso solo
+# es seguro porque abajo se exige que el commit anterior corriera la suite de
+# verdad: no relajes esa comprobación sin cambiar también aquel script.
+#
 # Usage: scripts/baselines-only-after-green.sh
 # Requires: gh con lectura de contents y de actions, y jq.
 # Entrada:  GH_REPO, BEFORE_SHA (`github.event.before`), HEAD_SHA (la cabeza
