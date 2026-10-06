@@ -346,11 +346,16 @@ describe("main no repite el trabajo del PR", () => {
     );
   });
 
-  // Sin `always()`, Actions exige implícitamente que la dependencia haya
-  // terminado en success(), y en un pull request el job de la pregunta ni
-  // siquiera arranca: los checks se saltarían en todos los PRs.
+  // Sin una función de estado, Actions exige implícitamente que la dependencia
+  // haya terminado en success(), y en un pull request el job de la pregunta ni
+  // siquiera arranca: los checks se saltarían en todos los PRs. Es
+  // `!cancelled()` y no `always()`: con `always()`, un push nuevo al PR no
+  // cortaba los checks viejos y seguían contra dev (#416, #507).
   it("los checks corren igual cuando la pregunta no llegó a hacerse", () => {
-    expect(readWorkflow(CHECKS).jobs.checks?.if).toMatch(/always\(\)/);
+    const condition = readWorkflow(CHECKS).jobs.checks?.if ?? "";
+
+    expect(condition).toMatch(/!cancelled\(\)/);
+    expect(condition).not.toMatch(/always\(\)/);
   });
 
   it("la pregunta la responde un script del repositorio, no YAML pegado", () => {

@@ -67,13 +67,47 @@ jobs:
           GH_REPO: ${{ github.repository }}
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
 
-  checks:
+  # Los tests de integración usan `seadragons-dev`, igual que la visual. Este
+  # job espera a que ninguna corrida anterior de los dos workflows lo esté
+  # usando (#507): diez jobs a la vez contra dev lo dejaban sin contestar. Va
+  # aparte y no como paso de `checks` para que su nombre lo vean las demás
+  # corridas. Ver scripts/wait-for-dev-turn.sh.
+  #
+  # `!cancelled()` y no `always()`: un push nuevo al PR cancela esta corrida,
+  # y con `always()` seguiría esperando turno para nada (#416). Se salta, sin
+  # ocupar sitio en la cola, cuando el árbol ya estaba verificado.
+  turno-dev:
     needs: [arbol-ya-verificado]
-    # `always()` es obligatorio: sin una función de estado explícita, Actions
-    # exige implícitamente que la dependencia haya terminado en success(), y en
-    # un pull request ese job ni siquiera arranca. Sin esto, los checks se
+    if: "!cancelled() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true'"
+    runs-on: ubuntu-latest
+    # Red por si una llamada a la API se cuelga: el máximo del script sólo
+    # cuenta las esperas entre consultas, y el de Actions son seis horas.
+    timeout-minutes: 75
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Espera turno en seadragons-dev
+        run: bash scripts/wait-for-dev-turn.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+
+  checks:
+    needs: [arbol-ya-verificado, turno-dev]
+    # Una función de estado es obligatoria: sin ella, Actions exige
+    # implícitamente que la dependencia haya terminado en success(), y en un
+    # pull request ese job ni siquiera arranca. Sin esto, los checks se
     # saltarían en todos los PRs, que es lo contrario de lo que se busca.
-    if: always() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true'
+    #
+    # `!cancelled()` y no `always()`: al cancelar una corrida, GitHub no corta
+    # un job cuyo `if` sigue dando true. Con `always()`, un push nuevo al PR
+    # dejaba los checks viejos contra dev junto a los nuevos, y la cola da por
+    # libre el sitio de una corrida cancelada (#416, #507). Por la función de
+    # estado hay que pedir el turno en dev a mano: arrancaría aunque la espera
+    # se hubiera agotado.
+    if: "!cancelled() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true' && needs.turno-dev.result == 'success'"
     runs-on: ubuntu-latest
     steps:
       # Con toda la historia: el paso `texto` compara la rama con main, y el

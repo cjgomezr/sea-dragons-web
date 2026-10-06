@@ -529,7 +529,9 @@ describe("main no repite la visual que el PR ya pasó (#441)", () => {
   it("la aceptación a mano no espera a la pregunta", () => {
     const { regenerate, accept } = parseWorkflow().jobs;
 
-    expect(regenerate?.needs).toBeUndefined();
+    // Sí espera su turno en dev (#507, tests/unit/workflows/dev-queue.test.ts),
+    // pero no depende de la pregunta del árbol.
+    expect(regenerate?.needs ?? []).not.toContain(GATE_JOB);
     expect(accept?.needs).toEqual("regenerate");
   });
 });
