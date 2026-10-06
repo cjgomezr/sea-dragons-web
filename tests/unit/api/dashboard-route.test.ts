@@ -80,6 +80,7 @@ function dashboardGateways(): DashboardGateways {
     roster: {
       countActiveMembers: async () => ({ active: 1, joinedRecently: 1 }),
       findNewsSeenAt: async () => null,
+      findOwnContact: async () => ({ phone: null, emergencyContact: null }),
     },
     membership: {
       findByUserId: async () => ({
@@ -201,6 +202,7 @@ describe("GET /api/v1/dashboard", () => {
         },
         upcomingEvents: { kind: "events", events: [] },
         latestNews: { kind: "news", posts: [] },
+        contactReminder: { kind: "reminder", reminder: "both" },
       },
     });
   });
@@ -266,6 +268,7 @@ describe("GET /api/v1/dashboard sin la membresía al día (#453)", () => {
         viewer: { firstName: "Alba" },
         block: "past_due",
         nextTraining: { kind: "none" },
+        contactReminder: { kind: "reminder", reminder: "both" },
       },
     });
   });

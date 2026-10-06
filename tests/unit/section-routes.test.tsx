@@ -17,6 +17,7 @@ vi.mock("@/lib/club/supabase-club-brand", () => ({
 }));
 vi.mock("@/lib/auth/caller-role", () => ({
   readCallerRole: async () => callerRole.current,
+  readCallerId: async () => "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d",
 }));
 const { default: DashboardPage } = await import("@/app/(app)/dashboard/page");
 const { default: PagosPage } = await import("@/app/(app)/pagos/page");
@@ -161,6 +162,7 @@ describe("panel principal", () => {
                 },
                 upcomingEvents: { kind: "events", events: [] },
                 latestNews: { kind: "news", posts: [] },
+                contactReminder: { kind: "reminder", reminder: "none" },
               },
             }),
             { status: 200, headers: { "content-type": "application/json" } },

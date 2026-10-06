@@ -6,6 +6,9 @@ import {
 } from "@/lib/attendance/supabase-attendance-stats";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { createEventAgendaGateways } from "@/lib/events/supabase-event-agenda-gateways";
+import { readText } from "@/lib/auth/supabase-auth-gateways";
+import type { ProfileContact } from "@/lib/members/profile-contact";
+import { readEmergencyContact } from "@/lib/members/supabase-profile-contact";
 import { createMembershipGateway } from "@/lib/membership/supabase-membership-gateways";
 import { createNewsGateways } from "@/lib/news/supabase-news-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
@@ -19,8 +22,8 @@ import type {
 
 /**
  * Adaptador entre el dashboard (#424) y Supabase. Cada fuente se cablea con
- * el mismo adaptador que usa su sección; lo único nuevo son las dos lecturas
- * de `members` que ninguna sección hacía.
+ * el mismo adaptador que usa su sección; lo único nuevo son las lecturas de
+ * `members` que ninguna sección hacía.
  */
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -86,12 +89,40 @@ async function findNewsSeenAt(
   return newsSeenRowSchema.parse(data).news_seen_at;
 }
 
+/** Las mismas columnas y la misma lectura que el perfil propio (#496). */
+const CONTACT_COLUMNS =
+  "phone, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship";
+
+async function findOwnContact(
+  serviceClient: SupabaseClient,
+  userId: string,
+): Promise<ProfileContact> {
+  const { data, error } = await serviceClient
+    .from(MEMBERS_TABLE)
+    .select(CONTACT_COLUMNS)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `No se pudo leer el contacto de ${userId}: ${error.message}`,
+    );
+  }
+  if (data === null) {
+    throw new Error(`No hay ningún socio con el id ${userId}.`);
+  }
+  return {
+    phone: readText(data, "phone", MEMBERS_TABLE),
+    emergencyContact: readEmergencyContact(data),
+  };
+}
+
 export function createDashboardRosterGateway(
   serviceClient: SupabaseClient,
 ): DashboardRosterGateway {
   return {
     countActiveMembers: (query) => countActiveMembers(serviceClient, query),
     findNewsSeenAt: (userId) => findNewsSeenAt(serviceClient, userId),
+    findOwnContact: (userId) => findOwnContact(serviceClient, userId),
   };
 }
 

@@ -11,8 +11,10 @@ import type {
   EmergencyContactProposal,
   OwnProfile,
 } from "@/lib/members/own-profile";
+import { contactReminderOf } from "@/lib/members/contact-reminder";
 import type { MembershipPlan } from "@/lib/membership/membership";
 import { AccountHeader } from "./AccountHeader";
+import { ContactReminderNotice } from "./ContactReminderNotice";
 import { MembershipTypeSummary } from "./MembershipTypeSummary";
 import { MyGroups } from "./MyGroups";
 import { ProfileEvaluation } from "./ProfileEvaluation";
@@ -22,7 +24,9 @@ import { RoleRequestPanel } from "./RoleRequestPanel";
 /** El perfil propio (#241): Mi cuenta convertida en perfil. La cabecera, la
  * ficha editable y, debajo, lo que Mi cuenta ya enseñaba (#209, #229), con
  * su asistencia (#396) y la evaluación o el aviso de que es privada (#324).
- * El tipo de membresía se ve, pero se cambia en Pagos (#456).
+ * El tipo de membresía se ve, pero se cambia en Pagos (#456). Bajo la
+ * cabecera, el aviso de los datos de contacto que faltan (#498): sale de la
+ * ficha guardada, así que se va en cuanto el guardado refresca la página.
  * La página lee los datos; esto sólo los coloca. */
 export function ProfileScreen({
   locale,
@@ -65,6 +69,11 @@ export function ProfileScreen({
         fullName={account.fullName}
         role={account.role}
         photoUrl={photoUrl}
+      />
+      <ContactReminderNotice
+        locale={locale}
+        userId={userId}
+        reminder={contactReminderOf(profile)}
       />
       <ProfileForm
         locale={locale}

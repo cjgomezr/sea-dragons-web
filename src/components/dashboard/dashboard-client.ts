@@ -108,6 +108,14 @@ const latestNewsSchema = z.discriminatedUnion("kind", [
 
 const viewerSchema = z.object({ firstName: z.string() });
 
+const contactReminderSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("reminder"),
+    reminder: z.enum(["none", "phone", "emergency_contact", "both"]),
+  }),
+  unavailableSchema,
+]);
+
 const memberDashboardSchema = z.object({
   kind: z.literal("member"),
   viewer: viewerSchema,
@@ -119,6 +127,7 @@ const memberDashboardSchema = z.object({
   }),
   upcomingEvents: upcomingEventsSchema,
   latestNews: latestNewsSchema,
+  contactReminder: contactReminderSchema,
 });
 
 /** El de quien no tiene la membresía al día (#453). */
@@ -127,6 +136,7 @@ const restrictedDashboardSchema = z.object({
   viewer: viewerSchema,
   block: z.enum(["pending", "past_due", "cancelled"]),
   nextTraining: nextTrainingTileSchema,
+  contactReminder: contactReminderSchema,
 });
 
 const dashboardResponseSchema = z.object({

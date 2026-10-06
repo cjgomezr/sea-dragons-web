@@ -2735,6 +2735,17 @@ const ACCOUNT_STATES: readonly AccountState[] = [
     beforeVisit: chooseSpanish,
     prepare: saveHalfEmergencyContact,
   },
+  // El aviso de lo que falta (#498): `perfil-completo` no tiene ni teléfono ni
+  // contacto, así que es la ficha con el aviso de los dos.
+  {
+    name: "perfil-aviso-contacto",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+  },
+  {
+    name: "perfil-aviso-contacto-es",
+    storageState: FULL_PROFILE_STORAGE_STATE,
+    beforeVisit: chooseSpanish,
+  },
   {
     name: "perfil-contacto-menor",
     storageState: roleRequestStorageStatePath("perfil-contacto-menor"),
@@ -14395,6 +14406,7 @@ const ADMIN_DASHBOARD = {
   },
   upcomingEvents: { kind: "events", events: DASHBOARD_UPCOMING },
   latestNews: { kind: "news", posts: DASHBOARD_LATEST_NEWS },
+  contactReminder: { kind: "reminder", reminder: "none" },
 };
 
 const PLAYER_DASHBOARD = {
@@ -14420,6 +14432,7 @@ const EMPTY_DASHBOARD = {
   },
   upcomingEvents: { kind: "events", events: [] },
   latestNews: { kind: "news", posts: [] },
+  contactReminder: { kind: "reminder", reminder: "none" },
 };
 
 // El inicio reducido de quien no tiene la membresía al día (#453): el aviso
@@ -14432,6 +14445,20 @@ const RESTRICTED_DASHBOARD = {
     kind: "training",
     training: { ...DASHBOARD_TRAINING, myResponse: null },
   },
+  contactReminder: { kind: "reminder", reminder: "none" },
+};
+
+// El aviso de los datos de contacto que faltan (#498). Sin ninguno de los dos
+// es el caso de casi todo socio nuevo, y el aviso más largo: el que más podría
+// empujar la tarjeta del entrenamiento en el móvil.
+const CONTACT_REMINDER_DASHBOARD = {
+  ...PLAYER_DASHBOARD,
+  contactReminder: { kind: "reminder", reminder: "both" },
+};
+
+const PHONE_REMINDER_DASHBOARD = {
+  ...PLAYER_DASHBOARD,
+  contactReminder: { kind: "reminder", reminder: "phone" },
 };
 
 type DashboardScreenState = {
@@ -14464,6 +14491,16 @@ const DASHBOARD_STATES: readonly DashboardScreenState[] = [
     "inicio-sin-membresia",
     RESTRICTED_DASHBOARD,
     UNPAID_MEMBER_STORAGE_STATE_PATH,
+  ),
+  ...dashboardStates(
+    "inicio-aviso-contacto",
+    CONTACT_REMINDER_DASHBOARD,
+    E2E_STORAGE_STATE_PATH,
+  ),
+  ...dashboardStates(
+    "inicio-aviso-telefono",
+    PHONE_REMINDER_DASHBOARD,
+    E2E_STORAGE_STATE_PATH,
   ),
 ];
 
@@ -14671,6 +14708,64 @@ test.describe("el inicio en el navegador", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: DASHBOARD_GREETING }),
     ).toBeVisible();
+  });
+});
+
+test.describe("el aviso del contacto en el inicio (#498)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: E2E_STORAGE_STATE_PATH });
+
+  test("a 375px no empuja el RSVP del entrenamiento fuera de la primera pantalla", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToDashboard(page, { dashboard: CONTACT_REMINDER_DASHBOARD });
+
+    await expect(
+      page.getByRole("note", {
+        name: "Add your phone number and emergency contact",
+      }),
+    ).toBeVisible();
+    const rsvp = page
+      .getByRole("region", { name: "Next training" })
+      .getByRole("group", { name: `RSVP: ${DASHBOARD_TRAINING.title}` });
+    const [rsvpBox, tabBarBox] = await Promise.all([
+      rsvp.boundingBox(),
+      page.getByRole("navigation", { name: "Sections" }).boundingBox(),
+    ]);
+
+    // La barra de pestañas va fija abajo: lo que queda debajo no se ve.
+    expect(rsvpBox).not.toBeNull();
+    expect(tabBarBox).not.toBeNull();
+    expect((rsvpBox?.y ?? 0) + (rsvpBox?.height ?? 0)).toBeLessThanOrEqual(
+      tabBarBox?.y ?? 0,
+    );
+  });
+
+  test("el del teléfono, cerrado, no vuelve al recargar", async ({ page }) => {
+    await goToDashboard(page, { dashboard: PHONE_REMINDER_DASHBOARD });
+    const note = page.getByRole("note", { name: "Add your phone number" });
+
+    await note.getByRole("button", { name: "Dismiss phone reminder" }).click();
+    await expect(note).toBeHidden();
+    await page.reload();
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: DASHBOARD_GREETING }),
+    ).toBeVisible();
+    await expect(note).toBeHidden();
+  });
+
+  test("el enlace lleva a la sección Contacto del perfil", async ({ page }) => {
+    await goToDashboard(page, { dashboard: CONTACT_REMINDER_DASHBOARD });
+
+    await page
+      .getByRole("link", { name: "Complete it in Contact, on your profile" })
+      .click();
+
+    await expect(page).toHaveURL(/\/cuenta#perfil-contacto$/);
+    await expect(page.getByRole("heading", { name: "Contact" })).toBeVisible();
   });
 });
 

@@ -33,6 +33,11 @@ import {
 } from "@/lib/news/news-feed";
 import type { NewsCategory, NewsGateways } from "@/lib/news/news-posts";
 import {
+  type ContactReminder,
+  contactReminderOf,
+} from "@/lib/members/contact-reminder";
+import type { ProfileContact } from "@/lib/members/profile-contact";
+import {
   clubCalendarDate,
   clubMoment,
   subtractClubDays,
@@ -53,6 +58,9 @@ import {
  * inicio reducido: el saludo, el motivo y el próximo entrenamiento, sin
  * teselas de club ni noticias. Vale para todos los roles: el personal
  * conserva sus pantallas de gestión desde el menú, no desde el inicio.
+ *
+ * Los dos inicios llevan el aviso de los datos de contacto que faltan (#498,
+ * RF-2 del PRD de E19): no depende de tener la membresía al día.
  */
 
 /** Cuántos eventos y noticias enseña el inicio (FR-077). */
@@ -122,6 +130,11 @@ export type LatestNews =
   | { readonly kind: "news"; readonly posts: readonly LatestNewsItem[] }
   | Unavailable;
 
+/** Qué dato de contacto le falta a quien mira (#498). */
+export type ContactReminderPart =
+  | { readonly kind: "reminder"; readonly reminder: ContactReminder }
+  | Unavailable;
+
 /** Quien mira, para el saludo de la pantalla (#426, RF-4). */
 export type DashboardViewer = { readonly firstName: string };
 
@@ -137,6 +150,7 @@ export type MemberDashboard = {
   };
   readonly upcomingEvents: UpcomingEvents;
   readonly latestNews: LatestNews;
+  readonly contactReminder: ContactReminderPart;
 };
 
 /** El inicio de quien no tiene la membresía al día (#453). */
@@ -146,6 +160,7 @@ export type RestrictedDashboard = {
   /** Por qué: lo que dice el aviso que lleva a Pagos. */
   readonly block: MembershipBlock;
   readonly nextTraining: NextTrainingTile;
+  readonly contactReminder: ContactReminderPart;
 };
 
 export type Dashboard = MemberDashboard | RestrictedDashboard;
@@ -165,11 +180,13 @@ export type DashboardRosterGateway = {
   }): Promise<ActiveMembers>;
   /** La última visita a Noticias, o `null` si nunca las abrió. */
   findNewsSeenAt(userId: string): Promise<string | null>;
+  /** El teléfono y el contacto de emergencia de quien mira (#498). */
+  findOwnContact(userId: string): Promise<ProfileContact>;
 };
 
 /** Las partes que pueden caer por separado, para el log. */
 export type DashboardSource =
-  "attendance" | "members" | "agenda" | "news" | "news_seen";
+  "attendance" | "members" | "agenda" | "news" | "news_seen" | "contact";
 
 export type DashboardFailureLog = {
   report(source: DashboardSource, error: unknown): void;
@@ -455,6 +472,20 @@ async function readNewsParts(
   return { unreadNews, latestNews };
 }
 
+async function readContactReminder(
+  gateways: DashboardGateways,
+  callerId: string,
+): Promise<ContactReminderPart> {
+  const reminder = await orUnavailable(
+    gateways,
+    "contact",
+    gateways.roster
+      .findOwnContact(callerId)
+      .then((contact) => contactReminderOf(contact)),
+  );
+  return isUnavailable(reminder) ? reminder : { kind: "reminder", reminder };
+}
+
 type DashboardCaller = NonNullable<
   Awaited<ReturnType<DashboardGateways["members"]["findRoleRequestMember"]>>
 >;
@@ -464,20 +495,22 @@ async function readMemberDashboard(
   request: DashboardRequest & { readonly caller: DashboardCaller },
 ): Promise<MemberDashboard> {
   const { caller } = request;
-  const [attendance, members, eventParts, newsParts] = await Promise.all([
-    orUnavailable(
-      gateways,
-      "attendance",
-      readAttendanceTile(gateways, { ...request, role: caller.role }),
-    ),
-    orUnavailable(
-      gateways,
-      "members",
-      readMembersTile(gateways, { clubId: caller.clubId, now: request.now }),
-    ),
-    readEventParts(gateways, request),
-    readNewsParts(gateways, request),
-  ]);
+  const [attendance, members, eventParts, newsParts, contactReminder] =
+    await Promise.all([
+      orUnavailable(
+        gateways,
+        "attendance",
+        readAttendanceTile(gateways, { ...request, role: caller.role }),
+      ),
+      orUnavailable(
+        gateways,
+        "members",
+        readMembersTile(gateways, { clubId: caller.clubId, now: request.now }),
+      ),
+      readEventParts(gateways, request),
+      readNewsParts(gateways, request),
+      readContactReminder(gateways, request.callerId),
+    ]);
   return {
     kind: "member",
     viewer: { firstName: firstNameOf(caller.fullName) },
@@ -489,6 +522,7 @@ async function readMemberDashboard(
     },
     upcomingEvents: eventParts.upcomingEvents,
     latestNews: newsParts.latestNews,
+    contactReminder,
   };
 }
 
@@ -499,12 +533,16 @@ async function readRestrictedDashboard(
     readonly block: MembershipBlock;
   },
 ): Promise<RestrictedDashboard> {
-  const { nextTraining } = await readEventParts(gateways, request);
+  const [{ nextTraining }, contactReminder] = await Promise.all([
+    readEventParts(gateways, request),
+    readContactReminder(gateways, request.callerId),
+  ]);
   return {
     kind: "restricted",
     viewer: { firstName: firstNameOf(request.caller.fullName) },
     block: request.block,
     nextTraining,
+    contactReminder,
   };
 }
 

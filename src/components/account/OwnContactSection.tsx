@@ -16,6 +16,8 @@ import {
  * persona.
  */
 
+/** El título de la sección: el aviso del contacto (#498) lleva aquí. */
+export const CONTACT_SECTION_ID = "perfil-contacto";
 const PHONE_ID = "perfil-telefono";
 const EMERGENCY_HINT_ID = "perfil-emergencia-pista";
 const GUARDIAN_PROPOSED_ID = "perfil-emergencia-tutor";
@@ -105,8 +107,10 @@ export function OwnContactSection({
     ? [EMERGENCY_HINT_ID, GUARDIAN_PROPOSED_ID]
     : [EMERGENCY_HINT_ID];
   return (
-    <section className="auth-fields" aria-labelledby="perfil-contacto">
-      <h3 id="perfil-contacto">{translate("account.profile.contact.title")}</h3>
+    <section className="auth-fields" aria-labelledby={CONTACT_SECTION_ID}>
+      <h3 id={CONTACT_SECTION_ID}>
+        {translate("account.profile.contact.title")}
+      </h3>
       <TextField
         id={PHONE_ID}
         label={translate("account.profile.contact.phone")}

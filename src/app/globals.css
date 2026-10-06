@@ -5047,6 +5047,82 @@ a.auth-brand-header:focus-visible {
   font-weight: 600;
 }
 
+/* El aviso de los datos de contacto que faltan (#498), en el inicio y en el
+   perfil. Es primo del de la membresía: el mismo borde de aviso a la
+   izquierda, pero más compacto. En el inicio va detrás de la tarjeta del
+   entrenamiento, para no empujar el RSVP fuera de la primera pantalla del
+   móvil. El botón de cerrar (sólo el del teléfono) va a la derecha y mide
+   44px, el mínimo de un objetivo táctil. */
+.contact-reminder {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-warning);
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.contact-reminder-text {
+  display: grid;
+  flex: 1;
+  gap: var(--space-1);
+  justify-items: start;
+  min-width: 0;
+}
+
+.contact-reminder-text p {
+  max-width: 70ch;
+  margin: 0;
+}
+
+.contact-reminder-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.contact-reminder-text a {
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+
+.contact-reminder-dismiss {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-top: calc(-1 * var(--space-2));
+  padding: 0;
+  color: var(--color-text-secondary);
+  font-size: 24px;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.contact-reminder-dismiss:hover {
+  color: var(--color-text);
+  background: var(--color-background);
+}
+
+.contact-reminder-dismiss:active {
+  background: var(--color-border);
+}
+
+.contact-reminder-dismiss:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
 /* Pagos (#454, #455): sigue docs/mockups/payments-light.png sin la tarjeta
    de proveedores ni la alerta roja. Arriba el aviso de la puerta, si lo hay;
    luego "Plan actual" y el historial. El ancho es el del contenido del

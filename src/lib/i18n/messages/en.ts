@@ -375,6 +375,15 @@ export const englishMessages = {
     "The expiry can't be before the day you joined the club.",
   "account.profile.error.aufVerified":
     "Your AUF is already verified. Only an Admin can change it.",
+  // El aviso de los datos de contacto que faltan (#498).
+  "contactReminder.emergencyContact.title": "Add your emergency contact",
+  "contactReminder.phone.title": "Add your phone number",
+  "contactReminder.both.title": "Add your phone number and emergency contact",
+  "contactReminder.emergencyContact.why":
+    "So the club knows who to call if something happens to you at the pool.",
+  "contactReminder.phone.why": "So the club can reach you if it needs to.",
+  "contactReminder.link": "Complete it in Contact, on your profile",
+  "contactReminder.dismissPhone": "Dismiss phone reminder",
   // El teléfono y el contacto de emergencia del perfil propio (#496).
   "account.profile.contact.title": "Contact",
   "account.profile.contact.phone": "Your phone (optional)",

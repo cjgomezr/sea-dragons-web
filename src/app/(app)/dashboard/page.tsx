@@ -1,5 +1,5 @@
 import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
-import { readCallerRole } from "@/lib/auth/caller-role";
+import { readCallerId, readCallerRole } from "@/lib/auth/caller-role";
 import { type Role, hasCapability } from "@/lib/auth/roles";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 
@@ -20,13 +20,15 @@ function canCreateTrainingsFromHome(role: Role): boolean {
 }
 
 export default async function DashboardPage(): Promise<React.JSX.Element> {
-  const [locale, role] = await Promise.all([
+  const [locale, role, userId] = await Promise.all([
     readRequestLocale(),
     readCallerRole(),
+    readCallerId(),
   ]);
   return (
     <DashboardScreen
       locale={locale}
+      userId={userId}
       canCreateTrainings={canCreateTrainingsFromHome(role)}
     />
   );
