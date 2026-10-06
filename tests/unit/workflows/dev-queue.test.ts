@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const WORKFLOWS_DIR = path.join(REPO_ROOT, ".github/workflows");
+const TURN_SCRIPT = path.join(REPO_ROOT, "scripts/wait-for-dev-turn.sh");
 
 const CHECKS = "checks.yml";
 const VISUAL = "visual-baselines.yml";
@@ -14,6 +15,9 @@ const MIGRATIONS = "migrations.yml";
  * script lo busca por este nombre en las demás corridas. */
 const TURN_JOB = "turno-dev";
 const TREE_JOB = "arbol-ya-verificado";
+/** Lo que el turno aguanta, por encima de la espera del script, para las
+ * consultas a la API que esa espera no cuenta. */
+const API_MARGIN_MINUTES = 10;
 
 interface Step {
   run?: string;
@@ -22,6 +26,7 @@ interface Step {
 
 interface Job {
   if?: string;
+  "timeout-minutes"?: number;
   needs?: string | string[];
   permissions?: Record<string, string>;
   strategy?: { matrix?: Record<string, unknown> };
@@ -36,6 +41,16 @@ function readWorkflow(fileName: string): Workflow {
   return load(
     readFileSync(path.join(WORKFLOWS_DIR, fileName), "utf8"),
   ) as Workflow;
+}
+
+/** El máximo de espera que el script usa sin `DEV_TURN_MAX_WAIT_MINUTES`. */
+function readDefaultMaxWaitMinutes(): number {
+  const script = readFileSync(TURN_SCRIPT, "utf8");
+  const match = /DEV_TURN_MAX_WAIT_MINUTES:-(\d+)\}/.exec(script);
+  if (!match) {
+    throw new Error(`No encuentro el máximo por defecto en ${TURN_SCRIPT}`);
+  }
+  return Number(match[1]);
 }
 
 function needsOf(job: Job | undefined): string[] {
@@ -65,6 +80,20 @@ describe("cola entre corridas para seadragons-dev (#507)", () => {
   it.each(JOBS_WITHOUT_DEV)("%s: el job %s no hace cola", (file, name) => {
     expect(needsOf(readWorkflow(file).jobs[name])).not.toContain(TURN_JOB);
   });
+
+  // Si Actions corta antes que el script, la corrida se pierde sin decir
+  // detrás de quién esperaba (#517). El margen cubre las consultas a la API,
+  // que el máximo del script no cuenta.
+  it.each([CHECKS, VISUAL])(
+    "%s: el turno dura más que la espera máxima del script, con margen",
+    (file) => {
+      const timeout = readWorkflow(file).jobs[TURN_JOB]?.["timeout-minutes"];
+
+      expect(timeout).toBeGreaterThanOrEqual(
+        readDefaultMaxWaitMinutes() + API_MARGIN_MINUTES,
+      );
+    },
+  );
 
   it("migrations.yml, con su Postgres propio, no hace cola", () => {
     expect(readWorkflow(MIGRATIONS).jobs[TURN_JOB]).toBeUndefined();

@@ -30,10 +30,15 @@
 
 set -uo pipefail
 
-# Una corrida de checks son unos 10 minutos y una visual otros tantos: una hora
-# es una cola de varias por delante. Más que eso es que algo se ha quedado
-# colgado, y es mejor un rojo que diga detrás de quién que esperar para siempre.
-MAX_WAIT_MINUTES="${DEV_TURN_MAX_WAIT_MINUTES:-60}"
+# Un `checks` tarda de 30 a 40 minutos, y una visual o una aceptación de
+# capturas, de 15 a 20. Con dos personas y la fábrica es normal tener tres o
+# cuatro corridas delante: el 6 de octubre de 2026 un `checks` se rindió a los
+# 60 minutos detrás de cuatro (#517). 150 minutos cubren cuatro `checks` o una
+# mezcla parecida. Más que eso es que algo se ha quedado colgado, y es mejor un
+# rojo que diga detrás de quién que esperar para siempre. El `timeout-minutes`
+# del job `turno-dev` debe quedar por encima, para que corte este script y no
+# Actions.
+MAX_WAIT_MINUTES="${DEV_TURN_MAX_WAIT_MINUTES:-150}"
 # Cada vuelta son dos consultas de la lista y, como mucho, una de jobs: unas
 # 180 peticiones por hora por corrida que espera. El GITHUB_TOKEN tiene 1.000
 # por hora para todo el repositorio, así que caben cuatro o cinco esperando a

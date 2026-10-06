@@ -18,6 +18,10 @@ const CHECKS = ".github/workflows/checks.yml";
 const VISUAL = ".github/workflows/visual-baselines.yml";
 const MIGRATIONS = ".github/workflows/migrations.yml";
 
+/** El máximo de espera sin `DEV_TURN_MAX_WAIT_MINUTES` (#517): un `checks`
+ * tarda de 30 a 40 minutos y una visual de 15 a 20. */
+const DEFAULT_MAX_WAIT_MINUTES = 150;
+
 /** La corrida que pregunta: `checks` de la rama impl-2, arrancada a las 10. */
 const MY_RUN_ID = "500";
 const MY_RUN = `2026-10-06T10:00:00Z pull_request impl-2 ${CHECKS}`;
@@ -353,6 +357,16 @@ describe("wait-for-dev-turn", () => {
     expect(sleeps).toBe(2);
     expect(output).toMatch(/2 min/);
     expect(output).toContain(AHEAD_URL);
+  });
+
+  // Con 150 vueltas del `sleep` de mentira el test tardaría demasiado en
+  // Windows, así que el valor por defecto se lee del propio script.
+  it("sin la variable, se rinde a los 150 minutos de espera", async () => {
+    const script = await readFile(SCRIPT, "utf8");
+
+    expect(script).toContain(
+      `MAX_WAIT_MINUTES="\${DEV_TURN_MAX_WAIT_MINUTES:-${DEFAULT_MAX_WAIT_MINUTES}}"`,
+    );
   });
 
   it("vuelve a preguntar cuando la API falla y arranca cuando contesta", async () => {
