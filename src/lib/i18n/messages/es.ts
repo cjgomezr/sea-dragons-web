@@ -985,6 +985,28 @@ export const spanishMessages: MessageCatalog = {
   "payments.history.paid": "Pagado",
   "payments.history.failed": "Fallido",
   "payments.history.pending": "Pendiente",
+  "payments.sessions.left": {
+    one: "Te queda {count} sesión",
+    other: "Te quedan {count} sesiones",
+  },
+  "payments.sessions.empty": "Compra un pack para seguir entrenando.",
+  "payments.sessions.frozen": {
+    one: "Saldo congelado: {count} sesión",
+    other: "Saldo congelado: {count} sesiones",
+  },
+  "payments.sessions.frozenHint":
+    "Congelado mientras tengas un plan mensual: vuelve a valer si pasas a Casual.",
+  "payments.sessions.activity.title": "Movimientos de sesiones",
+  "payments.sessions.activity.date": "Fecha",
+  "payments.sessions.activity.movement": "Movimiento",
+  "payments.sessions.activity.sessions": "Sesiones",
+  "payments.sessions.activity.empty": "Todavía no hay movimientos de sesiones.",
+  "payments.sessions.activity.pack": {
+    one: "Pack de {count} sesión",
+    other: "Pack de {count} sesiones",
+  },
+  "payments.sessions.activity.training": "Entrenamiento del {date}: {title}",
+  "payments.sessions.activity.trainingUnavailable": "Entrenamiento",
   "payments.choice.title": "Elige tu membresía",
   "payments.choice.hint": "Puedes cambiarla mientras no hayas pagado.",
   "payments.choice.sessionPrice": "{price} por sesión",

@@ -33,6 +33,7 @@ function anAttendance(
     id: "mov-asistencia",
     delta: -1,
     eventId: "evt-1",
+    training: null,
     createdAt: new Date("2026-10-02T09:00:00Z"),
     ...overrides,
   };
