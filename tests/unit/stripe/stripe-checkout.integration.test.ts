@@ -27,6 +27,28 @@ if (!isTestMode) {
   );
 }
 
+/** stripe-node reintenta solo una llamada cuya respuesta se pierde por la red.
+ * Si la primera ya caducó la sesión, el reintento recibe "ya está caducada":
+ * la limpieza está hecha y el test no debe caer por eso. */
+const ALREADY_EXPIRED_MESSAGE = "status of `expired`";
+
+async function expireCheckoutSession(
+  client: Extract<typeof stripe, { kind: "configured" }>["client"],
+  sessionId: string,
+): Promise<void> {
+  try {
+    await client.checkout.sessions.expire(sessionId);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes(ALREADY_EXPIRED_MESSAGE)
+    ) {
+      return;
+    }
+    throw error;
+  }
+}
+
 const PENDING_FULL: MembershipRecord = {
   userId: USER_ID,
   clubId: "c1ab0000-0000-4000-8000-000000000001",
@@ -92,7 +114,7 @@ describe.skipIf(!isTestMode)("Checkout en Stripe (modo de prueba)", () => {
         });
         expect(session.line_items?.data[0]?.price?.id).toBe(stripe.prices.full);
       } finally {
-        await stripe.client.checkout.sessions.expire(session.id);
+        await expireCheckoutSession(stripe.client, session.id);
       }
     },
     NETWORK_TEST_TIMEOUT_MS,
