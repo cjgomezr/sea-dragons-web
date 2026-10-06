@@ -1229,6 +1229,7 @@ export const spanishMessages: MessageCatalog = {
   "languageToggle.target": "EN",
 
   "email.signature": "{clubName}, club de rugby subacuático de Melbourne.",
+  "email.directory.signature": "Te escribe {name}, {role} de {clubName}.",
   "email.recovery.subject": "Recupera tu contraseña de {clubName}",
   "email.recovery.requested":
     "Alguien pidió cambiar la contraseña de tu cuenta de {clubName}.",

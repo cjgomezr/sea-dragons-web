@@ -4,6 +4,7 @@ import {
   evaluateAccentColor,
 } from "@/lib/club/accent-color";
 import type { ClubBrand } from "@/lib/club/club-brand";
+import type { Role } from "@/lib/auth/roles";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import {
@@ -27,17 +28,24 @@ export type RenderedEmail = {
   readonly text: string;
 };
 
+type EmailAction = {
+  /** El texto corto del botón. Sólo va en el HTML: en texto plano no hay
+   * botón, y ahí manda la frase de `label`. */
+  readonly buttonLabel: string;
+  readonly label: string;
+  readonly url: string;
+};
+
 type EmailContent = {
   readonly subject: string;
   readonly intro: readonly string[];
-  readonly action: {
-    /** El texto corto del botón. Sólo va en el HTML: en texto plano no hay
-     * botón, y ahí manda la frase de `label`. */
-    readonly buttonLabel: string;
-    readonly label: string;
-    readonly url: string;
-  };
+  /** `null` en el correo que escribe un socio (#501): no lleva a ninguna
+   * pantalla. */
+  readonly action: EmailAction | null;
   readonly outro: readonly string[];
+  /** El pie: el del club en los correos de la aplicación, y quién escribe en
+   * los del directorio (#501). */
+  readonly signature: string;
 };
 
 /** Los tokens del tema claro de `design-system.md`, salvo la cabecera, que usa
@@ -134,7 +142,7 @@ const HTML_ESCAPES: Readonly<Record<string, string>> = {
   "'": "&#39;",
 };
 
-function signatureIn(t: Translator, brand: EmailBrand): string {
+function clubSignatureIn(t: Translator, brand: ClubBrand): string {
   return t("email.signature", { clubName: brand.name });
 }
 
@@ -145,16 +153,16 @@ function escapeHtml(value: string): string {
   );
 }
 
+/** Un salto de línea dentro de un párrafo se conserva: el correo del
+ * directorio (#501) va tal como lo escribió el socio. */
 function renderParagraph(text: string): string {
-  return `<p style="${PARAGRAPH_STYLE}">${escapeHtml(text)}</p>`;
+  const lines = escapeHtml(text).split("\n").join("<br>\n");
+  return `<p style="${PARAGRAPH_STYLE}">${lines}</p>`;
 }
 
 /** El color va en la celda y no sólo en el enlace: Outlook y Gmail respetan
  * el fondo de una `td`, y un `<a>` con `display: block` lo pierden. */
-function renderButton(
-  action: EmailContent["action"],
-  accent: AccentPair,
-): string {
+function renderButton(action: EmailAction, accent: AccentPair): string {
   return [
     `<table ${LAYOUT_TABLE_ATTRIBUTES} style="margin: 0 0 16px;">`,
     `<tr><td bgcolor="${accent.accent}" style="${buttonCellStyle(accent)}">`,
@@ -166,10 +174,7 @@ function renderButton(
 
 /** El botón no sustituye al enlace escrito entero: hay clientes que bloquean
  * los enlaces, y quien lo lee en texto plano tiene que poder copiarlo igual. */
-function renderWrittenLink(
-  action: EmailContent["action"],
-  accent: AccentPair,
-): string {
+function renderWrittenLink(action: EmailAction, accent: AccentPair): string {
   const url = escapeHtml(action.url);
   return `<p style="${PARAGRAPH_STYLE}">${escapeHtml(action.label)}: <a href="${url}" style="${writtenLinkStyle(accent)}">${url}</a></p>`;
 }
@@ -184,21 +189,25 @@ function renderHeaderContent(brand: EmailBrand): string {
   return `<img src="${escapeHtml(brand.logoUrl)}" alt="${name}" height="${LOGO_HEIGHT_PX}" style="display: block; height: ${LOGO_HEIGHT_PX}px; width: auto; border: 0; ${HEADER_TEXT_STYLE}">`;
 }
 
-function renderCard(
-  t: Translator,
-  brand: EmailBrand,
-  content: EmailContent,
-): string {
+function renderAction(
+  action: EmailAction | null,
+  accent: AccentPair,
+): readonly string[] {
+  return action === null
+    ? []
+    : [renderButton(action, accent), renderWrittenLink(action, accent)];
+}
+
+function renderCard(brand: EmailBrand, content: EmailContent): string {
   return [
     `<table ${LAYOUT_TABLE_ATTRIBUTES} width="100%" style="width: 100%; max-width: ${MAX_WIDTH_PX}px;">`,
     `<tr><td style="${headerStyle(brand.accent)}">${renderHeaderContent(brand)}</td></tr>`,
     `<tr><td style="${CONTENT_STYLE}">`,
     ...content.intro.map(renderParagraph),
-    renderButton(content.action, brand.accent),
-    renderWrittenLink(content.action, brand.accent),
+    ...renderAction(content.action, brand.accent),
     ...content.outro.map(renderParagraph),
     "</td></tr>",
-    `<tr><td style="${FOOTER_STYLE}"><p style="${SIGNATURE_STYLE}">${escapeHtml(signatureIn(t, brand))}</p></td></tr>`,
+    `<tr><td style="${FOOTER_STYLE}"><p style="${SIGNATURE_STYLE}">${escapeHtml(content.signature)}</p></td></tr>`,
     "</table>",
   ].join("\n");
 }
@@ -218,7 +227,7 @@ function renderHtml(
     // Outlook de escritorio pinta con el motor de Word e ignora `max-width`:
     // esta tabla fija, que sólo él lee, le pone el mismo tope.
     `<!--[if mso]><table ${LAYOUT_TABLE_ATTRIBUTES} width="${MAX_WIDTH_PX}" align="center"><tr><td><![endif]-->`,
-    renderCard(t, brand, content),
+    renderCard(brand, content),
     "<!--[if mso]></td></tr></table><![endif]-->",
     "</td></tr>",
     "</table>",
@@ -227,29 +236,31 @@ function renderHtml(
   ].join("\n");
 }
 
-function renderText(
-  t: Translator,
-  brand: EmailBrand,
-  content: EmailContent,
-): string {
+function renderText(content: EmailContent): string {
+  const action =
+    content.action === null
+      ? []
+      : [`${content.action.label}: ${content.action.url}`];
   return `${[
     ...content.intro,
-    `${content.action.label}: ${content.action.url}`,
+    ...action,
     ...content.outro,
-    signatureIn(t, brand),
+    content.signature,
   ].join("\n\n")}\n`;
 }
 
+/** Los correos de la aplicación, que firma el club. */
 function renderEmail(
   t: Translator,
   clubBrand: ClubBrand,
-  content: EmailContent,
+  content: Omit<EmailContent, "signature">,
 ): RenderedEmail {
   const brand = toEmailBrand(clubBrand);
+  const signed = { ...content, signature: clubSignatureIn(t, clubBrand) };
   return {
-    subject: content.subject,
-    html: renderHtml(t, brand, content),
-    text: renderText(t, brand, content),
+    subject: signed.subject,
+    html: renderHtml(t, brand, signed),
+    text: renderText(signed),
   };
 }
 
@@ -363,4 +374,45 @@ export function renderRenewalReminderEmail(input: {
     },
     outro: [],
   });
+}
+
+/** Lo que escribió quien manda un correo desde el directorio (#501). */
+export type DirectoryEmailDraft = {
+  readonly subject: string;
+  readonly message: string;
+};
+
+/** Cada línea en blanco del mensaje separa un párrafo del HTML. */
+const BLANK_LINE_PATTERN = /\n\s*\n/;
+
+/** El correo que un Admin o un Committee escribe a los socios desde el
+ * directorio (#501, RF-6 del PRD de E19). El asunto y el mensaje van tal como
+ * se escribieron: en el HTML se escapan, así que nada de lo escrito se
+ * interpreta como etiqueta. El pie dice quién escribe, en el idioma de quien
+ * lo recibe. */
+export function renderDirectoryEmail(input: {
+  readonly draft: DirectoryEmailDraft;
+  readonly sender: { readonly fullName: string; readonly role: Role };
+  readonly locale: Locale;
+  readonly brand: ClubBrand;
+}): RenderedEmail {
+  const t = createTranslator(input.locale);
+  const signature = t("email.directory.signature", {
+    name: input.sender.fullName,
+    role: t(`role.${input.sender.role}`),
+    clubName: input.brand.name,
+  });
+  return {
+    subject: input.draft.subject,
+    html: renderHtml(t, toEmailBrand(input.brand), {
+      subject: input.draft.subject,
+      intro: input.draft.message.split(BLANK_LINE_PATTERN),
+      action: null,
+      outro: [],
+      signature,
+    }),
+    // El texto plano lleva el mensaje entero tal cual, con sus líneas en
+    // blanco, y no los párrafos que el HTML saca de él.
+    text: `${input.draft.message}\n\n${signature}\n`,
+  };
 }

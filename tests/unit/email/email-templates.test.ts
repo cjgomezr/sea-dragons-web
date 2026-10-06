@@ -8,6 +8,7 @@ import { contrastRatio } from "../helpers/wcag-contrast";
 import {
   type RenderedEmail,
   renderAccountConfirmationEmail,
+  renderDirectoryEmail,
   renderMemberInvitationEmail,
   renderPasswordRecoveryEmail,
   renderRenewalReminderEmail,
@@ -771,4 +772,59 @@ describe("la marca en los correos", () => {
       expect(email.html.toLowerCase()).not.toContain(accentColor.toLowerCase());
     },
   );
+});
+
+describe("correo del directorio", () => {
+  const MESSAGE = "Hola:\n\nEl sábado entrenamos a las 8.\n<b>Traed aletas</b> & gorro";
+
+  function renderFor(locale: Locale, role: "Admin" | "Committee" = "Committee") {
+    return renderDirectoryEmail({
+      draft: { subject: "Entreno <sábado>", message: MESSAGE },
+      sender: { fullName: "Ana Admin", role },
+      locale,
+      brand: DEFAULT_CLUB_BRAND,
+    });
+  }
+
+  it("lleva el asunto tal como se escribió", () => {
+    expect(renderFor("es").subject).toBe("Entreno <sábado>");
+  });
+
+  it("lleva el mensaje tal cual en el texto plano", () => {
+    expect(renderFor("es").text).toContain(MESSAGE);
+  });
+
+  it("no interpreta el mensaje como HTML", () => {
+    const { html } = renderFor("es");
+
+    expect(html).not.toContain("<b>Traed aletas</b>");
+    expect(html).toContain("&lt;b&gt;Traed aletas&lt;/b&gt; &amp; gorro");
+  });
+
+  it("conserva los saltos de línea del mensaje en el HTML", () => {
+    const { html } = renderFor("es");
+
+    expect(html).toContain("El sábado entrenamos a las 8.<br>");
+  });
+
+  it("no lleva botón ni enlace", () => {
+    expect(renderFor("es").html).not.toContain("<a ");
+  });
+
+  it("firma en español con el nombre, el rol y el club", () => {
+    const { html, text } = renderFor("es");
+
+    expect(text).toContain("Te escribe Ana Admin, Comité de Victoria Seadragons.");
+    expect(readableTextOf(html)).toContain(
+      "Te escribe Ana Admin, Comité de Victoria Seadragons.",
+    );
+  });
+
+  it("firma en inglés con el nombre, el rol y el club", () => {
+    const { text } = renderFor("en");
+
+    expect(text).toContain(
+      "Ana Admin, Committee at Victoria Seadragons, wrote to you.",
+    );
+  });
 });

@@ -109,6 +109,11 @@ export const AUDIT_ACTIONS = [
   // (`{ newStatus }`).
   "membership.waived",
   "membership.waiver_removed",
+  // RF-6 de E19 (#501): un Admin o un Committee manda un correo desde el
+  // directorio. La entidad es el envío (`directory_email`), y la metadata
+  // lleva el asunto, a cuántos se pidió y cuántos salieron
+  // (`{ subject, recipientCount, sentCount }`). Ni el cuerpo ni a quiénes.
+  "directory.email_sent",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

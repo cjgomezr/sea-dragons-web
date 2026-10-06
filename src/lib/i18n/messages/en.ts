@@ -1232,6 +1232,7 @@ export const englishMessages = {
   // Los dos correos del club (RF-6). Salen en el idioma guardado en la fila
   // del socio, no en el de la visita: se mandan después de responder.
   "email.signature": "{clubName}, underwater rugby club in Melbourne.",
+  "email.directory.signature": "{name}, {role} at {clubName}, wrote to you.",
   "email.recovery.subject": "Reset your {clubName} password",
   "email.recovery.requested":
     "Someone asked to change the password for your {clubName} account.",

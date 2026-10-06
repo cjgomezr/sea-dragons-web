@@ -169,6 +169,24 @@ export function connectResendEmailSender(
   env: Environment,
   fetchImplementation: typeof fetch = fetch,
 ): EmailSenderConnection {
+  const connection = readResendConnection(env, fetchImplementation);
+  if (connection.kind === "not_connected") {
+    return connection;
+  }
+  return {
+    kind: "connected",
+    sender: {
+      sendEmail: (email) => sendThroughResend(connection.resend, email),
+    },
+  };
+}
+
+function readResendConnection(
+  env: Environment,
+  fetchImplementation: typeof fetch,
+):
+  | { readonly kind: "connected"; readonly resend: ResendConnection }
+  | { readonly kind: "not_connected"; readonly reason: string } {
   const apiKey = readVariable(env, RESEND_API_KEY_ENV);
   const from = readVariable(env, EMAIL_FROM_ENV);
   if (apiKey === null || from === null) {
@@ -180,11 +198,147 @@ export function connectResendEmailSender(
       ]),
     };
   }
-
-  const connection: ResendConnection = { apiKey, from, fetchImplementation };
   return {
     kind: "connected",
-    sender: { sendEmail: (email) => sendThroughResend(connection, email) },
+    resend: { apiKey, from, fetchImplementation },
+  };
+}
+
+/** El envío por lotes (#501): una petición con un correo propio por
+ * destinatario, para no gastar en un correo a 50 socios 50 de las dos
+ * peticiones por segundo que deja Resend. */
+export const RESEND_BATCH_ENDPOINT = "https://api.resend.com/emails/batch";
+
+/** Con la permisiva, una dirección que Resend rechaza no tumba el lote: el
+ * resto sale y la respuesta dice cuál falló. */
+const BATCH_VALIDATION_HEADER = "x-batch-validation";
+const PERMISSIVE_BATCH_VALIDATION = "permissive";
+
+/** Un correo con respuesta a otra dirección que la del club: la de quien lo
+ * escribió (#501). */
+export type ReplyableEmail = OutgoingEmail & { readonly replyTo: string };
+
+export type BatchEmailDelivery =
+  | { readonly kind: "sent" }
+  | { readonly kind: "failed"; readonly reason: string };
+
+/** Lanza `EmailDeliveryError` si el lote entero no sale. Si sale, dice qué
+ * pasó con cada correo, en el mismo orden. `idempotencyKey` hace que Resend
+ * no mande dos veces el mismo lote si la petición se repite. */
+export type BatchEmailSender = {
+  sendBatch(
+    emails: readonly ReplyableEmail[],
+    idempotencyKey: string,
+  ): Promise<readonly BatchEmailDelivery[]>;
+};
+
+export type BatchEmailSenderConnection =
+  | { readonly kind: "connected"; readonly sender: BatchEmailSender }
+  | { readonly kind: "not_connected"; readonly reason: string };
+
+async function postBatchToResend(
+  connection: ResendConnection,
+  batch: { readonly emails: readonly ReplyableEmail[]; readonly key: string },
+): Promise<Response> {
+  try {
+    return await connection.fetchImplementation(RESEND_BATCH_ENDPOINT, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${connection.apiKey}`,
+        "content-type": "application/json",
+        "idempotency-key": batch.key,
+        [BATCH_VALIDATION_HEADER]: PERMISSIVE_BATCH_VALIDATION,
+      },
+      body: JSON.stringify(
+        batch.emails.map((email) => ({
+          from: connection.from,
+          to: [email.to],
+          reply_to: email.replyTo,
+          subject: email.subject,
+          html: email.html,
+          text: email.text,
+        })),
+      ),
+      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw new EmailDeliveryError(
+      `No se pudo hablar con Resend: ${describeCause(error)}`,
+      { cause: error },
+    );
+  }
+}
+
+/** Los correos que Resend no aceptó, por su posición en el lote. */
+function readBatchErrors(body: unknown): ReadonlyMap<number, string> {
+  const errors =
+    typeof body === "object" && body !== null && "errors" in body
+      ? body.errors
+      : [];
+  if (!Array.isArray(errors)) {
+    return new Map();
+  }
+  return new Map(
+    errors.flatMap((error: unknown) => {
+      const index =
+        typeof error === "object" && error !== null && "index" in error
+          ? error.index
+          : null;
+      return typeof index === "number"
+        ? [[index, readStringAt(error, ["message"]) ?? "sin motivo"] as const]
+        : [];
+    }),
+  );
+}
+
+function hasBatchData(body: unknown): boolean {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    "data" in body &&
+    Array.isArray(body.data)
+  );
+}
+
+async function sendBatchThroughResend(
+  connection: ResendConnection,
+  batch: { readonly emails: readonly ReplyableEmail[]; readonly key: string },
+): Promise<readonly BatchEmailDelivery[]> {
+  const response = await postBatchToResend(connection, batch);
+  const body = await readJsonBody(response);
+  if (!response.ok) {
+    throw new EmailDeliveryError(describeRejection(response.status, body), {
+      status: response.status,
+    });
+  }
+  if (!hasBatchData(body)) {
+    throw new EmailDeliveryError(
+      `Resend respondió ${response.status} sin la lista de envíos, así que no hay constancia de que salieran.`,
+      { status: response.status },
+    );
+  }
+  const errors = readBatchErrors(body);
+  return batch.emails.map((_, index) => {
+    const reason = errors.get(index);
+    return reason === undefined ? { kind: "sent" } : { kind: "failed", reason };
+  });
+}
+
+/** Como `connectResendEmailSender`, con las mismas dos variables. */
+export function connectResendBatchEmailSender(
+  env: Environment,
+  fetchImplementation: typeof fetch = fetch,
+): BatchEmailSenderConnection {
+  const connection = readResendConnection(env, fetchImplementation);
+  if (connection.kind === "not_connected") {
+    return connection;
+  }
+  return {
+    kind: "connected",
+    sender: {
+      sendBatch: (emails, key) =>
+        sendBatchThroughResend(connection.resend, { emails, key }),
+    },
   };
 }
 
