@@ -64,9 +64,8 @@ async function seedCasual(
   }
 }
 
-/** Un entrenamiento al que el Casual asistió: la base le descuenta la
- * sesión. Borrar el evento al terminar se lleva la asistencia y el
- * movimiento. */
+/** Un entrenamiento al que el Casual asistió, con su sesión descontada.
+ * Borrar el evento al terminar se lleva la asistencia y el movimiento. */
 async function withAttendedTraining(
   serviceClient: ServiceRoleClient,
   input: {
@@ -102,6 +101,21 @@ async function withAttendedTraining(
         });
       if (error) {
         throw new Error(`No se pudo sembrar la asistencia: ${error.message}`);
+      }
+      // Sin saldo la hoja no descuenta (D1): el descuento se siembra a mano.
+      const { error: debitError } = await serviceClient.client
+        .from("session_ledger")
+        .insert({
+          user_id: input.user.id,
+          club_id: input.clubId,
+          delta: -1,
+          kind: "attendance",
+          attendance_event_id: event?.id,
+        });
+      if (debitError) {
+        throw new Error(
+          `No se pudo sembrar el descuento: ${debitError.message}`,
+        );
       }
       await run();
     },
