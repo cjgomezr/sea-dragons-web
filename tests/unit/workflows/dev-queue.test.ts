@@ -17,7 +17,7 @@ const TURN_JOB = "turno-dev";
 const TREE_JOB = "arbol-ya-verificado";
 /** Lo que el turno aguanta, por encima de la espera del script, para las
  * consultas a la API que esa espera no cuenta. */
-const API_MARGIN_MINUTES = 10;
+const API_MARGIN_MINUTES = 15;
 
 interface Step {
   run?: string;
