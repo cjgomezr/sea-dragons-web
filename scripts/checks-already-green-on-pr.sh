@@ -85,6 +85,13 @@ fi
 # mienta. En la visual deja fuera además la aceptación a mano
 # (`workflow_dispatch`): sale verde sin haber comparado nada.
 #
+# Desde el #494 hay una excepción en `checks`: una corrida de PR también
+# concluye `success` con la suite saltada cuando `solo-lineas-base` vio que el
+# empujón solo traía capturas de Linux. Es aceptable porque ese salto exige que
+# en el commit anterior el job `checks` corriera de verdad, y el árbol de ahora
+# es ese más PNG: la cadena tiene como mucho un nivel. Si alguien relaja esa
+# exigencia en baselines-only-after-green.sh, esto vuelve a poder mentir.
+#
 # `head_sha` es la cabeza del PR y no cualquier commit suyo: una visual verde
 # sobre un commit anterior no dice nada del árbol que se mergeó.
 corridas_verdes=$(

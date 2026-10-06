@@ -67,6 +67,51 @@ jobs:
           GH_REPO: ${{ github.repository }}
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
 
+  # Lo mismo en un PR: al aceptar capturas, visual-baselines.yml sube a la rama
+  # un commit que solo trae PNG de Linux, y eso disparaba otra vez la suite
+  # entera sobre el código que acababa de salir verde. Si el empujón solo trae
+  # líneas base y el commit anterior pasó el job `checks` de verdad, se salta.
+  # Solo en `synchronize`: es el único evento con commit anterior (#494).
+  # La corrida anterior probó la rama mezclada con el main de entonces; si
+  # main avanzó después, el salto no prueba la mezcla nueva. Es el mismo
+  # riesgo que `arbol-ya-verificado` ya acepta en el push a main.
+  solo-lineas-base:
+    if: github.event_name == 'pull_request' && github.event.action == 'synchronize'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      ya_verificado: ${{ steps.pregunta.outputs.ya_verificado }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: pregunta
+        run: bash scripts/baselines-only-after-green.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          WORKFLOW_FILE: checks.yml
+          HEAVY_JOB: checks
+
+  # Cuando la suite se salta, corren igual los tests que listan las líneas
+  # base: un PNG nuevo puede dejar una captura huérfana o un estado en español
+  # sin sus seis. No necesitan dev ni navegador, así que no piden turno.
+  tests-lineas-base:
+    needs: [solo-lineas-base]
+    if: needs.solo-lineas-base.outputs.ya_verificado == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Tests que leen las líneas base
+        run: npx vitest run tests/unit/scripts/spanish-captures.test.ts tests/unit/scripts/visual-baselines-tracking.test.ts
+
   # Los tests de integración usan `seadragons-dev`, igual que la visual. Este
   # job espera a que ninguna corrida anterior de los dos workflows lo esté
   # usando (#507): diez jobs a la vez contra dev lo dejaban sin contestar. Va
@@ -77,8 +122,8 @@ jobs:
   # y con `always()` seguiría esperando turno para nada (#416). Se salta, sin
   # ocupar sitio en la cola, cuando el árbol ya estaba verificado.
   turno-dev:
-    needs: [arbol-ya-verificado]
-    if: "!cancelled() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true'"
+    needs: [arbol-ya-verificado, solo-lineas-base]
+    if: "!cancelled() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true' && needs.solo-lineas-base.outputs.ya_verificado != 'true'"
     runs-on: ubuntu-latest
     # Red por si una llamada a la API se cuelga: el máximo del script sólo
     # cuenta las esperas entre consultas, y el de Actions son seis horas.
@@ -95,7 +140,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
 
   checks:
-    needs: [arbol-ya-verificado, turno-dev]
+    needs: [arbol-ya-verificado, solo-lineas-base, turno-dev]
     # Una función de estado es obligatoria: sin ella, Actions exige
     # implícitamente que la dependencia haya terminado en success(), y en un
     # pull request ese job ni siquiera arranca. Sin esto, los checks se
@@ -107,7 +152,7 @@ jobs:
     # libre el sitio de una corrida cancelada (#416, #507). Por la función de
     # estado hay que pedir el turno en dev a mano: arrancaría aunque la espera
     # se hubiera agotado.
-    if: "!cancelled() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true' && needs.turno-dev.result == 'success'"
+    if: "!cancelled() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true' && needs.solo-lineas-base.outputs.ya_verificado != 'true' && needs.turno-dev.result == 'success'"
     runs-on: ubuntu-latest
     steps:
       # Con toda la historia: el paso `texto` compara la rama con main, y el
