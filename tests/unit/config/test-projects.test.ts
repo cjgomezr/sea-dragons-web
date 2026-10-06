@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  INTEGRATION_FETCH_TIMEOUT_SETUP_FILE,
   INTEGRATION_PROJECT_NAME,
+  SHARED_SETUP_FILE,
   selectTestProjects,
   UNIT_PROJECT_NAME,
 } from "../../support/test-projects.mts";
+import { SUPABASE_FETCH_WORST_CASE_MS } from "../../support/supabase-fetch-timeout";
 import {
   INTEGRATION_TEST_PATTERNS,
   RUN_INTEGRATION_TESTS_ENV,
@@ -40,6 +43,28 @@ describe("los proyectos de Vitest", () => {
 
     expect(unit.fileParallelism).toBeUndefined();
     expect(unit.maxWorkers).toBeUndefined();
+  });
+
+  it("ponen tiempo máximo a las peticiones a Supabase sólo en el de red", () => {
+    const unit = findProject(ENABLED, UNIT_PROJECT_NAME);
+    const integration = findProject(ENABLED, INTEGRATION_PROJECT_NAME);
+
+    expect(integration.setupFiles).toEqual([
+      SHARED_SETUP_FILE,
+      INTEGRATION_FETCH_TIMEOUT_SETUP_FILE,
+    ]);
+    expect(unit.setupFiles).toEqual([SHARED_SETUP_FILE]);
+  });
+
+  it("dan a los tests y hooks del de red un plazo que cubre una lectura colgada", () => {
+    const integration = findProject(ENABLED, INTEGRATION_PROJECT_NAME);
+
+    expect(integration.testTimeout).toBeGreaterThan(
+      SUPABASE_FETCH_WORST_CASE_MS,
+    );
+    expect(integration.hookTimeout).toBeGreaterThan(
+      SUPABASE_FETCH_WORST_CASE_MS,
+    );
   });
 
   it("dan al de red exactamente los patrones de integración", () => {

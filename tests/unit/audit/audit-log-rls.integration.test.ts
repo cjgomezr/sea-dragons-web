@@ -11,7 +11,11 @@ import {
   readSupabaseConfig,
   readSupabaseServiceRoleConfig,
 } from "@/lib/supabase/config";
-import { createServiceRoleTestClient, leaseTestUser } from "../../support/rls";
+import {
+  createServiceRoleTestClient,
+  leaseTestUser,
+  RLS_NETWORK_TEST_TIMEOUT_MS,
+} from "../../support/rls";
 
 // Este archivo monta sus propios clientes en vez de usar `describeRls`; el
 // usuario autenticado sí sale de la reserva de `tests/support/rls.ts`.
@@ -35,8 +39,6 @@ if (!hasCredentials) {
     `⚠ audit_log RLS/concurrencia: tests saltados, faltan variables: ${[...missingKeys].join(", ")}`,
   );
 }
-
-const TEST_TIMEOUT_MS = 20_000;
 
 /**
  * La marca de tiempo la pone Postgres, así que esta comprobación enfrenta el
@@ -126,11 +128,11 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
         },
       },
     );
-  }, TEST_TIMEOUT_MS);
+  }, RLS_NETWORK_TEST_TIMEOUT_MS);
 
   afterAll(async () => {
     await releaseTestUser?.();
-  }, TEST_TIMEOUT_MS);
+  }, RLS_NETWORK_TEST_TIMEOUT_MS);
 
   it(
     "un usuario autenticado que no es Admin no recibe ninguna fila",
@@ -161,7 +163,7 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
       }
       expect(data).toEqual([]);
     },
-    TEST_TIMEOUT_MS,
+    RLS_NETWORK_TEST_TIMEOUT_MS,
   );
 
   it(
@@ -209,7 +211,7 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
         .single();
       expect(afterDelete?.id).toBe(row!.id);
     },
-    TEST_TIMEOUT_MS,
+    RLS_NETWORK_TEST_TIMEOUT_MS,
   );
 
   it(
@@ -246,7 +248,7 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
         Date.now() + CLOCK_SKEW_TOLERANCE_MS,
       );
     },
-    TEST_TIMEOUT_MS,
+    RLS_NETWORK_TEST_TIMEOUT_MS,
   );
 
   it(
@@ -275,7 +277,7 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
       expect(error).toBeNull();
       expect(data).toEqual([]);
     },
-    TEST_TIMEOUT_MS,
+    RLS_NETWORK_TEST_TIMEOUT_MS,
   );
 
   it(
@@ -313,6 +315,6 @@ describe.skipIf(!hasCredentials)("audit_log: RLS y concurrencia", () => {
       expect(error).toBeNull();
       expect(data).toHaveLength(2);
     },
-    TEST_TIMEOUT_MS,
+    RLS_NETWORK_TEST_TIMEOUT_MS,
   );
 });

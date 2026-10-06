@@ -21,7 +21,6 @@ const sharedProjectOptions = {
 const sharedTestOptions = {
   globals: true,
   environment: "jsdom",
-  setupFiles: ["./vitest.setup.ts"],
   // Los 5 s por defecto de Vitest están pensados para tests en memoria.
   // Buena parte de esta suite no lo es: lanza scripts de shell reales
   // (stop-gate, process-backlog, file-incident, assign-epic, clear-blockers)
@@ -45,6 +44,7 @@ function toVitestProject(
       ...project,
       include: [...project.include],
       exclude: [...project.exclude],
+      setupFiles: [...project.setupFiles],
     },
   };
 }
@@ -58,6 +58,9 @@ export default defineConfig({
       totalMemoryBytes: totalmem(),
     }),
     projects: selectTestProjects(process.env).map(toVitestProject),
-    globalSetup: ["./tests/support/vitest-global-setup.ts"],
+    globalSetup: [
+      "./tests/support/vitest-global-setup.ts",
+      "./tests/support/fetch-timeout-report.ts",
+    ],
   },
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { NO_SIGN_IN_TEXTS } from "@/lib/club/sign-in-texts";
 import { fetchClubBrandRow } from "@/lib/club/supabase-club-brand";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
+import { NETWORK_TEST_TIMEOUT_MS } from "../../support/network-test-timeout";
 
 /**
  * La lectura de la marca contra `seadragons-dev` (#292). La base de desarrollo
@@ -14,8 +15,6 @@ const hasCredentials =
 if (!hasCredentials) {
   console.warn("⚠ marca del club: test saltado, falta la config de Supabase");
 }
-
-const TEST_TIMEOUT_MS = 20_000;
 
 describe.skipIf(!hasCredentials)("lectura de la marca en Supabase", () => {
   it(
@@ -31,7 +30,7 @@ describe.skipIf(!hasCredentials)("lectura de la marca en Supabase", () => {
         signInTexts: NO_SIGN_IN_TEXTS,
       });
     },
-    TEST_TIMEOUT_MS,
+    NETWORK_TEST_TIMEOUT_MS,
   );
 });
 

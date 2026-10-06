@@ -1,4 +1,5 @@
 import { configDefaults } from "vitest/config";
+import { NETWORK_TEST_TIMEOUT_MS } from "./network-test-timeout";
 import {
   INTEGRATION_TEST_PATTERNS,
   selectExcludedTests,
@@ -22,6 +23,13 @@ export const INTEGRATION_PROJECT_NAME = "integration";
  * por defecto); con `isolate: false` se negaría a arrancar. */
 const SEQUENTIAL_WORKERS = 1;
 
+export const SHARED_SETUP_FILE = "./vitest.setup.ts";
+/** Pone tiempo máximo a las peticiones a dev y reintenta las lecturas
+ * colgadas (#506). Es sólo del arnés de red: los unitarios no hablan con dev,
+ * y la aplicación no reintenta (#165). */
+export const INTEGRATION_FETCH_TIMEOUT_SETUP_FILE =
+  "./tests/support/integration-fetch-timeout.setup.ts";
+
 // *.test.ts(x) is Vitest; *.spec.ts is Playwright. Keeping the split on the
 // extension stops each runner from collecting the other one's suite.
 const TEST_FILES = [
@@ -35,6 +43,7 @@ type Environment = Readonly<Record<string, string | undefined>>;
 type ProjectFiles = {
   readonly include: readonly string[];
   readonly exclude: readonly string[];
+  readonly setupFiles: readonly string[];
 };
 
 export type TestProjectSelection =
@@ -42,11 +51,15 @@ export type TestProjectSelection =
       readonly name: typeof UNIT_PROJECT_NAME;
       readonly fileParallelism?: undefined;
       readonly maxWorkers?: undefined;
+      readonly testTimeout?: undefined;
+      readonly hookTimeout?: undefined;
     })
   | (ProjectFiles & {
       readonly name: typeof INTEGRATION_PROJECT_NAME;
       readonly fileParallelism: false;
       readonly maxWorkers: typeof SEQUENTIAL_WORKERS;
+      readonly testTimeout: number;
+      readonly hookTimeout: number;
     });
 
 export function selectTestProjects(
@@ -57,13 +70,19 @@ export function selectTestProjects(
       name: UNIT_PROJECT_NAME,
       include: TEST_FILES,
       exclude: [...configDefaults.exclude, ...INTEGRATION_TEST_PATTERNS],
+      setupFiles: [SHARED_SETUP_FILE],
     },
     {
       name: INTEGRATION_PROJECT_NAME,
       include: INTEGRATION_TEST_PATTERNS,
       exclude: selectExcludedTests(env),
+      setupFiles: [SHARED_SETUP_FILE, INTEGRATION_FETCH_TIMEOUT_SETUP_FILE],
       fileParallelism: false,
       maxWorkers: SEQUENTIAL_WORKERS,
+      // Un test o un hook que no fije su plazo no debe agotarse antes que una
+      // lectura colgada con todos sus reintentos (#506).
+      testTimeout: NETWORK_TEST_TIMEOUT_MS,
+      hookTimeout: NETWORK_TEST_TIMEOUT_MS,
     },
   ];
 }
