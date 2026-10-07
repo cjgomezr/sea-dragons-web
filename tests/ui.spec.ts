@@ -5189,14 +5189,15 @@ test.describe("la hoja de filtros del directorio en el móvil", () => {
 /* Los filtros de #497 piden axe en cada ancho y en los dos temas, no sólo en
    el ancho por defecto: la barra y la hoja son controles distintos. El
    contacto de #499 también: la columna de la tabla y la tarjeta del móvil
-   son marcados distintos. */
+   son marcados distintos. Y el correo de #501: el formulario, el diálogo y
+   el resultado se piden en los dos temas. */
 test.describe("los filtros del directorio con axe en cada ancho y tema", () => {
   skipWithoutSession();
   quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
   const filterStates = DIRECTORY_STATES.filter((state) =>
-    /^directorio-(filtros|filtrado-sin|contacto)/.test(state.name),
+    /^(directorio-(filtros|filtrado-sin|contacto)|correo-)/.test(state.name),
   );
 
   for (const vp of viewports) {
