@@ -209,6 +209,7 @@ function renderScreen(options: RenderOptions = {}): void {
       checkoutReturn={options.checkoutReturn ?? null}
       cardReturn={options.cardReturn ?? null}
       packReturn={options.packReturn ?? null}
+      canSeeLevyPayers={false}
     />,
   );
 }

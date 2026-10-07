@@ -73,6 +73,8 @@ const SRD_MATRIX: Readonly<
   manageGroups: [true, true, true, false],
   // No está en la tabla de la sección 4: es FR-080 (#469).
   configureSessionPacks: [true, false, true, false],
+  // Tampoco: es la ampliación de FR-069 del 8 de octubre de 2026 (#531).
+  viewLevyPayers: [true, false, true, false],
   useMemberFeatures: [true, true, true, true],
 };
 
@@ -87,8 +89,8 @@ const SRD_CELLS = Object.entries(SRD_MATRIX).flatMap(([capability, row]) =>
 );
 
 describe("matriz de capacidades", () => {
-  it("recorre las 28 celdas de la tabla del SRD y las cuatro de FR-080", () => {
-    expect(SRD_CELLS).toHaveLength(32);
+  it("recorre las 28 celdas de la tabla del SRD, las cuatro de FR-080 y las cuatro de #531", () => {
+    expect(SRD_CELLS).toHaveLength(36);
   });
 
   it("no tiene capacidades que el SRD no liste", () => {

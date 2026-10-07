@@ -178,11 +178,13 @@ function MembershipPanel({
   returns,
   onViewReplaced,
   onPlanChanged,
+  canSeeLevyPayers,
 }: {
   readonly translate: Translator;
   readonly view: MembershipView;
   readonly waiting: Waiting;
   readonly returns: StripeReturns;
+  readonly canSeeLevyPayers: boolean;
   readonly onViewReplaced: (view: MembershipView) => void;
   readonly onPlanChanged: () => void;
 }): React.JSX.Element {
@@ -224,7 +226,9 @@ function MembershipPanel({
           packReturn={returns.packReturn}
         />
       ) : null}
-      {view.paymentsConfigured ? <LevyCharges translate={translate} /> : null}
+      {view.paymentsConfigured ? (
+        <LevyCharges translate={translate} canSeePayers={canSeeLevyPayers} />
+      ) : null}
       {membership?.plan === "Casual" ? (
         <SessionActivity
           translate={translate}
@@ -241,11 +245,15 @@ export function PaymentsScreen({
   checkoutReturn,
   cardReturn,
   packReturn,
+  canSeeLevyPayers,
 }: {
   readonly locale: Locale;
   readonly checkoutReturn: CheckoutReturn | null;
   readonly cardReturn: CheckoutReturn | null;
   readonly packReturn: CheckoutReturn | null;
+  /** Si quien mira puede ver quién pagó cada levy (#531): lo decide el
+   * servidor con el rol de la sesión, y el endpoint lo vuelve a exigir. */
+  readonly canSeeLevyPayers: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const { state, waiting, retry, refresh, replace } = useMembershipLoad({
@@ -276,6 +284,7 @@ export function PaymentsScreen({
           returns={{ checkoutReturn, cardReturn, packReturn }}
           onViewReplaced={replace}
           onPlanChanged={refresh}
+          canSeeLevyPayers={canSeeLevyPayers}
         />
       ) : null}
     </>

@@ -22,6 +22,7 @@ export type Capability =
   | "buildTeamsAndTrackAttendance"
   | "manageGroups"
   | "configureSessionPacks"
+  | "viewLevyPayers"
   | "useMemberFeatures";
 
 /** Una fila de la matriz. Al ser un `Record` de los cuatro roles, una fila que
@@ -62,6 +63,14 @@ export const CAPABILITY_MATRIX: Readonly<Record<Capability, RoleGrants>> = {
   // Los packs de sesiones que se ofrecen a los Casual. No es una fila de la
   // tabla de la sección 4, sino de FR-080, que la da al Admin y al Committee.
   configureSessionPacks: {
+    Admin: true,
+    Coach: false,
+    Committee: true,
+    Player: false,
+  },
+  // Quién pagó cada levy (#531). Tampoco está en la sección 4: el dueño la
+  // dio el 8 de octubre de 2026 a quienes ya ven el contacto de todos.
+  viewLevyPayers: {
     Admin: true,
     Coach: false,
     Committee: true,
