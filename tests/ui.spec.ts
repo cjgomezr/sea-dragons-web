@@ -12325,12 +12325,81 @@ async function stubLevies(
   );
 }
 
+/** Quién pagó el levy de Nationals (#531), fingido: un Admin lo abre bajo el
+ * levy. Un nombre largo para ver cómo parte la fila apilada en 375px. */
+const NATIONALS_PAYERS_ENDPOINT = `${LEVIES_ENDPOINT}/${NATIONALS_LEVY.id}/payers`;
+const WHO_PAID_BUTTON_NAME = /^(Who paid|Quién pagó)$/;
+const PAID_TABLE_NAME = /^(Paid|Pagaron)$/;
+const NO_PAYMENTS_TEXT =
+  /^(Nobody has paid this charge yet\.|Todavía no hay pagos de este cobro\.)$/;
+
+const NATIONALS_PAYERS = {
+  levy: {
+    id: NATIONALS_LEVY.id,
+    name: NATIONALS_LEVY.name,
+    amountCents: NATIONALS_LEVY.amountCents,
+  },
+  summary: { paidCount: 2, missingCount: 2, collectedCents: 16000 },
+  payers: [
+    {
+      userId: "payer-1",
+      fullName: "Maximiliana Fitzgerald-Papadopoulos",
+      email: "maxi@example.com",
+      paidAt: "2026-10-05T01:00:00.000Z",
+      amountCents: 8000,
+    },
+    {
+      userId: "payer-2",
+      fullName: "Bruno Díaz",
+      email: "bruno@example.com",
+      paidAt: "2026-10-02T01:00:00.000Z",
+      amountCents: 8000,
+    },
+  ],
+  missing: [
+    { userId: "missing-1", fullName: "Carla Soto", email: "carla@example.com" },
+    { userId: "missing-2", fullName: "Dani Vega", email: "dani@example.com" },
+  ],
+} as const;
+
+const NATIONALS_WITHOUT_PAYERS = {
+  ...NATIONALS_PAYERS,
+  summary: { paidCount: 0, missingCount: 2, collectedCents: 0 },
+  payers: [],
+} as const;
+
+async function stubLevyPayers(page: Page, report: object): Promise<void> {
+  await page.route(
+    (url) => url.pathname === NATIONALS_PAYERS_ENDPOINT,
+    (route) => route.fulfill(jsonBody(report)),
+  );
+}
+
+/** Abre la lista bajo el primer levy y espera a que llegue. */
+async function openLevyPayers(page: Page, report: object): Promise<void> {
+  await page
+    .getByRole("button", { name: WHO_PAID_BUTTON_NAME })
+    .first()
+    .click();
+  const hasPayers =
+    "payers" in report && Array.isArray(report.payers)
+      ? report.payers.length > 0
+      : false;
+  await expect(
+    hasPayers
+      ? page.getByRole("table", { name: PAID_TABLE_NAME })
+      : page.getByText(NO_PAYMENTS_TEXT),
+  ).toBeVisible();
+}
+
 type PaymentsScreenState = {
   readonly name: string;
   /** Lo que sirve el endpoint fingido; sin él, la membresía sembrada. */
   readonly view?: object;
   /** Los levies que sirve su endpoint fingido; sin ellos, ninguno. */
   readonly levies?: readonly object[];
+  /** Quién pagó el primer levy (#531): si está, se abre su lista. */
+  readonly payers?: object;
   readonly storageState: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
 };
@@ -12351,6 +12420,16 @@ function paymentsStates(
       beforeVisit: chooseSpanish,
     },
   ];
+}
+
+/** Los estados de un Admin con la lista de quién pagó abierta (#531). */
+function levyPayersStates(
+  name: string,
+  payers: object,
+): readonly PaymentsScreenState[] {
+  return paymentsStates(name, ACTIVE_MEMBERSHIP_VIEW, UNPAID_LEVIES).map(
+    (state) => ({ ...state, payers, storageState: ADMIN_STORAGE_STATE }),
+  );
 }
 
 const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
@@ -12382,6 +12461,8 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   ...paymentsStates("pagos-full-congelado", FROZEN_BALANCE_MEMBERSHIP_VIEW),
   ...paymentsStates("pagos-levies", ACTIVE_MEMBERSHIP_VIEW, UNPAID_LEVIES),
   ...paymentsStates("pagos-levy-pagado", ACTIVE_MEMBERSHIP_VIEW, ONE_PAID_LEVY),
+  ...levyPayersStates("pagos-levy-pagadores", NATIONALS_PAYERS),
+  ...levyPayersStates("pagos-levy-sin-pagos", NATIONALS_WITHOUT_PAYERS),
   // La alerta de pago fallido (#474) la pinta la cáscara con el socio
   // sembrado en `past_due`; el panel de Pagos sigue fingido.
   {
@@ -12417,11 +12498,17 @@ async function serveMembership(page: Page, view: object): Promise<void> {
 
 async function goToPayments(
   page: Page,
-  state: Pick<PaymentsScreenState, "view" | "levies" | "beforeVisit">,
+  state: Pick<
+    PaymentsScreenState,
+    "view" | "levies" | "payers" | "beforeVisit"
+  >,
   theme?: (typeof themes)[number],
 ): Promise<void> {
   const levies = state.levies ?? [];
   await stubLevies(page, levies);
+  if (state.payers !== undefined) {
+    await stubLevyPayers(page, state.payers);
+  }
   if (state.view !== undefined) {
     await serveMembership(page, state.view);
     // Un Casual ve los packs del club (#471): fingidos, para que la captura
@@ -12451,6 +12538,9 @@ async function goToPayments(
     await expect(
       page.getByRole("heading", { level: 2, name: LEVIES_HEADING }),
     ).toBeVisible();
+  }
+  if (state.payers !== undefined) {
+    await openLevyPayers(page, state.payers);
   }
 }
 
