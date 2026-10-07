@@ -55,6 +55,7 @@ async function seededClubId(serviceClient: ServiceRoleClient): Promise<string> {
 async function withPendingMember(
   serviceClient: ServiceRoleClient,
   run: (user: TestUser) => Promise<void>,
+  options: { readonly hasMembership: boolean } = { hasMembership: true },
 ): Promise<void> {
   const clubId = await seededClubId(serviceClient);
   await withTestUser(serviceClient, async (user) => {
@@ -70,11 +71,13 @@ async function withPendingMember(
     if (memberError) {
       throw new Error(`No se pudo sembrar el socio: ${memberError.message}`);
     }
-    const { error } = await serviceClient.client
-      .from("memberships")
-      .insert({ user_id: user.id, club_id: clubId, plan: "Full" });
-    if (error) {
-      throw new Error(`No se pudo sembrar la membresía: ${error.message}`);
+    if (options.hasMembership) {
+      const { error } = await serviceClient.client
+        .from("memberships")
+        .insert({ user_id: user.id, club_id: clubId, plan: "Full" });
+      if (error) {
+        throw new Error(`No se pudo sembrar la membresía: ${error.message}`);
+      }
     }
     await run(user);
   });
@@ -195,6 +198,33 @@ describeRls("el levy por el webhook contra la base", () => {
           await deleteEvent(serviceClient, event.id);
         }
       });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "apunta el levy de un socio que todavía no tiene membresía (D4)",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      await withPendingMember(
+        serviceClient,
+        async (user) => {
+          const event = levyEvent(user);
+          try {
+            const response = await postSigned(event);
+
+            await expect(response.json()).resolves.toEqual({
+              data: { outcome: "applied" },
+            });
+            await expect(
+              readPaymentDescriptions(serviceClient, user),
+            ).resolves.toEqual(["Nationals 2026"]);
+          } finally {
+            await deleteEvent(serviceClient, event.id);
+          }
+        },
+        { hasMembership: false },
+      );
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );

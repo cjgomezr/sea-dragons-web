@@ -256,6 +256,7 @@ export function createMembershipGateway(
 }
 
 const PAYMENTS_TABLE = "payments";
+const MEMBERS_TABLE = "members";
 const PAYMENT_COLUMNS =
   "id, amount_cents, description, status, paid_at, created_at";
 
@@ -627,6 +628,19 @@ export function createStripeWebhookGateway(
       }
       return z.enum(APPLY_STRIPE_EVENT_OUTCOMES).parse(data);
     },
+    async findMemberClubId(userId) {
+      const { data, error } = await serviceClient
+        .from(MEMBERS_TABLE)
+        .select("club_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (error) {
+        throw new Error(
+          `No se pudo buscar la ficha del socio ${userId}: ${error.message}`,
+        );
+      }
+      return data === null ? null : z.string().parse(data.club_id);
+    },
     async applyLevyPayment({ event, owner, payment }) {
       const { data, error } = await serviceClient.rpc(
         APPLY_LEVY_PAYMENT_FUNCTION,
@@ -766,7 +780,6 @@ async function insertMembershipIfMissing(
   }
 }
 
-const MEMBERS_TABLE = "members";
 const memberEmailRowSchema = z.object({ email: z.string() });
 
 /** El correo con el que Checkout crea el cliente de Stripe (#454). Es la

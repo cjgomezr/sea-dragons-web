@@ -53,6 +53,9 @@ export type StripeWebhookGateway = {
   /** Todo o nada, como `applyEvent`: el id del evento y el pago del levy,
    * con su producto. La membresía no cambia (D4). */
   applyLevyPayment(input: LevyPaymentToApply): Promise<"applied" | "duplicate">;
+  /** El club de la ficha del socio. Un levy no exige membresía (D4), así
+   * que su dueño sale de aquí y no de `findMembership`. */
+  findMemberClubId(userId: string): Promise<string | null>;
 };
 
 /** Un pack pagado (#471): el pago y las sesiones que suma al libro. */
@@ -176,6 +179,10 @@ export async function handleStripeEvent(
     return "ignored";
   }
 
+  if (facts.kind === "levyPaid") {
+    return handleLevyPayment({ event, facts }, dependencies);
+  }
+
   const { gateway, log } = dependencies;
   const membership = await gateway.findMembership(facts.lookup);
   if (membership === null) {
@@ -198,15 +205,6 @@ export async function handleStripeEvent(
     });
   }
 
-  if (facts.kind === "levyPaid") {
-    const { userId, clubId } = membership.record;
-    return gateway.applyLevyPayment({
-      event: { id: event.id, type: event.type, created: facts.created },
-      owner: { userId, clubId },
-      payment: facts.payment,
-    });
-  }
-
   const plannable = await toPlannableFacts(facts, dependencies.stripe);
   const writes = planStripeEventWrites({
     facts: plannable,
@@ -224,6 +222,30 @@ export async function handleStripeEvent(
     event: { id: event.id, type: event.type, created: facts.created },
     owner: { userId, clubId },
     writes,
+  });
+}
+
+/** Quien paga un levy puede no tener membresía todavía (D4): basta con que
+ * sea socio del club. */
+async function handleLevyPayment(
+  input: { readonly event: Stripe.Event; readonly facts: LevyPaidFacts },
+  dependencies: StripeWebhookDependencies,
+): Promise<StripeWebhookOutcome> {
+  const { event, facts } = input;
+  const { gateway, log } = dependencies;
+  const { userId } = facts.lookup;
+  const clubId =
+    userId === null ? null : await gateway.findMemberClubId(userId);
+  if (userId === null || clubId === null) {
+    log(
+      `${LOG_PREFIX} ${event.id} (${event.type}) no es de ningún socio conocido: ${describeLookup(facts.lookup)}`,
+    );
+    return "unknown_member";
+  }
+  return gateway.applyLevyPayment({
+    event: { id: event.id, type: event.type, created: facts.created },
+    owner: { userId, clubId },
+    payment: facts.payment,
   });
 }
 

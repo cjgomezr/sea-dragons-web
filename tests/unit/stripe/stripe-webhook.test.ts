@@ -57,6 +57,7 @@ const applyEvent = vi.fn<StripeWebhookGateway["applyEvent"]>();
 const applySessionPackPayment =
   vi.fn<StripeWebhookGateway["applySessionPackPayment"]>();
 const applyLevyPayment = vi.fn<StripeWebhookGateway["applyLevyPayment"]>();
+const findMemberClubId = vi.fn<StripeWebhookGateway["findMemberClubId"]>();
 const readCard = vi.fn<(paymentMethodId: string) => Promise<MembershipCard>>();
 const readSubscription =
   vi.fn<(subscriptionId: string) => Promise<Stripe.Subscription>>();
@@ -73,6 +74,7 @@ function handle(event: ReturnType<typeof stripeEvent>) {
       applyEvent,
       applySessionPackPayment,
       applyLevyPayment,
+      findMemberClubId,
     },
     stripe: {
       readCard,
@@ -450,7 +452,7 @@ describe("un pack de sesiones pagado", () => {
 // no toca la membresía.
 describe("un levy pagado", () => {
   beforeEach(() => {
-    findMembership.mockResolvedValue(KNOWN_MEMBERSHIP);
+    findMemberClubId.mockResolvedValue(CLUB_ID);
     applyLevyPayment.mockResolvedValue("applied");
   });
 
@@ -489,6 +491,34 @@ describe("un levy pagado", () => {
     );
 
     expect(outcome).toBe("duplicate");
+  });
+
+  it("lo apunta aunque el socio no tenga membresía: el dueño sale de su ficha (D4)", async () => {
+    findMembership.mockResolvedValue(null);
+
+    const outcome = await handle(
+      stripeEvent("checkout.session.completed (levy)"),
+    );
+
+    expect(outcome).toBe("applied");
+    expect(findMemberClubId).toHaveBeenCalledWith(FIXTURE_USER_ID);
+    expect(applyLevyPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: { userId: FIXTURE_USER_ID, clubId: CLUB_ID },
+      }),
+    );
+  });
+
+  it("no apunta el levy de un socio que la base no conoce y lo deja en el log", async () => {
+    findMemberClubId.mockResolvedValue(null);
+
+    const outcome = await handle(
+      stripeEvent("checkout.session.completed (levy)"),
+    );
+
+    expect(outcome).toBe("unknown_member");
+    expect(applyLevyPayment).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledOnce();
   });
 
   it("no apunta un levy sin pagar", async () => {
