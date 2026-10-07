@@ -592,6 +592,10 @@ export const LEVIES_API_PATH = "/api/v1/levies";
 /** Abrir Stripe Checkout para pagar un levy, por el id de su `Price`. */
 export const LEVY_CHECKOUT_API_PATH = `${LEVIES_API_PATH}/[priceId]/checkout`;
 
+/** Quién pagó un levy y quién falta (#531). Sólo lo leen un Admin y un
+ * Committee: está en `RESTRICTED_ROUTES`. */
+export const LEVY_PAYERS_API_PATH = `${LEVIES_API_PATH}/[priceId]/payers`;
+
 /**
  * Los únicos endpoints de la API que no exigen sesión.
  *
@@ -694,6 +698,7 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: ATTENDANCE_API_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: ATTENDANCE_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: TEAMS_API_PATH, capability: "buildTeamsAndTrackAttendance" },
+  { path: LEVY_PAYERS_API_PATH, capability: "viewLevyPayers" },
 ];
 
 /** Una ruta de socio, que sólo alcanza quien tiene la membresía al día. */

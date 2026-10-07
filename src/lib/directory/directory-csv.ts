@@ -235,7 +235,7 @@ export function directoryCsv(
 
 /** Sin acentos ni signos: el nombre tiene que servir en cualquier sistema de
  * archivos y en la cabecera `Content-Disposition` sin codificarlo. */
-function asFileNamePart(text: string): string {
+export function asFileNamePart(text: string): string {
   return text
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
