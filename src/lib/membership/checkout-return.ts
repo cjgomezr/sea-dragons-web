@@ -11,6 +11,8 @@ export const CARD_RETURN_QUERY_PARAM = "tarjeta";
 /** La vuelta de la compra de un pack de sesiones (#471), una sesión de
  * Checkout en modo `payment`: `ok` le dice a la pantalla que espere el pago. */
 export const PACK_RETURN_QUERY_PARAM = "pack";
+/** La vuelta del pago de un levy (#473), otra sesión en modo `payment`. */
+export const LEVY_RETURN_QUERY_PARAM = "levy";
 export const CHECKOUT_RETURN_VALUES = ["ok", "cancelado"] as const;
 export type CheckoutReturn = (typeof CHECKOUT_RETURN_VALUES)[number];
 
