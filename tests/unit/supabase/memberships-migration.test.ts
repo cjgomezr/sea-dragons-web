@@ -294,6 +294,7 @@ describeConPostgres("membresías y pagos en la base", () => {
           "status:text",
           "stripe_charge_id:text",
           "stripe_invoice_id:text",
+          "stripe_product_id:text",
           "user_id:uuid",
         ].join(","),
       );
