@@ -552,6 +552,11 @@ export const MEMBERSHIP_CHECKOUT_API_PATH = `${MEMBERSHIP_API_PATH}/checkout`;
 /** Abrir Stripe Checkout en modo `setup` para cambiar la tarjeta (#455). */
 export const MEMBERSHIP_CARD_API_PATH = `${MEMBERSHIP_API_PATH}/card`;
 
+/** Reintentar un cobro fallido en la página de la factura que aloja Stripe
+ * (#474, RF-7 del PRD de E13). Cuelga de la membresía, así que también lo
+ * alcanza quien no está al día: es justo quien lo necesita. */
+export const MEMBERSHIP_RETRY_PAYMENT_API_PATH = `${MEMBERSHIP_API_PATH}/retry-payment`;
+
 /** Cambiar de plan al siguiente ciclo, o anular el cambio (#456, RF-6). Lo
  * alcanza también quien no está al día: un Casual lo usa para ir a Checkout. */
 export const MEMBERSHIP_PLAN_API_PATH = `${MEMBERSHIP_API_PATH}/plan`;

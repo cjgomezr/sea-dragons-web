@@ -1,10 +1,17 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "@/components/AppShell";
 import type { Role } from "@/lib/auth/roles";
 import { type ClubBrand, DEFAULT_CLUB_BRAND } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
+import type { FailedPaymentAlert } from "@/lib/membership/failed-payment-alert";
 
 const { usePathname, useRouter } = vi.hoisted(() => ({
   usePathname: vi.fn(),
@@ -12,6 +19,11 @@ const { usePathname, useRouter } = vi.hoisted(() => ({
   useRouter: vi.fn(() => ({ replace: vi.fn(), refresh: vi.fn() })),
 }));
 vi.mock("next/navigation", () => ({ usePathname, useRouter }));
+
+const openCheckout = vi.hoisted(() => vi.fn());
+vi.mock("@/components/payments/checkout-navigation", () => ({
+  openCheckout: (url: string) => openCheckout(url),
+}));
 
 const BRAND: ClubBrand = {
   ...DEFAULT_CLUB_BRAND,
@@ -37,6 +49,7 @@ function renderShell(
       access={{ role, membershipCurrent }}
       viewerId={VIEWER_ID}
       brand={brand}
+      failedPayment={null}
     >
       <p>Contenido de la sección</p>
     </AppShell>,
@@ -313,6 +326,7 @@ describe("app shell", () => {
         access={{ role: "Player", membershipCurrent: true }}
         viewerId={VIEWER_ID}
         brand={BRAND}
+        failedPayment={null}
       >
         <p>Contenido de la sección</p>
       </AppShell>,
@@ -336,6 +350,7 @@ describe("app shell", () => {
         access={{ role: "Player", membershipCurrent: true }}
         viewerId={VIEWER_ID}
         brand={BRAND}
+        failedPayment={null}
       >
         <p>Contenido de la sección</p>
       </AppShell>,
@@ -359,6 +374,7 @@ describe("app shell", () => {
         access={{ role: "Admin", membershipCurrent: true }}
         viewerId={VIEWER_ID}
         brand={BRAND}
+        failedPayment={null}
       >
         <p>Contenido de la sección</p>
       </AppShell>,
@@ -380,6 +396,7 @@ describe("app shell", () => {
         access={{ role: "Player", membershipCurrent: true }}
         viewerId={VIEWER_ID}
         brand={BRAND}
+        failedPayment={null}
       >
         <p>Contenido de la sección</p>
       </AppShell>,
@@ -474,5 +491,149 @@ describe("la cáscara de quien no tiene la membresía al día (#453)", () => {
     expect(
       within(menu).getByRole("link", { name: "My profile" }),
     ).toBeInTheDocument();
+  });
+});
+
+const RETRY_PAYMENT_PATH = "/api/v1/membership/retry-payment";
+const INVOICE_URL = "https://invoice.stripe.com/i/acct_1/test_inv_open";
+const FAILED_PAYMENT: FailedPaymentAlert = {
+  failedAt: new Date("2026-10-01T03:12:00.000Z"),
+};
+
+function renderShellWithFailedPayment(
+  failedPayment: FailedPaymentAlert | null,
+  locale: Locale = "en",
+): void {
+  usePathname.mockReturnValue("/dashboard");
+  render(
+    <AppShell
+      locale={locale}
+      access={{ role: "Player", membershipCurrent: false }}
+      viewerId={VIEWER_ID}
+      brand={BRAND}
+      failedPayment={failedPayment}
+    >
+      <p>Contenido de la sección</p>
+    </AppShell>,
+  );
+}
+
+function stubRetryResponse(status: number, body: unknown): typeof fetch {
+  const fetchDouble = vi.fn(async (input: RequestInfo | URL) =>
+    String(input) === RETRY_PAYMENT_PATH
+      ? new Response(JSON.stringify(body), {
+          status,
+          headers: { "content-type": "application/json" },
+        })
+      : new Response(JSON.stringify({ data: { items: [] } }), { status: 200 }),
+  );
+  vi.stubGlobal("fetch", fetchDouble);
+  return fetchDouble;
+}
+
+function failedPaymentAlert(name = "Payment failed"): HTMLElement {
+  return screen.getByRole("region", { name });
+}
+
+describe("la alerta de pago fallido (#474)", () => {
+  afterEach(() => {
+    openCheckout.mockReset();
+    vi.unstubAllGlobals();
+  });
+
+  it("con la membresía past_due enseña arriba la fecha del fallo y el botón de reintentar", () => {
+    renderShellWithFailedPayment(FAILED_PAYMENT);
+
+    const alert = failedPaymentAlert();
+    expect(alert).toHaveTextContent("1 October 2026");
+    expect(
+      within(alert).getByRole("button", { name: "Retry payment" }),
+    ).toBeEnabled();
+    expect(alert.compareDocumentPosition(screen.getByRole("main"))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it("sin la fila del cobro fallido avisa igual, sin fecha", () => {
+    renderShellWithFailedPayment({ failedAt: null });
+
+    expect(failedPaymentAlert()).toHaveTextContent(
+      "Your last membership payment didn't go through.",
+    );
+  });
+
+  it("no aparece sin un cobro fallido", () => {
+    renderShellWithFailedPayment(null);
+
+    expect(
+      screen.queryByRole("region", { name: "Payment failed" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("cambia el texto y la fecha con el idioma", () => {
+    renderShellWithFailedPayment(FAILED_PAYMENT, "es");
+
+    const alert = failedPaymentAlert("Pago fallido");
+    expect(alert).toHaveTextContent("1 de octubre de 2026");
+    expect(
+      within(alert).getByRole("button", { name: "Reintentar el pago" }),
+    ).toBeInTheDocument();
+  });
+
+  it("el botón pide la factura abierta y lleva a su página de Stripe", async () => {
+    const fetchDouble = stubRetryResponse(200, { data: { url: INVOICE_URL } });
+    renderShellWithFailedPayment(FAILED_PAYMENT);
+
+    await userEvent.click(
+      within(failedPaymentAlert()).getByRole("button", {
+        name: "Retry payment",
+      }),
+    );
+
+    await waitFor(() => expect(openCheckout).toHaveBeenCalledWith(INVOICE_URL));
+    expect(fetchDouble).toHaveBeenCalledWith(
+      RETRY_PAYMENT_PATH,
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("dice que no hay nada pendiente cuando no hay factura abierta", async () => {
+    stubRetryResponse(409, {
+      error: {
+        code: "conflict",
+        message: "No tienes ningún pago pendiente.",
+        reason: "no_open_invoice",
+      },
+    });
+    renderShellWithFailedPayment(FAILED_PAYMENT);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Retry payment" }),
+    );
+
+    expect(
+      await within(failedPaymentAlert()).findByRole("alert"),
+    ).toHaveTextContent("There's nothing pending to pay.");
+    expect(openCheckout).not.toHaveBeenCalled();
+  });
+
+  it("dice que no se pudo abrir el pago cuando Stripe falla", async () => {
+    stubRetryResponse(502, {
+      error: {
+        code: "bad_gateway",
+        message: "Stripe no pudo abrir el pago.",
+        reason: "stripe_failed",
+      },
+    });
+    renderShellWithFailedPayment(FAILED_PAYMENT);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Retry payment" }),
+    );
+
+    expect(
+      await within(failedPaymentAlert()).findByRole("alert"),
+    ).toHaveTextContent("We couldn't open the payment.");
+    expect(openCheckout).not.toHaveBeenCalled();
   });
 });

@@ -400,6 +400,17 @@ export const UNPAID_MEMBER_STORAGE_STATE_PATH = path.join(
   "e2e-storage-state-sin-membresia.json",
 );
 
+/** El socio con un cobro de cuota fallido (#474): su membresía está en
+ * `past_due` y la cáscara le enseña arriba la alerta con la fecha del fallo. */
+export const PAST_DUE_MEMBER_STORAGE_STATE_PATH = path.join(
+  REPO_ROOT,
+  "test-results",
+  "e2e-storage-state-pago-fallido.json",
+);
+
+/** La fecha del cobro fallido sembrado, fija para que la captura no cambie. */
+export const SEEDED_FAILED_PAYMENT_AT = "2026-10-01T03:00:00.000Z";
+
 const APP_URL = process.env.APP_URL ?? "http://localhost:3417";
 
 const CLUB_SLUG = "victoria-seadragons";
@@ -544,6 +555,7 @@ function everyStorageStatePath(): readonly string[] {
     ...ROLE_REQUEST_MEMBER_NAMES.map(roleRequestStorageStatePath),
     GROUPED_MEMBER_STORAGE_STATE_PATH,
     UNPAID_MEMBER_STORAGE_STATE_PATH,
+    PAST_DUE_MEMBER_STORAGE_STATE_PATH,
   ];
 }
 
@@ -660,7 +672,7 @@ async function seedMembershipStatus(
   membership: {
     readonly clubId: string;
     readonly userId: string;
-    readonly status: "active" | "pending";
+    readonly status: "active" | "pending" | "past_due";
   },
 ): Promise<void> {
   const failure = await describeSupabaseFailure(
@@ -924,6 +936,50 @@ async function ensureArchivedE2ePosition(
 const ACTIVE_ROLE = "activo";
 const GROUPED_ROLE = "con-grupos";
 const UNPAID_ROLE = "sin-membresia";
+const PAST_DUE_ROLE = "pago-fallido";
+/** La cuota Full en centavos (CON-005): lo que cobraría la factura fallida. */
+const FAILED_FEE_CENTS = 4500;
+const PAYMENTS_TABLE = "payments";
+
+/** El socio con la cuota fallida (#474): `past_due` y la fila del cobro
+ * fallido que escribiría el webhook. La fila se va con la del socio en
+ * cascada. */
+async function seedPastDueMember(
+  target: SeedTarget,
+  runId: string,
+  userIds: string[],
+): Promise<void> {
+  const member = await seedMember(target, PAST_DUE_ROLE, {
+    account_status: "active",
+  });
+  userIds.push(member.userId);
+  await seedMembershipStatus(target.serviceClient, {
+    clubId: target.clubId,
+    userId: member.userId,
+    status: "past_due",
+  });
+  const failure = await describeSupabaseFailure(
+    "sembrar el cobro fallido del socio de prueba",
+    () =>
+      target.serviceClient.from(PAYMENTS_TABLE).insert({
+        club_id: target.clubId,
+        user_id: member.userId,
+        stripe_invoice_id: `in_e2e_${runId}_${target.slot}`,
+        amount_cents: FAILED_FEE_CENTS,
+        currency: "aud",
+        status: "failed",
+        created_at: SEEDED_FAILED_PAYMENT_AT,
+      }),
+  );
+  if (failure !== null) {
+    throw new Error(`No se pudo sembrar el cobro fallido: ${failure}`);
+  }
+  await writeStorageState(
+    member.email,
+    member.password,
+    PAST_DUE_MEMBER_STORAGE_STATE_PATH,
+  );
+}
 
 /** Siembra a los socios a medias y apunta sus `userId` en `userIds`. */
 async function seedIncompleteMembers(
@@ -1036,6 +1092,7 @@ async function createTestMembers(): Promise<E2eSessionState> {
       unpaid.password,
       UNPAID_MEMBER_STORAGE_STATE_PATH,
     );
+    await seedPastDueMember(target, runId, userIds);
 
     return {
       kind: "available",

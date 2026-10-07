@@ -19,6 +19,9 @@ export const API_ERROR_CODES = [
   "rate_limited",
   "method_not_allowed",
   "service_unavailable",
+  // Un servicio de fuera (Stripe) contestó con un fallo a algo que sí está
+  // configurado: no es culpa de quien pide ni de este servidor (#474).
+  "bad_gateway",
   "internal_error",
 ] as const;
 

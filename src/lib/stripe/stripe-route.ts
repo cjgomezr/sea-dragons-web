@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { ApiError } from "@/lib/api/response";
 import type { CheckoutStripe } from "@/lib/membership/checkout";
 import type { PlanChangeStripe } from "@/lib/membership/plan-change";
+import type { PaymentRetryStripe } from "@/lib/membership/retry-payment";
 import type { SessionPackCheckoutStripe } from "@/lib/membership/session-pack-checkout";
 import {
   STRIPE_PRICE_CASUAL_SESSION_ENV,
@@ -73,6 +74,18 @@ export function resolveRoutePlanChangeStripe(
     subscriptions: createSubscriptionPlanApi(stripe.client),
     sessions: stripe.client.checkout.sessions,
   };
+}
+
+/** Lo que necesita el reintento de un cobro fallido (#474): las facturas. */
+export function resolveRoutePaymentRetryStripe(
+  logPrefix: string,
+): PaymentRetryStripe {
+  const stripe = createStripeSetup(process.env);
+  if (stripe.kind === "unconfigured") {
+    console.warn(`${logPrefix} faltan ${stripe.missingKeys.join(", ")}`);
+    return { kind: "unconfigured" };
+  }
+  return { kind: "configured", invoices: stripe.client.invoices };
 }
 
 /** Un fallo de Stripe (red, llave, precio) no es culpa de quien pide: 503

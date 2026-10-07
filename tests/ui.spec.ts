@@ -48,6 +48,7 @@ import {
   E2E_STORAGE_STATE_PATH,
   GROUPED_MEMBER_GROUP_NAMES,
   GROUPED_MEMBER_STORAGE_STATE_PATH,
+  PAST_DUE_MEMBER_STORAGE_STATE_PATH,
   PHOTOGRAPHED_MEMBERS,
   PROFILE_PHOTO_FIXTURE_PATH,
   UNPAID_MEMBER_STORAGE_STATE_PATH,
@@ -12093,6 +12094,19 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
     CASUAL_NO_BALANCE_MEMBERSHIP_VIEW,
   ),
   ...paymentsStates("pagos-full-congelado", FROZEN_BALANCE_MEMBERSHIP_VIEW),
+  // La alerta de pago fallido (#474) la pinta la cáscara con el socio
+  // sembrado en `past_due`; el panel de Pagos sigue fingido.
+  {
+    name: "alerta-pago-fallido-pagos",
+    view: PAST_DUE_MEMBERSHIP_VIEW,
+    storageState: PAST_DUE_MEMBER_STORAGE_STATE_PATH,
+  },
+  {
+    name: "alerta-pago-fallido-pagos-es",
+    view: PAST_DUE_MEMBERSHIP_VIEW,
+    storageState: PAST_DUE_MEMBER_STORAGE_STATE_PATH,
+    beforeVisit: chooseSpanish,
+  },
 ];
 
 function isCasualView(view: object | undefined): boolean {
@@ -12185,6 +12199,45 @@ for (const state of PAYMENTS_STATES) {
     });
   });
 }
+
+// El botón de la alerta (#474) pide la factura abierta y sale a su página
+// de Stripe. Las dos se fingen: no hay factura de verdad en dev.
+const RETRY_PAYMENT_ENDPOINT = "/api/v1/membership/retry-payment";
+const FAKE_INVOICE_URL = "https://invoice.stripe.test/i/factura-fingida";
+
+test.describe("la alerta de pago fallido en el navegador (#474)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: PAST_DUE_MEMBER_STORAGE_STATE_PATH });
+
+  test("el botón lleva a la página fingida de la factura", async ({ page }) => {
+    await serveDashboard(page, PAST_DUE_DASHBOARD);
+    await page.route(
+      (url) => url.pathname === RETRY_PAYMENT_ENDPOINT,
+      (route) => route.fulfill(jsonBody({ url: FAKE_INVOICE_URL })),
+    );
+    await page.route(FAKE_INVOICE_URL, (route) =>
+      route.fulfill({ contentType: "text/html", body: "<h1>Invoice</h1>" }),
+    );
+    await page.goto(`${APP_URL}${HOME_SCREEN_PATH}`);
+
+    await page
+      .getByRole("region", { name: "Payment failed" })
+      .getByRole("button", { name: "Retry payment" })
+      .click();
+
+    await expect(page).toHaveURL(FAKE_INVOICE_URL);
+  });
+
+  test("enseña la fecha del cobro fallido sembrado", async ({ page }) => {
+    await serveDashboard(page, PAST_DUE_DASHBOARD);
+    await page.goto(`${APP_URL}${HOME_SCREEN_PATH}`);
+
+    await expect(
+      page.getByRole("region", { name: "Payment failed" }),
+    ).toContainText("1 October 2026");
+  });
+});
 
 test.describe("Pagos en el navegador", () => {
   skipWithoutSession();
@@ -14461,6 +14514,10 @@ const PHONE_REMINDER_DASHBOARD = {
   contactReminder: { kind: "reminder", reminder: "phone" },
 };
 
+// El inicio de quien tiene un cobro fallido (#474): el reducido, con la
+// alerta de la cáscara encima.
+const PAST_DUE_DASHBOARD = { ...RESTRICTED_DASHBOARD, block: "past_due" };
+
 type DashboardScreenState = {
   readonly name: string;
   readonly dashboard: object;
@@ -14501,6 +14558,11 @@ const DASHBOARD_STATES: readonly DashboardScreenState[] = [
     "inicio-aviso-telefono",
     PHONE_REMINDER_DASHBOARD,
     E2E_STORAGE_STATE_PATH,
+  ),
+  ...dashboardStates(
+    "alerta-pago-fallido",
+    PAST_DUE_DASHBOARD,
+    PAST_DUE_MEMBER_STORAGE_STATE_PATH,
   ),
 ];
 

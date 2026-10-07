@@ -5047,6 +5047,46 @@ a.auth-brand-header:focus-visible {
   font-weight: 600;
 }
 
+/* La alerta de pago fallido (#474), arriba de toda pantalla. Lleva el tono
+   de error del sistema (la barra gruesa de .auth-error) porque la puerta del
+   club está cerrada hasta pagar. Va dentro del flujo, no fija: no tapa la
+   navegación ni el contenido. En el móvil el botón baja debajo del texto. */
+.failed-payment-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  /* El mismo margen lateral que .app-main, para alinearse con su contenido. */
+  margin: var(--space-4) var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-danger);
+  border-left: 4px solid var(--color-danger);
+  border-radius: var(--radius);
+}
+
+.failed-payment-alert-text {
+  display: grid;
+  flex: 1 1 240px;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.failed-payment-alert-text strong {
+  color: var(--color-danger);
+}
+
+.failed-payment-alert-text p {
+  margin: 0;
+}
+
+.failed-payment-alert .auth-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 /* El aviso de los datos de contacto que faltan (#498), en el inicio y en el
    perfil. Es primo del de la membresía: el mismo borde de aviso a la
    izquierda, pero más compacto. En el inicio va detrás de la tarjeta del

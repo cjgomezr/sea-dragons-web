@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AccountMenu } from "@/components/AccountMenu";
 import { ClubBrandMark } from "@/components/ClubBrandMark";
+import { FailedPaymentNotice } from "@/components/FailedPaymentNotice";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
@@ -13,12 +14,14 @@ import {
 } from "@/lib/auth/session-boundary";
 import type { ClubBrand } from "@/lib/club/club-brand";
 import type { Locale } from "@/lib/i18n/locale";
+import type { FailedPaymentAlert } from "@/lib/membership/failed-payment-alert";
 
 export function AppShell({
   locale,
   access,
   viewerId,
   brand,
+  failedPayment,
   children,
 }: {
   locale: Locale;
@@ -30,6 +33,9 @@ export function AppShell({
   viewerId: string;
   /** La que leyó el servidor de la base (#292). */
   brand: ClubBrand;
+  /** El cobro fallido de quien mira, decidido en el servidor (#474); nulo
+   * si no tiene ninguno pendiente. */
+  failedPayment: FailedPaymentAlert | null;
   children: ReactNode;
 }): React.JSX.Element {
   const viewer = { userId: viewerId, role: access.role };
@@ -78,6 +84,14 @@ export function AppShell({
             <GlobalSearch locale={locale} viewer={viewer} layout="bar" />
           </div>
         ) : null}
+        {/* Arriba del contenido de cualquier pantalla y fuera de la
+            navegación, para no taparla (#474). */}
+        {failedPayment === null ? null : (
+          <FailedPaymentNotice
+            locale={locale}
+            failedAt={failedPayment.failedAt?.toISOString() ?? null}
+          />
+        )}
         <main className="app-main">{children}</main>
       </div>
       {/* After main on purpose: the bar sits at the bottom of the screen, so

@@ -15,10 +15,15 @@ class RedirectSignal extends Error {
   }
 }
 
-const { createSessionClient, readSessionState } = vi.hoisted(() => ({
-  createSessionClient: vi.fn(),
-  readSessionState: vi.fn(),
-}));
+const { createSessionClient, readSessionState, failedPaymentGateway } =
+  vi.hoisted(() => ({
+    createSessionClient: vi.fn(),
+    readSessionState: vi.fn(),
+    failedPaymentGateway: {
+      findStanding: vi.fn(),
+      findLastFailedInvoiceAt: vi.fn(),
+    },
+  }));
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({ get: () => undefined, getAll: () => [] }),
@@ -39,6 +44,9 @@ vi.mock("@/lib/auth/session-reader", () => ({
   // #427: la cáscara también recibe quién mira, para la búsqueda global.
   readSessionUserId: async () => "00000000-0000-4000-8000-000000000001",
 }));
+vi.mock("@/lib/membership/supabase-failed-payment-gateway", () => ({
+  createFailedPaymentAlertGateway: () => failedPaymentGateway,
+}));
 vi.mock("@/lib/club/supabase-club-brand", () => ({
   readClubBrand: async () => ({ name: "Hobart Orcas", initials: "HO" }),
 }));
@@ -56,7 +64,19 @@ async function renderAppLayout(): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  failedPaymentGateway.findStanding.mockResolvedValue(null);
+  failedPaymentGateway.findLastFailedInvoiceAt.mockResolvedValue(null);
 });
+
+function givenMembershipStatus(status: string): void {
+  failedPaymentGateway.findStanding.mockResolvedValue({
+    status,
+    stripeSubscriptionId: "sub_123",
+    trialEnd: null,
+    currentPeriodEnd: null,
+    waivedUntil: null,
+  });
+}
 
 describe("disposición de la aplicación", () => {
   // #292: la cabecera enseña la marca que guarda la base.
@@ -99,6 +119,43 @@ describe("disposición de la aplicación", () => {
     expect(sidebar).toHaveTextContent("Payments");
     expect(sidebar).not.toHaveTextContent("Directory");
     expect(sidebar).not.toHaveTextContent("News");
+  });
+
+  // #474: la alerta se decide en el servidor, sin otra petición del navegador.
+  it("pone arriba la alerta de pago fallido con la membresía past_due", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: false });
+    givenMembershipStatus("past_due");
+    failedPaymentGateway.findLastFailedInvoiceAt.mockResolvedValue(
+      new Date("2026-10-01T03:12:00.000Z"),
+    );
+
+    await renderAppLayout();
+
+    expect(
+      screen.getByRole("region", { name: "Payment failed" }),
+    ).toHaveTextContent("1 October 2026");
+  });
+
+  it("no pone la alerta a quien no está al día por otro motivo", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: false });
+    givenMembershipStatus("pending");
+
+    await renderAppLayout();
+
+    expect(
+      screen.queryByRole("region", { name: "Payment failed" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("no lee la membresía de quien está al día", async () => {
+    givenSession({ kind: "active", role: "Player", membershipCurrent: true });
+
+    await renderAppLayout();
+
+    expect(failedPaymentGateway.findStanding).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("region", { name: "Payment failed" }),
+    ).not.toBeInTheDocument();
   });
 
   it("manda a la entrada a quien ya no tiene sesión", async () => {
