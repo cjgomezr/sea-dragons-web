@@ -32,6 +32,32 @@ describe("respuesta correcta", () => {
     });
   });
 
+  it("responde un archivo tal cual, con su tipo y su nombre de descarga", async () => {
+    const route = createApiRoute({
+      handler: async () => ({
+        file: {
+          body: "\uFEFFa,b\r\n",
+          contentType: "text/csv; charset=utf-8",
+          filename: "club-2026-10-08.csv",
+        },
+      }),
+    });
+
+    const response = await route(
+      new NextRequest("http://localhost/api/v1/export"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe(
+      "text/csv; charset=utf-8",
+    );
+    expect(response.headers.get("content-disposition")).toBe(
+      'attachment; filename="club-2026-10-08.csv"',
+    );
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  });
+
   it("usa 201 cuando el handler declara creación", async () => {
     const route = createApiRoute({
       handler: async () => ({ data: { id: "1" }, status: 201 as const }),

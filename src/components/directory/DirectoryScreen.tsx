@@ -31,6 +31,7 @@ import {
 } from "./DirectoryFilters";
 import { NO_MORE_FILTERS, countActiveFilters } from "./DirectoryMoreFilters";
 import type { DirectoryOrder } from "./DirectorySortControl";
+import { DirectoryExportButton } from "./DirectoryExportButton";
 import { DirectoryTable } from "./DirectoryTable";
 import { RoleRequestsPanel } from "./RoleRequestsPanel";
 import { useDebouncedValue } from "./use-debounced-value";
@@ -66,7 +67,14 @@ const EMAIL_EMPTY_REASON_ID = "correo-directorio-sin-socios";
 type ScreenState =
   | { readonly kind: "loading" }
   | { readonly kind: "failed"; readonly failure: DirectoryFailure }
-  | { readonly kind: "ready"; readonly listing: DirectoryListing };
+  | {
+      readonly kind: "ready";
+      readonly listing: DirectoryListing;
+      /** La consulta que trajo esta lista. Mientras llega la siguiente, la
+       * de los controles ya es otra, y exportar (#500) tiene que dar la que
+       * se ve. */
+      readonly listedQuery: DirectoryQuery;
+    };
 
 /** Lo que la pantalla enseña en sus controles para una consulta. */
 function filtersOf(query: DirectoryQuery): DirectoryFilterState {
@@ -154,6 +162,12 @@ function EmptyDirectory({
  * la marca la pone el servidor, y el servidor vuelve a mirar el rol al
  * enviar. */
 function canWriteEmails(listing: DirectoryListing): boolean {
+  return listing.kind === "admin" || listing.kind === "committee";
+}
+
+/** Exporta a CSV quien ve el contacto de todos (D6, #500): hoy los mismos
+ * que escriben correos, pero son dos permisos distintos. */
+function canExportListing(listing: DirectoryListing): boolean {
   return listing.kind === "admin" || listing.kind === "committee";
 }
 
@@ -273,7 +287,7 @@ export function DirectoryScreen({
       }
       setState(
         outcome.kind === "loaded"
-          ? { kind: "ready", listing: outcome.listing }
+          ? { kind: "ready", listing: outcome.listing, listedQuery: query }
           : { kind: "failed", failure: outcome },
       );
     });
@@ -321,7 +335,7 @@ export function DirectoryScreen({
     setState((current) =>
       current.kind === "ready"
         ? {
-            kind: "ready",
+            ...current,
             listing: withMemberRole(current.listing, userId, role),
           }
         : current,
@@ -348,6 +362,13 @@ export function DirectoryScreen({
               translate={translate}
               recipients={emailRecipientsOf(state.listing)}
               onOpen={setEmailRecipients}
+            />
+          ) : null}
+          {state.kind === "ready" && canExportListing(state.listing) ? (
+            <DirectoryExportButton
+              translate={translate}
+              query={state.listedQuery}
+              isEmpty={state.listing.members.length === 0}
             />
           ) : null}
           {/* Sólo quien recibe la lista de Admin puede dar de alta (#243). */}

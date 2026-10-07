@@ -2417,14 +2417,19 @@ a.auth-brand-header:focus-visible {
   align-items: flex-start;
 }
 
-.directory-email-open {
+/* Los botones de la cabecera con su motivo debajo: escribir un correo (#501)
+   y exportar a CSV (#500). */
+.directory-email-open,
+.directory-export-open {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   max-width: 280px;
 }
 
-.directory-email-open .auth-hint {
+.directory-email-open .auth-hint,
+.directory-export-open .auth-hint,
+.directory-export-open .auth-error {
   margin: 0;
 }
 

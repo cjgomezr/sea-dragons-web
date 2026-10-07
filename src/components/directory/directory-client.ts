@@ -125,14 +125,18 @@ export type DirectoryLoad =
   | { readonly kind: "loaded"; readonly listing: DirectoryListing }
   | DirectoryFailure;
 
-/** El camino con la consulta puesta. Sólo viajan los filtros que dicen algo:
- * un `?role=` vacío no es "sin filtrar", es un rol que no existe. El orden
- * va siempre, para que la petición diga entera qué lista espera. */
-export function directoryPath(query: DirectoryQuery): string {
+/** El camino con la consulta puesta, del directorio o de su exportación
+ * (#500), que lee la misma. Sólo viajan los filtros que dicen algo: un
+ * `?role=` vacío no es "sin filtrar", es un rol que no existe. El orden va
+ * siempre, para que la petición diga entera qué lista espera. */
+export function directoryPath(
+  query: DirectoryQuery,
+  basePath: string = DIRECTORY_API_PATH,
+): string {
   const params = writeDirectoryQuery(query);
   params.set(SORT_QUERY_PARAM, query.sort);
   params.set(DIRECTION_QUERY_PARAM, query.direction);
-  return `${DIRECTORY_API_PATH}?${params.toString()}`;
+  return `${basePath}?${params.toString()}`;
 }
 
 /** Nunca rechaza: `requestApi` atrapa el fallo de red y un cuerpo que no
