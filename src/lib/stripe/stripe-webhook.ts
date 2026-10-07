@@ -3,6 +3,8 @@ import type { MembershipCard } from "@/lib/membership/membership";
 import type { RenewalNoticeSender } from "./renewal-notice";
 import {
   type CardSetupCompletedFacts,
+  type LevyPaidFacts,
+  type LevyPayment,
   type MembershipLookup,
   type PlannableStripeEventFacts,
   type RenewalUpcomingFacts,
@@ -48,6 +50,9 @@ export type StripeWebhookGateway = {
   applySessionPackPayment(
     input: SessionPackPaymentToApply,
   ): Promise<"applied" | "duplicate">;
+  /** Todo o nada, como `applyEvent`: el id del evento y el pago del levy,
+   * con su producto. La membresía no cambia (D4). */
+  applyLevyPayment(input: LevyPaymentToApply): Promise<"applied" | "duplicate">;
 };
 
 /** Un pack pagado (#471): el pago y las sesiones que suma al libro. */
@@ -57,6 +62,11 @@ export type SessionPackPaymentToApply = Pick<
 > & {
   readonly sessions: number;
   readonly payment: SessionPackPayment;
+};
+
+/** Un levy pagado (#473): el pago con el producto de Stripe. */
+export type LevyPaymentToApply = Pick<StripeEventToApply, "event" | "owner"> & {
+  readonly payment: LevyPayment;
 };
 
 /** La tarjeta que guardó un SetupIntent, con el id de su método de pago. */
@@ -139,7 +149,10 @@ async function resolveCard(
 async function toPlannableFacts(
   facts: Exclude<
     StripeEventFacts,
-    { kind: "ignored" } | RenewalUpcomingFacts | SessionPackPaidFacts
+    | { kind: "ignored" }
+    | RenewalUpcomingFacts
+    | SessionPackPaidFacts
+    | LevyPaidFacts
   >,
   stripe: StripeApi,
 ): Promise<PlannableStripeEventFacts> {
@@ -181,6 +194,15 @@ export async function handleStripeEvent(
       event: { id: event.id, type: event.type, created: facts.created },
       owner: { userId, clubId },
       sessions: facts.sessions,
+      payment: facts.payment,
+    });
+  }
+
+  if (facts.kind === "levyPaid") {
+    const { userId, clubId } = membership.record;
+    return gateway.applyLevyPayment({
+      event: { id: event.id, type: event.type, created: facts.created },
+      owner: { userId, clubId },
       payment: facts.payment,
     });
   }

@@ -10,6 +10,9 @@ import {
 } from "@/lib/stripe/stripe-webhook";
 import type { StripeMembership } from "@/lib/stripe/webhook-events";
 import {
+  FIXTURE_LEVY_NAME,
+  FIXTURE_LEVY_PAYMENT_INTENT_ID,
+  FIXTURE_LEVY_PRODUCT_ID,
   FIXTURE_PACK_SESSIONS,
   FIXTURE_PAYMENT_INTENT_ID,
   FIXTURE_PRICES,
@@ -53,6 +56,7 @@ const findMembership = vi.fn<StripeWebhookGateway["findMembership"]>();
 const applyEvent = vi.fn<StripeWebhookGateway["applyEvent"]>();
 const applySessionPackPayment =
   vi.fn<StripeWebhookGateway["applySessionPackPayment"]>();
+const applyLevyPayment = vi.fn<StripeWebhookGateway["applyLevyPayment"]>();
 const readCard = vi.fn<(paymentMethodId: string) => Promise<MembershipCard>>();
 const readSubscription =
   vi.fn<(subscriptionId: string) => Promise<Stripe.Subscription>>();
@@ -64,7 +68,12 @@ const notifyUpcomingRenewal =
 
 function handle(event: ReturnType<typeof stripeEvent>) {
   return handleStripeEvent(event, {
-    gateway: { findMembership, applyEvent, applySessionPackPayment },
+    gateway: {
+      findMembership,
+      applyEvent,
+      applySessionPackPayment,
+      applyLevyPayment,
+    },
     stripe: {
       readCard,
       readSubscription,
@@ -434,5 +443,62 @@ describe("un pack de sesiones pagado", () => {
     expect(outcome).toBe("unknown_member");
     expect(applySessionPackPayment).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledOnce();
+  });
+});
+
+// #473: un levy pagado entra en el historial con su producto, una sola vez, y
+// no toca la membresía.
+describe("un levy pagado", () => {
+  beforeEach(() => {
+    findMembership.mockResolvedValue(KNOWN_MEMBERSHIP);
+    applyLevyPayment.mockResolvedValue("applied");
+  });
+
+  it("escribe el pago del levy con su producto y su nombre, con el id del evento", async () => {
+    const event = stripeEvent("checkout.session.completed (levy)");
+
+    const outcome = await handle(event);
+
+    expect(outcome).toBe("applied");
+    expect(applyLevyPayment).toHaveBeenCalledWith({
+      event: {
+        id: event.id,
+        type: "checkout.session.completed",
+        created: new Date(event.created * 1000),
+      },
+      owner: { userId: FIXTURE_USER_ID, clubId: CLUB_ID },
+      payment: {
+        paymentIntentId: FIXTURE_LEVY_PAYMENT_INTENT_ID,
+        productId: FIXTURE_LEVY_PRODUCT_ID,
+        amountCents: 8000,
+        currency: "aud",
+        description: FIXTURE_LEVY_NAME,
+        paidAt: new Date(event.created * 1000),
+      },
+    });
+    expect(applyEvent).not.toHaveBeenCalled();
+    expect(applySessionPackPayment).not.toHaveBeenCalled();
+    expect(readSubscription).not.toHaveBeenCalled();
+  });
+
+  it("responde que ya estaba aplicado cuando el evento se repite", async () => {
+    applyLevyPayment.mockResolvedValue("duplicate");
+
+    const outcome = await handle(
+      stripeEvent("checkout.session.completed (levy)"),
+    );
+
+    expect(outcome).toBe("duplicate");
+  });
+
+  it("no apunta un levy sin pagar", async () => {
+    const outcome = await handle(
+      stripeEvent("checkout.session.completed (levy)", {
+        object: { payment_status: "unpaid" },
+      }),
+    );
+
+    expect(outcome).toBe("ignored");
+    expect(applyLevyPayment).not.toHaveBeenCalled();
   });
 });
