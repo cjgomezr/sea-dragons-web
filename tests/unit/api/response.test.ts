@@ -41,6 +41,7 @@ describe("apiError", () => {
     rate_limited: 429,
     method_not_allowed: 405,
     service_unavailable: 503,
+    bad_gateway: 502,
     internal_error: 500,
   };
 
