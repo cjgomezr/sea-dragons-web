@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { ModalDialog } from "@/components/ModalDialog";
 import type { Translator } from "@/lib/i18n/translator";
 import {
   type MembershipWaiverChange,
@@ -64,49 +65,6 @@ function useWaiverRequest(
   return { sending, send };
 }
 
-function ModalDialog({
-  title,
-  isSending,
-  onClosed,
-  children,
-}: {
-  readonly title: string;
-  readonly isSending: boolean;
-  /** Ya cerrado: quien lo abrió lo desmonta. */
-  readonly onClosed: () => void;
-  readonly children: React.ReactNode;
-}): React.JSX.Element {
-  const titleId = useId();
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    dialogRef.current?.showModal();
-  }, []);
-
-  return (
-    <dialog
-      ref={dialogRef}
-      className="event-dialog"
-      aria-labelledby={titleId}
-      onClose={onClosed}
-      // Escape cierra salvo mientras guarda, como el diálogo del calendario.
-      onCancel={(event) => {
-        if (isSending) {
-          event.preventDefault();
-        }
-      }}
-    >
-      <div className="event-dialog-panel">
-        <div className="event-dialog-header">
-          <h2 id={titleId} className="event-dialog-title">
-            {title}
-          </h2>
-        </div>
-        <div className="event-dialog-body">{children}</div>
-      </div>
-    </dialog>
-  );
-}
 
 function DialogActions({
   translate,

@@ -718,6 +718,67 @@ export const spanishMessages: MessageCatalog = {
   // La invitación de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta
   // desde la cabecera del directorio.
   "directory.addMember": "Invitar miembro",
+  "directory.email.open": "Escribir correo",
+  "directory.email.emptyReason": "No hay miembros en la lista a quien escribir.",
+  "directory.email.title": "Escribir a los miembros",
+  "directory.email.lead":
+    "Cada miembro recibe su propio correo desde la dirección del club, y las respuestas te llegan a tu correo.",
+  "directory.email.recipients": {
+    one: "{count} destinatario",
+    other: "{count} destinatarios",
+  },
+  "directory.email.removeShort": "Quitar",
+  "directory.email.remove": "Quitar a {name}",
+  "directory.email.noRecipients":
+    "La lista está vacía: no hay a quién mandarlo.",
+  "directory.email.subject": "Asunto",
+  "directory.email.message": "Mensaje",
+  "directory.email.messageHint": "Texto plano. Sale tal como lo escribes.",
+  "directory.email.error.subjectRequired": "Escribe el asunto.",
+  "directory.email.error.subjectTooLong":
+    "El asunto puede tener como mucho {max} caracteres.",
+  "directory.email.error.messageRequired": "Escribe el mensaje.",
+  "directory.email.error.messageTooLong":
+    "El mensaje puede tener como mucho {max} caracteres.",
+  "directory.email.send": "Enviar",
+  "directory.email.close": "Cerrar",
+  "directory.email.confirm.title": "¿Mandar el correo?",
+  "directory.email.confirm.recipients": {
+    one: "Va a {count} miembro.",
+    other: "Va a {count} miembros.",
+  },
+  "directory.email.confirm.remaining": {
+    one: "Hoy queda {count} correo del directorio.",
+    other: "Hoy quedan {count} correos del directorio.",
+  },
+  "directory.email.confirm.loadingQuota":
+    "Mirando cuántos correos quedan hoy…",
+  "directory.email.confirm.quotaUnknown":
+    "No se pudo saber cuántos correos quedan hoy.",
+  "directory.email.confirm.send": "Mandar",
+  "directory.email.confirm.sending": "Mandando…",
+  "directory.email.confirm.cancel": "Cancelar",
+  "directory.email.result.sent": {
+    one: "Se mandó {count} correo.",
+    other: "Se mandaron {count} correos.",
+  },
+  "directory.email.result.failed": "No llegó a:",
+  "directory.email.error.quotaExceeded": {
+    one: "No caben: hoy el directorio puede mandar {count} correo más. Quita miembros de la lista o inténtalo más tarde.",
+    other:
+      "No caben: hoy el directorio puede mandar {count} correos más. Quita miembros de la lista o inténtalo más tarde.",
+  },
+  "directory.email.error.quotaExceededUnknown":
+    "No caben en lo que el directorio puede mandar hoy. Quita miembros de la lista o inténtalo más tarde.",
+  "directory.email.error.unavailable":
+    "El envío de correos no está disponible ahora. Inténtalo más tarde.",
+  "directory.email.error.duplicate": "Este correo ya se mandó.",
+  "directory.email.error.forbidden":
+    "Tu rol ya no puede mandar correos desde el directorio.",
+  "directory.email.error.noRecipients":
+    "Ninguno de los miembros de la lista puede recibirlo: puede que su cuenta esté desactivada.",
+  "directory.email.error.unexpected":
+    "No se pudo mandar el correo. Inténtalo de nuevo.",
   "newMember.metaTitle": "Invitar miembro · {club}",
   "newMember.metaDescription":
     "Invita a un miembro al club y mándale el correo para activar su cuenta.",
