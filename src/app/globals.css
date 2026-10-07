@@ -2502,9 +2502,13 @@ a.auth-brand-header:focus-visible {
   min-width: 0;
 }
 
+/* El chip ya tiene su borde: el botón de dentro no pinta otra caja, y sólo
+   se marca al pasar por encima. */
 .directory-email-recipients li button {
   flex-shrink: 0;
   white-space: nowrap;
+  background: transparent;
+  border-color: transparent;
 }
 
 .directory-email-actions {

@@ -205,6 +205,22 @@ describeConPostgres("el registro de los correos del directorio", () => {
     );
   });
 
+  it("los correos del directorio no restan del cupo de los correos de cuenta", async () => {
+    const { database, clubId, senderId } = await setUp();
+    const accountRequests = () =>
+      database.query("select count(*) from public.email_send_requests");
+    const before = await accountRequests();
+    const reserved = outcomeOf(
+      await reserve(database, { clubId, senderId, count: LIMIT }),
+    ) as { send_id: string };
+    await database.query(
+      `update public.directory_email_sends set sent_count = ${LIMIT}
+        where id = '${reserved.send_id}'`,
+    );
+
+    await expect(accountRequests()).resolves.toBe(before);
+  });
+
   it("volver a aplicarla no toca lo apuntado", async () => {
     const { database, clubId, senderId } = await setUp();
     await reserve(database, { clubId, senderId, count: 7 });

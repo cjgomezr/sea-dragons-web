@@ -312,44 +312,66 @@ function composeEmails(
     }),
   }));
 }
+type BatchOutcome =
+  | {
+      readonly kind: "delivered";
+      readonly deliveries: readonly BatchEmailDelivery[];
+    }
+  | { readonly kind: "failed"; readonly error: EmailDeliveryError };
 
-/** Un lote que no sale entero no gasta cupo. Sólo un fallo de entrega es
- * un resultado; cualquier otro error sube tal cual. */
+/** Sólo un fallo de entrega es un resultado; cualquier otro error sube tal
+ * cual. */
 async function deliverBatch(
-  gateways: DirectoryEmailGateways,
-  batch: {
-    readonly sender: BatchEmailSender;
-    readonly sendId: string;
-    readonly emails: readonly ReplyableEmail[];
-    readonly requestId: string;
-  },
-): Promise<readonly BatchEmailDelivery[]> {
+  sender: BatchEmailSender,
+  emails: readonly ReplyableEmail[],
+  requestId: string,
+): Promise<BatchOutcome> {
   try {
-    return await batch.sender.sendBatch(batch.emails, batch.requestId);
+    return {
+      kind: "delivered",
+      deliveries: await sender.sendBatch(emails, requestId),
+    };
   } catch (error) {
     if (!(error instanceof EmailDeliveryError)) {
       throw error;
     }
-    await gateways.quota.settle(batch.sendId, 0);
-    throw new DirectoryEmailUnavailableError(error.message);
+    return { kind: "failed", error };
   }
 }
 
+const CLIENT_ERROR_MIN_STATUS = 400;
+const SERVER_ERROR_MIN_STATUS = 500;
+
+/** Un 4xx es Resend diciendo que no aceptó el lote: no salió nada. Sin
+ * respuesta, con un 5xx o con un 200 sin la lista de envíos no hay constancia
+ * de qué pasó, y el lote pudo salir entero. */
+function isClearRejection(error: EmailDeliveryError): boolean {
+  return (
+    error.status !== undefined &&
+    error.status >= CLIENT_ERROR_MIN_STATUS &&
+    error.status < SERVER_ERROR_MIN_STATUS
+  );
+}
+
+/** Un envío tal como lo cuenta la bitácora. */
+type AuditedSend = {
+  readonly sender: Sender;
+  readonly sendId: string;
+  readonly subject: string;
+  readonly recipientCount: number;
+};
+
 /** La bitácora guarda quién, cuándo, el asunto y a cuántos (NFR-010); el
- * cuerpo no. Los correos ya salieron cuando esto corre, así que un fallo de
- * la bitácora se registra en el servidor y no cambia la respuesta: decir que
- * falló invitaría a mandarlos otra vez. */
+ * cuerpo no. `sentCount` es `null` cuando no se sabe si el lote salió. Los
+ * correos pudieron salir cuando esto corre, así que un fallo de la bitácora
+ * se registra en el servidor y no cambia la respuesta: decir que falló
+ * invitaría a mandarlos otra vez. */
 async function auditSend(
   gateways: DirectoryEmailGateways,
-  send: {
-    readonly sender: Sender;
-    readonly sendId: string;
-    readonly subject: string;
-    readonly recipientCount: number;
-    readonly sentCount: number;
-  },
+  send: AuditedSend & { readonly sentCount: number | null },
 ): Promise<void> {
   const actor = { id: send.sender.userId, clubId: send.sender.clubId };
+  const isSent = send.sentCount !== null && send.sentCount > 0;
   try {
     await recordAuditEvent(gateways.audit, {
       actor,
@@ -357,7 +379,7 @@ async function auditSend(
       action: "directory.email_sent",
       entityType: "directory_email",
       entityId: send.sendId,
-      result: send.sentCount > 0 ? "success" : "failure",
+      result: isSent ? "success" : "failure",
       metadata: {
         subject: send.subject,
         recipientCount: send.recipientCount,
@@ -414,6 +436,21 @@ async function prepareEmails(
   return { sender, recipients, emails };
 }
 
+/** Un lote que Resend rechazó no gasta cupo. Uno del que no se sabe si salió
+ * deja el cupo reservado entero: contar de menos podría dejar sin cupo a los
+ * correos de cuenta (D8). */
+async function settleFailedBatch(
+  gateways: DirectoryEmailGateways,
+  send: AuditedSend & { readonly error: EmailDeliveryError },
+): Promise<never> {
+  const isRejected = isClearRejection(send.error);
+  if (isRejected) {
+    await gateways.quota.settle(send.sendId, 0);
+  }
+  await auditSend(gateways, { ...send, sentCount: isRejected ? 0 : null });
+  throw new DirectoryEmailUnavailableError(send.error.message);
+}
+
 export async function sendDirectoryEmail(
   gateways: DirectoryEmailGateways,
   request: DirectoryEmailRequest,
@@ -425,22 +462,20 @@ export async function sendDirectoryEmail(
     { ...request, sender },
     recipients.length,
   );
-  const deliveries = await deliverBatch(gateways, {
-    sender: batchSender,
-    sendId,
-    emails,
-    requestId: request.requestId,
-  });
-  const failed = failedRecipients(recipients, deliveries);
-  const sentCount = recipients.length - failed.length;
-  await gateways.quota.settle(sendId, sentCount);
-  await auditSend(gateways, {
+  const send: AuditedSend = {
     sender,
     sendId,
     subject: request.draft.subject,
     recipientCount: recipients.length,
-    sentCount,
-  });
+  };
+  const outcome = await deliverBatch(batchSender, emails, request.requestId);
+  if (outcome.kind === "failed") {
+    return settleFailedBatch(gateways, { ...send, error: outcome.error });
+  }
+  const failed = failedRecipients(recipients, outcome.deliveries);
+  const sentCount = recipients.length - failed.length;
+  await gateways.quota.settle(sendId, sentCount);
+  await auditSend(gateways, { ...send, sentCount });
   return {
     sentCount,
     failed,

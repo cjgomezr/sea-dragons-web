@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import type { ApiRequestFailure } from "@/lib/api/request-api";
+import {
+  type ApiRequestFailure,
+  UNRECOGNIZED_RESPONSE,
+} from "@/lib/api/request-api";
 import {
   DIRECTORY_EMAIL_MESSAGE_MAX_LENGTH,
   DIRECTORY_EMAIL_SUBJECT_MAX_LENGTH,
@@ -251,11 +254,18 @@ function useEmailSending(onSettled: (phase: Phase) => void): {
     }
     isSendingRef.current = true;
     setIsSending(true);
-    void settle(request).then((phase) => {
-      isSendingRef.current = false;
-      setIsSending(false);
-      onSettled(phase);
-    });
+    void settle(request)
+      // Un fallo inesperado no puede dejar el diálogo atascado en "Mandando":
+      // se explica como una respuesta que la pantalla no sabe leer.
+      .catch((): Phase => ({
+        kind: "editing",
+        notice: { kind: "failure", failure: UNRECOGNIZED_RESPONSE },
+      }))
+      .then((phase) => {
+        isSendingRef.current = false;
+        setIsSending(false);
+        onSettled(phase);
+      });
   }
 
   return { isSending, send };

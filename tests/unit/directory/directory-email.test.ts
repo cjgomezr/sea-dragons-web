@@ -492,11 +492,11 @@ describe("sendDirectoryEmail", () => {
       expect(quota.sends).toEqual([]);
     });
 
-    it("si el lote entero falla, dice que no está disponible y no gasta cupo", async () => {
+    it("si Resend rechaza el lote, dice que no está disponible y no gasta cupo", async () => {
       const { gateways, quota } = setUp({
         deliver: () => {
-          throw new EmailDeliveryError("Resend rechazó el envío con 500", {
-            status: 500,
+          throw new EmailDeliveryError("Resend rechazó el envío con 422", {
+            status: 422,
           });
         },
       });
@@ -505,6 +505,47 @@ describe("sendDirectoryEmail", () => {
         sendTo(gateways, [recipient(1).userId]),
       ).rejects.toBeInstanceOf(DirectoryEmailUnavailableError);
       expect(quota.sends[0]?.sent).toBe(0);
+    });
+
+    it.each([
+      ["sin respuesta", undefined],
+      ["con un error del servidor", 500],
+      ["con un 200 sin la lista de envíos", 200],
+    ])(
+      "si el lote falla %s, el cupo sigue reservado: pudo haber salido",
+      async (_, status) => {
+        const { gateways, quota } = setUp({
+          deliver: () => {
+            throw new EmailDeliveryError("no hay constancia", { status });
+          },
+        });
+
+        await expect(
+          sendTo(gateways, [recipient(1).userId, recipient(2).userId]),
+        ).rejects.toBeInstanceOf(DirectoryEmailUnavailableError);
+        expect(quota.sends[0]).toMatchObject({ reserved: 2, sent: null });
+      },
+    );
+
+    it("deja en la bitácora el envío que no salió", async () => {
+      const { gateways, auditRows } = setUp({
+        deliver: () => {
+          throw new EmailDeliveryError("Resend rechazó el envío con 422", {
+            status: 422,
+          });
+        },
+      });
+
+      await expect(
+        sendTo(gateways, [recipient(1).userId]),
+      ).rejects.toBeInstanceOf(DirectoryEmailUnavailableError);
+      expect(auditRows).toMatchObject([
+        {
+          action: "directory.email_sent",
+          result: "failure",
+          metadata: { subject: DRAFT.subject, recipientCount: 1, sentCount: 0 },
+        },
+      ]);
     });
   });
 
