@@ -280,7 +280,7 @@ Next.js 16 (App Router), TypeScript estricto, Supabase, Stripe desde E12, puerto
 - **NFR-011 (Privacy Act 1988)** es ahora el epic **E15, Privacidad y datos
   personales**: aviso de privacidad en el registro, exportación de datos, borrado
   o anonimización dentro de 30 días y política de retención tras la baja.
-- NFR-001 y NFR-008 se verifican con la prueba de carga de E16, NFR-003 con el
+- NFR-001 y NFR-008 se verifican con la prueba de carga de E16b (#521), NFR-003 con el
   monitoreo del hosting. Escrito en el propio texto de cada NFR, para que ningún
   ticket funcional cargue con ellos.
 
@@ -288,6 +288,11 @@ Next.js 16 (App Router), TypeScript estricto, Supabase, Stripe desde E12, puerto
 
 `pg_cron` de Supabase, dentro del epic **E16**. De ahí cuelgan la generación de
 ocurrencias recurrentes (FR-031) y el aviso previo a la renovación (FR-072).
+
+Actualizado el 7 de octubre de 2026: ninguno de los dos acabó necesitando
+`pg_cron`. Las ocurrencias se generan al crear la serie (E7) y el aviso lo
+dispara Stripe (E13). `pg_cron` llega con E16b (#521) para la limpieza nocturna
+de datos viejos.
 
 ### P4 · No hay epic de despliegue · RESUELTO
 
