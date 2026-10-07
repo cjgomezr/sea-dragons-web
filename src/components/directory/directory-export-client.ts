@@ -42,7 +42,9 @@ function saveFile(file: Blob, filename: string): void {
   link.href = url;
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  // Después del clic y no en él: algún navegador cancela la descarga si la
+  // dirección desaparece antes de que empiece.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /** Nunca rechaza: el fallo de red y la respuesta de error salen como

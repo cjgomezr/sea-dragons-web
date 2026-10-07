@@ -259,5 +259,7 @@ export function directoryCsvFilename({
     translate("directory.export.fileName"),
     todayInClub,
   ];
-  return `${parts.join("-")}.csv`;
+  // Un nombre de club sin letras latinas no deja nada: sin él, el archivo
+  // empezaría por un guion.
+  return `${parts.filter((part) => part !== "").join("-")}.csv`;
 }

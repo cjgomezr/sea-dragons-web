@@ -82,6 +82,9 @@ export function apiFile(file: ApiFile): NextResponse<ApiFileBody> {
     headers: {
       "content-type": file.contentType,
       "content-disposition": `attachment; filename="${file.filename}"`,
+      // Lleva datos personales (el CSV del directorio): que no se quede una
+      // copia en ninguna caché por el camino.
+      "cache-control": "no-store",
     },
   });
 }

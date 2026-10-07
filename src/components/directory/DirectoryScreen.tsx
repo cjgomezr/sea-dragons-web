@@ -165,6 +165,12 @@ function canWriteEmails(listing: DirectoryListing): boolean {
   return listing.kind === "admin" || listing.kind === "committee";
 }
 
+/** Exporta a CSV quien ve el contacto de todos (D6, #500): hoy los mismos
+ * que escriben correos, pero son dos permisos distintos. */
+function canExportListing(listing: DirectoryListing): boolean {
+  return listing.kind === "admin" || listing.kind === "committee";
+}
+
 /** La lista que se está viendo, sin las bajas: no van a recibirlo. El
  * servidor las vuelve a quitar al enviar, por si alguien se dio de baja
  * entre medias. */
@@ -358,9 +364,7 @@ export function DirectoryScreen({
               onOpen={setEmailRecipients}
             />
           ) : null}
-          {/* Exporta quien escribe correos: quien ve el contacto de todos
-              (D6, #500). */}
-          {state.kind === "ready" && canWriteEmails(state.listing) ? (
+          {state.kind === "ready" && canExportListing(state.listing) ? (
             <DirectoryExportButton
               translate={translate}
               query={state.listedQuery}

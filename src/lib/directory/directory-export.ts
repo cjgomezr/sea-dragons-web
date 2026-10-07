@@ -73,6 +73,23 @@ function asExportable(listing: DirectoryListing): ExportableListing {
   throw new DirectoryExportForbiddenError();
 }
 
+function buildExport(
+  listing: ExportableListing,
+  { locale, todayInClub }: DirectoryExportRequest,
+  brand: ClubBrand,
+): DirectoryExport {
+  const translate = createTranslator(locale);
+  return {
+    filename: directoryCsvFilename({
+      clubName: brand.name,
+      todayInClub,
+      translate,
+    }),
+    csv: directoryCsv(listing, translate),
+    memberCount: listing.members.length,
+  };
+}
+
 export async function exportDirectory(
   gateways: DirectoryExportGateways,
   request: DirectoryExportRequest,
@@ -87,7 +104,13 @@ export async function exportDirectory(
   const listing = asExportable(
     await listDirectory({ ...gateways, photos: WITHOUT_PHOTOS }, request),
   );
-  const memberCount = listing.members.length;
+  const exported = buildExport(
+    listing,
+    request,
+    await gateways.brand.readClubBrand(),
+  );
+  // Lo último antes de entregarlo: la bitácora no apunta una exportación que
+  // luego no salió, y sin apuntarla no sale.
   await recordAuditEvent(gateways.audit, {
     actor: { id: request.callerId, clubId: caller.clubId },
     clubId: caller.clubId,
@@ -97,18 +120,8 @@ export async function exportDirectory(
     result: "success",
     metadata: {
       filters: Object.fromEntries(writeDirectoryQuery(request.query)),
-      memberCount,
+      memberCount: exported.memberCount,
     },
   });
-  const translate = createTranslator(request.locale);
-  const brand = await gateways.brand.readClubBrand();
-  return {
-    filename: directoryCsvFilename({
-      clubName: brand.name,
-      todayInClub: request.todayInClub,
-      translate,
-    }),
-    csv: directoryCsv(listing, translate),
-    memberCount,
-  };
+  return exported;
 }

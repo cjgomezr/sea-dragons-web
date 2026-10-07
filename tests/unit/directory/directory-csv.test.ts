@@ -317,4 +317,14 @@ describe("directoryCsvFilename", () => {
       }),
     ).toBe("club-nandu-sub-acuatico-directory-2026-10-08.csv");
   });
+
+  it("no empieza por un guion si el nombre del club no deja letras", () => {
+    expect(
+      directoryCsvFilename({
+        clubName: "海龍",
+        todayInClub: "2026-10-08",
+        translate: createTranslator("es"),
+      }),
+    ).toBe("directorio-2026-10-08.csv");
+  });
 });

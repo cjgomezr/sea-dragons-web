@@ -233,6 +233,24 @@ describe("GET /api/v1/directory/export", () => {
     });
   });
 
+  it("responde 403 al Committee que pide los socios dados de baja", async () => {
+    givenRole("Committee");
+
+    const response = await exportDirectory("?includeInactive=true");
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "forbidden" },
+    });
+    expect(auditRows).toEqual([]);
+  });
+
+  it("no deja que nada guarde una copia del archivo", async () => {
+    const response = await exportDirectory();
+
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
   it("responde 400 con su motivo a una consulta mal escrita", async () => {
     const response = await exportDirectory("?sort=altura");
 

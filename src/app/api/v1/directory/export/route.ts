@@ -8,6 +8,7 @@ import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import {
   DIRECTORY_FILTER_FORBIDDEN_REASON,
   DirectoryFilterForbiddenError,
+  DirectoryForbiddenError,
   type DirectoryQuery,
 } from "@/lib/directory/directory";
 import {
@@ -61,6 +62,9 @@ function asExportApiError(error: unknown): never {
       error.message,
       DIRECTORY_EXPORT_FORBIDDEN_REASON,
     );
+  }
+  if (error instanceof DirectoryForbiddenError) {
+    throw new ApiError("forbidden", error.message);
   }
   if (error instanceof DirectoryFilterForbiddenError) {
     throw new ApiError(
