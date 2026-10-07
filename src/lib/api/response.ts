@@ -63,6 +63,29 @@ export function apiNoContent(): NextResponse<null> {
   return new NextResponse(null, { status: NO_CONTENT_STATUS });
 }
 
+/** Un archivo para descargar, como el CSV del directorio (#500). Sale tal
+ * cual, sin `{ data }`: quien lo pide lo guarda, no lo lee. */
+export type ApiFile = {
+  readonly body: string;
+  readonly contentType: string;
+  /** Sin comillas ni caracteres fuera de ASCII: va dentro de la cabecera sin
+   * codificar. */
+  readonly filename: string;
+};
+
+/** El cuerpo de un archivo, para tipar la respuesta que lo lleva. */
+export type ApiFileBody = string;
+
+export function apiFile(file: ApiFile): NextResponse<ApiFileBody> {
+  return new NextResponse<ApiFileBody>(file.body, {
+    status: DEFAULT_SUCCESS_STATUS,
+    headers: {
+      "content-type": file.contentType,
+      "content-disposition": `attachment; filename="${file.filename}"`,
+    },
+  });
+}
+
 export function apiError(
   code: ApiErrorCode,
   message: string,

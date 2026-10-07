@@ -165,6 +165,12 @@ export const DIRECTORY_MEMBER_PHOTO_API_PATH = `${DIRECTORY_API_PATH}/[id]/photo
  * responde 403 con motivo. */
 export const DIRECTORY_EMAILS_API_PATH = `${DIRECTORY_API_PATH}/emails`;
 
+/** La exportación a CSV del directorio (#500, RF-5 del PRD de E19): la
+ * misma consulta que `DIRECTORY_API_PATH`. Es de Admin y Committee, y tampoco
+ * está en `RESTRICTED_ROUTES`: lo decide el dominio leyendo el rol de quien
+ * llama, y responde 403 con motivo. */
+export const DIRECTORY_EXPORT_API_PATH = `${DIRECTORY_API_PATH}/export`;
+
 /** Los grupos de quien llama (#229, RF-8 del PRD de E4). Va fuera de
  * `/api/v1/groups`, que es de quien gestiona grupos, porque lo alcanza
  * cualquier cuenta activa: por eso no aparece en `RESTRICTED_ROUTES`. Una
