@@ -341,13 +341,17 @@ async function deliverBatch(
 
 const CLIENT_ERROR_MIN_STATUS = 400;
 const SERVER_ERROR_MIN_STATUS = 500;
+const IDEMPOTENCY_CONFLICT_STATUS = 409;
 
-/** Un 4xx es Resend diciendo que no aceptó el lote: no salió nada. Sin
- * respuesta, con un 5xx o con un 200 sin la lista de envíos no hay constancia
- * de qué pasó, y el lote pudo salir entero. */
+/** Un 4xx es Resend diciendo que no aceptó el lote: no salió nada. Salvo el
+ * 409, que es la misma clave de idempotencia en otra petición todavía en
+ * curso: ese lote puede salir. Sin respuesta, con un 5xx o con un 200 sin la
+ * lista de envíos no hay constancia de qué pasó, y el lote pudo salir
+ * entero. */
 function isClearRejection(error: EmailDeliveryError): boolean {
   return (
     error.status !== undefined &&
+    error.status !== IDEMPOTENCY_CONFLICT_STATUS &&
     error.status >= CLIENT_ERROR_MIN_STATUS &&
     error.status < SERVER_ERROR_MIN_STATUS
   );

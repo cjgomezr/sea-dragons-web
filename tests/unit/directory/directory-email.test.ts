@@ -511,6 +511,7 @@ describe("sendDirectoryEmail", () => {
       ["sin respuesta", undefined],
       ["con un error del servidor", 500],
       ["con un 200 sin la lista de envíos", 200],
+      ["con un conflicto de idempotencia", 409],
     ])(
       "si el lote falla %s, el cupo sigue reservado: pudo haber salido",
       async (_, status) => {
@@ -526,6 +527,21 @@ describe("sendDirectoryEmail", () => {
         expect(quota.sends[0]).toMatchObject({ reserved: 2, sent: null });
       },
     );
+
+    it("si no se sabe si salió, la bitácora no da ningún número", async () => {
+      const { gateways, auditRows } = setUp({
+        deliver: () => {
+          throw new EmailDeliveryError("No se pudo hablar con Resend");
+        },
+      });
+
+      await expect(
+        sendTo(gateways, [recipient(1).userId]),
+      ).rejects.toBeInstanceOf(DirectoryEmailUnavailableError);
+      expect(auditRows).toMatchObject([
+        { result: "failure", metadata: { sentCount: null } },
+      ]);
+    });
 
     it("deja en la bitácora el envío que no salió", async () => {
       const { gateways, auditRows } = setUp({
