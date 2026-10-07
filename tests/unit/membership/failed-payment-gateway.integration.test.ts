@@ -23,6 +23,8 @@ const SEEDED_CLUB = "victoria-seadragons";
 const OLDER_FAILURE = "2026-09-01T03:00:00.000Z";
 const LATEST_FAILURE = "2026-10-01T03:00:00.000Z";
 const FAILED_PACK_CHARGE = "2026-10-05T03:00:00.000Z";
+/** La cuota Full en centavos (CON-005): lo que cobraría la factura fallida. */
+const FAILED_FEE_CENTS = 4500;
 
 async function seededClubId(serviceClient: ServiceRoleClient): Promise<string> {
   const { data, error } = await serviceClient.client
@@ -77,7 +79,7 @@ function failedPayment(
     ...(reference.invoice
       ? { stripe_invoice_id: `in_${stripeId}` }
       : { stripe_charge_id: `ch_${stripeId}` }),
-    amount_cents: 4500,
+    amount_cents: FAILED_FEE_CENTS,
     currency: "aud",
     status: "failed",
     created_at: reference.createdAt,

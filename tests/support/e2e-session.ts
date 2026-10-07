@@ -937,6 +937,8 @@ const ACTIVE_ROLE = "activo";
 const GROUPED_ROLE = "con-grupos";
 const UNPAID_ROLE = "sin-membresia";
 const PAST_DUE_ROLE = "pago-fallido";
+/** La cuota Full en centavos (CON-005): lo que cobraría la factura fallida. */
+const FAILED_FEE_CENTS = 4500;
 const PAYMENTS_TABLE = "payments";
 
 /** El socio con la cuota fallida (#474): `past_due` y la fila del cobro
@@ -963,7 +965,7 @@ async function seedPastDueMember(
         club_id: target.clubId,
         user_id: member.userId,
         stripe_invoice_id: `in_e2e_${runId}_${target.slot}`,
-        amount_cents: 4500,
+        amount_cents: FAILED_FEE_CENTS,
         currency: "aud",
         status: "failed",
         created_at: SEEDED_FAILED_PAYMENT_AT,
