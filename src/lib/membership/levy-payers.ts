@@ -95,6 +95,9 @@ export type LevyPayersRequest = {
   readonly priceId: string;
 };
 
+/** El orden de "Faltan" no puede depender del idioma del servidor. */
+const CLUB_COLLATION_LOCALE = "en-AU";
+
 type PaidTotal = { readonly paidAt: string; readonly amountCents: number };
 
 /** Un socio que pagó dos veces (dos pestañas de Checkout a la vez) es una
@@ -124,7 +127,7 @@ function byFullName(
   first: LevyMissingMember,
   second: LevyMissingMember,
 ): number {
-  return first.fullName.localeCompare(second.fullName);
+  return first.fullName.localeCompare(second.fullName, CLUB_COLLATION_LOCALE);
 }
 
 function byLatestPayment(first: LevyPayer, second: LevyPayer): number {
@@ -185,9 +188,9 @@ export async function readLevyPayers(
       productId: levy.productId,
     }),
   ]);
-  // Un pago de alguien que ya no tiene ficha no tiene a quién nombrar: no
-  // sale en la lista ni en el total, para que el total sea la suma de la
-  // lista.
+  // Sólo los pagos de quien tiene ficha: es defensivo, porque borrar la
+  // ficha ya borra sus pagos (`payments_member_same_club_fkey`, `0050`), y
+  // así el total es siempre la suma de la lista.
   const { payers, missing } = splitMembers(
     members,
     totalPaidByMember(payments),
