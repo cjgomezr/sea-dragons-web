@@ -9,6 +9,7 @@ import {
   loadLevies,
   requestLevyCheckout,
 } from "./payments-client";
+import { LevyPayers } from "./LevyPayers";
 import { StripeSessionButton } from "./StripeSessionButton";
 
 /**
@@ -16,7 +17,8 @@ import { StripeSessionButton } from "./StripeSessionButton";
  * que el comité crea en Stripe, cada uno con su importe y un botón que lleva
  * a Checkout, o "Pagado" si ya lo pagó. Los ve cualquier socio, al día o no.
  * Sin levies la sección no se pinta; si no se pudieron leer, lo dice y el
- * resto de Pagos sigue igual.
+ * resto de Pagos sigue igual. A un Admin o un Committee, además, cada levy
+ * le deja ver quién lo pagó y quién falta (#531).
  */
 
 type LeviesState = { readonly kind: "loading" } | LeviesLoad;
@@ -40,9 +42,11 @@ function useLevies(): LeviesState {
 function LevyItem({
   translate,
   levy,
+  canSeePayers,
 }: {
   readonly translate: Translator;
   readonly levy: Levy;
+  readonly canSeePayers: boolean;
 }): React.JSX.Element {
   const nameId = useId();
   return (
@@ -70,6 +74,13 @@ function LevyItem({
           />
         )}
       </div>
+      {canSeePayers ? (
+        <LevyPayers
+          translate={translate}
+          priceId={levy.id}
+          levyNameId={nameId}
+        />
+      ) : null}
     </li>
   );
 }
@@ -77,9 +88,11 @@ function LevyItem({
 function LeviesBody({
   translate,
   state,
+  canSeePayers,
 }: {
   readonly translate: Translator;
   readonly state: Exclude<LeviesState, { readonly kind: "loading" }>;
+  readonly canSeePayers: boolean;
 }): React.JSX.Element {
   if (state.kind === "failed") {
     return (
@@ -91,7 +104,12 @@ function LeviesBody({
   return (
     <ul className="payments-levies">
       {state.levies.map((levy) => (
-        <LevyItem key={levy.id} translate={translate} levy={levy} />
+        <LevyItem
+          key={levy.id}
+          translate={translate}
+          levy={levy}
+          canSeePayers={canSeePayers}
+        />
       ))}
     </ul>
   );
@@ -99,8 +117,11 @@ function LeviesBody({
 
 export function LevyCharges({
   translate,
+  canSeePayers,
 }: {
   readonly translate: Translator;
+  /** Si quien mira es Admin o Committee (#531). */
+  readonly canSeePayers: boolean;
 }): React.JSX.Element | null {
   const titleId = useId();
   const state = useLevies();
@@ -117,7 +138,11 @@ export function LevyCharges({
         {translate("payments.levies.title")}
       </h2>
       <p className="app-lead">{translate("payments.levies.lead")}</p>
-      <LeviesBody translate={translate} state={state} />
+      <LeviesBody
+        translate={translate}
+        state={state}
+        canSeePayers={canSeePayers}
+      />
     </section>
   );
 }

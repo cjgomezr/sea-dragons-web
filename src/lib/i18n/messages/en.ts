@@ -1078,6 +1078,7 @@ export const englishMessages = {
   "payments.levyPayers.loadFailed":
     "We couldn't load who paid this charge. Try again in a moment.",
   "payments.levyPayers.retry": "Try again",
+  "payments.levyPayers.summary.title": "Summary",
   "payments.levyPayers.summary.paid": "Paid",
   "payments.levyPayers.summary.missing": "Still to pay",
   "payments.levyPayers.summary.collected": "Collected",

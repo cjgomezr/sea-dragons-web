@@ -1,6 +1,7 @@
 import { DIRECTORY_EXPORT_API_PATH } from "@/lib/auth/routes";
 import type { DirectoryQuery } from "@/lib/directory/directory";
 import type { Translator } from "@/lib/i18n/translator";
+import { saveFile } from "@/components/save-file";
 import { directoryPath } from "./directory-client";
 
 /**
@@ -32,19 +33,6 @@ function filenameOf(response: Response): string {
   const match =
     disposition === null ? null : ATTACHMENT_FILENAME.exec(disposition);
   return match?.[1] ?? FALLBACK_FILENAME;
-}
-
-/** Un enlace que nadie ve, pulsado una vez: es como el navegador guarda un
- * archivo que no viene de navegar. */
-function saveFile(file: Blob, filename: string): void {
-  const url = URL.createObjectURL(file);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  // Después del clic y no en él: algún navegador cancela la descarga si la
-  // dirección desaparece antes de que empiece.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /** Nunca rechaza: el fallo de red y la respuesta de error salen como

@@ -1,4 +1,6 @@
 import { PaymentsScreen } from "@/components/payments/PaymentsScreen";
+import { readCallerRole } from "@/lib/auth/caller-role";
+import { hasCapability } from "@/lib/auth/roles";
 import { readRequestLocale } from "@/lib/i18n/request-locale";
 import {
   CARD_RETURN_QUERY_PARAM,
@@ -13,15 +15,19 @@ import {
  * la aplicación nativa (CON-002).
  *
  * `?checkout=`, `?tarjeta=` y `?pack=` (`ok` o `cancelado`) es con lo que se
- * vuelve de Stripe tras suscribirse, cambiar la tarjeta o comprar un pack. */
+ * vuelve de Stripe tras suscribirse, cambiar la tarjeta o comprar un pack.
+ *
+ * El rol se lee aquí, en el servidor, para ofrecer a un Admin o un Committee
+ * quién pagó cada levy (#531). */
 export default async function PagosPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<React.JSX.Element> {
-  const [locale, params] = await Promise.all([
+  const [locale, params, role] = await Promise.all([
     readRequestLocale(),
     searchParams,
+    readCallerRole(),
   ]);
   return (
     <PaymentsScreen
@@ -29,6 +35,7 @@ export default async function PagosPage({
       checkoutReturn={readCheckoutReturn(params[CHECKOUT_RETURN_QUERY_PARAM])}
       cardReturn={readCheckoutReturn(params[CARD_RETURN_QUERY_PARAM])}
       packReturn={readCheckoutReturn(params[PACK_RETURN_QUERY_PARAM])}
+      canSeeLevyPayers={hasCapability(role, "viewLevyPayers")}
     />
   );
 }

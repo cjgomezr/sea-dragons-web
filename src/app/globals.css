@@ -5502,6 +5502,94 @@ a.auth-brand-header:focus-visible {
   justify-items: start;
 }
 
+/* Quién pagó cada levy (#531), sólo para Admin y Committee: el botón y la
+   lista ocupan la fila entera del levy, bajo su nombre y su acción. La tabla
+   es `.payments-table`, que en el móvil ya se apila en tarjetas. */
+.payments-levy-payers-open {
+  display: grid;
+  flex: 1 1 100%;
+  gap: var(--space-3);
+  justify-items: start;
+  min-width: 0;
+}
+
+.payments-levy-payers {
+  display: grid;
+  gap: var(--space-4);
+  justify-self: stretch;
+  min-width: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.payments-levy-payers p {
+  margin: 0;
+}
+
+.payments-levy-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.payments-levy-summary-label {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.payments-levy-summary-value {
+  font-family: var(--font-family-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.payments-levy-group {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.payments-levy-group h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.payments-levy-group .payments-table th:first-child,
+.payments-levy-group .payments-table td:first-child {
+  padding-left: 0;
+}
+
+/* En el móvil la tarjeta del pago ya está dentro de la del levy: sin el
+   margen lateral de la tabla, y con el nombre en la fila entera sobre la
+   fecha y el importe. Fuera del móvil ninguna de las dos cosas aplica. */
+.payments-levy-group .payments-table tbody {
+  padding: 0;
+}
+
+.payments-table .payments-levy-payer {
+  grid-column: 1 / -1;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.payments-levy-missing {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-6);
+  overflow-wrap: anywhere;
+}
+
 .payments-offer {
   display: grid;
   gap: var(--space-2);

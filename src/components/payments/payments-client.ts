@@ -9,6 +9,7 @@ import {
   CLUB_SESSION_PACKS_API_PATH,
   LEVIES_API_PATH,
   LEVY_CHECKOUT_API_PATH,
+  LEVY_PAYERS_API_PATH,
   MEMBERSHIP_API_PATH,
   MEMBERSHIP_CARD_API_PATH,
   MEMBERSHIP_CHECKOUT_API_PATH,
@@ -28,6 +29,7 @@ import {
   PAYMENT_STATUSES,
 } from "@/lib/membership/membership-view";
 import type { Levy } from "@/lib/membership/levies";
+import type { LevyPayersReport } from "@/lib/membership/levy-payers";
 import type { ClubPrice } from "@/lib/membership/stripe-prices";
 
 /**
@@ -254,6 +256,53 @@ export async function loadLevies(): Promise<LeviesLoad> {
   return read.kind === "failed"
     ? read
     : { kind: "loaded", levies: read.value.data.levies };
+}
+
+const levyMemberSchema = {
+  userId: z.string(),
+  fullName: z.string(),
+  email: z.string(),
+};
+
+const levyPayersResponseSchema = z.object({
+  data: z.object({
+    levy: z.object({
+      id: z.string(),
+      name: z.string(),
+      amountCents: z.number().int(),
+    }),
+    summary: z.object({
+      paidCount: z.number().int(),
+      missingCount: z.number().int(),
+      collectedCents: z.number().int(),
+    }),
+    payers: z.array(
+      z.object({
+        ...levyMemberSchema,
+        paidAt: isoInstantSchema,
+        amountCents: z.number().int(),
+      }),
+    ),
+    missing: z.array(z.object(levyMemberSchema)),
+  }),
+});
+
+export type LevyPayersLoad =
+  | { readonly kind: "loaded"; readonly report: LevyPayersReport }
+  | PaymentsFailure;
+
+/** Quién pagó el levy del precio `priceId` y quién falta (#531). Sólo lo
+ * responde a un Admin o a un Committee. */
+export async function loadLevyPayers(priceId: string): Promise<LevyPayersLoad> {
+  const read = readApiPayload(
+    await requestApi(
+      LEVY_PAYERS_API_PATH.replace("[priceId]", encodeURIComponent(priceId)),
+    ),
+    levyPayersResponseSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "loaded", report: read.value.data };
 }
 
 /** Abre Checkout para pagar el levy del precio `priceId` (#473). */

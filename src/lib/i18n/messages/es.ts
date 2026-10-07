@@ -1076,6 +1076,7 @@ export const spanishMessages: MessageCatalog = {
   "payments.levyPayers.loadFailed":
     "No pudimos cargar quién pagó este cobro. Inténtalo otra vez en un momento.",
   "payments.levyPayers.retry": "Reintentar",
+  "payments.levyPayers.summary.title": "Resumen",
   "payments.levyPayers.summary.paid": "Pagaron",
   "payments.levyPayers.summary.missing": "Faltan",
   "payments.levyPayers.summary.collected": "Cobrado",
