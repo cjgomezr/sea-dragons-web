@@ -5057,6 +5057,7 @@ a.auth-brand-header:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  /* El mismo margen lateral que .app-main, para alinearse con su contenido. */
   margin: var(--space-4) var(--space-4) 0;
   padding: var(--space-3) var(--space-4);
   color: var(--color-text);
@@ -5084,12 +5085,6 @@ a.auth-brand-header:focus-visible {
 .failed-payment-alert .auth-error {
   flex-basis: 100%;
   margin: 0;
-}
-
-@media (min-width: 768px) {
-  .failed-payment-alert {
-    margin: var(--space-4) var(--space-8) 0;
-  }
 }
 
 /* El aviso de los datos de contacto que faltan (#498), en el inicio y en el
