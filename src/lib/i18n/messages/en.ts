@@ -722,6 +722,67 @@ export const englishMessages = {
   // La invitación de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta
   // desde la cabecera del directorio.
   "directory.addMember": "Invite member",
+  "directory.email.open": "Write an email",
+  "directory.email.emptyReason":
+    "There are no members in the list to write to.",
+  "directory.email.title": "Email members",
+  "directory.email.lead":
+    "Each member gets their own email from the club address, and replies come to your email.",
+  "directory.email.recipients": {
+    one: "{count} recipient",
+    other: "{count} recipients",
+  },
+  "directory.email.removeShort": "Remove",
+  "directory.email.remove": "Remove {name}",
+  "directory.email.noRecipients":
+    "The list is empty: there's nobody to send it to.",
+  "directory.email.subject": "Subject",
+  "directory.email.message": "Message",
+  "directory.email.messageHint": "Plain text, sent exactly as you write it.",
+  "directory.email.error.subjectRequired": "Write a subject.",
+  "directory.email.error.subjectTooLong":
+    "The subject can be at most {max} characters.",
+  "directory.email.error.messageRequired": "Write a message.",
+  "directory.email.error.messageTooLong":
+    "The message can be at most {max} characters.",
+  "directory.email.send": "Send",
+  "directory.email.close": "Close",
+  "directory.email.confirm.title": "Send the email?",
+  "directory.email.confirm.recipients": {
+    one: "It goes to {count} member.",
+    other: "It goes to {count} members.",
+  },
+  "directory.email.confirm.remaining": {
+    one: "The directory has {count} email left today.",
+    other: "The directory has {count} emails left today.",
+  },
+  "directory.email.confirm.loadingQuota":
+    "Checking how many emails are left today…",
+  "directory.email.confirm.quotaUnknown":
+    "We couldn't check how many emails are left today.",
+  "directory.email.confirm.send": "Send now",
+  "directory.email.confirm.sending": "Sending…",
+  "directory.email.confirm.cancel": "Cancel",
+  "directory.email.result.sent": {
+    one: "{count} email sent.",
+    other: "{count} emails sent.",
+  },
+  "directory.email.result.failed": "It didn't reach:",
+  "directory.email.error.quotaExceeded": {
+    one: "It doesn't fit: the directory can send {count} more email today. Remove members from the list or try again later.",
+    other:
+      "It doesn't fit: the directory can send {count} more emails today. Remove members from the list or try again later.",
+  },
+  "directory.email.error.quotaExceededUnknown":
+    "It doesn't fit in what the directory can still send today. Remove members from the list or try again later.",
+  "directory.email.error.unavailable":
+    "Sending emails isn't available right now. Try again later.",
+  "directory.email.error.duplicate": "This email was already sent.",
+  "directory.email.error.forbidden":
+    "Your role can no longer send emails from the directory.",
+  "directory.email.error.noRecipients":
+    "None of the members in the list can receive it: their account may be deactivated.",
+  "directory.email.error.unexpected": "We couldn't send the email. Try again.",
   "newMember.metaTitle": "Invite member · {club}",
   "newMember.metaDescription":
     "Invite a member to the club and send them an email to activate their account.",
@@ -1240,6 +1301,7 @@ export const englishMessages = {
   // Los dos correos del club (RF-6). Salen en el idioma guardado en la fila
   // del socio, no en el de la visita: se mandan después de responder.
   "email.signature": "{clubName}, underwater rugby club in Melbourne.",
+  "email.directory.signature": "{name}, {role} at {clubName}, wrote to you.",
   "email.recovery.subject": "Reset your {clubName} password",
   "email.recovery.requested":
     "Someone asked to change the password for your {clubName} account.",

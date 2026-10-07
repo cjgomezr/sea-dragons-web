@@ -2408,6 +2408,135 @@ a.auth-brand-header:focus-visible {
   text-decoration: none;
 }
 
+/* "Escribir correo" e "Invitar miembro" (#501): juntos a la derecha del
+   título, y debajo de él en el móvil. */
+.directory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.directory-email-open {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 280px;
+}
+
+.directory-email-open .auth-hint {
+  margin: 0;
+}
+
+/* El formulario del correo del directorio (#501): un panel sobre la lista,
+   con el mismo borde que las tarjetas del directorio. */
+.directory-email {
+  padding: var(--space-4);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.directory-email-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.directory-email-header h2:focus {
+  outline: none;
+}
+
+.directory-email-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.directory-email-form .app-lead {
+  margin: 0;
+}
+
+.directory-email-form textarea {
+  resize: vertical;
+}
+
+.directory-email-recipients {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.directory-email-count {
+  margin: 0;
+  font-weight: 600;
+}
+
+.directory-email-recipients ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  max-height: 240px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.directory-email-recipients li {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  max-width: 100%;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+}
+
+/* Con un nombre largo salta de línea el nombre, nunca el botón. */
+.directory-email-recipients li span {
+  min-width: 0;
+}
+
+/* El chip ya tiene su borde: el botón de dentro no pinta otra caja, y sólo
+   se marca al pasar por encima. */
+.directory-email-recipients li button {
+  flex-shrink: 0;
+  white-space: nowrap;
+  background: transparent;
+  border-color: transparent;
+}
+
+.directory-email-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.directory-email-result,
+.directory-email-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.directory-email-result p,
+.directory-email-confirm p {
+  margin: 0;
+}
+
+.directory-email-result ul {
+  margin: 0;
+  padding-left: var(--space-6);
+}
+
+.directory-email-confirm {
+  margin-bottom: var(--space-4);
+}
+
 .new-member-created {
   display: flex;
   flex-direction: column;

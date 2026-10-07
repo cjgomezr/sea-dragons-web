@@ -4596,6 +4596,203 @@ type DirectoryState = {
   readonly prepare?: (page: Page) => Promise<void>;
 };
 
+/* El correo del directorio (#501): el formulario, el diálogo que confirma,
+   el envío que no cabe y el que falla a medias. Las respuestas del endpoint
+   son de mentira: lo que hace de verdad lo prueban el dominio y la ruta. */
+const DIRECTORY_EMAILS_ENDPOINT = "/api/v1/directory/emails";
+
+type EmailLabels = {
+  readonly open: string;
+  readonly subject: string;
+  readonly message: string;
+  readonly send: string;
+  readonly dialog: string;
+  readonly confirm: string;
+  readonly remaining: RegExp;
+};
+
+const ENGLISH_EMAIL_LABELS: EmailLabels = {
+  open: "Write an email",
+  subject: "Subject",
+  message: "Message",
+  send: "Send",
+  dialog: "Send the email?",
+  confirm: "Send now",
+  remaining: /emails? left today/,
+};
+
+const SPANISH_EMAIL_LABELS: EmailLabels = {
+  open: "Escribir correo",
+  subject: "Asunto",
+  message: "Mensaje",
+  send: "Enviar",
+  dialog: "¿Mandar el correo?",
+  confirm: "Mandar",
+  remaining: /correos? del directorio/,
+};
+
+type EmailAnswer = {
+  /** Lo que responde cada lectura del cupo, en orden; la última se repite. */
+  readonly quota: readonly number[];
+  readonly send: { readonly status: number; readonly body: unknown };
+};
+
+const EMAIL_SENT_TO_ALL: EmailAnswer = {
+  quota: [38],
+  send: {
+    status: 200,
+    body: { data: { sentCount: 3, failed: [], remaining: 35 } },
+  },
+};
+
+const EMAIL_DOES_NOT_FIT: EmailAnswer = {
+  quota: [38, 1],
+  send: {
+    status: 409,
+    body: {
+      error: {
+        code: "conflict",
+        message: "No caben.",
+        reason: "directory_email_quota_exceeded",
+      },
+    },
+  },
+};
+
+const EMAIL_PARTLY_SENT: EmailAnswer = {
+  quota: [38],
+  send: {
+    status: 200,
+    body: {
+      data: {
+        sentCount: 1,
+        failed: [
+          {
+            userId: "33333333-0000-4000-8000-000000000003",
+            fullName: "Nerea Ruiz",
+          },
+          {
+            userId: "44444444-0000-4000-8000-000000000004",
+            fullName: LONG_MEMBER_NAME,
+          },
+        ],
+        remaining: 37,
+      },
+    },
+  },
+};
+
+function stubDirectoryEmails(answer: EmailAnswer) {
+  return async (page: Page): Promise<void> => {
+    const quotas = [...answer.quota];
+    await page.route(
+      (url) => url.pathname === DIRECTORY_EMAILS_ENDPOINT,
+      (route, request) => {
+        if (request.method() === "POST") {
+          return route.fulfill({
+            status: answer.send.status,
+            contentType: "application/json",
+            body: JSON.stringify(answer.send.body),
+          });
+        }
+        const remaining = quotas.length > 1 ? quotas.shift() : quotas[0];
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ data: { limit: 50, remaining } }),
+        });
+      },
+    );
+  };
+}
+
+/** Pone las respuestas del correo y, si toca, el idioma. */
+function beforeEmailVisit(answer: EmailAnswer, isSpanish: boolean) {
+  return async (page: Page): Promise<void> => {
+    await stubDirectoryEmails(answer)(page);
+    if (isSpanish) {
+      await chooseSpanish(page);
+    }
+  };
+}
+
+/** Abre el formulario y escribe un correo de varias líneas. */
+function writeEmail(labels: EmailLabels) {
+  return async (page: Page): Promise<void> => {
+    await page.getByRole("button", { name: labels.open }).click();
+    await page
+      .getByRole("textbox", { name: labels.subject })
+      .fill("Saturday training moves to 8am");
+    await page
+      .getByRole("textbox", { name: labels.message })
+      .fill("Hi all,\n\nThis Saturday we start at 8am sharp.\nBring fins.");
+  };
+}
+
+/** Escribe, pulsa enviar y espera a que el diálogo diga cuántos quedan. */
+function confirmEmail(labels: EmailLabels) {
+  return async (page: Page): Promise<void> => {
+    await writeEmail(labels)(page);
+    await page.getByRole("button", { name: labels.send, exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: labels.dialog });
+    await expect(dialog.getByText(labels.remaining)).toBeVisible();
+  };
+}
+
+/** Confirma el envío y espera lo que diga la pantalla después. */
+function sendEmail(labels: EmailLabels, outcome: RegExp) {
+  return async (page: Page): Promise<void> => {
+    await confirmEmail(labels)(page);
+    await page
+      .getByRole("dialog", { name: labels.dialog })
+      .getByRole("button", { name: labels.confirm, exact: true })
+      .click();
+    await expect(page.getByText(outcome)).toBeVisible();
+    await expect(page.getByRole("dialog", { name: labels.dialog })).toHaveCount(
+      0,
+    );
+  };
+}
+
+function emailStates(spanish: boolean): readonly DirectoryState[] {
+  const suffix = spanish ? "-es" : "";
+  const labels = spanish ? SPANISH_EMAIL_LABELS : ENGLISH_EMAIL_LABELS;
+  const listHeading = spanish
+    ? SPANISH_DIRECTORY_HEADING
+    : ENGLISH_DIRECTORY_HEADING;
+  return [
+    {
+      name: `correo-formulario${suffix}`,
+      asAdmin: true,
+      listHeading,
+      beforeVisit: beforeEmailVisit(EMAIL_SENT_TO_ALL, spanish),
+      prepare: writeEmail(labels),
+    },
+    {
+      name: `correo-confirmacion${suffix}`,
+      asAdmin: true,
+      endsInModal: true,
+      listHeading,
+      beforeVisit: beforeEmailVisit(EMAIL_SENT_TO_ALL, spanish),
+      prepare: confirmEmail(labels),
+    },
+    {
+      name: `correo-no-cabe${suffix}`,
+      asAdmin: true,
+      listHeading,
+      beforeVisit: beforeEmailVisit(EMAIL_DOES_NOT_FIT, spanish),
+      prepare: sendEmail(labels, spanish ? /No caben/ : /It doesn't fit/),
+    },
+    {
+      name: `correo-resultado-parcial${suffix}`,
+      asAdmin: true,
+      listHeading,
+      beforeVisit: beforeEmailVisit(EMAIL_PARTLY_SENT, spanish),
+      prepare: sendEmail(labels, spanish ? /No llegó a/ : /It didn't reach/),
+    },
+  ];
+}
+
 const DIRECTORY_STATES: readonly DirectoryState[] = [
   {
     name: "directorio-con-miembros",
@@ -4810,6 +5007,8 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     beforeVisit: chooseSpanish,
     prepare: filterToNobody(SPANISH_FILTER_LABELS, /Nadie del club coincide/),
   },
+  ...emailStates(false),
+  ...emailStates(true),
 ];
 
 async function goToDirectory(
@@ -4991,14 +5190,15 @@ test.describe("la hoja de filtros del directorio en el móvil", () => {
 /* Los filtros de #497 piden axe en cada ancho y en los dos temas, no sólo en
    el ancho por defecto: la barra y la hoja son controles distintos. El
    contacto de #499 también: la columna de la tabla y la tarjeta del móvil
-   son marcados distintos. */
+   son marcados distintos. Y el correo de #501: el formulario, el diálogo y
+   el resultado se piden en los dos temas. */
 test.describe("los filtros del directorio con axe en cada ancho y tema", () => {
   skipWithoutSession();
   quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE });
 
   const filterStates = DIRECTORY_STATES.filter((state) =>
-    /^directorio-(filtros|filtrado-sin|contacto)/.test(state.name),
+    /^(directorio-(filtros|filtrado-sin|contacto)|correo-)/.test(state.name),
   );
 
   for (const vp of viewports) {

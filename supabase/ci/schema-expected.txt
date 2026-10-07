@@ -44,6 +44,13 @@ columna confirmation_email_requests.club_id tipo=uuid null=NO default=-
 columna confirmation_email_requests.email_hash tipo=text null=NO default=-
 columna confirmation_email_requests.id tipo=uuid null=NO default=gen_random_uuid()
 columna confirmation_email_requests.requested_at tipo=timestamp with time zone null=NO default=now()
+columna directory_email_sends.club_id tipo=uuid null=NO default=-
+columna directory_email_sends.created_at tipo=timestamp with time zone null=NO default=now()
+columna directory_email_sends.id tipo=uuid null=NO default=gen_random_uuid()
+columna directory_email_sends.request_id tipo=uuid null=NO default=-
+columna directory_email_sends.reserved_count tipo=integer null=NO default=-
+columna directory_email_sends.sender_id tipo=uuid null=NO default=-
+columna directory_email_sends.sent_count tipo=integer null=YES default=-
 columna email_send_requests.club_id tipo=uuid null=NO default=-
 columna email_send_requests.id tipo=uuid null=NO default=gen_random_uuid()
 columna email_send_requests.requested_at tipo=timestamp with time zone null=NO default=now()
@@ -254,6 +261,7 @@ funcion club_position_name_taken(acting_club_id uuid, own_position_id uuid, name
 funcion clubs_seed_default_evaluation_categories()
 funcion clubs_seed_default_positions()
 funcion clubs_seed_default_session_pack_options()
+funcion count_directory_emails_since(window_start timestamp with time zone)
 funcion create_club_position(acting_club_id uuid, name_en text, name_es text)
 funcion create_evaluation_category(acting_club_id uuid, category_name text)
 funcion create_events(acting_club_id uuid, acting_user_id uuid, schedule jsonb)
@@ -284,6 +292,7 @@ funcion rename_evaluation_category(acting_club_id uuid, target_category_id uuid,
 funcion reorder_club_positions(acting_club_id uuid, ordered_ids uuid[])
 funcion reorder_evaluation_categories(acting_club_id uuid, ordered_ids uuid[])
 funcion replace_club_session_pack_options(acting_club_id uuid, pack_sessions integer[])
+funcion reserve_directory_email_quota(target_club_id uuid, sender_user_id uuid, send_request_id uuid, recipient_count integer, quota_limit integer, window_start timestamp with time zone)
 funcion save_attendance_sheet(acting_club_id uuid, acting_user_id uuid, target_event_id uuid, records jsonb)
 funcion save_member_evaluation_ratings(acting_club_id uuid, target_user_id uuid, expected_updated_at timestamp with time zone, ratings jsonb)
 funcion save_team_split(acting_club_id uuid, acting_user_id uuid, target_event_id uuid, split jsonb)
@@ -420,6 +429,15 @@ grant confirmation_email_requests service_role SELECT
 grant confirmation_email_requests service_role TRIGGER
 grant confirmation_email_requests service_role TRUNCATE
 grant confirmation_email_requests service_role UPDATE
+grant directory_email_sends postgres DELETE
+grant directory_email_sends postgres INSERT
+grant directory_email_sends postgres REFERENCES
+grant directory_email_sends postgres SELECT
+grant directory_email_sends postgres TRIGGER
+grant directory_email_sends postgres TRUNCATE
+grant directory_email_sends postgres UPDATE
+grant directory_email_sends service_role INSERT
+grant directory_email_sends service_role SELECT
 grant email_send_requests postgres DELETE
 grant email_send_requests postgres INSERT
 grant email_send_requests postgres REFERENCES
@@ -792,6 +810,7 @@ grant-columna clubs.accent_color anon SELECT
 grant-columna clubs.initials anon SELECT
 grant-columna clubs.logo_path anon SELECT
 grant-columna clubs.name anon SELECT
+grant-columna directory_email_sends.sent_count service_role UPDATE
 indice attendance_records_pkey CREATE UNIQUE INDEX attendance_records_pkey ON public.attendance_records USING btree (event_id, user_id)
 indice attendance_records_recorded_by_club_id_idx CREATE INDEX attendance_records_recorded_by_club_id_idx ON public.attendance_records USING btree (recorded_by, club_id)
 indice attendance_records_user_id_club_id_idx CREATE INDEX attendance_records_user_id_club_id_idx ON public.attendance_records USING btree (user_id, club_id)
@@ -810,6 +829,9 @@ indice clubs_pkey CREATE UNIQUE INDEX clubs_pkey ON public.clubs USING btree (id
 indice clubs_slug_key CREATE UNIQUE INDEX clubs_slug_key ON public.clubs USING btree (slug)
 indice confirmation_email_requests_email_hash_requested_at_idx CREATE INDEX confirmation_email_requests_email_hash_requested_at_idx ON public.confirmation_email_requests USING btree (email_hash, requested_at DESC)
 indice confirmation_email_requests_pkey CREATE UNIQUE INDEX confirmation_email_requests_pkey ON public.confirmation_email_requests USING btree (id)
+indice directory_email_sends_created_at_idx CREATE INDEX directory_email_sends_created_at_idx ON public.directory_email_sends USING btree (created_at DESC)
+indice directory_email_sends_pkey CREATE UNIQUE INDEX directory_email_sends_pkey ON public.directory_email_sends USING btree (id)
+indice directory_email_sends_request_id_key CREATE UNIQUE INDEX directory_email_sends_request_id_key ON public.directory_email_sends USING btree (request_id)
 indice email_send_requests_pkey CREATE UNIQUE INDEX email_send_requests_pkey ON public.email_send_requests USING btree (id)
 indice email_send_requests_requested_at_idx CREATE INDEX email_send_requests_requested_at_idx ON public.email_send_requests USING btree (requested_at DESC)
 indice evaluation_categories_club_id_name_key CREATE UNIQUE INDEX evaluation_categories_club_id_name_key ON public.evaluation_categories USING btree (club_id, lower(btrim(name)))
@@ -905,6 +927,7 @@ policy club_sign_in_texts.club_sign_in_texts_select_public cmd=SELECT roles={ano
 policy clubs.clubs_select_anon cmd=SELECT roles={anon} using=true check=-
 policy clubs.clubs_select_authenticated cmd=SELECT roles={authenticated} using=true check=-
 policy confirmation_email_requests.confirmation_email_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
+policy directory_email_sends.directory_email_sends_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy email_send_requests.email_send_requests_select_denied cmd=SELECT roles={authenticated} using=false check=-
 policy event_groups.event_groups_select_own_groups cmd=SELECT roles={authenticated} using=(EXISTS ( SELECT 1
    FROM group_memberships gm
@@ -989,6 +1012,11 @@ restriccion clubs.clubs_pkey PRIMARY KEY (id)
 restriccion clubs.clubs_slug_key UNIQUE (slug)
 restriccion confirmation_email_requests.confirmation_email_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion confirmation_email_requests.confirmation_email_requests_pkey PRIMARY KEY (id)
+restriccion directory_email_sends.directory_email_sends_check CHECK (((sent_count >= 0) AND (sent_count <= reserved_count)))
+restriccion directory_email_sends.directory_email_sends_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion directory_email_sends.directory_email_sends_pkey PRIMARY KEY (id)
+restriccion directory_email_sends.directory_email_sends_request_id_key UNIQUE (request_id)
+restriccion directory_email_sends.directory_email_sends_reserved_count_check CHECK ((reserved_count > 0))
 restriccion email_send_requests.email_send_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion email_send_requests.email_send_requests_pkey PRIMARY KEY (id)
 restriccion evaluation_categories.evaluation_categories_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
@@ -1166,6 +1194,7 @@ tabla club_session_pack_options rls=t
 tabla club_sign_in_texts rls=t
 tabla clubs rls=t
 tabla confirmation_email_requests rls=t
+tabla directory_email_sends rls=t
 tabla email_send_requests rls=t
 tabla evaluation_categories rls=t
 tabla event_groups rls=t

@@ -17,6 +17,10 @@ import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import { AdministrationNotice } from "./AdministrationNotice";
 import {
+  DirectoryEmailComposer,
+  type EmailRecipient,
+} from "./DirectoryEmailComposer";
+import {
   type DirectoryFailure,
   describeDirectoryFailure,
   loadDirectory,
@@ -56,6 +60,8 @@ import { useMemberRoleChange } from "./use-member-role-change";
  * menos, escribir un nombre dispara una petición por letra; con más, la lista
  * se queda atrás de quien escribe. */
 const SEARCH_DEBOUNCE_MS = 250;
+
+const EMAIL_EMPTY_REASON_ID = "correo-directorio-sin-socios";
 
 type ScreenState =
   | { readonly kind: "loading" }
@@ -144,6 +150,54 @@ function EmptyDirectory({
   );
 }
 
+/** Escriben correos quienes reciben la lista con el correo de todos (D5, D7):
+ * la marca la pone el servidor, y el servidor vuelve a mirar el rol al
+ * enviar. */
+function canWriteEmails(listing: DirectoryListing): boolean {
+  return listing.kind === "admin" || listing.kind === "committee";
+}
+
+/** La lista que se está viendo, sin las bajas: no van a recibirlo. El
+ * servidor las vuelve a quitar al enviar, por si alguien se dio de baja
+ * entre medias. */
+function emailRecipientsOf(
+  listing: DirectoryListing,
+): readonly EmailRecipient[] {
+  return listing.members
+    .filter((member) => member.status !== "inactive")
+    .map(({ userId, fullName }) => ({ userId, fullName }));
+}
+
+function WriteEmailButton({
+  translate,
+  recipients,
+  onOpen,
+}: {
+  translate: Translator;
+  recipients: readonly EmailRecipient[];
+  onOpen: (recipients: readonly EmailRecipient[]) => void;
+}): React.JSX.Element {
+  const isEmpty = recipients.length === 0;
+  return (
+    <div className="directory-email-open">
+      <button
+        type="button"
+        className="admin-secondary"
+        disabled={isEmpty}
+        aria-describedby={isEmpty ? EMAIL_EMPTY_REASON_ID : undefined}
+        onClick={() => onOpen(recipients)}
+      >
+        {translate("directory.email.open")}
+      </button>
+      {isEmpty ? (
+        <p className="auth-hint" id={EMAIL_EMPTY_REASON_ID}>
+          {translate("directory.email.emptyReason")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function DirectoryScreen({
   locale,
   initialQuery = DEFAULT_DIRECTORY_QUERY,
@@ -165,6 +219,11 @@ export function DirectoryScreen({
   // Volver a intentarlo cuenta como una lectura más, aunque la consulta sea la
   // misma de antes: así el pedido vive sólo en el efecto.
   const [reloads, setReloads] = useState(0);
+  // A quién va el correo que se está escribiendo (#501), o `null` sin
+  // formulario abierto.
+  const [emailRecipients, setEmailRecipients] = useState<
+    readonly EmailRecipient[] | null
+  >(null);
 
   const settledSearch = useDebouncedValue(filters.search, SEARCH_DEBOUNCE_MS);
   const query = useMemo<DirectoryQuery>(
@@ -283,13 +342,29 @@ export function DirectoryScreen({
           <h1>{translate("directory.title")}</h1>
           <p className="app-lead">{translate("directory.lead")}</p>
         </div>
-        {/* Sólo quien recibe la lista de Admin puede dar de alta (#243). */}
-        {state.kind === "ready" && state.listing.kind === "admin" ? (
-          <Link href={NEW_MEMBER_PATH} className="auth-submit directory-add">
-            {translate("directory.addMember")}
-          </Link>
-        ) : null}
+        <div className="directory-actions">
+          {state.kind === "ready" && canWriteEmails(state.listing) ? (
+            <WriteEmailButton
+              translate={translate}
+              recipients={emailRecipientsOf(state.listing)}
+              onOpen={setEmailRecipients}
+            />
+          ) : null}
+          {/* Sólo quien recibe la lista de Admin puede dar de alta (#243). */}
+          {state.kind === "ready" && state.listing.kind === "admin" ? (
+            <Link href={NEW_MEMBER_PATH} className="auth-submit directory-add">
+              {translate("directory.addMember")}
+            </Link>
+          ) : null}
+        </div>
       </header>
+      {emailRecipients === null ? null : (
+        <DirectoryEmailComposer
+          locale={locale}
+          recipients={emailRecipients}
+          onClose={() => setEmailRecipients(null)}
+        />
+      )}
       {state.kind === "loading" ? (
         <p className="admin-empty">{translate("directory.loading")}</p>
       ) : null}
