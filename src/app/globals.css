@@ -2497,6 +2497,16 @@ a.auth-brand-header:focus-visible {
   overflow-wrap: anywhere;
 }
 
+/* Con un nombre largo salta de línea el nombre, nunca el botón. */
+.directory-email-recipients li span {
+  min-width: 0;
+}
+
+.directory-email-recipients li button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .directory-email-actions {
   display: flex;
   justify-content: flex-end;
