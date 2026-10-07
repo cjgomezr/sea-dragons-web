@@ -8,6 +8,7 @@ import {
   type UnwaivedStatus,
   resolveMembership,
 } from "@/lib/membership/membership";
+import { LEVY_KIND } from "@/lib/membership/levies";
 import { SESSION_PACK_METADATA_KIND } from "@/lib/membership/session-pack-checkout";
 
 /**
@@ -108,6 +109,16 @@ export type SessionPackPaidFacts = FactsOf<
   { readonly sessions: number; readonly payment: SessionPackPayment }
 >;
 
+/** El pago de un levy (#473): un cobro suelto como el de un pack, con el
+ * producto de Stripe que dice qué levy pagó el socio. */
+export type LevyPayment = SessionPackPayment & { readonly productId: string };
+
+/** Un levy pagado (#473, RF-6 del PRD de E13, D4). No toca la membresía. */
+export type LevyPaidFacts = FactsOf<
+  "levyPaid",
+  { readonly payment: LevyPayment }
+>;
+
 export type StripeEventFacts =
   | { readonly kind: "ignored" }
   | CheckoutCompletedFacts
@@ -116,7 +127,8 @@ export type StripeEventFacts =
   | FactsOf<"subscriptionDeleted", Record<never, never>>
   | FactsOf<"invoiceSettled", { readonly payment: StripePayment }>
   | RenewalUpcomingFacts
-  | SessionPackPaidFacts;
+  | SessionPackPaidFacts
+  | LevyPaidFacts;
 
 /** Lo que el plan sabe escribir sin preguntarle nada más a Stripe. */
 export type PlannableStripeEventFacts = Exclude<
@@ -125,6 +137,7 @@ export type PlannableStripeEventFacts = Exclude<
   | CheckoutCompletedFacts
   | RenewalUpcomingFacts
   | SessionPackPaidFacts
+  | LevyPaidFacts
 >;
 
 /** La membresía tal como la ve el webhook: la fila y el `created` del último
@@ -281,6 +294,56 @@ function readSessionPackFacts(
   };
 }
 
+/** Sólo un levy ya cobrado se apunta. El producto y el nombre los pone la
+ * compra en los metadatos: el nombre es la descripción del historial. */
+function readLevyFacts(
+  session: Stripe.Checkout.Session,
+  created: Date,
+): StripeEventFacts {
+  const { metadata } = session;
+  const productId = metadata?.levy_product_id;
+  const name = metadata?.levy_name;
+  const paymentIntentId = optionalIdOf(session.payment_intent);
+  if (
+    session.payment_status !== "paid" ||
+    !productId ||
+    !name ||
+    paymentIntentId === null ||
+    session.amount_total === null ||
+    session.currency === null
+  ) {
+    return { kind: "ignored" };
+  }
+  return {
+    kind: "levyPaid",
+    created,
+    lookup: {
+      userId: readMetadataUserId(metadata) ?? readCheckoutUserId(session),
+      customerId: null,
+      subscriptionId: null,
+    },
+    payment: {
+      paymentIntentId,
+      productId,
+      amountCents: session.amount_total,
+      currency: session.currency,
+      description: name,
+      paidAt: created,
+    },
+  };
+}
+
+/** Un Checkout en modo `payment` es un pack o un levy, según los metadatos
+ * que puso la compra. */
+function readPaymentFacts(
+  session: Stripe.Checkout.Session,
+  created: Date,
+): StripeEventFacts {
+  return session.metadata?.kind === LEVY_KIND
+    ? readLevyFacts(session, created)
+    : readSessionPackFacts(session, created);
+}
+
 function readCheckoutFacts(
   session: Stripe.Checkout.Session,
   created: Date,
@@ -289,7 +352,7 @@ function readCheckoutFacts(
     return readCardSetupFacts(session, created);
   }
   if (session.mode === "payment") {
-    return readSessionPackFacts(session, created);
+    return readPaymentFacts(session, created);
   }
   const customerId = optionalIdOf(session.customer);
   const subscriptionId = optionalIdOf(session.subscription);

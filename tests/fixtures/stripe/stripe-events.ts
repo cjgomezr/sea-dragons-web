@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import checkoutSessionCompleted from "./checkout-session-completed.json";
+import checkoutSessionLevyCompleted from "./checkout-session-levy-completed.json";
 import checkoutSessionPackCompleted from "./checkout-session-pack-completed.json";
 import customerSubscriptionDeleted from "./customer-subscription-deleted.json";
 import customerSubscriptionUpdated from "./customer-subscription-updated.json";
@@ -26,10 +27,16 @@ export const FIXTURE_PRICES = {
 export const FIXTURE_PAYMENT_INTENT_ID = "pi_TestSeadragonsPack";
 export const FIXTURE_PACK_SESSIONS = 5;
 
+/** El levy del Checkout en modo `payment` de #473. */
+export const FIXTURE_LEVY_PAYMENT_INTENT_ID = "pi_TestSeadragonsLevy";
+export const FIXTURE_LEVY_PRODUCT_ID = "prod_TestNationals";
+export const FIXTURE_LEVY_NAME = "Nationals 2026";
+
 /** Las claves nombran el ejemplo; el tipo del evento va dentro de cada uno. */
 const FIXTURES = {
   "checkout.session.completed": checkoutSessionCompleted,
   "checkout.session.completed (pack)": checkoutSessionPackCompleted,
+  "checkout.session.completed (levy)": checkoutSessionLevyCompleted,
   "customer.subscription.updated": customerSubscriptionUpdated,
   "customer.subscription.deleted": customerSubscriptionDeleted,
   "invoice.paid": invoicePaid,

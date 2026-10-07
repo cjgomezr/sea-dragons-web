@@ -114,6 +114,11 @@ export const AUDIT_ACTIONS = [
   // lleva el asunto, a cuántos se pidió y cuántos salieron
   // (`{ subject, recipientCount, sentCount }`). Ni el cuerpo ni a quiénes.
   "directory.email_sent",
+  // RF-5 de E19 (#500): un Admin o un Committee exporta a CSV la lista del
+  // directorio. La entidad es el club, y la metadata lleva los filtros tal
+  // como viajan en la dirección y cuántos socios salieron
+  // (`{ filters, memberCount }`). Ni quiénes ni sus datos.
+  "directory.exported",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

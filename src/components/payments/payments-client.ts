@@ -7,6 +7,8 @@ import {
 } from "@/lib/api/request-api";
 import {
   CLUB_SESSION_PACKS_API_PATH,
+  LEVIES_API_PATH,
+  LEVY_CHECKOUT_API_PATH,
   MEMBERSHIP_API_PATH,
   MEMBERSHIP_CARD_API_PATH,
   MEMBERSHIP_CHECKOUT_API_PATH,
@@ -25,6 +27,7 @@ import {
   type MembershipView,
   PAYMENT_STATUSES,
 } from "@/lib/membership/membership-view";
+import type { Levy } from "@/lib/membership/levies";
 import type { ClubPrice } from "@/lib/membership/stripe-prices";
 
 /**
@@ -222,6 +225,44 @@ export async function loadSessionPackOffers(): Promise<SessionPackOffersLoad> {
   return read.kind === "failed"
     ? read
     : { kind: "loaded", packs: read.value.data.packs };
+}
+
+const leviesResponseSchema = z.object({
+  data: z.object({
+    levies: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        description: z.string().nullable(),
+        amountCents: z.number().int(),
+        isPaid: z.boolean(),
+      }),
+    ),
+  }),
+});
+
+export type LeviesLoad =
+  | { readonly kind: "loaded"; readonly levies: readonly Levy[] }
+  | PaymentsFailure;
+
+/** Los levies que el comité creó en Stripe, con los que ya pagó (#473). */
+export async function loadLevies(): Promise<LeviesLoad> {
+  const read = readApiPayload(
+    await requestApi(LEVIES_API_PATH),
+    leviesResponseSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "loaded", levies: read.value.data.levies };
+}
+
+/** Abre Checkout para pagar el levy del precio `priceId` (#473). */
+export function requestLevyCheckout(
+  priceId: string,
+): Promise<StripeSessionOutcome> {
+  return requestStripeSession(
+    LEVY_CHECKOUT_API_PATH.replace("[priceId]", encodeURIComponent(priceId)),
+  );
 }
 
 /** Lo que respondió el cambio de plan (#456): programado, que Pagos vuelve

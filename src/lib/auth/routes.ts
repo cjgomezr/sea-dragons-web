@@ -165,6 +165,12 @@ export const DIRECTORY_MEMBER_PHOTO_API_PATH = `${DIRECTORY_API_PATH}/[id]/photo
  * responde 403 con motivo. */
 export const DIRECTORY_EMAILS_API_PATH = `${DIRECTORY_API_PATH}/emails`;
 
+/** La exportación a CSV del directorio (#500, RF-5 del PRD de E19): la
+ * misma consulta que `DIRECTORY_API_PATH`. Es de Admin y Committee, y tampoco
+ * está en `RESTRICTED_ROUTES`: lo decide el dominio leyendo el rol de quien
+ * llama, y responde 403 con motivo. */
+export const DIRECTORY_EXPORT_API_PATH = `${DIRECTORY_API_PATH}/export`;
+
 /** Los grupos de quien llama (#229, RF-8 del PRD de E4). Va fuera de
  * `/api/v1/groups`, que es de quien gestiona grupos, porque lo alcanza
  * cualquier cuenta activa: por eso no aparece en `RESTRICTED_ROUTES`. Una
@@ -577,6 +583,14 @@ export const MEMBERSHIP_PRICES_API_PATH = `${MEMBERSHIP_API_PATH}/prices`;
  * E13). Cuelga de la membresía, así que también lo alcanza quien no está al
  * día: es como se pone al día un Casual. */
 export const MEMBERSHIP_SESSION_PACK_CHECKOUT_API_PATH = `${MEMBERSHIP_API_PATH}/session-packs/checkout`;
+
+/** Los levies que el comité crea en Stripe (#473, RF-6 del PRD de E13). D4:
+ * los ve y los paga cualquier cuenta activa, al día o no, así que no
+ * aparecen en `MEMBER_ONLY_ROUTES`. */
+export const LEVIES_API_PATH = "/api/v1/levies";
+
+/** Abrir Stripe Checkout para pagar un levy, por el id de su `Price`. */
+export const LEVY_CHECKOUT_API_PATH = `${LEVIES_API_PATH}/[priceId]/checkout`;
 
 /**
  * Los únicos endpoints de la API que no exigen sesión.

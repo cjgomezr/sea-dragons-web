@@ -3,6 +3,8 @@ import type { MembershipCard } from "@/lib/membership/membership";
 import type { RenewalNoticeSender } from "./renewal-notice";
 import {
   type CardSetupCompletedFacts,
+  type LevyPaidFacts,
+  type LevyPayment,
   type MembershipLookup,
   type PlannableStripeEventFacts,
   type RenewalUpcomingFacts,
@@ -48,6 +50,12 @@ export type StripeWebhookGateway = {
   applySessionPackPayment(
     input: SessionPackPaymentToApply,
   ): Promise<"applied" | "duplicate">;
+  /** Todo o nada, como `applyEvent`: el id del evento y el pago del levy,
+   * con su producto. La membresía no cambia (D4). */
+  applyLevyPayment(input: LevyPaymentToApply): Promise<"applied" | "duplicate">;
+  /** El club de la ficha del socio. Un levy no exige membresía (D4), así
+   * que su dueño sale de aquí y no de `findMembership`. */
+  findMemberClubId(userId: string): Promise<string | null>;
 };
 
 /** Un pack pagado (#471): el pago y las sesiones que suma al libro. */
@@ -57,6 +65,11 @@ export type SessionPackPaymentToApply = Pick<
 > & {
   readonly sessions: number;
   readonly payment: SessionPackPayment;
+};
+
+/** Un levy pagado (#473): el pago con el producto de Stripe. */
+export type LevyPaymentToApply = Pick<StripeEventToApply, "event" | "owner"> & {
+  readonly payment: LevyPayment;
 };
 
 /** La tarjeta que guardó un SetupIntent, con el id de su método de pago. */
@@ -139,7 +152,10 @@ async function resolveCard(
 async function toPlannableFacts(
   facts: Exclude<
     StripeEventFacts,
-    { kind: "ignored" } | RenewalUpcomingFacts | SessionPackPaidFacts
+    | { kind: "ignored" }
+    | RenewalUpcomingFacts
+    | SessionPackPaidFacts
+    | LevyPaidFacts
   >,
   stripe: StripeApi,
 ): Promise<PlannableStripeEventFacts> {
@@ -161,6 +177,10 @@ export async function handleStripeEvent(
   const facts = readStripeEventFacts(event);
   if (facts.kind === "ignored") {
     return "ignored";
+  }
+
+  if (facts.kind === "levyPaid") {
+    return handleLevyPayment({ event, facts }, dependencies);
   }
 
   const { gateway, log } = dependencies;
@@ -202,6 +222,30 @@ export async function handleStripeEvent(
     event: { id: event.id, type: event.type, created: facts.created },
     owner: { userId, clubId },
     writes,
+  });
+}
+
+/** Quien paga un levy puede no tener membresía todavía (D4): basta con que
+ * sea socio del club. */
+async function handleLevyPayment(
+  input: { readonly event: Stripe.Event; readonly facts: LevyPaidFacts },
+  dependencies: StripeWebhookDependencies,
+): Promise<StripeWebhookOutcome> {
+  const { event, facts } = input;
+  const { gateway, log } = dependencies;
+  const { userId } = facts.lookup;
+  const clubId =
+    userId === null ? null : await gateway.findMemberClubId(userId);
+  if (userId === null || clubId === null) {
+    log(
+      `${LOG_PREFIX} ${event.id} (${event.type}) no es de ningún socio conocido: ${describeLookup(facts.lookup)}`,
+    );
+    return "unknown_member";
+  }
+  return gateway.applyLevyPayment({
+    event: { id: event.id, type: event.type, created: facts.created },
+    owner: { userId, clubId },
+    payment: facts.payment,
   });
 }
 

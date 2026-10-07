@@ -718,6 +718,27 @@ export const spanishMessages: MessageCatalog = {
   // La invitación de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta
   // desde la cabecera del directorio.
   "directory.addMember": "Invitar miembro",
+  // La exportación a CSV del directorio (#500, RF-5 del PRD de E19).
+  "directory.export.open": "Exportar CSV",
+  "directory.export.emptyReason": "No hay miembros en la lista que exportar.",
+  "directory.export.error": "No se pudo exportar la lista. Inténtalo de nuevo.",
+  "directory.export.fileName": "directorio",
+  "directory.export.column.name": "Nombre",
+  "directory.export.column.aufNumber": "Número de AUF",
+  "directory.export.column.aufExpiry": "Vencimiento del AUF",
+  "directory.export.column.aufVerified": "AUF verificado",
+  "directory.export.column.accountStatus": "Estado de la cuenta",
+  "directory.export.column.membership": "Membresía",
+  "directory.export.column.evaluated": "Evaluado",
+  "directory.export.column.attendance": "Asistencia (%)",
+  "directory.export.column.emergencyName": "Contacto de emergencia",
+  "directory.export.column.emergencyPhone": "Teléfono de emergencia",
+  "directory.export.column.emergencyRelationship": "Relación del contacto",
+  "directory.export.status.incomplete": "Pendiente de activar",
+  "directory.export.status.active": "Activa",
+  "directory.export.status.inactive": "Desactivada",
+  "directory.export.yes": "Sí",
+  "directory.export.no": "No",
   "directory.email.open": "Escribir correo",
   "directory.email.emptyReason":
     "No hay miembros en la lista a quien escribir.",
@@ -1041,6 +1062,14 @@ export const spanishMessages: MessageCatalog = {
     "Pack pagado. Tus sesiones se suman en cuanto Stripe confirma el pago.",
   "payments.packs.cancelled":
     "Saliste de Stripe sin comprar un pack. Puedes intentarlo otra vez cuando quieras.",
+  // Los levies que el comité crea en Stripe (#473, RF-6 del PRD de E13).
+  "payments.levies.title": "Cobros del club",
+  "payments.levies.lead":
+    "Cobros sueltos que abre el comité, como la inscripción a un torneo. Pagarlos no cambia tu membresía.",
+  "payments.levies.loadFailed":
+    "No pudimos cargar los cobros del club. Recarga la página para intentarlo otra vez.",
+  "payments.levies.pay": "Pagar",
+  "payments.levies.paid": "Pagado",
   "payments.trialing": "En prueba hasta el día {date}",
   "payments.error.unavailable":
     "No pudimos abrir Stripe. Vuelve a intentarlo en un momento.",

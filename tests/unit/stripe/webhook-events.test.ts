@@ -19,6 +19,9 @@ import {
 } from "@/lib/stripe/webhook-events";
 import {
   FIXTURE_CUSTOMER_ID,
+  FIXTURE_LEVY_NAME,
+  FIXTURE_LEVY_PAYMENT_INTENT_ID,
+  FIXTURE_LEVY_PRODUCT_ID,
   FIXTURE_PACK_SESSIONS,
   FIXTURE_PAYMENT_INTENT_ID,
   FIXTURE_PRICES,
@@ -77,7 +80,8 @@ function plannableFacts(facts: StripeEventFacts): PlannableStripeEventFacts {
     facts.kind === "ignored" ||
     facts.kind === "checkoutCompleted" ||
     facts.kind === "renewalUpcoming" ||
-    facts.kind === "sessionPackPaid"
+    facts.kind === "sessionPackPaid" ||
+    facts.kind === "levyPaid"
   ) {
     throw new Error("El evento de ejemplo debería planificarse tal cual.");
   }
@@ -885,6 +889,74 @@ describe("checkout.session.completed de un pack de sesiones", () => {
         object: { status: "expired", payment_status: "unpaid" },
       }),
     );
+
+    expect(facts).toEqual({ kind: "ignored" });
+  });
+});
+
+// #473: un levy es otro Checkout en modo `payment`. Trae el producto de
+// Stripe y su nombre en los metadatos, que es lo que el historial enseña.
+describe("checkout.session.completed de un levy", () => {
+  function levyCheckout(
+    object: Record<string, unknown> = {},
+  ): ReturnType<typeof stripeEvent> {
+    return stripeEvent("checkout.session.completed (levy)", { object });
+  }
+
+  it("lee el pago del levy con su producto y su nombre", () => {
+    const event = levyCheckout();
+
+    const facts = readStripeEventFacts(event);
+
+    expect(facts).toEqual({
+      kind: "levyPaid",
+      created: secondsToDate(event.created),
+      lookup: {
+        userId: FIXTURE_USER_ID,
+        customerId: null,
+        subscriptionId: null,
+      },
+      payment: {
+        paymentIntentId: FIXTURE_LEVY_PAYMENT_INTENT_ID,
+        productId: FIXTURE_LEVY_PRODUCT_ID,
+        amountCents: 8000,
+        currency: "aud",
+        description: FIXTURE_LEVY_NAME,
+        paidAt: secondsToDate(event.created),
+      },
+    });
+  });
+
+  it.each(["unpaid", "no_payment_required"])(
+    "ignora un levy con el pago %s",
+    (paymentStatus) => {
+      const facts = readStripeEventFacts(
+        levyCheckout({ payment_status: paymentStatus }),
+      );
+
+      expect(facts).toEqual({ kind: "ignored" });
+    },
+  );
+
+  it.each(["levy_product_id", "levy_name"])(
+    "ignora un levy sin %s en los metadatos",
+    (missingKey) => {
+      const metadata: Record<string, string> = {
+        user_id: FIXTURE_USER_ID,
+        kind: "levy",
+        levy_product_id: FIXTURE_LEVY_PRODUCT_ID,
+        levy_name: FIXTURE_LEVY_NAME,
+      };
+      delete metadata[missingKey];
+
+      const facts = readStripeEventFacts(levyCheckout({ metadata }));
+
+      expect(facts).toEqual({ kind: "ignored" });
+    },
+  );
+
+  it("ignora un levy sin PaymentIntent", () => {
+    const facts = readStripeEventFacts(levyCheckout({ payment_intent: null }));
 
     expect(facts).toEqual({ kind: "ignored" });
   });
