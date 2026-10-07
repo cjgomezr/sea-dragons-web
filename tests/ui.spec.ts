@@ -12286,10 +12286,51 @@ const FROZEN_BALANCE_MEMBERSHIP_VIEW = membershipView(
 
 const BUY_PACK_BUTTON_NAME = /^(Buy|Comprar) 5 (sessions|sesiones)/;
 
+/** Los levies fingidos de Pagos (#473): uno con nombre largo, para ver cómo
+ * parte en 375px, y otro corto. Siempre fingidos: los de dev salen de la
+ * cuenta de prueba de Stripe y cambiarían la captura. */
+const LEVIES_ENDPOINT = "/api/v1/levies";
+
+const NATIONALS_LEVY = {
+  id: "price_levy_nationals",
+  name: "Australian Underwater Rugby Nationals 2026 entry",
+  description: "Team entry for the national championship in Perth.",
+  amountCents: 8000,
+  isPaid: false,
+} as const;
+
+const POOL_HIRE_LEVY = {
+  id: "price_levy_pool",
+  name: "Extra pool hire",
+  description: null,
+  amountCents: 1250,
+  isPaid: false,
+} as const;
+
+const UNPAID_LEVIES: readonly object[] = [NATIONALS_LEVY, POOL_HIRE_LEVY];
+const ONE_PAID_LEVY: readonly object[] = [
+  { ...NATIONALS_LEVY, isPaid: true },
+  POOL_HIRE_LEVY,
+];
+
+const LEVIES_HEADING = /^(Club charges|Cobros del club)$/;
+
+async function stubLevies(
+  page: Page,
+  levies: readonly object[],
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === LEVIES_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ levies })),
+  );
+}
+
 type PaymentsScreenState = {
   readonly name: string;
   /** Lo que sirve el endpoint fingido; sin él, la membresía sembrada. */
   readonly view?: object;
+  /** Los levies que sirve su endpoint fingido; sin ellos, ninguno. */
+  readonly levies?: readonly object[];
   readonly storageState: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
 };
@@ -12297,11 +12338,18 @@ type PaymentsScreenState = {
 function paymentsStates(
   name: string,
   view: object,
+  levies?: readonly object[],
 ): readonly PaymentsScreenState[] {
   const storageState = E2E_STORAGE_STATE_PATH;
   return [
-    { name, view, storageState },
-    { name: `${name}-es`, view, storageState, beforeVisit: chooseSpanish },
+    { name, view, levies, storageState },
+    {
+      name: `${name}-es`,
+      view,
+      levies,
+      storageState,
+      beforeVisit: chooseSpanish,
+    },
   ];
 }
 
@@ -12332,6 +12380,8 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
     CASUAL_NO_BALANCE_MEMBERSHIP_VIEW,
   ),
   ...paymentsStates("pagos-full-congelado", FROZEN_BALANCE_MEMBERSHIP_VIEW),
+  ...paymentsStates("pagos-levies", ACTIVE_MEMBERSHIP_VIEW, UNPAID_LEVIES),
+  ...paymentsStates("pagos-levy-pagado", ACTIVE_MEMBERSHIP_VIEW, ONE_PAID_LEVY),
   // La alerta de pago fallido (#474) la pinta la cáscara con el socio
   // sembrado en `past_due`; el panel de Pagos sigue fingido.
   {
@@ -12367,9 +12417,11 @@ async function serveMembership(page: Page, view: object): Promise<void> {
 
 async function goToPayments(
   page: Page,
-  state: Pick<PaymentsScreenState, "view" | "beforeVisit">,
+  state: Pick<PaymentsScreenState, "view" | "levies" | "beforeVisit">,
   theme?: (typeof themes)[number],
 ): Promise<void> {
+  const levies = state.levies ?? [];
+  await stubLevies(page, levies);
   if (state.view !== undefined) {
     await serveMembership(page, state.view);
     // Un Casual ve los packs del club (#471): fingidos, para que la captura
@@ -12393,6 +12445,11 @@ async function goToPayments(
   if (isCasualView(state.view)) {
     await expect(
       page.getByRole("button", { name: BUY_PACK_BUTTON_NAME }),
+    ).toBeVisible();
+  }
+  if (levies.length > 0) {
+    await expect(
+      page.getByRole("heading", { level: 2, name: LEVIES_HEADING }),
     ).toBeVisible();
   }
 }

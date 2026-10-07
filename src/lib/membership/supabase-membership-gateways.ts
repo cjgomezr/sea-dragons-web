@@ -16,6 +16,7 @@ import {
 import type { StripeWebhookGateway } from "@/lib/stripe/stripe-webhook";
 import type { MemberEmailGateway } from "./checkout";
 import type { PlanChoiceGateway } from "./choose-plan";
+import type { LevyGateways } from "./levies";
 import type { ScheduledPlanChangeGateway } from "./plan-change";
 import type {
   SessionLedgerGateway,
@@ -28,6 +29,7 @@ import {
   type PaymentHistoryGateway,
 } from "./membership-view";
 import type {
+  LevyPayment,
   MembershipChanges,
   MembershipLookup,
   SessionPackPayment,
@@ -254,6 +256,7 @@ export function createMembershipGateway(
 }
 
 const PAYMENTS_TABLE = "payments";
+const MEMBERS_TABLE = "members";
 const PAYMENT_COLUMNS =
   "id, amount_cents, description, status, paid_at, created_at";
 
@@ -294,6 +297,32 @@ export function createPaymentHistoryGateway(
           paidAt: toDate(row.paid_at),
           createdAt: new Date(row.created_at),
         }));
+    },
+  };
+}
+
+const paidProductRowSchema = z.object({ stripe_product_id: z.string() });
+
+/** Los productos de Stripe que un socio ya pagó (#473): qué levies le salen
+ * como pagados. Un pago fallido o pendiente no cuenta. */
+export function createPaidProductsGateway(
+  client: SupabaseClient,
+): LevyGateways["paidProducts"] {
+  return {
+    async findPaidProductIds(userId) {
+      const { data, error } = await client
+        .from(PAYMENTS_TABLE)
+        .select("stripe_product_id")
+        .eq("user_id", userId)
+        .eq("status", "paid")
+        .not("stripe_product_id", "is", null);
+      if (error) {
+        throw new Error(
+          `No se pudieron leer los productos pagados de ${userId}: ${error.message}`,
+        );
+      }
+      const rows = z.array(paidProductRowSchema).parse(data);
+      return new Set(rows.map((row) => row.stripe_product_id));
     },
   };
 }
@@ -414,6 +443,7 @@ export function createSessionLedgerGateway(
 const STRIPE_MEMBERSHIP_COLUMNS = `${MEMBERSHIP_COLUMNS}, stripe_event_at`;
 const APPLY_STRIPE_EVENT_FUNCTION = "apply_stripe_event";
 const APPLY_SESSION_PACK_PAYMENT_FUNCTION = "apply_session_pack_payment";
+const APPLY_LEVY_PAYMENT_FUNCTION = "apply_levy_payment";
 const APPLY_STRIPE_EVENT_OUTCOMES = ["applied", "duplicate"] as const;
 
 const stripeMembershipRowSchema = membershipRowSchema.extend({
@@ -529,6 +559,15 @@ function toSessionPackPaymentJson(
   };
 }
 
+/** Un levy se guarda como un pack, y además con el producto de Stripe que
+ * dice cuál pagó el socio (#473). */
+function toLevyPaymentJson(payment: LevyPayment): Record<string, unknown> {
+  return {
+    ...toSessionPackPaymentJson(payment),
+    stripe_product_id: payment.productId,
+  };
+}
+
 /** Lo que necesita el webhook de Stripe (#452): encontrar la membresía de un
  * evento y escribirlo todo de una vez con `apply_stripe_event`
  * (`0051_apply_stripe_event.sql`). */
@@ -585,6 +624,38 @@ export function createStripeWebhookGateway(
       if (error) {
         throw new Error(
           `No se pudo aplicar el pack del evento de Stripe ${event.id}: ${error.message}`,
+        );
+      }
+      return z.enum(APPLY_STRIPE_EVENT_OUTCOMES).parse(data);
+    },
+    async findMemberClubId(userId) {
+      const { data, error } = await serviceClient
+        .from(MEMBERS_TABLE)
+        .select("club_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (error) {
+        throw new Error(
+          `No se pudo buscar la ficha del socio ${userId}: ${error.message}`,
+        );
+      }
+      return data === null ? null : z.string().parse(data.club_id);
+    },
+    async applyLevyPayment({ event, owner, payment }) {
+      const { data, error } = await serviceClient.rpc(
+        APPLY_LEVY_PAYMENT_FUNCTION,
+        {
+          event_id: event.id,
+          event_type: event.type,
+          event_created: event.created.toISOString(),
+          target_user_id: owner.userId,
+          target_club_id: owner.clubId,
+          payment: toLevyPaymentJson(payment),
+        },
+      );
+      if (error) {
+        throw new Error(
+          `No se pudo aplicar el levy del evento de Stripe ${event.id}: ${error.message}`,
         );
       }
       return z.enum(APPLY_STRIPE_EVENT_OUTCOMES).parse(data);
@@ -709,7 +780,6 @@ async function insertMembershipIfMissing(
   }
 }
 
-const MEMBERS_TABLE = "members";
 const memberEmailRowSchema = z.object({ email: z.string() });
 
 /** El correo con el que Checkout crea el cliente de Stripe (#454). Es la

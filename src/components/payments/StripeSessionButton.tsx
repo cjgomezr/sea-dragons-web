@@ -25,6 +25,7 @@ export function StripeSessionButton({
   label,
   requestSession,
   describeFailure = describeCheckoutFailure,
+  describedBy,
 }: {
   readonly translate: Translator;
   /** Lo que dice en reposo, ya traducido: para qué abre Stripe. */
@@ -35,6 +36,9 @@ export function StripeSessionButton({
     translate: Translator,
     failure: PaymentsFailure,
   ) => string;
+  /** El id de lo que se paga, cuando el botón sólo dice "Pagar" y hay
+   * varios en la misma lista. */
+  readonly describedBy?: string;
 }): React.JSX.Element {
   const [session, setSession] = useState<SessionState>({ kind: "idle" });
 
@@ -71,6 +75,7 @@ export function StripeSessionButton({
         type="button"
         className="auth-submit"
         disabled={session.kind === "opening"}
+        aria-describedby={describedBy}
         onClick={openSession}
       >
         {session.kind === "idle" ? label : translate(busyLabel(session))}

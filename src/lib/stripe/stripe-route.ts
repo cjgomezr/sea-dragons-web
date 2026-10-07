@@ -1,11 +1,13 @@
 import Stripe from "stripe";
 import { ApiError } from "@/lib/api/response";
 import type { CheckoutStripe } from "@/lib/membership/checkout";
+import type { LevyStripe } from "@/lib/membership/levies";
 import type { PlanChangeStripe } from "@/lib/membership/plan-change";
 import type { PaymentRetryStripe } from "@/lib/membership/retry-payment";
 import type { SessionPackCheckoutStripe } from "@/lib/membership/session-pack-checkout";
 import {
   STRIPE_PRICE_CASUAL_SESSION_ENV,
+  createProductCatalogSource,
   createStripeSetup,
 } from "./stripe-client";
 import { createSubscriptionPlanApi } from "./subscription-plan-api";
@@ -86,6 +88,21 @@ export function resolveRoutePaymentRetryStripe(
     return { kind: "unconfigured" };
   }
   return { kind: "configured", invoices: stripe.client.invoices };
+}
+
+/** Lo que necesitan los levies (#473): los productos de la cuenta y
+ * Checkout. */
+export function resolveRouteLevyStripe(logPrefix: string): LevyStripe {
+  const stripe = createStripeSetup(process.env);
+  if (stripe.kind === "unconfigured") {
+    console.warn(`${logPrefix} faltan ${stripe.missingKeys.join(", ")}`);
+    return { kind: "unconfigured" };
+  }
+  return {
+    kind: "configured",
+    catalog: createProductCatalogSource(stripe.client),
+    sessions: stripe.client.checkout.sessions,
+  };
 }
 
 /** Un fallo de Stripe (red, llave, precio) no es culpa de quien pide: 503

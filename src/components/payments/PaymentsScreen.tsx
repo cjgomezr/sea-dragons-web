@@ -7,6 +7,7 @@ import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import type { CheckoutReturn } from "@/lib/membership/checkout-return";
 import { membershipBlockOfStatus } from "@/lib/membership/membership";
 import type { MembershipView } from "@/lib/membership/membership-view";
+import { LevyCharges } from "./LevyCharges";
 import { PaymentHistory } from "./PaymentHistory";
 import {
   type PaymentsFailure,
@@ -223,6 +224,7 @@ function MembershipPanel({
           packReturn={returns.packReturn}
         />
       ) : null}
+      {view.paymentsConfigured ? <LevyCharges translate={translate} /> : null}
       {membership?.plan === "Casual" ? (
         <SessionActivity
           translate={translate}

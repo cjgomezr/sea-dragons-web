@@ -30,6 +30,10 @@ const CARD_PATH = "/api/v1/membership/card";
 const PLAN_PATH = "/api/v1/membership/plan";
 const PACKS_PATH = "/api/v1/club/session-packs";
 const PACK_CHECKOUT_PATH = "/api/v1/membership/session-packs/checkout";
+const LEVIES_PATH = "/api/v1/levies";
+const LEVY_PRICE = "price_nationals";
+const LEVY_CHECKOUT_PATH = `/api/v1/levies/${LEVY_PRICE}/checkout`;
+const LEVY_CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_levy";
 const PACK_CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_pack";
 const CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_123";
 const SETUP_URL = "https://checkout.stripe.com/c/pay/cs_test_setup";
@@ -145,7 +149,14 @@ type FetchRoutes = {
   /** Los packs del club (#469); por defecto, 5 y 10 a 15 AUD la sesión. */
   readonly packs?: RouteHandler;
   readonly packCheckout?: RouteHandler;
+  /** Los levies del club (#473); por defecto, ninguno. */
+  readonly levies?: RouteHandler;
+  readonly levyCheckout?: RouteHandler;
 };
+
+function noLevies(): Response {
+  return jsonResponse({ data: { levies: [] } });
+}
 
 function packsResponse(): Response {
   return jsonResponse({
@@ -167,6 +178,8 @@ function stubFetch(routes: FetchRoutes): ReturnType<typeof vi.fn> {
     [PLAN_PATH]: routes.plan,
     [PACKS_PATH]: routes.packs ?? packsResponse,
     [PACK_CHECKOUT_PATH]: routes.packCheckout,
+    [LEVIES_PATH]: routes.levies ?? noLevies,
+    [LEVY_CHECKOUT_PATH]: routes.levyCheckout,
   };
   const fetchDouble = vi.fn(
     async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -1791,5 +1804,139 @@ describe("PaymentsScreen: saldo de sesiones (#472)", () => {
     expect(
       screen.queryByRole("region", { name: "Session activity" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("PaymentsScreen: cobros del club (#473)", () => {
+  const NATIONALS = {
+    id: LEVY_PRICE,
+    name: "Nationals 2026",
+    description: "Entry for the national championship",
+    amountCents: 8000,
+    isPaid: false,
+  };
+  const CAMP = {
+    id: "price_camp",
+    name: "Winter camp",
+    description: null,
+    amountCents: 12000,
+    isPaid: true,
+  };
+
+  function leviesResponse(): Response {
+    return jsonResponse({ data: { levies: [NATIONALS, CAMP] } });
+  }
+
+  function leviesSection(): HTMLElement {
+    return screen.getByRole("region", {
+      name: /^(Club charges|Cobros del club)$/,
+    });
+  }
+
+  it("pinta cada levy con su nombre, su descripción, su importe y un botón Pagar", async () => {
+    await renderLoaded(ACTIVE_FULL, { routes: { levies: leviesResponse } });
+
+    const section = await waitFor(leviesSection);
+    expect(section).toHaveTextContent("Nationals 2026");
+    expect(section).toHaveTextContent("Entry for the national championship");
+    expect(section).toHaveTextContent("$80.00");
+    expect(
+      within(section).getByRole("button", {
+        name: "Pay",
+        description: "Nationals 2026",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("dice Pagado del levy que ya pagó, sin botón", async () => {
+    await renderLoaded(ACTIVE_FULL, { routes: { levies: leviesResponse } });
+
+    const section = await waitFor(leviesSection);
+    expect(section).toHaveTextContent("Winter camp");
+    expect(within(section).getByText("Paid")).toBeInTheDocument();
+    expect(within(section).getAllByRole("button")).toHaveLength(1);
+  });
+
+  it("lleva a Checkout del levy que se toca", async () => {
+    const fetchDouble = await renderLoaded(ACTIVE_FULL, {
+      routes: {
+        levies: leviesResponse,
+        levyCheckout: () => jsonResponse({ data: { url: LEVY_CHECKOUT_URL } }),
+      },
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Pay" }));
+
+    expect(openCheckout).toHaveBeenCalledWith(LEVY_CHECKOUT_URL);
+    const [, init] =
+      fetchDouble.mock.calls.find(
+        ([input]) => String(input) === LEVY_CHECKOUT_PATH,
+      ) ?? [];
+    expect(init).toMatchObject({ method: "POST" });
+  });
+
+  it("dice por qué no se abrió Stripe y deja reintentar", async () => {
+    await renderLoaded(ACTIVE_FULL, {
+      routes: { levies: leviesResponse, levyCheckout: serviceUnavailable },
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Pay" }));
+
+    expect(await within(leviesSection()).findByRole("alert")).toHaveTextContent(
+      "We couldn't open Stripe",
+    );
+    expect(openCheckout).not.toHaveBeenCalled();
+  });
+
+  it("se los ofrece también a quien no está al día", async () => {
+    await renderLoaded(PAST_DUE_FULL, { routes: { levies: leviesResponse } });
+
+    expect(
+      await screen.findByRole("button", { name: "Pay" }),
+    ).toBeInTheDocument();
+  });
+
+  it("sin levies no pinta la sección", async () => {
+    const fetchDouble = await renderLoaded(ACTIVE_FULL);
+
+    await waitFor(() => expect(countCalls(fetchDouble, LEVIES_PATH)).toBe(1));
+    expect(
+      screen.queryByRole("region", { name: "Club charges" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("dice que no pudo cargar los levies sin romper el resto de Pagos", async () => {
+    await renderLoaded(ACTIVE_FULL, { routes: { levies: serviceUnavailable } });
+
+    expect(
+      await within(await waitFor(leviesSection)).findByText(
+        /couldn't load the club charges/,
+      ),
+    ).toBeInTheDocument();
+    expect(statusChip()).toHaveTextContent("Active");
+  });
+
+  it("cambia sus textos con el idioma, pero no el nombre del levy", async () => {
+    await renderLoaded(ACTIVE_FULL, {
+      locale: "es",
+      routes: { levies: leviesResponse },
+    });
+
+    const section = await waitFor(leviesSection);
+    expect(section).toHaveAccessibleName("Cobros del club");
+    expect(section).toHaveTextContent("Nationals 2026");
+    expect(within(section).getByText("Pagado")).toBeInTheDocument();
+    expect(
+      within(section).getByRole("button", { name: "Pagar" }),
+    ).toBeInTheDocument();
+  });
+
+  it("sin pagos configurados no los pide", async () => {
+    const fetchDouble = await renderLoaded({
+      ...ACTIVE_FULL,
+      paymentsConfigured: false,
+    });
+
+    expect(countCalls(fetchDouble, LEVIES_PATH)).toBe(0);
   });
 });

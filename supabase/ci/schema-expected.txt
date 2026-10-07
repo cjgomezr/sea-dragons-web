@@ -207,6 +207,7 @@ columna payments.paid_at tipo=timestamp with time zone null=YES default=-
 columna payments.status tipo=text null=NO default=-
 columna payments.stripe_charge_id tipo=text null=YES default=-
 columna payments.stripe_invoice_id tipo=text null=YES default=-
+columna payments.stripe_product_id tipo=text null=YES default=-
 columna payments.user_id tipo=uuid null=NO default=-
 columna registration_requests.club_id tipo=uuid null=NO default=-
 columna registration_requests.id tipo=uuid null=NO default=gen_random_uuid()
@@ -251,6 +252,7 @@ columna team_splits.team_a_name tipo=text null=NO default=-
 columna team_splits.team_b_color tipo=text null=NO default=-
 columna team_splits.team_b_name tipo=text null=NO default=-
 columna team_splits.updated_at tipo=timestamp with time zone null=NO default=now()
+funcion apply_levy_payment(event_id text, event_type text, event_created timestamp with time zone, target_user_id uuid, target_club_id uuid, payment jsonb)
 funcion apply_session_pack_payment(event_id text, event_type text, event_created timestamp with time zone, target_user_id uuid, target_club_id uuid, payment jsonb, pack_sessions integer)
 funcion apply_stripe_event(event_id text, event_type text, event_created timestamp with time zone, target_user_id uuid, target_club_id uuid, membership_changes jsonb, payment jsonb)
 funcion are_valid_weekdays(weekdays smallint[])
@@ -895,6 +897,7 @@ indice payments_pkey CREATE UNIQUE INDEX payments_pkey ON public.payments USING 
 indice payments_stripe_charge_id_key CREATE UNIQUE INDEX payments_stripe_charge_id_key ON public.payments USING btree (stripe_charge_id)
 indice payments_stripe_invoice_id_key CREATE UNIQUE INDEX payments_stripe_invoice_id_key ON public.payments USING btree (stripe_invoice_id)
 indice payments_user_id_club_id_idx CREATE INDEX payments_user_id_club_id_idx ON public.payments USING btree (user_id, club_id)
+indice payments_user_id_stripe_product_id_idx CREATE INDEX payments_user_id_stripe_product_id_idx ON public.payments USING btree (user_id, stripe_product_id) WHERE (stripe_product_id IS NOT NULL)
 indice registration_requests_pkey CREATE UNIQUE INDEX registration_requests_pkey ON public.registration_requests USING btree (id)
 indice registration_requests_subject_requested_at_idx CREATE INDEX registration_requests_subject_requested_at_idx ON public.registration_requests USING btree (subject_kind, subject_hash, requested_at DESC)
 indice role_requests_decided_by_idx CREATE INDEX role_requests_decided_by_idx ON public.role_requests USING btree (decided_by)

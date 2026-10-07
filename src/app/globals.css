@@ -5450,6 +5450,58 @@ a.auth-brand-header:focus-visible {
   justify-items: start;
 }
 
+/* Los cobros del club (#473): un levy por fila, con su nombre, su importe y
+   el botón o el chip de pagado. En 375px la acción baja bajo el texto. */
+.payments-levies {
+  display: grid;
+  gap: var(--space-3);
+  justify-self: stretch;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.payments-levy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.payments-levy-details {
+  display: grid;
+  flex: 1 1 16rem;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.payments-plan-card .payments-levy-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.payments-plan-card .payments-levy-price {
+  font-family: var(--font-family-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.payments-levy-action {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
 .payments-offer {
   display: grid;
   gap: var(--space-2);

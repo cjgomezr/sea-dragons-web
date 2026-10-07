@@ -1,0 +1,31 @@
+{
+  "id": "evt_test_levy_completed",
+  "object": "event",
+  "api_version": "2026-09-30.endive",
+  "created": 1790000700,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": { "id": null, "idempotency_key": null },
+  "type": "checkout.session.completed",
+  "data": {
+    "object": {
+      "id": "cs_test_seadragons_levy",
+      "object": "checkout.session",
+      "mode": "payment",
+      "status": "complete",
+      "payment_status": "paid",
+      "client_reference_id": "7b0e5a52-3c1d-4e8f-9a6b-2d4c8e1f0a37",
+      "customer": null,
+      "subscription": null,
+      "payment_intent": "pi_TestSeadragonsLevy",
+      "amount_total": 8000,
+      "currency": "aud",
+      "metadata": {
+        "user_id": "7b0e5a52-3c1d-4e8f-9a6b-2d4c8e1f0a37",
+        "kind": "levy",
+        "levy_product_id": "prod_TestNationals",
+        "levy_name": "Nationals 2026"
+      }
+    }
+  }
+}
