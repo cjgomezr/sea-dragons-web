@@ -3678,6 +3678,44 @@ for (const state of GROUPS_STATES) {
   });
 }
 
+/* ---------------------------------------------------------------------------
+   La exportación a CSV del directorio (#500): el Admin sembrado descarga la
+   lista desde la pantalla, en el navegador de verdad y contra el endpoint de
+   verdad. Las columnas y el escape los prueba el dominio; aquí, que el
+   archivo llega como descarga, con su nombre y legible por Excel.
+   --------------------------------------------------------------------------- */
+
+test.describe("la exportación del directorio de un Admin", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("descarga un CSV con BOM, cabeceras en su idioma y una fila por socio", async ({
+    page,
+  }) => {
+    await page.goto(`${APP_URL}/directorio`);
+    const memberRows = page.locator("table.directory-table tbody tr");
+    await expect(memberRows.first()).toBeVisible();
+    const listedCount = await memberRows.count();
+
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Export CSV" }).click(),
+    ]);
+
+    expect(download.suggestedFilename()).toMatch(
+      /^[a-z0-9-]+-directory-\d{4}-\d{2}-\d{2}\.csv$/,
+    );
+    const downloadedPath = await download.path();
+    const csv = readFileSync(downloadedPath, "utf8");
+    expect(csv.startsWith("\uFEFF")).toBe(true);
+    const lines = csv.slice(1).split("\r\n");
+    expect(lines[0]).toMatch(/^Name,Country,Level,AUF number,/);
+    // La cabecera, una fila por socio de la tabla y la línea vacía del final.
+    expect(lines).toHaveLength(listedCount + 2);
+  });
+});
+
 test.describe("la sección Grupos con los datos de verdad", () => {
   skipWithoutSession();
   quietNotificationBell();
