@@ -578,6 +578,14 @@ export const MEMBERSHIP_PRICES_API_PATH = `${MEMBERSHIP_API_PATH}/prices`;
  * día: es como se pone al día un Casual. */
 export const MEMBERSHIP_SESSION_PACK_CHECKOUT_API_PATH = `${MEMBERSHIP_API_PATH}/session-packs/checkout`;
 
+/** Los levies que el comité crea en Stripe (#473, RF-6 del PRD de E13). D4:
+ * los ve y los paga cualquier cuenta activa, al día o no, así que no
+ * aparecen en `MEMBER_ONLY_ROUTES`. */
+export const LEVIES_API_PATH = "/api/v1/levies";
+
+/** Abrir Stripe Checkout para pagar un levy, por el id de su `Price`. */
+export const LEVY_CHECKOUT_API_PATH = `${LEVIES_API_PATH}/[priceId]/checkout`;
+
 /**
  * Los únicos endpoints de la API que no exigen sesión.
  *

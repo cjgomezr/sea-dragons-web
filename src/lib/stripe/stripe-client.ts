@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import type { SetupCard, StripeApi } from "./stripe-webhook";
 import type { StripePriceSetup } from "@/lib/membership/stripe-prices";
+import type { ProductCatalogSource } from "./product-catalog";
 import { type StripePrices, readCard } from "./webhook-events";
 
 /**
@@ -91,6 +92,28 @@ export function readStripePriceSetup(env: Environment): StripePriceSetup {
       student: readRequired(env, STRIPE_PRICE_STUDENT_ENV),
       casualSession: readRequired(env, STRIPE_PRICE_CASUAL_SESSION_ENV),
     },
+  };
+}
+
+/** Un tope para que una cuenta con muchos productos no deje Pagos leyendo
+ * página tras página: el club vende unos pocos. */
+const MAX_CATALOG_PRODUCTS = 1000;
+const CATALOG_PAGE_SIZE = 100;
+
+/** Los productos activos con su precio por defecto expandido (#473): una
+ * sola lista paginada en vez de pedir el precio de cada uno. */
+export function createProductCatalogSource(
+  client: Stripe,
+): ProductCatalogSource {
+  return {
+    listActiveProducts: () =>
+      client.products
+        .list({
+          active: true,
+          limit: CATALOG_PAGE_SIZE,
+          expand: ["data.default_price"],
+        })
+        .autoPagingToArray({ limit: MAX_CATALOG_PRODUCTS }),
   };
 }
 

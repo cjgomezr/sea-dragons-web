@@ -33,6 +33,8 @@ import {
   GROUPS_API_PATH,
   GROUPS_PATH,
   GUARDIAN_CONSENT_API_PATH,
+  LEVIES_API_PATH,
+  LEVY_CHECKOUT_API_PATH,
   MEMBERS_API_PATH,
   MEMBER_RECORD_API_PATH,
   MEMBER_RECORD_PATH,
@@ -1169,8 +1171,10 @@ describe("frontera de la membresía: un Player que no está al día (#453)", () 
     NOTIFICATIONS_API_PATH,
     ROLE_REQUESTS_API_PATH,
     SESSION_API_PATH,
+    LEVIES_API_PATH,
+    withId(LEVY_CHECKOUT_API_PATH),
   ])(
-    "le deja pedir %s: su perfil, el calendario en lectura o salir",
+    "le deja pedir %s: su perfil, el calendario en lectura, los levies (D4) o salir",
     (pathname) => {
       expect(
         decideSessionBoundary({ pathname, ...notCurrentAs("Player") }),
