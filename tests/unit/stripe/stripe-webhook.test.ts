@@ -501,6 +501,7 @@ describe("un levy pagado", () => {
     );
 
     expect(outcome).toBe("applied");
+    expect(findMembership).not.toHaveBeenCalled();
     expect(findMemberClubId).toHaveBeenCalledWith(FIXTURE_USER_ID);
     expect(applyLevyPayment).toHaveBeenCalledWith(
       expect.objectContaining({
