@@ -158,6 +158,13 @@ export const DIRECTORY_API_PATH = "/api/v1/directory";
  * aparece en `RESTRICTED_ROUTES`. */
 export const DIRECTORY_MEMBER_PHOTO_API_PATH = `${DIRECTORY_API_PATH}/[id]/photo`;
 
+/** El correo del directorio (#501, RF-6 y RF-7 del PRD de E19): GET dice
+ * cuántos quedan hoy y POST lo manda. Es de Admin y Committee, que no
+ * comparten ninguna fila de la matriz del SRD, así que no está en
+ * `RESTRICTED_ROUTES`: lo decide el dominio leyendo el rol de quien llama, y
+ * responde 403 con motivo. */
+export const DIRECTORY_EMAILS_API_PATH = `${DIRECTORY_API_PATH}/emails`;
+
 /** Los grupos de quien llama (#229, RF-8 del PRD de E4). Va fuera de
  * `/api/v1/groups`, que es de quien gestiona grupos, porque lo alcanza
  * cualquier cuenta activa: por eso no aparece en `RESTRICTED_ROUTES`. Una
