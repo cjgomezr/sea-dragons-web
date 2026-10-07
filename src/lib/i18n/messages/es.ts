@@ -931,6 +931,14 @@ export const spanishMessages: MessageCatalog = {
     "Tu sesión terminó. Vuelve a entrar para responder.",
   "calendar.rsvp.error.membershipNotCurrent":
     "Tu membresía no está al día. Ponla al día en Pagos para responder.",
+  // La alerta de pago fallido en toda la aplicación (#474, RF-7 de E13).
+  "failedPayment.title": "Pago fallido",
+  "failedPayment.dated": "No se pudo cobrar tu cuota del {date}.",
+  "failedPayment.undated": "No se pudo cobrar tu última cuota.",
+  "failedPayment.retry": "Reintentar el pago",
+  "failedPayment.error.nothingPending": "No hay nada pendiente de pago.",
+  "failedPayment.error.stripeFailed":
+    "No se pudo abrir el pago. Vuelve a intentarlo en un momento.",
   "membership.block.pending":
     "Tu membresía está pendiente: todavía no has añadido una tarjeta.",
   "membership.block.pastDue": "Tu último pago no se pudo cobrar.",

@@ -24,11 +24,17 @@ export function StripeSessionButton({
   translate,
   label,
   requestSession,
+  describeFailure = describeCheckoutFailure,
 }: {
   readonly translate: Translator;
   /** Lo que dice en reposo, ya traducido: para qué abre Stripe. */
   readonly label: string;
   readonly requestSession: () => Promise<StripeSessionOutcome>;
+  /** Por qué no se abrió. Sin él, los fallos de abrir Checkout. */
+  readonly describeFailure?: (
+    translate: Translator,
+    failure: PaymentsFailure,
+  ) => string;
 }): React.JSX.Element {
   const [session, setSession] = useState<SessionState>({ kind: "idle" });
 
@@ -58,7 +64,7 @@ export function StripeSessionButton({
     <>
       {session.kind === "failed" ? (
         <p className="auth-error" role="alert">
-          {describeCheckoutFailure(translate, session.failure)}
+          {describeFailure(translate, session.failure)}
         </p>
       ) : null}
       <button

@@ -933,6 +933,14 @@ export const englishMessages = {
     "Your session ended. Sign in again to answer.",
   "calendar.rsvp.error.membershipNotCurrent":
     "Your membership isn't up to date. Sort it out in Payments to answer.",
+  // La alerta de pago fallido en toda la aplicación (#474, RF-7 de E13).
+  "failedPayment.title": "Payment failed",
+  "failedPayment.dated": "Your membership payment on {date} didn't go through.",
+  "failedPayment.undated": "Your last membership payment didn't go through.",
+  "failedPayment.retry": "Retry payment",
+  "failedPayment.error.nothingPending": "There's nothing pending to pay.",
+  "failedPayment.error.stripeFailed":
+    "We couldn't open the payment. Try again in a moment.",
   "membership.block.pending":
     "Your membership is pending: you haven't added a card yet.",
   "membership.block.pastDue": "Your last payment didn't go through.",

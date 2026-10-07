@@ -11,6 +11,7 @@ import {
   MEMBERSHIP_CARD_API_PATH,
   MEMBERSHIP_CHECKOUT_API_PATH,
   MEMBERSHIP_PLAN_API_PATH,
+  MEMBERSHIP_RETRY_PAYMENT_API_PATH,
   MEMBERSHIP_SESSION_PACK_CHECKOUT_API_PATH,
 } from "@/lib/auth/routes";
 import { MEMBERSHIP_TYPES } from "@/lib/auth/registration";
@@ -169,6 +170,12 @@ export function requestCardUpdate(): Promise<StripeSessionOutcome> {
   return requestStripeSession(MEMBERSHIP_CARD_API_PATH);
 }
 
+/** La página de Stripe de la factura abierta, para reintentar un cobro
+ * fallido (#474). No es Checkout, pero se abre igual: dejando la aplicación. */
+export function requestPaymentRetry(): Promise<StripeSessionOutcome> {
+  return requestStripeSession(MEMBERSHIP_RETRY_PAYMENT_API_PATH);
+}
+
 /** Abre Checkout para pagar un pack de `sessions` sesiones (#471). */
 export async function requestSessionPackCheckout(
   sessions: number,
@@ -323,5 +330,21 @@ export function describeCheckoutFailure(
       return translate("payments.error.unavailable");
     default:
       return translate("payments.error.unexpected");
+  }
+}
+
+/** Por qué no se abrió el reintento (#474): sin factura abierta no hay nada
+ * que pagar, y un 502 es que Stripe falló. */
+export function describePaymentRetryFailure(
+  translate: Translator,
+  failure: PaymentsFailure,
+): string {
+  switch (failure.failure) {
+    case "conflict":
+      return translate("failedPayment.error.nothingPending");
+    case "bad_gateway":
+      return translate("failedPayment.error.stripeFailed");
+    default:
+      return describeCheckoutFailure(translate, failure);
   }
 }
