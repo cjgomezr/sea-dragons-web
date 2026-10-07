@@ -775,9 +775,13 @@ describe("la marca en los correos", () => {
 });
 
 describe("correo del directorio", () => {
-  const MESSAGE = "Hola:\n\nEl sábado entrenamos a las 8.\n<b>Traed aletas</b> & gorro";
+  const MESSAGE =
+    "Hola:\n\nEl sábado entrenamos a las 8.\n<b>Traed aletas</b> & gorro";
 
-  function renderFor(locale: Locale, role: "Admin" | "Committee" = "Committee") {
+  function renderFor(
+    locale: Locale,
+    role: "Admin" | "Committee" = "Committee",
+  ) {
     return renderDirectoryEmail({
       draft: { subject: "Entreno <sábado>", message: MESSAGE },
       sender: { fullName: "Ana Admin", role },
@@ -814,7 +818,9 @@ describe("correo del directorio", () => {
   it("firma en español con el nombre, el rol y el club", () => {
     const { html, text } = renderFor("es");
 
-    expect(text).toContain("Te escribe Ana Admin, Comité de Victoria Seadragons.");
+    expect(text).toContain(
+      "Te escribe Ana Admin, Comité de Victoria Seadragons.",
+    );
     expect(readableTextOf(html)).toContain(
       "Te escribe Ana Admin, Comité de Victoria Seadragons.",
     );

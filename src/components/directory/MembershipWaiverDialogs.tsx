@@ -65,7 +65,6 @@ function useWaiverRequest(
   return { sending, send };
 }
 
-
 function DialogActions({
   translate,
   sending,

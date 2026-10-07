@@ -723,7 +723,8 @@ export const englishMessages = {
   // desde la cabecera del directorio.
   "directory.addMember": "Invite member",
   "directory.email.open": "Write an email",
-  "directory.email.emptyReason": "There are no members in the list to write to.",
+  "directory.email.emptyReason":
+    "There are no members in the list to write to.",
   "directory.email.title": "Email members",
   "directory.email.lead":
     "Each member gets their own email from the club address, and replies come to your email.",
@@ -781,8 +782,7 @@ export const englishMessages = {
     "Your role can no longer send emails from the directory.",
   "directory.email.error.noRecipients":
     "None of the members in the list can receive it: their account may be deactivated.",
-  "directory.email.error.unexpected":
-    "We couldn't send the email. Try again.",
+  "directory.email.error.unexpected": "We couldn't send the email. Try again.",
   "newMember.metaTitle": "Invite member · {club}",
   "newMember.metaDescription":
     "Invite a member to the club and send them an email to activate their account.",

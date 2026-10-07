@@ -418,10 +418,7 @@ export async function sendDirectoryEmail(
   gateways: DirectoryEmailGateways,
   request: DirectoryEmailRequest,
 ): Promise<DirectoryEmailResult> {
-  const { sender, recipients, emails } = await prepareEmails(
-    gateways,
-    request,
-  );
+  const { sender, recipients, emails } = await prepareEmails(gateways, request);
   const batchSender = await requireConnectedSender(gateways.delivery);
   const sendId = await reserveQuota(
     gateways,

@@ -719,7 +719,8 @@ export const spanishMessages: MessageCatalog = {
   // desde la cabecera del directorio.
   "directory.addMember": "Invitar miembro",
   "directory.email.open": "Escribir correo",
-  "directory.email.emptyReason": "No hay miembros en la lista a quien escribir.",
+  "directory.email.emptyReason":
+    "No hay miembros en la lista a quien escribir.",
   "directory.email.title": "Escribir a los miembros",
   "directory.email.lead":
     "Cada miembro recibe su propio correo desde la dirección del club, y las respuestas te llegan a tu correo.",
@@ -751,8 +752,7 @@ export const spanishMessages: MessageCatalog = {
     one: "Hoy queda {count} correo del directorio.",
     other: "Hoy quedan {count} correos del directorio.",
   },
-  "directory.email.confirm.loadingQuota":
-    "Mirando cuántos correos quedan hoy…",
+  "directory.email.confirm.loadingQuota": "Mirando cuántos correos quedan hoy…",
   "directory.email.confirm.quotaUnknown":
     "No se pudo saber cuántos correos quedan hoy.",
   "directory.email.confirm.send": "Mandar",

@@ -18,7 +18,6 @@ export const DIRECTORY_EMAIL_WINDOW_HOURS = 24;
 export const DIRECTORY_EMAIL_SUBJECT_MAX_LENGTH = 150;
 export const DIRECTORY_EMAIL_MESSAGE_MAX_LENGTH = 5_000;
 
-
 /** Los motivos de los rechazos, que la pantalla traduce (E17). */
 export const DIRECTORY_EMAIL_FORBIDDEN_REASON = "directory_email_forbidden";
 export const INVALID_DIRECTORY_EMAIL_REASON = "invalid_directory_email";
@@ -59,7 +58,6 @@ export function hasDraftProblems(problems: DraftProblems): boolean {
   return problems.subject !== null || problems.message !== null;
 }
 
-
 export type DirectoryEmailQuota = {
   readonly limit: number;
   readonly remaining: number;
@@ -75,4 +73,3 @@ export type DirectoryEmailResult = {
   readonly failed: readonly FailedRecipient[];
   readonly remaining: number;
 };
-
