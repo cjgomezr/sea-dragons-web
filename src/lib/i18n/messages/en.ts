@@ -1043,6 +1043,14 @@ export const englishMessages = {
     "Pack paid. Your sessions are added as soon as Stripe confirms the payment.",
   "payments.packs.cancelled":
     "You left Stripe without buying a pack. You can try again whenever you like.",
+  // Los levies que el comité crea en Stripe (#473, RF-6 del PRD de E13).
+  "payments.levies.title": "Club charges",
+  "payments.levies.lead":
+    "One-off charges the committee opens, like a tournament entry. Paying them doesn't change your membership.",
+  "payments.levies.loadFailed":
+    "We couldn't load the club charges. Reload the page to try again.",
+  "payments.levies.pay": "Pay",
+  "payments.levies.paid": "Paid",
   "payments.trialing": "On trial until {date}",
   "payments.error.unavailable":
     "We couldn't open Stripe. Try again in a moment.",

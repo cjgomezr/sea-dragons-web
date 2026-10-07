@@ -1041,6 +1041,14 @@ export const spanishMessages: MessageCatalog = {
     "Pack pagado. Tus sesiones se suman en cuanto Stripe confirma el pago.",
   "payments.packs.cancelled":
     "Saliste de Stripe sin comprar un pack. Puedes intentarlo otra vez cuando quieras.",
+  // Los levies que el comité crea en Stripe (#473, RF-6 del PRD de E13).
+  "payments.levies.title": "Cobros del club",
+  "payments.levies.lead":
+    "Cobros sueltos que abre el comité, como la inscripción a un torneo. Pagarlos no cambia tu membresía.",
+  "payments.levies.loadFailed":
+    "No pudimos cargar los cobros del club. Recarga la página para intentarlo otra vez.",
+  "payments.levies.pay": "Pagar",
+  "payments.levies.paid": "Pagado",
   "payments.trialing": "En prueba hasta el día {date}",
   "payments.error.unavailable":
     "No pudimos abrir Stripe. Vuelve a intentarlo en un momento.",
