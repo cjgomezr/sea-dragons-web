@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Pide turno en `seadragons-dev` y espera hasta que le toque (#507).
 #
-# `checks.yml` y `visual-baselines.yml` usan la misma base de desarrollo. Con
+# Hasta el #536, `checks.yml` y `visual-baselines.yml` usaban la misma base de
+# desarrollo; hoy solo la visual la usa, hasta que pase a su Supabase local. Con
 # dos o tres PR a la vez, más una aceptación de capturas, llegaban a coincidir
 # diez jobs contra ella y dev dejaba peticiones sin contestar: tests que se
 # agotaban y rondas enteras que había que relanzar.
@@ -48,8 +49,9 @@ POLL_SECONDS=60
 # El job que pide turno. Si se renombra en los workflows, hay que seguirlo
 # aquí: una corrida sin ese job contaría siempre como que necesita dev.
 TURN_JOB="turno-dev"
+# `checks.yml` salió de la lista en el #536: usa su propio Supabase local y ya
+# no tiene job de turno, así que dejarlo aquí lo contaría siempre delante.
 DEV_WORKFLOWS=(
-  ".github/workflows/checks.yml"
   ".github/workflows/visual-baselines.yml"
 )
 # Los estados en los que una corrida ya pidió runner y no ha terminado.

@@ -144,11 +144,14 @@ describe("un empujón de PR que solo trae líneas base no repite la suite (#494)
     });
   });
 
-  it("checks no pide turno en dev cuando la suite se salta", () => {
-    const turn = jobOf("checks.yml", "turno-dev");
+  // Levantar Supabase cuesta minutos de runner; el camino del salto solo lee
+  // PNG del repositorio (#536).
+  it("checks no levanta Supabase cuando la suite se salta", () => {
+    const uses = (jobOf("checks.yml", BASELINE_TESTS_JOB).steps ?? []).map(
+      (step) => step.uses ?? "",
+    );
 
-    expect(needsOf(turn)).toContain(GATE_JOB);
-    expect(turn.if).toContain(SKIPPED_CONDITION);
+    expect(uses.join("\n")).not.toMatch(/supabase-local/);
   });
 
   it("checks sigue preguntando en el push a main si el árbol ya pasó en el PR", () => {

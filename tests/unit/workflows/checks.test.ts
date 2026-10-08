@@ -11,10 +11,13 @@ import { RUN_INTEGRATION_TESTS_ENV } from "../../support/test-selection.mts";
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const WORKFLOW_PATH = path.join(REPO_ROOT, ".github/workflows/checks.yml");
 
-/** Los orígenes de prueba que el manifiesto pone en CI: la base de desarrollo
- * y la cuenta de Stripe en modo de prueba (#454), con la que Pagos ofrece
- * Checkout y el test de integración abre una sesión de verdad. */
-const DEVELOPMENT_SOURCES = ["seadragons-dev", "stripe-test"] as const;
+/** Los orígenes que el manifiesto pone en los secretos de CI. Desde el #536
+ * el job `checks` solo toma de ahí la cuenta de Stripe en modo de prueba
+ * (#454); Supabase lo levanta el propio runner. */
+const STRIPE_TEST_SOURCE = "stripe-test";
+const DEVELOPMENT_DATABASE_SOURCE = "seadragons-dev";
+
+const LOCAL_SUPABASE_ACTION = "./.github/actions/supabase-local";
 
 const TEXT_ONLY_STEP_ID = "texto";
 const TEXT_ONLY_OUTPUT = `steps.${TEXT_ONLY_STEP_ID}.outputs.solo_texto`;
@@ -23,14 +26,11 @@ const TEXT_ONLY_OUTPUT = `steps.${TEXT_ONLY_STEP_ID}.outputs.solo_texto`;
  * que se quiere va en medio. */
 const NOT_TEXT_ONLY_CONDITION = `${TEXT_ONLY_OUTPUT} != 'true'`;
 
-/** Las credenciales que el manifiesto pone en los secretos del repositorio.
- * Sale de ahí y no de una lista escrita a mano: declarar una cuarta en el
- * manifiesto y olvidarla en el workflow tiene que dejar esto en rojo. */
-function developmentCredentials(): string[] {
-  const manifest = readEnvironmentManifest();
-  return DEVELOPMENT_SOURCES.flatMap((source) =>
-    variablesFromSource(manifest, "ci", source),
-  );
+/** Las variables que el manifiesto pone en CI desde un origen. Sale de ahí y
+ * no de una lista escrita a mano: declarar una más en el manifiesto y
+ * olvidarla en el workflow tiene que dejar esto en rojo. */
+function ciVariablesFrom(source: string): string[] {
+  return variablesFromSource(readEnvironmentManifest(), "ci", source);
 }
 
 function referencedSecrets(): string[] {
@@ -59,6 +59,7 @@ interface WorkflowStep {
 
 interface WorkflowJob {
   if?: string;
+  needs?: string[];
   permissions?: Record<string, string>;
   steps: WorkflowStep[];
 }
@@ -91,6 +92,28 @@ function stepNamed(name: string): WorkflowStep {
   const step = allSteps().find((candidate) => candidate.name === name);
   if (!step) {
     throw new Error(`el workflow no tiene ningún paso llamado "${name}"`);
+  }
+  return step;
+}
+
+function checksSteps(): WorkflowStep[] {
+  const job = parseWorkflow().jobs.checks;
+  if (!job) {
+    throw new Error("el workflow no tiene el job checks");
+  }
+  return job.steps;
+}
+
+function indexOfStep(predicate: (step: WorkflowStep) => boolean): number {
+  return checksSteps().findIndex(predicate);
+}
+
+function localSupabaseStep(): WorkflowStep {
+  const step = checksSteps().find(
+    (candidate) => candidate.uses === LOCAL_SUPABASE_ACTION,
+  );
+  if (!step) {
+    throw new Error(`el job checks no usa ${LOCAL_SUPABASE_ACTION}`);
   }
   return step;
 }
@@ -129,21 +152,37 @@ describe("workflow de checks", () => {
 
   // Hasta el issue #149 este workflow no referenciaba ningún secreto, y el
   // precio era que las pruebas con sesión, las de integración y las de RLS se
-  // saltaban enteras: el check salía verde sin haber probado nada. Ahora sí
-  // los referencia, y lo que se vigila es de dónde salen.
-  it("da a los tests las credenciales de desarrollo que el manifiesto declara en CI", () => {
+  // saltaban enteras: el check salía verde sin haber probado nada. Desde el
+  // #536 las de Supabase corren contra un Supabase local; Stripe sigue
+  // llegando de los secretos.
+  it("da a los tests las credenciales de Stripe en modo de prueba que el manifiesto declara en CI", () => {
     const credentials = Object.entries(stepNamed("Tests").env ?? {}).filter(
       ([name]) => name !== RUN_INTEGRATION_TESTS_ENV,
     );
 
     expect(credentials.map(([name]) => name).sort()).toEqual(
-      developmentCredentials().sort(),
+      ciVariablesFrom(STRIPE_TEST_SOURCE).sort(),
     );
     for (const [name, value] of credentials) {
       expect(value).toBe(
         `\${{ ${NOT_TEXT_ONLY_CONDITION} && secrets.${name} || '' }}`,
       );
     }
+  });
+
+  it("no pasa a ningún paso las credenciales de seadragons-dev", () => {
+    const devVariables = ciVariablesFrom(DEVELOPMENT_DATABASE_SOURCE);
+
+    expect(devVariables.length).toBeGreaterThan(0);
+    expect(
+      referencedSecrets().filter((name) => devVariables.includes(name)),
+    ).toEqual([]);
+    const stepEnvNames = allSteps().flatMap((step) =>
+      Object.keys(step.env ?? {}),
+    );
+    expect(stepEnvNames.filter((name) => devVariables.includes(name))).toEqual(
+      [],
+    );
   });
 
   // Fuera de CI, `npm test` se salta los tests que hablan con seadragons-dev
@@ -157,8 +196,8 @@ describe("workflow de checks", () => {
     );
   });
 
-  it("no referencia ningún secreto que el manifiesto no ponga en CI como de desarrollo", () => {
-    const permitted = new Set(developmentCredentials());
+  it("no referencia ningún secreto que no sea de Stripe en modo de prueba", () => {
+    const permitted = new Set(ciVariablesFrom(STRIPE_TEST_SOURCE));
 
     expect(referencedSecrets().filter((name) => !permitted.has(name))).toEqual(
       [],
@@ -259,14 +298,6 @@ describe("workflow de checks", () => {
   // seadragons-dev ni sus credenciales (#439). Los unitarios, el lint, los
   // tipos y el build siguen corriendo: varios tests leen docs/.
   describe("en un PR de solo texto", () => {
-    function checksSteps(): WorkflowStep[] {
-      const job = parseWorkflow().jobs.checks;
-      if (!job) {
-        throw new Error("el workflow no tiene el job checks");
-      }
-      return job.steps;
-    }
-
     function textOnlyStep(): WorkflowStep {
       const step = checksSteps().find(
         (candidate) => candidate.id === TEXT_ONLY_STEP_ID,
@@ -321,6 +352,55 @@ describe("workflow de checks", () => {
       ]) {
         expect(JSON.stringify(stepNamed(name))).not.toMatch(/solo_texto/);
       }
+    });
+  });
+
+  // Los tests de integración y de RLS corrían contra seadragons-dev, el que
+  // más logs generaba allí y el que más se colgaba (#536, E20).
+  describe("Supabase local", () => {
+    it("lo levanta la acción del repositorio antes de los tests", () => {
+      const supabaseIndex = indexOfStep(
+        (step) => step.uses === LOCAL_SUPABASE_ACTION,
+      );
+      const testIndex = indexOfStep((step) => step.name === "Tests");
+
+      expect(supabaseIndex).toBeGreaterThanOrEqual(0);
+      expect(testIndex).toBeGreaterThan(supabaseIndex);
+    });
+
+    // La acción arranca el CLI de `devDependencies`.
+    it("lo levanta después de instalar las dependencias", () => {
+      const installIndex = indexOfStep((step) => step.run === "npm ci");
+      const supabaseIndex = indexOfStep(
+        (step) => step.uses === LOCAL_SUPABASE_ACTION,
+      );
+
+      expect(supabaseIndex).toBeGreaterThan(installIndex);
+    });
+
+    it("no lo levanta en un PR de solo texto, que no corre los tests de red", () => {
+      const supabaseIndex = indexOfStep(
+        (step) => step.uses === LOCAL_SUPABASE_ACTION,
+      );
+      const decisionIndex = indexOfStep(
+        (step) => step.id === TEXT_ONLY_STEP_ID,
+      );
+
+      expect(localSupabaseStep().if).toContain(NOT_TEXT_ONLY_CONDITION);
+      expect(supabaseIndex).toBeGreaterThan(decisionIndex);
+    });
+
+    it("no lo levanta mientras el repositorio no haya pasado por el bootstrap", () => {
+      expect(localSupabaseStep().if).toMatch(
+        /steps\.repo\.outputs\.bootstrapped == 'true'/,
+      );
+    });
+
+    it("no espera a ninguna otra corrida: el job checks no depende de un turno", () => {
+      const needs = parseWorkflow().jobs.checks?.needs ?? [];
+
+      expect(needs).not.toContain("turno-dev");
+      expect(parseWorkflow().jobs["turno-dev"]).toBeUndefined();
     });
   });
 });

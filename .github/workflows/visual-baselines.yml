@@ -145,9 +145,9 @@ jobs:
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
           WORKFLOW_FILE: visual-baselines.yml
 
-  # Comparar y regenerar usan `seadragons-dev`, igual que los tests de
-  # integración de checks.yml. Este job espera a que ninguna corrida anterior
-  # de los dos workflows lo esté usando (#507). Es uno solo, antes de la
+  # Comparar y regenerar usan `seadragons-dev`. Este job espera a que ninguna
+  # corrida anterior de este workflow lo esté usando (#507); checks.yml ya no
+  # hace cola, porque usa su propio Supabase local (#536). Es uno solo, antes de la
   # matriz: la cola es entre corridas, y las cuatro partes de ésta arrancan
   # juntas cuando le toca. Ver scripts/wait-for-dev-turn.sh.
   #

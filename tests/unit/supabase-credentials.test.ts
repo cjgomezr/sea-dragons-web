@@ -40,6 +40,14 @@ describe("credenciales de Supabase en la suite de tests", () => {
     );
   });
 
+  // Desde el #536 el checks no recibe llaves de dev: las pone la acción del
+  // Supabase local. El mensaje tiene que mandar a mirar ahí.
+  it("en CI dice que las llaves las pone la acción del Supabase local", () => {
+    expect(() => decideSupabaseCredentials({ CI: "true" })).toThrowError(
+      /\.github\/actions\/supabase-local/,
+    );
+  });
+
   it("sigue disponible en CI cuando las credenciales sí están", () => {
     expect(decideSupabaseCredentials({ ...CONFIGURED, CI: "true" })).toEqual({
       kind: "available",
