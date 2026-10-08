@@ -1,0 +1,21 @@
+# Un Supabase local dentro del runner, con las migraciones del repo aplicadas
+# (#535, E20). Es la pieza que `checks` y la visual usarán en lugar de la base
+# compartida `seadragons-dev`: cada job tiene la suya, se muere con él y nunca
+# guarda un dato real.
+#
+# El trabajo lo hace `scripts/start-local-supabase.sh`, que tiene sus tests:
+# arranca con el CLI de `devDependencies` (por eso el job tiene que haber hecho
+# `npm ci` antes), reintenta una vez y deja en el entorno del job
+# NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY y
+# SUPABASE_SERVICE_ROLE_KEY. Son las llaves de ejemplo del CLI, no secretos.
+#
+# No lee ningún secreto: no hay nada de dev que pueda usar si el arranque falla.
+name: Supabase local
+description: Levanta Supabase local con las migraciones del repo y exporta su URL y sus llaves al job.
+
+runs:
+  using: composite
+  steps:
+    - name: Arrancar Supabase local
+      shell: bash
+      run: bash scripts/start-local-supabase.sh

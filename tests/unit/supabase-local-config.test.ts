@@ -68,6 +68,28 @@ describe("configuración de Supabase local", () => {
   });
 });
 
+/** Lo que una suite entera hace desde la IP del runner (#535), con margen: los
+ * límites de fábrica (30 inicios de sesión cada 5 minutos) los toca a la
+ * mitad y el resto falla con 429. */
+const MINIMUM_AUTH_REQUESTS_PER_WINDOW = 1000;
+
+describe("límites de Auth del Supabase local", () => {
+  const config = readRepoFile("supabase/config.toml");
+
+  it.each(["sign_in_sign_ups", "token_verifications", "token_refresh"])(
+    "%s no frena a una suite entera desde una sola IP",
+    (limit) => {
+      const value = Number(readTomlValue(config, "auth.rate_limit", limit));
+
+      expect(value).toBeGreaterThanOrEqual(MINIMUM_AUTH_REQUESTS_PER_WINDOW);
+    },
+  );
+
+  it("avisa de que sólo afectan a los Supabase locales", () => {
+    expect(readTomlSection(config, "auth.rate_limit")).toMatch(/solo|sólo/i);
+  });
+});
+
 describe("scripts de la base local", () => {
   it("instala la CLI de Supabase como dependencia de desarrollo", () => {
     expect(packageJson.devDependencies.supabase).toBeDefined();
