@@ -31,6 +31,12 @@ jobs:
   supabase-local:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Con `shell: bash` explícito Actions añade `pipefail`: un `curl` que falla
+    # dentro de `curl | jq` deja el paso rojo con el error HTTP, no con un
+    # "no está el club" que despista.
+    defaults:
+      run:
+        shell: bash
     env:
       # El contenedor de la base lo nombra la CLI con el `project_id` de
       # `supabase/config.toml`.
