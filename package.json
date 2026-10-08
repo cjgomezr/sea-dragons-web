@@ -19,7 +19,8 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:copy-dev": "bash scripts/copy-dev-to-local.sh",
-    "db:restore-backup": "bash scripts/restore-local-backup.sh"
+    "db:restore-backup": "bash scripts/restore-local-backup.sh",
+    "db:seed-load-test": "tsx scripts/load-test/seed.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
