@@ -139,17 +139,17 @@ Un script siembra, sobre un Supabase local, un club con el tamaño que pide el S
 
 ## 9. Preguntas abiertas
 
-- [ ] **La épica de CI con su propio Supabase no existe todavía.** RF-6 y RF-7 dependen de ella (D7). Si se decide no hacerla, la prueba de carga tendría que levantar su propio Supabase local, que es más o menos el mismo trabajo. Hay que escribir esa épica antes de los tickets 3 y 4.
+- [x] **La épica de CI con su propio Supabase** existe desde el 8 de octubre de 2026: E20 (#534). El #524 depende de su primer ticket, el #535.
 - [ ] **k6 o autocannon** para la prueba de carga. k6 es un binario aparte, no una dependencia de npm, y da percentiles y umbrales de serie. autocannon es de npm y más simple, pero peor para recorrer varias pantallas con sesión. Recomiendo k6; lo decide el ticket con una línea de justificación.
 
 ## 10. Descomposición en tickets (para write-ticket)
 
-| #        | Título propuesto                                                                                           | Tamaño | Depende de                  | Auto-merge sugerido                                    |
-| -------- | ---------------------------------------------------------------------------------------------------------- | ------ | --------------------------- | ------------------------------------------------------ |
-| 1 (#522) | Borra los registros de cupos de más de 90 días y la bitácora de más de 12 meses (RF-1, RF-2, RF-3)         | M      | ninguna                     | No: borra datos en producción                          |
-| 2 (#523) | Activa pg_cron y programa la limpieza nocturna, con su propio historial acotado (RF-4, RF-5)               | S      | 1                           | No: extensión nueva y trabajo programado en producción |
-| 3 (#524) | Siembra en un Supabase local el club de NFR-008: 500 socios, 5.000 ocurrencias y 50.000 asistencias (RF-6) | M      | épica de CI con su Supabase | No: herramienta nueva, aunque no toca producción       |
-| 4 (#525) | Prueba con 50 usuarios que el p95 queda por debajo de 1 segundo, a mano y cada semana (RF-7, RF-8)         | M      | 3                           | No: workflow nuevo y dependencia nueva                 |
+| #        | Título propuesto                                                                                           | Tamaño | Depende de | Auto-merge sugerido                                    |
+| -------- | ---------------------------------------------------------------------------------------------------------- | ------ | ---------- | ------------------------------------------------------ |
+| 1 (#522) | Borra los registros de cupos de más de 90 días y la bitácora de más de 12 meses (RF-1, RF-2, RF-3)         | M      | ninguna    | No: borra datos en producción                          |
+| 2 (#523) | Activa pg_cron y programa la limpieza nocturna, con su propio historial acotado (RF-4, RF-5)               | S      | 1          | No: extensión nueva y trabajo programado en producción |
+| 3 (#524) | Siembra en un Supabase local el club de NFR-008: 500 socios, 5.000 ocurrencias y 50.000 asistencias (RF-6) | M      | #535 (E20) | No: herramienta nueva, aunque no toca producción       |
+| 4 (#525) | Prueba con 50 usuarios que el p95 queda por debajo de 1 segundo, a mano y cada semana (RF-7, RF-8)         | M      | 3          | No: workflow nuevo y dependencia nueva                 |
 
 Además, el PR de este PRD corrige la fila de E16b en `docs/plan-maestro.md` (sin FR-031 ni FR-072, con la limpieza y la dependencia de la épica de CI) y las notas P2 y P3 de `docs/preguntas-abiertas.md`.
 
