@@ -27,8 +27,15 @@ export type SeedOutcome =
   | { readonly kind: "refused"; readonly message: string }
   | { readonly kind: "seeded"; readonly anchorDate: string };
 
+/** La vuelta completa descarta fechas como el 30 de febrero, que `Date`
+ * acepta y convierte en marzo sin avisar. */
 function isValidIsoDate(value: string): boolean {
-  return ISO_DATE.test(value) && !Number.isNaN(Date.parse(value));
+  if (!ISO_DATE.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
 }
 
 /** Comprueba el destino y la fecha antes de generar nada, y sólo entonces

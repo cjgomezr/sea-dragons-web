@@ -173,6 +173,28 @@
         "ci-produccion": null
       }
     },
+    "SEED_ANCHOR_DATE": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": "developer",
+        "preview": null,
+        "production": null,
+        "ci": null,
+        "ci-produccion": null
+      }
+    },
+    "LOAD_TEST_LOCAL_SUPABASE": {
+      "secret": false,
+      "writeCredential": false,
+      "scopes": {
+        "local": "developer",
+        "preview": null,
+        "production": null,
+        "ci": null,
+        "ci-produccion": null
+      }
+    },
     "SUPABASE_PRODUCTION_DB_URL": {
       "secret": true,
       "writeCredential": true,

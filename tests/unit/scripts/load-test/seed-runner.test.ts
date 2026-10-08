@@ -56,6 +56,15 @@ describe("runSeed", () => {
     expect(outcome.kind === "seeded" && outcome.anchorDate).toBe("2026-01-15");
   });
 
+  it("rejects an anchor date that does not exist", async () => {
+    const dependencies = fakeDependencies({ SEED_ANCHOR_DATE: "2026-02-30" });
+
+    const outcome = await runSeed(dependencies);
+
+    expect(outcome.kind).toBe("refused");
+    expect(dependencies.runSql).not.toHaveBeenCalled();
+  });
+
   it("rejects an anchor date that is not YYYY-MM-DD", async () => {
     const dependencies = fakeDependencies({ SEED_ANCHOR_DATE: "15/01/2026" });
 

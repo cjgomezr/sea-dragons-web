@@ -106,6 +106,17 @@ const NOTIFICATION_INTERVAL_DAYS = 5;
 const RECENT_NEWS_FOR_NOTIFICATIONS = 20;
 const READ_SHARE = 0.7;
 
+/** Uno de cada tres socios recibe los correos en español. */
+const SPANISH_LOCALE_EVERY = 3;
+/** Altas repartidas en unos cinco años, una semana entre cada una. */
+const JOIN_STEP_DAYS = 7;
+const JOIN_SPREAD_DAYS = 1800;
+/** Nacidos entre 1966 y 2000. */
+const OLDEST_BIRTH_YEAR = 1966;
+const BIRTH_YEAR_SPREAD = 35;
+const MONTHS_PER_YEAR = 12;
+const DAYS_VALID_IN_EVERY_MONTH = 28;
+
 /** Tres de cada cinco Player tienen evaluación. */
 const EVALUATION_CYCLE = 5;
 const EVALUATED_PER_CYCLE = 3;
@@ -389,6 +400,15 @@ function planOf(memberIndex: number): SeedPlan {
   return "Casual";
 }
 
+/** Todos adultos: así ninguno necesita el consentimiento de un tutor. El día
+ * no pasa de 28 para que sea válido en cualquier mes. */
+function birthDateOf(index: number): string {
+  const year = OLDEST_BIRTH_YEAR + (index % BIRTH_YEAR_SPREAD);
+  const month = 1 + (index % MONTHS_PER_YEAR);
+  const day = 1 + (index % DAYS_VALID_IN_EVERY_MONTH);
+  return `${year}-${padNumber(month, 2)}-${padNumber(day, 2)}`;
+}
+
 function buildMember(
   index: number,
   anchorDate: string,
@@ -402,9 +422,12 @@ function buildMember(
     email: `socio-${padNumber(index + 1, 3)}@${EMAIL_DOMAIN}`,
     role: LEADERSHIP_ROLES[index] ?? "Player",
     canSignIn: index < LOGIN_IDENTITY_COUNT,
-    emailLocale: index % 3 === 0 ? "es" : "en",
-    joinedOn: addDays(anchorDate, -(((index * 7) % 1800) + 1)),
-    dateOfBirth: `${1966 + (index % 35)}-${padNumber(1 + (index % 12), 2)}-${padNumber(1 + (index % 28), 2)}`,
+    emailLocale: index % SPANISH_LOCALE_EVERY === 0 ? "es" : "en",
+    joinedOn: addDays(
+      anchorDate,
+      -(((index * JOIN_STEP_DAYS) % JOIN_SPREAD_DAYS) + 1),
+    ),
+    dateOfBirth: birthDateOf(index),
     gender: pick(GENDERS, index),
     experienceLevel: pick(EXPERIENCE_LEVELS, index),
     membershipType: planOf(index),
@@ -615,9 +638,6 @@ function buildMemberNotifications(
       -(position * NOTIFICATION_INTERVAL_DAYS + 1),
     );
     const isNews = position % 2 === 0;
-    const series = context.latestSeriesByGroup.get(
-      pick(context.groups, memberIndex).id,
-    )!;
     return {
       id: createUuid(random),
       userId: member.userId,
@@ -626,7 +646,11 @@ function buildMemberNotifications(
         ? newsNotificationData(
             pick(context.recentClubNews, memberIndex + position),
           )
-        : seriesNotificationData(series),
+        : seriesNotificationData(
+            context.latestSeriesByGroup.get(
+              pick(context.groups, memberIndex).id,
+            )!,
+          ),
       createdAt: `${day}T09:00:00Z`,
       readAt: random() < READ_SHARE ? `${day}T21:00:00Z` : null,
     };
@@ -674,6 +698,31 @@ function buildMembership(
   return { ...fields, status: isPastDue ? "past_due" : "active" };
 }
 
+/** Los avisos hablan de las noticias del club más recientes y de la última
+ * serie del grupo de cada socio. */
+function buildNotifications(
+  club: {
+    readonly members: readonly SeedMember[];
+    readonly newsPosts: readonly SeedNewsPost[];
+    readonly series: readonly SeedSeries[];
+    readonly groups: readonly SeedGroup[];
+    readonly options: SeedOptions;
+  },
+  random: Random,
+): SeedNotification[] {
+  const context: NotificationContext = {
+    recentClubNews: club.newsPosts
+      .filter((post) => post.audience === "club")
+      .slice(0, RECENT_NEWS_FOR_NOTIFICATIONS),
+    latestSeriesByGroup: latestSeriesOfEachGroup(club.series),
+    groups: club.groups,
+    options: club.options,
+  };
+  return club.members.flatMap((member, index) =>
+    buildMemberNotifications(index, member, context, random),
+  );
+}
+
 export function generateSeedDataset(options: SeedOptions): SeedDataset {
   const random = createRandom(options.seed);
   const members = Array.from({ length: MEMBER_COUNT }, (_, index) =>
@@ -693,14 +742,6 @@ export function generateSeedDataset(options: SeedOptions): SeedDataset {
   const newsPosts = Array.from({ length: NEWS_POST_COUNT }, (_, index) =>
     buildNewsPost(index, { groups, members, options }, random),
   );
-  const notificationContext: NotificationContext = {
-    recentClubNews: newsPosts
-      .filter((post) => post.audience === "club")
-      .slice(0, RECENT_NEWS_FOR_NOTIFICATIONS),
-    latestSeriesByGroup: latestSeriesOfEachGroup(series),
-    groups,
-    options,
-  };
   return {
     members,
     groups,
@@ -710,8 +751,9 @@ export function generateSeedDataset(options: SeedOptions): SeedDataset {
     attendance: buildAttendance(pastEvents, rosters, random),
     rsvps: buildRsvps(futureEvents, rosters, options, random),
     newsPosts,
-    notifications: members.flatMap((member, index) =>
-      buildMemberNotifications(index, member, notificationContext, random),
+    notifications: buildNotifications(
+      { members, newsPosts, series, groups, options },
+      random,
     ),
     evaluations: buildEvaluations(members, random),
     memberships: members.map((member, index) =>

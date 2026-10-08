@@ -197,8 +197,9 @@ npm run db:seed-load-test
 - Entras con `socio-001@carga.seadragons.test` hasta `socio-050`, contraseña
   `Seadragons-carga-2026`. Los dos primeros son Admin, los tres siguientes
   Committee, del 6 al 10 Coach y el resto Player.
-- Se niega si `NEXT_PUBLIC_SUPABASE_URL` apunta fuera de tu máquina, y también
-  si la base ya tiene socios. Nunca siembra en desarrollo ni en producción.
+- Siempre escribe en la base del contenedor local. No lee `.env.local`: si
+  exportas `NEXT_PUBLIC_SUPABASE_URL` en la terminal y apunta fuera de tu
+  máquina, se niega. También se niega si la base ya tiene socios.
 - Para su prueba, `LOAD_TEST_LOCAL_SUPABASE=1 RUN_INTEGRATION_TESTS=1 npm test`
   siembra dentro de una transacción y la deshace al final.
 

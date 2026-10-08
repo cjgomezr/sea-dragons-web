@@ -77,12 +77,19 @@ function renderBatchedInsert(insert: BatchedInsert): string {
 }
 
 /** Una tabla del club: sus columnas del dataset, el club y las fijas. */
-function renderClubTable(
-  table: string,
-  columns: readonly Column[],
-  rows: readonly Row[],
-  fixed: FixedColumns = {},
-): string {
+type ClubTable = {
+  readonly table: string;
+  readonly columns: readonly Column[];
+  readonly rows: readonly Row[];
+  readonly fixed?: FixedColumns;
+};
+
+function renderClubTable({
+  table,
+  columns,
+  rows,
+  fixed = {},
+}: ClubTable): string {
   const names = [
     "club_id",
     ...Object.keys(fixed),
@@ -147,9 +154,9 @@ function renderAuth(dataset: SeedDataset): string[] {
 }
 
 function renderMembers(dataset: SeedDataset): string {
-  return renderClubTable(
-    "members",
-    [
+  return renderClubTable({
+    table: "members",
+    columns: [
       ["user_id", "uuid"],
       ["full_name", "text"],
       ["email", "text"],
@@ -161,7 +168,7 @@ function renderMembers(dataset: SeedDataset): string {
       ["experience_level", "text"],
       ["membership_type", "text"],
     ],
-    dataset.members.map((m) => [
+    rows: dataset.members.map((m) => [
       m.userId,
       m.fullName,
       m.email,
@@ -173,28 +180,28 @@ function renderMembers(dataset: SeedDataset): string {
       m.experienceLevel,
       m.membershipType,
     ]),
-    { account_status: "'active'" },
-  );
+    fixed: { account_status: "'active'" },
+  });
 }
 
 function renderGroups(dataset: SeedDataset): string[] {
   return [
-    renderClubTable(
-      "groups",
-      [
+    renderClubTable({
+      table: "groups",
+      columns: [
         ["id", "uuid"],
         ["name", "text"],
       ],
-      dataset.groups.map((g) => [g.id, g.name]),
-    ),
-    renderClubTable(
-      "group_memberships",
-      [
+      rows: dataset.groups.map((g) => [g.id, g.name]),
+    }),
+    renderClubTable({
+      table: "group_memberships",
+      columns: [
         ["group_id", "uuid"],
         ["user_id", "uuid"],
       ],
-      dataset.groupMemberships.map((gm) => [gm.groupId, gm.userId]),
-    ),
+      rows: dataset.groupMemberships.map((gm) => [gm.groupId, gm.userId]),
+    }),
   ];
 }
 
@@ -212,15 +219,15 @@ const EVENT_COLUMNS: readonly Column[] = [
 
 function renderCalendar(dataset: SeedDataset): string[] {
   return [
-    renderClubTable(
-      "event_series",
-      [
+    renderClubTable({
+      table: "event_series",
+      columns: [
         ...EVENT_COLUMNS,
         ["weekdays", "smallint[]"],
         ["starts_on", "date"],
         ["ends_on", "date"],
       ],
-      dataset.series.map((s) => [
+      rows: dataset.series.map((s) => [
         s.id,
         s.title,
         s.eventType,
@@ -231,17 +238,17 @@ function renderCalendar(dataset: SeedDataset): string[] {
         s.startsOn,
         s.endsOn,
       ]),
-      GROUP_AUDIENCE,
-    ),
-    renderClubTable(
-      "event_series_groups",
-      [["series_id", "uuid"], GROUP_LINK],
-      dataset.series.map((s) => [s.id, s.groupId]),
-    ),
-    renderClubTable(
-      "events",
-      [...EVENT_COLUMNS, ["series_id", "uuid"], ["starts_on", "date"]],
-      dataset.events.map((e) => [
+      fixed: GROUP_AUDIENCE,
+    }),
+    renderClubTable({
+      table: "event_series_groups",
+      columns: [["series_id", "uuid"], GROUP_LINK],
+      rows: dataset.series.map((s) => [s.id, s.groupId]),
+    }),
+    renderClubTable({
+      table: "events",
+      columns: [...EVENT_COLUMNS, ["series_id", "uuid"], ["starts_on", "date"]],
+      rows: dataset.events.map((e) => [
         e.id,
         e.title,
         e.eventType,
@@ -251,50 +258,50 @@ function renderCalendar(dataset: SeedDataset): string[] {
         e.seriesId,
         e.startsOn,
       ]),
-      GROUP_AUDIENCE,
-    ),
-    renderClubTable(
-      "event_groups",
-      [["event_id", "uuid"], GROUP_LINK],
-      dataset.events.map((e) => [e.id, e.groupId]),
-    ),
+      fixed: GROUP_AUDIENCE,
+    }),
+    renderClubTable({
+      table: "event_groups",
+      columns: [["event_id", "uuid"], GROUP_LINK],
+      rows: dataset.events.map((e) => [e.id, e.groupId]),
+    }),
   ];
 }
 
 function renderParticipation(dataset: SeedDataset): string[] {
   return [
-    renderClubTable(
-      "attendance_records",
-      [
+    renderClubTable({
+      table: "attendance_records",
+      columns: [
         ["event_id", "uuid"],
         ["user_id", "uuid"],
         ["status", "text"],
         ["recorded_by", "uuid"],
         ["recorded_at", "timestamptz"],
       ],
-      dataset.attendance.map((a) => [
+      rows: dataset.attendance.map((a) => [
         a.eventId,
         a.userId,
         a.status,
         a.recordedBy,
         a.recordedAt,
       ]),
-    ),
-    renderClubTable(
-      "event_rsvps",
-      [
+    }),
+    renderClubTable({
+      table: "event_rsvps",
+      columns: [
         ["event_id", "uuid"],
         ["user_id", "uuid"],
         ["response", "text"],
         ["responded_at", "timestamptz"],
       ],
-      dataset.rsvps.map((r) => [
+      rows: dataset.rsvps.map((r) => [
         r.eventId,
         r.userId,
         r.response,
         r.respondedAt,
       ]),
-    ),
+    }),
   ];
 }
 
@@ -306,9 +313,9 @@ function groupLinksOf(posts: readonly SeedNewsPost[]): Row[] {
 
 function renderNews(dataset: SeedDataset): string[] {
   return [
-    renderClubTable(
-      "news_posts",
-      [
+    renderClubTable({
+      table: "news_posts",
+      columns: [
         ["id", "uuid"],
         ["title", "text"],
         ["body", "text"],
@@ -317,7 +324,7 @@ function renderNews(dataset: SeedDataset): string[] {
         ["author_id", "uuid"],
         ["published_at", "timestamptz"],
       ],
-      dataset.newsPosts.map((p) => [
+      rows: dataset.newsPosts.map((p) => [
         p.id,
         p.title,
         p.body,
@@ -326,15 +333,15 @@ function renderNews(dataset: SeedDataset): string[] {
         p.authorId,
         p.publishedAt,
       ]),
-    ),
-    renderClubTable(
-      "news_post_groups",
-      [["post_id", "uuid"], GROUP_LINK],
-      groupLinksOf(dataset.newsPosts),
-    ),
-    renderClubTable(
-      "notifications",
-      [
+    }),
+    renderClubTable({
+      table: "news_post_groups",
+      columns: [["post_id", "uuid"], GROUP_LINK],
+      rows: groupLinksOf(dataset.newsPosts),
+    }),
+    renderClubTable({
+      table: "notifications",
+      columns: [
         ["id", "uuid"],
         ["user_id", "uuid"],
         ["type", "text"],
@@ -342,7 +349,7 @@ function renderNews(dataset: SeedDataset): string[] {
         ["created_at", "timestamptz"],
         ["read_at", "timestamptz"],
       ],
-      dataset.notifications.map((n) => [
+      rows: dataset.notifications.map((n) => [
         n.id,
         n.userId,
         n.type,
@@ -350,7 +357,7 @@ function renderNews(dataset: SeedDataset): string[] {
         n.createdAt,
         n.readAt,
       ]),
-    ),
+    }),
   ];
 }
 
@@ -359,14 +366,14 @@ function renderNews(dataset: SeedDataset): string[] {
  * `gen_random_uuid()`, y la nota tiene que ser la misma en cada sembrado. */
 function renderEvaluations(dataset: SeedDataset): string[] {
   return [
-    renderClubTable(
-      "member_evaluations",
-      [
+    renderClubTable({
+      table: "member_evaluations",
+      columns: [
         ["id", "uuid"],
         ["user_id", "uuid"],
       ],
-      dataset.evaluations.map((e) => [e.id, e.userId]),
-    ),
+      rows: dataset.evaluations.map((e) => [e.id, e.userId]),
+    }),
     `insert into public.member_evaluation_ratings (evaluation_id, category_id, club_id, rating)
 select e.id, cat.id, e.club_id, ${MIN_RATING} + abs(hashtext(e.id::text || cat.name)) % ${RATING_SPREAD}
 from public.member_evaluations e
@@ -377,9 +384,9 @@ where e.club_id = (select id from seed_club);`,
 }
 
 function renderMemberships(dataset: SeedDataset): string {
-  return renderClubTable(
-    "memberships",
-    [
+  return renderClubTable({
+    table: "memberships",
+    columns: [
       ["user_id", "uuid"],
       ["plan", "text"],
       ["status", "text"],
@@ -387,7 +394,7 @@ function renderMemberships(dataset: SeedDataset): string {
       ["waived_by", "uuid"],
       ["waived_reason", "text"],
     ],
-    dataset.memberships.map((m) => [
+    rows: dataset.memberships.map((m) => [
       m.userId,
       m.plan,
       m.status,
@@ -395,7 +402,7 @@ function renderMemberships(dataset: SeedDataset): string {
       m.status === "waived" ? m.waivedBy : null,
       m.status === "waived" ? m.waivedReason : null,
     ]),
-  );
+  });
 }
 
 /** Lo que imprime al final: cuántas filas quedaron de lo que pide NFR-008. */
