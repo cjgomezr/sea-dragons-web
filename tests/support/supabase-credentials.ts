@@ -7,8 +7,9 @@ export type SupabaseCredentialsDecision =
   | { readonly kind: "skip"; readonly reason: string };
 
 /** Actions pone `CI` en cada runner, y es la única señal que importa: allí las
- * credenciales de `seadragons-dev` están en los secretos del repositorio desde
- * el issue #149, así que faltar es un secreto mal configurado. */
+ * credenciales siempre están (en `checks`, las del Supabase local desde el
+ * #536; en la visual, las de `seadragons-dev`), así que faltar es un workflow
+ * mal configurado. */
 function runsInCi(env: Environment): boolean {
   return (env.CI ?? "") !== "";
 }
@@ -33,10 +34,11 @@ export function decideSupabaseCredentials(
   const named = missingKeys.join(", ");
   if (runsInCi(env)) {
     throw new Error(
-      `Faltan variables de entorno de Supabase en CI: ${named}. Son ` +
-        "secretos del repositorio (Settings, Secrets and variables, Actions) " +
-        "con los valores de seadragons-dev. Sin ellas esta corrida se " +
-        "saltaría justo las pruebas que tenía que decidir.",
+      `Faltan variables de entorno de Supabase en CI: ${named}. En checks ` +
+        "las deja la acción .github/actions/supabase-local, que tiene que " +
+        "correr antes de los tests; en la visual son secretos del " +
+        "repositorio con los valores de seadragons-dev. Sin ellas esta " +
+        "corrida se saltaría justo las pruebas que tenía que decidir.",
     );
   }
   return {

@@ -22,9 +22,10 @@ const MIGRATIONS = ".github/workflows/migrations.yml";
  * tarda de 30 a 40 minutos y una visual de 15 a 20. */
 const DEFAULT_MAX_WAIT_MINUTES = 150;
 
-/** La corrida que pregunta: `checks` de la rama impl-2, arrancada a las 10. */
+/** La corrida que pregunta: la visual de la rama impl-2, arrancada a las 10.
+ * Desde el #536 es el único workflow que pide turno. */
 const MY_RUN_ID = "500";
-const MY_RUN = `2026-10-06T10:00:00Z pull_request impl-2 ${CHECKS}`;
+const MY_RUN = `2026-10-06T10:00:00Z pull_request impl-2 ${VISUAL}`;
 
 const EARLIER = "2026-10-06T09:50:00Z";
 const EVEN_EARLIER = "2026-10-06T09:40:00Z";
@@ -194,7 +195,7 @@ describe("wait-for-dev-turn", () => {
       id: MY_RUN_ID,
       startedAt: "2026-10-06T10:00:00Z",
       branch: "impl-2",
-      workflowPath: CHECKS,
+      workflowPath: VISUAL,
     });
 
     const { code, sleeps } = await run({
@@ -274,7 +275,7 @@ describe("wait-for-dev-turn", () => {
       id: "450",
       startedAt: EARLIER,
       branch: "impl-2",
-      workflowPath: CHECKS,
+      workflowPath: VISUAL,
     });
 
     const { code, sleeps } = await run({
@@ -286,21 +287,19 @@ describe("wait-for-dev-turn", () => {
     expect(sleeps).toBe(0);
   });
 
-  it("sí espera a la visual del mismo PR: también usa dev", async () => {
-    const sameBranchVisual = runLine({
-      id: "450",
+  // `checks` usa su propio Supabase local desde el #536. Una corrida suya no
+  // tiene job de turno, y sin quitarla de la lista contaría como que lo pidió.
+  it("no espera a una corrida de checks: ya no usa dev", async () => {
+    const checks = runLine({
+      id: "400",
       startedAt: EARLIER,
-      branch: "impl-2",
-      workflowPath: VISUAL,
+      workflowPath: CHECKS,
     });
 
-    const { sleeps } = await run({
-      IN_PROGRESS_1: sameBranchVisual,
-      GATE_OF_450: "success",
-      IN_PROGRESS_2: "",
-    });
+    const { code, sleeps } = await run({ IN_PROGRESS_1: checks });
 
-    expect(sleeps).toBe(1);
+    expect(code).toBe(0);
+    expect(sleeps).toBe(0);
   });
 
   it("no espera a un workflow que no usa dev", async () => {

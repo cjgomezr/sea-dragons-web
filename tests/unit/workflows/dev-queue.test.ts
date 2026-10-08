@@ -58,14 +58,16 @@ function needsOf(job: Job | undefined): string[] {
   return Array.isArray(needs) ? needs : [needs];
 }
 
+/** Los jobs que todavía usan dev. `checks` salió de la cola en el #536: usa
+ * su propio Supabase local. */
 const DEV_JOBS: ReadonlyArray<[string, string]> = [
-  [CHECKS, "checks"],
   [VISUAL, "compare"],
   [VISUAL, "regenerate"],
 ];
 
 const JOBS_WITHOUT_DEV: ReadonlyArray<[string, string]> = [
   [CHECKS, TREE_JOB],
+  [CHECKS, "checks"],
   [VISUAL, TREE_JOB],
   [VISUAL, "reparto"],
   [VISUAL, "visual-diff"],
@@ -84,7 +86,7 @@ describe("cola entre corridas para seadragons-dev (#507)", () => {
   // Si Actions corta antes que el script, la corrida se pierde sin decir
   // detrás de quién esperaba (#517). El margen cubre las consultas a la API,
   // que el máximo del script no cuenta.
-  it.each([CHECKS, VISUAL])(
+  it.each([VISUAL])(
     "%s: el turno dura más que la espera máxima del script, con margen",
     (file) => {
       const timeout = readWorkflow(file).jobs[TURN_JOB]?.["timeout-minutes"];
@@ -95,11 +97,14 @@ describe("cola entre corridas para seadragons-dev (#507)", () => {
     },
   );
 
-  it("migrations.yml, con su Postgres propio, no hace cola", () => {
-    expect(readWorkflow(MIGRATIONS).jobs[TURN_JOB]).toBeUndefined();
-  });
+  it.each([MIGRATIONS, CHECKS])(
+    "%s, con su base propia, no tiene job de turno",
+    (file) => {
+      expect(readWorkflow(file).jobs[TURN_JOB]).toBeUndefined();
+    },
+  );
 
-  it.each([CHECKS, VISUAL])(
+  it.each([VISUAL])(
     "%s: el turno es un solo job, así que las tandas no se esperan entre sí",
     (file) => {
       expect(readWorkflow(file).jobs[TURN_JOB]?.strategy).toBeUndefined();
@@ -113,7 +118,7 @@ describe("cola entre corridas para seadragons-dev (#507)", () => {
     expect(regenerate?.strategy?.matrix).toBeDefined();
   });
 
-  it.each([CHECKS, VISUAL])(
+  it.each([VISUAL])(
     "%s: el turno lo pide el script del repositorio con la API de Actions",
     (file) => {
       const turn = readWorkflow(file).jobs[TURN_JOB];
@@ -129,7 +134,7 @@ describe("cola entre corridas para seadragons-dev (#507)", () => {
 
   // Un push a main cuyo árbol ya pasó en el PR no toca dev: no debe ocupar
   // un sitio en la cola.
-  it.each([CHECKS, VISUAL])(
+  it.each([VISUAL])(
     "%s: el turno se salta cuando el árbol ya estaba verificado",
     (file) => {
       const turn = readWorkflow(file).jobs[TURN_JOB];
@@ -143,7 +148,7 @@ describe("cola entre corridas para seadragons-dev (#507)", () => {
 
   // Un push nuevo al PR cancela la corrida vieja; con `always()` su job de
   // turno seguiría esperando, y luego usando dev, igual (#416).
-  it.each([CHECKS, VISUAL])(
+  it.each([VISUAL])(
     "%s: una corrida cancelada deja de esperar turno",
     (file) => {
       const condition = readWorkflow(file).jobs[TURN_JOB]?.if ?? "";
@@ -155,7 +160,7 @@ describe("cola entre corridas para seadragons-dev (#507)", () => {
 
   // El turno no mira el evento: un push a main y una aceptación a mano
   // entran en la misma cola que un PR.
-  it.each([CHECKS, VISUAL])(
+  it.each([VISUAL])(
     "%s: el turno no distingue PR, push a main ni aceptación",
     (file) => {
       expect(readWorkflow(file).jobs[TURN_JOB]?.if ?? "").not.toMatch(

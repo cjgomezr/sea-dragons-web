@@ -5,13 +5,14 @@
 #
 # Hasta el issue #149 corría sin ningún secreto, y el precio era que las
 # pruebas de integración y de RLS se saltaban enteras: el check salía verde sin
-# haberlas corrido. Ahora el paso de tests recibe las credenciales de
-# `seadragons-dev`, y faltar deja de ser un salto silencioso para ser un fallo
+# haberlas corrido. Desde el #536 (E20) corren contra un Supabase local que el
+# job levanta en el propio runner, sin tocar `seadragons-dev` ni esperar turno.
+# Que falten sus llaves sigue siendo un fallo y no un salto silencioso
 # (`decideSupabaseCredentials`, en tests/support/supabase-credentials.ts).
 #
-# Consecuencia asumida: un PR desde un fork no recibe secretos, así que este
-# check saldría rojo. Este repositorio es privado y no recibe PRs desde forks
-# (ver docs/entornos.md, "CI escribe en seadragons-dev"). Si algún día los
+# Consecuencia asumida: un PR desde un fork no recibe los secretos de Stripe,
+# así que este check saldría rojo. Este repositorio es privado y no recibe PRs
+# desde forks (ver docs/entornos.md, "CI escribe en seadragons-dev"). Si algún día los
 # recibe, la decisión hay que tomarla ahí y no aquí: saltarse la suite para que
 # un fork salga verde es exactamente el agujero que el #149 cerró.
 #
@@ -97,7 +98,7 @@ jobs:
 
   # Cuando la suite se salta, corren igual los tests que listan las líneas
   # base: un PNG nuevo puede dejar una captura huérfana o un estado en español
-  # sin sus seis. No necesitan dev ni navegador, así que no piden turno.
+  # sin sus seis. No necesitan base ni navegador, así que no levantan Supabase.
   tests-lineas-base:
     needs: [solo-lineas-base]
     if: needs.solo-lineas-base.outputs.ya_verificado == 'true'
@@ -112,37 +113,8 @@ jobs:
       - name: Tests que leen las líneas base
         run: npx vitest run tests/unit/scripts/spanish-captures.test.ts tests/unit/scripts/visual-baselines-tracking.test.ts
 
-  # Los tests de integración usan `seadragons-dev`, igual que la visual. Este
-  # job espera a que ninguna corrida anterior de los dos workflows lo esté
-  # usando (#507): diez jobs a la vez contra dev lo dejaban sin contestar. Va
-  # aparte y no como paso de `checks` para que su nombre lo vean las demás
-  # corridas. Ver scripts/wait-for-dev-turn.sh.
-  #
-  # `!cancelled()` y no `always()`: un push nuevo al PR cancela esta corrida,
-  # y con `always()` seguiría esperando turno para nada (#416). Se salta, sin
-  # ocupar sitio en la cola, cuando el árbol ya estaba verificado.
-  turno-dev:
-    needs: [arbol-ya-verificado, solo-lineas-base]
-    if: "!cancelled() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true' && needs.solo-lineas-base.outputs.ya_verificado != 'true'"
-    runs-on: ubuntu-latest
-    # Red por si una llamada a la API se cuelga: el máximo del script sólo
-    # cuenta las esperas entre consultas, y el de Actions son seis horas. Va
-    # 15 minutos por encima de los 150 del script, para que corte él con su
-    # mensaje (#517).
-    timeout-minutes: 165
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - uses: actions/checkout@v4
-      - name: Espera turno en seadragons-dev
-        run: bash scripts/wait-for-dev-turn.sh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-
   checks:
-    needs: [arbol-ya-verificado, solo-lineas-base, turno-dev]
+    needs: [arbol-ya-verificado, solo-lineas-base]
     # Una función de estado es obligatoria: sin ella, Actions exige
     # implícitamente que la dependencia haya terminado en success(), y en un
     # pull request ese job ni siquiera arranca. Sin esto, los checks se
@@ -150,11 +122,8 @@ jobs:
     #
     # `!cancelled()` y no `always()`: al cancelar una corrida, GitHub no corta
     # un job cuyo `if` sigue dando true. Con `always()`, un push nuevo al PR
-    # dejaba los checks viejos contra dev junto a los nuevos, y la cola da por
-    # libre el sitio de una corrida cancelada (#416, #507). Por la función de
-    # estado hay que pedir el turno en dev a mano: arrancaría aunque la espera
-    # se hubiera agotado.
-    if: "!cancelled() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true' && needs.solo-lineas-base.outputs.ya_verificado != 'true' && needs.turno-dev.result == 'success'"
+    # dejaba los checks viejos corriendo junto a los nuevos (#416).
+    if: "!cancelled() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true' && needs.solo-lineas-base.outputs.ya_verificado != 'true'"
     runs-on: ubuntu-latest
     steps:
       # Con toda la historia: el paso `texto` compara la rama con main, y el
@@ -193,7 +162,7 @@ jobs:
         run: npm run test:kit
       # Un PR que solo cambia texto (.github/text-only-paths.txt) no puede
       # romper un test de red, y cada corrida completa son unos 40.000 viajes
-      # a seadragons-dev (#439). Solo en pull_request: en un push a main el
+      # a la base (#439). Solo en pull_request: en un push a main el
       # paso no corre, la salida queda vacía y los tests corren completos. Si
       # el script no puede comparar con main, responde que no es texto.
       - id: texto
@@ -202,21 +171,28 @@ jobs:
         run: |
           if bash scripts/branch-is-text-only.sh; then
             echo "solo_texto=true" >> "$GITHUB_OUTPUT"
-            echo "PR de solo texto: todos sus archivos están en .github/text-only-paths.txt, así que los tests de red no corren y no reciben credenciales."
+            echo "PR de solo texto: todos sus archivos están en .github/text-only-paths.txt, así que los tests de red no corren, no reciben credenciales y no se levanta Supabase."
           else
             echo "solo_texto=false" >> "$GITHUB_OUTPUT"
           fi
-      # Las credenciales de `seadragons-dev`, y sólo en este paso: el build no
-      # las necesita y la llave de servicio no tiene nada que hacer cerca de un
-      # bundle. Sin ellas, las pruebas de integración y de RLS se saltan
-      # enteras y el check sale verde sin haberlas corrido (issue #149). Que
-      # apunten al proyecto de desarrollo lo verifica el guardia de entorno
-      # antes del primer test, no la confianza en quien pegó el secreto.
+      # La base de los tests de integración y de RLS es de esta corrida: la
+      # acción deja su URL y sus llaves en el entorno del job, y se muere con
+      # el runner (#536, E20). Son las llaves de ejemplo del CLI, no secretos.
+      # Si no arranca, el job falla; nunca cae a `seadragons-dev`.
       #
+      # Mismo salto que los tests de red: un PR de solo texto no los corre y
+      # no necesita minutos de Docker para nada.
+      - name: Levanta Supabase local
+        if: steps.repo.outputs.bootstrapped == 'true' && steps.texto.outputs.solo_texto != 'true'
+        uses: ./.github/actions/supabase-local
       # `RUN_INTEGRATION_TESTS=1` porque fuera de CI esas pruebas se saltan
       # (#415): el Stop gate de cada worker las corría tras cada turno y el
       # proyecto de desarrollo se acercaba al límite de usuarios de Supabase.
       # Aquí se exigen, salvo en un PR de solo texto.
+      #
+      # Los secretos de Stripe en modo de prueba (#454), sólo en este paso.
+      # Stripe no tiene un equivalente local, así que siguen llegando del
+      # repositorio.
       #
       # Actions no tiene operador ternario, y `cond && '' || '1'` daría
       # siempre '1' porque la cadena vacía es falsa. Por eso la condición va
@@ -226,9 +202,6 @@ jobs:
         run: npm test
         env:
           RUN_INTEGRATION_TESTS: ${{ steps.texto.outputs.solo_texto != 'true' && '1' || '' }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
           STRIPE_SECRET_KEY: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.STRIPE_SECRET_KEY || '' }}
           STRIPE_WEBHOOK_SECRET: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.STRIPE_WEBHOOK_SECRET || '' }}
           STRIPE_PRICE_FULL: ${{ steps.texto.outputs.solo_texto != 'true' && secrets.STRIPE_PRICE_FULL || '' }}
