@@ -48,6 +48,14 @@ describe("credenciales de Supabase en la suite de tests", () => {
     );
   });
 
+  // Desde el #537 tampoco la visual: el mensaje no puede mandar a buscar
+  // secretos de dev que ningún workflow pasa ya.
+  it("en CI no manda a buscar las llaves en los secretos de seadragons-dev", () => {
+    expect(() => decideSupabaseCredentials({ CI: "true" })).toThrowError(
+      /^(?![\s\S]*seadragons-dev)/,
+    );
+  });
+
   it("sigue disponible en CI cuando las credenciales sí están", () => {
     expect(decideSupabaseCredentials({ ...CONFIGURED, CI: "true" })).toEqual({
       kind: "available",
