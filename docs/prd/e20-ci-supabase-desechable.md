@@ -1,6 +1,6 @@
 # PRD: E20 · CI con su propio Supabase
 
-**Estado:** borrador · **Fecha:** 8 de octubre de 2026 · **Autor:** sesión de planificación (Claude Code)
+**Estado:** aprobado · **Fecha:** 8 de octubre de 2026 · **Autor:** sesión de planificación (Claude Code)
 
 Fuente: la conversación con el dueño del 6 al 8 de octubre de 2026, el aviso de Supabase sobre la cuota de logs y el PRD de E16b (`docs/prd/e16b-scheduler-y-carga.md`, D7), cuya prueba de carga depende de esta épica. Es una épica de infraestructura añadida después del plan; no cambia ningún requisito del SRD.
 
@@ -123,14 +123,14 @@ Una acción compuesta (por ejemplo `.github/actions/supabase-local`) que cualqui
 
 ## 10. Descomposición en tickets (para write-ticket)
 
-| #   | Título propuesto                                                                                       | Tamaño | Depende de | Auto-merge sugerido                         |
-| --- | ------------------------------------------------------------------------------------------------------ | ------ | ---------- | ------------------------------------------- |
-| 1   | Levanta un Supabase local en el runner con las migraciones del repo, en una acción reutilizable (RF-1) | M      | ninguna    | No: infraestructura nueva de CI             |
-| 2   | Corre los tests de integración del checks contra su propio Supabase y sin cola (RF-2)                  | M      | 1          | No: cambia qué verifica el gate de los PR   |
-| 3   | Corre la visual y la aceptación de capturas contra su propio Supabase por tanda y sin cola (RF-3)      | M      | 2          | No: cambia el gate visual y las líneas base |
-| 4   | Quita la cola de turnos de dev y pone al día la documentación de entornos (RF-4, RF-5)                 | S      | 3          | No: borra un control y toca `CLAUDE.md`     |
-| 5   | Corre en paralelo los tests de integración en CI (RF-6)                                                | S      | 2          | No: puede volver inestable el checks        |
+| #        | Título propuesto                                                                                       | Tamaño | Depende de | Auto-merge sugerido                         |
+| -------- | ------------------------------------------------------------------------------------------------------ | ------ | ---------- | ------------------------------------------- |
+| 1 (#535) | Levanta un Supabase local en el runner con las migraciones del repo, en una acción reutilizable (RF-1) | M      | ninguna    | No: infraestructura nueva de CI             |
+| 2 (#536) | Corre los tests de integración del checks contra su propio Supabase y sin cola (RF-2)                  | M      | 1          | No: cambia qué verifica el gate de los PR   |
+| 3 (#537) | Corre la visual y la aceptación de capturas contra su propio Supabase por tanda y sin cola (RF-3)      | M      | 2          | No: cambia el gate visual y las líneas base |
+| 4 (#538) | Quita la cola de turnos de dev y pone al día la documentación de entornos (RF-4, RF-5)                 | S      | 3          | No: borra un control y toca `CLAUDE.md`     |
+| 5 (#539) | Corre en paralelo los tests de integración en CI (RF-6)                                                | S      | 2          | No: puede volver inestable el checks        |
 
-Los tickets de E16b que esperan esta épica: el #524 (sembrar el club de NFR-008) pasa a depender del ticket 1, y el #525 sigue dependiendo del #524.
+Los tickets de E16b que esperan esta épica: el #524 (sembrar el club de NFR-008) pasa a depender del #535, y el #525 sigue dependiendo del #524.
 
 Los tickets 2 y 3 se prueban a sí mismos en su PR: es mejor correrlos con pocos PR abiertos. Ninguno lleva migraciones, así que los puede hacer cualquiera de los dos.
