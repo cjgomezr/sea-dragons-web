@@ -13,19 +13,27 @@ const WORKFLOW_PATH = path.join(
   ".github/workflows/visual-baselines.yml",
 );
 
-/** Los orígenes de prueba que el manifiesto pone en CI: la base de desarrollo
- * y la cuenta de Stripe en modo de prueba (#454), con la que Pagos ofrece
- * Checkout y el test de integración abre una sesión de verdad. */
-const DEVELOPMENT_SOURCES = ["seadragons-dev", "stripe-test"] as const;
+/** Los orígenes que el manifiesto pone en los secretos de CI. Desde el #537
+ * la visual solo toma de ahí la cuenta de Stripe en modo de prueba (#454),
+ * con la que Pagos ofrece Checkout; Supabase lo levanta cada tanda. */
+const STRIPE_TEST_SOURCE = "stripe-test";
+const DEVELOPMENT_DATABASE_SOURCE = "seadragons-dev";
 
-/** Las credenciales que el manifiesto pone en los secretos del repositorio.
- * Sale de ahí y no de una lista escrita a mano: declarar una cuarta en el
- * manifiesto y olvidarla en el workflow tiene que dejar esto en rojo. */
+const LOCAL_SUPABASE_ACTION = "./.github/actions/supabase-local";
+
+/** Las variables que el manifiesto pone en CI desde un origen. Sale de ahí y
+ * no de una lista escrita a mano: declarar una más en el manifiesto y
+ * olvidarla en el workflow tiene que dejar esto en rojo. */
+function ciVariablesFrom(source: string): string[] {
+  return variablesFromSource(readEnvironmentManifest(), "ci", source);
+}
+
+/** Todo lo que el manifiesto pone en CI como de prueba: dev y Stripe. */
 function developmentCredentials(): string[] {
-  const manifest = readEnvironmentManifest();
-  return DEVELOPMENT_SOURCES.flatMap((source) =>
-    variablesFromSource(manifest, "ci", source),
-  );
+  return [
+    ...ciVariablesFrom(DEVELOPMENT_DATABASE_SOURCE),
+    ...ciVariablesFrom(STRIPE_TEST_SOURCE),
+  ];
 }
 
 function referencedSecrets(): string[] {
@@ -160,24 +168,42 @@ describe("visual-baselines.yml", () => {
     expect(runLines("accept")).toMatch(/reviewed_run_url/);
   });
 
-  // Desde el #135 casi toda pantalla vive detrás de la frontera de sesión, y
-  // el arranque de Playwright abre esa sesión creando un socio en
-  // `seadragons-dev`. Sin estas variables, el job no falla: se salta las
-  // pruebas y sale verde sobre capturas que nadie comparó (issue #149).
+  // Pagos ofrece Checkout sólo con Stripe configurado (#454): sin estas, el
+  // estado `pagos-pendiente` fotografiaría "pagos sin configurar". Supabase ya
+  // no viene de aquí: lo deja en el entorno la acción del Supabase local.
   it.each([
     ["compare", "Compara contra la línea base vinculante"],
     ["regenerate", "Regenera la línea base"],
   ])(
-    "da al paso que corre Playwright en el job $0 las credenciales que el manifiesto declara en CI",
+    "da al paso que corre Playwright en el job $0 las llaves de Stripe en modo de prueba que el manifiesto declara en CI",
     (jobName, stepName) => {
       const env = stepNamed(jobName, stepName).env ?? {};
 
-      expect(Object.keys(env).sort()).toEqual(developmentCredentials().sort());
+      expect(Object.keys(env).sort()).toEqual(
+        ciVariablesFrom(STRIPE_TEST_SOURCE).sort(),
+      );
       for (const [name, value] of Object.entries(env)) {
         expect(value).toBe(`\${{ secrets.${name} }}`);
       }
     },
   );
+
+  // La visual era la última que usaba `seadragons-dev` (#537, E20): cada
+  // tanda compila y fotografía contra su propio Supabase.
+  it("no pasa a ningún paso las credenciales de seadragons-dev", () => {
+    const devVariables = ciVariablesFrom(DEVELOPMENT_DATABASE_SOURCE);
+    const stepEnvNames = Object.values(parseWorkflow().jobs).flatMap((job) =>
+      job.steps.flatMap((step) => Object.keys(step.env ?? {})),
+    );
+
+    expect(devVariables.length).toBeGreaterThan(0);
+    expect(
+      referencedSecrets().filter((name) => devVariables.includes(name)),
+    ).toEqual([]);
+    expect(stepEnvNames.filter((name) => devVariables.includes(name))).toEqual(
+      [],
+    );
+  });
 
   // Una llave de escritura en el entorno del job la heredarían `npm ci` y
   // cualquier postinstall de una dependencia, que no tienen nada que hacer
@@ -195,8 +221,8 @@ describe("visual-baselines.yml", () => {
     }
   });
 
-  it("no referencia ningún secreto que el manifiesto no ponga en CI como de desarrollo", () => {
-    const permitted = new Set(developmentCredentials());
+  it("no referencia ningún secreto que no sea de Stripe en modo de prueba", () => {
+    const permitted = new Set(ciVariablesFrom(STRIPE_TEST_SOURCE));
 
     expect(referencedSecrets().filter((name) => !permitted.has(name))).toEqual(
       [],
@@ -356,11 +382,22 @@ describe("aceptación repartida (#255)", () => {
     expect(runs).toMatch(/exit 1/);
   });
 
+  // Sin función de estado en el `if`, Actions exige que todas las tandas de
+  // `regenerate` hayan salido bien. Cualquier función de estado lo apagaría.
   it("commitea sólo cuando todas las partes terminaron bien", () => {
     const accept = parseWorkflow().jobs.accept;
 
     expect(accept?.needs).toContain("regenerate");
-    expect(accept?.if).not.toMatch(/always\(\)/);
+    expect(accept?.if).not.toMatch(/always\(\)|cancelled\(\)|failure\(\)/);
+  });
+
+  // Sin dependencias no hay un antepasado saltado que la deje sin correr, ni
+  // nada a lo que esperar antes de empezar.
+  it("regenerate arranca en cuanto se lanza la aceptación, sin esperar a nada", () => {
+    const regenerate = parseWorkflow().jobs.regenerate;
+
+    expect(regenerate?.needs).toBeUndefined();
+    expect(regenerate?.if).toBe("github.event_name == 'workflow_dispatch'");
   });
 
   it("baja las capturas de todas las partes antes de commitear", () => {
@@ -529,9 +566,98 @@ describe("main no repite la visual que el PR ya pasó (#441)", () => {
   it("la aceptación a mano no espera a la pregunta", () => {
     const { regenerate, accept } = parseWorkflow().jobs;
 
-    // Sí espera su turno en dev (#507, tests/unit/workflows/dev-queue.test.ts),
-    // pero no depende de la pregunta del árbol.
     expect(regenerate?.needs ?? []).not.toContain(GATE_JOB);
     expect(accept?.needs).toEqual("regenerate");
   });
+});
+
+function indexOfStep(
+  jobName: string,
+  predicate: (step: WorkflowStep) => boolean,
+): number {
+  return stepsOf(jobName).findIndex(predicate);
+}
+
+function needsOf(jobName: string): string[] {
+  const needs = parseWorkflow().jobs[jobName]?.needs ?? [];
+  return Array.isArray(needs) ? needs : [needs];
+}
+
+// Cada tanda es un runner distinto, así que cada una levanta el suyo (#537,
+// E20). Ya no comparten `seadragons-dev`, ni con otras corridas ni entre sí.
+describe("un Supabase local por tanda (#537)", () => {
+  it.each(SHARDED_JOBS)(
+    "el job %s sigue repartido en cuatro tandas",
+    (jobName) => {
+      expect(parseWorkflow().jobs[jobName]?.strategy?.matrix?.shard).toEqual([
+        1, 2, 3, 4,
+      ]);
+    },
+  );
+
+  it.each(SHARDED_JOBS)(
+    "el job %s levanta su Supabase con la acción del repositorio",
+    (jobName) => {
+      expect(stepUsing(jobName, LOCAL_SUPABASE_ACTION).if).toBeUndefined();
+    },
+  );
+
+  // La acción arranca el CLI de `devDependencies`.
+  it.each(SHARDED_JOBS)(
+    "el job %s lo levanta después de instalar las dependencias",
+    (jobName) => {
+      const install = indexOfStep(jobName, (step) => step.run === "npm ci");
+      const supabase = indexOfStep(
+        jobName,
+        (step) => step.uses === LOCAL_SUPABASE_ACTION,
+      );
+
+      expect(install).toBeGreaterThanOrEqual(0);
+      expect(supabase).toBeGreaterThan(install);
+    },
+  );
+
+  // El prerender lee la marca del club (#292): compilar sin base caería al
+  // respaldo y fotografiaría un nombre que la base no tiene.
+  it.each(SHARDED_JOBS)("el job %s lo levanta antes de compilar", (jobName) => {
+    const supabase = indexOfStep(
+      jobName,
+      (step) => step.uses === LOCAL_SUPABASE_ACTION,
+    );
+    const build = indexOfStep(
+      jobName,
+      (step) => step.name === "Compila la aplicación",
+    );
+
+    expect(supabase).toBeLessThan(build);
+  });
+
+  it.each(SHARDED_JOBS)(
+    "el job %s compila con lo que dejó la acción, sin secretos",
+    (jobName) => {
+      expect(stepNamed(jobName, "Compila la aplicación").env).toBeUndefined();
+    },
+  );
+
+  it("no queda un job de turno en dev", () => {
+    expect(parseWorkflow().jobs["turno-dev"]).toBeUndefined();
+  });
+
+  it.each(Object.keys(parseWorkflow().jobs))(
+    "el job %s no espera turno en dev",
+    (jobName) => {
+      expect(needsOf(jobName)).not.toContain("turno-dev");
+    },
+  );
+
+  // Esperar al `checks` del propio PR volvería a poner a la visual en fila.
+  it.each(SHARDED_JOBS)(
+    "el job %s no espera a ningún otro workflow",
+    (jobName) => {
+      expect(
+        needsOf(jobName).every((need) => need in parseWorkflow().jobs),
+      ).toBe(true);
+      expect(runLines(jobName)).not.toMatch(/gh run (watch|list)/);
+    },
+  );
 });

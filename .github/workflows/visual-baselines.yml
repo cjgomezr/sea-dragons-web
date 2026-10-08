@@ -104,8 +104,7 @@ permissions:
   contents: read
 
 # Un push nuevo al PR deja sin valor la visual del commit anterior, y cada
-# corrida son cuatro máquinas contra `seadragons-dev` (#416). Sólo se cancela
-# en `pull_request`. Fuera de un PR el grupo lleva el id de la corrida y no la
+# corrida son cuatro máquinas (#416). Sólo se cancela en `pull_request`. Fuera de un PR el grupo lleva el id de la corrida y no la
 # rama: GitHub deja una sola corrida en espera por grupo y descarta la que ya
 # esperaba, así que un grupo por rama sin cancelar pondría en cola los merges a
 # `main` y perdería el del medio. Cada merge comprueba su árbol y
@@ -118,8 +117,8 @@ concurrency:
 jobs:
   # En un push a main, ¿este árbol es el mismo que la visual del PR acaba de
   # comparar en verde? La fábrica mergea con squash un PR rebasado, así que
-  # casi siempre lo es, y repetir cuatro máquinas contra `seadragons-dev` no
-  # puede descubrir nada (#441). El script es el de `checks.yml`, apuntado a
+  # casi siempre lo es, y repetir cuatro máquinas no puede descubrir nada
+  # (#441). El script es el de `checks.yml`, apuntado a
   # este workflow; ante cualquier duda responde que no y se compara.
   #
   # El commit que empuja `accept` no rompe esto: su `compare` sobre la rama
@@ -145,62 +144,27 @@ jobs:
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
           WORKFLOW_FILE: visual-baselines.yml
 
-  # Comparar y regenerar usan `seadragons-dev`. Este job espera a que ninguna
-  # corrida anterior de este workflow lo esté usando (#507); checks.yml ya no
-  # hace cola, porque usa su propio Supabase local (#536). Es uno solo, antes
-  # de la matriz: la cola es entre corridas, y las cuatro partes de ésta
-  # arrancan juntas cuando le toca. Ver scripts/wait-for-dev-turn.sh.
-  #
-  # Sin condición de evento: un push a main y una aceptación a mano entran en
-  # la misma cola que un PR. `!cancelled()` para que una corrida cancelada deje
-  # de esperar (#416), y saltado, sin ocupar sitio, cuando el árbol ya estaba
-  # verificado.
-  turno-dev:
-    needs: [arbol-ya-verificado]
-    if: "!cancelled() && needs.arbol-ya-verificado.outputs.ya_verificado != 'true'"
-    runs-on: ubuntu-latest
-    # Red por si una llamada a la API se cuelga: el máximo del script sólo
-    # cuenta las esperas entre consultas, y el de Actions son seis horas. Va
-    # 15 minutos por encima de los 150 del script, para que corte él con su
-    # mensaje (#517).
-    timeout-minutes: 165
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - uses: actions/checkout@v4
-      - name: Espera turno en seadragons-dev
-        run: bash scripts/wait-for-dev-turn.sh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-
   # La suite se reparte en varias máquinas (#255): en una sola, comparar
-  # tardaba más de 8 minutos y aceptar entre 13 y 16. Cada parte siembra sus
-  # propios miembros de prueba en `seadragons-dev` con un nombre único por
-  # corrida (#254), así que las partes no chocan entre sí. Más partes también
-  # son más sesiones abiertas a la vez contra el límite de peticiones de
-  # Supabase Auth; si ese límite empieza a hundir corridas, la salida es
-  # bajar el número de partes.
+  # tardaba más de 8 minutos y aceptar entre 13 y 16. Cada parte es un runner
+  # distinto y levanta su propio Supabase local (#537, E20), así que las
+  # partes no comparten base ni entre sí ni con otras corridas: no hay cola
+  # que esperar ni nada que limpiar al terminar.
   #
   # `regenerate` se reparte exactamente igual; scripts/check-shard-coverage.ts
   # lo comprueba en el job `reparto`.
   compare:
-    needs: [arbol-ya-verificado, turno-dev]
+    needs: [arbol-ya-verificado]
     # En un pull request la pregunta no arranca, y sin una función de estado
     # Actions exige que la dependencia haya salido bien: la visual se saltaría
     # en todos los PRs. `!cancelled()` y no `always()`: al cancelar una
     # corrida, GitHub no corta un job cuyo `if` sigue dando true, así que con
     # `always()` un push nuevo al PR dejaría las cuatro partes viejas corriendo
-    # contra `seadragons-dev` (#416). Un `compare` saltado queda `skipped`, y
-    # ni `visual-diff` ni `report-incident` arrancan. El turno se pide a mano
-    # por lo mismo: con la función de estado, arrancaría aunque la espera se
-    # hubiera agotado.
+    # (#416). Un `compare` saltado queda `skipped`, y ni `visual-diff` ni
+    # `report-incident` arrancan.
     if: >-
       !cancelled()
       && (github.event_name == 'pull_request' || github.event_name == 'push')
       && needs.arbol-ya-verificado.outputs.ya_verificado != 'true'
-      && needs.turno-dev.result == 'success'
     runs-on: ubuntu-latest
     strategy:
       # Que una parte falle no cancela las demás: el diff de cada una es lo
@@ -217,30 +181,28 @@ jobs:
       - run: npm ci
       - uses: ./.github/actions/playwright-browsers
       # Playwright sirve en CI la aplicación compilada (`npm run start`, ver
-      # tests/support/web-server-command.ts). Sin credenciales, igual que en
-      # checks.yml: el build no las necesita.
+      # tests/support/web-server-command.ts).
+      # La base de esta parte: la acción deja su URL y sus llaves en el
+      # entorno del job, y se muere con el runner (#537, E20). Son las llaves
+      # de ejemplo del CLI, no secretos. Si no arranca, el job falla; nunca
+      # cae a `seadragons-dev`.
+      - name: Levanta Supabase local
+        uses: ./.github/actions/supabase-local
+      # Después del Supabase local: al compilar, Next prerenderiza las
+      # pantallas y eso ejecuta la lectura de la marca del club (#292). Sin
+      # base cae al respaldo, y en cuanto un club se renombre las capturas
+      # saldrían con el nombre viejo y la comparación fallaría sin decir por
+      # qué.
       - name: Compila la aplicación
-        # Con los secretos: al compilar, Next prerenderiza las pantallas y eso
-        # ejecuta la lectura de la marca del club (#292). Sin ellos cae al
-        # respaldo, y hoy no se nota sólo porque el respaldo coincide con lo
-        # sembrado. En cuanto un club se renombre, las capturas saldrían con el
-        # nombre viejo y la comparación fallaría sin decir por qué.
         run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      # Sólo en este paso: `npm ci` y sus postinstall no tienen nada que hacer
-      # con una llave de escritura. El `npm run start` que Playwright levanta
-      # sí las recibe, porque lo arranca como hijo de este proceso, y las
-      # necesita: la aplicación que se fotografía vive detrás de la frontera de
-      # sesión.
+      # Las llaves de Stripe, sólo en este paso: `npm ci` y sus postinstall no
+      # tienen nada que hacer con ellas. El `npm run start` que Playwright
+      # levanta sí las recibe, porque lo arranca como hijo de este proceso.
+      # Las de Supabase ya están en el entorno del job: son las del Supabase
+      # local de esta parte.
       - name: Compara contra la línea base vinculante
         run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           # Pagos ofrece Checkout sólo con Stripe configurado (#454): sin
           # estas, el estado `pagos-pendiente` fotografiaría "pagos sin
           # configurar". Son las llaves del modo de prueba.
@@ -323,25 +285,20 @@ jobs:
         run: bash scripts/report-visual-incident.sh
 
   # Aceptar son dos jobs: `regenerate` rehace las capturas repartido en
-  # partes, con las credenciales y sin permiso de escritura; `accept` junta lo
-  # que produjo cada parte y lo empuja, con permiso de escritura y sin
-  # credenciales.
+  # partes, cada una con su Supabase local y sin permiso de escritura;
+  # `accept` junta lo que produjo cada parte y lo empuja, con permiso de
+  # escritura y sin credenciales.
   #
   # Los dos parten de `github.sha`, el commit que era la punta de la rama al
   # lanzar el workflow, y no de la punta en el momento en que arranca cada
   # job. Si alguien empuja a la rama mientras se acepta, las partes siguen
   # saliendo del mismo commit, y el push de `accept` se rechaza por no ser
   # fast-forward en vez de dejar capturas viejas encima del código nuevo.
+  #
+  # `regenerate` no depende de nada: con su propia base no hay turno que
+  # esperar (#537).
   regenerate:
-    needs: [turno-dev]
-    # En una aceptación `arbol-ya-verificado` queda `skipped`, y sin una
-    # función de estado Actions salta cualquier job con un antepasado saltado,
-    # aunque el que tiene delante haya salido bien. Por eso `!cancelled()` y
-    # el resultado del turno escrito a mano.
-    if: >-
-      !cancelled()
-      && github.event_name == 'workflow_dispatch'
-      && needs.turno-dev.result == 'success'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -361,17 +318,19 @@ jobs:
           cache: npm
       - run: npm ci
       - uses: ./.github/actions/playwright-browsers
+      # La base de esta parte: la acción deja su URL y sus llaves en el
+      # entorno del job, y se muere con el runner (#537, E20). Son las llaves
+      # de ejemplo del CLI, no secretos. Si no arranca, el job falla; nunca
+      # cae a `seadragons-dev`.
+      - name: Levanta Supabase local
+        uses: ./.github/actions/supabase-local
+      # Después del Supabase local: al compilar, Next prerenderiza las
+      # pantallas y eso ejecuta la lectura de la marca del club (#292). Sin
+      # base cae al respaldo, y en cuanto un club se renombre las capturas
+      # saldrían con el nombre viejo y la comparación fallaría sin decir por
+      # qué.
       - name: Compila la aplicación
-        # Con los secretos: al compilar, Next prerenderiza las pantallas y eso
-        # ejecuta la lectura de la marca del club (#292). Sin ellos cae al
-        # respaldo, y hoy no se nota sólo porque el respaldo coincide con lo
-        # sembrado. En cuanto un club se renombre, las capturas saldrían con el
-        # nombre viejo y la comparación fallaría sin decir por qué.
         run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       # Regenerar es correr la misma suite: sin sesión fotografiaría la
       # pantalla de entrada en vez de la que se está aceptando.
       - name: Regenera la línea base
@@ -379,9 +338,6 @@ jobs:
         run: bash scripts/update-visual-baselines.sh --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         continue-on-error: true
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           # Pagos ofrece Checkout sólo con Stripe configurado (#454): sin
           # estas, el estado `pagos-pendiente` fotografiaría "pagos sin
           # configurar". Son las llaves del modo de prueba.
@@ -415,14 +371,10 @@ jobs:
 
   accept:
     needs: regenerate
-    # Sin `always()` a propósito: si una parte falló por algo que no eran
-    # píxeles, no se acepta nada. La línea base no se acepta a medias.
-    # `!cancelled()` sólo por el antepasado saltado de `regenerate` (ver
-    # allí); el resultado de las partes se sigue exigiendo a mano.
-    if: >-
-      !cancelled()
-      && github.event_name == 'workflow_dispatch'
-      && needs.regenerate.result == 'success'
+    # Sin función de estado a propósito: así Actions exige que todas las
+    # partes de `regenerate` hayan salido bien. Si una falló por algo que no
+    # eran píxeles, no se acepta nada. La línea base no se acepta a medias.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
