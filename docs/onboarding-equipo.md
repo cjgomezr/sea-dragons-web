@@ -203,6 +203,25 @@ npm run db:seed-load-test
 - Para su prueba, `LOAD_TEST_LOCAL_SUPABASE=1 RUN_INTEGRATION_TESTS=1 npm test`
   siembra dentro de una transacción y la deshace al final.
 
+#### La prueba de carga
+
+El workflow `carga` (`.github/workflows/carga.yml`) mide NFR-001 sobre ese
+club: 50 socios con sesión recorren la aplicación compilada durante 6
+minutos, y falla si el p95 pasa de 1 segundo o los errores del 1%. Corre los
+domingos y a mano desde Actions (`Run workflow`). El resumen del job enseña
+p50, p95 y p99 por endpoint; el artefacto `carga-<run>` guarda cada petición.
+
+Para correrla en tu máquina necesitas [k6](https://grafana.com/docs/k6/latest/set-up/install-k6/),
+el club sembrado y la aplicación en modo producción (`npm run build` y
+`npm run start`) contra el Supabase local:
+
+```bash
+k6 run --out json=carga-resultados.json scripts/load-test/club-journey.ts
+npx tsx scripts/load-test/report.ts carga-resultados.json
+```
+
+Los umbrales viven en `scripts/load-test/load-test-config.ts`.
+
 ## 4. Comprobar que quedó bien
 
 Corre esto en orden. Si algo falla, no sigas: mira la tabla del final.
