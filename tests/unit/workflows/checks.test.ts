@@ -294,9 +294,9 @@ describe("workflow de checks", () => {
     expect(probe.run).toMatch(/test:kit/);
   });
 
-  // Un PR que solo cambia texto no necesita los tests que hablan con
-  // seadragons-dev ni sus credenciales (#439). Los unitarios, el lint, los
-  // tipos y el build siguen corriendo: varios tests leen docs/.
+  // Un PR que solo cambia texto no necesita los tests de red ni levantar
+  // Supabase (#439, #536). Los unitarios, el lint, los tipos y el build
+  // siguen corriendo: varios tests leen docs/.
   describe("en un PR de solo texto", () => {
     function textOnlyStep(): WorkflowStep {
       const step = checksSteps().find(

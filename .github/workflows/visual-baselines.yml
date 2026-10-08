@@ -147,9 +147,9 @@ jobs:
 
   # Comparar y regenerar usan `seadragons-dev`. Este job espera a que ninguna
   # corrida anterior de este workflow lo esté usando (#507); checks.yml ya no
-  # hace cola, porque usa su propio Supabase local (#536). Es uno solo, antes de la
-  # matriz: la cola es entre corridas, y las cuatro partes de ésta arrancan
-  # juntas cuando le toca. Ver scripts/wait-for-dev-turn.sh.
+  # hace cola, porque usa su propio Supabase local (#536). Es uno solo, antes
+  # de la matriz: la cola es entre corridas, y las cuatro partes de ésta
+  # arrancan juntas cuando le toca. Ver scripts/wait-for-dev-turn.sh.
   #
   # Sin condición de evento: un push a main y una aceptación a mano entran en
   # la misma cola que un PR. `!cancelled()` para que una corrida cancelada deje
