@@ -821,6 +821,17 @@ producción. En CI la pone solo `migrations.yml`, a `1`, para que la falta de
 Postgres sea un fallo en vez de un salto silencioso. `checks.yml` no la pone a
 propósito: ahí `npm test` corre sin base y saltarse esos tests es lo correcto.
 
+`SEED_ANCHOR_DATE`: sólo local, y opcional. Es el "hoy" (`YYYY-MM-DD`) del
+club que siembra `npm run db:seed-load-test` (#524); vacía, vale hoy en
+Melbourne. Sirve para repetir las fechas de otro sembrado. No aplica a
+preview, producción ni CI.
+
+`LOAD_TEST_LOCAL_SUPABASE`: local y CI. A `1`, enciende la prueba de
+integración del sembrado, que necesita el Supabase local arrancado y sin
+socios. En CI la pone solo `sembrado-carga.yml`, después de levantar el
+Supabase local del runner con la acción de #535. No aplica a preview ni a
+producción.
+
 `SUPABASE_PRODUCTION_DB_URL`: la cadena de conexión con la que
 `migraciones-produccion.yml` aplica el esquema en `seadragons-prod`. **No está
 en `.env.example` a propósito**, y no porque se haya olvidado: enumerarla ahí
