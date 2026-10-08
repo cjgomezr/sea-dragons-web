@@ -58,6 +58,17 @@ describe("los proyectos de Vitest", () => {
     expect(LOCAL_CI_INTEGRATION_WORKERS).toBeGreaterThan(1);
   });
 
+  it("ponen a los de red en paralelo en su propio grupo, tras el unitario", () => {
+    const env = { ...ENABLED, ...IN_CI, ...LOCAL_SUPABASE };
+    const unit = findProject(env, UNIT_PROJECT_NAME);
+    const integration = findProject(env, INTEGRATION_PROJECT_NAME);
+
+    // Vitest se niega a arrancar si dos proyectos con distinto `maxWorkers`
+    // comparten grupo; el unitario va en el 0, el de por defecto.
+    expect(unit.sequence).toBeUndefined();
+    expect(integration.sequence?.groupOrder).toBeGreaterThan(0);
+  });
+
   it("siguen en serie en CI si apunta a dev", () => {
     const integration = findProject(
       { ...ENABLED, ...IN_CI, ...DEV_SUPABASE },

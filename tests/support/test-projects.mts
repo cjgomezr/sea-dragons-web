@@ -32,6 +32,11 @@ const SEQUENTIAL_WORKERS = 1;
  * del runner estándar de Actions para un repositorio privado. */
 export const LOCAL_CI_INTEGRATION_WORKERS = 4;
 
+/** El grupo del de red en paralelo. Vitest no deja que dos proyectos con
+ * distinto `maxWorkers` compartan grupo, y el unitario va en el 0 (el de por
+ * defecto): con el 1, el de red sigue corriendo tras los unitarios. */
+const PARALLEL_INTEGRATION_GROUP_ORDER = 1;
+
 export const SHARED_SETUP_FILE = "./vitest.setup.ts";
 /** Pone tiempo máximo a las peticiones a dev y reintenta las lecturas
  * colgadas (#506). Es sólo del arnés de red: los unitarios no hablan con dev,
@@ -60,21 +65,28 @@ export type TestProjectSelection =
       readonly name: typeof UNIT_PROJECT_NAME;
       readonly fileParallelism?: undefined;
       readonly maxWorkers?: undefined;
+      readonly sequence?: undefined;
       readonly testTimeout?: undefined;
       readonly hookTimeout?: undefined;
     })
-  | (ProjectFiles & {
-      readonly name: typeof INTEGRATION_PROJECT_NAME;
-      readonly fileParallelism: boolean;
-      readonly maxWorkers: number;
-      readonly testTimeout: number;
-      readonly hookTimeout: number;
-    });
+  | (ProjectFiles &
+      IntegrationParallelism & {
+        readonly name: typeof INTEGRATION_PROJECT_NAME;
+        readonly testTimeout: number;
+        readonly hookTimeout: number;
+      });
 
-type IntegrationParallelism = {
-  readonly fileParallelism: boolean;
-  readonly maxWorkers: number;
-};
+type IntegrationParallelism =
+  | {
+      readonly fileParallelism: false;
+      readonly maxWorkers: typeof SEQUENTIAL_WORKERS;
+      readonly sequence?: undefined;
+    }
+  | {
+      readonly fileParallelism: true;
+      readonly maxWorkers: typeof LOCAL_CI_INTEGRATION_WORKERS;
+      readonly sequence: { readonly groupOrder: number };
+    };
 
 /** Actions pone `CI` en cada runner. */
 function runsInCi(env: Environment): boolean {
@@ -91,6 +103,7 @@ function selectIntegrationParallelism(
     return {
       fileParallelism: true,
       maxWorkers: LOCAL_CI_INTEGRATION_WORKERS,
+      sequence: { groupOrder: PARALLEL_INTEGRATION_GROUP_ORDER },
     };
   }
   return { fileParallelism: false, maxWorkers: SEQUENTIAL_WORKERS };
