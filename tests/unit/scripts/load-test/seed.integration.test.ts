@@ -13,10 +13,10 @@ import { renderSeedSql } from "../../../../scripts/load-test/seed-sql";
  * estaba.
  *
  * Necesita el Supabase local arrancado (`npm run db:start`) y vacío de
- * socios, así que no basta con `RUN_INTEGRATION_TESTS=1`: CI corre los de
- * integración contra seadragons-dev, sin Supabase local. Se enciende con
- * `LOAD_TEST_LOCAL_SUPABASE=1`, que pondrá la épica de CI con su propio
- * Supabase cuando exista.
+ * socios, así que no basta con `RUN_INTEGRATION_TESTS=1`: `checks` corre
+ * los de integración contra seadragons-dev, sin Supabase local. Se enciende
+ * con `LOAD_TEST_LOCAL_SUPABASE=1`, que en CI pone `sembrado-carga.yml` tras
+ * levantar el Supabase local del runner (#535).
  */
 const isEnabled = process.env.LOAD_TEST_LOCAL_SUPABASE === "1";
 

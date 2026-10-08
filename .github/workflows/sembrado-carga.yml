@@ -1,0 +1,74 @@
+# Corre la prueba de integración del sembrado de NFR-008 (#524) contra un
+# Supabase local del runner, levantado con la acción de #535. Sin esto, la
+# prueba solo corría en la máquina de quien la lanzaba a mano: `checks` usa
+# seadragons-dev, y ahí sembrar 500 socios no tiene sitio.
+#
+# Arranca solo cuando cambia algo que puede romper el sembrado: su código, sus
+# tests, el esquema (una migración nueva puede dejar fuera de sitio una
+# columna que el SQL del sembrado rellena), la acción que levanta la base o el
+# arnés de Vitest que decide si la prueba corre y contra qué URL. `checks` no
+# caza eso último: corre contra seadragons-dev, no contra el Supabase local.
+#
+# No pide ninguna credencial: todo vive en el runner y se muere con el job.
+name: sembrado-carga
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "scripts/load-test/**"
+      - "tests/unit/scripts/load-test/**"
+      - "supabase/**"
+      - ".github/actions/supabase-local/**"
+      - "scripts/start-local-supabase.sh"
+      - "src/lib/supabase/environment-guard.ts"
+      - "src/lib/supabase/config.ts"
+      - "tests/support/**"
+      - "vitest.config.mts"
+      - "vitest.setup.ts"
+      - ".nvmrc"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/sembrado-carga.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sembrado-carga-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sembrado:
+    runs-on: ubuntu-latest
+    # El arranque de Supabase ronda los dos minutos y el sembrado tiene cinco
+    # como máximo (RF-6). Lo demás es margen.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: ./.github/actions/supabase-local
+      # Las dos variables hacen falta: `RUN_INTEGRATION_TESTS` deja entrar los
+      # `*.integration.test.ts` en la corrida, y `LOAD_TEST_LOCAL_SUPABASE`
+      # enciende este en concreto, que necesita la base local vacía de socios.
+      - name: Siembra el club dentro de una transacción y la deshace
+        run: >-
+          npx vitest run --project integration
+          --reporter=default --reporter=json --outputFile=seed-result.json
+          tests/unit/scripts/load-test/seed.integration.test.ts
+        env:
+          RUN_INTEGRATION_TESTS: "1"
+          LOAD_TEST_LOCAL_SUPABASE: "1"
+      # Un test saltado sale con código 0. Sin esta comprobación, perder una de
+      # las dos variables de arriba dejaría el check en verde sin sembrar nada.
+      - name: Comprueba que la prueba corrió y no se saltó
+        run: |
+          jq -e '.numPassedTests > 0 and .numPendingTests == 0' seed-result.json > /dev/null || {
+            echo "::error::la prueba del sembrado no corrió: $(jq -c '{numPassedTests, numPendingTests}' seed-result.json)"
+            exit 1
+          }

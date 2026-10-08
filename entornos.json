@@ -191,7 +191,7 @@
         "local": "developer",
         "preview": null,
         "production": null,
-        "ci": null,
+        "ci": "platform",
         "ci-produccion": null
       }
     },

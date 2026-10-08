@@ -826,10 +826,11 @@ club que siembra `npm run db:seed-load-test` (#524); vacía, vale hoy en
 Melbourne. Sirve para repetir las fechas de otro sembrado. No aplica a
 preview, producción ni CI.
 
-`LOAD_TEST_LOCAL_SUPABASE`: sólo local por ahora. A `1`, enciende la prueba
-de integración del sembrado, que necesita el Supabase local arrancado y sin
-socios. CI no la pone todavía: llegará con el Supabase local del runner
-(#535). No aplica a preview ni a producción.
+`LOAD_TEST_LOCAL_SUPABASE`: local y CI. A `1`, enciende la prueba de
+integración del sembrado, que necesita el Supabase local arrancado y sin
+socios. En CI la pone solo `sembrado-carga.yml`, después de levantar el
+Supabase local del runner con la acción de #535. No aplica a preview ni a
+producción.
 
 `SUPABASE_PRODUCTION_DB_URL`: la cadena de conexión con la que
 `migraciones-produccion.yml` aplica el esquema en `seadragons-prod`. **No está
