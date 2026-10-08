@@ -180,6 +180,28 @@ npm run db:restore-backup -- --yes  # devuelve lo que había antes de la copia
   escribe en la base local (`127.0.0.1:54322`). Si la copia falla a mitad, tu
   base local queda como estaba.
 
+#### Sembrar el club grande de la prueba de carga
+
+Para probar la aplicación con el tamaño que pide NFR-008 hay un club de
+mentira: 500 socios, 5.070 ocurrencias y unas 51.000 asistencias, con grupos,
+RSVP, noticias, avisos, evaluaciones y membresías. Va sobre una base local
+recién levantada, sin socios:
+
+```bash
+npm run db:reset
+npm run db:seed-load-test
+```
+
+- Tarda unos segundos. Dos sembrados el mismo día dan los mismos datos; para
+  repetir las fechas de otro día, `SEED_ANCHOR_DATE=2026-10-08`.
+- Entras con `socio-001@carga.seadragons.test` hasta `socio-050`, contraseña
+  `Seadragons-carga-2026`. Los dos primeros son Admin, los tres siguientes
+  Committee, del 6 al 10 Coach y el resto Player.
+- Se niega si `NEXT_PUBLIC_SUPABASE_URL` apunta fuera de tu máquina, y también
+  si la base ya tiene socios. Nunca siembra en desarrollo ni en producción.
+- Para su prueba, `LOAD_TEST_LOCAL_SUPABASE=1 RUN_INTEGRATION_TESTS=1 npm test`
+  siembra dentro de una transacción y la deshace al final.
+
 ## 4. Comprobar que quedó bien
 
 Corre esto en orden. Si algo falla, no sigas: mira la tabla del final.
