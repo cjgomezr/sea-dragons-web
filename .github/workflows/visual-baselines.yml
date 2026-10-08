@@ -104,10 +104,11 @@ permissions:
   contents: read
 
 # Un push nuevo al PR deja sin valor la visual del commit anterior, y cada
-# corrida son cuatro máquinas (#416). Sólo se cancela en `pull_request`. Fuera de un PR el grupo lleva el id de la corrida y no la
-# rama: GitHub deja una sola corrida en espera por grupo y descarta la que ya
-# esperaba, así que un grupo por rama sin cancelar pondría en cola los merges a
-# `main` y perdería el del medio. Cada merge comprueba su árbol y
+# corrida son cuatro máquinas (#416). Sólo se cancela en `pull_request`.
+# Fuera de un PR el grupo lleva el id de la corrida y no la rama: GitHub deja
+# una sola corrida en espera por grupo y descarta la que ya esperaba, así que
+# un grupo por rama sin cancelar pondría en cola los merges a `main` y
+# perdería el del medio. Cada merge comprueba su árbol y
 # `report-incident` depende de que termine; una aceptación a mano tampoco se
 # corta ni se queda esperando.
 concurrency:
@@ -118,8 +119,8 @@ jobs:
   # En un push a main, ¿este árbol es el mismo que la visual del PR acaba de
   # comparar en verde? La fábrica mergea con squash un PR rebasado, así que
   # casi siempre lo es, y repetir cuatro máquinas no puede descubrir nada
-  # (#441). El script es el de `checks.yml`, apuntado a
-  # este workflow; ante cualquier duda responde que no y se compara.
+  # (#441). El script es el de `checks.yml`, apuntado a este workflow; ante
+  # cualquier duda responde que no y se compara.
   #
   # El commit que empuja `accept` no rompe esto: su `compare` sobre la rama
   # queda en `action_required` hasta que alguien lo aprueba, y sólo una

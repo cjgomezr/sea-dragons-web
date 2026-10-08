@@ -654,10 +654,10 @@ describe("un Supabase local por tanda (#537)", () => {
   it.each(SHARDED_JOBS)(
     "el job %s no espera a ningún otro workflow",
     (jobName) => {
-      expect(
-        needsOf(jobName).every((need) => need in parseWorkflow().jobs),
-      ).toBe(true);
-      expect(runLines(jobName)).not.toMatch(/gh run (watch|list)/);
+      const runs = runLines(jobName);
+
+      expect(runs).not.toMatch(/wait-for-dev-turn/);
+      expect(runs).not.toMatch(/gh run (watch|list)/);
     },
   );
 });
