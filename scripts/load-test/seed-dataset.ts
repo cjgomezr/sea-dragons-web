@@ -409,6 +409,17 @@ function birthDateOf(index: number): string {
   return `${year}-${padNumber(month, 2)}-${padNumber(day, 2)}`;
 }
 
+/** El correo del socio en la posición `index` (desde 0). La prueba de carga
+ * lo usa para iniciar sesión con las identidades sembradas. */
+export function seedEmailOf(index: number): string {
+  return `socio-${padNumber(index + 1, 3)}@${EMAIL_DOMAIN}`;
+}
+
+/** El rol del socio en la posición `index` (desde 0). */
+export function seedRoleOf(index: number): SeedRole {
+  return LEADERSHIP_ROLES[index] ?? "Player";
+}
+
 function buildMember(
   index: number,
   anchorDate: string,
@@ -419,8 +430,8 @@ function buildMember(
   return {
     userId: createUuid(random),
     fullName: `${firstName} ${lastName}`,
-    email: `socio-${padNumber(index + 1, 3)}@${EMAIL_DOMAIN}`,
-    role: LEADERSHIP_ROLES[index] ?? "Player",
+    email: seedEmailOf(index),
+    role: seedRoleOf(index),
     canSignIn: index < LOGIN_IDENTITY_COUNT,
     emailLocale: index % SPANISH_LOCALE_EVERY === 0 ? "es" : "en",
     joinedOn: addDays(
