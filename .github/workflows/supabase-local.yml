@@ -1,0 +1,97 @@
+# Prueba la acción `supabase-local` contra un Supabase de verdad (#535, E20),
+# sin tocar `checks` ni la visual. Corre a mano o en los PR que cambian la
+# acción, su script o la configuración del Supabase local.
+#
+# Cada comprobación es una consulta real a lo que la acción levantó: por la API
+# con las llaves que exportó (así se prueba también que son las buenas) y, para
+# lo que la API no enseña, con `psql` dentro del contenedor de la base. El
+# tiempo de arranque queda en el resumen de la corrida.
+#
+# No pide ninguna credencial: todo vive en el runner y se muere con el job.
+name: supabase-local
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/actions/supabase-local/**"
+      - "scripts/start-local-supabase.sh"
+      - "supabase/config.toml"
+      - ".github/workflows/supabase-local.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-local-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  supabase-local:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # El contenedor de la base lo nombra la CLI con el `project_id` de
+      # `supabase/config.toml`.
+      DB_CONTAINER: supabase_db_sea-dragons-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: ./.github/actions/supabase-local
+
+      - name: Exporta las tres variables de la app
+        run: |
+          for name in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY; do
+            [ -n "${!name:-}" ] || { echo "::error::falta $name"; exit 1; }
+          done
+          case "$NEXT_PUBLIC_SUPABASE_URL" in
+            http://127.0.0.1:*) ;;
+            *) echo "::error::NEXT_PUBLIC_SUPABASE_URL no es local: $NEXT_PUBLIC_SUPABASE_URL"; exit 1 ;;
+          esac
+
+      - name: No levanta Studio, Realtime, Edge Functions, analítica ni correo
+        run: |
+          docker ps --format '{{.Names}}' | tee running.txt
+          if grep -E 'studio|realtime|edge_runtime|analytics|vector|inbucket|mailpit' running.txt; then
+            echo "::error::hay servicios de más en marcha"
+            exit 1
+          fi
+
+      - name: Auth responde con la llave anónima
+        run: |
+          curl --fail --silent --show-error \
+            -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/health"
+
+      - name: Tiene el club victoria-seadragons con sus tres posiciones
+        run: |
+          rest() {
+            curl --fail --silent --show-error \
+              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+              "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/$1"
+          }
+          club_id=$(rest "clubs?slug=eq.victoria-seadragons&select=id" | jq -r '.[0].id // empty')
+          [ -n "$club_id" ] || { echo "::error::no está el club victoria-seadragons"; exit 1; }
+          positions=$(rest "club_positions?club_id=eq.$club_id&select=id" | jq length)
+          [ "$positions" -eq 3 ] || { echo "::error::el club tiene $positions posiciones, no 3"; exit 1; }
+
+      - name: Tiene los buckets de Storage de las migraciones
+        run: |
+          buckets=$(curl --fail --silent --show-error \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            "$NEXT_PUBLIC_SUPABASE_URL/storage/v1/bucket" | jq -r '.[].id')
+          for bucket in member-photos club-logos news-attachments; do
+            grep -qx "$bucket" <<<"$buckets" || { echo "::error::falta el bucket $bucket"; exit 1; }
+          done
+
+      - name: Tiene pg_cron
+        run: |
+          installed=$(docker exec "$DB_CONTAINER" psql -U postgres -tAc "select count(*) from pg_extension where extname = 'pg_cron'")
+          [ "$installed" -eq 1 ] || { echo "::error::pg_cron no está instalado"; exit 1; }
