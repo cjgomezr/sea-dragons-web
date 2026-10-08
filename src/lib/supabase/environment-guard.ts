@@ -39,6 +39,13 @@ function parseUrl(url: string): URL | null {
   }
 }
 
+/** Si la URL es la del Supabase local de la CLI. Contra él, y sólo en CI, los
+ * tests de red pueden correr en paralelo (#539). */
+export function isLocalSupabaseUrl(url: string): boolean {
+  const parsed = parseUrl(url);
+  return parsed !== null && LOCAL_SUPABASE_ORIGINS.includes(parsed.origin);
+}
+
 function isAllowedTestSupabase(parsed: URL): boolean {
   return (
     parsed.hostname === DEVELOPMENT_SUPABASE_HOSTNAME ||

@@ -4,6 +4,7 @@ import {
   DEVELOPMENT_SUPABASE_PROJECT_REF,
   assertTestSupabaseEnvironment,
   checkTestSupabaseEnvironment,
+  isLocalSupabaseUrl,
 } from "@/lib/supabase/environment-guard";
 
 /** Ref de `seadragons-prod`, escrito a mano y no importado del guardia: si se
@@ -121,5 +122,28 @@ describe("guardia de entorno de tests", () => {
         message: expect.stringContaining(SUPABASE_URL_ENV),
       }),
     );
+  });
+});
+
+describe("isLocalSupabaseUrl", () => {
+  it("reconoce el Supabase local de la CLI", () => {
+    expect(isLocalSupabaseUrl("http://127.0.0.1:54321")).toBe(true);
+    expect(isLocalSupabaseUrl("http://localhost:54321/")).toBe(true);
+  });
+
+  it("no confunde la app local con el Supabase local", () => {
+    expect(isLocalSupabaseUrl("http://localhost:3417")).toBe(false);
+  });
+
+  it("no da por local el proyecto de desarrollo", () => {
+    expect(
+      isLocalSupabaseUrl(
+        `https://${DEVELOPMENT_SUPABASE_PROJECT_REF}.supabase.co`,
+      ),
+    ).toBe(false);
+  });
+
+  it("no da por local una URL que no se puede leer", () => {
+    expect(isLocalSupabaseUrl("no es una url")).toBe(false);
   });
 });
