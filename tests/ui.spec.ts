@@ -57,10 +57,12 @@ import {
   roleRequestStorageStatePath,
   seededMemberName,
 } from "./support/e2e-session";
+import { HOME_NOW, fixClockOnHome } from "./support/home-clock";
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
 import { isStatePhotographed } from "./support/spanish-captures";
 import { snapshotCreatedNotice } from "./support/visual-baseline-notice";
 import { waitForHydration } from "./support/wait-for-hydration";
+import { waitForSectionsLoaded } from "./support/wait-for-sections";
 import { servesCompiledApp } from "./support/web-server-command";
 import {
   type AccentPalette,
@@ -69,7 +71,8 @@ import {
 import { memberInitials } from "@/lib/auth/member-initials";
 import { buildAccentStylesheet } from "@/lib/club/accent-stylesheet";
 import { shrinkProfilePhoto } from "@/lib/members/shrink-profile-photo";
-import { LOCALE_COOKIE_NAME, type Locale } from "@/lib/i18n/locale";
+import { LOCALE_COOKIE_NAME, type Locale, isLocale } from "@/lib/i18n/locale";
+import { createTranslator } from "@/lib/i18n/translator";
 
 // Con qué condiciones se toma cada captura, sembrada o comparada. Hoy
 // coinciden con los valores por defecto de toHaveScreenshot, pero se pasan a
@@ -209,6 +212,9 @@ async function goToWithTheme(
   path: string,
   theme: (typeof themes)[number],
 ): Promise<void> {
+  // El saludo del inicio sale de la hora: sin fijarla, la captura dependía
+  // de a qué hora corría la visual (#561).
+  await fixClockOnHome(page, path);
   await page.goto(`${APP_URL}${path}`);
   await page.addStyleTag({ content: HIDE_DEV_OVERLAY_CSS });
   if (theme === "dark") {
@@ -1347,6 +1353,10 @@ test.describe("dentro de la aplicación", () => {
         "lang",
         language.locale,
       );
+      // La barra del móvil se recorta sobre el inicio, que asoma por su borde
+      // de arriba: sin esperar a que cargue, esa franja cambiaba de una
+      // corrida a otra (#561).
+      await waitForSectionsLoaded(page, []);
     }
 
     async function openMore(
@@ -7101,6 +7111,12 @@ function hoursAgo(hours: number): string {
   return new Date(Date.now() - (hours + 0.5) * HOUR_MS).toISOString();
 }
 
+/** Los avisos se miran sobre el inicio, que se fotografía con la hora fijada
+ * (#561): su tiempo relativo se cuenta desde esa hora, no desde ahora. */
+function hoursBeforeHome(hours: number): string {
+  return new Date(HOME_NOW.getTime() - (hours + 0.5) * HOUR_MS).toISOString();
+}
+
 function fakeNotificationId(index: number): string {
   return `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
 }
@@ -7110,28 +7126,28 @@ const SAMPLE_NOTIFICATIONS: readonly FakeNotification[] = [
     id: fakeNotificationId(1),
     type: "role_request_received",
     data: { requesterName: "Nerea Ruiz", requestedRole: "Coach" },
-    createdAt: hoursAgo(2),
+    createdAt: hoursBeforeHome(2),
     isRead: false,
   },
   {
     id: fakeNotificationId(2),
     type: "role_changed",
     data: { newRole: "Committee" },
-    createdAt: hoursAgo(5),
+    createdAt: hoursBeforeHome(5),
     isRead: false,
   },
   {
     id: fakeNotificationId(3),
     type: "role_request_rejected",
     data: { requestedRole: "Coach" },
-    createdAt: hoursAgo(26),
+    createdAt: hoursBeforeHome(26),
     isRead: false,
   },
   {
     id: fakeNotificationId(4),
     type: "role_changed",
     data: { newRole: "Player" },
-    createdAt: hoursAgo(24 * 9),
+    createdAt: hoursBeforeHome(24 * 9),
     isRead: true,
   },
 ];
@@ -7141,7 +7157,7 @@ function unreadOnly(count: number): readonly FakeNotification[] {
     id: fakeNotificationId(index + 1),
     type: "role_changed",
     data: { newRole: "Coach" },
-    createdAt: hoursAgo(index + 1),
+    createdAt: hoursBeforeHome(index + 1),
     isRead: false,
   }));
 }
@@ -7286,6 +7302,7 @@ for (const capture of NOTIFICATION_LIST_CAPTURES) {
         }) => {
           await capture.beforeVisit?.(page);
           await serveNotifications(page, capture.notifications);
+          await fixClockOnHome(page, NOTIFICATIONS_SCREEN_PATH);
           await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
           await openNotifications(page);
           const overflow = await page.evaluate(
@@ -7301,6 +7318,7 @@ for (const capture of NOTIFICATION_LIST_CAPTURES) {
         }) => {
           await capture.beforeVisit?.(page);
           await serveNotifications(page, capture.notifications);
+          await fixClockOnHome(page, NOTIFICATIONS_SCREEN_PATH);
           await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
           await openNotifications(page);
           await expectNoAxeViolations(page);
@@ -8260,6 +8278,22 @@ const CLUB_SETTINGS_STATES: readonly ClubSettingsState[] = [
   },
 ];
 
+/** La configuración carga cada sección por su lado (#469): sin esperarlas
+ * todas, la captura de la pantalla entera salía con unas cargadas y otras en
+ * "Loading…", según la corrida (#561). */
+async function waitForClubSettingsSections(page: Page): Promise<void> {
+  const lang = await page.locator("html").getAttribute("lang");
+  if (!isLocale(lang)) {
+    throw new Error(`La configuración del club no declara su idioma: ${lang}`);
+  }
+  const translate = createTranslator(lang);
+  await waitForSectionsLoaded(page, [
+    translate("clubSettings.signInTexts.title"),
+    translate("clubSettings.positions.title"),
+    translate("clubSettings.sessionPacks.title"),
+  ]);
+}
+
 async function goToClubSettings(
   page: Page,
   state: ClubSettingsState,
@@ -8279,11 +8313,7 @@ async function goToClubSettings(
     await goToWithTheme(page, CLUB_SETTINGS_SCREEN_PATH, theme);
   }
   await expect(clubNameField(page)).toHaveValue(STUBBED_CLUB_SETTINGS.name);
-  // La última sección en cargar (#469): sin esperarla, la captura de la
-  // pantalla entera podría salir con su "Cargando".
-  await expect(
-    sessionPacksSection(page).getByRole("list").first(),
-  ).toBeVisible();
+  await waitForClubSettingsSections(page);
   await state.prepare?.(page);
   // El puntero se queda sobre el botón pulsado: la captura saldría con su
   // hover.
@@ -9321,6 +9351,14 @@ async function goToClubSettingsWithLogo(
 ): Promise<void> {
   await serveClubLogos(page);
   await stubClubSettings(page);
+  // Las posiciones y los textos de entrada, de mentira como en los demás
+  // estados de la pantalla: los de verdad cambian con lo que dejen otras
+  // pruebas de la corrida.
+  await stubClubPositions(page, {
+    positions: STUBBED_ACTIVE_POSITIONS,
+    create: "hangs",
+  });
+  await stubSignInTexts(page, NO_STUBBED_SIGN_IN_TEXTS);
   await stubSessionPacks(page);
   // Registrada después, gana a la de `stubClubSettings`.
   await page.route(
@@ -9339,6 +9377,7 @@ async function goToClubSettingsWithLogo(
     await goToWithTheme(page, CLUB_SETTINGS_SCREEN_PATH, theme);
   }
   await expect(clubNameField(page)).toHaveValue(STUBBED_CLUB_SETTINGS.name);
+  await waitForClubSettingsSections(page);
 }
 
 test.describe("club-con-logo", () => {
@@ -14748,13 +14787,11 @@ test.describe("la búsqueda global con los datos de verdad", () => {
 const DASHBOARD_ENDPOINT = "/api/v1/dashboard";
 const HOME_SCREEN_PATH = "/";
 const DASHBOARD_NARROW_WIDTHS = [320, 375, 768] as const;
-// Miércoles 30 de septiembre de 2026 a las 18:00 en Melbourne (AEST).
-const DASHBOARD_NOW = new Date("2026-09-30T08:00:00.000Z");
 const DASHBOARD_GREETING = /^(Good|Buenos|Buenas) .+, Liam$/;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 function dashboardDaysAgo(days: number): string {
-  return new Date(DASHBOARD_NOW.getTime() - days * DAY_IN_MS).toISOString();
+  return new Date(HOME_NOW.getTime() - days * DAY_IN_MS).toISOString();
 }
 
 const DASHBOARD_TRAINING = {
@@ -14968,7 +15005,7 @@ async function goToDashboard(
   state: Pick<DashboardScreenState, "dashboard" | "beforeVisit">,
   theme?: (typeof themes)[number],
 ): Promise<void> {
-  await page.clock.setFixedTime(DASHBOARD_NOW);
+  await page.clock.setFixedTime(HOME_NOW);
   await serveDashboard(page, state.dashboard);
   await state.beforeVisit?.(page);
   if (theme === undefined) {
@@ -15136,7 +15173,7 @@ test.describe("el inicio en el navegador", () => {
   test("con la red caída lo dice y vuelve a pedir al reintentar", async ({
     page,
   }) => {
-    await page.clock.setFixedTime(DASHBOARD_NOW);
+    await page.clock.setFixedTime(HOME_NOW);
     // La red falla hasta que se pulsa reintentar. Contar peticiones no
     // sirve: en desarrollo React monta el efecto dos veces y la primera
     // respuesta se descarta.

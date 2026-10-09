@@ -7,7 +7,7 @@ export const HYDRATION_TIMEOUT_MS = 15_000;
 /** Lo único del `page` de Playwright que hace falta para esperar. */
 export type HydrationPage = Pick<Page, "waitForFunction">;
 
-function isTimeout(error: unknown): boolean {
+export function isTimeout(error: unknown): boolean {
   return error instanceof Error && error.name === "TimeoutError";
 }
 
