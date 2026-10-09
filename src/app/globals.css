@@ -4141,7 +4141,7 @@ a.auth-brand-header:focus-visible {
 }
 
 /* "Publicar" es un enlace con forma de botón primario. */
-.news-publish {
+.news-publish-link {
   display: inline-flex;
   align-items: center;
   text-decoration: none;
