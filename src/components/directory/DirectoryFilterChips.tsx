@@ -27,12 +27,15 @@ import type { FilterChoices } from "./use-filter-choices";
  * si el elegido ya no existe: la ficha sigue ahí para poder quitarla. */
 const UNKNOWN_CHOICE = "…";
 
+/** Un desplegable dice qué se eligió; una casilla marcada es sólo su
+ * nombre. */
 type FilterChip = {
   readonly id: keyof MoreFilters;
   readonly filter: string;
-  /** `null` en una casilla: la ficha es sólo su nombre. */
-  readonly value: string | null;
-};
+} & (
+  | { readonly kind: "choice"; readonly value: string }
+  | { readonly kind: "check" }
+);
 
 type ChipContext = {
   readonly translate: Translator;
@@ -76,6 +79,7 @@ function chipsOf(
     filters.position === null
       ? null
       : {
+          kind: "choice",
           id: "position",
           filter: translate("directory.filter.position"),
           value: positionLabel(filters.position, context),
@@ -83,6 +87,7 @@ function chipsOf(
     filters.groupId === null
       ? null
       : {
+          kind: "choice",
           id: "groupId",
           filter: translate("directory.filter.group"),
           value: groupLabel(filters.groupId, context),
@@ -90,6 +95,7 @@ function chipsOf(
     filters.auf === null
       ? null
       : {
+          kind: "choice",
           id: "auf",
           filter: translate("directory.filter.auf"),
           value: translate(AUF_FILTER_KEYS[filters.auf]),
@@ -97,6 +103,7 @@ function chipsOf(
     filters.membership === null
       ? null
       : {
+          kind: "choice",
           id: "membership",
           filter: translate("directory.filter.membership"),
           value: translate(MEMBERSHIP_FILTER_KEYS[filters.membership]),
@@ -113,24 +120,24 @@ function checkedChipsOf(
     {
       id: "withoutPhone",
       filter: translate("directory.filter.withoutPhone"),
-      value: null,
+      kind: "check",
     },
     {
       id: "withoutEmergencyContact",
       filter: translate("directory.filter.withoutEmergencyContact"),
-      value: null,
+      kind: "check",
     },
     {
       id: "includeInactive",
       filter: translate("directory.includeInactive"),
-      value: null,
+      kind: "check",
     },
   ];
   return checked.filter((chip) => filters[chip.id] === true);
 }
 
 function chipName(chip: FilterChip, translate: Translator): string {
-  return chip.value === null
+  return chip.kind === "check"
     ? chip.filter
     : translate("directory.filter.chip", {
         filter: chip.filter,
@@ -152,7 +159,7 @@ function Chip({
   });
   return (
     <li className="directory-chip">
-      {chip.value === null ? (
+      {chip.kind === "check" ? (
         chip.filter
       ) : (
         <>

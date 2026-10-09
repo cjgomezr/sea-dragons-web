@@ -5837,9 +5837,11 @@ test.describe("el directorio con los datos de verdad", () => {
     page,
   }) => {
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+    // Desde #548 la casilla vive en Filtros.
+    const filters = await filterContainer(page, ENGLISH_FILTER_LABELS);
 
     await expect(
-      page.getByRole("checkbox", { name: "Include deactivated accounts" }),
+      filters.getByRole("checkbox", { name: "Include deactivated accounts" }),
     ).toBeVisible();
   });
 

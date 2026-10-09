@@ -464,11 +464,19 @@ function matchesFilters(
 /** Dado de baja no aparece (FR-085), salvo que un Admin los pida. Una cuenta
  * `incomplete` sí aparece: es un socio del club que todavía no terminó su
  * registro, y ninguna regla pide esconderlo. */
+/** Los dados de baja sólo salen cuando un Admin los pide (AC-040). */
+function isListedStatus(
+  record: DirectoryMemberRecord,
+  query: DirectoryQuery,
+): boolean {
+  return record.status !== "inactive" || query.includeInactive;
+}
+
 function isVisible(
   record: DirectoryMemberRecord,
   query: DirectoryQuery,
 ): boolean {
-  if (record.status === "inactive" && !query.includeInactive) {
+  if (!isListedStatus(record, query)) {
     return false;
   }
   if (query.role !== null && record.role !== query.role) {
@@ -757,9 +765,7 @@ function countClubMembers(
   records: readonly DirectoryMemberRecord[],
   query: DirectoryQuery,
 ): number {
-  return records.filter(
-    (record) => record.status !== "inactive" || query.includeInactive,
-  ).length;
+  return records.filter((record) => isListedStatus(record, query)).length;
 }
 
 /** La vista que toca a cada rol: el servidor decide qué campos salen, nunca

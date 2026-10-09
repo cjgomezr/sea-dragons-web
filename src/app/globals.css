@@ -2729,6 +2729,19 @@ a.auth-brand-header:focus-visible {
   border: none;
 }
 
+/* La leyenda que se ve, la del orden de la lista estrecha, se lee como la
+   etiqueta de un campo. La del rol de la barra sólo la oye el lector. */
+.directory-roles legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
 .directory-role-options {
   display: flex;
   gap: 2px;
@@ -2746,7 +2759,7 @@ a.auth-brand-header:focus-visible {
   display: inline-flex;
   flex: none;
   align-items: center;
-  min-height: 36px;
+  min-height: var(--touch-target-min);
   padding: 0 var(--space-3);
   font-size: 14px;
   color: var(--color-text-secondary);
@@ -2868,6 +2881,7 @@ a.auth-brand-header:focus-visible {
 
 .directory-popover .auth-consent {
   align-items: center;
+  min-height: 0;
 }
 
 .directory-popover .auth-consent input {
@@ -2936,8 +2950,10 @@ a.auth-brand-header:focus-visible {
   border-radius: 999px;
 }
 
+/* Text secondary no llega a 4.5:1 sobre el acento tintado del tema claro;
+   Text soft sí, en los dos temas. */
 .directory-chip-key {
-  color: var(--color-text-secondary);
+  color: var(--color-text-soft);
 }
 
 /* La ✕ mide 24px a la vista; en el móvil, su zona de toque llega a 44px
@@ -2975,7 +2991,7 @@ a.auth-brand-header:focus-visible {
     font-size: 14px;
   }
 
-  .directory-role {
+  .directory-toolbar .directory-role {
     min-height: 30px;
   }
 
@@ -3294,11 +3310,10 @@ a.auth-brand-header:focus-visible {
   color: var(--color-accent-text);
 }
 
-/* Las casillas de los filtros de contacto se alinean con el pie de los
-   desplegables de la barra. */
+/* Las casillas de los filtros miden lo que un dedo en la hoja del móvil;
+   el popover de escritorio las junta (#548). */
 .directory-filter-check {
   align-items: center;
-  align-self: flex-end;
   min-height: var(--touch-target-min);
 }
 
@@ -3339,32 +3354,6 @@ a.auth-brand-header:focus-visible {
 }
 
 @media (min-width: 768px) {
-  .directory-filters {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: flex-end;
-  }
-
-  .directory-filter-toggle {
-    display: none;
-  }
-
-  .directory-filter-bar {
-    display: flex;
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-    gap: var(--space-4);
-  }
-
-  .directory-filter {
-    flex: 1 1 180px;
-  }
-
-  .directory-search {
-    flex: 1 1 260px;
-    min-width: 0;
-  }
-
   .directory-table {
     font-size: 16px;
   }
