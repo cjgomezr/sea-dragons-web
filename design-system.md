@@ -29,19 +29,23 @@ desplazamiento lo sigan.
 
 #### Light theme (paleta por defecto, en `:root`)
 
-| Role           | Value     | Usage                          |
-| -------------- | --------- | ------------------------------ |
-| Accent         | `#1C6EA4` | Primary actions, active states |
-| Accent text    | `#1C6EA4` | Links, focus, accent as text   |
-| Background     | `#EFF3F7` | Page background                |
-| Panel          | `#FFFFFF` | Cards, panels                  |
-| Text           | `#1C3245` | Body text                      |
-| Text secondary | `#5A7086` | Captions, metadata             |
-| Border         | `#DEE6ED` | Dividers, input borders        |
-| Success        | `#2E9E86` | Success state only             |
-| Warning        | `#C99A3E` | Warning state only             |
-| Danger         | `#BC3B2E` | Validation errors, destructive |
-| Text on accent | `#FFFFFF` | Text/icons on an accent fill   |
+| Role             | Value     | Usage                            |
+| ---------------- | --------- | -------------------------------- |
+| Accent           | `#1C6EA4` | Primary actions, active states   |
+| Accent text      | `#1C6EA4` | Links, focus, accent as text     |
+| Background       | `#EFF3F7` | Page background                  |
+| Panel            | `#FFFFFF` | Cards, panels                    |
+| Text             | `#1C3245` | Body text                        |
+| Text secondary   | `#5A7086` | Captions, metadata               |
+| Border           | `#DEE6ED` | Dividers, input borders          |
+| Success          | `#2E9E86` | Success state only               |
+| Warning          | `#C99A3E` | Warning state only               |
+| Danger           | `#BC3B2E` | Validation errors, destructive   |
+| Text on accent   | `#FFFFFF` | Text/icons on an accent fill     |
+| Hover            | `#E6EDF3` | Row or control under the pointer |
+| Accent soft text | `#14507A` | Text on an accent tint           |
+| Text soft        | `#2F4659` | Quiet body text, table values    |
+| Accent hover     | `#175C89` | Accent fill under the pointer    |
 
 > **Decisión del 2026-09-04.** El texto secundario del tema claro se desvía
 > del prototipo a propósito. El valor original del prototipo, `#6B8095`, da
@@ -54,19 +58,23 @@ desplazamiento lo sigan.
 
 #### Dark theme (`[data-theme="dark"]` y `prefers-color-scheme: dark`)
 
-| Role           | Value     | Usage                          |
-| -------------- | --------- | ------------------------------ |
-| Accent         | `#33A1E0` | Primary actions, active states |
-| Accent text    | `#33A1E0` | Links, focus, accent as text   |
-| Background     | `#0C1A26` | Page background                |
-| Panel          | `#13283A` | Cards, panels                  |
-| Text           | `#E8F0F7` | Body text                      |
-| Text secondary | `#8AA1B5` | Captions, metadata             |
-| Border         | `#274055` | Dividers, input borders        |
-| Success        | `#6FD6B4` | Success state only             |
-| Warning        | `#F2CE78` | Warning state only             |
-| Danger         | `#F2887A` | Validation errors, destructive |
-| Text on accent | `#0C1A26` | Text/icons on an accent fill   |
+| Role             | Value     | Usage                            |
+| ---------------- | --------- | -------------------------------- |
+| Accent           | `#33A1E0` | Primary actions, active states   |
+| Accent text      | `#33A1E0` | Links, focus, accent as text     |
+| Background       | `#0C1A26` | Page background                  |
+| Panel            | `#13283A` | Cards, panels                    |
+| Text             | `#E8F0F7` | Body text                        |
+| Text secondary   | `#8AA1B5` | Captions, metadata               |
+| Border           | `#274055` | Dividers, input borders          |
+| Success          | `#6FD6B4` | Success state only               |
+| Warning          | `#F2CE78` | Warning state only               |
+| Danger           | `#F2887A` | Validation errors, destructive   |
+| Text on accent   | `#0C1A26` | Text/icons on an accent fill     |
+| Hover            | `#1A3349` | Row or control under the pointer |
+| Accent soft text | `#CFE8F7` | Text on an accent tint           |
+| Text soft        | `#CFDEEA` | Quiet body text, table values    |
+| Accent hover     | `#5AB4E8` | Accent fill under the pointer    |
 
 Rules: one accent color; success/warning/danger appear only with their meaning;
 never place text on a background with contrast ratio below 4.5:1 (3:1 for
@@ -103,6 +111,27 @@ text ≥ 24px).
 > panel y el fondo oscuros. Se rechaza un acento con el que ningún texto llegue
 > a AA, o que como enlace no llegue a 4.5:1 sobre el panel y el fondo claros.
 > Nada más de la paleta cambia con el club.
+
+> **Decisión del 2026-10-09 (issue #547).** El rediseño del directorio (E21,
+> D6) traía cuatro colores sueltos; ahora son tokens. Los oscuros son los del
+> handoff (`docs/design/directorio-admin/README.md`) y los claros se eligieron
+> para este tema.
+>
+> - `Hover` (`--color-hover`) es el fondo de una fila, una opción de menú o un
+>   botón sin relleno bajo el puntero. El texto encima pasa a `Text`: en claro,
+>   `Text secondary` sobre `Hover` se queda en 4.3:1.
+> - `Accent soft text` (`--color-accent-soft-text`) es el texto de una píldora
+>   o un aviso con fondo de acento tintado
+>   (`color-mix(in srgb, var(--color-accent) N%, transparent)`, hasta 16 %).
+> - `Text soft` (`--color-text-soft`) es texto que pesa menos que `Text` sin
+>   ser metadato: valores de una tabla, la cita de una solicitud.
+> - `Accent hover` (`--color-accent-hover`) es el relleno de un botón primario
+>   bajo el puntero, con `Text on accent` encima.
+>
+> Los cuatro son del club sembrado. `accent-color.ts` todavía no los deriva del
+> acento de cada club, así que con un acento propio `Accent hover` y
+> `Accent soft text` siguen en azul. `tests/unit/design-tokens.test.ts`
+> comprueba el contraste de cada uno en los dos temas.
 
 #### Sidebar (no cambia con el tema)
 
@@ -151,6 +180,23 @@ cards in a grid share identical gaps; label-to-input distance is constant).
 - Border radius: 8px everywhere interactive; pick ONE
   radius and stick to it.
 - Max 2 elevation levels: see `--shadow` and `--shadow-sm` above.
+
+## Icons
+
+Los iconos vienen de **Phosphor** (`@phosphor-icons/react`, issue #547), en
+peso `regular` y `fill`, como en el handoff del directorio. Los once glifos de
+la navegación (`src/components/NavIcons.tsx`) son anteriores y siguen siendo
+SVG propios.
+
+- Un icono de Phosphor se pinta siempre con `<Icon glyph={...} />`
+  (`src/components/Icon.tsx`). Sale decorativo (`aria-hidden`), mide `1em` y
+  toma `currentColor`: el tamaño y el color los pone el texto que lo rodea.
+  El nombre accesible lo lleva el control (su texto o su `aria-label`), nunca
+  el icono.
+- Se importa un icono por archivo, desde la ruta de servidor:
+  `import { MagnifyingGlass } from "@phosphor-icons/react/dist/ssr/MagnifyingGlass"`.
+  Así el bundle solo lleva los que se usan y el icono funciona también en un
+  Server Component. ESLint rechaza cualquier otra ruta del paquete.
 
 ## Mandatory component states
 

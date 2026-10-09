@@ -6,7 +6,7 @@ import {
   cssCustomProperties,
   readGlobalsCss,
 } from "./helpers/css-tokens";
-import { contrastRatio } from "./helpers/wcag-contrast";
+import { contrastRatio, tintOver } from "./helpers/wcag-contrast";
 
 const designSystem = readFileSync(
   join(process.cwd(), "design-system.md"),
@@ -106,6 +106,10 @@ const colorRoleToCssVariable: Record<string, string> = {
   Warning: "color-warning",
   "Text on accent": "color-on-accent",
   Danger: "color-danger",
+  Hover: "color-hover",
+  "Accent soft text": "color-accent-soft-text",
+  "Text soft": "color-text-soft",
+  "Accent hover": "color-accent-hover",
 };
 
 describe("tokens de color: tema claro", () => {
@@ -269,6 +273,64 @@ describe("contraste", () => {
     ).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+// #547: los tokens del rediseño del directorio. El fondo de acento suave es el
+// acento mezclado con transparente sobre la superficie; 16 % es el tinte más
+// fuerte del handoff, y el que menos contraste deja en los dos temas.
+const STRONGEST_ACCENT_TINT = 0.16;
+const AA_TEXT = 4.5;
+
+describe.each([
+  ["claro", rootCss],
+  ["oscuro", darkCss],
+] as const)(
+  "contraste de los tokens del directorio en tema %s",
+  (_, tokens) => {
+    it.each(["color-panel", "color-background", "color-hover"])(
+      "el texto suave cumple AA sobre %s",
+      (surface) => {
+        expect(
+          contrastRatio(
+            token(tokens, "color-text-soft"),
+            token(tokens, surface),
+          ),
+        ).toBeGreaterThanOrEqual(AA_TEXT);
+      },
+    );
+
+    it("el texto cumple AA sobre el hover", () => {
+      expect(
+        contrastRatio(
+          token(tokens, "color-text"),
+          token(tokens, "color-hover"),
+        ),
+      ).toBeGreaterThanOrEqual(AA_TEXT);
+    });
+
+    it.each(["color-panel", "color-background"])(
+      "el texto de acento suave cumple AA sobre el tinte de acento encima de %s",
+      (surface) => {
+        const tint = tintOver(
+          token(tokens, "color-accent"),
+          token(tokens, surface),
+          STRONGEST_ACCENT_TINT,
+        );
+        expect(
+          contrastRatio(token(tokens, "color-accent-soft-text"), tint),
+        ).toBeGreaterThanOrEqual(AA_TEXT);
+      },
+    );
+
+    it("el texto sobre acento cumple AA sobre el acento al pasar el ratón", () => {
+      expect(
+        contrastRatio(
+          token(tokens, "color-on-accent"),
+          token(tokens, "color-accent-hover"),
+        ),
+      ).toBeGreaterThanOrEqual(AA_TEXT);
+    });
+  },
+);
 
 describe("tipografía", () => {
   it("la pila de texto declara una familia de respaldo genérica", () => {

@@ -31,6 +31,15 @@
      el fondo oscuro, que da 7.4:1. Con el acento propio de un club (#294) el
      layout raíz sobrescribe los dos con los que calcula `accent-color.ts`. */
   --color-on-accent: #ffffff;
+  /* El rediseño del directorio (#547). Hover es el fondo de una fila o un
+     control bajo el puntero, y encima el texto va en --color-text. El texto de
+     acento suave va sobre un tinte del acento; el texto suave queda entre el
+     texto y el secundario. El acento al pasar es el relleno del botón
+     primario bajo el puntero: no lo deriva el acento de cada club. */
+  --color-hover: #e6edf3;
+  --color-accent-soft-text: #14507a;
+  --color-text-soft: #2f4659;
+  --color-accent-hover: #175c89;
   /* El enlace de ejemplo junto al acento que el Admin elige (#346). La
      muestra pone los de cada tema en línea; aquí están porque toda variable
      que la hoja lee tiene su valor en :root (tests/unit/theme-css.test.ts). */
@@ -100,6 +109,10 @@
     --color-warning: #f2ce78;
     --color-danger: #f2887a;
     --color-on-accent: #0c1a26;
+    --color-hover: #1a3349;
+    --color-accent-soft-text: #cfe8f7;
+    --color-text-soft: #cfdeea;
+    --color-accent-hover: #5ab4e8;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   }
@@ -122,6 +135,10 @@
   --color-warning: #f2ce78;
   --color-danger: #f2887a;
   --color-on-accent: #0c1a26;
+  --color-hover: #1a3349;
+  --color-accent-soft-text: #cfe8f7;
+  --color-text-soft: #cfdeea;
+  --color-accent-hover: #5ab4e8;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
