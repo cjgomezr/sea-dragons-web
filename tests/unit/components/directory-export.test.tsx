@@ -84,7 +84,12 @@ function stubApi(
       }
       if (url.startsWith("/api/v1/directory")) {
         return jsonResponse(200, {
-          data: { kind, members, availableFilters: ["position"] },
+          data: {
+            kind,
+            members,
+            availableFilters: ["position"],
+            total: members.length,
+          },
         });
       }
       if (url === "/api/v1/club/positions") {

@@ -165,6 +165,9 @@ type ApiStub = {
   readonly respond?: (url: string) => Response | Promise<Response>;
   /** Los filtros que el servidor dice que se pueden usar (#497). */
   readonly availableFilters?: readonly string[];
+  /** El total del club que dice el servidor; por defecto, los de `members`
+   * que no están dados de baja. */
+  readonly total?: number;
 };
 
 const requestedUrls: string[] = [];
@@ -186,6 +189,14 @@ function normalize(text: string): string {
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase();
+}
+
+/** El club entero de la respuesta, sin búsqueda, rol ni filtros: el total
+ * de la cabecera (#548). */
+function clubSizeOf(stub: ApiStub, includeInactive: boolean): number {
+  return (stub.members ?? [MARIA]).filter(
+    (member) => includeInactive || member.status !== "inactive",
+  ).length;
 }
 
 /** Lo que el endpoint de #238 hace con la consulta, reducido a lo que estos
@@ -212,6 +223,7 @@ function listingFor(stub: ApiStub, url: string): Response {
       kind,
       members,
       availableFilters: stub.availableFilters ?? FILTERS_BY_KIND[kind],
+      total: stub.total ?? clubSizeOf(stub, includeInactive),
     },
   });
 }
@@ -236,7 +248,12 @@ function deferredResponses(): {
 
 function listingResponse(members: readonly AnyMember[]): Response {
   return jsonResponse(200, {
-    data: { kind: "member", members, availableFilters: ["position"] },
+    data: {
+      kind: "member",
+      members,
+      availableFilters: ["position"],
+      total: members.length,
+    },
   });
 }
 
@@ -290,6 +307,43 @@ function listedNames(): readonly string[] {
     .getAllByRole("row")
     .map((row) => row.getAttribute("aria-label"))
     .filter((label): label is string => label !== null);
+}
+
+/** El ancho desde el que Filtros abre el popover en vez de la hoja (#548). */
+const WIDE_SCREEN_QUERY = "(min-width: 768px)";
+
+function stubScreenWidth(isWide: boolean): void {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: isWide && query === WIDE_SCREEN_QUERY,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }));
+}
+
+function showAsDesktop(): void {
+  stubScreenWidth(true);
+}
+
+function showAsPhone(): void {
+  stubScreenWidth(false);
+}
+
+const FILTERS_NAME = { en: "Filters", es: "Filtros" } as const;
+
+/** El popover de los filtros, abierto desde su botón si todavía no lo está. */
+async function openFilters(locale: "en" | "es" = "en"): Promise<HTMLElement> {
+  const name = FILTERS_NAME[locale];
+  const open = screen.queryByRole("dialog", { name });
+  if (open !== null) {
+    return open;
+  }
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: new RegExp(`^${name}`) }));
+  return screen.getByRole("dialog", { name });
 }
 
 function columnHeader(name: string): HTMLElement {
@@ -554,6 +608,7 @@ describe("pantalla del directorio", () => {
             kind: "member",
             members: [MARIA],
             availableFilters: ["position"],
+            total: 1,
           },
         });
       },
@@ -818,25 +873,29 @@ describe("incluir inactivos", () => {
   });
 
   it("no ofrece el control a quien no es Admin", async () => {
+    showAsDesktop();
     stubApi({ kind: "member", members: [MARIA] });
 
     await renderScreen();
 
     expect(
-      screen.queryByRole("checkbox", { name: "Include deactivated accounts" }),
+      within(await openFilters()).queryByRole("checkbox", {
+        name: "Include deactivated accounts",
+      }),
     ).toBeNull();
   });
 
   it("enseña a los dados de baja con una marca cuando un Admin lo activa", async () => {
+    showAsDesktop();
     stubApi({ kind: "admin", members: [VENCIDA, ZOE] });
     await renderScreen();
     expect(listedNames()).toEqual(["Ana Admin"]);
 
-    await userEvent
-      .setup()
-      .click(
-        screen.getByRole("checkbox", { name: "Include deactivated accounts" }),
-      );
+    await userEvent.setup().click(
+      within(await openFilters()).getByRole("checkbox", {
+        name: "Include deactivated accounts",
+      }),
+    );
 
     await waitFor(() => {
       expect(listedNames()).toEqual(["Ana Admin", "Zoe Zapata"]);
@@ -862,11 +921,14 @@ describe("incluir inactivos", () => {
           ? errorResponse(403, "forbidden")
           : listingFor(asAdmin, url),
     });
+    showAsDesktop();
     await renderScreen();
     const user = userEvent.setup();
 
     await user.click(
-      screen.getByRole("checkbox", { name: "Include deactivated accounts" }),
+      within(await openFilters()).getByRole("checkbox", {
+        name: "Include deactivated accounts",
+      }),
     );
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 
@@ -1024,6 +1086,7 @@ describe("marca de sin evaluar", () => {
             kind: "admin",
             members: [{ ...ZOE, isEvaluated: false }],
             availableFilters: FILTERS_BY_KIND.admin,
+            total: 1,
           },
         }),
     });
@@ -1191,8 +1254,12 @@ describe("llegar con un texto buscado", () => {
 
 // #497: filtros por posición, grupo, AUF y membresía, en la dirección.
 describe("filtros del directorio", () => {
-  function filterBar(): HTMLElement {
-    return screen.getByRole("group", { name: "More filters" });
+  // Desde #548 los filtros viven en el popover de Filtros, que se abre
+  // desde 768 px. Los dos casos de la hoja del móvil lo dicen ellos mismos.
+  beforeEach(showAsDesktop);
+
+  function filterBar(): Promise<HTMLElement> {
+    return openFilters();
   }
 
   function optionsOf(select: HTMLElement): readonly string[] {
@@ -1205,7 +1272,7 @@ describe("filtros del directorio", () => {
     stubApi({ members: [MARIA, TOMAS] });
     await renderScreen();
 
-    const position = await within(filterBar()).findByRole("combobox", {
+    const position = await within(await filterBar()).findByRole("combobox", {
       name: "Position",
     });
     await waitFor(() => {
@@ -1223,7 +1290,7 @@ describe("filtros del directorio", () => {
     stubApi({ kind: "member", availableFilters: ["position"] });
     await renderScreen();
 
-    const bar = filterBar();
+    const bar = await filterBar();
     expect(
       within(bar).queryByRole("combobox", { name: "Group" }),
     ).not.toBeInTheDocument();
@@ -1258,14 +1325,14 @@ describe("filtros del directorio", () => {
       });
       await renderScreen();
 
-      const group = await within(filterBar()).findByRole("combobox", {
+      const group = await within(await filterBar()).findByRole("combobox", {
         name: "Group",
       });
       await waitFor(() => {
         expect(optionsOf(group)).toEqual(["All groups", "Senior Squad"]);
       });
       expect(
-        within(filterBar()).queryByRole("combobox", { name: "AUF" }),
+        within(await filterBar()).queryByRole("combobox", { name: "AUF" }),
       ).not.toBeInTheDocument();
     },
   );
@@ -1275,7 +1342,9 @@ describe("filtros del directorio", () => {
     await renderScreen();
 
     expect(
-      optionsOf(within(filterBar()).getByRole("combobox", { name: "AUF" })),
+      optionsOf(
+        within(await filterBar()).getByRole("combobox", { name: "AUF" }),
+      ),
     ).toEqual([
       "Any AUF",
       "No AUF number",
@@ -1285,7 +1354,7 @@ describe("filtros del directorio", () => {
     ]);
     expect(
       optionsOf(
-        within(filterBar()).getByRole("combobox", { name: "Membership" }),
+        within(await filterBar()).getByRole("combobox", { name: "Membership" }),
       ),
     ).toEqual([
       "Any membership",
@@ -1303,7 +1372,7 @@ describe("filtros del directorio", () => {
     stubApi({ members: [MARIA, NEREA, TOMAS] });
     await renderScreen();
     const user = userEvent.setup();
-    const position = within(filterBar()).getByRole("combobox", {
+    const position = within(await filterBar()).getByRole("combobox", {
       name: "Position",
     });
     await within(position).findByRole("option", { name: "Goalkeeper" });
@@ -1321,10 +1390,11 @@ describe("filtros del directorio", () => {
     stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
     await renderScreen();
     const user = userEvent.setup();
-    const bar = filterBar();
-    await within(bar).findByRole("option", { name: "Senior Squad" });
 
+    // El rol está en la barra, fuera del popover: pulsarlo lo cierra (#548).
     await user.click(screen.getByRole("radio", { name: "Coach" }));
+    const bar = await filterBar();
+    await within(bar).findByRole("option", { name: "Senior Squad" });
     await user.selectOptions(
       within(bar).getByRole("combobox", { name: "Group" }),
       "Senior Squad",
@@ -1354,7 +1424,7 @@ describe("filtros del directorio", () => {
     stubApi({ members: [MARIA] });
     await renderScreen();
     const user = userEvent.setup();
-    const position = within(filterBar()).getByRole("combobox", {
+    const position = within(await filterBar()).getByRole("combobox", {
       name: "Position",
     });
     await within(position).findByRole("option", { name: "No position" });
@@ -1372,7 +1442,7 @@ describe("filtros del directorio", () => {
     });
     expect(lastRequest().get("position")).toBeNull();
     expect(
-      within(filterBar()).getByRole("combobox", { name: "Position" }),
+      within(await filterBar()).getByRole("combobox", { name: "Position" }),
     ).toHaveValue("");
   });
 
@@ -1382,7 +1452,7 @@ describe("filtros del directorio", () => {
     const user = userEvent.setup();
 
     await user.selectOptions(
-      within(filterBar()).getByRole("combobox", { name: "AUF" }),
+      within(await filterBar()).getByRole("combobox", { name: "AUF" }),
       "Expired",
     );
 
@@ -1410,9 +1480,10 @@ describe("filtros del directorio", () => {
     });
     expect(requestedUrls).toHaveLength(1);
     expect(lastRequest().get("position")).toBe(FORWARD.id);
+    const bar = await filterBar();
     await waitFor(() => {
       expect(
-        within(filterBar()).getByRole("combobox", { name: "Position" }),
+        within(bar).getByRole("combobox", { name: "Position" }),
       ).toHaveValue(FORWARD.id);
     });
   });
@@ -1424,11 +1495,11 @@ describe("filtros del directorio", () => {
     expect(screen.getByRole("button", { name: "Filters" })).toBeVisible();
 
     await user.selectOptions(
-      within(filterBar()).getByRole("combobox", { name: "AUF" }),
+      within(await filterBar()).getByRole("combobox", { name: "AUF" }),
       "Expired",
     );
     await user.selectOptions(
-      within(filterBar()).getByRole("combobox", { name: "Membership" }),
+      within(await filterBar()).getByRole("combobox", { name: "Membership" }),
       "Active",
     );
 
@@ -1438,6 +1509,7 @@ describe("filtros del directorio", () => {
   });
 
   it("abre los filtros en una hoja y devuelve el foco al botón al cerrarla con Escape", async () => {
+    showAsPhone();
     stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
     await renderScreen();
     const user = userEvent.setup();
@@ -1458,6 +1530,7 @@ describe("filtros del directorio", () => {
   });
 
   it("aplica lo que se elige en la hoja", async () => {
+    showAsPhone();
     stubApi({ members: [MARIA, NEREA] });
     await renderScreen();
     const user = userEvent.setup();
@@ -1517,7 +1590,7 @@ describe("filtros del directorio", () => {
     stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
     await renderScreen("es");
 
-    const bar = screen.getByRole("group", { name: "Más filtros" });
+    const bar = await openFilters("es");
     const position = within(bar).getByRole("combobox", { name: "Posición" });
     await within(position).findByRole("option", { name: "Portería" });
     expect(optionsOf(position)).toEqual([
@@ -1661,13 +1734,14 @@ describe("el contacto en el directorio", () => {
   });
 
   it("ofrece a quien ve el contacto los filtros sin teléfono y sin contacto de emergencia, y los lleva a la dirección", async () => {
+    showAsDesktop();
     stubApi({
       kind: "committee",
       members: [{ ...NEREA, ...NEREA_SIN_CONTACTO }],
     });
     await renderScreen();
     const user = userEvent.setup();
-    const bar = screen.getByRole("group", { name: "More filters" });
+    const bar = await openFilters();
 
     await user.click(within(bar).getByRole("checkbox", { name: "No phone" }));
     await user.click(
@@ -1685,19 +1759,21 @@ describe("el contacto en el directorio", () => {
   });
 
   it("no ofrece los filtros de contacto a un Coach", async () => {
+    showAsDesktop();
     stubApi({
       kind: "coach",
       members: [{ ...MARIA, isEvaluated: true, emergencyContact: null }],
     });
     await renderScreen();
 
-    const bar = screen.getByRole("group", { name: "More filters" });
+    const bar = await openFilters();
     expect(
       within(bar).queryByRole("checkbox", { name: "No phone" }),
     ).not.toBeInTheDocument();
   });
 
   it("lo dice todo en español", async () => {
+    showAsDesktop();
     stubApi({
       kind: "committee",
       members: [{ ...MARIA, ...MARIA_CON_CONTACTO }],
@@ -1711,12 +1787,447 @@ describe("el contacto en el directorio", () => {
     expect(within(cell).getByText("Correo")).toBeVisible();
     expect(within(cell).getByText("Teléfono")).toBeVisible();
     expect(within(cell).getByText("Contacto de emergencia")).toBeVisible();
-    const bar = screen.getByRole("group", { name: "Más filtros" });
+    const bar = await openFilters("es");
     expect(
       within(bar).getByRole("checkbox", { name: "Sin teléfono" }),
     ).toBeInTheDocument();
     expect(
       within(bar).getByRole("checkbox", { name: "Sin contacto de emergencia" }),
     ).toBeInTheDocument();
+  });
+});
+// #548: la cabecera, la barra de una fila, el popover de Filtros y las fichas
+// de los filtros activos.
+
+/** El nombre visible de un campo, por su `<label>`. */
+function fieldLabel(field: HTMLElement): string {
+  const id = field.getAttribute("id");
+  return id === null
+    ? ""
+    : (document.querySelector(`label[for="${id}"]`)?.textContent ?? "");
+}
+
+describe("cabecera del directorio", () => {
+  it("dice cuántos socios enseña de cuántos tiene el club", async () => {
+    stubApi({ members: [MARIA, NEREA, TOMAS], total: 5 });
+
+    await renderScreen();
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Directory" }),
+    ).toBeVisible();
+    expect(screen.getByText("3 of 5 members")).toBeVisible();
+  });
+
+  it("lo dice en singular con un solo socio en el club", async () => {
+    stubApi({ members: [MARIA], total: 1 });
+
+    await renderScreen();
+
+    expect(screen.getByText("1 of 1 member")).toBeVisible();
+  });
+
+  it("lo dice en español", async () => {
+    stubApi({ members: [MARIA, NEREA], total: 4 });
+
+    await renderScreen("es");
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Directorio" }),
+    ).toBeVisible();
+    expect(screen.getByText("2 de 4 miembros")).toBeVisible();
+  });
+
+  it("a un Admin le pone correo, exportar e invitar como botones de solo icono con su título", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+
+    await renderScreen();
+
+    const email = screen.getByRole("button", { name: "Write an email" });
+    const csv = screen.getByRole("button", { name: "Export CSV" });
+    const invite = screen.getByRole("link", { name: "Invite member" });
+    expect(email).toHaveAttribute("title", "Write an email");
+    expect(csv).toHaveAttribute("title", "Export CSV");
+    expect(invite).toHaveAttribute("title", "Invite member");
+    for (const action of [email, csv, invite]) {
+      expect(action).toHaveTextContent("");
+    }
+  });
+
+  it("a un Committee le pone correo y exportar, sin invitar", async () => {
+    stubApi({
+      kind: "committee",
+      members: [
+        {
+          ...MARIA,
+          email: "maria@club.test",
+          phone: null,
+          emergencyContact: null,
+        },
+      ],
+    });
+
+    await renderScreen();
+
+    expect(
+      screen.getByRole("button", { name: "Write an email" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Export CSV" })).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Invite member" })).toBeNull();
+  });
+
+  it.each([
+    ["Coach", "coach", { ...MARIA, isEvaluated: true, emergencyContact: null }],
+    ["Player", "member", MARIA],
+  ] as const)(
+    "a un %s no le pone ninguna acción de la cabecera",
+    async (_role, kind, member) => {
+      stubApi({ kind, members: [member] });
+
+      await renderScreen();
+
+      expect(
+        screen.queryByRole("button", { name: "Write an email" }),
+      ).toBeNull();
+      expect(screen.queryByRole("button", { name: "Export CSV" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Invite member" })).toBeNull();
+    },
+  );
+});
+
+describe("barra del directorio", () => {
+  it("lleva la búsqueda, el rol, Filtros y ningún botón del panel todavía", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(
+      screen.getByRole("searchbox", { name: "Search by name" }),
+    ).toBeVisible();
+    const roles = screen.getByRole("group", { name: "Filter by role" });
+    expect(
+      within(roles)
+        .getAllByRole("radio")
+        .map((radio) => radio.closest("label")?.textContent),
+    ).toEqual(["All", "Player", "Coach", "Committee", "Admin"]);
+    expect(screen.getByRole("button", { name: "Filters" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /panel/i })).toBeNull();
+  });
+
+  it("a un Coach le da la misma barra, con sólo sus filtros en el popover", async () => {
+    showAsDesktop();
+    stubApi({
+      kind: "coach",
+      members: [{ ...MARIA, isEvaluated: true, emergencyContact: null }],
+    });
+    await renderScreen();
+
+    const popover = await openFilters();
+
+    expect(within(popover).getAllByRole("combobox").map(fieldLabel)).toEqual([
+      "Position",
+      "Group",
+    ]);
+    expect(within(popover).queryAllByRole("checkbox")).toEqual([]);
+  });
+});
+
+describe("el popover de Filtros", () => {
+  beforeEach(showAsDesktop);
+
+  it("ofrece a un Admin los cuatro desplegables, las tres casillas y el pie", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+    await renderScreen();
+
+    const popover = await openFilters();
+
+    expect(popover.tagName).not.toBe("DIALOG");
+    expect(screen.getByRole("button", { name: "Filters" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(within(popover).getAllByRole("combobox").map(fieldLabel)).toEqual([
+      "Position",
+      "Group",
+      "AUF",
+      "Membership",
+    ]);
+    expect(within(popover).getAllByRole("checkbox").map(fieldLabel)).toEqual([
+      "No phone",
+      "No emergency contact",
+      "Include deactivated accounts",
+    ]);
+    expect(
+      within(popover).getByRole("button", { name: "Clear all" }),
+    ).toBeVisible();
+    expect(
+      within(popover).getByRole("button", { name: "Show 1 member" }),
+    ).toBeVisible();
+  });
+
+  it("filtra al elegir y Mostrar cierra el popover y devuelve el foco a Filtros", async () => {
+    stubApi({ members: [MARIA, NEREA, TOMAS] });
+    await renderScreen();
+    const user = userEvent.setup();
+    const popover = await openFilters();
+    const position = within(popover).getByRole("combobox", {
+      name: "Position",
+    });
+    await within(position).findByRole("option", { name: "Goalkeeper" });
+
+    await user.selectOptions(position, "Goalkeeper");
+    await waitFor(() => {
+      expect(listedNames()).toEqual(["Nerea Ruiz"]);
+    });
+    await user.click(
+      within(popover).getByRole("button", { name: "Show 1 member" }),
+    );
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filters: 1 active" }),
+    ).toHaveFocus();
+  });
+
+  it("cuenta los socios en plural en el botón Mostrar", async () => {
+    stubApi({ members: [MARIA, NEREA] });
+    await renderScreen();
+
+    const popover = await openFilters();
+
+    expect(
+      within(popover).getByRole("button", { name: "Show 2 members" }),
+    ).toBeVisible();
+  });
+
+  it("Borrar todo quita los filtros del popover y lo deja abierto", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+    await renderScreen();
+    const user = userEvent.setup();
+    const popover = await openFilters();
+    await user.selectOptions(
+      within(popover).getByRole("combobox", { name: "AUF" }),
+      "Expired",
+    );
+    await user.click(
+      within(popover).getByRole("checkbox", { name: "No phone" }),
+    );
+    await waitFor(() => {
+      expect(lastRequest().get("withoutPhone")).toBe("true");
+    });
+
+    await user.click(
+      within(popover).getByRole("button", { name: "Clear all" }),
+    );
+
+    await waitFor(() => {
+      expect(lastRequest().get("auf")).toBeNull();
+    });
+    expect(lastRequest().get("withoutPhone")).toBeNull();
+    expect(within(popover).getByRole("combobox", { name: "AUF" })).toHaveValue(
+      "",
+    );
+    expect(
+      within(popover).getByRole("checkbox", { name: "No phone" }),
+    ).not.toBeChecked();
+    expect(screen.getByRole("dialog", { name: "Filters" })).toBeVisible();
+  });
+
+  it("Escape lo cierra y devuelve el foco a Filtros", async () => {
+    stubApi();
+    await renderScreen();
+    await openFilters();
+
+    await userEvent.setup().keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filters" })).toHaveFocus();
+  });
+
+  it("pulsar fuera lo cierra y devuelve el foco a Filtros", async () => {
+    stubApi();
+    await renderScreen();
+    await openFilters();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("heading", { level: 1, name: "Directory" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filters" })).toHaveFocus();
+  });
+
+  it("pulsar otro control lo cierra y deja el foco en ese control", async () => {
+    stubApi();
+    await renderScreen();
+    await openFilters();
+    const search = screen.getByRole("searchbox", { name: "Search by name" });
+
+    await userEvent.setup().click(search);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(search).toHaveFocus();
+  });
+
+  it("pulsar otra vez Filtros lo cierra", async () => {
+    stubApi();
+    await renderScreen();
+    await openFilters();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Filters" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("se escribe en español", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+    await renderScreen("es");
+
+    const popover = await openFilters("es");
+
+    expect(
+      within(popover).getByRole("button", { name: "Borrar todo" }),
+    ).toBeVisible();
+    expect(
+      within(popover).getByRole("button", { name: "Mostrar 1 miembro" }),
+    ).toBeVisible();
+    expect(
+      within(popover).getByRole("checkbox", {
+        name: "Incluir las cuentas desactivadas",
+      }),
+    ).toBeVisible();
+  });
+});
+
+describe("la hoja de Filtros en el móvil", () => {
+  it("lleva también la casilla de los dados de baja para un Admin", async () => {
+    showAsPhone();
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+    await renderScreen();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Filters" }));
+
+    const sheet = screen.getByRole("dialog", { name: "Filters" });
+    expect(sheet.tagName).toBe("DIALOG");
+    expect(
+      within(sheet).getByRole("checkbox", {
+        name: "Include deactivated accounts",
+      }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("las fichas de los filtros activos", () => {
+  function chipTexts(name = "Active filters"): readonly string[] {
+    return within(screen.getByRole("list", { name }))
+      .getAllByRole("listitem")
+      .map((chip) => chip.textContent ?? "");
+  }
+
+  function renderWithFilters(locale: "en" | "es" = "en"): void {
+    render(
+      <DirectoryScreen
+        locale={locale}
+        initialQuery={{
+          ...DEFAULT_DIRECTORY_QUERY,
+          auf: "expired",
+          withoutPhone: true,
+        }}
+      />,
+    );
+  }
+
+  it("no enseña fichas sin filtros activos", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(screen.queryByRole("list", { name: "Active filters" })).toBeNull();
+  });
+
+  it("enseña cada filtro activo con su nombre y su valor", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+
+    renderWithFilters();
+
+    await waitFor(() => {
+      expect(chipTexts()).toEqual(["AUF: Expired", "No phone"]);
+    });
+    expect(
+      screen.getByRole("button", { name: "Filters: 2 active" }),
+    ).toBeVisible();
+  });
+
+  it("nombra la posición elegida", async () => {
+    stubApi({ members: [MARIA] });
+
+    render(
+      <DirectoryScreen
+        locale="en"
+        initialQuery={{
+          ...DEFAULT_DIRECTORY_QUERY,
+          position: { kind: "position", positionId: FORWARD.id },
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(chipTexts()).toEqual(["Position: Forward"]);
+    });
+  });
+
+  it("la ✕ quita ese filtro, de la petición y de la dirección", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+    renderWithFilters();
+    const remove = await screen.findByRole("button", {
+      name: "Remove the filter AUF: Expired",
+    });
+    expect(remove).toHaveAttribute("title", "Remove the filter AUF: Expired");
+
+    await userEvent.setup().click(remove);
+
+    await waitFor(() => {
+      expect(lastRequest().get("auf")).toBeNull();
+    });
+    expect(lastRequest().get("withoutPhone")).toBe("true");
+    expect(window.location.search).toBe("?withoutPhone=true");
+    expect(chipTexts()).toEqual(["No phone"]);
+  });
+
+  it("Borrar las quita todas", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+    renderWithFilters();
+    await screen.findByRole("list", { name: "Active filters" });
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Clear" }));
+
+    await waitFor(() => {
+      expect(window.location.search).toBe("");
+    });
+    expect(screen.queryByRole("list", { name: "Active filters" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Filters" })).toBeVisible();
+  });
+
+  it("se escriben en español", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+
+    renderWithFilters("es");
+
+    await waitFor(() => {
+      expect(chipTexts("Filtros activos")).toEqual([
+        "AUF: Vencido",
+        "Sin teléfono",
+      ]);
+    });
+    expect(
+      screen.getByRole("button", { name: "Quitar el filtro AUF: Vencido" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Borrar" })).toBeVisible();
   });
 });

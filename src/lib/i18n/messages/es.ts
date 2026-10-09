@@ -541,8 +541,6 @@ export const spanishMessages: MessageCatalog = {
   "directory.metaDescription":
     "Todo el club, con su país, su nivel, su rol y su posición.",
   "directory.title": "Directorio",
-  "directory.lead":
-    "Todo el club. Busca por nombre, filtra por rol y ordena la lista.",
   "directory.loading": "Cargando el directorio del club…",
   "directory.retry": "Volver a intentarlo",
   "directory.list.title": "Miembros del club",
@@ -588,6 +586,24 @@ export const spanishMessages: MessageCatalog = {
   },
   "directory.filter.sheetTitle": "Filtros",
   "directory.filter.apply": "Ver resultados",
+  "directory.filter.clearAll": "Borrar todo",
+  "directory.filter.showMembers": {
+    one: "Mostrar {count} miembro",
+    other: "Mostrar {count} miembros",
+  },
+  "directory.filter.chips": "Filtros activos",
+  "directory.filter.chip": "{filter}: {value}",
+  "directory.filter.chipRemove": "Quitar el filtro {filter}",
+  "directory.filter.chipsClear": "Borrar",
+  "directory.count": {
+    one: "{shown} de {count} miembro",
+    other: "{shown} de {count} miembros",
+  },
+  "directory.requests.none": "No hay solicitudes pendientes",
+  "directory.requests.waiting": {
+    one: "{count} solicitud de rol esperando",
+    other: "{count} solicitudes de rol esperando",
+  },
   "directory.error.filterForbidden":
     "Tu rol no puede usar alguno de estos filtros. Vuelve a intentarlo sin ellos.",
   "directory.column.member": "Miembro",

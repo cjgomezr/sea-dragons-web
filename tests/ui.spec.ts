@@ -4192,6 +4192,9 @@ function stubbedListing(
     kind,
     members: listed.map(LISTING_MEMBER_VIEWS[kind]),
     availableFilters: STUBBED_AVAILABLE_FILTERS[kind],
+    total: options.members.filter(
+      (member) => includeInactive || member.status !== "inactive",
+    ).length,
   };
 }
 
@@ -4365,9 +4368,13 @@ function searchFor(term: string, emptyText: RegExp | null) {
   };
 }
 
-function includeFormerMembers(label: string) {
+/** La casilla de los dados de baja vive en Filtros desde #548: se marca y
+ * se cierra, para que la captura enseñe la lista con su ficha. */
+function includeFormerMembers(labels: FilterLabels, label: string) {
   return async (page: Page): Promise<void> => {
-    await page.getByRole("checkbox", { name: label }).check();
+    const container = await filterContainer(page, labels);
+    await container.getByRole("checkbox", { name: label }).check();
+    await closeFilters(page, labels);
     await expect(page.getByRole("row", { name: "Zoe Zapata" })).toBeVisible();
   };
 }
@@ -4491,15 +4498,13 @@ function openLargePhoto(shape: LargePhotoShape | "failed") {
   };
 }
 
-/* Los filtros de #497. En escritorio están en la barra sobre la tabla; por
-   debajo de 768px, detrás del botón "Filtros", en una hoja que sube desde
-   abajo. */
+/* Los filtros de #497, detrás del botón "Filtros" (#548): desde 768px abre
+   un popover anclado al botón; por debajo, una hoja que sube desde abajo.
+   Los dos se llaman "Filtros". */
 
 type FilterLabels = {
   readonly toggle: string;
   readonly sheet: string;
-  readonly apply: string;
-  readonly bar: string;
   readonly position: string;
   readonly forward: string;
   readonly auf: string;
@@ -4511,8 +4516,6 @@ type FilterLabels = {
 const ENGLISH_FILTER_LABELS: FilterLabels = {
   toggle: "Filters",
   sheet: "Filters",
-  apply: "Show results",
-  bar: "More filters",
   position: "Position",
   forward: "Forward",
   auf: "AUF",
@@ -4524,8 +4527,6 @@ const ENGLISH_FILTER_LABELS: FilterLabels = {
 const SPANISH_FILTER_LABELS: FilterLabels = {
   toggle: "Filtros",
   sheet: "Filtros",
-  apply: "Ver resultados",
-  bar: "Más filtros",
   position: "Posición",
   forward: "Ataque",
   auf: "AUF",
@@ -4540,25 +4541,27 @@ function filterToggle(page: Page, labels: FilterLabels): Locator {
   });
 }
 
-/** Donde están los filtros en este ancho: la barra, o la hoja ya abierta. */
+/** Abre los filtros: el popover o la hoja, según el ancho. */
 async function filterContainer(
   page: Page,
   labels: FilterLabels,
 ): Promise<Locator> {
-  const toggle = filterToggle(page, labels);
-  if (!(await toggle.isVisible())) {
-    return page.getByRole("group", { name: labels.bar });
-  }
-  await toggle.click();
-  const sheet = page.getByRole("dialog", { name: labels.sheet });
-  await expect(sheet).toBeVisible();
-  return sheet;
+  await filterToggle(page, labels).click();
+  const filters = page.getByRole("dialog", { name: labels.sheet });
+  await expect(filters).toBeVisible();
+  return filters;
 }
 
-/** Elige una posición y el AUF vencido. Con `keepSheetOpen`, en el móvil la
- * hoja se queda abierta para la captura; si no, se cierra y el botón dice
- * cuántos filtros hay activos. */
-function chooseFilters(labels: FilterLabels, keepSheetOpen: boolean) {
+/** Escape cierra el popover y la hoja por igual. */
+async function closeFilters(page: Page, labels: FilterLabels): Promise<void> {
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: labels.sheet })).toHaveCount(0);
+}
+
+/** Elige una posición y el AUF vencido. Con `keepOpen`, el popover o la
+ * hoja se quedan abiertos para la captura; si no, se cierran y quedan las
+ * fichas y el botón con cuántos filtros hay activos. */
+function chooseFilters(labels: FilterLabels, keepOpen: boolean) {
   return async (page: Page): Promise<void> => {
     const container = await filterContainer(page, labels);
     await container
@@ -4571,10 +4574,8 @@ function chooseFilters(labels: FilterLabels, keepSheetOpen: boolean) {
     await expect(
       page.getByRole("row", { name: "Mateo Restrepo" }),
     ).toBeVisible();
-    const sheet = page.getByRole("dialog", { name: labels.sheet });
-    if (!keepSheetOpen && (await sheet.isVisible())) {
-      await sheet.getByRole("button", { name: labels.apply }).click();
-      await expect(sheet).toHaveCount(0);
+    if (!keepOpen) {
+      await closeFilters(page, labels);
     }
   };
 }
@@ -4587,10 +4588,7 @@ function filterToNobody(labels: FilterLabels, emptyText: RegExp) {
     await container
       .getByRole("combobox", { name: labels.group })
       .selectOption({ label: labels.senior });
-    const sheet = page.getByRole("dialog", { name: labels.sheet });
-    if (await sheet.isVisible()) {
-      await sheet.getByRole("button", { name: labels.apply }).click();
-    }
+    await closeFilters(page, labels);
     await expect(page.getByText(emptyText)).toBeVisible();
   };
 }
@@ -4631,11 +4629,7 @@ function filterWithoutPhone(labels: ContactLabels) {
     await container
       .getByRole("checkbox", { name: labels.withoutPhone })
       .check();
-    const sheet = page.getByRole("dialog", { name: labels.filters.sheet });
-    if (await sheet.isVisible()) {
-      await sheet.getByRole("button", { name: labels.filters.apply }).click();
-      await expect(sheet).toHaveCount(0);
-    }
+    await closeFilters(page, labels.filters);
     await expect(page.getByRole("row", { name: "Ana Admin" })).toHaveCount(0);
     await waitForContactColumn(page);
   };
@@ -4941,14 +4935,20 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     name: "directorio-con-inactivos",
     asAdmin: true,
     listHeading: ENGLISH_DIRECTORY_HEADING,
-    prepare: includeFormerMembers("Include deactivated accounts"),
+    prepare: includeFormerMembers(
+      ENGLISH_FILTER_LABELS,
+      "Include deactivated accounts",
+    ),
   },
   {
     name: "directorio-con-inactivos-es",
     asAdmin: true,
     listHeading: SPANISH_DIRECTORY_HEADING,
     beforeVisit: chooseSpanish,
-    prepare: includeFormerMembers("Incluir las cuentas desactivadas"),
+    prepare: includeFormerMembers(
+      SPANISH_FILTER_LABELS,
+      "Incluir las cuentas desactivadas",
+    ),
   },
   {
     name: "directorio-admin-con-solicitudes",
@@ -5015,6 +5015,21 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     listHeading: SPANISH_DIRECTORY_HEADING,
     beforeVisit: chooseSpanish,
     prepare: chooseFilters(SPANISH_FILTER_LABELS, false),
+  },
+  {
+    name: "directorio-filtros-popover",
+    asAdmin: true,
+    endsInModal: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: chooseFilters(ENGLISH_FILTER_LABELS, true),
+  },
+  {
+    name: "directorio-filtros-popover-es",
+    asAdmin: true,
+    endsInModal: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: chooseFilters(SPANISH_FILTER_LABELS, true),
   },
   {
     name: "directorio-filtros-movil",
@@ -5196,9 +5211,7 @@ test.describe("la hoja de filtros del directorio en el móvil", () => {
   }) => {
     await goToDirectory(page, state);
     const toggle = filterToggle(page, ENGLISH_FILTER_LABELS);
-    await expect(
-      page.getByRole("group", { name: ENGLISH_FILTER_LABELS.bar }),
-    ).toBeHidden();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
 
     await toggle.focus();
     await page.keyboard.press("Enter");
@@ -5250,6 +5263,46 @@ test.describe("la hoja de filtros del directorio en el móvil", () => {
     ).toBeVisible();
     await expect(page.getByRole("row", { name: "Ana Admin" })).toHaveCount(0);
   });
+});
+
+/* El popover de Filtros en escritorio (#548): el foco entra al abrirlo,
+   Escape lo cierra devolviéndolo al botón, y a 768px, el ancho más justo,
+   cabe entero en la ventana. */
+test.describe("el popover de filtros del directorio en escritorio", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  const state: DirectoryState = {
+    name: "directorio-filtros-popover",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+  };
+
+  for (const width of [768, 1440]) {
+    test(`a ${width}px cabe en la ventana y Escape devuelve el foco`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await goToDirectory(page, state);
+      const toggle = filterToggle(page, ENGLISH_FILTER_LABELS);
+
+      await toggle.focus();
+      await page.keyboard.press("Enter");
+
+      const popover = page.getByRole("dialog", { name: "Filters" });
+      await expect(popover).toBeVisible();
+      await expect(popover.getByRole("combobox").first()).toBeFocused();
+      const box = await popover.boundingBox();
+      expect(box?.x).toBeGreaterThanOrEqual(0);
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
+
+      await page.keyboard.press("Escape");
+
+      await expect(popover).toHaveCount(0);
+      await expect(toggle).toBeFocused();
+    });
+  }
 });
 
 /* Los filtros de #497 piden axe en cada ancho y en los dos temas, no sólo en
@@ -5575,7 +5628,10 @@ test.describe("el directorio en pantalla estrecha (#283)", () => {
     page,
   }) => {
     await goToNarrowDirectory(page, { asAdmin: true });
-    await includeFormerMembers("Include deactivated accounts")(page);
+    await includeFormerMembers(
+      ENGLISH_FILTER_LABELS,
+      "Include deactivated accounts",
+    )(page);
     await expect(page.getByText("Deactivated", { exact: true })).toBeVisible();
     await expect(page.getByText("AUF expired")).toBeVisible();
     await expect(page.getByText("AUF not verified")).toBeVisible();
@@ -5781,9 +5837,11 @@ test.describe("el directorio con los datos de verdad", () => {
     page,
   }) => {
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
+    // Desde #548 la casilla vive en Filtros.
+    const filters = await filterContainer(page, ENGLISH_FILTER_LABELS);
 
     await expect(
-      page.getByRole("checkbox", { name: "Include deactivated accounts" }),
+      filters.getByRole("checkbox", { name: "Include deactivated accounts" }),
     ).toBeVisible();
   });
 

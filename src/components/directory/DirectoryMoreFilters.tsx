@@ -1,346 +1,50 @@
 "use client";
 
+import { FunnelSimple } from "@phosphor-icons/react/dist/ssr/FunnelSimple";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { Icon } from "@/components/Icon";
 import { useDismissal } from "@/components/use-dismissal";
-import { positionName } from "@/lib/club/club-positions";
-import {
-  AUF_FILTERS,
-  type AufFilter,
-  type DirectoryFilter,
-  type DirectoryPositionFilter,
-  type DirectoryQuery,
-  MEMBERSHIP_FILTERS,
-  type MembershipFilter,
-} from "@/lib/directory/directory";
-import type { Locale } from "@/lib/i18n/locale";
-import type { MessageKey } from "@/lib/i18n/message";
 import type { Translator } from "@/lib/i18n/translator";
-import type { FilterChoices } from "./use-filter-choices";
+import {
+  CheckFields,
+  type FieldsProps,
+  NO_MORE_FILTERS,
+  SelectFields,
+  countActiveFilters,
+} from "./DirectoryFilterFields";
 
 /**
- * Los filtros por posición, grupo, AUF y membresía del directorio (#497, RF-4
- * del PRD de E19), y los de quien no tiene teléfono o contacto de emergencia
- * (#499), que se marcan en una casilla. Qué filtros se ofrecen lo dice el
- * servidor al responder la lista, no la marca de la vista: un Coach recibe
- * la suya y filtra por grupo, pero no por lo que le falta a cada contacto.
+ * El botón "Filtros" del directorio, con cuántos hay activos, y lo que abre
+ * (#548): desde 768 px, un popover anclado al botón con los campos en una
+ * cuadrícula, "Borrar todo" y "Mostrar {n} socios"; por debajo, la hoja que
+ * sube desde abajo, como desde #497.
  *
- * En escritorio van en la barra sobre la tabla. En el móvil no caben junto a
- * la búsqueda y los roles: van detrás de un botón "Filtros", con cuántos hay
- * activos, en una hoja que se abre desde abajo. Los dos se dibujan siempre y
- * el CSS enseña uno u otro; así el foco no depende de medir la pantalla.
+ * Cuál de los dos se decide al pulsar, midiendo la pantalla en ese momento:
+ * nada se dibuja antes de saberlo, así que el foco nunca cae en un control
+ * escondido por el CSS.
  */
 
-export type MoreFilters = Pick<
-  DirectoryQuery,
-  | "position"
-  | "groupId"
-  | "auf"
-  | "membership"
-  | "withoutPhone"
-  | "withoutEmergencyContact"
->;
-
-export const NO_MORE_FILTERS: MoreFilters = {
-  position: null,
-  groupId: null,
-  auf: null,
-  membership: null,
-  withoutPhone: false,
-  withoutEmergencyContact: false,
-};
-
-/** "Sin filtrar" en un `<select>`, que sólo habla en textos. */
-const ANY_VALUE = "";
-const UNASSIGNED_POSITION_VALUE = "none";
-
-const AUF_KEYS = {
-  missing: "directory.filter.auf.missing",
-  expired: "directory.filter.auf.expired",
-  expiring: "directory.filter.auf.expiring",
-  unverified: "directory.filter.auf.unverified",
-} as const satisfies Record<AufFilter, MessageKey>;
-
-const MEMBERSHIP_KEYS = {
-  pending: "directory.filter.membership.pending",
-  trialing: "directory.filter.membership.trialing",
-  active: "directory.filter.membership.active",
-  past_due: "directory.filter.membership.pastDue",
-  cancelled: "directory.filter.membership.cancelled",
-  waived: "directory.filter.membership.waived",
-  none: "directory.filter.membership.none",
-} as const satisfies Record<MembershipFilter, MessageKey>;
-
-/** Los seis y ninguno más: quien llama puede pasar el estado entero de la
- * pantalla, con la búsqueda y el rol, que no cuentan en el botón. */
-export function countActiveFilters({
-  position,
-  groupId,
-  auf,
-  membership,
-  withoutPhone,
-  withoutEmergencyContact,
-}: MoreFilters): number {
-  const chosen = [position, groupId, auf, membership].filter(
-    (value) => value !== null,
-  ).length;
-  const checked = [withoutPhone, withoutEmergencyContact].filter(
-    (isChecked) => isChecked,
-  ).length;
-  return chosen + checked;
-}
-
-function positionValue(position: DirectoryPositionFilter | null): string {
-  if (position === null) {
-    return ANY_VALUE;
-  }
-  return position.kind === "unassigned"
-    ? UNASSIGNED_POSITION_VALUE
-    : position.positionId;
-}
-
-function readPosition(value: string): DirectoryPositionFilter | null {
-  if (value === ANY_VALUE) {
-    return null;
-  }
-  return value === UNASSIGNED_POSITION_VALUE
-    ? { kind: "unassigned" }
-    : { kind: "position", positionId: value };
-}
-
-/** El valor elegido, de vuelta al catálogo del que salieron las opciones. */
-function readChoice<T extends string>(
-  catalog: readonly T[],
-  value: string,
-): T | null {
-  return catalog.find((entry) => entry === value) ?? null;
-}
-
-type Option = { readonly value: string; readonly label: string };
-
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: readonly Option[];
-  onChange: (value: string) => void;
-}): React.JSX.Element {
-  const id = useId();
-  return (
-    <div className="auth-field directory-filter">
-      <label htmlFor={id}>{label}</label>
-      <select
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-type FieldsProps = {
-  readonly translate: Translator;
-  readonly locale: Locale;
-  readonly filters: MoreFilters;
-  readonly availableFilters: readonly DirectoryFilter[];
-  readonly choices: FilterChoices;
-  readonly onChange: (filters: MoreFilters) => void;
-};
-
-function PositionField({
-  translate,
-  locale,
-  filters,
-  choices,
-  onChange,
-}: FieldsProps): React.JSX.Element | null {
-  if (choices.positions === null) {
-    return null;
-  }
-  return (
-    <FilterSelect
-      label={translate("directory.filter.position")}
-      value={positionValue(filters.position)}
-      options={[
-        { value: ANY_VALUE, label: translate("directory.filter.position.all") },
-        ...choices.positions.map((position) => ({
-          value: position.id,
-          label: positionName(position.names, locale),
-        })),
-        {
-          value: UNASSIGNED_POSITION_VALUE,
-          label: translate("directory.filter.position.none"),
-        },
-      ]}
-      onChange={(value) =>
-        onChange({ ...filters, position: readPosition(value) })
-      }
-    />
-  );
-}
-
-function GroupField({
-  translate,
-  filters,
-  choices,
-  onChange,
-}: FieldsProps): React.JSX.Element | null {
-  if (choices.groups === null) {
-    return null;
-  }
-  return (
-    <FilterSelect
-      label={translate("directory.filter.group")}
-      value={filters.groupId ?? ANY_VALUE}
-      options={[
-        { value: ANY_VALUE, label: translate("directory.filter.group.all") },
-        ...choices.groups.map((group) => ({
-          value: group.id,
-          label: group.name,
-        })),
-      ]}
-      onChange={(value) =>
-        onChange({ ...filters, groupId: value === ANY_VALUE ? null : value })
-      }
-    />
-  );
-}
-
-function AufField({
-  translate,
-  filters,
-  onChange,
-}: FieldsProps): React.JSX.Element {
-  return (
-    <FilterSelect
-      label={translate("directory.filter.auf")}
-      value={filters.auf ?? ANY_VALUE}
-      options={[
-        { value: ANY_VALUE, label: translate("directory.filter.auf.all") },
-        ...AUF_FILTERS.map((auf) => ({
-          value: auf,
-          label: translate(AUF_KEYS[auf]),
-        })),
-      ]}
-      onChange={(value) =>
-        onChange({ ...filters, auf: readChoice(AUF_FILTERS, value) })
-      }
-    />
-  );
-}
-
-function MembershipField({
-  translate,
-  filters,
-  onChange,
-}: FieldsProps): React.JSX.Element {
-  return (
-    <FilterSelect
-      label={translate("directory.filter.membership")}
-      value={filters.membership ?? ANY_VALUE}
-      options={[
-        {
-          value: ANY_VALUE,
-          label: translate("directory.filter.membership.all"),
-        },
-        ...MEMBERSHIP_FILTERS.map((membership) => ({
-          value: membership,
-          label: translate(MEMBERSHIP_KEYS[membership]),
-        })),
-      ]}
-      onChange={(value) =>
-        onChange({
-          ...filters,
-          membership: readChoice(MEMBERSHIP_FILTERS, value),
-        })
-      }
-    />
-  );
-}
-
-/** Una casilla y su etiqueta. El `id` sale de `useId` porque la misma
- * casilla vive a la vez en la barra y en la hoja. */
-function FilterCheckbox({
-  label,
-  isChecked,
-  onChange,
-}: {
-  label: string;
-  isChecked: boolean;
-  onChange: (isChecked: boolean) => void;
-}): React.JSX.Element {
-  const id = useId();
-  return (
-    <div className="auth-consent directory-filter directory-filter-check">
-      <input
-        id={id}
-        type="checkbox"
-        checked={isChecked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <label htmlFor={id}>{label}</label>
-    </div>
-  );
-}
-
-function WithoutPhoneField({
-  translate,
-  filters,
-  onChange,
-}: FieldsProps): React.JSX.Element {
-  return (
-    <FilterCheckbox
-      label={translate("directory.filter.withoutPhone")}
-      isChecked={filters.withoutPhone}
-      onChange={(withoutPhone) => onChange({ ...filters, withoutPhone })}
-    />
-  );
-}
-
-function WithoutEmergencyContactField({
-  translate,
-  filters,
-  onChange,
-}: FieldsProps): React.JSX.Element {
-  return (
-    <FilterCheckbox
-      label={translate("directory.filter.withoutEmergencyContact")}
-      isChecked={filters.withoutEmergencyContact}
-      onChange={(withoutEmergencyContact) =>
-        onChange({ ...filters, withoutEmergencyContact })
-      }
-    />
-  );
-}
-
-/** Los mismos campos en la barra y en la hoja, en el orden del ticket. */
-function FilterFields(props: FieldsProps): React.JSX.Element {
-  const offers = (filter: DirectoryFilter): boolean =>
-    props.availableFilters.includes(filter);
-  return (
-    <>
-      {offers("position") ? <PositionField {...props} /> : null}
-      {offers("group") ? <GroupField {...props} /> : null}
-      {offers("auf") ? <AufField {...props} /> : null}
-      {offers("membership") ? <MembershipField {...props} /> : null}
-      {offers("withoutPhone") ? <WithoutPhoneField {...props} /> : null}
-      {offers("withoutEmergencyContact") ? (
-        <WithoutEmergencyContactField {...props} />
-      ) : null}
-    </>
-  );
-}
+/** El mismo corte que el CSS del directorio entre el móvil y el escritorio. */
+const WIDE_SCREEN_QUERY = "(min-width: 768px)";
 
 const FOCUSABLE_SELECTOR = "select, input, button";
+
+type OpenedFilters = "none" | "popover" | "sheet";
+
+/** Lo que recibe el foco al pulsarlo: un campo, un botón, un enlace. */
+const PRESS_FOCUSABLE_SELECTOR =
+  "input, select, textarea, button, a[href], [tabindex]";
+
+function takesFocus(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest(PRESS_FOCUSABLE_SELECTOR) !== null
+  );
+}
+
+function isWideScreen(): boolean {
+  return window.matchMedia(WIDE_SCREEN_QUERY).matches;
+}
 
 function focusableIn(panel: HTMLElement | null): readonly HTMLElement[] {
   return panel === null
@@ -374,13 +78,12 @@ function cycleFocus(
  * al botón que la abrió. */
 function FilterSheet({
   fields,
-  translate,
   onClosed,
 }: {
   fields: FieldsProps;
-  translate: Translator;
   onClosed: () => void;
 }): React.JSX.Element {
+  const { translate } = fields;
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -428,7 +131,8 @@ function FilterSheet({
           {translate("directory.filter.sheetTitle")}
         </h2>
         <div className="directory-sheet-fields">
-          <FilterFields {...fields} />
+          <SelectFields {...fields} />
+          <CheckFields {...fields} />
         </div>
         <button type="button" className="auth-submit" onClick={close}>
           {translate("directory.filter.apply")}
@@ -438,54 +142,159 @@ function FilterSheet({
   );
 }
 
-export function DirectoryMoreFilters(props: FieldsProps): React.JSX.Element {
-  const { translate, filters } = props;
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const toggleRef = useRef<HTMLButtonElement>(null);
-  const activeCount = countActiveFilters(filters);
+/** El popover de escritorio. No es modal: la lista de detrás se rehace con
+ * cada cambio y sigue a la vista. Al abrirse, el foco entra en su primer
+ * control. */
+function FilterPopover({
+  fields,
+  shownCount,
+  onDone,
+}: {
+  fields: FieldsProps;
+  shownCount: number;
+  onDone: () => void;
+}): React.JSX.Element {
+  const { translate, onChange } = fields;
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  const closeSheet = useCallback(() => {
-    setIsSheetOpen(false);
-    toggleRef.current?.focus();
+  useEffect(() => {
+    focusableIn(panelRef.current).at(0)?.focus();
   }, []);
 
   return (
-    <>
-      <div
-        role="group"
-        aria-label={translate("directory.filter.legend")}
-        className="directory-filter-bar"
-      >
-        <FilterFields {...props} />
+    <div
+      ref={panelRef}
+      role="dialog"
+      aria-label={translate("directory.filter.sheetTitle")}
+      className="directory-popover"
+    >
+      <div className="directory-popover-grid">
+        <SelectFields {...fields} />
       </div>
-      <button
-        ref={toggleRef}
-        type="button"
-        className="admin-secondary directory-filter-toggle"
-        aria-haspopup="dialog"
-        aria-label={
-          activeCount === 0
-            ? undefined
-            : translate("directory.filter.toggleActive", {
-                count: activeCount,
-              })
-        }
-        onClick={() => setIsSheetOpen(true)}
-      >
-        {translate("directory.filter.toggle")}
-        {activeCount === 0 ? null : (
-          <span className="directory-filter-count" aria-hidden="true">
-            {activeCount}
-          </span>
-        )}
-      </button>
-      {isSheetOpen ? (
-        <FilterSheet
-          fields={props}
-          translate={translate}
-          onClosed={closeSheet}
+      <div className="directory-popover-checks">
+        <CheckFields {...fields} />
+      </div>
+      <div className="directory-popover-footer">
+        <button
+          type="button"
+          className="directory-link-button"
+          onClick={() => onChange(NO_MORE_FILTERS)}
+        >
+          {translate("directory.filter.clearAll")}
+        </button>
+        <button type="button" className="auth-submit" onClick={onDone}>
+          {translate("directory.filter.showMembers", { count: shownCount })}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FiltersToggle({
+  translate,
+  activeCount,
+  isExpanded,
+  toggleRef,
+  onToggle,
+}: {
+  translate: Translator;
+  activeCount: number;
+  isExpanded: boolean;
+  toggleRef: React.RefObject<HTMLButtonElement | null>;
+  onToggle: () => void;
+}): React.JSX.Element {
+  return (
+    <button
+      ref={toggleRef}
+      type="button"
+      className="directory-tool directory-filter-toggle"
+      aria-haspopup="dialog"
+      aria-expanded={isExpanded}
+      aria-label={
+        activeCount === 0
+          ? undefined
+          : translate("directory.filter.toggleActive", { count: activeCount })
+      }
+      onClick={onToggle}
+    >
+      <Icon glyph={FunnelSimple} />
+      {translate("directory.filter.toggle")}
+      {activeCount === 0 ? null : (
+        <span className="directory-filter-count" aria-hidden="true">
+          {activeCount}
+        </span>
+      )}
+    </button>
+  );
+}
+
+export function DirectoryMoreFilters({
+  shownCount,
+  ...fields
+}: FieldsProps & {
+  /** Cuántos socios enseña la lista ahora: el "Mostrar {n} socios". */
+  shownCount: number;
+}): React.JSX.Element {
+  const [opened, setOpened] = useState<OpenedFilters>("none");
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  // El botón cuenta como dentro del popover: pulsarlo lo cierra por su
+  // `onClick`, no por pulsar fuera, que lo volvería a abrir enseguida.
+  const anchorRef = useRef<HTMLDivElement>(null);
+
+  const closeAndRefocus = useCallback(() => {
+    setOpened("none");
+    toggleRef.current?.focus();
+  }, []);
+  // Pulsar otro control lo cierra y deja el foco en ese control; pulsar
+  // donde no hay ninguno lo devuelve a Filtros, como Escape.
+  const pressOutside = useCallback(
+    (event: MouseEvent) => {
+      if (takesFocus(event.target)) {
+        setOpened("none");
+        return;
+      }
+      event.preventDefault();
+      closeAndRefocus();
+    },
+    [closeAndRefocus],
+  );
+  // Quien sale con el tabulador ya eligió adónde va: se cierra sin moverlo.
+  const leave = useCallback(() => setOpened("none"), []);
+  useDismissal({
+    isOpen: opened === "popover",
+    containerRef: anchorRef,
+    onEscape: closeAndRefocus,
+    onPressOutside: pressOutside,
+    onFocusOutside: leave,
+  });
+
+  function toggle(): void {
+    if (opened === "popover") {
+      setOpened("none");
+      return;
+    }
+    setOpened(isWideScreen() ? "popover" : "sheet");
+  }
+
+  return (
+    <div ref={anchorRef} className="directory-filters-anchor">
+      <FiltersToggle
+        translate={fields.translate}
+        activeCount={countActiveFilters(fields.filters)}
+        isExpanded={opened !== "none"}
+        toggleRef={toggleRef}
+        onToggle={toggle}
+      />
+      {opened === "popover" ? (
+        <FilterPopover
+          fields={fields}
+          shownCount={shownCount}
+          onDone={closeAndRefocus}
         />
       ) : null}
-    </>
+      {opened === "sheet" ? (
+        <FilterSheet fields={fields} onClosed={closeAndRefocus} />
+      ) : null}
+    </div>
   );
 }

@@ -421,6 +421,27 @@ describe("directorio", () => {
     ).toContainEqual(["Zoe Zapata", "inactive"]);
   });
 
+  it("cuenta a todo el club activo aunque la búsqueda y el rol recorten la lista (#548)", async () => {
+    const listing = await listDirectory(gateways(), {
+      callerId: CALLER_ID,
+      query: { ...DEFAULT_DIRECTORY_QUERY, role: "Coach", search: "bru" },
+      todayInClub: TODAY,
+    });
+
+    expect(listing.members).toHaveLength(1);
+    expect(listing.total).toBe(3);
+  });
+
+  it("cuenta también a los dados de baja cuando un Admin los pide (#548)", async () => {
+    const listing = await listDirectory(gateways({ callerRole: "Admin" }), {
+      callerId: CALLER_ID,
+      query: { ...DEFAULT_DIRECTORY_QUERY, includeInactive: true },
+      todayInClub: TODAY,
+    });
+
+    expect(listing.total).toBe(4);
+  });
+
   it.each(["Coach", "Committee", "Player"] as const)(
     "niega los dados de baja a un %s, sin leer el directorio",
     async (callerRole) => {
@@ -704,6 +725,7 @@ describe("marca de sin evaluar", () => {
         },
       ],
       availableFilters: ["position", "group"],
+      total: 3,
     });
   });
 
@@ -742,12 +764,14 @@ describe("el rol nuevo en la lista (#240)", () => {
       kind: "member",
       members: [NEREA, TOMAS],
       availableFilters: ["position"],
+      total: 2,
     };
 
     expect(withMemberRole(listing, NEREA.userId, "Coach")).toEqual({
       kind: "member",
       members: [{ ...NEREA, role: "Coach" }, TOMAS],
       availableFilters: ["position"],
+      total: 2,
     });
   });
 
@@ -768,12 +792,14 @@ describe("el rol nuevo en la lista (#240)", () => {
       kind: "admin",
       members: [admin],
       availableFilters: DIRECTORY_FILTERS,
+      total: 2,
     };
 
     expect(withMemberRole(listing, NEREA.userId, "Committee")).toEqual({
       kind: "admin",
       members: [{ ...admin, role: "Committee" }],
       availableFilters: DIRECTORY_FILTERS,
+      total: 2,
     });
   });
 
@@ -788,12 +814,14 @@ describe("el rol nuevo en la lista (#240)", () => {
       kind: "committee",
       members: [committeeView],
       availableFilters: ["position", "group"],
+      total: 2,
     };
 
     expect(withMemberRole(listing, NEREA.userId, "Coach")).toEqual({
       kind: "committee",
       members: [{ ...committeeView, role: "Coach" }],
       availableFilters: ["position", "group"],
+      total: 2,
     });
   });
 
@@ -803,12 +831,14 @@ describe("el rol nuevo en la lista (#240)", () => {
       kind: "coach",
       members: [coachView],
       availableFilters: ["position", "group"],
+      total: 2,
     };
 
     expect(withMemberRole(listing, NEREA.userId, "Coach")).toEqual({
       kind: "coach",
       members: [{ ...coachView, role: "Coach" }],
       availableFilters: ["position", "group"],
+      total: 2,
     });
   });
 });
@@ -1081,6 +1111,7 @@ describe("el contacto en el directorio (#499)", () => {
         "withoutPhone",
         "withoutEmergencyContact",
       ],
+      total: 3,
     });
   });
 
