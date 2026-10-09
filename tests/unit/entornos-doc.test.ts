@@ -257,6 +257,20 @@ describe("docs/entornos.md · dónde corre cada cosa (issue #538)", () => {
     expect(section).toContain("tests/support/test-member-pool.ts");
   });
 
+  it("ninguna ficha de variable dice que en CI apunta a seadragons-dev", () => {
+    const doc = readEntornosDoc().replace(/\s+/g, " ");
+
+    expect(doc).not.toMatch(/En CI, (a|la de) `seadragons-dev`/);
+  });
+
+  it("no dice que las policies de tests/rls sólo hablan con seadragons-dev en un PR", () => {
+    const doc = readEntornosDoc().replace(/\s+/g, " ");
+
+    expect(doc).not.toContain(
+      "los de `tests/rls/` hablan con `seadragons-dev` y el runner no tiene credenciales",
+    );
+  });
+
   it("la lista de credenciales no manda a CI a seadragons-dev", () => {
     const doc = readEntornosDoc().replace(/\s+/g, " ");
 

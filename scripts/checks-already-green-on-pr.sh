@@ -6,8 +6,8 @@
 # La fábrica mergea con squash un PR que se rebasó sobre main y salió verde, así
 # que el commit que aterriza en main casi siempre tiene un SHA nuevo y un ÁRBOL
 # idéntico al que se acaba de comprobar. Volver a correr la suite entera sobre
-# ese mismo árbol cuesta minutos de Actions (y, en la visual, decenas de miles
-# de peticiones a `seadragons-dev`) y no puede descubrir nada.
+# ese mismo árbol cuesta minutos de Actions (y, en la visual, levantar un
+# Supabase por tanda) y no puede descubrir nada.
 #
 # Se compara el árbol y no el SHA a propósito: el SHA cambia siempre (el squash
 # reescribe el commit), y el árbol es lo único que los tests ven.

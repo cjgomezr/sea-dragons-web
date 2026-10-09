@@ -563,9 +563,7 @@ Postgres. En el workflow de migraciones no se pueden saltar:
 media cobertura de la comprobación. Son los de
 `tests/unit/scripts/apply-migrations.test.ts` (el aplicador) y los de
 `tests/unit/supabase/` (lo que cada migración promete: restricciones,
-privilegios y policies). Estos últimos son el único sitio donde las policies se
-comprueban en un PR, porque los de `tests/rls/` hablan con `seadragons-dev` y el
-runner no tiene credenciales.
+privilegios y policies). Estos últimos comprueban lo que cada migración promete contra un Postgres pelado. Las policies de punta a punta las comprueba `checks`, que corre `tests/rls/` contra su propio Supabase local (#536).
 
 ### Por qué el esquema declarado concede tanto a `anon`
 
@@ -757,19 +755,12 @@ Los cinco entornos posibles:
 `NEXT_PUBLIC_SUPABASE_URL`: en local, `.env.local` apunta a `seadragons-dev`
 o a la base local en Docker (`http://127.0.0.1:54321`).
 En preview, apunta a `seadragons-dev`, **nunca** al proyecto de producción. En
-producción, apunta a `seadragons-prod`. En CI, a `seadragons-dev` desde el
-issue #149: sin ella, las pruebas que hablan con la base se saltaban y su check
-salía verde sin haber probado nada. La pone quien desarrolla en local; en
-Vercel, quien administre el proyecto; en Actions, quien administre el
-repositorio.
+producción, apunta a `seadragons-prod`. En CI, la del Supabase local que levanta cada corrida (#538), sacada de `supabase status` dentro del runner: nadie la pega en Actions. Sin ella, las pruebas que hablan con la base se saltaban y su check salía verde sin haber probado nada (#149). La pone quien desarrolla en local, y en Vercel quien administre el proyecto.
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`: en local, la del proyecto `seadragons-dev` o
 la que da `npx supabase status` para la base local.
 En preview, la misma llave anónima de `seadragons-dev`. En producción, la
-llave anónima de `seadragons-prod`, distinta a la de desarrollo. En CI, la de
-`seadragons-dev`, por el mismo motivo que la anterior. La pone quien desarrolla
-en local; en Vercel, quien administre el proyecto; en Actions, quien administre
-el repositorio.
+llave anónima de `seadragons-prod`, distinta a la de desarrollo. En CI, la del Supabase local de cada corrida, igual que la anterior. La pone quien desarrolla en local, y en Vercel quien administre el proyecto.
 
 `SUPABASE_SERVICE_ROLE_KEY`: la llave de servicio, la única que se salta
 RLS. En local, la de `seadragons-dev` o la de la base local, en `.env.local`,
@@ -777,10 +768,7 @@ nunca en un `.env`
 versionado. **En preview no existe**, ni siquiera la de desarrollo: es lo que
 impide que el preview de un fork reciba una credencial de escritura (ver
 "Secretos por entorno"). En producción, la de `seadragons-prod`, nunca la misma
-que desarrollo. En CI, la de `seadragons-dev` desde el issue #149, para que el
-arranque de Playwright pueda crear el miembro con el que entra a la aplicación.
-La pone quien desarrolla en local; en Vercel, quien administre el proyecto; en
-Actions, quien administre el repositorio.
+que desarrollo. En CI, la del Supabase local de cada corrida (#538), para que el arranque de Playwright pueda crear el miembro con el que entra a la aplicación (#149). Escribe en esa base desechable y muere con el runner. La pone quien desarrolla en local, y en Vercel quien administre el proyecto.
 
 Esta es la variable a la que hay que tenerle respeto. Nunca lleva el prefijo
 `NEXT_PUBLIC_`: con ese prefijo Next.js la metería en el bundle del navegador y
