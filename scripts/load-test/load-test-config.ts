@@ -96,11 +96,17 @@ export function buildLoadTestOptions(): Options {
         duration: `${MINIMUM_MEASURED_MINUTES + SIGN_IN_MARGIN_MINUTES}m`,
       },
     },
+    // Una página sin sesión redirige a /entrar, que contesta 200. Sin seguir
+    // la redirección, esa respuesta cuenta como el error que es.
+    maxRedirects: 0,
     thresholds: {
       [`http_req_duration{phase:${JOURNEY_PHASE}}`]: [`p(95)<${P95_LIMIT_MS}`],
       [`http_req_failed{phase:${JOURNEY_PHASE}}`]: [`rate<${MAX_ERROR_RATE}`],
       [`http_req_duration{phase:${TEAM_BALANCE_PHASE}}`]: [
         `p(95)<${TEAM_BALANCE_P95_LIMIT_MS}`,
+      ],
+      [`http_req_failed{phase:${TEAM_BALANCE_PHASE}}`]: [
+        `rate<${MAX_ERROR_RATE}`,
       ],
     },
   };

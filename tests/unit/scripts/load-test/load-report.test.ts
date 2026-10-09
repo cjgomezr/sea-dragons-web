@@ -27,6 +27,7 @@ function sample(overrides: SampleOverrides = {}): RequestSample {
     phase: JOURNEY_PHASE,
     durationMs: 100,
     isFailure: false,
+    status: "200",
     timeMs: START,
     ...overrides,
   };
@@ -73,6 +74,7 @@ describe("parseK6Results", () => {
         name: SLOW_REQUEST,
         phase: JOURNEY_PHASE,
         expected_response: "false",
+        status: "500",
       }),
     ].join("\n");
 
@@ -84,6 +86,7 @@ describe("parseK6Results", () => {
         phase: JOURNEY_PHASE,
         durationMs: 812.5,
         isFailure: true,
+        status: "500",
         timeMs: Date.parse("2026-10-09T10:00:01.5Z"),
       },
     ]);
@@ -195,6 +198,21 @@ describe("summarizeLoadTest", () => {
     ]);
   });
 
+  it("fails a fast team balance that only answered errors", () => {
+    const balances = spread(10, 6, {
+      name: "POST /api/v1/teams/[eventId]/auto-balance",
+      phase: TEAM_BALANCE_PHASE,
+      durationMs: 50,
+      isFailure: true,
+    });
+
+    const report = summarizeLoadTest(healthyRun(balances), EXPECTED);
+
+    expect(report.verdict.kind === "failed" && report.verdict.reasons).toEqual([
+      expect.stringMatching(/reparto/),
+    ]);
+  });
+
   it("fails when the run measured less than five minutes", () => {
     const run: LoadTestRun = {
       samples: [...spread(100, 3), ...spread(100, 3, { name: SLOW_REQUEST })],
@@ -247,6 +265,21 @@ describe("renderLoadTestSummary", () => {
 
     expect(summary).toContain("| p50 | p95 | p99 |");
     expect(summary).toMatch(/\| GET \/api\/v1\/news \| journey \| 100 \| 0 \|/);
+  });
+
+  it("says which status codes the failures had", () => {
+    const failures = [
+      ...spread(3, 6, { isFailure: true, status: "500" }),
+      ...spread(2, 6, { isFailure: true, status: "401" }),
+    ];
+
+    const summary = renderLoadTestSummary(
+      summarizeLoadTest(healthyRun(failures), EXPECTED),
+    );
+
+    expect(summary).toMatch(
+      /\| GET \/api\/v1\/news \| journey \| 105 \| 5 \(500: 3, 401: 2\) \|/,
+    );
   });
 
   it("opens with the verdict", () => {

@@ -28,6 +28,8 @@ export type RequestSample = {
   readonly phase: string;
   readonly durationMs: number;
   readonly isFailure: boolean;
+  /** El código HTTP; "0" cuando no hubo respuesta (timeout, conexión). */
+  readonly status: string;
   readonly timeMs: number;
 };
 
@@ -41,6 +43,8 @@ export type EndpointStats = {
   readonly phase: string;
   readonly count: number;
   readonly failures: number;
+  /** Cuántos errores hubo de cada código, de más a menos frecuente. */
+  readonly failureStatuses: readonly (readonly [string, number])[];
   readonly p50: number;
   readonly p95: number;
   readonly p99: number;
@@ -70,6 +74,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function readStringTags(tags: unknown): Record<string, string> {
+  if (!isRecord(tags)) return {};
+  return Object.fromEntries(
+    Object.entries(tags).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+}
+
 function readPoint(line: string, lineNumber: number): K6Point | null {
   let parsed: unknown;
   try {
@@ -86,7 +99,7 @@ function readPoint(line: string, lineNumber: number): K6Point | null {
     metric: parsed.metric,
     value: Number(data.value),
     time: String(data.time),
-    tags: isRecord(data.tags) ? (data.tags as Record<string, string>) : {},
+    tags: readStringTags(data.tags),
   };
 }
 
@@ -96,6 +109,7 @@ function toSample(point: K6Point): RequestSample {
     phase: point.tags.phase ?? "(sin fase)",
     durationMs: point.value,
     isFailure: point.tags.expected_response === "false",
+    status: point.tags.status ?? "0",
     timeMs: Date.parse(point.time),
   };
 }
@@ -127,6 +141,18 @@ function percentile(sorted: readonly number[], fraction: number): number {
   return Math.round(below + (above - below) * (position - lower));
 }
 
+function countFailureStatuses(
+  samples: readonly RequestSample[],
+): readonly (readonly [string, number])[] {
+  const counts = new Map<string, number>();
+  for (const sample of samples) {
+    if (sample.isFailure) {
+      counts.set(sample.status, (counts.get(sample.status) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()].sort((left, right) => right[1] - left[1]);
+}
+
 function statsOf(
   name: string,
   phase: string,
@@ -139,6 +165,7 @@ function statsOf(
     phase,
     count: samples.length,
     failures: samples.filter((sample) => sample.isFailure).length,
+    failureStatuses: countFailureStatuses(samples),
     p50: percentile(sorted, 0.5),
     p95: percentile(sorted, 0.95),
     p99: percentile(sorted, 0.99),
@@ -209,6 +236,25 @@ function completenessFailures(input: VerdictInput): string[] {
   return reasons;
 }
 
+/** Un reparto que solo contesta errores es rápido: sin mirar sus errores,
+ * su p95 pasaría sin haber repartido nada. */
+function teamBalanceFailures(teamBalance: EndpointStats | null): string[] {
+  if (!teamBalance) return [];
+  const reasons: string[] = [];
+  if (teamBalance.p95 >= TEAM_BALANCE_P95_LIMIT_MS) {
+    reasons.push(
+      `El reparto automático tiene un p95 de ${teamBalance.p95} ms; el límite es ${TEAM_BALANCE_P95_LIMIT_MS} ms.`,
+    );
+  }
+  const errorRate = errorRateOf(teamBalance);
+  if (errorRate >= MAX_ERROR_RATE) {
+    reasons.push(
+      `El ${formatPercent(errorRate)} de los repartos automáticos dieron errores; el límite es ${formatPercent(MAX_ERROR_RATE)}.`,
+    );
+  }
+  return reasons;
+}
+
 function limitFailures(input: VerdictInput): string[] {
   const { report, teamBalance } = input;
   const reasons: string[] = [];
@@ -223,12 +269,7 @@ function limitFailures(input: VerdictInput): string[] {
       `El ${formatPercent(errorRate)} de las peticiones del recorrido dieron errores; el límite es ${formatPercent(MAX_ERROR_RATE)}.`,
     );
   }
-  if (teamBalance && teamBalance.p95 >= TEAM_BALANCE_P95_LIMIT_MS) {
-    reasons.push(
-      `El reparto automático tiene un p95 de ${teamBalance.p95} ms; el límite es ${TEAM_BALANCE_P95_LIMIT_MS} ms.`,
-    );
-  }
-  return reasons;
+  return [...reasons, ...teamBalanceFailures(teamBalance)];
 }
 
 /** El veredicto de la prueba y las estadísticas por endpoint.
@@ -268,8 +309,16 @@ export function summarizeLoadTest(
   return { ...report, verdict };
 }
 
+function formatFailures(endpoint: EndpointStats): string {
+  if (endpoint.failures === 0) return "0";
+  const statuses = endpoint.failureStatuses
+    .map(([status, count]) => `${status}: ${count}`)
+    .join(", ");
+  return `${endpoint.failures} (${statuses})`;
+}
+
 function endpointRow(endpoint: EndpointStats): string {
-  return `| ${endpoint.name} | ${endpoint.phase} | ${endpoint.count} | ${endpoint.failures} | ${endpoint.p50} | ${endpoint.p95} | ${endpoint.p99} |`;
+  return `| ${endpoint.name} | ${endpoint.phase} | ${endpoint.count} | ${formatFailures(endpoint)} | ${endpoint.p50} | ${endpoint.p95} | ${endpoint.p99} |`;
 }
 
 function verdictLines(report: LoadTestReport): string[] {

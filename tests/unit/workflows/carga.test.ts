@@ -126,6 +126,13 @@ describe("workflow carga", () => {
     expect(report.if).toBe("always()");
   });
 
+  it("lleva el informe al resumen del job sin perder su código de salida", () => {
+    const run = stepRunning("scripts/load-test/report.ts").run;
+
+    expect(run).toContain("$GITHUB_STEP_SUMMARY");
+    expect(run).toMatch(/exit "?\$status"?/);
+  });
+
   it("guarda el informe completo como artefacto", () => {
     const upload = onlyJob().steps.find((step) =>
       step.uses?.startsWith("actions/upload-artifact@"),

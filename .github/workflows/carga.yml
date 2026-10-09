@@ -58,13 +58,18 @@ jobs:
         with:
           k6-version: 2.3.0
       # Si el runner se queda sin memoria, el sistema mata k6 y este paso sale
-      # en rojo; el informe de abajo dice cuánto llegó a medir.
+      # en rojo; el informe de abajo dice cuánto llegó a medir. `--quiet` quita
+      # la barra de progreso, que en el log de Actions es una línea por segundo.
       - name: Corre el recorrido del club con 50 usuarios
         timeout-minutes: 10
-        run: k6 run --out json=carga-resultados.json scripts/load-test/club-journey.ts
+        run: k6 run --quiet --out json=carga-resultados.json scripts/load-test/club-journey.ts
       - name: Resume p50, p95 y p99 por endpoint
         if: always()
-        run: npx tsx scripts/load-test/report.ts carga-resultados.json
+        run: |
+          status=0
+          npx tsx scripts/load-test/report.ts carga-resultados.json > carga-resumen.md || status=$?
+          tee -a "$GITHUB_STEP_SUMMARY" < carga-resumen.md
+          exit "$status"
       - name: Comprime los resultados
         if: always()
         run: |
@@ -76,6 +81,7 @@ jobs:
           name: carga-${{ github.run_id }}
           path: |
             carga-resultados.json.gz
+            carga-resumen.md
             app.log
           if-no-files-found: warn
           retention-days: 30

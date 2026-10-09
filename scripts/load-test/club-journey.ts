@@ -24,6 +24,10 @@ import {
 
 export const options: Options = buildLoadTestOptions();
 
+// k6 da por buena cualquier respuesta por debajo de 400. Aquí una redirección
+// es un fallo: la página mandó a /entrar o a /pagos en lugar de pintarse.
+http.setResponseCallback(http.expectedStatuses({ min: 200, max: 299 }));
+
 const BASE_URL = __ENV.APP_URL || "http://localhost:3417";
 /** Lo que un socio tarda entre pantalla y pantalla. */
 const THINK_TIME_SECONDS = 1;
@@ -52,7 +56,12 @@ type AgendaEvent = {
   readonly goingCount: number;
 };
 
-type Visitor = { readonly identity: SignInIdentity };
+type SessionCookies = Readonly<Record<string, string>>;
+
+type Visitor = {
+  readonly identity: SignInIdentity;
+  readonly cookies: SessionCookies;
+};
 
 /** Por usuario virtual: k6 da a cada uno su propia copia del módulo. */
 let visitor: Visitor | null = null;
@@ -95,6 +104,8 @@ function isAgendaEvent(value: unknown): value is AgendaEvent {
     isRecord(value) &&
     typeof value.id === "string" &&
     typeof value.startsOn === "string" &&
+    typeof value.status === "string" &&
+    typeof value.inAudience === "boolean" &&
     typeof value.goingCount === "number"
   );
 }
@@ -120,12 +131,40 @@ function signIn(identity: SignInIdentity): void {
   }
 }
 
+/** Las cookies de la aplicación tal como están ahora en el tarro. Guarda la
+ * última de cada nombre: el proxy puede haberlas refrescado. */
+function currentCookies(): SessionCookies {
+  const cookies = http.cookieJar().cookiesForURL(BASE_URL);
+  return Object.fromEntries(
+    Object.entries(cookies).flatMap(([name, values]) => {
+      const latest = values[values.length - 1];
+      return latest === undefined ? [] : [[name, latest]];
+    }),
+  );
+}
+
+/** k6 vacía el tarro de cookies al empezar cada iteración. Sin devolverle la
+ * sesión, desde la segunda vuelta todo contestaría 401. */
+function restoreCookies(cookies: SessionCookies): void {
+  const jar = http.cookieJar();
+  for (const [name, value] of Object.entries(cookies)) {
+    jar.set(BASE_URL, name, value);
+  }
+}
+
 function ensureSignedIn(): Visitor {
-  if (visitor) return visitor;
+  if (visitor) {
+    restoreCookies(visitor.cookies);
+    return visitor;
+  }
   const identity = signInIdentityOf(exec.vu.idInTest);
   signIn(identity);
-  visitor = { identity };
+  visitor = { identity, cookies: currentCookies() };
   return visitor;
+}
+
+function keepSession(signedIn: Visitor): void {
+  visitor = { ...signedIn, cookies: currentCookies() };
 }
 
 /** Inicio. Devuelve si la membresía está al día: un socio con la cuota
@@ -224,7 +263,8 @@ function balanceTeams(events: readonly AgendaEvent[]): void {
 }
 
 export default function clubJourney(): void {
-  const { identity } = ensureSignedIn();
+  const signedIn = ensureSignedIn();
+  const { identity } = signedIn;
   const isMembershipCurrent = visitHome();
   sleep(THINK_TIME_SECONDS);
   const events = visitCalendar(isMembershipCurrent);
@@ -244,5 +284,6 @@ export default function clubJourney(): void {
   get(MEASURED_REQUESTS.notifications, "/api/v1/notifications");
   sleep(THINK_TIME_SECONDS);
   visitPayments();
+  keepSession(signedIn);
   sleep(THINK_TIME_SECONDS);
 }

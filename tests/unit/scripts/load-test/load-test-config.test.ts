@@ -76,6 +76,21 @@ describe("load test thresholds", () => {
     expect(
       thresholds[`http_req_duration{phase:${TEAM_BALANCE_PHASE}}`],
     ).toEqual([`p(95)<${TEAM_BALANCE_P95_LIMIT_MS}`]);
+    expect(thresholds[`http_req_failed{phase:${TEAM_BALANCE_PHASE}}`]).toEqual([
+      `rate<${MAX_ERROR_RATE}`,
+    ]);
+  });
+
+  it("does not follow redirects, so a page sending to sign-in is not a 200", () => {
+    expect(buildLoadTestOptions().maxRedirects).toBe(0);
+  });
+
+  it("counts only 2xx answers as successes in the k6 script", () => {
+    const script = readFileSync(JOURNEY_SCRIPT, "utf8");
+
+    expect(script).toContain(
+      "http.setResponseCallback(http.expectedStatuses({ min: 200, max: 299 }));",
+    );
   });
 
   it("is the configuration the k6 script exports", () => {
