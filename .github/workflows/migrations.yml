@@ -146,7 +146,8 @@ jobs:
       # viven en `tests/unit/supabase/`, así que el filtro los recoge todos sin
       # que haya que ampliar esta lista con cada una.
       #
-      # Es el único sitio donde las policies se comprueban en un PR: los tests
-      # de `tests/rls/` hablan con `seadragons-dev` y aquí no hay credenciales.
+      # Esto mira cada migración contra Postgres pelado. Las policies de punta
+      # a punta las comprueba `checks`, que corre `tests/rls/` contra su propio
+      # Supabase local (#536).
       - name: Comprueba el aplicador y las migraciones contra ese mismo Postgres
         run: npx vitest run tests/unit/scripts/apply-migrations.test.ts "tests/unit/supabase/"

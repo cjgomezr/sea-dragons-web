@@ -1,5 +1,5 @@
 # Las rutas que no pueden romper un test de red. Un PR que solo toca estas
-# corre `checks` sin los tests contra seadragons-dev ni sus credenciales
+# corre `checks` sin levantar su Supabase local ni los tests que lo usan
 # (#439); los unitarios, el lint, los tipos y el build corren igual, porque
 # varios tests leen docs/ y CLAUDE.md. La lee scripts/branch-is-text-only.sh.
 # Mismo formato que .github/visual-paths.txt (`*` no cruza `/` y `**` sí),

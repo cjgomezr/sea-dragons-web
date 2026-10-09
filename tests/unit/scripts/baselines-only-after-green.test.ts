@@ -81,7 +81,7 @@ const GREEN_RUN_ON_BEFORE: FakeRun = {
 
 const HEAVY_JOB_RAN: Record<string, FakeJob[]> = {
   [String(GREEN_RUN_ID)]: [
-    { name: "turno-dev", conclusion: "success" },
+    { name: "arbol-ya-verificado", conclusion: "success" },
     { name: HEAVY_JOB, conclusion: "success" },
   ],
 };

@@ -1,13 +1,13 @@
 # Corre la prueba de integración del sembrado de NFR-008 (#524) contra un
 # Supabase local del runner, levantado con la acción de #535. Sin esto, la
-# prueba solo corría en la máquina de quien la lanzaba a mano: `checks` usa
-# seadragons-dev, y ahí sembrar 500 socios no tiene sitio.
+# prueba solo corría en la máquina de quien la lanzaba a mano. `checks` también
+# corre contra un Supabase local, pero no la incluye: sembrar 500 socios es
+# pesado y solo hace falta cuando cambia algo de la lista de abajo.
 #
 # Arranca solo cuando cambia algo que puede romper el sembrado: su código, sus
 # tests, el esquema (una migración nueva puede dejar fuera de sitio una
 # columna que el SQL del sembrado rellena), la acción que levanta la base o el
-# arnés de Vitest que decide si la prueba corre y contra qué URL. `checks` no
-# caza eso último: corre contra seadragons-dev, no contra el Supabase local.
+# arnés de Vitest que decide si la prueba corre y contra qué URL.
 #
 # No pide ninguna credencial: todo vive en el runner y se muere con el job.
 name: sembrado-carga

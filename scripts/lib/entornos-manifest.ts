@@ -44,6 +44,10 @@ const sourceSchema = z.object({
   /** De dónde sale el valor: `true` sólo para lo que pertenece al proyecto de
    * producción. Es la marca que hace posible el chequeo de RF-4. */
   production: z.boolean(),
+  /** `true` para lo que se genera en cada corrida y muere con ella, como las
+   * llaves del Supabase local de CI (#538). No vive en ningún sitio donde
+   * rotarlo, así que la tabla de rotación no lo lista. */
+  perRun: z.boolean().default(false),
 });
 
 const variableSchema = z.object({
@@ -200,9 +204,9 @@ export function environmentsFor(
 }
 
 /** Variables que el manifiesto declara en `environment` con ese origen
- * concreto, en el orden del manifiesto. Responde "qué credenciales de
- * `seadragons-dev` lleva CI", que es lo que un workflow tiene que pasarle a
- * sus tests. */
+ * concreto, en el orden del manifiesto. Responde "qué credenciales del
+ * Supabase local lleva CI", que es lo que un workflow tiene que darle a sus
+ * tests. */
 export function variablesFromSource(
   manifest: EnvironmentManifest,
   environment: EnvironmentName,

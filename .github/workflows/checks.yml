@@ -12,7 +12,7 @@
 #
 # Consecuencia asumida: un PR desde un fork no recibe los secretos de Stripe,
 # así que este check saldría rojo. Este repositorio es privado y no recibe PRs
-# desde forks (ver docs/entornos.md, "CI escribe en seadragons-dev"). Si algún día los
+# desde forks (ver docs/entornos.md, "CI escribe en su propio Supabase local"). Si algún día los
 # recibe, la decisión hay que tomarla ahí y no aquí: saltarse la suite para que
 # un fork salga verde es exactamente el agujero que el #149 cerró.
 #
