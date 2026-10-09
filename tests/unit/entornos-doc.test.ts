@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { CLUB_TIME_ZONE, TRAINING_SESSIONS } from "@/lib/training-hours";
 import {
+  type EnvironmentName,
   environmentsFor,
   readEnvironmentManifest,
   secretVariableNames,
@@ -191,20 +192,76 @@ function expectedRotationRows(): RotationRow[] {
   const manifest = readEnvironmentManifest();
 
   return secretVariableNames(manifest).flatMap((variable) =>
-    environmentsFor(manifest, variable).map(
-      (environment) =>
-        [
-          variable,
-          environment,
-          manifest.environments[environment]?.where ?? "",
-        ] as const,
-    ),
+    environmentsFor(manifest, variable)
+      .filter((environment) => !isPerRunSource(manifest, variable, environment))
+      .map(
+        (environment) =>
+          [
+            variable,
+            environment,
+            manifest.environments[environment]?.where ?? "",
+          ] as const,
+      ),
   );
+}
+
+/** Una llave que la CLI genera en cada corrida no vive en ningún sitio donde
+ * rotarla: mandar a alguien a buscarla sería mandarlo a un sitio vacío. */
+function isPerRunSource(
+  manifest: ReturnType<typeof readEnvironmentManifest>,
+  variable: string,
+  environment: EnvironmentName,
+): boolean {
+  const source = manifest.variables[variable]?.scopes[environment];
+  return source != null && manifest.sources[source]?.perRun === true;
 }
 
 describe("rotación de credenciales en docs/entornos.md", () => {
   it("enumera un sitio por cada entorno en el que vive cada variable secreta", () => {
     expect(readRotationRows()).toEqual(expectedRotationRows());
+  });
+});
+
+const CI_SECTION_HEADING = "### CI escribe en su propio Supabase local";
+
+function readCiSection(): string {
+  const doc = readEntornosDoc();
+  const start = doc.indexOf(CI_SECTION_HEADING);
+  if (start < 0) {
+    throw new Error(`${ENTORNOS_DOC_PATH} no tiene "${CI_SECTION_HEADING}"`);
+  }
+  const body = doc.slice(start + CI_SECTION_HEADING.length);
+  return (body.split(/^#{2,3} /m)[0] ?? "").replace(/\s+/g, " ");
+}
+
+// Desde el #538 CI no toca seadragons-dev: `checks` y la visual levantan un
+// Supabase local por corrida. Las máquinas siguen contra dev. Un documento que
+// dijera lo contrario mandaría a quien depura un rojo de CI a mirar la base
+// equivocada.
+describe("docs/entornos.md · dónde corre cada cosa (issue #538)", () => {
+  it("ya no dice que CI escribe en seadragons-dev", () => {
+    expect(readEntornosDoc()).not.toContain("CI escribe en seadragons-dev");
+  });
+
+  it("dice que CI usa un Supabase local por corrida", () => {
+    const section = readCiSection();
+
+    expect(section).toContain("Supabase local");
+    expect(section).toContain("por corrida");
+  });
+
+  it("dice que las máquinas siguen usando seadragons-dev con la reserva de socios de prueba", () => {
+    const section = readCiSection();
+
+    expect(section).toContain("seadragons-dev");
+    expect(section).toContain("tests/support/test-member-pool.ts");
+  });
+
+  it("la lista de credenciales no manda a CI a seadragons-dev", () => {
+    const doc = readEntornosDoc().replace(/\s+/g, " ");
+
+    expect(doc).not.toContain("En CI:** también sólo de `seadragons-dev`");
+    expect(doc).toMatch(/\*\*En CI:\*\*[^*]*Supabase local/);
   });
 });
 

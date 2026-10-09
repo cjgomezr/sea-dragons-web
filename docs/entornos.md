@@ -185,10 +185,11 @@ archivo versionado del repositorio.
   Las de la base local las da `npx supabase status`. Qué variable hace falta
   y para qué sirve se describe en `.env.example`, sin valores reales (issue
   #90).
-- **En CI:** también sólo de `seadragons-dev`, en los secretos del repositorio
-  (Settings, Secrets and variables, Actions), con los valores que da el panel
-  de Supabase de ese proyecto en Project Settings, API. Por qué las tiene, y
-  qué lo compensa, está en "CI escribe en seadragons-dev".
+- **En CI:** ninguna de `seadragons-dev`. `checks.yml` y la visual levantan un
+  Supabase local por corrida y sacan sus credenciales de `supabase status`,
+  dentro del propio runner. Lo único que CI lee de los secretos del
+  repositorio son las llaves de prueba de Stripe. Por qué y qué lo compensa
+  está en "CI escribe en su propio Supabase local".
 - **De producción:** no viven en el portátil de nadie. Van a los secretos del
   despliegue (Vercel, puestos el 11 de septiembre de 2026; la clave de Resend,
   el 14 de septiembre de 2026) y a los del repositorio (GitHub Actions, cuando
@@ -225,7 +226,7 @@ en el campo `whyWriteCredentials` del manifiesto. No es documentación de
 cortesía: `parseEnvironmentManifest` rechaza el manifiesto sin ese texto, para
 que quien encienda el interruptor se encuentre antes con el razonamiento.
 
-### CI escribe en seadragons-dev, y es una regla que se aflojó a propósito
+### CI escribe en su propio Supabase local
 
 Hasta el issue #149 el entorno `ci` no llevaba ninguna credencial. La
 consecuencia no era que CI probara menos: era que probaba **menos de lo que
@@ -236,32 +237,51 @@ saltaban y el check salía verde sobre capturas que nadie comparó. Pasó en el
 PR #148, sobre una pantalla nueva sin ninguna línea base de Linux. Lo mismo
 con las pruebas de integración y de RLS.
 
-Así que `ci` admite hoy credenciales de escritura, y conviene decir en voz
-alta que eso afloja una regla que se puso a propósito. Lo que la compensa:
+Por eso `ci` admite credenciales de escritura. Del #149 al #536 eran las de
+`seadragons-dev`, y con varios PR a la vez la base compartida se saturaba: la
+cola de turnos (#507) ordenaba las corridas para que no coincidieran. Desde el
+E20 ya no hace falta. `checks` y cada tanda de la visual levantan un Supabase
+local por corrida con la acción `.github/actions/supabase-local`, siembran ahí lo que necesitan y lo
+tiran al terminar. Dos PR abiertos a la vez corren sus checks y sus visuales
+en paralelo, sin esperar a nadie, y el #538 quitó la cola.
 
+Lo que lo compensa:
+
+- La llave de servicio de CI es la que la CLI genera para esa base desechable.
+  No apunta a ningún proyecto de Supabase del club y muere con el runner. En
+  el manifiesto su origen es `supabase-local`, marcado `perRun`, y por eso no
+  sale en la tabla de rotación: no hay ningún sitio donde rotarla.
 - El guardia de entorno (`src/lib/supabase/environment-guard.ts`), enganchado
-  en `vitest.setup.ts` y en el arranque de Playwright, sólo admite la URL de
-  `seadragons-dev` y la del Supabase local de la CLI, que en CI no existe. Un
-  secreto mal pegado detiene la corrida entera antes de
-  que ningún test escriba, y si apunta a producción el mensaje lo dice con ese
-  nombre.
+  en `vitest.setup.ts` y en el arranque de Playwright, sólo admite la URL del
+  Supabase local de la CLI y la de `seadragons-dev`. Una URL equivocada
+  detiene la corrida entera antes de que ningún test escriba, y si apunta a
+  producción el mensaje lo dice con ese nombre.
 - La regla 1 sigue intacta: un origen de producción en `ci` deja el test del
   manifiesto en rojo. Producción sólo entra por `ci-produccion`, el entorno
   protegido de Actions.
-- Faltar deja de ser un salto silencioso. En CI, `decideSupabaseCredentials`
+- Faltar no es un salto silencioso. En CI, `decideSupabaseCredentials`
   (`tests/support/supabase-credentials.ts`) lanza en vez de saltarse, así que
-  un secreto borrado se ve como un fallo y no como una corrida verde.
+  un Supabase local que no arrancó se ve como un fallo y no como una corrida
+  verde.
 
-Preview no cambia: sigue sin ninguna credencial de escritura. Este hueco se
-abrió para CI, que no sirve páginas a nadie y cuyos secretos no viajan a un
-despliegue de un fork.
+**Las máquinas siguen con `seadragons-dev`.** Quien corre a mano
+`RUN_INTEGRATION_TESTS=1 npm test` o `npx playwright test` en su portátil lo
+hace contra dev, con las credenciales de su `.env.local`. Ahí la reserva de
+socios de prueba (`tests/support/test-member-pool.ts`, #415) sigue haciendo
+falta: cada identidad nueva de Auth cuenta como usuario del mes aunque se
+borre. Los secretos de dev siguen en el repositorio para quien los necesite,
+pero ningún workflow se los pasa a sus tests, y
+`tests/unit/workflows/dev-queue.test.ts` falla si alguno vuelve a hacerlo.
 
-**Qué pasa con un PR desde un fork.** GitHub no le entrega secretos, así que
-`checks.yml` y el job `compare` saldrían rojos nombrando las variables que
-faltan. Se asume: este repositorio es privado y no recibe PRs desde forks. El
-día que los reciba, la salida no es saltarse la suite para que el fork salga
-verde, porque eso es el agujero que el #149 cerró; es decidir explícitamente
-qué corre sin credenciales, con la condición escrita en el workflow.
+Preview no cambia: sigue sin ninguna credencial de escritura.
+
+**Qué pasa con un PR desde un fork.** GitHub no le entrega secretos. El
+Supabase de CI ya no los necesita, pero las llaves de prueba de Stripe siguen
+saliendo de los secretos del repositorio, y un fork correría sin ellas. Se
+asume: este repositorio es privado y no recibe PRs desde forks. El día que los
+reciba, la salida no es saltarse la suite para que el fork salga verde, porque
+eso es el agujero que el #149 cerró; es decidir explícitamente qué corre sin
+credenciales, con la condición escrita en el workflow.
 
 ### Qué se pega en cada ámbito de Vercel
 
@@ -454,7 +474,6 @@ el manifiesto se separan.
 | ---------------------------- | ------------- | ---------------------------------------------------------------------------------------------------- |
 | `SUPABASE_SERVICE_ROLE_KEY`  | local         | .env.local, en la máquina de quien desarrolla, fuera de git                                          |
 | `SUPABASE_SERVICE_ROLE_KEY`  | production    | Vercel, proyecto victoria-seadragons, Settings, Environment Variables, ámbito Production             |
-| `SUPABASE_SERVICE_ROLE_KEY`  | ci            | GitHub, repositorio sea-dragons-web, Settings, Secrets and variables, Actions                        |
 | `SUPABASE_ACCESS_TOKEN`      | local         | .env.local, en la máquina de quien desarrolla, fuera de git                                          |
 | `SUPABASE_DEV_DB_URL`        | local         | .env.local, en la máquina de quien desarrolla, fuera de git                                          |
 | `SUPABASE_PRODUCTION_DB_URL` | ci-produccion | GitHub, repositorio sea-dragons-web, Settings, Environments, entorno Production, Environment secrets |

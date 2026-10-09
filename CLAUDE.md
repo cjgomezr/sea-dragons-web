@@ -32,10 +32,12 @@ A task is ONLY finished when ALL of the following are true. The Stop hook
 enforces this; you cannot end the session with failing checks.
 
 1. All tests pass (`npm test`), including new tests for the new behavior.
-   Locally `npm test` skips the tests that talk to `seadragons-dev`
-   (`*.integration.test.ts` and `tests/rls/**`) and says so in one line: CI
-   (`checks.yml`) runs and requires them with `RUN_INTEGRATION_TESTS=1`. To
-   run them by hand: `RUN_INTEGRATION_TESTS=1 npm test`. They take their
+   Locally `npm test` skips the tests that talk to Supabase
+   (`*.integration.test.ts` and `tests/rls/**`) and says so in one line. CI
+   (`checks.yml`) runs and requires them with `RUN_INTEGRATION_TESTS=1`,
+   against a local Supabase that each run starts for itself (#536): CI never
+   touches `seadragons-dev`. On a machine you run them by hand against
+   `seadragons-dev`: `RUN_INTEGRATION_TESTS=1 npm test`. There they take their
    identities from the test member pool (`tests/support/test-member-pool.ts`),
    never create their own: every new Auth identity counts as a monthly user
    in Supabase even after it is deleted (#415).
@@ -276,12 +278,14 @@ is no board) alongside the label and the comment.
 - **Integration tests without credentials in the cloud:** integration, RLS
   and Playwright tests are required in CI (`checks.yml` sets
   `RUN_INTEGRATION_TESTS=1`; `visual-baselines.yml` runs Playwright), not in
-  the local Stop gate. Run them by hand with `RUN_INTEGRATION_TESTS=1 npm test`
-  and `npx playwright test` when your ticket touches what they cover. If the
-  runner lacks the app's env vars and the ticket does not depend on those
-  services, you may skip those tests declaring "⚠ integration tests not run in
-  CI" in the PR. If the ticket does depend on them, `needs-human` naming the
-  missing repo secret.
+  the local Stop gate. Both workflows start their own local Supabase per run,
+  so they need no Supabase repo secret and never wait for another PR (#538).
+  On a machine, run them by hand against `seadragons-dev` with
+  `RUN_INTEGRATION_TESTS=1 npm test` and `npx playwright test` when your
+  ticket touches what they cover. If your runner has no `.env.local` (a cloud
+  worker), you cannot run them by hand: say "⚠ integration tests not run by
+  hand" in the PR and let the PR's `checks` decide. If those checks fail
+  because a non-Supabase secret is missing (Stripe), `needs-human` naming it.
 - **Never print the contents of a `.env*` file** (not in comments, PRs or
   logs). To check a variable exists use `grep -c '^NAME=' .env.local` or
   `[ -n "${NAME:-}" ]`.

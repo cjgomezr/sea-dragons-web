@@ -171,7 +171,13 @@ describe("workflow de checks", () => {
   });
 
   it("no pasa a ningún paso las credenciales de seadragons-dev", () => {
-    const devVariables = ciVariablesFrom(DEVELOPMENT_DATABASE_SOURCE);
+    // CI ya no lleva ninguna (#538): las de dev son las que el manifiesto
+    // pone en la máquina de quien desarrolla.
+    const devVariables = variablesFromSource(
+      readEnvironmentManifest(),
+      "local",
+      DEVELOPMENT_DATABASE_SOURCE,
+    );
 
     expect(devVariables.length).toBeGreaterThan(0);
     expect(

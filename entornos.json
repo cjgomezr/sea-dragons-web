@@ -21,7 +21,7 @@
       "where": "GitHub, repositorio sea-dragons-web, Settings, Secrets and variables, Actions",
       "allowsProductionSources": false,
       "allowsWriteCredentials": true,
-      "whyWriteCredentials": "Abierto en el issue #149, y a sabiendas de que afloja una regla que se puso a propósito. Sin llave de servicio, el arranque de Playwright no puede crear el socio con el que entrar, así que toda pantalla detrás de la frontera de sesión se salta y el check sale verde sin haber comparado ninguna captura; lo mismo con las pruebas de integración y de RLS. El control que lo compensa es el guardia de entorno (src/lib/supabase/environment-guard.ts, enganchado en vitest.setup.ts y en el arranque de Playwright): sólo admite la URL de seadragons-dev y lanza antes de que corra ningún test, así que un secreto mal pegado se detiene antes de escribir. La regla 1 sigue intacta: aquí nunca entra un origen de producción."
+      "whyWriteCredentials": "Desde el #538 la llave de servicio de CI es la del Supabase local que cada corrida de checks y de la visual levanta para sí y tira al terminar: escribe en esa base desechable, nunca en seadragons-dev. Sin ella, el arranque de Playwright no puede crear el socio con el que entrar, así que toda pantalla detrás de la frontera de sesión se saltaría y el check saldría verde sin haber comparado ninguna captura; lo mismo con las pruebas de integración y de RLS (#149). El guardia de entorno (src/lib/supabase/environment-guard.ts, enganchado en vitest.setup.ts y en el arranque de Playwright) sigue de red: sólo admite la URL del Supabase local o la de seadragons-dev, y lanza antes de que corra ningún test. La regla 1 sigue intacta: aquí nunca entra un origen de producción."
     },
     "ci-produccion": {
       "where": "GitHub, repositorio sea-dragons-web, Settings, Environments, entorno Production, Environment secrets",
@@ -36,6 +36,7 @@
     "supabase-account": { "production": false },
     "developer": { "production": false },
     "platform": { "production": false },
+    "supabase-local": { "production": false, "perRun": true },
     "test-harness": { "production": false },
     "resend": { "production": true },
     "stripe-test": { "production": false }
@@ -48,7 +49,7 @@
         "local": "seadragons-dev",
         "preview": "seadragons-dev",
         "production": "seadragons-prod",
-        "ci": "seadragons-dev",
+        "ci": "supabase-local",
         "ci-produccion": null
       }
     },
@@ -59,7 +60,7 @@
         "local": "seadragons-dev",
         "preview": "seadragons-dev",
         "production": "seadragons-prod",
-        "ci": "seadragons-dev",
+        "ci": "supabase-local",
         "ci-produccion": null
       }
     },
@@ -70,7 +71,7 @@
         "local": "seadragons-dev",
         "preview": null,
         "production": "seadragons-prod",
-        "ci": "seadragons-dev",
+        "ci": "supabase-local",
         "ci-produccion": null
       }
     },

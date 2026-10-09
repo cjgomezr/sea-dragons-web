@@ -36,6 +36,21 @@ describe("CLAUDE.md sobre los tests de integración y Playwright", () => {
     expect(definitionOfDone).toContain("checks.yml");
   });
 
+  // Desde el #538 CI no usa seadragons-dev: cada corrida levanta su propio
+  // Supabase local. Las máquinas siguen contra dev, y ahí la reserva de socios
+  // de prueba (#415) sigue haciendo falta.
+  it("dice en la Definition of Done que CI corre los de integración contra un Supabase local y las máquinas contra dev", () => {
+    const definitionOfDone = sectionStartingWith(
+      readClaudeMd(),
+      "## Definition of Done",
+    );
+
+    expect(definitionOfDone).toContain("CI never touches `seadragons-dev`");
+    expect(definitionOfDone).toContain("against a local Supabase");
+    expect(definitionOfDone).toContain("seadragons-dev");
+    expect(definitionOfDone).toContain("tests/support/test-member-pool.ts");
+  });
+
   it("dice en la Definition of Done cuándo corre Playwright el Stop gate y cómo correrlo a mano", () => {
     const definitionOfDone = sectionStartingWith(
       readClaudeMd(),
@@ -54,5 +69,17 @@ describe("CLAUDE.md sobre los tests de integración y Playwright", () => {
 
     expect(section).toMatch(/required in CI/);
     expect(section).toContain("RUN_INTEGRATION_TESTS=1 npm test");
+  });
+
+  it("dice en la sección de tests sin credenciales que CI no necesita los secretos de dev", () => {
+    const section = sectionStartingWith(
+      readClaudeMd(),
+      "**Integration tests without credentials in the cloud:**",
+    );
+
+    expect(section).toMatch(/local Supabase/);
+    expect(section).toMatch(
+      /seadragons-dev[^.]*by hand|by hand[^.]*seadragons-dev/,
+    );
   });
 });

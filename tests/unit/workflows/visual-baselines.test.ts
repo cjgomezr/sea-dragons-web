@@ -18,6 +18,7 @@ const WORKFLOW_PATH = path.join(
  * con la que Pagos ofrece Checkout; Supabase lo levanta cada tanda. */
 const STRIPE_TEST_SOURCE = "stripe-test";
 const DEVELOPMENT_DATABASE_SOURCE = "seadragons-dev";
+const LOCAL_SUPABASE_SOURCE = "supabase-local";
 
 const LOCAL_SUPABASE_ACTION = "./.github/actions/supabase-local";
 
@@ -28,10 +29,16 @@ function ciVariablesFrom(source: string): string[] {
   return variablesFromSource(readEnvironmentManifest(), "ci", source);
 }
 
-/** Todo lo que el manifiesto pone en CI como de prueba: dev y Stripe. */
+/** Toda credencial de prueba que el manifiesto conoce: las del Supabase local
+ * que CI levanta por corrida, las de dev de las máquinas y las de Stripe. */
 function developmentCredentials(): string[] {
   return [
-    ...ciVariablesFrom(DEVELOPMENT_DATABASE_SOURCE),
+    ...ciVariablesFrom(LOCAL_SUPABASE_SOURCE),
+    ...variablesFromSource(
+      readEnvironmentManifest(),
+      "local",
+      DEVELOPMENT_DATABASE_SOURCE,
+    ),
     ...ciVariablesFrom(STRIPE_TEST_SOURCE),
   ];
 }
@@ -191,7 +198,13 @@ describe("visual-baselines.yml", () => {
   // La visual era la última que usaba `seadragons-dev` (#537, E20): cada
   // tanda compila y fotografía contra su propio Supabase.
   it("no pasa a ningún paso las credenciales de seadragons-dev", () => {
-    const devVariables = ciVariablesFrom(DEVELOPMENT_DATABASE_SOURCE);
+    // CI ya no lleva ninguna (#538): las de dev son las que el manifiesto
+    // pone en la máquina de quien desarrolla.
+    const devVariables = variablesFromSource(
+      readEnvironmentManifest(),
+      "local",
+      DEVELOPMENT_DATABASE_SOURCE,
+    );
     const stepEnvNames = Object.values(parseWorkflow().jobs).flatMap((job) =>
       job.steps.flatMap((step) => Object.keys(step.env ?? {})),
     );

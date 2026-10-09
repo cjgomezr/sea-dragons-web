@@ -19,6 +19,7 @@ import {
 
 const PRODUCTION_SOURCE = "seadragons-prod";
 const DEVELOPMENT_SOURCE = "seadragons-dev";
+const LOCAL_SUPABASE_SOURCE = "supabase-local";
 const RESEND_SOURCE = "resend";
 
 /** Entornos del manifiesto sintético, con las mismas decisiones que el real:
@@ -413,18 +414,48 @@ describe("decisiones que el manifiesto no puede cambiar en silencio", () => {
     ).toEqual(["local", "production", "ci", "ci-produccion"]);
   });
 
-  // El criterio del issue #149: sin estas tres en el runner, las pruebas que
-  // viven detrás de la sesión se saltan y su check sale verde sin decidir
-  // nada.
-  it("CI recibe las tres credenciales de desarrollo, y sólo de desarrollo", () => {
+  // El criterio del issue #149 sigue en pie: sin estas tres en el runner, las
+  // pruebas que viven detrás de la sesión se saltan y su check sale verde sin
+  // decidir nada. Desde el #538 salen del Supabase local que levanta cada
+  // corrida, no de seadragons-dev.
+  it("CI recibe las tres credenciales de Supabase de su base local, y ninguna de desarrollo", () => {
     const manifest = readEnvironmentManifest();
 
-    expect(variablesFromSource(manifest, "ci", DEVELOPMENT_SOURCE)).toEqual([
+    expect(variablesFromSource(manifest, "ci", LOCAL_SUPABASE_SOURCE)).toEqual([
       "NEXT_PUBLIC_SUPABASE_URL",
       "NEXT_PUBLIC_SUPABASE_ANON_KEY",
       "SUPABASE_SERVICE_ROLE_KEY",
     ]);
+    expect(variablesFromSource(manifest, "ci", DEVELOPMENT_SOURCE)).toEqual([]);
     expect(variablesFromSource(manifest, "ci", PRODUCTION_SOURCE)).toEqual([]);
+  });
+
+  it("las máquinas de quien desarrolla siguen usando seadragons-dev", () => {
+    const manifest = readEnvironmentManifest();
+
+    expect(variablesFromSource(manifest, "local", DEVELOPMENT_SOURCE)).toEqual(
+      expect.arrayContaining([
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+      ]),
+    );
+  });
+
+  // Sus llaves las genera la CLI en cada corrida y mueren con el runner: no
+  // viven en ningún sitio donde rotarlas, y la tabla de rotación no debe
+  // mandar a nadie a buscarlas.
+  it("el Supabase local de CI es un origen por corrida y no de producción", () => {
+    const localSupabase =
+      readEnvironmentManifest().sources[LOCAL_SUPABASE_SOURCE];
+
+    expect(localSupabase).toEqual({ production: false, perRun: true });
+  });
+
+  it("seadragons-dev no es un origen por corrida", () => {
+    expect(readEnvironmentManifest().sources[DEVELOPMENT_SOURCE]?.perRun).toBe(
+      false,
+    );
   });
 
   // El porqué vive en el manifiesto y no sólo en el PR que lo cambió: la
@@ -445,10 +476,12 @@ describe("decisiones que el manifiesto no puede cambiar en silencio", () => {
     }
   });
 
-  it("el porqué de CI nombra el guardia de entorno, que es el control que lo compensa", () => {
+  it("el porqué de CI dice que escribe en su Supabase local y nombra el guardia de entorno", () => {
     const ci = readEnvironmentManifest().environments.ci;
 
+    expect(ci?.whyWriteCredentials).toContain("Supabase local");
     expect(ci?.whyWriteCredentials).toContain("environment-guard");
+    expect(ci?.whyWriteCredentials).not.toMatch(/escribe en seadragons-dev/);
   });
 
   // La credencial con la que el workflow del issue #94 aplica migraciones en
