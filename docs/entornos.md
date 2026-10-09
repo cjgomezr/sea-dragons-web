@@ -778,8 +778,9 @@ a través de `src/lib/supabase/service-client.ts`.
 
 `SUPABASE_ACCESS_TOKEN`: en local, un token personal de cuenta completa (no
 de proyecto). No aplica a preview ni a producción: no lo lee el runtime de la
-aplicación, solo el CLI/MCP de quien desarrolla. Tampoco aplica hoy a CI:
-nadie corre el CLI de Supabase ahí todavía. Cada quien genera el suyo en
+aplicación, solo el CLI/MCP de quien desarrolla. Tampoco aplica a CI:
+el CLI que levanta el Supabase local de cada corrida no necesita token de
+cuenta. Cada quien genera el suyo en
 Supabase Dashboard → Account → Access Tokens.
 
 `SUPABASE_DEV_DB_URL`: opcional en local. Es la cadena de conexión de
