@@ -145,6 +145,17 @@ function chipName(chip: FilterChip, translate: Translator): string {
       });
 }
 
+/** Cada filtro activo dicho como su ficha, en el mismo orden: lo que el
+ * estado vacío (#549) cuenta que se está pidiendo. */
+export function describeActiveFilters(
+  filters: MoreFilters,
+  context: ChipContext,
+): readonly string[] {
+  return chipsOf(filters, context).map((chip) =>
+    chipName(chip, context.translate),
+  );
+}
+
 function Chip({
   chip,
   translate,

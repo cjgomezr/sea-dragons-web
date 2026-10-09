@@ -217,18 +217,18 @@ function trayItem(): HTMLElement {
   return screen.getByRole("listitem", { name: /Nerea Ruiz/ });
 }
 
-function memberRole(): HTMLSelectElement {
-  return screen.getByRole("combobox", { name: "Role for Nerea Ruiz" });
+/** La celda del rol de un miembro, que desde #549 es sólo texto. Sin
+ * solicitud pendiente, su nombre es el rol y nada más. */
+function roleCell(name: string, role: string): HTMLElement {
+  return within(screen.getByRole("row", { name })).getByRole("cell", {
+    name: role,
+  });
 }
 
 function approveButton(): HTMLElement {
   return screen.getByRole("button", {
     name: "Approve the request from Nerea Ruiz",
   });
-}
-
-function saveButton(name = "Nerea Ruiz"): HTMLElement {
-  return screen.getByRole("button", { name: `Save the role for ${name}` });
 }
 
 function emptyTray(): HTMLElement {
@@ -278,7 +278,7 @@ describe("directorio para Admin: bandeja de solicitudes", () => {
     await user.click(approveButton());
 
     await waitFor(() => expect(emptyTray()).toBeVisible());
-    expect(memberRole()).toHaveValue("Coach");
+    expect(roleCell("Nerea Ruiz", "Coach")).toBeVisible();
     expect(calls.filter((call) => call.method === "POST")).toEqual([
       {
         url: `/api/v1/role-requests/${REQUEST_ID}/decision`,
@@ -305,7 +305,7 @@ describe("directorio para Admin: bandeja de solicitudes", () => {
     );
 
     await waitFor(() => expect(emptyTray()).toBeVisible());
-    expect(memberRole()).toHaveValue("Player");
+    expect(roleCell("Nerea Ruiz", "Player")).toBeVisible();
     expect(calls.at(-1)?.body).toEqual({ decision: "rejected" });
   });
 
@@ -320,7 +320,7 @@ describe("directorio para Admin: bandeja de solicitudes", () => {
       "Another Admin already answered this request.",
     );
     expect(screen.queryByRole("listitem", { name: /Nerea Ruiz/ })).toBeNull();
-    expect(memberRole()).toHaveValue("Player");
+    expect(roleCell("Nerea Ruiz", "Player")).toBeVisible();
   });
 
   it("con un error de red muestra el aviso y deja volver a intentar", async () => {
@@ -387,7 +387,7 @@ describe("directorio para Admin: bandeja de solicitudes", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't load the pending requests.",
     );
-    expect(memberRole()).toHaveValue("Player");
+    expect(roleCell("Nerea Ruiz", "Player")).toBeVisible();
 
     stubApi();
     await user.click(screen.getByRole("button", { name: "Try again" }));
@@ -398,195 +398,71 @@ describe("directorio para Admin: bandeja de solicitudes", () => {
   });
 });
 
-describe("directorio para Admin: cambio de rol", () => {
-  it("pone en la fila de cada miembro un control con su rol", async () => {
+// #549: la fila ya no cambia el rol. Los casos del cambio (confirmar, último
+// Admin, red caída, doble clic, miembro que ya no está, regla desconocida)
+// viven en `member-record-screen.test.tsx`, porque hasta el panel de #550 el
+// Admin lo cambia desde la ficha; el de los borradores compartidos, en
+// `member-role-control.test.tsx`.
+describe("directorio para Admin: el rol en la fila (#549)", () => {
+  it("pone el rol de cada miembro como texto, sin selector ni botón Guardar", async () => {
     stubApi({ members: [NEREA, ANA], requests: [] });
 
     await renderAdminDirectory();
 
+    expect(roleCell("Nerea Ruiz", "Player")).toBeVisible();
+    expect(roleCell("Ana Admin", "Admin")).toBeVisible();
     expect(
-      within(screen.getByRole("row", { name: "Nerea Ruiz" })).getByRole(
-        "combobox",
-        { name: "Role for Nerea Ruiz" },
-      ),
-    ).toHaveValue("Player");
+      within(screen.getByRole("table")).queryByRole("combobox"),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /Save the role/ })).toBeNull();
+  });
+
+  it("pone debajo del rol la píldora con el rol que el miembro pidió", async () => {
+    stubApi({ members: [NEREA, ANA] });
+
+    await renderAdminDirectory();
+
+    const pill = within(memberRow("Nerea Ruiz")).getByText("→ Coach");
+    expect(pill).toBeVisible();
+    expect(pill.closest("[title]")).toHaveAttribute(
+      "title",
+      "Asked to be Coach",
+    );
+    expect(within(memberRow("Ana Admin")).queryByText(/→/)).toBeNull();
+  });
+
+  it("dice a un lector de pantalla qué rol pidió", async () => {
+    stubApi({ members: [NEREA] });
+
+    await renderAdminDirectory();
+
     expect(
-      screen.getByRole("combobox", { name: "Role for Ana Admin" }),
-    ).toHaveValue("Admin");
+      within(memberRow("Nerea Ruiz")).getByRole("cell", {
+        name: "Player Asked to be Coach",
+      }),
+    ).toBeVisible();
   });
 
-  it("al confirmar otro rol, la lista muestra el rol nuevo", async () => {
-    const user = userEvent.setup();
-    stubApi({ requests: [] });
+  it("quita la píldora al aprobar la solicitud, y el rol pasa a ser el pedido", async () => {
+    stubApi({ members: [NEREA] });
     await renderAdminDirectory();
 
-    await user.selectOptions(memberRole(), "Committee");
-    await user.click(saveButton());
+    await userEvent.setup().click(approveButton());
 
-    await waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent(
-        "Nerea Ruiz is now Committee.",
-      ),
-    );
-    expect(memberRole()).toHaveValue("Committee");
-    expect(calls.filter((call) => call.method === "PATCH")).toEqual([
-      {
-        url: `/api/v1/members/${NEREA_ID}/role`,
-        method: "PATCH",
-        body: { role: "Committee" },
-      },
-    ]);
+    await waitFor(() => expect(emptyTray()).toBeVisible());
+    expect(roleCell("Nerea Ruiz", "Coach")).toBeVisible();
+    expect(within(memberRow("Nerea Ruiz")).queryByText(/→/)).toBeNull();
   });
 
-  it("con el último Admin explica por qué no se puede y deja el rol igual", async () => {
-    const user = userEvent.setup();
-    stubApi({
-      members: [ANA],
-      requests: [],
-      roleChange: async () => errorResponse(422, "business_rule", "last_admin"),
-    });
-    await renderAdminDirectory();
-    const role = screen.getByRole("combobox", { name: "Role for Ana Admin" });
+  it("escribe la píldora en español", async () => {
+    stubApi({ members: [NEREA] });
 
-    await user.selectOptions(role, "Player");
-    await user.click(saveButton("Ana Admin"));
+    await renderAdminDirectory("es");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "This is the club's last Admin.",
-    );
-    expect(role).toHaveValue("Admin");
-  });
-
-  it("con un error de red muestra el aviso y deja volver a intentar", async () => {
-    const user = userEvent.setup();
-    stubApi({
-      requests: [],
-      roleChange: async () => {
-        throw new TypeError("Failed to fetch");
-      },
-    });
-    await renderAdminDirectory();
-
-    await user.selectOptions(memberRole(), "Coach");
-    await user.click(saveButton());
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "We couldn't reach the server",
-    );
-
-    stubApi({
-      requests: [],
-      roleChange: async () =>
-        jsonResponse(200, {
-          data: { userId: NEREA_ID, previousRole: "Player", role: "Coach" },
-        }),
-    });
-    await user.click(saveButton());
-    await waitFor(() => expect(memberRole()).toHaveValue("Coach"));
-  });
-
-  it("desactiva el botón del miembro mientras el cambio está en curso", async () => {
-    const user = userEvent.setup();
-    let answer: (response: Response) => void = () => undefined;
-    stubApi({
-      requests: [],
-      roleChange: () =>
-        new Promise<Response>((resolve) => {
-          answer = resolve;
-        }),
-    });
-    await renderAdminDirectory();
-
-    await user.selectOptions(memberRole(), "Coach");
-    await user.click(saveButton());
-
-    expect(saveButton()).toBeDisabled();
-    await act(async () => {
-      answer(
-        jsonResponse(200, {
-          data: { userId: NEREA_ID, previousRole: "Player", role: "Coach" },
-        }),
-      );
-    });
-  });
-
-  it("un doble clic manda un solo cambio", async () => {
-    const user = userEvent.setup();
-    stubApi({ requests: [] });
-    await renderAdminDirectory();
-
-    await user.selectOptions(memberRole(), "Committee");
-    await user.dblClick(saveButton());
-
-    await waitFor(() => expect(memberRole()).toHaveValue("Committee"));
-    expect(calls.filter((call) => call.method === "PATCH")).toHaveLength(1);
-  });
-
-  it("con un miembro que ya no está en el club lo dice del miembro, no de una solicitud", async () => {
-    const user = userEvent.setup();
-    stubApi({
-      requests: [],
-      roleChange: async () => errorResponse(404, "not_found"),
-    });
-    await renderAdminDirectory();
-
-    await user.selectOptions(memberRole(), "Coach");
-    await user.click(saveButton());
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "That member is no longer in the club.",
-    );
-  });
-
-  it("con una regla de negocio que no conoce da el aviso genérico", async () => {
-    const user = userEvent.setup();
-    stubApi({
-      requests: [],
-      roleChange: async () =>
-        errorResponse(422, "business_rule", "regla_desconocida"),
-    });
-    await renderAdminDirectory();
-
-    await user.selectOptions(memberRole(), "Coach");
-    await user.click(saveButton());
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "We couldn't finish that. Try again in a moment.",
-    );
-    expect(memberRole()).toHaveValue("Player");
-  });
-
-  it("desactiva el botón de los demás miembros mientras un cambio está en curso", async () => {
-    const user = userEvent.setup();
-    let answer: (response: Response) => void = () => undefined;
-    stubApi({
-      members: [NEREA, ANA],
-      requests: [],
-      roleChange: () =>
-        new Promise<Response>((resolve) => {
-          answer = resolve;
-        }),
-    });
-    await renderAdminDirectory();
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "Role for Ana Admin" }),
-      "Committee",
-    );
-
-    await user.selectOptions(memberRole(), "Coach");
-    await user.click(saveButton());
-
-    expect(saveButton("Ana Admin")).toBeDisabled();
-    await act(async () => {
-      answer(
-        jsonResponse(200, {
-          data: { userId: NEREA_ID, previousRole: "Player", role: "Coach" },
-        }),
-      );
-    });
+    const pill = within(memberRow("Nerea Ruiz")).getByText("→ Coach");
+    expect(pill.closest("[title]")).toHaveAttribute("title", "Pidió ser Coach");
   });
 });
-
 describe("directorio para Admin: lecturas", () => {
   it("pide la lista y la bandeja a la API v1, no a la base", async () => {
     stubApi();
@@ -633,7 +509,17 @@ describe("directorio para Admin: alta de un miembro (#243)", () => {
   });
 });
 
+// Desde #549 el AUF de la fila es un punto: de peligro si venció, de aviso si
+// falta el número o vence en 30 días. El número, el vencimiento y la
+// verificación (#274) están en la ficha, que los prueba en
+// `member-record-screen.test.tsx`.
 describe("directorio para Admin: ficha reservada (#242)", () => {
+  function dotsOf(name: string): readonly (string | null)[] {
+    return within(memberRow(name))
+      .queryAllByRole("img")
+      .map((dot) => dot.getAttribute("title"));
+  }
+
   it("enlaza cada miembro con su ficha", async () => {
     stubApi({ members: [NEREA, ANA], requests: [] });
 
@@ -647,114 +533,64 @@ describe("directorio para Admin: ficha reservada (#242)", () => {
     ).toHaveAttribute("href", `/directorio/${ADMIN_ID}`);
   });
 
-  it("enseña el número de AUF y su vencimiento", async () => {
+  it("no señala un AUF con número y vencimiento lejano", async () => {
     stubApi({ members: [ANA], requests: [] });
 
     await renderAdminDirectory();
 
-    expect(
-      within(memberRow("Ana Admin")).getByText(
-        "AUF AUF-1 · expires 30 June 2030",
-      ),
-    ).toBeVisible();
+    expect(dotsOf("Ana Admin")).toEqual([]);
+    expect(within(memberRow("Ana Admin")).queryByText(/AUF-1/)).toBeNull();
   });
 
-  it("dice que no tiene AUF quien no lo tiene", async () => {
+  it("señala con un punto de aviso a quien no tiene AUF", async () => {
     stubApi({ members: [NEREA], requests: [] });
 
     await renderAdminDirectory();
 
-    expect(within(memberRow("Nerea Ruiz")).getByText("No AUF")).toBeVisible();
+    expect(dotsOf("Nerea Ruiz")).toEqual(["No AUF number"]);
   });
 
-  it("dice que un AUF no tiene vencimiento cuando no lo tiene", async () => {
+  it("no señala un AUF que no tiene vencimiento", async () => {
     stubApi({ members: [{ ...ANA, aufExpiry: null }], requests: [] });
 
     await renderAdminDirectory();
 
-    expect(
-      within(memberRow("Ana Admin")).getByText("AUF AUF-1 · no expiry date"),
-    ).toBeVisible();
+    expect(dotsOf("Ana Admin")).toEqual([]);
   });
 
-  it("marca el vencimiento pasado junto al número", async () => {
+  it("señala con un punto de peligro el vencimiento pasado", async () => {
     stubApi({ members: [VENCIDA], requests: [] });
 
     await renderAdminDirectory();
 
-    const row = memberRow("Vera Vencida");
-    expect(
-      within(row).getByText("AUF AUF-7 · expires 31 January 2020"),
-    ).toBeVisible();
-    expect(within(row).getByText("AUF expired")).toBeVisible();
+    expect(dotsOf("Vera Vencida")).toEqual(["AUF expired"]);
   });
 
-  it("marca sin verificar el AUF que escribió el miembro (#274)", async () => {
-    stubApi({ members: [{ ...ANA, isAufVerified: false }], requests: [] });
+  it("no lleva a la fila la verificación del AUF (#274): la dice la ficha", async () => {
+    stubApi({
+      members: [{ ...ANA, isAufVerified: false }, VENCIDA],
+      requests: [],
+    });
 
     await renderAdminDirectory();
 
-    const row = memberRow("Ana Admin");
-    expect(within(row).getByText("AUF not verified")).toBeVisible();
-    expect(within(row).queryByText("AUF verified")).toBeNull();
+    expect(screen.queryByText(/AUF (not )?verified/)).toBeNull();
+    expect(dotsOf("Ana Admin")).toEqual([]);
+    expect(dotsOf("Vera Vencida")).toEqual(["AUF expired"]);
   });
 
-  it("marca verificado el AUF que confirmó un Admin (#274)", async () => {
-    stubApi({ members: [ANA], requests: [] });
-
-    await renderAdminDirectory();
-
-    const row = memberRow("Ana Admin");
-    expect(within(row).getByText("AUF verified")).toBeVisible();
-    expect(within(row).queryByText("AUF not verified")).toBeNull();
-  });
-
-  it("marca verificado y vencido a la vez un AUF verificado que venció", async () => {
-    stubApi({ members: [VENCIDA], requests: [] });
-
-    await renderAdminDirectory();
-
-    const row = memberRow("Vera Vencida");
-    expect(within(row).getByText("AUF verified")).toBeVisible();
-    expect(within(row).getByText("AUF expired")).toBeVisible();
-  });
-
-  it("no marca la verificación de quien no tiene AUF", async () => {
-    stubApi({ members: [NEREA], requests: [] });
-
-    await renderAdminDirectory();
-
-    expect(
-      within(memberRow("Nerea Ruiz")).queryByText(/AUF (not )?verified/),
-    ).toBeNull();
-  });
-
-  it("escribe en español la marca del AUF sin verificar", async () => {
-    stubApi({ members: [{ ...ANA, isAufVerified: false }], requests: [] });
+  it("escribe el enlace y los puntos del AUF en español", async () => {
+    stubApi({ members: [NEREA, VENCIDA], requests: [] });
 
     await renderAdminDirectory("es");
 
     expect(
-      within(memberRow("Ana Admin")).getByText("AUF sin verificar"),
+      screen.getByRole("link", { name: "Abrir la ficha de Nerea Ruiz" }),
     ).toBeVisible();
-  });
-
-  it("escribe el enlace y el AUF en español", async () => {
-    stubApi({ members: [ANA], requests: [] });
-
-    await renderAdminDirectory("es");
-
-    expect(
-      screen.getByRole("link", { name: "Abrir la ficha de Ana Admin" }),
-    ).toBeVisible();
-    expect(
-      within(memberRow("Ana Admin")).getByText(
-        "AUF AUF-1 · vence el 30 de junio de 2030",
-      ),
-    ).toBeVisible();
+    expect(dotsOf("Nerea Ruiz")).toEqual(["Sin número de AUF"]);
+    expect(dotsOf("Vera Vencida")).toEqual(["AUF vencido"]);
   });
 });
-
 describe("directorio para quien no es Admin", () => {
   it.each(["Coach", "Committee", "Player"] as const)(
     "a un %s no le enseña la bandeja ni el control de rol",
@@ -798,14 +634,7 @@ describe("directorio para Admin en español", () => {
     expect(
       screen.getByText("No hay solicitudes esperando respuesta."),
     ).toBeVisible();
-    expect(
-      screen.getByRole("combobox", { name: "Rol de Nerea Ruiz" }),
-    ).toHaveValue("Player");
-    expect(
-      within(
-        screen.getByRole("combobox", { name: "Rol de Nerea Ruiz" }),
-      ).getByRole("option", { name: "Jugador" }),
-    ).toBeInTheDocument();
+    expect(roleCell("Nerea Ruiz", "Jugador")).toBeVisible();
   });
 
   it("escribe en español la fecha y el rol pedido de una solicitud", async () => {

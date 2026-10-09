@@ -127,6 +127,19 @@ const MARIA_PARA_ADMIN: AdminDirectoryMember = {
   emergencyContact: null,
 };
 
+/** Invitada el 5 de octubre y todavía sin entrar (#549). */
+const INVITED_NEREA: DirectoryMember = {
+  ...NEREA,
+  status: "incomplete",
+  invitedOn: "2026-10-05",
+};
+
+/** Con la membresía atrasada (#453): un punto de peligro (#549). */
+const PAST_DUE_MARIA: AdminDirectoryMember = {
+  ...MARIA_PARA_ADMIN,
+  membershipStatus: "past_due",
+};
+
 /** El guion que ocupa el sitio de un dato que el socio no tiene. */
 const MISSING = "–";
 
@@ -536,20 +549,43 @@ describe("pantalla del directorio", () => {
   });
 
   it.each([
-    ["Role", "role"],
-    ["Position", "position"],
-    ["Attendance", "attendance"],
-  ])("ordena por %s al pulsar su cabecera", async (column, sort) => {
+    ["Role", "role", "asc", "ascending"],
+    ["Position", "position", "asc", "ascending"],
+    // La asistencia empieza de mayor a menor (#549).
+    ["Attendance", "attendance", "desc", "descending"],
+  ])(
+    "ordena por %s al pulsar su cabecera",
+    async (column, sort, direction, ariaSort) => {
+      stubApi();
+      await renderScreen();
+
+      await sortBy(column);
+
+      await waitFor(() => {
+        expect(lastRequest().get("sort")).toBe(sort);
+      });
+      expect(lastRequest().get("direction")).toBe(direction);
+      expect(columnHeader(column)).toHaveAttribute("aria-sort", ariaSort);
+    },
+  );
+
+  it("invierte la asistencia, de menor a mayor, al volver a pulsarla (#549)", async () => {
     stubApi();
     await renderScreen();
 
-    await sortBy(column);
+    await sortBy("Attendance");
+    await waitFor(() => {
+      expect(lastRequest().get("sort")).toBe("attendance");
+    });
+    await sortBy("Attendance");
 
     await waitFor(() => {
-      expect(lastRequest().get("sort")).toBe(sort);
+      expect(lastRequest().get("direction")).toBe("asc");
     });
-    expect(lastRequest().get("direction")).toBe("asc");
-    expect(columnHeader(column)).toHaveAttribute("aria-sort", "ascending");
+    expect(columnHeader("Attendance")).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
   });
 
   it("invierte el nombre al pulsar la cabecera por la que ya venía ordenado", async () => {
@@ -589,13 +625,14 @@ describe("pantalla del directorio", () => {
 
     await user.type(screen.getByLabelText("Search by name"), "zzz");
     await waitFor(() => {
-      expect(
-        screen.getByText("No member matches what you're looking for."),
-      ).toBeVisible();
+      expect(screen.getByText("No members match these filters")).toBeVisible();
     });
+    expect(
+      screen.getByText("Showing all roles · Name: zzz. Try removing a filter."),
+    ).toBeVisible();
     expect(screen.queryByRole("table")).toBeNull();
 
-    await user.click(screen.getByRole("button", { name: "Clear the filters" }));
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
 
     await waitFor(() => {
       expect(listedNames()).toEqual(["María Ñíguez"]);
@@ -946,20 +983,20 @@ describe("incluir inactivos", () => {
     expect(lastRequest().get("includeInactive")).toBeNull();
   });
 
-  it("marca como pendiente de activar a quien todavía no entró", async () => {
-    stubApi({
-      kind: "member",
-      members: [MARIA, { ...NEREA, status: "incomplete" }],
-    });
+  it("marca como invitado a quien todavía no entró, con el día de la invitación", async () => {
+    stubApi({ kind: "member", members: [MARIA, INVITED_NEREA] });
 
     await renderScreen();
 
+    const invited = memberRow("Nerea Ruiz");
+    expect(within(invited).getByText("Invited")).toBeVisible();
     expect(
-      within(memberRow("Nerea Ruiz")).getByText("Pending activation"),
+      within(invited).getByText(
+        "Invited on 5 October 2026 · not signed in yet",
+      ),
     ).toBeVisible();
-    expect(
-      within(memberRow("María Ñíguez")).queryByText("Pending activation"),
-    ).toBeNull();
+    expect(within(invited).queryByText(/Spain/)).toBeNull();
+    expect(within(memberRow("María Ñíguez")).queryByText(/Invited/)).toBeNull();
   });
 
   it("señala a un Admin la fila con el registro de AUF vencido", async () => {
@@ -968,43 +1005,61 @@ describe("incluir inactivos", () => {
     await renderScreen();
 
     expect(
-      within(memberRow("Ana Admin")).getByText("AUF expired"),
+      within(memberRow("Ana Admin")).getByRole("img", { name: "AUF expired" }),
     ).toBeVisible();
     expect(
-      within(memberRow("María Ñíguez")).queryByText("AUF expired"),
+      within(memberRow("María Ñíguez")).queryByRole("img", {
+        name: "AUF expired",
+      }),
     ).toBeNull();
   });
 });
 
-describe("chip de membresía (#453)", () => {
-  it("enseña a un Admin el estado de la membresía de cada fila", async () => {
+// Desde #549 la fila sólo señala la membresía atrasada, con un punto; el
+// estado completo está en la ficha.
+describe("punto de membresía (#453, #549)", () => {
+  it("señala a un Admin con un punto de peligro la membresía atrasada", async () => {
     stubApi({
       kind: "admin",
-      members: [{ ...VENCIDA, membershipStatus: "pending" }, MARIA_PARA_ADMIN],
+      members: [{ ...VENCIDA, isAufExpired: false }, PAST_DUE_MARIA],
     });
 
     await renderScreen();
 
-    expect(
-      within(memberRow("Ana Admin")).getByText("Membership pending"),
-    ).toBeVisible();
-    expect(
-      within(memberRow("María Ñíguez")).getByText("Membership active"),
-    ).toBeVisible();
-  });
-
-  it("pinta como aviso la membresía que no está al día", async () => {
-    stubApi({
-      kind: "admin",
-      members: [{ ...MARIA_PARA_ADMIN, membershipStatus: "cancelled" }],
+    const dot = within(memberRow("María Ñíguez")).getByRole("img", {
+      name: "Membership past due",
     });
-
-    await renderScreen();
-
+    expect(dot).toHaveAttribute("title", "Membership past due");
+    expect(dot).toHaveClass("directory-dot-danger");
     expect(
-      within(memberRow("María Ñíguez")).getByText("Membership cancelled"),
-    ).toHaveClass("directory-mark-warning");
+      within(memberRow("Ana Admin")).queryByRole("img", {
+        name: "Membership past due",
+      }),
+    ).toBeNull();
   });
+
+  it.each([
+    "pending",
+    "trialing",
+    "active",
+    "cancelled",
+    "waived",
+    null,
+  ] as const)(
+    "no señala en la fila la membresía %s: el estado está en la ficha",
+    async (membershipStatus) => {
+      stubApi({
+        kind: "admin",
+        members: [{ ...MARIA_PARA_ADMIN, membershipStatus }],
+      });
+
+      await renderScreen();
+
+      const row = memberRow("María Ñíguez");
+      expect(within(row).queryByRole("img")).toBeNull();
+      expect(within(row).queryByText(/Membership/)).toBeNull();
+    },
+  );
 
   it("no enseña la membresía a quien no es Admin", async () => {
     stubApi({ kind: "member", members: [MARIA] });
@@ -1017,19 +1072,17 @@ describe("chip de membresía (#453)", () => {
   });
 
   it("se escribe en español", async () => {
-    stubApi({
-      kind: "admin",
-      members: [{ ...MARIA_PARA_ADMIN, membershipStatus: "past_due" }],
-    });
+    stubApi({ kind: "admin", members: [PAST_DUE_MARIA] });
 
     await renderScreen("es");
 
     expect(
-      within(memberRow("María Ñíguez")).getByText("Pago atrasado"),
-    ).toBeVisible();
+      within(memberRow("María Ñíguez")).getByRole("img", {
+        name: "Membresía vencida",
+      }),
+    ).toHaveAttribute("title", "Membresía vencida");
   });
 });
-
 describe("marca de sin evaluar", () => {
   const SIN_EVALUAR: CoachDirectoryMember = {
     ...NEREA,
@@ -1439,11 +1492,14 @@ describe("filtros del directorio", () => {
 
     await user.selectOptions(position, "No position");
     await waitFor(() => {
-      expect(
-        screen.getByText("No member matches what you're looking for."),
-      ).toBeVisible();
+      expect(screen.getByText("No members match these filters")).toBeVisible();
     });
-    await user.click(screen.getByRole("button", { name: "Clear the filters" }));
+    expect(
+      screen.getByText(
+        "Showing all roles · Position: No position. Try removing a filter.",
+      ),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
 
     await waitFor(() => {
       expect(listedNames()).toEqual(["María Ñíguez"]);
@@ -2237,5 +2293,226 @@ describe("las fichas de los filtros activos", () => {
       screen.getByRole("button", { name: "Quitar el filtro AUF: Vencido" }),
     ).toBeVisible();
     expect(screen.getByRole("button", { name: "Borrar" })).toBeVisible();
+  });
+});
+
+/** La lista compacta del rediseño de E21 (#549, RF-3): el encabezado que
+ * ordena, los puntos de estado que sólo ve el Admin, la fila del invitado y
+ * la leyenda. Medidas: `docs/design/directorio-admin/README.md`. */
+describe("la lista compacta (#549)", () => {
+  /** Sin número de AUF: un punto de aviso. */
+  const SIN_AUF: AdminDirectoryMember = {
+    ...MARIA_PARA_ADMIN,
+    aufNumber: null,
+    aufExpiry: null,
+  };
+  /** Vigente, pero vence en los próximos 30 días: un punto de aviso. */
+  const POR_VENCER: AdminDirectoryMember = {
+    ...MARIA_PARA_ADMIN,
+    aufExpiry: "2026-10-20",
+    isAufExpiring: true,
+  };
+  /** Vencido y con la membresía atrasada: dos puntos de peligro. */
+  const DOS_PUNTOS: AdminDirectoryMember = {
+    ...VENCIDA,
+    membershipStatus: "past_due",
+  };
+
+  function dotsOf(name: string): readonly (string | null)[] {
+    return within(memberRow(name))
+      .queryAllByRole("img")
+      .map((dot) => dot.getAttribute("title"));
+  }
+
+  it("pone el encabezado Miembro, Rol, Posición y Asistencia, la última abreviada", async () => {
+    stubApi({ members: [MARIA] });
+
+    await renderScreen();
+
+    expect(
+      screen.getAllByRole("columnheader").map((header) => header.textContent),
+    ).toEqual(["Member↑", "Role", "Position", "Attend."]);
+    expect(columnHeader("Attendance")).toBeVisible();
+  });
+
+  it("escribe el encabezado en español", async () => {
+    stubApi({ members: [MARIA] });
+
+    await renderScreen("es");
+
+    expect(
+      screen.getAllByRole("columnheader").map((header) => header.textContent),
+    ).toEqual(["Miembro↑", "Rol", "Posición", "Asist."]);
+    expect(columnHeader("Asistencia")).toBeVisible();
+  });
+
+  it("pinta el avatar a 32 px", async () => {
+    const photoUrl = "https://storage.test/member-photos/nerea.webp?token=t";
+    stubApi({ members: [{ ...NEREA, photoUrl }] });
+
+    await renderScreen();
+
+    const photo = within(memberRow("Nerea Ruiz")).getByRole("presentation");
+    expect(photo).toHaveAttribute("width", "32");
+    expect(photo).toHaveAttribute("height", "32");
+  });
+
+  it("marca sólo el encabezado activo, con ↑ o ↓ según el sentido", async () => {
+    stubApi();
+    await renderScreen();
+    expect(within(columnHeader("Role")).queryByText(/[↑↓]/)).toBeNull();
+
+    await sortBy("Member");
+
+    await waitFor(() => {
+      expect(within(columnHeader("Member")).getByText("↓")).toBeVisible();
+    });
+    await sortBy("Attendance");
+    await waitFor(() => {
+      expect(within(columnHeader("Attendance")).getByText("↓")).toBeVisible();
+    });
+    expect(within(columnHeader("Member")).queryByText(/[↑↓]/)).toBeNull();
+  });
+
+  it("a un Admin ya no le pone selector de rol ni botón Guardar en la fila", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+
+    await renderScreen();
+
+    const table = screen.getByRole("table");
+    expect(within(table).queryByRole("combobox")).toBeNull();
+    expect(within(table).queryByRole("button", { name: /save/i })).toBeNull();
+    expect(
+      within(memberRow("María Ñíguez")).getByRole("cell", { name: "Coach" }),
+    ).toBeVisible();
+  });
+
+  it.each([
+    ["el AUF vencido", VENCIDA, ["AUF expired"], "danger"],
+    [
+      "la membresía atrasada",
+      PAST_DUE_MARIA,
+      ["Membership past due"],
+      "danger",
+    ],
+    ["la falta de número de AUF", SIN_AUF, ["No AUF number"], "warning"],
+    ["el AUF que vence pronto", POR_VENCER, ["AUF expiring soon"], "warning"],
+  ] as const)(
+    "señala a un Admin %s con un punto que se lee y lleva su title",
+    async (_case, member, titles, tone) => {
+      stubApi({ kind: "admin", members: [member] });
+
+      await renderScreen();
+
+      expect(dotsOf(member.fullName)).toEqual(titles);
+      const [title] = titles;
+      const dot = within(memberRow(member.fullName)).getByRole("img", {
+        name: title,
+      });
+      expect(dot).toHaveClass(`directory-dot-${tone}`);
+    },
+  );
+
+  it("pone los dos puntos de peligro a quien tiene el AUF vencido y la membresía atrasada", async () => {
+    stubApi({ kind: "admin", members: [DOS_PUNTOS] });
+
+    await renderScreen();
+
+    expect(dotsOf("Ana Admin")).toEqual(["AUF expired", "Membership past due"]);
+  });
+
+  it("no pone ningún punto a quien lo tiene todo al día", async () => {
+    stubApi({ kind: "admin", members: [MARIA_PARA_ADMIN] });
+
+    await renderScreen();
+
+    expect(dotsOf("María Ñíguez")).toEqual([]);
+  });
+
+  it("escribe los puntos en español", async () => {
+    stubApi({ kind: "admin", members: [DOS_PUNTOS, SIN_AUF, POR_VENCER] });
+
+    await renderScreen("es");
+
+    expect(dotsOf("Ana Admin")).toEqual(["AUF vencido", "Membresía vencida"]);
+    expect(
+      screen.getAllByRole("img", { name: "Sin número de AUF" }),
+    ).toHaveLength(1);
+    expect(screen.getAllByRole("img", { name: "AUF por vencer" })).toHaveLength(
+      1,
+    );
+  });
+
+  it("pone a un Admin la leyenda de los puntos debajo de la lista", async () => {
+    stubApi({ kind: "admin", members: [VENCIDA] });
+
+    await renderScreen();
+
+    const legend = screen.getByRole("list", { name: "Status dots" });
+    expect(within(legend).getByText("Needs action")).toBeVisible();
+    expect(within(legend).getByText("Check soon")).toBeVisible();
+  });
+
+  it("escribe la leyenda en español", async () => {
+    stubApi({ kind: "admin", members: [VENCIDA] });
+
+    await renderScreen("es");
+
+    const legend = screen.getByRole("list", { name: "Puntos de estado" });
+    expect(within(legend).getByText("Necesita acción")).toBeVisible();
+    expect(within(legend).getByText("Revisar pronto")).toBeVisible();
+  });
+
+  it.each([
+    ["Committee", "committee"],
+    ["Coach", "coach"],
+    ["Player", "member"],
+  ] as const)(
+    "a un %s no le pone puntos de AUF ni de membresía, ni la leyenda (D4)",
+    async (_role, kind) => {
+      stubApi({ kind, members: [DOS_PUNTOS, SIN_AUF] });
+
+      await renderScreen();
+
+      expect(screen.queryAllByRole("img")).toEqual([]);
+      expect(screen.queryByRole("list", { name: "Status dots" })).toBeNull();
+    },
+  );
+
+  it("escribe en español la fila de un invitado", async () => {
+    stubApi({ members: [INVITED_NEREA] });
+
+    await renderScreen("es");
+
+    const invited = memberRow("Nerea Ruiz");
+    expect(within(invited).getByText("Invitado")).toBeVisible();
+    expect(
+      within(invited).getByText(
+        "Invitado el 5 de octubre de 2026 · todavía no ha entrado",
+      ),
+    ).toBeVisible();
+  });
+
+  it("escribe en español el estado vacío con el rol y el filtro activos", async () => {
+    stubApi({ members: [MARIA] });
+    await renderScreen("es");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("radio", { name: "Comité" }));
+    await user.type(screen.getByLabelText("Buscar por nombre"), "zzz");
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Ningún miembro coincide con estos filtros"),
+      ).toBeVisible();
+    });
+    expect(
+      screen.getByText(
+        "Mostrando Comité · Nombre: zzz. Prueba a quitar un filtro.",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Borrar filtros" }),
+    ).toBeVisible();
   });
 });
