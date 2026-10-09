@@ -200,6 +200,7 @@ describe("GET /api/v1/directory", () => {
           },
         ],
         availableFilters: ["position"],
+        total: 1,
       },
     });
     expect(databaseCalls).toEqual([
@@ -235,7 +236,12 @@ describe("GET /api/v1/directory", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: { kind: "member", members: [], availableFilters: ["position"] },
+      data: {
+        kind: "member",
+        members: [],
+        availableFilters: ["position"],
+        total: 1,
+      },
     });
   });
 

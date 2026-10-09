@@ -165,6 +165,9 @@ type ApiStub = {
   readonly respond?: (url: string) => Response | Promise<Response>;
   /** Los filtros que el servidor dice que se pueden usar (#497). */
   readonly availableFilters?: readonly string[];
+  /** El total del club que dice el servidor; por defecto, los de `members`
+   * que no están dados de baja. */
+  readonly total?: number;
 };
 
 const requestedUrls: string[] = [];
@@ -186,6 +189,14 @@ function normalize(text: string): string {
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase();
+}
+
+/** El club entero de la respuesta, sin búsqueda, rol ni filtros: el total
+ * de la cabecera (#548). */
+function clubSizeOf(stub: ApiStub, includeInactive: boolean): number {
+  return (stub.members ?? [MARIA]).filter(
+    (member) => includeInactive || member.status !== "inactive",
+  ).length;
 }
 
 /** Lo que el endpoint de #238 hace con la consulta, reducido a lo que estos
@@ -212,6 +223,7 @@ function listingFor(stub: ApiStub, url: string): Response {
       kind,
       members,
       availableFilters: stub.availableFilters ?? FILTERS_BY_KIND[kind],
+      total: stub.total ?? clubSizeOf(stub, includeInactive),
     },
   });
 }
@@ -236,7 +248,12 @@ function deferredResponses(): {
 
 function listingResponse(members: readonly AnyMember[]): Response {
   return jsonResponse(200, {
-    data: { kind: "member", members, availableFilters: ["position"] },
+    data: {
+      kind: "member",
+      members,
+      availableFilters: ["position"],
+      total: members.length,
+    },
   });
 }
 
@@ -554,6 +571,7 @@ describe("pantalla del directorio", () => {
             kind: "member",
             members: [MARIA],
             availableFilters: ["position"],
+            total: 1,
           },
         });
       },
@@ -1024,6 +1042,7 @@ describe("marca de sin evaluar", () => {
             kind: "admin",
             members: [{ ...ZOE, isEvaluated: false }],
             availableFilters: FILTERS_BY_KIND.admin,
+            total: 1,
           },
         }),
     });

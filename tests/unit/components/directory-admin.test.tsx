@@ -127,6 +127,7 @@ function readResponse(stub: ApiStub, url: string): Promise<Response> {
         data: {
           kind: stub.kind ?? "admin",
           members: stub.members ?? [NEREA],
+          total: (stub.members ?? [NEREA]).length,
           availableFilters:
             (stub.kind ?? "admin") === "admin"
               ? ["position", "group", "auf", "membership"]

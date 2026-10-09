@@ -31,7 +31,12 @@ function stubDirectory(): void {
       }
       directoryRequests.push(url);
       return jsonResponse({
-        data: { kind: "member", members: [], availableFilters: ["position"] },
+        data: {
+          kind: "member",
+          members: [],
+          availableFilters: ["position"],
+          total: 0,
+        },
       });
     }),
   );

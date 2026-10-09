@@ -94,26 +94,32 @@ const adminMemberSchema = coachMemberSchema.extend({
  * adivina por la presencia de un campo si le toca dibujar lo del Admin. */
 const availableFiltersSchema = z.array(z.enum(DIRECTORY_FILTERS));
 
+/** Lo que llevan las cuatro vistas además de sus socios. */
+const listingShape = {
+  availableFilters: availableFiltersSchema,
+  total: z.number().int().nonnegative(),
+};
+
 const listingSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("member"),
     members: z.array(memberSchema),
-    availableFilters: availableFiltersSchema,
+    ...listingShape,
   }),
   z.object({
     kind: z.literal("committee"),
     members: z.array(committeeMemberSchema),
-    availableFilters: availableFiltersSchema,
+    ...listingShape,
   }),
   z.object({
     kind: z.literal("coach"),
     members: z.array(coachMemberSchema),
-    availableFilters: availableFiltersSchema,
+    ...listingShape,
   }),
   z.object({
     kind: z.literal("admin"),
     members: z.array(adminMemberSchema),
-    availableFilters: availableFiltersSchema,
+    ...listingShape,
   }),
 ]);
 

@@ -4192,6 +4192,9 @@ function stubbedListing(
     kind,
     members: listed.map(LISTING_MEMBER_VIEWS[kind]),
     availableFilters: STUBBED_AVAILABLE_FILTERS[kind],
+    total: options.members.filter(
+      (member) => includeInactive || member.status !== "inactive",
+    ).length,
   };
 }
 

@@ -235,6 +235,10 @@ export type AdminDirectoryMember = CoachDirectoryMember &
  * deduce de `kind`. */
 export type DirectoryListing = {
   readonly availableFilters: readonly DirectoryFilter[];
+  /** Cuántos socios tiene el club para quien mira, sin la búsqueda, el rol
+   * ni los filtros (#548): el "{shown} de {total}" de la cabecera. Cuenta a
+   * los dados de baja sólo cuando se pidieron. */
+  readonly total: number;
 } & (
   | { readonly kind: "member"; readonly members: readonly DirectoryMember[] }
   | {
@@ -745,7 +749,17 @@ export async function listDirectory(
   return listingFor(caller.role, listed, {
     ...context,
     todayInClub: request.todayInClub,
+    total: countClubMembers(records, request.query),
   });
+}
+
+function countClubMembers(
+  records: readonly DirectoryMemberRecord[],
+  query: DirectoryQuery,
+): number {
+  return records.filter(
+    (record) => record.status !== "inactive" || query.includeInactive,
+  ).length;
 }
 
 /** La vista que toca a cada rol: el servidor decide qué campos salen, nunca
@@ -753,8 +767,12 @@ export async function listDirectory(
 function listingFor(
   role: Role,
   listed: readonly DirectoryMemberRecord[],
-  context: ListingContext & { readonly todayInClub: string },
+  context: ListingContext & {
+    readonly todayInClub: string;
+    readonly total: number;
+  },
 ): DirectoryListing {
+  const { total } = context;
   const availableFilters = availableDirectoryFilters(role);
   if (hasCapability(role, "manageUsersAndRoles")) {
     return {
@@ -763,6 +781,7 @@ function listingFor(
         toAdminDirectoryMember(record, context.todayInClub, context),
       ),
       availableFilters,
+      total,
     };
   }
   if (hasCapability(role, "viewEvaluations")) {
@@ -770,6 +789,7 @@ function listingFor(
       kind: "coach",
       members: listed.map((record) => toCoachDirectoryMember(record, context)),
       availableFilters,
+      total,
     };
   }
   if (contactAccessOf(role) === "full") {
@@ -779,12 +799,14 @@ function listingFor(
         toCommitteeDirectoryMember(record, context),
       ),
       availableFilters,
+      total,
     };
   }
   return {
     kind: "member",
     members: listed.map((record) => toDirectoryMember(record, context)),
     availableFilters,
+    total,
   };
 }
 
