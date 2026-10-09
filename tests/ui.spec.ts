@@ -2525,7 +2525,12 @@ type AccountState = {
   readonly prepare?: (page: Page) => Promise<void>;
 };
 
+/** `/cuenta` llega entera del servidor: hasta que React la hidrata, lo que se
+ * escriba o pulse en ella no lo escucha nadie (#557). */
+const JUSTIFICATION_SELECTOR = "#rol-justificacion";
+
 async function writeTooLongJustification(page: Page): Promise<void> {
+  await waitForHydration(page, JUSTIFICATION_SELECTOR);
   await page
     .getByLabel("Why do you want this role? (optional)")
     .fill(TOO_LONG_JUSTIFICATION);
@@ -2539,10 +2544,14 @@ const FULL_PROFILE_STORAGE_STATE =
  * la pantalla con la misma función. */
 const SAVE_PROFILE_BUTTON = /^(Save changes|Guardar cambios)$/;
 const PROFILE_SAVED_MESSAGE = /^(Changes saved\.|Cambios guardados\.)$/;
+/** Un campo de la ficha: React la hidrata entera, botón de guardar incluido.
+ * Pulsado antes, el botón envía el formulario a la antigua y recarga. */
+const PROFILE_FORM_SELECTOR = "#perfil-nombre";
 
 /** Guarda la ficha tal como está. Escribe lo que ya había, así que las
  * capturas de varios tamaños pueden hacerlo a la vez sobre el mismo socio. */
 async function saveProfileUnchanged(page: Page): Promise<void> {
+  await waitForHydration(page, PROFILE_FORM_SELECTOR);
   await page.getByRole("button", { name: SAVE_PROFILE_BUTTON }).click();
   await expect(page.getByRole("status")).toHaveText(PROFILE_SAVED_MESSAGE, {
     timeout: ACCOUNT_CHANGE_TIMEOUT_MS,
@@ -2584,6 +2593,7 @@ async function chooseTooLargePhoto(page: Page): Promise<void> {
  * formulario lo para y avisa junto a los dos datos que faltan (#496). No
  * llega al servidor, así que no cambia al socio compartido. */
 async function saveHalfEmergencyContact(page: Page): Promise<void> {
+  await waitForHydration(page, PROFILE_FORM_SELECTOR);
   await page
     .getByLabel(/^(Contact name|Nombre del contacto)$/)
     .fill("Lucía Ruiz");
@@ -2598,6 +2608,7 @@ async function failProfileSaveOnNetwork(page: Page): Promise<void> {
   await page.route(`**${ACCOUNT_PROFILE_ENDPOINT}`, (route) =>
     route.abort("internetdisconnected"),
   );
+  await waitForHydration(page, PROFILE_FORM_SELECTOR);
   await page.getByRole("button", { name: SAVE_PROFILE_BUTTON }).click();
   // Con texto: el anunciador de rutas de Next también es un `alert`, vacío.
   await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toBeVisible();
@@ -3297,6 +3308,7 @@ test.describe("una socia que sube su foto de perfil", () => {
         response.request().method() === "PUT",
       { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
     );
+    await waitForHydration(page, PHOTO_INPUT_SELECTOR);
     await page
       .getByLabel("Choose a photo")
       .setInputFiles(PROFILE_PHOTO_FIXTURE_PATH);
