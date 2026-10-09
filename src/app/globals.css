@@ -2754,8 +2754,11 @@ a.auth-brand-header:focus-visible {
 
 /* El radio no se ve, pero sigue ahí: recibe el foco y el teclado lo recorre
    con las flechas. Lo que se pinta es el segmento, que muestra el foco y la
-   elección por él. */
+   elección por él. El segmento lo posiciona: si no, el radio se coloca
+   fuera del control, que no lo recorta, y en Linux el último ensancha la
+   página a 320 px. */
 .directory-role {
+  position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -4135,6 +4138,13 @@ a.auth-brand-header:focus-visible {
 
 .news-header h1 {
   margin: 0;
+}
+
+/* "Publicar" es un enlace con forma de botón primario. */
+.news-publish {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
 }
 
 .news-eyebrow {

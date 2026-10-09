@@ -183,7 +183,7 @@ export function NewsFeedScreen({
           <h1 id={TITLE_ID}>{translate("news.title")}</h1>
         </div>
         {canPublish ? (
-          <Link href={NEWS_PUBLISH_PATH} className="auth-submit directory-add">
+          <Link href={NEWS_PUBLISH_PATH} className="auth-submit news-publish">
             {translate("news.publish")}
           </Link>
         ) : null}
