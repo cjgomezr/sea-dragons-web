@@ -32,6 +32,20 @@ describe("imports de Phosphor", () => {
     expect(await restrictedImportMessages(source)).toHaveLength(1);
   });
 
+  it("rechaza un import de valor desde dist/lib/types, que solo trae .d.ts", async () => {
+    const source =
+      'import { IconWeight } from "@phosphor-icons/react/dist/lib/types";';
+
+    expect(await restrictedImportMessages(source)).toHaveLength(1);
+  });
+
+  it("acepta un import type desde dist/lib/types", async () => {
+    const source =
+      'import type { Icon } from "@phosphor-icons/react/dist/lib/types";';
+
+    expect(await restrictedImportMessages(source)).toEqual([]);
+  });
+
   it("acepta la ruta por icono de dist/ssr", async () => {
     const source =
       'import { MagnifyingGlass } from "@phosphor-icons/react/dist/ssr/MagnifyingGlass";';

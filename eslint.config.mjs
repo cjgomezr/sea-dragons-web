@@ -36,6 +36,13 @@ const config = [
               message:
                 'Importa cada icono desde "@phosphor-icons/react/dist/ssr/<Icono>" y píntalo con <Icon> (design-system.md, Icons).',
             },
+            {
+              // Solo trae declaraciones: un import de valor se rompe al
+              // construir.
+              regex: "^@phosphor-icons/react/dist/lib/types$",
+              allowTypeImports: true,
+              message: 'Los tipos de Phosphor se importan con "import type".',
+            },
           ],
         },
       ],
