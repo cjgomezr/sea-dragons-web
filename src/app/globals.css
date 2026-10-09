@@ -3385,10 +3385,12 @@ a.auth-brand-header:focus-visible {
   display: flex;
   align-items: center;
   min-height: var(--touch-target-min);
-  padding: var(--space-2);
+  padding: var(--space-2) 0;
   font-family: var(--font-family-mono);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--color-text-secondary);
 }
 
@@ -3501,16 +3503,18 @@ a.auth-brand-header:focus-visible {
     border-top-color: color-mix(in srgb, var(--color-border) 60%, transparent);
   }
 
+  /* El fondo de la página y no el de hover: sobre `--color-hover` el gris
+     secundario del tema claro baja de 4,5:1, y axe lo caza. */
   .directory-table tbody tr:hover {
-    background: var(--color-hover);
+    background: var(--color-background);
   }
 
   .directory-table th:nth-child(2) {
-    width: 122px;
+    width: 104px;
   }
 
   .directory-table th:nth-child(3) {
-    width: 108px;
+    width: 96px;
   }
 
   .directory-table th:nth-child(4) {
@@ -3531,7 +3535,8 @@ a.auth-brand-header:focus-visible {
     justify-content: flex-end;
   }
 
-  .directory-attendance-cell {
+  /* Con la tabla delante para que gane a la alineación de toda celda. */
+  .directory-table .directory-attendance-cell {
     font-size: 12.5px;
     color: var(--color-text);
     text-align: right;
@@ -3544,6 +3549,23 @@ a.auth-brand-header:focus-visible {
   /* Con cabeceras, el orden se pide desde ellas. */
   .directory-sort-control {
     display: none;
+  }
+}
+
+/* En la tabla ancha cada dato del contacto va en una línea con su etiqueta
+   al lado: apilados, la columna triplicaba la altura de la fila compacta de
+   #549. */
+@media (min-width: 1200px) {
+  .directory-contact {
+    gap: 2px;
+    font-size: 12.5px;
+  }
+
+  .directory-contact-line {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 6px;
   }
 }
 

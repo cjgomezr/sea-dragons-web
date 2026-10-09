@@ -4444,6 +4444,10 @@ function sortByAttendance(labels: {
   return async (page: Page): Promise<void> => {
     const header = page.getByRole("columnheader", { name: labels.column });
     if (await header.isVisible()) {
+      // La asistencia empieza de mayor a menor (#549): el segundo clic la
+      // pone de menor a mayor.
+      await header.getByRole("button").click();
+      await expect(header).toHaveAttribute("aria-sort", "descending");
       await header.getByRole("button").click();
       await expect(header).toHaveAttribute("aria-sort", "ascending");
     } else {
@@ -4654,7 +4658,10 @@ function filterRoleToNobody(
   options: { readonly role: string; readonly emptyText: RegExp },
 ) {
   return async (page: Page): Promise<void> => {
-    await page.getByRole("radio", { name: options.role }).check();
+    // El radio va escondido bajo su etiqueta, que es lo que se pulsa.
+    await page
+      .getByRole("radio", { name: options.role })
+      .check({ force: true });
     await filterToNobody(labels, options.emptyText)(page);
   };
 }
@@ -5727,8 +5734,8 @@ test.describe("el directorio en pantalla estrecha (#283)", () => {
       "Include deactivated accounts",
     )(page);
     await expect(page.getByText("Deactivated", { exact: true })).toBeVisible();
-    await expect(page.getByText("AUF expired")).toBeVisible();
-    await expect(page.getByText("AUF not verified")).toBeVisible();
+    // Desde #549 el AUF de la fila es un punto, sin palabras que partir.
+    await expect(page.getByRole("img", { name: "AUF expired" })).toBeVisible();
 
     expect(await wordsSplitAcrossLines(page)).toEqual([]);
   });
