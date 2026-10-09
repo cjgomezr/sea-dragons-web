@@ -60,6 +60,7 @@ import {
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
 import { isStatePhotographed } from "./support/spanish-captures";
 import { snapshotCreatedNotice } from "./support/visual-baseline-notice";
+import { waitForHydration } from "./support/wait-for-hydration";
 import { servesCompiledApp } from "./support/web-server-command";
 import {
   type AccentPalette,
@@ -2524,7 +2525,12 @@ type AccountState = {
   readonly prepare?: (page: Page) => Promise<void>;
 };
 
+/** `/cuenta` llega entera del servidor: hasta que React la hidrata, lo que se
+ * escriba o pulse en ella no lo escucha nadie (#557). */
+const JUSTIFICATION_SELECTOR = "#rol-justificacion";
+
 async function writeTooLongJustification(page: Page): Promise<void> {
+  await waitForHydration(page, JUSTIFICATION_SELECTOR);
   await page
     .getByLabel("Why do you want this role? (optional)")
     .fill(TOO_LONG_JUSTIFICATION);
@@ -2538,10 +2544,14 @@ const FULL_PROFILE_STORAGE_STATE =
  * la pantalla con la misma función. */
 const SAVE_PROFILE_BUTTON = /^(Save changes|Guardar cambios)$/;
 const PROFILE_SAVED_MESSAGE = /^(Changes saved\.|Cambios guardados\.)$/;
+/** Un campo de la ficha: React la hidrata entera, botón de guardar incluido.
+ * Pulsado antes, el botón envía el formulario a la antigua y recarga. */
+const PROFILE_FORM_SELECTOR = "#perfil-nombre";
 
 /** Guarda la ficha tal como está. Escribe lo que ya había, así que las
  * capturas de varios tamaños pueden hacerlo a la vez sobre el mismo socio. */
 async function saveProfileUnchanged(page: Page): Promise<void> {
+  await waitForHydration(page, PROFILE_FORM_SELECTOR);
   await page.getByRole("button", { name: SAVE_PROFILE_BUTTON }).click();
   await expect(page.getByRole("status")).toHaveText(PROFILE_SAVED_MESSAGE, {
     timeout: ACCOUNT_CHANGE_TIMEOUT_MS,
@@ -2552,6 +2562,7 @@ const PHOTO_PROFILE_STORAGE_STATE =
   roleRequestStorageStatePath("perfil-con-foto");
 const PROFILE_PHOTO_ALT = /^(Your profile photo|Tu foto de perfil)$/;
 const CHOOSE_PHOTO_LABEL = /^(Choose a photo|Elegir una foto)$/;
+const PHOTO_INPUT_SELECTOR = "input.account-photo-input";
 /** Un byte más de lo que admite la foto de perfil (#245). */
 const TOO_LARGE_PHOTO_BYTES = 2 * 1024 * 1024 + 1;
 
@@ -2563,8 +2574,11 @@ async function waitForProfilePhoto(page: Page): Promise<void> {
   ).toHaveJSProperty("complete", true);
 }
 
-/** Elige una foto de más de 2 MB: la pantalla la rechaza sin subirla. */
+/** Elige una foto de más de 2 MB: la pantalla la rechaza sin subirla. El
+ * aviso lo da el navegador, así que hay que esperar a que React escuche el
+ * campo (#557). */
 async function chooseTooLargePhoto(page: Page): Promise<void> {
+  await waitForHydration(page, PHOTO_INPUT_SELECTOR);
   await page.getByLabel(CHOOSE_PHOTO_LABEL).setInputFiles({
     name: "foto-enorme.jpg",
     mimeType: "image/jpeg",
@@ -2579,6 +2593,7 @@ async function chooseTooLargePhoto(page: Page): Promise<void> {
  * formulario lo para y avisa junto a los dos datos que faltan (#496). No
  * llega al servidor, así que no cambia al socio compartido. */
 async function saveHalfEmergencyContact(page: Page): Promise<void> {
+  await waitForHydration(page, PROFILE_FORM_SELECTOR);
   await page
     .getByLabel(/^(Contact name|Nombre del contacto)$/)
     .fill("Lucía Ruiz");
@@ -2593,6 +2608,7 @@ async function failProfileSaveOnNetwork(page: Page): Promise<void> {
   await page.route(`**${ACCOUNT_PROFILE_ENDPOINT}`, (route) =>
     route.abort("internetdisconnected"),
   );
+  await waitForHydration(page, PROFILE_FORM_SELECTOR);
   await page.getByRole("button", { name: SAVE_PROFILE_BUTTON }).click();
   // Con texto: el anunciador de rutas de Next también es un `alert`, vacío.
   await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toBeVisible();
@@ -3292,6 +3308,7 @@ test.describe("una socia que sube su foto de perfil", () => {
         response.request().method() === "PUT",
       { timeout: ACCOUNT_CHANGE_TIMEOUT_MS },
     );
+    await waitForHydration(page, PHOTO_INPUT_SELECTOR);
     await page
       .getByLabel("Choose a photo")
       .setInputFiles(PROFILE_PHOTO_FIXTURE_PATH);
@@ -8586,13 +8603,7 @@ async function showSignInTextsOnServedPage(
 ): Promise<void> {
   // Antes de que React hidrate, un texto cambiado a mano no casa con lo que
   // pintó el servidor, y React vuelve a poner el suyo.
-  await page.waitForFunction(() => {
-    const headline = document.querySelector(".auth-brand-headline");
-    return (
-      headline !== null &&
-      Object.keys(headline).some((key) => key.startsWith("__reactFiber"))
-    );
-  });
+  await waitForHydration(page, ".auth-brand-headline");
   await page.evaluate(({ tagline, welcome }) => {
     const headline = document.querySelector(".auth-brand-headline");
     const copy = document.querySelector(".auth-brand-copy");
@@ -8963,13 +8974,7 @@ async function showLogoOnServedPage(
 ): Promise<void> {
   // Antes de que React hidrate, la imagen puesta a mano no casa con lo que
   // pintó el servidor, y React la cambia por el recuadro de iniciales.
-  await page.waitForFunction(() => {
-    const brand = document.querySelector(".auth-brand-mark, .app-brand");
-    return (
-      brand !== null &&
-      Object.keys(brand).some((key) => key.startsWith("__reactFiber"))
-    );
-  });
+  await waitForHydration(page, ".auth-brand-mark, .app-brand");
   await page.evaluate(
     ({ url, alt }) => {
       const image = document.createElement("img");
