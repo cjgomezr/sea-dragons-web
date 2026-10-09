@@ -10,6 +10,7 @@ tsconfig.json
 docs/SRD_Victoria_Seadragons_Club_Platform.md
 docs/Seadragons Platform.dc.html
 docs/support.js
+docs/design/
 
 # Los permisos personales de Claude Code. Cada persona tiene el suyo, no se
 # versiona, y Claude Code lo reescribe con su propio formato cada vez que
