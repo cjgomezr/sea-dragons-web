@@ -6,7 +6,8 @@ import { isTimeout } from "./wait-for-hydration";
 export const SECTION_LOAD_TIMEOUT_MS = 15_000;
 
 /** Cómo empieza cada indicador de carga de la aplicación, en los dos
- * idiomas: "Loading the positions…", "Cargando las posiciones…". */
+ * idiomas: "Loading the positions…", "Cargando las posiciones…". Supone que
+ * ningún otro párrafo de la pantalla empieza así; en la del club se cumple. */
 const LOADING_PREFIXES: readonly string[] = ["Loading", "Cargando"];
 
 /** Lo único del `page` de Playwright que hace falta para esperar. */

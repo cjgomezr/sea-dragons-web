@@ -7298,6 +7298,7 @@ for (const capture of NOTIFICATION_LIST_CAPTURES) {
         }) => {
           await capture.beforeVisit?.(page);
           await serveNotifications(page, capture.notifications);
+          await fixClockOnHome(page, NOTIFICATIONS_SCREEN_PATH);
           await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
           await openNotifications(page);
           const overflow = await page.evaluate(
@@ -7313,6 +7314,7 @@ for (const capture of NOTIFICATION_LIST_CAPTURES) {
         }) => {
           await capture.beforeVisit?.(page);
           await serveNotifications(page, capture.notifications);
+          await fixClockOnHome(page, NOTIFICATIONS_SCREEN_PATH);
           await page.goto(`${APP_URL}${NOTIFICATIONS_SCREEN_PATH}`);
           await openNotifications(page);
           await expectNoAxeViolations(page);

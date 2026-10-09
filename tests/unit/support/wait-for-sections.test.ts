@@ -137,9 +137,12 @@ describe("waitForSectionsLoaded (#561)", () => {
 
     await waitForSectionsLoaded(page, [POSITIONS, SESSION_PACKS]);
 
-    expect(page.timeouts.every((t) => t === SECTION_LOAD_TIMEOUT_MS)).toBe(
-      true,
-    );
+    // Una espera por sección y otra por la página entera.
+    expect(page.timeouts).toEqual([
+      SECTION_LOAD_TIMEOUT_MS,
+      SECTION_LOAD_TIMEOUT_MS,
+      SECTION_LOAD_TIMEOUT_MS,
+    ]);
   });
 
   it("deja pasar sin tocar un error que no es el plazo agotado", async () => {
