@@ -149,7 +149,8 @@ Dos cosas a saber:
   contraseña se ven en un buzón falso en `http://127.0.0.1:54324`.
 
 Para volver a `seadragons-dev`, cambia las tres variables en `.env.local`. CI
-sigue usando siempre `seadragons-dev`.
+no usa ninguna de las dos: cada corrida levanta su propio Supabase local
+(#538).
 
 #### Copiar los datos de `seadragons-dev` a tu base local
 
