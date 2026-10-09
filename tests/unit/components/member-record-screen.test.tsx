@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemberRecordScreen } from "@/components/directory/MemberRecordScreen";
@@ -18,6 +18,7 @@ const MASTERS_ID = "9a9a9a9a-0000-4000-8000-000000000002";
 const RECORD_PATH = `/api/v1/members/${MEMBER_ID}/record`;
 const INVITATION_PATH = `/api/v1/members/${MEMBER_ID}/invitation`;
 const STATUS_PATH = `/api/v1/members/${MEMBER_ID}/status`;
+const ROLE_PATH = `/api/v1/members/${MEMBER_ID}/role`;
 const WAIVER_PATH = `/api/v1/members/${MEMBER_ID}/membership-waiver`;
 const VERIFICATION_PATH = `${RECORD_PATH}/auf-verification`;
 const GROUPS_PATH = "/api/v1/groups";
@@ -26,6 +27,7 @@ const EVALUATION_PATH = `/api/v1/evaluations/${MEMBER_ID}`;
 const RECORD: MemberRecord = {
   userId: MEMBER_ID,
   fullName: "Paula Player",
+  role: "Player",
   joinedOn: "2024-03-06",
   accountStatus: "active",
   aufNumber: "AUF-1",
@@ -77,12 +79,14 @@ type Stub = {
   readonly evaluation?: () => Response;
   readonly waive?: (body: unknown) => Response | Promise<Response>;
   readonly removeWaiver?: () => Response | Promise<Response>;
+  readonly changeRole?: (body: unknown) => Response | Promise<Response>;
 };
 
 const resends: string[] = [];
 const statusChanges: unknown[] = [];
 const verifications: unknown[] = [];
 const waiverRequests: Request[] = [];
+const roleChanges: unknown[] = [];
 
 function jsonResponse(status: number, payload: unknown): Response {
   return new Response(JSON.stringify(payload), {
@@ -137,6 +141,14 @@ function changedStatus(body: unknown): Response {
   const { status } = body as { status: string };
   return jsonResponse(200, {
     data: { userId: MEMBER_ID, previousStatus: "active", status },
+  });
+}
+
+/** Lo que el servidor respondería a un cambio de rol que aplicó. */
+function changedRole(body: unknown): Response {
+  const { role } = body as { role: string };
+  return jsonResponse(200, {
+    data: { userId: MEMBER_ID, previousRole: "Player", role },
   });
 }
 
@@ -209,6 +221,11 @@ function stubApi(stub: Stub = {}): void {
       if (url === WAIVER_PATH) {
         return answerWaiver(stub, init);
       }
+      if (url === ROLE_PATH && init?.method === "PATCH") {
+        const body: unknown = JSON.parse(String(init.body));
+        roleChanges.push(body);
+        return stub.changeRole?.(body) ?? changedRole(body);
+      }
       if (url === STATUS_PATH && init?.method === "PATCH") {
         const body: unknown = JSON.parse(String(init.body));
         statusChanges.push(body);
@@ -246,6 +263,7 @@ beforeEach(() => {
   statusChanges.length = 0;
   verifications.length = 0;
   waiverRequests.length = 0;
+  roleChanges.length = 0;
 });
 
 afterEach(() => {
@@ -1569,6 +1587,160 @@ describe("ficha en pantalla: contacto (#499)", () => {
     );
     expect(
       within(section).getByLabelText("Nombre del contacto"),
+    ).toBeInTheDocument();
+  });
+});
+
+// #549: la fila del directorio deja de cambiar el rol, y hasta que llegue el
+// panel de E21 (#550) el Admin lo cambia aquí. Son los casos que vivían en
+// `directory-admin.test.tsx`, con el mismo endpoint.
+describe("ficha en pantalla: rol (#549)", () => {
+  function roleControl(name = "Role for Paula Player"): HTMLElement {
+    return screen.getByRole("combobox", { name });
+  }
+
+  function saveRoleButton(): HTMLElement {
+    return screen.getByRole("button", {
+      name: "Save the role for Paula Player",
+    });
+  }
+
+  async function chooseRole(role: string): Promise<void> {
+    const user = userEvent.setup();
+    await user.selectOptions(roleControl(), role);
+    await user.click(saveRoleButton());
+  }
+
+  it("enseña un control con el rol del miembro", async () => {
+    stubApi();
+
+    await renderScreen();
+
+    expect(roleControl()).toHaveValue("Player");
+    expect(saveRoleButton()).toBeDisabled();
+  });
+
+  it("al confirmar otro rol, lo guarda y lo dice", async () => {
+    stubApi();
+    await renderScreen();
+
+    await chooseRole("Committee");
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Paula Player is now Committee.",
+    );
+    expect(roleControl()).toHaveValue("Committee");
+    expect(roleChanges).toEqual([{ role: "Committee" }]);
+  });
+
+  it("con el último Admin explica por qué no se puede y deja el rol igual", async () => {
+    stubApi({
+      record: { ...RECORD, role: "Admin" },
+      changeRole: () => errorResponse(422, "business_rule", "last_admin"),
+    });
+    await renderScreen();
+
+    await chooseRole("Player");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This is the club's last Admin.",
+    );
+    expect(roleControl()).toHaveValue("Admin");
+  });
+
+  it("con un error de red muestra el aviso y deja volver a intentar", async () => {
+    const user = userEvent.setup();
+    let isOffline = true;
+    stubApi({
+      changeRole: (body) => {
+        if (isOffline) {
+          throw new TypeError("Failed to fetch");
+        }
+        return changedRole(body);
+      },
+    });
+    await renderScreen();
+
+    await chooseRole("Coach");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't reach the server",
+    );
+    isOffline = false;
+    await user.click(saveRoleButton());
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Paula Player is now Coach.",
+    );
+  });
+
+  it("desactiva el botón mientras el cambio está en curso", async () => {
+    let answer: (response: Response) => void = () => undefined;
+    stubApi({
+      changeRole: () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve;
+        }),
+    });
+    await renderScreen();
+
+    await chooseRole("Coach");
+
+    expect(saveRoleButton()).toBeDisabled();
+    expect(roleControl()).toBeDisabled();
+    await act(async () => {
+      answer(changedRole({ role: "Coach" }));
+    });
+  });
+
+  it("un doble clic manda un solo cambio", async () => {
+    const user = userEvent.setup();
+    stubApi();
+    await renderScreen();
+
+    await user.selectOptions(roleControl(), "Committee");
+    await user.dblClick(saveRoleButton());
+
+    await screen.findByRole("status");
+    expect(roleChanges).toHaveLength(1);
+  });
+
+  it("con un miembro que ya no está en el club lo dice del miembro", async () => {
+    stubApi({ changeRole: () => errorResponse(404, "not_found") });
+    await renderScreen();
+
+    await chooseRole("Coach");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That member is no longer in the club.",
+    );
+  });
+
+  it("con una regla de negocio que no conoce da el aviso genérico", async () => {
+    stubApi({
+      changeRole: () =>
+        errorResponse(422, "business_rule", "regla_desconocida"),
+    });
+    await renderScreen();
+
+    await chooseRole("Coach");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't finish that. Try again in a moment.",
+    );
+    expect(roleControl()).toHaveValue("Player");
+  });
+
+  it("sale en español", async () => {
+    stubApi();
+
+    render(<MemberRecordScreen locale="es" userId={MEMBER_ID} />);
+    await screen.findByRole("heading", { level: 1, name: "Paula Player" });
+
+    expect(screen.getByRole("heading", { name: "Rol" })).toBeVisible();
+    const role = roleControl("Rol de Paula Player");
+    expect(role).toHaveValue("Player");
+    expect(
+      within(role).getByRole("option", { name: "Jugador" }),
     ).toBeInTheDocument();
   });
 });

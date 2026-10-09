@@ -3,6 +3,7 @@ import {
   type AccountStatus,
   parseAccountStatus,
 } from "@/lib/auth/account-status";
+import { type Role, parseRole } from "@/lib/auth/roles";
 import { createMemberAttendanceGateway } from "@/lib/attendance/supabase-attendance-stats";
 import { readRequiredText, readText } from "@/lib/auth/supabase-auth-gateways";
 import { createGroupMembersGateways } from "@/lib/groups/supabase-group-members-gateways";
@@ -54,7 +55,7 @@ const MEMBERS_TABLE = "members";
 // La membresía va por el `left join` del chip del Admin (#453), con el motivo
 // de la exención (#457). El teléfono y el contacto de emergencia (#499) los
 // corrige el Admin desde aquí.
-const RECORD_COLUMNS = `user_id, full_name, joined_on, account_status, auf_number, auf_expiry, auf_verified_at, date_of_birth, created_at, guardian_consent_at, photo_path, ${CONTACT_COLUMNS}, ${MEMBERSHIP_SUMMARY_EMBED}`;
+const RECORD_COLUMNS = `user_id, full_name, role, joined_on, account_status, auf_number, auf_expiry, auf_verified_at, date_of_birth, created_at, guardian_consent_at, photo_path, ${CONTACT_COLUMNS}, ${MEMBERSHIP_SUMMARY_EMBED}`;
 const MEMBERSHIPS_RELATION = "memberships";
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -70,6 +71,15 @@ function readAccountStatus(row: Row): AccountStatus {
   return status;
 }
 
+function readRole(row: Row): Role {
+  const value = readRequiredText(row, "role", MEMBERS_TABLE);
+  const role = parseRole(value);
+  if (role === null) {
+    throw new Error(`${value} no es un rol que se reconozca.`);
+  }
+  return role;
+}
+
 function toStoredMemberRecord(row: Row, now: Date): StoredMemberRecord {
   const membership = readEmbeddedMembershipSummary(
     row[MEMBERSHIPS_RELATION],
@@ -78,6 +88,7 @@ function toStoredMemberRecord(row: Row, now: Date): StoredMemberRecord {
   return {
     userId: readRequiredText(row, "user_id", MEMBERS_TABLE),
     fullName: readRequiredText(row, "full_name", MEMBERS_TABLE),
+    role: readRole(row),
     // Las columnas `date` llegan como YYYY-MM-DD, el formato con el que el
     // dominio las compara.
     joinedOn: readRequiredText(row, "joined_on", MEMBERS_TABLE),

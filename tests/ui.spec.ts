@@ -6145,6 +6145,7 @@ const STUBBED_CLUB_GROUPS = [
 type StubbedMemberRecord = {
   readonly userId: string;
   readonly fullName: string;
+  readonly role: "Player" | "Coach" | "Committee" | "Admin";
   readonly joinedOn: string;
   readonly accountStatus: "incomplete" | "active" | "inactive";
   readonly aufNumber: string;
@@ -6177,6 +6178,7 @@ type StubbedMemberRecord = {
 const CURRENT_RECORD: StubbedMemberRecord = {
   userId: RECORD_MEMBER_ID,
   fullName: LONG_MEMBER_NAME,
+  role: "Player",
   joinedOn: "2024-03-06",
   accountStatus: "active",
   aufNumber: "AUF-2026-0042",

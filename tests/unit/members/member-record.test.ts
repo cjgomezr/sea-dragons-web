@@ -148,6 +148,7 @@ function fake(options: FakeOptions = {}): Fake {
           ? {
               userId,
               fullName: "Paula Player",
+              role: "Player",
               joinedOn: JOINED_ON,
               accountStatus,
               ...auf,
@@ -367,6 +368,7 @@ describe("ficha reservada al Admin: lectura", () => {
     expect(record).toEqual({
       userId: MEMBER_ID,
       fullName: "Paula Player",
+      role: "Player",
       joinedOn: JOINED_ON,
       accountStatus: "active",
       aufNumber: "AUF-1",

@@ -874,6 +874,7 @@ export const englishMessages = {
   "newMember.error.invitationNotPending":
     "This member has already activated their account.",
   "memberRecord.invitation.title": "Invitation",
+  "memberRecord.role.title": "Role",
   "memberRecord.invitation.lead":
     "{name} hasn't activated their account yet. The invitation link expires after an hour, so you can send a new one.",
   "memberRecord.invitation.resent": "We sent {name} a new invitation.",

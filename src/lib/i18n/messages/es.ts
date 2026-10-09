@@ -869,6 +869,7 @@ export const spanishMessages: MessageCatalog = {
     "No pudimos invitar al miembro. Inténtalo de nuevo.",
   "newMember.error.invitationNotPending": "Este miembro ya activó su cuenta.",
   "memberRecord.invitation.title": "Invitación",
+  "memberRecord.role.title": "Rol",
   "memberRecord.invitation.lead":
     "{name} todavía no activó su cuenta. El enlace de la invitación caduca a la hora, así que puedes mandarle uno nuevo.",
   "memberRecord.invitation.resent":

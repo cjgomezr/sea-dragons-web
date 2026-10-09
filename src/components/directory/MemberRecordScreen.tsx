@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { MemberAttendanceSummary } from "@/components/attendance/MemberAttendanceSummary";
 import type { AccountStatus } from "@/lib/auth/account-status";
+import type { Role } from "@/lib/auth/roles";
 import { DIRECTORY_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
 import type { MembershipWaiverChange } from "@/lib/membership/membership-waiver";
@@ -16,13 +17,15 @@ import {
 import { InvitationResend } from "./InvitationResend";
 import { MemberRecordEvaluation } from "./MemberRecordEvaluation";
 import { MemberRecordForm } from "./MemberRecordForm";
+import { MemberRecordRole } from "./MemberRecordRole";
 import { MemberStatusControl } from "./MemberStatusControl";
 import { MembershipWaiverControl } from "./MembershipWaiverControl";
 
 /**
  * La ficha reservada al Admin de un miembro (#242, RF-4 del PRD de E5), que se
  * abre desde su fila del directorio: su número de AUF, su vencimiento y sus
- * grupos, su asistencia (#396) y su evaluación para leer (#324).
+ * grupos, su asistencia (#396), su evaluación para leer (#324) y su rol
+ * (#549).
  *
  * La frontera ya mandó al panel a quien no es Admin; si alguien deja de serlo
  * con la pantalla abierta, el 403 del endpoint lo dice aquí. Es de cliente
@@ -67,6 +70,15 @@ export function MemberRecordScreen({
     setState((current) =>
       current.kind === "loaded"
         ? { ...current, record: { ...current.record, accountStatus } }
+        : current,
+    );
+  }
+
+  /** El rol confirmado (#549) sólo cambia el rol. */
+  function applyRole(role: Role): void {
+    setState((current) =>
+      current.kind === "loaded"
+        ? { ...current, record: { ...current.record, role } }
         : current,
     );
   }
@@ -148,6 +160,13 @@ export function MemberRecordScreen({
       ) : null}
       {state.kind === "loaded" ? (
         <MemberRecordEvaluation translate={translate} userId={userId} />
+      ) : null}
+      {state.kind === "loaded" ? (
+        <MemberRecordRole
+          translate={translate}
+          member={state.record}
+          onRoleChanged={applyRole}
+        />
       ) : null}
       {state.kind === "loaded" ? (
         <MembershipWaiverControl

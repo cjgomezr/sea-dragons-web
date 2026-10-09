@@ -20,7 +20,7 @@ import {
   validateDateOfBirthOn,
 } from "@/lib/auth/registration";
 import type { RoleRequestMember } from "@/lib/auth/role-request";
-import { hasCapability } from "@/lib/auth/roles";
+import { type Role, hasCapability } from "@/lib/auth/roles";
 import {
   type GroupMembersGateways,
   assignGroupMember,
@@ -85,6 +85,8 @@ export type AufRegistration =
 export type StoredMemberRecord = ProfileContact & {
   readonly userId: string;
   readonly fullName: string;
+  /** Su rol: desde #549 la ficha es donde el Admin lo cambia. */
+  readonly role: Role;
   /** YYYY-MM-DD, el día del club en que ingresó (#237). */
   readonly joinedOn: string;
   /** `incomplete` es quien todavía no activó su cuenta: la pantalla le ofrece
