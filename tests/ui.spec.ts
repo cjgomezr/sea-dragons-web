@@ -3850,6 +3850,7 @@ const MEMBER_WITHOUT_DATA = {
   role: "Player",
   position: null,
   status: "active",
+  invitedOn: null,
   photoUrl: null,
   attendance: STUBBED_ATTENDANCE,
 } as const;
@@ -3886,6 +3887,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     role: "Admin",
     position: STUBBED_POSITIONS.Defender,
     status: "active",
+    invitedOn: null,
     photoUrl: null,
     attendance: { kind: "rate", percent: 92, sessions: 23 },
   },
@@ -3897,6 +3899,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     role: "Coach",
     position: STUBBED_POSITIONS.Forward,
     status: "active",
+    invitedOn: null,
     photoUrl: null,
     attendance: { kind: "rate", percent: 88, sessions: 22 },
   },
@@ -3908,6 +3911,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     role: "Player",
     position: STUBBED_POSITIONS.Goalkeeper,
     status: "active",
+    invitedOn: null,
     photoUrl: null,
     attendance: { kind: "rate", percent: 64, sessions: 16 },
   },
@@ -3920,6 +3924,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     role: "Committee",
     position: STUBBED_POSITIONS.Defender,
     status: "inactive",
+    invitedOn: null,
     photoUrl: null,
     attendance: STUBBED_ATTENDANCE,
   },
@@ -4031,6 +4036,7 @@ function asAdminMember(member: {
     aufExpiry: isAufExpired ? "2020-01-31" : "2030-06-30",
     isAufVerified: member.userId !== UNVERIFIED_AUF_MEMBER_ID,
     isAufExpired,
+    isAufExpiring: false,
     // La fila del AUF vencido carga además el chip de la membresía atrasada
     // (#453): la de más marcas, para medirlas en la tarjeta más estrecha.
     membershipStatus: isAufExpired ? "past_due" : "active",

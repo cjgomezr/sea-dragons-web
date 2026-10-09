@@ -411,6 +411,7 @@ describe("en el directorio", () => {
     role: "Player",
     position: null,
     status: "active",
+    invitedOn: null,
     photoUrl: null,
     attendance: { kind: "no_data" },
     email: "nerea@club.test",

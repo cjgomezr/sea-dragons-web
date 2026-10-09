@@ -53,6 +53,7 @@ const memberSchema = z.object({
   role: z.enum(ROLES),
   position: namedPositionSchema.nullable(),
   status: z.enum(ACCOUNT_STATUSES),
+  invitedOn: z.string().nullable(),
   // Sólo una dirección web: la pantalla la pone tal cual en una imagen.
   photoUrl: z.url({ protocol: /^https?$/ }).nullable(),
   attendance: memberAttendanceSchema,
@@ -87,6 +88,7 @@ const adminMemberSchema = coachMemberSchema.extend({
   aufExpiry: z.string().nullable(),
   isAufVerified: z.boolean(),
   isAufExpired: z.boolean(),
+  isAufExpiring: z.boolean(),
   membershipStatus: membershipStatusSchema,
 });
 

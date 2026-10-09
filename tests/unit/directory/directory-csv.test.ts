@@ -27,6 +27,7 @@ const COMMITTEE_MARIA: CommitteeDirectoryMember = {
   role: "Player",
   position: asDirectoryPosition(DEFENDER),
   status: "active",
+  invitedOn: null,
   photoUrl: null,
   attendance: { kind: "rate", percent: 75, sessions: 3 },
   email: "maria@club.test",
@@ -45,6 +46,7 @@ const ADMIN_MARIA: AdminDirectoryMember = {
   aufExpiry: "2027-01-31",
   isAufVerified: true,
   isAufExpired: false,
+  isAufExpiring: false,
   membershipStatus: "past_due",
 };
 
