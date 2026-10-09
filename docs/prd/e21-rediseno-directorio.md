@@ -1,6 +1,6 @@
 # PRD: E21 · El rediseño del directorio
 
-**Estado:** borrador · **Fecha:** 9 de octubre de 2026 · **Autor:** sesión de planificación (Claude Code)
+**Estado:** aprobado · **Fecha:** 9 de octubre de 2026 · **Autor:** sesión de planificación (Claude Code)
 
 Fuente: el diseño que el dueño hizo con Claude Design, guardado en `docs/design/directorio-admin/` (el prototipo `Directory Upgrade.dc.html`, su `README.md` de handoff y `support.js`), con sus capturas en `docs/mockups/` (las `directory-admin-*` y `mobile-directory-admin-*`). Se construye la opción **2** del prototipo: "2a" en escritorio y "2b" en el móvil. Las secciones "1a" a "1e" son exploraciones y no se construyen. Es una épica añadida después del plan; no cambia ningún requisito del SRD, sino cómo se presentan los de E5 y E19 (FR-015 a FR-019, FR-085, FR-088 a FR-093).
 
@@ -154,16 +154,16 @@ Para medidas, colores y textos de cada pieza, ver el `README.md` del handoff. Ca
 
 ## 10. Descomposición en tickets (para write-ticket)
 
-| #   | Título propuesto                                                                              | Tamaño | Depende de | Auto-merge sugerido                           |
-| --- | --------------------------------------------------------------------------------------------- | ------ | ---------- | --------------------------------------------- |
-| 1   | Añade los tokens nuevos del directorio y los iconos de Phosphor (RF-1)                        | S      | ninguna    | No: dependencia nueva y tokens de toda la app |
-| 2   | Rehace la cabecera y la barra del directorio con el popover de filtros (RF-2)                 | M      | 1          | No: UI nueva                                  |
-| 3   | Rehace la lista del directorio: filas compactas, orden por columnas y puntos de estado (RF-3) | M      | 2          | No: UI nueva                                  |
-| 4   | Añade el panel lateral con la ficha rápida del socio y el cambio de rol confirmado (RF-5)     | M      | 3          | No: cambia cómo se guardan los roles          |
-| 5   | Añade al panel el resumen del club: solicitudes, AUF por renovar y datos que faltan (RF-4)    | M      | 4          | No: lógica nueva y contadores                 |
-| 6   | Selecciona varios socios para escribirles, exportarlos o cambiarles el rol en bloque (RF-6)   | M      | 4          | No: permisos y cambio de roles en bloque      |
-| 7   | Rehace el directorio en el móvil: lista, orden, menú y pantalla de solicitudes (RF-7)         | M      | 3          | No: UI nueva                                  |
-| 8   | Añade en el móvil la ficha que sube y las acciones al deslizar (RF-8)                         | M      | 4, 7       | No: gestos y enlaces de llamada               |
+| #        | Título propuesto                                                                              | Tamaño | Depende de | Auto-merge sugerido                           |
+| -------- | --------------------------------------------------------------------------------------------- | ------ | ---------- | --------------------------------------------- |
+| 1 (#547) | Añade los tokens nuevos del directorio y los iconos de Phosphor (RF-1)                        | S      | ninguna    | No: dependencia nueva y tokens de toda la app |
+| 2 (#548) | Rehace la cabecera y la barra del directorio con el popover de filtros (RF-2)                 | M      | 1          | No: UI nueva                                  |
+| 3 (#549) | Rehace la lista del directorio: filas compactas, orden por columnas y puntos de estado (RF-3) | M      | 2          | No: UI nueva                                  |
+| 4 (#550) | Añade el panel lateral con la ficha rápida del socio y el cambio de rol confirmado (RF-5)     | M      | 3          | No: cambia cómo se guardan los roles          |
+| 5 (#551) | Añade al panel el resumen del club: solicitudes, AUF por renovar y datos que faltan (RF-4)    | M      | 4          | No: lógica nueva y contadores                 |
+| 6 (#552) | Selecciona varios socios para escribirles, exportarlos o cambiarles el rol en bloque (RF-6)   | M      | 4          | No: permisos y cambio de roles en bloque      |
+| 7 (#553) | Rehace el directorio en el móvil: lista, orden, menú y pantalla de solicitudes (RF-7)         | M      | 3          | No: UI nueva                                  |
+| 8 (#554) | Añade en el móvil la ficha que sube y las acciones al deslizar (RF-8)                         | M      | 4, 7       | No: gestos y enlaces de llamada               |
 
 Cada ticket cubre todos los roles (D4), los dos temas y los dos idiomas. Todos llevan `ui-review`.
 
