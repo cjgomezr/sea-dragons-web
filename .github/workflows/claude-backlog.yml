@@ -110,15 +110,10 @@ jobs:
           # cron → bolsa del cron; humanos → su token personal (o API key de equipo).
           #
           # NOTA sobre credenciales de la APP en la nube: el runner no tiene tu
-          # .env.local. Si los tests de integración necesitan servicios reales
-          # (p. ej. Supabase), crea sus valores como secrets del repo y expórtalos
-          # agregando al step un bloque env:, por ejemplo:
-          #   env:
-          #     NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          #     NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          #     SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          # Sin esto, los tests de integración se saltan/fallan en la nube y los
-          # workers nocturnos entregan trabajo sin verificar contra servicios reales.
+          # .env.local, y no se le pasan los secretos de seadragons-dev a
+          # propósito (#538). Los tests de integración y de RLS los corre
+          # `checks.yml` en el PR, contra un Supabase local que levanta cada
+          # corrida; ese check es el que decide, no el worker.
           claude_code_oauth_token: ${{ steps.cred.outputs.oauth }}
           anthropic_api_key: ${{ steps.cred.outputs.api }}
           prompt: |
