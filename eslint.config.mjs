@@ -21,6 +21,33 @@ const config = [
   },
   ...coreWebVitals,
   ...typescriptConfig,
+  {
+    rules: {
+      // #547: la raíz de Phosphor reexporta más de mil iconos y la variante
+      // `csr` necesita un contexto de React que obliga a "use client". Un
+      // icono por archivo, desde `dist/ssr`, y nada más del paquete.
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex:
+                "^@phosphor-icons/react(?!/dist/ssr/[A-Z]\\w*$|/dist/lib/types$)",
+              message:
+                'Importa cada icono desde "@phosphor-icons/react/dist/ssr/<Icono>" y píntalo con <Icon> (design-system.md, Icons).',
+            },
+            {
+              // Solo trae declaraciones: un import de valor se rompe al
+              // construir.
+              regex: "^@phosphor-icons/react/dist/lib/types$",
+              allowTypeImports: true,
+              message: 'Los tipos de Phosphor se importan con "import type".',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];
 
 export default config;

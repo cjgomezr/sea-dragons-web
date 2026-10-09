@@ -62,6 +62,27 @@ describe("tokens del tema sin data-theme", () => {
   });
 });
 
+// #547: los colores del rediseño del directorio que el handoff traía sueltos.
+const DIRECTORY_REDESIGN_TOKENS = [
+  "color-hover",
+  "color-accent-soft-text",
+  "color-text-soft",
+  "color-accent-hover",
+] as const;
+
+describe("tokens del rediseño del directorio", () => {
+  it.each(DIRECTORY_REDESIGN_TOKENS)("%s tiene valor en :root", (name) => {
+    expect(rootTokens[name]).toBeDefined();
+  });
+
+  it.each(DIRECTORY_REDESIGN_TOKENS)(
+    "%s tiene valor en el tema oscuro",
+    (name) => {
+      expect(cssCustomProperties(manualDarkBlock)[name]).toBeDefined();
+    },
+  );
+});
+
 describe("tema por preferencia del sistema", () => {
   it("declara un bloque para prefers-color-scheme: dark", () => {
     expect(globalsCss).toContain(SYSTEM_DARK_MEDIA);
