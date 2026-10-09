@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { NEW_MEMBER_PATH } from "@/lib/auth/routes";
 import type { Role } from "@/lib/auth/roles";
 import {
   DEFAULT_DIRECTORY_QUERY,
@@ -25,18 +23,19 @@ import {
   describeDirectoryFailure,
   loadDirectory,
 } from "./directory-client";
+import { NO_MORE_FILTERS, countActiveFilters } from "./DirectoryFilterFields";
 import {
   type DirectoryFilterState,
   DirectoryFilters,
 } from "./DirectoryFilters";
-import { NO_MORE_FILTERS, countActiveFilters } from "./DirectoryMoreFilters";
+import { DirectoryHeader } from "./DirectoryHeader";
 import type { DirectoryOrder } from "./DirectorySortControl";
-import { DirectoryExportButton } from "./DirectoryExportButton";
 import { DirectoryTable } from "./DirectoryTable";
 import { RoleRequestsPanel } from "./RoleRequestsPanel";
 import { useDebouncedValue } from "./use-debounced-value";
 import { useFilterChoices } from "./use-filter-choices";
 import { useMemberRoleChange } from "./use-member-role-change";
+import { usePendingRoleRequests } from "./use-pending-role-requests";
 
 /**
  * La pantalla del directorio (#239, RF-2 del PRD de E5): quién está en el
@@ -48,7 +47,8 @@ import { useMemberRoleChange } from "./use-member-role-change";
  * viene marcada, y no por un rol que la pantalla haya leído por su cuenta.
  * Con esa marca, un Admin encuentra además la bandeja de solicitudes de rol y
  * el cambio de rol de cada fila (#240), que antes vivían en su propia pantalla
- * de administración.
+ * de administración. La cabecera y la barra son las del rediseño de E21
+ * (#548): la bandeja queda debajo de la lista, y la cabecera lleva a ella.
  *
  * Es de cliente porque su razón de ser es cambiar sin recargar: buscar,
  * filtrar y ordenar rehacen la lectura. Lee por la API v1 y nunca contra la
@@ -62,7 +62,7 @@ import { useMemberRoleChange } from "./use-member-role-change";
  * se queda atrás de quien escribe. */
 const SEARCH_DEBOUNCE_MS = 250;
 
-const EMAIL_EMPTY_REASON_ID = "correo-directorio-sin-socios";
+const MEMBERS_HEADING_ID = "miembros-del-club";
 
 type ScreenState =
   | { readonly kind: "loading" }
@@ -153,60 +153,6 @@ function EmptyDirectory({
         <button type="button" className="admin-secondary" onClick={onClear}>
           {translate("directory.clearFilters")}
         </button>
-      ) : null}
-    </div>
-  );
-}
-
-/** Escriben correos quienes reciben la lista con el correo de todos (D5, D7):
- * la marca la pone el servidor, y el servidor vuelve a mirar el rol al
- * enviar. */
-function canWriteEmails(listing: DirectoryListing): boolean {
-  return listing.kind === "admin" || listing.kind === "committee";
-}
-
-/** Exporta a CSV quien ve el contacto de todos (D6, #500): hoy los mismos
- * que escriben correos, pero son dos permisos distintos. */
-function canExportListing(listing: DirectoryListing): boolean {
-  return listing.kind === "admin" || listing.kind === "committee";
-}
-
-/** La lista que se está viendo, sin las bajas: no van a recibirlo. El
- * servidor las vuelve a quitar al enviar, por si alguien se dio de baja
- * entre medias. */
-function emailRecipientsOf(
-  listing: DirectoryListing,
-): readonly EmailRecipient[] {
-  return listing.members
-    .filter((member) => member.status !== "inactive")
-    .map(({ userId, fullName }) => ({ userId, fullName }));
-}
-
-function WriteEmailButton({
-  translate,
-  recipients,
-  onOpen,
-}: {
-  translate: Translator;
-  recipients: readonly EmailRecipient[];
-  onOpen: (recipients: readonly EmailRecipient[]) => void;
-}): React.JSX.Element {
-  const isEmpty = recipients.length === 0;
-  return (
-    <div className="directory-email-open">
-      <button
-        type="button"
-        className="admin-secondary"
-        disabled={isEmpty}
-        aria-describedby={isEmpty ? EMAIL_EMPTY_REASON_ID : undefined}
-        onClick={() => onOpen(recipients)}
-      >
-        {translate("directory.email.open")}
-      </button>
-      {isEmpty ? (
-        <p className="auth-hint" id={EMAIL_EMPTY_REASON_ID}>
-          {translate("directory.email.emptyReason")}
-        </p>
       ) : null}
     </div>
   );
@@ -343,6 +289,13 @@ export function DirectoryScreen({
   }
 
   const roleChange = useMemberRoleChange(translate, applyRole);
+  const isAdminListing =
+    state.kind === "ready" && state.listing.kind === "admin";
+  const pendingRequests = usePendingRoleRequests({
+    isEnabled: isAdminListing,
+    translate,
+    onRoleGranted: applyRole,
+  });
 
   const hasNarrowingFilters =
     asSearchQuery(filters.search) !== null ||
@@ -351,34 +304,12 @@ export function DirectoryScreen({
 
   return (
     <div className="directory">
-      <header className="directory-header">
-        <div>
-          <h1>{translate("directory.title")}</h1>
-          <p className="app-lead">{translate("directory.lead")}</p>
-        </div>
-        <div className="directory-actions">
-          {state.kind === "ready" && canWriteEmails(state.listing) ? (
-            <WriteEmailButton
-              translate={translate}
-              recipients={emailRecipientsOf(state.listing)}
-              onOpen={setEmailRecipients}
-            />
-          ) : null}
-          {state.kind === "ready" && canExportListing(state.listing) ? (
-            <DirectoryExportButton
-              translate={translate}
-              query={state.listedQuery}
-              isEmpty={state.listing.members.length === 0}
-            />
-          ) : null}
-          {/* Sólo quien recibe la lista de Admin puede dar de alta (#243). */}
-          {state.kind === "ready" && state.listing.kind === "admin" ? (
-            <Link href={NEW_MEMBER_PATH} className="auth-submit directory-add">
-              {translate("directory.addMember")}
-            </Link>
-          ) : null}
-        </div>
-      </header>
+      <DirectoryHeader
+        translate={translate}
+        listed={state.kind === "ready" ? state : null}
+        pendingRequests={isAdminListing ? pendingRequests.state : null}
+        onOpenEmail={setEmailRecipients}
+      />
       {emailRecipients === null ? null : (
         <DirectoryEmailComposer
           locale={locale}
@@ -396,20 +327,23 @@ export function DirectoryScreen({
           onRetry={retryLoad}
         />
       ) : null}
-      {state.kind === "ready" && state.listing.kind === "admin" ? (
-        <RoleRequestsPanel translate={translate} onRoleGranted={applyRole} />
-      ) : null}
       {state.kind === "ready" ? (
-        <section className="admin-section" aria-labelledby="miembros-del-club">
-          <h2 id="miembros-del-club">{translate("directory.list.title")}</h2>
+        <section
+          className="directory-members"
+          aria-labelledby={MEMBERS_HEADING_ID}
+        >
+          <h2 id={MEMBERS_HEADING_ID} className="visually-hidden">
+            {translate("directory.list.title")}
+          </h2>
           <AdministrationNotice notice={roleChange.notice} />
           <DirectoryFilters
             translate={translate}
             locale={locale}
             filters={filters}
-            canIncludeInactive={state.listing.kind === "admin"}
+            canIncludeInactive={isAdminListing}
             availableFilters={availableFilters}
             choices={choices}
+            shownCount={state.listing.members.length}
             onChange={setFilters}
           />
           {state.listing.members.length === 0 ? (
@@ -437,6 +371,12 @@ export function DirectoryScreen({
             />
           )}
         </section>
+      ) : null}
+      {isAdminListing ? (
+        <RoleRequestsPanel
+          translate={translate}
+          pendingRequests={pendingRequests}
+        />
       ) : null}
     </div>
   );

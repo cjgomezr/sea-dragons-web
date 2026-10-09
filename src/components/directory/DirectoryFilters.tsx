@@ -1,20 +1,27 @@
 "use client";
 
+import { MagnifyingGlass } from "@phosphor-icons/react/dist/ssr/MagnifyingGlass";
+import { Icon } from "@/components/Icon";
 import type { Role } from "@/lib/auth/roles";
 import type { DirectoryFilter } from "@/lib/directory/directory";
 import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
-import { DirectoryMoreFilters, type MoreFilters } from "./DirectoryMoreFilters";
+import type { MoreFilters } from "./DirectoryFilterFields";
+import { DirectoryFilterChips } from "./DirectoryFilterChips";
+import { DirectoryMoreFilters } from "./DirectoryMoreFilters";
 import type { FilterChoices } from "./use-filter-choices";
 
 /**
- * Los controles con los que se recorta el directorio (RF-2 del PRD de E5): la
- * búsqueda por nombre, el filtro por rol, los de posición, grupo, AUF,
- * membresía (#497) y contacto (#499) que el rol deja usar y, sólo para un
- * Admin, los socios dados de baja.
+ * La barra con la que se recorta el directorio (RF-2 de los PRD de E5 y
+ * E21): en una sola fila, la búsqueda por nombre, el control segmentado del
+ * rol y el botón Filtros, que abre el resto (#497, #499) en un popover o en
+ * la hoja del móvil. Debajo, las fichas de los filtros activos (#548).
  *
  * No filtran nada por su cuenta: dicen qué se pidió y la pantalla vuelve a
  * preguntárselo al servidor, que es quien decide qué puede ver cada rol.
+ *
+ * El botón del panel lateral del diseño todavía no está: llega con el panel
+ * (#550), para no dejar un botón que no hace nada.
  */
 
 /** Qué se está pidiendo. `search` es el texto tal como se escribe, sin asentar
@@ -22,7 +29,6 @@ import type { FilterChoices } from "./use-filter-choices";
 export type DirectoryFilterState = MoreFilters & {
   readonly search: string;
   readonly role: Role | null;
-  readonly includeInactive: boolean;
 };
 
 /** El orden del mockup y del ticket: "Todos" primero, que es el estado en el
@@ -38,8 +44,9 @@ const ROLE_OPTIONS: readonly (Role | null)[] = [
 ];
 
 const SEARCH_FIELD_ID = "directorio-buscar";
-const INACTIVE_FIELD_ID = "directorio-inactivos";
 
+/** Un radio por opción: el teclado recorre el control con las flechas, como
+ * un grupo de radios, y lo que se pinta es el segmento. */
 function RoleOption({
   translate,
   role,
@@ -68,15 +75,40 @@ function RoleOption({
   );
 }
 
+function SearchField({
+  translate,
+  search,
+  onSearch,
+}: {
+  translate: Translator;
+  search: string;
+  onSearch: (search: string) => void;
+}): React.JSX.Element {
+  return (
+    <div className="directory-search">
+      <label htmlFor={SEARCH_FIELD_ID} className="visually-hidden">
+        {translate("directory.search.label")}
+      </label>
+      <Icon glyph={MagnifyingGlass} />
+      <input
+        id={SEARCH_FIELD_ID}
+        type="search"
+        value={search}
+        placeholder={translate("directory.search.placeholder")}
+        onChange={(event) => onSearch(event.target.value)}
+      />
+    </div>
+  );
+}
+
 export function DirectoryFilters({
   translate,
   locale,
   filters,
-  /** Sólo un Admin puede pedir a los dados de baja (AC-040), y el servidor lo
-   * dice al responder la lista. Para el resto el control no existe. */
   canIncludeInactive,
   availableFilters,
   choices,
+  shownCount,
   onChange,
 }: {
   translate: Translator;
@@ -85,61 +117,54 @@ export function DirectoryFilters({
   canIncludeInactive: boolean;
   availableFilters: readonly DirectoryFilter[];
   choices: FilterChoices;
+  /** Cuántos socios enseña la lista ahora, para el pie del popover. */
+  shownCount: number;
   onChange: (filters: DirectoryFilterState) => void;
 }): React.JSX.Element {
+  const changeMore = (more: MoreFilters): void =>
+    onChange({ ...filters, ...more });
   return (
     <div className="directory-filters">
-      <div className="auth-field directory-search">
-        <label htmlFor={SEARCH_FIELD_ID}>
-          {translate("directory.search.label")}
-        </label>
-        <input
-          id={SEARCH_FIELD_ID}
-          type="search"
-          value={filters.search}
-          placeholder={translate("directory.search.placeholder")}
-          onChange={(event) =>
-            onChange({ ...filters, search: event.target.value })
-          }
+      <div className="directory-toolbar">
+        <SearchField
+          translate={translate}
+          search={filters.search}
+          onSearch={(search) => onChange({ ...filters, search })}
+        />
+        <fieldset className="directory-roles">
+          <legend className="visually-hidden">
+            {translate("directory.role.legend")}
+          </legend>
+          <div className="directory-role-options">
+            {ROLE_OPTIONS.map((role) => (
+              <RoleOption
+                key={role ?? "all"}
+                translate={translate}
+                role={role}
+                isChosen={filters.role === role}
+                onChoose={() => onChange({ ...filters, role })}
+              />
+            ))}
+          </div>
+        </fieldset>
+        <DirectoryMoreFilters
+          translate={translate}
+          locale={locale}
+          filters={filters}
+          availableFilters={availableFilters}
+          canIncludeInactive={canIncludeInactive}
+          choices={choices}
+          shownCount={shownCount}
+          onChange={changeMore}
         />
       </div>
-      <fieldset className="directory-roles">
-        <legend>{translate("directory.role.legend")}</legend>
-        <div className="directory-role-options">
-          {ROLE_OPTIONS.map((role) => (
-            <RoleOption
-              key={role ?? "all"}
-              translate={translate}
-              role={role}
-              isChosen={filters.role === role}
-              onChoose={() => onChange({ ...filters, role })}
-            />
-          ))}
-        </div>
-      </fieldset>
-      <DirectoryMoreFilters
+      <DirectoryFilterChips
         translate={translate}
         locale={locale}
         filters={filters}
-        availableFilters={availableFilters}
         choices={choices}
-        onChange={(more) => onChange({ ...filters, ...more })}
+        onChange={changeMore}
       />
-      {canIncludeInactive ? (
-        <div className="auth-consent directory-inactive">
-          <input
-            id={INACTIVE_FIELD_ID}
-            type="checkbox"
-            checked={filters.includeInactive}
-            onChange={(event) =>
-              onChange({ ...filters, includeInactive: event.target.checked })
-            }
-          />
-          <label htmlFor={INACTIVE_FIELD_ID}>
-            {translate("directory.includeInactive")}
-          </label>
-        </div>
-      ) : null}
     </div>
   );
 }

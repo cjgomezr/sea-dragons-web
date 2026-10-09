@@ -546,8 +546,6 @@ export const englishMessages = {
   "directory.metaDescription":
     "Everyone in the club, with their country, level, role and position.",
   "directory.title": "Directory",
-  "directory.lead":
-    "Everyone in the club. Search by name, filter by role and sort the list.",
   "directory.loading": "Loading the club's directory…",
   "directory.retry": "Try again",
   "directory.list.title": "Club members",
@@ -593,6 +591,24 @@ export const englishMessages = {
   },
   "directory.filter.sheetTitle": "Filters",
   "directory.filter.apply": "Show results",
+  "directory.filter.clearAll": "Clear all",
+  "directory.filter.showMembers": {
+    one: "Show {count} member",
+    other: "Show {count} members",
+  },
+  "directory.filter.chips": "Active filters",
+  "directory.filter.chip": "{filter}: {value}",
+  "directory.filter.chipRemove": "Remove the filter {filter}",
+  "directory.filter.chipsClear": "Clear",
+  "directory.count": {
+    one: "{shown} of {count} member",
+    other: "{shown} of {count} members",
+  },
+  "directory.requests.none": "No pending requests",
+  "directory.requests.waiting": {
+    one: "{count} role request waiting",
+    other: "{count} role requests waiting",
+  },
   "directory.error.filterForbidden":
     "Your role can't use one of these filters. Try again without them.",
   "directory.column.member": "Member",

@@ -839,3 +839,75 @@ describe("directorio para Admin en español", () => {
     );
   });
 });
+// #548: la línea de estado de las solicitudes, en la cabecera del directorio.
+describe("directorio para Admin: solicitudes en la cabecera", () => {
+  const SECOND_REQUEST: PendingRoleRequest = {
+    ...COACH_REQUEST,
+    id: "1f1e1d1c-1b1a-4918-8716-151413121110",
+    userId: ADMIN_ID,
+    fullName: "Ana Admin",
+    requestedRole: "Committee",
+  };
+
+  it("dice que no hay solicitudes pendientes cuando no hay ninguna", async () => {
+    stubApi({ requests: [] });
+
+    await renderAdminDirectory();
+
+    expect(screen.getByText("No pending requests")).toBeVisible();
+    expect(screen.queryByRole("link", { name: /waiting/ })).toBeNull();
+  });
+
+  it("con una, lleva a la bandeja con la frase en singular", async () => {
+    stubApi({ requests: [COACH_REQUEST] });
+
+    await renderAdminDirectory();
+
+    expect(
+      screen.getByRole("link", { name: "1 role request waiting" }),
+    ).toHaveAttribute("href", "#solicitudes-pendientes");
+    expect(screen.queryByText("No pending requests")).toBeNull();
+  });
+
+  it("con dos, lo dice en plural", async () => {
+    stubApi({ requests: [COACH_REQUEST, SECOND_REQUEST] });
+
+    await renderAdminDirectory();
+
+    expect(
+      screen.getByRole("link", { name: "2 role requests waiting" }),
+    ).toBeVisible();
+  });
+
+  it("al aprobar la última, pasa a no tener ninguna pendiente", async () => {
+    stubApi({ requests: [COACH_REQUEST] });
+    await renderAdminDirectory();
+
+    await userEvent.setup().click(approveButton());
+
+    expect(await screen.findByText("No pending requests")).toBeVisible();
+    expect(screen.queryByRole("link", { name: /waiting/ })).toBeNull();
+  });
+
+  it.each([
+    [[], "No hay solicitudes pendientes"],
+    [[COACH_REQUEST], "1 solicitud de rol esperando"],
+    [[COACH_REQUEST, SECOND_REQUEST], "2 solicitudes de rol esperando"],
+  ] as const)("lo dice en español (%#)", async (requests, expected) => {
+    stubApi({ requests });
+
+    await renderAdminDirectory("es");
+
+    expect(screen.getByText(expected)).toBeVisible();
+  });
+
+  it("a quien no es Admin no le dice nada de solicitudes", async () => {
+    stubApi({ kind: "member", members: [NEREA] });
+
+    render(<DirectoryScreen locale="en" />);
+    await screen.findByRole("region", { name: "Club members" });
+
+    expect(screen.queryByText("No pending requests")).toBeNull();
+    expect(screen.queryByRole("link", { name: /waiting/ })).toBeNull();
+  });
+});
