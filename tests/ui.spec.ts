@@ -1353,6 +1353,10 @@ test.describe("dentro de la aplicación", () => {
         "lang",
         language.locale,
       );
+      // La barra del móvil se recorta sobre el inicio, que asoma por su borde
+      // de arriba: sin esperar a que cargue, esa franja cambiaba de una
+      // corrida a otra (#561).
+      await waitForSectionsLoaded(page, []);
     }
 
     async function openMore(
