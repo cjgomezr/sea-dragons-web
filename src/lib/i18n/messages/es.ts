@@ -588,16 +588,16 @@ export const spanishMessages: MessageCatalog = {
   "directory.filter.apply": "Ver resultados",
   "directory.filter.clearAll": "Borrar todo",
   "directory.filter.showMembers": {
-    one: "Mostrar {count} socio",
-    other: "Mostrar {count} socios",
+    one: "Mostrar {count} miembro",
+    other: "Mostrar {count} miembros",
   },
   "directory.filter.chips": "Filtros activos",
   "directory.filter.chip": "{filter}: {value}",
   "directory.filter.chipRemove": "Quitar el filtro {filter}",
   "directory.filter.chipsClear": "Borrar",
   "directory.count": {
-    one: "{shown} de {count} socio",
-    other: "{shown} de {count} socios",
+    one: "{shown} de {count} miembro",
+    other: "{shown} de {count} miembros",
   },
   "directory.requests.none": "No hay solicitudes pendientes",
   "directory.requests.waiting": {

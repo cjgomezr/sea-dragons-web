@@ -1835,7 +1835,7 @@ describe("cabecera del directorio", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Directorio" }),
     ).toBeVisible();
-    expect(screen.getByText("2 de 4 socios")).toBeVisible();
+    expect(screen.getByText("2 de 4 miembros")).toBeVisible();
   });
 
   it("a un Admin le pone correo, exportar e invitar como botones de solo icono con su título", async () => {
@@ -2091,7 +2091,7 @@ describe("el popover de Filtros", () => {
       within(popover).getByRole("button", { name: "Borrar todo" }),
     ).toBeVisible();
     expect(
-      within(popover).getByRole("button", { name: "Mostrar 1 socio" }),
+      within(popover).getByRole("button", { name: "Mostrar 1 miembro" }),
     ).toBeVisible();
     expect(
       within(popover).getByRole("checkbox", {
