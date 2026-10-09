@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/nocturne-86322cf7-8817-4786-bcc4-05729df32b18/styles.css">
+<script src="_ds/nocturne-86322cf7-8817-4786-bcc4-05729df32b18/_ds_bundle.js"></script>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+body{margin:0;background:color-mix(in srgb,var(--color-bg) 70%,black);font-family:var(--font-body);color:var(--color-text)}
+a{color:var(--color-accent-300)}a:hover{color:var(--color-accent-200)}
+.dv-turn{padding:40px 44px 32px;scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:var(--color-accent-500);color:var(--color-bg);border-radius:4px;text-decoration:none}
+.dv-tname{font:500 15px/1.2 var(--font-body);color:var(--color-text)}
+.dv-intro{max-width:760px;margin:0 0 28px;font:13px/1.55 var(--font-body);color:var(--color-neutral-400);text-wrap:pretty}
+.dv-opts{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:var(--color-neutral-800);color:var(--color-text);border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:500 13px/1.3 var(--font-body);color:var(--color-text)}
+.dv-card{max-width:100%;background:var(--color-bg);border:1px solid var(--color-divider);border-radius:10px;box-shadow:var(--shadow-lg);overflow:visible}
+.dv-opt:target .dv-oid{background:var(--color-accent-500);color:var(--color-bg)}
+.dv-notes{margin:0;padding:0 0 0 16px;font:12.5px/1.6 var(--font-body);color:var(--color-neutral-400);max-width:900px}
+.dv-card .btn,.dv-card .tag{white-space:nowrap;flex:none}
+.dv-next{margin:28px 0 0;font:12px/1.5 var(--font-body);color:var(--color-neutral-500)}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Filtros de <a class="dv-oid" href="#1a">1a</a> + lista y panel de <a class="dv-oid" href="#1b">1b</a>, con los colores de tu app</span></div>
+<p class="dv-intro">Paleta tomada de <code>globals.css</code> (tema oscuro): fondo #0c1a26, panel #13283a, borde #274055, acento #33a1e0, sidebar #163a55, y warning/danger para AUF y pagos. Hacé click en una persona para abrir su panel y cambiale el rol, o abrí Filters.</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2a">
+<div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Escritorio — dentro de tu app</div>
+<div class="dv-card" style="width:1180px;background:#0c1a26;border-color:#274055;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#e8f0f7;display:grid;grid-template-columns:200px minmax(0,1fr);min-height:760px">
+<aside style="background:#163a55;border-right:1px solid #244b69;padding:18px 10px;display:flex;flex-direction:column;gap:4px;border-radius:10px 0 0 10px">
+<div style="display:flex;gap:10px;align-items:center;padding:0 8px 14px"><span style="width:30px;height:30px;border-radius:6px;background:#1d4869;border:1px dashed #89a1b5;flex:none"></span><span style="font-weight:700;font-size:15px;line-height:1.2;color:#e8f0f7">Victoria Seadragons</span></div>
+<sc-for list="{{ nav2 }}" as="n" hint-placeholder-count="9">
+<sc-if value="{{ n.on }}"><span style="padding:9px 12px;border-radius:8px;background:#1d4869;box-shadow:inset 3px 0 0 #33a1e0;font-size:14px;font-weight:600;color:#e8f0f7">{{ n.label }}</span></sc-if>
+<sc-if value="{{ n.off }}"><span style="padding:9px 12px;border-radius:8px;font-size:14px;color:#cfdeea;cursor:pointer" style-hover="background:#1d4869">{{ n.label }}</span></sc-if>
+</sc-for>
+</aside>
+<div style="display:flex;flex-direction:column;min-width:0">
+<div style="padding:22px 24px 14px;display:flex;flex-direction:column;gap:14px;border-bottom:1px solid #274055">
+<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;align-items:baseline;gap:10px"><h1 style="margin:0;font:700 28px/1.1 system-ui,-apple-system,'Segoe UI',sans-serif">Directory</h1><span style="font:12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ shown2 }} of {{ total2 }} members</span></div>
+<sc-if value="{{ noReqs2 }}"><span style="font-size:12.5px;color:#8aa1b5;display:flex;gap:6px;align-items:center"><i class="ph ph-check-circle" style="color:#6fd6b4"></i>No pending requests</span></sc-if>
+<sc-if value="{{ hasReqs2 }}"><button onClick="{{ clearSel2 }}" style="all:unset;cursor:pointer;align-self:flex-start;display:flex;gap:7px;align-items:center;padding:3px 10px 3px 8px;border-radius:999px;font-size:12.5px;font-weight:600;color:#cfe8f7;background:color-mix(in srgb,#33a1e0 14%,transparent);border:1px solid color-mix(in srgb,#33a1e0 45%,transparent)" style-hover="border-color:#33a1e0"><span style="width:7px;height:7px;border-radius:50%;background:#33a1e0"></span>{{ reqLabel2 }}<i class="ph ph-arrow-right" style="font-size:12px"></i></button></sc-if>
+</div>
+<div style="display:flex;gap:8px">
+<button title="Email filtered members" aria-label="Email filtered members" style="all:unset;cursor:pointer;width:38px;height:38px;box-sizing:border-box;border-radius:8px;border:1px solid #274055;background:#13283a;display:grid;place-items:center" style-hover="border-color:#33a1e0"><i class="ph ph-envelope-simple" style="font-size:17px"></i></button>
+<button title="Export CSV" aria-label="Export CSV" style="all:unset;cursor:pointer;width:38px;height:38px;box-sizing:border-box;border-radius:8px;border:1px solid #274055;background:#13283a;display:grid;place-items:center" style-hover="border-color:#33a1e0"><i class="ph ph-download-simple" style="font-size:17px"></i></button>
+<button title="Invite member" aria-label="Invite member" style="all:unset;cursor:pointer;width:38px;height:38px;border-radius:8px;background:#33a1e0;color:#0c1a26;display:grid;place-items:center" style-hover="background:#5ab4e8"><i class="ph ph-user-plus" style="font-size:18px"></i></button>
+</div>
+</div>
+<div style="display:flex;gap:8px;align-items:center;position:relative">
+<div style="flex:1;min-width:0;position:relative;display:flex;align-items:center"><i class="ph ph-magnifying-glass" style="position:absolute;left:12px;color:#8aa1b5"></i><input placeholder="Search members…" style="all:unset;box-sizing:border-box;width:100%;height:38px;padding:0 12px 0 34px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:14px;color:#e8f0f7"></div>
+<div style="display:flex;padding:3px;gap:2px;border:1px solid #274055;border-radius:8px;background:#13283a">
+<sc-for list="{{ seg2 }}" as="s" hint-placeholder-count="5">
+<sc-if value="{{ s.active }}"><button onClick="{{ s.pick }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;background:#33a1e0;color:#0c1a26">{{ s.label }}</button></sc-if>
+<sc-if value="{{ s.inactive }}"><button onClick="{{ s.pick }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:6px 12px;border-radius:6px;font-size:13px;color:#8aa1b5" style-hover="color:#e8f0f7;background:#1a3349">{{ s.label }}</button></sc-if>
+</sc-for>
+</div>
+<button onClick="{{ toggleFilters2 }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:6px;align-items:center;height:38px;box-sizing:border-box;padding:0 14px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:13.5px;font-weight:600" style-hover="border-color:#33a1e0"><i class="ph ph-funnel-simple"></i>Filters<span style="min-width:18px;height:18px;border-radius:9px;background:#33a1e0;color:#0c1a26;font-size:11px;font-weight:700;display:grid;place-items:center">2</span></button>
+<button onClick="{{ togglePanel2 }}" title="{{ panelTitle2 }}" aria-label="{{ panelTitle2 }}" aria-pressed="{{ panelOpen2 }}" style="all:unset;cursor:pointer;position:relative;width:38px;height:38px;box-sizing:border-box;border-radius:8px;border:1px solid {{ panelBorder2 }};background:{{ panelBg2 }};display:grid;place-items:center;color:{{ panelColor2 }}" style-hover="border-color:#33a1e0"><i class="ph ph-sidebar-simple" style="font-size:18px;transform:scaleX(-1)"></i><sc-if value="{{ panelBadge2 }}"><span style="position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:10px;font-weight:700;display:grid;place-items:center;box-shadow:0 0 0 2px #0c1a26">{{ reqCount2 }}</span></sc-if></button>
+<sc-if value="{{ filtersOpen2 }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;right:0;top:calc(100% + 6px);z-index:40;width:460px;background:#13283a;border:1px solid #274055;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.28);padding:16px;display:flex;flex-direction:column;gap:14px">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<sc-for list="{{ fsel2 }}" as="f">
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">{{ f.label }}</span><select style="height:36px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26;color:#e8f0f7;font-size:13.5px"><option>{{ f.value }}</option></select></label>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:9px;font-size:13.5px">
+<label style="display:flex;gap:9px;align-items:center"><input type="checkbox" checked style="accent-color:#33a1e0;width:16px;height:16px">No phone</label>
+<label style="display:flex;gap:9px;align-items:center"><input type="checkbox" style="accent-color:#33a1e0;width:16px;height:16px">No emergency contact</label>
+<label style="display:flex;gap:9px;align-items:center"><input type="checkbox" style="accent-color:#33a1e0;width:16px;height:16px">Include deactivated accounts</label>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center"><button style="all:unset;cursor:pointer;font-size:13px;color:#33a1e0">Clear all</button><button onClick="{{ toggleFilters2 }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:8px 14px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:13.5px;font-weight:700">Show 2 members</button></div>
+</div>
+</sc-if>
+</div>
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+<span style="display:flex;gap:6px;align-items:center;white-space:nowrap;padding:3px 6px 3px 10px;border-radius:999px;border:1px solid color-mix(in srgb,#33a1e0 45%,transparent);background:color-mix(in srgb,#33a1e0 12%,transparent);font-size:12.5px;color:#cfe8f7"><span style="color:#8aa1b5">AUF</span>Expired<i class="ph ph-x" style="cursor:pointer;font-size:11px;padding:2px"></i></span>
+<span style="display:flex;gap:6px;align-items:center;white-space:nowrap;padding:3px 6px 3px 10px;border-radius:999px;border:1px solid color-mix(in srgb,#33a1e0 45%,transparent);background:color-mix(in srgb,#33a1e0 12%,transparent);font-size:12.5px;color:#cfe8f7">No phone<i class="ph ph-x" style="cursor:pointer;font-size:11px;padding:2px"></i></span>
+<button onClick="{{ clearAll2 }}" style="all:unset;cursor:pointer;font-size:12.5px;color:#33a1e0;margin-left:4px">Clear</button>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:{{ cols2 }};flex:1;transition:grid-template-columns .2s">
+<div style="display:flex;flex-direction:column;border-right:1px solid #274055;min-width:0">
+<sc-if value="{{ hasChk2 }}">
+<div style="display:flex;gap:4px;align-items:center;padding:6px 12px 6px 20px;background:color-mix(in srgb,#33a1e0 12%,#0c1a26);border-bottom:1px solid color-mix(in srgb,#33a1e0 45%,transparent);position:relative;z-index:6">
+<span style="flex:1;font-size:13.5px;font-weight:600;color:#cfe8f7">{{ chkCount2 }} selected</span>
+<button title="Email selected" aria-label="Email selected" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:6px;display:grid;place-items:center;color:#e8f0f7" style-hover="background:#1a3349"><i class="ph ph-envelope-simple" style="font-size:17px"></i></button><button title="Export selected" aria-label="Export selected" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:6px;display:grid;place-items:center;color:#e8f0f7" style-hover="background:#1a3349"><i class="ph ph-download-simple" style="font-size:17px"></i></button>
+<button onClick="{{ toggleBulkMenu2 }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:6px;align-items:center;height:32px;padding:0 10px;border-radius:6px;font-size:13px;font-weight:600" style-hover="background:#1a3349"><i class="ph ph-user-switch" style="font-size:16px"></i>Change role<i class="ph ph-caret-down" style="font-size:11px"></i></button>
+<button onClick="{{ clearChk2 }}" title="Clear selection" aria-label="Clear selection" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:6px;display:grid;place-items:center;color:#e8f0f7" style-hover="background:#1a3349"><i class="ph ph-x" style="font-size:17px"></i></button>
+<sc-if value="{{ bulkMenu2 }}"><div style="position:absolute;right:44px;top:calc(100% + 4px);z-index:30;width:170px;background:#13283a;border:1px solid #274055;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.28);padding:4px;display:flex;flex-direction:column"><sc-for list="{{ bulkOpts2 }}" as="r"><button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;padding:8px 10px;border-radius:6px;font-size:13.5px" style-hover="background:#1a3349">{{ r.label }}</button></sc-for></div></sc-if>
+</div>
+<sc-if value="{{ bulkDirty2 }}"><div style="display:flex;gap:8px;align-items:center;padding:8px 12px 8px 20px;background:color-mix(in srgb,#f2ce78 9%,#0c1a26);border-bottom:1px solid color-mix(in srgb,#f2ce78 35%,transparent)"><span style="flex:1;font-size:13px;color:#f2ce78">{{ bulkMsg2 }}</span><button onClick="{{ bulkCancel2 }}" style="all:unset;cursor:pointer;padding:0 12px;height:30px;line-height:30px;border-radius:6px;font-size:13px;color:#cfdeea" style-hover="background:#1a3349">Cancel</button><button onClick="{{ bulkSave2 }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:0 14px;height:30px;line-height:30px;border-radius:6px;font-size:13px;font-weight:700;background:#33a1e0;color:#0c1a26">Change roles</button></div></sc-if>
+</sc-if>
+<div style="display:grid;grid-template-columns:28px minmax(0,1fr) 96px 86px 64px;gap:12px;padding:9px 20px;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5;border-bottom:1px solid #274055"><button onClick="{{ toggleAll2 }}" aria-label="Select all" style="all:unset;cursor:pointer;display:grid;place-items:center"><i class="{{ allIcon2 }}" style="font-size:18px;color:{{ allColor2 }}"></i></button><sc-for list="{{ heads2 }}" as="h"><button onClick="{{ h.sort }}" style="all:unset;cursor:pointer;display:flex;gap:4px;justify-content:{{ h.just }};color:{{ h.color }}" style-hover="color:#e8f0f7">{{ h.label }}<span style="color:#33a1e0">{{ h.arrow }}</span></button></sc-for></div>
+<sc-for list="{{ rows2 }}" as="m" hint-placeholder-count="8">
+<div onClick="{{ m.select2 }}" style="cursor:pointer;display:grid;grid-template-columns:28px minmax(0,1fr) 96px 86px 64px;gap:12px;align-items:center;padding:8px 20px;font-size:13.5px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent);background:{{ m.bg2 }};box-shadow:{{ m.bar2 }}" style-hover="background:#13283a">
+<button onClick="{{ m.check2 }}" aria-label="Select {{ m.name }}" style="all:unset;cursor:pointer;display:grid;place-items:center;height:32px"><i class="{{ m.checkIcon2 }}" style="font-size:18px;color:{{ m.checkColor2 }}"></i></button>
+<span style="display:flex;gap:10px;align-items:center;min-width:0">
+<span style="flex:none;width:32px;height:32px;border-radius:50%;background:#1d4869;color:#cfdeea;display:grid;place-items:center;font-size:11.5px;font-weight:700">{{ m.ini }}</span>
+<span style="display:flex;flex-direction:column;min-width:0"><span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;gap:6px;align-items:center">{{ m.name }}<sc-if value="{{ m.invited }}"><span style="flex:none;padding:0 7px;border-radius:999px;font:11px ui-monospace,Menlo,monospace;color:#8aa1b5;border:1px dashed #5a7086">Invited</span></sc-if><sc-for list="{{ m.warnDanger }}" as="w"><span title="{{ w }}" style="flex:none;width:7px;height:7px;border-radius:50%;background:#f2887a"></span></sc-for><sc-for list="{{ m.warnWarn }}" as="w"><span title="{{ w }}" style="flex:none;width:7px;height:7px;border-radius:50%;background:#f2ce78"></span></sc-for></span><span style="font-size:12px;color:#8aa1b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.meta }}</span></span>
+</span>
+<span style="display:flex;flex-direction:column;gap:2px;color:#cfdeea">{{ m.role }}<sc-if value="{{ m.hasReq }}"><span style="align-self:flex-start;white-space:nowrap;display:flex;gap:3px;align-items:center;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;color:#cfe8f7;background:color-mix(in srgb,#33a1e0 16%,transparent)"><i class="ph ph-arrow-right" style="font-size:10px"></i>{{ m.reqRole }}</span></sc-if></span>
+<span style="color:#8aa1b5">{{ m.pos }}</span>
+<span style="font:12.5px ui-monospace,Menlo,monospace;color:#cfdeea;text-align:right">{{ m.attLabel }}</span>
+</div>
+</sc-for>
+<sc-if value="{{ empty2 }}"><div style="display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:40px 20px 40px 60px"><i class="ph ph-magnifying-glass" style="font-size:28px;color:#5a7086"></i><span style="font-size:15px;font-weight:600">No members match these filters</span><span style="font-size:13px;color:#8aa1b5">{{ emptyWhy2 }}</span><button onClick="{{ clearAll2 }}" style="all:unset;cursor:pointer;margin-top:6px;padding:7px 14px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:13px;font-weight:600" style-hover="border-color:#33a1e0">Clear filters</button></div></sc-if>
+<div style="padding:10px 20px;font-size:12px;color:#8aa1b5;display:flex;gap:14px"><span style="display:flex;gap:6px;align-items:center"><span style="width:7px;height:7px;border-radius:50%;background:#f2887a"></span>Needs action</span><span style="display:flex;gap:6px;align-items:center"><span style="width:7px;height:7px;border-radius:50%;background:#f2ce78"></span>Check soon</span></div>
+</div>
+<div style="padding:20px;display:{{ panelDisp2 }};flex-direction:column;gap:18px;background:#13283a;border-radius:0 0 10px 0">
+<sc-if value="{{ noSel2 }}">
+<div style="display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;gap:8px;align-items:flex-start"><div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font-weight:700;font-size:17px">Club overview</span><span style="font-size:13px;color:#8aa1b5;text-wrap:pretty">Select a member to see their details or change their role.</span></div><button onClick="{{ togglePanel2 }}" title="Hide panel" aria-label="Hide panel" style="all:unset;cursor:pointer;width:30px;height:30px;border-radius:6px;display:grid;place-items:center;color:#8aa1b5" style-hover="background:#1a3349;color:#e8f0f7"><i class="ph ph-caret-double-right"></i></button></div>
+<sc-if value="{{ notice2 }}"><div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;font-size:13px;color:#6fd6b4;background:color-mix(in srgb,#6fd6b4 10%,transparent);border:1px solid color-mix(in srgb,#6fd6b4 35%,transparent)"><i class="ph ph-check-circle"></i><span style="flex:1">{{ notice2 }}</span></div></sc-if>
+<sc-if value="{{ hasReqs2 }}">
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">ROLE REQUESTS · {{ reqCount2 }}</span>
+<sc-for list="{{ reqs2 }}" as="q">
+<div style="display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:8px;border:1px solid color-mix(in srgb,#33a1e0 45%,transparent);background:color-mix(in srgb,#33a1e0 8%,#0c1a26)">
+<div style="display:flex;gap:10px;align-items:center"><span style="flex:none;width:32px;height:32px;border-radius:50%;background:#1d4869;color:#cfdeea;display:grid;place-items:center;font-size:11.5px;font-weight:700">{{ q.ini }}</span><div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1"><a href="#2a" onClick="{{ q.view }}" style="font-size:13.5px;font-weight:600;color:#e8f0f7;text-decoration:none">{{ q.name }}</a><span style="font-size:12px;color:#8aa1b5;display:flex;gap:5px;align-items:center">{{ q.from }}<i class="ph ph-arrow-right" style="font-size:11px"></i><span style="color:#e8f0f7;font-weight:600">{{ q.role }}</span>· {{ q.date }}</span></div></div>
+<p style="margin:0;font-size:13px;line-height:1.45;color:#cfdeea;text-wrap:pretty">“{{ q.note }}”</p>
+<div style="display:flex;gap:8px"><button onClick="{{ q.approve }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:32px;line-height:32px;border-radius:6px;font-size:13px;font-weight:700;background:#33a1e0;color:#0c1a26" style-hover="background:#5ab4e8">Approve</button><button onClick="{{ q.reject }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:30px;line-height:30px;border-radius:6px;font-size:13px;font-weight:600;border:1px solid #274055;background:#13283a" style-hover="border-color:#f2887a;color:#f2887a">Reject</button></div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<div style="display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:8px;border:1px solid color-mix(in srgb,#f2ce78 35%,transparent);background:color-mix(in srgb,#f2ce78 6%,#0c1a26)">
+<div style="display:flex;gap:10px;align-items:flex-start"><i class="ph ph-identification-badge" style="font-size:20px;color:#f2ce78"></i><div style="display:flex;flex-direction:column;gap:3px;flex:1"><span style="font-size:13.5px;font-weight:600">2 AUF registrations need renewal</span><span style="font-size:12.5px;color:#8aa1b5;line-height:1.45">Sam O’Neill expired · Priya Nair expires in 26 days</span></div></div>
+<sc-if value="{{ aufNotSent2 }}"><div style="display:flex;gap:8px"><button onClick="{{ sendAuf2 }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:32px;line-height:30px;box-sizing:border-box;border-radius:6px;font-size:13px;font-weight:600;border:1px solid color-mix(in srgb,#f2ce78 55%,transparent);color:#f2ce78" style-hover="background:color-mix(in srgb,#f2ce78 12%,transparent)">Send reminder</button><button onClick="{{ viewAuf2 }}" style="all:unset;cursor:pointer;padding:0 12px;height:32px;line-height:32px;border-radius:6px;font-size:13px;color:#cfdeea" style-hover="background:#1a3349">View</button></div></sc-if>
+<sc-if value="{{ aufSent2 }}"><span style="font-size:12.5px;color:#6fd6b4;display:flex;gap:6px;align-items:center"><i class="ph ph-check-circle"></i>Reminder sent to 2 members · today</span></sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">NEEDS ATTENTION</span>
+<sc-for list="{{ attn2 }}" as="a">
+<button onClick="{{ a.toggle }}" style="all:unset;cursor:pointer;display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:8px;border:1px solid {{ a.border }};background:{{ a.bg }};font-size:13.5px" style-hover="border-color:#33a1e0"><span style="width:8px;height:8px;border-radius:50%;background:{{ a.color }}"></span><span style="flex:1">{{ a.label }}</span><span style="font:600 13px ui-monospace,Menlo,monospace">{{ a.count }}</span></button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ hasSel2 }}">
+<div style="display:flex;gap:12px;align-items:center">
+<span style="flex:none;width:52px;height:52px;border-radius:50%;background:#1d4869;color:#e8f0f7;display:grid;place-items:center;font-size:16px;font-weight:700">{{ d2.ini }}</span>
+<div style="display:flex;flex-direction:column;gap:3px;min-width:0;flex:1"><a href="#2a" style="font-weight:700;font-size:17px;color:#e8f0f7">{{ d2.name }}</a><span style="font-size:12.5px;color:#8aa1b5">{{ d2.meta }}</span></div>
+<button onClick="{{ clearSel2 }}" title="Close" aria-label="Close" style="all:unset;cursor:pointer;align-self:flex-start;width:30px;height:30px;border-radius:6px;display:grid;place-items:center;color:#8aa1b5" style-hover="background:#1a3349;color:#e8f0f7"><i class="ph ph-x"></i></button>
+</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap">
+<sc-for list="{{ d2.warnDanger }}" as="f"><span style="white-space:nowrap;padding:2px 8px;border-radius:999px;font:11.5px ui-monospace,Menlo,monospace;color:#f2887a;background:color-mix(in srgb,#f2887a 14%,transparent);border:1px solid color-mix(in srgb,#f2887a 40%,transparent)">{{ f }}</span></sc-for>
+<sc-for list="{{ d2.warnWarn }}" as="f"><span style="white-space:nowrap;padding:2px 8px;border-radius:999px;font:11.5px ui-monospace,Menlo,monospace;color:#f2ce78;background:color-mix(in srgb,#f2ce78 12%,transparent);border:1px solid color-mix(in srgb,#f2ce78 40%,transparent)">{{ f }}</span></sc-for>
+<sc-for list="{{ d2.info }}" as="f"><span style="white-space:nowrap;padding:2px 8px;border-radius:999px;font:11.5px ui-monospace,Menlo,monospace;color:#8aa1b5;border:1px solid #274055">{{ f }}</span></sc-for>
+</div>
+<sc-if value="{{ d2.invited }}"><div style="display:flex;flex-direction:column;gap:9px;padding:12px;border-radius:8px;border:1px dashed #5a7086;background:#0c1a26"><span style="font-size:13px;display:flex;gap:6px;align-items:center"><i class="ph ph-paper-plane-tilt" style="color:#8aa1b5"></i>Invitation sent {{ d2.invitedOn }} · not accepted yet</span><sc-if value="{{ resendable2 }}"><button onClick="{{ resend2 }}" style="all:unset;cursor:pointer;text-align:center;height:32px;line-height:30px;box-sizing:border-box;border-radius:6px;font-size:13px;font-weight:600;border:1px solid #274055;background:#13283a" style-hover="border-color:#33a1e0">Resend invitation</button></sc-if><sc-if value="{{ resent2 }}"><span style="font-size:12.5px;color:#6fd6b4;display:flex;gap:6px;align-items:center"><i class="ph ph-check-circle"></i>Sent again to {{ d2.email }}</span></sc-if></div></sc-if>
+<sc-if value="{{ d2.hasReq }}"><div style="display:flex;flex-direction:column;gap:9px;padding:12px;border-radius:8px;border:1px solid color-mix(in srgb,#33a1e0 45%,transparent);background:color-mix(in srgb,#33a1e0 8%,#0c1a26)"><span style="font-size:13px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><i class="ph ph-hand" style="color:#33a1e0"></i>Asked to be <strong>{{ d2.reqRole }}</strong><span style="color:#8aa1b5">· {{ d2.reqDate }}</span></span><p style="margin:0;font-size:13px;line-height:1.45;color:#cfdeea">“{{ d2.reqNote }}”</p><div style="display:flex;gap:8px"><button onClick="{{ d2.approve }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:32px;line-height:32px;border-radius:6px;font-size:13px;font-weight:700;background:#33a1e0;color:#0c1a26" style-hover="background:#5ab4e8">Approve</button><button onClick="{{ d2.reject }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:30px;line-height:30px;border-radius:6px;font-size:13px;font-weight:600;border:1px solid #274055;background:#13283a" style-hover="border-color:#f2887a;color:#f2887a">Reject</button></div></div></sc-if>
+<div style="display:flex;flex-direction:column;gap:7px">
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">ROLE</span>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);padding:3px;gap:2px;border:1px solid #274055;border-radius:8px;background:#0c1a26">
+<sc-for list="{{ d2.roleOpts }}" as="r">
+<sc-if value="{{ r.active }}"><button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;text-align:center;padding:6px 0;border-radius:6px;font-size:12.5px;font-weight:700;background:#33a1e0;color:#0c1a26">{{ r.label }}</button></sc-if>
+<sc-if value="{{ r.inactive }}"><button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;text-align:center;padding:6px 0;border-radius:6px;font-size:12.5px;color:#8aa1b5" style-hover="color:#e8f0f7;background:#1a3349">{{ r.label }}</button></sc-if>
+</sc-for>
+</div>
+<sc-if value="{{ d2.dirty }}"><div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,#f2ce78 10%,transparent);border:1px solid color-mix(in srgb,#f2ce78 35%,transparent)"><span style="flex:1;font-size:12.5px;color:#f2ce78">{{ d2.fromRole }} → {{ d2.toRole }}</span><button onClick="{{ d2.cancel }}" style="all:unset;cursor:pointer;padding:0 12px;height:30px;line-height:30px;border-radius:6px;font-size:13px;color:#cfdeea" style-hover="background:#1a3349">Cancel</button><button onClick="{{ d2.save }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:0 14px;height:30px;line-height:30px;border-radius:6px;font-size:13px;font-weight:700;background:#33a1e0;color:#0c1a26">Save role</button></div></sc-if>
+<sc-if value="{{ d2.justSaved }}"><span style="font-size:12px;color:#6fd6b4;display:flex;gap:5px;align-items:center"><i class="ph ph-check"></i>Role saved</span></sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:9px;font-size:13.5px">
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">CONTACT</span>
+<sc-for list="{{ d2.contacts }}" as="c">
+<sc-if value="{{ c.has }}"><div style="display:flex;gap:10px;align-items:center"><i class="{{ c.icon }}" style="color:#8aa1b5"></i><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.value }}</span><i class="ph ph-copy" style="color:#8aa1b5;cursor:pointer"></i></div></sc-if>
+<sc-if value="{{ c.missing }}"><div style="display:flex;gap:10px;align-items:center;color:#f2ce78"><i class="{{ c.icon }}"></i><span style="flex:1">{{ c.value }}</span><a href="#2a" style="font-size:12.5px;color:#33a1e0">Add</a></div></sc-if>
+</sc-for>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:13.5px">
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">ATTENDANCE</span><span style="font-weight:700;font-size:20px">{{ d2.attLabel }}</span></div>
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">POSITION</span><span>{{ d2.pos }}</span></div>
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">AUF</span><span>{{ d2.auf }}</span></div>
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">MEMBERSHIP</span><span>{{ d2.memb }}</span></div>
+</div>
+<button style="all:unset;cursor:pointer;text-align:center;padding:9px 0;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:13.5px;font-weight:600" style-hover="border-color:#33a1e0">Open full record</button>
+</sc-if>
+</div>
+</div>
+</div>
+</div>
+<ul class="dv-notes">
+<li>Filtros de <a class="dv-oid" href="#1a">1a</a>: búsqueda, roles en una barra segmentada, "Filters" con conteo y el resto en un popover. Los activos quedan como chips.</li>
+<li>Lista de <a class="dv-oid" href="#1b">1b</a>: 4 columnas que se escanean rápido. Los puntos rojo y amarillo reemplazan las etiquetas de AUF y pago en la fila.</li>
+<li>Cambiar el rol ahora pide confirmación: elegís el nuevo, aparece "Player → Coach" y recién se guarda con "Save role".</li>
+<li>Solicitudes de rol: aviso arriba del título, tarjetas con Approve/Reject en el resumen, una marca "→ Coach" en la fila y el mismo aviso dentro del panel de esa persona.</li>
+<li>El ícono de panel junto a Filters lo abre y lo cierra; cerrado, la lista usa todo el ancho y el ícono muestra cuántas solicitudes hay. Elegir a alguien lo vuelve a abrir.</li>
+<li>Selección múltiple: checkboxes (y "todos" en la cabecera). Aparece una barra con Email, Export y Change role, que también pide confirmación.</li>
+<li>Las cabeceras ordenan (click de nuevo invierte). En celular: "Sort" abre una hoja.</li>
+<li>Celular: deslizá una fila a la izquierda para Email / Call / Emergency (gris si falta el dato). Mateo ya está deslizado de ejemplo.</li>
+<li>Resumen: aviso de AUF por renovar con "Send reminder". Alex Kim muestra una invitación pendiente con "Resend". Probá Committee + "Membership past due" para ver el estado vacío.</li>
+<li>Para deseleccionar: X del panel, click de nuevo en la fila seleccionada, o Esc.</li>
+<li>Sin nadie seleccionado, el panel muestra un resumen del club: qué falta resolver Cada número filtra la lista.</li>
+</ul>
+</div>
+
+<div class="dv-opt" id="2b">
+<div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Celular — lista · solicitudes (desde "Review") · hoja de miembro</div>
+<div style="display:flex;gap:24px">
+<div class="dv-card" style="width:390px;height:780px;overflow:hidden;border-radius:28px;background:#0c1a26;border-color:#274055;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#e8f0f7;display:flex;flex-direction:column;position:relative">
+<sc-if value="{{ sortSheet2 }}">
+<div onClick="{{ toggleSort2 }}" style="position:absolute;inset:0;z-index:10;background:color-mix(in srgb,#0c1a26 60%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;z-index:11;background:#13283a;border-top:1px solid #274055;border-radius:20px 20px 0 0;padding:10px 14px 22px;display:flex;flex-direction:column;gap:2px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#274055;margin-bottom:8px"></span>
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5;padding:0 8px 6px">SORT BY</span>
+<sc-for list="{{ sortOpts2 }}" as="o"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;min-height:50px;padding:0 8px;border-radius:8px;font-size:15px;font-weight:{{ o.weight }};color:{{ o.color }}" style-hover="background:#1a3349"><span style="flex:1">{{ o.label }}</span><span style="font-size:13px">{{ o.dir }}</span></button></sc-for>
+<span style="font-size:12px;color:#8aa1b5;padding:6px 8px 0">Tap the active option again to flip the order.</span>
+</div>
+</sc-if>
+<sc-if value="{{ mobMenu2 }}">
+<div onClick="{{ toggleMob2 }}" style="position:absolute;inset:0;z-index:10;background:color-mix(in srgb,#0c1a26 60%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;z-index:11;background:#13283a;border-top:1px solid #274055;border-radius:20px 20px 0 0;padding:10px 14px 22px;display:flex;flex-direction:column;gap:4px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#274055;margin-bottom:8px"></span>
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5;padding:0 6px 6px">{{ shown2 }} MEMBERS IN THIS VIEW</span>
+<button onClick="{{ toggleMob2 }}" style="all:unset;cursor:pointer;display:flex;gap:14px;align-items:center;min-height:56px;padding:0 6px;border-radius:8px" style-hover="background:#1a3349"><span style="width:40px;height:40px;border-radius:50%;border:1px solid #274055;display:grid;place-items:center"><i class="ph ph-envelope-simple" style="font-size:19px"></i></span><span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600">Email these members</span><span style="font-size:12.5px;color:#8aa1b5">Each one gets their own copy · 50/day</span></span></button>
+<button onClick="{{ toggleMob2 }}" style="all:unset;cursor:pointer;display:flex;gap:14px;align-items:center;min-height:56px;padding:0 6px;border-radius:8px" style-hover="background:#1a3349"><span style="width:40px;height:40px;border-radius:50%;border:1px solid #274055;display:grid;place-items:center"><i class="ph ph-download-simple" style="font-size:19px"></i></span><span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600">Export CSV</span><span style="font-size:12.5px;color:#8aa1b5">Only the columns your role can see</span></span></button>
+<button onClick="{{ toggleMob2 }}" style="all:unset;cursor:pointer;text-align:center;height:46px;line-height:44px;box-sizing:border-box;margin-top:8px;border-radius:8px;border:1px solid #274055;font-weight:600">Cancel</button>
+</div>
+</sc-if>
+<div style="padding:18px 16px 10px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;justify-content:space-between;align-items:center"><h1 style="margin:0;font:700 26px/1.1 system-ui,-apple-system,sans-serif">Directory</h1><div style="display:flex;gap:6px"><button onClick="{{ toggleMob2 }}" aria-label="More actions" style="all:unset;cursor:pointer;width:44px;height:44px;box-sizing:border-box;border-radius:8px;border:1px solid #274055;background:#13283a;display:grid;place-items:center"><i class="ph ph-dots-three-vertical"></i></button><button style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:8px;background:#33a1e0;color:#0c1a26;display:grid;place-items:center"><i class="ph ph-user-plus" style="font-size:18px"></i></button></div></div>
+<div style="display:flex;gap:8px"><div style="flex:1;position:relative;display:flex;align-items:center"><i class="ph ph-magnifying-glass" style="position:absolute;left:12px;color:#8aa1b5"></i><input placeholder="Search members" style="all:unset;box-sizing:border-box;width:100%;height:44px;padding:0 12px 0 36px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:15px"></div><button style="all:unset;cursor:pointer;white-space:nowrap;height:44px;box-sizing:border-box;padding:0 14px;border-radius:8px;border:1px solid #274055;background:#13283a;display:flex;gap:6px;align-items:center;font-weight:600"><i class="ph ph-funnel-simple"></i><span style="min-width:18px;height:18px;border-radius:9px;background:#33a1e0;color:#0c1a26;font-size:11px;font-weight:700;display:grid;place-items:center">2</span></button></div>
+<div style="display:flex;gap:5px;overflow-x:auto;scrollbar-width:none">
+<sc-for list="{{ seg2 }}" as="s">
+<sc-if value="{{ s.active }}"><button onClick="{{ s.pick }}" style="all:unset;cursor:pointer;flex:none;padding:9px 12px;border-radius:999px;font-size:13.5px;font-weight:600;background:#33a1e0;color:#0c1a26">{{ s.label }}</button></sc-if>
+<sc-if value="{{ s.inactive }}"><button onClick="{{ s.pick }}" style="all:unset;cursor:pointer;flex:none;padding:9px 12px;border-radius:999px;font-size:13.5px;border:1px solid #274055;color:#8aa1b5">{{ s.label }}</button></sc-if>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:-2px"><span style="font-size:13px;color:#8aa1b5">{{ shown2 }} members · swipe ← for actions</span><button onClick="{{ toggleSort2 }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;height:36px;padding:0 4px 0 8px;font-size:13.5px;font-weight:600;color:#33a1e0"><i class="ph ph-sort-ascending" style="font-size:16px"></i>{{ sortLabel2 }}</button></div>
+</div>
+<sc-if value="{{ hasReqs2 }}"><button onClick="{{ openFirstReq }}" style="all:unset;cursor:pointer;margin:0 16px 8px;display:flex;gap:10px;align-items:center;min-height:48px;padding:0 14px;border-radius:8px;font-size:14px;font-weight:600;color:#cfe8f7;background:color-mix(in srgb,#33a1e0 12%,transparent);border:1px solid color-mix(in srgb,#33a1e0 45%,transparent)"><span style="width:8px;height:8px;border-radius:50%;background:#33a1e0"></span><span style="flex:1">{{ reqLabel2 }}</span><span style="color:#33a1e0">Review</span></button></sc-if>
+<div style="flex:1;overflow:hidden">
+<sc-for list="{{ rows2 }}" as="m" hint-placeholder-count="8">
+<div style="position:relative;overflow:hidden;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent)">
+<div style="position:absolute;top:0;bottom:0;right:0;display:flex">
+<sc-for list="{{ m.swActs }}" as="c"><button title="{{ c.title }}" aria-label="{{ c.title }}" style="all:unset;cursor:pointer;width:60px;display:grid;place-items:center;background:{{ c.bg }};color:{{ c.color }}"><i class="{{ c.icon }}" style="font-size:21px"></i></button></sc-for>
+</div>
+<div onClick="{{ m.tapM }}" onPointerDown="{{ m.pd }}" onPointerUp="{{ m.pu }}" style="cursor:pointer;position:relative;touch-action:pan-y;user-select:none;background:#0c1a26;transform:translateX({{ m.swX }});transition:transform .22s ease;display:flex;gap:12px;align-items:center;padding:10px 16px;min-height:44px">
+<span style="flex:none;width:40px;height:40px;border-radius:50%;background:#1d4869;color:#cfdeea;display:grid;place-items:center;font-size:12px;font-weight:700">{{ m.ini }}</span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600;display:flex;gap:6px;align-items:center">{{ m.name }}<sc-for list="{{ m.warnDanger }}" as="w"><span style="width:7px;height:7px;border-radius:50%;background:#f2887a"></span></sc-for><sc-for list="{{ m.warnWarn }}" as="w"><span style="width:7px;height:7px;border-radius:50%;background:#f2ce78"></span></sc-for></span><span style="font-size:13px;color:#8aa1b5">{{ m.sub }}</span></span>
+<span style="font:13px ui-monospace,Menlo,monospace;color:#cfdeea">{{ m.attLabel }}</span>
+<i class="ph ph-caret-right" style="color:#5a7086"></i>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+<div class="dv-card" style="width:390px;height:780px;overflow:hidden;border-radius:28px;background:#0c1a26;border-color:#274055;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#e8f0f7;display:flex;flex-direction:column">
+<div style="padding:14px 8px 10px;display:flex;align-items:center;gap:4px;border-bottom:1px solid #274055">
+<button aria-label="Back to directory" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:8px;display:grid;place-items:center"><i class="ph ph-arrow-left" style="font-size:20px"></i></button>
+<div style="display:flex;flex-direction:column;gap:1px"><span style="font-weight:700;font-size:18px">Role requests</span><span style="font-size:12.5px;color:#8aa1b5">{{ reqLabel2 }}</span></div>
+</div>
+<div style="flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+<sc-if value="{{ notice2 }}"><div style="display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:8px;font-size:14px;color:#6fd6b4;background:color-mix(in srgb,#6fd6b4 10%,transparent);border:1px solid color-mix(in srgb,#6fd6b4 35%,transparent)"><i class="ph ph-check-circle"></i><span style="flex:1">{{ notice2 }}</span></div></sc-if>
+<sc-for list="{{ reqs2 }}" as="q">
+<div style="display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:10px;border:1px solid #274055;background:#13283a">
+<div style="display:flex;gap:12px;align-items:center"><span style="flex:none;width:44px;height:44px;border-radius:50%;background:#1d4869;color:#cfdeea;display:grid;place-items:center;font-size:13px;font-weight:700">{{ q.ini }}</span><div style="display:flex;flex-direction:column;gap:3px;min-width:0;flex:1"><span style="font-size:15.5px;font-weight:600">{{ q.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ q.date }}</span></div><i class="ph ph-caret-right" style="color:#5a7086"></i></div>
+<div style="display:flex;gap:8px;align-items:center;font-size:14px"><span style="padding:4px 10px;border-radius:999px;border:1px solid #274055;color:#8aa1b5">{{ q.from }}</span><i class="ph ph-arrow-right" style="color:#33a1e0"></i><span style="padding:4px 10px;border-radius:999px;font-weight:700;color:#0c1a26;background:#33a1e0">{{ q.role }}</span></div>
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">REASON</span><p style="margin:0;font-size:14px;line-height:1.45;color:#cfdeea;text-wrap:pretty">{{ q.note }}</p></div>
+<div style="display:flex;gap:8px"><button onClick="{{ q.reject }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:44px;line-height:42px;box-sizing:border-box;border-radius:8px;font-size:14.5px;font-weight:600;border:1px solid #274055;background:#0c1a26">Reject</button><button onClick="{{ q.approve }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:44px;line-height:44px;border-radius:8px;font-size:14.5px;font-weight:700;background:#33a1e0;color:#0c1a26">Approve</button></div>
+</div>
+</sc-for>
+<sc-if value="{{ noReqs2 }}"><div style="display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center;padding:60px 20px;color:#8aa1b5"><i class="ph ph-check-circle" style="font-size:36px;color:#6fd6b4"></i><span style="font-size:16px;font-weight:600;color:#e8f0f7">All caught up</span><span style="font-size:13.5px">No requests are waiting for an answer.</span><a href="#2b" onClick="{{ resetReqs2 }}" style="font-size:13px;color:#33a1e0;margin-top:8px">Reset demo</a></div></sc-if>
+</div>
+</div>
+<div class="dv-card" style="width:390px;height:780px;overflow:hidden;border-radius:28px;background:#0c1a26;border-color:#274055;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#e8f0f7;position:relative">
+<div style="position:absolute;inset:0;padding:18px 16px;opacity:.3;display:flex;flex-direction:column;gap:10px"><h1 style="margin:0;font:700 26px system-ui,sans-serif">Directory</h1><sc-for list="{{ rows2 }}" as="m"><div style="display:flex;gap:12px;align-items:center;padding:6px 0"><span style="width:40px;height:40px;border-radius:50%;background:#1d4869"></span><span>{{ m.name }}</span></div></sc-for></div>
+<div style="position:absolute;inset:0;background:color-mix(in srgb,#0c1a26 55%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#13283a;border-top:1px solid #274055;border-radius:20px 20px 0 0;padding:10px 18px 24px;display:flex;flex-direction:column;gap:16px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#274055"></span>
+<div style="display:flex;gap:12px;align-items:center"><span style="width:54px;height:54px;border-radius:50%;background:#1d4869;display:grid;place-items:center;font-size:16px;font-weight:700">{{ dm2.ini }}</span><div style="display:flex;flex-direction:column;gap:3px"><span style="font-weight:700;font-size:18px">{{ dm2.name }}</span><span style="font-size:13px;color:#8aa1b5">{{ dm2.meta }}</span></div></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ dm2.warnDanger }}" as="f"><span style="padding:3px 9px;border-radius:999px;font:12px ui-monospace,Menlo,monospace;color:#f2887a;border:1px solid color-mix(in srgb,#f2887a 40%,transparent)">{{ f }}</span></sc-for><sc-for list="{{ dm2.warnWarn }}" as="f"><span style="padding:3px 9px;border-radius:999px;font:12px ui-monospace,Menlo,monospace;color:#f2ce78;border:1px solid color-mix(in srgb,#f2ce78 40%,transparent)">{{ f }}</span></sc-for><sc-for list="{{ dm2.info }}" as="f"><span style="padding:3px 9px;border-radius:999px;font:12px ui-monospace,Menlo,monospace;color:#8aa1b5;border:1px solid #274055">{{ f }}</span></sc-for></div>
+<div style="display:flex;gap:10px">
+<sc-for list="{{ dm2.contacts }}" as="c">
+<sc-if value="{{ c.has }}"><button title="{{ c.title }}" aria-label="{{ c.title }}" style="all:unset;cursor:pointer;width:48px;height:48px;border-radius:50%;border:1px solid #274055;background:#0c1a26;display:grid;place-items:center;color:#e8f0f7"><i class="{{ c.icon }}" style="font-size:20px"></i></button></sc-if>
+<sc-if value="{{ c.missing }}"><button title="{{ c.title }}" aria-label="{{ c.title }}" style="all:unset;cursor:pointer;width:48px;height:48px;box-sizing:border-box;border-radius:50%;border:1px dashed color-mix(in srgb,#f2ce78 60%,transparent);display:grid;place-items:center;color:#f2ce78"><i class="{{ c.icon }}" style="font-size:20px"></i></button></sc-if>
+</sc-for>
+</div>
+<sc-if value="{{ dm2.invited }}"><div style="display:flex;flex-direction:column;gap:9px;padding:12px;border-radius:8px;border:1px dashed #5a7086;background:#0c1a26"><span style="font-size:13px;display:flex;gap:6px;align-items:center"><i class="ph ph-paper-plane-tilt" style="color:#8aa1b5"></i>Invitation sent {{ dm2.invitedOn }} · not accepted yet</span><sc-if value="{{ resendable2 }}"><button onClick="{{ resend2 }}" style="all:unset;cursor:pointer;text-align:center;height:44px;line-height:42px;box-sizing:border-box;border-radius:6px;font-size:13px;font-weight:600;border:1px solid #274055;background:#13283a" style-hover="border-color:#33a1e0">Resend invitation</button></sc-if><sc-if value="{{ resent2 }}"><span style="font-size:12.5px;color:#6fd6b4;display:flex;gap:6px;align-items:center"><i class="ph ph-check-circle"></i>Sent again to {{ dm2.email }}</span></sc-if></div></sc-if>
+<sc-if value="{{ dm2.hasReq }}"><div style="display:flex;flex-direction:column;gap:9px;padding:12px;border-radius:8px;border:1px solid color-mix(in srgb,#33a1e0 45%,transparent);background:color-mix(in srgb,#33a1e0 8%,#0c1a26)"><span style="font-size:13px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><i class="ph ph-hand" style="color:#33a1e0"></i>Asked to be <strong>{{ dm2.reqRole }}</strong><span style="color:#8aa1b5">· {{ dm2.reqDate }}</span></span><p style="margin:0;font-size:13px;line-height:1.45;color:#cfdeea">“{{ dm2.reqNote }}”</p><div style="display:flex;gap:8px"><button onClick="{{ dm2.approve }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:44px;line-height:44px;border-radius:6px;font-size:13px;font-weight:700;background:#33a1e0;color:#0c1a26" style-hover="background:#5ab4e8">Approve</button><button onClick="{{ dm2.reject }}" style="all:unset;cursor:pointer;flex:1;text-align:center;height:42px;line-height:42px;border-radius:6px;font-size:13px;font-weight:600;border:1px solid #274055;background:#13283a" style-hover="border-color:#f2887a;color:#f2887a">Reject</button></div></div></sc-if>
+<div style="display:flex;flex-direction:column;gap:7px">
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">ROLE</span>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);padding:3px;gap:2px;border:1px solid #274055;border-radius:8px;background:#0c1a26">
+<sc-for list="{{ dm2.roleOpts }}" as="r">
+<sc-if value="{{ r.active }}"><button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;text-align:center;height:42px;line-height:42px;border-radius:6px;font-size:13px;font-weight:700;background:#33a1e0;color:#0c1a26">{{ r.label }}</button></sc-if>
+<sc-if value="{{ r.inactive }}"><button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;text-align:center;height:42px;line-height:42px;border-radius:6px;font-size:13px;color:#8aa1b5">{{ r.label }}</button></sc-if>
+</sc-for>
+</div>
+</div>
+<sc-if value="{{ dm2.dirty }}"><div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,#f2ce78 10%,transparent);border:1px solid color-mix(in srgb,#f2ce78 35%,transparent)"><span style="flex:1;font-size:12.5px;color:#f2ce78">{{ dm2.fromRole }} → {{ dm2.toRole }}</span><button onClick="{{ dm2.cancel }}" style="all:unset;cursor:pointer;padding:0 12px;height:40px;line-height:40px;border-radius:6px;font-size:13px;color:#cfdeea" style-hover="background:#1a3349">Cancel</button><button onClick="{{ dm2.save }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:0 14px;height:40px;line-height:40px;border-radius:6px;font-size:13px;font-weight:700;background:#33a1e0;color:#0c1a26">Save role</button></div></sc-if>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:13px">
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font:600 10px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5">ATTEND.</span><span style="font-weight:700;font-size:18px">{{ dm2.attLabel }}</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font:600 10px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5">AUF</span><span>{{ dm2.auf }}</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font:600 10px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5">MEMBERSHIP</span><span>{{ dm2.memb }}</span></div>
+</div>
+<button style="all:unset;cursor:pointer;text-align:center;height:46px;line-height:46px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-weight:700">Open full record</button>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Probá pedir: "<a class="dv-oid" href="#2a">2a</a> con los atajos 'Needs attention' de <a class="dv-oid" href="#1c">1c</a>" · "el tema claro de <a class="dv-oid" href="#2a">2a</a>" · "cómo lo ve un Coach"</p>
+</section>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Directorio — vista de Admin, más denso</span></div>
+<p class="dv-intro">Mismo ancho de contenido que tu app hoy (~890px). Las tres variantes atacan lo mismo: el control de rol sale de la fila (o se vuelve un chip que guarda solo, sin botón Save), los filtros pasan de 3 filas a 1, y el contacto se resume en íconos. Resultado: ~8 personas visibles por pantalla en vez de ~1.5. Todo es clickeable: probá cambiar roles, abrir filtros y seleccionar filas.</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Tabla compacta — fiel a lo que ya tenés</div>
+<div class="dv-card" style="width:900px">
+<div style="padding:24px 24px 0;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;align-items:baseline;gap:10px"><h1 style="margin:0;font:500 26px/1.1 var(--font-heading)">Directory</h1><span style="font-size:13px;color:var(--color-neutral-500)">{{ total }} members</span></div>
+<span style="font-size:12px;color:var(--color-neutral-500);display:flex;gap:6px;align-items:center"><i class="ph ph-check-circle"></i>No pending requests</span>
+</div>
+<div style="display:flex;gap:8px">
+<button class="btn btn-ghost" style="display:flex;gap:6px;align-items:center"><i class="ph ph-envelope-simple"></i>Email</button>
+<button class="btn btn-ghost" style="display:flex;gap:6px;align-items:center"><i class="ph ph-download-simple"></i>Export</button>
+<button class="btn btn-primary" style="display:flex;gap:6px;align-items:center"><i class="ph ph-user-plus"></i>Invite member</button>
+</div>
+</div>
+<div style="display:flex;gap:8px;align-items:center;position:relative">
+<div style="flex:1;min-width:0;position:relative;display:flex;align-items:center">
+<i class="ph ph-magnifying-glass" style="position:absolute;left:10px;color:var(--color-neutral-500)"></i>
+<input class="input" placeholder="Search by name…" style="width:100%;padding-left:32px;box-sizing:border-box">
+</div>
+<div style="display:flex;padding:3px;gap:2px;border:1px solid var(--color-divider);border-radius:var(--radius-md)">
+<sc-for list="{{ seg1a }}" as="s" hint-placeholder-count="5">
+<sc-if value="{{ s.active }}"><button onClick="{{ s.pick }}" style="all:unset;cursor:pointer;padding:5px 10px;border-radius:5px;font-size:12.5px;background:var(--color-accent-900);color:var(--color-accent-200);box-shadow:inset 0 0 0 1px var(--color-accent-700)">{{ s.label }}</button></sc-if>
+<sc-if value="{{ s.inactive }}"><button onClick="{{ s.pick }}" style="all:unset;cursor:pointer;padding:5px 10px;border-radius:5px;font-size:12.5px;color:var(--color-neutral-400)" style-hover="color:var(--color-text);background:var(--color-surface)">{{ s.label }}</button></sc-if>
+</sc-for>
+</div>
+<button class="btn btn-secondary" onClick="{{ toggleFilters }}" style="display:flex;gap:6px;align-items:center"><i class="ph ph-funnel-simple"></i>Filters<span style="min-width:18px;height:18px;border-radius:9px;background:var(--color-accent-800);color:var(--color-accent-200);font-size:11px;display:grid;place-items:center">2</span></button>
+<sc-if value="{{ filtersOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;right:0;top:calc(100% + 6px);z-index:20;width:440px;background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);padding:16px;display:flex;flex-direction:column;gap:14px">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div class="field" style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:var(--color-neutral-400)">Position</label><select class="input"><option>All positions</option><option>Handler</option><option>Cutter</option></select></div>
+<div class="field" style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:var(--color-neutral-400)">Group</label><select class="input"><option>All groups</option></select></div>
+<div class="field" style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:var(--color-neutral-400)">AUF</label><select class="input"><option>Expired</option><option>Any AUF</option></select></div>
+<div class="field" style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:var(--color-neutral-400)">Membership</label><select class="input"><option>Any membership</option></select></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" checked>No phone</label>
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox">No emergency contact</label>
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox">Include deactivated accounts</label>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center"><button class="btn btn-ghost">Clear all</button><button class="btn btn-primary" onClick="{{ toggleFilters }}">Show 3 members</button></div>
+</div>
+</sc-if>
+</div>
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px">
+<span class="tag tag-outline" style="display:flex;gap:6px;align-items:center">AUF: Expired<i class="ph ph-x" style="cursor:pointer"></i></span>
+<span class="tag tag-outline" style="display:flex;gap:6px;align-items:center">No phone<i class="ph ph-x" style="cursor:pointer"></i></span>
+<a href="#1a" style="font-size:12px;margin-left:4px">Clear</a>
+</div>
+</div>
+<sc-if value="{{ hasSel }}" hint-placeholder-val="{{ false }}">
+<div style="margin:12px 24px 0;padding:8px 12px;display:flex;gap:12px;align-items:center;border-radius:var(--radius-md);background:var(--color-accent-900);box-shadow:inset 0 0 0 1px var(--color-accent-700);font-size:13px">
+<span style="color:var(--color-accent-200)">{{ selCount }} selected</span>
+<span style="flex:1"></span>
+<button class="btn btn-ghost" style="display:flex;gap:6px;align-items:center"><i class="ph ph-envelope-simple"></i>Email</button>
+<button class="btn btn-ghost" style="display:flex;gap:6px;align-items:center"><i class="ph ph-download-simple"></i>Export</button>
+<button class="btn btn-ghost" style="display:flex;gap:6px;align-items:center"><i class="ph ph-user-switch"></i>Change role</button>
+<button class="btn btn-icon btn-ghost" onClick="{{ clearSel }}"><i class="ph ph-x"></i></button>
+</div>
+</sc-if>
+<div style="margin-top:12px">
+<div style="display:grid;grid-template-columns:32px minmax(0,2.3fr) 118px 92px 120px minmax(0,1.3fr) 88px;gap:12px;align-items:center;padding:8px 24px;font-size:11px;letter-spacing:.04em;color:var(--color-neutral-500);border-bottom:1px solid var(--color-divider)">
+<span></span><span>Member ↑</span><span>Role</span><span>Position</span><span>Attendance</span><span>Status</span><span>Contact</span>
+</div>
+<sc-for list="{{ rows1a }}" as="m" hint-placeholder-count="8">
+<div style="display:grid;grid-template-columns:32px minmax(0,2.3fr) 118px 92px 120px minmax(0,1.3fr) 88px;gap:12px;align-items:center;padding:7px 24px;border-bottom:1px solid var(--color-divider);font-size:13px;position:relative" style-hover="background:color-mix(in srgb,var(--color-surface) 55%,transparent)">
+<span onClick="{{ m.toggleCheck }}" style="cursor:pointer;display:grid;place-items:center">
+<sc-if value="{{ m.checked }}"><i class="ph-fill ph-check-square" style="font-size:18px;color:var(--color-accent)"></i></sc-if>
+<sc-if value="{{ m.unchecked }}"><i class="ph ph-square" style="font-size:18px;color:var(--color-neutral-600)"></i></sc-if>
+</span>
+<span style="display:flex;gap:10px;align-items:center;min-width:0">
+<span style="flex:none;width:30px;height:30px;border-radius:50%;background:var(--color-accent-900);color:var(--color-accent-300);display:grid;place-items:center;font-size:11px;font-weight:500">{{ m.ini }}</span>
+<span style="display:flex;flex-direction:column;min-width:0">
+<a href="#1a" style="color:var(--color-text);text-decoration:none;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</a>
+<span style="font-size:11.5px;color:var(--color-neutral-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.meta }}</span>
+</span>
+</span>
+<span style="position:relative">
+<button onClick="{{ m.toggleMenu }}" style="all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:center;padding:3px 8px 3px 10px;border-radius:999px;font-size:12.5px;border:1px solid var(--color-divider);color:var(--color-neutral-200)" style-hover="border-color:var(--color-accent-600)">{{ m.role }}<i class="ph ph-caret-down" style="font-size:11px;color:var(--color-neutral-500)"></i></button>
+<sc-if value="{{ m.justSaved }}"><i class="ph ph-check" style="margin-left:6px;color:var(--color-accent)"></i></sc-if>
+<sc-if value="{{ m.menuOpen }}">
+<div style="position:absolute;left:0;top:calc(100% + 4px);z-index:30;min-width:160px;background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:4px;display:flex;flex-direction:column">
+<sc-for list="{{ m.roleOpts }}" as="r">
+<button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:5px;font-size:13px" style-hover="background:var(--color-accent-900)">{{ r.label }}<sc-if value="{{ r.active }}"><i class="ph ph-check" style="color:var(--color-accent)"></i></sc-if></button>
+</sc-for>
+<span style="padding:6px 10px 4px;font-size:11px;color:var(--color-neutral-500);border-top:1px solid var(--color-divider);margin-top:4px">Saves instantly · Undo for 5s</span>
+</div>
+</sc-if>
+</span>
+<span style="color:var(--color-neutral-300)">{{ m.pos }}</span>
+<span style="display:flex;gap:8px;align-items:center">
+<span style="flex:1;height:4px;border-radius:2px;background:var(--color-neutral-800);overflow:hidden"><span style="display:block;height:100%;background:var(--color-accent-500);width:{{ m.attW }}"></span></span>
+<span style="font-size:12px;color:var(--color-neutral-300);width:34px;text-align:right">{{ m.attLabel }}</span>
+</span>
+<span style="display:flex;gap:4px;flex-wrap:wrap">
+<sc-for list="{{ m.warn }}" as="f"><span class="tag tag-accent" style="font-size:11px">{{ f }}</span></sc-for>
+<sc-for list="{{ m.info }}" as="f"><span class="tag tag-neutral" style="font-size:11px">{{ f }}</span></sc-for>
+</span>
+<span style="display:flex;gap:4px">
+<sc-for list="{{ m.contacts }}" as="c">
+<sc-if value="{{ c.has }}"><span title="{{ c.title }}" style="width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--color-neutral-300);cursor:pointer" style-hover="background:var(--color-surface);color:var(--color-accent-300)"><i class="{{ c.icon }}"></i></span></sc-if>
+<sc-if value="{{ c.missing }}"><span title="{{ c.title }}" style="width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--color-accent-500);border:1px dashed var(--color-accent-700);box-sizing:border-box"><i class="{{ c.icon }}" style="font-size:12px"></i></span></sc-if>
+</sc-for>
+</span>
+</div>
+</sc-for>
+<div style="padding:10px 24px 16px;font-size:12px;color:var(--color-neutral-500)">Hover a contact icon to see it · dashed = missing</div>
+</div>
+</div>
+<ul class="dv-notes">
+<li>Rol = chip con menú que guarda al elegir (con "Undo"), sin botón Save. La fila baja de ~150px a ~46px.</li>
+<li>Filtros secundarios en un popover; los activos quedan como chips removibles debajo de la búsqueda.</li>
+<li>Email / Export trabajan sobre la selección (checkboxes) o sobre todo lo filtrado.</li>
+</ul>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Lista + panel de detalle</div>
+<div class="dv-card" style="width:900px;display:flex;flex-direction:column">
+<div style="padding:24px 24px 14px;display:flex;flex-direction:column;gap:14px;border-bottom:1px solid var(--color-divider)">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+<div style="display:flex;align-items:baseline;gap:10px"><h1 style="margin:0;font:500 26px/1.1 var(--font-heading)">Directory</h1><span style="font-size:13px;color:var(--color-neutral-500)">{{ total }}</span></div>
+<div style="display:flex;gap:8px"><button class="btn btn-icon btn-ghost" title="Email filtered"><i class="ph ph-envelope-simple"></i></button><button class="btn btn-icon btn-ghost" title="Export CSV"><i class="ph ph-download-simple"></i></button><button class="btn btn-primary" style="display:flex;gap:6px;align-items:center"><i class="ph ph-user-plus"></i>Invite</button></div>
+</div>
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+<div style="position:relative;display:flex;align-items:center;width:220px"><i class="ph ph-magnifying-glass" style="position:absolute;left:10px;color:var(--color-neutral-500)"></i><input class="input" placeholder="Search…" style="width:100%;padding-left:32px;box-sizing:border-box"></div>
+<sc-for list="{{ facets }}" as="f" hint-placeholder-count="5">
+<sc-if value="{{ f.on }}"><button style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;padding:5px 10px;border-radius:999px;font-size:12.5px;background:var(--color-accent-900);box-shadow:inset 0 0 0 1px var(--color-accent-700);color:var(--color-accent-200)">{{ f.label }}<i class="ph ph-caret-down" style="font-size:11px"></i></button></sc-if>
+<sc-if value="{{ f.off }}"><button style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;padding:5px 10px;border-radius:999px;font-size:12.5px;border:1px dashed var(--color-neutral-700);color:var(--color-neutral-400)" style-hover="color:var(--color-text);border-color:var(--color-neutral-500)"><i class="ph ph-plus" style="font-size:11px"></i>{{ f.label }}</button></sc-if>
+</sc-for>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 330px">
+<div style="display:flex;flex-direction:column;border-right:1px solid var(--color-divider)">
+<sc-for list="{{ rows1b }}" as="m" hint-placeholder-count="8">
+<sc-if value="{{ m.selected }}">
+<div style="display:flex;gap:10px;align-items:center;padding:9px 20px;background:var(--color-surface);box-shadow:inset 2px 0 0 var(--color-accent);font-size:13px">
+<span style="flex:none;width:32px;height:32px;border-radius:50%;background:var(--color-accent-800);color:var(--color-accent-200);display:grid;place-items:center;font-size:11px;font-weight:500">{{ m.ini }}</span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-weight:500">{{ m.name }}</span><span style="font-size:11.5px;color:var(--color-neutral-400)">{{ m.role }} · {{ m.pos }}</span></span>
+<sc-for list="{{ m.warn }}" as="w"><span style="width:7px;height:7px;border-radius:50%;background:var(--color-accent)" title="{{ w }}"></span></sc-for>
+<span style="font-size:12px;color:var(--color-neutral-300);width:40px;text-align:right">{{ m.attLabel }}</span>
+</div>
+</sc-if>
+<sc-if value="{{ m.notSelected }}">
+<div onClick="{{ m.select }}" style="cursor:pointer;display:flex;gap:10px;align-items:center;padding:9px 20px;font-size:13px;border-bottom:1px solid color-mix(in srgb,var(--color-divider) 60%,transparent)" style-hover="background:color-mix(in srgb,var(--color-surface) 55%,transparent)">
+<span style="flex:none;width:32px;height:32px;border-radius:50%;background:var(--color-accent-900);color:var(--color-accent-300);display:grid;place-items:center;font-size:11px;font-weight:500">{{ m.ini }}</span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-weight:500">{{ m.name }}</span><span style="font-size:11.5px;color:var(--color-neutral-500)">{{ m.role }} · {{ m.pos }}</span></span>
+<sc-for list="{{ m.warn }}" as="w"><span style="width:7px;height:7px;border-radius:50%;background:var(--color-accent)" title="{{ w }}"></span></sc-for>
+<span style="font-size:12px;color:var(--color-neutral-400);width:40px;text-align:right">{{ m.attLabel }}</span>
+</div>
+</sc-if>
+</sc-for>
+</div>
+<div style="padding:20px;display:flex;flex-direction:column;gap:18px;background:linear-gradient(180deg,color-mix(in srgb,var(--color-surface) 50%,transparent),transparent 60%)">
+<div style="display:flex;gap:12px;align-items:center">
+<span style="width:48px;height:48px;border-radius:50%;background:var(--color-accent-800);color:var(--color-accent-200);display:grid;place-items:center;font-size:15px;font-weight:500">{{ d.ini }}</span>
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font:500 17px/1.2 var(--font-heading)">{{ d.name }}</span><span style="font-size:12px;color:var(--color-neutral-400)">{{ d.meta }}</span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<span style="font-size:11px;color:var(--color-neutral-500);letter-spacing:.04em">ROLE</span>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);padding:3px;gap:2px;border:1px solid var(--color-divider);border-radius:var(--radius-md)">
+<sc-for list="{{ d.roleOpts }}" as="r">
+<sc-if value="{{ r.active }}"><button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;text-align:center;padding:5px 0;border-radius:5px;font-size:12px;background:var(--color-accent-900);color:var(--color-accent-200);box-shadow:inset 0 0 0 1px var(--color-accent-700)">{{ r.label }}</button></sc-if>
+<sc-if value="{{ r.inactive }}"><button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;text-align:center;padding:5px 0;border-radius:5px;font-size:12px;color:var(--color-neutral-400)" style-hover="color:var(--color-text)">{{ r.label }}</button></sc-if>
+</sc-for>
+</div>
+<sc-if value="{{ d.justSaved }}"><span style="font-size:11.5px;color:var(--color-accent-300);display:flex;gap:4px;align-items:center"><i class="ph ph-check"></i>Saved · <a href="#1b">Undo</a></span></sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+<span style="font-size:11px;color:var(--color-neutral-500);letter-spacing:.04em">CONTACT</span>
+<sc-for list="{{ d.contacts }}" as="c">
+<div style="display:flex;gap:10px;align-items:center"><i class="{{ c.icon }}" style="color:var(--color-neutral-500)"></i><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.value }}</span><sc-if value="{{ c.has }}"><i class="ph ph-copy" style="color:var(--color-neutral-500);cursor:pointer"></i></sc-if></div>
+</sc-for>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:11px;color:var(--color-neutral-500);letter-spacing:.04em">ATTENDANCE</span><span style="font:500 20px var(--font-heading)">{{ d.attLabel }}</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:11px;color:var(--color-neutral-500);letter-spacing:.04em">POSITION</span><span>{{ d.pos }}</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:11px;color:var(--color-neutral-500);letter-spacing:.04em">AUF</span><span>{{ d.auf }}</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:11px;color:var(--color-neutral-500);letter-spacing:.04em">MEMBERSHIP</span><span>{{ d.memb }}</span></div>
+</div>
+<button class="btn btn-secondary btn-block">Open full record</button>
+</div>
+</div>
+</div>
+<ul class="dv-notes">
+<li>La lista sólo muestra lo que se escanea (nombre, rol, posición, asistencia, un punto si hay algo pendiente).</li>
+<li>Rol, contacto, AUF y membresía viven en el panel; cambiar rol es un toque. En celular el panel se vuelve hoja (ver <a class="dv-oid" href="#1e">1e</a>).</li>
+<li>Filtros como chips de una línea: los activos se pintan, los demás son "+ Position", etc.</li>
+</ul>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Atención primero — filtros rápidos + agrupado por rol</div>
+<div class="dv-card" style="width:900px">
+<div style="padding:24px 24px 0;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+<h1 style="margin:0;font:500 26px/1.1 var(--font-heading)">Directory</h1>
+<div style="display:flex;gap:8px"><button class="btn btn-ghost" style="display:flex;gap:6px;align-items:center"><i class="ph ph-envelope-simple"></i>Email {{ shown1c }}</button><button class="btn btn-ghost" style="display:flex;gap:6px;align-items:center"><i class="ph ph-download-simple"></i>Export</button><button class="btn btn-primary" style="display:flex;gap:6px;align-items:center"><i class="ph ph-user-plus"></i>Invite member</button></div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--color-neutral-700);border-radius:var(--radius-md);background:color-mix(in srgb,var(--color-surface) 60%,transparent)">
+<i class="ph ph-magnifying-glass" style="color:var(--color-neutral-500);margin-left:4px"></i>
+<sc-for list="{{ tokens }}" as="t">
+<span style="display:flex;gap:6px;align-items:center;padding:3px 6px 3px 8px;border-radius:5px;background:var(--color-accent-900);box-shadow:inset 0 0 0 1px var(--color-accent-700);font-size:12.5px;color:var(--color-accent-200)"><span style="color:var(--color-accent-400)">{{ t.k }}:</span>{{ t.v }}<i class="ph ph-x" onClick="{{ t.remove }}" style="cursor:pointer;font-size:11px"></i></span>
+</sc-for>
+<input placeholder="Search name, or type role:, position:, auf:…" style="all:unset;flex:1;min-width:200px;font-size:13px;padding:4px 0;color:var(--color-text)">
+<span style="font:11px ui-monospace,Menlo,monospace;color:var(--color-neutral-500);border:1px solid var(--color-neutral-700);border-radius:4px;padding:1px 5px">/</span>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<span style="font-size:12px;color:var(--color-neutral-500);margin-right:2px">Needs attention</span>
+<sc-for list="{{ attn }}" as="a" hint-placeholder-count="4">
+<sc-if value="{{ a.on }}"><button onClick="{{ a.toggle }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;padding:5px 10px;border-radius:var(--radius-md);font-size:12.5px;background:var(--color-accent-900);box-shadow:inset 0 0 0 1px var(--color-accent-600);color:var(--color-accent-200)"><span style="font-weight:600">{{ a.count }}</span>{{ a.label }}</button></sc-if>
+<sc-if value="{{ a.off }}"><button onClick="{{ a.toggle }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;padding:5px 10px;border-radius:var(--radius-md);font-size:12.5px;border:1px solid var(--color-divider);color:var(--color-neutral-300)" style-hover="border-color:var(--color-accent-700)"><span style="font-weight:600;color:var(--color-accent-400)">{{ a.count }}</span>{{ a.label }}</button></sc-if>
+</sc-for>
+</div>
+</div>
+<div style="padding:8px 0 12px">
+<sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:8px;padding:14px 24px 6px;font-size:11px;letter-spacing:.06em;color:var(--color-neutral-500)"><span>{{ g.name }}</span><span style="color:var(--color-neutral-600)">{{ g.count }}</span><span style="flex:1;height:1px;background:linear-gradient(90deg,var(--color-divider),transparent)"></span></div>
+<sc-for list="{{ g.rows }}" as="m">
+<div style="display:grid;grid-template-columns:minmax(0,1.6fr) 90px minmax(0,1fr) 56px minmax(0,1.6fr) 32px;gap:12px;align-items:center;padding:6px 24px;font-size:13px;position:relative" style-hover="background:color-mix(in srgb,var(--color-surface) 55%,transparent)">
+<span style="display:flex;gap:10px;align-items:center;min-width:0"><span style="flex:none;width:24px;height:24px;border-radius:50%;background:var(--color-accent-900);color:var(--color-accent-300);display:grid;place-items:center;font-size:10px;font-weight:500">{{ m.ini }}</span><span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</span></span>
+<span style="color:var(--color-neutral-300)">{{ m.pos }}</span>
+<span style="font-size:12px;color:var(--color-neutral-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.meta }}</span>
+<span style="font-size:12px;color:var(--color-neutral-300);text-align:right">{{ m.attLabel }}</span>
+<span style="display:flex;gap:4px;flex-wrap:wrap"><sc-for list="{{ m.warn }}" as="f"><span class="tag tag-accent" style="font-size:11px">{{ f }}</span></sc-for><sc-for list="{{ m.info }}" as="f"><span class="tag tag-neutral" style="font-size:11px">{{ f }}</span></sc-for></span>
+<span style="position:relative;z-index:5;display:flex;justify-content:flex-end">
+<button class="btn btn-icon btn-ghost" onClick="{{ m.toggleMenu }}" style="padding:4px"><i class="ph ph-dots-three"></i></button>
+<sc-if value="{{ m.menuOpen }}">
+<div style="position:absolute;right:0;top:calc(100% + 4px);z-index:30;width:200px;background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:4px;display:flex;flex-direction:column;font-size:13px">
+<span style="padding:6px 10px 2px;font-size:11px;color:var(--color-neutral-500)">Move to</span>
+<sc-for list="{{ m.roleOpts }}" as="r"><button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;display:flex;justify-content:space-between;padding:6px 10px;border-radius:5px" style-hover="background:var(--color-accent-900)">{{ r.label }}<sc-if value="{{ r.active }}"><i class="ph ph-check" style="color:var(--color-accent)"></i></sc-if></button></sc-for>
+<span style="height:1px;background:var(--color-divider);margin:4px 0"></span>
+<button style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;padding:6px 10px;border-radius:5px" style-hover="background:var(--color-accent-900)"><i class="ph ph-envelope-simple"></i>{{ m.email }}</button>
+<button style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;padding:6px 10px;border-radius:5px" style-hover="background:var(--color-accent-900)"><i class="ph ph-identification-card"></i>Open record</button>
+</div>
+</sc-if>
+</span>
+</div>
+</sc-for>
+</sc-for>
+<sc-if value="{{ empty1c }}"><div style="padding:24px;font-size:13px;color:var(--color-neutral-500)">No members match.</div></sc-if>
+</div>
+</div>
+<ul class="dv-notes">
+<li>Un solo campo de búsqueda con tokens (role:, position:, auf:…): reemplaza los 4 selects + 3 checkboxes.</li>
+<li>"Needs attention" convierte los checkboxes en atajos con conteo: el admin ve el problema antes de buscarlo. Probá hacer click.</li>
+<li>Agrupado por rol; cambiar rol desde el menú "⋯" mueve a la persona de grupo.</li>
+</ul>
+</div>
+
+</div>
+
+<div class="dv-opts" style="margin-top:40px">
+<div class="dv-opt" id="1d">
+<div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Celular — lista</div>
+<div class="dv-card" style="width:390px;height:780px;overflow:hidden;border-radius:28px;display:flex;flex-direction:column">
+<div style="padding:18px 16px 10px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;justify-content:space-between;align-items:center"><h1 style="margin:0;font:500 24px/1.1 var(--font-heading)">Directory</h1><div style="display:flex;gap:4px"><button class="btn btn-icon btn-ghost" style="width:44px;height:44px"><i class="ph ph-dots-three-vertical"></i></button><button class="btn btn-icon btn-primary" style="width:44px;height:44px"><i class="ph ph-user-plus"></i></button></div></div>
+<div style="display:flex;gap:8px"><div style="flex:1;position:relative;display:flex;align-items:center"><i class="ph ph-magnifying-glass" style="position:absolute;left:12px;color:var(--color-neutral-500)"></i><input class="input" placeholder="Search {{ total }} members" style="width:100%;height:44px;padding-left:36px;box-sizing:border-box"></div><button class="btn btn-secondary" style="height:44px;display:flex;gap:6px;align-items:center"><i class="ph ph-funnel-simple"></i>2</button></div>
+<div style="display:flex;gap:6px;overflow:hidden">
+<sc-for list="{{ seg1a }}" as="s">
+<sc-if value="{{ s.active }}"><span style="flex:none;padding:8px 12px;border-radius:999px;font-size:13px;background:var(--color-accent-900);color:var(--color-accent-200);box-shadow:inset 0 0 0 1px var(--color-accent-700)">{{ s.label }}</span></sc-if>
+<sc-if value="{{ s.inactive }}"><span style="flex:none;padding:8px 12px;border-radius:999px;font-size:13px;border:1px solid var(--color-divider);color:var(--color-neutral-400)">{{ s.label }}</span></sc-if>
+</sc-for>
+</div>
+</div>
+<div style="flex:1;overflow:hidden">
+<sc-for list="{{ rowsM }}" as="m" hint-placeholder-count="8">
+<div style="display:flex;gap:12px;align-items:center;padding:10px 16px;min-height:44px;border-bottom:1px solid color-mix(in srgb,var(--color-divider) 60%,transparent)">
+<span style="flex:none;width:38px;height:38px;border-radius:50%;background:var(--color-accent-900);color:var(--color-accent-300);display:grid;place-items:center;font-size:12px;font-weight:500">{{ m.ini }}</span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14.5px;font-weight:500;display:flex;gap:6px;align-items:center">{{ m.name }}<sc-for list="{{ m.warn }}" as="w"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-accent)"></span></sc-for></span><span style="font-size:12.5px;color:var(--color-neutral-500)">{{ m.role }} · {{ m.pos }}</span></span>
+<span style="font-size:13px;color:var(--color-neutral-300)">{{ m.attLabel }}</span>
+<i class="ph ph-caret-right" style="color:var(--color-neutral-600)"></i>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1e">
+<div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Celular — hoja de miembro (rol en 1 toque)</div>
+<div class="dv-card" style="width:390px;height:780px;overflow:hidden;border-radius:28px;position:relative">
+<div style="position:absolute;inset:0;padding:18px 16px;opacity:.35;display:flex;flex-direction:column;gap:10px">
+<h1 style="margin:0;font:500 24px/1.1 var(--font-heading)">Directory</h1>
+<sc-for list="{{ rowsM }}" as="m"><div style="display:flex;gap:12px;align-items:center;padding:6px 0"><span style="width:38px;height:38px;border-radius:50%;background:var(--color-accent-900)"></span><span style="font-size:14px">{{ m.name }}</span></div></sc-for>
+</div>
+<div style="position:absolute;inset:0;background:color-mix(in srgb,var(--color-bg) 50%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:var(--color-surface);border-radius:20px 20px 0 0;box-shadow:var(--shadow-lg);padding:10px 18px 24px;display:flex;flex-direction:column;gap:18px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:var(--color-neutral-700)"></span>
+<div style="display:flex;gap:12px;align-items:center"><span style="width:52px;height:52px;border-radius:50%;background:var(--color-accent-800);color:var(--color-accent-200);display:grid;place-items:center;font-size:16px;font-weight:500">{{ dm.ini }}</span><div style="display:flex;flex-direction:column;gap:2px"><span style="font:500 18px var(--font-heading)">{{ dm.name }}</span><span style="font-size:12.5px;color:var(--color-neutral-400)">{{ dm.meta }}</span></div></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ dm.warn }}" as="f"><span class="tag tag-accent">{{ f }}</span></sc-for><sc-for list="{{ dm.info }}" as="f"><span class="tag tag-neutral">{{ f }}</span></sc-for></div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+<button class="btn btn-secondary" style="height:56px;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;font-size:12px"><i class="ph ph-envelope-simple" style="font-size:18px"></i>Email</button>
+<button class="btn btn-secondary" style="height:56px;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;font-size:12px"><i class="ph ph-phone" style="font-size:18px"></i>Call</button>
+<button class="btn btn-secondary" style="height:56px;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;font-size:12px"><i class="ph ph-first-aid" style="font-size:18px"></i>Emergency</button>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:11px;color:var(--color-neutral-500);letter-spacing:.04em">ROLE</span>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);padding:3px;gap:2px;border:1px solid var(--color-divider);border-radius:var(--radius-md)">
+<sc-for list="{{ dm.roleOpts }}" as="r">
+<sc-if value="{{ r.active }}"><button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;text-align:center;height:40px;line-height:40px;border-radius:6px;font-size:13px;background:var(--color-accent-900);color:var(--color-accent-200);box-shadow:inset 0 0 0 1px var(--color-accent-700)">{{ r.label }}</button></sc-if>
+<sc-if value="{{ r.inactive }}"><button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;text-align:center;height:40px;line-height:40px;border-radius:6px;font-size:13px;color:var(--color-neutral-400)">{{ r.label }}</button></sc-if>
+</sc-for>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:13px">
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;color:var(--color-neutral-500)">Attendance</span><span style="font:500 18px var(--font-heading)">{{ dm.attLabel }}</span></div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;color:var(--color-neutral-500)">AUF</span><span>{{ dm.auf }}</span></div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;color:var(--color-neutral-500)">Membership</span><span>{{ dm.memb }}</span></div>
+</div>
+<button class="btn btn-primary btn-block" style="height:44px">Open full record</button>
+</div>
+</div>
+</div>
+</div>
+
+<p class="dv-next">Probá pedir: "<a class="dv-oid" href="#1a">1a</a> pero con los filtros rápidos de <a class="dv-oid" href="#1c">1c</a>" · "<a class="dv-oid" href="#1b">1b</a> con el panel como modal" · "cómo se ve para un Player"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const ROLES = ['Player','Coach','Committee','Admin'];
+const INV = {id:9,name:'Alex Kim',country:'—',level:'—',role:'Player',pos:'—',att:null,email:'alex.kim@gmail.com',phone:null,emerg:null,auf:null,memb:'—',invited:true,invitedOn:'Oct 5'};
+const REQS = {8:{role:'Coach',date:'Oct 6, 2026',note:'I have been running the Saturday juniors session for a month and would like to log their attendance.'},5:{role:'Committee',date:'Oct 4, 2026',note:'Helping with the fundraising nights this season.'}};
+const BASE = [
+  {id:1,name:'Andrea Cadavid',country:'Australia',level:'—',role:'Admin',pos:'—',att:100,email:'andreacadavid98@gmail.com',phone:null,emerg:null,auf:null,memb:'Waived'},
+  {id:2,name:'Camilo Gomez',country:'Australia',level:'Beginner',role:'Admin',pos:'Handler',att:94,email:'camilo.g@gmail.com',phone:'0412 555 019',emerg:'Laura G · 0413 222 108',auf:'AUF 20431 · Mar 2027',memb:'Active'},
+  {id:3,name:'Mateo Rossi',country:'Italy',level:'Advanced',role:'Coach',pos:'Handler',att:88,email:'mateo.rossi@outlook.com',phone:'0422 118 340',emerg:'Giulia R · 0422 900 112',auf:'AUF 18822 · Jan 2027',memb:'Active'},
+  {id:4,name:'Priya Nair',country:'India',level:'Intermediate',role:'Committee',pos:'Cutter',att:76,email:'priya.nair@gmail.com',phone:'0433 640 771',emerg:null,auf:'AUF 19907 · Nov 2026',memb:'Active',expiring:true},
+  {id:5,name:'Sam O’Neill',country:'Ireland',level:'Intermediate',role:'Player',pos:'Cutter',att:64,email:'sam.oneill@gmail.com',phone:null,emerg:'Kate O · 0400 300 912',auf:'AUF 17254 · expired',memb:'Past due',aufExpired:true},
+  {id:6,name:'Lucía Fernández',country:'Uruguay',level:'Advanced',role:'Player',pos:'Handler',att:92,email:'lu.fernandez@gmail.com',phone:'0455 213 008',emerg:'Pablo F · 0455 000 214',auf:'AUF 20117 · Aug 2027',memb:'Active'},
+  {id:7,name:'Tom Baker',country:'Australia',level:'Beginner',role:'Player',pos:'—',att:null,email:'tbaker@icloud.com',phone:'0401 777 652',emerg:null,auf:null,memb:'Trialing'},
+  {id:8,name:'Hana Sato',country:'Japan',level:'Intermediate',role:'Player',pos:'Cutter',att:81,email:'hana.sato@gmail.com',phone:'0466 108 221',emerg:'Ken S · 0466 108 990',auf:'AUF 20502 · May 2027',memb:'Active'},
+];
+const ATTN = [
+  {k:'noAuf',label:'without AUF',test:m=>!m.auf},
+  {k:'aufExp',label:'AUF expired / expiring',test:m=>m.aufExpired||m.expiring},
+  {k:'noEmerg',label:'no emergency contact',test:m=>!m.emerg},
+  {k:'pastDue',label:'membership past due',test:m=>m.memb==='Past due'},
+];
+class Component extends DCLogic {
+  state = {chk2:{}, sort2:{k:'name',d:1}, swiped2:3, reqs2:[8,5], notice2:null, roles:{}, open:null, sel:{3:true,5:true}, filtersOpen:false, role1a:'All', sel1b:5, role1c:null, attn:null, saved:null};
+  componentDidMount(){ this._k = e=>{ if(e.key==='Escape') this.setState({sel2:null,draft2:null}); }; window.addEventListener('keydown', this._k); }
+  componentWillUnmount(){ window.removeEventListener('keydown', this._k); }
+  decide2(id, ok){ const m = BASE.find(b=>b.id===id), q = REQS[id];
+    this.setState(s=>({reqs2:s.reqs2.filter(x=>x!==id), notice2: ok ? m.name+' is now '+q.role+'.' : m.name+'’s request was rejected.'}));
+    if(ok) this.setRole(id, q.role); }
+  setRole(id, r){ this.setState(s=>({roles:{...s.roles,[id]:r}, open:null, saved:id})); clearTimeout(this._t); this._t=setTimeout(()=>this.setState({saved:null}),2200); }
+  row(m, opt){
+    const role = this.state.roles[m.id] || m.role;
+    const key = opt+m.id, s = this.state;
+    const warn = [], info = [];
+    if(!m.auf) warn.push('No AUF'); if(m.aufExpired) warn.push('AUF expired'); if(m.expiring) warn.push('AUF expiring');
+    if(m.memb==='Past due') warn.push('Past due');
+    if(m.memb==='Waived') info.push('Waived'); if(m.memb==='Trialing') info.push('Trial');
+    if(m.invited){ warn.length=0; info.length=0; info.push('Invited'); }
+    return {...m, role, ini:m.name.split(' ').map(w=>w[0]).join('').slice(0,2),
+      meta: m.invited ? `Invited ${m.invitedOn} · not activated yet` : `${m.country} · ${m.level}`, warn, info,
+      attW: m.att==null?'0%':m.att+'%', attLabel: m.att==null?'No data':m.att+'%',
+      auf: m.auf||'No AUF number',
+      contacts:[{icon:'ph ph-envelope-simple',title:m.email,value:m.email,has:true,missing:false},
+        {icon:'ph ph-phone',title:m.phone||'No phone',value:m.phone||'No phone',has:!!m.phone,missing:!m.phone},
+        {icon:'ph ph-first-aid',title:m.emerg||'No emergency contact',value:m.emerg||'No emergency contact',has:!!m.emerg,missing:!m.emerg}],
+      menuOpen: s.open===key, toggleMenu:(e)=>{e&&e.stopPropagation(); this.setState({open:s.open===key?null:key});},
+      roleOpts: ROLES.map(r=>({label:r, active:r===role, inactive:r!==role, pick:()=>this.setRole(m.id,r)})),
+      checked:!!s.sel[m.id], unchecked:!s.sel[m.id],
+      toggleCheck:()=>this.setState(st=>({sel:{...st.sel,[m.id]:!st.sel[m.id]}})),
+      selected: s.sel1b===m.id, notSelected: s.sel1b!==m.id, select:()=>this.setState({sel1b:m.id}),
+      justSaved: s.saved===m.id,
+      warnDanger: warn.filter(w=>w==='AUF expired'||w==='Past due'),
+      warnWarn: warn.filter(w=>w==='No AUF'||w==='AUF expiring'),
+      select2:()=>this.setState(st=>({sel2: st.sel2===m.id?null:m.id, draft2:null, panelClosed2:false})),
+      hasReq: (s.reqs2||[]).includes(m.id), reqRole: REQS[m.id]&&REQS[m.id].role, reqNote: REQS[m.id]&&REQS[m.id].note, reqDate: REQS[m.id]&&REQS[m.id].date,
+      approve:()=>this.decide2(m.id,true), reject:()=>this.decide2(m.id,false),
+      bg2: s.sel2===m.id?'#13283a':'transparent', bar2: s.sel2===m.id?'inset 3px 0 0 #33a1e0':'none'};
+  }
+  renderVals(){
+    const s = this.state;
+    const all = o => BASE.map(m=>this.row(m,o));
+    const rows1a = all('a').filter(m=>s.role1a==='All'||m.role===s.role1a);
+    const selCount = Object.values(s.sel).filter(Boolean).length;
+    const rows1b = all('b');
+    const d = rows1b.find(m=>m.id===s.sel1b);
+    const att = ATTN.find(a=>a.k===s.attn);
+    const rows1c = all('c').filter(m=>(!s.role1c||m.role===s.role1c)&&(!att||att.test(m)));
+    const groups = ['Admin','Committee','Coach','Player'].map(g=>({name:g.toUpperCase()+(g==='Coach'||g==='Player'?'S':''),rows:rows1c.filter(m=>m.role===g)})).filter(g=>g.rows.length).map(g=>({...g,count:g.rows.length}));
+    const tokens = [];
+    if(s.role1c) tokens.push({k:'role',v:s.role1c,remove:()=>this.setState({role1c:null})});
+    if(att) tokens.push({k:'needs',v:att.label,remove:()=>this.setState({attn:null})});
+    const rowsM = all('m');
+    const role2 = s.role2||'All';
+    const all2 = [...BASE, INV].map(m=>this.row(m,'2'));
+    const att2 = ATTN.find(a=>a.k===s.attn2);
+    const sk = s.sort2;
+    const val = m=> sk.k==='name'?m.name : sk.k==='role'?ROLES.indexOf(m.role) : sk.k==='pos'?(m.pos==='—'?'zz':m.pos) : (m.att==null?-1:m.att);
+    const chk = s.chk2;
+    const rows2 = all2.filter(m=>(role2==='All'||m.role===role2)&&(!att2||(!m.invited&&att2.test(m))))
+      .sort((a,b)=>{const x=val(a),y=val(b); return (x>y?1:x<y?-1:0)*sk.d;})
+      .map(m=>({...m,
+        check2: e=>{ e.stopPropagation(); this.setState(st=>({chk2:{...st.chk2,[m.id]:!st.chk2[m.id]}, bulkRole2:null})); },
+        checkIcon2: chk[m.id]?'ph-fill ph-check-square':'ph ph-square', checkColor2: chk[m.id]?'#33a1e0':'#5a7086',
+        sub: m.invited ? 'Invited · not activated' : m.role+' · '+m.pos,
+        swX: s.swiped2===m.id?'-180px':'0px',
+        pd: e=>{ this._px=e.clientX; this._moved=false; },
+        pu: e=>{ const dx=e.clientX-(this._px==null?e.clientX:this._px); if(dx<-30){ this._moved=true; this.setState({swiped2:m.id}); } else if(dx>30){ this._moved=true; this.setState({swiped2:null}); } },
+        tapM: ()=>{ if(this._moved){ this._moved=false; return; } if(this.state.swiped2===m.id){ this.setState({swiped2:null}); return; } this.setState({sel2:m.id,draft2:null}); },
+        swActs: m.contacts.map((c,i)=>({icon:c.icon, title:c.has?c.title:c.title, bg: c.has?['#1c6ea4','#2e9e86','#bc3b2e'][i]:'#1a2a38', color: c.has?'#e8f0f7':'#5a7086'}))}));
+    const chkIds = Object.keys(chk).filter(k=>chk[k]).map(Number);
+    const allOn = rows2.length>0 && rows2.every(m=>chk[m.id]);
+    const SL = {name:'Name',role:'Role',pos:'Position',att:'Attendance'};
+    const flip = k=>this.setState({sort2:{k, d: sk.k===k?-sk.d:(k==='att'?-1:1)}});
+    const mk = (id)=>{ const r = all2.find(m=>m.id===id); if(!r) return null;
+      const dr = s.draft2 && s.draft2.id===id ? s.draft2.role : null; const shown = dr||r.role;
+      return {...r, contacts:r.contacts.map((c,i)=>({...c, short:['Email','Call','Emergency'][i]})),
+        roleOpts: ROLES.map(x=>({label:x, active:x===shown, inactive:x!==shown, pick:()=>this.setState({draft2: x===r.role?null:{id,role:x}})})),
+        dirty: !!dr, fromRole:r.role, toRole:dr, cancel:()=>this.setState({draft2:null}),
+        save:()=>{ this.setState({draft2:null}); this.setRole(id, dr); }}; };
+    const d2 = s.sel2 ? mk(s.sel2) : null;
+    const dm2 = mk(s.sel2||5);
+    return {
+      nav2: ['Dashboard','Directory','Calendar','Attendance','Teams','Evaluations','News','Payments','Groups'].map(l=>({label:l,on:l==='Directory',off:l!=='Directory'})),
+      seg2: ['All',...ROLES].map(r=>({label:r,active:role2===r,inactive:role2!==r,pick:()=>this.setState({role2:r})})),
+      toggleFilters2:()=>this.setState({filtersOpen2:!s.filtersOpen2}), filtersOpen2:!!s.filtersOpen2,
+      fsel2:[{label:'POSITION',value:'All positions'},{label:'GROUP',value:'All groups'},{label:'AUF',value:'Expired'},{label:'MEMBERSHIP',value:'Any membership'}],
+      d2: d2||{}, dm2, hasReqs2: s.reqs2.length>0, noReqs2: s.reqs2.length===0, reqCount2: s.reqs2.length, reqLabel2: s.reqs2.length+(s.reqs2.length===1?' role request waiting':' role requests waiting'), notice2: s.notice2,
+      reqs2: s.reqs2.map(id=>{ const r = all2.find(m=>m.id===id); const q = REQS[id]; return {name:r.name, ini:r.ini, from:r.role, role:q.role, date:q.date, note:q.note, approve:r.approve, reject:r.reject, view:()=>this.setState({sel2:id,draft2:null})}; }),
+      openFirstReq:()=>this.setState({sel2:s.reqs2[0]}), mobMenu2: !!s.mobMenu2, toggleMob2:()=>this.setState(st=>({mobMenu2:!st.mobMenu2})), resetReqs2:()=>this.setState({reqs2:[8,5],notice2:null}), hasSel2: !!d2, noSel2: !d2, clearSel2:()=>this.setState({sel2:null,draft2:null,panelClosed2:false}),
+      panelOpen2: !s.panelClosed2, panelDisp2: s.panelClosed2?'none':'flex', cols2: s.panelClosed2?'minmax(0,1fr) 0px':'minmax(0,1fr) 340px',
+      togglePanel2:()=>this.setState(st=>({panelClosed2:!st.panelClosed2, sel2: st.panelClosed2?st.sel2:null, draft2:null})),
+      panelTitle2: s.panelClosed2?'Show club overview':'Hide panel', panelBadge2: !!s.panelClosed2 && s.reqs2.length>0,
+      panelBg2: s.panelClosed2?'#13283a':'color-mix(in srgb,#33a1e0 14%,#13283a)', panelBorder2: s.panelClosed2?'#274055':'color-mix(in srgb,#33a1e0 55%,transparent)', panelColor2: s.panelClosed2?'#e8f0f7':'#cfe8f7',
+      attn2: ATTN.map((a,i)=>({label:a.label[0].toUpperCase()+a.label.slice(1), count:BASE.filter(a.test).length, color: i===1||i===3?'#f2887a':'#f2ce78',
+        bg: s.attn2===a.k?'color-mix(in srgb,#33a1e0 14%,transparent)':'#0c1a26', border: s.attn2===a.k?'#33a1e0':'#274055',
+        toggle:()=>this.setState({attn2: s.attn2===a.k?null:a.k})})),
+      byRole2: ['Admin','Committee','Coach','Player'].map(r=>({label:({Admin:'Admins',Committee:'Committee',Coach:'Coaches',Player:'Players'})[r], count: all2.filter(m=>m.role===r).length, pick:()=>this.setState({role2:r})})),
+      rows2, total2: all2.length, shown2: rows2.length, empty2: rows2.length===0,
+      heads2: [['name','MEMBER','flex-start'],['role','ROLE','flex-start'],['pos','POSITION','flex-start'],['att','ATTEND.','flex-end']].map(([k,l,j])=>({label:l, just:j, arrow: sk.k===k?(sk.d>0?'↑':'↓'):'', color: sk.k===k?'#e8f0f7':'#8aa1b5', sort:()=>flip(k)})),
+      sortLabel2: SL[sk.k]+' '+(sk.d>0?'↑':'↓'), sortSheet2: !!s.sortSheet2, toggleSort2:()=>this.setState(st=>({sortSheet2:!st.sortSheet2})),
+      sortOpts2: Object.keys(SL).map(k=>({label:SL[k], dir: sk.k===k?(sk.d>0?'Ascending ↑':'Descending ↓'):'', weight: sk.k===k?700:400, color: sk.k===k?'#33a1e0':'#e8f0f7', pick:()=>{ flip(k); this.setState({sortSheet2:false}); }})),
+      toggleAll2:()=>this.setState({chk2: allOn?{}:Object.fromEntries(rows2.map(m=>[m.id,true])), bulkRole2:null}),
+      allIcon2: allOn?'ph-fill ph-check-square':(chkIds.length?'ph-fill ph-minus-square':'ph ph-square'), allColor2: chkIds.length?'#33a1e0':'#5a7086',
+      hasChk2: chkIds.length>0, chkCount2: chkIds.length, clearChk2:()=>this.setState({chk2:{}, bulkRole2:null, bulkMenu2:false}),
+      bulkMenu2: !!s.bulkMenu2, toggleBulkMenu2:()=>this.setState(st=>({bulkMenu2:!st.bulkMenu2})),
+      bulkOpts2: ROLES.map(r=>({label:r, pick:()=>this.setState({bulkRole2:r, bulkMenu2:false})})),
+      bulkDirty2: !!s.bulkRole2, bulkMsg2: s.bulkRole2 ? 'Change '+chkIds.length+' member'+(chkIds.length>1?'s':'')+' to '+s.bulkRole2+'?' : '',
+      bulkCancel2:()=>this.setState({bulkRole2:null}),
+      bulkSave2:()=>{ const r=s.bulkRole2; this.setState(st=>{ const roles={...st.roles}; chkIds.forEach(id=>roles[id]=r); return {roles, chk2:{}, bulkRole2:null, notice2: chkIds.length+' member'+(chkIds.length>1?'s are':' is')+' now '+r+'.'}; }); },
+      aufSent2: !!s.aufSent2, aufNotSent2: !s.aufSent2, sendAuf2:()=>this.setState({aufSent2:true}), viewAuf2:()=>this.setState({attn2:'aufExp', role2:'All'}),
+      resent2: !!s.resent2, resendable2: !s.resent2, resend2:()=>this.setState({resent2:true}),
+      clearAll2:()=>this.setState({role2:'All', attn2:null}),
+      emptyWhy2: 'Showing '+role2+(att2?' · '+att2.label:'')+'. Try removing a filter.',
+      total: BASE.length,
+      seg1a: ['All',...ROLES].map(r=>({label:r,active:s.role1a===r,inactive:s.role1a!==r,pick:()=>this.setState({role1a:r})})),
+      toggleFilters:()=>this.setState({filtersOpen:!s.filtersOpen}), filtersOpen:s.filtersOpen,
+      rows1a, hasSel:selCount>0, selCount, clearSel:()=>this.setState({sel:{}}),
+      facets:[{label:'Role: All',on:false,off:true},{label:'Position',on:false,off:true},{label:'Group',on:false,off:true},{label:'AUF: Expired',on:true,off:false},{label:'Membership',on:false,off:true},{label:'Missing info',on:false,off:true}].map(f=>({...f,label:f.label})),
+      rows1b, d,
+      tokens, attn: ATTN.map(a=>({label:a.label,count:BASE.filter(a.test).length,on:s.attn===a.k,off:s.attn!==a.k,toggle:()=>this.setState({attn:s.attn===a.k?null:a.k})})),
+      groups, empty1c: rows1c.length===0, shown1c: rows1c.length,
+      rowsM, dm: rowsM.find(m=>m.id===5),
+    };
+  }
+}
+</script>
+</body>
+</html>
