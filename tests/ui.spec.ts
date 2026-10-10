@@ -15433,6 +15433,10 @@ test.describe("la búsqueda global en el navegador", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
+    // El evento buscado es del 10 de octubre de 2026. Sin fijar la hora,
+    // desde ese día el calendario lo abre en "pasados" y la URL lleva
+    // además `&periodo=past`.
+    await page.clock.setFixedTime(HOME_NOW);
     await serveSearch(page, SEARCH_RESULTS);
     await page.goto(`${APP_URL}${SEARCH_SCREEN_PATH}`);
     await searchGlobally(page, "Geelong");
