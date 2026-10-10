@@ -150,6 +150,10 @@ export type DirectoryMemberRecord = {
   readonly status: AccountStatus;
   /** `members.created_at`: de él sale el día de la invitación (#549). */
   readonly registeredAt: string;
+  /** Sólo si la tiene, no la fecha. Un alta del Admin nace sin ella y la
+   * escribe el invitado al completar el registro; quien se registra solo la
+   * trae desde el principio. Separa al invitado de los demás `incomplete`. */
+  readonly hasDateOfBirth: boolean;
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
   /** Si un Admin lo confirmó (#274). Sin número, siempre false. */
@@ -649,6 +653,10 @@ type ListingContext = SortContext & {
   readonly signedPhotos: SignedPhotos;
 };
 
+function isPendingInvitation(record: DirectoryMemberRecord): boolean {
+  return record.status === "incomplete" && !record.hasDateOfBirth;
+}
+
 function toDirectoryMember(
   record: DirectoryMemberRecord,
   { positions, signedPhotos, attendance }: ListingContext,
@@ -661,10 +669,9 @@ function toDirectoryMember(
     role: record.role,
     position: directoryPositionOf(positions, record.positionId),
     status: record.status,
-    invitedOn:
-      record.status === "incomplete"
-        ? clubCalendarDate(new Date(record.registeredAt))
-        : null,
+    invitedOn: isPendingInvitation(record)
+      ? clubCalendarDate(new Date(record.registeredAt))
+      : null,
     photoUrl: photoUrlOf(record, signedPhotos),
     attendance: attendanceOf(attendance, record.userId),
   };

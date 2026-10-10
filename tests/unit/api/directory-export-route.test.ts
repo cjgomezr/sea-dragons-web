@@ -31,6 +31,7 @@ const MARIA: DirectoryMemberRecord = {
   positionId: DEFENDER.id,
   status: "active",
   registeredAt: "2024-03-06T01:00:00.000Z",
+  hasDateOfBirth: true,
   aufNumber: "AUF-7",
   aufExpiry: "2027-01-31",
   isAufVerified: true,
