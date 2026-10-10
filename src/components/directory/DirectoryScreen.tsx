@@ -220,7 +220,7 @@ function usePanelSelection(hasOverview: boolean): {
   readonly isOpen: boolean;
   readonly selectedUserId: string | null;
   readonly toggleMember: (userId: string) => void;
-  readonly close: () => void;
+  readonly close: (isShowingMember: boolean) => void;
   readonly togglePanel: () => void;
 } {
   const [isOpen, setIsOpen] = useState(false);
@@ -248,12 +248,17 @@ function usePanelSelection(hasOverview: boolean): {
   }
 
   /** La ✕ y Esc de una ficha vuelven al resumen, como pide el diseño; los
-   * del resumen cierran el panel del todo. */
-  function close(): void {
-    deselect();
-    if (selectedUserId === null) {
-      setIsOpen(false);
+   * del resumen cierran el panel del todo. Lo decide lo que el panel enseña
+   * y no la selección: la de un socio que un filtro dejó fuera sigue
+   * guardada mientras el panel ya enseña el resumen, y su fila no existe. */
+  function close(isShowingMember: boolean): void {
+    if (isShowingMember) {
+      deselect();
+      return;
     }
+    focusById(PANEL_TOGGLE_ID);
+    setSelectedUserId(null);
+    setIsOpen(false);
   }
 
   function togglePanel(): void {
@@ -639,7 +644,7 @@ export function DirectoryScreen({
                 locale={locale}
                 view={panelView}
                 pendingRequests={isAdminListing ? pendingRequests : null}
-                onClose={panel.close}
+                onClose={() => panel.close(panelView.kind === "member")}
                 onRoleChanged={applyRole}
               />
             ) : null}

@@ -158,7 +158,10 @@ function memberView(
 function readResponse(stub: ApiStub, url: string): Response {
   const kind = stub.kind ?? "admin";
   if (url.startsWith(DIRECTORY_PATH)) {
-    const members = stub.members ?? [NEREA, ANA];
+    const search = new URL(url, "http://localhost").searchParams.get("q");
+    const members = (stub.members ?? [NEREA, ANA]).filter(
+      (member) => search === null || member.fullName.includes(search),
+    );
     return jsonResponse(200, {
       data: {
         kind,
@@ -1115,6 +1118,27 @@ describe("el resumen del club (#551)", () => {
       expect(button()).toHaveAttribute("aria-pressed", "false");
     },
   );
+
+  it("si un filtro deja fuera al socio elegido, el » cierra el panel a la primera y deja el foco en el botón", async () => {
+    const user = userEvent.setup();
+    stubApi();
+    await renderDirectory();
+    await user.click(row("Nerea Ruiz"));
+
+    await user.type(
+      screen.getByRole("searchbox", { name: "Search by name" }),
+      "Ana",
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("row", { name: "Nerea Ruiz" })).toBeNull(),
+    );
+    await user.click(
+      within(overview()).getByRole("button", { name: "Close the panel" }),
+    );
+
+    expect(screen.queryByRole("region", { name: "Side panel" })).toBeNull();
+    expect(panelToggle()).toHaveFocus();
+  });
 
   it("cerrado, el botón del panel enseña cuántas solicitudes esperan", async () => {
     const user = userEvent.setup();
