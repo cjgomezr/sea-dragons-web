@@ -9940,7 +9940,12 @@ const ACCENT_SCREENS: readonly AccentScreen[] = [
   {
     name: "acento-panel",
     storageState: E2E_STORAGE_STATE_PATH,
-    visit: (page, theme) => goToWithTheme(page, "/dashboard", theme),
+    // Sin esperar, la captura salía a veces con el inicio cargado y a veces
+    // con "Loading…", según lo rápido que respondiera la base.
+    visit: async (page, theme) => {
+      await goToWithTheme(page, "/dashboard", theme);
+      await waitForSectionsLoaded(page, []);
+    },
   },
   {
     name: "acento-directorio",
