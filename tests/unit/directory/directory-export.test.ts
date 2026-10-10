@@ -96,10 +96,12 @@ function harness(callerRole: Role | null): Harness {
 function exportAs(
   { gateways }: Harness,
   query = DEFAULT_DIRECTORY_QUERY,
+  selectedUserIds: readonly string[] | null = null,
 ): ReturnType<typeof exportDirectory> {
   return exportDirectory(gateways, {
     callerId: CALLER_ID,
     query,
+    selectedUserIds,
     todayInClub: TODAY_IN_CLUB,
     locale: "es",
   });
@@ -206,6 +208,7 @@ describe("exportDirectory", () => {
       exportDirectory(gateways, {
         callerId: CALLER_ID,
         query: DEFAULT_DIRECTORY_QUERY,
+        selectedUserIds: null,
         todayInClub: TODAY_IN_CLUB,
         locale: "es",
       }),
@@ -216,5 +219,50 @@ describe("exportDirectory", () => {
     await exportAs(admin);
 
     expect(admin.signedPhotoRequests.flat()).toEqual([]);
+  });
+
+  it("con socios marcados exporta sólo a esos (#552)", async () => {
+    const exported = await exportAs(admin, DEFAULT_DIRECTORY_QUERY, [
+      TOMAS.userId,
+    ]);
+
+    expect(exported.memberCount).toBe(1);
+    expect(exported.csv).toContain("Tomás Gil");
+    expect(exported.csv).not.toContain("María Ñíguez");
+  });
+
+  it("no saca a un marcado que el filtro deja fuera", async () => {
+    const exported = await exportAs(
+      admin,
+      { ...DEFAULT_DIRECTORY_QUERY, withoutPhone: true },
+      [TOMAS.userId],
+    );
+
+    expect(exported.memberCount).toBe(0);
+    expect(exported.csv).not.toContain("Tomás Gil");
+  });
+
+  it("a un Committee le da con marcados las mismas columnas", async () => {
+    const all = await exportAs(harness("Committee"));
+    const marked = await exportAs(
+      harness("Committee"),
+      DEFAULT_DIRECTORY_QUERY,
+      [MARIA.userId],
+    );
+
+    expect(marked.csv.split("\r\n")[0]).toBe(all.csv.split("\r\n")[0]);
+  });
+
+  it("apunta en la bitácora cuántos iban marcados", async () => {
+    await exportAs(admin, DEFAULT_DIRECTORY_QUERY, [
+      MARIA.userId,
+      TOMAS.userId,
+    ]);
+
+    expect(admin.auditRows[0]?.metadata).toEqual({
+      filters: {},
+      memberCount: 2,
+      selectedCount: 2,
+    });
   });
 });
