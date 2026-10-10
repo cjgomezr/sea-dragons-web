@@ -4734,7 +4734,9 @@ function filterWithoutPhone(labels: ContactLabels) {
       .check();
     await closeFilters(page, labels.filters);
     await expect(page.getByRole("row", { name: "Ana Admin" })).toHaveCount(0);
-    await waitForContactColumn(page);
+    // La fila de Nerea, y no su contacto: en el móvil, el de un Admin se
+    // queda en la ficha (#553). La fila y su contacto se pintan juntos.
+    await expect(page.getByRole("row", { name: "Nerea Ruiz" })).toBeVisible();
   };
 }
 
@@ -4767,6 +4769,9 @@ const DIRECTORY_EMAILS_ENDPOINT = "/api/v1/directory/emails";
 
 type EmailLabels = {
   readonly open: string;
+  /** En el móvil el correo se abre desde el "⋯" (#553). */
+  readonly more: string;
+  readonly moreEmail: RegExp;
   readonly subject: string;
   readonly message: string;
   readonly send: string;
@@ -4777,6 +4782,8 @@ type EmailLabels = {
 
 const ENGLISH_EMAIL_LABELS: EmailLabels = {
   open: "Write an email",
+  more: "More actions",
+  moreEmail: /^Email these members/,
   subject: "Subject",
   message: "Message",
   send: "Send",
@@ -4787,6 +4794,8 @@ const ENGLISH_EMAIL_LABELS: EmailLabels = {
 
 const SPANISH_EMAIL_LABELS: EmailLabels = {
   open: "Escribir correo",
+  more: "Más acciones",
+  moreEmail: /^Escribir a estos miembros/,
   subject: "Asunto",
   message: "Mensaje",
   send: "Enviar",
@@ -4880,10 +4889,25 @@ function beforeEmailVisit(answer: EmailAnswer, isSpanish: boolean) {
   };
 }
 
+/** Abre el formulario: con el botón de la cabecera de escritorio, o desde
+ * la hoja del "⋯" en el móvil (#553). */
+async function openEmailForm(page: Page, labels: EmailLabels): Promise<void> {
+  const headerButton = page.getByRole("button", { name: labels.open });
+  if (await headerButton.isVisible()) {
+    await headerButton.click();
+    return;
+  }
+  await page.getByRole("button", { name: labels.more }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: labels.moreEmail })
+    .click();
+}
+
 /** Abre el formulario y escribe un correo de varias líneas. */
 function writeEmail(labels: EmailLabels) {
   return async (page: Page): Promise<void> => {
-    await page.getByRole("button", { name: labels.open }).click();
+    await openEmailForm(page, labels);
     await page
       .getByRole("textbox", { name: labels.subject })
       .fill("Saturday training moves to 8am");
