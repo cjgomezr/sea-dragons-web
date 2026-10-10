@@ -18,10 +18,16 @@ import type { PendingRoleRequests } from "./use-pending-role-requests";
  *
  * Esc lo cierra desde cualquier punto de dentro, igual que su ✕; la pantalla
  * devuelve entonces el foco a la fila. Por debajo de 768px no hay panel: la
- * hoja de estilos lo esconde, y el móvil tendrá su ficha que sube.
+ * hoja de estilos lo esconde, y el móvil tendrá su ficha que sube. Entre 768
+ * y 1199px se abre encima de la lista, nunca de la barra: su botón sigue a
+ * la vista.
  */
 
 export const DIRECTORY_PANEL_ID = "directorio-panel";
+
+/** El botón de la barra: recibe el foco cuando se cierra el panel sin nadie
+ * elegido, que no tiene una fila a la que volver. */
+export const PANEL_TOGGLE_ID = "directorio-panel-boton";
 
 export function PanelToggle({
   translate,
@@ -35,6 +41,7 @@ export function PanelToggle({
   const label = translate("directory.panel.toggle");
   return (
     <button
+      id={PANEL_TOGGLE_ID}
       type="button"
       className="directory-icon-button directory-panel-toggle"
       aria-label={label}
@@ -109,21 +116,25 @@ export function DirectoryPanel({
         }
       }}
     >
-      {selected === null ? (
-        <EmptyPanel translate={translate} onClose={onClose} />
-      ) : (
-        <MemberQuickCard
-          // Otro socio empieza de cero: sin esto, la franja de un rol a medio
-          // elegir pasaría de una ficha a la siguiente.
-          key={selected.member.userId}
-          translate={translate}
-          locale={locale}
-          selected={selected}
-          pendingRequests={pendingRequests}
-          onClose={onClose}
-          onRoleChanged={onRoleChanged}
-        />
-      )}
+      {/* El interior es el que se queda pegado al bajar por la lista: la
+          sección mide lo que la lista, para no tapar nada fuera de ella. */}
+      <div className="directory-panel-inner">
+        {selected === null ? (
+          <EmptyPanel translate={translate} onClose={onClose} />
+        ) : (
+          <MemberQuickCard
+            // Otro socio empieza de cero: sin esto, la franja de un rol a medio
+            // elegir pasaría de una ficha a la siguiente.
+            key={selected.member.userId}
+            translate={translate}
+            locale={locale}
+            selected={selected}
+            pendingRequests={pendingRequests}
+            onClose={onClose}
+            onRoleChanged={onRoleChanged}
+          />
+        )}
+      </div>
     </section>
   );
 }

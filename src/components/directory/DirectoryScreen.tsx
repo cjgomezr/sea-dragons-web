@@ -33,7 +33,7 @@ import {
 } from "./DirectoryFilters";
 import { DirectoryHeader } from "./DirectoryHeader";
 import type { DirectoryOrder } from "./DirectorySortControl";
-import { DirectoryPanel } from "./DirectoryPanel";
+import { DirectoryPanel, PANEL_TOGGLE_ID } from "./DirectoryPanel";
 import {
   DirectoryTable,
   type RequestedRoles,
@@ -150,12 +150,12 @@ function requestedRolesOf(state: PendingRequestsState): RequestedRoles {
   );
 }
 
-/** Devuelve el foco a la fila del socio que el panel enseñaba, si sigue en
- * la lista: quien cerró el panel con el teclado sigue donde estaba. */
-function focusMemberRow(userId: string): void {
-  const row = document.getElementById(memberRowId(userId));
-  if (row !== null) {
-    row.focus();
+/** Devuelve el foco a un elemento si sigue en la página: quien cerró el
+ * panel con el teclado sigue donde estaba. */
+function focusById(id: string): void {
+  const element = document.getElementById(id);
+  if (element !== null) {
+    element.focus();
   }
 }
 
@@ -172,10 +172,12 @@ function usePanelSelection(): {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
+  /** El foco vuelve a la fila que el panel enseñaba o, sin ninguna, al
+   * botón que lo abrió. */
   function deselect(): void {
-    if (selectedUserId !== null) {
-      focusMemberRow(selectedUserId);
-    }
+    focusById(
+      selectedUserId === null ? PANEL_TOGGLE_ID : memberRowId(selectedUserId),
+    );
     setSelectedUserId(null);
   }
 

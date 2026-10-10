@@ -5545,6 +5545,33 @@ test.describe("el panel lateral del directorio con el teclado", () => {
   });
 });
 
+/* Entre 768 y 1199px el panel se abre encima de la lista, nunca de la
+   barra: su botón tiene que seguir pulsándose para cerrarlo. Playwright no
+   pulsa un botón que otro elemento tapa. */
+test.describe("el botón del panel lateral a 768px", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 768, height: 1024 },
+  });
+
+  test("sigue a la vista y cierra el panel abierto", async ({ page }) => {
+    await goToDirectory(page, {
+      name: "directorio-ficha-boton",
+      asAdmin: true,
+      listHeading: ENGLISH_DIRECTORY_HEADING,
+      prepare: selectMember("Nerea Ruiz"),
+    });
+
+    await page.getByRole("button", { name: "Side panel" }).click();
+
+    await expect(
+      page.getByRole("region", { name: "Details of Nerea Ruiz" }),
+    ).toHaveCount(0);
+  });
+});
+
 /* Los filtros de #497 piden axe en cada ancho y en los dos temas, no sólo en
    el ancho por defecto: la barra y la hoja son controles distintos. El
    contacto de #499 también: la columna de la tabla y la tarjeta del móvil

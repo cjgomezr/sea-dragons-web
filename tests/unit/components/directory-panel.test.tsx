@@ -383,6 +383,21 @@ describe("el panel lateral: el botón de la barra", () => {
     expect(screen.queryByRole("region", { name: "Side panel" })).toBeNull();
   });
 
+  it("abierto sin nadie, Esc lo cierra y devuelve el foco al botón", async () => {
+    const user = userEvent.setup();
+    stubApi();
+    await renderDirectory();
+    await user.click(panelToggle());
+    within(screen.getByRole("region", { name: "Side panel" }))
+      .getByRole("button", { name: "Close the panel" })
+      .focus();
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("region", { name: "Side panel" })).toBeNull();
+    expect(panelToggle()).toHaveFocus();
+  });
+
   it("cerrarlo con alguien seleccionado quita la ficha; seleccionar lo vuelve a abrir", async () => {
     const user = userEvent.setup();
     stubApi();

@@ -140,7 +140,7 @@ function CardTags({
     >
       {tags.map((tag) => (
         <li
-          key={tag.text}
+          key={`${tag.tone}-${tag.text}`}
           className={`directory-card-tag directory-card-tag-${tag.tone}`}
         >
           {tag.text}
