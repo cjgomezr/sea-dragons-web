@@ -134,6 +134,11 @@ export const MEMBERSHIP_WAIVER_API_PATH = `${MEMBERS_API_PATH}/[id]/membership-w
  * Admin: quien no lo es y la pide a mano vuelve al panel, como con Equipos. */
 export const MEMBER_RECORD_PATH = `${DIRECTORY_PATH}/[id]`;
 
+/** La ficha de un miembro concreto. */
+export function memberRecordHref(userId: string): string {
+  return MEMBER_RECORD_PATH.replace("[id]", userId);
+}
+
 /** El alta de un miembro por un Admin (#243, FR-020), abierta desde la
  * cabecera del directorio. Casa también con `MEMBER_RECORD_PATH`, que ya la
  * reserva al Admin; se declara igual para que siga siéndolo si esa cambia. */

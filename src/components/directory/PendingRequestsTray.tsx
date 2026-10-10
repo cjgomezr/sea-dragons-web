@@ -23,7 +23,7 @@ import { useSingleDecision } from "./use-single-decision";
  * así que un doble clic no puede mandar dos.
  */
 
-function RequestActions({
+export function RequestActions({
   translate,
   request,
   isBusy,

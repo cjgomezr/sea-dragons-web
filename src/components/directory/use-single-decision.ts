@@ -7,8 +7,8 @@ import type { RoleRequestDecision } from "@/lib/auth/role-request-decision";
 /**
  * Una decisión sobre las solicitudes de rol cada vez: mientras una está en
  * vuelo, ninguna otra sale, así que un doble toque no puede mandar dos. Lo
- * usan la bandeja de escritorio (#240) y la pantalla de solicitudes del
- * móvil (#553).
+ * usan la bandeja de escritorio (#240), la pantalla de solicitudes del
+ * móvil (#553) y el recuadro de la solicitud del panel lateral (#550).
  */
 
 type Decide = (
