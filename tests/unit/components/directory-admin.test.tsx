@@ -78,6 +78,7 @@ const COACH_REQUEST: PendingRoleRequest = {
   id: REQUEST_ID,
   userId: NEREA_ID,
   fullName: "Nerea Ruiz",
+  currentRole: "Player",
   requestedRole: "Coach",
   justification: "Entreno a los juveniles los jueves.",
   // 18:30 en Melbourne.

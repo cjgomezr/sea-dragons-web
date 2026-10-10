@@ -38,6 +38,7 @@ const pendingRequestsSchema = z.object({
         id: z.string(),
         userId: z.string(),
         fullName: z.string(),
+        currentRole: z.enum(ROLES),
         requestedRole: z.enum(REQUESTABLE_ROLES),
         justification: z.string().nullable(),
         createdAt: z.string(),
