@@ -797,56 +797,36 @@ describe("pantalla del directorio", () => {
   });
 });
 
-/** El control de orden de la lista de tarjetas (#283). En el navegador sólo se
+/** La hoja del orden de la lista del móvil (#553). En el navegador sólo se
  * ve por debajo de 768px, donde la tabla pierde sus cabeceras; aquí no hay
  * hoja de estilos, así que convive con ellas, y eso es justo lo que deja
- * probar que los dos leen y escriben el mismo orden. */
-function sortGroup(name = "Sort by"): HTMLElement {
-  return screen.getByRole("group", { name });
+ * probar que las dos leen y escriben el mismo orden. Lo demás de la hoja se
+ * prueba en `directory-mobile.test.tsx`. */
+function sortSheetButton(name = /^Sort:/): HTMLElement {
+  return screen.getByRole("button", { name });
 }
 
-function directionGroup(name = "Order"): HTMLElement {
-  return screen.getByRole("group", { name });
+async function sortFromSheet(
+  field: string,
+  locale: "en" | "es" = "en",
+): Promise<void> {
+  const user = userEvent.setup();
+  await user.click(sortSheetButton(locale === "en" ? /^Sort:/ : /^Orden:/));
+  await user.click(
+    within(
+      screen.getByRole("dialog", {
+        name: locale === "en" ? "Sort by" : "Ordenar por",
+      }),
+    ).getByRole("button", { name: new RegExp(`^${field}`) }),
+  );
 }
 
-describe("orden desde el control de la lista estrecha", () => {
-  it("ofrece los mismos campos que las cabeceras y los dos sentidos", async () => {
-    stubApi();
-
-    await renderScreen();
-
-    expect(
-      within(sortGroup())
-        .getAllByRole("radio")
-        .map((radio) => radio.closest("label")?.textContent),
-    ).toEqual(["Member", "Role", "Position", "Attendance"]);
-    expect(
-      within(directionGroup())
-        .getAllByRole("radio")
-        .map((radio) => radio.closest("label")?.textContent),
-    ).toEqual(["Ascending", "Descending"]);
-  });
-
-  it("arranca con el orden por defecto elegido", async () => {
-    stubApi();
-
-    await renderScreen();
-
-    expect(
-      within(sortGroup()).getByRole("radio", { name: "Member" }),
-    ).toBeChecked();
-    expect(
-      within(directionGroup()).getByRole("radio", { name: "Ascending" }),
-    ).toBeChecked();
-  });
-
+describe("orden desde la hoja de la lista estrecha", () => {
   it("pide el campo que se elige y lo refleja en la cabecera de la tabla", async () => {
     stubApi();
     await renderScreen();
 
-    await userEvent
-      .setup()
-      .click(within(sortGroup()).getByRole("radio", { name: "Role" }));
+    await sortFromSheet("Role");
 
     await waitFor(() => {
       expect(lastRequest().get("sort")).toBe("role");
@@ -854,25 +834,6 @@ describe("orden desde el control de la lista estrecha", () => {
     expect(lastRequest().get("direction")).toBe("asc");
     expect(columnHeader("Role")).toHaveAttribute("aria-sort", "ascending");
     expect(columnHeader("Member")).toHaveAttribute("aria-sort", "none");
-  });
-
-  it("pide el sentido que se elige sin cambiar de campo", async () => {
-    stubApi();
-    await renderScreen();
-    const user = userEvent.setup();
-    await user.click(
-      within(sortGroup()).getByRole("radio", { name: "Position" }),
-    );
-
-    await user.click(
-      within(directionGroup()).getByRole("radio", { name: "Descending" }),
-    );
-
-    await waitFor(() => {
-      expect(lastRequest().get("direction")).toBe("desc");
-    });
-    expect(lastRequest().get("sort")).toBe("position");
-    expect(columnHeader("Position")).toHaveAttribute("aria-sort", "descending");
   });
 
   it("enseña el orden que se eligió desde una cabecera", async () => {
@@ -884,27 +845,7 @@ describe("orden desde el control de la lista estrecha", () => {
     await waitFor(() => {
       expect(lastRequest().get("direction")).toBe("desc");
     });
-    expect(
-      within(sortGroup()).getByRole("radio", { name: "Member" }),
-    ).toBeChecked();
-    expect(
-      within(directionGroup()).getByRole("radio", { name: "Descending" }),
-    ).toBeChecked();
-  });
-
-  it("se escribe en español", async () => {
-    stubApi();
-
-    await renderScreen("es");
-
-    expect(
-      within(sortGroup("Ordenar por")).getByRole("radio", { name: "Miembro" }),
-    ).toBeChecked();
-    expect(
-      within(directionGroup("Sentido")).getByRole("radio", {
-        name: "Ascendente",
-      }),
-    ).toBeChecked();
+    expect(sortSheetButton()).toHaveAccessibleName("Sort: Name, descending");
   });
 });
 
@@ -1231,33 +1172,29 @@ describe("columna de asistencia", () => {
     expect(attendanceCell("Nerea Ruiz")).toHaveTextContent(/^Sin datos$/);
   });
 
-  it.each([
-    ["Ascending", "asc"],
-    ["Descending", "desc"],
-  ])(
-    "pide el orden por asistencia %s desde el control de la lista estrecha",
-    async (directionLabel, direction) => {
-      stubApi();
-      await renderScreen();
-      const user = userEvent.setup();
+  it("pide la asistencia de mayor a menor desde la hoja, y al repetir, al revés", async () => {
+    stubApi();
+    await renderScreen();
 
-      await user.click(
-        within(sortGroup()).getByRole("radio", { name: "Attendance" }),
-      );
-      await user.click(
-        within(directionGroup()).getByRole("radio", { name: directionLabel }),
-      );
-
-      await waitFor(() => {
-        expect(lastRequest().get("direction")).toBe(direction);
-      });
+    await sortFromSheet("Attendance");
+    await waitFor(() => {
       expect(lastRequest().get("sort")).toBe("attendance");
-      expect(columnHeader("Attendance")).toHaveAttribute(
-        "aria-sort",
-        direction === "asc" ? "ascending" : "descending",
-      );
-    },
-  );
+    });
+    expect(lastRequest().get("direction")).toBe("desc");
+    expect(columnHeader("Attendance")).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+
+    await sortFromSheet("Attendance");
+    await waitFor(() => {
+      expect(lastRequest().get("direction")).toBe("asc");
+    });
+    expect(columnHeader("Attendance")).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+  });
 
   it("enseña la lista en el orden que responde el servidor, con los sin datos al final", async () => {
     const MENOS: DirectoryMember = {
@@ -1281,14 +1218,13 @@ describe("columna de asistencia", () => {
 
   it("ofrece el orden por asistencia en español", async () => {
     stubApi();
-
     await renderScreen("es");
 
-    expect(
-      within(sortGroup("Ordenar por")).getByRole("radio", {
-        name: "Asistencia",
-      }),
-    ).not.toBeChecked();
+    await sortFromSheet("Asistencia", "es");
+
+    await waitFor(() => {
+      expect(lastRequest().get("sort")).toBe("attendance");
+    });
   });
 });
 
@@ -2113,9 +2049,9 @@ describe("el popover de Filtros", () => {
     await renderScreen();
     await openFilters();
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole("heading", { level: 1, name: "Directory" }));
+    // El total de la cabecera: texto, nada que reciba el foco. El título ya
+    // no sirve, porque lo recibe al volver de las solicitudes (#553).
+    await userEvent.setup().click(screen.getByText("1 of 1 member"));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Filters" })).toHaveFocus();

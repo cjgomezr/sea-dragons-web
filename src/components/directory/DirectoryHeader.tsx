@@ -14,6 +14,7 @@ import type {
 import type { Translator } from "@/lib/i18n/translator";
 import type { EmailRecipient } from "./DirectoryEmailComposer";
 import { DirectoryExportButton } from "./DirectoryExportButton";
+import { DirectoryMoreActions } from "./DirectoryMoreActions";
 import { ROLE_REQUESTS_HEADING_ID } from "./RoleRequestsPanel";
 import type { PendingRequestsState } from "./use-pending-role-requests";
 
@@ -22,7 +23,9 @@ import type { PendingRequestsState } from "./use-pending-role-requests";
  * socios enseña la lista de cuántos tiene el club y, a un Admin, cómo van las
  * solicitudes de rol. A la derecha, los botones de solo icono de escribir un
  * correo (#501), exportar a CSV (#500) e invitar (#243), cada uno sólo para
- * quien hoy puede usarlo.
+ * quien hoy puede usarlo. En el móvil (#553) el correo y el CSV van juntos
+ * en el menú "⋯", y la hoja de estilos esconde el total y la línea de las
+ * solicitudes: de ellas avisa la lista.
  *
  * Quién puede qué lo dice la marca que el servidor pone a la lista, nunca un
  * rol que la pantalla lea por su cuenta; y el servidor lo vuelve a mirar al
@@ -154,16 +157,27 @@ function HeaderActions({
   onOpenEmail: (recipients: readonly EmailRecipient[]) => void;
 }): React.JSX.Element {
   const { listing, listedQuery } = listed;
+  const canEmail = canWriteEmails(listing);
+  const canExport = canExportListing(listing);
   return (
     <div className="directory-actions">
-      {canWriteEmails(listing) ? (
+      {canEmail || canExport ? (
+        <DirectoryMoreActions
+          translate={translate}
+          memberCount={listing.members.length}
+          emailRecipients={canEmail ? emailRecipientsOf(listing) : null}
+          exportQuery={canExport ? listedQuery : null}
+          onOpenEmail={onOpenEmail}
+        />
+      ) : null}
+      {canEmail ? (
         <WriteEmailButton
           translate={translate}
           recipients={emailRecipientsOf(listing)}
           onOpen={onOpenEmail}
         />
       ) : null}
-      {canExportListing(listing) ? (
+      {canExport ? (
         <DirectoryExportButton
           translate={translate}
           query={listedQuery}
@@ -180,6 +194,7 @@ export function DirectoryHeader({
   translate,
   listed,
   pendingRequests,
+  titleRef,
   onOpenEmail,
 }: {
   translate: Translator;
@@ -187,13 +202,18 @@ export function DirectoryHeader({
   listed: ListedDirectory | null;
   /** `null` para quien no es Admin: no tiene solicitudes que decidir. */
   pendingRequests: PendingRequestsState | null;
+  /** El foco vuelve al título al salir de la pantalla de solicitudes del
+   * móvil sin ninguna pendiente (#553). */
+  titleRef: React.Ref<HTMLHeadingElement>;
   onOpenEmail: (recipients: readonly EmailRecipient[]) => void;
 }): React.JSX.Element {
   return (
     <header className="directory-header">
       <div className="directory-heading">
         <div className="directory-title">
-          <h1>{translate("directory.title")}</h1>
+          <h1 ref={titleRef} tabIndex={-1}>
+            {translate("directory.title")}
+          </h1>
           {listed === null ? null : (
             <p className="directory-total">
               {translate("directory.count", {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Role } from "@/lib/auth/roles";
 import {
   DEFAULT_DIRECTORY_QUERY,
@@ -34,7 +34,9 @@ import {
 import { DirectoryHeader } from "./DirectoryHeader";
 import type { DirectoryOrder } from "./DirectorySortControl";
 import { DirectoryTable, type RequestedRoles } from "./DirectoryTable";
+import { RoleRequestsBanner } from "./RoleRequestsBanner";
 import { RoleRequestsPanel } from "./RoleRequestsPanel";
+import { RoleRequestsScreen } from "./RoleRequestsScreen";
 import { useDebouncedValue } from "./use-debounced-value";
 import { useFilterChoices } from "./use-filter-choices";
 import {
@@ -56,6 +58,10 @@ import {
  * rediseño de E21 (#548): la bandeja queda debajo de la lista, y la cabecera
  * lleva a ella. La lista es la compacta de #549, que ya no cambia el rol: eso
  * se hace en la ficha del socio.
+ *
+ * En el móvil (#553) las solicitudes no van debajo de la lista: un aviso
+ * encima de ella abre su propia pantalla, que tapa el directorio hasta que
+ * se vuelve con la flecha.
  *
  * Es de cliente porque su razón de ser es cambiar sin recargar: buscar,
  * filtrar y ordenar rehacen la lectura. Lee por la API v1 y nunca contra la
@@ -132,6 +138,16 @@ const FIRST_DIRECTION: Readonly<Record<DirectorySort, DirectoryDirection>> = {
 };
 
 const NO_REQUESTED_ROLES: RequestedRoles = new Map();
+
+/** Dónde está un Admin respecto a la pantalla de solicitudes del móvil.
+ * `returned` es la lista otra vez, recién vuelto: el foco vuelve al aviso,
+ * o al título si ya no queda ninguna. */
+type RequestsView = "list" | "screen" | "returned";
+
+/** Cuántas solicitudes esperan, si la bandeja ya lo sabe. */
+function waitingCountOf(state: PendingRequestsState): number {
+  return state.kind === "ready" ? state.requests.length : 0;
+}
 
 /** Lo que pidió cada socio, mientras la bandeja lo sabe. */
 function requestedRolesOf(state: PendingRequestsState): RequestedRoles {
@@ -305,11 +321,35 @@ export function DirectoryScreen({
     onRoleGranted: applyRole,
   });
 
+  const [requestsView, setRequestsView] = useState<RequestsView>("list");
+  const bannerRef = useRef<HTMLButtonElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (requestsView === "returned") {
+      (bannerRef.current ?? titleRef.current)?.focus();
+    }
+  }, [requestsView]);
+
   const emptyCriteria = describeEmptyCriteria(filters, {
     translate,
     locale,
     choices,
   });
+  const waitingCount = isAdminListing
+    ? waitingCountOf(pendingRequests.state)
+    : 0;
+
+  if (isAdminListing && requestsView === "screen") {
+    return (
+      <div className="directory">
+        <RoleRequestsScreen
+          translate={translate}
+          pendingRequests={pendingRequests}
+          onBack={() => setRequestsView("returned")}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="directory">
@@ -317,6 +357,7 @@ export function DirectoryScreen({
         translate={translate}
         listed={state.kind === "ready" ? state : null}
         pendingRequests={isAdminListing ? pendingRequests.state : null}
+        titleRef={titleRef}
         onOpenEmail={setEmailRecipients}
       />
       {emailRecipients === null ? null : (
@@ -354,6 +395,14 @@ export function DirectoryScreen({
             shownCount={state.listing.members.length}
             onChange={setFilters}
           />
+          {waitingCount === 0 ? null : (
+            <RoleRequestsBanner
+              ref={bannerRef}
+              translate={translate}
+              count={waitingCount}
+              onReview={() => setRequestsView("screen")}
+            />
+          )}
           {state.listing.members.length === 0 ? (
             <DirectoryEmptyState
               translate={translate}
@@ -379,7 +428,6 @@ export function DirectoryScreen({
                   : NO_REQUESTED_ROLES
               }
               onSort={sortBy}
-              onOrderChange={setOrder}
             />
           )}
         </section>

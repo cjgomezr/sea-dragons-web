@@ -153,20 +153,25 @@ describeRls("las lecturas de administración contra seadragons-dev", () => {
                       },
                     ]);
                     expect(
-                      pending.map(({ userId, fullName, requestedRole }) => ({
-                        userId,
-                        fullName,
-                        requestedRole,
-                      })),
+                      pending.map(
+                        ({ userId, fullName, currentRole, requestedRole }) => ({
+                          userId,
+                          fullName,
+                          currentRole,
+                          requestedRole,
+                        }),
+                      ),
                     ).toEqual([
                       {
                         userId: andres.id,
                         fullName: "Andrés Mora",
+                        currentRole: "Player",
                         requestedRole: "Committee",
                       },
                       {
                         userId: beatriz.id,
                         fullName: "Beatriz Soto",
+                        currentRole: "Player",
                         requestedRole: "Coach",
                       },
                     ]);

@@ -4265,6 +4265,7 @@ const STUBBED_REQUESTS = [
     id: "11111111-0000-4000-8000-0000000000aa",
     userId: "33333333-0000-4000-8000-000000000003",
     fullName: "Nerea Ruiz",
+    currentRole: "Player",
     requestedRole: "Coach",
     justification: LONG_JUSTIFICATION,
     createdAt: "2026-09-17T08:30:00.000Z",
@@ -4273,6 +4274,7 @@ const STUBBED_REQUESTS = [
     id: "22222222-0000-4000-8000-0000000000bb",
     userId: MEMBER_WITHOUT_DATA.userId,
     fullName: LONG_MEMBER_NAME,
+    currentRole: "Player",
     requestedRole: "Committee",
     justification: null,
     createdAt: "2026-09-18T02:00:00.000Z",
@@ -4367,9 +4369,14 @@ async function waitForDirectory(
   await expect(page.getByRole("region", { name: heading })).toBeVisible();
   await expect(page.getByRole("table")).toBeVisible();
   if (asAdmin) {
+    // En el móvil la bandeja está escondida: allí las solicitudes tienen
+    // su pantalla (#553). Se espera igual a que termine de cargar.
     await expect(
-      page.getByRole("region", { name: TRAY_HEADINGS[heading] }),
-    ).toBeVisible();
+      page.getByRole("region", {
+        name: TRAY_HEADINGS[heading],
+        includeHidden: true,
+      }),
+    ).toBeAttached();
     await expect(page.getByText(TRAY_LOADING)).toHaveCount(0);
   }
 }
@@ -4433,6 +4440,19 @@ function includeFormerMembers(labels: FilterLabels, label: string) {
   };
 }
 
+/** Abre la hoja del orden del móvil (#553), toca un campo y espera a que
+ * se cierre. */
+async function chooseSortInSheet(
+  page: Page,
+  labels: { readonly sortGroup: string; readonly sortButton: RegExp },
+  field: string,
+): Promise<void> {
+  await page.getByRole("button", { name: labels.sortButton }).click();
+  const sheet = page.getByRole("dialog", { name: labels.sortGroup });
+  await sheet.getByRole("button", { name: new RegExp(`^${field}`) }).click();
+  await expect(sheet).toHaveCount(0);
+}
+
 /** Pide el orden por asistencia de menor a mayor y espera a que llegue:
  * desde la cabecera en la tabla y desde el control en la lista de tarjetas,
  * según el ancho. Ascendente para que la captura se distinga del orden
@@ -4440,6 +4460,7 @@ function includeFormerMembers(labels: FilterLabels, label: string) {
 function sortByAttendance(labels: {
   readonly column: string;
   readonly sortGroup: string;
+  readonly sortButton: RegExp;
 }) {
   return async (page: Page): Promise<void> => {
     const header = page.getByRole("columnheader", { name: labels.column });
@@ -4451,7 +4472,10 @@ function sortByAttendance(labels: {
       await header.getByRole("button").click();
       await expect(header).toHaveAttribute("aria-sort", "ascending");
     } else {
-      await sortOption(page, labels.sortGroup, labels.column).click();
+      // La hoja del móvil (#553): la asistencia empieza de mayor a menor, y
+      // tocarla otra vez la pone de menor a mayor.
+      await chooseSortInSheet(page, labels, labels.column);
+      await chooseSortInSheet(page, labels, labels.column);
     }
     await expect(page.locator("tbody tr").first()).toHaveAccessibleName(
       "Nerea Ruiz",
@@ -4710,7 +4734,9 @@ function filterWithoutPhone(labels: ContactLabels) {
       .check();
     await closeFilters(page, labels.filters);
     await expect(page.getByRole("row", { name: "Ana Admin" })).toHaveCount(0);
-    await waitForContactColumn(page);
+    // La fila de Nerea, y no su contacto: en el móvil, el de un Admin se
+    // queda en la ficha (#553). La fila y su contacto se pintan juntos.
+    await expect(page.getByRole("row", { name: "Nerea Ruiz" })).toBeVisible();
   };
 }
 
@@ -4743,6 +4769,9 @@ const DIRECTORY_EMAILS_ENDPOINT = "/api/v1/directory/emails";
 
 type EmailLabels = {
   readonly open: string;
+  /** En el móvil el correo se abre desde el "⋯" (#553). */
+  readonly more: string;
+  readonly moreEmail: RegExp;
   readonly subject: string;
   readonly message: string;
   readonly send: string;
@@ -4753,6 +4782,8 @@ type EmailLabels = {
 
 const ENGLISH_EMAIL_LABELS: EmailLabels = {
   open: "Write an email",
+  more: "More actions",
+  moreEmail: /^Email these members/,
   subject: "Subject",
   message: "Message",
   send: "Send",
@@ -4763,6 +4794,8 @@ const ENGLISH_EMAIL_LABELS: EmailLabels = {
 
 const SPANISH_EMAIL_LABELS: EmailLabels = {
   open: "Escribir correo",
+  more: "Más acciones",
+  moreEmail: /^Escribir a estos miembros/,
   subject: "Asunto",
   message: "Mensaje",
   send: "Enviar",
@@ -4856,10 +4889,25 @@ function beforeEmailVisit(answer: EmailAnswer, isSpanish: boolean) {
   };
 }
 
+/** Abre el formulario: con el botón de la cabecera de escritorio, o desde
+ * la hoja del "⋯" en el móvil (#553). */
+async function openEmailForm(page: Page, labels: EmailLabels): Promise<void> {
+  const headerButton = page.getByRole("button", { name: labels.open });
+  if (await headerButton.isVisible()) {
+    await headerButton.click();
+    return;
+  }
+  await page.getByRole("button", { name: labels.more }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: labels.moreEmail })
+    .click();
+}
+
 /** Abre el formulario y escribe un correo de varias líneas. */
 function writeEmail(labels: EmailLabels) {
   return async (page: Page): Promise<void> => {
-    await page.getByRole("button", { name: labels.open }).click();
+    await openEmailForm(page, labels);
     await page
       .getByRole("textbox", { name: labels.subject })
       .fill("Saturday training moves to 8am");
@@ -5089,7 +5137,11 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     name: "directorio-orden-asistencia",
     asAdmin: false,
     listHeading: ENGLISH_DIRECTORY_HEADING,
-    prepare: sortByAttendance({ column: "Attendance", sortGroup: "Sort by" }),
+    prepare: sortByAttendance({
+      column: "Attendance",
+      sortGroup: "Sort by",
+      sortButton: /^Sort:/,
+    }),
   },
   {
     name: "directorio-orden-asistencia-es",
@@ -5099,6 +5151,7 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     prepare: sortByAttendance({
       column: "Asistencia",
       sortGroup: "Ordenar por",
+      sortButton: /^Orden:/,
     }),
   },
   {
@@ -5438,6 +5491,223 @@ test.describe("los filtros del directorio con axe en cada ancho y tema", () => {
   }
 });
 
+/* El directorio en el móvil (#553, RF-7 del PRD de E21; mockups
+   docs/mockups/mobile-directory-admin-*-dark.png): la lista con el aviso de
+   solicitudes, la hoja del orden, la del "⋯" y la pantalla de solicitudes.
+   Sólo a 375px: desde 768px nada de esto se ve. */
+
+const MOBILE_DIRECTORY_VIEWPORT = { width: 375, height: 812 } as const;
+
+async function openSortSheet(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /^Sort:/ }).click();
+  await expect(page.getByRole("dialog", { name: "Sort by" })).toBeVisible();
+}
+
+async function openMoreSheet(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "More actions" }).click();
+  await expect(
+    page.getByRole("dialog", { name: /members? in this view$/ }),
+  ).toBeVisible();
+}
+
+async function openRequestsScreen(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /role requests? waiting/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Role requests" }),
+  ).toBeFocused();
+}
+
+const MOBILE_DIRECTORY_STATES: readonly DirectoryState[] = [
+  {
+    name: "directorio-movil",
+    asAdmin: true,
+    withRequests: true,
+    members: WITH_INVITED_MEMBER,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+  },
+  {
+    name: "directorio-movil-orden",
+    asAdmin: true,
+    withRequests: true,
+    endsInModal: true,
+    members: WITH_INVITED_MEMBER,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: openSortSheet,
+  },
+  {
+    name: "directorio-movil-menu",
+    asAdmin: true,
+    withRequests: true,
+    endsInModal: true,
+    members: WITH_INVITED_MEMBER,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: openMoreSheet,
+  },
+  {
+    name: "directorio-movil-solicitudes",
+    asAdmin: true,
+    withRequests: true,
+    members: WITH_INVITED_MEMBER,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: openRequestsScreen,
+  },
+];
+
+test.describe("el directorio en el móvil (#553)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: MOBILE_DIRECTORY_VIEWPORT,
+  });
+
+  for (const state of MOBILE_DIRECTORY_STATES) {
+    test.describe(state.name, () => {
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await goToDirectory(page, state, theme);
+          const snapshot = `${state.name}-mobile-${theme}.png`;
+          const fullPage = state.endsInModal !== true;
+          await createMissingLocalBaseline(snapshot, () =>
+            page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage }),
+          );
+          await expect(page).toHaveScreenshot(snapshot, {
+            ...SCREENSHOT_OPTIONS,
+            fullPage,
+            maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+          });
+        });
+
+        test(`has no accessibility violations (${theme})`, async ({ page }) => {
+          await goToDirectory(page, state, theme);
+          await expectNoAxeViolations(page);
+        });
+      }
+
+      // La fila de los chips del rol se desplaza dentro de sí misma: la
+      // página no.
+      test("has no horizontal scroll", async ({ page }) => {
+        await goToDirectory(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    });
+  }
+
+  test("la cabecera lleva el ⋯ e Invitar de 44 × 44, y el aviso mide al menos 48px", async ({
+    page,
+  }) => {
+    await goToDirectory(page, MOBILE_DIRECTORY_STATES[0]!);
+
+    for (const name of ["More actions", "Invite member"]) {
+      const control = page.getByRole(
+        name === "More actions" ? "button" : "link",
+        { name },
+      );
+      const box = await control.boundingBox();
+      expect(box?.width, name).toBe(44);
+      expect(box?.height, name).toBe(44);
+    }
+    const banner = page.getByRole("button", { name: /role requests? waiting/ });
+    expect((await banner.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+    await expect(
+      page.getByRole("button", { name: "Write an email" }),
+    ).toBeHidden();
+    await expect(
+      page.getByRole("region", { name: "Pending requests" }),
+    ).toBeHidden();
+  });
+
+  test("los chips del rol se desplazan en su fila y el elegido filtra", async ({
+    page,
+  }) => {
+    await goToDirectory(page, MOBILE_DIRECTORY_STATES[0]!);
+    const chips = page.getByRole("group", { name: "Filter by role" });
+    const isScrollable = await chips
+      .locator(".directory-role-options")
+      .evaluate((row) => getComputedStyle(row).overflowX === "auto");
+    expect(isScrollable).toBe(true);
+
+    await chips.getByText("Coach", { exact: true }).click();
+
+    await expect(
+      page.getByRole("row", { name: "Mateo Restrepo" }),
+    ).toBeVisible();
+    await expect(page.getByRole("row", { name: "Ana Admin" })).toHaveCount(0);
+  });
+
+  test("el ⋯ se cierra con Escape y devuelve el foco", async ({ page }) => {
+    await goToDirectory(page, MOBILE_DIRECTORY_STATES[0]!);
+    const more = page.getByRole("button", { name: "More actions" });
+    await more.focus();
+    await page.keyboard.press("Enter");
+    const sheet = page.getByRole("dialog", { name: /in this view$/ });
+    await expect(sheet).toBeVisible();
+
+    await page.keyboard.press("Escape");
+
+    await expect(sheet).toHaveCount(0);
+    await expect(more).toBeFocused();
+  });
+
+  // El navegador avisa del cierre de la hoja más tarde que jsdom: el foco
+  // tiene que acabar en el formulario, no en el "⋯".
+  test("escribir desde el ⋯ deja el foco en el formulario del correo", async ({
+    page,
+  }) => {
+    await goToDirectory(page, {
+      ...MOBILE_DIRECTORY_STATES[0]!,
+      prepare: openMoreSheet,
+    });
+
+    await page
+      .getByRole("dialog", { name: /in this view$/ })
+      .getByRole("button", { name: /^Email these members/ })
+      .click();
+
+    await expect(
+      page.getByRole("heading", { name: "Email members" }),
+    ).toBeFocused();
+  });
+
+  test("la pantalla de solicitudes vuelve a la lista con la flecha", async ({
+    page,
+  }) => {
+    await goToDirectory(page, {
+      ...MOBILE_DIRECTORY_STATES[0]!,
+      prepare: openRequestsScreen,
+    });
+    for (const name of [/^Approve the request/, /^Reject the request/]) {
+      const box = await page
+        .getByRole("button", { name })
+        .first()
+        .boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+    }
+
+    await page.getByRole("button", { name: "Back to the directory" }).click();
+
+    await expect(
+      page.getByRole("button", { name: /role requests? waiting/ }),
+    ).toBeFocused();
+  });
+
+  test("a un Coach no le sale el ⋯ ni el aviso (D4)", async ({ page }) => {
+    await goToDirectory(page, {
+      name: "directorio-movil-coach",
+      asAdmin: false,
+      asCoach: true,
+      listHeading: ENGLISH_DIRECTORY_HEADING,
+    });
+
+    await expect(
+      page.getByRole("button", { name: "More actions" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: /role requests? waiting/ }),
+    ).toHaveCount(0);
+  });
+});
+
 /** Cómo queda la foto grande en la pantalla, medido en el navegador. */
 type RenderedPhoto = {
   readonly width: number;
@@ -5601,11 +5871,12 @@ test.describe("la foto grande en el directorio (#355)", () => {
 });
 
 /* ---------------------------------------------------------------------------
-   El directorio como lista de tarjetas (#283). Por debajo de 768px la tabla
-   pierde sus cabeceras y cada socio es una tarjeta con sus datos etiquetados.
-   Todo esto vive en la hoja de estilos, así que sólo un navegador lo puede
-   probar: el nombre accesible de cada dato con su etiqueta, que ninguna
-   palabra se parta, y que el orden sobreviva al cambio de ancho.
+   El directorio en pantalla estrecha (#283, rehecho en #553). Por debajo de
+   768px la tabla pierde sus cabeceras y cada socio es una fila compacta:
+   avatar, nombre, "Rol · Posición" y la asistencia. Todo esto vive en la
+   hoja de estilos, así que sólo un navegador lo puede probar: lo que se oye
+   de cada fila, que ninguna palabra se parta, y que el orden sobreviva al
+   cambio de ancho.
    --------------------------------------------------------------------------- */
 
 /** Más de 40 caracteres, el caso de nombre larguísimo del criterio. */
@@ -5679,16 +5950,13 @@ async function hasHorizontalScroll(page: Page): Promise<boolean> {
   );
 }
 
-function sortOption(page: Page, group: string, option: string): Locator {
-  return page
-    .getByRole("group", { name: group })
-    .locator("label", { hasText: option });
-}
+const ENGLISH_SORT_LABELS = {
+  sortGroup: "Sort by",
+  sortButton: /^Sort:/,
+} as const;
 
-function sortRadio(page: Page, group: string, option: string): Locator {
-  return page
-    .getByRole("group", { name: group })
-    .getByRole("radio", { name: option });
+function sortButton(page: Page): Locator {
+  return page.getByRole("button", { name: ENGLISH_SORT_LABELS.sortButton });
 }
 
 test.describe("el directorio en pantalla estrecha (#283)", () => {
@@ -5696,33 +5964,32 @@ test.describe("el directorio en pantalla estrecha (#283)", () => {
   quietNotificationBell();
   test.use({ storageState: ADMIN_STORAGE_STATE, viewport: NARROW_VIEWPORT });
 
-  test("cada socio es una tarjeta con sus datos etiquetados y sin cabeceras", async ({
+  test("cada socio es una fila con su nombre, el rol y la posición en una línea, y sin cabeceras", async ({
     page,
   }) => {
     await goToNarrowDirectory(page, { asAdmin: false });
 
-    const card = page.getByRole("row", { name: "Mateo Restrepo" });
+    const row = page.getByRole("row", { name: "Mateo Restrepo" });
     await expect(page.getByRole("columnheader")).toHaveCount(0);
-    await expect(card.getByText("MR")).toBeVisible();
-    await expect(card.getByRole("rowheader")).toHaveAccessibleName(
-      /Mateo Restrepo\s*Country\s*Colombia\s*Level\s*Advanced/,
+    await expect(row.getByText("MR")).toBeVisible();
+    // El país y el nivel se quedan para la ficha (#553).
+    await expect(row.getByRole("rowheader")).toHaveAccessibleName(
+      "Mateo Restrepo",
     );
-    await expect(card.getByRole("cell", { name: "Role Coach" })).toBeVisible();
     await expect(
-      card.getByRole("cell", { name: "Position Forward" }),
+      row.getByRole("cell", { name: "Coach", exact: true }),
     ).toBeVisible();
+    await expect(row.getByRole("cell", { name: /Forward$/ })).toBeVisible();
+    const role = await row.getByText("Coach", { exact: true }).boundingBox();
+    const position = await row.getByText("Forward").boundingBox();
+    expect(Math.round(role?.y ?? 0)).toBe(Math.round(position?.y ?? -1));
   });
 
-  test("un dato que falta sale con su etiqueta y su guion", async ({
-    page,
-  }) => {
+  test("una posición que falta sale con su guion", async ({ page }) => {
     await goToNarrowDirectory(page, { asAdmin: false });
 
-    const card = page.getByRole("row", { name: LONG_MEMBER_NAME });
-    await expect(card.getByRole("rowheader")).toHaveAccessibleName(
-      /Country\s*–\s*Level\s*–/,
-    );
-    await expect(card.getByRole("cell", { name: "Position –" })).toBeVisible();
+    const row = page.getByRole("row", { name: LONG_MEMBER_NAME });
+    await expect(row.getByRole("cell", { name: /–$/ })).toBeVisible();
   });
 
   test("ninguna palabra queda partida, tampoco las marcas", async ({
@@ -5781,35 +6048,58 @@ test.describe("el directorio en pantalla estrecha (#283)", () => {
     expect(await wordsSplitAcrossLines(page)).toEqual([]);
   });
 
-  test("se ordena con un control que se ve y se toca", async ({ page }) => {
+  test("se ordena desde una hoja con controles que se tocan", async ({
+    page,
+  }) => {
     await goToNarrowDirectory(page, { asAdmin: false });
-    const roleOption = sortOption(page, "Sort by", "Role");
-    const box = await roleOption.boundingBox();
-    expect(box?.height).toBeGreaterThanOrEqual(44);
+    expect(
+      (await sortButton(page).boundingBox())?.height,
+    ).toBeGreaterThanOrEqual(44);
+    await sortButton(page).click();
+    const sheet = page.getByRole("dialog", { name: "Sort by" });
+    for (const option of await sheet.getByRole("button").all()) {
+      expect((await option.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    }
 
     const requested = page.waitForRequest(
       (request) =>
         new URL(request.url()).pathname === DIRECTORY_ENDPOINT &&
         new URL(request.url()).searchParams.get("sort") === "role",
     );
-    await roleOption.click();
+    await sheet.getByRole("button", { name: "Role" }).click();
     await requested;
-    await sortOption(page, "Order", "Descending").click();
 
-    await expect(sortRadio(page, "Sort by", "Role")).toBeChecked();
-    await expect(sortRadio(page, "Order", "Descending")).toBeChecked();
+    await expect(sortButton(page)).toHaveAccessibleName(
+      "Sort: Role, ascending",
+    );
+  });
+
+  test("la hoja del orden se cierra con Escape y devuelve el foco al botón", async ({
+    page,
+  }) => {
+    await goToNarrowDirectory(page, { asAdmin: false });
+    await sortButton(page).focus();
+    await page.keyboard.press("Enter");
+    const sheet = page.getByRole("dialog", { name: "Sort by" });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByRole("button").first()).toBeFocused();
+
+    await page.keyboard.press("Escape");
+
+    await expect(sheet).toHaveCount(0);
+    await expect(sortButton(page)).toBeFocused();
   });
 
   test("el orden elegido se conserva al cambiar de ancho, en los dos sentidos", async ({
     page,
   }) => {
     await goToNarrowDirectory(page, { asAdmin: false });
-    await sortOption(page, "Sort by", "Position").click();
-    await sortOption(page, "Order", "Descending").click();
+    await chooseSortInSheet(page, ENGLISH_SORT_LABELS, "Position");
+    await chooseSortInSheet(page, ENGLISH_SORT_LABELS, "Position");
 
     await page.setViewportSize(TABLE_VIEWPORT);
 
-    await expect(page.getByRole("group", { name: "Sort by" })).toBeHidden();
+    await expect(sortButton(page)).toBeHidden();
     await expect(
       page.getByRole("columnheader", { name: "Position" }),
     ).toHaveAttribute("aria-sort", "descending");
@@ -5823,14 +6113,15 @@ test.describe("el directorio en pantalla estrecha (#283)", () => {
     ).toHaveAttribute("aria-sort", "ascending");
     await page.setViewportSize(NARROW_VIEWPORT);
 
-    await expect(sortRadio(page, "Sort by", "Role")).toBeChecked();
-    await expect(sortRadio(page, "Order", "Ascending")).toBeChecked();
+    await expect(sortButton(page)).toHaveAccessibleName(
+      "Sort: Role, ascending",
+    );
   });
 
   // #549: la fila ya no cambia el rol, ni en la tabla ni en la tarjeta. El
   // cambio y el rechazo del último Admin están en la ficha
   // (`ficha-rol-ultimo-admin`).
-  test("la tarjeta de un Admin enseña el rol sin selector ni botón Guardar", async ({
+  test("la fila de un Admin enseña el rol sin selector ni botón Guardar", async ({
     page,
   }) => {
     await goToNarrowDirectory(page, { asAdmin: true });
@@ -5848,7 +6139,7 @@ test.describe("el directorio en pantalla estrecha (#283)", () => {
     await goToNarrowDirectory(page, { asAdmin: false });
 
     await expect(page.getByRole("columnheader")).toHaveCount(4);
-    await expect(page.getByRole("group", { name: "Sort by" })).toBeHidden();
+    await expect(sortButton(page)).toBeHidden();
     await expect(
       page
         .getByRole("row", { name: "Mateo Restrepo" })
@@ -6051,7 +6342,8 @@ test.describe("el contacto en el directorio con los datos de verdad", () => {
 });
 
 /* En el móvil, cada teléfono y cada correo del contacto se pulsa con el dedo
-   (#499): miden al menos 44 px de alto. */
+   (#499): miden al menos 44 px de alto. Se mira con un Coach, porque la fila
+   de un Admin deja el contacto para la ficha en el móvil (#553). */
 test.describe("los enlaces del contacto en el móvil", () => {
   skipWithoutSession();
   quietNotificationBell();
@@ -6062,14 +6354,16 @@ test.describe("los enlaces del contacto en el móvil", () => {
 
   test("cada enlace tel: y mailto: mide al menos 44 px", async ({ page }) => {
     const state = DIRECTORY_STATES.find(
-      (candidate) => candidate.name === "directorio-admin-sin-solicitudes",
+      (candidate) => candidate.name === "directorio-contacto-coach",
     );
     if (state === undefined) {
-      throw new Error("Falta el estado del directorio del Admin.");
+      throw new Error("Falta el estado del contacto del Coach.");
     }
     await goToDirectory(page, state);
 
-    const links = page.locator('a[href^="tel:"], a[href^="mailto:"]');
+    const links = page
+      .locator('a[href^="tel:"], a[href^="mailto:"]')
+      .filter({ visible: true });
     expect(await links.count()).toBeGreaterThan(0);
     for (const link of await links.all()) {
       expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44);

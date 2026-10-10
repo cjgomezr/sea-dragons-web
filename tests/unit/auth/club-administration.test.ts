@@ -41,6 +41,7 @@ const PENDING: readonly PendingRoleRequest[] = [
     id: "0f0e0d0c-0b0a-4908-8706-050403020100",
     userId: "b1b1b1b1-0000-4000-8000-00000000000b",
     fullName: "Nerea Ruiz",
+    currentRole: "Player",
     requestedRole: "Coach",
     justification: "Entreno a los juveniles.",
     createdAt: "2026-09-17T08:30:00.000Z",

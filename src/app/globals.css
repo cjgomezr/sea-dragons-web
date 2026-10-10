@@ -3018,7 +3018,7 @@ a.auth-brand-header:focus-visible {
   color: var(--color-text);
   background: var(--color-panel);
   border: none;
-  border-radius: var(--radius) var(--radius) 0 0;
+  border-radius: 20px 20px 0 0;
   box-shadow: var(--shadow);
 }
 
@@ -3191,7 +3191,8 @@ a.auth-brand-header:focus-visible {
 /* La misma pieza que la fila de socio de Grupos, que sale de este mismo
    mockup. Comparten regla en vez de copiarla. */
 .admin-member-avatar,
-.directory-avatar {
+.directory-avatar,
+.directory-request-avatar {
   display: flex;
   flex: none;
   align-items: center;
@@ -3455,12 +3456,35 @@ a.auth-brand-header:focus-visible {
   padding: 0 var(--space-3);
 }
 
-/* El orden de la lista de tarjetas (#283): campo y sentido, con las mismas
-   pastillas que el filtro por rol. Desde 768px lo sustituyen las cabeceras. */
-.directory-sort-control {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
+/* "Orden: {campo} ↑" de la lista del móvil (#553): un botón que se lee como
+   enlace, en el acento, a la derecha de "{n} miembros". Desde 768px lo
+   sustituyen las cabeceras. */
+.directory-list {
+  position: relative;
+}
+
+.directory-sort-open {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  margin-top: -4px;
+  padding: 0 var(--space-1) 0 var(--space-2);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-accent-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.directory-sort-open:hover {
+  text-decoration: underline;
 }
 
 /* En el móvil la posición es texto a secas: la pastilla del mockup necesita
@@ -3546,8 +3570,10 @@ a.auth-brand-header:focus-visible {
     font-size: inherit;
   }
 
-  /* Con cabeceras, el orden se pide desde ellas. */
-  .directory-sort-control {
+  /* Con cabeceras, el orden se pide desde ellas, y la fila no necesita la
+     flecha del móvil (#553). */
+  .directory-sort-open,
+  .directory-row-caret {
     display: none;
   }
 }
@@ -3576,16 +3602,15 @@ a.auth-brand-header:focus-visible {
   }
 }
 
-/* Por debajo de 768px el directorio es una lista de tarjetas (#283): tres
-   columnas no caben en 375px sin partir palabras por la mitad. Es el mismo
-   marcado que la tabla, así que un lector de pantalla sigue recorriendo filas;
-   lo que cambia es que cada dato lleva su etiqueta, escrita desde su
-   `data-label`, porque las cabeceras se esconden. El texto generado entra en
-   el nombre accesible de la celda, así que la etiqueta también se oye.
+/* La lista del móvil del rediseño (#553, "2b" de
+   docs/design/directorio-admin/README.md, punto 1): una fila compacta por
+   socio, con el avatar de 40px, el nombre con sus puntos, "Rol · Posición"
+   debajo, la asistencia en la letra de las cifras y, en la fila que abre la
+   ficha, una flecha. Es el mismo marcado que la tabla, así que un lector de
+   pantalla sigue recorriendo filas; lo que cambia es dónde cae cada celda.
 
-   La tarjeta es una rejilla de tres columnas: la del avatar y dos de datos.
-   El país y el nivel viven dentro del nombre, a la derecha del avatar, y usan
-   el mismo hueco, así que quedan alineados con el rol y la posición. */
+   El avatar y la flecha van posicionados contra la fila: así el avatar queda
+   centrado en las dos líneas sin sacar al nombre de su celda. */
 @media (width < 768px) {
   .directory-card {
     overflow: visible;
@@ -3606,29 +3631,28 @@ a.auth-brand-header:focus-visible {
     display: none;
   }
 
+  /* "{n} miembros", con "Orden: {campo}" a su derecha. */
   .directory-count {
-    padding: 0 0 var(--space-3);
+    min-height: 36px;
+    padding: 0 0 var(--space-1);
+    padding-right: 140px;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 36px;
     border-bottom: none;
   }
 
-  .directory-table tbody {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-
   .directory-table tbody tr {
+    position: relative;
     display: grid;
-    grid-template-columns: 40px 1fr 1fr;
-    gap: var(--space-3);
-    padding: var(--space-4);
-    background: var(--color-panel);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 2px 0;
+    align-items: center;
+    min-height: 64px;
+    padding: var(--space-3) 28px var(--space-3) 52px;
+    border-bottom: 1px solid var(--color-border);
   }
 
-  /* Sin `anywhere`: una palabra sólo se parte si no cabe entera en una línea,
-     que en una tarjeta de 375px no pasa con ningún dato de verdad. */
   .directory-table th,
   .directory-table td,
   .directory-table tbody tr + tr th,
@@ -3640,29 +3664,72 @@ a.auth-brand-header:focus-visible {
   }
 
   .directory-table tbody th {
-    grid-column: 1 / -1;
+    grid-column: 1 / 3;
+    grid-row: 1;
   }
 
-  /* El rol abre la fila de datos debajo del nombre; la posición le sigue. */
+  .directory-role-cell,
+  .directory-position-cell {
+    grid-row: 2;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+
   .directory-role-cell {
+    grid-column: 1;
+  }
+
+  .directory-position-cell {
     grid-column: 2;
   }
 
-  /* El rol y la posición van en la primera fila de datos: la asistencia
-     abre la segunda, bajo el rol. */
+  /* El punto que une el rol y la posición es de la vista: cada celda se
+     sigue leyendo sola. */
+  .directory-position-cell::before {
+    content: "\00a0·\00a0";
+  }
+
+  .directory-position {
+    font-size: 13px;
+  }
+
   .directory-attendance-cell {
-    grid-column: 2;
+    grid-column: 3;
+    grid-row: 1 / 3;
+    padding-left: var(--space-3);
+    font-size: 12.5px;
     color: var(--color-text);
-    text-align: left;
+    text-align: right;
   }
 
-  /* El contacto (#499) ocupa las dos columnas de datos, al final de la
-     tarjeta, y cada enlace mide lo que pide un dedo. */
+  /* Sin cabecera que la nombre, la cifra se oye con su etiqueta, que no se
+     ve: "Asistencia 92 %" y no un número suelto (#396). */
+  .directory-attendance-cell::before {
+    content: attr(data-label) " ";
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* El contacto (#499) de un Committee o un Coach, bajo el rol y la
+     posición: hasta la ficha que sube desde abajo (#554), es la única forma
+     de llegar a él en el móvil. Un Admin lo tiene en la ficha, a un toque. */
   .directory-contact-cell {
-    grid-column: 2 / -1;
+    grid-column: 1 / -1;
+    grid-row: 3;
+    padding-top: var(--space-2);
+  }
+
+  .directory-list-admin .directory-contact-cell {
+    display: none;
   }
 
   .directory-contact-link {
+    position: relative;
+    z-index: 1;
     display: inline-flex;
     align-items: center;
     min-height: var(--touch-target-min);
@@ -3671,63 +3738,508 @@ a.auth-brand-header:focus-visible {
     margin-block: calc((var(--touch-target-min) - 1lh) / -2);
   }
 
-  /* La tarjeta guarda el avatar de 40px: su primera columna lo mide, y el
-     rol y la posición se alinean con el nombre. */
+  /* Arriba y no centrado: en la fila con contacto, el avatar acompaña al
+     nombre. En la de dos líneas cae igual en el centro. */
   .directory-avatar {
+    position: absolute;
+    top: var(--space-3);
+    left: 0;
+    z-index: 1;
     width: 40px;
     height: 40px;
     font-size: 12px;
   }
 
-  .directory-member {
-    align-items: flex-start;
+  .directory-name {
+    font-size: 15px;
   }
 
-  /* A lo ancho de la tarjeta, para que el nivel caiga en la misma columna que
-     la posición y no donde acabe el nombre de cada uno. */
-  .directory-identity {
-    flex: 1;
+  /* Toda la fila de un Admin lleva a la ficha: el enlace del nombre se
+     estira sobre ella. Lo que se pulsa dentro de la fila queda por encima. */
+  .directory-table .directory-record-link {
+    text-decoration: none;
   }
 
-  .directory-facts {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-3);
+  .directory-record-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
   }
 
-  .directory-fact-separator {
+  .directory-mark-link {
+    position: relative;
+    z-index: 1;
+  }
+
+  .directory-row-caret {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    display: flex;
+    font-size: 16px;
+    color: var(--color-text-secondary);
+    transform: translateY(-50%);
+  }
+
+  /* El país y el nivel, la línea del invitado y el rol pedido se quedan para
+     la ficha: la fila tiene dos líneas. El aviso de encima de la lista
+     cuenta las solicitudes. */
+  .directory-meta,
+  .directory-request {
     display: none;
   }
 
-  .directory-fact,
-  .directory-position {
-    font-size: 14px;
-    color: var(--color-text);
-  }
-
-  .directory-table td::before,
-  .directory-fact::before {
-    content: attr(data-label);
-    display: block;
-    margin-bottom: var(--space-1);
-    font-family: var(--font-family-mono);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--color-text-secondary);
-  }
-
-  /* Una marca se lee entera: si no cabe al lado de la otra, baja entera. */
   .directory-mark {
     white-space: nowrap;
+  }
+}
+/* La cabecera y la barra del móvil (#553, "2b", punto 1): "Directorio" con
+   el "⋯" e Invitar; debajo, la búsqueda y Filtros con su contador, y los
+   chips del rol en una fila que se desplaza sola. El total y la línea de
+   las solicitudes son de escritorio: en el móvil, las solicitudes las
+   avisa la lista. */
+@media (width < 768px) {
+  .directory-header {
+    align-items: center;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .directory-title h1 {
+    font-size: 26px;
+  }
+
+  .directory-total,
+  .directory-requests-none,
+  .directory-requests-pill,
+  .directory-email-open,
+  .directory-export-open,
+  .directory-requests-tray {
+    display: none;
+  }
+
+  .directory-search {
+    flex: 1 1 0;
+  }
+
+  .directory-filters-anchor {
+    order: 1;
+  }
+
+  .directory-filter-toggle {
+    min-width: var(--touch-target-min);
+    justify-content: center;
+  }
+
+  .directory-filter-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .directory-toolbar .directory-roles {
+    flex-basis: 100%;
+    order: 2;
+  }
+
+  .directory-toolbar .directory-role-options {
+    gap: 6px;
+    padding: 0;
+    background: none;
+    border: none;
+    scrollbar-width: none;
+  }
+
+  .directory-toolbar .directory-role {
+    padding: 0 var(--space-3);
+    color: var(--color-text);
+    background: var(--color-panel);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+  }
+
+  .directory-toolbar .directory-role:has(input:checked) {
+    border-color: var(--color-accent);
+  }
+
+  /* El anillo del foco va por dentro: fuera, la fila que se desplaza lo
+     recortaría. */
+  .directory-toolbar .directory-role:has(input:focus-visible) {
+    outline-offset: -4px;
+  }
+}
+
+/* El "⋯" lleva debajo el error del CSV, si lo hay, como el botón de
+   escritorio. */
+.directory-more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: flex-end;
+  max-width: 220px;
+}
+
+.directory-more .auth-error {
+  margin: 0;
+  font-size: 12px;
+  text-align: right;
+}
+
+/* El aviso de solicitudes (#553): acento tintado, al menos 48px. */
+.directory-requests-banner {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-2) var(--space-4);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: left;
+  background: color-mix(
+    in srgb,
+    var(--color-accent) 8%,
+    var(--color-background)
+  );
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.directory-requests-banner:hover {
+  border-color: var(--color-accent);
+}
+
+.directory-requests-banner-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--color-accent);
+  border-radius: 50%;
+}
+
+.directory-requests-banner-text {
+  flex: 1;
+}
+
+/* Sobre el tinte del acento, el texto de acento suave: el acento a secas
+   no llega a 4,5:1 en el tema claro. */
+.directory-requests-banner-review {
+  color: var(--color-accent-soft-text);
+}
+
+/* Las hojas del orden y del "⋯": la etiqueta pequeña en mayúsculas del
+   diseño, y opciones del ancho de la hoja. */
+.directory-sheet-label {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.directory-sheet-options {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.directory-sheet-option {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--space-1);
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.directory-sheet-option:hover {
+  background: var(--color-hover);
+}
+
+.directory-sheet-option[aria-pressed="true"] {
+  font-weight: 700;
+  color: var(--color-accent-text);
+}
+
+.directory-sheet-option-detail {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.directory-sheet-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.directory-sheet-action {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-1);
+  font-family: inherit;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.directory-sheet-action:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.directory-sheet-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.directory-sheet-action-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+}
+
+.directory-sheet-action-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.directory-sheet-action-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.directory-sheet-action-hint {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.directory-sheet-cancel {
+  width: 100%;
+  min-height: 48px;
+}
+
+/* La pantalla de solicitudes del móvil (#553, "2b", punto 2). */
+.directory-requests-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.directory-requests-header {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.directory-requests-header h1 {
+  margin: 0;
+  font-family: var(--font-family-heading);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.directory-requests-header h1:focus {
+  outline: none;
+}
+
+.directory-requests-count {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.directory-back {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  font-size: 20px;
+  color: var(--color-text);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.directory-back:hover {
+  background: var(--color-hover);
+}
+
+.directory-request-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.directory-request-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.directory-request-who {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  min-width: 0;
+}
+
+.directory-request-avatar {
+  width: 44px;
+  height: 44px;
+  font-size: 13px;
+}
+
+.directory-request-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.directory-request-date {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.directory-request-change {
+  margin: 0;
+}
+
+.directory-request-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.directory-request-role {
+  padding: 4px 12px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+.directory-request-role-asked {
+  font-weight: 700;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.directory-request-arrow {
+  color: var(--color-accent-text);
+}
+
+.directory-request-reason-label {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-family-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.directory-request-reason {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.directory-request-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.directory-request-actions button {
+  padding: 0 var(--space-3);
+}
+
+.directory-requests-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: center;
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+}
+
+.directory-requests-empty-icon {
+  display: flex;
+  font-size: 28px;
+  color: var(--color-success);
+}
+
+.directory-requests-empty-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.directory-requests-empty-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+@media (min-width: 768px) {
+  .directory-more,
+  .directory-requests-banner {
+    display: none;
   }
 }
 /* Con la columna del contacto (#499) la tabla no cabe en lo que deja la
    barra lateral entre 768px y 1200px: cinco columnas en unos 500px parten
    cada nombre por sílabas. En ese tramo la lista de quien ve el contacto es
-   la misma lista de tarjetas del móvil, con el selector del orden en lugar
-   de las cabeceras. Las reglas son las de arriba, sólo para esa lista. */
+   una lista de tarjetas (la del móvil de antes de #553), con el botón del
+   orden en lugar de las cabeceras. */
 @media (768px <= width < 1200px) {
   .directory-list-contact .directory-card {
     overflow: visible;
@@ -3858,8 +4370,8 @@ a.auth-brand-header:focus-visible {
     width: auto;
   }
 
-  .directory-list-contact .directory-sort-control {
-    display: flex;
+  .directory-list-contact .directory-sort-open {
+    display: inline-flex;
   }
 }
 
