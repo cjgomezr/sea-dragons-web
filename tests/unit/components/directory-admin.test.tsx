@@ -733,7 +733,10 @@ describe("directorio para Admin: solicitudes en la cabecera", () => {
 
     await renderAdminDirectory("es");
 
-    expect(screen.getByText(expected)).toBeVisible();
+    // La línea de la cabecera, un párrafo o la píldora que enlaza: el aviso
+    // del móvil (#553) dice lo mismo en un botón, y sin hoja de estilos los
+    // dos están en la página.
+    expect(screen.getByText(expected, { selector: "p, a" })).toBeVisible();
   });
 
   it("a quien no es Admin no le dice nada de solicitudes", async () => {

@@ -77,7 +77,6 @@ function renderTable(listing: DirectoryListing): void {
       order={{ sort: "name", direction: "asc" }}
       requestedRoles={new Map()}
       onSort={() => undefined}
-      onOrderChange={() => undefined}
     />,
   );
 }

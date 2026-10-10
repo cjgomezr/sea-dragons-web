@@ -8,6 +8,7 @@ import {
   formatCalendarDay,
   formatCalendarDayAt,
   formatCalendarDayParts,
+  formatClubDay,
   formatClubMoment,
   formatWeekdayName,
   formatWeekdays,
@@ -34,6 +35,13 @@ describe("fechas por idioma", () => {
     expect(formatClubMoment("es", instant)).toBe(
       "15 de septiembre de 2026, 18:00",
     );
+  });
+
+  it("escribe sólo el día del club, el de Melbourne y no el de UTC (#553)", () => {
+    const lateEvening = new Date("2026-09-15T14:30:00.000Z");
+
+    expect(formatClubDay("en", lateEvening)).toBe("16 September 2026");
+    expect(formatClubDay("es", lateEvening)).toBe("16 de septiembre de 2026");
   });
 
   // Cómo se unen fecha y hora lo decide la versión de datos de idioma que trae

@@ -50,8 +50,10 @@ export function RoleRequestsPanel({
 }): React.JSX.Element {
   const { state, notice, decide, retry } = pendingRequests;
   return (
+    // En el móvil la esconde la hoja de estilos: allí las solicitudes tienen
+    // su pantalla (#553).
     <section
-      className="admin-section"
+      className="admin-section directory-requests-tray"
       aria-labelledby={ROLE_REQUESTS_HEADING_ID}
     >
       <h2 id={ROLE_REQUESTS_HEADING_ID}>{translate("admin.requests.title")}</h2>

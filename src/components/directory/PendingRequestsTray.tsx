@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId } from "react";
 import type { PendingRoleRequest } from "@/lib/auth/club-administration";
 import type { RoleRequestDecision } from "@/lib/auth/role-request-decision";
 import { formatClubMoment } from "@/lib/i18n/format";
@@ -9,6 +9,7 @@ import {
   AdministrationNotice,
   type AdministrationNoticeState,
 } from "./AdministrationNotice";
+import { useSingleDecision } from "./use-single-decision";
 
 /**
  * La bandeja de solicitudes pendientes del club (RF-8 del PRD de E3), que
@@ -18,8 +19,8 @@ import {
  * estado de carga, la pone `RoleRequestsPanel`.
  *
  * Quién decide de verdad es el servidor: aquí sólo se manda la decisión y se
- * espera. Mientras una está en vuelo, ninguna otra sale, así que un doble clic
- * no puede mandar dos.
+ * espera. Mientras una está en vuelo, ninguna otra sale (`useSingleDecision`),
+ * así que un doble clic no puede mandar dos.
  */
 
 function RequestActions({
@@ -115,24 +116,7 @@ export function PendingRequestsTray({
     decision: RoleRequestDecision,
   ) => Promise<void>;
 }): React.JSX.Element {
-  const [isDeciding, setIsDeciding] = useState(false);
-  // El estado desactiva los botones en el siguiente pintado, pero un doble
-  // clic llega antes. La referencia cambia en el acto.
-  const isDecidingRef = useRef(false);
-
-  async function decide(
-    request: PendingRoleRequest,
-    decision: RoleRequestDecision,
-  ): Promise<void> {
-    if (isDecidingRef.current) {
-      return;
-    }
-    isDecidingRef.current = true;
-    setIsDeciding(true);
-    await onDecide(request, decision);
-    isDecidingRef.current = false;
-    setIsDeciding(false);
-  }
+  const { isDeciding, decide } = useSingleDecision(onDecide);
 
   return (
     <>
