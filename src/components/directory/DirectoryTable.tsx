@@ -535,10 +535,15 @@ function swipeableContactOf(
   return swipe === null || row.contact.kind === "none" ? null : row.contact;
 }
 
-function rowClassName(swipe: RowSwipe | null): string {
-  return swipe?.isOpen === true
-    ? "directory-row directory-row-swiped"
-    : "directory-row";
+/** La abierta se corre lo que miden sus acciones: tres, o la de emergencia
+ * sola del Coach. */
+function rowClassName(swipedContact: ReachableContact | null): string {
+  if (swipedContact === null) {
+    return "directory-row";
+  }
+  return swipedContact.kind === "emergency"
+    ? "directory-row directory-row-swiped directory-row-swiped-emergency"
+    : "directory-row directory-row-swiped";
 }
 
 function MemberRow({
@@ -586,7 +591,7 @@ function MemberRow({
       aria-label={member.fullName}
       aria-current={isSelected ? "true" : undefined}
       tabIndex={0}
-      className={rowClassName(rowSwipe)}
+      className={rowClassName(rowSwipe?.isOpen === true ? swipeContact : null)}
       onClick={(event) => {
         if (gesture.takeIsGestureClick() || isFromControl(event.target)) {
           return;

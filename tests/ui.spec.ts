@@ -5732,6 +5732,39 @@ async function openRequestsScreen(page: Page): Promise<void> {
   ).toBeFocused();
 }
 
+/** Toca la fila y espera a que su ficha haya subido (#554). */
+function openMemberSheet(name: string) {
+  return async (page: Page): Promise<void> => {
+    await page.getByRole("row", { name }).click();
+    await expect(page.getByRole("dialog", { name })).toBeVisible();
+  };
+}
+
+/** Desliza la fila con el ratón: los eventos de puntero son los mismos que
+ * los del dedo. Espera a que la fila haya terminado de correrse. */
+function swipeRowLeft(name: string) {
+  return async (page: Page): Promise<void> => {
+    const row = page.getByRole("row", { name });
+    const box = await row.boundingBox();
+    if (box === null) {
+      throw new Error(`La fila de ${name} no está en la pantalla`);
+    }
+    const y = box.y + box.height / 2;
+    await page.mouse.move(box.x + box.width - 40, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width - 140, y, { steps: 5 });
+    await page.mouse.up();
+    await expect(
+      row.getByRole("group", { name: `Actions for ${name}` }),
+    ).toBeVisible();
+    await row.evaluate((element) =>
+      Promise.all(
+        element.getAnimations().map((animation) => animation.finished),
+      ),
+    );
+  };
+}
+
 const MOBILE_DIRECTORY_STATES: readonly DirectoryState[] = [
   {
     name: "directorio-movil",
@@ -5765,6 +5798,23 @@ const MOBILE_DIRECTORY_STATES: readonly DirectoryState[] = [
     members: WITH_INVITED_MEMBER,
     listHeading: ENGLISH_DIRECTORY_HEADING,
     prepare: openRequestsScreen,
+  },
+  {
+    name: "directorio-movil-ficha",
+    asAdmin: true,
+    withRequests: true,
+    endsInModal: true,
+    members: WITH_INVITED_MEMBER,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: openMemberSheet("Alex Kim"),
+  },
+  {
+    name: "directorio-movil-deslizar",
+    asAdmin: true,
+    withRequests: true,
+    members: WITH_INVITED_MEMBER,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: swipeRowLeft("Nerea Ruiz"),
   },
 ];
 
@@ -5928,6 +5978,79 @@ test.describe("el directorio en el móvil (#553)", () => {
     await expect(
       page.getByRole("button", { name: /role requests? waiting/ }),
     ).toHaveCount(0);
+  });
+
+  // La ficha que sube y las acciones al deslizar (#554, "2b", puntos 1 y 3).
+  test("la ficha mide lo del diseño y Esc devuelve el foco a la fila", async ({
+    page,
+  }) => {
+    await goToDirectory(page, {
+      ...MOBILE_DIRECTORY_STATES[0]!,
+      prepare: openMemberSheet("Nerea Ruiz"),
+    });
+    const sheet = page.getByRole("dialog", { name: "Nerea Ruiz" });
+    const contact = sheet.getByRole("group", { name: "Contact" });
+    for (const button of await contact.getByRole("link").all()) {
+      const box = await button.boundingBox();
+      expect(box?.width).toBe(48);
+      expect(box?.height).toBe(48);
+    }
+    const open = sheet.getByRole("link", { name: "Open full record" });
+    expect((await open.boundingBox())?.height).toBe(46);
+    const segment = sheet
+      .getByRole("group", { name: "Role" })
+      .locator(".directory-role")
+      .first();
+    expect((await segment.boundingBox())?.height).toBe(42);
+
+    await page.keyboard.press("Escape");
+
+    await expect(sheet).toHaveCount(0);
+    await expect(page.getByRole("row", { name: "Nerea Ruiz" })).toBeFocused();
+  });
+
+  test("tocar fuera de la ficha la cierra", async ({ page }) => {
+    await goToDirectory(page, {
+      ...MOBILE_DIRECTORY_STATES[0]!,
+      prepare: openMemberSheet("Nerea Ruiz"),
+    });
+
+    await page.mouse.click(180, 40);
+
+    await expect(page.getByRole("dialog", { name: "Nerea Ruiz" })).toHaveCount(
+      0,
+    );
+    await expect(page.getByRole("row", { name: "Nerea Ruiz" })).toBeFocused();
+  });
+
+  test("las filas dejan el desplazamiento vertical al navegador", async ({
+    page,
+  }) => {
+    await goToDirectory(page, MOBILE_DIRECTORY_STATES[0]!);
+
+    const touchAction = await page
+      .getByRole("row", { name: "Nerea Ruiz" })
+      .evaluate((row) => getComputedStyle(row).touchAction);
+
+    expect(touchAction).toBe("pan-y");
+  });
+
+  test("las acciones de la fila miden 60px y tocar fuera las cierra", async ({
+    page,
+  }) => {
+    await goToDirectory(page, {
+      ...MOBILE_DIRECTORY_STATES[0]!,
+      prepare: swipeRowLeft("Nerea Ruiz"),
+    });
+    const row = page.getByRole("row", { name: "Nerea Ruiz" });
+    const actions = row.getByRole("group", { name: "Actions for Nerea Ruiz" });
+    const email = actions.getByRole("link", { name: "Email Nerea Ruiz" });
+    expect((await email.boundingBox())?.width).toBe(60);
+    await expect(email).toBeInViewport();
+
+    await page.getByRole("heading", { name: "Directory" }).click();
+
+    await expect(actions).toHaveCount(0);
   });
 });
 
