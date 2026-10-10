@@ -3556,6 +3556,13 @@ a.auth-brand-header:focus-visible {
    al lado: apilados, la columna triplicaba la altura de la fila compacta de
    #549. */
 @media (min-width: 1200px) {
+  /* La asistencia va alineada a la derecha y el contacto a la izquierda: sin
+     un hueco mayor, "Sin datos" se pega a la etiqueta del correo. */
+  .directory-table-contact th:nth-child(5),
+  .directory-table-contact .directory-contact-cell {
+    padding-left: var(--space-6);
+  }
+
   .directory-contact {
     gap: 2px;
     font-size: 12.5px;
