@@ -106,7 +106,9 @@ export class RoleChangeNotAuditedError extends Error {
   }
 }
 
-async function findActor(
+/** Quien actúa, si puede cambiar roles. Lo usa también el cambio en bloque
+ * (#552), que lo pregunta antes de tocar a nadie. */
+export async function findRoleChangeActor(
   gateways: MemberRoleChangeGateways,
   actorId: string,
 ): Promise<RoleRequestMember> {
@@ -222,7 +224,7 @@ export async function changeMemberRole(
   gateways: MemberRoleChangeGateways,
   input: MemberRoleChangeInput,
 ): Promise<MemberRoleChange> {
-  const actor = await findActor(gateways, input.actorId);
+  const actor = await findRoleChangeActor(gateways, input.actorId);
   const write = await gateways.roles.applyRoleChange({
     targetUserId: input.targetUserId,
     clubId: actor.clubId,
