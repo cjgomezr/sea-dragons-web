@@ -3087,6 +3087,136 @@ a.auth-brand-header:focus-visible {
   overflow: hidden;
 }
 
+/* El desplegable de "Cambiar rol" (#552) cae sobre la lista: con una sola
+   fila, la tarjeta lo recortaría. */
+.directory-card:has(.directory-bulk-menu) {
+  overflow: visible;
+}
+
+/* La casilla de cada fila y la de marcar a todos (#552). */
+.directory-check {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  vertical-align: middle;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+/* La barra de los marcados ("Bulk bar"): el acento al 12% sobre el fondo y
+   al 45% en el borde de abajo. Va encima del encabezado de la lista. */
+.directory-bulk-bar {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: var(--space-1) var(--space-3) var(--space-1) 20px;
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-panel));
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.directory-bulk-count {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.directory-bulk-actions {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.directory-bulk-icon,
+.directory-bulk-role-toggle {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.directory-bulk-icon {
+  font-size: 18px;
+}
+
+.directory-bulk-icon:hover:not(:disabled),
+.directory-bulk-role-toggle:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.directory-bulk-icon:disabled,
+.directory-bulk-role-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.directory-bulk-role {
+  position: relative;
+}
+
+.directory-bulk-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: var(--space-1);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.directory-bulk-menu button {
+  min-height: 36px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.directory-bulk-menu button:hover {
+  background: var(--color-background);
+}
+
+/* La franja que confirma el cambio en bloque ocupa el ancho de la tarjeta,
+   entre la barra y el encabezado. Con el contenedor delante para que gane a
+   la franja de la ficha, que se declara más abajo. */
+.directory-bulk .directory-bulk-confirm {
+  padding-inline: 20px var(--space-3);
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+
+.directory-bulk > .auth-error,
+.directory-card > .admin-notice,
+.directory-card > .auth-error {
+  margin: 0;
+  border-width: 0 0 1px 4px;
+  border-radius: 0;
+}
+
 /* `table-layout: fixed` es lo que impide que un nombre largo ensanche la tabla
    más allá de la pantalla a 375px: las columnas miden lo que dice el reparto
    de abajo, y el texto se parte dentro. */
@@ -3130,13 +3260,13 @@ a.auth-brand-header:focus-visible {
   border-top: 1px solid var(--color-border);
 }
 
-.directory-table th:nth-child(2),
-.directory-table th:nth-child(3) {
+.directory-table .directory-column-role,
+.directory-table .directory-column-position {
   width: 28%;
 }
 
 /* La asistencia (#396) es una cifra corta: le basta el ancho de su título. */
-.directory-table th:nth-child(4) {
+.directory-table .directory-column-attendance {
   width: 20%;
 }
 
@@ -4003,22 +4133,28 @@ a.auth-brand-header:focus-visible {
     background: var(--color-background);
   }
 
-  .directory-table th:nth-child(2) {
+  /* Por su clase y no por su posición: la casilla de #552 va delante. */
+  .directory-table .directory-column-role {
     width: 104px;
   }
 
-  .directory-table th:nth-child(3) {
+  .directory-table .directory-column-position {
     width: 96px;
   }
 
-  .directory-table th:nth-child(4) {
+  .directory-table .directory-column-attendance {
     width: 96px;
   }
 
   /* El contacto (#499) se queda con lo que necesita un correo partido en dos
-     líneas. */
-  .directory-table-contact th:nth-child(5) {
+     líneas. Es siempre la última columna. */
+  .directory-table-contact thead th:last-child {
     width: 26%;
+  }
+
+  /* La casilla (#552): los 20px de aire de la fila y la caja de 16px. */
+  .directory-table .directory-check-cell {
+    width: 42px;
   }
 
   .directory-sort {
@@ -4054,7 +4190,7 @@ a.auth-brand-header:focus-visible {
 @media (min-width: 1200px) {
   /* La asistencia va alineada a la derecha y el contacto a la izquierda: sin
      un hueco mayor, "Sin datos" se pega a la etiqueta del correo. */
-  .directory-table-contact th:nth-child(5),
+  .directory-table-contact thead th:last-child,
   .directory-table-contact .directory-contact-cell {
     padding-left: var(--space-6);
   }
@@ -4082,6 +4218,13 @@ a.auth-brand-header:focus-visible {
    El avatar y la flecha van posicionados contra la fila: así el avatar queda
    centrado en las dos líneas sin sacar al nombre de su celda. */
 @media (width < 768px) {
+  /* La selección múltiple es del escritorio (#552): en el móvil, cada fila
+     tiene sus acciones al deslizar. */
+  .directory-check-cell,
+  .directory-bulk {
+    display: none;
+  }
+
   .directory-card {
     overflow: visible;
     background: none;
@@ -4716,6 +4859,35 @@ a.auth-brand-header:focus-visible {
     background: none;
     border: none;
     border-radius: 0;
+  }
+
+  /* Aquí las filas son tarjetas y "Orden" flota sobre la línea del total.
+     Con la barra de los marcados (#552) delante, "Orden" baja a su propia
+     línea encima de ella, en vez de pisarla. */
+  .directory-list-contact:has(.directory-bulk) .directory-sort-open {
+    position: static;
+    display: flex;
+    width: fit-content;
+    margin: 0 0 var(--space-2) auto;
+  }
+
+  /* Sin la tarjeta alrededor, la barra y la franja van sueltas, cada una
+     con su borde. */
+  .directory-list-contact .directory-bulk {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+
+  .directory-list-contact .directory-bulk-bar {
+    border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+    border-radius: var(--radius);
+  }
+
+  .directory-list-contact .directory-bulk .directory-bulk-confirm {
+    border-width: 1px;
+    border-radius: var(--radius);
   }
 
   .directory-list-contact .directory-table,

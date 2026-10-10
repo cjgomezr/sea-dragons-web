@@ -553,7 +553,6 @@ export function DirectoryScreen({
                 }
                 toolbar={
                   <>
-                    <AdministrationNotice notice={bulkRoles.notice} />
                     {checked.members.length === 0 ? null : (
                       <DirectoryBulkBar
                         translate={translate}
@@ -572,6 +571,7 @@ export function DirectoryScreen({
                         onClear={checked.clear}
                       />
                     )}
+                    <AdministrationNotice notice={bulkRoles.notice} />
                   </>
                 }
                 onSort={sortBy}

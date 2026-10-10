@@ -5521,7 +5521,56 @@ const PANEL_STATES: readonly DirectoryState[] = [
   },
 ];
 
-for (const state of PANEL_STATES) {
+/* La selección múltiple del directorio (#552). Mockup:
+   docs/mockups/directory-admin-bulk-selection-confirm-dark.png; el tema
+   claro se revisa contra design-system.md. Como el panel, sólo existe desde
+   768px. El cambio en bloque no llega a guardarse: la franja es lo último. */
+
+/** Marca las filas y espera a la barra que las cuenta. */
+function checkMembers(names: readonly string[]) {
+  return async (page: Page): Promise<void> => {
+    for (const name of names) {
+      await page.getByRole("checkbox", { name: `Select ${name}` }).check();
+    }
+    await expect(
+      page.getByRole("group", { name: `${names.length} selected` }),
+    ).toBeVisible();
+  };
+}
+
+/** Marca las filas, elige un rol en "Change role" y espera a la franja. */
+function pickBulkRole(names: readonly string[], role: string) {
+  return async (page: Page): Promise<void> => {
+    await checkMembers(names)(page);
+    const bar = page.getByRole("group", { name: `${names.length} selected` });
+    await bar.getByRole("button", { name: "Change role" }).click();
+    await bar.getByRole("button", { name: role, exact: true }).click();
+    await expect(
+      page.getByText(`Change ${names.length} members to ${role}?`),
+    ).toBeVisible();
+  };
+}
+
+const BULK_STATES: readonly DirectoryState[] = [
+  {
+    name: "directorio-seleccion",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: checkMembers(["Mateo Restrepo", "Nerea Ruiz"]),
+  },
+  {
+    name: "directorio-seleccion-cambio-rol",
+    asAdmin: true,
+    withRequests: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: pickBulkRole(
+      ["Ana Admin", "Mateo Restrepo", "Nerea Ruiz"],
+      "Coach",
+    ),
+  },
+];
+
+for (const state of [...PANEL_STATES, ...BULK_STATES]) {
   test.describe(state.name, () => {
     skipWithoutSession();
     quietNotificationBell();
