@@ -14,6 +14,7 @@ Las decisiones del dueño van marcadas como D1 a D6:
 - **D4.** **Todos los roles** usan el diseño nuevo. Cada uno ve y hace solo lo que ya puede hoy: el Admin, todo; Committee, Coach y Player, la misma lista y la ficha rápida sin lo de administrar (sin cambiar roles, sin decidir solicitudes, sin el AUF ni la membresía, y con el contacto según FR-090).
 - **D5.** Solo está diseñado el **tema oscuro**. El claro aplica el mismo diseño con los tokens del tema claro, sin mockup propio: el `ui-reviewer` lo revisa contra `design-system.md`.
 - **D6.** Los colores sueltos del diseño que todavía no son tokens (hover `#1a3349`, texto de acento `#cfe8f7`, texto suave `#cfdeea`, acento al pasar `#5ab4e8`) pasan a ser tokens, con su versión para el tema claro.
+- **D7.** _(Añadida el 11 de octubre de 2026, tras el #552.)_ La lista **ya no tiene columna de contacto** para ningún rol. El contacto vive en la ficha rápida: el panel en escritorio (RF-5) y la hoja y las acciones al deslizar en el móvil (RF-8). Con la columna, entre 768 y 1199 px las listas de Admin, Committee y Coach se volvían tarjetas altas, una por socio, que no son del diseño.
 
 ## 1. Problema
 
@@ -120,6 +121,14 @@ Para medidas, colores y textos de cada pieza, ver el `README.md` del handoff. Ca
 - **Dado** el botón de llamada o de emergencia, **cuando** se toca, **entonces** abre `tel:` con ese número; el de correo, `mailto:`.
 - **Dado** un lector de pantalla, **cuando** recorre la lista, **entonces** las acciones de deslizar también se alcanzan sin el gesto (por ejemplo, desde la ficha).
 
+### RF-9 · La lista sin columna de contacto · Must (D7)
+
+- **Dado** un Admin, un Committee o un Coach a 768, 1024 y 1440 px, **cuando** mira la lista, **entonces** ve la tabla compacta de RF-3 (Miembro, Rol, Posición, Asist.), una línea por socio, sin columna de contacto y sin tarjetas.
+- **Dado** cualquier ancho desde 768 px, **cuando** se compara la fila de un Admin con la de un Player, **entonces** miden lo mismo de alto.
+- **Dado** un rol que puede ver contactos (FR-090), **cuando** abre la ficha rápida en el panel o en la hoja del móvil, **entonces** sigue teniendo el correo, el teléfono y el contacto de emergencia, con sus enlaces `mailto:` y `tel:`.
+- **Dado** el móvil, **cuando** un Committee o un Coach mira una fila, **entonces** ya no ve el contacto bajo "Rol · Posición": lo tiene al deslizar y en la ficha.
+- **Dado** los filtros "Sin teléfono" y "Sin contacto de emergencia", **cuando** se aplican, **entonces** siguen funcionando igual: la columna desaparece, el dato no.
+
 ## 6. Casos borde y estados de error
 
 - **Sin solicitudes:** la línea de estado dice "No hay solicitudes pendientes" y el resumen no enseña esa sección.
@@ -130,6 +139,7 @@ Para medidas, colores y textos de cada pieza, ver el `README.md` del handoff. Ca
 - **Copiar al portapapeles sin permiso del navegador:** el botón avisa de que no pudo copiar; no falla en silencio.
 - **Teclado:** el panel, los popovers y las hojas se cierran con Esc y devuelven el foco a lo que los abrió. Foco visible de 2 px en el color de acento.
 - **Doble clic** en Aprobar, Guardar rol o Cambiar roles: una sola petición.
+- **Ventana estrecha o con zoom en escritorio** (entre 768 y 1199 px de ancho útil): la lista es la misma tabla compacta, no tarjetas (RF-9).
 
 ## 7. UX / UI
 
@@ -164,6 +174,9 @@ Para medidas, colores y textos de cada pieza, ver el `README.md` del handoff. Ca
 | 6 (#552) | Selecciona varios socios para escribirles, exportarlos o cambiarles el rol en bloque (RF-6)   | M      | 4          | No: permisos y cambio de roles en bloque      |
 | 7 (#553) | Rehace el directorio en el móvil: lista, orden, menú y pantalla de solicitudes (RF-7)         | M      | 3          | No: UI nueva                                  |
 | 8 (#554) | Añade en el móvil la ficha que sube y las acciones al deslizar (RF-8)                         | M      | 4, 7       | No: gestos y enlaces de llamada               |
+| 9        | Quita la columna de contacto del directorio y deja la tabla compacta desde 768 px (RF-9)      | S      | 8          | No: cambia qué ve cada rol en la lista        |
+
+El 9 se añadió después de la descomposición (D7) y va con `priority:high`: cualquier Admin con un portátil o con zoom ve las tarjetas.
 
 Cada ticket cubre todos los roles (D4), los dos temas y los dos idiomas. Todos llevan `ui-review`.
 
