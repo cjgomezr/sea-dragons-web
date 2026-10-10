@@ -1,10 +1,11 @@
 "use client";
 
 import { FunnelSimple } from "@phosphor-icons/react/dist/ssr/FunnelSimple";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { useDismissal } from "@/components/use-dismissal";
 import type { Translator } from "@/lib/i18n/translator";
+import { BottomSheet } from "./BottomSheet";
 import {
   CheckFields,
   type FieldsProps,
@@ -52,30 +53,7 @@ function focusableIn(panel: HTMLElement | null): readonly HTMLElement[] {
     : [...panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)];
 }
 
-/** Tab desde el último control vuelve al primero, y Mayúsculas+Tab desde el
- * primero va al último. El `<dialog>` modal deja inerte la página, pero no
- * impide que el foco salga a la barra del navegador. */
-function cycleFocus(
-  event: React.KeyboardEvent,
-  panel: HTMLElement | null,
-): void {
-  if (event.key !== "Tab") {
-    return;
-  }
-  const focusable = focusableIn(panel);
-  const first = focusable.at(0);
-  const last = focusable.at(-1);
-  const edge = event.shiftKey ? first : last;
-  if (edge === undefined || document.activeElement !== edge) {
-    return;
-  }
-  event.preventDefault();
-  (event.shiftKey ? last : first)?.focus();
-}
-
-/** La hoja del móvil: un `<dialog>` modal, como el visor de la foto (#355),
- * con lo que comparte con él por `useDismissal`. Cerrarla devuelve el foco
- * al botón que la abrió. */
+/** La hoja del móvil. Cerrarla devuelve el foco al botón que la abrió. */
 function FilterSheet({
   fields,
   onClosed,
@@ -84,61 +62,23 @@ function FilterSheet({
   onClosed: () => void;
 }): React.JSX.Element {
   const { translate } = fields;
-  const titleId = useId();
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  const focusFirstField = useCallback(() => {
-    focusableIn(panelRef.current).at(0)?.focus();
-  }, []);
-
-  useEffect(() => {
-    dialogRef.current?.showModal();
-    focusFirstField();
-  }, [focusFirstField]);
-
-  const close = useCallback(() => dialogRef.current?.close(), []);
-  const pressOutside = useCallback(
-    (event: MouseEvent) => {
-      event.preventDefault();
-      close();
-    },
-    [close],
-  );
-  const keepFocusInside = useCallback(() => {
-    if (dialogRef.current?.open === true) {
-      focusFirstField();
-    }
-  }, [focusFirstField]);
-  useDismissal({
-    isOpen: true,
-    containerRef: panelRef,
-    onEscape: close,
-    onPressOutside: pressOutside,
-    onFocusOutside: keepFocusInside,
-  });
-
   return (
-    <dialog
-      ref={dialogRef}
-      className="directory-sheet"
-      aria-labelledby={titleId}
-      onClose={onClosed}
-      onKeyDown={(event) => cycleFocus(event, panelRef.current)}
+    <BottomSheet
+      title={translate("directory.filter.sheetTitle")}
+      onClosed={onClosed}
     >
-      <div ref={panelRef} className="directory-sheet-panel">
-        <h2 id={titleId} className="directory-sheet-title">
-          {translate("directory.filter.sheetTitle")}
-        </h2>
-        <div className="directory-sheet-fields">
-          <SelectFields {...fields} />
-          <CheckFields {...fields} />
-        </div>
-        <button type="button" className="auth-submit" onClick={close}>
-          {translate("directory.filter.apply")}
-        </button>
-      </div>
-    </dialog>
+      {(close) => (
+        <>
+          <div className="directory-sheet-fields">
+            <SelectFields {...fields} />
+            <CheckFields {...fields} />
+          </div>
+          <button type="button" className="auth-submit" onClick={close}>
+            {translate("directory.filter.apply")}
+          </button>
+        </>
+      )}
+    </BottomSheet>
   );
 }
 
