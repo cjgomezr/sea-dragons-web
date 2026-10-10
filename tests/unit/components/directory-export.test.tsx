@@ -6,6 +6,7 @@ import type {
   CommitteeDirectoryMember,
   DirectoryListing,
 } from "@/lib/directory/directory";
+import { QUIET_CLUB_SUMMARY } from "../helpers/club-summary";
 
 /**
  * El botón "Exportar CSV" del directorio (#500, RF-5 del PRD de E19): sólo
@@ -91,6 +92,7 @@ function stubApi(
             members,
             availableFilters: ["position"],
             total: members.length,
+            summary: QUIET_CLUB_SUMMARY,
           },
         });
       }

@@ -16,6 +16,7 @@ import {
   SEEDED_POSITIONS,
   asDirectoryPosition,
 } from "../helpers/seeded-positions";
+import { QUIET_CLUB_SUMMARY } from "../helpers/club-summary";
 
 /**
  * La pantalla del directorio (#239, RF-2 del PRD de E5). Buscar, filtrar y
@@ -245,6 +246,7 @@ function listingFor(stub: ApiStub, url: string): Response {
       members,
       availableFilters: stub.availableFilters ?? FILTERS_BY_KIND[kind],
       total: stub.total ?? clubSizeOf(stub, includeInactive),
+      summary: QUIET_CLUB_SUMMARY,
     },
   });
 }
@@ -1089,6 +1091,7 @@ describe("marca de sin evaluar", () => {
             members: [{ ...ZOE, isEvaluated: false }],
             availableFilters: FILTERS_BY_KIND.admin,
             total: 1,
+            summary: QUIET_CLUB_SUMMARY,
           },
         }),
     });
@@ -1348,6 +1351,7 @@ describe("filtros del directorio", () => {
       "Expired",
       "Expires within 30 days",
       "Not verified",
+      "Expired or expiring",
     ]);
     expect(
       optionsOf(
@@ -1608,6 +1612,7 @@ describe("filtros del directorio", () => {
       "Vencido",
       "Vence en los próximos 30 días",
       "Sin verificar",
+      "Vencido o por vencer",
     ]);
     expect(
       optionsOf(within(bar).getByRole("combobox", { name: "Membresía" })),
@@ -1896,8 +1901,8 @@ describe("cabecera del directorio", () => {
 });
 
 describe("barra del directorio", () => {
-  it("lleva la búsqueda, el rol, Filtros y el botón del panel lateral (#550)", async () => {
-    stubApi();
+  it("lleva a un Admin la búsqueda, el rol, Filtros y el botón del panel lateral (#550, #551)", async () => {
+    stubApi({ kind: "admin", members: [VENCIDA] });
 
     await renderScreen();
 

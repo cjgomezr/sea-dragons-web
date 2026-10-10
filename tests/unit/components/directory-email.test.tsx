@@ -11,6 +11,7 @@ import { DirectoryEmailComposer } from "@/components/directory/DirectoryEmailCom
 import { DirectoryScreen } from "@/components/directory/DirectoryScreen";
 import type { CommitteeDirectoryMember } from "@/lib/directory/directory";
 import type { Locale } from "@/lib/i18n/locale";
+import { QUIET_CLUB_SUMMARY } from "../helpers/club-summary";
 
 /**
  * El correo del directorio en la pantalla (#501, RF-6 del PRD de E19): el
@@ -433,6 +434,7 @@ describe("en el directorio", () => {
               members,
               availableFilters: ["position"],
               total: members.length,
+              summary: QUIET_CLUB_SUMMARY,
             },
           });
         }

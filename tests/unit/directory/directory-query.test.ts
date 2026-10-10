@@ -110,7 +110,7 @@ describe("los filtros de la consulta (#497)", () => {
     expect(parse(`group=${GROUP_ID}`).groupId).toBe(GROUP_ID);
   });
 
-  it.each(["missing", "expired", "expiring", "unverified"] as const)(
+  it.each(["missing", "expired", "expiring", "unverified", "renewal"] as const)(
     "acepta el AUF %s",
     (auf) => {
       expect(parse(`auf=${auf}`).auf).toBe(auf);

@@ -3687,14 +3687,6 @@ a.auth-brand-header:focus-visible {
   border-color: var(--color-border);
 }
 
-.directory-panel-hint {
-  flex: 1;
-  margin: 0;
-  padding-top: var(--space-2);
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-
 /* Lo que en la fila son puntos, aquí con su palabra. El texto va en el color
    de siempre y el tono en el borde y el fondo: el amarillo del tema claro no
    llega al contraste AA como texto (ver .directory-mark-warning). */

@@ -12,6 +12,7 @@ export const AUF_FILTER_KEYS = {
   expired: "directory.filter.auf.expired",
   expiring: "directory.filter.auf.expiring",
   unverified: "directory.filter.auf.unverified",
+  renewal: "directory.filter.auf.renewal",
 } as const satisfies Record<AufFilter, MessageKey>;
 
 export const MEMBERSHIP_FILTER_KEYS = {

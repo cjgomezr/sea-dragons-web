@@ -37,7 +37,12 @@ import { DirectoryBulkBar } from "./DirectoryBulkBar";
 import type { RowChecking } from "./DirectoryCheckboxes";
 import { DirectoryHeader } from "./DirectoryHeader";
 import type { DirectoryOrder } from "./DirectorySortControl";
-import { DirectoryPanel, PANEL_TOGGLE_ID } from "./DirectoryPanel";
+import type { OverviewContext } from "./ClubOverview";
+import {
+  DirectoryPanel,
+  PANEL_TOGGLE_ID,
+  type PanelView,
+} from "./DirectoryPanel";
 import {
   DirectoryTable,
   type RequestedRoles,
@@ -52,7 +57,7 @@ import {
   canExportListing,
   canWriteEmails,
 } from "./listing-permissions";
-import { findSelectedMember } from "./selected-member";
+import { type SelectedMember, findSelectedMember } from "./selected-member";
 import { useBulkRoleChange } from "./use-bulk-role-change";
 import { type CheckedMembers, useCheckedMembers } from "./use-checked-members";
 import { useDebouncedValue } from "./use-debounced-value";
@@ -209,8 +214,9 @@ function focusById(id: string): void {
 
 /** Qué enseña el panel lateral (#550). Elegir a alguien lo abre siempre;
  * cerrarlo suelta la selección, para que ninguna fila quede marcada sin su
- * ficha a la vista. */
-function usePanelSelection(): {
+ * ficha a la vista. Con `hasOverview` (el Admin, #551), soltar a alguien
+ * vuelve al resumen del club; sin él, cierra el panel (D4). */
+function usePanelSelection(hasOverview: boolean): {
   readonly isOpen: boolean;
   readonly selectedUserId: string | null;
   readonly toggleMember: (userId: string) => void;
@@ -227,6 +233,9 @@ function usePanelSelection(): {
       selectedUserId === null ? PANEL_TOGGLE_ID : memberRowId(selectedUserId),
     );
     setSelectedUserId(null);
+    if (!hasOverview) {
+      setIsOpen(false);
+    }
   }
 
   function toggleMember(userId: string): void {
@@ -238,11 +247,13 @@ function usePanelSelection(): {
     setIsOpen(true);
   }
 
-  /** Sin nadie elegido, hasta el resumen del club, el panel no tiene nada
-   * que enseñar: la ✕ y Esc lo cierran del todo. */
+  /** La ✕ y Esc de una ficha vuelven al resumen, como pide el diseño; los
+   * del resumen cierran el panel del todo. */
   function close(): void {
     deselect();
-    setIsOpen(false);
+    if (selectedUserId === null) {
+      setIsOpen(false);
+    }
   }
 
   function togglePanel(): void {
@@ -251,6 +262,34 @@ function usePanelSelection(): {
   }
 
   return { isOpen, selectedUserId, toggleMember, close, togglePanel };
+}
+
+/** Lo que el resumen del club toma de la pantalla, además de la lista. */
+type OverviewSources = Omit<OverviewContext, "summary" | "members"> & {
+  readonly listing: DirectoryListing | null;
+};
+
+/** La ficha de quien se eligió o, sin nadie, el resumen del club, que sólo
+ * trae la lista del Admin. `null` es que el panel no tiene nada que
+ * enseñar. */
+function panelViewOf(
+  selected: SelectedMember | null,
+  { listing, ...sources }: OverviewSources,
+): PanelView | null {
+  if (selected !== null) {
+    return { kind: "member", selected };
+  }
+  if (listing === null || listing.kind !== "admin") {
+    return null;
+  }
+  return {
+    kind: "overview",
+    overview: {
+      ...sources,
+      summary: listing.summary,
+      members: listing.members,
+    },
+  };
 }
 
 function LoadFailure({
@@ -301,7 +340,9 @@ export function DirectoryScreen({
     readonly EmailRecipient[] | null
   >(null);
 
-  const panel = usePanelSelection();
+  const isAdminListing =
+    state.kind === "ready" && state.listing.kind === "admin";
+  const panel = usePanelSelection(isAdminListing);
 
   const settledSearch = useDebouncedValue(filters.search, SEARCH_DEBOUNCE_MS);
   const query = useMemo<DirectoryQuery>(
@@ -409,8 +450,6 @@ export function DirectoryScreen({
     );
   }
 
-  const isAdminListing =
-    state.kind === "ready" && state.listing.kind === "admin";
   const checked = useCheckedMembers(
     state.kind === "ready" ? state.listing.members : NO_MEMBERS,
   );
@@ -429,6 +468,14 @@ export function DirectoryScreen({
     state.kind === "ready" && panel.selectedUserId !== null
       ? findSelectedMember(state.listing, panel.selectedUserId)
       : null;
+  const panelView = panelViewOf(selected, {
+    listing: state.kind === "ready" ? state.listing : null,
+    pendingRequests,
+    filters,
+    onFiltersChange: (more) =>
+      setFilters((current) => ({ ...current, ...more })),
+    onSelectMember: panel.toggleMember,
+  });
 
   const [requestsView, setRequestsView] = useState<RequestsView>("list");
   const bannerRef = useRef<HTMLButtonElement>(null);
@@ -460,9 +507,11 @@ export function DirectoryScreen({
     );
   }
 
+  const isPanelShown = panel.isOpen && panelView !== null;
+
   return (
     <div
-      className={panel.isOpen ? "directory directory-with-panel" : "directory"}
+      className={isPanelShown ? "directory directory-with-panel" : "directory"}
     >
       <DirectoryHeader
         translate={translate}
@@ -505,9 +554,16 @@ export function DirectoryScreen({
             availableFilters={availableFilters}
             choices={choices}
             shownCount={state.listing.members.length}
-            isPanelOpen={panel.isOpen}
+            panelToggle={
+              isAdminListing
+                ? {
+                    isOpen: panel.isOpen,
+                    waitingCount,
+                    onToggle: panel.togglePanel,
+                  }
+                : null
+            }
             onChange={setFilters}
-            onTogglePanel={panel.togglePanel}
           />
           {waitingCount === 0 ? null : (
             <RoleRequestsBanner
@@ -577,11 +633,11 @@ export function DirectoryScreen({
                 onSort={sortBy}
               />
             )}
-            {panel.isOpen ? (
+            {isPanelShown ? (
               <DirectoryPanel
                 translate={translate}
                 locale={locale}
-                selected={selected}
+                view={panelView}
                 pendingRequests={isAdminListing ? pendingRequests : null}
                 onClose={panel.close}
                 onRoleChanged={applyRole}

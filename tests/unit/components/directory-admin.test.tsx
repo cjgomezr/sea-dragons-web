@@ -12,6 +12,7 @@ import {
   GOALKEEPER,
   asDirectoryPosition,
 } from "../helpers/seeded-positions";
+import { QUIET_CLUB_SUMMARY } from "../helpers/club-summary";
 
 /**
  * Lo que el directorio le enseña a un Admin además de la lista (#240, RF-8 del
@@ -137,6 +138,7 @@ function readResponse(stub: ApiStub, url: string): Promise<Response> {
             (stub.kind ?? "admin") === "admin"
               ? ["position", "group", "auf", "membership"]
               : ["position"],
+          summary: QUIET_CLUB_SUMMARY,
         },
       }),
     );
