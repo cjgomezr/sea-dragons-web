@@ -3191,7 +3191,8 @@ a.auth-brand-header:focus-visible {
 /* La misma pieza que la fila de socio de Grupos, que sale de este mismo
    mockup. Comparten regla en vez de copiarla. */
 .admin-member-avatar,
-.directory-avatar {
+.directory-avatar,
+.directory-card-avatar {
   display: flex;
   flex: none;
   align-items: center;
@@ -3213,6 +3214,13 @@ a.auth-brand-header:focus-visible {
   width: 32px;
   height: 32px;
   font-size: 11px;
+}
+
+/* La ficha rápida del panel (#550) lleva el de 52px. */
+.directory-card-avatar {
+  width: 52px;
+  height: 52px;
+  font-size: 16px;
 }
 
 /* `min-width: 0` para que un nombre largo se parta dentro de su columna en vez
@@ -3453,6 +3461,456 @@ a.auth-brand-header:focus-visible {
 .directory-role-control .admin-secondary {
   flex: 1 0 auto;
   padding: 0 var(--space-3);
+}
+
+/* El panel lateral y la ficha rápida del socio (#550, "Panel column" y
+   "State B" de docs/design/directorio-admin/README.md). Por debajo de 768px
+   no hay panel ni botón: el móvil tendrá su ficha que sube. */
+.directory-panel,
+.directory-panel-toggle {
+  display: none;
+}
+
+.directory-panel {
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  padding: 20px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.directory-panel-toggle[aria-expanded="true"] {
+  color: var(--color-accent-text);
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-panel));
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+
+/* La fila se pulsa entera para abrir su ficha; con el teclado se enfoca. */
+.directory-row {
+  cursor: pointer;
+}
+
+.directory-row:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: -2px;
+}
+
+.directory-card-header {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.directory-card-header .directory-identity {
+  flex: 1;
+  padding-top: var(--space-1);
+}
+
+.directory-card-name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.directory-card-name a {
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* La ✕ del panel y la de copiar: sin borde, para no competir con el resto. */
+.directory-card-close,
+.directory-card-copy {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-size: 18px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.directory-card-copy {
+  width: 32px;
+  height: 32px;
+  font-size: 15px;
+}
+
+.directory-card-close:hover,
+.directory-card-copy:hover {
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.directory-panel-hint {
+  flex: 1;
+  margin: 0;
+  padding-top: var(--space-2);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* Lo que en la fila son puntos, aquí con su palabra. El texto va en el color
+   de siempre y el tono en el borde y el fondo: el amarillo del tema claro no
+   llega al contraste AA como texto (ver .directory-mark-warning). */
+.directory-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.directory-card-tag {
+  padding: 1px var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: 11.5px;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+.directory-card-tag-neutral {
+  color: var(--color-text-secondary);
+}
+
+.directory-card-tag-warning {
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  border-color: var(--color-warning);
+}
+
+.directory-card-tag-danger {
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  border-color: var(--color-danger);
+}
+
+.directory-card-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+/* Las etiquetas de cada bloque: mono, mayúsculas y espaciadas, como las de
+   la cabecera de la lista. */
+.directory-card-label,
+.directory-roles legend.directory-card-label {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.directory-roles legend.directory-card-label {
+  margin-bottom: var(--space-2);
+}
+
+.directory-card-role {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Los cuatro roles a partes iguales, más bajos que los de la barra. */
+.directory-card-roles .directory-role {
+  flex: 1 1 0;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 var(--space-1);
+  font-size: 13px;
+}
+
+.directory-card-roles .directory-role:has(input:disabled) {
+  cursor: progress;
+}
+
+/* La franja que confirma un rol: el aviso al 9% de fondo y al 35% de borde,
+   como la del cambio en bloque. */
+.directory-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--color-warning) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
+  border-radius: var(--radius);
+}
+
+.directory-confirm-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.directory-confirm-text {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.directory-confirm .directory-link-button {
+  min-height: 34px;
+  padding: 0 6px;
+  color: var(--color-text);
+}
+
+.directory-confirm-save.auth-submit {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13.5px;
+}
+
+.directory-confirm .auth-error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+}
+
+.directory-card-saved {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.directory-card-saved svg {
+  color: var(--color-success);
+}
+
+.directory-card-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.directory-card-contact-line {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 32px;
+  font-size: 13.5px;
+}
+
+.directory-card-contact-line > svg {
+  color: var(--color-text-secondary);
+}
+
+.directory-card-contact-value {
+  overflow-wrap: anywhere;
+}
+
+.directory-card-contact-missing {
+  color: var(--color-text-secondary);
+}
+
+/* El dato que falta y el Admin puede completar: el aviso en el fondo y en el
+   icono, la palabra en el color del texto (contraste AA en los dos temas). */
+.directory-card-contact-warning {
+  padding: 0 var(--space-2);
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  border-radius: 6px;
+}
+
+.directory-card-contact-warning > svg {
+  color: var(--color-warning);
+}
+
+/* El acento suave y no el del texto: sobre el fondo de aviso del tema
+   oscuro, el acento normal no llega a 4,5:1. */
+.directory-card-add {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent-soft-text);
+}
+
+.directory-card-feedback {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.directory-card-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.directory-card-facts li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.directory-card-fact {
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+
+/* La asistencia abre la cuadrícula a 20px: es el dato que más se mira. */
+.directory-card-facts li:first-child .directory-card-fact {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.directory-card-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-target-min);
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.directory-card-open:hover {
+  border-color: var(--color-accent);
+}
+
+/* Los recuadros del Admin: la invitación, con el borde discontinuo del
+   invitado, y la solicitud, con el acento de la bandeja. */
+.directory-card-invitation,
+.directory-card-request {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius);
+}
+
+.directory-card-invitation {
+  border: 1px dashed var(--color-text-secondary);
+}
+
+.directory-card-request {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+
+.directory-card-box-line {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  margin: 0;
+  font-size: 13px;
+}
+
+.directory-card-box-line > svg {
+  flex: none;
+  align-self: center;
+}
+
+.directory-card-justification {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-soft);
+}
+
+.directory-card-invitation .invitation-resend,
+.directory-card-request .admin-request-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.directory-card-invitation .admin-secondary,
+.directory-card-request .admin-request-actions button {
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  font-size: 14px;
+}
+
+.directory-card-invitation .auth-note {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+@media (min-width: 768px) {
+  .directory-panel-toggle {
+    display: inline-flex;
+  }
+
+  /* Entre 768 y 1199px la columna de la lista no deja 340px libres: el
+     panel se abre por encima, pegado al borde derecho. */
+  .directory-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 25;
+    display: flex;
+    width: 340px;
+    overflow-y: auto;
+    border-width: 0 0 0 1px;
+    border-radius: 0;
+    box-shadow: var(--shadow);
+  }
+
+  .directory-table tbody tr[aria-current="true"] {
+    background: var(--color-background);
+    box-shadow: inset 3px 0 0 var(--color-accent);
+  }
+}
+
+/* Desde 1200px el panel es una columna más: la lista y él, uno al lado del
+   otro. El directorio crece lo que mide el panel para que la lista no
+   pierda ancho. */
+@media (min-width: 1200px) {
+  .directory-with-panel {
+    max-width: calc(960px + 340px + var(--space-4));
+  }
+
+  .directory-with-panel .directory-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: var(--space-4);
+    align-items: start;
+  }
+
+  .directory-panel {
+    position: sticky;
+    top: var(--space-4);
+    bottom: auto;
+    z-index: auto;
+    width: auto;
+    max-height: calc(100vh - 2 * var(--space-4));
+    border-width: 1px;
+    border-radius: var(--radius);
+    box-shadow: none;
+  }
 }
 
 /* El orden de la lista de tarjetas (#283): campo y sentido, con las mismas

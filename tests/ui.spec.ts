@@ -5406,6 +5406,145 @@ test.describe("el popover de filtros del directorio en escritorio", () => {
   }
 });
 
+/* El panel lateral con la ficha rápida del socio (#550). Mockups:
+   docs/mockups/directory-admin-member-selected-role-confirm-dark.png y
+   directory-admin-invited-member-dark.png; el tema claro y el Coach se
+   revisan contra design-system.md. Sólo existe desde 768px: por debajo, la
+   ficha que sube llega en su propio ticket. Entre 768 y 1199px se abre por
+   encima de la lista, así que se fotografía la ventana y no la página. */
+const PANEL_VIEWPORTS = viewports.filter((vp) => vp.width >= 768);
+
+/** Pulsa la fila y espera a que su ficha esté en el panel. */
+function selectMember(name: string) {
+  return async (page: Page): Promise<void> => {
+    await page.getByRole("row", { name }).click();
+    await expect(
+      page.getByRole("region", { name: `Details of ${name}` }),
+    ).toBeVisible();
+  };
+}
+
+/** Elige otro rol en la ficha y espera a la franja que lo confirma. */
+function pickRoleInPanel(name: string, role: string, strip: string) {
+  return async (page: Page): Promise<void> => {
+    await selectMember(name)(page);
+    const card = page.getByRole("region", { name: `Details of ${name}` });
+    // El radio va escondido bajo su segmento, que es lo que se pulsa.
+    await card
+      .getByRole("group", { name: "Role" })
+      .getByRole("radio", { name: role })
+      .check({ force: true });
+    await expect(card.getByText(strip)).toBeVisible();
+  };
+}
+
+const PANEL_STATES: readonly DirectoryState[] = [
+  {
+    name: "directorio-ficha-rapida",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: selectMember("Nerea Ruiz"),
+  },
+  {
+    name: "directorio-ficha-cambio-rol",
+    asAdmin: true,
+    withRequests: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: pickRoleInPanel("Nerea Ruiz", "Committee", "Player → Committee"),
+  },
+  {
+    name: "directorio-ficha-invitado",
+    asAdmin: true,
+    members: WITH_INVITED_MEMBER,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: selectMember("Alex Kim"),
+  },
+  {
+    name: "directorio-ficha-rapida-coach",
+    asAdmin: false,
+    asCoach: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: selectMember("Nerea Ruiz"),
+  },
+];
+
+for (const state of PANEL_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of PANEL_VIEWPORTS) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToDirectory(page, state, theme);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot(SCREENSHOT_OPTIONS),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+
+          test(`has no accessibility violations (${theme})`, async ({
+            page,
+          }) => {
+            await goToDirectory(page, state, theme);
+            await expectNoAxeViolations(page);
+          });
+        }
+
+        test("has no horizontal scroll", async ({ page }) => {
+          await goToDirectory(page, state);
+          const overflow = await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth,
+          );
+          expect(overflow, `horizontal overflow at ${vp.width}px`).toBe(false);
+        });
+      });
+    }
+  });
+}
+
+/* Con el teclado: Enter sobre la fila abre su ficha, Esc la cierra y el foco
+   vuelve a la fila. */
+test.describe("el panel lateral del directorio con el teclado", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 1440, height: 900 },
+  });
+
+  test("Enter abre la ficha y Esc la cierra devolviendo el foco", async ({
+    page,
+  }) => {
+    await goToDirectory(page, {
+      name: "directorio-ficha-teclado",
+      asAdmin: true,
+      listHeading: ENGLISH_DIRECTORY_HEADING,
+    });
+    const row = page.getByRole("row", { name: "Nerea Ruiz" });
+
+    await row.focus();
+    await page.keyboard.press("Enter");
+    const card = page.getByRole("region", { name: "Details of Nerea Ruiz" });
+    await expect(card).toBeVisible();
+    await card.getByRole("button", { name: "Close the panel" }).focus();
+    await page.keyboard.press("Escape");
+
+    await expect(card).toHaveCount(0);
+    await expect(row).toBeFocused();
+  });
+});
+
 /* Los filtros de #497 piden axe en cada ancho y en los dos temas, no sólo en
    el ancho por defecto: la barra y la hoja son controles distintos. El
    contacto de #499 también: la columna de la tabla y la tarjeta del móvil

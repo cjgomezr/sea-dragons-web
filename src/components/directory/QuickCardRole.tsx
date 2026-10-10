@@ -3,7 +3,7 @@
 import { Check } from "@phosphor-icons/react/dist/ssr/Check";
 import { useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
-import { ROLES, type Role } from "@/lib/auth/roles";
+import type { Role } from "@/lib/auth/roles";
 import type { Translator } from "@/lib/i18n/translator";
 import type { RoleEditableMember } from "./MemberRoleControl";
 import { requestRoleChange } from "./use-member-role-change";
@@ -20,6 +20,15 @@ import { requestRoleChange } from "./use-member-role-change";
  * ese rol, con el error en la franja; un tropiezo de red deja el elegido,
  * para que reintentar sea un clic.
  */
+
+/** El orden del mockup y de la barra: del rol más común al menos, no el de
+ * la matriz de permisos de `ROLES`. */
+const ROLE_SEGMENTS: readonly Role[] = [
+  "Player",
+  "Coach",
+  "Committee",
+  "Admin",
+];
 
 type RoleChangeState =
   | { readonly kind: "idle" }
@@ -111,7 +120,7 @@ function RoleSegments({
         {translate("directory.card.role")}
       </legend>
       <div className="directory-role-options directory-card-roles">
-        {ROLES.map((role) => (
+        {ROLE_SEGMENTS.map((role) => (
           <label key={role} className="directory-role">
             <input
               type="radio"
