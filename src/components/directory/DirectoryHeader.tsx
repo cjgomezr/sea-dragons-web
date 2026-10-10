@@ -9,12 +9,18 @@ import { Icon } from "@/components/Icon";
 import { NEW_MEMBER_PATH } from "@/lib/auth/routes";
 import type {
   DirectoryListing,
+  DirectoryMember,
   DirectoryQuery,
 } from "@/lib/directory/directory";
 import type { Translator } from "@/lib/i18n/translator";
 import type { EmailRecipient } from "./DirectoryEmailComposer";
 import { DirectoryExportButton } from "./DirectoryExportButton";
 import { DirectoryMoreActions } from "./DirectoryMoreActions";
+import {
+  canExportListing,
+  canWriteEmails,
+  emailRecipientsOf,
+} from "./listing-permissions";
 import { ROLE_REQUESTS_HEADING_ID } from "./RoleRequestsPanel";
 import type { PendingRequestsState } from "./use-pending-role-requests";
 
@@ -30,6 +36,10 @@ import type { PendingRequestsState } from "./use-pending-role-requests";
  * Quién puede qué lo dice la marca que el servidor pone a la lista, nunca un
  * rol que la pantalla lea por su cuenta; y el servidor lo vuelve a mirar al
  * enviar, exportar o dar de alta.
+ *
+ * Con socios marcados (#552), el correo y el CSV de escritorio actúan sólo
+ * sobre ellos, igual que los de la barra de los marcados. El menú del móvil
+ * no tiene casillas y sigue con la lista entera.
  */
 
 const EMAIL_EMPTY_REASON_ID = "correo-directorio-sin-socios";
@@ -40,28 +50,6 @@ export type ListedDirectory = {
   readonly listing: DirectoryListing;
   readonly listedQuery: DirectoryQuery;
 };
-
-/** Escriben correos quienes reciben la lista con el correo de todos (D5, D7). */
-function canWriteEmails(listing: DirectoryListing): boolean {
-  return listing.kind === "admin" || listing.kind === "committee";
-}
-
-/** Exporta a CSV quien ve el contacto de todos (D6, #500): hoy los mismos
- * que escriben correos, pero son dos permisos distintos. */
-function canExportListing(listing: DirectoryListing): boolean {
-  return listing.kind === "admin" || listing.kind === "committee";
-}
-
-/** La lista que se está viendo, sin las bajas: no van a recibirlo. El
- * servidor las vuelve a quitar al enviar, por si alguien se dio de baja
- * entre medias. */
-function emailRecipientsOf(
-  listing: DirectoryListing,
-): readonly EmailRecipient[] {
-  return listing.members
-    .filter((member) => member.status !== "inactive")
-    .map(({ userId, fullName }) => ({ userId, fullName }));
-}
 
 function WriteEmailButton({
   translate,
@@ -150,22 +138,25 @@ function RequestsStatus({
 function HeaderActions({
   translate,
   listed,
+  checkedMembers,
   onOpenEmail,
 }: {
   translate: Translator;
   listed: ListedDirectory;
+  checkedMembers: readonly DirectoryMember[];
   onOpenEmail: (recipients: readonly EmailRecipient[]) => void;
 }): React.JSX.Element {
   const { listing, listedQuery } = listed;
   const canEmail = canWriteEmails(listing);
   const canExport = canExportListing(listing);
+  const hasChecked = checkedMembers.length > 0;
   return (
     <div className="directory-actions">
       {canEmail || canExport ? (
         <DirectoryMoreActions
           translate={translate}
           memberCount={listing.members.length}
-          emailRecipients={canEmail ? emailRecipientsOf(listing) : null}
+          emailRecipients={canEmail ? emailRecipientsOf(listing.members) : null}
           exportQuery={canExport ? listedQuery : null}
           onOpenEmail={onOpenEmail}
         />
@@ -173,7 +164,9 @@ function HeaderActions({
       {canEmail ? (
         <WriteEmailButton
           translate={translate}
-          recipients={emailRecipientsOf(listing)}
+          recipients={emailRecipientsOf(
+            hasChecked ? checkedMembers : listing.members,
+          )}
           onOpen={onOpenEmail}
         />
       ) : null}
@@ -181,6 +174,9 @@ function HeaderActions({
         <DirectoryExportButton
           translate={translate}
           query={listedQuery}
+          selectedUserIds={
+            hasChecked ? checkedMembers.map((member) => member.userId) : null
+          }
           isEmpty={listing.members.length === 0}
         />
       ) : null}
@@ -195,6 +191,7 @@ export function DirectoryHeader({
   listed,
   pendingRequests,
   titleRef,
+  checkedMembers,
   onOpenEmail,
 }: {
   translate: Translator;
@@ -205,6 +202,8 @@ export function DirectoryHeader({
   /** El foco vuelve al título al salir de la pantalla de solicitudes del
    * móvil sin ninguna pendiente (#553). */
   titleRef: React.Ref<HTMLHeadingElement>;
+  /** Los socios marcados en la lista (#552); vacío sin ninguno. */
+  checkedMembers: readonly DirectoryMember[];
   onOpenEmail: (recipients: readonly EmailRecipient[]) => void;
 }): React.JSX.Element {
   return (
@@ -231,6 +230,7 @@ export function DirectoryHeader({
         <HeaderActions
           translate={translate}
           listed={listed}
+          checkedMembers={checkedMembers}
           onOpenEmail={onOpenEmail}
         />
       )}

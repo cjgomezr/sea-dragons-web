@@ -7,6 +7,7 @@ import {
   changeMemberRole,
   findRoleChangeActor,
 } from "./member-role-change";
+import type { BulkRoleChangeFailureReason } from "./bulk-role-change-reasons";
 import type { Role } from "./roles";
 
 /**
@@ -23,11 +24,6 @@ import type { Role } from "./roles";
 /** Cuántos socios admite una petición. El club tiene decenas; una lista más
  * larga no sale de la pantalla, y cada socio es una llamada a la base. */
 export const MAX_BULK_ROLE_CHANGE_MEMBERS = 100;
-
-/** Por qué un socio no cambió. `not_audited` sí cambió en la base, pero su
- * rastro no llegó a la bitácora, y eso no se da por bueno. */
-export type BulkRoleChangeFailureReason =
-  "last_admin" | "not_found" | "forbidden" | "not_audited" | "unexpected";
 
 export type BulkRoleChangeResult =
   | {
@@ -89,7 +85,11 @@ function failureReasonOf(
 
 async function changeOne(
   gateways: MemberRoleChangeGateways,
-  change: { readonly actorId: string; readonly userId: string; readonly newRole: Role },
+  change: {
+    readonly actorId: string;
+    readonly userId: string;
+    readonly newRole: Role;
+  },
 ): Promise<BulkRoleChangeResult> {
   try {
     const result = await changeMemberRole(gateways, {

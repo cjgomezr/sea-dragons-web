@@ -136,7 +136,9 @@ export const SELECTED_MEMBER_QUERY_PARAM = "member";
 export function parseSelectedMembers(
   searchParams: URLSearchParams,
 ): readonly string[] | null {
-  const userIds = [...new Set(searchParams.getAll(SELECTED_MEMBER_QUERY_PARAM))];
+  const userIds = [
+    ...new Set(searchParams.getAll(SELECTED_MEMBER_QUERY_PARAM)),
+  ];
   if (userIds.length === 0) {
     return null;
   }

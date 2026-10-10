@@ -194,9 +194,7 @@ describe("los socios marcados de una exportación (#552)", () => {
   const OTHER = "dddddddd-0000-4000-8000-00000000000d";
 
   it("sin ninguno marcado no acota nada", () => {
-    expect(parseSelectedMembers(new URLSearchParams("role=Player"))).toBe(
-      null,
-    );
+    expect(parseSelectedMembers(new URLSearchParams("role=Player"))).toBe(null);
   });
 
   it("lee cada socio marcado, sin repetidos", () => {

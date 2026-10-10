@@ -18,6 +18,11 @@ import { memberEvaluationHref } from "@/lib/evaluations/member-evaluation-href";
 import { formatCalendarDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
+import {
+  MemberCheckCell,
+  type RowChecking,
+  SelectAllHeader,
+} from "./DirectoryCheckboxes";
 import { DirectoryContactCell, type RowContact } from "./DirectoryContactCell";
 import {
   type DirectoryOrder,
@@ -62,6 +67,9 @@ import { type StatusDot, statusDotsOf } from "./status-dots";
  * Quien ve el contacto de los socios (#499) tiene además una columna
  * "Contacto" al final: Admin y Committee con todo, el Coach con el de
  * emergencia. La marca de la lista dice cuál, igual que con el AUF.
+ *
+ * Quien puede escribir o exportar tiene además una casilla por fila (#552),
+ * y la barra de los marcados va encima del encabezado, dentro de la tarjeta.
  */
 
 /** El círculo de cada fila, en píxeles; `.directory-avatar` dice lo mismo. */
@@ -482,11 +490,13 @@ function MemberRow({
   locale,
   row,
   selection,
+  checking,
 }: {
   translate: Translator;
   locale: Locale;
   row: DirectoryRow;
   selection: RowSelection;
+  checking: RowChecking | null;
 }): React.JSX.Element {
   const { member } = row;
   const isSelected = selection.selectedUserId === member.userId;
@@ -522,6 +532,14 @@ function MemberRow({
       }}
       onKeyDown={onKeyDown}
     >
+      {checking === null ? null : (
+        <MemberCheckCell
+          translate={translate}
+          checking={checking}
+          userId={member.userId}
+          fullName={member.fullName}
+        />
+      )}
       <MemberCell translate={translate} locale={locale} row={row} />
       <RoleCell translate={translate} row={row} />
       <td
@@ -576,11 +594,16 @@ function DotLegend({
 }
 
 /** Las clases de la tabla según lo que trae la lista: la hoja de estilos
- * reparte el ancho distinto con el contacto. */
-function tableClassName(listing: DirectoryListing): string {
-  return listing.kind === "member"
-    ? "directory-table"
-    : "directory-table directory-table-contact";
+ * reparte el ancho distinto con el contacto y con las casillas (#552). */
+function tableClassName(
+  listing: DirectoryListing,
+  hasCheckboxes: boolean,
+): string {
+  const base =
+    listing.kind === "member"
+      ? "directory-table"
+      : "directory-table directory-table-contact";
+  return hasCheckboxes ? `${base} directory-table-checks` : base;
 }
 
 /** Las de la lista: con el contacto, el reparto de la tabla cambia; y en la
@@ -605,6 +628,8 @@ export function DirectoryTable({
   order,
   requestedRoles,
   selection,
+  checking,
+  toolbar,
   onSort,
 }: {
   translate: Translator;
@@ -615,6 +640,10 @@ export function DirectoryTable({
   requestedRoles: RequestedRoles;
   /** Qué fila enseña el panel lateral y qué hacer al pulsar una (#550). */
   selection: RowSelection;
+  /** Las casillas de la selección múltiple (#552), o `null` sin ellas. */
+  checking: RowChecking | null;
+  /** La barra de los marcados, sobre el encabezado; `null` sin ninguno. */
+  toolbar: React.ReactNode;
   /** Lo que pide una cabecera de la tabla, o la hoja del orden en el
    * móvil: sólo el campo. */
   onSort: (column: DirectorySort) => void;
@@ -630,12 +659,16 @@ export function DirectoryTable({
       {/* La tarjeta es el div y no la tabla: un `border-radius` sobre una
           tabla no recorta las esquinas de su primera y su última fila. */}
       <div className="directory-card">
-        <table className={tableClassName(listing)}>
+        {toolbar}
+        <table className={tableClassName(listing, checking !== null)}>
           <caption className="directory-count">
             {translate("directory.memberCount", { count: rows.length })}
           </caption>
           <thead>
             <tr>
+              {checking === null ? null : (
+                <SelectAllHeader translate={translate} checking={checking} />
+              )}
               {SORTABLE_COLUMNS.map((column) => (
                 <SortableHeader
                   key={column}
@@ -662,6 +695,7 @@ export function DirectoryTable({
                 locale={locale}
                 row={row}
                 selection={selection}
+                checking={checking}
               />
             ))}
           </tbody>

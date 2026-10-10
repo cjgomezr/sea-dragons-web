@@ -188,7 +188,9 @@ describe("GET /api/v1/directory/export", () => {
   });
 
   it("con socios marcados exporta sólo a esos (#552)", async () => {
-    const response = await exportDirectory("?member=dddddddd-0000-4000-8000-00000000000d");
+    const response = await exportDirectory(
+      "?member=dddddddd-0000-4000-8000-00000000000d",
+    );
 
     const csv = await response.text();
     expect(csv).toContain("Tomás Gil");
