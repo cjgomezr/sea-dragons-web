@@ -28,11 +28,17 @@ export type RowSwipe = {
   readonly close: () => void;
 };
 
-/** La fila que tiene sus acciones abiertas, una como mucho. */
-export function useOpenSwipeRow(): {
+/** La fila que tiene sus acciones abiertas, una como mucho. Una que ya no
+ * está en la lista (otro filtro la dejó fuera) no cuenta como abierta: si
+ * no, el siguiente toque se gastaría en cerrar unas acciones que no se ven. */
+export function useOpenSwipeRow(listedUserIds: readonly string[]): {
   readonly swipeOf: (userId: string) => RowSwipe;
 } {
-  const [openUserId, setOpenUserId] = useState<string | null>(null);
+  const [swipedUserId, setSwipedUserId] = useState<string | null>(null);
+  const openUserId =
+    swipedUserId !== null && listedUserIds.includes(swipedUserId)
+      ? swipedUserId
+      : null;
 
   useEffect(() => {
     if (openUserId === null) {
@@ -43,7 +49,7 @@ export function useOpenSwipeRow(): {
         event.target instanceof Element &&
         event.target.closest(SWIPE_ACTIONS_SELECTOR) !== null;
       if (!isInsideActions) {
-        setOpenUserId(null);
+        setSwipedUserId(null);
       }
     }
     document.addEventListener("pointerdown", closeOnPressOutside);
@@ -55,9 +61,9 @@ export function useOpenSwipeRow(): {
     return {
       isOpen: openUserId === userId,
       isAnyOpen: openUserId !== null,
-      open: () => setOpenUserId(userId),
+      open: () => setSwipedUserId(userId),
       close: () =>
-        setOpenUserId((current) => (current === userId ? null : current)),
+        setSwipedUserId((current) => (current === userId ? null : current)),
     };
   }
 

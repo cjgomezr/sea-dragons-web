@@ -527,21 +527,29 @@ function SwipeActionsCell({
   );
 }
 
+/** Una fila que se desliza, con lo que enseña al hacerlo. */
+type RowSwiping = {
+  readonly swipe: RowSwipe;
+  readonly contact: ReachableContact;
+};
+
 /** Sólo en el móvil, y sólo con un contacto que enseñar (FR-090). */
-function swipeableContactOf(
+function rowSwipingOf(
   row: DirectoryRow,
   swipe: RowSwipe | null,
-): ReachableContact | null {
-  return swipe === null || row.contact.kind === "none" ? null : row.contact;
+): RowSwiping | null {
+  return swipe === null || row.contact.kind === "none"
+    ? null
+    : { swipe, contact: row.contact };
 }
 
 /** La abierta se corre lo que miden sus acciones: tres, o la de emergencia
  * sola del Coach. */
-function rowClassName(swipedContact: ReachableContact | null): string {
-  if (swipedContact === null) {
+function rowClassName(swiping: RowSwiping | null): string {
+  if (swiping === null || !swiping.swipe.isOpen) {
     return "directory-row";
   }
-  return swipedContact.kind === "emergency"
+  return swiping.contact.kind === "emergency"
     ? "directory-row directory-row-swiped directory-row-swiped-emergency"
     : "directory-row directory-row-swiped";
 }
@@ -564,9 +572,8 @@ function MemberRow({
 }): React.JSX.Element {
   const { member } = row;
   const isSelected = selection.selectedUserId === member.userId;
-  const swipeContact = swipeableContactOf(row, swipe);
-  const rowSwipe = swipeContact === null ? null : swipe;
-  const gesture = useSwipeGesture(rowSwipe);
+  const swiping = rowSwipingOf(row, swipe);
+  const gesture = useSwipeGesture(swiping === null ? null : swiping.swipe);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLTableRowElement>): void {
     if (event.target !== event.currentTarget) {
@@ -591,7 +598,7 @@ function MemberRow({
       aria-label={member.fullName}
       aria-current={isSelected ? "true" : undefined}
       tabIndex={0}
-      className={rowClassName(rowSwipe?.isOpen === true ? swipeContact : null)}
+      className={rowClassName(swiping)}
       onClick={(event) => {
         if (gesture.takeIsGestureClick() || isFromControl(event.target)) {
           return;
@@ -636,12 +643,12 @@ function MemberRow({
       {row.contact.kind === "none" ? null : (
         <DirectoryContactCell translate={translate} contact={row.contact} />
       )}
-      {swipeContact === null || rowSwipe === null ? null : (
+      {swiping === null ? null : (
         <SwipeActionsCell
           translate={translate}
-          contact={swipeContact}
+          contact={swiping.contact}
           fullName={member.fullName}
-          isOpen={rowSwipe.isOpen}
+          isOpen={swiping.swipe.isOpen}
         />
       )}
     </tr>
@@ -737,7 +744,7 @@ export function DirectoryTable({
   onSort: (column: DirectorySort) => void;
 }): React.JSX.Element {
   const rows = rowsOf(translate, listing, requestedRoles);
-  const { swipeOf } = useOpenSwipeRow();
+  const { swipeOf } = useOpenSwipeRow(rows.map((row) => row.member.userId));
   return (
     <div className={listClassName(listing)}>
       <DirectorySortControl

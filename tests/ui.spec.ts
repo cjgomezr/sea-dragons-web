@@ -5989,6 +5989,8 @@ test.describe("el directorio en el móvil (#553)", () => {
       prepare: openMemberSheet("Nerea Ruiz"),
     });
     const sheet = page.getByRole("dialog", { name: "Nerea Ruiz" });
+    // La fila esconde el país y el nivel; la ficha los enseña.
+    await expect(sheet.getByText(/ · /).first()).toBeVisible();
     const contact = sheet.getByRole("group", { name: "Contact" });
     for (const button of await contact.getByRole("link").all()) {
       const box = await button.boundingBox();

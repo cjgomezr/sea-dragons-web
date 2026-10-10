@@ -154,7 +154,11 @@ function memberView(
 function readResponse(stub: ApiStub, url: string): Response {
   const kind = stub.kind ?? "admin";
   if (url.startsWith(DIRECTORY_PATH)) {
-    const members = stub.members ?? [NEREA, ANA];
+    // El rol filtra como en el servidor: así una fila puede salir de la lista.
+    const role = new URL(url, "http://localhost").searchParams.get("role");
+    const members = (stub.members ?? [NEREA, ANA]).filter(
+      (member) => role === null || member.role === role,
+    );
     return jsonResponse(200, {
       data: {
         kind,
@@ -581,6 +585,35 @@ describe("deslizar la fila", () => {
 
     expect(rowActions("Nerea Ruiz")).toBeNull();
     expect(rowActions("Ana Admin")).not.toBeNull();
+  });
+
+  it("tocar otra fila con unas acciones abiertas sólo las cierra", async () => {
+    stubApi();
+    await renderDirectory();
+    swipe(row("Nerea Ruiz"), { dx: -60 });
+
+    swipe(row("Ana Admin"), { dx: 0 });
+
+    expect(rowActions("Nerea Ruiz")).toBeNull();
+    expect(rowActions("Ana Admin")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("si la fila abierta sale de la lista, el siguiente toque sube la ficha", async () => {
+    const user = userEvent.setup();
+    stubApi();
+    await renderDirectory();
+    swipe(row("Nerea Ruiz"), { dx: -60 });
+
+    // Con el teclado: un toque fuera ya cerraría las acciones por sí solo.
+    screen.getByRole("radio", { name: "Admin" }).focus();
+    await user.keyboard(" ");
+    await waitFor(() =>
+      expect(screen.queryByRole("row", { name: "Nerea Ruiz" })).toBeNull(),
+    );
+    swipe(row("Ana Admin"), { dx: 0 });
+
+    expect(sheet("Ana Admin")).toBeVisible();
   });
 
   it("un movimiento en vertical no abre nada", async () => {

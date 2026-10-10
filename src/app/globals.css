@@ -3111,6 +3111,11 @@ a.auth-brand-header:focus-visible {
   border: 1px dashed var(--color-warning);
 }
 
+/* La fila del móvil esconde el país y el nivel; la ficha es donde se leen. */
+.directory-sheet .directory-meta {
+  display: block;
+}
+
 .directory-sheet .directory-card-roles .directory-role {
   min-height: 42px;
 }
