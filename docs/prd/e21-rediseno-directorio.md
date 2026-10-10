@@ -174,7 +174,7 @@ Para medidas, colores y textos de cada pieza, ver el `README.md` del handoff. Ca
 | 6 (#552) | Selecciona varios socios para escribirles, exportarlos o cambiarles el rol en bloque (RF-6)   | M      | 4          | No: permisos y cambio de roles en bloque      |
 | 7 (#553) | Rehace el directorio en el móvil: lista, orden, menú y pantalla de solicitudes (RF-7)         | M      | 3          | No: UI nueva                                  |
 | 8 (#554) | Añade en el móvil la ficha que sube y las acciones al deslizar (RF-8)                         | M      | 4, 7       | No: gestos y enlaces de llamada               |
-| 9        | Quita la columna de contacto del directorio y deja la tabla compacta desde 768 px (RF-9)      | S      | 8          | No: cambia qué ve cada rol en la lista        |
+| 9 (#571) | Quita la columna de contacto del directorio y deja la tabla compacta desde 768 px (RF-9)      | S      | 8          | No: cambia qué ve cada rol en la lista        |
 
 El 9 se añadió después de la descomposición (D7) y va con `priority:high`: cualquier Admin con un portátil o con zoom ve las tarjetas.
 
