@@ -125,6 +125,12 @@ export function useSwipeGesture(swipe: RowSwipe | null): SwipeHandlers {
 
   function endGesture(): void {
     startRef.current = null;
+    // El clic del gesto, si llega, llega justo tras el pointerup. En el
+    // táctil un deslizamiento acaba sin clic, y la marca se comería el clic
+    // sin puntero de un lector de pantalla.
+    setTimeout(() => {
+      isGestureClickRef.current = false;
+    }, 0);
   }
 
   function takeIsGestureClick(): boolean {

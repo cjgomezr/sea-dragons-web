@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -564,6 +565,24 @@ describe("deslizar la fila", () => {
 
     expect(rowActions("Nerea Ruiz")).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("tras un gesto sin clic, el clic de un lector de pantalla sube la ficha", async () => {
+    stubApi();
+    await renderDirectory();
+    swipe(row("Nerea Ruiz"), { dx: -60 });
+    // En el táctil un deslizamiento acaba sin clic.
+    const start = { clientX: 300, clientY: 200, pointerId: 1 };
+    const end = { clientX: 360, clientY: 200, pointerId: 1 };
+    fireEvent.pointerDown(row("Nerea Ruiz"), start);
+    fireEvent.pointerMove(row("Nerea Ruiz"), end);
+    fireEvent.pointerUp(row("Nerea Ruiz"), end);
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+
+    // TalkBack y VoiceOver activan con un clic sin puntero antes.
+    fireEvent.click(row("Nerea Ruiz"));
+
+    expect(sheet("Nerea Ruiz")).toBeVisible();
   });
 
   it("tocar fuera las cierra", async () => {
