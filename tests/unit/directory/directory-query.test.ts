@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_DIRECTORY_QUERY } from "@/lib/directory/directory";
 import {
   InvalidDirectoryQueryError,
+  SELECTED_MEMBER_QUERY_PARAM,
   parseDirectoryQuery,
+  parseSelectedMembers,
   writeDirectoryQuery,
 } from "@/lib/directory/directory-query";
 
@@ -184,5 +186,32 @@ describe("la consulta escrita en la dirección (#497)", () => {
     } as const;
 
     expect(parseDirectoryQuery(writeDirectoryQuery(query))).toEqual(query);
+  });
+});
+
+describe("los socios marcados de una exportación (#552)", () => {
+  const MARKED = "cccccccc-0000-4000-8000-00000000000c";
+  const OTHER = "dddddddd-0000-4000-8000-00000000000d";
+
+  it("sin ninguno marcado no acota nada", () => {
+    expect(parseSelectedMembers(new URLSearchParams("role=Player"))).toBe(null);
+  });
+
+  it("lee cada socio marcado, sin repetidos", () => {
+    const params = new URLSearchParams();
+    for (const userId of [MARKED, OTHER, MARKED]) {
+      params.append(SELECTED_MEMBER_QUERY_PARAM, userId);
+    }
+
+    expect(parseSelectedMembers(params)).toEqual([MARKED, OTHER]);
+  });
+
+  it("rechaza un socio que no es un uuid", () => {
+    const params = new URLSearchParams();
+    params.append(SELECTED_MEMBER_QUERY_PARAM, "abc");
+
+    expect(() => parseSelectedMembers(params)).toThrow(
+      InvalidDirectoryQueryError,
+    );
   });
 });

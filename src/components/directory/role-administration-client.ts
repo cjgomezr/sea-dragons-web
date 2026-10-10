@@ -7,10 +7,13 @@ import {
   requestApi,
 } from "@/lib/api/request-api";
 import type { PendingRoleRequest } from "@/lib/auth/club-administration";
+import { BULK_ROLE_CHANGE_FAILURE_REASONS } from "@/lib/auth/bulk-role-change-reasons";
+import type { BulkRoleChange } from "@/lib/auth/member-roles-bulk-change";
 import { REQUESTABLE_ROLES } from "@/lib/auth/role-request";
 import type { RoleRequestDecision } from "@/lib/auth/role-request-decision";
 import { ROLES, type Role } from "@/lib/auth/roles";
 import {
+  MEMBER_ROLES_API_PATH,
   MEMBER_ROLE_API_PATH,
   ROLE_REQUESTS_API_PATH,
   ROLE_REQUEST_DECISION_API_PATH,
@@ -49,6 +52,33 @@ const pendingRequestsSchema = z.object({
 
 const memberRoleSchema = z.object({ data: z.object({ role: z.enum(ROLES) }) });
 
+/** Lo que responde `POST /api/v1/members/roles` (#552), socio a socio. */
+const memberRolesSchema = z.object({
+  data: z.object({
+    role: z.enum(ROLES),
+    results: z.array(
+      z.discriminatedUnion("kind", [
+        z.object({
+          kind: z.literal("changed"),
+          userId: z.string(),
+          previousRole: z.enum(ROLES),
+          role: z.enum(ROLES),
+        }),
+        z.object({
+          kind: z.literal("unchanged"),
+          userId: z.string(),
+          role: z.enum(ROLES),
+        }),
+        z.object({
+          kind: z.literal("failed"),
+          userId: z.string(),
+          reason: z.enum(BULK_ROLE_CHANGE_FAILURE_REASONS),
+        }),
+      ]),
+    ),
+  }),
+}) satisfies z.ZodType<{ data: BulkRoleChange }>;
+
 /** Por qué no salió una petición de la bandeja o del cambio de rol. */
 export type AdministrationFailure = ApiRequestFailure;
 
@@ -64,6 +94,10 @@ export type DecisionOutcome =
 
 export type RoleChangeOutcome =
   { readonly kind: "changed"; readonly role: Role } | AdministrationFailure;
+
+export type BulkRoleChangeOutcome =
+  | { readonly kind: "applied"; readonly change: BulkRoleChange }
+  | AdministrationFailure;
 
 /** Nunca rechaza: `readApiPayload` devuelve tal cual el fallo de red o de
  * HTTP, y un cuerpo que no cuadra sale como fallo, no como excepción. */
@@ -111,6 +145,26 @@ export async function submitMemberRole(
   return read.kind === "failed"
     ? read
     : { kind: "changed", role: read.value.data.role };
+}
+
+/** Cambia el rol de varios socios en una petición (#552). Un 200 puede traer
+ * socios que no cambiaron: cada uno lleva su resultado. */
+export async function submitMemberRoles(
+  userIds: readonly string[],
+  role: Role,
+): Promise<BulkRoleChangeOutcome> {
+  const outcome = await requestApi(MEMBER_ROLES_API_PATH, {
+    method: "POST",
+    headers: JSON_REQUEST_HEADERS,
+    body: JSON.stringify({ userIds, role }),
+  });
+  if (outcome.kind === "failed") {
+    return outcome;
+  }
+  const read = readApiPayload(outcome, memberRolesSchema);
+  return read.kind === "failed"
+    ? read
+    : { kind: "applied", change: read.value.data };
 }
 
 /** Una solicitud que el servidor dice que ya no está pendiente no vuelve a la

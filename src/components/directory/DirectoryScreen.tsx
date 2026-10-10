@@ -6,6 +6,7 @@ import {
   DEFAULT_DIRECTORY_QUERY,
   type DirectoryDirection,
   type DirectoryListing,
+  type DirectoryMember,
   type DirectoryQuery,
   type DirectorySort,
   withMemberRole,
@@ -31,6 +32,9 @@ import {
   type DirectoryFilterState,
   DirectoryFilters,
 } from "./DirectoryFilters";
+import { AdministrationNotice } from "./AdministrationNotice";
+import { DirectoryBulkBar } from "./DirectoryBulkBar";
+import type { RowChecking } from "./DirectoryCheckboxes";
 import { DirectoryHeader } from "./DirectoryHeader";
 import type { DirectoryOrder } from "./DirectorySortControl";
 import { DirectoryPanel, PANEL_TOGGLE_ID } from "./DirectoryPanel";
@@ -42,7 +46,15 @@ import {
 import { RoleRequestsBanner } from "./RoleRequestsBanner";
 import { RoleRequestsPanel } from "./RoleRequestsPanel";
 import { RoleRequestsScreen } from "./RoleRequestsScreen";
+import {
+  canChangeRoles,
+  canCheckMembers,
+  canExportListing,
+  canWriteEmails,
+} from "./listing-permissions";
 import { findSelectedMember } from "./selected-member";
+import { useBulkRoleChange } from "./use-bulk-role-change";
+import { type CheckedMembers, useCheckedMembers } from "./use-checked-members";
 import { useDebouncedValue } from "./use-debounced-value";
 import { useFilterChoices } from "./use-filter-choices";
 import {
@@ -69,6 +81,10 @@ import {
  * En el móvil (#553) las solicitudes no van debajo de la lista: un aviso
  * encima de ella abre su propia pantalla, que tapa el directorio hasta que
  * se vuelve con la flecha.
+ *
+ * Quien puede escribir o exportar marca socios con casillas (#552): con
+ * alguno marcado, una barra sobre la lista les escribe, los exporta o, al
+ * Admin, les cambia el rol a todos de una vez.
  *
  * Es de cliente porque su razón de ser es cambiar sin recargar: buscar,
  * filtrar y ordenar rehacen la lectura. Lee por la API v1 y nunca contra la
@@ -145,6 +161,22 @@ const FIRST_DIRECTION: Readonly<Record<DirectorySort, DirectoryDirection>> = {
 };
 
 const NO_REQUESTED_ROLES: RequestedRoles = new Map();
+
+const NO_MEMBERS: readonly DirectoryMember[] = [];
+
+/** Lo que las filas necesitan de los marcados. */
+function rowCheckingOf(
+  checked: CheckedMembers,
+  visibleCount: number,
+): RowChecking {
+  return {
+    isChecked: checked.isChecked,
+    toggle: checked.toggle,
+    toggleAll: checked.toggleAll,
+    checkedCount: checked.members.length,
+    visibleCount,
+  };
+}
 
 /** Dónde está un Admin respecto a la pantalla de solicitudes del móvil.
  * `returned` es la lista otra vez, recién vuelto: el foco vuelve al aviso,
@@ -379,6 +411,14 @@ export function DirectoryScreen({
 
   const isAdminListing =
     state.kind === "ready" && state.listing.kind === "admin";
+  const checked = useCheckedMembers(
+    state.kind === "ready" ? state.listing.members : NO_MEMBERS,
+  );
+  const bulkRoles = useBulkRoleChange({
+    translate,
+    onRoleChanged: applyRole,
+    onApplied: checked.clear,
+  });
   const pendingRequests = usePendingRoleRequests({
     isEnabled: isAdminListing,
     translate,
@@ -429,6 +469,7 @@ export function DirectoryScreen({
         listed={state.kind === "ready" ? state : null}
         pendingRequests={isAdminListing ? pendingRequests.state : null}
         titleRef={titleRef}
+        checkedMembers={checked.members}
         onOpenEmail={setEmailRecipients}
       />
       {emailRecipients === null ? null : (
@@ -505,6 +546,34 @@ export function DirectoryScreen({
                   selectedUserId: panel.selectedUserId,
                   onToggle: panel.toggleMember,
                 }}
+                checking={
+                  canCheckMembers(state.listing)
+                    ? rowCheckingOf(checked, state.listing.members.length)
+                    : null
+                }
+                toolbar={
+                  <>
+                    {checked.members.length === 0 ? null : (
+                      <DirectoryBulkBar
+                        translate={translate}
+                        checkedMembers={checked.members}
+                        listedQuery={state.listedQuery}
+                        permissions={{
+                          canEmail: canWriteEmails(state.listing),
+                          canExport: canExportListing(state.listing),
+                          canChangeRole: canChangeRoles(state.listing),
+                        }}
+                        isSavingRoles={bulkRoles.isSaving}
+                        onEmail={setEmailRecipients}
+                        onChangeRoles={(role) =>
+                          bulkRoles.changeRoles(checked.members, role)
+                        }
+                        onClear={checked.clear}
+                      />
+                    )}
+                    <AdministrationNotice notice={bulkRoles.notice} />
+                  </>
+                }
                 onSort={sortBy}
               />
             )}

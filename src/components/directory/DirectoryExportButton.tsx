@@ -23,11 +23,14 @@ const EXPORT_EMPTY_REASON_ID = "exportar-directorio-sin-socios";
 export function DirectoryExportButton({
   translate,
   query,
+  selectedUserIds,
   isEmpty,
 }: {
   translate: Translator;
   /** La consulta de la lista que se está viendo. */
   query: DirectoryQuery;
+  /** Los socios marcados (#552), o `null` para la lista entera. */
+  selectedUserIds: readonly string[] | null;
   isEmpty: boolean;
 }): React.JSX.Element {
   const { state, exportList } = useDirectoryExport();
@@ -42,7 +45,7 @@ export function DirectoryExportButton({
         title={label}
         disabled={isEmpty || state.kind === "exporting"}
         aria-describedby={isEmpty ? EXPORT_EMPTY_REASON_ID : undefined}
-        onClick={() => void exportList(query)}
+        onClick={() => void exportList(query, selectedUserIds)}
       >
         <Icon glyph={DownloadSimple} />
       </button>

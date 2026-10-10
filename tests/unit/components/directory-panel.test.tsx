@@ -255,9 +255,11 @@ function roleRadio(card: HTMLElement, role: string): HTMLElement {
 }
 
 /** La primera celda de datos: la del rol. El nombre va en la cabecera de
- * la fila. */
+ * la fila, y la casilla de marcarla (#552) no es un dato. */
 function roleCellOf(name: string): HTMLElement {
-  const [roleCell] = within(row(name)).getAllByRole("cell");
+  const [roleCell] = within(row(name))
+    .getAllByRole("cell")
+    .filter((cell) => within(cell).queryByRole("checkbox") === null);
   if (roleCell === undefined) {
     throw new Error(`La fila de ${name} no tiene celdas`);
   }

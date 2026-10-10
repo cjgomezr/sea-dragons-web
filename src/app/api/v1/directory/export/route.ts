@@ -21,6 +21,7 @@ import {
   INVALID_DIRECTORY_QUERY_REASON,
   InvalidDirectoryQueryError,
   parseDirectoryQuery,
+  parseSelectedMembers,
 } from "@/lib/directory/directory-query";
 import { createSupabaseDirectoryExportGateways } from "@/lib/directory/supabase-directory-export-gateways";
 import { readApiRequestLocale } from "@/lib/i18n/request-locale";
@@ -76,11 +77,19 @@ function asExportApiError(error: unknown): never {
   return asAccountApiError(error);
 }
 
+type ExportQuery = {
+  readonly query: DirectoryQuery;
+  readonly selectedUserIds: readonly string[] | null;
+};
+
 /** Una consulta mal escrita se contesta antes de identificar a nadie, como
- * en el directorio. */
-function readExportQuery(searchParams: URLSearchParams): DirectoryQuery {
+ * en el directorio. Los socios marcados (#552) acotan la lista filtrada. */
+function readExportQuery(searchParams: URLSearchParams): ExportQuery {
   try {
-    return parseDirectoryQuery(searchParams);
+    return {
+      query: parseDirectoryQuery(searchParams),
+      selectedUserIds: parseSelectedMembers(searchParams),
+    };
   } catch (error) {
     if (error instanceof InvalidDirectoryQueryError) {
       throw new ApiError(
@@ -95,12 +104,15 @@ function readExportQuery(searchParams: URLSearchParams): DirectoryQuery {
 
 const getExport = createApiRoute<never>({
   handler: async ({ request, decorateResponse }) => {
-    const query = readExportQuery(request.nextUrl.searchParams);
+    const { query, selectedUserIds } = readExportQuery(
+      request.nextUrl.searchParams,
+    );
     const callerId = await identifyAccountCaller({ request, decorateResponse });
     try {
       const exported = await exportDirectory(requireExportGateways(), {
         callerId,
         query,
+        selectedUserIds,
         // El día de Melbourne (NFR-003): el del nombre del archivo y el que
         // mide los AUF por vencer, como en el directorio.
         todayInClub: clubCalendarDate(new Date()),

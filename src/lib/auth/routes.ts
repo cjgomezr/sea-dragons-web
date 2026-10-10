@@ -98,6 +98,10 @@ export const MEMBERS_API_PATH = "/api/v1/members";
  * socio. Sólo lo alcanza quien gestiona usuarios y roles. */
 export const MEMBER_ROLE_API_PATH = `${MEMBERS_API_PATH}/[id]/role`;
 
+/** Cambiar el rol de varios socios a la vez (#552, RF-6 del PRD de E21).
+ * Sólo lo alcanza quien gestiona usuarios y roles. */
+export const MEMBER_ROLES_API_PATH = `${MEMBERS_API_PATH}/roles`;
+
 /** El directorio del club (#239). Lo alcanza cualquier cuenta activa. */
 export const DIRECTORY_PATH = "/directorio";
 
@@ -655,6 +659,8 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   // cambio de rol tiene que seguir siendo sólo de un Admin sin que nadie se
   // acuerde de escribir esta línea.
   { path: MEMBER_ROLE_API_PATH, capability: "manageUsersAndRoles" },
+  // Cuelga del de los socios; se declara por el mismo motivo que el anterior.
+  { path: MEMBER_ROLES_API_PATH, capability: "manageUsersAndRoles" },
   { path: MEMBER_RECORD_API_PATH, capability: "manageUsersAndRoles" },
   {
     path: MEMBER_AUF_VERIFICATION_API_PATH,

@@ -187,6 +187,23 @@ describe("GET /api/v1/directory/export", () => {
     expect(csv).not.toContain("Tomás Gil");
   });
 
+  it("con socios marcados exporta sólo a esos (#552)", async () => {
+    const response = await exportDirectory(
+      "?member=dddddddd-0000-4000-8000-00000000000d",
+    );
+
+    const csv = await response.text();
+    expect(csv).toContain("Tomás Gil");
+    expect(csv).not.toContain("María Ñíguez");
+  });
+
+  it("responde 400 a un socio marcado que no es un uuid", async () => {
+    const response = await exportDirectory("?member=abc");
+
+    expect(response.status).toBe(400);
+    expect(auditRows).toEqual([]);
+  });
+
   it("apunta la exportación en la bitácora con los filtros y el total", async () => {
     await exportDirectory("?withoutPhone=true");
 

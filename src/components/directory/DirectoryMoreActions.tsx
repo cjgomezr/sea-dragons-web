@@ -167,7 +167,7 @@ export function DirectoryMoreActions({
                       : null
                   }
                   onChoose={() => {
-                    void exportList(exportQuery);
+                    void exportList(exportQuery, null);
                     close();
                   }}
                 />

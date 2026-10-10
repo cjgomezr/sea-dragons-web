@@ -126,6 +126,28 @@ function readPosition(
     : { kind: "position", positionId: value };
 }
 
+/** Los socios marcados de una exportación (#552): uno por parámetro, como
+ * `?member=a&member=b`. No es parte de la consulta de la pantalla, que se
+ * comparte por la dirección: marcar es de un momento. */
+export const SELECTED_MEMBER_QUERY_PARAM = "member";
+
+/** Los socios marcados, sin repetidos, o `null` si no se marcó ninguno: la
+ * exportación es entonces la de la lista filtrada entera. */
+export function parseSelectedMembers(
+  searchParams: URLSearchParams,
+): readonly string[] | null {
+  const userIds = [
+    ...new Set(searchParams.getAll(SELECTED_MEMBER_QUERY_PARAM)),
+  ];
+  if (userIds.length === 0) {
+    return null;
+  }
+  if (!userIds.every((userId) => z.uuid().safeParse(userId).success)) {
+    throw new InvalidDirectoryQueryError([SELECTED_MEMBER_QUERY_PARAM]);
+  }
+  return userIds;
+}
+
 export function parseDirectoryQuery(
   searchParams: URLSearchParams,
 ): DirectoryQuery {
