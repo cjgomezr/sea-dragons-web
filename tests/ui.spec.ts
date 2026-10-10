@@ -5808,6 +5808,14 @@ test.describe("el directorio en el móvil (#553)", () => {
     });
   }
 
+  // La selección múltiple es del escritorio (#552): en el móvil no sale
+  // ninguna casilla en las filas.
+  test("las filas no llevan casilla de selección", async ({ page }) => {
+    await goToDirectory(page, MOBILE_DIRECTORY_STATES[0]!);
+
+    await expect(page.getByRole("checkbox")).toHaveCount(0);
+  });
+
   test("la cabecera lleva el ⋯ e Invitar de 44 × 44, y el aviso mide al menos 48px", async ({
     page,
   }) => {

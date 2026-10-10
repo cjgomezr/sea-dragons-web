@@ -4219,8 +4219,9 @@ a.auth-brand-header:focus-visible {
    centrado en las dos líneas sin sacar al nombre de su celda. */
 @media (width < 768px) {
   /* La selección múltiple es del escritorio (#552): en el móvil, cada fila
-     tiene sus acciones al deslizar. */
-  .directory-check-cell,
+     tiene sus acciones al deslizar. La casilla lleva la tabla delante para
+     ganarle a `.directory-table td`, que pone cada celda en bloque. */
+  .directory-table .directory-check-cell,
   .directory-bulk {
     display: none;
   }
