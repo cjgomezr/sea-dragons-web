@@ -5947,7 +5947,8 @@ test.describe("el directorio con los datos de verdad", () => {
     ).toBeVisible();
   });
 
-  test("un Admin ve la bandeja y el control de su propio rol", async ({
+  // Desde #549 la fila enseña el rol como texto: se cambia en la ficha.
+  test("un Admin ve la bandeja y su propio rol en su fila", async ({
     page,
   }) => {
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
@@ -5956,10 +5957,10 @@ test.describe("el directorio con los datos de verdad", () => {
       page.getByRole("heading", { name: "Pending requests" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("combobox", {
-        name: `Role for ${ADMINISTRATION_ADMIN_NAME}`,
-      }),
-    ).toHaveValue("Admin");
+      page
+        .getByRole("row", { name: ADMINISTRATION_ADMIN_NAME })
+        .getByRole("cell", { name: "Admin", exact: true }),
+    ).toBeVisible();
   });
 
   test("en español, la bandeja sale en español", async ({ page }) => {
@@ -6118,8 +6119,10 @@ test.describe("un Admin que decide una solicitud desde el directorio", () => {
 
     await expect(approve).toHaveCount(0);
     await expect(
-      page.getByRole("combobox", { name: `Role for ${DECIDABLE_MEMBER_NAME}` }),
-    ).toHaveValue("Committee");
+      page
+        .getByRole("row", { name: DECIDABLE_MEMBER_NAME })
+        .getByRole("cell", { name: "Committee", exact: true }),
+    ).toBeVisible();
   });
 });
 
@@ -6838,15 +6841,20 @@ test.describe("un Admin frente a la ficha con los datos de verdad", () => {
     expect((await saved).status()).toBe(200);
     await expect(page.getByText("Record saved.")).toBeVisible();
 
+    // Desde #549 la fila no escribe el AUF: con número y un vencimiento
+    // lejano, su fila ya no lleva ningún punto del AUF.
     await page.getByRole("link", { name: /Back to the directory/ }).click();
-    await expect(
-      page
-        .getByRole("row", { name: ADMINISTRATION_ADMIN_NAME })
-        .getByText(`AUF ${aufNumber} · expires 31 December 2099`),
-    ).toBeVisible();
+    const ownRow = page.getByRole("row", { name: ADMINISTRATION_ADMIN_NAME });
+    await expect(ownRow).toBeVisible();
+    await expect(ownRow.getByRole("img", { name: /AUF/ })).toHaveCount(0);
 
     // Deja la fila como estaba: sin número, que borra también el vencimiento.
     await openOwnRecordLink(page).click();
+    // Se espera a la ficha: en el directorio, los puntos "No AUF number"
+    // (#549) también responden a esa etiqueta.
+    await expect(
+      page.getByRole("heading", { level: 1, name: ADMINISTRATION_ADMIN_NAME }),
+    ).toBeVisible({ timeout: ACCOUNT_CHANGE_TIMEOUT_MS });
     await page.getByLabel("AUF number").fill("");
     await page.getByRole("button", { name: ENGLISH_SAVE_RECORD }).click();
     await expect(page.getByText("Record saved.")).toBeVisible();

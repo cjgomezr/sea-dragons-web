@@ -63,18 +63,26 @@ import { type StatusDot, statusDotsOf } from "./status-dots";
 /** El círculo de cada fila, en píxeles; `.directory-avatar` dice lo mismo. */
 const DIRECTORY_AVATAR_SIZE = 32;
 
-/** Lo que una fila necesita saber, con lo que sólo un Admin recibe ya
- * resuelto: así la fila no tiene que volver a preguntarse quién la mira.
- * `dots` y `requestedRole` sólo llegan a un Admin; `isEvaluated` es null para
- * quien no ve evaluaciones (#324). */
-type DirectoryRow = {
-  readonly member: DirectoryMember;
-  readonly isAdmin: boolean;
+/** Lo que de una fila sólo recibe un Admin: sus puntos de estado y el rol
+ * que el socio pidió, si pidió alguno. */
+type AdminRowView = {
   readonly dots: readonly StatusDot[];
   readonly requestedRole: Role | null;
+};
+
+/** Lo que una fila necesita saber, con lo que sólo un Admin recibe ya
+ * resuelto: así la fila no tiene que volver a preguntarse quién la mira. Con
+ * `admin` la fila es de Admin: enlaza la ficha (#242) y enseña puntos y
+ * solicitud (#549). `isEvaluated` es null para quien no ve evaluaciones
+ * (#324). */
+type DirectoryRow = {
+  readonly member: DirectoryMember;
+  readonly admin: AdminRowView | null;
   readonly isEvaluated: boolean | null;
   readonly contact: RowContact;
 };
+
+const NO_DOTS: readonly StatusDot[] = [];
 
 /** Las solicitudes de rol pendientes, por socio: lo que pidió cada uno. */
 export type RequestedRoles = ReadonlyMap<string, Role>;
@@ -90,9 +98,6 @@ function fullContactOf(member: MemberContactView): RowContact {
   };
 }
 
-/** Lo que una fila lleva cuando quien mira no es Admin. */
-const NOT_ADMIN = { isAdmin: false, dots: [], requestedRole: null } as const;
-
 function rowsOf(
   translate: Translator,
   listing: DirectoryListing,
@@ -102,22 +107,23 @@ function rowsOf(
     case "admin":
       return listing.members.map((member) => ({
         member,
-        isAdmin: true,
-        dots: statusDotsOf(translate, member),
-        requestedRole: requestedRoles.get(member.userId) ?? null,
+        admin: {
+          dots: statusDotsOf(translate, member),
+          requestedRole: requestedRoles.get(member.userId) ?? null,
+        },
         isEvaluated: member.isEvaluated,
         contact: fullContactOf(member),
       }));
     case "committee":
       return listing.members.map((member) => ({
-        ...NOT_ADMIN,
+        admin: null,
         member,
         isEvaluated: null,
         contact: fullContactOf(member),
       }));
     case "coach":
       return listing.members.map((member) => ({
-        ...NOT_ADMIN,
+        admin: null,
         member,
         isEvaluated: member.isEvaluated,
         contact: {
@@ -127,7 +133,7 @@ function rowsOf(
       }));
     case "member":
       return listing.members.map((member) => ({
-        ...NOT_ADMIN,
+        admin: null,
         member,
         isEvaluated: null,
         contact: NO_CONTACT,
@@ -295,7 +301,7 @@ function MemberName({
   row: DirectoryRow;
 }): React.JSX.Element {
   const { member } = row;
-  if (!row.isAdmin) {
+  if (row.admin === null) {
     return <span className="directory-name">{member.fullName}</span>;
   }
   return (
@@ -391,7 +397,7 @@ function MemberCell({
           <span className="directory-name-line">
             <MemberName translate={translate} row={row} />
             <StatusPills translate={translate} member={member} />
-            <StatusDots dots={row.dots} />
+            <StatusDots dots={row.admin === null ? NO_DOTS : row.admin.dots} />
             {needsEvaluation(row) ? (
               <NotEvaluatedMark translate={translate} member={member} />
             ) : null}
@@ -431,6 +437,7 @@ function RoleCell({
   translate: Translator;
   row: DirectoryRow;
 }): React.JSX.Element {
+  const requestedRole = row.admin === null ? null : row.admin.requestedRole;
   return (
     <td
       className="directory-role-cell"
@@ -439,10 +446,10 @@ function RoleCell({
       <span className="directory-role-name">
         {translate(`role.${row.member.role}`)}
       </span>
-      {row.requestedRole === null ? null : (
+      {requestedRole === null ? null : (
         <>
           {" "}
-          <RequestedRolePill translate={translate} role={row.requestedRole} />
+          <RequestedRolePill translate={translate} role={requestedRole} />
         </>
       )}
     </td>
