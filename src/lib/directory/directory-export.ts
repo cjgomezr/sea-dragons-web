@@ -76,6 +76,13 @@ function asExportable(listing: DirectoryListing): ExportableListing {
   throw new DirectoryExportForbiddenError();
 }
 
+function keepSelected<Member extends { readonly userId: string }>(
+  members: readonly Member[],
+  selected: ReadonlySet<string>,
+): readonly Member[] {
+  return members.filter((member) => selected.has(member.userId));
+}
+
 function onlySelected(
   listing: ExportableListing,
   selectedUserIds: readonly string[] | null,
@@ -84,21 +91,11 @@ function onlySelected(
     return listing;
   }
   const selected = new Set(selectedUserIds);
-  // Las dos ramas por separado: TypeScript no deja filtrar una unión de
-  // listas sin perder qué miembros lleva cada una.
+  // Una rama por lista: TypeScript no deja filtrar la unión sin perder qué
+  // miembros lleva cada una.
   return listing.kind === "admin"
-    ? {
-        ...listing,
-        members: listing.members.filter((member) =>
-          selected.has(member.userId),
-        ),
-      }
-    : {
-        ...listing,
-        members: listing.members.filter((member) =>
-          selected.has(member.userId),
-        ),
-      };
+    ? { ...listing, members: keepSelected(listing.members, selected) }
+    : { ...listing, members: keepSelected(listing.members, selected) };
 }
 
 /** Lo que la bitácora apunta de una exportación: los filtros y cuántos
