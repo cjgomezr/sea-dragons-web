@@ -11,7 +11,7 @@ import type {
   DirectorySort,
   MemberContactView,
 } from "@/lib/directory/directory";
-import { MEMBER_RECORD_PATH } from "@/lib/auth/routes";
+import { memberRecordHref } from "@/lib/auth/routes";
 import { memberEvaluationHref } from "@/lib/evaluations/member-evaluation-href";
 import { formatCalendarDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
@@ -36,10 +36,11 @@ import { type StatusDot, statusDotsOf } from "./status-dots";
  * cabeceras que piden el orden. Medidas: "List column" de
  * `docs/design/directorio-admin/README.md`.
  *
- * La fila ya no cambia el rol: hasta el panel lateral (#550) eso se hace en
- * la ficha. Lo que un Admin ve de más son puntos de estado (el AUF y la
- * membresía) y, bajo el rol, el que el socio pidió. El resto de la ficha
- * reservada está a un clic, en el nombre (#242).
+ * La fila no cambia el rol: pulsarla la selecciona y abre su ficha rápida en
+ * el panel lateral (#550), que es donde el Admin lo cambia. Lo que un Admin
+ * ve de más son puntos de estado (el AUF y la membresía) y, bajo el rol, el
+ * que el socio pidió. El resto de la ficha reservada está a un clic, en el
+ * nombre (#242).
  *
  * Del OVR, el directorio sólo cuenta a Admin y Coach quién está sin evaluar
  * (#324): la nota se ve en Evaluaciones, y a un Player o un Committee no le
@@ -83,6 +84,27 @@ type DirectoryRow = {
 };
 
 const NO_DOTS: readonly StatusDot[] = [];
+
+/** El id de la fila de un socio: la pantalla le devuelve el foco cuando el
+ * panel se cierra (#550). */
+export function memberRowId(userId: string): string {
+  return `directorio-fila-${userId}`;
+}
+
+/** Un clic en un enlace o un botón de la fila es suyo: no la selecciona. */
+function isFromControl(target: EventTarget): boolean {
+  return (
+    target instanceof Element &&
+    target.closest("a, button, input, select, textarea") !== null
+  );
+}
+
+/** Lo que pide la fila al pulsarla, con el teclado o el ratón: seleccionarse
+ * o, si ya lo estaba, dejar de estarlo. */
+type RowSelection = {
+  readonly selectedUserId: string | null;
+  readonly onToggle: (userId: string) => void;
+};
 
 /** Las solicitudes de rol pendientes, por socio: lo que pidió cada uno. */
 export type RequestedRoles = ReadonlyMap<string, Role>;
@@ -139,10 +161,6 @@ function rowsOf(
         contact: NO_CONTACT,
       }));
   }
-}
-
-function memberRecordHref(userId: string): string {
-  return MEMBER_RECORD_PATH.replace("[id]", userId);
 }
 
 /** A un dado de baja no se le marca: no se le puede crear evaluación (RF-1)
@@ -460,18 +478,47 @@ function MemberRow({
   translate,
   locale,
   row,
+  selection,
 }: {
   translate: Translator;
   locale: Locale;
   row: DirectoryRow;
+  selection: RowSelection;
 }): React.JSX.Element {
   const { member } = row;
+  const isSelected = selection.selectedUserId === member.userId;
+
+  function onKeyDown(event: React.KeyboardEvent<HTMLTableRowElement>): void {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+    const isActivation = event.key === "Enter" || event.key === " ";
+    if (isActivation || (event.key === "Escape" && isSelected)) {
+      event.preventDefault();
+      selection.onToggle(member.userId);
+    }
+  }
+
   return (
     // El nombre accesible de la fila se declara en vez de dejarlo calcular:
     // el nombre calculado saldría del contenido de las celdas, y ahí van el
     // país, el nivel, los puntos y el rol. Quien recorre la tabla con un
     // lector de pantalla quiere saber de quién es la fila en la que entra.
-    <tr aria-label={member.fullName}>
+    // Se enfoca para que el teclado también abra la ficha (#550), y
+    // `aria-current` dice cuál es la que el panel enseña.
+    <tr
+      id={memberRowId(member.userId)}
+      aria-label={member.fullName}
+      aria-current={isSelected ? "true" : undefined}
+      tabIndex={0}
+      className="directory-row"
+      onClick={(event) => {
+        if (!isFromControl(event.target)) {
+          selection.onToggle(member.userId);
+        }
+      }}
+      onKeyDown={onKeyDown}
+    >
       <MemberCell translate={translate} locale={locale} row={row} />
       <RoleCell translate={translate} row={row} />
       <td data-label={translate("directory.column.position")}>
@@ -536,6 +583,7 @@ export function DirectoryTable({
   listing,
   order,
   requestedRoles,
+  selection,
   onSort,
   onOrderChange,
 }: {
@@ -545,6 +593,8 @@ export function DirectoryTable({
   order: DirectoryOrder;
   /** Las solicitudes pendientes; sólo se pintan en una lista de Admin. */
   requestedRoles: RequestedRoles;
+  /** Qué fila enseña el panel lateral y qué hacer al pulsar una (#550). */
+  selection: RowSelection;
   /** Lo que pide una cabecera de la tabla: sólo el campo. */
   onSort: (column: DirectorySort) => void;
   /** Lo que pide el selector de la lista de tarjetas: campo y sentido. */
@@ -598,6 +648,7 @@ export function DirectoryTable({
                 translate={translate}
                 locale={locale}
                 row={row}
+                selection={selection}
               />
             ))}
           </tbody>

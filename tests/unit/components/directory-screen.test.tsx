@@ -1960,7 +1960,7 @@ describe("cabecera del directorio", () => {
 });
 
 describe("barra del directorio", () => {
-  it("lleva la búsqueda, el rol, Filtros y ningún botón del panel todavía", async () => {
+  it("lleva la búsqueda, el rol, Filtros y el botón del panel lateral (#550)", async () => {
     stubApi();
 
     await renderScreen();
@@ -1975,7 +1975,7 @@ describe("barra del directorio", () => {
         .map((radio) => radio.closest("label")?.textContent),
     ).toEqual(["All", "Player", "Coach", "Committee", "Admin"]);
     expect(screen.getByRole("button", { name: "Filters" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: /panel/i })).toBeNull();
+    expect(screen.getByRole("button", { name: "Side panel" })).toBeVisible();
   });
 
   it("a un Coach le da la misma barra, con sólo sus filtros en el popover", async () => {

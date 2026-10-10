@@ -9,6 +9,7 @@ import type { Translator } from "@/lib/i18n/translator";
 import type { MoreFilters } from "./DirectoryFilterFields";
 import { DirectoryFilterChips } from "./DirectoryFilterChips";
 import { DirectoryMoreFilters } from "./DirectoryMoreFilters";
+import { PanelToggle } from "./DirectoryPanel";
 import type { FilterChoices } from "./use-filter-choices";
 
 /**
@@ -20,8 +21,7 @@ import type { FilterChoices } from "./use-filter-choices";
  * No filtran nada por su cuenta: dicen qué se pidió y la pantalla vuelve a
  * preguntárselo al servidor, que es quien decide qué puede ver cada rol.
  *
- * El botón del panel lateral del diseño todavía no está: llega con el panel
- * (#550), para no dejar un botón que no hace nada.
+ * Al final de la barra va el botón que abre y cierra el panel lateral (#550).
  */
 
 /** Qué se está pidiendo. `search` es el texto tal como se escribe, sin asentar
@@ -109,7 +109,9 @@ export function DirectoryFilters({
   availableFilters,
   choices,
   shownCount,
+  isPanelOpen,
   onChange,
+  onTogglePanel,
 }: {
   translate: Translator;
   locale: Locale;
@@ -119,7 +121,9 @@ export function DirectoryFilters({
   choices: FilterChoices;
   /** Cuántos socios enseña la lista ahora, para el pie del popover. */
   shownCount: number;
+  isPanelOpen: boolean;
   onChange: (filters: DirectoryFilterState) => void;
+  onTogglePanel: () => void;
 }): React.JSX.Element {
   const changeMore = (more: MoreFilters): void =>
     onChange({ ...filters, ...more });
@@ -156,6 +160,11 @@ export function DirectoryFilters({
           choices={choices}
           shownCount={shownCount}
           onChange={changeMore}
+        />
+        <PanelToggle
+          translate={translate}
+          isOpen={isPanelOpen}
+          onToggle={onTogglePanel}
         />
       </div>
       <DirectoryFilterChips

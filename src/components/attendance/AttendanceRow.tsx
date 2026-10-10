@@ -5,7 +5,7 @@ import {
   ATTENDANCE_STATUSES,
   type AttendanceStatus,
 } from "@/lib/attendance/attendance-status";
-import { MEMBER_RECORD_PATH } from "@/lib/auth/routes";
+import { memberRecordHref } from "@/lib/auth/routes";
 import { positionName } from "@/lib/club/club-positions";
 import type { Translator } from "@/lib/i18n/translator";
 import type { SheetMember } from "./attendance-client";
@@ -32,10 +32,6 @@ export type RowViewer = {
   /** Con cambios sin guardar, pregunta si se descartan. */
   readonly canLeaveSheet: () => boolean;
 };
-
-function memberRecordHref(userId: string): string {
-  return MEMBER_RECORD_PATH.replace("[id]", userId);
-}
 
 /** Abrir en otra pestaña o ventana no saca de la hoja: no hay nada que
  * descartar, y preguntar cancelaría esa apertura si se contesta que no. */

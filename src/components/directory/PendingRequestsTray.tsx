@@ -22,7 +22,7 @@ import {
  * no puede mandar dos.
  */
 
-function RequestActions({
+export function RequestActions({
   translate,
   request,
   isBusy,
@@ -101,20 +101,18 @@ function RequestItem({
   );
 }
 
-export function PendingRequestsTray({
-  translate,
-  requests,
-  notice,
-  onDecide,
-}: {
-  translate: Translator;
-  requests: readonly PendingRoleRequest[];
-  notice: AdministrationNoticeState;
-  onDecide: (
-    request: PendingRoleRequest,
-    decision: RoleRequestDecision,
-  ) => Promise<void>;
-}): React.JSX.Element {
+type DecideRequest = (
+  request: PendingRoleRequest,
+  decision: RoleRequestDecision,
+) => Promise<void>;
+
+/** Una decisión a la vez: mientras una está en vuelo, ninguna otra sale. La
+ * comparten la bandeja y el recuadro de la solicitud del panel lateral
+ * (#550). */
+export function useGuardedDecision(onDecide: DecideRequest): {
+  readonly isDeciding: boolean;
+  readonly decide: DecideRequest;
+} {
   const [isDeciding, setIsDeciding] = useState(false);
   // El estado desactiva los botones en el siguiente pintado, pero un doble
   // clic llega antes. La referencia cambia en el acto.
@@ -133,6 +131,22 @@ export function PendingRequestsTray({
     isDecidingRef.current = false;
     setIsDeciding(false);
   }
+
+  return { isDeciding, decide };
+}
+
+export function PendingRequestsTray({
+  translate,
+  requests,
+  notice,
+  onDecide,
+}: {
+  translate: Translator;
+  requests: readonly PendingRoleRequest[];
+  notice: AdministrationNoticeState;
+  onDecide: DecideRequest;
+}): React.JSX.Element {
+  const { isDeciding, decide } = useGuardedDecision(onDecide);
 
   return (
     <>

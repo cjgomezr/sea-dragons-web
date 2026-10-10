@@ -22,7 +22,11 @@ export type AufState = {
   readonly isAufExpired: boolean;
 };
 
-function verificationMarkOf(translate: Translator, auf: AufState): RowMark {
+/** Si un Admin confirmó el número (#274). Sólo tiene sentido con número. */
+export function verificationMarkOf(
+  translate: Translator,
+  auf: AufState,
+): RowMark {
   return auf.isAufVerified
     ? { text: translate("directory.mark.aufVerified"), tone: "neutral" }
     : { text: translate("directory.mark.aufNotVerified"), tone: "warning" };

@@ -33,8 +33,14 @@ import {
 } from "./DirectoryFilters";
 import { DirectoryHeader } from "./DirectoryHeader";
 import type { DirectoryOrder } from "./DirectorySortControl";
-import { DirectoryTable, type RequestedRoles } from "./DirectoryTable";
+import { DirectoryPanel } from "./DirectoryPanel";
+import {
+  DirectoryTable,
+  type RequestedRoles,
+  memberRowId,
+} from "./DirectoryTable";
 import { RoleRequestsPanel } from "./RoleRequestsPanel";
+import { findSelectedMember } from "./selected-member";
 import { useDebouncedValue } from "./use-debounced-value";
 import { useFilterChoices } from "./use-filter-choices";
 import {
@@ -54,8 +60,9 @@ import {
  * (#240), que antes vivía en su propia pantalla de administración, y en cada
  * fila el rol que ese socio pidió. La cabecera y la barra son las del
  * rediseño de E21 (#548): la bandeja queda debajo de la lista, y la cabecera
- * lleva a ella. La lista es la compacta de #549, que ya no cambia el rol: eso
- * se hace en la ficha del socio.
+ * lleva a ella. La lista es la compacta de #549, que ya no cambia el rol:
+ * pulsar una fila abre su ficha rápida en el panel lateral (#550), y es ahí
+ * donde el Admin lo cambia.
  *
  * Es de cliente porque su razón de ser es cambiar sin recargar: buscar,
  * filtrar y ordenar rehacen la lectura. Lee por la API v1 y nunca contra la
@@ -143,6 +150,59 @@ function requestedRolesOf(state: PendingRequestsState): RequestedRoles {
   );
 }
 
+/** Devuelve el foco a la fila del socio que el panel enseñaba, si sigue en
+ * la lista: quien cerró el panel con el teclado sigue donde estaba. */
+function focusMemberRow(userId: string): void {
+  const row = document.getElementById(memberRowId(userId));
+  if (row !== null) {
+    row.focus();
+  }
+}
+
+/** Qué enseña el panel lateral (#550). Elegir a alguien lo abre siempre;
+ * cerrarlo suelta la selección, para que ninguna fila quede marcada sin su
+ * ficha a la vista. */
+function usePanelSelection(): {
+  readonly isOpen: boolean;
+  readonly selectedUserId: string | null;
+  readonly toggleMember: (userId: string) => void;
+  readonly close: () => void;
+  readonly togglePanel: () => void;
+} {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  function deselect(): void {
+    if (selectedUserId !== null) {
+      focusMemberRow(selectedUserId);
+    }
+    setSelectedUserId(null);
+  }
+
+  function toggleMember(userId: string): void {
+    if (selectedUserId === userId) {
+      deselect();
+      return;
+    }
+    setSelectedUserId(userId);
+    setIsOpen(true);
+  }
+
+  /** Sin nadie elegido, hasta el resumen del club, el panel no tiene nada
+   * que enseñar: la ✕ y Esc lo cierran del todo. */
+  function close(): void {
+    deselect();
+    setIsOpen(false);
+  }
+
+  function togglePanel(): void {
+    setSelectedUserId(null);
+    setIsOpen((current) => !current);
+  }
+
+  return { isOpen, selectedUserId, toggleMember, close, togglePanel };
+}
+
 function LoadFailure({
   translate,
   failure,
@@ -190,6 +250,8 @@ export function DirectoryScreen({
   const [emailRecipients, setEmailRecipients] = useState<
     readonly EmailRecipient[] | null
   >(null);
+
+  const panel = usePanelSelection();
 
   const settledSearch = useDebouncedValue(filters.search, SEARCH_DEBOUNCE_MS);
   const query = useMemo<DirectoryQuery>(
@@ -285,7 +347,7 @@ export function DirectoryScreen({
   }
 
   /** Lo que el servidor ya confirmó llega a la fila sin volver a leer la
-   * lista: la aprobación de una solicitud. */
+   * lista: la aprobación de una solicitud o el rol guardado en el panel. */
   function applyRole(userId: string, role: Role): void {
     setState((current) =>
       current.kind === "ready"
@@ -305,6 +367,11 @@ export function DirectoryScreen({
     onRoleGranted: applyRole,
   });
 
+  const selected =
+    state.kind === "ready" && panel.selectedUserId !== null
+      ? findSelectedMember(state.listing, panel.selectedUserId)
+      : null;
+
   const emptyCriteria = describeEmptyCriteria(filters, {
     translate,
     locale,
@@ -312,7 +379,9 @@ export function DirectoryScreen({
   });
 
   return (
-    <div className="directory">
+    <div
+      className={panel.isOpen ? "directory directory-with-panel" : "directory"}
+    >
       <DirectoryHeader
         translate={translate}
         listed={state.kind === "ready" ? state : null}
@@ -352,36 +421,54 @@ export function DirectoryScreen({
             availableFilters={availableFilters}
             choices={choices}
             shownCount={state.listing.members.length}
+            isPanelOpen={panel.isOpen}
             onChange={setFilters}
+            onTogglePanel={panel.togglePanel}
           />
-          {state.listing.members.length === 0 ? (
-            <DirectoryEmptyState
-              translate={translate}
-              criteria={emptyCriteria}
-              onClear={() =>
-                setFilters((current) => ({
-                  ...current,
-                  ...NO_MORE_FILTERS,
-                  search: "",
-                  role: null,
-                }))
-              }
-            />
-          ) : (
-            <DirectoryTable
-              translate={translate}
-              locale={locale}
-              listing={state.listing}
-              order={order}
-              requestedRoles={
-                isAdminListing
-                  ? requestedRolesOf(pendingRequests.state)
-                  : NO_REQUESTED_ROLES
-              }
-              onSort={sortBy}
-              onOrderChange={setOrder}
-            />
-          )}
+          <div className="directory-body">
+            {state.listing.members.length === 0 ? (
+              <DirectoryEmptyState
+                translate={translate}
+                criteria={emptyCriteria}
+                onClear={() =>
+                  setFilters((current) => ({
+                    ...current,
+                    ...NO_MORE_FILTERS,
+                    search: "",
+                    role: null,
+                  }))
+                }
+              />
+            ) : (
+              <DirectoryTable
+                translate={translate}
+                locale={locale}
+                listing={state.listing}
+                order={order}
+                requestedRoles={
+                  isAdminListing
+                    ? requestedRolesOf(pendingRequests.state)
+                    : NO_REQUESTED_ROLES
+                }
+                selection={{
+                  selectedUserId: panel.selectedUserId,
+                  onToggle: panel.toggleMember,
+                }}
+                onSort={sortBy}
+                onOrderChange={setOrder}
+              />
+            )}
+            {panel.isOpen ? (
+              <DirectoryPanel
+                translate={translate}
+                locale={locale}
+                selected={selected}
+                pendingRequests={isAdminListing ? pendingRequests : null}
+                onClose={panel.close}
+                onRoleChanged={applyRole}
+              />
+            ) : null}
+          </div>
         </section>
       ) : null}
       {isAdminListing ? (
