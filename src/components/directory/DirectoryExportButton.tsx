@@ -1,15 +1,11 @@
 "use client";
 
 import { DownloadSimple } from "@phosphor-icons/react/dist/ssr/DownloadSimple";
-import { useState } from "react";
 import { Icon } from "@/components/Icon";
 import type { DirectoryQuery } from "@/lib/directory/directory";
 import type { Translator } from "@/lib/i18n/translator";
-import {
-  type DirectoryExportFailure,
-  describeDirectoryExportFailure,
-  downloadDirectoryExport,
-} from "./directory-export-client";
+import { describeDirectoryExportFailure } from "./directory-export-client";
+import { useDirectoryExport } from "./use-directory-export";
 
 /**
  * "Exportar CSV" (#500, RF-5 del PRD de E19): descarga la lista que se está
@@ -24,11 +20,6 @@ import {
 
 const EXPORT_EMPTY_REASON_ID = "exportar-directorio-sin-socios";
 
-type ExportState =
-  | { readonly kind: "idle" }
-  | { readonly kind: "exporting" }
-  | { readonly kind: "failed"; readonly failure: DirectoryExportFailure };
-
 export function DirectoryExportButton({
   translate,
   query,
@@ -39,18 +30,8 @@ export function DirectoryExportButton({
   query: DirectoryQuery;
   isEmpty: boolean;
 }): React.JSX.Element {
-  const [state, setState] = useState<ExportState>({ kind: "idle" });
+  const { state, exportList } = useDirectoryExport();
   const label = translate("directory.export.open");
-
-  async function exportList(): Promise<void> {
-    setState({ kind: "exporting" });
-    const outcome = await downloadDirectoryExport(query);
-    setState(
-      outcome.kind === "failed"
-        ? { kind: "failed", failure: outcome.failure }
-        : { kind: "idle" },
-    );
-  }
 
   return (
     <div className="directory-export-open">
@@ -61,7 +42,7 @@ export function DirectoryExportButton({
         title={label}
         disabled={isEmpty || state.kind === "exporting"}
         aria-describedby={isEmpty ? EXPORT_EMPTY_REASON_ID : undefined}
-        onClick={() => void exportList()}
+        onClick={() => void exportList(query)}
       >
         <Icon glyph={DownloadSimple} />
       </button>

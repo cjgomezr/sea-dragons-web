@@ -36,6 +36,9 @@ export type PendingRoleRequest = {
   readonly id: string;
   readonly userId: string;
   readonly fullName: string;
+  /** El rol que tiene hoy: la pantalla del móvil lo enseña junto al que pide
+   * (#553). */
+  readonly currentRole: Role;
   readonly requestedRole: RequestableRole;
   readonly justification: string | null;
   readonly createdAt: string;
@@ -117,6 +120,7 @@ function toPendingRoleRequest(
     id: record.id,
     userId: record.userId,
     fullName: record.fullName,
+    currentRole: record.currentRole,
     requestedRole: record.requestedRole,
     justification: record.justification,
     createdAt: record.createdAt,

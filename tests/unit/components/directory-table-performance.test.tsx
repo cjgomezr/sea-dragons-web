@@ -78,7 +78,6 @@ function renderTable(listing: DirectoryListing): void {
       requestedRoles={new Map()}
       selection={{ selectedUserId: null, onToggle: () => undefined }}
       onSort={() => undefined}
-      onOrderChange={() => undefined}
     />,
   );
 }

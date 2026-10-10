@@ -11,7 +11,8 @@ import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
 import { InvitationResend } from "./InvitationResend";
-import { RequestActions, useGuardedDecision } from "./PendingRequestsTray";
+import { RequestActions } from "./PendingRequestsTray";
+import { useSingleDecision } from "./use-single-decision";
 
 /**
  * Los dos recuadros de la ficha rápida que sólo ve un Admin (#550): la
@@ -67,7 +68,7 @@ export function RoleRequestBox({
   ) => Promise<void>;
 }): React.JSX.Element {
   const titleId = useId();
-  const { isDeciding, decide } = useGuardedDecision(onDecide);
+  const { isDeciding, decide } = useSingleDecision(onDecide);
   return (
     <div
       role="group"

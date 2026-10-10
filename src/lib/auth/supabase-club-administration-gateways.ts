@@ -8,7 +8,7 @@ import type {
   PendingRoleRequestRecord,
 } from "./club-administration";
 import { parseRequestableRole } from "./role-request";
-import { parseRole } from "./roles";
+import { type Role, parseRole } from "./roles";
 import { readRequiredText, readText } from "./supabase-auth-gateways";
 import { createRoleRequestGateways } from "./supabase-role-request-gateways";
 
@@ -35,23 +35,28 @@ type Row = Record<string, unknown>;
 
 /** Las filas que devuelve supabase-js llegan sin tipo del esquema. Se estrecha
  * columna a columna, como en `supabase-role-request-gateways.ts`. */
-function toClubMember(row: Row): ClubMember {
+function readMemberRole(row: Row): Role {
   const value = readRequiredText(row, "role", MEMBERS_TABLE);
   const role = parseRole(value);
   if (role === null) {
     throw new Error(`${value} no es un rol que el catálogo reconozca.`);
   }
+  return role;
+}
+
+function toClubMember(row: Row): ClubMember {
   return {
     userId: readRequiredText(row, "user_id", MEMBERS_TABLE),
     fullName: readRequiredText(row, "full_name", MEMBERS_TABLE),
     email: readRequiredText(row, "email", MEMBERS_TABLE),
-    role,
+    role: readMemberRole(row),
   };
 }
 
 /** Quien pidió, con lo que la bandeja necesita saber de su fila. */
 type Requester = {
   readonly fullName: string;
+  readonly role: Role;
   readonly accountStatus: PendingRoleRequestRecord["requesterStatus"];
 };
 
@@ -63,6 +68,7 @@ function toRequester(row: Row): Requester {
   }
   return {
     fullName: readRequiredText(row, "full_name", MEMBERS_TABLE),
+    role: readMemberRole(row),
     accountStatus,
   };
 }
@@ -80,6 +86,7 @@ function toPendingRequest(
     id: readRequiredText(row, "id", ROLE_REQUESTS_TABLE),
     userId: readRequiredText(row, "user_id", ROLE_REQUESTS_TABLE),
     fullName: requester.fullName,
+    currentRole: requester.role,
     requestedRole,
     justification: readText(row, "justification", ROLE_REQUESTS_TABLE),
     // Postgres devuelve `timestamptz` con su propio formato; se normaliza a
@@ -92,7 +99,7 @@ function toPendingRequest(
 }
 
 /**
- * Los nombres y el estado de cuenta de quienes pidieron, en una sola
+ * Los nombres, el rol y el estado de cuenta de quienes pidieron, en una sola
  * consulta más.
  *
  * Se leen aparte en vez de pedirle a PostgREST que incruste `members` en la
@@ -108,7 +115,7 @@ async function readRequesters(
 ): Promise<ReadonlyMap<string, Requester>> {
   const { data, error } = await serviceClient
     .from(MEMBERS_TABLE)
-    .select("user_id, full_name, account_status")
+    .select("user_id, full_name, role, account_status")
     .eq("club_id", clubId)
     .in("user_id", userIds);
   if (error) {

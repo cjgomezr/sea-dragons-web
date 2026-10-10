@@ -133,6 +133,12 @@ export function formatClubMoment(locale: Locale, instant: Date): string {
   return `${day}${DATE_TIME_JOINERS[locale]}${time}`;
 }
 
+/** El día del club en que pasó algo, sin la hora: la fecha de una tarjeta
+ * de solicitud en el móvil (#553). */
+export function formatClubDay(locale: Locale, instant: Date): string {
+  return CLUB_DAY_FORMATTERS[locale].format(instant);
+}
+
 /** Un día de calendario sin hora (YYYY-MM-DD, como una columna `date`). */
 export function formatCalendarDay(locale: Locale, isoDate: string): string {
   return CALENDAR_DAY_FORMATTERS[locale].format(parseCalendarDay(isoDate));

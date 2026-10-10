@@ -1,6 +1,8 @@
 "use client";
 
+import { CaretRight } from "@phosphor-icons/react/dist/ssr/CaretRight";
 import Link from "next/link";
+import { Icon } from "@/components/Icon";
 import { MemberAvatar } from "@/components/MemberAvatar";
 import { describeAttendance } from "@/components/attendance/MemberAttendanceSummary";
 import type { Role } from "@/lib/auth/roles";
@@ -20,6 +22,7 @@ import { DirectoryContactCell, type RowContact } from "./DirectoryContactCell";
 import {
   type DirectoryOrder,
   DirectorySortControl,
+  SORT_ARROWS,
   SORT_COLUMN_LABELS,
 } from "./DirectorySortControl";
 import {
@@ -49,12 +52,12 @@ import { type StatusDot, statusDotsOf } from "./status-dots";
  * Ordenar es cosa del servidor, así que pulsar una cabecera no reordena nada
  * aquí: dice por dónde, y la pantalla vuelve a preguntar.
  *
- * Por debajo de 768px la misma tabla se pinta como una lista de tarjetas
- * (#283), sin cabeceras: cada dato lleva entonces su etiqueta, escrita por la
- * hoja de estilos desde su `data-label`, y el orden se elige con
- * `DirectorySortControl`. Es el mismo marcado en los dos anchos para que el
- * servidor no tenga que adivinar cuál pintar, y para que las filas sigan
- * siendo filas para un lector de pantalla.
+ * Por debajo de 768px la misma tabla se pinta como la lista del móvil del
+ * rediseño (#553, "2b"), sin cabeceras: el avatar, el nombre con sus puntos,
+ * "Rol · Posición" debajo, la asistencia y, en la fila que abre la ficha, una
+ * flecha. El orden se elige con `DirectorySortControl`. Es el mismo marcado
+ * en los dos anchos para que el servidor no tenga que adivinar cuál pintar,
+ * y para que las filas sigan siendo filas para un lector de pantalla.
  *
  * Quien ve el contacto de los socios (#499) tiene además una columna
  * "Contacto" al final: Admin y Committee con todo, el Coach con el de
@@ -174,13 +177,6 @@ const ARIA_SORT: Readonly<
 > = {
   asc: "ascending",
   desc: "descending",
-};
-
-/** La flecha del orden es decorativa: lo que un lector de pantalla anuncia es
- * el `aria-sort` de la cabecera, y ahí la dirección ya va dicha con palabras. */
-const SORT_ARROWS: Readonly<Record<DirectoryDirection, string>> = {
-  asc: "↑",
-  desc: "↓",
 };
 
 /** La cabecera que no cabe en su columna de 64px se abrevia; su nombre
@@ -422,6 +418,13 @@ function MemberCell({
           </span>
           <MemberMeta translate={translate} locale={locale} member={member} />
         </span>
+        {/* La flecha del móvil dice que la fila lleva a la ficha; desde 768px
+            la esconde la hoja de estilos. */}
+        {row.admin === null ? null : (
+          <span className="directory-row-caret" aria-hidden="true">
+            <Icon glyph={CaretRight} />
+          </span>
+        )}
       </span>
     </th>
   );
@@ -521,7 +524,10 @@ function MemberRow({
     >
       <MemberCell translate={translate} locale={locale} row={row} />
       <RoleCell translate={translate} row={row} />
-      <td data-label={translate("directory.column.position")}>
+      <td
+        className="directory-position-cell"
+        data-label={translate("directory.column.position")}
+      >
         <span className="directory-position">
           {describePosition(translate, member.position)}
         </span>
@@ -577,6 +583,21 @@ function tableClassName(listing: DirectoryListing): string {
     : "directory-table directory-table-contact";
 }
 
+/** Las de la lista: con el contacto, el reparto de la tabla cambia; y en la
+ * de un Admin, el móvil deja el contacto para la ficha, a la que lleva cada
+ * fila (#553). */
+function listClassName(listing: DirectoryListing): string {
+  switch (listing.kind) {
+    case "member":
+      return "directory-list";
+    case "admin":
+      return "directory-list directory-list-contact directory-list-admin";
+    case "committee":
+    case "coach":
+      return "directory-list directory-list-contact";
+  }
+}
+
 export function DirectoryTable({
   translate,
   locale,
@@ -585,7 +606,6 @@ export function DirectoryTable({
   requestedRoles,
   selection,
   onSort,
-  onOrderChange,
 }: {
   translate: Translator;
   locale: Locale;
@@ -595,24 +615,17 @@ export function DirectoryTable({
   requestedRoles: RequestedRoles;
   /** Qué fila enseña el panel lateral y qué hacer al pulsar una (#550). */
   selection: RowSelection;
-  /** Lo que pide una cabecera de la tabla: sólo el campo. */
+  /** Lo que pide una cabecera de la tabla, o la hoja del orden en el
+   * móvil: sólo el campo. */
   onSort: (column: DirectorySort) => void;
-  /** Lo que pide el selector de la lista de tarjetas: campo y sentido. */
-  onOrderChange: (order: DirectoryOrder) => void;
 }): React.JSX.Element {
   const rows = rowsOf(translate, listing, requestedRoles);
   return (
-    <div
-      className={
-        listing.kind === "member"
-          ? "directory-list"
-          : "directory-list directory-list-contact"
-      }
-    >
+    <div className={listClassName(listing)}>
       <DirectorySortControl
         translate={translate}
         order={order}
-        onChange={onOrderChange}
+        onSort={onSort}
       />
       {/* La tarjeta es el div y no la tabla: un `border-radius` sobre una
           tabla no recorta las esquinas de su primera y su última fila. */}
