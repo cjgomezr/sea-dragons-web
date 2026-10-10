@@ -6342,7 +6342,8 @@ test.describe("el contacto en el directorio con los datos de verdad", () => {
 });
 
 /* En el móvil, cada teléfono y cada correo del contacto se pulsa con el dedo
-   (#499): miden al menos 44 px de alto. */
+   (#499): miden al menos 44 px de alto. Se mira con un Coach, porque la fila
+   de un Admin deja el contacto para la ficha en el móvil (#553). */
 test.describe("los enlaces del contacto en el móvil", () => {
   skipWithoutSession();
   quietNotificationBell();
@@ -6353,14 +6354,16 @@ test.describe("los enlaces del contacto en el móvil", () => {
 
   test("cada enlace tel: y mailto: mide al menos 44 px", async ({ page }) => {
     const state = DIRECTORY_STATES.find(
-      (candidate) => candidate.name === "directorio-admin-sin-solicitudes",
+      (candidate) => candidate.name === "directorio-contacto-coach",
     );
     if (state === undefined) {
-      throw new Error("Falta el estado del directorio del Admin.");
+      throw new Error("Falta el estado del contacto del Coach.");
     }
     await goToDirectory(page, state);
 
-    const links = page.locator('a[href^="tel:"], a[href^="mailto:"]');
+    const links = page
+      .locator('a[href^="tel:"], a[href^="mailto:"]')
+      .filter({ visible: true });
     expect(await links.count()).toBeGreaterThan(0);
     for (const link of await links.all()) {
       expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44);
