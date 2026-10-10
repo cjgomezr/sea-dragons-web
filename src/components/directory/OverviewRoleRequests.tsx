@@ -78,8 +78,8 @@ function RequestCard({
   onSelectMember: (userId: string) => void;
 }): React.JSX.Element {
   return (
-    <li
-      className="directory-card-request directory-overview-request"
+    <div
+      className="directory-card-request"
       role="group"
       aria-label={translate("directory.overview.requestLabel", {
         name: request.fullName,
@@ -123,7 +123,7 @@ function RequestCard({
         isBusy={isBusy}
         onDecide={onDecide}
       />
-    </li>
+    </div>
   );
 }
 
@@ -156,16 +156,19 @@ export function OverviewRoleRequests({
       </h3>
       <ul className="directory-overview-requests">
         {requests.map((request) => (
-          <RequestCard
-            key={request.id}
-            translate={translate}
-            locale={locale}
-            request={request}
-            member={members.find((member) => member.userId === request.userId)}
-            isBusy={isDeciding}
-            onDecide={(decision) => void decide(request, decision)}
-            onSelectMember={onSelectMember}
-          />
+          <li key={request.id}>
+            <RequestCard
+              translate={translate}
+              locale={locale}
+              request={request}
+              member={members.find(
+                (member) => member.userId === request.userId,
+              )}
+              isBusy={isDeciding}
+              onDecide={(decision) => void decide(request, decision)}
+              onSelectMember={onSelectMember}
+            />
+          </li>
         ))}
       </ul>
     </section>
