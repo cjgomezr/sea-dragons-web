@@ -26,7 +26,7 @@ import {
 import type { EmergencyContact } from "@/lib/members/profile-contact";
 import type { ExperienceLevel } from "@/lib/members/profile-fields";
 import { isAufExpired } from "@/lib/members/member-record";
-import { addClubDays } from "@/lib/time/club-calendar";
+import { addClubDays, clubCalendarDate } from "@/lib/time/club-calendar";
 import { matchesNameSearch } from "@/lib/text/name-search";
 import { compareNames } from "@/lib/text/name-order";
 
@@ -148,6 +148,12 @@ export type DirectoryMemberRecord = {
   /** Una posición del catálogo del club (#299), o null sin posición. */
   readonly positionId: string | null;
   readonly status: AccountStatus;
+  /** `members.created_at`: de él sale el día de la invitación (#549). */
+  readonly registeredAt: string;
+  /** Sólo si la tiene, no la fecha. Un alta del Admin nace sin ella y la
+   * escribe el invitado al completar el registro; quien se registra solo la
+   * trae desde el principio. Separa al invitado de los demás `incomplete`. */
+  readonly hasDateOfBirth: boolean;
   readonly aufNumber: string | null;
   readonly aufExpiry: string | null;
   /** Si un Admin lo confirmó (#274). Sin número, siempre false. */
@@ -184,6 +190,10 @@ export type DirectoryMember = {
   readonly role: Role;
   readonly position: DirectoryPosition | null;
   readonly status: AccountStatus;
+  /** El día del club en que se le invitó, mientras su cuenta siga
+   * `incomplete` (#549); null en cuanto entra. Es el día de su fila, el
+   * mismo que la ficha da por invitación pendiente (#243). */
+  readonly invitedOn: string | null;
   /** Null sin foto: la fila enseña entonces las iniciales. */
   readonly photoUrl: string | null;
   /** Su porcentaje de asistencia, o sin datos (#394, FR-015). Es de todo el
@@ -224,6 +234,9 @@ export type AdminDirectoryMember = CoachDirectoryMember &
     readonly aufExpiry: string | null;
     readonly isAufVerified: boolean;
     readonly isAufExpired: boolean;
+    /** Vigente, pero vence en los próximos 30 días del club: el mismo
+     * criterio que el filtro "expiring" (#497, #549). */
+    readonly isAufExpiring: boolean;
     readonly membershipStatus: MembershipStatus | null;
   };
 
@@ -640,6 +653,10 @@ type ListingContext = SortContext & {
   readonly signedPhotos: SignedPhotos;
 };
 
+function isPendingInvitation(record: DirectoryMemberRecord): boolean {
+  return record.status === "incomplete" && !record.hasDateOfBirth;
+}
+
 function toDirectoryMember(
   record: DirectoryMemberRecord,
   { positions, signedPhotos, attendance }: ListingContext,
@@ -652,6 +669,9 @@ function toDirectoryMember(
     role: record.role,
     position: directoryPositionOf(positions, record.positionId),
     status: record.status,
+    invitedOn: isPendingInvitation(record)
+      ? clubCalendarDate(new Date(record.registeredAt))
+      : null,
     photoUrl: photoUrlOf(record, signedPhotos),
     attendance: attendanceOf(attendance, record.userId),
   };
@@ -699,6 +719,7 @@ function toAdminDirectoryMember(
     aufExpiry: record.aufExpiry,
     isAufVerified: record.isAufVerified,
     isAufExpired: isAufExpired(record.aufExpiry, todayInClub),
+    isAufExpiring: isAufExpiring(record.aufExpiry, todayInClub),
     membershipStatus: record.membershipStatus,
   };
 }

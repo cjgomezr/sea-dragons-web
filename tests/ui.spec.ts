@@ -3850,6 +3850,7 @@ const MEMBER_WITHOUT_DATA = {
   role: "Player",
   position: null,
   status: "active",
+  invitedOn: null,
   photoUrl: null,
   attendance: STUBBED_ATTENDANCE,
 } as const;
@@ -3886,6 +3887,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     role: "Admin",
     position: STUBBED_POSITIONS.Defender,
     status: "active",
+    invitedOn: null,
     photoUrl: null,
     attendance: { kind: "rate", percent: 92, sessions: 23 },
   },
@@ -3897,6 +3899,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     role: "Coach",
     position: STUBBED_POSITIONS.Forward,
     status: "active",
+    invitedOn: null,
     photoUrl: null,
     attendance: { kind: "rate", percent: 88, sessions: 22 },
   },
@@ -3908,6 +3911,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     role: "Player",
     position: STUBBED_POSITIONS.Goalkeeper,
     status: "active",
+    invitedOn: null,
     photoUrl: null,
     attendance: { kind: "rate", percent: 64, sessions: 16 },
   },
@@ -3920,6 +3924,7 @@ const STUBBED_DIRECTORY_MEMBERS = [
     role: "Committee",
     position: STUBBED_POSITIONS.Defender,
     status: "inactive",
+    invitedOn: null,
     photoUrl: null,
     attendance: STUBBED_ATTENDANCE,
   },
@@ -3932,6 +3937,45 @@ const EXPIRED_AUF_MEMBER_ID = "11111111-0000-4000-8000-000000000001";
 /** La única fila con un AUF que escribió el socio y nadie ha verificado
  * (#274): así la captura del Admin enseña las tres marcas. */
 const UNVERIFIED_AUF_MEMBER_ID = "33333333-0000-4000-8000-000000000003";
+/** El AUF que vence en los próximos 30 días: un punto de aviso (#549). */
+const EXPIRING_AUF_MEMBER_ID = "22222222-0000-4000-8000-000000000002";
+/** Sin número de AUF: el otro punto de aviso (#549). Son el nombre más largo
+ * y el socio invitado, que todavía no lo ha dado. */
+const MEMBERS_WITHOUT_AUF: ReadonlySet<string> = new Set([
+  "44444444-0000-4000-8000-000000000004",
+  "77777777-0000-4000-8000-000000000007",
+]);
+
+/** El vencimiento que corresponde a cada caso de la lista fija. */
+function aufExpiryOf(auf: {
+  readonly hasAuf: boolean;
+  readonly isAufExpired: boolean;
+  readonly isAufExpiring: boolean;
+}): string | null {
+  if (!auf.hasAuf) {
+    return null;
+  }
+  if (auf.isAufExpired) {
+    return "2020-01-31";
+  }
+  return auf.isAufExpiring ? "2026-10-20" : "2030-06-30";
+}
+
+/** Un socio invitado que todavía no ha entrado (#549): la píldora de borde
+ * discontinuo y la línea con el día de la invitación. Sólo va en las listas
+ * que lo piden, para no cambiar el resto de las capturas. */
+const INVITED_MEMBER = {
+  userId: "77777777-0000-4000-8000-000000000007",
+  fullName: "Alex Kim",
+  country: "AU",
+  experienceLevel: null,
+  role: "Player",
+  position: null,
+  status: "incomplete",
+  invitedOn: "2026-10-05",
+  photoUrl: null,
+  attendance: STUBBED_ATTENDANCE,
+} as const;
 
 /** Quien no tiene evaluación en las listas fijas (#324): los dos nombres más
  * largos, para que la marca se mida en las tarjetas más estrechas. */
@@ -4024,15 +4068,18 @@ function asAdminMember(member: {
   readonly userId: string;
 }): Record<string, unknown> {
   const isAufExpired = member.userId === EXPIRED_AUF_MEMBER_ID;
+  const isAufExpiring = member.userId === EXPIRING_AUF_MEMBER_ID;
+  const hasAuf = !MEMBERS_WITHOUT_AUF.has(member.userId);
   return {
     ...asCoachMember(member),
     ...stubbedContactOf(member),
-    aufNumber: `AUF-${member.userId.slice(0, 2)}`,
-    aufExpiry: isAufExpired ? "2020-01-31" : "2030-06-30",
-    isAufVerified: member.userId !== UNVERIFIED_AUF_MEMBER_ID,
+    aufNumber: hasAuf ? `AUF-${member.userId.slice(0, 2)}` : null,
+    aufExpiry: aufExpiryOf({ hasAuf, isAufExpired, isAufExpiring }),
+    isAufVerified: hasAuf && member.userId !== UNVERIFIED_AUF_MEMBER_ID,
     isAufExpired,
-    // La fila del AUF vencido carga además el chip de la membresía atrasada
-    // (#453): la de más marcas, para medirlas en la tarjeta más estrecha.
+    isAufExpiring,
+    // La fila del AUF vencido carga además la membresía atrasada (#453): con
+    // los dos puntos de peligro (#549) es la de más marcas.
     membershipStatus: isAufExpired ? "past_due" : "active",
   };
 }
@@ -4048,8 +4095,13 @@ function normalizeName(text: string): string {
  * describe pueda añadir los suyos. */
 type StubbedMember = Omit<
   (typeof STUBBED_DIRECTORY_MEMBERS)[number],
-  "userId" | "fullName"
-> & { readonly userId: string; readonly fullName: string };
+  "userId" | "fullName" | "status" | "invitedOn"
+> & {
+  readonly userId: string;
+  readonly fullName: string;
+  readonly status: "incomplete" | "active" | "inactive";
+  readonly invitedOn: string | null;
+};
 
 /** Cómo sirve el endpoint la lista a cada rol: sólo un Admin recibe la suya,
  * y un Coach la de todos con la marca de evaluación (#324). */
@@ -4322,34 +4374,36 @@ async function waitForDirectory(
   }
 }
 
-/** Intenta degradar a la Admin de la lista y espera a que la pantalla explique
- * que no se puede. Lo que responde la base se finge, porque cuántos Admin
- * tiene el club de pruebas depende de qué otros tests estén corriendo. El
- * aviso se busca por su texto: el anunciador de rutas del dev server de Next
- * también lleva `role="alert"`. */
-async function refuseLastAdminChange(page: Page): Promise<void> {
-  await page.route(
-    (url) => /^\/api\/v1\/members\/[^/]+\/role$/.test(url.pathname),
-    (route) =>
-      route.fulfill({
-        status: 422,
-        contentType: "application/json",
-        body: JSON.stringify({
-          error: {
-            code: "business_rule",
-            message: "Es el último Admin del club.",
-            reason: "last_admin",
-          },
+/** Intenta degradar a una Admin y espera a que la pantalla explique que no se
+ * puede. Lo que responde la base se finge, porque cuántos Admin tiene el club
+ * de pruebas depende de qué otros tests estén corriendo. El aviso se busca
+ * por su texto: el anunciador de rutas del dev server de Next también lleva
+ * `role="alert"`. Desde #549 el rol se cambia en la ficha, no en la fila. */
+function refuseLastAdminChange(name: string) {
+  return async (page: Page): Promise<void> => {
+    await page.route(
+      (url) => /^\/api\/v1\/members\/[^/]+\/role$/.test(url.pathname),
+      (route) =>
+        route.fulfill({
+          status: 422,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: {
+              code: "business_rule",
+              message: "Es el último Admin del club.",
+              reason: "last_admin",
+            },
+          }),
         }),
-      }),
-  );
-  await page
-    .getByRole("combobox", { name: "Role for Ana Admin" })
-    .selectOption("Player");
-  await page
-    .getByRole("button", { name: "Save the role for Ana Admin" })
-    .click();
-  await expect(page.getByText(/last Admin/)).toBeVisible();
+    );
+    await page
+      .getByRole("combobox", { name: `Role for ${name}` })
+      .selectOption("Player");
+    await page
+      .getByRole("button", { name: `Save the role for ${name}` })
+      .click();
+    await expect(page.getByText(/last Admin/)).toBeVisible();
+  };
 }
 
 /** Escribe en la búsqueda y espera al desenlace: la tabla recortada, o la
@@ -4390,6 +4444,10 @@ function sortByAttendance(labels: {
   return async (page: Page): Promise<void> => {
     const header = page.getByRole("columnheader", { name: labels.column });
     if (await header.isVisible()) {
+      // La asistencia empieza de mayor a menor (#549): el segundo clic la
+      // pone de menor a mayor.
+      await header.getByRole("button").click();
+      await expect(header).toHaveAttribute("aria-sort", "descending");
       await header.getByRole("button").click();
       await expect(header).toHaveAttribute("aria-sort", "ascending");
     } else {
@@ -4593,6 +4651,27 @@ function filterToNobody(labels: FilterLabels, emptyText: RegExp) {
   };
 }
 
+/** Un rol y después un grupo en el que no está nadie: el estado vacío de
+ * #549, con el rol y el filtro en su frase. */
+function filterRoleToNobody(
+  labels: FilterLabels,
+  options: { readonly role: string; readonly emptyText: RegExp },
+) {
+  return async (page: Page): Promise<void> => {
+    // El radio va escondido bajo su etiqueta, que es lo que se pulsa.
+    await page
+      .getByRole("radio", { name: options.role })
+      .check({ force: true });
+    await filterToNobody(labels, options.emptyText)(page);
+  };
+}
+
+/** La lista fija con el socio invitado delante, como sale por nombre. */
+const WITH_INVITED_MEMBER: readonly StubbedMember[] = [
+  INVITED_MEMBER,
+  ...STUBBED_DIRECTORY_MEMBERS,
+];
+
 /* El contacto de cada socio (#499): una columna para quien lo ve, y la
    casilla "Sin teléfono" de quien ve todo el contacto. */
 
@@ -4646,6 +4725,8 @@ type DirectoryState = {
   readonly withRequests?: boolean;
   /** Una de las filas sale con foto en vez de iniciales (#245). */
   readonly withPhoto?: boolean;
+  /** La lista que sirve el endpoint, si no es la fija. */
+  readonly members?: readonly StubbedMember[];
   /** Termina con un diálogo modal abierto (#355). Se fotografía lo que se ve
    * en la ventana: a página entera la capa modal, que es fija, sale partida a
    * media altura. */
@@ -4922,14 +5003,14 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     name: "directorio-sin-resultados",
     asAdmin: false,
     listHeading: ENGLISH_DIRECTORY_HEADING,
-    prepare: searchFor("zzz", /No member matches/),
+    prepare: searchFor("zzz", /No members match these filters/),
   },
   {
     name: "directorio-sin-resultados-es",
     asAdmin: false,
     listHeading: SPANISH_DIRECTORY_HEADING,
     beforeVisit: chooseSpanish,
-    prepare: searchFor("zzz", /Nadie del club coincide/),
+    prepare: searchFor("zzz", /Ningún miembro coincide/),
   },
   {
     name: "directorio-con-inactivos",
@@ -4954,14 +5035,37 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     name: "directorio-admin-con-solicitudes",
     asAdmin: true,
     withRequests: true,
+    members: WITH_INVITED_MEMBER,
     listHeading: ENGLISH_DIRECTORY_HEADING,
   },
   {
     name: "directorio-admin-con-solicitudes-es",
     asAdmin: true,
     withRequests: true,
+    members: WITH_INVITED_MEMBER,
     listHeading: SPANISH_DIRECTORY_HEADING,
     beforeVisit: chooseSpanish,
+  },
+  // El estado vacío del handoff de E21 (#549): con un rol y un filtro, la
+  // frase dice los dos.
+  {
+    name: "directorio-vacio",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: filterRoleToNobody(ENGLISH_FILTER_LABELS, {
+      role: "Committee",
+      emptyText: /No members match these filters/,
+    }),
+  },
+  {
+    name: "directorio-vacio-es",
+    asAdmin: true,
+    listHeading: SPANISH_DIRECTORY_HEADING,
+    beforeVisit: chooseSpanish,
+    prepare: filterRoleToNobody(SPANISH_FILTER_LABELS, {
+      role: "Comité",
+      emptyText: /Ningún miembro coincide/,
+    }),
   },
   {
     name: "directorio-admin-sin-solicitudes",
@@ -4996,12 +5100,6 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
       column: "Asistencia",
       sortGroup: "Ordenar por",
     }),
-  },
-  {
-    name: "directorio-admin-ultimo-admin",
-    asAdmin: true,
-    listHeading: ENGLISH_DIRECTORY_HEADING,
-    prepare: refuseLastAdminChange,
   },
   {
     name: "directorio-filtros-abiertos",
@@ -5050,7 +5148,10 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     name: "directorio-filtrado-sin-resultados",
     asAdmin: true,
     listHeading: ENGLISH_DIRECTORY_HEADING,
-    prepare: filterToNobody(ENGLISH_FILTER_LABELS, /No member matches/),
+    prepare: filterToNobody(
+      ENGLISH_FILTER_LABELS,
+      /No members match these filters/,
+    ),
   },
   {
     name: "directorio-contacto-admin",
@@ -5085,7 +5186,7 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     asAdmin: true,
     listHeading: SPANISH_DIRECTORY_HEADING,
     beforeVisit: chooseSpanish,
-    prepare: filterToNobody(SPANISH_FILTER_LABELS, /Nadie del club coincide/),
+    prepare: filterToNobody(SPANISH_FILTER_LABELS, /Ningún miembro coincide/),
   },
   ...emailStates(false),
   ...emailStates(true),
@@ -5633,8 +5734,8 @@ test.describe("el directorio en pantalla estrecha (#283)", () => {
       "Include deactivated accounts",
     )(page);
     await expect(page.getByText("Deactivated", { exact: true })).toBeVisible();
-    await expect(page.getByText("AUF expired")).toBeVisible();
-    await expect(page.getByText("AUF not verified")).toBeVisible();
+    // Desde #549 el AUF de la fila es un punto, sin palabras que partir.
+    await expect(page.getByRole("img", { name: "AUF expired" })).toBeVisible();
 
     expect(await wordsSplitAcrossLines(page)).toEqual([]);
   });
@@ -5726,17 +5827,18 @@ test.describe("el directorio en pantalla estrecha (#283)", () => {
     await expect(sortRadio(page, "Order", "Ascending")).toBeChecked();
   });
 
-  test("un Admin cambia el rol desde la tarjeta con el mismo resultado que en la tabla", async ({
+  // #549: la fila ya no cambia el rol, ni en la tabla ni en la tarjeta. El
+  // cambio y el rechazo del último Admin están en la ficha
+  // (`ficha-rol-ultimo-admin`).
+  test("la tarjeta de un Admin enseña el rol sin selector ni botón Guardar", async ({
     page,
   }) => {
     await goToNarrowDirectory(page, { asAdmin: true });
-    await expect(
-      page
-        .getByRole("row", { name: "Ana Admin" })
-        .getByRole("combobox", { name: "Role for Ana Admin" }),
-    ).toBeVisible();
 
-    await refuseLastAdminChange(page);
+    const row = page.getByRole("row", { name: "Ana Admin" });
+    await expect(row.getByText("Admin", { exact: true })).toBeVisible();
+    await expect(row.getByRole("combobox")).toHaveCount(0);
+    await expect(row.getByRole("button", { name: /Save/ })).toHaveCount(0);
   });
 
   test("a 768px sigue siendo la tabla, con sus cabeceras y sin etiquetas", async ({
@@ -5845,7 +5947,8 @@ test.describe("el directorio con los datos de verdad", () => {
     ).toBeVisible();
   });
 
-  test("un Admin ve la bandeja y el control de su propio rol", async ({
+  // Desde #549 la fila enseña el rol como texto: se cambia en la ficha.
+  test("un Admin ve la bandeja y su propio rol en su fila", async ({
     page,
   }) => {
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
@@ -5854,10 +5957,10 @@ test.describe("el directorio con los datos de verdad", () => {
       page.getByRole("heading", { name: "Pending requests" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("combobox", {
-        name: `Role for ${ADMINISTRATION_ADMIN_NAME}`,
-      }),
-    ).toHaveValue("Admin");
+      page
+        .getByRole("row", { name: ADMINISTRATION_ADMIN_NAME })
+        .getByRole("cell", { name: "Admin", exact: true }),
+    ).toBeVisible();
   });
 
   test("en español, la bandeja sale en español", async ({ page }) => {
@@ -6016,8 +6119,10 @@ test.describe("un Admin que decide una solicitud desde el directorio", () => {
 
     await expect(approve).toHaveCount(0);
     await expect(
-      page.getByRole("combobox", { name: `Role for ${DECIDABLE_MEMBER_NAME}` }),
-    ).toHaveValue("Committee");
+      page
+        .getByRole("row", { name: DECIDABLE_MEMBER_NAME })
+        .getByRole("cell", { name: "Committee", exact: true }),
+    ).toBeVisible();
   });
 });
 
@@ -6145,6 +6250,7 @@ const STUBBED_CLUB_GROUPS = [
 type StubbedMemberRecord = {
   readonly userId: string;
   readonly fullName: string;
+  readonly role: "Player" | "Coach" | "Committee" | "Admin";
   readonly joinedOn: string;
   readonly accountStatus: "incomplete" | "active" | "inactive";
   readonly aufNumber: string;
@@ -6177,6 +6283,7 @@ type StubbedMemberRecord = {
 const CURRENT_RECORD: StubbedMemberRecord = {
   userId: RECORD_MEMBER_ID,
   fullName: LONG_MEMBER_NAME,
+  role: "Player",
   joinedOn: "2024-03-06",
   accountStatus: "active",
   aufNumber: "AUF-2026-0042",
@@ -6392,6 +6499,14 @@ const MEMBER_RECORD_STATES: readonly MemberRecordState[] = [
     name: "ficha-auf-vigente",
     record: CURRENT_RECORD,
     saveLabel: ENGLISH_SAVE_RECORD,
+  },
+  // #549: el cambio de rol se mudó de la fila del directorio a la ficha, y
+  // con él el rechazo del último Admin.
+  {
+    name: "ficha-rol-ultimo-admin",
+    record: { ...CURRENT_RECORD, role: "Admin" },
+    saveLabel: ENGLISH_SAVE_RECORD,
+    prepare: refuseLastAdminChange(LONG_MEMBER_NAME),
   },
   {
     name: "ficha-auf-vigente-es",
@@ -6726,15 +6841,20 @@ test.describe("un Admin frente a la ficha con los datos de verdad", () => {
     expect((await saved).status()).toBe(200);
     await expect(page.getByText("Record saved.")).toBeVisible();
 
+    // Desde #549 la fila no escribe el AUF: con número y un vencimiento
+    // lejano, su fila ya no lleva ningún punto del AUF.
     await page.getByRole("link", { name: /Back to the directory/ }).click();
-    await expect(
-      page
-        .getByRole("row", { name: ADMINISTRATION_ADMIN_NAME })
-        .getByText(`AUF ${aufNumber} · expires 31 December 2099`),
-    ).toBeVisible();
+    const ownRow = page.getByRole("row", { name: ADMINISTRATION_ADMIN_NAME });
+    await expect(ownRow).toBeVisible();
+    await expect(ownRow.getByRole("img", { name: /AUF/ })).toHaveCount(0);
 
     // Deja la fila como estaba: sin número, que borra también el vencimiento.
     await openOwnRecordLink(page).click();
+    // Se espera a la ficha: en el directorio, los puntos "No AUF number"
+    // (#549) también responden a esa etiqueta.
+    await expect(
+      page.getByRole("heading", { level: 1, name: ADMINISTRATION_ADMIN_NAME }),
+    ).toBeVisible({ timeout: ACCOUNT_CHANGE_TIMEOUT_MS });
     await page.getByLabel("AUF number").fill("");
     await page.getByRole("button", { name: ENGLISH_SAVE_RECORD }).click();
     await expect(page.getByText("Record saved.")).toBeVisible();

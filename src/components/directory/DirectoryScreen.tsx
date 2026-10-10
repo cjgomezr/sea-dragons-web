@@ -13,7 +13,6 @@ import {
 import { writeDirectoryQuery } from "@/lib/directory/directory-query";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
-import { AdministrationNotice } from "./AdministrationNotice";
 import {
   DirectoryEmailComposer,
   type EmailRecipient,
@@ -23,19 +22,25 @@ import {
   describeDirectoryFailure,
   loadDirectory,
 } from "./directory-client";
-import { NO_MORE_FILTERS, countActiveFilters } from "./DirectoryFilterFields";
+import {
+  DirectoryEmptyState,
+  describeEmptyCriteria,
+} from "./DirectoryEmptyState";
+import { NO_MORE_FILTERS } from "./DirectoryFilterFields";
 import {
   type DirectoryFilterState,
   DirectoryFilters,
 } from "./DirectoryFilters";
 import { DirectoryHeader } from "./DirectoryHeader";
 import type { DirectoryOrder } from "./DirectorySortControl";
-import { DirectoryTable } from "./DirectoryTable";
+import { DirectoryTable, type RequestedRoles } from "./DirectoryTable";
 import { RoleRequestsPanel } from "./RoleRequestsPanel";
 import { useDebouncedValue } from "./use-debounced-value";
 import { useFilterChoices } from "./use-filter-choices";
-import { useMemberRoleChange } from "./use-member-role-change";
-import { usePendingRoleRequests } from "./use-pending-role-requests";
+import {
+  type PendingRequestsState,
+  usePendingRoleRequests,
+} from "./use-pending-role-requests";
 
 /**
  * La pantalla del directorio (#239, RF-2 del PRD de E5): quién está en el
@@ -45,10 +50,12 @@ import { usePendingRoleRequests } from "./use-pending-role-requests";
  * que comprobar aquí: quien no tiene sesión no llega, y lo que es del Admin lo
  * decide el servidor. Que quien mira sea Admin se sabe por la respuesta, que
  * viene marcada, y no por un rol que la pantalla haya leído por su cuenta.
- * Con esa marca, un Admin encuentra además la bandeja de solicitudes de rol y
- * el cambio de rol de cada fila (#240), que antes vivían en su propia pantalla
- * de administración. La cabecera y la barra son las del rediseño de E21
- * (#548): la bandeja queda debajo de la lista, y la cabecera lleva a ella.
+ * Con esa marca, un Admin encuentra además la bandeja de solicitudes de rol
+ * (#240), que antes vivía en su propia pantalla de administración, y en cada
+ * fila el rol que ese socio pidió. La cabecera y la barra son las del
+ * rediseño de E21 (#548): la bandeja queda debajo de la lista, y la cabecera
+ * lleva a ella. La lista es la compacta de #549, que ya no cambia el rol: eso
+ * se hace en la ficha del socio.
  *
  * Es de cliente porque su razón de ser es cambiar sin recargar: buscar,
  * filtrar y ordenar rehacen la lectura. Lee por la API v1 y nunca contra la
@@ -114,6 +121,28 @@ function invert(direction: DirectoryDirection): DirectoryDirection {
   return direction === "asc" ? "desc" : "asc";
 }
 
+/** El sentido con el que empieza cada columna (#549): la asistencia, de
+ * mayor a menor, porque lo que se busca es quién viene más; el resto, como
+ * se lee una lista por primera vez. */
+const FIRST_DIRECTION: Readonly<Record<DirectorySort, DirectoryDirection>> = {
+  name: "asc",
+  role: "asc",
+  position: "asc",
+  attendance: "desc",
+};
+
+const NO_REQUESTED_ROLES: RequestedRoles = new Map();
+
+/** Lo que pidió cada socio, mientras la bandeja lo sabe. */
+function requestedRolesOf(state: PendingRequestsState): RequestedRoles {
+  if (state.kind !== "ready") {
+    return NO_REQUESTED_ROLES;
+  }
+  return new Map(
+    state.requests.map((request) => [request.userId, request.requestedRole]),
+  );
+}
+
 function LoadFailure({
   translate,
   failure,
@@ -131,29 +160,6 @@ function LoadFailure({
       <button type="button" className="auth-submit" onClick={onRetry}>
         {translate("directory.retry")}
       </button>
-    </div>
-  );
-}
-
-/** Nadie coincide con lo que se pidió. Limpiar sólo se ofrece cuando hay algo
- * que limpiar: con el club entero delante, ese botón no haría nada. */
-function EmptyDirectory({
-  translate,
-  hasFilters,
-  onClear,
-}: {
-  translate: Translator;
-  hasFilters: boolean;
-  onClear: () => void;
-}): React.JSX.Element {
-  return (
-    <div className="directory-empty">
-      <p className="admin-empty">{translate("directory.empty")}</p>
-      {hasFilters ? (
-        <button type="button" className="admin-secondary" onClick={onClear}>
-          {translate("directory.clearFilters")}
-        </button>
-      ) : null}
     </div>
   );
 }
@@ -266,17 +272,20 @@ export function DirectoryScreen({
     setReloads((count) => count + 1);
   }
 
-  /** La misma columna otra vez invierte el sentido; una nueva empieza
-   * ascendente, que es como se lee una lista por primera vez. */
+  /** La misma columna otra vez invierte el sentido; una nueva empieza por
+   * el suyo. */
   function sortBy(column: DirectorySort): void {
     setOrder((current) => ({
       sort: column,
-      direction: current.sort === column ? invert(current.direction) : "asc",
+      direction:
+        current.sort === column
+          ? invert(current.direction)
+          : FIRST_DIRECTION[column],
     }));
   }
 
   /** Lo que el servidor ya confirmó llega a la fila sin volver a leer la
-   * lista: la aprobación de una solicitud o un cambio de rol. */
+   * lista: la aprobación de una solicitud. */
   function applyRole(userId: string, role: Role): void {
     setState((current) =>
       current.kind === "ready"
@@ -288,7 +297,6 @@ export function DirectoryScreen({
     );
   }
 
-  const roleChange = useMemberRoleChange(translate, applyRole);
   const isAdminListing =
     state.kind === "ready" && state.listing.kind === "admin";
   const pendingRequests = usePendingRoleRequests({
@@ -297,10 +305,11 @@ export function DirectoryScreen({
     onRoleGranted: applyRole,
   });
 
-  const hasNarrowingFilters =
-    asSearchQuery(filters.search) !== null ||
-    filters.role !== null ||
-    countActiveFilters(filters) > 0;
+  const emptyCriteria = describeEmptyCriteria(filters, {
+    translate,
+    locale,
+    choices,
+  });
 
   return (
     <div className="directory">
@@ -335,7 +344,6 @@ export function DirectoryScreen({
           <h2 id={MEMBERS_HEADING_ID} className="visually-hidden">
             {translate("directory.list.title")}
           </h2>
-          <AdministrationNotice notice={roleChange.notice} />
           <DirectoryFilters
             translate={translate}
             locale={locale}
@@ -347,9 +355,9 @@ export function DirectoryScreen({
             onChange={setFilters}
           />
           {state.listing.members.length === 0 ? (
-            <EmptyDirectory
+            <DirectoryEmptyState
               translate={translate}
-              hasFilters={hasNarrowingFilters}
+              criteria={emptyCriteria}
               onClear={() =>
                 setFilters((current) => ({
                   ...current,
@@ -365,9 +373,13 @@ export function DirectoryScreen({
               locale={locale}
               listing={state.listing}
               order={order}
+              requestedRoles={
+                isAdminListing
+                  ? requestedRolesOf(pendingRequests.state)
+                  : NO_REQUESTED_ROLES
+              }
               onSort={sortBy}
               onOrderChange={setOrder}
-              onSaveRole={roleChange.saveRole}
             />
           )}
         </section>

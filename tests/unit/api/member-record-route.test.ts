@@ -94,6 +94,7 @@ function memberRecordGateways(
           ? {
               userId,
               fullName: "Paula Player",
+              role: "Player",
               joinedOn: JOINED_ON,
               accountStatus,
               ...auf,
@@ -277,6 +278,7 @@ describe("PATCH /api/v1/members/{id}/record", () => {
       data: {
         userId: MEMBER_ID,
         fullName: "Paula Player",
+        role: "Player",
         joinedOn: JOINED_ON,
         accountStatus: "active",
         aufNumber: "AUF-2026-0042",

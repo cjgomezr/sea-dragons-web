@@ -62,6 +62,8 @@ const ANA: DirectoryMemberRecord = {
   role: "Admin",
   positionId: null,
   status: "active",
+  registeredAt: "2024-03-06T01:00:00.000Z",
+  hasDateOfBirth: true,
   aufNumber: "AUF-1",
   aufExpiry: "2027-01-31",
   isAufVerified: true,
@@ -86,6 +88,8 @@ const BRUNO: DirectoryMemberRecord = {
   role: "Coach",
   positionId: GOALKEEPER.id,
   status: "active",
+  registeredAt: "2024-03-06T01:00:00.000Z",
+  hasDateOfBirth: true,
   aufNumber: "AUF-2",
   aufExpiry: "2026-09-20",
   isAufVerified: true,
@@ -111,6 +115,8 @@ const MARIA: DirectoryMemberRecord = {
   role: "Player",
   positionId: DEFENDER.id,
   status: "active",
+  registeredAt: "2024-03-06T01:00:00.000Z",
+  hasDateOfBirth: true,
   aufNumber: null,
   aufExpiry: null,
   isAufVerified: false,
@@ -131,6 +137,8 @@ const ZOE: DirectoryMemberRecord = {
   role: "Committee",
   positionId: FORWARD.id,
   status: "inactive",
+  registeredAt: "2024-03-06T01:00:00.000Z",
+  hasDateOfBirth: true,
   aufNumber: "AUF-4",
   aufExpiry: TODAY,
   // Lo escribió la socia y ningún Admin lo ha verificado todavía (#274).
@@ -321,10 +329,64 @@ describe("directorio", () => {
         role: "Player",
         position: { id: DEFENDER.id, names: DEFENDER.names },
         status: "active",
+        invitedOn: null,
         photoUrl: null,
         attendance: { kind: "rate", percent: 40, sessions: 2 },
       },
     ]);
+  });
+
+  it("dice el día del club en que se invitó a quien todavía no entró (#549)", async () => {
+    const invited: DirectoryMemberRecord = {
+      ...MARIA,
+      status: "incomplete",
+      // El 5 de octubre a la 1:30 en Melbourne, todavía el 4 en UTC.
+      registeredAt: "2026-10-04T14:30:00.000Z",
+      hasDateOfBirth: false,
+    };
+    const listing = await listDirectory(
+      {
+        ...gateways(),
+        directory: { findDirectoryMembers: async () => [invited, ANA] },
+      },
+      {
+        callerId: CALLER_ID,
+        query: DEFAULT_DIRECTORY_QUERY,
+        todayInClub: TODAY,
+      },
+    );
+
+    expect(
+      listing.members.map(({ fullName, invitedOn }) => [fullName, invitedOn]),
+    ).toEqual([
+      ["Ana Admin", null],
+      ["María Ñíguez", "2026-10-05"],
+    ]);
+  });
+
+  /* `incomplete` también es quien se registró solo y no confirmó el correo,
+     o el socio de años que una corrección de la fecha de nacimiento dejó
+     menor sin consentimiento. Los dos tienen fecha de nacimiento; un alta
+     del Admin no la tiene hasta que el invitado completa su registro. */
+  it("no da por invitado a un incomplete que ya tiene fecha de nacimiento (#549)", async () => {
+    const backToIncomplete: DirectoryMemberRecord = {
+      ...MARIA,
+      status: "incomplete",
+      hasDateOfBirth: true,
+    };
+    const listing = await listDirectory(
+      {
+        ...gateways(),
+        directory: { findDirectoryMembers: async () => [backToIncomplete] },
+      },
+      {
+        callerId: CALLER_ID,
+        query: DEFAULT_DIRECTORY_QUERY,
+        todayInClub: TODAY,
+      },
+    );
+
+    expect(listing.members.map(({ invitedOn }) => invitedOn)).toEqual([null]);
   });
 
   it("trae a un Player el porcentaje de los demás, o sin datos (FR-015)", async () => {
@@ -628,6 +690,19 @@ describe("el AUF en el directorio", () => {
     });
   });
 
+  it("marca por vencer el registro que vence en los próximos 30 días (#549)", async () => {
+    const members = await listForAdmin();
+
+    expect(
+      [...members].map(([name, member]) => [name, member.isAufExpiring]),
+    ).toEqual([
+      ["Ana Admin", false],
+      ["Bruno Beltrán", false],
+      ["María Ñíguez", false],
+      ["Zoe Zapata", true],
+    ]);
+  });
+
   it("marca sin verificar el AUF que escribió el socio", async () => {
     const members = await listForAdmin();
 
@@ -718,6 +793,7 @@ describe("marca de sin evaluar", () => {
           role: "Coach",
           position: { id: GOALKEEPER.id, names: GOALKEEPER.names },
           status: "active",
+          invitedOn: null,
           photoUrl: null,
           attendance: { kind: "no_data" },
           isEvaluated: false,
@@ -750,6 +826,7 @@ describe("el rol nuevo en la lista (#240)", () => {
     role: "Player",
     position: { id: GOALKEEPER.id, names: GOALKEEPER.names },
     status: "active",
+    invitedOn: null,
     photoUrl: null,
     attendance: { kind: "no_data" },
   } as const;
@@ -782,6 +859,7 @@ describe("el rol nuevo en la lista (#240)", () => {
       aufExpiry: "2020-01-31",
       isAufVerified: true,
       isAufExpired: true,
+      isAufExpiring: false,
       isEvaluated: true,
       membershipStatus: "active" as const,
       email: "nerea@club.test",
@@ -1098,6 +1176,7 @@ describe("el contacto en el directorio (#499)", () => {
           role: "Player",
           position: { id: DEFENDER.id, names: DEFENDER.names },
           status: "active",
+          invitedOn: null,
           photoUrl: null,
           attendance: { kind: "rate", percent: 40, sessions: 2 },
           email: "maria@club.test",

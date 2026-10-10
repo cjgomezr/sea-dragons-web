@@ -6,6 +6,7 @@ import {
   requestApi,
 } from "@/lib/api/request-api";
 import { ACCOUNT_STATUSES } from "@/lib/auth/account-status";
+import { ROLES } from "@/lib/auth/roles";
 import { describeAuthIssue } from "@/lib/auth/issue-messages";
 import {
   MEMBER_AUF_VERIFICATION_API_PATH,
@@ -55,6 +56,7 @@ import { membershipWaiverSchema } from "./membership-waiver-client";
 const recordSchema = z.object({
   userId: z.uuid(),
   fullName: z.string(),
+  role: z.enum(ROLES),
   joinedOn: z.string(),
   accountStatus: z.enum(ACCOUNT_STATUSES),
   aufNumber: z.string().nullable(),

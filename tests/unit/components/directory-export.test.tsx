@@ -26,6 +26,7 @@ const NEREA: CommitteeDirectoryMember = {
   role: "Player",
   position: null,
   status: "active",
+  invitedOn: null,
   photoUrl: null,
   attendance: { kind: "no_data" },
   email: "nerea@club.test",
@@ -40,6 +41,7 @@ const ADMIN_NEREA = {
   aufExpiry: null,
   isAufVerified: false,
   isAufExpired: false,
+  isAufExpiring: false,
   membershipStatus: null,
 };
 

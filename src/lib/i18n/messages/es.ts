@@ -554,7 +554,12 @@ export const spanishMessages: MessageCatalog = {
   "directory.role.all": "Todos",
   "directory.includeInactive": "Incluir las cuentas desactivadas",
   "directory.empty": "Nadie del club coincide con lo que buscas.",
-  "directory.clearFilters": "Limpiar los filtros",
+  "directory.clearFilters": "Borrar filtros",
+  "directory.empty.title": "Ningún miembro coincide con estos filtros",
+  "directory.empty.criteria":
+    "Mostrando {criteria}. Prueba a quitar un filtro.",
+  "directory.empty.allRoles": "todos los roles",
+  "directory.empty.name": "Nombre",
   "directory.filter.legend": "Más filtros",
   "directory.filter.position": "Posición",
   "directory.filter.position.all": "Todas las posiciones",
@@ -610,6 +615,7 @@ export const spanishMessages: MessageCatalog = {
   "directory.column.role": "Rol",
   "directory.column.position": "Posición",
   "directory.column.attendance": "Asistencia",
+  "directory.column.attendanceShort": "Asist.",
   // El contacto de cada socio (#499), según quién mira.
   "directory.column.contact": "Contacto",
   "directory.contact.email": "Correo",
@@ -632,11 +638,21 @@ export const spanishMessages: MessageCatalog = {
   "directory.sort.direction.asc": "Ascendente",
   "directory.sort.direction.desc": "Descendente",
   "directory.mark.inactive": "Desactivada",
+  "directory.dot.aufExpired": "AUF vencido",
+  "directory.dot.membershipPastDue": "Membresía vencida",
+  "directory.dot.aufMissing": "Sin número de AUF",
+  "directory.dot.aufExpiring": "AUF por vencer",
+  "directory.legend.label": "Puntos de estado",
+  "directory.legend.danger": "Necesita acción",
+  "directory.legend.warning": "Revisar pronto",
+  "directory.invited.pill": "Invitado",
+  "directory.invited.line": "Invitado el {date} · todavía no ha entrado",
+  "directory.request.pill": "→ {role}",
+  "directory.request.label": "Pidió ser {role}",
   "directory.mark.aufExpired": "AUF vencido",
   // #274: el AUF que escribió el miembro, hasta que un Admin lo verifica.
   "directory.mark.aufNotVerified": "AUF sin verificar",
   "directory.mark.aufVerified": "AUF verificado",
-  "directory.mark.pendingActivation": "Pendiente de activar",
   "directory.mark.membership.none": "Sin membresía",
   "directory.mark.membership.pending": "Membresía pendiente",
   "directory.mark.membership.trialing": "En prueba",
@@ -728,9 +744,6 @@ export const spanishMessages: MessageCatalog = {
     "Sólo un Admin puede ver y editar esta ficha.",
   "memberRecord.error.unexpected":
     "No pudimos guardar la ficha. Vuelve a intentarlo.",
-  "directory.aufSummary": "AUF {number} · vence el {date}",
-  "directory.aufWithoutExpiry": "AUF {number} · sin vencimiento",
-  "directory.aufMissing": "Sin AUF",
   // La invitación de un miembro por un Admin (#243, RF-5 del PRD de E5), abierta
   // desde la cabecera del directorio.
   "directory.addMember": "Invitar miembro",
@@ -869,6 +882,7 @@ export const spanishMessages: MessageCatalog = {
     "No pudimos invitar al miembro. Inténtalo de nuevo.",
   "newMember.error.invitationNotPending": "Este miembro ya activó su cuenta.",
   "memberRecord.invitation.title": "Invitación",
+  "memberRecord.role.title": "Rol",
   "memberRecord.invitation.lead":
     "{name} todavía no activó su cuenta. El enlace de la invitación caduca a la hora, así que puedes mandarle uno nuevo.",
   "memberRecord.invitation.resent":

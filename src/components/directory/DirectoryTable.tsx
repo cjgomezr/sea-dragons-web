@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { MemberAvatar } from "@/components/MemberAvatar";
 import { describeAttendance } from "@/components/attendance/MemberAttendanceSummary";
+import type { Role } from "@/lib/auth/roles";
 import type {
   DirectoryDirection,
   DirectoryListing,
@@ -15,35 +16,34 @@ import { memberEvaluationHref } from "@/lib/evaluations/member-evaluation-href";
 import { formatCalendarDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
-import type { MembershipStatus } from "@/lib/membership/membership";
-import { type AufState, type RowMark, aufMarksOf } from "./auf-marks";
 import { DirectoryContactCell, type RowContact } from "./DirectoryContactCell";
-import { membershipMarkOf } from "./membership-mark";
 import {
   type DirectoryOrder,
   DirectorySortControl,
   SORT_COLUMN_LABELS,
 } from "./DirectorySortControl";
 import {
-  MemberRoleControl,
-  type RoleDraftsControl,
-  type SaveMemberRole,
-  useRoleDrafts,
-} from "./MemberRoleControl";
-import {
   describeCountry,
   describeExperienceLevel,
   describePosition,
 } from "./member-labels";
+import { type StatusDot, statusDotsOf } from "./status-dots";
 
 /**
- * La tabla del directorio (FR-015, FR-019): una fila por socio con su foto o
- * sus iniciales (#245), su nombre, su país, su nivel, su rol, su posición y su
- * asistencia (#396), y cabeceras que piden el orden.
+ * La lista del directorio (FR-015, FR-019), compacta desde el rediseño de
+ * E21 (#549, RF-3): una fila por socio con su foto o sus iniciales (#245), su
+ * nombre, su país y su nivel, su rol, su posición y su asistencia (#396), y
+ * cabeceras que piden el orden. Medidas: "List column" de
+ * `docs/design/directorio-admin/README.md`.
  *
- * La columna de OVR del mockup no está. Del OVR, el directorio sólo cuenta a
- * Admin y Coach quién está sin evaluar (#324): la nota se ve en Evaluaciones,
- * y a un Player o un Committee no le llega nada (FR-055).
+ * La fila ya no cambia el rol: hasta el panel lateral (#550) eso se hace en
+ * la ficha. Lo que un Admin ve de más son puntos de estado (el AUF y la
+ * membresía) y, bajo el rol, el que el socio pidió. El resto de la ficha
+ * reservada está a un clic, en el nombre (#242).
+ *
+ * Del OVR, el directorio sólo cuenta a Admin y Coach quién está sin evaluar
+ * (#324): la nota se ve en Evaluaciones, y a un Player o un Committee no le
+ * llega nada (FR-055).
  *
  * Ordenar es cosa del servidor, así que pulsar una cabecera no reordena nada
  * aquí: dice por dónde, y la pantalla vuelve a preguntar.
@@ -55,38 +55,37 @@ import {
  * servidor no tenga que adivinar cuál pintar, y para que las filas sigan
  * siendo filas para un lector de pantalla.
  *
- * A un Admin la celda del rol le da además el control para cambiarlo (#240).
- * Lo decide la marca de la lista, no un rol leído aparte: el endpoint del
- * cambio de rol lo comprueba igual por su cuenta.
- *
  * Quien ve el contacto de los socios (#499) tiene además una columna
  * "Contacto" al final: Admin y Committee con todo, el Coach con el de
  * emergencia. La marca de la lista dice cuál, igual que con el AUF.
  */
 
 /** El círculo de cada fila, en píxeles; `.directory-avatar` dice lo mismo. */
-const DIRECTORY_AVATAR_SIZE = 40;
+const DIRECTORY_AVATAR_SIZE = 32;
 
-/** El registro federativo de una fila, que sólo recibe un Admin (BR-008). */
-type AufView = AufState & { readonly aufExpiry: string | null };
-
-/** Lo que de una fila sólo recibe un Admin: el registro federativo y el
- * estado de la membresía (#453). */
-type AdminView = AufView & {
-  readonly membershipStatus: MembershipStatus | null;
+/** Lo que de una fila sólo recibe un Admin: sus puntos de estado y el rol
+ * que el socio pidió, si pidió alguno. */
+type AdminRowView = {
+  readonly dots: readonly StatusDot[];
+  readonly requestedRole: Role | null;
 };
 
 /** Lo que una fila necesita saber, con lo que sólo un Admin recibe ya
  * resuelto: así la fila no tiene que volver a preguntarse quién la mira. Con
- * `admin` la fila es de Admin: enseña el registro y la membresía, enlaza la
- * ficha (#242) y deja cambiar el rol (#240). `isEvaluated` es null para quien no ve
- * evaluaciones (#324). */
+ * `admin` la fila es de Admin: enlaza la ficha (#242) y enseña puntos y
+ * solicitud (#549). `isEvaluated` es null para quien no ve evaluaciones
+ * (#324). */
 type DirectoryRow = {
   readonly member: DirectoryMember;
-  readonly admin: AdminView | null;
+  readonly admin: AdminRowView | null;
   readonly isEvaluated: boolean | null;
   readonly contact: RowContact;
 };
+
+const NO_DOTS: readonly StatusDot[] = [];
+
+/** Las solicitudes de rol pendientes, por socio: lo que pidió cada uno. */
+export type RequestedRoles = ReadonlyMap<string, Role>;
 
 const NO_CONTACT: RowContact = { kind: "none" };
 
@@ -99,26 +98,33 @@ function fullContactOf(member: MemberContactView): RowContact {
   };
 }
 
-function rowsOf(listing: DirectoryListing): readonly DirectoryRow[] {
+function rowsOf(
+  translate: Translator,
+  listing: DirectoryListing,
+  requestedRoles: RequestedRoles,
+): readonly DirectoryRow[] {
   switch (listing.kind) {
     case "admin":
       return listing.members.map((member) => ({
         member,
-        admin: member,
+        admin: {
+          dots: statusDotsOf(translate, member),
+          requestedRole: requestedRoles.get(member.userId) ?? null,
+        },
         isEvaluated: member.isEvaluated,
         contact: fullContactOf(member),
       }));
     case "committee":
       return listing.members.map((member) => ({
-        member,
         admin: null,
+        member,
         isEvaluated: null,
         contact: fullContactOf(member),
       }));
     case "coach":
       return listing.members.map((member) => ({
-        member,
         admin: null,
+        member,
         isEvaluated: member.isEvaluated,
         contact: {
           kind: "emergency",
@@ -127,38 +133,12 @@ function rowsOf(listing: DirectoryListing): readonly DirectoryRow[] {
       }));
     case "member":
       return listing.members.map((member) => ({
-        member,
         admin: null,
+        member,
         isEvaluated: null,
         contact: NO_CONTACT,
       }));
   }
-}
-
-/** La línea del AUF, con el vencimiento escrito en el idioma de la pantalla.
- * Quien no tiene número no tiene registro: se dice, no se deja en blanco. */
-function describeAuf(
-  translate: Translator,
-  locale: Locale,
-  auf: AufView,
-): string {
-  if (auf.aufNumber === null) {
-    return translate("directory.aufMissing");
-  }
-  return auf.aufExpiry === null
-    ? translate("directory.aufWithoutExpiry", { number: auf.aufNumber })
-    : translate("directory.aufSummary", {
-        number: auf.aufNumber,
-        date: formatCalendarDay(locale, auf.aufExpiry),
-      });
-}
-
-/** Sólo la lista de un Admin trae el AUF y la membresía, y es la misma marca que le da el
- * enlace a la ficha y el cambio de rol. */
-function isAdminRow(row: DirectoryRow): row is DirectoryRow & {
-  readonly admin: AdminView;
-} {
-  return row.admin !== null;
 }
 
 function memberRecordHref(userId: string): string {
@@ -185,6 +165,19 @@ const SORT_ARROWS: Readonly<Record<DirectoryDirection, string>> = {
   desc: "↓",
 };
 
+/** La cabecera que no cabe en su columna de 64px se abrevia; su nombre
+ * accesible sigue siendo el entero. */
+const SHORT_COLUMN_LABELS: Readonly<
+  Partial<Record<DirectorySort, "directory.column.attendanceShort">>
+> = { attendance: "directory.column.attendanceShort" };
+
+const SORTABLE_COLUMNS: readonly DirectorySort[] = [
+  "name",
+  "role",
+  "position",
+  "attendance",
+];
+
 function SortableHeader({
   translate,
   column,
@@ -197,14 +190,25 @@ function SortableHeader({
   onSort: (column: DirectorySort) => void;
 }): React.JSX.Element {
   const isSorted = order.sort === column;
+  const label = translate(SORT_COLUMN_LABELS[column]);
+  const shortLabelKey = SHORT_COLUMN_LABELS[column];
+  // El nombre entero va en la cabecera y en su botón: la cabecera no lo
+  // toma del `aria-label` del botón en todos los lectores.
+  const fullLabel = shortLabelKey === undefined ? undefined : label;
   return (
-    <th scope="col" aria-sort={isSorted ? ARIA_SORT[order.direction] : "none"}>
+    <th
+      scope="col"
+      className={`directory-column-${column}`}
+      aria-label={fullLabel}
+      aria-sort={isSorted ? ARIA_SORT[order.direction] : "none"}
+    >
       <button
         type="button"
         className="directory-sort"
+        aria-label={fullLabel}
         onClick={() => onSort(column)}
       >
-        {translate(SORT_COLUMN_LABELS[column])}
+        {shortLabelKey === undefined ? label : translate(shortLabelKey)}
         <span className="directory-arrow" aria-hidden="true">
           {isSorted ? SORT_ARROWS[order.direction] : ""}
         </span>
@@ -213,39 +217,34 @@ function SortableHeader({
   );
 }
 
-/** Lo que distingue a esta fila de las demás: pendiente de activar (#243), de
- * baja (AC-040) y el estado del registro federativo (BR-008, #274), que sólo
- * un Admin recibe. */
-function marksOf(translate: Translator, row: DirectoryRow): readonly RowMark[] {
-  return [
-    ...(row.member.status === "incomplete"
-      ? [
-          {
-            text: translate("directory.mark.pendingActivation"),
-            tone: "neutral" as const,
-          },
-        ]
-      : []),
-    ...(row.member.status === "inactive"
-      ? [
-          {
-            text: translate("directory.mark.inactive"),
-            tone: "neutral" as const,
-          },
-        ]
-      : []),
-    ...(row.admin === null
-      ? []
-      : [
-          ...aufMarksOf(translate, row.admin),
-          membershipMarkOf(translate, row.admin.membershipStatus),
-        ]),
-  ];
+/** Un punto por cada cosa que un Admin tiene que mirar. Se lee como imagen
+ * con su texto, y el `title` lo enseña al pasar el ratón. */
+function StatusDots({
+  dots,
+}: {
+  dots: readonly StatusDot[];
+}): React.JSX.Element | null {
+  if (dots.length === 0) {
+    return null;
+  }
+  return (
+    <span className="directory-dots">
+      {dots.map((dot) => (
+        <span
+          key={dot.text}
+          role="img"
+          aria-label={dot.text}
+          title={dot.text}
+          className={`directory-dot directory-dot-${dot.tone}`}
+        />
+      ))}
+    </span>
+  );
 }
 
 /** La única marca que se pulsa: lleva a crear la evaluación que falta. El
- * tono es el de lo que pide hacer algo, como el AUF vencido. El nombre
- * accesible empieza por el texto visible (WCAG 2.5.3) y dice de quién es. */
+ * nombre accesible empieza por el texto visible (WCAG 2.5.3) y dice de quién
+ * es. */
 function NotEvaluatedMark({
   translate,
   member,
@@ -266,33 +265,30 @@ function NotEvaluatedMark({
   );
 }
 
-function RowMarks({
+/** Las píldoras que van tras el nombre: invitado (#549) y de baja
+ * (AC-040). */
+function StatusPills({
   translate,
-  row,
+  member,
 }: {
   translate: Translator;
-  row: DirectoryRow;
+  member: DirectoryMember;
 }): React.JSX.Element | null {
-  const marks = marksOf(translate, row);
-  const isMarkedUnevaluated = needsEvaluation(row);
-  if (marks.length === 0 && !isMarkedUnevaluated) {
-    return null;
+  if (member.invitedOn !== null) {
+    return (
+      <span className="directory-pill directory-pill-invited">
+        {translate("directory.invited.pill")}
+      </span>
+    );
   }
-  return (
-    <span className="directory-marks">
-      {marks.map((mark) => (
-        <span
-          key={mark.text}
-          className={`directory-mark directory-mark-${mark.tone}`}
-        >
-          {mark.text}
-        </span>
-      ))}
-      {isMarkedUnevaluated ? (
-        <NotEvaluatedMark translate={translate} member={row.member} />
-      ) : null}
-    </span>
-  );
+  if (member.status === "inactive") {
+    return (
+      <span className="directory-pill">
+        {translate("directory.mark.inactive")}
+      </span>
+    );
+  }
+  return null;
 }
 
 /** A un Admin el nombre le abre la ficha del miembro (#242). El nombre
@@ -305,7 +301,7 @@ function MemberName({
   row: DirectoryRow;
 }): React.JSX.Element {
   const { member } = row;
-  if (!isAdminRow(row)) {
+  if (row.admin === null) {
     return <span className="directory-name">{member.fullName}</span>;
   }
   return (
@@ -351,62 +347,133 @@ function MemberFacts({
   );
 }
 
-function MemberRow({
+/** Bajo el nombre: el país y el nivel, o, de quien todavía no entró, cuándo
+ * se le invitó. */
+function MemberMeta({
+  translate,
+  locale,
+  member,
+}: {
+  translate: Translator;
+  locale: Locale;
+  member: DirectoryMember;
+}): React.JSX.Element {
+  if (member.invitedOn === null) {
+    return <MemberFacts translate={translate} member={member} />;
+  }
+  return (
+    <span className="directory-meta">
+      {translate("directory.invited.line", {
+        date: formatCalendarDay(locale, member.invitedOn),
+      })}
+    </span>
+  );
+}
+
+function MemberCell({
   translate,
   locale,
   row,
-  roleDrafts,
 }: {
   translate: Translator;
   locale: Locale;
   row: DirectoryRow;
-  roleDrafts: RoleDraftsControl;
+}): React.JSX.Element {
+  const { member } = row;
+  return (
+    <th scope="row">
+      {/* La caja flexible va dentro y no en la celda: un `th` que deja de
+          ser `table-cell` no estira con su fila, y el contenido de la más
+          alta se sale por debajo del borde. */}
+      <span className="directory-member">
+        <MemberAvatar
+          className="directory-avatar"
+          fullName={member.fullName}
+          photoUrl={member.photoUrl}
+          size={DIRECTORY_AVATAR_SIZE}
+          viewer={{ userId: member.userId, translate }}
+        />
+        <span className="directory-identity">
+          <span className="directory-name-line">
+            <MemberName translate={translate} row={row} />
+            <StatusPills translate={translate} member={member} />
+            <StatusDots dots={row.admin === null ? NO_DOTS : row.admin.dots} />
+            {needsEvaluation(row) ? (
+              <NotEvaluatedMark translate={translate} member={member} />
+            ) : null}
+          </span>
+          <MemberMeta translate={translate} locale={locale} member={member} />
+        </span>
+      </span>
+    </th>
+  );
+}
+
+/** La píldora del rol que el socio pidió (#549). La flecha es para la vista:
+ * un lector de pantalla oye la frase entera. */
+function RequestedRolePill({
+  translate,
+  role,
+}: {
+  translate: Translator;
+  role: Role;
+}): React.JSX.Element {
+  const roleName = translate(`role.${role}`);
+  const label = translate("directory.request.label", { role: roleName });
+  return (
+    <span className="directory-request" title={label}>
+      <span aria-hidden="true">
+        {translate("directory.request.pill", { role: roleName })}
+      </span>
+      <span className="visually-hidden">{label}</span>
+    </span>
+  );
+}
+
+function RoleCell({
+  translate,
+  row,
+}: {
+  translate: Translator;
+  row: DirectoryRow;
+}): React.JSX.Element {
+  const requestedRole = row.admin === null ? null : row.admin.requestedRole;
+  return (
+    <td
+      className="directory-role-cell"
+      data-label={translate("directory.column.role")}
+    >
+      <span className="directory-role-name">
+        {translate(`role.${row.member.role}`)}
+      </span>
+      {requestedRole === null ? null : (
+        <>
+          {" "}
+          <RequestedRolePill translate={translate} role={requestedRole} />
+        </>
+      )}
+    </td>
+  );
+}
+
+function MemberRow({
+  translate,
+  locale,
+  row,
+}: {
+  translate: Translator;
+  locale: Locale;
+  row: DirectoryRow;
 }): React.JSX.Element {
   const { member } = row;
   return (
     // El nombre accesible de la fila se declara en vez de dejarlo calcular:
     // el nombre calculado saldría del contenido de las celdas, y ahí van el
-    // país, el nivel, las marcas y el rol. Quien recorre la tabla con un
+    // país, el nivel, los puntos y el rol. Quien recorre la tabla con un
     // lector de pantalla quiere saber de quién es la fila en la que entra.
     <tr aria-label={member.fullName}>
-      <th scope="row">
-        {/* La caja flexible va dentro y no en la celda: un `th` que deja de
-            ser `table-cell` no estira con su fila, y el contenido de la más
-            alta se sale por debajo del borde. */}
-        <span className="directory-member">
-          <MemberAvatar
-            className="directory-avatar"
-            fullName={member.fullName}
-            photoUrl={member.photoUrl}
-            size={DIRECTORY_AVATAR_SIZE}
-            viewer={{ userId: member.userId, translate }}
-          />
-          <span className="directory-identity">
-            <MemberName translate={translate} row={row} />
-            <MemberFacts translate={translate} member={member} />
-            {isAdminRow(row) ? (
-              <span className="directory-meta">
-                {describeAuf(translate, locale, row.admin)}
-              </span>
-            ) : null}
-            <RowMarks translate={translate} row={row} />
-          </span>
-        </span>
-      </th>
-      <td
-        className="directory-role-cell"
-        data-label={translate("directory.column.role")}
-      >
-        {isAdminRow(row) ? (
-          <MemberRoleControl
-            translate={translate}
-            member={member}
-            drafts={roleDrafts}
-          />
-        ) : (
-          translate(`role.${member.role}`)
-        )}
-      </td>
+      <MemberCell translate={translate} locale={locale} row={row} />
+      <RoleCell translate={translate} row={row} />
       <td data-label={translate("directory.column.position")}>
         <span className="directory-position">
           {describePosition(translate, member.position)}
@@ -425,14 +492,42 @@ function MemberRow({
   );
 }
 
+/** Qué quiere decir cada color de punto. Sólo la ve un Admin, que es quien
+ * tiene puntos. */
+function DotLegend({
+  translate,
+}: {
+  translate: Translator;
+}): React.JSX.Element {
+  return (
+    <ul
+      className="directory-legend"
+      aria-label={translate("directory.legend.label")}
+    >
+      <li>
+        <span
+          className="directory-dot directory-dot-danger"
+          aria-hidden="true"
+        />
+        {translate("directory.legend.danger")}
+      </li>
+      <li>
+        <span
+          className="directory-dot directory-dot-warning"
+          aria-hidden="true"
+        />
+        {translate("directory.legend.warning")}
+      </li>
+    </ul>
+  );
+}
+
 /** Las clases de la tabla según lo que trae la lista: la hoja de estilos
- * reparte el ancho distinto con el control del rol y con el contacto. */
+ * reparte el ancho distinto con el contacto. */
 function tableClassName(listing: DirectoryListing): string {
-  return [
-    "directory-table",
-    ...(listing.kind === "admin" ? ["directory-table-admin"] : []),
-    ...(listing.kind === "member" ? [] : ["directory-table-contact"]),
-  ].join(" ");
+  return listing.kind === "member"
+    ? "directory-table"
+    : "directory-table directory-table-contact";
 }
 
 export function DirectoryTable({
@@ -440,24 +535,22 @@ export function DirectoryTable({
   locale,
   listing,
   order,
+  requestedRoles,
   onSort,
   onOrderChange,
-  onSaveRole,
 }: {
   translate: Translator;
   locale: Locale;
   listing: DirectoryListing;
   order: DirectoryOrder;
+  /** Las solicitudes pendientes; sólo se pintan en una lista de Admin. */
+  requestedRoles: RequestedRoles;
   /** Lo que pide una cabecera de la tabla: sólo el campo. */
   onSort: (column: DirectorySort) => void;
   /** Lo que pide el selector de la lista de tarjetas: campo y sentido. */
   onOrderChange: (order: DirectoryOrder) => void;
-  /** Sólo se llama desde una lista de Admin, que es la única que dibuja el
-   * control del rol. */
-  onSaveRole: SaveMemberRole;
 }): React.JSX.Element {
-  const rows = rowsOf(listing);
-  const roleDrafts = useRoleDrafts(onSaveRole);
+  const rows = rowsOf(translate, listing, requestedRoles);
   return (
     <div
       className={
@@ -480,30 +573,15 @@ export function DirectoryTable({
           </caption>
           <thead>
             <tr>
-              <SortableHeader
-                translate={translate}
-                column="name"
-                order={order}
-                onSort={onSort}
-              />
-              <SortableHeader
-                translate={translate}
-                column="role"
-                order={order}
-                onSort={onSort}
-              />
-              <SortableHeader
-                translate={translate}
-                column="position"
-                order={order}
-                onSort={onSort}
-              />
-              <SortableHeader
-                translate={translate}
-                column="attendance"
-                order={order}
-                onSort={onSort}
-              />
+              {SORTABLE_COLUMNS.map((column) => (
+                <SortableHeader
+                  key={column}
+                  translate={translate}
+                  column={column}
+                  order={order}
+                  onSort={onSort}
+                />
+              ))}
               {listing.kind === "member" ? null : (
                 <th scope="col">
                   <span className="directory-column-title">
@@ -520,12 +598,12 @@ export function DirectoryTable({
                 translate={translate}
                 locale={locale}
                 row={row}
-                roleDrafts={roleDrafts}
               />
             ))}
           </tbody>
         </table>
       </div>
+      {listing.kind === "admin" ? <DotLegend translate={translate} /> : null}
     </div>
   );
 }

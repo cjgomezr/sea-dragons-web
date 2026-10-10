@@ -44,6 +44,8 @@ function memberRecord(
     role: "Player",
     positionId: null,
     status: "active",
+    registeredAt: "2024-03-06T01:00:00.000Z",
+    hasDateOfBirth: true,
     aufNumber: "AUF-1",
     aufExpiry: "2028-01-01",
     isAufVerified: true,

@@ -42,7 +42,7 @@ const MEMBERS_TABLE = "members";
 // basta el id: el filtro por grupo (#497) no pinta ningún nombre. El
 // correo y el contacto (#499) se leen siempre; el dominio decide a quién
 // le salen.
-export const DIRECTORY_COLUMNS = `user_id, full_name, country, experience_level, role, position_id, account_status, auf_number, auf_expiry, auf_verified_at, photo_path, email, ${CONTACT_COLUMNS}, member_evaluations(id), group_memberships(group_id), ${MEMBERSHIP_STANDING_EMBED}`;
+export const DIRECTORY_COLUMNS = `user_id, full_name, country, experience_level, role, position_id, account_status, created_at, date_of_birth, auf_number, auf_expiry, auf_verified_at, photo_path, email, ${CONTACT_COLUMNS}, member_evaluations(id), group_memberships(group_id), ${MEMBERSHIP_STANDING_EMBED}`;
 const EVALUATIONS_RELATION = "member_evaluations";
 const GROUP_MEMBERSHIPS_RELATION = "group_memberships";
 const MEMBERSHIPS_RELATION = "memberships";
@@ -122,6 +122,8 @@ export function toDirectoryMemberRecord(
     role: readCatalogValue(row, "role", parseRole),
     positionId: readText(row, "position_id", MEMBERS_TABLE),
     status: readCatalogValue(row, "account_status", parseAccountStatus),
+    registeredAt: readRequiredText(row, "created_at", MEMBERS_TABLE),
+    hasDateOfBirth: readText(row, "date_of_birth", MEMBERS_TABLE) !== null,
     aufNumber: readText(row, "auf_number", MEMBERS_TABLE),
     // Una columna `date` llega como YYYY-MM-DD, que es el formato con el que
     // el dominio compara el vencimiento contra el día del club.
