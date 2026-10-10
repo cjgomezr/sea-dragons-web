@@ -52,11 +52,13 @@ import {
   canExportListing,
   canWriteEmails,
 } from "./listing-permissions";
+import { MemberSheet } from "./MemberSheet";
 import { findSelectedMember } from "./selected-member";
 import { useBulkRoleChange } from "./use-bulk-role-change";
 import { type CheckedMembers, useCheckedMembers } from "./use-checked-members";
 import { useDebouncedValue } from "./use-debounced-value";
 import { useFilterChoices } from "./use-filter-choices";
+import { useIsPhone } from "./use-is-phone";
 import {
   type PendingRequestsState,
   usePendingRoleRequests,
@@ -302,6 +304,9 @@ export function DirectoryScreen({
   >(null);
 
   const panel = usePanelSelection();
+  // En el móvil no hay panel lateral: la fila elegida sube su ficha (#554).
+  const isPhone = useIsPhone();
+  const isPanelShown = panel.isOpen && !isPhone;
 
   const settledSearch = useDebouncedValue(filters.search, SEARCH_DEBOUNCE_MS);
   const query = useMemo<DirectoryQuery>(
@@ -462,7 +467,7 @@ export function DirectoryScreen({
 
   return (
     <div
-      className={panel.isOpen ? "directory directory-with-panel" : "directory"}
+      className={isPanelShown ? "directory directory-with-panel" : "directory"}
     >
       <DirectoryHeader
         translate={translate}
@@ -574,16 +579,28 @@ export function DirectoryScreen({
                     <AdministrationNotice notice={bulkRoles.notice} />
                   </>
                 }
+                isPhone={isPhone}
                 onSort={sortBy}
               />
             )}
-            {panel.isOpen ? (
+            {isPanelShown ? (
               <DirectoryPanel
                 translate={translate}
                 locale={locale}
                 selected={selected}
                 pendingRequests={isAdminListing ? pendingRequests : null}
                 onClose={panel.close}
+                onRoleChanged={applyRole}
+              />
+            ) : null}
+            {isPhone && selected !== null ? (
+              <MemberSheet
+                key={selected.member.userId}
+                translate={translate}
+                locale={locale}
+                selected={selected}
+                pendingRequests={isAdminListing ? pendingRequests : null}
+                onClosed={panel.close}
                 onRoleChanged={applyRole}
               />
             ) : null}

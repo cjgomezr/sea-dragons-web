@@ -711,6 +711,13 @@ export const spanishMessages: MessageCatalog = {
   "directory.card.request": "Solicitud de rol",
   "directory.card.requestAsked": "Pidió ser",
   "directory.card.justification": "«{text}»",
+  "directory.sheet.close": "Cerrar la ficha",
+  "directory.action.group": "Acciones de {name}",
+  "directory.action.email": "Escribir a {name}",
+  "directory.action.call": "Llamar a {name}",
+  "directory.action.emergency": "Llamar al contacto de emergencia de {name}",
+  "directory.action.noPhone": "{name} no tiene teléfono",
+  "directory.action.noEmergency": "{name} no tiene contacto de emergencia",
   "directory.mark.aufExpired": "AUF vencido",
   // #274: el AUF que escribió el miembro, hasta que un Admin lo verifica.
   "directory.mark.aufNotVerified": "AUF sin verificar",
