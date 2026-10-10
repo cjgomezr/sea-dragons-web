@@ -477,7 +477,10 @@ function MemberRow({
     <tr aria-label={member.fullName}>
       <MemberCell translate={translate} locale={locale} row={row} />
       <RoleCell translate={translate} row={row} />
-      <td data-label={translate("directory.column.position")}>
+      <td
+        className="directory-position-cell"
+        data-label={translate("directory.column.position")}
+      >
         <span className="directory-position">
           {describePosition(translate, member.position)}
         </span>
@@ -533,6 +536,21 @@ function tableClassName(listing: DirectoryListing): string {
     : "directory-table directory-table-contact";
 }
 
+/** Las de la lista: con el contacto, el reparto de la tabla cambia; y en la
+ * de un Admin, el móvil deja el contacto para la ficha, a la que lleva cada
+ * fila (#553). */
+function listClassName(listing: DirectoryListing): string {
+  switch (listing.kind) {
+    case "member":
+      return "directory-list";
+    case "admin":
+      return "directory-list directory-list-contact directory-list-admin";
+    case "committee":
+    case "coach":
+      return "directory-list directory-list-contact";
+  }
+}
+
 export function DirectoryTable({
   translate,
   locale,
@@ -553,13 +571,7 @@ export function DirectoryTable({
 }): React.JSX.Element {
   const rows = rowsOf(translate, listing, requestedRoles);
   return (
-    <div
-      className={
-        listing.kind === "member"
-          ? "directory-list"
-          : "directory-list directory-list-contact"
-      }
-    >
+    <div className={listClassName(listing)}>
       <DirectorySortControl
         translate={translate}
         order={order}

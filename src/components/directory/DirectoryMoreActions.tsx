@@ -113,7 +113,7 @@ export function DirectoryMoreActions({
         aria-expanded={isOpen}
         onClick={() => setIsOpen(true)}
       >
-        <Icon glyph={DotsThreeVertical} weight="fill" />
+        <Icon glyph={DotsThreeVertical} />
       </button>
       {exportState.kind === "failed" ? (
         <p className="auth-error" role="alert">

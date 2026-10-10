@@ -158,7 +158,11 @@ function FiltersToggle({
       onClick={onToggle}
     >
       <Icon glyph={FunnelSimple} />
-      {translate("directory.filter.toggle")}
+      {/* En el móvil sólo se ve el embudo, como en el diseño; la palabra
+          sigue siendo el nombre del botón. */}
+      <span className="directory-filter-label">
+        {translate("directory.filter.toggle")}
+      </span>
       {activeCount === 0 ? null : (
         <span className="directory-filter-count" aria-hidden="true">
           {activeCount}
