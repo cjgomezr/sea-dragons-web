@@ -95,10 +95,20 @@ export function DirectoryMoreActions({
   const openerRef = useRef<HTMLButtonElement>(null);
   const { state: exportState, exportList } = useDirectoryExport();
   const label = translate("directory.more.open");
+  // Lo que se eligió en la hoja corre cuando ya se cerró: el navegador
+  // avisa del cierre más tarde, y devolver entonces el foco al "⋯" se lo
+  // quitaría al formulario del correo que acaba de abrirse.
+  const afterCloseRef = useRef<(() => void) | null>(null);
 
   function closeSheet(): void {
     setIsOpen(false);
-    openerRef.current?.focus();
+    const chosen = afterCloseRef.current;
+    afterCloseRef.current = null;
+    if (chosen === null) {
+      openerRef.current?.focus();
+      return;
+    }
+    chosen();
   }
 
   return (
@@ -141,7 +151,7 @@ export function DirectoryMoreActions({
                       : null
                   }
                   onChoose={() => {
-                    onOpenEmail(emailRecipients);
+                    afterCloseRef.current = () => onOpenEmail(emailRecipients);
                     close();
                   }}
                 />

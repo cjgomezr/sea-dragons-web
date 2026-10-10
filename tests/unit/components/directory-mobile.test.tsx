@@ -369,7 +369,7 @@ describe("la hoja del ⋯", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(
       screen.getByRole("heading", { name: "Email members" }),
-    ).toBeVisible();
+    ).toHaveFocus();
   });
 
   it("descarga la lista que se ve y cierra la hoja", async () => {

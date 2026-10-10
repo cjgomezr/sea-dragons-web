@@ -634,7 +634,6 @@ export const spanishMessages: MessageCatalog = {
   "directory.field.country": "País",
   "directory.field.level": "Nivel",
   "directory.sort.label": "Ordenar por",
-  "directory.sort.directionLabel": "Sentido",
   "directory.sort.direction.asc": "Ascendente",
   "directory.sort.direction.desc": "Descendente",
   // El directorio en el móvil (#553): el botón del orden, su hoja, el menú

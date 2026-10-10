@@ -3927,8 +3927,10 @@ a.auth-brand-header:focus-visible {
   flex: 1;
 }
 
+/* Sobre el tinte del acento, el texto de acento suave: el acento a secas
+   no llega a 4,5:1 en el tema claro. */
 .directory-requests-banner-review {
-  color: var(--color-accent-text);
+  color: var(--color-accent-soft-text);
 }
 
 /* Las hojas del orden y del "⋯": la etiqueta pequeña en mayúsculas del

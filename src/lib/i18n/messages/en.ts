@@ -640,7 +640,6 @@ export const englishMessages = {
   "directory.field.country": "Country",
   "directory.field.level": "Level",
   "directory.sort.label": "Sort by",
-  "directory.sort.directionLabel": "Order",
   "directory.sort.direction.asc": "Ascending",
   "directory.sort.direction.desc": "Descending",
   // El directorio en el móvil (#553): el botón del orden, su hoja, el menú

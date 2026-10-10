@@ -5625,6 +5625,26 @@ test.describe("el directorio en el móvil (#553)", () => {
     await expect(more).toBeFocused();
   });
 
+  // El navegador avisa del cierre de la hoja más tarde que jsdom: el foco
+  // tiene que acabar en el formulario, no en el "⋯".
+  test("escribir desde el ⋯ deja el foco en el formulario del correo", async ({
+    page,
+  }) => {
+    await goToDirectory(page, {
+      ...MOBILE_DIRECTORY_STATES[0]!,
+      prepare: openMoreSheet,
+    });
+
+    await page
+      .getByRole("dialog", { name: /in this view$/ })
+      .getByRole("button", { name: /^Email these members/ })
+      .click();
+
+    await expect(
+      page.getByRole("heading", { name: "Email members" }),
+    ).toBeFocused();
+  });
+
   test("la pantalla de solicitudes vuelve a la lista con la flecha", async ({
     page,
   }) => {
