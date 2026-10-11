@@ -2794,6 +2794,14 @@ a.auth-brand-header:focus-visible {
   background: var(--color-accent);
 }
 
+/* Filtros y el botón del panel, que bajan juntos de línea (#575). */
+.directory-toolbar-end {
+  display: flex;
+  flex: none;
+  gap: var(--space-2);
+  align-items: center;
+}
+
 /* Filtros: el ancla del popover, que se abre pegado a su borde derecho. */
 .directory-filters-anchor {
   position: relative;
@@ -3598,13 +3606,11 @@ a.auth-brand-header:focus-visible {
 }
 
 /* La marca de sin evaluar (#324) es la única que se pulsa: lleva a la
-   evaluación. El subrayado dice que es un enlace sin depender del color. Aquí
-   no se parte ninguna palabra, ni por sílabas: "Not evaluated" y "Sin
-   evaluar" caben en dos líneas a 375px, y una marca que se pulsa se tiene que
-   leer entera. */
+   evaluación. El subrayado dice que es un enlace sin depender del color. Una
+   marca que se pulsa se lee entera y en una línea (#575): si no cabe junto
+   al nombre, baja entera debajo. */
 .directory-mark-link {
-  -webkit-hyphens: manual;
-  hyphens: manual;
+  white-space: nowrap;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -4317,17 +4323,25 @@ a.auth-brand-header:focus-visible {
     background: var(--color-background);
   }
 
-  /* Por su clase y no por su posición: la casilla de #552 va delante. */
-  .directory-table .directory-column-role {
-    width: 104px;
+  /* El rol, la posición y la asistencia miden lo que su contenido, sin
+     partirse; el nombre se lleva el resto (#575). Con anchos fijos, a 768px
+     al nombre le quedaban 100px y bajaba a cuatro líneas. El 1% es el ancho
+     más pequeño que la tabla puede darles: crecen hasta lo que pide su
+     contenido y nada más. */
+  .directory-table {
+    table-layout: auto;
   }
 
-  .directory-table .directory-column-position {
-    width: 96px;
-  }
-
+  .directory-table .directory-column-role,
+  .directory-table .directory-column-position,
   .directory-table .directory-column-attendance {
-    width: 96px;
+    width: 1%;
+  }
+
+  .directory-table .directory-role-cell,
+  .directory-table .directory-position-cell,
+  .directory-table .directory-attendance-cell {
+    white-space: nowrap;
   }
 
   /* La casilla (#552): los 20px de aire de la fila y la caja de 16px. */
@@ -4359,6 +4373,28 @@ a.auth-brand-header:focus-visible {
   .directory-sort-open,
   .directory-row-caret {
     display: none;
+  }
+}
+
+/* Entre 768 y 1023px la tabla tiene unos 500px, y con la letra de Linux
+   "Aranburu de la Hoz" pide 151px de línea (#575). El aire de la fila y de
+   las celdas se estrecha para que un nombre largo quepa en dos líneas. */
+@media (768px <= width < 1024px) {
+  .directory-table th,
+  .directory-table td {
+    padding-inline: var(--space-1);
+  }
+
+  .directory-table tr > :first-child {
+    padding-left: var(--space-3);
+  }
+
+  .directory-table tr > :last-child {
+    padding-right: var(--space-3);
+  }
+
+  .directory-table .directory-check-cell {
+    width: 32px;
   }
 }
 

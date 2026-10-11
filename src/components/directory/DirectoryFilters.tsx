@@ -151,19 +151,23 @@ export function DirectoryFilters({
             ))}
           </div>
         </fieldset>
-        <DirectoryMoreFilters
-          translate={translate}
-          locale={locale}
-          filters={filters}
-          availableFilters={availableFilters}
-          canIncludeInactive={canIncludeInactive}
-          choices={choices}
-          shownCount={shownCount}
-          onChange={changeMore}
-        />
-        {panelToggle === null ? null : (
-          <PanelToggle translate={translate} toggle={panelToggle} />
-        )}
+        {/* Filtros y el botón del panel bajan juntos cuando no caben (#575):
+            el botón nunca se queda solo en una línea. */}
+        <div className="directory-toolbar-end">
+          <DirectoryMoreFilters
+            translate={translate}
+            locale={locale}
+            filters={filters}
+            availableFilters={availableFilters}
+            canIncludeInactive={canIncludeInactive}
+            choices={choices}
+            shownCount={shownCount}
+            onChange={changeMore}
+          />
+          {panelToggle === null ? null : (
+            <PanelToggle translate={translate} toggle={panelToggle} />
+          )}
+        </div>
       </div>
       <DirectoryFilterChips
         translate={translate}
