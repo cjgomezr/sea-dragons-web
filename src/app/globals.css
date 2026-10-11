@@ -4531,6 +4531,37 @@ a.auth-brand-header:focus-visible {
     font-size: 12px;
   }
 
+  /* Con foto, lo que sale del flujo es el botón que la abre (#578), no la
+     foto de dentro: si no, el botón se queda en la fila flexible y empuja
+     el nombre. Su margen de -2px deja la foto en la caja de las
+     iniciales. */
+  .directory-member > .member-photo-button {
+    position: absolute;
+    top: var(--space-3);
+    left: 0;
+    z-index: 1;
+  }
+
+  .member-photo-button > .directory-avatar {
+    position: static;
+  }
+
+  /* El foco de la fila (#578) enmarca lo que hay a la derecha del avatar,
+     a medio camino del nombre: el contorno de la fila entera pasaba por
+     encima de él, y por fuera lo recortaría el `overflow-x: clip` de la
+     lista. */
+  .directory-row:focus-visible {
+    outline: none;
+  }
+
+  .directory-row:focus-visible::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 0 46px;
+    pointer-events: none;
+    border: 2px solid var(--color-accent-text);
+  }
+
   .directory-name {
     font-size: 15px;
   }
