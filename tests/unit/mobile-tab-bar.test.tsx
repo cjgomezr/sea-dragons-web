@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileTabBar } from "@/components/MobileTabBar";
 
 const { usePathname } = vi.hoisted(() => ({ usePathname: vi.fn() }));
@@ -420,5 +420,123 @@ describe("barra móvil de quien no tiene la membresía al día (#453)", () => {
     expect(
       screen.queryByRole("button", { name: "Más" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+// #577: la barra vive en el layout y no se desmonta al navegar; si nada cierra
+// Más, el menú se queda abierto encima de la página nueva.
+describe("cierre del menú Más (#577)", () => {
+  function coachBar(): React.JSX.Element {
+    return (
+      <MobileTabBar
+        locale="es"
+        access={{ role: "Coach", membershipCurrent: true }}
+      />
+    );
+  }
+
+  function renderCoachBarAt(pathname: string): {
+    rerenderAt: (nextPathname: string) => void;
+  } {
+    usePathname.mockReturnValue(pathname);
+    const { rerender } = render(coachBar());
+    return {
+      rerenderAt: (nextPathname) => {
+        usePathname.mockReturnValue(nextPathname);
+        rerender(coachBar());
+      },
+    };
+  }
+
+  function moreButton(): HTMLElement {
+    return screen.getByRole("button", { name: "Más" });
+  }
+
+  function expectMenuClosed(): void {
+    expect(moreButton()).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("link", { name: "Pagos" }),
+    ).not.toBeInTheDocument();
+  }
+
+  // Los enlaces de la barra no navegan en jsdom: el clic basta para probar
+  // que el menú se cierra sin esperar a que cambie la ruta.
+  function preventNavigation(event: MouseEvent): void {
+    event.preventDefault();
+  }
+  beforeEach(() => document.addEventListener("click", preventNavigation));
+  afterEach(() => document.removeEventListener("click", preventNavigation));
+
+  it("cierra el menú al elegir una de sus secciones", async () => {
+    const user = userEvent.setup();
+    renderCoachBarAt("/dashboard");
+    await user.click(moreButton());
+
+    await user.click(screen.getByRole("link", { name: "Pagos" }));
+
+    expectMenuClosed();
+  });
+
+  it("cierra el menú al pulsar otra pestaña", async () => {
+    const user = userEvent.setup();
+    renderCoachBarAt("/dashboard");
+    await user.click(moreButton());
+
+    await user.click(screen.getByRole("link", { name: "Agenda" }));
+
+    expectMenuClosed();
+  });
+
+  it("cierra el menú con un toque fuera de la barra", async () => {
+    const user = userEvent.setup();
+    renderCoachBarAt("/dashboard");
+    await user.click(moreButton());
+
+    await user.click(document.body);
+
+    expectMenuClosed();
+  });
+
+  it("Escape cierra el menú y devuelve el foco a Más", async () => {
+    const user = userEvent.setup();
+    renderCoachBarAt("/dashboard");
+    await user.click(moreButton());
+    screen.getByRole("link", { name: "Pagos" }).focus();
+
+    await user.keyboard("{Escape}");
+
+    expectMenuClosed();
+    expect(moreButton()).toHaveFocus();
+  });
+
+  it("cierra el menú cuando cambia la ruta", async () => {
+    const user = userEvent.setup();
+    const { rerenderAt } = renderCoachBarAt("/dashboard");
+    await user.click(moreButton());
+
+    rerenderAt("/noticias");
+
+    expectMenuClosed();
+  });
+
+  it("sigue cerrado al volver atrás a la ruta donde se abrió", async () => {
+    const user = userEvent.setup();
+    const { rerenderAt } = renderCoachBarAt("/dashboard");
+    await user.click(moreButton());
+    rerenderAt("/noticias");
+
+    rerenderAt("/dashboard");
+
+    expectMenuClosed();
+  });
+
+  it("pulsar Más con el menú abierto lo cierra una sola vez", async () => {
+    const user = userEvent.setup();
+    renderCoachBarAt("/dashboard");
+    await user.click(moreButton());
+
+    await user.click(moreButton());
+
+    expectMenuClosed();
   });
 });
