@@ -6,6 +6,7 @@ import type {
   DirectoryListing,
 } from "@/lib/directory/directory";
 import { createTranslator } from "@/lib/i18n/translator";
+import { QUIET_CLUB_SUMMARY } from "../helpers/club-summary";
 
 /**
  * La lista con los 500 socios de NFR-008 (#549, RF-3). El club no pagina el
@@ -65,6 +66,7 @@ function adminListing(size: number): DirectoryListing {
     ),
     availableFilters: [],
     total: size,
+    summary: QUIET_CLUB_SUMMARY,
   };
 }
 

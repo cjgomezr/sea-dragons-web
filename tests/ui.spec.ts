@@ -4247,6 +4247,43 @@ function stubbedListing(
     total: options.members.filter(
       (member) => includeInactive || member.status !== "inactive",
     ).length,
+    ...(kind === "admin"
+      ? { summary: stubbedClubSummary(options.members) }
+      : {}),
+  };
+}
+
+/** El resumen del club (#551) como lo cuenta el servidor: de todo el club
+ * activo, sin la búsqueda ni los filtros, con las mismas marcas que
+ * `asAdminMember`. */
+function stubbedClubSummary(
+  members: readonly StubbedMember[],
+): Record<string, unknown> {
+  const active = members.filter((member) => member.status !== "inactive");
+  const renewals = [EXPIRED_AUF_MEMBER_ID, EXPIRING_AUF_MEMBER_ID].flatMap(
+    (userId) =>
+      active
+        .filter((member) => member.userId === userId)
+        .map((member) => ({
+          userId,
+          fullName: member.fullName,
+          aufStatus: userId === EXPIRED_AUF_MEMBER_ID ? "expired" : "expiring",
+        })),
+  );
+  const countOf = (isCounted: (member: StubbedMember) => boolean): number =>
+    active.filter(isCounted).length;
+  return {
+    aufRenewals: renewals,
+    attention: {
+      aufMissing: countOf((member) => MEMBERS_WITHOUT_AUF.has(member.userId)),
+      aufRenewal: renewals.length,
+      withoutEmergencyContact: countOf(
+        (member) => stubbedContactOf(member).emergencyContact === null,
+      ),
+      membershipPastDue: countOf(
+        (member) => member.userId === EXPIRED_AUF_MEMBER_ID,
+      ),
+    },
   };
 }
 
@@ -5459,7 +5496,9 @@ test.describe("el popover de filtros del directorio en escritorio", () => {
   }
 });
 
-/* El panel lateral con la ficha rápida del socio (#550). Mockups:
+/* El panel lateral con la ficha rápida del socio (#550) y, sin nadie
+   elegido, el resumen del club (#551, mockup
+   docs/mockups/directory-admin-overview-with-requests-dark.png). Mockups:
    docs/mockups/directory-admin-member-selected-role-confirm-dark.png y
    directory-admin-invited-member-dark.png; el tema claro y el Coach se
    revisan contra design-system.md. Sólo existe desde 768px: por debajo, la
@@ -5491,7 +5530,31 @@ function pickRoleInPanel(name: string, role: string, strip: string) {
   };
 }
 
+/** Abre el panel sin nadie elegido y espera al resumen del club (#551). El
+ * botón cuenta las solicitudes en su nombre cuando las hay. */
+async function openClubOverview(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /^Side panel/ }).click();
+  await expect(
+    page
+      .getByRole("region", { name: "Side panel" })
+      .getByRole("heading", { name: "Club overview" }),
+  ).toBeVisible();
+}
+
 const PANEL_STATES: readonly DirectoryState[] = [
+  {
+    name: "directorio-resumen",
+    asAdmin: true,
+    withRequests: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: openClubOverview,
+  },
+  {
+    name: "directorio-resumen-sin-solicitudes",
+    asAdmin: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: openClubOverview,
+  },
   {
     name: "directorio-ficha-rapida",
     asAdmin: true,

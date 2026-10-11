@@ -5,9 +5,11 @@ import { DirectoryScreen } from "@/components/directory/DirectoryScreen";
 import type { PendingRoleRequest } from "@/lib/auth/club-administration";
 import type {
   AdminDirectoryMember,
+  ClubSummary,
   DirectoryListing,
 } from "@/lib/directory/directory";
 import { formatCalendarDay } from "@/lib/i18n/format";
+import { QUIET_CLUB_SUMMARY } from "../helpers/club-summary";
 import { GOALKEEPER, asDirectoryPosition } from "../helpers/seeded-positions";
 
 /**
@@ -99,6 +101,8 @@ type Respond = () => Promise<Response>;
 
 type ApiStub = {
   readonly kind?: DirectoryListing["kind"];
+  /** El resumen del club que sólo recibe el Admin (#551). */
+  readonly summary?: ClubSummary;
   readonly members?: readonly AdminDirectoryMember[];
   readonly requests?: readonly PendingRoleRequest[];
   readonly roleChange?: Respond;
@@ -154,13 +158,20 @@ function memberView(
 function readResponse(stub: ApiStub, url: string): Response {
   const kind = stub.kind ?? "admin";
   if (url.startsWith(DIRECTORY_PATH)) {
-    const members = stub.members ?? [NEREA, ANA];
+    const search = new URL(url, "http://localhost").searchParams.get("q");
+    const members = (stub.members ?? [NEREA, ANA]).filter(
+      (member) => search === null || member.fullName.includes(search),
+    );
     return jsonResponse(200, {
       data: {
         kind,
         members: members.map((member) => memberView(kind, member)),
         total: members.length,
-        availableFilters: kind === "admin" ? ["position"] : [],
+        availableFilters:
+          kind === "admin" ? ["position", "auf", "membership"] : [],
+        ...(kind === "admin"
+          ? { summary: stub.summary ?? QUIET_CLUB_SUMMARY }
+          : {}),
       },
     });
   }
@@ -885,6 +896,332 @@ describe("la ficha rápida en español", () => {
     ).toBeVisible();
     expect(
       within(card).getByRole("link", { name: "Abrir ficha completa" }),
+    ).toBeVisible();
+  });
+});
+
+describe("el resumen del club (#551)", () => {
+  const NEEDS_ATTENTION: ClubSummary = {
+    aufRenewals: [
+      { userId: NEREA_ID, fullName: "Nerea Ruiz", aufStatus: "expired" },
+      { userId: ANA_ID, fullName: "Ana Admin", aufStatus: "expiring" },
+    ],
+    attention: {
+      aufMissing: 3,
+      aufRenewal: 2,
+      withoutEmergencyContact: 4,
+      membershipPastDue: 1,
+    },
+  };
+
+  function overview(): HTMLElement {
+    return screen.getByRole("region", { name: "Side panel" });
+  }
+
+  async function openOverview(stub: ApiStub = {}): Promise<HTMLElement> {
+    const user = userEvent.setup();
+    stubApi(stub);
+    await renderDirectory();
+    // Con solicitudes, el botón también las cuenta en su nombre.
+    await user.click(screen.getByRole("button", { name: /^Side panel/ }));
+    return overview();
+  }
+
+  function lastDirectoryRead(): URLSearchParams {
+    const reads = calls.filter((call) => call.url.startsWith(DIRECTORY_PATH));
+    const last = reads.at(-1);
+    if (last === undefined) {
+      throw new Error("No se leyó el directorio");
+    }
+    return new URL(last.url, "http://localhost").searchParams;
+  }
+
+  it("abierto sin nadie, enseña el título, el subtítulo y el » que lo cierra", async () => {
+    const user = userEvent.setup();
+    const summary = await openOverview();
+
+    expect(
+      within(summary).getByRole("heading", { name: "Club overview" }),
+    ).toBeVisible();
+    expect(
+      within(summary).getByText(
+        "Select a member to see their details or change their role.",
+      ),
+    ).toBeVisible();
+
+    await user.click(
+      within(summary).getByRole("button", { name: "Close the panel" }),
+    );
+    expect(screen.queryByRole("region", { name: "Side panel" })).toBeNull();
+  });
+
+  it("con solicitudes, enseña una tarjeta por solicitud con el cambio, la fecha, la justificación y las dos decisiones", async () => {
+    const summary = await openOverview({ requests: [COACH_REQUEST] });
+    const card = within(summary).getByRole("group", {
+      name: "Role request from Nerea Ruiz",
+    });
+
+    expect(
+      within(summary).getByRole("heading", { name: "Role requests · 1" }),
+    ).toBeVisible();
+    expect(card).toHaveTextContent(
+      `Player → Coach · ${formatCalendarDay("en", "2026-09-17")}`,
+    );
+    expect(
+      within(card).getByText("“Entreno a los juveniles los jueves.”"),
+    ).toBeVisible();
+    expect(
+      within(card).getByRole("button", {
+        name: "Approve the request from Nerea Ruiz",
+      }),
+    ).toBeEnabled();
+    expect(
+      within(card).getByRole("button", {
+        name: "Reject the request from Nerea Ruiz",
+      }),
+    ).toBeEnabled();
+  });
+
+  it("el nombre de la tarjeta selecciona a ese socio", async () => {
+    const user = userEvent.setup();
+    const summary = await openOverview({ requests: [COACH_REQUEST] });
+
+    await user.click(
+      within(summary).getByRole("button", {
+        name: "Open the details of Nerea Ruiz",
+      }),
+    );
+
+    expect(panel("Nerea Ruiz")).toBeVisible();
+    expect(row("Nerea Ruiz")).toHaveAttribute("aria-current", "true");
+  });
+
+  it("sin solicitudes no enseña la sección", async () => {
+    const summary = await openOverview();
+
+    expect(
+      within(summary).queryByRole("heading", { name: /Role requests/ }),
+    ).toBeNull();
+  });
+
+  it("al aprobar con doble clic sale una sola decisión, el aviso, la tarjeta se va y la fila cambia", async () => {
+    const user = userEvent.setup();
+    const summary = await openOverview({ requests: [COACH_REQUEST] });
+
+    await user.dblClick(
+      within(summary).getByRole("button", {
+        name: "Approve the request from Nerea Ruiz",
+      }),
+    );
+
+    expect(
+      await within(summary).findByText("Nerea Ruiz is now Coach."),
+    ).toBeVisible();
+    expect(writesTo(DECISION_PATH)).toHaveLength(1);
+    expect(
+      within(summary).queryByRole("group", {
+        name: "Role request from Nerea Ruiz",
+      }),
+    ).toBeNull();
+    expect(roleCellOf("Nerea Ruiz")).toHaveTextContent("Coach");
+  });
+
+  it("al rechazar sale el aviso, la tarjeta se va y el rol no cambia", async () => {
+    const user = userEvent.setup();
+    const summary = await openOverview({ requests: [COACH_REQUEST] });
+
+    await user.click(
+      within(summary).getByRole("button", {
+        name: "Reject the request from Nerea Ruiz",
+      }),
+    );
+
+    expect(
+      await within(summary).findByText("Nerea Ruiz's request was rejected."),
+    ).toBeVisible();
+    expect(
+      within(summary).queryByRole("group", {
+        name: "Role request from Nerea Ruiz",
+      }),
+    ).toBeNull();
+    expect(roleCellOf("Nerea Ruiz")).toHaveTextContent("Player");
+  });
+
+  it("con AUF por renovar, nombra a cada socio con su estado y Ver filtra la lista por vencido o por vencer", async () => {
+    const user = userEvent.setup();
+    const summary = await openOverview({ summary: NEEDS_ATTENTION });
+    const card = within(summary).getByRole("group", {
+      name: "2 AUF registrations need renewal",
+    });
+
+    expect(card).toHaveTextContent(
+      "Nerea Ruiz (expired), Ana Admin (expiring)",
+    );
+    expect(
+      within(summary).queryByRole("button", { name: /reminder/i }),
+    ).toBeNull();
+
+    await user.click(
+      within(card).getByRole("button", {
+        name: "View the AUF registrations to renew",
+      }),
+    );
+
+    await waitFor(() => expect(lastDirectoryRead().get("auf")).toBe("renewal"));
+  });
+
+  it("sin AUF por renovar no enseña la tarjeta", async () => {
+    const summary = await openOverview();
+
+    expect(
+      within(summary).queryByRole("group", { name: /AUF registration/ }),
+    ).toBeNull();
+  });
+
+  it("enseña las cuatro filas de Necesita atención con su contador", async () => {
+    const summary = await openOverview({ summary: NEEDS_ATTENTION });
+    const attention = within(summary).getByRole("group", {
+      name: "Needs attention",
+    });
+
+    expect(
+      within(attention)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual([
+      "Without AUF 3",
+      "AUF expired or expiring 2",
+      "No emergency contact 4",
+      "Membership past due 1",
+    ]);
+  });
+
+  it.each([
+    ["Without AUF 3", "auf", "missing"],
+    ["AUF expired or expiring 2", "auf", "renewal"],
+    ["No emergency contact 4", "withoutEmergencyContact", "true"],
+    ["Membership past due 1", "membership", "past_due"],
+  ] as const)(
+    "la fila %s activa su filtro, se marca, y otra pulsación lo quita",
+    async (name, param, value) => {
+      const user = userEvent.setup();
+      const summary = await openOverview({ summary: NEEDS_ATTENTION });
+      const button = (): HTMLElement =>
+        within(summary).getByRole("button", { name });
+
+      await user.click(button());
+      await waitFor(() => expect(lastDirectoryRead().get(param)).toBe(value));
+      expect(button()).toHaveAttribute("aria-pressed", "true");
+
+      await user.click(button());
+      await waitFor(() => expect(lastDirectoryRead().get(param)).toBeNull());
+      expect(button()).toHaveAttribute("aria-pressed", "false");
+    },
+  );
+
+  it("si un filtro deja fuera al socio elegido, el » cierra el panel a la primera y deja el foco en el botón", async () => {
+    const user = userEvent.setup();
+    stubApi();
+    await renderDirectory();
+    await user.click(row("Nerea Ruiz"));
+
+    await user.type(
+      screen.getByRole("searchbox", { name: "Search by name" }),
+      "Ana",
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("row", { name: "Nerea Ruiz" })).toBeNull(),
+    );
+    await user.click(
+      within(overview()).getByRole("button", { name: "Close the panel" }),
+    );
+
+    expect(screen.queryByRole("region", { name: "Side panel" })).toBeNull();
+    expect(panelToggle()).toHaveFocus();
+  });
+
+  it("cerrado, el botón del panel enseña cuántas solicitudes esperan", async () => {
+    const user = userEvent.setup();
+    stubApi({ requests: [COACH_REQUEST] });
+    await renderDirectory();
+
+    const toggle = screen.getByRole("button", {
+      name: "Side panel, 1 pending request",
+    });
+    expect(toggle).toHaveTextContent("1");
+
+    await user.click(toggle);
+    expect(panelToggle()).not.toHaveTextContent("1");
+  });
+
+  it("sin solicitudes, el botón del panel no lleva número", async () => {
+    stubApi();
+    await renderDirectory();
+
+    expect(panelToggle()).toHaveTextContent("");
+  });
+
+  it.each(["committee", "coach", "member"] as const)(
+    "a la vista %s no le da el botón del panel: sólo se abre al seleccionar (D4)",
+    async (kind) => {
+      const user = userEvent.setup();
+      stubApi({ kind, requests: [COACH_REQUEST] });
+      await renderDirectory({ isAdmin: false });
+
+      expect(screen.queryByRole("button", { name: /Side panel/ })).toBeNull();
+
+      await user.click(row("Nerea Ruiz"));
+      await user.click(
+        within(panel("Nerea Ruiz")).getByRole("button", {
+          name: "Close the panel",
+        }),
+      );
+      expect(
+        screen.queryByRole("heading", { name: "Club overview" }),
+      ).toBeNull();
+    },
+  );
+
+  it("se escribe en español", async () => {
+    const user = userEvent.setup();
+    stubApi({ requests: [COACH_REQUEST], summary: NEEDS_ATTENTION });
+    await renderDirectory({ locale: "es" });
+    await user.click(
+      screen.getByRole("button", {
+        name: "Panel lateral, 1 solicitud pendiente",
+      }),
+    );
+    const summary = screen.getByRole("region", { name: "Panel lateral" });
+
+    expect(
+      within(summary).getByRole("heading", { name: "Resumen del club" }),
+    ).toBeVisible();
+    expect(
+      within(summary).getByText(
+        "Selecciona a un miembro para ver sus datos o cambiarle el rol.",
+      ),
+    ).toBeVisible();
+    expect(
+      within(summary).getByRole("heading", { name: "Solicitudes de rol · 1" }),
+    ).toBeVisible();
+    expect(
+      within(summary).getByRole("group", {
+        name: "2 registros AUF por renovar",
+      }),
+    ).toHaveTextContent("Nerea Ruiz (vencido), Ana Admin (por vencer)");
+    expect(
+      within(summary).getByRole("group", { name: "Necesita atención" }),
+    ).toHaveTextContent("Sin AUF 3");
+
+    await user.click(
+      within(summary).getByRole("button", {
+        name: "Rechazar la solicitud de Nerea Ruiz",
+      }),
+    );
+    expect(
+      await within(summary).findByText(
+        "Se rechazó la solicitud de Nerea Ruiz.",
+      ),
     ).toBeVisible();
   });
 });

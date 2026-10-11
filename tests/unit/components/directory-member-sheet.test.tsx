@@ -15,6 +15,7 @@ import type {
   DirectoryListing,
 } from "@/lib/directory/directory";
 import { formatCalendarDay } from "@/lib/i18n/format";
+import { QUIET_CLUB_SUMMARY } from "../helpers/club-summary";
 import { GOALKEEPER, asDirectoryPosition } from "../helpers/seeded-positions";
 
 /**
@@ -166,6 +167,7 @@ function readResponse(stub: ApiStub, url: string): Response {
         members: members.map((member) => memberView(kind, member)),
         total: members.length,
         availableFilters: kind === "admin" ? ["position"] : [],
+        ...(kind === "admin" ? { summary: QUIET_CLUB_SUMMARY } : {}),
       },
     });
   }

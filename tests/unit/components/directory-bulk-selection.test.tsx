@@ -6,6 +6,7 @@ import type {
   AdminDirectoryMember,
   DirectoryListing,
 } from "@/lib/directory/directory";
+import { QUIET_CLUB_SUMMARY } from "../helpers/club-summary";
 
 /**
  * La selección múltiple del directorio (#552, RF-6 del PRD de E21): casillas
@@ -186,6 +187,7 @@ function respond(stub: ApiStub, call: ApiCall): Response {
         members: viewOf(kind),
         total: MEMBERS.length,
         availableFilters: [],
+        summary: QUIET_CLUB_SUMMARY,
       },
     });
   }
