@@ -6773,11 +6773,22 @@ test.describe("los enlaces del contacto en el móvil", () => {
   }) => {
     await goToDirectory(page, coachState);
 
-    const links = page
-      .getByRole("row", { name: "Nerea Ruiz" })
-      .locator('a[href^="tel:"], a[href^="mailto:"]')
-      .filter({ visible: true });
-    await expect(links).toHaveCount(0);
+    // Las acciones al deslizar ya están en la fila, cerradas y fuera de la
+    // vista: el árbol de accesibilidad no las cuenta hasta que se abren.
+    const hrefs = await Promise.all(
+      (
+        await page
+          .getByRole("row", { name: "Nerea Ruiz" })
+          .getByRole("link")
+          .all()
+      ).map((link) => link.getAttribute("href")),
+    );
+    expect(hrefs.filter((href) => /^(tel|mailto):/.test(href ?? ""))).toEqual(
+      [],
+    );
+    await expect(
+      page.getByRole("row", { name: "Nerea Ruiz" }).getByText(/Emergency/),
+    ).toHaveCount(0);
   });
 
   test("cada enlace tel: y mailto: mide al menos 44 px", async ({ page }) => {
@@ -6882,11 +6893,12 @@ test.describe("la lista compacta desde 768 px (#571)", () => {
 
     await selectAll.check();
 
+    const rowChecks = page.getByRole("checkbox", { name: /^Select (?!all)/ });
+    for (const check of await rowChecks.all()) {
+      await expect(check).toBeChecked();
+    }
     await expect(
-      page.getByRole("checkbox", { name: "Select Nerea Ruiz" }),
-    ).toBeChecked();
-    await expect(
-      page.getByText(`${STUBBED_DIRECTORY_MEMBERS.length} selected`),
+      page.getByRole("group", { name: `${await rowChecks.count()} selected` }),
     ).toBeVisible();
   });
 });
