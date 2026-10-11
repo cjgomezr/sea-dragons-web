@@ -7,7 +7,7 @@ import type {
 } from "@/lib/directory/directory";
 import type { Translator } from "@/lib/i18n/translator";
 import { verificationMarkOf } from "./auf-marks";
-import type { RowContact } from "./DirectoryContactCell";
+import type { RowContact } from "./row-contact";
 import { statusDotsOf } from "./status-dots";
 
 /**

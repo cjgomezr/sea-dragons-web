@@ -622,10 +622,8 @@ export const englishMessages = {
   "directory.column.attendance": "Attendance",
   "directory.column.attendanceShort": "Attend.",
   // El contacto de cada socio (#499), según quién mira.
-  "directory.column.contact": "Contact",
   "directory.contact.email": "Email",
   "directory.contact.phone": "Phone",
-  "directory.contact.emergency": "Emergency contact",
   "directory.contact.emergencyPerson": "{name} ({relationship})",
   // El porcentaje de asistencia de un miembro (#396): en el directorio, el
   // perfil propio y la ficha. El prefijo sólo lo oye un lector de pantalla.

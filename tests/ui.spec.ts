@@ -4733,8 +4733,8 @@ const WITH_INVITED_MEMBER: readonly StubbedMember[] = [
   ...STUBBED_DIRECTORY_MEMBERS,
 ];
 
-/* El contacto de cada socio (#499): una columna para quien lo ve, y la
-   casilla "Sin teléfono" de quien ve todo el contacto. */
+/* El contacto de cada socio (#499): la casilla "Sin teléfono" de quien ve
+   todo el contacto. La lista ya no lo enseña (#571): vive en la ficha. */
 
 type ContactLabels = {
   readonly withoutPhone: string;
@@ -4751,13 +4751,10 @@ const SPANISH_CONTACT_LABELS: ContactLabels = {
   filters: SPANISH_FILTER_LABELS,
 };
 
-/** La columna del contacto ya pintada. Se espera al enlace del contacto de
- * emergencia de Nerea y no a la cabecera: en el móvil la cabecera se esconde
- * y no queda en el árbol de accesibilidad. */
-async function waitForContactColumn(page: Page): Promise<void> {
-  await expect(
-    page.getByRole("link", { name: "0488 222 333" }).first(),
-  ).toBeVisible();
+/** La fila de Nerea ya pintada: la lista de un Coach, que ya no lleva el
+ * contacto (#571), está entera. */
+async function waitForNereaRow(page: Page): Promise<void> {
+  await expect(page.getByRole("row", { name: "Nerea Ruiz" })).toBeVisible();
 }
 
 /** Marca "Sin teléfono": quedan Nerea, con contacto de emergencia, y el
@@ -5261,7 +5258,7 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     asAdmin: false,
     asCoach: true,
     listHeading: ENGLISH_DIRECTORY_HEADING,
-    prepare: waitForContactColumn,
+    prepare: waitForNereaRow,
   },
   {
     name: "directorio-contacto-coach-es",
@@ -5269,7 +5266,7 @@ const DIRECTORY_STATES: readonly DirectoryState[] = [
     asCoach: true,
     listHeading: SPANISH_DIRECTORY_HEADING,
     beforeVisit: chooseSpanish,
-    prepare: waitForContactColumn,
+    prepare: waitForNereaRow,
   },
   {
     name: "directorio-filtrado-sin-resultados-es",
@@ -6753,32 +6750,144 @@ test.describe("el contacto en el directorio con los datos de verdad", () => {
 });
 
 /* En el móvil, cada teléfono y cada correo del contacto se pulsa con el dedo
-   (#499): miden al menos 44 px de alto. Se mira con un Coach, porque la fila
-   de un Admin deja el contacto para la ficha en el móvil (#553). */
+   (#499): miden al menos 44 px de alto. Desde #571 la fila no lleva el
+   contacto: el del Coach sale al deslizarla (#554). */
 test.describe("los enlaces del contacto en el móvil", () => {
   skipWithoutSession();
   quietNotificationBell();
   test.use({
     storageState: ADMIN_STORAGE_STATE,
-    viewport: { width: 375, height: 812 },
+    viewport: MOBILE_DIRECTORY_VIEWPORT,
+  });
+
+  const coachState: DirectoryState = {
+    name: "directorio-contacto-coach-movil",
+    asAdmin: false,
+    asCoach: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+    prepare: waitForNereaRow,
+  };
+
+  test("la fila de un Coach no enseña enlaces tel: ni mailto:", async ({
+    page,
+  }) => {
+    await goToDirectory(page, coachState);
+
+    const links = page
+      .getByRole("row", { name: "Nerea Ruiz" })
+      .locator('a[href^="tel:"], a[href^="mailto:"]')
+      .filter({ visible: true });
+    await expect(links).toHaveCount(0);
   });
 
   test("cada enlace tel: y mailto: mide al menos 44 px", async ({ page }) => {
-    const state = DIRECTORY_STATES.find(
-      (candidate) => candidate.name === "directorio-contacto-coach",
-    );
-    if (state === undefined) {
-      throw new Error("Falta el estado del contacto del Coach.");
-    }
-    await goToDirectory(page, state);
+    await goToDirectory(page, {
+      ...coachState,
+      prepare: swipeRowLeft("Nerea Ruiz"),
+    });
 
     const links = page
+      .getByRole("group", { name: "Actions for Nerea Ruiz" })
       .locator('a[href^="tel:"], a[href^="mailto:"]')
       .filter({ visible: true });
     expect(await links.count()).toBeGreaterThan(0);
     for (const link of await links.all()) {
       expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44);
     }
+  });
+});
+
+/* Desde 768 px la lista es la tabla compacta para todos (#571, RF-3): sin
+   columna de contacto ni tarjetas, y la fila de quien ve el contacto mide lo
+   mismo que la de un Player. El 1024 es donde antes salían las tarjetas. */
+const COMPACT_LIST_WIDTHS = [768, 1024, 1440] as const;
+
+/** Lo que una fila puede medir de más o de menos que la de un Player. */
+const ROW_HEIGHT_TOLERANCE_PX = 2;
+
+const COMPACT_LIST_VIEWERS = [
+  { name: "Admin", asAdmin: true, asCoach: false, columnCount: 5 },
+  { name: "Coach", asAdmin: false, asCoach: true, columnCount: 4 },
+] as const;
+
+async function rowHeightOf(page: Page, name: string): Promise<number> {
+  const box = await page.getByRole("row", { name }).boundingBox();
+  if (box === null) {
+    throw new Error(`La fila de ${name} no está en la pantalla`);
+  }
+  return box.height;
+}
+
+test.describe("la lista compacta desde 768 px (#571)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  for (const width of COMPACT_LIST_WIDTHS) {
+    test.describe(`@ ${width}px`, () => {
+      test.use({ viewport: { width, height: 900 } });
+
+      for (const viewer of COMPACT_LIST_VIEWERS) {
+        test(`a un ${viewer.name} le enseña el encabezado compacto, sin contacto, y filas como las de un Player`, async ({
+          page,
+        }) => {
+          await goToDirectory(page, {
+            name: "directorio-compacto-player",
+            asAdmin: false,
+            listHeading: ENGLISH_DIRECTORY_HEADING,
+            prepare: waitForNereaRow,
+          });
+          const playerRowHeight = await rowHeightOf(page, "Nerea Ruiz");
+
+          await goToDirectory(page, {
+            name: `directorio-compacto-${viewer.name}`,
+            asAdmin: viewer.asAdmin,
+            asCoach: viewer.asCoach,
+            listHeading: ENGLISH_DIRECTORY_HEADING,
+            prepare: waitForNereaRow,
+          });
+
+          await expect(page.getByRole("columnheader")).toHaveCount(
+            viewer.columnCount,
+          );
+          await expect(
+            page.getByRole("columnheader", { name: "Contact" }),
+          ).toHaveCount(0);
+          await expect(
+            page
+              .getByRole("table")
+              .locator('a[href^="tel:"], a[href^="mailto:"]')
+              .filter({ visible: true }),
+          ).toHaveCount(0);
+          expect(
+            Math.abs((await rowHeightOf(page, "Nerea Ruiz")) - playerRowHeight),
+          ).toBeLessThanOrEqual(ROW_HEIGHT_TOLERANCE_PX);
+        });
+      }
+    });
+  }
+
+  test("a 1024 px el Admin marca a todos desde la casilla del encabezado", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await goToDirectory(page, {
+      name: "directorio-compacto-seleccion",
+      asAdmin: true,
+      listHeading: ENGLISH_DIRECTORY_HEADING,
+      prepare: waitForNereaRow,
+    });
+    const selectAll = page.getByRole("checkbox", { name: "Select all" });
+    await expect(selectAll).toBeVisible();
+
+    await selectAll.check();
+
+    await expect(
+      page.getByRole("checkbox", { name: "Select Nerea Ruiz" }),
+    ).toBeChecked();
+    await expect(
+      page.getByText(`${STUBBED_DIRECTORY_MEMBERS.length} selected`),
+    ).toBeVisible();
   });
 });
 
