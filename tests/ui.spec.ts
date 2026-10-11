@@ -6894,6 +6894,7 @@ test.describe("la lista compacta desde 768 px (#571)", () => {
     await selectAll.check();
 
     const rowChecks = page.getByRole("checkbox", { name: /^Select (?!all)/ });
+    expect(await rowChecks.count()).toBeGreaterThan(0);
     for (const check of await rowChecks.all()) {
       await expect(check).toBeChecked();
     }
