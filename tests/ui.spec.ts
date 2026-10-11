@@ -1146,6 +1146,47 @@ test.describe("dentro de la aplicación", () => {
       await expect(overflowLink).toBeVisible();
     });
 
+    // #577: the bar lives in the layout, so nothing unmounts the menu when
+    // the page underneath changes.
+    test(`mobile closes the More menu after picking one of its sections (${language.locale})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(MOBILE);
+      await goToIn(page, language, "/dashboard");
+      const tabBar = page.getByRole("navigation", { name: language.tabBar });
+      await tabBar.getByRole("button", { name: language.more }).click();
+
+      await tabBar
+        .getByRole("link", { name: language.overflowSection })
+        .click();
+
+      await expect(page).toHaveURL(/\/pagos$/);
+      await expect(page.locator("#app-tabbar-overflow")).toBeHidden();
+    });
+
+    test.describe("on a touch screen", () => {
+      test.use({ hasTouch: true });
+
+      // useDismissal listens for mousedown: a tap has to fire it too.
+      test(`mobile closes the More menu with a tap outside the bar (${language.locale})`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(MOBILE);
+        await goToIn(page, language, "/dashboard");
+        const tabBar = page.getByRole("navigation", {
+          name: language.tabBar,
+        });
+        await tabBar.getByRole("button", { name: language.more }).tap();
+        const menu = page.locator("#app-tabbar-overflow");
+        await expect(menu).toBeVisible();
+
+        await page.getByRole("heading", { level: 1 }).tap();
+
+        await expect(menu).toBeHidden();
+        await expect(page).toHaveURL(/\/dashboard$/);
+      });
+    });
+
     test(`mobile tabs keep the 44px touch target at 360px (ASS-004 minimum, ${language.locale})`, async ({
       page,
     }) => {
