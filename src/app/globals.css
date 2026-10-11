@@ -4548,9 +4548,8 @@ a.auth-brand-header:focus-visible {
 
   /* El foco de la fila (#578) enmarca lo que hay a la derecha del avatar:
      empieza a 46px, entre el avatar (acaba en 40px) y el nombre (empieza en
-     52px). El contorno de la fila entera pasaba por
-     encima de él, y por fuera lo recortaría el `overflow-x: clip` de la
-     lista. */
+     52px). El contorno de la fila entera pasaba por encima de él, y por
+     fuera lo recortaría el `overflow-x: clip` de la lista. */
   .directory-row:focus-visible {
     outline: none;
   }
