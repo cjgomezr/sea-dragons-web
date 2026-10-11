@@ -11,7 +11,7 @@ import { Icon } from "@/components/Icon";
 import { memberRecordHref } from "@/lib/auth/routes";
 import type { Translator } from "@/lib/i18n/translator";
 import type { EmergencyContact } from "@/lib/members/profile-contact";
-import type { RowContact } from "./DirectoryContactCell";
+import type { RowContact } from "./row-contact";
 
 /**
  * El contacto de la ficha rápida (#550): una línea por dato, con un botón de

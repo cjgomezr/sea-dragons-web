@@ -1629,7 +1629,9 @@ describe("filtros del directorio", () => {
     expect(screen.getByRole("button", { name: "Filtros" })).toBeVisible();
   });
 });
-// #499: el contacto de cada socio según quién mira, y sus dos filtros.
+// #499: el contacto de cada socio según quién mira, y sus dos filtros. Desde
+// #571 la lista no lo enseña: vive en la ficha rápida (#550) y en las acciones
+// de la fila del móvil (#554). Los filtros siguen filtrando por el dato.
 describe("el contacto en el directorio", () => {
   const LUIS = {
     name: "Luis Ñíguez",
@@ -1647,6 +1649,14 @@ describe("el contacto en el directorio", () => {
     emergencyContact: null,
   } as const;
 
+  /** Ningún enlace de la tabla llama ni escribe. */
+  function expectNoContactLinks(): void {
+    const links = within(screen.getByRole("table")).queryAllByRole("link");
+    for (const link of links) {
+      expect(link.getAttribute("href")).not.toMatch(/^(tel|mailto):/);
+    }
+  }
+
   it.each([
     [
       "Admin",
@@ -1659,55 +1669,35 @@ describe("el contacto en el directorio", () => {
       "Committee",
       { kind: "committee", members: [{ ...MARIA, ...MARIA_CON_CONTACTO }] },
     ],
+    [
+      "Coach",
+      {
+        kind: "coach",
+        members: [{ ...MARIA, isEvaluated: true, emergencyContact: LUIS }],
+      },
+    ],
   ] as const)(
-    "a un %s le enseña el correo, el teléfono y el contacto de emergencia, que se pulsan",
+    "a un %s no le enseña columna de contacto ni enlaces tel: o mailto: en la lista",
     async (_role, stub) => {
+      showAsDesktop();
       stubApi(stub);
       await renderScreen();
 
-      expect(columnHeader("Contact")).toBeVisible();
-      const cell = memberRow("María Ñíguez");
       expect(
-        within(cell).getByRole("link", { name: "maria@club.test" }),
-      ).toHaveAttribute("href", "mailto:maria@club.test");
+        screen.queryByRole("columnheader", { name: "Contact" }),
+      ).not.toBeInTheDocument();
+      const dataHeaders = within(screen.getByRole("table"))
+        .getAllByRole("columnheader")
+        .filter((header) => within(header).queryByRole("checkbox") === null);
+      expect(dataHeaders).toHaveLength(4);
       expect(
-        within(cell).getByRole("link", { name: "0412 345 678" }),
-      ).toHaveAttribute("href", "tel:0412345678");
-      expect(within(cell).getByText(/Luis Ñíguez/)).toBeVisible();
-      expect(within(cell).getByText(/Father/)).toBeVisible();
-      expect(
-        within(cell).getByRole("link", { name: "+61 499 111 222" }),
-      ).toHaveAttribute("href", "tel:+61499111222");
+        within(memberRow("María Ñíguez")).queryByText("Luis Ñíguez", {
+          exact: false,
+        }),
+      ).not.toBeInTheDocument();
+      expectNoContactLinks();
     },
   );
-
-  it("a un Coach le enseña sólo el contacto de emergencia", async () => {
-    stubApi({
-      kind: "coach",
-      // Aunque el servidor mandara el correo, la vista del Coach no lo pinta.
-      members: [
-        {
-          ...MARIA,
-          isEvaluated: true,
-          emergencyContact: LUIS,
-          email: "maria@club.test",
-        },
-      ],
-    });
-    await renderScreen();
-
-    const cell = memberRow("María Ñíguez");
-    expect(within(cell).getByText(/Emergency contact/)).toBeVisible();
-    expect(
-      within(cell).getByRole("link", { name: "+61 499 111 222" }),
-    ).toHaveAttribute("href", "tel:+61499111222");
-    expect(within(cell).queryByText(/Email/)).not.toBeInTheDocument();
-    expect(
-      within(memberRow("María Ñíguez")).queryByRole("link", {
-        name: /maria@club\.test/,
-      }),
-    ).not.toBeInTheDocument();
-  });
 
   it("a un Player no le enseña la columna ni ningún enlace de contacto", async () => {
     stubApi({ kind: "member", members: [MARIA] });
@@ -1720,22 +1710,6 @@ describe("el contacto en el directorio", () => {
     for (const link of links) {
       expect(link.getAttribute("href")).not.toMatch(/^(tel|mailto):/);
     }
-  });
-
-  it("pone la etiqueta con un guion en el dato que falta", async () => {
-    stubApi({
-      kind: "committee",
-      members: [{ ...NEREA, ...NEREA_SIN_CONTACTO }],
-    });
-    await renderScreen();
-
-    const cell = memberRow("Nerea Ruiz");
-    expect(within(cell).getByText("Phone").parentElement).toHaveTextContent(
-      `Phone${MISSING}`,
-    );
-    expect(
-      within(cell).getByText("Emergency contact").parentElement,
-    ).toHaveTextContent(`Emergency contact${MISSING}`);
   });
 
   it("ofrece a quien ve el contacto los filtros sin teléfono y sin contacto de emergencia, y los lleva a la dirección", async () => {
@@ -1785,13 +1759,9 @@ describe("el contacto en el directorio", () => {
     });
     await renderScreen("es");
 
-    const cell = within(memberRow("María Ñíguez")).getByRole("cell", {
-      name: /Contacto/,
-    });
-    expect(columnHeader("Contacto")).toBeVisible();
-    expect(within(cell).getByText("Correo")).toBeVisible();
-    expect(within(cell).getByText("Teléfono")).toBeVisible();
-    expect(within(cell).getByText("Contacto de emergencia")).toBeVisible();
+    expect(
+      screen.queryByRole("columnheader", { name: "Contacto" }),
+    ).not.toBeInTheDocument();
     const bar = await openFilters("es");
     expect(
       within(bar).getByRole("checkbox", { name: "Sin teléfono" }),

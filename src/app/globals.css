@@ -3618,57 +3618,6 @@ a.auth-brand-header:focus-visible {
   white-space: nowrap;
 }
 
-/* El contacto de cada socio (#499): una columna compacta en la que cada dato
-   lleva su etiqueta, porque la cabecera sólo dice "Contacto". El título no
-   ordena nada, pero se alinea con los botones de las demás cabeceras. */
-.directory-column-title {
-  display: flex;
-  align-items: center;
-  min-height: var(--touch-target-min);
-  padding: var(--space-2) 0;
-  font-family: var(--font-family-mono);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-}
-
-.directory-contact {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  font-size: 14px;
-}
-
-.directory-contact-line {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  align-items: flex-start;
-}
-
-.directory-contact-label {
-  font-family: var(--font-family-mono);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--color-text-secondary);
-}
-
-/* Como el nombre que abre la ficha: del color del texto, y el subrayado dice
-   que se pulsa. */
-.directory-contact-link {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  color: var(--color-text);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.directory-contact-link:hover {
-  color: var(--color-accent-text);
-}
-
 /* Las casillas de los filtros miden lo que un dedo en la hoja del móvil;
    el popover de escritorio las junta (#548). */
 .directory-filter-check {
@@ -4381,12 +4330,6 @@ a.auth-brand-header:focus-visible {
     width: 96px;
   }
 
-  /* El contacto (#499) se queda con lo que necesita un correo partido en dos
-     líneas. Es siempre la última columna. */
-  .directory-table-contact thead th:last-child {
-    width: 26%;
-  }
-
   /* La casilla (#552): los 20px de aire de la fila y la caja de 16px. */
   .directory-table .directory-check-cell {
     width: 42px;
@@ -4416,30 +4359,6 @@ a.auth-brand-header:focus-visible {
   .directory-sort-open,
   .directory-row-caret {
     display: none;
-  }
-}
-
-/* En la tabla ancha cada dato del contacto va en una línea con su etiqueta
-   al lado: apilados, la columna triplicaba la altura de la fila compacta de
-   #549. */
-@media (min-width: 1200px) {
-  /* La asistencia va alineada a la derecha y el contacto a la izquierda: sin
-     un hueco mayor, "Sin datos" se pega a la etiqueta del correo. */
-  .directory-table-contact thead th:last-child,
-  .directory-table-contact .directory-contact-cell {
-    padding-left: var(--space-6);
-  }
-
-  .directory-contact {
-    gap: 2px;
-    font-size: 12.5px;
-  }
-
-  .directory-contact-line {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: baseline;
-    column-gap: 6px;
   }
 }
 
@@ -4563,33 +4482,8 @@ a.auth-brand-header:focus-visible {
     white-space: nowrap;
   }
 
-  /* El contacto (#499) de un Committee o un Coach, bajo el rol y la
-     posición: se lee sin tocar nada, y la ficha que sube y las acciones al
-     deslizar (#554) lo marcan o lo escriben. Un Admin lo tiene ahí, a un
-     toque. */
-  .directory-contact-cell {
-    grid-column: 1 / -1;
-    grid-row: 3;
-    padding-top: var(--space-2);
-  }
-
-  .directory-list-admin .directory-contact-cell {
-    display: none;
-  }
-
-  .directory-contact-link {
-    position: relative;
-    z-index: 1;
-    display: inline-flex;
-    align-items: center;
-    min-height: var(--touch-target-min);
-    /* El dedo sigue teniendo sus 44 px, pero el texto queda pegado a su
-       etiqueta como el de los datos que no se pulsan. */
-    margin-block: calc((var(--touch-target-min) - 1lh) / -2);
-  }
-
-  /* Arriba y no centrado: en la fila con contacto, el avatar acompaña al
-     nombre. En la de dos líneas cae igual en el centro. */
+  /* A la altura del padding de la fila: con sus dos líneas, cae en el
+     centro. */
   .directory-avatar {
     position: absolute;
     top: var(--space-3);
@@ -5139,174 +5033,6 @@ a.auth-brand-header:focus-visible {
   .directory-more,
   .directory-requests-banner {
     display: none;
-  }
-}
-/* Con la columna del contacto (#499) la tabla no cabe en lo que deja la
-   barra lateral entre 768px y 1200px: cinco columnas en unos 500px parten
-   cada nombre por sílabas. En ese tramo la lista de quien ve el contacto es
-   una lista de tarjetas (la del móvil de antes de #553), con el botón del
-   orden en lugar de las cabeceras. */
-@media (768px <= width < 1200px) {
-  .directory-list-contact .directory-card {
-    overflow: visible;
-    background: none;
-    border: none;
-    border-radius: 0;
-  }
-
-  /* Aquí las filas son tarjetas y "Orden" flota sobre la línea del total.
-     Con la barra de los marcados (#552) delante, "Orden" baja a su propia
-     línea encima de ella, en vez de pisarla. */
-  .directory-list-contact:has(.directory-bulk) .directory-sort-open {
-    position: static;
-    display: flex;
-    width: fit-content;
-    margin: 0 0 var(--space-2) auto;
-  }
-
-  /* Sin la tarjeta alrededor, la barra y la franja van sueltas, cada una
-     con su borde. */
-  .directory-list-contact .directory-bulk {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    margin-bottom: var(--space-3);
-  }
-
-  .directory-list-contact .directory-bulk-bar {
-    border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
-    border-radius: var(--radius);
-  }
-
-  .directory-list-contact .directory-bulk .directory-bulk-confirm {
-    border-width: 1px;
-    border-radius: var(--radius);
-  }
-
-  .directory-list-contact .directory-table,
-  .directory-list-contact .directory-table caption,
-  .directory-list-contact .directory-table tbody,
-  .directory-list-contact .directory-table th,
-  .directory-list-contact .directory-table td {
-    display: block;
-  }
-
-  .directory-list-contact .directory-table thead {
-    display: none;
-  }
-
-  .directory-list-contact .directory-count {
-    padding: 0 0 var(--space-3);
-    border-bottom: none;
-  }
-
-  .directory-list-contact .directory-table tbody {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-
-  .directory-list-contact .directory-table tbody tr {
-    display: grid;
-    grid-template-columns: 40px 1fr 1fr;
-    gap: var(--space-3);
-    padding: var(--space-4);
-    background: var(--color-panel);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-  }
-
-  .directory-list-contact .directory-table th,
-  .directory-list-contact .directory-table td,
-  .directory-list-contact .directory-table tbody tr + tr th,
-  .directory-list-contact .directory-table tbody tr + tr td {
-    min-width: 0;
-    padding: 0;
-    overflow-wrap: break-word;
-    border-top: none;
-  }
-
-  .directory-list-contact .directory-table tbody th {
-    grid-column: 1 / -1;
-  }
-
-  .directory-list-contact .directory-role-cell {
-    grid-column: 2;
-  }
-
-  .directory-list-contact .directory-attendance-cell {
-    grid-column: 2;
-    color: var(--color-text);
-    text-align: left;
-  }
-
-  .directory-list-contact .directory-contact-cell {
-    grid-column: 2 / -1;
-  }
-
-  .directory-list-contact .directory-contact-link {
-    display: inline-flex;
-    align-items: center;
-    min-height: var(--touch-target-min);
-    /* El dedo sigue teniendo sus 44 px, pero el texto queda pegado a su
-       etiqueta como el de los datos que no se pulsan. */
-    margin-block: calc((var(--touch-target-min) - 1lh) / -2);
-  }
-
-  .directory-list-contact .directory-avatar {
-    width: 40px;
-    height: 40px;
-    font-size: 12px;
-  }
-
-  .directory-list-contact .directory-member {
-    align-items: flex-start;
-  }
-
-  .directory-list-contact .directory-identity {
-    flex: 1;
-  }
-
-  .directory-list-contact .directory-facts {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-3);
-  }
-
-  .directory-list-contact .directory-fact-separator {
-    display: none;
-  }
-
-  .directory-list-contact .directory-fact,
-  .directory-list-contact .directory-position {
-    font-size: 14px;
-    color: var(--color-text);
-  }
-
-  .directory-list-contact .directory-table td::before,
-  .directory-list-contact .directory-fact::before {
-    content: attr(data-label);
-    display: block;
-    margin-bottom: var(--space-1);
-    font-family: var(--font-family-mono);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--color-text-secondary);
-  }
-
-  .directory-list-contact .directory-mark {
-    white-space: nowrap;
-  }
-
-  .directory-list-contact .directory-table th,
-  .directory-list-contact .directory-table td {
-    width: auto;
-  }
-
-  .directory-list-contact .directory-sort-open {
-    display: inline-flex;
   }
 }
 

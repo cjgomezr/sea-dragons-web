@@ -23,7 +23,7 @@ import {
   type RowChecking,
   SelectAllHeader,
 } from "./DirectoryCheckboxes";
-import { DirectoryContactCell, type RowContact } from "./DirectoryContactCell";
+import type { RowContact } from "./row-contact";
 import {
   type DirectoryOrder,
   DirectorySortControl,
@@ -70,9 +70,9 @@ import {
  * en los dos anchos para que el servidor no tenga que adivinar cuál pintar,
  * y para que las filas sigan siendo filas para un lector de pantalla.
  *
- * Quien ve el contacto de los socios (#499) tiene además una columna
- * "Contacto" al final: Admin y Committee con todo, el Coach con el de
- * emergencia. La marca de la lista dice cuál, igual que con el AUF.
+ * El contacto de los socios (#499) no tiene columna (#571, RF-9): la fila lo
+ * guarda para las acciones al deslizar del móvil, y la ficha rápida lo
+ * enseña. Así la tabla es la misma para todos desde 768px.
  *
  * Quien puede escribir o exportar tiene además una casilla por fila (#552),
  * y la barra de los marcados va encima del encabezado, dentro de la tarjeta.
@@ -349,10 +349,8 @@ function MemberName({
   );
 }
 
-/** El país y el nivel, que en la tabla se leen juntos bajo el nombre y en la
- * tarjeta cada uno con su etiqueta. El punto que los separa en la tabla sobra
- * en la tarjeta, y la hoja de estilos lo quita. Un dato que falta sigue ahí
- * con su guion: la etiqueta nunca queda sola. */
+/** El país y el nivel, que se leen juntos bajo el nombre. Cada uno va en su
+ * elemento: un dato que falta sigue ahí con su guion. */
 function MemberFacts({
   translate,
   member,
@@ -361,20 +359,10 @@ function MemberFacts({
   member: DirectoryMember;
 }): React.JSX.Element {
   return (
-    <span className="directory-meta directory-facts">
-      <span
-        className="directory-fact"
-        data-label={translate("directory.field.country")}
-      >
-        {describeCountry(translate, member.country)}
-      </span>
-      <span className="directory-fact-separator"> · </span>
-      <span
-        className="directory-fact"
-        data-label={translate("directory.field.level")}
-      >
-        {describeExperienceLevel(translate, member.experienceLevel)}
-      </span>
+    <span className="directory-meta">
+      <span>{describeCountry(translate, member.country)}</span>
+      {" · "}
+      <span>{describeExperienceLevel(translate, member.experienceLevel)}</span>
     </span>
   );
 }
@@ -478,10 +466,7 @@ function RoleCell({
 }): React.JSX.Element {
   const requestedRole = row.admin === null ? null : row.admin.requestedRole;
   return (
-    <td
-      className="directory-role-cell"
-      data-label={translate("directory.column.role")}
-    >
+    <td className="directory-role-cell">
       <span className="directory-role-name">
         {translate(`role.${row.member.role}`)}
       </span>
@@ -626,10 +611,7 @@ function MemberRow({
         isPhone={swipe !== null}
       />
       <RoleCell translate={translate} row={row} />
-      <td
-        className="directory-position-cell"
-        data-label={translate("directory.column.position")}
-      >
+      <td className="directory-position-cell">
         <span className="directory-position">
           {describePosition(translate, member.position)}
         </span>
@@ -640,9 +622,6 @@ function MemberRow({
       >
         {describeAttendance(translate, locale, member.attendance)}
       </td>
-      {row.contact.kind === "none" ? null : (
-        <DirectoryContactCell translate={translate} contact={row.contact} />
-      )}
       {swiping === null ? null : (
         <SwipeActionsCell
           translate={translate}
@@ -685,34 +664,6 @@ function DotLegend({
   );
 }
 
-/** Las clases de la tabla según lo que trae la lista: la hoja de estilos
- * reparte el ancho distinto con el contacto y con las casillas (#552). */
-function tableClassName(
-  listing: DirectoryListing,
-  hasCheckboxes: boolean,
-): string {
-  const base =
-    listing.kind === "member"
-      ? "directory-table"
-      : "directory-table directory-table-contact";
-  return hasCheckboxes ? `${base} directory-table-checks` : base;
-}
-
-/** Las de la lista: con el contacto, el reparto de la tabla cambia; y en la
- * de un Admin, el móvil deja el contacto para la ficha, a la que lleva cada
- * fila (#553). */
-function listClassName(listing: DirectoryListing): string {
-  switch (listing.kind) {
-    case "member":
-      return "directory-list";
-    case "admin":
-      return "directory-list directory-list-contact directory-list-admin";
-    case "committee":
-    case "coach":
-      return "directory-list directory-list-contact";
-  }
-}
-
 export function DirectoryTable({
   translate,
   locale,
@@ -746,7 +697,7 @@ export function DirectoryTable({
   const rows = rowsOf(translate, listing, requestedRoles);
   const { swipeOf } = useOpenSwipeRow(rows.map((row) => row.member.userId));
   return (
-    <div className={listClassName(listing)}>
+    <div className="directory-list">
       <DirectorySortControl
         translate={translate}
         order={order}
@@ -756,7 +707,7 @@ export function DirectoryTable({
           tabla no recorta las esquinas de su primera y su última fila. */}
       <div className="directory-card">
         {toolbar}
-        <table className={tableClassName(listing, checking !== null)}>
+        <table className="directory-table">
           <caption className="directory-count">
             {translate("directory.memberCount", { count: rows.length })}
           </caption>
@@ -774,13 +725,6 @@ export function DirectoryTable({
                   onSort={onSort}
                 />
               ))}
-              {listing.kind === "member" ? null : (
-                <th scope="col">
-                  <span className="directory-column-title">
-                    {translate("directory.column.contact")}
-                  </span>
-                </th>
-              )}
             </tr>
           </thead>
           <tbody>

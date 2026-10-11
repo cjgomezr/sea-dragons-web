@@ -4,7 +4,7 @@ import { Phone } from "@phosphor-icons/react/dist/ssr/Phone";
 import type { Icon as PhosphorGlyph } from "@phosphor-icons/react/dist/lib/types";
 import { Icon } from "@/components/Icon";
 import type { Translator } from "@/lib/i18n/translator";
-import { type RowContact, telHref } from "./DirectoryContactCell";
+import { type RowContact, telHref } from "./row-contact";
 
 /**
  * Los botones de solo icono que escriben o llaman a un socio en el móvil

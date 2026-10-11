@@ -415,6 +415,28 @@ describe("la ficha que sube: los botones de contacto", () => {
     ).toBeNull();
   });
 
+  it("al Committee le da correo, llamada y emergencia con su mailto: y su tel:", async () => {
+    const user = userEvent.setup();
+    stubApi({ kind: "committee" });
+    await renderDirectory({ isAdmin: false });
+    await user.click(row("Nerea Ruiz"));
+    const contact = within(sheet("Nerea Ruiz")).getByRole("group", {
+      name: "Contact",
+    });
+
+    expect(
+      within(contact).getByRole("link", { name: "Email Nerea Ruiz" }),
+    ).toHaveAttribute("href", "mailto:nerea@club.test");
+    expect(
+      within(contact).getByRole("link", { name: "Call Nerea Ruiz" }),
+    ).toHaveAttribute("href", "tel:0466108221");
+    expect(
+      within(contact).getByRole("link", {
+        name: "Call Nerea Ruiz's emergency contact",
+      }),
+    ).toHaveAttribute("href", "tel:+61488222333");
+  });
+
   it("al Coach sólo le da el botón de emergencia", async () => {
     const user = userEvent.setup();
     stubApi({ kind: "coach" });
@@ -557,6 +579,24 @@ describe("deslizar la fila", () => {
     ).toHaveAttribute("href", "tel:+61488222333");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it.each(["committee", "coach"] as const)(
+    "a un %s la fila sin deslizar no le enseña contacto bajo el rol",
+    async (kind) => {
+      stubApi({ kind });
+      await renderDirectory({ isAdmin: false });
+
+      const contactLinks = within(row("Nerea Ruiz"))
+        .queryAllByRole("link")
+        .filter((link) =>
+          /^(tel|mailto):/.test(link.getAttribute("href") ?? ""),
+        );
+      expect(contactLinks).toEqual([]);
+      expect(
+        within(row("Nerea Ruiz")).queryByText(/Emergency contact/),
+      ).toBeNull();
+    },
+  );
 
   it("deslizar a la derecha las cierra", async () => {
     stubApi();

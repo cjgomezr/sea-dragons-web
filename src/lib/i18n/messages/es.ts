@@ -618,10 +618,8 @@ export const spanishMessages: MessageCatalog = {
   "directory.column.attendance": "Asistencia",
   "directory.column.attendanceShort": "Asist.",
   // El contacto de cada socio (#499), según quién mira.
-  "directory.column.contact": "Contacto",
   "directory.contact.email": "Correo",
   "directory.contact.phone": "Teléfono",
-  "directory.contact.emergency": "Contacto de emergencia",
   "directory.contact.emergencyPerson": "{name} ({relationship})",
   // El porcentaje de asistencia de un miembro (#396): en el directorio, el
   // perfil propio y la ficha. El prefijo sólo lo oye un lector de pantalla.
