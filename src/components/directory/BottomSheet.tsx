@@ -7,7 +7,8 @@ import { useDismissal } from "@/components/use-dismissal";
  * La hoja que sube desde abajo en el móvil: un `<dialog>` modal, como el
  * visor de la foto (#355), con lo que comparte con él por `useDismissal`.
  * Nació con los filtros (#497); el orden y el menú "⋯" del rediseño (#553)
- * son la segunda y la tercera, y por eso vive aquí.
+ * son la segunda y la tercera, y por eso vive aquí. La ficha del socio
+ * (#554) es la cuarta, y la primera con asa y con un encabezado propio.
  *
  * Al abrirse, el foco entra en su primer control y no sale mientras esté
  * abierta. Escape, un toque fuera o `close`, que reciben sus controles, la
@@ -17,7 +18,11 @@ import { useDismissal } from "@/components/use-dismissal";
  * abierto, el foco que sale de él vuelve dentro.
  */
 
-const FOCUSABLE_SELECTOR = "select, input, button";
+const FOCUSABLE_SELECTOR = "select, input, button:not(:disabled), a[href]";
+
+/** Lo que hay que arrastrar el asa hacia abajo para que la hoja se cierre.
+ * Menos se confunde con un toque que tiembla. */
+const GRIP_CLOSE_DISTANCE_PX = 40;
 
 function focusableIn(panel: HTMLElement | null): readonly HTMLElement[] {
   return panel === null
@@ -46,16 +51,56 @@ function cycleFocus(
   (event.shiftKey ? last : first)?.focus();
 }
 
+/** El asa de arriba: se arrastra hacia abajo para cerrar, como en el
+ * diseño. Es un botón para que quien no arrastra, con el teclado o con un
+ * lector de pantalla, también tenga con qué cerrarla. */
+function SheetGrip({
+  label,
+  onClose,
+}: {
+  label: string;
+  onClose: () => void;
+}): React.JSX.Element {
+  const startYRef = useRef<number | null>(null);
+  return (
+    <button
+      type="button"
+      className="directory-sheet-grip"
+      aria-label={label}
+      title={label}
+      onClick={onClose}
+      onPointerDown={(event) => {
+        startYRef.current = event.clientY;
+      }}
+      onPointerUp={(event) => {
+        const startY = startYRef.current;
+        startYRef.current = null;
+        if (
+          startY !== null &&
+          event.clientY - startY >= GRIP_CLOSE_DISTANCE_PX
+        ) {
+          onClose();
+        }
+      }}
+    />
+  );
+}
+
 export function BottomSheet({
   title,
   titleClassName = "directory-sheet-title",
+  gripLabel,
   onClosed,
   children,
 }: {
-  title: string;
+  /** El texto del título o, si la hoja lleva un encabezado propio, lo que
+   * lo pinta: su título tiene que llevar el id que recibe. */
+  title: string | ((titleId: string) => React.ReactNode);
   /** El de los filtros es un título; el del orden y el del "⋯", una
    * etiqueta pequeña en mayúsculas, como en el diseño. */
   titleClassName?: string;
+  /** Con él, la hoja lleva arriba un asa que la cierra; es su nombre. */
+  gripLabel?: string;
   /** Se llama una vez cerrada, sea por Escape, por un toque fuera o por
    * `close`. */
   onClosed: () => void;
@@ -110,9 +155,16 @@ export function BottomSheet({
       onKeyDown={(event) => cycleFocus(event, panelRef.current)}
     >
       <div ref={panelRef} className="directory-sheet-panel">
-        <h2 id={titleId} className={titleClassName}>
-          {title}
-        </h2>
+        {gripLabel === undefined ? null : (
+          <SheetGrip label={gripLabel} onClose={close} />
+        )}
+        {typeof title === "string" ? (
+          <h2 id={titleId} className={titleClassName}>
+            {title}
+          </h2>
+        ) : (
+          title(titleId)
+        )}
         {children(close)}
       </div>
     </dialog>

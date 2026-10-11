@@ -739,6 +739,13 @@ export const englishMessages = {
   "directory.card.request": "Role request",
   "directory.card.requestAsked": "Asked to be",
   "directory.card.justification": "“{text}”",
+  "directory.sheet.close": "Close the sheet",
+  "directory.action.group": "Actions for {name}",
+  "directory.action.email": "Email {name}",
+  "directory.action.call": "Call {name}",
+  "directory.action.emergency": "Call {name}'s emergency contact",
+  "directory.action.noPhone": "{name} has no phone",
+  "directory.action.noEmergency": "{name} has no emergency contact",
   "directory.mark.aufExpired": "AUF expired",
   // #274: el AUF que escribió el miembro, hasta que un Admin lo verifica.
   "directory.mark.aufNotVerified": "AUF not verified",

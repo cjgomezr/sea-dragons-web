@@ -36,6 +36,12 @@ import {
   describePosition,
 } from "./member-labels";
 import { type StatusDot, statusDotsOf } from "./status-dots";
+import { ContactActions, type ReachableContact } from "./ContactActions";
+import {
+  type RowSwipe,
+  useOpenSwipeRow,
+  useSwipeGesture,
+} from "./use-row-swipe";
 
 /**
  * La lista del directorio (FR-015, FR-019), compacta desde el rediseño de
@@ -314,16 +320,20 @@ function StatusPills({
 }
 
 /** A un Admin el nombre le abre la ficha del miembro (#242). El nombre
- * accesible dice a dónde lleva y contiene el nombre visible (WCAG 2.5.3). */
+ * accesible dice a dónde lleva y contiene el nombre visible (WCAG 2.5.3).
+ * En el móvil no enlaza: tocar la fila sube su ficha (#554), que lleva a la
+ * completa. */
 function MemberName({
   translate,
   row,
+  isPhone,
 }: {
   translate: Translator;
   row: DirectoryRow;
+  isPhone: boolean;
 }): React.JSX.Element {
   const { member } = row;
-  if (row.admin === null) {
+  if (row.admin === null || isPhone) {
     return <span className="directory-name">{member.fullName}</span>;
   }
   return (
@@ -396,10 +406,12 @@ function MemberCell({
   translate,
   locale,
   row,
+  isPhone,
 }: {
   translate: Translator;
   locale: Locale;
   row: DirectoryRow;
+  isPhone: boolean;
 }): React.JSX.Element {
   const { member } = row;
   return (
@@ -417,7 +429,7 @@ function MemberCell({
         />
         <span className="directory-identity">
           <span className="directory-name-line">
-            <MemberName translate={translate} row={row} />
+            <MemberName translate={translate} row={row} isPhone={isPhone} />
             <StatusPills translate={translate} member={member} />
             <StatusDots dots={row.admin === null ? NO_DOTS : row.admin.dots} />
             {needsEvaluation(row) ? (
@@ -426,13 +438,11 @@ function MemberCell({
           </span>
           <MemberMeta translate={translate} locale={locale} member={member} />
         </span>
-        {/* La flecha del móvil dice que la fila lleva a la ficha; desde 768px
-            la esconde la hoja de estilos. */}
-        {row.admin === null ? null : (
-          <span className="directory-row-caret" aria-hidden="true">
-            <Icon glyph={CaretRight} />
-          </span>
-        )}
+        {/* La flecha del móvil dice que la fila sube su ficha (#554); desde
+            768px la esconde la hoja de estilos. */}
+        <span className="directory-row-caret" aria-hidden="true">
+          <Icon glyph={CaretRight} />
+        </span>
       </span>
     </th>
   );
@@ -485,21 +495,85 @@ function RoleCell({
   );
 }
 
+/** Las acciones que la fila enseña al deslizarla (#554). Cerradas siguen en
+ * la página, para que se vean entrar con la fila, pero nadie llega a ellas:
+ * con el teclado o un lector de pantalla, las mismas están en la ficha. */
+function SwipeActionsCell({
+  translate,
+  contact,
+  fullName,
+  isOpen,
+}: {
+  translate: Translator;
+  contact: ReachableContact;
+  fullName: string;
+  isOpen: boolean;
+}): React.JSX.Element {
+  return (
+    <td
+      className="directory-swipe-cell"
+      data-swipe-actions=""
+      aria-hidden={isOpen ? undefined : true}
+      inert={!isOpen}
+    >
+      <ContactActions
+        translate={translate}
+        contact={contact}
+        fullName={fullName}
+        label={translate("directory.action.group", { name: fullName })}
+        className="directory-swipe-actions"
+      />
+    </td>
+  );
+}
+
+/** Una fila que se desliza, con lo que enseña al hacerlo. */
+type RowSwiping = {
+  readonly swipe: RowSwipe;
+  readonly contact: ReachableContact;
+};
+
+/** Sólo en el móvil, y sólo con un contacto que enseñar (FR-090). */
+function rowSwipingOf(
+  row: DirectoryRow,
+  swipe: RowSwipe | null,
+): RowSwiping | null {
+  return swipe === null || row.contact.kind === "none"
+    ? null
+    : { swipe, contact: row.contact };
+}
+
+/** La abierta se corre lo que miden sus acciones: tres, o la de emergencia
+ * sola del Coach. */
+function rowClassName(swiping: RowSwiping | null): string {
+  if (swiping === null || !swiping.swipe.isOpen) {
+    return "directory-row";
+  }
+  return swiping.contact.kind === "emergency"
+    ? "directory-row directory-row-swiped directory-row-swiped-emergency"
+    : "directory-row directory-row-swiped";
+}
+
 function MemberRow({
   translate,
   locale,
   row,
   selection,
   checking,
+  swipe,
 }: {
   translate: Translator;
   locale: Locale;
   row: DirectoryRow;
   selection: RowSelection;
   checking: RowChecking | null;
+  /** Lo que la fila hace al deslizarla en el móvil; `null` en escritorio. */
+  swipe: RowSwipe | null;
 }): React.JSX.Element {
   const { member } = row;
   const isSelected = selection.selectedUserId === member.userId;
+  const swiping = rowSwipingOf(row, swipe);
+  const gesture = useSwipeGesture(swiping === null ? null : swiping.swipe);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLTableRowElement>): void {
     if (event.target !== event.currentTarget) {
@@ -524,13 +598,18 @@ function MemberRow({
       aria-label={member.fullName}
       aria-current={isSelected ? "true" : undefined}
       tabIndex={0}
-      className="directory-row"
+      className={rowClassName(swiping)}
       onClick={(event) => {
-        if (!isFromControl(event.target)) {
-          selection.onToggle(member.userId);
+        if (gesture.takeIsGestureClick() || isFromControl(event.target)) {
+          return;
         }
+        selection.onToggle(member.userId);
       }}
       onKeyDown={onKeyDown}
+      onPointerDown={gesture.onPointerDown}
+      onPointerMove={gesture.onPointerMove}
+      onPointerUp={gesture.onPointerUp}
+      onPointerCancel={gesture.onPointerCancel}
     >
       {checking === null ? null : (
         <MemberCheckCell
@@ -540,7 +619,12 @@ function MemberRow({
           fullName={member.fullName}
         />
       )}
-      <MemberCell translate={translate} locale={locale} row={row} />
+      <MemberCell
+        translate={translate}
+        locale={locale}
+        row={row}
+        isPhone={swipe !== null}
+      />
       <RoleCell translate={translate} row={row} />
       <td
         className="directory-position-cell"
@@ -558,6 +642,14 @@ function MemberRow({
       </td>
       {row.contact.kind === "none" ? null : (
         <DirectoryContactCell translate={translate} contact={row.contact} />
+      )}
+      {swiping === null ? null : (
+        <SwipeActionsCell
+          translate={translate}
+          contact={swiping.contact}
+          fullName={member.fullName}
+          isOpen={swiping.swipe.isOpen}
+        />
       )}
     </tr>
   );
@@ -630,6 +722,7 @@ export function DirectoryTable({
   selection,
   checking,
   toolbar,
+  isPhone,
   onSort,
 }: {
   translate: Translator;
@@ -644,11 +737,14 @@ export function DirectoryTable({
   checking: RowChecking | null;
   /** La barra de los marcados, sobre el encabezado; `null` sin ninguno. */
   toolbar: React.ReactNode;
+  /** Por debajo de 768px las filas se deslizan (#554). */
+  isPhone: boolean;
   /** Lo que pide una cabecera de la tabla, o la hoja del orden en el
    * móvil: sólo el campo. */
   onSort: (column: DirectorySort) => void;
 }): React.JSX.Element {
   const rows = rowsOf(translate, listing, requestedRoles);
+  const { swipeOf } = useOpenSwipeRow(rows.map((row) => row.member.userId));
   return (
     <div className={listClassName(listing)}>
       <DirectorySortControl
@@ -696,6 +792,7 @@ export function DirectoryTable({
                 row={row}
                 selection={selection}
                 checking={checking}
+                swipe={isPhone ? swipeOf(row.member.userId) : null}
               />
             ))}
           </tbody>

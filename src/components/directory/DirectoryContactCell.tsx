@@ -27,7 +27,7 @@ export type RowContact =
 /** El número tal como se marca: sin espacios, guiones ni paréntesis, con el
  * `+` del prefijo si lo trae. Se escribió así a propósito (#496): sólo se
  * limpia para el enlace. */
-function telHref(phone: string): string {
+export function telHref(phone: string): string {
   return `tel:${phone.replace(/[^\d+]/g, "")}`;
 }
 

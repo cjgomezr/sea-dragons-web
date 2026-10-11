@@ -3044,6 +3044,105 @@ a.auth-brand-header:focus-visible {
   gap: var(--space-4);
 }
 
+/* El asa de la ficha del socio (#554): la raya de 36px se ve, pero lo que se
+   arrastra o se toca es toda la franja de arriba. */
+.directory-sheet-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  margin: calc(var(--space-4) - var(--space-6)) 0 calc(-1 * var(--space-2));
+  padding: 0;
+  cursor: grab;
+  background: none;
+  border: none;
+  touch-action: none;
+}
+
+.directory-sheet-grip::before {
+  content: "";
+  width: 36px;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+.directory-sheet-grip:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: -2px;
+}
+
+/* Va delante de la regla común de los avatares, así que gana por la hoja. */
+.directory-sheet .directory-sheet-avatar {
+  width: 54px;
+  height: 54px;
+  font-size: 17px;
+}
+
+/* Correo, llamada y emergencia: botones redondos de 48px. El que falta va
+   con el borde discontinuo del aviso y no se pulsa. */
+.directory-sheet-contact {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.directory-sheet-contact .directory-contact-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  font-size: 20px;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+.directory-sheet-contact a.directory-contact-action:hover {
+  border-color: var(--color-accent);
+}
+
+.directory-sheet-contact .directory-contact-action:disabled {
+  color: var(--color-warning);
+  cursor: not-allowed;
+  background: none;
+  border: 1px dashed var(--color-warning);
+}
+
+/* La fila del móvil esconde el país y el nivel; la ficha es donde se leen. */
+.directory-sheet .directory-meta {
+  display: block;
+}
+
+.directory-sheet .directory-card-roles .directory-role {
+  min-height: 42px;
+}
+
+/* Los datos en una fila: tres para el Admin, dos para los demás. */
+.directory-sheet .directory-card-facts {
+  grid-template-columns: none;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+}
+
+.directory-sheet-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  font-weight: 600;
+  color: var(--color-on-accent);
+  text-decoration: none;
+  background: var(--color-accent);
+  border-radius: var(--radius);
+}
+
+.directory-sheet-open:hover {
+  background: var(--color-accent-hover);
+}
+
 /* La lista con su barra encima (#548). Su título sólo lo lee el lector de
    pantalla: la cabecera ya dice qué se está viendo. */
 .directory-members {
@@ -3323,6 +3422,7 @@ a.auth-brand-header:focus-visible {
 .admin-member-avatar,
 .directory-avatar,
 .directory-card-avatar,
+.directory-sheet-avatar,
 .directory-overview-avatar,
 .directory-request-avatar {
   display: flex;
@@ -4464,8 +4564,9 @@ a.auth-brand-header:focus-visible {
   }
 
   /* El contacto (#499) de un Committee o un Coach, bajo el rol y la
-     posición: hasta la ficha que sube desde abajo (#554), es la única forma
-     de llegar a él en el móvil. Un Admin lo tiene en la ficha, a un toque. */
+     posición: se lee sin tocar nada, y la ficha que sube y las acciones al
+     deslizar (#554) lo marcan o lo escriben. Un Admin lo tiene ahí, a un
+     toque. */
   .directory-contact-cell {
     grid-column: 1 / -1;
     grid-row: 3;
@@ -4503,23 +4604,6 @@ a.auth-brand-header:focus-visible {
     font-size: 15px;
   }
 
-  /* Toda la fila de un Admin lleva a la ficha: el enlace del nombre se
-     estira sobre ella. Lo que se pulsa dentro de la fila queda por encima. */
-  .directory-table .directory-record-link {
-    text-decoration: none;
-  }
-
-  .directory-record-link::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-  }
-
-  .directory-mark-link {
-    position: relative;
-    z-index: 1;
-  }
-
   .directory-row-caret {
     position: absolute;
     top: 50%;
@@ -4540,6 +4624,79 @@ a.auth-brand-header:focus-visible {
 
   .directory-mark {
     white-space: nowrap;
+  }
+
+  /* Deslizar la fila (#554, "2b", punto 1): la fila entera se corre a la
+     izquierda y sus acciones entran por la derecha, que estaban fuera de la
+     lista. En vertical, el gesto es del navegador, que desplaza la lista. */
+  .directory-table tbody {
+    overflow-x: clip;
+  }
+
+  /* Arrastrar la fila no selecciona su texto. */
+  .directory-table tbody tr {
+    touch-action: pan-y;
+    user-select: none;
+    transition: transform 160ms ease-out;
+  }
+
+  .directory-table tbody tr.directory-row-swiped {
+    transform: translateX(-180px);
+  }
+
+  /* El Coach sólo tiene la de emergencia (FR-090). */
+  .directory-table tbody tr.directory-row-swiped-emergency {
+    transform: translateX(-60px);
+  }
+
+  .directory-table .directory-swipe-cell {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 100%;
+  }
+
+  .directory-swipe-actions {
+    display: flex;
+    height: 100%;
+  }
+
+  /* Los colores son los del diseño, fijos en los dos temas: el icono blanco
+     pasa los 3:1 sobre los tres. */
+  .directory-swipe-actions .directory-contact-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    padding: 0;
+    font-size: 22px;
+    color: #ffffff;
+    border: none;
+    border-radius: 0;
+  }
+
+  .directory-swipe-actions .directory-contact-action-email {
+    background: #1c6ea4;
+  }
+
+  .directory-swipe-actions .directory-contact-action-phone {
+    background: #2e9e86;
+  }
+
+  .directory-swipe-actions .directory-contact-action-emergency {
+    background: #bc3b2e;
+  }
+
+  .directory-swipe-actions .directory-contact-action:disabled {
+    color: #5a7086;
+    background: #1a2a38;
+    cursor: not-allowed;
+  }
+}
+
+@media (width < 768px) and (prefers-reduced-motion: reduce) {
+  .directory-table tbody tr {
+    transition: none;
   }
 }
 /* La cabecera y la barra del móvil (#553, "2b", punto 1): "Directorio" con

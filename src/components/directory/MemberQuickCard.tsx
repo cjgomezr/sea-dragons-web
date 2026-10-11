@@ -50,7 +50,7 @@ import type { PendingRoleRequests } from "./use-pending-role-requests";
  * mismo. */
 const CARD_AVATAR_SIZE = 52;
 
-function MemberMetaLine({
+export function MemberMetaLine({
   translate,
   locale,
   member,
@@ -123,7 +123,7 @@ function CardHeader({
   );
 }
 
-function CardTags({
+export function CardTags({
   translate,
   tags,
 }: {
@@ -150,7 +150,7 @@ function CardTags({
   );
 }
 
-type Fact = { readonly label: string; readonly value: string };
+export type Fact = { readonly label: string; readonly value: string };
 
 function aufFactOf(
   translate: Translator,
@@ -169,39 +169,60 @@ function aufFactOf(
   });
 }
 
+export function attendanceFactOf(
+  translate: Translator,
+  locale: Locale,
+  member: DirectoryMember,
+): Fact {
+  return {
+    label: translate("directory.column.attendance"),
+    value: describeAttendance(translate, locale, member.attendance),
+  };
+}
+
+export function positionFactOf(
+  translate: Translator,
+  member: DirectoryMember,
+): Fact {
+  return {
+    label: translate("directory.column.position"),
+    value: describePosition(translate, member.position),
+  };
+}
+
+/** Lo que de los datos sólo ve el Admin: el AUF y la membresía. */
+export function adminFactsOf(
+  translate: Translator,
+  locale: Locale,
+  member: AdminDirectoryMember,
+): readonly Fact[] {
+  return [
+    {
+      label: translate("directory.filter.auf"),
+      value: aufFactOf(translate, locale, member),
+    },
+    {
+      label: translate("directory.filter.membership"),
+      value: membershipMarkOf(translate, member.membershipStatus).text,
+    },
+  ];
+}
+
 function factsOf(
   translate: Translator,
   locale: Locale,
   selected: SelectedMember,
 ): readonly Fact[] {
-  const { member } = selected;
-  const shared: readonly Fact[] = [
-    {
-      label: translate("directory.column.attendance"),
-      value: describeAttendance(translate, locale, member.attendance),
-    },
-    {
-      label: translate("directory.column.position"),
-      value: describePosition(translate, member.position),
-    },
+  const shared = [
+    attendanceFactOf(translate, locale, selected.member),
+    positionFactOf(translate, selected.member),
   ];
-  if (selected.kind !== "admin") {
-    return shared;
-  }
-  return [
-    ...shared,
-    {
-      label: translate("directory.filter.auf"),
-      value: aufFactOf(translate, locale, selected.member),
-    },
-    {
-      label: translate("directory.filter.membership"),
-      value: membershipMarkOf(translate, selected.member.membershipStatus).text,
-    },
-  ];
+  return selected.kind === "admin"
+    ? [...shared, ...adminFactsOf(translate, locale, selected.member)]
+    : shared;
 }
 
-function CardFacts({
+export function CardFacts({
   translate,
   facts,
 }: {
@@ -239,7 +260,7 @@ function requestOf(
 
 /** Lo que sólo ve el Admin: la invitación, la solicitud con lo que respondió
  * el servidor a la decisión tomada aquí, y el rol. */
-function AdminSections({
+export function AdminSections({
   translate,
   locale,
   member,

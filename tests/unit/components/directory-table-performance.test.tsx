@@ -80,6 +80,7 @@ function renderTable(listing: DirectoryListing): void {
       requestedRoles={new Map()}
       selection={{ selectedUserId: null, onToggle: () => undefined }}
       checking={null}
+      isPhone={false}
       toolbar={null}
       onSort={() => undefined}
     />,
