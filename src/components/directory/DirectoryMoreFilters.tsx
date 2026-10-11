@@ -1,7 +1,13 @@
 "use client";
 
 import { FunnelSimple } from "@phosphor-icons/react/dist/ssr/FunnelSimple";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Icon } from "@/components/Icon";
 import { useDismissal } from "@/components/use-dismissal";
 import type { Translator } from "@/lib/i18n/translator";
@@ -82,6 +88,29 @@ function FilterSheet({
   );
 }
 
+/** El popover se abre hacia la izquierda desde el borde derecho de Filtros.
+ * A 768 px la columna del directorio mide unos 500 px y Filtros puede quedar
+ * a la izquierda de la línea (#575): abierto así, se metería bajo el menú
+ * lateral. Entonces se corre a la derecha lo justo para empezar donde empieza
+ * la barra. Se mide antes de pintar, para que no se vea el salto, y siempre
+ * desde la posición de partida: en desarrollo React corre el efecto dos
+ * veces. */
+function keepInsideToolbar(panel: HTMLElement | null): void {
+  if (!panel) {
+    return;
+  }
+  const toolbar = panel.closest(".directory-toolbar");
+  if (!toolbar) {
+    return;
+  }
+  panel.style.removeProperty("right");
+  const overhang =
+    toolbar.getBoundingClientRect().left - panel.getBoundingClientRect().left;
+  if (overhang > 0) {
+    panel.style.right = `${-overhang}px`;
+  }
+}
+
 /** El popover de escritorio. No es modal: la lista de detrás se rehace con
  * cada cambio y sigue a la vista. Al abrirse, el foco entra en su primer
  * control. */
@@ -96,6 +125,10 @@ function FilterPopover({
 }): React.JSX.Element {
   const { translate, onChange } = fields;
   const panelRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    keepInsideToolbar(panelRef.current);
+  }, []);
 
   useEffect(() => {
     focusableIn(panelRef.current).at(0)?.focus();

@@ -5645,7 +5645,9 @@ test.describe("la hoja de filtros del directorio en el móvil", () => {
 
 /* El popover de Filtros en escritorio (#548): el foco entra al abrirlo,
    Escape lo cierra devolviéndolo al botón, y a 768px, el ancho más justo,
-   cabe entero en la ventana. */
+   cabe entero en la ventana. Tampoco se mete bajo el menú lateral: cuando
+   Filtros queda a la izquierda de la línea (#575), el popover se corre a la
+   derecha hasta el borde de la barra. */
 test.describe("el popover de filtros del directorio en escritorio", () => {
   skipWithoutSession();
   quietNotificationBell();
@@ -5672,7 +5674,8 @@ test.describe("el popover de filtros del directorio en escritorio", () => {
       await expect(popover).toBeVisible();
       await expect(popover.getByRole("combobox").first()).toBeFocused();
       const box = await popover.boundingBox();
-      expect(box?.x).toBeGreaterThanOrEqual(0);
+      const toolbar = await page.locator(".directory-toolbar").boundingBox();
+      expect(box?.x).toBeGreaterThanOrEqual(toolbar?.x ?? Infinity);
       expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
 
       await page.keyboard.press("Escape");
