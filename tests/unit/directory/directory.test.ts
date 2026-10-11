@@ -15,6 +15,7 @@ import {
 } from "@/lib/directory/directory";
 import type { MemberAttendance } from "@/lib/attendance/attendance-stats";
 import type { ClubPosition } from "@/lib/club/club-positions";
+import { QUIET_CLUB_SUMMARY } from "../helpers/club-summary";
 
 /**
  * El directorio del club (#238, RF-2 del PRD de E5, FR-015 a FR-019),
@@ -871,6 +872,7 @@ describe("el rol nuevo en la lista (#240)", () => {
       members: [admin],
       availableFilters: DIRECTORY_FILTERS,
       total: 2,
+      summary: QUIET_CLUB_SUMMARY,
     };
 
     expect(withMemberRole(listing, NEREA.userId, "Committee")).toEqual({
@@ -878,6 +880,7 @@ describe("el rol nuevo en la lista (#240)", () => {
       members: [{ ...admin, role: "Committee" }],
       availableFilters: DIRECTORY_FILTERS,
       total: 2,
+      summary: QUIET_CLUB_SUMMARY,
     });
   });
 
@@ -1279,4 +1282,135 @@ describe("los filtros de contacto (#499)", () => {
       }
     },
   );
+});
+
+describe("el resumen del club para el Admin (#551)", () => {
+  /** Vencido ayer, por vencer en 10 días y con la membresía atrasada: así
+   * cada contador tiene algo que contar además de los socios de `CLUB`. */
+  const PAZ: DirectoryMemberRecord = {
+    ...ANA,
+    userId: "eeeeeeee-0000-4000-8000-00000000000e",
+    fullName: "Paz Pérez",
+    role: "Player",
+    aufNumber: "AUF-5",
+    aufExpiry: "2026-10-01",
+    membershipStatus: "past_due",
+    emergencyContact: null,
+  };
+  const ALBA: DirectoryMemberRecord = {
+    ...ANA,
+    userId: "ffffffff-0000-4000-8000-00000000000f",
+    fullName: "Alba Arce",
+    role: "Player",
+    aufNumber: "AUF-6",
+    aufExpiry: "2026-09-01",
+  };
+  const SUMMARY_CLUB: readonly DirectoryMemberRecord[] = [...CLUB, PAZ, ALBA];
+
+  async function adminListing(
+    query: Partial<DirectoryQuery> = {},
+  ): Promise<DirectoryListing> {
+    return listDirectory(
+      {
+        ...gateways({ callerRole: "Admin" }),
+        directory: { findDirectoryMembers: async () => SUMMARY_CLUB },
+      },
+      {
+        callerId: CALLER_ID,
+        query: { ...DEFAULT_DIRECTORY_QUERY, ...query },
+        todayInClub: TODAY,
+      },
+    );
+  }
+
+  async function summaryOf(
+    query: Partial<DirectoryQuery> = {},
+  ): Promise<unknown> {
+    const listing = await adminListing(query);
+    if (listing.kind !== "admin") {
+      throw new Error(`Se esperaba la vista del Admin y llegó ${listing.kind}`);
+    }
+    return listing.summary;
+  }
+
+  it("cuenta a los socios activos sin AUF, con el AUF por renovar, sin contacto de emergencia y con la membresía vencida", async () => {
+    const summary = await summaryOf();
+
+    expect(summary).toEqual({
+      aufRenewals: [
+        { userId: ALBA.userId, fullName: "Alba Arce", aufStatus: "expired" },
+        {
+          userId: BRUNO.userId,
+          fullName: "Bruno Beltrán",
+          aufStatus: "expired",
+        },
+        { userId: PAZ.userId, fullName: "Paz Pérez", aufStatus: "expiring" },
+      ],
+      attention: {
+        aufMissing: 1,
+        aufRenewal: 3,
+        withoutEmergencyContact: 2,
+        membershipPastDue: 1,
+      },
+    });
+  });
+
+  it("no cuenta a los dados de baja, ni aunque el Admin los pida en la lista", async () => {
+    const summary = await summaryOf({ includeInactive: true });
+
+    expect(summary).toEqual(await summaryOf());
+  });
+
+  it("no depende de la búsqueda, el rol ni los filtros de la lista", async () => {
+    const summary = await summaryOf({
+      search: "ana",
+      role: "Admin",
+      auf: "unverified",
+      withoutPhone: true,
+    });
+
+    expect(summary).toEqual(await summaryOf());
+  });
+
+  it.each([
+    ["aufMissing", { auf: "missing" }],
+    ["aufRenewal", { auf: "renewal" }],
+    ["withoutEmergencyContact", { withoutEmergencyContact: true }],
+    ["membershipPastDue", { membership: "past_due" }],
+  ] as const)(
+    "el contador %s cuadra con lo que da su filtro",
+    async (counter, filter) => {
+      const listing = await adminListing(filter);
+      const summary = await summaryOf();
+
+      expect(summary).toMatchObject({
+        attention: { [counter]: listing.members.length },
+      });
+    },
+  );
+
+  it.each(["Player", "Coach", "Committee"] as const)(
+    "a un %s no le manda el resumen",
+    async (callerRole) => {
+      const listing = await listDirectory(gateways({ callerRole }), {
+        callerId: CALLER_ID,
+        query: DEFAULT_DIRECTORY_QUERY,
+        todayInClub: TODAY,
+      });
+
+      expect(listing).not.toHaveProperty("summary");
+    },
+  );
+});
+
+describe("el filtro del AUF por renovar (#551)", () => {
+  it("trae a quien tiene el AUF vencido o por vencer, y a nadie más", async () => {
+    const names = await listNames(
+      { auf: "renewal", includeInactive: true },
+      "Admin",
+    );
+
+    // Bruno venció ayer; Zoe, dada de baja, vence hoy.
+    expect(names).toEqual(["Bruno Beltrán", "Zoe Zapata"]);
+  });
 });

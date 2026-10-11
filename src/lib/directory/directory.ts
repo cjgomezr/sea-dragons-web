@@ -85,12 +85,14 @@ export type DirectoryPositionFilter =
   | { readonly kind: "unassigned" };
 
 /** Sin número; vencido; vigente pero vence en los próximos 30 días del club;
- * con número y sin la confirmación de un Admin (#274). */
+ * con número y sin la confirmación de un Admin (#274); vencido o por vencer,
+ * que es lo que pide el "Ver" del AUF por renovar del resumen (#551). */
 export const AUF_FILTERS = [
   "missing",
   "expired",
   "expiring",
   "unverified",
+  "renewal",
 ] as const;
 
 export type AufFilter = (typeof AUF_FILTERS)[number];
@@ -240,6 +242,34 @@ export type AdminDirectoryMember = CoachDirectoryMember &
     readonly membershipStatus: MembershipStatus | null;
   };
 
+/** Por qué hay que renovar un AUF: ya venció, o vence en 30 días. */
+export const AUF_RENEWAL_STATUSES = ["expired", "expiring"] as const;
+
+export type AufRenewalStatus = (typeof AUF_RENEWAL_STATUSES)[number];
+
+export type AufRenewal = {
+  readonly userId: string;
+  readonly fullName: string;
+  readonly aufStatus: AufRenewalStatus;
+};
+
+/** Los cuatro contadores de "Necesita atención" (#551). Cada uno cuenta lo
+ * mismo que da su filtro sobre la lista sin recortar. */
+export type AttentionCounts = {
+  readonly aufMissing: number;
+  readonly aufRenewal: number;
+  readonly withoutEmergencyContact: number;
+  readonly membershipPastDue: number;
+};
+
+/** El resumen del club del panel lateral del Admin (#551, RF-4 del PRD de
+ * E21). Es de todo el club activo, no de la vista: la búsqueda y los filtros
+ * de la lista no lo tocan. */
+export type ClubSummary = {
+  readonly aufRenewals: readonly AufRenewal[];
+  readonly attention: AttentionCounts;
+};
+
 /** La lista, marcada con quién la está viendo. Quien la consume no tiene que
  * adivinar por la presencia de un campo si le toca dibujar la columna del
  * AUF, la marca de sin evaluar o la columna del contacto (#499).
@@ -265,6 +295,7 @@ export type DirectoryListing = {
   | {
       readonly kind: "admin";
       readonly members: readonly AdminDirectoryMember[];
+      readonly summary: ClubSummary;
     }
 );
 
@@ -434,7 +465,19 @@ function matchesAuf(
       return isAufExpiring(record.aufExpiry, todayInClub);
     case "unverified":
       return record.aufNumber !== null && !record.isAufVerified;
+    case "renewal":
+      return aufRenewalStatusOf(record.aufExpiry, todayInClub) !== null;
   }
+}
+
+function aufRenewalStatusOf(
+  aufExpiry: string | null,
+  todayInClub: string,
+): AufRenewalStatus | null {
+  if (isAufExpired(aufExpiry, todayInClub)) {
+    return "expired";
+  }
+  return isAufExpiring(aufExpiry, todayInClub) ? "expiring" : null;
 }
 
 function matchesMembership(
@@ -779,7 +822,59 @@ export async function listDirectory(
     ...context,
     todayInClub: request.todayInClub,
     total: countClubMembers(records, request.query),
+    clubRecords: records,
   });
+}
+
+/** Lo vencido primero, que es lo que pide hacer algo; después, por nombre. */
+function compareRenewals(first: AufRenewal, second: AufRenewal): number {
+  if (first.aufStatus !== second.aufStatus) {
+    return first.aufStatus === "expired" ? -1 : 1;
+  }
+  return compareNames(first.fullName, second.fullName);
+}
+
+function aufRenewalsOf(
+  active: readonly DirectoryMemberRecord[],
+  todayInClub: string,
+): readonly AufRenewal[] {
+  return active
+    .flatMap((record) => {
+      const aufStatus = aufRenewalStatusOf(record.aufExpiry, todayInClub);
+      return aufStatus === null
+        ? []
+        : [{ userId: record.userId, fullName: record.fullName, aufStatus }];
+    })
+    .sort(compareRenewals);
+}
+
+/** Cada contador usa el mismo criterio que su filtro, para que pulsarlo dé
+ * exactamente esa cantidad de filas. */
+export function summarizeClub(
+  records: readonly DirectoryMemberRecord[],
+  todayInClub: string,
+): ClubSummary {
+  const active = records.filter((record) =>
+    isListedStatus(record, DEFAULT_DIRECTORY_QUERY),
+  );
+  const countWhere = (filter: Partial<DirectoryQuery>): number =>
+    active.filter((record) =>
+      matchesFilters(
+        record,
+        { ...DEFAULT_DIRECTORY_QUERY, ...filter },
+        todayInClub,
+      ),
+    ).length;
+  const aufRenewals = aufRenewalsOf(active, todayInClub);
+  return {
+    aufRenewals,
+    attention: {
+      aufMissing: countWhere({ auf: "missing" }),
+      aufRenewal: aufRenewals.length,
+      withoutEmergencyContact: countWhere({ withoutEmergencyContact: true }),
+      membershipPastDue: countWhere({ membership: "past_due" }),
+    },
+  };
 }
 
 function countClubMembers(
@@ -797,6 +892,8 @@ function listingFor(
   context: ListingContext & {
     readonly todayInClub: string;
     readonly total: number;
+    /** Todo el club, sin recortar: de ahí sale el resumen del Admin. */
+    readonly clubRecords: readonly DirectoryMemberRecord[];
   },
 ): DirectoryListing {
   const { total } = context;
@@ -809,6 +906,7 @@ function listingFor(
       ),
       availableFilters,
       total,
+      summary: summarizeClub(context.clubRecords, context.todayInClub),
     };
   }
   if (hasCapability(role, "viewEvaluations")) {

@@ -3323,6 +3323,7 @@ a.auth-brand-header:focus-visible {
 .admin-member-avatar,
 .directory-avatar,
 .directory-card-avatar,
+.directory-overview-avatar,
 .directory-request-avatar {
   display: flex;
   flex: none;
@@ -3687,14 +3688,6 @@ a.auth-brand-header:focus-visible {
   border-color: var(--color-border);
 }
 
-.directory-panel-hint {
-  flex: 1;
-  margin: 0;
-  padding-top: var(--space-2);
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-
 /* Lo que en la fila son puntos, aquí con su palabra. El texto va en el color
    de siempre y el tono en el borde y el fondo: el amarillo del tema claro no
    llega al contraste AA como texto (ver .directory-mark-warning). */
@@ -3992,6 +3985,148 @@ a.auth-brand-header:focus-visible {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text);
+}
+
+/* El resumen del club (#551, "State A" de
+   docs/design/directorio-admin/README.md): lo que el panel del Admin enseña
+   sin nadie elegido. */
+.directory-overview-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.directory-overview-requests,
+.directory-overview-attention {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.directory-overview-requester {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.directory-overview-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 11px;
+}
+
+.directory-overview-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+/* El nombre se pulsa para abrir la ficha: sin el relleno del enlace de la
+   barra, para que se alinee con la línea del cambio. */
+.directory-overview-name.directory-link-button {
+  min-height: auto;
+  padding: 0;
+  font-size: 14px;
+  color: var(--color-text);
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.directory-overview-change {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.directory-overview-change strong {
+  color: var(--color-text);
+}
+
+/* El AUF por renovar: el tono de aviso en el borde y el fondo, nunca en el
+   texto, por el contraste del amarillo del tema claro. */
+.directory-overview-auf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--color-warning) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
+  border-radius: var(--radius);
+}
+
+.directory-overview-auf-names {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-soft);
+}
+
+.directory-overview-view {
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  font-size: 14px;
+}
+
+.directory-overview-attention-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.directory-overview-attention-row:hover {
+  border-color: var(--color-accent);
+}
+
+.directory-overview-attention-row[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-panel));
+  border-color: var(--color-accent);
+}
+
+.directory-overview-attention-label {
+  flex: 1;
+}
+
+.directory-overview-count {
+  font-family: var(--font-family-mono);
+  font-weight: 700;
+}
+
+/* La burbuja del botón del panel cerrado: cuántas solicitudes esperan. */
+.directory-panel-toggle {
+  position: relative;
+}
+
+.directory-panel-bubble {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-radius: 999px;
 }
 
 @media (min-width: 768px) {

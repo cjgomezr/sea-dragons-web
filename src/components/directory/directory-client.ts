@@ -9,6 +9,7 @@ import { ROLES } from "@/lib/auth/roles";
 import { DIRECTORY_API_PATH } from "@/lib/auth/routes";
 import { MEMBERSHIP_STATUSES } from "@/lib/membership/membership";
 import {
+  AUF_RENEWAL_STATUSES,
   DIRECTORY_FILTERS,
   DIRECTORY_FILTER_FORBIDDEN_REASON,
   type DirectoryListing,
@@ -92,6 +93,25 @@ const adminMemberSchema = coachMemberSchema.extend({
   membershipStatus: membershipStatusSchema,
 });
 
+const countSchema = z.number().int().nonnegative();
+
+/** El resumen del club que sólo recibe el Admin (#551). */
+const clubSummarySchema = z.object({
+  aufRenewals: z.array(
+    z.object({
+      userId: z.uuid(),
+      fullName: z.string(),
+      aufStatus: z.enum(AUF_RENEWAL_STATUSES),
+    }),
+  ),
+  attention: z.object({
+    aufMissing: countSchema,
+    aufRenewal: countSchema,
+    withoutEmergencyContact: countSchema,
+    membershipPastDue: countSchema,
+  }),
+});
+
 /** La misma unión discriminada que sirve el endpoint: quien la consume no
  * adivina por la presencia de un campo si le toca dibujar lo del Admin. */
 const availableFiltersSchema = z.array(z.enum(DIRECTORY_FILTERS));
@@ -122,6 +142,7 @@ const listingSchema = z.discriminatedUnion("kind", [
     kind: z.literal("admin"),
     members: z.array(adminMemberSchema),
     ...listingShape,
+    summary: clubSummarySchema,
   }),
 ]);
 

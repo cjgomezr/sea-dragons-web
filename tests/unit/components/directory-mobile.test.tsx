@@ -8,6 +8,7 @@ import type {
   DirectoryListing,
 } from "@/lib/directory/directory";
 import { GOALKEEPER, asDirectoryPosition } from "../helpers/seeded-positions";
+import { QUIET_CLUB_SUMMARY } from "../helpers/club-summary";
 
 /**
  * El directorio en el móvil (#553, RF-7 del PRD de E21): la cabecera con
@@ -124,6 +125,7 @@ function readResponse(stub: ApiStub, url: string): Response {
         members: [NEREA],
         availableFilters: ["position"],
         total: 1,
+        summary: QUIET_CLUB_SUMMARY,
       },
     });
   }
@@ -558,7 +560,7 @@ describe("la pantalla de solicitudes", () => {
 
     expect(
       await within(requestsScreen).findByText(
-        "The request from Nerea Ruiz was rejected.",
+        "Nerea Ruiz's request was rejected.",
       ),
     ).toBeVisible();
   });

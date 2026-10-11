@@ -1,11 +1,11 @@
 "use client";
 
 import { SidebarSimple } from "@phosphor-icons/react/dist/ssr/SidebarSimple";
-import { X } from "@phosphor-icons/react/dist/ssr/X";
 import { Icon } from "@/components/Icon";
 import type { Role } from "@/lib/auth/roles";
 import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
+import { ClubOverview, type OverviewContext } from "./ClubOverview";
 import { MemberQuickCard } from "./MemberQuickCard";
 import type { SelectedMember } from "./selected-member";
 import type { PendingRoleRequests } from "./use-pending-role-requests";
@@ -13,8 +13,8 @@ import type { PendingRoleRequests } from "./use-pending-role-requests";
 /**
  * El panel lateral del directorio (#550, RF-5 del PRD de E21): la columna de
  * 340px a la derecha de la lista, con la ficha rápida del socio que se
- * eligió. Sin nadie elegido, hasta que llegue el resumen del club (ticket 5
- * de E21), sólo dice cómo llenarlo.
+ * eligió. Sin nadie elegido, al Admin le enseña el resumen del club (#551);
+ * a los demás roles no se les abre sin alguien elegido (D4).
  *
  * Esc lo cierra desde cualquier punto de dentro, igual que su ✕; la pantalla
  * devuelve entonces el foco a la fila. Por debajo de 768px no hay panel: la
@@ -29,22 +29,34 @@ export const DIRECTORY_PANEL_ID = "directorio-panel";
  * elegido, que no tiene una fila a la que volver. */
 export const PANEL_TOGGLE_ID = "directorio-panel-boton";
 
+/** Lo que el botón de la barra necesita saber del panel. Sólo lo lleva un
+ * Admin: a los demás el panel se les abre al elegir a alguien (D4). */
+export type PanelToggleState = {
+  readonly isOpen: boolean;
+  /** Las solicitudes de rol que esperan: cerrado, el botón las cuenta. */
+  readonly waitingCount: number;
+  readonly onToggle: () => void;
+};
+
 export function PanelToggle({
   translate,
-  isOpen,
-  onToggle,
+  toggle: { isOpen, waitingCount, onToggle },
 }: {
   translate: Translator;
-  isOpen: boolean;
-  onToggle: () => void;
+  toggle: PanelToggleState;
 }): React.JSX.Element {
   const label = translate("directory.panel.toggle");
+  const hasBubble = !isOpen && waitingCount > 0;
   return (
     <button
       id={PANEL_TOGGLE_ID}
       type="button"
       className="directory-icon-button directory-panel-toggle"
-      aria-label={label}
+      aria-label={
+        hasBubble
+          ? translate("directory.panel.toggleWaiting", { count: waitingCount })
+          : label
+      }
       title={label}
       aria-expanded={isOpen}
       // Cerrado, el panel no está en la página: no hay a qué apuntar.
@@ -52,48 +64,41 @@ export function PanelToggle({
       onClick={onToggle}
     >
       <Icon glyph={SidebarSimple} />
+      {hasBubble ? (
+        <span className="directory-panel-bubble" aria-hidden="true">
+          {waitingCount}
+        </span>
+      ) : null}
     </button>
   );
 }
 
-function EmptyPanel({
-  translate,
-  onClose,
-}: {
-  translate: Translator;
-  onClose: () => void;
-}): React.JSX.Element {
-  const closeLabel = translate("directory.panel.close");
-  return (
-    <div className="directory-card-header">
-      <p className="directory-panel-hint">
-        {translate("directory.panel.hint")}
-      </p>
-      <button
-        type="button"
-        className="directory-card-close"
-        aria-label={closeLabel}
-        title={closeLabel}
-        onClick={onClose}
-      >
-        <Icon glyph={X} />
-      </button>
-    </div>
-  );
+/** Lo que enseña el panel: la ficha de quien se eligió o, sin nadie, el
+ * resumen del club del Admin. */
+export type PanelView =
+  | { readonly kind: "member"; readonly selected: SelectedMember }
+  | { readonly kind: "overview"; readonly overview: OverviewContext };
+
+function panelLabelOf(translate: Translator, view: PanelView): string {
+  return view.kind === "overview"
+    ? translate("directory.panel.label")
+    : translate("directory.panel.memberLabel", {
+        name: view.selected.member.fullName,
+      });
 }
 
 export function DirectoryPanel({
   translate,
   locale,
-  selected,
+  view,
   pendingRequests,
   onClose,
   onRoleChanged,
 }: {
   translate: Translator;
   locale: Locale;
-  /** `null` con el panel abierto y nadie elegido. */
-  selected: SelectedMember | null;
+  view: PanelView;
+  /** `null` para quien no es Admin: no decide solicitudes. */
   pendingRequests: PendingRoleRequests | null;
   onClose: () => void;
   onRoleChanged: (userId: string, role: Role) => void;
@@ -102,13 +107,7 @@ export function DirectoryPanel({
     <section
       id={DIRECTORY_PANEL_ID}
       className="directory-panel"
-      aria-label={
-        selected === null
-          ? translate("directory.panel.label")
-          : translate("directory.panel.memberLabel", {
-              name: selected.member.fullName,
-            })
-      }
+      aria-label={panelLabelOf(translate, view)}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
@@ -119,16 +118,21 @@ export function DirectoryPanel({
       {/* El interior es el que se queda pegado al bajar por la lista: la
           sección mide lo que la lista, para no tapar nada fuera de ella. */}
       <div className="directory-panel-inner">
-        {selected === null ? (
-          <EmptyPanel translate={translate} onClose={onClose} />
+        {view.kind === "overview" ? (
+          <ClubOverview
+            translate={translate}
+            locale={locale}
+            overview={view.overview}
+            onClose={onClose}
+          />
         ) : (
           <MemberQuickCard
             // Otro socio empieza de cero: sin esto, la franja de un rol a medio
             // elegir pasaría de una ficha a la siguiente.
-            key={selected.member.userId}
+            key={view.selected.member.userId}
             translate={translate}
             locale={locale}
-            selected={selected}
+            selected={view.selected}
             pendingRequests={pendingRequests}
             onClose={onClose}
             onRoleChanged={onRoleChanged}

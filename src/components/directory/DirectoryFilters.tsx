@@ -9,7 +9,7 @@ import type { Translator } from "@/lib/i18n/translator";
 import type { MoreFilters } from "./DirectoryFilterFields";
 import { DirectoryFilterChips } from "./DirectoryFilterChips";
 import { DirectoryMoreFilters } from "./DirectoryMoreFilters";
-import { PanelToggle } from "./DirectoryPanel";
+import { PanelToggle, type PanelToggleState } from "./DirectoryPanel";
 import type { FilterChoices } from "./use-filter-choices";
 
 /**
@@ -21,7 +21,8 @@ import type { FilterChoices } from "./use-filter-choices";
  * No filtran nada por su cuenta: dicen qué se pidió y la pantalla vuelve a
  * preguntárselo al servidor, que es quien decide qué puede ver cada rol.
  *
- * Al final de la barra va el botón que abre y cierra el panel lateral (#550).
+ * Al final de la barra va el botón que abre y cierra el panel lateral (#550),
+ * sólo para el Admin, que es quien tiene un resumen que ver en él (#551).
  */
 
 /** Qué se está pidiendo. `search` es el texto tal como se escribe, sin asentar
@@ -109,9 +110,8 @@ export function DirectoryFilters({
   availableFilters,
   choices,
   shownCount,
-  isPanelOpen,
+  panelToggle,
   onChange,
-  onTogglePanel,
 }: {
   translate: Translator;
   locale: Locale;
@@ -121,9 +121,9 @@ export function DirectoryFilters({
   choices: FilterChoices;
   /** Cuántos socios enseña la lista ahora, para el pie del popover. */
   shownCount: number;
-  isPanelOpen: boolean;
+  /** `null` sin botón del panel: a quien no es Admin se le abre al elegir. */
+  panelToggle: PanelToggleState | null;
   onChange: (filters: DirectoryFilterState) => void;
-  onTogglePanel: () => void;
 }): React.JSX.Element {
   const changeMore = (more: MoreFilters): void =>
     onChange({ ...filters, ...more });
@@ -161,11 +161,9 @@ export function DirectoryFilters({
           shownCount={shownCount}
           onChange={changeMore}
         />
-        <PanelToggle
-          translate={translate}
-          isOpen={isPanelOpen}
-          onToggle={onTogglePanel}
-        />
+        {panelToggle === null ? null : (
+          <PanelToggle translate={translate} toggle={panelToggle} />
+        )}
       </div>
       <DirectoryFilterChips
         translate={translate}
