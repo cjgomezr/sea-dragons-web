@@ -4378,7 +4378,8 @@ a.auth-brand-header:focus-visible {
 
 /* Entre 768 y 1023px la tabla tiene unos 500px, y con la letra de Linux
    "Aranburu de la Hoz" pide 151px de línea (#575). El aire de la fila y de
-   las celdas se estrecha para que un nombre largo quepa en dos líneas. */
+   las celdas se estrecha para que un nombre largo quepa en dos líneas. La
+   casilla mide los 12px de aire de la fila, su caja de 16px y 4px. */
 @media (768px <= width < 1024px) {
   .directory-table th,
   .directory-table td {
@@ -4658,7 +4659,7 @@ a.auth-brand-header:focus-visible {
     flex: 1 1 0;
   }
 
-  .directory-filters-anchor {
+  .directory-toolbar-end {
     order: 1;
   }
 
