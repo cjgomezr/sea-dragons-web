@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { ActiveAccess } from "@/lib/auth/session-boundary";
 import type { Locale } from "@/lib/i18n/locale";
@@ -13,6 +13,7 @@ import {
   isSectionActive,
 } from "@/lib/navigation";
 import { NAV_SECTION_ICONS, OverflowIcon } from "@/components/NavIcons";
+import { useDismissal } from "@/components/use-dismissal";
 
 const OVERFLOW_PANEL_ID = "app-tabbar-overflow";
 
@@ -28,15 +29,42 @@ export function MobileTabBar({
 }): React.JSX.Element {
   const pathname = usePathname();
   const translate = createTranslator(locale);
+  const navRef = useRef<HTMLElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
+  // The bar lives in the layout and survives navigation (#577): any route
+  // change (a link in the page, the browser's back) closes the menu. Reset
+  // during render, as React recommends over an effect.
+  const [menuPathname, setMenuPathname] = useState(pathname);
+  if (pathname !== menuPathname) {
+    setMenuPathname(pathname);
+    setIsOverflowOpen(false);
+  }
   const { primary, overflow } = getMobileSections(access);
+
+  const closeOverflow = useCallback(() => setIsOverflowOpen(false), []);
+  const closeOverflowAndReturnFocus = useCallback(() => {
+    setIsOverflowOpen(false);
+    moreButtonRef.current?.focus();
+  }, []);
+  useDismissal({
+    isOpen: isOverflowOpen,
+    containerRef: navRef,
+    onEscape: closeOverflowAndReturnFocus,
+    onPressOutside: closeOverflow,
+    onFocusOutside: closeOverflow,
+  });
 
   const hasActiveOverflowSection = overflow.some((section) =>
     isSectionActive(section.href, pathname),
   );
 
   return (
-    <nav aria-label={translate("nav.tabBarLabel")} className="app-tabbar">
+    <nav
+      ref={navRef}
+      aria-label={translate("nav.tabBarLabel")}
+      className="app-tabbar"
+    >
       <ul
         className="app-tabbar-overflow"
         id={OVERFLOW_PANEL_ID}
@@ -46,6 +74,7 @@ export function MobileTabBar({
           <li key={section.href}>
             <Link
               href={section.href}
+              onClick={closeOverflow}
               aria-current={
                 isSectionActive(section.href, pathname) ? "page" : undefined
               }
@@ -62,6 +91,7 @@ export function MobileTabBar({
             <li key={section.href}>
               <Link
                 href={section.href}
+                onClick={closeOverflow}
                 aria-current={
                   isSectionActive(section.href, pathname) ? "page" : undefined
                 }
@@ -77,6 +107,7 @@ export function MobileTabBar({
         {overflow.length === 0 ? null : (
           <li>
             <button
+              ref={moreButtonRef}
               type="button"
               aria-controls={OVERFLOW_PANEL_ID}
               aria-expanded={isOverflowOpen}
