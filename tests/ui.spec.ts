@@ -66,10 +66,10 @@ import { waitForSectionsLoaded } from "./support/wait-for-sections";
 import { servesCompiledApp } from "./support/web-server-command";
 import {
   type AccentPalette,
+  contrastRatio,
   evaluateAccentColor,
 } from "@/lib/club/accent-color";
 import { memberInitials } from "@/lib/auth/member-initials";
-import { contrastRatio } from "@/lib/club/accent-color";
 import { buildAccentStylesheet } from "@/lib/club/accent-stylesheet";
 import { shrinkProfilePhoto } from "@/lib/members/shrink-profile-photo";
 import { LOCALE_COOKIE_NAME, type Locale, isLocale } from "@/lib/i18n/locale";
