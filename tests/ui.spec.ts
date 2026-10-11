@@ -5377,6 +5377,196 @@ test.describe("la asistencia en la lista de tarjetas", () => {
   });
 });
 
+/* El nombre se lleva el ancho de la fila (#575): a 768px el menú lateral
+   deja a la tabla unos 500px, y el rol, la posición y la asistencia miden lo
+   justo para lo suyo. El nombre nunca se recorta ni se abrevia: si no cabe,
+   baja entero a otra línea. */
+
+/** Las líneas que ocupa el texto de un elemento, contadas por la altura a la
+ * que empieza cada trozo de texto y no por el alto de su caja, que en una
+ * píldora o una celda lleva además el borde y el aire. */
+async function renderedLineCount(locator: Locator): Promise<number> {
+  return locator.evaluate((element) => {
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    const lineTops = new Set<number>();
+    for (
+      let node = walker.nextNode();
+      node !== null;
+      node = walker.nextNode()
+    ) {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      for (const rect of range.getClientRects()) {
+        if (rect.width > 0) {
+          lineTops.add(Math.round(rect.top));
+        }
+      }
+    }
+    return lineTops.size;
+  });
+}
+
+/** El alto de la fila de Nerea, una Player, a 1440px antes de #575. */
+const DESKTOP_PLAYER_ROW_HEIGHT = 57.75;
+const ROW_HEIGHT_TOLERANCE = 2;
+/** "Su borde superior a ±4 px del de Filters" (#575). */
+const TOOLBAR_ALIGNMENT_TOLERANCE = 4;
+
+test.describe("el nombre se lleva el ancho de la fila del directorio", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  const state: DirectoryState = {
+    name: "directorio-nombre-entero",
+    asAdmin: true,
+    withRequests: true,
+    listHeading: ENGLISH_DIRECTORY_HEADING,
+  };
+
+  // Zoe, la única Committee de la lista fija, de alta: el rol más largo
+  // tiene que estar en la lista sin pedir los dados de baja.
+  const withActiveCommittee: DirectoryState = {
+    ...state,
+    members: STUBBED_DIRECTORY_MEMBERS.map((member) =>
+      member.fullName === "Zoe Zapata"
+        ? { ...member, status: "active" as const }
+        : member,
+    ),
+  };
+
+  /** El nombre visible de una fila, que a un Admin le enlaza su ficha. */
+  function memberNameIn(page: Page, name: string): Locator {
+    return page
+      .getByRole("row", { name })
+      .getByRole("link", { name: `Open ${name}'s record` });
+  }
+
+  test("a 768 px un nombre corto cabe en una línea", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await goToDirectory(page, state);
+
+    expect(await renderedLineCount(memberNameIn(page, "Mateo Restrepo"))).toBe(
+      1,
+    );
+  });
+
+  test("a 768 px un nombre largo se lee entero en dos líneas como mucho", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await goToDirectory(page, state);
+    const name = memberNameIn(page, LONG_MEMBER_NAME);
+
+    expect(await renderedLineCount(name)).toBeLessThanOrEqual(2);
+    await expect(name).toHaveText(LONG_MEMBER_NAME);
+    expect(await wordsSplitAcrossLines(page)).toEqual([]);
+    const clipping = await name.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        overflows: element.scrollWidth > element.clientWidth,
+        textOverflow: style.textOverflow,
+        lineClamp: style.webkitLineClamp,
+      };
+    });
+    expect(clipping).toEqual({
+      overflows: false,
+      textOverflow: "clip",
+      lineClamp: "none",
+    });
+  });
+
+  for (const width of [375, 768, 1024, 1440]) {
+    test(`la píldora de sin evaluar no se parte (${width}px)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 1024 });
+      await goToDirectory(page, state);
+      const mark = page
+        .getByRole("row", { name: LONG_MEMBER_NAME })
+        .getByRole("link", { name: /^Not evaluated/ });
+
+      expect(await renderedLineCount(mark)).toBe(1);
+    });
+  }
+
+  test("rol, posición y asistencia no se parten a 768 px", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await goToDirectory(page, withActiveCommittee);
+    const cells = [
+      page
+        .getByRole("row", { name: "Zoe Zapata" })
+        .getByRole("cell", { name: "Committee" }),
+      page
+        .getByRole("row", { name: "Nerea Ruiz" })
+        .getByRole("cell", { name: "Goalkeeper" }),
+      page
+        .getByRole("row", { name: LONG_MEMBER_NAME })
+        .getByRole("cell", { name: "No data" }),
+    ];
+
+    for (const cell of cells) {
+      expect(await renderedLineCount(cell)).toBe(1);
+    }
+  });
+
+  for (const width of [768, 1024, 1440]) {
+    test(`el botón del panel comparte línea con Filters (${width}px)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await goToDirectory(page, state);
+
+      const filters = await filterToggle(
+        page,
+        ENGLISH_FILTER_LABELS,
+      ).boundingBox();
+      const panel = await page
+        .getByRole("button", { name: /^Side panel/ })
+        .boundingBox();
+      expect(
+        Math.abs((panel?.y ?? Infinity) - (filters?.y ?? 0)),
+      ).toBeLessThanOrEqual(TOOLBAR_ALIGNMENT_TOLERANCE);
+    });
+  }
+
+  for (const width of [375, 768, 1440]) {
+    test(`la segunda línea de la última fila no se recorta (${width}px)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 1024 });
+      await goToDirectory(page, state);
+      // Desde 768px es el país y el nivel; en el móvil, el rol y la
+      // posición.
+      const secondLine = page
+        .getByRole("row")
+        .last()
+        .locator(width >= 768 ? ".directory-meta" : ".directory-position-cell");
+
+      const line = await secondLine.boundingBox();
+      const card = await page.locator(".directory-card").boundingBox();
+      expect((line?.y ?? Infinity) + (line?.height ?? 0)).toBeLessThanOrEqual(
+        (card?.y ?? 0) + (card?.height ?? 0),
+      );
+    });
+  }
+
+  test("a 1440 px la fila de un Player mantiene su alto", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToDirectory(page, state);
+
+    const row = await page
+      .getByRole("row", { name: "Nerea Ruiz" })
+      .boundingBox();
+    expect(
+      Math.abs((row?.height ?? 0) - DESKTOP_PLAYER_ROW_HEIGHT),
+    ).toBeLessThanOrEqual(ROW_HEIGHT_TOLERANCE);
+    expect(await renderedLineCount(memberNameIn(page, "Mateo Restrepo"))).toBe(
+      1,
+    );
+  });
+});
+
 /* La hoja de filtros del móvil (#497) con el teclado: el foco entra al
    abrirla, no sale mientras está abierta, y Escape la cierra devolviéndolo al
    botón. Y cada control mide al menos 44 px. */
@@ -5455,7 +5645,9 @@ test.describe("la hoja de filtros del directorio en el móvil", () => {
 
 /* El popover de Filtros en escritorio (#548): el foco entra al abrirlo,
    Escape lo cierra devolviéndolo al botón, y a 768px, el ancho más justo,
-   cabe entero en la ventana. */
+   cabe entero en la ventana. Tampoco se mete bajo el menú lateral: cuando
+   Filtros queda a la izquierda de la línea (#575), el popover se corre a la
+   derecha hasta el borde de la barra. */
 test.describe("el popover de filtros del directorio en escritorio", () => {
   skipWithoutSession();
   quietNotificationBell();
@@ -5482,7 +5674,8 @@ test.describe("el popover de filtros del directorio en escritorio", () => {
       await expect(popover).toBeVisible();
       await expect(popover.getByRole("combobox").first()).toBeFocused();
       const box = await popover.boundingBox();
-      expect(box?.x).toBeGreaterThanOrEqual(0);
+      const toolbar = await page.locator(".directory-toolbar").boundingBox();
+      expect(box?.x).toBeGreaterThanOrEqual(toolbar?.x ?? Infinity);
       expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
 
       await page.keyboard.press("Escape");
