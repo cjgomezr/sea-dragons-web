@@ -7910,6 +7910,24 @@ a.auth-brand-header:focus-visible {
   border-color: var(--color-accent);
 }
 
+/* "Sesiones anteriores" (#580) cierra la fila de fichas: es un enlace de
+   texto, no otra ficha, porque saca de la hoja hacia el calendario. */
+.attendance-older-sessions {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-1);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.attendance-older-sessions:hover {
+  text-decoration-thickness: 2px;
+}
+
 .attendance-totals {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

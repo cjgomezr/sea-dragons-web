@@ -1974,6 +1974,8 @@ export const spanishMessages: MessageCatalog = {
   "attendance.noSessions":
     "No ha empezado ningún entrenamiento en los últimos 30 días.",
   "attendance.toCalendar": "Ir al calendario",
+  "attendance.olderSessions": "Sesiones anteriores",
+  "attendance.olderSessions.label": "Sesiones anteriores: abrir el calendario",
   "attendance.totals.label": "Totales",
   "attendance.group.yes": "Confirmaron",
   "attendance.group.maybe": "Quizás",
