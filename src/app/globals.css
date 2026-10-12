@@ -36,7 +36,7 @@
      acento suave va sobre un tinte del acento; el texto suave queda entre el
      texto y el secundario. El acento al pasar es el relleno del botón
      primario bajo el puntero: no lo deriva el acento de cada club. */
-  --color-hover: #e6edf3;
+  --color-hover: #cfdae5;
   --color-accent-soft-text: #14507a;
   --color-text-soft: #2f4659;
   --color-accent-hover: #175c89;
@@ -4848,6 +4848,11 @@ a.auth-brand-header:focus-visible {
   color: var(--color-accent-text);
 }
 
+/* Bajo el puntero el acento no llega a AA sobre el hover (#581). */
+.directory-sheet-option[aria-pressed="true"]:hover {
+  color: var(--color-text);
+}
+
 .directory-sheet-option-detail {
   font-size: 14px;
   font-weight: 600;
@@ -4910,6 +4915,11 @@ a.auth-brand-header:focus-visible {
 .directory-sheet-action-hint {
   font-size: 12.5px;
   color: var(--color-text-secondary);
+}
+
+/* El secundario tampoco llega a AA sobre el hover (#581). */
+.directory-sheet-action:hover:not(:disabled) .directory-sheet-action-hint {
+  color: var(--color-text-soft);
 }
 
 .directory-sheet-cancel {
