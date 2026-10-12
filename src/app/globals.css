@@ -3707,10 +3707,17 @@ a.auth-brand-header:focus-visible {
   overflow-wrap: anywhere;
 }
 
+/* Como el nombre de la tabla: en el encabezado de la ficha, un subrayado fijo
+   se leía como un título roto. La línea sale con el ratón y con el foco. */
 .directory-card-name a {
   color: var(--color-text);
-  text-decoration: underline;
+  text-decoration: none;
   text-underline-offset: 3px;
+}
+
+.directory-card-name a:hover,
+.directory-card-name a:focus-visible {
+  text-decoration: underline;
 }
 
 /* La ✕ del panel y la de copiar: sin borde, para no competir con el resto. */
@@ -4082,7 +4089,9 @@ a.auth-brand-header:focus-visible {
 }
 
 /* El nombre se pulsa para abrir la ficha: sin el relleno del enlace de la
-   barra, para que se alinee con la línea del cambio. */
+   barra, para que se alinee con la línea del cambio. A diferencia de la tabla,
+   aquí sigue subrayado: en esta lista conviven nombres que se pulsan y otros
+   que no (quien aún no está en el directorio), y sólo la línea los distingue. */
 .directory-overview-name.directory-link-button {
   min-height: auto;
   padding: 0;
@@ -5105,17 +5114,21 @@ a.auth-brand-header:focus-visible {
 }
 
 /* A un Admin el nombre de cada fila le abre la ficha del miembro (#242). Se
-   queda del color del texto, como el nombre de quien sólo mira, y lo que dice
-   que es un enlace es el subrayado: el acento sobre el panel no se usa para
-   texto de 14px en esta tabla. */
+   queda del color del texto, como el nombre de quien sólo mira: el acento
+   sobre el panel no se usa para texto de 14px en esta tabla. Tampoco va
+   subrayado en reposo. En una columna donde cada nombre es el enlace de su
+   fila, el patrón ya dice que se pulsa, y una raya por fila sólo competía con
+   las marcas. La línea sale con el ratón y con el foco del teclado. */
 .directory-record-link {
   color: var(--color-text);
-  text-decoration: underline;
+  text-decoration: none;
   text-underline-offset: 3px;
 }
 
-.directory-record-link:hover {
+.directory-record-link:hover,
+.directory-record-link:focus-visible {
   color: var(--color-accent-text);
+  text-decoration: underline;
 }
 
 /* La ficha reservada al Admin (#242). Sin mockup: sigue el aspecto del
@@ -8038,9 +8051,11 @@ a.auth-brand-header:focus-visible {
   overflow-wrap: break-word;
 }
 
-/* Al Admin el nombre le abre la ficha (#414), con la forma de
-   `.directory-record-link`. Mide los 44px de toque de alto de verdad: con un
-   margen negativo, la línea de la posición taparía la mitad de abajo. */
+/* Al Admin el nombre le abre la ficha (#414). Mide los 44px de toque de alto
+   de verdad: con un margen negativo, la línea de la posición taparía la mitad
+   de abajo. A diferencia del directorio, aquí sigue subrayado: mientras se
+   pasa lista, tocar el nombre saca de la hoja en vez de marcar la presencia, y
+   eso tiene que verse. La línea va en gris para que no pese. */
 .attendance-record-link {
   display: inline-flex;
   align-items: center;
@@ -8048,11 +8063,13 @@ a.auth-brand-header:focus-visible {
   min-height: var(--touch-target-min);
   color: var(--color-text);
   text-decoration: underline;
+  text-decoration-color: var(--color-text-secondary);
   text-underline-offset: 3px;
 }
 
 .attendance-record-link:hover {
   color: var(--color-accent-text);
+  text-decoration-color: currentColor;
 }
 
 /* La foto mide 36px: su botón le suma 4px por lado, y no los 2px del
