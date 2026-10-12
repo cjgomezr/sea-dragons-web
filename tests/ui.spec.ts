@@ -6256,6 +6256,33 @@ function hexOfComputedColor(color: string): string {
     .join("")}`;
 }
 
+/** Lo bastante lento para que el gesto pase por varios `pointermove`. */
+const SWIPE_SPEED_PX_PER_SECOND = 600;
+
+/** Un dedo que se apoya en el centro de `target` y se desliza en vertical
+ * por pasos, sin inercia al soltar: positivo baja, negativo sube. */
+async function swipeWithFinger(
+  page: Page,
+  target: Locator,
+  distanceY: number,
+): Promise<void> {
+  const box = await target.boundingBox();
+  if (box === null) {
+    throw new Error("Lo que se iba a deslizar no está en la pantalla");
+  }
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.synthesizeScrollGesture", {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2,
+    xDistance: 0,
+    yDistance: distanceY,
+    gestureSourceType: "touch",
+    preventFling: true,
+    speed: SWIPE_SPEED_PX_PER_SECOND,
+  });
+  await cdp.detach();
+}
+
 /** Abre la ficha de la fila y la cierra con Escape: el foco vuelve a ella. */
 async function openAndCloseMemberSheet(
   page: Page,
@@ -6472,6 +6499,75 @@ test.describe("el directorio en el móvil (#553)", () => {
       0,
     );
     await expect(page.getByRole("row", { name: "Nerea Ruiz" })).toBeFocused();
+  });
+
+  // El foco sin contorno al abrirla con el dedo y el arrastre desde arriba
+  // (#579). Los gestos son de un dedo de verdad: Chromium los sintetiza por
+  // su propia tubería de entrada, así que el `touch-action` cuenta.
+  test.describe("con el dedo", () => {
+    test.use({ hasTouch: true });
+
+    test("la ficha abierta con el dedo no muestra contorno de foco en el asa", async ({
+      page,
+    }) => {
+      await goToDirectory(page, MOBILE_DIRECTORY_STATES[0]!);
+
+      await page.getByRole("row", { name: "Nerea Ruiz" }).tap();
+
+      const sheet = page.getByRole("dialog", { name: "Nerea Ruiz" });
+      await expect(sheet).toBeVisible();
+      await expect(
+        sheet.getByRole("button", { name: "Close the sheet" }),
+      ).not.toBeFocused();
+      const focusOutline = await page.evaluate(() =>
+        document.activeElement === null
+          ? "sin foco"
+          : getComputedStyle(document.activeElement).outlineStyle,
+      );
+      expect(focusOutline).toBe("none");
+    });
+
+    test("arrastrar la ficha hacia abajo desde la cabecera la cierra", async ({
+      page,
+    }) => {
+      await goToDirectory(page, {
+        ...MOBILE_DIRECTORY_STATES[0]!,
+        prepare: openMemberSheet("Nerea Ruiz"),
+      });
+      const sheet = page.getByRole("dialog", { name: "Nerea Ruiz" });
+
+      await swipeWithFinger(
+        page,
+        sheet.getByRole("heading", { name: "Nerea Ruiz" }),
+        240,
+      );
+
+      await expect(sheet).toHaveCount(0);
+      await expect(page.getByRole("row", { name: "Nerea Ruiz" })).toBeFocused();
+    });
+
+    test("arrastrar dentro del contenido hace scroll y no cierra", async ({
+      page,
+    }) => {
+      // Más baja que el móvil de siempre, para que la ficha no quepa entera.
+      await page.setViewportSize({ width: 375, height: 520 });
+      await goToDirectory(page, {
+        ...MOBILE_DIRECTORY_STATES[0]!,
+        prepare: openMemberSheet("Nerea Ruiz"),
+      });
+      const sheet = page.getByRole("dialog", { name: "Nerea Ruiz" });
+
+      await swipeWithFinger(
+        page,
+        sheet.getByRole("group", { name: "Contact" }),
+        -160,
+      );
+
+      await expect(sheet).toBeVisible();
+      expect(
+        await sheet.evaluate((dialog) => dialog.scrollTop),
+      ).toBeGreaterThan(0);
+    });
   });
 
   test("las filas dejan el desplazamiento vertical al navegador", async ({
