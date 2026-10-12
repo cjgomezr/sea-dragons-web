@@ -110,6 +110,9 @@ const colorRoleToCssVariable: Record<string, string> = {
   "Accent soft text": "color-accent-soft-text",
   "Text soft": "color-text-soft",
   "Accent hover": "color-accent-hover",
+  "Editor bar": "color-editor-bar",
+  "Segment selected": "color-segment-selected",
+  "Border dashed": "color-border-dashed",
 };
 
 describe("tokens de color: tema claro", () => {
@@ -331,6 +334,51 @@ describe.each([
     });
   },
 );
+
+// #590: la etiqueta de categoría de las noticias. Su fondo es el tono de la
+// categoría mezclado con el panel, y el texto va siempre en --color-text.
+const CATEGORY_LABEL_TINTS = [
+  ["announcement", "color-warning", 0.28],
+  ["news", "color-accent", 0.16],
+  ["document", "color-success", 0.22],
+] as const;
+
+describe.each([
+  ["claro", rootCss],
+  ["oscuro", darkCss],
+] as const)("contraste de las noticias en tema %s", (_, tokens) => {
+  it.each(CATEGORY_LABEL_TINTS)(
+    "el texto de la etiqueta %s cumple AA sobre su fondo",
+    (_category, tone, weight) => {
+      const labelBackground = tintOver(
+        token(tokens, tone),
+        token(tokens, "color-panel"),
+        weight,
+      );
+      expect(
+        contrastRatio(token(tokens, "color-text"), labelBackground),
+      ).toBeGreaterThanOrEqual(AA_TEXT);
+    },
+  );
+
+  it("el texto cumple AA sobre el segmento elegido", () => {
+    expect(
+      contrastRatio(
+        token(tokens, "color-text"),
+        token(tokens, "color-segment-selected"),
+      ),
+    ).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+
+  it("el texto cumple AA sobre la barra del editor", () => {
+    expect(
+      contrastRatio(
+        token(tokens, "color-text"),
+        token(tokens, "color-editor-bar"),
+      ),
+    ).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+});
 
 // #581: el hover claro de #547 (#E6EDF3) se quedaba en 1.18:1 sobre el panel
 // y casi en nada sobre el fondo, así que el puntero no se notaba. No es texto:

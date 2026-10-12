@@ -115,3 +115,39 @@ describe("la elección manual gana", () => {
     expect(manualDarkBlock).toMatch(/color-scheme:\s*dark;/);
   });
 });
+
+// #590: los colores del rediseño de las noticias que el handoff traía sueltos.
+const NEWS_REDESIGN_TOKENS = [
+  "color-editor-bar",
+  "color-segment-selected",
+  "color-border-dashed",
+] as const;
+
+describe("tokens del rediseño de las noticias", () => {
+  const manualDarkTokens = cssCustomProperties(manualDarkBlock);
+
+  it.each(NEWS_REDESIGN_TOKENS)("%s tiene valor en :root", (name) => {
+    expect(rootTokens[name]).toBeDefined();
+  });
+
+  it.each(NEWS_REDESIGN_TOKENS)(
+    "%s tiene valor en el tema oscuro manual",
+    (name) => {
+      expect(manualDarkTokens[name]).toBeDefined();
+    },
+  );
+
+  it.each(NEWS_REDESIGN_TOKENS)(
+    "%s tiene valor en la preferencia del sistema",
+    (name) => {
+      expect(cssCustomProperties(systemDarkBlock)[name]).toBeDefined();
+    },
+  );
+
+  it.each(NEWS_REDESIGN_TOKENS)(
+    "%s tiene un valor propio en el tema claro",
+    (name) => {
+      expect(rootTokens[name]).not.toBe(manualDarkTokens[name]);
+    },
+  );
+});
