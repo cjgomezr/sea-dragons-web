@@ -1958,6 +1958,8 @@ export const englishMessages = {
   "attendance.sessions.choice": "{weekday} {day} · {title}",
   "attendance.noSessions": "No training has started in the last 30 days.",
   "attendance.toCalendar": "Go to the calendar",
+  "attendance.olderSessions": "Older sessions",
+  "attendance.olderSessions.label": "Older sessions: open the calendar",
   "attendance.totals.label": "Totals",
   "attendance.group.yes": "Confirmed",
   "attendance.group.maybe": "Maybe",

@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import {
   ATTENDANCE_STATUSES,
   type AttendanceTotals,
 } from "@/lib/attendance/attendance-status";
+import { CALENDAR_PATH } from "@/lib/auth/routes";
 import type { RsvpResponse } from "@/lib/events/event-rsvp";
 import type { Translator } from "@/lib/i18n/translator";
 import {
@@ -18,7 +20,7 @@ import {
   statusOf,
   totalsOf,
 } from "./attendance-marks";
-import { AttendanceRow, type RowViewer } from "./AttendanceRow";
+import { AttendanceRow, type RowViewer, opensElsewhere } from "./AttendanceRow";
 import { sessionDay } from "./session-day";
 import {
   type AttendanceSheetControls,
@@ -59,11 +61,13 @@ function SessionChips({
   sessions,
   openedId,
   onChoose,
+  canLeaveSheet,
 }: {
   readonly translate: Translator;
   readonly sessions: readonly SessionChoice[];
   readonly openedId: string;
   readonly onChoose: (eventId: string) => void;
+  readonly canLeaveSheet: () => boolean;
 }): React.JSX.Element {
   return (
     <div
@@ -89,7 +93,33 @@ function SessionChips({
           </button>
         );
       })}
+      <OlderSessionsLink translate={translate} canLeaveSheet={canLeaveSheet} />
     </div>
+  );
+}
+
+/** Las fichas sólo llegan a 30 días atrás (#580): una sesión más vieja se
+ * abre desde el calendario, con "Pasar lista". */
+function OlderSessionsLink({
+  translate,
+  canLeaveSheet,
+}: {
+  readonly translate: Translator;
+  readonly canLeaveSheet: () => boolean;
+}): React.JSX.Element {
+  return (
+    <Link
+      href={CALENDAR_PATH}
+      className="attendance-older-sessions"
+      aria-label={translate("attendance.olderSessions.label")}
+      onClick={(event) => {
+        if (!opensElsewhere(event) && !canLeaveSheet()) {
+          event.preventDefault();
+        }
+      }}
+    >
+      {translate("attendance.olderSessions")}
+    </Link>
   );
 }
 
@@ -358,6 +388,7 @@ export function AttendanceSheetPanel({
           sessions={sessions}
           openedId={eventId}
           onChoose={chooseSession}
+          canLeaveSheet={canLeaveSheet}
         />
       )}
       {state.kind === "ready" ? (

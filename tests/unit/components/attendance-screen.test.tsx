@@ -580,6 +580,88 @@ describe("la hoja", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("ofrece un enlace a las sesiones anteriores que lleva al calendario", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    const sessions = await screen.findByRole("group", { name: "Sessions" });
+    const older = within(sessions).getByRole("link", {
+      name: /^Older sessions/,
+    });
+    expect(older).toHaveTextContent("Older sessions");
+    expect(older).toHaveAttribute("href", "/calendario");
+  });
+
+  it("el enlace nombra adónde lleva", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    expect(
+      await screen.findByRole("link", {
+        name: "Older sessions: open the calendar",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("sin sesiones recientes muestra un solo enlace al calendario", async () => {
+    stubClub([], []);
+
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+
+    await screen.findByText("No training has started in the last 30 days.");
+    const toCalendar = screen
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("href") === "/calendario");
+    expect(toCalendar).toHaveLength(1);
+    expect(
+      screen.queryByRole("link", { name: /^Older sessions/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("en español el enlace dice Sesiones anteriores", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+
+    render(<AttendanceScreen locale="es" initialSessionId={null} />);
+
+    const older = await screen.findByRole("link", {
+      name: "Sesiones anteriores: abrir el calendario",
+    });
+    expect(older).toHaveTextContent("Sesiones anteriores");
+  });
+
+  it("con cambios sin guardar el enlace a las sesiones anteriores pregunta y, si no se acepta, se queda", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    const mateo = await findRow(MATEO.fullName);
+    await userEvent.click(choice(mateo, "Late"));
+
+    await userEvent.click(
+      screen.getByRole("link", { name: /^Older sessions/ }),
+    );
+
+    expect(confirm).toHaveBeenCalledWith(
+      "You have unsaved changes on this session. Discard them?",
+    );
+    expect(navigate).not.toHaveBeenCalled();
+    expect(choice(mateo, "Late")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("con cambios sin guardar el enlace a las sesiones anteriores navega si se acepta descartarlos", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await userEvent.click(choice(await findRow(MATEO.fullName), "Late"));
+
+    await userEvent.click(
+      screen.getByRole("link", { name: /^Older sessions/ }),
+    );
+
+    expect(navigate).toHaveBeenCalledWith("/calendario");
+  });
+
   it("con ?sesion= abre esa hoja aunque no esté entre las fichas", async () => {
     const oldSheet = sheetFor(
       { eventId: OLD_TRAINING_ID, title: "Early Season Training" },
