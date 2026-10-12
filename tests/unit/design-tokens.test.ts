@@ -332,6 +332,79 @@ describe.each([
   },
 );
 
+// #581: el hover claro de #547 (#E6EDF3) se quedaba en 1.18:1 sobre el panel
+// y casi en nada sobre el fondo, así que el puntero no se notaba. No es texto:
+// los umbrales son los que hacen visible el cambio a simple vista.
+const HOVER_OVER_PANEL_MIN = 1.4;
+const HOVER_OVER_BACKGROUND_MIN = 1.25;
+const DARK_HOVER = "#1A3349";
+
+describe("visibilidad del hover", () => {
+  it("en el tema claro el hover se distingue del panel (1,4:1 o más)", () => {
+    expect(
+      contrastRatio(
+        token(rootCss, "color-hover"),
+        token(rootCss, "color-panel"),
+      ),
+    ).toBeGreaterThanOrEqual(HOVER_OVER_PANEL_MIN);
+  });
+
+  it("en el tema claro el hover se distingue del fondo (1,25:1 o más)", () => {
+    expect(
+      contrastRatio(
+        token(rootCss, "color-hover"),
+        token(rootCss, "color-background"),
+      ),
+    ).toBeGreaterThanOrEqual(HOVER_OVER_BACKGROUND_MIN);
+  });
+
+  it("design-system.md documenta el contraste del hover claro con el panel y el fondo", () => {
+    const hoverRow = designSystem
+      .split("\n")
+      .find((line) => line.startsWith("| Hover "));
+    const hover = token(rootCss, "color-hover");
+    const panelRatio = contrastRatio(hover, token(rootCss, "color-panel"));
+    const backgroundRatio = contrastRatio(
+      hover,
+      token(rootCss, "color-background"),
+    );
+    expect(hoverRow).toContain(`${panelRatio.toFixed(2)}:1 on Panel`);
+    expect(hoverRow).toContain(`${backgroundRatio.toFixed(2)}:1 on Background`);
+  });
+
+  it("el tema oscuro conserva su hover", () => {
+    expect(token(darkCss, "color-hover").toUpperCase()).toBe(DARK_HOVER);
+  });
+
+  // Un hover más oscuro baja el contraste del texto encima: el acento de la
+  // opción de orden activa y la pista gris de las acciones del "⋯" dejaban de
+  // llegar a AA, así que al pasar el ratón cambian de color.
+  const textColorUnderPointer: Record<string, string> = {
+    ".directory-role:hover": "color-text",
+    '.directory-sheet-option[aria-pressed="true"]:hover': "color-text",
+    ".directory-sheet-action:hover:not(:disabled) .directory-sheet-action-hint":
+      "color-text-soft",
+  };
+
+  it.each(Object.entries(textColorUnderPointer))(
+    "%s pinta su texto con un token que cumple AA sobre el hover",
+    (selector, cssVariable) => {
+      const declared = /\scolor:\s*var\(--([\w-]+)\)/.exec(
+        cssBlock(globalsCss, selector),
+      )?.[1];
+      expect(declared).toBe(cssVariable);
+      for (const tokens of [rootCss, darkCss]) {
+        expect(
+          contrastRatio(
+            token(tokens, cssVariable),
+            token(tokens, "color-hover"),
+          ),
+        ).toBeGreaterThanOrEqual(AA_TEXT);
+      }
+    },
+  );
+});
+
 describe("tipografía", () => {
   it("la pila de texto declara una familia de respaldo genérica", () => {
     expect(token(rootCss, "font-family-body")).toMatch(/,\s*sans-serif\s*$/);
