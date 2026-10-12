@@ -6256,6 +6256,51 @@ function hexOfComputedColor(color: string): string {
     .join("")}`;
 }
 
+/** Lo que avanza el dedo entre un `touchMove` y el siguiente: pasos cortos,
+ * para que el gesto pase por varios `pointermove`. */
+const SWIPE_STEP_PX = 10;
+
+/** Un dedo que se apoya en el centro de `target` y se desliza en vertical
+ * por pasos: positivo baja, negativo sube.
+ *
+ * Son toques sueltos (`Input.dispatchTouchEvent`) y no
+ * `Input.synthesizeScrollGesture`: con este, Chromium sin ventana manda los
+ * `pointermove` pero nunca desplaza nada, ni la hoja ni la página (#579).
+ * Los toques sueltos no pueden pedir que no haya inercia al soltar, así que
+ * quien mida un desplazamiento no debe esperar una cifra exacta. */
+async function swipeWithFinger(
+  page: Page,
+  target: Locator,
+  distanceY: number,
+): Promise<void> {
+  const box = await target.boundingBox();
+  if (box === null) {
+    throw new Error("Lo que se iba a deslizar no está en la pantalla");
+  }
+  const x = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
+  const stepCount = Math.ceil(Math.abs(distanceY) / SWIPE_STEP_PX);
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x, y: startY }],
+    });
+    for (let step = 1; step <= stepCount; step += 1) {
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x, y: startY + (distanceY * step) / stepCount }],
+      });
+    }
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+  } finally {
+    await cdp.detach();
+  }
+}
+
 /** Abre la ficha de la fila y la cierra con Escape: el foco vuelve a ella. */
 async function openAndCloseMemberSheet(
   page: Page,
@@ -6472,6 +6517,119 @@ test.describe("el directorio en el móvil (#553)", () => {
       0,
     );
     await expect(page.getByRole("row", { name: "Nerea Ruiz" })).toBeFocused();
+  });
+
+  // El foco sin contorno al abrirla con el dedo y el arrastre desde arriba
+  // (#579). Los gestos son de un dedo de verdad: Chromium los sintetiza por
+  // su propia tubería de entrada, así que el `touch-action` cuenta.
+  test.describe("con el dedo", () => {
+    test.use({ hasTouch: true });
+
+    test("la ficha abierta con el dedo no muestra contorno de foco en el asa", async ({
+      page,
+    }) => {
+      await goToDirectory(page, MOBILE_DIRECTORY_STATES[0]!);
+
+      await page.getByRole("row", { name: "Nerea Ruiz" }).tap();
+
+      const sheet = page.getByRole("dialog", { name: "Nerea Ruiz" });
+      await expect(sheet).toBeVisible();
+      await expect(
+        sheet.getByRole("button", { name: "Close the sheet" }),
+      ).not.toBeFocused();
+      const focusOutline = await page.evaluate(() =>
+        document.activeElement === null
+          ? "sin foco"
+          : getComputedStyle(document.activeElement).outlineStyle,
+      );
+      expect(focusOutline).toBe("none");
+    });
+
+    test("arrastrar la ficha hacia abajo desde la cabecera la cierra", async ({
+      page,
+    }) => {
+      await goToDirectory(page, {
+        ...MOBILE_DIRECTORY_STATES[0]!,
+        prepare: openMemberSheet("Nerea Ruiz"),
+      });
+      const sheet = page.getByRole("dialog", { name: "Nerea Ruiz" });
+
+      await swipeWithFinger(
+        page,
+        sheet.getByRole("heading", { name: "Nerea Ruiz" }),
+        240,
+      );
+
+      await expect(sheet).toHaveCount(0);
+      await expect(page.getByRole("row", { name: "Nerea Ruiz" })).toBeFocused();
+    });
+
+    // El cambio está en `BottomSheet`, así que las otras tres hojas lo
+    // heredan: se abren sin contorno y se cierran arrastrando su título.
+    const OTHER_SHEETS = [
+      {
+        name: "filtros",
+        opener: (page: Page) => filterToggle(page, ENGLISH_FILTER_LABELS),
+        dialog: "Filters",
+      },
+      {
+        name: "orden",
+        opener: (page: Page) => page.getByRole("button", { name: /^Sort:/ }),
+        dialog: "Sort by",
+      },
+      {
+        name: "⋯",
+        opener: (page: Page) =>
+          page.getByRole("button", { name: "More actions" }),
+        dialog: /members? in this view$/,
+      },
+    ] as const;
+
+    for (const other of OTHER_SHEETS) {
+      test(`la hoja de ${other.name} se abre sin contorno y se cierra arrastrando su título`, async ({
+        page,
+      }) => {
+        await goToDirectory(page, MOBILE_DIRECTORY_STATES[0]!);
+
+        await other.opener(page).tap();
+
+        const sheet = page.getByRole("dialog", { name: other.dialog });
+        await expect(sheet).toBeVisible();
+        const focusOutline = await page.evaluate(() =>
+          document.activeElement === null
+            ? "sin foco"
+            : getComputedStyle(document.activeElement).outlineStyle,
+        );
+        expect(focusOutline).toBe("none");
+
+        await swipeWithFinger(page, sheet.getByRole("heading").first(), 240);
+
+        await expect(sheet).toHaveCount(0);
+      });
+    }
+
+    test("arrastrar dentro del contenido hace scroll y no cierra", async ({
+      page,
+    }) => {
+      // Más baja que el móvil de siempre, para que la ficha no quepa entera.
+      await page.setViewportSize({ width: 375, height: 520 });
+      await goToDirectory(page, {
+        ...MOBILE_DIRECTORY_STATES[0]!,
+        prepare: openMemberSheet("Nerea Ruiz"),
+      });
+      const sheet = page.getByRole("dialog", { name: "Nerea Ruiz" });
+
+      await swipeWithFinger(
+        page,
+        sheet.getByRole("group", { name: "Contact" }),
+        -160,
+      );
+
+      await expect(sheet).toBeVisible();
+      expect(
+        await sheet.evaluate((dialog) => dialog.scrollTop),
+      ).toBeGreaterThan(0);
+    });
   });
 
   test("las filas dejan el desplazamiento vertical al navegador", async ({
