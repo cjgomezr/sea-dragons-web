@@ -9,14 +9,14 @@ import { formatCalendarDay } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
-import { RequestActions } from "./PendingRequestsTray";
+import { RequestActions } from "./RequestActions";
 import { useSingleDecision } from "./use-single-decision";
 
 /**
  * Las solicitudes de rol del resumen del club (#551, RF-4 del PRD de E21):
- * una tarjeta por solicitud, con Aprobar y Rechazar. Deciden por el mismo
- * `usePendingRoleRequests` que la bandeja, y una sola decisión sale cada
- * vez para toda la sección, como allí.
+ * una tarjeta por solicitud, con Aprobar y Rechazar. Deciden por
+ * `usePendingRoleRequests`, y una sola decisión sale cada vez para toda la
+ * sección.
  */
 
 /** El círculo de la tarjeta, en píxeles; `.directory-overview-avatar` dice

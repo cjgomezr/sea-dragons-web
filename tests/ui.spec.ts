@@ -4429,17 +4429,14 @@ async function stubDirectoryReads(
 const ENGLISH_DIRECTORY_HEADING = "Club members";
 const SPANISH_DIRECTORY_HEADING = "Miembros del club";
 
-/** El título de la bandeja en el idioma de cada lista. */
-const TRAY_HEADINGS: Readonly<Record<string, string>> = {
-  [ENGLISH_DIRECTORY_HEADING]: "Pending requests",
-  [SPANISH_DIRECTORY_HEADING]: "Solicitudes pendientes",
-};
+/** Lo que dice la cabecera, en los dos idiomas, cuando ya sabe cuántas
+ * solicitudes hay; el aviso del móvil (#553) dice lo mismo. */
+const REQUESTS_SETTLED =
+  /No pending requests|role requests? waiting|No hay solicitudes pendientes|solicitud(es)? de rol esperando/;
 
-const TRAY_LOADING = /Loading the pending requests|Cargando las solicitudes/;
-
-/** La pantalla pide su lista al montarse, y la de un Admin después su
- * bandeja, así que hasta que llegan sólo dicen que están cargando. Sin
- * esperarlas, la captura sale de ese estado. */
+/** La pantalla pide su lista al montarse, y la de un Admin después sus
+ * solicitudes. Sin esperarlas, la captura sale sin la línea de la cabecera
+ * o sin el aviso del móvil. */
 async function waitForDirectory(
   page: Page,
   heading: string,
@@ -4448,15 +4445,9 @@ async function waitForDirectory(
   await expect(page.getByRole("region", { name: heading })).toBeVisible();
   await expect(page.getByRole("table")).toBeVisible();
   if (asAdmin) {
-    // En el móvil la bandeja está escondida: allí las solicitudes tienen
-    // su pantalla (#553). Se espera igual a que termine de cargar.
-    await expect(
-      page.getByRole("region", {
-        name: TRAY_HEADINGS[heading],
-        includeHidden: true,
-      }),
-    ).toBeAttached();
-    await expect(page.getByText(TRAY_LOADING)).toHaveCount(0);
+    // En el móvil la línea de la cabecera está escondida, así que basta con
+    // que esté en la página.
+    await expect(page.getByText(REQUESTS_SETTLED).first()).toBeAttached();
   }
 }
 
@@ -6379,9 +6370,6 @@ test.describe("el directorio en el móvil (#553)", () => {
     await expect(
       page.getByRole("button", { name: "Write an email" }),
     ).toBeHidden();
-    await expect(
-      page.getByRole("region", { name: "Pending requests" }),
-    ).toBeHidden();
   });
 
   test("los chips del rol se desplazan en su fila y el elegido filtra", async ({
@@ -7278,14 +7266,12 @@ test.describe("el directorio con los datos de verdad", () => {
   });
 
   // Desde #549 la fila enseña el rol como texto: se cambia en la ficha.
-  test("un Admin ve la bandeja y su propio rol en su fila", async ({
+  test("un Admin ve la línea de las solicitudes y su propio rol en su fila", async ({
     page,
   }) => {
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
 
-    await expect(
-      page.getByRole("heading", { name: "Pending requests" }),
-    ).toBeVisible();
+    await expect(page.getByText(REQUESTS_SETTLED).first()).toBeVisible();
     await expect(
       page
         .getByRole("row", { name: ADMINISTRATION_ADMIN_NAME })
@@ -7293,12 +7279,18 @@ test.describe("el directorio con los datos de verdad", () => {
     ).toBeVisible();
   });
 
-  test("en español, la bandeja sale en español", async ({ page }) => {
+  test("en español, la línea de las solicitudes sale en español", async ({
+    page,
+  }) => {
     await chooseSpanish(page);
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
 
     await expect(
-      page.getByRole("heading", { name: "Solicitudes pendientes" }),
+      page
+        .getByText(
+          /No hay solicitudes pendientes|solicitud(es)? de rol esperando/,
+        )
+        .first(),
     ).toBeVisible();
   });
 
@@ -7308,9 +7300,7 @@ test.describe("el directorio con los datos de verdad", () => {
     await page.goto(`${APP_URL}/administracion`);
 
     await expect(page).toHaveURL(new RegExp(`${DIRECTORY_SCREEN_PATH}$`));
-    await expect(
-      page.getByRole("heading", { name: "Pending requests" }),
-    ).toBeVisible();
+    await expect(page.getByText(REQUESTS_SETTLED).first()).toBeVisible();
   });
 
   test("las lecturas de E3 le siguen respondiendo 200", async ({ request }) => {
@@ -7617,13 +7607,13 @@ test.describe("un Player frente al directorio", () => {
     expect(directory.status()).toBe(200);
   });
 
-  test("no le enseña la bandeja ni el control de rol", async ({ page }) => {
+  test("no le enseña las solicitudes ni el control de rol", async ({
+    page,
+  }) => {
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
     await expect(page.getByRole("table")).toBeVisible();
 
-    await expect(
-      page.getByRole("heading", { name: "Pending requests" }),
-    ).toHaveCount(0);
+    await expect(page.getByText(REQUESTS_SETTLED)).toHaveCount(0);
     // La búsqueda global de la barra (#427) también es un combobox: el que
     // no puede estar es el del rol de una fila.
     await expect(page.getByRole("combobox", { name: /^Role for/ })).toHaveCount(

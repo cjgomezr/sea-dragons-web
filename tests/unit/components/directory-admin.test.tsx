@@ -197,27 +197,36 @@ function stubApi(stub: ApiStub = {}): void {
   );
 }
 
-const TRAY_LOADING = {
-  en: "Loading the pending requests…",
-  es: "Cargando las solicitudes pendientes…",
+/** Lo que dice la cabecera cuando ya sabe cuántas solicitudes hay. */
+const REQUESTS_STATUS = {
+  en: /No pending requests|role requests? waiting/,
+  es: /No hay solicitudes pendientes|solicitud(es)? de rol esperando/,
 } as const;
 
-/** Espera a que el directorio y la bandeja hayan pintado lo que leyeron. */
+/** Espera a que el directorio y las solicitudes hayan pintado lo que
+ * leyeron. */
 async function renderAdminDirectory(locale: "en" | "es" = "en"): Promise<void> {
   render(<DirectoryScreen locale={locale} />);
   await screen.findByRole("region", {
     name: locale === "en" ? "Club members" : "Miembros del club",
   });
-  await screen.findByRole("region", {
-    name: locale === "en" ? "Pending requests" : "Solicitudes pendientes",
-  });
-  await waitFor(() =>
-    expect(screen.queryByText(TRAY_LOADING[locale])).toBeNull(),
-  );
+  await screen.findAllByText(REQUESTS_STATUS[locale]);
 }
 
-function trayItem(): HTMLElement {
-  return screen.getByRole("listitem", { name: /Nerea Ruiz/ });
+/** La píldora de la cabecera, que abre el resumen del panel. El aviso del
+ * móvil (#553) también cuenta las solicitudes, pero termina en "Review". */
+function requestsPill(name: string | RegExp = /^\d+ role requests? waiting$/) {
+  return screen.getByRole("button", { name });
+}
+
+/** Abre el panel en el resumen desde la píldora de la cabecera. */
+async function openRequests(): Promise<HTMLElement> {
+  await userEvent.setup().click(requestsPill());
+  return screen.getByRole("region", { name: "Side panel" });
+}
+
+function requestCard(): HTMLElement {
+  return screen.getByRole("group", { name: "Role request from Nerea Ruiz" });
 }
 
 /** La celda del rol de un miembro, que desde #549 es sólo texto. Sin
@@ -234,10 +243,6 @@ function approveButton(): HTMLElement {
   });
 }
 
-function emptyTray(): HTMLElement {
-  return screen.getByText("No requests are waiting for an answer.");
-}
-
 beforeEach(() => {
   calls.length = 0;
 });
@@ -246,41 +251,67 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("directorio para Admin: bandeja de solicitudes", () => {
-  it("lista cada solicitud con el miembro, el rol pedido, la fecha y la justificación", async () => {
+// Desde el rediseño (E21) las solicitudes se deciden en el resumen del panel
+// (#551). La bandeja de abajo, que venía de #240, repetía las mismas.
+describe("directorio para Admin: solicitudes en el resumen del panel", () => {
+  it("no repite las solicitudes en una bandeja debajo de la lista", async () => {
     stubApi();
 
     await renderAdminDirectory();
 
-    const item = trayItem();
     expect(
-      within(item).getByText(/Nerea Ruiz asked to be Coach/),
-    ).toBeVisible();
+      screen.queryByRole("region", { name: "Pending requests" }),
+    ).toBeNull();
     expect(
-      within(item).getByText("Asked on 17 September 2026 at 6:30 pm"),
-    ).toBeVisible();
-    expect(
-      within(item).getByText("Entreno a los juveniles los jueves."),
-    ).toBeVisible();
+      screen.queryByRole("button", {
+        name: "Approve the request from Nerea Ruiz",
+      }),
+    ).toBeNull();
   });
 
-  it("dice con una frase que no hay ninguna, en vez de una lista vacía", async () => {
-    stubApi({ requests: [] });
-
+  it("la píldora de la cabecera abre el panel en el resumen, con la solicitud", async () => {
+    stubApi();
     await renderAdminDirectory();
 
-    expect(emptyTray()).toBeVisible();
-    expect(screen.queryByRole("listitem", { name: /Nerea Ruiz/ })).toBeNull();
+    const summary = await openRequests();
+
+    expect(
+      within(summary).getByRole("heading", { name: "Role requests · 1" }),
+    ).toBeVisible();
+    expect(
+      within(summary).getByRole("group", {
+        name: "Role request from Nerea Ruiz",
+      }),
+    ).toBeVisible();
   });
 
-  it("al aprobar, la solicitud sale de la bandeja y la lista enseña el rol nuevo", async () => {
+  it("con la ficha de un socio a la vista, la píldora vuelve al resumen", async () => {
+    const user = userEvent.setup();
+    stubApi({ members: [NEREA, ANA] });
+    await renderAdminDirectory();
+    await user.click(screen.getByRole("row", { name: "Ana Admin" }));
+
+    await user.click(requestsPill());
+
+    expect(requestCard()).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "Details of Ana Admin" }),
+    ).toBeNull();
+  });
+
+  it("al aprobar, la solicitud sale del resumen y la lista enseña el rol nuevo", async () => {
     const user = userEvent.setup();
     stubApi();
     await renderAdminDirectory();
+    await openRequests();
 
     await user.click(approveButton());
 
-    await waitFor(() => expect(emptyTray()).toBeVisible());
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("group", { name: "Role request from Nerea Ruiz" }),
+      ).toBeNull(),
+    );
     expect(roleCell("Nerea Ruiz", "Coach")).toBeVisible();
     expect(calls.filter((call) => call.method === "POST")).toEqual([
       {
@@ -291,38 +322,20 @@ describe("directorio para Admin: bandeja de solicitudes", () => {
     ]);
   });
 
-  it("al rechazar, la solicitud sale de la bandeja y el rol no cambia", async () => {
-    const user = userEvent.setup();
-    stubApi({
-      decision: async () =>
-        jsonResponse(200, {
-          data: { ...APPROVED_DECISION.data, status: "rejected" },
-        }),
-    });
-    await renderAdminDirectory();
-
-    await user.click(
-      screen.getByRole("button", {
-        name: "Reject the request from Nerea Ruiz",
-      }),
-    );
-
-    await waitFor(() => expect(emptyTray()).toBeVisible());
-    expect(roleCell("Nerea Ruiz", "Player")).toBeVisible();
-    expect(calls.at(-1)?.body).toEqual({ decision: "rejected" });
-  });
-
-  it("una solicitud que otro Admin ya resolvió lo dice y sale de la bandeja", async () => {
+  it("una solicitud que otro Admin ya resolvió lo dice y sale del resumen", async () => {
     const user = userEvent.setup();
     stubApi({ decision: async () => errorResponse(409, "conflict") });
     await renderAdminDirectory();
+    await openRequests();
 
     await user.click(approveButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Another Admin already answered this request.",
     );
-    expect(screen.queryByRole("listitem", { name: /Nerea Ruiz/ })).toBeNull();
+    expect(
+      screen.queryByRole("group", { name: "Role request from Nerea Ruiz" }),
+    ).toBeNull();
     expect(roleCell("Nerea Ruiz", "Player")).toBeVisible();
   });
 
@@ -334,17 +347,18 @@ describe("directorio para Admin: bandeja de solicitudes", () => {
       },
     });
     await renderAdminDirectory();
+    await openRequests();
 
     await user.click(approveButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't reach the server",
     );
-    expect(trayItem()).toBeVisible();
+    expect(requestCard()).toBeVisible();
 
     stubApi();
     await user.click(approveButton());
-    await waitFor(() => expect(emptyTray()).toBeVisible());
+    await waitFor(() => expect(roleCell("Nerea Ruiz", "Coach")).toBeVisible());
   });
 
   it("desactiva aprobar y rechazar mientras la decisión está en curso", async () => {
@@ -357,6 +371,7 @@ describe("directorio para Admin: bandeja de solicitudes", () => {
         }),
     });
     await renderAdminDirectory();
+    await openRequests();
 
     await user.click(approveButton());
 
@@ -371,18 +386,7 @@ describe("directorio para Admin: bandeja de solicitudes", () => {
     });
   });
 
-  it("un doble clic manda una sola decisión", async () => {
-    const user = userEvent.setup();
-    stubApi();
-    await renderAdminDirectory();
-
-    await user.dblClick(approveButton());
-
-    await waitFor(() => expect(emptyTray()).toBeVisible());
-    expect(calls.filter((call) => call.method === "POST")).toHaveLength(1);
-  });
-
-  it("si la bandeja no carga, lo dice y deja volver a intentar sin perder la lista", async () => {
+  it("si las solicitudes no cargan, la cabecera lo dice y deja volver a intentar sin perder la lista", async () => {
     const user = userEvent.setup();
     stubApi({ loadRequests: async () => errorResponse(500, "internal_error") });
     render(<DirectoryScreen locale="en" />);
@@ -395,9 +399,10 @@ describe("directorio para Admin: bandeja de solicitudes", () => {
     stubApi();
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
-    expect(await screen.findByRole("listitem", { name: /Nerea Ruiz/ })).toBe(
-      trayItem(),
-    );
+    expect(
+      await screen.findByRole("button", { name: "1 role request waiting" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
 
@@ -449,11 +454,11 @@ describe("directorio para Admin: el rol en la fila (#549)", () => {
   it("quita la píldora al aprobar la solicitud, y el rol pasa a ser el pedido", async () => {
     stubApi({ members: [NEREA] });
     await renderAdminDirectory();
+    await openRequests();
 
     await userEvent.setup().click(approveButton());
 
-    await waitFor(() => expect(emptyTray()).toBeVisible());
-    expect(roleCell("Nerea Ruiz", "Coach")).toBeVisible();
+    await waitFor(() => expect(roleCell("Nerea Ruiz", "Coach")).toBeVisible());
     expect(within(memberRow("Nerea Ruiz")).queryByText(/→/)).toBeNull();
   });
 
@@ -596,7 +601,7 @@ describe("directorio para Admin: ficha reservada (#242)", () => {
 });
 describe("directorio para quien no es Admin", () => {
   it.each(["Coach", "Committee", "Player"] as const)(
-    "a un %s no le enseña la bandeja ni el control de rol",
+    "a un %s no le enseña las solicitudes ni el control de rol",
     async (role) => {
       stubApi({ kind: "member", members: [{ ...NEREA, role }] });
 
@@ -626,34 +631,21 @@ describe("directorio para quien no es Admin", () => {
 });
 
 describe("directorio para Admin en español", () => {
-  it("escribe títulos, roles y estados vacíos en español", async () => {
+  it("escribe los roles en español", async () => {
     stubApi({ requests: [] });
 
     await renderAdminDirectory("es");
 
-    expect(
-      screen.getByRole("heading", { name: "Solicitudes pendientes" }),
-    ).toBeVisible();
-    expect(
-      screen.getByText("No hay solicitudes esperando respuesta."),
-    ).toBeVisible();
     expect(roleCell("Nerea Ruiz", "Jugador")).toBeVisible();
-  });
-
-  it("escribe en español la fecha y el rol pedido de una solicitud", async () => {
-    stubApi();
-
-    await renderAdminDirectory("es");
-
-    const item = screen.getByRole("listitem", { name: /Nerea Ruiz/ });
-    expect(within(item).getByText(/Nerea Ruiz pidió ser Coach/)).toBeVisible();
-    expect(within(item).getByText(/17 de septiembre de 2026/)).toBeVisible();
   });
 
   it("traduce al español el aviso de un error del servidor", async () => {
     const user = userEvent.setup();
     stubApi({ decision: async () => errorResponse(409, "conflict") });
     await renderAdminDirectory("es");
+    await user.click(
+      screen.getByRole("button", { name: "1 solicitud de rol esperando" }),
+    );
 
     await user.click(
       screen.getByRole("button", {
@@ -666,7 +658,7 @@ describe("directorio para Admin en español", () => {
     );
   });
 
-  it("traduce al español que la bandeja no cargó", async () => {
+  it("traduce al español que las solicitudes no cargaron", async () => {
     stubApi({ loadRequests: async () => errorResponse(500, "internal_error") });
 
     render(<DirectoryScreen locale="es" />);
@@ -692,17 +684,15 @@ describe("directorio para Admin: solicitudes en la cabecera", () => {
     await renderAdminDirectory();
 
     expect(screen.getByText("No pending requests")).toBeVisible();
-    expect(screen.queryByRole("link", { name: /waiting/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /waiting$/ })).toBeNull();
   });
 
-  it("con una, lleva a la bandeja con la frase en singular", async () => {
+  it("con una, la píldora lo dice en singular", async () => {
     stubApi({ requests: [COACH_REQUEST] });
 
     await renderAdminDirectory();
 
-    expect(
-      screen.getByRole("link", { name: "1 role request waiting" }),
-    ).toHaveAttribute("href", "#solicitudes-pendientes");
+    expect(requestsPill("1 role request waiting")).toBeVisible();
     expect(screen.queryByText("No pending requests")).toBeNull();
   });
 
@@ -711,19 +701,18 @@ describe("directorio para Admin: solicitudes en la cabecera", () => {
 
     await renderAdminDirectory();
 
-    expect(
-      screen.getByRole("link", { name: "2 role requests waiting" }),
-    ).toBeVisible();
+    expect(requestsPill("2 role requests waiting")).toBeVisible();
   });
 
   it("al aprobar la última, pasa a no tener ninguna pendiente", async () => {
     stubApi({ requests: [COACH_REQUEST] });
     await renderAdminDirectory();
+    await openRequests();
 
     await userEvent.setup().click(approveButton());
 
     expect(await screen.findByText("No pending requests")).toBeVisible();
-    expect(screen.queryByRole("link", { name: /waiting/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /waiting$/ })).toBeNull();
   });
 
   it.each([
@@ -735,10 +724,12 @@ describe("directorio para Admin: solicitudes en la cabecera", () => {
 
     await renderAdminDirectory("es");
 
-    // La línea de la cabecera, un párrafo o la píldora que enlaza: el aviso
-    // del móvil (#553) dice lo mismo en un botón, y sin hoja de estilos los
+    // La línea de la cabecera, un párrafo o la píldora: el aviso del móvil
+    // (#553) dice lo mismo seguido de "Revisar", y sin hoja de estilos los
     // dos están en la página.
-    expect(screen.getByText(expected, { selector: "p, a" })).toBeVisible();
+    expect(
+      screen.getByText(expected, { selector: "p, .directory-requests-pill" }),
+    ).toBeVisible();
   });
 
   it("a quien no es Admin no le dice nada de solicitudes", async () => {
@@ -748,6 +739,6 @@ describe("directorio para Admin: solicitudes en la cabecera", () => {
     await screen.findByRole("region", { name: "Club members" });
 
     expect(screen.queryByText("No pending requests")).toBeNull();
-    expect(screen.queryByRole("link", { name: /waiting/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /waiting/ })).toBeNull();
   });
 });

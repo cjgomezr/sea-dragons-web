@@ -49,7 +49,6 @@ import {
   memberRowId,
 } from "./DirectoryTable";
 import { RoleRequestsBanner } from "./RoleRequestsBanner";
-import { RoleRequestsPanel } from "./RoleRequestsPanel";
 import { RoleRequestsScreen } from "./RoleRequestsScreen";
 import {
   canChangeRoles,
@@ -77,11 +76,11 @@ import {
  * que comprobar aquí: quien no tiene sesión no llega, y lo que es del Admin lo
  * decide el servidor. Que quien mira sea Admin se sabe por la respuesta, que
  * viene marcada, y no por un rol que la pantalla haya leído por su cuenta.
- * Con esa marca, un Admin encuentra además la bandeja de solicitudes de rol
- * (#240), que antes vivía en su propia pantalla de administración, y en cada
- * fila el rol que ese socio pidió. La cabecera y la barra son las del
- * rediseño de E21 (#548): la bandeja queda debajo de la lista, y la cabecera
- * lleva a ella. La lista es la compacta de #549, que ya no cambia el rol:
+ * Con esa marca, un Admin ve además las solicitudes de rol: en cada fila, el
+ * rol que ese socio pidió, y en la cabecera (#548), cuántas esperan. Se
+ * deciden en el resumen del club del panel (#551), que la cabecera abre. La
+ * bandeja que #240 puso debajo de la lista repetía las mismas y ya no está.
+ * La lista es la compacta de #549, que ya no cambia el rol:
  * pulsar una fila abre su ficha rápida en el panel lateral (#550), y es ahí
  * donde el Admin lo cambia.
  *
@@ -190,12 +189,12 @@ function rowCheckingOf(
  * o al título si ya no queda ninguna. */
 type RequestsView = "list" | "screen" | "returned";
 
-/** Cuántas solicitudes esperan, si la bandeja ya lo sabe. */
+/** Cuántas solicitudes esperan, si ya se sabe. */
 function waitingCountOf(state: PendingRequestsState): number {
   return state.kind === "ready" ? state.requests.length : 0;
 }
 
-/** Lo que pidió cada socio, mientras la bandeja lo sabe. */
+/** Lo que pidió cada socio, mientras se sabe. */
 function requestedRolesOf(state: PendingRequestsState): RequestedRoles {
   if (state.kind !== "ready") {
     return NO_REQUESTED_ROLES;
@@ -224,6 +223,7 @@ function usePanelSelection(hasOverview: boolean): {
   readonly toggleMember: (userId: string) => void;
   readonly close: (isShowingMember: boolean) => void;
   readonly togglePanel: () => void;
+  readonly showOverview: () => void;
 } {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -268,7 +268,21 @@ function usePanelSelection(hasOverview: boolean): {
     setIsOpen((current) => !current);
   }
 
-  return { isOpen, selectedUserId, toggleMember, close, togglePanel };
+  /** Las solicitudes de la cabecera llevan al resumen, abierto o no el
+   * panel, y aunque enseñara la ficha de alguien. */
+  function showOverview(): void {
+    setSelectedUserId(null);
+    setIsOpen(true);
+  }
+
+  return {
+    isOpen,
+    selectedUserId,
+    toggleMember,
+    close,
+    togglePanel,
+    showOverview,
+  };
 }
 
 /** Lo que el resumen del club toma de la pantalla, además de la lista. */
@@ -525,7 +539,15 @@ export function DirectoryScreen({
       <DirectoryHeader
         translate={translate}
         listed={state.kind === "ready" ? state : null}
-        pendingRequests={isAdminListing ? pendingRequests.state : null}
+        requests={
+          isAdminListing
+            ? {
+                state: pendingRequests.state,
+                onReview: panel.showOverview,
+                onRetry: pendingRequests.retry,
+              }
+            : null
+        }
         titleRef={titleRef}
         checkedMembers={checked.members}
         onOpenEmail={setEmailRecipients}
@@ -666,12 +688,6 @@ export function DirectoryScreen({
             ) : null}
           </div>
         </section>
-      ) : null}
-      {isAdminListing ? (
-        <RoleRequestsPanel
-          translate={translate}
-          pendingRequests={pendingRequests}
-        />
       ) : null}
     </div>
   );

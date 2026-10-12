@@ -191,7 +191,9 @@ function sortButton(): HTMLElement {
 }
 
 function requestsBanner(): HTMLElement {
-  return screen.getByRole("button", { name: /role requests? waiting/ });
+  return screen.getByRole("button", {
+    name: /role requests? waiting · Review/,
+  });
 }
 
 async function openRequestsScreen(): Promise<HTMLElement> {
@@ -465,7 +467,7 @@ describe("el aviso de solicitudes", () => {
     await renderAdminDirectory();
 
     expect(
-      screen.queryByRole("button", { name: /role requests? waiting/ }),
+      screen.queryByRole("button", { name: /role requests? waiting · Review/ }),
     ).toBeNull();
   });
 
@@ -477,7 +479,9 @@ describe("el aviso de solicitudes", () => {
       await renderDirectory();
 
       expect(
-        screen.queryByRole("button", { name: /role requests? waiting/ }),
+        screen.queryByRole("button", {
+          name: /role requests? waiting · Review/,
+        }),
       ).toBeNull();
       expect(calls.some(({ url }) => url === PENDING_REQUESTS_PATH)).toBe(
         false,
