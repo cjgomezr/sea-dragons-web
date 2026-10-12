@@ -4429,17 +4429,14 @@ async function stubDirectoryReads(
 const ENGLISH_DIRECTORY_HEADING = "Club members";
 const SPANISH_DIRECTORY_HEADING = "Miembros del club";
 
-/** El título de la bandeja en el idioma de cada lista. */
-const TRAY_HEADINGS: Readonly<Record<string, string>> = {
-  [ENGLISH_DIRECTORY_HEADING]: "Pending requests",
-  [SPANISH_DIRECTORY_HEADING]: "Solicitudes pendientes",
-};
+/** Lo que dice la cabecera, en los dos idiomas, cuando ya sabe cuántas
+ * solicitudes hay; el aviso del móvil (#553) dice lo mismo. */
+const REQUESTS_SETTLED =
+  /No pending requests|role requests? waiting|No hay solicitudes pendientes|solicitud(es)? de rol esperando/;
 
-const TRAY_LOADING = /Loading the pending requests|Cargando las solicitudes/;
-
-/** La pantalla pide su lista al montarse, y la de un Admin después su
- * bandeja, así que hasta que llegan sólo dicen que están cargando. Sin
- * esperarlas, la captura sale de ese estado. */
+/** La pantalla pide su lista al montarse, y la de un Admin después sus
+ * solicitudes. Sin esperarlas, la captura sale sin la línea de la cabecera
+ * o sin el aviso del móvil. */
 async function waitForDirectory(
   page: Page,
   heading: string,
@@ -4448,15 +4445,9 @@ async function waitForDirectory(
   await expect(page.getByRole("region", { name: heading })).toBeVisible();
   await expect(page.getByRole("table")).toBeVisible();
   if (asAdmin) {
-    // En el móvil la bandeja está escondida: allí las solicitudes tienen
-    // su pantalla (#553). Se espera igual a que termine de cargar.
-    await expect(
-      page.getByRole("region", {
-        name: TRAY_HEADINGS[heading],
-        includeHidden: true,
-      }),
-    ).toBeAttached();
-    await expect(page.getByText(TRAY_LOADING)).toHaveCount(0);
+    // En el móvil la línea de la cabecera está escondida, así que basta con
+    // que esté en la página.
+    await expect(page.getByText(REQUESTS_SETTLED).first()).toBeAttached();
   }
 }
 
@@ -6256,6 +6247,51 @@ function hexOfComputedColor(color: string): string {
     .join("")}`;
 }
 
+/** Lo que avanza el dedo entre un `touchMove` y el siguiente: pasos cortos,
+ * para que el gesto pase por varios `pointermove`. */
+const SWIPE_STEP_PX = 10;
+
+/** Un dedo que se apoya en el centro de `target` y se desliza en vertical
+ * por pasos: positivo baja, negativo sube.
+ *
+ * Son toques sueltos (`Input.dispatchTouchEvent`) y no
+ * `Input.synthesizeScrollGesture`: con este, Chromium sin ventana manda los
+ * `pointermove` pero nunca desplaza nada, ni la hoja ni la página (#579).
+ * Los toques sueltos no pueden pedir que no haya inercia al soltar, así que
+ * quien mida un desplazamiento no debe esperar una cifra exacta. */
+async function swipeWithFinger(
+  page: Page,
+  target: Locator,
+  distanceY: number,
+): Promise<void> {
+  const box = await target.boundingBox();
+  if (box === null) {
+    throw new Error("Lo que se iba a deslizar no está en la pantalla");
+  }
+  const x = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
+  const stepCount = Math.ceil(Math.abs(distanceY) / SWIPE_STEP_PX);
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x, y: startY }],
+    });
+    for (let step = 1; step <= stepCount; step += 1) {
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x, y: startY + (distanceY * step) / stepCount }],
+      });
+    }
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+  } finally {
+    await cdp.detach();
+  }
+}
+
 /** Abre la ficha de la fila y la cierra con Escape: el foco vuelve a ella. */
 async function openAndCloseMemberSheet(
   page: Page,
@@ -6333,9 +6369,6 @@ test.describe("el directorio en el móvil (#553)", () => {
     expect((await banner.boundingBox())?.height).toBeGreaterThanOrEqual(48);
     await expect(
       page.getByRole("button", { name: "Write an email" }),
-    ).toBeHidden();
-    await expect(
-      page.getByRole("region", { name: "Pending requests" }),
     ).toBeHidden();
   });
 
@@ -6472,6 +6505,119 @@ test.describe("el directorio en el móvil (#553)", () => {
       0,
     );
     await expect(page.getByRole("row", { name: "Nerea Ruiz" })).toBeFocused();
+  });
+
+  // El foco sin contorno al abrirla con el dedo y el arrastre desde arriba
+  // (#579). Los gestos son de un dedo de verdad: Chromium los sintetiza por
+  // su propia tubería de entrada, así que el `touch-action` cuenta.
+  test.describe("con el dedo", () => {
+    test.use({ hasTouch: true });
+
+    test("la ficha abierta con el dedo no muestra contorno de foco en el asa", async ({
+      page,
+    }) => {
+      await goToDirectory(page, MOBILE_DIRECTORY_STATES[0]!);
+
+      await page.getByRole("row", { name: "Nerea Ruiz" }).tap();
+
+      const sheet = page.getByRole("dialog", { name: "Nerea Ruiz" });
+      await expect(sheet).toBeVisible();
+      await expect(
+        sheet.getByRole("button", { name: "Close the sheet" }),
+      ).not.toBeFocused();
+      const focusOutline = await page.evaluate(() =>
+        document.activeElement === null
+          ? "sin foco"
+          : getComputedStyle(document.activeElement).outlineStyle,
+      );
+      expect(focusOutline).toBe("none");
+    });
+
+    test("arrastrar la ficha hacia abajo desde la cabecera la cierra", async ({
+      page,
+    }) => {
+      await goToDirectory(page, {
+        ...MOBILE_DIRECTORY_STATES[0]!,
+        prepare: openMemberSheet("Nerea Ruiz"),
+      });
+      const sheet = page.getByRole("dialog", { name: "Nerea Ruiz" });
+
+      await swipeWithFinger(
+        page,
+        sheet.getByRole("heading", { name: "Nerea Ruiz" }),
+        240,
+      );
+
+      await expect(sheet).toHaveCount(0);
+      await expect(page.getByRole("row", { name: "Nerea Ruiz" })).toBeFocused();
+    });
+
+    // El cambio está en `BottomSheet`, así que las otras tres hojas lo
+    // heredan: se abren sin contorno y se cierran arrastrando su título.
+    const OTHER_SHEETS = [
+      {
+        name: "filtros",
+        opener: (page: Page) => filterToggle(page, ENGLISH_FILTER_LABELS),
+        dialog: "Filters",
+      },
+      {
+        name: "orden",
+        opener: (page: Page) => page.getByRole("button", { name: /^Sort:/ }),
+        dialog: "Sort by",
+      },
+      {
+        name: "⋯",
+        opener: (page: Page) =>
+          page.getByRole("button", { name: "More actions" }),
+        dialog: /members? in this view$/,
+      },
+    ] as const;
+
+    for (const other of OTHER_SHEETS) {
+      test(`la hoja de ${other.name} se abre sin contorno y se cierra arrastrando su título`, async ({
+        page,
+      }) => {
+        await goToDirectory(page, MOBILE_DIRECTORY_STATES[0]!);
+
+        await other.opener(page).tap();
+
+        const sheet = page.getByRole("dialog", { name: other.dialog });
+        await expect(sheet).toBeVisible();
+        const focusOutline = await page.evaluate(() =>
+          document.activeElement === null
+            ? "sin foco"
+            : getComputedStyle(document.activeElement).outlineStyle,
+        );
+        expect(focusOutline).toBe("none");
+
+        await swipeWithFinger(page, sheet.getByRole("heading").first(), 240);
+
+        await expect(sheet).toHaveCount(0);
+      });
+    }
+
+    test("arrastrar dentro del contenido hace scroll y no cierra", async ({
+      page,
+    }) => {
+      // Más baja que el móvil de siempre, para que la ficha no quepa entera.
+      await page.setViewportSize({ width: 375, height: 520 });
+      await goToDirectory(page, {
+        ...MOBILE_DIRECTORY_STATES[0]!,
+        prepare: openMemberSheet("Nerea Ruiz"),
+      });
+      const sheet = page.getByRole("dialog", { name: "Nerea Ruiz" });
+
+      await swipeWithFinger(
+        page,
+        sheet.getByRole("group", { name: "Contact" }),
+        -160,
+      );
+
+      await expect(sheet).toBeVisible();
+      expect(
+        await sheet.evaluate((dialog) => dialog.scrollTop),
+      ).toBeGreaterThan(0);
+    });
   });
 
   test("las filas dejan el desplazamiento vertical al navegador", async ({
@@ -7120,14 +7266,12 @@ test.describe("el directorio con los datos de verdad", () => {
   });
 
   // Desde #549 la fila enseña el rol como texto: se cambia en la ficha.
-  test("un Admin ve la bandeja y su propio rol en su fila", async ({
+  test("un Admin ve la línea de las solicitudes y su propio rol en su fila", async ({
     page,
   }) => {
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
 
-    await expect(
-      page.getByRole("heading", { name: "Pending requests" }),
-    ).toBeVisible();
+    await expect(page.getByText(REQUESTS_SETTLED).first()).toBeVisible();
     await expect(
       page
         .getByRole("row", { name: ADMINISTRATION_ADMIN_NAME })
@@ -7135,12 +7279,18 @@ test.describe("el directorio con los datos de verdad", () => {
     ).toBeVisible();
   });
 
-  test("en español, la bandeja sale en español", async ({ page }) => {
+  test("en español, la línea de las solicitudes sale en español", async ({
+    page,
+  }) => {
     await chooseSpanish(page);
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
 
     await expect(
-      page.getByRole("heading", { name: "Solicitudes pendientes" }),
+      page
+        .getByText(
+          /No hay solicitudes pendientes|solicitud(es)? de rol esperando/,
+        )
+        .first(),
     ).toBeVisible();
   });
 
@@ -7150,9 +7300,7 @@ test.describe("el directorio con los datos de verdad", () => {
     await page.goto(`${APP_URL}/administracion`);
 
     await expect(page).toHaveURL(new RegExp(`${DIRECTORY_SCREEN_PATH}$`));
-    await expect(
-      page.getByRole("heading", { name: "Pending requests" }),
-    ).toBeVisible();
+    await expect(page.getByText(REQUESTS_SETTLED).first()).toBeVisible();
   });
 
   test("las lecturas de E3 le siguen respondiendo 200", async ({ request }) => {
@@ -7388,10 +7536,10 @@ test.describe("un Admin que decide una solicitud desde el directorio", () => {
     timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS,
   });
 
-  test("aprobar la saca de la bandeja y deja al miembro con su rol nuevo", async ({
+  test("aprobar desde el resumen del panel la saca y deja al miembro con su rol nuevo", async ({
     page,
   }) => {
-    // La bandeja se pide aparte, después de la lista. Con la suite entera en
+    // Las solicitudes se piden aparte, después de la lista. Con la suite entera en
     // paralelo en CI esa respuesta pasaba a veces de los 5 s por defecto de
     // `expect`, y el test fallaba sin que hubiera nada roto: se espera a que
     // llegue antes de buscar el botón.
@@ -7403,6 +7551,10 @@ test.describe("un Admin que decide una solicitud desde el directorio", () => {
     );
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
     expect((await trayLoaded).status()).toBe(200);
+    // La píldora de la cabecera abre el panel en el resumen, donde se deciden.
+    await page
+      .getByRole("button", { name: /^\d+ role requests? waiting$/ })
+      .click();
     const approve = page.getByRole("button", {
       name: `Approve the request from ${DECIDABLE_MEMBER_NAME}`,
     });
@@ -7459,13 +7611,13 @@ test.describe("un Player frente al directorio", () => {
     expect(directory.status()).toBe(200);
   });
 
-  test("no le enseña la bandeja ni el control de rol", async ({ page }) => {
+  test("no le enseña las solicitudes ni el control de rol", async ({
+    page,
+  }) => {
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
     await expect(page.getByRole("table")).toBeVisible();
 
-    await expect(
-      page.getByRole("heading", { name: "Pending requests" }),
-    ).toHaveCount(0);
+    await expect(page.getByText(REQUESTS_SETTLED)).toHaveCount(0);
     // La búsqueda global de la barra (#427) también es un combobox: el que
     // no puede estar es el del rol de una fila.
     await expect(page.getByRole("combobox", { name: /^Role for/ })).toHaveCount(
@@ -15258,6 +15410,20 @@ test.describe("asistencia en el navegador", () => {
     expect(saved.map((body) => body.records.length)).toEqual([
       ATTENDANCE_MEMBERS.length,
     ]);
+  });
+
+  test("el enlace a sesiones anteriores mide 44 px y no ensancha la página a 375 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+
+    const older = page
+      .getByRole("group", { name: "Sessions" })
+      .getByRole("link", { name: "Older sessions: open the calendar" });
+    await expect(older).toBeVisible();
+    expect((await older.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    expect(await hasHorizontalScroll(page)).toBe(false);
   });
 
   test("agrupa la hoja en cuatro regiones, en el orden de las respuestas", async ({

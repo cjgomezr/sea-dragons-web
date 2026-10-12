@@ -44,4 +44,14 @@ if (typeof window !== "undefined") {
       },
     });
   }
+
+  // Nor pointer capture. The sheet that follows the finger (#579) captures the
+  // pointer once a drag starts; which element then receives the events only
+  // exists in a real browser, so Playwright covers that half.
+  if (!("setPointerCapture" in Element.prototype)) {
+    Object.assign(Element.prototype, {
+      setPointerCapture(): void {},
+      releasePointerCapture(): void {},
+    });
+  }
 }

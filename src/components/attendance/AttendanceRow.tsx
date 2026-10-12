@@ -35,7 +35,7 @@ export type RowViewer = {
 
 /** Abrir en otra pestaña o ventana no saca de la hoja: no hay nada que
  * descartar, y preguntar cancelaría esa apertura si se contesta que no. */
-function opensElsewhere(event: React.MouseEvent): boolean {
+export function opensElsewhere(event: React.MouseEvent): boolean {
   return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey;
 }
 

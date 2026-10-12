@@ -36,7 +36,7 @@
      acento suave va sobre un tinte del acento; el texto suave queda entre el
      texto y el secundario. El acento al pasar es el relleno del botón
      primario bajo el puntero: no lo deriva el acento de cada club. */
-  --color-hover: #e6edf3;
+  --color-hover: #cfdae5;
   --color-accent-soft-text: #14507a;
   --color-text-soft: #2f4659;
   --color-accent-hover: #175c89;
@@ -2089,7 +2089,6 @@ a.auth-brand-header:focus-visible {
   gap: var(--space-4);
 }
 
-.admin-requests,
 .admin-members {
   display: flex;
   flex-direction: column;
@@ -2097,39 +2096,6 @@ a.auth-brand-header:focus-visible {
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.admin-request {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-}
-
-.admin-request-summary {
-  margin: 0;
-  font-size: 16px;
-  line-height: 1.3;
-  /* Un nombre largo parte por donde haga falta antes que ensanchar la tarjeta
-     y sacar una barra horizontal a 375px. */
-  overflow-wrap: anywhere;
-}
-
-.admin-request-date {
-  margin: 0;
-  font-family: var(--font-family-mono);
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-/* La justificación la escribe quien pide y puede llegar a 500 caracteres. */
-.admin-request-note {
-  margin: 0;
-  color: var(--color-text-secondary);
-  overflow-wrap: anywhere;
 }
 
 .admin-request-actions {
@@ -2460,25 +2426,41 @@ a.auth-brand-header:focus-visible {
   color: var(--color-success);
 }
 
-/* La píldora que lleva a la bandeja: acento tintado, con el texto suave del
-   acento que design-system.md reserva para esto (#547). */
+/* La píldora que abre el resumen del panel, donde se deciden las
+   solicitudes: acento tintado, con el texto suave del acento que
+   design-system.md reserva para esto (#547). */
 .directory-requests-pill {
   display: inline-flex;
   gap: 6px;
   align-items: center;
   align-self: flex-start;
   padding: 4px 10px;
+  font-family: inherit;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--color-accent-soft-text);
-  text-decoration: none;
   background: color-mix(in srgb, var(--color-accent) 14%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
   border-radius: 999px;
+  cursor: pointer;
 }
 
 .directory-requests-pill:hover {
   border-color: var(--color-accent);
+}
+
+/* Las solicitudes no cargaron: la línea lo dice y deja volver a pedirlas. */
+.directory-requests-failed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+  font-size: 12.5px;
+  color: var(--color-danger);
+}
+
+.directory-requests-failed p {
+  margin: 0;
 }
 
 .directory-actions {
@@ -3028,6 +3010,19 @@ a.auth-brand-header:focus-visible {
   border: none;
   border-radius: 20px 20px 0 0;
   box-shadow: var(--shadow);
+  transition: transform 200ms ease-out;
+}
+
+/* Mientras el dedo la arrastra (#579), la hoja va con él sin retraso; la
+   transición sólo la devuelve a su sitio al soltar. */
+.directory-sheet[data-dragging] {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .directory-sheet {
+    transition: none;
+  }
 }
 
 .directory-sheet::backdrop {
@@ -3038,7 +3033,25 @@ a.auth-brand-header:focus-visible {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-6) var(--space-4);
+  padding: 0 var(--space-4) var(--space-6);
+}
+
+/* El panel recibe el foco cuando la hoja la abre un dedo (#579): no es un
+   control y Tab no llega a él, así que no pinta contorno. */
+.directory-sheet-panel:focus {
+  outline: none;
+}
+
+/* La zona de arriba, desde donde se arrastra la hoja (#579): el asa y el
+   título o el encabezado. Lleva el relleno de arriba del panel para que el
+   dedo la encuentre desde el borde. Sólo ella anula el gesto del navegador;
+   el contenido de debajo sigue haciendo scroll. */
+.directory-sheet-handle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-6);
+  touch-action: none;
 }
 
 .directory-sheet-title {
@@ -3053,7 +3066,7 @@ a.auth-brand-header:focus-visible {
 }
 
 /* El asa de la ficha del socio (#554): la raya de 36px se ve, pero lo que se
-   arrastra o se toca es toda la franja de arriba. */
+   toca es toda la franja de arriba. Se arrastra con la zona que la lleva. */
 .directory-sheet-grip {
   display: flex;
   align-items: center;
@@ -3064,7 +3077,6 @@ a.auth-brand-header:focus-visible {
   cursor: grab;
   background: none;
   border: none;
-  touch-action: none;
 }
 
 .directory-sheet-grip::before {
@@ -4689,9 +4701,9 @@ a.auth-brand-header:focus-visible {
   .directory-total,
   .directory-requests-none,
   .directory-requests-pill,
+  .directory-requests-failed,
   .directory-email-open,
-  .directory-export-open,
-  .directory-requests-tray {
+  .directory-export-open {
     display: none;
   }
 
@@ -4857,6 +4869,11 @@ a.auth-brand-header:focus-visible {
   color: var(--color-accent-text);
 }
 
+/* Bajo el puntero el acento no llega a AA sobre el hover (#581). */
+.directory-sheet-option[aria-pressed="true"]:hover {
+  color: var(--color-text);
+}
+
 .directory-sheet-option-detail {
   font-size: 14px;
   font-weight: 600;
@@ -4919,6 +4936,11 @@ a.auth-brand-header:focus-visible {
 .directory-sheet-action-hint {
   font-size: 12.5px;
   color: var(--color-text-secondary);
+}
+
+/* El secundario tampoco llega a AA sobre el hover (#581). */
+.directory-sheet-action:hover:not(:disabled) .directory-sheet-action-hint {
+  color: var(--color-text-soft);
 }
 
 .directory-sheet-cancel {
@@ -7921,6 +7943,24 @@ a.auth-brand-header:focus-visible {
   color: var(--color-on-accent);
   background: var(--color-accent);
   border-color: var(--color-accent);
+}
+
+/* "Sesiones anteriores" (#580) cierra la fila de fichas: es un enlace de
+   texto, no otra ficha, porque saca de la hoja hacia el calendario. */
+.attendance-older-sessions {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-1);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.attendance-older-sessions:hover {
+  text-decoration-thickness: 2px;
 }
 
 .attendance-totals {

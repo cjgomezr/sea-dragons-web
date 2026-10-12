@@ -29,23 +29,23 @@ desplazamiento lo sigan.
 
 #### Light theme (paleta por defecto, en `:root`)
 
-| Role             | Value     | Usage                            |
-| ---------------- | --------- | -------------------------------- |
-| Accent           | `#1C6EA4` | Primary actions, active states   |
-| Accent text      | `#1C6EA4` | Links, focus, accent as text     |
-| Background       | `#EFF3F7` | Page background                  |
-| Panel            | `#FFFFFF` | Cards, panels                    |
-| Text             | `#1C3245` | Body text                        |
-| Text secondary   | `#5A7086` | Captions, metadata               |
-| Border           | `#DEE6ED` | Dividers, input borders          |
-| Success          | `#2E9E86` | Success state only               |
-| Warning          | `#C99A3E` | Warning state only               |
-| Danger           | `#BC3B2E` | Validation errors, destructive   |
-| Text on accent   | `#FFFFFF` | Text/icons on an accent fill     |
-| Hover            | `#E6EDF3` | Row or control under the pointer |
-| Accent soft text | `#14507A` | Text on an accent tint           |
-| Text soft        | `#2F4659` | Quiet body text, table values    |
-| Accent hover     | `#175C89` | Accent fill under the pointer    |
+| Role             | Value     | Usage                                                                   |
+| ---------------- | --------- | ----------------------------------------------------------------------- |
+| Accent           | `#1C6EA4` | Primary actions, active states                                          |
+| Accent text      | `#1C6EA4` | Links, focus, accent as text                                            |
+| Background       | `#EFF3F7` | Page background                                                         |
+| Panel            | `#FFFFFF` | Cards, panels                                                           |
+| Text             | `#1C3245` | Body text                                                               |
+| Text secondary   | `#5A7086` | Captions, metadata                                                      |
+| Border           | `#DEE6ED` | Dividers, input borders                                                 |
+| Success          | `#2E9E86` | Success state only                                                      |
+| Warning          | `#C99A3E` | Warning state only                                                      |
+| Danger           | `#BC3B2E` | Validation errors, destructive                                          |
+| Text on accent   | `#FFFFFF` | Text/icons on an accent fill                                            |
+| Hover            | `#CFDAE5` | Row or control under the pointer; 1.42:1 on Panel, 1.27:1 on Background |
+| Accent soft text | `#14507A` | Text on an accent tint                                                  |
+| Text soft        | `#2F4659` | Quiet body text, table values                                           |
+| Accent hover     | `#175C89` | Accent fill under the pointer                                           |
 
 > **Decisión del 2026-09-04.** El texto secundario del tema claro se desvía
 > del prototipo a propósito. El valor original del prototipo, `#6B8095`, da
@@ -119,7 +119,7 @@ text ≥ 24px).
 >
 > - `Hover` (`--color-hover`) es el fondo de una fila, una opción de menú o un
 >   botón sin relleno bajo el puntero. El texto encima pasa a `Text`: en claro,
->   `Text secondary` sobre `Hover` se queda en 4.3:1.
+>   `Text secondary` sobre `Hover` se queda en 3.6:1.
 > - `Accent soft text` (`--color-accent-soft-text`) es el texto de una píldora
 >   o un aviso con fondo de acento tintado
 >   (`color-mix(in srgb, var(--color-accent) N%, transparent)`, hasta 16 %).
@@ -132,6 +132,14 @@ text ≥ 24px).
 > acento de cada club, así que con un acento propio `Accent hover` y
 > `Accent soft text` siguen en azul. `tests/unit/design-tokens.test.ts`
 > comprueba el contraste de cada uno en los dos temas.
+
+> **Decisión del 2026-10-12 (issue #581).** El `Hover` claro de #547
+> (`#E6EDF3`) daba 1.18:1 sobre el panel y 1.06:1 sobre el fondo: el puntero
+> apenas se notaba. Ahora es `#CFDAE5`, con 1.42:1 sobre `Panel` y 1.27:1
+> sobre `Background`. `Text` encima da 9.3:1 y `Text soft` 6.9:1. El acento
+> como texto baja a 3.9:1, así que la opción de orden activa pasa a `Text`
+> bajo el puntero, y la pista en `Text secondary` de las acciones del "⋯" pasa
+> a `Text soft`. El tema oscuro no cambia.
 
 #### Sidebar (no cambia con el tema)
 
