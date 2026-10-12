@@ -649,6 +649,19 @@ describe("la hoja", () => {
     expect(choice(mateo, "Late")).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("con cambios sin guardar el enlace a las sesiones anteriores navega si se acepta descartarlos", async () => {
+    stubClub([POOL_TRAINING], [POOL_SHEET]);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<AttendanceScreen locale="en" initialSessionId={null} />);
+    await userEvent.click(choice(await findRow(MATEO.fullName), "Late"));
+
+    await userEvent.click(
+      screen.getByRole("link", { name: /^Older sessions/ }),
+    );
+
+    expect(navigate).toHaveBeenCalledWith("/calendario");
+  });
+
   it("con ?sesion= abre esa hoja aunque no esté entre las fichas", async () => {
     const oldSheet = sheetFor(
       { eventId: OLD_TRAINING_ID, title: "Early Season Training" },
