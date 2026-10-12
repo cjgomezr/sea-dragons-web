@@ -15260,6 +15260,20 @@ test.describe("asistencia en el navegador", () => {
     ]);
   });
 
+  test("el enlace a sesiones anteriores mide 44 px y no ensancha la página a 375 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToAttendance(page, ATTENDANCE_SHEET_STATE);
+
+    const older = page
+      .getByRole("group", { name: "Sessions" })
+      .getByRole("link", { name: "Older sessions: open the calendar" });
+    await expect(older).toBeVisible();
+    expect((await older.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    expect(await hasHorizontalScroll(page)).toBe(false);
+  });
+
   test("agrupa la hoja en cuatro regiones, en el orden de las respuestas", async ({
     page,
   }) => {
