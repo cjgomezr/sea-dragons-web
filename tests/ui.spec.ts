@@ -6546,6 +6546,50 @@ test.describe("el directorio en el móvil (#553)", () => {
       await expect(page.getByRole("row", { name: "Nerea Ruiz" })).toBeFocused();
     });
 
+    // El cambio está en `BottomSheet`, así que las otras tres hojas lo
+    // heredan: se abren sin contorno y se cierran arrastrando su título.
+    const OTHER_SHEETS = [
+      {
+        name: "filtros",
+        opener: (page: Page) => filterToggle(page, ENGLISH_FILTER_LABELS),
+        dialog: "Filters",
+      },
+      {
+        name: "orden",
+        opener: (page: Page) => page.getByRole("button", { name: /^Sort:/ }),
+        dialog: "Sort by",
+      },
+      {
+        name: "⋯",
+        opener: (page: Page) =>
+          page.getByRole("button", { name: "More actions" }),
+        dialog: /members? in this view$/,
+      },
+    ] as const;
+
+    for (const other of OTHER_SHEETS) {
+      test(`la hoja de ${other.name} se abre sin contorno y se cierra arrastrando su título`, async ({
+        page,
+      }) => {
+        await goToDirectory(page, MOBILE_DIRECTORY_STATES[0]!);
+
+        await other.opener(page).tap();
+
+        const sheet = page.getByRole("dialog", { name: other.dialog });
+        await expect(sheet).toBeVisible();
+        const focusOutline = await page.evaluate(() =>
+          document.activeElement === null
+            ? "sin foco"
+            : getComputedStyle(document.activeElement).outlineStyle,
+        );
+        expect(focusOutline).toBe("none");
+
+        await swipeWithFinger(page, sheet.getByRole("heading").first(), 240);
+
+        await expect(sheet).toHaveCount(0);
+      });
+    }
+
     test("arrastrar dentro del contenido hace scroll y no cierra", async ({
       page,
     }) => {
