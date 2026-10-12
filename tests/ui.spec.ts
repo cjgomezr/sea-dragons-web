@@ -7536,10 +7536,10 @@ test.describe("un Admin que decide una solicitud desde el directorio", () => {
     timeout: ACCOUNT_CHANGE_TEST_TIMEOUT_MS,
   });
 
-  test("aprobar la saca de la bandeja y deja al miembro con su rol nuevo", async ({
+  test("aprobar desde el resumen del panel la saca y deja al miembro con su rol nuevo", async ({
     page,
   }) => {
-    // La bandeja se pide aparte, después de la lista. Con la suite entera en
+    // Las solicitudes se piden aparte, después de la lista. Con la suite entera en
     // paralelo en CI esa respuesta pasaba a veces de los 5 s por defecto de
     // `expect`, y el test fallaba sin que hubiera nada roto: se espera a que
     // llegue antes de buscar el botón.
@@ -7551,6 +7551,10 @@ test.describe("un Admin que decide una solicitud desde el directorio", () => {
     );
     await page.goto(`${APP_URL}${DIRECTORY_SCREEN_PATH}`);
     expect((await trayLoaded).status()).toBe(200);
+    // La píldora de la cabecera abre el panel en el resumen, donde se deciden.
+    await page
+      .getByRole("button", { name: /^\d+ role requests? waiting$/ })
+      .click();
     const approve = page.getByRole("button", {
       name: `Approve the request from ${DECIDABLE_MEMBER_NAME}`,
     });
