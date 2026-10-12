@@ -16,8 +16,9 @@ import { useSheetDrag } from "./use-sheet-drag";
  * dedo, al panel, que no pinta ninguno (#579): Safari pinta el contorno de
  * un `focus()` hecho tras un toque, y el primer control es el asa. Si el
  * foco sale, vuelve al mismo sitio. Escape, un toque fuera o `close`, que
- * reciben sus controles, la cierran; quién recibe después el foco lo decide quien la abrió, en
- * `onClosed`, porque sólo él sabe qué botón la abrió. Sus controles la
+ * reciben sus controles, la cierran; quién recibe después el foco lo decide
+ * quien la abrió, en `onClosed`, porque sólo él sabe qué botón la abrió.
+ * Sus controles la
  * cierran con `close` y no desmontándola: mientras el `<dialog>` siga
  * abierto, el foco que sale de él vuelve dentro.
  *

@@ -389,6 +389,20 @@ describe("la ficha que sube: abrir y cerrar", () => {
     expect(focused.matches(":focus-visible")).toBe(true);
   });
 
+  it("abierta con el teclado, el foco que sale vuelve a un control de la hoja", async () => {
+    const user = userEvent.setup();
+    stubApi();
+    await renderDirectory();
+    row("Nerea Ruiz").focus();
+    await user.keyboard("{Enter}");
+
+    row("Ana Admin").focus();
+
+    const focused = document.activeElement as HTMLElement;
+    expect(sheet("Nerea Ruiz")).toContainElement(focused);
+    expect(focused.tabIndex).toBeGreaterThanOrEqual(0);
+  });
+
   it("abierta con el teclado, el foco sigue atrapado y Escape lo devuelve a la fila", async () => {
     const user = userEvent.setup();
     stubApi();

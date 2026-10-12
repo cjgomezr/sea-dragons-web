@@ -119,6 +119,17 @@ describe("la hoja que sube: el foco al abrirse", () => {
   });
 });
 
+describe("la hoja que sube: el foco que intenta salir", () => {
+  it("abierta con el dedo, el foco que sale vuelve al panel y no al asa", async () => {
+    await openWithFinger();
+
+    screen.getByRole("button", { name: OPENER, hidden: true }).focus();
+
+    expect(grip()).not.toHaveFocus();
+    expect(sheet()).toContainElement(document.activeElement as HTMLElement);
+  });
+});
+
 describe("la hoja que sube: arrastrarla desde arriba", () => {
   it("baja siguiendo al dedo mientras se arrastra la cabecera", async () => {
     await openWithFinger();
