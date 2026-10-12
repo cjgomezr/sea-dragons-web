@@ -11804,6 +11804,23 @@ for (const state of NEWS_STATES) {
   });
 }
 
+// #590: la etiqueta Document pasa al verde; su contraste se mira en los dos
+// temas, no solo en el que trae el navegador.
+test.describe("etiquetas de categoría del feed", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  for (const theme of themes) {
+    test(`has no accessibility violations (axe-core, ${theme})`, async ({
+      page,
+    }) => {
+      await goToNews(page, FEED_WITH_POSTS, theme);
+      await expectNoAxeViolations(page);
+    });
+  }
+});
+
 test.describe("noticias en el navegador", () => {
   skipWithoutSession();
   quietNotificationBell();
