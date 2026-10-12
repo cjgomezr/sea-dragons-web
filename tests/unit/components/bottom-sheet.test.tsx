@@ -97,11 +97,12 @@ function pressAndMove(
   }
 }
 
-/** Suelta donde se quedó y manda el clic que el navegador manda después. */
+/** Suelta donde se quedó y manda el clic que el navegador manda después,
+ * con el `detail` de un clic de puntero. */
 function release(element: HTMLElement, distance: number): void {
   const end = { clientX: 180, clientY: 300 + distance, pointerId: 1 };
   fireEvent.pointerUp(element, end);
-  fireEvent.click(element, end);
+  fireEvent.click(element, { ...end, detail: 1 });
 }
 
 function drag(element: HTMLElement, distance: number): void {
@@ -178,6 +179,18 @@ describe("la hoja que sube: arrastrarla desde arriba", () => {
     expect(sheet().style.transform).toBe("");
     release(action, 160);
     expect(sheet()).toBeVisible();
+  });
+
+  it("tras un arrastre que no la cierra, Enter en el asa sí la cierra", async () => {
+    const user = userEvent.setup();
+    await openWithFinger();
+    pressAndMove(header(), [20, 40]);
+    fireEvent.pointerUp(header(), { clientX: 180, clientY: 340, pointerId: 1 });
+
+    grip().focus();
+    await user.keyboard("{Enter}");
+
+    expect(queryOpenSheet()).toBeNull();
   });
 
   it("un toque corto en el asa la cierra", async () => {

@@ -75,62 +75,72 @@ export function useSheetDrag(onDismiss: () => void): SheetDrag {
     setIsDragging(true);
   }
 
+  function pressDown(event: React.PointerEvent): void {
+    if (gestureRef.current !== null || event.button !== 0) {
+      return;
+    }
+    wasDraggedRef.current = false;
+    gestureRef.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      isDragging: false,
+    };
+  }
+
+  function follow(event: React.PointerEvent): void {
+    const gesture = currentGesture(event);
+    if (gesture === null) {
+      return;
+    }
+    const isStillATap = Math.abs(event.clientY - gesture.startY) < TAP_SLOP_PX;
+    if (!gesture.isDragging && isStillATap) {
+      return;
+    }
+    if (!gesture.isDragging) {
+      startDragging(event, gesture);
+    }
+    setOffset(offsetOf(gesture, event.clientY));
+  }
+
+  function release(event: React.PointerEvent): void {
+    const gesture = currentGesture(event);
+    if (gesture === null) {
+      return;
+    }
+    const shouldClose =
+      gesture.isDragging &&
+      offsetOf(gesture, event.clientY) >= SHEET_CLOSE_DISTANCE_PX;
+    endGesture();
+    if (shouldClose) {
+      onDismiss();
+    }
+  }
+
+  function cancel(event: React.PointerEvent): void {
+    if (currentGesture(event) !== null) {
+      endGesture();
+    }
+  }
+
+  // Un clic del teclado (`detail` 0) nunca es el que deja un arrastre.
+  function swallowClickAfterDrag(event: React.MouseEvent): void {
+    if (!wasDraggedRef.current || event.detail === 0) {
+      return;
+    }
+    wasDraggedRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
   return {
     offset,
     isDragging,
     handlers: {
-      onPointerDown: (event) => {
-        if (gestureRef.current !== null || event.button !== 0) {
-          return;
-        }
-        wasDraggedRef.current = false;
-        gestureRef.current = {
-          pointerId: event.pointerId,
-          startY: event.clientY,
-          isDragging: false,
-        };
-      },
-      onPointerMove: (event) => {
-        const gesture = currentGesture(event);
-        if (gesture === null) {
-          return;
-        }
-        const isStillATap =
-          Math.abs(event.clientY - gesture.startY) < TAP_SLOP_PX;
-        if (!gesture.isDragging && isStillATap) {
-          return;
-        }
-        if (!gesture.isDragging) {
-          startDragging(event, gesture);
-        }
-        setOffset(offsetOf(gesture, event.clientY));
-      },
-      onPointerUp: (event) => {
-        const gesture = currentGesture(event);
-        if (gesture === null) {
-          return;
-        }
-        const shouldClose =
-          gesture.isDragging &&
-          offsetOf(gesture, event.clientY) >= SHEET_CLOSE_DISTANCE_PX;
-        endGesture();
-        if (shouldClose) {
-          onDismiss();
-        }
-      },
-      onPointerCancel: (event) => {
-        if (currentGesture(event) !== null) {
-          endGesture();
-        }
-      },
-      onClickCapture: (event) => {
-        if (!wasDraggedRef.current) {
-          return;
-        }
-        wasDraggedRef.current = false;
-        event.preventDefault();
-        event.stopPropagation();
-      },
+      onPointerDown: pressDown,
+      onPointerMove: follow,
+      onPointerUp: release,
+      onPointerCancel: cancel,
+      onClickCapture: swallowClickAfterDrag,
     },
   };
 }
