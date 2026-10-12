@@ -66,6 +66,7 @@ import { waitForSectionsLoaded } from "./support/wait-for-sections";
 import { servesCompiledApp } from "./support/web-server-command";
 import {
   type AccentPalette,
+  contrastRatio,
   evaluateAccentColor,
 } from "@/lib/club/accent-color";
 import { memberInitials } from "@/lib/auth/member-initials";
@@ -6112,6 +6113,160 @@ const MOBILE_DIRECTORY_STATES: readonly DirectoryState[] = [
   },
 ];
 
+/* La fila del móvil con y sin foto (#578): el nombre empieza en la misma x
+   en todas, y el foco de la fila no se pinta sobre el avatar. */
+
+const MOBILE_PHOTO_STATE: DirectoryState = {
+  ...MOBILE_DIRECTORY_STATES[0]!,
+  name: "directorio-movil-con-foto",
+  withPhoto: true,
+  prepare: waitForDirectoryPhoto,
+};
+const ROW_WITH_PHOTO = "Mateo Restrepo";
+const ROW_WITH_INITIALS = "Nerea Ruiz";
+const MOBILE_AVATAR_SIZE_PX = 40;
+/** WCAG 1.4.11: un indicador de foco frente a lo que tiene alrededor. */
+const FOCUS_INDICATOR_MIN_CONTRAST = 3;
+
+type Box = {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+};
+
+/** El avatar de la fila: la foto o las iniciales. */
+function rowAvatar(page: Page, name: string): Locator {
+  return page.getByRole("row", { name }).locator(".directory-avatar").first();
+}
+
+async function boxOf(locator: Locator): Promise<Box> {
+  const box = await locator.boundingBox();
+  if (box === null) {
+    throw new Error("El elemento no está en la pantalla");
+  }
+  return box;
+}
+
+/** El marco que el foco pinta en la fila: el `outline` de la fila o el borde
+ * de su `::after`, el que esté. Con su grosor, su color y el fondo sobre el
+ * que se pinta. */
+type FocusRing = {
+  readonly outer: Box;
+  readonly thickness: number;
+  readonly color: string;
+  readonly background: string;
+};
+
+async function focusRingsOf(row: Locator): Promise<readonly FocusRing[]> {
+  return row.evaluate((element) => {
+    function px(value: string): number {
+      return Number.parseFloat(value) || 0;
+    }
+    function backgroundBehind(node: Element | null): string {
+      for (let current = node; current !== null;) {
+        const color = getComputedStyle(current).backgroundColor;
+        if (color !== "rgba(0, 0, 0, 0)" && color !== "transparent") {
+          return color;
+        }
+        current = current.parentElement;
+      }
+      return "rgb(255, 255, 255)";
+    }
+    const box = element.getBoundingClientRect();
+    const background = backgroundBehind(element);
+    const rings: FocusRing[] = [];
+    const style = getComputedStyle(element);
+    if (style.outlineStyle !== "none" && px(style.outlineWidth) > 0) {
+      const reach = px(style.outlineOffset) + px(style.outlineWidth);
+      rings.push({
+        outer: {
+          x: box.x - reach,
+          y: box.y - reach,
+          width: box.width + 2 * reach,
+          height: box.height + 2 * reach,
+        },
+        thickness: px(style.outlineWidth),
+        color: style.outlineColor,
+        background,
+      });
+    }
+    const after = getComputedStyle(element, "::after");
+    if (
+      after.content !== "none" &&
+      after.borderLeftStyle !== "none" &&
+      px(after.borderLeftWidth) > 0
+    ) {
+      const left = box.x + px(after.left);
+      const top = box.y + px(after.top);
+      rings.push({
+        outer: {
+          x: left,
+          y: top,
+          width: box.right - px(after.right) - left,
+          height: box.bottom - px(after.bottom) - top,
+        },
+        thickness: px(after.borderLeftWidth),
+        color: after.borderLeftColor,
+        background,
+      });
+    }
+    return rings;
+  });
+}
+
+function overlaps(a: Box, b: Box): boolean {
+  return (
+    a.x < b.x + b.width &&
+    b.x < a.x + a.width &&
+    a.y < b.y + b.height &&
+    b.y < a.y + a.height
+  );
+}
+
+function contains(outer: Box, inner: Box): boolean {
+  return (
+    inner.x >= outer.x &&
+    inner.y >= outer.y &&
+    inner.x + inner.width <= outer.x + outer.width &&
+    inner.y + inner.height <= outer.y + outer.height
+  );
+}
+
+/** Si el anillo pasa por la caja: la toca por fuera y no la deja entera en
+ * su hueco. */
+function ringCrosses(ring: FocusRing, box: Box): boolean {
+  const hole: Box = {
+    x: ring.outer.x + ring.thickness,
+    y: ring.outer.y + ring.thickness,
+    width: ring.outer.width - 2 * ring.thickness,
+    height: ring.outer.height - 2 * ring.thickness,
+  };
+  return overlaps(ring.outer, box) && !contains(hole, box);
+}
+
+function hexOfComputedColor(color: string): string {
+  const channels = color.match(/\d+(\.\d+)?/g);
+  if (channels === null || channels.length < 3) {
+    throw new Error(`Color que no se sabe leer: ${color}`);
+  }
+  return `#${channels
+    .slice(0, 3)
+    .map((channel) => Math.round(Number(channel)).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+/** Abre la ficha de la fila y la cierra con Escape: el foco vuelve a ella. */
+async function openAndCloseMemberSheet(
+  page: Page,
+  name: string,
+): Promise<void> {
+  await openMemberSheet(name)(page);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name })).toHaveCount(0);
+  await expect(page.getByRole("row", { name })).toBeFocused();
+}
+
 test.describe("el directorio en el móvil (#553)", () => {
   skipWithoutSession();
   quietNotificationBell();
@@ -6347,6 +6502,90 @@ test.describe("el directorio en el móvil (#553)", () => {
     await page.getByRole("heading", { name: "Directory" }).click();
 
     await expect(actions).toHaveCount(0);
+  });
+
+  test("los nombres empiezan en la misma x con foto y sin foto", async ({
+    page,
+  }) => {
+    await goToDirectory(page, MOBILE_PHOTO_STATE);
+
+    const names = page.locator("tbody tr .directory-name");
+    const lefts = await names.evaluateAll((elements) =>
+      elements.map((element) => element.getBoundingClientRect().left),
+    );
+
+    expect(lefts.length).toBeGreaterThan(1);
+    for (const left of lefts) {
+      expect(left).toBeCloseTo(lefts[0]!, 0);
+    }
+  });
+
+  test("el avatar con foto mide y se coloca como el de iniciales", async ({
+    page,
+  }) => {
+    await goToDirectory(page, MOBILE_PHOTO_STATE);
+    const photoRow = await boxOf(
+      page.getByRole("row", { name: ROW_WITH_PHOTO }),
+    );
+    const initialsRow = await boxOf(
+      page.getByRole("row", { name: ROW_WITH_INITIALS }),
+    );
+
+    const photo = await boxOf(rowAvatar(page, ROW_WITH_PHOTO));
+    const initials = await boxOf(rowAvatar(page, ROW_WITH_INITIALS));
+
+    expect(photo.width).toBe(MOBILE_AVATAR_SIZE_PX);
+    expect(photo.height).toBe(MOBILE_AVATAR_SIZE_PX);
+    expect(initials.width).toBe(MOBILE_AVATAR_SIZE_PX);
+    expect(initials.height).toBe(MOBILE_AVATAR_SIZE_PX);
+    expect(photo.x - photoRow.x).toBeCloseTo(initials.x - initialsRow.x, 0);
+    expect(photo.y - photoRow.y).toBeCloseTo(initials.y - initialsRow.y, 0);
+  });
+
+  test("el foco de la fila no tapa el avatar", async ({ page }) => {
+    await goToDirectory(page, MOBILE_PHOTO_STATE);
+
+    for (const name of [ROW_WITH_PHOTO, ROW_WITH_INITIALS]) {
+      await openAndCloseMemberSheet(page, name);
+      const rings = await focusRingsOf(page.getByRole("row", { name }));
+      const avatar = await boxOf(rowAvatar(page, name));
+
+      expect(rings.length, name).toBeGreaterThan(0);
+      for (const ring of rings) {
+        expect(ringCrosses(ring, avatar), name).toBe(false);
+      }
+    }
+  });
+
+  test("la fila enfocada con Tab tiene un foco visible", async ({ page }) => {
+    await goToDirectory(page, MOBILE_PHOTO_STATE);
+    const row = page.getByRole("row", { name: ROW_WITH_INITIALS });
+    // La fila de antes es la de la foto: su botón es lo último enfocable.
+    await page.getByRole("button", { name: OPEN_PHOTO_BUTTON }).focus();
+
+    await page.keyboard.press("Tab");
+
+    await expect(row).toBeFocused();
+    const [ring] = await focusRingsOf(row);
+    expect(ring).toBeDefined();
+    expect(ring!.thickness).toBeGreaterThanOrEqual(2);
+    expect(
+      contrastRatio(
+        hexOfComputedColor(ring!.color),
+        hexOfComputedColor(ring!.background),
+      ),
+    ).toBeGreaterThanOrEqual(FOCUS_INDICATOR_MIN_CONTRAST);
+  });
+
+  test("tocar la foto de la fila abre la foto en grande", async ({ page }) => {
+    await goToDirectory(page, {
+      ...MOBILE_PHOTO_STATE,
+      prepare: openLargePhoto("landscape"),
+    });
+
+    await expect(
+      photoDialog(page).getByRole("img", { name: LARGE_PHOTO_NAME }),
+    ).toBeVisible();
   });
 });
 
