@@ -11,7 +11,7 @@ import type { Locale } from "@/lib/i18n/locale";
 import type { Translator } from "@/lib/i18n/translator";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
 import { InvitationResend } from "./InvitationResend";
-import { RequestActions } from "./PendingRequestsTray";
+import { RequestActions } from "./RequestActions";
 import { useSingleDecision } from "./use-single-decision";
 
 /**

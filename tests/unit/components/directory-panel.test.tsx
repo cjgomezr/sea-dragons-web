@@ -240,9 +240,12 @@ async function renderDirectory(
     await waitFor(() =>
       expect(calls.map((call) => call.url)).toContain(PENDING_REQUESTS_PATH),
     );
-    await screen.findByRole("heading", {
-      name: locale === "en" ? "Pending requests" : "Solicitudes pendientes",
-    });
+    // La cabecera ya sabe cuántas solicitudes hay.
+    await screen.findAllByText(
+      locale === "en"
+        ? /No pending requests|role requests? waiting/
+        : /No hay solicitudes pendientes|solicitud(es)? de rol esperando/,
+    );
   }
 }
 

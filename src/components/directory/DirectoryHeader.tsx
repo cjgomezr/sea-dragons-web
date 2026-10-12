@@ -21,7 +21,6 @@ import {
   canWriteEmails,
   emailRecipientsOf,
 } from "./listing-permissions";
-import { ROLE_REQUESTS_HEADING_ID } from "./RoleRequestsPanel";
 import type { PendingRequestsState } from "./use-pending-role-requests";
 
 /**
@@ -102,20 +101,54 @@ function InviteLink({
   );
 }
 
-/** "No hay solicitudes pendientes", o la píldora que lleva a la bandeja.
- * Mientras la bandeja carga, o si no cargó, no dice nada: la bandeja ya
- * enseña su propio estado. */
+/** Lo que la línea de las solicitudes necesita de la pantalla. */
+export type RequestsLine = {
+  readonly state: PendingRequestsState;
+  /** Abre el panel en el resumen del club, donde se deciden (#551). */
+  readonly onReview: () => void;
+  readonly onRetry: () => void;
+};
+
+/** Que las solicitudes no cargaron, con cómo volver a pedirlas. La lista
+ * sigue a la vista: carga aparte. */
+function RequestsLoadFailure({
+  translate,
+  onRetry,
+}: {
+  translate: Translator;
+  onRetry: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="directory-requests-failed">
+      <p role="alert">{translate("admin.loadFailed")}</p>
+      <button type="button" className="directory-link-button" onClick={onRetry}>
+        {translate("admin.retry")}
+      </button>
+    </div>
+  );
+}
+
+/** "No hay solicitudes pendientes", o la píldora que abre el resumen del
+ * panel, donde se deciden. Mientras cargan no dice nada; si no cargaron, lo
+ * dice aquí, que es lo único del escritorio que las nombra sin abrir el
+ * panel. */
 function RequestsStatus({
   translate,
   requests,
 }: {
   translate: Translator;
-  requests: PendingRequestsState;
+  requests: RequestsLine;
 }): React.JSX.Element | null {
-  if (requests.kind !== "ready") {
+  const { state } = requests;
+  if (state.kind === "failed") {
+    return (
+      <RequestsLoadFailure translate={translate} onRetry={requests.onRetry} />
+    );
+  }
+  if (state.kind !== "ready") {
     return null;
   }
-  const count = requests.requests.length;
+  const count = state.requests.length;
   if (count === 0) {
     return (
       <p className="directory-requests-none">
@@ -125,13 +158,14 @@ function RequestsStatus({
     );
   }
   return (
-    <a
-      href={`#${ROLE_REQUESTS_HEADING_ID}`}
+    <button
+      type="button"
       className="directory-requests-pill"
+      onClick={requests.onReview}
     >
       {translate("directory.requests.waiting", { count })}
       <Icon glyph={ArrowRight} />
-    </a>
+    </button>
   );
 }
 
@@ -189,7 +223,7 @@ function HeaderActions({
 export function DirectoryHeader({
   translate,
   listed,
-  pendingRequests,
+  requests,
   titleRef,
   checkedMembers,
   onOpenEmail,
@@ -198,7 +232,7 @@ export function DirectoryHeader({
   /** `null` mientras la lista no ha llegado, o si falló. */
   listed: ListedDirectory | null;
   /** `null` para quien no es Admin: no tiene solicitudes que decidir. */
-  pendingRequests: PendingRequestsState | null;
+  requests: RequestsLine | null;
   /** El foco vuelve al título al salir de la pantalla de solicitudes del
    * móvil sin ninguna pendiente (#553). */
   titleRef: React.Ref<HTMLHeadingElement>;
@@ -222,8 +256,8 @@ export function DirectoryHeader({
             </p>
           )}
         </div>
-        {pendingRequests === null ? null : (
-          <RequestsStatus translate={translate} requests={pendingRequests} />
+        {requests === null ? null : (
+          <RequestsStatus translate={translate} requests={requests} />
         )}
       </div>
       {listed === null ? null : (

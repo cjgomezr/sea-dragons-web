@@ -16,9 +16,9 @@ import {
 
 /**
  * Las solicitudes de rol pendientes del club (#240) y lo que se decide sobre
- * ellas. Vivían dentro de `RoleRequestsPanel`; desde #548 la cabecera del
- * directorio también cuenta cuántas quedan, así que el estado sube a la
- * pantalla y la bandeja sólo lo pinta.
+ * ellas. El estado vive en la pantalla, que lo reparte: la cabecera cuenta
+ * cuántas quedan (#548), el resumen del panel las decide (#551) y, en el
+ * móvil, su pantalla propia (#553).
  *
  * Sólo carga cuando `isEnabled`: la pantalla lo enciende cuando su lista
  * llega marcada `admin`. A cualquier otro rol el endpoint le respondería 403.
