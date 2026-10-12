@@ -341,6 +341,77 @@ describe("la ficha que sube: abrir y cerrar", () => {
     expect(row("Nerea Ruiz")).toHaveFocus();
   });
 
+  it("arrastrar desde la cabecera más allá del umbral cierra la hoja y devuelve el foco a la fila", async () => {
+    const user = userEvent.setup();
+    stubApi();
+    await renderDirectory();
+    await user.click(row("Nerea Ruiz"));
+    const name = within(sheet("Nerea Ruiz")).getByRole("heading", {
+      name: "Nerea Ruiz",
+    });
+
+    fireEvent.pointerDown(name, { clientX: 180, clientY: 400, pointerId: 1 });
+    fireEvent.pointerMove(name, { clientX: 182, clientY: 480, pointerId: 1 });
+    fireEvent.pointerMove(name, { clientX: 182, clientY: 560, pointerId: 1 });
+    fireEvent.pointerUp(name, { clientX: 182, clientY: 560, pointerId: 1 });
+
+    expect(screen.queryByRole("dialog", { name: "Nerea Ruiz" })).toBeNull();
+    expect(row("Nerea Ruiz")).toHaveFocus();
+  });
+
+  it("abierta con el dedo, el foco no se queda en el asa", async () => {
+    const user = userEvent.setup();
+    stubApi();
+    await renderDirectory();
+
+    await user.click(row("Nerea Ruiz"));
+
+    expect(
+      within(sheet("Nerea Ruiz")).getByRole("button", {
+        name: "Close the sheet",
+      }),
+    ).not.toHaveFocus();
+  });
+
+  it("abrir con el teclado deja el foco en un control de la hoja", async () => {
+    const user = userEvent.setup();
+    stubApi();
+    await renderDirectory();
+    row("Nerea Ruiz").focus();
+
+    await user.keyboard("{Enter}");
+
+    // Un control al que llega Tab, no el panel, que sólo recibe el foco
+    // cuando la abre un dedo.
+    const focused = document.activeElement as HTMLElement;
+    expect(sheet("Nerea Ruiz")).toContainElement(focused);
+    expect(focused.tabIndex).toBeGreaterThanOrEqual(0);
+    expect(focused.matches(":focus-visible")).toBe(true);
+  });
+
+  it("abierta con el teclado, el foco sigue atrapado y Escape lo devuelve a la fila", async () => {
+    const user = userEvent.setup();
+    stubApi();
+    await renderDirectory();
+    row("Nerea Ruiz").focus();
+    await user.keyboard("{Enter}");
+    const grip = within(sheet("Nerea Ruiz")).getByRole("button", {
+      name: "Close the sheet",
+    });
+
+    await user.tab({ shift: true });
+
+    expect(sheet("Nerea Ruiz")).toContainElement(
+      document.activeElement as HTMLElement,
+    );
+    expect(grip).not.toHaveFocus();
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "Nerea Ruiz" })).toBeNull();
+    expect(row("Nerea Ruiz")).toHaveFocus();
+  });
+
   it("desde 768px la fila sigue abriendo el panel lateral", async () => {
     const user = userEvent.setup();
     stubScreen(false);

@@ -3028,6 +3028,19 @@ a.auth-brand-header:focus-visible {
   border: none;
   border-radius: 20px 20px 0 0;
   box-shadow: var(--shadow);
+  transition: transform 200ms ease-out;
+}
+
+/* Mientras el dedo la arrastra (#579), la hoja va con él sin retraso; la
+   transición sólo la devuelve a su sitio al soltar. */
+.directory-sheet[data-dragging] {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .directory-sheet {
+    transition: none;
+  }
 }
 
 .directory-sheet::backdrop {
@@ -3038,7 +3051,25 @@ a.auth-brand-header:focus-visible {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-6) var(--space-4);
+  padding: 0 var(--space-4) var(--space-6);
+}
+
+/* El panel recibe el foco cuando la hoja la abre un dedo (#579): no es un
+   control y Tab no llega a él, así que no pinta contorno. */
+.directory-sheet-panel:focus {
+  outline: none;
+}
+
+/* La zona de arriba, desde donde se arrastra la hoja (#579): el asa y el
+   título o el encabezado. Lleva el relleno de arriba del panel para que el
+   dedo la encuentre desde el borde. Sólo ella anula el gesto del navegador;
+   el contenido de debajo sigue haciendo scroll. */
+.directory-sheet-handle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-6);
+  touch-action: none;
 }
 
 .directory-sheet-title {
@@ -3053,7 +3084,7 @@ a.auth-brand-header:focus-visible {
 }
 
 /* El asa de la ficha del socio (#554): la raya de 36px se ve, pero lo que se
-   arrastra o se toca es toda la franja de arriba. */
+   toca es toda la franja de arriba. Se arrastra con la zona que la lleva. */
 .directory-sheet-grip {
   display: flex;
   align-items: center;
@@ -3064,7 +3095,6 @@ a.auth-brand-header:focus-visible {
   cursor: grab;
   background: none;
   border: none;
-  touch-action: none;
 }
 
 .directory-sheet-grip::before {
