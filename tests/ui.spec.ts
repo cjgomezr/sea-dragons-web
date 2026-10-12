@@ -6256,11 +6256,18 @@ function hexOfComputedColor(color: string): string {
     .join("")}`;
 }
 
-/** Lo bastante lento para que el gesto pase por varios `pointermove`. */
-const SWIPE_SPEED_PX_PER_SECOND = 600;
+/** Lo que avanza el dedo entre un `touchMove` y el siguiente: pasos cortos,
+ * para que el gesto pase por varios `pointermove`. */
+const SWIPE_STEP_PX = 10;
 
 /** Un dedo que se apoya en el centro de `target` y se desliza en vertical
- * por pasos, sin inercia al soltar: positivo baja, negativo sube. */
+ * por pasos: positivo baja, negativo sube.
+ *
+ * Son toques sueltos (`Input.dispatchTouchEvent`) y no
+ * `Input.synthesizeScrollGesture`: con este, Chromium sin ventana manda los
+ * `pointermove` pero nunca desplaza nada, ni la hoja ni la página (#579).
+ * Los toques sueltos no pueden pedir que no haya inercia al soltar, así que
+ * quien mida un desplazamiento no debe esperar una cifra exacta. */
 async function swipeWithFinger(
   page: Page,
   target: Locator,
@@ -6270,17 +6277,28 @@ async function swipeWithFinger(
   if (box === null) {
     throw new Error("Lo que se iba a deslizar no está en la pantalla");
   }
+  const x = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
+  const stepCount = Math.ceil(Math.abs(distanceY) / SWIPE_STEP_PX);
   const cdp = await page.context().newCDPSession(page);
-  await cdp.send("Input.synthesizeScrollGesture", {
-    x: box.x + box.width / 2,
-    y: box.y + box.height / 2,
-    xDistance: 0,
-    yDistance: distanceY,
-    gestureSourceType: "touch",
-    preventFling: true,
-    speed: SWIPE_SPEED_PX_PER_SECOND,
-  });
-  await cdp.detach();
+  try {
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x, y: startY }],
+    });
+    for (let step = 1; step <= stepCount; step += 1) {
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x, y: startY + (distanceY * step) / stepCount }],
+      });
+    }
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+  } finally {
+    await cdp.detach();
+  }
 }
 
 /** Abre la ficha de la fila y la cierra con Escape: el foco vuelve a ella. */
