@@ -11496,7 +11496,8 @@ const STUBBED_POST = {
   category: "announcement",
   title: STUBBED_FEED_POSTS[0].title,
   body: "Twelve Seadragons named in the extended squad for the August nationals in Brisbane.\nFinal eight confirmed after trials.\n\nTraining for the squad starts on Tuesday. <b>Bring fins.</b>",
-  author: NEWS_AUTHOR,
+  author: { ...NEWS_AUTHOR, photoUrl: null },
+  audience: { kind: "club" },
   publishedAt: "2026-09-15T08:00:00.000Z",
   editedAt: "2026-09-16T01:30:00.000Z",
   status: "published",
@@ -11553,11 +11554,66 @@ const STUBBED_OWN_WITHDRAWN_POST = {
   status: "withdrawn",
 } as const;
 
+/** La publicación abierta del diseño 1c (#596), como
+ * `docs/mockups/news-redesign-post-dark.png`: con portada, audiencia de
+ * grupos, editada, cuerpo en Markdown y un adjunto de cada tipo. Es de quien
+ * mira, así que lleva Editar y Retirar. */
+const STUBBED_OPEN_POST = {
+  ...STUBBED_POST,
+  id: "a0a0a0a0-0000-4000-8000-0000000000a8",
+  category: "news",
+  title: "Seadragons take silver at the Island Cup",
+  body: "The under-16 squad brought home **silver** from the Island Cup on Sunday, after five games in two days.\n\n## Highlights\n\n- Four wins in pool play, including a comeback in the quarter-final\n- The *fair-play award*, voted by the other teams\n- Three players at their first tournament\n\n> They kept their heads up the whole weekend, even after the final.\n\nPractice resumes **Tuesday at 6 pm** on Field 2. Photos are in the [shared album](https://example.com/album).",
+  audience: { kind: "groups", groupNames: ["U16 squad", "Parents"] },
+  canManage: true,
+  coverUrl: STUBBED_COVER_URL,
+  attachments: [
+    ...STUBBED_POST.attachments,
+    {
+      id: "d0d0d0d0-0000-4000-8000-0000000000d3",
+      fileName: "island-cup-results.docx",
+      contentType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      sizeBytes: 18_432,
+    },
+  ],
+} as const;
+
+/** Sin portada (#596): el fondo de su categoría a la misma altura, con un
+ * título de 120 caracteres y un autor de nombre muy largo, que se parten en
+ * líneas sin desbordar. */
+const STUBBED_NO_COVER_POST = {
+  ...STUBBED_POST_WITHOUT_ATTACHMENTS,
+  id: "a0a0a0a0-0000-4000-8000-0000000000a9",
+  category: "document",
+  title:
+    "Reminder for every member: the pool safety briefing, the equipment check and the annual dues all fall due before Friday.",
+  author: {
+    id: "44444444-0000-4000-8000-000000000044",
+    fullName:
+      "Maximiliana Alejandra de los Ángeles Fitzgerald-Montgomery Castro Echeverri",
+    photoUrl: null,
+  },
+} as const;
+
+/** Una retirada abierta por quien la publicó (#596): sigue marcada. */
+const STUBBED_WITHDRAWN_OPEN_POST = {
+  ...STUBBED_OPEN_POST,
+  id: "a0a0a0a0-0000-4000-8000-0000000000b1",
+  title: "Friendly against Sydney is postponed",
+  status: "withdrawn",
+  coverUrl: null,
+  editedAt: null,
+} as const;
+
 const STUBBED_POSTS = [
   STUBBED_POST,
   STUBBED_POST_WITHOUT_ATTACHMENTS,
   STUBBED_OWN_POST,
   STUBBED_OWN_WITHDRAWN_POST,
+  STUBBED_OPEN_POST,
+  STUBBED_NO_COVER_POST,
+  STUBBED_WITHDRAWN_OPEN_POST,
 ] as const;
 
 /** El feed de quien publicó: lo suyo retirado le llega marcado (#331). */
@@ -11896,6 +11952,108 @@ for (const state of NEWS_STATES) {
     test("has no accessibility violations (axe-core)", async ({ page }) => {
       await goToNews(page, state);
       await expectNoAxeViolations(page);
+    });
+  });
+}
+
+// #596: la publicación abierta del diseño 1c. Se fotografía a 1440 y 768 en
+// los dos temas, y en los dos se mira axe y el scroll horizontal. A 375 la
+// barra del móvil llega con el #601: hasta entonces, axe, sin scroll y cada
+// control táctil de al menos 44 px.
+const OPEN_POST_STATES = [
+  { name: "noticia-abierta", post: STUBBED_OPEN_POST },
+  { name: "noticia-sin-portada", post: STUBBED_NO_COVER_POST },
+  { name: "noticia-retirada", post: STUBBED_WITHDRAWN_OPEN_POST },
+] as const;
+
+const OPEN_POST_VIEWPORTS = viewports.filter((vp) => vp.name !== "mobile");
+const MOBILE_VIEWPORT = { width: 375, height: 812 } as const;
+const MIN_TOUCH_TARGET_PX = 44;
+
+function openPostState(state: (typeof OPEN_POST_STATES)[number]): NewsState {
+  return {
+    name: state.name,
+    path: postPath(state.post.id),
+    feed: [],
+    heading: new RegExp(state.post.title),
+    ready: waitForPost,
+  };
+}
+
+/** Los controles de la publicación: volver, Editar y Retirar, y cada
+ * adjunto. Los enlaces dentro del texto del cuerpo quedan fuera: son parte
+ * de una frase (la excepción "inline" de WCAG 2.5.8). */
+function touchControlsOf(page: Page): Locator {
+  const screen = page.locator(".news-post-screen");
+  return screen
+    .getByRole("button")
+    .or(screen.getByRole("link", { name: /Back to News|Volver a Noticias/ }))
+    .or(screen.getByRole("link", { name: /^(Edit|Editar)$/ }));
+}
+
+for (const openState of OPEN_POST_STATES) {
+  const state = openPostState(openState);
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of OPEN_POST_VIEWPORTS) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        for (const theme of themes) {
+          test(`matches approved baseline (${theme})`, async ({ page }) => {
+            await goToNews(page, state, theme);
+            const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+            await createMissingLocalBaseline(snapshot, () =>
+              page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+            );
+            await expect(page).toHaveScreenshot(snapshot, {
+              ...SCREENSHOT_OPTIONS,
+              fullPage: true,
+              maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+            });
+          });
+
+          test(`has no accessibility violations (axe-core, ${theme})`, async ({
+            page,
+          }) => {
+            await goToNews(page, state, theme);
+            await expectNoAxeViolations(page);
+          });
+
+          test(`has no horizontal scroll (${theme})`, async ({ page }) => {
+            await goToNews(page, state, theme);
+            expect(await hasHorizontalScroll(page)).toBe(false);
+          });
+        }
+      });
+    }
+
+    test.describe("@ 375px", () => {
+      test.use({ viewport: MOBILE_VIEWPORT });
+
+      test("has no accessibility violations (axe-core)", async ({ page }) => {
+        await goToNews(page, state);
+        await expectNoAxeViolations(page);
+      });
+
+      test("has no horizontal scroll", async ({ page }) => {
+        await goToNews(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+
+      test("every touch control is at least 44px", async ({ page }) => {
+        await goToNews(page, state);
+        const controls = await touchControlsOf(page).all();
+        expect(controls.length).toBeGreaterThan(0);
+        for (const control of controls) {
+          const box = await control.boundingBox();
+          expect(box?.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
+          expect(box?.width).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
+        }
+      });
     });
   });
 }
