@@ -474,6 +474,20 @@ describe("fijar al editar", () => {
     expect(post).toMatchObject({ isPinned: true, pinnedUntil: UNTIL });
   });
 
+  it("no guarda la edición si el Admin fija una retirada", async () => {
+    const club = fakeAttachmentClub({
+      callerRole: "Admin",
+      posts: [aPost({ id: POST_ID, status: "withdrawn" })],
+    });
+
+    await expect(
+      edit(club, { kind: "pin", until: UNTIL }),
+    ).rejects.toBeInstanceOf(NewsPinWithdrawnPostError);
+
+    expect(club.edits).toEqual([]);
+    expect(club.audited).toEqual([]);
+  });
+
   it("rechaza una fecha de fin pasada antes de guardar nada", async () => {
     const club = fakeAttachmentClub({
       callerRole: "Admin",

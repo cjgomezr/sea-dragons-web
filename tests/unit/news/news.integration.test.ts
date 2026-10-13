@@ -1043,6 +1043,40 @@ describeRls("fijar noticias contra seadragons-dev (#592)", () => {
   );
 
   it(
+    "una fijada cuya fecha de fin ya pasó no sale aparte y vuelve a la lista (D7)",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, async (seeded) => {
+        const [postId] = await insertDatedPosts(serviceClient, seeded, 1);
+        await pinNewsPost(seeded.gateways, {
+          callerId: seeded.admin.id,
+          postId: String(postId),
+          until: PIN_UNTIL,
+          now: new Date(),
+        });
+        // Caducada sin esperar: el check sólo pide que siga habiendo fijado.
+        await runSupabase(
+          "caducar la fijada",
+          serviceClient.client
+            .from("news_posts")
+            .update({ pinned_until: "2000-01-01T00:00:00.000Z" })
+            .eq("id", String(postId)),
+        );
+
+        const feed = await listNewsFeed(seeded.gateways, {
+          callerId: seeded.outsider.id,
+          now: new Date(),
+        });
+
+        expect(feed.pinned).toBeNull();
+        expect(feed.posts.map((post) => post.id)).toEqual([postId]);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "a quien no es audiencia de la fijada le llega pinned nulo",
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);

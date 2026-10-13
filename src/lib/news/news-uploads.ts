@@ -278,6 +278,8 @@ export async function publishNewsPostWithUploads(
   const pin = authorizeNewsPinChange(request.pin, {
     role: publisherRole,
     now: request.now,
+    // Lo que se publica nace publicado.
+    postStatus: "published",
   });
   const publisher = { clubId: newPost.clubId, userId: request.callerId };
   const uploads = await resolveUploads(gateways, publisher, request.uploadIds);

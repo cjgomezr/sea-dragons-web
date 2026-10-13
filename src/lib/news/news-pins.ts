@@ -8,6 +8,7 @@ import { readNewsPinUntil } from "./news-pin-rule";
 import {
   type NewsGateways,
   type NewsPostDetail,
+  type NewsPostStatus,
   type NewsUnpinned,
   NewsPostNotFoundError,
   canPinNewsPosts,
@@ -63,18 +64,26 @@ type PinRequest = {
  */
 export function authorizeNewsPinChange(
   change: NewsPinChange,
-  caller: { readonly role: Role; readonly now: Date },
+  context: {
+    readonly role: Role;
+    readonly now: Date;
+    /** El de la publicación antes de guardar: una retirada no se fija. */
+    readonly postStatus: NewsPostStatus;
+  },
 ): NewsPinChange {
   if (change.kind === "keep") {
     return change;
   }
-  if (!canPinNewsPosts(caller.role)) {
+  if (!canPinNewsPosts(context.role)) {
     throw new NewsPinForbiddenError();
   }
   if (change.kind === "unpin") {
     return change;
   }
-  return { kind: "pin", until: readNewsPinUntil(change.until, caller.now) };
+  if (context.postStatus === "withdrawn") {
+    throw new NewsPinWithdrawnPostError();
+  }
+  return { kind: "pin", until: readNewsPinUntil(change.until, context.now) };
 }
 
 /** Quien llama, si es Admin. */

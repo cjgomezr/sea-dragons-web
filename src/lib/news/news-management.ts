@@ -240,6 +240,7 @@ export async function editNewsPost(
   const pin = authorizeNewsPinChange(request.pin, {
     role: managed.role,
     now: request.now,
+    postStatus: post.status,
   });
   const cover = await resolveCoverChange(gateways, {
     actor,
