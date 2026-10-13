@@ -35,7 +35,12 @@ const POST: NewsPostDetail = {
   category: "announcement",
   title: "Pool change on Tuesday",
   body: "We train at MSAC.",
-  author: { id: "33333333-0000-4000-8000-000000000003", fullName: "Liam" },
+  author: {
+    id: "33333333-0000-4000-8000-000000000003",
+    fullName: "Liam",
+    photoUrl: null,
+  },
+  audience: { kind: "club" },
   publishedAt: "2026-09-15T08:00:00.000Z",
   editedAt: null,
   status: "published",

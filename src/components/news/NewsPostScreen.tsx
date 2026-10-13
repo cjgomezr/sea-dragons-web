@@ -6,7 +6,11 @@ import { NEWS_PATH } from "@/lib/auth/routes";
 import { formatClubMoment } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
-import type { NewsPostDetail } from "@/lib/news/news-posts";
+import type {
+  NewsPostAudienceLabel,
+  NewsPostDetail,
+} from "@/lib/news/news-posts";
+import { MemberAvatar } from "@/components/MemberAvatar";
 import {
   type NewsFailure,
   describeNewsFailure,
@@ -15,22 +19,29 @@ import {
 } from "./news-client";
 import { NewsAttachmentList } from "./NewsAttachmentList";
 import { NewsCategoryLabel } from "./NewsCategoryLabel";
+import { NewsCover } from "./NewsCover";
+import { NewsMarkdown } from "./NewsMarkdown";
 import { NewsPostActions } from "./NewsPostActions";
 
 /**
- * Una publicación abierta (#329, RF-5 del PRD de E11): el cuerpo entero, el
- * autor, la fecha, si se editó y sus adjuntos.
+ * Una publicación abierta (#329, RF-5 del PRD de E11), con el diseño 1c de
+ * E22 (#596): la portada arriba, o el fondo de su categoría, y debajo una
+ * columna de lectura con la categoría y la audiencia, el título, el autor con
+ * su foto y sus fechas, el cuerpo en Markdown (#593) y los adjuntos.
  *
- * El cuerpo es texto plano: React lo escapa, así que una etiqueta HTML sale
- * tal cual, y los saltos de línea los respeta el CSS. Lo que no le corresponde
- * a quien mira llega del servidor como 404, igual que lo que no existe, y aquí
- * se pinta la misma pantalla para los dos: ninguna pista de que exista. Es de
- * cliente porque lee por la API v1, la misma que usará la aplicación nativa de
- * Release 2 (CON-002).
+ * Lo que no le corresponde a quien mira llega del servidor como 404, igual
+ * que lo que no existe, y aquí se pinta la misma pantalla para los dos:
+ * ninguna pista de que exista. Es de cliente porque lee por la API v1, la
+ * misma que usará la aplicación nativa de Release 2 (CON-002).
  *
- * A quien puede editarla y retirarla (#331) le ofrece esas acciones bajo la
- * cabecera; lo que responde el servidor sustituye a lo que había.
+ * A quien puede editarla y retirarla (#331) le ofrece esas acciones en la
+ * línea del autor; lo que responde el servidor sustituye a lo que había.
  */
+
+/** Las medidas del handoff: el icono del fondo grande y el avatar. */
+const COVER_ICON_SIZE = 88;
+const AVATAR_SIZE = 40;
+const AUDIENCE_SEPARATOR = " · ";
 
 type ScreenState =
   | { readonly kind: "loading" }
@@ -51,6 +62,52 @@ function PostNotFound({
   );
 }
 
+function describeAudience(
+  translate: Translator,
+  audience: NewsPostAudienceLabel,
+): string {
+  if (audience.kind === "club") {
+    return translate("news.post.audience.club");
+  }
+  return translate("news.post.audience.groups", {
+    groups: audience.groupNames.join(AUDIENCE_SEPARATOR),
+  });
+}
+
+/** El nombre del autor y, debajo, "Publicada … · Editada …". */
+function PostAuthorAndDates({
+  translate,
+  post,
+}: {
+  readonly translate: Translator;
+  readonly post: NewsPostDetail;
+}): React.JSX.Element {
+  const formatMoment = (instant: string): string =>
+    formatClubMoment(translate.locale, new Date(instant));
+  return (
+    <p className="news-post-byline-text">
+      <span className="news-post-author">{post.author.fullName}</span>
+      <span className="news-post-dates">
+        <time dateTime={post.publishedAt}>
+          {translate("news.post.published", {
+            date: formatMoment(post.publishedAt),
+          })}
+        </time>
+        {post.editedAt === null ? null : (
+          <>
+            <span aria-hidden="true"> · </span>
+            <time dateTime={post.editedAt}>
+              {translate("news.post.edited", {
+                date: formatMoment(post.editedAt),
+              })}
+            </time>
+          </>
+        )}
+      </span>
+    </p>
+  );
+}
+
 function PostContent({
   translate,
   post,
@@ -60,54 +117,53 @@ function PostContent({
   readonly post: NewsPostDetail;
   readonly onChanged: (post: NewsPostDetail) => void;
 }): React.JSX.Element {
-  const formatMoment = (instant: string): string =>
-    formatClubMoment(translate.locale, new Date(instant));
   return (
     <article className="news-post">
-      <header className="news-post-header">
-        <p className="news-row-meta">
-          <NewsCategoryLabel translate={translate} category={post.category} />
-          {post.status === "withdrawn" ? (
-            <span className="news-withdrawn">
-              {translate("news.post.withdrawn")}
-            </span>
-          ) : null}
-        </p>
-        <h1>{post.title}</h1>
-        <p className="news-post-byline">
-          <span>{post.author.fullName}</span>
-          <span aria-hidden="true"> · </span>
-          <time dateTime={post.publishedAt}>
-            {translate("news.post.published", {
-              date: formatMoment(post.publishedAt),
-            })}
-          </time>
-        </p>
-        {post.editedAt === null ? null : (
-          <p className="news-post-edited">
-            <time dateTime={post.editedAt}>
-              {translate("news.post.edited", {
-                date: formatMoment(post.editedAt),
-              })}
-            </time>
+      <div className="news-post-cover">
+        <NewsCover
+          url={post.coverUrl}
+          category={post.category}
+          iconSize={COVER_ICON_SIZE}
+        />
+      </div>
+      <div className="news-post-column">
+        <header className="news-post-header">
+          <p className="news-post-meta">
+            <NewsCategoryLabel translate={translate} category={post.category} />
+            <span>{describeAudience(translate, post.audience)}</span>
+            {post.status === "withdrawn" ? (
+              <span className="news-withdrawn">
+                {translate("news.post.withdrawn")}
+              </span>
+            ) : null}
           </p>
-        )}
-        {post.canManage ? (
-          <NewsPostActions
+          <h1>{post.title}</h1>
+          <div className="news-post-byline">
+            <MemberAvatar
+              fullName={post.author.fullName}
+              photoUrl={post.author.photoUrl}
+              size={AVATAR_SIZE}
+              className="news-post-avatar"
+            />
+            <PostAuthorAndDates translate={translate} post={post} />
+            {post.canManage ? (
+              <NewsPostActions
+                translate={translate}
+                post={post}
+                onChanged={onChanged}
+              />
+            ) : null}
+          </div>
+        </header>
+        <NewsMarkdown body={post.body} />
+        {post.attachments.length > 0 ? (
+          <NewsAttachmentList
             translate={translate}
-            post={post}
-            onChanged={onChanged}
+            postId={post.id}
+            attachments={post.attachments}
           />
         ) : null}
-      </header>
-      <p className="news-post-body">{post.body}</p>
-      {post.attachments.length > 0 ? (
-        <NewsAttachmentList
-          translate={translate}
-          postId={post.id}
-          attachments={post.attachments}
-        />
-      ) : null}
+      </div>
     </article>
   );
 }

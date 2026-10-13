@@ -1,5 +1,8 @@
 "use client";
 
+import { ArrowCounterClockwise } from "@phosphor-icons/react/dist/ssr/ArrowCounterClockwise";
+import { EyeSlash } from "@phosphor-icons/react/dist/ssr/EyeSlash";
+import { PencilSimple } from "@phosphor-icons/react/dist/ssr/PencilSimple";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { NEWS_EDIT_PATH } from "@/lib/auth/routes";
@@ -10,7 +13,8 @@ import { changeNewsStatus } from "./news-manage-client";
 /**
  * Editar, retirar y volver a publicar desde la publicación abierta (#331).
  * Sólo se pintan si el servidor dice que quien mira puede (`canManage`); el
- * servidor lo vuelve a comprobar en cada acción.
+ * servidor lo vuelve a comprobar en cada acción. Son botones de icono en la
+ * línea del autor (#596): el nombre lo lleva `aria-label`.
  *
  * Retirar pide confirmación, porque afecta a lo que ya vio el club. Volver a
  * publicar no: deshace lo anterior y no avisa a nadie. Nada cambia en
@@ -106,33 +110,36 @@ export function NewsPostActions({
 
   return (
     <div className="news-post-actions">
-      <div className="groups-actions">
+      <div className="news-post-action-buttons">
         <Link
           href={NEWS_EDIT_PATH.replace("[id]", encodeURIComponent(post.id))}
-          className="admin-secondary"
+          className="news-icon-button"
+          aria-label={translate("news.post.edit")}
         >
-          {translate("news.post.edit")}
+          <PencilSimple aria-hidden="true" focusable="false" />
         </Link>
         {isWithdrawn ? (
           <button
             type="button"
-            className="admin-secondary"
+            className="news-icon-button"
             disabled={isSending}
-            onClick={() => void changeStatus("published")}
-          >
-            {translate(
+            aria-label={translate(
               isSending ? "news.post.republishing" : "news.post.republish",
             )}
+            onClick={() => void changeStatus("published")}
+          >
+            <ArrowCounterClockwise aria-hidden="true" focusable="false" />
           </button>
         ) : (
           <button
             type="button"
-            className="admin-secondary"
+            className="news-icon-button news-icon-button-danger"
             disabled={isSending || isConfirming}
             aria-expanded={isConfirming}
+            aria-label={translate("news.post.withdraw")}
             onClick={() => setState({ kind: "confirmingWithdrawal" })}
           >
-            {translate("news.post.withdraw")}
+            <EyeSlash aria-hidden="true" focusable="false" />
           </button>
         )}
       </div>

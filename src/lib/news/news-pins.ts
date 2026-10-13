@@ -212,6 +212,7 @@ async function readPinnedDetail(
   return describeNewsPost(gateways, post, {
     access: { canManage: true, canPin: true },
     now: request.now,
+    readerGroupIds: [],
   });
 }
 

@@ -315,6 +315,7 @@ export async function publishNewsPostWithUploads(
   const detail = await describeNewsPost(gateways, published, {
     access: { canManage: true, canPin: canPinNewsPosts(publisherRole) },
     now: request.now,
+    readerGroupIds: [],
   });
   return { ...detail, attachments };
 }

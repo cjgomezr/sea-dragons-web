@@ -1,13 +1,14 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NewsAttachmentDownload } from "@/lib/news/news-attachments";
 import type { NewsPostDetail } from "@/lib/news/news-posts";
 
 /**
- * La publicación abierta en pantalla (#329, RF-5 del PRD de E11): el cuerpo
- * entero como texto, su autor, su fecha, si se editó y sus adjuntos. Lo que no
- * le corresponde a quien mira ya llega del servidor como 404 (#327), y la
+ * La publicación abierta en pantalla (#329, RF-5 del PRD de E11; #596, RF-7
+ * del PRD de E22): la portada, la categoría y la audiencia, el autor con su
+ * foto, las fechas, el cuerpo en Markdown y los adjuntos. Lo que no le
+ * corresponde a quien mira ya llega del servidor como 404 (#327), y la
  * pantalla lo trata igual que lo que no existe.
  */
 
@@ -25,6 +26,9 @@ const RULES_ID = "d1d1d1d1-0000-4000-8000-0000000000d1";
 const MAP_ID = "d2d2d2d2-0000-4000-8000-0000000000d2";
 const RULES_PATH = `${POST_PATH}/attachments/${RULES_ID}`;
 const SIGNED_URL = "https://storage.test/news/reglamento.pdf?token=firmado";
+const COVER_URL = "https://storage.test/covers/portada-grande.webp";
+const AUTHOR_PHOTO_URL = "https://storage.test/photos/liam.webp";
+const WORD_ID = "d3d3d3d3-0000-4000-8000-0000000000d3";
 const NEWS_SEEN_PATH = "/api/v1/account/news-seen";
 
 const newsVisits: string[] = [];
@@ -37,7 +41,9 @@ const POST: NewsPostDetail = {
   author: {
     id: "33333333-0000-4000-8000-000000000003",
     fullName: "Liam O'Connor",
+    photoUrl: null,
   },
+  audience: { kind: "club" },
   publishedAt: "2026-09-15T08:00:00.000Z",
   editedAt: null,
   status: "published",
@@ -58,6 +64,13 @@ const POST: NewsPostDetail = {
       fileName: "mapa-piscina.png",
       contentType: "image/png",
       sizeBytes: 240 * 1024,
+    },
+    {
+      id: WORD_ID,
+      fileName: "acta.docx",
+      contentType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      sizeBytes: 18 * 1024,
     },
   ],
 };
@@ -148,20 +161,182 @@ describe("publicación abierta", () => {
     expect(screen.getByText("Document")).toBeInTheDocument();
     expect(screen.getByText(/Liam O'Connor/)).toBeInTheDocument();
     expect(screen.getByText(/15 September 2026/)).toBeInTheDocument();
-    expect(screen.getByText(/Thanks, the committee\./).textContent).toBe(
-      POST.body,
-    );
+    expect(screen.getByText(/buddy-check policy\./)).toBeInTheDocument();
+    expect(screen.getByText("Thanks, the committee.")).toBeInTheDocument();
   });
 
-  it("pinta el cuerpo tal cual, con sus saltos de línea", async () => {
+  it("pinta el cuerpo con el renderizador de Markdown (#593)", async () => {
+    stubPost({
+      ...POST,
+      body: "The squad took **silver**.\n\n## Highlights\n\n- Four wins",
+      attachments: [],
+    });
+
+    await renderPost();
+
+    expect(screen.getByText("silver").tagName).toBe("STRONG");
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Highlights" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("listitem")).toHaveTextContent("Four wins");
+  });
+
+  it("respeta los saltos del texto plano: uno simple parte la línea y uno doble, el párrafo", async () => {
     stubApi();
 
     await renderPost();
 
-    const body = screen.getByText(/Signature required/);
-    expect(body.textContent).toContain(
-      "buddy-check policy.\nSignature required.\n\nThanks",
+    const firstParagraph = screen.getByText(/buddy-check policy\./);
+    expect(firstParagraph.tagName).toBe("P");
+    expect(firstParagraph).toHaveTextContent(
+      "Please review the revised buddy-check policy. Signature required.",
     );
+    expect(firstParagraph.querySelector("br")).not.toBeNull();
+    expect(screen.getByText("Thanks, the committee.")).not.toBe(firstParagraph);
+  });
+
+  it("enseña la portada arriba cuando la tiene", async () => {
+    stubPost({ ...POST, coverUrl: COVER_URL });
+
+    const { container } = render(
+      <NewsPostScreen locale="en" postId={POST_ID} />,
+    );
+    await screen.findByRole("heading", { level: 1 });
+
+    expect(container.querySelector(`img[src="${COVER_URL}"]`)).not.toBeNull();
+    expect(container.querySelector(".news-cover-fallback")).toBeNull();
+  });
+
+  it("sin portada, enseña en su lugar el fondo de su categoría", async () => {
+    stubApi();
+
+    const { container } = render(
+      <NewsPostScreen locale="en" postId={POST_ID} />,
+    );
+    await screen.findByRole("heading", { level: 1 });
+
+    expect(
+      container.querySelector(".news-post-cover .news-cover-fallback-document"),
+    ).not.toBeNull();
+  });
+
+  it("dice que va a todo el club", async () => {
+    stubApi();
+
+    await renderPost();
+
+    expect(screen.getByText("For the whole club")).toBeInTheDocument();
+  });
+
+  it("nombra los grupos a los que va", async () => {
+    stubPost({
+      ...POST,
+      audience: { kind: "groups", groupNames: ["U16 squad", "Parents"] },
+    });
+
+    await renderPost();
+
+    expect(screen.getByText("For U16 squad · Parents")).toBeInTheDocument();
+  });
+
+  it("dice la audiencia en español", async () => {
+    stubPost({ ...POST, audience: { kind: "groups", groupNames: ["Sub-16"] } });
+
+    await renderPost("es");
+
+    expect(screen.getByText("Para Sub-16")).toBeInTheDocument();
+  });
+
+  it("pone la foto del autor junto a su nombre", async () => {
+    stubPost({
+      ...POST,
+      author: { ...POST.author, photoUrl: AUTHOR_PHOTO_URL },
+    });
+
+    const { container } = render(
+      <NewsPostScreen locale="en" postId={POST_ID} />,
+    );
+    await screen.findByRole("heading", { level: 1 });
+
+    expect(
+      container.querySelector(`img[src="${AUTHOR_PHOTO_URL}"]`),
+    ).not.toBeNull();
+  });
+
+  it("sin foto, pone las iniciales del autor", async () => {
+    stubApi();
+
+    await renderPost();
+
+    expect(screen.getByText("LO")).toBeInTheDocument();
+  });
+
+  it("junta en una línea la publicada y la editada", async () => {
+    stubPost({ ...POST, editedAt: "2026-09-20T08:00:00.000Z" });
+
+    await renderPost();
+
+    const published = screen.getByText(/Published 15 September 2026/);
+    expect(published.parentElement).toHaveTextContent(
+      /Published 15 September 2026.* · Edited 20 September 2026/,
+    );
+  });
+
+  it("a quien puede, le da Editar y Retirar como botones de icono con nombre", async () => {
+    stubPost({ ...POST, canManage: true });
+
+    await renderPost();
+
+    const edit = screen.getByRole("link", { name: "Edit" });
+    const withdraw = screen.getByRole("button", { name: "Withdraw" });
+    expect(edit).toHaveTextContent(/^$/);
+    expect(edit.querySelector("svg")).not.toBeNull();
+    expect(withdraw).toHaveTextContent(/^$/);
+    expect(withdraw.querySelector("svg")).not.toBeNull();
+  });
+
+  it("a quien no puede, no le da Editar ni Retirar", async () => {
+    stubApi();
+
+    await renderPost();
+
+    expect(screen.queryByRole("link", { name: "Edit" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Withdraw" })).toBeNull();
+  });
+
+  it.each([
+    [/Download reglamento\.pdf/, "PDF"],
+    [/Download mapa-piscina\.png/, "Image"],
+    [/Download acta\.docx/, "Word document"],
+  ])("la tarjeta %s lleva el icono de su tipo", async (name, kind) => {
+    stubApi();
+
+    await renderPost();
+
+    const card = screen.getByRole("button", { name });
+    expect(within(card).getByRole("img", { name: kind })).toBeInTheDocument();
+  });
+
+  it("un adjunto de otro tipo lleva el icono de archivo genérico", async () => {
+    stubPost({
+      ...POST,
+      attachments: [
+        {
+          id: RULES_ID,
+          fileName: "resultados.xlsx",
+          contentType:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          sizeBytes: 4096,
+        },
+      ],
+    });
+
+    await renderPost();
+
+    const card = screen.getByRole("button", {
+      name: /Download resultados\.xlsx/,
+    });
+    expect(within(card).getByRole("img", { name: "File" })).toBeInTheDocument();
   });
 
   it("enseña las etiquetas HTML del cuerpo como texto, sin interpretarlas", async () => {

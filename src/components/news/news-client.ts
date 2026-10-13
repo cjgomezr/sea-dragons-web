@@ -64,7 +64,16 @@ export const newsPostDetailSchema = z.object({
   category: z.enum(NEWS_CATEGORIES),
   title: z.string(),
   body: z.string(),
-  author: authorSchema,
+  author: authorSchema.extend({
+    photoUrl: z.url({ protocol: /^https?$/ }).nullable(),
+  }),
+  audience: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("club") }),
+    z.object({
+      kind: z.literal("groups"),
+      groupNames: z.array(z.string()),
+    }),
+  ]),
   publishedAt: z.iso.datetime({ offset: true }),
   editedAt: z.iso.datetime({ offset: true }).nullable(),
   status: statusSchema,

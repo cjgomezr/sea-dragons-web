@@ -146,6 +146,8 @@ function managerView(managed: ManagedPost, now: Date): NewsPostView {
   return {
     access: { canManage: true, canPin: canPinNewsPosts(managed.role) },
     now,
+    // Quien la gestiona ve todos los grupos de la audiencia, sean suyos o no.
+    readerGroupIds: [],
   };
 }
 
