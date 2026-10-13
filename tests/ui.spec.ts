@@ -12417,10 +12417,10 @@ test.describe("publicar en el navegador", () => {
       await page.getByRole("button", { name: PUBLISH_BUTTON }).click();
 
       await expect(page).toHaveURL(new RegExp(`${NEWS_SCREEN_PATH}$`));
-      const titles = page
-        .getByRole("list", { name: FEED_HEADING })
-        .getByRole("link");
-      await expect(titles.first()).toHaveText(published.title);
+      // Sin fijada, la más reciente es la tarjeta destacada (#594).
+      await expect(
+        page.getByRole("article", { name: published.title }),
+      ).toBeVisible();
       expect(
         await page.evaluate(
           () => (window as { sinRecargar?: boolean }).sinRecargar,
