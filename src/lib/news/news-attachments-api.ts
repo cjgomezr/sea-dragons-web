@@ -28,6 +28,21 @@ import { createSupabaseNewsPublishGateways } from "./supabase-news-publish-gatew
  * nativa, sin codificar nada a mano. */
 export const NEWS_ATTACHMENT_FILE_NAME_PARAM = "name";
 
+/** Qué se sube por el flujo de subidas previas: un adjunto (lo de siempre,
+ * sin el parámetro) o la portada (#591). */
+export const NEWS_UPLOAD_KIND_PARAM = "kind";
+
+export const NEWS_UPLOAD_KINDS = ["attachment", "cover"] as const;
+
+export type NewsUploadKind = (typeof NEWS_UPLOAD_KINDS)[number];
+
+const TOO_LARGE_CODES: Readonly<
+  Record<NewsUploadKind, NewsAttachmentIssueCode>
+> = {
+  attachment: "attachment_too_large",
+  cover: "cover_too_large",
+};
+
 export type NewsAttachmentUpload = {
   readonly fileName: string;
   readonly bytes: Uint8Array;
@@ -38,10 +53,28 @@ function rejectFile(code: NewsAttachmentIssueCode): never {
   throw new ApiError("validation_error", error.message, code);
 }
 
+/** Qué se sube. Sin el parámetro es un adjunto, como antes de #591. */
+export function readNewsUploadKind(request: NextRequest): NewsUploadKind {
+  const kind = request.nextUrl.searchParams.get(NEWS_UPLOAD_KIND_PARAM);
+  if (kind === null) {
+    return "attachment";
+  }
+  const known = NEWS_UPLOAD_KINDS.find((candidate) => candidate === kind);
+  if (known === undefined) {
+    throw new ApiError(
+      "validation_error",
+      `El tipo de subida tiene que ser ${NEWS_UPLOAD_KINDS.join(" o ")}.`,
+    );
+  }
+  return known;
+}
+
 /** El nombre y los bytes de la subida. El cuerpo se lee como mucho hasta el
- * límite: un archivo de más se rechaza sin cargarlo entero. */
+ * límite: un archivo de más se rechaza sin cargarlo entero, con el código de
+ * lo que se subía. */
 export async function readNewsAttachmentUpload(
   request: NextRequest,
+  kind: NewsUploadKind = "attachment",
 ): Promise<NewsAttachmentUpload> {
   const fileName = request.nextUrl.searchParams.get(
     NEWS_ATTACHMENT_FILE_NAME_PARAM,
@@ -51,7 +84,7 @@ export async function readNewsAttachmentUpload(
   }
   const body = await readLimitedBody(request, NEWS_ATTACHMENT_MAX_BYTES);
   if (body.kind === "too_large") {
-    rejectFile("attachment_too_large");
+    rejectFile(TOO_LARGE_CODES[kind]);
   }
   return { fileName, bytes: body.bytes };
 }

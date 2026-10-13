@@ -165,6 +165,10 @@ columna memberships.user_id tipo=uuid null=NO default=-
 columna memberships.waived_by tipo=uuid null=YES default=-
 columna memberships.waived_reason tipo=text null=YES default=-
 columna memberships.waived_until tipo=timestamp with time zone null=YES default=-
+columna news_cover_uploads.club_id tipo=uuid null=NO default=-
+columna news_cover_uploads.created_at tipo=timestamp with time zone null=NO default=now()
+columna news_cover_uploads.id tipo=uuid null=NO default=-
+columna news_cover_uploads.uploaded_by tipo=uuid null=NO default=-
 columna news_post_attachments.club_id tipo=uuid null=NO default=-
 columna news_post_attachments.content_type tipo=text null=NO default=-
 columna news_post_attachments.created_at tipo=timestamp with time zone null=NO default=now()
@@ -181,6 +185,7 @@ columna news_posts.author_id tipo=uuid null=NO default=-
 columna news_posts.body tipo=text null=NO default=-
 columna news_posts.category tipo=text null=NO default=-
 columna news_posts.club_id tipo=uuid null=NO default=-
+columna news_posts.cover_upload_id tipo=uuid null=YES default=-
 columna news_posts.edited_at tipo=timestamp with time zone null=YES default=-
 columna news_posts.id tipo=uuid null=NO default=gen_random_uuid()
 columna news_posts.published_at tipo=timestamp with time zone null=NO default=now()
@@ -635,6 +640,20 @@ grant memberships service_role SELECT
 grant memberships service_role TRIGGER
 grant memberships service_role TRUNCATE
 grant memberships service_role UPDATE
+grant news_cover_uploads postgres DELETE
+grant news_cover_uploads postgres INSERT
+grant news_cover_uploads postgres REFERENCES
+grant news_cover_uploads postgres SELECT
+grant news_cover_uploads postgres TRIGGER
+grant news_cover_uploads postgres TRUNCATE
+grant news_cover_uploads postgres UPDATE
+grant news_cover_uploads service_role DELETE
+grant news_cover_uploads service_role INSERT
+grant news_cover_uploads service_role REFERENCES
+grant news_cover_uploads service_role SELECT
+grant news_cover_uploads service_role TRIGGER
+grant news_cover_uploads service_role TRUNCATE
+grant news_cover_uploads service_role UPDATE
 grant news_post_attachments authenticated SELECT
 grant news_post_attachments postgres DELETE
 grant news_post_attachments postgres INSERT
@@ -880,6 +899,9 @@ indice memberships_pkey CREATE UNIQUE INDEX memberships_pkey ON public.membershi
 indice memberships_stripe_customer_id_key CREATE UNIQUE INDEX memberships_stripe_customer_id_key ON public.memberships USING btree (stripe_customer_id)
 indice memberships_stripe_subscription_id_key CREATE UNIQUE INDEX memberships_stripe_subscription_id_key ON public.memberships USING btree (stripe_subscription_id)
 indice memberships_waived_by_club_id_idx CREATE INDEX memberships_waived_by_club_id_idx ON public.memberships USING btree (waived_by, club_id)
+indice news_cover_uploads_id_club_id_key CREATE UNIQUE INDEX news_cover_uploads_id_club_id_key ON public.news_cover_uploads USING btree (id, club_id)
+indice news_cover_uploads_pkey CREATE UNIQUE INDEX news_cover_uploads_pkey ON public.news_cover_uploads USING btree (id)
+indice news_cover_uploads_uploaded_by_created_at_idx CREATE INDEX news_cover_uploads_uploaded_by_created_at_idx ON public.news_cover_uploads USING btree (uploaded_by, created_at)
 indice news_post_attachments_pkey CREATE UNIQUE INDEX news_post_attachments_pkey ON public.news_post_attachments USING btree (id)
 indice news_post_attachments_post_id_idx CREATE INDEX news_post_attachments_post_id_idx ON public.news_post_attachments USING btree (post_id)
 indice news_post_attachments_storage_path_key CREATE UNIQUE INDEX news_post_attachments_storage_path_key ON public.news_post_attachments USING btree (storage_path)
@@ -888,6 +910,7 @@ indice news_post_groups_pkey CREATE UNIQUE INDEX news_post_groups_pkey ON public
 indice news_posts_author_id_club_id_idx CREATE INDEX news_posts_author_id_club_id_idx ON public.news_posts USING btree (author_id, club_id)
 indice news_posts_body_search_idx CREATE INDEX news_posts_body_search_idx ON public.news_posts USING gin (search_normalize(body) extensions.gin_trgm_ops)
 indice news_posts_club_id_published_at_idx CREATE INDEX news_posts_club_id_published_at_idx ON public.news_posts USING btree (club_id, published_at DESC)
+indice news_posts_cover_upload_id_key CREATE UNIQUE INDEX news_posts_cover_upload_id_key ON public.news_posts USING btree (cover_upload_id) WHERE (cover_upload_id IS NOT NULL)
 indice news_posts_id_club_id_key CREATE UNIQUE INDEX news_posts_id_club_id_key ON public.news_posts USING btree (id, club_id)
 indice news_posts_pkey CREATE UNIQUE INDEX news_posts_pkey ON public.news_posts USING btree (id)
 indice news_posts_title_search_idx CREATE INDEX news_posts_title_search_idx ON public.news_posts USING gin (search_normalize(title) extensions.gin_trgm_ops)
@@ -1120,6 +1143,10 @@ restriccion memberships.memberships_stripe_customer_id_key UNIQUE (stripe_custom
 restriccion memberships.memberships_stripe_subscription_id_key UNIQUE (stripe_subscription_id)
 restriccion memberships.memberships_waived_reason_check CHECK (((status <> 'waived'::text) OR (waived_reason IS NOT NULL)))
 restriccion memberships.memberships_waiver_same_club_fkey FOREIGN KEY (waived_by, club_id) REFERENCES members(user_id, club_id) ON DELETE SET NULL (waived_by)
+restriccion news_cover_uploads.news_cover_uploads_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion news_cover_uploads.news_cover_uploads_id_club_id_key UNIQUE (id, club_id)
+restriccion news_cover_uploads.news_cover_uploads_pkey PRIMARY KEY (id)
+restriccion news_cover_uploads.news_cover_uploads_uploader_same_club_fkey FOREIGN KEY (uploaded_by, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
 restriccion news_post_attachments.news_post_attachments_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion news_post_attachments.news_post_attachments_pkey PRIMARY KEY (id)
 restriccion news_post_attachments.news_post_attachments_post_same_club_fkey FOREIGN KEY (post_id, club_id) REFERENCES news_posts(id, club_id) ON DELETE CASCADE
@@ -1134,6 +1161,7 @@ restriccion news_posts.news_posts_author_same_club_fkey FOREIGN KEY (author_id, 
 restriccion news_posts.news_posts_body_not_blank CHECK ((body ~ '\S'::text))
 restriccion news_posts.news_posts_category_check CHECK ((category = ANY (ARRAY['announcement'::text, 'news'::text, 'document'::text])))
 restriccion news_posts.news_posts_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion news_posts.news_posts_cover_same_club_fkey FOREIGN KEY (cover_upload_id, club_id) REFERENCES news_cover_uploads(id, club_id)
 restriccion news_posts.news_posts_id_club_id_key UNIQUE (id, club_id)
 restriccion news_posts.news_posts_pkey PRIMARY KEY (id)
 restriccion news_posts.news_posts_status_check CHECK ((status = ANY (ARRAY['published'::text, 'withdrawn'::text])))
@@ -1215,6 +1243,7 @@ tabla member_evaluation_ratings rls=t
 tabla member_evaluations rls=t
 tabla members rls=t
 tabla memberships rls=t
+tabla news_cover_uploads rls=t
 tabla news_post_attachments rls=t
 tabla news_post_groups rls=t
 tabla news_posts rls=t

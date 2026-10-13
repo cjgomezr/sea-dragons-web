@@ -7,6 +7,7 @@ import type {
 } from "@/lib/auth/role-request";
 import { type Role, hasCapability } from "@/lib/auth/roles";
 import type { MemberGroupsGateway } from "@/lib/groups/member-groups";
+import { type NewsCoversGateway, signNewsCoverUrl } from "./news-covers";
 
 /**
  * Publicar y abrir una publicación del club (#327, RF-2 y RF-5 del PRD de
@@ -61,14 +62,21 @@ export type NewsPost = {
   readonly status: NewsPostStatus;
   readonly audience: NewsAudience;
   readonly attachments: readonly NewsAttachmentSummary[];
+  /** La subida de `news_cover_uploads` que hace de portada (#591). */
+  readonly coverUploadId: string | null;
 };
 
 /** Lo que recibe quien abre una publicación. Ni el club ni la audiencia: a
  * qué otros grupos iba no es asunto de quien la lee. `canManage` dice si
  * quien la abre puede editarla y retirarla (#331), para que la pantalla no
- * tenga que repetir la regla. */
-export type NewsPostDetail = Omit<NewsPost, "clubId" | "audience"> & {
+ * tenga que repetir la regla. `coverUrl` es la versión grande de la portada,
+ * firmada (#591). */
+export type NewsPostDetail = Omit<
+  NewsPost,
+  "clubId" | "audience" | "coverUploadId"
+> & {
   readonly canManage: boolean;
+  readonly coverUrl: string | null;
 };
 
 /** Lo que manda quien publica, tal como llega. */
@@ -82,6 +90,7 @@ export type NewsDraft = {
 export type NewNewsPost = NewsDraft & {
   readonly clubId: string;
   readonly authorId: string;
+  readonly coverUploadId: string | null;
 };
 
 /** Una fila del feed antes de recortar el cuerpo en extracto. */
@@ -95,6 +104,7 @@ export type NewsFeedRow = {
   /** Retirada sólo le llega a quien la publicó (#331). */
   readonly status: NewsPostStatus;
   readonly attachmentCount: number;
+  readonly coverUploadId: string | null;
 };
 
 /** Dónde terminó la página anterior. Va con el id porque dos publicaciones
@@ -114,6 +124,13 @@ export type NewsFeedQuery = {
   readonly limit: number;
 };
 
+/** Lo que una edición hace con la portada (#591): dejarla como está, o
+ * ponerle otra (`null` la quita). Dos casos y no un campo opcional, para que
+ * "no la toques" y "quítala" no se confundan. */
+export type NewsCoverChange =
+  | { readonly kind: "keep" }
+  | { readonly kind: "replace"; readonly coverUploadId: string | null };
+
 /** Una edición (#331). Sólo se escribe si la publicación sigue en
  * `expectedEditedAt`, la edición que tenía delante quien guarda (`null` si
  * nunca se editó): si alguien guardó entretanto, no se pisa nada. */
@@ -122,6 +139,7 @@ export type NewsPostEdit = NewsDraft & {
   readonly clubId: string;
   readonly expectedEditedAt: string | null;
   readonly editedAt: string;
+  readonly cover: NewsCoverChange;
 };
 
 export type NewsPostUpdate =
@@ -160,6 +178,7 @@ export type NewsGateways = {
   readonly members: RoleRequestGateways["members"];
   readonly memberGroups: MemberGroupsGateway;
   readonly posts: NewsPostsGateway;
+  readonly covers: NewsCoversGateway;
   readonly audit: AuditLogWriter;
 };
 
@@ -322,6 +341,7 @@ export async function normalizeNewsDraft(
 export function toNewsPostDetail(
   post: NewsPost,
   canManage: boolean,
+  coverUrl: string | null,
 ): NewsPostDetail {
   return {
     id: post.id,
@@ -334,7 +354,24 @@ export function toNewsPostDetail(
     status: post.status,
     attachments: post.attachments,
     canManage,
+    coverUrl,
   };
+}
+
+/** El detalle con la grande de su portada firmada. Firmar no comprueba la
+ * audiencia: quien llama ya decidió que la publicación se le enseña. */
+export async function describeNewsPost(
+  gateways: Pick<NewsGateways, "covers">,
+  post: NewsPost,
+  canManage: boolean,
+): Promise<NewsPostDetail> {
+  const coverUrl = await signNewsCoverUrl(
+    gateways.covers,
+    post.coverUploadId === null
+      ? null
+      : { id: post.coverUploadId, clubId: post.clubId },
+  );
+  return toNewsPostDetail(post, canManage, coverUrl);
 }
 
 /** La publicación lista para guardar, o el motivo por el que no vale. No
@@ -347,7 +384,7 @@ export function toNewsPostDetail(
 export async function prepareNewsPost(
   gateways: Pick<NewsGateways, "members" | "posts">,
   request: { readonly callerId: string; readonly draft: NewsDraft },
-): Promise<NewNewsPost> {
+): Promise<Omit<NewNewsPost, "coverUploadId">> {
   const caller = await findNewsPublisher(gateways, request.callerId);
   return {
     ...(await normalizeNewsDraft(gateways, caller.clubId, request.draft)),
@@ -394,7 +431,8 @@ export async function openNewsPost(
   if (post === null || !isVisibleTo(post, { id: request.callerId, groupIds })) {
     throw new NewsPostNotFoundError();
   }
-  return toNewsPostDetail(
+  return describeNewsPost(
+    gateways,
     post,
     canManageNewsPost({ id: request.callerId, role: caller.role }, post),
   );

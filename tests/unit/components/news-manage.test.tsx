@@ -40,6 +40,7 @@ const POST: NewsPostDetail = {
   editedAt: null,
   status: "published",
   canManage: true,
+  coverUrl: null,
   attachments: [],
 };
 
@@ -51,6 +52,7 @@ const EDITABLE: EditableNewsPost = {
   audience: { kind: "groups", groupIds: [SENIOR.id] },
   editedAt: EDITED_AT,
   status: "published",
+  coverUploadId: null,
 };
 
 type Call = {
@@ -249,6 +251,8 @@ describe("el feed de quien publicó", () => {
       publishedAt: "2026-09-15T08:00:00.000Z",
       status: "withdrawn",
       attachmentCount: 0,
+      coverThumbnailUrl: null,
+      coverUrl: null,
     };
     responders[`GET ${FEED_PATH}`] = () =>
       jsonResponse(200, { data: { posts: [withdrawn], nextCursor: null } });

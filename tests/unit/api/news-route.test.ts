@@ -29,6 +29,7 @@ import {
 
 const ORIGIN = "http://localhost:3417";
 const POST_ID = "d3d3d3d3-0000-4000-8000-00000000000d";
+const COVER_ID = "c0c0c0c0-0000-4000-8000-000000000001";
 
 const DRAFT = {
   category: "announcement",
@@ -246,6 +247,40 @@ describe("POST /api/v1/news/publish", () => {
         attachments: [{ fileName: "acta.pdf", contentType: "application/pdf" }],
       },
     });
+  });
+
+  it("enlaza la portada subida antes y responde con su dirección firmada", async () => {
+    mockWiring({
+      callerRole: "Committee",
+      covers: [
+        {
+          id: COVER_ID,
+          clubId: CLUB_ID,
+          uploadedBy: CALLER_ID,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    });
+
+    const response = await publish({ ...DRAFT, coverUploadId: COVER_ID });
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { coverUrl: expect.stringContaining(COVER_ID) },
+    });
+    expect(club.inserted[0]?.coverUploadId).toBe(COVER_ID);
+  });
+
+  it("responde 400 con su motivo a una portada que no está subida", async () => {
+    mockWiring({ callerRole: "Committee" });
+
+    const response = await publish({ ...DRAFT, coverUploadId: COVER_ID });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "validation_error", reason: "cover_upload_missing" },
+    });
+    expect(club.inserted).toEqual([]);
   });
 
   it("responde 400 con su motivo a un adjunto que ya no está subido", async () => {

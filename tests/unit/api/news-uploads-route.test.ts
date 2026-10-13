@@ -10,6 +10,7 @@ import {
   uploadIdFor,
 } from "../helpers/news-attachments-club";
 import { CALLER_ID, CLUB_ID } from "../helpers/news-club";
+import { SHRUNK_COVER_LARGE } from "../helpers/news-attachments-club";
 
 /**
  * Los endpoints de las subidas previas (#330): subir un archivo mientras se
@@ -19,6 +20,10 @@ import { CALLER_ID, CLUB_ID } from "../helpers/news-club";
 
 const ORIGIN = "http://localhost:3417";
 const FILE_NAME_PARAM = "name";
+const KIND_PARAM = "kind";
+const PNG_BYTES = Uint8Array.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13,
+]);
 
 const PDF_BYTES = Uint8Array.from(Buffer.from("%PDF-1.7\n1 0 obj"));
 const TEXT_BYTES = Uint8Array.from(Buffer.from("hola, soy un pdf"));
@@ -50,11 +55,15 @@ function mockWiring(options: FakeAttachmentClubOptions = {}): void {
 async function stage(
   fileName: string | null,
   bytes: Uint8Array,
+  kind: string | null = null,
 ): Promise<Response> {
   const { POST } = await import("@/app/api/v1/news/publish/uploads/route");
   const url = new URL(NEWS_UPLOADS_API_PATH, ORIGIN);
   if (fileName !== null) {
     url.searchParams.set(FILE_NAME_PARAM, fileName);
+  }
+  if (kind !== null) {
+    url.searchParams.set(KIND_PARAM, kind);
   }
   return POST(
     new NextRequest(url, {
@@ -93,6 +102,63 @@ afterEach(() => {
   vi.doUnmock("@/lib/supabase/session-client");
   vi.doUnmock("@/lib/auth/session-reader");
   vi.restoreAllMocks();
+});
+
+describe("POST /api/v1/news/publish/uploads?kind=cover", () => {
+  it("responde 201 con el id de la portada, guardada en WebP", async () => {
+    mockWiring();
+
+    const response = await stage("portada.png", PNG_BYTES, "cover");
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        id: NEW_FILE_ID,
+        fileName: "portada.png",
+        contentType: "image/webp",
+        sizeBytes: SHRUNK_COVER_LARGE.length,
+      },
+    });
+    expect(club.coverFiles.size).toBe(2);
+  });
+
+  it("responde 400 con su código y los tipos que admite a un PDF", async () => {
+    mockWiring();
+
+    const response = await stage("acta.pdf", PDF_BYTES, "cover");
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: "validation_error",
+        reason: "cover_type_unsupported",
+        message: expect.stringMatching(/JPEG, PNG o WebP/),
+      },
+    });
+  });
+
+  it("responde 400 con el código de tamaño a una portada de más de 10 MB", async () => {
+    mockWiring();
+    const huge = new Uint8Array(NEWS_ATTACHMENT_MAX_BYTES + 1);
+    huge.set(PNG_BYTES);
+
+    await expectRejectedFile(
+      await stage("enorme.png", huge, "cover"),
+      "cover_too_large",
+    );
+    expect(club.coverFiles.size).toBe(0);
+  });
+
+  it("responde 400 a un tipo de subida que no existe", async () => {
+    mockWiring();
+
+    const response = await stage("portada.png", PNG_BYTES, "banner");
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "validation_error" },
+    });
+  });
 });
 
 describe("POST /api/v1/news/publish/uploads", () => {

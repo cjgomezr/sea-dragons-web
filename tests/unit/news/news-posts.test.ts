@@ -41,6 +41,7 @@ function publishWithoutAttachments(
   return publishNewsPostWithUploads(gateways, {
     ...request,
     uploadIds: [],
+    coverUploadId: null,
     now: new Date(),
   });
 }
@@ -71,6 +72,7 @@ describe("publicar", () => {
           title: "Cambia la piscina",
           body: DRAFT.body,
           audience: { kind: "club" },
+          coverUploadId: null,
         },
       ]);
       expect(post).toMatchObject({
@@ -251,6 +253,7 @@ describe("abrir una publicación", () => {
       status: "published",
       attachments: [attachment],
       canManage: false,
+      coverUrl: null,
     });
   });
 

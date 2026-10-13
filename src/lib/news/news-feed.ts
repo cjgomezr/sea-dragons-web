@@ -1,5 +1,11 @@
 import { z } from "zod";
 import {
+  NO_COVER_URLS,
+  type NewsCoverRef,
+  type NewsCoverUrls,
+  signNewsCovers,
+} from "./news-covers";
+import {
   type NewsAuthor,
   type NewsCategory,
   type NewsFeedPosition,
@@ -28,7 +34,9 @@ const ELLIPSIS = "…";
 const WHITESPACE_RUN = /\s+/;
 const TRAILING_SPACE_OR_PUNCTUATION = /[\s\p{P}]+$/u;
 
-export type NewsFeedItem = {
+/** Las dos direcciones de la portada (#591): la miniatura para la fila y la
+ * grande para la tarjeta destacada. */
+export type NewsFeedItem = NewsCoverUrls & {
   readonly id: string;
   readonly category: NewsCategory;
   readonly title: string;
@@ -100,8 +108,14 @@ export function excerptNewsBody(body: string): string {
   return `${excerpt}${ELLIPSIS}`;
 }
 
-function toFeedItem(row: NewsFeedRow): NewsFeedItem {
+function toFeedItem(
+  row: NewsFeedRow,
+  coverUrls: ReadonlyMap<string, NewsCoverUrls>,
+): NewsFeedItem {
+  const cover =
+    row.coverUploadId === null ? undefined : coverUrls.get(row.coverUploadId);
   return {
+    ...(cover ?? NO_COVER_URLS),
     id: row.id,
     category: row.category,
     title: row.title,
@@ -111,6 +125,17 @@ function toFeedItem(row: NewsFeedRow): NewsFeedItem {
     status: row.status,
     attachmentCount: row.attachmentCount,
   };
+}
+
+/** Las portadas de la página. Todas son del club de quien lee: el feed sólo
+ * trae lo de su club. */
+function coversOf(
+  rows: readonly NewsFeedRow[],
+  clubId: string,
+): readonly NewsCoverRef[] {
+  return rows.flatMap((row) =>
+    row.coverUploadId === null ? [] : [{ id: row.coverUploadId, clubId }],
+  );
 }
 
 /** Una página del feed de quien llama. Se pide una fila de más para saber,
@@ -133,10 +158,14 @@ export async function listNewsFeed(
     limit: NEWS_FEED_PAGE_SIZE + 1,
   });
   const page = rows.slice(0, NEWS_FEED_PAGE_SIZE);
+  const coverUrls = await signNewsCovers(
+    gateways.covers,
+    coversOf(page, caller.clubId),
+  );
   const last = page.at(-1);
   const hasMore = rows.length > NEWS_FEED_PAGE_SIZE && last !== undefined;
   return {
-    posts: page.map(toFeedItem),
+    posts: page.map((row) => toFeedItem(row, coverUrls)),
     nextCursor: hasMore
       ? encodeCursor({ publishedAt: last.publishedAt, id: last.id })
       : null,

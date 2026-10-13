@@ -2,6 +2,7 @@ import type { NextRequest, NextResponse } from "next/server";
 import type { z } from "zod";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
+import { asNewsAttachmentApiError } from "@/lib/news/news-attachments-api";
 import {
   asNewsApiError,
   newsEditSchema,
@@ -20,7 +21,8 @@ import type { NewsPostDetail } from "@/lib/news/news-posts";
  * formulario: la audiencia entera y la marca de editada. PATCH guarda
  * categoría, título, cuerpo y audiencia, y responde 409 si alguien guardó
  * entretanto: `expectedEditedAt` es la marca que se tenía delante, `null` si
- * nunca se editó. Editar no avisa a nadie (decisión D2).
+ * nunca se editó. Con `coverUploadId` cambia o quita la portada (#591), y la
+ * anterior se borra. Editar no avisa a nadie (decisión D2).
  *
  * La frontera lo reserva a Admin y Committee. El dominio exige además que la
  * publicación sea de quien llama, salvo al Admin, y responde 403 si no.
@@ -78,7 +80,7 @@ export function PATCH(
         decorateResponse,
       });
       const postId = readNewsPostId((await context.params).id);
-      const { expectedEditedAt, ...draft } = body;
+      const { expectedEditedAt, coverUploadId, ...draft } = body;
       try {
         return {
           data: await editNewsPost(requireNewsGateways(), {
@@ -86,11 +88,16 @@ export function PATCH(
             postId,
             draft,
             expectedEditedAt,
+            cover:
+              coverUploadId === undefined
+                ? { kind: "keep" }
+                : { kind: "replace", coverUploadId },
             now: new Date(),
           }),
         };
       } catch (error) {
-        asNewsApiError(error);
+        // Una portada que no vale es un rechazo de subida, con su motivo.
+        asNewsAttachmentApiError(error);
       }
     },
   });

@@ -138,6 +138,16 @@ export function describeAttachmentIssue(
       });
     case "attachment_upload_missing":
       return translate("news.publish.attachments.issue.uploadMissing");
+    case "cover_empty":
+      return translate("news.publish.cover.issue.empty");
+    case "cover_too_large":
+      return translate("news.publish.cover.issue.tooLarge", {
+        max: MAX_MEGABYTES,
+      });
+    case "cover_type_unsupported":
+      return translate("news.publish.cover.issue.typeUnsupported");
+    case "cover_upload_missing":
+      return translate("news.publish.cover.issue.uploadMissing");
   }
 }
 

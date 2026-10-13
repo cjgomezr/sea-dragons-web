@@ -7,6 +7,7 @@ import {
 import type { NewsPost } from "@/lib/news/news-posts";
 import {
   CALLER_ID,
+  CLUB_ID,
   type FakeClub,
   type FakeClubOptions,
   SENIOR_SQUAD_ID,
@@ -23,6 +24,7 @@ import {
 
 const ORIGIN = "http://localhost:3417";
 const POST_ID = "d3d3d3d3-0000-4000-8000-00000000000d";
+const COVER_ID = "c0c0c0c0-0000-4000-8000-000000000001";
 
 const EDIT = {
   category: "announcement",
@@ -156,6 +158,7 @@ describe("GET /api/v1/news/publish/[id]", () => {
         audience: { kind: "groups", groupIds: [SENIOR_SQUAD_ID] },
         editedAt: null,
         status: "published",
+        coverUploadId: null,
       },
     });
   });
@@ -187,6 +190,60 @@ describe("PATCH /api/v1/news/publish/[id]", () => {
         editedAt: expect.any(String),
         canManage: true,
       },
+    });
+  });
+
+  it("quita la portada con coverUploadId null y borra la anterior", async () => {
+    mockWiring({
+      posts: [{ ...OWN_POST, coverUploadId: COVER_ID }],
+      covers: [
+        {
+          id: COVER_ID,
+          clubId: CLUB_ID,
+          uploadedBy: CALLER_ID,
+          createdAt: "2026-09-27T09:00:00.000Z",
+        },
+      ],
+    });
+
+    const response = await saveEdit({ ...EDIT, coverUploadId: null });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { coverUrl: null },
+    });
+    expect(club.covers).toEqual([]);
+  });
+
+  it("deja la portada como está si la edición no manda coverUploadId", async () => {
+    mockWiring({
+      posts: [{ ...OWN_POST, coverUploadId: COVER_ID }],
+      covers: [
+        {
+          id: COVER_ID,
+          clubId: CLUB_ID,
+          uploadedBy: CALLER_ID,
+          createdAt: "2026-09-27T09:00:00.000Z",
+        },
+      ],
+    });
+
+    const response = await saveEdit(EDIT);
+
+    await expect(response.json()).resolves.toMatchObject({
+      data: { coverUrl: expect.stringContaining(COVER_ID) },
+    });
+    expect(club.posts[0]?.coverUploadId).toBe(COVER_ID);
+  });
+
+  it("responde 400 con su motivo a una portada ajena", async () => {
+    mockWiring();
+
+    const response = await saveEdit({ ...EDIT, coverUploadId: COVER_ID });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "validation_error", reason: "cover_upload_missing" },
     });
   });
 

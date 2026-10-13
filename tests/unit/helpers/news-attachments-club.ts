@@ -59,6 +59,8 @@ export type FakeAttachmentClubOptions = FakeClubOptions & {
   readonly failInsert?: boolean;
   readonly failRemove?: boolean;
   readonly failList?: boolean;
+  /** La portada empieza como una imagen pero sharp no la entiende. */
+  readonly undecodableCover?: boolean;
 };
 
 export type FakeAttachmentClub = {
@@ -72,10 +74,17 @@ export type FakeAttachmentClub = {
   readonly posts: FakeClub["posts"];
   readonly edits: FakeClub["edits"];
   readonly audited: FakeClub["audited"];
+  readonly covers: FakeClub["covers"];
+  readonly coverFiles: FakeClub["coverFiles"];
   /** Las rutas que hay en el almacenamiento. */
   readonly files: Set<string>;
   readonly fileInfo: Map<string, StoredNewsFile>;
 };
+
+/** Lo que devuelve la reducción falsa: bytes cualquiera, de tamaños
+ * distintos para saber cuál es cuál. */
+export const SHRUNK_COVER_THUMBNAIL = new Uint8Array(12);
+export const SHRUNK_COVER_LARGE = new Uint8Array(345);
 
 const MAX_ROWS_PER_POST = 5;
 const STORED_AT = "2026-09-27T10:00:00.000Z";
@@ -232,6 +241,16 @@ export function fakeAttachmentClub(
     },
     storage: createFakeStorage(options, files, fileInfo),
     newFileId: () => NEW_FILE_ID,
+    images: {
+      shrinkCover: async () =>
+        options.undecodableCover === true
+          ? { kind: "undecodable" }
+          : {
+              kind: "shrunk",
+              thumbnail: SHRUNK_COVER_THUMBNAIL,
+              large: SHRUNK_COVER_LARGE,
+            },
+    },
     newsAudience: {
       findAudienceMemberIds: async ({ audience }) => {
         if (options.failAudience === true) {
@@ -254,5 +273,7 @@ export function fakeAttachmentClub(
     posts: news.posts,
     edits: news.edits,
     audited: news.audited,
+    covers: news.covers,
+    coverFiles: news.coverFiles,
   };
 }

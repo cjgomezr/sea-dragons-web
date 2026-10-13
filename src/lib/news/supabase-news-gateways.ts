@@ -5,6 +5,7 @@ import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gate
 import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-groups-gateway";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
+import { createNewsCoversGateway } from "./supabase-news-covers-gateway";
 import {
   NEWS_CATEGORIES,
   type NewNewsPost,
@@ -43,7 +44,7 @@ const AUTHOR_EMBED =
 
 const POST_COLUMNS = [
   "id, club_id, category, title, body, author_id, published_at, edited_at",
-  "status, audience",
+  "status, audience, cover_upload_id",
   AUTHOR_EMBED,
   "news_post_groups(group_id)",
   "news_post_attachments(id, file_name, content_type, size_bytes, created_at)",
@@ -53,6 +54,7 @@ const POST_COLUMNS = [
  * grupo del lector hace que la publicación le alcance. */
 const FEED_COLUMNS = [
   "id, category, title, body, author_id, published_at, status",
+  "cover_upload_id",
   AUTHOR_EMBED,
   "news_post_attachments(count)",
   "news_post_groups(group_id)",
@@ -86,6 +88,7 @@ const postRowSchema = z.object({
   edited_at: z.string().nullable(),
   status: z.enum(["published", "withdrawn"]),
   audience: z.enum(["club", "groups"]),
+  cover_upload_id: z.string().nullable(),
   author: authorSchema,
   news_post_groups: z.array(z.object({ group_id: z.string() })),
   news_post_attachments: z.array(
@@ -107,6 +110,7 @@ const feedRowSchema = z.object({
   author_id: z.string(),
   published_at: z.string(),
   status: z.enum(["published", "withdrawn"]),
+  cover_upload_id: z.string().nullable(),
   author: authorSchema,
   news_post_attachments: z.tuple([z.object({ count: z.number().int() })]),
 });
@@ -142,6 +146,7 @@ function toNewsPost(row: unknown): NewsPost {
       contentType: attachment.content_type,
       sizeBytes: attachment.size_bytes,
     })),
+    coverUploadId: parsed.cover_upload_id,
   };
 }
 
@@ -156,6 +161,7 @@ function toFeedRow(row: unknown): NewsFeedRow {
     publishedAt: parsed.published_at,
     status: parsed.status,
     attachmentCount: parsed.news_post_attachments[0].count,
+    coverUploadId: parsed.cover_upload_id,
   };
 }
 
@@ -228,6 +234,7 @@ async function insertPost(
       title: post.title,
       body: post.body,
       audience: post.audience.kind,
+      cover_upload_id: post.coverUploadId,
     })
     .select("id")
     .single();
@@ -274,6 +281,9 @@ async function updatePost(
       body: edit.body,
       audience: edit.audience.kind,
       edited_at: edit.editedAt,
+      ...(edit.cover.kind === "replace"
+        ? { cover_upload_id: edit.cover.coverUploadId }
+        : {}),
     })
     .eq("id", edit.postId)
     .eq("club_id", edit.clubId);
@@ -417,6 +427,7 @@ export function createNewsGateways(
 
       setPostStatus: (change) => setPostStatus(serviceClient, change),
     },
+    covers: createNewsCoversGateway(serviceClient),
     audit: createSupabaseAuditLogWriter(serviceClient),
   };
 }

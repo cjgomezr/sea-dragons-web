@@ -146,6 +146,7 @@ async function withSeededPost(
             {
               now: new Date(),
               uploadIds: [],
+              coverUploadId: null,
               callerId: committee.id,
               draft: {
                 category: "document",

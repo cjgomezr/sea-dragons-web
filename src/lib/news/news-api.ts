@@ -40,15 +40,19 @@ export const newsDraftSchema = z.object({
     .array(z.uuid())
     .max(NEWS_ATTACHMENTS_MAX_PER_POST)
     .default([]),
+  // La portada subida antes (#591). Opcional: sin ella sale sin portada.
+  coverUploadId: z.uuid().nullable().default(null),
 });
 
 /** Una edición (#331): el mismo borrador, sin adjuntos, y la marca de
  * editada que se tenía delante. Es obligatoria, `null` incluido: sin ella no
- * hay forma de saber si se pisaría a otra persona. */
+ * hay forma de saber si se pisaría a otra persona. `coverUploadId` (#591)
+ * pone otra portada, `null` la quita, y sin él la portada sigue como está. */
 export const newsEditSchema = newsDraftSchema
-  .omit({ attachmentUploadIds: true })
+  .omit({ attachmentUploadIds: true, coverUploadId: true })
   .extend({
     expectedEditedAt: z.iso.datetime({ offset: true }).nullable(),
+    coverUploadId: z.uuid().nullable().optional(),
   });
 
 export const newsStatusSchema = z.object({

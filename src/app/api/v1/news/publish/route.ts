@@ -13,7 +13,8 @@ import { publishNewsPostWithUploads } from "@/lib/news/news-uploads";
  * Publicar (#327, RF-2 del PRD de E11, FR-057): categoría, título, cuerpo y
  * audiencia, que es todo el club o al menos un grupo del club. Con
  * `attachmentUploadIds`, los adjuntos que se subieron mientras se escribía
- * (#330) quedan ligados a la publicación; sin ellos, sale sin adjuntos.
+ * (#330) quedan ligados a la publicación; sin ellos, sale sin adjuntos. Con
+ * `coverUploadId`, la portada subida antes (#591).
  *
  * Quién puede llamarlo lo decide la frontera: `RESTRICTED_ROUTES` lo reserva
  * a Admin y Committee, y el dominio lo vuelve a comprobar. El autor y el club
@@ -32,13 +33,14 @@ const postNews = createApiRoute<PublishedNewsPostResponse, NewsDraftBody>({
   schema: newsDraftSchema,
   handler: async ({ request, body, decorateResponse }) => {
     const callerId = await identifyAccountCaller({ request, decorateResponse });
-    const { attachmentUploadIds, ...draft } = body;
+    const { attachmentUploadIds, coverUploadId, ...draft } = body;
     try {
       return {
         data: await publishNewsPostWithUploads(requireNewsPublishGateways(), {
           callerId,
           draft,
           uploadIds: attachmentUploadIds,
+          coverUploadId,
           now: new Date(),
         }),
         status: 201,

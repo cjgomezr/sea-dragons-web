@@ -5,6 +5,7 @@ import { DASHBOARD_API_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
 import type { DashboardGateways } from "@/lib/dashboard/dashboard";
 import type { MembershipStatus } from "@/lib/membership/membership";
+import { fakeCoverlessGateway } from "../helpers/news-club";
 
 /**
  * El dashboard por API (#424, RF-6 del PRD de E14): una sola petición para
@@ -75,6 +76,7 @@ function dashboardGateways(): DashboardGateways {
         updatePost: unused,
         setPostStatus: unused,
       },
+      covers: fakeCoverlessGateway(),
       audit: { insertAuditLogRow: unused },
     },
     roster: {
