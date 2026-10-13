@@ -1,8 +1,8 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import Markdown, { type Components, type ExtraProps } from "react-markdown";
 import remarkBreaks from "remark-breaks";
-import remarkGfm from "remark-gfm";
 import {
+  NEWS_REMARK_PLUGINS,
   isExternalNewsLinkUrl,
   isSafeNewsLinkUrl,
 } from "@/lib/news/news-markdown";
@@ -17,7 +17,7 @@ import {
  * texto plano se ven como antes (D9).
  */
 
-const REMARK_PLUGINS = [remarkGfm, remarkBreaks];
+const REMARK_PLUGINS = [...NEWS_REMARK_PLUGINS, remarkBreaks];
 const DISALLOWED_ELEMENTS = ["img"];
 
 /** Un href que no pasa la lista blanca se quita: el enlace queda en su texto. */
