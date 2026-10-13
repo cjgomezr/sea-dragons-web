@@ -328,6 +328,7 @@ describe("GET /api/v1/news", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       data: {
+        pinned: null,
         posts: [
           expect.objectContaining({
             id: POST_ID,
@@ -358,7 +359,7 @@ describe("GET /api/v1/news", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: { posts: [], nextCursor: null },
+      data: { pinned: null, posts: [], nextCursor: null },
     });
   });
 

@@ -74,6 +74,7 @@ describe("el feed de cada miembro", () => {
         audienceGroupIds: [SENIOR_SQUAD_ID],
         after: null,
         limit: NEWS_FEED_PAGE_SIZE + 1,
+        now: expect.any(String),
       },
     ]);
   });
@@ -172,7 +173,7 @@ describe("el feed de cada miembro", () => {
 
     const feed = await listNewsFeed(club.gateways, { callerId: CALLER_ID });
 
-    expect(feed).toEqual({ posts: [], nextCursor: null });
+    expect(feed).toEqual({ pinned: null, posts: [], nextCursor: null });
   });
 
   it("trae las 20 más recientes y una forma de pedir las siguientes", async () => {

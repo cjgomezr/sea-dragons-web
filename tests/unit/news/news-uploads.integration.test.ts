@@ -163,6 +163,7 @@ describeRls("subidas previas de noticias contra seadragons-dev", () => {
             },
             uploadIds: [upload.id],
             coverUploadId: null,
+            pin: { kind: "keep" },
             now: new Date(),
           },
         );

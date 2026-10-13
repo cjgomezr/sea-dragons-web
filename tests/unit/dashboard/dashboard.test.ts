@@ -27,6 +27,7 @@ import type {
   NewsCategory,
   NewsFeedQuery,
   NewsFeedRow,
+  NewsPinnedFeedRow,
   NewsPostStatus,
 } from "@/lib/news/news-posts";
 import type {
@@ -68,6 +69,8 @@ type Club = {
   groupIds: string[];
   events: EventRow[];
   posts: NewsFeedRow[];
+  /** La fijada vigente, que el feed trae aparte de `posts` (#592). */
+  pinned: NewsPinnedFeedRow | null;
   clubRate: ClubAttendanceRate;
   ownAttendance: MemberAttendance;
   activeMembers: { active: number; joinedRecently: number };
@@ -238,6 +241,13 @@ function gateways(): DashboardGateways {
         deletePost: async () => undefined,
         updatePost: async () => ({ kind: "updated" }),
         setPostStatus: async () => undefined,
+        findPinnedFeedRow: async () => club.pinned,
+        pinPost: async () => {
+          throw new Error("el dashboard no fija");
+        },
+        unpinPost: async () => {
+          throw new Error("el dashboard no desfija");
+        },
       },
       covers: fakeCoverlessGateway(),
       audit: { insertAuditLogRow: async () => ({ error: null }) },
@@ -318,6 +328,7 @@ beforeEach(() => {
     groupIds: [],
     events: [],
     posts: [],
+    pinned: null,
     clubRate: { kind: "rate", percent: 86, records: 42 },
     ownAttendance: { kind: "rate", percent: 75, sessions: 6 },
     activeMembers: { active: 1, joinedRecently: 0 },
@@ -591,6 +602,52 @@ describe("las últimas noticias", () => {
           publishedAt: "2026-09-20T00:00:00.000Z",
         },
       ],
+    });
+  });
+});
+
+describe("la fijada en el inicio", () => {
+  function pinnedPost(
+    overrides: Parameters<typeof post>[0],
+  ): NewsPinnedFeedRow {
+    return { ...post(overrides), pinnedUntil: null };
+  }
+
+  it("sale entre las últimas en su sitio por fecha aunque el feed la traiga aparte", async () => {
+    const newest = post({ publishedAt: "2026-09-29T00:00:00.000Z" });
+    const pinned = pinnedPost({ publishedAt: "2026-09-28T00:00:00.000Z" });
+    const older = post({ publishedAt: "2026-09-27T00:00:00.000Z" });
+    const oldest = post({ publishedAt: "2026-09-26T00:00:00.000Z" });
+    club.posts = [oldest, older, newest];
+    club.pinned = pinned;
+
+    const result = await dashboard();
+
+    expect(result.latestNews).toMatchObject({
+      kind: "news",
+      posts: [{ id: newest.id }, { id: pinned.id }, { id: older.id }],
+    });
+  });
+
+  it("cuenta la fijada sin leer una sola vez, aunque sea más antigua que la primera página", async () => {
+    club.newsSeenAt = "2026-09-01T00:00:00.000Z";
+    // Del 28 al 4 de septiembre: más de una página, todas sin leer.
+    club.posts = Array.from({ length: 25 }, (_, index) =>
+      post({
+        publishedAt: `2026-09-${String(28 - index).padStart(2, "0")}T00:00:00.000Z`,
+      }),
+    );
+    club.pinned = pinnedPost({
+      publishedAt: "2026-09-02T00:00:00.000Z",
+      category: "announcement",
+    });
+
+    const result = await dashboard();
+
+    expect(result.tiles.unreadNews).toEqual({
+      kind: "unread",
+      count: club.posts.length + 1,
+      announcements: 1,
     });
   });
 });

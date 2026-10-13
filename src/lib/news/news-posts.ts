@@ -8,6 +8,7 @@ import type {
 import { type Role, hasCapability } from "@/lib/auth/roles";
 import type { MemberGroupsGateway } from "@/lib/groups/member-groups";
 import { type NewsCoversGateway, signNewsCoverUrl } from "./news-covers";
+import { type NewsPin, isNewsPinActive } from "./news-pin-rule";
 
 /**
  * Publicar y abrir una publicación del club (#327, RF-2 y RF-5 del PRD de
@@ -64,6 +65,8 @@ export type NewsPost = {
   readonly attachments: readonly NewsAttachmentSummary[];
   /** La subida de `news_cover_uploads` que hace de portada (#591). */
   readonly coverUploadId: string | null;
+  /** El fijado tal como está guardado, caducado o no (#592). */
+  readonly pin: NewsPin | null;
 };
 
 /** Lo que recibe quien abre una publicación. Ni el club ni la audiencia: a
@@ -73,10 +76,22 @@ export type NewsPost = {
  * firmada (#591). */
 export type NewsPostDetail = Omit<
   NewsPost,
-  "clubId" | "audience" | "coverUploadId"
+  "clubId" | "audience" | "coverUploadId" | "pin"
 > & {
   readonly canManage: boolean;
   readonly coverUrl: string | null;
+  /** Si está fijada ahora (#592). Una caducada no lo está (D7), y entonces
+   * `pinnedUntil` es nulo, como en una fijada sin fecha de fin. */
+  readonly isPinned: boolean;
+  readonly pinnedUntil: string | null;
+  /** Solo el Admin fija y desfija (D1). */
+  readonly canPin: boolean;
+};
+
+/** Lo que quien abre la publicación puede hacer con ella. */
+export type NewsPostAccess = {
+  readonly canManage: boolean;
+  readonly canPin: boolean;
 };
 
 /** Lo que manda quien publica, tal como llega. */
@@ -107,6 +122,11 @@ export type NewsFeedRow = {
   readonly coverUploadId: string | null;
 };
 
+/** La fila de la fijada vigente, con su fecha de fin (#592). */
+export type NewsPinnedFeedRow = NewsFeedRow & {
+  readonly pinnedUntil: string | null;
+};
+
 /** Dónde terminó la página anterior. Va con el id porque dos publicaciones
  * pueden compartir instante, y sin desempate una se repetiría o se perdería
  * entre páginas. */
@@ -122,7 +142,42 @@ export type NewsFeedQuery = {
   readonly audienceGroupIds: readonly string[];
   readonly after: NewsFeedPosition | null;
   readonly limit: number;
+  /** La hora contra la que caduca el fijado (D7). La fijada vigente no va en
+   * ninguna página: el feed la trae aparte (#592). */
+  readonly now: string;
 };
+
+/** Quién lee y cuándo, para buscar la fijada vigente que le alcanza. */
+export type NewsPinnedQuery = Omit<NewsFeedQuery, "after" | "limit">;
+
+/** Quién fija y cuál. La base vuelve a comprobar que es Admin. */
+export type NewsPinCommand = {
+  readonly clubId: string;
+  readonly actingUserId: string;
+  readonly postId: string;
+};
+
+/** Una fijada que se quitó, con la fecha de fin que tenía. */
+export type NewsUnpinned = {
+  readonly postId: string;
+  readonly pinnedUntil: string | null;
+};
+
+/** Lo que responde la base al fijar. `replaced` es la fijada vigente que
+ * quitó, o nula si no había. */
+export type NewsPinOutcome =
+  | { readonly kind: "pinned"; readonly replaced: NewsUnpinned | null }
+  | { readonly kind: "forbidden" }
+  | { readonly kind: "not_found" }
+  | { readonly kind: "withdrawn" };
+
+/** Lo que responde la base al desfijar. Una caducada responde `not_pinned`:
+ * ya no contaba como fijada. */
+export type NewsUnpinOutcome =
+  | { readonly kind: "unpinned"; readonly pinnedUntil: string | null }
+  | { readonly kind: "not_pinned" }
+  | { readonly kind: "forbidden" }
+  | { readonly kind: "not_found" };
 
 /** Lo que una edición hace con la portada (#591): dejarla como está, o
  * ponerle otra (`null` la quita). Dos casos y no un campo opcional, para que
@@ -166,12 +221,22 @@ export type NewsPostsGateway = {
   deletePost(postId: string): Promise<void>;
   /** Categoría, título, cuerpo, audiencia y la marca de editada. */
   updatePost(edit: NewsPostEdit): Promise<NewsPostUpdate>;
-  /** Retirar o volver a publicar: cambia el estado y nada más. */
+  /** Retirar o volver a publicar: cambia el estado y nada más. Retirar
+   * desfija (D8). */
   setPostStatus(change: {
     readonly clubId: string;
     readonly postId: string;
     readonly status: NewsPostStatus;
   }): Promise<void>;
+  /** La fijada vigente del club, si le alcanza a quien lee con la misma
+   * audiencia que el feed. */
+  findPinnedFeedRow(query: NewsPinnedQuery): Promise<NewsPinnedFeedRow | null>;
+  /** Fija hasta `until` (nula: sin fecha de fin) y desfija la anterior, en
+   * una sola transacción. */
+  pinPost(
+    command: NewsPinCommand & { readonly until: string | null },
+  ): Promise<NewsPinOutcome>;
+  unpinPost(command: NewsPinCommand): Promise<NewsUnpinOutcome>;
 };
 
 export type NewsGateways = {
@@ -312,6 +377,15 @@ async function resolveAudience(
 /** El Admin, sobre cualquiera del club. */
 const MANAGES_EVERY_POST: Role = "Admin";
 
+/** Solo el Admin fija (D1): fijar otra quita la anterior aunque sea de otra
+ * persona, y con el Committee fijando, dos personas se pisarían el
+ * destacado. */
+const PINS_POSTS: Role = "Admin";
+
+export function canPinNewsPosts(role: Role): boolean {
+  return role === PINS_POSTS;
+}
+
 /** Quien puede editar y retirar la publicación (#331, RF-6): el Admin
  * cualquiera, y quien puede publicar sólo la suya. Coach y Player, ninguna,
  * aunque alguna vez la hubieran publicado. */
@@ -338,11 +412,19 @@ export async function normalizeNewsDraft(
   return { category: draft.category, title, body, audience };
 }
 
-export function toNewsPostDetail(
+/** Cómo la ve quien la abre: qué puede hacer con ella y a qué hora, contra
+ * la que caduca el fijado (D7). */
+export type NewsPostView = {
+  readonly access: NewsPostAccess;
+  readonly now: Date;
+};
+
+function toNewsPostDetail(
   post: NewsPost,
-  canManage: boolean,
+  view: NewsPostView,
   coverUrl: string | null,
 ): NewsPostDetail {
+  const isPinned = isNewsPinActive(post.pin, view.now);
   return {
     id: post.id,
     category: post.category,
@@ -353,8 +435,11 @@ export function toNewsPostDetail(
     editedAt: post.editedAt,
     status: post.status,
     attachments: post.attachments,
-    canManage,
+    canManage: view.access.canManage,
     coverUrl,
+    isPinned,
+    pinnedUntil: isPinned && post.pin !== null ? post.pin.pinnedUntil : null,
+    canPin: view.access.canPin,
   };
 }
 
@@ -363,7 +448,7 @@ export function toNewsPostDetail(
 export async function describeNewsPost(
   gateways: Pick<NewsGateways, "covers">,
   post: NewsPost,
-  canManage: boolean,
+  view: NewsPostView,
 ): Promise<NewsPostDetail> {
   const coverUrl = await signNewsCoverUrl(
     gateways.covers,
@@ -371,8 +456,15 @@ export async function describeNewsPost(
       ? null
       : { id: post.coverUploadId, clubId: post.clubId },
   );
-  return toNewsPostDetail(post, canManage, coverUrl);
+  return toNewsPostDetail(post, view, coverUrl);
 }
+
+/** Una publicación lista para guardar, con el rol de quien la publica, que
+ * decide además si puede fijarla (#592). */
+export type PreparedNewsPost = {
+  readonly post: Omit<NewNewsPost, "coverUploadId">;
+  readonly publisherRole: Role;
+};
 
 /** La publicación lista para guardar, o el motivo por el que no vale. No
  * escribe nada: publicar con adjuntos (#330) comprueba además sus subidas
@@ -384,12 +476,15 @@ export async function describeNewsPost(
 export async function prepareNewsPost(
   gateways: Pick<NewsGateways, "members" | "posts">,
   request: { readonly callerId: string; readonly draft: NewsDraft },
-): Promise<Omit<NewNewsPost, "coverUploadId">> {
+): Promise<PreparedNewsPost> {
   const caller = await findNewsPublisher(gateways, request.callerId);
   return {
-    ...(await normalizeNewsDraft(gateways, caller.clubId, request.draft)),
-    clubId: caller.clubId,
-    authorId: request.callerId,
+    post: {
+      ...(await normalizeNewsDraft(gateways, caller.clubId, request.draft)),
+      clubId: caller.clubId,
+      authorId: request.callerId,
+    },
+    publisherRole: caller.role,
   };
 }
 
@@ -421,7 +516,12 @@ function isVisibleTo(
  */
 export async function openNewsPost(
   gateways: NewsGateways,
-  request: { readonly callerId: string; readonly postId: string },
+  request: {
+    readonly callerId: string;
+    readonly postId: string;
+    /** Contra la que caduca el fijado (D7). El endpoint la pasa siempre. */
+    readonly now?: Date;
+  },
 ): Promise<NewsPostDetail> {
   const caller = await findNewsReader(gateways, request.callerId);
   const [post, groupIds] = await Promise.all([
@@ -431,9 +531,14 @@ export async function openNewsPost(
   if (post === null || !isVisibleTo(post, { id: request.callerId, groupIds })) {
     throw new NewsPostNotFoundError();
   }
-  return describeNewsPost(
-    gateways,
-    post,
-    canManageNewsPost({ id: request.callerId, role: caller.role }, post),
-  );
+  return describeNewsPost(gateways, post, {
+    access: {
+      canManage: canManageNewsPost(
+        { id: request.callerId, role: caller.role },
+        post,
+      ),
+      canPin: canPinNewsPosts(caller.role),
+    },
+    now: request.now ?? new Date(),
+  });
 }

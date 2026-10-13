@@ -6,8 +6,10 @@ import type {
   NewsFeedQuery,
   NewsFeedRow,
   NewsGateways,
+  NewsPinnedQuery,
   NewsPost,
 } from "@/lib/news/news-posts";
+import { isNewsPinActive } from "@/lib/news/news-pin-rule";
 import { type NewsCoverRef, newsCoverPathsOf } from "@/lib/news/news-covers";
 
 /**
@@ -16,7 +18,9 @@ import { type NewsCoverRef, newsCoverPathsOf } from "@/lib/news/news-covers";
  * va a todo el club o a alguno de los grupos que se le pasan, de la más
  * reciente a la más antigua, y a quien lo publicó también lo suyo retirado.
  * Editar sólo escribe si la publicación sigue en la edición que se tenía
- * delante, como la escritura condicional de verdad.
+ * delante, como la escritura condicional de verdad. Fijar y desfijar
+ * responden como las funciones de `0064_news_post_pins.sql`, con la hora de
+ * la base en `DATABASE_NOW`.
  */
 
 export const CALLER_ID = "a0a0a0a0-0000-4000-8000-00000000000a";
@@ -36,6 +40,9 @@ export type FakeCover = NewsCoverRef & {
 };
 
 export const COVER_SIGNED_URL_PREFIX = "https://storage.test/covers/";
+
+/** La hora de la base para fijar y desfijar: lo que sería su `now()`. */
+export const DATABASE_NOW = "2026-10-13T10:00:00.000Z";
 
 export type FakeClubOptions = {
   readonly callerRole?: Role;
@@ -83,6 +90,7 @@ export function aPost(overrides: Partial<NewsPost> & { id: string }): NewsPost {
     clubId: CLUB_ID,
     attachments: [],
     coverUploadId: null,
+    pin: null,
     ...overrides,
   };
 }
@@ -100,6 +108,11 @@ function isInFeedOf(post: NewsPost, query: NewsFeedQuery): boolean {
     return true;
   }
   return post.status === "published" && reaches(post, query.audienceGroupIds);
+}
+
+/** La fijada vigente va aparte del feed (#592). */
+function isPinnedNow(post: NewsPost, query: NewsPinnedQuery): boolean {
+  return isNewsPinActive(post.pin, new Date(query.now));
 }
 
 function isAfter(post: NewsPost, query: NewsFeedQuery): boolean {
@@ -226,6 +239,7 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
   const coverFiles = coverFilesOf(covers);
   const indexOf = (clubId: string, postId: string): number =>
     posts.findIndex((post) => post.id === postId && post.clubId === clubId);
+  const isAdmin = options.callerRole === "Admin";
   const clubGroupIds = options.clubGroupIds ?? [
     SENIOR_SQUAD_ID,
     MASTERS_SQUAD_ID,
@@ -254,7 +268,7 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
         ),
       insertPost: async (post) => {
         inserted.push(post);
-        return {
+        const stored: NewsPost = {
           id: INSERTED_POST_ID,
           clubId: post.clubId,
           category: post.category,
@@ -267,7 +281,10 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
           audience: post.audience,
           attachments: [],
           coverUploadId: post.coverUploadId,
+          pin: null,
         };
+        posts.push(stored);
+        return stored;
       },
       findFeedPage: async (query) => {
         feedQueries.push(query);
@@ -276,6 +293,7 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
             (post) =>
               post.clubId === query.clubId &&
               isInFeedOf(post, query) &&
+              !isPinnedNow(post, query) &&
               isAfter(post, query),
           )
           .sort(newestFirst)
@@ -308,7 +326,72 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
         if (current === undefined) {
           throw new Error(`no existe ${postId}`);
         }
-        posts[index] = { ...current, status };
+        posts[index] =
+          status === "withdrawn"
+            ? { ...current, status, pin: null }
+            : { ...current, status };
+      },
+      findPinnedFeedRow: async (query) => {
+        const pinned = posts.find(
+          (post) =>
+            post.clubId === query.clubId &&
+            post.status === "published" &&
+            isInFeedOf(post, { ...query, after: null, limit: 1 }) &&
+            isPinnedNow(post, query),
+        );
+        return pinned === undefined || pinned.pin === null
+          ? null
+          : { ...toFeedRow(pinned), pinnedUntil: pinned.pin.pinnedUntil };
+      },
+      pinPost: async ({ clubId, postId, until }) => {
+        if (!isAdmin) {
+          return { kind: "forbidden" };
+        }
+        const index = indexOf(clubId, postId);
+        const target = posts[index];
+        if (target === undefined) {
+          return { kind: "not_found" };
+        }
+        if (target.status === "withdrawn") {
+          return { kind: "withdrawn" };
+        }
+        const replaced = posts.find(
+          (post) =>
+            post.id !== postId &&
+            post.clubId === clubId &&
+            isNewsPinActive(post.pin, new Date(DATABASE_NOW)),
+        );
+        posts.forEach((post, position) => {
+          if (post.clubId === clubId && post.id !== postId) {
+            posts[position] = { ...post, pin: null };
+          }
+        });
+        posts[index] = {
+          ...target,
+          pin: { pinnedAt: DATABASE_NOW, pinnedUntil: until },
+        };
+        return {
+          kind: "pinned",
+          replaced:
+            replaced?.pin == null
+              ? null
+              : { postId: replaced.id, pinnedUntil: replaced.pin.pinnedUntil },
+        };
+      },
+      unpinPost: async ({ clubId, postId }) => {
+        if (!isAdmin) {
+          return { kind: "forbidden" };
+        }
+        const index = indexOf(clubId, postId);
+        const target = posts[index];
+        if (target === undefined) {
+          return { kind: "not_found" };
+        }
+        posts[index] = { ...target, pin: null };
+        return isNewsPinActive(target.pin, new Date(DATABASE_NOW)) &&
+          target.pin !== null
+          ? { kind: "unpinned", pinnedUntil: target.pin.pinnedUntil }
+          : { kind: "not_pinned" };
       },
     },
     covers: createFakeCovers(covers, coverFiles, posts),

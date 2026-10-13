@@ -11471,6 +11471,9 @@ const STUBBED_POST = {
   status: "published",
   canManage: false,
   coverUrl: null,
+  isPinned: false,
+  pinnedUntil: null,
+  canPin: false,
   attachments: [
     {
       id: "d0d0d0d0-0000-4000-8000-0000000000d1",
@@ -11566,6 +11569,7 @@ async function stubNewsReads(
     (route) =>
       route.fulfill(
         jsonBody({
+          pinned: null,
           posts: feed,
           nextCursor: feed.length > 0 ? "pagina-2" : null,
         }),
@@ -11943,6 +11947,7 @@ test.describe("noticias en el navegador", () => {
       (route) =>
         route.fulfill(
           jsonBody({
+            pinned: null,
             posts: [
               {
                 ...STUBBED_FEED_POSTS[2],

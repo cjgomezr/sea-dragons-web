@@ -43,6 +43,9 @@ const POST: NewsPostDetail = {
   status: "published",
   canManage: false,
   coverUrl: null,
+  isPinned: false,
+  pinnedUntil: null,
+  canPin: false,
   attachments: [
     {
       id: RULES_ID,

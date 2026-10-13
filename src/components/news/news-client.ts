@@ -47,6 +47,10 @@ const feedItemSchema = z.object({
 
 const feedResponseSchema = z.object({
   data: z.object({
+    // La fijada vigente (#592); su tarjeta llega con el feed nuevo (#594).
+    pinned: feedItemSchema
+      .extend({ pinnedUntil: z.iso.datetime({ offset: true }).nullable() })
+      .nullable(),
     posts: z.array(feedItemSchema),
     nextCursor: z.string().nullable(),
   }),
@@ -73,6 +77,9 @@ export const newsPostDetailSchema = z.object({
   ),
   canManage: z.boolean(),
   coverUrl: z.url().nullable(),
+  isPinned: z.boolean(),
+  pinnedUntil: z.iso.datetime({ offset: true }).nullable(),
+  canPin: z.boolean(),
 });
 
 const postResponseSchema = z.object({ data: newsPostDetailSchema });

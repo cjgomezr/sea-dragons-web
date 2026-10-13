@@ -29,6 +29,7 @@ const getNewsFeed = createApiRoute<NewsFeedResponse>({
         data: await listNewsFeed(requireNewsGateways(), {
           callerId,
           ...(cursor === null ? {} : { cursor }),
+          now: new Date(),
         }),
       };
     } catch (error) {

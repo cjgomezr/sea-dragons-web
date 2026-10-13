@@ -82,6 +82,7 @@ function publish(
     draft,
     uploadIds,
     coverUploadId: null,
+    pin: { kind: "keep" },
     now: NOW,
   });
 }

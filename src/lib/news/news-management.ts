@@ -3,6 +3,12 @@ import {
   type AuditActor,
   recordAuditEvent,
 } from "@/lib/audit/audit-log";
+import type { Role } from "@/lib/auth/roles";
+import {
+  type NewsPinChange,
+  applyNewsPinChange,
+  authorizeNewsPinChange,
+} from "./news-pins";
 import {
   type NewsAudience,
   type NewsCategory,
@@ -12,8 +18,10 @@ import {
   type NewsPost,
   type NewsPostDetail,
   type NewsPostStatus,
+  type NewsPostView,
   NewsPostNotFoundError,
   canManageNewsPost,
+  canPinNewsPosts,
   describeNewsPost,
   findNewsPublisher,
   normalizeNewsDraft,
@@ -75,7 +83,11 @@ export class NewsPostChangedError extends Error {
   }
 }
 
-type ManagedPost = { readonly actor: AuditActor; readonly post: NewsPost };
+type ManagedPost = {
+  readonly actor: AuditActor;
+  readonly role: Role;
+  readonly post: NewsPost;
+};
 
 /** Quien llama y la publicación, si puede editarla. Una de otro club responde
  * como una que no existe. Una ajena del club responde 403, como pide el
@@ -96,7 +108,11 @@ async function findManagedPost(
   if (!canManageNewsPost({ id: request.callerId, role: caller.role }, post)) {
     throw new NewsPostNotYoursError();
   }
-  return { actor: { id: request.callerId, clubId: caller.clubId }, post };
+  return {
+    actor: { id: request.callerId, clubId: caller.clubId },
+    role: caller.role,
+    post,
+  };
 }
 
 /** Sin metadata: ni el título ni el cuerpo (NFR-010). */
@@ -118,19 +134,32 @@ function recordNewsPostEvent(
   });
 }
 
+/** Cómo ve la publicación quien la gestiona: puede editarla y retirarla, y
+ * fijarla sólo si es Admin. */
+function managerView(managed: ManagedPost, now: Date): NewsPostView {
+  return {
+    access: { canManage: true, canPin: canPinNewsPosts(managed.role) },
+    now,
+  };
+}
+
 /** La publicación tal como quedó, para quien acaba de tocarla. */
 async function readManagedDetail(
   gateways: NewsGateways,
-  actor: AuditActor,
-  postId: string,
+  managed: ManagedPost,
+  now: Date,
 ): Promise<NewsPostDetail> {
-  const post = await gateways.posts.findPost({ clubId: actor.clubId, postId });
-  if (post === null) {
+  const { actor, post } = managed;
+  const stored = await gateways.posts.findPost({
+    clubId: actor.clubId,
+    postId: post.id,
+  });
+  if (stored === null) {
     throw new Error(
-      `La publicación ${postId} no aparece justo después de guardarla.`,
+      `La publicación ${post.id} no aparece justo después de guardarla.`,
     );
   }
-  return describeNewsPost(gateways, post, true);
+  return describeNewsPost(gateways, stored, managerView(managed, now));
 }
 
 export async function readEditableNewsPost(
@@ -193,18 +222,26 @@ async function discardReplacedCover(
 
 /** Valida después de saber quién pide y antes de escribir nada, con las
  * mismas reglas que publicar. La bitácora va después: antes dejaría rastro de
- * una edición que no se guardó. */
+ * una edición que no se guardó. El fijado (#592) va después de la edición:
+ * sin `pin`, la fijada sigue fijada aunque la edite un Committee. */
 export async function editNewsPost(
   gateways: NewsGateways,
   request: PostRequest & {
     readonly draft: NewsDraft;
     readonly expectedEditedAt: string | null;
     readonly cover: NewsCoverChange;
+    readonly pin: NewsPinChange;
     readonly now: Date;
   },
 ): Promise<NewsPostDetail> {
-  const { actor, post } = await findManagedPost(gateways, request);
+  const managed = await findManagedPost(gateways, request);
+  const { actor, post } = managed;
   const draft = await normalizeNewsDraft(gateways, actor.clubId, request.draft);
+  const pin = authorizeNewsPinChange(request.pin, {
+    role: managed.role,
+    now: request.now,
+    postStatus: post.status,
+  });
   const cover = await resolveCoverChange(gateways, {
     actor,
     post,
@@ -226,23 +263,35 @@ export async function editNewsPost(
     action: "news_post.edited",
     postId: request.postId,
   });
+  await applyNewsPinChange(gateways, {
+    actor,
+    postId: request.postId,
+    change: pin,
+  });
   await discardReplacedCover(gateways, post, cover);
   await sweepStaleNewsCovers(gateways.covers, {
     uploadedBy: actor.id,
     now: request.now,
   });
-  return readManagedDetail(gateways, actor, request.postId);
+  return readManagedDetail(gateways, managed, request.now);
 }
 
 /** Retirar o volver a publicar. Pedir el estado que ya tiene no escribe
- * nada, ni en la bitácora: no pasó nada que contar. */
+ * nada, ni en la bitácora: no pasó nada que contar. Retirar desfija (D8), y
+ * eso lo hace la base. */
 export async function changeNewsPostStatus(
   gateways: NewsGateways,
-  request: PostRequest & { readonly status: NewsPostStatus },
+  request: PostRequest & {
+    readonly status: NewsPostStatus;
+    /** Contra la que caduca el fijado (D7). El endpoint la pasa siempre. */
+    readonly now?: Date;
+  },
 ): Promise<NewsPostDetail> {
-  const { actor, post } = await findManagedPost(gateways, request);
+  const managed = await findManagedPost(gateways, request);
+  const { actor, post } = managed;
+  const now = request.now ?? new Date();
   if (post.status === request.status) {
-    return describeNewsPost(gateways, post, true);
+    return describeNewsPost(gateways, post, managerView(managed, now));
   }
   await gateways.posts.setPostStatus({
     clubId: actor.clubId,
@@ -254,5 +303,5 @@ export async function changeNewsPostStatus(
     action: STATUS_ACTIONS[request.status],
     postId: request.postId,
   });
-  return readManagedDetail(gateways, actor, request.postId);
+  return readManagedDetail(gateways, managed, now);
 }

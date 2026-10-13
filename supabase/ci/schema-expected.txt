@@ -188,6 +188,8 @@ columna news_posts.club_id tipo=uuid null=NO default=-
 columna news_posts.cover_upload_id tipo=uuid null=YES default=-
 columna news_posts.edited_at tipo=timestamp with time zone null=YES default=-
 columna news_posts.id tipo=uuid null=NO default=gen_random_uuid()
+columna news_posts.pinned_at tipo=timestamp with time zone null=YES default=-
+columna news_posts.pinned_until tipo=timestamp with time zone null=YES default=-
 columna news_posts.published_at tipo=timestamp with time zone null=NO default=now()
 columna news_posts.status tipo=text null=NO default='published'::text
 columna news_posts.title tipo=text null=NO default=-
@@ -290,6 +292,8 @@ funcion lock_evaluation_categories(acting_club_id uuid)
 funcion members_sync_position_id()
 funcion memberships_refresh_casual_status()
 funcion news_post_attachments_enforce_max()
+funcion news_posts_unpin_withdrawn()
+funcion pin_news_post(acting_club_id uuid, acting_user_id uuid, target_post_id uuid, pin_until timestamp with time zone)
 funcion prune_all_member_notifications()
 funcion prune_member_notifications(recipient_user_ids uuid[])
 funcion publish_team_split(acting_club_id uuid, target_event_id uuid)
@@ -318,6 +322,7 @@ funcion session_ledger_refresh_status()
 funcion set_club_position_archived(acting_club_id uuid, target_position_id uuid, archived boolean)
 funcion set_evaluation_category_active(acting_club_id uuid, target_category_id uuid, active boolean)
 funcion set_member_status(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, new_status text)
+funcion unpin_news_post(acting_club_id uuid, acting_user_id uuid, target_post_id uuid)
 funcion update_event(acting_club_id uuid, target_event_id uuid, changes jsonb)
 funcion update_series(acting_club_id uuid, target_series_id uuid, changes jsonb)
 funcion waive_membership(target_user_id uuid, acting_club_id uuid, acting_user_id uuid, reason text, until_day date)
@@ -912,6 +917,7 @@ indice news_posts_body_search_idx CREATE INDEX news_posts_body_search_idx ON pub
 indice news_posts_club_id_published_at_idx CREATE INDEX news_posts_club_id_published_at_idx ON public.news_posts USING btree (club_id, published_at DESC)
 indice news_posts_cover_upload_id_key CREATE UNIQUE INDEX news_posts_cover_upload_id_key ON public.news_posts USING btree (cover_upload_id) WHERE (cover_upload_id IS NOT NULL)
 indice news_posts_id_club_id_key CREATE UNIQUE INDEX news_posts_id_club_id_key ON public.news_posts USING btree (id, club_id)
+indice news_posts_one_pinned_per_club CREATE UNIQUE INDEX news_posts_one_pinned_per_club ON public.news_posts USING btree (club_id) WHERE (pinned_at IS NOT NULL)
 indice news_posts_pkey CREATE UNIQUE INDEX news_posts_pkey ON public.news_posts USING btree (id)
 indice news_posts_title_search_idx CREATE INDEX news_posts_title_search_idx ON public.news_posts USING gin (search_normalize(title) extensions.gin_trgm_ops)
 indice notifications_pkey CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)
@@ -1163,6 +1169,7 @@ restriccion news_posts.news_posts_category_check CHECK ((category = ANY (ARRAY['
 restriccion news_posts.news_posts_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion news_posts.news_posts_cover_same_club_fkey FOREIGN KEY (cover_upload_id, club_id) REFERENCES news_cover_uploads(id, club_id)
 restriccion news_posts.news_posts_id_club_id_key UNIQUE (id, club_id)
+restriccion news_posts.news_posts_pin_check CHECK ((((pinned_until IS NULL) OR (pinned_at IS NOT NULL)) AND ((pinned_at IS NULL) OR (status = 'published'::text))))
 restriccion news_posts.news_posts_pkey PRIMARY KEY (id)
 restriccion news_posts.news_posts_status_check CHECK ((status = ANY (ARRAY['published'::text, 'withdrawn'::text])))
 restriccion news_posts.news_posts_title_length CHECK (((char_length(btrim(title)) >= 1) AND (char_length(btrim(title)) <= 120)))
@@ -1262,4 +1269,5 @@ trigger clubs_seed_default_session_pack_options CREATE TRIGGER clubs_seed_defaul
 trigger members_sync_position_id CREATE TRIGGER members_sync_position_id BEFORE INSERT OR UPDATE OF "position" ON public.members FOR EACH ROW EXECUTE FUNCTION members_sync_position_id()
 trigger memberships_refresh_casual_status CREATE TRIGGER memberships_refresh_casual_status AFTER INSERT OR UPDATE OF plan ON public.memberships FOR EACH ROW WHEN ((new.plan = 'Casual'::text)) EXECUTE FUNCTION memberships_refresh_casual_status()
 trigger news_post_attachments_enforce_max CREATE TRIGGER news_post_attachments_enforce_max BEFORE INSERT OR UPDATE OF post_id ON public.news_post_attachments FOR EACH ROW EXECUTE FUNCTION news_post_attachments_enforce_max()
+trigger news_posts_unpin_withdrawn CREATE TRIGGER news_posts_unpin_withdrawn BEFORE UPDATE OF status ON public.news_posts FOR EACH ROW WHEN ((new.status = 'withdrawn'::text)) EXECUTE FUNCTION news_posts_unpin_withdrawn()
 trigger session_ledger_refresh_status CREATE TRIGGER session_ledger_refresh_status AFTER INSERT OR DELETE ON public.session_ledger FOR EACH ROW EXECUTE FUNCTION session_ledger_refresh_status()

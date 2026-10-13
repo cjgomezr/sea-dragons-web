@@ -10,6 +10,11 @@ import {
 import { resolveNewsCoverUpload } from "./news-cover-uploads";
 import { sweepStaleNewsCovers } from "./news-covers";
 import {
+  type NewsPinChange,
+  applyNewsPinChange,
+  authorizeNewsPinChange,
+} from "./news-pins";
+import {
   type NewsPublishGateways,
   announceNewsPost,
 } from "./news-publication-notice";
@@ -18,6 +23,7 @@ import {
   type NewsDraft,
   type NewsPost,
   type NewsPostDetail,
+  canPinNewsPosts,
   describeNewsPost,
   findNewsPublisher,
   prepareNewsPost,
@@ -226,6 +232,23 @@ async function removePublishedUploads(
   }
 }
 
+/** La publicación recién fijada, tal como quedó en la base. */
+async function findPublishedPost(
+  gateways: NewsPublishGateways,
+  post: NewsPost,
+): Promise<NewsPost> {
+  const stored = await gateways.posts.findPost({
+    clubId: post.clubId,
+    postId: post.id,
+  });
+  if (stored === null) {
+    throw new Error(
+      `La publicación ${post.id} no aparece justo después de fijarla.`,
+    );
+  }
+  return stored;
+}
+
 /** Publica con los adjuntos y la portada (#591) que se subieron mientras se
  * escribía. Primero se valida todo, subidas incluidas, y sólo entonces se
  * escribe. La audiencia se entera al final, con la publicación ya entera
@@ -233,7 +256,10 @@ async function removePublishedUploads(
  *
  * Si la publicación se deshace a medias, la portada queda sin publicación
  * que la apunte: se puede reintentar con ella, y si no, la recoge la
- * limpieza de lo abandonado. */
+ * limpieza de lo abandonado.
+ *
+ * Fijarla al publicar (#592) se comprueba con todo lo demás, antes de
+ * escribir, y se guarda con la publicación ya entera y antes del aviso. */
 export async function publishNewsPostWithUploads(
   gateways: NewsPublishGateways,
   request: {
@@ -241,10 +267,20 @@ export async function publishNewsPostWithUploads(
     readonly draft: NewsDraft;
     readonly uploadIds: readonly string[];
     readonly coverUploadId: string | null;
+    readonly pin: NewsPinChange;
     readonly now: Date;
   },
 ): Promise<NewsPostDetail> {
-  const newPost = await prepareNewsPost(gateways, request);
+  const { post: newPost, publisherRole } = await prepareNewsPost(
+    gateways,
+    request,
+  );
+  const pin = authorizeNewsPinChange(request.pin, {
+    role: publisherRole,
+    now: request.now,
+    // Lo que se publica nace publicado.
+    postStatus: "published",
+  });
   const publisher = { clubId: newPost.clubId, userId: request.callerId };
   const uploads = await resolveUploads(gateways, publisher, request.uploadIds);
   const cover =
@@ -260,6 +296,11 @@ export async function publishNewsPostWithUploads(
     coverUploadId: cover === null ? null : cover.id,
   });
   const attachments = await attachUploads(gateways, post, uploads);
+  await applyNewsPinChange(gateways, {
+    actor: { id: request.callerId, clubId: post.clubId },
+    postId: post.id,
+    change: pin,
+  });
   await removePublishedUploads(gateways, uploads);
   await sweepStaleUploads(gateways, publisher, request.now);
   await sweepStaleNewsCovers(gateways.covers, {
@@ -268,6 +309,12 @@ export async function publishNewsPostWithUploads(
   });
   await announceNewsPost(gateways, post);
   // Quien publica es su autor, y publicar ya exigía poder hacerlo: la puede
-  // editar y retirar.
-  return { ...(await describeNewsPost(gateways, post, true)), attachments };
+  // editar y retirar. Con el fijado recién guardado, se vuelve a leer.
+  const published =
+    pin.kind === "pin" ? await findPublishedPost(gateways, post) : post;
+  const detail = await describeNewsPost(gateways, published, {
+    access: { canManage: true, canPin: canPinNewsPosts(publisherRole) },
+    now: request.now,
+  });
+  return { ...detail, attachments };
 }

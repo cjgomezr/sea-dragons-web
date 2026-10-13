@@ -13,10 +13,15 @@ import {
   type NewsFeedQuery,
   type NewsFeedRow,
   type NewsGateways,
+  type NewsPinCommand,
+  type NewsPinOutcome,
+  type NewsPinnedFeedRow,
+  type NewsPinnedQuery,
   type NewsPost,
   type NewsPostEdit,
   type NewsPostStatus,
   type NewsPostUpdate,
+  type NewsUnpinOutcome,
 } from "./news-posts";
 
 /**
@@ -44,7 +49,7 @@ const AUTHOR_EMBED =
 
 const POST_COLUMNS = [
   "id, club_id, category, title, body, author_id, published_at, edited_at",
-  "status, audience, cover_upload_id",
+  "status, audience, cover_upload_id, pinned_at, pinned_until",
   AUTHOR_EMBED,
   "news_post_groups(group_id)",
   "news_post_attachments(id, file_name, content_type, size_bytes, created_at)",
@@ -60,7 +65,14 @@ const FEED_COLUMNS = [
   "news_post_groups(group_id)",
 ].join(", ");
 
+const PINNED_FEED_COLUMNS = `${FEED_COLUMNS}, pinned_until`;
+
 const READER_GROUP_FILTER = "news_post_groups.group_id";
+
+/** Las funciones de `0064_news_post_pins.sql`, que comprueban al Admin y
+ * sustituyen la fijada en una transacción. */
+const PIN_FUNCTION = "pin_news_post";
+const UNPIN_FUNCTION = "unpin_news_post";
 
 /** Lo que va a todo el club o a alguno de sus grupos, y lo suyo esté como
  * esté (#331): quien publicó ve lo retirado, marcado, y nadie más. El id sale
@@ -71,6 +83,17 @@ function audienceFilter(readerId: string): string {
 
 function statusFilter(readerId: string): string {
   return `status.eq.published,author_id.eq.${readerId}`;
+}
+
+/** Sin fijar ahora: nunca fijada, o con su fecha de fin ya pasada (D7). La
+ * hora la formatea el dominio con `toISOString`, así que no puede romper la
+ * sintaxis del filtro. */
+function notPinnedNowFilter(now: string): string {
+  return `pinned_at.is.null,pinned_until.lte."${now}"`;
+}
+
+function pinStillRunsFilter(now: string): string {
+  return `pinned_until.is.null,pinned_until.gt."${now}"`;
 }
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -89,6 +112,8 @@ const postRowSchema = z.object({
   status: z.enum(["published", "withdrawn"]),
   audience: z.enum(["club", "groups"]),
   cover_upload_id: z.string().nullable(),
+  pinned_at: z.string().nullable(),
+  pinned_until: z.string().nullable(),
   author: authorSchema,
   news_post_groups: z.array(z.object({ group_id: z.string() })),
   news_post_attachments: z.array(
@@ -114,6 +139,27 @@ const feedRowSchema = z.object({
   author: authorSchema,
   news_post_attachments: z.tuple([z.object({ count: z.number().int() })]),
 });
+
+const pinnedFeedRowSchema = z.object({ pinned_until: z.string().nullable() });
+
+const pinOutcomeSchema = z.discriminatedUnion("outcome", [
+  z.object({
+    outcome: z.literal("pinned"),
+    replaced_post_id: z.string().nullable(),
+    replaced_pinned_until: z.string().nullable(),
+  }),
+  z.object({
+    outcome: z.enum(["forbidden", "not_found", "withdrawn", "invalid_until"]),
+  }),
+]);
+
+const unpinOutcomeSchema = z.discriminatedUnion("outcome", [
+  z.object({
+    outcome: z.literal("unpinned"),
+    pinned_until: z.string().nullable(),
+  }),
+  z.object({ outcome: z.enum(["not_pinned", "forbidden", "not_found"]) }),
+]);
 
 function toAudience(
   audience: "club" | "groups",
@@ -147,6 +193,10 @@ function toNewsPost(row: unknown): NewsPost {
       sizeBytes: attachment.size_bytes,
     })),
     coverUploadId: parsed.cover_upload_id,
+    pin:
+      parsed.pinned_at === null
+        ? null
+        : { pinnedAt: parsed.pinned_at, pinnedUntil: parsed.pinned_until },
   };
 }
 
@@ -171,6 +221,131 @@ function toFeedRow(row: unknown): NewsFeedRow {
 function olderThanFilter(after: NonNullable<NewsFeedQuery["after"]>): string {
   const instant = `"${after.publishedAt}"`;
   return `published_at.lt.${instant},and(published_at.eq.${instant},id.lt.${after.id})`;
+}
+
+function toPinnedFeedRow(row: unknown): NewsPinnedFeedRow {
+  return {
+    ...toFeedRow(row),
+    pinnedUntil: pinnedFeedRowSchema.parse(row).pinned_until,
+  };
+}
+
+/** Lo del club que le alcanza a quien lee: lo publicado de su audiencia y lo
+ * suyo esté como esté. Lo comparten el feed y la fijada. */
+function selectReadable(
+  serviceClient: SupabaseClient,
+  query: NewsPinnedQuery & { readonly columns: string },
+) {
+  return serviceClient
+    .from(POSTS_TABLE)
+    .select(query.columns)
+    .eq("club_id", query.clubId)
+    .or(statusFilter(query.readerId))
+    .in(READER_GROUP_FILTER, query.audienceGroupIds)
+    .or(audienceFilter(query.readerId));
+}
+
+async function findFeedPage(
+  serviceClient: SupabaseClient,
+  query: NewsFeedQuery,
+): Promise<readonly NewsFeedRow[]> {
+  let page = selectReadable(serviceClient, {
+    ...query,
+    columns: FEED_COLUMNS,
+  }).or(notPinnedNowFilter(query.now));
+  if (query.after !== null) {
+    page = page.or(olderThanFilter(query.after));
+  }
+  const { data, error } = await page
+    .order("published_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(query.limit);
+  if (error) {
+    throw new Error(
+      `No se pudo leer el feed del club ${query.clubId}: ${error.message}`,
+    );
+  }
+  return data.map(toFeedRow);
+}
+
+/** Sólo una publicada puede estar fijada (`news_posts_pin_check`), y sólo
+ * una por club. */
+async function findPinnedFeedRow(
+  serviceClient: SupabaseClient,
+  query: NewsPinnedQuery,
+): Promise<NewsPinnedFeedRow | null> {
+  const { data, error } = await selectReadable(serviceClient, {
+    ...query,
+    columns: PINNED_FEED_COLUMNS,
+  })
+    .not("pinned_at", "is", null)
+    .or(pinStillRunsFilter(query.now))
+    .limit(1);
+  if (error) {
+    throw new Error(
+      `No se pudo leer la publicación fijada del club ${query.clubId}: ${error.message}`,
+    );
+  }
+  const [row] = data;
+  return row === undefined ? null : toPinnedFeedRow(row);
+}
+
+/** `invalid_until` no debería llegar: el dominio valida la fecha antes. Si
+ * llega, el reloj del servidor y el de la base no coinciden, y es un fallo. */
+async function pinPost(
+  serviceClient: SupabaseClient,
+  command: NewsPinCommand & { readonly until: string | null },
+): Promise<NewsPinOutcome> {
+  const { data, error } = await serviceClient.rpc(PIN_FUNCTION, {
+    acting_club_id: command.clubId,
+    acting_user_id: command.actingUserId,
+    target_post_id: command.postId,
+    pin_until: command.until,
+  });
+  if (error) {
+    throw new Error(
+      `No se pudo fijar la publicación ${command.postId}: ${error.message}`,
+    );
+  }
+  const outcome = pinOutcomeSchema.parse(data);
+  if (outcome.outcome === "invalid_until") {
+    throw new Error(
+      `La base rechazó la fecha de fin ${String(command.until)} al fijar la publicación ${command.postId}.`,
+    );
+  }
+  if (outcome.outcome !== "pinned") {
+    return { kind: outcome.outcome };
+  }
+  return {
+    kind: "pinned",
+    replaced:
+      outcome.replaced_post_id === null
+        ? null
+        : {
+            postId: outcome.replaced_post_id,
+            pinnedUntil: outcome.replaced_pinned_until,
+          },
+  };
+}
+
+async function unpinPost(
+  serviceClient: SupabaseClient,
+  command: NewsPinCommand,
+): Promise<NewsUnpinOutcome> {
+  const { data, error } = await serviceClient.rpc(UNPIN_FUNCTION, {
+    acting_club_id: command.clubId,
+    acting_user_id: command.actingUserId,
+    target_post_id: command.postId,
+  });
+  if (error) {
+    throw new Error(
+      `No se pudo desfijar la publicación ${command.postId}: ${error.message}`,
+    );
+  }
+  const outcome = unpinOutcomeSchema.parse(data);
+  return outcome.outcome === "unpinned"
+    ? { kind: "unpinned", pinnedUntil: outcome.pinned_until }
+    : { kind: outcome.outcome };
 }
 
 async function findPost(
@@ -386,28 +561,7 @@ export function createNewsGateways(
 
       insertPost: (post) => insertPost(serviceClient, post),
 
-      async findFeedPage({ clubId, readerId, audienceGroupIds, after, limit }) {
-        let query = serviceClient
-          .from(POSTS_TABLE)
-          .select(FEED_COLUMNS)
-          .eq("club_id", clubId)
-          .or(statusFilter(readerId))
-          .in(READER_GROUP_FILTER, audienceGroupIds)
-          .or(audienceFilter(readerId));
-        if (after !== null) {
-          query = query.or(olderThanFilter(after));
-        }
-        const { data, error } = await query
-          .order("published_at", { ascending: false })
-          .order("id", { ascending: false })
-          .limit(limit);
-        if (error) {
-          throw new Error(
-            `No se pudo leer el feed del club ${clubId}: ${error.message}`,
-          );
-        }
-        return data.map(toFeedRow);
-      },
+      findFeedPage: (query) => findFeedPage(serviceClient, query),
 
       findPost: (query) => findPost(serviceClient, query),
 
@@ -426,6 +580,12 @@ export function createNewsGateways(
       updatePost: (edit) => updatePost(serviceClient, edit),
 
       setPostStatus: (change) => setPostStatus(serviceClient, change),
+
+      findPinnedFeedRow: (query) => findPinnedFeedRow(serviceClient, query),
+
+      pinPost: (command) => pinPost(serviceClient, command),
+
+      unpinPost: (command) => unpinPost(serviceClient, command),
     },
     covers: createNewsCoversGateway(serviceClient),
     audit: createSupabaseAuditLogWriter(serviceClient),

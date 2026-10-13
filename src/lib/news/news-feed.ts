@@ -11,6 +11,7 @@ import {
   type NewsFeedPosition,
   type NewsFeedRow,
   type NewsGateways,
+  type NewsPinnedFeedRow,
   type NewsPostStatus,
   findNewsReader,
   findReaderGroupIds,
@@ -48,9 +49,19 @@ export type NewsFeedItem = NewsCoverUrls & {
   readonly attachmentCount: number;
 };
 
+/** La fijada vigente (#592), con hasta cuándo: nulo si no tiene fecha de
+ * fin. */
+export type NewsPinnedFeedItem = NewsFeedItem & {
+  readonly pinnedUntil: string | null;
+};
+
 /** `nextCursor` es nulo en la última página. Quien quiera la siguiente lo
- * devuelve tal cual: su contenido no es contrato. */
+ * devuelve tal cual: su contenido no es contrato.
+ *
+ * `pinned` es la fijada vigente si quien lee es su audiencia (#592). Sólo la
+ * trae la primera página, y `posts` no la incluye en ninguna. */
 export type NewsFeedPage = {
+  readonly pinned: NewsPinnedFeedItem | null;
   readonly posts: readonly NewsFeedItem[];
   readonly nextCursor: string | null;
 };
@@ -142,7 +153,12 @@ function coversOf(
  * sin contar, si hay página siguiente. */
 export async function listNewsFeed(
   gateways: NewsGateways,
-  request: { readonly callerId: string; readonly cursor?: string },
+  request: {
+    readonly callerId: string;
+    readonly cursor?: string;
+    /** Contra la que caduca el fijado (D7). El endpoint la pasa siempre. */
+    readonly now?: Date;
+  },
 ): Promise<NewsFeedPage> {
   const after =
     request.cursor === undefined ? null : decodeCursor(request.cursor);
@@ -150,24 +166,39 @@ export async function listNewsFeed(
     findNewsReader(gateways, request.callerId),
     findReaderGroupIds(gateways, request.callerId),
   ]);
-  const rows = await gateways.posts.findFeedPage({
+  const reader = {
     clubId: caller.clubId,
     readerId: request.callerId,
     audienceGroupIds,
-    after,
-    limit: NEWS_FEED_PAGE_SIZE + 1,
-  });
+    now: (request.now ?? new Date()).toISOString(),
+  };
+  const [rows, pinned] = await Promise.all([
+    gateways.posts.findFeedPage({
+      ...reader,
+      after,
+      limit: NEWS_FEED_PAGE_SIZE + 1,
+    }),
+    after === null ? gateways.posts.findPinnedFeedRow(reader) : null,
+  ]);
   const page = rows.slice(0, NEWS_FEED_PAGE_SIZE);
   const coverUrls = await signNewsCovers(
     gateways.covers,
-    coversOf(page, caller.clubId),
+    coversOf(pinned === null ? page : [pinned, ...page], caller.clubId),
   );
   const last = page.at(-1);
   const hasMore = rows.length > NEWS_FEED_PAGE_SIZE && last !== undefined;
   return {
+    pinned: pinned === null ? null : toPinnedFeedItem(pinned, coverUrls),
     posts: page.map((row) => toFeedItem(row, coverUrls)),
     nextCursor: hasMore
       ? encodeCursor({ publishedAt: last.publishedAt, id: last.id })
       : null,
   };
+}
+
+function toPinnedFeedItem(
+  row: NewsPinnedFeedRow,
+  coverUrls: ReadonlyMap<string, NewsCoverUrls>,
+): NewsPinnedFeedItem {
+  return { ...toFeedItem(row, coverUrls), pinnedUntil: row.pinnedUntil };
 }
