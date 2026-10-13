@@ -125,6 +125,15 @@ describe("los enlaces sólo llevan esquemas seguros", () => {
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
+  it("conserva el título del enlace", () => {
+    renderBody('[x](https://a.com "Horario")');
+
+    expect(screen.getByRole("link", { name: "x" })).toHaveAttribute(
+      "title",
+      "Horario",
+    );
+  });
+
   it("un correo es un enlace mailto", () => {
     renderBody("[x](mailto:a@b.com)");
 

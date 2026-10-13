@@ -27,16 +27,21 @@ function keepSafeUrl(url: string): string | null {
 
 function NewsLink({
   href,
+  title,
   children,
 }: ComponentPropsWithoutRef<"a"> & ExtraProps): ReactNode {
   if (href === undefined) {
     return children;
   }
   if (!isExternalNewsLinkUrl(href)) {
-    return <a href={href}>{children}</a>;
+    return (
+      <a href={href} title={title}>
+        {children}
+      </a>
+    );
   }
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer">
+    <a href={href} title={title} target="_blank" rel="noopener noreferrer">
       {children}
     </a>
   );

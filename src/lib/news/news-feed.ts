@@ -78,10 +78,9 @@ function decodeCursor(cursor: string): NewsFeedPosition {
 
 /**
  * El cuerpo sin formato de Markdown (#593) y en una línea, cortado sin partir
- * una palabra. Sólo se corta en
- * medio de una palabra si la primera ya no cabe entera, porque no hay otro
- * sitio. Se cuenta en caracteres y no en unidades de UTF-16, para no partir
- * un emoji en dos.
+ * una palabra. Sólo se corta en medio de una palabra si la primera ya no cabe
+ * entera, porque no hay otro sitio. Se cuenta en caracteres y no en unidades
+ * de UTF-16, para no partir un emoji en dos.
  */
 export function excerptNewsBody(body: string): string {
   const text = newsBodyToPlainText(body).trim().split(WHITESPACE_RUN).join(" ");
