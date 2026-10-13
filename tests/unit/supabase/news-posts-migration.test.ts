@@ -221,6 +221,8 @@ describeConPostgres("migración de las publicaciones", () => {
       "body text null=NO",
       "category text null=NO",
       "club_id uuid null=NO",
+      // La portada (#591, `0063_news_post_covers.sql`).
+      "cover_upload_id uuid null=YES",
       "edited_at timestamp with time zone null=YES",
       "id uuid null=NO",
       "published_at timestamp with time zone null=NO",

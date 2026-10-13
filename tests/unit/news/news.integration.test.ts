@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
+import sharp from "sharp";
 import { expect, it } from "vitest";
+import { stageNewsCover } from "@/lib/news/news-cover-uploads";
 import { listNewsFeed } from "@/lib/news/news-feed";
 import {
   ForeignNewsGroupError,
@@ -15,6 +17,7 @@ import {
   editNewsPost,
 } from "@/lib/news/news-management";
 import { publishNewsPostWithUploads } from "@/lib/news/news-uploads";
+import { NEWS_ATTACHMENTS_BUCKET } from "@/lib/news/supabase-news-attachment-gateways";
 import { createNewsPublishGateways } from "@/lib/news/supabase-news-publish-gateways";
 import { createSupabaseNotificationWriter } from "@/lib/notifications/supabase-notification-gateways";
 import {
@@ -184,6 +187,218 @@ function publishWithoutAttachments(
     now: new Date(),
   });
 }
+
+/** Una foto pequeña de verdad, para que sharp la reduzca. */
+async function aCoverPicture(): Promise<Uint8Array> {
+  const picture = sharp({
+    create: {
+      width: 400,
+      height: 300,
+      channels: 3,
+      background: { r: 20, g: 60, b: 110 },
+    },
+  });
+  return new Uint8Array(await picture.png().toBuffer());
+}
+
+async function listCoverFiles(
+  serviceClient: ServiceRoleClient,
+  clubId: string,
+): Promise<readonly string[]> {
+  const { data, error } = await serviceClient.client.storage
+    .from(NEWS_ATTACHMENTS_BUCKET)
+    .list(`${clubId}/covers`);
+  if (error) {
+    throw new Error(`No se pudieron listar las portadas: ${error.message}`);
+  }
+  return data.map((file) => file.name).sort();
+}
+
+/** La cascada del club no alcanza a Storage: las portadas se borran aparte. */
+async function withCoverCleanup(
+  serviceClient: ServiceRoleClient,
+  clubId: string,
+  run: () => Promise<void>,
+): Promise<void> {
+  try {
+    await run();
+  } finally {
+    const leftovers = await listCoverFiles(serviceClient, clubId);
+    if (leftovers.length > 0) {
+      await runSupabase(
+        "borrar las portadas de la prueba",
+        serviceClient.client.storage
+          .from(NEWS_ATTACHMENTS_BUCKET)
+          .remove(leftovers.map((name) => `${clubId}/covers/${name}`)),
+      );
+    }
+  }
+}
+
+async function stageCover(seeded: SeededClub): Promise<string> {
+  const cover = await stageNewsCover(seeded.gateways, {
+    callerId: seeded.admin.id,
+    fileName: "portada.png",
+    bytes: await aCoverPicture(),
+  });
+  return cover.id;
+}
+
+function publishWithCover(
+  seeded: SeededClub,
+  coverUploadId: string,
+  audience: NewsDraft["audience"],
+): Promise<NewsPostDetail> {
+  return publishNewsPostWithUploads(seeded.gateways, {
+    callerId: seeded.admin.id,
+    draft: {
+      category: "news",
+      title: "Crónica del torneo",
+      body: "Ganamos la final.",
+      audience,
+    },
+    uploadIds: [],
+    coverUploadId,
+    now: new Date(),
+  });
+}
+
+/** Lo que responde Storage a la dirección firmada. */
+async function fetchCover(url: string | null | undefined): Promise<string> {
+  if (url === null || url === undefined) {
+    throw new Error("Falta la dirección de la portada.");
+  }
+  const response = await fetch(url);
+  return `${response.status} ${response.headers.get("content-type")}`;
+}
+
+describeRls("portadas de noticias contra seadragons-dev (#591)", () => {
+  it(
+    "la audiencia recibe la miniatura y la grande firmadas, y quien no es audiencia no la recibe",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, (seeded) =>
+        withCoverCleanup(serviceClient, seeded.clubId, async () => {
+          const coverId = await stageCover(seeded);
+          const post = await publishWithCover(seeded, coverId, {
+            kind: "groups",
+            groupIds: [seeded.squadId],
+          });
+
+          const memberFeed = await listNewsFeed(seeded.gateways, {
+            callerId: seeded.squadMember.id,
+          });
+          const memberPost = await openNewsPost(seeded.gateways, {
+            callerId: seeded.squadMember.id,
+            postId: post.id,
+          });
+          const outsiderFeed = await listNewsFeed(seeded.gateways, {
+            callerId: seeded.outsider.id,
+          });
+
+          const [item] = memberFeed.posts;
+          expect(await fetchCover(item?.coverThumbnailUrl)).toBe(
+            "200 image/webp",
+          );
+          expect(await fetchCover(item?.coverUrl)).toBe("200 image/webp");
+          expect(await fetchCover(memberPost.coverUrl)).toBe("200 image/webp");
+          expect(await listCoverFiles(serviceClient, seeded.clubId)).toEqual([
+            `${coverId}-large.webp`,
+            `${coverId}-thumb.webp`,
+          ]);
+          expect(outsiderFeed.posts).toEqual([]);
+          await expect(
+            openNewsPost(seeded.gateways, {
+              callerId: seeded.outsider.id,
+              postId: post.id,
+            }),
+          ).rejects.toBeInstanceOf(NewsPostNotFoundError);
+        }),
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "una retirada no sirve su portada a quien no la publicó",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, (seeded) =>
+        withCoverCleanup(serviceClient, seeded.clubId, async () => {
+          const post = await publishWithCover(
+            seeded,
+            await stageCover(seeded),
+            { kind: "club" },
+          );
+
+          await changeNewsPostStatus(seeded.gateways, {
+            callerId: seeded.admin.id,
+            postId: post.id,
+            status: "withdrawn",
+          });
+          const memberFeed = await listNewsFeed(seeded.gateways, {
+            callerId: seeded.squadMember.id,
+          });
+
+          expect(memberFeed.posts).toEqual([]);
+          await expect(
+            openNewsPost(seeded.gateways, {
+              callerId: seeded.squadMember.id,
+              postId: post.id,
+            }),
+          ).rejects.toBeInstanceOf(NewsPostNotFoundError);
+        }),
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "cambiar la portada sirve la nueva y borra la anterior del bucket y de la base",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, (seeded) =>
+        withCoverCleanup(serviceClient, seeded.clubId, async () => {
+          const oldCoverId = await stageCover(seeded);
+          const post = await publishWithCover(seeded, oldCoverId, {
+            kind: "club",
+          });
+          const newCoverId = await stageCover(seeded);
+
+          const edited = await editNewsPost(seeded.gateways, {
+            callerId: seeded.admin.id,
+            postId: post.id,
+            draft: {
+              category: "news",
+              title: "Crónica del torneo",
+              body: "Ganamos la final.",
+              audience: { kind: "club" },
+            },
+            expectedEditedAt: null,
+            cover: { kind: "replace", coverUploadId: newCoverId },
+            now: new Date(),
+          });
+          const { data, error } = await serviceClient.client
+            .from("news_cover_uploads")
+            .select("id")
+            .eq("club_id", seeded.clubId);
+
+          expect(edited.coverUrl).toContain(newCoverId);
+          expect(await listCoverFiles(serviceClient, seeded.clubId)).toEqual([
+            `${newCoverId}-large.webp`,
+            `${newCoverId}-thumb.webp`,
+          ]);
+          expect(error).toBeNull();
+          expect(data).toEqual([{ id: newCoverId }]);
+        }),
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+});
 
 describeRls("noticias contra seadragons-dev", () => {
   it(

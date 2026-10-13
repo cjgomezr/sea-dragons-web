@@ -8,10 +8,7 @@ import type {
   NewsGateways,
   NewsPost,
 } from "@/lib/news/news-posts";
-import {
-  type NewsCoverRef,
-  newsCoverPathsOf,
-} from "@/lib/news/news-covers";
+import { type NewsCoverRef, newsCoverPathsOf } from "@/lib/news/news-covers";
 
 /**
  * Un club en memoria para los tests del dominio de noticias. El doble cumple

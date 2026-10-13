@@ -1811,8 +1811,7 @@ export const spanishMessages: MessageCatalog = {
   "news.publish.attachments.issue.uploadMissing":
     "Un adjunto ya no está subido. Quítalo y vuelve a adjuntarlo.",
   "news.publish.cover.issue.empty": "La portada está vacía.",
-  "news.publish.cover.issue.tooLarge":
-    "La portada puede pesar hasta {max} MB.",
+  "news.publish.cover.issue.tooLarge": "La portada puede pesar hasta {max} MB.",
   "news.publish.cover.issue.typeUnsupported":
     "La portada tiene que ser una imagen JPEG, PNG o WebP.",
   "news.publish.cover.issue.uploadMissing":
