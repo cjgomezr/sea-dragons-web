@@ -140,3 +140,23 @@ describe("fila de la lista", () => {
     expect(block).toContain("background: var(--color-accent);");
   });
 });
+
+describe("la chincheta de cada fila (#595)", () => {
+  it("mide 34 px y su zona táctil llega a 44", () => {
+    const button = declarations(globalsCss, ".news-row-pin");
+    const touchZone = declarations(globalsCss, ".news-row-pin::after");
+
+    expect(button).toContain("width: 34px;");
+    expect(button).toContain("height: 34px;");
+    expect(touchZone).toContain("inset: -5px;");
+  });
+
+  it("sólo sale desde 768 px: en el móvil no hay chincheta por fila", () => {
+    expect(declarations(globalsCss, ".news-row-pin")).toContain(
+      "display: none;",
+    );
+    expect(declarations(desktopCss(), ".news-row-pin")).toContain(
+      "display: inline-flex;",
+    );
+  });
+});
