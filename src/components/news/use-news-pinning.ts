@@ -89,8 +89,13 @@ export function useNewsPinning({
     setPinning({ kind: "saving", postId, action });
     const failure = await send();
     isSaving.current = false;
-    setPinning(
-      failure === null ? IDLE : { kind: "failed", postId, action, failure },
+    const settled: NewsPinning =
+      failure === null ? IDLE : { kind: "failed", postId, action, failure };
+    // Si mientras tanto se cerró la tira o se abrió la de otra fila, eso manda.
+    setPinning((current) =>
+      current.kind === "saving" && current.postId === postId
+        ? settled
+        : current,
     );
   }
 

@@ -1,7 +1,7 @@
 import { PushPin } from "@phosphor-icons/react/dist/ssr/PushPin";
 import { PushPinSlash } from "@phosphor-icons/react/dist/ssr/PushPinSlash";
 import Link from "next/link";
-import { useEffect, useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { NEWS_POST_PATH } from "@/lib/auth/routes";
 import { formatClubShortDay } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
@@ -72,9 +72,13 @@ function FeaturedPinning({
   const stripId = useId();
   const { toggleRef, cancel, onToggleKeyDown } = usePinStripToggle(controls);
   const { pinning } = controls;
+  // Sólo un fijado o desfijado nuevo mueve el foco: montarse otra vez (al
+  // reintentar la carga) no es una petición.
+  const handledFocusRequest = useRef(focusRequest);
 
   useEffect(() => {
-    if (focusRequest > 0) {
+    if (focusRequest !== handledFocusRequest.current) {
+      handledFocusRequest.current = focusRequest;
       toggleRef.current?.focus();
     }
   }, [focusRequest, toggleRef]);
