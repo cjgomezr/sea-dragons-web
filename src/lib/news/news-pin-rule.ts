@@ -12,6 +12,11 @@ export type NewsPin = {
   readonly pinnedUntil: string | null;
 };
 
+/** El motivo del 409 al fijar una retirada (#592), para que la pantalla lo
+ * explique sin leer la frase. Vive aquí, sin nada de servidor alrededor,
+ * porque la pantalla del feed también lo lee (#595). */
+export const NEWS_POST_WITHDRAWN_REASON = "news_post_withdrawn";
+
 export class InvalidNewsPinUntilError extends Error {
   constructor() {
     super("La fecha hasta la que se fija tiene que ser una fecha futura.");

@@ -1745,6 +1745,27 @@ export const spanishMessages: MessageCatalog = {
   "news.latest": "Lo último",
   "news.featured.readPost": "Leer publicación",
   "news.list.earlier": "Anteriores",
+  // Fijar y desfijar desde el feed (#595).
+  "news.pin.pin": "Fijar",
+  "news.pin.unpin": "Desfijar",
+  "news.pin.row": "Fijar {title}",
+  "news.pin.stripLabel": "Fijar arriba durante",
+  "news.pin.duration.oneWeek": "1 semana",
+  "news.pin.duration.twoWeeks": "2 semanas",
+  "news.pin.duration.fourWeeks": "4 semanas",
+  "news.pin.duration.untilUnpinned": "Hasta que la desfije",
+  "news.pin.cancel": "Cancelar",
+  "news.pin.replaces": "Reemplaza a la que está fijada ahora.",
+  "news.pin.error.withdrawn":
+    "Esta publicación está retirada y no se puede fijar.",
+  "news.pin.error.forbidden":
+    "Solo un Admin puede fijar o desfijar publicaciones.",
+  "news.pin.error.signInRequired":
+    "Tu sesión terminó. Vuelve a entrar para fijar o desfijar publicaciones.",
+  "news.pin.error.pinUnexpected":
+    "No pudimos fijar esta publicación. Vuelve a intentarlo.",
+  "news.pin.error.unpinUnexpected":
+    "No pudimos desfijar esta publicación. Vuelve a intentarlo.",
   "news.unread": "Nueva",
   "news.category.announcement": "Aviso",
   "news.category.news": "Noticia",

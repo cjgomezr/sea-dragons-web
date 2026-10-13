@@ -5778,6 +5778,178 @@ a.auth-brand-header:focus-visible {
   text-overflow: ellipsis;
 }
 
+/* Fijar desde el feed (#595), sólo para el Admin. La chincheta de la fila
+   mide 34 px y su `::after` estira la zona táctil hasta 44. Ella, la tira y
+   los botones de la destacada quedan por encima del enlace que cubre la fila
+   o la tarjeta, para que pulsarlos no abra la publicación. En el móvil no hay
+   chincheta por fila (#600): se fija desde la hoja ⋯ (#601). */
+.news-row-pin {
+  position: relative;
+  z-index: 1;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.news-row-pin::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+}
+
+.news-row-pin:hover,
+.news-row-pin[aria-expanded="true"] {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+.news-row-pin:focus-visible,
+.news-featured-pin:focus-visible,
+.news-pin-duration:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+/* La tira va debajo de la fila, alineada con el texto y no con la miniatura,
+   como en el diseño. */
+.news-row-pinning {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  grid-column: 2 / -1;
+  min-width: 0;
+}
+
+.news-pin-strip {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.news-pin-strip-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.news-pin-strip-label {
+  font-size: 13px;
+  color: var(--color-text-soft);
+}
+
+.news-pin-durations {
+  display: inline-flex;
+  flex-wrap: wrap;
+  max-width: 100%;
+  padding: 3px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.news-pin-duration {
+  min-height: calc(var(--touch-target-min) - 8px);
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--color-text);
+  white-space: nowrap;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.news-pin-duration:hover {
+  background: var(--color-segment-selected);
+}
+
+.news-pin-duration[aria-disabled="true"] {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+/* El aviso no se cuenta con el color: el amarillo no llega a AA como texto
+   sobre el fondo claro, así que lo lleva el icono y la frase va en el color
+   del texto. */
+.news-pin-strip-warning {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.news-pin-strip-warning svg {
+  flex-shrink: 0;
+  color: var(--color-warning);
+}
+
+.news-pin-error {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-size: 14px;
+}
+
+.news-featured-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* "Fijar" y "Desfijar": botones fantasma, con la zona táctil de 44 px. */
+.news-featured-pin {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.news-featured-pin:hover {
+  background: var(--color-hover);
+}
+
+.news-featured-pin[aria-disabled="true"] {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+@media (min-width: 768px) {
+  .news-row-pin {
+    display: inline-flex;
+  }
+}
+
 /* Lo no leído: un punto de 7 px en el acento. La palabra la escribe la
    destacada; en la fila sólo la oye el lector de pantalla. */
 .news-unread {

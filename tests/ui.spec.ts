@@ -11933,6 +11933,71 @@ test.describe("etiquetas de categoría del feed", () => {
   }
 });
 
+// #595: la tira de duración abierta bajo una fila, con otra ya fijada (como
+// `news-redesign-feed-pin-duration-dark.png`). La chincheta de la fila sólo
+// existe desde 768 px: en el móvil se fija desde la hoja ⋯ (#601).
+const PIN_STRIP_STATE = "noticias-tira-fijar";
+const PIN_STRIP_VIEWPORTS = viewports.filter((vp) => vp.name !== "mobile");
+
+async function openPinStrip(
+  page: Page,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await goToNews(page, FEED_WITH_PINNED, theme);
+  const title = STUBBED_FEED_POSTS[1].title;
+  await page
+    .getByRole("button", { name: new RegExp(`^(Pin|Fijar) ${title}$`) })
+    .click();
+  await expect(
+    page.getByRole("group", {
+      name: /^(Pin to the top for|Fijar arriba durante)$/,
+    }),
+  ).toBeVisible();
+}
+
+test.describe(PIN_STRIP_STATE, () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  for (const vp of PIN_STRIP_VIEWPORTS) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await openPinStrip(page, theme);
+          const snapshot = `${PIN_STRIP_STATE}-${vp.name}-${theme}.png`;
+          await createMissingLocalBaseline(snapshot, () =>
+            page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+          );
+          await expect(page).toHaveScreenshot(snapshot, {
+            ...SCREENSHOT_OPTIONS,
+            fullPage: true,
+            maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+          });
+        });
+      }
+    });
+  }
+
+  for (const theme of themes) {
+    test(`has no accessibility violations (axe-core, ${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await openPinStrip(page, theme);
+      await expectNoAxeViolations(page);
+    });
+  }
+
+  test("has no horizontal scroll at 768px", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await openPinStrip(page);
+    expect(await hasHorizontalScroll(page)).toBe(false);
+  });
+});
+
 test.describe("noticias en el navegador", () => {
   skipWithoutSession();
   quietNotificationBell();

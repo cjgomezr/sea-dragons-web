@@ -6,6 +6,10 @@ import { NEWS_PUBLISH_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import type { NewsFeedItem, NewsPinnedFeedItem } from "@/lib/news/news-feed";
+import {
+  arrangeAfterPin,
+  arrangeAfterUnpin,
+} from "@/lib/news/news-feed-pinning";
 import { isNewsUnread, newsUnreadCutoff } from "@/lib/news/news-seen";
 import {
   type NewsFailure,
@@ -15,7 +19,9 @@ import {
 } from "./news-client";
 import { type FeaturedPost, NewsFeaturedCard } from "./NewsFeaturedCard";
 import { NewsFeedRow } from "./NewsFeedRow";
+import type { PinControls } from "./NewsPinControls";
 import { NewsPublishedNotice } from "./NewsPublishedNotice";
+import { pinningOf, useNewsPinning } from "./use-news-pinning";
 
 /**
  * El feed de noticias (#329, RF-4 del PRD de E11): lo publicado para quien
@@ -34,6 +40,9 @@ import { NewsPublishedNotice } from "./NewsPublishedNotice";
  * nunca la repite. Lo no leído se mide contra la visita a Noticias que trae
  * la primera página, la de antes de abrir: por eso la visita se registra
  * después de leerla, y no a la vez.
+ *
+ * El Admin fija y desfija desde aquí (#595) sin recargar: la que fija pasa a
+ * la destacada y la que lo era vuelve a la lista en su sitio por fecha.
  */
 
 type MoreState =
@@ -133,14 +142,21 @@ function LoadMore({
   );
 }
 
+/** Los controles de fijar de cada publicación, o nulo si quien mira no fija. */
+type PinControlsFor = ((postId: string) => PinControls) | null;
+
 function FeedPosts({
   translate,
   feed,
   now,
+  pinControlsFor,
+  pinFocusRequest,
 }: {
   readonly translate: Translator;
   readonly feed: Extract<FeedState, { kind: "ready" }>;
   readonly now: Date;
+  readonly pinControlsFor: PinControlsFor;
+  readonly pinFocusRequest: number;
 }): React.JSX.Element {
   const { featured, listed } = arrangeFeed(feed.pinned, feed.posts);
   if (featured === null) {
@@ -153,6 +169,8 @@ function FeedPosts({
         featured={featured}
         now={now}
         isUnread={isNewsUnread(featured.post, feed.unreadCutoff)}
+        pinControls={pinControlsFor?.(featured.post.id) ?? null}
+        pinFocusRequest={pinFocusRequest}
       />
       {listed.length > 0 ? (
         <div className="news-list-section">
@@ -170,6 +188,7 @@ function FeedPosts({
                 now={now}
                 isUnread={isNewsUnread(post, feed.unreadCutoff)}
                 shouldTakeFocus={post.id === feed.focusPostId}
+                pinControls={pinControlsFor?.(post.id) ?? null}
               />
             ))}
           </ul>
@@ -182,16 +201,38 @@ function FeedPosts({
 export function NewsFeedScreen({
   locale,
   canPublish,
+  canPin,
 }: {
   readonly locale: Locale;
   /** Si quien mira puede publicar (#330). Sólo decide si se pinta el botón:
    * la frontera es quien niega el formulario y el endpoint. */
   readonly canPublish: boolean;
+  /** Si quien mira puede fijar (#595, D1): lo mismo, sólo pinta los botones. */
+  readonly canPin: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const [state, setState] = useState<FeedState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
+  const [pinFocusRequest, setPinFocusRequest] = useState(0);
   const hasRecordedVisit = useRef(false);
+  const { pinning, toggleStrip, closeStrip, pin, unpin } = useNewsPinning({
+    onPinned: (postId, pinnedUntil) => {
+      setState((current) =>
+        current.kind === "ready"
+          ? { ...current, ...arrangeAfterPin(current, postId, pinnedUntil) }
+          : current,
+      );
+      setPinFocusRequest((count) => count + 1);
+    },
+    onUnpinned: () => {
+      setState((current) =>
+        current.kind === "ready"
+          ? { ...current, ...arrangeAfterUnpin(current) }
+          : current,
+      );
+      setPinFocusRequest((count) => count + 1);
+    },
+  });
 
   useEffect(() => {
     let isCurrent = true;
@@ -255,6 +296,17 @@ export function NewsFeedScreen({
 
   const now = new Date();
   const nextCursor = state.kind === "ready" ? state.nextCursor : null;
+  const hasPinned = state.kind === "ready" && state.pinned !== null;
+  const pinControlsFor: PinControlsFor = canPin
+    ? (postId) => ({
+        pinning: pinningOf(pinning, postId),
+        replacesPinned: hasPinned,
+        onToggleStrip: () => toggleStrip(postId),
+        onCloseStrip: closeStrip,
+        onChoose: (duration) => void pin(postId, duration),
+        onUnpin: () => void unpin(postId),
+      })
+    : null;
 
   return (
     <div className="news">
@@ -284,7 +336,13 @@ export function NewsFeedScreen({
         />
       ) : null}
       {state.kind === "ready" ? (
-        <FeedPosts translate={translate} feed={state} now={now} />
+        <FeedPosts
+          translate={translate}
+          feed={state}
+          now={now}
+          pinControlsFor={pinControlsFor}
+          pinFocusRequest={pinFocusRequest}
+        />
       ) : null}
       {state.kind === "ready" && nextCursor !== null ? (
         <LoadMore
