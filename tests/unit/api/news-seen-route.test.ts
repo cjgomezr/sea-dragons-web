@@ -28,6 +28,7 @@ function newsSeenGateway(): NewsSeenGateway {
       marks.push(mark);
       return "marked";
     },
+    findNewsSeenAt: async () => null,
   };
 }
 

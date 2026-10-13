@@ -273,14 +273,20 @@ describe("el feed de quien publicó", () => {
     };
     responders[`GET ${FEED_PATH}`] = () =>
       jsonResponse(200, {
-        data: { pinned: null, posts: [withdrawn], nextCursor: null },
+        data: {
+          pinned: null,
+          posts: [withdrawn],
+          nextCursor: null,
+          seenAt: null,
+        },
       });
 
     render(<NewsFeedScreen locale="en" canPublish />);
 
+    // Sola en el feed, es la tarjeta destacada (#594).
     const row = (
       await screen.findByRole("link", { name: "Old call-up" })
-    ).closest("li");
+    ).closest("article");
     expect(row).not.toBeNull();
     expect(within(row as HTMLElement).getByText("Withdrawn")).toBeVisible();
   });

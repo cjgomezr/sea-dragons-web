@@ -732,7 +732,7 @@ describe("aviso de publicada en el feed", () => {
         const pathname = new URL(input, "http://localhost").pathname;
         if (pathname === FEED_PATH) {
           return jsonResponse(200, {
-            data: { pinned: null, posts: [], nextCursor: null },
+            data: { pinned: null, posts: [], nextCursor: null, seenAt: null },
           });
         }
         return new Response(null, { status: 204 });
@@ -812,7 +812,7 @@ describe("permisos", () => {
           throw new Error(`Petición inesperada: ${input}`);
         }
         return jsonResponse(200, {
-          data: { pinned: null, posts: [], nextCursor: null },
+          data: { pinned: null, posts: [], nextCursor: null, seenAt: null },
         });
       }),
     );

@@ -34,6 +34,15 @@ const CLUB_DAY_FORMATTERS = formattersByLocale(
     }),
 );
 
+const CLUB_SHORT_DAY_FORMATTERS = formattersByLocale(
+  (displayLocale) =>
+    new Intl.DateTimeFormat(displayLocale, {
+      day: "numeric",
+      month: "short",
+      timeZone: CLUB_TIME_ZONE,
+    }),
+);
+
 const CLUB_TIME_FORMATTERS = formattersByLocale(
   (displayLocale) =>
     new Intl.DateTimeFormat(displayLocale, {
@@ -137,6 +146,12 @@ export function formatClubMoment(locale: Locale, instant: Date): string {
  * de solicitud en el móvil (#553). */
 export function formatClubDay(locale: Locale, instant: Date): string {
   return CLUB_DAY_FORMATTERS[locale].format(instant);
+}
+
+/** El día del club en corto, sin el año ("30 Oct", "30 oct"): hasta cuándo
+ * está fijada una publicación (#594). */
+export function formatClubShortDay(locale: Locale, instant: Date): string {
+  return CLUB_SHORT_DAY_FORMATTERS[locale].format(instant);
 }
 
 /** Un día de calendario sin hora (YYYY-MM-DD, como una columna `date`). */

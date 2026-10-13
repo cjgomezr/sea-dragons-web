@@ -32,6 +32,7 @@ import {
   listNewsFeed,
 } from "@/lib/news/news-feed";
 import type { NewsCategory, NewsGateways } from "@/lib/news/news-posts";
+import { isNewsUnread, newsUnreadCutoff } from "@/lib/news/news-seen";
 import {
   type ContactReminder,
   contactReminderOf,
@@ -66,11 +67,9 @@ import {
 /** Cuántos eventos y noticias enseña el inicio (FR-077). */
 export const DASHBOARD_LIST_SIZE = 3;
 
-/** Los días hacia atrás que cubren las altas y, sin marca de visita, las
- * noticias sin leer (D2). */
+/** Los días hacia atrás que cubren las altas (D2). Las noticias sin leer
+ * usan la misma ventana, `NEWS_UNREAD_WINDOW_DAYS`. */
 export const DASHBOARD_WINDOW_DAYS = 30;
-
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 export type Unavailable = { readonly kind: "unavailable" };
 
@@ -386,10 +385,7 @@ async function readUnreadNewsTile(
     readonly seenAt: string | null;
   },
 ): Promise<UnreadNewsTile> {
-  const sinceMs =
-    request.seenAt === null
-      ? request.now.getTime() - DASHBOARD_WINDOW_DAYS * DAY_IN_MS
-      : Date.parse(request.seenAt);
+  const sinceMs = newsUnreadCutoff(request.seenAt, request.now);
   const unread = await countUnreadFrom(gateways, {
     callerId: request.callerId,
     page: request.firstPage,
@@ -411,11 +407,7 @@ function addPinnedUnread(
   sinceMs: number,
 ): UnreadCount {
   const { pinned } = firstPage;
-  if (
-    pinned === null ||
-    !isReadable(pinned) ||
-    Date.parse(pinned.publishedAt) <= sinceMs
-  ) {
+  if (pinned === null || !isNewsUnread(pinned, sinceMs)) {
     return unread;
   }
   return {

@@ -1735,6 +1735,13 @@ export const englishMessages = {
   "news.loadMore": "Load more",
   "news.loadingMore": "Loading…",
   "news.retry": "Try again",
+  // La tarjeta destacada y la lista de debajo (#594).
+  "news.featured.pinned": "Pinned",
+  "news.featured.pinnedUntil": "Pinned · until {date}",
+  "news.latest": "Latest",
+  "news.featured.readPost": "Read post",
+  "news.list.earlier": "Earlier",
+  "news.unread": "New",
   "news.category.announcement": "Announcement",
   "news.category.news": "News",
   "news.category.document": "Document",

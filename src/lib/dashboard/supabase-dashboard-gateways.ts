@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { z } from "zod";
 import {
   createClubAttendanceRateGateways,
   createMemberAttendanceGateway,
@@ -11,6 +10,7 @@ import type { ProfileContact } from "@/lib/members/profile-contact";
 import { readEmergencyContact } from "@/lib/members/supabase-profile-contact";
 import { createMembershipGateway } from "@/lib/membership/supabase-membership-gateways";
 import { createNewsGateways } from "@/lib/news/supabase-news-gateways";
+import { createNewsSeenGateway } from "@/lib/news/supabase-news-seen-gateway";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import type {
@@ -29,8 +29,6 @@ import type {
 type Environment = Readonly<Record<string, string | undefined>>;
 
 const MEMBERS_TABLE = "members";
-
-const newsSeenRowSchema = z.object({ news_seen_at: z.string().nullable() });
 
 async function countMembers(
   query: PromiseLike<{
@@ -69,26 +67,6 @@ async function countActiveMembers(
   return { active, joinedRecently };
 }
 
-async function findNewsSeenAt(
-  serviceClient: SupabaseClient,
-  userId: string,
-): Promise<string | null> {
-  const { data, error } = await serviceClient
-    .from(MEMBERS_TABLE)
-    .select("news_seen_at")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (error) {
-    throw new Error(
-      `No se pudo leer la visita a Noticias de ${userId}: ${error.message}`,
-    );
-  }
-  if (data === null) {
-    throw new Error(`No hay ningún socio con el id ${userId}.`);
-  }
-  return newsSeenRowSchema.parse(data).news_seen_at;
-}
-
 /** Las mismas columnas y la misma lectura que el perfil propio (#496). */
 const CONTACT_COLUMNS =
   "phone, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship";
@@ -121,7 +99,8 @@ export function createDashboardRosterGateway(
 ): DashboardRosterGateway {
   return {
     countActiveMembers: (query) => countActiveMembers(serviceClient, query),
-    findNewsSeenAt: (userId) => findNewsSeenAt(serviceClient, userId),
+    findNewsSeenAt: (userId) =>
+      createNewsSeenGateway(serviceClient).findNewsSeenAt(userId),
     findOwnContact: (userId) => findOwnContact(serviceClient, userId),
   };
 }

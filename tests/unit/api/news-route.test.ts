@@ -30,6 +30,7 @@ import {
 const ORIGIN = "http://localhost:3417";
 const POST_ID = "d3d3d3d3-0000-4000-8000-00000000000d";
 const COVER_ID = "c0c0c0c0-0000-4000-8000-000000000001";
+const CALLER_SEEN_AT = "2026-09-25T08:00:00.000Z";
 
 const DRAFT = {
   category: "announcement",
@@ -73,6 +74,16 @@ function mockWiring(options: FakeAttachmentClubOptions = {}): void {
     createSupabaseNewsPublishGateways: () => ({
       kind: "ready",
       gateways: club.gateways,
+    }),
+  }));
+  vi.doMock("@/lib/news/supabase-news-seen-gateway", () => ({
+    createSupabaseNewsSeenGateway: () => ({
+      kind: "ready",
+      gateway: {
+        markNewsSeen: async () => "marked",
+        findNewsSeenAt: async (userId: string) =>
+          userId === CALLER_ID ? CALLER_SEEN_AT : null,
+      },
     }),
   }));
   mockSessionClient();
@@ -130,6 +141,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.doUnmock("@/lib/news/supabase-news-gateways");
   vi.doUnmock("@/lib/news/supabase-news-attachment-gateways");
+  vi.doUnmock("@/lib/news/supabase-news-seen-gateway");
   vi.doUnmock("@/lib/supabase/session-client");
   vi.doUnmock("@/lib/auth/session-reader");
   vi.restoreAllMocks();
@@ -337,7 +349,18 @@ describe("GET /api/v1/news", () => {
           }),
         ],
         nextCursor: null,
+        seenAt: CALLER_SEEN_AT,
       },
+    });
+  });
+
+  it("trae la última visita a Noticias de quien llama, para marcar lo que no ha leído", async () => {
+    mockWiring({ posts: [aPost({ id: POST_ID })] });
+
+    const response = await readFeed();
+
+    await expect(response.json()).resolves.toMatchObject({
+      data: { seenAt: CALLER_SEEN_AT },
     });
   });
 
@@ -359,7 +382,12 @@ describe("GET /api/v1/news", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: { pinned: null, posts: [], nextCursor: null },
+      data: {
+        pinned: null,
+        posts: [],
+        nextCursor: null,
+        seenAt: CALLER_SEEN_AT,
+      },
     });
   });
 

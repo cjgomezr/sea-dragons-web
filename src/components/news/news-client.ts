@@ -12,7 +12,7 @@ import {
 } from "@/lib/auth/routes";
 import type { Translator } from "@/lib/i18n/translator";
 import type { NewsAttachmentDownload } from "@/lib/news/news-attachments";
-import type { NewsFeedPage } from "@/lib/news/news-feed";
+import type { NewsFeedResponsePage } from "@/lib/news/news-feed";
 import { NEWS_CATEGORIES, type NewsPostDetail } from "@/lib/news/news-posts";
 
 /**
@@ -47,12 +47,13 @@ const feedItemSchema = z.object({
 
 const feedResponseSchema = z.object({
   data: z.object({
-    // La fijada vigente (#592); su tarjeta llega con el feed nuevo (#594).
+    // La fijada vigente (#592), arriba como tarjeta destacada (#594).
     pinned: feedItemSchema
       .extend({ pinnedUntil: z.iso.datetime({ offset: true }).nullable() })
       .nullable(),
     posts: z.array(feedItemSchema),
     nextCursor: z.string().nullable(),
+    seenAt: z.iso.datetime({ offset: true }).nullable(),
   }),
 });
 
@@ -99,7 +100,8 @@ const downloadResponseSchema = z.object({
 export type NewsFailure = ApiRequestFailure;
 
 export type NewsFeedLoad =
-  { readonly kind: "loaded"; readonly page: NewsFeedPage } | NewsFailure;
+  | { readonly kind: "loaded"; readonly page: NewsFeedResponsePage }
+  | NewsFailure;
 
 export type NewsPostLoad =
   { readonly kind: "loaded"; readonly post: NewsPostDetail } | NewsFailure;

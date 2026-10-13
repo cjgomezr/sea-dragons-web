@@ -79,6 +79,7 @@ import {
 import { memberInitials } from "@/lib/auth/member-initials";
 import { buildAccentStylesheet } from "@/lib/club/accent-stylesheet";
 import { shrinkProfilePhoto } from "@/lib/members/shrink-profile-photo";
+import { shrinkNewsCover } from "@/lib/news/shrink-news-cover";
 import { LOCALE_COOKIE_NAME, type Locale, isLocale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
 
@@ -11412,6 +11413,11 @@ const NEWS_AUTHOR = {
 };
 const NEWS_NARROW_WIDTHS = [320, 375, 768] as const;
 
+/** Las portadas (#591) llegan firmadas desde Storage; aquí, de este origen
+ * inventado, con las dos versiones de una foto fija (#594). */
+const STUBBED_COVER_URL = "https://archivos.test/portada-grande.webp";
+const STUBBED_COVER_THUMBNAIL_URL = "https://archivos.test/portada-mini.webp";
+
 /** Las tres categorías, una con un título que parte en dos líneas a 375px, y
  * adjuntos en dos de ellas. Hace cuánto se cuenta desde ahora, así que la
  * fila dice siempre lo mismo. */
@@ -11442,8 +11448,8 @@ const STUBBED_FEED_POSTS = [
     publishedAt: hoursAgo(97),
     status: "published",
     attachmentCount: 0,
-    coverThumbnailUrl: null,
-    coverUrl: null,
+    coverThumbnailUrl: STUBBED_COVER_THUMBNAIL_URL,
+    coverUrl: STUBBED_COVER_URL,
   },
   {
     id: "a0a0a0a0-0000-4000-8000-0000000000a4",
@@ -11459,6 +11465,30 @@ const STUBBED_FEED_POSTS = [
     coverUrl: null,
   },
 ] as const;
+
+/** La fijada vigente (#592) del feed de escritorio (#594), con portada. Su
+ * fin es fijo: la tarjeta lo escribe como fecha, no como tiempo relativo. */
+const STUBBED_PINNED_POST = {
+  id: "a0a0a0a0-0000-4000-8000-0000000000a7",
+  category: "announcement",
+  title: "Spring league registration closes Friday",
+  excerpt:
+    "Have your AUF number and a recent photo ready. Fee waiver requests go through the same form.",
+  author: NEWS_AUTHOR,
+  publishedAt: hoursAgo(30),
+  status: "published",
+  attachmentCount: 1,
+  coverThumbnailUrl: STUBBED_COVER_THUMBNAIL_URL,
+  coverUrl: STUBBED_COVER_URL,
+  pinnedUntil: "2026-10-30T08:00:00.000Z",
+} as const;
+
+/** La última visita a Noticias: lo de hace menos de tres días sale como no
+ * leído, y lo demás no. */
+const STUBBED_NEWS_SEEN_AT = hoursAgo(72);
+
+/** Lo bastante dentro para salir del radio de 10 px de la tarjeta. */
+const CARD_CORNER_INSET_PX = 16;
 
 /** Fechas fijas: la publicación abierta las escribe enteras, no relativas. */
 const STUBBED_POST = {
@@ -11559,20 +11589,46 @@ function jsonBody(data: unknown): {
   };
 }
 
+async function stubNewsCovers(page: Page): Promise<void> {
+  const shrunk = await shrinkNewsCover(
+    readFileSync(LARGE_PHOTO_FIXTURES.landscape),
+  );
+  if (shrunk.kind !== "shrunk") {
+    throw new Error("La portada fija no se pudo reducir.");
+  }
+  const versions = new Map([
+    [STUBBED_COVER_URL, shrunk.large],
+    [STUBBED_COVER_THUMBNAIL_URL, shrunk.thumbnail],
+  ]);
+  for (const [url, bytes] of versions) {
+    await page.route(url, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "image/webp",
+        body: Buffer.from(bytes),
+      }),
+    );
+  }
+}
+
 /** El feed y las publicaciones, con el mismo contrato que #327. La de otro
- * grupo responde 404, como la que no existe. */
+ * grupo responde 404, como la que no existe. Con más de una publicación hay
+ * página siguiente, para que se vea "Cargar más". */
 async function stubNewsReads(
   page: Page,
-  feed: readonly unknown[],
+  posts: readonly unknown[],
+  pinned: unknown = null,
 ): Promise<void> {
+  await stubNewsCovers(page);
   await page.route(
     (url) => url.pathname === NEWS_FEED_ENDPOINT,
     (route) =>
       route.fulfill(
         jsonBody({
-          pinned: null,
-          posts: feed,
-          nextCursor: feed.length > 0 ? "pagina-2" : null,
+          pinned,
+          posts,
+          nextCursor: posts.length > 1 ? "pagina-2" : null,
+          seenAt: STUBBED_NEWS_SEEN_AT,
         }),
       ),
   );
@@ -11599,6 +11655,8 @@ type NewsState = {
   readonly name: string;
   readonly path: string;
   readonly feed: readonly unknown[];
+  /** La fijada vigente del feed (#592), si la hay. */
+  readonly pinned?: unknown;
   readonly heading: RegExp;
   readonly beforeVisit?: (page: Page) => Promise<void>;
   /** Lo que tiene que estar a la vista para que la pantalla haya cargado. */
@@ -11608,6 +11666,12 @@ type NewsState = {
 async function waitForFeedRows(page: Page): Promise<void> {
   await expect(
     page.getByRole("link", { name: STUBBED_FEED_POSTS[0].title }),
+  ).toBeVisible();
+}
+
+async function waitForPinnedFeed(page: Page): Promise<void> {
+  await expect(
+    page.getByRole("link", { name: STUBBED_PINNED_POST.title }),
   ).toBeVisible();
 }
 
@@ -11644,12 +11708,23 @@ async function openWithdrawConfirmation(page: Page): Promise<void> {
 const FEED_HEADING = /Club feed|Novedades del club/;
 const postPath = (id: string): string => `${NEWS_SCREEN_PATH}/${id}`;
 
+/** Sin fijada: la más reciente es la destacada y el resto, "Anteriores". */
 const FEED_WITH_POSTS: NewsState = {
-  name: "noticias-con-publicaciones",
+  name: "noticias-sin-fijar",
   path: NEWS_SCREEN_PATH,
   feed: STUBBED_FEED_POSTS,
   heading: FEED_HEADING,
   ready: waitForFeedRows,
+};
+
+/** Con fijada: ella es la destacada y la lista, "Lo último". */
+const FEED_WITH_PINNED: NewsState = {
+  name: "noticias-fijada",
+  path: NEWS_SCREEN_PATH,
+  feed: STUBBED_FEED_POSTS,
+  pinned: STUBBED_PINNED_POST,
+  heading: FEED_HEADING,
+  ready: waitForPinnedFeed,
 };
 
 const POST_WITH_ATTACHMENTS: NewsState = {
@@ -11663,11 +11738,28 @@ const POST_WITH_ATTACHMENTS: NewsState = {
 const NEWS_STATES: readonly NewsState[] = [
   FEED_WITH_POSTS,
   {
-    name: "noticias-con-publicaciones-es",
+    name: "noticias-sin-fijar-es",
     path: NEWS_SCREEN_PATH,
     feed: STUBBED_FEED_POSTS,
     heading: FEED_HEADING,
     beforeVisit: chooseSpanish,
+    ready: waitForFeedRows,
+  },
+  FEED_WITH_PINNED,
+  {
+    name: "noticias-fijada-es",
+    path: NEWS_SCREEN_PATH,
+    feed: STUBBED_FEED_POSTS,
+    pinned: STUBBED_PINNED_POST,
+    heading: FEED_HEADING,
+    beforeVisit: chooseSpanish,
+    ready: waitForPinnedFeed,
+  },
+  {
+    name: "noticias-una",
+    path: NEWS_SCREEN_PATH,
+    feed: STUBBED_FEED_POSTS.slice(0, 1),
+    heading: FEED_HEADING,
     ready: waitForFeedRows,
   },
   {
@@ -11751,7 +11843,7 @@ async function goToNews(
   state: NewsState,
   theme?: (typeof themes)[number],
 ): Promise<void> {
-  await stubNewsReads(page, state.feed);
+  await stubNewsReads(page, state.feed, state.pinned);
   await state.beforeVisit?.(page);
   if (theme === undefined) {
     await page.goto(`${APP_URL}${state.path}`);
@@ -11822,6 +11914,22 @@ test.describe("etiquetas de categoría del feed", () => {
       await goToNews(page, FEED_WITH_POSTS, theme);
       await expectNoAxeViolations(page);
     });
+
+    // #594: la destacada fijada lleva su borde y su chincheta en el acento.
+    test(`la fijada no tiene violaciones de accesibilidad (axe-core, ${theme})`, async ({
+      page,
+    }) => {
+      await goToNews(page, FEED_WITH_PINNED, theme);
+      await expectNoAxeViolations(page);
+    });
+
+    test(`la fijada no tiene scroll horizontal a 768 px (${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 768, height: 1024 });
+      await goToNews(page, FEED_WITH_PINNED, theme);
+      expect(await hasHorizontalScroll(page)).toBe(false);
+    });
   }
 });
 
@@ -11850,6 +11958,16 @@ test.describe("noticias en el navegador", () => {
         node !== null;
         node = walker.nextNode()
       ) {
+        // El extracto va en una línea cortada con puntos suspensivos (#594):
+        // un texto que no puede saltar de línea no parte ninguna palabra, y
+        // Chromium cuenta aparte el trozo que esconde el corte.
+        const parent = node.parentElement;
+        if (
+          parent !== null &&
+          getComputedStyle(parent).whiteSpace === "nowrap"
+        ) {
+          continue;
+        }
         const text = node.textContent ?? "";
         for (const match of text.matchAll(/\S+/g)) {
           const range = document.createRange();
@@ -11957,6 +12075,7 @@ test.describe("noticias en el navegador", () => {
               },
             ],
             nextCursor: null,
+            seenAt: STUBBED_NEWS_SEEN_AT,
           }),
         ),
     );
@@ -11968,14 +12087,68 @@ test.describe("noticias en el navegador", () => {
     await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(
       0,
     );
+    // La primera sigue arriba como destacada (#594); la lista no la repite.
     const titles = await page
-      .getByRole("list", { name: FEED_HEADING })
+      .getByRole("list", { name: /^(Earlier|Anteriores)$/ })
       .getByRole("link")
       .allTextContents();
     expect(titles).toEqual([
-      ...STUBBED_FEED_POSTS.map((post) => post.title),
+      ...STUBBED_FEED_POSTS.slice(1).map((post) => post.title),
       "Geelong friendly match recap",
     ]);
+  });
+
+  test("a 375px el feed con fijada no tiene violaciones de accesibilidad (axe-core)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToNews(page, FEED_WITH_PINNED);
+    await expectNoAxeViolations(page);
+  });
+
+  // #594 y D11 del PRD de E22: antes del feed móvil (#600), a 375 px cada
+  // control del feed se sigue pulsando con el dedo. La tarjeta y cada fila se
+  // pulsan enteras porque el enlace del título las cubre.
+  test("a 375px cada control táctil del feed llega a 44 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToNews(page, FEED_WITH_PINNED);
+
+    const cards = [
+      page.getByRole("article", { name: STUBBED_PINNED_POST.title }),
+      ...STUBBED_FEED_POSTS.map((post) =>
+        page.getByRole("listitem").filter({
+          has: page.getByRole("link", { name: post.title }),
+        }),
+      ),
+    ];
+    for (const card of cards) {
+      // Un punto junto a la esquina, lejos del título, abre la publicación.
+      // No en la misma esquina: la tarjeta tiene el borde redondeado. Todo en
+      // un paso: `elementFromPoint` sólo ve lo que está en la ventana, y el
+      // scroll suave movería la tarjeta entre medir y apuntar.
+      const target = await card.evaluate((element, inset) => {
+        element.scrollIntoView({ block: "center", behavior: "instant" });
+        const box = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          box.left + inset,
+          box.bottom - inset,
+        );
+        return {
+          height: box.height,
+          opensPost: hit?.closest("a") !== null && element.contains(hit),
+        };
+      }, CARD_CORNER_INSET_PX);
+      expect(target.height).toBeGreaterThanOrEqual(44);
+      expect(target.opensPost).toBe(true);
+    }
+    for (const control of [
+      page.getByRole("link", { name: /^\+ (Publish|Publicar)$/ }),
+      page.getByRole("button", { name: "Load more" }),
+    ]) {
+      expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    }
   });
 });
 
@@ -12312,10 +12485,10 @@ test.describe("publicar en el navegador", () => {
       await page.getByRole("button", { name: PUBLISH_BUTTON }).click();
 
       await expect(page).toHaveURL(new RegExp(`${NEWS_SCREEN_PATH}$`));
-      const titles = page
-        .getByRole("list", { name: FEED_HEADING })
-        .getByRole("link");
-      await expect(titles.first()).toHaveText(published.title);
+      // Sin fijada, la más reciente es la tarjeta destacada (#594).
+      await expect(
+        page.getByRole("article", { name: published.title }),
+      ).toBeVisible();
       await expect(page.getByRole("status")).toHaveText(
         `Published · we notified ${PUBLISH_GROUPS[0].name}`,
       );
