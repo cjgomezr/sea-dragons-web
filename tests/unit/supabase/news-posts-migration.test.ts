@@ -225,6 +225,9 @@ describeConPostgres("migración de las publicaciones", () => {
       "cover_upload_id uuid null=YES",
       "edited_at timestamp with time zone null=YES",
       "id uuid null=NO",
+      // El fijado (#592, `0064_news_post_pins.sql`).
+      "pinned_at timestamp with time zone null=YES",
+      "pinned_until timestamp with time zone null=YES",
       "published_at timestamp with time zone null=NO",
       "status text null=NO",
       "title text null=NO",
