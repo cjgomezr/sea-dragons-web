@@ -297,3 +297,80 @@ describe("el extracto del feed", () => {
     expect(excerptNewsBody(body)).toBe(body);
   });
 });
+
+describe("el extracto de un cuerpo con Markdown (#593)", () => {
+  it.each([
+    ["# Entreno del martes\n\nEn MSAC.", "Entreno del martes En MSAC."],
+    ["## Sección\n### Apartado", "Sección Apartado"],
+    [
+      "Traed **gorro** y *aletas*, o __tubo__.",
+      "Traed gorro y aletas, o tubo.",
+    ],
+    ["Mirad [el horario](https://example.com/horario).", "Mirad el horario."],
+    ["Antes ![pie](https://example.com/foto.jpg) después", "Antes después"],
+    ["> Nadie juega solo.", "Nadie juega solo."],
+    [
+      "- gorro\n- aletas\n\n1. calentar\n2. jugar",
+      "gorro aletas calentar jugar",
+    ],
+    ["La clave es `MSAC-2026`.", "La clave es MSAC-2026."],
+  ])("%j da %j", (body, excerpt) => {
+    expect(excerptNewsBody(body)).toBe(excerpt);
+  });
+
+  it("no deja marcas de Markdown en un cuerpo que las mezcla todas", () => {
+    const excerpt = excerptNewsBody(
+      "# Aviso\n\n> **Importante:** leed [esto](https://a.com) ![x](https://a.com/x.png)\n\n- *uno*",
+    );
+
+    expect(excerpt).toBe("Aviso Importante: leed esto uno");
+    expect(excerpt).not.toMatch(/[#*>[\]()]/);
+  });
+
+  it.each([
+    "El martes entrenamos en MSAC.",
+    "El martes entrenamos en MSAC.\nTraed gorro.",
+    "Please review the revised buddy-check policy.\nSignature required.\n\nThanks, the committee.",
+    "  Hola,\n\nequipo.\t Nos vemos.  ",
+  ])("un cuerpo de texto plano da el mismo extracto que antes: %j", (body) => {
+    expect(excerptNewsBody(body)).toBe(body.trim().split(/\s+/).join(" "));
+  });
+
+  it("corta el texto ya sin formato, sin partir palabras", () => {
+    const word = "piscina";
+    const body = Array.from({ length: 60 }, () => `**${word}**`).join(" ");
+
+    const excerpt = excerptNewsBody(body);
+
+    expect(excerpt.endsWith("…")).toBe(true);
+    expect([...excerpt].length).toBeLessThanOrEqual(
+      NEWS_EXCERPT_MAX_LENGTH + 1,
+    );
+    expect(
+      excerpt
+        .slice(0, -1)
+        .split(" ")
+        .every((part) => part === word),
+    ).toBe(true);
+  });
+
+  it("corta una palabra larga con formato donde no hay otro sitio", () => {
+    const excerpt = excerptNewsBody(
+      `*${"x".repeat(NEWS_EXCERPT_MAX_LENGTH * 2)}*`,
+    );
+
+    expect(excerpt).toBe(`${"x".repeat(NEWS_EXCERPT_MAX_LENGTH)}…`);
+  });
+
+  it("no parte un emoji con formato", () => {
+    const body = `**${"🤿".repeat(NEWS_EXCERPT_MAX_LENGTH + 10)}**`;
+
+    expect(excerptNewsBody(body)).toBe(
+      `${"🤿".repeat(NEWS_EXCERPT_MAX_LENGTH)}…`,
+    );
+  });
+
+  it("deja el HTML crudo como el texto que se ve en la publicación", () => {
+    expect(excerptNewsBody("Hola <b>equipo</b>.")).toBe("Hola <b>equipo</b>.");
+  });
+});
