@@ -1,12 +1,11 @@
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
-import { ApiError, NO_CONTENT_STATUS } from "@/lib/api/response";
+import { NO_CONTENT_STATUS } from "@/lib/api/response";
 import {
   asAccountApiError,
   identifyAccountCaller,
 } from "@/lib/auth/account-api";
-import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
-import { type NewsSeenGateway, markNewsSeen } from "@/lib/news/news-seen";
-import { createSupabaseNewsSeenGateway } from "@/lib/news/supabase-news-seen-gateway";
+import { requireNewsSeenGateway } from "@/lib/news/news-api";
+import { markNewsSeen } from "@/lib/news/news-seen";
 
 /**
  * La marca de la última visita a Noticias (#424, D2 del PRD de E14): la
@@ -17,17 +16,6 @@ import { createSupabaseNewsSeenGateway } from "@/lib/news/supabase-news-seen-gat
 
 // Escribe la fila de quien llama.
 export const dynamic = "force-dynamic";
-
-function requireNewsSeenGateway(): NewsSeenGateway {
-  const wiring = createSupabaseNewsSeenGateway(process.env);
-  if (wiring.kind === "unconfigured") {
-    throw new ApiError(
-      "service_unavailable",
-      describeMissingAuthKeys(wiring.missingKeys),
-    );
-  }
-  return wiring.gateway;
-}
 
 const postNewsSeen = createApiRoute<never>({
   handler: async ({ request, decorateResponse }) => {

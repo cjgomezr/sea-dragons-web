@@ -441,7 +441,7 @@ describe("permisos", () => {
           throw new Error(`Petición inesperada: ${input}`);
         }
         return jsonResponse(200, {
-          data: { pinned: null, posts: [], nextCursor: null },
+          data: { pinned: null, posts: [], nextCursor: null, seenAt: null },
         });
       }),
     );

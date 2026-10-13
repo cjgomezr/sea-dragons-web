@@ -21,7 +21,9 @@ import {
   NewsForbiddenError,
   NewsPostNotFoundError,
 } from "./news-posts";
+import type { NewsSeenGateway } from "./news-seen";
 import { createSupabaseNewsGateways } from "./supabase-news-gateways";
+import { createSupabaseNewsSeenGateway } from "./supabase-news-seen-gateway";
 
 /**
  * Lo que comparten los endpoints de noticias (#327): cómo se cablean, cómo
@@ -108,6 +110,19 @@ export function requireNewsGateways(): NewsGateways {
     );
   }
   return wiring.gateways;
+}
+
+/** La marca de visita a Noticias (#424): la escribe su endpoint y la lee el
+ * feed (#594). */
+export function requireNewsSeenGateway(): NewsSeenGateway {
+  const wiring = createSupabaseNewsSeenGateway(process.env);
+  if (wiring.kind === "unconfigured") {
+    throw new ApiError(
+      "service_unavailable",
+      describeMissingAuthKeys(wiring.missingKeys),
+    );
+  }
+  return wiring.gateway;
 }
 
 const VALIDATION_ERRORS = [

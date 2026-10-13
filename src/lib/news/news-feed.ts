@@ -66,6 +66,13 @@ export type NewsFeedPage = {
   readonly nextCursor: string | null;
 };
 
+/** Lo que responde el endpoint del feed: la página y la última visita a
+ * Noticias de quien lee (#594), o `null` si nunca las abrió. Con ella la
+ * pantalla marca lo que no ha leído. */
+export type NewsFeedResponsePage = NewsFeedPage & {
+  readonly seenAt: string | null;
+};
+
 export class InvalidNewsFeedCursorError extends Error {
   constructor() {
     super("El cursor no corresponde a ninguna página del feed.");
