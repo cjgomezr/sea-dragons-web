@@ -59,6 +59,12 @@ import {
 } from "./support/e2e-session";
 import { HOME_NOW, fixClockOnHome } from "./support/home-clock";
 import { shouldCreateMissingSnapshot } from "./support/missing-snapshot-policy";
+// Los presupuestos de píxeles y la tolerancia de color que los acompaña
+// (#77, #606). La tolerancia la aplica playwright.config.ts.
+import {
+  COMPONENT_MAX_DIFF_PIXELS,
+  PAGE_MAX_DIFF_PIXELS,
+} from "./support/screenshot-tolerance";
 import { isStatePhotographed } from "./support/spanish-captures";
 import { snapshotCreatedNotice } from "./support/visual-baseline-notice";
 import { waitForHydration } from "./support/wait-for-hydration";
@@ -136,22 +142,6 @@ const viewports = [
 ] as const;
 
 const themes = ["light", "dark"] as const;
-
-// #77: medido comparando esta misma rama sin cambios dos veces en CI
-// (Linux), contra la línea base ya aceptada, con tolerancia puesta a cero
-// para que cualquier diferencia real de renderizado quedara expuesta en el
-// reporte (runs 34072162451 y 34072312519). Resultado: 0 píxeles de
-// diferencia en las 22 capturas de página sin regresión real, en ambas
-// corridas. Las únicas fallas fueron las dos líneas base oscuras ya sabidas
-// como desactualizadas (home-mobile-dark: 1756px, section-mobile-dark:
-// 1849px, idénticos en ambas corridas), que no son ruido sino el defecto
-// que este ticket corrige. El margen de abajo es generoso frente al ruido
-// medido (0) y sigue quedando dos órdenes de magnitud por debajo de la
-// regresión real más pequeña observada (1756px). Es un presupuesto
-// ABSOLUTO a propósito: uno por ratio crece con el alto de la página y es
-// la causa raíz del punto ciego (#77).
-const PAGE_MAX_DIFF_PIXELS = 20;
-const COMPONENT_MAX_DIFF_PIXELS = 10;
 
 // El dev server dibuja su propia burbuja de errores en una esquina, dentro de
 // <nextjs-portal>, y aparece unos milisegundos después de la carga: la captura
