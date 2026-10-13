@@ -658,9 +658,9 @@ describe("portada", () => {
 
     await chooseCover(file);
 
-    expect(
-      await within(coverGroup()).findByRole("alert"),
-    ).toHaveTextContent(reason);
+    expect(await within(coverGroup()).findByRole("alert")).toHaveTextContent(
+      reason,
+    );
     expect(callsTo("POST", UPLOADS_PATH)).toEqual([]);
     expect(within(coverGroup()).getByText("No cover photo")).toBeVisible();
   });
@@ -678,9 +678,9 @@ describe("portada", () => {
 
     await chooseCover(picture("falsa.png"));
 
-    expect(
-      await within(coverGroup()).findByRole("alert"),
-    ).toHaveTextContent("The cover must be a JPEG, PNG or WebP image.");
+    expect(await within(coverGroup()).findByRole("alert")).toHaveTextContent(
+      "The cover must be a JPEG, PNG or WebP image.",
+    );
     expect(within(coverGroup()).getByText("No cover photo")).toBeVisible();
   });
 

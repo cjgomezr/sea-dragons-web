@@ -298,9 +298,7 @@ describe("editar", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Edit post",
     );
-    expect(
-      screen.getByRole("radio", { name: "Announcement" }),
-    ).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Announcement" })).toBeChecked();
     expect(
       within(coverGroup()).getByText(
         "The announcement background is used instead.",
@@ -410,9 +408,7 @@ describe("editar", () => {
     );
 
     expect(within(coverGroup()).getByText("No cover photo")).toBeVisible();
-    expect(
-      calls.filter((call) => call.method !== "GET"),
-    ).toEqual([]);
+    expect(calls.filter((call) => call.method !== "GET")).toEqual([]);
   });
 
   it("cambiar la portada sube la nueva y la guarda con su id", async () => {
@@ -463,9 +459,7 @@ describe("editar", () => {
 
     await userEvent.clear(screen.getByLabelText("Title"));
 
-    expect(
-      screen.getByRole("button", { name: "Save changes" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
 
   it("dice en español el título y el botón de guardar", async () => {

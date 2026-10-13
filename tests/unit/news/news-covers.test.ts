@@ -7,10 +7,7 @@ import {
 } from "@/lib/news/news-cover-uploads";
 import { STALE_COVER_AGE_MS, newsCoverPathsOf } from "@/lib/news/news-covers";
 import { listNewsFeed } from "@/lib/news/news-feed";
-import {
-  editNewsPost,
-  readEditableNewsPost,
-} from "@/lib/news/news-management";
+import { editNewsPost, readEditableNewsPost } from "@/lib/news/news-management";
 import {
   type NewsDraft,
   NewsForbiddenError,

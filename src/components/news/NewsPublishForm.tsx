@@ -30,7 +30,10 @@ import {
   rememberPublishedNotice,
 } from "./news-published-notice";
 import { useNewsAttachments } from "./use-news-attachments";
-import { type NewsCoverField as NewsCover, useNewsCover } from "./use-news-cover";
+import {
+  type NewsCoverField as NewsCover,
+  useNewsCover,
+} from "./use-news-cover";
 
 /**
  * El formulario de publicar (#330, RF-2 y RF-3 del PRD de E11): categoría,
