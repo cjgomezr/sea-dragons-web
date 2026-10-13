@@ -11435,6 +11435,8 @@ const STUBBED_FEED_POSTS = [
     publishedAt: hoursAgo(49),
     status: "published",
     attachmentCount: 1,
+    coverThumbnailUrl: null,
+    coverUrl: null,
   },
   {
     id: NEWS_POST_WITHOUT_ATTACHMENTS_ID,
@@ -11449,6 +11451,8 @@ const STUBBED_FEED_POSTS = [
     publishedAt: hoursAgo(97),
     status: "published",
     attachmentCount: 0,
+    coverThumbnailUrl: null,
+    coverUrl: null,
   },
   {
     id: "a0a0a0a0-0000-4000-8000-0000000000a4",
@@ -11460,6 +11464,8 @@ const STUBBED_FEED_POSTS = [
     publishedAt: hoursAgo(24 * 8),
     status: "published",
     attachmentCount: 2,
+    coverThumbnailUrl: null,
+    coverUrl: null,
   },
 ] as const;
 
@@ -11474,6 +11480,7 @@ const STUBBED_POST = {
   editedAt: "2026-09-16T01:30:00.000Z",
   status: "published",
   canManage: false,
+  coverUrl: null,
   attachments: [
     {
       id: "d0d0d0d0-0000-4000-8000-0000000000d1",
@@ -11540,6 +11547,8 @@ const STUBBED_FEED_WITH_WITHDRAWN = [
     publishedAt: hoursAgo(26),
     status: "withdrawn",
     attachmentCount: 0,
+    coverThumbnailUrl: null,
+    coverUrl: null,
   },
   ...STUBBED_FEED_POSTS,
 ] as const;
@@ -12937,6 +12946,7 @@ const STUBBED_EDITABLE_POST = {
   audience: { kind: "groups", groupIds: [PUBLISH_GROUPS[0].id] },
   editedAt: STUBBED_OWN_POST.editedAt,
   status: "published",
+  coverUploadId: null,
 } as const;
 
 /** Las lecturas del feed y los grupos, y la publicación editable. Va después
