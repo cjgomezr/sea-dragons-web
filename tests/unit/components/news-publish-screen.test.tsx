@@ -754,8 +754,22 @@ describe("aviso de publicada en el feed", () => {
 
     await publishAndOpenFeed();
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Published · we notified the whole club",
+    expect(
+      await screen.findByText("Published · we notified the whole club"),
+    ).toBeInTheDocument();
+  });
+
+  it("la región de estado ya está, vacía, antes de que llegue el aviso", async () => {
+    await openForm();
+    await fillValidDraft();
+
+    await publishAndOpenFeed();
+
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Published · we notified the whole club",
+      ),
     );
   });
 
@@ -770,16 +784,16 @@ describe("aviso de publicada en el feed", () => {
 
     await publishAndOpenFeed();
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Published · we notified Senior and Masters",
-    );
+    expect(
+      await screen.findByText("Published · we notified Senior and Masters"),
+    ).toBeInTheDocument();
   });
 
   it("el aviso sale una sola vez", async () => {
     await openForm();
     await fillValidDraft();
     await publishAndOpenFeed();
-    await screen.findByRole("status");
+    await screen.findByText(/^Published ·/);
 
     cleanup();
     render(<NewsFeedScreen locale="en" canPublish />);

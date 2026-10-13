@@ -444,6 +444,50 @@ describe("editar", () => {
     });
   });
 
+  it("si falla una segunda portada nueva, vuelve la que tenía y guardar no la toca", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:nueva");
+    URL.revokeObjectURL = vi.fn();
+    let uploads = 0;
+    responders[`GET ${MANAGE_PATH}`] = () =>
+      jsonResponse(200, { data: EDITABLE_WITH_COVER });
+    responders[`POST ${UPLOADS_PATH}`] = () => {
+      uploads += 1;
+      return uploads === 1
+        ? jsonResponse(201, {
+            data: {
+              id: NEW_COVER_ID,
+              fileName: "nueva.png",
+              contentType: "image/webp",
+              sizeBytes: 2_048,
+            },
+          })
+        : errorResponse(503, "service_unavailable");
+    };
+    responders[`PATCH ${MANAGE_PATH}`] = respondWith(POST);
+    await openEdit();
+    const chooser = screen.getByLabelText("Choose a cover photo");
+    const aPicture = (name: string): File =>
+      new File([new Uint8Array(64)], name, { type: "image/png" });
+
+    await userEvent.upload(chooser, aPicture("nueva.png"));
+    await waitFor(() =>
+      expect(
+        within(coverGroup()).getByRole("img", { name: "Cover photo" }),
+      ).toHaveAttribute("src", "blob:nueva"),
+    );
+    await userEvent.upload(chooser, aPicture("otra.png"));
+
+    await within(coverGroup()).findByRole("alert");
+    expect(
+      within(coverGroup()).getByRole("img", { name: "Cover photo" }),
+    ).toHaveAttribute("src", EDITABLE_WITH_COVER.coverUrl);
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(push).toHaveBeenCalled());
+    expect(callsTo("PATCH", MANAGE_PATH)[0]?.body).not.toHaveProperty(
+      "coverUploadId",
+    );
+  });
+
   it("guardar no deja el aviso de publicada en el feed", async () => {
     responders[`PATCH ${MANAGE_PATH}`] = respondWith(POST);
     await openEdit();

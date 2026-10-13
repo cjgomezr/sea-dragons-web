@@ -33,12 +33,8 @@ function parseStored(raw: string): unknown {
   }
 }
 
-/** El aviso pendiente, o null. Sólo lee: quien lo enseña lo olvida después,
- * así que leerlo dos veces da lo mismo. Fuera del navegador no hay ninguno. */
+/** El aviso pendiente, o null. Sólo lee: quien lo enseña lo olvida después. */
 export function readPublishedNotice(): PublishedAudience | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
   const raw = window.sessionStorage.getItem(STORAGE_KEY);
   if (raw === null) {
     return null;

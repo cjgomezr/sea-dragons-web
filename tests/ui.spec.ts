@@ -12359,12 +12359,20 @@ test.describe("publicar en el navegador", () => {
         page.getByRole("button", { name: /^Remove mapa-piscina/ }),
         page.getByRole("button", { name: "Add files" }),
         page.getByRole("button", { name: PUBLISH_BUTTON }),
+        ...["The whole club", "Specific groups", PUBLISH_GROUPS[0].name].map(
+          (name) => page.locator("label").filter({ hasText: name }),
+        ),
       ];
+      const addCover = page.getByRole("button", { name: "Add cover photo" });
 
       for (const control of controls) {
         const box = await control.boundingBox();
         expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
       }
+      await page.getByRole("button", { name: "Remove cover" }).click();
+      expect(
+        (await addCover.boundingBox())?.height ?? 0,
+      ).toBeGreaterThanOrEqual(44);
     });
   });
 

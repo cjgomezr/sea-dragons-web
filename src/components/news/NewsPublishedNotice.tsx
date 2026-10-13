@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Translator } from "@/lib/i18n/translator";
 import {
   type PublishedAudience,
@@ -11,7 +11,7 @@ import {
 /**
  * "Publicada · avisamos a {audiencia}" en el feed, al volver de publicar
  * (#597). La región de estado está siempre, vacía si no hay nada que decir, y
- * no ocupa sitio: el feed no se mueve por ella.
+ * no ocupa sitio vacía: el feed no se mueve por ella.
  */
 
 function describeAudience(
@@ -31,13 +31,26 @@ export function NewsPublishedNotice({
 }: {
   readonly translate: Translator;
 }): React.JSX.Element {
-  // Se llega aquí desde publicar sin recargar, así que se lee al montar en
-  // el navegador. Leer no lo borra: en desarrollo React monta dos veces, y la
-  // segunda tiene que ver lo mismo. Se borra después, en el efecto.
-  const [audience] = useState<PublishedAudience | null>(readPublishedNotice);
+  const [audience, setAudience] = useState<PublishedAudience | null>(null);
+  // Lo leído sobrevive a que React monte dos veces en desarrollo: la segunda
+  // vez ya no está en `sessionStorage`, porque la primera lo borró.
+  const pending = useRef<PublishedAudience | null | undefined>(undefined);
 
+  // La región se pinta vacía y el aviso entra en el cuadro siguiente: un
+  // lector de pantalla sólo anuncia lo que cambia dentro de una región que ya
+  // estaba. Leer tras montar evita además que el servidor, que no tiene
+  // `sessionStorage`, pinte otra cosa que el navegador.
   useEffect(() => {
-    forgetPublishedNotice();
+    if (pending.current === undefined) {
+      pending.current = readPublishedNotice();
+      forgetPublishedNotice();
+    }
+    const notice = pending.current;
+    if (notice === null) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => setAudience(notice));
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   return (

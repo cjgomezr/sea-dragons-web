@@ -243,10 +243,9 @@ const DRAFT_FIELDS: Readonly<Record<keyof Draft, NewsDraftField | null>> = {
 };
 
 function touchedBy(change: Partial<Draft>): readonly NewsDraftField[] {
-  return Object.keys(change).flatMap((key) => {
-    const field = DRAFT_FIELDS[key as keyof Draft];
-    return field === null ? [] : [field];
-  });
+  return Object.entries(DRAFT_FIELDS).flatMap(([key, field]) =>
+    field !== null && key in change ? [field] : [],
+  );
 }
 
 /** A quién avisó lo publicado, con los nombres de los grupos de hoy. */

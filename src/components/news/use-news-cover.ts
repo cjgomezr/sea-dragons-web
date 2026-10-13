@@ -47,7 +47,15 @@ export type NewsCoverField = {
 };
 
 /** Los tipos que el servidor acepta como portada (#591). */
-export const NEWS_COVER_TYPES = ["image/jpeg", "image/png", "image/webp"];
+export const NEWS_COVER_TYPES: readonly string[] = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+
+/** El tope de `NEWS_COVER_MAX_BYTES`, que es el de un adjunto. Se lee de
+ * aquí porque `news-cover-uploads` es código de servidor. */
+const COVER_MAX_BYTES = NEWS_ATTACHMENT_MAX_BYTES;
 
 /** Lo que se comprueba antes de subir. Un archivo sin tipo conocido sí se
  * sube: quien decide es el servidor, mirando los bytes. */
@@ -55,7 +63,7 @@ function checkCoverBeforeUpload(file: File): NewsAttachmentIssueCode | null {
   if (file.size === 0) {
     return "cover_empty";
   }
-  if (file.size > NEWS_ATTACHMENT_MAX_BYTES) {
+  if (file.size > COVER_MAX_BYTES) {
     return "cover_too_large";
   }
   return file.type === "" || NEWS_COVER_TYPES.includes(file.type)
@@ -89,6 +97,16 @@ function changeOf(cover: NewsCover, hadCover: boolean): NewsCoverChange {
         ? { kind: "replace", coverUploadId: null }
         : { kind: "keep" };
   }
+}
+
+/** Lo que se vuelve a ver si la nueva no vale. Mientras no se haya quitado,
+ * la publicación que se edita sigue con la suya; la vista previa de una
+ * subida anterior ya se soltó, así que esa no vuelve. */
+function fallbackFor(cover: NewsCover, currentUrl: string | null): NewsCover {
+  if (cover.kind === "none" || currentUrl === null) {
+    return { kind: "none" };
+  }
+  return { kind: "current", url: currentUrl };
 }
 
 export function useNewsCover(currentUrl: string | null): NewsCoverField {
@@ -135,10 +153,7 @@ export function useNewsCover(currentUrl: string | null): NewsCoverField {
       setIssue({ kind: "rejected", code });
       return;
     }
-    // Si la nueva no vale, la publicación que se edita sigue con la suya. La
-    // vista previa de una subida anterior ya se soltó, así que esa no vuelve.
-    const fallback: NewsCover =
-      cover.kind === "current" ? cover : { kind: "none" };
+    const fallback = fallbackFor(cover, currentUrl);
     latestChoice.current += 1;
     setIssue(null);
     setCover({ kind: "uploading" });

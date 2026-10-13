@@ -6202,6 +6202,18 @@ a.auth-brand-header:focus-visible {
     min-height: var(--touch-target-min);
     padding: 0 var(--space-2);
   }
+
+  /* Las opciones de audiencia: la etiqueta, que es lo que se toca, llega a
+     la medida táctil. */
+  .news-publish-form .auth-consent {
+    align-items: center;
+  }
+
+  .news-publish-form .auth-consent label {
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-target-min);
+  }
 }
 
 /* El título: 44 px, con el contador en mono a la derecha de la etiqueta. */
