@@ -46,6 +46,9 @@ desplazamiento lo sigan.
 | Accent soft text | `#14507A` | Text on an accent tint                                                  |
 | Text soft        | `#2F4659` | Quiet body text, table values                                           |
 | Accent hover     | `#175C89` | Accent fill under the pointer                                           |
+| Editor bar       | `#F5F8FA` | Toolbar strip of the news editor                                        |
+| Segment selected | `#D6E6F2` | Chosen option of a segmented control                                    |
+| Border dashed    | `#A9BCCC` | Dashed outline of a drop zone or an "add" button                        |
 
 > **Decisión del 2026-09-04.** El texto secundario del tema claro se desvía
 > del prototipo a propósito. El valor original del prototipo, `#6B8095`, da
@@ -58,23 +61,26 @@ desplazamiento lo sigan.
 
 #### Dark theme (`[data-theme="dark"]` y `prefers-color-scheme: dark`)
 
-| Role             | Value     | Usage                            |
-| ---------------- | --------- | -------------------------------- |
-| Accent           | `#33A1E0` | Primary actions, active states   |
-| Accent text      | `#33A1E0` | Links, focus, accent as text     |
-| Background       | `#0C1A26` | Page background                  |
-| Panel            | `#13283A` | Cards, panels                    |
-| Text             | `#E8F0F7` | Body text                        |
-| Text secondary   | `#8AA1B5` | Captions, metadata               |
-| Border           | `#274055` | Dividers, input borders          |
-| Success          | `#6FD6B4` | Success state only               |
-| Warning          | `#F2CE78` | Warning state only               |
-| Danger           | `#F2887A` | Validation errors, destructive   |
-| Text on accent   | `#0C1A26` | Text/icons on an accent fill     |
-| Hover            | `#1A3349` | Row or control under the pointer |
-| Accent soft text | `#CFE8F7` | Text on an accent tint           |
-| Text soft        | `#CFDEEA` | Quiet body text, table values    |
-| Accent hover     | `#5AB4E8` | Accent fill under the pointer    |
+| Role             | Value     | Usage                                            |
+| ---------------- | --------- | ------------------------------------------------ |
+| Accent           | `#33A1E0` | Primary actions, active states                   |
+| Accent text      | `#33A1E0` | Links, focus, accent as text                     |
+| Background       | `#0C1A26` | Page background                                  |
+| Panel            | `#13283A` | Cards, panels                                    |
+| Text             | `#E8F0F7` | Body text                                        |
+| Text secondary   | `#8AA1B5` | Captions, metadata                               |
+| Border           | `#274055` | Dividers, input borders                          |
+| Success          | `#6FD6B4` | Success state only                               |
+| Warning          | `#F2CE78` | Warning state only                               |
+| Danger           | `#F2887A` | Validation errors, destructive                   |
+| Text on accent   | `#0C1A26` | Text/icons on an accent fill                     |
+| Hover            | `#1A3349` | Row or control under the pointer                 |
+| Accent soft text | `#CFE8F7` | Text on an accent tint                           |
+| Text soft        | `#CFDEEA` | Quiet body text, table values                    |
+| Accent hover     | `#5AB4E8` | Accent fill under the pointer                    |
+| Editor bar       | `#0F2131` | Toolbar strip of the news editor                 |
+| Segment selected | `#1D4869` | Chosen option of a segmented control             |
+| Border dashed    | `#3A5670` | Dashed outline of a drop zone or an "add" button |
 
 Rules: one accent color; success/warning/danger appear only with their meaning;
 never place text on a background with contrast ratio below 4.5:1 (3:1 for
@@ -140,6 +146,23 @@ text ≥ 24px).
 > como texto baja a 3.9:1, así que la opción de orden activa pasa a `Text`
 > bajo el puntero, y la pista en `Text secondary` de las acciones del "⋯" pasa
 > a `Text soft`. El tema oscuro no cambia.
+
+> **Decisión del 2026-10-13 (issue #590).** El rediseño de las noticias (E22,
+> D5) traía tres colores sueltos; ahora son tokens. Los oscuros son los del
+> handoff (`docs/design/design_handoff_news/README.md`) y los claros se
+> eligieron para este tema.
+>
+> - `Editor bar` (`--color-editor-bar`) es la franja de la barra de
+>   herramientas del editor, entre el panel y el fondo.
+> - `Segment selected` (`--color-segment-selected`) es la opción elegida de un
+>   control segmentado, con `Text` encima.
+> - `Border dashed` (`--color-border-dashed`) es el borde a trazos de una zona
+>   para soltar archivos; pesa más que `Border` para que el trazo se vea.
+>
+> La etiqueta de categoría Document deja de reutilizar el acento: su fondo es
+> `Success` al 22 % sobre el panel. `tests/unit/design-tokens.test.ts`
+> comprueba que `Text` cumple AA sobre las tres etiquetas, el segmento elegido
+> y la barra del editor en los dos temas.
 
 #### Sidebar (no cambia con el tema)
 

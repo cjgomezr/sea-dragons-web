@@ -40,6 +40,13 @@
   --color-accent-soft-text: #14507a;
   --color-text-soft: #2f4659;
   --color-accent-hover: #175c89;
+  /* El rediseño de las noticias (#590). La barra del editor va entre el panel
+     y el fondo; el segmento elegido es un tinte del acento con el texto en
+     --color-text encima; el borde punteado marca dónde soltar un archivo y
+     pesa más que --color-border para que se vea a trazos. */
+  --color-editor-bar: #f5f8fa;
+  --color-segment-selected: #d6e6f2;
+  --color-border-dashed: #a9bccc;
   /* El enlace de ejemplo junto al acento que el Admin elige (#346). La
      muestra pone los de cada tema en línea; aquí están porque toda variable
      que la hoja lee tiene su valor en :root (tests/unit/theme-css.test.ts). */
@@ -113,6 +120,9 @@
     --color-accent-soft-text: #cfe8f7;
     --color-text-soft: #cfdeea;
     --color-accent-hover: #5ab4e8;
+    --color-editor-bar: #0f2131;
+    --color-segment-selected: #1d4869;
+    --color-border-dashed: #3a5670;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   }
@@ -139,6 +149,9 @@
   --color-accent-soft-text: #cfe8f7;
   --color-text-soft: #cfdeea;
   --color-accent-hover: #5ab4e8;
+  --color-editor-bar: #0f2131;
+  --color-segment-selected: #1d4869;
+  --color-border-dashed: #3a5670;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
@@ -5633,6 +5646,54 @@ a.auth-brand-header:focus-visible {
 
 .news-category-announcement {
   background: color-mix(in srgb, var(--color-warning) 28%, var(--color-panel));
+}
+
+/* Document tiene su verde (#590): antes reutilizaba el acento de News y las
+   dos se confundían. */
+.news-category-document {
+  background: color-mix(in srgb, var(--color-success) 22%, var(--color-panel));
+}
+
+/* El fondo de lo que no tiene portada (#590): un degradado del tono de la
+   categoría sobre el panel y su icono en ese tono, a media opacidad para que
+   no compita con el título. Quien lo usa le da el alto. */
+.news-cover-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.news-cover-fallback svg {
+  opacity: 0.5;
+}
+
+.news-cover-fallback-announcement {
+  color: var(--color-warning);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-warning) 30%, var(--color-panel)),
+    var(--color-panel) 78%
+  );
+}
+
+/* El icono va en el acento como texto: con el acento claro de un club el de
+   relleno apenas se vería sobre el panel (#341). */
+.news-cover-fallback-news {
+  color: var(--color-accent-text);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-accent) 32%, var(--color-panel)),
+    var(--color-panel) 78%
+  );
+}
+
+.news-cover-fallback-document {
+  color: var(--color-success);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-success) 26%, var(--color-panel)),
+    var(--color-panel) 78%
+  );
 }
 
 .news-withdrawn {
