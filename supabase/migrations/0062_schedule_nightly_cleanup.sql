@@ -50,6 +50,12 @@ revoke all on procedure public.run_nightly_cleanup()
 -- `scripts/apply-migrations.sh` aplica cada archivo en una sola transacción.
 -- La programación mira el esquema `cron` y no la extensión, para que el test
 -- pueda probarla con un `cron` falso.
+--
+-- Donde ya está instalada no se vuelve a crear: en Supabase cada
+-- `create extension pg_cron` dispara el event trigger `grant_pg_cron_access`
+-- aunque lleve `if not exists`, y al reaplicar el histórico ese trigger falla
+-- con "dependent privileges exist". Así se cayó en producción el merge del
+-- #591.
 do $$
 declare
   nightly_cleanup_job constant text := 'limpieza-nocturna';
@@ -58,8 +64,9 @@ declare
   -- caen fuera de las franjas de NFR-003.
   nightly_cleanup_schedule constant text := '30 16 * * *';
 begin
-  if exists (select from pg_available_extensions where name = 'pg_cron') then
-    create extension if not exists pg_cron with schema pg_catalog;
+  if exists (select from pg_available_extensions where name = 'pg_cron')
+     and not exists (select from pg_extension where extname = 'pg_cron') then
+    create extension pg_cron with schema pg_catalog;
     grant usage on schema cron to postgres;
     grant all privileges on all tables in schema cron to postgres;
   end if;
