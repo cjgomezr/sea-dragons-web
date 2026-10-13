@@ -58,6 +58,7 @@ function publish(
     callerId: CALLER_ID,
     draft,
     uploadIds: [],
+    coverUploadId: null,
     now: new Date(),
   });
 }
@@ -199,6 +200,7 @@ describe("cuándo no se avisa", () => {
       postId: POST_ID,
       draft: DRAFT,
       expectedEditedAt: null,
+      cover: { kind: "keep" },
       now: new Date(),
     });
 

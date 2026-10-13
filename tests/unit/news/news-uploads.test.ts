@@ -81,6 +81,7 @@ function publish(
     callerId: CALLER_ID,
     draft,
     uploadIds,
+    coverUploadId: null,
     now: NOW,
   });
 }

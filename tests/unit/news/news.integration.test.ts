@@ -180,6 +180,7 @@ function publishWithoutAttachments(
   return publishNewsPostWithUploads(gateways, {
     ...request,
     uploadIds: [],
+    coverUploadId: null,
     now: new Date(),
   });
 }
@@ -411,6 +412,7 @@ describeRls("noticias contra seadragons-dev", () => {
             audience: { kind: "club" },
           },
           expectedEditedAt: null,
+          cover: { kind: "keep" },
           now: new Date(),
         });
         expect(widened.title).toBe("Para todo el club");
@@ -423,6 +425,7 @@ describeRls("noticias contra seadragons-dev", () => {
             postId: post.id,
             draft: { ...draft, title: "Pisaría a la primera" },
             expectedEditedAt: null,
+            cover: { kind: "keep" },
             now: new Date(),
           }),
         ).rejects.toBeInstanceOf(NewsPostChangedError);
@@ -432,6 +435,7 @@ describeRls("noticias contra seadragons-dev", () => {
           postId: post.id,
           draft,
           expectedEditedAt: widened.editedAt,
+          cover: { kind: "keep" },
           now: new Date(),
         });
         expect(await feedIdsOf(seeded.outsider.id)).not.toContain(post.id);

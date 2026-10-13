@@ -42,6 +42,7 @@ const POST: NewsPostDetail = {
   editedAt: null,
   status: "published",
   canManage: false,
+  coverUrl: null,
   attachments: [
     {
       id: RULES_ID,

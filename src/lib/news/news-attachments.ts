@@ -1,4 +1,5 @@
 import { type DetectableFileType, detectFileType } from "@/lib/files/file-type";
+import type { ShrunkNewsCover } from "./shrink-news-cover";
 import {
   type NewsAttachmentSummary,
   type NewsGateways,
@@ -58,6 +59,11 @@ export const NEWS_ATTACHMENT_ISSUE_CODES = [
   "attachment_name_invalid",
   "attachment_limit_reached",
   "attachment_upload_missing",
+  // La portada (#591) comparte el flujo de subidas y su forma de rechazar.
+  "cover_empty",
+  "cover_too_large",
+  "cover_type_unsupported",
+  "cover_upload_missing",
 ] as const;
 
 export type NewsAttachmentIssueCode =
@@ -74,6 +80,12 @@ const ISSUE_MESSAGES: Readonly<Record<NewsAttachmentIssueCode, string>> = {
   attachment_limit_reached: `Una publicación puede llevar como mucho ${NEWS_ATTACHMENTS_MAX_PER_POST} adjuntos.`,
   attachment_upload_missing:
     "Uno de los adjuntos ya no está subido. Quítalo y vuelve a adjuntarlo.",
+  cover_empty: "La portada está vacía.",
+  cover_too_large: "La portada puede pesar como mucho 10 MB.",
+  cover_type_unsupported:
+    "La portada tiene que ser una imagen JPEG, PNG o WebP.",
+  cover_upload_missing:
+    "La portada ya no está subida. Quítala y vuelve a añadirla.",
 };
 
 export class NewsAttachmentValidationError extends Error {
@@ -162,6 +174,10 @@ export type NewsAttachmentGateways = NewsGateways & {
   /** El nombre aleatorio del fichero nuevo. Se inyecta para que los tests
    * sepan qué ruta esperar. */
   readonly newFileId: () => string;
+  /** La reducción de la portada (#591), con sharp en el servidor. */
+  readonly images: {
+    shrinkCover(bytes: Uint8Array): Promise<ShrunkNewsCover>;
+  };
 };
 
 type AttachmentRequest = {
@@ -175,7 +191,9 @@ function extensionOf(fileName: string): string {
   return dot === -1 ? "" : fileName.slice(dot + 1).toLowerCase();
 }
 
-function validateFileName(rawName: string): string {
+/** El nombre recortado, o el motivo por el que no vale. Lo comparten los
+ * adjuntos y la portada (#591). */
+export function validateNewsAttachmentName(rawName: string): string {
   const fileName = rawName.trim();
   const length = [...fileName].length;
   if (
@@ -217,7 +235,7 @@ export function validateNewsAttachmentFile(
   rawName: string,
   bytes: Uint8Array,
 ): { readonly fileName: string; readonly contentType: DetectableFileType } {
-  const fileName = validateFileName(rawName);
+  const fileName = validateNewsAttachmentName(rawName);
   return { fileName, contentType: validateFileBytes(bytes, fileName) };
 }
 

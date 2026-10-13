@@ -28,6 +28,8 @@ const SHORTLIST: NewsFeedItem = {
   publishedAt: TWO_DAYS_AGO,
   status: "published",
   attachmentCount: 2,
+  coverThumbnailUrl: null,
+  coverUrl: null,
 };
 
 const WINTER: NewsFeedItem = {
@@ -42,6 +44,8 @@ const WINTER: NewsFeedItem = {
   publishedAt: FOUR_DAYS_AGO,
   status: "published",
   attachmentCount: 0,
+  coverThumbnailUrl: null,
+  coverUrl: null,
 };
 
 const POLICY: NewsFeedItem = {
@@ -56,6 +60,8 @@ const POLICY: NewsFeedItem = {
   publishedAt: "2026-09-19T08:00:00.000Z",
   status: "published",
   attachmentCount: 1,
+  coverThumbnailUrl: null,
+  coverUrl: null,
 };
 
 type FeedStub = (cursor: string | null) => Response | Promise<Response>;

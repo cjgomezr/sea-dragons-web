@@ -41,6 +41,8 @@ const feedItemSchema = z.object({
   publishedAt: z.iso.datetime({ offset: true }),
   status: statusSchema,
   attachmentCount: z.number().int().nonnegative(),
+  coverThumbnailUrl: z.url().nullable(),
+  coverUrl: z.url().nullable(),
 });
 
 const feedResponseSchema = z.object({
@@ -70,6 +72,7 @@ export const newsPostDetailSchema = z.object({
     }),
   ),
   canManage: z.boolean(),
+  coverUrl: z.url().nullable(),
 });
 
 const postResponseSchema = z.object({ data: newsPostDetailSchema });

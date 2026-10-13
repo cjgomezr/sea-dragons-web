@@ -38,6 +38,7 @@ const editableResponseSchema = z.object({
     ]),
     editedAt: z.iso.datetime({ offset: true }).nullable(),
     status: z.enum(["published", "withdrawn"]),
+    coverUploadId: z.uuid().nullable(),
   }),
 });
 

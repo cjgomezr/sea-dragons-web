@@ -6,6 +6,7 @@ import {
 import {
   type NewsAudience,
   type NewsCategory,
+  type NewsCoverChange,
   type NewsDraft,
   type NewsGateways,
   type NewsPost,
@@ -13,10 +14,12 @@ import {
   type NewsPostStatus,
   NewsPostNotFoundError,
   canManageNewsPost,
+  describeNewsPost,
   findNewsPublisher,
   normalizeNewsDraft,
-  toNewsPostDetail,
 } from "./news-posts";
+import { resolveNewsCoverUpload } from "./news-cover-uploads";
+import { discardNewsCover } from "./news-covers";
 
 /**
  * Editar, retirar y volver a publicar (#331, RF-6 del PRD de E11), contado
@@ -41,8 +44,8 @@ const STATUS_ACTIONS: Readonly<Record<NewsPostStatus, AuditAction>> = {
 };
 
 /** Lo que carga el formulario de editar: la audiencia entera, que la
- * publicación abierta no enseña, y la marca de editada, que es la versión
- * contra la que se guarda. */
+ * publicación abierta no enseña, la marca de editada, que es la versión
+ * contra la que se guarda, y la portada que tiene (#591). */
 export type EditableNewsPost = {
   readonly id: string;
   readonly category: NewsCategory;
@@ -51,6 +54,7 @@ export type EditableNewsPost = {
   readonly audience: NewsAudience;
   readonly editedAt: string | null;
   readonly status: NewsPostStatus;
+  readonly coverUploadId: string | null;
 };
 
 type PostRequest = { readonly callerId: string; readonly postId: string };
@@ -126,7 +130,7 @@ async function readManagedDetail(
       `La publicación ${postId} no aparece justo después de guardarla.`,
     );
   }
-  return toNewsPostDetail(post, true);
+  return describeNewsPost(gateways, post, true);
 }
 
 export async function readEditableNewsPost(
@@ -142,7 +146,49 @@ export async function readEditableNewsPost(
     audience: post.audience,
     editedAt: post.editedAt,
     status: post.status,
+    coverUploadId: post.coverUploadId,
   };
+}
+
+/** El cambio de portada tal como se guarda. Pedir la que ya tiene, o quitar
+ * la que no tiene, no cambia nada. Una nueva tiene que ser de quien edita,
+ * comprobada antes de escribir. */
+async function resolveCoverChange(
+  gateways: NewsGateways,
+  request: {
+    readonly actor: AuditActor;
+    readonly post: NewsPost;
+    readonly cover: NewsCoverChange;
+  },
+): Promise<NewsCoverChange> {
+  const { actor, post, cover } = request;
+  if (cover.kind === "keep" || cover.coverUploadId === post.coverUploadId) {
+    return { kind: "keep" };
+  }
+  if (cover.coverUploadId !== null) {
+    await resolveNewsCoverUpload(gateways, {
+      callerId: actor.id,
+      clubId: actor.clubId,
+      coverUploadId: cover.coverUploadId,
+    });
+  }
+  return cover;
+}
+
+/** La portada que se quitó o se cambió deja de servirse en cuanto la
+ * publicación deja de apuntarla; luego se borran su fila y sus ficheros. */
+async function discardReplacedCover(
+  gateways: NewsGateways,
+  post: NewsPost,
+  cover: NewsCoverChange,
+): Promise<void> {
+  if (cover.kind === "keep" || post.coverUploadId === null) {
+    return;
+  }
+  await discardNewsCover(gateways.covers, {
+    id: post.coverUploadId,
+    clubId: post.clubId,
+  });
 }
 
 /** Valida después de saber quién pide y antes de escribir nada, con las
@@ -153,17 +199,24 @@ export async function editNewsPost(
   request: PostRequest & {
     readonly draft: NewsDraft;
     readonly expectedEditedAt: string | null;
+    readonly cover: NewsCoverChange;
     readonly now: Date;
   },
 ): Promise<NewsPostDetail> {
-  const { actor } = await findManagedPost(gateways, request);
+  const { actor, post } = await findManagedPost(gateways, request);
   const draft = await normalizeNewsDraft(gateways, actor.clubId, request.draft);
+  const cover = await resolveCoverChange(gateways, {
+    actor,
+    post,
+    cover: request.cover,
+  });
   const update = await gateways.posts.updatePost({
     ...draft,
     postId: request.postId,
     clubId: actor.clubId,
     expectedEditedAt: request.expectedEditedAt,
     editedAt: request.now.toISOString(),
+    cover,
   });
   if (update.kind === "changed") {
     throw new NewsPostChangedError();
@@ -173,6 +226,7 @@ export async function editNewsPost(
     action: "news_post.edited",
     postId: request.postId,
   });
+  await discardReplacedCover(gateways, post, cover);
   return readManagedDetail(gateways, actor, request.postId);
 }
 
@@ -184,7 +238,7 @@ export async function changeNewsPostStatus(
 ): Promise<NewsPostDetail> {
   const { actor, post } = await findManagedPost(gateways, request);
   if (post.status === request.status) {
-    return toNewsPostDetail(post, true);
+    return describeNewsPost(gateways, post, true);
   }
   await gateways.posts.setPostStatus({
     clubId: actor.clubId,

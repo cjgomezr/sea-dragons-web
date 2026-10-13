@@ -7,6 +7,8 @@ import {
   storedExtensionOf,
   validateNewsAttachmentFile,
 } from "./news-attachments";
+import { resolveNewsCoverUpload } from "./news-cover-uploads";
+import { sweepStaleNewsCovers } from "./news-covers";
 import {
   type NewsPublishGateways,
   announceNewsPost,
@@ -16,9 +18,9 @@ import {
   type NewsDraft,
   type NewsPost,
   type NewsPostDetail,
+  describeNewsPost,
   findNewsPublisher,
   prepareNewsPost,
-  toNewsPostDetail,
 } from "./news-posts";
 
 /**
@@ -224,27 +226,48 @@ async function removePublishedUploads(
   }
 }
 
-/** Publica con los adjuntos que se subieron mientras se escribía. Primero se
- * valida todo, subidas incluidas, y sólo entonces se escribe. La audiencia se
- * entera al final, con la publicación ya entera (#332). */
+/** Publica con los adjuntos y la portada (#591) que se subieron mientras se
+ * escribía. Primero se valida todo, subidas incluidas, y sólo entonces se
+ * escribe. La audiencia se entera al final, con la publicación ya entera
+ * (#332).
+ *
+ * Si la publicación se deshace a medias, la portada queda sin publicación
+ * que la apunte: se puede reintentar con ella, y si no, la recoge la
+ * limpieza de lo abandonado. */
 export async function publishNewsPostWithUploads(
   gateways: NewsPublishGateways,
   request: {
     readonly callerId: string;
     readonly draft: NewsDraft;
     readonly uploadIds: readonly string[];
+    readonly coverUploadId: string | null;
     readonly now: Date;
   },
 ): Promise<NewsPostDetail> {
   const newPost = await prepareNewsPost(gateways, request);
   const publisher = { clubId: newPost.clubId, userId: request.callerId };
   const uploads = await resolveUploads(gateways, publisher, request.uploadIds);
-  const post = await gateways.posts.insertPost(newPost);
+  const cover =
+    request.coverUploadId === null
+      ? null
+      : await resolveNewsCoverUpload(gateways, {
+          callerId: request.callerId,
+          clubId: newPost.clubId,
+          coverUploadId: request.coverUploadId,
+        });
+  const post = await gateways.posts.insertPost({
+    ...newPost,
+    coverUploadId: cover === null ? null : cover.id,
+  });
   const attachments = await attachUploads(gateways, post, uploads);
   await removePublishedUploads(gateways, uploads);
   await sweepStaleUploads(gateways, publisher, request.now);
+  await sweepStaleNewsCovers(gateways.covers, {
+    uploadedBy: request.callerId,
+    now: request.now,
+  });
   await announceNewsPost(gateways, post);
   // Quien publica es su autor, y publicar ya exigía poder hacerlo: la puede
   // editar y retirar.
-  return { ...toNewsPostDetail(post, true), attachments };
+  return { ...(await describeNewsPost(gateways, post, true)), attachments };
 }

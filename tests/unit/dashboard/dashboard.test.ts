@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { fakeCoverlessGateway } from "../helpers/news-club";
 import type {
   ClubAttendanceRate,
   MemberAttendance,
@@ -139,6 +140,7 @@ function post(overrides: {
     author: { id: CALLER_ID, fullName: "Alba Ferrer" },
     status: "published",
     attachmentCount: 0,
+    coverUploadId: null,
     ...overrides,
   };
 }
@@ -237,6 +239,7 @@ function gateways(): DashboardGateways {
         updatePost: async () => ({ kind: "updated" }),
         setPostStatus: async () => undefined,
       },
+      covers: fakeCoverlessGateway(),
       audit: { insertAuditLogRow: async () => ({ error: null }) },
     },
     roster: {

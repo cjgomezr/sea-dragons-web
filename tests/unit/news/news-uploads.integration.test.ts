@@ -162,6 +162,7 @@ describeRls("subidas previas de noticias contra seadragons-dev", () => {
               audience: { kind: "club" },
             },
             uploadIds: [upload.id],
+            coverUploadId: null,
             now: new Date(),
           },
         );

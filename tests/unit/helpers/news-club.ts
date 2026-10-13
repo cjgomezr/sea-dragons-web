@@ -8,6 +8,10 @@ import type {
   NewsGateways,
   NewsPost,
 } from "@/lib/news/news-posts";
+import {
+  type NewsCoverRef,
+  newsCoverPathsOf,
+} from "@/lib/news/news-covers";
 
 /**
  * Un club en memoria para los tests del dominio de noticias. El doble cumple
@@ -27,6 +31,15 @@ export const MASTERS_SQUAD_ID = "8b8b8b8b-0000-4000-8000-000000000008";
 
 export const AUTHOR = { id: AUTHOR_ID, fullName: "Carla Committee" };
 
+/** Una portada subida, con quién la subió y cuándo. A qué publicación va lo
+ * dice la publicación, como en la base. */
+export type FakeCover = NewsCoverRef & {
+  readonly uploadedBy: string;
+  readonly createdAt: string;
+};
+
+export const COVER_SIGNED_URL_PREFIX = "https://storage.test/covers/";
+
 export type FakeClubOptions = {
   readonly callerRole?: Role;
   readonly callerGroupIds?: readonly string[];
@@ -36,6 +49,8 @@ export type FakeClubOptions = {
   /** Lo que quien llama cree que hay: la versión que se tenía delante deja
    * de valer justo antes de guardar, como si otra persona hubiera guardado. */
   readonly editedMeanwhileAt?: string;
+  /** Las portadas subidas; sus dos ficheros están en el almacenamiento. */
+  readonly covers?: readonly FakeCover[];
 };
 
 export type FakeClub = {
@@ -47,6 +62,10 @@ export type FakeClub = {
   readonly posts: NewsPost[];
   readonly edits: NewsPostEdit[];
   readonly audited: AuditLogInsertRow[];
+  /** Las filas de las portadas como están ahora. */
+  readonly covers: FakeCover[];
+  /** Las rutas de las portadas que hay en el almacenamiento. */
+  readonly coverFiles: Set<string>;
 };
 
 /** El id que recibe la publicación que guarda el doble. */
@@ -66,6 +85,7 @@ export function aPost(overrides: Partial<NewsPost> & { id: string }): NewsPost {
     audience: { kind: "club" },
     clubId: CLUB_ID,
     attachments: [],
+    coverUploadId: null,
     ...overrides,
   };
 }
@@ -112,6 +132,7 @@ function toFeedRow(post: NewsPost): NewsFeedRow {
     publishedAt: post.publishedAt,
     status: post.status,
     attachmentCount: post.attachments.length,
+    coverUploadId: post.coverUploadId,
   };
 }
 
@@ -123,6 +144,77 @@ function applyEdit(post: NewsPost, edit: NewsPostEdit): NewsPost {
     body: edit.body,
     audience: edit.audience,
     editedAt: edit.editedAt,
+    coverUploadId:
+      edit.cover.kind === "replace"
+        ? edit.cover.coverUploadId
+        : post.coverUploadId,
+  };
+}
+
+const COVER_STORED_AT = "2026-09-27T10:00:00.000Z";
+
+function coverFilesOf(covers: readonly FakeCover[]): Set<string> {
+  return new Set(
+    covers.flatMap((cover) => Object.values(newsCoverPathsOf(cover))),
+  );
+}
+
+/** Un club sin ninguna portada, para quien sólo necesita leer el feed. */
+export function fakeCoverlessGateway(): NewsGateways["covers"] {
+  return createFakeCovers([], new Set(), []);
+}
+
+/** Las portadas en memoria. Una portada está ligada si alguna publicación la
+ * apunta, como con la clave foránea de verdad. */
+function createFakeCovers(
+  covers: FakeCover[],
+  coverFiles: Set<string>,
+  posts: readonly NewsPost[],
+): NewsGateways["covers"] {
+  const postOf = (coverId: string): string | null =>
+    posts.find((post) => post.coverUploadId === coverId)?.id ?? null;
+  return {
+    upload: async ({ storagePath }) => {
+      coverFiles.add(storagePath);
+    },
+    removeFiles: async (paths) => {
+      for (const path of paths) {
+        coverFiles.delete(path);
+      }
+    },
+    signUrls: async (paths) =>
+      new Map(
+        paths
+          .filter((path) => coverFiles.has(path))
+          .map((path) => [path, `${COVER_SIGNED_URL_PREFIX}${path}`]),
+      ),
+    insertCover: async (cover) => {
+      covers.push({ ...cover, createdAt: COVER_STORED_AT });
+    },
+    findCover: async (coverId) => {
+      const cover = covers.find((candidate) => candidate.id === coverId);
+      return cover === undefined
+        ? null
+        : {
+            id: cover.id,
+            clubId: cover.clubId,
+            uploadedBy: cover.uploadedBy,
+            postId: postOf(cover.id),
+          };
+    },
+    findStaleCovers: async ({ uploadedBy, createdBefore }) =>
+      covers
+        .filter(
+          (cover) =>
+            cover.uploadedBy === uploadedBy &&
+            cover.createdAt < createdBefore &&
+            postOf(cover.id) === null,
+        )
+        .map(({ id, clubId }) => ({ id, clubId })),
+    deleteCover: async (coverId) => {
+      const index = covers.findIndex((cover) => cover.id === coverId);
+      covers.splice(index, 1);
+    },
   };
 }
 
@@ -133,6 +225,8 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
   const edits: NewsPostEdit[] = [];
   const audited: AuditLogInsertRow[] = [];
   const posts = [...(options.posts ?? [])];
+  const covers = [...(options.covers ?? [])];
+  const coverFiles = coverFilesOf(covers);
   const indexOf = (clubId: string, postId: string): number =>
     posts.findIndex((post) => post.id === postId && post.clubId === clubId);
   const clubGroupIds = options.clubGroupIds ?? [
@@ -175,6 +269,7 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
           status: "published",
           audience: post.audience,
           attachments: [],
+          coverUploadId: post.coverUploadId,
         };
       },
       findFeedPage: async (query) => {
@@ -219,6 +314,7 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
         posts[index] = { ...current, status };
       },
     },
+    covers: createFakeCovers(covers, coverFiles, posts),
     audit: {
       insertAuditLogRow: async (row) => {
         audited.push(row);
@@ -234,5 +330,7 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
     posts,
     edits,
     audited,
+    covers,
+    coverFiles,
   };
 }

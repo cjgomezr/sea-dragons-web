@@ -79,6 +79,7 @@ function edit(
     postId: POST_ID,
     draft: DRAFT,
     expectedEditedAt: null,
+    cover: { kind: "keep" },
     now: NOW,
     ...overrides,
   });
@@ -225,6 +226,7 @@ describe("editar una publicación", () => {
       audience: { kind: "groups", groupIds: [SENIOR_SQUAD_ID] },
       editedAt: "2026-09-26T12:00:00.000Z",
       status: "published",
+      coverUploadId: null,
     });
   });
 });

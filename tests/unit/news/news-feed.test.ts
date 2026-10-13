@@ -155,6 +155,8 @@ describe("el feed de cada miembro", () => {
         publishedAt: "2026-09-26T10:01:00.000000+00:00",
         status: "published",
         attachmentCount: 2,
+        coverThumbnailUrl: null,
+        coverUrl: null,
       },
     ]);
   });

@@ -1800,6 +1800,12 @@ export const englishMessages = {
     "A post can have at most {max} attachments.",
   "news.publish.attachments.issue.uploadMissing":
     "An attachment is no longer uploaded. Remove it and attach it again.",
+  "news.publish.cover.issue.empty": "The cover image is empty.",
+  "news.publish.cover.issue.tooLarge": "The cover can be up to {max} MB.",
+  "news.publish.cover.issue.typeUnsupported":
+    "The cover must be a JPEG, PNG or WebP image.",
+  "news.publish.cover.issue.uploadMissing":
+    "The cover is no longer uploaded. Remove it and add it again.",
   "news.publish.issue.titleMissing": "Give the post a title.",
   "news.publish.issue.titleTooLong":
     "The title can have up to {max} characters.",
