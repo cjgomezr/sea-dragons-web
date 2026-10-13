@@ -1769,7 +1769,6 @@ export const englishMessages = {
   "news.publish.loadFailed": "We couldn't load the club's groups. Try again.",
   "news.publish.category": "Category",
   "news.publish.titleLabel": "Title",
-  "news.publish.titleHint": "Up to {max} characters.",
   "news.publish.body": "Message",
   "news.publish.bodyHint": "Plain text. Line breaks are kept.",
   "news.publish.audience.legend": "Who sees it",
@@ -1800,6 +1799,19 @@ export const englishMessages = {
     "A post can have at most {max} attachments.",
   "news.publish.attachments.issue.uploadMissing":
     "An attachment is no longer uploaded. Remove it and attach it again.",
+  "news.publish.titleCounter": "{length} / {max}",
+  "news.publish.cover.legend": "Cover photo",
+  "news.publish.cover.optional": "optional",
+  "news.publish.cover.empty": "No cover photo",
+  "news.publish.cover.fallback": "The {category} background is used instead.",
+  "news.publish.cover.add": "Add cover photo",
+  "news.publish.cover.choose": "Choose a cover photo",
+  "news.publish.cover.preview": "Cover photo",
+  "news.publish.cover.hint":
+    "Shown in the feed and at the top of the post. Landscape works best.",
+  "news.publish.cover.remove": "Remove cover",
+  "news.published.notice": "Published · we notified {audience}",
+  "news.published.audience.club": "the whole club",
   "news.publish.cover.issue.empty": "The cover image is empty.",
   "news.publish.cover.issue.tooLarge": "The cover can be up to {max} MB.",
   "news.publish.cover.issue.typeUnsupported":
@@ -1814,8 +1826,7 @@ export const englishMessages = {
     "Choose at least one group, or send it to the whole club.",
   "news.publish.submit": "Publish",
   "news.publish.sending": "Publishing…",
-  "news.publish.waitForUploads":
-    "Wait for the attachments to finish uploading.",
+  "news.publish.waitForUploads": "Wait for the uploads to finish.",
   "news.publish.error.network":
     "We couldn't reach the server. Nothing was published: check your connection and try again.",
   "news.publish.error.signInRequired":

@@ -13,6 +13,7 @@ import {
   recordNewsVisit,
 } from "./news-client";
 import { NewsFeedRow } from "./NewsFeedRow";
+import { NewsPublishedNotice } from "./NewsPublishedNotice";
 
 /**
  * El feed de noticias (#329, RF-4 del PRD de E11): lo publicado para quien
@@ -191,6 +192,7 @@ export function NewsFeedScreen({
           </Link>
         ) : null}
       </header>
+      <NewsPublishedNotice translate={translate} />
       {state.kind === "loading" ? (
         <p className="admin-empty">{translate("news.loading")}</p>
       ) : null}

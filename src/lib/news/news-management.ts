@@ -27,7 +27,11 @@ import {
   normalizeNewsDraft,
 } from "./news-posts";
 import { resolveNewsCoverUpload } from "./news-cover-uploads";
-import { discardNewsCover, sweepStaleNewsCovers } from "./news-covers";
+import {
+  discardNewsCover,
+  signNewsCoverUrl,
+  sweepStaleNewsCovers,
+} from "./news-covers";
 
 /**
  * Editar, retirar y volver a publicar (#331, RF-6 del PRD de E11), contado
@@ -53,7 +57,8 @@ const STATUS_ACTIONS: Readonly<Record<NewsPostStatus, AuditAction>> = {
 
 /** Lo que carga el formulario de editar: la audiencia entera, que la
  * publicación abierta no enseña, la marca de editada, que es la versión
- * contra la que se guarda, y la portada que tiene (#591). */
+ * contra la que se guarda, y la portada que tiene (#591), con su versión
+ * grande firmada para enseñarla en el formulario (#597). */
 export type EditableNewsPost = {
   readonly id: string;
   readonly category: NewsCategory;
@@ -63,6 +68,7 @@ export type EditableNewsPost = {
   readonly editedAt: string | null;
   readonly status: NewsPostStatus;
   readonly coverUploadId: string | null;
+  readonly coverUrl: string | null;
 };
 
 type PostRequest = { readonly callerId: string; readonly postId: string };
@@ -176,6 +182,12 @@ export async function readEditableNewsPost(
     editedAt: post.editedAt,
     status: post.status,
     coverUploadId: post.coverUploadId,
+    coverUrl: await signNewsCoverUrl(
+      gateways.covers,
+      post.coverUploadId === null
+        ? null
+        : { id: post.coverUploadId, clubId: post.clubId },
+    ),
   };
 }
 

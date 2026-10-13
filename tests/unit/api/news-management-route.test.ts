@@ -159,6 +159,7 @@ describe("GET /api/v1/news/publish/[id]", () => {
         editedAt: null,
         status: "published",
         coverUploadId: null,
+        coverUrl: null,
       },
     });
   });

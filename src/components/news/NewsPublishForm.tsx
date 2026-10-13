@@ -6,12 +6,10 @@ import type { Group } from "@/lib/groups/groups";
 import type { Translator } from "@/lib/i18n/translator";
 import {
   type NewsDraftField,
-  type NewsDraftIssue,
   listNewsDraftIssues,
 } from "@/lib/news/news-draft";
 import type { EditableNewsPost } from "@/lib/news/news-management";
 import {
-  NEWS_CATEGORIES,
   NEWS_TITLE_MAX_LENGTH,
   type NewsAudience,
   type NewsCategory,
@@ -19,13 +17,23 @@ import {
 } from "@/lib/news/news-posts";
 import { type AudienceChoice, AudienceField } from "@/components/AudienceField";
 import { NewsAttachmentsField } from "./NewsAttachmentsField";
+import { NewsCategoryField } from "./NewsCategoryField";
+import { NewsCoverField } from "./NewsCoverField";
 import { describeEditFailure, saveNewsEdit } from "./news-manage-client";
 import {
   describeDraftIssue,
   describePublishFailure,
   publishNews,
 } from "./news-publish-client";
+import {
+  type PublishedAudience,
+  rememberPublishedNotice,
+} from "./news-published-notice";
 import { useNewsAttachments } from "./use-news-attachments";
+import {
+  type NewsCoverField as NewsCover,
+  useNewsCover,
+} from "./use-news-cover";
 
 /**
  * El formulario de publicar (#330, RF-2 y RF-3 del PRD de E11): categoría,
@@ -41,6 +49,11 @@ import { useNewsAttachments } from "./use-news-attachments";
  * y los adjuntos tienen sus propios endpoints. Guarda con la marca de editada
  * que tenía delante; si alguien guardó entretanto, el servidor responde con
  * un conflicto y lo escrito se queda para no perderlo.
+ *
+ * El rediseño de E22 (#597) pone delante la portada, cambia la categoría a un
+ * control segmentado y deja el botón desactivado mientras falte algo. Por eso
+ * el aviso de un campo sale en cuanto se toca, y no al pulsar: con el botón
+ * desactivado no habría otro momento para decir qué falta.
  */
 
 /** Publicar una nueva, o editar una que ya existe. */
@@ -72,12 +85,11 @@ const EMPTY_DRAFT: Draft = {
 };
 
 const FIELD_IDS = {
-  category: "publicar-categoria",
   title: "publicar-titulo",
   body: "publicar-cuerpo",
 } as const;
 
-const TITLE_HINT_ID = "publicar-titulo-pista";
+const TITLE_COUNTER_ID = "publicar-titulo-contador";
 const BODY_HINT_ID = "publicar-cuerpo-pista";
 const UPLOADS_HINT_ID = "publicar-esperando-adjuntos";
 
@@ -130,38 +142,6 @@ type TextFieldsProps = {
   readonly onChange: (change: Partial<Draft>) => void;
 };
 
-function CategoryField({
-  translate,
-  draft,
-  onChange,
-}: TextFieldsProps): React.JSX.Element {
-  return (
-    <div className="auth-field">
-      <label htmlFor={FIELD_IDS.category}>
-        {translate("news.publish.category")}
-      </label>
-      <select
-        id={FIELD_IDS.category}
-        value={draft.category}
-        onChange={(event) => {
-          const category = NEWS_CATEGORIES.find(
-            (candidate) => candidate === event.target.value,
-          );
-          if (category !== undefined) {
-            onChange({ category });
-          }
-        }}
-      >
-        {NEWS_CATEGORIES.map((category) => (
-          <option key={category} value={category}>
-            {translate(`news.category.${category}`)}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 function TitleAndBodyFields({
   translate,
   draft,
@@ -174,10 +154,18 @@ function TitleAndBodyFields({
   const bodyIssueId = `${FIELD_IDS.body}-aviso`;
   return (
     <>
-      <div className="auth-field">
-        <label htmlFor={FIELD_IDS.title}>
-          {translate("news.publish.titleLabel")}
-        </label>
+      <div className="auth-field news-publish-title">
+        <div className="news-publish-title-label">
+          <label htmlFor={FIELD_IDS.title}>
+            {translate("news.publish.titleLabel")}
+          </label>
+          <span className="news-publish-counter" id={TITLE_COUNTER_ID}>
+            {translate("news.publish.titleCounter", {
+              length: [...draft.title].length,
+              max: NEWS_TITLE_MAX_LENGTH,
+            })}
+          </span>
+        </div>
         <input
           id={FIELD_IDS.title}
           type="text"
@@ -186,14 +174,11 @@ function TitleAndBodyFields({
           aria-invalid={titleIssue !== null}
           aria-describedby={describedBy(
             titleIssue === null ? null : titleIssueId,
-            TITLE_HINT_ID,
+            TITLE_COUNTER_ID,
           )}
           onChange={(event) => onChange({ title: event.target.value })}
         />
         <FieldIssue id={titleIssueId} text={titleIssue} />
-        <p className="auth-hint" id={TITLE_HINT_ID}>
-          {translate("news.publish.titleHint", { max: NEWS_TITLE_MAX_LENGTH })}
-        </p>
       </div>
       <div className="auth-field">
         <label htmlFor={FIELD_IDS.body}>{translate("news.publish.body")}</label>
@@ -249,6 +234,64 @@ function submitLabel(
   return translate(isSending ? "news.publish.sending" : "news.publish.submit");
 }
 
+/** Lo que el borrador cambia de cada campo, para saber cuáles se tocaron. */
+const DRAFT_FIELDS: Readonly<Record<keyof Draft, NewsDraftField | null>> = {
+  category: null,
+  title: "title",
+  body: "body",
+  audience: "audience",
+};
+
+function touchedBy(change: Partial<Draft>): readonly NewsDraftField[] {
+  return Object.entries(DRAFT_FIELDS).flatMap(([key, field]) =>
+    field !== null && key in change ? [field] : [],
+  );
+}
+
+/** A quién avisó lo publicado, con los nombres de los grupos de hoy. */
+function publishedAudienceOf(
+  audience: NewsAudience,
+  clubGroups: readonly Group[],
+): PublishedAudience {
+  if (audience.kind === "club") {
+    return { kind: "club" };
+  }
+  return {
+    kind: "groups",
+    groupNames: clubGroups
+      .filter((group) => audience.groupIds.includes(group.id))
+      .map((group) => group.name),
+  };
+}
+
+type FormSubmission = {
+  readonly draft: NewsDraft;
+  readonly attachmentUploadIds: readonly string[];
+  readonly cover: NewsCover["change"];
+};
+
+/** Editar sólo manda la portada si cambió; publicar la manda siempre. */
+function sendSubmission(
+  intent: NewsFormIntent,
+  submission: FormSubmission,
+): ReturnType<typeof saveNewsEdit | typeof publishNews> {
+  const { draft, cover } = submission;
+  if (intent.kind === "edit") {
+    return saveNewsEdit(intent.post.id, {
+      ...draft,
+      expectedEditedAt: intent.post.editedAt,
+      ...(cover.kind === "replace"
+        ? { coverUploadId: cover.coverUploadId }
+        : {}),
+    });
+  }
+  return publishNews({
+    ...draft,
+    attachmentUploadIds: submission.attachmentUploadIds,
+    coverUploadId: cover.kind === "replace" ? cover.coverUploadId : null,
+  });
+}
+
 export function NewsPublishForm({
   translate,
   clubGroups,
@@ -262,48 +305,45 @@ export function NewsPublishForm({
     intent.kind === "edit" ? draftOf(intent.post) : EMPTY_DRAFT,
   );
   const [status, setStatus] = useState<Status>({ kind: "editing" });
-  const [issues, setIssues] = useState<readonly NewsDraftIssue[]>([]);
+  const [touched, setTouched] = useState<ReadonlySet<NewsDraftField>>(
+    () => new Set(),
+  );
   const attachments = useNewsAttachments();
+  const cover = useNewsCover(
+    intent.kind === "edit" ? intent.post.coverUrl : null,
+  );
   // El estado desactiva el botón en el siguiente pintado, pero un doble clic
   // llega antes. La referencia cambia en el acto.
   const isSendingRef = useRef(false);
+  const audience = toAudience(draft.audience);
+  const issues = listNewsDraftIssues({ ...draft, audience });
+  const isUploading = attachments.isUploading || cover.isUploading;
+  const isSending = status.kind === "sending";
 
   function update(change: Partial<Draft>): void {
     setDraft((current) => ({ ...current, ...change }));
-    setIssues([]);
+    setTouched((current) => new Set([...current, ...touchedBy(change)]));
   }
 
   async function handleSubmit(
     event: React.FormEvent<HTMLFormElement>,
   ): Promise<void> {
     event.preventDefault();
-    if (isSendingRef.current || attachments.isUploading) {
-      return;
-    }
-    const audience = toAudience(draft.audience);
-    const found = listNewsDraftIssues({ ...draft, audience });
-    if (found.length > 0) {
-      setIssues(found);
+    if (isSendingRef.current || isUploading || issues.length > 0) {
       return;
     }
     isSendingRef.current = true;
     setStatus({ kind: "sending" });
-    const submission: NewsDraft = {
-      category: draft.category,
-      title: draft.title,
-      body: draft.body,
-      audience,
-    };
-    const result =
-      intent.kind === "edit"
-        ? await saveNewsEdit(intent.post.id, {
-            ...submission,
-            expectedEditedAt: intent.post.editedAt,
-          })
-        : await publishNews({
-            ...submission,
-            attachmentUploadIds: attachments.uploadIds,
-          });
+    const result = await sendSubmission(intent, {
+      draft: {
+        category: draft.category,
+        title: draft.title,
+        body: draft.body,
+        audience,
+      },
+      attachmentUploadIds: attachments.uploadIds,
+      cover: cover.change,
+    });
     isSendingRef.current = false;
     if (result.kind === "failed") {
       setStatus(result);
@@ -311,18 +351,18 @@ export function NewsPublishForm({
     }
     if (intent.kind === "edit") {
       intent.onSaved();
-    } else {
-      intent.onPublished();
+      return;
     }
+    rememberPublishedNotice(publishedAudienceOf(audience, clubGroups));
+    intent.onPublished();
   }
 
   const issueTextFor = (field: NewsDraftField): string | null => {
     const issue = issues.find((candidate) => candidate.field === field);
-    return issue === undefined
+    return issue === undefined || !touched.has(field)
       ? null
       : describeDraftIssue(translate, issue.code);
   };
-  const isSending = status.kind === "sending";
   const fieldProps: TextFieldsProps = {
     translate,
     draft,
@@ -331,13 +371,18 @@ export function NewsPublishForm({
   };
 
   return (
-    <form
-      className="auth-pending member-record-form news-publish-form"
-      onSubmit={handleSubmit}
-      noValidate
-    >
-      <fieldset className="member-record-fields" disabled={isSending}>
-        <CategoryField {...fieldProps} />
+    <form className="news-publish-form" onSubmit={handleSubmit} noValidate>
+      <fieldset className="news-publish-fields" disabled={isSending}>
+        <NewsCoverField
+          translate={translate}
+          category={draft.category}
+          field={cover}
+        />
+        <NewsCategoryField
+          translate={translate}
+          category={draft.category}
+          onChange={(category) => update({ category })}
+        />
         <TitleAndBodyFields {...fieldProps} />
         <AudienceField
           translate={translate}
@@ -345,7 +390,7 @@ export function NewsPublishForm({
           clubGroups={clubGroups}
           audience={draft.audience}
           issueText={issueTextFor("audience")}
-          onChange={(audience) => update({ audience })}
+          onChange={(choice) => update({ audience: choice })}
         />
         {intent.kind === "publish" ? (
           <NewsAttachmentsField
@@ -359,16 +404,16 @@ export function NewsPublishForm({
         intent={intent.kind}
         status={status}
       />
-      {attachments.isUploading ? (
+      {isUploading ? (
         <p className="auth-note" id={UPLOADS_HINT_ID}>
           {translate("news.publish.waitForUploads")}
         </p>
       ) : null}
       <button
         type="submit"
-        className="auth-submit"
-        disabled={isSending || attachments.isUploading}
-        aria-describedby={attachments.isUploading ? UPLOADS_HINT_ID : undefined}
+        className="auth-submit news-publish-submit"
+        disabled={isSending || isUploading || issues.length > 0}
+        aria-describedby={isUploading ? UPLOADS_HINT_ID : undefined}
       >
         {submitLabel(translate, intent.kind, isSending)}
       </button>

@@ -39,6 +39,7 @@ const editableResponseSchema = z.object({
     editedAt: z.iso.datetime({ offset: true }).nullable(),
     status: z.enum(["published", "withdrawn"]),
     coverUploadId: z.uuid().nullable(),
+    coverUrl: z.url().nullable(),
   }),
 });
 
@@ -52,9 +53,11 @@ export type NewsPostChange =
   { readonly kind: "saved"; readonly post: NewsPostDetail } | ApiRequestFailure;
 
 /** La edición que se manda: el borrador y la marca de editada que se tenía
- * delante, que es con lo que el servidor detecta un conflicto. */
+ * delante, que es con lo que el servidor detecta un conflicto. Sin
+ * `coverUploadId` la portada se queda como está; con `null` se quita (#591). */
 export type NewsEditSubmission = NewsDraft & {
   readonly expectedEditedAt: string | null;
+  readonly coverUploadId?: string | null;
 };
 
 function managePath(postId: string): string {
