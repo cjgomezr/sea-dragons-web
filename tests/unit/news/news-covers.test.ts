@@ -7,7 +7,10 @@ import {
 } from "@/lib/news/news-cover-uploads";
 import { STALE_COVER_AGE_MS, newsCoverPathsOf } from "@/lib/news/news-covers";
 import { listNewsFeed } from "@/lib/news/news-feed";
-import { editNewsPost } from "@/lib/news/news-management";
+import {
+  editNewsPost,
+  readEditableNewsPost,
+} from "@/lib/news/news-management";
 import {
   type NewsDraft,
   NewsForbiddenError,
@@ -298,6 +301,22 @@ describe("publicar con portada", () => {
 });
 
 describe("editar la portada", () => {
+  it("el formulario de editar recibe la portada que tiene, firmada", async () => {
+    const club = committeeClub({
+      covers: [aCover({ id: COVER_ID })],
+      posts: [ownPost({ coverUploadId: COVER_ID })],
+    });
+
+    const editable = await readEditableNewsPost(club.gateways, {
+      callerId: CALLER_ID,
+      postId: POST_ID,
+    });
+
+    const paths = newsCoverPathsOf({ clubId: CLUB_ID, id: COVER_ID });
+    expect(editable.coverUploadId).toBe(COVER_ID);
+    expect(editable.coverUrl).toBe(signed(paths.large));
+  });
+
   it("cambia la portada y borra la anterior con sus archivos", async () => {
     const club = committeeClub({
       covers: [aCover({ id: COVER_ID }), aCover({ id: OTHER_COVER_ID })],

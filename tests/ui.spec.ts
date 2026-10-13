@@ -12942,6 +12942,7 @@ const STUBBED_EDITABLE_POST = {
   editedAt: STUBBED_OWN_POST.editedAt,
   status: "published",
   coverUploadId: null,
+  coverUrl: null,
 } as const;
 
 /** Las lecturas del feed y los grupos, y la publicación editable. Va después

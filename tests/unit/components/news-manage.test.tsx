@@ -56,6 +56,7 @@ const EDITABLE: EditableNewsPost = {
   editedAt: EDITED_AT,
   status: "published",
   coverUploadId: null,
+  coverUrl: null,
 };
 
 type Call = {
