@@ -129,4 +129,14 @@ describe("prefijar las líneas", () => {
   it("prefija una línea vacía cuando el cursor está en ella", () => {
     expect(mark(applyBodyFormat(parse("Uno\n|"), "heading"))).toBe("Uno\n## |");
   });
+
+  it("con el cursor al principio de un texto que empieza en blanco, prefija esa línea vacía", () => {
+    expect(mark(applyBodyFormat(parse("|\nabc"), "heading"))).toBe("## |\nabc");
+  });
+
+  it("una selección desde el principio de un texto que empieza en blanco conserva su inicio", () => {
+    expect(mark(applyBodyFormat(parse("[\nabc]"), "bulletList"))).toBe(
+      "[\n- abc]",
+    );
+  });
 });

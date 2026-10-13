@@ -18,7 +18,8 @@ import { NewsMarkdown } from "./NewsMarkdown";
  * activación automática: las flechas cambian de pestaña y la enfocan.
  *
  * El área no se desmonta al pasar a Vista previa, sólo se esconde: así
- * conserva la selección y el deshacer del navegador al volver.
+ * conserva la selección al volver. Los formatos cambian el valor desde
+ * React, así que el deshacer del navegador no los recoge.
  */
 
 const TABS = ["write", "preview"] as const;

@@ -60,7 +60,12 @@ function wrapSelection(edit: BodyEdit, wrapper: Wrapper): BodyEdit {
   };
 }
 
+/** `lastIndexOf` lleva un índice negativo a 0: sin la guarda, un salto en la
+ * posición 0 se tomaría como el de la línea anterior. */
 function lineStartBefore(text: string, index: number): number {
+  if (index === 0) {
+    return 0;
+  }
   return text.lastIndexOf("\n", index - 1) + 1;
 }
 
