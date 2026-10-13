@@ -6132,8 +6132,280 @@ a.auth-brand-header:focus-visible {
   justify-content: space-between;
 }
 
-/* El formulario de publicar (#330). Sin mockup: sigue a la ficha del
-   miembro, con los campos en el mismo panel. */
+/* El formulario de publicar y editar (#597), el "#2b" del handoff de E22
+   (docs/mockups/news-redesign-publish-write-dark.png): una columna de hasta
+   720 px, sin panel, con las etiquetas en el texto y no en mono. */
+.news-publish {
+  max-width: 720px;
+}
+
+.news-publish-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.news-publish-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.news-publish-form .auth-field label,
+.news-publish-form legend {
+  padding: 0;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-text);
+}
+
+.news-publish-form .auth-submit {
+  align-self: flex-start;
+}
+
+/* La portada: un fieldset sin recuadro, como los demás grupos. */
+.news-publish-cover,
+.news-category-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.news-publish-cover legend,
+.news-category-field legend {
+  margin-bottom: var(--space-2);
+}
+
+.news-publish-optional {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+/* Sin portada, el fondo de la categoría con su icono grande arriba a la
+   derecha, y el texto y el botón abajo. */
+.news-cover-banner {
+  position: relative;
+  display: flex;
+  min-height: 160px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.news-cover-banner .news-cover-fallback {
+  position: absolute;
+  inset: 0;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: var(--space-6);
+}
+
+.news-cover-banner-content {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: var(--space-4);
+}
+
+.news-cover-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.news-cover-add {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: 0 var(--space-4);
+  font-size: 14px;
+}
+
+.news-cover-uploading {
+  align-items: center;
+  justify-content: center;
+  background: var(--color-panel);
+}
+
+.news-cover-uploading p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.news-cover-preview {
+  display: block;
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.news-cover-preview-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* "Quitar portada" se lee como un enlace, pero es un botón: no lleva a
+   ningún sitio. */
+.news-cover-remove {
+  min-height: var(--touch-target-min);
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.news-cover-remove:focus-visible,
+.news-cover-add:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+/* La categoría segmentada. El radio queda encima de su segmento,
+   transparente: el clic y el foco son suyos, y lo que se ve es la etiqueta. */
+.news-category-segments {
+  display: inline-flex;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 3px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.news-category-segment {
+  position: relative;
+  flex: 1 1 auto;
+}
+
+.news-category-segment input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.news-category-segment label {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--touch-target-min) - 8px);
+  padding: 0 var(--space-4);
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  border-radius: 6px;
+}
+
+.news-category-segment input:checked + label {
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-segment-selected);
+}
+
+.news-category-segment input:focus-visible + label {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.news-category-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.news-category-dot-announcement {
+  background: var(--color-warning);
+}
+
+.news-category-dot-news {
+  background: var(--color-accent);
+}
+
+.news-category-dot-document {
+  background: var(--color-success);
+}
+
+/* En el móvil los tres segmentos ocupan el ancho a partes iguales y cada uno
+   llega a la medida táctil. */
+@media (max-width: 767px) {
+  .news-category-segments {
+    display: flex;
+    align-self: stretch;
+  }
+
+  .news-category-segment {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .news-category-segment label {
+    min-height: var(--touch-target-min);
+    padding: 0 var(--space-2);
+  }
+
+  /* Las opciones de audiencia: la etiqueta, que es lo que se toca, llega a
+     la medida táctil. */
+  .news-publish-form .auth-consent {
+    align-items: center;
+  }
+
+  .news-publish-form .auth-consent label {
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-target-min);
+  }
+}
+
+/* El título: 44 px, con el contador en mono a la derecha de la etiqueta. */
+.news-publish-title-label {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.news-publish-counter {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.news-publish-title input {
+  height: var(--touch-target-min);
+}
+
 .auth-field .news-publish-body {
   min-height: 12rem;
 }
@@ -6157,9 +6429,10 @@ a.auth-brand-header:focus-visible {
   list-style: none;
 }
 
-/* La fila de un adjunto es la misma caja que en la publicación abierta, pero
-   no se pulsa entera: el botón de quitar es lo único que actúa. */
+/* La fila de un adjunto: la caja del archivo de la publicación abierta, que
+   no se pulsa entera; la X es lo único que actúa. */
 .news-publish-attachment {
+  background: var(--color-panel);
   cursor: default;
 }
 
@@ -6167,12 +6440,87 @@ a.auth-brand-header:focus-visible {
   border-color: var(--color-border);
 }
 
-.news-publish-attachment .admin-secondary {
-  flex-shrink: 0;
+.news-publish-attachment .news-attachment-size {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
 }
 
+.news-publish-attachment-remove {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  margin: calc(var(--space-2) * -1) calc(var(--space-3) * -1)
+    calc(var(--space-2) * -1) 0;
+  padding: 0;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.news-publish-attachment-remove:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+.news-publish-attachment-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.news-publish-attachment-remove:focus-visible,
+.news-publish-add:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+/* "Añadir archivos": una zona punteada a todo el ancho. */
 .news-publish-add {
-  align-self: flex-start;
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-text);
+  background: none;
+  border: 1px dashed var(--color-border-dashed);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.news-publish-add:hover {
+  border-color: var(--color-accent);
+}
+
+/* Mientras guarda, todo el formulario se ve bloqueado. */
+.news-publish-fields:disabled .news-category-segment label,
+.news-publish-fields:disabled .news-publish-add,
+.news-publish-fields:disabled .news-cover-add {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* El aviso de publicada en el feed (#597). La región de estado no ocupa
+   sitio vacía, así que el feed no se mueve cuando no hay nada que decir. */
+.news-published-status {
+  display: contents;
+}
+
+.news-published-notice {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-success);
+  border-radius: var(--radius);
 }
 
 /* Evaluaciones (#322). Sigue docs/mockups/evaluations-light.png: el OVR grande,

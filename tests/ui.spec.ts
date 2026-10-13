@@ -44,6 +44,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 import {
   E2E_STORAGE_STATE_PATH,
   GROUPED_MEMBER_GROUP_NAMES,
@@ -12152,9 +12153,13 @@ test.describe("noticias en el navegador", () => {
 });
 
 /* ---------------------------------------------------------------------------
-   Publicar en Noticias (#330). El formulario no tiene mockup: se revisa
-   contra design-system.md, siguiendo el alta de miembro. El botón que lo abre
-   sí sale en docs/mockups/news-light.png, en la cabecera del feed.
+   Publicar en Noticias (#330), rehecho en E22 (#597) según
+   docs/mockups/news-redesign-publish-write-dark.png: portada, categoría
+   segmentada, título con contador, cuerpo, audiencia y adjuntos. El botón que
+   lo abre sale en docs/mockups/news-light.png, en la cabecera del feed.
+
+   Se fotografía a 768 y 1440. A 375 sólo se comprueban axe y el scroll
+   horizontal: la barra del móvil la rehace el ticket #602.
 
    Los grupos, las subidas y publicar se sirven con `page.route`: así las
    capturas no dependen de los grupos que haya en la base, y ninguna subida
@@ -12218,6 +12223,51 @@ async function stubPublishReads(
   );
 }
 
+const PUBLISH_COVER_NAME = "portada-seleccion.png";
+const COVER_PREVIEW_NAME = /^(Cover photo|Portada)$/;
+
+/** Una portada apaisada con un degradado, para que la vista previa se lea
+ * como una foto y no como un bloque de color. */
+function coverPicture(): Promise<Buffer> {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f5f8b"/><stop offset="1" stop-color="#6fd6b4"/>
+    </linearGradient></defs>
+    <rect width="1200" height="600" fill="url(#g)"/>
+    <circle cx="900" cy="180" r="90" fill="#f2ce78"/>
+  </svg>`;
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+async function choosePublishCover(page: Page): Promise<void> {
+  await page
+    .getByLabel(/^(Choose a cover photo|Elegir una portada)$/)
+    .setInputFiles({
+      name: PUBLISH_COVER_NAME,
+      mimeType: "image/png",
+      buffer: await coverPicture(),
+    });
+  await expectCoverPreviewLoaded(page);
+}
+
+/** Visible no basta para la captura: la imagen tiene que estar decodificada. */
+async function expectCoverPreviewLoaded(page: Page): Promise<void> {
+  const preview = page.getByRole("img", { name: COVER_PREVIEW_NAME });
+  await expect(preview).toBeVisible();
+  await expect
+    .poll(() =>
+      preview.evaluate(
+        (image) => image instanceof HTMLImageElement && image.naturalWidth > 0,
+      ),
+    )
+    .toBe(true);
+}
+
+/** Lo que se fotografía de publicar y editar: el móvil espera a #602. */
+const PUBLISH_PHOTO_VIEWPORTS = viewports.filter(
+  (viewport) => viewport.name !== "mobile",
+);
+
 async function attachPublishFiles(page: Page): Promise<void> {
   await page.getByLabel(/^(Choose files|Elegir archivos)$/).setInputFiles(
     PUBLISH_ATTACHMENTS.map((file) => ({
@@ -12229,7 +12279,7 @@ async function attachPublishFiles(page: Page): Promise<void> {
 }
 
 async function fillPublishForm(page: Page): Promise<void> {
-  await page.getByLabel(/^(Category|Categoría)$/).selectOption("announcement");
+  await page.getByRole("radio", { name: /^(Announcement|Aviso)$/ }).check();
   await page
     .getByLabel(/^(Title|Título)$/)
     .fill("Nationals squad shortlist announced for the August championships");
@@ -12251,7 +12301,14 @@ type PublishState = {
 };
 
 const PUBLISH_STATES_EN: readonly PublishState[] = [
-  { name: "publicar-vacio", prepare: async () => undefined },
+  { name: "publicar-sin-portada", prepare: async () => undefined },
+  {
+    name: "publicar-con-portada",
+    prepare: async (page) => {
+      await fillPublishForm(page);
+      await choosePublishCover(page);
+    },
+  },
   {
     name: "publicar-con-datos-y-adjuntos",
     prepare: async (page) => {
@@ -12265,12 +12322,14 @@ const PUBLISH_STATES_EN: readonly PublishState[] = [
   {
     name: "publicar-aviso-validacion",
     prepare: async (page) => {
+      const title = page.getByLabel(/^(Title|Título)$/);
+      await title.fill("Pool");
+      await title.fill("");
       await page.getByLabel(/^(Specific groups|Grupos concretos)$/).check();
-      await page.getByRole("button", { name: PUBLISH_BUTTON }).click();
-      await expect(page.getByLabel(/^(Title|Título)$/)).toHaveAttribute(
-        "aria-invalid",
-        "true",
-      );
+      await expect(title).toHaveAttribute("aria-invalid", "true");
+      await expect(
+        page.getByRole("button", { name: PUBLISH_BUTTON }),
+      ).toBeDisabled();
     },
   },
   {
@@ -12318,7 +12377,7 @@ for (const state of PUBLISH_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of viewports) {
+    for (const vp of PUBLISH_PHOTO_VIEWPORTS) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -12341,18 +12400,27 @@ for (const state of PUBLISH_STATES) {
       });
     }
 
-    for (const width of NEWS_NARROW_WIDTHS) {
-      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
-        await page.setViewportSize({ width, height: 812 });
-        await goToPublish(page, state);
-        expect(await hasHorizontalScroll(page)).toBe(false);
-      });
-    }
+    for (const theme of themes) {
+      for (const width of NEWS_NARROW_WIDTHS) {
+        test(`has no horizontal scroll at ${width}px (${theme})`, async ({
+          page,
+        }) => {
+          await page.setViewportSize({ width, height: 812 });
+          await goToPublish(page, state, theme);
+          expect(await hasHorizontalScroll(page)).toBe(false);
+        });
+      }
 
-    test("has no accessibility violations (axe-core)", async ({ page }) => {
-      await goToPublish(page, state);
-      await expectNoAxeViolations(page);
-    });
+      for (const vp of viewports) {
+        test(`has no accessibility violations at ${vp.name} (axe-core, ${theme})`, async ({
+          page,
+        }) => {
+          await page.setViewportSize({ width: vp.width, height: vp.height });
+          await goToPublish(page, state, theme);
+          await expectNoAxeViolations(page);
+        });
+      }
+    }
   });
 }
 
@@ -12421,6 +12489,9 @@ test.describe("publicar en el navegador", () => {
       await expect(
         page.getByRole("article", { name: published.title }),
       ).toBeVisible();
+      await expect(page.getByRole("status")).toHaveText(
+        `Published · we notified ${PUBLISH_GROUPS[0].name}`,
+      );
       expect(
         await page.evaluate(
           () => (window as { sinRecargar?: boolean }).sinRecargar,
@@ -12429,11 +12500,52 @@ test.describe("publicar en el navegador", () => {
       expect(sent).toMatchObject({
         category: "announcement",
         audience: { kind: "groups", groupIds: [PUBLISH_GROUPS[0].id] },
+        coverUploadId: null,
         attachmentUploadIds: [
           "a7a7a7a7-0000-4000-8000-000000000001",
           "a7a7a7a7-0000-4000-8000-000000000002",
         ],
       });
+    });
+  });
+
+  test.describe("a 375 px", () => {
+    test.use({
+      storageState: ADMIN_STORAGE_STATE,
+      viewport: { width: 375, height: 812 },
+    });
+
+    test("cada control táctil del formulario llega a 44 px", async ({
+      page,
+    }) => {
+      await goToPublish(page, PUBLISH_STATES_EN[1] as PublishState);
+      await attachPublishFiles(page);
+      await expect(
+        page.getByRole("button", { name: /^Remove mapa-piscina/ }),
+      ).toBeVisible();
+      const controls = [
+        page.getByRole("button", { name: "Remove cover" }),
+        ...["Announcement", "News", "Document"].map((name) =>
+          page.locator("label").filter({ hasText: new RegExp(`^${name}$`) }),
+        ),
+        page.getByLabel("Title"),
+        page.getByRole("button", { name: /^Remove mapa-piscina/ }),
+        page.getByRole("button", { name: "Add files" }),
+        page.getByRole("button", { name: PUBLISH_BUTTON }),
+        ...["The whole club", "Specific groups", PUBLISH_GROUPS[0].name].map(
+          (name) => page.locator("label").filter({ hasText: name }),
+        ),
+      ];
+      const addCover = page.getByRole("button", { name: "Add cover photo" });
+
+      for (const control of controls) {
+        const box = await control.boundingBox();
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+      }
+      await page.getByRole("button", { name: "Remove cover" }).click();
+      expect(
+        (await addCover.boundingBox())?.height ?? 0,
+      ).toBeGreaterThanOrEqual(44);
     });
   });
 
@@ -13090,9 +13202,9 @@ test.describe("categorías de evaluación en el navegador", () => {
 });
 
 /* ---------------------------------------------------------------------------
-   Editar y retirar una publicación (#331). Sin mockup: se revisan contra
-   design-system.md. Editar es el formulario de publicar con los valores
-   cargados, sin adjuntos.
+   Editar y retirar una publicación (#331). Editar es el formulario de
+   publicar (#597) con los valores cargados, portada incluida, sin adjuntos;
+   se fotografía a 768 y 1440, como publicar.
 
    Como el resto de Noticias, las capturas leen datos fijos servidos por
    `page.route`. Lo que los endpoints hacen de verdad se prueba contra
@@ -13105,7 +13217,10 @@ const EDIT_HEADING = /^(Edit post|Editar publicación)$/;
 const SAVE_BUTTON = /^(Save changes|Guardar cambios)$/;
 const newsEditPath = (id: string): string => `${postPath(id)}/editar`;
 
-/** Lo que carga el formulario: dirigida a un grupo del club. */
+/** La portada firmada de la publicación que se edita, servida por el test. */
+const STUBBED_COVER_PATH = "/portadas-de-prueba/portada.png";
+
+/** Lo que carga el formulario: dirigida a un grupo del club, con portada. */
 const STUBBED_EDITABLE_POST = {
   id: NEWS_OWN_POST_ID,
   category: STUBBED_OWN_POST.category,
@@ -13114,7 +13229,8 @@ const STUBBED_EDITABLE_POST = {
   audience: { kind: "groups", groupIds: [PUBLISH_GROUPS[0].id] },
   editedAt: STUBBED_OWN_POST.editedAt,
   status: "published",
-  coverUploadId: null,
+  coverUploadId: "c0c0c0c0-0000-4000-8000-000000000001",
+  coverUrl: `${APP_URL}${STUBBED_COVER_PATH}`,
 } as const;
 
 /** Las lecturas del feed y los grupos, y la publicación editable. Va después
@@ -13123,6 +13239,12 @@ const STUBBED_EDITABLE_POST = {
 async function stubEditReads(page: Page): Promise<void> {
   await stubNewsReads(page, STUBBED_FEED_POSTS);
   await stubPublishReads(page, { holdUploads: false });
+  const cover = await coverPicture();
+  await page.route(
+    (url) => url.pathname === STUBBED_COVER_PATH,
+    (route) =>
+      route.fulfill({ status: 200, contentType: "image/png", body: cover }),
+  );
   await page.route(
     (url) => url.pathname === NEWS_MANAGE_ENDPOINT,
     (route, request) =>
@@ -13139,7 +13261,10 @@ async function stubEditReads(page: Page): Promise<void> {
 }
 
 const EDIT_STATES_EN: readonly PublishState[] = [
-  { name: "editar-publicacion", prepare: async () => undefined },
+  {
+    name: "editar-noticia",
+    prepare: expectCoverPreviewLoaded,
+  },
   {
     name: "editar-publicacion-conflicto",
     prepare: async (page) => {
@@ -13185,7 +13310,7 @@ for (const state of EDIT_STATES) {
     quietNotificationBell();
     test.use({ storageState: ADMIN_STORAGE_STATE });
 
-    for (const vp of viewports) {
+    for (const vp of PUBLISH_PHOTO_VIEWPORTS) {
       test.describe(`@ ${vp.name}`, () => {
         test.use({ viewport: { width: vp.width, height: vp.height } });
 
@@ -13208,18 +13333,27 @@ for (const state of EDIT_STATES) {
       });
     }
 
-    for (const width of NEWS_NARROW_WIDTHS) {
-      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
-        await page.setViewportSize({ width, height: 812 });
-        await goToEdit(page, state);
-        expect(await hasHorizontalScroll(page)).toBe(false);
-      });
-    }
+    for (const theme of themes) {
+      for (const width of NEWS_NARROW_WIDTHS) {
+        test(`has no horizontal scroll at ${width}px (${theme})`, async ({
+          page,
+        }) => {
+          await page.setViewportSize({ width, height: 812 });
+          await goToEdit(page, state, theme);
+          expect(await hasHorizontalScroll(page)).toBe(false);
+        });
+      }
 
-    test("has no accessibility violations (axe-core)", async ({ page }) => {
-      await goToEdit(page, state);
-      await expectNoAxeViolations(page);
-    });
+      for (const vp of viewports) {
+        test(`has no accessibility violations at ${vp.name} (axe-core, ${theme})`, async ({
+          page,
+        }) => {
+          await page.setViewportSize({ width: vp.width, height: vp.height });
+          await goToEdit(page, state, theme);
+          await expectNoAxeViolations(page);
+        });
+      }
+    }
   });
 }
 

@@ -228,6 +228,7 @@ describe("editar una publicación", () => {
       editedAt: "2026-09-26T12:00:00.000Z",
       status: "published",
       coverUploadId: null,
+      coverUrl: null,
     });
   });
 });
