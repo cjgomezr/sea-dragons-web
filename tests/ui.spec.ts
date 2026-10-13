@@ -12357,6 +12357,20 @@ async function fillPublishForm(page: Page): Promise<void> {
   await page.getByLabel(PUBLISH_GROUPS[0].name).check();
 }
 
+/** Un cuerpo con todo lo que pone la barra de formato (#598). */
+const PUBLISH_MARKDOWN_BODY = [
+  "Twelve Seadragons named in the **extended squad** for the *August nationals*.",
+  "",
+  "## Squad",
+  "",
+  "- Final eight confirmed after trials",
+  "- Travel details to follow",
+  "",
+  "> Train hard, play fair.",
+  "",
+  "Read the [selection policy](https://example.com/policy).",
+].join("\n");
+
 type PublishState = {
   readonly name: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
@@ -12395,6 +12409,24 @@ const PUBLISH_STATES_EN: readonly PublishState[] = [
       await expect(
         page.getByRole("button", { name: PUBLISH_BUTTON }),
       ).toBeDisabled();
+    },
+  },
+  {
+    name: "publicar-escribir",
+    prepare: async (page) => {
+      await fillPublishForm(page);
+      await page.getByLabel(/^(Message|Mensaje)$/).fill(PUBLISH_MARKDOWN_BODY);
+    },
+  },
+  {
+    name: "publicar-vista-previa",
+    prepare: async (page) => {
+      await fillPublishForm(page);
+      await page.getByLabel(/^(Message|Mensaje)$/).fill(PUBLISH_MARKDOWN_BODY);
+      await page.getByRole("tab", { name: /^(Preview|Vista previa)$/ }).click();
+      await expect(
+        page.getByRole("heading", { level: 2, name: "Squad" }),
+      ).toBeVisible();
     },
   },
   {
