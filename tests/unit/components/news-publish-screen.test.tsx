@@ -745,7 +745,7 @@ describe("aviso de publicada en el feed", () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith("/noticias"));
     cleanup();
     stubFeedAfterPublishing();
-    render(<NewsFeedScreen locale="en" canPublish />);
+    render(<NewsFeedScreen locale="en" canPublish canPin={false} />);
   }
 
   it("al volver al feed dice que se publicó y que se avisó a todo el club", async () => {
@@ -796,7 +796,7 @@ describe("aviso de publicada en el feed", () => {
     await screen.findByText(/^Published ·/);
 
     cleanup();
-    render(<NewsFeedScreen locale="en" canPublish />);
+    render(<NewsFeedScreen locale="en" canPublish canPin={false} />);
 
     await screen.findByText(/Nothing has been published/);
     expect(screen.queryByText(/^Published ·/)).toBeNull();
@@ -821,7 +821,7 @@ describe("permisos", () => {
   it("quien puede publicar ve el botón de publicar en Noticias", async () => {
     stubEmptyFeed();
 
-    render(<NewsFeedScreen locale="en" canPublish />);
+    render(<NewsFeedScreen locale="en" canPublish canPin={false} />);
 
     expect(
       await screen.findByRole("link", { name: "+ Publish" }),
@@ -831,7 +831,7 @@ describe("permisos", () => {
   it("un Coach o un Player no ven el botón de publicar", async () => {
     stubEmptyFeed();
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByText(/Nothing has been published/);
     expect(screen.queryByRole("link", { name: "+ Publish" })).toBeNull();

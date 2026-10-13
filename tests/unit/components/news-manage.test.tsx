@@ -281,7 +281,7 @@ describe("el feed de quien publicó", () => {
         },
       });
 
-    render(<NewsFeedScreen locale="en" canPublish />);
+    render(<NewsFeedScreen locale="en" canPublish canPin={false} />);
 
     // Sola en el feed, es la tarjeta destacada (#594).
     const row = (

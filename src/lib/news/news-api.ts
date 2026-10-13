@@ -5,7 +5,10 @@ import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { NEWS_ATTACHMENTS_MAX_PER_POST } from "./news-attachments";
 import { InvalidNewsFeedCursorError } from "./news-feed";
 import { NewsPostChangedError, NewsPostNotYoursError } from "./news-management";
-import { InvalidNewsPinUntilError } from "./news-pin-rule";
+import {
+  InvalidNewsPinUntilError,
+  NEWS_POST_WITHDRAWN_REASON,
+} from "./news-pin-rule";
 import {
   type NewsPinChange,
   NewsPinForbiddenError,
@@ -30,10 +33,6 @@ import { createSupabaseNewsSeenGateway } from "./supabase-news-seen-gateway";
  * leen el id del camino y cómo responde cada error del dominio con su código
  * de la convención.
  */
-
-/** El motivo del 409 al fijar una retirada (#592), para que la pantalla lo
- * explique sin leer la frase. */
-export const NEWS_POST_WITHDRAWN_REASON = "news_post_withdrawn";
 
 /** Hasta cuándo se fija (#592): una fecha con zona, o `null` para "hasta que
  * la desfije". Que esté en el futuro lo comprueba el dominio. */

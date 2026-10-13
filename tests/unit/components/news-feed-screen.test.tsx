@@ -205,7 +205,7 @@ describe("feed de noticias", () => {
   it("registra la visita a Noticias una sola vez al abrirse (#424)", async () => {
     stubSinglePage([SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     await waitFor(() => expect(newsVisits).toEqual(["POST"]));
@@ -214,7 +214,7 @@ describe("feed de noticias", () => {
   it("registra la visita después de leer el feed, que así trae la visita anterior y no esta", async () => {
     stubSinglePage([SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     await waitFor(() =>
@@ -239,7 +239,7 @@ describe("feed de noticias", () => {
       });
     });
     const user = userEvent.setup();
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 
@@ -250,7 +250,7 @@ describe("feed de noticias", () => {
   it("enseña las publicaciones en el orden en que las sirve el servidor, de la más reciente a la más antigua", async () => {
     stubSinglePage([SHORTLIST, WINTER, POLICY]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual(
@@ -261,7 +261,7 @@ describe("feed de noticias", () => {
   it("cada fila trae su categoría, hace cuánto, el autor, el título y el extracto", async () => {
     stubSinglePage([WINTER, SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     const inRow = within(rowOf(SHORTLIST.title));
@@ -274,7 +274,7 @@ describe("feed de noticias", () => {
   it("la fila abre la publicación", async () => {
     stubSinglePage([SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     expect(
       await screen.findByRole("link", { name: SHORTLIST.title }),
@@ -284,7 +284,7 @@ describe("feed de noticias", () => {
   it("la marca de adjuntos dice cuántos son", async () => {
     stubSinglePage([SHORTLIST, POLICY]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(screen.getByText("2 attachments")).toBeInTheDocument();
@@ -294,7 +294,7 @@ describe("feed de noticias", () => {
   it("una publicación sin adjuntos no lleva marca", async () => {
     stubSinglePage([WINTER]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: WINTER.title });
     expect(screen.queryByText(/attachment/)).not.toBeInTheDocument();
@@ -303,7 +303,7 @@ describe("feed de noticias", () => {
   it("dice en español la categoría, el tiempo y los adjuntos", async () => {
     stubSinglePage([SHORTLIST, WINTER]);
 
-    render(<NewsFeedScreen locale="es" canPublish={false} />);
+    render(<NewsFeedScreen locale="es" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(screen.getByText("Aviso")).toBeInTheDocument();
@@ -314,7 +314,7 @@ describe("feed de noticias", () => {
   it("explica con una frase que no hay nada publicado para quien mira", async () => {
     stubSinglePage([]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     expect(
       await screen.findByText("Nothing has been published for you yet."),
@@ -334,7 +334,7 @@ describe("feed de noticias", () => {
         : pageResponse({ pinned: null, posts: [POLICY], nextCursor: null }),
     );
     const user = userEvent.setup();
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await user.click(await screen.findByRole("button", { name: "Load more" }));
 
@@ -362,7 +362,7 @@ describe("feed de noticias", () => {
           }),
     );
     const user = userEvent.setup();
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await user.click(await screen.findByRole("button", { name: "Load more" }));
 
@@ -373,7 +373,7 @@ describe("feed de noticias", () => {
   it("no ofrece cargar más en la última página", async () => {
     stubSinglePage([SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(
@@ -395,7 +395,7 @@ describe("feed de noticias", () => {
       });
     });
     const user = userEvent.setup();
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't reach the server.",
@@ -425,7 +425,7 @@ describe("feed de noticias", () => {
       return pageResponse({ pinned: null, posts: [WINTER], nextCursor: null });
     });
     const user = userEvent.setup();
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await user.click(await screen.findByRole("button", { name: "Load more" }));
 
@@ -449,7 +449,7 @@ describe("feed de noticias", () => {
       }),
     );
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Your session ended. Sign in again to see the news.",
@@ -461,7 +461,7 @@ describe("la cabecera del feed", () => {
   it("lleva la etiqueta de la sección y el título", async () => {
     stubSinglePage([SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Club feed" }),
@@ -473,7 +473,7 @@ describe("la cabecera del feed", () => {
   it("ofrece publicar a quien puede", async () => {
     stubSinglePage([SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" canPublish />);
+    render(<NewsFeedScreen locale="en" canPublish canPin={false} />);
 
     expect(screen.getByRole("link", { name: "+ Publish" })).toHaveAttribute(
       "href",
@@ -485,7 +485,7 @@ describe("la cabecera del feed", () => {
   it("no ofrece publicar a quien no puede", async () => {
     stubSinglePage([SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(
@@ -498,7 +498,7 @@ describe("la tarjeta destacada", () => {
   it("es la fijada vigente, con hasta cuándo está fijada", async () => {
     stubPinnedPage(PINNED, [SHORTLIST, WINTER]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: PINNED.title });
     const inCard = within(featuredCard(PINNED.title));
@@ -509,7 +509,7 @@ describe("la tarjeta destacada", () => {
   it("dice sólo que está fijada cuando no tiene fecha de fin", async () => {
     stubPinnedPage({ ...PINNED, pinnedUntil: null }, [SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: PINNED.title });
     expect(
@@ -520,7 +520,7 @@ describe("la tarjeta destacada", () => {
   it("dice en español hasta cuándo está fijada", async () => {
     stubPinnedPage(PINNED, [SHORTLIST]);
 
-    render(<NewsFeedScreen locale="es" canPublish={false} />);
+    render(<NewsFeedScreen locale="es" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: PINNED.title });
     expect(
@@ -531,7 +531,7 @@ describe("la tarjeta destacada", () => {
   it("sin fijada es la más reciente, marcada como lo último", async () => {
     stubSinglePage([SHORTLIST, WINTER]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     const inCard = within(featuredCard(SHORTLIST.title));
@@ -542,7 +542,7 @@ describe("la tarjeta destacada", () => {
   it("trae su categoría, hace cuánto, el autor, el título, el extracto y la invitación a leerla", async () => {
     stubSinglePage([SHORTLIST, WINTER]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     const inCard = within(featuredCard(SHORTLIST.title));
@@ -566,7 +566,7 @@ describe("la tarjeta destacada", () => {
       },
     ]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(featuredCard(SHORTLIST.title).querySelector("img")).toHaveAttribute(
@@ -578,7 +578,7 @@ describe("la tarjeta destacada", () => {
   it("sin portada no pinta ninguna imagen: lleva el fondo de su categoría", async () => {
     stubSinglePage([SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(featuredCard(SHORTLIST.title).querySelector("img")).toBeNull();
@@ -592,7 +592,7 @@ describe("la tarjeta destacada", () => {
         coverThumbnailUrl: "https://archivos.test/caducada-mini.webp",
       },
     ]);
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
     await screen.findByRole("link", { name: SHORTLIST.title });
     const cover = featuredCard(SHORTLIST.title).querySelector("img");
     expect(cover).not.toBeNull();
@@ -607,7 +607,7 @@ describe("la lista bajo la destacada", () => {
   it("con una fijada se titula lo último y no la repite", async () => {
     stubPinnedPage(PINNED, [SHORTLIST, WINTER]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: PINNED.title });
     expect(
@@ -620,7 +620,7 @@ describe("la lista bajo la destacada", () => {
   it("sin fijada se titula anteriores y empieza en la segunda", async () => {
     stubSinglePage([SHORTLIST, WINTER, POLICY]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(
@@ -632,7 +632,7 @@ describe("la lista bajo la destacada", () => {
   it("dice en español sus etiquetas", async () => {
     stubSinglePage([SHORTLIST, WINTER]);
 
-    render(<NewsFeedScreen locale="es" canPublish={false} />);
+    render(<NewsFeedScreen locale="es" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(
@@ -646,7 +646,7 @@ describe("la lista bajo la destacada", () => {
   it("con una sola publicación no hay lista ni etiqueta de lista", async () => {
     stubSinglePage([SHORTLIST]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(featuredCard(SHORTLIST.title)).toBeInTheDocument();
@@ -659,7 +659,7 @@ describe("la lista bajo la destacada", () => {
   it("con sólo la fijada tampoco hay lista", async () => {
     stubPinnedPage(PINNED, []);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: PINNED.title });
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
@@ -676,7 +676,7 @@ describe("la lista bajo la destacada", () => {
       },
     ]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: WINTER.title });
     expect(rowOf(WINTER.title).querySelector("img")).toHaveAttribute(
@@ -688,7 +688,7 @@ describe("la lista bajo la destacada", () => {
   it("la fila sin portada no pinta ninguna imagen", async () => {
     stubSinglePage([SHORTLIST, WINTER]);
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: WINTER.title });
     expect(rowOf(WINTER.title).querySelector("img")).toBeNull();
@@ -705,7 +705,7 @@ describe("la lista bajo la destacada", () => {
         : pageResponse({ pinned: null, posts: [WINTER], nextCursor: null }),
     );
     const user = userEvent.setup();
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await user.click(await screen.findByRole("button", { name: "Load more" }));
 
@@ -727,7 +727,7 @@ describe("lo que no se ha leído", () => {
       }),
     );
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(
@@ -746,7 +746,7 @@ describe("lo que no se ha leído", () => {
       }),
     );
 
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: PINNED.title });
     expect(within(rowOf(SHORTLIST.title)).getByText("New")).toBeInTheDocument();
@@ -764,7 +764,7 @@ describe("lo que no se ha leído", () => {
       }),
     );
 
-    render(<NewsFeedScreen locale="es" canPublish={false} />);
+    render(<NewsFeedScreen locale="es" canPublish={false} canPin={false} />);
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(
@@ -793,7 +793,7 @@ describe("lo que no se ha leído", () => {
           }),
     );
     const user = userEvent.setup();
-    render(<NewsFeedScreen locale="en" canPublish={false} />);
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await user.click(await screen.findByRole("button", { name: "Load more" }));
 
