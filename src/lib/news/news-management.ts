@@ -19,7 +19,7 @@ import {
   normalizeNewsDraft,
 } from "./news-posts";
 import { resolveNewsCoverUpload } from "./news-cover-uploads";
-import { discardNewsCover } from "./news-covers";
+import { discardNewsCover, sweepStaleNewsCovers } from "./news-covers";
 
 /**
  * Editar, retirar y volver a publicar (#331, RF-6 del PRD de E11), contado
@@ -227,6 +227,10 @@ export async function editNewsPost(
     postId: request.postId,
   });
   await discardReplacedCover(gateways, post, cover);
+  await sweepStaleNewsCovers(gateways.covers, {
+    uploadedBy: actor.id,
+    now: request.now,
+  });
   return readManagedDetail(gateways, actor, request.postId);
 }
 

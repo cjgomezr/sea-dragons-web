@@ -124,9 +124,6 @@ export type NewsFeedQuery = {
   readonly limit: number;
 };
 
-/** Una edición (#331). Sólo se escribe si la publicación sigue en
- * `expectedEditedAt`, la edición que tenía delante quien guarda (`null` si
- * nunca se editó): si alguien guardó entretanto, no se pisa nada. */
 /** Lo que una edición hace con la portada (#591): dejarla como está, o
  * ponerle otra (`null` la quita). Dos casos y no un campo opcional, para que
  * "no la toques" y "quítala" no se confundan. */
@@ -134,6 +131,9 @@ export type NewsCoverChange =
   | { readonly kind: "keep" }
   | { readonly kind: "replace"; readonly coverUploadId: string | null };
 
+/** Una edición (#331). Sólo se escribe si la publicación sigue en
+ * `expectedEditedAt`, la edición que tenía delante quien guarda (`null` si
+ * nunca se editó): si alguien guardó entretanto, no se pisa nada. */
 export type NewsPostEdit = NewsDraft & {
   readonly postId: string;
   readonly clubId: string;

@@ -355,6 +355,21 @@ describe("editar la portada", () => {
     expect(club.coverFiles.size).toBe(2);
   });
 
+  it("borra también al editar las portadas propias abandonadas hace más de un día", async () => {
+    const longAgo = new Date(NOW.getTime() - STALE_COVER_AGE_MS - 1);
+    const club = committeeClub({
+      covers: [
+        aCover({ id: OTHER_COVER_ID, createdAt: longAgo.toISOString() }),
+      ],
+      posts: [ownPost()],
+    });
+
+    await edit(club, { kind: "keep" });
+
+    expect(club.covers).toEqual([]);
+    expect(club.coverFiles.size).toBe(0);
+  });
+
   it("rechaza una portada ajena sin tocar la publicación", async () => {
     const club = committeeClub({
       covers: [aCover({ id: OTHER_COVER_ID, uploadedBy: AUTHOR_ID })],
