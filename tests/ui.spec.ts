@@ -12541,6 +12541,39 @@ test.describe("publicar en el navegador", () => {
       ).toBeVisible();
     });
 
+    test("el editor del cuerpo tiene las medidas del handoff (#598)", async ({
+      page,
+    }) => {
+      await stubPublishReads(page, { holdUploads: false });
+      await page.goto(`${APP_URL}${NEWS_PUBLISH_SCREEN_PATH}`);
+      const editor = page.locator(".news-body-editor");
+      const area = page.getByRole("textbox", { name: "Message" });
+      const bold = page.getByRole("button", { name: "Bold" });
+
+      await expect(editor).toHaveCSS("border-radius", "10px");
+      await expect(page.getByRole("tab", { name: "Write" })).toHaveCSS(
+        "border-bottom-width",
+        "2px",
+      );
+      await expect(bold).toHaveCSS("width", "32px");
+      await expect(bold).toHaveCSS("height", "32px");
+      const touchArea = await bold.evaluate((button) => {
+        const after = getComputedStyle(button, "::after");
+        return (
+          button.getBoundingClientRect().width -
+          2 * Number.parseFloat(after.left)
+        );
+      });
+      expect(touchArea).toBe(44);
+      await expect(area).toHaveCSS("font-size", "14px");
+      await expect(area).toHaveCSS("line-height", "23.8px");
+      expect(
+        await area.evaluate((element) => getComputedStyle(element).fontFamily),
+      ).toMatch(/mono/i);
+      const areaBox = await area.boundingBox();
+      expect(areaBox?.height).toBeGreaterThanOrEqual(300);
+    });
+
     test("publicar vuelve al feed sin recargar, con la publicación arriba", async ({
       page,
     }) => {
