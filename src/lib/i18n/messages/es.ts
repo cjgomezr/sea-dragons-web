@@ -1758,7 +1758,8 @@ export const spanishMessages: MessageCatalog = {
   "news.pin.replaces": "Reemplaza a la que está fijada ahora.",
   "news.pin.error.withdrawn":
     "Esta publicación está retirada y no se puede fijar.",
-  "news.pin.error.forbidden": "Solo un Admin puede fijar o desfijar publicaciones.",
+  "news.pin.error.forbidden":
+    "Solo un Admin puede fijar o desfijar publicaciones.",
   "news.pin.error.signInRequired":
     "Tu sesión terminó. Vuelve a entrar para fijar o desfijar publicaciones.",
   "news.pin.error.pinUnexpected":
