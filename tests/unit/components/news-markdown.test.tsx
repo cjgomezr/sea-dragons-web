@@ -178,6 +178,71 @@ describe("las publicaciones de texto plano se ven igual", () => {
   });
 });
 
+describe("las reglas de Markdown que cambiarían un texto plano están apagadas", () => {
+  const HEADING_SELECTOR = "h1, h2, h3, h4, h5, h6";
+
+  it("una línea de guiones debajo de otra no la vuelve encabezado", () => {
+    const root = renderBody("Horarios\n---\nLunes 19:00");
+
+    expect(root.querySelector(HEADING_SELECTOR)).toBeNull();
+    expect(root.querySelector("p")?.textContent).toBe("Horarios");
+  });
+
+  it("una línea de iguales debajo de otra no la vuelve encabezado", () => {
+    const root = renderBody("Aviso\n===");
+
+    expect(root.querySelector(HEADING_SELECTOR)).toBeNull();
+    expect(root.textContent).toBe("Aviso\n===");
+  });
+
+  it("una línea de guiones sola entre dos párrafos sigue siendo un separador", () => {
+    const root = renderBody("Antes\n\n---\n\nDespués");
+
+    expect(root.querySelector("hr")).not.toBeNull();
+    expect(root.querySelectorAll("p")).toHaveLength(2);
+  });
+
+  it.each([
+    ["cuatro espacios", "Material:\n\n    gorro\n    aletas"],
+    ["un tabulador", "Material:\n\n\tgorro\n\taletas"],
+    ["sangría al principio", "    gorro y aletas"],
+  ])("las líneas sangradas con %s salen como párrafo", (_label, body) => {
+    const root = renderBody(body);
+
+    expect(root.querySelector("pre")).toBeNull();
+    expect(root.querySelector("code")).toBeNull();
+    expect(root.querySelector("p")).not.toBeNull();
+  });
+
+  it("un bloque con tres comillas invertidas sigue siendo código", () => {
+    const root = renderBody("```\nMSAC-2026\n```");
+
+    expect(root.querySelector("pre code")?.textContent).toBe("MSAC-2026\n");
+  });
+
+  it.each(["Tom &amp; Jerry", "&#169; Seadragons", "&#xA9; Seadragons"])(
+    "la entidad de %j se ve tal cual",
+    (body) => {
+      const root = renderBody(body);
+
+      expect(root.textContent).toBe(body);
+    },
+  );
+
+  it("una sola tilde a cada lado no tacha", () => {
+    const root = renderBody("~texto~");
+
+    expect(root.querySelector("del")).toBeNull();
+    expect(root.textContent).toBe("~texto~");
+  });
+
+  it("dos tildes a cada lado sí tachan", () => {
+    const root = renderBody("~~texto~~");
+
+    expect(root.querySelector("del")?.textContent).toBe("texto");
+  });
+});
+
 describe("lo que no se pinta", () => {
   it.each(["Hola **mundo", "- uno\n-", "1. uno\n2.", "[enlace roto](", "> "])(
     "el Markdown roto %j sale como texto sin lanzar",
