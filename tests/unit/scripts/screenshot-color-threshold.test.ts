@@ -97,6 +97,7 @@ describe("la tolerancia de color de la visual (#606)", () => {
     expect(source).not.toMatch(/\bthreshold\s*:/);
   });
 
+  // Basta con el tema claro: es el que limita (0,0217 frente a 0,0623).
   it("es la más alta que lo ve: un escalón más y el tema claro lo pierde", async () => {
     const [light] = THEMES;
     const before = await paintDocumentLabel(light, newsBackground(light));
