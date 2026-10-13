@@ -174,12 +174,18 @@ async function renderDirectory(locale: "en" | "es" = "en"): Promise<void> {
   });
 }
 
-/** Espera además a la bandeja, que llega después de la lista. */
-async function renderAdminDirectory(): Promise<void> {
-  await renderDirectory();
-  await waitFor(() =>
-    expect(screen.queryByText("Loading the pending requests…")).toBeNull(),
-  );
+/** Lo que dice la cabecera cuando ya sabe cuántas solicitudes hay. */
+const REQUESTS_STATUS = {
+  en: /No pending requests|role requests? waiting/,
+  es: /No hay solicitudes pendientes|solicitud(es)? de rol esperando/,
+} as const;
+
+/** Espera además a las solicitudes, que llegan en otra petición después de
+ * la lista. Desde #587 ya no hay un "Cargando…" cuya desaparición esperar: la
+ * señal es la cabecera, que solo habla de ellas cuando ya las leyó. */
+async function renderAdminDirectory(locale: "en" | "es" = "en"): Promise<void> {
+  await renderDirectory(locale);
+  await screen.findAllByText(REQUESTS_STATUS[locale]);
 }
 
 function moreButton(): HTMLElement {
@@ -652,12 +658,7 @@ describe("la pantalla de solicitudes", () => {
 
   it("se escribe en español", async () => {
     stubApi();
-    await renderDirectory("es");
-    await waitFor(() =>
-      expect(
-        screen.queryByText("Cargando las solicitudes pendientes…"),
-      ).toBeNull(),
-    );
+    await renderAdminDirectory("es");
 
     await userEvent.setup().click(
       screen.getByRole("button", {
