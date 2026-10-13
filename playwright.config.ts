@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { SCREENSHOT_COLOR_THRESHOLD } from "./tests/support/screenshot-tolerance";
 import { webServerCommand } from "./tests/support/web-server-command";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3417";
@@ -25,7 +26,12 @@ export default defineConfig({
   // cada máquina sigue corriendo su parte de la suite en paralelo contra
   // Supabase. 15 s no debilita ninguna comprobación: lo que está roto falla
   // igual, solo deja de fallar lo que era lento.
-  expect: { timeout: process.env.CI ? 15_000 : 5_000 },
+  // La tolerancia de color vive aquí y no en cada llamada para que ninguna
+  // captura pueda saltársela (#606, ver tests/support/screenshot-tolerance.ts).
+  expect: {
+    timeout: process.env.CI ? 15_000 : 5_000,
+    toHaveScreenshot: { threshold: SCREENSHOT_COLOR_THRESHOLD },
+  },
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL: APP_URL,
