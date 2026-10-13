@@ -203,7 +203,7 @@ describe("las reglas de Markdown que cambiarían un texto plano están apagadas"
   });
 
   it.each([
-    ["cuatro espacios", "Material:\n    gorro\n    aletas"],
+    ["cuatro espacios", "Material:\n\n    gorro\n    aletas"],
     ["un tabulador", "Material:\n\n\tgorro\n\taletas"],
     ["sangría al principio", "    gorro y aletas"],
   ])("las líneas sangradas con %s salen como párrafo", (_label, body) => {

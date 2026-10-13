@@ -10,7 +10,7 @@ import { newsBodyToPlainText } from "@/lib/news/news-markdown";
 
 const WHITESPACE_RUN = /\s+/g;
 
-function plainTextOf(body: string): string {
+function collapsedPlainTextOf(body: string): string {
   return newsBodyToPlainText(body).replace(WHITESPACE_RUN, " ").trim();
 }
 
@@ -18,13 +18,13 @@ describe("newsBodyToPlainText con las reglas apagadas", () => {
   it.each([
     ["Horarios\n---\nLunes 19:00", "Horarios Lunes 19:00"],
     ["Aviso\n===", "Aviso ==="],
-    ["Material:\n    gorro\n    aletas", "Material: gorro aletas"],
+    ["Material:\n\n    gorro\n    aletas", "Material: gorro aletas"],
     ["Material:\n\n\tgorro\n\taletas", "Material: gorro aletas"],
     ["Tom &amp; Jerry", "Tom &amp; Jerry"],
     ["&#169; Seadragons", "&#169; Seadragons"],
     ["~texto~", "~texto~"],
   ])("%j da %j", (body, expected) => {
-    expect(plainTextOf(body)).toBe(expected);
+    expect(collapsedPlainTextOf(body)).toBe(expected);
   });
 });
 
@@ -36,6 +36,6 @@ describe("newsBodyToPlainText con las reglas que siguen igual", () => {
     ["# Título\n\nCuerpo", "Título Cuerpo"],
     ["Traed **gorro** y [aletas](https://a.com).", "Traed gorro y aletas."],
   ])("%j da %j", (body, expected) => {
-    expect(plainTextOf(body)).toBe(expected);
+    expect(collapsedPlainTextOf(body)).toBe(expected);
   });
 });
