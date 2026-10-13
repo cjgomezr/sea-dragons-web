@@ -4,6 +4,8 @@ import type { Translator } from "@/lib/i18n/translator";
 import type { NewsFeedItem } from "@/lib/news/news-feed";
 import { NewsCategoryLabel } from "./NewsCategoryLabel";
 
+export type UnreadMark = "none" | "dot" | "dot-and-word";
+
 /**
  * La línea de encima del título, en la tarjeta destacada y en cada fila del
  * feed (#594): categoría, el punto de no leída, si está retirada, y hace
@@ -13,9 +15,6 @@ import { NewsCategoryLabel } from "./NewsCategoryLabel";
  * escribe "Nueva" al lado, y en la fila la palabra la oye el lector de
  * pantalla.
  */
-
-export type UnreadMark = "none" | "dot" | "dot-and-word";
-
 export function NewsFeedMeta({
   translate,
   post,

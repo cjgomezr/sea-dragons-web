@@ -11486,6 +11486,9 @@ const STUBBED_PINNED_POST = {
  * leído, y lo demás no. */
 const STUBBED_NEWS_SEEN_AT = hoursAgo(72);
 
+/** Lo bastante dentro para salir del radio de 10 px de la tarjeta. */
+const CARD_CORNER_INSET_PX = 16;
+
 /** Fechas fijas: la publicación abierta las escribe enteras, no relativas. */
 const STUBBED_POST = {
   id: NEWS_POST_ID,
@@ -11954,6 +11957,16 @@ test.describe("noticias en el navegador", () => {
         node !== null;
         node = walker.nextNode()
       ) {
+        // El extracto va en una línea cortada con puntos suspensivos (#594):
+        // un texto que no puede saltar de línea no parte ninguna palabra, y
+        // Chromium cuenta aparte el trozo que esconde el corte.
+        const parent = node.parentElement;
+        if (
+          parent !== null &&
+          getComputedStyle(parent).whiteSpace === "nowrap"
+        ) {
+          continue;
+        }
         const text = node.textContent ?? "";
         for (const match of text.matchAll(/\S+/g)) {
           const range = document.createRange();
@@ -12061,6 +12074,7 @@ test.describe("noticias en el navegador", () => {
               },
             ],
             nextCursor: null,
+            seenAt: STUBBED_NEWS_SEEN_AT,
           }),
         ),
     );
@@ -12083,6 +12097,14 @@ test.describe("noticias en el navegador", () => {
     ]);
   });
 
+  test("a 375px el feed con fijada no tiene violaciones de accesibilidad (axe-core)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToNews(page, FEED_WITH_PINNED);
+    await expectNoAxeViolations(page);
+  });
+
   // #594 y D11 del PRD de E22: antes del feed móvil (#600), a 375 px cada
   // control del feed se sigue pulsando con el dedo. La tarjeta y cada fila se
   // pulsan enteras porque el enlace del título las cubre.
@@ -12101,19 +12123,24 @@ test.describe("noticias en el navegador", () => {
       ),
     ];
     for (const card of cards) {
-      const box = await card.boundingBox();
-      if (box === null) {
-        throw new Error("Una tarjeta del feed no está a la vista.");
-      }
-      expect(box.height).toBeGreaterThanOrEqual(44);
-      // Una esquina de la tarjeta, lejos del título, abre la publicación.
-      const hitsLink = await card.evaluate(
-        (element, point) =>
-          document.elementFromPoint(point.x, point.y)?.closest("a") !== null &&
-          element.contains(document.elementFromPoint(point.x, point.y)),
-        { x: box.x + 4, y: box.y + box.height - 4 },
-      );
-      expect(hitsLink).toBe(true);
+      // Un punto junto a la esquina, lejos del título, abre la publicación.
+      // No en la misma esquina: la tarjeta tiene el borde redondeado. Todo en
+      // un paso: `elementFromPoint` sólo ve lo que está en la ventana, y el
+      // scroll suave movería la tarjeta entre medir y apuntar.
+      const target = await card.evaluate((element, inset) => {
+        element.scrollIntoView({ block: "center", behavior: "instant" });
+        const box = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          box.left + inset,
+          box.bottom - inset,
+        );
+        return {
+          height: box.height,
+          opensPost: hit?.closest("a") !== null && element.contains(hit),
+        };
+      }, CARD_CORNER_INSET_PX);
+      expect(target.height).toBeGreaterThanOrEqual(44);
+      expect(target.opensPost).toBe(true);
     }
     for (const control of [
       page.getByRole("link", { name: /^\+ (Publish|Publicar)$/ }),
