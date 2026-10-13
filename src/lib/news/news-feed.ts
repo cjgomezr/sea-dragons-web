@@ -9,6 +9,7 @@ import {
   findNewsReader,
   findReaderGroupIds,
 } from "./news-posts";
+import { newsBodyToPlainText } from "./news-markdown";
 
 /**
  * El feed de cada miembro (#327, RF-4 del PRD de E11): lo publicado para él,
@@ -76,13 +77,14 @@ function decodeCursor(cursor: string): NewsFeedPosition {
 }
 
 /**
- * El cuerpo en una línea, cortado sin partir una palabra. Sólo se corta en
+ * El cuerpo sin formato de Markdown (#593) y en una línea, cortado sin partir
+ * una palabra. Sólo se corta en
  * medio de una palabra si la primera ya no cabe entera, porque no hay otro
  * sitio. Se cuenta en caracteres y no en unidades de UTF-16, para no partir
  * un emoji en dos.
  */
 export function excerptNewsBody(body: string): string {
-  const text = body.trim().split(WHITESPACE_RUN).join(" ");
+  const text = newsBodyToPlainText(body).trim().split(WHITESPACE_RUN).join(" ");
   const characters = [...text];
   if (characters.length <= NEWS_EXCERPT_MAX_LENGTH) {
     return text;
