@@ -5,6 +5,12 @@ import { describeMissingAuthKeys } from "@/lib/auth/supabase-auth-gateways";
 import { NEWS_ATTACHMENTS_MAX_PER_POST } from "./news-attachments";
 import { InvalidNewsFeedCursorError } from "./news-feed";
 import { NewsPostChangedError, NewsPostNotYoursError } from "./news-management";
+import { InvalidNewsPinUntilError } from "./news-pin-rule";
+import {
+  type NewsPinChange,
+  NewsPinForbiddenError,
+  NewsPinWithdrawnPostError,
+} from "./news-pins";
 import {
   EmptyNewsAudienceError,
   ForeignNewsGroupError,
@@ -22,6 +28,30 @@ import { createSupabaseNewsGateways } from "./supabase-news-gateways";
  * leen el id del camino y cómo responde cada error del dominio con su código
  * de la convención.
  */
+
+/** El motivo del 409 al fijar una retirada (#592), para que la pantalla lo
+ * explique sin leer la frase. */
+export const NEWS_POST_WITHDRAWN_REASON = "news_post_withdrawn";
+
+/** Hasta cuándo se fija (#592): una fecha con zona, o `null` para "hasta que
+ * la desfije". Que esté en el futuro lo comprueba el dominio. */
+export const newsPinSchema = z.object({
+  until: z.iso.datetime({ offset: true }).nullable(),
+});
+
+/** `pin` al publicar o editar: `{ until }` fija, `null` desfija y sin él no
+ * se toca. Solo un Admin puede mandarlo (D1). */
+const newsPinFieldSchema = newsPinSchema.nullable().optional();
+
+/** El cambio de fijado que pide el cuerpo de publicar o editar. */
+export function toNewsPinChange(
+  pin: z.infer<typeof newsPinFieldSchema>,
+): NewsPinChange {
+  if (pin === undefined) {
+    return { kind: "keep" };
+  }
+  return pin === null ? { kind: "unpin" } : { kind: "pin", until: pin.until };
+}
 
 /** La forma de lo que manda quien publica. Recortar y medir el título es del
  * dominio; aquí sólo se exige la forma. Los ids de grupo tienen que ser uuid
@@ -42,6 +72,7 @@ export const newsDraftSchema = z.object({
     .default([]),
   // La portada subida antes (#591). Opcional: sin ella sale sin portada.
   coverUploadId: z.uuid().nullable().default(null),
+  pin: newsPinFieldSchema,
 });
 
 /** Una edición (#331): el mismo borrador, sin adjuntos, y la marca de
@@ -85,6 +116,7 @@ const VALIDATION_ERRORS = [
   EmptyNewsAudienceError,
   ForeignNewsGroupError,
   InvalidNewsFeedCursorError,
+  InvalidNewsPinUntilError,
 ] as const;
 
 export function asNewsApiError(error: unknown): never {
@@ -101,12 +133,16 @@ export function asNewsApiError(error: unknown): never {
   }
   if (
     error instanceof NewsForbiddenError ||
-    error instanceof NewsPostNotYoursError
+    error instanceof NewsPostNotYoursError ||
+    error instanceof NewsPinForbiddenError
   ) {
     throw new ApiError("forbidden", error.message);
   }
   if (error instanceof NewsPostChangedError) {
     throw new ApiError("conflict", error.message);
+  }
+  if (error instanceof NewsPinWithdrawnPostError) {
+    throw new ApiError("conflict", error.message, NEWS_POST_WITHDRAWN_REASON);
   }
   return asAccountApiError(error);
 }

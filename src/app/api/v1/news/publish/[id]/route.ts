@@ -8,6 +8,7 @@ import {
   newsEditSchema,
   readNewsPostId,
   requireNewsGateways,
+  toNewsPinChange,
 } from "@/lib/news/news-api";
 import {
   type EditableNewsPost,
@@ -22,7 +23,9 @@ import type { NewsPostDetail } from "@/lib/news/news-posts";
  * categoría, título, cuerpo y audiencia, y responde 409 si alguien guardó
  * entretanto: `expectedEditedAt` es la marca que se tenía delante, `null` si
  * nunca se editó. Con `coverUploadId` cambia o quita la portada (#591), y la
- * anterior se borra. Editar no avisa a nadie (decisión D2).
+ * anterior se borra. Con `pin` fija (`{ until }`) o desfija (`null`), y sin
+ * él la fijada sigue fijada (#592); solo un Admin puede mandarlo. Editar no
+ * avisa a nadie (decisión D2).
  *
  * La frontera lo reserva a Admin y Committee. El dominio exige además que la
  * publicación sea de quien llama, salvo al Admin, y responde 403 si no.
@@ -80,7 +83,7 @@ export function PATCH(
         decorateResponse,
       });
       const postId = readNewsPostId((await context.params).id);
-      const { expectedEditedAt, coverUploadId, ...draft } = body;
+      const { expectedEditedAt, coverUploadId, pin, ...draft } = body;
       try {
         return {
           data: await editNewsPost(requireNewsGateways(), {
@@ -92,6 +95,7 @@ export function PATCH(
               coverUploadId === undefined
                 ? { kind: "keep" }
                 : { kind: "replace", coverUploadId },
+            pin: toNewsPinChange(pin),
             now: new Date(),
           }),
         };

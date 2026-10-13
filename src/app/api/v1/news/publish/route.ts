@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
-import { newsDraftSchema } from "@/lib/news/news-api";
+import { newsDraftSchema, toNewsPinChange } from "@/lib/news/news-api";
 import {
   asNewsAttachmentApiError,
   requireNewsPublishGateways,
@@ -14,7 +14,9 @@ import { publishNewsPostWithUploads } from "@/lib/news/news-uploads";
  * audiencia, que es todo el club o al menos un grupo del club. Con
  * `attachmentUploadIds`, los adjuntos que se subieron mientras se escribía
  * (#330) quedan ligados a la publicación; sin ellos, sale sin adjuntos. Con
- * `coverUploadId`, la portada subida antes (#591).
+ * `coverUploadId`, la portada subida antes (#591). Con `pin: { until }`, sale
+ * fijada (#592): solo un Admin puede mandarlo, y a cualquier otro se le
+ * responde 403 sin guardar nada.
  *
  * Quién puede llamarlo lo decide la frontera: `RESTRICTED_ROUTES` lo reserva
  * a Admin y Committee, y el dominio lo vuelve a comprobar. El autor y el club
@@ -33,7 +35,7 @@ const postNews = createApiRoute<PublishedNewsPostResponse, NewsDraftBody>({
   schema: newsDraftSchema,
   handler: async ({ request, body, decorateResponse }) => {
     const callerId = await identifyAccountCaller({ request, decorateResponse });
-    const { attachmentUploadIds, coverUploadId, ...draft } = body;
+    const { attachmentUploadIds, coverUploadId, pin, ...draft } = body;
     try {
       return {
         data: await publishNewsPostWithUploads(requireNewsPublishGateways(), {
@@ -41,6 +43,7 @@ const postNews = createApiRoute<PublishedNewsPostResponse, NewsDraftBody>({
           draft,
           uploadIds: attachmentUploadIds,
           coverUploadId,
+          pin: toNewsPinChange(pin),
           now: new Date(),
         }),
         status: 201,

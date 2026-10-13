@@ -88,6 +88,7 @@ function publish(
     draft: DRAFT,
     uploadIds: [],
     coverUploadId,
+    pin: { kind: "keep" },
     now: NOW,
   });
 }
@@ -102,6 +103,7 @@ function edit(
     draft: DRAFT,
     expectedEditedAt: null,
     cover,
+    pin: { kind: "keep" },
     now: NOW,
   });
 }

@@ -80,6 +80,7 @@ function edit(
     draft: DRAFT,
     expectedEditedAt: null,
     cover: { kind: "keep" },
+    pin: { kind: "keep" },
     now: NOW,
     ...overrides,
   });

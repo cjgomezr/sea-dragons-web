@@ -311,10 +311,22 @@ function isReadable(post: NewsFeedItem): boolean {
   return post.status === "published";
 }
 
+/** La primera página con la fijada vigente en su sitio por fecha. El feed
+ * la trae aparte (#592), pero el inicio la enseña como una más. */
+function withPinnedByDate(page: NewsFeedPage): readonly NewsFeedItem[] {
+  if (page.pinned === null) {
+    return page.posts;
+  }
+  return [page.pinned, ...page.posts].sort(
+    (first, second) =>
+      Date.parse(second.publishedAt) - Date.parse(first.publishedAt),
+  );
+}
+
 function toLatestNews(page: NewsFeedPage): LatestNews {
   return {
     kind: "news",
-    posts: page.posts
+    posts: withPinnedByDate(page)
       .filter(isReadable)
       .slice(0, DASHBOARD_LIST_SIZE)
       .map((post) => ({
@@ -337,6 +349,7 @@ async function countUnreadFrom(
     readonly callerId: string;
     readonly page: NewsFeedPage;
     readonly sinceMs: number;
+    readonly now: Date;
   },
 ): Promise<UnreadCount> {
   const fresh = request.page.posts.filter(
@@ -357,6 +370,7 @@ async function countUnreadFrom(
     page: await listNewsFeed(gateways.news, {
       callerId: request.callerId,
       cursor: request.page.nextCursor,
+      now: request.now,
     }),
   });
   return {
@@ -380,8 +394,35 @@ async function readUnreadNewsTile(
     callerId: request.callerId,
     page: request.firstPage,
     sinceMs,
+    now: request.now,
   });
-  return { kind: "unread", ...unread };
+  return {
+    kind: "unread",
+    ...addPinnedUnread(unread, request.firstPage, sinceMs),
+  };
+}
+
+/** La fijada no sale en ninguna página del feed (#592), así que se cuenta
+ * aparte. Recorrer las páginas se corta en la primera publicación ya leída,
+ * y meterla entre ellas por fecha podría cortarlo antes de tiempo. */
+function addPinnedUnread(
+  unread: UnreadCount,
+  firstPage: NewsFeedPage,
+  sinceMs: number,
+): UnreadCount {
+  const { pinned } = firstPage;
+  if (
+    pinned === null ||
+    !isReadable(pinned) ||
+    Date.parse(pinned.publishedAt) <= sinceMs
+  ) {
+    return unread;
+  }
+  return {
+    count: unread.count + 1,
+    announcements:
+      unread.announcements + (pinned.category === "announcement" ? 1 : 0),
+  };
 }
 
 /** Lo que devuelve la fuente, o `unavailable` con el fallo en el log. Es el
@@ -449,7 +490,10 @@ async function readNewsParts(
     orUnavailable(
       gateways,
       "news",
-      listNewsFeed(gateways.news, { callerId: request.callerId }),
+      listNewsFeed(gateways.news, {
+        callerId: request.callerId,
+        now: request.now,
+      }),
     ),
     orUnavailable(
       gateways,

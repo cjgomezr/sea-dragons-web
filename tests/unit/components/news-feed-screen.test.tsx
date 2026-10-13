@@ -101,7 +101,7 @@ function stubFeed(respond: FeedStub): void {
 }
 
 function stubSinglePage(posts: readonly NewsFeedItem[]): void {
-  stubFeed(() => pageResponse({ posts, nextCursor: null }));
+  stubFeed(() => pageResponse({ pinned: null, posts, nextCursor: null }));
 }
 
 function feedList(): HTMLElement {
@@ -213,8 +213,12 @@ describe("feed de noticias", () => {
   it("carga las siguientes con el cursor recibido y conserva las que ya había", async () => {
     stubFeed((cursor) =>
       cursor === null
-        ? pageResponse({ posts: [SHORTLIST, WINTER], nextCursor: "pagina-2" })
-        : pageResponse({ posts: [POLICY], nextCursor: null }),
+        ? pageResponse({
+            pinned: null,
+            posts: [SHORTLIST, WINTER],
+            nextCursor: "pagina-2",
+          })
+        : pageResponse({ pinned: null, posts: [POLICY], nextCursor: null }),
     );
     const user = userEvent.setup();
     render(<NewsFeedScreen locale="en" canPublish={false} />);
@@ -232,8 +236,16 @@ describe("feed de noticias", () => {
   it("tras cargar más, el foco queda en la primera publicación nueva, no al principio de la página", async () => {
     stubFeed((cursor) =>
       cursor === null
-        ? pageResponse({ posts: [SHORTLIST], nextCursor: "pagina-2" })
-        : pageResponse({ posts: [WINTER, POLICY], nextCursor: null }),
+        ? pageResponse({
+            pinned: null,
+            posts: [SHORTLIST],
+            nextCursor: "pagina-2",
+          })
+        : pageResponse({
+            pinned: null,
+            posts: [WINTER, POLICY],
+            nextCursor: null,
+          }),
     );
     const user = userEvent.setup();
     render(<NewsFeedScreen locale="en" canPublish={false} />);
@@ -262,7 +274,11 @@ describe("feed de noticias", () => {
       if (attempts === 1) {
         throw new TypeError("Failed to fetch");
       }
-      return pageResponse({ posts: [SHORTLIST], nextCursor: null });
+      return pageResponse({
+        pinned: null,
+        posts: [SHORTLIST],
+        nextCursor: null,
+      });
     });
     const user = userEvent.setup();
     render(<NewsFeedScreen locale="en" canPublish={false} />);
@@ -282,13 +298,17 @@ describe("feed de noticias", () => {
     let moreAttempts = 0;
     stubFeed((cursor) => {
       if (cursor === null) {
-        return pageResponse({ posts: [SHORTLIST], nextCursor: "pagina-2" });
+        return pageResponse({
+          pinned: null,
+          posts: [SHORTLIST],
+          nextCursor: "pagina-2",
+        });
       }
       moreAttempts += 1;
       if (moreAttempts === 1) {
         throw new TypeError("Failed to fetch");
       }
-      return pageResponse({ posts: [WINTER], nextCursor: null });
+      return pageResponse({ pinned: null, posts: [WINTER], nextCursor: null });
     });
     const user = userEvent.setup();
     render(<NewsFeedScreen locale="en" canPublish={false} />);

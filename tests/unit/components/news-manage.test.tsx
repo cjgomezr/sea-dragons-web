@@ -41,6 +41,9 @@ const POST: NewsPostDetail = {
   status: "published",
   canManage: true,
   coverUrl: null,
+  isPinned: false,
+  pinnedUntil: null,
+  canPin: false,
   attachments: [],
 };
 
@@ -255,7 +258,9 @@ describe("el feed de quien publicó", () => {
       coverUrl: null,
     };
     responders[`GET ${FEED_PATH}`] = () =>
-      jsonResponse(200, { data: { posts: [withdrawn], nextCursor: null } });
+      jsonResponse(200, {
+        data: { pinned: null, posts: [withdrawn], nextCursor: null },
+      });
 
     render(<NewsFeedScreen locale="en" canPublish />);
 

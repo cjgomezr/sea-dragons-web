@@ -17,6 +17,7 @@ import {
   editNewsPost,
 } from "@/lib/news/news-management";
 import { publishNewsPostWithUploads } from "@/lib/news/news-uploads";
+import { pinNewsPost, unpinNewsPost } from "@/lib/news/news-pins";
 import { NEWS_ATTACHMENTS_BUCKET } from "@/lib/news/supabase-news-attachment-gateways";
 import { createNewsPublishGateways } from "@/lib/news/supabase-news-publish-gateways";
 import { createSupabaseNotificationWriter } from "@/lib/notifications/supabase-notification-gateways";
@@ -184,6 +185,7 @@ function publishWithoutAttachments(
     ...request,
     uploadIds: [],
     coverUploadId: null,
+    pin: { kind: "keep" },
     now: new Date(),
   });
 }
@@ -259,6 +261,7 @@ function publishWithCover(
     },
     uploadIds: [],
     coverUploadId,
+    pin: { kind: "keep" },
     now: new Date(),
   });
 }
@@ -379,6 +382,7 @@ describeRls("portadas de noticias contra seadragons-dev (#591)", () => {
             },
             expectedEditedAt: null,
             cover: { kind: "replace", coverUploadId: newCoverId },
+            pin: { kind: "keep" },
             now: new Date(),
           });
           const { data, error } = await serviceClient.client
@@ -560,6 +564,7 @@ describeRls("noticias contra seadragons-dev", () => {
           audienceGroupIds: [],
           after: { publishedAt: newer.publishedAt, id: newer.id },
           limit: 1,
+          now: new Date().toISOString(),
         });
 
         expect(rows.map((row) => row.id)).toEqual([older.id]);
@@ -628,6 +633,7 @@ describeRls("noticias contra seadragons-dev", () => {
           },
           expectedEditedAt: null,
           cover: { kind: "keep" },
+          pin: { kind: "keep" },
           now: new Date(),
         });
         expect(widened.title).toBe("Para todo el club");
@@ -641,6 +647,7 @@ describeRls("noticias contra seadragons-dev", () => {
             draft: { ...draft, title: "Pisaría a la primera" },
             expectedEditedAt: null,
             cover: { kind: "keep" },
+            pin: { kind: "keep" },
             now: new Date(),
           }),
         ).rejects.toBeInstanceOf(NewsPostChangedError);
@@ -651,6 +658,7 @@ describeRls("noticias contra seadragons-dev", () => {
           draft,
           expectedEditedAt: widened.editedAt,
           cover: { kind: "keep" },
+          pin: { kind: "keep" },
           now: new Date(),
         });
         expect(await feedIdsOf(seeded.outsider.id)).not.toContain(post.id);
@@ -798,6 +806,275 @@ describeRls("noticias contra seadragons-dev", () => {
         expect(data?.map((row) => row.user_id).sort()).toEqual(
           [seeded.squadMember.id, seeded.outsider.id].sort(),
         );
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+});
+/** Las filas de las publicaciones del club, en bloque y con su fecha, para
+ * llenar más de una página del feed sin publicar una a una. Vuelven de la más
+ * reciente a la más antigua, como las ordena el feed. */
+async function insertDatedPosts(
+  serviceClient: ServiceRoleClient,
+  seeded: SeededClub,
+  count: number,
+): Promise<readonly string[]> {
+  const { data, error } = await serviceClient.client
+    .from("news_posts")
+    .insert(
+      Array.from({ length: count }, (_, index) => ({
+        club_id: seeded.clubId,
+        author_id: seeded.admin.id,
+        category: "news",
+        title: `Crónica ${index}`,
+        body: "Ganamos.",
+        audience: "club",
+        published_at: new Date(Date.UTC(2026, 8, 1, 0, index)).toISOString(),
+      })),
+    )
+    .select("id, published_at");
+  if (error) {
+    throw new Error(
+      `No se pudieron sembrar las publicaciones: ${error.message}`,
+    );
+  }
+  return [...data]
+    .sort((first, second) =>
+      String(second.published_at).localeCompare(String(first.published_at)),
+    )
+    .map((row) => String(row.id));
+}
+
+async function readPinActions(
+  serviceClient: ServiceRoleClient,
+  seeded: SeededClub,
+): Promise<readonly unknown[]> {
+  const { data, error } = await serviceClient.client
+    .from("audit_log")
+    .select("action, entity_id, metadata")
+    .eq("club_id", seeded.clubId)
+    .in("action", ["news_post.pinned", "news_post.unpinned"])
+    .order("created_at", { ascending: true });
+  if (error) {
+    throw new Error(`No se pudo leer la bitácora: ${error.message}`);
+  }
+  return data;
+}
+
+async function readPinnedIds(
+  serviceClient: ServiceRoleClient,
+  seeded: SeededClub,
+): Promise<readonly string[]> {
+  const { data, error } = await serviceClient.client
+    .from("news_posts")
+    .select("id")
+    .eq("club_id", seeded.clubId)
+    .not("pinned_at", "is", null);
+  if (error) {
+    throw new Error(`No se pudieron leer las fijadas: ${error.message}`);
+  }
+  return data.map((row) => String(row.id));
+}
+
+const PIN_UNTIL = "2999-01-01T00:00:00.000Z";
+const PIN_UNTIL_AS_STORED = /^2999-01-01T00:00:00/;
+
+describeRls("fijar noticias contra seadragons-dev (#592)", () => {
+  it(
+    "fijar otra desfija la anterior, y la bitácora guarda las dos acciones con su fecha de fin",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, async (seeded) => {
+        const [first, second] = await insertDatedPosts(
+          serviceClient,
+          seeded,
+          2,
+        );
+        const admin = { callerId: seeded.admin.id, now: new Date() };
+
+        await pinNewsPost(seeded.gateways, {
+          ...admin,
+          postId: String(first),
+          until: PIN_UNTIL,
+        });
+        const pinned = await pinNewsPost(seeded.gateways, {
+          ...admin,
+          postId: String(second),
+          until: null,
+        });
+
+        expect(pinned).toMatchObject({ isPinned: true, pinnedUntil: null });
+        await expect(readPinnedIds(serviceClient, seeded)).resolves.toEqual([
+          second,
+        ]);
+        await expect(readPinActions(serviceClient, seeded)).resolves.toEqual([
+          {
+            action: "news_post.pinned",
+            entity_id: first,
+            metadata: { until: PIN_UNTIL },
+          },
+          {
+            action: "news_post.unpinned",
+            entity_id: first,
+            metadata: { until: expect.stringMatching(PIN_UNTIL_AS_STORED) },
+          },
+          {
+            action: "news_post.pinned",
+            entity_id: second,
+            metadata: { until: null },
+          },
+        ]);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "dos fijados a la vez sobre publicaciones distintas dejan una sola fijada",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, async (seeded) => {
+        const postIds = await insertDatedPosts(serviceClient, seeded, 2);
+
+        await Promise.all(
+          postIds.map((postId) =>
+            pinNewsPost(seeded.gateways, {
+              callerId: seeded.admin.id,
+              postId,
+              until: null,
+              now: new Date(),
+            }),
+          ),
+        );
+
+        await expect(
+          readPinnedIds(serviceClient, seeded),
+        ).resolves.toHaveLength(1);
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "retirar la fijada la desfija, volver a publicarla no la refija, y desfijar deja su rastro",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, async (seeded) => {
+        const [postId, otherId] = await insertDatedPosts(
+          serviceClient,
+          seeded,
+          2,
+        );
+        const admin = { callerId: seeded.admin.id, now: new Date() };
+        await pinNewsPost(seeded.gateways, {
+          ...admin,
+          postId: String(postId),
+          until: null,
+        });
+
+        await changeNewsPostStatus(seeded.gateways, {
+          ...admin,
+          postId: String(postId),
+          status: "withdrawn",
+        });
+        const republished = await changeNewsPostStatus(seeded.gateways, {
+          ...admin,
+          postId: String(postId),
+          status: "published",
+        });
+        await pinNewsPost(seeded.gateways, {
+          ...admin,
+          postId: String(otherId),
+          until: PIN_UNTIL,
+        });
+        await unpinNewsPost(seeded.gateways, {
+          callerId: seeded.admin.id,
+          postId: String(otherId),
+        });
+
+        expect(republished).toMatchObject({ isPinned: false });
+        await expect(readPinnedIds(serviceClient, seeded)).resolves.toEqual([]);
+        const actions = await readPinActions(serviceClient, seeded);
+        expect(actions.at(-1)).toEqual({
+          action: "news_post.unpinned",
+          entity_id: otherId,
+          metadata: { until: expect.stringMatching(PIN_UNTIL_AS_STORED) },
+        });
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "el feed trae la fijada aparte y no la repite ni en la primera página ni en la segunda",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, async (seeded) => {
+        const postIds = await insertDatedPosts(serviceClient, seeded, 23);
+        const pinnedId = String(postIds[21]);
+        await pinNewsPost(seeded.gateways, {
+          callerId: seeded.admin.id,
+          postId: pinnedId,
+          until: PIN_UNTIL,
+          now: new Date(),
+        });
+
+        const reader = { callerId: seeded.outsider.id, now: new Date() };
+        const first = await listNewsFeed(seeded.gateways, reader);
+        const second = await listNewsFeed(seeded.gateways, {
+          ...reader,
+          cursor: String(first.nextCursor),
+        });
+
+        expect(first.pinned).toMatchObject({
+          id: pinnedId,
+          pinnedUntil: expect.stringMatching(PIN_UNTIL_AS_STORED),
+        });
+        expect(second.pinned).toBeNull();
+        const listed = [...first.posts, ...second.posts].map((post) => post.id);
+        expect(listed).toEqual(postIds.filter((id) => id !== pinnedId));
+      });
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "a quien no es audiencia de la fijada le llega pinned nulo",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, async (seeded) => {
+        const post = await publishWithoutAttachments(seeded.gateways, {
+          callerId: seeded.admin.id,
+          draft: {
+            category: "announcement",
+            title: "Solo para el grupo",
+            body: "Entrenamiento extra.",
+            audience: { kind: "groups", groupIds: [seeded.squadId] },
+          },
+        });
+        await pinNewsPost(seeded.gateways, {
+          callerId: seeded.admin.id,
+          postId: post.id,
+          until: null,
+          now: new Date(),
+        });
+
+        const memberFeed = await listNewsFeed(seeded.gateways, {
+          callerId: seeded.squadMember.id,
+          now: new Date(),
+        });
+        const outsiderFeed = await listNewsFeed(seeded.gateways, {
+          callerId: seeded.outsider.id,
+          now: new Date(),
+        });
+
+        expect(memberFeed.pinned?.id).toBe(post.id);
+        expect(outsiderFeed).toMatchObject({ pinned: null, posts: [] });
       });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,

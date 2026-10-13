@@ -144,6 +144,7 @@ async function withSeededPost(
           const post = await publishNewsPostWithUploads(
             { ...gateways, ...QUIET_NEWS_NOTICES },
             {
+              pin: { kind: "keep" },
               now: new Date(),
               uploadIds: [],
               coverUploadId: null,

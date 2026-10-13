@@ -42,6 +42,7 @@ function publishWithoutAttachments(
     ...request,
     uploadIds: [],
     coverUploadId: null,
+    pin: { kind: "keep" },
     now: new Date(),
   });
 }
@@ -254,6 +255,9 @@ describe("abrir una publicación", () => {
       attachments: [attachment],
       canManage: false,
       coverUrl: null,
+      isPinned: false,
+      pinnedUntil: null,
+      canPin: false,
     });
   });
 

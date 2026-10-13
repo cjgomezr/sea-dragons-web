@@ -296,6 +296,13 @@ export const NEWS_API_PATH = "/api/v1/news";
  * alcanza cualquier cuenta activa; la que no le corresponde responde 404. */
 export const NEWS_POST_API_PATH = `${NEWS_API_PATH}/[id]`;
 
+/** Fijar (POST con `{ until }`) y desfijar (DELETE) una publicación (#592,
+ * RF-3 del PRD de E22). Solo el Admin, pero no aparece en
+ * `RESTRICTED_ROUTES`: la matriz de la sección 4 no tiene una fila para
+ * fijar, así que lo decide el dominio con el rol, y la base lo vuelve a
+ * comprobar. */
+export const NEWS_POST_PIN_API_PATH = `${NEWS_POST_API_PATH}/pin`;
+
 /** Publicar (#327, RF-2): sólo Admin y Committee (FR-057). Va en un camino
  * propio y no en el POST del feed porque la frontera decide por camino, no
  * por método, y el feed es de todos. */

@@ -70,8 +70,9 @@ create trigger news_posts_unpin_withdrawn
 -- Fija la publicación hasta `pin_until` (nula: sin fecha de fin) y desfija
 -- la que estuviera fijada. Responde `{ outcome }`: `forbidden` si quien llama
 -- no es Admin de alta en el club, `not_found`, `withdrawn`, `invalid_until`
--- si la fecha ya pasó, o `pinned` con `replaced_post_id`, la fijada vigente
--- que quitó (nula si no había).
+-- si la fecha ya pasó, o `pinned` con `replaced_post_id` y
+-- `replaced_pinned_until`, la fijada vigente que quitó y hasta cuándo iba
+-- (nulas si no había).
 --
 -- La fila del club se bloquea antes de nada: dos Admin que fijan a la vez se
 -- ponen en fila y gana el último, entero. Sin el bloqueo, el segundo chocaría
@@ -90,7 +91,7 @@ create or replace function public.pin_news_post(
 as $$
 declare
   target public.news_posts%rowtype;
-  replaced_post_id uuid;
+  replaced public.news_posts%rowtype;
 begin
   if not exists (
     select 1
@@ -121,7 +122,7 @@ begin
     return jsonb_build_object('outcome', 'invalid_until');
   end if;
 
-  select p.id into replaced_post_id
+  select * into replaced
     from public.news_posts p
    where p.club_id = acting_club_id
      and p.id <> target_post_id
@@ -142,14 +143,16 @@ begin
 
   return jsonb_build_object(
     'outcome', 'pinned',
-    'replaced_post_id', replaced_post_id
+    'replaced_post_id', replaced.id,
+    'replaced_pinned_until', replaced.pinned_until
   );
 end;
 $$;
 
 -- Desfija la publicación. Responde `{ outcome }`: `forbidden`, `not_found`,
--- `unpinned` si estaba fijada y vigente, o `not_pinned` si no lo estaba (una
--- caducada también se limpia, pero no cuenta como desfijar).
+-- `unpinned` con el `pinned_until` que tenía si estaba fijada y vigente, o
+-- `not_pinned` si no lo estaba (una caducada también se limpia, pero no
+-- cuenta como desfijar).
 create or replace function public.unpin_news_post(
   acting_club_id uuid,
   acting_user_id uuid,
@@ -196,7 +199,10 @@ begin
   if target.pinned_until is not null and target.pinned_until <= now() then
     return jsonb_build_object('outcome', 'not_pinned');
   end if;
-  return jsonb_build_object('outcome', 'unpinned');
+  return jsonb_build_object(
+    'outcome', 'unpinned',
+    'pinned_until', target.pinned_until
+  );
 end;
 $$;
 

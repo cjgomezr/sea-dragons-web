@@ -440,7 +440,9 @@ describe("permisos", () => {
         if (new URL(input, "http://localhost").pathname !== FEED_PATH) {
           throw new Error(`Petición inesperada: ${input}`);
         }
-        return jsonResponse(200, { data: { posts: [], nextCursor: null } });
+        return jsonResponse(200, {
+          data: { pinned: null, posts: [], nextCursor: null },
+        });
       }),
     );
   }

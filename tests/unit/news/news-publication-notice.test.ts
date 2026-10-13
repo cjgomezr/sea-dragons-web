@@ -59,6 +59,7 @@ function publish(
     draft,
     uploadIds: [],
     coverUploadId: null,
+    pin: { kind: "keep" },
     now: new Date(),
   });
 }
@@ -201,6 +202,7 @@ describe("cuándo no se avisa", () => {
       draft: DRAFT,
       expectedEditedAt: null,
       cover: { kind: "keep" },
+      pin: { kind: "keep" },
       now: new Date(),
     });
 

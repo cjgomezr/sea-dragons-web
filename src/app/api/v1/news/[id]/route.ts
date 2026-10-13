@@ -40,7 +40,11 @@ export function GET(
       const postId = readNewsPostId((await context.params).id);
       try {
         return {
-          data: await openNewsPost(requireNewsGateways(), { callerId, postId }),
+          data: await openNewsPost(requireNewsGateways(), {
+            callerId,
+            postId,
+            now: new Date(),
+          }),
         };
       } catch (error) {
         asNewsApiError(error);

@@ -91,6 +91,12 @@ export const AUDIT_ACTIONS = [
   "news_post.edited",
   "news_post.withdrawn",
   "news_post.republished",
+  // RF-3 de E22 (#592): un Admin fija o desfija una publicación, también
+  // cuando fijar otra quita la anterior. La entidad es la publicación
+  // (`news_post`) y la metadata lleva hasta cuándo (`{ until }`, nulo si no
+  // tenía fecha de fin). Ni el título ni el cuerpo.
+  "news_post.pinned",
+  "news_post.unpinned",
   // RF-3 de E8 (#393): un Admin o un Coach guarda la hoja de asistencia de
   // un entrenamiento, la primera vez o al corregirla. La entidad es el evento
   // (`event`), sin metadata: ni los estados ni a quién. Quién, qué sesión y

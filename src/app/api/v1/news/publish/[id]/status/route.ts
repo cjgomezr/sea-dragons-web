@@ -50,6 +50,7 @@ export function PUT(
             callerId,
             postId,
             status: body.status,
+            now: new Date(),
           }),
         };
       } catch (error) {
