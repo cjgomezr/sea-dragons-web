@@ -27,7 +27,7 @@ import {
 
 /**
  * Lo que el formulario de publicar (#330) le pide a la API v1: subir y quitar
- * un adjunto mientras se escribe, y publicar. Nada habla con la base, porque
+ * un adjunto mientras se escribe, subir la portada (#597), y publicar. Nada habla con la base, porque
  * la aplicación nativa de Release 2 va a usar estos mismos caminos (CON-002).
  * De un error se guarda el código, y la frase se arma al pintar, en el idioma
  * de la pantalla (E17).
@@ -36,6 +36,7 @@ import {
 const BYTES_PER_MEGABYTE = 1024 * 1024;
 const MAX_MEGABYTES = NEWS_ATTACHMENT_MAX_BYTES / BYTES_PER_MEGABYTE;
 const FILE_NAME_PARAM = "name";
+const UPLOAD_KIND_PARAM = "kind";
 
 const attachmentSchema = z.object({
   id: z.uuid(),
@@ -62,14 +63,22 @@ export type NewsPublishResult =
 
 export type NewsSubmission = NewsDraft & {
   readonly attachmentUploadIds: readonly string[];
+  readonly coverUploadId: string | null;
 };
+
+/** Lo que se sube antes de publicar: un adjunto, o la portada (#591). */
+type NewsUploadKind = "attachment" | "cover";
 
 /** Los bytes van tal cual en el cuerpo, y el nombre en la consulta, como en
  * #328: el servidor mira el tipo en los bytes. */
-export async function uploadNewsAttachment(
+async function uploadNewsFile(
   file: File,
+  kind: NewsUploadKind,
 ): Promise<NewsUploadResult> {
   const params = new URLSearchParams({ [FILE_NAME_PARAM]: file.name });
+  if (kind === "cover") {
+    params.set(UPLOAD_KIND_PARAM, kind);
+  }
   const read = readApiPayload(
     await requestApi(`${NEWS_UPLOADS_API_PATH}?${params.toString()}`, {
       method: "POST",
@@ -81,6 +90,16 @@ export async function uploadNewsAttachment(
   return read.kind === "failed"
     ? read
     : { kind: "uploaded", upload: read.value.data };
+}
+
+export function uploadNewsAttachment(file: File): Promise<NewsUploadResult> {
+  return uploadNewsFile(file, "attachment");
+}
+
+/** La portada se reduce en el servidor al subirla; su id va después en
+ * `coverUploadId`. */
+export function uploadNewsCover(file: File): Promise<NewsUploadResult> {
+  return uploadNewsFile(file, "cover");
 }
 
 /** Una subida que ya no está también se da por quitada: lo que se quería es

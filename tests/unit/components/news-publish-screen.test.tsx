@@ -1,4 +1,11 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NewsFeedScreen } from "@/components/news/NewsFeedScreen";
@@ -10,6 +17,10 @@ import { NEWS_ATTACHMENT_MAX_BYTES } from "@/lib/news/news-attachments";
  * lo decide el servidor (#327, #328): aquí se prueba que la pantalla manda lo
  * que se escribió, avisa junto a cada campo antes de mandar nada, sube cada
  * adjunto al elegirlo y no deja publicar a medias.
+ *
+ * El rediseño de E22 (#597) añade la portada, la categoría como control
+ * segmentado, el contador del título, el botón desactivado mientras falte
+ * algo y el aviso en el feed tras publicar.
  */
 
 const push = vi.fn();
@@ -59,6 +70,10 @@ function uploadedResponse(call: Call): Response {
       sizeBytes: 2_048,
     },
   });
+}
+
+function isCoverUpload(call: Call): boolean {
+  return new URLSearchParams(call.search).get("kind") === "cover";
 }
 
 function publishedResponse(): Response {
@@ -127,6 +142,10 @@ function pdf(name: string, size = 2_048): File {
   return new File([new Uint8Array(size)], name, { type: "application/pdf" });
 }
 
+function picture(name: string, type = "image/png", size = 2_048): File {
+  return new File([new Uint8Array(size)], name, { type });
+}
+
 async function openForm(): Promise<void> {
   render(<NewsPublishScreen locale="en" />);
   await screen.findByLabelText("Title");
@@ -137,6 +156,23 @@ async function fillValidDraft(): Promise<void> {
   await userEvent.type(
     screen.getByLabelText("Message"),
     "El martes entrenamos en MSAC.",
+  );
+}
+
+async function chooseCover(file: File): Promise<void> {
+  await userEvent.upload(screen.getByLabelText("Choose a cover photo"), file, {
+    applyAccept: false,
+  });
+}
+
+function coverGroup(): HTMLElement {
+  return screen.getByRole("group", { name: /^Cover photo/ });
+}
+
+function categoryRadio(name: string): HTMLElement {
+  return within(screen.getByRole("radiogroup", { name: "Category" })).getByRole(
+    "radio",
+    { name },
   );
 }
 
@@ -170,32 +206,42 @@ beforeEach(() => {
   respondToPublish = publishedResponse;
   respondToUpload = uploadedResponse;
   stubApi();
+  // jsdom no crea URLs de objeto: la vista previa de la portada la pide.
+  URL.createObjectURL = vi.fn((file: Blob) =>
+    file instanceof File ? `blob:${file.name}` : "blob:archivo",
+  );
+  URL.revokeObjectURL = vi.fn();
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  window.sessionStorage.clear();
 });
 
 describe("formulario de publicar", () => {
-  it("abre con categoría, título, cuerpo, audiencia y adjuntos", async () => {
+  it("abre con portada, categoría, título, cuerpo, audiencia y adjuntos, en ese orden", async () => {
     await openForm();
 
-    expect(screen.getByLabelText("Category")).toBeInTheDocument();
-    expect(screen.getByLabelText("Title")).toBeInTheDocument();
-    expect(screen.getByLabelText("Message")).toBeInTheDocument();
-    expect(
+    const fields = [
+      coverGroup(),
+      screen.getByRole("radiogroup", { name: "Category" }),
+      screen.getByLabelText("Title"),
+      screen.getByLabelText("Message"),
       screen.getByRole("group", { name: "Who sees it" }),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText("Choose files")).toBeInTheDocument();
+      screen.getByRole("group", { name: "Attachments" }),
+    ];
+    fields.slice(1).forEach((field, index) => {
+      expect(
+        fields[index]?.compareDocumentPosition(field) ??
+          Node.DOCUMENT_POSITION_PRECEDING,
+      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    });
   });
 
   it("publica para todo el club y vuelve al feed sin recargar la pantalla", async () => {
     await openForm();
     await fillValidDraft();
-    await userEvent.selectOptions(
-      screen.getByLabelText("Category"),
-      "announcement",
-    );
+    await userEvent.click(categoryRadio("Announcement"));
 
     await userEvent.click(publishButton());
 
@@ -207,6 +253,7 @@ describe("formulario de publicar", () => {
         body: "El martes entrenamos en MSAC.",
         audience: { kind: "club" },
         attachmentUploadIds: [],
+        coverUploadId: null,
       },
     ]);
   });
@@ -230,17 +277,18 @@ describe("formulario de publicar", () => {
     });
   });
 
-  it("explica que hay que elegir al menos un grupo, sin mandar nada", async () => {
+  it("explica que hay que elegir al menos un grupo, sin dejar publicar", async () => {
     await openForm();
     await fillValidDraft();
+
     await userEvent.click(
       screen.getByRole("radio", { name: /Specific groups/ }),
     );
 
-    await userEvent.click(publishButton());
-
     const groups = screen.getByRole("group", { name: "Groups" });
     expect(describedIssue(groups)).toMatch(/Choose at least one group/);
+    expect(publishButton()).toBeDisabled();
+    await userEvent.click(publishButton());
     expect(callsTo("POST", PUBLISH_PATH)).toEqual([]);
   });
 
@@ -252,33 +300,87 @@ describe("formulario de publicar", () => {
       "The title can have up to 120 characters.",
     ],
   ])(
-    "con %s avisa junto al título y no manda nada",
+    "con %s avisa junto al título y no deja publicar",
     async (_case, title, issue) => {
       await openForm();
-      if (title !== "") {
-        await userEvent.type(screen.getByLabelText("Title"), title);
-      }
       await userEvent.type(screen.getByLabelText("Message"), "Hola.");
 
-      await userEvent.click(publishButton());
+      await userEvent.type(screen.getByLabelText("Title"), title || "x");
+      if (title === "") {
+        await userEvent.clear(screen.getByLabelText("Title"));
+      }
 
       const input = screen.getByLabelText("Title");
       expect(input).toHaveAttribute("aria-invalid", "true");
       expect(describedIssue(input)).toContain(issue);
+      expect(publishButton()).toBeDisabled();
+      await userEvent.click(publishButton());
       expect(callsTo("POST", PUBLISH_PATH)).toEqual([]);
     },
   );
 
-  it("con el cuerpo vacío avisa junto al cuerpo y no manda nada", async () => {
+  it("con el cuerpo vacío avisa junto al cuerpo y no deja publicar", async () => {
     await openForm();
     await userEvent.type(screen.getByLabelText("Title"), "Cambia la piscina");
 
-    await userEvent.click(publishButton());
+    await userEvent.type(screen.getByLabelText("Message"), "x");
+    await userEvent.clear(screen.getByLabelText("Message"));
 
     const body = screen.getByLabelText("Message");
     expect(body).toHaveAttribute("aria-invalid", "true");
     expect(describedIssue(body)).toContain("Write the message.");
+    expect(publishButton()).toBeDisabled();
+    await userEvent.click(publishButton());
     expect(callsTo("POST", PUBLISH_PATH)).toEqual([]);
+  });
+
+  it("no marca como mal un campo que todavía no se tocó", async () => {
+    await openForm();
+
+    expect(screen.getByLabelText("Title")).toHaveAttribute(
+      "aria-invalid",
+      "false",
+    );
+    expect(screen.getByLabelText("Message")).toHaveAttribute(
+      "aria-invalid",
+      "false",
+    );
+  });
+
+  it.each([
+    ["sin título ni cuerpo", { title: "", body: "" }],
+    ["sin cuerpo", { title: "Cambia la piscina", body: "" }],
+    ["sin título", { title: "", body: "El martes en MSAC." }],
+  ])("publicar está desactivado %s", async (_case, draft) => {
+    await openForm();
+
+    if (draft.title !== "") {
+      await userEvent.type(screen.getByLabelText("Title"), draft.title);
+    }
+    if (draft.body !== "") {
+      await userEvent.type(screen.getByLabelText("Message"), draft.body);
+    }
+
+    expect(publishButton()).toBeDisabled();
+  });
+
+  it("publicar se activa con título, cuerpo y una audiencia válida", async () => {
+    await openForm();
+
+    await fillValidDraft();
+
+    expect(publishButton()).toBeEnabled();
+  });
+
+  it("el contador del título dice cuántos caracteres lleva de 120", async () => {
+    await openForm();
+    const title = screen.getByLabelText("Title");
+    expect(describedIssue(title)).toContain("0 / 120");
+
+    await userEvent.type(title, "Hola");
+
+    expect(screen.getByText("4 / 120")).toBeInTheDocument();
+    expect(describedIssue(title)).toContain("4 / 120");
   });
 
   it("un doble clic en publicar manda una sola publicación", async () => {
@@ -429,6 +531,261 @@ describe("adjuntos en el formulario", () => {
 
     await act(async () => finish(new Response()));
     await waitFor(() => expect(publishButton()).toBeEnabled());
+  });
+});
+
+describe("categoría segmentada", () => {
+  it("ofrece las tres categorías como opciones, con Noticia elegida al abrir", async () => {
+    await openForm();
+
+    const group = screen.getByRole("radiogroup", { name: "Category" });
+    expect(
+      within(group)
+        .getAllByRole("radio")
+        .map((radio) => radio.getAttribute("value")),
+    ).toEqual(["announcement", "news", "document"]);
+    expect(categoryRadio("News")).toBeChecked();
+  });
+
+  it("se maneja con las flechas y deja elegida la nueva", async () => {
+    await openForm();
+    categoryRadio("News").focus();
+
+    await userEvent.keyboard("{ArrowRight}");
+
+    expect(categoryRadio("Document")).toBeChecked();
+    expect(categoryRadio("Document")).toHaveFocus();
+    expect(categoryRadio("News")).not.toBeChecked();
+  });
+
+  it("publica con la categoría elegida con el teclado", async () => {
+    await openForm();
+    await fillValidDraft();
+    categoryRadio("News").focus();
+    await userEvent.keyboard("{ArrowLeft}");
+
+    await userEvent.click(publishButton());
+
+    await waitFor(() => expect(push).toHaveBeenCalled());
+    expect(callsTo("POST", PUBLISH_PATH)[0]?.body).toMatchObject({
+      category: "announcement",
+    });
+  });
+});
+
+describe("portada", () => {
+  it("sin portada enseña el fondo de la categoría y el botón de añadirla", async () => {
+    await openForm();
+
+    const cover = coverGroup();
+    expect(within(cover).getByText("No cover photo")).toBeInTheDocument();
+    expect(
+      within(cover).getByText("The news background is used instead."),
+    ).toBeInTheDocument();
+    expect(
+      within(cover).getByRole("button", { name: "Add cover photo" }),
+    ).toBeInTheDocument();
+    expect(within(cover).queryByRole("img")).toBeNull();
+  });
+
+  it("al cambiar la categoría, el fondo sin portada cambia con ella", async () => {
+    await openForm();
+
+    await userEvent.click(categoryRadio("Announcement"));
+
+    expect(
+      within(coverGroup()).getByText(
+        "The announcement background is used instead.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("una imagen válida se sube como portada y se ve con su pista y el enlace de quitarla", async () => {
+    await openForm();
+
+    await chooseCover(picture("portada.png"));
+
+    const cover = coverGroup();
+    expect(
+      await within(cover).findByRole("img", { name: "Cover photo" }),
+    ).toHaveAttribute("src", "blob:portada.png");
+    expect(
+      within(cover).getByText(
+        "Shown in the feed and at the top of the post. Landscape works best.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(cover).getByRole("button", { name: "Remove cover" }),
+    ).toBeInTheDocument();
+    expect(callsTo("POST", UPLOADS_PATH).map((call) => call.search)).toEqual([
+      "?name=portada.png&kind=cover",
+    ]);
+  });
+
+  it("publica con la portada subida", async () => {
+    await openForm();
+    await fillValidDraft();
+    await chooseCover(picture("portada.png"));
+    await within(coverGroup()).findByRole("button", { name: "Remove cover" });
+
+    await userEvent.click(publishButton());
+
+    await waitFor(() => expect(push).toHaveBeenCalled());
+    expect(callsTo("POST", PUBLISH_PATH)[0]?.body).toMatchObject({
+      coverUploadId: uploadIdFor(1),
+      attachmentUploadIds: [],
+    });
+  });
+
+  it.each([
+    [
+      "un tipo que no es imagen",
+      picture("acta.gif", "image/gif"),
+      "The cover must be a JPEG, PNG or WebP image.",
+    ],
+    [
+      "una imagen de más de 10 MB",
+      picture("enorme.png", "image/png", NEWS_ATTACHMENT_MAX_BYTES + 1),
+      "The cover can be up to 10 MB.",
+    ],
+    [
+      "un archivo vacío",
+      picture("vacia.png", "image/png", 0),
+      "The cover image is empty.",
+    ],
+  ])("con %s dice por qué y no la sube", async (_case, file, reason) => {
+    await openForm();
+
+    await chooseCover(file);
+
+    expect(
+      await within(coverGroup()).findByRole("alert"),
+    ).toHaveTextContent(reason);
+    expect(callsTo("POST", UPLOADS_PATH)).toEqual([]);
+    expect(within(coverGroup()).getByText("No cover photo")).toBeVisible();
+  });
+
+  it("si el servidor la rechaza, dice por qué y vuelve el fondo", async () => {
+    respondToUpload = () =>
+      jsonResponse(400, {
+        error: {
+          code: "validation_error",
+          message: "Tipo no admitido.",
+          reason: "cover_type_unsupported",
+        },
+      });
+    await openForm();
+
+    await chooseCover(picture("falsa.png"));
+
+    expect(
+      await within(coverGroup()).findByRole("alert"),
+    ).toHaveTextContent("The cover must be a JPEG, PNG or WebP image.");
+    expect(within(coverGroup()).getByText("No cover photo")).toBeVisible();
+  });
+
+  it("quitar la portada vuelve al fondo y publica sin ella", async () => {
+    await openForm();
+    await fillValidDraft();
+    await chooseCover(picture("portada.png"));
+
+    await userEvent.click(
+      await within(coverGroup()).findByRole("button", { name: "Remove cover" }),
+    );
+
+    expect(within(coverGroup()).getByText("No cover photo")).toBeVisible();
+    expect(
+      within(coverGroup()).getByRole("button", { name: "Add cover photo" }),
+    ).toHaveFocus();
+    await userEvent.click(publishButton());
+    await waitFor(() => expect(push).toHaveBeenCalled());
+    expect(callsTo("POST", PUBLISH_PATH)[0]?.body).toMatchObject({
+      coverUploadId: null,
+    });
+  });
+
+  it("mientras sube la portada, lo dice y no deja publicar", async () => {
+    let finish: () => void = () => undefined;
+    respondToUpload = (call) =>
+      new Promise((resolve) => {
+        finish = () => resolve(uploadedResponse(call));
+      });
+    await openForm();
+    await fillValidDraft();
+
+    await chooseCover(picture("portada.png"));
+
+    expect(within(coverGroup()).getByText("Uploading…")).toBeInTheDocument();
+    expect(publishButton()).toBeDisabled();
+
+    await act(async () => finish());
+    await waitFor(() => expect(publishButton()).toBeEnabled());
+    expect(isCoverUpload(callsTo("POST", UPLOADS_PATH)[0] as Call)).toBe(true);
+  });
+});
+
+describe("aviso de publicada en el feed", () => {
+  function stubFeedAfterPublishing(): void {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const pathname = new URL(input, "http://localhost").pathname;
+        if (pathname === FEED_PATH) {
+          return jsonResponse(200, {
+            data: { pinned: null, posts: [], nextCursor: null },
+          });
+        }
+        return new Response(null, { status: 204 });
+      }),
+    );
+  }
+
+  async function publishAndOpenFeed(): Promise<void> {
+    await userEvent.click(publishButton());
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/noticias"));
+    cleanup();
+    stubFeedAfterPublishing();
+    render(<NewsFeedScreen locale="en" canPublish />);
+  }
+
+  it("al volver al feed dice que se publicó y que se avisó a todo el club", async () => {
+    await openForm();
+    await fillValidDraft();
+
+    await publishAndOpenFeed();
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Published · we notified the whole club",
+    );
+  });
+
+  it("nombra los grupos avisados", async () => {
+    await openForm();
+    await fillValidDraft();
+    await userEvent.click(
+      screen.getByRole("radio", { name: /Specific groups/ }),
+    );
+    await userEvent.click(screen.getByLabelText("Senior"));
+    await userEvent.click(screen.getByLabelText("Masters"));
+
+    await publishAndOpenFeed();
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Published · we notified Senior and Masters",
+    );
+  });
+
+  it("el aviso sale una sola vez", async () => {
+    await openForm();
+    await fillValidDraft();
+    await publishAndOpenFeed();
+    await screen.findByRole("status");
+
+    cleanup();
+    render(<NewsFeedScreen locale="en" canPublish />);
+
+    await screen.findByText(/Nothing has been published/);
+    expect(screen.queryByText(/^Published ·/)).toBeNull();
   });
 });
 

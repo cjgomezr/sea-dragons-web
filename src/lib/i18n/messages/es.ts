@@ -1777,7 +1777,6 @@ export const spanishMessages: MessageCatalog = {
     "No pudimos cargar los grupos del club. Vuelve a intentarlo.",
   "news.publish.category": "Categoría",
   "news.publish.titleLabel": "Título",
-  "news.publish.titleHint": "Hasta {max} caracteres.",
   "news.publish.body": "Mensaje",
   "news.publish.bodyHint": "Texto plano. Se respetan los saltos de línea.",
   "news.publish.audience.legend": "Quién la ve",
@@ -1810,6 +1809,19 @@ export const spanishMessages: MessageCatalog = {
     "Una publicación puede llevar como mucho {max} adjuntos.",
   "news.publish.attachments.issue.uploadMissing":
     "Un adjunto ya no está subido. Quítalo y vuelve a adjuntarlo.",
+  "news.publish.titleCounter": "{length} / {max}",
+  "news.publish.cover.legend": "Portada",
+  "news.publish.cover.optional": "opcional",
+  "news.publish.cover.empty": "Sin portada",
+  "news.publish.cover.fallback": "Se usa el fondo de {category}.",
+  "news.publish.cover.add": "Añadir portada",
+  "news.publish.cover.choose": "Elegir una portada",
+  "news.publish.cover.preview": "Portada",
+  "news.publish.cover.hint":
+    "Se muestra en el feed y arriba de la publicación. Mejor en horizontal.",
+  "news.publish.cover.remove": "Quitar portada",
+  "news.published.notice": "Publicada · avisamos a {audience}",
+  "news.published.audience.club": "todo el club",
   "news.publish.cover.issue.empty": "La portada está vacía.",
   "news.publish.cover.issue.tooLarge": "La portada puede pesar hasta {max} MB.",
   "news.publish.cover.issue.typeUnsupported":
@@ -1824,7 +1836,7 @@ export const spanishMessages: MessageCatalog = {
     "Elige al menos un grupo, o mándala a todo el club.",
   "news.publish.submit": "Publicar",
   "news.publish.sending": "Publicando…",
-  "news.publish.waitForUploads": "Espera a que terminen de subir los adjuntos.",
+  "news.publish.waitForUploads": "Espera a que terminen las subidas.",
   "news.publish.error.network":
     "No pudimos llegar al servidor. No se publicó nada: revisa tu conexión y vuelve a intentarlo.",
   "news.publish.error.signInRequired":

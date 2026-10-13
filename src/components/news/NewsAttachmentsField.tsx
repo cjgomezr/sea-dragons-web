@@ -1,5 +1,7 @@
 "use client";
 
+import { Paperclip } from "@phosphor-icons/react/dist/ssr/Paperclip";
+import { X } from "@phosphor-icons/react/dist/ssr/X";
 import { useRef } from "react";
 import { AttachmentIcon } from "@/components/NavIcons";
 import { formatFileSize } from "@/lib/i18n/format";
@@ -19,6 +21,9 @@ import type {
  * Los adjuntos del formulario de publicar (#330): el botón que los elige, la
  * lista de lo subido y de lo que se está subiendo, y por qué no valió lo que
  * no valió. Lo que se sube lo lleva `useNewsAttachments`.
+ *
+ * Con el rediseño de E22 (#597) cada adjunto es una fila de archivo que se
+ * quita con una X, y "Añadir archivos" es una zona punteada a todo el ancho.
  */
 
 const LEGEND_ID = "publicar-adjuntos";
@@ -82,16 +87,17 @@ function AttachmentRow({
       </span>
       <button
         type="button"
-        className="admin-secondary"
+        className="news-publish-attachment-remove"
         disabled={entry.isRemoving}
         onClick={() => onRemove(entry.key)}
-        // Empieza por el texto visible, así que quien lo pide por voz lo
-        // encuentra, y el nombre dice cuál de los adjuntos se quita.
+        // El nombre dice cuál de los adjuntos se quita, y el title lo enseña
+        // a quien pasa el puntero por la X.
         aria-label={translate("news.publish.attachments.removeNamed", {
           name: fileName,
         })}
+        title={translate("news.publish.attachments.remove")}
       >
-        {translate("news.publish.attachments.remove")}
+        <X aria-hidden="true" focusable="false" size={18} />
       </button>
     </li>
   );
@@ -161,10 +167,11 @@ export function NewsAttachmentsField({
       />
       <button
         type="button"
-        className="admin-secondary news-publish-add"
+        className="news-publish-add"
         aria-describedby={HINT_ID}
         onClick={() => input.current?.click()}
       >
+        <Paperclip aria-hidden="true" focusable="false" size={18} />
         {translate("news.publish.attachments.add")}
       </button>
     </fieldset>
