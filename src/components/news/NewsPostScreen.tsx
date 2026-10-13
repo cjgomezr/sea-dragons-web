@@ -62,12 +62,17 @@ function PostNotFound({
   );
 }
 
+/** Nula si a ninguno de sus grupos le queda nombre (se borraron todos): un
+ * "Para" sin nada detrás no dice nada. */
 function describeAudience(
   translate: Translator,
   audience: NewsPostAudienceLabel,
-): string {
+): string | null {
   if (audience.kind === "club") {
     return translate("news.post.audience.club");
+  }
+  if (audience.groupNames.length === 0) {
+    return null;
   }
   return translate("news.post.audience.groups", {
     groups: audience.groupNames.join(AUDIENCE_SEPARATOR),
@@ -117,6 +122,7 @@ function PostContent({
   readonly post: NewsPostDetail;
   readonly onChanged: (post: NewsPostDetail) => void;
 }): React.JSX.Element {
+  const audience = describeAudience(translate, post.audience);
   return (
     <article className="news-post">
       <div className="news-post-cover">
@@ -130,7 +136,7 @@ function PostContent({
         <header className="news-post-header">
           <p className="news-post-meta">
             <NewsCategoryLabel translate={translate} category={post.category} />
-            <span>{describeAudience(translate, post.audience)}</span>
+            {audience === null ? null : <span>{audience}</span>}
             {post.status === "withdrawn" ? (
               <span className="news-withdrawn">
                 {translate("news.post.withdrawn")}

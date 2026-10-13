@@ -12,6 +12,7 @@ import {
   type NewsUnpinned,
   NewsPostNotFoundError,
   canPinNewsPosts,
+  ALL_AUDIENCE_GROUPS,
   describeNewsPost,
   findNewsReader,
 } from "./news-posts";
@@ -212,7 +213,7 @@ async function readPinnedDetail(
   return describeNewsPost(gateways, post, {
     access: { canManage: true, canPin: true },
     now: request.now,
-    readerGroupIds: [],
+    namedGroups: ALL_AUDIENCE_GROUPS,
   });
 }
 

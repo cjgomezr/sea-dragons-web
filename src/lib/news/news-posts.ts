@@ -82,10 +82,10 @@ export type NewsPostAudienceLabel =
 
 /** Lo que recibe quien abre una publicación. Ni el club ni los ids de la
  * audiencia. De los grupos, quien la lee sólo ve los suyos: a qué otros
- * grupos iba no es asunto suyo. Quien la gestiona los ve todos. `canManage` dice si
- * quien la abre puede editarla y retirarla (#331), para que la pantalla no
- * tenga que repetir la regla. `coverUrl` es la versión grande de la portada,
- * firmada (#591). */
+ * grupos iba no es asunto suyo. Quien la publicó o la gestiona los ve todos.
+ * `canManage` dice si quien la abre puede editarla y retirarla (#331), para
+ * que la pantalla no tenga que repetir la regla. `coverUrl` es la versión
+ * grande de la portada, firmada (#591). */
 export type NewsPostDetail = Omit<
   NewsPost,
   "clubId" | "author" | "authorPhotoPath" | "audience" | "coverUploadId" | "pin"
@@ -435,14 +435,21 @@ export async function normalizeNewsDraft(
   return { category: draft.category, title, body, audience };
 }
 
-/** Cómo la ve quien la abre: qué puede hacer con ella y a qué hora, contra
- * la que caduca el fijado (D7). */
+/** Qué grupos de la audiencia se le nombran a quien la abre (#596): todos a
+ * quien la publicó o la gestiona, y a quien sólo la lee, los suyos. */
+export type NamedAudienceGroups =
+  | { readonly kind: "all" }
+  | { readonly kind: "readerGroups"; readonly groupIds: readonly string[] };
+
+export const ALL_AUDIENCE_GROUPS: NamedAudienceGroups = { kind: "all" };
+
+/** Cómo la ve quien la abre: qué puede hacer con ella, qué grupos de su
+ * audiencia se le nombran y a qué hora, contra la que caduca el fijado
+ * (D7). */
 export type NewsPostView = {
   readonly access: NewsPostAccess;
   readonly now: Date;
-  /** Los grupos de quien la abre, para nombrarle sólo los suyos. A quien la
-   * gestiona se le nombran todos. */
-  readonly readerGroupIds: readonly string[];
+  readonly namedGroups: NamedAudienceGroups;
 };
 
 /** Lo que se firma o se busca aparte de la fila de la publicación. */
@@ -485,9 +492,13 @@ async function describeAudience(
   if (post.audience.kind === "club") {
     return { kind: "club" };
   }
-  const groupIds = view.access.canManage
-    ? post.audience.groupIds
-    : post.audience.groupIds.filter((id) => view.readerGroupIds.includes(id));
+  const { namedGroups } = view;
+  const groupIds =
+    namedGroups.kind === "all"
+      ? post.audience.groupIds
+      : post.audience.groupIds.filter((id) =>
+          namedGroups.groupIds.includes(id),
+        );
   const names = await gateways.posts.findGroupNames({
     clubId: post.clubId,
     groupIds,
@@ -604,15 +615,19 @@ export async function openNewsPost(
   if (post === null || !isVisibleTo(post, { id: request.callerId, groupIds })) {
     throw new NewsPostNotFoundError();
   }
+  const canManage = canManageNewsPost(
+    { id: request.callerId, role: caller.role },
+    post,
+  );
+  // Quien la publicó la sigue viendo aunque ya no pueda gestionarla, y
+  // entonces también a quién iba.
+  const isAuthor = post.author.id === request.callerId;
   return describeNewsPost(gateways, post, {
-    access: {
-      canManage: canManageNewsPost(
-        { id: request.callerId, role: caller.role },
-        post,
-      ),
-      canPin: canPinNewsPosts(caller.role),
-    },
+    access: { canManage, canPin: canPinNewsPosts(caller.role) },
     now: request.now ?? new Date(),
-    readerGroupIds: groupIds,
+    namedGroups:
+      canManage || isAuthor
+        ? ALL_AUDIENCE_GROUPS
+        : { kind: "readerGroups", groupIds },
   });
 }

@@ -22,6 +22,7 @@ import {
   NewsPostNotFoundError,
   canManageNewsPost,
   canPinNewsPosts,
+  ALL_AUDIENCE_GROUPS,
   describeNewsPost,
   findNewsPublisher,
   normalizeNewsDraft,
@@ -146,8 +147,7 @@ function managerView(managed: ManagedPost, now: Date): NewsPostView {
   return {
     access: { canManage: true, canPin: canPinNewsPosts(managed.role) },
     now,
-    // Quien la gestiona ve todos los grupos de la audiencia, sean suyos o no.
-    readerGroupIds: [],
+    namedGroups: ALL_AUDIENCE_GROUPS,
   };
 }
 

@@ -239,6 +239,14 @@ describe("publicación abierta", () => {
     expect(screen.getByText("For U16 squad · Parents")).toBeInTheDocument();
   });
 
+  it("si ya no queda ningún grupo que nombrar, no deja la audiencia a medias", async () => {
+    stubPost({ ...POST, audience: { kind: "groups", groupNames: [] } });
+
+    await renderPost();
+
+    expect(screen.queryByText(/^For/)).toBeNull();
+  });
+
   it("dice la audiencia en español", async () => {
     stubPost({ ...POST, audience: { kind: "groups", groupNames: ["Sub-16"] } });
 
