@@ -210,10 +210,13 @@ columna password_recovery_requests.email_hash tipo=text null=NO default=-
 columna password_recovery_requests.id tipo=uuid null=NO default=gen_random_uuid()
 columna password_recovery_requests.requested_at tipo=timestamp with time zone null=NO default=now()
 columna payments.amount_cents tipo=integer null=NO default=-
+columna payments.card_brand tipo=text null=YES default=-
+columna payments.card_last4 tipo=text null=YES default=-
 columna payments.club_id tipo=uuid null=NO default=-
 columna payments.created_at tipo=timestamp with time zone null=NO default=now()
 columna payments.currency tipo=text null=NO default='aud'::text
 columna payments.description tipo=text null=YES default=-
+columna payments.failure_reason tipo=text null=YES default=-
 columna payments.id tipo=uuid null=NO default=gen_random_uuid()
 columna payments.paid_at tipo=timestamp with time zone null=YES default=-
 columna payments.status tipo=text null=NO default=-
@@ -1207,6 +1210,7 @@ restriccion notifications.notifications_type_check CHECK ((type = ANY (ARRAY['ro
 restriccion password_recovery_requests.password_recovery_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion password_recovery_requests.password_recovery_requests_pkey PRIMARY KEY (id)
 restriccion payments.payments_amount_cents_check CHECK ((amount_cents >= 0))
+restriccion payments.payments_card_last4_check CHECK ((card_last4 ~ '^[0-9]{4}$'::text))
 restriccion payments.payments_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion payments.payments_currency_check CHECK ((currency ~ '^[a-z]{3}$'::text))
 restriccion payments.payments_id_user_id_club_id_key UNIQUE (id, user_id, club_id)
