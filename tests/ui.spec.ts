@@ -11830,6 +11830,7 @@ async function openWithdrawConfirmation(page: Page): Promise<void> {
   // En el móvil la ventana de 1×1 sigue siendo de móvil: la hoja no se cierra.
   if (!isPhoneViewport(page)) {
     await fitViewportToPage(page);
+    await expect(page.getByText(WITHDRAW_QUESTION)).toBeVisible();
   }
 }
 
