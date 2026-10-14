@@ -271,6 +271,7 @@ describe("si no se puede leer la fijada vigente", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't load the post. Try again.",
     );
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
   });
 });
 
