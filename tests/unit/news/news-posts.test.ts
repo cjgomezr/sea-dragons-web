@@ -17,8 +17,11 @@ import { publishNewsPostWithUploads } from "@/lib/news/news-uploads";
 import { fakeAttachmentClub } from "../helpers/news-attachments-club";
 import {
   AUTHOR,
+  AUTHOR_PHOTO_PATH,
+  AUTHOR_PHOTO_SIGNED_URL_PREFIX,
   CALLER_ID,
   CLUB_ID,
+  GROUP_NAMES,
   MASTERS_SQUAD_ID,
   OTHER_CLUB_ID,
   SENIOR_SQUAD_ID,
@@ -248,7 +251,8 @@ describe("abrir una publicación", () => {
       category: "news",
       title: "Cambia la piscina",
       body,
-      author: AUTHOR,
+      author: { ...AUTHOR, photoUrl: null },
+      audience: { kind: "club" },
       publishedAt: "2026-09-26T10:00:00.000000+00:00",
       editedAt: "2026-09-27T08:00:00.000000+00:00",
       status: "published",
@@ -376,6 +380,96 @@ describe("abrir una publicación", () => {
     });
 
     expect(post.id).toBe(POST_ID);
+  });
+
+  it("da la foto del autor con su dirección firmada (#596)", async () => {
+    const club = fakeAttachmentClub({
+      posts: [aPost({ id: POST_ID, authorPhotoPath: AUTHOR_PHOTO_PATH })],
+    });
+
+    const post = await openNewsPost(club.gateways, {
+      callerId: CALLER_ID,
+      postId: POST_ID,
+    });
+
+    expect(post.author.photoUrl).toBe(
+      `${AUTHOR_PHOTO_SIGNED_URL_PREFIX}${AUTHOR_PHOTO_PATH}`,
+    );
+  });
+
+  it("a quien está en uno de sus grupos le nombra ese grupo y no los demás", async () => {
+    const club = fakeAttachmentClub({
+      callerGroupIds: [MASTERS_SQUAD_ID],
+      posts: [
+        aPost({
+          id: POST_ID,
+          audience: {
+            kind: "groups",
+            groupIds: [SENIOR_SQUAD_ID, MASTERS_SQUAD_ID],
+          },
+        }),
+      ],
+    });
+
+    const post = await openNewsPost(club.gateways, {
+      callerId: CALLER_ID,
+      postId: POST_ID,
+    });
+
+    expect(post.audience).toEqual({
+      kind: "groups",
+      groupNames: [GROUP_NAMES[MASTERS_SQUAD_ID]],
+    });
+  });
+
+  it("a quien la publicó le nombra todos los grupos de su audiencia", async () => {
+    const club = fakeAttachmentClub({
+      callerRole: "Committee",
+      posts: [
+        aPost({
+          id: POST_ID,
+          author: { id: CALLER_ID, fullName: "Quien llama" },
+          audience: {
+            kind: "groups",
+            groupIds: [SENIOR_SQUAD_ID, MASTERS_SQUAD_ID],
+          },
+        }),
+      ],
+    });
+
+    const post = await openNewsPost(club.gateways, {
+      callerId: CALLER_ID,
+      postId: POST_ID,
+    });
+
+    expect(post.audience).toEqual({
+      kind: "groups",
+      groupNames: [GROUP_NAMES[MASTERS_SQUAD_ID], GROUP_NAMES[SENIOR_SQUAD_ID]],
+    });
+  });
+
+  it("a quien la publicó y ya no puede gestionarla le sigue nombrando todos sus grupos", async () => {
+    const club = fakeAttachmentClub({
+      callerRole: "Player",
+      posts: [
+        aPost({
+          id: POST_ID,
+          author: { id: CALLER_ID, fullName: "Quien llama" },
+          audience: { kind: "groups", groupIds: [SENIOR_SQUAD_ID] },
+        }),
+      ],
+    });
+
+    const post = await openNewsPost(club.gateways, {
+      callerId: CALLER_ID,
+      postId: POST_ID,
+    });
+
+    expect(post.canManage).toBe(false);
+    expect(post.audience).toEqual({
+      kind: "groups",
+      groupNames: [GROUP_NAMES[SENIOR_SQUAD_ID]],
+    });
   });
 
   it("no le da a nadie más que al autor la retirada, ni al Admin", async () => {

@@ -58,6 +58,8 @@ export type NewsPost = {
   readonly title: string;
   readonly body: string;
   readonly author: NewsAuthor;
+  /** La miniatura de la foto del autor en `member-photos` (#596). */
+  readonly authorPhotoPath: string | null;
   readonly publishedAt: string;
   readonly editedAt: string | null;
   readonly status: NewsPostStatus;
@@ -69,15 +71,27 @@ export type NewsPost = {
   readonly pin: NewsPin | null;
 };
 
-/** Lo que recibe quien abre una publicación. Ni el club ni la audiencia: a
- * qué otros grupos iba no es asunto de quien la lee. `canManage` dice si
- * quien la abre puede editarla y retirarla (#331), para que la pantalla no
- * tenga que repetir la regla. `coverUrl` es la versión grande de la portada,
- * firmada (#591). */
+/** El autor de una publicación abierta, con su foto firmada (#596). */
+export type NewsPostAuthor = NewsAuthor & { readonly photoUrl: string | null };
+
+/** A quién va, dicho para quien la abre (#596): todo el club, o los grupos
+ * por su nombre. */
+export type NewsPostAudienceLabel =
+  | { readonly kind: "club" }
+  | { readonly kind: "groups"; readonly groupNames: readonly string[] };
+
+/** Lo que recibe quien abre una publicación. Ni el club ni los ids de la
+ * audiencia. De los grupos, quien la lee sólo ve los suyos: a qué otros
+ * grupos iba no es asunto suyo. Quien la publicó o la gestiona los ve todos.
+ * `canManage` dice si quien la abre puede editarla y retirarla (#331), para
+ * que la pantalla no tenga que repetir la regla. `coverUrl` es la versión
+ * grande de la portada, firmada (#591). */
 export type NewsPostDetail = Omit<
   NewsPost,
-  "clubId" | "audience" | "coverUploadId" | "pin"
+  "clubId" | "author" | "authorPhotoPath" | "audience" | "coverUploadId" | "pin"
 > & {
+  readonly author: NewsPostAuthor;
+  readonly audience: NewsPostAudienceLabel;
   readonly canManage: boolean;
   readonly coverUrl: string | null;
   /** Si está fijada ahora (#592). Una caducada no lo está (D7), y entonces
@@ -206,6 +220,11 @@ export type NewsPostsGateway = {
     readonly clubId: string;
     readonly groupIds: readonly string[];
   }): Promise<ReadonlySet<string>>;
+  /** El nombre de cada uno de estos grupos que sea del club, por su id. */
+  findGroupNames(query: {
+    readonly clubId: string;
+    readonly groupIds: readonly string[];
+  }): Promise<ReadonlyMap<string, string>>;
   insertPost(post: NewNewsPost): Promise<NewsPost>;
   /** Las publicadas del club que van a todo el club o a alguno de esos
    * grupos, de la más reciente a la más antigua y desde `after`. */
@@ -244,6 +263,10 @@ export type NewsGateways = {
   readonly memberGroups: MemberGroupsGateway;
   readonly posts: NewsPostsGateway;
   readonly covers: NewsCoversGateway;
+  /** Firma la miniatura de la foto de un socio, o nula si no se pudo. */
+  readonly authorPhotos: {
+    signPhotoUrl(photoPath: string): Promise<string | null>;
+  };
   readonly audit: AuditLogWriter;
 };
 
@@ -412,17 +435,34 @@ export async function normalizeNewsDraft(
   return { category: draft.category, title, body, audience };
 }
 
-/** Cómo la ve quien la abre: qué puede hacer con ella y a qué hora, contra
- * la que caduca el fijado (D7). */
+/** Qué grupos de la audiencia se le nombran a quien la abre (#596): todos a
+ * quien la publicó o la gestiona, y a quien sólo la lee, los suyos. */
+export type NamedAudienceGroups =
+  | { readonly kind: "all" }
+  | { readonly kind: "readerGroups"; readonly groupIds: readonly string[] };
+
+export const ALL_AUDIENCE_GROUPS: NamedAudienceGroups = { kind: "all" };
+
+/** Cómo la ve quien la abre: qué puede hacer con ella, qué grupos de su
+ * audiencia se le nombran y a qué hora, contra la que caduca el fijado
+ * (D7). */
 export type NewsPostView = {
   readonly access: NewsPostAccess;
   readonly now: Date;
+  readonly namedGroups: NamedAudienceGroups;
+};
+
+/** Lo que se firma o se busca aparte de la fila de la publicación. */
+type NewsPostExtras = {
+  readonly coverUrl: string | null;
+  readonly author: NewsPostAuthor;
+  readonly audience: NewsPostAudienceLabel;
 };
 
 function toNewsPostDetail(
   post: NewsPost,
   view: NewsPostView,
-  coverUrl: string | null,
+  extras: NewsPostExtras,
 ): NewsPostDetail {
   const isPinned = isNewsPinActive(post.pin, view.now);
   return {
@@ -430,33 +470,77 @@ function toNewsPostDetail(
     category: post.category,
     title: post.title,
     body: post.body,
-    author: post.author,
+    author: extras.author,
+    audience: extras.audience,
     publishedAt: post.publishedAt,
     editedAt: post.editedAt,
     status: post.status,
     attachments: post.attachments,
     canManage: view.access.canManage,
-    coverUrl,
+    coverUrl: extras.coverUrl,
     isPinned,
     pinnedUntil: isPinned && post.pin !== null ? post.pin.pinnedUntil : null,
     canPin: view.access.canPin,
   };
 }
 
-/** El detalle con la grande de su portada firmada. Firmar no comprueba la
- * audiencia: quien llama ya decidió que la publicación se le enseña. */
+async function describeAudience(
+  gateways: Pick<NewsGateways, "posts">,
+  post: NewsPost,
+  view: NewsPostView,
+): Promise<NewsPostAudienceLabel> {
+  if (post.audience.kind === "club") {
+    return { kind: "club" };
+  }
+  const { namedGroups } = view;
+  const groupIds =
+    namedGroups.kind === "all"
+      ? post.audience.groupIds
+      : post.audience.groupIds.filter((id) =>
+          namedGroups.groupIds.includes(id),
+        );
+  const names = await gateways.posts.findGroupNames({
+    clubId: post.clubId,
+    groupIds,
+  });
+  return {
+    kind: "groups",
+    groupNames: [...names.values()].sort((first, second) =>
+      first.localeCompare(second),
+    ),
+  };
+}
+
+async function describeAuthor(
+  gateways: Pick<NewsGateways, "authorPhotos">,
+  post: NewsPost,
+): Promise<NewsPostAuthor> {
+  const photoUrl =
+    post.authorPhotoPath === null
+      ? null
+      : await gateways.authorPhotos.signPhotoUrl(post.authorPhotoPath);
+  return { ...post.author, photoUrl };
+}
+
+/** El detalle con la grande de su portada y la foto del autor firmadas.
+ * Firmar no comprueba la audiencia: quien llama ya decidió que la
+ * publicación se le enseña. */
 export async function describeNewsPost(
-  gateways: Pick<NewsGateways, "covers">,
+  gateways: Pick<NewsGateways, "covers" | "posts" | "authorPhotos">,
   post: NewsPost,
   view: NewsPostView,
 ): Promise<NewsPostDetail> {
-  const coverUrl = await signNewsCoverUrl(
-    gateways.covers,
-    post.coverUploadId === null
-      ? null
-      : { id: post.coverUploadId, clubId: post.clubId },
-  );
-  return toNewsPostDetail(post, view, coverUrl);
+  const [coverUrl, author, audience] = await Promise.all([
+    signNewsCoverUrl(
+      gateways.covers,
+      post.coverUploadId === null
+        ? null
+        : { id: post.coverUploadId, clubId: post.clubId },
+    ),
+    describeAuthor(gateways, post),
+    describeAudience(gateways, post, view),
+  ]);
+  return toNewsPostDetail(post, view, { coverUrl, author, audience });
 }
 
 /** Una publicación lista para guardar, con el rol de quien la publica, que
@@ -531,14 +615,19 @@ export async function openNewsPost(
   if (post === null || !isVisibleTo(post, { id: request.callerId, groupIds })) {
     throw new NewsPostNotFoundError();
   }
+  const canManage = canManageNewsPost(
+    { id: request.callerId, role: caller.role },
+    post,
+  );
+  // Quien la publicó la sigue viendo aunque ya no pueda gestionarla, y
+  // entonces también a quién iba.
+  const isAuthor = post.author.id === request.callerId;
   return describeNewsPost(gateways, post, {
-    access: {
-      canManage: canManageNewsPost(
-        { id: request.callerId, role: caller.role },
-        post,
-      ),
-      canPin: canPinNewsPosts(caller.role),
-    },
+    access: { canManage, canPin: canPinNewsPosts(caller.role) },
     now: request.now ?? new Date(),
+    namedGroups:
+      canManage || isAuthor
+        ? ALL_AUDIENCE_GROUPS
+        : { kind: "readerGroups", groupIds },
   });
 }

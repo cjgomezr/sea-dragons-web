@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { fakeCoverlessGateway } from "../helpers/news-club";
+import {
+  fakeAuthorPhotosGateway,
+  fakeCoverlessGateway,
+} from "../helpers/news-club";
 import type {
   ClubAttendanceRate,
   MemberAttendance,
@@ -233,6 +236,7 @@ function gateways(): DashboardGateways {
       memberGroups,
       posts: {
         findClubGroupIds: async () => new Set(),
+        findGroupNames: async () => new Map(),
         insertPost: async () => {
           throw new Error("el dashboard no publica");
         },
@@ -250,6 +254,7 @@ function gateways(): DashboardGateways {
         },
       },
       covers: fakeCoverlessGateway(),
+      authorPhotos: fakeAuthorPhotosGateway(),
       audit: { insertAuditLogRow: async () => ({ error: null }) },
     },
     roster: {
