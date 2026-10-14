@@ -72,6 +72,7 @@ columna event_series.audience tipo=text null=NO default=-
 columna event_series.author_id tipo=uuid null=NO default=-
 columna event_series.club_id tipo=uuid null=NO default=-
 columna event_series.created_at tipo=timestamp with time zone null=NO default=now()
+columna event_series.end_time tipo=time without time zone null=YES default=-
 columna event_series.ends_on tipo=date null=NO default=-
 columna event_series.event_type tipo=text null=NO default=-
 columna event_series.id tipo=uuid null=NO default=gen_random_uuid()
@@ -89,6 +90,8 @@ columna events.author_id tipo=uuid null=NO default=-
 columna events.cancelled_at tipo=timestamp with time zone null=YES default=-
 columna events.club_id tipo=uuid null=NO default=-
 columna events.created_at tipo=timestamp with time zone null=NO default=now()
+columna events.end_time tipo=time without time zone null=YES default=-
+columna events.ends_on tipo=date null=YES default=-
 columna events.event_type tipo=text null=NO default=-
 columna events.id tipo=uuid null=NO default=gen_random_uuid()
 columna events.location tipo=text null=NO default=-
