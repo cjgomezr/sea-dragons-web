@@ -12217,19 +12217,22 @@ test.describe("noticias en el navegador", () => {
     // "Final" empieza tras un salto y "Training" tras una línea en blanco.
     // Sólo con los saltos respetados queda entre las dos un renglón vacío:
     // colapsados, "Training" iría en la misma línea o en la siguiente.
+    // El cuerpo es Markdown (#596): cada palabra se busca en todos sus nodos
+    // de texto, porque el salto y la línea en blanco los parten.
     const layout = await page
-      .getByText(/Final eight confirmed/)
+      .locator("article .news-markdown")
       .evaluate((body) => {
-        const text = body.firstChild;
-        if (text === null) {
-          throw new Error("El cuerpo no tiene texto.");
-        }
         const wordRect = (word: string): DOMRect => {
-          const start = (text.textContent ?? "").indexOf(word);
-          const range = document.createRange();
-          range.setStart(text, start);
-          range.setEnd(text, start + word.length);
-          return range.getBoundingClientRect();
+          const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            const start = (node.textContent ?? "").indexOf(word);
+            if (start === -1) continue;
+            const range = document.createRange();
+            range.setStart(node, start);
+            range.setEnd(node, start + word.length);
+            return range.getBoundingClientRect();
+          }
+          throw new Error(`El cuerpo no contiene "${word}".`);
         };
         return {
           bodyLeft: body.getBoundingClientRect().left,
