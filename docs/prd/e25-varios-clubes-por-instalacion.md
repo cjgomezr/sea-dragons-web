@@ -1,6 +1,6 @@
 # PRD: E25 · Varios clubes en una misma instalación
 
-**Estado:** borrador · **Fecha:** 14 de octubre de 2026 · **Autor:** sesión de planificación (Claude Code)
+**Estado:** borrador · **Fecha:** 14 de octubre de 2026 · **Autor:** sesión de planificación (Claude Code) · **Épica:** #663
 
 Fuente: `docs/plan-maestro.md` (E18a, E18b y la decisión técnica "`club_id` + RLS en toda tabla desde el día uno", NFR-009) y CON-004 del SRD. `docs/preguntas-abiertas.md` deja sin resolver B6, que bloquea a E18b y no a esta épica, y B8, nueva, que bloquea sólo la puesta en producción de los subdominios (sección 9).
 
@@ -162,17 +162,17 @@ Decisiones tomadas en la sesión, que el dueño puede revertir:
 
 ## 10. Descomposición en tickets (para write-ticket)
 
-| #   | Título propuesto                                                                              | Tamaño | Depende de | Auto-merge sugerido                          |
-| --- | --------------------------------------------------------------------------------------------- | ------ | ---------- | -------------------------------------------- |
-| 1   | Demuestra con dos clubes que ningún endpoint ni tabla deja ver datos del otro                 | M      | ninguna    | No: es la prueba de la frontera de seguridad |
-| 2   | Resuelve el club de cada petición por su subdominio, con respaldo para un solo club           | M      | ninguna    | No: frontera de cada petición                |
-| 3   | Lee la marca del club de la petición, con caché por club                                      | M      | 2          | No: cambia qué ve cada club antes de entrar  |
-| 4   | Registra, confirma y recupera cuentas en el club de la petición                               | M      | 2          | No: toca autenticación                       |
-| 5   | Deja la sesión válida sólo en el subdominio de su club                                        | M      | 2          | No: toca autenticación                       |
-| 6   | Manda cada correo con la marca y el subdominio del club de quien lo recibe                    | S      | 3          | No: correos a miembros reales                |
-| 7   | Deja cobrar sólo al club dueño de la cuenta de Stripe de la instalación                       | M      | 2          | No: toca pagos                               |
-| 8   | Cierra la lectura pública de clubes y de los textos de entrada                                | S      | 3          | No: cambia políticas RLS                     |
-| 9   | Da de alta un club con su primer Admin desde un script                                        | S      | 4          | No: crea datos y manda invitaciones          |
-| 10  | Documenta el dominio comodín, `<slug>.localhost` y el alta de clubes en la guía y en entornos | S      | 2          | Sí: sólo documentación                       |
+| #   | Issue | Título propuesto                                                                              | Tamaño | Depende de | Auto-merge sugerido                          |
+| --- | ----- | --------------------------------------------------------------------------------------------- | ------ | ---------- | -------------------------------------------- |
+| 1   | #664  | Demuestra con dos clubes que ningún endpoint ni tabla deja ver datos del otro                 | M      | ninguna    | No: es la prueba de la frontera de seguridad |
+| 2   | #665  | Resuelve el club de cada petición por su subdominio, con respaldo para un solo club           | M      | ninguna    | No: frontera de cada petición                |
+| 3   | #666  | Lee la marca del club de la petición, con caché por club                                      | M      | 2          | No: cambia qué ve cada club antes de entrar  |
+| 4   | #667  | Registra, confirma y recupera cuentas en el club de la petición                               | M      | 2          | No: toca autenticación                       |
+| 5   | #668  | Deja la sesión válida sólo en el subdominio de su club                                        | M      | 2          | No: toca autenticación                       |
+| 6   | #669  | Manda cada correo con la marca y el subdominio del club de quien lo recibe                    | S      | 3          | No: correos a miembros reales                |
+| 7   | #670  | Deja cobrar sólo al club dueño de la cuenta de Stripe de la instalación                       | M      | 2          | No: toca pagos                               |
+| 8   | #671  | Cierra la lectura pública de clubes y de los textos de entrada                                | S      | 3          | No: cambia políticas RLS                     |
+| 9   | #672  | Da de alta un club con su primer Admin desde un script                                        | S      | 4          | No: crea datos y manda invitaciones          |
+| 10  | #673  | Documenta el dominio comodín, `<slug>.localhost` y el alta de clubes en la guía y en entornos | S      | 2          | Sí: sólo documentación                       |
 
 El 1 va primero y sin dependencias a propósito: siembra los dos clubes directamente con la clave de servicio, así que no espera al registro por subdominio, y deja la red puesta antes de tocar la frontera. Debería pasar casi entero ya hoy, porque los gateways filtran por `club_id`; lo que falle es un hallazgo.
