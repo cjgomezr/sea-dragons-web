@@ -8,7 +8,8 @@ import type { ManagedSeries } from "./series-management";
 
 /**
  * El aviso a la audiencia cuando un evento, una ocurrencia o una serie
- * cambian de fecha, hora o lugar, o se cancelan (#317, RF-13 del PRD de E7).
+ * cambian de fecha, hora, hora de fin o lugar, o se cancelan (#317, RF-13 del
+ * PRD de E7; la hora de fin, #642 y D10 de E24).
  * Quien pensaba ir tiene que enterarse; un título o unas notas nuevas no le
  * cambian el plan, así que no se avisan.
  *
@@ -19,7 +20,10 @@ import type { ManagedSeries } from "./series-management";
  */
 
 /** Lo que decide si quien pensaba ir tiene que enterarse. */
-type SessionSchedule = Pick<EventFields, "startTime" | "location"> & {
+type SessionSchedule = Pick<
+  EventFields,
+  "startTime" | "endTime" | "location"
+> & {
   readonly startsOn: string;
 };
 
@@ -30,8 +34,18 @@ export function isNoticeworthyChange(
   return (
     before.startsOn !== after.startsOn ||
     before.startTime !== after.startTime ||
+    before.endTime !== after.endTime ||
     before.location !== after.location
   );
+}
+
+/** Un evento suelto, además, avisa si cambia el día en que termina. En una
+ * serie, `endsOn` es el último día de la serie, que aquí no se edita. */
+function isNoticeworthyEventChange(
+  before: ManagedEvent,
+  after: ManagedEvent,
+): boolean {
+  return isNoticeworthyChange(before, after) || before.endsOn !== after.endsOn;
 }
 
 type Change<Subject> = {
@@ -52,7 +66,7 @@ export async function announceEventChange(
   change: Change<ManagedEvent>,
 ): Promise<void> {
   const { before, after } = change;
-  if (!isNoticeworthyChange(before, after)) {
+  if (!isNoticeworthyEventChange(before, after)) {
     return;
   }
   await notifyEventAudience(gateways, {
@@ -65,6 +79,8 @@ export async function announceEventChange(
         title: after.title,
         startsOn: after.startsOn,
         startTime: after.startTime,
+        endsOn: after.endsOn,
+        endTime: after.endTime,
         location: after.location,
       },
     },
@@ -109,6 +125,7 @@ export async function announceSeriesChange(
         title: after.title,
         weekdays: after.weekdays,
         startTime: after.startTime,
+        endTime: after.endTime,
         location: after.location,
       },
     },

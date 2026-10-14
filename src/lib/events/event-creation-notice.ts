@@ -28,7 +28,8 @@ export type EventAnnouncement = {
   readonly created: CreatedEvents;
 };
 
-/** Los datos mínimos para contarlo: nada de lugar ni notas. */
+/** Los datos mínimos para contarlo: nada de lugar ni notas. La hora de fin
+ * va desde E24 (D10). */
 function noticeOf(created: CreatedEvents): NotificationContent {
   if (created.repeat === "none") {
     const { event } = created;
@@ -40,6 +41,8 @@ function noticeOf(created: CreatedEvents): NotificationContent {
         eventType: event.eventType,
         startsOn: event.startsOn,
         startTime: event.startTime,
+        endsOn: event.endsOn,
+        endTime: event.endTime,
       },
     };
   }
@@ -54,6 +57,7 @@ function noticeOf(created: CreatedEvents): NotificationContent {
       startsOn: series.startsOn,
       endsOn: series.endsOn,
       startTime: series.startTime,
+      endTime: series.endTime,
     },
   };
 }

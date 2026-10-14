@@ -71,6 +71,10 @@ type NotificationDataByType = DataForEveryType<{
     readonly startsOn: string;
     /** `HH:MM`. */
     readonly startTime: string;
+    /** #642. Nula si termina el mismo día. */
+    readonly endsOn: string | null;
+    /** #642. Nula sólo en lo anterior a E24. */
+    readonly endTime: string | null;
   };
   /** #310. Un aviso por serie, no uno por ocurrencia. */
   readonly event_series_created: {
@@ -81,6 +85,7 @@ type NotificationDataByType = DataForEveryType<{
     readonly startsOn: string;
     readonly endsOn: string;
     readonly startTime: string;
+    readonly endTime: string | null;
   };
   /** #317. Lo que quedó después del cambio: el aviso cuenta lo nuevo. */
   readonly event_changed: {
@@ -88,6 +93,8 @@ type NotificationDataByType = DataForEveryType<{
     readonly title: string;
     readonly startsOn: string;
     readonly startTime: string;
+    readonly endsOn: string | null;
+    readonly endTime: string | null;
     readonly location: string;
   };
   /** #317. El día y la hora que se pierden. */
@@ -103,6 +110,7 @@ type NotificationDataByType = DataForEveryType<{
     readonly title: string;
     readonly weekdays: readonly IsoWeekday[];
     readonly startTime: string;
+    readonly endTime: string | null;
     readonly location: string;
   };
   /** #317. Una serie se cancela de hoy en adelante, con un solo aviso. */

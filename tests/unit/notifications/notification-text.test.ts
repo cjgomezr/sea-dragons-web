@@ -357,6 +357,115 @@ describe("texto de los avisos de evento", () => {
   });
 });
 
+// #642: los avisos dicen hasta cuándo dura, si lo dice el evento.
+describe("texto de los avisos con hora de fin", () => {
+  const EVENT_ID = "e0000000-0000-4000-8000-00000000000e";
+  const SERIES_ID = "c2c2c2c2-0000-4000-8000-00000000000c";
+
+  it.each([
+    ["en", "Liga estatal: 10 July 2027 at 6:00 pm – 7:30 pm"],
+    ["es", "Liga estatal: 10 de julio de 2027, 18:00 – 19:30"],
+  ] as const)(
+    "da la hora de fin de un evento nuevo de un día (%s)",
+    (locale, body) => {
+      const text = describeNotification(createTranslator(locale), {
+        type: "event_created",
+        data: {
+          ...DATA_FOR_EVERY_TYPE.event_created,
+          startTime: "18:00",
+          endsOn: null,
+          endTime: "19:30",
+        },
+      });
+
+      expect(text.body).toBe(body);
+    },
+  );
+
+  it.each([
+    ["en", "Liga estatal: 10 July 2027 at 8:30 am – 11 July 2027 at 5:00 pm"],
+    [
+      "es",
+      "Liga estatal: 10 de julio de 2027, 8:30 – 11 de julio de 2027, 17:00",
+    ],
+  ] as const)(
+    "da el rango de días de un evento nuevo de varios días (%s)",
+    (locale, body) => {
+      const text = describeNotification(createTranslator(locale), {
+        type: "event_created",
+        data: {
+          eventId: EVENT_ID,
+          title: "Liga estatal",
+          eventType: "competition",
+          startsOn: "2027-07-10",
+          startTime: "08:30",
+          endsOn: "2027-07-11",
+          endTime: "17:00",
+        },
+      });
+
+      expect(text.body).toBe(body);
+    },
+  );
+
+  it("da la hora de fin de una serie nueva", () => {
+    const text = describeNotification(createTranslator("en"), {
+      type: "event_series_created",
+      data: { ...DATA_FOR_EVERY_TYPE.event_series_created, endTime: "20:30" },
+    });
+
+    expect(text.body).toBe(
+      "Entrenamiento: Tuesday and Thursday at 7:00 pm – 8:30 pm, from 1 July 2027 to 31 August 2027",
+    );
+  });
+
+  it("da la hora de fin de un evento cambiado", () => {
+    const text = describeNotification(createTranslator("es"), {
+      type: "event_changed",
+      data: {
+        ...DATA_FOR_EVERY_TYPE.event_changed,
+        endsOn: null,
+        endTime: "13:00",
+      },
+    });
+
+    expect(text.body).toBe(
+      "Liga estatal: ahora el 11 de julio de 2027, 11:30 – 13:00, en Aquatic Centre",
+    );
+  });
+
+  it("da la hora de fin de una serie cambiada", () => {
+    const text = describeNotification(createTranslator("en"), {
+      type: "event_series_changed",
+      data: {
+        seriesId: SERIES_ID,
+        title: "Entrenamiento",
+        weekdays: [2, 4],
+        startTime: "18:00",
+        endTime: "19:30",
+        location: "Aquatic Centre",
+      },
+    });
+
+    expect(text.body).toBe(
+      "Entrenamiento: now Tuesday and Thursday at 6:00 pm – 7:30 pm, at Aquatic Centre",
+    );
+  });
+
+  it("da sólo el inicio de un evento sin hora de fin, como antes de E24", () => {
+    const text = describeNotification(createTranslator("en"), {
+      type: "event_created",
+      data: {
+        ...DATA_FOR_EVERY_TYPE.event_created,
+        endsOn: null,
+        endTime: null,
+      },
+    });
+
+    expect(text.body).toBe("Liga estatal: 10 July 2027 at 10:00 am");
+  });
+});
+
 describe("texto de los avisos de cambio, cancelación y equipos", () => {
   const cases = [
     {

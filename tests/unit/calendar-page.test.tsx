@@ -187,6 +187,8 @@ describe("el calendario de quien no tiene la membresía al día", () => {
                     eventType: "training",
                     startsOn: "2999-06-23",
                     startTime: "19:00",
+                    endTime: null,
+                    endsOn: null,
                     location: "MSAC",
                     status: "scheduled",
                     inAudience: true,

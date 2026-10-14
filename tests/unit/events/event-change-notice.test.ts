@@ -98,12 +98,14 @@ describe("qué cambios avisan", () => {
   const BEFORE = {
     startsOn: "2027-07-10",
     startTime: "10:00",
+    endTime: "12:00",
     location: "MSAC",
   };
 
   it.each([
     ["la fecha", { startsOn: "2027-07-11" }],
     ["la hora", { startTime: "11:30" }],
+    ["la hora de fin", { endTime: "12:30" }],
     ["el lugar", { location: "Aquatic Centre" }],
   ])("avisa cuando cambia %s", (_field, change) => {
     expect(isNoticeworthyChange(BEFORE, { ...BEFORE, ...change })).toBe(true);
@@ -141,10 +143,25 @@ describe("avisos de cambio y cancelación", () => {
           title: "Liga estatal",
           startsOn: "2027-07-10",
           startTime: "11:30",
+          endsOn: null,
+          endTime: "12:00",
           location: "MSAC",
         },
       })),
     );
+  });
+
+  it("avisa cuando cambia sólo la hora de fin", async () => {
+    const club = await editAs({ endTime: "13:00" });
+
+    expect(notifiedIn(club)).toEqual([ANA, BEA]);
+    expect(club.notices[0]?.data).toMatchObject({ endTime: "13:00" });
+  });
+
+  it("avisa cuando pasa a durar varios días", async () => {
+    const club = await editAs({ endsOn: "2027-07-11" });
+
+    expect(club.notices[0]?.data).toMatchObject({ endsOn: "2027-07-11" });
   });
 
   it("avisa del lugar nuevo de un evento", async () => {
@@ -275,10 +292,21 @@ describe("avisos de cambio y cancelación", () => {
           title: "Entrenamiento",
           weekdays: [2, 4],
           startTime: "18:00",
+          endTime: "20:30",
           location: "MSAC",
         },
       })),
     );
+  });
+
+  it("avisa una vez de la serie cuando cambia sólo su hora de fin", async () => {
+    const club = await editSeriesAs({ endTime: "21:00" });
+
+    expect(club.noticeBatches).toHaveLength(1);
+    expect(club.notices[0]).toMatchObject({
+      type: "event_series_changed",
+      data: { endTime: "21:00" },
+    });
   });
 
   it("avisa del lugar nuevo de una serie", async () => {

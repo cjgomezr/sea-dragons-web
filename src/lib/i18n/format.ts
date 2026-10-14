@@ -235,6 +235,44 @@ export function formatCalendarDayAt(
   return `${day}${DATE_TIME_JOINERS[locale]}${formatClockTime(locale, clockTime)}`;
 }
 
+/** Entre el inicio y el fin de un evento, con un espacio a cada lado, igual
+ * en los dos idiomas ("6:00 pm – 7:30 pm"). */
+const RANGE_SEPARATOR = " – ";
+
+/** La hora de inicio y, si la hay, la de fin, de una sesión de un día:
+ * "6:00 pm – 7:30 pm". Sin hora de fin (lo anterior a E24), sólo el inicio. */
+export function formatClockRange(
+  locale: Locale,
+  startTime: string,
+  endTime: string | null,
+): string {
+  const start = formatClockTime(locale, startTime);
+  return endTime === null
+    ? start
+    : `${start}${RANGE_SEPARATOR}${formatClockTime(locale, endTime)}`;
+}
+
+/** Cuándo empieza y termina un evento, con su día y su hora de Melbourne.
+ * El de varios días repite el día al final; el de uno, sólo la hora. */
+export function formatEventSpan(
+  locale: Locale,
+  span: {
+    readonly startsOn: string;
+    readonly startTime: string;
+    readonly endsOn: string | null;
+    readonly endTime: string | null;
+  },
+): string {
+  if (span.endTime === null || span.endsOn === null) {
+    const day = formatCalendarDay(locale, span.startsOn);
+    const times = formatClockRange(locale, span.startTime, span.endTime);
+    return `${day}${DATE_TIME_JOINERS[locale]}${times}`;
+  }
+  const start = formatCalendarDayAt(locale, span.startsOn, span.startTime);
+  const end = formatCalendarDayAt(locale, span.endsOn, span.endTime);
+  return `${start}${RANGE_SEPARATOR}${end}`;
+}
+
 const WEEKDAY_FORMATTERS = formattersByLocale(
   (displayLocale) =>
     new Intl.DateTimeFormat(displayLocale, {
