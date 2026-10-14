@@ -12518,6 +12518,20 @@ async function fillPublishForm(page: Page): Promise<void> {
   await page.getByLabel(PUBLISH_GROUPS[0].name).check();
 }
 
+/** Un cuerpo con todo lo que pone la barra de formato (#598). */
+const PUBLISH_MARKDOWN_BODY = [
+  "Twelve Seadragons named in the **extended squad** for the *August nationals*.",
+  "",
+  "## Squad",
+  "",
+  "- Final eight confirmed after trials",
+  "- Travel details to follow",
+  "",
+  "> Train hard, play fair.",
+  "",
+  "Read the [selection policy](https://example.com/policy).",
+].join("\n");
+
 type PublishState = {
   readonly name: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
@@ -12556,6 +12570,24 @@ const PUBLISH_STATES_EN: readonly PublishState[] = [
       await expect(
         page.getByRole("button", { name: PUBLISH_BUTTON }),
       ).toBeDisabled();
+    },
+  },
+  {
+    name: "publicar-escribir",
+    prepare: async (page) => {
+      await fillPublishForm(page);
+      await page.getByLabel(/^(Message|Mensaje)$/).fill(PUBLISH_MARKDOWN_BODY);
+    },
+  },
+  {
+    name: "publicar-vista-previa",
+    prepare: async (page) => {
+      await fillPublishForm(page);
+      await page.getByLabel(/^(Message|Mensaje)$/).fill(PUBLISH_MARKDOWN_BODY);
+      await page.getByRole("tab", { name: /^(Preview|Vista previa)$/ }).click();
+      await expect(
+        page.getByRole("heading", { level: 2, name: "Squad" }),
+      ).toBeVisible();
     },
   },
   {
@@ -12668,6 +12700,39 @@ test.describe("publicar en el navegador", () => {
       await expect(
         page.getByRole("heading", { level: 1, name: PUBLISH_HEADING }),
       ).toBeVisible();
+    });
+
+    test("el editor del cuerpo tiene las medidas del handoff (#598)", async ({
+      page,
+    }) => {
+      await stubPublishReads(page, { holdUploads: false });
+      await page.goto(`${APP_URL}${NEWS_PUBLISH_SCREEN_PATH}`);
+      const editor = page.locator(".news-body-editor");
+      const area = page.getByRole("textbox", { name: "Message" });
+      const bold = page.getByRole("button", { name: "Bold" });
+
+      await expect(editor).toHaveCSS("border-radius", "10px");
+      await expect(page.getByRole("tab", { name: "Write" })).toHaveCSS(
+        "border-bottom-width",
+        "2px",
+      );
+      await expect(bold).toHaveCSS("width", "32px");
+      await expect(bold).toHaveCSS("height", "32px");
+      const touchArea = await bold.evaluate((button) => {
+        const after = getComputedStyle(button, "::after");
+        return (
+          button.getBoundingClientRect().width -
+          2 * Number.parseFloat(after.left)
+        );
+      });
+      expect(touchArea).toBe(44);
+      await expect(area).toHaveCSS("font-size", "14px");
+      await expect(area).toHaveCSS("line-height", "23.8px");
+      expect(
+        await area.evaluate((element) => getComputedStyle(element).fontFamily),
+      ).toMatch(/mono/i);
+      const areaBox = await area.boundingBox();
+      expect(areaBox?.height).toBeGreaterThanOrEqual(300);
     });
 
     test("publicar vuelve al feed sin recargar, con la publicación arriba", async ({

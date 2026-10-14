@@ -17,6 +17,7 @@ import {
 } from "@/lib/news/news-posts";
 import { type AudienceChoice, AudienceField } from "@/components/AudienceField";
 import { NewsAttachmentsField } from "./NewsAttachmentsField";
+import { NewsBodyEditor } from "./NewsBodyEditor";
 import { NewsCategoryField } from "./NewsCategoryField";
 import { NewsCoverField } from "./NewsCoverField";
 import { describeEditFailure, saveNewsEdit } from "./news-manage-client";
@@ -90,7 +91,6 @@ const FIELD_IDS = {
 } as const;
 
 const TITLE_COUNTER_ID = "publicar-titulo-contador";
-const BODY_HINT_ID = "publicar-cuerpo-pista";
 const UPLOADS_HINT_ID = "publicar-esperando-adjuntos";
 
 function draftOf(post: EditableNewsPost): Draft {
@@ -181,22 +181,14 @@ function TitleAndBodyFields({
         <FieldIssue id={titleIssueId} text={titleIssue} />
       </div>
       <div className="auth-field">
-        <label htmlFor={FIELD_IDS.body}>{translate("news.publish.body")}</label>
-        <textarea
+        <NewsBodyEditor
+          translate={translate}
           id={FIELD_IDS.body}
-          className="news-publish-body"
           value={draft.body}
-          aria-invalid={bodyIssue !== null}
-          aria-describedby={describedBy(
-            bodyIssue === null ? null : bodyIssueId,
-            BODY_HINT_ID,
-          )}
-          onChange={(event) => onChange({ body: event.target.value })}
+          onChange={(body) => onChange({ body })}
+          issueId={bodyIssue === null ? null : bodyIssueId}
         />
         <FieldIssue id={bodyIssueId} text={bodyIssue} />
-        <p className="auth-hint" id={BODY_HINT_ID}>
-          {translate("news.publish.bodyHint")}
-        </p>
       </div>
     </>
   );
