@@ -101,6 +101,8 @@ const PAYMENTS: readonly PaymentView[] = [
     description: "Monthly membership",
     amountCents: 4500,
     status: "paid",
+    card: { brand: "visa", last4: "4242" },
+    failureReason: null,
   },
   {
     id: "pay-may",
@@ -108,6 +110,8 @@ const PAYMENTS: readonly PaymentView[] = [
     description: null,
     amountCents: 4500,
     status: "failed",
+    card: { brand: "visa", last4: "4242" },
+    failureReason: "Your card was declined.",
   },
   {
     id: "pay-apr",
@@ -115,6 +119,8 @@ const PAYMENTS: readonly PaymentView[] = [
     description: "Nationals levy",
     amountCents: 8000,
     status: "pending",
+    card: null,
+    failureReason: null,
   },
 ];
 

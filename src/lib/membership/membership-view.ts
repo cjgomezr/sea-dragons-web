@@ -31,6 +31,10 @@ import type { ClubPriceKey, ClubPriceReader } from "./stripe-prices";
 export const PAYMENT_STATUSES = ["paid", "failed", "pending"] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
+/** La tarjeta con que se cobró un pago (#629): sólo lo que dice cuál es
+ * (NFR-006). */
+export type PaymentCard = Pick<MembershipCard, "brand" | "last4">;
+
 /** Un pago del historial tal como lo guardó el webhook (`payments`). Los
  * importes son de AUD, en centavos enteros (CON-005). */
 export type PaymentRecord = {
@@ -41,6 +45,10 @@ export type PaymentRecord = {
   /** Nulo mientras no se cobró. */
   readonly paidAt: Date | null;
   readonly createdAt: Date;
+  /** Nula si el cobro no fue con tarjeta o es anterior a #629 (D4). */
+  readonly card: PaymentCard | null;
+  /** Sólo de un cobro fallido, y si Stripe dio el motivo. */
+  readonly failureReason: string | null;
 };
 
 export type PaymentHistoryGateway = {
@@ -54,6 +62,8 @@ export type PaymentView = {
   readonly description: string | null;
   readonly amountCents: number;
   readonly status: PaymentStatus;
+  readonly card: PaymentCard | null;
+  readonly failureReason: string | null;
 };
 
 export type MembershipWaiverView = {
@@ -310,6 +320,8 @@ function toPaymentView(payment: PaymentRecord): PaymentView {
     description: payment.description,
     amountCents: payment.amountCents,
     status: payment.status,
+    card: payment.card,
+    failureReason: payment.failureReason,
   };
 }
 

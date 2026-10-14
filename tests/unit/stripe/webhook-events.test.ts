@@ -6,14 +6,18 @@ import type {
   MembershipRecord,
 } from "@/lib/membership/membership";
 import {
+  type ChargeDetails,
   type CheckoutCompletedFacts,
   type PlannableStripeEventFacts,
   type RenewalUpcomingFacts,
   type StripeEventFacts,
   type StripeEventWrites,
   type StripeMembership,
+  NO_CHARGE_DETAILS,
   planRenewalNotice,
+  findInvoicePaymentIntentId,
   planStripeEventWrites,
+  readChargeDetails,
   readStripeEventFacts,
   subscriptionFactsFromCheckout,
 } from "@/lib/stripe/webhook-events";
@@ -44,6 +48,9 @@ const VISA: MembershipCard = {
   expMonth: 12,
   expYear: 2030,
 };
+
+const VISA_CHARGE = { brand: "visa", last4: "4242" } as const;
+const DECLINED = "Your card was declined.";
 
 function secondsToDate(seconds: number): Date {
   return new Date(seconds * 1000);
@@ -93,12 +100,14 @@ function plan(
   input: {
     readonly membership?: StripeMembership;
     readonly card?: MembershipCard | null;
+    readonly charge?: ChargeDetails;
   } = {},
 ): StripeEventWrites {
   return planStripeEventWrites({
     facts: plannableFacts(readStripeEventFacts(event)),
     membership: input.membership ?? membership(),
     card: input.card ?? null,
+    charge: input.charge ?? NO_CHARGE_DETAILS,
     prices: FIXTURE_PRICES,
     now: NOW,
   });
@@ -235,6 +244,7 @@ describe("checkout.session.completed", () => {
       ),
       membership: membership(),
       card: VISA,
+      charge: NO_CHARGE_DETAILS,
       prices: FIXTURE_PRICES,
       now: NOW,
     });
@@ -493,6 +503,8 @@ describe("invoice.paid e invoice.payment_failed", () => {
       description: "1 × Full membership (at $45.00 / month)",
       status: "paid",
       paidAt: secondsToDate(1792592090),
+      card: null,
+      failureReason: null,
     });
     expect(writes.membership).toBeNull();
   });
@@ -519,8 +531,179 @@ describe("invoice.paid e invoice.payment_failed", () => {
       description: "1 × Student membership (at $32.00 / month)",
       status: "failed",
       paidAt: null,
+      card: null,
+      failureReason: null,
     });
     expect(writes.membership).toBeNull();
+  });
+
+  it("invoice.paid guarda la marca y los cuatro dígitos de la tarjeta del cobro", () => {
+    const writes = plan(stripeEvent("invoice.paid"), {
+      charge: { card: VISA_CHARGE, failureReason: null },
+    });
+
+    expect(writes.payment).toMatchObject({
+      status: "paid",
+      card: VISA_CHARGE,
+      failureReason: null,
+    });
+  });
+
+  it("invoice.payment_failed guarda la tarjeta y el motivo del fallo", () => {
+    const writes = plan(stripeEvent("invoice.payment_failed"), {
+      charge: { card: VISA_CHARGE, failureReason: DECLINED },
+    });
+
+    expect(writes.payment).toMatchObject({
+      status: "failed",
+      card: VISA_CHARGE,
+      failureReason: DECLINED,
+    });
+  });
+
+  it("un cobro que se paga en el reintento no arrastra el motivo del fallo anterior", () => {
+    const writes = plan(stripeEvent("invoice.paid"), {
+      charge: { card: VISA_CHARGE, failureReason: DECLINED },
+    });
+
+    expect(writes.payment).toMatchObject({
+      status: "paid",
+      card: VISA_CHARGE,
+      failureReason: null,
+    });
+  });
+});
+
+describe("el PaymentIntent de una factura (#629)", () => {
+  function invoicePayment(
+    paymentIntent: string | null,
+    isDefault: boolean,
+  ): Stripe.InvoicePayment {
+    return {
+      id: `inpay_${paymentIntent ?? "fuera"}`,
+      object: "invoice_payment",
+      is_default: isDefault,
+      payment:
+        paymentIntent === null
+          ? { type: "payment_record", payment_record: "pr_Fuera" }
+          : { type: "payment_intent", payment_intent: paymentIntent },
+    } as unknown as Stripe.InvoicePayment;
+  }
+
+  it("toma el del pago por defecto de la factura", () => {
+    const id = findInvoicePaymentIntentId([
+      invoicePayment("pi_Viejo", false),
+      invoicePayment("pi_PorDefecto", true),
+    ]);
+
+    expect(id).toBe("pi_PorDefecto");
+  });
+
+  it("sin pago por defecto, toma el primero", () => {
+    expect(
+      findInvoicePaymentIntentId([invoicePayment("pi_Unico", false)]),
+    ).toBe("pi_Unico");
+  });
+
+  it("no hay ninguno si la factura no tiene pagos", () => {
+    expect(findInvoicePaymentIntentId([])).toBeNull();
+  });
+
+  it("no hay ninguno si el pago no fue por un PaymentIntent", () => {
+    expect(findInvoicePaymentIntentId([invoicePayment(null, true)])).toBeNull();
+  });
+});
+
+describe("la tarjeta y el motivo de un cobro (#629)", () => {
+  function paymentIntent(
+    change: {
+      readonly lastPaymentError?: string | null;
+      readonly charge?: Record<string, unknown> | string | null;
+    } = {},
+  ): Stripe.PaymentIntent {
+    const charge =
+      change.charge === undefined
+        ? {
+            id: "ch_TestSeadragons",
+            object: "charge",
+            failure_message: null,
+            payment_method_details: {
+              type: "card",
+              card: { brand: "visa", last4: "4242" },
+            },
+          }
+        : change.charge;
+    const error = change.lastPaymentError ?? null;
+    return {
+      id: "pi_TestSeadragons",
+      object: "payment_intent",
+      latest_charge: charge,
+      last_payment_error:
+        error === null ? null : { type: "card_error", message: error },
+    } as unknown as Stripe.PaymentIntent;
+  }
+
+  it("lee la marca y los cuatro dígitos de la tarjeta del cobro", () => {
+    expect(readChargeDetails(paymentIntent())).toEqual({
+      card: VISA_CHARGE,
+      failureReason: null,
+    });
+  });
+
+  it("toma el motivo del último error del pago", () => {
+    const details = readChargeDetails(
+      paymentIntent({ lastPaymentError: DECLINED }),
+    );
+
+    expect(details.failureReason).toBe(DECLINED);
+  });
+
+  it("sin error en el pago, toma el motivo del cobro", () => {
+    const details = readChargeDetails(
+      paymentIntent({
+        charge: {
+          id: "ch_TestSeadragons",
+          object: "charge",
+          failure_message: "Your card has insufficient funds.",
+          payment_method_details: {
+            type: "card",
+            card: { brand: "visa", last4: "4242" },
+          },
+        },
+      }),
+    );
+
+    expect(details.failureReason).toBe("Your card has insufficient funds.");
+  });
+
+  it("deja la tarjeta nula cuando el cobro no fue con tarjeta", () => {
+    const details = readChargeDetails(
+      paymentIntent({
+        charge: {
+          id: "ch_TestSeadragons",
+          object: "charge",
+          failure_message: null,
+          payment_method_details: {
+            type: "au_becs_debit",
+            au_becs_debit: { last4: "3456" },
+          },
+        },
+      }),
+    );
+
+    expect(details).toEqual({ card: null, failureReason: null });
+  });
+
+  it("deja todo nulo cuando todavía no hubo ningún cobro", () => {
+    expect(readChargeDetails(paymentIntent({ charge: null }))).toEqual(
+      NO_CHARGE_DETAILS,
+    );
+  });
+
+  it("no inventa una tarjeta si el cobro llega sólo como id", () => {
+    const details = readChargeDetails(paymentIntent({ charge: "ch_SoloElId" }));
+
+    expect(details.card).toBeNull();
   });
 });
 
@@ -549,6 +732,7 @@ describe("eventos fuera de orden", () => {
       facts: subscriptionFactsFromCheckout(checkout, subscription),
       membership: membership({ status: "cancelled" }, LATER),
       card: null,
+      charge: NO_CHARGE_DETAILS,
       prices: FIXTURE_PRICES,
       now: NOW,
     });
