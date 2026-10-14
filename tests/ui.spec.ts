@@ -13082,6 +13082,9 @@ async function goToPublish(
   ).toBeVisible();
   await expect(page.getByLabel(/^(Title|Título)$/)).toBeVisible();
   await state.prepare(page);
+  // El puntero se queda donde fue el último clic (una casilla, Guardar) y
+  // pinta su hover en la captura según cuánto se movió la página después.
+  await page.mouse.move(0, 0);
 }
 
 for (const state of PUBLISH_STATES) {
@@ -14391,6 +14394,9 @@ async function goToEdit(
     STUBBED_EDITABLE_POST.title,
   );
   await state.prepare(page);
+  // El puntero se queda donde fue el último clic (una casilla, Guardar) y
+  // pinta su hover en la captura según cuánto se movió la página después.
+  await page.mouse.move(0, 0);
 }
 
 for (const state of EDIT_STATES) {
