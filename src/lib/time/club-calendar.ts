@@ -55,3 +55,41 @@ export function addClubDays(date: string, days: number): string {
   day.setUTCDate(day.getUTCDate() + days);
   return day.toISOString().slice(0, ISO_DATE_LENGTH);
 }
+
+const CLUB_WALL_CLOCK_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: CLUB_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** Cuánto va Melbourne por delante de UTC en `instant`, en milisegundos. */
+function clubOffsetAt(instant: Date): number {
+  const parts = Object.fromEntries(
+    CLUB_WALL_CLOCK_FORMATTER.formatToParts(instant).map((part) => [
+      part.type,
+      part.value,
+    ]),
+  );
+  const wallClockAsUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+  );
+  return wallClockAsUtc - Math.floor(instant.getTime() / 60_000) * 60_000;
+}
+
+/** El instante en que el reloj de Melbourne marca `moment`, con el horario
+ * de verano que rija ese día. El desfase se mide dos veces porque el de la
+ * primera estimación puede ser el del otro lado del cambio de hora. */
+export function clubInstant(moment: ClubMoment): Date {
+  const wallClockAsUtc = new Date(`${moment.date}T${moment.time}:00Z`);
+  const firstGuess = wallClockAsUtc.getTime() - clubOffsetAt(wallClockAsUtc);
+  const offset = clubOffsetAt(new Date(firstGuess));
+  return new Date(wallClockAsUtc.getTime() - offset);
+}
