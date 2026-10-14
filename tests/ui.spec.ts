@@ -11798,6 +11798,28 @@ async function waitForManagedPost(page: Page): Promise<void> {
 const WITHDRAW_BUTTON = /^(Withdraw|Retirar)$/;
 const WITHDRAW_QUESTION = /^(Withdraw this post\?|¿Retirar esta publicación\?)/;
 
+/**
+ * Alarga la ventana hasta que quepa la página entera, sin tocar su ancho.
+ *
+ * Cuando la página no cabe, la captura de página entera de Chromium
+ * (`captureBeyondViewport`) deja la ventana en 1×1 durante un instante (#675).
+ * Ahí `(width < 768px)` se cumple, `useIsPhone` pasa a móvil y las acciones
+ * de la línea del autor se desmontan: vuelven en reposo, sin lo que se había
+ * abierto. Si la página ya cabe, Playwright captura sin ese truco.
+ */
+async function fitViewportToPage(page: Page): Promise<void> {
+  const viewport = page.viewportSize();
+  if (viewport === null) {
+    throw new Error("La página no tiene un tamaño de ventana fijo.");
+  }
+  const pageHeight = await page.evaluate(
+    () => document.documentElement.scrollHeight,
+  );
+  if (pageHeight > viewport.height) {
+    await page.setViewportSize({ width: viewport.width, height: pageHeight });
+  }
+}
+
 async function openWithdrawConfirmation(page: Page): Promise<void> {
   await waitForManagedPost(page);
   if (isPhoneViewport(page)) {
@@ -11805,6 +11827,10 @@ async function openWithdrawConfirmation(page: Page): Promise<void> {
   }
   await page.getByRole("button", { name: WITHDRAW_BUTTON }).click();
   await expect(page.getByText(WITHDRAW_QUESTION)).toBeVisible();
+  // En el móvil la ventana de 1×1 sigue siendo de móvil: la hoja no se cierra.
+  if (!isPhoneViewport(page)) {
+    await fitViewportToPage(page);
+  }
 }
 
 const FEED_HEADING = /Club feed|Novedades del club/;
