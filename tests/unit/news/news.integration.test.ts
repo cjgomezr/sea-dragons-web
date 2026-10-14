@@ -2,6 +2,12 @@ import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { expect, it } from "vitest";
 import { stageNewsCover } from "@/lib/news/news-cover-uploads";
+import { newsInlineImageUrlOf } from "@/lib/news/news-inline-image-urls";
+import {
+  NewsInlineImageNotFoundError,
+  serveNewsInlineImage,
+  stageNewsInlineImage,
+} from "@/lib/news/news-inline-images";
 import { listNewsFeed } from "@/lib/news/news-feed";
 import {
   ForeignNewsGroupError,
@@ -403,6 +409,200 @@ describeRls("portadas de noticias contra seadragons-dev (#591)", () => {
           ]);
           expect(error).toBeNull();
           expect(data).toEqual([{ id: newCoverId }]);
+        }),
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+});
+
+async function listInlineImageFiles(
+  serviceClient: ServiceRoleClient,
+  clubId: string,
+): Promise<readonly string[]> {
+  const { data, error } = await serviceClient.client.storage
+    .from(NEWS_ATTACHMENTS_BUCKET)
+    .list(`${clubId}/inline-images`);
+  if (error) {
+    throw new Error(`No se pudieron listar las imágenes: ${error.message}`);
+  }
+  return data.map((file) => file.name).sort();
+}
+
+/** La cascada del club no alcanza a Storage: las imágenes se borran aparte. */
+async function withInlineImageCleanup(
+  serviceClient: ServiceRoleClient,
+  clubId: string,
+  run: () => Promise<void>,
+): Promise<void> {
+  try {
+    await run();
+  } finally {
+    const leftovers = await listInlineImageFiles(serviceClient, clubId);
+    if (leftovers.length > 0) {
+      await runSupabase(
+        "borrar las imágenes de la prueba",
+        serviceClient.client.storage
+          .from(NEWS_ATTACHMENTS_BUCKET)
+          .remove(leftovers.map((name) => `${clubId}/inline-images/${name}`)),
+      );
+    }
+  }
+}
+
+async function stageInlineImage(seeded: SeededClub): Promise<string> {
+  const image = await stageNewsInlineImage(seeded.gateways, {
+    callerId: seeded.admin.id,
+    fileName: "equipo.png",
+    bytes: await aCoverPicture(),
+  });
+  return image.id;
+}
+
+function bodyWithImages(...imageIds: readonly string[]): string {
+  return [
+    "Ganamos la final.",
+    ...imageIds.map((id) => `![El equipo](${newsInlineImageUrlOf(id)})`),
+  ].join("\n\n");
+}
+
+function publishWithBody(
+  seeded: SeededClub,
+  body: string,
+  audience: NewsDraft["audience"],
+): Promise<NewsPostDetail> {
+  return publishWithoutAttachments(seeded.gateways, {
+    callerId: seeded.admin.id,
+    draft: { category: "news", title: "Crónica del torneo", body, audience },
+  });
+}
+
+/** Lo que responde Storage a la dirección firmada de la imagen. */
+async function fetchInlineImage(
+  seeded: SeededClub,
+  request: { readonly callerId: string; readonly imageId: string },
+): Promise<string> {
+  const url = await serveNewsInlineImage(seeded.gateways, request);
+  const response = await fetch(url);
+  return `${response.status} ${response.headers.get("content-type")}`;
+}
+
+describeRls("imágenes del cuerpo contra seadragons-dev (#603)", () => {
+  it(
+    "antes de publicar sólo la ve quien la subió; publicada, su audiencia y nadie más",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, (seeded) =>
+        withInlineImageCleanup(serviceClient, seeded.clubId, async () => {
+          const imageId = await stageInlineImage(seeded);
+          const asAdmin = { callerId: seeded.admin.id, imageId };
+          const asMember = { callerId: seeded.squadMember.id, imageId };
+
+          expect(await fetchInlineImage(seeded, asAdmin)).toBe(
+            "200 image/webp",
+          );
+          await expect(
+            serveNewsInlineImage(seeded.gateways, asMember),
+          ).rejects.toBeInstanceOf(NewsInlineImageNotFoundError);
+
+          await publishWithBody(seeded, bodyWithImages(imageId), {
+            kind: "groups",
+            groupIds: [seeded.squadId],
+          });
+
+          expect(await fetchInlineImage(seeded, asMember)).toBe(
+            "200 image/webp",
+          );
+          await expect(
+            serveNewsInlineImage(seeded.gateways, {
+              callerId: seeded.outsider.id,
+              imageId,
+            }),
+          ).rejects.toBeInstanceOf(NewsInlineImageNotFoundError);
+          expect(
+            await listInlineImageFiles(serviceClient, seeded.clubId),
+          ).toEqual([`${imageId}.webp`]);
+        }),
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "una retirada no sirve sus imágenes ni a quien la publicó",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, (seeded) =>
+        withInlineImageCleanup(serviceClient, seeded.clubId, async () => {
+          const imageId = await stageInlineImage(seeded);
+          const post = await publishWithBody(seeded, bodyWithImages(imageId), {
+            kind: "club",
+          });
+
+          await changeNewsPostStatus(seeded.gateways, {
+            callerId: seeded.admin.id,
+            postId: post.id,
+            status: "withdrawn",
+          });
+
+          for (const callerId of [seeded.squadMember.id, seeded.admin.id]) {
+            await expect(
+              serveNewsInlineImage(seeded.gateways, { callerId, imageId }),
+            ).rejects.toBeInstanceOf(NewsInlineImageNotFoundError);
+          }
+        }),
+      );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "quitar la línea de una imagen al editar la borra del bucket y de la base",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+
+      await withSeededClub(serviceClient, (seeded) =>
+        withInlineImageCleanup(serviceClient, seeded.clubId, async () => {
+          const removedId = await stageInlineImage(seeded);
+          const keptId = await stageInlineImage(seeded);
+          const post = await publishWithBody(
+            seeded,
+            bodyWithImages(removedId, keptId),
+            { kind: "club" },
+          );
+
+          await editNewsPost(seeded.gateways, {
+            callerId: seeded.admin.id,
+            postId: post.id,
+            draft: {
+              category: "news",
+              title: "Crónica del torneo",
+              body: bodyWithImages(keptId),
+              audience: { kind: "club" },
+            },
+            expectedEditedAt: null,
+            cover: { kind: "keep" },
+            pin: { kind: "keep" },
+            now: new Date(),
+          });
+          const { data, error } = await serviceClient.client
+            .from("news_inline_images")
+            .select("id, post_id")
+            .eq("club_id", seeded.clubId);
+
+          expect(error).toBeNull();
+          expect(data).toEqual([{ id: keptId, post_id: post.id }]);
+          expect(
+            await listInlineImageFiles(serviceClient, seeded.clubId),
+          ).toEqual([`${keptId}.webp`]);
+          await expect(
+            serveNewsInlineImage(seeded.gateways, {
+              callerId: seeded.squadMember.id,
+              imageId: removedId,
+            }),
+          ).rejects.toBeInstanceOf(NewsInlineImageNotFoundError);
         }),
       );
     },
