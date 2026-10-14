@@ -13601,6 +13601,35 @@ test.describe("publicar en el móvil: la barra y las medidas (#602)", () => {
     ).toBe(52);
   });
 
+  test("a 320 px en español, Publicando… no pisa el título", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ ...MOBILE_VIEWPORT, width: 320 });
+    await goToPublish(page, { ...writing, beforeVisit: chooseSpanish });
+    await page.route(
+      (url) => url.pathname === NEWS_PUBLISH_ENDPOINT,
+      () => undefined, // Se queda publicando: es lo que se mira.
+    );
+    const bar = page.getByRole("group", { name: PUBLISH_BAR_NAME });
+
+    await bar.getByRole("button", { name: PUBLISH_BUTTON }).click();
+
+    const sending = bar.getByRole("button", { name: "Publicando…" });
+    await expect(sending).toBeVisible();
+    const heading = await bar.getByRole("heading", { level: 1 }).boundingBox();
+    const cancel = await bar
+      .getByRole("button", { name: "Cancelar" })
+      .boundingBox();
+    const submit = await sending.boundingBox();
+    expect((heading?.x ?? 0) + (heading?.width ?? 0)).toBeLessThanOrEqual(
+      submit?.x ?? 0,
+    );
+    expect((cancel?.x ?? 0) + (cancel?.width ?? 0)).toBeLessThanOrEqual(
+      heading?.x ?? 0,
+    );
+    expect((submit?.x ?? 0) + (submit?.width ?? 0)).toBeLessThanOrEqual(320);
+  });
+
   test("en 768 px no hay barra: manda el escritorio", async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await goToPublish(page, writing);

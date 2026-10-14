@@ -7473,7 +7473,12 @@ a.auth-brand-header:focus-visible {
   top: 0;
   z-index: 2;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  /* Cancelar y el botón nunca se encogen: "Publicando…" en español no cabe
+     junto al título a 320 px, y lo que se corta con puntos es el título. */
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(
+      max-content,
+      1fr
+    );
   gap: var(--space-2);
   align-items: center;
   margin: calc(-1 * var(--space-8)) calc(-1 * var(--space-4)) 0;

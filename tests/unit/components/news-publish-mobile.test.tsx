@@ -21,6 +21,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 const PHONE_QUERY = "(width < 768px)";
 const GROUPS_PATH = "/api/v1/groups";
 const PUBLISH_PATH = "/api/v1/news/publish";
+const FEED_PATH = "/api/v1/news";
 const UPLOADS_PATH = "/api/v1/news/publish/uploads";
 const POST_ID = "aaaaaaaa-0000-4000-8000-00000000000a";
 const MANAGE_PATH = `/api/v1/news/publish/${POST_ID}`;
@@ -243,6 +244,53 @@ describe("barra del formulario en el móvil", () => {
 
     expect(confirm).toHaveBeenCalledOnce();
     expect(push).toHaveBeenCalledWith("/noticias");
+  });
+
+  it("con una portada ya subida, Cancelar pregunta", async () => {
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
+    responders[`POST ${UPLOADS_PATH}`] = () =>
+      jsonResponse(201, {
+        data: {
+          id: "a7a7a7a7-0000-4000-8000-000000000001",
+          fileName: "portada.png",
+          contentType: "image/png",
+          sizeBytes: 2_048,
+        },
+      });
+    await openPublish();
+    await userEvent.upload(
+      screen.getByLabelText("Choose a cover photo"),
+      new File([new Uint8Array(2_048)], "portada.png", { type: "image/png" }),
+    );
+    await screen.findByRole("button", { name: "Remove cover" });
+
+    await userEvent.click(
+      within(bar()).getByRole("button", { name: "Cancel" }),
+    );
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("con la caja de fijar encendida, Cancelar pregunta", async () => {
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
+    responders[`GET ${FEED_PATH}`] = () =>
+      jsonResponse(200, {
+        data: { pinned: null, posts: [], nextCursor: null, seenAt: null },
+      });
+    render(<NewsPublishScreen locale="en" canPin />);
+    await userEvent.click(
+      await screen.findByRole("switch", { name: "Pin to the top of the feed" }),
+    );
+
+    await userEvent.click(
+      within(bar()).getByRole("button", { name: "Cancel" }),
+    );
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(push).not.toHaveBeenCalled();
   });
 
   it("al editar sin cambios, Cancelar vuelve a la publicación", async () => {

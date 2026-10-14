@@ -422,7 +422,7 @@ export function NewsPublishForm({
   function hasUnsavedChanges(): boolean {
     return (
       !isSameNewsFormDraft(initialDraft, draft) ||
-      cover.isUploading ||
+      isUploading ||
       cover.change.kind !== "keep" ||
       attachments.entries.length > 0 ||
       pin.changeAt(new Date()).kind !== "keep"
