@@ -1816,6 +1816,16 @@ export const englishMessages = {
   "news.publish.editor.format.numberedList": "Numbered list",
   "news.publish.editor.format.quote": "Quote",
   "news.publish.editor.format.link": "Link",
+  "news.publish.editor.image": "Insert image",
+  "news.publish.editor.imageUploading": "Uploading the image…",
+  "news.publish.editor.chooseImage": "Choose an image",
+  "news.publish.editor.image.issue.uploadFailed":
+    "We couldn't upload the image. Check your connection and try again.",
+  "news.publish.editor.image.issue.empty": "The image is empty.",
+  "news.publish.editor.image.issue.tooLarge":
+    "Each image can be up to {max} MB.",
+  "news.publish.editor.image.issue.typeUnsupported":
+    "The image must be a JPEG, PNG or WebP.",
   "news.publish.editor.help": "Formatting help",
   "news.publish.editor.help.bold": "**bold text**",
   "news.publish.editor.help.italic": "*italic text*",

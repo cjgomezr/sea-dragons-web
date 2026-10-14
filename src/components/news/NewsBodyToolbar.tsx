@@ -10,11 +10,13 @@ import { Fragment } from "react";
 import type { Translator } from "@/lib/i18n/translator";
 import type { BodyFormat } from "@/lib/news/news-body-format";
 import { Icon } from "@/components/Icon";
+import { NewsBodyImageButton } from "./NewsBodyImageButton";
 
 /**
  * La barra de formato del editor (#598): botones de icono separados en tres
  * grupos, como en el handoff. Cada botón cancela el `mousedown`, así el área
- * no pierde el foco ni la selección antes de que el clic llegue.
+ * no pierde el foco ni la selección antes de que el clic llegue. El último
+ * grupo cierra con Imagen (#603), que no es un formato: sube un archivo.
  */
 
 const GLYPHS: Readonly<Record<BodyFormat, PhosphorGlyph>> = {
@@ -37,10 +39,12 @@ export function NewsBodyToolbar({
   translate,
   controlsId,
   onFormat,
+  onChooseImage,
 }: {
   readonly translate: Translator;
   readonly controlsId: string;
   readonly onFormat: (format: BodyFormat) => void;
+  readonly onChooseImage: (file: File) => void;
 }): React.JSX.Element {
   return (
     <div
@@ -68,6 +72,11 @@ export function NewsBodyToolbar({
           ))}
         </Fragment>
       ))}
+      <NewsBodyImageButton
+        translate={translate}
+        controlsId={controlsId}
+        onChoose={onChooseImage}
+      />
     </div>
   );
 }

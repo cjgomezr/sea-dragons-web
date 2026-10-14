@@ -10,7 +10,7 @@ import {
   type StoredNewsFile,
 } from "./news-attachments";
 import type { NewsAttachmentSummary } from "./news-posts";
-import { shrinkNewsCover } from "./shrink-news-cover";
+import { shrinkNewsCover, shrinkNewsInlineImage } from "./shrink-news-cover";
 import { createNewsGateways } from "./supabase-news-gateways";
 
 /**
@@ -274,7 +274,10 @@ export function createNewsAttachmentGateways(
     attachments: createAttachmentsGateway(serviceClient),
     storage: createStorageGateway(serviceClient, urlLifetimeSeconds),
     newFileId: randomUUID,
-    images: { shrinkCover: shrinkNewsCover },
+    images: {
+      shrinkCover: shrinkNewsCover,
+      shrinkInlineImage: shrinkNewsInlineImage,
+    },
   };
 }
 

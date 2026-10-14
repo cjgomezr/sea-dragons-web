@@ -724,6 +724,56 @@ describe("portada", () => {
   });
 });
 
+describe("imágenes del cuerpo (#603)", () => {
+  async function chooseBodyImage(file: File): Promise<void> {
+    await userEvent.click(screen.getByRole("button", { name: "Insert image" }));
+    await userEvent.upload(screen.getByLabelText("Choose an image"), file, {
+      applyAccept: false,
+    });
+  }
+
+  it("mientras sube una imagen, lo dice y no deja publicar", async () => {
+    let finish: () => void = () => undefined;
+    respondToUpload = (call) =>
+      new Promise((resolve) => {
+        finish = () => resolve(uploadedResponse(call));
+      });
+    await openForm();
+    await fillValidDraft();
+
+    await chooseBodyImage(picture("equipo.png"));
+
+    expect(screen.getByText("Uploading the image…")).toBeInTheDocument();
+    expect(publishButton()).toBeDisabled();
+
+    await act(async () => finish());
+    await waitFor(() => expect(publishButton()).toBeEnabled());
+    expect(callsTo("POST", UPLOADS_PATH)[0]?.search).toBe(
+      "?name=equipo.png&kind=inline_image",
+    );
+    expect(screen.getByLabelText("Message")).toHaveValue(
+      `El martes entrenamos en MSAC.![](/api/v1/news/images/${uploadIdFor(1)})`,
+    );
+  });
+
+  it("una imagen de más de 10 MB no se sube y el editor dice por qué", async () => {
+    await openForm();
+    await fillValidDraft();
+
+    await chooseBodyImage(
+      picture("enorme.png", "image/png", 10 * 1024 * 1024 + 1),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Each image can be up to 10 MB.",
+    );
+    expect(callsTo("POST", UPLOADS_PATH)).toEqual([]);
+    expect(screen.getByLabelText("Message")).toHaveValue(
+      "El martes entrenamos en MSAC.",
+    );
+  });
+});
+
 describe("aviso de publicada en el feed", () => {
   function stubFeedAfterPublishing(): void {
     vi.stubGlobal(

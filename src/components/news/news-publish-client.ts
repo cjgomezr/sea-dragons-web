@@ -66,8 +66,9 @@ export type NewsSubmission = NewsDraft & {
   readonly coverUploadId: string | null;
 };
 
-/** Lo que se sube antes de publicar: un adjunto, o la portada (#591). */
-type NewsUploadKind = "attachment" | "cover";
+/** Lo que se sube antes de publicar: un adjunto, la portada (#591) o una
+ * imagen del cuerpo (#603). */
+type NewsUploadKind = "attachment" | "cover" | "inline_image";
 
 /** Los bytes van tal cual en el cuerpo, y el nombre en la consulta, como en
  * #328: el servidor mira el tipo en los bytes. */
@@ -76,7 +77,7 @@ async function uploadNewsFile(
   kind: NewsUploadKind,
 ): Promise<NewsUploadResult> {
   const params = new URLSearchParams({ [FILE_NAME_PARAM]: file.name });
-  if (kind === "cover") {
+  if (kind !== "attachment") {
     params.set(UPLOAD_KIND_PARAM, kind);
   }
   const read = readApiPayload(
@@ -100,6 +101,12 @@ export function uploadNewsAttachment(file: File): Promise<NewsUploadResult> {
  * `coverUploadId`. */
 export function uploadNewsCover(file: File): Promise<NewsUploadResult> {
   return uploadNewsFile(file, "cover");
+}
+
+/** Una imagen del cuerpo (#603) se reduce en el servidor al subirla; su id
+ * va en el cuerpo, dentro de la dirección estable de la imagen. */
+export function uploadNewsInlineImage(file: File): Promise<NewsUploadResult> {
+  return uploadNewsFile(file, "inline_image");
 }
 
 /** Una subida que ya no está también se da por quitada: lo que se quería es
@@ -167,6 +174,14 @@ export function describeAttachmentIssue(
       return translate("news.publish.cover.issue.typeUnsupported");
     case "cover_upload_missing":
       return translate("news.publish.cover.issue.uploadMissing");
+    case "inline_image_empty":
+      return translate("news.publish.editor.image.issue.empty");
+    case "inline_image_too_large":
+      return translate("news.publish.editor.image.issue.tooLarge", {
+        max: MAX_MEGABYTES,
+      });
+    case "inline_image_type_unsupported":
+      return translate("news.publish.editor.image.issue.typeUnsupported");
   }
 }
 

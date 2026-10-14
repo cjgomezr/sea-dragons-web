@@ -8,6 +8,7 @@ import type {
 import { type Role, hasCapability } from "@/lib/auth/roles";
 import type { MemberGroupsGateway } from "@/lib/groups/member-groups";
 import { type NewsCoversGateway, signNewsCoverUrl } from "./news-covers";
+import type { NewsInlineImagesGateway } from "./news-inline-images";
 import { type NewsPin, isNewsPinActive } from "./news-pin-rule";
 
 /**
@@ -263,6 +264,8 @@ export type NewsGateways = {
   readonly memberGroups: MemberGroupsGateway;
   readonly posts: NewsPostsGateway;
   readonly covers: NewsCoversGateway;
+  /** Las imágenes del cuerpo (#603). */
+  readonly inlineImages: NewsInlineImagesGateway;
   /** Firma la miniatura de la foto de un socio, o nula si no se pudo. */
   readonly authorPhotos: {
     signPhotoUrl(photoPath: string): Promise<string | null>;
@@ -590,6 +593,36 @@ function isVisibleTo(
   );
 }
 
+/** La publicación con quien la lee y sus grupos, o null si no es su
+ * audiencia o no existe. Lo comparten abrirla y servir las imágenes de su
+ * cuerpo (#603), que no necesitan firmar nada más. */
+async function findVisibleNewsPost(
+  gateways: Pick<NewsGateways, "members" | "memberGroups" | "posts">,
+  request: { readonly callerId: string; readonly postId: string },
+): Promise<{
+  readonly caller: RoleRequestMember;
+  readonly post: NewsPost | null;
+  readonly groupIds: readonly string[];
+}> {
+  const caller = await findNewsReader(gateways, request.callerId);
+  const [post, groupIds] = await Promise.all([
+    gateways.posts.findPost({ clubId: caller.clubId, postId: request.postId }),
+    findReaderGroupIds(gateways, request.callerId),
+  ]);
+  const isVisible =
+    post !== null && isVisibleTo(post, { id: request.callerId, groupIds });
+  return { caller, post: isVisible ? post : null, groupIds };
+}
+
+/** La publicación, si quien llama es su audiencia; null si no, igual que si
+ * no existiera. */
+export async function findReadableNewsPost(
+  gateways: Pick<NewsGateways, "members" | "memberGroups" | "posts">,
+  request: { readonly callerId: string; readonly postId: string },
+): Promise<NewsPost | null> {
+  return (await findVisibleNewsPost(gateways, request)).post;
+}
+
 /**
  * La publicación entera, para quien es su audiencia.
  *
@@ -607,12 +640,11 @@ export async function openNewsPost(
     readonly now?: Date;
   },
 ): Promise<NewsPostDetail> {
-  const caller = await findNewsReader(gateways, request.callerId);
-  const [post, groupIds] = await Promise.all([
-    gateways.posts.findPost({ clubId: caller.clubId, postId: request.postId }),
-    findReaderGroupIds(gateways, request.callerId),
-  ]);
-  if (post === null || !isVisibleTo(post, { id: request.callerId, groupIds })) {
+  const { caller, post, groupIds } = await findVisibleNewsPost(
+    gateways,
+    request,
+  );
+  if (post === null) {
     throw new NewsPostNotFoundError();
   }
   const canManage = canManageNewsPost(

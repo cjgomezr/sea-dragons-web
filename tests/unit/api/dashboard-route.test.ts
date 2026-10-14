@@ -8,6 +8,7 @@ import type { MembershipStatus } from "@/lib/membership/membership";
 import {
   fakeAuthorPhotosGateway,
   fakeCoverlessGateway,
+  fakeImagelessGateway,
 } from "../helpers/news-club";
 
 /**
@@ -84,6 +85,7 @@ function dashboardGateways(): DashboardGateways {
         unpinPost: unused,
       },
       covers: fakeCoverlessGateway(),
+      inlineImages: fakeImagelessGateway(),
       authorPhotos: fakeAuthorPhotosGateway(),
       audit: { insertAuditLogRow: unused },
     },

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   fakeAuthorPhotosGateway,
   fakeCoverlessGateway,
+  fakeImagelessGateway,
 } from "../helpers/news-club";
 import type {
   ClubAttendanceRate,
@@ -254,6 +255,7 @@ function gateways(): DashboardGateways {
         },
       },
       covers: fakeCoverlessGateway(),
+      inlineImages: fakeImagelessGateway(),
       authorPhotos: fakeAuthorPhotosGateway(),
       audit: { insertAuditLogRow: async () => ({ error: null }) },
     },

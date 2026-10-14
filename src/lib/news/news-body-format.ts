@@ -100,3 +100,10 @@ export function applyBodyFormat(edit: BodyEdit, format: BodyFormat): BodyEdit {
     ? wrapSelection(edit, rule)
     : prefixLines(edit, rule.prefix);
 }
+
+/** Una imagen del club (#603) donde está el cursor: `![pie](dirección)`. Lo
+ * seleccionado pasa a ser el pie y queda seleccionado; sin selección, el
+ * cursor queda entre los corchetes para escribirlo. */
+export function insertBodyImage(edit: BodyEdit, url: string): BodyEdit {
+  return wrapSelection(edit, { before: "![", after: `](${url})` });
+}

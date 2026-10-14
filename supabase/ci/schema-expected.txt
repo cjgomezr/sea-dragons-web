@@ -169,6 +169,11 @@ columna news_cover_uploads.club_id tipo=uuid null=NO default=-
 columna news_cover_uploads.created_at tipo=timestamp with time zone null=NO default=now()
 columna news_cover_uploads.id tipo=uuid null=NO default=-
 columna news_cover_uploads.uploaded_by tipo=uuid null=NO default=-
+columna news_inline_images.club_id tipo=uuid null=NO default=-
+columna news_inline_images.created_at tipo=timestamp with time zone null=NO default=now()
+columna news_inline_images.id tipo=uuid null=NO default=-
+columna news_inline_images.post_id tipo=uuid null=YES default=-
+columna news_inline_images.uploaded_by tipo=uuid null=NO default=-
 columna news_post_attachments.club_id tipo=uuid null=NO default=-
 columna news_post_attachments.content_type tipo=text null=NO default=-
 columna news_post_attachments.created_at tipo=timestamp with time zone null=NO default=now()
@@ -659,6 +664,20 @@ grant news_cover_uploads service_role SELECT
 grant news_cover_uploads service_role TRIGGER
 grant news_cover_uploads service_role TRUNCATE
 grant news_cover_uploads service_role UPDATE
+grant news_inline_images postgres DELETE
+grant news_inline_images postgres INSERT
+grant news_inline_images postgres REFERENCES
+grant news_inline_images postgres SELECT
+grant news_inline_images postgres TRIGGER
+grant news_inline_images postgres TRUNCATE
+grant news_inline_images postgres UPDATE
+grant news_inline_images service_role DELETE
+grant news_inline_images service_role INSERT
+grant news_inline_images service_role REFERENCES
+grant news_inline_images service_role SELECT
+grant news_inline_images service_role TRIGGER
+grant news_inline_images service_role TRUNCATE
+grant news_inline_images service_role UPDATE
 grant news_post_attachments authenticated SELECT
 grant news_post_attachments postgres DELETE
 grant news_post_attachments postgres INSERT
@@ -907,6 +926,9 @@ indice memberships_waived_by_club_id_idx CREATE INDEX memberships_waived_by_club
 indice news_cover_uploads_id_club_id_key CREATE UNIQUE INDEX news_cover_uploads_id_club_id_key ON public.news_cover_uploads USING btree (id, club_id)
 indice news_cover_uploads_pkey CREATE UNIQUE INDEX news_cover_uploads_pkey ON public.news_cover_uploads USING btree (id)
 indice news_cover_uploads_uploaded_by_created_at_idx CREATE INDEX news_cover_uploads_uploaded_by_created_at_idx ON public.news_cover_uploads USING btree (uploaded_by, created_at)
+indice news_inline_images_pkey CREATE UNIQUE INDEX news_inline_images_pkey ON public.news_inline_images USING btree (id)
+indice news_inline_images_post_id_idx CREATE INDEX news_inline_images_post_id_idx ON public.news_inline_images USING btree (post_id) WHERE (post_id IS NOT NULL)
+indice news_inline_images_uploaded_by_created_at_idx CREATE INDEX news_inline_images_uploaded_by_created_at_idx ON public.news_inline_images USING btree (uploaded_by, created_at)
 indice news_post_attachments_pkey CREATE UNIQUE INDEX news_post_attachments_pkey ON public.news_post_attachments USING btree (id)
 indice news_post_attachments_post_id_idx CREATE INDEX news_post_attachments_post_id_idx ON public.news_post_attachments USING btree (post_id)
 indice news_post_attachments_storage_path_key CREATE UNIQUE INDEX news_post_attachments_storage_path_key ON public.news_post_attachments USING btree (storage_path)
@@ -1153,6 +1175,10 @@ restriccion news_cover_uploads.news_cover_uploads_club_id_fkey FOREIGN KEY (club
 restriccion news_cover_uploads.news_cover_uploads_id_club_id_key UNIQUE (id, club_id)
 restriccion news_cover_uploads.news_cover_uploads_pkey PRIMARY KEY (id)
 restriccion news_cover_uploads.news_cover_uploads_uploader_same_club_fkey FOREIGN KEY (uploaded_by, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
+restriccion news_inline_images.news_inline_images_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
+restriccion news_inline_images.news_inline_images_pkey PRIMARY KEY (id)
+restriccion news_inline_images.news_inline_images_post_same_club_fkey FOREIGN KEY (post_id, club_id) REFERENCES news_posts(id, club_id) ON DELETE SET NULL (post_id)
+restriccion news_inline_images.news_inline_images_uploader_same_club_fkey FOREIGN KEY (uploaded_by, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
 restriccion news_post_attachments.news_post_attachments_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
 restriccion news_post_attachments.news_post_attachments_pkey PRIMARY KEY (id)
 restriccion news_post_attachments.news_post_attachments_post_same_club_fkey FOREIGN KEY (post_id, club_id) REFERENCES news_posts(id, club_id) ON DELETE CASCADE
@@ -1251,6 +1277,7 @@ tabla member_evaluations rls=t
 tabla members rls=t
 tabla memberships rls=t
 tabla news_cover_uploads rls=t
+tabla news_inline_images rls=t
 tabla news_post_attachments rls=t
 tabla news_post_groups rls=t
 tabla news_posts rls=t

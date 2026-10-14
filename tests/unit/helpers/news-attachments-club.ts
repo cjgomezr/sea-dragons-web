@@ -61,6 +61,10 @@ export type FakeAttachmentClubOptions = FakeClubOptions & {
   readonly failList?: boolean;
   /** La portada empieza como una imagen pero sharp no la entiende. */
   readonly undecodableCover?: boolean;
+  /** Igual con una imagen del cuerpo (#603). */
+  readonly undecodableInlineImage?: boolean;
+  /** Ligar las imágenes del cuerpo a la publicación falla. */
+  readonly failLinkInlineImages?: boolean;
 };
 
 export type FakeAttachmentClub = {
@@ -76,6 +80,8 @@ export type FakeAttachmentClub = {
   readonly audited: FakeClub["audited"];
   readonly covers: FakeClub["covers"];
   readonly coverFiles: FakeClub["coverFiles"];
+  readonly inlineImages: FakeClub["inlineImages"];
+  readonly inlineImageFiles: FakeClub["inlineImageFiles"];
   /** Las rutas que hay en el almacenamiento. */
   readonly files: Set<string>;
   readonly fileInfo: Map<string, StoredNewsFile>;
@@ -85,6 +91,7 @@ export type FakeAttachmentClub = {
  * distintos para saber cuál es cuál. */
 export const SHRUNK_COVER_THUMBNAIL = new Uint8Array(12);
 export const SHRUNK_COVER_LARGE = new Uint8Array(345);
+export const SHRUNK_INLINE_IMAGE = new Uint8Array(678);
 
 const MAX_ROWS_PER_POST = 5;
 const STORED_AT = "2026-09-27T10:00:00.000Z";
@@ -218,6 +225,15 @@ export function fakeAttachmentClub(
   const notices: NotificationInsert[] = [];
   const gateways: NewsPublishGateways = {
     ...news.gateways,
+    inlineImages:
+      options.failLinkInlineImages === true
+        ? {
+            ...news.gateways.inlineImages,
+            linkImages: async () => {
+              throw new Error("la base no responde");
+            },
+          }
+        : news.gateways.inlineImages,
     attachments: {
       insertAttachment: async (attachment) => {
         if (options.failInsert === true) {
@@ -250,6 +266,10 @@ export function fakeAttachmentClub(
               thumbnail: SHRUNK_COVER_THUMBNAIL,
               large: SHRUNK_COVER_LARGE,
             },
+      shrinkInlineImage: async () =>
+        options.undecodableInlineImage === true
+          ? { kind: "undecodable" }
+          : { kind: "shrunk", image: SHRUNK_INLINE_IMAGE },
     },
     newsAudience: {
       findAudienceMemberIds: async ({ audience }) => {
@@ -275,5 +295,7 @@ export function fakeAttachmentClub(
     audited: news.audited,
     covers: news.covers,
     coverFiles: news.coverFiles,
+    inlineImages: news.inlineImages,
+    inlineImageFiles: news.inlineImageFiles,
   };
 }
