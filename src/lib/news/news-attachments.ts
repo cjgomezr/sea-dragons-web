@@ -98,6 +98,28 @@ const ISSUE_MESSAGES: Readonly<Record<NewsAttachmentIssueCode, string>> = {
   inline_image_type_unsupported: "La imagen tiene que ser JPEG, PNG o WebP.",
 };
 
+/** Con qué código se rechaza cada motivo de una imagen que el servidor
+ * reduce: la portada (#591) y las del cuerpo (#603) siguen las mismas reglas
+ * y lo dicen cada una a su manera. Viven aquí porque las usan también las
+ * comprobaciones del formulario, antes de subir. */
+export type NewsImageIssueCodes = {
+  readonly empty: NewsAttachmentIssueCode;
+  readonly tooLarge: NewsAttachmentIssueCode;
+  readonly typeUnsupported: NewsAttachmentIssueCode;
+};
+
+export const NEWS_COVER_ISSUES: NewsImageIssueCodes = {
+  empty: "cover_empty",
+  tooLarge: "cover_too_large",
+  typeUnsupported: "cover_type_unsupported",
+};
+
+export const NEWS_INLINE_IMAGE_ISSUES: NewsImageIssueCodes = {
+  empty: "inline_image_empty",
+  tooLarge: "inline_image_too_large",
+  typeUnsupported: "inline_image_type_unsupported",
+};
+
 export class NewsAttachmentValidationError extends Error {
   readonly code: NewsAttachmentIssueCode;
 

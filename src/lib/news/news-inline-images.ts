@@ -1,6 +1,6 @@
 import {
+  NEWS_INLINE_IMAGE_ISSUES,
   type NewsAttachmentGateways,
-  type NewsAttachmentIssueCode,
   NewsAttachmentValidationError,
 } from "./news-attachments";
 import {
@@ -41,12 +41,6 @@ export const STALE_INLINE_IMAGE_AGE_MS = 24 * 60 * 60 * 1000;
 const INLINE_IMAGES_FOLDER = "inline-images";
 
 const STORED_INLINE_IMAGE_TYPE = "image/webp";
-
-const INLINE_IMAGE_ISSUES = {
-  empty: "inline_image_empty",
-  tooLarge: "inline_image_too_large",
-  typeUnsupported: "inline_image_type_unsupported",
-} as const satisfies Readonly<Record<string, NewsAttachmentIssueCode>>;
 
 /** Una imagen subida, por su id y su club. */
 export type NewsInlineImageRef = {
@@ -109,7 +103,7 @@ export function validateNewsInlineImageFile(
   rawName: string,
   bytes: Uint8Array,
 ): string {
-  return validateNewsImageFile(rawName, bytes, INLINE_IMAGE_ISSUES);
+  return validateNewsImageFile(rawName, bytes, NEWS_INLINE_IMAGE_ISSUES);
 }
 
 /** Si la fila no entra, se borra el fichero para no dejarlo huérfano, y
@@ -160,7 +154,7 @@ export async function stageNewsInlineImage(
   const shrunk = await gateways.images.shrinkInlineImage(request.bytes);
   if (shrunk.kind === "undecodable") {
     throw new NewsAttachmentValidationError(
-      INLINE_IMAGE_ISSUES.typeUnsupported,
+      NEWS_INLINE_IMAGE_ISSUES.typeUnsupported,
     );
   }
   const id = gateways.newFileId();

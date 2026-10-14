@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import {
   NEWS_ATTACHMENT_MAX_BYTES,
+  NEWS_COVER_ISSUES,
   type NewsAttachmentIssueCode,
+  type NewsImageIssueCodes,
 } from "@/lib/news/news-attachments";
-import type { NewsImageIssueCodes } from "@/lib/news/news-cover-uploads";
 import type { NewsCoverChange } from "@/lib/news/news-posts";
 import { readAttachmentIssue, uploadNewsCover } from "./news-publish-client";
 
@@ -58,12 +59,6 @@ export const NEWS_COVER_TYPES: readonly string[] = [
 /** El tope de `NEWS_COVER_MAX_BYTES`, que es el de un adjunto. Se lee de
  * aquí porque `news-cover-uploads` es código de servidor. */
 const COVER_MAX_BYTES = NEWS_ATTACHMENT_MAX_BYTES;
-
-const COVER_ISSUES: NewsImageIssueCodes = {
-  empty: "cover_empty",
-  tooLarge: "cover_too_large",
-  typeUnsupported: "cover_type_unsupported",
-};
 
 /** Lo que se comprueba antes de subir una imagen que el servidor reduce: la
  * portada o una del cuerpo (#603), cada una con sus códigos. Un archivo sin
@@ -160,7 +155,7 @@ export function useNewsCover(currentUrl: string | null): NewsCoverField {
   }
 
   function choose(file: File): void {
-    const code = checkNewsImageBeforeUpload(file, COVER_ISSUES);
+    const code = checkNewsImageBeforeUpload(file, NEWS_COVER_ISSUES);
     if (code !== null) {
       setIssue({ kind: "rejected", code });
       return;

@@ -593,14 +593,6 @@ function isVisibleTo(
   );
 }
 
-/**
- * La publicación entera, para quien es su audiencia.
- *
- * Todo lo que no le corresponde responde igual que lo que no existe: la de
- * otro club, la de un grupo ajeno y la retirada. Es deliberado. Con un
- * "prohibido" distinto de un "no existe", cualquiera podría recorrer ids y
- * enumerar qué publicaciones tiene el club y cuáles le ocultan (RF-5).
- */
 /** La publicación con quien la lee y sus grupos, o null si no es su
  * audiencia o no existe. Lo comparten abrirla y servir las imágenes de su
  * cuerpo (#603), que no necesitan firmar nada más. */
@@ -631,6 +623,14 @@ export async function findReadableNewsPost(
   return (await findVisibleNewsPost(gateways, request)).post;
 }
 
+/**
+ * La publicación entera, para quien es su audiencia.
+ *
+ * Todo lo que no le corresponde responde igual que lo que no existe: la de
+ * otro club, la de un grupo ajeno y la retirada. Es deliberado. Con un
+ * "prohibido" distinto de un "no existe", cualquiera podría recorrer ids y
+ * enumerar qué publicaciones tiene el club y cuáles le ocultan (RF-5).
+ */
 export async function openNewsPost(
   gateways: NewsGateways,
   request: {

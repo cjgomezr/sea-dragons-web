@@ -2,8 +2,10 @@
 
 import { useRef, useState } from "react";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
-import type { NewsAttachmentIssueCode } from "@/lib/news/news-attachments";
-import type { NewsImageIssueCodes } from "@/lib/news/news-cover-uploads";
+import {
+  NEWS_INLINE_IMAGE_ISSUES,
+  type NewsAttachmentIssueCode,
+} from "@/lib/news/news-attachments";
 import { newsInlineImageUrlOf } from "@/lib/news/news-inline-image-urls";
 import {
   readAttachmentIssue,
@@ -37,12 +39,6 @@ export type NewsInlineImageUploader = {
   readonly upload: (file: File) => Promise<NewsInlineImageUploadOutcome>;
 };
 
-const INLINE_IMAGE_ISSUES: NewsImageIssueCodes = {
-  empty: "inline_image_empty",
-  tooLarge: "inline_image_too_large",
-  typeUnsupported: "inline_image_type_unsupported",
-};
-
 function uploadFailureIssue(failure: ApiRequestFailure): NewsInlineImageIssue {
   const code = readAttachmentIssue(failure);
   return code === null
@@ -70,7 +66,7 @@ export function useNewsInlineImageUpload(): NewsInlineImageUploader {
   }
 
   async function upload(file: File): Promise<NewsInlineImageUploadOutcome> {
-    const code = checkNewsImageBeforeUpload(file, INLINE_IMAGE_ISSUES);
+    const code = checkNewsImageBeforeUpload(file, NEWS_INLINE_IMAGE_ISSUES);
     if (code !== null) {
       return { kind: "rejected", issue: { kind: "rejected", code } };
     }

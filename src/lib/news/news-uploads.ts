@@ -269,9 +269,9 @@ async function findPublishedPost(
 }
 
 /** Publica con los adjuntos, la portada (#591) y las imágenes del cuerpo
- * (#603) que se subieron mientras se escribía. Primero se valida todo, subidas incluidas, y sólo entonces se
- * escribe. La audiencia se entera al final, con la publicación ya entera
- * (#332).
+ * (#603) que se subieron mientras se escribía. Primero se valida todo,
+ * subidas incluidas, y sólo entonces se escribe. La audiencia se entera al
+ * final, con la publicación ya entera (#332).
  *
  * Si la publicación se deshace a medias, la portada queda sin publicación
  * que la apunte: se puede reintentar con ella, y si no, la recoge la

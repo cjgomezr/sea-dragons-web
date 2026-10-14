@@ -18,7 +18,8 @@ const INLINE_IMAGES_BUCKET = "news-attachments";
 
 /** Diez minutos: la dirección estable redirige a esta en cada carga, así que
  * no hace falta que dure lo que la pestaña abierta, sólo más que la caché de
- * la redirección (`NEWS_INLINE_IMAGE_REDIRECT_MAX_AGE_SECONDS`). */
+ * la redirección (`REDIRECT_MAX_AGE_SECONDS`, en
+ * `src/app/api/v1/news/images/[imageId]/route.ts`). */
 export const NEWS_INLINE_IMAGE_URL_LIFETIME_SECONDS = 10 * 60;
 
 const INLINE_IMAGES_TABLE = "news_inline_images";

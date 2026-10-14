@@ -245,8 +245,10 @@ async function discardReplacedCover(
  * sin `pin`, la fijada sigue fijada aunque la edite un Committee.
  *
  * Las imágenes nuevas del cuerpo (#603) se ligan antes de guardar, para que
- * el cuerpo nunca nombre una que su audiencia no puede ver. Las que el
- * cuerpo ya no nombra se borran después, sólo si la edición se guardó. */
+ * el cuerpo nunca nombre una que su audiencia no puede ver. Si la edición
+ * choca con otra, quedan ligadas sin que el cuerpo las nombre, y las borra
+ * la siguiente edición que se guarde. Las que el cuerpo ya no nombra se
+ * borran después de guardar, sólo si la edición se guardó. */
 export async function editNewsPost(
   gateways: NewsGateways,
   request: PostRequest & {
