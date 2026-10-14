@@ -10,7 +10,10 @@ import {
   uploadIdFor,
 } from "../helpers/news-attachments-club";
 import { CALLER_ID, CLUB_ID } from "../helpers/news-club";
-import { SHRUNK_COVER_LARGE } from "../helpers/news-attachments-club";
+import {
+  SHRUNK_COVER_LARGE,
+  SHRUNK_INLINE_IMAGE,
+} from "../helpers/news-attachments-club";
 
 /**
  * Los endpoints de las subidas previas (#330): subir un archivo mientras se
@@ -243,5 +246,45 @@ describe("DELETE /api/v1/news/publish/uploads/[uploadId]", () => {
     const response = await discard("../otra-carpeta");
 
     expect(response.status).toBe(404);
+  });
+});
+
+describe("POST /api/v1/news/publish/uploads?kind=inline_image", () => {
+  it("responde 201 con el id de la imagen del cuerpo, guardada en WebP", async () => {
+    mockWiring();
+
+    const response = await stage("equipo.png", PNG_BYTES, "inline_image");
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        id: NEW_FILE_ID,
+        fileName: "equipo.png",
+        contentType: "image/webp",
+        sizeBytes: SHRUNK_INLINE_IMAGE.length,
+      },
+    });
+    expect(club.inlineImageFiles.size).toBe(1);
+  });
+
+  it("responde 400 con su código a un PDF", async () => {
+    mockWiring();
+
+    await expectRejectedFile(
+      await stage("acta.pdf", PDF_BYTES, "inline_image"),
+      "inline_image_type_unsupported",
+    );
+  });
+
+  it("responde 400 con el código de tamaño a una imagen de más de 10 MB", async () => {
+    mockWiring();
+    const huge = new Uint8Array(NEWS_ATTACHMENT_MAX_BYTES + 1);
+    huge.set(PNG_BYTES);
+
+    await expectRejectedFile(
+      await stage("enorme.png", huge, "inline_image"),
+      "inline_image_too_large",
+    );
+    expect(club.inlineImageFiles.size).toBe(0);
   });
 });

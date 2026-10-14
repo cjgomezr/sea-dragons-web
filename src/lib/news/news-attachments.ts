@@ -1,5 +1,8 @@
 import { type DetectableFileType, detectFileType } from "@/lib/files/file-type";
-import type { ShrunkNewsCover } from "./shrink-news-cover";
+import type {
+  ShrunkNewsCover,
+  ShrunkNewsInlineImage,
+} from "./shrink-news-cover";
 import {
   type NewsAttachmentSummary,
   type NewsGateways,
@@ -64,6 +67,10 @@ export const NEWS_ATTACHMENT_ISSUE_CODES = [
   "cover_too_large",
   "cover_type_unsupported",
   "cover_upload_missing",
+  // Y las imágenes del cuerpo (#603).
+  "inline_image_empty",
+  "inline_image_too_large",
+  "inline_image_type_unsupported",
 ] as const;
 
 export type NewsAttachmentIssueCode =
@@ -86,6 +93,9 @@ const ISSUE_MESSAGES: Readonly<Record<NewsAttachmentIssueCode, string>> = {
     "La portada tiene que ser una imagen JPEG, PNG o WebP.",
   cover_upload_missing:
     "La portada ya no está subida. Quítala y vuelve a añadirla.",
+  inline_image_empty: "La imagen está vacía.",
+  inline_image_too_large: "Cada imagen puede pesar como mucho 10 MB.",
+  inline_image_type_unsupported: "La imagen tiene que ser JPEG, PNG o WebP.",
 };
 
 export class NewsAttachmentValidationError extends Error {
@@ -174,9 +184,11 @@ export type NewsAttachmentGateways = NewsGateways & {
   /** El nombre aleatorio del fichero nuevo. Se inyecta para que los tests
    * sepan qué ruta esperar. */
   readonly newFileId: () => string;
-  /** La reducción de la portada (#591), con sharp en el servidor. */
+  /** La reducción de la portada (#591) y de las imágenes del cuerpo
+   * (#603), con sharp en el servidor. */
   readonly images: {
     shrinkCover(bytes: Uint8Array): Promise<ShrunkNewsCover>;
+    shrinkInlineImage(bytes: Uint8Array): Promise<ShrunkNewsInlineImage>;
   };
 };
 

@@ -89,6 +89,28 @@ export function apiFile(file: ApiFile): NextResponse<ApiFileBody> {
   });
 }
 
+/** Una redirección a otra dirección, como la firmada de una imagen del
+ * cuerpo de una noticia (#603): un `<img>` sigue la redirección, pero no
+ * puede leer un `{ data }`. */
+export type ApiRedirect = {
+  readonly url: string;
+  /** Cuánto la puede guardar el navegador de quien la pidió, y nadie más:
+   * depende de su sesión. */
+  readonly maxAgeSeconds: number;
+};
+
+const REDIRECT_STATUS = 302;
+
+export function apiRedirect(redirect: ApiRedirect): NextResponse<null> {
+  return new NextResponse(null, {
+    status: REDIRECT_STATUS,
+    headers: {
+      location: redirect.url,
+      "cache-control": `private, max-age=${redirect.maxAgeSeconds}`,
+    },
+  });
+}
+
 export function apiError(
   code: ApiErrorCode,
   message: string,

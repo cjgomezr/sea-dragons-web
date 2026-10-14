@@ -2,6 +2,7 @@ import { detectFileType } from "@/lib/files/file-type";
 import {
   NEWS_ATTACHMENT_MAX_BYTES,
   type NewsAttachmentGateways,
+  type NewsAttachmentIssueCode,
   NewsAttachmentValidationError,
   validateNewsAttachmentName,
 } from "./news-attachments";
@@ -36,25 +37,48 @@ const COVER_TYPES: ReadonlySet<string> = new Set([
 /** Las dos versiones son WebP; lo que se devuelve describe la grande. */
 const STORED_COVER_TYPE = "image/webp";
 
-/** El nombre limpio de una portada que vale, o el motivo por el que no. El
- * nombre no tiene que coincidir con el tipo: la portada se vuelve a
- * codificar, así que lo que llegue dentro es lo único que cuenta. */
+/** Con qué código se rechaza cada motivo: la portada y las imágenes del
+ * cuerpo (#603) siguen las mismas reglas y lo dicen cada una a su manera. */
+export type NewsImageIssueCodes = {
+  readonly empty: NewsAttachmentIssueCode;
+  readonly tooLarge: NewsAttachmentIssueCode;
+  readonly typeUnsupported: NewsAttachmentIssueCode;
+};
+
+const COVER_ISSUES: NewsImageIssueCodes = {
+  empty: "cover_empty",
+  tooLarge: "cover_too_large",
+  typeUnsupported: "cover_type_unsupported",
+};
+
+/** El nombre limpio de una imagen que se va a reducir, o el motivo por el
+ * que no vale. El nombre no tiene que coincidir con el tipo: la imagen se
+ * vuelve a codificar, así que lo que llegue dentro es lo único que cuenta. */
+export function validateNewsImageFile(
+  rawName: string,
+  bytes: Uint8Array,
+  issues: NewsImageIssueCodes,
+): string {
+  const fileName = validateNewsAttachmentName(rawName);
+  if (bytes.length === 0) {
+    throw new NewsAttachmentValidationError(issues.empty);
+  }
+  if (bytes.length > NEWS_COVER_MAX_BYTES) {
+    throw new NewsAttachmentValidationError(issues.tooLarge);
+  }
+  const type = detectFileType(bytes);
+  if (type === null || !COVER_TYPES.has(type)) {
+    throw new NewsAttachmentValidationError(issues.typeUnsupported);
+  }
+  return fileName;
+}
+
+/** El nombre limpio de una portada que vale, o el motivo por el que no. */
 export function validateNewsCoverFile(
   rawName: string,
   bytes: Uint8Array,
 ): string {
-  const fileName = validateNewsAttachmentName(rawName);
-  if (bytes.length === 0) {
-    throw new NewsAttachmentValidationError("cover_empty");
-  }
-  if (bytes.length > NEWS_COVER_MAX_BYTES) {
-    throw new NewsAttachmentValidationError("cover_too_large");
-  }
-  const type = detectFileType(bytes);
-  if (type === null || !COVER_TYPES.has(type)) {
-    throw new NewsAttachmentValidationError("cover_type_unsupported");
-  }
-  return fileName;
+  return validateNewsImageFile(rawName, bytes, COVER_ISSUES);
 }
 
 /** Si la fila no entra, se borran los ficheros para no dejarlos huérfanos, y

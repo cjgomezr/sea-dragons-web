@@ -1827,6 +1827,13 @@ export const spanishMessages: MessageCatalog = {
   "news.publish.editor.format.numberedList": "Lista numerada",
   "news.publish.editor.format.quote": "Cita",
   "news.publish.editor.format.link": "Enlace",
+  "news.publish.editor.image": "Insertar imagen",
+  "news.publish.editor.imageUploading": "Subiendo la imagen…",
+  "news.publish.editor.image.issue.empty": "La imagen está vacía.",
+  "news.publish.editor.image.issue.tooLarge":
+    "Cada imagen puede pesar hasta {max} MB.",
+  "news.publish.editor.image.issue.typeUnsupported":
+    "La imagen tiene que ser JPEG, PNG o WebP.",
   "news.publish.editor.help": "Ayuda de formato",
   "news.publish.editor.help.bold": "**texto en negrita**",
   "news.publish.editor.help.italic": "*texto en cursiva*",

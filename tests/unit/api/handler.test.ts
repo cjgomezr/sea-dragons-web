@@ -58,6 +58,27 @@ describe("respuesta correcta", () => {
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
   });
 
+  it("redirige a la dirección que da el handler, con una caché privada y corta", async () => {
+    const route = createApiRoute({
+      handler: async () => ({
+        redirect: {
+          url: "https://storage.test/signed/foto.webp",
+          maxAgeSeconds: 300,
+        },
+      }),
+    });
+
+    const response = await route(
+      new NextRequest("http://localhost/api/v1/news/images/1"),
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(
+      "https://storage.test/signed/foto.webp",
+    );
+    expect(response.headers.get("cache-control")).toBe("private, max-age=300");
+  });
+
   it("usa 201 cuando el handler declara creación", async () => {
     const route = createApiRoute({
       handler: async () => ({ data: { id: "1" }, status: 201 as const }),
