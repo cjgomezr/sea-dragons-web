@@ -7164,6 +7164,30 @@ a.auth-brand-header:focus-visible {
   color: var(--color-text-secondary);
 }
 
+/* Lo que pasa con la imagen que se sube (#603). El estado vacío no ocupa
+   sitio, pero sigue en la página para que se anuncie. */
+.news-body-image-status,
+.news-body-image-issue {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  font-size: 13px;
+  border-top: 1px solid var(--color-border);
+}
+
+.news-body-image-status {
+  color: var(--color-text-secondary);
+}
+
+.news-body-image-status:empty {
+  padding: 0;
+  border-top: none;
+}
+
+.news-body-image-issue {
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
 .news-body-footer {
   display: flex;
   flex-wrap: wrap;

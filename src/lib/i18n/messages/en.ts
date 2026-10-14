@@ -1818,6 +1818,9 @@ export const englishMessages = {
   "news.publish.editor.format.link": "Link",
   "news.publish.editor.image": "Insert image",
   "news.publish.editor.imageUploading": "Uploading the image…",
+  "news.publish.editor.chooseImage": "Choose an image",
+  "news.publish.editor.image.issue.uploadFailed":
+    "We couldn't upload the image. Check your connection and try again.",
   "news.publish.editor.image.issue.empty": "The image is empty.",
   "news.publish.editor.image.issue.tooLarge":
     "Each image can be up to {max} MB.",

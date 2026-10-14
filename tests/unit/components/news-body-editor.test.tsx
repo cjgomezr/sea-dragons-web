@@ -1,8 +1,12 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NewsBodyEditor } from "@/components/news/NewsBodyEditor";
+import type {
+  NewsInlineImageUploader,
+  NewsInlineImageUploadOutcome,
+} from "@/components/news/use-news-inline-images";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
 
@@ -16,12 +20,29 @@ import { createTranslator } from "@/lib/i18n/translator";
 const MAC_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36";
 
+const IMAGE_URL = "/api/v1/news/images/1d1d1d1d-0000-4000-8000-000000000001";
+
+/** Una subida que responde lo que se le diga, cuando se le diga. */
+function fakeUploader(
+  respond: () => Promise<NewsInlineImageUploadOutcome>,
+  isUploading = false,
+): NewsInlineImageUploader {
+  return { isUploading, upload: vi.fn(respond) };
+}
+
+const UPLOADED: NewsInlineImageUploader = fakeUploader(async () => ({
+  kind: "uploaded",
+  url: IMAGE_URL,
+}));
+
 function Harness({
   initialBody,
   locale,
+  imageUpload = UPLOADED,
 }: {
   readonly initialBody: string;
   readonly locale: Locale;
+  readonly imageUpload?: NewsInlineImageUploader;
 }): React.JSX.Element {
   const [body, setBody] = useState(initialBody);
   return (
@@ -31,12 +52,36 @@ function Harness({
       value={body}
       onChange={setBody}
       issueId={null}
+      imageUpload={imageUpload}
     />
   );
 }
 
-function renderEditor(initialBody = "", locale: Locale = "en"): void {
-  render(<Harness initialBody={initialBody} locale={locale} />);
+function renderEditor(
+  initialBody = "",
+  locale: Locale = "en",
+  imageUpload: NewsInlineImageUploader = UPLOADED,
+): void {
+  render(
+    <Harness
+      initialBody={initialBody}
+      locale={locale}
+      imageUpload={imageUpload}
+    />,
+  );
+}
+
+function picture(name = "equipo.png"): File {
+  return new File([new Uint8Array(2_048)], name, { type: "image/png" });
+}
+
+async function chooseImage(file: File = picture()): Promise<void> {
+  await userEvent.click(
+    within(toolbar()).getByRole("button", { name: "Insert image" }),
+  );
+  await userEvent.upload(screen.getByLabelText("Choose an image"), file, {
+    applyAccept: false,
+  });
 }
 
 function bodyArea(): HTMLTextAreaElement {
@@ -99,6 +144,7 @@ describe("editor del cuerpo", () => {
       "Numbered list",
       "Quote",
       "Link",
+      "Insert image",
     ]);
   });
 
@@ -365,5 +411,120 @@ describe("pie y ayuda de formato", () => {
     expect(
       within(sheet).getByText("[texto del enlace](https://…)"),
     ).toBeVisible();
+  });
+});
+
+describe("imágenes del cuerpo (#603)", () => {
+  it("Imagen sube la elegida y la inserta donde estaba el cursor, con el cursor en el pie", async () => {
+    renderEditor("Antes después");
+    select(6, 6);
+
+    await chooseImage();
+
+    expect(UPLOADED.upload).toHaveBeenCalledWith(expect.any(File));
+    expect(bodyArea()).toHaveValue(`Antes ![](${IMAGE_URL})después`);
+    expect(bodyArea().selectionStart).toBe(8);
+    expect(bodyArea().selectionEnd).toBe(8);
+    expect(bodyArea()).toHaveFocus();
+  });
+
+  it("el selector sólo ofrece JPEG, PNG y WebP", () => {
+    renderEditor();
+
+    expect(screen.getByLabelText("Choose an image")).toHaveAttribute(
+      "accept",
+      "image/jpeg,image/png,image/webp",
+    );
+  });
+
+  it("si la imagen no vale, no inserta nada y dice por qué", async () => {
+    renderEditor(
+      "Antes",
+      "en",
+      fakeUploader(async () => ({
+        kind: "rejected",
+        issue: { kind: "rejected", code: "inline_image_too_large" },
+      })),
+    );
+
+    await chooseImage();
+
+    expect(bodyArea()).toHaveValue("Antes");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Each image can be up to 10 MB.",
+    );
+  });
+
+  it("si la subida falla, no inserta nada y dice por qué", async () => {
+    renderEditor(
+      "Antes",
+      "en",
+      fakeUploader(async () => ({
+        kind: "rejected",
+        issue: {
+          kind: "uploadFailed",
+          failure: { kind: "failed", failure: "network", reason: null },
+        },
+      })),
+    );
+
+    await chooseImage();
+
+    expect(bodyArea()).toHaveValue("Antes");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/connection/i);
+  });
+
+  it("elegir otra imagen quita el aviso de la anterior", async () => {
+    let outcome: NewsInlineImageUploadOutcome = {
+      kind: "rejected",
+      issue: { kind: "rejected", code: "inline_image_type_unsupported" },
+    };
+    renderEditor(
+      "",
+      "en",
+      fakeUploader(async () => outcome),
+    );
+    await chooseImage();
+    await screen.findByRole("alert");
+
+    outcome = { kind: "uploaded", url: IMAGE_URL };
+    await chooseImage();
+
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("mientras sube, lo dice", () => {
+    renderEditor(
+      "",
+      "en",
+      fakeUploader(() => new Promise(() => undefined), true),
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Uploading the image…",
+    );
+  });
+
+  it("la vista previa enseña la imagen recién subida", async () => {
+    let finish: () => void = () => undefined;
+    renderEditor(
+      "",
+      "en",
+      fakeUploader(
+        () =>
+          new Promise((resolve) => {
+            finish = () => resolve({ kind: "uploaded", url: IMAGE_URL });
+          }),
+      ),
+    );
+    await chooseImage();
+    await act(async () => finish());
+
+    await userEvent.click(tab("Preview"));
+
+    // Sin pie, el alt va vacío: es decorativa, así que su rol no es "img".
+    expect(
+      screen.getByRole("tabpanel", { name: "Preview" }).querySelector("img"),
+    ).toHaveAttribute("src", IMAGE_URL);
   });
 });

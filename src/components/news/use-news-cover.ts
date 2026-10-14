@@ -6,6 +6,7 @@ import {
   NEWS_ATTACHMENT_MAX_BYTES,
   type NewsAttachmentIssueCode,
 } from "@/lib/news/news-attachments";
+import type { NewsImageIssueCodes } from "@/lib/news/news-cover-uploads";
 import type { NewsCoverChange } from "@/lib/news/news-posts";
 import { readAttachmentIssue, uploadNewsCover } from "./news-publish-client";
 
@@ -46,7 +47,8 @@ export type NewsCoverField = {
   readonly remove: () => void;
 };
 
-/** Los tipos que el servidor acepta como portada (#591). */
+/** Los tipos que el servidor acepta como portada (#591) y como imagen del
+ * cuerpo (#603). */
 export const NEWS_COVER_TYPES: readonly string[] = [
   "image/jpeg",
   "image/png",
@@ -57,18 +59,28 @@ export const NEWS_COVER_TYPES: readonly string[] = [
  * aquí porque `news-cover-uploads` es código de servidor. */
 const COVER_MAX_BYTES = NEWS_ATTACHMENT_MAX_BYTES;
 
-/** Lo que se comprueba antes de subir. Un archivo sin tipo conocido sí se
- * sube: quien decide es el servidor, mirando los bytes. */
-function checkCoverBeforeUpload(file: File): NewsAttachmentIssueCode | null {
+const COVER_ISSUES: NewsImageIssueCodes = {
+  empty: "cover_empty",
+  tooLarge: "cover_too_large",
+  typeUnsupported: "cover_type_unsupported",
+};
+
+/** Lo que se comprueba antes de subir una imagen que el servidor reduce: la
+ * portada o una del cuerpo (#603), cada una con sus códigos. Un archivo sin
+ * tipo conocido sí se sube: quien decide es el servidor, mirando los bytes. */
+export function checkNewsImageBeforeUpload(
+  file: File,
+  issues: NewsImageIssueCodes,
+): NewsAttachmentIssueCode | null {
   if (file.size === 0) {
-    return "cover_empty";
+    return issues.empty;
   }
   if (file.size > COVER_MAX_BYTES) {
-    return "cover_too_large";
+    return issues.tooLarge;
   }
   return file.type === "" || NEWS_COVER_TYPES.includes(file.type)
     ? null
-    : "cover_type_unsupported";
+    : issues.typeUnsupported;
 }
 
 function uploadFailureIssue(failure: ApiRequestFailure): NewsCoverIssue {
@@ -148,7 +160,7 @@ export function useNewsCover(currentUrl: string | null): NewsCoverField {
   }
 
   function choose(file: File): void {
-    const code = checkCoverBeforeUpload(file);
+    const code = checkNewsImageBeforeUpload(file, COVER_ISSUES);
     if (code !== null) {
       setIssue({ kind: "rejected", code });
       return;

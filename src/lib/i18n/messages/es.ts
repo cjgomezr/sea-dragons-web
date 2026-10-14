@@ -1829,6 +1829,9 @@ export const spanishMessages: MessageCatalog = {
   "news.publish.editor.format.link": "Enlace",
   "news.publish.editor.image": "Insertar imagen",
   "news.publish.editor.imageUploading": "Subiendo la imagen…",
+  "news.publish.editor.chooseImage": "Elige una imagen",
+  "news.publish.editor.image.issue.uploadFailed":
+    "No pudimos subir la imagen. Revisa tu conexión y vuelve a intentarlo.",
   "news.publish.editor.image.issue.empty": "La imagen está vacía.",
   "news.publish.editor.image.issue.tooLarge":
     "Cada imagen puede pesar hasta {max} MB.",

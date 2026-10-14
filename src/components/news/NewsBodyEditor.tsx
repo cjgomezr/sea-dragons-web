@@ -3,13 +3,23 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { Translator } from "@/lib/i18n/translator";
 import {
+  type BodyEdit,
   type BodyFormat,
   type BodySelection,
   applyBodyFormat,
+  insertBodyImage,
 } from "@/lib/news/news-body-format";
 import { NewsBodyToolbar } from "./NewsBodyToolbar";
 import { NewsFormattingHelp } from "./NewsFormattingHelp";
 import { NewsMarkdown } from "./NewsMarkdown";
+import {
+  describeAttachmentIssue,
+  readAttachmentIssue,
+} from "./news-publish-client";
+import type {
+  NewsInlineImageIssue,
+  NewsInlineImageUploader,
+} from "./use-news-inline-images";
 
 /**
  * El cuerpo de una noticia como editor de Markdown (#598, RF-9 del PRD de
@@ -20,6 +30,10 @@ import { NewsMarkdown } from "./NewsMarkdown";
  * El área no se desmonta al pasar a Vista previa, sólo se esconde: así
  * conserva la selección al volver. Los formatos cambian el valor desde
  * React, así que el deshacer del navegador no los recoge.
+ *
+ * El botón Imagen (#603) sube la foto con la subida que le pasa el
+ * formulario y, al acabar, la inserta donde está el cursor en ese momento.
+ * Si no vale, no inserta nada y dice por qué debajo del área.
  */
 
 const TABS = ["write", "preview"] as const;
@@ -148,13 +162,14 @@ function PreviewPanel({
   );
 }
 
-/** Aplica un formato y devuelve la selección al área cuando React la pinte. */
-function useBodyFormatting(
+/** Cambia el texto desde el área (un formato, una imagen) y devuelve la
+ * selección al área cuando React la pinte. */
+function useBodyEdits(
   value: string,
   onChange: (body: string) => void,
 ): {
   readonly areaRef: React.RefObject<HTMLTextAreaElement | null>;
-  readonly format: (format: BodyFormat) => void;
+  readonly applyEdit: (change: (edit: BodyEdit) => BodyEdit) => void;
 } {
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const pendingSelection = useRef<BodySelection | null>(null);
@@ -170,23 +185,58 @@ function useBodyFormatting(
     area.setSelectionRange(selection.start, selection.end);
   }, [value]);
 
-  function format(bodyFormat: BodyFormat): void {
+  function applyEdit(change: (edit: BodyEdit) => BodyEdit): void {
     const area = areaRef.current;
     if (area === null) {
       return;
     }
-    const edit = applyBodyFormat(
-      {
-        text: area.value,
-        selection: { start: area.selectionStart, end: area.selectionEnd },
-      },
-      bodyFormat,
-    );
+    const edit = change({
+      text: area.value,
+      selection: { start: area.selectionStart, end: area.selectionEnd },
+    });
     pendingSelection.current = edit.selection;
     onChange(edit.text);
   }
 
-  return { areaRef, format };
+  return { areaRef, applyEdit };
+}
+
+function describeImageIssue(
+  translate: Translator,
+  issue: NewsInlineImageIssue,
+): string {
+  if (issue.kind === "rejected") {
+    return describeAttachmentIssue(translate, issue.code);
+  }
+  const code = readAttachmentIssue(issue.failure);
+  return code === null
+    ? translate("news.publish.editor.image.issue.uploadFailed")
+    : describeAttachmentIssue(translate, code);
+}
+
+/** Lo que pasa con la imagen que se sube: el estado vive siempre en la
+ * página, vacío, para que el lector de pantalla anuncie cuándo empieza. */
+function ImageUploadNotes({
+  translate,
+  isUploading,
+  issue,
+}: {
+  readonly translate: Translator;
+  readonly isUploading: boolean;
+  readonly issue: NewsInlineImageIssue | null;
+}): React.JSX.Element {
+  return (
+    <>
+      <p className="news-body-image-status" role="status">
+        {isUploading ? translate("news.publish.editor.imageUploading") : null}
+      </p>
+      {issue === null ? null : (
+        <p className="news-body-image-issue" role="alert">
+          {describeImageIssue(translate, issue)}
+        </p>
+      )}
+    </>
+  );
 }
 
 export function NewsBodyEditor({
@@ -195,6 +245,7 @@ export function NewsBodyEditor({
   value,
   onChange,
   issueId,
+  imageUpload,
 }: {
   readonly translate: Translator;
   readonly id: string;
@@ -202,11 +253,29 @@ export function NewsBodyEditor({
   readonly onChange: (body: string) => void;
   /** El aviso del campo, si lo hay: también describe al área. */
   readonly issueId: string | null;
+  readonly imageUpload: NewsInlineImageUploader;
 }): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<EditorTab>("write");
-  const { areaRef, format } = useBodyFormatting(value, onChange);
+  const [imageIssue, setImageIssue] = useState<NewsInlineImageIssue | null>(
+    null,
+  );
+  const { areaRef, applyEdit } = useBodyEdits(value, onChange);
   const hintId = `${id}-pista`;
   const isWriting = activeTab === "write";
+
+  function format(bodyFormat: BodyFormat): void {
+    applyEdit((edit) => applyBodyFormat(edit, bodyFormat));
+  }
+
+  async function chooseImage(file: File): Promise<void> {
+    setImageIssue(null);
+    const outcome = await imageUpload.upload(file);
+    if (outcome.kind === "rejected") {
+      setImageIssue(outcome.issue);
+      return;
+    }
+    applyEdit((edit) => insertBodyImage(edit, outcome.url));
+  }
 
   function handleKeyDown(
     event: React.KeyboardEvent<HTMLTextAreaElement>,
@@ -235,6 +304,7 @@ export function NewsBodyEditor({
               translate={translate}
               controlsId={id}
               onFormat={format}
+              onChooseImage={(file) => void chooseImage(file)}
             />
           ) : null}
         </div>
@@ -263,6 +333,11 @@ export function NewsBodyEditor({
           idPrefix={id}
           body={value}
           isActive={!isWriting}
+        />
+        <ImageUploadNotes
+          translate={translate}
+          isUploading={imageUpload.isUploading}
+          issue={imageIssue}
         />
         <NewsFormattingHelp
           translate={translate}

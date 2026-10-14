@@ -35,6 +35,10 @@ import {
   type NewsCoverField as NewsCover,
   useNewsCover,
 } from "./use-news-cover";
+import {
+  type NewsInlineImageUploader,
+  useNewsInlineImageUpload,
+} from "./use-news-inline-images";
 
 /**
  * El formulario de publicar (#330, RF-2 y RF-3 del PRD de E11): categoría,
@@ -140,6 +144,7 @@ type TextFieldsProps = {
   readonly draft: Draft;
   readonly issueTextFor: (field: NewsDraftField) => string | null;
   readonly onChange: (change: Partial<Draft>) => void;
+  readonly imageUpload: NewsInlineImageUploader;
 };
 
 function TitleAndBodyFields({
@@ -147,6 +152,7 @@ function TitleAndBodyFields({
   draft,
   issueTextFor,
   onChange,
+  imageUpload,
 }: TextFieldsProps): React.JSX.Element {
   const titleIssue = issueTextFor("title");
   const bodyIssue = issueTextFor("body");
@@ -187,6 +193,7 @@ function TitleAndBodyFields({
           value={draft.body}
           onChange={(body) => onChange({ body })}
           issueId={bodyIssue === null ? null : bodyIssueId}
+          imageUpload={imageUpload}
         />
         <FieldIssue id={bodyIssueId} text={bodyIssue} />
       </div>
@@ -309,7 +316,9 @@ export function NewsPublishForm({
   const isSendingRef = useRef(false);
   const audience = toAudience(draft.audience);
   const issues = listNewsDraftIssues({ ...draft, audience });
-  const isUploading = attachments.isUploading || cover.isUploading;
+  const inlineImages = useNewsInlineImageUpload();
+  const isUploading =
+    attachments.isUploading || cover.isUploading || inlineImages.isUploading;
   const isSending = status.kind === "sending";
 
   function update(change: Partial<Draft>): void {
@@ -360,6 +369,7 @@ export function NewsPublishForm({
     draft,
     issueTextFor,
     onChange: update,
+    imageUpload: inlineImages,
   };
 
   return (
