@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+body{margin:0;background:#070f16;color:#e8f0f7;font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+a{color:#33a1e0}a:hover{color:#5ab4e8}
+button:focus-visible,a:focus-visible{outline:2px solid #33a1e0;outline-offset:2px}
+</style>
+</helmet>
+
+<section id="t2" style="padding:48px 56px 24px;display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:8px;max-width:920px">
+<div style="display:flex;gap:12px;align-items:center"><a href="#t2" style="width:28px;height:28px;border-radius:50%;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;font-weight:700;font-size:14px;text-decoration:none">2</a><span style="font-size:20px;font-weight:700"><a href="#1a">1a</a> en celular</span></div>
+<p style="margin:0;font-size:14.5px;line-height:1.55;color:#cfdeea;text-wrap:pretty">Las pestañas pasan a un control de dos partes arriba. En "Club extras" cada extra muestra vendidos y recaudado en la fila; tocarlo abre una hoja con los compradores y Export CSV. Tocá otro extra en <a href="#2b">2b</a> para cambiar la hoja de <a href="#2c">2c</a>.</p>
+</div>
+<div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+<div id="2a" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;gap:10px;align-items:center"><a href="#2a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2a</a><span style="font-size:13.5px;color:#8aa1b5">My membership</span></div><div style="width:390px;height:800px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;position:relative;display:flex;flex-direction:column"><div style="padding:20px 16px 12px;display:flex;flex-direction:column;gap:14px">
+<h1 style="margin:0;font-size:26px;font-weight:700">Payments</h1>
+<div style="display:grid;grid-template-columns:1fr 1fr;padding:3px;gap:2px;border:1px solid #274055;border-radius:10px;background:#13283a">
+<button style="all:unset;cursor:pointer;display:flex;justify-content:center;align-items:center;height:40px;border-radius:8px;font-size:14px;font-weight:700;background:#1d4869;color:#e8f0f7">My membership</button>
+<button style="all:unset;cursor:pointer;display:flex;gap:6px;justify-content:center;align-items:center;height:40px;border-radius:8px;font-size:14px;color:#8aa1b5">Club extras<span style="min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;background:#274055;color:#cfdeea;font-size:11.5px;font-weight:700;display:grid;place-items:center">3</span></button>
+</div>
+</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none;padding:0 16px 24px;display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;flex-direction:column;gap:10px;padding:14px 16px;border:1px solid #274055;border-radius:12px;background:#13283a">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span style="font-size:16.5px;font-weight:700">Full membership</span><span style="padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;color:#6fd6b4;background:color-mix(in srgb,#6fd6b4 14%,transparent);border:1px solid color-mix(in srgb,#6fd6b4 40%,transparent)">Active</span></div>
+<div style="display:flex;flex-direction:column;gap:6px;font-size:13.5px;color:#cfdeea"><span style="display:flex;gap:8px;align-items:center"><i class="ph ph-currency-dollar" style="color:#8aa1b5"></i>A$25.00 / month · next charge Nov 1</span><span style="display:flex;gap:8px;align-items:center"><i class="ph ph-credit-card" style="color:#8aa1b5"></i>Visa •••• 4242 · exp 08/28</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:4px"><button style="all:unset;cursor:pointer;text-align:center;height:42px;line-height:40px;box-sizing:border-box;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14px;font-weight:600">Change plan</button><button style="all:unset;cursor:pointer;text-align:center;height:42px;line-height:40px;box-sizing:border-box;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14px;font-weight:600">Update card</button></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;gap:8px;align-items:baseline"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">CLUB EXTRAS</span><span style="font-size:12.5px;color:#8aa1b5">Optional</span></div>
+<sc-for list="{{ myCharges }}" as="c">
+<div style="display:flex;gap:12px;align-items:center;min-height:56px;padding:6px 0;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent)">
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600">{{ c.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ c.priceText }}</span></span>
+<sc-if value="{{ c.unpaid }}"><button onClick="{{ c.pay }}" style="all:unset;cursor:pointer;flex:none;height:40px;padding:0 18px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:14px;font-weight:700;display:flex;align-items:center">Buy</button></sc-if>
+<sc-if value="{{ c.isPaid }}"><span style="flex:none;display:flex;gap:5px;align-items:center;font-size:13.5px;font-weight:600;color:#6fd6b4"><i class="ph ph-check-circle"></i>Bought</span></sc-if>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between;align-items:center"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">PAYMENT HISTORY</span><button title="Export CSV" aria-label="Export CSV" style="all:unset;cursor:pointer;width:44px;height:44px;margin-right:-10px;display:grid;place-items:center;color:#cfdeea"><i class="ph ph-download-simple" style="font-size:19px"></i></button></div>
+<div style="display:flex;gap:6px">
+<sc-for list="{{ hfM }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;display:flex;align-items:center;height:44px;box-sizing:border-box;padding:0 16px;border-radius:999px;font-size:13.5px;font-weight:700;background:#33a1e0;color:#0c1a26">{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;display:flex;align-items:center;height:44px;box-sizing:border-box;padding:0 16px;border-radius:999px;font-size:13.5px;border:1px solid #274055;color:#cfdeea">{{ o.label }}</button></sc-if></sc-for>
+</div>
+<sc-for list="{{ histM }}" as="g">
+<div style="padding:14px 0 4px;font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5">{{ g.monthUp }}</div>
+<sc-for list="{{ g.rows }}" as="r">
+<div style="display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:center;min-height:56px;border-bottom:1px solid color-mix(in srgb,#274055 50%,transparent)">
+<span style="width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:{{ r.tint }};color:{{ r.color }}"><i class="ph {{ r.icon }}" style="font-size:17px"></i></span>
+<span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.desc }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ r.d }}<sc-if value="{{ r.hasNote }}"><span style="color:#f2887a"> · {{ r.note }}</span></sc-if></span></span>
+<span style="display:flex;flex-direction:column;gap:2px;align-items:flex-end"><span style="font:14px ui-monospace,Menlo,monospace">{{ r.amt }}</span><span style="font-size:12px;font-weight:600;color:{{ r.color }}">{{ r.label }}</span></span>
+</div>
+</sc-for>
+</sc-for>
+<sc-if value="{{ histEmptyM }}"><div style="padding:20px 0;font-size:14px;color:#8aa1b5">No payments match this filter.</div></sc-if>
+</div>
+</div></div></div>
+<div id="2b" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;gap:10px;align-items:center"><a href="#2b" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2b</a><span style="font-size:13.5px;color:#8aa1b5">Club extras (admin)</span></div><div style="width:390px;height:800px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;position:relative;display:flex;flex-direction:column"><div style="padding:20px 16px 12px;display:flex;flex-direction:column;gap:14px">
+<h1 style="margin:0;font-size:26px;font-weight:700">Payments</h1>
+<div style="display:grid;grid-template-columns:1fr 1fr;padding:3px;gap:2px;border:1px solid #274055;border-radius:10px;background:#13283a">
+<button style="all:unset;cursor:pointer;display:flex;justify-content:center;align-items:center;height:40px;border-radius:8px;font-size:14px;color:#8aa1b5">My membership</button>
+<button style="all:unset;cursor:pointer;display:flex;gap:6px;justify-content:center;align-items:center;height:40px;border-radius:8px;font-size:14px;font-weight:700;background:#1d4869;color:#e8f0f7">Club extras<span style="min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:11.5px;font-weight:700;display:grid;place-items:center">3</span></button>
+</div>
+</div>
+<div style="padding:0 16px 8px;font-size:13px;color:#8aa1b5">3 extras on sale · created by the committee in Stripe</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none;border-top:1px solid #274055"><sc-for list="{{ levM }}" as="l">
+<div onClick="{{ l.select }}" style="cursor:pointer;display:flex;gap:12px;align-items:center;min-height:64px;padding:8px 16px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent)">
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span style="font-size:15px;font-weight:600">{{ l.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ l.priceText }}</span></span>
+<span style="display:flex;flex-direction:column;gap:2px;align-items:flex-end"><span style="font:14px ui-monospace,Menlo,monospace">{{ l.collected }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ l.paid }} sold</span></span>
+<i class="ph ph-caret-right" style="color:#5a7086"></i>
+</div>
+</sc-for></div></div></div>
+<div id="2c" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;gap:10px;align-items:center"><a href="#2c" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2c</a><span style="font-size:13.5px;color:#8aa1b5">Detalle de un extra</span></div><div style="width:390px;height:800px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;position:relative;display:flex;flex-direction:column"><div style="opacity:.3;pointer-events:none"><div style="padding:20px 16px 12px;display:flex;flex-direction:column;gap:14px">
+<h1 style="margin:0;font-size:26px;font-weight:700">Payments</h1>
+<div style="display:grid;grid-template-columns:1fr 1fr;padding:3px;gap:2px;border:1px solid #274055;border-radius:10px;background:#13283a">
+<button style="all:unset;cursor:pointer;display:flex;justify-content:center;align-items:center;height:40px;border-radius:8px;font-size:14px;color:#8aa1b5">My membership</button>
+<button style="all:unset;cursor:pointer;display:flex;gap:6px;justify-content:center;align-items:center;height:40px;border-radius:8px;font-size:14px;font-weight:700;background:#1d4869;color:#e8f0f7">Club extras<span style="min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:11.5px;font-weight:700;display:grid;place-items:center">3</span></button>
+</div>
+</div><div style="border-top:1px solid #274055"><sc-for list="{{ levM }}" as="l">
+<div onClick="{{ l.select }}" style="cursor:pointer;display:flex;gap:12px;align-items:center;min-height:64px;padding:8px 16px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent)">
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span style="font-size:15px;font-weight:600">{{ l.name }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ l.priceText }}</span></span>
+<span style="display:flex;flex-direction:column;gap:2px;align-items:flex-end"><span style="font:14px ui-monospace,Menlo,monospace">{{ l.collected }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ l.paid }} sold</span></span>
+<i class="ph ph-caret-right" style="color:#5a7086"></i>
+</div>
+</sc-for></div></div>
+<div style="position:absolute;inset:0;background:color-mix(in srgb,#0c1a26 55%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;max-height:640px;background:#13283a;border-top:1px solid #274055;border-radius:20px 20px 0 0;padding:10px 18px 22px;display:flex;flex-direction:column;gap:14px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#274055"></span>
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:18px;font-weight:700">{{ selM.name }}</span><span style="font-size:13.5px;line-height:1.45;color:#8aa1b5">{{ selM.desc }}</span><span style="font-size:13.5px;color:#cfdeea">{{ selM.priceText }}</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<div style="display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26"><span style="font-size:20px;font-weight:700">{{ selM.paid }}</span><span style="font-size:12.5px;color:#8aa1b5">Sold</span></div>
+<div style="display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26"><span style="font-size:20px;font-weight:700">{{ selM.collected }}</span><span style="font-size:12.5px;color:#8aa1b5">Revenue</span></div>
+</div>
+<span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">BUYERS</span>
+<div style="display:flex;flex-direction:column;max-height:250px;overflow-y:auto;scrollbar-width:none;margin-top:-8px">
+<sc-for list="{{ selM.payers }}" as="m"><div style="display:flex;gap:12px;align-items:center;min-height:44px"><span style="flex:none;width:32px;height:32px;border-radius:50%;background:#1d4869;color:#cfdeea;display:grid;place-items:center;font-size:11px;font-weight:700">{{ m.ini }}</span><span style="flex:1;font-size:14.5px">{{ m.name }}</span><span style="font:12.5px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ m.date }}</span></div></sc-for>
+</div>
+<button style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;justify-content:center;height:46px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14.5px;font-weight:600"><i class="ph ph-download-simple"></i>Export CSV</button>
+</div></div></div>
+</div>
+</section>
+
+<section id="t1" style="padding:48px 56px 80px;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:10px;max-width:920px">
+<div style="display:flex;gap:12px;align-items:center"><a href="#t1" style="width:28px;height:28px;border-radius:50%;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;font-weight:700;font-size:14px;text-decoration:none">1</a><span style="font-size:20px;font-weight:700">Pagos — más ordenado, sobre todo para el admin</span></div>
+<ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14.5px;line-height:1.5;color:#cfdeea">
+<li>Separar lo personal (mi membresía, mis compras, mi historial) de la gestión (ventas de los extras del club). Hoy está todo mezclado en una sola columna.</li>
+<li>Los extras pasan de tarjetas grandes a filas compactas. El admin ve vendidos y recaudado sin abrir nada, y los compradores en un panel, como en el directorio.</li>
+<li>El historial va agrupado por mes, con filtro y el estado en color + palabra.</li>
+</ul>
+<p style="margin:0;font-size:14px;color:#8aa1b5">Probá las pestañas de <a href="#1a">1a</a>, elegí otro extra para ver sus compradores, o "Buy" en "My membership".</p>
+</div>
+
+<div style="display:flex;gap:48px;flex-wrap:wrap;align-items:flex-start">
+
+<div id="1a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1a</a><span style="font-size:13.5px;color:#8aa1b5">Pestañas: Mi membresía · Extras del club (ventas solo para admin y comité)</span></div>
+<div style="width:1180px;min-height:780px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;display:grid;grid-template-columns:200px minmax(0,1fr);overflow:hidden">
+<aside style="background:#163a55;border-right:1px solid #244b69;padding:18px 10px;display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;gap:10px;align-items:center;padding:0 8px 14px"><span style="width:30px;height:30px;border-radius:6px;background:#1d4869;border:1px dashed #89a1b5;flex:none"></span><span style="font-weight:700;font-size:15px;line-height:1.2">Victoria Seadragons</span></div>
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="9">
+<sc-if value="{{ n.on }}"><span style="padding:9px 12px;border-radius:8px;background:#1d4869;box-shadow:inset 3px 0 0 #33a1e0;font-size:14px;font-weight:600">{{ n.label }}</span></sc-if>
+<sc-if value="{{ n.off }}"><span style="padding:9px 12px;border-radius:8px;font-size:14px;color:#cfdeea">{{ n.label }}</span></sc-if>
+</sc-for>
+</aside>
+<div style="display:flex;flex-direction:column;min-width:0">
+<div style="padding:22px 28px 0;display:flex;flex-direction:column;gap:14px;border-bottom:1px solid #274055">
+<h1 style="margin:0;font-size:28px;line-height:1.1;font-weight:700">Payments</h1>
+<div style="display:flex;gap:4px">
+<sc-for list="{{ tabsA }}" as="t"><button onClick="{{ t.pick }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center;padding:10px 4px;margin-right:18px;font-size:14px;font-weight:600;color:{{ t.color }};box-shadow:inset 0 -2px 0 {{ t.line }}">{{ t.label }}<sc-if value="{{ t.hasCount }}"><span style="min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;background:#1d4869;color:#cfe8f7;font-size:11.5px;font-weight:700;display:grid;place-items:center">{{ t.count }}</span></sc-if></button></sc-for>
+</div>
+</div>
+
+<sc-if value="{{ mineA }}">
+<div style="padding:24px 28px 32px;display:flex;flex-direction:column;gap:26px">
+<div style="display:flex;gap:20px;align-items:center;padding:16px 18px;border:1px solid #274055;border-radius:10px;background:#13283a;flex-wrap:wrap">
+<div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;gap:10px;align-items:center"><span style="font-size:17px;font-weight:700">Full membership</span><span style="padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;color:#6fd6b4;background:color-mix(in srgb,#6fd6b4 14%,transparent);border:1px solid color-mix(in srgb,#6fd6b4 40%,transparent)">Active</span></div>
+<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13.5px;color:#cfdeea"><span>A$25.00 / month</span><span style="display:flex;gap:6px;align-items:center"><i class="ph ph-calendar-blank" style="color:#8aa1b5"></i>Next charge Nov 1</span><span style="display:flex;gap:6px;align-items:center"><i class="ph ph-credit-card" style="color:#8aa1b5"></i>Visa •••• 4242 · exp 08/28</span></div>
+</div>
+<div style="display:flex;gap:8px">
+<button style="all:unset;cursor:pointer;white-space:nowrap;padding:8px 14px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:13.5px;font-weight:600" style-hover="border-color:#33a1e0">Change plan</button>
+<button style="all:unset;cursor:pointer;white-space:nowrap;padding:8px 14px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:13.5px;font-weight:600" style-hover="border-color:#33a1e0">Update card</button>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:baseline"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">CLUB EXTRAS</span><span style="font-size:13px;color:#8aa1b5">Optional · buy what you need</span></div>
+<div style="border:1px solid #274055;border-radius:10px;overflow:hidden">
+<sc-for list="{{ myCharges }}" as="c" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 120px 96px 100px;gap:16px;align-items:center;padding:11px 16px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent)">
+<span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:14.5px;font-weight:600">{{ c.name }}</span><span style="font-size:12.5px;color:#8aa1b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.desc }}</span></span>
+<span style="font-size:13px;color:#8aa1b5">{{ c.availText }}</span>
+<span style="font:13.5px ui-monospace,Menlo,monospace;text-align:right">{{ c.priceText }}</span>
+<span style="display:flex;justify-content:flex-end">
+<sc-if value="{{ c.unpaid }}"><button onClick="{{ c.pay }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:6px 16px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:13px;font-weight:700" style-hover="background:#5ab4e8">Buy</button></sc-if>
+<sc-if value="{{ c.isPaid }}"><span style="display:flex;gap:5px;align-items:center;font-size:13px;font-weight:600;color:#6fd6b4"><i class="ph ph-check-circle"></i>Bought</span></sc-if>
+</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+<span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">PAYMENT HISTORY</span>
+<div style="display:flex;gap:8px;align-items:center">
+<div style="display:flex;padding:3px;gap:2px;border:1px solid #274055;border-radius:8px;background:#13283a">
+<sc-for list="{{ hfA }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:5px 12px;border-radius:6px;font-size:13px;font-weight:700;background:#33a1e0;color:#0c1a26">{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:5px 12px;border-radius:6px;font-size:13px;color:#8aa1b5" style-hover="color:#e8f0f7;background:#1a3349">{{ o.label }}</button></sc-if></sc-for>
+</div>
+<button title="Export CSV" aria-label="Export CSV" style="all:unset;cursor:pointer;width:34px;height:34px;box-sizing:border-box;border-radius:8px;border:1px solid #274055;background:#13283a;display:grid;place-items:center" style-hover="border-color:#33a1e0"><i class="ph ph-download-simple" style="font-size:16px"></i></button>
+</div>
+</div>
+<div style="border:1px solid #274055;border-radius:10px;overflow:hidden">
+<div style="display:grid;grid-template-columns:72px minmax(0,1fr) 170px 96px 96px 32px;gap:14px;padding:9px 16px;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5;background:#0f2131;border-bottom:1px solid #274055"><span>DATE</span><span>DESCRIPTION</span><span>METHOD</span><span style="text-align:right">AMOUNT</span><span>STATUS</span><span></span></div>
+<sc-for list="{{ histA }}" as="g" hint-placeholder-count="3">
+<div style="padding:8px 16px 4px;font-size:12.5px;font-weight:700;color:#cfdeea">{{ g.month }}</div>
+<sc-for list="{{ g.rows }}" as="r">
+<div style="display:grid;grid-template-columns:72px minmax(0,1fr) 170px 96px 96px 32px;gap:14px;align-items:center;padding:9px 16px;font-size:13.5px;border-bottom:1px solid color-mix(in srgb,#274055 50%,transparent)" style-hover="background:#13283a">
+<span style="font:13px ui-monospace,Menlo,monospace;color:#cfdeea">{{ r.d }}</span>
+<span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.desc }}</span><sc-if value="{{ r.hasNote }}"><span style="font-size:12px;color:#f2887a">{{ r.note }}</span></sc-if></span>
+<span style="color:#8aa1b5;white-space:nowrap">{{ r.method }}</span>
+<span style="font:13.5px ui-monospace,Menlo,monospace;text-align:right">{{ r.amt }}</span>
+<span style="display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600;color:{{ r.color }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ r.color }}"></span>{{ r.label }}</span>
+<sc-if value="{{ r.hasReceipt }}"><button title="View or download receipt" aria-label="View or download receipt" style="all:unset;cursor:pointer;width:30px;height:30px;border-radius:6px;display:grid;place-items:center;color:#8aa1b5" style-hover="background:#1a3349;color:#e8f0f7"><i class="ph ph-receipt" style="font-size:16px"></i></button></sc-if>
+<sc-if value="{{ r.noReceipt }}"><span></span></sc-if>
+</div>
+</sc-for>
+</sc-for>
+<sc-if value="{{ histEmptyA }}"><div style="padding:22px 16px;font-size:13.5px;color:#8aa1b5">No payments match this filter.</div></sc-if>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ chargesA }}">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;flex:1">
+<div style="padding:20px 24px 28px;display:flex;flex-direction:column;gap:14px;border-right:1px solid #274055;min-width:0">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="font-size:13.5px;color:#8aa1b5">{{ levyCount }} extras on sale · created by the committee in Stripe</span></div>
+<div style="border:1px solid #274055;border-radius:10px;overflow:hidden">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 84px 90px 110px;gap:16px;padding:9px 16px;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5;background:#0f2131;border-bottom:1px solid #274055"><span>EXTRA</span><span style="text-align:right">PRICE</span><span style="text-align:right">SOLD</span><span style="text-align:right">REVENUE</span></div>
+<sc-for list="{{ levRows }}" as="l" hint-placeholder-count="3">
+<div onClick="{{ l.select }}" style="cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) 84px 90px 110px;gap:16px;align-items:center;padding:12px 16px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent);background:{{ l.bg }};box-shadow:{{ l.bar }}" style-hover="background:#13283a">
+<span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:14.5px;font-weight:600">{{ l.name }}</span><span style="font-size:12.5px;color:#8aa1b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.desc }}</span></span>
+<span style="font:13.5px ui-monospace,Menlo,monospace;text-align:right">{{ l.priceText }}</span>
+<span style="font:13.5px ui-monospace,Menlo,monospace;text-align:right">{{ l.paid }}</span>
+<span style="font:13.5px ui-monospace,Menlo,monospace;text-align:right">{{ l.collected }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="padding:20px;display:flex;flex-direction:column;gap:16px;background:#13283a">
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:17px;font-weight:700">{{ selL.name }}</span><span style="font-size:13px;line-height:1.45;color:#8aa1b5">{{ selL.desc }}</span><span style="font-size:13px;color:#cfdeea">{{ selL.priceText }}</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<div style="display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26"><span style="font-size:20px;font-weight:700">{{ selL.paid }}</span><span style="font-size:12px;color:#8aa1b5">Sold</span></div>
+<div style="display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26"><span style="font-size:20px;font-weight:700">{{ selL.collected }}</span><span style="font-size:12px;color:#8aa1b5">Revenue</span></div>
+</div>
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">BUYERS</span>
+<div>
+<div style="display:flex;flex-direction:column;max-height:360px;overflow-y:auto;margin:0 -6px">
+<sc-for list="{{ selL.payers }}" as="m"><div style="display:flex;gap:10px;align-items:center;padding:6px"><span style="flex:none;width:28px;height:28px;border-radius:50%;background:#1d4869;color:#cfdeea;display:grid;place-items:center;font-size:10.5px;font-weight:700">{{ m.ini }}</span><span style="flex:1;font-size:13.5px">{{ m.name }}</span><span style="font:12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ m.date }}</span></div></sc-for>
+</div>
+</div>
+<button style="all:unset;cursor:pointer;display:flex;gap:7px;align-items:center;justify-content:center;padding:9px 0;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:13.5px;font-weight:600" style-hover="border-color:#33a1e0"><i class="ph ph-download-simple"></i>Export CSV</button>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+</div>
+
+<div id="1b" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1b" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1b</a><span style="font-size:13.5px;color:#8aa1b5">Una sola página: lo mío a la izquierda, cobros del club a la derecha</span></div>
+<div style="width:1180px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;padding:24px 28px 32px;display:flex;flex-direction:column;gap:20px">
+<h1 style="margin:0;font-size:28px;line-height:1.1;font-weight:700">Payments</h1>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:24px;min-width:0">
+<div style="display:flex;flex-direction:column;gap:12px;padding:16px 18px;border:1px solid #274055;border-radius:10px;background:#13283a">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:17px;font-weight:700">Full membership</span><span style="padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;color:#6fd6b4;background:color-mix(in srgb,#6fd6b4 14%,transparent);border:1px solid color-mix(in srgb,#6fd6b4 40%,transparent)">Active</span></div><span style="font:15px ui-monospace,Menlo,monospace">A$25.00 / mo</span></div>
+<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;font-size:13.5px;color:#cfdeea"><span style="display:flex;gap:6px;align-items:center"><i class="ph ph-calendar-blank" style="color:#8aa1b5"></i>Next charge Nov 1</span><span style="display:flex;gap:6px;align-items:center"><i class="ph ph-credit-card" style="color:#8aa1b5"></i>Visa •••• 4242 · exp 08/28</span><span style="flex:1"></span><a href="#1b" style="font-size:13.5px">Change plan</a><a href="#1b" style="font-size:13.5px">Update card</a></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+<span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">PAYMENT HISTORY</span>
+<div style="display:flex;padding:3px;gap:2px;border:1px solid #274055;border-radius:8px;background:#13283a">
+<sc-for list="{{ hfB }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:5px 12px;border-radius:6px;font-size:13px;font-weight:700;background:#33a1e0;color:#0c1a26">{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:5px 12px;border-radius:6px;font-size:13px;color:#8aa1b5" style-hover="color:#e8f0f7;background:#1a3349">{{ o.label }}</button></sc-if></sc-for>
+</div>
+</div>
+<div style="display:flex;flex-direction:column">
+<sc-for list="{{ histB }}" as="g" hint-placeholder-count="3">
+<div style="padding:12px 0 6px;font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5;border-bottom:1px solid #274055">{{ g.monthUp }}</div>
+<sc-for list="{{ g.rows }}" as="r">
+<div style="display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid color-mix(in srgb,#274055 50%,transparent)">
+<span style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:{{ r.tint }};color:{{ r.color }}"><i class="ph {{ r.icon }}" style="font-size:17px"></i></span>
+<span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.desc }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ r.d }} · {{ r.method }}<sc-if value="{{ r.hasNote }}"><span style="color:#f2887a"> · {{ r.note }}</span></sc-if></span></span>
+<span style="display:flex;flex-direction:column;gap:2px;align-items:flex-end"><span style="font:14px ui-monospace,Menlo,monospace">{{ r.amt }}</span><span style="font-size:12px;font-weight:600;color:{{ r.color }}">{{ r.label }}</span></span>
+</div>
+</sc-for>
+</sc-for>
+<sc-if value="{{ histEmptyB }}"><div style="padding:22px 0;font-size:13.5px;color:#8aa1b5">No payments match this filter.</div></sc-if>
+</div>
+</div>
+</div>
+<aside style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:center"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">CLUB CHARGES</span><span style="font-size:12px;color:#8aa1b5;display:flex;gap:5px;align-items:center"><i class="ph ph-eye"></i>Progress visible to admins</span></div>
+<sc-for list="{{ levB }}" as="l" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid #274055;border-radius:10px;background:#13283a">
+<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><span style="font-size:14.5px;font-weight:600">{{ l.name }}</span><span style="font:14px ui-monospace,Menlo,monospace">{{ l.priceText }}</span></div>
+<span style="font-size:12.5px;color:#8aa1b5;margin-top:-6px">{{ l.dueText }}</span>
+<sc-if value="{{ l.unpaid }}"><button onClick="{{ l.pay }}" style="all:unset;cursor:pointer;text-align:center;padding:7px 0;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:13.5px;font-weight:700" style-hover="background:#5ab4e8">Pay {{ l.priceText }}</button></sc-if>
+<sc-if value="{{ l.isPaid }}"><span style="display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600;color:#6fd6b4"><i class="ph ph-check-circle"></i>You paid this</span></sc-if>
+<div style="display:flex;flex-direction:column;gap:7px;padding-top:10px;border-top:1px solid #274055">
+<div style="display:flex;gap:10px;align-items:center"><span style="flex:1;height:6px;border-radius:3px;background:#274055;overflow:hidden"><span style="display:block;height:100%;width:{{ l.pct }};background:#33a1e0;border-radius:3px"></span></span><span style="font:12.5px ui-monospace,Menlo,monospace;color:#cfdeea">{{ l.paid }} / {{ l.total }}</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px"><span style="color:#8aa1b5">{{ l.collected }} collected</span><button onClick="{{ l.toggle }}" style="all:unset;cursor:pointer;display:flex;gap:4px;align-items:center;color:#33a1e0;font-weight:600">{{ l.toggleLabel }}<i class="ph {{ l.caret }}" style="font-size:11px"></i></button></div>
+<sc-if value="{{ l.open }}">
+<div style="display:flex;flex-wrap:wrap;gap:5px;padding-top:4px">
+<sc-for list="{{ l.missing }}" as="m"><span style="padding:3px 9px;border-radius:999px;font-size:12.5px;border:1px solid #274055;color:#cfdeea">{{ m.name }}</span></sc-for>
+</div>
+<div style="display:flex;gap:8px;padding-top:4px">
+<sc-if value="{{ l.notReminded }}"><button onClick="{{ l.remind }}" style="all:unset;cursor:pointer;flex:1;display:flex;gap:6px;align-items:center;justify-content:center;padding:7px 0;border-radius:8px;border:1px solid color-mix(in srgb,#f2ce78 55%,transparent);color:#f2ce78;font-size:13px;font-weight:600"><i class="ph ph-bell-ringing"></i>Remind {{ l.missingN }}</button></sc-if>
+<sc-if value="{{ l.reminded }}"><span style="flex:1;display:flex;gap:6px;align-items:center;justify-content:center;font-size:12.5px;color:#6fd6b4"><i class="ph ph-check-circle"></i>Reminder sent</span></sc-if>
+<button title="Export CSV" aria-label="Export CSV" style="all:unset;cursor:pointer;width:34px;height:32px;box-sizing:border-box;border-radius:8px;border:1px solid #274055;background:#0c1a26;display:grid;place-items:center"><i class="ph ph-download-simple" style="font-size:15px"></i></button>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-for>
+</aside>
+</div>
+</div>
+</div>
+
+</div>
+<ul style="margin:0;padding-left:18px;max-width:920px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:#cfdeea">
+<li>Los socios sin rol de admin o comité ven solo "Mi membresía" (en <a href="#1a">1a</a> no aparecen las pestañas; en <a href="#1b">1b</a> la columna derecha no muestra el avance).</li>
+<li>En <a href="#1a">1a</a> los cobros del club son extras opcionales: el socio los compra si quiere, y el admin ve ventas y compradores (no quién "falta").</li>
+<li>Si el plan es Casual, la franja del plan muestra las sesiones que quedan y los packs como botones chicos en la misma franja.</li>
+</ul>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const NAMES = ['Lucía Fernández','Tom Baker','Mateo Rossi','Priya Nair',"Sam O'Neill",'Hana Sato','Dana Whitfield','Andrea Cadavid','Alex Kim','Jordan Lee','Maya Patel','Liam Walsh','Sofia Russo','Noah Chen','Emma Clarke','Lucas Martin','Chloe Evans','Ethan Brown','Ava Wilson','Leo Garcia','Mia Thompson','Oscar White','Isla Harris','Jack Taylor','Ruby Moore','Finn Jackson','Zoe Martin','Max Lewis','Ella Young','Kai Turner','Grace Hall','Ben Allen','Lily King','Sam Wright','Nina Scott','Theo Green','Ivy Adams','Eli Baker','Rose Nelson','Owen Price'];
+const GROUPS = ['U16 squad','Juniors','Masters','Parents'];
+const LEVIES = [
+  {id:'L1',name:'Island Cup entry fee',desc:'U16 squad. Covers entry, field hire and the team bus.',price:4500,due:'Due Oct 30',avail:'On sale until Oct 30',paid:14,total:22,mine:false},
+  {id:'L2',name:'2026 club jersey',desc:'Home and away jersey with your number.',price:6000,due:'No due date',avail:'Always available',paid:31,total:38,mine:true},
+  {id:'L3',name:'End-of-season dinner',desc:'Saturday Nov 28 at the clubhouse. Partners welcome.',price:3500,due:'Due Nov 20',avail:'On sale until Nov 20',paid:9,total:40,mine:false}
+];
+const HIST = [
+  {d:'Oct 1',m:'October 2026',desc:'Full membership',method:'Visa •••• 4242',amt:2500,st:'paid'},
+  {d:'Sep 18',m:'September 2026',desc:'2026 club jersey',method:'Visa •••• 4242',amt:6000,st:'paid'},
+  {d:'Sep 1',m:'September 2026',desc:'Full membership',method:'Visa •••• 4242',amt:2500,st:'paid'},
+  {d:'Aug 4',m:'August 2026',desc:'Full membership · retry',method:'Visa •••• 4242',amt:2500,st:'paid'},
+  {d:'Aug 1',m:'August 2026',desc:'Full membership',method:'Visa •••• 1881',amt:2500,st:'failed',note:'Card declined'},
+  {d:'Jul 1',m:'July 2026',desc:'Full membership',method:'Visa •••• 1881',amt:2500,st:'paid'},
+  {d:'Jun 14',m:'June 2026',desc:'Winter league levy',method:'Visa •••• 1881',amt:3000,st:'paid'}
+];
+const ST = {paid:{label:'Paid',color:'#6fd6b4',icon:'ph-check'},failed:{label:'Failed',color:'#f2887a',icon:'ph-x'}};
+const money = c => 'A$' + (c/100).toFixed(2);
+const ini = n => n.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+
+class Component extends DCLogic {
+  state = { selM:'L1', hfM:'all', tabA:'charges', selA:'L1', ptab:'missing', hfA:'all', hfB:'all', openB:'L1', myPaid:{L2:true}, reminded:{} };
+  people(l, i){
+    const list = NAMES.slice(i*7).concat(NAMES.slice(0, i*7)).slice(0, l.total).map((n, j) => ({name:n, ini:ini(n), group:GROUPS[(j+i)%4]}));
+    return {payers: list.slice(0, l.paid).map((p, j) => ({...p, date:'Oct ' + String(13 - (j%12)).padStart(2,'0')})), missing: list.slice(l.paid)};
+  }
+  levy(l, i){
+    const s = this.state, ppl = this.people(l, i), mine = !!s.myPaid[l.id];
+    return {...l, ...ppl, availText:l.avail, priceText:money(l.price), dueText:l.due, collected:money(l.price*l.paid), missingN:l.total-l.paid,
+      pct:Math.round(l.paid/l.total*100)+'%', isPaid:mine, unpaid:!mine,
+      pay:()=>this.setState(st=>({myPaid:{...st.myPaid,[l.id]:true}})),
+      reminded:!!s.reminded[l.id], notReminded:!s.reminded[l.id],
+      remind:()=>this.setState(st=>({reminded:{...st.reminded,[l.id]:true}}))};
+  }
+  hist(k){
+    const f = this.state['hf'+k];
+    const rows = HIST.filter(h => f==='all' || h.st===f);
+    const groups = [];
+    rows.forEach(h => { let g = groups.find(x => x.month===h.m); if(!g){ g = {month:h.m, monthUp:h.m.toUpperCase(), rows:[]}; groups.push(g); }
+      const st = ST[h.st]; g.rows.push({...h, amt:money(h.amt), label:st.label, color:st.color, icon:st.icon, tint:'color-mix(in srgb,'+st.color+' 14%,transparent)', hasNote:!!h.note, hasReceipt:h.st==='paid', noReceipt:h.st!=='paid'}); });
+    return {['hist'+k]:groups, ['histEmpty'+k]:rows.length===0,
+      ['hf'+k]:[['all','All'],['paid','Paid'],['failed','Failed']].map(([id,l]) => ({label:l, active:f===id, inactive:f!==id, pick:()=>this.setState({['hf'+k]:id})}))};
+  }
+  renderVals(){
+    const s = this.state;
+    const levs = LEVIES.map((l, i) => this.levy(l, i));
+    const due = levs.filter(l => l.unpaid).length;
+    const sel = levs.find(l => l.id===s.selA);
+    return {
+      nav: ['Dashboard','Directory','Calendar','Attendance','Teams','Evaluations','News','Payments','Groups'].map(l => ({label:l, on:l==='Payments', off:l!=='Payments'})),
+      tabsA: [['mine','My membership',null],['charges','Club extras',levs.length]].map(([id,l,c]) => ({label:l, count:c, hasCount:c!=null, color:s.tabA===id?'#e8f0f7':'#8aa1b5', line:s.tabA===id?'#33a1e0':'transparent', pick:()=>this.setState({tabA:id})})),
+      mineA: s.tabA==='mine', chargesA: s.tabA==='charges',
+      myCharges: levs.map(l => ({...l, availText: l.unpaid ? '' : 'Bought Sep 18'})),
+      dueLabel: due ? due + ' to pay' : 'All paid',
+      levyCount: levs.length,
+      levRows: levs.map(l => ({...l, select:()=>this.setState({selA:l.id}), bg:s.selA===l.id?'#13283a':'transparent', bar:s.selA===l.id?'inset 3px 0 0 #33a1e0':'none'})),
+      selL: sel,
+      ptabs: [['missing','Missing ('+sel.missingN+')'],['paid','Paid ('+sel.paid+')']].map(([id,l]) => ({label:l, active:s.ptab===id, inactive:s.ptab!==id, pick:()=>this.setState({ptab:id})})),
+      showMissing: s.ptab==='missing', showPaid: s.ptab==='paid',
+      levB: levs.map(l => ({...l, open:s.openB===l.id, caret:s.openB===l.id?'ph-caret-up':'ph-caret-down',
+        toggleLabel: s.openB===l.id ? 'Hide' : "See who's missing ("+l.missingN+')',
+        toggle:()=>this.setState(st=>({openB: st.openB===l.id ? null : l.id}))})),
+      ...this.hist('A'), ...this.hist('B'), ...this.hist('M'),
+      levM: levs.map(l => ({...l, select:()=>this.setState({selM:l.id})})), selM: levs.find(l => l.id===s.selM)
+    };
+  }
+}
+</script>
+</body>
+</html>
