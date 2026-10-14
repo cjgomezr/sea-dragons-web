@@ -32,7 +32,7 @@ const FAILURE_MESSAGES = {
   published: "news.post.error.republish",
 } as const;
 
-function WithdrawConfirmation({
+export function WithdrawConfirmation({
   translate,
   isSending,
   onConfirm,
