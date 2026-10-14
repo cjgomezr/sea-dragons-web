@@ -494,6 +494,42 @@ describe("retirar desde la hoja", () => {
   });
 });
 
+describe("retirar o volver a publicar: lo que puede salir mal y lo que se anuncia", () => {
+  it("si el servidor no deja retirar, la hoja lo dice y la publicación no cambia", async () => {
+    responders[`PUT ${STATUS_PATH}`] = () => errorResponse(500, "unexpected");
+    const sheet = await openSheet(COMMITTEE_POST);
+
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "Withdraw" }),
+    );
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "Withdraw post" }),
+    );
+
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent(
+      "We couldn't withdraw it. Try again.",
+    );
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
+  it("volver a publicar manda published, cierra la hoja y lo anuncia", async () => {
+    responders[`PUT ${STATUS_PATH}`] = () =>
+      jsonResponse(200, { data: COMMITTEE_POST });
+    const sheet = await openSheet({ ...COMMITTEE_POST, status: "withdrawn" });
+
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "Publish again" }),
+    );
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(callsTo("PUT", STATUS_PATH).map((call) => call.body)).toEqual([
+      { status: "published" },
+    ]);
+    expect(screen.getByRole("status")).toHaveTextContent("Published again.");
+  });
+});
+
 describe("cerrar la hoja", () => {
   it("Esc la cierra y devuelve el foco a ⋯", async () => {
     await openSheet(ADMIN_POST);
