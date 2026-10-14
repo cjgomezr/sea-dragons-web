@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { type BodyEdit, applyBodyFormat } from "@/lib/news/news-body-format";
+import {
+  type BodyEdit,
+  applyBodyFormat,
+  insertBodyImage,
+} from "@/lib/news/news-body-format";
 
 /**
  * La barra de formato del editor de noticias (#598, RF-9 del PRD de E22):
@@ -138,5 +142,39 @@ describe("prefijar las líneas", () => {
     expect(mark(applyBodyFormat(parse("[\nabc]"), "bulletList"))).toBe(
       "[\n- abc]",
     );
+  });
+});
+
+describe("insertar una imagen", () => {
+  const URL = "/api/v1/news/images/1d1d1d1d-0000-4000-8000-000000000001";
+
+  it("la inserta donde está el cursor, con el cursor dentro de los corchetes", () => {
+    const edit = insertBodyImage(
+      { text: "Antes después", selection: { start: 6, end: 6 } },
+      URL,
+    );
+
+    expect(edit.text).toBe(`Antes ![](${URL})después`);
+    expect(edit.selection).toEqual({ start: 8, end: 8 });
+  });
+
+  it("la inserta al principio de un cuerpo vacío", () => {
+    const edit = insertBodyImage(
+      { text: "", selection: { start: 0, end: 0 } },
+      URL,
+    );
+
+    expect(edit.text).toBe(`![](${URL})`);
+    expect(edit.selection).toEqual({ start: 2, end: 2 });
+  });
+
+  it("con texto seleccionado, lo usa de pie y lo deja seleccionado", () => {
+    const edit = insertBodyImage(
+      { text: "Mirad el equipo en la final", selection: { start: 6, end: 15 } },
+      URL,
+    );
+
+    expect(edit.text).toBe(`Mirad ![el equipo](${URL}) en la final`);
+    expect(edit.selection).toEqual({ start: 8, end: 17 });
   });
 });

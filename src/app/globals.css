@@ -6619,6 +6619,37 @@ a.auth-brand-header:focus-visible {
   background: none;
 }
 
+/* Las imágenes del cuerpo (#603): a lo ancho de la columna y recortadas a
+ * una altura fija, para que una foto vertical no ocupe la pantalla entera.
+ * Son spans porque Markdown las pone dentro de un párrafo. */
+.news-body-image {
+  display: block;
+  margin: 4px 0;
+}
+
+.news-body-image img {
+  display: block;
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--color-hover);
+}
+
+@media (min-width: 768px) {
+  .news-body-image img {
+    height: 300px;
+  }
+}
+
+.news-body-image-caption {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
 .news-post-attachments {
   display: flex;
   flex-direction: column;

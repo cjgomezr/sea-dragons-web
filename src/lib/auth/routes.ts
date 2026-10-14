@@ -333,6 +333,12 @@ export const NEWS_UPLOADS_API_PATH = `${NEWS_PUBLISH_API_PATH}/uploads`;
  * devolvió la subida. */
 export const NEWS_UPLOAD_API_PATH = `${NEWS_UPLOADS_API_PATH}/[uploadId]`;
 
+/** Una imagen del cuerpo de una publicación (#603, RF-14 del PRD de E22).
+ * Es la dirección estable que el cuerpo guarda: GET comprueba que quien la
+ * pide puede verla y redirige a una dirección firmada de vida corta. Lo
+ * alcanza cualquier cuenta activa; quien no es la audiencia recibe 404. */
+export const NEWS_INLINE_IMAGE_API_PATH = `${NEWS_API_PATH}/images/[imageId]`;
+
 /** Pedir la dirección firmada de un adjunto (#328). Lo alcanza cualquier
  * cuenta activa; quien no es la audiencia de la publicación recibe 404. */
 export const NEWS_ATTACHMENT_API_PATH = `${NEWS_POST_API_PATH}/attachments/[attachmentId]`;

@@ -2,6 +2,7 @@ import type { Nodes } from "mdast";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { type PluggableList, type Processor, unified } from "unified";
+import { readNewsInlineImageId } from "./news-inline-image-urls";
 
 /**
  * El cuerpo de una noticia se guarda como texto y se lee como Markdown (#593,
@@ -101,9 +102,32 @@ function plainTextOf(node: Nodes): string {
   return node.children.map((child) => plainTextOf(child)).join(separator);
 }
 
+function parseNewsBody(body: string): Nodes {
+  return unified().use(remarkParse).use(NEWS_REMARK_PLUGINS).parse(body);
+}
+
 /** El texto que se lee del cuerpo, sin marcas: los enlaces quedan en su texto
  * y las imágenes desaparecen. Los bloques quedan separados por espacios. */
 export function newsBodyToPlainText(body: string): string {
-  const tree = unified().use(remarkParse).use(NEWS_REMARK_PLUGINS).parse(body);
-  return plainTextOf(tree);
+  return plainTextOf(parseNewsBody(body));
+}
+
+/** Las direcciones de imagen del cuerpo: las de `![](...)` y las de una
+ * definición, que es a donde apunta `![pie][ref]`. */
+function imageUrlsOf(node: Nodes): readonly string[] {
+  if (node.type === "image" || node.type === "definition") {
+    return [node.url];
+  }
+  return "children" in node ? node.children.flatMap(imageUrlsOf) : [];
+}
+
+/** Los ids de las imágenes del club (#603) que el cuerpo enseña, en orden y
+ * sin repetir. Lo que esté escrito dentro de un código no cuenta: se ve como
+ * texto, no como imagen. */
+export function findNewsInlineImageIds(body: string): readonly string[] {
+  const ids = imageUrlsOf(parseNewsBody(body)).flatMap((url) => {
+    const imageId = readNewsInlineImageId(url);
+    return imageId === null ? [] : [imageId];
+  });
+  return [...new Set(ids)];
 }

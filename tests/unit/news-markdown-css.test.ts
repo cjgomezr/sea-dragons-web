@@ -81,3 +81,29 @@ describe("estilos del cuerpo en Markdown", () => {
     expect(block).toContain("background: var(--color-hover);");
   });
 });
+
+describe("las imágenes del cuerpo (#603)", () => {
+  it("van a lo ancho de la columna, con radio 8 y recortadas a 200 px en el móvil", () => {
+    const block = declarations(".news-body-image img");
+
+    expect(block).toContain("display: block;");
+    expect(block).toContain("width: 100%;");
+    expect(block).toContain("height: 200px;");
+    expect(block).toContain("border-radius: 8px;");
+    expect(block).toContain("object-fit: cover;");
+  });
+
+  it("miden 300 px de alto desde el escritorio", () => {
+    expect(globalsCss).toMatch(
+      /@media \(min-width: 768px\) \{\s*\.news-body-image img \{[^}]*height: 300px;/,
+    );
+  });
+
+  it("el pie va a 13 px en el texto secundario", () => {
+    const block = declarations(".news-body-image-caption");
+
+    expect(block).toContain("display: block;");
+    expect(block).toContain("font-size: 13px;");
+    expect(block).toContain("color: var(--color-text-secondary);");
+  });
+});
