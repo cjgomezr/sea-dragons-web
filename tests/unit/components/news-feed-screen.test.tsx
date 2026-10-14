@@ -475,7 +475,21 @@ describe("la cabecera del feed", () => {
 
     render(<NewsFeedScreen locale="en" canPublish canPin={false} />);
 
-    expect(screen.getByRole("link", { name: "+ Publish" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Publish" })).toHaveAttribute(
+      "href",
+      "/noticias/publicar",
+    );
+    await screen.findByRole("link", { name: SHORTLIST.title });
+  });
+
+  // #600: en el móvil es un botón de icono "+", y su nombre sigue siendo la
+  // palabra, sin el "+" que a la vista la acompaña en el escritorio.
+  it("el botón de publicar se llama Publicar en español", async () => {
+    stubSinglePage([SHORTLIST]);
+
+    render(<NewsFeedScreen locale="es" canPublish canPin={false} />);
+
+    expect(screen.getByRole("link", { name: "Publicar" })).toHaveAttribute(
       "href",
       "/noticias/publicar",
     );
@@ -489,7 +503,7 @@ describe("la cabecera del feed", () => {
 
     await screen.findByRole("link", { name: SHORTLIST.title });
     expect(
-      screen.queryByRole("link", { name: "+ Publish" }),
+      screen.queryByRole("link", { name: /Publish/ }),
     ).not.toBeInTheDocument();
   });
 });
@@ -513,8 +527,35 @@ describe("la tarjeta destacada", () => {
 
     await screen.findByRole("link", { name: PINNED.title });
     expect(
-      within(featuredCard(PINNED.title)).getByText("Pinned"),
+      within(featuredCard(PINNED.title)).getByText("Pinned", { selector: "p" }),
     ).toBeInTheDocument();
+  });
+
+  // #600: en el móvil la marca va en una píldora sobre la portada. El lector
+  // de pantalla no la oye: ya oye el estado, con hasta cuándo.
+  it("la fijada lleva la píldora Fijada, callada para el lector de pantalla", async () => {
+    stubPinnedPage(PINNED, [SHORTLIST]);
+
+    render(<NewsFeedScreen locale="es" canPublish={false} canPin={false} />);
+
+    await screen.findByRole("link", { name: PINNED.title });
+    const pill = within(featuredCard(PINNED.title)).getByText("Fijada", {
+      selector: "span",
+    });
+    expect(pill).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("la más reciente sin fijar no lleva píldora", async () => {
+    stubSinglePage([SHORTLIST, WINTER]);
+
+    render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
+
+    await screen.findByRole("link", { name: SHORTLIST.title });
+    expect(
+      within(featuredCard(SHORTLIST.title)).queryByText("Pinned", {
+        selector: "span",
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("dice en español hasta cuándo está fijada", async () => {

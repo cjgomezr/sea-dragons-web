@@ -441,7 +441,9 @@ describe("fijar con una duración", () => {
     );
 
     expect(
-      await within(featuredCard(POLICY.title)).findByText("Pinned"),
+      await within(featuredCard(POLICY.title)).findByText("Pinned", {
+        selector: "p",
+      }),
     ).toBeInTheDocument();
     expect(listTitles()).toEqual([SHORTLIST.title, WINTER.title]);
   });
@@ -488,7 +490,9 @@ describe("fijar con una duración", () => {
     );
     await act(async () => release());
 
-    await within(featuredCard(WINTER.title)).findByText(/^Pinned/);
+    await within(featuredCard(WINTER.title)).findByText(/^Pinned/, {
+      selector: "p",
+    });
     expect(pinRequests).toHaveLength(1);
   });
 

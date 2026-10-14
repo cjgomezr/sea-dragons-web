@@ -1788,6 +1788,8 @@ export const englishMessages = {
   "news.post.error.unexpected": "We couldn't open the post. Try again.",
   // El formulario de publicar (#330).
   "news.publish": "+ Publish",
+  // El nombre del enlace de publicar (#600): en el móvil es sólo el icono "+".
+  "news.publishName": "Publish",
   "news.publish.metaTitle": "Publish · {club}",
   "news.publish.metaDescription":
     "Write a post for the club, choose who sees it and attach documents.",

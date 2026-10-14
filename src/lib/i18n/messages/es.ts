@@ -1798,6 +1798,8 @@ export const spanishMessages: MessageCatalog = {
     "No pudimos abrir la publicación. Vuelve a intentarlo.",
   // El formulario de publicar (#330).
   "news.publish": "+ Publicar",
+  // El nombre del enlace de publicar (#600): en el móvil es sólo el icono "+".
+  "news.publishName": "Publicar",
   "news.publish.metaTitle": "Publicar · {club}",
   "news.publish.metaDescription":
     "Escribe una publicación para el club, elige quién la ve y adjunta documentos.",

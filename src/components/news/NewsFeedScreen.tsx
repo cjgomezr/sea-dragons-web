@@ -1,7 +1,9 @@
 "use client";
 
+import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/Icon";
 import { NEWS_PUBLISH_PATH } from "@/lib/auth/routes";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
@@ -316,11 +318,19 @@ export function NewsFeedScreen({
           <h1 id={TITLE_ID}>{translate("news.title")}</h1>
         </div>
         {canPublish ? (
+          // En el móvil es un botón de icono "+" (#600) y en el escritorio,
+          // "+ Publicar". El nombre es la palabra en los dos: el "+" no se lee.
           <Link
             href={NEWS_PUBLISH_PATH}
             className="auth-submit news-publish-link"
+            aria-label={translate("news.publishName")}
           >
-            {translate("news.publish")}
+            <span className="news-publish-icon">
+              <Icon glyph={Plus} />
+            </span>
+            <span className="news-publish-text">
+              {translate("news.publish")}
+            </span>
           </Link>
         ) : null}
       </header>
