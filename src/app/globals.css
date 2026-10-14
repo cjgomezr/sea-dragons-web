@@ -6190,7 +6190,9 @@ a.auth-brand-header:focus-visible {
 
   /* Lo que la píldora y el punto ya dicen a la vista sigue para el lector de
      pantalla, con hasta cuándo está fijada. La línea de la fila deja el
-     autor fuera de la vista, como el diseño, pero no del lector. */
+     autor fuera de la vista, como el diseño, pero no del lector. Son las
+     declaraciones de `.visually-hidden`, que no se puede aplicar sólo en un
+     ancho: si cambia una, cambia la otra. */
   .news-featured-status,
   .news-unread-word,
   .news-row .news-row-author {
@@ -6223,8 +6225,11 @@ a.auth-brand-header:focus-visible {
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
+  /* Cancela el margen lateral de `.app-main`, que en el móvil es
+     var(--space-4). */
   .news-list {
     margin: 0 calc(-1 * var(--space-4));
   }
@@ -6253,6 +6258,7 @@ a.auth-brand-header:focus-visible {
     font-size: 15.5px;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .news-row-excerpt {
