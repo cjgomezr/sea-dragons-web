@@ -4,6 +4,8 @@ import { EVENT_MANAGE_API_PATH } from "@/lib/auth/routes";
 import {
   CALLER_ID,
   CANCELLED_EVENT_ID,
+  FIRST_OCCURRENCE_ID,
+  LEGACY_EVENT_ID,
   type FakeManagedEventsClub,
   type FakeManagedEventsClubOptions,
   MISSING_EVENT_ID,
@@ -119,6 +121,55 @@ describe("endpoint de editar un evento", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       data: { ...SINGLE_EVENT, location: "Aquatic Centre" },
+    });
+  });
+
+  it("responde 200 con la hora y la fecha de fin nuevas", async () => {
+    mockWiring();
+
+    const response = await editEvent(SINGLE_EVENT_ID, {
+      endsOn: "2027-07-11",
+      endTime: "09:00",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { endTime: "09:00", endsOn: "2027-07-11" },
+    });
+  });
+
+  it("responde 422 a una sesión de una serie con fecha de fin", async () => {
+    mockWiring();
+
+    const response = await editEvent(FIRST_OCCURRENCE_ID, {
+      endsOn: "2027-07-07",
+    });
+
+    await expectError(response, 422, {
+      code: "business_rule",
+      reason: "multi_day_series",
+    });
+  });
+
+  it("responde 422 a un evento anterior a E24 guardado sin hora de fin", async () => {
+    mockWiring();
+
+    const response = await editEvent(LEGACY_EVENT_ID, { title: "Liga" });
+
+    await expectError(response, 422, {
+      code: "business_rule",
+      reason: "end_time_required",
+    });
+  });
+
+  it("responde 422 a una hora de fin que no va después del inicio", async () => {
+    mockWiring();
+
+    const response = await editEvent(SINGLE_EVENT_ID, { endTime: "09:00" });
+
+    await expectError(response, 422, {
+      code: "business_rule",
+      reason: "end_before_start",
     });
   });
 

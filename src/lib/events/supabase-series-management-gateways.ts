@@ -13,6 +13,7 @@ import {
   createEventManagementGateways,
   toChangesArgument,
   toHoursAndMinutes,
+  toOptionalHoursAndMinutes,
 } from "./supabase-event-management-gateways";
 
 /**
@@ -31,7 +32,7 @@ const EVENTS_TABLE = "events";
 const UPDATE_SERIES_FUNCTION = "update_series";
 
 const MANAGED_SERIES_COLUMNS =
-  "id, title, event_type, start_time, location, notes, audience, weekdays, starts_on, ends_on, event_series_groups(group_id)";
+  "id, title, event_type, start_time, end_time, location, notes, audience, weekdays, starts_on, ends_on, event_series_groups(group_id)";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -40,6 +41,7 @@ const managedSeriesRowSchema = z.object({
   title: z.string(),
   event_type: z.enum(EVENT_TYPES),
   start_time: z.string(),
+  end_time: z.string().nullable(),
   location: z.string(),
   notes: z.string().nullable(),
   audience: z.enum(["all", "groups"]),
@@ -57,6 +59,7 @@ function toManagedSeries(row: ManagedSeriesRow): ManagedSeries {
     title: row.title,
     eventType: row.event_type,
     startTime: toHoursAndMinutes(row.start_time),
+    endTime: toOptionalHoursAndMinutes(row.end_time),
     location: row.location,
     notes: row.notes,
     audience:

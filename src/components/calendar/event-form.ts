@@ -76,7 +76,14 @@ export type EventFormField =
  * devuelve nunca. */
 export type FieldIssueCode = Exclude<
   EventIssueCode,
-  "event_started" | "event_cancelled" | "series_without_upcoming"
+  | "event_started"
+  | "event_cancelled"
+  | "series_without_upcoming"
+  // El formulario todavía no tiene hora ni fecha de fin: las pone #650, que
+  // también traduce estos tres junto a su campo.
+  | "end_time_required"
+  | "end_before_start"
+  | "multi_day_series"
 >;
 
 export type EventFormIssue = {

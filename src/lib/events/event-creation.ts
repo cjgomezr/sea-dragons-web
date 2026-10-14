@@ -65,6 +65,8 @@ export type EventFields = {
   readonly eventType: EventType;
   /** `HH:MM` de Melbourne. */
   readonly startTime: string;
+  /** `HH:MM` de Melbourne. Nula sólo en lo creado antes de E24 (D5). */
+  readonly endTime: string | null;
   readonly location: string;
   readonly notes: string | null;
   readonly audience: EventAudience;
@@ -76,18 +78,32 @@ export type SeriesRange = {
   readonly endsOn: string;
 };
 
-/** Lo que manda quien crea, tal como llega. */
-export type EventDraft = EventFields &
-  (
-    | { readonly repeat: "none"; readonly startsOn: string }
+/** Lo que manda quien crea, tal como llega. La hora de fin puede faltar:
+ * se rechaza con 422 y no con 400, para que la pantalla lo traduzca. Sólo un
+ * evento suelto tiene fecha de fin (D6); en una serie, `endsOn` es la de la
+ * serie. */
+export type EventDraft = Omit<EventFields, "endTime"> & {
+  readonly endTime?: string | null;
+} & (
+    | {
+        readonly repeat: "none";
+        readonly startsOn: string;
+        readonly endsOn?: string | null;
+      }
     | ({ readonly repeat: "weekly" } & SeriesRange)
   );
 
-/** Lo que se guarda de una vez: la serie, si la hay, y una fila por fecha. */
+/** Lo nuevo siempre dice cuándo termina (D5). */
+export type NewEventFields = EventFields & { readonly endTime: string };
+
+/** Lo que se guarda de una vez: la serie, si la hay, y una fila por fecha.
+ * `endsOn` es la fecha de fin de un evento suelto de varios días, y nula en
+ * uno de un día y en las sesiones de una serie. */
 export type NewEventSchedule = {
   readonly clubId: string;
   readonly authorId: string;
-  readonly fields: EventFields;
+  readonly fields: NewEventFields;
+  readonly endsOn: string | null;
   readonly occurrenceDates: readonly string[];
   readonly series: SeriesRange | null;
 };
@@ -101,6 +117,7 @@ export type SavedEventSchedule = {
 export type CreatedEvent = EventFields & {
   readonly id: string;
   readonly startsOn: string;
+  readonly endsOn: string | null;
 };
 
 /** Una serie no repite sus campos en cada ocurrencia: una temporada son
@@ -146,6 +163,9 @@ export const EVENT_ISSUE_CODES = [
   "event_started",
   "event_cancelled",
   "series_without_upcoming",
+  "end_time_required",
+  "end_before_start",
+  "multi_day_series",
 ] as const;
 
 export type EventIssueCode = (typeof EVENT_ISSUE_CODES)[number];
@@ -167,6 +187,10 @@ const ISSUE_MESSAGES: Readonly<Record<EventIssueCode, string>> = {
   event_cancelled: "El evento está cancelado: ya no se puede cambiar.",
   series_without_upcoming:
     "La serie no tiene sesiones futuras sin cancelar: no queda nada que cambiar.",
+  end_time_required: "Indica la hora de fin del evento.",
+  end_before_start: "El fin del evento tiene que ir después de su inicio.",
+  multi_day_series:
+    "Las sesiones de una serie son de un día: sólo un evento suelto dura varios días.",
 };
 
 export class EventValidationError extends Error {
@@ -269,15 +293,74 @@ export async function resolveAudience(
   return { kind: "groups", groupIds };
 }
 
+/** Cuándo termina un evento, como se guarda. */
+export type EventEnd = {
+  readonly endTime: string;
+  /** Nula si termina el mismo día que empieza. */
+  readonly endsOn: string | null;
+};
+
+/** Lo que hay que saber de un evento para decidir si su fin vale. */
+export type EventEndCandidate = {
+  readonly startsOn: string;
+  readonly startTime: string;
+  readonly endTime: string | null | undefined;
+  readonly endsOn: string | null | undefined;
+  readonly isSeriesSession: boolean;
+};
+
+function isMultiDay(candidate: EventEndCandidate): boolean {
+  return (
+    candidate.endsOn !== null &&
+    candidate.endsOn !== undefined &&
+    candidate.endsOn !== candidate.startsOn
+  );
+}
+
+/** El fin de un evento, o por qué no vale. Una fecha de fin igual a la de
+ * inicio es un evento de un día y se guarda como ninguna. Las fechas y las
+ * horas se comparan como texto: `YYYY-MM-DD` y `HH:MM` ordenan igual que lo
+ * que nombran. También lo usan editar un evento y editar una serie. */
+export function resolveEventEnd(candidate: EventEndCandidate): EventEnd {
+  const { endTime, endsOn } = candidate;
+  if (endTime === null || endTime === undefined) {
+    throw new EventValidationError("end_time_required");
+  }
+  if (!isMultiDay(candidate)) {
+    if (endTime <= candidate.startTime) {
+      throw new EventValidationError("end_before_start");
+    }
+    return { endTime, endsOn: null };
+  }
+  if (candidate.isSeriesSession) {
+    throw new EventValidationError("multi_day_series");
+  }
+  if (endsOn === null || endsOn === undefined || endsOn < candidate.startsOn) {
+    throw new EventValidationError("end_before_start");
+  }
+  return { endTime, endsOn };
+}
+
+function resolveDraftEnd(draft: EventDraft): EventEnd {
+  return resolveEventEnd({
+    startsOn: draft.startsOn,
+    startTime: draft.startTime,
+    endTime: draft.endTime,
+    endsOn: draft.repeat === "none" ? draft.endsOn : null,
+    isSeriesSession: draft.repeat === "weekly",
+  });
+}
+
 async function normalizeFields(
   gateways: Pick<EventGateways, "events">,
   clubId: string,
-  draft: EventDraft,
-): Promise<EventFields> {
+  draft: EventDraft & { readonly endTime: string },
+): Promise<NewEventFields> {
   return {
     title: normalizeTitle(draft.title),
     eventType: draft.eventType,
     startTime: draft.startTime,
+    endTime: draft.endTime,
     location: normalizeLocation(draft.location),
     notes: normalizeNotes(draft.notes),
     audience: await resolveAudience(gateways, clubId, draft.audience),
@@ -356,7 +439,14 @@ function toCreatedEvents(
 ): CreatedEvents {
   const occurrences = pairOccurrenceIds(schedule.occurrenceDates, saved);
   if (schedule.series === null) {
-    return { repeat: "none", event: { ...schedule.fields, ...occurrences[0] } };
+    return {
+      repeat: "none",
+      event: {
+        ...schedule.fields,
+        ...occurrences[0],
+        endsOn: schedule.endsOn,
+      },
+    };
   }
   if (saved.seriesId === null) {
     throw new Error("La serie se guardó sin volver con su id.");
@@ -381,10 +471,15 @@ export async function createEvents(
 ): Promise<CreatedEvents> {
   const caller = await findEventOrganizer(gateways, request.callerId);
   const planned = planDates(request.draft, request.now);
+  const end = resolveDraftEnd(request.draft);
   const schedule: NewEventSchedule = {
     clubId: caller.clubId,
     authorId: request.callerId,
-    fields: await normalizeFields(gateways, caller.clubId, request.draft),
+    fields: await normalizeFields(gateways, caller.clubId, {
+      ...request.draft,
+      endTime: end.endTime,
+    }),
+    endsOn: end.endsOn,
     ...planned,
   };
   const saved = await gateways.events.insertSchedule(schedule);

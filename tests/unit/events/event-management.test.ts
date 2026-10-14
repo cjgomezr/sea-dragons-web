@@ -17,6 +17,7 @@ import {
   CANCELLED_EVENT_ID,
   type FakeManagedEventsClubOptions,
   FIRST_OCCURRENCE_ID,
+  LEGACY_EVENT_ID,
   MASTERS_SQUAD_ID,
   MISSING_EVENT_ID,
   NOW,
@@ -250,6 +251,116 @@ describe("editar un evento", () => {
     await Promise.all([editTo("Primera piscina"), editTo("Segunda piscina")]);
 
     expect(club.event(SINGLE_EVENT_ID)?.location).toBe("Segunda piscina");
+  });
+});
+
+describe("editar un evento: hora y fecha de fin", () => {
+  async function editSingle(changes: EventEdit, eventId = SINGLE_EVENT_ID) {
+    const club = fakeManagedEventsClub();
+    const edited = await editEvent(club.gateways, {
+      callerId: CALLER_ID,
+      eventId,
+      changes,
+      now: NOW,
+    });
+    return { club, edited };
+  }
+
+  it("cambia la hora de fin", async () => {
+    const { edited } = await editSingle({ endTime: "13:30" });
+
+    expect(edited).toMatchObject({ endTime: "13:30", endsOn: null });
+  });
+
+  it("conserva la hora de fin al cambiar otra cosa", async () => {
+    const { edited } = await editSingle({ location: "Aquatic Centre" });
+
+    expect(edited).toMatchObject({ endTime: "12:00", endsOn: null });
+  });
+
+  it("lo alarga a varios días con cualquier hora de fin", async () => {
+    const { edited } = await editSingle({
+      endsOn: "2027-07-11",
+      endTime: "09:00",
+    });
+
+    expect(edited).toMatchObject({ endTime: "09:00", endsOn: "2027-07-11" });
+  });
+
+  it("guarda como de un día una fecha de fin igual a la de inicio", async () => {
+    const { edited } = await editSingle({ endsOn: "2027-07-10" });
+
+    expect(edited.endsOn).toBeNull();
+  });
+
+  it("rechaza una hora de fin que no va después del inicio", async () => {
+    await expectEditRejected(
+      { changes: { endTime: "10:00" } },
+      "end_before_start",
+    );
+  });
+
+  it("rechaza mover el inicio a después de la hora de fin que ya tenía", async () => {
+    await expectEditRejected(
+      { changes: { startTime: "12:30" } },
+      "end_before_start",
+    );
+  });
+
+  it("rechaza mover el inicio a después de su fecha de fin", async () => {
+    const { club } = await editSingle({
+      endsOn: "2027-07-11",
+      endTime: "09:00",
+    });
+
+    const attempt = editEvent(club.gateways, {
+      callerId: CALLER_ID,
+      eventId: SINGLE_EVENT_ID,
+      changes: { startsOn: "2027-07-12" },
+      now: NOW,
+    });
+
+    await expect(attempt).rejects.toMatchObject({ code: "end_before_start" });
+  });
+
+  it("rechaza una fecha de fin anterior a la de inicio", async () => {
+    await expectEditRejected(
+      { changes: { endsOn: "2027-07-09" } },
+      "end_before_start",
+    );
+  });
+
+  it("rechaza que una sesión de una serie dure varios días", async () => {
+    await expectEditRejected(
+      { eventId: FIRST_OCCURRENCE_ID, changes: { endsOn: "2027-07-07" } },
+      "multi_day_series",
+    );
+  });
+
+  it("rechaza quitarle la hora de fin", async () => {
+    await expectEditRejected(
+      { changes: { endTime: null } },
+      "end_time_required",
+    );
+  });
+
+  it("rechaza guardar un evento anterior a E24 sin ponerle hora de fin", async () => {
+    await expectEditRejected(
+      { eventId: LEGACY_EVENT_ID, changes: { location: "Aquatic Centre" } },
+      "end_time_required",
+    );
+  });
+
+  it("guarda un evento anterior a E24 cuando se le pone hora de fin", async () => {
+    const { edited } = await editSingle(
+      { location: "Aquatic Centre", endTime: "11:00" },
+      LEGACY_EVENT_ID,
+    );
+
+    expect(edited).toMatchObject({
+      location: "Aquatic Centre",
+      endTime: "11:00",
+    });
   });
 });
 

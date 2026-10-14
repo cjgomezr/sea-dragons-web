@@ -7,6 +7,7 @@ import {
   type EventFields,
   EventValidationError,
   findEventOrganizer,
+  resolveEventEnd,
 } from "./event-creation";
 import {
   type EventManagementGateways,
@@ -104,6 +105,20 @@ async function findExistingSeries(
   return series;
 }
 
+/** Las sesiones de una serie son de un día (D6), y una serie anterior a E24
+ * no se guarda sin hora de fin aunque no se toque la hora (D5). La hora de
+ * fin sólo se escribe si viene: así una sesión editada sola conserva la
+ * suya. */
+function assertValidEnd(series: ManagedSeries, changes: SeriesEdit): void {
+  resolveEventEnd({
+    startsOn: series.startsOn,
+    startTime: changes.startTime ?? series.startTime,
+    endTime: changes.endTime === undefined ? series.endTime : changes.endTime,
+    endsOn: null,
+    isSeriesSession: true,
+  });
+}
+
 function assertSomethingChanged(changedOccurrences: number): void {
   if (changedOccurrences === 0) {
     throw new EventValidationError("series_without_upcoming");
@@ -135,6 +150,7 @@ export async function editSeries(
     caller.clubId,
     request.changes,
   );
+  assertValidEnd(before, changes);
   const updatedOccurrences = await gateways.managedSeries.updateSeries({
     ...target,
     changes,

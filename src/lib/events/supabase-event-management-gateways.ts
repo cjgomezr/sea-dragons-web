@@ -30,7 +30,7 @@ const EVENTS_TABLE = "events";
 const UPDATE_EVENT_FUNCTION = "update_event";
 
 const MANAGED_EVENT_COLUMNS =
-  "id, series_id, title, event_type, starts_on, start_time, location, notes, audience, status, cancelled_at, event_groups(group_id)";
+  "id, series_id, title, event_type, starts_on, start_time, end_time, ends_on, location, notes, audience, status, cancelled_at, event_groups(group_id)";
 
 /** Postgres devuelve un `time` como `HH:MM:SS`; el dominio habla en `HH:MM`. */
 const HOURS_AND_MINUTES_LENGTH = 5;
@@ -38,6 +38,11 @@ const HOURS_AND_MINUTES_LENGTH = 5;
 /** Un `time` de Postgres como lo habla el dominio. */
 export function toHoursAndMinutes(time: string): string {
   return time.slice(0, HOURS_AND_MINUTES_LENGTH);
+}
+
+/** La hora de fin, que es nula en lo creado antes de E24 (D5). */
+export function toOptionalHoursAndMinutes(time: string | null): string | null {
+  return time === null ? null : toHoursAndMinutes(time);
 }
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -49,6 +54,8 @@ const managedEventRowSchema = z.object({
   event_type: z.enum(EVENT_TYPES),
   starts_on: z.string(),
   start_time: z.string(),
+  end_time: z.string().nullable(),
+  ends_on: z.string().nullable(),
   location: z.string(),
   notes: z.string().nullable(),
   audience: z.enum(["all", "groups"]),
@@ -67,6 +74,8 @@ function toManagedEvent(row: ManagedEventRow): ManagedEvent {
     eventType: row.event_type,
     startsOn: row.starts_on,
     startTime: toHoursAndMinutes(row.start_time),
+    endTime: toOptionalHoursAndMinutes(row.end_time),
+    endsOn: row.ends_on,
     location: row.location,
     notes: row.notes,
     audience:
@@ -125,6 +134,8 @@ export function toChangesArgument(changes: EventEdit): Record<string, unknown> {
     ...(changes.startTime === undefined
       ? {}
       : { start_time: changes.startTime }),
+    ...(changes.endTime === undefined ? {} : { end_time: changes.endTime }),
+    ...(changes.endsOn === undefined ? {} : { ends_on: changes.endsOn }),
     ...(changes.location === undefined ? {} : { location: changes.location }),
     ...(changes.notes === undefined ? {} : { notes: changes.notes }),
     ...(audience === undefined

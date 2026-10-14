@@ -5,6 +5,7 @@ import {
   CALLER_ID,
   type FakeManagedSeriesClub,
   type FakeManagedSeriesClubOptions,
+  LEGACY_SERIES_ID,
   MISSING_SERIES_ID,
   NOW,
   SERIES,
@@ -124,6 +125,28 @@ describe("endpoint de editar una serie", () => {
         series: { ...SERIES, ...NEW_PLACE, startTime: "20:00" },
         updatedOccurrences: 2,
       },
+    });
+  });
+
+  it("responde 200 con la hora de fin nueva de la serie", async () => {
+    mockWiring();
+
+    const response = await editSeries(SERIES_ID, { endTime: "21:00" });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { series: { endTime: "21:00" } },
+    });
+  });
+
+  it("responde 422 a una serie anterior a E24 guardada sin hora de fin", async () => {
+    mockWiring();
+
+    const response = await editSeries(LEGACY_SERIES_ID, { title: "Verano" });
+
+    await expectError(response, 422, {
+      code: "business_rule",
+      reason: "end_time_required",
     });
   });
 

@@ -40,12 +40,15 @@ import { createSupabaseSeriesManagementGateways } from "./supabase-series-manage
  */
 
 /** `HH:MM`, de 00:00 a 23:59, como la escribe un `<input type="time">`. */
-const START_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const eventFieldsSchema = z.object({
   title: z.string(),
   eventType: z.enum(EVENT_TYPES),
-  startTime: z.string().regex(START_TIME),
+  startTime: z.string().regex(CLOCK_TIME),
+  // Que falte es un 422 (`end_time_required`) y no un 400: lo decide el
+  // dominio, que también lo exige al editar algo anterior a E24 (D5).
+  endTime: z.string().regex(CLOCK_TIME).nullable().optional(),
   location: z.string(),
   notes: z.string().nullable(),
   // Los ids de grupo tienen que ser uuid para no mandarle a Postgres un valor
@@ -62,6 +65,9 @@ export const eventDraftSchema = z.discriminatedUnion("repeat", [
   eventFieldsSchema.extend({
     repeat: z.literal("none"),
     startsOn: z.iso.date(),
+    // La de un evento de varios días. En una serie, `endsOn` es la de la
+    // serie: sus sesiones son de un día (D6).
+    endsOn: z.iso.date().nullable().optional(),
   }),
   eventFieldsSchema.extend({
     repeat: z.literal("weekly"),
@@ -72,9 +78,10 @@ export const eventDraftSchema = z.discriminatedUnion("repeat", [
 ]);
 
 /** Lo que cambia de un evento suelto o una ocurrencia: los mismos campos que
- * al crear, todos opcionales, y al menos uno. */
+ * al crear, todos opcionales, y al menos uno. `endsOn` a `null` lo vuelve de
+ * un día. */
 export const eventEditSchema = eventFieldsSchema
-  .extend({ startsOn: z.iso.date() })
+  .extend({ startsOn: z.iso.date(), endsOn: z.iso.date().nullable() })
   .partial()
   .refine((edit) => Object.values(edit).some((value) => value !== undefined), {
     message: "Envía al menos un campo que cambiar.",

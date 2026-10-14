@@ -28,6 +28,7 @@ const COMPETITION = {
   title: "Liga estatal",
   eventType: "competition",
   startTime: "10:00",
+  endTime: "12:00",
   location: "MSAC",
   notes: "Llevad gorro azul.",
   audience: { kind: "groups", groupIds: [SENIOR_SQUAD_ID] },
@@ -39,6 +40,7 @@ const WEEKLY_TRAINING = {
   title: "Entrenamiento",
   eventType: "training",
   startTime: "19:00",
+  endTime: "20:30",
   location: "MSAC",
   notes: null,
   audience: { kind: "club" },
@@ -186,6 +188,60 @@ describe("endpoint de crear eventos", () => {
     },
   );
 
+  it("responde 201 con la hora de fin del evento creado", async () => {
+    mockWiring();
+
+    const response = await createEvent(COMPETITION);
+
+    await expect(response.json()).resolves.toMatchObject({
+      data: { event: { endTime: "12:00", endsOn: null } },
+    });
+  });
+
+  it("responde 201 a un evento suelto de varios días con cualquier hora de fin", async () => {
+    mockWiring();
+
+    const response = await createEvent({
+      ...COMPETITION,
+      endsOn: "2027-07-11",
+      endTime: "09:00",
+    });
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { event: { endTime: "09:00", endsOn: "2027-07-11" } },
+    });
+  });
+
+  it.each([
+    ["un evento suelto", COMPETITION],
+    ["una serie", WEEKLY_TRAINING],
+  ])("responde 422 a %s sin hora de fin", async (_kind, draft) => {
+    mockWiring();
+    const response = await createEvent({ ...draft, endTime: undefined });
+
+    await expectError(response, 422, {
+      code: "business_rule",
+      reason: "end_time_required",
+    });
+    expect(club.saved).toEqual([]);
+  });
+
+  it.each([
+    ["anterior al inicio", { endTime: "09:30" }],
+    ["igual al inicio", { endTime: "10:00" }],
+    ["con una fecha de fin anterior", { endsOn: "2027-07-09" }],
+  ])("responde 422 a un fin %s", async (_case, end) => {
+    mockWiring();
+
+    const response = await createEvent({ ...COMPETITION, ...end });
+
+    await expectError(response, 422, {
+      code: "business_rule",
+      reason: "end_before_start",
+    });
+  });
+
   it("responde 401 sin sesión", async () => {
     mockAnonymousCaller();
 
@@ -198,6 +254,11 @@ describe("endpoint de crear eventos", () => {
     ["un tipo fuera de los cuatro", { ...COMPETITION, eventType: "party" }],
     ["una repetición desconocida", { ...COMPETITION, repeat: "monthly" }],
     ["una fecha sin forma de fecha", { ...COMPETITION, startsOn: "10/07" }],
+    ["una hora de fin sin forma de hora", { ...COMPETITION, endTime: "7pm" }],
+    [
+      "una fecha de fin sin forma de fecha",
+      { ...COMPETITION, endsOn: "11/07" },
+    ],
     ["una hora sin forma de hora", { ...COMPETITION, startTime: "25:00" }],
     [
       "un día de la semana fuera de 1 a 7",
