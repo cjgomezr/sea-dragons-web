@@ -6273,8 +6273,8 @@ a.auth-brand-header:focus-visible {
 
 /* La publicación abierta, diseño 1c del handoff de E22 (#596,
    docs/mockups/news-redesign-post-dark.png): la portada a lo ancho y debajo
-   una columna de lectura de hasta 680 px, centrada. El móvil con su barra
-   propia llega con el #601; hasta entonces la portada sólo baja de alto. */
+   una columna de lectura de hasta 680 px, centrada. El móvil, con su barra
+   propia, va más abajo (#601). */
 .news-post-screen {
   display: flex;
   flex-direction: column;
@@ -6381,6 +6381,155 @@ a.auth-brand-header:focus-visible {
 .news-post-dates {
   font-size: 13px;
   color: var(--color-text-secondary);
+}
+
+/* La publicación en el móvil (#601, "#2d" del handoff de E22,
+   docs/mockups/mobile-news-redesign-post-dark.png). La pantalla sólo lleva
+   esta clase por debajo de 768 px. La barra sube sobre el relleno de arriba
+   de la página para quedar justo bajo la cabecera de la app (D10), y la
+   portada sale por los lados hasta el borde. El contenido lleva los 16 px de
+   la página y 2 más: los 18 del handoff. */
+.news-post-screen-phone {
+  gap: 0;
+}
+
+.news-post-screen-phone .news-post {
+  gap: 18px;
+}
+
+.news-post-screen-phone .news-post-cover {
+  height: 220px;
+  margin-inline: calc(-1 * var(--space-4));
+  border-radius: 0;
+}
+
+.news-post-screen-phone .news-post-column {
+  padding-inline: 2px;
+}
+
+/* Tres columnas fijas: sin ⋯, la tercera queda vacía y la categoría sigue
+   en el centro. */
+.news-post-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns:
+    var(--touch-target-min) minmax(0, 1fr)
+    var(--touch-target-min);
+  align-items: center;
+  margin: calc(-1 * var(--space-8)) calc(-1 * var(--space-4)) 0;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.news-post-bar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  font-size: 22px;
+  color: var(--color-text);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.news-post-bar a.news-post-bar-button {
+  color: var(--color-accent-text);
+}
+
+.news-post-bar-button:hover {
+  background: var(--color-hover);
+}
+
+.news-post-bar-title {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* La hoja ⋯ (#601): filas de al menos 52 px con su icono, como en
+   docs/mockups/mobile-news-redesign-post-actions-dark.png. El paso recibe el
+   foco cuando la hoja cambia de paso; no es un control y no pinta contorno. */
+.news-sheet-step {
+  display: flex;
+  flex-direction: column;
+}
+
+.news-sheet-step:focus {
+  outline: none;
+}
+
+.news-sheet-action {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  width: 100%;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-1);
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--color-text);
+  text-align: left;
+  text-decoration: none;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.news-sheet-action > svg {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.news-sheet-action:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.news-sheet-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.news-sheet-action-danger {
+  color: var(--color-danger);
+}
+
+/* Sobre el hover gris el rojo no llega a AA: el fondo se tiñe de rojo. */
+.news-sheet-action-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger) 10%, var(--color-panel));
+}
+
+.news-sheet-action-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.news-sheet-action-hint {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+/* El secundario tampoco llega a AA sobre el hover (#581). */
+.news-sheet-action:hover:not(:disabled) .news-sheet-action-hint {
+  color: var(--color-text-soft);
+}
+
+.news-sheet-durations {
+  display: flex;
+  flex-direction: column;
 }
 
 /* El cuerpo en Markdown (#593): medidas del handoff de E22. */
@@ -6859,8 +7008,191 @@ a.auth-brand-header:focus-visible {
   height: var(--touch-target-min);
 }
 
-.auth-field .news-publish-body {
-  min-height: 12rem;
+/* El editor del cuerpo (#598): una caja con la barra de pestañas y formato
+   arriba, el área o la vista previa en medio y el pie con la ayuda. */
+.news-body-editor {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.news-body-editor:has(.news-body-area[aria-invalid="true"]) {
+  border-color: var(--color-danger);
+}
+
+.news-body-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-2);
+  background: var(--color-editor-bar);
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 10px 10px 0 0;
+}
+
+.news-body-tabs {
+  display: flex;
+}
+
+.news-body-tab {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.news-body-tab[aria-selected="true"] {
+  font-weight: 700;
+  color: var(--color-text);
+  border-bottom-color: var(--color-accent);
+}
+
+.news-body-tab:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Hasta la barra desplazable del móvil (#602), en lo estrecho baja de línea
+   antes que ensanchar la página. */
+.news-body-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  min-width: 0;
+}
+
+/* El botón se ve de 32 px, pero su zona táctil llega a los 44. */
+.news-body-toolbar-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 18px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.news-body-toolbar-button::after {
+  position: absolute;
+  inset: calc((32px - var(--touch-target-min)) / 2);
+  content: "";
+}
+
+.news-body-toolbar-button:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+.news-body-toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--color-border);
+}
+
+.auth-field .news-body-area {
+  display: block;
+  width: 100%;
+  min-height: 300px;
+  padding: var(--space-4);
+  font-family: var(--font-family-mono);
+  font-size: 14px;
+  line-height: 1.7;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  resize: vertical;
+}
+
+.news-body-area:focus-visible {
+  outline-offset: -2px;
+}
+
+.news-body-preview {
+  min-height: 300px;
+  padding: var(--space-4);
+}
+
+.news-body-preview-empty {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.news-body-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-1) var(--space-4);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  border-top: 1px solid var(--color-border);
+}
+
+.news-body-hint {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.news-body-hint svg {
+  flex: none;
+  font-size: 16px;
+}
+
+.news-body-help-toggle {
+  min-height: var(--touch-target-min);
+  padding: 0;
+  font: inherit;
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.news-body-help {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  font-size: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.news-body-help dl {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.news-body-help-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) 1fr;
+  gap: var(--space-3);
+}
+
+.news-body-help dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.news-body-help code {
+  font-family: var(--font-family-mono);
+  font-size: 13px;
 }
 
 /* El grupo de casillas de la audiencia queda sangrado bajo su opción, para

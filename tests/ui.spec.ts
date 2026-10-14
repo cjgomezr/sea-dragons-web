@@ -11606,6 +11606,17 @@ const STUBBED_WITHDRAWN_OPEN_POST = {
   editedAt: null,
 } as const;
 
+/** La del móvil (#601), como `docs/mockups/mobile-news-redesign-post-dark.png`:
+ * quien mira es Admin y no está fijada, así que la hoja ⋯ lleva Editar,
+ * Fijar arriba y Retirar. */
+const STUBBED_MOBILE_POST = {
+  ...STUBBED_OPEN_POST,
+  id: "a0a0a0a0-0000-4000-8000-0000000000b2",
+  canPin: true,
+  isPinned: false,
+  pinnedUntil: null,
+} as const;
+
 const STUBBED_POSTS = [
   STUBBED_POST,
   STUBBED_POST_WITHOUT_ATTACHMENTS,
@@ -11614,6 +11625,7 @@ const STUBBED_POSTS = [
   STUBBED_OPEN_POST,
   STUBBED_NO_COVER_POST,
   STUBBED_WITHDRAWN_OPEN_POST,
+  STUBBED_MOBILE_POST,
 ] as const;
 
 /** El feed de quien publicó: lo suyo retirado le llega marcado (#331). */
@@ -11744,11 +11756,26 @@ async function waitForPost(page: Page): Promise<void> {
   ).toHaveCount(0);
 }
 
-/** La de quien mira, con sus acciones (#331). */
+const MORE_ACTIONS_BUTTON = /^(More actions|Más acciones)$/;
+const DESKTOP_MIN_WIDTH_PX = 768;
+
+/** Por debajo de 768 px las acciones viven en la hoja ⋯ de la barra (#601). */
+function isPhoneViewport(page: Page): boolean {
+  const width = page.viewportSize()?.width;
+  if (width === undefined) {
+    throw new Error("La página no tiene un tamaño de ventana fijo.");
+  }
+  return width < DESKTOP_MIN_WIDTH_PX;
+}
+
+/** La de quien mira, con sus acciones (#331): en la línea del autor, o en
+ * el móvil tras el ⋯. */
 async function waitForManagedPost(page: Page): Promise<void> {
   await waitForPost(page);
   await expect(
-    page.getByRole("link", { name: /^(Edit|Editar)$/ }),
+    isPhoneViewport(page)
+      ? page.getByRole("button", { name: MORE_ACTIONS_BUTTON })
+      : page.getByRole("link", { name: /^(Edit|Editar)$/ }),
   ).toBeVisible();
 }
 
@@ -11757,6 +11784,9 @@ const WITHDRAW_QUESTION = /^(Withdraw this post\?|¿Retirar esta publicación\?)
 
 async function openWithdrawConfirmation(page: Page): Promise<void> {
   await waitForManagedPost(page);
+  if (isPhoneViewport(page)) {
+    await page.getByRole("button", { name: MORE_ACTIONS_BUTTON }).click();
+  }
   await page.getByRole("button", { name: WITHDRAW_BUTTON }).click();
   await expect(page.getByText(WITHDRAW_QUESTION)).toBeVisible();
 }
@@ -12057,6 +12087,128 @@ for (const openState of OPEN_POST_STATES) {
     });
   });
 }
+
+// #601: la publicación en el móvil, con su barra y con la hoja ⋯ abierta
+// (docs/mockups/mobile-news-redesign-post-dark.png y
+// mobile-news-redesign-post-actions-dark.png). Sólo a 375: desde 768 manda
+// el escritorio, que fotografía el bloque de arriba.
+const MOBILE_POST_STATE = "noticia-movil";
+const MOBILE_POST_ACTIONS_STATE = "noticia-movil-acciones";
+const MOBILE_NARROW_WIDTHS = [320, 375] as const;
+const SCROLL_BEFORE_BAR_CHECK_PX = 600;
+
+const MOBILE_POST: NewsState = {
+  name: MOBILE_POST_STATE,
+  path: postPath(STUBBED_MOBILE_POST.id),
+  feed: [],
+  heading: new RegExp(STUBBED_MOBILE_POST.title),
+  ready: waitForManagedPost,
+};
+
+async function openMoreActionsSheet(
+  page: Page,
+  theme?: (typeof themes)[number],
+): Promise<void> {
+  await goToNews(page, MOBILE_POST, theme);
+  await page.getByRole("button", { name: MORE_ACTIONS_BUTTON }).click();
+  await expect(
+    page.getByRole("dialog", {
+      name: /^(Post actions|Acciones de la publicación)$/,
+    }),
+  ).toBeVisible();
+}
+
+const MOBILE_POST_CAPTURES = [
+  {
+    name: MOBILE_POST_STATE,
+    open: (page: Page, theme?: (typeof themes)[number]) =>
+      goToNews(page, MOBILE_POST, theme),
+  },
+  { name: MOBILE_POST_ACTIONS_STATE, open: openMoreActionsSheet },
+] as const;
+
+for (const capture of MOBILE_POST_CAPTURES) {
+  test.describe(capture.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE, viewport: MOBILE_VIEWPORT });
+
+    for (const theme of themes) {
+      test(`matches approved baseline (${theme})`, async ({ page }) => {
+        await capture.open(page, theme);
+        const snapshot = `${capture.name}-mobile-${theme}.png`;
+        await createMissingLocalBaseline(snapshot, () =>
+          page.screenshot(SCREENSHOT_OPTIONS),
+        );
+        await expect(page).toHaveScreenshot(snapshot, {
+          ...SCREENSHOT_OPTIONS,
+          maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+        });
+      });
+
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await capture.open(page, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
+
+    for (const width of MOBILE_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ ...MOBILE_VIEWPORT, width });
+        await capture.open(page);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+  });
+}
+
+test.describe(`${MOBILE_POST_STATE}: la barra`, () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE, viewport: MOBILE_VIEWPORT });
+
+  test("se queda arriba al hacer scroll", async ({ page }) => {
+    await goToNews(page, MOBILE_POST);
+    const bar = page.getByRole("navigation", { name: /^(Post|Publicación)$/ });
+
+    await page.mouse.wheel(0, SCROLL_BEFORE_BAR_CHECK_PX);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeGreaterThan(0);
+
+    const box = await bar.boundingBox();
+    expect(box?.y).toBe(0);
+    await expect(bar).toBeInViewport();
+  });
+
+  test("volver y ⋯ miden 44 px", async ({ page }) => {
+    await goToNews(page, MOBILE_POST);
+    const bar = page.getByRole("navigation", { name: /^(Post|Publicación)$/ });
+
+    for (const control of [
+      bar.getByRole("link", { name: /^(Back to News|Volver a Noticias)$/ }),
+      bar.getByRole("button", { name: MORE_ACTIONS_BUTTON }),
+    ]) {
+      const box = await control.boundingBox();
+      expect(box?.width).toBe(MIN_TOUCH_TARGET_PX);
+      expect(box?.height).toBe(MIN_TOUCH_TARGET_PX);
+    }
+  });
+
+  test("en 768 px no hay barra: manda el escritorio", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await goToNews(page, MOBILE_POST);
+
+    await expect(
+      page.getByRole("navigation", { name: /^(Post|Publicación)$/ }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: /^(Edit|Editar)$/ }),
+    ).toBeVisible();
+  });
+});
 
 // #590: la etiqueta Document pasa al verde; su contraste se mira en los dos
 // temas, no solo en el que trae el navegador.
@@ -12651,6 +12803,20 @@ async function fillPublishForm(page: Page): Promise<void> {
   await page.getByLabel(PUBLISH_GROUPS[0].name).check();
 }
 
+/** Un cuerpo con todo lo que pone la barra de formato (#598). */
+const PUBLISH_MARKDOWN_BODY = [
+  "Twelve Seadragons named in the **extended squad** for the *August nationals*.",
+  "",
+  "## Squad",
+  "",
+  "- Final eight confirmed after trials",
+  "- Travel details to follow",
+  "",
+  "> Train hard, play fair.",
+  "",
+  "Read the [selection policy](https://example.com/policy).",
+].join("\n");
+
 type PublishState = {
   readonly name: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
@@ -12689,6 +12855,24 @@ const PUBLISH_STATES_EN: readonly PublishState[] = [
       await expect(
         page.getByRole("button", { name: PUBLISH_BUTTON }),
       ).toBeDisabled();
+    },
+  },
+  {
+    name: "publicar-escribir",
+    prepare: async (page) => {
+      await fillPublishForm(page);
+      await page.getByLabel(/^(Message|Mensaje)$/).fill(PUBLISH_MARKDOWN_BODY);
+    },
+  },
+  {
+    name: "publicar-vista-previa",
+    prepare: async (page) => {
+      await fillPublishForm(page);
+      await page.getByLabel(/^(Message|Mensaje)$/).fill(PUBLISH_MARKDOWN_BODY);
+      await page.getByRole("tab", { name: /^(Preview|Vista previa)$/ }).click();
+      await expect(
+        page.getByRole("heading", { level: 2, name: "Squad" }),
+      ).toBeVisible();
     },
   },
   {
@@ -12801,6 +12985,39 @@ test.describe("publicar en el navegador", () => {
       await expect(
         page.getByRole("heading", { level: 1, name: PUBLISH_HEADING }),
       ).toBeVisible();
+    });
+
+    test("el editor del cuerpo tiene las medidas del handoff (#598)", async ({
+      page,
+    }) => {
+      await stubPublishReads(page, { holdUploads: false });
+      await page.goto(`${APP_URL}${NEWS_PUBLISH_SCREEN_PATH}`);
+      const editor = page.locator(".news-body-editor");
+      const area = page.getByRole("textbox", { name: "Message" });
+      const bold = page.getByRole("button", { name: "Bold" });
+
+      await expect(editor).toHaveCSS("border-radius", "10px");
+      await expect(page.getByRole("tab", { name: "Write" })).toHaveCSS(
+        "border-bottom-width",
+        "2px",
+      );
+      await expect(bold).toHaveCSS("width", "32px");
+      await expect(bold).toHaveCSS("height", "32px");
+      const touchArea = await bold.evaluate((button) => {
+        const after = getComputedStyle(button, "::after");
+        return (
+          button.getBoundingClientRect().width -
+          2 * Number.parseFloat(after.left)
+        );
+      });
+      expect(touchArea).toBe(44);
+      await expect(area).toHaveCSS("font-size", "14px");
+      await expect(area).toHaveCSS("line-height", "23.8px");
+      expect(
+        await area.evaluate((element) => getComputedStyle(element).fontFamily),
+      ).toMatch(/mono/i);
+      const areaBox = await area.boundingBox();
+      expect(areaBox?.height).toBeGreaterThanOrEqual(300);
     });
 
     test("publicar vuelve al feed sin recargar, con la publicación arriba", async ({
