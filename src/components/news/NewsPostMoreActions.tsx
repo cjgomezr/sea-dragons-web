@@ -325,7 +325,7 @@ export function NewsPostMoreActions({
         aria-expanded={isOpen}
         onClick={() => setIsOpen(true)}
       >
-        <Icon glyph={DotsThreeVertical} weight="fill" />
+        <Icon glyph={DotsThreeVertical} />
       </button>
       {isOpen ? (
         <BottomSheet
