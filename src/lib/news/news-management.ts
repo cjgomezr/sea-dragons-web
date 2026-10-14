@@ -4,6 +4,7 @@ import {
   recordAuditEvent,
 } from "@/lib/audit/audit-log";
 import type { Role } from "@/lib/auth/roles";
+import { isNewsPinActive } from "./news-pin-rule";
 import {
   type NewsPinChange,
   applyNewsPinChange,
@@ -59,7 +60,8 @@ const STATUS_ACTIONS: Readonly<Record<NewsPostStatus, AuditAction>> = {
 /** Lo que carga el formulario de editar: la audiencia entera, que la
  * publicación abierta no enseña, la marca de editada, que es la versión
  * contra la que se guarda, y la portada que tiene (#591), con su versión
- * grande firmada para enseñarla en el formulario (#597). */
+ * grande firmada para enseñarla en el formulario (#597). Si está fijada
+ * ahora, y hasta cuándo, enciende la caja de fijar del Admin (#599). */
 export type EditableNewsPost = {
   readonly id: string;
   readonly category: NewsCategory;
@@ -70,6 +72,9 @@ export type EditableNewsPost = {
   readonly status: NewsPostStatus;
   readonly coverUploadId: string | null;
   readonly coverUrl: string | null;
+  readonly isPinned: boolean;
+  /** Nula también cuando está fijada sin fecha de fin. */
+  readonly pinnedUntil: string | null;
 };
 
 type PostRequest = { readonly callerId: string; readonly postId: string };
@@ -172,9 +177,13 @@ async function readManagedDetail(
 
 export async function readEditableNewsPost(
   gateways: NewsGateways,
-  request: PostRequest,
+  request: PostRequest & {
+    /** Contra la que caduca el fijado (D7). El endpoint la pasa siempre. */
+    readonly now?: Date;
+  },
 ): Promise<EditableNewsPost> {
   const { post } = await findManagedPost(gateways, request);
+  const isPinned = isNewsPinActive(post.pin, request.now ?? new Date());
   return {
     id: post.id,
     category: post.category,
@@ -190,6 +199,8 @@ export async function readEditableNewsPost(
         ? null
         : { id: post.coverUploadId, clubId: post.clubId },
     ),
+    isPinned,
+    pinnedUntil: isPinned && post.pin !== null ? post.pin.pinnedUntil : null,
   };
 }
 

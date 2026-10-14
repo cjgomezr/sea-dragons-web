@@ -18,6 +18,7 @@ import {
   type NewsAttachmentIssueCode,
 } from "@/lib/news/news-attachments";
 import type { NewsDraftIssueCode } from "@/lib/news/news-draft";
+import type { NewsPinChange } from "@/lib/news/news-pins";
 import {
   NEWS_CATEGORIES,
   NEWS_TITLE_MAX_LENGTH,
@@ -61,10 +62,17 @@ export type NewsUploadRemoval =
 export type NewsPublishResult =
   { readonly kind: "published"; readonly postId: string } | ApiRequestFailure;
 
-export type NewsSubmission = NewsDraft & {
-  readonly attachmentUploadIds: readonly string[];
-  readonly coverUploadId: string | null;
+/** `pin` tal como lo lee la API (#592): `{ until }` fija, `null` desfija y
+ * sin él el fijado no cambia. */
+export type NewsPinField = {
+  readonly pin?: { readonly until: string | null } | null;
 };
+
+export type NewsSubmission = NewsDraft &
+  NewsPinField & {
+    readonly attachmentUploadIds: readonly string[];
+    readonly coverUploadId: string | null;
+  };
 
 /** Lo que se sube antes de publicar: un adjunto, o la portada (#591). */
 type NewsUploadKind = "attachment" | "cover";
@@ -115,6 +123,17 @@ export async function removeNewsUpload(
     return outcome;
   }
   return { kind: "removed" };
+}
+
+export function newsPinFieldOf(change: NewsPinChange): NewsPinField {
+  switch (change.kind) {
+    case "keep":
+      return {};
+    case "unpin":
+      return { pin: null };
+    case "pin":
+      return { pin: { until: change.until } };
+  }
 }
 
 export async function publishNews(

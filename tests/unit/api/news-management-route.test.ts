@@ -135,6 +135,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 describe("GET /api/v1/news/publish/[id]", () => {
   it("da a quien la publicó los valores que carga el formulario de editar", async () => {
     mockWiring({
@@ -160,7 +162,27 @@ describe("GET /api/v1/news/publish/[id]", () => {
         status: "published",
         coverUploadId: null,
         coverUrl: null,
+        isPinned: false,
+        pinnedUntil: null,
       },
+    });
+  });
+
+  it("dice si está fijada ahora y hasta cuándo (#599)", async () => {
+    const pinnedUntil = new Date(Date.now() + 7 * DAY_MS).toISOString();
+    mockWiring({
+      posts: [
+        {
+          ...OWN_POST,
+          pin: { pinnedAt: new Date().toISOString(), pinnedUntil },
+        },
+      ],
+    });
+
+    const response = await readEditable();
+
+    await expect(response.json()).resolves.toMatchObject({
+      data: { isPinned: true, pinnedUntil },
     });
   });
 

@@ -8,7 +8,8 @@ import { NEWS_PATH } from "@/lib/auth/routes";
 import type { Group } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
-import { NewsPublishForm } from "./NewsPublishForm";
+import { type NewsFormPinning, NewsPublishForm } from "./NewsPublishForm";
+import { loadNewsFormPinning } from "./load-news-form-pinning";
 
 /**
  * Publicar en Noticias (#330), abierto desde la cabecera del feed.
@@ -18,17 +19,38 @@ import { NewsPublishForm } from "./NewsPublishForm";
  * vigentes del club y no una lista escrita a mano. Al publicar vuelve al feed
  * sin recargar: el feed pide su primera página al montarse, y el servidor la
  * sirve de la más reciente a la más antigua, así que la nueva sale arriba.
+ *
+ * Al Admin le enseña además la caja de fijar (#599), que necesita saber cuál
+ * es la fijada vigente: se lee con los grupos, antes de pintar el formulario.
  */
 
 type GroupsState =
   | { readonly kind: "loading" }
   | { readonly kind: "failed" }
-  | { readonly kind: "ready"; readonly groups: readonly Group[] };
+  | {
+      readonly kind: "ready";
+      readonly groups: readonly Group[];
+      readonly pinning: NewsFormPinning | null;
+    };
+
+async function loadPublishScreen(canPin: boolean): Promise<GroupsState> {
+  const [groups, pinning] = await Promise.all([
+    loadGroups(),
+    loadNewsFormPinning(canPin),
+  ]);
+  if (groups.kind !== "loaded" || pinning.kind === "failed") {
+    return { kind: "failed" };
+  }
+  return { kind: "ready", groups: groups.groups, pinning: pinning.pinning };
+}
 
 export function NewsPublishScreen({
   locale,
+  canPin,
 }: {
   readonly locale: Locale;
+  /** Si quien publica puede fijar (D1): sólo decide si ve la caja. */
+  readonly canPin: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const router = useRouter();
@@ -37,19 +59,15 @@ export function NewsPublishScreen({
 
   useEffect(() => {
     let isCurrent = true;
-    void loadGroups().then((loaded) => {
+    void loadPublishScreen(canPin).then((loaded) => {
       if (isCurrent) {
-        setGroups(
-          loaded.kind === "loaded"
-            ? { kind: "ready", groups: loaded.groups }
-            : { kind: "failed" },
-        );
+        setGroups(loaded);
       }
     });
     return () => {
       isCurrent = false;
     };
-  }, [reloads]);
+  }, [canPin, reloads]);
 
   function retryLoad(): void {
     setGroups({ kind: "loading" });
@@ -82,6 +100,7 @@ export function NewsPublishScreen({
         <NewsPublishForm
           translate={translate}
           clubGroups={groups.groups}
+          pinning={groups.pinning}
           intent={{
             kind: "publish",
             onPublished: () => router.push(NEWS_PATH),

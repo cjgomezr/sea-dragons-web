@@ -19,7 +19,8 @@ import type { NewsPostDetail } from "@/lib/news/news-posts";
 
 /**
  * Editar una publicación (#331, RF-6 del PRD de E11). GET da lo que carga el
- * formulario: la audiencia entera y la marca de editada. PATCH guarda
+ * formulario: la audiencia entera, la marca de editada y si está fijada
+ * ahora (#599). PATCH guarda
  * categoría, título, cuerpo y audiencia, y responde 409 si alguien guardó
  * entretanto: `expectedEditedAt` es la marca que se tenía delante, `null` si
  * nunca se editó. Con `coverUploadId` cambia o quita la portada (#591), y la
@@ -61,6 +62,7 @@ export function GET(
           data: await readEditableNewsPost(requireNewsGateways(), {
             callerId,
             postId,
+            now: new Date(),
           }),
         };
       } catch (error) {

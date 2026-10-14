@@ -9,6 +9,7 @@ import {
   listNewsDraftIssues,
 } from "@/lib/news/news-draft";
 import type { EditableNewsPost } from "@/lib/news/news-management";
+import type { NewsPinChange } from "@/lib/news/news-pins";
 import {
   NEWS_TITLE_MAX_LENGTH,
   type NewsAudience,
@@ -20,17 +21,21 @@ import { NewsAttachmentsField } from "./NewsAttachmentsField";
 import { NewsBodyEditor } from "./NewsBodyEditor";
 import { NewsCategoryField } from "./NewsCategoryField";
 import { NewsCoverField } from "./NewsCoverField";
+import { NewsPinField } from "./NewsPinField";
 import { describeEditFailure, saveNewsEdit } from "./news-manage-client";
 import {
   describeDraftIssue,
   describePublishFailure,
+  newsPinFieldOf,
   publishNews,
 } from "./news-publish-client";
 import {
   type PublishedAudience,
+  type PublishedPin,
   rememberPublishedNotice,
 } from "./news-published-notice";
 import { useNewsAttachments } from "./use-news-attachments";
+import { type PinnedNow, useNewsPinChoice } from "./use-news-pin-choice";
 import {
   type NewsCoverField as NewsCover,
   useNewsCover,
@@ -55,7 +60,17 @@ import {
  * control segmentado y deja el botón desactivado mientras falte algo. Por eso
  * el aviso de un campo sale en cuanto se toca, y no al pulsar: con el botón
  * desactivado no habría otro momento para decir qué falta.
+ *
+ * El Admin ve además la caja de fijar (#599), después del cuerpo. Solo se
+ * manda `pin` si la caja cambió el fijado: editar sin tocarla lo deja igual.
  */
+
+/** Si salió fijada, hasta cuándo, para el aviso del feed. */
+function publishedPinOf(change: NewsPinChange): PublishedPin {
+  return change.kind === "pin"
+    ? { kind: "pinned", until: change.until }
+    : { kind: "none" };
+}
 
 /** Publicar una nueva, o editar una que ya existe. */
 export type NewsFormIntent =
@@ -65,6 +80,10 @@ export type NewsFormIntent =
       readonly post: EditableNewsPost;
       readonly onSaved: () => void;
     };
+
+/** Lo que necesita la caja de fijar, que solo ve quien puede fijar: la
+ * fijada vigente del club, para avisar de que se reemplaza. */
+export type NewsFormPinning = { readonly pinnedNow: PinnedNow | null };
 
 type Status =
   | { readonly kind: "editing" }
@@ -260,6 +279,7 @@ type FormSubmission = {
   readonly draft: NewsDraft;
   readonly attachmentUploadIds: readonly string[];
   readonly cover: NewsCover["change"];
+  readonly pin: NewsPinChange;
 };
 
 /** Editar sólo manda la portada si cambió; publicar la manda siempre. */
@@ -268,9 +288,11 @@ function sendSubmission(
   submission: FormSubmission,
 ): ReturnType<typeof saveNewsEdit | typeof publishNews> {
   const { draft, cover } = submission;
+  const pin = newsPinFieldOf(submission.pin);
   if (intent.kind === "edit") {
     return saveNewsEdit(intent.post.id, {
       ...draft,
+      ...pin,
       expectedEditedAt: intent.post.editedAt,
       ...(cover.kind === "replace"
         ? { coverUploadId: cover.coverUploadId }
@@ -279,6 +301,7 @@ function sendSubmission(
   }
   return publishNews({
     ...draft,
+    ...pin,
     attachmentUploadIds: submission.attachmentUploadIds,
     coverUploadId: cover.kind === "replace" ? cover.coverUploadId : null,
   });
@@ -288,10 +311,13 @@ export function NewsPublishForm({
   translate,
   clubGroups,
   intent,
+  pinning,
 }: {
   readonly translate: Translator;
   readonly clubGroups: readonly Group[];
   readonly intent: NewsFormIntent;
+  /** `null` para quien no puede fijar: no ve la caja. */
+  readonly pinning: NewsFormPinning | null;
 }): React.JSX.Element {
   const [draft, setDraft] = useState<Draft>(() =>
     intent.kind === "edit" ? draftOf(intent.post) : EMPTY_DRAFT,
@@ -307,6 +333,10 @@ export function NewsPublishForm({
   // El estado desactiva el botón en el siguiente pintado, pero un doble clic
   // llega antes. La referencia cambia en el acto.
   const isSendingRef = useRef(false);
+  const pin = useNewsPinChoice(
+    intent.kind === "edit" ? intent.post : null,
+    pinning?.pinnedNow ?? null,
+  );
   const audience = toAudience(draft.audience);
   const issues = listNewsDraftIssues({ ...draft, audience });
   const isUploading = attachments.isUploading || cover.isUploading;
@@ -326,6 +356,7 @@ export function NewsPublishForm({
     }
     isSendingRef.current = true;
     setStatus({ kind: "sending" });
+    const pinChange = pin.changeAt(new Date());
     const result = await sendSubmission(intent, {
       draft: {
         category: draft.category,
@@ -335,6 +366,7 @@ export function NewsPublishForm({
       },
       attachmentUploadIds: attachments.uploadIds,
       cover: cover.change,
+      pin: pinChange,
     });
     isSendingRef.current = false;
     if (result.kind === "failed") {
@@ -345,7 +377,10 @@ export function NewsPublishForm({
       intent.onSaved();
       return;
     }
-    rememberPublishedNotice(publishedAudienceOf(audience, clubGroups));
+    rememberPublishedNotice({
+      audience: publishedAudienceOf(audience, clubGroups),
+      pin: publishedPinOf(pinChange),
+    });
     intent.onPublished();
   }
 
@@ -376,6 +411,15 @@ export function NewsPublishForm({
           onChange={(category) => update({ category })}
         />
         <TitleAndBodyFields {...fieldProps} />
+        {pinning === null ? null : (
+          <NewsPinField
+            translate={translate}
+            choice={pin.choice}
+            replacedTitle={pin.replacedTitle}
+            onToggle={pin.onToggle}
+            onChoose={pin.onChoose}
+          />
+        )}
         <AudienceField
           translate={translate}
           legend={translate("news.publish.audience.legend")}

@@ -9,7 +9,8 @@ import type { Group } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
 import type { EditableNewsPost } from "@/lib/news/news-management";
-import { NewsPublishForm } from "./NewsPublishForm";
+import { type NewsFormPinning, NewsPublishForm } from "./NewsPublishForm";
+import { loadNewsFormPinning } from "./load-news-form-pinning";
 import { loadEditableNewsPost } from "./news-manage-client";
 
 /**
@@ -20,6 +21,9 @@ import { loadEditableNewsPost } from "./news-manage-client";
  * publicación sea suya lo decide el endpoint: a un Committee que abre la de
  * otra persona se le dice que no puede, sin formulario. Al guardar vuelve a
  * la publicación, que se lee de nuevo y ya dice que se editó.
+ *
+ * Al Admin le enseña además la caja de fijar (#599), encendida si la
+ * publicación está fijada, y para eso lee también cuál es la fijada vigente.
  */
 
 type ScreenState =
@@ -30,30 +34,43 @@ type ScreenState =
       readonly kind: "ready";
       readonly post: EditableNewsPost;
       readonly groups: readonly Group[];
+      readonly pinning: NewsFormPinning | null;
     };
 
-async function loadEditScreen(postId: string): Promise<ScreenState> {
-  const [post, groups] = await Promise.all([
+async function loadEditScreen(
+  postId: string,
+  canPin: boolean,
+): Promise<ScreenState> {
+  const [post, groups, pinning] = await Promise.all([
     loadEditableNewsPost(postId),
     loadGroups(),
+    loadNewsFormPinning(canPin),
   ]);
   if (post.kind === "failed") {
     return post.failure === "forbidden"
       ? { kind: "forbidden" }
       : { kind: "failed" };
   }
-  if (groups.kind !== "loaded") {
+  if (groups.kind !== "loaded" || pinning.kind === "failed") {
     return { kind: "failed" };
   }
-  return { kind: "ready", post: post.post, groups: groups.groups };
+  return {
+    kind: "ready",
+    post: post.post,
+    groups: groups.groups,
+    pinning: pinning.pinning,
+  };
 }
 
 export function NewsEditScreen({
   locale,
   postId,
+  canPin,
 }: {
   readonly locale: Locale;
   readonly postId: string;
+  /** Si quien edita puede fijar (D1): sólo decide si ve la caja. */
+  readonly canPin: boolean;
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const router = useRouter();
@@ -63,7 +80,7 @@ export function NewsEditScreen({
 
   useEffect(() => {
     let isCurrent = true;
-    void loadEditScreen(postId).then((loaded) => {
+    void loadEditScreen(postId, canPin).then((loaded) => {
       if (isCurrent) {
         setState(loaded);
       }
@@ -71,7 +88,7 @@ export function NewsEditScreen({
     return () => {
       isCurrent = false;
     };
-  }, [postId, reloads]);
+  }, [postId, canPin, reloads]);
 
   function retryLoad(): void {
     setState({ kind: "loading" });
@@ -109,6 +126,7 @@ export function NewsEditScreen({
         <NewsPublishForm
           translate={translate}
           clubGroups={state.groups}
+          pinning={state.pinning}
           intent={{
             kind: "edit",
             post: state.post,

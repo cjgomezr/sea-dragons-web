@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { formatClubShortDay } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import {
   type PublishedAudience,
+  type PublishedNotice,
   forgetPublishedNotice,
   readPublishedNotice,
 } from "./news-published-notice";
 
 /**
  * "Publicada · avisamos a {audiencia}" en el feed, al volver de publicar
- * (#597). La región de estado está siempre, vacía si no hay nada que decir, y
+ * (#597), o "Publicada y fijada…" si salió fijada (#599). La región de estado está siempre, vacía si no hay nada que decir, y
  * no ocupa sitio vacía: el feed no se mueve por ella.
  */
 
@@ -26,15 +28,33 @@ function describeAudience(
   }).format(audience.groupNames);
 }
 
+function describeNotice(
+  translate: Translator,
+  notice: PublishedNotice,
+): string {
+  const audience = describeAudience(translate, notice.audience);
+  const { pin } = notice;
+  if (pin.kind === "none") {
+    return translate("news.published.notice", { audience });
+  }
+  if (pin.until === null) {
+    return translate("news.published.pinnedNotice", { audience });
+  }
+  return translate("news.published.pinnedUntilNotice", {
+    audience,
+    date: formatClubShortDay(translate.locale, new Date(pin.until)),
+  });
+}
+
 export function NewsPublishedNotice({
   translate,
 }: {
   readonly translate: Translator;
 }): React.JSX.Element {
-  const [audience, setAudience] = useState<PublishedAudience | null>(null);
+  const [notice, setNotice] = useState<PublishedNotice | null>(null);
   // Lo leído sobrevive a que React monte dos veces en desarrollo: la segunda
   // vez ya no está en `sessionStorage`, porque la primera lo borró.
-  const pending = useRef<PublishedAudience | null | undefined>(undefined);
+  const pending = useRef<PublishedNotice | null | undefined>(undefined);
 
   // La región se pinta vacía y el aviso entra en el cuadro siguiente: un
   // lector de pantalla sólo anuncia lo que cambia dentro de una región que ya
@@ -45,21 +65,19 @@ export function NewsPublishedNotice({
       pending.current = readPublishedNotice();
       forgetPublishedNotice();
     }
-    const notice = pending.current;
-    if (notice === null) {
+    const stored = pending.current;
+    if (stored === null) {
       return;
     }
-    const frame = requestAnimationFrame(() => setAudience(notice));
+    const frame = requestAnimationFrame(() => setNotice(stored));
     return () => cancelAnimationFrame(frame);
   }, []);
 
   return (
     <div className="news-published-status" role="status">
-      {audience === null ? null : (
+      {notice === null ? null : (
         <p className="news-published-notice">
-          {translate("news.published.notice", {
-            audience: describeAudience(translate, audience),
-          })}
+          {describeNotice(translate, notice)}
         </p>
       )}
     </div>
