@@ -14798,6 +14798,8 @@ function paidMembershipFee(id: string, date: string): object {
     description: "Monthly membership",
     amountCents: 4500,
     status: "paid",
+    card: { brand: "visa", last4: "4242" },
+    failureReason: null,
   };
 }
 
@@ -14816,6 +14818,8 @@ const PAYMENTS_HISTORY = [
     description: "Nationals levy",
     amountCents: 8000,
     status: "paid",
+    card: { brand: "visa", last4: "4242" },
+    failureReason: null,
   },
   paidMembershipFee(
     "e0e0e0e0-0000-4000-8000-0000000000e4",
@@ -14829,6 +14833,8 @@ const FAILED_PAYMENT = {
   description: null,
   amountCents: 4500,
   status: "failed",
+  card: { brand: "visa", last4: "4242" },
+  failureReason: "Your card was declined.",
 } as const;
 
 const NO_SESSIONS = { sessions: 0, movements: [] } as const;
