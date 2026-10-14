@@ -32,6 +32,16 @@ export const MASTERS_SQUAD_ID = "8b8b8b8b-0000-4000-8000-000000000008";
 
 export const AUTHOR = { id: AUTHOR_ID, fullName: "Carla Committee" };
 
+/** La miniatura de la foto del autor y cómo la firma el doble (#596). */
+export const AUTHOR_PHOTO_PATH = `${AUTHOR_ID}/photo.webp`;
+export const AUTHOR_PHOTO_SIGNED_URL_PREFIX = "https://storage.test/photos/";
+
+/** Los nombres de los grupos del club, como los guarda `groups.name`. */
+export const GROUP_NAMES: Readonly<Record<string, string>> = {
+  [SENIOR_SQUAD_ID]: "Senior squad",
+  [MASTERS_SQUAD_ID]: "Masters",
+};
+
 /** Una portada subida, con quién la subió y cuándo. A qué publicación va lo
  * dice la publicación, como en la base. */
 export type FakeCover = NewsCoverRef & {
@@ -83,6 +93,7 @@ export function aPost(overrides: Partial<NewsPost> & { id: string }): NewsPost {
     title: "Cambia la piscina",
     body: "El martes entrenamos en MSAC.",
     author: AUTHOR,
+    authorPhotoPath: null,
     publishedAt: PUBLISHED_AT,
     editedAt: null,
     status: "published",
@@ -167,6 +178,14 @@ function coverFilesOf(covers: readonly FakeCover[]): Set<string> {
   return new Set(
     covers.flatMap((cover) => Object.values(newsCoverPathsOf(cover))),
   );
+}
+
+/** Firma cualquier foto con un prefijo reconocible. */
+export function fakeAuthorPhotosGateway(): NewsGateways["authorPhotos"] {
+  return {
+    signPhotoUrl: async (photoPath) =>
+      `${AUTHOR_PHOTO_SIGNED_URL_PREFIX}${photoPath}`,
+  };
 }
 
 /** Un club sin ninguna portada, para quien sólo necesita leer el feed. */
@@ -266,6 +285,15 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
             ? groupIds.filter((id) => clubGroupIds.includes(id))
             : [],
         ),
+      findGroupNames: async ({ clubId, groupIds }) =>
+        new Map(
+          clubId === CLUB_ID
+            ? groupIds.flatMap((id): [string, string][] => {
+                const name = GROUP_NAMES[id];
+                return name === undefined ? [] : [[id, name]];
+              })
+            : [],
+        ),
       insertPost: async (post) => {
         inserted.push(post);
         const stored: NewsPost = {
@@ -275,6 +303,7 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
           title: post.title,
           body: post.body,
           author: { id: post.authorId, fullName: "Quien llama" },
+          authorPhotoPath: null,
           publishedAt: PUBLISHED_AT,
           editedAt: null,
           status: "published",
@@ -395,6 +424,7 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
       },
     },
     covers: createFakeCovers(covers, coverFiles, posts),
+    authorPhotos: fakeAuthorPhotosGateway(),
     audit: {
       insertAuditLogRow: async (row) => {
         audited.push(row);

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createSupabaseAuditLogWriter } from "@/lib/audit/audit-log";
 import { createRoleRequestGateways } from "@/lib/auth/supabase-role-request-gateways";
 import { createSupabaseMemberGroupsGateway } from "@/lib/groups/supabase-member-groups-gateway";
+import { signProfilePhotoUrl } from "@/lib/members/supabase-profile-photo-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { createNewsCoversGateway } from "./supabase-news-covers-gateway";
@@ -47,10 +48,14 @@ const GROUPS_TABLE = "groups";
 const AUTHOR_EMBED =
   "author:members!news_posts_author_same_club_fkey(full_name)";
 
+/** La publicación abierta lleva además la foto del autor (#596). */
+const POST_AUTHOR_EMBED =
+  "author:members!news_posts_author_same_club_fkey(full_name, photo_path)";
+
 const POST_COLUMNS = [
   "id, club_id, category, title, body, author_id, published_at, edited_at",
   "status, audience, cover_upload_id, pinned_at, pinned_until",
-  AUTHOR_EMBED,
+  POST_AUTHOR_EMBED,
   "news_post_groups(group_id)",
   "news_post_attachments(id, file_name, content_type, size_bytes, created_at)",
 ].join(", ");
@@ -114,7 +119,7 @@ const postRowSchema = z.object({
   cover_upload_id: z.string().nullable(),
   pinned_at: z.string().nullable(),
   pinned_until: z.string().nullable(),
-  author: authorSchema,
+  author: authorSchema.extend({ photo_path: z.string().nullable() }),
   news_post_groups: z.array(z.object({ group_id: z.string() })),
   news_post_attachments: z.array(
     z.object({
@@ -182,6 +187,7 @@ function toNewsPost(row: unknown): NewsPost {
     title: parsed.title,
     body: parsed.body,
     author: { id: parsed.author_id, fullName: parsed.author.full_name },
+    authorPhotoPath: parsed.author.photo_path,
     publishedAt: parsed.published_at,
     editedAt: parsed.edited_at,
     status: parsed.status,
@@ -559,6 +565,29 @@ export function createNewsGateways(
         return new Set(data.map((row) => z.string().parse(row.id)));
       },
 
+      async findGroupNames({ clubId, groupIds }) {
+        // Una audiencia cuyos grupos se borraron ya no tiene a quién nombrar.
+        if (groupIds.length === 0) {
+          return new Map();
+        }
+        const { data, error } = await serviceClient
+          .from(GROUPS_TABLE)
+          .select("id, name")
+          .eq("club_id", clubId)
+          .in("id", groupIds);
+        if (error) {
+          throw new Error(
+            `No se pudieron leer los nombres de los grupos de la audiencia en el club ${clubId}: ${error.message}`,
+          );
+        }
+        return new Map(
+          z
+            .array(z.object({ id: z.string(), name: z.string() }))
+            .parse(data)
+            .map((group) => [group.id, group.name]),
+        );
+      },
+
       insertPost: (post) => insertPost(serviceClient, post),
 
       findFeedPage: (query) => findFeedPage(serviceClient, query),
@@ -588,6 +617,10 @@ export function createNewsGateways(
       unpinPost: (command) => unpinPost(serviceClient, command),
     },
     covers: createNewsCoversGateway(serviceClient),
+    authorPhotos: {
+      signPhotoUrl: (photoPath) =>
+        signProfilePhotoUrl(serviceClient, photoPath),
+    },
     audit: createSupabaseAuditLogWriter(serviceClient),
   };
 }

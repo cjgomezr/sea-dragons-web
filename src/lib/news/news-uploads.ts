@@ -24,6 +24,7 @@ import {
   type NewsPost,
   type NewsPostDetail,
   canPinNewsPosts,
+  ALL_AUDIENCE_GROUPS,
   describeNewsPost,
   findNewsPublisher,
   prepareNewsPost,
@@ -315,6 +316,7 @@ export async function publishNewsPostWithUploads(
   const detail = await describeNewsPost(gateways, published, {
     access: { canManage: true, canPin: canPinNewsPosts(publisherRole) },
     now: request.now,
+    namedGroups: ALL_AUDIENCE_GROUPS,
   });
   return { ...detail, attachments };
 }

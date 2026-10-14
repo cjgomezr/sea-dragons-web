@@ -2500,9 +2500,11 @@ a.auth-brand-header:focus-visible {
   text-align: right;
 }
 
-/* Los botones de solo icono de la cabecera: 44px en el móvil, para el
-   dedo, y los 38px del diseño desde 768px. */
-.directory-icon-button {
+/* Los botones de solo icono de la cabecera del directorio y de la línea del
+   autor de una noticia (#596): 44px en el móvil, para el dedo, y los 38px
+   del diseño desde 768px. */
+.directory-icon-button,
+.news-icon-button {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -2518,11 +2520,13 @@ a.auth-brand-header:focus-visible {
   cursor: pointer;
 }
 
-.directory-icon-button:hover:not(:disabled) {
+.directory-icon-button:hover:not(:disabled),
+.news-icon-button:hover:not(:disabled) {
   border-color: var(--color-accent);
 }
 
-.directory-icon-button:disabled {
+.directory-icon-button:disabled,
+.news-icon-button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -2539,7 +2543,8 @@ a.auth-brand-header:focus-visible {
 }
 
 @media (min-width: 768px) {
-  .directory-icon-button {
+  .directory-icon-button,
+  .news-icon-button {
     width: 38px;
     height: 38px;
   }
@@ -3457,7 +3462,8 @@ a.auth-brand-header:focus-visible {
 .directory-card-avatar,
 .directory-sheet-avatar,
 .directory-overview-avatar,
-.directory-request-avatar {
+.directory-request-avatar,
+.news-post-avatar {
   display: flex;
   flex: none;
   align-items: center;
@@ -5039,7 +5045,8 @@ a.auth-brand-header:focus-visible {
   min-width: 0;
 }
 
-.directory-request-avatar {
+.directory-request-avatar,
+.news-post-avatar {
   width: 44px;
   height: 44px;
   font-size: 13px;
@@ -6049,20 +6056,36 @@ a.auth-brand-header:focus-visible {
   color: var(--color-danger);
 }
 
-/* Editar, retirar y volver a publicar (#331), bajo la cabecera de la
-   publicación. La confirmación de retirar se abre debajo de los botones. */
+/* Editar, retirar y volver a publicar (#331), como botones de icono al final
+   de la línea del autor (#596). La caja no pinta nada: sus piezas entran en
+   la fila del autor, y la confirmación de retirar y el error bajan a una
+   línea propia debajo. */
 .news-post-actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
+  display: contents;
 }
 
-/* Editar es un enlace con la forma del botón de al lado. */
-.news-post-actions a.admin-secondary {
-  display: inline-flex;
-  align-items: center;
+.news-post-action-buttons {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.news-post-actions .news-post-confirm,
+.news-post-actions .auth-error {
+  flex-basis: 100%;
+}
+
+.news-icon-button {
   text-decoration: none;
+}
+
+.news-icon-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.news-icon-button-danger {
+  color: var(--color-danger);
 }
 
 /* El clip con el número de adjuntos, al final de la línea de la fila y en el
@@ -6075,8 +6098,7 @@ a.auth-brand-header:focus-visible {
   color: var(--color-text-secondary);
 }
 
-.news-attachment-mark svg,
-.news-attachment svg {
+.news-attachment-mark svg {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
@@ -6089,41 +6111,82 @@ a.auth-brand-header:focus-visible {
   gap: var(--space-3);
 }
 
-/* La publicación abierta. Sin mockup: sigue a la ficha del miembro, con el
-   cuerpo en el panel de las tarjetas del feed. */
+/* La publicación abierta, diseño 1c del handoff de E22 (#596,
+   docs/mockups/news-redesign-post-dark.png): la portada a lo ancho y debajo
+   una columna de lectura de hasta 680 px, centrada. El móvil con su barra
+   propia llega con el #601; hasta entonces la portada sólo baja de alto. */
 .news-post-screen {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  max-width: 780px;
+  max-width: 960px;
 }
 
 .news-post {
   display: flex;
   flex-direction: column;
+  gap: 28px;
+}
+
+.news-post-cover {
+  display: flex;
+  height: 220px;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.news-post-cover > * {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .news-post-cover {
+    height: 340px;
+  }
+}
+
+.news-post-column {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-6);
-  padding: var(--space-6);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+  width: 100%;
+  max-width: 680px;
+  margin-inline: auto;
+}
+
+/* La línea de 1 px que separa la cabecera del cuerpo. */
+.news-post-column > .news-post-header {
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .news-post-header {
   display: flex;
   flex-direction: column;
+  gap: 14px;
+}
+
+.news-post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
 }
 
 .app-main .news-post-header h1 {
   margin: 0;
-  font-size: 24px;
-  overflow-wrap: break-word;
+  font-size: 26px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 @media (min-width: 768px) {
   .app-main .news-post-header h1 {
-    font-size: 28px;
+    font-size: 34px;
   }
 }
 
@@ -6131,23 +6194,33 @@ a.auth-brand-header:focus-visible {
   margin: 0;
 }
 
-.news-post-byline,
-.news-post-edited {
+.news-post-byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* `min-width: 0` para que un nombre muy largo se parta dentro de su hueco
+   en vez de empujar los botones fuera de la columna. */
+.news-post-byline-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
   margin: 0;
-  font-size: 14px;
+}
+
+.news-post-author {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.news-post-dates {
+  font-size: 13px;
   color: var(--color-text-secondary);
-}
-
-.news-post-edited {
-  font-style: italic;
-}
-
-/* Texto plano: los saltos de línea que escribió quien publicó se respetan,
-   y una palabra sólo se parte si no cabe entera en la línea. */
-.news-post-body {
-  margin: 0;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
 }
 
 /* El cuerpo en Markdown (#593): medidas del handoff de E22. */
@@ -6245,33 +6318,81 @@ a.auth-brand-header:focus-visible {
 
 .news-post-attachments h2 {
   margin: 0;
-  font-size: 16px;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
 }
 
+/* Tarjetas de unos 330 px, tantas por fila como quepan; en el móvil, una. */
 .news-post-attachments ul {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* Cada tarjeta (#596): el icono del tipo, el nombre sobre el tamaño y el de
+   descargar al final. El icono va el último en el DOM (ver el componente) y
+   `order` lo pone el primero a la vista. */
 .news-attachment {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   width: 100%;
-  min-height: var(--touch-target-min);
-  padding: var(--space-2) var(--space-3);
+  min-height: 56px;
+  padding: var(--space-3) var(--space-4);
   font: inherit;
   font-size: 14px;
   text-align: left;
   color: var(--color-text);
-  background: var(--color-background);
+  background: var(--color-panel);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: 10px;
   cursor: pointer;
+}
+
+.news-attachment-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.news-attachment-text .news-attachment-name {
+  font-weight: 600;
+}
+
+.news-attachment-text .news-attachment-size {
+  font-size: 12px;
+}
+
+.news-attachment-kind {
+  order: -1;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  color: var(--color-text-secondary);
+}
+
+.news-attachment-kind-pdf {
+  color: var(--color-danger);
+}
+
+.news-attachment-kind-image,
+.news-attachment-kind-word {
+  color: var(--color-accent-text);
+}
+
+.news-attachment-download {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-secondary);
 }
 
 .news-attachment:hover {

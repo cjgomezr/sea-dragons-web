@@ -5,7 +5,10 @@ import { DASHBOARD_API_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
 import type { DashboardGateways } from "@/lib/dashboard/dashboard";
 import type { MembershipStatus } from "@/lib/membership/membership";
-import { fakeCoverlessGateway } from "../helpers/news-club";
+import {
+  fakeAuthorPhotosGateway,
+  fakeCoverlessGateway,
+} from "../helpers/news-club";
 
 /**
  * El dashboard por API (#424, RF-6 del PRD de E14): una sola petición para
@@ -69,6 +72,7 @@ function dashboardGateways(): DashboardGateways {
       memberGroups,
       posts: {
         findClubGroupIds: async () => new Set(),
+        findGroupNames: async () => new Map(),
         insertPost: unused,
         findFeedPage: async () => [],
         findPost: async () => null,
@@ -80,6 +84,7 @@ function dashboardGateways(): DashboardGateways {
         unpinPost: unused,
       },
       covers: fakeCoverlessGateway(),
+      authorPhotos: fakeAuthorPhotosGateway(),
       audit: { insertAuditLogRow: unused },
     },
     roster: {

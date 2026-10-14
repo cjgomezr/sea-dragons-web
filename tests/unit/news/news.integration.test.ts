@@ -306,6 +306,12 @@ describeRls("portadas de noticias contra seadragons-dev (#591)", () => {
           );
           expect(await fetchCover(item?.coverUrl)).toBe("200 image/webp");
           expect(await fetchCover(memberPost.coverUrl)).toBe("200 image/webp");
+          // La audiencia por su nombre y el autor sin foto (#596).
+          expect(memberPost.audience).toEqual({
+            kind: "groups",
+            groupNames: [expect.stringMatching(/^News Squad /)],
+          });
+          expect(memberPost.author.photoUrl).toBeNull();
           expect(await listCoverFiles(serviceClient, seeded.clubId)).toEqual([
             `${coverId}-large.webp`,
             `${coverId}-thumb.webp`,
