@@ -12958,6 +12958,10 @@ type PublishState = {
   readonly prepare: (page: Page) => Promise<void>;
 };
 
+/** El día en que se aprobó la línea base de `publicar-fijando`: con dos
+ * semanas, la caja dice que se desfija el 28 de octubre. */
+const PIN_BASELINE_NOW = new Date("2026-10-14T02:00:00.000Z");
+
 const PUBLISH_STATES_EN: readonly PublishState[] = [
   { name: "publicar-sin-portada", prepare: async () => undefined },
   {
@@ -13012,6 +13016,9 @@ const PUBLISH_STATES_EN: readonly PublishState[] = [
     // La caja de fijar encendida, como el mockup (#599).
     name: "publicar-fijando",
     prepare: async (page) => {
+      // La caja dice "Se desfija sola el {fecha}", contada desde hoy: sin un
+      // reloj fijo la captura cambia cada día.
+      await page.clock.setFixedTime(PIN_BASELINE_NOW);
       await fillPublishForm(page);
       const pin = page.getByRole("switch", {
         name: /^(Pin to the top of the feed|Fijar arriba del feed)$/,
