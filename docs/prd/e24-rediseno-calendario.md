@@ -235,7 +235,7 @@ La vista previa del lugar, si se ve bien (D3).
 - **Lugar borrado de OpenStreetMap o con datos raros:** lo guardado en el evento no cambia; el enlace sigue funcionando con las coordenadas.
 - **Photon caído o lento:** RF-5; nunca bloquea crear un evento.
 - **Imagen que no se puede reducir** (archivo corrupto): se rechaza con un error claro y el formulario sigue.
-- **Dos organizadores parten la misma serie a la vez:** la segunda partición se rechaza si la serie cambió desde que se abrió el formulario, como el control de concurrencia de la edición de hoy.
+- **Dos organizadores parten la misma serie a la vez:** la edición de eventos no tiene hoy control de concurrencia y no se añade. La partición va en una transacción con la serie bloqueada (`for update`): la segunda espera a la primera y, si su sesión ya no pertenece a esa serie, se rechaza con `session_not_in_series` y el formulario pide recargar. Si no, se aplica sobre lo que dejó la primera.
 - **Partir una serie con sesiones editadas solas después de la fecha:** se aplican los cambios, igual que hoy la edición de serie pisa las ediciones sueltas futuras, y el selector lo advierte.
 - **Filtro con un tipo desconocido en la URL** (`?types=foo`): se ignora el desconocido.
 - **Agenda con cientos de eventos:** la paginación de hoy no cambia.
