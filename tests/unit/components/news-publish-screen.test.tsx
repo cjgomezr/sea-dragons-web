@@ -824,7 +824,7 @@ describe("permisos", () => {
     render(<NewsFeedScreen locale="en" canPublish canPin={false} />);
 
     expect(
-      await screen.findByRole("link", { name: "+ Publish" }),
+      await screen.findByRole("link", { name: "Publish" }),
     ).toHaveAttribute("href", "/noticias/publicar");
   });
 
@@ -834,6 +834,6 @@ describe("permisos", () => {
     render(<NewsFeedScreen locale="en" canPublish={false} canPin={false} />);
 
     await screen.findByText(/Nothing has been published/);
-    expect(screen.queryByRole("link", { name: "+ Publish" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Publish" })).toBeNull();
   });
 });

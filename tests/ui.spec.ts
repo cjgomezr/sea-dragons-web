@@ -12370,11 +12370,144 @@ test.describe("noticias en el navegador", () => {
       expect(target.opensPost).toBe(true);
     }
     for (const control of [
-      page.getByRole("link", { name: /^\+ (Publish|Publicar)$/ }),
+      page.getByRole("link", { name: /^(Publish|Publicar)$/ }),
       page.getByRole("button", { name: "Load more" }),
     ]) {
       expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44);
     }
+  });
+});
+
+// #600: el feed por debajo de 768 px, "#2c Feed" del handoff de E22
+// (docs/mockups/mobile-news-redesign-feed-dark.png). Se fotografía a 375 con
+// y sin fijada, en los dos temas; quien mira es Admin, que en el escritorio
+// tendría chincheta en cada fila y botones de fijar en la destacada.
+const MOBILE_FEED_STATES = [
+  { ...FEED_WITH_PINNED, name: "noticias-movil-fijada" },
+  { ...FEED_WITH_POSTS, name: "noticias-movil-sin-fijar" },
+] as const;
+const MOBILE_FEED_WIDTHS = [320, 375] as const;
+const PUBLISH_LINK = /^(Publish|Publicar)$/;
+const PIN_BUTTON = /^(Pin|Fijar|Unpin|Desfijar)\b/;
+
+for (const state of MOBILE_FEED_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE, viewport: MOBILE_VIEWPORT });
+
+    for (const theme of themes) {
+      test(`matches approved baseline (${theme})`, async ({ page }) => {
+        await goToNews(page, state, theme);
+        const snapshot = `${state.name}-${theme}.png`;
+        await createMissingLocalBaseline(snapshot, () =>
+          page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
+        );
+        await expect(page).toHaveScreenshot(snapshot, {
+          ...SCREENSHOT_OPTIONS,
+          fullPage: true,
+          maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+        });
+      });
+
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await goToNews(page, state, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
+
+    for (const width of MOBILE_FEED_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: MOBILE_VIEWPORT.height });
+        await goToNews(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+
+    test("publicar es un botón de icono de 44 × 44", async ({ page }) => {
+      await goToNews(page, state);
+
+      const box = await page
+        .getByRole("link", { name: PUBLISH_LINK })
+        .boundingBox();
+      expect(box?.width).toBe(MIN_TOUCH_TARGET_PX);
+      expect(box?.height).toBe(MIN_TOUCH_TARGET_PX);
+    });
+
+    test("ni las filas ni la destacada llevan botones de fijar", async ({
+      page,
+    }) => {
+      await goToNews(page, state);
+
+      await expect(page.getByRole("button", { name: PIN_BUTTON })).toHaveCount(
+        0,
+      );
+    });
+
+    test("cargar más ocupa el ancho de la lista y mide 46 px", async ({
+      page,
+    }) => {
+      await goToNews(page, state);
+
+      const button = await page
+        .getByRole("button", { name: "Load more" })
+        .boundingBox();
+      const list = await page.locator(".news-featured").boundingBox();
+      expect(button?.height).toBe(46);
+      expect(button?.width).toBe(list?.width);
+    });
+  });
+}
+
+test.describe("noticias-movil-fijada en el navegador", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE, viewport: MOBILE_VIEWPORT });
+
+  test("la píldora Fijada no intercepta el toque: abre la publicación", async ({
+    page,
+  }) => {
+    await goToNews(page, FEED_WITH_PINNED);
+    const pill = page.locator(".news-featured-pill");
+    await expect(pill).toBeVisible();
+
+    await pill.click({ force: true });
+
+    await expect(page).toHaveURL(
+      new RegExp(`${postPath(STUBBED_PINNED_POST.id)}$`),
+    );
+  });
+
+  test("las filas no llevan extracto y la destacada sí", async ({ page }) => {
+    await goToNews(page, FEED_WITH_PINNED);
+
+    await expect(page.getByText(STUBBED_PINNED_POST.excerpt)).toBeVisible();
+    for (const post of STUBBED_FEED_POSTS) {
+      await expect(page.getByText(post.excerpt)).toBeHidden();
+    }
+  });
+});
+
+test.describe("a 768 px el feed sigue siendo el de escritorio (#600)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({
+    storageState: ADMIN_STORAGE_STATE,
+    viewport: { width: 768, height: 1024 },
+  });
+
+  test("sin píldora, con extracto en las filas y Publicar escrito", async ({
+    page,
+  }) => {
+    await goToNews(page, FEED_WITH_PINNED);
+
+    await expect(page.locator(".news-featured-pill")).toBeHidden();
+    await expect(page.getByText(STUBBED_FEED_POSTS[0].excerpt)).toBeVisible();
+    await expect(page.getByRole("link", { name: PUBLISH_LINK })).toContainText(
+      "+ Publish",
+    );
   });
 });
 
@@ -12662,7 +12795,7 @@ test.describe("publicar en el navegador", () => {
       await stubPublishReads(page, { holdUploads: false });
       await page.goto(`${APP_URL}${NEWS_SCREEN_PATH}`);
 
-      await page.getByRole("link", { name: "+ Publish" }).click();
+      await page.getByRole("link", { name: "Publish" }).click();
 
       await expect(page).toHaveURL(new RegExp(`${NEWS_PUBLISH_SCREEN_PATH}$`));
       await expect(
@@ -12786,9 +12919,7 @@ test.describe("publicar en el navegador", () => {
       await expect(
         page.getByRole("link", { name: STUBBED_FEED_POSTS[0].title }),
       ).toBeVisible();
-      await expect(page.getByRole("link", { name: "+ Publish" })).toHaveCount(
-        0,
-      );
+      await expect(page.getByRole("link", { name: "Publish" })).toHaveCount(0);
 
       await page.goto(`${APP_URL}${NEWS_PUBLISH_SCREEN_PATH}`);
 

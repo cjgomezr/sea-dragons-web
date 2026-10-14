@@ -5552,11 +5552,16 @@ a.auth-brand-header:focus-visible {
   font-weight: 700;
 }
 
-/* "Publicar" es un enlace con forma de botón primario. */
+/* "Publicar" es un enlace con forma de botón primario. En el móvil se queda
+   en el icono "+" (#600); el "+ Publicar" escrito es del escritorio. */
 .news-publish-link {
   display: inline-flex;
   align-items: center;
   text-decoration: none;
+}
+
+.news-publish-icon {
+  display: none;
 }
 
 .news-eyebrow {
@@ -6109,6 +6114,153 @@ a.auth-brand-header:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: var(--space-3);
+}
+
+/* "Fijada" sobre la portada de la destacada, sólo en el móvil. No recibe el
+   toque: lo pasa al enlace que cubre la tarjeta. */
+.news-featured-pill {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  display: none;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-background) 88%, transparent);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.news-featured-pill svg {
+  flex-shrink: 0;
+  color: var(--color-accent-text);
+}
+
+/* El feed por debajo de 768 px (#600), "Mobile" y "#2c Feed" del handoff de
+   E22 (docs/mockups/mobile-news-redesign-feed-dark.png). La lista llega a los
+   bordes de la pantalla y cada fila lleva su margen de 16 px, alineada con la
+   destacada. No hay chincheta por fila ni botones de fijar en la destacada:
+   en el móvil se fija desde la hoja ⋯ de la publicación (#601). */
+@media (width < 768px) {
+  .news-header h1 {
+    font-size: 26px;
+  }
+
+  .news-publish-link {
+    justify-content: center;
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
+    padding: 0;
+  }
+
+  .news-publish-icon {
+    display: inline-flex;
+    font-size: 22px;
+  }
+
+  .news-publish-text {
+    display: none;
+  }
+
+  .news-featured {
+    border-radius: 12px;
+  }
+
+  .news-featured-cover {
+    position: relative;
+    height: 190px;
+  }
+
+  .news-featured-cover svg {
+    width: 64px;
+    height: 64px;
+  }
+
+  .news-featured-pill {
+    display: inline-flex;
+  }
+
+  .news-featured-body {
+    gap: var(--space-2);
+    padding: 14px var(--space-4) var(--space-4);
+  }
+
+  /* Lo que la píldora y el punto ya dicen a la vista sigue para el lector de
+     pantalla, con hasta cuándo está fijada. */
+  .news-featured-status,
+  .news-unread-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .news-featured-status-row {
+    display: contents;
+  }
+
+  .news-featured-pin,
+  .news-featured-footer {
+    display: none;
+  }
+
+  .news-featured-title {
+    font-size: 20px;
+  }
+
+  .news-featured-excerpt {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .news-list {
+    margin: 0 calc(-1 * var(--space-4));
+  }
+
+  .news-row {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: var(--space-3);
+    padding: 10px var(--space-4);
+    border-radius: 0;
+  }
+
+  /* A lo ancho de la pantalla, el contorno por fuera se saldría de ella. */
+  .news-row:has(.news-row-link:focus-visible) {
+    outline-offset: -2px;
+  }
+
+  .news-row-thumbnail {
+    width: 72px;
+    height: 72px;
+    border-radius: 8px;
+  }
+
+  .news-row-title {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 15.5px;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .news-row-excerpt {
+    display: none;
+  }
+
+  .news-more .admin-secondary {
+    width: 100%;
+    min-height: 46px;
+  }
 }
 
 /* La publicación abierta, diseño 1c del handoff de E22 (#596,

@@ -23,6 +23,7 @@ export type FeaturedPost =
 
 const PIN_ICON_SIZE = 16;
 const ACTION_ICON_SIZE = 16;
+const PILL_ICON_SIZE = 13;
 
 function FeaturedStatus({
   translate,
@@ -139,6 +140,30 @@ function FeaturedPinning({
 }
 
 /**
+ * "Fijada" sobre la esquina de la portada, sólo en el móvil (#600), donde el
+ * estado de la tarjeta no se ve. Es lo mismo que ese estado dice, así que el
+ * lector de pantalla oye el estado, con hasta cuándo, y no la píldora. No
+ * recibe el toque: pulsarla abre la publicación como el resto de la tarjeta.
+ */
+function PinnedPill({
+  translate,
+}: {
+  readonly translate: Translator;
+}): React.JSX.Element {
+  return (
+    <span className="news-featured-pill" aria-hidden="true">
+      <PushPin
+        focusable="false"
+        size={PILL_ICON_SIZE}
+        weight="fill"
+        color="currentColor"
+      />
+      {translate("news.featured.pinned")}
+    </span>
+  );
+}
+
+/**
  * La tarjeta destacada: la portada grande a la izquierda. A la derecha van la
  * marca de fijada o de lo último, la línea de categoría, el título, el
  * extracto y la invitación a leerla. Como en las filas, el único enlace es el título y su `::after`
@@ -172,6 +197,9 @@ export function NewsFeaturedCard({
     >
       <div className="news-featured-cover">
         <NewsCover url={post.coverUrl} category={post.category} iconSize={88} />
+        {featured.kind === "pinned" ? (
+          <PinnedPill translate={translate} />
+        ) : null}
       </div>
       <div className="news-featured-body">
         {pinControls === null ? (
