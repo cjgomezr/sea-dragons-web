@@ -1809,7 +1809,7 @@ export const spanishMessages: MessageCatalog = {
     "Escríbela, elige quién la ve y adjunta los documentos que hagan falta. Sale arriba del feed en cuanto la publicas.",
   "news.publish.loading": "Cargando los grupos del club…",
   "news.publish.loadFailed":
-    "No pudimos cargar los grupos del club. Vuelve a intentarlo.",
+    "No pudimos cargar el formulario. Vuelve a intentarlo.",
   "news.publish.category": "Categoría",
   "news.publish.titleLabel": "Título",
   "news.publish.body": "Mensaje",
@@ -1876,6 +1876,14 @@ export const spanishMessages: MessageCatalog = {
   "news.publish.attachments.issue.uploadMissing":
     "Un adjunto ya no está subido. Quítalo y vuelve a adjuntarlo.",
   "news.publish.titleCounter": "{length} / {max}",
+  // La caja de fijar del formulario, solo para el Admin (#599).
+  "news.publish.pin.label": "Fijar arriba del feed",
+  "news.publish.pin.hint":
+    "Se queda como destacada. Lo demás va de la más nueva a la más antigua.",
+  "news.publish.pin.unpinsOn": "Se desfija sola el {date}.",
+  "news.publish.pin.staysUntilUnpinned": "Se queda hasta que la desfijes.",
+  "news.publish.pin.replaces":
+    "Reemplaza a la que está fijada ahora: “{title}”",
   "news.publish.cover.legend": "Portada",
   "news.publish.cover.optional": "opcional",
   "news.publish.cover.empty": "Sin portada",
@@ -1887,6 +1895,9 @@ export const spanishMessages: MessageCatalog = {
     "Se muestra en el feed y arriba de la publicación. Mejor en horizontal.",
   "news.publish.cover.remove": "Quitar portada",
   "news.published.notice": "Publicada · avisamos a {audience}",
+  "news.published.pinnedNotice": "Publicada y fijada · avisamos a {audience}",
+  "news.published.pinnedUntilNotice":
+    "Publicada y fijada hasta el {date} · avisamos a {audience}",
   "news.published.audience.club": "todo el club",
   "news.publish.cover.issue.empty": "La portada está vacía.",
   "news.publish.cover.issue.tooLarge": "La portada puede pesar hasta {max} MB.",

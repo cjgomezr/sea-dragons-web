@@ -62,6 +62,8 @@ const EDITABLE: EditableNewsPost = {
   status: "published",
   coverUploadId: null,
   coverUrl: null,
+  isPinned: false,
+  pinnedUntil: null,
 };
 
 const NEW_COVER_ID = "c0c0c0c0-0000-4000-8000-000000000002";
@@ -299,7 +301,7 @@ describe("el feed de quien publicó", () => {
 
 describe("editar", () => {
   async function openEdit(locale: "en" | "es" = "en"): Promise<void> {
-    render(<NewsEditScreen locale={locale} postId={POST_ID} />);
+    render(<NewsEditScreen locale={locale} postId={POST_ID} canPin={false} />);
     await screen.findByLabelText(locale === "en" ? "Title" : "Título");
   }
 
@@ -367,7 +369,7 @@ describe("editar", () => {
   it("a quien no puede editarla le dice por qué, sin formulario", async () => {
     responders[`GET ${MANAGE_PATH}`] = () => errorResponse(403, "forbidden");
 
-    render(<NewsEditScreen locale="en" postId={POST_ID} />);
+    render(<NewsEditScreen locale="en" postId={POST_ID} canPin={false} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "You can only edit your own posts.",

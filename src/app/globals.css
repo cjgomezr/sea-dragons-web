@@ -7342,9 +7342,125 @@ a.auth-brand-header:focus-visible {
 /* Mientras guarda, todo el formulario se ve bloqueado. */
 .news-publish-fields:disabled .news-category-segment label,
 .news-publish-fields:disabled .news-publish-add,
+.news-publish-fields:disabled .news-pin-switch,
 .news-publish-fields:disabled .news-cover-add {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+/* La caja de fijar del Admin (#599). Encendida toma el borde y un tinte del
+   acento; el texto suave, y no el secundario, es el que pasa AA sobre ese
+   tinte en el tema claro. */
+.news-pin-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.news-pin-field-on {
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-panel));
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+
+.news-pin-switch {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 24px;
+  padding: 0;
+  background: var(--color-text-secondary);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.news-pin-switch::before {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  content: "";
+  background: var(--color-panel);
+  border-radius: 999px;
+  transition: transform 0.15s ease;
+}
+
+.news-pin-switch[aria-checked="true"] {
+  background: var(--color-accent);
+}
+
+.news-pin-switch[aria-checked="true"]::before {
+  transform: translateX(16px);
+}
+
+.news-pin-switch:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.news-pin-field-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.news-pin-field-label {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.news-pin-field-hint,
+.news-pin-field-end {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-soft);
+}
+
+.news-pin-field-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.news-pin-field-durations {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+/* Las duraciones usan el segmentado de la categoría, a la medida de la tira
+   del feed. "Hasta que la desfije" es largo: si no caben, bajan de línea en
+   vez de ensanchar la página. */
+.news-pin-field-durations .news-category-segments {
+  flex-wrap: wrap;
+}
+
+.news-pin-field-durations .news-category-segment {
+  flex: 1 1 auto;
+}
+
+.news-pin-field-durations .news-category-segment label {
+  padding: 0 var(--space-3);
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .news-pin-switch::before {
+    transition: none;
+  }
 }
 
 /* El aviso de publicada en el feed (#597). La región de estado no ocupa

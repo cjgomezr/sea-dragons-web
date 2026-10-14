@@ -13009,6 +13009,18 @@ const PUBLISH_STATES_EN: readonly PublishState[] = [
     },
   },
   {
+    // La caja de fijar encendida, como el mockup (#599).
+    name: "publicar-fijando",
+    prepare: async (page) => {
+      await fillPublishForm(page);
+      const pin = page.getByRole("switch", {
+        name: /^(Pin to the top of the feed|Fijar arriba del feed)$/,
+      });
+      await pin.click();
+      await expect(pin).toHaveAttribute("aria-checked", "true");
+    },
+  },
+  {
     name: "publicar-subiendo",
     holdUploads: true,
     prepare: async (page) => {
@@ -13033,6 +13045,15 @@ async function goToPublish(
   state: PublishState,
   theme?: (typeof themes)[number],
 ): Promise<void> {
+  // La caja de fijar del Admin (#599) lee la fijada vigente del feed: sin
+  // ninguna, como el mockup, para no depender de lo que haya en la base.
+  await page.route(
+    (url) => url.pathname === NEWS_FEED_ENDPOINT,
+    (route) =>
+      route.fulfill(
+        jsonBody({ pinned: null, posts: [], nextCursor: null, seenAt: null }),
+      ),
+  );
   await stubPublishReads(page, { holdUploads: state.holdUploads === true });
   await state.beforeVisit?.(page);
   if (theme === undefined) {
@@ -13938,6 +13959,8 @@ const STUBBED_EDITABLE_POST = {
   status: "published",
   coverUploadId: "c0c0c0c0-0000-4000-8000-000000000001",
   coverUrl: `${APP_URL}${STUBBED_COVER_PATH}`,
+  isPinned: false,
+  pinnedUntil: null,
 } as const;
 
 /** Las lecturas del feed y los grupos, y la publicación editable. Va después

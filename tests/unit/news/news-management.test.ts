@@ -229,7 +229,45 @@ describe("editar una publicación", () => {
       status: "published",
       coverUploadId: null,
       coverUrl: null,
+      isPinned: false,
+      pinnedUntil: null,
     });
+  });
+
+  it("dice si está fijada ahora y hasta cuándo, para encender la caja", async () => {
+    const until = "2026-10-11T09:30:00.000Z";
+    const club = clubWith(
+      ownPost({
+        pin: { pinnedAt: "2026-09-20T08:00:00.000Z", pinnedUntil: until },
+      }),
+    );
+
+    const editable = await readEditableNewsPost(club.gateways, {
+      callerId: CALLER_ID,
+      postId: POST_ID,
+      now: NOW,
+    });
+
+    expect(editable).toMatchObject({ isPinned: true, pinnedUntil: until });
+  });
+
+  it("una fijada que ya caducó se carga como no fijada", async () => {
+    const club = clubWith(
+      ownPost({
+        pin: {
+          pinnedAt: "2026-09-01T08:00:00.000Z",
+          pinnedUntil: "2026-09-08T08:00:00.000Z",
+        },
+      }),
+    );
+
+    const editable = await readEditableNewsPost(club.gateways, {
+      callerId: CALLER_ID,
+      postId: POST_ID,
+      now: NOW,
+    });
+
+    expect(editable).toMatchObject({ isPinned: false, pinnedUntil: null });
   });
 });
 

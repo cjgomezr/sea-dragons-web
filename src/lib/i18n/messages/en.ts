@@ -1798,7 +1798,7 @@ export const englishMessages = {
   "news.publish.lead":
     "Write it, choose who sees it and attach any documents. It goes to the top of the feed as soon as you publish.",
   "news.publish.loading": "Loading the club's groups…",
-  "news.publish.loadFailed": "We couldn't load the club's groups. Try again.",
+  "news.publish.loadFailed": "We couldn't load the form. Try again.",
   "news.publish.category": "Category",
   "news.publish.titleLabel": "Title",
   "news.publish.body": "Message",
@@ -1863,6 +1863,13 @@ export const englishMessages = {
   "news.publish.attachments.issue.uploadMissing":
     "An attachment is no longer uploaded. Remove it and attach it again.",
   "news.publish.titleCounter": "{length} / {max}",
+  // La caja de fijar del formulario, solo para el Admin (#599).
+  "news.publish.pin.label": "Pin to the top of the feed",
+  "news.publish.pin.hint":
+    "It stays as the featured post. Everything else is listed newest first.",
+  "news.publish.pin.unpinsOn": "Unpins automatically on {date}.",
+  "news.publish.pin.staysUntilUnpinned": "Stays until you unpin it.",
+  "news.publish.pin.replaces": "Replaces the post pinned now: “{title}”",
   "news.publish.cover.legend": "Cover photo",
   "news.publish.cover.optional": "optional",
   "news.publish.cover.empty": "No cover photo",
@@ -1874,6 +1881,10 @@ export const englishMessages = {
     "Shown in the feed and at the top of the post. Landscape works best.",
   "news.publish.cover.remove": "Remove cover",
   "news.published.notice": "Published · we notified {audience}",
+  "news.published.pinnedNotice":
+    "Published and pinned · we notified {audience}",
+  "news.published.pinnedUntilNotice":
+    "Published and pinned until {date} · we notified {audience}",
   "news.published.audience.club": "the whole club",
   "news.publish.cover.issue.empty": "The cover image is empty.",
   "news.publish.cover.issue.tooLarge": "The cover can be up to {max} MB.",

@@ -147,7 +147,7 @@ function picture(name: string, type = "image/png", size = 2_048): File {
 }
 
 async function openForm(): Promise<void> {
-  render(<NewsPublishScreen locale="en" />);
+  render(<NewsPublishScreen locale="en" canPin={false} />);
   await screen.findByLabelText("Title");
 }
 

@@ -19,6 +19,7 @@ import {
   type NewsPostStatus,
 } from "@/lib/news/news-posts";
 import { newsPostDetailSchema } from "./news-client";
+import type { NewsPinField } from "./news-publish-client";
 
 /**
  * Lo que editar y retirar (#331) le piden a la API v1. Como el resto de
@@ -40,6 +41,8 @@ const editableResponseSchema = z.object({
     status: z.enum(["published", "withdrawn"]),
     coverUploadId: z.uuid().nullable(),
     coverUrl: z.url().nullable(),
+    isPinned: z.boolean(),
+    pinnedUntil: z.iso.datetime({ offset: true }).nullable(),
   }),
 });
 
@@ -55,10 +58,11 @@ export type NewsPostChange =
 /** La edición que se manda: el borrador y la marca de editada que se tenía
  * delante, que es con lo que el servidor detecta un conflicto. Sin
  * `coverUploadId` la portada se queda como está; con `null` se quita (#591). */
-export type NewsEditSubmission = NewsDraft & {
-  readonly expectedEditedAt: string | null;
-  readonly coverUploadId?: string | null;
-};
+export type NewsEditSubmission = NewsDraft &
+  NewsPinField & {
+    readonly expectedEditedAt: string | null;
+    readonly coverUploadId?: string | null;
+  };
 
 function managePath(postId: string): string {
   return NEWS_POST_MANAGE_API_PATH.replace("[id]", encodeURIComponent(postId));
