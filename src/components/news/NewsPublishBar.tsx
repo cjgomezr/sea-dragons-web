@@ -46,7 +46,7 @@ export function NewsPublishBar({
       </h1>
       <button
         type="submit"
-        className="news-publish-bar-submit"
+        className="auth-submit news-publish-bar-submit"
         disabled={submit.isDisabled}
         aria-describedby={submit.describedBy}
       >

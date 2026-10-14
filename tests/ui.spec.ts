@@ -12802,8 +12802,9 @@ test.describe("a 768 px el feed sigue siendo el de escritorio (#600)", () => {
    segmentada, título con contador, cuerpo, audiencia y adjuntos. El botón que
    lo abre sale en docs/mockups/news-light.png, en la cabecera del feed.
 
-   Se fotografía a 768 y 1440. A 375 sólo se comprueban axe y el scroll
-   horizontal: la barra del móvil la rehace el ticket #602.
+   Se fotografía a 768 y 1440. A 375 se comprueban axe y el scroll
+   horizontal de cada estado; el móvil (#602) se fotografía más abajo, en
+   los dos estados de sus mockups.
 
    Los grupos, las subidas y publicar se sirven con `page.route`: así las
    capturas no dependen de los grupos que haya en la base, y ninguna subida
@@ -12907,7 +12908,8 @@ async function expectCoverPreviewLoaded(page: Page): Promise<void> {
     .toBe(true);
 }
 
-/** Lo que se fotografía de publicar y editar: el móvil espera a #602. */
+/** Lo que se fotografía de publicar y editar en cada estado. El móvil sólo
+ * en los dos estados de sus mockups (#602), más abajo. */
 const PUBLISH_PHOTO_VIEWPORTS = viewports.filter(
   (viewport) => viewport.name !== "mobile",
 );
@@ -13253,29 +13255,39 @@ test.describe("publicar en el navegador", () => {
       await expect(
         page.getByRole("button", { name: /^Remove mapa-piscina/ }),
       ).toBeVisible();
+      // Lo que se dibuja más pequeño (#602) cuenta con su zona táctil.
       const controls = [
+        page.getByRole("button", { name: "Cancel" }),
+        page.getByRole("button", { name: PUBLISH_BUTTON }),
         page.getByRole("button", { name: "Remove cover" }),
         ...["Announcement", "News", "Document"].map((name) =>
-          page.locator("label").filter({ hasText: new RegExp(`^${name}$`) }),
+          page.getByRole("radio", { name }),
         ),
         page.getByLabel("Title"),
+        page.getByRole("tab", { name: "Write" }),
+        page.getByRole("tab", { name: "Preview" }),
+        page.getByRole("button", { name: "Bold" }),
+        page.getByRole("switch", { name: "Pin to the top of the feed" }),
         page.getByRole("button", { name: /^Remove mapa-piscina/ }),
         page.getByRole("button", { name: "Add files" }),
-        page.getByRole("button", { name: PUBLISH_BUTTON }),
-        ...["The whole club", "Specific groups", PUBLISH_GROUPS[0].name].map(
-          (name) => page.locator("label").filter({ hasText: name }),
+        ...["The whole club", "Specific groups"].map((name) =>
+          page.locator("label").filter({ hasText: name }),
         ),
+        page
+          .locator(".news-audience-groups .auth-consent")
+          .filter({ hasText: PUBLISH_GROUPS[0].name }),
       ];
       const addCover = page.getByRole("button", { name: "Add cover photo" });
 
       for (const control of controls) {
-        const box = await control.boundingBox();
-        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+        expect(await touchAreaHeight(control)).toBeGreaterThanOrEqual(
+          MIN_TOUCH_TARGET_PX,
+        );
       }
       await page.getByRole("button", { name: "Remove cover" }).click();
-      expect(
-        (await addCover.boundingBox())?.height ?? 0,
-      ).toBeGreaterThanOrEqual(44);
+      expect(await touchAreaHeight(addCover)).toBeGreaterThanOrEqual(
+        MIN_TOUCH_TARGET_PX,
+      );
     });
   });
 
@@ -13296,6 +13308,309 @@ test.describe("publicar en el navegador", () => {
 
       await expect(page).toHaveURL(new RegExp("/dashboard$"));
     });
+  });
+});
+
+/** Lo que mide de alto la zona que se toca: la caja, o el `::after` que la
+ * agranda cuando el control se dibuja más pequeño (D11 de E22). */
+async function touchAreaHeight(control: Locator): Promise<number> {
+  return control.evaluate((element) => {
+    const { height } = element.getBoundingClientRect();
+    const after = getComputedStyle(element, "::after");
+    if (after.content === "none" || after.position !== "absolute") {
+      return height;
+    }
+    return (
+      height - Number.parseFloat(after.top) - Number.parseFloat(after.bottom)
+    );
+  });
+}
+
+/* #602: el formulario de publicar en el móvil, con su barra y el editor
+   adaptado (docs/mockups/mobile-news-redesign-publish-write-dark.png y
+   mobile-news-redesign-publish-preview-dark.png). Sólo a 375: desde 768
+   manda el escritorio, que se fotografía arriba. */
+/** Rellenar baja la página; la captura, como el mockup, se mira desde
+ * arriba y sin foco en el cuerpo. */
+async function backToFormTop(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    window.scrollTo(0, 0);
+    document.querySelector("textarea")?.scrollTo(0, 0);
+  });
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+}
+
+const MOBILE_PUBLISH_STATES: readonly PublishState[] = [
+  {
+    name: "publicar-movil-escribir",
+    prepare: async (page) => {
+      await fillPublishForm(page);
+      await page.getByLabel(/^(Message|Mensaje)$/).fill(PUBLISH_MARKDOWN_BODY);
+      await backToFormTop(page);
+    },
+  },
+  {
+    name: "publicar-movil-vista-previa",
+    prepare: async (page) => {
+      await fillPublishForm(page);
+      await page.getByLabel(/^(Message|Mensaje)$/).fill(PUBLISH_MARKDOWN_BODY);
+      await page.getByRole("tab", { name: /^(Preview|Vista previa)$/ }).click();
+      await expect(
+        page.getByRole("heading", { level: 2, name: "Squad" }),
+      ).toBeVisible();
+      await backToFormTop(page);
+    },
+  },
+];
+
+/** Ningún segmento de la categoría parte ni corta su texto. */
+async function categoryLabelsFit(page: Page): Promise<boolean> {
+  return page
+    .locator(".news-category-field label")
+    .evaluateAll((labels) =>
+      labels.every((label) => label.scrollWidth <= label.clientWidth),
+    );
+}
+
+const PUBLISH_BAR_NAME = PUBLISH_HEADING;
+const PUBLISH_BAR_SUBMIT_PX = 36;
+const PUBLISH_TITLE_HEIGHT_PX = 48;
+const PUBLISH_TOOLBAR_BUTTON_PX = 40;
+const PUBLISH_MOBILE_AREA_MIN_PX = 260;
+
+for (const state of MOBILE_PUBLISH_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE, viewport: MOBILE_VIEWPORT });
+
+    for (const theme of themes) {
+      test(`matches approved baseline (${theme})`, async ({ page }) => {
+        await goToPublish(page, state, theme);
+        const snapshot = `${state.name}-mobile-${theme}.png`;
+        await createMissingLocalBaseline(snapshot, () =>
+          page.screenshot(SCREENSHOT_OPTIONS),
+        );
+        await expect(page).toHaveScreenshot(snapshot, {
+          ...SCREENSHOT_OPTIONS,
+          maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+        });
+      });
+
+      test(`has no accessibility violations (axe-core, ${theme})`, async ({
+        page,
+      }) => {
+        await goToPublish(page, state, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
+
+    for (const width of MOBILE_NARROW_WIDTHS) {
+      test(`has no horizontal scroll at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ ...MOBILE_VIEWPORT, width });
+        await goToPublish(page, state);
+        expect(await hasHorizontalScroll(page)).toBe(false);
+      });
+    }
+  });
+}
+
+test.describe("publicar en el móvil: la barra y las medidas (#602)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE, viewport: MOBILE_VIEWPORT });
+
+  const writing = MOBILE_PUBLISH_STATES[0] as PublishState;
+
+  test("la barra se queda arriba al hacer scroll", async ({ page }) => {
+    await goToPublish(page, writing);
+    const bar = page.getByRole("group", { name: PUBLISH_BAR_NAME });
+
+    await page.evaluate(
+      (distance) => window.scrollTo(0, distance),
+      SCROLL_BEFORE_BAR_CHECK_PX,
+    );
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeGreaterThan(0);
+
+    expect((await bar.boundingBox())?.y).toBe(0);
+    await expect(bar.getByRole("button", { name: "Cancel" })).toBeInViewport();
+    await expect(
+      bar.getByRole("button", { name: PUBLISH_BUTTON }),
+    ).toBeInViewport();
+  });
+
+  test("Publicar se dibuja de 36 px con 44 de zona táctil", async ({
+    page,
+  }) => {
+    await goToPublish(page, writing);
+    const submit = page
+      .getByRole("group", { name: PUBLISH_BAR_NAME })
+      .getByRole("button", { name: PUBLISH_BUTTON });
+
+    expect((await submit.boundingBox())?.height).toBe(PUBLISH_BAR_SUBMIT_PX);
+    expect(await touchAreaHeight(submit)).toBe(MIN_TOUCH_TARGET_PX);
+  });
+
+  test("el título mide 48 px con letra de 16", async ({ page }) => {
+    await goToPublish(page, writing);
+    const title = page.getByLabel("Title");
+
+    expect((await title.boundingBox())?.height).toBe(PUBLISH_TITLE_HEIGHT_PX);
+    await expect(title).toHaveCSS("font-size", "16px");
+  });
+
+  test("las pestañas ocupan el ancho y la barra de formato es su propia fila", async ({
+    page,
+  }) => {
+    await goToPublish(page, writing);
+    const editor = await page.locator(".news-body-editor").boundingBox();
+    const write = await page.getByRole("tab", { name: "Write" }).boundingBox();
+    const preview = await page
+      .getByRole("tab", { name: "Preview" })
+      .boundingBox();
+    const bold = page.getByRole("button", { name: "Bold" });
+    const area = await page
+      .getByRole("textbox", { name: "Message" })
+      .boundingBox();
+
+    expect(write?.height).toBe(MIN_TOUCH_TARGET_PX);
+    expect((write?.width ?? 0) + (preview?.width ?? 0)).toBeCloseTo(
+      (editor?.width ?? 0) - 2,
+      0,
+    );
+    expect((await bold.boundingBox())?.y).toBeGreaterThanOrEqual(
+      (write?.y ?? 0) + (write?.height ?? 0),
+    );
+    await expect(bold).toHaveCSS("width", `${PUBLISH_TOOLBAR_BUTTON_PX}px`);
+    await expect(bold).toHaveCSS("height", `${PUBLISH_TOOLBAR_BUTTON_PX}px`);
+    expect(area?.height).toBeGreaterThanOrEqual(PUBLISH_MOBILE_AREA_MIN_PX);
+    await expect(
+      page.getByRole("button", { name: "Formatting help" }),
+    ).toBeVisible();
+  });
+
+  for (const width of MOBILE_NARROW_WIDTHS) {
+    test(`a ${width} px la barra de formato se desplaza de lado sin mover la página`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ ...MOBILE_VIEWPORT, width });
+      await goToPublish(page, writing);
+      const toolbar = page.getByRole("group", { name: "Formatting" });
+      await toolbar.scrollIntoViewIfNeeded();
+
+      const scrolled = await toolbar.evaluate((element) => {
+        element.scrollLeft = element.scrollWidth;
+        return element.scrollLeft;
+      });
+
+      expect(scrolled).toBeGreaterThan(0);
+      await expect(
+        page.getByRole("button", { name: "Insert image" }),
+      ).toBeInViewport();
+      expect(await page.evaluate(() => window.scrollX)).toBe(0);
+      expect(await hasHorizontalScroll(page)).toBe(false);
+    });
+  }
+
+  for (const width of MOBILE_NARROW_WIDTHS) {
+    test(`a ${width} px cada segmento de la categoría cabe entero`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ ...MOBILE_VIEWPORT, width });
+      await goToPublish(page, writing);
+
+      expect(await categoryLabelsFit(page)).toBe(true);
+    });
+  }
+
+  test("la portada vacía mide 140 px con el botón de 40, y con foto 180", async ({
+    page,
+  }) => {
+    await goToPublish(page, writing);
+    const addCover = page.getByRole("button", { name: "Add cover photo" });
+
+    expect(
+      (await page.locator(".news-cover-banner").boundingBox())?.height,
+    ).toBe(140);
+    expect((await addCover.boundingBox())?.height).toBe(40);
+    await choosePublishCover(page);
+    expect(
+      (await page.getByRole("img", { name: COVER_PREVIEW_NAME }).boundingBox())
+        ?.height,
+    ).toBe(180);
+    await expect(
+      page.getByRole("button", { name: "Remove cover" }),
+    ).toBeVisible();
+  });
+
+  test("la categoría son tres segmentos iguales de 40 px", async ({ page }) => {
+    await goToPublish(page, writing);
+    const boxes = await Promise.all(
+      ["Announcement", "News", "Document"].map((name) =>
+        page
+          .locator(".news-category-field label")
+          .filter({ hasText: new RegExp(`^${name}$`) })
+          .boundingBox(),
+      ),
+    );
+
+    for (const box of boxes) {
+      expect(box?.height).toBe(40);
+      expect(box?.width).toBeCloseTo(boxes[0]?.width ?? 0, 0);
+    }
+  });
+
+  test("la caja de fijar lleva el interruptor de 44 × 26 a la derecha", async ({
+    page,
+  }) => {
+    await goToPublish(page, writing);
+    const pin = page.getByRole("switch", {
+      name: "Pin to the top of the feed",
+    });
+    const label = page.getByText("Pin to the top of the feed", { exact: true });
+
+    await pin.click();
+
+    const pinBox = await pin.boundingBox();
+    expect(pinBox?.width).toBe(44);
+    expect(pinBox?.height).toBe(26);
+    expect(pinBox?.x ?? 0).toBeGreaterThan((await label.boundingBox())?.x ?? 0);
+    await expect(
+      page.getByRole("radio", { name: /^Until I unpin/ }),
+    ).toBeAttached();
+    await expect(page.getByText(/^Unpins automatically on /)).toBeVisible();
+  });
+
+  test("las fichas de grupo llevan 9 × 14 px y Añadir archivos 52", async ({
+    page,
+  }) => {
+    await goToPublish(page, writing);
+    const chip = page
+      .locator(".news-audience-groups .auth-consent")
+      .filter({ hasText: PUBLISH_GROUPS[0].name });
+
+    await expect(chip).toHaveCSS("padding", "9px 14px");
+    expect(
+      (await page.getByRole("button", { name: "Add files" }).boundingBox())
+        ?.height,
+    ).toBe(52);
+  });
+
+  test("en 768 px no hay barra: manda el escritorio", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await goToPublish(page, writing);
+
+    await expect(
+      page.getByRole("group", { name: PUBLISH_BAR_NAME }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: /Back to News/ }),
+    ).toBeVisible();
   });
 });
 

@@ -7463,6 +7463,282 @@ a.auth-brand-header:focus-visible {
   }
 }
 
+/* El formulario en el móvil (#602, "#2e" del handoff de E22,
+   docs/mockups/mobile-news-redesign-publish-write-dark.png). La barra sube
+   sobre el relleno de arriba de la página para quedar justo bajo la cabecera
+   de la app (D10), como la de la publicación (#601). Lo que se ve más
+   pequeño que 44 px lleva su zona táctil alrededor (D11). */
+.news-publish-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  margin: calc(-1 * var(--space-8)) calc(-1 * var(--space-4)) 0;
+  padding: var(--space-1) var(--space-4);
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.news-publish-bar-cancel {
+  justify-self: start;
+  min-height: var(--touch-target-min);
+  padding: 0;
+  font: inherit;
+  font-size: 15px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.news-publish-bar-cancel:hover {
+  color: var(--color-text);
+}
+
+.app-main .news-publish-bar-title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 36 px dibujado; la zona táctil llega a los 44. */
+.news-publish-form .news-publish-bar-submit {
+  position: relative;
+  justify-self: end;
+  align-self: center;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.news-publish-bar-submit::after {
+  position: absolute;
+  inset: calc((36px - var(--touch-target-min)) / 2) 0;
+  content: "";
+}
+
+@media (width < 768px) {
+  .news-publish-form-phone {
+    gap: var(--space-4);
+  }
+
+  .news-publish-form-phone .news-publish-fields {
+    gap: var(--space-4);
+  }
+
+  /* La portada: sin texto a la vista, sólo el botón abajo a la izquierda.
+     El texto sigue para el lector de pantalla; son las declaraciones de
+     `.visually-hidden`, que no se aplica sólo en un ancho. */
+  .news-publish-form-phone .news-cover-banner {
+    min-height: 140px;
+  }
+
+  .news-publish-form-phone .news-cover-banner-content {
+    padding: var(--space-3);
+  }
+
+  .news-publish-form-phone .news-cover-banner-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .news-publish-form-phone .news-cover-add {
+    position: relative;
+    min-height: 40px;
+  }
+
+  .news-publish-form-phone .news-cover-add::after {
+    position: absolute;
+    inset: calc((40px - var(--touch-target-min)) / 2) 0;
+    content: "";
+  }
+
+  .news-publish-form-phone .news-cover-preview {
+    height: 180px;
+  }
+
+  /* Tres segmentos de 40 px; el radio, que es lo que se toca, sobresale
+     hasta los 44 por el relleno del grupo. */
+  /* "Aviso" en inglés es "Announcement": en un tercio de 375 px sólo cabe
+     con la letra y los huecos del mockup. */
+  .news-publish-form-phone .news-category-segment label {
+    gap: 6px;
+    min-height: 40px;
+    padding: 0 var(--space-1);
+    font-size: 13px;
+  }
+
+  .news-publish-form-phone .news-category-segment input {
+    inset: calc((40px - var(--touch-target-min)) / 2) 0;
+    height: auto;
+  }
+
+  /* A 320 px ni así: se quita el punto de color, que repite lo que dice,
+     y la letra baja un punto. */
+  @media (width < 360px) {
+    .news-publish-form-phone .news-category-field .news-category-dot {
+      display: none;
+    }
+
+    .news-publish-form-phone .news-category-field label {
+      padding: 0 2px;
+      font-size: 12px;
+    }
+  }
+
+  /* 16 px: con menos, iOS acerca la página al tocar el campo. */
+  .news-publish-form-phone .news-publish-title input {
+    height: 48px;
+    font-size: 16px;
+  }
+
+  /* El editor: las pestañas a todo el ancho y la barra de formato en su
+     propia fila, que se desplaza de lado sin mover la página. */
+  .news-publish-form-phone .news-body-bar {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 0;
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .news-publish-form-phone .news-body-tab {
+    flex: 1 1 0;
+  }
+
+  .news-publish-form-phone .news-body-toolbar {
+    flex-wrap: nowrap;
+    gap: var(--space-1);
+    padding: 2px var(--space-2);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .news-publish-form-phone .news-body-toolbar > * {
+    flex: none;
+  }
+
+  .news-publish-form-phone .news-body-toolbar-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .news-publish-form-phone .news-body-toolbar-button::after {
+    inset: calc((40px - var(--touch-target-min)) / 2) 0;
+  }
+
+  .news-publish-form-phone .news-body-area,
+  .news-publish-form-phone .news-body-preview {
+    min-height: 260px;
+  }
+
+  /* La caja de fijar: la etiqueta a la izquierda y el interruptor de
+     44 × 26 a la derecha; su zona táctil llega a los 44 de alto. */
+  .news-publish-form-phone .news-pin-field {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .news-publish-form-phone .news-pin-switch {
+    grid-row: 1;
+    grid-column: 2;
+    width: 44px;
+    height: 26px;
+  }
+
+  .news-publish-form-phone .news-pin-switch::before {
+    width: 20px;
+    height: 20px;
+  }
+
+  .news-publish-form-phone .news-pin-switch[aria-checked="true"]::before {
+    transform: translateX(18px);
+  }
+
+  .news-publish-form-phone .news-pin-switch::after {
+    position: absolute;
+    inset: calc((26px - var(--touch-target-min)) / 2) 0;
+    content: "";
+  }
+
+  .news-publish-form-phone .news-pin-field-body {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  /* Las duraciones no bajan de línea: se desplazan de lado. */
+  .news-publish-form-phone .news-pin-field-durations .news-category-segments {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .news-publish-form-phone .news-pin-field-durations .news-category-segment {
+    flex: none;
+  }
+
+  /* La audiencia: filas de 44 px y los grupos como fichas. Toda la ficha
+     marca la casilla: la etiqueta la cubre entera. */
+  .news-publish-form-phone .news-audience-groups {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding-left: 0;
+  }
+
+  .news-publish-form-phone .news-audience-groups legend {
+    width: 100%;
+  }
+
+  .news-publish-form-phone .news-audience-groups .auth-consent {
+    position: relative;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--touch-target-min);
+    padding: 9px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+  }
+
+  .news-publish-form-phone .news-audience-groups .auth-consent:has(:checked) {
+    background: var(--color-segment-selected);
+    border-color: var(--color-accent);
+  }
+
+  /* La casilla queda encima de la etiqueta que cubre la ficha. */
+  .news-publish-form-phone .news-audience-groups .auth-consent input {
+    position: relative;
+    z-index: 1;
+    width: 18px;
+    height: 18px;
+  }
+
+  .news-publish-form-phone .news-audience-groups .auth-consent label {
+    min-height: 0;
+    font-size: 14px;
+  }
+
+  .news-publish-form-phone .news-audience-groups .auth-consent label::after {
+    position: absolute;
+    inset: 0;
+    content: "";
+  }
+}
+
 /* El aviso de publicada en el feed (#597). La región de estado no ocupa
    sitio vacía, así que el feed no se mueve cuando no hay nada que decir. */
 .news-published-status {
