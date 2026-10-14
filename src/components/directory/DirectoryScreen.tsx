@@ -62,7 +62,7 @@ import { useBulkRoleChange } from "./use-bulk-role-change";
 import { type CheckedMembers, useCheckedMembers } from "./use-checked-members";
 import { useDebouncedValue } from "./use-debounced-value";
 import { useFilterChoices } from "./use-filter-choices";
-import { useIsPhone } from "./use-is-phone";
+import { useIsPhone } from "@/components/use-is-phone";
 import {
   type PendingRequestsState,
   usePendingRoleRequests,

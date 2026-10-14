@@ -11,6 +11,7 @@ import type {
   NewsPostDetail,
 } from "@/lib/news/news-posts";
 import { MemberAvatar } from "@/components/MemberAvatar";
+import { useIsPhone } from "@/components/use-is-phone";
 import {
   type NewsFailure,
   describeNewsFailure,
@@ -22,6 +23,7 @@ import { NewsCategoryLabel } from "./NewsCategoryLabel";
 import { NewsCover } from "./NewsCover";
 import { NewsMarkdown } from "./NewsMarkdown";
 import { NewsPostActions } from "./NewsPostActions";
+import { NewsPostBar } from "./NewsPostBar";
 
 /**
  * Una publicación abierta (#329, RF-5 del PRD de E11), con el diseño 1c de
@@ -36,6 +38,8 @@ import { NewsPostActions } from "./NewsPostActions";
  *
  * A quien puede editarla y retirarla (#331) le ofrece esas acciones en la
  * línea del autor; lo que responde el servidor sustituye a lo que había.
+ * Por debajo de 768 px (#601) esas acciones, y fijar para el Admin, viven en
+ * la hoja ⋯ de la barra propia del móvil, y lo que hacen se anuncia.
  */
 
 /** Las medidas del handoff: el icono del fondo grande y el avatar. */
@@ -116,10 +120,13 @@ function PostAuthorAndDates({
 function PostContent({
   translate,
   post,
+  hasBylineActions,
   onChanged,
 }: {
   readonly translate: Translator;
   readonly post: NewsPostDetail;
+  /** En el móvil las acciones van en la hoja ⋯ de la barra. */
+  readonly hasBylineActions: boolean;
   readonly onChanged: (post: NewsPostDetail) => void;
 }): React.JSX.Element {
   const audience = describeAudience(translate, post.audience);
@@ -152,7 +159,7 @@ function PostContent({
               className="news-post-avatar"
             />
             <PostAuthorAndDates translate={translate} post={post} />
-            {post.canManage ? (
+            {post.canManage && hasBylineActions ? (
               <NewsPostActions
                 translate={translate}
                 post={post}
@@ -184,6 +191,8 @@ export function NewsPostScreen({
   const translate = createTranslator(locale);
   const [state, setState] = useState<ScreenState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
+  const [announcement, setAnnouncement] = useState("");
+  const isPhone = useIsPhone();
 
   // Abrir una publicación también cuenta como visita a Noticias (#424).
   useEffect(() => {
@@ -214,11 +223,34 @@ export function NewsPostScreen({
     setReloads((count) => count + 1);
   }
 
+  function showChange(post: NewsPostDetail, message: string): void {
+    setState({ kind: "loaded", post });
+    setAnnouncement(message);
+  }
+
+  const hasPhoneBar = isPhone && state.kind === "loaded";
   return (
-    <div className="news-post-screen">
-      <Link href={NEWS_PATH} className="member-record-back">
-        {translate("news.post.back")}
-      </Link>
+    <div
+      className={
+        hasPhoneBar
+          ? "news-post-screen news-post-screen-phone"
+          : "news-post-screen"
+      }
+    >
+      {hasPhoneBar ? (
+        <NewsPostBar
+          translate={translate}
+          post={state.post}
+          onChanged={showChange}
+        />
+      ) : (
+        <Link href={NEWS_PATH} className="member-record-back">
+          {translate("news.post.back")}
+        </Link>
+      )}
+      <p className="visually-hidden" role="status">
+        {announcement}
+      </p>
       {state.kind === "loading" ? (
         <p className="admin-empty">{translate("news.post.loading")}</p>
       ) : null}
@@ -243,6 +275,7 @@ export function NewsPostScreen({
         <PostContent
           translate={translate}
           post={state.post}
+          hasBylineActions={!isPhone}
           onChanged={(post) => setState({ kind: "loaded", post })}
         />
       ) : null}
