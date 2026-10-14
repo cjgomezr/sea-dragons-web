@@ -2,7 +2,14 @@ import Stripe from "stripe";
 import type { SetupCard, StripeApi } from "./stripe-webhook";
 import type { StripePriceSetup } from "@/lib/membership/stripe-prices";
 import type { ProductCatalogSource } from "./product-catalog";
-import { type StripePrices, readCard } from "./webhook-events";
+import {
+  type ChargeDetails,
+  NO_CHARGE_DETAILS,
+  type StripePrices,
+  findInvoicePaymentIntentId,
+  readCard,
+  readChargeDetails,
+} from "./webhook-events";
 
 /**
  * El cliente de Stripe del servidor (#452, RF-9 del PRD de E12). Sin sus
@@ -132,11 +139,35 @@ async function readSetupCard(
   return card === null ? null : { paymentMethodId: paymentMethod.id, card };
 }
 
+async function readPaymentCharge(
+  client: Stripe,
+  paymentIntentId: string,
+): Promise<ChargeDetails> {
+  const paymentIntent = await client.paymentIntents.retrieve(paymentIntentId, {
+    expand: ["latest_charge"],
+  });
+  return readChargeDetails(paymentIntent);
+}
+
+async function readInvoiceCharge(
+  client: Stripe,
+  invoiceId: string,
+): Promise<ChargeDetails> {
+  const { data } = await client.invoicePayments.list({ invoice: invoiceId });
+  const paymentIntentId = findInvoicePaymentIntentId(data);
+  return paymentIntentId === null
+    ? NO_CHARGE_DETAILS
+    : readPaymentCharge(client, paymentIntentId);
+}
+
 /** Lo que el webhook pide a la API de Stripe. La suscripción viene con su
  * método de pago expandido, para no tener que pedir la tarjeta aparte. */
 export function createStripeApi(client: Stripe): StripeApi {
   return {
     readSetupCard: (setupIntentId) => readSetupCard(client, setupIntentId),
+    readInvoiceCharge: (invoiceId) => readInvoiceCharge(client, invoiceId),
+    readPaymentCharge: (paymentIntentId) =>
+      readPaymentCharge(client, paymentIntentId),
     async makeDefaultPaymentMethod({
       customerId,
       subscriptionId,

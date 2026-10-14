@@ -26,15 +26,17 @@ import type {
 import {
   type MembershipWaiverView,
   PAYMENT_STATUSES,
+  type PaymentCard,
   type PaymentHistoryGateway,
 } from "./membership-view";
 import type {
+  ChargeCard,
   LevyPayment,
   MembershipChanges,
   MembershipLookup,
+  RecordedPayment,
   SessionPackPayment,
   StripeMembership,
-  StripePayment,
 } from "@/lib/stripe/webhook-events";
 
 /**
@@ -258,7 +260,7 @@ export function createMembershipGateway(
 const PAYMENTS_TABLE = "payments";
 const MEMBERS_TABLE = "members";
 const PAYMENT_COLUMNS =
-  "id, amount_cents, description, status, paid_at, created_at";
+  "id, amount_cents, description, status, paid_at, created_at, card_brand, card_last4, failure_reason";
 
 const paymentRowSchema = z.object({
   id: z.string(),
@@ -267,7 +269,20 @@ const paymentRowSchema = z.object({
   status: z.enum(PAYMENT_STATUSES),
   paid_at: z.string().nullable(),
   created_at: z.string(),
+  card_brand: z.string().nullable(),
+  card_last4: z.string().nullable(),
+  failure_reason: z.string().nullable(),
 });
+
+/** Sin marca o sin dígitos no hay tarjeta que enseñar. */
+function toPaymentCard(row: {
+  readonly card_brand: string | null;
+  readonly card_last4: string | null;
+}): PaymentCard | null {
+  return row.card_brand === null || row.card_last4 === null
+    ? null
+    : { brand: row.card_brand, last4: row.card_last4 };
+}
 
 /** El historial de pagos de un socio (#455). Con el cliente de la sesión,
  * `payments_select_own` sólo deja leer los propios. El orden lo pone el
@@ -296,6 +311,8 @@ export function createPaymentHistoryGateway(
           status: row.status,
           paidAt: toDate(row.paid_at),
           createdAt: new Date(row.created_at),
+          card: toPaymentCard(row),
+          failureReason: row.failure_reason,
         }));
     },
   };
@@ -534,7 +551,15 @@ function toMembershipChangesJson(
   };
 }
 
-function toPaymentJson(payment: StripePayment): Record<string, unknown> {
+/** La tarjeta de un cobro, en las columnas de `payments` (#629). */
+function toChargeCardJson(card: ChargeCard | null): Record<string, unknown> {
+  return {
+    card_brand: card === null ? null : card.brand,
+    card_last4: card === null ? null : card.last4,
+  };
+}
+
+function toPaymentJson(payment: RecordedPayment): Record<string, unknown> {
   return {
     stripe_invoice_id: payment.invoiceId,
     amount_cents: payment.amountCents,
@@ -542,6 +567,8 @@ function toPaymentJson(payment: StripePayment): Record<string, unknown> {
     description: payment.description,
     status: payment.status,
     paid_at: toNullableIso(payment.paidAt),
+    ...toChargeCardJson(payment.card),
+    failure_reason: payment.failureReason,
   };
 }
 
@@ -549,6 +576,7 @@ function toPaymentJson(payment: StripePayment): Record<string, unknown> {
  * (#471). Siempre pagado: uno sin pagar no llega hasta aquí. */
 function toSessionPackPaymentJson(
   payment: SessionPackPayment,
+  card: ChargeCard | null,
 ): Record<string, unknown> {
   return {
     stripe_charge_id: payment.paymentIntentId,
@@ -556,14 +584,18 @@ function toSessionPackPaymentJson(
     currency: payment.currency,
     description: payment.description,
     paid_at: payment.paidAt.toISOString(),
+    ...toChargeCardJson(card),
   };
 }
 
 /** Un levy se guarda como un pack, y además con el producto de Stripe que
  * dice cuál pagó el socio (#473). */
-function toLevyPaymentJson(payment: LevyPayment): Record<string, unknown> {
+function toLevyPaymentJson(
+  payment: LevyPayment,
+  card: ChargeCard | null,
+): Record<string, unknown> {
   return {
-    ...toSessionPackPaymentJson(payment),
+    ...toSessionPackPaymentJson(payment, card),
     stripe_product_id: payment.productId,
   };
 }
@@ -608,7 +640,7 @@ export function createStripeWebhookGateway(
       }
       return z.enum(APPLY_STRIPE_EVENT_OUTCOMES).parse(data);
     },
-    async applySessionPackPayment({ event, owner, sessions, payment }) {
+    async applySessionPackPayment({ event, owner, sessions, payment, card }) {
       const { data, error } = await serviceClient.rpc(
         APPLY_SESSION_PACK_PAYMENT_FUNCTION,
         {
@@ -617,7 +649,7 @@ export function createStripeWebhookGateway(
           event_created: event.created.toISOString(),
           target_user_id: owner.userId,
           target_club_id: owner.clubId,
-          payment: toSessionPackPaymentJson(payment),
+          payment: toSessionPackPaymentJson(payment, card),
           pack_sessions: sessions,
         },
       );
@@ -641,7 +673,7 @@ export function createStripeWebhookGateway(
       }
       return data === null ? null : z.string().parse(data.club_id);
     },
-    async applyLevyPayment({ event, owner, payment }) {
+    async applyLevyPayment({ event, owner, payment, card }) {
       const { data, error } = await serviceClient.rpc(
         APPLY_LEVY_PAYMENT_FUNCTION,
         {
@@ -650,7 +682,7 @@ export function createStripeWebhookGateway(
           event_created: event.created.toISOString(),
           target_user_id: owner.userId,
           target_club_id: owner.clubId,
-          payment: toLevyPaymentJson(payment),
+          payment: toLevyPaymentJson(payment, card),
         },
       );
       if (error) {

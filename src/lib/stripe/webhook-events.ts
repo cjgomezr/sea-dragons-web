@@ -46,6 +46,24 @@ export type StripePayment = {
   readonly paidAt: Date | null;
 };
 
+/** La tarjeta de un cobro: lo que dice cuál es, y nada más (NFR-006). */
+export type ChargeCard = Pick<MembershipCard, "brand" | "last4">;
+
+/** Lo que el evento no trae de un cobro y se lee en su PaymentIntent (#629).
+ * Nulo lo que Stripe no da: un cobro sin tarjeta, un fallo sin motivo. */
+export type ChargeDetails = {
+  readonly card: ChargeCard | null;
+  readonly failureReason: string | null;
+};
+
+export const NO_CHARGE_DETAILS: ChargeDetails = {
+  card: null,
+  failureReason: null,
+};
+
+/** Un pago de una factura tal como se apunta: con su cobro. */
+export type RecordedPayment = StripePayment & ChargeDetails;
+
 type FactsOf<Kind extends string, Extra> = {
   readonly kind: Kind;
   readonly created: Date;
@@ -167,7 +185,7 @@ export type MembershipChanges = {
 
 export type StripeEventWrites = {
   readonly membership: MembershipChanges | null;
-  readonly payment: StripePayment | null;
+  readonly payment: RecordedPayment | null;
   /** Lo que no se pudo reconocer y va al log. */
   readonly warnings: readonly string[];
 };
@@ -513,6 +531,62 @@ function readUpcomingRenewalFacts(
   };
 }
 
+/** El cobro sale del PaymentIntent con `latest_charge` expandido. Si llega
+ * sólo como id, o no hubo cobro, no hay tarjeta que leer. */
+function readChargeCard(charge: Stripe.Charge | null): ChargeCard | null {
+  if (charge === null || charge.payment_method_details === null) {
+    return null;
+  }
+  const { card } = charge.payment_method_details;
+  if (card === undefined || card.brand === null || card.last4 === null) {
+    return null;
+  }
+  return { brand: card.brand, last4: card.last4 };
+}
+
+function readFailureReason(
+  paymentIntent: Stripe.PaymentIntent,
+  charge: Stripe.Charge | null,
+): string | null {
+  const paymentErrorMessage = paymentIntent.last_payment_error?.message;
+  if (paymentErrorMessage !== undefined) {
+    return paymentErrorMessage;
+  }
+  return charge === null ? null : charge.failure_message;
+}
+
+/** La tarjeta y el motivo del fallo de un cobro (#629). El motivo es el que
+ * Stripe escribe para personas: el del pago y, si no hay, el del cargo. */
+export function readChargeDetails(
+  paymentIntent: Stripe.PaymentIntent,
+): ChargeDetails {
+  const { latest_charge: latestCharge } = paymentIntent;
+  const charge =
+    latestCharge === null || typeof latestCharge === "string"
+      ? null
+      : latestCharge;
+  return {
+    card: readChargeCard(charge),
+    failureReason: readFailureReason(paymentIntent, charge),
+  };
+}
+
+/** Desde la API de 2025 la factura no nombra su PaymentIntent: lo dicen sus
+ * pagos, y el que cuenta es el de por defecto. Una factura sin ninguno (por
+ * ejemplo, pagada fuera de Stripe) no tiene cobro que leer. */
+export function findInvoicePaymentIntentId(
+  invoicePayments: readonly Stripe.InvoicePayment[],
+): string | null {
+  const invoicePayment =
+    invoicePayments.find((candidate) => candidate.is_default) ??
+    invoicePayments[0];
+  if (invoicePayment === undefined) {
+    return null;
+  }
+  const paymentIntent = invoicePayment.payment.payment_intent;
+  return paymentIntent === undefined ? null : idOf(paymentIntent);
+}
+
 /** Lo que dice el evento, sin mirar todavía la base. Cualquier tipo que no
  * mueve la membresía ni el historial se ignora (RF-8). */
 export function readStripeEventFacts(event: Stripe.Event): StripeEventFacts {
@@ -545,6 +619,9 @@ type PlanInput = {
   readonly membership: StripeMembership;
   /** La tarjeta del método de pago, ya resuelta; nula si no hay ninguna. */
   readonly card: MembershipCard | null;
+  /** El cobro de la factura, ya leído en Stripe. Vacío en cualquier otro
+   * evento, o si no se pudo leer. */
+  readonly charge: ChargeDetails;
   readonly prices: StripePrices;
   readonly now: Date;
 };
@@ -681,9 +758,24 @@ function isOlderThanLastApplied(input: PlanInput): boolean {
   );
 }
 
+/** Un cobro pagado ya no tiene motivo de fallo, aunque Stripe guarde el del
+ * intento anterior: un reintento bueno lo deja sin él. */
+function recordPayment(
+  payment: StripePayment,
+  charge: ChargeDetails,
+): RecordedPayment {
+  return {
+    ...payment,
+    card: charge.card,
+    failureReason: payment.status === "failed" ? charge.failureReason : null,
+  };
+}
+
 export function planStripeEventWrites(input: PlanInput): StripeEventWrites {
   const payment =
-    input.facts.kind === "invoiceSettled" ? input.facts.payment : null;
+    input.facts.kind === "invoiceSettled"
+      ? recordPayment(input.facts.payment, input.charge)
+      : null;
   const change = planMembershipChange(input);
   if (change === null || isOlderThanLastApplied(input)) {
     return { membership: null, payment, warnings: [] };

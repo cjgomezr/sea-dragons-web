@@ -8,7 +8,11 @@ import {
   type StripeWebhookGateway,
   handleStripeEvent,
 } from "@/lib/stripe/stripe-webhook";
-import type { StripeMembership } from "@/lib/stripe/webhook-events";
+import {
+  type ChargeDetails,
+  NO_CHARGE_DETAILS,
+  type StripeMembership,
+} from "@/lib/stripe/webhook-events";
 import {
   FIXTURE_LEVY_NAME,
   FIXTURE_LEVY_PAYMENT_INTENT_ID,
@@ -34,6 +38,13 @@ const MASTERCARD: MembershipCard = {
   expMonth: 3,
   expYear: 2031,
 };
+
+const VISA_CHARGE: ChargeDetails = {
+  card: { brand: "visa", last4: "4242" },
+  failureReason: null,
+};
+const DECLINED = "Your card was declined.";
+const STRIPE_DOWN = new Error("Stripe no responde");
 
 const KNOWN_MEMBERSHIP: StripeMembership = {
   record: {
@@ -63,6 +74,8 @@ const readSubscription =
   vi.fn<(subscriptionId: string) => Promise<Stripe.Subscription>>();
 const readSetupCard = vi.fn<StripeApi["readSetupCard"]>();
 const makeDefaultPaymentMethod = vi.fn<StripeApi["makeDefaultPaymentMethod"]>();
+const readInvoiceCharge = vi.fn<StripeApi["readInvoiceCharge"]>();
+const readPaymentCharge = vi.fn<StripeApi["readPaymentCharge"]>();
 const log = vi.fn<(line: string) => void>();
 const notifyUpcomingRenewal =
   vi.fn<RenewalNoticeSender["notifyUpcomingRenewal"]>();
@@ -81,6 +94,8 @@ function handle(event: ReturnType<typeof stripeEvent>) {
       readSubscription,
       readSetupCard,
       makeDefaultPaymentMethod,
+      readInvoiceCharge,
+      readPaymentCharge,
     },
     renewalNotices: { notifyUpcomingRenewal },
     prices: FIXTURE_PRICES,
@@ -99,6 +114,8 @@ beforeEach(() => {
     card: MASTERCARD,
   });
   makeDefaultPaymentMethod.mockResolvedValue(undefined);
+  readInvoiceCharge.mockResolvedValue(NO_CHARGE_DETAILS);
+  readPaymentCharge.mockResolvedValue(NO_CHARGE_DETAILS);
   notifyUpcomingRenewal.mockResolvedValue(undefined);
   readSubscription.mockResolvedValue(
     stripeEvent("customer.subscription.updated", {
@@ -289,6 +306,136 @@ describe("handleStripeEvent", () => {
   });
 });
 
+// #629: ni la factura ni el Checkout traen la tarjeta ni el motivo del
+// fallo; se leen en Stripe, y si esa lectura falla el pago se guarda igual.
+describe("la tarjeta y el motivo de cada cobro (#629)", () => {
+  it("lee en Stripe la tarjeta del cobro de una factura pagada", async () => {
+    readInvoiceCharge.mockResolvedValue(VISA_CHARGE);
+
+    await handle(stripeEvent("invoice.paid"));
+
+    expect(readInvoiceCharge).toHaveBeenCalledWith("in_TestSeadragons");
+    expect(applyEvent.mock.calls[0]?.[0].writes.payment).toMatchObject({
+      card: VISA_CHARGE.card,
+      failureReason: null,
+    });
+  });
+
+  it("guarda la tarjeta y el motivo de una factura fallida", async () => {
+    readInvoiceCharge.mockResolvedValue({
+      card: VISA_CHARGE.card,
+      failureReason: DECLINED,
+    });
+
+    await handle(stripeEvent("invoice.payment_failed"));
+
+    expect(applyEvent.mock.calls[0]?.[0].writes.payment).toMatchObject({
+      status: "failed",
+      card: VISA_CHARGE.card,
+      failureReason: DECLINED,
+    });
+  });
+
+  it("guarda la factura fallida sin motivo cuando Stripe no lo da", async () => {
+    readInvoiceCharge.mockResolvedValue(VISA_CHARGE);
+
+    await handle(stripeEvent("invoice.payment_failed"));
+
+    expect(applyEvent.mock.calls[0]?.[0].writes.payment).toMatchObject({
+      status: "failed",
+      failureReason: null,
+    });
+  });
+
+  it("guarda la factura sin tarjeta y la aplica igual si leerla en Stripe falla", async () => {
+    readInvoiceCharge.mockRejectedValue(STRIPE_DOWN);
+
+    const outcome = await handle(stripeEvent("invoice.paid"));
+
+    expect(outcome).toBe("applied");
+    expect(applyEvent.mock.calls[0]?.[0].writes.payment).toMatchObject({
+      status: "paid",
+      card: null,
+      failureReason: null,
+    });
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining(STRIPE_DOWN.message),
+    );
+  });
+
+  it("no lee ningún cobro de un evento que no es un pago", async () => {
+    await handle(stripeEvent("customer.subscription.updated"));
+
+    expect(readInvoiceCharge).not.toHaveBeenCalled();
+    expect(readPaymentCharge).not.toHaveBeenCalled();
+  });
+
+  it("guarda la tarjeta del cobro de un pack, leída por su PaymentIntent", async () => {
+    applySessionPackPayment.mockResolvedValue("applied");
+    readPaymentCharge.mockResolvedValue(VISA_CHARGE);
+
+    await handle(stripeEvent("checkout.session.completed (pack)"));
+
+    expect(readPaymentCharge).toHaveBeenCalledWith(FIXTURE_PAYMENT_INTENT_ID);
+    expect(applySessionPackPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ card: VISA_CHARGE.card }),
+    );
+  });
+
+  it("guarda la tarjeta del cobro de un levy, leída por su PaymentIntent", async () => {
+    findMemberClubId.mockResolvedValue(CLUB_ID);
+    applyLevyPayment.mockResolvedValue("applied");
+    readPaymentCharge.mockResolvedValue(VISA_CHARGE);
+
+    await handle(stripeEvent("checkout.session.completed (levy)"));
+
+    expect(readPaymentCharge).toHaveBeenCalledWith(
+      FIXTURE_LEVY_PAYMENT_INTENT_ID,
+    );
+    expect(applyLevyPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ card: VISA_CHARGE.card }),
+    );
+  });
+
+  it("apunta el pack sin tarjeta si leerla en Stripe falla", async () => {
+    applySessionPackPayment.mockResolvedValue("applied");
+    readPaymentCharge.mockRejectedValue(STRIPE_DOWN);
+
+    const outcome = await handle(
+      stripeEvent("checkout.session.completed (pack)"),
+    );
+
+    expect(outcome).toBe("applied");
+    expect(applySessionPackPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ card: null }),
+    );
+    expect(log).toHaveBeenCalledOnce();
+  });
+
+  it("apunta el levy sin tarjeta si leerla en Stripe falla", async () => {
+    findMemberClubId.mockResolvedValue(CLUB_ID);
+    applyLevyPayment.mockResolvedValue("applied");
+    readPaymentCharge.mockRejectedValue(STRIPE_DOWN);
+
+    const outcome = await handle(
+      stripeEvent("checkout.session.completed (levy)"),
+    );
+
+    expect(outcome).toBe("applied");
+    expect(applyLevyPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ card: null }),
+    );
+  });
+
+  it("no lee la tarjeta de un pago de alguien que la base no conoce", async () => {
+    findMembership.mockResolvedValue(null);
+
+    await handle(stripeEvent("checkout.session.completed (pack)"));
+
+    expect(readPaymentCharge).not.toHaveBeenCalled();
+  });
+});
+
 describe("handleStripeEvent con invoice.upcoming (#470)", () => {
   const ACTIVE_MEMBERSHIP: StripeMembership = {
     ...KNOWN_MEMBERSHIP,
@@ -398,6 +545,7 @@ describe("un pack de sesiones pagado", () => {
         description: "Casual session pack (5 sessions)",
         paidAt: new Date(event.created * 1000),
       },
+      card: null,
     });
     expect(applyEvent).not.toHaveBeenCalled();
     expect(readSubscription).not.toHaveBeenCalled();
@@ -477,6 +625,7 @@ describe("un levy pagado", () => {
         description: FIXTURE_LEVY_NAME,
         paidAt: new Date(event.created * 1000),
       },
+      card: null,
     });
     expect(applyEvent).not.toHaveBeenCalled();
     expect(applySessionPackPayment).not.toHaveBeenCalled();

@@ -285,10 +285,13 @@ describeConPostgres("membresías y pagos en la base", () => {
       await expect(columnsOf(database, "payments")).resolves.toBe(
         [
           "amount_cents:integer",
+          "card_brand:text",
+          "card_last4:text",
           "club_id:uuid",
           "created_at:timestamp with time zone",
           "currency:text",
           "description:text",
+          "failure_reason:text",
           "id:uuid",
           "paid_at:timestamp with time zone",
           "status:text",

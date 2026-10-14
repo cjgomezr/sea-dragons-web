@@ -52,6 +52,8 @@ function aPayment(overrides: Partial<PaymentRecord> = {}): PaymentRecord {
     status: "paid",
     paidAt: new Date("2026-09-01T09:00:00Z"),
     createdAt: new Date("2026-09-01T08:59:00Z"),
+    card: null,
+    failureReason: null,
     ...overrides,
   };
 }
@@ -384,8 +386,35 @@ describe("readMembershipView: el historial", () => {
         description: "Monthly membership",
         amountCents: 4500,
         status: "paid",
+        card: null,
+        failureReason: null,
       },
     ]);
+  });
+
+  it("sirve la marca y los cuatro dígitos de la tarjeta con que se cobró (#629)", async () => {
+    const view = await viewOf(aRecord(), [
+      aPayment({ card: { brand: "visa", last4: "4242" } }),
+    ]);
+
+    expect(view.payments[0]?.card).toEqual({ brand: "visa", last4: "4242" });
+  });
+
+  it("sirve el motivo de un pago fallido (#629)", async () => {
+    const view = await viewOf(aRecord(), [
+      aPayment({
+        status: "failed",
+        paidAt: null,
+        card: { brand: "mastercard", last4: "4444" },
+        failureReason: "Your card was declined.",
+      }),
+    ]);
+
+    expect(view.payments[0]).toMatchObject({
+      status: "failed",
+      card: { brand: "mastercard", last4: "4444" },
+      failureReason: "Your card was declined.",
+    });
   });
 
   it("fecha un pago sin cobrar por cuándo se registró", async () => {

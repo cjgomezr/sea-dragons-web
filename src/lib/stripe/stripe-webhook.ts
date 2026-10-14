@@ -3,6 +3,8 @@ import type { MembershipCard } from "@/lib/membership/membership";
 import type { RenewalNoticeSender } from "./renewal-notice";
 import {
   type CardSetupCompletedFacts,
+  type ChargeCard,
+  type ChargeDetails,
   type LevyPaidFacts,
   type LevyPayment,
   type MembershipLookup,
@@ -14,6 +16,7 @@ import {
   type StripeEventWrites,
   type StripeMembership,
   type StripePrices,
+  NO_CHARGE_DETAILS,
   planRenewalNotice,
   planStripeEventWrites,
   readStripeEventFacts,
@@ -65,11 +68,15 @@ export type SessionPackPaymentToApply = Pick<
 > & {
   readonly sessions: number;
   readonly payment: SessionPackPayment;
+  /** Nula si el cobro no fue con tarjeta o no se pudo leer (#629). */
+  readonly card: ChargeCard | null;
 };
 
 /** Un levy pagado (#473): el pago con el producto de Stripe. */
 export type LevyPaymentToApply = Pick<StripeEventToApply, "event" | "owner"> & {
   readonly payment: LevyPayment;
+  /** Nula si el cobro no fue con tarjeta o no se pudo leer (#629). */
+  readonly card: ChargeCard | null;
 };
 
 /** La tarjeta que guardó un SetupIntent, con el id de su método de pago. */
@@ -92,6 +99,10 @@ export type StripeApi = {
     readonly subscriptionId: string | null;
     readonly paymentMethodId: string;
   }): Promise<void>;
+  /** El cobro de una factura (#629): ni la factura lo trae. */
+  readInvoiceCharge(invoiceId: string): Promise<ChargeDetails>;
+  /** El cobro de un pago suelto, un pack o un levy (#629). */
+  readPaymentCharge(paymentIntentId: string): Promise<ChargeDetails>;
 };
 
 export type StripeWebhookDependencies = {
@@ -166,6 +177,58 @@ async function toPlannableFacts(
   return subscriptionFactsFromCheckout(facts, subscription);
 }
 
+/** La tarjeta y el motivo son para enseñar, no para apuntar el pago: si
+ * Stripe no los da, el pago se guarda sin ellos y el evento no se pierde. */
+async function readChargeOrNothing(
+  read: () => Promise<ChargeDetails>,
+  context: {
+    readonly event: Stripe.Event;
+    readonly log: (line: string) => void;
+  },
+): Promise<ChargeDetails> {
+  try {
+    return await read();
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    context.log(
+      `${LOG_PREFIX} ${context.event.id} (${context.event.type}): no se pudo leer el cobro en Stripe, el pago se guarda sin tarjeta: ${reason}`,
+    );
+    return NO_CHARGE_DETAILS;
+  }
+}
+
+function readInvoiceChargeOf(
+  facts: PlannableStripeEventFacts,
+  context: {
+    readonly event: Stripe.Event;
+    readonly dependencies: StripeWebhookDependencies;
+  },
+): Promise<ChargeDetails> {
+  if (facts.kind !== "invoiceSettled") {
+    return Promise.resolve(NO_CHARGE_DETAILS);
+  }
+  const { stripe, log } = context.dependencies;
+  return readChargeOrNothing(
+    () => stripe.readInvoiceCharge(facts.payment.invoiceId),
+    { event: context.event, log },
+  );
+}
+
+async function readPaymentCardOf(
+  paymentIntentId: string,
+  context: {
+    readonly event: Stripe.Event;
+    readonly dependencies: StripeWebhookDependencies;
+  },
+): Promise<ChargeCard | null> {
+  const { stripe, log } = context.dependencies;
+  const charge = await readChargeOrNothing(
+    () => stripe.readPaymentCharge(paymentIntentId),
+    { event: context.event, log },
+  );
+  return charge.card;
+}
+
 function describeLookup(lookup: MembershipLookup): string {
   return `socio ${lookup.userId ?? "-"}, cliente ${lookup.customerId ?? "-"}, suscripción ${lookup.subscriptionId ?? "-"}`;
 }
@@ -202,6 +265,10 @@ export async function handleStripeEvent(
       owner: { userId, clubId },
       sessions: facts.sessions,
       payment: facts.payment,
+      card: await readPaymentCardOf(facts.payment.paymentIntentId, {
+        event,
+        dependencies,
+      }),
     });
   }
 
@@ -210,6 +277,7 @@ export async function handleStripeEvent(
     facts: plannable,
     membership,
     card: await resolveCard(plannable, membership, dependencies.stripe),
+    charge: await readInvoiceChargeOf(plannable, { event, dependencies }),
     prices: dependencies.prices,
     now: dependencies.now,
   });
@@ -246,6 +314,10 @@ async function handleLevyPayment(
     event: { id: event.id, type: event.type, created: facts.created },
     owner: { userId, clubId },
     payment: facts.payment,
+    card: await readPaymentCardOf(facts.payment.paymentIntentId, {
+      event,
+      dependencies,
+    }),
   });
 }
 
