@@ -36,6 +36,8 @@ const CREATED_EVENT: AgendaEvent = {
   id: "aaaaaaaa-0000-4000-8000-00000000000a",
   startsOn: "2026-10-06",
   startTime: "19:00",
+  endTime: null,
+  endsOn: null,
   title: "Pool Training",
   eventType: "training",
   location: "MSAC Dive Pool",

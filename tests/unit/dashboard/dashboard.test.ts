@@ -115,6 +115,8 @@ function event(overrides: {
   return {
     id: uuid(),
     startsAt: `${overrides.startsOn}T${overrides.startTime}:00+10:00`,
+    endTime: null,
+    endsOn: null,
     title: "Entrenamiento del miércoles",
     eventType: "training",
     location: "MSAC",

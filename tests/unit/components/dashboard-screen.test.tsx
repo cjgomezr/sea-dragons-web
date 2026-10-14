@@ -43,6 +43,8 @@ function agendaEvent(
   return {
     startsOn: "2026-10-02",
     startTime: "19:00",
+    endTime: null,
+    endsOn: null,
     eventType: "training",
     location: "MSAC Dive Pool",
     status: "scheduled",

@@ -39,6 +39,9 @@ export const agendaEventSchema = z.object({
   id: z.uuid(),
   startsOn: z.iso.date(),
   startTime: z.string(),
+  // Nulas en lo anterior a E24 (D5); `endsOn`, también en un evento de un día.
+  endTime: z.string().nullable(),
+  endsOn: z.iso.date().nullable(),
   title: z.string(),
   eventType: z.enum(EVENT_TYPES),
   location: z.string(),
