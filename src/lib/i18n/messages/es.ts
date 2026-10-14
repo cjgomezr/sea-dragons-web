@@ -1913,6 +1913,10 @@ export const spanishMessages: MessageCatalog = {
     "Elige al menos un grupo, o mándala a todo el club.",
   "news.publish.submit": "Publicar",
   "news.publish.sending": "Publicando…",
+  "news.publish.done": "✓ Publicada",
+  "news.publish.bar.cancel": "Cancelar",
+  "news.publish.bar.discardQuestion":
+    "Tienes cambios sin guardar. ¿Salir y descartarlos?",
   "news.publish.waitForUploads": "Espera a que terminen las subidas.",
   "news.publish.error.network":
     "No pudimos llegar al servidor. No se publicó nada: revisa tu conexión y vuelve a intentarlo.",
@@ -2065,6 +2069,8 @@ export const spanishMessages: MessageCatalog = {
   "news.edit.forbidden": "Sólo puedes editar tus propias publicaciones.",
   "news.edit.submit": "Guardar cambios",
   "news.edit.sending": "Guardando…",
+  "news.edit.barSubmit": "Guardar",
+  "news.edit.done": "✓ Guardada",
   "news.edit.error.conflict":
     "Otra persona guardó esta publicación mientras la editabas. Recarga la página para ver sus cambios antes de guardar los tuyos.",
   "news.edit.error.unexpected":

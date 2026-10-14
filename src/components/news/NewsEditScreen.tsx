@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { loadGroups } from "@/components/groups/groups-client";
+import { useIsPhone } from "@/components/use-is-phone";
 import { NEWS_POST_PATH } from "@/lib/auth/routes";
 import type { Group } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";
@@ -74,6 +75,7 @@ export function NewsEditScreen({
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const router = useRouter();
+  const isPhone = useIsPhone();
   const [state, setState] = useState<ScreenState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
   const postPath = NEWS_POST_PATH.replace("[id]", encodeURIComponent(postId));
@@ -95,15 +97,21 @@ export function NewsEditScreen({
     setReloads((count) => count + 1);
   }
 
+  // En el móvil el formulario trae su barra, con Cancelar y el título (#602).
+  const hasPhoneBar = isPhone && state.kind === "ready";
   return (
     <div className="member-record news-publish">
-      <Link href={postPath} className="member-record-back">
-        {translate("news.edit.back")}
-      </Link>
-      <header className="member-record-header">
-        <h1>{translate("news.edit.title")}</h1>
-        <p className="app-lead">{translate("news.edit.lead")}</p>
-      </header>
+      {hasPhoneBar ? null : (
+        <>
+          <Link href={postPath} className="member-record-back">
+            {translate("news.edit.back")}
+          </Link>
+          <header className="member-record-header">
+            <h1>{translate("news.edit.title")}</h1>
+            <p className="app-lead">{translate("news.edit.lead")}</p>
+          </header>
+        </>
+      )}
       {state.kind === "loading" ? (
         <p className="admin-empty">{translate("news.edit.loading")}</p>
       ) : null}
@@ -127,6 +135,7 @@ export function NewsEditScreen({
           translate={translate}
           clubGroups={state.groups}
           pinning={state.pinning}
+          onLeave={() => router.push(postPath)}
           intent={{
             kind: "edit",
             post: state.post,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { loadGroups } from "@/components/groups/groups-client";
+import { useIsPhone } from "@/components/use-is-phone";
 import { NEWS_PATH } from "@/lib/auth/routes";
 import type { Group } from "@/lib/groups/groups";
 import type { Locale } from "@/lib/i18n/locale";
@@ -54,6 +55,7 @@ export function NewsPublishScreen({
 }): React.JSX.Element {
   const translate = createTranslator(locale);
   const router = useRouter();
+  const isPhone = useIsPhone();
   const [groups, setGroups] = useState<GroupsState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
 
@@ -74,15 +76,21 @@ export function NewsPublishScreen({
     setReloads((count) => count + 1);
   }
 
+  // En el móvil el formulario trae su barra, con Cancelar y el título (#602).
+  const hasPhoneBar = isPhone && groups.kind === "ready";
   return (
     <div className="member-record news-publish">
-      <Link href={NEWS_PATH} className="member-record-back">
-        {translate("news.publish.back")}
-      </Link>
-      <header className="member-record-header">
-        <h1>{translate("news.publish.title")}</h1>
-        <p className="app-lead">{translate("news.publish.lead")}</p>
-      </header>
+      {hasPhoneBar ? null : (
+        <>
+          <Link href={NEWS_PATH} className="member-record-back">
+            {translate("news.publish.back")}
+          </Link>
+          <header className="member-record-header">
+            <h1>{translate("news.publish.title")}</h1>
+            <p className="app-lead">{translate("news.publish.lead")}</p>
+          </header>
+        </>
+      )}
       {groups.kind === "loading" ? (
         <p className="admin-empty">{translate("news.publish.loading")}</p>
       ) : null}
@@ -101,6 +109,7 @@ export function NewsPublishScreen({
           translate={translate}
           clubGroups={groups.groups}
           pinning={groups.pinning}
+          onLeave={() => router.push(NEWS_PATH)}
           intent={{
             kind: "publish",
             onPublished: () => router.push(NEWS_PATH),

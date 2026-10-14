@@ -1900,6 +1900,10 @@ export const englishMessages = {
     "Choose at least one group, or send it to the whole club.",
   "news.publish.submit": "Publish",
   "news.publish.sending": "Publishing…",
+  "news.publish.done": "✓ Posted",
+  "news.publish.bar.cancel": "Cancel",
+  "news.publish.bar.discardQuestion":
+    "You have unsaved changes. Leave and discard them?",
   "news.publish.waitForUploads": "Wait for the uploads to finish.",
   "news.publish.error.network":
     "We couldn't reach the server. Nothing was published: check your connection and try again.",
@@ -2047,6 +2051,8 @@ export const englishMessages = {
   "news.edit.forbidden": "You can only edit your own posts.",
   "news.edit.submit": "Save changes",
   "news.edit.sending": "Saving…",
+  "news.edit.barSubmit": "Save",
+  "news.edit.done": "✓ Saved",
   "news.edit.error.conflict":
     "Someone else saved this post while you were editing it. Reload the page to see their changes before saving yours.",
   "news.edit.error.unexpected": "We couldn't save the changes. Try again.",

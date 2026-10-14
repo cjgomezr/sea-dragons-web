@@ -13,15 +13,22 @@ import type { NewsPinChange } from "@/lib/news/news-pins";
 import {
   NEWS_TITLE_MAX_LENGTH,
   type NewsAudience,
-  type NewsCategory,
   type NewsDraft,
 } from "@/lib/news/news-posts";
 import { type AudienceChoice, AudienceField } from "@/components/AudienceField";
+import { useIsPhone } from "@/components/use-is-phone";
 import { NewsAttachmentsField } from "./NewsAttachmentsField";
 import { NewsBodyEditor } from "./NewsBodyEditor";
 import { NewsCategoryField } from "./NewsCategoryField";
 import { NewsCoverField } from "./NewsCoverField";
 import { NewsPinField } from "./NewsPinField";
+import { NewsPublishBar, type NewsPublishBarSubmit } from "./NewsPublishBar";
+import {
+  EMPTY_NEWS_FORM_DRAFT,
+  type NewsFormDraft,
+  isSameNewsFormDraft,
+  newsFormDraftOf,
+} from "./news-form-draft";
 import { describeEditFailure, saveNewsEdit } from "./news-manage-client";
 import {
   describeDraftIssue,
@@ -92,21 +99,11 @@ export type NewsFormPinning = { readonly pinnedNow: PinnedNow | null };
 type Status =
   | { readonly kind: "editing" }
   | { readonly kind: "sending" }
+  /** Salió bien y se está volviendo: el botón lo dice mientras tanto. */
+  | { readonly kind: "done" }
   | ApiRequestFailure;
 
-type Draft = {
-  readonly category: NewsCategory;
-  readonly title: string;
-  readonly body: string;
-  readonly audience: AudienceChoice;
-};
-
-const EMPTY_DRAFT: Draft = {
-  category: "news",
-  title: "",
-  body: "",
-  audience: { kind: "club", groupIds: new Set() },
-};
+type Draft = NewsFormDraft;
 
 const FIELD_IDS = {
   title: "publicar-titulo",
@@ -115,20 +112,6 @@ const FIELD_IDS = {
 
 const TITLE_COUNTER_ID = "publicar-titulo-contador";
 const UPLOADS_HINT_ID = "publicar-esperando-adjuntos";
-
-function draftOf(post: EditableNewsPost): Draft {
-  return {
-    category: post.category,
-    title: post.title,
-    body: post.body,
-    audience: {
-      kind: post.audience.kind,
-      groupIds: new Set(
-        post.audience.kind === "groups" ? post.audience.groupIds : [],
-      ),
-    },
-  };
-}
 
 function toAudience(choice: AudienceChoice): NewsAudience {
   return choice.kind === "club"
@@ -220,36 +203,71 @@ function TitleAndBodyFields({
   );
 }
 
-function SubmitFailure({
+/** Por qué no salió, o que espera a las subidas. En el móvil va bajo la
+ * barra, junto al botón al que se refiere. */
+function SubmitNotes({
   translate,
   intent,
   status,
+  isUploading,
 }: {
   readonly translate: Translator;
   readonly intent: NewsFormIntent["kind"];
   readonly status: Status;
-}): React.JSX.Element | null {
-  if (status.kind !== "failed") {
-    return null;
-  }
+  readonly isUploading: boolean;
+}): React.JSX.Element {
   return (
-    <p className="auth-error" role="alert">
-      {intent === "edit"
-        ? describeEditFailure(translate, status)
-        : describePublishFailure(translate, status)}
-    </p>
+    <>
+      {status.kind === "failed" ? (
+        <p className="auth-error" role="alert">
+          {intent === "edit"
+            ? describeEditFailure(translate, status)
+            : describePublishFailure(translate, status)}
+        </p>
+      ) : null}
+      {isUploading ? (
+        <p className="auth-note" id={UPLOADS_HINT_ID}>
+          {translate("news.publish.waitForUploads")}
+        </p>
+      ) : null}
+    </>
   );
 }
 
+/** Las frases del botón principal según la pantalla. En la barra del móvil
+ * no cabe "Guardar cambios": dice "Guardar". */
+const SUBMIT_LABELS = {
+  publish: {
+    idle: "news.publish.submit",
+    barIdle: "news.publish.submit",
+    sending: "news.publish.sending",
+    done: "news.publish.done",
+  },
+  edit: {
+    idle: "news.edit.submit",
+    barIdle: "news.edit.barSubmit",
+    sending: "news.edit.sending",
+    done: "news.edit.done",
+  },
+} as const;
+
 function submitLabel(
   translate: Translator,
-  intent: NewsFormIntent["kind"],
-  isSending: boolean,
+  context: {
+    readonly intent: NewsFormIntent["kind"];
+    readonly status: Status;
+    readonly isPhone: boolean;
+  },
 ): string {
-  if (intent === "edit") {
-    return translate(isSending ? "news.edit.sending" : "news.edit.submit");
+  const labels = SUBMIT_LABELS[context.intent];
+  switch (context.status.kind) {
+    case "sending":
+      return translate(labels.sending);
+    case "done":
+      return translate(labels.done);
+    default:
+      return translate(context.isPhone ? labels.barIdle : labels.idle);
   }
-  return translate(isSending ? "news.publish.sending" : "news.publish.submit");
 }
 
 /** Lo que el borrador cambia de cada campo, para saber cuáles se tocaron. */
@@ -319,16 +337,22 @@ export function NewsPublishForm({
   clubGroups,
   intent,
   pinning,
+  onLeave,
 }: {
   readonly translate: Translator;
   readonly clubGroups: readonly Group[];
   readonly intent: NewsFormIntent;
   /** `null` para quien no puede fijar: no ve la caja. */
   readonly pinning: NewsFormPinning | null;
+  /** Cancelar en la barra del móvil, ya confirmado si había cambios. */
+  readonly onLeave: () => void;
 }): React.JSX.Element {
-  const [draft, setDraft] = useState<Draft>(() =>
-    intent.kind === "edit" ? draftOf(intent.post) : EMPTY_DRAFT,
+  const [initialDraft] = useState<Draft>(() =>
+    intent.kind === "edit"
+      ? newsFormDraftOf(intent.post)
+      : EMPTY_NEWS_FORM_DRAFT,
   );
+  const [draft, setDraft] = useState<Draft>(initialDraft);
   const [status, setStatus] = useState<Status>({ kind: "editing" });
   const [touched, setTouched] = useState<ReadonlySet<NewsDraftField>>(
     () => new Set(),
@@ -349,7 +373,8 @@ export function NewsPublishForm({
   const inlineImages = useNewsInlineImageUpload();
   const isUploading =
     attachments.isUploading || cover.isUploading || inlineImages.isUploading;
-  const isSending = status.kind === "sending";
+  const isLocked = status.kind === "sending" || status.kind === "done";
+  const isPhone = useIsPhone();
 
   function update(change: Partial<Draft>): void {
     setDraft((current) => ({ ...current, ...change }));
@@ -377,11 +402,12 @@ export function NewsPublishForm({
       cover: cover.change,
       pin: pinChange,
     });
-    isSendingRef.current = false;
     if (result.kind === "failed") {
+      isSendingRef.current = false;
       setStatus(result);
       return;
     }
+    setStatus({ kind: "done" });
     if (intent.kind === "edit") {
       intent.onSaved();
       return;
@@ -391,6 +417,25 @@ export function NewsPublishForm({
       pin: publishedPinOf(pinChange),
     });
     intent.onPublished();
+  }
+
+  function hasUnsavedChanges(): boolean {
+    return (
+      !isSameNewsFormDraft(initialDraft, draft) ||
+      cover.isUploading ||
+      cover.change.kind !== "keep" ||
+      attachments.entries.length > 0 ||
+      pin.changeAt(new Date()).kind !== "keep"
+    );
+  }
+
+  function cancel(): void {
+    if (
+      !hasUnsavedChanges() ||
+      window.confirm(translate("news.publish.bar.discardQuestion"))
+    ) {
+      onLeave();
+    }
   }
 
   const issueTextFor = (field: NewsDraftField): string | null => {
@@ -407,9 +452,44 @@ export function NewsPublishForm({
     imageUpload: inlineImages,
   };
 
+  const submit: NewsPublishBarSubmit = {
+    label: submitLabel(translate, { intent: intent.kind, status, isPhone }),
+    isDisabled: isLocked || isUploading || issues.length > 0,
+    describedBy: isUploading ? UPLOADS_HINT_ID : undefined,
+  };
+  const submitNotes = (
+    <SubmitNotes
+      translate={translate}
+      intent={intent.kind}
+      status={status}
+      isUploading={isUploading}
+    />
+  );
+
   return (
-    <form className="news-publish-form" onSubmit={handleSubmit} noValidate>
-      <fieldset className="news-publish-fields" disabled={isSending}>
+    <form
+      className={
+        isPhone
+          ? "news-publish-form news-publish-form-phone"
+          : "news-publish-form"
+      }
+      onSubmit={handleSubmit}
+      noValidate
+    >
+      {isPhone ? (
+        <>
+          <NewsPublishBar
+            translate={translate}
+            heading={translate(
+              intent.kind === "edit" ? "news.edit.title" : "news.publish.title",
+            )}
+            submit={submit}
+            onCancel={cancel}
+          />
+          {submitNotes}
+        </>
+      ) : null}
+      <fieldset className="news-publish-fields" disabled={isLocked}>
         <NewsCoverField
           translate={translate}
           category={draft.category}
@@ -445,24 +525,19 @@ export function NewsPublishForm({
           />
         ) : null}
       </fieldset>
-      <SubmitFailure
-        translate={translate}
-        intent={intent.kind}
-        status={status}
-      />
-      {isUploading ? (
-        <p className="auth-note" id={UPLOADS_HINT_ID}>
-          {translate("news.publish.waitForUploads")}
-        </p>
-      ) : null}
-      <button
-        type="submit"
-        className="auth-submit news-publish-submit"
-        disabled={isSending || isUploading || issues.length > 0}
-        aria-describedby={isUploading ? UPLOADS_HINT_ID : undefined}
-      >
-        {submitLabel(translate, intent.kind, isSending)}
-      </button>
+      {isPhone ? null : (
+        <>
+          {submitNotes}
+          <button
+            type="submit"
+            className="auth-submit news-publish-submit"
+            disabled={submit.isDisabled}
+            aria-describedby={submit.describedBy}
+          >
+            {submit.label}
+          </button>
+        </>
+      )}
     </form>
   );
 }
