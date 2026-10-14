@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<script src="./image-slot.js"></script>
+<style>
+body{margin:0;background:#070f16;color:#e8f0f7;font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+a{color:#33a1e0}a:hover{color:#5ab4e8}
+input::placeholder,textarea::placeholder{color:#5a7086}
+input[type="time"]::-webkit-calendar-picker-indicator,input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.8)}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #33a1e0;outline-offset:2px}
+</style>
+</helmet>
+
+<section id="t2" style="padding:48px 56px 24px;display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:8px;max-width:940px">
+<div style="display:flex;gap:12px;align-items:center"><a href="#t2" style="width:28px;height:28px;border-radius:50%;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;font-weight:700;font-size:14px;text-decoration:none">2</a><span style="font-size:20px;font-weight:700">Celular — agenda, evento y crear</span></div>
+<p style="margin:0;font-size:14.5px;line-height:1.55;color:#cfdeea;text-wrap:pretty">Basado en <a href="#1a">1a</a> y <a href="#1c">1c</a>. Tocá un evento en <a href="#2a">2a</a> y se muestra en <a href="#2b">2b</a>; ⋯ abre editar / cancelar (pregunta el alcance si se repite). <a href="#2c">2c</a> comparte datos con <a href="#1c">1c</a>.</p>
+</div>
+<div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+<div id="2a" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;gap:10px;align-items:center"><a href="#2a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2a</a><span style="font-size:13.5px;color:#8aa1b5">Agenda</span></div><div style="width:390px;height:800px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;position:relative;display:flex;flex-direction:column"><div style="padding:18px 16px 10px;display:flex;flex-direction:column;gap:12px;border-bottom:1px solid #274055">
+<div style="display:flex;justify-content:space-between;align-items:center"><h1 style="margin:0;font-size:26px;font-weight:700">Calendar</h1><button aria-label="New event" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:10px;background:#33a1e0;color:#0c1a26;display:grid;place-items:center"><i class="ph ph-plus" style="font-size:20px"></i></button></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;padding:3px;gap:2px;border:1px solid #274055;border-radius:8px;background:#13283a">
+<sc-for list="{{ periods }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;text-align:center;height:38px;line-height:38px;border-radius:6px;font-size:14px;font-weight:700;background:#33a1e0;color:#0c1a26">{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;text-align:center;height:38px;line-height:38px;border-radius:6px;font-size:14px;color:#8aa1b5">{{ o.label }}</button></sc-if></sc-for>
+</div>
+<div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px">
+<sc-for list="{{ typeChips }}" as="c"><button onClick="{{ c.toggle }}" aria-pressed="{{ c.on }}" style="all:unset;cursor:pointer;flex:none;display:flex;gap:7px;align-items:center;height:36px;box-sizing:border-box;padding:0 14px 0 12px;border-radius:999px;font-size:13.5px;font-weight:600;border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.color }}"><span style="width:9px;height:9px;border-radius:50%;background:{{ c.ink }};opacity:{{ c.dot }}"></span>{{ c.label }}</button></sc-for>
+</div>
+</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none;padding:0 12px 20px">
+<sc-for list="{{ daysA }}" as="g">
+<div style="padding:16px 4px 6px;display:flex;gap:8px;align-items:baseline"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:{{ g.labelColor }}">{{ g.label }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ g.sub }}</span></div>
+<sc-for list="{{ g.items }}" as="e">
+<div onClick="{{ e.select }}" style="cursor:pointer;display:grid;grid-template-columns:4px 52px minmax(0,1fr);gap:12px;align-items:center;padding:10px 10px 10px 0;margin-bottom:6px;border-radius:10px;background:#13283a;border:1px solid {{ e.mBorder }};overflow:hidden">
+<span style="align-self:stretch;margin:-10px 0;background:{{ e.ink }}"></span>
+<span style="position:relative;width:52px;height:52px;border-radius:8px;overflow:hidden">
+<sc-if value="{{ e.hasCover }}"><image-slot id="m-ev-{{ e.id }}-thumb" shape="rect" placeholder=" "></image-slot></sc-if>
+<sc-if value="{{ e.noCover }}"><span style="position:absolute;inset:0;display:grid;place-items:center;background:{{ e.fb }}"><i class="ph {{ e.icon }}" style="font-size:22px;color:{{ e.ink }}"></i></span></sc-if>
+</span>
+<span style="display:flex;flex-direction:column;gap:4px;min-width:0">
+<span style="display:flex;gap:6px;align-items:center;font:12.5px ui-monospace,Menlo,monospace;color:#cfdeea"><span style="color:#e8f0f7;font-weight:600">{{ e.startShort }}–{{ e.endShort }}</span><sc-if value="{{ e.isSeries }}"><i class="ph ph-repeat" style="font-size:13px;color:#8aa1b5"></i></sc-if><span style="margin-left:auto;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;color:{{ e.mineColor }}">{{ e.mineLabel }}</span></span>
+<span style="font-size:15px;font-weight:650;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ e.title }}</span>
+<span style="display:flex;gap:4px;align-items:center;font-size:13px;color:#8aa1b5;min-width:0"><i class="ph ph-map-pin" style="flex:none"></i><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.place }}</span></span>
+</span>
+</div>
+</sc-for>
+</sc-for>
+<sc-if value="{{ emptyA }}"><div style="padding:40px 4px;font-size:14px;color:#8aa1b5">No events of these types.</div></sc-if>
+</div></div></div>
+<div id="2b" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;gap:10px;align-items:center"><a href="#2b" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2b</a><span style="font-size:13.5px;color:#8aa1b5">Evento</span></div><div style="width:390px;height:800px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;position:relative;display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #274055">
+<button aria-label="Back to calendar" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;color:#33a1e0"><i class="ph ph-arrow-left" style="font-size:21px"></i></button>
+<span style="padding:2px 9px;border-radius:6px;font-size:12.5px;font-weight:700;background:{{ sel.tagBg }}">{{ sel.typeLabel }}</span>
+<button onClick="{{ toggleMSheet }}" aria-label="Event actions" style="all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center"><i class="ph ph-dots-three-vertical" style="font-size:21px"></i></button>
+</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none">
+<div style="position:relative;height:200px">
+<sc-if value="{{ sel.hasCover }}"><image-slot id="m-ev-{{ sel.id }}-cover" shape="rect" placeholder="Event photo"></image-slot></sc-if>
+<sc-if value="{{ sel.noCover }}"><div style="position:absolute;inset:0;display:grid;place-items:center;background:{{ sel.fb }}"><i class="ph {{ sel.icon }}" style="font-size:72px;color:{{ sel.ink }};opacity:.5"></i></div></sc-if>
+<span style="position:absolute;left:0;right:0;bottom:0;height:4px;background:{{ sel.ink }};pointer-events:none"></span>
+</div>
+<div style="padding:16px 16px 28px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:24px;line-height:1.2;font-weight:700;text-wrap:pretty">{{ sel.title }}</h1><span style="font-size:13px;color:#8aa1b5">{{ sel.audience }}</span></div>
+<div style="display:flex;gap:12px;align-items:center"><span style="flex:none;width:40px;height:40px;border-radius:10px;background:#13283a;border:1px solid #274055;display:grid;place-items:center"><i class="ph ph-clock" style="font-size:19px;color:{{ sel.ink }}"></i></span><span style="display:flex;flex-direction:column;gap:2px;flex:1"><span style="font-size:15px;font-weight:600">{{ sel.dateLong }}</span><span style="font-size:14px;color:#cfdeea">{{ sel.timeRange }} <span style="color:#8aa1b5">· {{ sel.dur }}</span></span></span><button aria-label="Add to my calendar" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:#cfdeea"><i class="ph ph-calendar-plus" style="font-size:20px"></i></button></div>
+<sc-if value="{{ sel.isSeries }}"><div style="display:flex;gap:12px;align-items:center;margin-top:-4px"><span style="flex:none;width:40px;height:40px;border-radius:10px;background:#13283a;border:1px solid #274055;display:grid;place-items:center"><i class="ph ph-repeat" style="font-size:19px;color:{{ sel.ink }}"></i></span><span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600">{{ sel.repeatText }}</span><span style="font-size:13px;color:#8aa1b5">{{ sel.repeatSub }}</span></span></div></sc-if>
+<div style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;overflow:hidden;background:#13283a">
+<div style="display:flex;gap:12px;align-items:center;padding:12px 14px"><i class="ph-fill ph-map-pin" style="font-size:22px;color:{{ sel.ink }}"></i><span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0"><span style="font-size:15px;font-weight:600">{{ sel.place }}</span><span style="font-size:13px;color:#8aa1b5">{{ sel.addr }}</span></span><button onClick="{{ copyAddr }}" aria-label="Copy address" style="all:unset;cursor:pointer;flex:none;width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:#cfdeea"><i class="ph {{ copyIcon }}" style="font-size:19px"></i></button></div>
+<a href="{{ sel.maps }}" target="_blank" rel="noopener" style="display:flex;gap:8px;align-items:center;justify-content:center;height:48px;border-top:1px solid #274055;font-size:15px;font-weight:700;color:#33a1e0;text-decoration:none"><i class="ph ph-navigation-arrow" style="font-size:18px"></i>Directions</a>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">ARE YOU GOING?</span>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+<sc-for list="{{ sel.rsvp }}" as="r"><button onClick="{{ r.pick }}" aria-pressed="{{ r.on }}" style="all:unset;cursor:pointer;display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;height:58px;border-radius:10px;font-size:13.5px;font-weight:700;border:1px solid {{ r.border }};background:{{ r.bg }};color:{{ r.color }}"><i class="ph {{ r.icon }}" style="font-size:19px"></i>{{ r.label }}</button></sc-for>
+</div></div>
+<div style="display:flex;flex-direction:column;gap:8px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">GOING · {{ sel.goingN }}</span><span style="font-size:13px;color:#8aa1b5">{{ sel.maybeN }} maybe</span></div>
+<button style="all:unset;cursor:pointer;display:flex;align-items:center;min-height:44px"><sc-for list="{{ sel.faces }}" as="p"><span style="width:34px;height:34px;margin-right:-7px;border-radius:50%;background:#1d4869;border:2px solid #0c1a26;color:#cfdeea;display:grid;place-items:center;font-size:11px;font-weight:700">{{ p.ini }}</span></sc-for><sc-if value="{{ sel.hasMore }}"><span style="margin-left:16px;font-size:13px;color:#cfdeea">+{{ sel.more }}</span></sc-if><i class="ph ph-caret-right" style="margin-left:auto;color:#5a7086"></i></button></div>
+<sc-if value="{{ sel.hasNotes }}"><div style="display:flex;flex-direction:column;gap:6px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">NOTES</span><p style="margin:0;font-size:15px;line-height:1.55;color:#cfdeea">{{ sel.notes }}</p></div></sc-if>
+<sc-if value="{{ sel.isToday }}"><button style="all:unset;cursor:pointer;text-align:center;height:48px;line-height:48px;border-radius:10px;background:#33a1e0;color:#0c1a26;font-size:15px;font-weight:700">Take attendance</button></sc-if>
+</div>
+</div>
+<sc-if value="{{ mSheet }}">
+<div onClick="{{ toggleMSheet }}" style="position:absolute;inset:0;background:color-mix(in srgb,#0c1a26 60%,transparent)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#13283a;border-top:1px solid #274055;border-radius:20px 20px 0 0;padding:10px 14px 24px;display:flex;flex-direction:column;gap:2px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#274055;margin-bottom:10px"></span>
+<sc-if value="{{ sel.isSeries }}"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5;padding:0 8px 6px">THIS EVENT REPEATS</span>
+<button onClick="{{ toggleMSheet }}" style="all:unset;cursor:pointer;display:flex;gap:14px;align-items:center;min-height:54px;padding:0 8px;border-radius:8px"><i class="ph ph-calendar-dot" style="font-size:20px;color:#33a1e0"></i><span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:15px">Edit this session only</span><span style="font-size:12.5px;color:#8aa1b5">{{ sel.dateLong }}</span></span></button>
+<button onClick="{{ toggleMSheet }}" style="all:unset;cursor:pointer;display:flex;gap:14px;align-items:center;min-height:54px;padding:0 8px;border-radius:8px"><i class="ph ph-repeat" style="font-size:20px;color:#33a1e0"></i><span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:15px">Edit this and following</span><span style="font-size:12.5px;color:#8aa1b5">Every session from this one on</span></span></button>
+</sc-if>
+<sc-if value="{{ sel.notSeries }}"><button onClick="{{ toggleMSheet }}" style="all:unset;cursor:pointer;display:flex;gap:14px;align-items:center;min-height:54px;padding:0 8px;border-radius:8px;font-size:15px"><i class="ph ph-pencil-simple" style="font-size:20px"></i>Edit event</button></sc-if>
+<button onClick="{{ toggleMSheet }}" style="all:unset;cursor:pointer;display:flex;gap:14px;align-items:center;min-height:54px;padding:0 8px;border-radius:8px;font-size:15px;color:#f2887a"><i class="ph ph-x-circle" style="font-size:20px"></i>Cancel event</button>
+<button onClick="{{ toggleMSheet }}" style="all:unset;cursor:pointer;text-align:center;height:46px;line-height:44px;box-sizing:border-box;margin-top:8px;border-radius:8px;border:1px solid #274055;font-weight:600">Close</button>
+</div>
+</sc-if></div></div>
+<div id="2c" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;gap:10px;align-items:center"><a href="#2c" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">2c</a><span style="font-size:13.5px;color:#8aa1b5">Crear / editar</span></div><div style="width:390px;height:800px;box-sizing:border-box;border-radius:32px;border:1px solid #274055;background:#0c1a26;overflow:hidden;position:relative;display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;align-items:center;padding:8px 8px 8px 4px;border-bottom:1px solid #274055">
+<button style="all:unset;cursor:pointer;height:44px;padding:0 12px;font-size:15px;color:#cfdeea">Cancel</button>
+<span style="font-size:16px;font-weight:700">New event</span>
+<button style="all:unset;cursor:pointer;height:36px;padding:0 16px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:14.5px;font-weight:700;opacity:{{ f.saveOpacity }}">Create</button>
+</div>
+<div style="flex:1;overflow-y:auto;scrollbar-width:none;padding:16px;display:flex;flex-direction:column;gap:20px">
+<sc-if value="{{ f.noCover }}"><div style="position:relative;flex:none;height:120px;border-radius:12px;overflow:hidden;background:{{ f.fb }}"><i class="ph {{ f.icon }}" style="position:absolute;right:22px;top:16px;font-size:64px;color:{{ f.ink }};opacity:.4"></i><button onClick="{{ f.addCover }}" style="all:unset;cursor:pointer;position:absolute;left:12px;bottom:12px;display:flex;gap:6px;align-items:center;height:40px;padding:0 14px;border-radius:8px;background:color-mix(in srgb,#0c1a26 70%,transparent);border:1px solid #274055;font-size:14px;font-weight:600"><i class="ph ph-image"></i>Add image</button></div></sc-if>
+<sc-if value="{{ f.hasCover }}"><div style="position:relative;flex:none;height:160px;border-radius:12px;overflow:hidden"><image-slot id="m-form-cover" shape="rect" placeholder="Tap to choose an image"></image-slot></div><button onClick="{{ f.removeCover }}" style="all:unset;cursor:pointer;align-self:flex-end;margin-top:-12px;font-size:13px;color:#33a1e0">Remove image</button></sc-if>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<sc-for list="{{ f.types }}" as="t"><button onClick="{{ t.pick }}" aria-pressed="{{ t.on }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;justify-content:center;height:46px;border-radius:10px;font-size:14.5px;font-weight:{{ t.weight }};border:1px solid {{ t.border }};background:{{ t.bg }};color:{{ t.color }}"><i class="ph {{ t.icon }}" style="font-size:18px;color:{{ t.ink }}"></i>{{ t.label }}</button></sc-for>
+</div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Title</span><input value="{{ f.title }}" onChange="{{ f.onTitle }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<div style="display:flex;flex-direction:column;gap:10px">
+<span style="font-size:14px;font-weight:600">When</span>
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:#8aa1b5">{{ f.startDateLabel }}</span><input type="date" value="{{ f.date }}" onChange="{{ f.onDate }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<sc-if value="{{ f.multiOn }}"><label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:#8aa1b5">End date</span><input type="date" value="{{ f.endDate }}" onChange="{{ f.onEndDate }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label></sc-if>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:#8aa1b5">Starts</span><input type="time" value="{{ f.start }}" onChange="{{ f.onStart }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:#8aa1b5">Ends</span><input type="time" value="{{ f.end }}" onChange="{{ f.onEnd }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid {{ f.endBorder }};background:#13283a;font-size:16px;color:#e8f0f7"></label>
+</div>
+<sc-if value="{{ f.ok }}"><span style="display:flex;gap:6px;align-items:center;font-size:13.5px;color:#cfdeea"><i class="ph ph-hourglass-medium" style="color:#8aa1b5"></i>{{ f.durText }}</span></sc-if>
+<sc-if value="{{ f.bad }}"><span style="display:flex;gap:6px;align-items:center;font-size:13.5px;color:#f2887a"><i class="ph ph-warning-circle"></i>The end must be after the start.</span></sc-if>
+<div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none"><sc-for list="{{ f.quick }}" as="q"><button onClick="{{ q.pick }}" style="all:unset;cursor:pointer;flex:none;display:flex;align-items:center;height:40px;padding:0 14px;border-radius:999px;font-size:13.5px;border:1px solid #274055;color:#cfdeea">{{ q.label }}</button></sc-for></div>
+<sc-if value="{{ f.once }}"><button onClick="{{ f.toggleMulti }}" role="switch" aria-checked="{{ f.multi }}" style="all:unset;cursor:pointer;display:flex;gap:12px;align-items:center;min-height:44px;font-size:14.5px"><span style="flex:1">Ends on another day</span><span style="position:relative;width:44px;height:26px;border-radius:13px;background:{{ f.swBg }}"><span style="position:absolute;top:3px;left:{{ f.swXM }};width:20px;height:20px;border-radius:50%;background:#e8f0f7;transition:left .15s"></span></span></button></sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<span style="font-size:14px;font-weight:600">Repeat</span>
+<div style="display:grid;grid-template-columns:1fr 1fr;padding:3px;gap:2px;border:1px solid #274055;border-radius:8px;background:#13283a">
+<sc-for list="{{ f.repeats }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:40px;border-radius:6px;font-size:14px;font-weight:700;background:#33a1e0;color:#0c1a26"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:40px;border-radius:6px;font-size:14px;color:#8aa1b5"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if></sc-for>
+</div>
+<sc-if value="{{ f.weekly }}">
+<div style="display:flex;justify-content:space-between">
+<sc-for list="{{ f.wd }}" as="d"><button onClick="{{ d.toggle }}" aria-pressed="{{ d.on }}" aria-label="{{ d.full }}" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:14px;font-weight:700;border:1px solid {{ d.border }};background:{{ d.bg }};color:{{ d.color }}">{{ d.short }}</button></sc-for>
+</div>
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:#8aa1b5">Until</span><input type="date" value="{{ f.until }}" onChange="{{ f.onUntil }}" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:16px;color:#e8f0f7"></label>
+<sc-if value="{{ f.hasSessions }}"><div style="display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:10px;background:#13283a;border:1px solid #274055"><span style="display:flex;gap:8px;align-items:flex-start;font-size:14px;font-weight:600;line-height:1.4"><i class="ph ph-repeat" style="color:#33a1e0;margin-top:2px"></i>{{ f.summary }}</span><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ f.nextDates }}" as="n"><span style="padding:4px 10px;border-radius:999px;font:12.5px ui-monospace,Menlo,monospace;border:1px solid #274055;color:#cfdeea">{{ n }}</span></sc-for></div></div></sc-if>
+<sc-if value="{{ f.noSessions }}"><span style="display:flex;gap:6px;align-items:center;font-size:13.5px;color:#f2887a"><i class="ph ph-warning-circle"></i>{{ f.sessionsError }}</span></sc-if>
+</sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;padding-bottom:20px">
+<span style="font-size:14px;font-weight:600">Location</span>
+<sc-if value="{{ f.noPlace }}">
+<div style="position:relative;display:flex;align-items:center"><i class="ph ph-magnifying-glass" style="position:absolute;left:12px;color:#8aa1b5"></i><input value="{{ f.q }}" onChange="{{ f.onQ }}" placeholder="Search a park or address" style="all:unset;box-sizing:border-box;width:100%;height:48px;padding:0 12px 0 36px;border-radius:8px;border:1px solid #33a1e0;background:#13283a;font-size:16px;color:#e8f0f7"></div>
+<sc-for list="{{ f.results }}" as="r"><button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;display:flex;gap:12px;align-items:center;min-height:56px;padding:0 4px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent)"><i class="ph ph-map-pin" style="font-size:19px;color:#8aa1b5"></i><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:15px;font-weight:600">{{ r.place }}</span><span style="font-size:13px;color:#8aa1b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.addr }}</span></span></button></sc-for>
+</sc-if>
+<sc-if value="{{ f.hasPlace }}"><div style="display:flex;gap:12px;align-items:center;padding:10px 12px;border:1px solid #274055;border-radius:10px;background:#13283a"><i class="ph-fill ph-map-pin" style="font-size:22px;color:#6fd6b4"></i><span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0"><span style="font-size:15px;font-weight:600">{{ f.place }}</span><span style="font-size:13px;color:#8aa1b5">{{ f.addr }}</span></span><button onClick="{{ f.clearPlace }}" aria-label="Change location" style="all:unset;cursor:pointer;width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:#8aa1b5"><i class="ph ph-x"></i></button></div></sc-if>
+</div>
+</div></div></div>
+</div>
+<ul style="margin:0;padding-left:18px;max-width:940px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:#cfdeea">
+<li>En la lista, cada evento es una tarjeta con la barra de color, la hora de inicio y fin, el ícono de repetir y tu respuesta (Going / Maybe).</li>
+<li>El RSVP va dentro del evento, con botones grandes. "Directions" abre la app de mapas del teléfono.</li>
+<li>Los campos usan letra de 16px para que el iPhone no haga zoom al escribir.</li>
+</ul>
+</section>
+
+<section id="t1" style="padding:48px 56px 80px;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:10px;max-width:940px">
+<div style="display:flex;gap:12px;align-items:center"><a href="#t1" style="width:28px;height:28px;border-radius:50%;background:#33a1e0;color:#0c1a26;display:grid;place-items:center;font-weight:700;font-size:14px;text-decoration:none">1</a><span style="font-size:20px;font-weight:700">Calendario — con color, imagen, hora de fin y mapa</span></div>
+<ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14.5px;line-height:1.5;color:#cfdeea">
+<li><strong>Color por tipo</strong> en toda la pantalla: Training azul, Competition dorado, Social verde, Meeting gris. Se filtra tocando el tipo.</li>
+<li><strong>Imagen opcional</strong> por evento. Sin imagen, el fondo y el ícono de su tipo (como en News).</li>
+<li><strong>Hora de inicio y fin</strong> ("6:00 – 7:30 pm · 1 h 30 min"), y eventos de varios días.</li>
+<li><strong>El lugar abre el mapa</strong>: "Directions" abre Google Maps (en el celular abre la app), más "Copy address".</li>
+</ul>
+<p style="margin:0;font-size:14px;color:#8aa1b5">Probá elegir otro evento en <a href="#1a">1a</a>, responder RSVP, filtrar por tipo, tocar un día en <a href="#1b">1b</a>, y la hora de fin en <a href="#1c">1c</a>. Arrastrá una foto sobre cualquier imagen.</p>
+</div>
+
+<div style="display:flex;gap:48px;flex-wrap:wrap;align-items:flex-start">
+
+<div id="1a" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1a" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1a</a><span style="font-size:13.5px;color:#8aa1b5">Agenda por día + panel del evento (como el directorio)</span></div>
+<div style="width:1180px;min-height:820px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;display:grid;grid-template-columns:200px minmax(0,1fr);overflow:hidden">
+<aside style="background:#163a55;border-right:1px solid #244b69;padding:18px 10px;display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;gap:10px;align-items:center;padding:0 8px 14px"><span style="width:30px;height:30px;border-radius:6px;background:#1d4869;border:1px dashed #89a1b5;flex:none"></span><span style="font-weight:700;font-size:15px;line-height:1.2">Victoria Seadragons</span></div>
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="9">
+<sc-if value="{{ n.on }}"><span style="padding:9px 12px;border-radius:8px;background:#1d4869;box-shadow:inset 3px 0 0 #33a1e0;font-size:14px;font-weight:600">{{ n.label }}</span></sc-if>
+<sc-if value="{{ n.off }}"><span style="padding:9px 12px;border-radius:8px;font-size:14px;color:#cfdeea">{{ n.label }}</span></sc-if>
+</sc-for>
+</aside>
+<div style="display:flex;flex-direction:column;min-width:0">
+<div style="padding:22px 24px 14px;display:flex;flex-direction:column;gap:14px;border-bottom:1px solid #274055">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">CALENDAR &amp; EVENTS</span><h1 style="margin:0;font-size:28px;line-height:1.1;font-weight:700">Upcoming events</h1></div>
+<div style="display:flex;gap:8px;align-items:center">
+<div style="display:flex;padding:3px;gap:2px;border:1px solid #274055;border-radius:8px;background:#13283a">
+<sc-for list="{{ periods }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:700;background:#33a1e0;color:#0c1a26">{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:6px 14px;border-radius:6px;font-size:13px;color:#8aa1b5" style-hover="color:#e8f0f7;background:#1a3349">{{ o.label }}</button></sc-if></sc-for>
+</div>
+<button style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:6px;align-items:center;padding:8px 14px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:13.5px;font-weight:700" style-hover="background:#5ab4e8"><i class="ph ph-plus"></i>Event</button>
+</div>
+</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap">
+<sc-for list="{{ typeChips }}" as="c" hint-placeholder-count="4">
+<button onClick="{{ c.toggle }}" aria-pressed="{{ c.on }}" style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:7px;align-items:center;padding:5px 12px 5px 10px;border-radius:999px;font-size:13px;font-weight:600;border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.color }}"><span style="width:9px;height:9px;border-radius:50%;background:{{ c.ink }};opacity:{{ c.dot }}"></span>{{ c.label }}</button>
+</sc-for>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 380px;flex:1">
+<div style="padding:6px 20px 24px;display:flex;flex-direction:column;border-right:1px solid #274055;min-width:0">
+<sc-for list="{{ daysA }}" as="g" hint-placeholder-count="3">
+<div style="display:flex;gap:10px;align-items:baseline;padding:16px 4px 8px"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:{{ g.labelColor }}">{{ g.label }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ g.sub }}</span></div>
+<sc-for list="{{ g.items }}" as="e">
+<div onClick="{{ e.select }}" style="cursor:pointer;display:grid;grid-template-columns:4px 74px 56px minmax(0,1fr) auto;gap:14px;align-items:center;padding:10px 12px 10px 0;border-radius:10px;background:{{ e.rowBg }};overflow:hidden" style-hover="background:#13283a">
+<span style="align-self:stretch;margin:-10px 0;background:{{ e.ink }};border-radius:0 3px 3px 0"></span>
+<span style="display:flex;flex-direction:column;gap:2px;font:13px ui-monospace,Menlo,monospace"><span style="color:#e8f0f7;font-weight:600">{{ e.startShort }}</span><span style="color:#8aa1b5">{{ e.endShort }}</span></span>
+<span style="position:relative;width:56px;height:56px;border-radius:8px;overflow:hidden;border:1px solid #274055">
+<sc-if value="{{ e.hasCover }}"><image-slot id="ev-{{ e.id }}-thumb" shape="rect" placeholder=" "></image-slot></sc-if>
+<sc-if value="{{ e.noCover }}"><span style="position:absolute;inset:0;display:grid;place-items:center;background:{{ e.fb }}"><i class="ph {{ e.icon }}" style="font-size:24px;color:{{ e.ink }}"></i></span></sc-if>
+</span>
+<span style="display:flex;flex-direction:column;gap:5px;min-width:0">
+<span style="font-size:15px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.title }}</span>
+<span style="display:flex;gap:10px;align-items:center;min-width:0">
+<span style="flex:none;padding:1px 7px;border-radius:6px;font-size:11.5px;font-weight:700;background:{{ e.tagBg }}">{{ e.typeLabel }}</span>
+<sc-if value="{{ e.isSeries }}"><i class="ph ph-repeat" title="Repeats weekly" style="flex:none;font-size:14px;color:#8aa1b5"></i></sc-if>
+<a href="{{ e.maps }}" target="_blank" rel="noopener" onClick="{{ stop }}" style="display:flex;gap:4px;align-items:center;min-width:0;font-size:13px;color:#cfdeea;text-decoration:none" style-hover="color:#5ab4e8"><i class="ph ph-map-pin" style="flex:none;color:#8aa1b5"></i><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.place }}</span></a>
+</span>
+</span>
+<span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+<sc-if value="{{ e.hasMine }}"><span style="white-space:nowrap;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;color:{{ e.mineColor }};border:1px solid {{ e.mineBorder }}">{{ e.mineLabel }}</span></sc-if>
+<sc-if value="{{ e.noMine }}"><span style="white-space:nowrap;font-size:12px;font-weight:600;color:#33a1e0">RSVP</span></sc-if>
+<span style="white-space:nowrap;font-size:12px;color:#8aa1b5">{{ e.goingN }} going</span>
+</span>
+</div>
+</sc-for>
+</sc-for>
+<sc-if value="{{ emptyA }}"><div style="padding:40px 4px;font-size:14px;color:#8aa1b5">No events of these types. Turn a type back on above.</div></sc-if>
+</div>
+
+<div style="display:flex;flex-direction:column;background:#13283a;min-width:0">
+<div style="position:relative;height:190px;flex:none">
+<sc-if value="{{ sel.hasCover }}"><image-slot id="ev-{{ sel.id }}-cover" shape="rect" placeholder="Drop an event photo"></image-slot></sc-if>
+<sc-if value="{{ sel.noCover }}"><div style="position:absolute;inset:0;display:grid;place-items:center;background:{{ sel.fb }}"><i class="ph {{ sel.icon }}" style="font-size:76px;color:{{ sel.ink }};opacity:.5"></i></div></sc-if>
+<span style="position:absolute;left:0;right:0;bottom:0;height:4px;background:{{ sel.ink }};pointer-events:none"></span>
+</div>
+<div style="padding:18px 20px 22px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;gap:8px;align-items:center"><span style="padding:2px 8px;border-radius:6px;font-size:12px;font-weight:700;background:{{ sel.tagBg }}">{{ sel.typeLabel }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ sel.audience }}</span></div>
+<h2 style="margin:0;font-size:21px;line-height:1.2;font-weight:700;text-wrap:pretty">{{ sel.title }}</h2>
+</div>
+<div style="display:flex;gap:12px;align-items:flex-start">
+<span style="flex:none;width:36px;height:36px;border-radius:8px;background:#0c1a26;border:1px solid #274055;display:grid;place-items:center"><i class="ph ph-clock" style="font-size:18px;color:{{ sel.ink }}"></i></span>
+<span style="display:flex;flex-direction:column;gap:2px;flex:1"><span style="font-size:14.5px;font-weight:600">{{ sel.dateLong }}</span><span style="font-size:13.5px;color:#cfdeea">{{ sel.timeRange }} <span style="color:#8aa1b5">· {{ sel.dur }}</span></span></span>
+<a href="#1a" title="Add to my calendar" aria-label="Add to my calendar" style="flex:none;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:#cfdeea;text-decoration:none" style-hover="background:#1a3349"><i class="ph ph-calendar-plus" style="font-size:18px"></i></a>
+</div>
+<sc-if value="{{ sel.isSeries }}"><div style="display:flex;gap:12px;align-items:center;margin-top:-6px"><span style="flex:none;width:36px;height:36px;border-radius:8px;background:#0c1a26;border:1px solid #274055;display:grid;place-items:center"><i class="ph ph-repeat" style="font-size:18px;color:{{ sel.ink }}"></i></span><span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:600">{{ sel.repeatText }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ sel.repeatSub }}</span></span></div></sc-if>
+<div style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:10px;overflow:hidden;background:#0c1a26">
+<a href="{{ sel.maps }}" target="_blank" rel="noopener" style="position:relative;height:110px;display:grid;place-items:center;text-decoration:none;background:repeating-linear-gradient(0deg,transparent 0 27px,#16283a 27px 28px),repeating-linear-gradient(90deg,transparent 0 27px,#16283a 27px 28px),#0f2131" title="Open in Maps">
+<span style="display:flex;flex-direction:column;align-items:center;gap:4px"><i class="ph-fill ph-map-pin" style="font-size:30px;color:{{ sel.ink }}"></i><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5">MAP PREVIEW</span></span>
+</a>
+<div style="display:flex;gap:10px;align-items:center;padding:12px 14px">
+<span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0"><span style="font-size:14px;font-weight:600">{{ sel.place }}</span><span style="font-size:12.5px;color:#8aa1b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sel.addr }}</span></span>
+<button onClick="{{ copyAddr }}" title="Copy address" aria-label="Copy address" style="all:unset;cursor:pointer;flex:none;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349"><i class="ph {{ copyIcon }}" style="font-size:17px"></i></button>
+</div>
+<a href="{{ sel.maps }}" target="_blank" rel="noopener" style="display:flex;gap:7px;align-items:center;justify-content:center;padding:10px 0;border-top:1px solid #274055;font-size:13.5px;font-weight:700;color:#33a1e0;text-decoration:none" style-hover="background:#13283a"><i class="ph ph-navigation-arrow"></i>Directions</a>
+</div>
+<sc-if value="{{ sel.canRsvp }}">
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">ARE YOU GOING?</span>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+<sc-for list="{{ sel.rsvp }}" as="r"><button onClick="{{ r.pick }}" aria-pressed="{{ r.on }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;height:38px;border-radius:8px;font-size:13.5px;font-weight:700;border:1px solid {{ r.border }};background:{{ r.bg }};color:{{ r.color }}"><i class="ph {{ r.icon }}"></i>{{ r.label }}</button></sc-for>
+</div>
+</div>
+</sc-if>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">GOING · {{ sel.goingN }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ sel.maybeN }} maybe</span></div>
+<div style="display:flex;align-items:center">
+<sc-for list="{{ sel.faces }}" as="f"><span title="{{ f.name }}" style="width:30px;height:30px;margin-right:-6px;border-radius:50%;background:#1d4869;border:2px solid #13283a;color:#cfdeea;display:grid;place-items:center;font-size:10.5px;font-weight:700">{{ f.ini }}</span></sc-for>
+<sc-if value="{{ sel.hasMore }}"><span style="margin-left:14px;font-size:12.5px;color:#cfdeea">+{{ sel.more }} more</span></sc-if>
+<a href="#1a" style="margin-left:auto;font-size:12.5px">See all</a>
+</div>
+</div>
+<sc-if value="{{ sel.hasNotes }}"><div style="display:flex;flex-direction:column;gap:6px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">NOTES</span><p style="margin:0;font-size:14px;line-height:1.55;color:#cfdeea;text-wrap:pretty">{{ sel.notes }}</p></div></sc-if>
+<sc-if value="{{ askScope }}">
+<div style="display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:10px;border:1px solid #274055;background:#0c1a26">
+<span style="font-size:13.5px;font-weight:600">This event repeats. What do you want to edit?</span>
+<sc-for list="{{ scopes }}" as="o"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:8px;border:1px solid #274055" style-hover="border-color:#33a1e0;background:#13283a"><i class="ph {{ o.icon }}" style="font-size:18px;color:#33a1e0;margin-top:1px"></i><span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13.5px;font-weight:600">{{ o.label }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ o.sub }}</span></span></button></sc-for>
+<button onClick="{{ closeScope }}" style="all:unset;cursor:pointer;align-self:flex-start;font-size:12.5px;color:#33a1e0">Cancel</button>
+</div>
+</sc-if>
+<div style="display:flex;gap:8px;padding-top:12px;border-top:1px solid #274055">
+<sc-if value="{{ sel.isToday }}"><button style="all:unset;cursor:pointer;flex:1;text-align:center;padding:9px 0;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:13.5px;font-weight:700" style-hover="background:#5ab4e8">Take attendance</button></sc-if>
+<button onClick="{{ openEdit }}" style="all:unset;cursor:pointer;flex:1;display:flex;gap:6px;align-items:center;justify-content:center;padding:9px 0;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:13.5px;font-weight:600" style-hover="border-color:#33a1e0"><i class="ph ph-pencil-simple"></i>Edit</button>
+<button title="Cancel event" aria-label="Cancel event" style="all:unset;cursor:pointer;width:38px;height:36px;box-sizing:border-box;border-radius:8px;border:1px solid #274055;background:#0c1a26;display:grid;place-items:center;color:#f2887a" style-hover="border-color:#f2887a"><i class="ph ph-x-circle" style="font-size:17px"></i></button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="1b" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1b" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1b</a><span style="font-size:13.5px;color:#8aa1b5">Mes a la izquierda + tarjetas con imagen</span></div>
+<div style="width:1180px;box-sizing:border-box;background:#0c1a26;border:1px solid #274055;border-radius:12px;padding:24px 28px 32px;display:flex;flex-direction:column;gap:20px">
+<header style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">CALENDAR &amp; EVENTS</span><h1 style="margin:0;font-size:28px;line-height:1.1;font-weight:700">Upcoming events</h1></div>
+<button style="all:unset;cursor:pointer;white-space:nowrap;display:flex;gap:6px;align-items:center;padding:8px 14px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:13.5px;font-weight:700" style-hover="background:#5ab4e8"><i class="ph ph-plus"></i>Event</button>
+</header>
+<div style="display:grid;grid-template-columns:300px minmax(0,1fr);gap:28px;align-items:start">
+<aside style="display:flex;flex-direction:column;gap:16px">
+<div style="padding:16px;border:1px solid #274055;border-radius:10px;background:#13283a;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:15px;font-weight:700">October 2026</span><span style="display:flex;gap:2px"><button aria-label="Previous month" style="all:unset;cursor:pointer;width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349"><i class="ph ph-caret-left"></i></button><button aria-label="Next month" style="all:unset;cursor:pointer;width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:#cfdeea" style-hover="background:#1a3349"><i class="ph ph-caret-right"></i></button></span></div>
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font:600 10.5px ui-monospace,Menlo,monospace;color:#8aa1b5;text-align:center"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">
+<sc-for list="{{ monthB }}" as="d" hint-placeholder-count="35">
+<sc-if value="{{ d.blank }}"><span style="height:38px"></span></sc-if>
+<sc-if value="{{ d.real }}"><button onClick="{{ d.pick }}" style="all:unset;cursor:pointer;height:38px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:13px;font-weight:{{ d.weight }};color:{{ d.color }};background:{{ d.bg }};box-shadow:{{ d.ring }}" style-hover="background:#1a3349">{{ d.n }}<span style="display:flex;gap:2px;height:5px"><sc-for list="{{ d.dots }}" as="c"><span style="width:5px;height:5px;border-radius:50%;background:{{ c }}"></span></sc-for></span></button></sc-if>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#8aa1b5">SHOW</span>
+<sc-for list="{{ typeChips }}" as="c"><button onClick="{{ c.toggle }}" aria-pressed="{{ c.on }}" style="all:unset;cursor:pointer;display:flex;gap:10px;align-items:center;font-size:14px;padding:3px 0;color:{{ c.color }}"><i class="ph {{ c.check }}" style="font-size:18px;color:{{ c.ink }}"></i><span style="flex:1">{{ c.label }}</span><span style="font:12px ui-monospace,Menlo,monospace;color:#8aa1b5">{{ c.count }}</span></button></sc-for>
+</div>
+</aside>
+<div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:14px;color:#cfdeea">{{ rangeB }}</span><sc-if value="{{ dayPickedB }}"><button onClick="{{ clearDayB }}" style="all:unset;cursor:pointer;font-size:13px;color:#33a1e0">Show all upcoming</button></sc-if></div>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px">
+<sc-for list="{{ cardsB }}" as="e" hint-placeholder-count="4">
+<article style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:12px;overflow:hidden;background:#13283a">
+<div style="position:relative;height:150px">
+<sc-if value="{{ e.hasCover }}"><image-slot id="ev-{{ e.id }}-card" shape="rect" placeholder="Drop an event photo"></image-slot></sc-if>
+<sc-if value="{{ e.noCover }}"><div style="position:absolute;inset:0;display:grid;place-items:center;background:{{ e.fb }}"><i class="ph {{ e.icon }}" style="font-size:60px;color:{{ e.ink }};opacity:.5"></i></div></sc-if>
+<div style="position:absolute;top:12px;left:12px;pointer-events:none;width:52px;padding:6px 0;border-radius:8px;background:color-mix(in srgb,#0c1a26 85%,transparent);display:flex;flex-direction:column;align-items:center;gap:0;border-top:3px solid {{ e.ink }}"><span style="font:600 10px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#cfdeea">{{ e.wk }}</span><span style="font-size:20px;font-weight:700;line-height:1.1">{{ e.d }}</span><span style="font:600 10px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#8aa1b5">{{ e.mon }}</span></div>
+<span style="position:absolute;top:12px;right:12px;pointer-events:none;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;background:{{ e.tagBg }};border:1px solid color-mix(in srgb,{{ e.ink }} 50%,transparent)">{{ e.typeLabel }}</span>
+</div>
+<div style="padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px;flex:1">
+<h3 style="margin:0;font-size:17px;line-height:1.3;font-weight:700">{{ e.title }}</h3>
+<div style="display:flex;flex-direction:column;gap:6px;font-size:13.5px;color:#cfdeea">
+<span style="display:flex;gap:8px;align-items:center"><i class="ph ph-clock" style="color:{{ e.ink }}"></i>{{ e.timeRange }}<span style="color:#8aa1b5">· {{ e.dur }}</span></span>
+<a href="{{ e.maps }}" target="_blank" rel="noopener" style="display:flex;gap:8px;align-items:center;color:#cfdeea;text-decoration:none;min-width:0" style-hover="color:#5ab4e8"><i class="ph ph-map-pin" style="color:{{ e.ink }}"></i><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.place }}</span><i class="ph ph-arrow-square-out" style="flex:none;font-size:13px;color:#8aa1b5"></i></a>
+</div>
+<div style="margin-top:auto;padding-top:10px;border-top:1px solid #274055;display:flex;justify-content:space-between;align-items:center;gap:10px">
+<sc-if value="{{ e.canRsvp }}"><div style="display:flex;gap:4px"><sc-for list="{{ e.rsvp }}" as="r"><button onClick="{{ r.pick }}" aria-pressed="{{ r.on }}" style="all:unset;cursor:pointer;white-space:nowrap;padding:5px 11px;border-radius:999px;font-size:12.5px;font-weight:700;border:1px solid {{ r.border }};background:{{ r.bg }};color:{{ r.color }}">{{ r.label }}</button></sc-for></div></sc-if>
+<span style="font-size:12.5px;color:#8aa1b5;white-space:nowrap">{{ e.goingN }} going</span>
+</div>
+</div>
+</article>
+</sc-for>
+</div>
+<sc-if value="{{ emptyB }}"><div style="padding:32px 0;font-size:14px;color:#8aa1b5">Nothing on this day. <a href="#1b" onClick="{{ clearDayB }}">Show all upcoming</a></div></sc-if>
+</div>
+</div>
+</div>
+</div>
+
+<div id="1c" style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><a href="#1c" style="padding:2px 9px;border-radius:999px;background:#13283a;border:1px solid #274055;font:600 12px ui-monospace,Menlo,monospace;color:#e8f0f7;text-decoration:none">1c</a><span style="font-size:13.5px;color:#8aa1b5">Crear / editar evento: imagen, tipo, hora de fin y lugar con mapa</span></div>
+<div style="width:640px;box-sizing:border-box;background:#13283a;border:1px solid #274055;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.3),0 12px 32px rgba(0,0,0,.35);display:flex;flex-direction:column">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #274055"><span style="font-size:18px;font-weight:700">New event</span><button aria-label="Close" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:#8aa1b5" style-hover="background:#1a3349;color:#e8f0f7"><i class="ph ph-x" style="font-size:18px"></i></button></div>
+<div style="padding:20px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:14px;font-weight:600">Image <span style="font-weight:400;color:#8aa1b5">· optional</span></span>
+<sc-if value="{{ f.noCover }}"><div style="position:relative;height:120px;border-radius:10px;overflow:hidden;background:{{ f.fb }};display:flex;align-items:flex-end;justify-content:space-between;padding:14px"><i class="ph {{ f.icon }}" style="position:absolute;right:32px;top:18px;font-size:72px;color:{{ f.ink }};opacity:.4"></i><span style="position:relative;font-size:13px;color:#cfdeea">Without an image, the {{ f.typeLower }} background is used.</span><button onClick="{{ f.addCover }}" style="all:unset;cursor:pointer;position:relative;white-space:nowrap;display:flex;gap:6px;align-items:center;padding:7px 12px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:13px;font-weight:600" style-hover="border-color:#33a1e0"><i class="ph ph-image"></i>Add image</button></div></sc-if>
+<sc-if value="{{ f.hasCover }}"><div style="position:relative;height:160px;border-radius:10px;overflow:hidden;border:1px solid #274055"><image-slot id="form-c-cover" shape="rect" placeholder="Drop an image or click to browse"></image-slot></div><button onClick="{{ f.removeCover }}" style="all:unset;cursor:pointer;align-self:flex-end;font-size:12.5px;color:#33a1e0">Remove image</button></sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:14px;font-weight:600">Type</span>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+<sc-for list="{{ f.types }}" as="t"><button onClick="{{ t.pick }}" aria-pressed="{{ t.on }}" style="all:unset;cursor:pointer;display:flex;gap:7px;align-items:center;justify-content:center;height:38px;border-radius:8px;font-size:13.5px;font-weight:{{ t.weight }};border:1px solid {{ t.border }};background:{{ t.bg }};color:{{ t.color }}"><i class="ph {{ t.icon }}" style="color:{{ t.ink }}"></i>{{ t.label }}</button></sc-for>
+</div>
+</div>
+<label style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;font-weight:600">Title</span><input value="{{ f.title }}" onChange="{{ f.onTitle }}" style="all:unset;box-sizing:border-box;height:42px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14.5px;color:#e8f0f7"></label>
+<div style="display:flex;flex-direction:column;gap:10px">
+<span style="font-size:14px;font-weight:600">When</span>
+<div style="display:grid;grid-template-columns:{{ f.whenCols }};gap:10px;align-items:end">
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:12.5px;color:#8aa1b5">{{ f.startDateLabel }}</span><input type="date" value="{{ f.date }}" onChange="{{ f.onDate }}" style="all:unset;box-sizing:border-box;height:42px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14px;color:#e8f0f7"></label>
+<sc-if value="{{ f.multiOn }}"><label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:12.5px;color:#8aa1b5">End date</span><input type="date" value="{{ f.endDate }}" onChange="{{ f.onEndDate }}" style="all:unset;box-sizing:border-box;height:42px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14px;color:#e8f0f7"></label></sc-if>
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:12.5px;color:#8aa1b5">Starts</span><input type="time" value="{{ f.start }}" onChange="{{ f.onStart }}" style="all:unset;box-sizing:border-box;height:42px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14px;color:#e8f0f7"></label>
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:12.5px;color:#8aa1b5">Ends</span><input type="time" value="{{ f.end }}" onChange="{{ f.onEnd }}" style="all:unset;box-sizing:border-box;height:42px;padding:0 10px;border-radius:8px;border:1px solid {{ f.endBorder }};background:#0c1a26;font-size:14px;color:#e8f0f7"></label>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+<sc-if value="{{ f.ok }}"><span style="display:flex;gap:6px;align-items:center;font-size:13px;color:#cfdeea"><i class="ph ph-hourglass-medium" style="color:#8aa1b5"></i>{{ f.durText }}</span></sc-if>
+<sc-if value="{{ f.bad }}"><span style="display:flex;gap:6px;align-items:center;font-size:13px;color:#f2887a"><i class="ph ph-warning-circle"></i>The end must be after the start.</span></sc-if>
+<sc-if value="{{ f.once }}"><button onClick="{{ f.toggleMulti }}" role="switch" aria-checked="{{ f.multi }}" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center;font-size:13px;color:#cfdeea"><span style="position:relative;width:32px;height:18px;border-radius:9px;background:{{ f.swBg }}"><span style="position:absolute;top:2px;left:{{ f.swX }};width:14px;height:14px;border-radius:50%;background:#e8f0f7;transition:left .15s"></span></span>Ends on another day</button></sc-if>
+</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-size:12.5px;color:#8aa1b5;align-self:center;margin-right:2px">Quick length:</span><sc-for list="{{ f.quick }}" as="q"><button onClick="{{ q.pick }}" style="all:unset;cursor:pointer;padding:4px 10px;border-radius:999px;font-size:12.5px;border:1px solid #274055;color:#cfdeea" style-hover="border-color:#33a1e0">{{ q.label }}</button></sc-for></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<span style="font-size:14px;font-weight:600">Repeat</span>
+<div style="display:grid;grid-template-columns:1fr 1fr;padding:3px;gap:2px;border:1px solid #274055;border-radius:8px;background:#0c1a26;width:280px">
+<sc-for list="{{ f.repeats }}" as="o"><sc-if value="{{ o.active }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;padding:7px 0;border-radius:6px;font-size:13.5px;font-weight:700;background:#33a1e0;color:#0c1a26"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if><sc-if value="{{ o.inactive }}"><button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;padding:7px 0;border-radius:6px;font-size:13.5px;color:#8aa1b5" style-hover="color:#e8f0f7;background:#1a3349"><i class="ph {{ o.icon }}"></i>{{ o.label }}</button></sc-if></sc-for>
+</div>
+<sc-if value="{{ f.weekly }}">
+<div style="display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:10px;border:1px solid #274055;background:#0c1a26">
+<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12.5px;color:#8aa1b5">On these days</span>
+<div style="display:flex;gap:6px">
+<sc-for list="{{ f.wd }}" as="d"><button onClick="{{ d.toggle }}" aria-pressed="{{ d.on }}" aria-label="{{ d.full }}" title="{{ d.full }}" style="all:unset;cursor:pointer;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:13.5px;font-weight:700;border:1px solid {{ d.border }};background:{{ d.bg }};color:{{ d.color }}">{{ d.short }}</button></sc-for>
+</div>
+</div>
+<label style="display:flex;flex-direction:column;gap:5px;width:200px"><span style="font-size:12.5px;color:#8aa1b5">Until</span><input type="date" value="{{ f.until }}" onChange="{{ f.onUntil }}" style="all:unset;box-sizing:border-box;height:42px;padding:0 10px;border-radius:8px;border:1px solid #274055;background:#13283a;font-size:14px;color:#e8f0f7"></label>
+<sc-if value="{{ f.hasSessions }}">
+<div style="display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid #274055">
+<span style="display:flex;gap:8px;align-items:center;font-size:13.5px;font-weight:600"><i class="ph ph-repeat" style="color:#33a1e0"></i>{{ f.summary }}</span>
+<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:12.5px;color:#8aa1b5">Next:</span><sc-for list="{{ f.nextDates }}" as="n"><span style="padding:3px 9px;border-radius:999px;font:12px ui-monospace,Menlo,monospace;border:1px solid #274055;color:#cfdeea">{{ n }}</span></sc-for><sc-if value="{{ f.hasMoreDates }}"><span style="font-size:12.5px;color:#8aa1b5">+{{ f.moreDates }} more</span></sc-if></div>
+<span style="font-size:12.5px;color:#8aa1b5">Each session gets its own RSVP and attendance. You can still edit or cancel a single one.</span>
+</div>
+</sc-if>
+<sc-if value="{{ f.noSessions }}"><span style="display:flex;gap:6px;align-items:center;font-size:13px;color:#f2887a"><i class="ph ph-warning-circle"></i>{{ f.sessionsError }}</span></sc-if>
+</div>
+</sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;position:relative">
+<span style="font-size:14px;font-weight:600">Location</span>
+<sc-if value="{{ f.noPlace }}">
+<div style="position:relative;display:flex;align-items:center"><i class="ph ph-magnifying-glass" style="position:absolute;left:12px;color:#8aa1b5"></i><input value="{{ f.q }}" onChange="{{ f.onQ }}" placeholder="Search a park, venue or address" style="all:unset;box-sizing:border-box;width:100%;height:42px;padding:0 12px 0 34px;border-radius:8px;border:1px solid #33a1e0;background:#0c1a26;font-size:14.5px;color:#e8f0f7"></div>
+<div style="display:flex;flex-direction:column;border:1px solid #274055;border-radius:8px;background:#0c1a26;overflow:hidden">
+<sc-for list="{{ f.results }}" as="r"><button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid color-mix(in srgb,#274055 60%,transparent)" style-hover="background:#13283a"><i class="ph ph-map-pin" style="color:#8aa1b5"></i><span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:14px;font-weight:600">{{ r.place }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ r.addr }}</span></span></button></sc-for>
+<span style="padding:8px 12px;font-size:12px;color:#8aa1b5">Or keep what you typed as free text (it won't open a map).</span>
+</div>
+</sc-if>
+<sc-if value="{{ f.hasPlace }}">
+<div style="display:flex;gap:12px;align-items:center;padding:10px 12px;border:1px solid #274055;border-radius:8px;background:#0c1a26">
+<span style="flex:none;width:36px;height:36px;border-radius:8px;background:color-mix(in srgb,#6fd6b4 14%,transparent);display:grid;place-items:center"><i class="ph-fill ph-map-pin" style="font-size:18px;color:#6fd6b4"></i></span>
+<span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0"><span style="font-size:14px;font-weight:600">{{ f.place }}</span><span style="font-size:12.5px;color:#8aa1b5">{{ f.addr }}</span></span>
+<a href="{{ f.maps }}" target="_blank" rel="noopener" style="white-space:nowrap;font-size:13px;font-weight:600">Check on map</a>
+<button onClick="{{ f.clearPlace }}" aria-label="Change location" title="Change location" style="all:unset;cursor:pointer;width:30px;height:30px;border-radius:6px;display:grid;place-items:center;color:#8aa1b5" style-hover="background:#1a3349;color:#e8f0f7"><i class="ph ph-x"></i></button>
+</div>
+<label style="display:flex;flex-direction:column;gap:5px"><span style="font-size:12.5px;color:#8aa1b5">Where exactly <span style="color:#5a7086">· optional</span></span><input value="Field 2, near the pavilion" style="all:unset;box-sizing:border-box;height:40px;padding:0 12px;border-radius:8px;border:1px solid #274055;background:#0c1a26;font-size:14px;color:#e8f0f7"></label>
+</sc-if>
+</div>
+<p style="margin:0;font-size:13px;color:#8aa1b5">Notes and who it's for stay as they are today.</p>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid #274055">
+<button style="all:unset;cursor:pointer;padding:9px 16px;border-radius:8px;font-size:14px;font-weight:600;color:#cfdeea" style-hover="background:#1a3349">Cancel</button>
+<button style="all:unset;cursor:pointer;padding:9px 18px;border-radius:8px;background:#33a1e0;color:#0c1a26;font-size:14px;font-weight:700;opacity:{{ f.saveOpacity }}" style-hover="background:#5ab4e8">Create event</button>
+</div>
+</div>
+</div>
+
+</div>
+<ul style="margin:0;padding-left:18px;max-width:940px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:#cfdeea">
+<li>Mapa sin costo: "Directions" es un link de Google Maps (no necesita clave ni cobra). La vista previa del mapa en <a href="#1a">1a</a> es opcional: se puede hacer gratis con OpenStreetMap, o dejar solo el link.</li>
+<li>Para que el lugar abra el punto exacto, al crear el evento se busca y se elige el lugar (<a href="#1c">1c</a>). Si se escribe texto libre, sigue funcionando pero busca ese texto en el mapa.</li>
+<li>Repetir: en <a href="#1c">1c</a> elegís "Weekly", los días (ej. lunes y jueves) y hasta cuándo; muestra cuántas sesiones se crean y las próximas fechas. Al editar uno que se repite (<a href="#1a">1a</a>, Edit en el entrenamiento de hoy) pregunta si es solo esa sesión o esta y las siguientes, como ya hace la app.</li>
+<li>Eventos viejos sin hora de fin: se muestran solo con la hora de inicio, como hoy.</li>
+</ul>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const TYPES = {
+  training:{label:'Training', ink:'#33a1e0', icon:'ph-timer'},
+  competition:{label:'Competition', ink:'#f2ce78', icon:'ph-trophy'},
+  social:{label:'Social', ink:'#6fd6b4', icon:'ph-confetti'},
+  meeting:{label:'Meeting', ink:'#b7c7d6', icon:'ph-users-three'}
+};
+const tagBg = ink => `color-mix(in srgb,${ink} 24%,#13283a)`;
+const fbOf = ink => `linear-gradient(135deg,color-mix(in srgb,${ink} 32%,#13283a) 0%,#13283a 80%)`;
+const PLACES = [
+  {place:'Princes Park, Oval 2', addr:'Princes Park Dr, Carlton North VIC 3054'},
+  {place:'Fawkner Park', addr:'Commercial Rd, South Yarra VIC 3141'},
+  {place:'Albert Park, Field 4', addr:'Aughtie Dr, Albert Park VIC 3206'},
+  {place:'Seadragons Clubhouse', addr:'12 Lygon St, Brunswick East VIC 3057'},
+  {place:'State Netball & Hockey Centre', addr:'10 Brens Dr, Parkville VIC 3052'}
+];
+const NAMES = ['Lucía Fernández','Tom Baker','Mateo Rossi','Priya Nair','Hana Sato','Dana Whitfield','Andrea Cadavid','Alex Kim','Jordan Lee','Maya Patel'];
+const ini = n => n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+const EVENTS = [
+  {id:'e1', series:true, type:'training', title:'Tuesday–Wednesday open training', day:14, wk:'WED', start:'18:00', end:'19:30', p:0, cover:false, going:18, maybe:3, my:'yes', aud:'Whole club', notes:'Bring light and dark tops. We finish with a 20-minute scrimmage.'},
+  {id:'e2', type:'training', title:'Juniors skills session', day:17, wk:'SAT', start:'09:00', end:'10:30', p:1, cover:true, going:12, maybe:2, my:null, aud:'Juniors · Parents', notes:'Parents are welcome to stay and watch.'},
+  {id:'e3', type:'social', title:'Fundraiser trivia night', day:17, wk:'SAT', start:'19:00', end:'22:00', p:3, cover:true, going:34, maybe:9, my:'maybe', aud:'Whole club', notes:'Teams of six. Food and drinks at the bar, all proceeds go to the Island Cup trip.'},
+  {id:'e4', type:'meeting', title:'Committee meeting', day:20, wk:'TUE', start:'19:00', end:'20:00', p:3, cover:false, going:6, maybe:1, my:null, aud:'Committee', notes:'Agenda: spring league, jersey order, end-of-season dinner.'},
+  {id:'e5', series:true, type:'training', title:'Tuesday–Wednesday open training', day:21, wk:'WED', start:'18:00', end:'19:30', p:0, cover:false, going:9, maybe:4, my:null, aud:'Whole club', notes:''},
+  {id:'e6', type:'competition', title:'Island Cup', day:24, endDay:25, wk:'SAT', start:'08:30', end:'17:00', p:4, cover:true, going:22, maybe:0, my:'yes', aud:'U16 squad', notes:'Two days, five games. Bus leaves the clubhouse at 7:15 on Saturday.'}
+];
+const fmt = t => { let [h,m] = t.split(':').map(Number); const ap = h>=12?'pm':'am'; h = h%12||12; return m ? `${h}:${String(m).padStart(2,'0')} ${ap}` : `${h} ${ap}`; };
+const fmtShort = t => { let [h,m] = t.split(':').map(Number); h = h%12||12; return `${h}:${String(m).padStart(2,'0')}`; };
+const mins = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+const durOf = (a,b) => { const d = mins(b)-mins(a); if(d<=0) return ''; const h = Math.floor(d/60), m = d%60; return (h?h+' h':'')+(h&&m?' ':'')+(m?m+' min':''); };
+const maps = (p) => 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p.place+', '+p.addr);
+const WD = {14:'Wednesday',17:'Saturday',20:'Tuesday',21:'Wednesday',24:'Saturday',25:'Sunday'};
+const RS = [['yes','Going','ph-check','#6fd6b4'],['maybe','Maybe','ph-question','#f2ce78'],['no',"Can't go",'ph-x','#f2887a']];
+
+class Component extends DCLogic {
+  state = { sel:'e3', rsvp:{}, off:{}, period:'upcoming', copied:false, dayB:null,
+    askScope:false, f:{repeat:'weekly', days:{1:true,4:true}, until:'2026-12-17', type:'training', title:'Monday & Thursday training', date:'2026-10-19', endDate:'2026-10-25', start:'18:00', end:'19:30', multi:false, cover:false, q:'princes', place:null} };
+  ev(e){
+    const s = this.state, T = TYPES[e.type], P = PLACES[e.p];
+    const my = s.rsvp[e.id] !== undefined ? s.rsvp[e.id] : e.my;
+    const goingN = e.going + (my==='yes' && e.my!=='yes' ? 1 : 0) - (e.my==='yes' && my!=='yes' ? 1 : 0);
+    const r = RS.find(x => x[0]===my);
+    const multi = !!e.endDay;
+    return {...e, ...P, typeLabel:T.label, ink:T.ink, icon:T.icon, tagBg:tagBg(T.ink), fb:fbOf(T.ink),
+      hasCover:e.cover, noCover:!e.cover, maps:maps(P),
+      startShort:fmtShort(e.start), endShort:fmtShort(e.end),
+      timeRange: multi ? `${fmt(e.start)} Sat – ${fmt(e.end)} Sun` : `${fmt(e.start)} – ${fmt(e.end)}`,
+      dur: multi ? '2 days' : durOf(e.start, e.end),
+      dateLong: multi ? `Sat, Oct ${e.day} – Sun, Oct ${e.endDay}` : `${WD[e.day]}, October ${e.day}`,
+      d:e.day, mon:'OCT', goingN, maybeN:e.maybe, audience:e.aud, hasNotes:!!e.notes, isToday:e.day===14,
+      canRsvp:true, isSeries:!!e.series, notSeries:!e.series, mBorder: s.sel===e.id ? 'color-mix(in srgb,#33a1e0 55%,transparent)' : '#274055', repeatText:'Every Wednesday', repeatSub:'Until Dec 16 · 10 sessions left', hasMine:!!r, noMine:!r, mineLabel:r?r[1]:'', mineColor:r?r[3]:'', mineBorder:r?`color-mix(in srgb,${r[3]} 45%,transparent)`:'',
+      rsvp: RS.map(([k,l,ic,c]) => ({label:l, icon:ic, on:my===k, bg:my===k?`color-mix(in srgb,${c} 18%,transparent)`:'transparent', border:my===k?c:'#274055', color:my===k?c:'#cfdeea',
+        pick:ev2=>{ if(ev2) ev2.stopPropagation(); this.setState(st=>({rsvp:{...st.rsvp,[e.id]: my===k?null:k}})); }})),
+      faces: NAMES.slice(0, Math.min(7, goingN)).map(n=>({name:n, ini:ini(n)})), more: Math.max(0, goingN-7), hasMore: goingN>7,
+      select:()=>this.setState({sel:e.id, copied:false, askScope:false}), rowBg: s.sel===e.id ? '#13283a' : 'transparent'};
+  }
+  form(){
+    const s = this.state, f = s.f, T = TYPES[f.type];
+    const set = p => this.setState(st=>({f:{...st.f, ...p}}));
+    const bad = !(f.multi && f.repeat!=='weekly') && mins(f.end) <= mins(f.start);
+    const res = PLACES.filter(p => !f.q || (p.place+' '+p.addr).toLowerCase().includes(f.q.toLowerCase())).slice(0,3);
+    const P = f.place!=null ? PLACES[f.place] : null;
+    const add = m => { const t = mins(f.start)+m; return String(Math.floor(t/60)%24).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); };
+    return {
+      ink:T.ink, icon:T.icon, fb:fbOf(T.ink), typeLower:T.label.toLowerCase(),
+      hasCover:f.cover, noCover:!f.cover, addCover:()=>set({cover:true}), removeCover:()=>set({cover:false}),
+      types: Object.keys(TYPES).map(k=>({label:TYPES[k].label, icon:TYPES[k].icon, ink:TYPES[k].ink, on:f.type===k, weight:f.type===k?700:500,
+        bg:f.type===k?tagBg(TYPES[k].ink):'#0c1a26', border:f.type===k?TYPES[k].ink:'#274055', color:f.type===k?'#e8f0f7':'#cfdeea', pick:()=>set({type:k})})),
+      title:f.title, onTitle:e=>set({title:e.target.value}),
+      date:f.date, endDate:f.endDate, start:f.start, end:f.end,
+      onDate:e=>set({date:e.target.value}), onEndDate:e=>set({endDate:e.target.value}), onStart:e=>set({start:e.target.value}), onEnd:e=>set({end:e.target.value}),
+      multi:f.multi, multiOn: f.multi && f.repeat!=='weekly', toggleMulti:()=>set({multi:!f.multi}), swBg:f.multi?'#33a1e0':'#274055', swX:f.multi?'16px':'2px', swXM:f.multi?'21px':'3px',
+      
+      bad, ok:!bad, endBorder: bad ? '#f2887a' : '#274055',
+      durText: f.multi ? 'Runs over more than one day' : 'Lasts '+durOf(f.start, f.end),
+      quick: [['1 h',60],['1 h 30',90],['2 h',120],['3 h',180]].map(([l,m])=>({label:l, pick:()=>set({end:add(m), multi:false})})),
+      noPlace:!P, hasPlace:!!P, q:f.q, onQ:e=>set({q:e.target.value}),
+      results: res.map(p=>({...p, pick:()=>set({place:PLACES.indexOf(p)})})),
+      place:P?P.place:'', addr:P?P.addr:'', maps:P?maps(P):'#1c', clearPlace:()=>set({place:null}),
+      ...(()=>{ const WDN = [['M','Monday',1],['T','Tuesday',2],['W','Wednesday',3],['T','Thursday',4],['F','Friday',5],['S','Saturday',6],['S','Sunday',7]];
+        const weekly = f.repeat==='weekly'; const picked = WDN.filter(w=>f.days[w[2]]);
+        const [y,m,d] = (f.date||'').split('-').map(Number); const [uy,um,ud] = (f.until||'').split('-').map(Number);
+        const dates = [];
+        if(weekly && y && uy){ const cur = new Date(y,m-1,d), end = new Date(uy,um-1,ud); let guard = 0;
+          while(cur<=end && guard++<400){ const iso = cur.getDay()||7; if(f.days[iso]) dates.push(new Date(cur)); cur.setDate(cur.getDate()+1); } }
+        const fd = dt => dt.toLocaleDateString('en-AU',{weekday:'short', day:'numeric', month:'short'});
+        const names = picked.map(w=>w[1]); const dayText = names.length>1 ? names.slice(0,-1).join(', ')+' and '+names.slice(-1) : (names[0]||'');
+        const err = !picked.length ? 'Pick at least one day.' : (!dates.length ? 'No sessions fall between the start and the until date.' : '');
+        return {
+          once: !weekly, weekly,
+          repeats: [['none','Once','ph-calendar-blank'],['weekly','Weekly','ph-repeat']].map(([k,l,ic])=>({label:l, icon:ic, active:f.repeat===k, inactive:f.repeat!==k, pick:()=>set({repeat:k, multi:false})})),
+          wd: WDN.map(([s1,full,iso])=>{ const on = !!f.days[iso]; return {short:s1, full, on, bg:on?'#33a1e0':'transparent', border:on?'#33a1e0':'#274055', color:on?'#0c1a26':'#cfdeea', toggle:()=>set({days:{...f.days,[iso]:!on}})}; }),
+          until:f.until, onUntil:e=>set({until:e.target.value}),
+          hasSessions: !err, noSessions: !!err, sessionsError: err,
+          summary: dates.length ? `Every ${dayText}, ${fmt(f.start)} – ${fmt(f.end)} · ${dates.length} sessions until ${fd(dates[dates.length-1])}` : '',
+          nextDates: dates.slice(0,4).map(fd), moreDates: Math.max(0, dates.length-4), hasMoreDates: dates.length>4,
+          startDateLabel: weekly ? 'Starts' : (f.multi ? 'Start date' : 'Date'),
+          whenCols: f.multi && !weekly ? '1fr 1fr 110px 110px' : '1.4fr 1fr 1fr'
+        }; })(),
+      saveOpacity: bad || (f.repeat==='weekly' && (!Object.values(f.days).some(Boolean))) ? .45 : 1
+    };
+  }
+  renderVals(){
+    const s = this.state;
+    const all = EVENTS.map(e=>this.ev(e));
+    const vis = all.filter(e=>!s.off[e.type]);
+    const days = [];
+    vis.forEach(e=>{ let g = days.find(x=>x.day===e.day); if(!g){ g = {day:e.day, items:[],
+      label: e.day===14 ? 'TODAY' : `${e.wk} · OCT ${e.day}`, sub: e.day===14 ? 'Wednesday, October 14' : (e.day===17 ? 'This weekend' : ''),
+      labelColor: e.day===14 ? '#33a1e0' : '#8aa1b5'}; days.push(g); } g.items.push(e); });
+    const sel = all.find(e=>e.id===s.sel) || all[0];
+    const byDay = {}; all.forEach(e=>{ [e.day].concat(e.endDay?[e.endDay]:[]).forEach(d=>{ (byDay[d]=byDay[d]||[]).push(e); }); });
+    const month = [];
+    for(let i=0;i<3;i++) month.push({blank:true, real:false});
+    for(let d=1; d<=31; d++){ const evs = (byDay[d]||[]).filter(e=>!s.off[e.type]); const picked = s.dayB===d, today = d===14;
+      month.push({blank:false, real:true, n:d, dots:[...new Set(evs.map(e=>e.ink))].slice(0,3),
+        weight: today||picked ? 700 : 400, color: d<14 ? '#5a7086' : '#e8f0f7',
+        bg: picked ? '#1d4869' : 'transparent', ring: today ? 'inset 0 0 0 1px #33a1e0' : 'none',
+        pick:()=>this.setState({dayB: picked ? null : d})}); }
+    while(month.length%7) month.push({blank:true, real:false});
+    const cardsB = vis.filter(e => s.dayB==null ? true : (e.day===s.dayB || e.endDay===s.dayB));
+    return {
+      nav: ['Dashboard','Directory','Calendar','Attendance','Teams','Evaluations','News','Payments','Groups'].map(l=>({label:l, on:l==='Calendar', off:l!=='Calendar'})),
+      periods: [['upcoming','Upcoming'],['past','Past']].map(([k,l])=>({label:l, active:s.period===k, inactive:s.period!==k, pick:()=>this.setState({period:k})})),
+      typeChips: Object.keys(TYPES).map(k=>{ const on = !s.off[k], T = TYPES[k]; return {label:T.label, ink:T.ink, on, dot:on?1:.35,
+        bg:on?tagBg(T.ink):'transparent', border:on?`color-mix(in srgb,${T.ink} 50%,transparent)`:'#274055', color:on?'#e8f0f7':'#8aa1b5',
+        check:on?'ph-fill ph-check-square':'ph-square', count:all.filter(e=>e.type===k).length,
+        toggle:()=>this.setState(st=>({off:{...st.off,[k]:!st.off[k]}}))}; }),
+      daysA: days, emptyA: days.length===0, sel,
+      stop: e=>e.stopPropagation(),
+      copyAddr: ()=>{ try{ navigator.clipboard.writeText(sel.place+', '+sel.addr); }catch(err){} this.setState({copied:true}); },
+      copyIcon: s.copied ? 'ph-check' : 'ph-copy',
+      mSheet: !!s.mSheet, toggleMSheet: ()=>this.setState(st=>({mSheet:!st.mSheet})),
+      askScope: s.askScope && sel.isSeries, openEdit: ()=>this.setState({askScope:true}), closeScope: ()=>this.setState({askScope:false}),
+      scopes: [['ph-calendar-dot','This session only','Changes only '+sel.dateLong+'. The rest stay the same.'],['ph-repeat','This and all following sessions','Changes every session from '+sel.dateLong+' on.']].map(([ic,l,sub])=>({icon:ic, label:l, sub, pick:()=>this.setState({askScope:false})})),
+      monthB: month, cardsB, emptyB: cardsB.length===0, dayPickedB: s.dayB!=null,
+      rangeB: s.dayB==null ? `${vis.length} upcoming events` : `October ${s.dayB}`,
+      clearDayB: ()=>this.setState({dayB:null}),
+      f: this.form()
+    };
+  }
+}
+</script>
+</body>
+</html>
