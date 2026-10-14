@@ -79,7 +79,10 @@ import {
 import { memberInitials } from "@/lib/auth/member-initials";
 import { buildAccentStylesheet } from "@/lib/club/accent-stylesheet";
 import { shrinkProfilePhoto } from "@/lib/members/shrink-profile-photo";
-import { shrinkNewsCover } from "@/lib/news/shrink-news-cover";
+import {
+  shrinkNewsCover,
+  shrinkNewsInlineImage,
+} from "@/lib/news/shrink-news-cover";
 import { LOCALE_COOKIE_NAME, type Locale, isLocale } from "@/lib/i18n/locale";
 import { createTranslator } from "@/lib/i18n/translator";
 
@@ -11617,6 +11620,18 @@ const STUBBED_MOBILE_POST = {
   pinnedUntil: null,
 } as const;
 
+/** Con imágenes en el cuerpo (#603), como la de
+ * `docs/mockups/news-redesign-post-dark.png`: una con pie, apaisada, y otra
+ * sin pie, vertical, que se recorta a la altura fija. */
+const STUBBED_IMAGE_ID = "1d1d1d1d-0000-4000-8000-0000000000c1";
+const STUBBED_UNCAPTIONED_IMAGE_ID = "1d1d1d1d-0000-4000-8000-0000000000c2";
+const STUBBED_IMAGE_POST = {
+  ...STUBBED_OPEN_POST,
+  id: "a0a0a0a0-0000-4000-8000-0000000000b3",
+  body: `The under-16 squad brought home **silver** from the Island Cup on Sunday.\n\n![The squad after the final](/api/v1/news/images/${STUBBED_IMAGE_ID})\n\n> They kept their heads up the whole weekend, even after the final.\n\n![](/api/v1/news/images/${STUBBED_UNCAPTIONED_IMAGE_ID})\n\nPractice resumes **Tuesday at 6 pm** on Field 2.`,
+  attachments: [],
+} as const;
+
 const STUBBED_POSTS = [
   STUBBED_POST,
   STUBBED_POST_WITHOUT_ATTACHMENTS,
@@ -11626,6 +11641,7 @@ const STUBBED_POSTS = [
   STUBBED_NO_COVER_POST,
   STUBBED_WITHDRAWN_OPEN_POST,
   STUBBED_MOBILE_POST,
+  STUBBED_IMAGE_POST,
 ] as const;
 
 /** El feed de quien publicó: lo suyo retirado le llega marcado (#331). */
@@ -12087,6 +12103,123 @@ for (const openState of OPEN_POST_STATES) {
     });
   });
 }
+
+// #603: las imágenes del cuerpo, a 1440 y a 375 en los dos temas. La
+// dirección estable de la API se sirve aquí con los bytes ya reducidos: la
+// redirección a la firmada la prueba la integración.
+const IMAGE_POST_STATE = "noticia-con-imagen";
+const IMAGE_POST_VIEWPORTS = viewports.filter((vp) => vp.name !== "tablet");
+
+async function stubInlineImages(page: Page): Promise<void> {
+  const images = new Map([
+    [STUBBED_IMAGE_ID, LARGE_PHOTO_FIXTURES.landscape],
+    [STUBBED_UNCAPTIONED_IMAGE_ID, LARGE_PHOTO_FIXTURES.portrait],
+  ]);
+  for (const [imageId, fixture] of images) {
+    const shrunk = await shrinkNewsInlineImage(readFileSync(fixture));
+    if (shrunk.kind !== "shrunk") {
+      throw new Error("La imagen fija no se pudo reducir.");
+    }
+    await page.route(
+      (url) => url.pathname === `/api/v1/news/images/${imageId}`,
+      (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "image/webp",
+          body: Buffer.from(shrunk.image),
+        }),
+    );
+  }
+}
+
+/** Las dos imágenes ya pintadas: sin esto la captura sale con el hueco. Son
+ * perezosas, así que hay que llegar hasta ellas, y luego volver arriba para
+ * que la barra del móvil salga en su sitio. */
+async function waitForInlineImages(page: Page): Promise<void> {
+  await waitForManagedPost(page);
+  const images = page.locator(".news-body-image img");
+  await expect(images).toHaveCount(2);
+  for (const image of await images.all()) {
+    await image.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() =>
+        image.evaluate((element: HTMLImageElement) => element.naturalWidth),
+      )
+      .toBeGreaterThan(0);
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
+}
+
+const IMAGE_POST: NewsState = {
+  name: IMAGE_POST_STATE,
+  path: postPath(STUBBED_IMAGE_POST.id),
+  feed: [],
+  heading: new RegExp(STUBBED_IMAGE_POST.title),
+  beforeVisit: stubInlineImages,
+  ready: waitForInlineImages,
+};
+
+test.describe(IMAGE_POST_STATE, () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  for (const vp of IMAGE_POST_VIEWPORTS) {
+    test.describe(`@ ${vp.name}`, () => {
+      test.use({ viewport: { width: vp.width, height: vp.height } });
+
+      for (const theme of themes) {
+        test(`matches approved baseline (${theme})`, async ({ page }) => {
+          await goToNews(page, IMAGE_POST, theme);
+          // En el móvil la barra de pestañas es fija y en una captura de
+          // página entera taparía la foto: se fotografía la pantalla con la
+          // primera imagen en medio, como la ve quien lee.
+          const fullPage = vp.name !== "mobile";
+          if (!fullPage) {
+            await page
+              .locator(".news-body-image")
+              .first()
+              .evaluate((element) =>
+                element.scrollIntoView({ block: "center" }),
+              );
+          }
+          const snapshot = `${IMAGE_POST_STATE}-${vp.name}-${theme}.png`;
+          await createMissingLocalBaseline(snapshot, () =>
+            page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage }),
+          );
+          await expect(page).toHaveScreenshot(snapshot, {
+            ...SCREENSHOT_OPTIONS,
+            fullPage,
+            maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+          });
+        });
+
+        test(`has no accessibility violations (axe-core, ${theme})`, async ({
+          page,
+        }) => {
+          await goToNews(page, IMAGE_POST, theme);
+          await expectNoAxeViolations(page);
+        });
+      }
+
+      test("the image fills the column and its caption sits under it", async ({
+        page,
+      }) => {
+        await goToNews(page, IMAGE_POST);
+        const column = await page.locator(".news-markdown").boundingBox();
+        const image = page.getByRole("img", {
+          name: "The squad after the final",
+        });
+        const box = await image.boundingBox();
+        expect(box?.width).toBeCloseTo(column?.width ?? 0, 0);
+        expect(box?.height).toBe(vp.name === "mobile" ? 200 : 300);
+        await expect(
+          page.locator(".news-body-image-caption").first(),
+        ).toHaveText("The squad after the final");
+      });
+    });
+  }
+});
 
 // #601: la publicación en el móvil, con su barra y con la hoja ⋯ abierta
 // (docs/mockups/mobile-news-redesign-post-dark.png y

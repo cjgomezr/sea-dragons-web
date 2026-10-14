@@ -2,8 +2,9 @@ import sharp, { type Sharp } from "sharp";
 
 /**
  * La reducción de la portada de una publicación (#591, decisión D6 del PRD
- * de E22) a sus dos versiones, como la foto de perfil (#271, #353). Vive
- * aparte porque sharp es nativo: sólo corre en el servidor.
+ * de E22) a sus dos versiones, como la foto de perfil (#271, #353), y la de
+ * las imágenes del cuerpo (#603) a una. Vive aparte porque sharp es nativo:
+ * sólo corre en el servidor.
  */
 
 /** La de las filas del feed: la miniatura mide 88 px y se dibuja a 2x. */
@@ -41,6 +42,12 @@ async function encodeVersion(
   return new Uint8Array(encoded);
 }
 
+/** La imagen del cuerpo (#603) reducida a un solo WebP, o la señal de que
+ * no se puede decodificar. */
+export type ShrunkNewsInlineImage =
+  | { readonly kind: "shrunk"; readonly image: Uint8Array }
+  | { readonly kind: "undecodable" };
+
 /** `rotate()` sin ángulo aplica la orientación EXIF, y sharp no copia los
  * metadatos (GPS, cámara) salvo que se le pida. Las dos salen juntas o no
  * sale ninguna. */
@@ -60,6 +67,27 @@ export async function shrinkNewsCover(
     return { kind: "shrunk", thumbnail, large };
   } catch (error) {
     console.warn("[news-covers] no se pudo decodificar la portada", error);
+    return { kind: "undecodable" };
+  }
+}
+
+/** Una imagen del cuerpo (#603): una sola versión, la grande de la portada,
+ * porque se pinta a lo ancho de la columna de lectura. */
+export async function shrinkNewsInlineImage(
+  bytes: Uint8Array,
+): Promise<ShrunkNewsInlineImage> {
+  try {
+    const image = await encodeVersion(
+      sharp(bytes).rotate(),
+      NEWS_COVER_LARGE_SIDE_PX,
+      LARGE_WEBP_QUALITY,
+    );
+    return { kind: "shrunk", image };
+  } catch (error) {
+    console.warn(
+      "[news-inline-images] no se pudo decodificar la imagen",
+      error,
+    );
     return { kind: "undecodable" };
   }
 }

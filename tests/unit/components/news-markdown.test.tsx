@@ -258,12 +258,49 @@ describe("lo que no se pinta", () => {
     expect(root.querySelector("strong")).toBeNull();
   });
 
-  it("una imagen no se carga", () => {
+  it("una imagen de fuera no se carga", () => {
     const root = renderBody(
       "Antes ![pie](https://example.com/foto.jpg) después",
     );
 
     expect(root.querySelector("img")).toBeNull();
     expect(screen.queryByRole("img")).toBeNull();
+  });
+});
+
+describe("las imágenes del club (#603)", () => {
+  const IMAGE_URL = "/api/v1/news/images/1d1d1d1d-0000-4000-8000-000000000001";
+
+  it("se carga con su texto alternativo como alt y como pie", () => {
+    const root = renderBody(`![El equipo tras la final](${IMAGE_URL})`);
+
+    const image = screen.getByRole("img", { name: "El equipo tras la final" });
+    expect(image).toHaveAttribute("src", IMAGE_URL);
+    expect(root.querySelector(".news-body-image-caption")?.textContent).toBe(
+      "El equipo tras la final",
+    );
+  });
+
+  it("sin texto alternativo lleva alt vacío y no tiene pie", () => {
+    const root = renderBody(`![](${IMAGE_URL})`);
+
+    const image = root.querySelector("img");
+    expect(image).toHaveAttribute("src", IMAGE_URL);
+    expect(image).toHaveAttribute("alt", "");
+    expect(root.querySelector(".news-body-image-caption")).toBeNull();
+  });
+
+  it("no anida bloques dentro del párrafo que la envuelve", () => {
+    const root = renderBody(`Antes ![pie](${IMAGE_URL}) después`);
+
+    const paragraph = root.querySelector("p");
+    expect(paragraph?.querySelector("div, figure, p")).toBeNull();
+    expect(paragraph?.querySelector("img")).not.toBeNull();
+  });
+
+  it("una imagen con la ruta del club en otro dominio no se carga", () => {
+    const root = renderBody(`![pie](https://otro-sitio.test${IMAGE_URL})`);
+
+    expect(root.querySelector("img")).toBeNull();
   });
 });

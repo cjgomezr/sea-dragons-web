@@ -1,7 +1,10 @@
 // @vitest-environment node
 import sharp from "sharp";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { shrinkNewsCover } from "@/lib/news/shrink-news-cover";
+import {
+  shrinkNewsCover,
+  shrinkNewsInlineImage,
+} from "@/lib/news/shrink-news-cover";
 
 /**
  * La reducción de la portada de una publicación (#591, RF-2 del PRD de E22)
@@ -68,6 +71,36 @@ describe("shrinkNewsCover", () => {
     const broken = (await aPicture(400, 300)).slice(0, 40);
 
     const result = await shrinkNewsCover(broken);
+
+    expect(result).toEqual({ kind: "undecodable" });
+  });
+});
+
+describe("shrinkNewsInlineImage (#603)", () => {
+  it("reduce la imagen del cuerpo a un WebP de 1600 px por su lado mayor", async () => {
+    const result = await shrinkNewsInlineImage(
+      await aPicture(1800, 3200, "png"),
+    );
+
+    expect(
+      result.kind === "shrunk" && (await describeVersion(result.image)),
+    ).toEqual([900, 1600, "webp"]);
+  });
+
+  it("no agranda una imagen más pequeña", async () => {
+    const result = await shrinkNewsInlineImage(await aPicture(800, 600));
+
+    expect(
+      result.kind === "shrunk" && (await describeVersion(result.image)),
+    ).toEqual([800, 600, "webp"]);
+  });
+
+  it("avisa de que no se puede decodificar en vez de lanzar", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await shrinkNewsInlineImage(
+      Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]),
+    );
 
     expect(result).toEqual({ kind: "undecodable" });
   });

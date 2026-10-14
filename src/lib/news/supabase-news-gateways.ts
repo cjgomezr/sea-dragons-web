@@ -7,6 +7,7 @@ import { signProfilePhotoUrl } from "@/lib/members/supabase-profile-photo-gatewa
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 import { createNewsCoversGateway } from "./supabase-news-covers-gateway";
+import { createNewsInlineImagesGateway } from "./supabase-news-inline-images-gateway";
 import {
   NEWS_CATEGORIES,
   type NewNewsPost,
@@ -617,6 +618,7 @@ export function createNewsGateways(
       unpinPost: (command) => unpinPost(serviceClient, command),
     },
     covers: createNewsCoversGateway(serviceClient),
+    inlineImages: createNewsInlineImagesGateway(serviceClient),
     authorPhotos: {
       signPhotoUrl: (photoPath) =>
         signProfilePhotoUrl(serviceClient, photoPath),

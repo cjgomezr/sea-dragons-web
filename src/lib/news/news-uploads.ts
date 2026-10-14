@@ -10,6 +10,10 @@ import {
 import { resolveNewsCoverUpload } from "./news-cover-uploads";
 import { sweepStaleNewsCovers } from "./news-covers";
 import {
+  linkNewsInlineImages,
+  sweepStaleNewsInlineImages,
+} from "./news-inline-images";
+import {
   type NewsPinChange,
   applyNewsPinChange,
   authorizeNewsPinChange,
@@ -217,6 +221,20 @@ async function sweepStaleUploads(
   }
 }
 
+/** Las imágenes del cuerpo (#603) van con la publicación o no va ninguna:
+ * sin ligarlas, su audiencia no las vería. */
+async function linkInlineImagesOrUndo(
+  gateways: NewsAttachmentGateways,
+  request: { readonly callerId: string; readonly post: NewsPost },
+): Promise<void> {
+  try {
+    await linkNewsInlineImages(gateways, request);
+  } catch (error) {
+    await undoPublication(gateways, request.post.id, []);
+    throw error;
+  }
+}
+
 /** Las subidas ya copiadas sobran. Si no se pueden borrar, las recoge la
  * limpieza de lo abandonado: ya no las nombra ninguna fila. */
 async function removePublishedUploads(
@@ -250,10 +268,10 @@ async function findPublishedPost(
   return stored;
 }
 
-/** Publica con los adjuntos y la portada (#591) que se subieron mientras se
- * escribía. Primero se valida todo, subidas incluidas, y sólo entonces se
- * escribe. La audiencia se entera al final, con la publicación ya entera
- * (#332).
+/** Publica con los adjuntos, la portada (#591) y las imágenes del cuerpo
+ * (#603) que se subieron mientras se escribía. Primero se valida todo,
+ * subidas incluidas, y sólo entonces se escribe. La audiencia se entera al
+ * final, con la publicación ya entera (#332).
  *
  * Si la publicación se deshace a medias, la portada queda sin publicación
  * que la apunte: se puede reintentar con ella, y si no, la recoge la
@@ -296,6 +314,7 @@ export async function publishNewsPostWithUploads(
     ...newPost,
     coverUploadId: cover === null ? null : cover.id,
   });
+  await linkInlineImagesOrUndo(gateways, { callerId: request.callerId, post });
   const attachments = await attachUploads(gateways, post, uploads);
   await applyNewsPinChange(gateways, {
     actor: { id: request.callerId, clubId: post.clubId },
@@ -305,6 +324,10 @@ export async function publishNewsPostWithUploads(
   await removePublishedUploads(gateways, uploads);
   await sweepStaleUploads(gateways, publisher, request.now);
   await sweepStaleNewsCovers(gateways.covers, {
+    uploadedBy: request.callerId,
+    now: request.now,
+  });
+  await sweepStaleNewsInlineImages(gateways, {
     uploadedBy: request.callerId,
     now: request.now,
   });

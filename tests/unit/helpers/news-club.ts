@@ -11,6 +11,10 @@ import type {
 } from "@/lib/news/news-posts";
 import { isNewsPinActive } from "@/lib/news/news-pin-rule";
 import { type NewsCoverRef, newsCoverPathsOf } from "@/lib/news/news-covers";
+import {
+  type NewsInlineImage,
+  newsInlineImagePathOf,
+} from "@/lib/news/news-inline-images";
 
 /**
  * Un club en memoria para los tests del dominio de noticias. El doble cumple
@@ -51,6 +55,12 @@ export type FakeCover = NewsCoverRef & {
 
 export const COVER_SIGNED_URL_PREFIX = "https://storage.test/covers/";
 
+/** Una imagen del cuerpo subida (#603), con la publicación que la liga y
+ * cuándo llegó. */
+export type FakeInlineImage = NewsInlineImage & { readonly createdAt: string };
+
+export const INLINE_IMAGE_SIGNED_URL_PREFIX = "https://storage.test/images/";
+
 /** La hora de la base para fijar y desfijar: lo que sería su `now()`. */
 export const DATABASE_NOW = "2026-10-13T10:00:00.000Z";
 
@@ -65,6 +75,8 @@ export type FakeClubOptions = {
   readonly editedMeanwhileAt?: string;
   /** Las portadas subidas; sus dos ficheros están en el almacenamiento. */
   readonly covers?: readonly FakeCover[];
+  /** Las imágenes del cuerpo subidas; su fichero está en el almacenamiento. */
+  readonly inlineImages?: readonly FakeInlineImage[];
 };
 
 export type FakeClub = {
@@ -80,6 +92,10 @@ export type FakeClub = {
   readonly covers: FakeCover[];
   /** Las rutas de las portadas que hay en el almacenamiento. */
   readonly coverFiles: Set<string>;
+  /** Las filas de las imágenes del cuerpo como están ahora. */
+  readonly inlineImages: FakeInlineImage[];
+  /** Las rutas de las imágenes del cuerpo que hay en el almacenamiento. */
+  readonly inlineImageFiles: Set<string>;
 };
 
 /** El id que recibe la publicación que guarda el doble. */
@@ -247,6 +263,87 @@ function createFakeCovers(
   };
 }
 
+/** Un club sin ninguna imagen en el cuerpo, para quien sólo lee el feed. */
+export function fakeImagelessGateway(): NewsGateways["inlineImages"] {
+  return createFakeInlineImages([], new Set());
+}
+
+const INLINE_IMAGE_STORED_AT = "2026-09-27T10:00:00.000Z";
+
+function replaceImage(
+  images: FakeInlineImage[],
+  imageId: string,
+  change: Partial<FakeInlineImage>,
+): void {
+  const index = images.findIndex((image) => image.id === imageId);
+  const current = images[index];
+  if (current !== undefined) {
+    images[index] = { ...current, ...change };
+  }
+}
+
+/** Las imágenes del cuerpo en memoria. La fila dice a qué publicación va,
+ * como `news_inline_images.post_id`. */
+function createFakeInlineImages(
+  images: FakeInlineImage[],
+  files: Set<string>,
+): NewsGateways["inlineImages"] {
+  return {
+    upload: async ({ storagePath }) => {
+      files.add(storagePath);
+    },
+    removeFiles: async (paths) => {
+      for (const path of paths) {
+        files.delete(path);
+      }
+    },
+    signUrl: async (path) =>
+      files.has(path) ? `${INLINE_IMAGE_SIGNED_URL_PREFIX}${path}` : null,
+    insertImage: async (image) => {
+      images.push({
+        ...image,
+        postId: null,
+        createdAt: INLINE_IMAGE_STORED_AT,
+      });
+    },
+    findImages: async (imageIds) =>
+      images
+        .filter((image) => imageIds.includes(image.id))
+        .map(({ id, clubId, uploadedBy, postId }) => ({
+          id,
+          clubId,
+          uploadedBy,
+          postId,
+        })),
+    findPostImages: async (postId) =>
+      images
+        .filter((image) => image.postId === postId)
+        .map(({ id, clubId }) => ({ id, clubId })),
+    linkImages: async ({ postId, imageIds }) => {
+      for (const imageId of imageIds) {
+        replaceImage(images, imageId, { postId });
+      }
+    },
+    findStaleImages: async ({ uploadedBy, createdBefore }) =>
+      images
+        .filter(
+          (image) =>
+            image.uploadedBy === uploadedBy &&
+            image.createdAt < createdBefore &&
+            image.postId === null,
+        )
+        .map(({ id, clubId }) => ({ id, clubId })),
+    deleteImage: async (imageId) => {
+      const index = images.findIndex((image) => image.id === imageId);
+      images.splice(index, 1);
+    },
+  };
+}
+
+function inlineImageFilesOf(images: readonly FakeInlineImage[]): Set<string> {
+  return new Set(images.map((image) => newsInlineImagePathOf(image)));
+}
+
 export function fakeClub(options: FakeClubOptions = {}): FakeClub {
   const inserted: NewNewsPost[] = [];
   const feedQueries: NewsFeedQuery[] = [];
@@ -256,6 +353,8 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
   const posts = [...(options.posts ?? [])];
   const covers = [...(options.covers ?? [])];
   const coverFiles = coverFilesOf(covers);
+  const inlineImages = [...(options.inlineImages ?? [])];
+  const inlineImageFiles = inlineImageFilesOf(inlineImages);
   const indexOf = (clubId: string, postId: string): number =>
     posts.findIndex((post) => post.id === postId && post.clubId === clubId);
   const isAdmin = options.callerRole === "Admin";
@@ -334,6 +433,13 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
         null,
       deletePost: async (postId) => {
         deletedPostIds.push(postId);
+        // Como `on delete set null (post_id)`: sus imágenes vuelven a estar
+        // sin publicar.
+        for (const image of inlineImages.filter(
+          (candidate) => candidate.postId === postId,
+        )) {
+          replaceImage(inlineImages, image.id, { postId: null });
+        }
       },
       updatePost: async (edit) => {
         const index = indexOf(edit.clubId, edit.postId);
@@ -424,6 +530,7 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
       },
     },
     covers: createFakeCovers(covers, coverFiles, posts),
+    inlineImages: createFakeInlineImages(inlineImages, inlineImageFiles),
     authorPhotos: fakeAuthorPhotosGateway(),
     audit: {
       insertAuditLogRow: async (row) => {
@@ -442,5 +549,7 @@ export function fakeClub(options: FakeClubOptions = {}): FakeClub {
     audited,
     covers,
     coverFiles,
+    inlineImages,
+    inlineImageFiles,
   };
 }

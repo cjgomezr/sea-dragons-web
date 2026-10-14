@@ -29,10 +29,14 @@ import { createSupabaseNewsPublishGateways } from "./supabase-news-publish-gatew
 export const NEWS_ATTACHMENT_FILE_NAME_PARAM = "name";
 
 /** Qué se sube por el flujo de subidas previas: un adjunto (lo de siempre,
- * sin el parámetro) o la portada (#591). */
+ * sin el parámetro), la portada (#591) o una imagen del cuerpo (#603). */
 export const NEWS_UPLOAD_KIND_PARAM = "kind";
 
-export const NEWS_UPLOAD_KINDS = ["attachment", "cover"] as const;
+export const NEWS_UPLOAD_KINDS = [
+  "attachment",
+  "cover",
+  "inline_image",
+] as const;
 
 export type NewsUploadKind = (typeof NEWS_UPLOAD_KINDS)[number];
 
@@ -41,6 +45,7 @@ const TOO_LARGE_CODES: Readonly<
 > = {
   attachment: "attachment_too_large",
   cover: "cover_too_large",
+  inline_image: "inline_image_too_large",
 };
 
 export type NewsAttachmentUpload = {
@@ -63,7 +68,7 @@ export function readNewsUploadKind(request: NextRequest): NewsUploadKind {
   if (known === undefined) {
     throw new ApiError(
       "validation_error",
-      `El tipo de subida tiene que ser ${NEWS_UPLOAD_KINDS.join(" o ")}.`,
+      `El tipo de subida tiene que ser uno de: ${NEWS_UPLOAD_KINDS.join(", ")}.`,
     );
   }
   return known;

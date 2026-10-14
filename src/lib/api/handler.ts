@@ -6,12 +6,14 @@ import {
   type ApiErrorBody,
   type ApiFile,
   type ApiFileBody,
+  type ApiRedirect,
   type ApiSuccessBody,
   type ApiSuccessStatus,
   NO_CONTENT_STATUS,
   apiError,
   apiFile,
   apiNoContent,
+  apiRedirect,
   apiSuccess,
 } from "./response";
 
@@ -30,11 +32,12 @@ export type ApiRouteHandler<T> = (
 ) => Promise<NextResponse<ApiResponseBody<T> | ApiFileBody | null>>;
 
 /** Lo que devuelve un handler: un valor que va en `{ data }`, nada, que sale
- * como 204 sin cuerpo, o un archivo para descargar. */
+ * como 204 sin cuerpo, un archivo para descargar o una redirección. */
 type ApiHandlerResult<T> =
   | { readonly data: T; readonly status?: ApiSuccessStatus }
   | { readonly status: typeof NO_CONTENT_STATUS }
-  | { readonly file: ApiFile };
+  | { readonly file: ApiFile }
+  | { readonly redirect: ApiRedirect };
 /** Una modificación que la respuesta de la ruta tiene que llevar pase lo que
  * pase, también si el handler termina lanzando. El caso que la pide es el
  * endpoint de la sesión: las cookies que Supabase emite al cerrar sesión o al
@@ -167,6 +170,9 @@ export function createApiRoute<T, Body = undefined>(
       });
       if ("file" in result) {
         return decorated(apiFile(result.file));
+      }
+      if ("redirect" in result) {
+        return decorated(apiRedirect(result.redirect));
       }
       if (!("data" in result)) {
         return decorated(apiNoContent());
