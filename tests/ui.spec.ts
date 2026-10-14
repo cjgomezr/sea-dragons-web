@@ -12960,10 +12960,6 @@ type PublishState = {
   readonly prepare: (page: Page) => Promise<void>;
 };
 
-/** El día en que se aceptó la línea base de `publicar-fijando` (#599),
- * miércoles 14 de octubre de 2026 a las 11:00 en Melbourne. */
-const PUBLISH_PIN_NOW = new Date("2026-10-14T00:00:00.000Z");
-
 const PUBLISH_STATES_EN: readonly PublishState[] = [
   { name: "publicar-sin-portada", prepare: async () => undefined },
   {
@@ -13015,11 +13011,8 @@ const PUBLISH_STATES_EN: readonly PublishState[] = [
     },
   },
   {
-    // La caja de fijar encendida, como el mockup (#599). La fecha de fin
-    // ("Unpins automatically on 28 Oct.") sale de hoy más dos semanas: sin
-    // fijar la hora, la línea base caducaba al día siguiente.
+    // La caja de fijar encendida, como el mockup (#599).
     name: "publicar-fijando",
-    beforeVisit: (page) => page.clock.setFixedTime(PUBLISH_PIN_NOW),
     prepare: async (page) => {
       await fillPublishForm(page);
       const pin = page.getByRole("switch", {
@@ -13045,14 +13038,7 @@ const PUBLISH_STATES_EN: readonly PublishState[] = [
 const PUBLISH_STATES: readonly PublishState[] = PUBLISH_STATES_EN.flatMap(
   (state) => [
     state,
-    {
-      ...state,
-      name: `${state.name}-es`,
-      beforeVisit: async (page) => {
-        await state.beforeVisit?.(page);
-        await chooseSpanish(page);
-      },
-    },
+    { ...state, name: `${state.name}-es`, beforeVisit: chooseSpanish },
   ],
 );
 
