@@ -7580,12 +7580,6 @@ a.auth-brand-header:focus-visible {
      hasta los 44 por el relleno del grupo. */
   /* "Aviso" en inglés es "Announcement": en un tercio de 375 px sólo cabe
      con la letra y los huecos del mockup. */
-  /* Cada segmento mide lo que su texto: a partes iguales "Announcement" no
-     cabe en un tercio con la letra de Linux, y "News" deja hueco de sobra. */
-  .news-publish-form-phone .news-category-field .news-category-segment {
-    flex: 1 1 auto;
-  }
-
   .news-publish-form-phone .news-category-segment label {
     gap: 6px;
     min-height: 40px;
@@ -7598,9 +7592,11 @@ a.auth-brand-header:focus-visible {
     height: auto;
   }
 
-  /* A 320 px ni así: se quita el punto de color, que repite lo que dice,
-     y la letra baja un punto. */
-  @media (width < 360px) {
+  /* Con la letra de Linux, "Announcement" en negrita de 13 px mide 110 px:
+     con su punto sólo cabe en un tercio desde 440 px de ancho. Por debajo se
+     quita el punto, que repite lo que dice, y la letra baja un punto (102 px
+     en un tercio de 108 a 375 px). */
+  @media (width < 440px) {
     .news-publish-form-phone .news-category-field .news-category-dot {
       display: none;
     }
@@ -7608,6 +7604,23 @@ a.auth-brand-header:focus-visible {
     .news-publish-form-phone .news-category-field label {
       padding: 0 2px;
       font-size: 12px;
+    }
+  }
+
+  /* Por debajo de 375 px ni así: la elegida pierde la negrita (el fondo ya
+     la marca) y las letras se juntan un poco, 89 px en un tercio de 93. */
+  @media (width < 375px) {
+    .news-publish-form-phone .news-category-field label {
+      padding: 0;
+      letter-spacing: -0.2px;
+    }
+
+    .news-publish-form-phone
+      .news-category-field
+      .news-category-segment
+      input:checked
+      + label {
+      font-weight: 400;
     }
   }
 
