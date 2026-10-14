@@ -214,7 +214,10 @@ describe("tarjeta destacada en el móvil", () => {
     expect(declarations(mobileCss(), ".news-featured-cover")).toContain(
       "height: 190px;",
     );
-    const icon = declarations(mobileCss(), ".news-featured-cover svg");
+    const icon = declarations(
+      mobileCss(),
+      ".news-featured-cover .news-cover-fallback svg",
+    );
     expect(icon).toContain("width: 64px;");
     expect(icon).toContain("height: 64px;");
   });
@@ -307,6 +310,13 @@ describe("fila de la lista en el móvil", () => {
     expect(declarations(globalsCss, ".news-row-title")).toContain(
       "font-weight: 650;",
     );
+  });
+
+  it("la línea lleva categoría, punto, hora y adjuntos: el autor, sólo para el lector", () => {
+    const block = declarations(mobileCss(), ".news-row .news-row-author");
+
+    expect(block).toContain("position: absolute;");
+    expect(block).toContain("clip: rect(0, 0, 0, 0);");
   });
 
   it("no lleva extracto", () => {

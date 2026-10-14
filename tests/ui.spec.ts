@@ -12399,7 +12399,7 @@ for (const state of MOBILE_FEED_STATES) {
     for (const theme of themes) {
       test(`matches approved baseline (${theme})`, async ({ page }) => {
         await goToNews(page, state, theme);
-        const snapshot = `${state.name}-${theme}.png`;
+        const snapshot = `${state.name}-mobile-${theme}.png`;
         await createMissingLocalBaseline(snapshot, () =>
           page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true }),
         );

@@ -14,7 +14,8 @@ export type UnreadMark = "none" | "dot" | "dot-and-word";
  * Lo no leído nunca se cuenta sólo con el color del punto: la destacada
  * escribe "Nueva" al lado, y en la fila la palabra la oye el lector de
  * pantalla. En el móvil (#600) la destacada lleva sólo el punto, como la
- * fila: la palabra queda para el lector de pantalla.
+ * fila: la palabra queda para el lector de pantalla. La fila tampoco
+ * enseña ahí el autor, que el lector de pantalla sigue oyendo.
  */
 export function NewsFeedMeta({
   translate,
@@ -58,8 +59,10 @@ export function NewsFeedMeta({
             now,
           )}
         </time>
-        <span aria-hidden="true"> · </span>
-        <span>{post.author.fullName}</span>
+        <span className="news-row-author">
+          <span aria-hidden="true"> · </span>
+          <span>{post.author.fullName}</span>
+        </span>
       </span>
       {children}
     </p>

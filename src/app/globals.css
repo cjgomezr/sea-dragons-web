@@ -6174,7 +6174,7 @@ a.auth-brand-header:focus-visible {
     height: 190px;
   }
 
-  .news-featured-cover svg {
+  .news-featured-cover .news-cover-fallback svg {
     width: 64px;
     height: 64px;
   }
@@ -6189,9 +6189,11 @@ a.auth-brand-header:focus-visible {
   }
 
   /* Lo que la píldora y el punto ya dicen a la vista sigue para el lector de
-     pantalla, con hasta cuándo está fijada. */
+     pantalla, con hasta cuándo está fijada. La línea de la fila deja el
+     autor fuera de la vista, como el diseño, pero no del lector. */
   .news-featured-status,
-  .news-unread-word {
+  .news-unread-word,
+  .news-row .news-row-author {
     position: absolute;
     width: 1px;
     height: 1px;
