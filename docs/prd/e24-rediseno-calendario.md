@@ -1,6 +1,6 @@
 # PRD: E24 · El rediseño del calendario
 
-**Estado:** borrador · **Fecha:** 14 de octubre de 2026 · **Autor:** sesión de planificación (Claude Code)
+**Estado:** aprobado · **Fecha:** 14 de octubre de 2026 · **Autor:** sesión de planificación (Claude Code)
 
 Fuente: el diseño que el dueño hizo con Claude Design, guardado en `docs/design/design_handoff_calendar/` (el prototipo `Calendar Upgrade.dc.html`, su `README.md` de handoff, `support.js`, `image-slot.js` y ocho capturas en `screenshots/`). Se construyen **1a** (agenda y panel) y **1c** (crear y editar) en escritorio, y **2a**, **2b** y **2c** en móvil, por debajo de 768 px. La **1b** (rejilla del mes) es una exploración y no se construye. Es una épica añadida después del plan. Cambia cómo se presenta E7 y le añade lo que E7 dejó fuera a propósito: la hora de fin (su sección de fuera de alcance), la imagen, el lugar con mapa y el archivo para el calendario personal.
 
