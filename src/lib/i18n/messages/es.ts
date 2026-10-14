@@ -1809,7 +1809,7 @@ export const spanishMessages: MessageCatalog = {
     "Escríbela, elige quién la ve y adjunta los documentos que hagan falta. Sale arriba del feed en cuanto la publicas.",
   "news.publish.loading": "Cargando los grupos del club…",
   "news.publish.loadFailed":
-    "No pudimos cargar los grupos del club. Vuelve a intentarlo.",
+    "No pudimos cargar el formulario. Vuelve a intentarlo.",
   "news.publish.category": "Categoría",
   "news.publish.titleLabel": "Título",
   "news.publish.body": "Mensaje",

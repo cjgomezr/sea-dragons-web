@@ -7386,6 +7386,22 @@ a.auth-brand-header:focus-visible {
   border: none;
 }
 
+/* Las duraciones usan el segmentado de la categoría, a la medida de la tira
+   del feed. "Hasta que la desfije" es largo: si no caben, bajan de línea en
+   vez de ensanchar la página. */
+.news-pin-field-durations .news-category-segments {
+  flex-wrap: wrap;
+}
+
+.news-pin-field-durations .news-category-segment {
+  flex: 1 1 auto;
+}
+
+.news-pin-field-durations .news-category-segment label {
+  padding: 0 var(--space-3);
+  font-size: 13px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .news-pin-switch::before {
     transition: none;

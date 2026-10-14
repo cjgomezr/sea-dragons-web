@@ -1798,7 +1798,7 @@ export const englishMessages = {
   "news.publish.lead":
     "Write it, choose who sees it and attach any documents. It goes to the top of the feed as soon as you publish.",
   "news.publish.loading": "Loading the club's groups…",
-  "news.publish.loadFailed": "We couldn't load the club's groups. Try again.",
+  "news.publish.loadFailed": "We couldn't load the form. Try again.",
   "news.publish.category": "Category",
   "news.publish.titleLabel": "Title",
   "news.publish.body": "Message",

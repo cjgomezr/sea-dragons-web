@@ -54,6 +54,7 @@ type Call = {
 const calls: Call[] = [];
 let feedPinned: FeedPinned;
 let editable: EditableNewsPost;
+let isFeedDown: boolean;
 
 function jsonResponse(status: number, payload: unknown): Response {
   return new Response(JSON.stringify(payload), {
@@ -112,6 +113,11 @@ function respondTo(call: Call): Response {
     case `GET ${GROUPS_PATH}`:
       return jsonResponse(200, { data: { groups: [] } });
     case `GET ${FEED_PATH}`:
+      if (isFeedDown) {
+        return jsonResponse(500, {
+          error: { code: "internal", message: "internal" },
+        });
+      }
       return jsonResponse(200, {
         data: {
           pinned: feedPinned === null ? null : feedItem(feedPinned),
@@ -203,6 +209,7 @@ beforeEach(() => {
   calls.length = 0;
   feedPinned = null;
   editable = EDITABLE;
+  isFeedDown = false;
   push.mockReset();
   window.sessionStorage.clear();
   stubApi();
@@ -241,6 +248,29 @@ describe("quién ve la caja", () => {
     await openPublish();
 
     expect(screen.queryByRole("radio", { name: "2 weeks" })).toBeNull();
+  });
+});
+
+describe("si no se puede leer la fijada vigente", () => {
+  it("publicar no enseña el formulario y ofrece reintentar", async () => {
+    isFeedDown = true;
+
+    render(<NewsPublishScreen locale="en" canPin />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't load the form. Try again.",
+    );
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+  });
+
+  it("editar no enseña el formulario y ofrece reintentar", async () => {
+    isFeedDown = true;
+
+    render(<NewsEditScreen locale="en" postId={POST_ID} canPin />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't load the post. Try again.",
+    );
   });
 });
 

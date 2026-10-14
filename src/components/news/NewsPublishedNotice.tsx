@@ -12,8 +12,9 @@ import {
 
 /**
  * "Publicada · avisamos a {audiencia}" en el feed, al volver de publicar
- * (#597), o "Publicada y fijada…" si salió fijada (#599). La región de estado está siempre, vacía si no hay nada que decir, y
- * no ocupa sitio vacía: el feed no se mueve por ella.
+ * (#597), o "Publicada y fijada…" si salió fijada (#599). La región de
+ * estado está siempre, vacía si no hay nada que decir, y no ocupa sitio
+ * vacía: el feed no se mueve por ella.
  */
 
 function describeAudience(
