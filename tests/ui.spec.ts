@@ -14286,7 +14286,8 @@ test.describe("categorías de evaluación en el navegador", () => {
 const NEWS_MANAGE_ENDPOINT = `${NEWS_PUBLISH_ENDPOINT}/${NEWS_OWN_POST_ID}`;
 const NEWS_STATUS_ENDPOINT = `${NEWS_MANAGE_ENDPOINT}/status`;
 const EDIT_HEADING = /^(Edit post|Editar publicación)$/;
-const SAVE_BUTTON = /^(Save changes|Guardar cambios)$/;
+// En el móvil el botón de guardar es el de la barra (#602), "Save".
+const SAVE_BUTTON = /^(Save changes|Guardar cambios|Save|Guardar)$/;
 const newsEditPath = (id: string): string => `${postPath(id)}/editar`;
 
 /** La portada firmada de la publicación que se edita, servida por el test. */

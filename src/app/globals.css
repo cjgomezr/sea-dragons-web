@@ -7580,6 +7580,12 @@ a.auth-brand-header:focus-visible {
      hasta los 44 por el relleno del grupo. */
   /* "Aviso" en inglés es "Announcement": en un tercio de 375 px sólo cabe
      con la letra y los huecos del mockup. */
+  /* Cada segmento mide lo que su texto: a partes iguales "Announcement" no
+     cabe en un tercio con la letra de Linux, y "News" deja hueco de sobra. */
+  .news-publish-form-phone .news-category-field .news-category-segment {
+    flex: 1 1 auto;
+  }
+
   .news-publish-form-phone .news-category-segment label {
     gap: 6px;
     min-height: 40px;
