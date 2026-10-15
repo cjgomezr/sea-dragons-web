@@ -1251,6 +1251,7 @@ export const englishMessages = {
   "payments.levyPayers.csv.column.name": "Name",
   "payments.levyPayers.csv.column.email": "Email",
   "payments.levyPayers.csv.column.units": "Units",
+  "payments.levyPayers.csv.column.option": "Option",
   "payments.levyPayers.csv.column.date": "Payment date",
   "payments.levyPayers.csv.column.amount": "Amount (AUD)",
   "payments.levyPayers.csv.fileName": "payments",

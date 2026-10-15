@@ -30,6 +30,7 @@ type ProductShape = {
   readonly priceActive?: boolean;
   readonly unitAmount?: number;
   readonly kind?: string;
+  readonly options?: string;
 };
 
 function product(shape: ProductShape): Stripe.Product {
@@ -39,7 +40,12 @@ function product(shape: ProductShape): Stripe.Product {
     name: shape.name,
     description: `${shape.name}, descripción`,
     active: shape.active ?? true,
-    metadata: { seadragons_kind: shape.kind ?? "levy" },
+    metadata: {
+      seadragons_kind: shape.kind ?? "levy",
+      ...(shape.options === undefined
+        ? {}
+        : { seadragons_options: shape.options }),
+    },
     default_price: {
       id: shape.priceId ?? `price_${shape.id}`,
       object: "price",
@@ -75,6 +81,7 @@ function payment(
     amountCents: 6000,
     description: null,
     paidAt: "2026-10-01T10:00:00.000Z",
+    option: null,
     ...shape,
   };
 }
@@ -142,6 +149,7 @@ describe("readLevySales", () => {
         status: "open",
         soldQuantity: 0,
         buyerCount: 0,
+        soldByOption: [],
       },
       {
         productId: "prod_dinner",
@@ -152,6 +160,7 @@ describe("readLevySales", () => {
         status: "open",
         soldQuantity: 0,
         buyerCount: 0,
+        soldByOption: [],
       },
     ]);
   });
@@ -168,6 +177,53 @@ describe("readLevySales", () => {
     expect(sales[0]).toMatchObject({ soldQuantity: 6, buyerCount: 2 });
   });
 
+  it("da las unidades vendidas de cada opción en el orden de Stripe (#637)", async () => {
+    const jersey = product({
+      id: "prod_jersey",
+      name: "Jersey",
+      options: "S,M,L",
+    });
+
+    const sales = await readSales({
+      products: [jersey],
+      payments: [
+        payment("prod_jersey", "alba", { quantity: 2, option: "M" }),
+        payment("prod_jersey", "bruno", { quantity: 1, option: "S" }),
+        payment("prod_jersey", "carla", { quantity: 3, option: "M" }),
+      ],
+    });
+
+    expect(sales[0]?.soldByOption).toEqual([
+      { option: "S", quantity: 1 },
+      { option: "M", quantity: 5 },
+    ]);
+  });
+
+  it("conserva detrás las opciones que el comité ya quitó de la lista (#637)", async () => {
+    const jersey = product({ id: "prod_jersey", name: "Jersey", options: "M" });
+
+    const sales = await readSales({
+      products: [jersey],
+      payments: [
+        payment("prod_jersey", "alba", { option: "XS" }),
+        payment("prod_jersey", "bruno", { option: "M" }),
+      ],
+    });
+
+    expect(sales[0]?.soldByOption).toEqual([
+      { option: "M", quantity: 1 },
+      { option: "XS", quantity: 1 },
+    ]);
+  });
+
+  it("no da desglose de las compras sin opción (#637)", async () => {
+    const sales = await readSales({
+      payments: [payment("prod_hoodie", "alba", { quantity: 2 })],
+    });
+
+    expect(sales[0]?.soldByOption).toEqual([]);
+  });
+
   it("no lleva ninguna cifra de dinero agregada (D3)", async () => {
     const sales = await readSales({
       payments: [payment("prod_hoodie", "alba", { quantity: 2 })],
@@ -182,6 +238,7 @@ describe("readLevySales", () => {
       "name",
       "priceId",
       "productId",
+      "soldByOption",
       "soldQuantity",
       "status",
     ]);
@@ -207,6 +264,7 @@ describe("readLevySales", () => {
       status: "closed",
       soldQuantity: 1,
       buyerCount: 1,
+      soldByOption: [],
     });
   });
 
@@ -245,6 +303,7 @@ describe("readLevySales", () => {
       status: "closed",
       soldQuantity: 3,
       buyerCount: 2,
+      soldByOption: [],
     });
   });
 
@@ -338,7 +397,7 @@ function buyersGateways(fakes: BuyersFakes = {}): LevyBuyersGateways {
 }
 
 describe("readLevyBuyers", () => {
-  it("da una fila por compra, de la más reciente a la más antigua", async () => {
+  it("da una fila por compra con su opción, de la más reciente a la más antigua", async () => {
     const buyers = await readLevyBuyers(
       buyersGateways({
         payments: [
@@ -346,6 +405,7 @@ describe("readLevyBuyers", () => {
             quantity: 2,
             amountCents: 12000,
             paidAt: "2026-10-01T10:00:00.000Z",
+            option: "M",
           }),
           payment("prod_hoodie", "bruno", {
             paidAt: "2026-10-03T10:00:00.000Z",
@@ -363,6 +423,7 @@ describe("readLevyBuyers", () => {
         quantity: 1,
         paidAt: "2026-10-03T10:00:00.000Z",
         amountCents: 6000,
+        option: null,
       },
       {
         userId: "alba",
@@ -371,6 +432,7 @@ describe("readLevyBuyers", () => {
         quantity: 2,
         paidAt: "2026-10-01T10:00:00.000Z",
         amountCents: 12000,
+        option: "M",
       },
     ]);
   });

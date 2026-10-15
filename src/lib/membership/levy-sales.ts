@@ -6,6 +6,7 @@ import {
   readDefaultUnitAmount,
   toCatalogProduct,
 } from "@/lib/stripe/product-catalog";
+import { readProductOptions } from "@/lib/stripe/product-options";
 import { LEVY_KIND } from "./levies";
 import type { ClubMemberRecord } from "./levy-payers";
 
@@ -28,6 +29,8 @@ export type PaidLevyPayment = {
   /** El nombre del extra cuando se compró: el webhook lo apunta así. */
   readonly description: string | null;
   readonly paidAt: string;
+  /** La opción que eligió en Checkout (#637); nula si el extra no pedía. */
+  readonly option: string | null;
 };
 
 export type LevyPaymentsGateway = {
@@ -58,6 +61,12 @@ export type LevyBuyersGateways = {
 
 export type LevySaleStatus = "open" | "closed";
 
+/** Las unidades vendidas de una opción del extra (#637). */
+export type LevyOptionSales = {
+  readonly option: string;
+  readonly quantity: number;
+};
+
 export type LevySale = {
   readonly productId: string;
   /** Con él se compra; nulo si el extra ya no tiene un precio a la venta. */
@@ -70,6 +79,9 @@ export type LevySale = {
   /** La suma de las unidades de los pagos cobrados. */
   readonly soldQuantity: number;
   readonly buyerCount: number;
+  /** En el orden de las opciones de Stripe; detrás, las que el comité ya
+   * quitó. Vacío si ninguna compra trae opción. */
+  readonly soldByOption: readonly LevyOptionSales[];
 };
 
 export type LevyBuyer = {
@@ -80,6 +92,7 @@ export type LevyBuyer = {
   readonly paidAt: string;
   /** Lo que se pagó en esa compra, en centavos. */
   readonly amountCents: number;
+  readonly option: string | null;
 };
 
 export type LevySalesReading =
@@ -89,6 +102,8 @@ export type LevySalesReading =
 type ProductSales = {
   readonly soldQuantity: number;
   readonly buyerCount: number;
+  /** Las unidades de cada opción elegida, sin orden. */
+  readonly optionQuantities: ReadonlyMap<string, number>;
   /** De ahí salen el nombre y el precio de un extra borrado de Stripe. */
   readonly latestPayment: PaidLevyPayment;
 };
@@ -117,6 +132,18 @@ function groupByProduct(
   return groups;
 }
 
+function sumOptionQuantities(
+  payments: readonly PaidLevyPayment[],
+): ReadonlyMap<string, number> {
+  const quantities = new Map<string, number>();
+  for (const { option, quantity } of payments) {
+    if (option !== null) {
+      quantities.set(option, (quantities.get(option) ?? 0) + quantity);
+    }
+  }
+  return quantities;
+}
+
 function summarizeSales(
   payments: readonly PaidLevyPayment[],
 ): ReadonlyMap<string, ProductSales> {
@@ -128,6 +155,7 @@ function summarizeSales(
         0,
       ),
       buyerCount: new Set(productPayments.map(({ userId }) => userId)).size,
+      optionQuantities: sumOptionQuantities(productPayments),
       latestPayment: productPayments.reduce((latest, payment) =>
         payment.paidAt > latest.paidAt ? payment : latest,
       ),
@@ -136,7 +164,32 @@ function summarizeSales(
   return summaries;
 }
 
-const NO_SALES = { soldQuantity: 0, buyerCount: 0 } as const;
+const NO_SALES: Omit<ProductSales, "latestPayment"> = {
+  soldQuantity: 0,
+  buyerCount: 0,
+  optionQuantities: new Map(),
+};
+
+/** Las opciones que hoy ofrece el producto van primero y en su orden; las
+ * que el comité quitó después de venderlas, detrás y por orden alfabético. */
+function listSoldByOption(
+  optionQuantities: ReadonlyMap<string, number>,
+  product: Stripe.Product | undefined,
+): readonly LevyOptionSales[] {
+  const offered =
+    product === undefined
+      ? []
+      : (readProductOptions(product.metadata)?.values ?? []);
+  const sold = [...optionQuantities.keys()];
+  const ordered = [
+    ...offered.filter((option) => optionQuantities.has(option)),
+    ...sold.filter((option) => !offered.includes(option)).sort(),
+  ];
+  return ordered.map((option) => ({
+    option,
+    quantity: optionQuantities.get(option) ?? 0,
+  }));
+}
 
 /** Lo que costaba una unidad según el último pago, para el extra que Stripe
  * ya no conoce. */
@@ -161,6 +214,10 @@ function toOpenSale(
     status: "open",
     soldQuantity: (sales ?? NO_SALES).soldQuantity,
     buyerCount: (sales ?? NO_SALES).buyerCount,
+    soldByOption: listSoldByOption(
+      (sales ?? NO_SALES).optionQuantities,
+      product,
+    ),
   };
 }
 
@@ -181,6 +238,7 @@ function toClosedSale(
     status: "closed",
     soldQuantity: sales.soldQuantity,
     buyerCount: sales.buyerCount,
+    soldByOption: listSoldByOption(sales.optionQuantities, product),
   };
 }
 
@@ -255,7 +313,7 @@ export async function readLevyBuyers(
   // Sólo las compras de quien tiene ficha: es defensivo, porque borrar la
   // ficha ya borra sus pagos (`payments_member_same_club_fkey`, `0050`).
   return payments
-    .flatMap(({ userId, quantity, paidAt, amountCents }) => {
+    .flatMap(({ userId, quantity, paidAt, amountCents, option }) => {
       const buyer = membersById.get(userId);
       return buyer === undefined
         ? []
@@ -267,6 +325,7 @@ export async function readLevyBuyers(
               quantity,
               paidAt,
               amountCents,
+              option,
             },
           ];
     })
