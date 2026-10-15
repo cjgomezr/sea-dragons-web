@@ -10,8 +10,8 @@ import type { LevyBuyer } from "./levy-sales";
 /**
  * Los compradores de un extra en CSV (#531, #634): una fila por compra, con
  * sus unidades y sin faltantes (D1 del PRD de E23), con el codificador del
- * directorio (BOM, comillas y escape de fórmulas). Las cabeceras van en el idioma de la
- * pantalla; el nombre del levy es el de Stripe.
+ * directorio (BOM, comillas y escape de fórmulas). Las cabeceras van en el
+ * idioma de la pantalla; el nombre del levy es el de Stripe.
  */
 
 const CENTS_PER_DOLLAR = 100;
