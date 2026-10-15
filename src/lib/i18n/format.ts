@@ -159,6 +159,23 @@ export function formatCalendarDay(locale: Locale, isoDate: string): string {
   return CALENDAR_DAY_FORMATTERS[locale].format(parseCalendarDay(isoDate));
 }
 
+const CALENDAR_MONTH_FORMATTERS = formattersByLocale(
+  (displayLocale) =>
+    new Intl.DateTimeFormat(displayLocale, {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }),
+);
+
+/** Un mes de calendario (YYYY-MM) con su año: "October 2026", "octubre de
+ * 2026". El título de cada grupo del historial de pagos (#631). */
+export function formatCalendarMonth(locale: Locale, isoMonth: string): string {
+  return CALENDAR_MONTH_FORMATTERS[locale].format(
+    parseCalendarDay(`${isoMonth}-01`),
+  );
+}
+
 /** Las tres líneas del bloque de fecha de una fila de la agenda (#311). */
 export type CalendarDayParts = {
   readonly weekday: string;
