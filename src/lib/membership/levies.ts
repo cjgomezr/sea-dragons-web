@@ -26,6 +26,10 @@ import { type MembershipGateway, readMembership } from "./membership";
  * metadatos de la sesión para reconocer un levy. */
 export const LEVY_KIND = "levy";
 
+/** Los metadatos de la sesión que dicen hasta cuántas unidades se pudieron
+ * elegir (#632). Con una sola, el webhook no tiene que preguntar cuántas. */
+export const LEVY_MAX_QUANTITY_METADATA_KEY = "levy_max_quantity";
+
 export type Levy = {
   /** El id del `Price` de Stripe: con él se pide el Checkout. */
   readonly id: string;
@@ -33,6 +37,10 @@ export type Levy = {
   readonly description: string | null;
   /** Centavos enteros (CON-005). */
   readonly amountCents: number;
+  /** Cuántas unidades se pueden elegir en un Checkout (#632, D2). */
+  readonly maxQuantity: number;
+  /** La suma de las unidades de los pagos cobrados. */
+  readonly purchasedQuantity: number;
   readonly isPaid: boolean;
 };
 
@@ -47,9 +55,12 @@ export type LevyStripe =
 export type LevyGateways = {
   readonly membership: MembershipGateway;
   readonly memberEmails: MemberEmailGateway;
-  readonly paidProducts: {
-    /** Los productos de Stripe de los pagos que el socio ya hizo. */
-    findPaidProductIds(userId: string): Promise<ReadonlySet<string>>;
+  readonly purchases: {
+    /** Las unidades cobradas de cada producto de Stripe que el socio ya
+     * compró, por id del producto. */
+    findPurchasedQuantities(
+      userId: string,
+    ): Promise<ReadonlyMap<string, number>>;
   };
   readonly stripe: LevyStripe;
 };
@@ -69,25 +80,40 @@ export type LevyCheckoutRequest = CheckoutRequest & {
   readonly priceId: string;
 };
 
-type OfferedLevy = CatalogProduct & { readonly isPaid: boolean };
+type OfferedLevy = CatalogProduct & { readonly purchasedQuantity: number };
+
+const NOTHING_PURCHASED = 0;
+/** Checkout arranca en una unidad, y es el mínimo que se puede elegir. */
+const ONE_UNIT = 1;
 
 async function readOfferedLevies(
-  gateways: Pick<LevyGateways, "paidProducts">,
+  gateways: Pick<LevyGateways, "purchases">,
   catalog: ProductCatalogSource,
   userId: string,
 ): Promise<readonly OfferedLevy[]> {
-  const [products, paidProductIds] = await Promise.all([
+  const [products, purchasedQuantities] = await Promise.all([
     listActiveProductsOfKind(catalog, LEVY_KIND),
-    gateways.paidProducts.findPaidProductIds(userId),
+    gateways.purchases.findPurchasedQuantities(userId),
   ]);
   return products.map((product) => ({
     ...product,
-    isPaid: paidProductIds.has(product.productId),
+    purchasedQuantity:
+      purchasedQuantities.get(product.productId) ?? NOTHING_PURCHASED,
   }));
 }
 
+function isPurchased(levy: OfferedLevy): boolean {
+  return levy.purchasedQuantity > NOTHING_PURCHASED;
+}
+
+/** Un extra de una unidad se compra una vez; uno de varias, las que quiera
+ * (D2). */
+function isSingleUnit(levy: CatalogProduct): boolean {
+  return levy.maxQuantity === ONE_UNIT;
+}
+
 export async function listLevies(
-  gateways: Pick<LevyGateways, "paidProducts" | "stripe">,
+  gateways: Pick<LevyGateways, "purchases" | "stripe">,
   request: { readonly userId: string },
 ): Promise<LevyListing> {
   const { stripe } = gateways;
@@ -106,7 +132,9 @@ export async function listLevies(
       name: levy.name,
       description: levy.description,
       amountCents: levy.amountCents,
-      isPaid: levy.isPaid,
+      maxQuantity: levy.maxQuantity,
+      purchasedQuantity: levy.purchasedQuantity,
+      isPaid: isPurchased(levy),
     })),
   };
 }
@@ -128,6 +156,23 @@ async function buildLevyCustomerParams(
   return buildCustomerParams(reading.membership, gateways.memberEmails);
 }
 
+/** De varias unidades, el socio elige cuántas en Checkout. */
+function buildLevyLineItem(
+  levy: CatalogProduct,
+): Stripe.Checkout.SessionCreateParams.LineItem {
+  const lineItem = { price: levy.priceId, quantity: ONE_UNIT };
+  return isSingleUnit(levy)
+    ? lineItem
+    : {
+        ...lineItem,
+        adjustable_quantity: {
+          enabled: true,
+          minimum: ONE_UNIT,
+          maximum: levy.maxQuantity,
+        },
+      };
+}
+
 /** El nombre va en los metadatos para que el historial diga qué se pagó sin
  * volver a preguntarle a Stripe por el producto. */
 async function buildSessionParams(
@@ -137,7 +182,7 @@ async function buildSessionParams(
 ): Promise<Stripe.Checkout.SessionCreateParams> {
   return {
     mode: "payment",
-    line_items: [{ price: levy.priceId, quantity: 1 }],
+    line_items: [buildLevyLineItem(levy)],
     client_reference_id: request.userId,
     ...(await buildLevyCustomerParams(gateways, request)),
     metadata: {
@@ -145,6 +190,7 @@ async function buildSessionParams(
       kind: LEVY_KIND,
       levy_product_id: levy.productId,
       levy_name: levy.name,
+      [LEVY_MAX_QUANTITY_METADATA_KEY]: String(levy.maxQuantity),
     },
     success_url: buildPaymentsReturnUrl(
       request.origin,
@@ -157,6 +203,26 @@ async function buildSessionParams(
       "cancelado",
     ),
   };
+}
+
+/** Quien vuelve a comprar un extra dentro de la ventana de idempotencia
+ * tiene que abrir otra sesión, no recibir la que ya pagó. Lo que cambia entre
+ * las dos es cuántas unidades lleva compradas. */
+function levyIdempotencyKey(
+  params: Stripe.Checkout.SessionCreateParams,
+  levy: OfferedLevy,
+  now: Date,
+): string {
+  return idempotencyKeyFor(
+    {
+      ...params,
+      metadata: {
+        ...params.metadata,
+        purchased_quantity: String(levy.purchasedQuantity),
+      },
+    },
+    now,
+  );
 }
 
 export async function startLevyCheckout(
@@ -176,12 +242,12 @@ export async function startLevyCheckout(
   if (levy === undefined) {
     return { kind: "refused", reason: "levy_not_found" };
   }
-  if (levy.isPaid) {
+  if (isSingleUnit(levy) && isPurchased(levy)) {
     return { kind: "refused", reason: "levy_already_paid" };
   }
   const params = await buildSessionParams(levy, gateways, request);
   const session = await stripe.sessions.create(params, {
-    idempotencyKey: idempotencyKeyFor(params, request.now),
+    idempotencyKey: levyIdempotencyKey(params, levy, request.now),
   });
   if (session.url === null) {
     throw new Error(

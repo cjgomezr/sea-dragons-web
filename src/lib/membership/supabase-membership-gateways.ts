@@ -318,18 +318,22 @@ export function createPaymentHistoryGateway(
   };
 }
 
-const paidProductRowSchema = z.object({ stripe_product_id: z.string() });
+const purchasedProductRowSchema = z.object({
+  stripe_product_id: z.string(),
+  quantity: z.number().int().positive(),
+});
 
-/** Los productos de Stripe que un socio ya pagó (#473): qué levies le salen
- * como pagados. Un pago fallido o pendiente no cuenta. */
-export function createPaidProductsGateway(
+/** Las unidades que un socio ya pagó de cada producto de Stripe (#473,
+ * #632): qué levies le salen como pagados y cuántos lleva de un extra. Un
+ * pago fallido o pendiente no cuenta. */
+export function createLevyPurchasesGateway(
   client: SupabaseClient,
-): LevyGateways["paidProducts"] {
+): LevyGateways["purchases"] {
   return {
-    async findPaidProductIds(userId) {
+    async findPurchasedQuantities(userId) {
       const { data, error } = await client
         .from(PAYMENTS_TABLE)
-        .select("stripe_product_id")
+        .select("stripe_product_id, quantity")
         .eq("user_id", userId)
         .eq("status", "paid")
         .not("stripe_product_id", "is", null);
@@ -338,8 +342,12 @@ export function createPaidProductsGateway(
           `No se pudieron leer los productos pagados de ${userId}: ${error.message}`,
         );
       }
-      const rows = z.array(paidProductRowSchema).parse(data);
-      return new Set(rows.map((row) => row.stripe_product_id));
+      const rows = z.array(purchasedProductRowSchema).parse(data);
+      const quantities = new Map<string, number>();
+      for (const { stripe_product_id: productId, quantity } of rows) {
+        quantities.set(productId, (quantities.get(productId) ?? 0) + quantity);
+      }
+      return quantities;
     },
   };
 }

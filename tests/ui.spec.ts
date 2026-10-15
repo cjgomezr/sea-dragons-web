@@ -15425,6 +15425,8 @@ const NATIONALS_LEVY = {
   name: "Australian Underwater Rugby Nationals 2026 entry",
   description: "Team entry for the national championship in Perth.",
   amountCents: 8000,
+  maxQuantity: 1,
+  purchasedQuantity: 0,
   isPaid: false,
 } as const;
 
@@ -15433,12 +15435,14 @@ const POOL_HIRE_LEVY = {
   name: "Extra pool hire",
   description: null,
   amountCents: 1250,
+  maxQuantity: 1,
+  purchasedQuantity: 0,
   isPaid: false,
 } as const;
 
 const UNPAID_LEVIES: readonly object[] = [NATIONALS_LEVY, POOL_HIRE_LEVY];
 const ONE_PAID_LEVY: readonly object[] = [
-  { ...NATIONALS_LEVY, isPaid: true },
+  { ...NATIONALS_LEVY, purchasedQuantity: 1, isPaid: true },
   POOL_HIRE_LEVY,
 ];
 

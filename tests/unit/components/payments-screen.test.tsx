@@ -1820,6 +1820,8 @@ describe("PaymentsScreen: cobros del club (#473)", () => {
     name: "Nationals 2026",
     description: "Entry for the national championship",
     amountCents: 8000,
+    maxQuantity: 1,
+    purchasedQuantity: 0,
     isPaid: false,
   };
   const CAMP = {
@@ -1827,6 +1829,8 @@ describe("PaymentsScreen: cobros del club (#473)", () => {
     name: "Winter camp",
     description: null,
     amountCents: 12000,
+    maxQuantity: 1,
+    purchasedQuantity: 1,
     isPaid: true,
   };
 

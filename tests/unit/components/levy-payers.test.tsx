@@ -30,6 +30,8 @@ const NATIONALS = {
   name: "Nationals 2026",
   description: null,
   amountCents: 8000,
+  maxQuantity: 1,
+  purchasedQuantity: 0,
   isPaid: false,
 };
 

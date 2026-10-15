@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 import Stripe from "stripe";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { STRIPE_WEBHOOK_API_PATH } from "@/lib/auth/routes";
-import { createPaidProductsGateway } from "@/lib/membership/supabase-membership-gateways";
+import { createLevyPurchasesGateway } from "@/lib/membership/supabase-membership-gateways";
 import {
   FIXTURE_LEVY_PRODUCT_ID,
   FIXTURE_PRICES,
@@ -187,10 +187,10 @@ describeRls("el levy por el webhook contra la base", () => {
             readPaymentDescriptions(serviceClient, user),
           ).resolves.toEqual(["Nationals 2026"]);
           await expect(
-            createPaidProductsGateway(serviceClient.client).findPaidProductIds(
-              user.id,
-            ),
-          ).resolves.toEqual(new Set([FIXTURE_LEVY_PRODUCT_ID]));
+            createLevyPurchasesGateway(
+              serviceClient.client,
+            ).findPurchasedQuantities(user.id),
+          ).resolves.toEqual(new Map([[FIXTURE_LEVY_PRODUCT_ID, 1]]));
           await expect(readMembershipStatus(serviceClient, user)).resolves.toBe(
             "pending",
           );
