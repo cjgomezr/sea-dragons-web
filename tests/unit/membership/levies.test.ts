@@ -429,6 +429,41 @@ describe("startLevyCheckout", () => {
     expect(params?.metadata).toMatchObject({ levy_max_quantity: "10" });
   });
 
+  it("pide la talla en un desplegable obligatorio si el extra tiene opciones", async () => {
+    const sessions = sessionsDouble();
+    const withSizes = {
+      ...jersey(),
+      metadata: { ...jersey().metadata, seadragons_options: "S,M,L,XL" },
+    };
+
+    await payLevy(gateways({ products: [withSizes], sessions }), JERSEY_PRICE);
+
+    const [params] = sessions.create.mock.calls[0] ?? [];
+    expect(params?.custom_fields).toEqual([
+      {
+        key: "seadragonsoption",
+        type: "dropdown",
+        optional: false,
+        label: { type: "custom", custom: "Size" },
+        dropdown: {
+          options: ["S", "M", "L", "XL"].map((label, index) => ({
+            label,
+            value: `option${index + 1}`,
+          })),
+        },
+      },
+    ]);
+  });
+
+  it("no pide ninguna opción a un extra sin seadragons_options", async () => {
+    const sessions = sessionsDouble();
+
+    await payLevy(gateways({ products: [NATIONALS], sessions }));
+
+    const [params] = sessions.create.mock.calls[0] ?? [];
+    expect(params).not.toHaveProperty("custom_fields");
+  });
+
   it("deja volver a comprar un extra de varias unidades ya comprado", async () => {
     const sessions = sessionsDouble();
 
