@@ -652,15 +652,18 @@ describe("PaymentsScreen: cancelada", () => {
 });
 
 describe("PaymentsScreen: historial", () => {
-  it("pinta cada pago con su fecha, descripción, importe y estado, en el orden servido", async () => {
+  it("pinta cada pago bajo su mes con su día, descripción, método, importe y estado (#631)", async () => {
     await renderLoaded(view(panel(), { payments: PAYMENTS }));
 
     const table = screen.getByRole("table", { name: "Payment history" });
     const rows = within(table).getAllByRole("row").slice(1);
     expect(rows.map((row) => row.textContent)).toEqual([
-      "1 June 2026Monthly membership$45.00Paid",
-      "1 May 2026Membership payment$45.00Failed",
-      "12 April 2026Nationals levy$80.00Pending",
+      "June 2026",
+      "1 JunMonthly membershipVisa •••• 4242$45.00Paid",
+      "May 2026",
+      "1 MayMembership paymentYour card was declined.Visa •••• 4242$45.00Failed",
+      "April 2026",
+      "12 AprNationals levy—$80.00Pending",
     ]);
   });
 
@@ -670,8 +673,9 @@ describe("PaymentsScreen: historial", () => {
     });
 
     const table = screen.getByRole("table", { name: "Historial de pagos" });
-    const [, firstRow, secondRow] = within(table).getAllByRole("row");
-    expect(firstRow).toHaveTextContent("1 de junio de 2026");
+    const [, june, firstRow, , secondRow] = within(table).getAllByRole("row");
+    expect(june).toHaveTextContent("junio de 2026");
+    expect(firstRow).toHaveTextContent("1 jun");
     expect(firstRow).toHaveTextContent("45,00 AUD");
     expect(firstRow).toHaveTextContent("Pagado");
     expect(secondRow).toHaveTextContent("Pago de membresía");
@@ -1731,6 +1735,17 @@ describe("PaymentsScreen: saldo de sesiones (#472)", () => {
       "3 October 2026Training session-1",
       "1 October 2026Pack of 5 sessions+5",
     ]);
+  });
+
+  it("pone los movimientos debajo del historial de pagos (#631)", async () => {
+    await renderLoaded(view(CASUAL, { sessionBalance: MOVEMENTS }));
+
+    const history = screen.getByRole("region", { name: "Payment history" });
+    const activity = screen.getByRole("region", { name: "Session activity" });
+    expect(
+      history.compareDocumentPosition(activity) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("sin movimientos lo dice con una frase", async () => {

@@ -249,13 +249,13 @@ function MembershipPanel({
           canSeePayers={false}
         />
       ) : null}
+      <PaymentHistory translate={translate} payments={view.payments} />
       {membership?.plan === "Casual" ? (
         <SessionActivity
           translate={translate}
           movements={view.sessionBalance.movements}
         />
       ) : null}
-      <PaymentHistory translate={translate} payments={view.payments} />
     </div>
   );
 }

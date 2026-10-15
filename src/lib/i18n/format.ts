@@ -1,5 +1,5 @@
 import type { IsoWeekday } from "@/lib/events/event-occurrences";
-import { CLUB_TIME_ZONE } from "@/lib/time/club-calendar";
+import { CLUB_TIME_ZONE, clubCalendarDate } from "@/lib/time/club-calendar";
 import type { Locale } from "./locale";
 
 /** Las variantes con las que se escriben fechas y números. El inglés es el
@@ -218,6 +218,17 @@ export function formatCalendarDayParts(
       .slice(0, MONTH_ABBREVIATION_LENGTH)
       .join(""),
   };
+}
+
+/** El día del club en que pasó algo, en corto y con el mes recortado igual
+ * que el bloque de la agenda ("1 Oct", "18 sep"): la fecha de una fila del
+ * historial de pagos (#631), que no puede cambiar de ancho según el ICU. */
+export function formatClubCompactDay(locale: Locale, instant: Date): string {
+  const { day, month } = formatCalendarDayParts(
+    locale,
+    clubCalendarDate(instant),
+  );
+  return `${Number(day)} ${month}`;
 }
 
 // Una hora de reloj sin día, como el `HH:MM` de un evento, se formatea igual
