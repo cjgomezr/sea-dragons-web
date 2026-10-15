@@ -9945,6 +9945,7 @@ a.auth-brand-header:focus-visible {
 
   button.payments-history-row:disabled {
     cursor: progress;
+    opacity: 0.6;
   }
 
   .payments-history-glyph {
