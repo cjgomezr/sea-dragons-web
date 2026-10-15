@@ -55,6 +55,7 @@ function aPayment(overrides: Partial<PaymentRecord> = {}): PaymentRecord {
     card: null,
     failureReason: null,
     quantity: 1,
+    option: null,
     ...overrides,
   };
 }
@@ -390,6 +391,7 @@ describe("readMembershipView: el historial", () => {
         card: null,
         failureReason: null,
         quantity: 1,
+        option: null,
       },
     ]);
   });
@@ -403,6 +405,14 @@ describe("readMembershipView: el historial", () => {
       description: "2026 club jersey",
       quantity: 3,
     });
+  });
+
+  it("sirve la opción que el socio eligió al comprar el extra (#637)", async () => {
+    const view = await viewOf(aRecord(), [
+      aPayment({ description: "2026 club jersey", option: "M" }),
+    ]);
+
+    expect(view.payments[0]?.option).toBe("M");
   });
 
   it("sirve la marca y los cuatro dígitos de la tarjeta con que se cobró (#629)", async () => {

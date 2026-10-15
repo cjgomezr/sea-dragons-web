@@ -13,6 +13,7 @@ import {
   LEVY_MAX_QUANTITY_METADATA_KEY,
 } from "@/lib/membership/levies";
 import { SINGLE_UNIT } from "@/lib/stripe/product-catalog";
+import { readChosenOption } from "@/lib/stripe/product-options";
 import { SESSION_PACK_METADATA_KIND } from "@/lib/membership/session-pack-checkout";
 
 /**
@@ -132,8 +133,12 @@ export type SessionPackPaidFacts = FactsOf<
 >;
 
 /** El pago de un levy (#473): un cobro suelto como el de un pack, con el
- * producto de Stripe que dice qué levy pagó el socio. */
-export type LevyPayment = SessionPackPayment & { readonly productId: string };
+ * producto de Stripe que dice qué levy pagó el socio y, si el extra la pide,
+ * la opción que eligió en Checkout (#637). */
+export type LevyPayment = SessionPackPayment & {
+  readonly productId: string;
+  readonly option: string | null;
+};
 
 /** Cuántas unidades se pagaron de un levy (#632). De un extra de una sola
  * unidad no hay nada que preguntar; de uno de varias, el evento no trae las
@@ -382,6 +387,7 @@ function readLevyFacts(
       currency: session.currency,
       description: name,
       paidAt: created,
+      option: readChosenOption(session.custom_fields),
     },
     quantity: readLevyQuantity(session),
   };

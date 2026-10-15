@@ -240,6 +240,7 @@ describeRls("la tarjeta y el motivo de cada cobro contra la base", () => {
           payment: {
             ...chargePayment("Nationals 2026"),
             productId: `prod_it_${randomUUID()}`,
+            option: null,
           },
           quantity: 1,
           card: MASTERCARD,

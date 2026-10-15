@@ -60,6 +60,7 @@ type SeededPayment = {
   readonly user: TestUser;
   readonly quantity: number;
   readonly paidAt: string;
+  readonly option: string | null;
   readonly status?: "paid" | "failed";
 };
 
@@ -84,6 +85,7 @@ async function seedPayments(
       status: payment.status ?? "paid",
       paid_at: payment.paidAt,
       quantity: payment.quantity,
+      option: payment.option,
     })),
   );
   if (error) {
@@ -93,7 +95,7 @@ async function seedPayments(
 
 describeRls("el resumen de ventas de los extras contra la base", () => {
   it(
-    "suma las unidades cobradas, cuenta los compradores y da una fila por compra",
+    "suma las unidades cobradas, por opción también, cuenta los compradores y da una fila por compra",
     async () => {
       const serviceClient = createServiceRoleTestClient(process.env);
       const clubId = await seededClubId(serviceClient);
@@ -114,13 +116,29 @@ describeRls("el resumen de ventas de los extras contra la base", () => {
             clubId,
             productId,
             payments: [
-              { user: alba, quantity: 2, paidAt: "2026-10-01T10:00:00Z" },
-              { user: alba, quantity: 1, paidAt: "2026-10-05T10:00:00Z" },
-              { user: bruno, quantity: 3, paidAt: "2026-10-03T10:00:00Z" },
+              {
+                user: alba,
+                quantity: 2,
+                paidAt: "2026-10-01T10:00:00Z",
+                option: "M",
+              },
+              {
+                user: alba,
+                quantity: 1,
+                paidAt: "2026-10-05T10:00:00Z",
+                option: null,
+              },
+              {
+                user: bruno,
+                quantity: 3,
+                paidAt: "2026-10-03T10:00:00Z",
+                option: "L",
+              },
               {
                 user: bruno,
                 quantity: 4,
                 paidAt: "2026-10-04T10:00:00Z",
+                option: "L",
                 status: "failed",
               },
             ],
@@ -158,18 +176,25 @@ describeRls("el resumen de ventas de los extras contra la base", () => {
             status: "closed",
             soldQuantity: 6,
             buyerCount: 2,
+            soldByOption: [
+              { option: "L", quantity: 3 },
+              { option: "M", quantity: 2 },
+            ],
           });
           expect(
-            buyers.map(({ fullName, quantity, paidAt, amountCents }) => [
-              fullName,
-              quantity,
-              paidAt,
-              amountCents,
-            ]),
+            buyers.map(
+              ({ fullName, quantity, paidAt, amountCents, option }) => [
+                fullName,
+                quantity,
+                paidAt,
+                amountCents,
+                option,
+              ],
+            ),
           ).toEqual([
-            ["Alba Ruiz", 1, "2026-10-05T10:00:00.000Z", UNIT_CENTS],
-            ["Bruno Díaz", 3, "2026-10-03T10:00:00.000Z", 3 * UNIT_CENTS],
-            ["Alba Ruiz", 2, "2026-10-01T10:00:00.000Z", 2 * UNIT_CENTS],
+            ["Alba Ruiz", 1, "2026-10-05T10:00:00.000Z", UNIT_CENTS, null],
+            ["Bruno Díaz", 3, "2026-10-03T10:00:00.000Z", 3 * UNIT_CENTS, "L"],
+            ["Alba Ruiz", 2, "2026-10-01T10:00:00.000Z", 2 * UNIT_CENTS, "M"],
           ]);
         });
       });

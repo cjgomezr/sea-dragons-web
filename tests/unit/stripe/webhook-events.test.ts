@@ -1109,9 +1109,35 @@ describe("checkout.session.completed de un levy", () => {
         currency: "aud",
         description: FIXTURE_LEVY_NAME,
         paidAt: secondsToDate(event.created),
+        option: null,
       },
       quantity: { kind: "single" },
     });
+  });
+
+  it("lee la opción que el socio eligió en el desplegable (#637)", () => {
+    const facts = readStripeEventFacts(
+      levyCheckout({
+        custom_fields: [
+          {
+            key: "seadragonsoption",
+            type: "dropdown",
+            optional: false,
+            label: { type: "custom", custom: "Size" },
+            dropdown: {
+              default_value: null,
+              options: [
+                { label: "S", value: "option1" },
+                { label: "M", value: "option2" },
+              ],
+              value: "option2",
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(facts).toMatchObject({ kind: "levyPaid", payment: { option: "M" } });
   });
 
   it("pide las unidades a Stripe cuando el extra dejaba elegir varias (#632)", () => {

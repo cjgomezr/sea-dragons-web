@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import { type ProductOptions, readProductOptions } from "./product-options";
 
 /**
  * Los productos que el club crea en Stripe para venderlos sueltos (#473,
@@ -50,6 +51,8 @@ export type CatalogProduct = {
   readonly amountCents: number;
   /** De 1 a `STRIPE_MAX_ADJUSTABLE_QUANTITY`. */
   readonly maxQuantity: number;
+  /** Lo que Checkout pide elegir al comprarlo (#637); nulo si nada. */
+  readonly options: ProductOptions | null;
 };
 
 function readOneTimeClubPrice(
@@ -120,6 +123,7 @@ export function toCatalogProduct(
     description: product.description,
     amountCents: price.amountCents,
     maxQuantity: readMaxQuantity(product.metadata),
+    options: readProductOptions(product.metadata),
   };
 }
 

@@ -231,6 +231,7 @@ columna payments.currency tipo=text null=NO default='aud'::text
 columna payments.description tipo=text null=YES default=-
 columna payments.failure_reason tipo=text null=YES default=-
 columna payments.id tipo=uuid null=NO default=gen_random_uuid()
+columna payments.option tipo=text null=YES default=-
 columna payments.paid_at tipo=timestamp with time zone null=YES default=-
 columna payments.quantity tipo=integer null=NO default=1
 columna payments.status tipo=text null=NO default=-

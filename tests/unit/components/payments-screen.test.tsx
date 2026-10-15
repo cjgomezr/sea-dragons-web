@@ -104,6 +104,7 @@ const PAYMENTS: readonly PaymentView[] = [
     card: { brand: "visa", last4: "4242" },
     failureReason: null,
     quantity: 1,
+    option: null,
   },
   {
     id: "pay-may",
@@ -114,6 +115,7 @@ const PAYMENTS: readonly PaymentView[] = [
     card: { brand: "visa", last4: "4242" },
     failureReason: "Your card was declined.",
     quantity: 1,
+    option: null,
   },
   {
     id: "pay-apr",
@@ -124,6 +126,7 @@ const PAYMENTS: readonly PaymentView[] = [
     card: null,
     failureReason: null,
     quantity: 1,
+    option: null,
   },
 ];
 
@@ -661,6 +664,46 @@ describe("PaymentsScreen: historial", () => {
       "1 June 2026Monthly membership$45.00Paid",
       "1 May 2026Membership payment$45.00Failed",
       "12 April 2026Nationals levy$80.00Pending",
+    ]);
+  });
+
+  it("añade a la descripción de un extra sus unidades y su opción (#637)", async () => {
+    const extra = (
+      id: string,
+      change: Pick<PaymentView, "description" | "quantity" | "option">,
+    ): PaymentView => ({
+      id,
+      date: "2026-10-01T09:00:00.000Z",
+      amountCents: 13500,
+      status: "paid",
+      card: null,
+      failureReason: null,
+      ...change,
+    });
+
+    await renderLoaded(
+      view(panel(), {
+        payments: [
+          extra("jersey", {
+            description: "2026 club jersey",
+            quantity: 2,
+            option: "M",
+          }),
+          extra("hoodie", { description: "Hoodie", quantity: 1, option: "S" }),
+          extra("caps", { description: "Club cap", quantity: 3, option: null }),
+        ],
+      }),
+    );
+
+    const table = screen.getByRole("table", { name: "Payment history" });
+    const cells = within(table)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell")[1]?.textContent);
+    expect(cells).toEqual([
+      "2026 club jersey × 2 · M",
+      "Hoodie · S",
+      "Club cap × 3",
     ]);
   });
 

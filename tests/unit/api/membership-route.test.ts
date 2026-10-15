@@ -286,6 +286,7 @@ describe("GET /api/v1/membership", () => {
         card: { brand: "visa", last4: "4242" },
         failureReason: null,
         quantity: 1,
+        option: null,
       },
     ]);
 
@@ -307,6 +308,7 @@ describe("GET /api/v1/membership", () => {
             card: { brand: "visa", last4: "4242" },
             failureReason: null,
             quantity: 1,
+            option: null,
           },
         ],
       },
