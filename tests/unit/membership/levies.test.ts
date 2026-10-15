@@ -365,6 +365,15 @@ describe("startLevyCheckout", () => {
     expect(params).not.toHaveProperty("customer_email");
   });
 
+  it("no pide a Checkout una factura, que Stripe cobra aparte (#630)", async () => {
+    const sessions = sessionsDouble();
+
+    await payLevy(gateways({ products: [NATIONALS], sessions }));
+
+    const [params] = sessions.create.mock.calls[0] ?? [];
+    expect(params).not.toHaveProperty("invoice_creation");
+  });
+
   it("manda el correo de quien no tiene membresía", async () => {
     const sessions = sessionsDouble();
 

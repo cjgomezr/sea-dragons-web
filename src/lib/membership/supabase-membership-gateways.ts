@@ -20,6 +20,7 @@ import type {
 import type { MemberEmailGateway } from "./checkout";
 import type { PlanChoiceGateway } from "./choose-plan";
 import type { LevyGateways } from "./levies";
+import type { PaymentReceiptGateway, ReceiptSource } from "./payment-receipt";
 import type { ScheduledPlanChangeGateway } from "./plan-change";
 import type {
   SessionLedgerGateway,
@@ -326,6 +327,52 @@ const purchasedProductRowSchema = z.object({
   stripe_product_id: z.string(),
   quantity: z.number().int().positive(),
 });
+
+const receiptPaymentRowSchema = z.object({
+  status: z.enum(PAYMENT_STATUSES),
+  stripe_invoice_id: z.string().nullable(),
+  stripe_charge_id: z.string().nullable(),
+});
+
+/** La factura manda cuando la hay; si no, el cobro suelto. El check de
+ * `0050` garantiza que una de las dos está. */
+function toReceiptSource(
+  row: z.infer<typeof receiptPaymentRowSchema>,
+): ReceiptSource {
+  if (row.stripe_invoice_id !== null) {
+    return { kind: "invoice", invoiceId: row.stripe_invoice_id };
+  }
+  if (row.stripe_charge_id !== null) {
+    return { kind: "payment_intent", paymentIntentId: row.stripe_charge_id };
+  }
+  throw new Error("Un pago sin factura ni cobro de Stripe incumple 0050.");
+}
+
+/** Un pago por su id, para pedir su recibo (#630). Con el cliente de la
+ * sesión, `payments_select_own` hace que el de otro socio no exista. */
+export function createPaymentReceiptGateway(
+  client: SupabaseClient,
+): PaymentReceiptGateway {
+  return {
+    async findById(paymentId) {
+      const { data, error } = await client
+        .from(PAYMENTS_TABLE)
+        .select("status, stripe_invoice_id, stripe_charge_id")
+        .eq("id", paymentId)
+        .maybeSingle();
+      if (error) {
+        throw new Error(
+          `No se pudo leer el pago ${paymentId}: ${error.message}`,
+        );
+      }
+      if (data === null) {
+        return null;
+      }
+      const row = receiptPaymentRowSchema.parse(data);
+      return { status: row.status, source: toReceiptSource(row) };
+    },
+  };
+}
 
 /** Las unidades que un socio ya pagó de cada producto de Stripe (#473,
  * #632): qué levies le salen como pagados y cuántos lleva de un extra. Un
