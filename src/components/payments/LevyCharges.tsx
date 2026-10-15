@@ -21,11 +21,17 @@ import { StripeSessionButton } from "./StripeSessionButton";
  * le deja ver quién lo pagó y quién falta (#531).
  */
 
-type LeviesState = { readonly kind: "loading" } | LeviesLoad;
+export type LeviesState = { readonly kind: "loading" } | LeviesLoad;
 
-function useLevies(): LeviesState {
+/** Los levies, pedidos una vez cuando `isEnabled` (hay pagos configurados).
+ * Los comparten las dos pestañas de Pagos y la cuenta de la de Extras del
+ * club (#627). */
+export function useLevies(isEnabled: boolean): LeviesState {
   const [state, setState] = useState<LeviesState>({ kind: "loading" });
   useEffect(() => {
+    if (!isEnabled) {
+      return;
+    }
     let isCurrent = true;
     void loadLevies().then((outcome) => {
       if (isCurrent) {
@@ -35,8 +41,13 @@ function useLevies(): LeviesState {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [isEnabled]);
   return state;
+}
+
+/** Cuántos extras hay a la venta: 0 mientras cargan o si fallaron. */
+export function countLeviesForSale(state: LeviesState): number {
+  return state.kind === "loaded" ? state.levies.length : 0;
 }
 
 function LevyItem({
@@ -117,14 +128,16 @@ function LeviesBody({
 
 export function LevyCharges({
   translate,
+  state,
   canSeePayers,
 }: {
   readonly translate: Translator;
-  /** Si quien mira es Admin o Committee (#531). */
+  readonly state: LeviesState;
+  /** Si se enseña quién pagó cada levy: sólo en la pestaña Extras del club
+   * de un Admin o un Committee (#531, #627). */
   readonly canSeePayers: boolean;
 }): React.JSX.Element | null {
   const titleId = useId();
-  const state = useLevies();
   // Mientras carga no se reserva sitio: casi siempre no hay levies.
   if (
     state.kind === "loading" ||

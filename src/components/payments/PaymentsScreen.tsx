@@ -1,19 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { MembershipNotice } from "@/components/MembershipNotice";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
 import type { CheckoutReturn } from "@/lib/membership/checkout-return";
 import { membershipBlockOfStatus } from "@/lib/membership/membership";
 import type { MembershipView } from "@/lib/membership/membership-view";
-import { LevyCharges } from "./LevyCharges";
+import {
+  type LeviesState,
+  LevyCharges,
+  countLeviesForSale,
+  useLevies,
+} from "./LevyCharges";
 import { PaymentHistory } from "./PaymentHistory";
 import {
   type PaymentsFailure,
   describeLoadFailure,
   loadMembershipView,
 } from "./payments-client";
+import { PAYMENTS_TABS, type PaymentsTab } from "./payments-tab";
+import {
+  PaymentsTabs,
+  paymentsPanelId,
+  paymentsTabId,
+  usePaymentsTab,
+} from "./PaymentsTabs";
 import { PlanCard } from "./PlanCard";
 import { SessionActivity } from "./SessionActivity";
 import { SessionPackOffer } from "./SessionPackOffer";
@@ -31,6 +43,10 @@ import {
  * el historial; el saldo de sesiones de un Casual y sus movimientos (#472);
  * la elección de plan y el alta en Stripe Checkout de quien aún no puso
  * tarjeta; el cambio de plan; y la espera del webhook al volver de Stripe.
+ *
+ * Un Admin o un Committee la ve en dos pestañas (#627): Mi membresía, lo
+ * suyo, y Extras del club, con quién pagó cada levy. Los demás sólo ven Mi
+ * membresía, sin barra de pestañas.
  *
  * Es de cliente por los botones y por la espera: la membresía se pide a
  * `GET /api/v1/membership`, el mismo endpoint que leerá la aplicación nativa
@@ -178,13 +194,13 @@ function MembershipPanel({
   returns,
   onViewReplaced,
   onPlanChanged,
-  canSeeLevyPayers,
+  levies,
 }: {
   readonly translate: Translator;
   readonly view: MembershipView;
   readonly waiting: Waiting;
   readonly returns: StripeReturns;
-  readonly canSeeLevyPayers: boolean;
+  readonly levies: LeviesState;
   readonly onViewReplaced: (view: MembershipView) => void;
   readonly onPlanChanged: () => void;
 }): React.JSX.Element {
@@ -227,7 +243,11 @@ function MembershipPanel({
         />
       ) : null}
       {view.paymentsConfigured ? (
-        <LevyCharges translate={translate} canSeePayers={canSeeLevyPayers} />
+        <LevyCharges
+          translate={translate}
+          state={levies}
+          canSeePayers={false}
+        />
       ) : null}
       {membership?.plan === "Casual" ? (
         <SessionActivity
@@ -237,6 +257,120 @@ function MembershipPanel({
       ) : null}
       <PaymentHistory translate={translate} payments={view.payments} />
     </div>
+  );
+}
+
+/** Extras del club (#627): por ahora, los levies con quién pagó cada uno,
+ * como los veía un Admin bajo Mi membresía (#531). */
+function ExtrasPanel({
+  translate,
+  view,
+  levies,
+}: {
+  readonly translate: Translator;
+  readonly view: MembershipView;
+  readonly levies: LeviesState;
+}): React.JSX.Element | null {
+  if (!view.paymentsConfigured) {
+    return null;
+  }
+  return (
+    <div className="payments-panel">
+      <LevyCharges translate={translate} state={levies} canSeePayers />
+    </div>
+  );
+}
+
+type ScreenContent = {
+  readonly translate: Translator;
+  readonly state: LoadState;
+  readonly waiting: Waiting;
+  readonly returns: StripeReturns;
+  readonly levies: LeviesState;
+  readonly retry: () => void;
+  readonly refresh: () => void;
+  readonly replace: (view: MembershipView) => void;
+};
+
+/** Lo que pinta una pestaña: la carga, el fallo o su panel. */
+function TabContent({
+  tab,
+  content,
+}: {
+  readonly tab: PaymentsTab;
+  readonly content: ScreenContent;
+}): React.JSX.Element {
+  const { translate, state } = content;
+  if (state.kind === "loading") {
+    return (
+      <p className="admin-empty" role="status">
+        {translate("payments.loading")}
+      </p>
+    );
+  }
+  if (state.kind === "failed") {
+    return (
+      <LoadFailure
+        translate={translate}
+        failure={state.failure}
+        onRetry={content.retry}
+      />
+    );
+  }
+  if (tab === "extras") {
+    return (
+      <ExtrasPanel
+        translate={translate}
+        view={state.view}
+        levies={content.levies}
+      />
+    );
+  }
+  return (
+    <MembershipPanel
+      translate={translate}
+      view={state.view}
+      waiting={content.waiting}
+      returns={content.returns}
+      onViewReplaced={content.replace}
+      onPlanChanged={content.refresh}
+      levies={content.levies}
+    />
+  );
+}
+
+/** Las dos pestañas de un Admin o un Committee. Los dos paneles quedan
+ * montados y sólo se esconde el inactivo: así no se pierde lo que se estaba
+ * haciendo en uno al pasar al otro. */
+function TabbedContent({
+  content,
+}: {
+  readonly content: ScreenContent;
+}): React.JSX.Element {
+  const idPrefix = useId();
+  const { activeTab, selectTab } = usePaymentsTab();
+  return (
+    <>
+      <PaymentsTabs
+        translate={content.translate}
+        idPrefix={idPrefix}
+        activeTab={activeTab}
+        extrasForSale={countLeviesForSale(content.levies)}
+        onSelect={selectTab}
+      />
+      {PAYMENTS_TABS.map((tab) => (
+        <div
+          key={tab}
+          role="tabpanel"
+          id={paymentsPanelId(idPrefix, tab)}
+          aria-labelledby={paymentsTabId(idPrefix, tab)}
+          tabIndex={0}
+          hidden={tab !== activeTab}
+        >
+          <TabContent tab={tab} content={content} />
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -261,32 +395,27 @@ export function PaymentsScreen({
     cardReturn,
     packReturn,
   });
+  const levies = useLevies(
+    state.kind === "ready" && state.view.paymentsConfigured,
+  );
+  const content: ScreenContent = {
+    translate,
+    state,
+    waiting,
+    returns: { checkoutReturn, cardReturn, packReturn },
+    levies,
+    retry,
+    refresh,
+    replace,
+  };
   return (
     <>
-      <h1>{translate("nav.label.payments")}</h1>
-      {state.kind === "loading" ? (
-        <p className="admin-empty" role="status">
-          {translate("payments.loading")}
-        </p>
-      ) : null}
-      {state.kind === "failed" ? (
-        <LoadFailure
-          translate={translate}
-          failure={state.failure}
-          onRetry={retry}
-        />
-      ) : null}
-      {state.kind === "ready" ? (
-        <MembershipPanel
-          translate={translate}
-          view={state.view}
-          waiting={waiting}
-          returns={{ checkoutReturn, cardReturn, packReturn }}
-          onViewReplaced={replace}
-          onPlanChanged={refresh}
-          canSeeLevyPayers={canSeeLevyPayers}
-        />
-      ) : null}
+      <h1 className="payments-title">{translate("nav.label.payments")}</h1>
+      {canSeeLevyPayers ? (
+        <TabbedContent content={content} />
+      ) : (
+        <TabContent tab="membership" content={content} />
+      )}
     </>
   );
 }
