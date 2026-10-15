@@ -54,6 +54,13 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+const MSAC_PLACE = {
+  name: "MSAC",
+  address: "Aughtie Dr, Albert Park VIC 3206",
+  lat: -37.8423,
+  lng: 144.9601,
+} as const;
+
 describe("crear evento avisa", () => {
   it("avisa a cada miembro activo del grupo y a nadie fuera de él", async () => {
     const club = await createAs(SINGLE_DRAFT, {
@@ -84,6 +91,7 @@ describe("crear evento avisa", () => {
           startTime: "10:00",
           endsOn: null,
           endTime: "12:00",
+          address: null,
         },
       },
     ]);
@@ -98,6 +106,26 @@ describe("crear evento avisa", () => {
     expect(club.notices[0]?.data).toMatchObject({
       endsOn: "2027-07-11",
       endTime: "09:00",
+    });
+  });
+
+  it("guarda la dirección del lugar elegido", async () => {
+    const club = await createAs(
+      { ...SINGLE_DRAFT, place: MSAC_PLACE },
+      { groupMembers: { [SENIOR_SQUAD_ID]: [ANA] } },
+    );
+
+    expect(club.notices[0]?.data).toMatchObject({
+      address: "Aughtie Dr, Albert Park VIC 3206",
+    });
+  });
+
+  it("guarda la dirección del lugar de una serie", async () => {
+    const club = await createAs({ ...WEEKLY_DRAFT, place: MSAC_PLACE });
+
+    expect(club.notices[0]).toMatchObject({
+      type: "event_series_created",
+      data: { address: "Aughtie Dr, Albert Park VIC 3206" },
     });
   });
 
@@ -126,6 +154,7 @@ describe("crear evento avisa", () => {
           endsOn: "2027-08-31",
           startTime: "19:00",
           endTime: "20:30",
+          address: null,
         },
       },
     ]);

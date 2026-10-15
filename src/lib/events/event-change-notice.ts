@@ -4,12 +4,13 @@ import {
   notifyEventAudience,
 } from "./event-creation-notice";
 import type { ManagedEvent } from "./event-management";
+import { addressOf, isSamePlace } from "./event-place";
 import type { ManagedSeries } from "./series-management";
 
 /**
  * El aviso a la audiencia cuando un evento, una ocurrencia o una serie
  * cambian de fecha, hora, hora de fin o lugar, o se cancelan (#317, RF-13 del
- * PRD de E7; la hora de fin, #642 y D10 de E24).
+ * PRD de E7; la hora de fin, #642, y el lugar elegido, #645, por D10 de E24).
  * Quien pensaba ir tiene que enterarse; un título o unas notas nuevas no le
  * cambian el plan, así que no se avisan.
  *
@@ -22,7 +23,7 @@ import type { ManagedSeries } from "./series-management";
 /** Lo que decide si quien pensaba ir tiene que enterarse. */
 type SessionSchedule = Pick<
   EventFields,
-  "startTime" | "endTime" | "location"
+  "startTime" | "endTime" | "location" | "place" | "placeDetail"
 > & {
   readonly startsOn: string;
 };
@@ -35,7 +36,9 @@ export function isNoticeworthyChange(
     before.startsOn !== after.startsOn ||
     before.startTime !== after.startTime ||
     before.endTime !== after.endTime ||
-    before.location !== after.location
+    before.location !== after.location ||
+    !isSamePlace(before.place, after.place) ||
+    before.placeDetail !== after.placeDetail
   );
 }
 
@@ -82,6 +85,7 @@ export async function announceEventChange(
         endsOn: after.endsOn,
         endTime: after.endTime,
         location: after.location,
+        address: addressOf(after.place),
       },
     },
   });
@@ -127,6 +131,7 @@ export async function announceSeriesChange(
         startTime: after.startTime,
         endTime: after.endTime,
         location: after.location,
+        address: addressOf(after.place),
       },
     },
   });

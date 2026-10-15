@@ -75,3 +75,24 @@ export const eventPlaceSchema = z.union([
   z.object({ ...placeNamesShape, lat: z.number(), lng: z.number() }),
   z.object({ ...placeNamesShape, lat: z.null(), lng: z.null() }),
 ]);
+
+/** La dirección del lugar elegido, que llevan los avisos (D10). */
+export function addressOf(place: EventPlace | null): string | null {
+  return place === null ? null : place.address;
+}
+
+/** Si dos lugares son el mismo: nombre, dirección y coordenadas. */
+export function isSamePlace(
+  first: EventPlace | null,
+  second: EventPlace | null,
+): boolean {
+  if (first === null || second === null) {
+    return first === second;
+  }
+  return (
+    first.name === second.name &&
+    first.address === second.address &&
+    first.lat === second.lat &&
+    first.lng === second.lng
+  );
+}

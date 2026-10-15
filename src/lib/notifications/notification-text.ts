@@ -73,6 +73,15 @@ const clockTime = z.iso.time({ precision: -1 });
 const endTime = clockTime.nullable().default(null);
 const endsOn = z.iso.date().nullable().default(null);
 
+/** La dirección del lugar elegido llega desde #645; un aviso anterior no la
+ * trae. */
+const address = z.string().min(1).nullable().default(null);
+
+/** El lugar de un aviso de cambio: el nombre y, si la hay, la dirección. */
+function describeWhere(location: string, placeAddress: string | null): string {
+  return placeAddress === null ? location : `${location}, ${placeAddress}`;
+}
+
 const seriesWeekdays = z
   .array(z.union(ISO_WEEKDAYS.map((day) => z.literal(day))))
   .min(1);
@@ -85,6 +94,7 @@ const eventCreatedData = z.object({
   startTime: clockTime,
   endsOn,
   endTime,
+  address,
 });
 
 const eventSeriesCreatedData = z.object({
@@ -96,6 +106,7 @@ const eventSeriesCreatedData = z.object({
   endsOn: z.iso.date(),
   startTime: clockTime,
   endTime,
+  address,
 });
 
 const eventChangedData = z.object({
@@ -106,6 +117,7 @@ const eventChangedData = z.object({
   endsOn,
   endTime,
   location: z.string().min(1),
+  address,
 });
 
 const eventCancelledData = z.object({
@@ -122,6 +134,7 @@ const eventSeriesChangedData = z.object({
   startTime: clockTime,
   endTime,
   location: z.string().min(1),
+  address,
 });
 
 const eventSeriesCancelledData = z.object({
@@ -150,6 +163,26 @@ const membershipRenewalUpcomingData = z.object({
     .object({ brand: z.string().min(1), last4: z.string().regex(/^\d{4}$/) })
     .nullable(),
 });
+
+function describeSeriesCreatedBody(
+  translate: Translator,
+  series: z.infer<typeof eventSeriesCreatedData>,
+): string {
+  const { locale } = translate;
+  const params = {
+    title: series.title,
+    weekdays: formatWeekdays(locale, series.weekdays),
+    time: formatClockRange(locale, series.startTime, series.endTime),
+    startsOn: formatCalendarDay(locale, series.startsOn),
+    endsOn: formatCalendarDay(locale, series.endsOn),
+  };
+  return series.address === null
+    ? translate("notifications.event_series_created.body", params)
+    : translate("notifications.event_series_created.bodyWithAddress", {
+        ...params,
+        address: series.address,
+      });
+}
 
 /** Un `Record` sobre el catálogo: un tipo nuevo no compila hasta tener texto. */
 const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
@@ -213,10 +246,17 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         title: translate("notifications.event_created.title", {
           eventType: translate(`event.type.${event.eventType}`),
         }),
-        body: translate("notifications.event_created.body", {
-          title: event.title,
-          moment: formatEventSpan(translate.locale, event),
-        }),
+        body:
+          event.address === null
+            ? translate("notifications.event_created.body", {
+                title: event.title,
+                moment: formatEventSpan(translate.locale, event),
+              })
+            : translate("notifications.event_created.bodyWithAddress", {
+                title: event.title,
+                moment: formatEventSpan(translate.locale, event),
+                address: event.address,
+              }),
       };
     },
     event_series_created: (translate, data) => {
@@ -225,18 +265,11 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         return null;
       }
       const series = parsed.data;
-      const { locale } = translate;
       return {
         title: translate("notifications.event_series_created.title", {
           eventType: translate(`event.type.${series.eventType}`),
         }),
-        body: translate("notifications.event_series_created.body", {
-          title: series.title,
-          weekdays: formatWeekdays(locale, series.weekdays),
-          time: formatClockRange(locale, series.startTime, series.endTime),
-          startsOn: formatCalendarDay(locale, series.startsOn),
-          endsOn: formatCalendarDay(locale, series.endsOn),
-        }),
+        body: describeSeriesCreatedBody(translate, series),
       };
     },
     event_changed: (translate, data) => {
@@ -250,7 +283,7 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         body: translate("notifications.event_changed.body", {
           title: event.title,
           moment: formatEventSpan(translate.locale, event),
-          location: event.location,
+          location: describeWhere(event.location, event.address),
         }),
       };
     },
@@ -285,7 +318,7 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
           title: series.title,
           weekdays: formatWeekdays(locale, series.weekdays),
           time: formatClockRange(locale, series.startTime, series.endTime),
-          location: series.location,
+          location: describeWhere(series.location, series.address),
         }),
       };
     },

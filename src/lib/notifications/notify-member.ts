@@ -75,6 +75,8 @@ type NotificationDataByType = DataForEveryType<{
     readonly endsOn: string | null;
     /** #642. Nula sólo en lo anterior a E24. */
     readonly endTime: string | null;
+    /** #645. La del lugar elegido; nula con texto libre. */
+    readonly address: string | null;
   };
   /** #310. Un aviso por serie, no uno por ocurrencia. */
   readonly event_series_created: {
@@ -86,6 +88,7 @@ type NotificationDataByType = DataForEveryType<{
     readonly endsOn: string;
     readonly startTime: string;
     readonly endTime: string | null;
+    readonly address: string | null;
   };
   /** #317. Lo que quedó después del cambio: el aviso cuenta lo nuevo. */
   readonly event_changed: {
@@ -96,6 +99,7 @@ type NotificationDataByType = DataForEveryType<{
     readonly endsOn: string | null;
     readonly endTime: string | null;
     readonly location: string;
+    readonly address: string | null;
   };
   /** #317. El día y la hora que se pierden. */
   readonly event_cancelled: {
@@ -112,6 +116,7 @@ type NotificationDataByType = DataForEveryType<{
     readonly startTime: string;
     readonly endTime: string | null;
     readonly location: string;
+    readonly address: string | null;
   };
   /** #317. Una serie se cancela de hoy en adelante, con un solo aviso. */
   readonly event_series_cancelled: {

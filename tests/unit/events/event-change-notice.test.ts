@@ -94,12 +94,21 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+const MSAC_PLACE = {
+  name: "MSAC",
+  address: "Aughtie Dr, Albert Park VIC 3206",
+  lat: -37.8423,
+  lng: 144.9601,
+} as const;
+
 describe("qué cambios avisan", () => {
   const BEFORE = {
     startsOn: "2027-07-10",
     startTime: "10:00",
     endTime: "12:00",
     location: "MSAC",
+    place: MSAC_PLACE,
+    placeDetail: "Piscina de buceo",
   };
 
   it.each([
@@ -107,6 +116,16 @@ describe("qué cambios avisan", () => {
     ["la hora", { startTime: "11:30" }],
     ["la hora de fin", { endTime: "12:30" }],
     ["el lugar", { location: "Aquatic Centre" }],
+    [
+      "sólo la dirección del lugar",
+      { place: { ...MSAC_PLACE, address: "Otra calle 1" } },
+    ],
+    [
+      "sólo las coordenadas del lugar",
+      { place: { ...MSAC_PLACE, lat: -37.9, lng: 145 } },
+    ],
+    ["de lugar elegido a texto libre", { place: null }],
+    ["dónde exactamente", { placeDetail: "Piscina olímpica" }],
   ])("avisa cuando cambia %s", (_field, change) => {
     expect(isNoticeworthyChange(BEFORE, { ...BEFORE, ...change })).toBe(true);
   });
@@ -146,6 +165,7 @@ describe("avisos de cambio y cancelación", () => {
           endsOn: null,
           endTime: "12:00",
           location: "MSAC",
+          address: null,
         },
       })),
     );
@@ -162,6 +182,22 @@ describe("avisos de cambio y cancelación", () => {
     const club = await editAs({ endsOn: "2027-07-11" });
 
     expect(club.notices[0]?.data).toMatchObject({ endsOn: "2027-07-11" });
+  });
+
+  it("avisa con la dirección del lugar elegido", async () => {
+    const club = await editAs({ place: MSAC_PLACE });
+
+    expect(notifiedIn(club)).toEqual([ANA, BEA]);
+    expect(club.notices[0]?.data).toMatchObject({
+      location: "MSAC",
+      address: "Aughtie Dr, Albert Park VIC 3206",
+    });
+  });
+
+  it("avisa cuando cambia sólo dónde exactamente", async () => {
+    const club = await editAs({ placeDetail: "Piscina de buceo" });
+
+    expect(notifiedIn(club)).toEqual([ANA, BEA]);
   });
 
   it("avisa del lugar nuevo de un evento", async () => {
@@ -294,6 +330,7 @@ describe("avisos de cambio y cancelación", () => {
           startTime: "18:00",
           endTime: "20:30",
           location: "MSAC",
+          address: null,
         },
       })),
     );
@@ -306,6 +343,16 @@ describe("avisos de cambio y cancelación", () => {
     expect(club.notices[0]).toMatchObject({
       type: "event_series_changed",
       data: { endTime: "21:00" },
+    });
+  });
+
+  it("avisa una vez de la serie con la dirección de su lugar nuevo", async () => {
+    const club = await editSeriesAs({ place: MSAC_PLACE });
+
+    expect(club.noticeBatches).toHaveLength(1);
+    expect(club.notices[0]).toMatchObject({
+      type: "event_series_changed",
+      data: { location: "MSAC", address: "Aughtie Dr, Albert Park VIC 3206" },
     });
   });
 
