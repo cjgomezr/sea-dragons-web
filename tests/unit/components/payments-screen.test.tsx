@@ -2046,6 +2046,46 @@ describe("PaymentsScreen: la tira del plan (#628)", () => {
     expect(screen.queryByRole("group", { name: "Change plan" })).toBeNull();
   });
 
+  it("tras programar un cambio y anularlo, Cambiar plan vuelve cerrado", async () => {
+    const changeable = view(panel({ canChangePlan: true }));
+    const scheduled = view(
+      panel({
+        canChangePlan: true,
+        scheduledChange: { plan: "Student", effectiveAt: PERIOD_END },
+      }),
+    );
+    const served = [changeable, scheduled, changeable];
+    await renderLoaded(changeable, {
+      routes: {
+        membership: () => jsonResponse({ data: served.shift() ?? changeable }),
+        plan: (init) =>
+          init?.method === "DELETE"
+            ? jsonResponse({ data: { scheduledChange: null } })
+            : jsonResponse({
+                data: {
+                  kind: "scheduled",
+                  plan: "Student",
+                  effectiveAt: PERIOD_END,
+                },
+              }),
+      },
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Change plan" }));
+    await userEvent.click(screen.getByRole("radio", { name: /^Student/ }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Confirm the change" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Cancel the change" }),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Change plan" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("group", { name: "Change plan" })).toBeNull();
+  });
+
   it("no pone Cambiar plan a quien no puede cambiar de plan", async () => {
     await renderLoaded(ACTIVE_FULL);
 

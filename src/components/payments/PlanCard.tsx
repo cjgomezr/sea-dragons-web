@@ -353,6 +353,7 @@ type PlanPickerToggle = {
   readonly id: string;
   readonly isOpen: boolean;
   readonly toggle: () => void;
+  readonly close: () => void;
 };
 
 /** Quien aún no ha pagado elige plan entre las opciones (#479), que ya
@@ -378,7 +379,12 @@ function canOpenPlanPicker(strip: StripPlan): boolean {
 function usePlanPickerToggle(): PlanPickerToggle {
   const id = useId();
   const [isOpen, setIsOpen] = useState(false);
-  return { id, isOpen, toggle: () => setIsOpen((open) => !open) };
+  return {
+    id,
+    isOpen,
+    toggle: () => setIsOpen((open) => !open),
+    close: () => setIsOpen(false),
+  };
 }
 
 /** La parte izquierda: el plan y su chip, y debajo sus datos. */
@@ -470,7 +476,12 @@ function PlanChangeArea({
       <PlanChange
         translate={strip.translate}
         membership={membership}
-        onChanged={onPlanChanged}
+        onChanged={() => {
+          // Hecho el cambio, el selector no vuelve a abrirse solo si
+          // después se anula.
+          picker.close();
+          onPlanChanged();
+        }}
       />
     </div>
   );
