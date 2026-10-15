@@ -15540,6 +15540,18 @@ async function openLevyPayers(page: Page, report: object): Promise<void> {
   ).toBeVisible();
 }
 
+type PaymentsTabName = "membership" | "extras";
+
+/** Extras del club, con su cuenta de extras a la venta (#627). */
+const EXTRAS_TAB_NAME =
+  /^(Club extras|Extras del club) \d+ (for sale|a la venta)$/;
+
+function paymentsPath(tab: PaymentsTabName | undefined): string {
+  return tab === "extras"
+    ? `${PAYMENTS_SCREEN_PATH}?tab=extras`
+    : PAYMENTS_SCREEN_PATH;
+}
+
 type PaymentsScreenState = {
   readonly name: string;
   /** Lo que sirve el endpoint fingido; sin él, la membresía sembrada. */
@@ -15548,6 +15560,11 @@ type PaymentsScreenState = {
   readonly levies?: readonly object[];
   /** Quién pagó el primer levy (#531): si está, se abre su lista. */
   readonly payers?: object;
+  /** La pestaña que abre un Admin o un Committee (#627). Sin ella, quien
+   * mira es un socio sin pestañas. */
+  readonly tab?: PaymentsTabName;
+  /** Si su axe corre también en oscuro (#627). */
+  readonly checksDarkAxe?: boolean;
   readonly storageState: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
 };
@@ -15576,7 +15593,29 @@ function levyPayersStates(
   payers: object,
 ): readonly PaymentsScreenState[] {
   return paymentsStates(name, ACTIVE_MEMBERSHIP_VIEW, UNPAID_LEVIES).map(
-    (state) => ({ ...state, payers, storageState: ADMIN_STORAGE_STATE }),
+    (state) => ({
+      ...state,
+      payers,
+      tab: "extras",
+      storageState: ADMIN_STORAGE_STATE,
+    }),
+  );
+}
+
+/** La cabecera de Pagos (#627): un socio sin pestañas, o un Admin en una de
+ * las dos. Su axe corre en claro y en oscuro. */
+function paymentsTabsStates(
+  name: string,
+  tab?: PaymentsTabName,
+): readonly PaymentsScreenState[] {
+  return paymentsStates(name, ACTIVE_MEMBERSHIP_VIEW, UNPAID_LEVIES).map(
+    (state) => ({
+      ...state,
+      tab,
+      checksDarkAxe: true,
+      storageState:
+        tab === undefined ? E2E_STORAGE_STATE_PATH : ADMIN_STORAGE_STATE,
+    }),
   );
 }
 
@@ -15611,6 +15650,9 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   ...paymentsStates("pagos-levy-pagado", ACTIVE_MEMBERSHIP_VIEW, ONE_PAID_LEVY),
   ...levyPayersStates("pagos-levy-pagadores", NATIONALS_PAYERS),
   ...levyPayersStates("pagos-levy-sin-pagos", NATIONALS_WITHOUT_PAYERS),
+  ...paymentsTabsStates("pagos-pestanas-socio"),
+  ...paymentsTabsStates("pagos-pestanas-admin", "membership"),
+  ...paymentsTabsStates("pagos-pestanas-admin-extras", "extras"),
   // La alerta de pago fallido (#474) la pinta la cáscara con el socio
   // sembrado en `past_due`; el panel de Pagos sigue fingido.
   {
@@ -15648,7 +15690,7 @@ async function goToPayments(
   page: Page,
   state: Pick<
     PaymentsScreenState,
-    "view" | "levies" | "payers" | "beforeVisit"
+    "view" | "levies" | "payers" | "tab" | "beforeVisit"
   >,
   theme?: (typeof themes)[number],
 ): Promise<void> {
@@ -15664,14 +15706,22 @@ async function goToPayments(
     await stubSessionPacks(page);
   }
   await state.beforeVisit?.(page);
+  const path = paymentsPath(state.tab);
   if (theme === undefined) {
-    await page.goto(`${APP_URL}${PAYMENTS_SCREEN_PATH}`);
+    await page.goto(`${APP_URL}${path}`);
   } else {
-    await goToWithTheme(page, PAYMENTS_SCREEN_PATH, theme);
+    await goToWithTheme(page, path, theme);
   }
-  await expect(
-    page.getByRole("heading", { level: 2, name: PAYMENT_HISTORY_HEADING }),
-  ).toBeVisible();
+  if (state.tab !== "extras") {
+    await expect(
+      page.getByRole("heading", { level: 2, name: PAYMENT_HISTORY_HEADING }),
+    ).toBeVisible();
+  }
+  if (state.tab !== undefined && levies.length > 0) {
+    await expect(
+      page.getByRole("tab", { name: EXTRAS_TAB_NAME }),
+    ).toBeVisible();
+  }
   if (state.view === undefined) {
     await expect(
       page.getByRole("button", { name: ADD_CARD_BUTTON_NAME }),
@@ -15730,8 +15780,72 @@ for (const state of PAYMENTS_STATES) {
       await goToPayments(page, state);
       await expectNoAxeViolations(page);
     });
+
+    if (state.checksDarkAxe === true) {
+      test("has no accessibility violations in dark (axe-core)", async ({
+        page,
+      }) => {
+        await goToPayments(page, state, "dark");
+        await expectNoAxeViolations(page);
+      });
+    }
   });
 }
+
+// Las pestañas de Pagos de un Admin (#627) con el router de verdad: la
+// pestaña va en la dirección sin recargar y el atrás la devuelve.
+test.describe("las pestañas de Pagos en el navegador (#627)", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  const ADMIN_TABS_STATE = {
+    view: ACTIVE_MEMBERSHIP_VIEW,
+    levies: UNPAID_LEVIES,
+    tab: "membership",
+  } as const;
+
+  test("Extras del club pone ?tab=extras sin recargar y el atrás vuelve a Mi membresía", async ({
+    page,
+  }) => {
+    await goToPayments(page, ADMIN_TABS_STATE);
+    await page.evaluate(() => {
+      Object.assign(window, { pagosSinRecargar: true });
+    });
+
+    await page.getByRole("tab", { name: EXTRAS_TAB_NAME }).click();
+
+    await expect(page).toHaveURL(/\/pagos\?tab=extras$/);
+    await expect(
+      page.getByRole("button", { name: WHO_PAID_BUTTON_NAME }).first(),
+    ).toBeVisible();
+
+    await page.goBack();
+
+    await expect(page).toHaveURL(/\/pagos$/);
+    await expect(
+      page.getByRole("tab", { name: /^(My membership|Mi membresía)$/ }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(await page.evaluate(() => "pagosSinRecargar" in window)).toBe(true);
+  });
+
+  test("a 375px las pestañas son un segmentado de 40px con 44px de zona táctil", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPayments(page, ADMIN_TABS_STATE);
+
+    const tablist = page.getByRole("tablist");
+    const tablistBox = await tablist.boundingBox();
+    expect(tablistBox?.height).toBe(40);
+    const touchHeight = await page
+      .getByRole("tab", { name: EXTRAS_TAB_NAME })
+      .evaluate((tab) =>
+        getComputedStyle(tab, "::after").getPropertyValue("height"),
+      );
+    expect(Number.parseFloat(touchHeight)).toBeGreaterThanOrEqual(44);
+  });
+});
 
 // El botón de la alerta (#474) pide la factura abierta y sale a su página
 // de Stripe. Las dos se fingen: no hay factura de verdad en dev.
