@@ -623,6 +623,14 @@ export const LEVY_CHECKOUT_API_PATH = `${LEVIES_API_PATH}/[priceId]/checkout`;
  * Committee: está en `RESTRICTED_ROUTES`. */
 export const LEVY_PAYERS_API_PATH = `${LEVIES_API_PATH}/[priceId]/payers`;
 
+/** Qué se vendió de cada extra, abierto o cerrado (#634, D7 del PRD de E23).
+ * Sólo lo leen un Admin y un Committee: está en `RESTRICTED_ROUTES`. */
+export const LEVY_SALES_API_PATH = `${LEVIES_API_PATH}/sales`;
+
+/** Una fila por compra de un extra (#634). Va por el producto y no por el
+ * precio: un extra cerrado puede no tener precio activo. */
+export const LEVY_BUYERS_API_PATH = `${LEVIES_API_PATH}/products/[productId]/buyers`;
+
 /**
  * Los únicos endpoints de la API que no exigen sesión.
  *
@@ -728,6 +736,8 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: ATTENDANCE_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: TEAMS_API_PATH, capability: "buildTeamsAndTrackAttendance" },
   { path: LEVY_PAYERS_API_PATH, capability: "viewLevyPayers" },
+  { path: LEVY_SALES_API_PATH, capability: "viewLevyPayers" },
+  { path: LEVY_BUYERS_API_PATH, capability: "viewLevyPayers" },
 ];
 
 /** Una ruta de socio, que sólo alcanza quien tiene la membresía al día. */

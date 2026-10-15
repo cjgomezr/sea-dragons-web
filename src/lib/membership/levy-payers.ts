@@ -30,6 +30,8 @@ export type LevyPaymentRecord = {
   readonly userId: string;
   /** Centavos enteros (CON-005). */
   readonly amountCents: number;
+  /** Las unidades del pago (#632). */
+  readonly quantity: number;
   readonly status: PaymentStatus;
   readonly paidAt: string;
 };
@@ -54,6 +56,8 @@ export type LevyPayer = {
   readonly userId: string;
   readonly fullName: string;
   readonly email: string;
+  /** Las unidades de todos sus pagos: con ellas sale en el CSV (#634). */
+  readonly quantity: number;
   /** El último pago, si pagó más de una vez. */
   readonly paidAt: string;
   /** Lo que pagó en total, en centavos. */
@@ -98,11 +102,15 @@ export type LevyPayersRequest = {
 /** El orden de "Faltan" no puede depender del idioma del servidor. */
 const CLUB_COLLATION_LOCALE = "en-AU";
 
-type PaidTotal = { readonly paidAt: string; readonly amountCents: number };
+type PaidTotal = {
+  readonly quantity: number;
+  readonly paidAt: string;
+  readonly amountCents: number;
+};
 
 /** Un socio que pagó dos veces (dos pestañas de Checkout a la vez) es una
- * fila: con la fecha del último pago y la suma de lo que pagó, que es lo que
- * Stripe cobró. */
+ * fila: con la fecha del último pago, la suma de lo que pagó, que es lo que
+ * Stripe cobró, y la de sus unidades. */
 function totalPaidByMember(
   payments: readonly LevyPaymentRecord[],
 ): ReadonlyMap<string, PaidTotal> {
@@ -113,6 +121,7 @@ function totalPaidByMember(
     }
     const previous = totals.get(payment.userId);
     totals.set(payment.userId, {
+      quantity: (previous?.quantity ?? 0) + payment.quantity,
       paidAt:
         previous !== undefined && previous.paidAt > payment.paidAt
           ? previous.paidAt

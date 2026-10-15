@@ -26,6 +26,7 @@ const clubMemberRowSchema = z.object({
 const levyPaymentRowSchema = z.object({
   user_id: z.string(),
   amount_cents: z.number().int(),
+  quantity: z.number().int(),
   status: z.enum(PAYMENT_STATUSES),
   paid_at: z.string().nullable(),
   created_at: z.string(),
@@ -78,7 +79,7 @@ export function createLevyPaymentsGateway(
     async listLevyPayments({ clubId, productId }) {
       const { data, error } = await client
         .from(PAYMENTS_TABLE)
-        .select("user_id, amount_cents, status, paid_at, created_at")
+        .select("user_id, amount_cents, quantity, status, paid_at, created_at")
         .eq("club_id", clubId)
         .eq("stripe_product_id", productId);
       if (error) {
@@ -92,6 +93,7 @@ export function createLevyPaymentsGateway(
         .map((row) => ({
           userId: row.user_id,
           amountCents: row.amount_cents,
+          quantity: row.quantity,
           status: row.status,
           // El webhook guarda un levy pagado siempre con la fecha del cargo.
           // Sólo una fila pendiente o fallida llega sin ella, y el dominio

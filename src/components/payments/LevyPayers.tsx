@@ -49,7 +49,7 @@ function useLevyPayers(priceId: string): {
 }
 
 function exportCsv(report: LevyPayersReport, translate: Translator): void {
-  const csv = levyPayersCsv(report, translate);
+  const csv = levyPayersCsv(report.payers, translate);
   saveFile(
     new Blob([csv], { type: CSV_TYPE }),
     levyPayersCsvFilename({

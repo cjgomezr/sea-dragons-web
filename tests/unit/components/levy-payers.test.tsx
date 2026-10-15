@@ -43,6 +43,7 @@ const WITH_PAYMENTS: LevyPayersReport = {
       userId: "bruno",
       fullName: "Bruno Díaz",
       email: "bruno@club.test",
+      quantity: 1,
       paidAt: "2026-10-05T01:00:00.000Z",
       amountCents: 8000,
     },
@@ -50,6 +51,7 @@ const WITH_PAYMENTS: LevyPayersReport = {
       userId: "alba",
       fullName: "Alba Ruiz",
       email: "alba@club.test",
+      quantity: 2,
       paidAt: "2026-10-02T01:00:00.000Z",
       amountCents: 8000,
     },
@@ -285,7 +287,7 @@ describe("PaymentsScreen: quién pagó cada levy (#531)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("Exportar CSV descarga una fila por socio con el nombre del levy", async () => {
+  it("Exportar CSV descarga una fila por pagador con sus unidades y sin faltantes", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-08T02:00:00.000Z"));
     stubFetch({});
@@ -304,10 +306,9 @@ describe("PaymentsScreen: quién pagó cada levy (#531)", () => {
     const [file] = savedFiles;
     const csv = await file?.text();
     expect(csv?.split("\r\n")).toEqual([
-      expect.stringContaining("Name,Email,Paid,Payment date,Amount (AUD)"),
-      "Bruno Díaz,bruno@club.test,Yes,2026-10-05,80.00",
-      "Alba Ruiz,alba@club.test,Yes,2026-10-02,80.00",
-      "Carla Soto,c@club.test,No,,",
+      expect.stringContaining("Name,Email,Units,Payment date,Amount (AUD)"),
+      "Bruno Díaz,bruno@club.test,1,2026-10-05,80.00",
+      "Alba Ruiz,alba@club.test,2,2026-10-02,80.00",
       "",
     ]);
     vi.useRealTimers();

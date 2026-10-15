@@ -5,13 +5,13 @@ import {
 } from "@/lib/directory/directory-csv";
 import type { Translator } from "@/lib/i18n/translator";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
-import type { LevyPayersReport } from "./levy-payers";
+import type { LevyBuyer } from "./levy-sales";
 
 /**
- * Quién pagó un levy en CSV (#531): una fila por socio, primero los que
- * pagaron y luego los que faltan, con el codificador del directorio (BOM,
- * comillas y escape de fórmulas). Las cabeceras van en el idioma de la
- * pantalla; el nombre del levy es el de Stripe.
+ * Los compradores de un extra en CSV (#531, #634): una fila por compra, con
+ * sus unidades y sin faltantes (D1 del PRD de E23), con el codificador del
+ * directorio (BOM, comillas y escape de fórmulas). Las cabeceras van en el
+ * idioma de la pantalla; el nombre del levy es el de Stripe.
  */
 
 const CENTS_PER_DOLLAR = 100;
@@ -23,33 +23,24 @@ function asDollars(cents: number): string {
 }
 
 export function levyPayersCsv(
-  report: LevyPayersReport,
+  buyers: readonly LevyBuyer[],
   translate: Translator,
 ): string {
-  const yes = translate("payments.levyPayers.csv.yes");
-  const no = translate("payments.levyPayers.csv.no");
   const rows: (readonly CsvCell[])[] = [
     [
       translate("payments.levyPayers.csv.column.name"),
       translate("payments.levyPayers.csv.column.email"),
-      translate("payments.levyPayers.csv.column.paid"),
+      translate("payments.levyPayers.csv.column.units"),
       translate("payments.levyPayers.csv.column.date"),
       translate("payments.levyPayers.csv.column.amount"),
     ],
-    ...report.payers.map((payer) => [
-      payer.fullName,
-      payer.email,
-      yes,
+    ...buyers.map((buyer) => [
+      buyer.fullName,
+      buyer.email,
+      buyer.quantity,
       // El día de Melbourne (NFR-003), el mismo que enseña la pantalla.
-      clubCalendarDate(new Date(payer.paidAt)),
-      asDollars(payer.amountCents),
-    ]),
-    ...report.missing.map((member) => [
-      member.fullName,
-      member.email,
-      no,
-      null,
-      null,
+      clubCalendarDate(new Date(buyer.paidAt)),
+      asDollars(buyer.amountCents),
     ]),
   ];
   return encodeCsv(rows);

@@ -311,6 +311,7 @@ const levyPayersResponseSchema = z.object({
     payers: z.array(
       z.object({
         ...levyMemberSchema,
+        quantity: z.number().int(),
         paidAt: isoInstantSchema,
         amountCents: z.number().int(),
       }),

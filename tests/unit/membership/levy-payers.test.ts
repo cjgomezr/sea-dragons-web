@@ -67,6 +67,7 @@ function payment(
   return {
     userId,
     amountCents: NATIONALS_CENTS,
+    quantity: 1,
     status: "paid",
     paidAt,
     ...shape,
@@ -141,6 +142,7 @@ describe("readLevyPayers", () => {
         userId: "bruno",
         fullName: "Bruno Díaz",
         email: "bruno@club.test",
+        quantity: 1,
         paidAt: "2026-10-02T10:00:00.000Z",
         amountCents: NATIONALS_CENTS,
       },
@@ -237,13 +239,14 @@ describe("readLevyPayers", () => {
     const report = await readReport({
       payments: [
         payment("alba", "2026-10-01T10:00:00.000Z"),
-        payment("alba", "2026-10-04T10:00:00.000Z"),
+        payment("alba", "2026-10-04T10:00:00.000Z", { quantity: 2 }),
       ],
     });
 
     expect(report.payers).toEqual([
       expect.objectContaining({
         userId: "alba",
+        quantity: 3,
         paidAt: "2026-10-04T10:00:00.000Z",
         amountCents: 2 * NATIONALS_CENTS,
       }),
