@@ -1220,6 +1220,10 @@ export const spanishMessages: MessageCatalog = {
   "payments.packs.cancelled":
     "Saliste de Stripe sin comprar un pack. Puedes intentarlo otra vez cuando quieras.",
   // Los levies que el comité crea en Stripe (#473, RF-6 del PRD de E13).
+  "payments.tabs.label": "Secciones de Pagos",
+  "payments.tabs.membership": "Mi membresía",
+  "payments.tabs.extras": "Extras del club",
+  "payments.tabs.extrasForSale": "{count} a la venta",
   "payments.levies.title": "Cobros del club",
   "payments.levies.lead":
     "Cobros sueltos que abre el comité, como la inscripción a un torneo. Pagarlos no cambia tu membresía.",

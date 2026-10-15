@@ -1219,6 +1219,10 @@ export const englishMessages = {
   "payments.packs.cancelled":
     "You left Stripe without buying a pack. You can try again whenever you like.",
   // Los levies que el comité crea en Stripe (#473, RF-6 del PRD de E13).
+  "payments.tabs.label": "Payments sections",
+  "payments.tabs.membership": "My membership",
+  "payments.tabs.extras": "Club extras",
+  "payments.tabs.extrasForSale": "{count} for sale",
   "payments.levies.title": "Club charges",
   "payments.levies.lead":
     "One-off charges the committee opens, like a tournament entry. Paying them doesn't change your membership.",

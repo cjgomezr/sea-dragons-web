@@ -5,12 +5,19 @@ import { PaymentsScreen } from "@/components/payments/PaymentsScreen";
 import type { Locale } from "@/lib/i18n/locale";
 import type { LevyPayersReport } from "@/lib/membership/levy-payers";
 import type { MembershipView } from "@/lib/membership/membership-view";
+import { visit } from "../../support/location-search-params";
 
 /**
  * Quién pagó cada levy en Pagos (#531): un desplegable bajo cada levy, sólo
  * para Admin y Committee, con el resumen, los que pagaron, los que faltan y
- * el CSV. Los endpoints van doblados con `fetch`.
+ * el CSV. Desde #627 vive en la pestaña Extras del club, así que la dirección
+ * empieza en `?tab=extras`. Los endpoints van doblados con `fetch`.
  */
+
+vi.mock(
+  "next/navigation",
+  async () => await import("../../support/location-search-params"),
+);
 
 const MEMBERSHIP_PATH = "/api/v1/membership";
 const LEVIES_PATH = "/api/v1/levies";
@@ -127,6 +134,7 @@ function payersRegion(): HTMLElement {
 }
 
 beforeEach(() => {
+  visit("/pagos?tab=extras");
   savedFiles.length = 0;
   clickedDownloads.length = 0;
   // jsdom no implementa las direcciones de un Blob.
@@ -277,14 +285,19 @@ describe("PaymentsScreen: quién pagó cada levy (#531)", () => {
     renderScreen(true);
 
     expect(
-      await screen.findByText(/couldn't load the club charges/),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Payment history" }),
+      await within(screen.getByRole("tabpanel")).findByText(
+        /couldn't load the club charges/,
+      ),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Who paid" }),
     ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: "My membership" }));
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Payment history" }),
+    ).toBeInTheDocument();
   });
 
   it("Exportar CSV descarga una fila por pagador con sus unidades y sin faltantes", async () => {
