@@ -1,4 +1,3 @@
-import Stripe from "stripe";
 import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError, type ApiErrorCode } from "@/lib/api/response";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
@@ -7,7 +6,10 @@ import {
   startPaymentRetry,
 } from "@/lib/membership/retry-payment";
 import { createMembershipGateway } from "@/lib/membership/supabase-membership-gateways";
-import { resolveRoutePaymentRetryStripe } from "@/lib/stripe/stripe-route";
+import {
+  asStripeBadGateway,
+  resolveRoutePaymentRetryStripe,
+} from "@/lib/stripe/stripe-route";
 import { createServiceRoleClient } from "@/lib/supabase/service-client";
 
 /**
@@ -38,21 +40,8 @@ const REFUSALS: Record<
   },
 };
 
-const STRIPE_FAILED_REASON = "stripe_failed";
-
-/** El reintento lo pide el ticket como 502: Stripe está configurado y fue
- * Stripe quien falló. Lo que no es de Stripe se relanza. */
-function asStripeBadGateway(error: unknown): never {
-  if (error instanceof Stripe.errors.StripeError) {
-    console.warn(`${LOG_PREFIX} Stripe falló: ${error.message}`);
-    throw new ApiError(
-      "bad_gateway",
-      "Stripe no pudo abrir el pago. Vuelve a intentarlo en un momento.",
-      STRIPE_FAILED_REASON,
-    );
-  }
-  throw error;
-}
+const STRIPE_FAILED_MESSAGE =
+  "Stripe no pudo abrir el pago. Vuelve a intentarlo en un momento.";
 
 const retryPayment = createApiRoute<MembershipRetryPaymentResponse>({
   handler: async ({ request, decorateResponse }) => {
@@ -65,7 +54,7 @@ const retryPayment = createApiRoute<MembershipRetryPaymentResponse>({
         stripe: resolveRoutePaymentRetryStripe(LOG_PREFIX),
       },
       { userId, now: new Date() },
-    ).catch(asStripeBadGateway);
+    ).catch(asStripeBadGateway(LOG_PREFIX, STRIPE_FAILED_MESSAGE));
     if (outcome.kind === "refused") {
       const refusal = REFUSALS[outcome.reason];
       throw new ApiError(refusal.code, refusal.message, outcome.reason);
