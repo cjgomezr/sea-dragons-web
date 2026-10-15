@@ -2,12 +2,14 @@ import Stripe from "stripe";
 import { ApiError } from "@/lib/api/response";
 import type { CheckoutStripe } from "@/lib/membership/checkout";
 import type { LevyStripe } from "@/lib/membership/levies";
+import type { LevySalesGateways } from "@/lib/membership/levy-sales";
 import type { PlanChangeStripe } from "@/lib/membership/plan-change";
 import type { PaymentReceiptStripe } from "@/lib/membership/payment-receipt";
 import type { PaymentRetryStripe } from "@/lib/membership/retry-payment";
 import type { SessionPackCheckoutStripe } from "@/lib/membership/session-pack-checkout";
 import {
   STRIPE_PRICE_CASUAL_SESSION_ENV,
+  createProductArchiveSource,
   createProductCatalogSource,
   createStripeSetup,
 } from "./stripe-client";
@@ -120,6 +122,22 @@ export function resolveRouteLevyStripe(logPrefix: string): LevyStripe {
     kind: "configured",
     catalog: createProductCatalogSource(stripe.client),
     sessions: stripe.client.checkout.sessions,
+  };
+}
+
+/** Lo que necesita el resumen de ventas de los extras (#634): los productos
+ * de la cuenta, también los archivados. */
+export function resolveRouteLevySalesStripe(
+  logPrefix: string,
+): LevySalesGateways["stripe"] {
+  const stripe = createStripeSetup(process.env);
+  if (stripe.kind === "unconfigured") {
+    console.warn(`${logPrefix} faltan ${stripe.missingKeys.join(", ")}`);
+    return { kind: "unconfigured" };
+  }
+  return {
+    kind: "configured",
+    products: createProductArchiveSource(stripe.client),
   };
 }
 

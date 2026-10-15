@@ -1243,11 +1243,9 @@ export const spanishMessages: MessageCatalog = {
   "payments.levyPayers.export": "Exportar CSV",
   "payments.levyPayers.csv.column.name": "Nombre",
   "payments.levyPayers.csv.column.email": "Correo",
-  "payments.levyPayers.csv.column.paid": "Pagó",
+  "payments.levyPayers.csv.column.units": "Unidades",
   "payments.levyPayers.csv.column.date": "Fecha del pago",
   "payments.levyPayers.csv.column.amount": "Importe (AUD)",
-  "payments.levyPayers.csv.yes": "Sí",
-  "payments.levyPayers.csv.no": "No",
   "payments.levyPayers.csv.fileName": "pagos",
   "payments.trialing": "En prueba hasta el día {date}",
   "payments.error.unavailable":

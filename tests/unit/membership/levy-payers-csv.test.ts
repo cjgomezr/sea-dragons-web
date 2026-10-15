@@ -1,37 +1,39 @@
 import { describe, expect, it } from "vitest";
 import { CSV_BYTE_ORDER_MARK } from "@/lib/directory/directory-csv";
 import { createTranslator } from "@/lib/i18n/translator";
-import type { LevyPayersReport } from "@/lib/membership/levy-payers";
+import type { LevyBuyer } from "@/lib/membership/levy-sales";
 import {
   levyPayersCsv,
   levyPayersCsvFilename,
 } from "@/lib/membership/levy-payers-csv";
 
 /**
- * El CSV de quién pagó un levy (#531): una fila por socio, los que pagaron y
- * los que faltan, con el mismo codificador que el directorio.
+ * El CSV de los compradores de un extra (#531, #634): una fila por compra,
+ * con sus unidades y sin faltantes (D1 del PRD de E23), con el mismo
+ * codificador que el directorio.
  */
 
 const CRLF = "\r\n";
 
-const REPORT: LevyPayersReport = {
-  levy: { id: "price_nationals", name: "Nationals 2026", amountCents: 8000 },
-  summary: { paidCount: 1, missingCount: 2, collectedCents: 8050 },
-  payers: [
-    {
-      userId: "bruno",
-      fullName: "Díaz, Bruno",
-      email: "bruno@club.test",
-      // 23:30 en UTC ya es el día siguiente en Melbourne.
-      paidAt: "2026-10-02T23:30:00.000Z",
-      amountCents: 8050,
-    },
-  ],
-  missing: [
-    { userId: "alba", fullName: "=Alba", email: "alba@club.test" },
-    { userId: "carla", fullName: "Carla Soto", email: "carla@club.test" },
-  ],
-};
+const BUYERS: readonly LevyBuyer[] = [
+  {
+    userId: "bruno",
+    fullName: "Díaz, Bruno",
+    email: "bruno@club.test",
+    quantity: 2,
+    // 23:30 en UTC ya es el día siguiente en Melbourne.
+    paidAt: "2026-10-02T23:30:00.000Z",
+    amountCents: 16100,
+  },
+  {
+    userId: "alba",
+    fullName: "=Alba",
+    email: "alba@club.test",
+    quantity: 1,
+    paidAt: "2026-10-01T10:00:00.000Z",
+    amountCents: 8050,
+  },
+];
 
 function linesOf(csv: string): readonly string[] {
   return csv.slice(CSV_BYTE_ORDER_MARK.length).split(CRLF);
@@ -39,34 +41,37 @@ function linesOf(csv: string): readonly string[] {
 
 describe("levyPayersCsv", () => {
   it("empieza por la marca de orden de bytes", () => {
-    const csv = levyPayersCsv(REPORT, createTranslator("en"));
+    const csv = levyPayersCsv(BUYERS, createTranslator("en"));
 
     expect(csv.startsWith(CSV_BYTE_ORDER_MARK)).toBe(true);
   });
 
-  it("pone las cabeceras en inglés", () => {
-    const [header] = linesOf(levyPayersCsv(REPORT, createTranslator("en")));
+  it("pone las cabeceras en inglés, con Units y sin Paid", () => {
+    const [header] = linesOf(levyPayersCsv(BUYERS, createTranslator("en")));
 
-    expect(header).toBe("Name,Email,Paid,Payment date,Amount (AUD)");
+    expect(header).toBe("Name,Email,Units,Payment date,Amount (AUD)");
   });
 
-  it("pone las cabeceras y los valores en español", () => {
-    const lines = linesOf(levyPayersCsv(REPORT, createTranslator("es")));
+  it("pone las cabeceras en español, con Unidades y sin Pagó", () => {
+    const [header] = linesOf(levyPayersCsv(BUYERS, createTranslator("es")));
 
-    expect(lines[0]).toBe("Nombre,Correo,Pagó,Fecha del pago,Importe (AUD)");
-    expect(lines[1]).toContain(",Sí,");
-    expect(lines[2]).toContain(",No,");
+    expect(header).toBe("Nombre,Correo,Unidades,Fecha del pago,Importe (AUD)");
   });
 
-  it("da una fila por socio: primero los que pagaron, luego los que faltan", () => {
-    const lines = linesOf(levyPayersCsv(REPORT, createTranslator("en")));
+  it("da una fila por compra, en el orden en que llegan", () => {
+    const lines = linesOf(levyPayersCsv(BUYERS, createTranslator("en")));
 
     expect(lines.slice(1)).toEqual([
-      '"Díaz, Bruno",bruno@club.test,Yes,2026-10-03,80.50',
-      "'=Alba,alba@club.test,No,,",
-      "Carla Soto,carla@club.test,No,,",
+      '"Díaz, Bruno",bruno@club.test,2,2026-10-03,161.00',
+      "'=Alba,alba@club.test,1,2026-10-01,80.50",
       "",
     ]);
+  });
+
+  it("sin compras sólo lleva la cabecera", () => {
+    const lines = linesOf(levyPayersCsv([], createTranslator("en")));
+
+    expect(lines).toEqual(["Name,Email,Units,Payment date,Amount (AUD)", ""]);
   });
 });
 

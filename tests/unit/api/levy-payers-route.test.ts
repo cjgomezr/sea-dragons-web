@@ -62,6 +62,7 @@ const PAYMENTS: readonly LevyPaymentRecord[] = [
   {
     userId: "bruno",
     amountCents: 8000,
+    quantity: 1,
     status: "paid",
     paidAt: "2026-10-02T10:00:00.000Z",
   },
@@ -178,6 +179,7 @@ describe("GET /api/v1/levies/{priceId}/payers", () => {
               userId: "bruno",
               fullName: "Bruno Díaz",
               email: "bruno@club.test",
+              quantity: 1,
               paidAt: "2026-10-02T10:00:00.000Z",
               amountCents: 8000,
             },

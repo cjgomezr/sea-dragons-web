@@ -34,6 +34,13 @@ export type ProductCatalogSource = {
   listActiveProducts(): Promise<readonly Stripe.Product[]>;
 };
 
+/** Todos los productos de la cuenta, activos y archivados, con su precio por
+ * defecto expandido (#634): un extra cerrado sigue haciendo falta para ver
+ * quién lo compró (D5 del PRD de E23). */
+export type ProductArchiveSource = {
+  listProducts(): Promise<readonly Stripe.Product[]>;
+};
+
 export type CatalogProduct = {
   readonly productId: string;
   readonly priceId: string;
@@ -76,11 +83,30 @@ function readMaxQuantity(metadata: Stripe.Metadata): number {
     : Math.min(value, STRIPE_MAX_ADJUSTABLE_QUANTITY);
 }
 
-function toCatalogProduct(
+export function isProductOfKind(
+  product: Stripe.Product,
+  kind: string,
+): boolean {
+  return product.metadata[PRODUCT_KIND_METADATA_KEY] === kind;
+}
+
+/** El importe por unidad del precio por defecto, aunque ya no se venda:
+ * es lo que costaba un extra cerrado. */
+export function readDefaultUnitAmount(product: Stripe.Product): number | null {
+  const price = product.default_price;
+  if (price === null || price === undefined || typeof price === "string") {
+    return null;
+  }
+  return price.unit_amount;
+}
+
+/** El producto tal como se vende hoy, o nulo si no está a la venta: archivado,
+ * de otra clase o sin un precio de pago único en AUD. */
+export function toCatalogProduct(
   product: Stripe.Product,
   kind: string,
 ): CatalogProduct | null {
-  if (!product.active || product.metadata[PRODUCT_KIND_METADATA_KEY] !== kind) {
+  if (!product.active || !isProductOfKind(product, kind)) {
     return null;
   }
   const price = readOneTimeClubPrice(product);

@@ -1,7 +1,10 @@
 import Stripe from "stripe";
 import type { SetupCard, StripeApi } from "./stripe-webhook";
 import type { StripePriceSetup } from "@/lib/membership/stripe-prices";
-import type { ProductCatalogSource } from "./product-catalog";
+import type {
+  ProductArchiveSource,
+  ProductCatalogSource,
+} from "./product-catalog";
 import {
   type ChargeDetails,
   NO_CHARGE_DETAILS,
@@ -121,6 +124,19 @@ export function createProductCatalogSource(
           limit: CATALOG_PAGE_SIZE,
           expand: ["data.default_price"],
         })
+        .autoPagingToArray({ limit: MAX_CATALOG_PRODUCTS }),
+  };
+}
+
+/** Sin el filtro `active`: Stripe da los activos y los archivados en la misma
+ * lectura (#634). */
+export function createProductArchiveSource(
+  client: Stripe,
+): ProductArchiveSource {
+  return {
+    listProducts: () =>
+      client.products
+        .list({ limit: CATALOG_PAGE_SIZE, expand: ["data.default_price"] })
         .autoPagingToArray({ limit: MAX_CATALOG_PRODUCTS }),
   };
 }

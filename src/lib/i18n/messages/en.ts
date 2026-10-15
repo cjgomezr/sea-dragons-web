@@ -1242,11 +1242,9 @@ export const englishMessages = {
   "payments.levyPayers.export": "Export CSV",
   "payments.levyPayers.csv.column.name": "Name",
   "payments.levyPayers.csv.column.email": "Email",
-  "payments.levyPayers.csv.column.paid": "Paid",
+  "payments.levyPayers.csv.column.units": "Units",
   "payments.levyPayers.csv.column.date": "Payment date",
   "payments.levyPayers.csv.column.amount": "Amount (AUD)",
-  "payments.levyPayers.csv.yes": "Yes",
-  "payments.levyPayers.csv.no": "No",
   "payments.levyPayers.csv.fileName": "payments",
   "payments.trialing": "On trial until {date}",
   "payments.error.unavailable":
