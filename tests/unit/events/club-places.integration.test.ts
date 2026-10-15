@@ -15,7 +15,7 @@ import {
 
 /**
  * Los lugares del club con el adaptador de verdad (#646, RF-5 del PRD de
- * E24) y `0070_club_places.sql` aplicada: lo que ningún doble dice es que
+ * E24) y `0071_club_places.sql` aplicada: lo que ningún doble dice es que
  * `club_places` cuenta por eventos, que el adaptador lee las coordenadas como
  * números y que nunca trae los lugares de otro club.
  *

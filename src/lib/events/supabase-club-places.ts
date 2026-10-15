@@ -5,7 +5,7 @@ import { toEventPlace } from "./supabase-event-place";
 
 /**
  * Los lugares que el club ya usó, contados por la base (#646,
- * `0070_club_places.sql`). Va por la llave de servicio: la función sólo la
+ * `0071_club_places.sql`). Va por la llave de servicio: la función sólo la
  * ejecuta el servidor, y el club sale de la fila de quien busca.
  */
 

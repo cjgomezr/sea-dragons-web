@@ -6,7 +6,7 @@ import {
 } from "../../support/postgres";
 
 /**
- * `0070_club_places.sql` contra un Postgres desechable (#646, RF-5 del PRD
+ * `0071_club_places.sql` contra un Postgres desechable (#646, RF-5 del PRD
  * de E24). Los lugares que el club ya usó salen de sus eventos y sus series
  * con lugar estructurado, contados por eventos, y nunca de otro club.
  */
