@@ -10,8 +10,8 @@ import type {
 /**
  * Un club en memoria para los tests de la agenda y el detalle (#309). El
  * doble cumple el contrato del adaptador: sólo devuelve eventos del club que
- * se le pide, aplica la visibilidad, el periodo, el tipo, el orden y el cursor como la
- * consulta, y corta en el límite. Los conteos y los nombres los da tal cual:
+ * se le pide, aplica la visibilidad, el periodo, el tipo, el orden y el
+ * cursor como la consulta, y corta en el límite. Los conteos y los nombres los da tal cual:
  * quién cuenta lo decide la base (`0039_event_rsvp_tallies.sql`), y eso se
  * prueba en su migración.
  */
