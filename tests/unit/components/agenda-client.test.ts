@@ -16,6 +16,8 @@ const AGENDA_EVENT = {
   title: "Torneo",
   eventType: "competition",
   location: "MSAC",
+  place: null,
+  placeDetail: null,
   status: "scheduled",
   seriesId: null,
   goingCount: 0,
@@ -39,6 +41,31 @@ describe("agendaEventSchema", () => {
       endTime: null,
       endsOn: null,
     });
+  });
+
+  it("lee el lugar elegido con sus coordenadas y dónde exactamente", () => {
+    const place = {
+      name: "MSAC",
+      address: "Aughtie Dr, Albert Park VIC 3206",
+      lat: -37.8423,
+      lng: 144.9601,
+    };
+
+    const parsed = agendaEventSchema.parse({
+      ...AGENDA_EVENT,
+      place,
+      placeDetail: "Piscina de buceo",
+    });
+
+    expect(parsed).toMatchObject({ place, placeDetail: "Piscina de buceo" });
+  });
+
+  it("rechaza un lugar con una sola coordenada", () => {
+    const place = { name: "MSAC", address: null, lat: -37.8423, lng: null };
+
+    expect(
+      agendaEventSchema.safeParse({ ...AGENDA_EVENT, place }).success,
+    ).toBe(false);
   });
 
   it("rechaza un evento sin la hora de fin", () => {

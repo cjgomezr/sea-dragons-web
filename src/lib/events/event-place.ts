@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * El lugar estructurado de un evento y su enlace al mapa (#645, RF-4 del PRD
  * de E24).
@@ -15,7 +17,7 @@ export const PLACE_DETAIL_MAX_LENGTH = 120;
 export const LATITUDE_LIMIT = 90;
 export const LONGITUDE_LIMIT = 180;
 
-type PlaceCoordinates =
+export type PlaceCoordinates =
   | { readonly lat: number; readonly lng: number }
   | { readonly lat: null; readonly lng: null };
 
@@ -53,3 +55,23 @@ export function buildMapsUrl(where: {
       : encodeURIComponent(searchTextOf(where));
   return `${MAPS_SEARCH_URL}${query}`;
 }
+
+/** Un lugar tal como llega a la API. Que las coordenadas vayan las dos o
+ * ninguna, y dentro de su rango, lo decide el dominio con un 422. */
+export type PlaceDraft = {
+  readonly name: string;
+  readonly address?: string | null;
+  readonly lat?: number | null;
+  readonly lng?: number | null;
+};
+
+const placeNamesShape = {
+  name: z.string(),
+  address: z.string().nullable(),
+};
+
+/** Un lugar como lo devuelve la API, para quien la lee. */
+export const eventPlaceSchema = z.union([
+  z.object({ ...placeNamesShape, lat: z.number(), lng: z.number() }),
+  z.object({ ...placeNamesShape, lat: z.null(), lng: z.null() }),
+]);

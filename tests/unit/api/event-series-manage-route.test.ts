@@ -150,6 +150,31 @@ describe("endpoint de editar una serie", () => {
     });
   });
 
+  it("responde 200 con el lugar elegido de la serie", async () => {
+    mockWiring();
+    const place = { name: "MSAC", address: null, lat: -37.8423, lng: 144.9601 };
+
+    const response = await editSeries(SERIES_ID, { place });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { series: { location: "MSAC", place } },
+    });
+  });
+
+  it("responde 422 a una latitud fuera de rango", async () => {
+    mockWiring();
+
+    const response = await editSeries(SERIES_ID, {
+      place: { name: "MSAC", lat: 120, lng: 144.96 },
+    });
+
+    await expectError(response, 422, {
+      code: "business_rule",
+      reason: "event_place_coordinates_invalid",
+    });
+  });
+
   it("responde 400 a un cuerpo sin ningún cambio", async () => {
     mockWiring();
 

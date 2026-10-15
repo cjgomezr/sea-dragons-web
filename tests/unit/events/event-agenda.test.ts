@@ -47,6 +47,13 @@ function titlesOf(page: {
   return page.events.map((event) => event.title);
 }
 
+const MSAC_PLACE = {
+  name: "MSAC",
+  address: "Aughtie Dr, Albert Park VIC 3206",
+  lat: -37.8423,
+  lng: 144.9601,
+} as const;
+
 describe("agenda", () => {
   it("devuelve cada evento con sus campos, sus conteos y la respuesta propia", async () => {
     const event = clubEvent("2027-06-22", {
@@ -70,6 +77,8 @@ describe("agenda", () => {
           title: "Entrenamiento",
           eventType: "training",
           location: "MSAC",
+          place: null,
+          placeDetail: null,
           status: "scheduled",
           seriesId: "5e5e5e5e-0000-4000-8000-000000000005",
           goingCount: 7,
@@ -96,6 +105,29 @@ describe("agenda", () => {
       endTime: "17:00",
       endsOn: "2027-06-27",
     });
+  });
+
+  it("trae el lugar elegido y dónde exactamente", async () => {
+    const event = clubEvent("2027-06-22", {
+      place: MSAC_PLACE,
+      placeDetail: "Piscina de buceo",
+    });
+
+    const page = await agenda({ events: [event] });
+
+    expect(page.events[0]).toMatchObject({
+      location: "MSAC",
+      place: MSAC_PLACE,
+      placeDetail: "Piscina de buceo",
+    });
+  });
+
+  it("trae el lugar nulo en un evento con texto libre", async () => {
+    const event = clubEvent("2027-06-22", { location: "Piscina de Box Hill" });
+
+    const page = await agenda({ events: [event] });
+
+    expect(page.events[0]).toMatchObject({ place: null, placeDetail: null });
   });
 
   it("trae sin hora ni fecha de fin un evento anterior a E24", async () => {
@@ -276,6 +308,20 @@ function open(options: FakeAgendaClubOptions, eventId: string) {
 }
 
 describe("detalle de un evento", () => {
+  it("trae el lugar elegido y dónde exactamente", async () => {
+    const event = clubEvent("2027-06-22", {
+      place: MSAC_PLACE,
+      placeDetail: "Piscina de buceo",
+    });
+
+    const detail = await open({ events: [event] }, event.id);
+
+    expect(detail).toMatchObject({
+      place: MSAC_PLACE,
+      placeDetail: "Piscina de buceo",
+    });
+  });
+
   it("trae las notas y los nombres de quién va y quién quizás, ordenados", async () => {
     const event = clubEvent("2027-06-22", { notes: "Traed aletas." });
 
@@ -302,6 +348,8 @@ describe("detalle de un evento", () => {
       title: "Entrenamiento",
       eventType: "training",
       location: "MSAC",
+      place: null,
+      placeDetail: null,
       status: "scheduled",
       seriesId: null,
       goingCount: 2,

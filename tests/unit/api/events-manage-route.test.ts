@@ -50,6 +50,13 @@ const WEEKLY_TRAINING = {
   endsOn: "2027-08-31",
 };
 
+const MSAC_PLACE = {
+  name: "MSAC",
+  address: "Aughtie Dr, Albert Park VIC 3206",
+  lat: -37.8423,
+  lng: 144.9601,
+};
+
 let club: FakeEventsClub;
 
 function mockSessionClient(): void {
@@ -240,6 +247,79 @@ describe("endpoint de crear eventos", () => {
       code: "business_rule",
       reason: "end_before_start",
     });
+  });
+
+  it("responde 201 con el lugar elegido, su nombre como texto y dónde exactamente", async () => {
+    mockWiring();
+
+    const response = await createEvent({
+      ...COMPETITION,
+      location: "Lo que había escrito",
+      place: MSAC_PLACE,
+      placeDetail: "Piscina de buceo",
+    });
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        event: {
+          location: "MSAC",
+          place: MSAC_PLACE,
+          placeDetail: "Piscina de buceo",
+        },
+      },
+    });
+  });
+
+  it("responde 201 con el lugar nulo cuando sólo llega el texto libre", async () => {
+    mockWiring();
+
+    const response = await createEvent(COMPETITION);
+
+    await expect(response.json()).resolves.toMatchObject({
+      data: { event: { location: "MSAC", place: null, placeDetail: null } },
+    });
+  });
+
+  it.each([
+    ["una latitud fuera de rango", { ...MSAC_PLACE, lat: 91 }],
+    ["una longitud fuera de rango", { ...MSAC_PLACE, lng: -200 }],
+    ["una latitud sin longitud", { name: "MSAC", lat: -37.8 }],
+  ])("responde 422 a %s, sin guardar nada", async (_case, place) => {
+    mockWiring();
+
+    const response = await createEvent({ ...COMPETITION, place });
+
+    await expectError(response, 422, {
+      code: "business_rule",
+      reason: "event_place_coordinates_invalid",
+    });
+    expect(club.saved).toEqual([]);
+  });
+
+  it("responde 422 a un nombre de lugar demasiado largo", async () => {
+    mockWiring();
+
+    const response = await createEvent({
+      ...COMPETITION,
+      place: { name: "x".repeat(121) },
+    });
+
+    await expectError(response, 422, {
+      code: "business_rule",
+      reason: "event_place_invalid",
+    });
+  });
+
+  it("responde 400 a unas coordenadas que no son números", async () => {
+    mockWiring();
+
+    const response = await createEvent({
+      ...COMPETITION,
+      place: { ...MSAC_PLACE, lat: "-37.8" },
+    });
+
+    await expectError(response, 400, { code: "validation_error" });
   });
 
   it("responde 401 sin sesión", async () => {

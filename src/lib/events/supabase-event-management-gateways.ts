@@ -13,6 +13,12 @@ import type {
   ManagedEventWrite,
 } from "./event-management";
 import { findClubGroupIds } from "./supabase-event-gateways";
+import {
+  PLACE_COLUMNS,
+  placeRowShape,
+  toEventPlace,
+  toPlaceColumns,
+} from "./supabase-event-place";
 
 /**
  * Editar y cancelar eventos contra Supabase (#314).
@@ -29,8 +35,7 @@ import { findClubGroupIds } from "./supabase-event-gateways";
 const EVENTS_TABLE = "events";
 const UPDATE_EVENT_FUNCTION = "update_event";
 
-const MANAGED_EVENT_COLUMNS =
-  "id, series_id, title, event_type, starts_on, start_time, end_time, ends_on, location, notes, audience, status, cancelled_at, event_groups(group_id)";
+const MANAGED_EVENT_COLUMNS = `id, series_id, title, event_type, starts_on, start_time, end_time, ends_on, location, ${PLACE_COLUMNS}, notes, audience, status, cancelled_at, event_groups(group_id)`;
 
 /** Postgres devuelve un `time` como `HH:MM:SS`; el dominio habla en `HH:MM`. */
 const HOURS_AND_MINUTES_LENGTH = 5;
@@ -57,6 +62,7 @@ const managedEventRowSchema = z.object({
   end_time: z.string().nullable(),
   ends_on: z.string().nullable(),
   location: z.string(),
+  ...placeRowShape,
   notes: z.string().nullable(),
   audience: z.enum(["all", "groups"]),
   status: z.enum(["scheduled", "cancelled"]),
@@ -77,6 +83,8 @@ function toManagedEvent(row: ManagedEventRow): ManagedEvent {
     endTime: toOptionalHoursAndMinutes(row.end_time),
     endsOn: row.ends_on,
     location: row.location,
+    place: toEventPlace(row),
+    placeDetail: row.place_detail,
     notes: row.notes,
     audience:
       row.audience === "all"
@@ -137,6 +145,10 @@ export function toChangesArgument(changes: EventEdit): Record<string, unknown> {
     ...(changes.endTime === undefined ? {} : { end_time: changes.endTime }),
     ...(changes.endsOn === undefined ? {} : { ends_on: changes.endsOn }),
     ...(changes.location === undefined ? {} : { location: changes.location }),
+    ...(changes.place === undefined ? {} : toPlaceColumns(changes.place)),
+    ...(changes.placeDetail === undefined
+      ? {}
+      : { place_detail: changes.placeDetail }),
     ...(changes.notes === undefined ? {} : { notes: changes.notes }),
     ...(audience === undefined
       ? {}

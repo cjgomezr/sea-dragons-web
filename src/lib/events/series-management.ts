@@ -3,6 +3,7 @@ import {
   announceSeriesChange,
 } from "./event-change-notice";
 import type { IsoWeekday } from "./event-occurrences";
+import type { PlaceDraft } from "./event-place";
 import {
   type EventFields,
   EventValidationError,
@@ -39,6 +40,11 @@ export type ManagedSeries = EventFields & {
 
 /** Lo que se puede cambiar de una serie; lo que no viene se queda igual. */
 export type SeriesEdit = Partial<EventFields>;
+
+/** Lo que cambia tal como llega, con el lugar todavía sin validar. */
+export type SeriesEditDraft = Omit<SeriesEdit, "place"> & {
+  readonly place?: PlaceDraft | null;
+};
 
 export type ManagedSeriesGateway = {
   /** La serie, si es de ese club. */
@@ -139,7 +145,7 @@ export async function editSeries(
   request: {
     readonly callerId: string;
     readonly seriesId: string;
-    readonly changes: SeriesEdit;
+    readonly changes: SeriesEditDraft;
   },
 ): Promise<EditedSeries> {
   const caller = await findEventOrganizer(gateways, request.callerId);

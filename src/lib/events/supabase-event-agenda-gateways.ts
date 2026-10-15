@@ -18,6 +18,11 @@ import {
   toHoursAndMinutes,
   toOptionalHoursAndMinutes,
 } from "./supabase-event-management-gateways";
+import {
+  PLACE_COLUMNS,
+  placeRowShape,
+  toEventPlace,
+} from "./supabase-event-place";
 
 /**
  * La agenda y el detalle contra Supabase (#309).
@@ -54,6 +59,7 @@ const MY_RSVP_FILTER = "my_rsvp.user_id";
 
 const EVENT_COLUMNS = [
   "id, starts_on, start_time, end_time, ends_on, starts_at, title, event_type, location, notes",
+  PLACE_COLUMNS,
   "status, series_id, audience",
   AUDIENCE_EMBED,
   MY_RSVP_EMBED,
@@ -71,6 +77,7 @@ const eventRowSchema = z.object({
   title: z.string(),
   event_type: z.enum(EVENT_TYPES),
   location: z.string(),
+  ...placeRowShape,
   notes: z.string().nullable(),
   status: z.enum(["scheduled", "cancelled"]),
   series_id: z.string().nullable(),
@@ -104,6 +111,8 @@ function toEventRow(row: unknown): EventRow {
     title: parsed.title,
     eventType: parsed.event_type,
     location: parsed.location,
+    place: toEventPlace(parsed),
+    placeDetail: parsed.place_detail,
     notes: parsed.notes,
     status: parsed.status,
     seriesId: parsed.series_id,

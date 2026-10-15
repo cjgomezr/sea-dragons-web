@@ -11,6 +11,16 @@ import {
   announceEvents,
 } from "./event-creation-notice";
 import {
+  type EventPlace,
+  LATITUDE_LIMIT,
+  LONGITUDE_LIMIT,
+  PLACE_ADDRESS_MAX_LENGTH,
+  PLACE_DETAIL_MAX_LENGTH,
+  PLACE_NAME_MAX_LENGTH,
+  type PlaceCoordinates,
+  type PlaceDraft,
+} from "./event-place";
+import {
   type IsoWeekday,
   countRangeDays,
   generateWeeklyOccurrences,
@@ -67,7 +77,13 @@ export type EventFields = {
   readonly startTime: string;
   /** `HH:MM` de Melbourne. Nula sólo en lo creado antes de E24 (D5). */
   readonly endTime: string | null;
+  /** El texto que se enseña: el nombre del lugar elegido o el texto
+   * libre. */
   readonly location: string;
+  /** Nulo con texto libre y en lo anterior a E24 (#645). */
+  readonly place: EventPlace | null;
+  /** "Dónde exactamente": la piscina, la sala. */
+  readonly placeDetail: string | null;
   readonly notes: string | null;
   readonly audience: EventAudience;
 };
@@ -82,8 +98,13 @@ export type SeriesRange = {
  * se rechaza con 422 y no con 400, para que la pantalla lo traduzca. Sólo un
  * evento suelto tiene fecha de fin (D6); en una serie, `endsOn` es la de la
  * serie. */
-export type EventDraft = Omit<EventFields, "endTime"> & {
+export type EventDraft = Omit<
+  EventFields,
+  "endTime" | "place" | "placeDetail"
+> & {
   readonly endTime?: string | null;
+  readonly place?: PlaceDraft | null;
+  readonly placeDetail?: string | null;
 } & (
     | {
         readonly repeat: "none";
@@ -166,6 +187,9 @@ export const EVENT_ISSUE_CODES = [
   "end_time_required",
   "end_before_start",
   "multi_day_series",
+  "event_place_invalid",
+  "event_place_coordinates_invalid",
+  "event_place_detail_invalid",
 ] as const;
 
 export type EventIssueCode = (typeof EVENT_ISSUE_CODES)[number];
@@ -191,6 +215,9 @@ const ISSUE_MESSAGES: Readonly<Record<EventIssueCode, string>> = {
   end_before_start: "El fin del evento tiene que ir después de su inicio.",
   multi_day_series:
     "Las sesiones de una serie son de un día: sólo un evento suelto dura varios días.",
+  event_place_invalid: `El nombre del lugar tiene que tener entre 1 y ${PLACE_NAME_MAX_LENGTH} caracteres, y su dirección como mucho ${PLACE_ADDRESS_MAX_LENGTH}, sin caracteres de control.`,
+  event_place_coordinates_invalid: `Las coordenadas del lugar van las dos o ninguna, con la latitud entre -${LATITUDE_LIMIT} y ${LATITUDE_LIMIT} y la longitud entre -${LONGITUDE_LIMIT} y ${LONGITUDE_LIMIT}.`,
+  event_place_detail_invalid: `"Dónde exactamente" puede tener como mucho ${PLACE_DETAIL_MAX_LENGTH} caracteres, sin caracteres de control.`,
 };
 
 export class EventValidationError extends Error {
@@ -252,6 +279,80 @@ export function normalizeLocation(raw: string): string {
     EVENT_LOCATION_MAX_LENGTH,
     "event_location_invalid",
   );
+}
+
+/** Una línea opcional: en blanco es ninguna. */
+function normalizeOptionalLine(
+  raw: string | null | undefined,
+  maxLength: number,
+  issue: EventIssueCode,
+): string | null {
+  if (raw === null || raw === undefined || raw.trim() === "") {
+    return null;
+  }
+  return normalizeLine(raw, maxLength, issue);
+}
+
+function isWithin(value: number, limit: number): boolean {
+  return value >= -limit && value <= limit;
+}
+
+function normalizeCoordinates(place: PlaceDraft): PlaceCoordinates {
+  const lat = place.lat ?? null;
+  const lng = place.lng ?? null;
+  if (lat === null && lng === null) {
+    return { lat, lng };
+  }
+  if (
+    lat === null ||
+    lng === null ||
+    !isWithin(lat, LATITUDE_LIMIT) ||
+    !isWithin(lng, LONGITUDE_LIMIT)
+  ) {
+    throw new EventValidationError("event_place_coordinates_invalid");
+  }
+  return { lat, lng };
+}
+
+/** Un lugar elegido, recortado; sin dirección o sin coordenadas sigue
+ * valiendo (un lugar del club que se guardó así). También lo usa editar. */
+export function normalizePlace(place: PlaceDraft): EventPlace {
+  return {
+    name: normalizeLine(
+      place.name,
+      PLACE_NAME_MAX_LENGTH,
+      "event_place_invalid",
+    ),
+    address: normalizeOptionalLine(
+      place.address,
+      PLACE_ADDRESS_MAX_LENGTH,
+      "event_place_invalid",
+    ),
+    ...normalizeCoordinates(place),
+  };
+}
+
+export function normalizePlaceDetail(
+  raw: string | null | undefined,
+): string | null {
+  return normalizeOptionalLine(
+    raw,
+    PLACE_DETAIL_MAX_LENGTH,
+    "event_place_detail_invalid",
+  );
+}
+
+/** Dónde es un evento: con un lugar elegido, `location` es su nombre; sin
+ * él, el texto libre. */
+function resolveWhere(
+  location: string,
+  draft: PlaceDraft | null | undefined,
+): Pick<EventFields, "location" | "place"> {
+  if (draft === null || draft === undefined) {
+    return { location: normalizeLocation(location), place: null };
+  }
+  const place = normalizePlace(draft);
+  return { location: place.name, place };
 }
 
 /** Las notas son texto libre con saltos de línea; unas en blanco no dicen
@@ -361,7 +462,8 @@ async function normalizeFields(
     eventType: draft.eventType,
     startTime: draft.startTime,
     endTime: draft.endTime,
-    location: normalizeLocation(draft.location),
+    ...resolveWhere(draft.location, draft.place),
+    placeDetail: normalizePlaceDetail(draft.placeDetail),
     notes: normalizeNotes(draft.notes),
     audience: await resolveAudience(gateways, clubId, draft.audience),
   };

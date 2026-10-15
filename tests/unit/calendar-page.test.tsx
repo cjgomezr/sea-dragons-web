@@ -190,6 +190,8 @@ describe("el calendario de quien no tiene la membresía al día", () => {
                     endTime: null,
                     endsOn: null,
                     location: "MSAC",
+                    place: null,
+                    placeDetail: null,
                     status: "scheduled",
                     inAudience: true,
                     goingCount: 1,

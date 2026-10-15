@@ -41,6 +41,8 @@ const CREATED_EVENT: AgendaEvent = {
   title: "Pool Training",
   eventType: "training",
   location: "MSAC Dive Pool",
+  place: null,
+  placeDetail: null,
   status: "scheduled",
   seriesId: null,
   goingCount: 0,

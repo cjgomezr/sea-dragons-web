@@ -11,6 +11,11 @@ import {
   createEvents,
 } from "@/lib/events/event-creation";
 import {
+  PLACE_ADDRESS_MAX_LENGTH,
+  PLACE_DETAIL_MAX_LENGTH,
+  PLACE_NAME_MAX_LENGTH,
+} from "@/lib/events/event-place";
+import {
   CALLER_ID,
   CLUB_ID,
   MASTERS_SQUAD_ID,
@@ -72,6 +77,8 @@ describe("crear evento: evento suelto", () => {
           startTime: "10:00",
           endTime: "12:00",
           location: "MSAC",
+          place: null,
+          placeDetail: null,
           notes: "Llevad gorro azul.",
           audience: { kind: "groups", groupIds: [SENIOR_SQUAD_ID] },
         },
@@ -102,6 +109,8 @@ describe("crear evento: evento suelto", () => {
         startTime: "10:00",
         endTime: "12:00",
         location: "MSAC",
+        place: null,
+        placeDetail: null,
         notes: "Llevad gorro azul.",
         audience: { kind: "groups", groupIds: [SENIOR_SQUAD_ID] },
       },
@@ -119,6 +128,8 @@ describe("crear evento: evento suelto", () => {
     expect(club.saved[0]?.fields).toMatchObject({
       title: "Liga estatal",
       location: "MSAC",
+      place: null,
+      placeDetail: null,
       notes: null,
     });
   });
@@ -267,6 +278,8 @@ describe("crear evento: serie semanal", () => {
         startTime: "19:00",
         endTime: "20:30",
         location: "MSAC",
+        place: null,
+        placeDetail: null,
         notes: null,
         audience: { kind: "club" },
         weekdays: [2, 4],
@@ -450,5 +463,122 @@ describe("crear evento: hora y fecha de fin", () => {
       fields: { startTime: "19:00", endTime: "20:30" },
       endsOn: null,
     });
+  });
+});
+
+describe("crear evento: lugar estructurado", () => {
+  const MSAC_PLACE = {
+    name: "MSAC",
+    address: "Aughtie Dr, Albert Park VIC 3206",
+    lat: -37.8423,
+    lng: 144.9601,
+  } as const;
+
+  it("guarda el lugar y dónde exactamente, y enseña el nombre del lugar", async () => {
+    const club = await createAs({
+      ...SINGLE_DRAFT,
+      location: "Texto que escribió antes de elegir",
+      place: MSAC_PLACE,
+      placeDetail: "Piscina de buceo",
+    });
+
+    expect(club.saved[0]?.fields).toMatchObject({
+      location: "MSAC",
+      place: MSAC_PLACE,
+      placeDetail: "Piscina de buceo",
+    });
+  });
+
+  it("recorta el nombre, la dirección y el detalle, y guarda los vacíos como ninguno", async () => {
+    const club = await createAs({
+      ...SINGLE_DRAFT,
+      place: { name: " MSAC ", address: "  ", lat: null, lng: null },
+      placeDetail: "   ",
+    });
+
+    expect(club.saved[0]?.fields).toMatchObject({
+      location: "MSAC",
+      place: { name: "MSAC", address: null, lat: null, lng: null },
+      placeDetail: null,
+    });
+  });
+
+  it("acepta un lugar sin dirección ni coordenadas", async () => {
+    const club = await createAs({ ...SINGLE_DRAFT, place: { name: "MSAC" } });
+
+    expect(club.saved[0]?.fields.place).toEqual({
+      name: "MSAC",
+      address: null,
+      lat: null,
+      lng: null,
+    });
+  });
+
+  it("deja el lugar y el detalle nulos cuando sólo llega el texto libre", async () => {
+    const club = await createAs({
+      ...SINGLE_DRAFT,
+      location: "Piscina de Box Hill",
+    });
+
+    expect(club.saved[0]?.fields).toMatchObject({
+      location: "Piscina de Box Hill",
+      place: null,
+      placeDetail: null,
+    });
+  });
+
+  it("guarda el lugar en la serie, que lo comparten sus sesiones", async () => {
+    const club = await createAs({ ...WEEKLY_DRAFT, place: MSAC_PLACE });
+
+    expect(club.saved[0]?.fields.place).toEqual(MSAC_PLACE);
+  });
+
+  it.each([
+    ["una latitud por encima de 90", { ...MSAC_PLACE, lat: 90.0001 }],
+    ["una latitud por debajo de -90", { ...MSAC_PLACE, lat: -91 }],
+    ["una longitud por encima de 180", { ...MSAC_PLACE, lng: 180.5 }],
+    ["una longitud por debajo de -180", { ...MSAC_PLACE, lng: -181 }],
+    ["una latitud sin longitud", { ...MSAC_PLACE, lng: null }],
+    ["una longitud sin latitud", { name: "MSAC", lng: 144.9601 }],
+  ])("rechaza %s", async (_case, place) => {
+    await expectRejected(
+      { ...SINGLE_DRAFT, place },
+      "event_place_coordinates_invalid",
+    );
+  });
+
+  it("acepta las coordenadas justo en el borde del rango", async () => {
+    const club = await createAs({
+      ...SINGLE_DRAFT,
+      place: { name: "Polo", address: null, lat: -90, lng: 180 },
+    });
+
+    expect(club.saved[0]?.fields.place).toMatchObject({ lat: -90, lng: 180 });
+  });
+
+  it.each([
+    ["un nombre vacío", { name: "  " }],
+    [
+      "un nombre de más de 120 caracteres",
+      { name: "x".repeat(PLACE_NAME_MAX_LENGTH + 1) },
+    ],
+    ["un nombre con caracteres de control", { name: "MSAC\u0007" }],
+    [
+      "una dirección de más de 200 caracteres",
+      { name: "MSAC", address: "x".repeat(PLACE_ADDRESS_MAX_LENGTH + 1) },
+    ],
+  ])("rechaza %s", async (_case, place) => {
+    await expectRejected({ ...SINGLE_DRAFT, place }, "event_place_invalid");
+  });
+
+  it("rechaza un detalle de más de 120 caracteres", async () => {
+    await expectRejected(
+      {
+        ...SINGLE_DRAFT,
+        place: MSAC_PLACE,
+        placeDetail: "x".repeat(PLACE_DETAIL_MAX_LENGTH + 1),
+      },
+      "event_place_detail_invalid",
+    );
   });
 });

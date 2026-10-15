@@ -84,6 +84,11 @@ export type FieldIssueCode = Exclude<
   | "end_time_required"
   | "end_before_start"
   | "multi_day_series"
+  // El formulario todavía no elige un lugar: lo pone #646, que también
+  // traduce estos tres junto a su campo.
+  | "event_place_invalid"
+  | "event_place_coordinates_invalid"
+  | "event_place_detail_invalid"
 >;
 
 export type EventFormIssue = {

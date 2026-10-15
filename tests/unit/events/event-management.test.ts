@@ -7,10 +7,11 @@ import {
   EventsForbiddenError,
 } from "@/lib/events/event-creation";
 import {
-  type EventEdit,
+  type EventEditDraft,
   cancelEvent,
   editEvent,
 } from "@/lib/events/event-management";
+import { PLACE_DETAIL_MAX_LENGTH } from "@/lib/events/event-place";
 import { EventNotFoundError } from "@/lib/events/event-rsvp";
 import {
   CALLER_ID,
@@ -38,7 +39,7 @@ import {
 async function expectEditRejected(
   edit: {
     readonly eventId?: string;
-    readonly changes: EventEdit;
+    readonly changes: EventEditDraft;
   },
   code: EventIssueCode,
 ): Promise<void> {
@@ -255,7 +256,10 @@ describe("editar un evento", () => {
 });
 
 describe("editar un evento: hora y fecha de fin", () => {
-  async function editSingle(changes: EventEdit, eventId = SINGLE_EVENT_ID) {
+  async function editSingle(
+    changes: EventEditDraft,
+    eventId = SINGLE_EVENT_ID,
+  ) {
     const club = fakeManagedEventsClub();
     const edited = await editEvent(club.gateways, {
       callerId: CALLER_ID,
@@ -492,5 +496,107 @@ describe("quién puede editar y cancelar", () => {
     });
 
     await expect(attempt).rejects.toBeInstanceOf(MemberNotFoundError);
+  });
+});
+
+describe("editar un evento: lugar estructurado", () => {
+  const MSAC_PLACE = {
+    name: "MSAC",
+    address: "Aughtie Dr, Albert Park VIC 3206",
+    lat: -37.8423,
+    lng: 144.9601,
+  } as const;
+
+  async function editSingle(changes: EventEditDraft) {
+    const club = fakeManagedEventsClub();
+    const edited = await editEvent(club.gateways, {
+      callerId: CALLER_ID,
+      eventId: SINGLE_EVENT_ID,
+      changes,
+      now: NOW,
+    });
+    return { club, edited };
+  }
+
+  it("guarda el lugar elegido y dónde exactamente, y enseña su nombre", async () => {
+    const { club, edited } = await editSingle({
+      location: "Lo que había escrito",
+      place: { ...MSAC_PLACE, name: " Aquatic Centre " },
+      placeDetail: " Piscina de buceo ",
+    });
+
+    expect(edited).toMatchObject({
+      location: "Aquatic Centre",
+      place: { ...MSAC_PLACE, name: "Aquatic Centre" },
+      placeDetail: "Piscina de buceo",
+    });
+    expect(club.event(SINGLE_EVENT_ID)).toEqual(edited);
+  });
+
+  it("quita el lugar elegido y vuelve al texto libre", async () => {
+    const club = fakeManagedEventsClub();
+    await editEvent(club.gateways, {
+      callerId: CALLER_ID,
+      eventId: SINGLE_EVENT_ID,
+      changes: { place: MSAC_PLACE, placeDetail: "Piscina de buceo" },
+      now: NOW,
+    });
+
+    const edited = await editEvent(club.gateways, {
+      callerId: CALLER_ID,
+      eventId: SINGLE_EVENT_ID,
+      changes: {
+        location: "Piscina de Box Hill",
+        place: null,
+        placeDetail: null,
+      },
+      now: NOW,
+    });
+
+    expect(edited).toMatchObject({
+      location: "Piscina de Box Hill",
+      place: null,
+      placeDetail: null,
+    });
+  });
+
+  it("conserva el lugar al cambiar otra cosa", async () => {
+    const club = fakeManagedEventsClub();
+    await editEvent(club.gateways, {
+      callerId: CALLER_ID,
+      eventId: SINGLE_EVENT_ID,
+      changes: { place: MSAC_PLACE },
+      now: NOW,
+    });
+
+    const edited = await editEvent(club.gateways, {
+      callerId: CALLER_ID,
+      eventId: SINGLE_EVENT_ID,
+      changes: { title: "Final estatal" },
+      now: NOW,
+    });
+
+    expect(edited.place).toEqual(MSAC_PLACE);
+  });
+
+  it("rechaza coordenadas fuera de rango sin escribir nada", async () => {
+    await expectEditRejected(
+      { changes: { place: { ...MSAC_PLACE, lat: -95 } } },
+      "event_place_coordinates_invalid",
+    );
+  });
+
+  it("rechaza una latitud sin longitud sin escribir nada", async () => {
+    await expectEditRejected(
+      { changes: { place: { name: "MSAC", lat: -37.8 } } },
+      "event_place_coordinates_invalid",
+    );
+  });
+
+  it("rechaza un detalle demasiado largo sin escribir nada", async () => {
+    await expectEditRejected(
+      { changes: { placeDetail: "x".repeat(PLACE_DETAIL_MAX_LENGTH + 1) } },
+      "event_place_detail_invalid",
+    );
   });
 });

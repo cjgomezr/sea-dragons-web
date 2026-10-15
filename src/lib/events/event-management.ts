@@ -7,6 +7,8 @@ import {
   findEventOrganizer,
   normalizeLocation,
   normalizeNotes,
+  normalizePlace,
+  normalizePlaceDetail,
   normalizeTitle,
   resolveAudience,
   resolveEventEnd,
@@ -17,6 +19,7 @@ import {
 } from "./event-change-notice";
 import type { EventNoticeGateways } from "./event-creation-notice";
 import { isStillAhead } from "./event-occurrences";
+import type { PlaceDraft } from "./event-place";
 import { EventNotFoundError } from "./event-rsvp";
 
 /**
@@ -51,6 +54,13 @@ export type ManagedEvent = EventFields & {
 export type EventEdit = Partial<
   EventFields & { readonly startsOn: string; readonly endsOn: string | null }
 >;
+
+/** Lo que cambia tal como llega: el lugar todavía sin validar. Un lugar
+ * elegido pone su nombre en `location`; a `null`, el evento vuelve al texto
+ * libre. */
+export type EventEditDraft = Omit<EventEdit, "place"> & {
+  readonly place?: PlaceDraft | null;
+};
 
 /** `closed` si el evento se canceló o empezó entre leerlo y escribirlo. */
 export type ManagedEventWrite = "saved" | "closed";
@@ -132,19 +142,42 @@ async function readBackEvent(
   return event;
 }
 
+/** El lugar y el texto que se enseña, si cambian. Con un lugar elegido, el
+ * texto es su nombre aunque llegue otro. */
+function normalizeWhere({
+  place,
+  location,
+}: Pick<EventEditDraft, "location" | "place">): Pick<
+  EventEdit,
+  "location" | "place"
+> {
+  if (place !== null && place !== undefined) {
+    const normalized = normalizePlace(place);
+    return { location: normalized.name, place: normalized };
+  }
+  return {
+    ...(place === null ? { place: null } : {}),
+    ...(location === undefined
+      ? {}
+      : { location: normalizeLocation(location) }),
+  };
+}
+
 /** Las mismas reglas que al crear, sólo sobre lo que viene. También las usa
  * editar una serie (#315). */
-export async function normalizeChanges<Edit extends EventEdit>(
+export async function normalizeChanges(
   gateways: Pick<EventManagementGateways, "events">,
   clubId: string,
-  edit: Edit,
-): Promise<Edit> {
+  edit: EventEditDraft,
+): Promise<EventEdit> {
+  const { place, location, ...rest } = edit;
   return {
-    ...edit,
+    ...rest,
     ...(edit.title === undefined ? {} : { title: normalizeTitle(edit.title) }),
-    ...(edit.location === undefined
+    ...normalizeWhere({ place, location }),
+    ...(edit.placeDetail === undefined
       ? {}
-      : { location: normalizeLocation(edit.location) }),
+      : { placeDetail: normalizePlaceDetail(edit.placeDetail) }),
     ...(edit.notes === undefined ? {} : { notes: normalizeNotes(edit.notes) }),
     ...(edit.audience === undefined
       ? {}
@@ -189,7 +222,7 @@ export async function editEvent(
   request: {
     readonly callerId: string;
     readonly eventId: string;
-    readonly changes: EventEdit;
+    readonly changes: EventEditDraft;
     readonly now: Date;
   },
 ): Promise<ManagedEvent> {
