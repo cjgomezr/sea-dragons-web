@@ -184,6 +184,9 @@ export function requestPaymentRetry(): Promise<StripeSessionOutcome> {
   return requestStripeSession(MEMBERSHIP_RETRY_PAYMENT_API_PATH);
 }
 
+/** El recibo responde lo mismo que abrir una sesión: una URL de Stripe. */
+const paymentReceiptResponseSchema = stripeSessionResponseSchema;
+
 /** La URL del recibo de Stripe de un pago cobrado (#630). */
 export type PaymentReceiptOutcome =
   { readonly kind: "found"; readonly url: string } | PaymentsFailure;
@@ -200,7 +203,7 @@ export async function requestPaymentReceipt(
         encodeURIComponent(paymentId),
       ),
     ),
-    stripeSessionResponseSchema,
+    paymentReceiptResponseSchema,
   );
   return read.kind === "failed"
     ? read

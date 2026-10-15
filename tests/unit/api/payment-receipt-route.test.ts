@@ -17,6 +17,7 @@ const CONTINUE_HEADER = "x-middleware-next";
 const USER_ID = "7b0e5a52-3c1d-4e8f-9a6b-2d4c8e1f0a37";
 const PAYMENT_ID = "0f3a2b1c-4d5e-4f60-8a7b-9c0d1e2f3a4b";
 const INVOICE_URL = "https://invoice.stripe.com/i/acct_1/test_inv_paid";
+const RECEIPT_URL = "https://pay.stripe.com/receipts/payment/test_receipt";
 const STRIPE_SECRET_MESSAGE = "No such invoice: 'in_123'; sk_test_clave";
 const ORIGINAL_ENV = { ...process.env };
 
@@ -28,6 +29,7 @@ const PAID_INVOICE: ReceiptablePayment = {
 const readSessionState = vi.fn();
 const findById = vi.fn<() => Promise<ReceiptablePayment | null>>();
 const retrieveInvoice = vi.fn();
+const retrievePaymentIntent = vi.fn();
 const createPaymentReceiptGateway = vi.fn((client: unknown) => {
   void client;
   return { findById };
@@ -41,7 +43,9 @@ vi.mock("stripe", async (importOriginal) => {
     invoices = {
       retrieve: (...args: unknown[]) => retrieveInvoice(...args),
     };
-    paymentIntents = { retrieve: vi.fn() };
+    paymentIntents = {
+      retrieve: (...args: unknown[]) => retrievePaymentIntent(...args),
+    };
   }
   return { default: FakeStripe };
 });
@@ -123,6 +127,23 @@ describe("GET /api/v1/membership/payments/{paymentId}/receipt", () => {
     });
   });
 
+  it("responde el recibo del cobro de un pack o un extra", async () => {
+    findById.mockResolvedValue({
+      status: "paid",
+      source: { kind: "payment_intent", paymentIntentId: "pi_123" },
+    });
+    retrievePaymentIntent.mockResolvedValue({
+      latest_charge: { receipt_url: RECEIPT_URL },
+    });
+
+    const response = await getReceipt();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: { url: RECEIPT_URL },
+    });
+  });
+
   it("lee el pago con el cliente de la sesión, para que decida la RLS", async () => {
     await getReceipt();
 
@@ -193,6 +214,7 @@ describe("GET /api/v1/membership/payments/{paymentId}/receipt", () => {
       error: { code: "bad_gateway", reason: "stripe_failed" },
     });
     expect(rawBody).not.toContain("in_123");
+    expect(rawBody).not.toContain("sk_test");
   });
 
   it("responde 503 con el motivo de los otros endpoints de membresía cuando falta Stripe", async () => {
