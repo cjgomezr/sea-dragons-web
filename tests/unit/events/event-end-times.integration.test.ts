@@ -15,7 +15,7 @@ import {
 
 /**
  * La hora y la fecha de fin con los adaptadores de verdad (#642, RF-2 del PRD
- * de E24) y `0066_event_end_times.sql` aplicada: lo que ningún doble dice es
+ * de E24) y `0067_event_end_times.sql` aplicada: lo que ningún doble dice es
  * que `create_events` las guarda con los nombres que manda el adaptador, que
  * la agenda las lee de vuelta en `HH:MM` y que las sesiones de una serie
  * heredan la hora de fin de la serie.

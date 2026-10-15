@@ -8,7 +8,7 @@ import {
 } from "../../support/postgres";
 
 /**
- * `0066_event_end_times.sql` contra un Postgres desechable (#642, RF-2 del
+ * `0067_event_end_times.sql` contra un Postgres desechable (#642, RF-2 del
  * PRD de E24). Eventos y series guardan su hora de fin, y un evento suelto su
  * fecha de fin; las tres columnas son nulas en lo anterior a E24. Crear,
  * editar un evento y editar una serie las escriben, y las sesiones de una
@@ -97,7 +97,7 @@ const WEEKLY = {
 
 describeConPostgres("la hora y la fecha de fin de un evento en la base", () => {
   it("deja nulas las columnas nuevas en los eventos y las series que ya existían", async () => {
-    const database = await databaseBeforeMigration("0066");
+    const database = await databaseBeforeMigration("0067");
     const author = await seededAuthor(database);
     const single = await createEvents(database, author, {
       occurrence_dates: ["2099-07-10"],
