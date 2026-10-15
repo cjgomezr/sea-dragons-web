@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EVENTS_API_PATH, EVENT_API_PATH } from "@/lib/auth/routes";
+import { AGENDA_PAGE_SIZE } from "@/lib/events/event-agenda";
 import {
   AGENDA_CALLER_ID,
   AGENDA_NOW,
@@ -55,6 +56,31 @@ function mockAnonymousCaller(): void {
 async function requestAgenda(query = ""): Promise<Response> {
   const { GET } = await import("@/app/api/v1/events/route");
   return GET(new NextRequest(new URL(`${EVENTS_API_PATH}${query}`, ORIGIN)));
+}
+
+/** Más de una página de la agenda en cada tipo de los tests de filtro. */
+const EVENTS_PAST_A_PAGE = AGENDA_PAGE_SIZE + 5;
+
+type PageBody = {
+  readonly data: {
+    readonly events: readonly { readonly title: string }[];
+    readonly nextCursor: string | null;
+  };
+};
+
+async function readPage(response: Response): Promise<{
+  readonly titles: readonly string[];
+  readonly nextCursor: string | null;
+}> {
+  const body: PageBody = await response.json();
+  return {
+    titles: body.data.events.map((event) => event.title),
+    nextCursor: body.data.nextCursor,
+  };
+}
+
+async function titlesIn(response: Response): Promise<readonly string[]> {
+  return (await readPage(response)).titles;
 }
 
 async function requestEvent(eventId: string): Promise<Response> {
@@ -133,6 +159,57 @@ describe("endpoints de agenda y detalle", () => {
     const response = await requestAgenda("?cursor=inventado");
 
     await expectError(response, 400, "validation_error");
+  });
+
+  it("la agenda responde sólo los tipos pedidos", async () => {
+    mockWiring({
+      events: [
+        clubEvent("2027-06-16", { title: "entreno", eventType: "training" }),
+        clubEvent("2027-06-17", { title: "torneo", eventType: "competition" }),
+        clubEvent("2027-06-18", { title: "barbacoa", eventType: "social" }),
+      ],
+    });
+
+    const response = await requestAgenda("?types=training,social");
+
+    expect(response.status).toBe(200);
+    expect(await titlesIn(response)).toEqual(["entreno", "barbacoa"]);
+  });
+
+  it("la agenda pagina el filtro con el cursor y los mismos tipos", async () => {
+    const events = Array.from({ length: 2 * EVENTS_PAST_A_PAGE }, (_, index) =>
+      clubEvent("2027-06-20", {
+        title: `evento ${index}`,
+        eventType: index % 2 === 0 ? "social" : "meeting",
+      }),
+    );
+    mockWiring({ events });
+
+    const first = await readPage(await requestAgenda("?types=social"));
+    const second = await readPage(
+      await requestAgenda(`?types=social&cursor=${first.nextCursor ?? ""}`),
+    );
+
+    expect(second.nextCursor).toBeNull();
+    expect([...first.titles, ...second.titles]).toEqual(
+      events
+        .filter((event) => event.eventType === "social")
+        .map((event) => event.title),
+    );
+  });
+
+  it("la agenda responde todos los tipos si ninguno pedido es válido", async () => {
+    mockWiring({
+      events: [
+        clubEvent("2027-06-16", { title: "entreno", eventType: "training" }),
+        clubEvent("2027-06-17", { title: "torneo", eventType: "competition" }),
+      ],
+    });
+
+    const response = await requestAgenda("?types=foo");
+
+    expect(response.status).toBe(200);
+    expect(await titlesIn(response)).toEqual(["entreno", "torneo"]);
   });
 
   it("la agenda responde 401 sin sesión", async () => {

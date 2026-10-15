@@ -151,6 +151,9 @@ async function findAgendaPage(
     query.period === "upcoming"
       ? request.gte("starts_on", query.today)
       : request.lt("starts_on", query.today);
+  if (query.eventTypes !== null) {
+    request = request.in("event_type", query.eventTypes);
+  }
   if (query.visibility.kind === "audience") {
     request = request
       .in(READER_GROUP_FILTER, query.visibility.groupIds)

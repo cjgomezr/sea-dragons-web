@@ -10,8 +10,8 @@ import type {
 /**
  * Un club en memoria para los tests de la agenda y el detalle (#309). El
  * doble cumple el contrato del adaptador: sólo devuelve eventos del club que
- * se le pide, aplica la visibilidad, el periodo, el orden y el cursor como la
- * consulta, y corta en el límite. Los conteos y los nombres los da tal cual:
+ * se le pide, aplica la visibilidad, el periodo, el tipo, el orden y el
+ * cursor como la consulta, y corta en el límite. Los conteos y los nombres los da tal cual:
  * quién cuenta lo decide la base (`0039_event_rsvp_tallies.sql`), y eso se
  * prueba en su migración.
  */
@@ -111,6 +111,12 @@ function isInPeriod(event: FakeEvent, query: AgendaQuery): boolean {
     : event.startsOn < query.today;
 }
 
+function hasRequestedType(event: FakeEvent, query: AgendaQuery): boolean {
+  return (
+    query.eventTypes === null || query.eventTypes.includes(event.eventType)
+  );
+}
+
 function compareAscending(first: FakeEvent, second: FakeEvent): number {
   return (
     first.startsAt.localeCompare(second.startsAt) ||
@@ -141,6 +147,7 @@ function findAgendaPage(
         event.clubId === query.clubId &&
         isVisible(event, query) &&
         isInPeriod(event, query) &&
+        hasRequestedType(event, query) &&
         isAfterCursor(event, query),
     )
     .sort((first, second) => direction * compareAscending(first, second))

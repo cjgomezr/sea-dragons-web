@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
-import { agendaEventSchema } from "@/components/calendar/agenda-client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  agendaEventSchema,
+  loadAgenda,
+} from "@/components/calendar/agenda-client";
 
 /**
  * La forma de un evento de la agenda como la lee la pantalla (#642, RF-2 del
  * PRD de E24): la hora y la fecha de fin llegan siempre, nulas en lo anterior
- * a E24 y en un evento de un día.
+ * a E24 y en un evento de un día. Y los tipos que pide (#643): van en la
+ * consulta, y sin ninguno no van.
  */
 
 const AGENDA_EVENT = {
@@ -23,6 +27,45 @@ const AGENDA_EVENT = {
   myResponse: null,
   inAudience: true,
 };
+
+/** Sirve una agenda vacía y devuelve las URL que se pidieron. */
+function serveEmptyAgenda(): string[] {
+  const requestedUrls: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      requestedUrls.push(String(input));
+      return Response.json({ data: { events: [], nextCursor: null } });
+    }),
+  );
+  return requestedUrls;
+}
+
+function typesParamOf(url: string | undefined): string | null {
+  return new URL(url ?? "", "http://localhost").searchParams.get("types");
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("loadAgenda", () => {
+  it("manda los tipos pedidos en la consulta", async () => {
+    const requestedUrls = serveEmptyAgenda();
+
+    await loadAgenda("upcoming", "cursor-1", ["training", "social"]);
+
+    expect(typesParamOf(requestedUrls[0])).toBe("training,social");
+  });
+
+  it("no manda tipos cuando no se pide ninguno", async () => {
+    const requestedUrls = serveEmptyAgenda();
+
+    await loadAgenda("past", null, []);
+
+    expect(typesParamOf(requestedUrls[0])).toBeNull();
+  });
+});
 
 describe("agendaEventSchema", () => {
   it("lee la hora y la fecha de fin de un evento de varios días", () => {
