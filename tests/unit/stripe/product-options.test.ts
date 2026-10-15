@@ -69,6 +69,24 @@ describe("readProductOptions", () => {
     expect(options?.values.at(-1)).toBe("T200");
   });
 
+  it("recorta cada opción a los 100 caracteres que admite Stripe", () => {
+    const options = readProductOptions({
+      seadragons_options: `S,${"x".repeat(120)}`,
+    });
+
+    expect(options?.values).toEqual(["S", "x".repeat(100)]);
+  });
+
+  it("no repite dos opciones largas que sólo se distinguen tras el carácter 100", () => {
+    const prefix = "y".repeat(100);
+
+    const options = readProductOptions({
+      seadragons_options: `${prefix}A,${prefix}B`,
+    });
+
+    expect(options?.values).toEqual([prefix]);
+  });
+
   it("usa la etiqueta de seadragons_option_label si la hay", () => {
     const options = readProductOptions({
       seadragons_options: "Red,Blue",

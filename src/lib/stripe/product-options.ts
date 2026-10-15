@@ -22,6 +22,7 @@ const OPTIONS_SEPARATOR = ",";
 
 /** Los límites de Stripe para un desplegable de Checkout. */
 const STRIPE_MAX_LABEL_LENGTH = 50;
+const STRIPE_MAX_OPTION_LENGTH = 100;
 const STRIPE_MAX_DROPDOWN_OPTIONS = 200;
 
 /** Stripe pide un valor alfanumérico por opción; el texto puede ser
@@ -42,8 +43,8 @@ function readOptionLabel(metadata: Stripe.Metadata): string {
 }
 
 /** Un valor mal escrito en el panel de Stripe no puede romper la venta: lo
- * que no es una opción se descarta y, si no queda ninguna, el extra se vende
- * sin desplegable. */
+ * que no es una opción se descarta, la que pasa del límite de Stripe se
+ * recorta y, si no queda ninguna, el extra se vende sin desplegable. */
 export function readProductOptions(
   metadata: Stripe.Metadata,
 ): ProductOptions | null {
@@ -52,7 +53,7 @@ export function readProductOptions(
     ...new Set(
       raw
         .split(OPTIONS_SEPARATOR)
-        .map((value) => value.trim())
+        .map((value) => value.trim().slice(0, STRIPE_MAX_OPTION_LENGTH).trim())
         .filter((value) => value !== ""),
     ),
   ].slice(0, STRIPE_MAX_DROPDOWN_OPTIONS);
