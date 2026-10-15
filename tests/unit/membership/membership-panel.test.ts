@@ -54,6 +54,7 @@ function aPayment(overrides: Partial<PaymentRecord> = {}): PaymentRecord {
     createdAt: new Date("2026-09-01T08:59:00Z"),
     card: null,
     failureReason: null,
+    quantity: 1,
     ...overrides,
   };
 }
@@ -388,8 +389,20 @@ describe("readMembershipView: el historial", () => {
         status: "paid",
         card: null,
         failureReason: null,
+        quantity: 1,
       },
     ]);
+  });
+
+  it("sirve cuántas unidades se compraron en el pago de un extra (#632)", async () => {
+    const view = await viewOf(aRecord(), [
+      aPayment({ description: "2026 club jersey", quantity: 3 }),
+    ]);
+
+    expect(view.payments[0]).toMatchObject({
+      description: "2026 club jersey",
+      quantity: 3,
+    });
   });
 
   it("sirve la marca y los cuatro dígitos de la tarjeta con que se cobró (#629)", async () => {

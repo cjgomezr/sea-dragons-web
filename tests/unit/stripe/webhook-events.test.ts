@@ -18,11 +18,13 @@ import {
   findInvoicePaymentIntentId,
   planStripeEventWrites,
   readChargeDetails,
+  readLineItemsQuantity,
   readStripeEventFacts,
   subscriptionFactsFromCheckout,
 } from "@/lib/stripe/webhook-events";
 import {
   FIXTURE_CUSTOMER_ID,
+  FIXTURE_LEVY_CHECKOUT_SESSION_ID,
   FIXTURE_LEVY_NAME,
   FIXTURE_LEVY_PAYMENT_INTENT_ID,
   FIXTURE_LEVY_PRODUCT_ID,
@@ -1108,8 +1110,50 @@ describe("checkout.session.completed de un levy", () => {
         description: FIXTURE_LEVY_NAME,
         paidAt: secondsToDate(event.created),
       },
+      quantity: { kind: "single" },
     });
   });
+
+  it("pide las unidades a Stripe cuando el extra dejaba elegir varias (#632)", () => {
+    const facts = readStripeEventFacts(
+      levyCheckout({
+        metadata: {
+          user_id: FIXTURE_USER_ID,
+          kind: "levy",
+          levy_product_id: FIXTURE_LEVY_PRODUCT_ID,
+          levy_name: FIXTURE_LEVY_NAME,
+          levy_max_quantity: "10",
+        },
+      }),
+    );
+
+    expect(facts).toMatchObject({
+      kind: "levyPaid",
+      quantity: {
+        kind: "chosen",
+        checkoutSessionId: FIXTURE_LEVY_CHECKOUT_SESSION_ID,
+      },
+    });
+  });
+
+  it.each(["1", "abc"])(
+    "da por hecha una unidad con levy_max_quantity %s",
+    (maxQuantity) => {
+      const facts = readStripeEventFacts(
+        levyCheckout({
+          metadata: {
+            user_id: FIXTURE_USER_ID,
+            kind: "levy",
+            levy_product_id: FIXTURE_LEVY_PRODUCT_ID,
+            levy_name: FIXTURE_LEVY_NAME,
+            levy_max_quantity: maxQuantity,
+          },
+        }),
+      );
+
+      expect(facts).toMatchObject({ quantity: { kind: "single" } });
+    },
+  );
 
   it.each(["unpaid", "no_payment_required"])(
     "ignora un levy con el pago %s",
@@ -1143,5 +1187,25 @@ describe("checkout.session.completed de un levy", () => {
     const facts = readStripeEventFacts(levyCheckout({ payment_intent: null }));
 
     expect(facts).toEqual({ kind: "ignored" });
+  });
+});
+
+// #632: el evento no trae las líneas de la sesión; se piden a Stripe y de
+// ellas sale cuántas unidades eligió el socio.
+describe("readLineItemsQuantity", () => {
+  function lineItem(quantity: number | null): Stripe.LineItem {
+    return { object: "item", quantity } as Stripe.LineItem;
+  }
+
+  it("lee las unidades de la línea de la sesión", () => {
+    expect(readLineItemsQuantity([lineItem(3)])).toBe(3);
+  });
+
+  it("cuenta una unidad si Stripe no dice cuántas", () => {
+    expect(readLineItemsQuantity([lineItem(null)])).toBe(1);
+  });
+
+  it("cuenta una unidad si la sesión no trae líneas", () => {
+    expect(readLineItemsQuantity([])).toBe(1);
   });
 });

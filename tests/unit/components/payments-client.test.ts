@@ -20,6 +20,7 @@ const VIEW: MembershipView = {
       status: "paid",
       card: { brand: "visa", last4: "4242" },
       failureReason: null,
+      quantity: 1,
     },
     {
       id: "pay-sep",
@@ -29,6 +30,7 @@ const VIEW: MembershipView = {
       status: "failed",
       card: null,
       failureReason: "Your card was declined.",
+      quantity: 1,
     },
   ],
   sessionBalance: { sessions: 0, movements: [] },

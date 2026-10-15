@@ -13,7 +13,10 @@ import {
   type ScheduledPlanChange,
   resolveStandingStatus,
 } from "./membership";
-import type { StripeWebhookGateway } from "@/lib/stripe/stripe-webhook";
+import type {
+  LevyPaymentToApply,
+  StripeWebhookGateway,
+} from "@/lib/stripe/stripe-webhook";
 import type { MemberEmailGateway } from "./checkout";
 import type { PlanChoiceGateway } from "./choose-plan";
 import type { LevyGateways } from "./levies";
@@ -31,7 +34,6 @@ import {
 } from "./membership-view";
 import type {
   ChargeCard,
-  LevyPayment,
   MembershipChanges,
   MembershipLookup,
   RecordedPayment,
@@ -260,7 +262,7 @@ export function createMembershipGateway(
 const PAYMENTS_TABLE = "payments";
 const MEMBERS_TABLE = "members";
 const PAYMENT_COLUMNS =
-  "id, amount_cents, description, status, paid_at, created_at, card_brand, card_last4, failure_reason";
+  "id, amount_cents, description, status, paid_at, created_at, card_brand, card_last4, failure_reason, quantity";
 
 const paymentRowSchema = z.object({
   id: z.string(),
@@ -272,6 +274,7 @@ const paymentRowSchema = z.object({
   card_brand: z.string().nullable(),
   card_last4: z.string().nullable(),
   failure_reason: z.string().nullable(),
+  quantity: z.number().int().positive(),
 });
 
 /** Sin marca o sin dígitos no hay tarjeta que enseñar. */
@@ -313,6 +316,7 @@ export function createPaymentHistoryGateway(
           createdAt: new Date(row.created_at),
           card: toPaymentCard(row),
           failureReason: row.failure_reason,
+          quantity: row.quantity,
         }));
     },
   };
@@ -599,12 +603,12 @@ function toSessionPackPaymentJson(
 /** Un levy se guarda como un pack, y además con el producto de Stripe que
  * dice cuál pagó el socio (#473). */
 function toLevyPaymentJson(
-  payment: LevyPayment,
-  card: ChargeCard | null,
+  levy: Pick<LevyPaymentToApply, "payment" | "quantity" | "card">,
 ): Record<string, unknown> {
   return {
-    ...toSessionPackPaymentJson(payment, card),
-    stripe_product_id: payment.productId,
+    ...toSessionPackPaymentJson(levy.payment, levy.card),
+    stripe_product_id: levy.payment.productId,
+    quantity: levy.quantity,
   };
 }
 
@@ -681,7 +685,8 @@ export function createStripeWebhookGateway(
       }
       return data === null ? null : z.string().parse(data.club_id);
     },
-    async applyLevyPayment({ event, owner, payment, card }) {
+    async applyLevyPayment(levy) {
+      const { event, owner } = levy;
       const { data, error } = await serviceClient.rpc(
         APPLY_LEVY_PAYMENT_FUNCTION,
         {
@@ -690,7 +695,7 @@ export function createStripeWebhookGateway(
           event_created: event.created.toISOString(),
           target_user_id: owner.userId,
           target_club_id: owner.clubId,
-          payment: toLevyPaymentJson(payment, card),
+          payment: toLevyPaymentJson(levy),
         },
       );
       if (error) {

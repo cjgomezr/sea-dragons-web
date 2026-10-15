@@ -103,6 +103,7 @@ const PAYMENTS: readonly PaymentView[] = [
     status: "paid",
     card: { brand: "visa", last4: "4242" },
     failureReason: null,
+    quantity: 1,
   },
   {
     id: "pay-may",
@@ -112,6 +113,7 @@ const PAYMENTS: readonly PaymentView[] = [
     status: "failed",
     card: { brand: "visa", last4: "4242" },
     failureReason: "Your card was declined.",
+    quantity: 1,
   },
   {
     id: "pay-apr",
@@ -121,6 +123,7 @@ const PAYMENTS: readonly PaymentView[] = [
     status: "pending",
     card: null,
     failureReason: null,
+    quantity: 1,
   },
 ];
 

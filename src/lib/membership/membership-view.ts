@@ -49,6 +49,9 @@ export type PaymentRecord = {
   readonly card: PaymentCard | null;
   /** Sólo de un cobro fallido, y si Stripe dio el motivo. */
   readonly failureReason: string | null;
+  /** Las unidades compradas (#632): una, salvo un extra de varias. El
+   * historial puede decir "{descripción} × {unidades}". */
+  readonly quantity: number;
 };
 
 export type PaymentHistoryGateway = {
@@ -64,6 +67,7 @@ export type PaymentView = {
   readonly status: PaymentStatus;
   readonly card: PaymentCard | null;
   readonly failureReason: string | null;
+  readonly quantity: number;
 };
 
 export type MembershipWaiverView = {
@@ -322,6 +326,7 @@ function toPaymentView(payment: PaymentRecord): PaymentView {
     status: payment.status,
     card: payment.card,
     failureReason: payment.failureReason,
+    quantity: payment.quantity,
   };
 }
 

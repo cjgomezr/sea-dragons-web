@@ -9,6 +9,7 @@ import {
   findInvoicePaymentIntentId,
   readCard,
   readChargeDetails,
+  readLineItemsQuantity,
 } from "./webhook-events";
 
 /**
@@ -149,6 +150,16 @@ async function readPaymentCharge(
   return readChargeDetails(paymentIntent);
 }
 
+/** Un levy pide una sola línea: la primera página basta. */
+async function readCheckoutQuantity(
+  client: Stripe,
+  checkoutSessionId: string,
+): Promise<number> {
+  const { data } =
+    await client.checkout.sessions.listLineItems(checkoutSessionId);
+  return readLineItemsQuantity(data);
+}
+
 async function readInvoiceCharge(
   client: Stripe,
   invoiceId: string,
@@ -168,6 +179,8 @@ export function createStripeApi(client: Stripe): StripeApi {
     readInvoiceCharge: (invoiceId) => readInvoiceCharge(client, invoiceId),
     readPaymentCharge: (paymentIntentId) =>
       readPaymentCharge(client, paymentIntentId),
+    readCheckoutQuantity: (checkoutSessionId) =>
+      readCheckoutQuantity(client, checkoutSessionId),
     async makeDefaultPaymentMethod({
       customerId,
       subscriptionId,
