@@ -137,8 +137,8 @@ function describeMonthlyPrice(
 
 type Glyph = React.ComponentProps<typeof Icon>["glyph"];
 
-/** En el móvil el precio lleva el icono del dinero y el próximo cobro va a
- * su lado sin el suyo, como en el mockup; en escritorio, al revés. */
+/** El precio sólo lleva icono en el móvil, donde cada dato va en su línea;
+ * en la tira de escritorio va primero y sin él, como en el mockup. */
 function PhoneOnlyIcon({
   glyph,
 }: {
@@ -151,26 +151,16 @@ function PhoneOnlyIcon({
   );
 }
 
-function WideOnlyIcon({ glyph }: { readonly glyph: Glyph }): React.JSX.Element {
-  return (
-    <span className="payments-plan-icon-wide">
-      <Icon glyph={glyph} />
-    </span>
-  );
-}
-
 /** Un dato de la segunda línea de la tira, con su icono si lo lleva. */
 function PlanDetail({
-  className,
   icon,
   children,
 }: {
-  readonly className?: string;
   readonly icon?: React.ReactNode;
   readonly children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <li className={className}>
+    <li>
       {icon}
       <span>{children}</span>
     </li>
@@ -194,10 +184,7 @@ function PlanDetails({
   return (
     <ul className="payments-plan-details">
       {showsPrice ? (
-        <PlanDetail
-          className="payments-plan-detail-price"
-          icon={<PhoneOnlyIcon glyph={CurrencyDollar} />}
-        >
+        <PlanDetail icon={<PhoneOnlyIcon glyph={CurrencyDollar} />}>
           {describeMonthlyPrice(translate, membership.monthlyPriceCents)}
         </PlanDetail>
       ) : null}
@@ -205,10 +192,7 @@ function PlanDetails({
         <PlanDetail>{translate("payments.plan.noRecurringCharge")}</PlanDetail>
       ) : null}
       {nextChargeAt === null ? null : (
-        <PlanDetail
-          className="payments-plan-detail-next-charge"
-          icon={<WideOnlyIcon glyph={CalendarBlank} />}
-        >
+        <PlanDetail icon={<Icon glyph={CalendarBlank} />}>
           {translate("payments.plan.nextCharge", {
             date: formatClubDay(translate, nextChargeAt),
           })}

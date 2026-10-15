@@ -9155,10 +9155,11 @@ a.auth-brand-header:focus-visible {
   cursor: pointer;
 }
 
+/* El ::after se mide desde dentro del borde: 40px de los 42px. */
 .payments-plan-button::after {
   content: "";
   position: absolute;
-  inset: -2px 0;
+  inset: calc((40px - var(--touch-target-min)) / 2) 0;
 }
 
 .payments-plan-button:hover:not(:disabled) {
@@ -9197,6 +9198,13 @@ a.auth-brand-header:focus-visible {
 
 .payments-plan-packs .app-lead {
   font-size: 13.5px;
+}
+
+/* Los packs son botones pequeños dentro de la tira, sin bajar de los 44px
+   de toque (D11). */
+.payments-plan-packs .auth-submit {
+  padding: 0 var(--space-4);
+  font-size: 14px;
 }
 
 .card .payments-eyebrow {
@@ -9282,10 +9290,6 @@ a.auth-brand-header:focus-visible {
   display: none;
 }
 
-.payments-plan-icon-wide {
-  display: inline-flex;
-}
-
 .payments-plan-details:empty {
   display: none;
 }
@@ -9329,9 +9333,10 @@ a.auth-brand-header:focus-visible {
 }
 
 /* El móvil (#2a): tarjeta de radio 12 con el chip a la derecha del nombre;
-   el precio y el próximo cobro comparten línea tras el icono del dinero, la
-   tarjeta va en la suya, y los botones se reparten el ancho. Lo que el
-   móvil no dibuja (exención, Casual, pendiente) se apila igual (D9). */
+   cada dato en su línea con su icono (el precio, con el del dinero), y los
+   botones se reparten el ancho. El mockup junta precio y próximo cobro,
+   pero con los textos de la app no caben en 375px. Lo que el móvil no
+   dibuja (exención, Casual, pendiente) se apila igual (D9). */
 @media (max-width: 767px) {
   .payments-plan-strip {
     border-radius: 12px;
@@ -9353,21 +9358,8 @@ a.auth-brand-header:focus-visible {
     flex-basis: 100%;
   }
 
-  .payments-plan-details .payments-plan-detail-price,
-  .payments-plan-detail-price + .payments-plan-detail-next-charge {
-    flex-basis: auto;
-  }
-
-  .payments-plan-detail-price + .payments-plan-detail-next-charge::before {
-    content: "·" / "";
-  }
-
   .payments-plan-icon-phone {
     display: inline-flex;
-  }
-
-  .payments-plan-icon-wide {
-    display: none;
   }
 
   .payments-plan-buttons {

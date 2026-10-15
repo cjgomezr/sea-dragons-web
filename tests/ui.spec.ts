@@ -15989,6 +15989,51 @@ test.describe("Pagos en el navegador", () => {
     expect(amountLabel).toBe('"Amount"');
   });
 
+  test("a 1440px la tira del plan es una fila con los botones a la derecha", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goToPayments(page, { view: PLAN_CHANGE_MEMBERSHIP_VIEW });
+
+    const strip = page.getByRole("region", { name: "Current plan" });
+    const name = await strip.getByText("Full membership").boundingBox();
+    const changePlan = await strip
+      .getByRole("button", { name: "Change plan" })
+      .boundingBox();
+    const updateCard = await strip
+      .getByRole("button", { name: "Update card" })
+      .boundingBox();
+    expect(changePlan!.x).toBeGreaterThan(name!.x + name!.width);
+    expect(updateCard!.x).toBeGreaterThan(changePlan!.x);
+    expect(updateCard!.y).toBe(changePlan!.y);
+    expect(changePlan!.y).toBeLessThan(name!.y + name!.height + 24);
+  });
+
+  test("a 375px Cambiar plan y Actualizar tarjeta van lado a lado, de 42px y 44px de zona táctil", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPayments(page, { view: PLAN_CHANGE_MEMBERSHIP_VIEW });
+
+    const strip = page.getByRole("region", { name: "Current plan" });
+    const buttons = [
+      strip.getByRole("button", { name: "Change plan" }),
+      strip.getByRole("button", { name: "Update card" }),
+    ];
+    const [changePlan, updateCard] = await Promise.all(
+      buttons.map((button) => button.boundingBox()),
+    );
+    expect(changePlan!.y).toBe(updateCard!.y);
+    expect(updateCard!.x).toBeGreaterThan(changePlan!.x + changePlan!.width);
+    expect(changePlan!.height).toBe(42);
+    for (const button of buttons) {
+      const touchHeight = await button.evaluate((element) =>
+        getComputedStyle(element, "::after").getPropertyValue("height"),
+      );
+      expect(Number.parseFloat(touchHeight)).toBeGreaterThanOrEqual(44);
+    }
+  });
+
   test("a 375px las tres opciones de plan se apilan", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await goToPayments(page, { view: CHOOSE_PLAN_MEMBERSHIP_VIEW });
