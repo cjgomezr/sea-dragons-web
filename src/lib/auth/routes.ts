@@ -592,6 +592,11 @@ export const MEMBERSHIP_CARD_API_PATH = `${MEMBERSHIP_API_PATH}/card`;
  * alcanza quien no está al día: es justo quien lo necesita. */
 export const MEMBERSHIP_RETRY_PAYMENT_API_PATH = `${MEMBERSHIP_API_PATH}/retry-payment`;
 
+/** El recibo de Stripe de un pago cobrado (#630, RF-4 del PRD de E23).
+ * `[paymentId]` es el id de la fila de `payments`. Cuelga de la membresía,
+ * así que también lo alcanza quien no está al día. */
+export const MEMBERSHIP_PAYMENT_RECEIPT_API_PATH = `${MEMBERSHIP_API_PATH}/payments/[paymentId]/receipt`;
+
 /** Cambiar de plan al siguiente ciclo, o anular el cambio (#456, RF-6). Lo
  * alcanza también quien no está al día: un Casual lo usa para ir a Checkout. */
 export const MEMBERSHIP_PLAN_API_PATH = `${MEMBERSHIP_API_PATH}/plan`;

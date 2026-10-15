@@ -3,6 +3,7 @@ import { ApiError } from "@/lib/api/response";
 import type { CheckoutStripe } from "@/lib/membership/checkout";
 import type { LevyStripe } from "@/lib/membership/levies";
 import type { PlanChangeStripe } from "@/lib/membership/plan-change";
+import type { PaymentReceiptStripe } from "@/lib/membership/payment-receipt";
 import type { PaymentRetryStripe } from "@/lib/membership/retry-payment";
 import type { SessionPackCheckoutStripe } from "@/lib/membership/session-pack-checkout";
 import {
@@ -90,6 +91,23 @@ export function resolveRoutePaymentRetryStripe(
   return { kind: "configured", invoices: stripe.client.invoices };
 }
 
+/** Lo que necesita el recibo de un pago (#630): la factura de una cuota o
+ * el PaymentIntent de un cobro suelto. */
+export function resolveRoutePaymentReceiptStripe(
+  logPrefix: string,
+): PaymentReceiptStripe {
+  const stripe = createStripeSetup(process.env);
+  if (stripe.kind === "unconfigured") {
+    console.warn(`${logPrefix} faltan ${stripe.missingKeys.join(", ")}`);
+    return { kind: "unconfigured" };
+  }
+  return {
+    kind: "configured",
+    invoices: stripe.client.invoices,
+    paymentIntents: stripe.client.paymentIntents,
+  };
+}
+
 /** Lo que necesitan los levies (#473): los productos de la cuenta y
  * Checkout. */
 export function resolveRouteLevyStripe(logPrefix: string): LevyStripe {
@@ -118,6 +136,24 @@ export function asStripeUnavailable(
         STRIPE_UNAVAILABLE_MESSAGE,
         STRIPE_UNAVAILABLE_REASON,
       );
+    }
+    throw error;
+  };
+}
+
+const STRIPE_FAILED_REASON = "stripe_failed";
+
+/** Para los endpoints que sólo leen de Stripe lo que ya existe (#474, #630):
+ * Stripe está configurado y fue Stripe quien falló, así que 502, con
+ * `message` y sin la frase de Stripe. Lo que no es de Stripe se relanza. */
+export function asStripeBadGateway(
+  logPrefix: string,
+  message: string,
+): (error: unknown) => never {
+  return (error) => {
+    if (error instanceof Stripe.errors.StripeError) {
+      console.warn(`${logPrefix} Stripe falló: ${error.message}`);
+      throw new ApiError("bad_gateway", message, STRIPE_FAILED_REASON);
     }
     throw error;
   };
