@@ -15,11 +15,11 @@ import { StripeSessionButton } from "./StripeSessionButton";
 import type { Waiting } from "./use-membership-wait";
 
 /**
- * Los packs de sesiones de un Casual en Pagos (#471, RF-5 del PRD de E13):
- * un botón por cada pack que el club ofrece (#469), con sus sesiones y su
- * precio, que lleva a Stripe Checkout. Al volver, dice qué pasa con el pago
- * mientras el webhook no llega. El saldo y sus movimientos son de otro
- * ticket.
+ * Los packs de sesiones de un Casual en Pagos (#471, RF-5 del PRD de E13),
+ * dentro de la tira del plan (#628): un botón por cada pack que el club
+ * ofrece (#469), con sus sesiones y su precio, que lleva a Stripe Checkout.
+ * Al volver, dice qué pasa con el pago mientras el webhook no llega. El
+ * saldo y sus movimientos son de otro ticket.
  */
 
 type PacksState = { readonly kind: "loading" } | SessionPackOffersLoad;
@@ -149,10 +149,10 @@ export function SessionPackOffer({
   const titleId = useId();
   const state = useSessionPackOffers();
   return (
-    <section className="card payments-plan-card" aria-labelledby={titleId}>
-      <h2 id={titleId} className="payments-eyebrow">
+    <section className="payments-plan-packs" aria-labelledby={titleId}>
+      <h3 id={titleId} className="payments-eyebrow">
         {translate("payments.packs.title")}
-      </h2>
+      </h3>
       <p className="app-lead">{translate("payments.packs.lead")}</p>
       <PackReturnStatus
         translate={translate}

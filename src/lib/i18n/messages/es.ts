@@ -1332,6 +1332,7 @@ export const spanishMessages: MessageCatalog = {
   "payments.choice.failed":
     "No pudimos guardar tu elección. Inténtalo de nuevo.",
   "payments.planChange.title": "Cambiar de plan",
+  "payments.planChange.open": "Cambiar plan",
   "payments.planChange.hint":
     "El cambio empieza con tu siguiente ciclo de cobro, sin prorrateo.",
   "payments.planChange.casualHint": "Al elegir Full o Student vas a Stripe.",
