@@ -15206,6 +15206,7 @@ function paidMembershipFee(id: string, date: string): object {
     card: { brand: "visa", last4: "4242" },
     failureReason: null,
     quantity: 1,
+    option: null,
   };
 }
 
@@ -15227,6 +15228,7 @@ const PAYMENTS_HISTORY = [
     card: { brand: "visa", last4: "4242" },
     failureReason: null,
     quantity: 1,
+    option: null,
   },
   paidMembershipFee(
     "e0e0e0e0-0000-4000-8000-0000000000e4",
@@ -15243,6 +15245,7 @@ const FAILED_PAYMENT = {
   card: { brand: "visa", last4: "4242" },
   failureReason: "Your card was declined.",
   quantity: 1,
+  option: null,
 } as const;
 
 const NO_SESSIONS = { sessions: 0, movements: [] } as const;

@@ -5,6 +5,7 @@ import {
   SINGLE_UNIT,
   listActiveProductsOfKind,
 } from "@/lib/stripe/product-catalog";
+import { toOptionCustomField } from "@/lib/stripe/product-options";
 import {
   type CheckoutRequest,
   type CheckoutSessions,
@@ -182,6 +183,9 @@ async function buildSessionParams(
   return {
     mode: "payment",
     line_items: [buildLevyLineItem(levy)],
+    ...(levy.options === null
+      ? {}
+      : { custom_fields: [toOptionCustomField(levy.options)] }),
     client_reference_id: request.userId,
     ...(await buildLevyCustomerParams(gateways, request)),
     metadata: {

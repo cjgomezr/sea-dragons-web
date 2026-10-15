@@ -263,7 +263,7 @@ export function createMembershipGateway(
 const PAYMENTS_TABLE = "payments";
 const MEMBERS_TABLE = "members";
 const PAYMENT_COLUMNS =
-  "id, amount_cents, description, status, paid_at, created_at, card_brand, card_last4, failure_reason, quantity";
+  "id, amount_cents, description, status, paid_at, created_at, card_brand, card_last4, failure_reason, quantity, option";
 
 const paymentRowSchema = z.object({
   id: z.string(),
@@ -276,6 +276,7 @@ const paymentRowSchema = z.object({
   card_last4: z.string().nullable(),
   failure_reason: z.string().nullable(),
   quantity: z.number().int().positive(),
+  option: z.string().nullable(),
 });
 
 /** Sin marca o sin dígitos no hay tarjeta que enseñar. */
@@ -318,6 +319,7 @@ export function createPaymentHistoryGateway(
           card: toPaymentCard(row),
           failureReason: row.failure_reason,
           quantity: row.quantity,
+          option: row.option,
         }));
     },
   };
@@ -656,6 +658,7 @@ function toLevyPaymentJson(
     ...toSessionPackPaymentJson(levy.payment, levy.card),
     stripe_product_id: levy.payment.productId,
     quantity: levy.quantity,
+    option: levy.payment.option,
   };
 }
 

@@ -12,7 +12,7 @@ import type { LevyPaymentsGateway, PaidLevyPayment } from "./levy-sales";
 const PAYMENTS_TABLE = "payments";
 const PAID_STATUS = "paid";
 const PAID_LEVY_COLUMNS =
-  "stripe_product_id, user_id, quantity, amount_cents, description, paid_at, created_at";
+  "stripe_product_id, user_id, quantity, amount_cents, description, paid_at, created_at, option";
 
 const paidLevyRowSchema = z.object({
   stripe_product_id: z.string(),
@@ -22,6 +22,7 @@ const paidLevyRowSchema = z.object({
   description: z.string().nullable(),
   paid_at: z.string().nullable(),
   created_at: z.string(),
+  option: z.string().nullable(),
 });
 
 function toPaidLevyPayments(data: unknown): readonly PaidLevyPayment[] {
@@ -34,6 +35,7 @@ function toPaidLevyPayments(data: unknown): readonly PaidLevyPayment[] {
       quantity: row.quantity,
       amountCents: row.amount_cents,
       description: row.description,
+      option: row.option,
       // El webhook guarda un extra pagado siempre con la fecha del cargo; la
       // de creación sólo cubre una fila vieja sin ella. En ISO para que se
       // ordenen comparando textos.

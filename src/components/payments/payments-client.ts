@@ -108,6 +108,7 @@ const membershipViewSchema = z.object({
       card: z.object({ brand: z.string(), last4: z.string() }).nullable(),
       failureReason: z.string().nullable(),
       quantity: z.number().int().positive(),
+      option: z.string().nullable(),
     }),
   ),
   sessionBalance: z.object({

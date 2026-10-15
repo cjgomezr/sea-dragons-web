@@ -49,7 +49,12 @@ function useLevyPayers(priceId: string): {
 }
 
 function exportCsv(report: LevyPayersReport, translate: Translator): void {
-  const csv = levyPayersCsv(report.payers, translate);
+  // Esta lista suma las compras de cada socio, así que no tiene una opción
+  // por fila (#637): la da el detalle del extra, que tiene una fila por compra.
+  const csv = levyPayersCsv(
+    report.payers.map((payer) => ({ ...payer, option: null })),
+    translate,
+  );
   saveFile(
     new Blob([csv], { type: CSV_TYPE }),
     levyPayersCsvFilename({

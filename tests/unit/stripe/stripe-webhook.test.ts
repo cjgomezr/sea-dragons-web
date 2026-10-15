@@ -641,6 +641,7 @@ describe("un levy pagado", () => {
         currency: "aud",
         description: FIXTURE_LEVY_NAME,
         paidAt: new Date(event.created * 1000),
+        option: null,
       },
       quantity: 1,
       card: null,
@@ -661,6 +662,34 @@ describe("un levy pagado", () => {
     );
     expect(applyLevyPayment).toHaveBeenCalledWith(
       expect.objectContaining({ quantity: 3 }),
+    );
+  });
+
+  it("apunta la opción que el socio eligió en Checkout (#637)", async () => {
+    await handle(
+      stripeEvent("checkout.session.completed (levy)", {
+        object: {
+          custom_fields: [
+            {
+              key: "seadragonsoption",
+              type: "dropdown",
+              optional: false,
+              label: { type: "custom", custom: "Size" },
+              dropdown: {
+                default_value: null,
+                options: [{ label: "M", value: "option1" }],
+                value: "option1",
+              },
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(applyLevyPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment: expect.objectContaining({ option: "M" }),
+      }),
     );
   });
 

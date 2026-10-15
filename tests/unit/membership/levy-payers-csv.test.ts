@@ -15,6 +15,16 @@ import {
 
 const CRLF = "\r\n";
 
+const ALBA: LevyBuyer = {
+  userId: "alba",
+  fullName: "=Alba",
+  email: "alba@club.test",
+  quantity: 1,
+  paidAt: "2026-10-01T10:00:00.000Z",
+  amountCents: 8050,
+  option: null,
+};
+
 const BUYERS: readonly LevyBuyer[] = [
   {
     userId: "bruno",
@@ -24,15 +34,16 @@ const BUYERS: readonly LevyBuyer[] = [
     // 23:30 en UTC ya es el día siguiente en Melbourne.
     paidAt: "2026-10-02T23:30:00.000Z",
     amountCents: 16100,
+    option: null,
   },
-  {
-    userId: "alba",
-    fullName: "=Alba",
-    email: "alba@club.test",
-    quantity: 1,
-    paidAt: "2026-10-01T10:00:00.000Z",
-    amountCents: 8050,
-  },
+  ALBA,
+];
+
+const LONG_OPTION = "Women's relaxed fit, long sleeve, navy with gold trim";
+
+const BUYERS_WITH_OPTIONS: readonly LevyBuyer[] = [
+  { ...ALBA, option: LONG_OPTION },
+  { ...ALBA, userId: "carla", fullName: "Carla" },
 ];
 
 function linesOf(csv: string): readonly string[] {
@@ -64,6 +75,36 @@ describe("levyPayersCsv", () => {
     expect(lines.slice(1)).toEqual([
       '"Díaz, Bruno",bruno@club.test,2,2026-10-03,161.00',
       "'=Alba,alba@club.test,1,2026-10-01,80.50",
+      "",
+    ]);
+  });
+
+  it("añade la columna Option tras Units si alguna compra trae opción (#637)", () => {
+    const [header] = linesOf(
+      levyPayersCsv(BUYERS_WITH_OPTIONS, createTranslator("en")),
+    );
+
+    expect(header).toBe("Name,Email,Units,Option,Payment date,Amount (AUD)");
+  });
+
+  it("llama Opción a la columna en español (#637)", () => {
+    const [header] = linesOf(
+      levyPayersCsv(BUYERS_WITH_OPTIONS, createTranslator("es")),
+    );
+
+    expect(header).toBe(
+      "Nombre,Correo,Unidades,Opción,Fecha del pago,Importe (AUD)",
+    );
+  });
+
+  it("pone la opción completa, sin recortar, y vacía la de quien no eligió (#637)", () => {
+    const lines = linesOf(
+      levyPayersCsv(BUYERS_WITH_OPTIONS, createTranslator("en")),
+    );
+
+    expect(lines.slice(1)).toEqual([
+      `'=Alba,alba@club.test,1,"${LONG_OPTION}",2026-10-01,80.50`,
+      "Carla,alba@club.test,1,,2026-10-01,80.50",
       "",
     ]);
   });

@@ -24,6 +24,22 @@ const PAYMENT_STATUS_KEYS = {
   pending: "payments.history.pending",
 } as const satisfies Record<PaymentStatus, string>;
 
+/** "2026 club jersey × 2 · M" (#637): las unidades, si son más de una, y la
+ * opción, si el extra la pedía. */
+const QUANTITY_MARK = " × ";
+const OPTION_SEPARATOR = " · ";
+const SINGLE_UNIT = 1;
+
+function describePayment(payment: PaymentView, translate: Translator): string {
+  const description =
+    payment.description ?? translate("payments.history.defaultDescription");
+  const units =
+    payment.quantity > SINGLE_UNIT ? `${QUANTITY_MARK}${payment.quantity}` : "";
+  const option =
+    payment.option === null ? "" : `${OPTION_SEPARATOR}${payment.option}`;
+  return `${description}${units}${option}`;
+}
+
 type ColumnLabels = {
   readonly date: string;
   readonly description: string;
@@ -47,8 +63,7 @@ function PaymentRow({
         {formatCalendarDay(locale, clubCalendarDate(new Date(payment.date)))}
       </td>
       <td data-label={labels.description}>
-        {payment.description ??
-          translate("payments.history.defaultDescription")}
+        {describePayment(payment, translate)}
       </td>
       <td data-label={labels.amount} className="payments-cell-data">
         {formatAudCents(locale, payment.amountCents)}

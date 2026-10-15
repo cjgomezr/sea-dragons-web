@@ -58,6 +58,7 @@ const PAYMENTS: readonly PaidLevyPayment[] = [
     amountCents: 12000,
     description: "Hoodie",
     paidAt: "2026-10-02T10:00:00.000Z",
+    option: "L",
   },
 ];
 
@@ -195,6 +196,7 @@ describe("GET /api/v1/levies/sales", () => {
               status: "open",
               soldQuantity: 2,
               buyerCount: 1,
+              soldByOption: [{ option: "L", quantity: 2 }],
             },
           ],
         },
@@ -290,6 +292,7 @@ describe("GET /api/v1/levies/products/{productId}/buyers", () => {
               quantity: 2,
               paidAt: "2026-10-02T10:00:00.000Z",
               amountCents: 12000,
+              option: "L",
             },
           ],
         },
