@@ -23,6 +23,7 @@ import {
   readStripeEventFacts,
   subscriptionFactsFromCheckout,
 } from "./webhook-events";
+import { SINGLE_UNIT } from "./product-catalog";
 
 /**
  * Aplicar un evento de Stripe ya verificado (#452, RF-8 del PRD de E12): se
@@ -298,8 +299,6 @@ export async function handleStripeEvent(
     writes,
   });
 }
-
-const SINGLE_UNIT = 1;
 
 /** A diferencia de la tarjeta, las unidades no se pueden dejar sin leer: un
  * extra de tres apuntado como uno contaría mal lo que lleva comprado el

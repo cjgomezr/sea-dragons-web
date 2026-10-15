@@ -15,10 +15,12 @@ export const PRODUCT_KIND_METADATA_KEY = "seadragons_kind";
  * (#632, D2 del PRD de E23). Sin el dato, una sola. */
 export const MAX_QUANTITY_METADATA_KEY = "seadragons_max_quantity";
 
-/** Lo más que Stripe deja elegir en `adjustable_quantity`. */
+/** El tope de unidades por Checkout que fija el #632: el máximo que Stripe
+ * pone por defecto en `adjustable_quantity`. */
 export const STRIPE_MAX_ADJUSTABLE_QUANTITY = 99;
 
-const SINGLE_UNIT = 1;
+/** Una compra sin elegir cantidad, y el mínimo que se puede elegir. */
+export const SINGLE_UNIT = 1;
 
 /** Los metadatos de Stripe son texto: un entero positivo y nada más. */
 const WHOLE_NUMBER = /^\d+$/;

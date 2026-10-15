@@ -12,6 +12,7 @@ import {
   LEVY_KIND,
   LEVY_MAX_QUANTITY_METADATA_KEY,
 } from "@/lib/membership/levies";
+import { SINGLE_UNIT } from "@/lib/stripe/product-catalog";
 import { SESSION_PACK_METADATA_KIND } from "@/lib/membership/session-pack-checkout";
 
 /**
@@ -321,8 +322,6 @@ function readSessionPackFacts(
     },
   };
 }
-
-const SINGLE_UNIT = 1;
 
 /** Una sesión de antes de #632 no dice el máximo: era de una unidad. */
 function readLevyQuantity(session: Stripe.Checkout.Session): LevyQuantity {

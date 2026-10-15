@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import {
   type CatalogProduct,
   type ProductCatalogSource,
+  SINGLE_UNIT,
   listActiveProductsOfKind,
 } from "@/lib/stripe/product-catalog";
 import {
@@ -83,8 +84,6 @@ export type LevyCheckoutRequest = CheckoutRequest & {
 type OfferedLevy = CatalogProduct & { readonly purchasedQuantity: number };
 
 const NOTHING_PURCHASED = 0;
-/** Checkout arranca en una unidad, y es el mínimo que se puede elegir. */
-const ONE_UNIT = 1;
 
 async function readOfferedLevies(
   gateways: Pick<LevyGateways, "purchases">,
@@ -109,7 +108,7 @@ function isPurchased(levy: OfferedLevy): boolean {
 /** Un extra de una unidad se compra una vez; uno de varias, las que quiera
  * (D2). */
 function isSingleUnit(levy: CatalogProduct): boolean {
-  return levy.maxQuantity === ONE_UNIT;
+  return levy.maxQuantity === SINGLE_UNIT;
 }
 
 export async function listLevies(
@@ -160,14 +159,14 @@ async function buildLevyCustomerParams(
 function buildLevyLineItem(
   levy: CatalogProduct,
 ): Stripe.Checkout.SessionCreateParams.LineItem {
-  const lineItem = { price: levy.priceId, quantity: ONE_UNIT };
+  const lineItem = { price: levy.priceId, quantity: SINGLE_UNIT };
   return isSingleUnit(levy)
     ? lineItem
     : {
         ...lineItem,
         adjustable_quantity: {
           enabled: true,
-          minimum: ONE_UNIT,
+          minimum: SINGLE_UNIT,
           maximum: levy.maxQuantity,
         },
       };
