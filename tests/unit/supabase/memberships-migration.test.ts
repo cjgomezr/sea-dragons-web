@@ -294,6 +294,7 @@ describeConPostgres("membresías y pagos en la base", () => {
           "failure_reason:text",
           "id:uuid",
           "paid_at:timestamp with time zone",
+          "quantity:integer",
           "status:text",
           "stripe_charge_id:text",
           "stripe_invoice_id:text",
