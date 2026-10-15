@@ -29,6 +29,7 @@ export const FIXTURE_PACK_SESSIONS = 5;
 
 /** El levy del Checkout en modo `payment` de #473. */
 export const FIXTURE_LEVY_PAYMENT_INTENT_ID = "pi_TestSeadragonsLevy";
+export const FIXTURE_LEVY_CHECKOUT_SESSION_ID = "cs_test_seadragons_levy";
 export const FIXTURE_LEVY_PRODUCT_ID = "prod_TestNationals";
 export const FIXTURE_LEVY_NAME = "Nationals 2026";
 

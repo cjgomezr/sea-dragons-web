@@ -107,6 +107,7 @@ const membershipViewSchema = z.object({
       status: z.enum(PAYMENT_STATUSES),
       card: z.object({ brand: z.string(), last4: z.string() }).nullable(),
       failureReason: z.string().nullable(),
+      quantity: z.number().int().positive(),
     }),
   ),
   sessionBalance: z.object({
@@ -266,6 +267,8 @@ const leviesResponseSchema = z.object({
         name: z.string(),
         description: z.string().nullable(),
         amountCents: z.number().int(),
+        maxQuantity: z.number().int().positive(),
+        purchasedQuantity: z.number().int().nonnegative(),
         isPaid: z.boolean(),
       }),
     ),

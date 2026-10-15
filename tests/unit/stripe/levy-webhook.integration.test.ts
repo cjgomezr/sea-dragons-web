@@ -4,7 +4,11 @@ import { NextRequest } from "next/server";
 import Stripe from "stripe";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { STRIPE_WEBHOOK_API_PATH } from "@/lib/auth/routes";
-import { createPaidProductsGateway } from "@/lib/membership/supabase-membership-gateways";
+import {
+  createLevyPurchasesGateway,
+  createStripeWebhookGateway,
+} from "@/lib/membership/supabase-membership-gateways";
+import type { LevyPaymentToApply } from "@/lib/stripe/stripe-webhook";
 import {
   FIXTURE_LEVY_PRODUCT_ID,
   FIXTURE_PRICES,
@@ -145,6 +149,24 @@ async function readPaymentDescriptions(
   return data.map((row) => row.description);
 }
 
+const JERSEY_UNIT_CENTS = 4500;
+
+/** Unidades e importe de cada pago, del más grande al más pequeño. */
+async function readPaymentQuantities(
+  serviceClient: ServiceRoleClient,
+  user: TestUser,
+): Promise<readonly string[]> {
+  const { data, error } = await serviceClient.client
+    .from("payments")
+    .select("quantity, amount_cents")
+    .eq("user_id", user.id)
+    .order("quantity", { ascending: false });
+  if (error) {
+    throw new Error(`No se pudieron leer los pagos: ${error.message}`);
+  }
+  return data.map((row) => `${row.quantity}|${row.amount_cents}`);
+}
+
 async function deleteEvent(
   serviceClient: ServiceRoleClient,
   id: string,
@@ -187,10 +209,10 @@ describeRls("el levy por el webhook contra la base", () => {
             readPaymentDescriptions(serviceClient, user),
           ).resolves.toEqual(["Nationals 2026"]);
           await expect(
-            createPaidProductsGateway(serviceClient.client).findPaidProductIds(
-              user.id,
-            ),
-          ).resolves.toEqual(new Set([FIXTURE_LEVY_PRODUCT_ID]));
+            createLevyPurchasesGateway(
+              serviceClient.client,
+            ).findPurchasedQuantities(user.id),
+          ).resolves.toEqual(new Map([[FIXTURE_LEVY_PRODUCT_ID, 1]]));
           await expect(readMembershipStatus(serviceClient, user)).resolves.toBe(
             "pending",
           );
@@ -225,6 +247,55 @@ describeRls("el levy por el webhook contra la base", () => {
         },
         { hasMembership: false },
       );
+    },
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "apunta las unidades de cada compra de un extra y suma las del socio (#632)",
+    async () => {
+      const serviceClient = createServiceRoleTestClient(process.env);
+      const gateway = createStripeWebhookGateway(serviceClient.client);
+      await withPendingMember(serviceClient, async (user) => {
+        const clubId = await seededClubId(serviceClient);
+        const jerseyProductId = `prod_it_${randomUUID()}`;
+        const purchaseOf = (quantity: number): LevyPaymentToApply => ({
+          event: {
+            id: `evt_${randomUUID()}`,
+            type: "checkout.session.completed",
+            created: new Date("2026-10-15T09:00:00Z"),
+          },
+          owner: { userId: user.id, clubId },
+          payment: {
+            paymentIntentId: `pi_it_${randomUUID()}`,
+            productId: jerseyProductId,
+            amountCents: quantity * JERSEY_UNIT_CENTS,
+            currency: "aud",
+            description: "2026 club jersey",
+            paidAt: new Date("2026-10-15T09:00:00Z"),
+          },
+          quantity,
+          card: null,
+        });
+        const first = purchaseOf(3);
+        const second = purchaseOf(2);
+        try {
+          await gateway.applyLevyPayment(first);
+          await gateway.applyLevyPayment(second);
+
+          await expect(
+            readPaymentQuantities(serviceClient, user),
+          ).resolves.toEqual(["3|13500", "2|9000"]);
+          await expect(
+            createLevyPurchasesGateway(
+              serviceClient.client,
+            ).findPurchasedQuantities(user.id),
+          ).resolves.toEqual(new Map([[jerseyProductId, 5]]));
+        } finally {
+          await deleteEvent(serviceClient, first.event.id);
+          await deleteEvent(serviceClient, second.event.id);
+        }
+      });
     },
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );

@@ -2,7 +2,7 @@ import { createApiModule, createApiRoute } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/response";
 import { identifyAccountCaller } from "@/lib/auth/account-api";
 import { type Levy, listLevies } from "@/lib/membership/levies";
-import { createPaidProductsGateway } from "@/lib/membership/supabase-membership-gateways";
+import { createLevyPurchasesGateway } from "@/lib/membership/supabase-membership-gateways";
 import {
   asStripeUnavailable,
   resolveRouteLevyStripe,
@@ -28,7 +28,7 @@ const readLevies = createApiRoute<LeviesResponse>({
     const userId = await identifyAccountCaller({ request, decorateResponse });
     const listing = await listLevies(
       {
-        paidProducts: createPaidProductsGateway(
+        purchases: createLevyPurchasesGateway(
           createServiceRoleClient(process.env),
         ),
         stripe: resolveRouteLevyStripe(LOG_PREFIX),

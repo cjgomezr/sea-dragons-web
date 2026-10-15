@@ -74,7 +74,8 @@ const STRIPE_PRODUCTS = [
 const readSessionState = vi.fn();
 const listProducts = vi.fn();
 const createSession = vi.fn();
-const findPaidProductIds = vi.fn<() => Promise<ReadonlySet<string>>>();
+const findPurchasedQuantities =
+  vi.fn<() => Promise<ReadonlyMap<string, number>>>();
 
 vi.mock("stripe", async (importOriginal) => {
   const actual = await importOriginal<typeof import("stripe")>();
@@ -118,7 +119,7 @@ vi.mock("@/lib/membership/supabase-membership-gateways", () => ({
   createMemberEmailGateway: () => ({
     findEmail: async () => "alba@example.com",
   }),
-  createPaidProductsGateway: () => ({ findPaidProductIds }),
+  createLevyPurchasesGateway: () => ({ findPurchasedQuantities }),
 }));
 
 const { default: StripeSdk } = await import("stripe");
@@ -176,7 +177,7 @@ beforeEach(() => {
   configureStripe();
   givenSession({ kind: "active", role: "Player", membershipCurrent: false });
   listProducts.mockResolvedValue(STRIPE_PRODUCTS);
-  findPaidProductIds.mockResolvedValue(new Set());
+  findPurchasedQuantities.mockResolvedValue(new Map());
   createSession.mockResolvedValue({ url: CHECKOUT_URL });
 });
 
@@ -198,6 +199,8 @@ describe("GET /api/v1/levies", () => {
             name: "Nationals 2026",
             description: "Entry for the national championship",
             amountCents: 8000,
+            maxQuantity: 1,
+            purchasedQuantity: 0,
             isPaid: false,
           },
         ],
@@ -217,12 +220,12 @@ describe("GET /api/v1/levies", () => {
   });
 
   it("marca como pagado el levy que el socio ya pagó", async () => {
-    findPaidProductIds.mockResolvedValue(new Set([LEVY_PRODUCT]));
+    findPurchasedQuantities.mockResolvedValue(new Map([[LEVY_PRODUCT, 1]]));
 
     const response = await getLevies();
 
     await expect(response.json()).resolves.toMatchObject({
-      data: { levies: [{ isPaid: true }] },
+      data: { levies: [{ isPaid: true, purchasedQuantity: 1 }] },
     });
   });
 
@@ -313,7 +316,7 @@ describe("POST /api/v1/levies/{priceId}/checkout", () => {
   });
 
   it("responde 409 con su motivo a un levy que el socio ya pagó", async () => {
-    findPaidProductIds.mockResolvedValue(new Set([LEVY_PRODUCT]));
+    findPurchasedQuantities.mockResolvedValue(new Map([[LEVY_PRODUCT, 1]]));
 
     const response = await postCheckout();
 

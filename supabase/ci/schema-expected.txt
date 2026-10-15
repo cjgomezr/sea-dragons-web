@@ -219,6 +219,7 @@ columna payments.description tipo=text null=YES default=-
 columna payments.failure_reason tipo=text null=YES default=-
 columna payments.id tipo=uuid null=NO default=gen_random_uuid()
 columna payments.paid_at tipo=timestamp with time zone null=YES default=-
+columna payments.quantity tipo=integer null=NO default=1
 columna payments.status tipo=text null=NO default=-
 columna payments.stripe_charge_id tipo=text null=YES default=-
 columna payments.stripe_invoice_id tipo=text null=YES default=-
@@ -1216,6 +1217,7 @@ restriccion payments.payments_currency_check CHECK ((currency ~ '^[a-z]{3}$'::te
 restriccion payments.payments_id_user_id_club_id_key UNIQUE (id, user_id, club_id)
 restriccion payments.payments_member_same_club_fkey FOREIGN KEY (user_id, club_id) REFERENCES members(user_id, club_id) ON DELETE CASCADE
 restriccion payments.payments_pkey PRIMARY KEY (id)
+restriccion payments.payments_quantity_check CHECK ((quantity >= 1))
 restriccion payments.payments_status_check CHECK ((status = ANY (ARRAY['paid'::text, 'failed'::text, 'pending'::text])))
 restriccion payments.payments_stripe_charge_id_key UNIQUE (stripe_charge_id)
 restriccion payments.payments_stripe_invoice_id_key UNIQUE (stripe_invoice_id)
