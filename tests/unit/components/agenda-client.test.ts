@@ -7,7 +7,8 @@ import {
 /**
  * La forma de un evento de la agenda como la lee la pantalla (#642, RF-2 del
  * PRD de E24): la hora y la fecha de fin llegan siempre, nulas en lo anterior
- * a E24 y en un evento de un día.
+ * a E24 y en un evento de un día. Y los tipos que pide (#643): van en la
+ * consulta, y sin ninguno no van.
  */
 
 const AGENDA_EVENT = {
