@@ -656,6 +656,7 @@ function toLevyPaymentJson(
     ...toSessionPackPaymentJson(levy.payment, levy.card),
     stripe_product_id: levy.payment.productId,
     quantity: levy.quantity,
+    option: levy.payment.option,
   };
 }
 
