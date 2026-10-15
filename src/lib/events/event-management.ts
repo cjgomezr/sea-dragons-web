@@ -56,8 +56,10 @@ export type EventEdit = Partial<
 >;
 
 /** Lo que cambia tal como llega: el lugar todavía sin validar. Un lugar
- * elegido pone su nombre en `location`; a `null`, el evento vuelve al texto
- * libre. */
+ * elegido pone su nombre en `location`. A `null`, o con un `location` que
+ * llega sin `place`, el evento vuelve al texto libre y pierde también
+ * "dónde exactamente", salvo que llegue otro: el formulario anterior a #646
+ * sólo manda el texto. */
 export type EventEditDraft = Omit<EventEdit, "place"> & {
   readonly place?: PlaceDraft | null;
 };
@@ -142,24 +144,27 @@ async function readBackEvent(
   return event;
 }
 
-/** El lugar y el texto que se enseña, si cambian. Con un lugar elegido, el
- * texto es su nombre aunque llegue otro. */
+/** El lugar, el texto que se enseña y el detalle, si cambian. Con un lugar
+ * elegido, el texto es su nombre aunque llegue otro; un texto libre sin lugar
+ * quita el elegido, para que `location` y `place` no se contradigan. */
 function normalizeWhere({
   place,
   location,
 }: Pick<EventEditDraft, "location" | "place">): Pick<
   EventEdit,
-  "location" | "place"
+  "location" | "place" | "placeDetail"
 > {
   if (place !== null && place !== undefined) {
     const normalized = normalizePlace(place);
     return { location: normalized.name, place: normalized };
   }
+  if (location === undefined) {
+    return place === null ? { place: null, placeDetail: null } : {};
+  }
   return {
-    ...(place === null ? { place: null } : {}),
-    ...(location === undefined
-      ? {}
-      : { location: normalizeLocation(location) }),
+    location: normalizeLocation(location),
+    place: null,
+    placeDetail: null,
   };
 }
 

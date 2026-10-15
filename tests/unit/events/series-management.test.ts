@@ -395,6 +395,28 @@ describe("editar una serie: lugar estructurado", () => {
     expect(club.occurrence(PAST_OCCURRENCE_ID)?.place).toBeNull();
   });
 
+  it("cambiar sólo el texto libre quita el lugar elegido de la serie y sus sesiones", async () => {
+    const club = fakeManagedSeriesClub();
+    const request = { callerId: CALLER_ID, seriesId: SERIES_ID };
+    await editSeries(club.gateways, {
+      ...request,
+      changes: { place: MSAC_PLACE, placeDetail: "Piscina de buceo" },
+    });
+
+    await editSeries(club.gateways, {
+      ...request,
+      changes: { location: "Piscina de Box Hill" },
+    });
+
+    const freeText = {
+      location: "Piscina de Box Hill",
+      place: null,
+      placeDetail: null,
+    };
+    expect(club.series(SERIES_ID)).toMatchObject(freeText);
+    expect(club.occurrence(UPCOMING_OCCURRENCE_ID)).toMatchObject(freeText);
+  });
+
   it("rechaza coordenadas a medias sin escribir nada", async () => {
     const club = fakeManagedSeriesClub();
 

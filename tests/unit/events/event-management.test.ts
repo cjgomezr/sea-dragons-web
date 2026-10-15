@@ -579,6 +579,38 @@ describe("editar un evento: lugar estructurado", () => {
     expect(edited.place).toEqual(MSAC_PLACE);
   });
 
+  it("cambiar sólo el texto libre quita el lugar elegido y su detalle", async () => {
+    const club = fakeManagedEventsClub();
+    await editEvent(club.gateways, {
+      callerId: CALLER_ID,
+      eventId: SINGLE_EVENT_ID,
+      changes: { place: MSAC_PLACE, placeDetail: "Piscina de buceo" },
+      now: NOW,
+    });
+
+    const edited = await editEvent(club.gateways, {
+      callerId: CALLER_ID,
+      eventId: SINGLE_EVENT_ID,
+      changes: { location: "Piscina de Box Hill" },
+      now: NOW,
+    });
+
+    expect(edited).toMatchObject({
+      location: "Piscina de Box Hill",
+      place: null,
+      placeDetail: null,
+    });
+  });
+
+  it("conserva el detalle que llega junto al texto libre", async () => {
+    const { edited } = await editSingle({
+      location: "Piscina de Box Hill",
+      placeDetail: "Carril 3",
+    });
+
+    expect(edited).toMatchObject({ place: null, placeDetail: "Carril 3" });
+  });
+
   it("rechaza coordenadas fuera de rango sin escribir nada", async () => {
     await expectEditRejected(
       { changes: { place: { ...MSAC_PLACE, lat: -95 } } },
