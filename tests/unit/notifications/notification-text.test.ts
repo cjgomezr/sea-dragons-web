@@ -466,6 +466,86 @@ describe("texto de los avisos con hora de fin", () => {
   });
 });
 
+// #645: los avisos dicen la dirección del lugar elegido, si la tiene.
+describe("texto de los avisos con la dirección del lugar", () => {
+  const ADDRESS = "Aughtie Dr, Albert Park VIC 3206";
+
+  it.each([
+    [
+      "en",
+      "Liga estatal: 10 July 2027 at 10:00 am, at Aughtie Dr, Albert Park VIC 3206",
+    ],
+    [
+      "es",
+      "Liga estatal: 10 de julio de 2027, 10:00, en Aughtie Dr, Albert Park VIC 3206",
+    ],
+  ] as const)("da la dirección de un evento nuevo (%s)", (locale, body) => {
+    const text = describeNotification(createTranslator(locale), {
+      type: "event_created",
+      data: { ...DATA_FOR_EVERY_TYPE.event_created, address: ADDRESS },
+    });
+
+    expect(text.body).toBe(body);
+  });
+
+  it.each([
+    [
+      "en",
+      "Entrenamiento: Tuesday and Thursday at 7:00 pm, from 1 July 2027 to 31 August 2027, at Aughtie Dr, Albert Park VIC 3206",
+    ],
+    [
+      "es",
+      "Entrenamiento: martes y jueves, 19:00, del 1 de julio de 2027 al 31 de agosto de 2027, en Aughtie Dr, Albert Park VIC 3206",
+    ],
+  ] as const)("da la dirección de una serie nueva (%s)", (locale, body) => {
+    const text = describeNotification(createTranslator(locale), {
+      type: "event_series_created",
+      data: { ...DATA_FOR_EVERY_TYPE.event_series_created, address: ADDRESS },
+    });
+
+    expect(text.body).toBe(body);
+  });
+
+  it("da el nombre y la dirección del lugar de un evento cambiado", () => {
+    const text = describeNotification(createTranslator("en"), {
+      type: "event_changed",
+      data: {
+        ...DATA_FOR_EVERY_TYPE.event_changed,
+        location: "MSAC",
+        address: ADDRESS,
+      },
+    });
+
+    expect(text.body).toBe(
+      "Liga estatal: now 11 July 2027 at 11:30 am, at MSAC, Aughtie Dr, Albert Park VIC 3206",
+    );
+  });
+
+  it("da el nombre y la dirección del lugar de una serie cambiada", () => {
+    const text = describeNotification(createTranslator("es"), {
+      type: "event_series_changed",
+      data: {
+        ...DATA_FOR_EVERY_TYPE.event_series_changed,
+        location: "MSAC",
+        address: ADDRESS,
+      },
+    });
+
+    expect(text.body).toBe(
+      "Entrenamiento: ahora martes y jueves, 18:00, en MSAC, Aughtie Dr, Albert Park VIC 3206",
+    );
+  });
+
+  it("no añade nada a un evento sin dirección", () => {
+    const text = describeNotification(createTranslator("en"), {
+      type: "event_created",
+      data: { ...DATA_FOR_EVERY_TYPE.event_created, address: null },
+    });
+
+    expect(text.body).toBe("Liga estatal: 10 July 2027 at 10:00 am");
+  });
+});
+
 describe("texto de los avisos de cambio, cancelación y equipos", () => {
   const cases = [
     {

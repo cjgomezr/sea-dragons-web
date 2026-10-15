@@ -5,6 +5,7 @@ import {
   notifyMembers,
 } from "@/lib/notifications/notify-member";
 import type { CreatedEvents, EventAudience } from "./event-creation";
+import { addressOf } from "./event-place";
 
 /**
  * El aviso a la audiencia cuando se crea un evento o una serie (#310, RF-10
@@ -28,8 +29,8 @@ export type EventAnnouncement = {
   readonly created: CreatedEvents;
 };
 
-/** Los datos mínimos para contarlo: nada de lugar ni notas. La hora de fin
- * va desde E24 (D10). */
+/** Los datos mínimos para contarlo: ni notas ni el nombre del lugar. La hora
+ * de fin y la dirección del lugar elegido van desde E24 (D10). */
 function noticeOf(created: CreatedEvents): NotificationContent {
   if (created.repeat === "none") {
     const { event } = created;
@@ -43,6 +44,7 @@ function noticeOf(created: CreatedEvents): NotificationContent {
         startTime: event.startTime,
         endsOn: event.endsOn,
         endTime: event.endTime,
+        address: addressOf(event.place),
       },
     };
   }
@@ -58,6 +60,7 @@ function noticeOf(created: CreatedEvents): NotificationContent {
       endsOn: series.endsOn,
       startTime: series.startTime,
       endTime: series.endTime,
+      address: addressOf(series.place),
     },
   };
 }

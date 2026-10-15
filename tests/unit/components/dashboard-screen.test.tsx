@@ -47,6 +47,8 @@ function agendaEvent(
     endsOn: null,
     eventType: "training",
     location: "MSAC Dive Pool",
+    place: null,
+    placeDetail: null,
     status: "scheduled",
     seriesId: null,
     goingCount: 0,

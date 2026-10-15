@@ -78,6 +78,11 @@ columna event_series.event_type tipo=text null=NO default=-
 columna event_series.id tipo=uuid null=NO default=gen_random_uuid()
 columna event_series.location tipo=text null=NO default=-
 columna event_series.notes tipo=text null=YES default=-
+columna event_series.place_address tipo=text null=YES default=-
+columna event_series.place_detail tipo=text null=YES default=-
+columna event_series.place_lat tipo=double precision null=YES default=-
+columna event_series.place_lng tipo=double precision null=YES default=-
+columna event_series.place_name tipo=text null=YES default=-
 columna event_series.start_time tipo=time without time zone null=NO default=-
 columna event_series.starts_on tipo=date null=NO default=-
 columna event_series.title tipo=text null=NO default=-
@@ -96,6 +101,11 @@ columna events.event_type tipo=text null=NO default=-
 columna events.id tipo=uuid null=NO default=gen_random_uuid()
 columna events.location tipo=text null=NO default=-
 columna events.notes tipo=text null=YES default=-
+columna events.place_address tipo=text null=YES default=-
+columna events.place_detail tipo=text null=YES default=-
+columna events.place_lat tipo=double precision null=YES default=-
+columna events.place_lng tipo=double precision null=YES default=-
+columna events.place_name tipo=text null=YES default=-
 columna events.series_id tipo=uuid null=YES default=-
 columna events.start_time tipo=time without time zone null=NO default=-
 columna events.starts_at tipo=timestamp with time zone null=YES default=-
@@ -1106,6 +1116,12 @@ restriccion event_series.event_series_id_club_id_key UNIQUE (id, club_id)
 restriccion event_series.event_series_location_length CHECK (((char_length(btrim(location)) >= 1) AND (char_length(btrim(location)) <= 120)))
 restriccion event_series.event_series_notes_length CHECK ((char_length(notes) <= 2000))
 restriccion event_series.event_series_pkey PRIMARY KEY (id)
+restriccion event_series.event_series_place_address_length CHECK ((char_length(place_address) <= 200))
+restriccion event_series.event_series_place_coordinates_pair CHECK (((place_lat IS NULL) = (place_lng IS NULL)))
+restriccion event_series.event_series_place_detail_length CHECK ((char_length(place_detail) <= 120))
+restriccion event_series.event_series_place_lat_range CHECK (((place_lat >= ('-90'::integer)::double precision) AND (place_lat <= (90)::double precision)))
+restriccion event_series.event_series_place_lng_range CHECK (((place_lng >= ('-180'::integer)::double precision) AND (place_lng <= (180)::double precision)))
+restriccion event_series.event_series_place_name_length CHECK (((char_length(btrim(place_name)) >= 1) AND (char_length(btrim(place_name)) <= 120)))
 restriccion event_series.event_series_title_length CHECK (((char_length(btrim(title)) >= 1) AND (char_length(btrim(title)) <= 80)))
 restriccion event_series.event_series_weekdays_check CHECK (are_valid_weekdays(weekdays))
 restriccion event_series_groups.event_series_groups_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id)
@@ -1122,6 +1138,12 @@ restriccion events.events_id_club_id_key UNIQUE (id, club_id)
 restriccion events.events_location_length CHECK (((char_length(btrim(location)) >= 1) AND (char_length(btrim(location)) <= 120)))
 restriccion events.events_notes_length CHECK ((char_length(notes) <= 2000))
 restriccion events.events_pkey PRIMARY KEY (id)
+restriccion events.events_place_address_length CHECK ((char_length(place_address) <= 200))
+restriccion events.events_place_coordinates_pair CHECK (((place_lat IS NULL) = (place_lng IS NULL)))
+restriccion events.events_place_detail_length CHECK ((char_length(place_detail) <= 120))
+restriccion events.events_place_lat_range CHECK (((place_lat >= ('-90'::integer)::double precision) AND (place_lat <= (90)::double precision)))
+restriccion events.events_place_lng_range CHECK (((place_lng >= ('-180'::integer)::double precision) AND (place_lng <= (180)::double precision)))
+restriccion events.events_place_name_length CHECK (((char_length(btrim(place_name)) >= 1) AND (char_length(btrim(place_name)) <= 120)))
 restriccion events.events_series_same_club_fkey FOREIGN KEY (series_id, club_id) REFERENCES event_series(id, club_id)
 restriccion events.events_status_check CHECK ((status = ANY (ARRAY['scheduled'::text, 'cancelled'::text])))
 restriccion events.events_title_length CHECK (((char_length(btrim(title)) >= 1) AND (char_length(btrim(title)) <= 80)))

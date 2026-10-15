@@ -173,6 +173,39 @@ describe("endpoint de editar un evento", () => {
     });
   });
 
+  it("responde 200 con el lugar elegido y dónde exactamente", async () => {
+    mockWiring();
+    const place = {
+      name: "MSAC",
+      address: "Aughtie Dr, Albert Park VIC 3206",
+      lat: -37.8423,
+      lng: 144.9601,
+    };
+
+    const response = await editEvent(SINGLE_EVENT_ID, {
+      place,
+      placeDetail: "Piscina de buceo",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { location: "MSAC", place, placeDetail: "Piscina de buceo" },
+    });
+  });
+
+  it("responde 422 a una longitud sin latitud", async () => {
+    mockWiring();
+
+    const response = await editEvent(SINGLE_EVENT_ID, {
+      place: { name: "MSAC", lng: 144.96 },
+    });
+
+    await expectError(response, 422, {
+      code: "business_rule",
+      reason: "event_place_coordinates_invalid",
+    });
+  });
+
   it("responde 400 a un cuerpo sin ningún cambio", async () => {
     mockWiring();
 

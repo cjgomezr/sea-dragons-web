@@ -10,6 +10,7 @@ import type {
   NewEventSchedule,
   SavedEventSchedule,
 } from "./event-creation";
+import { type PlaceColumns, toPlaceColumns } from "./supabase-event-place";
 
 /**
  * Crear eventos contra Supabase (#307).
@@ -36,13 +37,14 @@ const savedScheduleSchema = z.object({
 });
 
 /** Lo que lee `create_events` de su argumento `schedule`. */
-type CreateEventsScheduleArgument = {
+type CreateEventsScheduleArgument = PlaceColumns & {
   readonly title: string;
   readonly event_type: string;
   readonly start_time: string;
   readonly end_time: string;
   readonly ends_on: string | null;
   readonly location: string;
+  readonly place_detail: string | null;
   readonly notes: string | null;
   readonly audience: "all" | "groups";
   readonly group_ids: readonly string[];
@@ -67,6 +69,8 @@ function toScheduleArgument(
     end_time: fields.endTime,
     ends_on: schedule.endsOn,
     location: fields.location,
+    ...toPlaceColumns(fields.place),
+    place_detail: fields.placeDetail,
     notes: fields.notes,
     audience: fields.audience.kind === "club" ? "all" : "groups",
     group_ids:

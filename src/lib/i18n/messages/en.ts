@@ -1097,9 +1097,13 @@ export const englishMessages = {
   "notifications.news_post_published.title": "New post: {category}",
   "notifications.event_created.title": "New event: {eventType}",
   "notifications.event_created.body": "{title}: {moment}",
+  "notifications.event_created.bodyWithAddress":
+    "{title}: {moment}, at {address}",
   "notifications.event_series_created.title": "New series: {eventType}",
   "notifications.event_series_created.body":
     "{title}: {weekdays} at {time}, from {startsOn} to {endsOn}",
+  "notifications.event_series_created.bodyWithAddress":
+    "{title}: {weekdays} at {time}, from {startsOn} to {endsOn}, at {address}",
   "notifications.event_changed.title": "Event changed",
   "notifications.event_changed.body": "{title}: now {moment}, at {location}",
   "notifications.event_cancelled.title": "Event cancelled",

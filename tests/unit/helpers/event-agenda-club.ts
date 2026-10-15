@@ -62,6 +62,8 @@ export function clubEvent(
     title: "Entrenamiento",
     eventType: "training",
     location: "MSAC",
+    place: null,
+    placeDetail: null,
     notes: null,
     status: "scheduled",
     seriesId: null,

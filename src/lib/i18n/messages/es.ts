@@ -1096,10 +1096,14 @@ export const spanishMessages: MessageCatalog = {
   "notifications.news_post_published.title": "Nueva publicación: {category}",
   "notifications.event_created.title": "Nuevo evento: {eventType}",
   "notifications.event_created.body": "{title}: {moment}",
+  "notifications.event_created.bodyWithAddress":
+    "{title}: {moment}, en {address}",
   "notifications.event_series_created.title": "Nueva serie: {eventType}",
   // Una coma y no "a las", como en `format.ts`: "a las" falla con la una.
   "notifications.event_series_created.body":
     "{title}: {weekdays}, {time}, del {startsOn} al {endsOn}",
+  "notifications.event_series_created.bodyWithAddress":
+    "{title}: {weekdays}, {time}, del {startsOn} al {endsOn}, en {address}",
   "notifications.event_changed.title": "Evento cambiado",
   "notifications.event_changed.body":
     "{title}: ahora el {moment}, en {location}",

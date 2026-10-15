@@ -15,6 +15,11 @@ import {
   toHoursAndMinutes,
   toOptionalHoursAndMinutes,
 } from "./supabase-event-management-gateways";
+import {
+  PLACE_COLUMNS,
+  placeRowShape,
+  toEventPlace,
+} from "./supabase-event-place";
 
 /**
  * Editar y cancelar una serie contra Supabase (#315).
@@ -31,8 +36,7 @@ const EVENT_SERIES_TABLE = "event_series";
 const EVENTS_TABLE = "events";
 const UPDATE_SERIES_FUNCTION = "update_series";
 
-const MANAGED_SERIES_COLUMNS =
-  "id, title, event_type, start_time, end_time, location, notes, audience, weekdays, starts_on, ends_on, event_series_groups(group_id)";
+const MANAGED_SERIES_COLUMNS = `id, title, event_type, start_time, end_time, location, ${PLACE_COLUMNS}, notes, audience, weekdays, starts_on, ends_on, event_series_groups(group_id)`;
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -43,6 +47,7 @@ const managedSeriesRowSchema = z.object({
   start_time: z.string(),
   end_time: z.string().nullable(),
   location: z.string(),
+  ...placeRowShape,
   notes: z.string().nullable(),
   audience: z.enum(["all", "groups"]),
   weekdays: z.array(z.union(ISO_WEEKDAYS.map((day) => z.literal(day)))),
@@ -61,6 +66,8 @@ function toManagedSeries(row: ManagedSeriesRow): ManagedSeries {
     startTime: toHoursAndMinutes(row.start_time),
     endTime: toOptionalHoursAndMinutes(row.end_time),
     location: row.location,
+    place: toEventPlace(row),
+    placeDetail: row.place_detail,
     notes: row.notes,
     audience:
       row.audience === "all"

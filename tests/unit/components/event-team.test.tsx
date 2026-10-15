@@ -24,6 +24,8 @@ const SCRIMMAGE: AgendaEvent = {
   title: "Scrimmage vs Geelong",
   eventType: "competition",
   location: "Geelong Aquatic Centre",
+  place: null,
+  placeDetail: null,
   status: "scheduled",
   seriesId: null,
   goingCount: 6,

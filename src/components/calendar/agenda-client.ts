@@ -13,6 +13,7 @@ import {
   EVENT_RSVP_API_PATH,
 } from "@/lib/auth/routes";
 import { EVENT_TYPES, type EventType } from "@/lib/events/event-creation";
+import { eventPlaceSchema } from "@/lib/events/event-place";
 import type {
   AgendaPage,
   AgendaPeriod,
@@ -47,6 +48,9 @@ export const agendaEventSchema = z.object({
   title: z.string(),
   eventType: z.enum(EVENT_TYPES),
   location: z.string(),
+  // Nulo con texto libre y en lo anterior a E24 (#645).
+  place: eventPlaceSchema.nullable(),
+  placeDetail: z.string().nullable(),
   status: z.enum(["scheduled", "cancelled"]),
   seriesId: z.uuid().nullable(),
   goingCount: z.number().int().nonnegative(),

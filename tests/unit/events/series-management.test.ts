@@ -366,3 +366,69 @@ describe("quién puede editar y cancelar una serie", () => {
     expect(club.writeCount()).toBe(0);
   });
 });
+
+describe("editar una serie: lugar estructurado", () => {
+  const MSAC_PLACE = {
+    name: "MSAC",
+    address: "Aughtie Dr, Albert Park VIC 3206",
+    lat: -37.8423,
+    lng: 144.9601,
+  } as const;
+
+  it("pasa el lugar elegido a la serie y a sus sesiones futuras", async () => {
+    const club = fakeManagedSeriesClub();
+
+    await editSeries(club.gateways, {
+      callerId: CALLER_ID,
+      seriesId: SERIES_ID,
+      changes: { place: MSAC_PLACE, placeDetail: "Piscina de buceo" },
+    });
+
+    const inherited = {
+      location: "MSAC",
+      place: MSAC_PLACE,
+      placeDetail: "Piscina de buceo",
+    };
+    expect(club.series(SERIES_ID)).toMatchObject(inherited);
+    expect(club.occurrence(UPCOMING_OCCURRENCE_ID)).toMatchObject(inherited);
+    expect(club.occurrence(EDITED_OCCURRENCE_ID)).toMatchObject(inherited);
+    expect(club.occurrence(PAST_OCCURRENCE_ID)?.place).toBeNull();
+  });
+
+  it("cambiar sólo el texto libre quita el lugar elegido de la serie y sus sesiones", async () => {
+    const club = fakeManagedSeriesClub();
+    const request = { callerId: CALLER_ID, seriesId: SERIES_ID };
+    await editSeries(club.gateways, {
+      ...request,
+      changes: { place: MSAC_PLACE, placeDetail: "Piscina de buceo" },
+    });
+
+    await editSeries(club.gateways, {
+      ...request,
+      changes: { location: "Piscina de Box Hill" },
+    });
+
+    const freeText = {
+      location: "Piscina de Box Hill",
+      place: null,
+      placeDetail: null,
+    };
+    expect(club.series(SERIES_ID)).toMatchObject(freeText);
+    expect(club.occurrence(UPCOMING_OCCURRENCE_ID)).toMatchObject(freeText);
+  });
+
+  it("rechaza coordenadas a medias sin escribir nada", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const attempt = editSeries(club.gateways, {
+      callerId: CALLER_ID,
+      seriesId: SERIES_ID,
+      changes: { place: { name: "MSAC", lng: 144.9601 } },
+    });
+
+    await expect(attempt).rejects.toMatchObject({
+      code: "event_place_coordinates_invalid",
+    });
+    expect(club.writeCount()).toBe(0);
+  });
+});

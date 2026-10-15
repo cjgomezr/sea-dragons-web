@@ -5,6 +5,7 @@ import { type Role, hasCapability } from "@/lib/auth/roles";
 import type { MemberGroupsGateway } from "@/lib/groups/member-groups";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
 import { type EventType, isEventType } from "./event-creation";
+import type { EventPlace } from "./event-place";
 import {
   EventNotFoundError,
   type RsvpResponse,
@@ -55,6 +56,9 @@ export type EventRow = {
   readonly title: string;
   readonly eventType: EventType;
   readonly location: string;
+  /** Nulo con texto libre y en lo anterior a E24 (#645). */
+  readonly place: EventPlace | null;
+  readonly placeDetail: string | null;
   readonly notes: string | null;
   readonly status: EventStatus;
   readonly seriesId: string | null;
@@ -129,6 +133,8 @@ export type AgendaEvent = {
   readonly title: string;
   readonly eventType: EventType;
   readonly location: string;
+  readonly place: EventPlace | null;
+  readonly placeDetail: string | null;
   readonly status: EventStatus;
   readonly seriesId: string | null;
   readonly goingCount: number;
@@ -266,6 +272,8 @@ function toAgendaEvent(
     title: row.title,
     eventType: row.eventType,
     location: row.location,
+    place: row.place,
+    placeDetail: row.placeDetail,
     status: row.status,
     seriesId: row.seriesId,
     goingCount: counts.goingCount,

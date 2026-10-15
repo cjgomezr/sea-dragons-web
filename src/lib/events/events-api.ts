@@ -50,6 +50,18 @@ const eventFieldsSchema = z.object({
   // dominio, que también lo exige al editar algo anterior a E24 (D5).
   endTime: z.string().regex(CLOCK_TIME).nullable().optional(),
   location: z.string(),
+  // Un lugar elegido (#645). Las coordenadas a medias o fuera de rango y los
+  // textos demasiado largos son un 422 del dominio, no un 400.
+  place: z
+    .object({
+      name: z.string(),
+      address: z.string().nullable().optional(),
+      lat: z.number().nullable().optional(),
+      lng: z.number().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+  placeDetail: z.string().nullable().optional(),
   notes: z.string().nullable(),
   // Los ids de grupo tienen que ser uuid para no mandarle a Postgres un valor
   // que rechazaría. Que la lista no venga vacía lo decide el dominio (422).

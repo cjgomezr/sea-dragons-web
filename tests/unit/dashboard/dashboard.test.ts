@@ -120,6 +120,8 @@ function event(overrides: {
     title: "Entrenamiento del miércoles",
     eventType: "training",
     location: "MSAC",
+    place: null,
+    placeDetail: null,
     notes: null,
     status: "scheduled",
     seriesId: null,
