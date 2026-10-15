@@ -14,7 +14,10 @@ import type {
 } from "./event-agenda";
 import { EVENT_TYPES } from "./event-creation";
 import { RSVP_RESPONSES } from "./event-rsvp";
-import { toHoursAndMinutes } from "./supabase-event-management-gateways";
+import {
+  toHoursAndMinutes,
+  toOptionalHoursAndMinutes,
+} from "./supabase-event-management-gateways";
 
 /**
  * La agenda y el detalle contra Supabase (#309).
@@ -50,7 +53,7 @@ const MY_RSVP_EMBED = "my_rsvp:event_rsvps(response)";
 const MY_RSVP_FILTER = "my_rsvp.user_id";
 
 const EVENT_COLUMNS = [
-  "id, starts_on, start_time, starts_at, title, event_type, location, notes",
+  "id, starts_on, start_time, end_time, ends_on, starts_at, title, event_type, location, notes",
   "status, series_id, audience",
   AUDIENCE_EMBED,
   MY_RSVP_EMBED,
@@ -62,6 +65,8 @@ const eventRowSchema = z.object({
   id: z.string(),
   starts_on: z.string(),
   start_time: z.string(),
+  end_time: z.string().nullable(),
+  ends_on: z.string().nullable(),
   starts_at: z.string(),
   title: z.string(),
   event_type: z.enum(EVENT_TYPES),
@@ -93,6 +98,8 @@ function toEventRow(row: unknown): EventRow {
     id: parsed.id,
     startsOn: parsed.starts_on,
     startTime: toHoursAndMinutes(parsed.start_time),
+    endTime: toOptionalHoursAndMinutes(parsed.end_time),
+    endsOn: parsed.ends_on,
     startsAt: parsed.starts_at,
     title: parsed.title,
     eventType: parsed.event_type,

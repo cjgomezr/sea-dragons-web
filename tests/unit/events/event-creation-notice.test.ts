@@ -82,9 +82,23 @@ describe("crear evento avisa", () => {
           eventType: "competition",
           startsOn: "2027-07-10",
           startTime: "10:00",
+          endsOn: null,
+          endTime: "12:00",
         },
       },
     ]);
+  });
+
+  it("guarda la fecha y la hora de fin de un evento de varios días", async () => {
+    const club = await createAs(
+      { ...SINGLE_DRAFT, endsOn: "2027-07-11", endTime: "09:00" },
+      { groupMembers: { [SENIOR_SQUAD_ID]: [ANA] } },
+    );
+
+    expect(club.notices[0]?.data).toMatchObject({
+      endsOn: "2027-07-11",
+      endTime: "09:00",
+    });
   });
 
   it("avisa a cada miembro activo del club cuando el evento es para todos", async () => {
@@ -111,6 +125,7 @@ describe("crear evento avisa", () => {
           startsOn: "2027-07-01",
           endsOn: "2027-08-31",
           startTime: "19:00",
+          endTime: "20:30",
         },
       },
     ]);

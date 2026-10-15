@@ -255,7 +255,7 @@ function columnsOf(
 }
 
 describeConPostgres("esquema de eventos", () => {
-  it("guarda de cada evento club, título, tipo, fecha, hora, inicio, lugar, notas, audiencia, estado, serie y autor", async () => {
+  it("guarda de cada evento club, título, tipo, fecha, hora, inicio, fin, lugar, notas, audiencia, estado, serie y autor", async () => {
     const database = await migratedDatabase();
 
     const columns = await columnsOf(database, "events");
@@ -266,6 +266,8 @@ describeConPostgres("esquema de eventos", () => {
       "cancelled_at timestamp with time zone null=YES",
       "club_id uuid null=NO",
       "created_at timestamp with time zone null=NO",
+      "end_time time without time zone null=YES",
+      "ends_on date null=YES",
       "event_type text null=NO",
       "id uuid null=NO",
       "location text null=NO",
@@ -289,6 +291,7 @@ describeConPostgres("esquema de eventos", () => {
       "author_id uuid null=NO",
       "club_id uuid null=NO",
       "created_at timestamp with time zone null=NO",
+      "end_time time without time zone null=YES",
       "ends_on date null=NO",
       "event_type text null=NO",
       "id uuid null=NO",

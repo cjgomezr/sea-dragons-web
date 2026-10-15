@@ -70,10 +70,12 @@ describe("crear evento: evento suelto", () => {
           title: "Liga estatal",
           eventType: "competition",
           startTime: "10:00",
+          endTime: "12:00",
           location: "MSAC",
           notes: "Llevad gorro azul.",
           audience: { kind: "groups", groupIds: [SENIOR_SQUAD_ID] },
         },
+        endsOn: null,
         occurrenceDates: ["2027-07-10"],
         series: null,
       },
@@ -96,7 +98,9 @@ describe("crear evento: evento suelto", () => {
         title: "Liga estatal",
         eventType: "competition",
         startsOn: "2027-07-10",
+        endsOn: null,
         startTime: "10:00",
+        endTime: "12:00",
         location: "MSAC",
         notes: "Llevad gorro azul.",
         audience: { kind: "groups", groupIds: [SENIOR_SQUAD_ID] },
@@ -261,6 +265,7 @@ describe("crear evento: serie semanal", () => {
         title: "Entrenamiento",
         eventType: "training",
         startTime: "19:00",
+        endTime: "20:30",
         location: "MSAC",
         notes: null,
         audience: { kind: "club" },
@@ -335,5 +340,115 @@ describe("crear evento: serie semanal", () => {
       },
       "series_without_sessions",
     );
+  });
+});
+
+describe("crear evento: hora y fecha de fin", () => {
+  it("rechaza un evento suelto sin hora de fin", async () => {
+    await expectRejected(
+      { ...SINGLE_DRAFT, endTime: undefined },
+      "end_time_required",
+    );
+  });
+
+  it("rechaza una serie sin hora de fin", async () => {
+    await expectRejected(
+      { ...WEEKLY_DRAFT, endTime: null },
+      "end_time_required",
+    );
+  });
+
+  it("rechaza una hora de fin anterior al inicio en un evento de un día", async () => {
+    await expectRejected(
+      { ...SINGLE_DRAFT, startTime: "10:00", endTime: "09:30" },
+      "end_before_start",
+    );
+  });
+
+  it("rechaza una hora de fin igual al inicio en un evento de un día", async () => {
+    await expectRejected(
+      { ...SINGLE_DRAFT, startTime: "10:00", endTime: "10:00" },
+      "end_before_start",
+    );
+  });
+
+  it("rechaza en una serie una hora de fin que no va después del inicio", async () => {
+    await expectRejected(
+      { ...WEEKLY_DRAFT, startTime: "19:00", endTime: "18:00" },
+      "end_before_start",
+    );
+  });
+
+  it("guarda la hora de fin de un evento de un día, sin fecha de fin", async () => {
+    const club = await createAs(SINGLE_DRAFT);
+
+    expect(club.saved[0]).toMatchObject({
+      fields: { startTime: "10:00", endTime: "12:00" },
+      endsOn: null,
+    });
+  });
+
+  it("acepta un evento de varios días con cualquier hora de fin", async () => {
+    const club = await createAs({
+      ...SINGLE_DRAFT,
+      startsOn: "2027-07-10",
+      startTime: "18:00",
+      endsOn: "2027-07-11",
+      endTime: "08:00",
+    });
+
+    expect(club.saved[0]).toMatchObject({
+      fields: { startTime: "18:00", endTime: "08:00" },
+      endsOn: "2027-07-11",
+    });
+  });
+
+  it("devuelve el evento creado con su hora y su fecha de fin", async () => {
+    const club = fakeEventsClub();
+
+    const created = await createEvents(club.gateways, {
+      callerId: CALLER_ID,
+      draft: { ...SINGLE_DRAFT, endsOn: "2027-07-12", endTime: "16:00" },
+      now: NOW,
+    });
+
+    expect(created).toMatchObject({
+      repeat: "none",
+      event: { endTime: "16:00", endsOn: "2027-07-12" },
+    });
+  });
+
+  it("trata como de un día un evento con la fecha de fin igual a la de inicio", async () => {
+    const club = await createAs({ ...SINGLE_DRAFT, endsOn: "2027-07-10" });
+
+    expect(club.saved[0]?.endsOn).toBeNull();
+  });
+
+  it("rechaza con la fecha de fin igual a la de inicio una hora de fin que no va después", async () => {
+    await expectRejected(
+      {
+        ...SINGLE_DRAFT,
+        endsOn: "2027-07-10",
+        startTime: "10:00",
+        endTime: "09:00",
+      },
+      "end_before_start",
+    );
+  });
+
+  it("rechaza una fecha de fin anterior a la de inicio", async () => {
+    await expectRejected(
+      { ...SINGLE_DRAFT, startsOn: "2027-07-10", endsOn: "2027-07-09" },
+      "end_before_start",
+    );
+  });
+
+  it("guarda la serie y sus sesiones con la hora de fin de la serie y sin fecha de fin", async () => {
+    const club = await createAs(WEEKLY_DRAFT);
+
+    expect(club.saved[0]).toMatchObject({
+      fields: { startTime: "19:00", endTime: "20:30" },
+      endsOn: null,
+    });
   });
 });

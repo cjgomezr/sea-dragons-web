@@ -19,6 +19,8 @@ const SCRIMMAGE: AgendaEvent = {
   id: "bbbbbbbb-0000-4000-8000-00000000000b",
   startsOn: "2026-06-27",
   startTime: "10:00",
+  endTime: null,
+  endsOn: null,
   title: "Scrimmage vs Geelong",
   eventType: "competition",
   location: "Geelong Aquatic Centre",

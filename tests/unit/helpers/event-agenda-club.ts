@@ -56,6 +56,8 @@ export function clubEvent(
     clubId: AGENDA_CLUB_ID,
     startsOn,
     startTime: "19:00",
+    endTime: "20:30",
+    endsOn: null,
     startsAt,
     title: "Entrenamiento",
     eventType: "training",

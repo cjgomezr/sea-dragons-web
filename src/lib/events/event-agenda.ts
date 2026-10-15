@@ -47,6 +47,10 @@ export type EventRow = {
   readonly id: string;
   readonly startsOn: string;
   readonly startTime: string;
+  /** Nula en lo creado antes de E24 (D5). */
+  readonly endTime: string | null;
+  /** Nula si termina el mismo día que empieza. */
+  readonly endsOn: string | null;
   readonly startsAt: string;
   readonly title: string;
   readonly eventType: EventType;
@@ -118,6 +122,8 @@ export type AgendaEvent = {
   readonly id: string;
   readonly startsOn: string;
   readonly startTime: string;
+  readonly endTime: string | null;
+  readonly endsOn: string | null;
   readonly title: string;
   readonly eventType: EventType;
   readonly location: string;
@@ -239,6 +245,8 @@ function toAgendaEvent(
     id: row.id,
     startsOn: row.startsOn,
     startTime: row.startTime,
+    endTime: row.endTime,
+    endsOn: row.endsOn,
     title: row.title,
     eventType: row.eventType,
     location: row.location,

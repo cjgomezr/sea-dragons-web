@@ -40,6 +40,8 @@ type CreateEventsScheduleArgument = {
   readonly title: string;
   readonly event_type: string;
   readonly start_time: string;
+  readonly end_time: string;
+  readonly ends_on: string | null;
   readonly location: string;
   readonly notes: string | null;
   readonly audience: "all" | "groups";
@@ -62,6 +64,8 @@ function toScheduleArgument(
     title: fields.title,
     event_type: fields.eventType,
     start_time: fields.startTime,
+    end_time: fields.endTime,
+    ends_on: schedule.endsOn,
     location: fields.location,
     notes: fields.notes,
     audience: fields.audience.kind === "club" ? "all" : "groups",

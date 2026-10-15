@@ -33,6 +33,8 @@ export const SECOND_OCCURRENCE_ID = "e3e3e3e3-0000-4000-8000-00000000000e";
 export const PAST_EVENT_ID = "e4e4e4e4-0000-4000-8000-00000000000e";
 export const CANCELLED_EVENT_ID = "e5e5e5e5-0000-4000-8000-00000000000e";
 export const MISSING_EVENT_ID = "e9e9e9e9-0000-4000-8000-00000000000e";
+/** Creado antes de E24: no dice cuándo termina (D5). */
+export const LEGACY_EVENT_ID = "e6e6e6e6-0000-4000-8000-00000000000e";
 
 /** 2027-06-15 10:00 en Melbourne (hora estándar, UTC+10). */
 export const NOW = new Date("2027-06-15T00:00:00Z");
@@ -44,7 +46,9 @@ export const SINGLE_EVENT: ManagedEvent = {
   title: "Liga estatal",
   eventType: "competition",
   startsOn: "2027-07-10",
+  endsOn: null,
   startTime: "10:00",
+  endTime: "12:00",
   location: "MSAC",
   notes: "Llevad gorro azul.",
   audience: { kind: "groups", groupIds: [SENIOR_SQUAD_ID] },
@@ -58,7 +62,9 @@ const TRAINING_OCCURRENCE: Omit<
   seriesId: SERIES_ID,
   title: "Entrenamiento",
   eventType: "training",
+  endsOn: null,
   startTime: "19:00",
+  endTime: "20:30",
   location: "MSAC",
   notes: null,
   audience: { kind: "club" },
@@ -75,6 +81,7 @@ function initialEvents(): readonly ManagedEvent[] {
       startsOn: "2027-07-08",
     },
     { ...SINGLE_EVENT, id: PAST_EVENT_ID, startsOn: "2027-06-01" },
+    { ...SINGLE_EVENT, id: LEGACY_EVENT_ID, endTime: null },
     {
       ...SINGLE_EVENT,
       id: CANCELLED_EVENT_ID,

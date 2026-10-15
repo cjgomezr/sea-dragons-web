@@ -65,6 +65,8 @@ describe("agenda", () => {
           id: event.id,
           startsOn: "2027-06-22",
           startTime: "19:00",
+          endTime: "20:30",
+          endsOn: null,
           title: "Entrenamiento",
           eventType: "training",
           location: "MSAC",
@@ -78,6 +80,30 @@ describe("agenda", () => {
       ],
       nextCursor: null,
     });
+  });
+
+  it("trae la fecha de fin de un evento de varios días", async () => {
+    const event = clubEvent("2027-06-26", {
+      startTime: "08:30",
+      endTime: "17:00",
+      endsOn: "2027-06-27",
+    });
+
+    const page = await agenda({ events: [event] });
+
+    expect(page.events[0]).toMatchObject({
+      startTime: "08:30",
+      endTime: "17:00",
+      endsOn: "2027-06-27",
+    });
+  });
+
+  it("trae sin hora ni fecha de fin un evento anterior a E24", async () => {
+    const event = clubEvent("2027-06-22", { endTime: null });
+
+    const page = await agenda({ events: [event] });
+
+    expect(page.events[0]).toMatchObject({ endTime: null, endsOn: null });
   });
 
   it("trae los de hoy en adelante, en fecha de Melbourne, por inicio ascendente", async () => {
@@ -271,6 +297,8 @@ describe("detalle de un evento", () => {
       id: event.id,
       startsOn: "2027-06-22",
       startTime: "19:00",
+      endTime: "20:30",
+      endsOn: null,
       title: "Entrenamiento",
       eventType: "training",
       location: "MSAC",

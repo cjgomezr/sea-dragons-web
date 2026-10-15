@@ -9,6 +9,7 @@ import {
   normalizeNotes,
   normalizeTitle,
   resolveAudience,
+  resolveEventEnd,
 } from "./event-creation";
 import {
   announceEventCancellation,
@@ -41,10 +42,15 @@ export type ManagedEvent = EventFields & {
   /** Nula en un evento suelto. */
   readonly seriesId: string | null;
   readonly startsOn: string;
+  /** Nula si termina el mismo día, y siempre en una sesión de una serie. */
+  readonly endsOn: string | null;
 } & ManagedEventState;
 
-/** Lo que se puede cambiar de un evento; lo que no viene se queda igual. */
-export type EventEdit = Partial<EventFields & { readonly startsOn: string }>;
+/** Lo que se puede cambiar de un evento; lo que no viene se queda igual.
+ * `endsOn` a `null` lo vuelve de un día. */
+export type EventEdit = Partial<
+  EventFields & { readonly startsOn: string; readonly endsOn: string | null }
+>;
 
 /** `closed` si el evento se canceló o empezó entre leerlo y escribirlo. */
 export type ManagedEventWrite = "saved" | "closed";
@@ -146,6 +152,20 @@ export async function normalizeChanges<Edit extends EventEdit>(
   };
 }
 
+/** Los cambios con el fin que tendrá el evento después de editarlo, o por
+ * qué no vale. Se exige aunque no se toque la hora: un evento anterior a E24
+ * no se guarda sin hora de fin (D5). */
+function withResolvedEnd(event: ManagedEvent, changes: EventEdit): EventEdit {
+  const end = resolveEventEnd({
+    startsOn: changes.startsOn ?? event.startsOn,
+    startTime: changes.startTime ?? event.startTime,
+    endTime: changes.endTime === undefined ? event.endTime : changes.endTime,
+    endsOn: changes.endsOn === undefined ? event.endsOn : changes.endsOn,
+    isSeriesSession: event.seriesId !== null,
+  });
+  return { ...changes, ...end };
+}
+
 /** La fecha y la hora que tendrá el evento después de editarlo. */
 function assertStillAheadAfter(
   event: ManagedEvent,
@@ -176,12 +196,13 @@ export async function editEvent(
   const caller = await findEventOrganizer(gateways, request.callerId);
   const target = { ...request, clubId: caller.clubId };
   const event = await findOpenEvent(gateways, target);
-  const changes = await normalizeChanges(
+  const normalized = await normalizeChanges(
     gateways,
     caller.clubId,
     request.changes,
   );
-  assertStillAheadAfter(event, changes, request.now);
+  assertStillAheadAfter(event, normalized, request.now);
+  const changes = withResolvedEnd(event, normalized);
   const write = await gateways.managedEvents.updateEvent({
     clubId: caller.clubId,
     eventId: request.eventId,

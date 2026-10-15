@@ -30,6 +30,8 @@ export const SERIES_ID = "c3c3c3c3-0000-4000-8000-00000000000c";
 /** Una serie cuyas ocurrencias ya pasaron o están canceladas. */
 export const SPENT_SERIES_ID = "c4c4c4c4-0000-4000-8000-00000000000c";
 export const MISSING_SERIES_ID = "c9c9c9c9-0000-4000-8000-00000000000c";
+/** Creada antes de E24: no dice cuándo terminan sus sesiones (D5). */
+export const LEGACY_SERIES_ID = "c5c5c5c5-0000-4000-8000-00000000000c";
 
 export const PAST_OCCURRENCE_ID = "e1e1e1e1-0000-4000-8000-00000000000e";
 export const CANCELLED_OCCURRENCE_ID = "e2e2e2e2-0000-4000-8000-00000000000e";
@@ -37,6 +39,7 @@ export const CANCELLED_OCCURRENCE_ID = "e2e2e2e2-0000-4000-8000-00000000000e";
 export const EDITED_OCCURRENCE_ID = "e3e3e3e3-0000-4000-8000-00000000000e";
 export const UPCOMING_OCCURRENCE_ID = "e4e4e4e4-0000-4000-8000-00000000000e";
 export const SPENT_OCCURRENCE_ID = "e5e5e5e5-0000-4000-8000-00000000000e";
+export const LEGACY_OCCURRENCE_ID = "e6e6e6e6-0000-4000-8000-00000000000e";
 
 /** 2027-06-15 10:00 en Melbourne (hora estándar, UTC+10). */
 export const NOW = new Date("2027-06-15T00:00:00Z");
@@ -47,6 +50,7 @@ export const SERIES: ManagedSeries = {
   title: "Entrenamiento",
   eventType: "training",
   startTime: "19:00",
+  endTime: "20:30",
   location: "MSAC",
   notes: null,
   audience: { kind: "club" },
@@ -62,6 +66,12 @@ const SPENT_SERIES: ManagedSeries = {
   endsOn: "2027-06-24",
 };
 
+const LEGACY_SERIES: ManagedSeries = {
+  ...SERIES,
+  id: LEGACY_SERIES_ID,
+  endTime: null,
+};
+
 function occurrenceOf(
   series: ManagedSeries,
   occurrence: { readonly id: string; readonly startsOn: string },
@@ -70,6 +80,8 @@ function occurrenceOf(
     title: series.title,
     eventType: series.eventType,
     startTime: series.startTime,
+    endTime: series.endTime,
+    endsOn: null,
     location: series.location,
     notes: series.notes,
     audience: series.audience,
@@ -96,6 +108,7 @@ function initialOccurrences(): readonly ManagedEvent[] {
         startsOn: "2027-06-22",
       }),
       startTime: "18:30",
+      endTime: "20:00",
       notes: "Piscina 2",
     },
     occurrenceOf(SERIES, {
@@ -110,6 +123,10 @@ function initialOccurrences(): readonly ManagedEvent[] {
       status: "cancelled",
       cancelledAt: "2027-06-10T00:00:00.000Z",
     },
+    occurrenceOf(LEGACY_SERIES, {
+      id: LEGACY_OCCURRENCE_ID,
+      startsOn: "2027-06-24",
+    }),
   ];
 }
 
@@ -144,7 +161,7 @@ export function fakeManagedSeriesClub(
   options: FakeManagedSeriesClubOptions = {},
 ): FakeManagedSeriesClub {
   const allSeries = new Map(
-    [SERIES, SPENT_SERIES].map((series) => [series.id, series]),
+    [SERIES, SPENT_SERIES, LEGACY_SERIES].map((series) => [series.id, series]),
   );
   const occurrences = new Map(
     initialOccurrences().map((event) => [event.id, event]),

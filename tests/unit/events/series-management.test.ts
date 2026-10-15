@@ -13,6 +13,8 @@ import {
   CANCELLED_OCCURRENCE_ID,
   EDITED_OCCURRENCE_ID,
   type FakeManagedSeriesClubOptions,
+  LEGACY_OCCURRENCE_ID,
+  LEGACY_SERIES_ID,
   MASTERS_SQUAD_ID,
   MISSING_SERIES_ID,
   NOW,
@@ -187,6 +189,75 @@ describe("editar una serie", () => {
 
     await expect(attempt).rejects.toThrow("a mitad de la escritura");
     expect(club.series(SERIES_ID)).toEqual(SERIES);
+  });
+});
+
+describe("editar una serie: hora de fin", () => {
+  it("pasa la hora de fin nueva a la serie y a sus sesiones futuras", async () => {
+    const club = fakeManagedSeriesClub();
+
+    await editSeries(club.gateways, {
+      callerId: CALLER_ID,
+      seriesId: SERIES_ID,
+      changes: { endTime: "21:00" },
+    });
+
+    expect(club.series(SERIES_ID)?.endTime).toBe("21:00");
+    expect(club.occurrence(UPCOMING_OCCURRENCE_ID)?.endTime).toBe("21:00");
+  });
+
+  it("deja su propia hora de fin a una sesión editada sola si la de la serie no cambia", async () => {
+    const club = fakeManagedSeriesClub();
+
+    await editSeries(club.gateways, {
+      callerId: CALLER_ID,
+      seriesId: SERIES_ID,
+      changes: { location: "Aquatic Centre" },
+    });
+
+    expect(club.occurrence(EDITED_OCCURRENCE_ID)).toMatchObject({
+      location: "Aquatic Centre",
+      endTime: "20:00",
+    });
+  });
+
+  it("rechaza una hora de fin que no va después del inicio, sin escribir nada", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const attempt = editSeries(club.gateways, {
+      callerId: CALLER_ID,
+      seriesId: SERIES_ID,
+      changes: { startTime: "21:00" },
+    });
+
+    await expect(attempt).rejects.toMatchObject({ code: "end_before_start" });
+    expect(club.writeCount()).toBe(0);
+  });
+
+  it("rechaza guardar una serie anterior a E24 sin ponerle hora de fin", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const attempt = editSeries(club.gateways, {
+      callerId: CALLER_ID,
+      seriesId: LEGACY_SERIES_ID,
+      changes: { title: "Entrenamiento de verano" },
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(EventValidationError);
+    await expect(attempt).rejects.toMatchObject({ code: "end_time_required" });
+    expect(club.writeCount()).toBe(0);
+  });
+
+  it("guarda una serie anterior a E24 cuando se le pone hora de fin", async () => {
+    const club = fakeManagedSeriesClub();
+
+    await editSeries(club.gateways, {
+      callerId: CALLER_ID,
+      seriesId: LEGACY_SERIES_ID,
+      changes: { endTime: "20:00" },
+    });
+
+    expect(club.occurrence(LEGACY_OCCURRENCE_ID)?.endTime).toBe("20:00");
   });
 });
 

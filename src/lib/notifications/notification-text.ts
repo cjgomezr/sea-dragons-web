@@ -13,7 +13,9 @@ import { ISO_WEEKDAYS } from "@/lib/events/event-occurrences";
 import {
   formatCalendarDay,
   formatCalendarDayAt,
+  formatClockRange,
   formatClockTime,
+  formatEventSpan,
   formatWeekdays,
 } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
@@ -66,6 +68,11 @@ const newsPostPublishedData = z.object({
 /** `HH:MM`, sin segundos, como la guarda un evento. */
 const clockTime = z.iso.time({ precision: -1 });
 
+/** La hora de fin y el día en que termina llegan desde E24 (#642). Un aviso
+ * anterior no los trae y se cuenta, como entonces, sólo con el inicio. */
+const endTime = clockTime.nullable().default(null);
+const endsOn = z.iso.date().nullable().default(null);
+
 const seriesWeekdays = z
   .array(z.union(ISO_WEEKDAYS.map((day) => z.literal(day))))
   .min(1);
@@ -76,6 +83,8 @@ const eventCreatedData = z.object({
   eventType: z.enum(EVENT_TYPES),
   startsOn: z.iso.date(),
   startTime: clockTime,
+  endsOn,
+  endTime,
 });
 
 const eventSeriesCreatedData = z.object({
@@ -86,6 +95,7 @@ const eventSeriesCreatedData = z.object({
   startsOn: z.iso.date(),
   endsOn: z.iso.date(),
   startTime: clockTime,
+  endTime,
 });
 
 const eventChangedData = z.object({
@@ -93,6 +103,8 @@ const eventChangedData = z.object({
   title: z.string().min(1),
   startsOn: z.iso.date(),
   startTime: clockTime,
+  endsOn,
+  endTime,
   location: z.string().min(1),
 });
 
@@ -108,6 +120,7 @@ const eventSeriesChangedData = z.object({
   title: z.string().min(1),
   weekdays: seriesWeekdays,
   startTime: clockTime,
+  endTime,
   location: z.string().min(1),
 });
 
@@ -202,11 +215,7 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         }),
         body: translate("notifications.event_created.body", {
           title: event.title,
-          moment: formatCalendarDayAt(
-            translate.locale,
-            event.startsOn,
-            event.startTime,
-          ),
+          moment: formatEventSpan(translate.locale, event),
         }),
       };
     },
@@ -224,7 +233,7 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         body: translate("notifications.event_series_created.body", {
           title: series.title,
           weekdays: formatWeekdays(locale, series.weekdays),
-          time: formatClockTime(locale, series.startTime),
+          time: formatClockRange(locale, series.startTime, series.endTime),
           startsOn: formatCalendarDay(locale, series.startsOn),
           endsOn: formatCalendarDay(locale, series.endsOn),
         }),
@@ -240,11 +249,7 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         title: translate("notifications.event_changed.title"),
         body: translate("notifications.event_changed.body", {
           title: event.title,
-          moment: formatCalendarDayAt(
-            translate.locale,
-            event.startsOn,
-            event.startTime,
-          ),
+          moment: formatEventSpan(translate.locale, event),
           location: event.location,
         }),
       };
@@ -279,7 +284,7 @@ const DESCRIBE_BY_TYPE: Readonly<Record<NotificationType, DescribeKnownType>> =
         body: translate("notifications.event_series_changed.body", {
           title: series.title,
           weekdays: formatWeekdays(locale, series.weekdays),
-          time: formatClockTime(locale, series.startTime),
+          time: formatClockRange(locale, series.startTime, series.endTime),
           location: series.location,
         }),
       };
