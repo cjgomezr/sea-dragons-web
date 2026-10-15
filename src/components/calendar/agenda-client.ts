@@ -12,7 +12,7 @@ import {
   EVENT_API_PATH,
   EVENT_RSVP_API_PATH,
 } from "@/lib/auth/routes";
-import { EVENT_TYPES } from "@/lib/events/event-creation";
+import { EVENT_TYPES, type EventType } from "@/lib/events/event-creation";
 import type {
   AgendaPage,
   AgendaPeriod,
@@ -33,6 +33,8 @@ import type { Translator } from "@/lib/i18n/translator";
 
 const CURSOR_PARAM = "cursor";
 const PERIOD_PARAM = "period";
+const TYPES_PARAM = "types";
+const TYPES_SEPARATOR = ",";
 
 /** Un evento como lo sirve la agenda; el inicio lo lee igual (#426). */
 export const agendaEventSchema = z.object({
@@ -120,14 +122,22 @@ export type RsvpSave =
     }
   | AgendaFailure;
 
-/** Los próximos van sin `period`, que es lo que la API da por defecto. */
-function agendaPath(period: AgendaPeriod, cursor: string | null): string {
+/** Los próximos van sin `period`, y todos los tipos sin `types`: es lo que
+ * la API da por defecto. */
+function agendaPath(
+  period: AgendaPeriod,
+  cursor: string | null,
+  eventTypes: readonly EventType[],
+): string {
   const params = new URLSearchParams();
   if (period === "past") {
     params.set(PERIOD_PARAM, period);
   }
   if (cursor !== null) {
     params.set(CURSOR_PARAM, cursor);
+  }
+  if (eventTypes.length > 0) {
+    params.set(TYPES_PARAM, eventTypes.join(TYPES_SEPARATOR));
   }
   const query = params.toString();
   return query === "" ? EVENTS_API_PATH : `${EVENTS_API_PATH}?${query}`;
@@ -138,14 +148,15 @@ function eventPath(template: string, eventId: string): string {
 }
 
 /** Una página de los próximos o de los pasados: la primera sin cursor, las
- * demás con el `nextCursor` de la anterior. Nunca rechaza: un fallo de red
- * sale como fallo. */
+ * demás con el `nextCursor` de la anterior y los mismos tipos. Sin tipos son
+ * todos. Nunca rechaza: un fallo de red sale como fallo. */
 export async function loadAgenda(
   period: AgendaPeriod,
   cursor: string | null,
+  eventTypes: readonly EventType[] = [],
 ): Promise<AgendaLoad> {
   const read = readApiPayload(
-    await requestApi(agendaPath(period, cursor)),
+    await requestApi(agendaPath(period, cursor, eventTypes)),
     agendaResponseSchema,
   );
   return read.kind === "failed"

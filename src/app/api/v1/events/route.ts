@@ -7,6 +7,7 @@ import {
   type AgendaPage,
   type AgendaPeriod,
   listAgenda,
+  readAgendaTypes,
 } from "@/lib/events/event-agenda";
 import {
   asEventsApiError,
@@ -17,7 +18,8 @@ import {
  * La agenda de quien llama (#309, RF-4, RF-6 y RF-7 del PRD de E7): los
  * eventos de hoy en adelante, o los pasados con `?period=past`, de 50 en 50.
  * La siguiente página se pide con `?cursor=` y el `nextCursor` de la
- * anterior.
+ * anterior. `?types=training,social` deja sólo esos tipos (#643); la página
+ * siguiente se pide con los mismos.
  *
  * Lo alcanza cualquier cuenta activa. Admin y Committee reciben todos los
  * eventos del club; los demás, sólo los de su audiencia. Crear eventos no
@@ -29,6 +31,7 @@ export const dynamic = "force-dynamic";
 
 const PERIOD_PARAM = "period";
 const CURSOR_PARAM = "cursor";
+const TYPES_PARAM = "types";
 const DEFAULT_PERIOD: AgendaPeriod = "upcoming";
 
 const periodSchema = z.enum(AGENDA_PERIODS);
@@ -55,6 +58,7 @@ const getAgenda = createApiRoute<EventAgendaResponse>({
     const params = request.nextUrl.searchParams;
     const period = readPeriod(params.get(PERIOD_PARAM));
     const cursor = params.get(CURSOR_PARAM);
+    const eventTypes = readAgendaTypes(params.get(TYPES_PARAM));
     try {
       return {
         data: await listAgenda(requireEventAgendaGateways(), {
@@ -62,6 +66,7 @@ const getAgenda = createApiRoute<EventAgendaResponse>({
           period,
           now: new Date(),
           ...(cursor === null ? {} : { cursor }),
+          ...(eventTypes === null ? {} : { eventTypes }),
         }),
       };
     } catch (error) {
