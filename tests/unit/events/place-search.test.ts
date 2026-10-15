@@ -425,6 +425,19 @@ describe("createCachedPlaceSearch", () => {
     expect(provider).toHaveBeenCalledTimes(2);
   });
 
+  it("olvida la búsqueda más vieja al pasar de 500", async () => {
+    const { target, provider } = cachedWorld();
+
+    for (let index = 0; index <= 500; index += 1) {
+      await suggest(target, `lugar ${index}`);
+    }
+    provider.mockClear();
+    await suggest(target, "lugar 1");
+    await suggest(target, "lugar 0");
+
+    expect(provider.mock.calls.map(([query]) => query)).toEqual(["lugar 0"]);
+  });
+
   it("no guarda un fallo: la siguiente vuelve a preguntar", async () => {
     const { target, provider } = cachedWorld();
     provider.mockRejectedValueOnce(new Error("Photon respondió 502"));

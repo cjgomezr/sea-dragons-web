@@ -203,6 +203,25 @@ describe("createPhotonPlaceSearch", () => {
     expect(places.map((place) => place.name)).toEqual(["MSAC"]);
   });
 
+  it("salta un resultado sin la forma de GeoJSON y se queda con los demás", async () => {
+    const fetchDouble = fetchReturning(
+      photonResponse([
+        {
+          geometry: { coordinates: "roto" },
+          properties: { countrycode: "AU" },
+        },
+        feature({ name: "MSAC" }),
+      ]),
+    );
+
+    const places = await createPhotonPlaceSearch(fetchDouble).search(
+      "msac",
+      SIGNAL,
+    );
+
+    expect(places.map((place) => place.name)).toEqual(["MSAC"]);
+  });
+
   it("falla con el código cuando Photon responde un error", async () => {
     const fetchDouble = fetchReturning(new Response("", { status: 502 }));
 

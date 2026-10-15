@@ -27,7 +27,10 @@ export const dynamic = "force-dynamic";
 
 const QUERY_PARAM = "q";
 
-const querySchema = z.string().max(PLACE_QUERY_MAX_LENGTH);
+// En caracteres y no en unidades UTF-16, como cuenta `char_length`.
+const querySchema = z
+  .string()
+  .refine((query) => [...query].length <= PLACE_QUERY_MAX_LENGTH);
 
 export type EventPlacesResponse = PlaceSuggestions;
 

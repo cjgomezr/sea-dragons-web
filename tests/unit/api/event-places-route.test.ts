@@ -141,6 +141,14 @@ describe("GET /api/v1/events/manage/places", () => {
     expect(response.status).toBe(200);
   });
 
+  it("cuenta en caracteres: acepta 100 emojis", async () => {
+    mockWiring();
+
+    const response = await getPlaces("🏊".repeat(100));
+
+    expect(response.status).toBe(200);
+  });
+
   it("responde 400 a una q de más de 100 caracteres sin llamar a Photon", async () => {
     mockWiring();
 

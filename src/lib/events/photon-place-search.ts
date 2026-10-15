@@ -67,11 +67,15 @@ function addressOf(properties: PhotonProperties, streetLine: string): string {
 }
 
 /** Un resultado de Photon como lugar, o `null` si no tiene con qué
- * nombrarse. Una dirección sin nombre se nombra por su calle. El nombre y la
+ * nombrarse o no tiene la forma de GeoJSON: uno raro no tumba a los demás. Una dirección sin nombre se nombra por su calle. El nombre y la
  * dirección se recortan a lo que admite un evento, para que elegirlo no
  * acabe en un 422. */
 export function toSearchedPlace(feature: unknown): SearchedPlace | null {
-  const { geometry, properties } = photonFeatureSchema.parse(feature);
+  const parsed = photonFeatureSchema.safeParse(feature);
+  if (!parsed.success) {
+    return null;
+  }
+  const { geometry, properties } = parsed.data;
   const streetLine = joinPresent(
     [properties.housenumber, properties.street],
     " ",
@@ -91,8 +95,11 @@ export function toSearchedPlace(feature: unknown): SearchedPlace | null {
 }
 
 function isInAustralia(feature: unknown): boolean {
-  const parsed = photonFeatureSchema.parse(feature);
-  return parsed.properties.countrycode === AUSTRALIA_COUNTRY_CODE;
+  const parsed = photonFeatureSchema.safeParse(feature);
+  return (
+    parsed.success &&
+    parsed.data.properties.countrycode === AUSTRALIA_COUNTRY_CODE
+  );
 }
 
 function buildSearchUrl(query: string): URL {
