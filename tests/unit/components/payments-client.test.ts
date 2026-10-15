@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadMembershipView } from "@/components/payments/payments-client";
+import {
+  loadMembershipView,
+  requestPaymentReceipt,
+} from "@/components/payments/payments-client";
 import type { MembershipView } from "@/lib/membership/membership-view";
 
 /**
@@ -20,6 +23,7 @@ const VIEW: MembershipView = {
       status: "paid",
       card: { brand: "visa", last4: "4242" },
       failureReason: null,
+      quantity: 1,
     },
     {
       id: "pay-sep",
@@ -29,6 +33,7 @@ const VIEW: MembershipView = {
       status: "failed",
       card: null,
       failureReason: "Your card was declined.",
+      quantity: 1,
     },
   ],
   sessionBalance: { sessions: 0, movements: [] },
@@ -63,5 +68,63 @@ describe("loadMembershipView", () => {
     const load = await loadMembershipView();
 
     expect(load.kind).toBe("failed");
+  });
+});
+
+describe("requestPaymentReceipt", () => {
+  const PAYMENT_ID = "0f3a2b1c-4d5e-4f60-8a7b-9c0d1e2f3a4b";
+  const RECEIPT_URL = "https://pay.stripe.com/receipts/payment/test_receipt";
+
+  it("pide el recibo del pago y devuelve su URL", async () => {
+    const fetchDouble = vi.fn(async (path: string) => {
+      void path;
+      return Response.json({ data: { url: RECEIPT_URL } });
+    });
+    vi.stubGlobal("fetch", fetchDouble);
+
+    const outcome = await requestPaymentReceipt(PAYMENT_ID);
+
+    expect(outcome).toEqual({ kind: "found", url: RECEIPT_URL });
+    const [path] = fetchDouble.mock.calls[0] ?? [];
+    expect(path).toBe(`/api/v1/membership/payments/${PAYMENT_ID}/receipt`);
+  });
+
+  it("devuelve el fallo con su motivo cuando el pago no tiene recibo", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          {
+            error: {
+              code: "not_found",
+              message: "Este pago no tiene recibo.",
+              reason: "receipt_not_found",
+            },
+          },
+          { status: 404 },
+        ),
+      ),
+    );
+
+    const outcome = await requestPaymentReceipt(PAYMENT_ID);
+
+    expect(outcome).toMatchObject({
+      kind: "failed",
+      failure: "not_found",
+      reason: "receipt_not_found",
+    });
+  });
+
+  it("no rechaza cuando falla la red: devuelve el fallo", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+
+    const outcome = await requestPaymentReceipt(PAYMENT_ID);
+
+    expect(outcome).toMatchObject({ kind: "failed", failure: "network" });
   });
 });

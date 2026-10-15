@@ -7,6 +7,7 @@ import {
   type ChargeDetails,
   type LevyPaidFacts,
   type LevyPayment,
+  type LevyQuantity,
   type MembershipLookup,
   type PlannableStripeEventFacts,
   type RenewalUpcomingFacts,
@@ -22,6 +23,7 @@ import {
   readStripeEventFacts,
   subscriptionFactsFromCheckout,
 } from "./webhook-events";
+import { SINGLE_UNIT } from "./product-catalog";
 
 /**
  * Aplicar un evento de Stripe ya verificado (#452, RF-8 del PRD de E12): se
@@ -75,6 +77,8 @@ export type SessionPackPaymentToApply = Pick<
 /** Un levy pagado (#473): el pago con el producto de Stripe. */
 export type LevyPaymentToApply = Pick<StripeEventToApply, "event" | "owner"> & {
   readonly payment: LevyPayment;
+  /** Las unidades que se pagaron (#632): una, salvo un extra de varias. */
+  readonly quantity: number;
   /** Nula si el cobro no fue con tarjeta o no se pudo leer (#629). */
   readonly card: ChargeCard | null;
 };
@@ -103,6 +107,9 @@ export type StripeApi = {
   readInvoiceCharge(invoiceId: string): Promise<ChargeDetails>;
   /** El cobro de un pago suelto, un pack o un levy (#629). */
   readPaymentCharge(paymentIntentId: string): Promise<ChargeDetails>;
+  /** Las unidades que el socio eligió en un Checkout (#632): el evento no
+   * trae las líneas de la sesión. */
+  readCheckoutQuantity(checkoutSessionId: string): Promise<number>;
 };
 
 export type StripeWebhookDependencies = {
@@ -293,6 +300,18 @@ export async function handleStripeEvent(
   });
 }
 
+/** A diferencia de la tarjeta, las unidades no se pueden dejar sin leer: un
+ * extra de tres apuntado como uno contaría mal lo que lleva comprado el
+ * socio. Si Stripe no responde, el error hace que reintente el evento. */
+function readLevyQuantityOf(
+  quantity: LevyQuantity,
+  stripe: StripeApi,
+): Promise<number> {
+  return quantity.kind === "single"
+    ? Promise.resolve(SINGLE_UNIT)
+    : stripe.readCheckoutQuantity(quantity.checkoutSessionId);
+}
+
 /** Quien paga un levy puede no tener membresía todavía (D4): basta con que
  * sea socio del club. */
 async function handleLevyPayment(
@@ -314,6 +333,7 @@ async function handleLevyPayment(
     event: { id: event.id, type: event.type, created: facts.created },
     owner: { userId, clubId },
     payment: facts.payment,
+    quantity: await readLevyQuantityOf(facts.quantity, dependencies.stripe),
     card: await readPaymentCardOf(facts.payment.paymentIntentId, {
       event,
       dependencies,

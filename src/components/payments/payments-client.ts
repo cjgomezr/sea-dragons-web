@@ -13,6 +13,7 @@ import {
   MEMBERSHIP_API_PATH,
   MEMBERSHIP_CARD_API_PATH,
   MEMBERSHIP_CHECKOUT_API_PATH,
+  MEMBERSHIP_PAYMENT_RECEIPT_API_PATH,
   MEMBERSHIP_PLAN_API_PATH,
   MEMBERSHIP_RETRY_PAYMENT_API_PATH,
   MEMBERSHIP_SESSION_PACK_CHECKOUT_API_PATH,
@@ -106,6 +107,7 @@ const membershipViewSchema = z.object({
       status: z.enum(PAYMENT_STATUSES),
       card: z.object({ brand: z.string(), last4: z.string() }).nullable(),
       failureReason: z.string().nullable(),
+      quantity: z.number().int().positive(),
     }),
   ),
   sessionBalance: z.object({
@@ -183,6 +185,32 @@ export function requestPaymentRetry(): Promise<StripeSessionOutcome> {
   return requestStripeSession(MEMBERSHIP_RETRY_PAYMENT_API_PATH);
 }
 
+/** El recibo responde lo mismo que abrir una sesión: una URL de Stripe. */
+const paymentReceiptResponseSchema = stripeSessionResponseSchema;
+
+/** La URL del recibo de Stripe de un pago cobrado (#630). */
+export type PaymentReceiptOutcome =
+  { readonly kind: "found"; readonly url: string } | PaymentsFailure;
+
+/** Nunca rechaza: un fallo de red sale como fallo. La URL caduca, así que
+ * se pide cada vez que alguien quiere abrir el recibo. */
+export async function requestPaymentReceipt(
+  paymentId: string,
+): Promise<PaymentReceiptOutcome> {
+  const read = readApiPayload(
+    await requestApi(
+      MEMBERSHIP_PAYMENT_RECEIPT_API_PATH.replace(
+        "[paymentId]",
+        encodeURIComponent(paymentId),
+      ),
+    ),
+    paymentReceiptResponseSchema,
+  );
+  return read.kind === "failed"
+    ? read
+    : { kind: "found", url: read.value.data.url };
+}
+
 /** Abre Checkout para pagar un pack de `sessions` sesiones (#471). */
 export async function requestSessionPackCheckout(
   sessions: number,
@@ -239,6 +267,8 @@ const leviesResponseSchema = z.object({
         name: z.string(),
         description: z.string().nullable(),
         amountCents: z.number().int(),
+        maxQuantity: z.number().int().positive(),
+        purchasedQuantity: z.number().int().nonnegative(),
         isPaid: z.boolean(),
       }),
     ),

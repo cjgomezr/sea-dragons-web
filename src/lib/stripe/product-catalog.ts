@@ -11,6 +11,20 @@ import type Stripe from "stripe";
 /** La marca que el comité pone en el producto, en el panel de Stripe. */
 export const PRODUCT_KIND_METADATA_KEY = "seadragons_kind";
 
+/** Cuántas unidades del producto puede comprar un socio en un Checkout
+ * (#632, D2 del PRD de E23). Sin el dato, una sola. */
+export const MAX_QUANTITY_METADATA_KEY = "seadragons_max_quantity";
+
+/** El tope de unidades por Checkout que fija el #632: el máximo que Stripe
+ * pone por defecto en `adjustable_quantity`. */
+export const STRIPE_MAX_ADJUSTABLE_QUANTITY = 99;
+
+/** Una compra sin elegir cantidad, y el mínimo que se puede elegir. */
+export const SINGLE_UNIT = 1;
+
+/** Los metadatos de Stripe son texto: un entero positivo y nada más. */
+const WHOLE_NUMBER = /^\d+$/;
+
 /** El club cobra en dólares australianos (CON-005). */
 const CLUB_CURRENCY = "aud";
 
@@ -27,6 +41,8 @@ export type CatalogProduct = {
   readonly description: string | null;
   /** Centavos enteros, como los manda Stripe (CON-005). */
   readonly amountCents: number;
+  /** De 1 a `STRIPE_MAX_ADJUSTABLE_QUANTITY`. */
+  readonly maxQuantity: number;
 };
 
 function readOneTimeClubPrice(
@@ -47,6 +63,19 @@ function readOneTimeClubPrice(
   return { id: price.id, amountCents: price.unit_amount };
 }
 
+/** Un valor que no es un entero positivo deja el producto en una unidad: un
+ * error al escribirlo en el panel de Stripe no puede romper la lista. */
+function readMaxQuantity(metadata: Stripe.Metadata): number {
+  const raw = metadata[MAX_QUANTITY_METADATA_KEY];
+  if (raw === undefined || !WHOLE_NUMBER.test(raw)) {
+    return SINGLE_UNIT;
+  }
+  const value = Number(raw);
+  return value < SINGLE_UNIT
+    ? SINGLE_UNIT
+    : Math.min(value, STRIPE_MAX_ADJUSTABLE_QUANTITY);
+}
+
 function toCatalogProduct(
   product: Stripe.Product,
   kind: string,
@@ -64,6 +93,7 @@ function toCatalogProduct(
     name: product.name,
     description: product.description,
     amountCents: price.amountCents,
+    maxQuantity: readMaxQuantity(product.metadata),
   };
 }
 

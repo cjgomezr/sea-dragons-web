@@ -285,6 +285,7 @@ describe("GET /api/v1/membership", () => {
         createdAt: new Date(PAID_AT),
         card: { brand: "visa", last4: "4242" },
         failureReason: null,
+        quantity: 1,
       },
     ]);
 
@@ -305,6 +306,7 @@ describe("GET /api/v1/membership", () => {
             status: "paid",
             card: { brand: "visa", last4: "4242" },
             failureReason: null,
+            quantity: 1,
           },
         ],
       },

@@ -8,7 +8,11 @@ import {
   type UnwaivedStatus,
   resolveMembership,
 } from "@/lib/membership/membership";
-import { LEVY_KIND } from "@/lib/membership/levies";
+import {
+  LEVY_KIND,
+  LEVY_MAX_QUANTITY_METADATA_KEY,
+} from "@/lib/membership/levies";
+import { SINGLE_UNIT } from "@/lib/stripe/product-catalog";
 import { SESSION_PACK_METADATA_KIND } from "@/lib/membership/session-pack-checkout";
 
 /**
@@ -131,10 +135,17 @@ export type SessionPackPaidFacts = FactsOf<
  * producto de Stripe que dice qué levy pagó el socio. */
 export type LevyPayment = SessionPackPayment & { readonly productId: string };
 
+/** Cuántas unidades se pagaron de un levy (#632). De un extra de una sola
+ * unidad no hay nada que preguntar; de uno de varias, el evento no trae las
+ * líneas de la sesión y hay que pedírselas a Stripe. */
+export type LevyQuantity =
+  | { readonly kind: "single" }
+  | { readonly kind: "chosen"; readonly checkoutSessionId: string };
+
 /** Un levy pagado (#473, RF-6 del PRD de E13, D4). No toca la membresía. */
 export type LevyPaidFacts = FactsOf<
   "levyPaid",
-  { readonly payment: LevyPayment }
+  { readonly payment: LevyPayment; readonly quantity: LevyQuantity }
 >;
 
 export type StripeEventFacts =
@@ -206,7 +217,7 @@ const MEMBERSHIP_STATUS_BY_STRIPE_STATUS: Readonly<
 const userIdSchema = z.uuid();
 
 /** Los metadatos de Stripe son texto: `"5"`, nunca `"2.5"` ni `"0"`. */
-const packSessionsSchema = z
+const positiveCountSchema = z
   .string()
   .regex(/^\d+$/)
   .transform(Number)
@@ -283,7 +294,7 @@ function readSessionPackFacts(
   ) {
     return { kind: "ignored" };
   }
-  const sessions = packSessionsSchema.safeParse(metadata.pack_sessions);
+  const sessions = positiveCountSchema.safeParse(metadata.pack_sessions);
   const paymentIntentId = optionalIdOf(session.payment_intent);
   if (
     !sessions.success ||
@@ -310,6 +321,30 @@ function readSessionPackFacts(
       paidAt: created,
     },
   };
+}
+
+/** Una sesión de antes de #632 no dice el máximo: era de una unidad. */
+function readLevyQuantity(session: Stripe.Checkout.Session): LevyQuantity {
+  const maxQuantity = positiveCountSchema.safeParse(
+    session.metadata?.[LEVY_MAX_QUANTITY_METADATA_KEY],
+  );
+  return maxQuantity.success && maxQuantity.data > SINGLE_UNIT
+    ? { kind: "chosen", checkoutSessionId: session.id }
+    : { kind: "single" };
+}
+
+/** Las unidades que el socio eligió en Checkout, de las líneas de la sesión
+ * (#632). Una línea sin cantidad, o una sesión sin líneas, es una unidad. */
+export function readLineItemsQuantity(
+  lineItems: readonly Stripe.LineItem[],
+): number {
+  if (lineItems.length === 0) {
+    return SINGLE_UNIT;
+  }
+  return lineItems.reduce(
+    (total, lineItem) => total + (lineItem.quantity ?? SINGLE_UNIT),
+    0,
+  );
 }
 
 /** Sólo un levy ya cobrado se apunta. El producto y el nombre los pone la
@@ -348,6 +383,7 @@ function readLevyFacts(
       description: name,
       paidAt: created,
     },
+    quantity: readLevyQuantity(session),
   };
 }
 

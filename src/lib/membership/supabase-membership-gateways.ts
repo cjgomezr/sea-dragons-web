@@ -13,10 +13,14 @@ import {
   type ScheduledPlanChange,
   resolveStandingStatus,
 } from "./membership";
-import type { StripeWebhookGateway } from "@/lib/stripe/stripe-webhook";
+import type {
+  LevyPaymentToApply,
+  StripeWebhookGateway,
+} from "@/lib/stripe/stripe-webhook";
 import type { MemberEmailGateway } from "./checkout";
 import type { PlanChoiceGateway } from "./choose-plan";
 import type { LevyGateways } from "./levies";
+import type { PaymentReceiptGateway, ReceiptSource } from "./payment-receipt";
 import type { ScheduledPlanChangeGateway } from "./plan-change";
 import type {
   SessionLedgerGateway,
@@ -31,7 +35,6 @@ import {
 } from "./membership-view";
 import type {
   ChargeCard,
-  LevyPayment,
   MembershipChanges,
   MembershipLookup,
   RecordedPayment,
@@ -260,7 +263,7 @@ export function createMembershipGateway(
 const PAYMENTS_TABLE = "payments";
 const MEMBERS_TABLE = "members";
 const PAYMENT_COLUMNS =
-  "id, amount_cents, description, status, paid_at, created_at, card_brand, card_last4, failure_reason";
+  "id, amount_cents, description, status, paid_at, created_at, card_brand, card_last4, failure_reason, quantity";
 
 const paymentRowSchema = z.object({
   id: z.string(),
@@ -272,6 +275,7 @@ const paymentRowSchema = z.object({
   card_brand: z.string().nullable(),
   card_last4: z.string().nullable(),
   failure_reason: z.string().nullable(),
+  quantity: z.number().int().positive(),
 });
 
 /** Sin marca o sin dígitos no hay tarjeta que enseñar. */
@@ -313,23 +317,74 @@ export function createPaymentHistoryGateway(
           createdAt: new Date(row.created_at),
           card: toPaymentCard(row),
           failureReason: row.failure_reason,
+          quantity: row.quantity,
         }));
     },
   };
 }
 
-const paidProductRowSchema = z.object({ stripe_product_id: z.string() });
+const purchasedProductRowSchema = z.object({
+  stripe_product_id: z.string(),
+  quantity: z.number().int().positive(),
+});
 
-/** Los productos de Stripe que un socio ya pagó (#473): qué levies le salen
- * como pagados. Un pago fallido o pendiente no cuenta. */
-export function createPaidProductsGateway(
+const receiptPaymentRowSchema = z.object({
+  status: z.enum(PAYMENT_STATUSES),
+  stripe_invoice_id: z.string().nullable(),
+  stripe_charge_id: z.string().nullable(),
+});
+
+/** La factura manda cuando la hay; si no, el cobro suelto. El check de
+ * `0050` garantiza que una de las dos está. */
+function toReceiptSource(
+  row: z.infer<typeof receiptPaymentRowSchema>,
+): ReceiptSource {
+  if (row.stripe_invoice_id !== null) {
+    return { kind: "invoice", invoiceId: row.stripe_invoice_id };
+  }
+  if (row.stripe_charge_id !== null) {
+    return { kind: "payment_intent", paymentIntentId: row.stripe_charge_id };
+  }
+  throw new Error("Un pago sin factura ni cobro de Stripe incumple 0050.");
+}
+
+/** Un pago por su id, para pedir su recibo (#630). Con el cliente de la
+ * sesión, `payments_select_own` hace que el de otro socio no exista. */
+export function createPaymentReceiptGateway(
   client: SupabaseClient,
-): LevyGateways["paidProducts"] {
+): PaymentReceiptGateway {
   return {
-    async findPaidProductIds(userId) {
+    async findById(paymentId) {
       const { data, error } = await client
         .from(PAYMENTS_TABLE)
-        .select("stripe_product_id")
+        .select("status, stripe_invoice_id, stripe_charge_id")
+        .eq("id", paymentId)
+        .maybeSingle();
+      if (error) {
+        throw new Error(
+          `No se pudo leer el pago ${paymentId}: ${error.message}`,
+        );
+      }
+      if (data === null) {
+        return null;
+      }
+      const row = receiptPaymentRowSchema.parse(data);
+      return { status: row.status, source: toReceiptSource(row) };
+    },
+  };
+}
+
+/** Las unidades que un socio ya pagó de cada producto de Stripe (#473,
+ * #632): qué levies le salen como pagados y cuántos lleva de un extra. Un
+ * pago fallido o pendiente no cuenta. */
+export function createLevyPurchasesGateway(
+  client: SupabaseClient,
+): LevyGateways["purchases"] {
+  return {
+    async findPurchasedQuantities(userId) {
+      const { data, error } = await client
+        .from(PAYMENTS_TABLE)
+        .select("stripe_product_id, quantity")
         .eq("user_id", userId)
         .eq("status", "paid")
         .not("stripe_product_id", "is", null);
@@ -338,8 +393,12 @@ export function createPaidProductsGateway(
           `No se pudieron leer los productos pagados de ${userId}: ${error.message}`,
         );
       }
-      const rows = z.array(paidProductRowSchema).parse(data);
-      return new Set(rows.map((row) => row.stripe_product_id));
+      const rows = z.array(purchasedProductRowSchema).parse(data);
+      const quantities = new Map<string, number>();
+      for (const { stripe_product_id: productId, quantity } of rows) {
+        quantities.set(productId, (quantities.get(productId) ?? 0) + quantity);
+      }
+      return quantities;
     },
   };
 }
@@ -591,12 +650,12 @@ function toSessionPackPaymentJson(
 /** Un levy se guarda como un pack, y además con el producto de Stripe que
  * dice cuál pagó el socio (#473). */
 function toLevyPaymentJson(
-  payment: LevyPayment,
-  card: ChargeCard | null,
+  levy: Pick<LevyPaymentToApply, "payment" | "quantity" | "card">,
 ): Record<string, unknown> {
   return {
-    ...toSessionPackPaymentJson(payment, card),
-    stripe_product_id: payment.productId,
+    ...toSessionPackPaymentJson(levy.payment, levy.card),
+    stripe_product_id: levy.payment.productId,
+    quantity: levy.quantity,
   };
 }
 
@@ -673,7 +732,8 @@ export function createStripeWebhookGateway(
       }
       return data === null ? null : z.string().parse(data.club_id);
     },
-    async applyLevyPayment({ event, owner, payment, card }) {
+    async applyLevyPayment(levy) {
+      const { event, owner } = levy;
       const { data, error } = await serviceClient.rpc(
         APPLY_LEVY_PAYMENT_FUNCTION,
         {
@@ -682,7 +742,7 @@ export function createStripeWebhookGateway(
           event_created: event.created.toISOString(),
           target_user_id: owner.userId,
           target_club_id: owner.clubId,
-          payment: toLevyPaymentJson(payment, card),
+          payment: toLevyPaymentJson(levy),
         },
       );
       if (error) {

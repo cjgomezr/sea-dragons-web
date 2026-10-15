@@ -48,6 +48,7 @@ function product(input: {
   readonly defaultPrice?: Stripe.Price | string | null;
   readonly active?: boolean;
   readonly description?: string | null;
+  readonly maxQuantity?: string;
 }): Stripe.Product {
   return {
     id: input.id,
@@ -55,7 +56,12 @@ function product(input: {
     name: input.name,
     description: input.description ?? null,
     active: input.active ?? true,
-    metadata: input.kind === undefined ? {} : { seadragons_kind: input.kind },
+    metadata: {
+      ...(input.kind === undefined ? {} : { seadragons_kind: input.kind }),
+      ...(input.maxQuantity === undefined
+        ? {}
+        : { seadragons_max_quantity: input.maxQuantity }),
+    },
     default_price:
       input.defaultPrice === undefined
         ? price(`price_of_${input.id}`)
@@ -70,6 +76,19 @@ const NATIONALS = product({
   kind: "levy",
   defaultPrice: price(NATIONALS_PRICE),
 });
+
+const JERSEY_PRODUCT = "prod_jersey";
+const JERSEY_PRICE = "price_jersey";
+
+function jersey(maxQuantity?: string): Stripe.Product {
+  return product({
+    id: JERSEY_PRODUCT,
+    name: "2026 club jersey",
+    kind: "levy",
+    defaultPrice: price(JERSEY_PRICE),
+    maxQuantity,
+  });
+}
 
 function membership(): MembershipRecord {
   return {
@@ -100,7 +119,7 @@ function sessionsDouble(): CheckoutSessions & {
 function gateways(
   input: {
     readonly products?: readonly Stripe.Product[];
-    readonly paidProductIds?: readonly string[];
+    readonly purchasedQuantities?: Readonly<Record<string, number>>;
     readonly sessions?: CheckoutSessions;
     readonly record?: MembershipRecord | null;
   } = {},
@@ -111,8 +130,9 @@ function gateways(
         input.record === undefined ? membership() : input.record,
     },
     memberEmails: { findEmail: async () => EMAIL },
-    paidProducts: {
-      findPaidProductIds: async () => new Set(input.paidProductIds ?? []),
+    purchases: {
+      findPurchasedQuantities: async () =>
+        new Map(Object.entries(input.purchasedQuantities ?? {})),
     },
     stripe: {
       kind: "configured",
@@ -148,6 +168,8 @@ describe("listLevies", () => {
           name: "Nationals 2026",
           description: "Entry for the national championship",
           amountCents: NATIONALS_CENTS,
+          maxQuantity: 1,
+          purchasedQuantity: 0,
           isPaid: false,
         },
       ],
@@ -156,12 +178,54 @@ describe("listLevies", () => {
 
   it("marca como pagado el levy cuyo producto ya pagó el socio", async () => {
     const listing = await listLevies(
-      gateways({ products: [NATIONALS], paidProductIds: [NATIONALS_PRODUCT] }),
+      gateways({
+        products: [NATIONALS],
+        purchasedQuantities: { [NATIONALS_PRODUCT]: 1 },
+      }),
       { userId: USER_ID },
     );
 
-    expect(listing).toMatchObject({ levies: [{ isPaid: true }] });
+    expect(listing).toMatchObject({
+      levies: [{ isPaid: true, purchasedQuantity: 1 }],
+    });
   });
+
+  it("dice cuántas unidades de un extra lleva compradas el socio", async () => {
+    const listing = await listLevies(
+      gateways({
+        products: [jersey("10")],
+        purchasedQuantities: { [JERSEY_PRODUCT]: 5 },
+      }),
+      { userId: USER_ID },
+    );
+
+    expect(listing).toMatchObject({
+      levies: [{ maxQuantity: 10, purchasedQuantity: 5, isPaid: true }],
+    });
+  });
+
+  it.each([
+    ["sin el dato", undefined, 1],
+    ["con 1", "1", 1],
+    ["con 10", "10", 10],
+    ["con 99", "99", 99],
+    ["con más del máximo de Stripe", "150", 99],
+    ["con texto", "abc", 1],
+    ["con 0", "0", 1],
+    ["con un negativo", "-2", 1],
+    ["con decimales", "1.5", 1],
+    ["vacío", "", 1],
+  ])(
+    "lee el máximo de unidades de un extra %s",
+    async (_case, maxQuantity, expected) => {
+      const listing = await listLevies(
+        gateways({ products: [jersey(maxQuantity)] }),
+        { userId: USER_ID },
+      );
+
+      expect(listing).toMatchObject({ levies: [{ maxQuantity: expected }] });
+    },
+  );
 
   it.each([
     ["sin la marca", product({ id: "prod_plan", name: "Full" })],
@@ -238,11 +302,11 @@ describe("listLevies", () => {
   });
 
   it("dice que Stripe no está configurado sin leer los pagos", async () => {
-    const findPaidProductIds = vi.fn();
+    const findPurchasedQuantities = vi.fn();
 
     const listing = await listLevies(
       {
-        paidProducts: { findPaidProductIds },
+        purchases: { findPurchasedQuantities },
         stripe: { kind: "unconfigured" },
       },
       { userId: USER_ID },
@@ -252,7 +316,7 @@ describe("listLevies", () => {
       kind: "refused",
       reason: "stripe_not_configured",
     });
-    expect(findPaidProductIds).not.toHaveBeenCalled();
+    expect(findPurchasedQuantities).not.toHaveBeenCalled();
   });
 });
 
@@ -276,6 +340,7 @@ describe("startLevyCheckout", () => {
           kind: "levy",
           levy_product_id: NATIONALS_PRODUCT,
           levy_name: "Nationals 2026",
+          levy_max_quantity: "1",
         },
         success_url: `${ORIGIN}/pagos?levy=ok`,
         cancel_url: `${ORIGIN}/pagos?levy=cancelado`,
@@ -298,6 +363,15 @@ describe("startLevyCheckout", () => {
     const [params] = sessions.create.mock.calls[0] ?? [];
     expect(params?.customer).toBe("cus_Alba");
     expect(params).not.toHaveProperty("customer_email");
+  });
+
+  it("no pide a Checkout una factura, que Stripe cobra aparte (#630)", async () => {
+    const sessions = sessionsDouble();
+
+    await payLevy(gateways({ products: [NATIONALS], sessions }));
+
+    const [params] = sessions.create.mock.calls[0] ?? [];
+    expect(params).not.toHaveProperty("invoice_creation");
   });
 
   it("manda el correo de quien no tiene membresía", async () => {
@@ -327,13 +401,67 @@ describe("startLevyCheckout", () => {
     const outcome = await payLevy(
       gateways({
         products: [NATIONALS],
-        paidProductIds: [NATIONALS_PRODUCT],
+        purchasedQuantities: { [NATIONALS_PRODUCT]: 1 },
         sessions,
       }),
     );
 
     expect(outcome).toEqual({ kind: "refused", reason: "levy_already_paid" });
     expect(sessions.create).not.toHaveBeenCalled();
+  });
+
+  it("deja elegir entre 1 y el máximo de unidades de un extra de varias", async () => {
+    const sessions = sessionsDouble();
+
+    await payLevy(
+      gateways({ products: [jersey("10")], sessions }),
+      JERSEY_PRICE,
+    );
+
+    const [params] = sessions.create.mock.calls[0] ?? [];
+    expect(params?.line_items).toEqual([
+      {
+        price: JERSEY_PRICE,
+        quantity: 1,
+        adjustable_quantity: { enabled: true, minimum: 1, maximum: 10 },
+      },
+    ]);
+    expect(params?.metadata).toMatchObject({ levy_max_quantity: "10" });
+  });
+
+  it("deja volver a comprar un extra de varias unidades ya comprado", async () => {
+    const sessions = sessionsDouble();
+
+    const outcome = await payLevy(
+      gateways({
+        products: [jersey("10")],
+        purchasedQuantities: { [JERSEY_PRODUCT]: 3 },
+        sessions,
+      }),
+      JERSEY_PRICE,
+    );
+
+    expect(outcome).toEqual({ kind: "created", url: CHECKOUT_URL });
+  });
+
+  it("abre otra sesión si el socio vuelve a comprar el extra dentro de la misma ventana", async () => {
+    const sessions = sessionsDouble();
+
+    await payLevy(
+      gateways({ products: [jersey("10")], sessions }),
+      JERSEY_PRICE,
+    );
+    await payLevy(
+      gateways({
+        products: [jersey("10")],
+        purchasedQuantities: { [JERSEY_PRODUCT]: 3 },
+        sessions,
+      }),
+      JERSEY_PRICE,
+    );
+
+    const [first, second] = sessions.create.mock.calls;
+    expect(first?.[1]?.idempotencyKey).not.toBe(second?.[1]?.idempotencyKey);
   });
 
   it("dice que Stripe no está configurado", async () => {

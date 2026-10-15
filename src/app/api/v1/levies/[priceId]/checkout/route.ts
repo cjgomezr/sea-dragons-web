@@ -9,7 +9,7 @@ import {
 import {
   createMemberEmailGateway,
   createMembershipGateway,
-  createPaidProductsGateway,
+  createLevyPurchasesGateway,
 } from "@/lib/membership/supabase-membership-gateways";
 import {
   asStripeUnavailable,
@@ -68,7 +68,7 @@ export function POST(
         {
           membership: createMembershipGateway(serviceClient),
           memberEmails: createMemberEmailGateway(serviceClient),
-          paidProducts: createPaidProductsGateway(serviceClient),
+          purchases: createLevyPurchasesGateway(serviceClient),
           stripe: resolveRouteLevyStripe(LOG_PREFIX),
         },
         {

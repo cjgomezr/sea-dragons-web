@@ -14,6 +14,7 @@ import {
   type StripeMembership,
 } from "@/lib/stripe/webhook-events";
 import {
+  FIXTURE_LEVY_CHECKOUT_SESSION_ID,
   FIXTURE_LEVY_NAME,
   FIXTURE_LEVY_PAYMENT_INTENT_ID,
   FIXTURE_LEVY_PRODUCT_ID,
@@ -76,6 +77,7 @@ const readSetupCard = vi.fn<StripeApi["readSetupCard"]>();
 const makeDefaultPaymentMethod = vi.fn<StripeApi["makeDefaultPaymentMethod"]>();
 const readInvoiceCharge = vi.fn<StripeApi["readInvoiceCharge"]>();
 const readPaymentCharge = vi.fn<StripeApi["readPaymentCharge"]>();
+const readCheckoutQuantity = vi.fn<StripeApi["readCheckoutQuantity"]>();
 const log = vi.fn<(line: string) => void>();
 const notifyUpcomingRenewal =
   vi.fn<RenewalNoticeSender["notifyUpcomingRenewal"]>();
@@ -96,6 +98,7 @@ function handle(event: ReturnType<typeof stripeEvent>) {
       makeDefaultPaymentMethod,
       readInvoiceCharge,
       readPaymentCharge,
+      readCheckoutQuantity,
     },
     renewalNotices: { notifyUpcomingRenewal },
     prices: FIXTURE_PRICES,
@@ -596,6 +599,20 @@ describe("un pack de sesiones pagado", () => {
   });
 });
 
+function multiUnitLevyEvent(): ReturnType<typeof stripeEvent> {
+  return stripeEvent("checkout.session.completed (levy)", {
+    object: {
+      metadata: {
+        user_id: FIXTURE_USER_ID,
+        kind: "levy",
+        levy_product_id: FIXTURE_LEVY_PRODUCT_ID,
+        levy_name: FIXTURE_LEVY_NAME,
+        levy_max_quantity: "10",
+      },
+    },
+  });
+}
+
 // #473: un levy pagado entra en el historial con su producto, una sola vez, y
 // no toca la membresía.
 describe("un levy pagado", () => {
@@ -625,11 +642,34 @@ describe("un levy pagado", () => {
         description: FIXTURE_LEVY_NAME,
         paidAt: new Date(event.created * 1000),
       },
+      quantity: 1,
       card: null,
     });
+    expect(readCheckoutQuantity).not.toHaveBeenCalled();
     expect(applyEvent).not.toHaveBeenCalled();
     expect(applySessionPackPayment).not.toHaveBeenCalled();
     expect(readSubscription).not.toHaveBeenCalled();
+  });
+
+  it("apunta las unidades que el socio eligió, leídas en las líneas de la sesión (#632)", async () => {
+    readCheckoutQuantity.mockResolvedValue(3);
+
+    await handle(multiUnitLevyEvent());
+
+    expect(readCheckoutQuantity).toHaveBeenCalledWith(
+      FIXTURE_LEVY_CHECKOUT_SESSION_ID,
+    );
+    expect(applyLevyPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ quantity: 3 }),
+    );
+  });
+
+  it("no apunta un extra de varias unidades si Stripe no dice cuántas eran", async () => {
+    readCheckoutQuantity.mockRejectedValue(STRIPE_DOWN);
+
+    await expect(handle(multiUnitLevyEvent())).rejects.toThrow(STRIPE_DOWN);
+
+    expect(applyLevyPayment).not.toHaveBeenCalled();
   });
 
   it("responde que ya estaba aplicado cuando el evento se repite", async () => {
