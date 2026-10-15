@@ -8978,7 +8978,7 @@ a.auth-brand-header:focus-visible {
 
 .payments-tab::after {
   position: absolute;
-  inset: -6px -3px;
+  inset: -6px 0;
   content: "";
 }
 
@@ -9012,6 +9012,11 @@ a.auth-brand-header:focus-visible {
   border-radius: 999px;
 }
 
+/* Sobre el segmento activo, la insignia tomaría su mismo fondo. */
+.payments-tab[aria-selected="true"] .payments-tab-badge {
+  background: var(--color-panel);
+}
+
 @media (min-width: 768px) {
   .app-main h1.payments-title {
     font-size: 28px;
@@ -9043,6 +9048,10 @@ a.auth-brand-header:focus-visible {
     font-weight: 600;
     background: none;
     border-bottom-color: var(--color-accent);
+  }
+
+  .payments-tab[aria-selected="true"] .payments-tab-badge {
+    background: var(--color-segment-selected);
   }
 
   .payments-tab:focus-visible {
