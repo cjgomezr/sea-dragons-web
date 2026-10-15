@@ -4,7 +4,7 @@ import type { RoleRequestGateways } from "@/lib/auth/role-request";
 import { type Role, hasCapability } from "@/lib/auth/roles";
 import type { MemberGroupsGateway } from "@/lib/groups/member-groups";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
-import type { EventType } from "./event-creation";
+import { type EventType, isEventType } from "./event-creation";
 import type { EventPlace } from "./event-place";
 import {
   EventNotFoundError,
@@ -84,6 +84,8 @@ export type AgendaQuery = {
   /** `YYYY-MM-DD` de Melbourne: los próximos empiezan este día, los pasados
    * terminan el anterior. */
   readonly today: string;
+  /** Sólo los eventos de estos tipos, o nulo para todos (D8 de E24). */
+  readonly eventTypes: readonly EventType[] | null;
   readonly after: AgendaPosition | null;
   readonly limit: number;
 };
@@ -191,6 +193,20 @@ function decodeCursor(cursor: string): AgendaPosition {
   }
 }
 
+const AGENDA_TYPES_SEPARATOR = ",";
+
+/** Los tipos de `?types=training,social`, sin repetir. Lo desconocido se
+ * ignora en vez de rechazarse, para que un cliente viejo frente a un tipo
+ * retirado siga viendo su agenda; si no queda ninguno, son todos (nulo). */
+export function readAgendaTypes(
+  value: string | null,
+): readonly EventType[] | null {
+  const types = new Set(
+    (value ?? "").split(AGENDA_TYPES_SEPARATOR).filter(isEventType),
+  );
+  return types.size === 0 ? null : [...types];
+}
+
 /** Admin y Committee, los que crean y gestionan eventos. */
 function seesWholeCalendar(role: Role): boolean {
   return hasCapability(role, "createEvents");
@@ -291,17 +307,22 @@ export async function listAgenda(
     readonly period: AgendaPeriod;
     readonly now: Date;
     readonly cursor?: string;
+    /** Sin tipos, o con la lista vacía, son todos. La página siguiente se
+     * pide con los mismos: el cursor no los recuerda. */
+    readonly eventTypes?: readonly EventType[];
   },
 ): Promise<AgendaPage> {
   const after =
     request.cursor === undefined ? null : decodeCursor(request.cursor);
   const viewer = await findViewer(gateways, request.callerId);
+  const eventTypes = request.eventTypes ?? [];
   const rows = await gateways.agenda.findAgendaPage({
     clubId: viewer.clubId,
     callerId: request.callerId,
     visibility: eventVisibilityFor(viewer.role, viewer.groupIds),
     period: request.period,
     today: clubCalendarDate(request.now),
+    eventTypes: eventTypes.length === 0 ? null : eventTypes,
     after,
     limit: AGENDA_PAGE_SIZE + 1,
   });

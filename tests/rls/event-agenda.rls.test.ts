@@ -7,6 +7,7 @@ import {
   listAgenda,
   openEvent,
 } from "@/lib/events/event-agenda";
+import type { EventType } from "@/lib/events/event-creation";
 import { EventNotFoundError } from "@/lib/events/event-rsvp";
 import { createEventAgendaGateways } from "@/lib/events/supabase-event-agenda-gateways";
 import { readSupabaseServiceRoleConfig } from "@/lib/supabase/config";
@@ -91,12 +92,13 @@ function eventRow(
     readonly startsOn: string;
     readonly title: string;
     readonly audience: "all" | "groups";
+    readonly eventType?: EventType;
   },
 ): Record<string, unknown> {
   return {
     club_id: author.clubId,
     title: fields.title,
-    event_type: "training",
+    event_type: fields.eventType ?? "training",
     starts_on: fields.startsOn,
     start_time: "19:00",
     location: "MSAC",
@@ -219,6 +221,7 @@ function farAgendaQuery(
     visibility: { kind: "club" },
     period: "upcoming",
     today: FAR_DAY,
+    eventTypes: null,
     after: null,
     limit: AGENDA_PAGE_SIZE,
     ...overrides,
@@ -295,6 +298,68 @@ describeRls("agenda y detalle contra la base", () => {
 
         expect(first?.id).toBe(world.groupEventId);
         expect(rest.map((row) => row.id)).toEqual([world.clubEventId]);
+      }),
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "el filtro por tipo se aplica con la audiencia y el cursor",
+    () =>
+      withAgendaWorld(async (world) => {
+        const author = { clubId: world.clubId, userId: world.insider.id };
+        const typedEvents = [
+          ["2099-03-04", "Social del club", "all", "social"],
+          ["2099-03-05", "Torneo del club", "all", "competition"],
+          ["2099-03-06", "Asamblea del club", "all", "meeting"],
+          ["2099-03-07", "Social del grupo", "groups", "social"],
+        ] as const;
+        await withSeededRows(
+          world.serviceClient,
+          "events",
+          typedEvents.map(([startsOn, title, audience, eventType]) =>
+            eventRow(author, { startsOn, title, audience, eventType }),
+          ),
+          async (seeded) => {
+            await insertRows(world.serviceClient, "event_groups", [
+              {
+                event_id: seeded[3]?.id,
+                group_id: world.groupId,
+                club_id: world.clubId,
+              },
+            ]);
+            const gateways = createEventAgendaGateways(
+              world.serviceClient.client,
+            );
+            const filtered = (overrides: Partial<AgendaQuery>) =>
+              gateways.agenda.findAgendaPage(
+                farAgendaQuery(world, {
+                  eventTypes: ["training", "social"],
+                  ...overrides,
+                }),
+              );
+            const titlesOf = (rows: readonly { readonly title: string }[]) =>
+              rows.map((row) => row.title);
+
+            const outsiderView = await filtered({
+              visibility: { kind: "audience", groupIds: [] },
+            });
+            const [first] = await filtered({ limit: 1 });
+            const rest = await filtered({
+              after: { startsAt: first?.startsAt ?? "", id: first?.id ?? "" },
+            });
+
+            expect(titlesOf(outsiderView)).toEqual([
+              "De todo el club",
+              "Social del club",
+            ]);
+            expect(first?.title).toBe("Del grupo");
+            expect(titlesOf(rest)).toEqual([
+              "De todo el club",
+              "Social del club",
+              "Social del grupo",
+            ]);
+          },
+        );
       }),
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
