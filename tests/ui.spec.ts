@@ -15845,6 +15845,57 @@ test.describe("las pestañas de Pagos en el navegador (#627)", () => {
       );
     expect(Number.parseFloat(touchHeight)).toBeGreaterThanOrEqual(44);
   });
+
+  test("a 375px la parte activa lleva --color-segment-selected", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await goToPayments(page, ADMIN_TABS_STATE);
+
+    const colors = await page
+      .getByRole("tab", { name: /^(My membership|Mi membresía)$/ })
+      .evaluate((tab) => {
+        const probe = document.createElement("div");
+        probe.style.background = "var(--color-segment-selected)";
+        document.body.append(probe);
+        const expected = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return { actual: getComputedStyle(tab).backgroundColor, expected };
+      });
+    expect(colors.actual).toBe(colors.expected);
+  });
+
+  test("el foco de teclado en una pestaña se ve con el contorno de acento", async ({
+    page,
+  }) => {
+    await goToPayments(page, ADMIN_TABS_STATE);
+    const membershipTab = page.getByRole("tab", {
+      name: /^(My membership|Mi membresía)$/,
+    });
+    await membershipTab.focus();
+
+    await page.keyboard.press("ArrowRight");
+
+    const extrasTab = page.getByRole("tab", { name: EXTRAS_TAB_NAME });
+    await expect(extrasTab).toBeFocused();
+    const outline = await extrasTab.evaluate((tab) => {
+      const probe = document.createElement("div");
+      probe.style.color = "var(--color-accent-text)";
+      document.body.append(probe);
+      const accent = getComputedStyle(probe).color;
+      probe.remove();
+      const style = getComputedStyle(tab);
+      return {
+        accent,
+        color: style.outlineColor,
+        width: style.outlineWidth,
+        style: style.outlineStyle,
+      };
+    });
+    expect(outline.color).toBe(outline.accent);
+    expect(outline.width).toBe("2px");
+    expect(outline.style).toBe("solid");
+  });
 });
 
 // El botón de la alerta (#474) pide la factura abierta y sale a su página
