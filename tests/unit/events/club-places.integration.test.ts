@@ -83,12 +83,25 @@ async function seedEvents(
   }
 }
 
+function memberRow(clubId: string, user: TestUser): Record<string, unknown> {
+  return {
+    club_id: clubId,
+    user_id: user.id,
+    full_name: "Olga Organiza",
+    email: user.email,
+    account_status: "active",
+    role: "Committee",
+  };
+}
+
+/** Un socio sólo es de un club, así que cada club tiene el suyo. */
 async function withTwoClubs(
   run: (world: {
     readonly serviceClient: ServiceRoleClient;
     readonly ownClubId: string;
     readonly otherClubId: string;
-    readonly author: TestUser;
+    readonly ownAuthor: TestUser;
+    readonly otherAuthor: TestUser;
   }) => Promise<void>,
 ): Promise<void> {
   const serviceClient = createServiceRoleTestClient(process.env);
@@ -102,25 +115,29 @@ async function withTwoClubs(
     async ([ownClub, otherClub]) => {
       const ownClubId = String(ownClub?.id);
       const otherClubId = String(otherClub?.id);
-      await withTestUser(serviceClient, (author) =>
-        withSeededRows(
-          serviceClient,
-          "members",
-          [ownClubId, otherClubId].map((clubId) => ({
-            club_id: clubId,
-            user_id: author.id,
-            full_name: "Olga Organiza",
-            email: author.email,
-            account_status: "active",
-            role: "Committee",
-          })),
-          async () => {
-            try {
-              await run({ serviceClient, ownClubId, otherClubId, author });
-            } finally {
-              await deleteEventsIn(serviceClient, [ownClubId, otherClubId]);
-            }
-          },
+      await withTestUser(serviceClient, (ownAuthor) =>
+        withTestUser(serviceClient, (otherAuthor) =>
+          withSeededRows(
+            serviceClient,
+            "members",
+            [
+              memberRow(ownClubId, ownAuthor),
+              memberRow(otherClubId, otherAuthor),
+            ],
+            async () => {
+              try {
+                await run({
+                  serviceClient,
+                  ownClubId,
+                  otherClubId,
+                  ownAuthor,
+                  otherAuthor,
+                });
+              } finally {
+                await deleteEventsIn(serviceClient, [ownClubId, otherClubId]);
+              }
+            },
+          ),
         ),
       );
     },
@@ -132,22 +149,28 @@ describeRls("los lugares del club contra la base (#646)", () => {
     "lista los lugares del club ordenados por uso, sin los de otro club",
     () =>
       withTwoClubs(
-        async ({ serviceClient, ownClubId, otherClubId, author }) => {
+        async ({
+          serviceClient,
+          ownClubId,
+          otherClubId,
+          ownAuthor,
+          otherAuthor,
+        }) => {
           await seedEvents(serviceClient, {
             clubId: ownClubId,
-            author,
+            author: ownAuthor,
             place: CLUBHOUSE,
             count: 1,
           });
           await seedEvents(serviceClient, {
             clubId: ownClubId,
-            author,
+            author: ownAuthor,
             place: MSAC,
             count: 2,
           });
           await seedEvents(serviceClient, {
             clubId: otherClubId,
-            author,
+            author: otherAuthor,
             place: BOX_HILL,
             count: 5,
           });
