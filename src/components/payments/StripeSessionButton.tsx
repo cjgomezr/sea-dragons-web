@@ -9,6 +9,15 @@ import {
   describeCheckoutFailure,
 } from "./payments-client";
 
+/** La principal de la pantalla (poner la tarjeta, comprar) o una de las de
+ * la tira del plan, que no compiten con ella (#628). */
+type ButtonAppearance = "primary" | "secondary";
+
+const APPEARANCE_CLASS: Readonly<Record<ButtonAppearance, string>> = {
+  primary: "auth-submit",
+  secondary: "payments-plan-button",
+};
+
 type SessionState =
   | { readonly kind: "idle" }
   | { readonly kind: "opening" }
@@ -26,6 +35,7 @@ export function StripeSessionButton({
   requestSession,
   describeFailure = describeCheckoutFailure,
   describedBy,
+  appearance = "primary",
 }: {
   readonly translate: Translator;
   /** Lo que dice en reposo, ya traducido: para qué abre Stripe. */
@@ -39,6 +49,7 @@ export function StripeSessionButton({
   /** El id de lo que se paga, cuando el botón sólo dice "Pagar" y hay
    * varios en la misma lista. */
   readonly describedBy?: string;
+  readonly appearance?: ButtonAppearance;
 }): React.JSX.Element {
   const [session, setSession] = useState<SessionState>({ kind: "idle" });
 
@@ -73,7 +84,7 @@ export function StripeSessionButton({
       ) : null}
       <button
         type="button"
-        className="auth-submit"
+        className={APPEARANCE_CLASS[appearance]}
         disabled={session.kind === "opening"}
         aria-describedby={describedBy}
         onClick={openSession}

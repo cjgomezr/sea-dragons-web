@@ -28,7 +28,6 @@ import {
 } from "./PaymentsTabs";
 import { PlanCard } from "./PlanCard";
 import { SessionActivity } from "./SessionActivity";
-import { SessionPackOffer } from "./SessionPackOffer";
 import {
   NOT_WAITING,
   type StripeReturns,
@@ -230,18 +229,11 @@ function MembershipPanel({
           view={view}
           membership={membership}
           waiting={waiting}
-          checkoutReturn={returns.checkoutReturn}
+          returns={returns}
           onViewReplaced={onViewReplaced}
           onPlanChanged={onPlanChanged}
         />
       )}
-      {membership?.plan === "Casual" && view.paymentsConfigured ? (
-        <SessionPackOffer
-          translate={translate}
-          waiting={waiting}
-          packReturn={returns.packReturn}
-        />
-      ) : null}
       {view.paymentsConfigured ? (
         <LevyCharges
           translate={translate}

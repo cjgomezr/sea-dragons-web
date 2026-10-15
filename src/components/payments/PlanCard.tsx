@@ -1,6 +1,10 @@
 "use client";
 
-import { useId } from "react";
+import { CalendarBlank } from "@phosphor-icons/react/dist/ssr/CalendarBlank";
+import { CreditCard } from "@phosphor-icons/react/dist/ssr/CreditCard";
+import { CurrencyDollar } from "@phosphor-icons/react/dist/ssr/CurrencyDollar";
+import { useId, useState } from "react";
+import { Icon } from "@/components/Icon";
 import { formatAudCents } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import { formatCardBrand } from "@/lib/membership/card-brand";
@@ -19,16 +23,18 @@ import { requestCardUpdate, requestCheckout } from "./payments-client";
 import { PlanChange } from "./PlanChange";
 import { PlanChoice } from "./PlanChoice";
 import { SessionBalanceSummary } from "./SessionBalanceSummary";
+import { SessionPackOffer } from "./SessionPackOffer";
 import { StripeSessionButton } from "./StripeSessionButton";
-import type { Waiting } from "./use-membership-wait";
+import type { StripeReturns, Waiting } from "./use-membership-wait";
 
 /**
- * La tarjeta "Plan actual" del mockup de Pagos (#455, RF-5 del PRD de E12):
- * el plan con su precio, el chip de estado, el próximo cobro, la tarjeta o la
- * exención, el saldo de sesiones (#472), y lo que el socio puede hacer según
- * su estado. A quien aún no puso tarjeta le ofrece elegir plan (#479) y el
- * alta en Checkout (#454), y a quien ya tiene suscripción, el cambio de plan
- * (#456).
+ * El plan actual de Pagos (#455, RF-5 del PRD de E12), como tira de una fila
+ * en escritorio y tarjeta compacta en el móvil (#628, RF-2 del PRD de E23):
+ * el plan con su chip de estado; debajo el precio, el próximo cobro, la
+ * tarjeta o la exención, y el saldo de sesiones (#472); a la derecha Cambiar
+ * plan y la tarjeta. A quien aún no puso tarjeta le ofrece elegir plan (#479)
+ * y el alta en Checkout (#454) dentro de la misma tira, y a un Casual, sus
+ * packs (#471).
  */
 
 /** El chip lleva siempre la palabra: el color sólo la acompaña. */
@@ -98,56 +104,22 @@ function isRecurringPlan(plan: MembershipPlan | null): boolean {
   return plan === "Full" || plan === "Student";
 }
 
-/** El plan guardado con su precio. Quien aún elige lo ve en las opciones. */
-function CurrentPlan({
+/** El nombre del plan guardado. Quien aún elige lo ve en las opciones. */
+function PlanName({
   translate,
-  membership,
+  plan,
 }: {
   readonly translate: Translator;
-  readonly membership: MembershipPanelView;
+  readonly plan: MembershipPlan | null;
 }): React.JSX.Element | null {
-  const { plan, monthlyPriceCents } = membership;
   if (plan === null) {
     return null;
   }
   return (
-    <>
-      <p className="payments-plan-name">
-        {translate("payments.plan.name", { plan })}
-      </p>
-      {isRecurringPlan(plan) ? (
-        <p className="payments-price">
-          {describeMonthlyPrice(translate, monthlyPriceCents)}
-        </p>
-      ) : null}
-    </>
+    <p className="payments-plan-name">
+      {translate("payments.plan.name", { plan })}
+    </p>
   );
-}
-
-/** Quien aún no ha pagado elige plan entre las opciones (#479), que ya
- * dicen el precio; los demás ven el plan que tienen. Mientras se espera a
- * Stripe no se elige nada. */
-function PlanSummary({
-  translate,
-  membership,
-  waiting,
-  onViewReplaced,
-}: {
-  readonly translate: Translator;
-  readonly membership: MembershipPanelView;
-  readonly waiting: Waiting;
-  readonly onViewReplaced: (view: MembershipView) => void;
-}): React.JSX.Element | null {
-  if (membership.canChoosePlan && !isWaitingForSubscription(waiting)) {
-    return (
-      <PlanChoice
-        translate={translate}
-        membership={membership}
-        onSaved={onViewReplaced}
-      />
-    );
-  }
-  return <CurrentPlan translate={translate} membership={membership} />;
 }
 
 /** El precio lo lee de Stripe el endpoint (#486). Nulo en un plan con cuota
@@ -163,48 +135,108 @@ function describeMonthlyPrice(
       });
 }
 
-/** El próximo cobro o, para Casual, que no lo hay (FR-065); la tarjeta; y
- * la exención con su motivo, su fin y, si tenía suscripción, cuándo termina
- * ésta (#457). */
+type Glyph = React.ComponentProps<typeof Icon>["glyph"];
+
+/** En el móvil el precio lleva el icono del dinero y el próximo cobro va a
+ * su lado sin el suyo, como en el mockup; en escritorio, al revés. */
+function PhoneOnlyIcon({
+  glyph,
+}: {
+  readonly glyph: Glyph;
+}): React.JSX.Element {
+  return (
+    <span className="payments-plan-icon-phone">
+      <Icon glyph={glyph} />
+    </span>
+  );
+}
+
+function WideOnlyIcon({ glyph }: { readonly glyph: Glyph }): React.JSX.Element {
+  return (
+    <span className="payments-plan-icon-wide">
+      <Icon glyph={glyph} />
+    </span>
+  );
+}
+
+/** Un dato de la segunda línea de la tira, con su icono si lo lleva. */
+function PlanDetail({
+  className,
+  icon,
+  children,
+}: {
+  readonly className?: string;
+  readonly icon?: React.ReactNode;
+  readonly children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <li className={className}>
+      {icon}
+      <span>{children}</span>
+    </li>
+  );
+}
+
+/** El precio de quien tiene cuota, salvo mientras elige plan; el próximo
+ * cobro o, para Casual, que no lo hay (FR-065); la tarjeta; y la exención
+ * con su motivo, su fin y, si tenía suscripción, cuándo termina ésta
+ * (#457). */
 function PlanDetails({
   translate,
   membership,
+  showsPrice,
 }: {
   readonly translate: Translator;
   readonly membership: MembershipPanelView;
+  readonly showsPrice: boolean;
 }): React.JSX.Element {
   const { plan, nextChargeAt, card, waiver, subscriptionEndsAt } = membership;
   return (
     <ul className="payments-plan-details">
+      {showsPrice ? (
+        <PlanDetail
+          className="payments-plan-detail-price"
+          icon={<PhoneOnlyIcon glyph={CurrencyDollar} />}
+        >
+          {describeMonthlyPrice(translate, membership.monthlyPriceCents)}
+        </PlanDetail>
+      ) : null}
       {plan === "Casual" ? (
-        <li>{translate("payments.plan.noRecurringCharge")}</li>
+        <PlanDetail>{translate("payments.plan.noRecurringCharge")}</PlanDetail>
       ) : null}
       {nextChargeAt === null ? null : (
-        <li>
+        <PlanDetail
+          className="payments-plan-detail-next-charge"
+          icon={<WideOnlyIcon glyph={CalendarBlank} />}
+        >
           {translate("payments.plan.nextCharge", {
             date: formatClubDay(translate, nextChargeAt),
           })}
-        </li>
+        </PlanDetail>
       )}
-      {card === null ? null : <li>{describeCard(translate, card)}</li>}
+      {card === null ? null : (
+        <PlanDetail icon={<Icon glyph={CreditCard} />}>
+          {describeCard(translate, card)}
+        </PlanDetail>
+      )}
       {waiver === null ? null : (
-        <li>
+        <PlanDetail>
           {translate("payments.waiver.reason", { reason: waiver.reason })}
-        </li>
+        </PlanDetail>
       )}
       {waiver === null || waiver.until === null ? null : (
-        <li>
+        <PlanDetail>
           {translate("payments.waiver.until", {
             date: formatClubDay(translate, waiver.until),
           })}
-        </li>
+        </PlanDetail>
       )}
       {subscriptionEndsAt === null ? null : (
-        <li>
+        <PlanDetail>
           {translate("payments.waiver.subscriptionEnds", {
             date: formatClubDay(translate, subscriptionEndsAt),
           })}
-        </li>
+        </PlanDetail>
       )}
     </ul>
   );
@@ -242,37 +274,34 @@ function SubscriptionWaitStatus({
 function PlanActions({
   translate,
   membership,
-  waiting,
 }: {
   readonly translate: Translator;
   readonly membership: MembershipPanelView;
-  readonly waiting: Waiting;
 }): React.JSX.Element | null {
   const { status, card, plan } = membership;
-  if (isWaitingForSubscription(waiting)) {
-    return <SubscriptionWaitStatus translate={translate} waiting={waiting} />;
-  }
   const canUpdateCard =
     status === "past_due" ||
     (card !== null && (status === "active" || status === "trialing"));
   if (canUpdateCard) {
     return (
-      <div className="payments-plan-actions">
+      <div className="payments-plan-button-slot">
         <StripeSessionButton
           translate={translate}
           label={translate("payments.card.update")}
           requestSession={requestCardUpdate}
+          appearance="secondary"
         />
       </div>
     );
   }
   if (status === "cancelled" && isRecurringPlan(plan)) {
     return (
-      <div className="payments-plan-actions">
+      <div className="payments-plan-button-slot">
         <StripeSessionButton
           translate={translate}
           label={translate("payments.card.resubscribe")}
           requestSession={requestCheckout}
+          appearance="secondary"
         />
       </div>
     );
@@ -286,25 +315,20 @@ function PendingOffer({
   translate,
   view,
   membership,
-  waiting,
   checkoutReturn,
 }: {
   readonly translate: Translator;
   readonly view: MembershipView;
   readonly membership: MembershipPanelView;
-  readonly waiting: Waiting;
   readonly checkoutReturn: CheckoutReturn | null;
 }): React.JSX.Element | null {
-  if (isWaitingForSubscription(waiting)) {
-    return <SubscriptionWaitStatus translate={translate} waiting={waiting} />;
-  }
   if (membership.plan === null) {
     return null;
   }
   if (!view.paymentsConfigured) {
     return <p>{translate("payments.offer.notConfigured")}</p>;
   }
-  // Un Casual se pone al día con un pack: Pagos le ofrece los suyos aparte.
+  // Un Casual se pone al día con un pack: la tira le ofrece los suyos.
   if (!isRecurringPlan(membership.plan)) {
     return null;
   }
@@ -334,12 +358,146 @@ function PendingOffer({
   );
 }
 
+type StripPlan = {
+  readonly translate: Translator;
+  readonly view: MembershipView;
+  readonly membership: MembershipPanelView;
+  readonly waiting: Waiting;
+};
+
+type PlanPickerToggle = {
+  readonly id: string;
+  readonly isOpen: boolean;
+  readonly toggle: () => void;
+};
+
+/** Quien aún no ha pagado elige plan entre las opciones (#479), que ya
+ * dicen el precio. Mientras se espera a Stripe no se elige nada. */
+function isChoosingPlan({ membership, waiting }: StripPlan): boolean {
+  return membership.canChoosePlan && !isWaitingForSubscription(waiting);
+}
+
+/** Quien elige plan no lo cambia además por el camino del #456. */
+function offersPlanChange({ membership, waiting }: StripPlan): boolean {
+  return !membership.canChoosePlan && !isWaitingForSubscription(waiting);
+}
+
+function canOpenPlanPicker(strip: StripPlan): boolean {
+  const { membership } = strip;
+  return (
+    offersPlanChange(strip) &&
+    membership.canChangePlan &&
+    membership.scheduledChange === null
+  );
+}
+
+function usePlanPickerToggle(): PlanPickerToggle {
+  const id = useId();
+  const [isOpen, setIsOpen] = useState(false);
+  return { id, isOpen, toggle: () => setIsOpen((open) => !open) };
+}
+
+/** La parte izquierda: el plan y su chip, y debajo sus datos. */
+function PlanOverview({
+  strip,
+}: {
+  readonly strip: StripPlan;
+}): React.JSX.Element {
+  const { translate, view, membership } = strip;
+  const isChoosing = isChoosingPlan(strip);
+  return (
+    <div className="payments-plan-overview">
+      <div className="payments-plan-heading">
+        {isChoosing ? null : (
+          <PlanName translate={translate} plan={membership.plan} />
+        )}
+        <StatusChip translate={translate} membership={membership} />
+      </div>
+      <PlanDetails
+        translate={translate}
+        membership={membership}
+        showsPrice={!isChoosing && isRecurringPlan(membership.plan)}
+      />
+      <SessionBalanceSummary
+        translate={translate}
+        plan={membership.plan}
+        sessionBalance={view.sessionBalance}
+      />
+    </div>
+  );
+}
+
+/** La parte derecha: Cambiar plan, que abre el selector bajo la tira, y
+ * Actualizar tarjeta o Volver a suscribirse. */
+function PlanButtons({
+  strip,
+  picker,
+}: {
+  readonly strip: StripPlan;
+  readonly picker: PlanPickerToggle;
+}): React.JSX.Element {
+  const { translate, view, membership, waiting } = strip;
+  const offersCardActions =
+    membership.status !== "pending" &&
+    view.paymentsConfigured &&
+    !isWaitingForSubscription(waiting);
+  return (
+    <div className="payments-plan-buttons">
+      {canOpenPlanPicker(strip) ? (
+        <div className="payments-plan-button-slot">
+          <button
+            type="button"
+            className="payments-plan-button"
+            aria-expanded={picker.isOpen}
+            aria-controls={picker.isOpen ? picker.id : undefined}
+            onClick={picker.toggle}
+          >
+            {translate("payments.planChange.open")}
+          </button>
+        </div>
+      ) : null}
+      {offersCardActions ? (
+        <PlanActions translate={translate} membership={membership} />
+      ) : null}
+    </div>
+  );
+}
+
+/** El selector del #456 cuando se abre, o el cambio ya programado con su
+ * anulación, que se ve siempre. */
+function PlanChangeArea({
+  strip,
+  picker,
+  onPlanChanged,
+}: {
+  readonly strip: StripPlan;
+  readonly picker: PlanPickerToggle;
+  readonly onPlanChanged: () => void;
+}): React.JSX.Element | null {
+  const { membership } = strip;
+  const isShown =
+    offersPlanChange(strip) &&
+    (membership.scheduledChange !== null || picker.isOpen);
+  if (!isShown) {
+    return null;
+  }
+  return (
+    <div id={picker.id}>
+      <PlanChange
+        translate={strip.translate}
+        membership={membership}
+        onChanged={onPlanChanged}
+      />
+    </div>
+  );
+}
+
 export function PlanCard({
   translate,
   view,
   membership,
   waiting,
-  checkoutReturn,
+  returns,
   onViewReplaced,
   onPlanChanged,
 }: {
@@ -347,58 +505,55 @@ export function PlanCard({
   readonly view: MembershipView;
   readonly membership: MembershipPanelView;
   readonly waiting: Waiting;
-  readonly checkoutReturn: CheckoutReturn | null;
+  readonly returns: StripeReturns;
   /** Pagos pinta la membresía que responde la elección de plan. */
   readonly onViewReplaced: (view: MembershipView) => void;
   /** Pagos vuelve a leer la membresía cuando el cambio de plan sale bien. */
   readonly onPlanChanged: () => void;
 }): React.JSX.Element {
   const titleId = useId();
-  const { status } = membership;
+  const picker = usePlanPickerToggle();
+  const strip: StripPlan = { translate, view, membership, waiting };
+  const isWaiting = isWaitingForSubscription(waiting);
   return (
-    <section className="card payments-plan-card" aria-labelledby={titleId}>
-      <div className="payments-plan-header">
-        <h2 id={titleId} className="payments-eyebrow">
-          {translate("payments.plan.title")}
-        </h2>
-        <StatusChip translate={translate} membership={membership} />
+    <section className="payments-plan-strip" aria-labelledby={titleId}>
+      <h2 id={titleId} className="visually-hidden">
+        {translate("payments.plan.title")}
+      </h2>
+      <div className="payments-plan-row">
+        <PlanOverview strip={strip} />
+        <PlanButtons strip={strip} picker={picker} />
       </div>
-      <PlanSummary
-        translate={translate}
-        membership={membership}
-        waiting={waiting}
-        onViewReplaced={onViewReplaced}
-      />
-      <PlanDetails translate={translate} membership={membership} />
-      <SessionBalanceSummary
-        translate={translate}
-        plan={membership.plan}
-        sessionBalance={view.sessionBalance}
-      />
-      {status === "pending" ? (
+      {isWaiting ? (
+        <SubscriptionWaitStatus translate={translate} waiting={waiting} />
+      ) : null}
+      {isChoosingPlan(strip) ? (
+        <PlanChoice
+          translate={translate}
+          membership={membership}
+          onSaved={onViewReplaced}
+        />
+      ) : null}
+      {membership.status === "pending" && !isWaiting ? (
         <PendingOffer
           translate={translate}
           view={view}
           membership={membership}
-          waiting={waiting}
-          checkoutReturn={checkoutReturn}
+          checkoutReturn={returns.checkoutReturn}
         />
       ) : null}
-      {status !== "pending" && view.paymentsConfigured ? (
-        <PlanActions
+      <PlanChangeArea
+        strip={strip}
+        picker={picker}
+        onPlanChanged={onPlanChanged}
+      />
+      {membership.plan === "Casual" && view.paymentsConfigured ? (
+        <SessionPackOffer
           translate={translate}
-          membership={membership}
           waiting={waiting}
+          packReturn={returns.packReturn}
         />
       ) : null}
-      {/* Quien elige plan no lo cambia además por el camino del #456. */}
-      {membership.canChoosePlan || isWaitingForSubscription(waiting) ? null : (
-        <PlanChange
-          translate={translate}
-          membership={membership}
-          onChanged={onPlanChanged}
-        />
-      )}
     </section>
   );
 }

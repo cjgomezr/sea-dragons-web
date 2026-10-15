@@ -9081,13 +9081,122 @@ a.auth-brand-header:focus-visible {
   margin: 0;
 }
 
-.payments-plan-header {
+/* La tira del plan (#628, RF-2 del PRD de E23): una fila que se parte, con
+   el plan y sus datos a la izquierda y los botones a la derecha. Lo que se
+   abre o se ofrece (el selector, la elección, el alta, los packs) va debajo,
+   dentro de la misma tira. En el móvil es la tarjeta #2a del handoff. */
+.payments-plan-strip {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-4) 18px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.payments-plan-strip p {
+  margin: 0;
+}
+
+.payments-plan-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.payments-plan-overview {
+  display: grid;
+  flex: 1 1 18rem;
   gap: var(--space-2);
-  justify-self: stretch;
+  min-width: 0;
+}
+
+.payments-plan-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) 10px;
+}
+
+.payments-plan-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.payments-plan-buttons:empty {
+  display: none;
+}
+
+.payments-plan-button-slot {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: stretch;
+}
+
+/* Los botones de la tira no compiten con la acción principal de la
+   pantalla: fondo de la página, borde y texto en su color. Miden 42px a la
+   vista y su zona de toque llega a 44px (D11). */
+.payments-plan-button {
+  position: relative;
+  min-height: 42px;
+  padding: 0 var(--space-4);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.payments-plan-button::after {
+  content: "";
+  position: absolute;
+  inset: -2px 0;
+}
+
+.payments-plan-button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.payments-plan-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.payments-plan-button[aria-expanded="true"] {
+  border-color: var(--color-accent);
+}
+
+/* Los packs de un Casual, en la tira bajo una línea, como el cambio de
+   plan. */
+.payments-plan-packs {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  min-width: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.payments-plan-packs .payments-eyebrow {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.payments-plan-packs .app-lead {
+  font-size: 13.5px;
 }
 
 .card .payments-eyebrow {
@@ -9136,28 +9245,45 @@ a.auth-brand-header:focus-visible {
   background: color-mix(in srgb, var(--color-danger) 16%, var(--color-panel));
 }
 
-.payments-plan-card .payments-plan-name {
-  font-size: 18px;
+.payments-plan-strip .payments-plan-name {
+  font-size: 17px;
   font-weight: 700;
   color: var(--color-text);
 }
 
-.payments-plan-card .payments-price {
-  margin-top: var(--space-2);
-  font-family: var(--font-family-mono);
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--color-text);
-}
-
+/* La segunda línea: precio, próximo cobro y tarjeta, o la exención, con
+   18px entre dato y dato. */
 .payments-plan-details {
-  display: grid;
-  gap: var(--space-1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) 18px;
   margin: 0;
   padding: 0;
-  font-size: 14px;
-  color: var(--color-text-secondary);
+  font-size: 13.5px;
+  color: var(--color-text-soft);
   list-style: none;
+}
+
+.payments-plan-details li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.payments-plan-details svg {
+  flex: none;
+  font-size: 15px;
+  color: var(--color-text-secondary);
+}
+
+.payments-plan-icon-phone {
+  display: none;
+}
+
+.payments-plan-icon-wide {
+  display: inline-flex;
 }
 
 .payments-plan-details:empty {
@@ -9178,7 +9304,7 @@ a.auth-brand-header:focus-visible {
   border-radius: var(--radius);
 }
 
-.payments-plan-card .payments-session-count {
+.payments-plan-strip .payments-session-count {
   font-size: 16px;
   font-weight: 700;
   color: var(--color-text);
@@ -9186,6 +9312,77 @@ a.auth-brand-header:focus-visible {
 
 .payments-session-balance-empty {
   border-left: 4px solid var(--color-warning);
+}
+
+/* En la tira el saldo es un dato más, sin caja propia; el saldo cero
+   conserva su borde de aviso. */
+.payments-plan-strip .payments-session-balance {
+  padding: 0;
+  font-size: 13.5px;
+  border: 0;
+  border-radius: 0;
+}
+
+.payments-plan-strip .payments-session-balance-empty {
+  padding-left: var(--space-3);
+  border-left: 4px solid var(--color-warning);
+}
+
+/* El móvil (#2a): tarjeta de radio 12 con el chip a la derecha del nombre;
+   el precio y el próximo cobro comparten línea tras el icono del dinero, la
+   tarjeta va en la suya, y los botones se reparten el ancho. Lo que el
+   móvil no dibuja (exención, Casual, pendiente) se apila igual (D9). */
+@media (max-width: 767px) {
+  .payments-plan-strip {
+    border-radius: 12px;
+  }
+
+  .payments-plan-heading {
+    justify-content: space-between;
+  }
+
+  .payments-plan-overview {
+    flex-basis: 100%;
+  }
+
+  .payments-plan-details {
+    gap: var(--space-2) 6px;
+  }
+
+  .payments-plan-details li {
+    flex-basis: 100%;
+  }
+
+  .payments-plan-details .payments-plan-detail-price,
+  .payments-plan-detail-price + .payments-plan-detail-next-charge {
+    flex-basis: auto;
+  }
+
+  .payments-plan-detail-price + .payments-plan-detail-next-charge::before {
+    content: "·" / "";
+  }
+
+  .payments-plan-icon-phone {
+    display: inline-flex;
+  }
+
+  .payments-plan-icon-wide {
+    display: none;
+  }
+
+  .payments-plan-buttons {
+    flex-basis: 100%;
+    flex-wrap: nowrap;
+  }
+
+  .payments-plan-button-slot {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .payments-plan-button {
+    white-space: normal;
+  }
 }
 
 .payments-plan-actions {

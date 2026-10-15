@@ -15629,6 +15629,24 @@ function paymentsTabsStates(
   );
 }
 
+// La tira del plan (#628): un pendiente con su plan ya guardado, que ve el
+// alta en Checkout dentro de la tira sin depender del socio sembrado.
+const PENDING_PLAN_MEMBERSHIP_VIEW = membershipView(
+  { status: "pending", card: null },
+  [],
+);
+
+/** Los estados de la tira del plan (#628), con su axe también en oscuro. */
+function planStripStates(
+  name: string,
+  view: object,
+): readonly PaymentsScreenState[] {
+  return paymentsStates(name, view).map((state) => ({
+    ...state,
+    checksDarkAxe: true,
+  }));
+}
+
 const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   { name: "pagos-pendiente", storageState: UNPAID_MEMBER_STORAGE_STATE_PATH },
   {
@@ -15660,6 +15678,10 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   ...paymentsStates("pagos-levy-pagado", ACTIVE_MEMBERSHIP_VIEW, ONE_PAID_LEVY),
   ...levyPayersStates("pagos-levy-pagadores", NATIONALS_PAYERS),
   ...levyPayersStates("pagos-levy-sin-pagos", NATIONALS_WITHOUT_PAYERS),
+  ...planStripStates("pagos-plan-activo", PLAN_CHANGE_MEMBERSHIP_VIEW),
+  ...planStripStates("pagos-plan-casual", CASUAL_BALANCE_MEMBERSHIP_VIEW),
+  ...planStripStates("pagos-plan-exencion", WAIVED_MEMBERSHIP_VIEW),
+  ...planStripStates("pagos-plan-pendiente", PENDING_PLAN_MEMBERSHIP_VIEW),
   ...paymentsTabsStates("pagos-pestanas-socio"),
   ...paymentsTabsStates("pagos-pestanas-admin", "membership"),
   ...paymentsTabsStates("pagos-pestanas-admin-extras", "extras"),
