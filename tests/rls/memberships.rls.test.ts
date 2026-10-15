@@ -11,6 +11,7 @@ import {
   withSeededRows,
   withTestUser,
 } from "../support/rls";
+import { createPaymentReceiptGateway } from "@/lib/membership/supabase-membership-gateways";
 
 /**
  * La membresía y los pagos contra `seadragons-dev` (#451, RF-1 y RF-7 del PRD
@@ -83,6 +84,23 @@ function paymentFor(
   };
 }
 
+async function paymentIdOf(
+  serviceClient: ServiceRoleClient,
+  user: TestUser,
+): Promise<string> {
+  const { data, error } = await serviceClient.client
+    .from("payments")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+  if (error || !data) {
+    throw new Error(
+      `No se pudo leer el pago sembrado: ${error?.message ?? "sin datos"}`,
+    );
+  }
+  return data.id as string;
+}
+
 function authenticatedClientFor(user: TestUser): Promise<RlsClient> {
   return createRlsClient(
     { role: "authenticated", email: user.email, password: user.password },
@@ -153,6 +171,29 @@ describeRls("RLS de la membresía y los pagos", () => {
 
         expect(error).toBeNull();
         expect(data).toEqual([{ description: "Cuota propia" }]);
+      }),
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "el recibo de un pago se lee con la sesión: el propio existe y el ajeno no (#630)",
+    () =>
+      withTwoPayingMembers(async ({ serviceClient, socia, otro }) => {
+        const { client } = await authenticatedClientFor(socia);
+        const receipts = createPaymentReceiptGateway(client);
+
+        const own = await receipts.findById(
+          await paymentIdOf(serviceClient, socia),
+        );
+        const foreign = await receipts.findById(
+          await paymentIdOf(serviceClient, otro),
+        );
+
+        expect(own).toMatchObject({
+          status: "paid",
+          source: { kind: "invoice" },
+        });
+        expect(foreign).toBeNull();
       }),
     RLS_NETWORK_TEST_TIMEOUT_MS,
   );
