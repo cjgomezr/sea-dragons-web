@@ -10381,7 +10381,7 @@ a.auth-brand-header:focus-visible {
    y el detalle del elegido en una columna de 360px. Sin la columna ni la
    ficha de Revenue (D3). Cuando el contenido no deja sitio a las dos
    columnas (la tableta junto al menú), el detalle va debajo de la lista; el
-   móvil propio es #636. */
+   móvil (#636) tiene filas y una hoja propias, más abajo. */
 .payments-club-extras {
   container: payments-club-extras / inline-size;
   max-width: 1040px;
@@ -10672,6 +10672,107 @@ a.auth-brand-header:focus-visible {
   justify-content: center;
   width: 100%;
   font-size: 14px;
+}
+
+/* La pestaña Extras del club en el móvil (#636, "#2b" y "#2c" del handoff
+   de pagos): filas de 64px como mínimo, con el nombre y el precio a la
+   izquierda, lo vendido a la derecha y un caret. Toda la fila es el botón
+   que sube la hoja del detalle. */
+.payments-phone-sales {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.payments-phone-sale {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 16px;
+  gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 0;
+  font: inherit;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+}
+
+.payments-phone-sale:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: -2px;
+}
+
+.payments-phone-sale-extra {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.payments-phone-sale-name {
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.payments-phone-sale-price {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.payments-phone-sale-sold {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.payments-phone-sale-caret {
+  display: flex;
+  color: var(--color-text-secondary);
+}
+
+/* La hoja del detalle: el nombre a 18px, compradores de 44px con un avatar
+   de 32px y en una lista con scroll, y Exportar CSV de 46px. */
+.payments-sale-sheet {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.directory-sheet .payments-sale-detail-header p {
+  margin: 0;
+}
+
+.directory-sheet .payments-sale-detail-name {
+  font-size: 18px;
+}
+
+.payments-sale-sheet p {
+  margin: 0;
+}
+
+.payments-sale-sheet .payments-buyers {
+  max-height: min(360px, 32vh);
+}
+
+.payments-sale-sheet .payments-buyer {
+  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+  min-height: 44px;
+  padding: 0;
+}
+
+.payments-sale-sheet .payments-buyer-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 11px;
+}
+
+.payments-sale-sheet .payments-sale-export {
+  min-height: 46px;
 }
 
 .payments-offer {

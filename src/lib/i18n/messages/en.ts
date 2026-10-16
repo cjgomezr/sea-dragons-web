@@ -1272,6 +1272,11 @@ export const englishMessages = {
   "payments.levySales.column.extra": "Extra",
   "payments.levySales.column.price": "Price",
   "payments.levySales.column.sold": "Sold",
+  "payments.levySales.soldCount": {
+    one: "{count} sold",
+    other: "{count} sold",
+  },
+  "payments.levySales.sheetClose": "Close the details",
   "payments.levySales.closedTitle": "Closed",
   "payments.levySales.loading": "Loading the club extras…",
   "payments.levySales.loadFailed":

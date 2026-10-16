@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
+import { useIsPhone } from "@/components/use-is-phone";
 import { formatAudCents } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import type { LevySale } from "@/lib/membership/levy-sales";
 import { ExtraDetail, useBuyersCache } from "./ExtraDetail";
+import { PhoneSalesWorkspace } from "./PhoneSales";
 import { type LevySalesLoad, loadLevySales } from "./payments-client";
 
 /**
@@ -13,6 +15,8 @@ import { type LevySalesLoad, loadLevySales } from "./payments-client";
  * de los extras a la venta con lo vendido de cada uno, y debajo los cerrados
  * que vendieron algo (D5); a la derecha, el detalle del elegido. El primero
  * empieza elegido. No enseña lo recaudado (D3): para el dinero está Stripe.
+ *
+ * En el móvil, la lista y una hoja con el detalle (#636, `PhoneSales`).
  *
  * Lo vendido de todos llega en una sola llamada (D7), y se pide la primera
  * vez que se abre la pestaña, no al cargar Pagos.
@@ -172,7 +176,7 @@ function SalesList({
 /** La lista y el detalle. Sin elegir nada todavía, el elegido es el primero:
  * el primero a la venta o, si no hay, el primer cerrado (el endpoint los da
  * en ese orden). */
-function SalesWorkspace({
+function DesktopSalesWorkspace({
   translate,
   sales,
 }: {
@@ -195,6 +199,21 @@ function SalesWorkspace({
       />
       <ExtraDetail translate={translate} sale={selected} buyers={buyers} />
     </div>
+  );
+}
+
+function SalesWorkspace({
+  translate,
+  sales,
+}: {
+  readonly translate: Translator;
+  readonly sales: readonly [LevySale, ...LevySale[]];
+}): React.JSX.Element {
+  const isPhone = useIsPhone();
+  return isPhone ? (
+    <PhoneSalesWorkspace translate={translate} sales={sales} />
+  ) : (
+    <DesktopSalesWorkspace translate={translate} sales={sales} />
   );
 }
 

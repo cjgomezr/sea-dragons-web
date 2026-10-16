@@ -26,7 +26,8 @@ import { type LevyBuyersLoad, loadLevyBuyers } from "./payments-client";
 
 const CSV_TYPE = "text/csv;charset=utf-8";
 
-/** En píxeles: el CSS de `.payments-buyer-avatar` dice lo mismo. */
+/** En píxeles: el CSS de `.payments-buyer-avatar` dice lo mismo. En la hoja
+ * del móvil el CSS lo sube a 32: son iniciales, no una foto que escalar. */
 const BUYER_AVATAR_SIZE = 28;
 
 type BuyersState = { readonly kind: "loading" } | LevyBuyersLoad;
@@ -39,15 +40,19 @@ export type BuyersCache = {
 };
 
 /** Los compradores de cada extra ya elegido, pedidos una sola vez. Vive en
- * la pestaña y no en el panel para que cambiar de extra no lo vacíe. */
-export function useBuyersCache(selectedProductId: string): BuyersCache {
+ * la pestaña y no en el panel para que cambiar de extra no lo vacíe. En el
+ * móvil no hay ninguno elegido hasta que se toca una fila (`null`). */
+export function useBuyersCache(selectedProductId: string | null): BuyersCache {
   const [loads, setLoads] = useState<ReadonlyMap<string, LevyBuyersLoad>>(
     () => new Map(),
   );
   const [attempt, setAttempt] = useState(0);
   const requested = useRef(new Set<string>());
   useEffect(() => {
-    if (requested.current.has(selectedProductId)) {
+    if (
+      selectedProductId === null ||
+      requested.current.has(selectedProductId)
+    ) {
       return;
     }
     requested.current.add(selectedProductId);
@@ -181,7 +186,34 @@ function BuyersBody({
   );
 }
 
-export function ExtraDetail({
+/** El nombre, la descripción y el precio. En la hoja del móvil (#636) son
+ * su encabezado, desde donde se arrastra. */
+export function ExtraDetailHeader({
+  translate,
+  sale,
+  nameId,
+}: {
+  readonly translate: Translator;
+  readonly sale: LevySale;
+  readonly nameId: string;
+}): React.JSX.Element {
+  return (
+    <div className="payments-sale-detail-header">
+      <h2 id={nameId} className="payments-sale-detail-name">
+        {sale.name}
+      </h2>
+      {sale.description === null ? null : (
+        <p className="payments-sale-detail-description">{sale.description}</p>
+      )}
+      <p className="payments-sale-detail-price">
+        {formatAudCents(translate.locale, sale.amountCents)}
+      </p>
+    </div>
+  );
+}
+
+/** Lo vendido, los compradores y el CSV. */
+export function ExtraDetailBody({
   translate,
   sale,
   buyers,
@@ -190,23 +222,11 @@ export function ExtraDetail({
   readonly sale: LevySale;
   readonly buyers: BuyersCache;
 }): React.JSX.Element {
-  const nameId = useId();
   const buyersTitleId = useId();
   const state = buyers.stateOf(sale.productId);
   const loadedBuyers = state.kind === "loaded" ? state.buyers : [];
   return (
-    <section className="payments-sale-detail" aria-labelledby={nameId}>
-      <div className="payments-sale-detail-header">
-        <h2 id={nameId} className="payments-sale-detail-name">
-          {sale.name}
-        </h2>
-        {sale.description === null ? null : (
-          <p className="payments-sale-detail-description">{sale.description}</p>
-        )}
-        <p className="payments-sale-detail-price">
-          {formatAudCents(translate.locale, sale.amountCents)}
-        </p>
-      </div>
+    <>
       <SaleTiles translate={translate} sale={sale} />
       <div className="payments-buyers-group">
         <h3 id={buyersTitleId} className="payments-buyers-title">
@@ -228,6 +248,24 @@ export function ExtraDetail({
         <Icon glyph={DownloadSimple} />
         <span>{translate("payments.levyPayers.export")}</span>
       </button>
+    </>
+  );
+}
+
+export function ExtraDetail({
+  translate,
+  sale,
+  buyers,
+}: {
+  readonly translate: Translator;
+  readonly sale: LevySale;
+  readonly buyers: BuyersCache;
+}): React.JSX.Element {
+  const nameId = useId();
+  return (
+    <section className="payments-sale-detail" aria-labelledby={nameId}>
+      <ExtraDetailHeader translate={translate} sale={sale} nameId={nameId} />
+      <ExtraDetailBody translate={translate} sale={sale} buyers={buyers} />
     </section>
   );
 }
