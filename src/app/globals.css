@@ -8988,6 +8988,61 @@ a.auth-brand-header:focus-visible {
   border-radius: 10px;
 }
 
+/* El mapa de #658: una franja de alto fijo desde el principio, para que el
+   panel no salte al llegar. Por capas: el fondo con el pin, el iframe, la
+   capa que recoge el toque y la atribución. */
+.agenda-place-map {
+  position: relative;
+  height: 110px;
+  overflow: hidden;
+  background: var(--color-editor-bar);
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 9px 9px 0 0;
+}
+
+.agenda-place-map-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent-text);
+}
+
+/* Más alto que la franja y centrado en ella: el recorte esconde los botones
+   de zoom de arriba y la barra de créditos de abajo, que a este ancho ocupa
+   dos líneas. Los créditos los pone la tarjeta, más pequeños. */
+.agenda-place-map-frame {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 260px;
+  border: 0;
+  transform: translateY(-50%);
+}
+
+.agenda-place-map-cover {
+  position: absolute;
+  inset: 0;
+}
+
+.agenda-place-map-attribution {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 1px var(--space-2);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  background: var(--color-panel);
+  border-top-left-radius: 6px;
+}
+
+.agenda-place-map-attribution:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: -2px;
+}
+
 .agenda-place-card-body {
   display: flex;
   align-items: center;

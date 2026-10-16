@@ -671,6 +671,122 @@ describe("tarjeta del lugar", () => {
   });
 });
 
+/** La capa encima del mapa: el único enlace del panel sin nombre, porque
+ * está escondida de los lectores de pantalla. */
+function mapCover(panel: HTMLElement): HTMLElement {
+  return within(panel).getByRole("link", { name: "", hidden: true });
+}
+
+describe("mapa del lugar", () => {
+  const TRIVIA_MAP_URL =
+    "https://www.openstreetmap.org/export/embed.html" +
+    "?bbox=144.9676%2C-37.8694%2C144.9806%2C-37.8658" +
+    "&layer=mapnik&marker=-37.8676%2C144.9741";
+
+  it("con coordenadas pinta el mapa de OpenStreetMap con su título, perezoso", async () => {
+    stubApi([TRIVIA_NIGHT]);
+    renderAgenda();
+
+    const panel = await findPanel(TRIVIA_NIGHT.title);
+
+    const map = within(panel).getByTitle("Map of Seadragons Clubhouse");
+    expect(map.tagName).toBe("IFRAME");
+    expect(map).toHaveAttribute("src", TRIVIA_MAP_URL);
+    expect(map).toHaveAttribute("loading", "lazy");
+  });
+
+  it("el iframe no recibe el foco", async () => {
+    stubApi([TRIVIA_NIGHT]);
+    renderAgenda();
+
+    const panel = await findPanel(TRIVIA_NIGHT.title);
+
+    const map = within(panel).getByTitle("Map of Seadragons Clubhouse");
+    expect(map).toHaveAttribute("inert");
+  });
+
+  it("enseña la atribución de OpenStreetMap con su enlace", async () => {
+    stubApi([TRIVIA_NIGHT]);
+    renderAgenda();
+
+    const panel = await findPanel(TRIVIA_NIGHT.title);
+
+    expect(
+      within(panel).getByRole("link", { name: /© OpenStreetMap/ }),
+    ).toHaveAttribute("href", "https://www.openstreetmap.org/copyright");
+  });
+
+  it("una capa encima del mapa lo abre en Google Maps en otra pestaña", async () => {
+    stubApi([TRIVIA_NIGHT]);
+    renderAgenda();
+
+    const panel = await findPanel(TRIVIA_NIGHT.title);
+
+    const cover = mapCover(panel);
+    expect(cover).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/search/?api=1&query=-37.8676,144.9741",
+    );
+    expect(cover).toHaveAttribute("target", "_blank");
+    expect(cover).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("la capa no es otra parada del tabulador: Directions ya lleva allí", async () => {
+    stubApi([TRIVIA_NIGHT]);
+    renderAgenda();
+
+    const panel = await findPanel(TRIVIA_NIGHT.title);
+
+    const cover = mapCover(panel);
+    expect(cover).toHaveAttribute("tabindex", "-1");
+    expect(cover).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("escribe el título del mapa en español", async () => {
+    stubApi([TRIVIA_NIGHT]);
+    renderAgenda({ locale: "es" });
+
+    const panel = await findPanel(TRIVIA_NIGHT.title);
+
+    expect(
+      within(panel).getByTitle("Mapa de Seadragons Clubhouse"),
+    ).toBeInTheDocument();
+  });
+
+  it("sin lugar elegido no pinta mapa", async () => {
+    stubApi([OPEN_TRAINING]);
+    renderAgenda();
+
+    const panel = await findPanel(OPEN_TRAINING.title);
+
+    expect(panel.querySelector("iframe")).toBeNull();
+    expect(
+      within(panel).queryByRole("link", { name: /OpenStreetMap/ }),
+    ).toBeNull();
+  });
+
+  it("con un lugar sin coordenadas no pinta mapa", async () => {
+    const withoutCoordinates: AgendaEvent = {
+      ...TRIVIA_NIGHT,
+      place: {
+        name: "Seadragons Clubhouse",
+        address: "12 Beach Rd, St Kilda VIC 3182",
+        lat: null,
+        lng: null,
+      },
+    };
+    stubApi([withoutCoordinates]);
+    renderAgenda();
+
+    const panel = await findPanel(TRIVIA_NIGHT.title);
+
+    expect(panel.querySelector("iframe")).toBeNull();
+    expect(
+      within(panel).queryByRole("link", { name: /OpenStreetMap/ }),
+    ).toBeNull();
+  });
+});
+
 describe("copiar la dirección", () => {
   it("copia el nombre y la dirección y lo anuncia", async () => {
     const copied: string[] = [];
