@@ -1273,6 +1273,11 @@ export const spanishMessages: MessageCatalog = {
   "payments.levySales.column.extra": "Extra",
   "payments.levySales.column.price": "Precio",
   "payments.levySales.column.sold": "Vendidos",
+  "payments.levySales.soldCount": {
+    one: "{count} vendido",
+    other: "{count} vendidos",
+  },
+  "payments.levySales.sheetClose": "Cerrar el detalle",
   "payments.levySales.closedTitle": "Cerrados",
   "payments.levySales.loading": "Cargando los extras del club…",
   "payments.levySales.loadFailed":
