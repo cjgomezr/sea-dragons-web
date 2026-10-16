@@ -201,6 +201,7 @@ describe("GET /api/v1/levies", () => {
         levies: [
           {
             id: LEVY_PRICE,
+            productId: LEVY_PRODUCT,
             name: "Nationals 2026",
             description: "Entry for the national championship",
             amountCents: 8000,
@@ -314,7 +315,7 @@ describe("POST /api/v1/levies/{priceId}/checkout", () => {
         kind: "levy",
         levy_product_id: LEVY_PRODUCT,
       },
-      success_url: `${ORIGIN}/pagos?levy=ok`,
+      success_url: `${ORIGIN}/pagos?levy=ok&extra=${LEVY_PRODUCT}&antes=0`,
       cancel_url: `${ORIGIN}/pagos?levy=cancelado`,
     });
   });

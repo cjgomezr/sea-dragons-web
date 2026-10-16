@@ -3,7 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PaymentsScreen } from "@/components/payments/PaymentsScreen";
 import type { Locale } from "@/lib/i18n/locale";
-import type { CheckoutReturn } from "@/lib/membership/checkout-return";
+import type {
+  CheckoutReturn,
+  LevyReturn,
+} from "@/lib/membership/checkout-return";
 import type { MembershipView } from "@/lib/membership/membership-view";
 import { visit } from "../../support/location-search-params";
 
@@ -49,6 +52,7 @@ const ACTIVE_FULL: MembershipView = {
 function levy(id: string, name: string): object {
   return {
     id,
+    productId: id.replace("price_", "prod_"),
     name,
     description: null,
     amountCents: 8000,
@@ -93,6 +97,7 @@ type RenderOptions = {
   readonly canSeeLevyPayers: boolean;
   readonly locale?: Locale;
   readonly cardReturn?: CheckoutReturn | null;
+  readonly levyReturn?: LevyReturn | null;
 };
 
 async function renderLoaded(options: RenderOptions): Promise<void> {
@@ -102,6 +107,7 @@ async function renderLoaded(options: RenderOptions): Promise<void> {
       checkoutReturn={null}
       cardReturn={options.cardReturn ?? null}
       packReturn={null}
+      levyReturn={options.levyReturn ?? null}
       canSeeLevyPayers={options.canSeeLevyPayers}
     />,
   );
@@ -186,6 +192,7 @@ describe("PaymentsScreen: pestañas de un Admin o un Committee (#627)", () => {
         checkoutReturn={null}
         cardReturn={null}
         packReturn={null}
+        levyReturn={null}
         canSeeLevyPayers
       />,
     );
@@ -332,6 +339,36 @@ describe("PaymentsScreen: pestañas de un Admin o un Committee (#627)", () => {
     expect(
       within(screen.getByRole("tabpanel")).getByRole("status"),
     ).toHaveTextContent("without changing your card");
+  });
+
+  it("la espera de un extra pagado sale en Mi membresía y no en Extras del club (#692)", async () => {
+    stubFetch();
+    const search = "?levy=ok&extra=prod_nationals&antes=0";
+    visit(`/pagos${search}`);
+    await renderLoaded({
+      canSeeLevyPayers: true,
+      levyReturn: {
+        kind: "paid",
+        productId: "prod_nationals",
+        purchasedBefore: 0,
+      },
+    });
+    expect(
+      within(screen.getByRole("tabpanel")).getByRole("status"),
+    ).toHaveTextContent("We're waiting for Stripe");
+
+    await userEvent.click(extrasTab());
+
+    expect(window.location.search).toBe(`${search}&tab=extras`);
+    expect(
+      within(screen.getByRole("tabpanel")).queryByRole("status"),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(membershipTab());
+
+    expect(
+      within(screen.getByRole("tabpanel")).getByRole("status"),
+    ).toHaveTextContent("We're waiting for Stripe");
   });
 });
 

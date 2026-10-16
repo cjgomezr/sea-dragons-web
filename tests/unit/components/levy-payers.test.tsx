@@ -34,6 +34,7 @@ const NO_MEMBERSHIP: MembershipView = {
 
 const NATIONALS = {
   id: LEVY_PRICE,
+  productId: "prod_nationals",
   name: "Nationals 2026",
   description: null,
   amountCents: 8000,
@@ -121,6 +122,7 @@ function renderScreen(canSeeLevyPayers: boolean, locale: Locale = "en"): void {
       checkoutReturn={null}
       cardReturn={null}
       packReturn={null}
+      levyReturn={null}
       canSeeLevyPayers={canSeeLevyPayers}
     />,
   );

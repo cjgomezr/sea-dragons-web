@@ -173,6 +173,7 @@ describe("listLevies", () => {
       levies: [
         {
           id: NATIONALS_PRICE,
+          productId: NATIONALS_PRODUCT,
           name: "Nationals 2026",
           description: "Entry for the national championship",
           amountCents: NATIONALS_CENTS,
@@ -365,7 +366,7 @@ describe("startLevyCheckout", () => {
           levy_name: "Nationals 2026",
           levy_max_quantity: "1",
         },
-        success_url: `${ORIGIN}/pagos?levy=ok`,
+        success_url: `${ORIGIN}/pagos?levy=ok&extra=${NATIONALS_PRODUCT}&antes=0`,
         cancel_url: `${ORIGIN}/pagos?levy=cancelado`,
       },
       { idempotencyKey: expect.any(String) },
@@ -500,6 +501,25 @@ describe("startLevyCheckout", () => {
     );
 
     expect(outcome).toEqual({ kind: "created", url: CHECKOUT_URL });
+  });
+
+  it("vuelve a Pagos con el extra y las unidades que ya tenía al recomprar (#692)", async () => {
+    const sessions = sessionsDouble();
+
+    await payLevy(
+      gateways({
+        products: [jersey("10")],
+        purchasedQuantities: { [JERSEY_PRODUCT]: 3 },
+        sessions,
+      }),
+      JERSEY_PRICE,
+    );
+
+    const [params] = sessions.create.mock.calls[0] ?? [];
+    expect(params?.success_url).toBe(
+      `${ORIGIN}/pagos?levy=ok&extra=${JERSEY_PRODUCT}&antes=3`,
+    );
+    expect(params?.cancel_url).toBe(`${ORIGIN}/pagos?levy=cancelado`);
   });
 
   it("abre otra sesión si el socio vuelve a comprar el extra dentro de la misma ventana", async () => {
