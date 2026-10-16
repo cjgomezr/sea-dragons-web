@@ -1497,7 +1497,16 @@ export const spanishMessages: MessageCatalog = {
   "calendar.form.image.uploadFailed":
     "No pudimos subir la imagen. Inténtalo de nuevo.",
   "calendar.form.location": "Lugar",
-  "calendar.form.locationPlaceholder": "p. ej. MSAC, piscina de saltos",
+  "calendar.form.locationPlaceholder": "Busca un lugar o escríbelo",
+  "calendar.form.place.freeText":
+    "O deja lo que escribiste como texto libre (no abrirá un mapa).",
+  "calendar.form.place.searchUnavailable":
+    "La búsqueda de lugares no está disponible ahora. Elige uno de los lugares del club o deja lo que escribiste.",
+  "calendar.form.place.checkOnMap": "Ver en el mapa",
+  "calendar.form.place.change": "Cambiar el lugar",
+  "calendar.form.place.detail": "Dónde exactamente",
+  "calendar.form.place.optional": "opcional",
+  "calendar.form.place.detailPlaceholder": "p. ej. Campo 2, junto al pabellón",
   "calendar.form.notes": "Notas",
   "calendar.form.repeat": "Repetición",
   "calendar.form.repeat.none": "Una vez",
@@ -1514,6 +1523,12 @@ export const spanishMessages: MessageCatalog = {
     "Escribe un título de hasta {max} caracteres.",
   "calendar.form.issue.event_location_invalid":
     "Escribe un lugar de hasta {max} caracteres.",
+  "calendar.form.issue.event_place_invalid":
+    "Ese lugar no se puede guardar. Elige otro o deja el texto.",
+  "calendar.form.issue.event_place_coordinates_invalid":
+    "La posición de ese lugar no es válida. Elige otro o deja el texto.",
+  "calendar.form.issue.event_place_detail_invalid":
+    "Dónde exactamente puede tener hasta {max} caracteres.",
   "calendar.form.issue.event_notes_too_long":
     "Las notas pueden tener hasta {max} caracteres.",
   "calendar.form.issue.event_audience_empty":
