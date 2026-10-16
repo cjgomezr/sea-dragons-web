@@ -30,6 +30,13 @@ import {
   SINGLE_EVENT_ID,
   fakeManagedEventsClub,
 } from "../helpers/managed-events-club";
+import {
+  FOREIGN_COVER_ID,
+  ORGANIZER_COVER_ID,
+  OWN_COVER_ID,
+  PLAYER_COVER_ID,
+} from "../helpers/event-covers-club";
+import { toChangesArgument } from "@/lib/events/supabase-event-management-gateways";
 
 /**
  * Editar y cancelar un evento suelto o una ocurrencia (#314, RF-11 del PRD
@@ -631,4 +638,70 @@ describe("editar un evento: lugar estructurado", () => {
       "event_place_detail_invalid",
     );
   });
+});
+
+describe("editar un evento: imagen (#644)", () => {
+  async function editCover(
+    coverUploadId: string | null,
+    eventId: string = SINGLE_EVENT_ID,
+  ): Promise<ReturnType<typeof fakeManagedEventsClub>> {
+    const club = fakeManagedEventsClub();
+    await editEvent(club.gateways, {
+      callerId: CALLER_ID,
+      eventId,
+      changes: { coverUploadId },
+      now: NOW,
+    });
+    return club;
+  }
+
+  it("enlaza la imagen de un evento suelto", async () => {
+    const club = await editCover(OWN_COVER_ID);
+
+    expect(club.event(SINGLE_EVENT_ID)).toMatchObject({
+      coverUploadId: OWN_COVER_ID,
+    });
+  });
+
+  it("enlaza a una sola sesión una imagen que subió otra organizadora", async () => {
+    const club = await editCover(ORGANIZER_COVER_ID, FIRST_OCCURRENCE_ID);
+
+    expect(club.event(FIRST_OCCURRENCE_ID)).toMatchObject({
+      coverUploadId: ORGANIZER_COVER_ID,
+    });
+    expect(club.event(SECOND_OCCURRENCE_ID)).not.toHaveProperty(
+      "coverUploadId",
+    );
+  });
+
+  it("quita la imagen con coverUploadId a null", async () => {
+    const club = await editCover(null);
+
+    expect(club.event(SINGLE_EVENT_ID)).toMatchObject({ coverUploadId: null });
+  });
+
+  it("manda a la base la imagen sólo cuando llega el campo", () => {
+    expect(toChangesArgument({ title: "Partido" })).not.toHaveProperty(
+      "cover_upload_id",
+    );
+    expect(toChangesArgument({ coverUploadId: null })).toEqual({
+      cover_upload_id: null,
+    });
+    expect(toChangesArgument({ coverUploadId: OWN_COVER_ID })).toEqual({
+      cover_upload_id: OWN_COVER_ID,
+    });
+  });
+
+  it.each([
+    ["de otro club", FOREIGN_COVER_ID],
+    ["de alguien que no organiza eventos", PLAYER_COVER_ID],
+  ])(
+    "rechaza una imagen %s sin escribir nada",
+    async (_case, coverUploadId) => {
+      await expectEditRejected(
+        { changes: { coverUploadId } },
+        "event_cover_upload_invalid",
+      );
+    },
+  );
 });

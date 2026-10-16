@@ -1,7 +1,9 @@
 import type { RoleRequestGateways } from "@/lib/auth/role-request";
 import { clubMoment } from "@/lib/time/club-calendar";
 import {
+  type CoverOrganizer,
   type EventFields,
+  type EventGateways,
   type EventsGateway,
   EventValidationError,
   findEventOrganizer,
@@ -11,6 +13,7 @@ import {
   normalizePlaceDetail,
   normalizeTitle,
   resolveAudience,
+  resolveCoverUpload,
   resolveEventEnd,
 } from "./event-creation";
 import {
@@ -50,9 +53,14 @@ export type ManagedEvent = EventFields & {
 } & ManagedEventState;
 
 /** Lo que se puede cambiar de un evento; lo que no viene se queda igual.
- * `endsOn` a `null` lo vuelve de un día. */
+ * `endsOn` a `null` lo vuelve de un día, y `coverUploadId` a `null` le quita
+ * la imagen (#644). */
 export type EventEdit = Partial<
-  EventFields & { readonly startsOn: string; readonly endsOn: string | null }
+  EventFields & {
+    readonly startsOn: string;
+    readonly endsOn: string | null;
+    readonly coverUploadId: string | null;
+  }
 >;
 
 /** Lo que cambia tal como llega: el lugar todavía sin validar. Un lugar
@@ -90,6 +98,7 @@ export type ManagedEventsGateway = {
 export type EventManagementGateways = EventNoticeGateways & {
   readonly members: RoleRequestGateways["members"];
   readonly events: Pick<EventsGateway, "findClubGroupIds">;
+  readonly eventCovers: EventGateways["eventCovers"];
   readonly managedEvents: ManagedEventsGateway;
 };
 
@@ -168,14 +177,25 @@ function normalizeWhere({
   };
 }
 
+/** La imagen, si cambia: una que vale, o `null` para quitarla. */
+async function normalizeCover(
+  gateways: Pick<EventManagementGateways, "members" | "eventCovers">,
+  organizer: CoverOrganizer,
+  coverUploadId: string | null | undefined,
+): Promise<Pick<EventEdit, "coverUploadId">> {
+  const resolved = await resolveCoverUpload(gateways, organizer, coverUploadId);
+  return resolved === undefined ? {} : { coverUploadId: resolved };
+}
+
 /** Las mismas reglas que al crear, sólo sobre lo que viene. También las usa
  * editar una serie (#315). */
 export async function normalizeChanges(
-  gateways: Pick<EventManagementGateways, "events">,
-  clubId: string,
+  gateways: Pick<EventManagementGateways, "events" | "members" | "eventCovers">,
+  organizer: CoverOrganizer,
   edit: EventEditDraft,
 ): Promise<EventEdit> {
   const { place, location, ...rest } = edit;
+  const { clubId } = organizer;
   return {
     ...rest,
     ...(edit.title === undefined ? {} : { title: normalizeTitle(edit.title) }),
@@ -187,6 +207,7 @@ export async function normalizeChanges(
     ...(edit.audience === undefined
       ? {}
       : { audience: await resolveAudience(gateways, clubId, edit.audience) }),
+    ...(await normalizeCover(gateways, organizer, edit.coverUploadId)),
   };
 }
 
@@ -236,7 +257,7 @@ export async function editEvent(
   const event = await findOpenEvent(gateways, target);
   const normalized = await normalizeChanges(
     gateways,
-    caller.clubId,
+    { clubId: caller.clubId, userId: request.callerId },
     request.changes,
   );
   assertStillAheadAfter(event, normalized, request.now);

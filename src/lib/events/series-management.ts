@@ -38,8 +38,12 @@ export type ManagedSeries = EventFields & {
   readonly endsOn: string;
 };
 
-/** Lo que se puede cambiar de una serie; lo que no viene se queda igual. */
-export type SeriesEdit = Partial<EventFields>;
+/** Lo que se puede cambiar de una serie; lo que no viene se queda igual.
+ * La imagen pasa a las sesiones futuras salvo a las que la cambiaron solas
+ * (#644), y eso lo decide la base. */
+export type SeriesEdit = Partial<
+  EventFields & { readonly coverUploadId: string | null }
+>;
 
 /** Lo que cambia tal como llega, con el lugar todavía sin validar. */
 export type SeriesEditDraft = Omit<SeriesEdit, "place"> & {
@@ -71,7 +75,7 @@ export type ManagedSeriesGateway = {
 
 export type SeriesManagementGateways = Pick<
   EventManagementGateways,
-  "members" | "events" | "eventAudience" | "notifications"
+  "members" | "events" | "eventCovers" | "eventAudience" | "notifications"
 > & {
   readonly managedSeries: ManagedSeriesGateway;
 };
@@ -153,7 +157,7 @@ export async function editSeries(
   const before = await findExistingSeries(gateways, target);
   const changes = await normalizeChanges(
     gateways,
-    caller.clubId,
+    { clubId: caller.clubId, userId: request.callerId },
     request.changes,
   );
   assertValidEnd(before, changes);

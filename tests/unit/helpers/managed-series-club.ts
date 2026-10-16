@@ -15,6 +15,7 @@ import {
   SENIOR_SQUAD_ID,
   fakeEventNotices,
 } from "./events-club";
+import { fakeEventCovers, findCoverUploader } from "./event-covers-club";
 
 /**
  * Un club en memoria para los tests de editar y cancelar una serie (#315).
@@ -194,11 +195,12 @@ export function fakeManagedSeriesClub(
   const gateways: SeriesManagementGateways = {
     ...noticeGateways,
     members: {
-      findRoleRequestMember: async () => ({
-        clubId: CLUB_ID,
-        fullName: "Quien organiza",
-        role: options.callerRole ?? "Committee",
-      }),
+      findRoleRequestMember: async (userId) =>
+        findCoverUploader(userId) ?? {
+          clubId: CLUB_ID,
+          fullName: "Quien organiza",
+          role: options.callerRole ?? "Committee",
+        },
     },
     events: {
       findClubGroupIds: async ({ clubId, groupIds }) =>
@@ -208,6 +210,7 @@ export function fakeManagedSeriesClub(
             : [],
         ),
     },
+    eventCovers: fakeEventCovers().gateway,
     managedSeries: {
       findSeries: async ({ clubId, seriesId }) =>
         (clubId === CLUB_ID ? allSeries.get(seriesId) : undefined) ?? null,

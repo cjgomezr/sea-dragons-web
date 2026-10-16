@@ -89,6 +89,12 @@ export type FieldIssueCode = Exclude<
   | "event_place_invalid"
   | "event_place_coordinates_invalid"
   | "event_place_detail_invalid"
+  // El formulario todavía no sube imagen: la pone #650, que también traduce
+  // estos cuatro junto a su campo.
+  | "event_cover_empty"
+  | "event_cover_too_large"
+  | "event_cover_type_unsupported"
+  | "event_cover_upload_invalid"
 >;
 
 export type EventFormIssue = {

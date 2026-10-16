@@ -26,6 +26,7 @@ import {
   EVENT_CANCELLATION_API_PATH,
   EVENT_MANAGE_API_PATH,
   EVENT_PLACES_API_PATH,
+  EVENT_COVER_UPLOADS_API_PATH,
   EVENT_API_PATH,
   EVENT_RSVP_API_PATH,
   EVENT_SERIES_CANCELLATION_API_PATH,
@@ -990,6 +991,26 @@ describe("frontera de editar y cancelar series (#315)", () => {
     expect(decideSessionBoundary({ pathname, ...activeAs(role) })).toEqual(
       ALLOW,
     );
+  });
+});
+
+describe("frontera de la subida de imágenes de eventos (#644)", () => {
+  it.each(["Coach", "Player"] as const)("niega a un %s", (role) => {
+    expect(
+      decideSessionBoundary({
+        pathname: EVENT_COVER_UPLOADS_API_PATH,
+        ...activeAs(role),
+      }),
+    ).toEqual({ kind: "missingCapability" });
+  });
+
+  it.each(["Admin", "Committee"] as const)("deja a un %s", (role) => {
+    expect(
+      decideSessionBoundary({
+        pathname: EVENT_COVER_UPLOADS_API_PATH,
+        ...activeAs(role),
+      }),
+    ).toEqual(ALLOW);
   });
 });
 

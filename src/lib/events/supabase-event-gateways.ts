@@ -10,6 +10,7 @@ import type {
   NewEventSchedule,
   SavedEventSchedule,
 } from "./event-creation";
+import { createSupabaseEventCoversGateway } from "./supabase-event-covers-gateway";
 import { type PlaceColumns, toPlaceColumns } from "./supabase-event-place";
 
 /**
@@ -47,6 +48,7 @@ type CreateEventsScheduleArgument = PlaceColumns & {
   readonly place_detail: string | null;
   readonly notes: string | null;
   readonly audience: "all" | "groups";
+  readonly cover_upload_id: string | null;
   readonly group_ids: readonly string[];
   readonly occurrence_dates: readonly string[];
   readonly series: {
@@ -73,6 +75,7 @@ function toScheduleArgument(
     place_detail: fields.placeDetail,
     notes: fields.notes,
     audience: fields.audience.kind === "club" ? "all" : "groups",
+    cover_upload_id: schedule.coverUploadId,
     group_ids:
       fields.audience.kind === "groups" ? fields.audience.groupIds : [],
     occurrence_dates: schedule.occurrenceDates,
@@ -131,6 +134,7 @@ export function createEventGateways(
       findClubGroupIds: (query) => findClubGroupIds(serviceClient, query),
       insertSchedule: (schedule) => insertSchedule(serviceClient, schedule),
     },
+    eventCovers: createSupabaseEventCoversGateway(serviceClient),
     eventAudience: createSupabaseAudienceMembersGateway(serviceClient),
     notifications: createSupabaseNotificationWriter(serviceClient),
   };

@@ -26,6 +26,7 @@ import {
   UPCOMING_OCCURRENCE_ID,
   fakeManagedSeriesClub,
 } from "../helpers/managed-series-club";
+import { FOREIGN_COVER_ID, OWN_COVER_ID } from "../helpers/event-covers-club";
 
 /**
  * Editar y cancelar una serie de hoy en adelante (#315, RF-12 del PRD de
@@ -428,6 +429,52 @@ describe("editar una serie: lugar estructurado", () => {
 
     await expect(attempt).rejects.toMatchObject({
       code: "event_place_coordinates_invalid",
+    });
+    expect(club.writeCount()).toBe(0);
+  });
+});
+
+describe("editar una serie: imagen (#644)", () => {
+  it("enlaza la imagen a la serie y la manda a sus sesiones futuras", async () => {
+    const club = fakeManagedSeriesClub();
+
+    await editSeries(club.gateways, {
+      callerId: CALLER_ID,
+      seriesId: SERIES_ID,
+      changes: { coverUploadId: OWN_COVER_ID },
+    });
+
+    expect(club.series(SERIES_ID)).toMatchObject({
+      coverUploadId: OWN_COVER_ID,
+    });
+    expect(club.occurrence(UPCOMING_OCCURRENCE_ID)).toMatchObject({
+      coverUploadId: OWN_COVER_ID,
+    });
+  });
+
+  it("quita la imagen de la serie con coverUploadId a null", async () => {
+    const club = fakeManagedSeriesClub();
+
+    await editSeries(club.gateways, {
+      callerId: CALLER_ID,
+      seriesId: SERIES_ID,
+      changes: { coverUploadId: null },
+    });
+
+    expect(club.series(SERIES_ID)).toMatchObject({ coverUploadId: null });
+  });
+
+  it("rechaza una imagen de otro club sin escribir nada", async () => {
+    const club = fakeManagedSeriesClub();
+
+    const attempt = editSeries(club.gateways, {
+      callerId: CALLER_ID,
+      seriesId: SERIES_ID,
+      changes: { coverUploadId: FOREIGN_COVER_ID },
+    });
+
+    await expect(attempt).rejects.toMatchObject({
+      code: "event_cover_upload_invalid",
     });
     expect(club.writeCount()).toBe(0);
   });

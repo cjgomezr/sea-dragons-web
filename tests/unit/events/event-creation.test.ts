@@ -28,6 +28,14 @@ import {
   fakeEventsClub,
   savedEventId,
 } from "../helpers/events-club";
+import {
+  FOREIGN_COVER_ID,
+  MISSING_COVER_ID,
+  ORGANIZER_COVER_ID,
+  ORPHAN_COVER_ID,
+  OWN_COVER_ID,
+  PLAYER_COVER_ID,
+} from "../helpers/event-covers-club";
 
 /**
  * Crear un evento suelto o una serie semanal (#307, RF-2 y RF-3 del PRD de
@@ -83,6 +91,7 @@ describe("crear evento: evento suelto", () => {
           audience: { kind: "groups", groupIds: [SENIOR_SQUAD_ID] },
         },
         endsOn: null,
+        coverUploadId: null,
         occurrenceDates: ["2027-07-10"],
         series: null,
       },
@@ -579,6 +588,55 @@ describe("crear evento: lugar estructurado", () => {
         placeDetail: "x".repeat(PLACE_DETAIL_MAX_LENGTH + 1),
       },
       "event_place_detail_invalid",
+    );
+  });
+});
+
+describe("crear evento: imagen (#644)", () => {
+  it("enlaza una imagen subida por quien crea", async () => {
+    const club = await createAs({
+      ...SINGLE_DRAFT,
+      coverUploadId: OWN_COVER_ID,
+    });
+
+    expect(club.saved[0]?.coverUploadId).toBe(OWN_COVER_ID);
+  });
+
+  it("enlaza una imagen que subió otra persona que organiza eventos", async () => {
+    const club = await createAs({
+      ...SINGLE_DRAFT,
+      coverUploadId: ORGANIZER_COVER_ID,
+    });
+
+    expect(club.saved[0]?.coverUploadId).toBe(ORGANIZER_COVER_ID);
+  });
+
+  it("guarda la imagen de una serie, que la base copia a sus sesiones", async () => {
+    const club = await createAs({
+      ...WEEKLY_DRAFT,
+      coverUploadId: OWN_COVER_ID,
+    });
+
+    expect(club.saved[0]?.coverUploadId).toBe(OWN_COVER_ID);
+  });
+
+  it("deja el evento sin imagen si no llega el campo o llega a null", async () => {
+    const withoutField = await createAs(SINGLE_DRAFT);
+    const withNull = await createAs({ ...SINGLE_DRAFT, coverUploadId: null });
+
+    expect(withoutField.saved[0]?.coverUploadId).toBeNull();
+    expect(withNull.saved[0]?.coverUploadId).toBeNull();
+  });
+
+  it.each([
+    ["de otro club", FOREIGN_COVER_ID],
+    ["de alguien que ya no organiza eventos", PLAYER_COVER_ID],
+    ["de alguien a quien se le borró la ficha", ORPHAN_COVER_ID],
+    ["que no existe", MISSING_COVER_ID],
+  ])("rechaza una imagen %s sin guardar nada", async (_case, coverUploadId) => {
+    await expectRejected(
+      { ...SINGLE_DRAFT, coverUploadId },
+      "event_cover_upload_invalid",
     );
   });
 });

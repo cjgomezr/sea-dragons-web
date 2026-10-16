@@ -365,6 +365,11 @@ export const EVENT_CANCELLATION_API_PATH = `${EVENT_MANAGE_API_PATH}/cancellatio
  * estático, así que Next lo prefiere al `[id]` de editar un evento. */
 export const EVENT_PLACES_API_PATH = `${EVENTS_MANAGE_API_PATH}/places`;
 
+/** Subir la imagen de un evento o una serie (#644, RF-3 del PRD de E24):
+ * POST con los bytes. Cuelga de crear, así que es sólo de Admin y Committee,
+ * y es un camino estático, como el del buscador de lugares. */
+export const EVENT_COVER_UPLOADS_API_PATH = `${EVENTS_MANAGE_API_PATH}/uploads`;
+
 /** Editar una serie de hoy en adelante (#315, RF-12): PATCH con lo que
  * cambia. `[id]` es el de la serie. Cuelga de crear, así que es sólo de
  * Admin y Committee. */
@@ -736,6 +741,7 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   { path: EVENT_MANAGE_API_PATH, capability: "createEvents" },
   { path: EVENT_CANCELLATION_API_PATH, capability: "createEvents" },
   { path: EVENT_PLACES_API_PATH, capability: "createEvents" },
+  { path: EVENT_COVER_UPLOADS_API_PATH, capability: "createEvents" },
   { path: EVENT_SERIES_MANAGE_API_PATH, capability: "createEvents" },
   { path: EVENT_SERIES_CANCELLATION_API_PATH, capability: "createEvents" },
   { path: ATTENDANCE_API_PATH, capability: "buildTeamsAndTrackAttendance" },

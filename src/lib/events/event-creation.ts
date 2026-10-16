@@ -10,6 +10,7 @@ import {
   type EventNoticeGateways,
   announceEvents,
 } from "./event-creation-notice";
+import type { EventCoversGateway } from "./event-covers";
 import {
   type EventPlace,
   LATITUDE_LIMIT,
@@ -105,6 +106,8 @@ export type EventDraft = Omit<
   readonly endTime?: string | null;
   readonly place?: PlaceDraft | null;
   readonly placeDetail?: string | null;
+  /** Una subida de `POST /api/v1/events/manage/uploads` (#644). */
+  readonly coverUploadId?: string | null;
 } & (
     | {
         readonly repeat: "none";
@@ -125,6 +128,8 @@ export type NewEventSchedule = {
   readonly authorId: string;
   readonly fields: NewEventFields;
   readonly endsOn: string | null;
+  /** La imagen, que la base copia a la serie y a cada sesión (#644). */
+  readonly coverUploadId: string | null;
   readonly occurrenceDates: readonly string[];
   readonly series: SeriesRange | null;
 };
@@ -168,6 +173,7 @@ export type EventsGateway = {
 export type EventGateways = EventNoticeGateways & {
   readonly members: RoleRequestGateways["members"];
   readonly events: EventsGateway;
+  readonly eventCovers: Pick<EventCoversGateway, "findCover">;
 };
 
 export const EVENT_ISSUE_CODES = [
@@ -190,6 +196,10 @@ export const EVENT_ISSUE_CODES = [
   "event_place_invalid",
   "event_place_coordinates_invalid",
   "event_place_detail_invalid",
+  "event_cover_empty",
+  "event_cover_too_large",
+  "event_cover_type_unsupported",
+  "event_cover_upload_invalid",
 ] as const;
 
 export type EventIssueCode = (typeof EVENT_ISSUE_CODES)[number];
@@ -218,6 +228,12 @@ const ISSUE_MESSAGES: Readonly<Record<EventIssueCode, string>> = {
   event_place_invalid: `El nombre del lugar tiene que tener entre 1 y ${PLACE_NAME_MAX_LENGTH} caracteres, y su dirección como mucho ${PLACE_ADDRESS_MAX_LENGTH}, sin caracteres de control.`,
   event_place_coordinates_invalid: `Las coordenadas del lugar van las dos o ninguna, con la latitud entre -${LATITUDE_LIMIT} y ${LATITUDE_LIMIT} y la longitud entre -${LONGITUDE_LIMIT} y ${LONGITUDE_LIMIT}.`,
   event_place_detail_invalid: `"Dónde exactamente" puede tener como mucho ${PLACE_DETAIL_MAX_LENGTH} caracteres, sin caracteres de control.`,
+  event_cover_empty: "La imagen está vacía.",
+  event_cover_too_large: "La imagen puede pesar como mucho 10 MB.",
+  event_cover_type_unsupported:
+    "La imagen tiene que ser un JPEG, un PNG o un WebP que se pueda abrir.",
+  event_cover_upload_invalid:
+    "La imagen no está entre las que subieron quienes organizan eventos en tu club.",
 };
 
 export class EventValidationError extends Error {
@@ -392,6 +408,57 @@ export async function resolveAudience(
     throw new EventValidationError("event_audience_foreign_group");
   }
   return { kind: "groups", groupIds };
+}
+
+/** Quien enlaza una imagen: su club y su id. */
+export type CoverOrganizer = {
+  readonly clubId: string;
+  readonly userId: string;
+};
+
+/** Si quien subió la imagen organiza eventos en el club: quien la enlaza, u
+ * otra persona que todavía tiene el rol. Una ficha borrada no cuenta. */
+async function isOrganizerUpload(
+  gateways: Pick<EventGateways, "members">,
+  organizer: CoverOrganizer,
+  uploadedBy: string | null,
+): Promise<boolean> {
+  if (uploadedBy === null) {
+    return false;
+  }
+  if (uploadedBy === organizer.userId) {
+    return true;
+  }
+  const uploader = await gateways.members.findRoleRequestMember(uploadedBy);
+  return (
+    uploader !== null &&
+    uploader.clubId === organizer.clubId &&
+    hasCapability(uploader.role, "createEvents")
+  );
+}
+
+/** La imagen que se enlaza (#644), o por qué no vale. Una subida se comparte
+ * entre la serie y sus sesiones, así que no hace falta que esté libre; sí que
+ * sea del club y de alguien que organiza. Sin el campo no cambia nada
+ * (`undefined`), y a `null` se quita. También lo usan editar un evento y una
+ * serie. */
+export async function resolveCoverUpload(
+  gateways: Pick<EventGateways, "members" | "eventCovers">,
+  organizer: CoverOrganizer,
+  coverUploadId: string | null | undefined,
+): Promise<string | null | undefined> {
+  if (coverUploadId === null || coverUploadId === undefined) {
+    return coverUploadId;
+  }
+  const cover = await gateways.eventCovers.findCover(coverUploadId);
+  if (
+    cover === null ||
+    cover.clubId !== organizer.clubId ||
+    !(await isOrganizerUpload(gateways, organizer, cover.uploadedBy))
+  ) {
+    throw new EventValidationError("event_cover_upload_invalid");
+  }
+  return cover.id;
 }
 
 /** Cuándo termina un evento, como se guarda. */
@@ -574,6 +641,11 @@ export async function createEvents(
   const caller = await findEventOrganizer(gateways, request.callerId);
   const planned = planDates(request.draft, request.now);
   const end = resolveDraftEnd(request.draft);
+  const coverUploadId = await resolveCoverUpload(
+    gateways,
+    { clubId: caller.clubId, userId: request.callerId },
+    request.draft.coverUploadId,
+  );
   const schedule: NewEventSchedule = {
     clubId: caller.clubId,
     authorId: request.callerId,
@@ -582,6 +654,7 @@ export async function createEvents(
       endTime: end.endTime,
     }),
     endsOn: end.endsOn,
+    coverUploadId: coverUploadId ?? null,
     ...planned,
   };
   const saved = await gateways.events.insertSchedule(schedule);

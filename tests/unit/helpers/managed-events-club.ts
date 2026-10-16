@@ -15,6 +15,7 @@ import {
   SENIOR_SQUAD_ID,
   fakeEventNotices,
 } from "./events-club";
+import { fakeEventCovers, findCoverUploader } from "./event-covers-club";
 
 /**
  * Un club en memoria para los tests de editar y cancelar eventos (#314). El
@@ -152,14 +153,15 @@ export function fakeManagedEventsClub(
   const gateways: EventManagementGateways = {
     ...noticeGateways,
     members: {
-      findRoleRequestMember: async () =>
-        options.callerIsMember === false
+      findRoleRequestMember: async (userId) =>
+        findCoverUploader(userId) ??
+        (options.callerIsMember === false
           ? null
           : {
               clubId: CLUB_ID,
               fullName: "Quien organiza",
               role: options.callerRole ?? "Committee",
-            },
+            }),
     },
     events: {
       findClubGroupIds: async ({ clubId, groupIds }) =>
@@ -169,6 +171,7 @@ export function fakeManagedEventsClub(
             : [],
         ),
     },
+    eventCovers: fakeEventCovers().gateway,
     managedEvents: {
       findEvent: async ({ clubId, eventId }) => {
         const event = clubId === CLUB_ID ? events.get(eventId) : undefined;
