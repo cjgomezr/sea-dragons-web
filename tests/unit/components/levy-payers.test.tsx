@@ -122,6 +122,7 @@ function renderScreen(canSeeLevyPayers: boolean, locale: Locale = "en"): void {
       checkoutReturn={null}
       cardReturn={null}
       packReturn={null}
+      levyReturn={null}
       canSeeLevyPayers={canSeeLevyPayers}
     />,
   );

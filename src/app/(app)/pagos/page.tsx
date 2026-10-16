@@ -7,6 +7,7 @@ import {
   CHECKOUT_RETURN_QUERY_PARAM,
   PACK_RETURN_QUERY_PARAM,
   readCheckoutReturn,
+  readLevyReturn,
 } from "@/lib/membership/checkout-return";
 
 /** Pagos (#454, #455): el panel de la membresía, el alta en Stripe Checkout
@@ -14,8 +15,9 @@ import {
  * membresía al día (#453). La pantalla pide la membresía al endpoint, como
  * la aplicación nativa (CON-002).
  *
- * `?checkout=`, `?tarjeta=` y `?pack=` (`ok` o `cancelado`) es con lo que se
- * vuelve de Stripe tras suscribirse, cambiar la tarjeta o comprar un pack.
+ * `?checkout=`, `?tarjeta=`, `?pack=` y `?levy=` (`ok` o `cancelado`) es con
+ * lo que se vuelve de Stripe tras suscribirse, cambiar la tarjeta, comprar un
+ * pack o pagar un extra; éste trae además `?extra=` y `?antes=` (#692).
  *
  * El rol se lee aquí, en el servidor, para ofrecer a un Admin o un Committee
  * quién pagó cada levy (#531). */
@@ -35,6 +37,7 @@ export default async function PagosPage({
       checkoutReturn={readCheckoutReturn(params[CHECKOUT_RETURN_QUERY_PARAM])}
       cardReturn={readCheckoutReturn(params[CARD_RETURN_QUERY_PARAM])}
       packReturn={readCheckoutReturn(params[PACK_RETURN_QUERY_PARAM])}
+      levyReturn={readLevyReturn(params)}
       canSeeLevyPayers={hasCapability(role, "viewLevyPayers")}
     />
   );

@@ -1232,6 +1232,12 @@ export const englishMessages = {
   "payments.levies.paid": "Bought",
   "payments.levies.boughtOn": "Bought {date}",
   "payments.levies.boughtCount": "Bought × {count}",
+  "payments.levies.waiting":
+    "Payment received. We're waiting for Stripe to confirm it, which can take a few seconds.",
+  "payments.levies.timedOut":
+    "Stripe hasn't confirmed it yet. Reload the page in a minute; if the extra still doesn't show up, write to the club.",
+  "payments.levies.cancelled":
+    "You left Stripe without buying the extra. You can try again whenever you like.",
   // Quién pagó cada levy (#531), sólo para Admin y Committee.
   "payments.levyPayers.toggle": "Who paid",
   "payments.levyPayers.loading": "Loading who paid…",

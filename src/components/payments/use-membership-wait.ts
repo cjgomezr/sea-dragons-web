@@ -14,8 +14,8 @@ import { loadMembershipView } from "./payments-client";
  */
 
 /** Cada cuánto se vuelve a preguntar y hasta cuándo. */
-const POLL_INTERVAL_MS = 3_000;
-const POLL_TIMEOUT_MS = 30_000;
+export const POLL_INTERVAL_MS = 3_000;
+export const POLL_TIMEOUT_MS = 30_000;
 
 /** Lo que se espera: la suscripción del alta o de la vuelta tras cancelar
  * (deja de estar pendiente o cancelada) o la tarjeta nueva (deja de ser la
