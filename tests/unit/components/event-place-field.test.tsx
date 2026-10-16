@@ -248,6 +248,33 @@ describe("buscador de lugares", () => {
     expect(screen.getAllByRole("option")).toHaveLength(2);
   });
 
+  it("si la petición falla lo dice, deja el texto libre y no reintenta", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const query = new URL(input, "http://localhost").searchParams.get("q");
+        queries.push(query);
+        return query === null
+          ? new Response(JSON.stringify({ data: TOP_PLACES }), { status: 200 })
+          : new Response("{}", { status: 500 });
+      }),
+    );
+    renderForm();
+    const user = userEvent.setup();
+    await user.click(locationBox());
+    await user.type(locationBox(), "princes");
+
+    expect(
+      await screen.findByText(
+        "Place search isn't available right now. Pick one of the club's places or keep what you typed.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("option").at(-1)).toHaveTextContent(
+      "Or keep what you typed as free text (it won't open a map).",
+    );
+    expect(queries.filter((query) => query === "princes")).toHaveLength(1);
+  });
+
   it("termina con la opción de dejar el texto libre, también en español", async () => {
     stubPlaces();
     renderForm({ locale: "es" });

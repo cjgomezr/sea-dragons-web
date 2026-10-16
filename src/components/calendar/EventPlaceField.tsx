@@ -9,6 +9,7 @@ import {
   type FieldProps,
   fieldId,
   issueAttributes,
+  issueId,
 } from "./EventFormFields";
 import { type PlaceSearchState, usePlaceSearch } from "./use-place-search";
 
@@ -149,6 +150,8 @@ function PlaceOptions({
 function usePlaceListKeys(options: {
   readonly count: number;
   readonly isExpanded: boolean;
+  /** Las opciones o sólo el aviso de que no se puede buscar. */
+  readonly isPopupShown: boolean;
   readonly open: () => void;
   readonly close: () => void;
   readonly chooseAt: (index: number) => boolean;
@@ -176,7 +179,7 @@ function usePlaceListKeys(options: {
       move(event, -1);
     } else if (event.key === "Enter" && options.chooseAt(activeIndex)) {
       event.preventDefault();
-    } else if (event.key === "Escape" && options.isExpanded) {
+    } else if (event.key === "Escape" && options.isPopupShown) {
       // Cierra la lista, no el diálogo que la contiene.
       event.preventDefault();
       event.stopPropagation();
@@ -205,9 +208,11 @@ function PlaceSearch({
   const search = usePlaceSearch(form.location, isOpen);
   const options = isOpen ? listOptions(search, form.location) : [];
   const isExpanded = options.length > 0;
+  const isPopupShown = isOpen && (isExpanded || isSearchDown(search));
   const keys = usePlaceListKeys({
     count: options.length,
     isExpanded,
+    isPopupShown,
     open: () => setIsOpen(true),
     close: () => setIsOpen(false),
     chooseAt: (index) => {
@@ -266,7 +271,7 @@ function PlaceSearch({
           }}
         />
       </div>
-      {isOpen && (isExpanded || isSearchDown(search)) ? (
+      {isPopupShown ? (
         <div className="event-place-popup">
           {isExpanded ? (
             <PlaceOptions
@@ -309,6 +314,7 @@ function ChosenPlace({
         className="event-place-chosen"
         role="group"
         aria-labelledby={LABEL_ID}
+        aria-describedby={issueText === null ? undefined : issueId("location")}
       >
         <span className="event-place-pin" aria-hidden="true">
           <MapPin weight="fill" size={ICON_SIZE} />
