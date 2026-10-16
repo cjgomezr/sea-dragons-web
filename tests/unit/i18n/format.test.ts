@@ -8,6 +8,8 @@ import {
   formatCalendarDay,
   formatCalendarDayAt,
   formatCalendarDayParts,
+  formatCalendarMonth,
+  formatClubCompactDay,
   formatClubDay,
   formatClubMoment,
   formatWeekdayName,
@@ -292,5 +294,36 @@ describe("bloque de fecha de la agenda", () => {
     expect(() => formatCalendarDayParts("en", "2026-02-30")).toThrow(
       RangeError,
     );
+  });
+});
+
+describe("mes de un grupo del historial", () => {
+  it("escribe el mes y el año en inglés", () => {
+    expect(formatCalendarMonth("en", "2026-10")).toBe("October 2026");
+  });
+
+  it("escribe el mes y el año en español", () => {
+    expect(formatCalendarMonth("es", "2026-10")).toBe("octubre de 2026");
+  });
+
+  it("rechaza un mes que no existe", () => {
+    expect(() => formatCalendarMonth("en", "2026-13")).toThrow(RangeError);
+  });
+});
+
+describe("día corto de una fila del historial", () => {
+  it("escribe el día y el mes en tres letras", () => {
+    expect(
+      formatClubCompactDay("en", new Date("2026-07-12T00:00:00.000Z")),
+    ).toBe("12 Jul");
+    expect(
+      formatClubCompactDay("es", new Date("2026-09-18T00:00:00.000Z")),
+    ).toBe("18 sep");
+  });
+
+  it("usa el día de Melbourne y no el de UTC", () => {
+    expect(
+      formatClubCompactDay("en", new Date("2026-09-30T15:00:00.000Z")),
+    ).toBe("1 Oct");
   });
 });

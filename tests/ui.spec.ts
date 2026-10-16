@@ -15312,6 +15312,48 @@ const WAIVED_MEMBERSHIP_VIEW = membershipView(
   PAYMENTS_HISTORY,
 );
 
+// El historial rehecho (#631): varios meses, un fallo con su motivo y sin
+// tarjeta guardada, y un pendiente para que aparezca su filtro.
+const REDESIGNED_HISTORY = [
+  {
+    ...FAILED_PAYMENT,
+    id: "e0e0e0e0-0000-4000-8000-0000000000f1",
+    date: "2026-08-01T00:00:00.000Z",
+    card: null,
+    failureReason: "Card declined",
+  },
+  {
+    id: "e0e0e0e0-0000-4000-8000-0000000000f2",
+    date: "2026-09-18T00:00:00.000Z",
+    description: "2026 club jersey",
+    amountCents: 6000,
+    status: "paid",
+    card: { brand: "mastercard", last4: "4444" },
+    failureReason: null,
+    quantity: 1,
+    option: null,
+  },
+  {
+    id: "e0e0e0e0-0000-4000-8000-0000000000f3",
+    date: "2026-06-14T00:00:00.000Z",
+    description: "Winter league levy",
+    amountCents: 3000,
+    status: "pending",
+    card: null,
+    failureReason: null,
+    quantity: 1,
+    option: null,
+  },
+  ...PAYMENTS_HISTORY,
+];
+
+const FAKE_RECEIPT_URL = "https://pay.stripe.test/receipts/fake";
+
+const REDESIGNED_HISTORY_MEMBERSHIP_VIEW = membershipView(
+  { status: "active", nextChargeAt: "2026-10-01T00:00:00.000Z" },
+  REDESIGNED_HISTORY,
+);
+
 // Casual: sin cuota mensual ni cobro recurrente, y todavía sin pagos.
 const EMPTY_HISTORY_MEMBERSHIP_VIEW = membershipView(
   { plan: "Casual", status: "active", monthlyPriceCents: null, card: null },
@@ -15578,6 +15620,8 @@ type PaymentsScreenState = {
   readonly tab?: PaymentsTabName;
   /** Si su axe corre también en oscuro (#627). */
   readonly checksDarkAxe?: boolean;
+  /** El filtro del historial que se pulsa antes de mirar (#631). */
+  readonly historyFilter?: RegExp;
   readonly storageState: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
 };
@@ -15632,6 +15676,20 @@ function paymentsTabsStates(
   );
 }
 
+/** El historial rehecho (#631), con un filtro pulsado o sin él. Su axe corre
+ * en claro y en oscuro. */
+function paymentHistoryStates(
+  name: string,
+  view: object,
+  historyFilter?: RegExp,
+): readonly PaymentsScreenState[] {
+  return paymentsStates(name, view).map((state) => ({
+    ...state,
+    historyFilter,
+    checksDarkAxe: true,
+  }));
+}
+
 // La tira del plan (#628): un pendiente con su plan ya guardado, que ve el
 // alta en Checkout dentro de la tira sin depender del socio sembrado.
 const PENDING_PLAN_MEMBERSHIP_VIEW = membershipView(
@@ -15649,6 +15707,8 @@ function planStripStates(
     checksDarkAxe: true,
   }));
 }
+
+const FAILED_FILTER_NAME = /^(Failed|Fallidos)$/;
 
 const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   { name: "pagos-pendiente", storageState: UNPAID_MEMBER_STORAGE_STATE_PATH },
@@ -15688,6 +15748,20 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   ...paymentsTabsStates("pagos-pestanas-socio"),
   ...paymentsTabsStates("pagos-pestanas-admin", "membership"),
   ...paymentsTabsStates("pagos-pestanas-admin-extras", "extras"),
+  ...paymentHistoryStates(
+    "pagos-historial",
+    REDESIGNED_HISTORY_MEMBERSHIP_VIEW,
+  ),
+  ...paymentHistoryStates(
+    "pagos-historial-fallidos",
+    REDESIGNED_HISTORY_MEMBERSHIP_VIEW,
+    FAILED_FILTER_NAME,
+  ),
+  ...paymentHistoryStates(
+    "pagos-historial-sin-resultados",
+    ACTIVE_MEMBERSHIP_VIEW,
+    FAILED_FILTER_NAME,
+  ),
   // La alerta de pago fallido (#474) la pinta la cáscara con el socio
   // sembrado en `past_due`; el panel de Pagos sigue fingido.
   {
@@ -15725,7 +15799,7 @@ async function goToPayments(
   page: Page,
   state: Pick<
     PaymentsScreenState,
-    "view" | "levies" | "payers" | "tab" | "beforeVisit"
+    "view" | "levies" | "payers" | "tab" | "beforeVisit" | "historyFilter"
   >,
   theme?: (typeof themes)[number],
 ): Promise<void> {
@@ -15775,6 +15849,16 @@ async function goToPayments(
   if (state.payers !== undefined) {
     await openLevyPayers(page, state.payers);
   }
+  if (state.historyFilter !== undefined) {
+    await chooseHistoryFilter(page, state.historyFilter);
+  }
+}
+
+/** Pulsa un filtro del historial (#631) y espera a que quede marcado. */
+async function chooseHistoryFilter(page: Page, name: RegExp): Promise<void> {
+  const filter = page.getByRole("button", { name });
+  await filter.click();
+  await expect(filter).toHaveAttribute("aria-pressed", "true");
 }
 
 for (const state of PAYMENTS_STATES) {
@@ -15977,19 +16061,64 @@ test.describe("Pagos en el navegador", () => {
   quietNotificationBell();
   test.use({ storageState: E2E_STORAGE_STATE_PATH });
 
-  test("a 375px el historial es una lista de tarjetas con la etiqueta de cada dato", async ({
+  // El historial del móvil (#631): filas de al menos 56px con su círculo de
+  // 36px, chips y exportar de 44px, y la tabla escondida.
+  test("a 375px el historial es una lista de filas tocables", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await goToPayments(page, { view: ACTIVE_MEMBERSHIP_VIEW });
+    await goToPayments(page, { view: REDESIGNED_HISTORY_MEMBERSHIP_VIEW });
 
-    const table = page.getByRole("table", { name: "Payment history" });
-    await expect(table.locator("thead")).toBeHidden();
-    const amountLabel = await table
-      .locator("td[data-label='Amount']")
-      .first()
-      .evaluate((cell) => getComputedStyle(cell, "::before").content);
-    expect(amountLabel).toBe('"Amount"');
+    await expect(
+      page.getByRole("table", { name: "Payment history" }),
+    ).toBeHidden();
+    const list = page.getByRole("region", { name: "Payments by month" });
+    const row = list.getByRole("button", {
+      name: "View receipt for 2026 club jersey",
+    });
+    const rowBox = await row.boundingBox();
+    expect(rowBox?.height).toBeGreaterThanOrEqual(56);
+    const circleBox = await row
+      .locator(".payments-history-glyph")
+      .boundingBox();
+    expect(circleBox?.width).toBe(36);
+    expect(circleBox?.height).toBe(36);
+    const chipBox = await page
+      .getByRole("button", { name: "Failed", exact: true })
+      .boundingBox();
+    expect(chipBox?.height).toBeGreaterThanOrEqual(44);
+    const exportBox = await page
+      .getByRole("button", { name: "Export CSV" })
+      .boundingBox();
+    expect(exportBox?.width).toBeGreaterThanOrEqual(44);
+    expect(exportBox?.height).toBeGreaterThanOrEqual(44);
+  });
+
+  // El recibo (#630, #631) se abre en una pestaña nueva sin acceso a Pagos.
+  test("el icono de recibo abre el recibo fingido en una pestaña nueva", async ({
+    page,
+  }) => {
+    await page.route(
+      (url) => url.pathname.endsWith("/receipt"),
+      (route) => route.fulfill(jsonBody({ url: FAKE_RECEIPT_URL })),
+    );
+    await page
+      .context()
+      .route(FAKE_RECEIPT_URL, (route) =>
+        route.fulfill({ contentType: "text/html", body: "<h1>Receipt</h1>" }),
+      );
+    await goToPayments(page, { view: REDESIGNED_HISTORY_MEMBERSHIP_VIEW });
+
+    const [receipt] = await Promise.all([
+      page.waitForEvent("popup"),
+      page
+        .getByRole("table", { name: "Payment history" })
+        .getByRole("button", { name: "View receipt for 2026 club jersey" })
+        .click(),
+    ]);
+
+    await expect(receipt).toHaveURL(FAKE_RECEIPT_URL);
+    expect(await receipt.evaluate(() => window.opener)).toBeNull();
   });
 
   test("a 1440px la tira del plan es una fila con los botones a la derecha", async ({

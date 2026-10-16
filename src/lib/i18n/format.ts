@@ -1,5 +1,5 @@
 import type { IsoWeekday } from "@/lib/events/event-occurrences";
-import { CLUB_TIME_ZONE } from "@/lib/time/club-calendar";
+import { CLUB_TIME_ZONE, clubCalendarDate } from "@/lib/time/club-calendar";
 import type { Locale } from "./locale";
 
 /** Las variantes con las que se escriben fechas y números. El inglés es el
@@ -159,6 +159,23 @@ export function formatCalendarDay(locale: Locale, isoDate: string): string {
   return CALENDAR_DAY_FORMATTERS[locale].format(parseCalendarDay(isoDate));
 }
 
+const CALENDAR_MONTH_FORMATTERS = formattersByLocale(
+  (displayLocale) =>
+    new Intl.DateTimeFormat(displayLocale, {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }),
+);
+
+/** Un mes de calendario (YYYY-MM) con su año: "October 2026", "octubre de
+ * 2026". El título de cada grupo del historial de pagos (#631). */
+export function formatCalendarMonth(locale: Locale, isoMonth: string): string {
+  return CALENDAR_MONTH_FORMATTERS[locale].format(
+    parseCalendarDay(`${isoMonth}-01`),
+  );
+}
+
 /** Las tres líneas del bloque de fecha de una fila de la agenda (#311). */
 export type CalendarDayParts = {
   readonly weekday: string;
@@ -201,6 +218,17 @@ export function formatCalendarDayParts(
       .slice(0, MONTH_ABBREVIATION_LENGTH)
       .join(""),
   };
+}
+
+/** El día del club en que pasó algo, en corto y con el mes recortado igual
+ * que el bloque de la agenda ("1 Oct", "18 sep"): la fecha de una fila del
+ * historial de pagos (#631), que no puede cambiar de ancho según el ICU. */
+export function formatClubCompactDay(locale: Locale, instant: Date): string {
+  const { day, month } = formatCalendarDayParts(
+    locale,
+    clubCalendarDate(instant),
+  );
+  return `${Number(day)} ${month}`;
 }
 
 // Una hora de reloj sin día, como el `HH:MM` de un evento, se formatea igual

@@ -18,7 +18,7 @@ const CENTS_PER_DOLLAR = 100;
 
 /** Con sus dos decimales y sin símbolo: la hoja de cálculo lo lee como un
  * número y lo puede sumar. */
-function asDollars(cents: number): string {
+export function asDollars(cents: number): string {
   return (cents / CENTS_PER_DOLLAR).toFixed(2);
 }
 
