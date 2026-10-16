@@ -113,6 +113,7 @@ const colorRoleToCssVariable: Record<string, string> = {
   "Editor bar": "color-editor-bar",
   "Segment selected": "color-segment-selected",
   "Border dashed": "color-border-dashed",
+  "Type meeting": "color-type-meeting",
 };
 
 describe("tokens de color: tema claro", () => {
@@ -377,6 +378,46 @@ describe.each([
         token(tokens, "color-editor-bar"),
       ),
     ).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+});
+
+// #641: la etiqueta de tipo de evento. Su fondo es el color del tipo al 24 %
+// sobre el panel, y el texto va siempre en --color-text.
+const EVENT_TYPE_TAG_WEIGHT = 0.24;
+const EVENT_TYPE_COLORS = [
+  ["training", "color-accent"],
+  ["competition", "color-warning"],
+  ["social", "color-success"],
+  ["meeting", "color-type-meeting"],
+] as const;
+// Lo que no es texto (la barra y el punto del tipo, su icono) pide 3:1.
+const AA_NON_TEXT = 3;
+
+describe.each([
+  ["claro", rootCss],
+  ["oscuro", darkCss],
+] as const)("contraste de los tipos de evento en tema %s", (_, tokens) => {
+  it.each(EVENT_TYPE_COLORS)(
+    "el texto de la etiqueta %s cumple AA sobre su fondo",
+    (_eventType, color) => {
+      const tagBackground = tintOver(
+        token(tokens, color),
+        token(tokens, "color-panel"),
+        EVENT_TYPE_TAG_WEIGHT,
+      );
+      expect(
+        contrastRatio(token(tokens, "color-text"), tagBackground),
+      ).toBeGreaterThanOrEqual(AA_TEXT);
+    },
+  );
+
+  it("el color de Reunión se distingue del panel (3:1 o más)", () => {
+    expect(
+      contrastRatio(
+        token(tokens, "color-type-meeting"),
+        token(tokens, "color-panel"),
+      ),
+    ).toBeGreaterThanOrEqual(AA_NON_TEXT);
   });
 });
 

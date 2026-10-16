@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useId } from "react";
 import { DateBlock } from "@/components/calendar/AgendaRow";
+import { EventTypeTag } from "@/components/calendar/EventTypeTag";
 import { NewsCategoryLabel } from "@/components/news/NewsCategoryLabel";
 import { CALENDAR_PATH, NEWS_PATH, NEWS_POST_PATH } from "@/lib/auth/routes";
 import type {
@@ -64,9 +65,7 @@ function UpcomingRow({
             })}
           </span>
         </span>
-        <span className={`agenda-type agenda-type-${event.eventType}`}>
-          {translate(`event.type.${event.eventType}`)}
-        </span>
+        <EventTypeTag translate={translate} eventType={event.eventType} />
       </Link>
     </li>
   );

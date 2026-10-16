@@ -49,6 +49,7 @@ desplazamiento lo sigan.
 | Editor bar       | `#F5F8FA` | Toolbar strip of the news editor                                        |
 | Segment selected | `#D6E6F2` | Chosen option of a segmented control                                    |
 | Border dashed    | `#A9BCCC` | Dashed outline of a drop zone or an "add" button                        |
+| Type meeting     | `#6E859B` | Colour of the Meeting event type                                        |
 
 > **Decisión del 2026-09-04.** El texto secundario del tema claro se desvía
 > del prototipo a propósito. El valor original del prototipo, `#6B8095`, da
@@ -81,6 +82,7 @@ desplazamiento lo sigan.
 | Editor bar       | `#0F2131` | Toolbar strip of the news editor                 |
 | Segment selected | `#1D4869` | Chosen option of a segmented control             |
 | Border dashed    | `#3A5670` | Dashed outline of a drop zone or an "add" button |
+| Type meeting     | `#B7C7D6` | Colour of the Meeting event type                 |
 
 Rules: one accent color; success/warning/danger appear only with their meaning;
 never place text on a background with contrast ratio below 4.5:1 (3:1 for
@@ -163,6 +165,17 @@ text ≥ 24px).
 > `Success` al 22 % sobre el panel. `tests/unit/design-tokens.test.ts`
 > comprueba que `Text` cumple AA sobre las tres etiquetas, el segmento elegido
 > y la barra del editor en los dos temas.
+
+> **Decisión del 2026-10-16 (issue #641).** Cada tipo de evento tiene su
+> color (E24, `docs/design/design_handoff_calendar/README.md`): Training es
+> `Accent`, Competition es `Warning`, Social es `Success` y Meeting estrena
+> `Type meeting`. El oscuro es el del handoff. El claro, `#6E859B`, da 3.8:1
+> sobre el panel blanco, por encima del 3:1 que piden la barra y el punto del
+> tipo. La etiqueta de tipo pinta su color al 24 % sobre el panel con `Text`
+> encima; `tests/unit/design-tokens.test.ts` comprueba que cumple AA con los
+> cuatro tipos en los dos temas. Que `Warning` y `Success` marquen un tipo de
+> evento es una excepción a la regla de arriba: ahí no significan aviso ni
+> éxito, y el nombre del tipo va siempre escrito.
 
 #### Sidebar (no cambia con el tema)
 

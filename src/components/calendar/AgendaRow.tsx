@@ -22,6 +22,7 @@ import {
 } from "./EventOrganizerActions";
 import { EventRsvp } from "./EventRsvp";
 import { EventTeams } from "./EventTeams";
+import { EventTypeTag } from "./EventTypeTag";
 import { useEventDetail } from "./use-event-detail";
 import { useEventRsvp } from "./use-event-rsvp";
 import { useEventTeam } from "./use-event-team";
@@ -179,9 +180,7 @@ export function AgendaRow({
               <span className="agenda-chevron" aria-hidden="true" />
             </button>
           </h2>
-          <span className={`agenda-type agenda-type-${event.eventType}`}>
-            {translate(`event.type.${event.eventType}`)}
-          </span>
+          <EventTypeTag translate={translate} eventType={event.eventType} />
           {isCancelled ? (
             <span className="agenda-cancelled">
               {translate("calendar.event.cancelled")}
