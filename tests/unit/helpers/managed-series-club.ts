@@ -53,7 +53,8 @@ export const SPLIT_EARLIER_OCCURRENCE_ID =
 export const SPLIT_FROM_OCCURRENCE_ID = "f3f3f3f3-0000-4000-8000-00000000000f";
 export const SPLIT_CANCELLED_OCCURRENCE_ID =
   "f4f4f4f4-0000-4000-8000-00000000000f";
-export const SPLIT_EDITED_OCCURRENCE_ID = "f5f5f5f5-0000-4000-8000-00000000000f";
+export const SPLIT_EDITED_OCCURRENCE_ID =
+  "f5f5f5f5-0000-4000-8000-00000000000f";
 export const SPLIT_LATER_OCCURRENCE_ID = "f6f6f6f6-0000-4000-8000-00000000000f";
 /** El id que recibe la serie que nace al partir. */
 export const NEW_SERIES_ID = "c7c7c7c7-0000-4000-8000-00000000000c";
@@ -291,7 +292,12 @@ function splitStoredSeries(
   ) {
     return { kind: "session_not_in_series" };
   }
-  if (!isStillAhead({ date: from.startsOn, time: from.startTime }, clubMoment(NOW))) {
+  if (
+    !isStillAhead(
+      { date: from.startsOn, time: from.startTime },
+      clubMoment(NOW),
+    )
+  ) {
     return { kind: "occurrence_started" };
   }
   const ofSeries = [...store.occurrences.values()].filter(
