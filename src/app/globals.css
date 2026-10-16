@@ -8230,15 +8230,15 @@ a.auth-brand-header:focus-visible {
   }
 }
 
-/* La agenda del Calendario (#311). Sigue docs/mockups/calendar-light.png y
-   mobile-calendar-light.png sin el control Mes/Semana/Agenda (ASS-010): una
-   tarjeta por evento con el bloque de fecha a la izquierda. En el móvil los
-   tres botones ocupan el ancho de la tarjeta, como en el mockup. */
+/* La agenda del Calendario (#311), con la forma de E24 (#647, "#1a Agenda +
+   panel" del handoff): los eventos agrupados por día, una fila por evento con
+   la barra del color del tipo, la hora, la miniatura, el cuerpo y mi
+   respuesta. El panel de la derecha llega con #648; el móvil, con #656. */
 .agenda {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  max-width: 780px;
+  max-width: 880px;
 }
 
 .agenda-header h1 {
@@ -8255,23 +8255,117 @@ a.auth-brand-header:focus-visible {
   color: var(--color-text-secondary);
 }
 
-.agenda-list {
+.agenda-list,
+.agenda-day-events {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.agenda-row {
+.agenda-list {
+  gap: var(--space-6);
+}
+
+.agenda-day-events {
+  gap: var(--space-1);
+}
+
+/* La etiqueta de un día: mono de 11px, hoy en el acento. */
+.agenda-day-heading {
   display: flex;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+.agenda-day-label.is-today {
+  color: var(--color-accent-text);
+}
+
+.agenda-day-note {
+  font-family: var(--font-family-body);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* El color de cada tipo en la barra de la fila. */
+.agenda-row-training .agenda-bar {
+  background: var(--color-accent);
+}
+
+.agenda-row-competition .agenda-bar {
+  background: var(--color-warning);
+}
+
+.agenda-row-social .agenda-bar {
+  background: var(--color-success);
+}
+
+.agenda-row-meeting .agenda-bar {
+  background: var(--color-type-meeting);
+}
+
+/* La rejilla del handoff: 4px | 74px | 56px | 1fr | auto. Lo desplegado va
+   debajo, de la hora al final, y la barra baja con ello. */
+.agenda-row {
+  display: grid;
+  grid-template-columns: 4px 74px 56px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  border-radius: 10px;
+}
+
+.agenda-bar {
+  grid-row: 1 / -1;
+  align-self: stretch;
+  border-radius: 2px;
+}
+
+.agenda-times {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding-left: var(--space-3);
+  font-family: var(--font-family-mono);
+  line-height: 1.4;
+}
+
+.agenda-start {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.agenda-end {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.agenda-thumbnail {
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
   border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+}
+
+.agenda-thumbnail > * {
+  width: 100%;
+  height: 100%;
+}
+
+.event-cover-image {
+  display: block;
+  object-fit: cover;
 }
 
 .agenda-date {
@@ -8307,19 +8401,125 @@ a.auth-brand-header:focus-visible {
   min-width: 0;
 }
 
-.agenda-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
+/* Una línea, con elipsis: el título entero lo da el botón al lector de
+   pantalla y el despliegue a la vista. */
 .agenda-title {
   margin: 0;
-  font-size: 16px;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 650;
   line-height: 1.3;
-  overflow-wrap: break-word;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.agenda-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   min-width: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.agenda-meta > * {
+  flex: none;
+}
+
+.agenda-repeat {
+  display: inline-flex;
+}
+
+/* El lugar es su propio enlace, por encima del que cubre la fila. */
+.agenda-place {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  min-height: 24px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.agenda-place:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+
+.agenda-place svg {
+  flex: none;
+}
+
+.agenda-place-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.agenda-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  text-align: end;
+}
+
+.agenda-answer,
+.agenda-going {
+  margin: 0;
+}
+
+.agenda-going {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.agenda-answer-missing {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-accent-text);
+}
+
+/* Mi respuesta en píldora, con el tinte de su color. El texto va en el color
+   del texto, como la etiqueta de tipo: el tono sobre su tinte no llega a AA
+   en claro. */
+.agenda-answer-pill {
+  display: inline-block;
+  padding: 1px var(--space-2);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+.agenda-answer-yes {
+  background: color-mix(in srgb, var(--color-success) 24%, var(--color-panel));
+  border-color: var(--color-success);
+}
+
+.agenda-answer-maybe {
+  background: color-mix(in srgb, var(--color-warning) 24%, var(--color-panel));
+  border-color: var(--color-warning);
+}
+
+.agenda-answer-no {
+  background: color-mix(in srgb, var(--color-danger) 24%, var(--color-panel));
+  border-color: var(--color-danger);
+}
+
+/* Un cancelado se ve atenuado y tachado; lo dice su palabra, no el color. */
+.agenda-row.is-cancelled .agenda-title {
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+}
+
+.agenda-row.is-cancelled .agenda-bar,
+.agenda-row.is-cancelled .agenda-thumbnail {
+  opacity: 0.4;
 }
 
 /* La etiqueta de tipo de evento (#641, "Event type colours" del handoff de
@@ -8409,13 +8609,6 @@ a.auth-brand-header:focus-visible {
   color: var(--color-danger);
   border: 1px solid currentcolor;
   border-radius: var(--radius);
-}
-
-.agenda-when {
-  margin: 0;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  overflow-wrap: break-word;
 }
 
 .agenda-footer {
@@ -8517,8 +8710,9 @@ a.auth-brand-header:focus-visible {
   position: relative;
 }
 
-.agenda-row:hover {
-  border-color: var(--color-accent);
+.agenda-row:hover,
+.agenda-row:has(.agenda-toggle[aria-expanded="true"]) {
+  background: var(--color-panel);
 }
 
 .agenda-row:has(.agenda-toggle:focus-visible) {
@@ -8574,9 +8768,18 @@ a.auth-brand-header:focus-visible {
 }
 
 .agenda-detail {
-  padding-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  grid-column: 2 / -1;
+  margin-top: var(--space-3);
+  padding: var(--space-3) 0 var(--space-2) var(--space-3);
   border-top: 1px solid var(--color-border);
   cursor: auto;
+}
+
+.agenda-detail[hidden] {
+  display: none;
 }
 
 .agenda-detail-list {
@@ -8758,7 +8961,7 @@ a.auth-brand-header:focus-visible {
   font-size: 12px;
 }
 
-/* Próximos y pasados, con la forma del control Mes/Semana/Agenda del mockup. */
+/* Próximos y pasados, un control segmentado (#647), y debajo los chips. */
 .agenda-header {
   display: flex;
   flex-wrap: wrap;
@@ -8795,8 +8998,112 @@ a.auth-brand-header:focus-visible {
 
 .agenda-period-choice[aria-pressed="true"] {
   color: var(--color-text);
-  background: var(--color-background);
+  background: color-mix(in srgb, var(--color-accent) 35%, var(--color-panel));
+}
+
+/* Un chip por tipo (#647): encendido, el tinte del tipo y el borde al 50 %;
+   apagado, sin fondo, el texto secundario y el punto al 35 %. */
+.agenda-chips {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.agenda-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.agenda-chip-training {
+  background: color-mix(in srgb, var(--color-accent) 24%, var(--color-panel));
+  border-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+}
+
+.agenda-chip-training .agenda-chip-dot {
+  background: var(--color-accent);
+}
+
+.agenda-chip-competition {
+  background: color-mix(in srgb, var(--color-warning) 24%, var(--color-panel));
+  border-color: color-mix(in srgb, var(--color-warning) 50%, transparent);
+}
+
+.agenda-chip-competition .agenda-chip-dot {
+  background: var(--color-warning);
+}
+
+.agenda-chip-social {
+  background: color-mix(in srgb, var(--color-success) 24%, var(--color-panel));
+  border-color: color-mix(in srgb, var(--color-success) 50%, transparent);
+}
+
+.agenda-chip-social .agenda-chip-dot {
+  background: var(--color-success);
+}
+
+.agenda-chip-meeting {
+  background: color-mix(
+    in srgb,
+    var(--color-type-meeting) 24%,
+    var(--color-panel)
+  );
+  border-color: color-mix(in srgb, var(--color-type-meeting) 50%, transparent);
+}
+
+.agenda-chip-meeting .agenda-chip-dot {
+  background: var(--color-type-meeting);
+}
+
+.agenda-chip:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+.agenda-chip[aria-pressed="false"] {
+  color: var(--color-text-secondary);
+  background: transparent;
   border-color: var(--color-border);
+}
+
+.agenda-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.agenda-chip[aria-pressed="false"] .agenda-chip-dot {
+  opacity: 0.35;
+}
+
+.agenda-no-types {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* Por debajo del escritorio la miniatura cede su sitio: la fila no puede
+   empujar la página hacia los lados. El móvil de verdad es #656. */
+@media (max-width: 559px) {
+  .agenda-row {
+    grid-template-columns: 4px 64px minmax(0, 1fr) auto;
+    column-gap: var(--space-2);
+  }
+
+  .agenda-thumbnail {
+    display: none;
+  }
 }
 
 .agenda-more {
@@ -8825,7 +9132,8 @@ a.auth-brand-header:focus-visible {
     min-height: 36px;
   }
 
-  .agenda-period-choice {
+  .agenda-period-choice,
+  .agenda-chip {
     min-height: 36px;
   }
 }
