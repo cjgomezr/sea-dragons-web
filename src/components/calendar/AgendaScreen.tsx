@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { PAYMENTS_PATH } from "@/lib/auth/routes";
 import type { AgendaEvent, AgendaPeriod } from "@/lib/events/event-agenda";
@@ -11,22 +12,20 @@ import {
 } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
-import { clubCalendarDate } from "@/lib/time/club-calendar";
+import { calendarYearOf, clubCalendarDate } from "@/lib/time/club-calendar";
 import {
   type AgendaFailure,
   type AgendaLoad,
   describeAgendaFailure,
   loadAgenda,
 } from "./agenda-client";
-import {
-  type AgendaDay,
-  classifyAgendaDay,
-  groupAgendaByDay,
-} from "./agenda-days";
+import { classifyAgendaDay, groupAgendaByDay } from "./agenda-days";
 import { AgendaRow } from "./AgendaRow";
 import {
+  AGENDA_TYPES_QUERY_PARAM,
   AGENDA_TYPE_CHIPS,
   agendaRequestTypes,
+  readAgendaTypeFilter,
   searchWithAgendaTypes,
   toggleAgendaType,
 } from "./agenda-type-filter";
@@ -208,8 +207,6 @@ function LoadMore({
   );
 }
 
-const YEAR_LENGTH = "YYYY".length;
-
 /** La etiqueta de un día: "TODAY" en el acento, o "SAT · OCT 17" con "This
  * weekend" al lado. La abreviatura es para la vista; el lector de pantalla
  * oye el día entero. */
@@ -237,7 +234,7 @@ function AgendaDayHeading({
       </h2>
     );
   }
-  const withYear = date.slice(0, YEAR_LENGTH) !== today.slice(0, YEAR_LENGTH);
+  const withYear = calendarYearOf(date) !== calendarYearOf(today);
   return (
     <h2 className="agenda-day-heading">
       <span className="agenda-day-label" aria-hidden="true">
@@ -281,7 +278,7 @@ function AgendaList({
   const today = clubCalendarDate(new Date());
   return (
     <ul className="agenda-list" aria-labelledby={TITLE_ID}>
-      {groupAgendaByDay(events).map((day: AgendaDay<AgendaEvent>) => (
+      {groupAgendaByDay(events).map((day) => (
         <li key={day.date} className="agenda-day">
           <AgendaDayHeading
             translate={translate}
@@ -639,8 +636,15 @@ export function AgendaScreen({
   const rsvpDisabledReasonId = canRespond ? null : membershipNoticeId;
   const [period, setPeriod] = useState<AgendaPeriod>(initialPeriod);
   const [notice, setNotice] = useState<AgendaNotice | null>(null);
-  const [chosenTypes, setChosenTypes] =
-    useState<readonly EventType[]>(initialTypes);
+  // En el navegador manda la dirección: al volver atrás, el router pinta la
+  // página con los props de antes de filtrar, sin `?types=`. Fuera de un
+  // router no hay dirección y valen los props.
+  const searchParams = useSearchParams();
+  const [chosenTypes, setChosenTypes] = useState<readonly EventType[]>(() =>
+    searchParams === null
+      ? initialTypes
+      : readAgendaTypeFilter(searchParams.get(AGENDA_TYPES_QUERY_PARAM)),
+  );
   // Cambia con cada evento creado, editado o cancelado: la clave nueva vuelve
   // a montar las vistas.
   const [agendaVersion, setAgendaVersion] = useState<AgendaVersion>({
@@ -671,6 +675,8 @@ export function AgendaScreen({
   function chooseTypes(eventTypes: readonly EventType[]): void {
     setChosenTypes(eventTypes);
     writeTypesToAddress(eventTypes);
+    // Vuelve a montar las vistas: la agenda llega de cero con los tipos nuevos
+    // y el foco no salta al evento con el que se abrió.
     reloadAgenda(null);
   }
 

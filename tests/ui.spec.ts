@@ -16577,6 +16577,40 @@ test.describe("calendario en el navegador", () => {
     expect(sent).toEqual({ response: "maybe" });
   });
 
+  test("volver atrás tras salir del calendario deja el mismo filtro (#647)", async ({
+    page,
+  }) => {
+    await goToCalendar(page, CALENDAR_WITH_EVENTS);
+    const chips = page.getByRole("group", { name: "Event types" });
+    await chips.getByRole("button", { name: "Meeting" }).click();
+    await expect(page).toHaveURL(/types=training%2Ccompetition%2Csocial$/);
+
+    await page.getByRole("link", { name: "Directory" }).first().click();
+    await expect(page).toHaveURL(/\/directorio/);
+    await page.goBack();
+
+    await expect(page).toHaveURL(/types=training%2Ccompetition%2Csocial$/);
+    await expect(
+      chips.getByRole("button", { name: "Meeting" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    await expect(
+      chips.getByRole("button", { name: "Training" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("recargar deja el mismo filtro (#647)", async ({ page }) => {
+    await goToCalendar(page, CALENDAR_WITH_EVENTS);
+    const chips = page.getByRole("group", { name: "Event types" });
+    await chips.getByRole("button", { name: "Meeting" }).click();
+    await expect(page).toHaveURL(/types=/);
+
+    await page.reload();
+
+    await expect(
+      chips.getByRole("button", { name: "Meeting" }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
+
   test("a 375px los botones de RSVP conservan el objetivo táctil de 44px", async ({
     page,
   }) => {

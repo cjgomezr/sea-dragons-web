@@ -1,5 +1,9 @@
 import type { IsoWeekday } from "@/lib/events/event-occurrences";
-import { CLUB_TIME_ZONE, clubCalendarDate } from "@/lib/time/club-calendar";
+import {
+  CLUB_TIME_ZONE,
+  calendarYearOf,
+  clubCalendarDate,
+} from "@/lib/time/club-calendar";
 import type { Locale } from "./locale";
 
 /** Las variantes con las que se escriben fechas y números. El inglés es el
@@ -234,7 +238,7 @@ export function formatAgendaDayLabel(
   const dayNumber = String(Number(day));
   const date =
     locale === "es" ? `${dayNumber} ${month}` : `${month} ${dayNumber}`;
-  const parts = [weekday, date, ...(withYear ? [isoDate.slice(0, 4)] : [])];
+  const parts = [weekday, date, ...(withYear ? [calendarYearOf(isoDate)] : [])];
   return parts
     .join(AGENDA_DAY_SEPARATOR)
     .toLocaleUpperCase(DISPLAY_LOCALES[locale]);
