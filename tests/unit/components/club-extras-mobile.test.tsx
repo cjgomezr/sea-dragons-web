@@ -110,7 +110,10 @@ function buyersResponse(buyers: readonly LevyBuyer[]): Handler {
 }
 
 function stubFetch(
-  routes: { readonly buyers?: Readonly<Record<string, Handler>> } = {},
+  routes: {
+    readonly sales?: Handler;
+    readonly buyers?: Readonly<Record<string, Handler>>;
+  } = {},
 ): ReturnType<typeof vi.fn> {
   const buyerHandlers = routes.buyers ?? {
     prod_cup: buyersResponse(CUP_BUYERS),
@@ -120,8 +123,9 @@ function stubFetch(
   const handlers: Record<string, Handler> = {
     [MEMBERSHIP_PATH]: () => jsonResponse({ data: CONFIGURED_VIEW }),
     [LEVIES_PATH]: () => jsonResponse({ data: { levies: [] } }),
-    [SALES_PATH]: () =>
-      jsonResponse({ data: { sales: [CUP, JERSEY, DINNER] } }),
+    [SALES_PATH]:
+      routes.sales ??
+      (() => jsonResponse({ data: { sales: [CUP, JERSEY, DINNER] } })),
     ...Object.fromEntries(
       Object.entries(buyerHandlers).map(([productId, handler]) => [
         buyersPath(productId),
@@ -453,6 +457,57 @@ describe("la hoja del detalle en el móvil (#636)", () => {
     expect(sheet(CUP.name)).toContainElement(
       document.activeElement as HTMLElement,
     );
+  });
+});
+
+describe("la pestaña de extras sin nada que enseñar en el móvil (#636)", () => {
+  it("sin extras explica que se crean en Stripe, como en escritorio", async () => {
+    stubFetch({ sales: () => jsonResponse({ data: { sales: [] } }) });
+    renderExtras();
+
+    expect(
+      await screen.findByText(/committee creates them in Stripe/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: /on sale/ })).toBeNull();
+  });
+
+  it("con Stripe sin configurar lo avisa, como en escritorio", async () => {
+    stubFetch({
+      sales: () =>
+        jsonResponse(
+          {
+            error: {
+              code: "service_unavailable",
+              message: "No se pudo.",
+              reason: "stripe_not_configured",
+            },
+          },
+          503,
+        ),
+    });
+    renderExtras();
+
+    expect(
+      await screen.findByText(/Payments aren't set up yet/),
+    ).toBeInTheDocument();
+  });
+
+  it("si la lista falla, lo dice y deja reintentar", async () => {
+    stubFetch({
+      sales: () =>
+        jsonResponse(
+          { error: { code: "internal_error", message: "No se pudo." } },
+          500,
+        ),
+    });
+    renderExtras();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't load the club extras.",
+    );
+    expect(
+      screen.getByRole("button", { name: "Try again" }),
+    ).toBeInTheDocument();
   });
 });
 
