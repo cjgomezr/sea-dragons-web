@@ -63,6 +63,10 @@ const eventFieldsSchema = z.object({
     .optional(),
   placeDetail: z.string().nullable().optional(),
   notes: z.string().nullable(),
+  // Una subida de `POST /api/v1/events/manage/uploads` (#644). A `null`
+  // quita la imagen; sin la clave, al editar no cambia. Que sea del club y
+  // de quien organiza lo decide el dominio (422).
+  coverUploadId: z.uuid().nullable().optional(),
   // Los ids de grupo tienen que ser uuid para no mandarle a Postgres un valor
   // que rechazaría. Que la lista no venga vacía lo decide el dominio (422).
   audience: z.discriminatedUnion("kind", [

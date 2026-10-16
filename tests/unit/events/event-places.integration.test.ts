@@ -108,6 +108,7 @@ function scheduleOf(
       audience: { kind: "club" },
     },
     endsOn: null,
+    coverUploadId: null,
     occurrenceDates: [FAR_DAY],
     series: null,
     ...overrides,

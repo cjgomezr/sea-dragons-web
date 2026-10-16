@@ -12,6 +12,7 @@ import type {
   ManagedEvent,
   ManagedEventWrite,
 } from "./event-management";
+import { createSupabaseEventCoversGateway } from "./supabase-event-covers-gateway";
 import { findClubGroupIds } from "./supabase-event-gateways";
 import {
   PLACE_COLUMNS,
@@ -150,6 +151,9 @@ export function toChangesArgument(changes: EventEdit): Record<string, unknown> {
       ? {}
       : { place_detail: changes.placeDetail }),
     ...(changes.notes === undefined ? {} : { notes: changes.notes }),
+    ...(changes.coverUploadId === undefined
+      ? {}
+      : { cover_upload_id: changes.coverUploadId }),
     ...(audience === undefined
       ? {}
       : {
@@ -213,6 +217,7 @@ export function createEventManagementGateways(
     events: {
       findClubGroupIds: (query) => findClubGroupIds(serviceClient, query),
     },
+    eventCovers: createSupabaseEventCoversGateway(serviceClient),
     managedEvents: {
       findEvent: (query) => findEvent(serviceClient, query),
       updateEvent: (update) => updateEvent(serviceClient, update),

@@ -11,6 +11,7 @@ import type {
   NotificationBroadcastWriter,
   NotificationInsert,
 } from "@/lib/notifications/notify-member";
+import { fakeEventCovers, findCoverUploader } from "./event-covers-club";
 
 /**
  * Un club en memoria para los tests de crear eventos (#307). El doble cumple
@@ -166,14 +167,15 @@ export function fakeEventsClub(
   ];
   const gateways: EventGateways = {
     members: {
-      findRoleRequestMember: async () =>
-        options.callerIsMember === false
+      findRoleRequestMember: async (userId) =>
+        findCoverUploader(userId) ??
+        (options.callerIsMember === false
           ? null
           : {
               clubId: CLUB_ID,
               fullName: "Quien llama",
               role: options.callerRole ?? "Committee",
-            },
+            }),
     },
     events: {
       findClubGroupIds: async ({ clubId, groupIds }) =>
@@ -192,6 +194,7 @@ export function fakeEventsClub(
         };
       },
     },
+    eventCovers: fakeEventCovers().gateway,
     ...noticeGateways,
   };
   return { gateways, saved, notices, noticeBatches };

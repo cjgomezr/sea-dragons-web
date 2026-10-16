@@ -151,11 +151,12 @@ async function cancelSeries(
 export function createSeriesManagementGateways(
   serviceClient: SupabaseClient,
 ): SeriesManagementGateways {
-  const { members, events, eventAudience, notifications } =
+  const { members, events, eventCovers, eventAudience, notifications } =
     createEventManagementGateways(serviceClient);
   return {
     members,
     events,
+    eventCovers,
     eventAudience,
     notifications,
     managedSeries: {
