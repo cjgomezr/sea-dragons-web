@@ -190,6 +190,10 @@ export const EVENT_ISSUE_CODES = [
   "event_place_invalid",
   "event_place_coordinates_invalid",
   "event_place_detail_invalid",
+  "event_cover_empty",
+  "event_cover_too_large",
+  "event_cover_type_unsupported",
+  "event_cover_upload_invalid",
 ] as const;
 
 export type EventIssueCode = (typeof EVENT_ISSUE_CODES)[number];
@@ -218,6 +222,12 @@ const ISSUE_MESSAGES: Readonly<Record<EventIssueCode, string>> = {
   event_place_invalid: `El nombre del lugar tiene que tener entre 1 y ${PLACE_NAME_MAX_LENGTH} caracteres, y su dirección como mucho ${PLACE_ADDRESS_MAX_LENGTH}, sin caracteres de control.`,
   event_place_coordinates_invalid: `Las coordenadas del lugar van las dos o ninguna, con la latitud entre -${LATITUDE_LIMIT} y ${LATITUDE_LIMIT} y la longitud entre -${LONGITUDE_LIMIT} y ${LONGITUDE_LIMIT}.`,
   event_place_detail_invalid: `"Dónde exactamente" puede tener como mucho ${PLACE_DETAIL_MAX_LENGTH} caracteres, sin caracteres de control.`,
+  event_cover_empty: "La imagen está vacía.",
+  event_cover_too_large: "La imagen puede pesar como mucho 10 MB.",
+  event_cover_type_unsupported:
+    "La imagen tiene que ser un JPEG, un PNG o un WebP que se pueda abrir.",
+  event_cover_upload_invalid:
+    "La imagen no está entre las que subieron quienes organizan eventos en tu club.",
 };
 
 export class EventValidationError extends Error {
