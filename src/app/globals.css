@@ -9665,6 +9665,7 @@ a.auth-brand-header:focus-visible {
    móvil propio es #636. */
 .payments-club-extras {
   container: payments-club-extras / inline-size;
+  max-width: 1040px;
   margin-top: var(--space-4);
 }
 
@@ -9795,7 +9796,7 @@ a.auth-brand-header:focus-visible {
   white-space: nowrap;
 }
 
-.payments-sale-number {
+.payments-sales-table .payments-sale-number {
   font-family: var(--font-family-mono);
   font-size: 13.5px;
   font-weight: 700;
@@ -9904,6 +9905,11 @@ a.auth-brand-header:focus-visible {
   overflow-x: hidden;
   overflow-y: auto;
   list-style: none;
+}
+
+.payments-buyers:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
 }
 
 .payments-buyer {

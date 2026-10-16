@@ -40,17 +40,14 @@ export type BuyersCache = {
 
 /** Los compradores de cada extra ya elegido, pedidos una sola vez. Vive en
  * la pestaña y no en el panel para que cambiar de extra no lo vacíe. */
-export function useBuyersCache(selectedProductId: string | null): BuyersCache {
+export function useBuyersCache(selectedProductId: string): BuyersCache {
   const [loads, setLoads] = useState<ReadonlyMap<string, LevyBuyersLoad>>(
     () => new Map(),
   );
   const [attempt, setAttempt] = useState(0);
   const requested = useRef(new Set<string>());
   useEffect(() => {
-    if (
-      selectedProductId === null ||
-      requested.current.has(selectedProductId)
-    ) {
+    if (requested.current.has(selectedProductId)) {
       return;
     }
     requested.current.add(selectedProductId);
@@ -171,7 +168,8 @@ function BuyersBody({
     return <p>{translate("payments.levyPayers.noPayments")}</p>;
   }
   return (
-    <ul className="payments-buyers" aria-labelledby={titleId}>
+    // Enfocable porque puede tener scroll: sin ratón, las flechas lo mueven.
+    <ul className="payments-buyers" aria-labelledby={titleId} tabIndex={0}>
       {state.buyers.map((buyer) => (
         <BuyerItem
           key={`${buyer.userId}-${buyer.paidAt}`}

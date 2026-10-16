@@ -15607,72 +15607,131 @@ async function stubLevies(
   );
 }
 
-/** Quién pagó el levy de Nationals (#531), fingido: un Admin lo abre bajo el
- * levy. Un nombre largo para ver cómo parte la fila apilada en 375px. */
-const NATIONALS_PAYERS_ENDPOINT = `${LEVIES_ENDPOINT}/${NATIONALS_LEVY.id}/payers`;
-const WHO_PAID_BUTTON_NAME = /^(Who paid|Quién pagó)$/;
-const PAID_TABLE_NAME = /^(Paid|Pagaron)$/;
-const NO_PAYMENTS_TEXT =
-  /^(Nobody has paid this charge yet\.|Todavía no hay pagos de este cobro\.)$/;
+/** Lo vendido de los extras del club (#635), fingido como los levies: un
+ * Admin lo ve en la pestaña Extras del club. Tres a la venta y uno cerrado,
+ * con nombres largos para ver cómo parten la tabla y el detalle. */
+const LEVY_SALES_ENDPOINT = `${LEVIES_ENDPOINT}/sales`;
+const LEVY_BUYERS_ENDPOINT = /^\/api\/v1\/levies\/products\/[^/]+\/buyers$/;
 
-const NATIONALS_PAYERS = {
-  levy: {
-    id: NATIONALS_LEVY.id,
-    name: NATIONALS_LEVY.name,
-    amountCents: NATIONALS_LEVY.amountCents,
-  },
-  summary: { paidCount: 2, missingCount: 2, collectedCents: 16000 },
-  payers: [
-    {
-      userId: "payer-1",
-      fullName: "Maximiliana Fitzgerald-Papadopoulos",
-      email: "maxi@example.com",
-      quantity: 1,
-      paidAt: "2026-10-05T01:00:00.000Z",
-      amountCents: 8000,
-    },
-    {
-      userId: "payer-2",
-      fullName: "Bruno Díaz",
-      email: "bruno@example.com",
-      quantity: 1,
-      paidAt: "2026-10-02T01:00:00.000Z",
-      amountCents: 8000,
-    },
-  ],
-  missing: [
-    { userId: "missing-1", fullName: "Carla Soto", email: "carla@example.com" },
-    { userId: "missing-2", fullName: "Dani Vega", email: "dani@example.com" },
-  ],
-} as const;
+function levySale(sale: {
+  readonly productId: string;
+  readonly name: string;
+  readonly description: string | null;
+  readonly amountCents: number;
+  readonly soldQuantity: number;
+  readonly buyerCount: number;
+  readonly status?: "open" | "closed";
+}): object {
+  return {
+    priceId: sale.status === "closed" ? null : `price_${sale.productId}`,
+    status: "open",
+    soldByOption: [],
+    ...sale,
+  };
+}
 
-const NATIONALS_WITHOUT_PAYERS = {
-  ...NATIONALS_PAYERS,
-  summary: { paidCount: 0, missingCount: 2, collectedCents: 0 },
-  payers: [],
-} as const;
+const OPEN_LEVY_SALES: readonly object[] = [
+  levySale({
+    productId: "prod_island_cup",
+    name: "Island Cup entry fee",
+    description: "U16 squad. Covers entry, field hire and the team bus.",
+    amountCents: 4500,
+    soldQuantity: 14,
+    buyerCount: 12,
+  }),
+  levySale({
+    productId: "prod_jersey",
+    name: "2026 club jersey",
+    description: "Home and away jersey with your number, in the club colours.",
+    amountCents: 6000,
+    soldQuantity: 31,
+    buyerCount: 24,
+  }),
+  levySale({
+    productId: "prod_dinner",
+    name: "End-of-season dinner",
+    description: "Saturday Nov 28 at the clubhouse. Partners welcome.",
+    amountCents: 3500,
+    soldQuantity: 9,
+    buyerCount: 9,
+  }),
+];
 
-async function stubLevyPayers(page: Page, report: object): Promise<void> {
+const CLOSED_LEVY_SALES: readonly object[] = [
+  ...OPEN_LEVY_SALES,
+  levySale({
+    productId: "prod_nationals_2025",
+    name: "Australian Underwater Rugby Nationals 2025 entry",
+    description: null,
+    amountCents: 8000,
+    soldQuantity: 18,
+    buyerCount: 18,
+    status: "closed",
+  }),
+];
+
+const BUYER_NAMES = [
+  "Lucía Fernández",
+  "Tom Baker",
+  "Maximiliana Fitzgerald-Papadopoulos",
+  "Priya Nair",
+  "Sam O'Neill",
+  "Hana Sato",
+  "Dana Whitfield",
+  "Andrea Cadavid",
+  "Alex Kim",
+  "Bruno Díaz",
+  "Carla Soto",
+  "Dani Vega",
+] as const;
+
+/** Doce compras, una de dos unidades, para que la lista llegue a su scroll. */
+const LEVY_BUYERS: readonly object[] = BUYER_NAMES.map((fullName, index) => {
+  const quantity = index === 0 ? 2 : 1;
+  return {
+    userId: `buyer-${index}`,
+    fullName,
+    email: `buyer-${index}@example.com`,
+    quantity,
+    paidAt: new Date(Date.UTC(2026, 9, 14 - index, 1)).toISOString(),
+    amountCents: 4500 * quantity,
+    option: null,
+  };
+});
+
+const SALES_TABLE_NAME = /(extras? on sale|extras? a la venta)/;
+const BUYERS_LIST_NAME = /^(Buyers|Compradores)$/;
+const NO_CLUB_EXTRAS_TEXT = /(creates them in Stripe|los crea en Stripe)/;
+
+async function stubLevySales(
+  page: Page,
+  sales: readonly object[],
+  buyers: readonly object[],
+): Promise<void> {
   await page.route(
-    (url) => url.pathname === NATIONALS_PAYERS_ENDPOINT,
-    (route) => route.fulfill(jsonBody(report)),
+    (url) => url.pathname === LEVY_SALES_ENDPOINT,
+    (route) => route.fulfill(jsonBody({ sales })),
+  );
+  await page.route(
+    (url) => LEVY_BUYERS_ENDPOINT.test(url.pathname),
+    (route) => route.fulfill(jsonBody({ buyers })),
   );
 }
 
-/** Abre la lista bajo el primer levy y espera a que llegue. */
-async function openLevyPayers(page: Page, report: object): Promise<void> {
-  await page
-    .getByRole("button", { name: WHO_PAID_BUTTON_NAME })
-    .first()
-    .click();
-  const hasPayers =
-    "payers" in report && Array.isArray(report.payers)
-      ? report.payers.length > 0
-      : false;
+/** Espera la tabla y los compradores del primer extra, o el estado vacío. */
+async function waitForClubExtras(
+  page: Page,
+  sales: readonly object[],
+): Promise<void> {
+  if (sales.length === 0) {
+    await expect(page.getByText(NO_CLUB_EXTRAS_TEXT)).toBeVisible();
+    return;
+  }
   await expect(
-    hasPayers
-      ? page.getByRole("table", { name: PAID_TABLE_NAME })
-      : page.getByText(NO_PAYMENTS_TEXT),
+    page.getByRole("table", { name: SALES_TABLE_NAME }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("list", { name: BUYERS_LIST_NAME }),
   ).toBeVisible();
 }
 
@@ -15694,8 +15753,9 @@ type PaymentsScreenState = {
   readonly view?: object;
   /** Los levies que sirve su endpoint fingido; sin ellos, ninguno. */
   readonly levies?: readonly object[];
-  /** Quién pagó el primer levy (#531): si está, se abre su lista. */
-  readonly payers?: object;
+  /** Lo vendido de los extras (#635), en la pestaña Extras del club. Sin
+   * ello, ninguno. */
+  readonly sales?: readonly object[];
   /** La pestaña que abre un Admin o un Committee (#627). Sin ella, quien
    * mira es un socio sin pestañas. */
   readonly tab?: PaymentsTabName;
@@ -15725,16 +15785,18 @@ function paymentsStates(
   ];
 }
 
-/** Los estados de un Admin con la lista de quién pagó abierta (#531). */
-function levyPayersStates(
+/** La pestaña Extras del club de un Admin (#635), con el primer extra
+ * elegido. Su axe corre en claro y en oscuro. */
+function clubExtrasStates(
   name: string,
-  payers: object,
+  sales: readonly object[],
 ): readonly PaymentsScreenState[] {
   return paymentsStates(name, ACTIVE_MEMBERSHIP_VIEW, UNPAID_LEVIES).map(
     (state) => ({
       ...state,
-      payers,
+      sales,
       tab: "extras",
+      checksDarkAxe: true,
       storageState: ADMIN_STORAGE_STATE,
     }),
   );
@@ -15832,8 +15894,9 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   ...paymentsStates("pagos-levies", ACTIVE_MEMBERSHIP_VIEW, UNPAID_LEVIES),
   ...paymentsStates("pagos-levy-pagado", ACTIVE_MEMBERSHIP_VIEW, ONE_PAID_LEVY),
   ...memberExtrasStates("pagos-extras-socio", MEMBER_EXTRAS),
-  ...levyPayersStates("pagos-levy-pagadores", NATIONALS_PAYERS),
-  ...levyPayersStates("pagos-levy-sin-pagos", NATIONALS_WITHOUT_PAYERS),
+  ...clubExtrasStates("pagos-extras-admin", OPEN_LEVY_SALES),
+  ...clubExtrasStates("pagos-extras-admin-cerrados", CLOSED_LEVY_SALES),
+  ...clubExtrasStates("pagos-extras-admin-vacio", []),
   ...planStripStates("pagos-plan-activo", PLAN_CHANGE_MEMBERSHIP_VIEW),
   ...planStripStates("pagos-plan-casual", CASUAL_BALANCE_MEMBERSHIP_VIEW),
   ...planStripStates("pagos-plan-exencion", WAIVED_MEMBERSHIP_VIEW),
@@ -15892,15 +15955,14 @@ async function goToPayments(
   page: Page,
   state: Pick<
     PaymentsScreenState,
-    "view" | "levies" | "payers" | "tab" | "beforeVisit" | "historyFilter"
+    "view" | "levies" | "sales" | "tab" | "beforeVisit" | "historyFilter"
   >,
   theme?: (typeof themes)[number],
 ): Promise<void> {
   const levies = state.levies ?? [];
   await stubLevies(page, levies);
-  if (state.payers !== undefined) {
-    await stubLevyPayers(page, state.payers);
-  }
+  // Siempre fingido: los de dev salen de la cuenta de prueba de Stripe.
+  await stubLevySales(page, state.sales ?? [], LEVY_BUYERS);
   if (state.view !== undefined) {
     await serveMembership(page, state.view);
     // Un Casual ve los packs del club (#471): fingidos, para que la captura
@@ -15934,13 +15996,13 @@ async function goToPayments(
       page.getByRole("button", { name: BUY_PACK_BUTTON_NAME }),
     ).toBeVisible();
   }
-  if (levies.length > 0) {
+  if (levies.length > 0 && state.tab !== "extras") {
     await expect(
       page.getByRole("heading", { level: 2, name: LEVIES_HEADING }),
     ).toBeVisible();
   }
-  if (state.payers !== undefined) {
-    await openLevyPayers(page, state.payers);
+  if (state.tab === "extras") {
+    await waitForClubExtras(page, state.sales ?? []);
   }
   if (state.historyFilter !== undefined) {
     await chooseHistoryFilter(page, state.historyFilter);
@@ -16028,9 +16090,7 @@ test.describe("las pestañas de Pagos en el navegador (#627)", () => {
     await page.getByRole("tab", { name: EXTRAS_TAB_NAME }).click();
 
     await expect(page).toHaveURL(/\/pagos\?tab=extras$/);
-    await expect(
-      page.getByRole("button", { name: WHO_PAID_BUTTON_NAME }).first(),
-    ).toBeVisible();
+    await expect(page.getByText(NO_CLUB_EXTRAS_TEXT)).toBeVisible();
 
     await page.goBack();
 
