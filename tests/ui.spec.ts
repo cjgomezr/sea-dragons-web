@@ -15616,6 +15616,18 @@ async function stubLevies(
 const LEVY_SALES_ENDPOINT = `${LEVIES_ENDPOINT}/sales`;
 const LEVY_BUYERS_ENDPOINT = /^\/api\/v1\/levies\/products\/[^/]+\/buyers$/;
 
+type LevySaleFixture = {
+  readonly productId: string;
+  readonly priceId: string | null;
+  readonly name: string;
+  readonly description: string | null;
+  readonly amountCents: number;
+  readonly soldQuantity: number;
+  readonly buyerCount: number;
+  readonly status: "open" | "closed";
+  readonly soldByOption: readonly object[];
+};
+
 function levySale(sale: {
   readonly productId: string;
   readonly name: string;
@@ -15624,7 +15636,7 @@ function levySale(sale: {
   readonly soldQuantity: number;
   readonly buyerCount: number;
   readonly status?: "open" | "closed";
-}): object {
+}): LevySaleFixture {
   return {
     priceId: sale.status === "closed" ? null : `price_${sale.productId}`,
     status: "open",
@@ -15633,7 +15645,7 @@ function levySale(sale: {
   };
 }
 
-const OPEN_LEVY_SALES: readonly object[] = [
+const OPEN_LEVY_SALES: readonly LevySaleFixture[] = [
   levySale({
     productId: "prod_island_cup",
     name: "Island Cup entry fee",
@@ -15660,7 +15672,7 @@ const OPEN_LEVY_SALES: readonly object[] = [
   }),
 ];
 
-const CLOSED_LEVY_SALES: readonly object[] = [
+const CLOSED_LEVY_SALES: readonly LevySaleFixture[] = [
   ...OPEN_LEVY_SALES,
   levySale({
     productId: "prod_nationals_2025",
@@ -15817,13 +15829,32 @@ function paymentsStates(
   ];
 }
 
+/** Los levies que `GET /api/v1/levies` daría con esos extras a la venta: la
+ * insignia de la pestaña los cuenta, así que tiene que cuadrar con la lista
+ * de lo vendido. */
+function leviesOnSale(sales: readonly LevySaleFixture[]): readonly object[] {
+  return sales
+    .filter((sale) => sale.status === "open")
+    .map((sale) => ({
+      id: sale.priceId,
+      productId: sale.productId,
+      name: sale.name,
+      description: sale.description,
+      amountCents: sale.amountCents,
+      maxQuantity: 1,
+      purchasedQuantity: 0,
+      lastPurchasedAt: null,
+      isPaid: false,
+    }));
+}
+
 /** La pestaña Extras del club de un Admin (#635), con el primer extra
  * elegido. Su axe corre en claro y en oscuro. */
 function clubExtrasStates(
   name: string,
-  sales: readonly object[],
+  sales: readonly LevySaleFixture[],
 ): readonly PaymentsScreenState[] {
-  return paymentsStates(name, ACTIVE_MEMBERSHIP_VIEW, UNPAID_LEVIES).map(
+  return paymentsStates(name, ACTIVE_MEMBERSHIP_VIEW, leviesOnSale(sales)).map(
     (state) => ({
       ...state,
       sales,

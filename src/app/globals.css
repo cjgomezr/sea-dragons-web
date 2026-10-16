@@ -9087,9 +9087,12 @@ a.auth-brand-header:focus-visible {
     font-size: 28px;
   }
 
+  /* La raya de la barra llega hasta donde llega la pestaña más ancha, la de
+     Extras del club con su detalle (`.payments-club-extras`). */
   .payments-tabs {
     display: flex;
     gap: var(--space-6);
+    max-width: 1040px;
     height: auto;
     padding: 0;
     background: none;
