@@ -21,7 +21,15 @@ const AGENDA_PATH = "/api/v1/events";
 const CREATE_PATH = "/api/v1/events/manage";
 const GROUPS_PATH = "/api/v1/groups";
 const UPLOAD_PATH = "/api/v1/events/manage/uploads";
+const PLACES_PATH = "/api/v1/events/manage/places";
 const COVER_ID = "c0c0c0c0-0000-4000-8000-00000000000c";
+
+const PRINCES_PARK = {
+  name: "Princes Park, Oval 2",
+  address: "Princes Park Dr, Carlton North VIC 3054",
+  lat: -37.7836,
+  lng: 144.9616,
+};
 
 const SENIOR = {
   id: "9a9a9a9a-0000-4000-8000-000000000009",
@@ -154,6 +162,14 @@ function stubApi(options: {
       }
       if (url.pathname === GROUPS_PATH) {
         return jsonResponse(200, { data: { groups } });
+      }
+      if (url.pathname === PLACES_PATH) {
+        return jsonResponse(200, {
+          data: {
+            places: [{ source: "club", ...PRINCES_PARK }],
+            searchAvailable: true,
+          },
+        });
       }
       if (url.pathname === UPLOAD_PATH && method === "POST") {
         return respondToUpload(call);
@@ -1160,5 +1176,56 @@ describe("los avisos del fin tras corregir (#650)", () => {
     expect(
       within(dialog).getByText("Lasts 1 h").closest("[aria-live]"),
     ).toHaveAttribute("aria-live", "polite");
+  });
+});
+
+describe("el lugar en el diálogo (#652)", () => {
+  it("manda el lugar elegido y dónde exactamente al crear", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    fillSingleEvent(dialog);
+    await userEvent.click(within(dialog).getByRole("combobox"));
+
+    await userEvent.click(
+      await within(dialog).findByRole("option", { name: /Princes Park/ }),
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText("Where exactly · optional"),
+      "Field 2",
+    );
+    await submit(dialog);
+
+    await waitFor(() => expect(createCalls()).toHaveLength(1));
+    expect(createCalls()[0]?.body).toMatchObject({
+      location: PRINCES_PARK.name,
+      place: PRINCES_PARK,
+      placeDetail: "Field 2",
+    });
+  });
+
+  it("con texto libre manda sólo el lugar escrito", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    fillSingleEvent(dialog);
+
+    await submit(dialog);
+
+    await waitFor(() => expect(createCalls()).toHaveLength(1));
+    const body = createCalls()[0]?.body;
+    expect(body).toMatchObject({ location: "MSAC Dive Pool" });
+    expect(body).not.toHaveProperty("place");
+    expect(body).not.toHaveProperty("placeDetail");
+  });
+
+  it("Escape cierra la lista de lugares sin cerrar el diálogo", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    await userEvent.click(within(dialog).getByRole("combobox"));
+    await within(dialog).findByRole("listbox");
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(within(dialog).queryByRole("listbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "New event" })).toBeVisible();
   });
 });

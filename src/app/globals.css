@@ -1365,7 +1365,8 @@ a.auth-brand-header:focus-visible {
   gap: var(--space-2);
 }
 
-.auth-field label {
+.auth-field label,
+.auth-field .event-place-label {
   font-family: var(--font-family-mono);
   font-size: 12px;
   font-weight: 700;
@@ -11719,6 +11720,144 @@ a.auth-brand-header:focus-visible {
 .event-form-optional {
   font-weight: 400;
   color: var(--color-text-secondary);
+}
+
+/* El buscador de lugares (#652): la lupa dentro del campo, y debajo las
+   sugerencias en el flujo, no flotando, para que el cuerpo del diálogo las
+   desplace sin recortarlas. */
+.event-place-search {
+  position: relative;
+  display: flex;
+}
+
+.event-place-search svg {
+  position: absolute;
+  top: 50%;
+  left: var(--space-3);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.auth-field .event-place-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: calc(var(--space-3) + 16px + var(--space-2));
+}
+
+.event-place-popup {
+  overflow: hidden;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.event-place-options {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event-place-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target-min);
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.event-place-option:hover,
+.event-place-option[aria-selected="true"] {
+  background: var(--color-hover);
+}
+
+.event-place-option[aria-selected="true"] {
+  box-shadow: inset 3px 0 0 var(--color-accent-text);
+}
+
+.event-place-option-freeText {
+  font-size: 13px;
+  border-top: 1px solid var(--color-border);
+}
+
+.event-place-option svg {
+  flex: none;
+}
+
+.event-place-lines {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.event-place-name {
+  font-weight: 650;
+  color: var(--color-text);
+}
+
+.event-place-address {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.event-place-note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  border-top: 1px solid var(--color-border);
+}
+
+.event-place-options:empty + .event-place-note {
+  border-top: none;
+}
+
+/* El lugar elegido: el pin verde de "lugar confirmado", el mapa y la × para
+   cambiarlo, en una fila que se parte en dos en un diálogo estrecho. */
+.event-place-chosen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.event-place-chosen .event-place-lines {
+  flex-basis: 12rem;
+}
+
+.event-place-pin {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 16%, var(--color-panel));
+  border-radius: var(--radius);
+}
+
+.event-place-map {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--color-accent-text);
+}
+
+.event-place-map:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
 }
 
 .event-cover-banner {

@@ -1494,6 +1494,7 @@ export const englishMessages = {
     "We couldn't upload the image. Try again.",
   "calendar.form.location": "Location",
   "calendar.form.locationPlaceholder": "Search for a place or type it",
+  "calendar.form.place.suggestions": "Suggested places",
   "calendar.form.place.freeText":
     "Or keep what you typed as free text (it won't open a map).",
   "calendar.form.place.searchUnavailable":

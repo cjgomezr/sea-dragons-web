@@ -221,10 +221,9 @@ function toPlaceDetail(placeDetail: string): string | null {
 
 /** Dónde al crear: el lugar elegido con su detalle, o sólo el texto libre
  * (#645). Con lugar, `location` es su nombre, como lo guarda el servidor. */
-function whereFields(form: EventForm): Pick<
-  EventDraft,
-  "location" | "place" | "placeDetail"
-> {
+function whereFields(
+  form: EventForm,
+): Pick<EventDraft, "location" | "place" | "placeDetail"> {
   return form.place === null
     ? { location: form.location }
     : {

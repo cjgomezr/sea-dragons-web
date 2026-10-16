@@ -1498,6 +1498,7 @@ export const spanishMessages: MessageCatalog = {
     "No pudimos subir la imagen. Inténtalo de nuevo.",
   "calendar.form.location": "Lugar",
   "calendar.form.locationPlaceholder": "Busca un lugar o escríbelo",
+  "calendar.form.place.suggestions": "Lugares sugeridos",
   "calendar.form.place.freeText":
     "O deja lo que escribiste como texto libre (no abrirá un mapa).",
   "calendar.form.place.searchUnavailable":
