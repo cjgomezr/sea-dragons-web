@@ -14660,6 +14660,17 @@ const STUBBED_CANCELLED_EVENT = {
   inAudience: true,
 } as const;
 
+// Una agenda con un evento de cada tipo, todos en pie (#641): la etiqueta de
+// cada tipo con su color, en los dos temas.
+const STUBBED_EVENT_OF_EACH_TYPE = [
+  ...STUBBED_AGENDA_EVENTS.slice(1),
+  {
+    ...STUBBED_CANCELLED_EVENT,
+    id: "e0e0e0e0-0000-4000-8000-0000000000e8",
+    status: "scheduled",
+  },
+] as const;
+
 // Los pasados y la fila desplegada (#312). El detalle es el mismo para
 // cualquier evento; cómo lo ve un Player o un Committee sólo cambia en que al
 // segundo la API le manda la audiencia, que es lo que decide la pantalla.
@@ -14904,6 +14915,14 @@ async function showRsvpError(page: Page): Promise<void> {
   await page.mouse.move(0, 0);
 }
 
+const EVENT_TYPE_NAMES = /^(Training|Competition|Social|Meeting)$/;
+
+async function waitForEachTypeTag(page: Page): Promise<void> {
+  await expect(page.getByText(EVENT_TYPE_NAMES)).toHaveCount(
+    STUBBED_EVENT_OF_EACH_TYPE.length,
+  );
+}
+
 function agendaRow(page: Page, title: string): Locator {
   return page.getByRole("listitem").filter({
     has: page.getByRole("heading", { level: 2, name: title }),
@@ -14984,6 +15003,11 @@ const CALENDAR_STATES: readonly CalendarState[] = [
     events: [...STUBBED_AGENDA_EVENTS, STUBBED_CANCELLED_EVENT],
     beforeVisit: chooseSpanish,
     ready: waitForAgendaRows,
+  },
+  {
+    name: "calendario-cada-tipo",
+    events: STUBBED_EVENT_OF_EACH_TYPE,
+    ready: waitForEachTypeTag,
   },
   {
     name: "calendario-error-rsvp",
@@ -15139,6 +15163,26 @@ for (const state of CALENDAR_STATES) {
     });
   });
 }
+
+// #641: el texto de cada etiqueta de tipo cumple AA también en oscuro.
+test.describe("calendario-cada-tipo en tema oscuro", () => {
+  skipWithoutSession();
+  quietNotificationBell();
+  test.use({ storageState: ADMIN_STORAGE_STATE });
+
+  test("has no accessibility violations (axe-core)", async ({ page }) => {
+    await goToCalendar(
+      page,
+      {
+        name: "calendario-cada-tipo",
+        events: STUBBED_EVENT_OF_EACH_TYPE,
+        ready: waitForEachTypeTag,
+      },
+      "dark",
+    );
+    await expectNoAxeViolations(page);
+  });
+});
 
 // Sin stubs: la frontera de verdad, con la membresía `pending` sembrada.
 test.describe("la puerta de quien no está al día (#453)", () => {

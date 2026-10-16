@@ -47,6 +47,10 @@
   --color-editor-bar: #f5f8fa;
   --color-segment-selected: #d6e6f2;
   --color-border-dashed: #a9bccc;
+  /* El color del tipo Reunión (#641); los otros tres tipos son el acento, el
+     aviso y el éxito. El claro es un gris azulado que pasa 3:1 sobre el panel,
+     como la barra y el punto del tipo piden. */
+  --color-type-meeting: #6e859b;
   /* El enlace de ejemplo junto al acento que el Admin elige (#346). La
      muestra pone los de cada tema en línea; aquí están porque toda variable
      que la hoja lee tiene su valor en :root (tests/unit/theme-css.test.ts). */
@@ -123,6 +127,7 @@
     --color-editor-bar: #0f2131;
     --color-segment-selected: #1d4869;
     --color-border-dashed: #3a5670;
+    --color-type-meeting: #b7c7d6;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   }
@@ -152,6 +157,7 @@
   --color-editor-bar: #0f2131;
   --color-segment-selected: #1d4869;
   --color-border-dashed: #3a5670;
+  --color-type-meeting: #b7c7d6;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
@@ -8316,35 +8322,93 @@ a.auth-brand-header:focus-visible {
   min-width: 0;
 }
 
-/* El chip de tipo, con el texto en el color del texto como la categoría de
-   las noticias: el tono sobre su propio fondo claro no llega a AA con 12px. */
-.agenda-type,
-.agenda-cancelled {
+/* La etiqueta de tipo de evento (#641, "Event type colours" del handoff de
+   E24). El texto va en el color del texto en los dos temas: el tono del tipo
+   sobre su propio fondo claro no llega a AA con 12px. Lo que distingue un
+   tipo de otro es el fondo, y siempre el nombre. */
+.event-type-tag {
   display: inline-block;
   padding: 2px var(--space-2);
   font-size: 12px;
   font-weight: 700;
   color: var(--color-text);
   border-radius: var(--radius);
-  background: color-mix(in srgb, var(--color-border) 70%, var(--color-panel));
 }
 
-.agenda-type-training {
-  background: color-mix(in srgb, var(--color-accent) 16%, var(--color-panel));
+.event-type-tag-training {
+  background: color-mix(in srgb, var(--color-accent) 24%, var(--color-panel));
 }
 
-.agenda-type-competition {
-  background: color-mix(in srgb, var(--color-warning) 28%, var(--color-panel));
+.event-type-tag-competition {
+  background: color-mix(in srgb, var(--color-warning) 24%, var(--color-panel));
 }
 
-.agenda-type-social {
-  background: color-mix(in srgb, var(--color-success) 22%, var(--color-panel));
+.event-type-tag-social {
+  background: color-mix(in srgb, var(--color-success) 24%, var(--color-panel));
+}
+
+.event-type-tag-meeting {
+  background: color-mix(
+    in srgb,
+    var(--color-type-meeting) 24%,
+    var(--color-panel)
+  );
+}
+
+/* El fondo de un evento sin imagen (#641): un degradado del color del tipo
+   sobre el panel y su icono en ese color. Training pinta el icono con el
+   acento como texto, que con el acento claro de un club sigue viéndose sobre
+   el panel (#341). Quien lo usa le da el tamaño. */
+.event-cover-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.event-cover-fallback-training {
+  color: var(--color-accent-text);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-accent) 32%, var(--color-panel)),
+    var(--color-panel) 80%
+  );
+}
+
+.event-cover-fallback-competition {
+  color: var(--color-warning);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-warning) 32%, var(--color-panel)),
+    var(--color-panel) 80%
+  );
+}
+
+.event-cover-fallback-social {
+  color: var(--color-success);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-success) 32%, var(--color-panel)),
+    var(--color-panel) 80%
+  );
+}
+
+.event-cover-fallback-meeting {
+  color: var(--color-type-meeting);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-type-meeting) 32%, var(--color-panel)),
+    var(--color-panel) 80%
+  );
 }
 
 .agenda-cancelled {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  font-size: 12px;
+  font-weight: 700;
   color: var(--color-danger);
-  background: transparent;
   border: 1px solid currentcolor;
+  border-radius: var(--radius);
 }
 
 .agenda-when {
@@ -11490,7 +11554,7 @@ a.dashboard-tile:hover {
   overflow-wrap: break-word;
 }
 
-.dashboard-event .agenda-type {
+.dashboard-event .event-type-tag {
   flex: 0 0 auto;
 }
 

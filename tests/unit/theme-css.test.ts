@@ -151,3 +151,30 @@ describe("tokens del rediseño de las noticias", () => {
     },
   );
 });
+
+// #641: el color del tipo Reunión del rediseño del calendario. Los otros tres
+// tipos reutilizan el acento, el aviso y el éxito.
+const CALENDAR_REDESIGN_TOKEN = "color-type-meeting";
+const HANDOFF_DARK_MEETING = "#b7c7d6";
+
+describe("token del tipo Reunión", () => {
+  it("tiene valor en :root", () => {
+    expect(rootTokens[CALENDAR_REDESIGN_TOKEN]).toBeDefined();
+  });
+
+  it("vale el color del handoff en el tema oscuro manual", () => {
+    expect(cssCustomProperties(manualDarkBlock)[CALENDAR_REDESIGN_TOKEN]).toBe(
+      HANDOFF_DARK_MEETING,
+    );
+  });
+
+  it("vale el color del handoff en la preferencia del sistema", () => {
+    expect(cssCustomProperties(systemDarkBlock)[CALENDAR_REDESIGN_TOKEN]).toBe(
+      HANDOFF_DARK_MEETING,
+    );
+  });
+
+  it("tiene un valor propio en el tema claro", () => {
+    expect(rootTokens[CALENDAR_REDESIGN_TOKEN]).not.toBe(HANDOFF_DARK_MEETING);
+  });
+});
