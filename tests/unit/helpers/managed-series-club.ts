@@ -3,7 +3,9 @@ import type { ManagedEvent } from "@/lib/events/event-management";
 import { isStillAhead } from "@/lib/events/event-occurrences";
 import type {
   ManagedSeries,
+  SeriesEdit,
   SeriesManagementGateways,
+  SeriesSplit,
 } from "@/lib/events/series-management";
 import { clubMoment } from "@/lib/time/club-calendar";
 import {
@@ -42,6 +44,27 @@ export const UPCOMING_OCCURRENCE_ID = "e4e4e4e4-0000-4000-8000-00000000000e";
 export const SPENT_OCCURRENCE_ID = "e5e5e5e5-0000-4000-8000-00000000000e";
 export const LEGACY_OCCURRENCE_ID = "e6e6e6e6-0000-4000-8000-00000000000e";
 
+/** La que se parte (#653): una sesión pasada y otra futura antes de la
+ * elegida; desde ella, una cancelada, una editada sola y otra. */
+export const SPLIT_SERIES_ID = "c6c6c6c6-0000-4000-8000-00000000000c";
+export const SPLIT_PAST_OCCURRENCE_ID = "f1f1f1f1-0000-4000-8000-00000000000f";
+export const SPLIT_EARLIER_OCCURRENCE_ID =
+  "f2f2f2f2-0000-4000-8000-00000000000f";
+export const SPLIT_FROM_OCCURRENCE_ID = "f3f3f3f3-0000-4000-8000-00000000000f";
+export const SPLIT_CANCELLED_OCCURRENCE_ID =
+  "f4f4f4f4-0000-4000-8000-00000000000f";
+export const SPLIT_EDITED_OCCURRENCE_ID =
+  "f5f5f5f5-0000-4000-8000-00000000000f";
+export const SPLIT_LATER_OCCURRENCE_ID = "f6f6f6f6-0000-4000-8000-00000000000f";
+/** El id que recibe la serie que nace al partir. */
+export const NEW_SERIES_ID = "c7c7c7c7-0000-4000-8000-00000000000c";
+/** Una serie que todavía no empezó: partir desde su primera sesión la edita
+ * entera. */
+export const FRESH_SERIES_ID = "c8c8c8c8-0000-4000-8000-00000000000c";
+export const FRESH_FIRST_OCCURRENCE_ID = "f7f7f7f7-0000-4000-8000-00000000000f";
+export const FRESH_SECOND_OCCURRENCE_ID =
+  "f8f8f8f8-0000-4000-8000-00000000000f";
+
 /** 2027-06-15 10:00 en Melbourne (hora estándar, UTC+10). */
 export const NOW = new Date("2027-06-15T00:00:00Z");
 
@@ -73,6 +96,14 @@ const LEGACY_SERIES: ManagedSeries = {
   ...SERIES,
   id: LEGACY_SERIES_ID,
   endTime: null,
+};
+
+export const SPLIT_SERIES: ManagedSeries = { ...SERIES, id: SPLIT_SERIES_ID };
+
+const FRESH_SERIES: ManagedSeries = {
+  ...SERIES,
+  id: FRESH_SERIES_ID,
+  startsOn: "2027-06-22",
 };
 
 function occurrenceOf(
@@ -132,6 +163,52 @@ function initialOccurrences(): readonly ManagedEvent[] {
       id: LEGACY_OCCURRENCE_ID,
       startsOn: "2027-06-24",
     }),
+    ...splitOccurrences(),
+  ];
+}
+
+function splitOccurrences(): readonly ManagedEvent[] {
+  return [
+    occurrenceOf(SPLIT_SERIES, {
+      id: SPLIT_PAST_OCCURRENCE_ID,
+      startsOn: "2027-06-01",
+    }),
+    occurrenceOf(SPLIT_SERIES, {
+      id: SPLIT_EARLIER_OCCURRENCE_ID,
+      startsOn: "2027-06-17",
+    }),
+    occurrenceOf(SPLIT_SERIES, {
+      id: SPLIT_FROM_OCCURRENCE_ID,
+      startsOn: "2027-06-22",
+    }),
+    {
+      ...occurrenceOf(SPLIT_SERIES, {
+        id: SPLIT_CANCELLED_OCCURRENCE_ID,
+        startsOn: "2027-06-24",
+      }),
+      status: "cancelled",
+      cancelledAt: "2027-06-10T00:00:00.000Z",
+    },
+    {
+      ...occurrenceOf(SPLIT_SERIES, {
+        id: SPLIT_EDITED_OCCURRENCE_ID,
+        startsOn: "2027-06-29",
+      }),
+      startTime: "18:30",
+      notes: "Piscina 2",
+    },
+    occurrenceOf(SPLIT_SERIES, {
+      id: SPLIT_LATER_OCCURRENCE_ID,
+      startsOn: "2027-07-01",
+    }),
+    occurrenceOf(FRESH_SERIES, {
+      id: FRESH_FIRST_OCCURRENCE_ID,
+      startsOn: "2027-06-22",
+    }),
+    occurrenceOf(FRESH_SERIES, {
+      id: FRESH_SECOND_OCCURRENCE_ID,
+      startsOn: "2027-06-24",
+    }),
   ];
 }
 
@@ -162,16 +239,124 @@ function isOpen(event: ManagedEvent, now: Date): boolean {
   );
 }
 
+type SeriesStore = {
+  readonly allSeries: Map<string, ManagedSeries>;
+  readonly occurrences: Map<string, ManagedEvent>;
+};
+
+/** Lo que hace `update_series`: los cambios a la serie y a sus ocurrencias
+ * futuras no canceladas; sin ninguna, no escribe nada. */
+function applyToOpenOccurrences(
+  store: SeriesStore,
+  seriesId: string,
+  changes: SeriesEdit,
+): number {
+  const open = [...store.occurrences.values()].filter(
+    (event) => event.seriesId === seriesId && isOpen(event, NOW),
+  );
+  const series = store.allSeries.get(seriesId);
+  if (open.length === 0 || series === undefined) {
+    return 0;
+  }
+  store.allSeries.set(seriesId, { ...series, ...changes });
+  for (const event of open) {
+    store.occurrences.set(event.id, { ...event, ...changes });
+  }
+  return open.length;
+}
+
+function dayBefore(day: string): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Lo que hace `split_series` (#653): mueve a una serie nueva las ocurrencias
+ * desde la elegida y le aplica los cambios, o edita la entera si la elegida
+ * es la primera. */
+function splitStoredSeries(
+  store: SeriesStore,
+  split: {
+    readonly clubId: string;
+    readonly seriesId: string;
+    readonly fromOccurrenceId: string;
+    readonly changes: SeriesEdit;
+  },
+): SeriesSplit {
+  const series = store.allSeries.get(split.seriesId);
+  const from = store.occurrences.get(split.fromOccurrenceId);
+  if (
+    split.clubId !== CLUB_ID ||
+    series === undefined ||
+    from?.seriesId !== split.seriesId
+  ) {
+    return { kind: "session_not_in_series" };
+  }
+  if (
+    !isStillAhead(
+      { date: from.startsOn, time: from.startTime },
+      clubMoment(NOW),
+    )
+  ) {
+    return { kind: "occurrence_started" };
+  }
+  const ofSeries = [...store.occurrences.values()].filter(
+    (event) => event.seriesId === split.seriesId,
+  );
+  const moved = ofSeries.filter((event) => event.startsOn >= from.startsOn);
+  if (moved.length === ofSeries.length) {
+    return {
+      kind: "edited",
+      seriesId: split.seriesId,
+      updatedOccurrences: applyToOpenOccurrences(
+        store,
+        split.seriesId,
+        split.changes,
+      ),
+    };
+  }
+  if (!moved.some((event) => isOpen(event, NOW))) {
+    return { kind: "edited", seriesId: split.seriesId, updatedOccurrences: 0 };
+  }
+  store.allSeries.set(split.seriesId, {
+    ...series,
+    endsOn: dayBefore(from.startsOn),
+  });
+  store.allSeries.set(NEW_SERIES_ID, {
+    ...series,
+    id: NEW_SERIES_ID,
+    startsOn: from.startsOn,
+  });
+  for (const event of moved) {
+    store.occurrences.set(event.id, { ...event, seriesId: NEW_SERIES_ID });
+  }
+  return {
+    kind: "split",
+    seriesId: NEW_SERIES_ID,
+    updatedOccurrences: applyToOpenOccurrences(
+      store,
+      NEW_SERIES_ID,
+      split.changes,
+    ),
+  };
+}
+
 export function fakeManagedSeriesClub(
   options: FakeManagedSeriesClubOptions = {},
 ): FakeManagedSeriesClub {
   const allSeries = new Map(
-    [SERIES, SPENT_SERIES, LEGACY_SERIES].map((series) => [series.id, series]),
+    [SERIES, SPENT_SERIES, LEGACY_SERIES, SPLIT_SERIES, FRESH_SERIES].map(
+      (series) => [series.id, series],
+    ),
   );
   const occurrences = new Map(
     initialOccurrences().map((event) => [event.id, event]),
   );
-  const rsvps = new Map([[UPCOMING_OCCURRENCE_ID, ["yes", "maybe"]]]);
+  const store: SeriesStore = { allSeries, occurrences };
+  const rsvps = new Map([
+    [UPCOMING_OCCURRENCE_ID, ["yes", "maybe"]],
+    [SPLIT_FROM_OCCURRENCE_ID, ["yes", "no"]],
+  ]);
   const clubGroupIds = options.clubGroupIds ?? [
     SENIOR_SQUAD_ID,
     MASTERS_SQUAD_ID,
@@ -216,16 +401,11 @@ export function fakeManagedSeriesClub(
         (clubId === CLUB_ID ? allSeries.get(seriesId) : undefined) ?? null,
       updateSeries: async ({ seriesId, changes }) => {
         startWrite();
-        const open = openOccurrencesOf(seriesId, NOW);
-        const series = allSeries.get(seriesId);
-        if (open.length === 0 || series === undefined) {
-          return 0;
-        }
-        allSeries.set(seriesId, { ...series, ...changes });
-        for (const event of open) {
-          occurrences.set(event.id, { ...event, ...changes });
-        }
-        return open.length;
+        return applyToOpenOccurrences(store, seriesId, changes);
+      },
+      splitSeries: async (split) => {
+        startWrite();
+        return splitStoredSeries(store, split);
       },
       cancelSeries: async ({ seriesId, cancelledAt }) => {
         startWrite();

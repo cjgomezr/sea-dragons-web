@@ -24,6 +24,7 @@ import type { EventManagementGateways } from "./event-management";
 import {
   type SeriesManagementGateways,
   SeriesNotFoundError,
+  SessionNotInSeriesError,
 } from "./series-management";
 import { createSupabaseEventGateways } from "./supabase-event-gateways";
 import { createSupabaseEventManagementGateways } from "./supabase-event-management-gateways";
@@ -106,13 +107,19 @@ export const eventEditSchema = eventFieldsSchema
 /** Lo que cambia de una serie: los mismos campos que al crear salvo la
  * fecha, todos opcionales, y al menos uno. Los días y las fechas de la serie
  * no se editan (#315), así que mandarlos es un 400 y no se ignoran en
- * silencio. */
+ * silencio. `fromOccurrenceId` no es un cambio: dice desde qué sesión se
+ * parte la serie (#653); sin él cambian todas las futuras desde hoy. */
 export const seriesEditSchema = eventFieldsSchema
   .partial()
+  .extend({ fromOccurrenceId: z.uuid().optional() })
   .strict()
-  .refine((edit) => Object.values(edit).some((value) => value !== undefined), {
-    message: "Envía al menos un campo que cambiar.",
-  });
+  .refine(
+    (edit) =>
+      Object.entries(edit).some(
+        ([field, value]) => field !== "fromOccurrenceId" && value !== undefined,
+      ),
+    { message: "Envía al menos un campo que cambiar." },
+  );
 
 export function requireSeriesManagementGateways(): SeriesManagementGateways {
   const wiring = createSupabaseSeriesManagementGateways(process.env);
@@ -208,6 +215,9 @@ export function asEventsApiError(error: unknown): never {
   }
   if (error instanceof EventsForbiddenError) {
     throw new ApiError("forbidden", error.message);
+  }
+  if (error instanceof SessionNotInSeriesError) {
+    throw new ApiError("conflict", error.message, error.code);
   }
   return asAccountApiError(error);
 }

@@ -183,6 +183,7 @@ function renderExtras(locale: Locale = "en"): void {
       checkoutReturn={null}
       cardReturn={null}
       packReturn={null}
+      levyReturn={null}
       canSeeLevyPayers
     />,
   );

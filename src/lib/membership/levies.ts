@@ -14,7 +14,11 @@ import {
   buildPaymentsReturnUrl,
   idempotencyKeyFor,
 } from "./checkout";
-import { LEVY_RETURN_QUERY_PARAM } from "./checkout-return";
+import {
+  LEVY_PRODUCT_QUERY_PARAM,
+  LEVY_PURCHASED_BEFORE_QUERY_PARAM,
+  LEVY_RETURN_QUERY_PARAM,
+} from "./checkout-return";
 import { type MembershipGateway, readMembership } from "./membership";
 
 /**
@@ -35,6 +39,9 @@ export const LEVY_MAX_QUANTITY_METADATA_KEY = "levy_max_quantity";
 export type Levy = {
   /** El id del `Price` de Stripe: con él se pide el Checkout. */
   readonly id: string;
+  /** El id del `Product` de Stripe: lo compra el socio y con él vuelve de
+   * Checkout (#692). */
+  readonly productId: string;
   readonly name: string;
   readonly description: string | null;
   /** Centavos enteros (CON-005). */
@@ -142,6 +149,7 @@ export async function listLevies(
     kind: "listed",
     levies: offered.map((levy) => ({
       id: levy.priceId,
+      productId: levy.productId,
       name: levy.name,
       description: levy.description,
       amountCents: levy.amountCents,
@@ -187,10 +195,24 @@ function buildLevyLineItem(
       };
 }
 
+/** La vuelta tras pagar lleva el extra y las unidades que el socio tenía al
+ * abrir Checkout: Pagos espera al webhook hasta verlas subir (#692). */
+function buildLevySuccessUrl(origin: string, levy: OfferedLevy): string {
+  const url = new URL(
+    buildPaymentsReturnUrl(origin, LEVY_RETURN_QUERY_PARAM, "ok"),
+  );
+  url.searchParams.set(LEVY_PRODUCT_QUERY_PARAM, levy.productId);
+  url.searchParams.set(
+    LEVY_PURCHASED_BEFORE_QUERY_PARAM,
+    String(levy.purchasedQuantity),
+  );
+  return url.toString();
+}
+
 /** El nombre va en los metadatos para que el historial diga qué se pagó sin
  * volver a preguntarle a Stripe por el producto. */
 async function buildSessionParams(
-  levy: CatalogProduct,
+  levy: OfferedLevy,
   gateways: LevyGateways,
   request: LevyCheckoutRequest,
 ): Promise<Stripe.Checkout.SessionCreateParams> {
@@ -209,37 +231,13 @@ async function buildSessionParams(
       levy_name: levy.name,
       [LEVY_MAX_QUANTITY_METADATA_KEY]: String(levy.maxQuantity),
     },
-    success_url: buildPaymentsReturnUrl(
-      request.origin,
-      LEVY_RETURN_QUERY_PARAM,
-      "ok",
-    ),
+    success_url: buildLevySuccessUrl(request.origin, levy),
     cancel_url: buildPaymentsReturnUrl(
       request.origin,
       LEVY_RETURN_QUERY_PARAM,
       "cancelado",
     ),
   };
-}
-
-/** Quien vuelve a comprar un extra dentro de la ventana de idempotencia
- * tiene que abrir otra sesión, no recibir la que ya pagó. Lo que cambia entre
- * las dos es cuántas unidades lleva compradas. */
-function levyIdempotencyKey(
-  params: Stripe.Checkout.SessionCreateParams,
-  levy: OfferedLevy,
-  now: Date,
-): string {
-  return idempotencyKeyFor(
-    {
-      ...params,
-      metadata: {
-        ...params.metadata,
-        purchased_quantity: String(levy.purchasedQuantity),
-      },
-    },
-    now,
-  );
 }
 
 export async function startLevyCheckout(
@@ -263,8 +261,11 @@ export async function startLevyCheckout(
     return { kind: "refused", reason: "levy_already_paid" };
   }
   const params = await buildSessionParams(levy, gateways, request);
+  // Quien vuelve a comprar dentro de la ventana de idempotencia abre otra
+  // sesión, no recibe la que ya pagó: las unidades que lleva compradas van en
+  // la `success_url`, así que cambian los parámetros y con ellos la llave.
   const session = await stripe.sessions.create(params, {
-    idempotencyKey: levyIdempotencyKey(params, levy, request.now),
+    idempotencyKey: idempotencyKeyFor(params, request.now),
   });
   if (session.url === null) {
     throw new Error(

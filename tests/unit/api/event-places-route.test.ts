@@ -54,7 +54,14 @@ function mockCaller(callerId: string | null): void {
   }));
 }
 
-function mockWiring(role: Role = "Committee"): void {
+/**
+ * Quien llama entra aquí y no en un `mockCaller` aparte: dos `vi.doMock` del
+ * mismo módulo en un caso a veces dejan ganar al primero bajo carga (#696).
+ */
+function mockWiring(
+  role: Role = "Committee",
+  callerId: string | null = CALLER_ID,
+): void {
   const gateways: PlaceSearchGateways = {
     members: {
       findRoleRequestMember: async () => ({
@@ -69,7 +76,7 @@ function mockWiring(role: Role = "Committee"): void {
   vi.doMock("@/lib/events/supabase-place-search-gateways", () => ({
     createSupabasePlaceSearchGateways: () => ({ kind: "ready", gateways }),
   }));
-  mockCaller(CALLER_ID);
+  mockCaller(callerId);
 }
 
 async function getPlaces(query: string | null): Promise<Response> {
@@ -162,8 +169,7 @@ describe("GET /api/v1/events/manage/places", () => {
   });
 
   it("responde 401 sin sesión", async () => {
-    mockWiring();
-    mockCaller(null);
+    mockWiring("Committee", null);
 
     const response = await getPlaces("park");
 

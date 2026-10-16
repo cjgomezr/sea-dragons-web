@@ -3,7 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PaymentsScreen } from "@/components/payments/PaymentsScreen";
 import type { Locale } from "@/lib/i18n/locale";
-import type { CheckoutReturn } from "@/lib/membership/checkout-return";
+import type {
+  CheckoutReturn,
+  LevyReturn,
+} from "@/lib/membership/checkout-return";
 import type {
   MembershipPanelView,
   MembershipView,
@@ -39,6 +42,7 @@ const CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_123";
 const SETUP_URL = "https://checkout.stripe.com/c/pay/cs_test_setup";
 const TRIAL_END = "2026-11-01T09:00:00.000Z";
 const PERIOD_END = "2026-07-01T09:00:00.000Z";
+const POLL_INTERVAL_MS = 3_000;
 const POLL_TIMEOUT_MS = 30_000;
 const VISA = { brand: "visa", last4: "4242", expMonth: 8, expYear: 2028 };
 const MASTERCARD = {
@@ -212,6 +216,7 @@ type RenderOptions = {
   readonly checkoutReturn?: CheckoutReturn | null;
   readonly cardReturn?: CheckoutReturn | null;
   readonly packReturn?: CheckoutReturn | null;
+  readonly levyReturn?: LevyReturn | null;
 };
 
 function renderScreen(options: RenderOptions = {}): void {
@@ -221,6 +226,7 @@ function renderScreen(options: RenderOptions = {}): void {
       checkoutReturn={options.checkoutReturn ?? null}
       cardReturn={options.cardReturn ?? null}
       packReturn={options.packReturn ?? null}
+      levyReturn={options.levyReturn ?? null}
       canSeeLevyPayers={false}
     />,
   );
@@ -1893,6 +1899,7 @@ describe("PaymentsScreen: saldo de sesiones (#472)", () => {
 describe("PaymentsScreen: los extras del club del socio (#473, #633)", () => {
   const NATIONALS = {
     id: LEVY_PRICE,
+    productId: "prod_nationals",
     name: "Nationals 2026",
     description: "Entry for the national championship",
     amountCents: 8000,
@@ -1903,6 +1910,7 @@ describe("PaymentsScreen: los extras del club del socio (#473, #633)", () => {
   };
   const CAMP = {
     id: "price_camp",
+    productId: "prod_camp",
     name: "Winter camp",
     description: null,
     amountCents: 12000,
@@ -1913,6 +1921,7 @@ describe("PaymentsScreen: los extras del club del socio (#473, #633)", () => {
   };
   const JERSEY = {
     id: "price_jersey",
+    productId: "prod_jersey",
     name: "2026 club jersey",
     description: "Home and away jersey with your number",
     amountCents: 6000,
@@ -2103,6 +2112,197 @@ describe("PaymentsScreen: los extras del club del socio (#473, #633)", () => {
         name: "Comprar",
       }),
     ).toBeInTheDocument();
+  });
+
+  describe("vuelta de pagar un extra (#692)", () => {
+    const JERSEY_PAID: LevyReturn = {
+      kind: "paid",
+      productId: "prod_jersey",
+      purchasedBefore: 3,
+    };
+    const WAITING_NOTICE = /Payment received\. We're waiting for Stripe/;
+    const TIMED_OUT_NOTICE = /Stripe hasn't confirmed it yet/;
+
+    /** Los extras con la camiseta en las unidades de cada respuesta, una
+     * tras otra; la última se repite. `null` es una consulta que falla por
+     * red. */
+    function leviesAnswering(
+      jerseyQuantities: readonly (number | null)[],
+    ): RouteHandler {
+      let answers = 0;
+      return () => {
+        const quantity =
+          jerseyQuantities[Math.min(answers, jerseyQuantities.length - 1)];
+        answers += 1;
+        if (quantity === null || quantity === undefined) {
+          throw new TypeError("Failed to fetch");
+        }
+        return jsonResponse({
+          data: {
+            levies: [NATIONALS, { ...JERSEY, purchasedQuantity: quantity }],
+          },
+        });
+      };
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+
+    it("avisa en los extras que espera a Stripe y vuelve a preguntar cada 3 s", async () => {
+      const fetchDouble = await renderLoaded(ACTIVE_FULL, {
+        levyReturn: JERSEY_PAID,
+        routes: { levies: leviesAnswering([3]) },
+      });
+
+      expect(
+        await within(await waitFor(leviesSection)).findByText(WAITING_NOTICE),
+      ).toHaveAttribute("role", "status");
+      expect(leviesSection()).toHaveTextContent(
+        "Payment received. We're waiting for Stripe to confirm it, which can take a few seconds.",
+      );
+
+      await act(() => vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 2));
+
+      expect(countCalls(fetchDouble, LEVIES_PATH)).toBe(3);
+    });
+
+    it("pinta lo comprado, quita el aviso y deja de preguntar cuando suben las unidades", async () => {
+      const fetchDouble = await renderLoaded(ACTIVE_FULL, {
+        levyReturn: JERSEY_PAID,
+        routes: { levies: leviesAnswering([3, 4]) },
+      });
+      await within(await waitFor(leviesSection)).findByText(WAITING_NOTICE);
+
+      await act(() => vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS));
+
+      expect(extraRow("2026 club jersey")).toHaveTextContent("Bought × 4");
+      expect(
+        within(leviesSection()).queryByText(WAITING_NOTICE),
+      ).not.toBeInTheDocument();
+      await act(() => vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 3));
+      expect(countCalls(fetchDouble, LEVIES_PATH)).toBe(2);
+    });
+
+    it("no espera si el webhook ya llegó al cargar", async () => {
+      const fetchDouble = await renderLoaded(ACTIVE_FULL, {
+        levyReturn: JERSEY_PAID,
+        routes: { levies: leviesAnswering([4]) },
+      });
+      await waitFor(leviesSection);
+
+      await act(() => vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 2));
+
+      expect(extraRow("2026 club jersey")).toHaveTextContent("Bought × 4");
+      expect(within(leviesSection()).queryByRole("status")).toBeNull();
+      expect(countCalls(fetchDouble, LEVIES_PATH)).toBe(1);
+    });
+
+    it("a los 30 s deja de preguntar y da el aviso prudente", async () => {
+      const fetchDouble = await renderLoaded(ACTIVE_FULL, {
+        levyReturn: JERSEY_PAID,
+        routes: { levies: leviesAnswering([3]) },
+      });
+      await within(await waitFor(leviesSection)).findByText(WAITING_NOTICE);
+
+      await act(() => vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS));
+      const callsAtTimeout = countCalls(fetchDouble, LEVIES_PATH);
+      await act(() => vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 3));
+
+      const notice = within(leviesSection()).getByText(TIMED_OUT_NOTICE);
+      expect(notice).toHaveTextContent(
+        "Stripe hasn't confirmed it yet. Reload the page in a minute; if the extra still doesn't show up, write to the club.",
+      );
+      expect(notice).toHaveAttribute("role", "status");
+      expect(
+        within(leviesSection()).queryByText(WAITING_NOTICE),
+      ).not.toBeInTheDocument();
+      expect(countCalls(fetchDouble, LEVIES_PATH)).toBe(callsAtTimeout);
+    });
+
+    it("una consulta que falla por red no corta la espera", async () => {
+      await renderLoaded(ACTIVE_FULL, {
+        levyReturn: JERSEY_PAID,
+        routes: { levies: leviesAnswering([3, null, 4]) },
+      });
+      await within(await waitFor(leviesSection)).findByText(WAITING_NOTICE);
+
+      await act(() => vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS));
+
+      expect(within(leviesSection()).getByText(WAITING_NOTICE)).toBeVisible();
+      expect(within(leviesSection()).queryByRole("alert")).toBeNull();
+
+      await act(() => vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS));
+
+      expect(extraRow("2026 club jersey")).toHaveTextContent("Bought × 4");
+      expect(
+        within(leviesSection()).queryByText(WAITING_NOTICE),
+      ).not.toBeInTheDocument();
+    });
+
+    it("dice que salió sin comprar al volver cancelado, sin esperar", async () => {
+      const fetchDouble = await renderLoaded(ACTIVE_FULL, {
+        levyReturn: { kind: "cancelled" },
+        routes: { levies: leviesAnswering([3]) },
+      });
+
+      expect(
+        await within(await waitFor(leviesSection)).findByText(
+          "You left Stripe without buying the extra. You can try again whenever you like.",
+        ),
+      ).toHaveAttribute("role", "status");
+      await act(() => vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 2));
+      expect(countCalls(fetchDouble, LEVIES_PATH)).toBe(1);
+    });
+
+    it("con un extra que no está en la lista se ve como sin vuelta", async () => {
+      const fetchDouble = await renderLoaded(ACTIVE_FULL, {
+        levyReturn: { ...JERSEY_PAID, productId: "prod_unknown" },
+        routes: { levies: leviesAnswering([3]) },
+      });
+      await waitFor(leviesSection);
+
+      await act(() => vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 2));
+
+      expect(within(leviesSection()).queryByRole("status")).toBeNull();
+      expect(countCalls(fetchDouble, LEVIES_PATH)).toBe(1);
+    });
+
+    it("lo dice en español, con tú", async () => {
+      await renderLoaded(ACTIVE_FULL, {
+        locale: "es",
+        levyReturn: JERSEY_PAID,
+        routes: { levies: leviesAnswering([3]) },
+      });
+
+      expect(
+        await within(await waitFor(leviesSection)).findByText(
+          "Pago recibido. Estamos esperando a que Stripe lo confirme, puede tardar unos segundos.",
+        ),
+      ).toHaveAttribute("role", "status");
+
+      await act(() => vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS));
+
+      expect(
+        within(leviesSection()).getByText(
+          "Stripe todavía no lo ha confirmado. Recarga la página en un minuto; si el extra sigue sin aparecer, escribe al club.",
+        ),
+      ).toBeVisible();
+    });
+
+    it("dice en español que saliste sin comprar", async () => {
+      await renderLoaded(ACTIVE_FULL, {
+        locale: "es",
+        levyReturn: { kind: "cancelled" },
+        routes: { levies: leviesAnswering([3]) },
+      });
+
+      expect(
+        await within(await waitFor(leviesSection)).findByText(
+          "Saliste de Stripe sin comprar el extra. Puedes intentarlo cuando quieras.",
+        ),
+      ).toHaveAttribute("role", "status");
+    });
   });
 
   it("sin pagos configurados no los pide", async () => {

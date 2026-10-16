@@ -4,7 +4,10 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { MembershipNotice } from "@/components/MembershipNotice";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
-import type { CheckoutReturn } from "@/lib/membership/checkout-return";
+import type {
+  CheckoutReturn,
+  LevyReturn,
+} from "@/lib/membership/checkout-return";
 import { membershipBlockOfStatus } from "@/lib/membership/membership";
 import type { MembershipView } from "@/lib/membership/membership-view";
 import {
@@ -29,6 +32,7 @@ import {
 } from "./PaymentsTabs";
 import { PlanCard } from "./PlanCard";
 import { SessionActivity } from "./SessionActivity";
+import { type LevyReturnNotice, levyReturnNotice } from "./use-levy-wait";
 import {
   NOT_WAITING,
   type StripeReturns,
@@ -196,12 +200,14 @@ function MembershipPanel({
   onViewReplaced,
   onPlanChanged,
   levies,
+  levyNotice,
 }: {
   readonly translate: Translator;
   readonly view: MembershipView;
   readonly waiting: Waiting;
   readonly returns: StripeReturns;
   readonly levies: LeviesState;
+  readonly levyNotice: LevyReturnNotice | null;
   readonly onViewReplaced: (view: MembershipView) => void;
   readonly onPlanChanged: () => void;
 }): React.JSX.Element {
@@ -237,7 +243,11 @@ function MembershipPanel({
         />
       )}
       {view.paymentsConfigured ? (
-        <LevyCharges translate={translate} state={levies} />
+        <LevyCharges
+          translate={translate}
+          state={levies}
+          returnNotice={levyNotice}
+        />
       ) : null}
       <PaymentHistory translate={translate} payments={view.payments} />
       {membership?.plan === "Casual" ? (
@@ -256,6 +266,7 @@ type ScreenContent = {
   readonly waiting: Waiting;
   readonly returns: StripeReturns;
   readonly levies: LeviesState;
+  readonly levyNotice: LevyReturnNotice | null;
   readonly retry: () => void;
   readonly refresh: () => void;
   readonly replace: (view: MembershipView) => void;
@@ -303,6 +314,7 @@ function TabContent({
       onViewReplaced={content.replace}
       onPlanChanged={content.refresh}
       levies={content.levies}
+      levyNotice={content.levyNotice}
     />
   );
 }
@@ -355,12 +367,15 @@ export function PaymentsScreen({
   checkoutReturn,
   cardReturn,
   packReturn,
+  levyReturn,
   canSeeLevyPayers,
 }: {
   readonly locale: Locale;
   readonly checkoutReturn: CheckoutReturn | null;
   readonly cardReturn: CheckoutReturn | null;
   readonly packReturn: CheckoutReturn | null;
+  /** Con qué volvió de pagar un extra (#692). */
+  readonly levyReturn: LevyReturn | null;
   /** Si quien mira puede ver quién pagó cada levy (#531): lo decide el
    * servidor con el rol de la sesión, y el endpoint lo vuelve a exigir. */
   readonly canSeeLevyPayers: boolean;
@@ -371,8 +386,9 @@ export function PaymentsScreen({
     cardReturn,
     packReturn,
   });
-  const levies = useLevies(
+  const { state: levies, waiting: levyWaiting } = useLevies(
     state.kind === "ready" && state.view.paymentsConfigured,
+    levyReturn,
   );
   const content: ScreenContent = {
     translate,
@@ -380,6 +396,7 @@ export function PaymentsScreen({
     waiting,
     returns: { checkoutReturn, cardReturn, packReturn },
     levies,
+    levyNotice: levyReturnNotice(levyWaiting, levyReturn),
     retry,
     refresh,
     replace,

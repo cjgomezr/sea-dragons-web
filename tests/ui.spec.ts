@@ -15539,6 +15539,7 @@ const LEVIES_ENDPOINT = "/api/v1/levies";
 
 const NATIONALS_LEVY = {
   id: "price_levy_nationals",
+  productId: "prod_levy_nationals",
   name: "Australian Underwater Rugby Nationals 2026 entry",
   description: "Team entry for the national championship in Perth.",
   amountCents: 8000,
@@ -15550,6 +15551,7 @@ const NATIONALS_LEVY = {
 
 const POOL_HIRE_LEVY = {
   id: "price_levy_pool",
+  productId: "prod_levy_pool",
   name: "Extra pool hire",
   description: null,
   amountCents: 1250,
@@ -15575,6 +15577,7 @@ const ONE_PAID_LEVY: readonly object[] = [
  * venta. */
 const JERSEY_LEVY = {
   id: "price_levy_jersey",
+  productId: "prod_levy_jersey",
   name: "2026 club jersey",
   description: "Home and away jersey with your number, in the club colours.",
   amountCents: 6000,
@@ -15741,11 +15744,38 @@ type PaymentsTabName = "membership" | "extras";
 const EXTRAS_TAB_NAME =
   /^(Club extras|Extras del club) \d+ (for sale|a la venta)$/;
 
-function paymentsPath(tab: PaymentsTabName | undefined): string {
-  return tab === "extras"
-    ? `${PAYMENTS_SCREEN_PATH}?tab=extras`
-    : PAYMENTS_SCREEN_PATH;
+function paymentsPath(
+  tab: PaymentsTabName | undefined,
+  levyReturn: LevyReturnVisit | undefined,
+): string {
+  const search = new URLSearchParams(levyReturn?.search);
+  if (tab === "extras") {
+    search.set("tab", "extras");
+  }
+  const query = search.toString();
+  return query === ""
+    ? PAYMENTS_SCREEN_PATH
+    : `${PAYMENTS_SCREEN_PATH}?${query}`;
 }
+
+/** La vuelta de pagar un extra en Stripe (#692): los parámetros con los que
+ * se llega y el aviso que se espera ver en la sección de extras. */
+type LevyReturnVisit = {
+  readonly search: string;
+  readonly notice: RegExp;
+};
+
+/** La camiseta de `MEMBER_EXTRAS` sigue en 3: el webhook no ha llegado. */
+const LEVY_WAITING_VISIT: LevyReturnVisit = {
+  search: `levy=ok&extra=${JERSEY_LEVY.productId}&antes=${JERSEY_LEVY.purchasedQuantity}`,
+  notice: /^(Payment received\.|Pago recibido\.)/,
+};
+
+const LEVY_CANCELLED_VISIT: LevyReturnVisit = {
+  search: "levy=cancelado",
+  notice:
+    /^(You left Stripe without buying the extra|Saliste de Stripe sin comprar el extra)/,
+};
 
 type PaymentsScreenState = {
   readonly name: string;
@@ -15763,6 +15793,8 @@ type PaymentsScreenState = {
   readonly checksDarkAxe?: boolean;
   /** El filtro del historial que se pulsa antes de mirar (#631). */
   readonly historyFilter?: RegExp;
+  /** Con qué se vuelve de pagar un extra (#692). */
+  readonly levyReturn?: LevyReturnVisit;
   readonly storageState: string;
   readonly beforeVisit?: (page: Page) => Promise<void>;
 };
@@ -15851,6 +15883,18 @@ function memberExtrasStates(
   }));
 }
 
+/** La vuelta de pagar un extra (#692): los extras del socio con el aviso de
+ * la espera o de la salida sin comprar, con su axe también en oscuro. */
+function levyReturnStates(
+  name: string,
+  levyReturn: LevyReturnVisit,
+): readonly PaymentsScreenState[] {
+  return memberExtrasStates(name, MEMBER_EXTRAS).map((state) => ({
+    ...state,
+    levyReturn,
+  }));
+}
+
 /** Los estados de la tira del plan (#628), con su axe también en oscuro. */
 function planStripStates(
   name: string,
@@ -15897,6 +15941,8 @@ const PAYMENTS_STATES: readonly PaymentsScreenState[] = [
   ...clubExtrasStates("pagos-extras-admin", OPEN_LEVY_SALES),
   ...clubExtrasStates("pagos-extras-admin-cerrados", CLOSED_LEVY_SALES),
   ...clubExtrasStates("pagos-extras-admin-vacio", []),
+  ...levyReturnStates("pagos-extra-esperando", LEVY_WAITING_VISIT),
+  ...levyReturnStates("pagos-extra-cancelado", LEVY_CANCELLED_VISIT),
   ...planStripStates("pagos-plan-activo", PLAN_CHANGE_MEMBERSHIP_VIEW),
   ...planStripStates("pagos-plan-casual", CASUAL_BALANCE_MEMBERSHIP_VIEW),
   ...planStripStates("pagos-plan-exencion", WAIVED_MEMBERSHIP_VIEW),
@@ -15955,7 +16001,13 @@ async function goToPayments(
   page: Page,
   state: Pick<
     PaymentsScreenState,
-    "view" | "levies" | "sales" | "tab" | "beforeVisit" | "historyFilter"
+    | "view"
+    | "levies"
+    | "sales"
+    | "tab"
+    | "beforeVisit"
+    | "historyFilter"
+    | "levyReturn"
   >,
   theme?: (typeof themes)[number],
 ): Promise<void> {
@@ -15970,7 +16022,7 @@ async function goToPayments(
     await stubSessionPacks(page);
   }
   await state.beforeVisit?.(page);
-  const path = paymentsPath(state.tab);
+  const path = paymentsPath(state.tab, state.levyReturn);
   if (theme === undefined) {
     await page.goto(`${APP_URL}${path}`);
   } else {
@@ -15999,6 +16051,11 @@ async function goToPayments(
   if (levies.length > 0 && state.tab !== "extras") {
     await expect(
       page.getByRole("heading", { level: 2, name: LEVIES_HEADING }),
+    ).toBeVisible();
+  }
+  if (state.levyReturn !== undefined) {
+    await expect(
+      page.getByRole("status").filter({ hasText: state.levyReturn.notice }),
     ).toBeVisible();
   }
   if (state.tab === "extras") {

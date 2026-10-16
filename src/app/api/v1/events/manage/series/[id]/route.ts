@@ -17,6 +17,12 @@ import { type EditedSeries, editSeries } from "@/lib/events/series-management";
  * solas; las pasadas y las canceladas no se tocan. Mandar los días o las
  * fechas responde 400: para eso se cancela el resto y se crea otra.
  *
+ * Con `fromOccurrenceId` ("esta y las siguientes", #653) la serie se parte
+ * desde esa sesión y responde la serie nueva; las sesiones anteriores no
+ * cambian. Si es la primera, se edita la serie entera. Una sesión que ya
+ * empezó responde 422 (`occurrence_started`); una que no es de la serie, o
+ * que otra partición ya se llevó, 409 (`session_not_in_series`).
+ *
  * La frontera lo reserva a Admin y Committee, y el dominio lo vuelve a
  * comprobar. Una serie de otro club o que no existe responde 404; una sin
  * ocurrencias futuras, 422.
@@ -46,12 +52,14 @@ export function PATCH(
         decorateResponse,
       });
       const seriesId = readSeriesId((await context.params).id);
+      const { fromOccurrenceId, ...changes } = body;
       try {
         return {
           data: await editSeries(requireSeriesManagementGateways(), {
             callerId,
             seriesId,
-            changes: body,
+            fromOccurrenceId,
+            changes,
           }),
         };
       } catch (error) {

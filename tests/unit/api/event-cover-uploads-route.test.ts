@@ -39,17 +39,26 @@ function mockCaller(callerId: string | null): void {
   }));
 }
 
+/**
+ * Quien llama entra aquí y no en un `mockCaller` aparte: dos `vi.doMock` del
+ * mismo módulo en un caso a veces dejan ganar al primero bajo carga (#696).
+ */
 function mockWiring(
-  options: { callerRole?: Role; undecodable?: boolean } = {},
+  options: {
+    callerId?: string | null;
+    callerRole?: Role;
+    undecodable?: boolean;
+  } = {},
 ): void {
-  club = fakeCoverUploadClub(options);
+  const { callerId = COVER_CALLER_ID, ...clubOptions } = options;
+  club = fakeCoverUploadClub(clubOptions);
   vi.doMock("@/lib/events/supabase-event-covers-gateway", () => ({
     createSupabaseEventCoverUploadGateways: () => ({
       kind: "ready",
       gateways: club.gateways,
     }),
   }));
-  mockCaller(COVER_CALLER_ID);
+  mockCaller(callerId);
 }
 
 async function upload(bytes: Uint8Array): Promise<Response> {
@@ -136,11 +145,11 @@ describe("POST /api/v1/events/manage/uploads", () => {
   });
 
   it("responde 401 sin sesión", async () => {
-    mockWiring();
-    mockCaller(null);
+    mockWiring({ callerId: null });
 
     const response = await upload(PNG_BYTES);
 
     expect(response.status).toBe(401);
+    expect(club.files.size).toBe(0);
   });
 });

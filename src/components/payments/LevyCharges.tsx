@@ -1,10 +1,11 @@
 "use client";
 
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
-import { useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { formatAudCents, formatClubShortDay } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
+import type { LevyReturn } from "@/lib/membership/checkout-return";
 import type { Levy } from "@/lib/membership/levies";
 import { SINGLE_UNIT } from "@/lib/stripe/product-catalog";
 import {
@@ -13,6 +14,13 @@ import {
   requestLevyCheckout,
 } from "./payments-client";
 import { StripeSessionButton } from "./StripeSessionButton";
+import {
+  type LevyReturnNotice,
+  type LevyWaiting,
+  NOT_WAITING_FOR_LEVY,
+  initialLevyWaiting,
+  useLevyWait,
+} from "./use-levy-wait";
 
 /**
  * Los extras del club en Pagos (#473, #633; RF-7 y D1 del PRD de E23): los
@@ -26,26 +34,57 @@ import { StripeSessionButton } from "./StripeSessionButton";
 
 export type LeviesState = { readonly kind: "loading" } | LeviesLoad;
 
-/** Los levies, pedidos una vez cuando `isEnabled` (hay pagos configurados).
- * Los comparten las dos pestañas de Pagos y la cuenta de la de Extras del
- * club (#627). */
-export function useLevies(isEnabled: boolean): LeviesState {
+/** Los levies, pedidos cuando `isEnabled` (hay pagos configurados). Los
+ * comparten las dos pestañas de Pagos y la cuenta de la de Extras del club
+ * (#627). La primera lista decide si se espera el pago con el que el socio
+ * volvió de Stripe (#692); mientras, se vuelven a pedir. */
+export function useLevies(
+  isEnabled: boolean,
+  levyReturn: LevyReturn | null,
+): { readonly state: LeviesState; readonly waiting: LevyWaiting } {
   const [state, setState] = useState<LeviesState>({ kind: "loading" });
+  const [waiting, setWaiting] = useState<LevyWaiting>(NOT_WAITING_FOR_LEVY);
+  const hasDecidedWaiting = useRef(false);
   useEffect(() => {
     if (!isEnabled) {
       return;
     }
     let isCurrent = true;
     void loadLevies().then((outcome) => {
-      if (isCurrent) {
-        setState(outcome);
+      if (!isCurrent) {
+        return;
+      }
+      setState(outcome);
+      if (outcome.kind === "loaded" && !hasDecidedWaiting.current) {
+        hasDecidedWaiting.current = true;
+        setWaiting(initialLevyWaiting(outcome.levies, levyReturn));
       }
     });
     return () => {
       isCurrent = false;
     };
-  }, [isEnabled]);
-  return state;
+  }, [isEnabled, levyReturn]);
+
+  const onLoaded = useCallback(
+    (levies: readonly Levy[], hasSettled: boolean) => {
+      setState({ kind: "loaded", levies });
+      if (hasSettled) {
+        setWaiting(NOT_WAITING_FOR_LEVY);
+      }
+    },
+    [],
+  );
+  const onTimeout = useCallback(
+    () =>
+      setWaiting((current) =>
+        current.kind === "polling"
+          ? { kind: "timed_out", target: current.target }
+          : current,
+      ),
+    [],
+  );
+  useLevyWait(waiting, { onLoaded, onTimeout });
+  return { state, waiting };
 }
 
 /** Cuántos extras hay a la venta: 0 mientras cargan o si fallaron. */
@@ -135,6 +174,12 @@ function LevyItem({
   );
 }
 
+const NOTICE_MESSAGES = {
+  waiting: "payments.levies.waiting",
+  timed_out: "payments.levies.timedOut",
+  cancelled: "payments.levies.cancelled",
+} as const;
+
 function LeviesBody({
   translate,
   state,
@@ -161,9 +206,13 @@ function LeviesBody({
 export function LevyCharges({
   translate,
   state,
+  returnNotice,
 }: {
   readonly translate: Translator;
   readonly state: LeviesState;
+  /** Lo que se dice al volver de pagar un extra en Stripe (#692): sólo en Mi
+   * membresía, que es donde está la compra. */
+  readonly returnNotice: LevyReturnNotice | null;
 }): React.JSX.Element | null {
   const titleId = useId();
   // Mientras carga no se reserva sitio: casi siempre no hay levies.
@@ -183,6 +232,11 @@ export function LevyCharges({
           {translate("payments.levies.lead")}
         </p>
       </div>
+      {returnNotice === null ? null : (
+        <p className="payments-status" role="status">
+          {translate(NOTICE_MESSAGES[returnNotice])}
+        </p>
+      )}
       <LeviesBody translate={translate} state={state} />
     </section>
   );
