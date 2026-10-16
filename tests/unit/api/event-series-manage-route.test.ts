@@ -7,17 +7,23 @@ import {
   type FakeManagedSeriesClubOptions,
   LEGACY_SERIES_ID,
   MISSING_SERIES_ID,
+  NEW_SERIES_ID,
   NOW,
   SERIES,
   SERIES_ID,
   SPENT_SERIES_ID,
+  SPLIT_FROM_OCCURRENCE_ID,
+  SPLIT_PAST_OCCURRENCE_ID,
+  SPLIT_SERIES,
+  SPLIT_SERIES_ID,
+  UPCOMING_OCCURRENCE_ID,
   fakeManagedSeriesClub,
 } from "../helpers/managed-series-club";
 
 /**
  * Los endpoints de editar y cancelar una serie (#315, RF-12 del PRD de E7).
  * Qué decide cada caso lo prueba el dominio; aquí se prueba que cada uno
- * sale con su código de la convención: 200, 400, 401, 403, 404 y 422.
+ * sale con su código de la convención: 200, 400, 401, 403, 404, 409 y 422.
  */
 
 const ORIGIN = "http://localhost:3417";
@@ -237,6 +243,102 @@ describe("endpoint de editar una serie", () => {
       code: "business_rule",
       reason: "series_without_upcoming",
     });
+  });
+});
+
+describe("endpoint de editar una serie desde una sesión (#653)", () => {
+  it("responde 200 con la serie nueva y cuántas sesiones cambiaron", async () => {
+    mockWiring();
+
+    const response = await editSeries(SPLIT_SERIES_ID, {
+      ...NEW_PLACE,
+      fromOccurrenceId: SPLIT_FROM_OCCURRENCE_ID,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        series: {
+          ...SPLIT_SERIES,
+          ...NEW_PLACE,
+          id: NEW_SERIES_ID,
+          startsOn: "2027-06-22",
+        },
+        updatedOccurrences: 3,
+      },
+    });
+  });
+
+  it("responde 422 con occurrence_started a una sesión que ya empezó", async () => {
+    mockWiring();
+
+    const response = await editSeries(SPLIT_SERIES_ID, {
+      ...NEW_PLACE,
+      fromOccurrenceId: SPLIT_PAST_OCCURRENCE_ID,
+    });
+
+    await expectError(response, 422, {
+      code: "business_rule",
+      reason: "occurrence_started",
+    });
+  });
+
+  it("responde 409 con session_not_in_series a una sesión de otra serie", async () => {
+    mockWiring();
+
+    const response = await editSeries(SPLIT_SERIES_ID, {
+      ...NEW_PLACE,
+      fromOccurrenceId: UPCOMING_OCCURRENCE_ID,
+    });
+
+    await expectError(response, 409, {
+      code: "conflict",
+      reason: "session_not_in_series",
+    });
+  });
+
+  it("responde 403 a un Coach, sin escribir nada", async () => {
+    mockWiring({ callerRole: "Coach" });
+
+    const response = await editSeries(SPLIT_SERIES_ID, {
+      ...NEW_PLACE,
+      fromOccurrenceId: SPLIT_FROM_OCCURRENCE_ID,
+    });
+
+    await expectError(response, 403, { code: "forbidden" });
+    expect(club.writeCount()).toBe(0);
+  });
+
+  it("responde 404 a una serie que no existe", async () => {
+    mockWiring();
+
+    const response = await editSeries(MISSING_SERIES_ID, {
+      ...NEW_PLACE,
+      fromOccurrenceId: SPLIT_FROM_OCCURRENCE_ID,
+    });
+
+    await expectError(response, 404, { code: "not_found" });
+  });
+
+  it("responde 400 a una sesión sin ningún cambio", async () => {
+    mockWiring();
+
+    const response = await editSeries(SPLIT_SERIES_ID, {
+      fromOccurrenceId: SPLIT_FROM_OCCURRENCE_ID,
+    });
+
+    await expectError(response, 400, { code: "validation_error" });
+  });
+
+  it("responde 400 a una sesión que no es un uuid", async () => {
+    mockWiring();
+
+    const response = await editSeries(SPLIT_SERIES_ID, {
+      ...NEW_PLACE,
+      fromOccurrenceId: "no-es-un-id",
+    });
+
+    await expectError(response, 400, { code: "validation_error" });
   });
 });
 
