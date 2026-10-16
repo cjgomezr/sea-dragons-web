@@ -13,7 +13,6 @@ import {
   loadLevies,
   requestLevyCheckout,
 } from "./payments-client";
-import { LevyPayers } from "./LevyPayers";
 import { StripeSessionButton } from "./StripeSessionButton";
 import {
   type LevyReturnNotice,
@@ -29,8 +28,8 @@ import {
  * una dice qué lleva comprado el socio, el importe y Comprar, que lleva a
  * Checkout, o "✓ Comprado" si era de una unidad y ya lo compró. Los ve
  * cualquier socio, al día o no. Sin levies el apartado no se pinta; si no se
- * pudieron leer, lo dice y el resto de Pagos sigue igual. A un Admin o un
- * Committee, además, cada levy le deja ver quién lo pagó (#531).
+ * pudieron leer, lo dice y el resto de Pagos sigue igual. Quién compró cada
+ * uno lo ve un Admin o un Committee en la pestaña Extras del club (#635).
  */
 
 export type LeviesState = { readonly kind: "loading" } | LeviesLoad;
@@ -147,11 +146,9 @@ function LevyAction({
 function LevyItem({
   translate,
   levy,
-  canSeePayers,
 }: {
   readonly translate: Translator;
   readonly levy: Levy;
-  readonly canSeePayers: boolean;
 }): React.JSX.Element {
   const nameId = useId();
   return (
@@ -173,13 +170,6 @@ function LevyItem({
       <div className="payments-extra-action">
         <LevyAction translate={translate} levy={levy} nameId={nameId} />
       </div>
-      {canSeePayers ? (
-        <LevyPayers
-          translate={translate}
-          priceId={levy.id}
-          levyNameId={nameId}
-        />
-      ) : null}
     </li>
   );
 }
@@ -193,11 +183,9 @@ const NOTICE_MESSAGES = {
 function LeviesBody({
   translate,
   state,
-  canSeePayers,
 }: {
   readonly translate: Translator;
   readonly state: Exclude<LeviesState, { readonly kind: "loading" }>;
-  readonly canSeePayers: boolean;
 }): React.JSX.Element {
   if (state.kind === "failed") {
     return (
@@ -209,12 +197,7 @@ function LeviesBody({
   return (
     <ul className="payments-extras-list">
       {state.levies.map((levy) => (
-        <LevyItem
-          key={levy.id}
-          translate={translate}
-          levy={levy}
-          canSeePayers={canSeePayers}
-        />
+        <LevyItem key={levy.id} translate={translate} levy={levy} />
       ))}
     </ul>
   );
@@ -223,14 +206,10 @@ function LeviesBody({
 export function LevyCharges({
   translate,
   state,
-  canSeePayers,
   returnNotice,
 }: {
   readonly translate: Translator;
   readonly state: LeviesState;
-  /** Si se enseña quién pagó cada levy: sólo en la pestaña Extras del club
-   * de un Admin o un Committee (#531, #627). */
-  readonly canSeePayers: boolean;
   /** Lo que se dice al volver de pagar un extra en Stripe (#692): sólo en Mi
    * membresía, que es donde está la compra. */
   readonly returnNotice: LevyReturnNotice | null;
@@ -258,11 +237,7 @@ export function LevyCharges({
           {translate(NOTICE_MESSAGES[returnNotice])}
         </p>
       )}
-      <LeviesBody
-        translate={translate}
-        state={state}
-        canSeePayers={canSeePayers}
-      />
+      <LeviesBody translate={translate} state={state} />
     </section>
   );
 }

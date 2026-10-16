@@ -23,7 +23,7 @@ vi.mock(
 
 const MEMBERSHIP_PATH = "/api/v1/membership";
 const LEVIES_PATH = "/api/v1/levies";
-const PAYERS_PATH_PATTERN = /^\/api\/v1\/levies\/[^/]+\/payers$/;
+const SALES_PATH = "/api/v1/levies/sales";
 const MEMBERSHIP_TAB = /^(My membership|Mi membresía)$/;
 const EXTRAS_TAB = /^(Club extras|Extras del club)/;
 const HISTORY_HEADING = /^(Payment history|Historial de pagos)$/;
@@ -87,6 +87,9 @@ function stubFetch(
     if (path === LEVIES_PATH) {
       return jsonResponse({ data: { levies } });
     }
+    if (path === SALES_PATH) {
+      return jsonResponse({ data: { sales: [] } });
+    }
     throw new Error(`petición inesperada a ${path}`);
   });
   vi.stubGlobal("fetch", fetchDouble);
@@ -121,9 +124,9 @@ async function renderLoaded(options: RenderOptions): Promise<void> {
   );
 }
 
-function payersRequests(fetchDouble: ReturnType<typeof vi.fn>): number {
-  return fetchDouble.mock.calls.filter(([input]) =>
-    PAYERS_PATH_PATTERN.test(String(input)),
+function salesRequests(fetchDouble: ReturnType<typeof vi.fn>): number {
+  return fetchDouble.mock.calls.filter(
+    ([input]) => String(input) === SALES_PATH,
   ).length;
 }
 
@@ -261,21 +264,19 @@ describe("PaymentsScreen: pestañas de un Admin o un Committee (#627)", () => {
     expect(membershipTab()).toHaveAttribute("aria-selected", "true");
   });
 
-  it("Extras del club enseña quién pagó cada levy", async () => {
-    stubFetch();
+  it("Extras del club enseña lo vendido de los extras del club", async () => {
+    const fetchDouble = stubFetch();
     visit("/pagos?tab=extras");
     await renderLoaded({ canSeeLevyPayers: true });
 
     const panel = screen.getByRole("tabpanel");
     expect(
-      within(panel).getByRole("button", {
-        name: "Who paid",
-        description: "Nationals 2026",
-      }),
+      await within(panel).findByText(/committee creates them in Stripe/),
     ).toBeInTheDocument();
+    expect(salesRequests(fetchDouble)).toBe(1);
   });
 
-  it("Mi membresía enseña el plan, los levies y el historial, sin Quién pagó", async () => {
+  it("Mi membresía enseña el plan, los levies y el historial, sin lo vendido", async () => {
     stubFetch();
     await renderLoaded({ canSeeLevyPayers: true });
 
@@ -293,9 +294,7 @@ describe("PaymentsScreen: pestañas de un Admin o un Committee (#627)", () => {
     expect(
       within(panel).getByRole("heading", { level: 2, name: HISTORY_HEADING }),
     ).toBeInTheDocument();
-    expect(
-      within(panel).queryByRole("button", { name: "Who paid" }),
-    ).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("table")).not.toBeInTheDocument();
   });
 
   it("las flechas mueven entre pestañas y se llevan el foco", async () => {
@@ -384,7 +383,7 @@ describe("PaymentsScreen: sin permiso para ver quién pagó (#627)", () => {
     ).toBeInTheDocument();
   });
 
-  it("con ?tab=extras ve Mi membresía y no pide quién pagó", async () => {
+  it("con ?tab=extras ve Mi membresía y no pide lo vendido", async () => {
     const fetchDouble = stubFetch();
     visit("/pagos?tab=extras");
     await renderLoaded({ canSeeLevyPayers: false });
@@ -392,9 +391,6 @@ describe("PaymentsScreen: sin permiso para ver quién pagó (#627)", () => {
     expect(
       screen.getByRole("region", { name: "Current plan" }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Who paid", hidden: true }),
-    ).not.toBeInTheDocument();
-    expect(payersRequests(fetchDouble)).toBe(0);
+    expect(salesRequests(fetchDouble)).toBe(0);
   });
 });

@@ -16,6 +16,7 @@ import {
   countLeviesForSale,
   useLevies,
 } from "./LevyCharges";
+import { ClubExtras } from "./ClubExtras";
 import { PaymentHistory } from "./PaymentHistory";
 import {
   type PaymentsFailure,
@@ -48,7 +49,8 @@ import {
  * tarjeta; el cambio de plan; y la espera del webhook al volver de Stripe.
  *
  * Un Admin o un Committee la ve en dos pestañas (#627): Mi membresía, lo
- * suyo, y Extras del club, con quién pagó cada levy. Los demás sólo ven Mi
+ * suyo, y Extras del club, con lo vendido de cada extra y quién lo compró
+ * (#635). Los demás sólo ven Mi
  * membresía, sin barra de pestañas.
  *
  * Es de cliente por los botones y por la espera: la membresía se pide a
@@ -244,7 +246,6 @@ function MembershipPanel({
         <LevyCharges
           translate={translate}
           state={levies}
-          canSeePayers={false}
           returnNotice={levyNotice}
         />
       ) : null}
@@ -255,32 +256,6 @@ function MembershipPanel({
           movements={view.sessionBalance.movements}
         />
       ) : null}
-    </div>
-  );
-}
-
-/** Extras del club (#627): por ahora, los levies con quién pagó cada uno,
- * como los veía un Admin bajo Mi membresía (#531). */
-function ExtrasPanel({
-  translate,
-  view,
-  levies,
-}: {
-  readonly translate: Translator;
-  readonly view: MembershipView;
-  readonly levies: LeviesState;
-}): React.JSX.Element | null {
-  if (!view.paymentsConfigured) {
-    return null;
-  }
-  return (
-    <div className="payments-panel">
-      <LevyCharges
-        translate={translate}
-        state={levies}
-        canSeePayers
-        returnNotice={null}
-      />
     </div>
   );
 }
@@ -324,10 +299,9 @@ function TabContent({
   }
   if (tab === "extras") {
     return (
-      <ExtrasPanel
+      <ClubExtras
         translate={translate}
-        view={state.view}
-        levies={content.levies}
+        paymentsConfigured={state.view.paymentsConfigured}
       />
     );
   }
@@ -347,7 +321,9 @@ function TabContent({
 
 /** Las dos pestañas de un Admin o un Committee. Los dos paneles quedan
  * montados y sólo se esconde el inactivo: así no se pierde lo que se estaba
- * haciendo en uno al pasar al otro. */
+ * haciendo en uno al pasar al otro. Extras del club se monta la primera vez
+ * que se abre (#635): casi siempre se viene a Pagos por lo propio, y sus
+ * números cuestan una llamada a Stripe. */
 function TabbedContent({
   content,
 }: {
@@ -355,6 +331,10 @@ function TabbedContent({
 }): React.JSX.Element {
   const idPrefix = useId();
   const { activeTab, selectTab } = usePaymentsTab();
+  const [hasShownExtras, setHasShownExtras] = useState(activeTab === "extras");
+  if (activeTab === "extras" && !hasShownExtras) {
+    setHasShownExtras(true);
+  }
   return (
     <>
       <PaymentsTabs
@@ -373,7 +353,9 @@ function TabbedContent({
           tabIndex={0}
           hidden={tab !== activeTab}
         >
-          <TabContent tab={tab} content={content} />
+          {tab === "extras" && !hasShownExtras ? null : (
+            <TabContent tab={tab} content={content} />
+          )}
         </div>
       ))}
     </>
