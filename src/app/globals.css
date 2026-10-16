@@ -11438,6 +11438,12 @@ a.auth-brand-header:focus-visible {
   margin: 0;
 }
 
+/* La región de la duración existe siempre para que se anuncie; vacía no
+   debe dejar un hueco de más entre la fila y lo que sigue. */
+.event-form-duration-region:empty {
+  margin-top: calc(-1 * var(--space-3));
+}
+
 .event-form-duration {
   display: flex;
   gap: var(--space-2);

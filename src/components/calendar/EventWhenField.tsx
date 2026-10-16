@@ -88,7 +88,7 @@ function Duration({
   // La región existe siempre: un lector de pantalla sólo anuncia los cambios
   // de una región que ya estaba, como el fin que pone una duración rápida.
   return (
-    <div aria-live="polite">
+    <div className="event-form-duration-region" aria-live="polite">
       {endCheck.kind === "valid" ? (
         <DurationText translate={translate} span={endCheck.span} />
       ) : null}
