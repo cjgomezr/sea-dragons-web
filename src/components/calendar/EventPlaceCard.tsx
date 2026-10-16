@@ -5,12 +5,13 @@ import { useEffect, useState } from "react";
 import type { AgendaEvent } from "@/lib/events/event-agenda";
 import { addressOf, buildMapsUrl, placeTextOf } from "@/lib/events/event-place";
 import type { Translator } from "@/lib/i18n/translator";
+import { EventPlaceMap } from "./EventPlaceMap";
 
 /**
  * La tarjeta del lugar en el panel del evento (#648, RF-4 y RF-7 del PRD de
  * E24): el nombre y la dirección del lugar elegido, o el texto libre, con
- * Copiar dirección y "Cómo llegar" a todo el ancho. El mapa embebido llega con
- * #658.
+ * Copiar dirección y "Cómo llegar" a todo el ancho. Un lugar con coordenadas
+ * abre la tarjeta con su mapa (#658); sin ellas no hay mapa ni hueco.
  *
  * Copiar enseña un check unos segundos y lo anuncia en una región que está
  * siempre en el DOM: un lector de pantalla sólo lee los cambios de una región
@@ -91,8 +92,13 @@ export function EventPlaceCard({
 
   const announcement = COPY_ANNOUNCEMENTS[copyStatus];
   const CopyGlyph = copyStatus === "copied" ? Check : Copy;
+  const { place } = event;
+  const mapsUrl = buildMapsUrl(event);
   return (
     <div className="agenda-place-card">
+      {place === null || place.lat === null ? null : (
+        <EventPlaceMap translate={translate} place={place} mapsUrl={mapsUrl} />
+      )}
       <div className="agenda-place-card-body">
         <PlaceLines event={event} />
         <button
@@ -116,7 +122,7 @@ export function EventPlaceCard({
       </p>
       <a
         className="agenda-directions"
-        href={buildMapsUrl(event)}
+        href={mapsUrl}
         target="_blank"
         rel="noopener noreferrer"
       >

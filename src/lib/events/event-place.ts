@@ -58,6 +58,59 @@ export function buildMapsUrl(where: {
   return `${MAPS_SEARCH_URL}${query}`;
 }
 
+/** Un punto con coordenadas, el único que tiene mapa (#658). */
+export type MapPoint = { readonly lat: number; readonly lng: number };
+
+/** La caja que enseña el mapa embebido, en grados. */
+export type MapBounds = {
+  readonly west: number;
+  readonly south: number;
+  readonly east: number;
+  readonly north: number;
+};
+
+/** Media caja alrededor del punto: unas calles a cada lado, más ancha que
+ * alta porque la franja del mapa mide 110 px de alto y el ancho de la
+ * tarjeta. */
+const MAP_HALF_HEIGHT_DEGREES = 0.0018;
+const MAP_HALF_WIDTH_DEGREES = 0.0065;
+
+/** Seis decimales son unos 10 cm: de sobra, y quitan el ruido de la suma en
+ * coma flotante de la URL. */
+const MAP_DEGREE_DECIMALS = 6;
+
+const MAP_EMBED_URL = "https://www.openstreetmap.org/export/embed.html";
+
+function roundDegrees(degrees: number): number {
+  return Number(degrees.toFixed(MAP_DEGREE_DECIMALS));
+}
+
+function clampDegrees(degrees: number, limit: number): number {
+  return roundDegrees(Math.min(limit, Math.max(-limit, degrees)));
+}
+
+/** La caja del mapa alrededor del punto, sin salirse del mundo. */
+export function mapBoundsAround(point: MapPoint): MapBounds {
+  return {
+    west: clampDegrees(point.lng - MAP_HALF_WIDTH_DEGREES, LONGITUDE_LIMIT),
+    south: clampDegrees(point.lat - MAP_HALF_HEIGHT_DEGREES, LATITUDE_LIMIT),
+    east: clampDegrees(point.lng + MAP_HALF_WIDTH_DEGREES, LONGITUDE_LIMIT),
+    north: clampDegrees(point.lat + MAP_HALF_HEIGHT_DEGREES, LATITUDE_LIMIT),
+  };
+}
+
+/** El mapa embebido de OpenStreetMap con el marcador en el punto: sin API
+ * key ni teselas propias (D3 del PRD de E24). */
+export function buildMapEmbedUrl(point: MapPoint): string {
+  const { west, south, east, north } = mapBoundsAround(point);
+  const query = new URLSearchParams({
+    bbox: [west, south, east, north].join(","),
+    layer: "mapnik",
+    marker: `${point.lat},${point.lng}`,
+  });
+  return `${MAP_EMBED_URL}?${query.toString()}`;
+}
+
 /** Un lugar tal como llega a la API. Que las coordenadas vayan las dos o
  * ninguna, y dentro de su rango, lo decide el dominio con un 422. */
 export type PlaceDraft = {

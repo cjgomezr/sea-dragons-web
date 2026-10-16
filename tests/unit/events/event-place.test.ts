@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildMapsUrl } from "@/lib/events/event-place";
+import {
+  buildMapEmbedUrl,
+  buildMapsUrl,
+  mapBoundsAround,
+} from "@/lib/events/event-place";
 
 /**
  * El enlace al mapa de un evento (#645, RF-4 del PRD de E24): con
@@ -63,6 +67,42 @@ describe("buildMapsUrl", () => {
 
     expect(url).toBe(
       `${SEARCH_URL}Bar%20%26%20Caf%C3%A9%20%232%2C%20Pe%C3%B1alol%C3%A9n`,
+    );
+  });
+});
+
+describe("mapBoundsAround", () => {
+  it("encierra el punto en una caja más ancha que alta, centrada en él", () => {
+    const bounds = mapBoundsAround({ lat: -37.8676, lng: 144.9741 });
+
+    expect(bounds).toEqual({
+      west: 144.9676,
+      south: -37.8694,
+      east: 144.9806,
+      north: -37.8658,
+    });
+  });
+
+  it("no se sale del mundo cerca de un polo ni del antimeridiano", () => {
+    const bounds = mapBoundsAround({ lat: 89.9995, lng: -179.999 });
+
+    expect(bounds).toEqual({
+      west: -180,
+      south: 89.9977,
+      east: -179.9925,
+      north: 90,
+    });
+  });
+});
+
+describe("buildMapEmbedUrl", () => {
+  it("apunta al mapa embebido de OpenStreetMap con la caja y el marcador", () => {
+    const url = buildMapEmbedUrl({ lat: -37.8676, lng: 144.9741 });
+
+    expect(url).toBe(
+      "https://www.openstreetmap.org/export/embed.html" +
+        "?bbox=144.9676%2C-37.8694%2C144.9806%2C-37.8658" +
+        "&layer=mapnik&marker=-37.8676%2C144.9741",
     );
   });
 });
