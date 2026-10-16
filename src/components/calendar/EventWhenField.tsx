@@ -1,6 +1,9 @@
 import { Hourglass } from "@phosphor-icons/react/dist/ssr/Hourglass";
 import { useId } from "react";
-import { describeEventDuration } from "@/lib/events/event-duration";
+import {
+  describeEventDuration,
+  type EventSpan,
+} from "@/lib/events/event-duration";
 import {
   applyQuickLength,
   type EndScope,
@@ -81,10 +84,25 @@ function Duration({
 }: {
   readonly translate: FieldProps["translate"];
   readonly endCheck: EventEndCheck;
-}): React.JSX.Element | null {
-  if (endCheck.kind !== "valid") {
-    return null;
-  }
+}): React.JSX.Element {
+  // La región existe siempre: un lector de pantalla sólo anuncia los cambios
+  // de una región que ya estaba, como el fin que pone una duración rápida.
+  return (
+    <div aria-live="polite">
+      {endCheck.kind === "valid" ? (
+        <DurationText translate={translate} span={endCheck.span} />
+      ) : null}
+    </div>
+  );
+}
+
+function DurationText({
+  translate,
+  span,
+}: {
+  readonly translate: FieldProps["translate"];
+  readonly span: EventSpan;
+}): React.JSX.Element {
   return (
     <p className="event-form-duration">
       <Hourglass
@@ -93,7 +111,7 @@ function Duration({
         size={DURATION_ICON_SIZE}
       />
       {translate("calendar.form.lasts", {
-        duration: describeEventDuration(translate.locale, endCheck.span),
+        duration: describeEventDuration(translate.locale, span),
       })}
     </p>
   );

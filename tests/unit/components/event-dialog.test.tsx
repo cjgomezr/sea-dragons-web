@@ -1124,3 +1124,35 @@ describe("imagen, tipo y cuándo (#650)", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("los avisos del fin tras corregir (#650)", () => {
+  it("al cambiar el inicio se va el aviso del servidor junto a Termina", async () => {
+    stubApi({ respondToCreate: () => businessRule("end_before_start") });
+    const dialog = await openDialog();
+    fillSingleEvent(dialog);
+    await submit(dialog);
+    const ends = within(dialog).getByLabelText("Ends");
+    await waitFor(() =>
+      expect(ends).toHaveAccessibleDescription(
+        "The end must be after the start.",
+      ),
+    );
+
+    setValue(dialog, "Starts", "18:00");
+
+    expect(ends).not.toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("anuncia cuánto dura sin mover el foco", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    setValue(dialog, "Date", "2026-10-14");
+    setValue(dialog, "Starts", "18:00");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "1 h" }));
+
+    expect(
+      within(dialog).getByText("Lasts 1 h").closest("[aria-live]"),
+    ).toHaveAttribute("aria-live", "polite");
+  });
+});

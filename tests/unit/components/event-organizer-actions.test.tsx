@@ -1088,3 +1088,35 @@ describe("el fin y la imagen al editar (#650)", () => {
     ).not.toBeChecked();
   });
 });
+
+describe("quitar una imagen que el servidor rechazó (#650)", () => {
+  it("se lleva también su aviso", async () => {
+    const withCover: AgendaEvent = {
+      ...SCRIMMAGE,
+      id: "abababab-0000-4000-8000-0000000000ab",
+      coverThumbUrl: "https://storage.example/scrimmage.webp",
+    };
+    stubApi({
+      events: [withCover],
+      respond: () => businessRule("event_cover_upload_invalid"),
+    });
+    renderAgenda();
+    const dialog = await openEditDialog(withCover.title, "Edit event");
+    setValue(dialog, "Title", "Scrimmage");
+    await save(dialog);
+    const image = within(dialog).getByRole("group", {
+      name: "Image · optional",
+    });
+    await waitFor(() =>
+      expect(image).toHaveAccessibleDescription(
+        "That image is no longer available. Choose it again.",
+      ),
+    );
+
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Remove image" }),
+    );
+
+    expect(image).toHaveAccessibleDescription("");
+  });
+});

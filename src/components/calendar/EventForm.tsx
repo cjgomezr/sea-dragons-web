@@ -111,6 +111,15 @@ function SubmitFailure({
   );
 }
 
+/** Lo que decide si el fin vale. */
+const WHEN_FIELDS: readonly (keyof EventFormValues)[] = [
+  "startsOn",
+  "startTime",
+  "endTime",
+  "endsAnotherDay",
+  "endDate",
+];
+
 const SUBMIT_LABELS = {
   create: "calendar.form.submit",
   event: "calendar.edit.submit",
@@ -165,8 +174,20 @@ export function EventForm({
 
   function update(change: Partial<EventFormValues>): void {
     setForm((current) => ({ ...current, ...change }));
-    // Sólo se va el aviso del campo que cambió: los demás siguen guiando.
-    setIssues((current) => current.filter((issue) => !(issue.field in change)));
+    // Sólo se va el aviso del campo que cambió: los demás siguen guiando. El
+    // de Termina habla del cuándo entero, así que se va con cualquier parte.
+    const isWhenChange = WHEN_FIELDS.some((field) => field in change);
+    setIssues((current) =>
+      current.filter(
+        (issue) =>
+          !(issue.field in change) &&
+          !(isWhenChange && issue.field === "endTime"),
+      ),
+    );
+  }
+
+  function dropCoverIssues(): void {
+    setIssues((current) => current.filter((issue) => issue.field !== "cover"));
   }
 
   function markSending(isSending: boolean): void {
@@ -204,8 +225,13 @@ export function EventForm({
   };
   // Otra imagen deja atrás lo que el servidor dijo de la anterior.
   function chooseCover(file: File): void {
-    setIssues((current) => current.filter((issue) => issue.field !== "cover"));
+    dropCoverIssues();
     cover.choose(file);
+  }
+
+  function removeCover(): void {
+    dropCoverIssues();
+    cover.remove();
   }
 
   const isSending = status.kind === "sending";
@@ -237,7 +263,7 @@ export function EventForm({
         <EventCoverField
           translate={translate}
           eventType={form.eventType}
-          field={{ ...cover, choose: chooseCover }}
+          field={{ ...cover, choose: chooseCover, remove: removeCover }}
           issueText={
             cover.issue === null
               ? issueTextFor("cover")
