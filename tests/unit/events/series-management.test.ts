@@ -760,6 +760,7 @@ describe("editar una serie desde una sesión (#653)", () => {
     expect(club.writeCount()).toBe(0);
   });
 });
+
 describe("partir una serie con otros días o otra fecha final (#654)", () => {
   const fromSession = {
     callerId: CALLER_ID,

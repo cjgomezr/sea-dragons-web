@@ -117,6 +117,7 @@ begin
        and e.club_id = acting_club_id
        and e.status = 'cancelled'
        and e.starts_on = any(added_dates)
+       and e.starts_at > now()
     returning e.id
   ),
   created as (

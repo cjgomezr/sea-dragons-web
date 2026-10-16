@@ -177,9 +177,16 @@ function toSeriesSplit(row: z.infer<typeof seriesSplitSchema>): SeriesSplit {
 }
 
 /** El horario nuevo en las claves que lee `split_series`. */
+type ScheduleArgument = {
+  readonly weekdays: SeriesReschedule["weekdays"];
+  readonly ends_on: string;
+  readonly session_dates: readonly string[];
+  readonly added_dates: readonly string[];
+};
+
 function toScheduleArgument(
   schedule: SeriesReschedule | null,
-): Readonly<Record<string, unknown>> | null {
+): ScheduleArgument | null {
   return schedule === null
     ? null
     : {
