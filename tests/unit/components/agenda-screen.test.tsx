@@ -107,6 +107,7 @@ function detailResponse(
     ...event,
     ...changes,
     coverUrl: null,
+    series: null,
     notes: null,
     going: [],
     maybe: [],

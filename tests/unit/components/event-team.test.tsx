@@ -110,7 +110,14 @@ function jsonResponse(status: number, payload: unknown): Response {
 }
 
 function detailOf(event: AgendaEvent): MemberEventDetail {
-  return { ...event, coverUrl: null, notes: null, going: [], maybe: [] };
+  return {
+    ...event,
+    coverUrl: null,
+    series: null,
+    notes: null,
+    going: [],
+    maybe: [],
+  };
 }
 
 /** La agenda con un evento, su detalle y lo que responda su equipo. */

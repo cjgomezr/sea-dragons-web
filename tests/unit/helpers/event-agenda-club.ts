@@ -2,6 +2,7 @@ import type { Role } from "@/lib/auth/roles";
 import type {
   AgendaQuery,
   EventAgendaGateways,
+  EventSeriesSummary,
   EventRow,
   Responder,
   RsvpTally,
@@ -93,9 +94,13 @@ export type FakeAgendaClubOptions = {
   readonly events?: readonly FakeEvent[];
   readonly tallies?: readonly RsvpTally[];
   readonly responders?: Readonly<Record<string, readonly Responder[]>>;
+  /** Los días y la fecha final de cada serie, por su id (#648). */
+  readonly series?: Readonly<Record<string, FakeSeries>>;
   /** Los ficheros de imagen que Storage tiene (#644). */
   readonly storedCoverPaths?: readonly string[];
 };
+
+export type FakeSeries = Omit<EventSeriesSummary, "sessionsLeft">;
 
 export type FakeAgendaClub = {
   readonly gateways: EventAgendaGateways;
@@ -142,6 +147,26 @@ function isAfterCursor(event: FakeEvent, query: AgendaQuery): boolean {
     id: query.after.id,
   });
   return query.period === "upcoming" ? order > 0 : order < 0;
+}
+
+/** Las sesiones que quedan cuentan como en la consulta: las de la serie que
+ * siguen en pie de hoy en adelante. */
+function summarizeSeries(
+  events: readonly FakeEvent[],
+  series: FakeAgendaClubOptions["series"],
+  query: { readonly seriesId: string; readonly today: string },
+): EventSeriesSummary | null {
+  const found = series?.[query.seriesId];
+  if (found === undefined) {
+    return null;
+  }
+  const sessionsLeft = events.filter(
+    (event) =>
+      event.seriesId === query.seriesId &&
+      event.status === "scheduled" &&
+      event.startsOn >= query.today,
+  ).length;
+  return { ...found, sessionsLeft };
 }
 
 function findAgendaPage(
@@ -196,6 +221,8 @@ export function fakeAgendaClub(
         );
       },
       listResponders: async (eventId) => options.responders?.[eventId] ?? [],
+      summarizeSeries: async (query) =>
+        summarizeSeries(events, options.series, query),
     },
     eventCovers: covers.gateway,
   };

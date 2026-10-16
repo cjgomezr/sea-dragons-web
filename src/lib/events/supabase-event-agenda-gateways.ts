@@ -9,10 +9,12 @@ import type {
   AgendaQuery,
   EventAgendaGateways,
   EventRow,
+  EventSeriesSummary,
   Responder,
   RsvpTally,
 } from "./event-agenda";
 import { EVENT_TYPES } from "./event-creation";
+import { ISO_WEEKDAYS } from "./event-occurrences";
 import { RSVP_RESPONSES } from "./event-rsvp";
 import { createSupabaseEventCoversGateway } from "./supabase-event-covers-gateway";
 import {
@@ -40,6 +42,7 @@ import {
  */
 
 const EVENTS_TABLE = "events";
+const SERIES_TABLE = "event_series";
 const TALLIES_FUNCTION = "event_rsvp_tallies";
 const RESPONDERS_FUNCTION = "live_event_rsvps";
 
@@ -99,6 +102,11 @@ const tallyRowSchema = z.object({
 const responderRowSchema = z.object({
   full_name: z.string(),
   response: z.enum(["yes", "maybe"]),
+});
+
+const seriesRowSchema = z.object({
+  weekdays: z.array(z.union(ISO_WEEKDAYS.map((day) => z.literal(day)))),
+  ends_on: z.string(),
 });
 
 function toEventRow(row: unknown): EventRow {
@@ -250,6 +258,42 @@ async function listResponders(
     .map((row) => ({ fullName: row.full_name, response: row.response }));
 }
 
+/** Dos peticiones: la serie y, sin traer filas, cuántas de sus sesiones
+ * siguen en pie de hoy en adelante. */
+async function summarizeSeries(
+  serviceClient: SupabaseClient,
+  query: { readonly seriesId: string; readonly today: string },
+): Promise<EventSeriesSummary | null> {
+  const [series, sessions] = await Promise.all([
+    serviceClient
+      .from(SERIES_TABLE)
+      .select("weekdays, ends_on")
+      .eq("id", query.seriesId)
+      .maybeSingle(),
+    serviceClient
+      .from(EVENTS_TABLE)
+      .select("id", { count: "exact", head: true })
+      .eq("series_id", query.seriesId)
+      .eq("status", "scheduled")
+      .gte("starts_on", query.today),
+  ]);
+  const error = series.error ?? sessions.error;
+  if (error) {
+    throw new Error(
+      `No se pudo resumir la serie ${query.seriesId}: ${error.message}`,
+    );
+  }
+  if (series.data === null) {
+    return null;
+  }
+  const parsed = seriesRowSchema.parse(series.data);
+  return {
+    weekdays: parsed.weekdays,
+    endsOn: parsed.ends_on,
+    sessionsLeft: sessions.count ?? 0,
+  };
+}
+
 export function createEventAgendaGateways(
   serviceClient: SupabaseClient,
 ): EventAgendaGateways {
@@ -261,6 +305,7 @@ export function createEventAgendaGateways(
       findEvent: (query) => findEvent(serviceClient, query),
       countResponses: (eventIds) => countResponses(serviceClient, eventIds),
       listResponders: (eventId) => listResponders(serviceClient, eventId),
+      summarizeSeries: (query) => summarizeSeries(serviceClient, query),
     },
     eventCovers: createSupabaseEventCoversGateway(serviceClient),
   };

@@ -89,6 +89,7 @@ const CANCELLED_SOCIAL: AgendaEvent = {
 const SCRIMMAGE_DETAIL: OrganizerEventDetail = {
   ...SCRIMMAGE,
   coverUrl: null,
+  series: null,
   notes: "Bring both caps",
   going: ["Ana Pérez", "Liam Chen", "Mia Rossi"],
   maybe: ["Noah Park"],
@@ -132,6 +133,7 @@ function detailOf(event: AgendaEvent): OrganizerEventDetail {
   return {
     ...event,
     coverUrl: null,
+    series: null,
     notes: null,
     going: ["Ana Pérez"],
     maybe: [],

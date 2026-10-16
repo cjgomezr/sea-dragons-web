@@ -35,6 +35,7 @@ import {
 
 const FAR_DAY = "2099-03-02";
 const NEXT_FAR_DAY = "2099-03-03";
+const SERIES_LAST_DAY = "2099-06-29";
 const TALLIES_RPC_PATH = "/rpc/event_rsvp_tallies";
 
 async function seededClubId(serviceClient: ServiceRoleClient): Promise<string> {
@@ -404,6 +405,7 @@ describeRls("agenda y detalle contra la base", () => {
         const detail = await openEvent(gateways, {
           callerId: world.insider.id,
           eventId: world.groupEventId,
+          now: new Date(),
         });
 
         expect(tallies).toEqual([
@@ -429,6 +431,7 @@ describeRls("agenda y detalle contra la base", () => {
           openEvent(gateways, {
             callerId: world.outsider.id,
             eventId: world.groupEventId,
+            now: new Date(),
           }),
         ).rejects.toBeInstanceOf(EventNotFoundError);
       }),
@@ -469,6 +472,78 @@ describeRls("agenda y detalle contra la base", () => {
                 url.includes(TALLIES_RPC_PATH),
               ),
             ).toHaveLength(1);
+          },
+        );
+      }),
+    RLS_NETWORK_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "resume una serie con sus días, su fecha final y las sesiones en pie desde hoy",
+    () =>
+      withAgendaWorld(async (world) => {
+        const author = { clubId: world.clubId, userId: world.insider.id };
+        await withSeededRows(
+          world.serviceClient,
+          "event_series",
+          [
+            {
+              club_id: world.clubId,
+              title: "Serie de la agenda",
+              event_type: "training",
+              start_time: "19:00",
+              location: "MSAC",
+              audience: "all",
+              weekdays: [1, 3],
+              starts_on: "2099-02-02",
+              ends_on: SERIES_LAST_DAY,
+              author_id: world.insider.id,
+            },
+          ],
+          async ([series]) => {
+            const seriesId = series?.id as string;
+            // Todas las filas llevan las mismas columnas: en una inserción
+            // de varias, PostgREST pone null en las que le faltan a una.
+            const session = (startsOn: string) => ({
+              ...eventRow(author, {
+                startsOn,
+                title: "Serie de la agenda",
+                audience: "all",
+              }),
+              series_id: seriesId,
+              status: "scheduled",
+              cancelled_at: null,
+            });
+            await withSeededRows(
+              world.serviceClient,
+              "events",
+              [
+                session("2099-02-23"),
+                session(FAR_DAY),
+                session("2099-03-04"),
+                {
+                  ...session("2099-03-09"),
+                  status: "cancelled",
+                  cancelled_at: new Date().toISOString(),
+                },
+              ],
+              async () => {
+                const gateways = createEventAgendaGateways(
+                  world.serviceClient.client,
+                );
+
+                const summary = await gateways.agenda.summarizeSeries({
+                  seriesId,
+                  today: FAR_DAY,
+                });
+
+                expect(summary).toEqual({
+                  weekdays: [1, 3],
+                  endsOn: SERIES_LAST_DAY,
+                  sessionsLeft: 2,
+                });
+              },
+            );
           },
         );
       }),
