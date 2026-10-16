@@ -15331,6 +15331,7 @@ const REDESIGNED_HISTORY = [
     card: { brand: "mastercard", last4: "4444" },
     failureReason: null,
     quantity: 1,
+    option: null,
   },
   {
     id: "e0e0e0e0-0000-4000-8000-0000000000f3",
@@ -15341,6 +15342,7 @@ const REDESIGNED_HISTORY = [
     card: null,
     failureReason: null,
     quantity: 1,
+    option: null,
   },
   ...PAYMENTS_HISTORY,
 ];
