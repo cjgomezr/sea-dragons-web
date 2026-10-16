@@ -220,6 +220,44 @@ export function formatCalendarDayParts(
   };
 }
 
+const AGENDA_DAY_SEPARATOR = " · ";
+
+/** La etiqueta de un día de la agenda (#647): "SAT · OCT 17", y en español
+ * con el día delante, "SÁB · 17 OCT". Con `withYear`, el año al final, para
+ * un día de otro año. */
+export function formatAgendaDayLabel(
+  locale: Locale,
+  isoDate: string,
+  { withYear }: { readonly withYear: boolean },
+): string {
+  const { weekday, day, month } = formatCalendarDayParts(locale, isoDate);
+  const dayNumber = String(Number(day));
+  const date =
+    locale === "es" ? `${dayNumber} ${month}` : `${month} ${dayNumber}`;
+  const parts = [weekday, date, ...(withYear ? [isoDate.slice(0, 4)] : [])];
+  return parts
+    .join(AGENDA_DAY_SEPARATOR)
+    .toLocaleUpperCase(DISPLAY_LOCALES[locale]);
+}
+
+const CALENDAR_DAY_WITH_WEEKDAY_FORMATTERS = calendarDayPartFormatters({
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
+/** Un día sin hora con su día de la semana: "Saturday 17 October 2026",
+ * "sábado, 17 de octubre de 2026". */
+export function formatCalendarDayWithWeekday(
+  locale: Locale,
+  isoDate: string,
+): string {
+  return CALENDAR_DAY_WITH_WEEKDAY_FORMATTERS[locale].format(
+    parseCalendarDay(isoDate),
+  );
+}
+
 /** El día del club en que pasó algo, en corto y con el mes recortado igual
  * que el bloque de la agenda ("1 Oct", "18 sep"): la fecha de una fila del
  * historial de pagos (#631), que no puede cambiar de ancho según el ICU. */

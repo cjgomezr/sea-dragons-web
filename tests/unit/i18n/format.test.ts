@@ -7,7 +7,9 @@ import {
 import {
   formatCalendarDay,
   formatCalendarDayAt,
+  formatAgendaDayLabel,
   formatCalendarDayParts,
+  formatCalendarDayWithWeekday,
   formatCalendarMonth,
   formatClubCompactDay,
   formatClubDay,
@@ -293,6 +295,44 @@ describe("bloque de fecha de la agenda", () => {
   it("rechaza un día que no existe en el calendario", () => {
     expect(() => formatCalendarDayParts("en", "2026-02-30")).toThrow(
       RangeError,
+    );
+  });
+});
+
+describe("etiqueta de un día de la agenda (#647)", () => {
+  it("escribe el día corto en mayúsculas, como el mockup", () => {
+    expect(formatAgendaDayLabel("en", "2026-10-17", { withYear: false })).toBe(
+      "SAT · OCT 17",
+    );
+  });
+
+  it("pone el día antes del mes en español", () => {
+    expect(formatAgendaDayLabel("es", "2026-10-17", { withYear: false })).toBe(
+      "SÁB · 17 OCT",
+    );
+  });
+
+  it("no rellena con cero el número del día", () => {
+    expect(formatAgendaDayLabel("en", "2026-10-03", { withYear: false })).toBe(
+      "SAT · OCT 3",
+    );
+  });
+
+  it("añade el año cuando se le pide", () => {
+    expect(formatAgendaDayLabel("en", "2025-10-18", { withYear: true })).toBe(
+      "SAT · OCT 18 · 2025",
+    );
+  });
+
+  it("escribe el día entero con su día de la semana", () => {
+    expect(formatCalendarDayWithWeekday("en", "2026-10-17")).toBe(
+      "Saturday 17 October 2026",
+    );
+  });
+
+  it("escribe el día entero con su día de la semana en español", () => {
+    expect(formatCalendarDayWithWeekday("es", "2026-10-17")).toBe(
+      "sábado, 17 de octubre de 2026",
     );
   });
 });

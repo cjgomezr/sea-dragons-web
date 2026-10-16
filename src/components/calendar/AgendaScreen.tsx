@@ -5,15 +5,31 @@ import { useEffect, useId, useRef, useState } from "react";
 import { PAYMENTS_PATH } from "@/lib/auth/routes";
 import type { AgendaEvent, AgendaPeriod } from "@/lib/events/event-agenda";
 import type { EventType } from "@/lib/events/event-creation";
+import {
+  formatAgendaDayLabel,
+  formatCalendarDayWithWeekday,
+} from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/locale";
 import { type Translator, createTranslator } from "@/lib/i18n/translator";
+import { clubCalendarDate } from "@/lib/time/club-calendar";
 import {
   type AgendaFailure,
   type AgendaLoad,
   describeAgendaFailure,
   loadAgenda,
 } from "./agenda-client";
+import {
+  type AgendaDay,
+  classifyAgendaDay,
+  groupAgendaByDay,
+} from "./agenda-days";
 import { AgendaRow } from "./AgendaRow";
+import {
+  AGENDA_TYPE_CHIPS,
+  agendaRequestTypes,
+  searchWithAgendaTypes,
+  toggleAgendaType,
+} from "./agenda-type-filter";
 import {
   type CreatedSummary,
   createEvent,
@@ -31,10 +47,14 @@ import type { EventOrganizer } from "./EventOrganizerActions";
 
 /**
  * La agenda del Calendario (#311, RF-5 a RF-7 del PRD de E7): los eventos de
- * quien mira de hoy en adelante, de 50 en 50, con el RSVP en cada fila. Sigue
- * docs/mockups/calendar-light.png sin el control Mes/Semana/Agenda (ASS-010).
- * En su sitio, un control cambia a los pasados (#312), del más reciente al
- * más antiguo, que es como los sirve la API.
+ * quien mira de hoy en adelante, de 50 en 50, agrupados por día. Desde E24
+ * (#647, RF-6) sigue docs/mockups/calendar-redesign-agenda-dark.png: un
+ * control cambia a los pasados (#312), del más reciente al más antiguo, que
+ * es como los sirve la API, y unos chips filtran por tipo.
+ *
+ * Los chips se guardan en la dirección (`?types=`) y la agenda se vuelve a
+ * pedir con ellos: filtrar lo ya cargado dejaría páginas vacías (D8). Con
+ * todos apagados no se pide nada.
  *
  * Es de cliente porque cambia sin recargar: "Ver más" añade la página
  * siguiente al final sin volver a pedir ni reordenar lo que ya hay, y cada
@@ -113,9 +133,10 @@ const MAX_PAGES_TO_FIND_EVENT = 4;
  * la agenda: se enseña lo que ya llegó. */
 async function loadFirstPages(
   period: AgendaPeriod,
+  eventTypes: readonly EventType[],
   soughtEventId: string | null,
 ): Promise<AgendaLoad> {
-  const first = await loadAgenda(period, null);
+  const first = await loadAgenda(period, null, eventTypes);
   if (first.kind === "failed" || soughtEventId === null) {
     return first;
   }
@@ -127,7 +148,7 @@ async function loadFirstPages(
     !events.some((event) => event.id === soughtEventId);
     pages += 1
   ) {
-    const next = await loadAgenda(period, nextCursor);
+    const next = await loadAgenda(period, nextCursor, eventTypes);
     if (next.kind === "failed") {
       break;
     }
@@ -187,6 +208,54 @@ function LoadMore({
   );
 }
 
+const YEAR_LENGTH = "YYYY".length;
+
+/** La etiqueta de un día: "TODAY" en el acento, o "SAT · OCT 17" con "This
+ * weekend" al lado. La abreviatura es para la vista; el lector de pantalla
+ * oye el día entero. */
+function AgendaDayHeading({
+  translate,
+  date,
+  today,
+}: {
+  readonly translate: Translator;
+  readonly date: string;
+  readonly today: string;
+}): React.JSX.Element {
+  const { locale } = translate;
+  const kind = classifyAgendaDay(date, today);
+  const fullDate = formatCalendarDayWithWeekday(locale, date);
+  if (kind === "today") {
+    const todayWord = translate("calendar.day.today");
+    return (
+      <h2 className="agenda-day-heading">
+        <span className="agenda-day-label is-today" aria-hidden="true">
+          {todayWord.toLocaleUpperCase(locale)}
+        </span>{" "}
+        <span className="visually-hidden">{todayWord}</span>{" "}
+        <span className="agenda-day-note">{fullDate}</span>
+      </h2>
+    );
+  }
+  const withYear = date.slice(0, YEAR_LENGTH) !== today.slice(0, YEAR_LENGTH);
+  return (
+    <h2 className="agenda-day-heading">
+      <span className="agenda-day-label" aria-hidden="true">
+        {formatAgendaDayLabel(locale, date, { withYear })}
+      </span>{" "}
+      <span className="visually-hidden">{fullDate}</span>
+      {kind === "thisWeekend" ? (
+        <>
+          {" "}
+          <span className="agenda-day-note">
+            {translate("calendar.day.thisWeekend")}
+          </span>
+        </>
+      ) : null}
+    </h2>
+  );
+}
+
 function AgendaList({
   translate,
   period,
@@ -209,19 +278,31 @@ function AgendaList({
       <p className="admin-empty">{translate(PERIOD_TEXTS[period].empty)}</p>
     );
   }
+  const today = clubCalendarDate(new Date());
   return (
     <ul className="agenda-list" aria-labelledby={TITLE_ID}>
-      {events.map((event) => (
-        <AgendaRow
-          key={event.id}
-          translate={translate}
-          event={event}
-          period={period}
-          shouldTakeFocus={event.id === focusEventId}
-          organizer={organizer}
-          canTakeAttendance={canTakeAttendance}
-          rsvpDisabledReasonId={rsvpDisabledReasonId}
-        />
+      {groupAgendaByDay(events).map((day: AgendaDay<AgendaEvent>) => (
+        <li key={day.date} className="agenda-day">
+          <AgendaDayHeading
+            translate={translate}
+            date={day.date}
+            today={today}
+          />
+          <ul className="agenda-day-events">
+            {day.events.map((event) => (
+              <AgendaRow
+                key={event.id}
+                translate={translate}
+                event={event}
+                period={period}
+                shouldTakeFocus={event.id === focusEventId}
+                organizer={organizer}
+                canTakeAttendance={canTakeAttendance}
+                rsvpDisabledReasonId={rsvpDisabledReasonId}
+              />
+            ))}
+          </ul>
+        </li>
       ))}
     </ul>
   );
@@ -318,9 +399,73 @@ function PeriodChoice({
   );
 }
 
+/** Un chip por tipo, con su punto de color. Encendido lleva el tinte del
+ * tipo; el color acompaña, `aria-pressed` es lo que se anuncia. */
+function TypeChips({
+  translate,
+  chosenTypes,
+  onToggle,
+}: {
+  readonly translate: Translator;
+  readonly chosenTypes: readonly EventType[];
+  readonly onToggle: (eventType: EventType) => void;
+}): React.JSX.Element {
+  return (
+    <div
+      className="agenda-chips"
+      role="group"
+      aria-label={translate("calendar.types.label")}
+    >
+      {AGENDA_TYPE_CHIPS.map((eventType) => (
+        <button
+          key={eventType}
+          type="button"
+          className={`agenda-chip agenda-chip-${eventType}`}
+          aria-pressed={chosenTypes.includes(eventType)}
+          onClick={() => onToggle(eventType)}
+        >
+          <span className="agenda-chip-dot" aria-hidden="true" />
+          {translate(`event.type.${eventType}`)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function NoTypesChosen({
+  translate,
+  onShowAll,
+}: {
+  readonly translate: Translator;
+  readonly onShowAll: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="agenda-no-types">
+      <p className="admin-empty">{translate("calendar.types.empty")}</p>
+      <button type="button" className="admin-secondary" onClick={onShowAll}>
+        {translate("calendar.types.showAll")}
+      </button>
+    </div>
+  );
+}
+
+/** Escribe el filtro en la dirección sin pedir la página otra vez. Se
+ * reemplaza la entrada del historial: volver atrás sale del calendario, y al
+ * volver a él la dirección trae el mismo filtro. Next la sincroniza con su
+ * router. */
+function writeTypesToAddress(eventTypes: readonly EventType[]): void {
+  const { pathname, search } = window.location;
+  window.history.replaceState(
+    null,
+    "",
+    `${pathname}${searchWithAgendaTypes(search, eventTypes)}`,
+  );
+}
+
 function AgendaView({
   translate,
   period,
+  eventTypes,
   isActive,
   focusOnLoad,
   organizer,
@@ -329,6 +474,8 @@ function AgendaView({
 }: {
   readonly translate: Translator;
   readonly period: AgendaPeriod;
+  /** Los tipos que se piden; ninguno, todos. */
+  readonly eventTypes: readonly EventType[];
   readonly isActive: boolean;
   /** El evento cuyo título recibe el foco con la primera página. */
   readonly focusOnLoad: string | null;
@@ -342,7 +489,7 @@ function AgendaView({
   useEffect(() => {
     let isCurrent = true;
     const soughtEventId = reloads === 0 ? focusOnLoad : null;
-    void loadFirstPages(period, soughtEventId).then((outcome) => {
+    void loadFirstPages(period, eventTypes, soughtEventId).then((outcome) => {
       if (!isCurrent) {
         return;
       }
@@ -361,7 +508,7 @@ function AgendaView({
     return () => {
       isCurrent = false;
     };
-  }, [period, reloads, focusOnLoad]);
+  }, [period, eventTypes, reloads, focusOnLoad]);
 
   function reloadAgenda(): void {
     setState({ kind: "loading" });
@@ -374,7 +521,7 @@ function AgendaView({
         ? { ...current, more: { kind: "loading" } }
         : current,
     );
-    const outcome = await loadAgenda(period, cursor);
+    const outcome = await loadAgenda(period, cursor, eventTypes);
     setState((current) => {
       if (current.kind !== "ready") {
         return current;
@@ -459,6 +606,7 @@ export function AgendaScreen({
   canTakeAttendance,
   canRespond,
   initialPeriod = "upcoming",
+  initialTypes = AGENDA_TYPE_CHIPS,
   focusEventId = null,
   openCreateWith = null,
 }: {
@@ -477,6 +625,8 @@ export function AgendaScreen({
   /** Dónde abre: un evento pasado de la búsqueda global vive en los pasados
    * (#427). */
   readonly initialPeriod?: AgendaPeriod;
+  /** Los tipos encendidos al abrir, los de `?types=` (#647). */
+  readonly initialTypes?: readonly EventType[];
   /** El evento cuyo título recibe el foco al llegar, como el que se abrió
    * desde la búsqueda global (#427). */
   readonly focusEventId?: string | null;
@@ -489,6 +639,8 @@ export function AgendaScreen({
   const rsvpDisabledReasonId = canRespond ? null : membershipNoticeId;
   const [period, setPeriod] = useState<AgendaPeriod>(initialPeriod);
   const [notice, setNotice] = useState<AgendaNotice | null>(null);
+  const [chosenTypes, setChosenTypes] =
+    useState<readonly EventType[]>(initialTypes);
   // Cambia con cada evento creado, editado o cancelado: la clave nueva vuelve
   // a montar las vistas.
   const [agendaVersion, setAgendaVersion] = useState<AgendaVersion>({
@@ -515,6 +667,12 @@ export function AgendaScreen({
         },
       }
     : null;
+
+  function chooseTypes(eventTypes: readonly EventType[]): void {
+    setChosenTypes(eventTypes);
+    writeTypesToAddress(eventTypes);
+    reloadAgenda(null);
+  }
 
   function choosePeriod(choice: AgendaPeriod): void {
     setPeriod(choice);
@@ -548,6 +706,13 @@ export function AgendaScreen({
             />
           ) : null}
         </div>
+        <TypeChips
+          translate={translate}
+          chosenTypes={chosenTypes}
+          onToggle={(eventType) =>
+            chooseTypes(toggleAgendaType(chosenTypes, eventType))
+          }
+        />
       </header>
       {rsvpDisabledReasonId === null ? null : (
         <MembershipRsvpNotice translate={translate} id={rsvpDisabledReasonId} />
@@ -566,18 +731,29 @@ export function AgendaScreen({
           {describeManageNotice(translate, notice)}
         </p>
       ) : null}
-      {PERIODS.filter((choice) => openedPeriods.has(choice)).map((choice) => (
-        <AgendaView
-          key={`${choice}-${agendaVersion.number}`}
+      {chosenTypes.length === 0 ? (
+        <NoTypesChosen
           translate={translate}
-          period={choice}
-          isActive={choice === period}
-          focusOnLoad={agendaVersion.focusEventId}
-          organizer={organizer}
-          canTakeAttendance={canTakeAttendance}
-          rsvpDisabledReasonId={rsvpDisabledReasonId}
+          onShowAll={() => chooseTypes(AGENDA_TYPE_CHIPS)}
         />
-      ))}
+      ) : null}
+      {chosenTypes.length === 0
+        ? null
+        : PERIODS.filter((choice) => openedPeriods.has(choice)).map(
+            (choice) => (
+              <AgendaView
+                key={`${choice}-${agendaVersion.number}`}
+                translate={translate}
+                period={choice}
+                eventTypes={agendaRequestTypes(chosenTypes)}
+                isActive={choice === period}
+                focusOnLoad={agendaVersion.focusEventId}
+                organizer={organizer}
+                canTakeAttendance={canTakeAttendance}
+                rsvpDisabledReasonId={rsvpDisabledReasonId}
+              />
+            ),
+          )}
     </div>
   );
 }

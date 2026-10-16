@@ -467,8 +467,9 @@ describe("editar desde el calendario", () => {
     ]);
     const row = await findRow(SCRIMMAGE.title);
     expect(
-      await within(row).findByText("10:00 am · MSAC Dive Pool"),
+      await within(row).findByRole("link", { name: /^MSAC Dive Pool/ }),
     ).toBeInTheDocument();
+    expect(within(row).getByText("10:00 am")).toBeInTheDocument();
     expect(agendaNotice()).toHaveTextContent("Changes saved.");
   });
 
