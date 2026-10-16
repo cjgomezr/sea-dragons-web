@@ -5,6 +5,14 @@ import { type Role, hasCapability } from "@/lib/auth/roles";
 import type { MemberGroupsGateway } from "@/lib/groups/member-groups";
 import { clubCalendarDate } from "@/lib/time/club-calendar";
 import { type EventType, isEventType } from "./event-creation";
+import {
+  type EventCoverRef,
+  type EventCoverUrls,
+  type EventCoversGateway,
+  NO_EVENT_COVER_URLS,
+  signEventCover,
+  signEventCoverThumbnails,
+} from "./event-covers";
 import type { EventPlace } from "./event-place";
 import {
   EventNotFoundError,
@@ -65,6 +73,8 @@ export type EventRow = {
   readonly audience: NamedEventAudience;
   /** La respuesta guardada de quien consulta, si la hay. */
   readonly myResponse: RsvpResponse | null;
+  /** La imagen (#644). Una sesión de una serie trae la que heredó. */
+  readonly coverUploadId: string | null;
 };
 
 /** El punto de la agenda desde el que sigue la página siguiente. */
@@ -122,6 +132,7 @@ export type EventAgendaGateways = {
   readonly members: RoleRequestGateways["members"];
   readonly memberGroups: MemberGroupsGateway;
   readonly agenda: EventAgendaGateway;
+  readonly eventCovers: Pick<EventCoversGateway, "signUrls">;
 };
 
 export type AgendaEvent = {
@@ -142,6 +153,8 @@ export type AgendaEvent = {
   readonly myResponse: RsvpResponse | null;
   /** Si quien consulta puede responder. Sólo es falso para quien organiza. */
   readonly inAudience: boolean;
+  /** La miniatura firmada (#644); null sin imagen o fuera de la audiencia. */
+  readonly coverThumbUrl: string | null;
 };
 
 /** `nextCursor` es nulo en la última página. Quien quiera la siguiente lo
@@ -152,6 +165,8 @@ export type AgendaPage = {
 };
 
 export type MemberEventDetail = AgendaEvent & {
+  /** La grande firmada (#644), con la misma regla que la miniatura. */
+  readonly coverUrl: string | null;
   readonly notes: string | null;
   readonly going: readonly string[];
   readonly maybe: readonly string[];
@@ -258,11 +273,16 @@ function reachesViewer(row: EventRow, viewer: Viewer): boolean {
   return isInAudience(audience, viewer.groupIds);
 }
 
-function toAgendaEvent(
-  row: EventRow,
-  counts: { readonly goingCount: number; readonly maybeCount: number },
-  inAudience: boolean,
-): AgendaEvent {
+/** Lo que la agenda añade a la fila: los conteos, si quien consulta es la
+ * audiencia y su miniatura. */
+type AgendaView = {
+  readonly goingCount: number;
+  readonly maybeCount: number;
+  readonly inAudience: boolean;
+  readonly coverThumbUrl: string | null;
+};
+
+function toAgendaEvent(row: EventRow, view: AgendaView): AgendaEvent {
   return {
     id: row.id,
     startsOn: row.startsOn,
@@ -276,11 +296,43 @@ function toAgendaEvent(
     placeDetail: row.placeDetail,
     status: row.status,
     seriesId: row.seriesId,
-    goingCount: counts.goingCount,
-    maybeCount: counts.maybeCount,
+    goingCount: view.goingCount,
+    maybeCount: view.maybeCount,
     myResponse: row.myResponse,
-    inAudience,
+    inAudience: view.inAudience,
+    coverThumbUrl: view.coverThumbUrl,
   };
+}
+
+/** La imagen que se le puede firmar a quien consulta: sólo si el evento la
+ * tiene y quien consulta es su audiencia (D7). Quien organiza ve el evento
+ * aunque no sea para él, pero no su imagen. */
+function signableCoverOf(row: EventRow, viewer: Viewer): EventCoverRef | null {
+  if (row.coverUploadId === null || !reachesViewer(row, viewer)) {
+    return null;
+  }
+  return { id: row.coverUploadId, clubId: viewer.clubId };
+}
+
+/** Las miniaturas de la página, por id de imagen, en una sola llamada. */
+function signPageCovers(
+  gateways: EventAgendaGateways,
+  viewer: Viewer,
+  rows: readonly EventRow[],
+): Promise<ReadonlyMap<string, string>> {
+  return signEventCoverThumbnails(
+    gateways.eventCovers,
+    rows.flatMap((row) => signableCoverOf(row, viewer) ?? []),
+  );
+}
+
+function thumbnailOf(
+  row: EventRow,
+  viewer: Viewer,
+  thumbnails: ReadonlyMap<string, string>,
+): string | null {
+  const cover = signableCoverOf(row, viewer);
+  return cover === null ? null : (thumbnails.get(cover.id) ?? null);
 }
 
 const NO_RESPONSES = { goingCount: 0, maybeCount: 0 } as const;
@@ -327,16 +379,19 @@ export async function listAgenda(
     limit: AGENDA_PAGE_SIZE + 1,
   });
   const page = rows.slice(0, AGENDA_PAGE_SIZE);
-  const tallies = await countPage(gateways, page);
+  const [tallies, thumbnails] = await Promise.all([
+    countPage(gateways, page),
+    signPageCovers(gateways, viewer, page),
+  ]);
   const last = page.at(-1);
   const hasMore = rows.length > AGENDA_PAGE_SIZE && last !== undefined;
   return {
     events: page.map((row) =>
-      toAgendaEvent(
-        row,
-        tallies.get(row.id) ?? NO_RESPONSES,
-        reachesViewer(row, viewer),
-      ),
+      toAgendaEvent(row, {
+        ...(tallies.get(row.id) ?? NO_RESPONSES),
+        inAudience: reachesViewer(row, viewer),
+        coverThumbUrl: thumbnailOf(row, viewer, thumbnails),
+      }),
     ),
     nextCursor: hasMore
       ? encodeCursor({ startsAt: last.startsAt, id: last.id })
@@ -352,6 +407,17 @@ function namesWith(
     .filter((responder) => responder.response === response)
     .map((responder) => responder.fullName)
     .sort((first, second) => first.localeCompare(second));
+}
+
+async function signDetailCover(
+  gateways: EventAgendaGateways,
+  row: EventRow,
+  viewer: Viewer,
+): Promise<EventCoverUrls> {
+  const cover = signableCoverOf(row, viewer);
+  return cover === null
+    ? NO_EVENT_COVER_URLS
+    : signEventCover(gateways.eventCovers, cover);
 }
 
 /** Un evento abierto: lo de la agenda más las notas y quién va. Quien no lo
@@ -374,15 +440,20 @@ export async function openEvent(
   if (!inAudience && !isOrganizer) {
     throw new EventNotFoundError();
   }
-  const responders = await gateways.agenda.listResponders(row.id);
+  const [responders, cover] = await Promise.all([
+    gateways.agenda.listResponders(row.id),
+    signDetailCover(gateways, row, viewer),
+  ]);
   const going = namesWith(responders, "yes");
   const maybe = namesWith(responders, "maybe");
   const detail: MemberEventDetail = {
-    ...toAgendaEvent(
-      row,
-      { goingCount: going.length, maybeCount: maybe.length },
+    ...toAgendaEvent(row, {
+      goingCount: going.length,
+      maybeCount: maybe.length,
       inAudience,
-    ),
+      coverThumbUrl: cover.coverThumbUrl,
+    }),
+    coverUrl: cover.coverUrl,
     notes: row.notes,
     going,
     maybe,

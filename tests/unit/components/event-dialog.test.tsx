@@ -49,6 +49,7 @@ const CREATED_EVENT: AgendaEvent = {
   maybeCount: 0,
   myResponse: null,
   inAudience: true,
+  coverThumbUrl: null,
 };
 
 type Call = {

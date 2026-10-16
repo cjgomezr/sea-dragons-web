@@ -67,6 +67,7 @@ function dashboardGateways(): DashboardGateways {
         countResponses: async () => [],
         listResponders: async () => [],
       },
+      eventCovers: { signUrls: async () => new Map() },
     },
     news: {
       members,

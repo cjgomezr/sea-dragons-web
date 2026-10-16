@@ -57,6 +57,8 @@ export const agendaEventSchema = z.object({
   maybeCount: z.number().int().nonnegative(),
   myResponse: z.enum(RSVP_RESPONSES).nullable(),
   inAudience: z.boolean(),
+  // La miniatura firmada (#644); nula sin imagen o fuera de la audiencia.
+  coverThumbUrl: z.string().nullable(),
 });
 
 const agendaResponseSchema = z.object({

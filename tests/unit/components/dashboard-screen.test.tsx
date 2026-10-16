@@ -55,6 +55,7 @@ function agendaEvent(
     maybeCount: 0,
     myResponse: null,
     inAudience: true,
+    coverThumbUrl: null,
     ...overrides,
   };
 }

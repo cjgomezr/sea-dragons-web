@@ -37,6 +37,7 @@ const POOL_TRAINING: AgendaEvent = {
   maybeCount: 2,
   myResponse: "yes",
   inAudience: true,
+  coverThumbUrl: null,
 };
 
 const SCRIMMAGE: AgendaEvent = {
@@ -56,6 +57,7 @@ const SCRIMMAGE: AgendaEvent = {
   maybeCount: 1,
   myResponse: null,
   inAudience: true,
+  coverThumbUrl: null,
 };
 
 const CANCELLED_SOCIAL: AgendaEvent = {
@@ -73,6 +75,7 @@ const COMMITTEE_ONLY: AgendaEvent = {
   title: "Coaches Meeting",
   eventType: "meeting",
   inAudience: false,
+  coverThumbUrl: null,
 };
 
 type Respond = (request: {
@@ -103,6 +106,7 @@ function detailResponse(
   const detail: MemberEventDetail = {
     ...event,
     ...changes,
+    coverUrl: null,
     notes: null,
     going: [],
     maybe: [],

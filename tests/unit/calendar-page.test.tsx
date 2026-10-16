@@ -194,6 +194,7 @@ describe("el calendario de quien no tiene la membresía al día", () => {
                     placeDetail: null,
                     status: "scheduled",
                     inAudience: true,
+                    coverThumbUrl: null,
                     goingCount: 1,
                     maybeCount: 0,
                     myResponse: null,

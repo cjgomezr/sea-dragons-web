@@ -6,6 +6,7 @@ import type {
   Responder,
   RsvpTally,
 } from "@/lib/events/event-agenda";
+import { fakeEventCovers } from "./event-covers-club";
 
 /**
  * Un club en memoria para los tests de la agenda y el detalle (#309). El
@@ -69,6 +70,7 @@ export function clubEvent(
     seriesId: null,
     audience: { kind: "club" },
     myResponse: null,
+    coverUploadId: null,
     ...overrides,
   };
 }
@@ -91,12 +93,16 @@ export type FakeAgendaClubOptions = {
   readonly events?: readonly FakeEvent[];
   readonly tallies?: readonly RsvpTally[];
   readonly responders?: Readonly<Record<string, readonly Responder[]>>;
+  /** Los ficheros de imagen que Storage tiene (#644). */
+  readonly storedCoverPaths?: readonly string[];
 };
 
 export type FakeAgendaClub = {
   readonly gateways: EventAgendaGateways;
   /** Los ids de cada llamada a los conteos, en orden. */
   readonly tallyCalls: (readonly string[])[];
+  /** Las rutas de cada llamada a firmar imágenes, en orden. */
+  readonly coverSignCalls: (readonly string[])[];
 };
 
 function isVisible(event: FakeEvent, query: AgendaQuery): boolean {
@@ -161,6 +167,7 @@ export function fakeAgendaClub(
 ): FakeAgendaClub {
   const events = options.events ?? [];
   const tallyCalls: (readonly string[])[] = [];
+  const covers = fakeEventCovers({ storedPaths: options.storedCoverPaths });
   const gateways: EventAgendaGateways = {
     members: {
       findRoleRequestMember: async () =>
@@ -190,6 +197,7 @@ export function fakeAgendaClub(
       },
       listResponders: async (eventId) => options.responders?.[eventId] ?? [],
     },
+    eventCovers: covers.gateway,
   };
-  return { gateways, tallyCalls };
+  return { gateways, tallyCalls, coverSignCalls: covers.signCalls };
 }

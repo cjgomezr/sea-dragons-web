@@ -55,6 +55,7 @@ const SCRIMMAGE: AgendaEvent = {
   maybeCount: 1,
   myResponse: null,
   inAudience: true,
+  coverThumbUrl: null,
 };
 
 const TRAINING_OCCURRENCE: AgendaEvent = {
@@ -74,6 +75,7 @@ const TRAINING_OCCURRENCE: AgendaEvent = {
   maybeCount: 0,
   myResponse: "yes",
   inAudience: true,
+  coverThumbUrl: null,
 };
 
 const CANCELLED_SOCIAL: AgendaEvent = {
@@ -86,6 +88,7 @@ const CANCELLED_SOCIAL: AgendaEvent = {
 
 const SCRIMMAGE_DETAIL: OrganizerEventDetail = {
   ...SCRIMMAGE,
+  coverUrl: null,
   notes: "Bring both caps",
   going: ["Ana Pérez", "Liam Chen", "Mia Rossi"],
   maybe: ["Noah Park"],
@@ -128,6 +131,7 @@ function detailOf(event: AgendaEvent): OrganizerEventDetail {
   }
   return {
     ...event,
+    coverUrl: null,
     notes: null,
     going: ["Ana Pérez"],
     maybe: [],

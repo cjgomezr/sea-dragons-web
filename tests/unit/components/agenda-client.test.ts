@@ -28,6 +28,7 @@ const AGENDA_EVENT = {
   maybeCount: 0,
   myResponse: null,
   inAudience: true,
+  coverThumbUrl: null,
 };
 
 /** Sirve una agenda vacía y devuelve las URL que se pidieron. */

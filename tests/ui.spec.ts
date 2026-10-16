@@ -14584,6 +14584,7 @@ const STUBBED_AGENDA_EVENTS = [
     maybeCount: 2,
     myResponse: "yes",
     inAudience: true,
+    coverThumbUrl: null,
   },
   {
     id: "e0e0e0e0-0000-4000-8000-0000000000e2",
@@ -14602,6 +14603,7 @@ const STUBBED_AGENDA_EVENTS = [
     maybeCount: 0,
     myResponse: null,
     inAudience: true,
+    coverThumbUrl: null,
   },
   {
     id: "e0e0e0e0-0000-4000-8000-0000000000e3",
@@ -14620,6 +14622,7 @@ const STUBBED_AGENDA_EVENTS = [
     maybeCount: 1,
     myResponse: "maybe",
     inAudience: true,
+    coverThumbUrl: null,
   },
   {
     id: "e0e0e0e0-0000-4000-8000-0000000000e4",
@@ -14638,6 +14641,7 @@ const STUBBED_AGENDA_EVENTS = [
     maybeCount: 0,
     myResponse: null,
     inAudience: false,
+    coverThumbUrl: null,
   },
 ] as const;
 
@@ -14658,6 +14662,7 @@ const STUBBED_CANCELLED_EVENT = {
   maybeCount: 0,
   myResponse: null,
   inAudience: true,
+  coverThumbUrl: null,
 } as const;
 
 // Los pasados y la fila desplegada (#312). El detalle es el mismo para
@@ -18320,6 +18325,7 @@ function dashboardEvent(overrides: {
     maybeCount: 0,
     myResponse: null,
     inAudience: true,
+    coverThumbUrl: null,
     ...overrides,
   };
 }

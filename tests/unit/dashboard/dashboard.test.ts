@@ -123,6 +123,7 @@ function event(overrides: {
     place: null,
     placeDetail: null,
     notes: null,
+    coverUploadId: null,
     status: "scheduled",
     seriesId: null,
     audience:
@@ -235,6 +236,7 @@ function gateways(): DashboardGateways {
         countResponses: async () => [],
         listResponders: async () => [],
       },
+      eventCovers: { signUrls: async () => new Map() },
     },
     news: {
       members,

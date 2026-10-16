@@ -14,6 +14,7 @@ import type {
 } from "./event-agenda";
 import { EVENT_TYPES } from "./event-creation";
 import { RSVP_RESPONSES } from "./event-rsvp";
+import { createSupabaseEventCoversGateway } from "./supabase-event-covers-gateway";
 import {
   toHoursAndMinutes,
   toOptionalHoursAndMinutes,
@@ -60,7 +61,7 @@ const MY_RSVP_FILTER = "my_rsvp.user_id";
 const EVENT_COLUMNS = [
   "id, starts_on, start_time, end_time, ends_on, starts_at, title, event_type, location, notes",
   PLACE_COLUMNS,
-  "status, series_id, audience",
+  "status, series_id, audience, cover_upload_id",
   AUDIENCE_EMBED,
   MY_RSVP_EMBED,
 ].join(", ");
@@ -82,6 +83,7 @@ const eventRowSchema = z.object({
   status: z.enum(["scheduled", "cancelled"]),
   series_id: z.string().nullable(),
   audience: z.enum(["all", "groups"]),
+  cover_upload_id: z.string().nullable(),
   event_groups: z.array(
     z.object({ group: z.object({ id: z.string(), name: z.string() }) }),
   ),
@@ -128,6 +130,7 @@ function toEventRow(row: unknown): EventRow {
               .sort((first, second) => first.name.localeCompare(second.name)),
           },
     myResponse: parsed.my_rsvp[0]?.response ?? null,
+    coverUploadId: parsed.cover_upload_id,
   };
 }
 
@@ -259,6 +262,7 @@ export function createEventAgendaGateways(
       countResponses: (eventIds) => countResponses(serviceClient, eventIds),
       listResponders: (eventId) => listResponders(serviceClient, eventId),
     },
+    eventCovers: createSupabaseEventCoversGateway(serviceClient),
   };
 }
 

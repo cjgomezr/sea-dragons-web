@@ -8,9 +8,12 @@ import {
   listAgenda,
   openEvent,
 } from "@/lib/events/event-agenda";
+import { eventCoverPathsOf } from "@/lib/events/event-covers";
 import { EventNotFoundError } from "@/lib/events/event-rsvp";
+import { SIGNED_URL_PREFIX } from "../helpers/event-covers-club";
 import {
   AGENDA_CALLER_ID,
+  AGENDA_CLUB_ID,
   AGENDA_NOW,
   type FakeAgendaClubOptions,
   MASTERS_SQUAD,
@@ -85,6 +88,7 @@ describe("agenda", () => {
           maybeCount: 2,
           myResponse: "maybe",
           inAudience: true,
+          coverThumbUrl: null,
         },
       ],
       nextCursor: null,
@@ -356,6 +360,8 @@ describe("detalle de un evento", () => {
       maybeCount: 1,
       myResponse: null,
       inAudience: true,
+      coverThumbUrl: null,
+      coverUrl: null,
       notes: "Traed aletas.",
       going: ["Ana", "Zoe"],
       maybe: ["Bea"],
@@ -437,5 +443,118 @@ describe("detalle de un evento", () => {
     await expect(
       open({ callerIsMember: false, events: [event] }, event.id),
     ).rejects.toBeInstanceOf(MemberNotFoundError);
+  });
+});
+
+describe("imagen de los eventos (#644)", () => {
+  const COVER = "cccccccc-0000-4000-8000-000000000001";
+  const OTHER_COVER = "cccccccc-0000-4000-8000-000000000002";
+  const coverOf = (id: string) =>
+    eventCoverPathsOf({ id, clubId: AGENDA_CLUB_ID });
+  const storedCoverPaths = [COVER, OTHER_COVER].flatMap((id) => [
+    coverOf(id).thumbnail,
+    coverOf(id).large,
+  ]);
+  const signed = (path: string): string => `${SIGNED_URL_PREFIX}${path}`;
+
+  it("da a cada evento de la audiencia su miniatura firmada", async () => {
+    const event = clubEvent("2027-06-22", { coverUploadId: COVER });
+    const plain = clubEvent("2027-06-23");
+
+    const page = await agenda({ events: [event, plain], storedCoverPaths });
+
+    expect(page.events.map((row) => row.coverThumbUrl)).toEqual([
+      signed(coverOf(COVER).thumbnail),
+      null,
+    ]);
+  });
+
+  it("firma todas las miniaturas de la página en una sola llamada", async () => {
+    const club = fakeAgendaClub({
+      storedCoverPaths,
+      events: [
+        clubEvent("2027-06-22", { coverUploadId: COVER }),
+        clubEvent("2027-06-23", { coverUploadId: OTHER_COVER }),
+        clubEvent("2027-06-24", { coverUploadId: COVER }),
+      ],
+    });
+
+    await listAgenda(club.gateways, {
+      callerId: AGENDA_CALLER_ID,
+      period: "upcoming",
+      now: AGENDA_NOW,
+    });
+
+    expect(club.coverSignCalls).toEqual([
+      [coverOf(COVER).thumbnail, coverOf(OTHER_COVER).thumbnail],
+    ]);
+  });
+
+  it("no llama a Storage si ningún evento de la página tiene imagen", async () => {
+    const club = fakeAgendaClub({ events: [clubEvent("2027-06-22")] });
+
+    await listAgenda(club.gateways, {
+      callerId: AGENDA_CALLER_ID,
+      period: "upcoming",
+      now: AGENDA_NOW,
+    });
+
+    expect(club.coverSignCalls).toEqual([]);
+  });
+
+  it("trae la grande y la miniatura en el detalle", async () => {
+    const event = clubEvent("2027-06-22", { coverUploadId: COVER });
+
+    const detail = await open({ events: [event], storedCoverPaths }, event.id);
+
+    expect(detail).toMatchObject({
+      coverThumbUrl: signed(coverOf(COVER).thumbnail),
+      coverUrl: signed(coverOf(COVER).large),
+    });
+  });
+
+  it("da a una sesión de una serie la imagen que heredó", async () => {
+    const session = clubEvent("2027-06-22", {
+      seriesId: "5e5e5e5e-0000-4000-8000-000000000005",
+      coverUploadId: COVER,
+    });
+
+    const detail = await open(
+      { events: [session], storedCoverPaths },
+      session.id,
+    );
+
+    expect(detail).toMatchObject({ coverUrl: signed(coverOf(COVER).large) });
+  });
+
+  it("no da ninguna dirección a quien organiza pero no es la audiencia", async () => {
+    const event = seniorSquadEvent("2027-06-22", { coverUploadId: COVER });
+    const club = fakeAgendaClub({
+      callerRole: "Committee",
+      events: [event],
+      storedCoverPaths,
+    });
+
+    const page = await listAgenda(club.gateways, {
+      callerId: AGENDA_CALLER_ID,
+      period: "upcoming",
+      now: AGENDA_NOW,
+    });
+    const detail = await openEvent(club.gateways, {
+      callerId: AGENDA_CALLER_ID,
+      eventId: event.id,
+    });
+
+    expect(page.events[0]?.coverThumbUrl).toBeNull();
+    expect(detail).toMatchObject({ coverThumbUrl: null, coverUrl: null });
+    expect(club.coverSignCalls).toEqual([]);
+  });
+
+  it("da null si Storage ya no tiene el fichero", async () => {
+    const event = clubEvent("2027-06-22", { coverUploadId: COVER });
+
+    const detail = await open({ events: [event] }, event.id);
+
+    expect(detail).toMatchObject({ coverThumbUrl: null, coverUrl: null });
   });
 });
