@@ -5,9 +5,9 @@ import { UsersThree } from "@phosphor-icons/react/dist/ssr/UsersThree";
 import type { Icon as PhosphorGlyph } from "@phosphor-icons/react/dist/lib/types";
 import type { EventType } from "@/lib/events/event-creation";
 
-/** Los tamaños del handoff de E24: la miniatura de la fila y la imagen del
- * panel. */
-export type EventCoverIconSize = 24 | 76;
+/** Los tamaños del handoff de E24: la miniatura de la fila, la imagen del
+ * diálogo (#650) y la del panel. */
+export type EventCoverIconSize = 24 | 48 | 76;
 
 const TYPE_GLYPHS: Readonly<Record<EventType, PhosphorGlyph>> = {
   training: Timer,

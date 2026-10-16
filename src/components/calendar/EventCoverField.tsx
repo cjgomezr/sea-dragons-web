@@ -24,8 +24,8 @@ import {
 
 const ISSUE_ID = "evento-imagen-aviso";
 
-/** El icono del fondo, del tamaño del de la imagen del panel. */
-const BANNER_ICON_SIZE = 76;
+/** El icono del fondo: en 120px de alto tiene que caber sobre el botón. */
+const BANNER_ICON_SIZE = 48;
 
 export function describeCoverIssue(
   translate: Translator,

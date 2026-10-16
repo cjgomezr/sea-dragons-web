@@ -11238,7 +11238,7 @@ a.auth-brand-header:focus-visible {
   inset: 0;
   align-items: flex-start;
   justify-content: flex-end;
-  padding: var(--space-4) var(--space-6);
+  padding: var(--space-3) var(--space-6);
 }
 
 .event-cover-banner-content {
