@@ -9401,50 +9401,193 @@ a.auth-brand-header:focus-visible {
   justify-items: start;
 }
 
-/* Los cobros del club (#473): un levy por fila, con su nombre, su importe y
-   el botón o el chip de pagado. En 375px la acción baja bajo el texto. */
-.payments-levies {
+/* Los extras del club del socio (#633, RF-7 del PRD de E23): la etiqueta
+   mono con su pista y una lista con borde de filas compactas. En escritorio
+   cada fila es la rejilla del handoff (nombre, compra, precio, acción); la
+   acción usa `display: contents` para que el aviso de Stripe, si sale, ocupe
+   la fila entera bajo ella y no los 100px de su columna. */
+.payments-extras {
+  container: payments-extras / inline-size;
   display: grid;
   gap: var(--space-3);
-  justify-self: stretch;
-  margin: var(--space-2) 0 0;
-  padding: 0;
-  list-style: none;
+  min-width: 0;
 }
 
-.payments-levy {
+.payments-extras-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  gap: var(--space-1) var(--space-3);
+  align-items: baseline;
 }
 
-.payments-levy-details {
-  display: grid;
-  flex: 1 1 16rem;
-  gap: var(--space-1);
-  min-width: 0;
-  font-size: 14px;
+.payments-extras-title {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--color-text-secondary);
+}
+
+.payments-extras-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.payments-extras-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.payments-extra {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 96px 100px;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  padding: 11px var(--space-4);
+}
+
+.payments-extra + .payments-extra {
+  border-top: 1px solid var(--color-border);
+}
+
+.payments-extra p {
+  margin: 0;
+}
+
+.payments-extra-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.payments-extra-name {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--color-text);
   overflow-wrap: anywhere;
 }
 
-.payments-plan-card .payments-levy-name {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--color-text);
+.payments-extra .payments-extra-description {
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.payments-plan-card .payments-levy-price {
+.payments-extra-purchase {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.payments-extra-price {
   font-family: var(--font-family-mono);
-  font-size: 16px;
+  font-size: 13.5px;
   font-weight: 700;
   color: var(--color-text);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.payments-extra-action {
+  display: contents;
+}
+
+.payments-extra-action .auth-error {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* Comprar mide 40px, como el handoff, y su zona de toque llega a 44px
+   (D11). */
+.payments-extra-action .auth-submit {
+  position: relative;
+  grid-row: 1;
+  grid-column: 4;
+  justify-self: end;
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  font-size: 14px;
+}
+
+.payments-extra-action .auth-submit::after {
+  content: "";
+  position: absolute;
+  inset: -2px 0;
+}
+
+.payments-extra-bought-mark {
+  display: inline-flex;
+  grid-row: 1;
+  grid-column: 4;
+  gap: var(--space-1);
+  align-items: center;
+  justify-self: end;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--color-success) 65%, var(--color-text));
+}
+
+.payments-extra .payments-levy-payers-open {
+  grid-column: 1 / -1;
+}
+
+/* Estrecho (el móvil #2a, y la tableta junto al menú, como el historial):
+   nombre y precio a la izquierda, Comprar o Comprado a la derecha, en filas
+   de al menos 56px. La descripción no cabe y se va; lo comprado queda bajo
+   el precio, para no perder la cantidad. */
+@container payments-extras (width < 640px) {
+  .payments-extra {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px var(--space-3);
+    min-height: 56px;
+  }
+
+  .payments-extra .payments-extra-description {
+    display: none;
+  }
+
+  .payments-extra-main,
+  .payments-extra-price,
+  .payments-extra-purchase {
+    grid-column: 1;
+  }
+
+  .payments-extra-price {
+    grid-row: 2;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--color-text-secondary);
+    text-align: left;
+  }
+
+  .payments-extra-purchase {
+    grid-row: 3;
+  }
+
+  .payments-extra-purchase:empty {
+    display: none;
+  }
+
+  .payments-extra-action .auth-submit,
+  .payments-extra-bought-mark {
+    grid-row: 1 / span 3;
+    grid-column: 2;
+  }
+
+  .payments-extra-action .auth-error {
+    grid-row: 4;
+  }
 }
 
 .payments-levy-action {
