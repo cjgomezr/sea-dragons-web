@@ -17410,11 +17410,15 @@ test.describe("editar y cancelar en el navegador", () => {
   }) => {
     await page.setViewportSize({ width: 1440, height: 700 });
     await goToCalendar(page, ACTIONS);
-    const cancel = firstEventPanel(page).getByRole("button", {
-      name: ORGANIZER_CANCEL,
-    });
+    const panel = firstEventPanel(page);
+    const cancel = panel.getByRole("button", { name: ORGANIZER_CANCEL });
+    // Que de verdad no quepa: si no, la prueba no prueba nada.
+    await expect(cancel).not.toBeInViewport();
 
-    await cancel.scrollIntoViewIfNeeded();
+    // Con la rueda, como quien mira: `scrollIntoViewIfNeeded` también
+    // movería una caja con `overflow: hidden`.
+    await panel.hover();
+    await page.mouse.wheel(0, 2000);
 
     await expect(cancel).toBeInViewport();
   });
