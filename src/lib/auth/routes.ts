@@ -360,6 +360,11 @@ export const EVENT_MANAGE_API_PATH = `${EVENTS_MANAGE_API_PATH}/[id]`;
 /** Cancelar un evento suelto o una ocurrencia (#314): POST. Marca, no borra. */
 export const EVENT_CANCELLATION_API_PATH = `${EVENT_MANAGE_API_PATH}/cancellation`;
 
+/** Buscar un lugar para un evento (#646, RF-5 del PRD de E24): GET con
+ * `?q=`. Cuelga de crear, así que es sólo de Admin y Committee. Es un camino
+ * estático, así que Next lo prefiere al `[id]` de editar un evento. */
+export const EVENT_PLACES_API_PATH = `${EVENTS_MANAGE_API_PATH}/places`;
+
 /** Editar una serie de hoy en adelante (#315, RF-12): PATCH con lo que
  * cambia. `[id]` es el de la serie. Cuelga de crear, así que es sólo de
  * Admin y Committee. */
@@ -730,6 +735,7 @@ export const RESTRICTED_ROUTES: readonly RestrictedRoute[] = [
   // Cuelgan del anterior; se declaran por el mismo motivo que el cambio de rol.
   { path: EVENT_MANAGE_API_PATH, capability: "createEvents" },
   { path: EVENT_CANCELLATION_API_PATH, capability: "createEvents" },
+  { path: EVENT_PLACES_API_PATH, capability: "createEvents" },
   { path: EVENT_SERIES_MANAGE_API_PATH, capability: "createEvents" },
   { path: EVENT_SERIES_CANCELLATION_API_PATH, capability: "createEvents" },
   { path: ATTENDANCE_API_PATH, capability: "buildTeamsAndTrackAttendance" },
