@@ -54,6 +54,7 @@ function levy(id: string, name: string): object {
     amountCents: 8000,
     maxQuantity: 1,
     purchasedQuantity: 0,
+    lastPurchasedAt: null,
     isPaid: false,
   };
 }
@@ -109,7 +110,7 @@ async function renderLoaded(options: RenderOptions): Promise<void> {
     expect(
       screen
         .getAllByRole("button", { hidden: true })
-        .some((button) => /^(Pay|Pagar)$/.test(button.textContent ?? "")),
+        .some((button) => /^(Buy|Comprar)$/.test(button.textContent ?? "")),
     ).toBe(true),
   );
 }
@@ -278,7 +279,7 @@ describe("PaymentsScreen: pestañas de un Admin o un Committee (#627)", () => {
     ).toBeInTheDocument();
     expect(
       within(panel).getByRole("button", {
-        name: "Pay",
+        name: "Buy",
         description: "Nationals 2026",
       }),
     ).toBeInTheDocument();

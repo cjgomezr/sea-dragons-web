@@ -211,10 +211,17 @@ describeRls("el levy por el webhook contra la base", () => {
             readPaymentDescriptions(serviceClient, user),
           ).resolves.toEqual(["Nationals 2026"]);
           await expect(
-            createLevyPurchasesGateway(
-              serviceClient.client,
-            ).findPurchasedQuantities(user.id),
-          ).resolves.toEqual(new Map([[FIXTURE_LEVY_PRODUCT_ID, 1]]));
+            createLevyPurchasesGateway(serviceClient.client).findPurchases(
+              user.id,
+            ),
+          ).resolves.toEqual(
+            new Map([
+              [
+                FIXTURE_LEVY_PRODUCT_ID,
+                { quantity: 1, lastPurchasedAt: expect.any(String) },
+              ],
+            ]),
+          );
           await expect(readMembershipStatus(serviceClient, user)).resolves.toBe(
             "pending",
           );
@@ -264,6 +271,7 @@ describeRls("el levy por el webhook contra la base", () => {
         const purchaseOf = (
           quantity: number,
           option: string | null,
+          paidAt: string,
         ): LevyPaymentToApply => ({
           event: {
             id: `evt_${randomUUID()}`,
@@ -277,14 +285,14 @@ describeRls("el levy por el webhook contra la base", () => {
             amountCents: quantity * JERSEY_UNIT_CENTS,
             currency: "aud",
             description: "2026 club jersey",
-            paidAt: new Date("2026-10-15T09:00:00Z"),
+            paidAt: new Date(paidAt),
             option,
           },
           quantity,
           card: null,
         });
-        const first = purchaseOf(3, "M");
-        const second = purchaseOf(2, null);
+        const first = purchaseOf(3, "M", "2026-10-16T09:00:00.000Z");
+        const second = purchaseOf(2, null, "2026-10-15T09:00:00.000Z");
         try {
           await gateway.applyLevyPayment(first);
           await gateway.applyLevyPayment(second);
@@ -293,10 +301,17 @@ describeRls("el levy por el webhook contra la base", () => {
             readPaymentPurchases(serviceClient, user),
           ).resolves.toEqual(["3|13500|M", "2|9000|-"]);
           await expect(
-            createLevyPurchasesGateway(
-              serviceClient.client,
-            ).findPurchasedQuantities(user.id),
-          ).resolves.toEqual(new Map([[jerseyProductId, 5]]));
+            createLevyPurchasesGateway(serviceClient.client).findPurchases(
+              user.id,
+            ),
+          ).resolves.toEqual(
+            new Map([
+              [
+                jerseyProductId,
+                { quantity: 5, lastPurchasedAt: "2026-10-16T09:00:00.000Z" },
+              ],
+            ]),
+          );
         } finally {
           await deleteEvent(serviceClient, first.event.id);
           await deleteEvent(serviceClient, second.event.id);

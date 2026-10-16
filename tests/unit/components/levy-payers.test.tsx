@@ -39,6 +39,7 @@ const NATIONALS = {
   amountCents: 8000,
   maxQuantity: 1,
   purchasedQuantity: 0,
+  lastPurchasedAt: null,
   isPaid: false,
 };
 
@@ -172,7 +173,7 @@ describe("PaymentsScreen: quién pagó cada levy (#531)", () => {
     const fetchDouble = stubFetch({});
     renderScreen(false);
 
-    await screen.findByRole("button", { name: "Pay" });
+    await screen.findByRole("button", { name: "Buy" });
     expect(
       screen.queryByRole("button", { name: "Who paid" }),
     ).not.toBeInTheDocument();
@@ -286,7 +287,7 @@ describe("PaymentsScreen: quién pagó cada levy (#531)", () => {
 
     expect(
       await within(screen.getByRole("tabpanel")).findByText(
-        /couldn't load the club charges/,
+        /couldn't load the club extras/,
       ),
     ).toBeInTheDocument();
     expect(

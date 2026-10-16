@@ -4,6 +4,7 @@ import type Stripe from "stripe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LEVIES_API_PATH, LEVY_CHECKOUT_API_PATH } from "@/lib/auth/routes";
 import type { SessionState } from "@/lib/auth/session-boundary";
+import type { LevyPurchases } from "@/lib/membership/levies";
 import type { MembershipRecord } from "@/lib/membership/membership";
 
 /**
@@ -74,8 +75,12 @@ const STRIPE_PRODUCTS = [
 const readSessionState = vi.fn();
 const listProducts = vi.fn();
 const createSession = vi.fn();
-const findPurchasedQuantities =
-  vi.fn<() => Promise<ReadonlyMap<string, number>>>();
+const findPurchases =
+  vi.fn<() => Promise<ReadonlyMap<string, LevyPurchases>>>();
+const BOUGHT_ONCE: LevyPurchases = {
+  quantity: 1,
+  lastPurchasedAt: "2026-09-18T02:30:00.000Z",
+};
 
 vi.mock("stripe", async (importOriginal) => {
   const actual = await importOriginal<typeof import("stripe")>();
@@ -119,7 +124,7 @@ vi.mock("@/lib/membership/supabase-membership-gateways", () => ({
   createMemberEmailGateway: () => ({
     findEmail: async () => "alba@example.com",
   }),
-  createLevyPurchasesGateway: () => ({ findPurchasedQuantities }),
+  createLevyPurchasesGateway: () => ({ findPurchases }),
 }));
 
 const { default: StripeSdk } = await import("stripe");
@@ -177,7 +182,7 @@ beforeEach(() => {
   configureStripe();
   givenSession({ kind: "active", role: "Player", membershipCurrent: false });
   listProducts.mockResolvedValue(STRIPE_PRODUCTS);
-  findPurchasedQuantities.mockResolvedValue(new Map());
+  findPurchases.mockResolvedValue(new Map());
   createSession.mockResolvedValue({ url: CHECKOUT_URL });
 });
 
@@ -201,6 +206,7 @@ describe("GET /api/v1/levies", () => {
             amountCents: 8000,
             maxQuantity: 1,
             purchasedQuantity: 0,
+            lastPurchasedAt: null,
             isPaid: false,
           },
         ],
@@ -220,12 +226,20 @@ describe("GET /api/v1/levies", () => {
   });
 
   it("marca como pagado el levy que el socio ya pagó", async () => {
-    findPurchasedQuantities.mockResolvedValue(new Map([[LEVY_PRODUCT, 1]]));
+    findPurchases.mockResolvedValue(new Map([[LEVY_PRODUCT, BOUGHT_ONCE]]));
 
     const response = await getLevies();
 
     await expect(response.json()).resolves.toMatchObject({
-      data: { levies: [{ isPaid: true, purchasedQuantity: 1 }] },
+      data: {
+        levies: [
+          {
+            isPaid: true,
+            purchasedQuantity: 1,
+            lastPurchasedAt: BOUGHT_ONCE.lastPurchasedAt,
+          },
+        ],
+      },
     });
   });
 
@@ -316,7 +330,7 @@ describe("POST /api/v1/levies/{priceId}/checkout", () => {
   });
 
   it("responde 409 con su motivo a un levy que el socio ya pagó", async () => {
-    findPurchasedQuantities.mockResolvedValue(new Map([[LEVY_PRODUCT, 1]]));
+    findPurchases.mockResolvedValue(new Map([[LEVY_PRODUCT, BOUGHT_ONCE]]));
 
     const response = await postCheckout();
 

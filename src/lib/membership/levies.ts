@@ -43,7 +43,16 @@ export type Levy = {
   readonly maxQuantity: number;
   /** La suma de las unidades de los pagos cobrados. */
   readonly purchasedQuantity: number;
+  /** Cuándo cobró el último pago (ISO 8601), o `null` si no compró. */
+  readonly lastPurchasedAt: string | null;
   readonly isPaid: boolean;
+};
+
+/** Lo que el socio lleva comprado de un producto: las unidades cobradas y
+ * cuándo se cobró el último pago (ISO 8601). */
+export type LevyPurchases = {
+  readonly quantity: number;
+  readonly lastPurchasedAt: string;
 };
 
 export type LevyStripe =
@@ -58,11 +67,9 @@ export type LevyGateways = {
   readonly membership: MembershipGateway;
   readonly memberEmails: MemberEmailGateway;
   readonly purchases: {
-    /** Las unidades cobradas de cada producto de Stripe que el socio ya
-     * compró, por id del producto. */
-    findPurchasedQuantities(
-      userId: string,
-    ): Promise<ReadonlyMap<string, number>>;
+    /** Lo cobrado de cada producto de Stripe que el socio ya compró, por id
+     * del producto. */
+    findPurchases(userId: string): Promise<ReadonlyMap<string, LevyPurchases>>;
   };
   readonly stripe: LevyStripe;
 };
@@ -82,7 +89,10 @@ export type LevyCheckoutRequest = CheckoutRequest & {
   readonly priceId: string;
 };
 
-type OfferedLevy = CatalogProduct & { readonly purchasedQuantity: number };
+type OfferedLevy = CatalogProduct & {
+  readonly purchasedQuantity: number;
+  readonly lastPurchasedAt: string | null;
+};
 
 const NOTHING_PURCHASED = 0;
 
@@ -91,15 +101,18 @@ async function readOfferedLevies(
   catalog: ProductCatalogSource,
   userId: string,
 ): Promise<readonly OfferedLevy[]> {
-  const [products, purchasedQuantities] = await Promise.all([
+  const [products, purchases] = await Promise.all([
     listActiveProductsOfKind(catalog, LEVY_KIND),
-    gateways.purchases.findPurchasedQuantities(userId),
+    gateways.purchases.findPurchases(userId),
   ]);
-  return products.map((product) => ({
-    ...product,
-    purchasedQuantity:
-      purchasedQuantities.get(product.productId) ?? NOTHING_PURCHASED,
-  }));
+  return products.map((product) => {
+    const purchased = purchases.get(product.productId);
+    return {
+      ...product,
+      purchasedQuantity: purchased?.quantity ?? NOTHING_PURCHASED,
+      lastPurchasedAt: purchased?.lastPurchasedAt ?? null,
+    };
+  });
 }
 
 function isPurchased(levy: OfferedLevy): boolean {
@@ -134,6 +147,7 @@ export async function listLevies(
       amountCents: levy.amountCents,
       maxQuantity: levy.maxQuantity,
       purchasedQuantity: levy.purchasedQuantity,
+      lastPurchasedAt: levy.lastPurchasedAt,
       isPaid: isPurchased(levy),
     })),
   };

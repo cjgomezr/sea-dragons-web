@@ -1219,18 +1219,20 @@ export const spanishMessages: MessageCatalog = {
     "Pack pagado. Tus sesiones se suman en cuanto Stripe confirma el pago.",
   "payments.packs.cancelled":
     "Saliste de Stripe sin comprar un pack. Puedes intentarlo otra vez cuando quieras.",
-  // Los levies que el comité crea en Stripe (#473, RF-6 del PRD de E13).
+  // Los levies que el comité crea en Stripe (#473, RF-6 del PRD de E13),
+  // presentados como extras opcionales del club (#633, D1 del PRD de E23).
   "payments.tabs.label": "Secciones de Pagos",
   "payments.tabs.membership": "Mi membresía",
   "payments.tabs.extras": "Extras del club",
   "payments.tabs.extrasForSale": "{count} a la venta",
-  "payments.levies.title": "Cobros del club",
-  "payments.levies.lead":
-    "Cobros sueltos que abre el comité, como la inscripción a un torneo. Pagarlos no cambia tu membresía.",
+  "payments.levies.title": "Extras del club",
+  "payments.levies.lead": "Opcional · compra lo que necesites",
   "payments.levies.loadFailed":
-    "No pudimos cargar los cobros del club. Recarga la página para intentarlo otra vez.",
-  "payments.levies.pay": "Pagar",
-  "payments.levies.paid": "Pagado",
+    "No pudimos cargar los extras del club. Recarga la página para intentarlo otra vez.",
+  "payments.levies.pay": "Comprar",
+  "payments.levies.paid": "Comprado",
+  "payments.levies.boughtOn": "Comprado el {date}",
+  "payments.levies.boughtCount": "Comprado × {count}",
   // Quién pagó cada levy (#531), sólo para Admin y Committee.
   "payments.levyPayers.toggle": "Quién pagó",
   "payments.levyPayers.loading": "Cargando quién pagó…",
