@@ -1,8 +1,9 @@
-import { EVENT_TYPES, isEventType } from "@/lib/events/event-creation";
+import { EVENT_TYPES } from "@/lib/events/event-creation";
 import { ISO_WEEKDAYS, type IsoWeekday } from "@/lib/events/event-occurrences";
 import { formatWeekdayName } from "@/lib/i18n/format";
 import type { Translator } from "@/lib/i18n/translator";
 import type { EventForm, EventFormField, EventRepeat } from "./event-form";
+import { EventTypeIcon } from "./EventCoverFallback";
 
 /**
  * Los campos del diálogo de evento (#313), en el orden del prototipo
@@ -20,15 +21,19 @@ export type FieldProps = {
 
 const ID_PREFIX = "evento";
 
-function fieldId(field: EventFormField | "eventType" | "repeat"): string {
+const TYPE_ICON_SIZE = 16;
+
+export function fieldId(
+  field: EventFormField | "eventType" | "repeat" | "endsAnotherDay",
+): string {
   return `${ID_PREFIX}-${field}`;
 }
 
-function issueId(field: EventFormField): string {
+export function issueId(field: EventFormField): string {
   return `${fieldId(field)}-aviso`;
 }
 
-function FieldIssue({
+export function FieldIssue({
   field,
   text,
 }: {
@@ -43,7 +48,7 @@ function FieldIssue({
 }
 
 /** Lo que enlaza un campo con su aviso, si lo tiene. */
-function issueAttributes(
+export function issueAttributes(
   field: EventFormField,
   issueText: string | null,
 ): { "aria-invalid": boolean; "aria-describedby": string | undefined } {
@@ -55,7 +60,7 @@ function issueAttributes(
 
 type InputFieldField = Extract<
   EventFormField,
-  "title" | "startsOn" | "endsOn" | "startTime" | "location"
+  "title" | "startsOn" | "endsOn" | "startTime" | "endDate" | "location"
 >;
 
 export function InputField({
@@ -118,32 +123,35 @@ export function NotesField({
   );
 }
 
+/** Los cuatro tipos como botones con su icono (#650): es una sola elección,
+ * así que son radios. El elegido lleva el tinte de su tipo. */
 export function TypeField({
   translate,
   form,
   onChange,
 }: FieldProps): React.JSX.Element {
   return (
-    <div className="auth-field">
-      <label htmlFor={fieldId("eventType")}>
-        {translate("calendar.form.type")}
-      </label>
-      <select
-        id={fieldId("eventType")}
-        value={form.eventType}
-        onChange={(event) => {
-          if (isEventType(event.target.value)) {
-            onChange({ eventType: event.target.value });
-          }
-        }}
-      >
+    <fieldset className="event-form-segmented">
+      <legend>{translate("calendar.form.type")}</legend>
+      <div className="event-form-types">
         {EVENT_TYPES.map((type) => (
-          <option key={type} value={type}>
-            {translate(`event.type.${type}`)}
-          </option>
+          <label
+            className={`event-form-type event-form-type-${type}`}
+            key={type}
+          >
+            <input
+              type="radio"
+              name={fieldId("eventType")}
+              value={type}
+              checked={form.eventType === type}
+              onChange={() => onChange({ eventType: type })}
+            />
+            <EventTypeIcon eventType={type} size={TYPE_ICON_SIZE} />
+            <span>{translate(`event.type.${type}`)}</span>
+          </label>
         ))}
-      </select>
-    </div>
+      </div>
+    </fieldset>
   );
 }
 

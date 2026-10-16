@@ -1477,7 +1477,25 @@ export const spanishMessages: MessageCatalog = {
   "calendar.form.titlePlaceholder": "p. ej. Entrenamiento en piscina",
   "calendar.form.type": "Tipo",
   "calendar.form.date": "Fecha",
-  "calendar.form.time": "Hora",
+  "calendar.form.when": "Cuándo",
+  "calendar.form.startTime": "Empieza",
+  "calendar.form.endTime": "Termina",
+  "calendar.form.lasts": "Dura {duration}",
+  "calendar.form.endTimeNowRequired":
+    "Ahora los eventos necesitan hora de fin. Añádela para guardar.",
+  "calendar.form.endsAnotherDay": "Termina otro día",
+  "calendar.form.endDate": "Fecha de fin",
+  "calendar.form.quickLength": "Duración rápida",
+  "calendar.form.image": "Imagen",
+  "calendar.form.image.optional": "opcional",
+  "calendar.form.image.fallback": "Sin imagen, se usa el fondo de {type}.",
+  "calendar.form.image.add": "Añadir imagen",
+  "calendar.form.image.choose": "Elegir una imagen",
+  "calendar.form.image.remove": "Quitar imagen",
+  "calendar.form.image.preview": "La imagen del evento",
+  "calendar.form.image.uploading": "Subiendo la imagen…",
+  "calendar.form.image.uploadFailed":
+    "No pudimos subir la imagen. Inténtalo de nuevo.",
   "calendar.form.location": "Lugar",
   "calendar.form.locationPlaceholder": "p. ej. MSAC, piscina de saltos",
   "calendar.form.notes": "Notas",
@@ -1485,8 +1503,8 @@ export const spanishMessages: MessageCatalog = {
   "calendar.form.repeat.none": "Una vez",
   "calendar.form.repeat.weekly": "Semanal",
   "calendar.form.weekdays": "Se repite los",
-  "calendar.form.startsOn": "Empieza",
-  "calendar.form.endsOn": "Termina",
+  "calendar.form.startsOn": "Empieza el",
+  "calendar.form.endsOn": "Hasta",
   "calendar.form.audience": "A quién va",
   "calendar.form.cancel": "Cancelar",
   "calendar.form.submit": "Crear evento",
@@ -1511,6 +1529,18 @@ export const spanishMessages: MessageCatalog = {
     "Una serie puede durar como mucho {max} días.",
   "calendar.form.issue.series_without_sessions":
     "Con esos días y esas fechas no sale ninguna sesión. Cambia los días o el rango.",
+  "calendar.form.issue.end_time_required": "Indica a qué hora termina.",
+  "calendar.form.issue.end_before_start":
+    "La hora de fin debe ser después del inicio.",
+  "calendar.form.issue.multi_day_series":
+    "Una sesión de una serie tiene que terminar el mismo día que empieza.",
+  "calendar.form.issue.event_cover_empty": "Esa imagen está vacía. Elige otra.",
+  "calendar.form.issue.event_cover_too_large":
+    "La imagen puede pesar como mucho {max} MB.",
+  "calendar.form.issue.event_cover_type_unsupported":
+    "Elige una imagen JPEG, PNG o WebP.",
+  "calendar.form.issue.event_cover_upload_invalid":
+    "Esa imagen ya no está disponible. Vuelve a elegirla.",
   "calendar.form.error.network":
     "No pudimos hablar con el servidor. Revisa tu conexión y vuelve a intentarlo.",
   "calendar.form.error.signInRequired":

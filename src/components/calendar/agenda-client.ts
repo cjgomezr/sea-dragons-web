@@ -93,7 +93,8 @@ const seriesSummarySchema = z.object({
 // La audiencia sólo le llega a Admin y Committee (RF-8): a los demás el
 // servidor no la manda.
 const openedEventSchema = z.object({
-  // La grande firmada (#644) y la repetición (#648), para el panel.
+  // La grande firmada (#644) y la repetición (#648), para el panel y el
+  // diálogo de editar (#650).
   coverUrl: z.string().nullable(),
   series: seriesSummarySchema.nullable(),
   notes: z.string().nullable(),

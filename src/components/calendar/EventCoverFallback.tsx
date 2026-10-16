@@ -5,9 +5,9 @@ import { UsersThree } from "@phosphor-icons/react/dist/ssr/UsersThree";
 import type { Icon as PhosphorGlyph } from "@phosphor-icons/react/dist/lib/types";
 import type { EventType } from "@/lib/events/event-creation";
 
-/** Los tamaños del handoff de E24: la miniatura de la fila y la imagen del
- * panel. */
-export type EventCoverIconSize = 24 | 76;
+/** Los tamaños del handoff de E24: la miniatura de la fila, la imagen del
+ * diálogo (#650) y la del panel. */
+export type EventCoverIconSize = 24 | 48 | 76;
 
 const TYPE_GLYPHS: Readonly<Record<EventType, PhosphorGlyph>> = {
   training: Timer,
@@ -15,6 +15,26 @@ const TYPE_GLYPHS: Readonly<Record<EventType, PhosphorGlyph>> = {
   social: Confetti,
   meeting: UsersThree,
 };
+
+/** El icono de un tipo de evento. Es decorativo: el tipo lo nombra su
+ * texto. */
+export function EventTypeIcon({
+  eventType,
+  size,
+}: {
+  readonly eventType: EventType;
+  readonly size: number;
+}): React.JSX.Element {
+  const Glyph = TYPE_GLYPHS[eventType];
+  return (
+    <Glyph
+      aria-hidden="true"
+      focusable="false"
+      size={size}
+      color="currentColor"
+    />
+  );
+}
 
 /** El fondo de un evento sin imagen (#641, D4 del PRD de E24): un degradado
  * y un icono por tipo. Es decorativo; el tipo lo nombra su etiqueta. El
@@ -27,15 +47,9 @@ export function EventCoverFallback({
   readonly eventType: EventType;
   readonly iconSize: EventCoverIconSize;
 }): React.JSX.Element {
-  const Glyph = TYPE_GLYPHS[eventType];
   return (
     <div className={`event-cover-fallback event-cover-fallback-${eventType}`}>
-      <Glyph
-        aria-hidden="true"
-        focusable="false"
-        size={iconSize}
-        color="currentColor"
-      />
+      <EventTypeIcon eventType={eventType} size={iconSize} />
     </div>
   );
 }

@@ -20,6 +20,8 @@ import type { AgendaEvent } from "@/lib/events/event-agenda";
 const AGENDA_PATH = "/api/v1/events";
 const CREATE_PATH = "/api/v1/events/manage";
 const GROUPS_PATH = "/api/v1/groups";
+const UPLOAD_PATH = "/api/v1/events/manage/uploads";
+const COVER_ID = "c0c0c0c0-0000-4000-8000-00000000000c";
 
 const SENIOR = {
   id: "9a9a9a9a-0000-4000-8000-000000000009",
@@ -123,11 +125,13 @@ function createdSeries(sessionCount: number): Response {
 function stubApi(options: {
   readonly groups?: readonly (typeof SENIOR)[];
   readonly respondToCreate?: Responder;
+  readonly respondToUpload?: Responder;
   readonly agendaAfterCreate?: readonly AgendaEvent[];
 }): void {
   const {
     groups = [SENIOR, MASTERS],
     respondToCreate = createdSingle,
+    respondToUpload = () => jsonResponse(201, { data: { id: COVER_ID } }),
     agendaAfterCreate = [CREATED_EVENT],
   } = options;
   let hasCreated = false;
@@ -150,6 +154,9 @@ function stubApi(options: {
       }
       if (url.pathname === GROUPS_PATH) {
         return jsonResponse(200, { data: { groups } });
+      }
+      if (url.pathname === UPLOAD_PATH && method === "POST") {
+        return respondToUpload(call);
       }
       if (url.pathname === CREATE_PATH && method === "POST") {
         const response = await respondToCreate(call);
@@ -190,7 +197,8 @@ function setValue(dialog: HTMLElement, label: string, value: string): void {
 function fillSingleEvent(dialog: HTMLElement): void {
   setValue(dialog, "Title", "Pool Training");
   setValue(dialog, "Date", "2026-10-06");
-  setValue(dialog, "Time", "19:00");
+  setValue(dialog, "Starts", "19:00");
+  setValue(dialog, "Ends", "20:30");
   setValue(dialog, "Location", "MSAC Dive Pool");
 }
 
@@ -200,7 +208,8 @@ async function chooseWeekly(dialog: HTMLElement): Promise<void> {
 
 async function fillWeeklySeries(dialog: HTMLElement): Promise<void> {
   setValue(dialog, "Title", "Pool Training");
-  setValue(dialog, "Time", "19:00");
+  setValue(dialog, "Starts", "19:00");
+  setValue(dialog, "Ends", "20:30");
   setValue(dialog, "Location", "MSAC Dive Pool");
   await chooseWeekly(dialog);
   await userEvent.click(
@@ -209,8 +218,8 @@ async function fillWeeklySeries(dialog: HTMLElement): Promise<void> {
   await userEvent.click(
     within(dialog).getByRole("checkbox", { name: "Thursday" }),
   );
-  setValue(dialog, "Starts", "2026-10-06");
-  setValue(dialog, "Ends", "2026-10-29");
+  setValue(dialog, "Starts on", "2026-10-06");
+  setValue(dialog, "Until", "2026-10-29");
 }
 
 async function submit(dialog: HTMLElement): Promise<void> {
@@ -289,7 +298,8 @@ describe("diálogo de evento", () => {
 
     expect(within(dialog).getByLabelText("Title")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Date")).toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Time")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Starts")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Ends")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Location")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Notes")).toBeInTheDocument();
     expect(
@@ -311,15 +321,13 @@ describe("diálogo de evento", () => {
 
     const dialog = await openDialog();
 
-    const options = within(within(dialog).getByLabelText("Type")).getAllByRole(
-      "option",
-    );
-    expect(options.map((option) => option.textContent)).toEqual([
-      "Training",
-      "Competition",
-      "Meeting",
-      "Social",
-    ]);
+    const types = within(dialog).getByRole("group", { name: "Type" });
+    expect(within(types).getAllByRole("radio")).toHaveLength(4);
+    expect(
+      ["Training", "Competition", "Meeting", "Social"].map((name) =>
+        within(types).getByRole("radio", { name }),
+      ),
+    ).toEqual(within(types).getAllByRole("radio"));
   });
 
   it("pone el foco en el título al abrir", async () => {
@@ -345,17 +353,16 @@ describe("diálogo de evento", () => {
     expect(
       within(days).getByRole("checkbox", { name: "Sunday" }),
     ).toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Starts")).toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Ends")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Starts on")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Until")).toBeInTheDocument();
   });
 
   it("manda un evento suelto con lo escrito y la audiencia de todo el club", async () => {
     stubApi({});
     const dialog = await openDialog();
     fillSingleEvent(dialog);
-    await userEvent.selectOptions(
-      within(dialog).getByLabelText("Type"),
-      "Competition",
+    await userEvent.click(
+      within(dialog).getByRole("radio", { name: "Competition" }),
     );
     await userEvent.type(within(dialog).getByLabelText("Notes"), "Bring fins");
 
@@ -368,6 +375,7 @@ describe("diálogo de evento", () => {
       eventType: "competition",
       startsOn: "2026-10-06",
       startTime: "19:00",
+      endTime: "20:30",
       location: "MSAC Dive Pool",
       notes: "Bring fins",
       audience: { kind: "club" },
@@ -417,6 +425,7 @@ describe("diálogo de evento", () => {
       startsOn: "2026-10-06",
       endsOn: "2026-10-29",
       startTime: "19:00",
+      endTime: "20:30",
       location: "MSAC Dive Pool",
       notes: null,
       audience: { kind: "groups", groupIds: [SENIOR.id] },
@@ -508,11 +517,12 @@ describe("diálogo de evento", () => {
     stubApi({ respondToCreate: () => businessRule("series_weekdays_empty") });
     const dialog = await openDialog();
     setValue(dialog, "Title", "Pool Training");
-    setValue(dialog, "Time", "19:00");
+    setValue(dialog, "Starts", "19:00");
+    setValue(dialog, "Ends", "20:30");
     setValue(dialog, "Location", "MSAC Dive Pool");
     await chooseWeekly(dialog);
-    setValue(dialog, "Starts", "2026-10-06");
-    setValue(dialog, "Ends", "2026-10-29");
+    setValue(dialog, "Starts on", "2026-10-06");
+    setValue(dialog, "Until", "2026-10-29");
 
     await submit(dialog);
 
@@ -522,7 +532,7 @@ describe("diálogo de evento", () => {
         "Choose at least one day of the week.",
       ),
     );
-    expect(within(dialog).getByLabelText("Ends")).toHaveValue("2026-10-29");
+    expect(within(dialog).getByLabelText("Until")).toHaveValue("2026-10-29");
   });
 
   it.each([
@@ -536,9 +546,9 @@ describe("diálogo de evento", () => {
     await submit(dialog);
 
     await waitFor(() =>
-      expect(within(dialog).getByLabelText("Ends")).toHaveAccessibleDescription(
-        message,
-      ),
+      expect(
+        within(dialog).getByLabelText("Until"),
+      ).toHaveAccessibleDescription(message),
     );
   });
 
@@ -577,7 +587,8 @@ describe("diálogo de evento", () => {
     );
     setValue(dialog, "Título", "Entreno");
     setValue(dialog, "Fecha", "2026-10-06");
-    setValue(dialog, "Hora", "19:00");
+    setValue(dialog, "Empieza", "19:00");
+    setValue(dialog, "Termina", "20:30");
     setValue(dialog, "Lugar", "MSAC");
 
     await userEvent.click(
@@ -770,5 +781,384 @@ describe("diálogo de evento", () => {
     expect(
       await within(dialog).findByRole("radio", { name: "Specific groups" }),
     ).toBeInTheDocument();
+  });
+});
+function aPicture(): File {
+  return new File([new Uint8Array([1, 2, 3])], "gala.png", {
+    type: "image/png",
+  });
+}
+
+async function chooseImage(dialog: HTMLElement): Promise<void> {
+  await userEvent.upload(
+    within(dialog).getByLabelText("Choose an image"),
+    aPicture(),
+  );
+}
+
+function uploadCalls(): Call[] {
+  return calls.filter((call) => call.pathname === UPLOAD_PATH);
+}
+
+describe("imagen, tipo y cuándo (#650)", () => {
+  it("pone los campos en el orden del diseño, con Cancelar y Crear evento al pie", async () => {
+    stubApi({});
+
+    const dialog = await openDialog();
+
+    const fields = [
+      within(dialog).getByRole("group", { name: "Image · optional" }),
+      within(dialog).getByRole("group", { name: "Type" }),
+      within(dialog).getByLabelText("Title"),
+      within(dialog).getByRole("group", { name: "When" }),
+      within(dialog).getByRole("group", { name: "Repeat" }),
+      within(dialog).getByLabelText("Location"),
+      within(dialog).getByLabelText("Notes"),
+      within(dialog).getByRole("group", { name: "Who's invited" }),
+      within(dialog).getByRole("button", { name: "Cancel" }),
+      within(dialog).getByRole("button", { name: "Create event" }),
+    ];
+    const followsPrevious = fields
+      .slice(1)
+      .map(
+        (field, index) =>
+          (fields[index]?.compareDocumentPosition(field) ?? 0) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    expect(followsPrevious).toEqual(
+      fields.slice(1).map(() => Node.DOCUMENT_POSITION_FOLLOWING),
+    );
+  });
+
+  it("sin imagen enseña el fondo del tipo y Añadir imagen", async () => {
+    stubApi({});
+
+    const dialog = await openDialog();
+
+    expect(
+      within(dialog).getByText(
+        "Without an image, the training background is used.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Add image" }),
+    ).toBeInTheDocument();
+  });
+
+  it("al elegir otro tipo marca ese y cambia el fondo sin imagen", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+
+    await userEvent.click(
+      within(dialog).getByRole("radio", { name: "Competition" }),
+    );
+
+    expect(
+      within(dialog).getByRole("radio", { name: "Competition" }),
+    ).toBeChecked();
+    expect(
+      within(dialog).getByRole("radio", { name: "Training" }),
+    ).not.toBeChecked();
+    expect(
+      within(dialog).getByText(
+        "Without an image, the competition background is used.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("sube la imagen elegida, dice que sube y al guardar manda su id", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:gala");
+    URL.revokeObjectURL = vi.fn();
+    let finishUpload: (response: Response) => void = () => undefined;
+    stubApi({
+      respondToUpload: () =>
+        new Promise<Response>((resolve) => {
+          finishUpload = resolve;
+        }),
+    });
+    const dialog = await openDialog();
+    fillSingleEvent(dialog);
+
+    await chooseImage(dialog);
+
+    expect(
+      await within(dialog).findByText("Uploading the image…"),
+    ).toHaveAttribute("role", "status");
+    expect(
+      within(dialog).getByRole("button", { name: "Create event" }),
+    ).toBeDisabled();
+    finishUpload(jsonResponse(201, { data: { id: COVER_ID } }));
+    expect(
+      await within(dialog).findByRole("img", { name: "The event image" }),
+    ).toHaveAttribute("src", "blob:gala");
+    expect(uploadCalls()).toEqual([
+      expect.objectContaining({ method: "POST", pathname: UPLOAD_PATH }),
+    ]);
+    await submit(dialog);
+    await waitFor(() => expect(createCalls()).toHaveLength(1));
+    expect(createCalls()[0]?.body).toMatchObject({ coverUploadId: COVER_ID });
+  });
+
+  it("quitar la imagen subida vuelve al fondo y no manda ninguna al crear", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:gala");
+    URL.revokeObjectURL = vi.fn();
+    stubApi({});
+    const dialog = await openDialog();
+    fillSingleEvent(dialog);
+    await chooseImage(dialog);
+
+    await userEvent.click(
+      await within(dialog).findByRole("button", { name: "Remove image" }),
+    );
+    await submit(dialog);
+
+    await waitFor(() => expect(createCalls()).toHaveLength(1));
+    expect(createCalls()[0]?.body).not.toHaveProperty("coverUploadId");
+  });
+
+  it.each([
+    ["event_cover_type_unsupported", "Choose a JPEG, PNG or WebP image."],
+    ["event_cover_too_large", "The image can be up to 10 MB."],
+    ["event_cover_empty", "That image is empty. Choose another one."],
+  ])("pinta el %s de la subida traducido", async (reason, message) => {
+    stubApi({ respondToUpload: () => businessRule(reason) });
+    const dialog = await openDialog();
+
+    await chooseImage(dialog);
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(message);
+    expect(
+      within(dialog).getByRole("button", { name: "Add image" }),
+    ).toBeInTheDocument();
+  });
+
+  it("si la subida no llega lo dice", async () => {
+    stubApi({
+      respondToUpload: () => {
+        throw new TypeError("Failed to fetch");
+      },
+    });
+    const dialog = await openDialog();
+
+    await chooseImage(dialog);
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "We couldn't reach the server. Check your connection and try again.",
+    );
+  });
+
+  it("dice cuánto dura con inicio y fin válidos", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+
+    setValue(dialog, "Date", "2026-10-14");
+    setValue(dialog, "Starts", "18:00");
+    setValue(dialog, "Ends", "19:30");
+
+    expect(within(dialog).getByText("Lasts 1 h 30 min")).toBeInTheDocument();
+  });
+
+  it("con el fin antes del inicio lo dice, marca Termina y desactiva Crear", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+
+    setValue(dialog, "Date", "2026-10-14");
+    setValue(dialog, "Starts", "18:00");
+    setValue(dialog, "Ends", "17:00");
+
+    const ends = within(dialog).getByLabelText("Ends");
+    expect(ends).toHaveAccessibleDescription(
+      "The end must be after the start.",
+    );
+    expect(ends).toHaveAttribute("aria-invalid", "true");
+    expect(within(dialog).queryByText(/^Lasts/)).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Create event" }),
+    ).toBeDisabled();
+  });
+
+  it("una duración rápida pone Termina en el inicio más esa duración", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    setValue(dialog, "Date", "2026-10-14");
+    setValue(dialog, "Starts", "18:00");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "2 h" }));
+
+    expect(within(dialog).getByLabelText("Ends")).toHaveValue("20:00");
+    expect(within(dialog).getByText("Lasts 2 h")).toBeInTheDocument();
+  });
+
+  it("una duración rápida que cruza la medianoche enciende Termina otro día con la fecha siguiente", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    setValue(dialog, "Date", "2026-10-14");
+    setValue(dialog, "Starts", "23:00");
+
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "1 h 30" }),
+    );
+
+    expect(within(dialog).getByLabelText("Ends")).toHaveValue("00:30");
+    expect(
+      within(dialog).getByRole("switch", { name: "Ends on another day" }),
+    ).toBeChecked();
+    expect(within(dialog).getByLabelText("End date")).toHaveValue("2026-10-15");
+  });
+
+  it("en una serie no hay Termina otro día y cruzar la medianoche marca el error", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    await chooseWeekly(dialog);
+    setValue(dialog, "Starts on", "2026-10-14");
+    setValue(dialog, "Starts", "23:00");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "3 h" }));
+
+    expect(
+      within(dialog).queryByRole("switch", { name: "Ends on another day" }),
+    ).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Ends")).toHaveAccessibleDescription(
+      "The end must be after the start.",
+    );
+    expect(
+      within(dialog).getByRole("button", { name: "Create event" }),
+    ).toBeDisabled();
+  });
+
+  it("Termina otro día añade la fecha de fin y la manda", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    fillSingleEvent(dialog);
+    expect(within(dialog).queryByLabelText("End date")).not.toBeInTheDocument();
+
+    await userEvent.click(
+      within(dialog).getByRole("switch", { name: "Ends on another day" }),
+    );
+    setValue(dialog, "End date", "2026-10-07");
+    setValue(dialog, "Ends", "17:00");
+    await submit(dialog);
+
+    await waitFor(() => expect(createCalls()).toHaveLength(1));
+    expect(createCalls()[0]?.body).toMatchObject({
+      startsOn: "2026-10-06",
+      endsOn: "2026-10-07",
+      endTime: "17:00",
+    });
+  });
+
+  it("pide la hora de fin sin llamar a la API", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    fillSingleEvent(dialog);
+    setValue(dialog, "Ends", "");
+
+    await submit(dialog);
+
+    expect(within(dialog).getByLabelText("Ends")).toHaveAccessibleDescription(
+      "Fill in this field.",
+    );
+    expect(createCalls()).toEqual([]);
+  });
+
+  it.each([
+    ["end_time_required", "Add the time the event ends."],
+    ["end_before_start", "The end must be after the start."],
+    ["multi_day_series", "A series session has to end on the day it starts."],
+  ])("pinta el %s de la API junto a Termina", async (reason, message) => {
+    stubApi({ respondToCreate: () => businessRule(reason) });
+    const dialog = await openDialog();
+    fillSingleEvent(dialog);
+
+    await submit(dialog);
+
+    const ends = within(dialog).getByLabelText("Ends");
+    await waitFor(() => expect(ends).toHaveAccessibleDescription(message));
+    expect(ends).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("pinta el event_cover_upload_invalid de la API junto a la imagen", async () => {
+    stubApi({
+      respondToCreate: () => businessRule("event_cover_upload_invalid"),
+    });
+    const dialog = await openDialog();
+    fillSingleEvent(dialog);
+
+    await submit(dialog);
+
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole("group", { name: "Image · optional" }),
+      ).toHaveAccessibleDescription(
+        "That image is no longer available. Choose it again.",
+      ),
+    );
+  });
+
+  it("lo dice en español: la duración, el fin al revés y la imagen", async () => {
+    stubApi({});
+    render(
+      <AgendaScreen
+        locale="es"
+        canManageEvents
+        canTakeAttendance={false}
+        canRespond
+      />,
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Evento" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Nuevo evento" });
+    await within(dialog).findByRole("radio", { name: "Todo el club" });
+
+    setValue(dialog, "Fecha", "2026-10-14");
+    setValue(dialog, "Empieza", "18:00");
+    setValue(dialog, "Termina", "19:30");
+    expect(within(dialog).getByText("Dura 1 h 30 min")).toBeInTheDocument();
+    setValue(dialog, "Termina", "17:00");
+
+    expect(
+      within(dialog).getByLabelText("Termina"),
+    ).toHaveAccessibleDescription(
+      "La hora de fin debe ser después del inicio.",
+    );
+    expect(
+      within(dialog).getByRole("switch", { name: "Termina otro día" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Añadir imagen" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("los avisos del fin tras corregir (#650)", () => {
+  it("al cambiar el inicio se va el aviso del servidor junto a Termina", async () => {
+    stubApi({ respondToCreate: () => businessRule("end_before_start") });
+    const dialog = await openDialog();
+    fillSingleEvent(dialog);
+    await submit(dialog);
+    const ends = within(dialog).getByLabelText("Ends");
+    await waitFor(() =>
+      expect(ends).toHaveAccessibleDescription(
+        "The end must be after the start.",
+      ),
+    );
+
+    setValue(dialog, "Starts", "18:00");
+
+    expect(ends).not.toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("anuncia cuánto dura sin mover el foco", async () => {
+    stubApi({});
+    const dialog = await openDialog();
+    setValue(dialog, "Date", "2026-10-14");
+    setValue(dialog, "Starts", "18:00");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "1 h" }));
+
+    expect(
+      within(dialog).getByText("Lasts 1 h").closest("[aria-live]"),
+    ).toHaveAttribute("aria-live", "polite");
   });
 });

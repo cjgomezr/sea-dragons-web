@@ -17151,7 +17151,8 @@ async function openEventDialog(page: Page): Promise<Locator> {
 
 async function fillEventBasics(dialog: Locator): Promise<void> {
   await dialog.getByLabel(/^(Title|Título)$/).fill("Pool Training");
-  await dialog.getByLabel(/^(Time|Hora)$/).fill("19:00");
+  await dialog.getByLabel(/^(Starts|Empieza)$/).fill("19:00");
+  await dialog.getByLabel(/^(Ends|Termina)$/).fill("20:30");
   await dialog.getByLabel(/^(Location|Lugar)$/).fill("MSAC Dive Pool");
 }
 
@@ -17168,8 +17169,8 @@ async function showWeeklyDialog(page: Page): Promise<void> {
   await dialog.getByRole("radio", { name: /^(Weekly|Semanal)$/ }).check();
   await dialog.getByRole("checkbox", { name: /^(Tuesday|martes)$/ }).check();
   await dialog.getByRole("checkbox", { name: /^(Thursday|jueves)$/ }).check();
-  await dialog.getByLabel(/^(Starts|Empieza)$/).fill("2026-10-06");
-  await dialog.getByLabel(/^(Ends|Termina)$/).fill("2026-12-17");
+  await dialog.getByLabel(/^(Starts on|Empieza el)$/).fill("2026-10-06");
+  await dialog.getByLabel(/^(Until|Hasta)$/).fill("2026-12-17");
   await dialog
     .getByRole("radio", { name: /^(Specific groups|Grupos concretos)$/ })
     .check();
@@ -17279,6 +17280,138 @@ for (const state of EVENT_DIALOG_STATES) {
       await goToCalendar(page, state);
       await expectNoAxeViolations(page);
     });
+  });
+}
+
+// El diálogo rehecho de E24 (#650): imagen, tipo con icono y cuándo con hora
+// de fin. Sólo tableta y escritorio: el móvil es #657. La subida de la imagen
+// se sirve desde el test, como la creación: nada se guarda de verdad.
+const EVENT_COVER_UPLOADS_ENDPOINT = "/api/v1/events/manage/uploads";
+const EVENT_COVER_PREVIEW_NAME = /^(The event image|La imagen del evento)$/;
+const REDESIGNED_DIALOG_VIEWPORTS = viewports.filter(
+  (vp) => vp.name !== "mobile",
+);
+
+async function fillCreateDialog(
+  page: Page,
+  times: { readonly starts: string; readonly ends: string },
+): Promise<Locator> {
+  const dialog = await openEventDialog(page);
+  await dialog
+    .getByRole("radio", { name: /^(Competition|Competición)$/ })
+    .check();
+  await dialog.getByLabel(/^(Title|Título)$/).fill("Scrimmage vs Geelong");
+  await dialog.getByLabel(/^(Date|Fecha)$/).fill("2026-10-14");
+  await dialog.getByLabel(/^(Starts|Empieza)$/).fill(times.starts);
+  await dialog.getByLabel(/^(Ends|Termina)$/).fill(times.ends);
+  await dialog.getByLabel(/^(Location|Lugar)$/).fill("MSAC Dive Pool");
+  return dialog;
+}
+
+async function showCreateDialog(page: Page): Promise<void> {
+  const dialog = await fillCreateDialog(page, {
+    starts: "18:00",
+    ends: "19:30",
+  });
+  await expect(dialog.getByText(/^(Lasts|Dura) 1 h 30 min$/)).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
+async function showCreateDialogWithInvalidEnd(page: Page): Promise<void> {
+  const dialog = await fillCreateDialog(page, {
+    starts: "18:00",
+    ends: "17:00",
+  });
+  await expect(
+    dialog.getByRole("button", { name: EVENT_DIALOG_SUBMIT }),
+  ).toBeDisabled();
+  await page.mouse.move(0, 0);
+}
+
+async function showCreateDialogWithImage(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname === EVENT_COVER_UPLOADS_ENDPOINT,
+    (route) =>
+      route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: { id: "c0c0c0c0-0000-4000-8000-0000000000c0" },
+        }),
+      }),
+  );
+  const dialog = await fillCreateDialog(page, {
+    starts: "18:00",
+    ends: "19:30",
+  });
+  await dialog
+    .getByLabel(/^(Choose an image|Elegir una imagen)$/)
+    .setInputFiles({
+      name: "scrimmage.png",
+      mimeType: "image/png",
+      buffer: await coverPicture(),
+    });
+  const preview = dialog.getByRole("img", { name: EVENT_COVER_PREVIEW_NAME });
+  await expect(preview).toBeVisible();
+  await expect
+    .poll(() =>
+      preview.evaluate(
+        (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+      ),
+    )
+    .toBe(true);
+  // La captura mira el pie de la imagen y el cuándo, no sólo la cabecera.
+  await dialog
+    .getByRole("button", { name: /^(Remove image|Quitar imagen)$/ })
+    .scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+}
+
+const REDESIGNED_DIALOG_STATES: readonly CalendarState[] = [
+  ...inBothLanguages("calendario-crear", showCreateDialog),
+  ...inBothLanguages(
+    "calendario-crear-fin-invalido",
+    showCreateDialogWithInvalidEnd,
+  ),
+  ...inBothLanguages("calendario-crear-con-imagen", showCreateDialogWithImage),
+];
+
+for (const state of REDESIGNED_DIALOG_STATES) {
+  test.describe(state.name, () => {
+    skipWithoutSession();
+    quietNotificationBell();
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+
+    for (const vp of REDESIGNED_DIALOG_VIEWPORTS) {
+      test.describe(`@ ${vp.name}`, () => {
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        if (isStatePhotographed(state.name)) {
+          for (const theme of themes) {
+            test(`matches approved baseline (${theme})`, async ({ page }) => {
+              await goToCalendar(page, state, theme);
+              const snapshot = `${state.name}-${vp.name}-${theme}.png`;
+              await createMissingLocalBaseline(snapshot, () =>
+                page.screenshot(SCREENSHOT_OPTIONS),
+              );
+              await expect(page).toHaveScreenshot(snapshot, {
+                ...SCREENSHOT_OPTIONS,
+                maxDiffPixels: PAGE_MAX_DIFF_PIXELS,
+              });
+            });
+          }
+        }
+      });
+    }
+
+    for (const theme of themes) {
+      test(`has no accessibility violations in ${theme} (axe-core)`, async ({
+        page,
+      }) => {
+        await goToCalendar(page, state, theme);
+        await expectNoAxeViolations(page);
+      });
+    }
   });
 }
 
@@ -19458,7 +19591,7 @@ test.describe("el inicio en el navegador", () => {
 
     await expect(page).toHaveURL(/\/calendario\?nuevo=training$/);
     const dialog = page.getByRole("dialog", { name: "New event" });
-    await expect(dialog.getByLabel("Type")).toHaveValue("training");
+    await expect(dialog.getByRole("radio", { name: "Training" })).toBeChecked();
   });
 
   test("con la red caída lo dice y vuelve a pedir al reintentar", async ({

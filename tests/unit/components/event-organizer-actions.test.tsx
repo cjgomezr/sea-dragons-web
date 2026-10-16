@@ -42,7 +42,7 @@ const SCRIMMAGE: AgendaEvent = {
   id: "aaaaaaaa-0000-4000-8000-00000000000a",
   startsOn: "2026-10-10",
   startTime: "10:00",
-  endTime: null,
+  endTime: "12:00",
   endsOn: null,
   title: "Scrimmage vs Geelong Krakens",
   eventType: "competition",
@@ -62,7 +62,7 @@ const TRAINING_OCCURRENCE: AgendaEvent = {
   id: "bbbbbbbb-0000-4000-8000-00000000000b",
   startsOn: "2026-10-06",
   startTime: "19:00",
-  endTime: null,
+  endTime: "20:30",
   endsOn: null,
   title: "Pool Training",
   eventType: "training",
@@ -132,7 +132,8 @@ function detailOf(event: AgendaEvent): OrganizerEventDetail {
   }
   return {
     ...event,
-    coverUrl: null,
+    // La grande no hace falta distinguirla de la miniatura aquí.
+    coverUrl: event.coverThumbUrl,
     series: null,
     notes: null,
     going: ["Ana Pérez"],
@@ -448,9 +449,12 @@ describe("editar desde el calendario", () => {
     const dialog = await openEditDialog(SCRIMMAGE.title, "Edit event");
 
     expect(within(dialog).getByLabelText("Title")).toHaveValue(SCRIMMAGE.title);
-    expect(within(dialog).getByLabelText("Type")).toHaveValue("competition");
+    expect(
+      within(dialog).getByRole("radio", { name: "Competition" }),
+    ).toBeChecked();
     expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-10-10");
-    expect(within(dialog).getByLabelText("Time")).toHaveValue("10:00");
+    expect(within(dialog).getByLabelText("Starts")).toHaveValue("10:00");
+    expect(within(dialog).getByLabelText("Ends")).toHaveValue("12:00");
     expect(within(dialog).getByLabelText("Location")).toHaveValue(
       SCRIMMAGE.location,
     );
@@ -562,7 +566,7 @@ describe("editar desde el calendario", () => {
     const dialog = await openDialogNamed("Edit event");
 
     expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-10-06");
-    setValue(dialog, "Time", "19:30");
+    setValue(dialog, "Starts", "19:30");
     await save(dialog);
 
     await waitFor(() => {
@@ -586,11 +590,13 @@ describe("editar desde el calendario", () => {
     const dialog = await openDialogNamed("Edit series");
 
     expect(within(dialog).queryByLabelText("Date")).not.toBeInTheDocument();
-    expect(within(dialog).queryByLabelText("Starts")).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByLabelText("Starts on"),
+    ).not.toBeInTheDocument();
     expect(
       within(dialog).queryByRole("group", { name: "Repeats on" }),
     ).not.toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Time")).toHaveValue("19:00");
+    expect(within(dialog).getByLabelText("Starts")).toHaveValue("19:00");
     expect(
       within(dialog).getByText(
         "These changes apply to every session from today on, including the ones that were edited on their own.",
@@ -608,7 +614,7 @@ describe("editar desde el calendario", () => {
     await chooseScope(panel, "Edit", "The whole series from today on");
     const dialog = await openDialogNamed("Edit series");
 
-    setValue(dialog, "Time", "19:30");
+    setValue(dialog, "Starts", "19:30");
     await save(dialog);
 
     await waitFor(() => {
@@ -681,7 +687,7 @@ describe("editar desde el calendario", () => {
     const dialog = await screen.findByRole("dialog", { name: "Editar serie" });
     await within(dialog).findByRole("radio", { name: "Todo el club" });
 
-    setValue(dialog, "Hora", "20:00");
+    setValue(dialog, "Empieza", "20:00");
     await userEvent.click(
       within(dialog).getByRole("button", { name: "Guardar cambios" }),
     );
@@ -1006,5 +1012,151 @@ describe("cancelar desde el calendario", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "This event no longer exists.",
     );
+  });
+});
+
+describe("el fin y la imagen al editar (#650)", () => {
+  const BEFORE_E24: AgendaEvent = {
+    ...SCRIMMAGE,
+    id: "eeeeeeee-0000-4000-8000-00000000000e",
+    title: "Committee Meeting",
+    eventType: "meeting",
+    endTime: null,
+  };
+  const WITH_COVER: AgendaEvent = {
+    ...SCRIMMAGE,
+    id: "ffffffff-0000-4000-8000-00000000000f",
+    title: "Gala Night",
+    eventType: "social",
+    coverThumbUrl: "https://storage.example/gala.webp",
+  };
+
+  it("en un evento anterior a E24 deja Termina vacío, explica por qué y no deja guardar", async () => {
+    stubApi({ events: [BEFORE_E24] });
+    renderAgenda();
+
+    const dialog = await openEditDialog(BEFORE_E24.title, "Edit event");
+
+    const ends = within(dialog).getByLabelText("Ends");
+    expect(ends).toHaveValue("");
+    expect(ends).toHaveAccessibleDescription(
+      "Events now need an end time. Add one to save.",
+    );
+    expect(
+      within(dialog).getByRole("button", { name: "Save changes" }),
+    ).toBeDisabled();
+  });
+
+  it("al llenar Termina en un evento anterior a E24 deja guardar y la manda", async () => {
+    stubApi({
+      events: [BEFORE_E24],
+      respond: () => managedEvent(BEFORE_E24, { endTime: "11:30" }),
+    });
+    renderAgenda();
+    const dialog = await openEditDialog(BEFORE_E24.title, "Edit event");
+
+    setValue(dialog, "Ends", "11:30");
+    await save(dialog);
+
+    await waitFor(() => {
+      expect(manageCalls()).toHaveLength(1);
+    });
+    expect(manageCalls()[0]?.body).toEqual({ endTime: "11:30" });
+  });
+
+  it("en un evento anterior a E24 lo dice en español", async () => {
+    stubApi({ events: [BEFORE_E24] });
+    renderAgenda({ locale: "es" });
+    const panel = await openPanel(BEFORE_E24.title);
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Editar" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Editar evento" });
+    await within(dialog).findByRole("radio", { name: "Todo el club" });
+
+    expect(
+      within(dialog).getByLabelText("Termina"),
+    ).toHaveAccessibleDescription(
+      "Ahora los eventos necesitan hora de fin. Añádela para guardar.",
+    );
+  });
+
+  it("enseña la imagen que tiene el evento y quitarla manda ninguna", async () => {
+    stubApi({
+      events: [WITH_COVER],
+      respond: () => managedEvent(WITH_COVER, {}),
+    });
+    renderAgenda();
+    const dialog = await openEditDialog(WITH_COVER.title, "Edit event");
+
+    expect(
+      within(dialog).getByRole("img", { name: "The event image" }),
+    ).toHaveAttribute("src", WITH_COVER.coverThumbUrl);
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Remove image" }),
+    );
+    await save(dialog);
+
+    await waitFor(() => {
+      expect(manageCalls()).toHaveLength(1);
+    });
+    expect(manageCalls()[0]?.body).toEqual({ coverUploadId: null });
+  });
+
+  it("en toda la serie no ofrece Termina otro día", async () => {
+    stubApi({ events: [TRAINING_OCCURRENCE] });
+    renderAgenda();
+    const panel = await openPanel(TRAINING_OCCURRENCE.title);
+
+    await chooseScope(panel, "Edit", "The whole series from today on");
+    const dialog = await openDialogNamed("Edit series");
+
+    expect(within(dialog).getByLabelText("Ends")).toHaveValue("20:30");
+    expect(
+      within(dialog).queryByRole("switch", { name: "Ends on another day" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("en un evento suelto ofrece Termina otro día", async () => {
+    stubApi({ events: [SCRIMMAGE] });
+    renderAgenda();
+
+    const dialog = await openEditDialog(SCRIMMAGE.title, "Edit event");
+
+    expect(
+      within(dialog).getByRole("switch", { name: "Ends on another day" }),
+    ).not.toBeChecked();
+  });
+});
+
+describe("quitar una imagen que el servidor rechazó (#650)", () => {
+  it("se lleva también su aviso", async () => {
+    const withCover: AgendaEvent = {
+      ...SCRIMMAGE,
+      id: "abababab-0000-4000-8000-0000000000ab",
+      coverThumbUrl: "https://storage.example/scrimmage.webp",
+    };
+    stubApi({
+      events: [withCover],
+      respond: () => businessRule("event_cover_upload_invalid"),
+    });
+    renderAgenda();
+    const dialog = await openEditDialog(withCover.title, "Edit event");
+    setValue(dialog, "Title", "Scrimmage");
+    await save(dialog);
+    const image = within(dialog).getByRole("group", {
+      name: "Image · optional",
+    });
+    await waitFor(() =>
+      expect(image).toHaveAccessibleDescription(
+        "That image is no longer available. Choose it again.",
+      ),
+    );
+
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Remove image" }),
+    );
+
+    expect(image).toHaveAccessibleDescription("");
   });
 });

@@ -12,6 +12,7 @@ import type {
 import type { EventEdit } from "@/lib/events/event-management";
 import type { IsoWeekday } from "@/lib/events/event-occurrences";
 import type { SeriesEdit } from "@/lib/events/series-management";
+import type { EndScope } from "./event-end";
 
 /**
  * Lo que se escribe en el diálogo de evento (#313) y cómo se convierte en lo
@@ -34,6 +35,12 @@ export type EventFormLayout = "create" | "event" | "series";
 
 export type EventRepeat = EventDraft["repeat"];
 
+/** La imagen al guardar (#650): la que había (ninguna, al crear) u otra, que
+ * puede ser ninguna si se quitó. */
+export type EventCoverChange =
+  | { readonly kind: "keep" }
+  | { readonly kind: "replace"; readonly coverUploadId: string | null };
+
 export type EventForm = {
   readonly title: string;
   readonly eventType: EventType;
@@ -42,9 +49,20 @@ export type EventForm = {
   readonly endsOn: string;
   readonly weekdays: ReadonlySet<IsoWeekday>;
   readonly startTime: string;
+  /** Vacía sólo al crear y en lo anterior a E24 (D5). */
+  readonly endTime: string;
+  /** "Termina otro día": sólo un evento suelto (D6). */
+  readonly endsAnotherDay: boolean;
+  /** La fecha de fin de un evento de varios días. `endsOn` es la de la
+   * serie. */
+  readonly endDate: string;
   readonly location: string;
   readonly notes: string;
   readonly audience: AudienceChoice;
+  readonly cover: EventCoverChange;
+  /** Una ocurrencia que se edita a solas sigue siendo de su serie: no puede
+   * terminar otro día (D6). */
+  readonly belongsToSeries: boolean;
 };
 
 export const EMPTY_EVENT_FORM: EventForm = {
@@ -55,9 +73,14 @@ export const EMPTY_EVENT_FORM: EventForm = {
   endsOn: "",
   weekdays: new Set(),
   startTime: "",
+  endTime: "",
+  endsAnotherDay: false,
+  endDate: "",
   location: "",
   notes: "",
   audience: { kind: "club", groupIds: new Set() },
+  cover: { kind: "keep" },
+  belongsToSeries: false,
 };
 
 export type EventFormField =
@@ -66,9 +89,12 @@ export type EventFormField =
   | "endsOn"
   | "weekdays"
   | "startTime"
+  | "endTime"
+  | "endDate"
   | "location"
   | "notes"
-  | "audience";
+  | "audience"
+  | "cover";
 
 /** Los motivos de la API que van junto a un campo. `event_started` y
  * `event_cancelled` hablan de un evento que ya existe (#314), y
@@ -80,22 +106,11 @@ export type FieldIssueCode = Exclude<
   | "event_cancelled"
   | "series_without_upcoming"
   | "occurrence_started"
-  // El formulario todavía no tiene hora ni fecha de fin: las pone #650, que
-  // también traduce estos tres junto a su campo.
-  | "end_time_required"
-  | "end_before_start"
-  | "multi_day_series"
   // El formulario todavía no elige un lugar: lo pone #646, que también
   // traduce estos tres junto a su campo.
   | "event_place_invalid"
   | "event_place_coordinates_invalid"
   | "event_place_detail_invalid"
-  // El formulario todavía no sube imagen: la pone #650, que también traduce
-  // estos cuatro junto a su campo.
-  | "event_cover_empty"
-  | "event_cover_too_large"
-  | "event_cover_type_unsupported"
-  | "event_cover_upload_invalid"
 >;
 
 export type EventFormIssue = {
@@ -115,6 +130,15 @@ const ISSUE_FIELDS: Readonly<Record<FieldIssueCode, EventFormField>> = {
   series_range_inverted: "endsOn",
   series_range_too_long: "endsOn",
   series_without_sessions: "weekdays",
+  // Una serie que cruza la medianoche se ve en la hora de fin: es lo que
+  // hay que cambiar.
+  end_time_required: "endTime",
+  end_before_start: "endTime",
+  multi_day_series: "endTime",
+  event_cover_empty: "cover",
+  event_cover_too_large: "cover",
+  event_cover_type_unsupported: "cover",
+  event_cover_upload_invalid: "cover",
 };
 
 export function isFieldIssueCode(reason: string): reason is FieldIssueCode {
@@ -128,13 +152,37 @@ export function issueFromApi(code: FieldIssueCode): EventFormIssue {
 
 type RequiredField = Extract<
   EventFormField,
-  "title" | "startsOn" | "endsOn" | "startTime" | "location"
+  | "title"
+  | "startsOn"
+  | "endsOn"
+  | "startTime"
+  | "endTime"
+  | "endDate"
+  | "location"
 >;
 
 function requiredFields(form: EventForm): readonly RequiredField[] {
-  const dates: readonly RequiredField[] =
-    form.repeat === "none" ? ["startsOn"] : ["startsOn", "endsOn"];
-  return ["title", ...dates, "startTime", "location"];
+  const endDate: readonly RequiredField[] =
+    form.repeat === "none" && form.endsAnotherDay ? ["endDate"] : [];
+  const seriesEnd: readonly RequiredField[] =
+    form.repeat === "none" ? [] : ["endsOn"];
+  return [
+    "title",
+    "startsOn",
+    "startTime",
+    "endTime",
+    ...endDate,
+    ...seriesEnd,
+    "location",
+  ];
+}
+
+/** Si lo que se escribe es un evento suelto o sesiones de una serie, que
+ * terminan el mismo día que empiezan. */
+export function endScopeOf(layout: EventFormLayout, form: EventForm): EndScope {
+  return layout === "series" || form.repeat === "weekly" || form.belongsToSeries
+    ? "series"
+    : "event";
 }
 
 /** Los campos obligatorios que siguen en blanco, en el orden del diálogo. */
@@ -155,6 +203,18 @@ function toAudience(choice: AudienceChoice): EventAudience {
     : { kind: "groups", groupIds: [...choice.groupIds] };
 }
 
+/** La fecha de fin de un evento suelto como se guarda: ninguna si termina
+ * el mismo día. */
+function eventEndsOn(form: EventForm): string | null {
+  return form.endsAnotherDay && form.endDate !== "" ? form.endDate : null;
+}
+
+function coverField(cover: EventCoverChange): {
+  readonly coverUploadId?: string | null;
+} {
+  return cover.kind === "keep" ? {} : { coverUploadId: cover.coverUploadId };
+}
+
 /** Lo que se manda: los días en orden de la semana, y las notas en blanco
  * como ninguna. */
 export function toEventDraft(form: EventForm): EventDraft {
@@ -162,12 +222,20 @@ export function toEventDraft(form: EventForm): EventDraft {
     title: form.title,
     eventType: form.eventType,
     startTime: form.startTime,
+    endTime: form.endTime,
     location: form.location,
     notes: toNotes(form.notes),
     audience: toAudience(form.audience),
+    ...coverField(form.cover),
   };
   if (form.repeat === "none") {
-    return { ...fields, repeat: "none", startsOn: form.startsOn };
+    const endsOn = eventEndsOn(form);
+    return {
+      ...fields,
+      repeat: "none",
+      startsOn: form.startsOn,
+      ...(endsOn === null ? {} : { endsOn }),
+    };
   }
   return {
     ...fields,
@@ -192,6 +260,10 @@ export function formFromEvent(
     eventType: event.eventType,
     startsOn: event.startsOn,
     startTime: event.startTime,
+    endTime: event.endTime ?? "",
+    endsAnotherDay: event.endsOn !== null,
+    endDate: event.endsOn ?? "",
+    belongsToSeries: event.seriesId !== null,
     location: event.location,
     notes: details.notes ?? "",
     audience:
@@ -232,11 +304,13 @@ export function listSeriesChanges(
     ...(form.startTime === initial.startTime
       ? {}
       : { startTime: form.startTime }),
+    ...(form.endTime === initial.endTime ? {} : { endTime: form.endTime }),
     ...(form.location === initial.location ? {} : { location: form.location }),
     ...(notes === toNotes(initial.notes) ? {} : { notes }),
     ...(isSameAudience(form.audience, initial.audience)
       ? {}
       : { audience: toAudience(form.audience) }),
+    ...coverField(form.cover),
   };
 }
 
@@ -249,5 +323,8 @@ export function listEventChanges(
   return {
     ...listSeriesChanges(initial, form),
     ...(form.startsOn === initial.startsOn ? {} : { startsOn: form.startsOn }),
+    ...(eventEndsOn(form) === eventEndsOn(initial)
+      ? {}
+      : { endsOn: eventEndsOn(form) }),
   };
 }

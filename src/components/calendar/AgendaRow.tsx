@@ -300,7 +300,11 @@ function PanelActions({
         <EventOrganizerActions
           translate={translate}
           event={event}
-          details={{ notes: opened.notes, audience }}
+          details={{
+            notes: opened.notes,
+            audience,
+            coverUrl: opened.coverUrl,
+          }}
           goingCount={goingCount}
           organizer={organizer}
         />

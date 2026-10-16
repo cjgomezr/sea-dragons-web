@@ -1472,7 +1472,26 @@ export const englishMessages = {
   "calendar.form.titlePlaceholder": "e.g. Pool Training",
   "calendar.form.type": "Type",
   "calendar.form.date": "Date",
-  "calendar.form.time": "Time",
+  "calendar.form.when": "When",
+  "calendar.form.startTime": "Starts",
+  "calendar.form.endTime": "Ends",
+  "calendar.form.lasts": "Lasts {duration}",
+  "calendar.form.endTimeNowRequired":
+    "Events now need an end time. Add one to save.",
+  "calendar.form.endsAnotherDay": "Ends on another day",
+  "calendar.form.endDate": "End date",
+  "calendar.form.quickLength": "Quick length",
+  "calendar.form.image": "Image",
+  "calendar.form.image.optional": "optional",
+  "calendar.form.image.fallback":
+    "Without an image, the {type} background is used.",
+  "calendar.form.image.add": "Add image",
+  "calendar.form.image.choose": "Choose an image",
+  "calendar.form.image.remove": "Remove image",
+  "calendar.form.image.preview": "The event image",
+  "calendar.form.image.uploading": "Uploading the image…",
+  "calendar.form.image.uploadFailed":
+    "We couldn't upload the image. Try again.",
   "calendar.form.location": "Location",
   "calendar.form.locationPlaceholder": "e.g. MSAC Dive Pool",
   "calendar.form.notes": "Notes",
@@ -1480,8 +1499,8 @@ export const englishMessages = {
   "calendar.form.repeat.none": "One-time",
   "calendar.form.repeat.weekly": "Weekly",
   "calendar.form.weekdays": "Repeats on",
-  "calendar.form.startsOn": "Starts",
-  "calendar.form.endsOn": "Ends",
+  "calendar.form.startsOn": "Starts on",
+  "calendar.form.endsOn": "Until",
   "calendar.form.audience": "Who's invited",
   "calendar.form.cancel": "Cancel",
   "calendar.form.submit": "Create event",
@@ -1507,6 +1526,18 @@ export const englishMessages = {
     "A series can last up to {max} days.",
   "calendar.form.issue.series_without_sessions":
     "Those days and dates don't give any session. Change the days or the range.",
+  "calendar.form.issue.end_time_required": "Add the time the event ends.",
+  "calendar.form.issue.end_before_start": "The end must be after the start.",
+  "calendar.form.issue.multi_day_series":
+    "A series session has to end on the day it starts.",
+  "calendar.form.issue.event_cover_empty":
+    "That image is empty. Choose another one.",
+  "calendar.form.issue.event_cover_too_large":
+    "The image can be up to {max} MB.",
+  "calendar.form.issue.event_cover_type_unsupported":
+    "Choose a JPEG, PNG or WebP image.",
+  "calendar.form.issue.event_cover_upload_invalid":
+    "That image is no longer available. Choose it again.",
   "calendar.form.error.network":
     "We couldn't reach the server. Check your connection and try again.",
   "calendar.form.error.signInRequired":
