@@ -8959,6 +8959,12 @@ a.auth-brand-header:focus-visible {
   color: var(--color-type-meeting);
 }
 
+/* El texto ocupa lo que sobra: el botón de un bloque queda al final. */
+.agenda-panel-block-text {
+  flex: 1;
+  min-width: 0;
+}
+
 .agenda-panel-block-text p {
   margin: 0;
 }

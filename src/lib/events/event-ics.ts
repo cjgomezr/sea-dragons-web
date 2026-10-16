@@ -26,8 +26,12 @@ const CRLF = "\r\n";
 /** RFC 5545 §3.1: ninguna línea pasa de 75 octetos sin contar el salto. */
 const MAX_LINE_OCTETS = 75;
 const FOLD_PREFIX = " ";
-const PRODUCT_ID = "-//Victoria Seadragons//Club Platform//EN";
-const UID_DOMAIN = "victoriaseadragons.club";
+/** Sin el nombre del club, que sale de la base (#292): el producto es la
+ * plataforma. */
+const PRODUCT_ID = "-//Club Platform//Event Calendar//EN";
+/** El UID sólo tiene que ser único y estable; `.invalid` (RFC 2606) dice que
+ * no es un dominio de verdad. */
+const UID_DOMAIN = "club-platform.invalid";
 
 /** Melbourne: AEST (+10) todo el año, y AEDT (+11) del primer domingo de
  * octubre al primer domingo de abril. */
