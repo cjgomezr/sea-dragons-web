@@ -1,7 +1,7 @@
 import { Clock } from "@phosphor-icons/react/dist/ssr/Clock";
 import { Repeat } from "@phosphor-icons/react/dist/ssr/Repeat";
 import type { Icon as PhosphorGlyph } from "@phosphor-icons/react/dist/lib/types";
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import type {
   AgendaEvent,
   NamedEventAudience,
@@ -31,6 +31,14 @@ import type { EventDetailState } from "./use-event-detail";
  * llega después. Mientras, la miniatura hace de imagen. El RSVP, los equipos
  * y las acciones los pone la fila, que es dueña de su estado.
  */
+
+/** Cómo entra y sale el foco del panel (#648, RNF de accesibilidad del PRD
+ * de E24): al elegir una fila con un gesto va al título; Escape o "Volver a
+ * la lista" lo devuelven a la fila. */
+export type PanelFocus = {
+  readonly shouldTakeFocus: boolean;
+  readonly onReturn: () => void;
+};
 
 /** Lo que la fila pone en su sitio del panel. */
 export type PanelSlots = {
@@ -200,6 +208,7 @@ export function EventDetailPanel({
   tally,
   onRetry,
   slots,
+  focus,
 }: {
   readonly id: string;
   readonly translate: Translator;
@@ -209,14 +218,34 @@ export function EventDetailPanel({
   readonly tally: EventTally;
   readonly onRetry: () => void;
   readonly slots: PanelSlots;
+  readonly focus: PanelFocus;
 }): React.JSX.Element {
   const titleId = useId();
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const opened = openedOf(detail);
+  const { shouldTakeFocus, onReturn } = focus;
+
+  useEffect(() => {
+    if (shouldTakeFocus) {
+      titleRef.current?.focus();
+    }
+  }, [shouldTakeFocus]);
+
+  // Escape dentro de un diálogo (editar) lo cierra a él, no al panel.
+  function returnOnEscape(keyDown: React.KeyboardEvent<HTMLElement>): void {
+    const target = keyDown.target;
+    const isInDialog = target instanceof Element && target.closest("dialog");
+    if (keyDown.key === "Escape" && !isInDialog) {
+      onReturn();
+    }
+  }
+
   return (
     <aside
       id={id}
       className={`agenda-panel agenda-panel-${event.eventType}`}
       aria-labelledby={titleId}
+      onKeyDown={returnOnEscape}
     >
       <div className="agenda-panel-cover">
         <EventCover
@@ -227,7 +256,12 @@ export function EventDetailPanel({
       </div>
       <div className="agenda-panel-body">
         <PanelTags translate={translate} event={event} opened={opened} />
-        <h2 id={titleId} className="agenda-panel-title">
+        <h2
+          ref={titleRef}
+          id={titleId}
+          className="agenda-panel-title"
+          tabIndex={-1}
+        >
           {event.title}
         </h2>
         <WhenBlocks translate={translate} event={event} opened={opened} />
@@ -241,6 +275,9 @@ export function EventDetailPanel({
         />
         {slots.teams}
         {slots.actions}
+        <button type="button" className="agenda-panel-back" onClick={onReturn}>
+          {translate("calendar.panel.backToList")}
+        </button>
       </div>
     </aside>
   );

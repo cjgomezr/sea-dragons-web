@@ -325,6 +325,9 @@ export type PanelTarget = {
   readonly slot: HTMLElement | null;
   /** El id del panel, al que apunta el botón de cada fila. */
   readonly id: string;
+  /** Si el panel se llevó el foco al elegirse: lo eligió un gesto, no la
+   * carga de la agenda. */
+  readonly shouldTakeFocus: boolean;
 };
 
 export function AgendaRow({
@@ -368,6 +371,8 @@ export function AgendaRow({
   const canHaveTeams =
     isMembershipCurrent && BUILDABLE_EVENT_TYPES.includes(event.eventType);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const { open: openTeam } = teams;
   const isCancelled = event.status === "cancelled";
   const canRespond = period === "upcoming" && event.inAudience && !isCancelled;
   const canManage = organizer !== null && period === "upcoming" && !isCancelled;
@@ -380,9 +385,9 @@ export function AgendaRow({
     }
     open();
     if (canHaveTeams) {
-      teams.open();
+      openTeam();
     }
-  }, [isSelected, canHaveTeams, open, teams]);
+  }, [isSelected, canHaveTeams, open, openTeam]);
 
   useEffect(() => {
     if (shouldTakeFocus) {
@@ -433,6 +438,7 @@ export function AgendaRow({
       <div className="agenda-body">
         <h3 ref={titleRef} className="agenda-title" tabIndex={-1}>
           <button
+            ref={toggleRef}
             type="button"
             className="agenda-toggle"
             aria-controls={panel.id}
@@ -480,6 +486,10 @@ export function AgendaRow({
               tally={tally}
               onRetry={retry}
               slots={slots}
+              focus={{
+                shouldTakeFocus: panel.shouldTakeFocus,
+                onReturn: () => toggleRef.current?.focus(),
+              }}
             />,
             panel.slot,
           )

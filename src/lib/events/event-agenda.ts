@@ -438,8 +438,7 @@ async function signDetailCover(
     : signEventCover(gateways.eventCovers, cover);
 }
 
-/** Un evento abierto: lo de la agenda más las notas y quién va. Quien no lo
- * puede ver recibe lo mismo que con uno que no existe. */
+/** La repetición de una sesión de una serie (#648); nula en uno suelto. */
 function summarizeSeriesOf(
   gateways: EventAgendaGateways,
   row: EventRow,
@@ -453,6 +452,8 @@ function summarizeSeriesOf(
       });
 }
 
+/** Un evento abierto: lo de la agenda más las notas y quién va. Quien no lo
+ * puede ver recibe lo mismo que con uno que no existe. */
 export async function openEvent(
   gateways: EventAgendaGateways,
   request: {

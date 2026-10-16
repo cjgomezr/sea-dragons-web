@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   type AgendaFailure,
   type OpenedEvent,
@@ -34,7 +34,7 @@ export function useEventDetail(eventId: string): {
   // antes y vuelve después trae nombres más viejos y no se pinta.
   const versionRef = useRef(0);
 
-  async function load(): Promise<void> {
+  const load = useCallback(async (): Promise<void> => {
     if (isLoadingRef.current) {
       return;
     }
@@ -51,15 +51,19 @@ export function useEventDetail(eventId: string): {
         ? { kind: "loaded", opened: outcome.opened }
         : { kind: "failed", failure: outcome },
     );
-  }
+  }, [eventId]);
+
+  // Estable mientras no cambie el estado: el efecto que la llama al elegir
+  // la fila no se repite en cada pintado.
+  const open = useCallback(() => {
+    if (detail.kind === "idle") {
+      void load();
+    }
+  }, [detail.kind, load]);
 
   return {
     detail,
-    open: () => {
-      if (detail.kind === "idle") {
-        void load();
-      }
-    },
+    open,
     retry: () => void load(),
     receive: (opened) => {
       versionRef.current += 1;

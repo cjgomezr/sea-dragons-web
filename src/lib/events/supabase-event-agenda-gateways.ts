@@ -259,7 +259,8 @@ async function listResponders(
 }
 
 /** Dos peticiones: la serie y, sin traer filas, cuántas de sus sesiones
- * siguen en pie de hoy en adelante. */
+ * siguen en pie de hoy en adelante. La de hoy cuenta aunque ya haya
+ * terminado, igual que sigue en los próximos de la agenda. */
 async function summarizeSeries(
   serviceClient: SupabaseClient,
   query: { readonly seriesId: string; readonly today: string },

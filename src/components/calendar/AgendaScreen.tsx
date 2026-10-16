@@ -110,6 +110,12 @@ const TITLE_ID = "calendario-titulo";
  * pueda leer. El mismo corte que `.agenda-columns` en la hoja de estilos. */
 const STACKED_PANEL_QUERY = "(width < 1024px)";
 
+/** El evento elegido y si lo eligió quien mira (#648). */
+type EventChoice = {
+  readonly eventId: string | null;
+  readonly isByGesture: boolean;
+};
+
 /** Qué fila enseña el panel y dónde lo pinta (#648). */
 type AgendaSelection = {
   readonly selectedEventId: string | null;
@@ -504,10 +510,12 @@ function AgendaView({
   const [state, setState] = useState<AgendaState>({ kind: "loading" });
   const [reloads, setReloads] = useState(0);
   // El evento al que se llega (de la búsqueda o tras editarlo) es el elegido;
-  // si no está en la agenda, el primero.
-  const [chosenEventId, setChosenEventId] = useState<string | null>(
-    focusOnLoad,
-  );
+  // si no está en la agenda, el primero. Sólo el que elige un gesto se lleva
+  // el foco al panel.
+  const [choice, setChoice] = useState<EventChoice>({
+    eventId: focusOnLoad,
+    isByGesture: false,
+  });
   const [panelSlot, setPanelSlot] = useState<HTMLElement | null>(null);
   const panelId = useId();
 
@@ -565,7 +573,7 @@ function AgendaView({
   }
 
   function selectEvent(eventId: string): void {
-    setChosenEventId(eventId);
+    setChoice({ eventId, isByGesture: true });
     revealStackedPanel(panelSlot);
   }
 
@@ -595,9 +603,13 @@ function AgendaView({
               events={state.events}
               focusEventId={state.focusEventId}
               selection={{
-                selectedEventId: selectedEventOf(state.events, chosenEventId),
+                selectedEventId: selectedEventOf(state.events, choice.eventId),
                 onSelect: selectEvent,
-                panel: { slot: panelSlot, id: panelId },
+                panel: {
+                  slot: panelSlot,
+                  id: panelId,
+                  shouldTakeFocus: choice.isByGesture,
+                },
               }}
               organizer={organizer}
               canTakeAttendance={canTakeAttendance}

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ApiRequestFailure } from "@/lib/api/request-api";
 import type { MyTeam } from "@/lib/teams/my-team";
 import { openEventTeam } from "./event-team-client";
@@ -26,7 +26,7 @@ export function useEventTeam(eventId: string): {
   // mientras el primero sigue pidiendo.
   const isLoadingRef = useRef(false);
 
-  async function load(): Promise<void> {
+  const load = useCallback(async (): Promise<void> => {
     if (isLoadingRef.current) {
       return;
     }
@@ -39,15 +39,19 @@ export function useEventTeam(eventId: string): {
         ? { kind: "loaded", team: outcome.team }
         : { kind: "failed", failure: outcome },
     );
-  }
+  }, [eventId]);
+
+  // Estable mientras no cambie el estado: el efecto que la llama al elegir
+  // la fila no se repite en cada pintado.
+  const open = useCallback(() => {
+    if (team.kind === "idle") {
+      void load();
+    }
+  }, [team.kind, load]);
 
   return {
     team,
-    open: () => {
-      if (team.kind === "idle") {
-        void load();
-      }
-    },
+    open,
     retry: () => void load(),
   };
 }

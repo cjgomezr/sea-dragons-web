@@ -17405,6 +17405,20 @@ test.describe("editar y cancelar en el navegador", () => {
     ).toBeFocused();
   });
 
+  test("a 1440x700 Cancelar se alcanza dentro del panel aunque no quepa", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 700 });
+    await goToCalendar(page, ACTIONS);
+    const cancel = firstEventPanel(page).getByRole("button", {
+      name: ORGANIZER_CANCEL,
+    });
+
+    await cancel.scrollIntoViewIfNeeded();
+
+    await expect(cancel).toBeInViewport();
+  });
+
   test("Escape cierra el diálogo de editar y devuelve el foco a Editar", async ({
     page,
   }) => {

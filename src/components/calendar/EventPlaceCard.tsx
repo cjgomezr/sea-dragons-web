@@ -20,8 +20,9 @@ import type { Translator } from "@/lib/i18n/translator";
 
 type CopyStatus = "idle" | "copied" | "failed";
 
-/** Lo que dura el check antes de volver al icono de copiar. */
-const COPIED_FEEDBACK_MS = 2500;
+/** Lo que dura el check, o el aviso de que no se pudo, antes de volver al
+ * icono de copiar: otro intento vuelve a anunciarse. */
+const COPY_FEEDBACK_MS = 2500;
 
 const COPY_ANNOUNCEMENTS = {
   idle: null,
@@ -73,12 +74,12 @@ export function EventPlaceCard({
   const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
 
   useEffect(() => {
-    if (copyStatus !== "copied") {
+    if (copyStatus === "idle") {
       return;
     }
     const timer = window.setTimeout(
       () => setCopyStatus("idle"),
-      COPIED_FEEDBACK_MS,
+      COPY_FEEDBACK_MS,
     );
     return () => window.clearTimeout(timer);
   }, [copyStatus]);

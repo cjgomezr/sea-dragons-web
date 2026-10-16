@@ -884,3 +884,65 @@ describe("sin acordeón", () => {
     ).toEqual([]);
   });
 });
+
+describe("foco entre la lista y el panel", () => {
+  it("al cargar no mueve el foco al panel", async () => {
+    stubApi([TRIVIA_NIGHT, OPEN_TRAINING]);
+    renderAgenda();
+
+    const panel = await findLoadedPanel(TRIVIA_NIGHT.title);
+
+    expect(within(panel).getByRole("heading", { level: 2 })).not.toHaveFocus();
+  });
+
+  it("al elegir una fila con el teclado lleva el foco al título del panel", async () => {
+    stubApi([TRIVIA_NIGHT, OPEN_TRAINING]);
+    renderAgenda();
+    await findPanel(TRIVIA_NIGHT.title);
+
+    rowButton(OPEN_TRAINING.title).focus();
+    await userEvent.keyboard("{Enter}");
+
+    const panel = await findPanel(OPEN_TRAINING.title);
+    await waitFor(() =>
+      expect(
+        within(panel).getByRole("heading", {
+          level: 2,
+          name: OPEN_TRAINING.title,
+        }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it("Escape en el panel devuelve el foco a la fila elegida", async () => {
+    stubApi([TRIVIA_NIGHT, OPEN_TRAINING]);
+    renderAgenda();
+    await findPanel(TRIVIA_NIGHT.title);
+    await userEvent.click(rowButton(OPEN_TRAINING.title));
+    const panel = await findPanel(OPEN_TRAINING.title);
+    await waitFor(() =>
+      expect(within(panel).getByRole("heading", { level: 2 })).toHaveFocus(),
+    );
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(rowButton(OPEN_TRAINING.title)).toHaveFocus();
+  });
+
+  it("Volver a la lista devuelve el foco a la fila elegida", async () => {
+    stubApi([TRIVIA_NIGHT, OPEN_TRAINING]);
+    renderAgenda({ locale: "es" });
+    const panel = await findPanel(TRIVIA_NIGHT.title);
+
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Volver a la lista" }),
+    );
+
+    expect(
+      within(screen.getByRole("list", { name: "Próximos eventos" })).getByRole(
+        "button",
+        { name: TRIVIA_NIGHT.title },
+      ),
+    ).toHaveFocus();
+  });
+});
