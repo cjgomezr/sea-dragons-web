@@ -660,15 +660,22 @@ describe("barra pegada al fondo de la ventana visible", () => {
   it("deja de escuchar la ventana visible al desmontarse", () => {
     stubPhoneScreen(true);
     const visualViewport = stubVisualViewport();
+    const addListener = vi.spyOn(visualViewport, "addEventListener");
     const removeListener = vi.spyOn(visualViewport, "removeEventListener");
     const { unmount } = renderPhoneBar();
 
     unmount();
 
-    expect(removeListener.mock.calls.map(([type]) => type).sort()).toEqual([
-      "resize",
-      "scroll",
+    const added = addListener.mock.calls.map(([type, listener]) => [
+      type,
+      listener,
     ]);
+    const removed = removeListener.mock.calls.map(([type, listener]) => [
+      type,
+      listener,
+    ]);
+    expect(added.map(([type]) => type).sort()).toEqual(["resize", "scroll"]);
+    expect(removed).toEqual(added);
   });
 
   it("no escucha la ventana visible a 768 px o más", () => {
